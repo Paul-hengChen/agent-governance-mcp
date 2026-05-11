@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 // Coded by @sr-engineer
 // SDD MCP Server v2.0 — 3-Layer Defense Architecture
 // Layer 1: MCP Prompts (auto-inject constitution + skill + state)

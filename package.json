@@ -4,12 +4,20 @@
   "description": "SDD (Spec-Driven Development) MCP Server — enforces constitution, tracks state, manages tasks",
   "type": "module",
   "main": "dist/index.js",
+  "bin": {
+    "teamwork-mcp-server": "./dist/index.js"
+  },
   "scripts": {
     "build": "tsc",
-    "start": "node dist/index.js",
-    "dev": "tsx index.ts"
+    "prepare": "npm run build",
+    "start": "node dist/index.js"
   },
-  "keywords": ["mcp", "sdd", "speckit", "ai-agent"],
+  "keywords": [
+    "mcp",
+    "sdd",
+    "speckit",
+    "ai-agent"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
