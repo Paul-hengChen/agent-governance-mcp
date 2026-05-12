@@ -13,12 +13,46 @@ import {
   ListPromptsRequestSchema,
   GetPromptRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
+import { z } from "zod";
 
 import { readHandoffState, writeHandoffState } from "./tools/handoff.js";
 import { getNextTask, completeTask, rollbackTask } from "./tools/tasks.js";
 import { detectDrift } from "./tools/drift.js";
 import { enforcePreFlight } from "./guards/session.js";
 import { buildSrEngineerPrompt } from "./prompts/sr-engineer.js";
+
+// ==========================================
+// Runtime validation schemas (zod)
+// ==========================================
+const WorkspaceOnly = z.object({
+  workspace_path: z.string().min(1, "workspace_path must be a non-empty string"),
+});
+
+const UpdateStateArgs = z.object({
+  workspace_path: z.string().min(1),
+  active_feature: z.string().min(1),
+  status: z.enum(["In_Progress", "PASS", "FAIL", "Blocked"]),
+  completed_tasks: z.array(z.string()).optional().default([]),
+  pending_notes: z.array(z.string()).optional().default([]),
+});
+
+const CompleteTaskArgs = z.object({
+  workspace_path: z.string().min(1),
+  task_id: z.string().min(1),
+  note: z.string().optional(),
+});
+
+const RollbackTaskArgs = z.object({
+  workspace_path: z.string().min(1),
+  task_id: z.string().min(1),
+  reason: z.string().min(1),
+});
+
+function formatZodError(err: z.ZodError): string {
+  return err.issues
+    .map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`)
+    .join("; ");
+}
 
 // ==========================================
 // 1. Initialize Server (Tools + Prompts)
@@ -213,65 +247,54 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
 
-  if (!args || typeof args.workspace_path !== "string") {
-    return {
-      content: [{ type: "text" as const, text: "❌ Missing required parameter: workspace_path" }],
-      isError: true,
-    };
-  }
-
-  const wp = args.workspace_path as string;
-
   try {
     switch (name) {
       // --- No guard: reading state IS the pre-flight check ---
       case "sdd_get_state": {
-        const result = readHandoffState(wp);
+        const { workspace_path } = WorkspaceOnly.parse(args);
+        const result = readHandoffState(workspace_path);
         return { content: [{ type: "text" as const, text: result }] };
       }
 
       // --- No guard: drift detection is read-only ---
       case "sdd_detect_drift": {
-        const result = detectDrift(wp);
+        const { workspace_path } = WorkspaceOnly.parse(args);
+        const result = detectDrift(workspace_path);
         return { content: [{ type: "text" as const, text: result }] };
       }
 
       // --- No guard: getting next task is read-only ---
       case "sdd_get_next_task": {
-        const result = getNextTask(wp);
+        const { workspace_path } = WorkspaceOnly.parse(args);
+        const result = getNextTask(workspace_path);
         return { content: [{ type: "text" as const, text: result }] };
       }
 
       // --- GUARDED: must call sdd_get_state first ---
       case "sdd_update_state": {
-        enforcePreFlight(wp, "sdd_update_state");
+        const parsed = UpdateStateArgs.parse(args);
+        enforcePreFlight(parsed.workspace_path, "sdd_update_state");
         const result = writeHandoffState(
-          wp,
-          args.active_feature as string,
-          args.status as string,
-          (args.completed_tasks as string[]) || [],
-          (args.pending_notes as string[]) || []
+          parsed.workspace_path,
+          parsed.active_feature,
+          parsed.status,
+          parsed.completed_tasks,
+          parsed.pending_notes
         );
         return { content: [{ type: "text" as const, text: result }] };
       }
 
       case "sdd_complete_task": {
-        enforcePreFlight(wp, "sdd_complete_task");
-        const result = completeTask(
-          wp,
-          args.task_id as string,
-          args.note as string | undefined
-        );
+        const parsed = CompleteTaskArgs.parse(args);
+        enforcePreFlight(parsed.workspace_path, "sdd_complete_task");
+        const result = completeTask(parsed.workspace_path, parsed.task_id, parsed.note);
         return { content: [{ type: "text" as const, text: result }] };
       }
 
       case "sdd_rollback_task": {
-        enforcePreFlight(wp, "sdd_rollback_task");
-        const result = rollbackTask(
-          wp,
-          args.task_id as string,
-          args.reason as string
-        );
+        const parsed = RollbackTaskArgs.parse(args);
+        enforcePreFlight(parsed.workspace_path, "sdd_rollback_task");
+        const result = rollbackTask(parsed.workspace_path, parsed.task_id, parsed.reason);
         return { content: [{ type: "text" as const, text: result }] };
       }
 
@@ -282,6 +305,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
     }
   } catch (error: unknown) {
+    if (error instanceof z.ZodError) {
+      return {
+        content: [
+          { type: "text" as const, text: `❌ Invalid arguments for ${name}: ${formatZodError(error)}` },
+        ],
+        isError: true,
+      };
+    }
     const message = error instanceof Error ? error.message : String(error);
     return {
       content: [{ type: "text" as const, text: message }],
@@ -294,6 +325,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 // 5. Start Server
 // ==========================================
 const transport = new StdioServerTransport();
-server.connect(transport).then(() => {
-  console.error("🛡️ SDD MCP Server v2.0 is online. (Tools + Prompts + Guards)");
-});
+server
+  .connect(transport)
+  .then(() => {
+    console.error("🛡️ SDD MCP Server v2.0 is online. (Tools + Prompts + Guards)");
+  })
+  .catch((err: unknown) => {
+    const message = err instanceof Error ? err.stack ?? err.message : String(err);
+    console.error("❌ SDD MCP Server failed to start:", message);
+    process.exit(1);
+  });

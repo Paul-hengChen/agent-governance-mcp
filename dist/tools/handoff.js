@@ -2,6 +2,7 @@
 // Tools: handoff state read/write with format enforcement
 import * as fs from "fs";
 import * as path from "path";
+import * as yaml from "js-yaml";
 import { markStateRead } from "../guards/session.js";
 function getHandoffPath(workspacePath) {
     return path.join(workspacePath, ".current", "handoff.md");
@@ -21,24 +22,29 @@ export function parseHandoff(workspacePath) {
     if (!fs.existsSync(handoffPath))
         return null;
     const content = fs.readFileSync(handoffPath, "utf-8");
-    // Parse YAML frontmatter
-    const yamlMatch = content.match(/^---\n([\s\S]*?)\n---/);
-    const yaml = {};
+    // Parse YAML frontmatter with js-yaml (handles quotes, colons in values, etc.)
+    const frontmatter = {};
+    const yamlMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
     if (yamlMatch) {
-        yamlMatch[1].split("\n").forEach((line) => {
-            const [key, ...rest] = line.split(":");
-            if (key && rest.length) {
-                yaml[key.trim()] = rest.join(":").trim().replace(/^"|"$/g, "");
+        try {
+            const parsed = yaml.load(yamlMatch[1]);
+            if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+                Object.assign(frontmatter, parsed);
             }
-        });
+        }
+        catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            throw new Error(`Failed to parse handoff.md frontmatter: ${message}`);
+        }
     }
+    const asString = (v) => (typeof v === "string" ? v : v == null ? "" : String(v));
     // Parse checkboxes
     const completed = [...content.matchAll(/- \[x\] (.+)/g)].map((m) => m[1]);
     const pending = [...content.matchAll(/- \[ \] (.+)/g)].map((m) => m[1]);
     return {
-        active_feature: yaml.active_feature || "",
-        status: yaml.status || "",
-        last_updated: yaml.last_updated || "",
+        active_feature: asString(frontmatter.active_feature),
+        status: asString(frontmatter.status),
+        last_updated: asString(frontmatter.last_updated),
         completed,
         pending,
     };
@@ -71,10 +77,12 @@ export function writeHandoffState(workspacePath, activeFeature, status, complete
     const pendingList = pendingNotes.length
         ? pendingNotes.map((t) => `- [ ] ${t}`).join("\n")
         : "- 無";
+    // Serialize frontmatter via js-yaml so quotes/colons/newlines in values are escaped safely.
+    const frontmatter = yaml
+        .dump({ active_feature: activeFeature, status, last_updated: now }, { lineWidth: -1, forceQuotes: true, quotingType: '"' })
+        .trimEnd();
     const content = `---
-active_feature: "${activeFeature}"
-status: "${status}"
-last_updated: "${now}"
+${frontmatter}
 ---
 # 📍 任務交接狀態 (Handoff State)
 
