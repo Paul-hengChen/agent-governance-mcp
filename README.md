@@ -16,7 +16,6 @@
 - [安裝與啟動](#安裝與啟動)
 - [日常使用流程](#日常使用流程)
 - [安全機制 (Safety)](#安全機制-safety)
-- [設計決策與技術挑戰](#設計決策與技術挑戰)
 - [常見問題 (FAQ)](#常見問題-faq)
 - [未來規劃](#未來規劃)
 - [專案結構](#專案結構)
@@ -381,56 +380,6 @@ sdd_get_state → sdd_update_state → sdd_complete_task ...
 
 ---
 
-## 設計決策與技術挑戰
-
-> 這個段落是為了未來面試 / 技術分享準備的，記錄了實作過程中遇到的非顯而易見的問題跟做的決策。
-
-### 挑戰 1：MCP 是 offer，不是 enforcement
-**問題**：MCP 的 tools 是「可選工具」，不是「強制 API」。AI 不呼叫 tool 而直接動檔案，server 抓不到。
-
-**決策**：放棄追求「100% 強制」，改採三層深度防禦 — prompt 注入規則（軟）、tools 提供 happy path（中）、guards 對「乖乖用 tools 的 agent」做硬檢查。不用 tools 的 agent 雖然抓不到，但 `sdd_detect_drift` 會在下次 session 把不一致挖出來。
-
-**取捨**：放棄完美 → 換來架構簡單 + 對主流 client 有效。
-
-### 挑戰 2：跨 process 寫入衝突
-**問題**：使用者開兩個 IDE，兩個 session 並行 → in-memory session map 不跨 process，兩邊各自寫 → lost update。
-
-**決策**：兩段防線：
-1. **File lock**（`O_EXCL` lockfile）強制序列化寫入，杜絕 torn write
-2. **Optimistic concurrency**（mtime snapshot + verify）抓 lost update
-
-**為什麼這樣設計**：
-- 純鎖（pessimistic）：要鎖很久（從 read 到 write），多個 agent 互相 starve
-- 純樂觀（optimistic）：對 torn write 沒幫助
-- 兩者組合：lock 只在 write 的短窗，optimistic 抓跨 session 的 stale snapshot
-
-**驗證**：4 個 child process 並行寫入 → 全部成功、序列化執行、lockfile 自動清乾淨；外部偷改 mtime → 後續寫入被 `STATE DRIFT` 擋下。
-
-### 挑戰 3：手刻 YAML parser 撐不住
-**問題**：原本 frontmatter parser 用 `line.split(":")`，值含冒號（"Ticket #42: rollback"）/ 引號 / 多行字串都會壞。
-
-**決策**：換 `js-yaml`，讀寫一致用 `load()` / `dump({ forceQuotes: true })`，把序列化完全交給 spec-compliant 套件。
-
-**教訓**：不要手刻已有 spec 的格式 parser。看起來簡單，邊界 case 一輩子修不完。
-
-### 挑戰 4：unhandled promise rejection 讓 server 假裝活著
-**問題**：`server.connect(transport).then(...)` 沒接 `.catch()`，連線失敗只丟 warning，process 看起來活著但其實沒在工作。
-
-**決策**：所有 top-level promise 都接 `.catch(err => { console.error(...); process.exit(1) })`。Fail loud 永遠比 fail silent 好除錯。
-
-### 挑戰 5：runtime 型別驗證 vs TypeScript 假象
-**問題**：TypeScript 的 `as string` 只是騙編譯器，runtime 來什麼都不知道。AI 傳 `null` / `number`，後面 `fs.readFile(null)` 直接炸 stack trace。
-
-**決策**：每個 tool 都用 zod schema 在 dispatch handler 入口驗證。ZodError 統一格式化成 MCP 錯誤 response。
-
-**附帶好處**：tool 的 inputSchema 跟 zod schema 兩邊都有，理論上可以從一個生另一個（未來工程改善方向）。
-
-### 挑戰 6：SessionStart hook 設計成 user-level 但不汙染無關專案
-**問題**：使用者希望在 Claude Code 開每個新 session 時自動載入規則。但 hook 設成 user-level 會在所有專案觸發，無關專案會看到突兀的 sr-engineer block。
-
-**決策**：把判斷邏輯放進 hook script 自己。Script 偵測 workspace 有沒有 `.current/` / `tasks.md` / `TODO.md`，沒有就 silent exit 0。Hook 設 user-level 沒問題、無關專案不受影響。
-
----
 
 ## 常見問題 (FAQ)
 
