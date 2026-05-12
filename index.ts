@@ -274,7 +274,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "sdd_update_state": {
         const parsed = UpdateStateArgs.parse(args);
         enforcePreFlight(parsed.workspace_path, "sdd_update_state");
-        const result = writeHandoffState(
+        const result = await writeHandoffState(
           parsed.workspace_path,
           parsed.active_feature,
           parsed.status,
@@ -287,14 +287,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "sdd_complete_task": {
         const parsed = CompleteTaskArgs.parse(args);
         enforcePreFlight(parsed.workspace_path, "sdd_complete_task");
-        const result = completeTask(parsed.workspace_path, parsed.task_id, parsed.note);
+        const result = await completeTask(parsed.workspace_path, parsed.task_id, parsed.note);
         return { content: [{ type: "text" as const, text: result }] };
       }
 
       case "sdd_rollback_task": {
         const parsed = RollbackTaskArgs.parse(args);
         enforcePreFlight(parsed.workspace_path, "sdd_rollback_task");
-        const result = rollbackTask(parsed.workspace_path, parsed.task_id, parsed.reason);
+        const result = await rollbackTask(parsed.workspace_path, parsed.task_id, parsed.reason);
         return { content: [{ type: "text" as const, text: result }] };
       }
 

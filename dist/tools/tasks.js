@@ -2,6 +2,8 @@
 // Tools: tasks.md manipulation — complete, rollback, get-next
 import * as fs from "fs";
 import * as path from "path";
+import { verifyFreshness, refreshSnapshotFor } from "../guards/session.js";
+import { withFileLock } from "../guards/file-lock.js";
 function findTasksFile(workspacePath) {
     // Search common locations for tasks.md
     const candidates = [
@@ -73,48 +75,72 @@ export function getNextTask(workspacePath) {
         },
     });
 }
+function atomicWrite(filePath, content) {
+    const tmpPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+    fs.writeFileSync(tmpPath, content, "utf-8");
+    fs.renameSync(tmpPath, filePath);
+}
 /**
  * Mark a task as completed in tasks.md.
  */
-export function completeTask(workspacePath, taskId, note) {
-    const result = parseTasks(workspacePath);
-    if (!result) {
+export async function completeTask(workspacePath, taskId, note) {
+    // Resolve target file once (outside the lock so we can early-return cleanly).
+    const probe = parseTasks(workspacePath);
+    if (!probe) {
         return JSON.stringify({ error: "No tasks.md found." });
     }
-    const task = result.tasks.find((t) => t.id === taskId);
-    if (!task) {
-        return JSON.stringify({ error: `Task ${taskId} not found.` });
-    }
-    if (task.completed) {
-        return JSON.stringify({ error: `Task ${taskId} is already completed.` });
-    }
-    let content = fs.readFileSync(result.filePath, "utf-8");
-    const suffix = note ? ` (${note})` : "";
-    // Replace the exact checkbox line
-    const oldPattern = new RegExp(`- \\[ \\] ${taskId}(\\s.+)$`, "m");
-    content = content.replace(oldPattern, `- [x] ${taskId}$1${suffix}`);
-    fs.writeFileSync(result.filePath, content, "utf-8");
-    return JSON.stringify({ success: true, taskId, marked: "completed", note: note || null });
+    const lockPath = `${probe.filePath}.lock`;
+    return withFileLock(lockPath, () => {
+        verifyFreshness(workspacePath, probe.filePath, "tasks");
+        // Re-parse inside the lock to act on authoritative content.
+        const result = parseTasks(workspacePath);
+        if (!result) {
+            return JSON.stringify({ error: "No tasks.md found." });
+        }
+        const task = result.tasks.find((t) => t.id === taskId);
+        if (!task) {
+            return JSON.stringify({ error: `Task ${taskId} not found.` });
+        }
+        if (task.completed) {
+            return JSON.stringify({ error: `Task ${taskId} is already completed.` });
+        }
+        let content = fs.readFileSync(result.filePath, "utf-8");
+        const suffix = note ? ` (${note})` : "";
+        const oldPattern = new RegExp(`- \\[ \\] ${taskId}(\\s.+)$`, "m");
+        content = content.replace(oldPattern, `- [x] ${taskId}$1${suffix}`);
+        atomicWrite(result.filePath, content);
+        refreshSnapshotFor(workspacePath, result.filePath, "tasks");
+        return JSON.stringify({ success: true, taskId, marked: "completed", note: note || null });
+    });
 }
 /**
  * Rollback a task: mark [x] → [ ] with reason.
  */
-export function rollbackTask(workspacePath, taskId, reason) {
-    const result = parseTasks(workspacePath);
-    if (!result) {
+export async function rollbackTask(workspacePath, taskId, reason) {
+    const probe = parseTasks(workspacePath);
+    if (!probe) {
         return JSON.stringify({ error: "No tasks.md found." });
     }
-    const task = result.tasks.find((t) => t.id === taskId);
-    if (!task) {
-        return JSON.stringify({ error: `Task ${taskId} not found.` });
-    }
-    if (!task.completed) {
-        return JSON.stringify({ error: `Task ${taskId} is not completed, cannot rollback.` });
-    }
-    let content = fs.readFileSync(result.filePath, "utf-8");
-    const oldPattern = new RegExp(`- \\[x\\] ${taskId}(\\s.+?)(?:\\s*\\(.*\\))?$`, "m");
-    content = content.replace(oldPattern, `- [ ] ${taskId}$1 (reverted: ${reason})`);
-    fs.writeFileSync(result.filePath, content, "utf-8");
-    return JSON.stringify({ success: true, taskId, marked: "reverted", reason });
+    const lockPath = `${probe.filePath}.lock`;
+    return withFileLock(lockPath, () => {
+        verifyFreshness(workspacePath, probe.filePath, "tasks");
+        const result = parseTasks(workspacePath);
+        if (!result) {
+            return JSON.stringify({ error: "No tasks.md found." });
+        }
+        const task = result.tasks.find((t) => t.id === taskId);
+        if (!task) {
+            return JSON.stringify({ error: `Task ${taskId} not found.` });
+        }
+        if (!task.completed) {
+            return JSON.stringify({ error: `Task ${taskId} is not completed, cannot rollback.` });
+        }
+        let content = fs.readFileSync(result.filePath, "utf-8");
+        const oldPattern = new RegExp(`- \\[x\\] ${taskId}(\\s.+?)(?:\\s*\\(.*\\))?$`, "m");
+        content = content.replace(oldPattern, `- [ ] ${taskId}$1 (reverted: ${reason})`);
+        atomicWrite(result.filePath, content);
+        refreshSnapshotFor(workspacePath, result.filePath, "tasks");
+        return JSON.stringify({ success: true, taskId, marked: "reverted", reason });
+    });
 }
 //# sourceMappingURL=tasks.js.map

@@ -18,6 +18,6 @@ export declare function readHandoffState(workspacePath: string): string;
  * Write handoff state with enforced formatting.
  * Guarantees valid YAML frontmatter + Markdown checkbox structure.
  */
-export declare function writeHandoffState(workspacePath: string, activeFeature: string, status: string, completedTasks: string[], pendingNotes: string[]): string;
+export declare function writeHandoffState(workspacePath: string, activeFeature: string, status: string, completedTasks: string[], pendingNotes: string[]): Promise<string>;
 export {};
 //# sourceMappingURL=handoff.d.ts.map
