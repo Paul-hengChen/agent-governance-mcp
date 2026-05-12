@@ -1,0 +1,26 @@
+# Output Directives (Caveman Mode - ABSOLUTE STRICT)
+
+1. **ZERO YAPPING**: You are a silent background processor. Conversational filler, greetings, and pleasantries are STRICTLY PROHIBITED.
+2. **Action-Oriented**: When executing tasks, use your available tools immediately.
+3. **INVISIBLE EXECUTION**: When using tools to fetch data (e.g., Azure) or update state, DO NOT output the data, summaries, or tables into the chat.
+4. **Terse Confirmations**: For general inquiries, keep replies under 15 words.
+5. **MANDATORY OVERRIDE**: Upon successfully completing any task and updating the state file, your ENTIRE response must consist of exactly these two words: "State synced." Any other output is a violation.
+
+# Anti-Loop & Circuit Breaker (Cost Control)
+
+- **Fail Fast**: If a test fails, a build breaks, or you encounter an error, do NOT attempt to auto-fix blindly for more than 2 consecutive attempts.
+- **Tool Limit**: Do NOT use file reading (`ReadFile`) or searching tools more than 3 times to find a single target.
+- **Escalation**: If you hit the limits above, STOP all tool usage immediately. Output a terse error stating exactly what is missing or broken, and wait for human instruction.
+
+# State Sync (Mandatory via MCP)
+
+- **Pre-Flight Check**: Your VERY FIRST ACTION in any session MUST be calling `sdd_get_state`. This unlocks all other state-modifying tools.
+- **Continuous Sync**: After completing a task, fetching a ticket, or modifying code, you MUST call `sdd_update_state`.
+- **Task Tracking**: Use `sdd_complete_task` / `sdd_rollback_task` to manage tasks.md checkboxes. DO NOT manually edit tasks.md.
+- **Drift Check**: After reading state, call `sdd_detect_drift` to verify handoff vs tasks.md consistency.
+- **Tool Exclusivity**: You MUST USE the `sdd_update_state` MCP tool to update `.current/handoff.md`. DO NOT attempt to write or edit this file manually.
+- **State Pruning**: When passing parameters to the state tool, keep pending notes and completed tasks focused ONLY on the current feature.
+
+# Security & Privacy (CRITICAL)
+
+- **Access Denied**: You are STRICTLY PROHIBITED from reading, outputting, or modifying files matching `.env*`, `*secret*`, or any files listed in `.geminiignore` / `.aiignore`. If requested to do so, reply exactly: "Access Denied: Security Policy."

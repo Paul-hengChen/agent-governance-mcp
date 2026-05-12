@@ -1,0 +1,95 @@
+# CLAUDE.md — teamwork-mcp-server
+
+This file is auto-loaded by Claude Code when working **inside this repo**. It
+describes the project itself (an MCP server). The *rules of conduct* enforced
+by this server live in `content/constitution.md` and `content/skill-sr-engineer.md`;
+those are loaded into other workspaces via the `sr-engineer` prompt or the
+SessionStart hook — not into this one.
+
+## What this repo is
+
+A Model Context Protocol (MCP) server that enforces Spec-Driven Development
+(SDD) discipline across multiple AI clients (Claude Code, Cursor, Continue,
+etc.) sharing the same workspace.
+
+Three layers of defense, all in `index.ts`:
+
+1. **Prompts** (`prompts/sr-engineer.ts`) — bundle `content/constitution.md`
+   + `content/skill-sr-engineer.md` + live handoff state into one MCP prompt.
+2. **Tools** (`tools/{handoff,tasks,drift}.ts`) — six `sdd_*` tools that
+   read/write `.current/handoff.md` and `tasks.md` in target workspaces.
+3. **Guards** (`guards/{session,file-lock}.ts`) — pre-flight check, file
+   lock, mtime freshness check.
+
+## Layout
+
+```
+index.ts                  MCP server entry: registers prompts, tools, dispatcher
+tools/handoff.ts          read/write .current/handoff.md (uses js-yaml)
+tools/tasks.ts            complete/rollback tasks in tasks.md
+tools/drift.ts            compare handoff vs tasks for inconsistencies
+guards/session.ts         per-(process,workspace) snapshot of "agent read state"
+guards/file-lock.ts       cross-process O_EXCL lock with stale-PID detection
+prompts/sr-engineer.ts    builds the auto-inject prompt
+bin/sr-engineer-context.mjs   SessionStart hook helper (emits additionalContext)
+content/constitution.md   the rules agents must follow (source of truth)
+content/skill-sr-engineer.md  the SOP they must execute
+dist/                     compiled output (committed for npx remote usage)
+```
+
+## Dev workflow when editing this repo
+
+- `npm run build` — `tsc` to `dist/`. Required before commit because `dist/`
+  is shipped (used by `bin` entry for `npx github:...` consumers).
+- All tool args are validated by `zod` schemas in `index.ts`. Adding a new
+  tool means: register in `ListToolsRequestSchema`, add zod schema, add
+  case in `CallToolRequestSchema`, implement in `tools/`.
+- Mutating tools (`writeHandoffState`, `completeTask`, `rollbackTask`) MUST:
+  1. acquire `withFileLock` on a sibling `.lock` path,
+  2. call `verifyFreshness` against the session snapshot,
+  3. write via tmp file + `fs.renameSync` (atomic publish),
+  4. call `refreshSnapshotFor` so subsequent same-session writes don't trip.
+- The pre-flight check (`enforcePreFlight`) is in-memory per-process. The
+  freshness check + file lock are what give cross-process safety.
+
+## Testing changes
+
+There is no test suite yet (Should-fix on the audit backlog). Smoke-test
+patterns proven to work:
+
+```bash
+# Boot test
+node -e "..."  # spawn dist/index.js, send initialize, expect "online" on stderr
+
+# YAML round-trip (catches handoff parsing regressions)
+node --input-type=module -e "import { writeHandoffState, parseHandoff } from './dist/tools/handoff.js'; ..."
+
+# Cross-process lock (catches torn-write regressions)
+( node writer.mjs A & node writer.mjs B & wait )  # confirm both succeed, file valid
+```
+
+## What this server does NOT do
+
+- It does NOT force agents to follow the constitution — it only puts the
+  constitution into context. An agent that ignores tool calls cannot be
+  stopped from editing `.current/handoff.md` directly. (But `sdd_detect_drift`
+  will surface the inconsistency on the next session.)
+- It is NOT cross-machine. The file lock is local-fs only.
+- It does NOT touch git. Commit/PR workflow is out of scope.
+
+## Auto-injection: SessionStart hook
+
+Configured in `~/.claude/settings.json` to run `bin/sr-engineer-context.mjs`
+on every session start. The script self-gates: it injects the full
+constitution/skill/state block only if the workspace has any of `.current/`,
+`.specify/`, `specs/`, or `tasks.md`. In this repo (the server's own source)
+none of those exist, so the hook is a silent no-op here — correct behavior.
+
+Override `SDD_SERVER_ROOT` env var if you move this checkout.
+
+## Pre-Flight Protocol (the one rule that matters in SDD-managed workspaces)
+
+When working **inside an SDD-managed workspace** (not this repo), the agent's
+first action must always be `sdd_get_state`. Without it, `sdd_update_state`,
+`sdd_complete_task`, and `sdd_rollback_task` will be blocked by the guard.
+This is enforced server-side; you cannot bypass it from the client.
