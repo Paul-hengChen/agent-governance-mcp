@@ -1,51 +1,199 @@
-# 🛡️ Teamwork MCP Server - AI 時代的專案協作大腦
+# 🛡️ Teamwork MCP Server
 
-## 🌟 什麼是 Teamwork MCP Server？
-
-在 AI 開發時代，我們大量依賴 AI Agent (如 Cursor, Claude, Windsurf) 來寫程式與開發。但 AI 在執行長線專案時有幾個致命弱點：
-1. **金魚腦 (狀態脫鉤)**：每次對話結束就忘記專案做到哪裡，切換 IDE 狀態就斷裂。
-2. **不受控 (規則遺忘)**：常常忘記遵守團隊制定的開發規範與安全政策。
-3. **格式混亂 (格式漂移)**：讓 AI 自己維護進度表時，Markdown 或 YAML 格式經常被寫壞。
-
-**Teamwork MCP Server** 就像是給 AI 戴上了一個「緊箍咒」與配置了一個「隨身秘書」。它是一個實作 Model Context Protocol (MCP) 的中介伺服器，扮演團隊專案的「唯一真實來源 (Single Source of Truth)」。只要 AI 接上這個伺服器，它就**必須**遵守團隊憲法，且**絕對無法**憑空亂改專案進度。
+> 給 AI 戴上「緊箍咒」+ 配「隨身秘書」的 Model Context Protocol 伺服器。
+> 讓 Cursor / Claude / Anti-Gravity / Gemini 等任何 AI 工具，跨 IDE、跨 session 都遵守同一套團隊規則、共享同一份專案進度。
 
 ---
 
-## 🏛️ 核心架構：三層防禦 (3-Layer Defense)
+## 📑 目錄
 
-這套系統並非只靠「軟性的提示詞 (Prompt)」來約束 AI，而是透過程式碼級別的硬約束：
-
-### Layer 1: MCP Prompts（大腦規則注入）
-- **機制**：當開發者呼叫 `sr-engineer` prompt 時，伺服器會「自動且強制」地將「團隊憲法 (Constitution)」、「資深工程師技能 (SOP)」以及「專案的即時狀態」打包注入給 AI 的上下文。
-- **白話文**：AI 上工的第一秒，我們就直接把員工守則和工作交接清單塞進它的腦袋裡，省去每次手動貼上的麻煩。
-
-### Layer 2: Structured Tools（手腳硬約束）
-- **機制**：伺服器提供 6 個結構化的 API 工具。AI **被剝奪了直接修改進度檔案的權力**，只能透過呼叫這些 API 進行操作。
-    - `sdd_get_state` / `sdd_get_next_task`: 讀取進度與下一個任務。
-    - `sdd_update_state` / `sdd_complete_task` / `sdd_rollback_task`: 精準更新狀態，保證 YAML 與 Checkbox (`[x]`) 格式永遠 100% 正確。
-    - `sdd_detect_drift`: 自動比對程式碼狀態與任務清單是否有出入。
-- **白話文**：AI 就像是在無塵室裡工作，只能按規定的按鈕來報告進度，杜絕了把進度表寫壞的可能。
-
-### Layer 3: Server-side Guards（海關攔截器）
-- **機制**：伺服器在記憶體中維護 Session 狀態 (`session.ts`)。如果一個全新的 AI Agent 企圖跳過讀取狀態，直接寫入或修改任務，伺服器會直接拋出 `⛔ BLOCKED` 錯誤並攔截該次行動。
-- **白話文**：這是一個強制的防呆機制。AI 必須先「讀取現狀」，才能「採取行動」，完全消除了 AI 憑空猜測導致專案脫鉤的致命風險。
+- [一句話定位](#一句話定位)
+- [給非工程師的快速說明](#給非工程師的快速說明)
+- [它在解決什麼問題](#它在解決什麼問題)
+- [核心架構：三層防禦](#核心架構三層防禦)
+- [技術細節](#技術細節)
+- [優點與限制](#優點與限制)
+- [安裝與啟動](#安裝與啟動)
+- [日常使用流程](#日常使用流程)
+- [安全機制 (Safety)](#安全機制-safety)
+- [設計決策與技術挑戰](#設計決策與技術挑戰)
+- [常見問題 (FAQ)](#常見問題-faq)
+- [未來規劃](#未來規劃)
+- [專案結構](#專案結構)
+- [名詞解釋](#名詞解釋)
 
 ---
 
-## 💻 技術實作細節
-- **語言**：TypeScript (Node.js)
-- **通訊協定**：MCP Stdio Transport (透過 Standard I/O 溝通，低延遲且無須網路通訊埠)。
-- **無縫掛載**：利用 Node ESM 模組解析與 `npx`，可直接從 GitHub 遠端執行，團隊成員**完全不需要 clone 原始碼**。
-- **資料儲存**：目前使用純文字檔案 (`.current/handoff.md` 與 `.current/tasks.md`) 進行持久化，兼具機器可讀 (YAML) 與人類可讀 (Markdown) 特性。
+## 一句話定位
+
+**Teamwork MCP Server** 是一個讓多個 AI agent / IDE 在同一個專案上工作時，能**共享狀態、遵守同一套規則、不互相覆蓋**的基礎建設。
+
+它**不是寫程式的工具**，而是「協作的治理層 (governance layer)」。
+
+> 類比：團隊的 PM + QA + 員工守則 — 但是給 AI 看的，且 24/7 自動執行。
 
 ---
 
-## 🚀 如何啟動與掛載？ (Team Onboarding)
+## 給非工程師的快速說明
 
-非常簡單！無需安裝複雜依賴，只需要你的電腦有安裝 Node.js (含有 `npx`) 即可。
+想像三個情境：
 
-### 方式 A：Claude Desktop / Antigravity / Gemini
-請編輯設定檔（`mcp_config.json` 或 `claude_desktop_config.json`），加入：
+- **情境 A**：你昨天叫 Claude 寫了一段登入功能，今天打開 Cursor 想繼續，但 Cursor 完全不知道昨天做到哪、用什麼方式做的。結果它重新猜一遍，跟昨天的版本不一致。
+- **情境 B**：你訂了規矩「絕對不要直接讀 `.env` 檔」，但每個 AI 工具（Cursor / Claude / Anti-Gravity）的設定方式都不同，你要去四個地方各設一次，改一次規矩要同步四個檔案。
+- **情境 C**：你在 VS Code 跟 Cursor 同時開著兩個 AI，兩邊同時更新進度紀錄，**後寫的把先寫的覆蓋了**。一個任務的成果靜默消失。
+
+**這個 server 就是把這三個情境用程式碼解決掉。**它放在你電腦本機，AI 跟它對話而不是直接動檔案；它會：
+1. 記住專案進度，無論你換哪個 AI 工具都讀同一份
+2. 規則放一個地方，所有 AI 都從這裡拿
+3. 兩個 AI 同時想寫東西時，幫你排隊、避免覆蓋
+
+---
+
+## 它在解決什麼問題
+
+AI 寫 code 工具（Cursor / Claude / Anti-Gravity / Gemini Code）在做長線專案時有四個致命弱點：
+
+### 痛點 1：金魚腦 — 狀態脫鉤
+- 每個新 session、每換一個 IDE，AI 就忘記做到哪
+- 你昨天叫 Claude 改的東西，今天打開 Cursor 它一無所知
+- 結果：AI 重複工作 / 漏做 / 跟你的記憶版本不一致
+
+### 痛點 2：規則飄移
+- 你的「不要 yapping」「TDD 優先」「絕不直接動 .env」這些規範
+- 每個工具都有自己的設定檔（`.cursorrules` / `CLAUDE.md` / `.antigravityrules`），寫法不同
+- 改一條規矩要去多個檔案同步，常常忘掉
+
+### 痛點 3：格式漂移
+- 讓 AI 自己維護進度檔（`handoff.md` / `tasks.md`）
+- 它常常把 YAML 寫壞、checkbox 格式不對、欄位漏掉
+- 下次想讀回來就解析失敗，前面累積的進度全廢
+
+### 痛點 4（隱形殺手）：寫入衝突 / Lost Update
+- 兩個 IDE 同時開、兩個 session 並行
+- 兩邊都讀到 state X，各自做事後分別寫入 Y 跟 Z
+- **後寫的覆蓋先寫的，狀態靜默丟失**
+- 沒人發現，直到下次 detect_drift 才看到「咦這 task 怎麼從完成變沒做？」
+
+**Teamwork MCP Server 把這四個痛點全部用 server-side 程式碼解決。**
+
+---
+
+## 核心架構：三層防禦
+
+不是只用「軟性的 prompt 約束」，而是 **server 端的硬約束** — AI 想繞也繞不過。
+
+### Layer 1：Prompts — 自動注入規則
+
+當任何 MCP-compatible client 呼叫 `sr-engineer` prompt 時，server 即時組裝：
+
+```
+content/constitution.md         ← 你的「憲法」（規範守則）
++ content/skill-sr-engineer.md   ← SOP（每次該做什麼順序）
++ 即時 handoff.md 狀態 JSON      ← 專案此刻做到哪
+```
+
+塞回給 client 當作 AI 的 context。
+
+**白話講**：AI 一上工，員工守則 + 工作 SOP + 上次交接清單**自動**進它腦袋。你改 `constitution.md` 一份檔，所有工具下次 session 立刻生效。
+
+### Layer 2：Tools — 結構化 API（剝奪 AI 亂寫的權力）
+
+Server 提供 6 個 tools。**AI 不能直接動 `handoff.md` / `tasks.md`，只能透過這些 tools**：
+
+| Tool | 功能 | 為什麼這樣設計 |
+|---|---|---|
+| `sdd_get_state` | 讀現在的專案進度 | **必須先呼叫**，否則所有寫入工具會被擋（pre-flight check） |
+| `sdd_update_state` | 更新 handoff（active_feature / status / completed / pending） | Server 強制產合法 YAML，AI 寫壞格式不可能 |
+| `sdd_get_next_task` | 從 tasks.md 拿下一個未完成 task | 結構化回傳 task ID、檔案路徑、是否到 checkpoint |
+| `sdd_complete_task` | 把 `[ ]` 改成 `[x]` | 可加 note（例如 "via vibe coding"） |
+| `sdd_rollback_task` | `[x]` → `[ ] (reverted: 原因)` | 用於後來發現先前實作壞掉 |
+| `sdd_detect_drift` | 比對 handoff 跟 tasks 是否一致 | 抓「兩邊不同步」的情況 |
+
+**白話講**：AI 在無塵室工作，只能按規定的按鈕報告進度，杜絕亂寫。
+
+### Layer 3：Guards — Server-side 攔截
+
+兩道防線，**程式碼級別**強制執行：
+
+#### (a) Pre-Flight Check
+AI 沒呼叫過 `sdd_get_state` 就想 `update_state`？被擋並回 `⛔ BLOCKED` 錯誤。
+強迫「先讀後寫」，不能憑空想像專案狀態。
+
+#### (b) Cross-Process File Lock + Mtime Freshness Check
+- **檔案鎖**：兩個 IDE / 兩個 AI 同時寫 → `O_EXCL` lockfile 序列化，不會 torn write
+- **新鮮度檢查**：你讀完之後別人改過 → `STATE DRIFT` 錯誤，要求重讀
+- **原子寫入**：寫入 `*.tmp` 然後 `rename`，讀者永遠看到舊版或新版，不會看到半寫的內容
+
+---
+
+## 技術細節
+
+### 語言 / Runtime
+- **TypeScript** 編譯到 ES2022，嚴格型別（no `any`）
+- **Node.js** ESM modules
+- 編譯產物在 `dist/` 內，直接 commit 進 repo 以供 `npx` 遠端執行
+
+### 主要相依
+| 套件 | 用途 |
+|---|---|
+| `@modelcontextprotocol/sdk` | MCP server 框架 |
+| `zod` v4 | Runtime 參數驗證 |
+| `js-yaml` | YAML frontmatter 安全讀寫 |
+
+### 通訊
+- **Stdio transport**：透過 stdin / stdout 與 MCP client 通訊
+- 不需要網路 port，零組態、低延遲、安全（不暴露在網路上）
+
+### 資料儲存
+- 純文字檔（無 DB）：
+  - `<workspace>/.current/handoff.md` — YAML frontmatter + Markdown checkbox
+  - `<workspace>/tasks.md` 或其他常見路徑 — 任務清單
+- 優點：人類可讀、可 git diff、可 grep、出問題時用編輯器就能修
+- 限制：不支援跨機器即時同步
+
+### 並行控制（重點，工業強度）
+- **In-memory session map**（`guards/session.ts`）：追蹤「本 process 是否呼叫過 `sdd_get_state`」+ snapshot 檔案 mtime
+- **檔案鎖**（`guards/file-lock.ts`）：`O_EXCL` lockfile + PID liveness 檢查 + 30 秒 stale mtime fallback
+- **Mtime freshness check**：讀取時 snapshot，寫入時比對，不一致就拒絕
+- **Atomic write**：tmp file + `fs.renameSync`（POSIX rename 原子性）
+
+---
+
+## 優點與限制
+
+### ✅ 優點
+
+1. **零組態啟動**：透過 `npx github:...` 直接從 GitHub 跑，團隊成員不用 clone、不用 npm install
+2. **Single Source of Truth**：規則改一個地方，所有 client 都生效
+3. **真.跨工具一致性**：Claude / Cursor / Anti-Gravity / Gemini / Continue / Cline 任何 MCP-compatible 工具都能用
+4. **資料完整性**：跨 process file lock + mtime check + atomic write 真的阻擋寫入衝突
+5. **人類可審查**：所有狀態都是純文字 markdown，不是黑箱 DB
+6. **失敗會大聲 (fail loud)**：server 啟動失敗 `process.exit(1)`、參數錯誤回乾淨的 zod error、寫入過時明確報 STATE DRIFT
+7. **MVP 心智**：~600 行 TypeScript，沒有過度設計
+
+### ❌ 限制（誠實邊界）
+
+| 期待 | 實際 |
+|---|---|
+| 強迫 AI 一定要遵守規則 | ❌ 規則放進 context，但 AI 仍可選擇忽略（MCP 本質限制） |
+| 強迫 AI 一定要用 tools | ❌ AI 可直接用 fs.write 改 handoff.md，server 抓不到；但下次 `detect_drift` 會發現 |
+| 跨機器同步 | ❌ File lock 是 local-fs，不跨機器（同一台機器同 workspace 才有效） |
+| 多人即時協作 | ❌ 沒有 user 概念、沒有 conflict resolution UI |
+| 自動 commit / merge | ❌ 不碰 git |
+| 寫程式 | ❌ Server 只管狀態 |
+
+---
+
+## 安裝與啟動
+
+需求：Node.js 18+（包含 `npx`）
+
+### 1. 設定 MCP client
+
+#### Claude Desktop / Anti-Gravity / Gemini Code
+
+編輯各自的 MCP 設定檔，加入：
+
 ```json
 {
   "mcpServers": {
@@ -57,24 +205,276 @@
 }
 ```
 
-### 方式 B：Cursor IDE
-1. 打開 Cursor Settings > Features > MCP。
-2. 點擊 `+ Add new MCP server`：
-   - Name: `teamwork-mcp-server`
-   - Type: `command`
-   - Command: `npx -y github:Paul-hengChen/teamwork-mcp-server`
+#### Cursor IDE
+
+Settings → Features → MCP → `+ Add new MCP server`：
+- Name: `teamwork-mcp-server`
+- Type: `command`
+- Command: `npx -y github:Paul-hengChen/teamwork-mcp-server`
+
+#### Claude Code (CLI)
+
+`~/.claude/settings.json`：
+```json
+{
+  "mcpServers": {
+    "teamwork-mcp-server": {
+      "command": "npx",
+      "args": ["-y", "github:Paul-hengChen/teamwork-mcp-server"]
+    }
+  }
+}
+```
+
+### 2. （推薦）設定 SessionStart hook 自動載入規則
+
+避免每次手動 `/sr-engineer`：
+
+```json
+// ~/.claude/settings.json
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node /path/to/teamwork-mcp-server/bin/sr-engineer-context.mjs",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Hook 會自動偵測 workspace 是否為 SDD-managed（有 `.current/` / `.specify/` / `tasks.md` / `specs/`）：
+- 是 → 注入完整憲法 + skill + state
+- 否 → 安靜退出，不打擾無關專案
+
+### 3. 在你的專案裡初始化
+
+第一次跑會自動建立 `.current/handoff.md`。你可以選擇手動先建一份：
+
+```markdown
+---
+active_feature: "Initial setup"
+status: "In_Progress"
+last_updated: "2026-05-12T00:00:00Z"
+---
+# 📍 任務交接狀態 (Handoff State)
+
+## ✅ 已完成 (Completed)
+- 無
+
+## ⚠️ 待辦與交接 (Pending & Handoff Notes)
+- [ ] 設定第一個任務
+```
 
 ---
 
-## ⚠️ 注意事項與最佳實踐
-1. **快取問題**：如果你發現 MCP Server 執行行為異常，或沒有更新到 GitHub 的最新版，請在終端機執行 `rm -rf ~/.npm/_npx` 清除 npx 的背景快取。
-2. **啟動工作流**：每次開立新的對話框，請直接對 AI 說：「**請呼叫 `sr-engineer` prompt 來啟動工作流，專案路徑是 `/你的/專案/絕對路徑`**」。
-3. **絕對路徑要求**：呼叫 prompt 與 tools 時，要求提供專案的「絕對路徑 (workspace_path)」，MCP Server 才能精準定位專案的 `.current/` 資料夾。
+## 日常使用流程
+
+### 場景：你在做一個新功能 Ticket #42
+
+```
+1. 你開 Claude Code 進入 workspace
+   → SessionStart hook 自動把規則 + 進度塞進 AI 的 context
+   → AI 知道："喔，現在在做 Ticket #42，已完成 T01-T03，T04 待辦"
+
+2. 你說「繼續做」
+   → AI 呼叫 sdd_get_next_task 拿到 T04
+   → AI 改 code、跑測試
+
+3. AI 呼叫 sdd_complete_task("T04")
+   → tasks.md 自動 [ ] → [x]
+
+4. AI 呼叫 sdd_update_state
+   → handoff.md 自動更新成合法 YAML
+
+5. 你關掉 session 去吃飯
+
+────────────────────
+
+6. 隔天你想用 Cursor 繼續
+   → Cursor 一接 server，sdd_get_state 拿到完整最新進度
+   → AI 自動接續 T05，零手動同步
+```
+
+### 場景：兩個 IDE 同時開（race condition 測試）
+
+```
+- VS Code 的 Claude Code 正在寫 handoff.md
+- 你忘了關，又在 Cursor 開新 session 也想動同一個檔案
+- Claude 在寫 → handoff.md 被 lockfile 鎖住
+- Cursor 想寫 → 排隊等鎖
+- 拿到鎖後 server 發現 mtime 變了 → 回 STATE DRIFT，要求重讀
+- 災難避免，沒有任何資料遺失
+```
 
 ---
 
-## 🔮 未來展望 (Roadmap)
-1. **Phase 3 (雲端整合)**：將傳輸協定從 `stdio` 升級為 `SSE (Server-Sent Events)`，並導入資料庫 (DB)，支援大型團隊的多人即時協作。
-2. **QA Skill 實作**：定義 `skill-qa-engineer`，將自動化驗收測試納入 SDD (Spec-Driven Development) 的完美閉環。
-3. **CI/CD Hook**：當 PR Merge 時自動分析變更，並自動更新 handoff 狀態。
-4. **認證層機制**：加入 API Key / JWT 認證機制以確保雲端存取安全性。
+## 安全機制 (Safety)
+
+| 層級 | 機制 | 防的事 |
+|---|---|---|
+| 0 | **Zod schema 驗證** | AI 傳壞型別 / 缺欄位 → 立刻被擋並回乾淨錯誤訊息 |
+| 1 | **Pre-Flight Check** | AI 沒讀過 state 就想寫 → 被擋 |
+| 2 | **Cross-process file lock** | 兩個 process 同時寫 → 序列化（O_EXCL + PID liveness + stale fallback） |
+| 3 | **Mtime freshness check** | 你讀完之後別人改過 → 拒絕你的寫入，要求重讀 |
+| 4 | **Atomic write (tmp + rename)** | 讀者看到的永遠是「舊版」或「新版」，不會看到半寫的檔案 |
+| 5 | **YAML 嚴格序列化** | 值含冒號 / 引號 / 中文都安全 round-trip（js-yaml） |
+| 6 | **Server 失敗 fail loud** | `server.connect()` 失敗 → 印錯誤 + `process.exit(1)` |
+
+---
+
+## 設計決策與技術挑戰
+
+> 這個段落是為了未來面試 / 技術分享準備的，記錄了實作過程中遇到的非顯而易見的問題跟做的決策。
+
+### 挑戰 1：MCP 是 offer，不是 enforcement
+**問題**：MCP 的 tools 是「可選工具」，不是「強制 API」。AI 不呼叫 tool 而直接動檔案，server 抓不到。
+
+**決策**：放棄追求「100% 強制」，改採三層深度防禦 — prompt 注入規則（軟）、tools 提供 happy path（中）、guards 對「乖乖用 tools 的 agent」做硬檢查。不用 tools 的 agent 雖然抓不到，但 `sdd_detect_drift` 會在下次 session 把不一致挖出來。
+
+**取捨**：放棄完美 → 換來架構簡單 + 對主流 client 有效。
+
+### 挑戰 2：跨 process 寫入衝突
+**問題**：使用者開兩個 IDE，兩個 session 並行 → in-memory session map 不跨 process，兩邊各自寫 → lost update。
+
+**決策**：兩段防線：
+1. **File lock**（`O_EXCL` lockfile）強制序列化寫入，杜絕 torn write
+2. **Optimistic concurrency**（mtime snapshot + verify）抓 lost update
+
+**為什麼這樣設計**：
+- 純鎖（pessimistic）：要鎖很久（從 read 到 write），多個 agent 互相 starve
+- 純樂觀（optimistic）：對 torn write 沒幫助
+- 兩者組合：lock 只在 write 的短窗，optimistic 抓跨 session 的 stale snapshot
+
+**驗證**：4 個 child process 並行寫入 → 全部成功、序列化執行、lockfile 自動清乾淨；外部偷改 mtime → 後續寫入被 `STATE DRIFT` 擋下。
+
+### 挑戰 3：手刻 YAML parser 撐不住
+**問題**：原本 frontmatter parser 用 `line.split(":")`，值含冒號（"Ticket #42: rollback"）/ 引號 / 多行字串都會壞。
+
+**決策**：換 `js-yaml`，讀寫一致用 `load()` / `dump({ forceQuotes: true })`，把序列化完全交給 spec-compliant 套件。
+
+**教訓**：不要手刻已有 spec 的格式 parser。看起來簡單，邊界 case 一輩子修不完。
+
+### 挑戰 4：unhandled promise rejection 讓 server 假裝活著
+**問題**：`server.connect(transport).then(...)` 沒接 `.catch()`，連線失敗只丟 warning，process 看起來活著但其實沒在工作。
+
+**決策**：所有 top-level promise 都接 `.catch(err => { console.error(...); process.exit(1) })`。Fail loud 永遠比 fail silent 好除錯。
+
+### 挑戰 5：runtime 型別驗證 vs TypeScript 假象
+**問題**：TypeScript 的 `as string` 只是騙編譯器，runtime 來什麼都不知道。AI 傳 `null` / `number`，後面 `fs.readFile(null)` 直接炸 stack trace。
+
+**決策**：每個 tool 都用 zod schema 在 dispatch handler 入口驗證。ZodError 統一格式化成 MCP 錯誤 response。
+
+**附帶好處**：tool 的 inputSchema 跟 zod schema 兩邊都有，理論上可以從一個生另一個（未來工程改善方向）。
+
+### 挑戰 6：SessionStart hook 設計成 user-level 但不汙染無關專案
+**問題**：使用者希望在 Claude Code 開每個新 session 時自動載入規則。但 hook 設成 user-level 會在所有專案觸發，無關專案會看到突兀的 sr-engineer block。
+
+**決策**：把判斷邏輯放進 hook script 自己。Script 偵測 workspace 有沒有 `.current/` / `.specify/` / `tasks.md` / `specs/`，沒有就 silent exit 0。Hook 設 user-level 沒問題、無關專案不受影響。
+
+---
+
+## 常見問題 (FAQ)
+
+**Q: 為什麼用 `npx github:...` 而不是 `npm install`？**
+A: 為了零組態。團隊成員不用 clone repo、不用 `npm install`、永遠用最新版（除非鎖 commit hash）。
+
+**Q: 我改了 `content/constitution.md`，client 沒有立即生效？**
+A: 兩個原因：(1) AI 把舊版載進 context 了，要開新 session；(2) `npx` 有快取，跑 `rm -rf ~/.npm/_npx` 清掉。
+
+**Q: 為什麼 `.current/handoff.md` 不存在但跑得起來？**
+A: 設計上允許冷啟動。第一次 `sdd_get_state` 回 `{exists: false}`，AI 看到後會呼叫 `sdd_update_state` 初始化。
+
+**Q: 跨機器團隊協作怎麼辦？**
+A: 目前不支援。File lock 是 local-fs。要跨機器需要把 `.current/` commit 到 git（已經是純文字），或等 Roadmap Phase 3 的雲端版。
+
+**Q: 我可以不用 SessionStart hook 嗎？**
+A: 可以。手動在每個 session 開頭打 `/sr-engineer` 或讓 AI 呼叫 `sr-engineer` prompt。Hook 只是把這步驟自動化。
+
+**Q: AI 還是不照規則做怎麼辦？**
+A: 觀察是哪一層失效：(a) 沒看到憲法 → 確認 sr-engineer prompt 有被載入；(b) 沒用 tools → 在 prompt 強化 "MUST use tools"；(c) 用了 tools 但邏輯錯 → 那是 AI 推理問題，不是 server 能解的。
+
+**Q: 跟 `.cursorrules` / `CLAUDE.md` 衝突嗎？**
+A: 不衝突，互補。Workspace-level 的 rules 文件還是有用（fallback、適用於不支援 MCP 的工具）。Server 是 source of truth，rules 文件可以是它的精簡版備援。
+
+---
+
+## 未來規劃
+
+| Phase | 內容 | 狀態 |
+|---|---|---|
+| 1 | 3-layer 架構、6 個 tools、`sr-engineer` prompt | ✅ 完成 |
+| 2 | zod 驗證、js-yaml 安全寫入、cross-process lock、SessionStart hook | ✅ 完成 |
+| 3 | Schema versioning（讓未來改格式不會破壞既有 workspace） | Backlog |
+| 4 | Test suite + GitHub Actions CI | Backlog |
+| 5 | 替換 stdio → SSE / HTTP transport，導入 DB，支援跨機器即時協作 | 規劃中 |
+| 6 | `skill-qa-engineer` 補完 SDD 閉環（自動驗收） | 規劃中 |
+| 7 | CI/CD hook — PR merge 自動更新 handoff | 規劃中 |
+| 8 | 認證層（API Key / JWT），雲端部署 | 規劃中 |
+
+---
+
+## 專案結構
+
+```
+teamwork-mcp-server/
+├── index.ts                       # MCP server 入口：註冊 prompts/tools/dispatcher
+├── tools/
+│   ├── handoff.ts                 # 讀寫 .current/handoff.md（js-yaml）
+│   ├── tasks.ts                   # 完成/回滾 tasks.md
+│   └── drift.ts                   # 比對 handoff vs tasks 找不一致
+├── guards/
+│   ├── session.ts                 # In-memory pre-flight + mtime snapshot
+│   └── file-lock.ts               # 跨 process O_EXCL lock + stale detection
+├── prompts/
+│   └── sr-engineer.ts             # 組裝 sr-engineer prompt
+├── content/
+│   ├── constitution.md            # 「憲法」(rules of conduct)
+│   └── skill-sr-engineer.md       # SOP
+├── bin/
+│   └── sr-engineer-context.mjs    # SessionStart hook 助手腳本
+├── dist/                          # 編譯產物（committed for npx）
+├── CLAUDE.md                      # 給 Claude Code 在這個 repo 工作的指引
+└── .antigravityrules              # 給 Anti-Gravity 的對應 rules
+```
+
+---
+
+## 名詞解釋
+
+給非 RD 背景的讀者：
+
+| 名詞 | 解釋 |
+|---|---|
+| **MCP (Model Context Protocol)** | Anthropic 提出的開放協議，讓 AI 工具（Cursor / Claude 等）可以呼叫外部 server 的工具，類似「給 AI 用的 API 標準」 |
+| **MCP Server** | 實作 MCP 協議的 server 程式。本專案就是一個 |
+| **MCP Client** | 你日常用的 AI 工具（Cursor / Claude / Anti-Gravity / Gemini Code），它們會連到 MCP server |
+| **Tool / Prompt (MCP 語境)** | Server 暴露給 AI 的兩種介面：tool 是「可以呼叫的函式」，prompt 是「可以注入的訊息模板」 |
+| **stdio transport** | 透過 process 的標準輸入/輸出（stdin/stdout）通訊，不走網路 |
+| **session** | 一次 AI 對話的生命週期。Cursor 開一個視窗 = 一個 session |
+| **handoff.md** | 「交接檔」— 記錄專案做到哪、誰做的、卡在哪 |
+| **tasks.md** | 任務清單，用 markdown checkbox 表示 |
+| **SDD (Spec-Driven Development)** | 規格驅動開發 — 寫程式前先寫規格，AI 照規格實作 |
+| **Speckit** | 一種 SDD 工作流框架，定義了 spec/plan/tasks 文件結構 |
+| **YAML frontmatter** | Markdown 檔案開頭用 `---` 包起來的結構化資料區塊 |
+| **race condition** | 兩個 process 競爭存取同一資源時的時序問題 |
+| **lost update** | 你讀了資料 A，別人改成 B，你基於 A 寫成 C，覆蓋掉 B 的問題 |
+| **atomic write** | 寫入是「全有或全無」的操作，不會出現半寫狀態 |
+| **file lock** | 用檔案存在性當作鎖，跨 process 互斥 |
+| **zod** | TypeScript 的 runtime 型別驗證套件 |
+| **hook** | 在特定事件觸發時自動執行的腳本（例如 SessionStart） |
+
+---
+
+## License & Author
+
+- Author: Paul Chen ([@Paul-hengChen](https://github.com/Paul-hengChen))
+- License: ISC
+- Repo: <https://github.com/Paul-hengChen/teamwork-mcp-server>
