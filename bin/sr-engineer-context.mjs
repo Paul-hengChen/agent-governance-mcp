@@ -1,36 +1,39 @@
 #!/usr/bin/env node
 // SessionStart hook helper for sr-engineer mode.
 //
-// Reads the SDD constitution + skill from the teamwork-mcp-server repo
-// and the workspace's current handoff state, then emits Claude Code's
-// `additionalContext` JSON on stdout so the session boots with everything
-// the agent needs to follow the rules.
+// Reads the constitution + skill (workspace override or server default) and
+// the current handoff state, then emits Claude Code's `additionalContext`
+// JSON on stdout so the session boots with everything the agent needs to
+// follow the rules.
 //
 // Behavior:
-// - If the workspace looks SDD-managed (.current/, .specify/, tasks.md, or
-//   specs/ exists), inject the full context block.
+// - If the workspace looks teamwork-managed (has .current/, tasks.md, or
+//   TODO.md), inject the full context block.
 // - Otherwise, exit silently with no output — unrelated projects stay clean.
 //
 // Env overrides:
-//   SDD_SERVER_ROOT  — point at a different teamwork-mcp-server checkout.
+//   TEAMWORK_SERVER_ROOT (alias: SDD_SERVER_ROOT) — point at a different
+//     teamwork-mcp-server checkout.
 //   CLAUDE_PROJECT_DIR — workspace path (set by Claude Code).
 
 import * as fs from "fs";
 import * as path from "path";
 
 const SERVER_ROOT =
-  process.env.SDD_SERVER_ROOT || "/Users/paul.ph.chen/teamwork-mcp-server";
+  process.env.TEAMWORK_SERVER_ROOT ||
+  process.env.SDD_SERVER_ROOT ||
+  "/Users/paul.ph.chen/teamwork-mcp-server";
 const workspace = process.env.CLAUDE_PROJECT_DIR || process.cwd();
 
-const sddMarkers = [
+// A workspace opts in by having any of these markers. Methodology-agnostic.
+const markers = [
   path.join(workspace, ".current"),
-  path.join(workspace, ".specify"),
-  path.join(workspace, "specs"),
   path.join(workspace, "tasks.md"),
+  path.join(workspace, "TODO.md"),
 ];
-const isSddWorkspace = sddMarkers.some((p) => fs.existsSync(p));
-if (!isSddWorkspace) {
-  // Silent no-op: not an SDD project.
+const isManagedWorkspace = markers.some((p) => fs.existsSync(p));
+if (!isManagedWorkspace) {
+  // Silent no-op: not a teamwork-managed workspace.
   process.exit(0);
 }
 
@@ -56,8 +59,8 @@ if (!constitution || !skill) {
   // Server repo missing or moved — surface a hint instead of injecting nothing.
   const hint = `## ⚠️ sr-engineer hook misconfigured
 Could not load constitution/skill from ${SERVER_ROOT}.
-Set SDD_SERVER_ROOT in your Claude Code settings env, or update the path
-in ~/.claude/settings.json's SessionStart hook.`;
+Set TEAMWORK_SERVER_ROOT in your Claude Code settings env, or update the
+path in ~/.claude/settings.json's SessionStart hook.`;
   process.stdout.write(
     JSON.stringify({
       hookSpecificOutput: {

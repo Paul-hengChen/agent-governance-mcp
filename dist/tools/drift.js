@@ -38,9 +38,9 @@ export function detectDrift(workspacePath) {
             tasksIncomplete: [],
         });
     }
-    // Parse tasks.md checkboxes using the configured task pattern so custom
+    // Parse task-list checkboxes using the configured task pattern so custom
     // formats (e.g. JIRA-123) are detected the same way the task tools see them.
-    const { regex } = resolveTaskRegex(workspacePath);
+    const regex = resolveTaskRegex(workspacePath);
     const tasksContent = fs.readFileSync(tasksPath, "utf-8");
     const completedTasks = [];
     const incompleteTasks = [];

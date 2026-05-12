@@ -1,9 +1,10 @@
 #!/usr/bin/env node
-// Coded by @sr-engineer
-// SDD MCP Server v2.0 — 3-Layer Defense Architecture
+// Teamwork MCP Server — 3-Layer Defense Architecture
 // Layer 1: MCP Prompts (auto-inject constitution + skill + state)
 // Layer 2: Structured Tools (6 tools for state/task/drift)
 // Layer 3: Server-side Guards (pre-flight check enforcement)
+// Methodology-agnostic: defaults to a generic markdown checkbox task format;
+// teams override task pattern / paths / constitution via <workspace>/.current/.
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { ListToolsRequestSchema, CallToolRequestSchema, ListPromptsRequestSchema, GetPromptRequestSchema, } from "@modelcontextprotocol/sdk/types.js";
@@ -53,7 +54,7 @@ server.setRequestHandler(ListPromptsRequestSchema, async () => {
         prompts: [
             {
                 name: "sr-engineer",
-                description: "Activate sr-engineer mode. Auto-loads SDD Constitution, Skill definition, and current project state. Use this at the start of any coding session.",
+                description: "Activate sr-engineer mode. Auto-loads the workspace constitution, skill definition, and current project state. Use this at the start of any coding session.",
                 arguments: [
                     {
                         name: "workspace_path",
@@ -286,11 +287,11 @@ const transport = new StdioServerTransport();
 server
     .connect(transport)
     .then(() => {
-    console.error("🛡️ SDD MCP Server v2.0 is online. (Tools + Prompts + Guards)");
+    console.error("🛡️ Teamwork MCP Server is online. (Tools + Prompts + Guards)");
 })
     .catch((err) => {
     const message = err instanceof Error ? err.stack ?? err.message : String(err);
-    console.error("❌ SDD MCP Server failed to start:", message);
+    console.error("❌ Teamwork MCP Server failed to start:", message);
     process.exit(1);
 });
 //# sourceMappingURL=index.js.map

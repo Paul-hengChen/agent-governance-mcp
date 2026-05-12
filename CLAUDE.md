@@ -4,13 +4,16 @@ This file is auto-loaded by Claude Code when working **inside this repo**. It
 describes the project itself (an MCP server). The *rules of conduct* enforced
 by this server live in `content/constitution.md` and `content/skill-sr-engineer.md`;
 those are loaded into other workspaces via the `sr-engineer` prompt or the
-SessionStart hook — not into this one.
+SessionStart hook — not into this one. This repo is the server's own source,
+not a teamwork-managed workspace.
 
 ## What this repo is
 
-A Model Context Protocol (MCP) server that enforces Spec-Driven Development
-(SDD) discipline across multiple AI clients (Claude Code, Cursor, Continue,
-etc.) sharing the same workspace.
+A Model Context Protocol (MCP) server that gives multiple AI clients
+(Claude Code, Cursor, Continue, Anti-Gravity, Gemini Code, etc.) a shared
+view of project state and a single source of truth for governance rules,
+so cross-IDE / cross-session work doesn't drift. Methodology-agnostic —
+no specific project-management framework assumed.
 
 Three layers of defense, all in `index.ts`:
 
@@ -82,14 +85,15 @@ node --input-type=module -e "import { writeHandoffState, parseHandoff } from './
 Configured in `~/.claude/settings.json` to run `bin/sr-engineer-context.mjs`
 on every session start. The script self-gates: it injects the full
 constitution/skill/state block only if the workspace has any of `.current/`,
-`.specify/`, `specs/`, or `tasks.md`. In this repo (the server's own source)
-none of those exist, so the hook is a silent no-op here — correct behavior.
+`tasks.md`, or `TODO.md`. In this repo (the server's own source) none of
+those exist, so the hook is a silent no-op here — correct behavior.
 
-Override `SDD_SERVER_ROOT` env var if you move this checkout.
+Override `TEAMWORK_SERVER_ROOT` env var if you move this checkout
+(legacy `SDD_SERVER_ROOT` is still honored as a fallback).
 
-## Pre-Flight Protocol (the one rule that matters in SDD-managed workspaces)
+## Pre-Flight Protocol (the one rule that matters in managed workspaces)
 
-When working **inside an SDD-managed workspace** (not this repo), the agent's
+When working **inside a teamwork-managed workspace** (not this repo), the agent's
 first action must always be `sdd_get_state`. Without it, `sdd_update_state`,
 `sdd_complete_task`, and `sdd_rollback_task` will be blocked by the guard.
 This is enforced server-side; you cannot bypass it from the client.

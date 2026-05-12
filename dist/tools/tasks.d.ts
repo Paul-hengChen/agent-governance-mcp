@@ -1,9 +1,9 @@
 /**
- * Get the next incomplete task from tasks.md.
+ * Get the next incomplete task from the task list.
  */
 export declare function getNextTask(workspacePath: string): string;
 /**
- * Mark a task as completed in tasks.md.
+ * Mark a task as completed.
  */
 export declare function completeTask(workspacePath: string, taskId: string, note?: string): Promise<string>;
 /**

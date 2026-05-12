@@ -1,9 +1,9 @@
-// Tools: tasks.md manipulation — complete, rollback, get-next.
+// Tools: task-list manipulation — complete, rollback, get-next.
 //
-// The Speckit task format is the *default*, not a hard requirement. Workspaces
-// can override the parser regex and search paths via .current/.config.json
-// (see tools/config.ts). For task completion/rollback the file must still use
-// standard markdown checkbox syntax (`- [ ]` / `- [x]`) — that's universal.
+// Format-agnostic by design. The default is a generic markdown checkbox
+// (`- [ ] <id> <description>`); any methodology with a different ID space
+// or paths can override via .current/.config.json. The complete/rollback
+// operations only require standard markdown checkbox syntax for the flip.
 
 import * as fs from "fs";
 import { verifyFreshness, refreshSnapshotFor } from "../guards/session.js";
@@ -13,49 +13,23 @@ import { findTasksFile, resolveTaskRegex } from "./config.js";
 interface TaskInfo {
   id: string;
   description: string;
-  file: string | null;       // only populated for Speckit-format tasks
-  phase: string;
-  parallel: boolean;          // only meaningful for Speckit-format tasks
-  userStory: string | null;   // only populated for Speckit-format tasks
+  section: string;
   completed: boolean;
 }
 
 function parseTaskLine(
   line: string,
-  phase: string,
-  regex: RegExp,
-  isCustom: boolean
+  section: string,
+  regex: RegExp
 ): TaskInfo | null {
   const match = line.match(regex);
-  if (!match) return null;
-
-  if (isCustom) {
-    // Custom pattern contract: group 1 = checkmark, group 2 = task ID.
-    // Everything after group 2 is concatenated as the description.
-    const checkmark = match[1];
-    const id = match[2];
-    if (checkmark === undefined || id === undefined) return null;
-    const rest = match.slice(3).filter(Boolean).join(" ").trim();
-    return {
-      id,
-      completed: checkmark === "x",
-      description: rest || id,
-      file: null,
-      phase,
-      parallel: false,
-      userStory: null,
-    };
-  }
-
-  // Speckit default: rich field extraction.
+  if (!match || match[1] === undefined || match[2] === undefined) return null;
+  const description = match.slice(3).filter(Boolean).join(" ").trim();
   return {
     id: match[2],
     completed: match[1] === "x",
-    parallel: !!match[3],
-    userStory: match[4]?.replace(/[\[\]]/g, "") ?? null,
-    file: match[5].trim(),
-    description: match[6].trim(),
-    phase,
+    description: description || match[2],
+    section,
   };
 }
 
@@ -65,19 +39,20 @@ function parseTasks(
   const filePath = findTasksFile(workspacePath);
   if (!filePath) return null;
 
-  const { regex, isCustom } = resolveTaskRegex(workspacePath);
+  const regex = resolveTaskRegex(workspacePath);
   const content = fs.readFileSync(filePath, "utf-8");
   const lines = content.split("\n");
   const tasks: TaskInfo[] = [];
-  let currentPhase = "Unknown";
+  let currentSection = "Unknown";
 
   for (const line of lines) {
-    const phaseMatch = line.match(/^## Phase (\d+|99): (.+)/);
-    if (phaseMatch) {
-      currentPhase = `Phase ${phaseMatch[1]}: ${phaseMatch[2]}`;
+    // Any `## heading` resets the current section. Methodology-agnostic.
+    const sectionMatch = line.match(/^##\s+(.+)/);
+    if (sectionMatch) {
+      currentSection = sectionMatch[1].trim();
       continue;
     }
-    const task = parseTaskLine(line.trim(), currentPhase, regex, isCustom);
+    const task = parseTaskLine(line.trim(), currentSection, regex);
     if (task) tasks.push(task);
   }
 
@@ -85,12 +60,12 @@ function parseTasks(
 }
 
 /**
- * Get the next incomplete task from tasks.md.
+ * Get the next incomplete task from the task list.
  */
 export function getNextTask(workspacePath: string): string {
   const result = parseTasks(workspacePath);
   if (!result) {
-    return JSON.stringify({ error: "No tasks.md found in workspace." });
+    return JSON.stringify({ error: "No task list file found in workspace." });
   }
 
   const next = result.tasks.find((t) => !t.completed);
@@ -98,9 +73,9 @@ export function getNextTask(workspacePath: string): string {
     return JSON.stringify({ allComplete: true, totalTasks: result.tasks.length });
   }
 
-  const currentPhaseIdx = result.tasks.indexOf(next);
-  const prevTask = currentPhaseIdx > 0 ? result.tasks[currentPhaseIdx - 1] : null;
-  const isCheckpoint = prevTask && prevTask.phase !== next.phase;
+  const currentIdx = result.tasks.indexOf(next);
+  const prevTask = currentIdx > 0 ? result.tasks[currentIdx - 1] : null;
+  const isCheckpoint = prevTask && prevTask.section !== next.section;
 
   return JSON.stringify({
     next,
@@ -123,7 +98,7 @@ function escapeRegExp(s: string): string {
 }
 
 /**
- * Mark a task as completed in tasks.md.
+ * Mark a task as completed.
  */
 export async function completeTask(
   workspacePath: string,
@@ -132,7 +107,7 @@ export async function completeTask(
 ): Promise<string> {
   const probe = parseTasks(workspacePath);
   if (!probe) {
-    return JSON.stringify({ error: "No tasks.md found." });
+    return JSON.stringify({ error: "No task list file found." });
   }
   const lockPath = `${probe.filePath}.lock`;
 
@@ -141,7 +116,7 @@ export async function completeTask(
 
     const result = parseTasks(workspacePath);
     if (!result) {
-      return JSON.stringify({ error: "No tasks.md found." });
+      return JSON.stringify({ error: "No task list file found." });
     }
 
     const task = result.tasks.find((t) => t.id === taskId);
@@ -154,12 +129,11 @@ export async function completeTask(
 
     let content = fs.readFileSync(result.filePath, "utf-8");
     const suffix = note ? ` (${note})` : "";
-    // Flip the standard markdown checkbox for this task id. Works for any
-    // format that uses `- [ ] <taskId> ...` line syntax (universal).
     const oldPattern = new RegExp(`- \\[ \\] ${escapeRegExp(taskId)}(\\s.+)$`, "m");
     if (!oldPattern.test(content)) {
       return JSON.stringify({
-        error: `Could not find an unchecked checkbox line for ${taskId}. ` +
+        error:
+          `Could not find an unchecked checkbox line for ${taskId}. ` +
           `Task lines must use markdown checkbox syntax: "- [ ] ${taskId} ...".`,
       });
     }
@@ -187,7 +161,7 @@ export async function rollbackTask(
 ): Promise<string> {
   const probe = parseTasks(workspacePath);
   if (!probe) {
-    return JSON.stringify({ error: "No tasks.md found." });
+    return JSON.stringify({ error: "No task list file found." });
   }
   const lockPath = `${probe.filePath}.lock`;
 
@@ -196,7 +170,7 @@ export async function rollbackTask(
 
     const result = parseTasks(workspacePath);
     if (!result) {
-      return JSON.stringify({ error: "No tasks.md found." });
+      return JSON.stringify({ error: "No task list file found." });
     }
 
     const task = result.tasks.find((t) => t.id === taskId);

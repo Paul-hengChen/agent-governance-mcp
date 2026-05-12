@@ -1,7 +1,7 @@
 {
   "name": "teamwork-mcp-server",
   "version": "2.0.0",
-  "description": "SDD (Spec-Driven Development) MCP Server — enforces constitution, tracks state, manages tasks",
+  "description": "Teamwork MCP Server — methodology-agnostic state sync, drift detection, and constitution enforcement for AI coding agents across multiple IDEs and sessions",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
@@ -13,9 +13,10 @@
   },
   "keywords": [
     "mcp",
-    "sdd",
-    "speckit",
-    "ai-agent"
+    "state-sync",
+    "ai-agent",
+    "multi-agent",
+    "governance"
   ],
   "author": "",
   "license": "ISC",
