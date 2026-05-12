@@ -2,8 +2,8 @@
 // Tool: drift detection — compare handoff.md state vs tasks.md checkboxes
 
 import * as fs from "fs";
-import * as path from "path";
 import { parseHandoff } from "./handoff.js";
+import { findTasksFile, resolveTaskRegex } from "./config.js";
 
 interface DriftReport {
   driftDetected: boolean;
@@ -11,16 +11,6 @@ interface DriftReport {
   handoffLastTask: string;
   tasksCompleted: string[];
   tasksIncomplete: string[];
-}
-
-function findTasksFile(workspacePath: string): string | null {
-  const candidates = [
-    path.join(workspacePath, ".current", "tasks.md"),
-    path.join(workspacePath, ".specify", "tasks.md"),
-    path.join(workspacePath, "specs", "tasks.md"),
-    path.join(workspacePath, "tasks.md"),
-  ];
-  return candidates.find((p) => fs.existsSync(p)) ?? null;
 }
 
 /**
@@ -62,25 +52,29 @@ export function detectDrift(workspacePath: string): string {
     });
   }
 
-  // Parse tasks.md checkboxes
+  // Parse tasks.md checkboxes using the configured task pattern so custom
+  // formats (e.g. JIRA-123) are detected the same way the task tools see them.
+  const { regex } = resolveTaskRegex(workspacePath);
   const tasksContent = fs.readFileSync(tasksPath, "utf-8");
   const completedTasks: string[] = [];
   const incompleteTasks: string[] = [];
 
-  for (const line of tasksContent.split("\n")) {
-    const completedMatch = line.match(/- \[x\] (T\d+)/);
-    const incompleteMatch = line.match(/- \[ \] (T\d+)/);
-    if (completedMatch) completedTasks.push(completedMatch[1]);
-    if (incompleteMatch) incompleteTasks.push(incompleteMatch[1]);
+  for (const rawLine of tasksContent.split("\n")) {
+    const line = rawLine.trim();
+    const match = line.match(regex);
+    if (!match || match[1] === undefined || match[2] === undefined) continue;
+    if (match[1] === "x") completedTasks.push(match[2]);
+    else if (match[1] === " ") incompleteTasks.push(match[2]);
   }
 
   // Detect drifts
   const drifts: string[] = [];
 
-  // Check 1: handoff completed tasks vs tasks.md completed
+  // Pull any token that looks like an ID out of handoff completed entries.
+  // We compare *all* IDs found in the configured regex's ID space.
+  const idVocab = new Set<string>([...completedTasks, ...incompleteTasks]);
   const handoffTaskIds = handoff.completed
-    .map((c) => c.match(/T\d+/)?.[0])
-    .filter(Boolean) as string[];
+    .flatMap((c) => Array.from(idVocab).filter((id) => c.includes(id)));
 
   for (const taskId of handoffTaskIds) {
     if (!completedTasks.includes(taskId)) {

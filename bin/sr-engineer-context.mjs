@@ -42,8 +42,15 @@ function readSafe(p) {
   }
 }
 
-const constitution = readSafe(path.join(SERVER_ROOT, "content", "constitution.md"));
-const skill = readSafe(path.join(SERVER_ROOT, "content", "skill-sr-engineer.md"));
+// Workspace override > server default.
+function loadContent(filename) {
+  const override = path.join(workspace, ".current", filename);
+  if (fs.existsSync(override)) return readSafe(override);
+  return readSafe(path.join(SERVER_ROOT, "content", filename));
+}
+
+const constitution = loadContent("constitution.md");
+const skill = loadContent("skill-sr-engineer.md");
 
 if (!constitution || !skill) {
   // Server repo missing or moved — surface a hint instead of injecting nothing.

@@ -15,7 +15,19 @@ const CONTENT_DIR = fs.existsSync(path.join(PROJECT_ROOT, "content"))
   ? path.join(PROJECT_ROOT, "content")
   : path.join(PROJECT_ROOT, "..", "content"); // fallback: dist/prompts/../../content
 
-function loadContent(filename: string): string {
+/**
+ * Load content with workspace override.
+ *   1. <workspace>/.current/<filename>  ← per-project override (e.g. team-specific constitution)
+ *   2. <repo>/content/<filename>        ← shipped default
+ *   3. error placeholder
+ */
+function loadContent(filename: string, workspacePath?: string): string {
+  if (workspacePath) {
+    const override = path.join(workspacePath, ".current", filename);
+    if (fs.existsSync(override)) {
+      return fs.readFileSync(override, "utf-8");
+    }
+  }
   const filePath = path.join(CONTENT_DIR, filename);
   if (!fs.existsSync(filePath)) {
     return `[ERROR: ${filename} not found at ${filePath}]`;
@@ -32,8 +44,8 @@ export function buildSrEngineerPrompt(workspacePath: string): {
   description: string;
   messages: Array<{ role: "user"; content: { type: "text"; text: string } }>;
 } {
-  const constitution = loadContent("constitution.md");
-  const skill = loadContent("skill-sr-engineer.md");
+  const constitution = loadContent("constitution.md", workspacePath);
+  const skill = loadContent("skill-sr-engineer.md", workspacePath);
 
   // Dynamic state injection
   const state = parseHandoff(workspacePath);

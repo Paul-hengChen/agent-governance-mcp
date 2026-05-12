@@ -4,6 +4,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
+import { findTasksFile } from "../tools/config.js";
 
 type FileKind = "handoff" | "tasks";
 
@@ -23,16 +24,6 @@ function statMtime(p: string): number | null {
   } catch {
     return null;
   }
-}
-
-function findTasksFile(workspacePath: string): string | null {
-  const candidates = [
-    path.join(workspacePath, ".current", "tasks.md"),
-    path.join(workspacePath, ".specify", "tasks.md"),
-    path.join(workspacePath, "specs", "tasks.md"),
-    path.join(workspacePath, "tasks.md"),
-  ];
-  return candidates.find((p) => fs.existsSync(p)) ?? null;
 }
 
 export function markStateRead(workspacePath: string): void {

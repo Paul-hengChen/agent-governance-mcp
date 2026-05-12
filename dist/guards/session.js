@@ -3,6 +3,7 @@
 // and per-file mtime snapshots for cross-process freshness checks.
 import * as fs from "fs";
 import * as path from "path";
+import { findTasksFile } from "../tools/config.js";
 const activeSessions = new Map();
 function statMtime(p) {
     try {
@@ -11,15 +12,6 @@ function statMtime(p) {
     catch {
         return null;
     }
-}
-function findTasksFile(workspacePath) {
-    const candidates = [
-        path.join(workspacePath, ".current", "tasks.md"),
-        path.join(workspacePath, ".specify", "tasks.md"),
-        path.join(workspacePath, "specs", "tasks.md"),
-        path.join(workspacePath, "tasks.md"),
-    ];
-    return candidates.find((p) => fs.existsSync(p)) ?? null;
 }
 export function markStateRead(workspacePath) {
     const handoffPath = path.join(workspacePath, ".current", "handoff.md");

@@ -1,40 +1,53 @@
-// Coded by @sr-engineer
-// Tools: tasks.md manipulation — complete, rollback, get-next
+// Tools: tasks.md manipulation — complete, rollback, get-next.
+//
+// The Speckit task format is the *default*, not a hard requirement. Workspaces
+// can override the parser regex and search paths via .current/.config.json
+// (see tools/config.ts). For task completion/rollback the file must still use
+// standard markdown checkbox syntax (`- [ ]` / `- [x]`) — that's universal.
 
 import * as fs from "fs";
-import * as path from "path";
 import { verifyFreshness, refreshSnapshotFor } from "../guards/session.js";
 import { withFileLock } from "../guards/file-lock.js";
+import { findTasksFile, resolveTaskRegex } from "./config.js";
 
 interface TaskInfo {
   id: string;
   description: string;
-  file: string;
+  file: string | null;       // only populated for Speckit-format tasks
   phase: string;
-  parallel: boolean;
-  userStory: string | null;
+  parallel: boolean;          // only meaningful for Speckit-format tasks
+  userStory: string | null;   // only populated for Speckit-format tasks
   completed: boolean;
 }
 
-function findTasksFile(workspacePath: string): string | null {
-  // Search common locations for tasks.md
-  const candidates = [
-    path.join(workspacePath, ".current", "tasks.md"),
-    path.join(workspacePath, ".specify", "tasks.md"),
-    path.join(workspacePath, "specs", "tasks.md"),
-    path.join(workspacePath, "tasks.md"),
-  ];
-  return candidates.find((p) => fs.existsSync(p)) ?? null;
-}
-
-function parseTaskLine(line: string, phase: string): TaskInfo | null {
-  // Match: - [ ] T01 [P] [US1] src/auth.ts: Implement JWT
-  // or:    - [x] T01 src/auth.ts: Implement JWT
-  const match = line.match(
-    /^- \[([ x])\] (T\d+)\s*(\[P\])?\s*(\[US\d+\])?\s*(.+?):\s*(.+)$/
-  );
+function parseTaskLine(
+  line: string,
+  phase: string,
+  regex: RegExp,
+  isCustom: boolean
+): TaskInfo | null {
+  const match = line.match(regex);
   if (!match) return null;
 
+  if (isCustom) {
+    // Custom pattern contract: group 1 = checkmark, group 2 = task ID.
+    // Everything after group 2 is concatenated as the description.
+    const checkmark = match[1];
+    const id = match[2];
+    if (checkmark === undefined || id === undefined) return null;
+    const rest = match.slice(3).filter(Boolean).join(" ").trim();
+    return {
+      id,
+      completed: checkmark === "x",
+      description: rest || id,
+      file: null,
+      phase,
+      parallel: false,
+      userStory: null,
+    };
+  }
+
+  // Speckit default: rich field extraction.
   return {
     id: match[2],
     completed: match[1] === "x",
@@ -46,10 +59,13 @@ function parseTaskLine(line: string, phase: string): TaskInfo | null {
   };
 }
 
-function parseTasks(workspacePath: string): { tasks: TaskInfo[]; filePath: string } | null {
+function parseTasks(
+  workspacePath: string
+): { tasks: TaskInfo[]; filePath: string } | null {
   const filePath = findTasksFile(workspacePath);
   if (!filePath) return null;
 
+  const { regex, isCustom } = resolveTaskRegex(workspacePath);
   const content = fs.readFileSync(filePath, "utf-8");
   const lines = content.split("\n");
   const tasks: TaskInfo[] = [];
@@ -61,7 +77,7 @@ function parseTasks(workspacePath: string): { tasks: TaskInfo[]; filePath: strin
       currentPhase = `Phase ${phaseMatch[1]}: ${phaseMatch[2]}`;
       continue;
     }
-    const task = parseTaskLine(line.trim(), currentPhase);
+    const task = parseTaskLine(line.trim(), currentPhase, regex, isCustom);
     if (task) tasks.push(task);
   }
 
@@ -82,7 +98,6 @@ export function getNextTask(workspacePath: string): string {
     return JSON.stringify({ allComplete: true, totalTasks: result.tasks.length });
   }
 
-  // Check if we're at a checkpoint
   const currentPhaseIdx = result.tasks.indexOf(next);
   const prevTask = currentPhaseIdx > 0 ? result.tasks[currentPhaseIdx - 1] : null;
   const isCheckpoint = prevTask && prevTask.phase !== next.phase;
@@ -103,6 +118,10 @@ function atomicWrite(filePath: string, content: string): void {
   fs.renameSync(tmpPath, filePath);
 }
 
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 /**
  * Mark a task as completed in tasks.md.
  */
@@ -111,7 +130,6 @@ export async function completeTask(
   taskId: string,
   note?: string
 ): Promise<string> {
-  // Resolve target file once (outside the lock so we can early-return cleanly).
   const probe = parseTasks(workspacePath);
   if (!probe) {
     return JSON.stringify({ error: "No tasks.md found." });
@@ -121,7 +139,6 @@ export async function completeTask(
   return withFileLock(lockPath, () => {
     verifyFreshness(workspacePath, probe.filePath, "tasks");
 
-    // Re-parse inside the lock to act on authoritative content.
     const result = parseTasks(workspacePath);
     if (!result) {
       return JSON.stringify({ error: "No tasks.md found." });
@@ -137,13 +154,26 @@ export async function completeTask(
 
     let content = fs.readFileSync(result.filePath, "utf-8");
     const suffix = note ? ` (${note})` : "";
-    const oldPattern = new RegExp(`- \\[ \\] ${taskId}(\\s.+)$`, "m");
+    // Flip the standard markdown checkbox for this task id. Works for any
+    // format that uses `- [ ] <taskId> ...` line syntax (universal).
+    const oldPattern = new RegExp(`- \\[ \\] ${escapeRegExp(taskId)}(\\s.+)$`, "m");
+    if (!oldPattern.test(content)) {
+      return JSON.stringify({
+        error: `Could not find an unchecked checkbox line for ${taskId}. ` +
+          `Task lines must use markdown checkbox syntax: "- [ ] ${taskId} ...".`,
+      });
+    }
     content = content.replace(oldPattern, `- [x] ${taskId}$1${suffix}`);
 
     atomicWrite(result.filePath, content);
     refreshSnapshotFor(workspacePath, result.filePath, "tasks");
 
-    return JSON.stringify({ success: true, taskId, marked: "completed", note: note || null });
+    return JSON.stringify({
+      success: true,
+      taskId,
+      marked: "completed",
+      note: note || null,
+    });
   });
 }
 
@@ -179,9 +209,14 @@ export async function rollbackTask(
 
     let content = fs.readFileSync(result.filePath, "utf-8");
     const oldPattern = new RegExp(
-      `- \\[x\\] ${taskId}(\\s.+?)(?:\\s*\\(.*\\))?$`,
+      `- \\[x\\] ${escapeRegExp(taskId)}(\\s.+?)(?:\\s*\\(.*\\))?$`,
       "m"
     );
+    if (!oldPattern.test(content)) {
+      return JSON.stringify({
+        error: `Could not find a checked checkbox line for ${taskId}.`,
+      });
+    }
     content = content.replace(oldPattern, `- [ ] ${taskId}$1 (reverted: ${reason})`);
 
     atomicWrite(result.filePath, content);
