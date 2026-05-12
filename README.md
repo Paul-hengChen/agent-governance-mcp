@@ -277,24 +277,52 @@ Hook 會自動偵測 workspace 是否為 teamwork-managed（有 `.current/` / `t
 - 是 → 注入完整憲法 + skill + state
 - 否 → 安靜退出，不打擾無關專案
 
-### 3. 在你的專案裡初始化
+### 3. 在新專案啟用 Teamwork 管理（⚠️ 關鍵步驟）
 
-第一次跑會自動建立 `.current/handoff.md`。你可以選擇手動先建一份：
+> **重要**：SessionStart hook 會偵測 workspace 是否包含以下任一 marker，**沒有就不會注入憲法**：
+> - `.current/` 目錄
+> - `tasks.md`
+> - `TODO.md`
 
-```markdown
----
-active_feature: "Initial setup"
-status: "In_Progress"
-last_updated: "2026-05-12T00:00:00Z"
----
-# 📍 任務交接狀態 (Handoff State)
+#### 方法 A：自動模式（推薦 — hook 每次 session 自動載入）
 
-## ✅ 已完成 (Completed)
-- 無
+在你的專案根目錄執行：
 
-## ⚠️ 待辦與交接 (Pending & Handoff Notes)
-- [ ] 設定第一個任務
+```bash
+# 建立 marker 目錄，讓 hook 知道這是被管理的專案
+mkdir -p .current
 ```
+
+下次開新 session 時，hook 會自動偵測到 `.current/` 並注入完整憲法 + skill + 當前 state。
+
+> 如果你有任務清單，也放一份 `tasks.md`（任何 markdown checkbox 格式皆可）：
+> ```markdown
+> ## Phase 1
+> - [ ] T01 初始化專案架構
+> - [ ] T02 實作核心功能
+> ```
+
+AI 首次啟動時會呼叫 `sdd_get_state`，發現沒有 `handoff.md` 就會自動呼叫 `sdd_update_state` 初始化。
+
+#### 方法 B：手動模式（不建 `.current/`，單次觸發）
+
+如果你不想在專案裡建 marker 目錄，可以在 Claude Code session 裡手動載入：
+
+```
+/sr-engineer workspace_path:/你的/專案/絕對路徑
+```
+
+這會一次性注入憲法 + skill + state，但**不會**在下次 session 自動生效。
+
+#### 方法 C：直接使用 Tools（最低門檻）
+
+即使不載入憲法，MCP server 的 6 個 tools 仍然可用。AI 可以直接呼叫：
+
+```
+sdd_get_state → sdd_update_state → sdd_complete_task ...
+```
+
+只是 AI 不會自動收到行為規範，需要你手動告訴它遵守什麼規則。
 
 ---
 
