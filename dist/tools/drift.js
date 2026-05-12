@@ -60,7 +60,7 @@ export function detectDrift(workspacePath) {
     // We compare *all* IDs found in the configured regex's ID space.
     const idVocab = new Set([...completedTasks, ...incompleteTasks]);
     const handoffTaskIds = handoff.completed
-        .flatMap((c) => Array.from(idVocab).filter((id) => c.includes(id)));
+        .flatMap((c) => Array.from(idVocab).filter((id) => new RegExp(`\\b${id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(c)));
     for (const taskId of handoffTaskIds) {
         if (!completedTasks.includes(taskId)) {
             drifts.push(`Handoff says ${taskId} completed, but tasks.md shows it as incomplete.`);

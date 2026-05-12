@@ -128,7 +128,7 @@ export async function completeTask(
     }
 
     let content = fs.readFileSync(result.filePath, "utf-8");
-    const suffix = note ? ` (${note})` : "";
+    const suffix = note ? ` (note: ${note})` : "";
     const oldPattern = new RegExp(`- \\[ \\] ${escapeRegExp(taskId)}(\\s.+)$`, "m");
     if (!oldPattern.test(content)) {
       return JSON.stringify({

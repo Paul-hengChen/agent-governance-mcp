@@ -35,6 +35,8 @@ const UpdateStateArgs = z.object({
   status: z.enum(["In_Progress", "PASS", "FAIL", "Blocked"]),
   completed_tasks: z.array(z.string()).optional().default([]),
   pending_notes: z.array(z.string()).optional().default([]),
+  blocking_reason: z.string().optional(),
+  agent_id: z.string().optional(),
 });
 
 const CompleteTaskArgs = z.object({
@@ -153,6 +155,14 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: "array",
               items: { type: "string" },
               description: "Handoff notes for next agent (e.g., ['T04 blocked: missing API key'])",
+            },
+            blocking_reason: {
+              type: "string",
+              description: "Why work is blocked or failed. Required when status is Blocked or FAIL.",
+            },
+            agent_id: {
+              type: "string",
+              description: "Identifier of the agent writing this state (e.g., 'claude-code', 'cursor').",
             },
           },
           required: ["workspace_path", "active_feature", "status"],
@@ -280,7 +290,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           parsed.active_feature,
           parsed.status,
           parsed.completed_tasks,
-          parsed.pending_notes
+          parsed.pending_notes,
+          parsed.blocking_reason,
+          parsed.agent_id,
         );
         return { content: [{ type: "text" as const, text: result }] };
       }

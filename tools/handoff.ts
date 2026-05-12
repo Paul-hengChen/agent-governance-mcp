@@ -15,6 +15,8 @@ interface HandoffState {
   active_feature: string;
   status: string;
   last_updated: string;
+  blocking_reason?: string;
+  last_agent?: string;
   completed: string[];
   pending: string[];
 }
@@ -30,8 +32,17 @@ function ensureDir(workspacePath: string): void {
   }
 }
 
+function extractSectionContent(body: string, headingPattern: RegExp): string {
+  const match = body.match(headingPattern);
+  if (!match || match.index === undefined) return "";
+  const start = match.index + match[0].length;
+  const rest = body.slice(start);
+  const nextSection = rest.search(/\n##\s/);
+  return nextSection === -1 ? rest : rest.slice(0, nextSection);
+}
+
 /**
- * Parse handoff.md YAML frontmatter + checkbox content into structured JSON.
+ * Parse handoff.md YAML frontmatter + section content into structured JSON.
  * Returns null if file doesn't exist.
  */
 export function parseHandoff(workspacePath: string): HandoffState | null {
@@ -57,14 +68,27 @@ export function parseHandoff(workspacePath: string): HandoffState | null {
 
   const asString = (v: unknown): string => (typeof v === "string" ? v : v == null ? "" : String(v));
 
-  // Parse checkboxes
-  const completed = [...content.matchAll(/- \[x\] (.+)/g)].map((m) => m[1]);
-  const pending = [...content.matchAll(/- \[ \] (.+)/g)].map((m) => m[1]);
+  // Section-scoped parsing: strip frontmatter, then extract by heading keyword.
+  // This avoids cross-section false positives (e.g. "- 無" in Completed leaking into pending).
+  const body = content.replace(/^---[\s\S]*?---\s*/, "");
+  const completedSection = extractSectionContent(body, /^##[^\n]*完成[^\n]*\n/m);
+  const pendingSection = extractSectionContent(body, /^##[^\n]*待辦[^\n]*\n/m);
+
+  const completed = [...completedSection.matchAll(/- \[x\] (.+)/g)].map((m) => m[1].trim());
+  // Pending notes are plain list items (not checkboxes). "無" is the empty-section sentinel.
+  const pending = [...pendingSection.matchAll(/^- (?!\[)(.+)/gm)]
+    .map((m) => m[1].trim())
+    .filter((s) => s !== "無" && s !== "");
+
+  const blockingReason = asString(frontmatter.blocking_reason) || undefined;
+  const lastAgent = asString(frontmatter.last_agent) || undefined;
 
   return {
     active_feature: asString(frontmatter.active_feature),
     status: asString(frontmatter.status),
     last_updated: asString(frontmatter.last_updated),
+    ...(blockingReason && { blocking_reason: blockingReason }),
+    ...(lastAgent && { last_agent: lastAgent }),
     completed,
     pending,
   };
@@ -88,14 +112,17 @@ export function readHandoffState(workspacePath: string): string {
 
 /**
  * Write handoff state with enforced formatting.
- * Guarantees valid YAML frontmatter + Markdown checkbox structure.
+ * Pending notes are written as plain list items (not checkboxes) to avoid
+ * ambiguity with tracked task IDs in the completed section.
  */
 export async function writeHandoffState(
   workspacePath: string,
   activeFeature: string,
   status: string,
   completedTasks: string[],
-  pendingNotes: string[]
+  pendingNotes: string[],
+  blockingReason?: string,
+  lastAgent?: string,
 ): Promise<string> {
   ensureDir(workspacePath);
   const handoffPath = getHandoffPath(workspacePath);
@@ -110,15 +137,21 @@ export async function writeHandoffState(
     const completedList = completedTasks.length
       ? completedTasks.map((t) => `- [x] ${t}`).join("\n")
       : "- 無";
+    // Plain list items (no checkbox) so they are visually distinct from task IDs.
     const pendingList = pendingNotes.length
-      ? pendingNotes.map((t) => `- [ ] ${t}`).join("\n")
+      ? pendingNotes.map((t) => `- ${t}`).join("\n")
       : "- 無";
 
+    const frontmatterData: Record<string, string> = {
+      active_feature: activeFeature,
+      status,
+      last_updated: now,
+    };
+    if (blockingReason) frontmatterData.blocking_reason = blockingReason;
+    if (lastAgent) frontmatterData.last_agent = lastAgent;
+
     const frontmatter = yaml
-      .dump(
-        { active_feature: activeFeature, status, last_updated: now },
-        { lineWidth: -1, forceQuotes: true, quotingType: '"' }
-      )
+      .dump(frontmatterData, { lineWidth: -1, forceQuotes: true, quotingType: '"' })
       .trimEnd();
 
     const content = `---
