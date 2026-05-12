@@ -98,16 +98,16 @@ content/constitution.md         ← 你的「憲法」（規範守則）
 
 ### Layer 2：Tools — 結構化 API（剝奪 AI 亂寫的權力）
 
-Server 提供 6 個 tools。**AI 不能直接動 `handoff.md` / `tasks.md`，只能透過這些 tools**：
+Server 提供 6 個 tools。**AI 不能直接動 `handoff.md` 或任務清單檔，只能透過這些 tools**：
 
 | Tool | 功能 | 為什麼這樣設計 |
 |---|---|---|
 | `sdd_get_state` | 讀現在的專案進度 | **必須先呼叫**，否則所有寫入工具會被擋（pre-flight check） |
 | `sdd_update_state` | 更新 handoff（active_feature / status / completed / pending） | Server 強制產合法 YAML，AI 寫壞格式不可能 |
-| `sdd_get_next_task` | 從 tasks.md 拿下一個未完成 task | 結構化回傳 task ID、檔案路徑、是否到 checkpoint |
+| `sdd_get_next_task` | 從任務清單拿下一個未完成 task | 結構化回傳 task ID、section、是否到 checkpoint |
 | `sdd_complete_task` | 把 `[ ]` 改成 `[x]` | 可加 note（例如 "via vibe coding"） |
 | `sdd_rollback_task` | `[x]` → `[ ] (reverted: 原因)` | 用於後來發現先前實作壞掉 |
-| `sdd_detect_drift` | 比對 handoff 跟 tasks 是否一致 | 抓「兩邊不同步」的情況 |
+| `sdd_detect_drift` | 比對 handoff 跟任務清單是否一致 | 抓「兩邊不同步」的情況 |
 
 **白話講**：AI 在無塵室工作，只能按規定的按鈕報告進度，杜絕亂寫。
 
