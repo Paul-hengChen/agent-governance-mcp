@@ -78,13 +78,13 @@ function escapeRegExp(s) {
  * Mark a task as completed.
  */
 export async function completeTask(workspacePath, taskId, note) {
-    const probe = parseTasks(workspacePath);
-    if (!probe) {
+    const filePath = findTasksFile(workspacePath);
+    if (!filePath) {
         return JSON.stringify({ error: "No task list file found." });
     }
-    const lockPath = `${probe.filePath}.lock`;
+    const lockPath = `${filePath}.lock`;
     return withFileLock(lockPath, () => {
-        verifyFreshness(workspacePath, probe.filePath, "tasks");
+        verifyFreshness(workspacePath, filePath, "tasks");
         const result = parseTasks(workspacePath);
         if (!result) {
             return JSON.stringify({ error: "No task list file found." });
@@ -120,13 +120,13 @@ export async function completeTask(workspacePath, taskId, note) {
  * Rollback a task: mark [x] → [ ] with reason.
  */
 export async function rollbackTask(workspacePath, taskId, reason) {
-    const probe = parseTasks(workspacePath);
-    if (!probe) {
+    const filePath = findTasksFile(workspacePath);
+    if (!filePath) {
         return JSON.stringify({ error: "No task list file found." });
     }
-    const lockPath = `${probe.filePath}.lock`;
+    const lockPath = `${filePath}.lock`;
     return withFileLock(lockPath, () => {
-        verifyFreshness(workspacePath, probe.filePath, "tasks");
+        verifyFreshness(workspacePath, filePath, "tasks");
         const result = parseTasks(workspacePath);
         if (!result) {
             return JSON.stringify({ error: "No task list file found." });
@@ -139,7 +139,9 @@ export async function rollbackTask(workspacePath, taskId, reason) {
             return JSON.stringify({ error: `Task ${taskId} is not completed, cannot rollback.` });
         }
         let content = fs.readFileSync(result.filePath, "utf-8");
-        const oldPattern = new RegExp(`- \\[x\\] ${escapeRegExp(taskId)}(\\s.+?)(?:\\s*\\(.*\\))?$`, "m");
+        // Strip only known annotation suffixes `(note: ...)` or `(reverted: ...)` — not arbitrary
+        // description parens like `fix(auth)` — to avoid stripping content from task descriptions.
+        const oldPattern = new RegExp(`- \\[x\\] ${escapeRegExp(taskId)}(\\s.+?)(?:\\s+\\((?:note|reverted):[^)]*\\))?$`, "m");
         if (!oldPattern.test(content)) {
             return JSON.stringify({
                 error: `Could not find a checked checkbox line for ${taskId}.`,

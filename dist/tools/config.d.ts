@@ -1,9 +1,9 @@
-export interface SddConfig {
+export interface WorkspaceConfig {
     taskPattern?: string;
     taskPaths?: string[];
 }
 export declare const DEFAULT_TASK_REGEX: RegExp;
-export declare function loadConfig(workspacePath: string): SddConfig;
+export declare function loadConfig(workspacePath: string): WorkspaceConfig;
 export declare function resolveTaskPaths(workspacePath: string): string[];
 export declare function findTasksFile(workspacePath: string): string | null;
 /**

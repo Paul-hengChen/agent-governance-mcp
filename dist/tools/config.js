@@ -24,10 +24,16 @@ const DEFAULT_TASK_PATHS = [
 //   - [x] PROJ-42 fix race
 //   - [ ] auth-refactor write migration
 export const DEFAULT_TASK_REGEX = /^- \[([ x])\] (\S+)\s+(.+)$/;
+const configCache = new Map();
 export function loadConfig(workspacePath) {
+    const cached = configCache.get(workspacePath);
+    if (cached !== undefined)
+        return cached;
     const configPath = path.join(workspacePath, ".current", ".config.json");
-    if (!fs.existsSync(configPath))
+    if (!fs.existsSync(configPath)) {
+        configCache.set(workspacePath, {});
         return {};
+    }
     let raw;
     try {
         raw = fs.readFileSync(configPath, "utf-8");
@@ -35,16 +41,19 @@ export function loadConfig(workspacePath) {
     catch (err) {
         throw new Error(`Failed to read ${configPath}: ${err.message}`);
     }
+    let result;
     try {
         const parsed = JSON.parse(raw);
         if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
             throw new Error("config must be a JSON object");
         }
-        return parsed;
+        result = parsed;
     }
     catch (err) {
         throw new Error(`Failed to parse ${configPath}: ${err.message}`);
     }
+    configCache.set(workspacePath, result);
+    return result;
 }
 export function resolveTaskPaths(workspacePath) {
     const config = loadConfig(workspacePath);

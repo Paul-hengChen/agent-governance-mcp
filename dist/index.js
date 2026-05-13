@@ -61,7 +61,7 @@ function formatZodError(err) {
 // ==========================================
 // 1. Initialize Server (Tools + Prompts)
 // ==========================================
-const server = new Server({ name: "teamwork-mcp-server", version: "2.0.0" }, { capabilities: { tools: {}, prompts: {} } });
+const server = new Server({ name: "teamwork-mcp-server", version: "3.0.0" }, { capabilities: { tools: {}, prompts: {} } });
 // ==========================================
 // 2. Register Prompts (Layer 1: Auto-inject constitution)
 // ==========================================

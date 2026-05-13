@@ -77,7 +77,7 @@ function formatZodError(err: z.ZodError): string {
 // 1. Initialize Server (Tools + Prompts)
 // ==========================================
 const server = new Server(
-  { name: "teamwork-mcp-server", version: "2.0.0" },
+  { name: "teamwork-mcp-server", version: "3.0.0" },
   { capabilities: { tools: {}, prompts: {} } }
 );
 

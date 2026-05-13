@@ -10,7 +10,7 @@
 import * as fs from "fs";
 import * as path from "path";
 
-export interface SddConfig {
+export interface WorkspaceConfig {
   taskPattern?: string;
   taskPaths?: string[];
 }
@@ -33,24 +33,35 @@ const DEFAULT_TASK_PATHS = [
 //   - [ ] auth-refactor write migration
 export const DEFAULT_TASK_REGEX = /^- \[([ x])\] (\S+)\s+(.+)$/;
 
-export function loadConfig(workspacePath: string): SddConfig {
+const configCache = new Map<string, WorkspaceConfig>();
+
+export function loadConfig(workspacePath: string): WorkspaceConfig {
+  const cached = configCache.get(workspacePath);
+  if (cached !== undefined) return cached;
+
   const configPath = path.join(workspacePath, ".current", ".config.json");
-  if (!fs.existsSync(configPath)) return {};
+  if (!fs.existsSync(configPath)) {
+    configCache.set(workspacePath, {});
+    return {};
+  }
   let raw: string;
   try {
     raw = fs.readFileSync(configPath, "utf-8");
   } catch (err) {
     throw new Error(`Failed to read ${configPath}: ${(err as Error).message}`);
   }
+  let result: WorkspaceConfig;
   try {
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
       throw new Error("config must be a JSON object");
     }
-    return parsed as SddConfig;
+    result = parsed as WorkspaceConfig;
   } catch (err) {
     throw new Error(`Failed to parse ${configPath}: ${(err as Error).message}`);
   }
+  configCache.set(workspacePath, result);
+  return result;
 }
 
 export function resolveTaskPaths(workspacePath: string): string[] {

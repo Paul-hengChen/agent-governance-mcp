@@ -66,6 +66,8 @@ export function refreshSnapshotFor(workspacePath, filePath, kind) {
         session.tasksMtimeMs = mtime;
         session.tasksPath = filePath;
     }
+    // Reset idle timer so long-running sessions aren't evicted mid-flight by cleanupStaleSessions
+    session.lastReadAt = new Date().toISOString();
 }
 export function resetSession(workspacePath) {
     activeSessions.delete(workspacePath);

@@ -105,14 +105,14 @@ export async function completeTask(
   taskId: string,
   note?: string
 ): Promise<string> {
-  const probe = parseTasks(workspacePath);
-  if (!probe) {
+  const filePath = findTasksFile(workspacePath);
+  if (!filePath) {
     return JSON.stringify({ error: "No task list file found." });
   }
-  const lockPath = `${probe.filePath}.lock`;
+  const lockPath = `${filePath}.lock`;
 
   return withFileLock(lockPath, () => {
-    verifyFreshness(workspacePath, probe.filePath, "tasks");
+    verifyFreshness(workspacePath, filePath, "tasks");
 
     const result = parseTasks(workspacePath);
     if (!result) {
@@ -159,14 +159,14 @@ export async function rollbackTask(
   taskId: string,
   reason: string
 ): Promise<string> {
-  const probe = parseTasks(workspacePath);
-  if (!probe) {
+  const filePath = findTasksFile(workspacePath);
+  if (!filePath) {
     return JSON.stringify({ error: "No task list file found." });
   }
-  const lockPath = `${probe.filePath}.lock`;
+  const lockPath = `${filePath}.lock`;
 
   return withFileLock(lockPath, () => {
-    verifyFreshness(workspacePath, probe.filePath, "tasks");
+    verifyFreshness(workspacePath, filePath, "tasks");
 
     const result = parseTasks(workspacePath);
     if (!result) {
@@ -182,8 +182,10 @@ export async function rollbackTask(
     }
 
     let content = fs.readFileSync(result.filePath, "utf-8");
+    // Strip only known annotation suffixes `(note: ...)` or `(reverted: ...)` — not arbitrary
+    // description parens like `fix(auth)` — to avoid stripping content from task descriptions.
     const oldPattern = new RegExp(
-      `- \\[x\\] ${escapeRegExp(taskId)}(\\s.+?)(?:\\s*\\(.*\\))?$`,
+      `- \\[x\\] ${escapeRegExp(taskId)}(\\s.+?)(?:\\s+\\((?:note|reverted):[^)]*\\))?$`,
       "m"
     );
     if (!oldPattern.test(content)) {
