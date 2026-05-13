@@ -1,3 +1,4 @@
+// Coded by @sr-engineer
 // Tools: tw_switch_role — load a role's skill SOP into the coordinator's context
 
 import * as fs from "fs";
@@ -12,12 +13,14 @@ const CONTENT_DIR = fs.existsSync(path.join(PROJECT_ROOT, "content"))
   ? path.join(PROJECT_ROOT, "content")
   : path.join(PROJECT_ROOT, "..", "content");
 
-const ROLE_SKILL_MAP: Record<string, string> = {
+// `as const` preserves the literal keys so `keyof typeof` yields the proper
+// "pm" | "researcher" | "sr-engineer" | "qa-engineer" union instead of `string`.
+const ROLE_SKILL_MAP = {
   "pm": "skill-pm.md",
   "researcher": "skill-researcher.md",
   "sr-engineer": "skill-sr-engineer.md",
   "qa-engineer": "skill-qa-engineer.md",
-};
+} as const satisfies Record<string, string>;
 
 export type RoleName = keyof typeof ROLE_SKILL_MAP;
 

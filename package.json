@@ -12,6 +12,7 @@
     "prebuild": "npm run check:version",
     "build": "tsc",
     "start": "node dist/index.js",
+    "pretest": "npm run build",
     "test": "node --test test/*.test.mjs"
   },
   "keywords": [

@@ -3,11 +3,25 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
 import { withFileLock } from "../dist/guards/file-lock.js";
+
+const WORKER = fileURLToPath(new URL("./_lock-worker.mjs", import.meta.url));
+
+function runWorker(args) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [WORKER, ...args], { stdio: ["ignore", "ignore", "pipe"] });
+    let stderr = "";
+    child.stderr.on("data", (c) => (stderr += c.toString()));
+    child.on("error", reject);
+    child.on("exit", (code) => resolve({ code, stderr }));
+  });
+}
 
 function mkTmp(prefix = "twlock-") {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -103,6 +117,37 @@ test("reaps a corrupted lockfile whose mtime is older than the stale threshold",
   let ran = false;
   await withFileLock(lockPath, () => { ran = true; });
   assert.equal(ran, true);
+});
+
+test("serialises concurrent CROSS-PROCESS callers without torn writes", async () => {
+  const dir = mkTmp();
+  const lockPath = path.join(dir, ".handoff.lock");
+  const outputPath = path.join(dir, "out.log");
+  fs.writeFileSync(outputPath, "");
+
+  const [a, b, c] = await Promise.all([
+    runWorker([lockPath, outputPath, "A", "60"]),
+    runWorker([lockPath, outputPath, "B", "60"]),
+    runWorker([lockPath, outputPath, "C", "60"]),
+  ]);
+  assert.equal(a.code, 0, `worker A failed: ${a.stderr}`);
+  assert.equal(b.code, 0, `worker B failed: ${b.stderr}`);
+  assert.equal(c.code, 0, `worker C failed: ${c.stderr}`);
+
+  const lines = fs.readFileSync(outputPath, "utf-8").trim().split("\n");
+  assert.equal(lines.length, 6, "each worker must contribute start+end");
+
+  // Each worker's start must be immediately followed by its own end. If any
+  // other tag appears between them, the lock failed to serialise.
+  for (let i = 0; i < lines.length; i += 2) {
+    const [startTag, startMarker] = lines[i].split(":");
+    const [endTag, endMarker] = lines[i + 1].split(":");
+    assert.equal(startMarker, "start");
+    assert.equal(endMarker, "end");
+    assert.equal(startTag, endTag, `interleaved critical section at line ${i}: ${lines.join(" | ")}`);
+  }
+
+  assert.equal(fs.existsSync(lockPath), false, "lockfile must be cleaned up");
 });
 
 test("creates the lock directory if missing", async () => {

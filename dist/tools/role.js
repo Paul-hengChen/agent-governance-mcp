@@ -1,3 +1,4 @@
+// Coded by @sr-engineer
 // Tools: tw_switch_role — load a role's skill SOP into the coordinator's context
 import * as fs from "fs";
 import * as path from "path";
@@ -8,6 +9,8 @@ const PROJECT_ROOT = path.resolve(__dirname, "..");
 const CONTENT_DIR = fs.existsSync(path.join(PROJECT_ROOT, "content"))
     ? path.join(PROJECT_ROOT, "content")
     : path.join(PROJECT_ROOT, "..", "content");
+// `as const` preserves the literal keys so `keyof typeof` yields the proper
+// "pm" | "researcher" | "sr-engineer" | "qa-engineer" union instead of `string`.
 const ROLE_SKILL_MAP = {
     "pm": "skill-pm.md",
     "researcher": "skill-researcher.md",
