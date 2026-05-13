@@ -19,7 +19,7 @@ Three layers of defense, all in `index.ts`:
 
 1. **Prompts** (`prompts/{teamwork,sr-engineer,pm,researcher,qa-engineer}.ts`) — bundle
    `content/constitution.md` + role-specific `content/skill-*.md` + live handoff state.
-2. **Tools** (`tools/{handoff,tasks,drift}.ts`) — six `tw_*` tools that
+2. **Tools** (`tools/{handoff,tasks,drift}.ts`) — seven `tw_*` tools that
    read/write `.current/handoff.md` and `tasks.md` in target workspaces.
 3. **Guards** (`guards/{session,file-lock}.ts`) — pre-flight check, file
    lock, mtime freshness check.
@@ -65,8 +65,13 @@ dist/                     compiled output (committed for npx remote usage)
 
 ## Testing changes
 
-There is no test suite yet (Should-fix on the audit backlog). Smoke-test
-patterns proven to work:
+A test suite lives in `test/` (session, file-lock, handoff, tasks). Run with:
+
+```bash
+node --test test/*.test.mjs
+```
+
+Additional smoke-test patterns:
 
 ```bash
 # Boot test
@@ -74,9 +79,6 @@ node -e "..."  # spawn dist/index.js, send initialize, expect "online" on stderr
 
 # YAML round-trip (catches handoff parsing regressions)
 node --input-type=module -e "import { writeHandoffState, parseHandoff } from './dist/tools/handoff.js'; ..."
-
-# Cross-process lock (catches torn-write regressions)
-( node writer.mjs A & node writer.mjs B & wait )  # confirm both succeed, file valid
 ```
 
 ## What this server does NOT do
