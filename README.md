@@ -323,10 +323,10 @@ The system now supports a complete autonomous development team with specialized 
 | 1 | 3-layer architecture, 6 tools, `sr-engineer` prompt | ✅ Done |
 | 2 | Zod validation, safe YAML, file locks, SessionStart hook | ✅ Done |
 | 2.5 | Configurable task paths/patterns, workspace overrides | ✅ Done |
-| 3 | Schema versioning | Backlog |
-| 4 | Test suite + GitHub Actions CI | Backlog |
-| 5 | SSE / HTTP transport, DB integration, remote team sync | Planning |
-| 6 | `skill-qa-engineer` (Automated QA closed loop) | Planning |
+| 3 | Multi-Agent Ecosystem (Researcher, PM, QA) | ✅ Done |
+| 4 | Schema versioning | Backlog |
+| 5 | Test suite + GitHub Actions CI | Backlog |
+| 6 | SSE / HTTP transport, DB integration, remote team sync | Planning |
 | 7 | CI/CD hook — auto-update handoff on PR merge | Planning |
 
 ---
