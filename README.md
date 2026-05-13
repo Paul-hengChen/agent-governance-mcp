@@ -313,11 +313,11 @@ A: No, they are complementary. The MCP Server acts as the source of truth, while
 
 The system now supports a complete autonomous development team with specialized roles:
 
-- **Coordinator (`teamwork`)**: The default role on session start. Classifies incoming requests and auto-routes them to the right specialist via `tw_switch_role` — no manual role switching required for most workflows.
-- **Sr. Engineer (`sr-engineer`)**: Implements features, fixes bugs, refactors code. Enforces TDD and type safety.
-- **Product Manager (`pm`)**: Analyzes user requests, writes specs, splits features into granular tasks (`tasks.md`), and prioritizes work.
-- **Researcher (`researcher`)**: Reads documentation, researches libraries, validates technical feasibility, and gathers context before execution.
-- **QA Engineer (`qa-engineer`)**: Writes tests, runs verifications, detects regressions, and signs off on completed tasks.
+- **Coordinator (`teamwork`)**: The default role on session start. Classifies incoming requests and auto-routes them to the right specialist via `tw_switch_role` — no manual role switching required for most workflows. Watermark: `// Touched by @coordinator` / `<!-- Touched by @coordinator -->`.
+- **Sr. Engineer (`sr-engineer`)**: Implements features, fixes bugs, refactors code. Enforces TDD and type safety. Watermark: `// Coded by @sr-engineer` / `<!-- Authored by @sr-engineer -->`.
+- **Product Manager (`pm`)**: Analyzes user requests, writes specs, splits features into granular tasks (`tasks.md`), and prioritizes work. Watermark: `// Authored by @pm` / `<!-- Authored by @pm -->`.
+- **Researcher (`researcher`)**: Reads documentation, researches libraries, validates technical feasibility, and gathers context before execution. Watermark: `<!-- Researched by @researcher -->`.
+- **QA Engineer (`qa-engineer`)**: Writes tests, runs verifications, detects regressions, and signs off on completed tasks. Watermark: `// Tested by @qa-engineer` / `<!-- QA by @qa-engineer -->`.
 
 ---
 
@@ -329,8 +329,10 @@ The system now supports a complete autonomous development team with specialized 
 | 2 | Zod validation, safe YAML, file locks, SessionStart hook | ✅ Done |
 | 2.5 | Configurable task paths/patterns, workspace overrides | ✅ Done |
 | 3 | Multi-Agent Ecosystem (Researcher, PM, QA) | ✅ Done |
+| 3.5 | Per-role watermark on created/modified files | ✅ Done |
 | 4 | Schema versioning | Backlog |
-| 5 | Test suite + GitHub Actions CI | Backlog |
+| 5a | Unit + integration test suite | ✅ Done |
+| 5b | GitHub Actions CI | Backlog |
 | 6 | SSE / HTTP transport, DB integration, remote team sync | Planning |
 | 7 | CI/CD hook — auto-update handoff on PR merge | Planning |
 
@@ -346,6 +348,7 @@ teamwork-mcp-server/
 ├── prompts/                       # Prompt assembly (teamwork, sr-engineer, pm, researcher, qa-engineer)
 ├── content/                       # Default constitutions and skills
 ├── bin/                           # Helper scripts (SessionStart hook)
+├── test/                          # Unit & integration tests (session, file-lock, handoff, tasks)
 ├── dist/                          # Compiled JS (committed for npx execution)
 ├── CLAUDE.md                      # Guide for Claude Code
 └── .antigravityrules              # Guide for Anti-Gravity
