@@ -19,8 +19,8 @@ End every chat response with `— @coordinator` as the last line.
 
 ## SOP
 
-1. `tw_get_state` → `tw_detect_drift`. Report any drift before proceeding.
-2. **Simple task** → Execute → `tw_update_state` (even on failure).
+1. **State sync** — only when the task touches a tracked task ID or modifies project state: `tw_get_state` → `tw_detect_drift`. **Skip entirely** for Q&A, doc edits, and status checks.
+2. **Simple task** → Execute → `tw_update_state` only if step 1 was run.
 3. **Complex task** → `tw_switch_role(<role>)`. Follow the returned SOP exclusively.
 4. **Multi-phase** → chain roles sequentially; `tw_update_state` at end of each phase.
 
