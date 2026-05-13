@@ -56,11 +56,11 @@ server.setRequestHandler(ListPromptsRequestSchema, async () => {
         prompts: [
             {
                 name: "sr-engineer",
-                description: "Activate sr-engineer mode. Auto-loads the workspace constitution, skill definition, and current project state. Use this at the start of any coding session.",
+                description: "Load constitution, skill, state. Run first.",
                 arguments: [
                     {
                         name: "workspace_path",
-                        description: "Absolute path to the project workspace",
+                        description: "Absolute workspace path",
                         required: true,
                     },
                 ],
@@ -87,15 +87,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         tools: [
             {
                 name: "sdd_get_state",
-                description: "Read the current project handoff state (.current/handoff.md) as structured JSON. " +
-                    "MUST be called as your VERY FIRST ACTION before any code modification. " +
-                    "If you skip this, subsequent state-modifying tools will be BLOCKED.",
+                description: "Read handoff state JSON. MANDATORY FIRST ACTION. Other sdd_* writes blocked if skipped.",
                 inputSchema: {
                     type: "object",
                     properties: {
                         workspace_path: {
                             type: "string",
-                            description: "Absolute path to the project workspace",
+                            description: "Absolute workspace path",
                         },
                     },
                     required: ["workspace_path"],
@@ -103,42 +101,40 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
             {
                 name: "sdd_update_state",
-                description: "Atomically update the project handoff state. Format is enforced server-side — " +
-                    "no matter what you pass, the output will be valid YAML frontmatter + Markdown checkboxes. " +
-                    "Call this at the END of every task execution.",
+                description: "Atomic write handoff state. Run at END of task.",
                 inputSchema: {
                     type: "object",
                     properties: {
                         workspace_path: {
                             type: "string",
-                            description: "Absolute path to the project workspace",
+                            description: "Absolute workspace path",
                         },
                         active_feature: {
                             type: "string",
-                            description: "Current feature or ticket (e.g., 'Ticket #123' or 'auth-module')",
+                            description: "Current ticket/feature",
                         },
                         status: {
                             type: "string",
                             enum: ["In_Progress", "PASS", "FAIL", "Blocked"],
-                            description: "Current execution status",
+                            description: "Execution status",
                         },
                         completed_tasks: {
                             type: "array",
                             items: { type: "string" },
-                            description: "Tasks completed in this session (e.g., ['T03 src/auth.ts: JWT validation'])",
+                            description: "Tasks completed now",
                         },
                         pending_notes: {
                             type: "array",
                             items: { type: "string" },
-                            description: "Handoff notes for next agent (e.g., ['T04 blocked: missing API key'])",
+                            description: "Notes for next agent",
                         },
                         blocking_reason: {
                             type: "string",
-                            description: "Why work is blocked or failed. Required when status is Blocked or FAIL.",
+                            description: "Required when status=Blocked/FAIL",
                         },
                         agent_id: {
                             type: "string",
-                            description: "Identifier of the agent writing this state (e.g., 'claude-code', 'cursor').",
+                            description: "Agent ID",
                         },
                     },
                     required: ["workspace_path", "active_feature", "status"],
@@ -146,14 +142,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
             {
                 name: "sdd_get_next_task",
-                description: "Get the next incomplete task from tasks.md. Returns task ID, file path, phase, " +
-                    "dependencies, and whether a checkpoint is reached. Use this to determine what to work on next.",
+                description: "Read next uncompleted task.",
                 inputSchema: {
                     type: "object",
                     properties: {
                         workspace_path: {
                             type: "string",
-                            description: "Absolute path to the project workspace",
+                            description: "Absolute workspace path",
                         },
                     },
                     required: ["workspace_path"],
@@ -161,22 +156,21 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
             {
                 name: "sdd_complete_task",
-                description: "Mark a specific task as completed [x] in tasks.md. Optionally add a note (e.g., 'via vibe coding'). " +
-                    "This is an atomic operation — the checkbox format is guaranteed correct.",
+                description: "Mark task completed [x].",
                 inputSchema: {
                     type: "object",
                     properties: {
                         workspace_path: {
                             type: "string",
-                            description: "Absolute path to the project workspace",
+                            description: "Absolute workspace path",
                         },
                         task_id: {
                             type: "string",
-                            description: "Task ID to complete (e.g., 'T03')",
+                            description: "Task ID",
                         },
                         note: {
                             type: "string",
-                            description: "Optional note to append (e.g., 'via vibe coding')",
+                            description: "Optional note",
                         },
                     },
                     required: ["workspace_path", "task_id"],
@@ -184,22 +178,21 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
             {
                 name: "sdd_rollback_task",
-                description: "Revert a completed task back to incomplete: [x] → [ ] (reverted: reason). " +
-                    "Use when a later task discovers the earlier implementation is broken.",
+                description: "Mark task uncompleted [ ]. Require reason.",
                 inputSchema: {
                     type: "object",
                     properties: {
                         workspace_path: {
                             type: "string",
-                            description: "Absolute path to the project workspace",
+                            description: "Absolute workspace path",
                         },
                         task_id: {
                             type: "string",
-                            description: "Task ID to rollback (e.g., 'T03')",
+                            description: "Task ID",
                         },
                         reason: {
                             type: "string",
-                            description: "Why this task is being reverted (e.g., 'breaks T05 contract')",
+                            description: "Rollback reason",
                         },
                     },
                     required: ["workspace_path", "task_id", "reason"],
@@ -207,14 +200,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
             {
                 name: "sdd_detect_drift",
-                description: "Compare handoff.md state against tasks.md checkboxes to detect inconsistencies. " +
-                    "Returns structured drift report. Call this after sdd_get_state to verify synchronization.",
+                description: "Check state vs tasks drift. Run after get_state.",
                 inputSchema: {
                     type: "object",
                     properties: {
                         workspace_path: {
                             type: "string",
-                            description: "Absolute path to the project workspace",
+                            description: "Absolute workspace path",
                         },
                     },
                     required: ["workspace_path"],

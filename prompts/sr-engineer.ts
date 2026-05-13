@@ -56,7 +56,7 @@ export function buildSrEngineerPrompt(workspacePath: string): {
   const prompt = `${constitution}\n\n---\n\n${skill}\n\n---\n\n${stateBlock}`;
 
   return {
-    description: "Activates sr-engineer mode: auto-loads constitution, skill, and current project state.",
+    description: "Load constitution, skill, state.",
     messages: [
       {
         role: "user" as const,

@@ -45,7 +45,7 @@ export function buildSrEngineerPrompt(workspacePath) {
         : `## 📍 Current Project State\nNo handoff state found. Fresh project — call \`sdd_get_state\` to initialize.`;
     const prompt = `${constitution}\n\n---\n\n${skill}\n\n---\n\n${stateBlock}`;
     return {
-        description: "Activates sr-engineer mode: auto-loads constitution, skill, and current project state.",
+        description: "Load constitution, skill, state.",
         messages: [
             {
                 role: "user",
