@@ -45,6 +45,8 @@ content/skill-sr-engineer.md  sr-engineer SOP
 content/skill-pm.md           pm SOP
 content/skill-researcher.md   researcher SOP
 content/skill-qa-engineer.md  qa-engineer SOP
+scripts/check-version.mjs verify package.json version matches index.ts Server() literal
+test/                     unit & integration tests (session, file-lock, handoff, tasks)
 dist/                     compiled output (committed for npx remote usage)
 ```
 
@@ -68,7 +70,7 @@ dist/                     compiled output (committed for npx remote usage)
 A test suite lives in `test/` (session, file-lock, handoff, tasks). Run with:
 
 ```bash
-node --test test/*.test.mjs
+npm test          # prebuild + node --test test/*.test.mjs
 ```
 
 Additional smoke-test patterns:

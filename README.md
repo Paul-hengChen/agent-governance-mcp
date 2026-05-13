@@ -302,7 +302,7 @@ A: Start a new session. Also, clear npx cache: `rm -rf ~/.npm/_npx`.
 A: It supports cold starts. `tw_get_state` returns `{exists: false}`, prompting the AI to initialize it via `tw_update_state`.
 
 **Q: How about cross-machine team collaboration?**
-A: Not supported natively yet (locks are local). You must commit `.current/handoff.md` to Git, or wait for the Phase 3 cloud version.
+A: Not supported natively yet (locks are local). You must commit `.current/handoff.md` to Git, or wait for the Phase 6 cloud version.
 
 **Q: Does this conflict with `.cursorrules` or `CLAUDE.md`?**
 A: No, they are complementary. The MCP Server acts as the source of truth, while your IDE rules act as a fallback.
