@@ -93,7 +93,7 @@ This is injected into the AI's context.
 
 ### Layer 2: Tools — Structured APIs (Revoking Free-Text Privileges)
 
-The server exposes 6 MCP tools. **AI cannot edit `handoff.md` or tasks directly; it MUST use these tools:**
+The server exposes 7 MCP tools. **AI cannot edit `handoff.md` or tasks directly; it MUST use these tools:**
 
 | Tool | Function | Why this design? |
 |---|---|---|
@@ -103,6 +103,7 @@ The server exposes 6 MCP tools. **AI cannot edit `handoff.md` or tasks directly;
 | `tw_complete_task` | Changes `[ ]` to `[x]` | Safely edits markdown checkboxes atomically |
 | `tw_rollback_task` | `[x]` → `[ ] (reverted: reason)` | Used when implementations fail later |
 | `tw_detect_drift` | Compares handoff vs tasks | Catches synchronization issues |
+| `tw_switch_role` | Loads a role's SOP into context | Coordinator calls this to auto-route complex tasks without a full prompt reload |
 
 **In short**: AI works in a cleanroom. It can only report progress by pressing pre-defined buttons.
 
@@ -251,13 +252,15 @@ Next time you open a session, the hook will detect `.current/` and auto-inject t
 
 **Method B: Manual**
 In Claude Code, type:
-`/sr-engineer workspace_path:/absolute/path/to/project`
+`/sr-engineer`
+(`workspace_path` is optional — defaults to the current project directory.)
 
 **Method C: Multi-Agent Switching**
-Once the session starts, you default to the `sr-engineer` role. You can dynamically switch roles by calling their MCP prompts:
+Once the session starts, you default to the **Coordinator** role (`/teamwork`). The Coordinator auto-routes complex tasks to the right specialist via `tw_switch_role` — no manual switching required. You can also invoke roles directly:
 - `/pm`: To analyze requests and split tasks into `tasks.md`.
 - `/researcher`: To do deep tech research and write reports.
 - `/qa-engineer`: To run tests, verify work, and rollback bugs.
+- `/sr-engineer`: To implement features, fix bugs, and refactor code.
 
 ---
 
@@ -308,11 +311,13 @@ A: No, they are complementary. The MCP Server acts as the source of truth, while
 
 ## Multi-Agent Ecosystem
 
-The system now supports a complete autonomous development team with specialized roles. In addition to the core `sr-engineer` role, the following agents are available:
+The system now supports a complete autonomous development team with specialized roles:
 
-- **Product Manager (`pm`)**: Focuses on analyzing user requests, writing specs, splitting features into granular tasks (`tasks.md`), and prioritizing work.
-- **Researcher (`researcher`)**: Focuses on reading documentation, researching libraries, validating technical feasibility, and gathering context before execution.
-- **QA Engineer (`qa-engineer`)**: Focuses on writing tests, running verifications, detecting regressions, and signing off on completed tasks.
+- **Coordinator (`teamwork`)**: The default role on session start. Classifies incoming requests and auto-routes them to the right specialist via `tw_switch_role` — no manual role switching required for most workflows.
+- **Sr. Engineer (`sr-engineer`)**: Implements features, fixes bugs, refactors code. Enforces TDD and type safety.
+- **Product Manager (`pm`)**: Analyzes user requests, writes specs, splits features into granular tasks (`tasks.md`), and prioritizes work.
+- **Researcher (`researcher`)**: Reads documentation, researches libraries, validates technical feasibility, and gathers context before execution.
+- **QA Engineer (`qa-engineer`)**: Writes tests, runs verifications, detects regressions, and signs off on completed tasks.
 
 ---
 
@@ -338,7 +343,7 @@ teamwork-mcp-server/
 ├── index.ts                       # MCP server entry point
 ├── tools/                         # MCP Tool implementations (handoff, tasks, drift)
 ├── guards/                        # Session state, pre-flight checks, file locks
-├── prompts/                       # Prompt assembly (sr-engineer)
+├── prompts/                       # Prompt assembly (teamwork, sr-engineer, pm, researcher, qa-engineer)
 ├── content/                       # Default constitutions and skills
 ├── bin/                           # Helper scripts (SessionStart hook)
 ├── dist/                          # Compiled JS (committed for npx execution)
