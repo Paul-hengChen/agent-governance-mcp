@@ -80,11 +80,11 @@ This isn't just "soft prompt engineering." It employs **server-side hard constra
 
 ### Layer 1: Prompts — Auto-Injected Rules
 
-When an MCP-compatible client calls the `sr-engineer` prompt, the server dynamically assembles:
+When an MCP-compatible client calls any role prompt (`teamwork`, `sr-engineer`, `pm`, `researcher`, `qa-engineer`), the server dynamically assembles:
 
 ```
 content/constitution.md         ← Your "Constitution" (rules of conduct)
-+ content/skill-sr-engineer.md   ← SOP (standard operating procedures)
++ content/skill-<role>.md        ← Role-specific SOP (standard operating procedures)
 + Current handoff.md JSON state  ← Where the project is currently at
 ```
 
@@ -252,7 +252,7 @@ Next time you open a session, the hook will detect `.current/` and auto-inject t
 
 **Method B: Manual**
 In Claude Code, type:
-`/sr-engineer`
+`/teamwork`
 (`workspace_path` is optional — defaults to the current project directory.)
 
 **Method C: Multi-Agent Switching**
@@ -329,7 +329,7 @@ The system now supports a complete autonomous development team with specialized 
 | 2 | Zod validation, safe YAML, file locks, SessionStart hook | ✅ Done |
 | 2.5 | Configurable task paths/patterns, workspace overrides | ✅ Done |
 | 3 | Multi-Agent Ecosystem (Researcher, PM, QA) | ✅ Done |
-| 3.5 | Per-role watermark on created/modified files | ✅ Done |
+| 3.5 | Per-role watermark as chat sign-off line | ✅ Done |
 | 4 | Schema versioning | Backlog |
 | 5a | Unit + integration test suite | ✅ Done |
 | 5b | GitHub Actions CI | Backlog |
