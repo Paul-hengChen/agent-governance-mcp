@@ -217,7 +217,7 @@ In `~/.claude/settings.json`:
 ```
 
 ### 2. (Recommended) Configure SessionStart Hook
-To automatically inject rules into Claude Code at startup without manually typing `/sr-engineer`:
+To automatically inject the constitution and Coordinator role into Claude Code at startup without manually invoking a role prompt:
 ```json
 // ~/.claude/settings.json
 {
