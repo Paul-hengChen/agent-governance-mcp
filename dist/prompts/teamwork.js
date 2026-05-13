@@ -1,5 +1,5 @@
-// Coded by @qa-engineer
-// MCP Prompt: qa-engineer — auto-injects constitution + skill + project state
+// Coded by @teamwork
+// MCP Prompt: teamwork — auto-injects constitution + skill + project state
 import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
@@ -23,9 +23,9 @@ function loadContent(filename, workspacePath) {
     }
     return fs.readFileSync(filePath, "utf-8");
 }
-export function buildQaEngineerPrompt(workspacePath) {
+export function buildTeamworkPrompt(workspacePath) {
     const constitution = loadContent("constitution.md", workspacePath);
-    const skill = loadContent("skill-qa-engineer.md", workspacePath);
+    const skill = loadContent("skill-coordinator.md", workspacePath);
     let state = null;
     try {
         state = parseHandoff(workspacePath);
@@ -38,7 +38,7 @@ export function buildQaEngineerPrompt(workspacePath) {
         : `## 📍 Current Project State\nNo handoff state found. Fresh project — call \`tw_get_state\` to initialize.`;
     const prompt = `${constitution}\n\n---\n\n${skill}\n\n---\n\n${stateBlock}`;
     return {
-        description: "QA role. Verify code, write tests, rollback bugs.",
+        description: "Teamwork Coordinator. Route tasks or execute them.",
         messages: [
             {
                 role: "user",
@@ -50,4 +50,4 @@ export function buildQaEngineerPrompt(workspacePath) {
         ],
     };
 }
-//# sourceMappingURL=qa-engineer.js.map
+//# sourceMappingURL=teamwork.js.map

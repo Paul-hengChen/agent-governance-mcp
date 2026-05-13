@@ -2,9 +2,9 @@
 
 This file is auto-loaded by Claude Code when working **inside this repo**. It
 describes the project itself (an MCP server). The *rules of conduct* enforced
-by this server live in `content/constitution.md` and `content/skill-sr-engineer.md`;
-those are loaded into other workspaces via the `sr-engineer` prompt or the
-SessionStart hook — not into this one. This repo is the server's own source,
+by this server live in `content/constitution.md` and the `content/skill-*.md` files;
+those are loaded into other workspaces via role prompts (`teamwork`, `sr-engineer`,
+`pm`, `researcher`, `qa-engineer`) or the SessionStart hook — not into this one. This repo is the server's own source,
 not a teamwork-managed workspace.
 
 ## What this repo is
@@ -17,8 +17,8 @@ no specific project-management framework assumed.
 
 Three layers of defense, all in `index.ts`:
 
-1. **Prompts** (`prompts/sr-engineer.ts`) — bundle `content/constitution.md`
-   + `content/skill-sr-engineer.md` + live handoff state into one MCP prompt.
+1. **Prompts** (`prompts/{teamwork,sr-engineer,pm,researcher,qa-engineer}.ts`) — bundle
+   `content/constitution.md` + role-specific `content/skill-*.md` + live handoff state.
 2. **Tools** (`tools/{handoff,tasks,drift}.ts`) — six `tw_*` tools that
    read/write `.current/handoff.md` and `tasks.md` in target workspaces.
 3. **Guards** (`guards/{session,file-lock}.ts`) — pre-flight check, file
@@ -33,10 +33,18 @@ tools/tasks.ts            complete/rollback tasks in tasks.md
 tools/drift.ts            compare handoff vs tasks for inconsistencies
 guards/session.ts         per-(process,workspace) snapshot of "agent read state"
 guards/file-lock.ts       cross-process O_EXCL lock with stale-PID detection
-prompts/sr-engineer.ts    builds the auto-inject prompt
-bin/teamwork-context.mjs      SessionStart hook helper (emits additionalContext)
+prompts/teamwork.ts       coordinator prompt (default role on SessionStart)
+prompts/sr-engineer.ts    sr-engineer role prompt
+prompts/pm.ts             pm role prompt
+prompts/researcher.ts     researcher role prompt
+prompts/qa-engineer.ts    qa-engineer role prompt
+bin/teamwork-context.mjs  SessionStart hook helper (emits additionalContext)
 content/constitution.md   the rules agents must follow (source of truth)
-content/skill-sr-engineer.md  the SOP they must execute
+content/skill-coordinator.md  default coordinator SOP (loaded by SessionStart hook)
+content/skill-sr-engineer.md  sr-engineer SOP
+content/skill-pm.md           pm SOP
+content/skill-researcher.md   researcher SOP
+content/skill-qa-engineer.md  qa-engineer SOP
 dist/                     compiled output (committed for npx remote usage)
 ```
 

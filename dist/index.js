@@ -18,6 +18,7 @@ import { buildSrEngineerPrompt } from "./prompts/sr-engineer.js";
 import { buildResearcherPrompt } from "./prompts/researcher.js";
 import { buildPmPrompt } from "./prompts/pm.js";
 import { buildQaEngineerPrompt } from "./prompts/qa-engineer.js";
+import { buildTeamworkPrompt } from "./prompts/teamwork.js";
 // ==========================================
 // Runtime validation schemas (zod)
 // ==========================================
@@ -106,6 +107,17 @@ server.setRequestHandler(ListPromptsRequestSchema, async () => {
                     },
                 ],
             },
+            {
+                name: "teamwork",
+                description: "Teamwork Coordinator. Route tasks or execute them.",
+                arguments: [
+                    {
+                        name: "workspace_path",
+                        description: "Absolute workspace path",
+                        required: true,
+                    },
+                ],
+            },
         ],
     };
 });
@@ -138,6 +150,13 @@ server.setRequestHandler(GetPromptRequestSchema, async (request) => {
             throw new Error("workspace_path is required for qa-engineer prompt.");
         }
         return buildQaEngineerPrompt(workspacePath);
+    }
+    else if (name === "teamwork") {
+        const workspacePath = args?.workspace_path;
+        if (!workspacePath || typeof workspacePath !== "string") {
+            throw new Error("workspace_path is required for teamwork prompt.");
+        }
+        return buildTeamworkPrompt(workspacePath);
     }
     throw new Error(`Prompt not found: ${name}`);
 });

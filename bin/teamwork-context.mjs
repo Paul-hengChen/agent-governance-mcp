@@ -54,7 +54,7 @@ function loadContent(filename) {
 }
 
 const constitution = loadContent("constitution.md");
-const skill = loadContent("skill-sr-engineer.md");
+const skill = loadContent("skill-coordinator.md");
 
 if (!constitution || !skill) {
   // Server repo missing or moved — surface a hint instead of injecting nothing.
@@ -82,7 +82,7 @@ const body = [
   "# 🛡️ Teamwork Auto-Context (SessionStart hook)",
   "",
   "The following constitution and SOP are now in effect for this session.",
-  "You are defaulting to the `sr-engineer` role. To switch roles, the user can type `/pm`, `/researcher`, or `/qa-engineer`.",
+  "You are currently in Coordinator mode. You can execute simple tasks, or advise the user to switch roles via `/pm`, `/researcher`, `/sr-engineer`, or `/qa-engineer`.",
   "Call `tw_get_state` before any state-modifying tool.",
   "",
   "---",

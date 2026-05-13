@@ -1,5 +1,5 @@
-// Coded by @qa-engineer
-// MCP Prompt: qa-engineer — auto-injects constitution + skill + project state
+// Coded by @teamwork
+// MCP Prompt: teamwork — auto-injects constitution + skill + project state
 
 import * as fs from "fs";
 import * as path from "path";
@@ -28,12 +28,12 @@ function loadContent(filename: string, workspacePath?: string): string {
   return fs.readFileSync(filePath, "utf-8");
 }
 
-export function buildQaEngineerPrompt(workspacePath: string): {
+export function buildTeamworkPrompt(workspacePath: string): {
   description: string;
   messages: Array<{ role: "user"; content: { type: "text"; text: string } }>;
 } {
   const constitution = loadContent("constitution.md", workspacePath);
-  const skill = loadContent("skill-qa-engineer.md", workspacePath);
+  const skill = loadContent("skill-coordinator.md", workspacePath);
 
   let state: ReturnType<typeof parseHandoff> = null;
   try {
@@ -48,7 +48,7 @@ export function buildQaEngineerPrompt(workspacePath: string): {
   const prompt = `${constitution}\n\n---\n\n${skill}\n\n---\n\n${stateBlock}`;
 
   return {
-    description: "QA role. Verify code, write tests, rollback bugs.",
+    description: "Teamwork Coordinator. Route tasks or execute them.",
     messages: [
       {
         role: "user" as const,

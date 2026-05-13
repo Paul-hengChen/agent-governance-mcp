@@ -42,8 +42,8 @@ export function buildPmPrompt(workspacePath: string): {
     // fall through to "no state" block
   }
   const stateBlock = state
-    ? `## 📍 Current Project State\n\`\`\`json\n${JSON.stringify(state, null, 2)}\n\`\`\``
-    : `## 📍 Current Project State\nNo state found. Call \`tw_get_state\` to init.`;
+    ? `## 📍 Current Project State (Auto-injected)\n\`\`\`json\n${JSON.stringify(state, null, 2)}\n\`\`\``
+    : `## 📍 Current Project State\nNo handoff state found. Fresh project — call \`tw_get_state\` to initialize.`;
 
   const prompt = `${constitution}\n\n---\n\n${skill}\n\n---\n\n${stateBlock}`;
 
