@@ -14,5 +14,6 @@ export declare function verifyFreshness(workspacePath: string, filePath: string,
  */
 export declare function refreshSnapshotFor(workspacePath: string, filePath: string, kind: FileKind): void;
 export declare function resetSession(workspacePath: string): void;
+export declare function cleanupStaleSessions(maxAgeMs: number): void;
 export {};
 //# sourceMappingURL=session.d.ts.map

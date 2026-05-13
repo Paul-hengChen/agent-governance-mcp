@@ -70,4 +70,12 @@ export function refreshSnapshotFor(workspacePath, filePath, kind) {
 export function resetSession(workspacePath) {
     activeSessions.delete(workspacePath);
 }
+export function cleanupStaleSessions(maxAgeMs) {
+    const now = Date.now();
+    for (const [key, session] of activeSessions.entries()) {
+        if (now - new Date(session.lastReadAt).getTime() > maxAgeMs) {
+            activeSessions.delete(key);
+        }
+    }
+}
 //# sourceMappingURL=session.js.map

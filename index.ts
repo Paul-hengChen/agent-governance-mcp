@@ -6,6 +6,7 @@
 // Methodology-agnostic: defaults to a generic markdown checkbox task format;
 // teams override task pattern / paths / constitution via <workspace>/.current/.
 
+import * as path from "path";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
@@ -19,7 +20,7 @@ import { z } from "zod";
 import { readHandoffState, writeHandoffState } from "./tools/handoff.js";
 import { getNextTask, completeTask, rollbackTask } from "./tools/tasks.js";
 import { detectDrift } from "./tools/drift.js";
-import { enforcePreFlight } from "./guards/session.js";
+import { enforcePreFlight, cleanupStaleSessions } from "./guards/session.js";
 import { buildSrEngineerPrompt } from "./prompts/sr-engineer.js";
 import { buildResearcherPrompt } from "./prompts/researcher.js";
 import { buildPmPrompt } from "./prompts/pm.js";
@@ -28,28 +29,33 @@ import { buildQaEngineerPrompt } from "./prompts/qa-engineer.js";
 // ==========================================
 // Runtime validation schemas (zod)
 // ==========================================
+const absoluteWorkspacePath = z
+  .string()
+  .min(1)
+  .refine((p) => path.isAbsolute(p), { message: "workspace_path must be an absolute path" });
+
 const WorkspaceOnly = z.object({
-  workspace_path: z.string().min(1, "workspace_path must be a non-empty string"),
+  workspace_path: absoluteWorkspacePath,
 });
 
 const UpdateStateArgs = z.object({
-  workspace_path: z.string().min(1),
-  active_feature: z.string().min(1),
+  workspace_path: absoluteWorkspacePath,
+  active_feature: z.string().min(1).max(500),
   status: z.enum(["In_Progress", "PASS", "FAIL", "Blocked"]),
   completed_tasks: z.array(z.string()).optional().default([]),
   pending_notes: z.array(z.string()).optional().default([]),
-  blocking_reason: z.string().optional(),
-  agent_id: z.string().optional(),
+  blocking_reason: z.string().max(2000).optional(),
+  agent_id: z.string().max(200).optional(),
 });
 
 const CompleteTaskArgs = z.object({
-  workspace_path: z.string().min(1),
+  workspace_path: absoluteWorkspacePath,
   task_id: z.string().min(1),
   note: z.string().optional(),
 });
 
 const RollbackTaskArgs = z.object({
-  workspace_path: z.string().min(1),
+  workspace_path: absoluteWorkspacePath,
   task_id: z.string().min(1),
   reason: z.string().min(1),
 });
@@ -365,7 +371,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         isError: true,
       };
     }
-    const message = error instanceof Error ? error.message : String(error);
+    const message = error instanceof Error ? (error.stack ?? error.message) : String(error);
     return {
       content: [{ type: "text" as const, text: message }],
       isError: true,
@@ -376,6 +382,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 // ==========================================
 // 5. Start Server
 // ==========================================
+// Evict sessions idle for more than 1 hour to prevent unbounded memory growth
+setInterval(() => cleanupStaleSessions(60 * 60 * 1000), 30 * 60 * 1000).unref();
+
 const transport = new StdioServerTransport();
 server
   .connect(transport)

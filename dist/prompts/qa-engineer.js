@@ -26,7 +26,13 @@ function loadContent(filename, workspacePath) {
 export function buildQaEngineerPrompt(workspacePath) {
     const constitution = loadContent("constitution.md", workspacePath);
     const skill = loadContent("skill-qa-engineer.md", workspacePath);
-    const state = parseHandoff(workspacePath);
+    let state = null;
+    try {
+        state = parseHandoff(workspacePath);
+    }
+    catch {
+        // fall through to "no state" block
+    }
     const stateBlock = state
         ? `## 📍 Current Project State\n\`\`\`json\n${JSON.stringify(state, null, 2)}\n\`\`\``
         : `## 📍 Current Project State\nNo state found. Call \`tw_get_state\` to init.`;

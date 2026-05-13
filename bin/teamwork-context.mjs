@@ -19,10 +19,11 @@
 import * as fs from "fs";
 import * as path from "path";
 
+const __dirname = path.dirname(new URL(import.meta.url).pathname);
 const SERVER_ROOT =
   process.env.TEAMWORK_SERVER_ROOT ||
   process.env.SDD_SERVER_ROOT ||
-  "/Users/paul.ph.chen/teamwork-mcp-server";
+  path.resolve(__dirname, "..");
 const workspace = process.env.CLAUDE_PROJECT_DIR || process.cwd();
 
 // A workspace opts in by having any of these markers. Methodology-agnostic.

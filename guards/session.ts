@@ -98,3 +98,12 @@ export function refreshSnapshotFor(
 export function resetSession(workspacePath: string): void {
   activeSessions.delete(workspacePath);
 }
+
+export function cleanupStaleSessions(maxAgeMs: number): void {
+  const now = Date.now();
+  for (const [key, session] of activeSessions.entries()) {
+    if (now - new Date(session.lastReadAt).getTime() > maxAgeMs) {
+      activeSessions.delete(key);
+    }
+  }
+}

@@ -38,8 +38,14 @@ function loadContent(filename, workspacePath) {
 export function buildSrEngineerPrompt(workspacePath) {
     const constitution = loadContent("constitution.md", workspacePath);
     const skill = loadContent("skill-sr-engineer.md", workspacePath);
-    // Dynamic state injection
-    const state = parseHandoff(workspacePath);
+    // Dynamic state injection — parseHandoff can throw on malformed YAML
+    let state = null;
+    try {
+        state = parseHandoff(workspacePath);
+    }
+    catch {
+        // fall through to "no state" block
+    }
     const stateBlock = state
         ? `## 📍 Current Project State (Auto-injected)\n\`\`\`json\n${JSON.stringify(state, null, 2)}\n\`\`\``
         : `## 📍 Current Project State\nNo handoff state found. Fresh project — call \`tw_get_state\` to initialize.`;
