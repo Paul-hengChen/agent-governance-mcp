@@ -21,6 +21,9 @@ import { getNextTask, completeTask, rollbackTask } from "./tools/tasks.js";
 import { detectDrift } from "./tools/drift.js";
 import { enforcePreFlight } from "./guards/session.js";
 import { buildSrEngineerPrompt } from "./prompts/sr-engineer.js";
+import { buildResearcherPrompt } from "./prompts/researcher.js";
+import { buildPmPrompt } from "./prompts/pm.js";
+import { buildQaEngineerPrompt } from "./prompts/qa-engineer.js";
 
 // ==========================================
 // Runtime validation schemas (zod)
@@ -82,6 +85,39 @@ server.setRequestHandler(ListPromptsRequestSchema, async () => {
           },
         ],
       },
+      {
+        name: "researcher",
+        description: "Deep research. Load constitution, skill, state.",
+        arguments: [
+          {
+            name: "workspace_path",
+            description: "Absolute workspace path",
+            required: true,
+          },
+        ],
+      },
+      {
+        name: "pm",
+        description: "PM role. Write specs, break down tasks, sync state.",
+        arguments: [
+          {
+            name: "workspace_path",
+            description: "Absolute workspace path",
+            required: true,
+          },
+        ],
+      },
+      {
+        name: "qa-engineer",
+        description: "QA role. Verify code, write tests, rollback bugs.",
+        arguments: [
+          {
+            name: "workspace_path",
+            description: "Absolute workspace path",
+            required: true,
+          },
+        ],
+      },
     ],
   };
 });
@@ -95,6 +131,24 @@ server.setRequestHandler(GetPromptRequestSchema, async (request) => {
       throw new Error("workspace_path is required for sr-engineer prompt.");
     }
     return buildSrEngineerPrompt(workspacePath);
+  } else if (name === "researcher") {
+    const workspacePath = args?.workspace_path;
+    if (!workspacePath || typeof workspacePath !== "string") {
+      throw new Error("workspace_path is required for researcher prompt.");
+    }
+    return buildResearcherPrompt(workspacePath);
+  } else if (name === "pm") {
+    const workspacePath = args?.workspace_path;
+    if (!workspacePath || typeof workspacePath !== "string") {
+      throw new Error("workspace_path is required for pm prompt.");
+    }
+    return buildPmPrompt(workspacePath);
+  } else if (name === "qa-engineer") {
+    const workspacePath = args?.workspace_path;
+    if (!workspacePath || typeof workspacePath !== "string") {
+      throw new Error("workspace_path is required for qa-engineer prompt.");
+    }
+    return buildQaEngineerPrompt(workspacePath);
   }
 
   throw new Error(`Prompt not found: ${name}`);
