@@ -93,8 +93,8 @@ server.setRequestHandler(ListPromptsRequestSchema, async () => {
         arguments: [
           {
             name: "workspace_path",
-            description: "Absolute workspace path",
-            required: true,
+            description: "Absolute workspace path (optional — defaults to current project dir)",
+            required: false,
           },
         ],
       },
@@ -104,8 +104,8 @@ server.setRequestHandler(ListPromptsRequestSchema, async () => {
         arguments: [
           {
             name: "workspace_path",
-            description: "Absolute workspace path",
-            required: true,
+            description: "Absolute workspace path (optional — defaults to current project dir)",
+            required: false,
           },
         ],
       },
@@ -115,8 +115,8 @@ server.setRequestHandler(ListPromptsRequestSchema, async () => {
         arguments: [
           {
             name: "workspace_path",
-            description: "Absolute workspace path",
-            required: true,
+            description: "Absolute workspace path (optional — defaults to current project dir)",
+            required: false,
           },
         ],
       },
@@ -126,8 +126,8 @@ server.setRequestHandler(ListPromptsRequestSchema, async () => {
         arguments: [
           {
             name: "workspace_path",
-            description: "Absolute workspace path",
-            required: true,
+            description: "Absolute workspace path (optional — defaults to current project dir)",
+            required: false,
           },
         ],
       },
@@ -137,8 +137,8 @@ server.setRequestHandler(ListPromptsRequestSchema, async () => {
         arguments: [
           {
             name: "workspace_path",
-            description: "Absolute workspace path",
-            required: true,
+            description: "Absolute workspace path (optional — defaults to current project dir)",
+            required: false,
           },
         ],
       },
@@ -149,36 +149,22 @@ server.setRequestHandler(ListPromptsRequestSchema, async () => {
 server.setRequestHandler(GetPromptRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
 
+  // Fallback: CLAUDE_PROJECT_DIR (set by Claude Code) or cwd
+  const resolvedPath =
+    (typeof args?.workspace_path === "string" && args.workspace_path) ||
+    process.env.CLAUDE_PROJECT_DIR ||
+    process.cwd();
+
   if (name === "sr-engineer") {
-    const workspacePath = args?.workspace_path;
-    if (!workspacePath || typeof workspacePath !== "string") {
-      throw new Error("workspace_path is required for sr-engineer prompt.");
-    }
-    return buildSrEngineerPrompt(workspacePath);
+    return buildSrEngineerPrompt(resolvedPath);
   } else if (name === "researcher") {
-    const workspacePath = args?.workspace_path;
-    if (!workspacePath || typeof workspacePath !== "string") {
-      throw new Error("workspace_path is required for researcher prompt.");
-    }
-    return buildResearcherPrompt(workspacePath);
+    return buildResearcherPrompt(resolvedPath);
   } else if (name === "pm") {
-    const workspacePath = args?.workspace_path;
-    if (!workspacePath || typeof workspacePath !== "string") {
-      throw new Error("workspace_path is required for pm prompt.");
-    }
-    return buildPmPrompt(workspacePath);
+    return buildPmPrompt(resolvedPath);
   } else if (name === "qa-engineer") {
-    const workspacePath = args?.workspace_path;
-    if (!workspacePath || typeof workspacePath !== "string") {
-      throw new Error("workspace_path is required for qa-engineer prompt.");
-    }
-    return buildQaEngineerPrompt(workspacePath);
+    return buildQaEngineerPrompt(resolvedPath);
   } else if (name === "teamwork") {
-    const workspacePath = args?.workspace_path;
-    if (!workspacePath || typeof workspacePath !== "string") {
-      throw new Error("workspace_path is required for teamwork prompt.");
-    }
-    return buildTeamworkPrompt(workspacePath);
+    return buildTeamworkPrompt(resolvedPath);
   }
 
   throw new Error(`Prompt not found: ${name}`);
