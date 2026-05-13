@@ -1,3 +1,4 @@
+<!-- Touched by @coordinator -->
 # 🛡️ Teamwork MCP Server
 
 > A "governance layer" + "automated secretary" via the Model Context Protocol.
