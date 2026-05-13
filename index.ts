@@ -305,7 +305,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "tw_switch_role",
-        description: "Load a role's SOP into context. Coordinator calls this to auto-route complex tasks.",
+        description:
+          "Return the named role's SOP text for the agent to read. " +
+          "CONTEXT LOADING ONLY — the server does NOT enforce a role swap or block other tools; " +
+          "the agent must voluntarily follow the returned SOP. Coordinator calls this to route complex tasks.",
         inputSchema: {
           type: "object" as const,
           properties: {

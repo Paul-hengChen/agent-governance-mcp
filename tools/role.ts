@@ -37,7 +37,10 @@ export function switchRole(role: RoleName, workspacePath: string): string {
   const skill = fs.readFileSync(filePath, "utf-8");
   return JSON.stringify({
     role,
-    instruction: `You have switched to the "${role}" role. Follow the SOP below exclusively until the task is complete or you switch roles again.`,
+    instruction:
+      `Context-loading only: the server is returning the "${role}" SOP for you to follow. ` +
+      `No server-side role enforcement exists — other tw_* tools remain callable regardless. ` +
+      `Follow the SOP below exclusively until the task is complete or you switch roles again.`,
     sop: skill,
   });
 }

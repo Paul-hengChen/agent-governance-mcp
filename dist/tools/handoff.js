@@ -49,10 +49,11 @@ export function parseHandoff(workspacePath) {
     }
     const asString = (v) => (typeof v === "string" ? v : v == null ? "" : String(v));
     // Section-scoped parsing: strip frontmatter, then extract by heading keyword.
-    // This avoids cross-section false positives (e.g. "- 無" in Completed leaking into pending).
+    // Match either the Chinese or English keyword so mixed-locale handoff.md
+    // files (or workspaces that have customised the heading text) still parse.
     const body = content.replace(/^---[\s\S]*?---\s*/, "");
-    const completedSection = extractSectionContent(body, /^##[^\n]*完成[^\n]*\n/m);
-    const pendingSection = extractSectionContent(body, /^##[^\n]*待辦[^\n]*\n/m);
+    const completedSection = extractSectionContent(body, /^##[^\n]*(?:完成|Completed)[^\n]*\n/im);
+    const pendingSection = extractSectionContent(body, /^##[^\n]*(?:待辦|Pending)[^\n]*\n/im);
     const completed = [...completedSection.matchAll(/- \[x\] (.+)/g)].map((m) => m[1].trim());
     // Pending notes are plain list items (not checkboxes). "無" is the empty-section sentinel.
     const pending = [...pendingSection.matchAll(/^- (?!\[)(.+)/gm)]
