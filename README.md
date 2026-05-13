@@ -227,7 +227,7 @@ To automatically inject rules into Claude Code at startup without manually typin
         "hooks": [
           {
             "type": "command",
-            "command": "node /path/to/teamwork-mcp-server/bin/sr-engineer-context.mjs",
+            "command": "node /path/to/teamwork-mcp-server/bin/teamwork-context.mjs",
             "timeout": 10
           }
         ]
@@ -253,8 +253,11 @@ Next time you open a session, the hook will detect `.current/` and auto-inject t
 In Claude Code, type:
 `/sr-engineer workspace_path:/absolute/path/to/project`
 
-**Method C: Tools Only**
-You can simply use the 6 MCP tools (`tw_get_state`, etc.) without the constitution prompt.
+**Method C: Multi-Agent Switching**
+Once the session starts, you default to the `sr-engineer` role. You can dynamically switch roles by calling their MCP prompts:
+- `/pm`: To analyze requests and split tasks into `tasks.md`.
+- `/researcher`: To do deep tech research and write reports.
+- `/qa-engineer`: To run tests, verify work, and rollback bugs.
 
 ---
 
@@ -303,9 +306,9 @@ A: No, they are complementary. The MCP Server acts as the source of truth, while
 
 ---
 
-## Multi-Agent Ecosystem (Planned)
+## Multi-Agent Ecosystem
 
-The current version focuses on the `sr-engineer` role for execution. To build a complete autonomous development team, we plan to introduce the following roles to assist the `sr-engineer`:
+The system now supports a complete autonomous development team with specialized roles. In addition to the core `sr-engineer` role, the following agents are available:
 
 - **Product Manager (`pm`)**: Focuses on analyzing user requests, writing specs, splitting features into granular tasks (`tasks.md`), and prioritizing work.
 - **Researcher (`researcher`)**: Focuses on reading documentation, researching libraries, validating technical feasibility, and gathering context before execution.

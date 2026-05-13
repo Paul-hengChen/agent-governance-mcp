@@ -34,7 +34,7 @@ tools/drift.ts            compare handoff vs tasks for inconsistencies
 guards/session.ts         per-(process,workspace) snapshot of "agent read state"
 guards/file-lock.ts       cross-process O_EXCL lock with stale-PID detection
 prompts/sr-engineer.ts    builds the auto-inject prompt
-bin/sr-engineer-context.mjs   SessionStart hook helper (emits additionalContext)
+bin/teamwork-context.mjs      SessionStart hook helper (emits additionalContext)
 content/constitution.md   the rules agents must follow (source of truth)
 content/skill-sr-engineer.md  the SOP they must execute
 dist/                     compiled output (committed for npx remote usage)
@@ -82,7 +82,7 @@ node --input-type=module -e "import { writeHandoffState, parseHandoff } from './
 
 ## Auto-injection: SessionStart hook
 
-Configured in `~/.claude/settings.json` to run `bin/sr-engineer-context.mjs`
+Configured in `~/.claude/settings.json` to run `bin/teamwork-context.mjs`
 on every session start. The script self-gates: it injects the full
 constitution/skill/state block only if the workspace has any of `.current/`,
 `tasks.md`, or `TODO.md`. In this repo (the server's own source) none of

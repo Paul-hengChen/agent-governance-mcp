@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// SessionStart hook helper for sr-engineer mode.
+// SessionStart hook helper for teamwork-mcp-server.
 //
 // Reads the constitution + skill (workspace override or server default) and
 // the current handoff state, then emits Claude Code's `additionalContext`
@@ -57,7 +57,7 @@ const skill = loadContent("skill-sr-engineer.md");
 
 if (!constitution || !skill) {
   // Server repo missing or moved — surface a hint instead of injecting nothing.
-  const hint = `## ⚠️ sr-engineer hook misconfigured
+  const hint = `## ⚠️ teamwork-context hook misconfigured
 Could not load constitution/skill from ${SERVER_ROOT}.
 Set TEAMWORK_SERVER_ROOT in your Claude Code settings env, or update the
 path in ~/.claude/settings.json's SessionStart hook.`;
@@ -78,9 +78,10 @@ const stateBlock = fs.existsSync(handoffPath)
   : `## 📍 Current Project State\n\nNo handoff state found in this workspace. Call \`tw_get_state\` to initialize.`;
 
 const body = [
-  "# 🛡️ sr-engineer Mode (auto-loaded by SessionStart hook)",
+  "# 🛡️ Teamwork Auto-Context (SessionStart hook)",
   "",
   "The following constitution and SOP are now in effect for this session.",
+  "You are defaulting to the `sr-engineer` role. To switch roles, the user can type `/pm`, `/researcher`, or `/qa-engineer`.",
   "Call `tw_get_state` before any state-modifying tool.",
   "",
   "---",
