@@ -31,12 +31,12 @@ for state synchronisation.
 
 This is the rule that makes multi-agent / multi-IDE work survive context resets.
 
-- **Pre-Flight Check**: EVERY time you start work, your VERY FIRST ACTION must be `sdd_get_state`. Do NOT guess project state.
-- **Drift Check**: After reading state, call `sdd_detect_drift` to verify the handoff record matches the task list. Report any drift to the human before proceeding.
-- **State Update**: At the end of EVERY execution (success or failure), call `sdd_update_state`. Never leave state stale.
-- **Crash Recovery**: If execution fails mid-way, STILL call `sdd_update_state` with the failure summary in `pending_notes`.
-- **Tool Exclusivity for Tasks**: Use `sdd_complete_task` / `sdd_rollback_task` to flip checkboxes. DO NOT manually edit the task-list file.
-- **Mode is Irrelevant**: Whether the human gave a structured task ID or a free-form instruction ("add dark mode"), the state-update protocol is the same. If your work touches a tracked task, mark it via `sdd_complete_task` with a clear note.
+- **Pre-Flight Check**: EVERY time you start work, your VERY FIRST ACTION must be `tw_get_state`. Do NOT guess project state.
+- **Drift Check**: After reading state, call `tw_detect_drift` to verify the handoff record matches the task list. Report any drift to the human before proceeding.
+- **State Update**: At the end of EVERY execution (success or failure), call `tw_update_state`. Never leave state stale.
+- **Crash Recovery**: If execution fails mid-way, STILL call `tw_update_state` with the failure summary in `pending_notes`.
+- **Tool Exclusivity for Tasks**: Use `tw_complete_task` / `tw_rollback_task` to flip checkboxes. DO NOT manually edit the task-list file.
+- **Mode is Irrelevant**: Whether the human gave a structured task ID or a free-form instruction ("add dark mode"), the state-update protocol is the same. If your work touches a tracked task, mark it via `tw_complete_task` with a clear note.
 
 ## 5. Anti-Loop & Circuit Breaker (Cost Control)
 

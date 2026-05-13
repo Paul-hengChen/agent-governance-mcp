@@ -97,12 +97,12 @@ The server exposes 6 MCP tools. **AI cannot edit `handoff.md` or tasks directly;
 
 | Tool | Function | Why this design? |
 |---|---|---|
-| `sdd_get_state` | Reads current project progress | **Mandatory first step**, otherwise write tools are blocked (pre-flight check) |
-| `sdd_update_state` | Updates handoff | Server enforces valid YAML; impossible for AI to break formatting |
-| `sdd_get_next_task` | Fetches next incomplete task | Returns structured data |
-| `sdd_complete_task` | Changes `[ ]` to `[x]` | Safely edits markdown checkboxes atomically |
-| `sdd_rollback_task` | `[x]` → `[ ] (reverted: reason)` | Used when implementations fail later |
-| `sdd_detect_drift` | Compares handoff vs tasks | Catches synchronization issues |
+| `tw_get_state` | Reads current project progress | **Mandatory first step**, otherwise write tools are blocked (pre-flight check) |
+| `tw_update_state` | Updates handoff | Server enforces valid YAML; impossible for AI to break formatting |
+| `tw_get_next_task` | Fetches next incomplete task | Returns structured data |
+| `tw_complete_task` | Changes `[ ]` to `[x]` | Safely edits markdown checkboxes atomically |
+| `tw_rollback_task` | `[x]` → `[ ] (reverted: reason)` | Used when implementations fail later |
+| `tw_detect_drift` | Compares handoff vs tasks | Catches synchronization issues |
 
 **In short**: AI works in a cleanroom. It can only report progress by pressing pre-defined buttons.
 
@@ -111,7 +111,7 @@ The server exposes 6 MCP tools. **AI cannot edit `handoff.md` or tasks directly;
 Two lines of defense enforced at the **code level**:
 
 #### (a) Pre-Flight Check
-If the AI tries to `update_state` without ever calling `sdd_get_state`, it receives a `⛔ BLOCKED` error. This forces a "read-before-write" discipline.
+If the AI tries to `update_state` without ever calling `tw_get_state`, it receives a `⛔ BLOCKED` error. This forces a "read-before-write" discipline.
 
 #### (b) Cross-Process File Lock + Mtime Freshness Check
 - **File Lock**: If two AIs write simultaneously, an `O_EXCL` lockfile serializes them. No torn writes.
@@ -254,7 +254,7 @@ In Claude Code, type:
 `/sr-engineer workspace_path:/absolute/path/to/project`
 
 **Method C: Tools Only**
-You can simply use the 6 MCP tools (`sdd_get_state`, etc.) without the constitution prompt.
+You can simply use the 6 MCP tools (`tw_get_state`, etc.) without the constitution prompt.
 
 ---
 
@@ -262,11 +262,11 @@ You can simply use the 6 MCP tools (`sdd_get_state`, etc.) without the constitut
 
 ### Scenario: Working on Ticket #42
 1. You open Claude Code in the workspace. The SessionStart hook automatically injects the constitution and state. The AI knows: *"I am on Ticket #42, tasks 1-3 are done, task 4 is pending."*
-2. You say "continue". AI calls `sdd_get_next_task` and starts working.
-3. AI finishes and calls `sdd_complete_task("auth-04")`. Checkbox flips to `[x]`.
-4. AI calls `sdd_update_state`. `handoff.md` is updated atomically.
+2. You say "continue". AI calls `tw_get_next_task` and starts working.
+3. AI finishes and calls `tw_complete_task("auth-04")`. Checkbox flips to `[x]`.
+4. AI calls `tw_update_state`. `handoff.md` is updated atomically.
 5. You close the session.
-6. The next day, you open **Cursor**. Cursor connects, calls `sdd_get_state`, gets the latest state, and seamlessly continues with task 5.
+6. The next day, you open **Cursor**. Cursor connects, calls `tw_get_state`, gets the latest state, and seamlessly continues with task 5.
 
 ---
 
@@ -293,7 +293,7 @@ A: Zero config. Your team doesn't need to clone or install anything. They always
 A: Start a new session. Also, clear npx cache: `rm -rf ~/.npm/_npx`.
 
 **Q: Why does it work even if `.current/handoff.md` doesn't exist?**
-A: It supports cold starts. `sdd_get_state` returns `{exists: false}`, prompting the AI to initialize it via `sdd_update_state`.
+A: It supports cold starts. `tw_get_state` returns `{exists: false}`, prompting the AI to initialize it via `tw_update_state`.
 
 **Q: How about cross-machine team collaboration?**
 A: Not supported natively yet (locks are local). You must commit `.current/handoff.md` to Git, or wait for the Phase 3 cloud version.

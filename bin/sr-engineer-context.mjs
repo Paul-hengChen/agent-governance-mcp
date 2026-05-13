@@ -75,13 +75,13 @@ path in ~/.claude/settings.json's SessionStart hook.`;
 const handoffPath = path.join(workspace, ".current", "handoff.md");
 const stateBlock = fs.existsSync(handoffPath)
   ? `## 📍 Current Project State (auto-injected at session start)\n\n\`\`\`yaml\n${readSafe(handoffPath)}\n\`\`\``
-  : `## 📍 Current Project State\n\nNo handoff state found in this workspace. Call \`sdd_get_state\` to initialize.`;
+  : `## 📍 Current Project State\n\nNo handoff state found in this workspace. Call \`tw_get_state\` to initialize.`;
 
 const body = [
   "# 🛡️ sr-engineer Mode (auto-loaded by SessionStart hook)",
   "",
   "The following constitution and SOP are now in effect for this session.",
-  "Call `sdd_get_state` before any state-modifying tool.",
+  "Call `tw_get_state` before any state-modifying tool.",
   "",
   "---",
   constitution,

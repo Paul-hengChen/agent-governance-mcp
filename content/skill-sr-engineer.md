@@ -12,13 +12,13 @@ framework. It assumes only that the workspace has a teamwork-mcp-server attached
 
 ## Standard Operating Procedure (MUST execute sequentially)
 
-1. **Context First**: Call `sdd_get_state` as your VERY FIRST ACTION.
-   - **Drift Check**: Call `sdd_detect_drift`. If drift detected, report and ask the human to confirm before proceeding.
+1. **Context First**: Call `tw_get_state` as your VERY FIRST ACTION.
+   - **Drift Check**: Call `tw_detect_drift`. If drift detected, report and ask the human to confirm before proceeding.
 2. **Implement & Trace**: Modify target files. Add `// Coded by @sr-engineer` at the top of modified files (if not already present).
 3. **Verify**: Execute the workspace's type/lint check (e.g., `npx tsc --noEmit`, `mypy .`, `cargo check`). Ensure ZERO errors.
-4. **State Sync**: Call `sdd_update_state` with completed work and pending notes.
+4. **State Sync**: Call `tw_update_state` with completed work and pending notes.
    - **Crash Recovery**: Even if step 3 fails and the Circuit Breaker triggers, STILL execute this step with the failure state.
-5. **Task Tracking** (only if the workspace has a task list): Call `sdd_complete_task` for each completed task ID.
+5. **Task Tracking** (only if the workspace has a task list): Call `tw_complete_task` for each completed task ID.
 
 ## Anti-Loop & Circuit Breaker
 

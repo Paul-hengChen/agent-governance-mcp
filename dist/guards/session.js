@@ -29,12 +29,12 @@ export function hasReadState(workspacePath) {
 }
 export function enforcePreFlight(workspacePath, toolName) {
     if (!hasReadState(workspacePath)) {
-        throw new Error(`⛔ BLOCKED: You must call sdd_get_state("${workspacePath}") before calling ${toolName}. ` +
+        throw new Error(`⛔ BLOCKED: You must call tw_get_state("${workspacePath}") before calling ${toolName}. ` +
             `This ensures you are working with current project state, not guessing.`);
     }
 }
 /**
- * Compare the on-disk mtime to the snapshot taken at sdd_get_state time.
+ * Compare the on-disk mtime to the snapshot taken at tw_get_state time.
  * If they diverge, another process (or a human editor) changed the file —
  * the caller's mental model is stale and writes must be rejected.
  */
@@ -46,8 +46,8 @@ export function verifyFreshness(workspacePath, filePath, kind) {
     const snapshotMtime = kind === "handoff" ? session.handoffMtimeMs : session.tasksMtimeMs;
     if (currentMtime !== snapshotMtime) {
         throw new Error(`⛔ STATE DRIFT: ${kind} file (${filePath}) was modified since you called ` +
-            `sdd_get_state (snapshot mtime=${snapshotMtime}, current mtime=${currentMtime}). ` +
-            `Call sdd_get_state again to refresh, then retry.`);
+            `tw_get_state (snapshot mtime=${snapshotMtime}, current mtime=${currentMtime}). ` +
+            `Call tw_get_state again to refresh, then retry.`);
     }
 }
 /**

@@ -79,7 +79,7 @@ export function readHandoffState(workspacePath) {
     if (!state) {
         return JSON.stringify({
             exists: false,
-            message: "No handoff state found. This is a fresh project — initialize by calling sdd_update_state.",
+            message: "No handoff state found. This is a fresh project — initialize by calling tw_update_state.",
         });
     }
     return JSON.stringify({ exists: true, ...state });

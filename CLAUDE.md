@@ -19,7 +19,7 @@ Three layers of defense, all in `index.ts`:
 
 1. **Prompts** (`prompts/sr-engineer.ts`) — bundle `content/constitution.md`
    + `content/skill-sr-engineer.md` + live handoff state into one MCP prompt.
-2. **Tools** (`tools/{handoff,tasks,drift}.ts`) — six `sdd_*` tools that
+2. **Tools** (`tools/{handoff,tasks,drift}.ts`) — six `tw_*` tools that
    read/write `.current/handoff.md` and `tasks.md` in target workspaces.
 3. **Guards** (`guards/{session,file-lock}.ts`) — pre-flight check, file
    lock, mtime freshness check.
@@ -75,7 +75,7 @@ node --input-type=module -e "import { writeHandoffState, parseHandoff } from './
 
 - It does NOT force agents to follow the constitution — it only puts the
   constitution into context. An agent that ignores tool calls cannot be
-  stopped from editing `.current/handoff.md` directly. (But `sdd_detect_drift`
+  stopped from editing `.current/handoff.md` directly. (But `tw_detect_drift`
   will surface the inconsistency on the next session.)
 - It is NOT cross-machine. The file lock is local-fs only.
 - It does NOT touch git. Commit/PR workflow is out of scope.
@@ -94,6 +94,6 @@ Override `TEAMWORK_SERVER_ROOT` env var if you move this checkout
 ## Pre-Flight Protocol (the one rule that matters in managed workspaces)
 
 When working **inside a teamwork-managed workspace** (not this repo), the agent's
-first action must always be `sdd_get_state`. Without it, `sdd_update_state`,
-`sdd_complete_task`, and `sdd_rollback_task` will be blocked by the guard.
+first action must always be `tw_get_state`. Without it, `tw_update_state`,
+`tw_complete_task`, and `tw_rollback_task` will be blocked by the guard.
 This is enforced server-side; you cannot bypass it from the client.

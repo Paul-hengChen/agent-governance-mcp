@@ -86,8 +86,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     return {
         tools: [
             {
-                name: "sdd_get_state",
-                description: "Read handoff state JSON. MANDATORY FIRST ACTION. Other sdd_* writes blocked if skipped.",
+                name: "tw_get_state",
+                description: "Read handoff state JSON. MANDATORY FIRST ACTION. Other tw_* writes blocked if skipped.",
                 inputSchema: {
                     type: "object",
                     properties: {
@@ -100,7 +100,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                 },
             },
             {
-                name: "sdd_update_state",
+                name: "tw_update_state",
                 description: "Atomic write handoff state. Run at END of task.",
                 inputSchema: {
                     type: "object",
@@ -141,7 +141,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                 },
             },
             {
-                name: "sdd_get_next_task",
+                name: "tw_get_next_task",
                 description: "Read next uncompleted task.",
                 inputSchema: {
                     type: "object",
@@ -155,7 +155,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                 },
             },
             {
-                name: "sdd_complete_task",
+                name: "tw_complete_task",
                 description: "Mark task completed [x].",
                 inputSchema: {
                     type: "object",
@@ -177,7 +177,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                 },
             },
             {
-                name: "sdd_rollback_task",
+                name: "tw_rollback_task",
                 description: "Mark task uncompleted [ ]. Require reason.",
                 inputSchema: {
                     type: "object",
@@ -199,7 +199,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                 },
             },
             {
-                name: "sdd_detect_drift",
+                name: "tw_detect_drift",
                 description: "Check state vs tasks drift. Run after get_state.",
                 inputSchema: {
                     type: "object",
@@ -223,39 +223,39 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     try {
         switch (name) {
             // --- No guard: reading state IS the pre-flight check ---
-            case "sdd_get_state": {
+            case "tw_get_state": {
                 const { workspace_path } = WorkspaceOnly.parse(args);
                 const result = readHandoffState(workspace_path);
                 return { content: [{ type: "text", text: result }] };
             }
             // --- No guard: drift detection is read-only ---
-            case "sdd_detect_drift": {
+            case "tw_detect_drift": {
                 const { workspace_path } = WorkspaceOnly.parse(args);
                 const result = detectDrift(workspace_path);
                 return { content: [{ type: "text", text: result }] };
             }
             // --- No guard: getting next task is read-only ---
-            case "sdd_get_next_task": {
+            case "tw_get_next_task": {
                 const { workspace_path } = WorkspaceOnly.parse(args);
                 const result = getNextTask(workspace_path);
                 return { content: [{ type: "text", text: result }] };
             }
-            // --- GUARDED: must call sdd_get_state first ---
-            case "sdd_update_state": {
+            // --- GUARDED: must call tw_get_state first ---
+            case "tw_update_state": {
                 const parsed = UpdateStateArgs.parse(args);
-                enforcePreFlight(parsed.workspace_path, "sdd_update_state");
+                enforcePreFlight(parsed.workspace_path, "tw_update_state");
                 const result = await writeHandoffState(parsed.workspace_path, parsed.active_feature, parsed.status, parsed.completed_tasks, parsed.pending_notes, parsed.blocking_reason, parsed.agent_id);
                 return { content: [{ type: "text", text: result }] };
             }
-            case "sdd_complete_task": {
+            case "tw_complete_task": {
                 const parsed = CompleteTaskArgs.parse(args);
-                enforcePreFlight(parsed.workspace_path, "sdd_complete_task");
+                enforcePreFlight(parsed.workspace_path, "tw_complete_task");
                 const result = await completeTask(parsed.workspace_path, parsed.task_id, parsed.note);
                 return { content: [{ type: "text", text: result }] };
             }
-            case "sdd_rollback_task": {
+            case "tw_rollback_task": {
                 const parsed = RollbackTaskArgs.parse(args);
-                enforcePreFlight(parsed.workspace_path, "sdd_rollback_task");
+                enforcePreFlight(parsed.workspace_path, "tw_rollback_task");
                 const result = await rollbackTask(parsed.workspace_path, parsed.task_id, parsed.reason);
                 return { content: [{ type: "text", text: result }] };
             }

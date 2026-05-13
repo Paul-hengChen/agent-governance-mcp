@@ -42,7 +42,7 @@ export function buildSrEngineerPrompt(workspacePath) {
     const state = parseHandoff(workspacePath);
     const stateBlock = state
         ? `## 📍 Current Project State (Auto-injected)\n\`\`\`json\n${JSON.stringify(state, null, 2)}\n\`\`\``
-        : `## 📍 Current Project State\nNo handoff state found. Fresh project — call \`sdd_get_state\` to initialize.`;
+        : `## 📍 Current Project State\nNo handoff state found. Fresh project — call \`tw_get_state\` to initialize.`;
     const prompt = `${constitution}\n\n---\n\n${skill}\n\n---\n\n${stateBlock}`;
     return {
         description: "Load constitution, skill, state.",
