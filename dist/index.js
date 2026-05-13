@@ -19,6 +19,7 @@ import { buildResearcherPrompt } from "./prompts/researcher.js";
 import { buildPmPrompt } from "./prompts/pm.js";
 import { buildQaEngineerPrompt } from "./prompts/qa-engineer.js";
 import { buildTeamworkPrompt } from "./prompts/teamwork.js";
+import { switchRole } from "./tools/role.js";
 // ==========================================
 // Runtime validation schemas (zod)
 // ==========================================
@@ -47,6 +48,10 @@ const RollbackTaskArgs = z.object({
     workspace_path: absoluteWorkspacePath,
     task_id: z.string().min(1),
     reason: z.string().min(1),
+});
+const SwitchRoleArgs = z.object({
+    workspace_path: absoluteWorkspacePath,
+    role: z.enum(["pm", "researcher", "sr-engineer", "qa-engineer"]),
 });
 function formatZodError(err) {
     return err.issues
@@ -293,6 +298,25 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                     required: ["workspace_path"],
                 },
             },
+            {
+                name: "tw_switch_role",
+                description: "Load a role's SOP into context. Coordinator calls this to auto-route complex tasks.",
+                inputSchema: {
+                    type: "object",
+                    properties: {
+                        workspace_path: {
+                            type: "string",
+                            description: "Absolute workspace path",
+                        },
+                        role: {
+                            type: "string",
+                            enum: ["pm", "researcher", "sr-engineer", "qa-engineer"],
+                            description: "Target role to switch into",
+                        },
+                    },
+                    required: ["workspace_path", "role"],
+                },
+            },
         ],
     };
 });
@@ -313,6 +337,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             case "tw_detect_drift": {
                 const { workspace_path } = WorkspaceOnly.parse(args);
                 const result = detectDrift(workspace_path);
+                return { content: [{ type: "text", text: result }] };
+            }
+            // --- No guard: role switching is read-only ---
+            case "tw_switch_role": {
+                const { workspace_path, role } = SwitchRoleArgs.parse(args);
+                const result = switchRole(role, workspace_path);
                 return { content: [{ type: "text", text: result }] };
             }
             // --- No guard: getting next task is read-only ---
