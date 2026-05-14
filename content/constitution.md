@@ -18,9 +18,9 @@ for state synchronisation.
 ## 2. Dev & Tech Standards
 
 - **Language & Typing**: Detect the language from the workspace and enforce strict typing (TypeScript: no `any`; Python: type hints required; etc.).
-- **Pragmatic TDD**: Generate failing tests AND the corresponding implementation in the SAME response.
+- **Test Ownership**: Test writing is exclusively qa-engineer's responsibility. Other roles must NOT write test files.
 - **Compile & Error Checks**: After task execution, ensure a successful build with ZERO errors.
-- **Test Strategy**: Unit tests for pure logic, integration tests for I/O boundaries. Mock external dependencies ONLY.
+- **Test Strategy** (qa-engineer only): Unit tests for pure logic, integration tests for I/O boundaries. Mock external dependencies ONLY.
 
 ## 3. Interaction & Output Formatting
 

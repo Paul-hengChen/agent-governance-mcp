@@ -259,7 +259,7 @@ In Claude Code, type:
 Once the session starts, you default to the **Coordinator** role (`/teamwork`). The Coordinator auto-routes complex tasks to the right specialist via `tw_switch_role` — no manual switching required. You can also invoke roles directly:
 - `/pm`: To analyze requests and split tasks into `tasks.md`.
 - `/researcher`: To do deep tech research and write reports.
-- `/qa-engineer`: To run tests, verify work, and rollback bugs.
+- `/qa-engineer`: To review code, write tests, verify work, and rollback bugs.
 - `/sr-engineer`: To implement features, fix bugs, and refactor code.
 
 ---
@@ -314,10 +314,10 @@ A: No, they are complementary. The MCP Server acts as the source of truth, while
 The system now supports a complete autonomous development team with specialized roles:
 
 - **Coordinator (`teamwork`)**: The default role on session start. Classifies incoming requests and auto-routes them to the right specialist via `tw_switch_role` — no manual role switching required for most workflows. Signs off chat responses with `— @coordinator`.
-- **Sr. Engineer (`sr-engineer`)**: Implements features, fixes bugs, refactors code. Enforces TDD and type safety. Signs off chat responses with `— @sr-engineer`.
+- **Sr. Engineer (`sr-engineer`)**: Implements features, fixes bugs, refactors code. Enforces strict typing and build integrity. Does NOT write tests. Signs off chat responses with `— @sr-engineer`.
 - **Product Manager (`pm`)**: Analyzes user requests, writes specs, splits features into granular tasks (`tasks.md`), and prioritizes work. Signs off chat responses with `— @pm`.
 - **Researcher (`researcher`)**: Reads documentation, researches libraries, validates technical feasibility, and gathers context before execution. Signs off chat responses with `— @researcher`.
-- **QA Engineer (`qa-engineer`)**: Writes tests, runs verifications, detects regressions, and signs off on completed tasks. Signs off chat responses with `— @qa-engineer`.
+- **QA Engineer (`qa-engineer`)**: Reviews sr-engineer's code, writes automated tests, runs verifications, and signs off on completed tasks. Signs off chat responses with `— @qa-engineer`.
 
 ---
 
