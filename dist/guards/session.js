@@ -16,13 +16,43 @@ function statMtime(p) {
 export function markStateRead(workspacePath) {
     const handoffPath = path.join(workspacePath, ".current", "handoff.md");
     const tasksPath = findTasksFile(workspacePath);
+    const prev = activeSessions.get(workspacePath);
     activeSessions.set(workspacePath, {
         hasReadState: true,
         lastReadAt: new Date().toISOString(),
         handoffMtimeMs: statMtime(handoffPath),
         tasksPath,
         tasksMtimeMs: tasksPath ? statMtime(tasksPath) : null,
+        // Preserve any extra tokens written by non-file storage between marks.
+        extra: prev?.extra ?? new Map(),
     });
+}
+/**
+ * Snapshot an arbitrary freshness token (e.g. SQLite row's last_updated).
+ * Used by non-file storage backends where mtime comparison doesn't apply.
+ */
+export function snapshotExtra(workspacePath, key, value) {
+    const session = activeSessions.get(workspacePath);
+    if (!session)
+        return;
+    session.extra.set(key, value);
+}
+/**
+ * Verify that the current value matches the snapshotted value for the given key.
+ * Throws if drift is detected. No-op if the session has no record (enforcePreFlight
+ * should already have rejected the call in that case).
+ */
+export function verifyExtra(workspacePath, key, currentValue) {
+    const session = activeSessions.get(workspacePath);
+    if (!session)
+        return;
+    if (!session.extra.has(key))
+        return; // never snapshotted — first write, allow.
+    const snapshot = session.extra.get(key) ?? null;
+    if (snapshot !== currentValue) {
+        throw new Error(`⛔ STATE DRIFT: ${key} changed since you called tw_get_state ` +
+            `(snapshot=${snapshot}, current=${currentValue}). Call tw_get_state again, then retry.`);
+    }
 }
 export function hasReadState(workspacePath) {
     return activeSessions.get(workspacePath)?.hasReadState ?? false;

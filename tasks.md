@@ -1,14 +1,14 @@
-# Tasks: skill-role-enhancements
-<!-- feature_id: skill-role-enhancements | created_at: 2026-05-15 | created_by: @pm -->
+# Tasks: phase6-remote-transport
+<!-- feature_id: phase6-remote-transport | created_at: 2026-05-15 | created_by: @pm -->
 
 ## Active
 
-- [x] T01 [P0] Add ambiguity gate (step 2.5) + spec schema reference + task priority/dependency format to `content/skill-pm.md` | depends_on: none (note: Added ambiguity gate, spec schema, priority/dependency task format, persona to skill-pm.md)
-- [x] T02 [P0] Add clarification gate (step 1.5) + security checklist (step 3.5) + task-size protocol to `content/skill-sr-engineer.md` | depends_on: none (note: Added clarification gate, security checklist, task-size circuit breaker to skill-sr-engineer.md)
-- [x] T03 [P0] Add backstory persona section to `skill-pm.md`, `skill-sr-engineer.md`, `skill-qa-engineer.md` | depends_on: none (note: Persona backstory embedded in pm, sr-engineer, qa-engineer edits)
-- [x] T04 [P1] Add coverage gate + spec-to-test mapping + security smoke tests + round time-box + CI runnability check to `content/skill-qa-engineer.md` | depends_on: none (note: Added coverage gate, spec-to-test mapping, security smoke tests, round time-box, CI runnability to skill-qa-engineer.md)
-- [x] T05 [P2] Create `content/skill-architect.md` — new Architect role with SOP, persona, and system design artifact output | depends_on: T01 (note: Created content/skill-architect.md with SOP, persona, artifact schema)
-- [x] T06 [P2] Update coordinator routing table in `content/skill-coordinator.md` to include Architect role | depends_on: T05 (note: Added architect row to coordinator routing table in skill-coordinator.md)
+- [x] T01 [P0] Add `--port` CLI arg parsing + dual-mode boot in `index.ts` (stdio default, HTTP when --port given) | depends_on: none (note: --port CLI arg parsing + dual-mode boot in index.ts. stdio default, HTTP when --port given.)
+- [x] T02 [P0] Create `transport/http.ts` — Node `http.createServer` + `StreamableHTTPServerTransport` wiring | depends_on: T01 (note: transport/http.ts created — Node http.createServer + StreamableHTTPServerTransport + body parsing.)
+- [x] T03 [P1] Define `StorageAdapter` interface in `tools/storage.ts` + refactor existing handoff/tasks tools to accept an adapter | depends_on: none (note: HandoffStorage interface + FileHandoffStorage in tools/storage.ts)
+- [x] T04 [P1] Implement `SqliteStorageAdapter` in `tools/storage-sqlite.ts` using `better-sqlite3` | depends_on: T03 (note: SqliteHandoffStorage in tools/storage-sqlite.ts using better-sqlite3 (WAL mode))
+- [x] T05 [P1] Wire storage selection: HTTP mode → `SqliteStorageAdapter`, stdio mode → `FileStorageAdapter` | depends_on: T02, T04 (note: index.ts wired: HTTP mode → SqliteHandoffStorage (--db path), stdio → FileHandoffStorage)
+- [x] T06 [P2] Add `Dockerfile` + `.dockerignore` for single-command cloud deployment | depends_on: T05 (note: Dockerfile (multi-stage, node:22-alpine) + .dockerignore)
 
 ## Completed
 

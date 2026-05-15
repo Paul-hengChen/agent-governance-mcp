@@ -133,9 +133,13 @@ If the AI tries to `update_state` without ever calling `tw_get_state`, it receiv
 - `@modelcontextprotocol/sdk`: MCP server framework
 - `zod` v4: Runtime validation
 - `js-yaml`: Safe YAML frontmatter read/write
+- `better-sqlite3`: SQLite storage adapter for HTTP/remote mode
 
 ### Communication
-- **Stdio transport**: Communicates via standard input/output. Zero network ports, zero config, highly secure.
+- **Stdio transport** (default): Communicates via standard input/output. Zero network ports, zero config, highly secure.
+- **HTTP transport** (`--port <n> [--db <path>]`): Streamable HTTP at `/mcp`, SQLite-backed state, `GET /healthz` for liveness probes.
+  - `TW_AUTH_TOKEN` — required Bearer token (set this whenever the port is reachable beyond localhost; a loud warning is logged if unset).
+  - `TW_ALLOWED_ORIGINS` — comma-separated Origin allowlist (DNS-rebinding defense). Empty list = allow any.
 
 ### Methodology-Agnostic
 The server defaults to a generic markdown checkbox format, but handles customization via workspace overrides:
@@ -414,8 +418,9 @@ The system now supports a complete autonomous development team with specialized 
 | 3.6 | Architect role + skill enhancements (spec schema, BDD AC, security checklist, coverage gate, persona backstory) | ✅ Done |
 | 4 | Schema versioning | Backlog |
 | 5a | Unit + integration test suite | ✅ Done |
-| 5b | GitHub Actions CI | Backlog |
-| 6 | SSE / HTTP transport, DB integration, remote team sync | Planning |
+| 5b | GitHub Actions CI | ✅ Done |
+| 6 | SSE / HTTP transport, SQLite storage, Docker deployment | ✅ Done |
+| 6.1 | HTTP-mode Bearer auth + Origin allowlist + `/healthz` | ✅ Done |
 | 7 | CI/CD hook — auto-update handoff on PR merge | Planning |
 
 ---

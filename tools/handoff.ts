@@ -11,7 +11,7 @@ import {
 } from "../guards/session.js";
 import { withFileLock } from "../guards/file-lock.js";
 
-interface HandoffState {
+export interface HandoffState {
   active_feature: string;
   status: string;
   last_updated: string;

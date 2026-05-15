@@ -19,7 +19,8 @@
     "index.ts",
     "tools/**/*.ts",
     "guards/**/*.ts",
-    "prompts/**/*.ts"
+    "prompts/**/*.ts",
+    "transport/**/*.ts"
   ],
   "exclude": ["node_modules", "dist"]
 }

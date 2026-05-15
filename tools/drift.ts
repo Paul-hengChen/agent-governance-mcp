@@ -2,7 +2,7 @@
 // Tool: drift detection — compare handoff.md state vs tasks.md checkboxes
 
 import * as fs from "fs";
-import { parseHandoff } from "./handoff.js";
+import { getActiveStorage } from "./storage.js";
 import { findTasksFile, resolveTaskRegex } from "./config.js";
 
 interface DriftReport {
@@ -18,7 +18,7 @@ interface DriftReport {
  * Returns structured JSON report.
  */
 export function detectDrift(workspacePath: string): string {
-  const handoff = parseHandoff(workspacePath);
+  const handoff = getActiveStorage().parse(workspacePath);
   const tasksPath = findTasksFile(workspacePath);
 
   // Edge cases
@@ -71,14 +71,15 @@ export function detectDrift(workspacePath: string): string {
   const drifts: string[] = [];
 
   // Pull any token that looks like an ID out of handoff completed entries.
-  // We compare *all* IDs found in the configured regex's ID space.
+  // Pre-compile one regex per ID so we don't re-build O(handoff × idVocab) regexes.
   const idVocab = new Set<string>([...completedTasks, ...incompleteTasks]);
-  const handoffTaskIds = handoff.completed
-    .flatMap((c) =>
-      Array.from(idVocab).filter((id) =>
-        new RegExp(`\\b${id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(c)
-      )
-    );
+  const idPatterns = new Map<string, RegExp>();
+  for (const id of idVocab) {
+    idPatterns.set(id, new RegExp(`\\b${id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`));
+  }
+  const handoffTaskIds = handoff.completed.flatMap((c) =>
+    [...idPatterns].filter(([, re]) => re.test(c)).map(([id]) => id),
+  );
 
   for (const taskId of handoffTaskIds) {
     if (!completedTasks.includes(taskId)) {

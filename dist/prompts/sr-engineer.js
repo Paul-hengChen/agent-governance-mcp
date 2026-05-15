@@ -3,7 +3,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
-import { parseHandoff } from "../tools/handoff.js";
+import { getActiveStorage } from "../tools/storage.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 // Resolve content dir: works from both source (prompts/) and compiled (dist/prompts/)
@@ -38,10 +38,10 @@ function loadContent(filename, workspacePath) {
 export function buildSrEngineerPrompt(workspacePath) {
     const constitution = loadContent("constitution.md", workspacePath);
     const skill = loadContent("skill-sr-engineer.md", workspacePath);
-    // Dynamic state injection — parseHandoff can throw on malformed YAML
+    // Dynamic state injection — storage adapter's parse() can throw on malformed YAML
     let state = null;
     try {
-        state = parseHandoff(workspacePath);
+        state = getActiveStorage().parse(workspacePath);
     }
     catch {
         // fall through to "no state" block

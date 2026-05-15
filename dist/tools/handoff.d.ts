@@ -1,4 +1,4 @@
-interface HandoffState {
+export interface HandoffState {
     active_feature: string;
     status: string;
     last_updated: string;
@@ -22,5 +22,4 @@ export declare function readHandoffState(workspacePath: string): string;
  * ambiguity with tracked task IDs in the completed section.
  */
 export declare function writeHandoffState(workspacePath: string, activeFeature: string, status: string, completedTasks: string[], pendingNotes: string[], blockingReason?: string, lastAgent?: string): Promise<string>;
-export {};
 //# sourceMappingURL=handoff.d.ts.map

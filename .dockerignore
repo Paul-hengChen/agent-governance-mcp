@@ -1,0 +1,8 @@
+node_modules
+.current
+*.db
+*.db-shm
+*.db-wal
+*.tmp
+.git
+dist

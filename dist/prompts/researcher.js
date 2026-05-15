@@ -3,7 +3,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
-import { parseHandoff } from "../tools/handoff.js";
+import { getActiveStorage } from "../tools/storage.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.resolve(__dirname, "..");
@@ -28,7 +28,7 @@ export function buildResearcherPrompt(workspacePath) {
     const skill = loadContent("skill-researcher.md", workspacePath);
     let state = null;
     try {
-        state = parseHandoff(workspacePath);
+        state = getActiveStorage().parse(workspacePath);
     }
     catch {
         // fall through to "no state" block

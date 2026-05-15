@@ -6,9 +6,10 @@
 // Methodology-agnostic: defaults to a generic markdown checkbox task format;
 // teams override task pattern / paths / constitution via <workspace>/.current/.
 
-import * as path from "path";
+import * as path from "node:path";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { createHttpTransport } from "./transport/http.js";
 import {
   ListToolsRequestSchema,
   CallToolRequestSchema,
@@ -17,10 +18,11 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 
-import { readHandoffState, writeHandoffState } from "./tools/handoff.js";
 import { getNextTask, completeTask, rollbackTask } from "./tools/tasks.js";
 import { detectDrift } from "./tools/drift.js";
 import { enforcePreFlight, cleanupStaleSessions } from "./guards/session.js";
+import { getActiveStorage, setActiveStorage } from "./tools/storage.js";
+import { SqliteHandoffStorage } from "./tools/storage-sqlite.js";
 import { buildSrEngineerPrompt } from "./prompts/sr-engineer.js";
 import { buildResearcherPrompt } from "./prompts/researcher.js";
 import { buildPmPrompt } from "./prompts/pm.js";
@@ -76,6 +78,7 @@ function formatZodError(err: z.ZodError): string {
 // ==========================================
 // 1. Initialize Server (Tools + Prompts)
 // ==========================================
+// Storage adapter defaults to FileHandoffStorage; HTTP-mode boot switches it via setActiveStorage().
 const server = new Server(
   { name: "teamwork-mcp-server", version: "3.0.0" },
   { capabilities: { tools: {}, prompts: {} } }
@@ -340,7 +343,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       // --- No guard: reading state IS the pre-flight check ---
       case "tw_get_state": {
         const { workspace_path } = WorkspaceOnly.parse(args);
-        const result = readHandoffState(workspace_path);
+        const result = getActiveStorage().readState(workspace_path);
         return { content: [{ type: "text" as const, text: result }] };
       }
 
@@ -369,7 +372,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "tw_update_state": {
         const parsed = UpdateStateArgs.parse(args);
         enforcePreFlight(parsed.workspace_path, "tw_update_state");
-        const result = await writeHandoffState(
+        const result = await getActiveStorage().writeState(
           parsed.workspace_path,
           parsed.active_feature,
           parsed.status,
@@ -424,14 +427,81 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 // Evict sessions idle for more than 1 hour to prevent unbounded memory growth
 setInterval(() => cleanupStaleSessions(60 * 60 * 1000), 30 * 60 * 1000).unref();
 
-const transport = new StdioServerTransport();
-server
-  .connect(transport)
-  .then(() => {
-    console.error("🛡️ Teamwork MCP Server is online. (Tools + Prompts + Guards)");
-  })
-  .catch((err: unknown) => {
-    const message = err instanceof Error ? err.stack ?? err.message : String(err);
+(async () => {
+  try {
+    const portArgIndex = process.argv.indexOf("--port");
+    const portRaw = portArgIndex !== -1 ? process.argv[portArgIndex + 1] : undefined;
+
+    if (portRaw !== undefined) {
+      // --port was given — fail fast on bad input rather than silently falling back to stdio.
+      if (!/^\d+$/.test(portRaw)) {
+        throw new Error(`Invalid --port value: "${portRaw}". Must be an integer 1–65535.`);
+      }
+      const port = parseInt(portRaw, 10);
+      if (port < 1 || port > 65535) {
+        throw new Error(`Invalid --port value: ${port}. Must be 1–65535.`);
+      }
+
+      const dbArgIndex = process.argv.indexOf("--db");
+      const dbPath = dbArgIndex !== -1 ? process.argv[dbArgIndex + 1] : path.join(process.cwd(), "teamwork.db");
+      const sqliteStorage = new SqliteHandoffStorage(dbPath);
+      setActiveStorage(sqliteStorage);
+
+      const authToken = process.env.TW_AUTH_TOKEN?.trim() || undefined;
+      const allowedOrigins =
+        process.env.TW_ALLOWED_ORIGINS?.split(",").map((s) => s.trim()).filter(Boolean) ?? [];
+
+      if (!authToken) {
+        console.error(
+          "⚠️  WARNING: HTTP mode started with no TW_AUTH_TOKEN. " +
+            "The /mcp endpoint is unauthenticated — anyone reaching this port can read/write " +
+            "handoff state for any workspace_path. Set TW_AUTH_TOKEN before exposing beyond localhost.",
+        );
+      }
+
+      const { transport, listen, close } = createHttpTransport(port, { authToken, allowedOrigins });
+      await listen();
+      await server.connect(transport);
+      console.error(`🛡️ Teamwork MCP Server is online (HTTP :${port}). MCP endpoint: http://localhost:${port}/mcp`);
+      console.error(`   Storage: SQLite → ${dbPath}`);
+      console.error(`   Auth: ${authToken ? "Bearer token required" : "DISABLED"}`);
+      console.error(`   Allowed Origins: ${allowedOrigins.length > 0 ? allowedOrigins.join(", ") : "(any)"}`);
+
+      let shuttingDown = false;
+      const shutdown = (signal: NodeJS.Signals): void => {
+        if (shuttingDown) return;
+        shuttingDown = true;
+        console.error(`\n📴 Received ${signal}, shutting down…`);
+        // Hard-cap shutdown at 10s so a stuck SSE stream or DB checkpoint
+        // can't keep the process alive past the supervisor's grace period.
+        const forceExit = setTimeout(() => {
+          console.error("⏱️  Shutdown timed out after 10s, forcing exit.");
+          process.exit(1);
+        }, 10_000);
+        forceExit.unref();
+
+        close()
+          .catch((err: unknown) => console.error("HTTP close error:", err))
+          .finally(() => {
+            try {
+              sqliteStorage.close();
+            } catch (err: unknown) {
+              console.error("SQLite close error:", err);
+            }
+            clearTimeout(forceExit);
+            process.exit(0);
+          });
+      };
+      process.on("SIGTERM", shutdown);
+      process.on("SIGINT", shutdown);
+    } else {
+      const transport = new StdioServerTransport();
+      await server.connect(transport);
+      console.error("🛡️ Teamwork MCP Server is online. (Tools + Prompts + Guards)");
+    }
+  } catch (err: unknown) {
+    const message = err instanceof Error ? (err.stack ?? err.message) : String(err);
     console.error("❌ Teamwork MCP Server failed to start:", message);
     process.exit(1);
-  });
+  }
+})();

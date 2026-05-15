@@ -14,6 +14,8 @@ interface SessionSnapshot {
   handoffMtimeMs: number | null;
   tasksPath: string | null;
   tasksMtimeMs: number | null;
+  // Non-file freshness tokens (used by SQLite storage to snapshot a row's last_updated)
+  extra: Map<string, string | null>;
 }
 
 const activeSessions = new Map<string, SessionSnapshot>();
@@ -29,13 +31,52 @@ function statMtime(p: string): number | null {
 export function markStateRead(workspacePath: string): void {
   const handoffPath = path.join(workspacePath, ".current", "handoff.md");
   const tasksPath = findTasksFile(workspacePath);
+  const prev = activeSessions.get(workspacePath);
   activeSessions.set(workspacePath, {
     hasReadState: true,
     lastReadAt: new Date().toISOString(),
     handoffMtimeMs: statMtime(handoffPath),
     tasksPath,
     tasksMtimeMs: tasksPath ? statMtime(tasksPath) : null,
+    // Preserve any extra tokens written by non-file storage between marks.
+    extra: prev?.extra ?? new Map(),
   });
+}
+
+/**
+ * Snapshot an arbitrary freshness token (e.g. SQLite row's last_updated).
+ * Used by non-file storage backends where mtime comparison doesn't apply.
+ */
+export function snapshotExtra(
+  workspacePath: string,
+  key: string,
+  value: string | null
+): void {
+  const session = activeSessions.get(workspacePath);
+  if (!session) return;
+  session.extra.set(key, value);
+}
+
+/**
+ * Verify that the current value matches the snapshotted value for the given key.
+ * Throws if drift is detected. No-op if the session has no record (enforcePreFlight
+ * should already have rejected the call in that case).
+ */
+export function verifyExtra(
+  workspacePath: string,
+  key: string,
+  currentValue: string | null
+): void {
+  const session = activeSessions.get(workspacePath);
+  if (!session) return;
+  if (!session.extra.has(key)) return; // never snapshotted — first write, allow.
+  const snapshot = session.extra.get(key) ?? null;
+  if (snapshot !== currentValue) {
+    throw new Error(
+      `⛔ STATE DRIFT: ${key} changed since you called tw_get_state ` +
+        `(snapshot=${snapshot}, current=${currentValue}). Call tw_get_state again, then retry.`
+    );
+  }
 }
 
 export function hasReadState(workspacePath: string): boolean {

@@ -4,7 +4,8 @@
 import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
-import { parseHandoff } from "../tools/handoff.js";
+import { getActiveStorage } from "../tools/storage.js";
+import type { HandoffState } from "../tools/handoff.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -47,10 +48,10 @@ export function buildSrEngineerPrompt(workspacePath: string): {
   const constitution = loadContent("constitution.md", workspacePath);
   const skill = loadContent("skill-sr-engineer.md", workspacePath);
 
-  // Dynamic state injection — parseHandoff can throw on malformed YAML
-  let state: ReturnType<typeof parseHandoff> = null;
+  // Dynamic state injection — storage adapter's parse() can throw on malformed YAML
+  let state: HandoffState | null = null;
   try {
-    state = parseHandoff(workspacePath);
+    state = getActiveStorage().parse(workspacePath);
   } catch {
     // fall through to "no state" block
   }
