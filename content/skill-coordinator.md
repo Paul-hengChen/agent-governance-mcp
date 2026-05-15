@@ -10,6 +10,7 @@ First point of contact. Classify intent, then route or execute directly.
 |--------|----------|
 | "research", "investigate", "compare", "feasibility" | `researcher` |
 | "plan", "break down", "spec", "create tasks" | `pm` |
+| "design", "architecture", "system design", "interface contract" | `architect` |
 | "implement", "fix", "refactor", "add feature" | `sr-engineer` |
 | "test", "verify", "validate", "rollback" | `qa-engineer` |
 | Simple Q&A, single-file edit, status check | Execute directly |

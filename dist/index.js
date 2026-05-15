@@ -51,7 +51,7 @@ const RollbackTaskArgs = z.object({
 });
 const SwitchRoleArgs = z.object({
     workspace_path: absoluteWorkspacePath,
-    role: z.enum(["pm", "researcher", "sr-engineer", "qa-engineer"]),
+    role: z.enum(["pm", "researcher", "sr-engineer", "qa-engineer", "architect"]),
 });
 function formatZodError(err) {
     return err.issues

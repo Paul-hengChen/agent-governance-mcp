@@ -14,12 +14,13 @@ const CONTENT_DIR = fs.existsSync(path.join(PROJECT_ROOT, "content"))
   : path.join(PROJECT_ROOT, "..", "content");
 
 // `as const` preserves the literal keys so `keyof typeof` yields the proper
-// "pm" | "researcher" | "sr-engineer" | "qa-engineer" union instead of `string`.
+// "pm" | "researcher" | "sr-engineer" | "qa-engineer" | "architect" union instead of `string`.
 const ROLE_SKILL_MAP = {
   "pm": "skill-pm.md",
   "researcher": "skill-researcher.md",
   "sr-engineer": "skill-sr-engineer.md",
   "qa-engineer": "skill-qa-engineer.md",
+  "architect": "skill-architect.md",
 } as const satisfies Record<string, string>;
 
 export type RoleName = keyof typeof ROLE_SKILL_MAP;
