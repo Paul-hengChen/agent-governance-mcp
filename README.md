@@ -257,10 +257,11 @@ In Claude Code, type:
 
 **Method C: Multi-Agent Switching**
 Once the session starts, you default to the **Coordinator** role (`/teamwork`). The Coordinator auto-routes complex tasks to the right specialist via `tw_switch_role` — no manual switching required. You can also invoke roles directly:
-- `/pm`: To analyze requests and split tasks into `tasks.md`.
+- `/pm`: To analyze requests, write structured specs, and split tasks into `tasks.md`.
+- `/architect`: To produce system design artifacts (file list, interface contracts) before implementation.
 - `/researcher`: To do deep tech research and write reports.
-- `/qa-engineer`: To review code, write tests, verify work, and rollback bugs.
 - `/sr-engineer`: To implement features, fix bugs, and refactor code.
+- `/qa-engineer`: To review code, write tests, verify work, and rollback bugs.
 
 ---
 
@@ -314,10 +315,11 @@ A: No, they are complementary. The MCP Server acts as the source of truth, while
 The system now supports a complete autonomous development team with specialized roles:
 
 - **Coordinator (`teamwork`)**: The default role on session start. Classifies incoming requests and auto-routes them to the right specialist via `tw_switch_role` — no manual role switching required for most workflows. Signs off chat responses with `— @coordinator`.
-- **Sr. Engineer (`sr-engineer`)**: Implements features, fixes bugs, refactors code. Enforces strict typing and build integrity. Does NOT write tests. Signs off chat responses with `— @sr-engineer`.
-- **Product Manager (`pm`)**: Analyzes user requests, writes specs, splits features into granular tasks (`tasks.md`), and prioritizes work. Signs off chat responses with `— @pm`.
+- **Product Manager (`pm`)**: Analyzes user requests, writes structured specs (`specs/<feature>.md` with User Stories + BDD Acceptance Criteria), splits features into prioritized tasks (`tasks.md`), and halts on ambiguous requirements. Signs off chat responses with `— @pm`.
+- **Architect (`architect`)**: Translates PM specs into system design artifacts (`specs/<feature>-architecture.md`) covering affected file list, data structures, interface contracts, and sequence diagrams. Runs between PM and sr-engineer for non-trivial features. Signs off chat responses with `— @architect`.
+- **Sr. Engineer (`sr-engineer`)**: Implements features, fixes bugs, refactors code. Enforces strict typing, build integrity, and OWASP security checklist before QA handoff. Does NOT write tests. Signs off chat responses with `— @sr-engineer`.
 - **Researcher (`researcher`)**: Reads documentation, researches libraries, validates technical feasibility, and gathers context before execution. Signs off chat responses with `— @researcher`.
-- **QA Engineer (`qa-engineer`)**: Reviews sr-engineer's code, writes automated tests, runs verifications, and signs off on completed tasks. Signs off chat responses with `— @qa-engineer`.
+- **QA Engineer (`qa-engineer`)**: Reviews sr-engineer's code, maps tests to PM acceptance criteria (≥80% coverage gate), runs verifications, and signs off on completed tasks. Signs off chat responses with `— @qa-engineer`.
 
 ---
 
@@ -330,6 +332,7 @@ The system now supports a complete autonomous development team with specialized 
 | 2.5 | Configurable task paths/patterns, workspace overrides | ✅ Done |
 | 3 | Multi-Agent Ecosystem (Researcher, PM, QA) | ✅ Done |
 | 3.5 | Per-role watermark as chat sign-off line | ✅ Done |
+| 3.6 | Architect role + skill enhancements (spec schema, BDD AC, security checklist, coverage gate, persona backstory) | ✅ Done |
 | 4 | Schema versioning | Backlog |
 | 5a | Unit + integration test suite | ✅ Done |
 | 5b | GitHub Actions CI | Backlog |
