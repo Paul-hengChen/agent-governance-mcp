@@ -19,7 +19,7 @@ Three layers of defense, all in `index.ts`:
 
 1. **Prompts** (`prompts/{teamwork,sr-engineer,pm,researcher,qa-engineer}.ts`) — bundle
    `content/constitution.md` + role-specific `content/skill-*.md` + live handoff state.
-2. **Tools** (`tools/{handoff,tasks,drift}.ts`) — seven `tw_*` tools that
+2. **Tools** (`tools/{handoff,tasks,tasks-file,drift,role,storage,storage-sqlite,config}.ts`) — eight `tw_*` tools that
    read/write `.current/handoff.md` and `tasks.md` in target workspaces.
 3. **Guards** (`guards/{session,file-lock}.ts`) — pre-flight check, file
    lock, mtime freshness check.
@@ -29,8 +29,13 @@ Three layers of defense, all in `index.ts`:
 ```
 index.ts                  MCP server entry: registers prompts, tools, dispatcher
 tools/handoff.ts          read/write .current/handoff.md (uses js-yaml)
-tools/tasks.ts            complete/rollback tasks in tasks.md
+tools/tasks.ts            thin delegator — routes task ops through getActiveStorage()
+tools/tasks-file.ts       file-based task operations (markdown checkbox parsing)
 tools/drift.ts            compare handoff vs tasks for inconsistencies
+tools/role.ts             tw_switch_role — loads role SOP text
+tools/storage.ts          HandoffStorage interface + getActiveStorage()/setActiveStorage()
+tools/storage-sqlite.ts   SQLite implementation of HandoffStorage (HTTP mode)
+tools/config.ts           .current/.config.json loader (taskPattern, taskPaths)
 guards/session.ts         per-(process,workspace) snapshot of "agent read state"
 guards/file-lock.ts       cross-process O_EXCL lock with stale-PID detection
 prompts/teamwork.ts       coordinator prompt (default role on SessionStart)

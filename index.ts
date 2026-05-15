@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Teamwork MCP Server — 3-Layer Defense Architecture
 // Layer 1: MCP Prompts (auto-inject constitution + skill + state)
-// Layer 2: Structured Tools (6 tools for state/task/drift)
+// Layer 2: Structured Tools (8 tw_* tools for state/task/drift/role)
 // Layer 3: Server-side Guards (pre-flight check enforcement)
 // Methodology-agnostic: defaults to a generic markdown checkbox task format;
 // teams override task pattern / paths / constitution via <workspace>/.current/.
@@ -355,7 +355,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
             role: {
               type: "string",
-              enum: ["pm", "researcher", "sr-engineer", "qa-engineer"],
+              enum: ["pm", "researcher", "sr-engineer", "qa-engineer", "architect"],
               description: "Target role to switch into",
             },
           },
