@@ -94,13 +94,14 @@ This is injected into the AI's context.
 
 ### Layer 2: Tools — Structured APIs (Revoking Free-Text Privileges)
 
-The server exposes 7 MCP tools. **AI cannot edit `handoff.md` or tasks directly; it MUST use these tools:**
+The server exposes 8 MCP tools. **AI cannot edit `handoff.md` or tasks directly; it MUST use these tools:**
 
 | Tool | Function | Why this design? |
 |---|---|---|
 | `tw_get_state` | Reads current project progress | **Mandatory first step**, otherwise write tools are blocked (pre-flight check) |
 | `tw_update_state` | Updates handoff | Server enforces valid YAML; impossible for AI to break formatting |
 | `tw_get_next_task` | Fetches next incomplete task | Returns structured data |
+| `tw_add_task` | Appends a new task | Works in stdio (markdown) and HTTP/SQLite modes — no workspace filesystem needed |
 | `tw_complete_task` | Changes `[ ]` to `[x]` | Safely edits markdown checkboxes atomically |
 | `tw_rollback_task` | `[x]` → `[ ] (reverted: reason)` | Used when implementations fail later |
 | `tw_detect_drift` | Compares handoff vs tasks | Catches synchronization issues |
@@ -421,7 +422,8 @@ The system now supports a complete autonomous development team with specialized 
 | 5b | GitHub Actions CI | ✅ Done |
 | 6 | SSE / HTTP transport, SQLite storage, Docker deployment | ✅ Done |
 | 6.1 | HTTP-mode Bearer auth + Origin allowlist + `/healthz` | ✅ Done |
-| 7 | CI/CD hook — auto-update handoff on PR merge | Planning |
+| 7 | Task ops lifted into storage adapter — HTTP/SQLite mode no longer needs a mounted workspace; new `tw_add_task` tool | ✅ Done |
+| 8 | CI/CD hook — auto-update handoff on PR merge | Planning |
 
 ---
 

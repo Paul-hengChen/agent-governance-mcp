@@ -18,7 +18,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 
-import { getNextTask, completeTask, rollbackTask } from "./tools/tasks.js";
+import { getNextTask, completeTask, rollbackTask, addTask } from "./tools/tasks.js";
 import { detectDrift } from "./tools/drift.js";
 import { enforcePreFlight, cleanupStaleSessions } from "./guards/session.js";
 import { getActiveStorage, setActiveStorage } from "./tools/storage.js";
@@ -62,6 +62,13 @@ const RollbackTaskArgs = z.object({
   workspace_path: absoluteWorkspacePath,
   task_id: z.string().min(1),
   reason: z.string().min(1),
+});
+
+const AddTaskArgs = z.object({
+  workspace_path: absoluteWorkspacePath,
+  task_id: z.string().min(1).max(200),
+  description: z.string().min(1).max(2000),
+  section: z.string().min(1).max(200).optional(),
 });
 
 const SwitchRoleArgs = z.object({
@@ -271,6 +278,33 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
+        name: "tw_add_task",
+        description:
+          "Append a task to the active task list. Works in both stdio (markdown) and HTTP/SQLite modes.",
+        inputSchema: {
+          type: "object" as const,
+          properties: {
+            workspace_path: {
+              type: "string",
+              description: "Absolute workspace path",
+            },
+            task_id: {
+              type: "string",
+              description: "Unique task ID (e.g. T01, JIRA-42)",
+            },
+            description: {
+              type: "string",
+              description: "Task description",
+            },
+            section: {
+              type: "string",
+              description: "Optional section heading (defaults to 'Active')",
+            },
+          },
+          required: ["workspace_path", "task_id", "description"],
+        },
+      },
+      {
         name: "tw_rollback_task",
         description: "Mark task uncompleted [ ]. Require reason.",
         inputSchema: {
@@ -395,6 +429,18 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const parsed = RollbackTaskArgs.parse(args);
         enforcePreFlight(parsed.workspace_path, "tw_rollback_task");
         const result = await rollbackTask(parsed.workspace_path, parsed.task_id, parsed.reason);
+        return { content: [{ type: "text" as const, text: result }] };
+      }
+
+      case "tw_add_task": {
+        const parsed = AddTaskArgs.parse(args);
+        enforcePreFlight(parsed.workspace_path, "tw_add_task");
+        const result = await addTask(
+          parsed.workspace_path,
+          parsed.task_id,
+          parsed.description,
+          parsed.section,
+        );
         return { content: [{ type: "text" as const, text: result }] };
       }
 

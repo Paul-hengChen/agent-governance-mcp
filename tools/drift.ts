@@ -1,9 +1,9 @@
 // Coded by @sr-engineer
-// Tool: drift detection — compare handoff.md state vs tasks.md checkboxes
+// Tool: drift detection — compare handoff state vs task list.
+// Reads both sides through the active storage adapter so SQLite/HTTP mode works
+// without any filesystem access to the workspace.
 
-import * as fs from "fs";
-import { getActiveStorage } from "./storage.js";
-import { findTasksFile, resolveTaskRegex } from "./config.js";
+import { getActiveStorage, type TaskRecord } from "./storage.js";
 
 interface DriftReport {
   driftDetected: boolean;
@@ -13,19 +13,29 @@ interface DriftReport {
   tasksIncomplete: string[];
 }
 
-/**
- * Detect drift between handoff.md and tasks.md.
- * Returns structured JSON report.
- */
-export function detectDrift(workspacePath: string): string {
-  const handoff = getActiveStorage().parse(workspacePath);
-  const tasksPath = findTasksFile(workspacePath);
+function partitionTasks(tasks: TaskRecord[]): { completed: string[]; incomplete: string[] } {
+  const completed: string[] = [];
+  const incomplete: string[] = [];
+  for (const t of tasks) {
+    if (t.completed) completed.push(t.id);
+    else incomplete.push(t.id);
+  }
+  return { completed, incomplete };
+}
 
-  // Edge cases
-  if (!handoff && !tasksPath) {
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+export function detectDrift(workspacePath: string): string {
+  const storage = getActiveStorage();
+  const handoff = storage.parse(workspacePath);
+  const tasks = storage.listTasks(workspacePath);
+
+  if (!handoff && !tasks) {
     return JSON.stringify({
       driftDetected: false,
-      details: ["No handoff.md or tasks.md found. Fresh project."],
+      details: ["No handoff state or task list found. Fresh project."],
       handoffLastTask: "",
       tasksCompleted: [],
       tasksIncomplete: [],
@@ -35,47 +45,33 @@ export function detectDrift(workspacePath: string): string {
   if (!handoff) {
     return JSON.stringify({
       driftDetected: true,
-      details: ["tasks.md exists but handoff.md is missing. State was never initialized."],
+      details: ["Task list exists but handoff state is missing. State was never initialized."],
       handoffLastTask: "",
       tasksCompleted: [],
       tasksIncomplete: [],
     });
   }
 
-  if (!tasksPath) {
+  if (!tasks) {
     return JSON.stringify({
       driftDetected: false,
-      details: ["handoff.md exists but no tasks.md found. Likely vibe-coding only mode."],
+      details: ["Handoff state exists but no task list found. Likely vibe-coding only mode."],
       handoffLastTask: handoff.active_feature,
       tasksCompleted: handoff.completed,
       tasksIncomplete: [],
     });
   }
 
-  // Parse task-list checkboxes using the configured task pattern so custom
-  // formats (e.g. JIRA-123) are detected the same way the task tools see them.
-  const regex = resolveTaskRegex(workspacePath);
-  const tasksContent = fs.readFileSync(tasksPath, "utf-8");
-  const completedTasks: string[] = [];
-  const incompleteTasks: string[] = [];
+  const { completed: completedTasks, incomplete: incompleteTasks } = partitionTasks(tasks);
 
-  for (const rawLine of tasksContent.split("\n")) {
-    const line = rawLine.trim();
-    const match = line.match(regex);
-    if (!match || match[1] === undefined || match[2] === undefined) continue;
-    if (match[1] === "x") completedTasks.push(match[2]);
-    else if (match[1] === " ") incompleteTasks.push(match[2]);
-  }
-
-  // Detect drifts
   const drifts: string[] = [];
 
-  // Pull any token that looks like an ID out of handoff completed entries.
-  // Pre-compile one regex per ID so we don't re-build O(handoff × idVocab) regexes.
+  // Pre-compile one regex per known task ID so handoff-string scanning stays O(handoff × matches)
+  // instead of recompiling on every iteration.
   const idVocab = new Set<string>([...completedTasks, ...incompleteTasks]);
   const idPatterns = new Map<string, RegExp>();
   for (const id of idVocab) {
-    idPatterns.set(id, new RegExp(`\\b${id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`));
+    idPatterns.set(id, new RegExp(`\\b${escapeRegExp(id)}\\b`));
   }
   const handoffTaskIds = handoff.completed.flatMap((c) =>
     [...idPatterns].filter(([, re]) => re.test(c)).map(([id]) => id),
@@ -83,21 +79,23 @@ export function detectDrift(workspacePath: string): string {
 
   for (const taskId of handoffTaskIds) {
     if (!completedTasks.includes(taskId)) {
-      drifts.push(`Handoff says ${taskId} completed, but tasks.md shows it as incomplete.`);
+      drifts.push(`Handoff says ${taskId} completed, but task list shows it as incomplete.`);
     }
   }
 
-  // Check 2: tasks.md has completed tasks not in handoff
   for (const taskId of completedTasks) {
     if (!handoffTaskIds.includes(taskId)) {
-      drifts.push(`tasks.md shows ${taskId} completed, but handoff.md doesn't mention it. Possible vibe-coding drift.`);
+      drifts.push(
+        `Task list shows ${taskId} completed, but handoff state doesn't mention it. Possible vibe-coding drift.`,
+      );
     }
   }
 
-  // Check 3: handoff status is FAIL/Blocked but tasks still show in-progress
   if (handoff.status === "FAIL" || handoff.status === "Blocked") {
     if (incompleteTasks.length > 0) {
-      drifts.push(`Handoff status is ${handoff.status}, but ${incompleteTasks.length} tasks remain incomplete.`);
+      drifts.push(
+        `Handoff status is ${handoff.status}, but ${incompleteTasks.length} tasks remain incomplete.`,
+      );
     }
   }
 

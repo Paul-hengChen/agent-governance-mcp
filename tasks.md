@@ -1,14 +1,14 @@
-# Tasks: phase6-remote-transport
-<!-- feature_id: phase6-remote-transport | created_at: 2026-05-15 | created_by: @pm -->
+# Tasks: phase7-task-storage-abstraction
+<!-- feature_id: phase7-task-storage-abstraction | created_at: 2026-05-15 | created_by: @sr-engineer -->
 
 ## Active
 
-- [x] T01 [P0] Add `--port` CLI arg parsing + dual-mode boot in `index.ts` (stdio default, HTTP when --port given) | depends_on: none (note: --port CLI arg parsing + dual-mode boot in index.ts. stdio default, HTTP when --port given.)
-- [x] T02 [P0] Create `transport/http.ts` — Node `http.createServer` + `StreamableHTTPServerTransport` wiring | depends_on: T01 (note: transport/http.ts created — Node http.createServer + StreamableHTTPServerTransport + body parsing.)
-- [x] T03 [P1] Define `StorageAdapter` interface in `tools/storage.ts` + refactor existing handoff/tasks tools to accept an adapter | depends_on: none (note: HandoffStorage interface + FileHandoffStorage in tools/storage.ts)
-- [x] T04 [P1] Implement `SqliteStorageAdapter` in `tools/storage-sqlite.ts` using `better-sqlite3` | depends_on: T03 (note: SqliteHandoffStorage in tools/storage-sqlite.ts using better-sqlite3 (WAL mode))
-- [x] T05 [P1] Wire storage selection: HTTP mode → `SqliteStorageAdapter`, stdio mode → `FileStorageAdapter` | depends_on: T02, T04 (note: index.ts wired: HTTP mode → SqliteHandoffStorage (--db path), stdio → FileHandoffStorage)
-- [x] T06 [P2] Add `Dockerfile` + `.dockerignore` for single-command cloud deployment | depends_on: T05 (note: Dockerfile (multi-stage, node:22-alpine) + .dockerignore)
+- [x] T01 [P0] Extend HandoffStorage interface with task ops (listTasks / getNextTask / completeTask / rollbackTask / addTask) and split file logic into tools/tasks-file.ts | depends_on: none (note: storage.ts + tasks-file.ts; FileHandoffStorage delegates to file helpers)
+- [x] T02 [P0] Refactor tools/tasks.ts as thin delegator to getActiveStorage() so test imports stay stable and SQLite mode is reachable | depends_on: T01 (note: tasks.ts now 4 exported functions delegating through storage adapter)
+- [x] T03 [P0] Implement SQLite task table + addTask/listTasks/getNextTask/completeTask/rollbackTask in SqliteHandoffStorage with prepared statements | depends_on: T01 (note: tasks table, idx_tasks_workspace_order, atomic UPDATEs with completed-state guard)
+- [x] T04 [P0] Rewrite tools/drift.ts to read tasks via getActiveStorage().listTasks() — no direct fs access | depends_on: T01, T03 (note: drift.ts now storage-only; works in SQLite mode without mounted workspace)
+- [x] T05 [P1] Register tw_add_task tool (zod schema + pre-flight + dispatch) so PM can seed tasks in HTTP mode | depends_on: T01 (note: tw_add_task added in index.ts; AddTaskArgs limits id≤200, description≤2000)
+- [x] T06 [P2] Update README (tool count 7→8, Phase 7 roadmap row) | depends_on: T05 (note: README tools table + roadmap updated)
 
 ## Completed
 
