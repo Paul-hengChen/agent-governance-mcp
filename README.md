@@ -14,6 +14,7 @@
 - [Technical Details](#technical-details)
 - [Pros and Cons](#pros-and-cons)
 - [Installation & Startup](#installation--startup)
+- [Multi-Agent Workflow](#multi-agent-workflow)
 - [Daily Usage Flow](#daily-usage-flow)
 - [Safety Mechanisms](#safety-mechanisms)
 - [FAQ](#faq)
@@ -262,6 +263,84 @@ Once the session starts, you default to the **Coordinator** role (`/teamwork`). 
 - `/researcher`: To do deep tech research and write reports.
 - `/sr-engineer`: To implement features, fix bugs, and refactor code.
 - `/qa-engineer`: To review code, write tests, verify work, and rollback bugs.
+
+---
+
+## Multi-Agent Workflow
+
+Every user message goes through the same routing pipeline. The diagram below shows both the session boot sequence and per-message decision flow.
+
+### Full Routing Flowchart
+
+```mermaid
+flowchart TD
+    USER([👤 User types a message]) --> HOOK
+
+    subgraph BOOT ["🚀 Session Start — fires once per session"]
+        HOOK[SessionStart hook detected\n.current/ or tasks.md present?] -- Yes --> INJECT[Inject into context:\nconstitution + coordinator SOP\n+ current handoff.md state]
+        HOOK -- No --> NOOP[Silent no-op\nnormal Claude session]
+    end
+
+    INJECT --> COORD
+    NOOP --> COORD
+
+    subgraph ROUTING ["🎯 Coordinator — every message"]
+        COORD{Classify intent\nfrom message}
+    end
+
+    COORD -- "research · investigate\ncompare · feasibility" --> RES
+    COORD -- "plan · spec · create tasks\nbreak down" --> PM
+    COORD -- "design · architecture\ninterface contract" --> ARCH
+    COORD -- "implement · fix\nrefactor · add feature" --> ENG
+    COORD -- "test · verify\nvalidate · rollback" --> QA
+    COORD -- "Q&A · single-file edit\nstatus check" --> DIRECT["Execute directly\n≤ 15 words reply\nno state sync needed"]
+
+    subgraph PIPELINE ["🔄 Specialist Roles — each follows its own SOP"]
+        RES["🔍 researcher\n① tw_get_state → tw_detect_drift\n② web search / file reads\n③ distil → write research/＊.md\n④ tw_update_state"]
+
+        PM["📋 pm\n① tw_get_state → tw_detect_drift\n② ambiguity gate — stop if unclear\n③ write specs/＊.md  ← enforced schema\n④ append tasks.md  ← priority + depends_on\n⑤ tw_update_state"]
+
+        ARCH["🏗️ architect  (optional — complex features)\n① tw_get_state → tw_detect_drift\n② read specs/＊.md\n③ write specs/＊-architecture.md\n   file list · data structs · interface contracts\n④ tw_update_state"]
+
+        ENG["⚙️ sr-engineer\n① tw_get_state → tw_detect_drift\n② clarification gate — block if ambiguous\n③ task-size check — block if > 5 files / 300 lines\n④ modify files\n⑤ tsc / mypy / cargo check — ZERO errors\n⑥ security checklist  ← OWASP basics\n⑦ tw_complete_task → tw_update_state"]
+
+        QA["🧪 qa-engineer\n① tw_get_state → tw_detect_drift\n② Phase 1 — review code\n③ Phase 2 — 3-round discussion  ← time-boxed\n④ Phase 3 — write tests\n   · spec-to-AC mapping\n   · ≥ 80% coverage gate\n   · security smoke tests\n⑤ Phase 4 — run + CI runnability check\n⑥ tw_complete_task / tw_rollback_task\n   tw_update_state"]
+    end
+
+    PM --> ARCH
+    ARCH --> ENG
+    ENG --> QA
+
+    QA -- "✅ PASS" --> DONE(["handoff.md\nstatus = PASS"])
+    QA -- "❌ FAIL" --> ROLL["tw_rollback_task\ntask checkbox reverted"]
+    ROLL --> ENG
+
+    style BOOT fill:#e3f2fd,stroke:#1976D2,color:#000
+    style ROUTING fill:#fff8e1,stroke:#F57F17,color:#000
+    style PIPELINE fill:#f3e5f5,stroke:#7B1FA2,color:#000
+```
+
+### Routing Decision Table
+
+| User says... | Routes to | Artifact produced |
+|---|---|---|
+| "research X", "compare A vs B" | `researcher` | `research/<topic>.md` |
+| "plan this", "create tasks for..." | `pm` | `specs/<feature>.md` + `tasks.md` |
+| "design the architecture" | `architect` | `specs/<feature>-architecture.md` |
+| "implement", "fix", "refactor" | `sr-engineer` | modified source files |
+| "test", "verify", "rollback" | `qa-engineer` | `qa_reports/review_<task-id>.md` + test files |
+| quick question, single-file edit | Coordinator (direct) | inline reply |
+
+### Typical Multi-Phase Feature Flow
+
+```
+User: "add dark mode"
+  └─▶ pm        → specs/dark-mode.md + tasks.md (T01–T04)
+       └─▶ architect  → specs/dark-mode-architecture.md
+            └─▶ sr-engineer  → implements T01–T04, build PASS
+                 └─▶ qa-engineer → reviews, writes tests, PASS
+                      └─▶ handoff.md: status = PASS ✅
+```
 
 ---
 
