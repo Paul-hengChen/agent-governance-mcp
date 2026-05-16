@@ -16,6 +16,26 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.1.1] - 2026-05-16
+
+### Fixed
+- SessionStart hook hint now lists `/architect` alongside the other four roles
+  (`bin/teamwork-context.mjs`). Previously, users were never told the architect
+  role existed via the auto-injected coordinator briefing, even though
+  constitution §4 and the coordinator routing table both include it.
+- `markStateRead()` (`guards/session.ts`) no longer scans the workspace
+  filesystem when the workspace path doesn't exist on the host. In SQLite/HTTP
+  mode the server may handle workspace paths it can't see locally; previously
+  every `tw_get_state` call there did wasted `stat()` syscalls (and risked
+  EACCES noise on hostile mounts). Freshness in that mode still rides on the
+  `extra` snapshot map.
+- `CLAUDE.md` no longer claims the SessionStart hook is a silent no-op in this
+  repo. The repo dogfoods its own server (`.current/`, `tasks.md` are present);
+  the hook fires here exactly as in any managed workspace.
+- `skill-sr-engineer.md` "Hard rules" no longer restates constitution §2 and §3
+  verbatim — both bullets now point at the relevant constitution section. This
+  honors constitution §1's "skills MUST NOT restate these rules".
+
 ## [3.1.0] - 2026-05-15
 
 ### Added

@@ -106,15 +106,20 @@ node --input-type=module -e "import { writeHandoffState, parseHandoff } from './
 Configured in `~/.claude/settings.json` to run `bin/teamwork-context.mjs`
 on every session start. The script self-gates: it injects the full
 constitution/skill/state block only if the workspace has any of `.current/`,
-`tasks.md`, or `TODO.md`. In this repo (the server's own source) none of
-those exist, so the hook is a silent no-op here — correct behavior.
+`tasks.md`, or `TODO.md`.
+
+**This repo dogfoods its own server.** `.current/handoff.md` and `tasks.md`
+exist at the root, so the hook *does* fire here, the same as in any other
+managed workspace. Agents working on the server itself follow the constitution
+and route through tw_* tools — that's how we catch regressions in our own
+governance rules before users hit them.
 
 Override `TEAMWORK_SERVER_ROOT` env var if you move this checkout
 (legacy `SDD_SERVER_ROOT` is still honored as a fallback).
 
 ## Pre-Flight Protocol (the one rule that matters in managed workspaces)
 
-When working **inside a teamwork-managed workspace** (not this repo), the agent's
-first action must always be `tw_get_state`. Without it, `tw_update_state`,
-`tw_complete_task`, and `tw_rollback_task` will be blocked by the guard.
-This is enforced server-side; you cannot bypass it from the client.
+The agent's first action in any teamwork-managed workspace — including this
+one — must be `tw_get_state`. Without it, `tw_update_state`, `tw_complete_task`,
+`tw_rollback_task`, and `tw_add_task` will be blocked by the guard. This is
+enforced server-side; you cannot bypass it from the client.

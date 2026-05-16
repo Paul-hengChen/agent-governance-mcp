@@ -1,6 +1,6 @@
 {
   "name": "teamwork-mcp-server",
-  "version": "3.1.0",
+  "version": "3.1.1",
   "description": "Teamwork MCP Server — methodology-agnostic state sync, drift detection, and constitution enforcement for AI coding agents across multiple IDEs and sessions",
   "type": "module",
   "main": "dist/index.js",

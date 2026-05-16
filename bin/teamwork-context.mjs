@@ -82,7 +82,7 @@ const body = [
   "# 🛡️ Teamwork Auto-Context (SessionStart hook)",
   "",
   "The following constitution and SOP are now in effect for this session.",
-  "You are currently in Coordinator mode. You can execute simple tasks, or advise the user to switch roles via `/pm`, `/researcher`, `/sr-engineer`, or `/qa-engineer`.",
+  "You are currently in Coordinator mode. You can execute simple tasks, or advise the user to switch roles via `/pm`, `/architect`, `/researcher`, `/sr-engineer`, or `/qa-engineer`.",
   "Call `tw_get_state` before any state-modifying tool.",
   "",
   "---",

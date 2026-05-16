@@ -14,13 +14,25 @@ function statMtime(p) {
     }
 }
 export function markStateRead(workspacePath) {
-    const handoffPath = path.join(workspacePath, ".current", "handoff.md");
-    const tasksPath = findTasksFile(workspacePath);
+    // In SQLite/HTTP mode the workspace path may not exist on this host; the
+    // mtime/tasksPath fields are meaningless there and verifyExtra() carries
+    // freshness via SNAPSHOT_KEY instead. Skip the fs scan when the workspace
+    // directory isn't present locally — avoids wasted syscalls and EACCES noise.
+    const workspaceExists = (() => {
+        try {
+            return fs.statSync(workspacePath).isDirectory();
+        }
+        catch {
+            return false;
+        }
+    })();
+    const handoffPath = workspaceExists ? path.join(workspacePath, ".current", "handoff.md") : null;
+    const tasksPath = workspaceExists ? findTasksFile(workspacePath) : null;
     const prev = activeSessions.get(workspacePath);
     activeSessions.set(workspacePath, {
         hasReadState: true,
         lastReadAt: new Date().toISOString(),
-        handoffMtimeMs: statMtime(handoffPath),
+        handoffMtimeMs: handoffPath ? statMtime(handoffPath) : null,
         tasksPath,
         tasksMtimeMs: tasksPath ? statMtime(tasksPath) : null,
         // Preserve any extra tokens written by non-file storage between marks.
