@@ -210,22 +210,30 @@ Settings → Features → MCP → `+ Add new MCP server`:
 - Command: `npx -y github:Paul-hengChen/teamwork-mcp-server`
 
 #### Claude Code (CLI)
-In `~/.claude/settings.json`:
-```json
-{
-  "mcpServers": {
-    "teamwork-mcp-server": {
-      "command": "npx",
-      "args": ["-y", "github:Paul-hengChen/teamwork-mcp-server"]
-    }
-  }
-}
+> ⚠️ **Common Mistake**: Do NOT add `mcpServers` to `~/.claude/settings.json` — Claude Code CLI ignores that key (it's Claude Desktop's format). Use the CLI command below instead.
+
+Run this once in your terminal:
+```bash
+claude mcp add -s user teamwork-mcp-server -- npx -y github:Paul-hengChen/teamwork-mcp-server
+```
+
+This writes the correct entry to `~/.claude.json` (the file Claude Code CLI actually reads). Verify the connection with:
+```bash
+claude mcp list
+# teamwork-mcp-server: npx -y github:Paul-hengChen/teamwork-mcp-server - ✓ Connected
 ```
 
 ### 2. (Recommended) Configure SessionStart Hook
-To automatically inject the constitution and Coordinator role into Claude Code at startup without manually invoking a role prompt:
+To automatically inject the constitution and Coordinator role into Claude Code at startup without manually invoking a role prompt.
+
+First, find the installed script path (the hash changes when the package updates):
+```bash
+find ~/.npm/_npx -name "teamwork-context.mjs" 2>/dev/null
+# e.g. /Users/<you>/.npm/_npx/711c19487fd3ce1f/node_modules/teamwork-mcp-server/bin/teamwork-context.mjs
+```
+
+Then add the hook to `~/.claude/settings.json`:
 ```json
-// ~/.claude/settings.json
 {
   "hooks": {
     "SessionStart": [
@@ -234,7 +242,7 @@ To automatically inject the constitution and Coordinator role into Claude Code a
         "hooks": [
           {
             "type": "command",
-            "command": "node /path/to/teamwork-mcp-server/bin/teamwork-context.mjs",
+            "command": "node /Users/<you>/.npm/_npx/<hash>/node_modules/teamwork-mcp-server/bin/teamwork-context.mjs",
             "timeout": 10
           }
         ]
@@ -243,6 +251,8 @@ To automatically inject the constitution and Coordinator role into Claude Code a
   }
 }
 ```
+
+> **Note**: The `<hash>` segment in the path changes whenever npx re-downloads the package. Re-run the `find` command above and update `settings.json` if the hook stops firing after a package update.
 
 ### 3. Enable Teamwork in a New Project (⚠️ Critical)
 
