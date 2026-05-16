@@ -5,6 +5,9 @@ import * as path from "path";
 import * as yaml from "js-yaml";
 import { markStateRead, verifyFreshness, refreshSnapshotFor, } from "../guards/session.js";
 import { withFileLock } from "../guards/file-lock.js";
+// Cap the completed_tasks array returned by readState() so long projects
+// don't bloat the LLM context. The full list is still in handoff.md.
+const COMPLETED_TASKS_RETURN_LIMIT = 50;
 function getHandoffPath(workspacePath) {
     return path.join(workspacePath, ".current", "handoff.md");
 }
@@ -54,9 +57,9 @@ export function parseHandoff(workspacePath) {
     const body = content.replace(/^---[\s\S]*?---\s*/, "");
     const completedSection = extractSectionContent(body, /^##[^\n]*(?:完成|Completed)[^\n]*\n/im);
     const pendingSection = extractSectionContent(body, /^##[^\n]*(?:待辦|Pending)[^\n]*\n/im);
-    const completed = [...completedSection.matchAll(/- \[x\] (.+)/g)].map((m) => m[1].trim());
+    const completed_tasks = [...completedSection.matchAll(/- \[x\] (.+)/g)].map((m) => m[1].trim());
     // Pending notes are plain list items (not checkboxes). "無" is the empty-section sentinel.
-    const pending = [...pendingSection.matchAll(/^- (?!\[)(.+)/gm)]
+    const pending_notes = [...pendingSection.matchAll(/^- (?!\[)(.+)/gm)]
         .map((m) => m[1].trim())
         .filter((s) => s !== "無" && s !== "");
     const blockingReason = asString(frontmatter.blocking_reason) || undefined;
@@ -67,8 +70,8 @@ export function parseHandoff(workspacePath) {
         last_updated: asString(frontmatter.last_updated),
         ...(blockingReason && { blocking_reason: blockingReason }),
         ...(lastAgent && { last_agent: lastAgent }),
-        completed,
-        pending,
+        completed_tasks,
+        pending_notes,
     };
 }
 /**
@@ -83,7 +86,20 @@ export function readHandoffState(workspacePath) {
             message: "No handoff state found. This is a fresh project — initialize by calling tw_update_state.",
         });
     }
-    return JSON.stringify({ exists: true, ...state });
+    const truncated = state.completed_tasks.length > COMPLETED_TASKS_RETURN_LIMIT;
+    const view = {
+        ...state,
+        completed_tasks: truncated
+            ? state.completed_tasks.slice(-COMPLETED_TASKS_RETURN_LIMIT)
+            : state.completed_tasks,
+        ...(truncated && {
+            completed_tasks_truncated: {
+                showing: COMPLETED_TASKS_RETURN_LIMIT,
+                total: state.completed_tasks.length,
+            },
+        }),
+    };
+    return JSON.stringify({ exists: true, ...view });
 }
 /**
  * Write handoff state with enforced formatting.

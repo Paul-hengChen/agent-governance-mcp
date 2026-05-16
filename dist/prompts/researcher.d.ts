@@ -1,11 +1,3 @@
-export declare function buildResearcherPrompt(workspacePath: string): {
-    description: string;
-    messages: Array<{
-        role: "user";
-        content: {
-            type: "text";
-            text: string;
-        };
-    }>;
-};
+import { type PromptResult } from "./build.js";
+export declare function buildResearcherPrompt(workspacePath: string): PromptResult;
 //# sourceMappingURL=researcher.d.ts.map

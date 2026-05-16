@@ -4,8 +4,8 @@ export interface HandoffState {
     last_updated: string;
     blocking_reason?: string;
     last_agent?: string;
-    completed: string[];
-    pending: string[];
+    completed_tasks: string[];
+    pending_notes: string[];
 }
 /**
  * Parse handoff.md YAML frontmatter + section content into structured JSON.

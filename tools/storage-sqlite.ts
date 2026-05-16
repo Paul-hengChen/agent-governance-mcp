@@ -184,8 +184,8 @@ export class SqliteHandoffStorage implements HandoffStorage {
       last_updated: row.last_updated,
       ...(row.blocking_reason ? { blocking_reason: row.blocking_reason } : {}),
       ...(row.last_agent ? { last_agent: row.last_agent } : {}),
-      completed: JSON.parse(row.completed) as string[],
-      pending: JSON.parse(row.pending) as string[],
+      completed_tasks: JSON.parse(row.completed) as string[],
+      pending_notes: JSON.parse(row.pending) as string[],
     };
   }
 
@@ -199,7 +199,16 @@ export class SqliteHandoffStorage implements HandoffStorage {
         message: "No handoff state found. Initialize by calling tw_update_state.",
       });
     }
-    return JSON.stringify({ exists: true, ...state });
+    const LIMIT = 50;
+    const truncated = state.completed_tasks.length > LIMIT;
+    const view = {
+      ...state,
+      completed_tasks: truncated ? state.completed_tasks.slice(-LIMIT) : state.completed_tasks,
+      ...(truncated && {
+        completed_tasks_truncated: { showing: LIMIT, total: state.completed_tasks.length },
+      }),
+    };
+    return JSON.stringify({ exists: true, ...view });
   }
 
   writeState(

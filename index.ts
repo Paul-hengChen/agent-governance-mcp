@@ -46,8 +46,8 @@ const UpdateStateArgs = z.object({
   workspace_path: absoluteWorkspacePath,
   active_feature: z.string().min(1).max(500),
   status: z.enum(["In_Progress", "PASS", "FAIL", "Blocked"]),
-  completed_tasks: z.array(z.string()).optional().default([]),
-  pending_notes: z.array(z.string()).optional().default([]),
+  completed_tasks: z.array(z.string().max(500)).max(200).optional().default([]),
+  pending_notes: z.array(z.string().max(1000)).max(50).optional().default([]),
   blocking_reason: z.string().max(2000).optional(),
   agent_id: z.string().max(200).optional(),
 });
@@ -87,7 +87,7 @@ function formatZodError(err: z.ZodError): string {
 // ==========================================
 // Storage adapter defaults to FileHandoffStorage; HTTP-mode boot switches it via setActiveStorage().
 const server = new Server(
-  { name: "teamwork-mcp-server", version: "3.0.0" },
+  { name: "teamwork-mcp-server", version: "3.1.0" },
   { capabilities: { tools: {}, prompts: {} } }
 );
 

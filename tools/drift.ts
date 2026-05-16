@@ -57,7 +57,7 @@ export function detectDrift(workspacePath: string): string {
       driftDetected: false,
       details: ["Handoff state exists but no task list found. Likely vibe-coding only mode."],
       handoffLastTask: handoff.active_feature,
-      tasksCompleted: handoff.completed,
+      tasksCompleted: handoff.completed_tasks,
       tasksIncomplete: [],
     });
   }
@@ -73,7 +73,7 @@ export function detectDrift(workspacePath: string): string {
   for (const id of idVocab) {
     idPatterns.set(id, new RegExp(`\\b${escapeRegExp(id)}\\b`));
   }
-  const handoffTaskIds = handoff.completed.flatMap((c) =>
+  const handoffTaskIds = handoff.completed_tasks.flatMap((c) =>
     [...idPatterns].filter(([, re]) => re.test(c)).map(([id]) => id),
   );
 

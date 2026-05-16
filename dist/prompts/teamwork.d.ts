@@ -1,11 +1,3 @@
-export declare function buildTeamworkPrompt(workspacePath: string): {
-    description: string;
-    messages: Array<{
-        role: "user";
-        content: {
-            type: "text";
-            text: string;
-        };
-    }>;
-};
+import { type PromptResult } from "./build.js";
+export declare function buildTeamworkPrompt(workspacePath: string): PromptResult;
 //# sourceMappingURL=teamwork.d.ts.map

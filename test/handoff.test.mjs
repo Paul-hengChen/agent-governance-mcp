@@ -52,8 +52,8 @@ last_updated: "2026-05-13T00:00:00.000Z"
   assert.ok(state);
   assert.equal(state.active_feature, "feature-x");
   assert.equal(state.status, "In_Progress");
-  assert.deepEqual(state.completed, ["T01 build login", "T02 add tests"]);
-  assert.deepEqual(state.pending, ["continue refactor", "無should-not-appear"]);
+  assert.deepEqual(state.completed_tasks, ["T01 build login", "T02 add tests"]);
+  assert.deepEqual(state.pending_notes, ["continue refactor", "無should-not-appear"]);
 });
 
 test("parseHandoff also matches English-only section headings", () => {
@@ -74,8 +74,8 @@ last_updated: "t"
   );
   const state = parseHandoff(ws);
   assert.ok(state);
-  assert.deepEqual(state.completed, ["A1 done"]);
-  assert.deepEqual(state.pending, ["remember to ship"]);
+  assert.deepEqual(state.completed_tasks, ["A1 done"]);
+  assert.deepEqual(state.pending_notes, ["remember to ship"]);
 });
 
 test("parseHandoff ignores the 無 sentinel for empty pending sections", () => {
@@ -95,7 +95,7 @@ last_updated: "t"
 `
   );
   const state = parseHandoff(ws);
-  assert.deepEqual(state.pending, []);
+  assert.deepEqual(state.pending_notes, []);
 });
 
 test("parseHandoff does not bleed completed checkboxes into pending", () => {
@@ -118,8 +118,8 @@ last_updated: "t"
 `
   );
   const state = parseHandoff(ws);
-  assert.deepEqual(state.completed, ["T1 a", "T2 b"]);
-  assert.deepEqual(state.pending, ["only-this-one"]);
+  assert.deepEqual(state.completed_tasks, ["T1 a", "T2 b"]);
+  assert.deepEqual(state.pending_notes, ["only-this-one"]);
 });
 
 test("parseHandoff surfaces blocking_reason and last_agent when present", () => {
@@ -181,8 +181,8 @@ test("writeHandoffState → parseHandoff round-trip preserves all fields", async
   assert.equal(state.active_feature, "feature-y");
   assert.equal(state.status, "In_Progress");
   assert.equal(state.last_agent, "agent-A");
-  assert.deepEqual(state.completed, ["T1 first", "T2 second"]);
-  assert.deepEqual(state.pending, ["note one", "note two"]);
+  assert.deepEqual(state.completed_tasks, ["T1 first", "T2 second"]);
+  assert.deepEqual(state.pending_notes, ["note one", "note two"]);
 });
 
 test("writeHandoffState round-trip with empty task/note arrays yields empty parsed arrays", async () => {
@@ -192,8 +192,8 @@ test("writeHandoffState round-trip with empty task/note arrays yields empty pars
 
   await writeHandoffState(ws, "feature-z", "PASS", [], [], undefined, undefined);
   const state = parseHandoff(ws);
-  assert.deepEqual(state.completed, []);
-  assert.deepEqual(state.pending, []);
+  assert.deepEqual(state.completed_tasks, []);
+  assert.deepEqual(state.pending_notes, []);
 });
 
 test("writeHandoffState round-trip preserves blocking_reason when status=Blocked", async () => {
@@ -213,5 +213,5 @@ test("writeHandoffState round-trip preserves blocking_reason when status=Blocked
   const state = parseHandoff(ws);
   assert.equal(state.status, "Blocked");
   assert.equal(state.blocking_reason, "missing api credentials");
-  assert.deepEqual(state.pending, ["needs human review"]);
+  assert.deepEqual(state.pending_notes, ["needs human review"]);
 });
