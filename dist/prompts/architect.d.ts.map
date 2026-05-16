@@ -1,0 +1,1 @@
+{"version":3,"file":"architect.d.ts","sourceRoot":"","sources":["../../prompts/architect.ts"],"names":[],"mappings":"AA+BA,wBAAgB,oBAAoB,CAAC,aAAa,EAAE,MAAM,GAAG;IAC3D,WAAW,EAAE,MAAM,CAAC;IACpB,QAAQ,EAAE,KAAK,CAAC;QAAE,IAAI,EAAE,MAAM,CAAC;QAAC,OAAO,EAAE;YAAE,IAAI,EAAE,MAAM,CAAC;YAAC,IAAI,EAAE,MAAM,CAAA;SAAE,CAAA;KAAE,CAAC,CAAC;CAC5E,CA4BA"}

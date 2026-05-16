@@ -22,12 +22,12 @@ import { getNextTask, completeTask, rollbackTask, addTask } from "./tools/tasks.
 import { detectDrift } from "./tools/drift.js";
 import { enforcePreFlight, cleanupStaleSessions } from "./guards/session.js";
 import { getActiveStorage, setActiveStorage } from "./tools/storage.js";
-import { SqliteHandoffStorage } from "./tools/storage-sqlite.js";
 import { buildSrEngineerPrompt } from "./prompts/sr-engineer.js";
 import { buildResearcherPrompt } from "./prompts/researcher.js";
 import { buildPmPrompt } from "./prompts/pm.js";
 import { buildQaEngineerPrompt } from "./prompts/qa-engineer.js";
 import { buildTeamworkPrompt } from "./prompts/teamwork.js";
+import { buildArchitectPrompt } from "./prompts/architect.js";
 import { switchRole, type RoleName } from "./tools/role.js";
 
 // ==========================================
@@ -152,6 +152,17 @@ server.setRequestHandler(ListPromptsRequestSchema, async () => {
           },
         ],
       },
+      {
+        name: "architect",
+        description: "Architect role. Write system design, interface contracts.",
+        arguments: [
+          {
+            name: "workspace_path",
+            description: "Absolute workspace path (optional — defaults to current project dir)",
+            required: false,
+          },
+        ],
+      },
     ],
   };
 });
@@ -175,6 +186,8 @@ server.setRequestHandler(GetPromptRequestSchema, async (request) => {
     return buildQaEngineerPrompt(resolvedPath);
   } else if (name === "teamwork") {
     return buildTeamworkPrompt(resolvedPath);
+  } else if (name === "architect") {
+    return buildArchitectPrompt(resolvedPath);
   }
 
   throw new Error(`Prompt not found: ${name}`);
@@ -490,6 +503,19 @@ setInterval(() => cleanupStaleSessions(60 * 60 * 1000), 30 * 60 * 1000).unref();
 
       const dbArgIndex = process.argv.indexOf("--db");
       const dbPath = dbArgIndex !== -1 ? process.argv[dbArgIndex + 1] : path.join(process.cwd(), "teamwork.db");
+      // Lazy load: HTTP mode is the only path that needs better-sqlite3 (a
+      // native module). Stdio users on machines without build tools shouldn't
+      // pay for it, hence it's an optionalDependency + dynamic import.
+      let SqliteHandoffStorage: typeof import("./tools/storage-sqlite.js").SqliteHandoffStorage;
+      try {
+        ({ SqliteHandoffStorage } = await import("./tools/storage-sqlite.js"));
+      } catch (err) {
+        throw new Error(
+          "HTTP mode requires better-sqlite3 but it is not installed. " +
+            "Reinstall with `npm install better-sqlite3` (needs Python + C++ toolchain on first build). " +
+            `Underlying error: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
       const sqliteStorage = new SqliteHandoffStorage(dbPath);
       setActiveStorage(sqliteStorage);
 
