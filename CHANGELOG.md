@@ -16,6 +16,14 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.1.2] - 2026-05-16
+
+### Changed
+- Constitution heading bumped to `v3.1.2` (`content/constitution.md`) so the
+  in-prompt version label stays aligned with the server package version. Going
+  forward, each release bumps both together; no semantic change to the rules
+  themselves in this release.
+
 ## [3.1.1] - 2026-05-16
 
 ### Fixed

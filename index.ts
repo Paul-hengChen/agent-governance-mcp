@@ -87,7 +87,7 @@ function formatZodError(err: z.ZodError): string {
 // ==========================================
 // Storage adapter defaults to FileHandoffStorage; HTTP-mode boot switches it via setActiveStorage().
 const server = new Server(
-  { name: "teamwork-mcp-server", version: "3.1.1" },
+  { name: "teamwork-mcp-server", version: "3.1.2" },
   { capabilities: { tools: {}, prompts: {} } }
 );
 
