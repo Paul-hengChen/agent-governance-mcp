@@ -40,5 +40,5 @@ All review notes, questions, and bug reports → `qa_reports/review_<task-id>.md
 5. **Phase 4 — Run**:
    - Project build: ZERO errors.
    - **CI Runnability**: `npm test` / `pytest` / `cargo test` runs headlessly with zero human interaction. Flag if not.
-   - **PASS** → `tw_complete_task(<task-id>)` → `tw_update_state(status=PASS, pending_notes=["QA: <task-id> PASS"])`.
+   - **PASS** → `tw_complete_task(<task-id>)` → `tw_update_state(status=PASS, agent_id="qa-engineer", pending_notes=["QA: <task-id> PASS"])`.
    - **FAIL** → `tw_rollback_task(<task-id>, <reason>)` → `tw_update_state(status=FAIL, pending_notes=["QA: <task-id> FAIL — <reason>", "next_role: sr-engineer"])`.

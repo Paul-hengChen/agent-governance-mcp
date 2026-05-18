@@ -390,6 +390,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             case "tw_update_state": {
                 const parsed = UpdateStateArgs.parse(args);
                 enforcePreFlight(parsed.workspace_path, "tw_update_state");
+                if (parsed.status === "PASS" && parsed.agent_id !== "qa-engineer") {
+                    const who = parsed.agent_id ? `"${parsed.agent_id}"` : "unidentified agent (agent_id not set)";
+                    return {
+                        content: [{
+                                type: "text",
+                                text: `⛔ BLOCKED: status=PASS is reserved for qa-engineer. Called by ${who}. Hand off to qa-engineer and pass agent_id="qa-engineer" when calling tw_update_state.`,
+                            }],
+                    };
+                }
                 const result = await getActiveStorage().writeState(parsed.workspace_path, parsed.active_feature, parsed.status, parsed.completed_tasks, parsed.pending_notes, parsed.blocking_reason, parsed.agent_id);
                 return { content: [{ type: "text", text: result }] };
             }
