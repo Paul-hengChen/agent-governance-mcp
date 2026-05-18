@@ -482,6 +482,84 @@ User: "add dark mode"
                       └─▶ handoff.md: status = PASS ✅
 ```
 
+### Automated Per-Write Pipeline (v3.2.0)
+
+Every `tw_update_state` call goes through a 9-step server-side pipeline
+*before* `.current/handoff.md` (or the SQLite row) is touched. This is what
+makes the routing chain non-bypassable rather than advisory.
+
+```
+caller: tw_update_state({ agent_id, status, completed_tasks, qa_review?, pending_notes })
+                                          │
+                                          ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ ① Pre-Flight Check (guards/session.ts)                          │
+│    hasReadState(workspace)? ─ no → ⛔ BLOCKED                    │
+├─────────────────────────────────────────────────────────────────┤
+│ ② File Lock (guards/file-lock.ts)                               │
+│    O_EXCL on .current/handoff.md.lock + stale-PID detection      │
+├─────────────────────────────────────────────────────────────────┤
+│ ③ Freshness Check                                                │
+│    file mode: current mtime == snapshot mtime?                   │
+│    SQLite mode: SNAPSHOT_KEY token unchanged?                    │
+│    drift → ⛔ STATE DRIFT (caller must re-read)                  │
+├─────────────────────────────────────────────────────────────────┤
+│ ④ validateTransition() (tools/transitions.ts)                   │
+│    (prev_agent, prev_status) → (next_agent, next_status)         │
+│    must appear in ALLOWED_TRANSITIONS, OR qualify for the        │
+│    same-agent In_Progress→In_Progress self-loop fast path.       │
+│    reject → { error, attempted, allowed, hint }                  │
+├─────────────────────────────────────────────────────────────────┤
+│ ⑤ Round-Cap Override                                             │
+│    if prev_qa_round ≥ 4 → matrix collapses to {(pm, In_Progress)}│
+│    forces PM re-entry; everything else rejected                  │
+├─────────────────────────────────────────────────────────────────┤
+│ ⑥ Agent-ID Gate (PASS path + tw_complete_task)                  │
+│    agent_id == "qa-engineer"? ─ no → ⛔ BLOCKED                  │
+├─────────────────────────────────────────────────────────────────┤
+│ ⑦ Evidence-of-QA (PASS path)                                     │
+│    every id in completed_tasks must have                         │
+│    qa_reports/review_<id>.md (file mode) or `reports` row        │
+│    qa_review attachment recorded atomically                      │
+├─────────────────────────────────────────────────────────────────┤
+│ ⑧ computeNewRound()                                              │
+│    (qa-engineer, FAIL) → prev + 1                                │
+│    (qa-engineer, PASS) | (pm, In_Progress) → 0                   │
+│    else → unchanged                                              │
+├─────────────────────────────────────────────────────────────────┤
+│ ⑨ Atomic Write                                                   │
+│    tmp file + fs.renameSync → refreshSnapshotFor                 │
+│    next same-session write won't self-trip freshness check       │
+└─────────────────────────────────────────────────────────────────┘
+                                          │
+                                          ▼
+                                  handoff state updated
+```
+
+**Handoff signal**: every role's `pending_notes` starts with `next_role:
+<name>`. Coordinator reads it next turn — routing rides on the handoff
+file, not on LLM memory.
+
+**Anti-loop circuit breaker** (cross-cutting, constitution §5):
+- Same-failure auto-fix attempts ≤ 2
+- Re-reads of the same target file ≤ 3
+- On limit → stop tool use, surface what's missing, wait for human
+
+**Bypass surface** (honest accounting):
+1. The hook is opt-in (`.current/` / `tasks.md` / `TODO.md` marker required).
+2. Constitution is *context*, not a capability gate — an agent can `Edit`/
+   `Write`/`Bash sed` the handoff file directly. `tw_detect_drift` catches
+   it on the *next* session, not at write time.
+3. `agent_id` is a self-declared string. The gate stops empty/misspelled
+   ids but cannot stop an agent that actively lies about its role.
+4. `tw_switch_role` returns SOP text; it does not change the LLM's
+   identity. Whether the model "stays in role" is unenforceable.
+5. The Q&A / doc-edit lane intentionally skips state sync — an agent that
+   miscategorises a state-modifying request as "doc tweak" routes around
+   the pipeline.
+6. File lock is local-fs only; cross-machine collaboration needs HTTP mode
+   + SQLite (Phase 6) or git-committed `.current/`.
+
 ---
 
 ## Daily Usage Flow
