@@ -13,8 +13,14 @@ import {
   addTaskInFile,
   type TaskRecord,
 } from "./tasks-file.js";
+import { recordReviewInFile, hasEvidenceInFile } from "./evidence-file.js";
 
 export type { HandoffState, TaskRecord };
+
+export interface EvidenceCheck {
+  present: string[];
+  missing: string[];
+}
 
 export interface HandoffStorage {
   // --- Handoff state ---
@@ -27,6 +33,7 @@ export interface HandoffStorage {
     pendingNotes: string[],
     blockingReason?: string,
     lastAgent?: string,
+    qaRound?: number,
   ): Promise<string>;
   parse(workspacePath: string): HandoffState | null;
 
@@ -41,6 +48,16 @@ export interface HandoffStorage {
     description: string,
     section?: string,
   ): Promise<string>;
+
+  // --- QA evidence ---
+  recordReview(
+    workspacePath: string,
+    taskIds: string[],
+    status: "PASS" | "FAIL",
+    reviewer: string,
+    notes: string,
+  ): Promise<void>;
+  hasEvidence(workspacePath: string, taskIds: string[]): Promise<EvidenceCheck>;
 }
 
 export class FileHandoffStorage implements HandoffStorage {
@@ -56,8 +73,9 @@ export class FileHandoffStorage implements HandoffStorage {
     pendingNotes: string[],
     blockingReason?: string,
     lastAgent?: string,
+    qaRound?: number,
   ): Promise<string> {
-    return writeHandoffState(workspacePath, activeFeature, status, completedTasks, pendingNotes, blockingReason, lastAgent);
+    return writeHandoffState(workspacePath, activeFeature, status, completedTasks, pendingNotes, blockingReason, lastAgent, qaRound);
   }
 
   parse(workspacePath: string): HandoffState | null {
@@ -87,6 +105,20 @@ export class FileHandoffStorage implements HandoffStorage {
     section?: string,
   ): Promise<string> {
     return addTaskInFile(workspacePath, taskId, description, section);
+  }
+
+  recordReview(
+    workspacePath: string,
+    taskIds: string[],
+    status: "PASS" | "FAIL",
+    reviewer: string,
+    notes: string,
+  ): Promise<void> {
+    return recordReviewInFile(workspacePath, taskIds, status, reviewer, notes);
+  }
+
+  hasEvidence(workspacePath: string, taskIds: string[]): Promise<EvidenceCheck> {
+    return Promise.resolve(hasEvidenceInFile(workspacePath, taskIds));
   }
 }
 

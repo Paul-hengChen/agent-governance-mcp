@@ -16,6 +16,46 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.2.0] - 2026-05-18
+
+### Added — QA-Flow Enforcement
+- **Routing-chain state machine**: `tw_update_state` now validates every write
+  against an `ALLOWED_TRANSITIONS` matrix keyed on `(prev_last_agent,
+  prev_status)`. Illegal edges (e.g. `sr-engineer → PASS`) reject with a
+  structured envelope listing the attempted tuple and allowed alternatives.
+  Self-loop on same-agent `In_Progress→In_Progress` is fast-pathed.
+- **QA round counter**: `qa_round` is now persisted in handoff frontmatter
+  (file mode) and the `handoff_state` table (SQLite). Increments on
+  `(qa-engineer, FAIL)`, resets on PASS or PM re-entry. Round 4 triggers
+  forced rollback to PM — only `(pm, In_Progress)` is accepted thereafter.
+- **Evidence-of-QA**: PASS path now requires `qa_reports/review_<id>.md`
+  (file mode) or a `reports` table row (SQLite) for every `completed_tasks`
+  id. `tw_update_state` gained an optional `qa_review` field; when set with
+  `agent_id="qa-engineer"` and status in {PASS, FAIL}, the server records
+  the review automatically.
+- **`tw_complete_task` agent gate**: `agent_id="qa-engineer"` now required.
+  Symmetric to the PASS gate; closes the bypass where any role could flip
+  `[x]` directly.
+- **`UpdateStateArgs` schema refinement**: `status="PASS"` requires
+  `agent_id="qa-engineer"` at the zod layer, so the constraint is visible
+  in the MCP client error envelope, not just a handler `if`.
+- New module `tools/transitions.ts` (pure: ALLOWED_TRANSITIONS,
+  validateTransition, computeNewRound, requireQaEngineer).
+- New module `tools/evidence-file.ts` (file-mode recordReview/hasEvidence).
+- `HandoffStorage` interface gained `recordReview` + `hasEvidence`;
+  `writeState` gained a trailing `qaRound` parameter.
+
+### Migration
+- SQLite databases upgrade automatically on first boot: the schema gets a
+  `qa_round` column (additive `ALTER`) and a new `reports` table.
+- File-mode `handoff.md` without `qa_round` frontmatter loads as `qa_round=0`.
+- No tool-name changes; client code keeps working.
+
+### Out of Scope (deferred)
+- Server-side session role snapshot (option C). Without MCP caller identity
+  binding it only relocates the self-declaration; revisit when MCP gains a
+  caller-id field.
+
 ## [3.1.2] - 2026-05-16
 
 ### Changed

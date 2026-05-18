@@ -19,6 +19,10 @@ export interface HandoffState {
   last_agent?: string;
   completed_tasks: string[];
   pending_notes: string[];
+  // QA round counter — incremented on (qa-engineer, FAIL), reset on PASS or
+  // PM re-entry. Round-cap override (>= 4) blocks all transitions except
+  // (pm, In_Progress). Backward-compat: parser defaults missing field to 0.
+  qa_round: number;
 }
 
 // Cap the completed_tasks array returned by readState() so long projects
@@ -87,6 +91,8 @@ export function parseHandoff(workspacePath: string): HandoffState | null {
 
   const blockingReason = asString(frontmatter.blocking_reason) || undefined;
   const lastAgent = asString(frontmatter.last_agent) || undefined;
+  const qaRoundRaw = Number(frontmatter.qa_round);
+  const qa_round = Number.isFinite(qaRoundRaw) && qaRoundRaw >= 0 ? Math.floor(qaRoundRaw) : 0;
 
   return {
     active_feature: asString(frontmatter.active_feature),
@@ -96,6 +102,7 @@ export function parseHandoff(workspacePath: string): HandoffState | null {
     ...(lastAgent && { last_agent: lastAgent }),
     completed_tasks,
     pending_notes,
+    qa_round,
   };
 }
 
@@ -141,6 +148,7 @@ export async function writeHandoffState(
   pendingNotes: string[],
   blockingReason?: string,
   lastAgent?: string,
+  qaRound?: number,
 ): Promise<string> {
   ensureDir(workspacePath);
   const handoffPath = getHandoffPath(workspacePath);
@@ -160,13 +168,17 @@ export async function writeHandoffState(
       ? pendingNotes.map((t) => `- ${t}`).join("\n")
       : "- 無";
 
-    const frontmatterData: Record<string, string> = {
+    const frontmatterData: Record<string, string | number> = {
       active_feature: activeFeature,
       status,
       last_updated: now,
     };
     if (blockingReason) frontmatterData.blocking_reason = blockingReason;
     if (lastAgent) frontmatterData.last_agent = lastAgent;
+    // Always emit qa_round (even 0) so the field is discoverable; falsy
+    // input (undefined/NaN) normalises to 0.
+    const normalisedRound = Number.isFinite(qaRound) && (qaRound as number) >= 0 ? Math.floor(qaRound as number) : 0;
+    frontmatterData.qa_round = normalisedRound;
 
     const frontmatter = yaml
       .dump(frontmatterData, { lineWidth: -1, forceQuotes: true, quotingType: '"' })

@@ -14,7 +14,8 @@ CREATE TABLE IF NOT EXISTS handoff_state (
   blocking_reason TEXT,
   last_agent      TEXT,
   completed       TEXT NOT NULL DEFAULT '[]',
-  pending         TEXT NOT NULL DEFAULT '[]'
+  pending         TEXT NOT NULL DEFAULT '[]',
+  qa_round        INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS tasks (
@@ -31,6 +32,19 @@ CREATE TABLE IF NOT EXISTS tasks (
 
 CREATE INDEX IF NOT EXISTS idx_tasks_workspace_order
   ON tasks (workspace_path, sort_order);
+
+CREATE TABLE IF NOT EXISTS reports (
+  workspace_path TEXT NOT NULL,
+  task_id        TEXT NOT NULL,
+  status         TEXT NOT NULL CHECK (status IN ('PASS', 'FAIL')),
+  reviewer       TEXT NOT NULL,
+  notes          TEXT NOT NULL,
+  created_at     TEXT NOT NULL,
+  PRIMARY KEY (workspace_path, task_id, created_at)
+);
+
+CREATE INDEX IF NOT EXISTS idx_reports_ws_task
+  ON reports (workspace_path, task_id, status);
 `;
 const SNAPSHOT_KEY = "sqlite:handoff.last_updated";
 export class SqliteHandoffStorage {
@@ -45,25 +59,37 @@ export class SqliteHandoffStorage {
     selectTaskStmt;
     completeTaskStmt;
     rollbackTaskStmt;
+    insertReportStmt;
+    selectReportsByTaskStmt;
     constructor(dbPath) {
         this.db = new Database(dbPath);
         this.db.pragma("journal_mode = WAL");
         this.db.pragma("synchronous = NORMAL");
         this.db.pragma("foreign_keys = ON");
         this.db.exec(SCHEMA);
+        // Idempotent additive migration: pre-v3.2.0 DBs lack qa_round column. The
+        // ALTER throws if the column already exists; swallow that one error only.
+        try {
+            this.db.exec("ALTER TABLE handoff_state ADD COLUMN qa_round INTEGER NOT NULL DEFAULT 0");
+        }
+        catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            if (!/duplicate column name/i.test(msg))
+                throw err;
+        }
         this.selectStmt = this.db.prepare("SELECT * FROM handoff_state WHERE workspace_path = ?");
         this.selectLastUpdatedStmt = this.db.prepare("SELECT last_updated FROM handoff_state WHERE workspace_path = ?");
         this.upsertStmt = this.db.prepare(`INSERT OR REPLACE INTO handoff_state
-        (workspace_path, active_feature, status, last_updated, blocking_reason, last_agent, completed, pending)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
-        this.txUpsert = this.db.transaction((workspacePath, activeFeature, status, now, blockingReason, lastAgent, completed, pending, expectedLastUpdated) => {
+        (workspace_path, active_feature, status, last_updated, blocking_reason, last_agent, completed, pending, qa_round)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+        this.txUpsert = this.db.transaction((workspacePath, activeFeature, status, now, blockingReason, lastAgent, completed, pending, qaRound, expectedLastUpdated) => {
             const row = this.selectLastUpdatedStmt.get(workspacePath);
             const actual = row?.last_updated ?? null;
             if (actual !== expectedLastUpdated) {
                 throw new Error(`⛔ STATE DRIFT: handoff row changed between freshness check and write ` +
                     `(expected last_updated=${expectedLastUpdated}, actual=${actual}). Retry after tw_get_state.`);
             }
-            this.upsertStmt.run(workspacePath, activeFeature, status, now, blockingReason, lastAgent, completed, pending);
+            this.upsertStmt.run(workspacePath, activeFeature, status, now, blockingReason, lastAgent, completed, pending, qaRound);
         });
         this.listTasksStmt = this.db.prepare(`SELECT task_id, description, section, completed, note, reverted_reason, sort_order
        FROM tasks WHERE workspace_path = ? ORDER BY sort_order ASC`);
@@ -77,6 +103,12 @@ export class SqliteHandoffStorage {
        WHERE workspace_path = ? AND task_id = ? AND completed = 0`);
         this.rollbackTaskStmt = this.db.prepare(`UPDATE tasks SET completed = 0, reverted_reason = ?, note = NULL
        WHERE workspace_path = ? AND task_id = ? AND completed = 1`);
+        this.insertReportStmt = this.db.prepare(`INSERT INTO reports (workspace_path, task_id, status, reviewer, notes, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`);
+        // PASS-status reports satisfy hasEvidence() in SQLite mode. File mode is
+        // laxer (any file is enough) because pass/fail isn't decodable from disk.
+        this.selectReportsByTaskStmt = this.db.prepare(`SELECT DISTINCT task_id FROM reports
+       WHERE workspace_path = ? AND status = 'PASS' AND task_id IN (SELECT value FROM json_each(?))`);
     }
     // ---------- handoff state ----------
     fetchRow(workspacePath) {
@@ -90,6 +122,10 @@ export class SqliteHandoffStorage {
         const row = this.fetchRow(workspacePath);
         if (!row)
             return null;
+        const qaRoundRaw = row.qa_round;
+        const qa_round = typeof qaRoundRaw === "number" && Number.isFinite(qaRoundRaw) && qaRoundRaw >= 0
+            ? Math.floor(qaRoundRaw)
+            : 0;
         return {
             active_feature: row.active_feature,
             status: row.status,
@@ -98,6 +134,7 @@ export class SqliteHandoffStorage {
             ...(row.last_agent ? { last_agent: row.last_agent } : {}),
             completed_tasks: JSON.parse(row.completed),
             pending_notes: JSON.parse(row.pending),
+            qa_round,
         };
     }
     readState(workspacePath) {
@@ -121,11 +158,12 @@ export class SqliteHandoffStorage {
         };
         return JSON.stringify({ exists: true, ...view });
     }
-    writeState(workspacePath, activeFeature, status, completedTasks, pendingNotes, blockingReason, lastAgent) {
+    writeState(workspacePath, activeFeature, status, completedTasks, pendingNotes, blockingReason, lastAgent, qaRound) {
         const currentLastUpdated = this.fetchLastUpdated(workspacePath);
         verifyExtra(workspacePath, SNAPSHOT_KEY, currentLastUpdated);
+        const normalisedRound = Number.isFinite(qaRound) && qaRound >= 0 ? Math.floor(qaRound) : 0;
         const now = new Date().toISOString();
-        this.txUpsert(workspacePath, activeFeature, status, now, blockingReason ?? null, lastAgent ?? null, JSON.stringify(completedTasks), JSON.stringify(pendingNotes), currentLastUpdated);
+        this.txUpsert(workspacePath, activeFeature, status, now, blockingReason ?? null, lastAgent ?? null, JSON.stringify(completedTasks), JSON.stringify(pendingNotes), normalisedRound, currentLastUpdated);
         snapshotExtra(workspacePath, SNAPSHOT_KEY, now);
         return Promise.resolve(JSON.stringify({ success: true, storage: "sqlite", updated_at: now }));
     }
@@ -214,6 +252,35 @@ export class SqliteHandoffStorage {
             section: section?.trim() || "Active",
             storage: "sqlite",
         }));
+    }
+    // ---------- QA evidence ----------
+    recordReview(workspacePath, taskIds, status, reviewer, notes) {
+        const now = new Date().toISOString();
+        // Insert per id in a single implicit transaction. Duplicate (ws, id,
+        // created_at) is theoretically possible if called twice in the same ms;
+        // the PRIMARY KEY constraint then throws — caller's retry path.
+        const insertMany = this.db.transaction((ids) => {
+            for (const id of ids) {
+                this.insertReportStmt.run(workspacePath, id, status, reviewer, notes, now);
+            }
+        });
+        insertMany(taskIds);
+        return Promise.resolve();
+    }
+    hasEvidence(workspacePath, taskIds) {
+        if (taskIds.length === 0)
+            return Promise.resolve({ present: [], missing: [] });
+        const rows = this.selectReportsByTaskStmt.all(workspacePath, JSON.stringify(taskIds));
+        const presentSet = new Set(rows.map((r) => r.task_id));
+        const present = [];
+        const missing = [];
+        for (const id of taskIds) {
+            if (presentSet.has(id))
+                present.push(id);
+            else
+                missing.push(id);
+        }
+        return Promise.resolve({ present, missing });
     }
     close() {
         this.db.close();

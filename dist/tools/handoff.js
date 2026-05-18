@@ -64,6 +64,8 @@ export function parseHandoff(workspacePath) {
         .filter((s) => s !== "無" && s !== "");
     const blockingReason = asString(frontmatter.blocking_reason) || undefined;
     const lastAgent = asString(frontmatter.last_agent) || undefined;
+    const qaRoundRaw = Number(frontmatter.qa_round);
+    const qa_round = Number.isFinite(qaRoundRaw) && qaRoundRaw >= 0 ? Math.floor(qaRoundRaw) : 0;
     return {
         active_feature: asString(frontmatter.active_feature),
         status: asString(frontmatter.status),
@@ -72,6 +74,7 @@ export function parseHandoff(workspacePath) {
         ...(lastAgent && { last_agent: lastAgent }),
         completed_tasks,
         pending_notes,
+        qa_round,
     };
 }
 /**
@@ -106,7 +109,7 @@ export function readHandoffState(workspacePath) {
  * Pending notes are written as plain list items (not checkboxes) to avoid
  * ambiguity with tracked task IDs in the completed section.
  */
-export async function writeHandoffState(workspacePath, activeFeature, status, completedTasks, pendingNotes, blockingReason, lastAgent) {
+export async function writeHandoffState(workspacePath, activeFeature, status, completedTasks, pendingNotes, blockingReason, lastAgent, qaRound) {
     ensureDir(workspacePath);
     const handoffPath = getHandoffPath(workspacePath);
     const lockPath = path.join(workspacePath, ".current", ".handoff.lock");
@@ -130,6 +133,10 @@ export async function writeHandoffState(workspacePath, activeFeature, status, co
             frontmatterData.blocking_reason = blockingReason;
         if (lastAgent)
             frontmatterData.last_agent = lastAgent;
+        // Always emit qa_round (even 0) so the field is discoverable; falsy
+        // input (undefined/NaN) normalises to 0.
+        const normalisedRound = Number.isFinite(qaRound) && qaRound >= 0 ? Math.floor(qaRound) : 0;
+        frontmatterData.qa_round = normalisedRound;
         const frontmatter = yaml
             .dump(frontmatterData, { lineWidth: -1, forceQuotes: true, quotingType: '"' })
             .trimEnd();

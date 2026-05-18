@@ -121,6 +121,26 @@ If the AI tries to `update_state` without ever calling `tw_get_state`, it receiv
 - **Freshness Check**: If the file was modified by someone else after you read it, the server throws a `STATE DRIFT` error and demands a re-read.
 - **Atomic Writes**: Writes to a `*.tmp` file, then uses POSIX `rename`. Readers only see the complete old or new version.
 
+#### (c) QA-Flow Enforcement (v3.2.0)
+The server validates every `tw_update_state` write against an
+`ALLOWED_TRANSITIONS` matrix so the routing chain
+`pm → architect → sr-engineer → qa-engineer` can't be bypassed. Highlights:
+
+- **Agent-id gate**: `status=PASS` and `tw_complete_task` require
+  `agent_id="qa-engineer"` (zod refinement + handler defense).
+- **Transition matrix**: `(prev_last_agent, prev_status) → (new_agent,
+  new_status)` must be a legal edge. Self-loops on
+  `In_Progress→In_Progress` for the same agent are fast-pathed.
+- **Round counter**: `qa_round` increments on `(qa-engineer, FAIL)` and
+  resets on PASS or PM re-entry. Round 4 collapses the matrix to
+  `{(pm, In_Progress)}` until PM resets.
+- **Evidence-of-QA**: PASS requires `qa_reports/review_<id>.md` (file
+  mode) or a `reports` table row (SQLite). Attach `qa_review` on the
+  PASS/FAIL write and the server records evidence automatically.
+
+Rejections return a structured envelope (`error`, `attempted`, `allowed`,
+`hint`). Full design: `specs/qa-flow-enforcement-architecture.md`.
+
 ---
 
 ## Technical Details

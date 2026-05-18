@@ -22,7 +22,7 @@ import { buildQaEngineerPrompt } from "./prompts/qa-engineer.js";
 import { buildTeamworkPrompt } from "./prompts/teamwork.js";
 import { buildArchitectPrompt } from "./prompts/architect.js";
 import { switchRole } from "./tools/role.js";
-import { requireQaEngineer } from "./tools/transitions.js";
+import { requireQaEngineer, validateTransition, computeNewRound, } from "./tools/transitions.js";
 // ==========================================
 // Runtime validation schemas (zod)
 // ==========================================
@@ -42,6 +42,10 @@ const UpdateStateArgs = z
     pending_notes: z.array(z.string().max(1000)).max(50).optional().default([]),
     blocking_reason: z.string().max(2000).optional(),
     agent_id: z.string().max(200).optional(),
+    // QA review notes attached when (status in {PASS, FAIL}) and
+    // (agent_id === "qa-engineer"). Storage records the review to
+    // qa_reports/review_<id>.md (file mode) or the reports table (SQLite).
+    qa_review: z.string().max(10000).optional(),
 })
     .refine((d) => d.status !== "PASS" || d.agent_id === "qa-engineer", {
     message: 'status="PASS" requires agent_id="qa-engineer"',
@@ -77,7 +81,7 @@ function formatZodError(err) {
 // 1. Initialize Server (Tools + Prompts)
 // ==========================================
 // Storage adapter defaults to FileHandoffStorage; HTTP-mode boot switches it via setActiveStorage().
-const server = new Server({ name: "teamwork-mcp-server", version: "3.1.2" }, { capabilities: { tools: {}, prompts: {} } });
+const server = new Server({ name: "teamwork-mcp-server", version: "3.2.0" }, { capabilities: { tools: {}, prompts: {} } });
 // ==========================================
 // 2. Register Prompts (Layer 1: Auto-inject constitution)
 // ==========================================
@@ -201,7 +205,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
             {
                 name: "tw_update_state",
-                description: "Atomic write handoff state. Run at END of task.",
+                description: "Atomic write handoff state. Run at END of task. Subject to ALLOWED_TRANSITIONS — see specs/qa-flow-enforcement-architecture.md.",
                 inputSchema: {
                     type: "object",
                     properties: {
@@ -216,7 +220,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                         status: {
                             type: "string",
                             enum: ["In_Progress", "PASS", "FAIL", "Blocked"],
-                            description: "Execution status",
+                            description: 'Execution status. status="PASS" requires agent_id="qa-engineer".',
                         },
                         completed_tasks: {
                             type: "array",
@@ -234,7 +238,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                         },
                         agent_id: {
                             type: "string",
-                            description: "Agent ID",
+                            description: 'Agent name. Validated against ALLOWED_TRANSITIONS. PASS reserved for "qa-engineer".',
+                        },
+                        qa_review: {
+                            type: "string",
+                            description: "Review notes. Recorded as evidence when agent_id=qa-engineer and status in {PASS, FAIL}.",
                         },
                     },
                     required: ["workspace_path", "active_feature", "status"],
@@ -401,13 +409,66 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             case "tw_update_state": {
                 const parsed = UpdateStateArgs.parse(args);
                 enforcePreFlight(parsed.workspace_path, "tw_update_state");
+                // Defense-in-depth: zod refine already enforces this on PASS, but a
+                // client that bypasses zod still hits this guard.
                 if (parsed.status === "PASS") {
                     const gate = requireQaEngineer(parsed.agent_id, "tw_update_state(status=PASS)");
                     if (!gate.ok) {
                         return { content: [{ type: "text", text: gate.message ?? "blocked" }] };
                     }
                 }
-                const result = await getActiveStorage().writeState(parsed.workspace_path, parsed.active_feature, parsed.status, parsed.completed_tasks, parsed.pending_notes, parsed.blocking_reason, parsed.agent_id);
+                const storage = getActiveStorage();
+                const prevState = storage.parse(parsed.workspace_path);
+                const prev_qa_round = prevState?.qa_round ?? 0;
+                const prevTuple = {
+                    agent: prevState?.last_agent ?? null,
+                    status: prevState?.status ?? null,
+                };
+                const nextTuple = {
+                    agent: parsed.agent_id ?? null,
+                    status: parsed.status,
+                };
+                const rejection = validateTransition({ prev: prevTuple, next: nextTuple, prev_qa_round });
+                if (rejection) {
+                    return {
+                        content: [{ type: "text", text: `⛔ ${rejection.error}\n${JSON.stringify(rejection, null, 2)}` }],
+                        isError: true,
+                    };
+                }
+                // Evidence record FIRST so the PASS gate below can observe the row /
+                // file just written. Only fires when QA attaches qa_review on a
+                // PASS or FAIL write.
+                if (parsed.qa_review &&
+                    parsed.agent_id === "qa-engineer" &&
+                    (parsed.status === "PASS" || parsed.status === "FAIL")) {
+                    let ids = parsed.completed_tasks;
+                    if (ids.length === 0) {
+                        const all = storage.listTasks(parsed.workspace_path);
+                        ids = all ? all.filter((t) => !t.completed).map((t) => t.id) : [];
+                    }
+                    if (ids.length > 0) {
+                        await storage.recordReview(parsed.workspace_path, ids, parsed.status, "qa-engineer", parsed.qa_review);
+                    }
+                }
+                // Evidence gate for PASS path
+                if (parsed.status === "PASS" && parsed.completed_tasks.length > 0) {
+                    const ev = await storage.hasEvidence(parsed.workspace_path, parsed.completed_tasks);
+                    if (ev.missing.length > 0) {
+                        return {
+                            content: [{
+                                    type: "text",
+                                    text: `⛔ MISSING_EVIDENCE: ${ev.missing.join(", ")}. Provide qa_review or write qa_reports/review_<id>.md (file mode) / insert reports row (SQLite) before PASS.`,
+                                }],
+                            isError: true,
+                        };
+                    }
+                }
+                const new_qa_round = computeNewRound(prev_qa_round, nextTuple);
+                const pending = [...parsed.pending_notes];
+                if (new_qa_round === 4 && prev_qa_round === 3) {
+                    pending.unshift("⛔ Round 4: forced rollback to pm — no further QA allowed until PM resets.");
+                }
+                const result = await storage.writeState(parsed.workspace_path, parsed.active_feature, parsed.status, parsed.completed_tasks, pending, parsed.blocking_reason, parsed.agent_id, new_qa_round);
                 return { content: [{ type: "text", text: result }] };
             }
             case "tw_complete_task": {

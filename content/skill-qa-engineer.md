@@ -20,16 +20,18 @@ All review notes, questions, and bug reports → `qa_reports/review_<task-id>.md
 
 1. `tw_get_state` → `tw_detect_drift`. Confirm sr-engineer's `pending_notes` indicate readiness.
 
-2. **Phase 1 — Review**: Read the implementation. Check correctness, edge cases, security. Write findings to `qa_reports/review_<task-id>.md`.
+2. **Phase 0 — Claim review**: `tw_update_state(status=In_Progress, agent_id="qa-engineer", pending_notes=["QA: claiming review of <task-ids>"])`. This advances the state machine from `(sr-engineer, In_Progress)` to `(qa-engineer, In_Progress)` — required before any later PASS/FAIL is accepted by the server.
 
-3. **Phase 2 — Discussion (only if issues found)**:
+3. **Phase 1 — Review**: Read the implementation. Check correctness, edge cases, security. Write findings to `qa_reports/review_<task-id>.md`.
+
+4. **Phase 2 — Discussion (only if issues found)**:
    - Append questions/concerns to the review doc under `## Round 1`.
-   - `tw_update_state(status=Blocked, pending_notes=["Waiting for sr-engineer Round <N>", "next_role: sr-engineer"])`. STOP.
+   - `tw_update_state(status=Blocked, agent_id="qa-engineer", pending_notes=["Waiting for sr-engineer Round <N>", "next_role: sr-engineer"])`. STOP.
    - Human switches sr-engineer in, who replies, then switches you back. Repeat for up to 3 rounds.
-   - **Unresolved after Round 3**: `tw_rollback_task(<task-id>, "QA: unresolved after 3 rounds")` → `tw_update_state(status=FAIL, pending_notes=["QA: <task-id> failed Round 3", "next_role: pm"])`. STOP — go no further.
+   - **Unresolved after Round 3**: `tw_rollback_task(<task-id>, "QA: unresolved after 3 rounds")` → `tw_update_state(status=FAIL, agent_id="qa-engineer", qa_review="<reason>", pending_notes=["QA: <task-id> failed Round 3", "next_role: pm"])`. The server increments `qa_round`; the next valid transition is `(pm, In_Progress)`. STOP.
    - **Phase 2 PASS** (all rounds resolved, or no issues found in Phase 1): proceed to Phase 3.
 
-4. **Phase 3 — Tests**:
+5. **Phase 3 — Tests**:
    a. **Spec-to-Test Map**: For each AC in `specs/<feature>.md`, write ≥ 1 test. Record the AC→test mapping in the review doc.
    b. **Coverage Gate**: ≥ 80% line coverage on new/modified files. If tooling can't measure, note explicitly in the review doc.
    c. **Security Smoke Tests** (always include):
@@ -37,8 +39,8 @@ All review notes, questions, and bug reports → `qa_reports/review_<task-id>.md
       - Auth/permission tests if the feature has access control.
    d. Write the automated tests.
 
-5. **Phase 4 — Run**:
+6. **Phase 4 — Run**:
    - Project build: ZERO errors.
    - **CI Runnability**: `npm test` / `pytest` / `cargo test` runs headlessly with zero human interaction. Flag if not.
-   - **PASS** → `tw_complete_task(<task-id>)` → `tw_update_state(status=PASS, agent_id="qa-engineer", pending_notes=["QA: <task-id> PASS"])`.
-   - **FAIL** → `tw_rollback_task(<task-id>, <reason>)` → `tw_update_state(status=FAIL, pending_notes=["QA: <task-id> FAIL — <reason>", "next_role: sr-engineer"])`.
+   - **PASS** → `tw_update_state(status=PASS, agent_id="qa-engineer", completed_tasks=[<ids>], qa_review="<summary>", pending_notes=["QA: <task-id> PASS"])`. Server auto-records the review (file mode: `qa_reports/review_<id>.md`; SQLite: `reports` row) AND verifies evidence exists before persisting PASS. Then call `tw_complete_task(<task-id>, agent_id="qa-engineer")` per completed id.
+   - **FAIL** → `tw_rollback_task(<task-id>, <reason>)` → `tw_update_state(status=FAIL, agent_id="qa-engineer", qa_review="<failure detail>", pending_notes=["QA: <task-id> FAIL — <reason>", "next_role: sr-engineer"])`. `qa_round` auto-increments. At Round 4 (after 3 prior FAILs), only `(pm, In_Progress)` is accepted next — escalate.

@@ -10,7 +10,7 @@ import {
   snapshotExtra,
   verifyExtra,
 } from "../guards/session.js";
-import type { HandoffStorage, HandoffState, TaskRecord } from "./storage.js";
+import type { HandoffStorage, HandoffState, TaskRecord, EvidenceCheck } from "./storage.js";
 
 interface HandoffRow {
   active_feature: string;
@@ -20,6 +20,7 @@ interface HandoffRow {
   last_agent: string | null;
   completed: string;
   pending: string;
+  qa_round: number | null;
 }
 
 interface TaskRow {
@@ -41,7 +42,8 @@ CREATE TABLE IF NOT EXISTS handoff_state (
   blocking_reason TEXT,
   last_agent      TEXT,
   completed       TEXT NOT NULL DEFAULT '[]',
-  pending         TEXT NOT NULL DEFAULT '[]'
+  pending         TEXT NOT NULL DEFAULT '[]',
+  qa_round        INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS tasks (
@@ -58,6 +60,19 @@ CREATE TABLE IF NOT EXISTS tasks (
 
 CREATE INDEX IF NOT EXISTS idx_tasks_workspace_order
   ON tasks (workspace_path, sort_order);
+
+CREATE TABLE IF NOT EXISTS reports (
+  workspace_path TEXT NOT NULL,
+  task_id        TEXT NOT NULL,
+  status         TEXT NOT NULL CHECK (status IN ('PASS', 'FAIL')),
+  reviewer       TEXT NOT NULL,
+  notes          TEXT NOT NULL,
+  created_at     TEXT NOT NULL,
+  PRIMARY KEY (workspace_path, task_id, created_at)
+);
+
+CREATE INDEX IF NOT EXISTS idx_reports_ws_task
+  ON reports (workspace_path, task_id, status);
 `;
 
 const SNAPSHOT_KEY = "sqlite:handoff.last_updated";
@@ -66,7 +81,7 @@ export class SqliteHandoffStorage implements HandoffStorage {
   private db: Database.Database;
   private selectStmt: Database.Statement<[string]>;
   private selectLastUpdatedStmt: Database.Statement<[string]>;
-  private upsertStmt: Database.Statement<[string, string, string, string, string | null, string | null, string, string]>;
+  private upsertStmt: Database.Statement<[string, string, string, string, string | null, string | null, string, string, number]>;
   private txUpsert: (
     workspacePath: string,
     activeFeature: string,
@@ -76,6 +91,7 @@ export class SqliteHandoffStorage implements HandoffStorage {
     lastAgent: string | null,
     completed: string,
     pending: string,
+    qaRound: number,
     expectedLastUpdated: string | null,
   ) => void;
 
@@ -86,12 +102,23 @@ export class SqliteHandoffStorage implements HandoffStorage {
   private completeTaskStmt: Database.Statement<[string | null, string, string]>;
   private rollbackTaskStmt: Database.Statement<[string, string, string]>;
 
+  private insertReportStmt: Database.Statement<[string, string, string, string, string, string]>;
+  private selectReportsByTaskStmt: Database.Statement<[string, string]>;
+
   constructor(dbPath: string) {
     this.db = new Database(dbPath);
     this.db.pragma("journal_mode = WAL");
     this.db.pragma("synchronous = NORMAL");
     this.db.pragma("foreign_keys = ON");
     this.db.exec(SCHEMA);
+    // Idempotent additive migration: pre-v3.2.0 DBs lack qa_round column. The
+    // ALTER throws if the column already exists; swallow that one error only.
+    try {
+      this.db.exec("ALTER TABLE handoff_state ADD COLUMN qa_round INTEGER NOT NULL DEFAULT 0");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!/duplicate column name/i.test(msg)) throw err;
+    }
 
     this.selectStmt = this.db.prepare<[string]>(
       "SELECT * FROM handoff_state WHERE workspace_path = ?",
@@ -99,10 +126,10 @@ export class SqliteHandoffStorage implements HandoffStorage {
     this.selectLastUpdatedStmt = this.db.prepare<[string]>(
       "SELECT last_updated FROM handoff_state WHERE workspace_path = ?",
     );
-    this.upsertStmt = this.db.prepare<[string, string, string, string, string | null, string | null, string, string]>(
+    this.upsertStmt = this.db.prepare<[string, string, string, string, string | null, string | null, string, string, number]>(
       `INSERT OR REPLACE INTO handoff_state
-        (workspace_path, active_feature, status, last_updated, blocking_reason, last_agent, completed, pending)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        (workspace_path, active_feature, status, last_updated, blocking_reason, last_agent, completed, pending, qa_round)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
 
     this.txUpsert = this.db.transaction(
@@ -115,6 +142,7 @@ export class SqliteHandoffStorage implements HandoffStorage {
         lastAgent: string | null,
         completed: string,
         pending: string,
+        qaRound: number,
         expectedLastUpdated: string | null,
       ) => {
         const row = this.selectLastUpdatedStmt.get(workspacePath) as { last_updated: string } | undefined;
@@ -134,6 +162,7 @@ export class SqliteHandoffStorage implements HandoffStorage {
           lastAgent,
           completed,
           pending,
+          qaRound,
         );
       },
     );
@@ -162,6 +191,17 @@ export class SqliteHandoffStorage implements HandoffStorage {
       `UPDATE tasks SET completed = 0, reverted_reason = ?, note = NULL
        WHERE workspace_path = ? AND task_id = ? AND completed = 1`,
     );
+
+    this.insertReportStmt = this.db.prepare<[string, string, string, string, string, string]>(
+      `INSERT INTO reports (workspace_path, task_id, status, reviewer, notes, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    );
+    // PASS-status reports satisfy hasEvidence() in SQLite mode. File mode is
+    // laxer (any file is enough) because pass/fail isn't decodable from disk.
+    this.selectReportsByTaskStmt = this.db.prepare<[string]>(
+      `SELECT DISTINCT task_id FROM reports
+       WHERE workspace_path = ? AND status = 'PASS' AND task_id IN (SELECT value FROM json_each(?))`,
+    );
   }
 
   // ---------- handoff state ----------
@@ -178,6 +218,11 @@ export class SqliteHandoffStorage implements HandoffStorage {
   parse(workspacePath: string): HandoffState | null {
     const row = this.fetchRow(workspacePath);
     if (!row) return null;
+    const qaRoundRaw = row.qa_round;
+    const qa_round =
+      typeof qaRoundRaw === "number" && Number.isFinite(qaRoundRaw) && qaRoundRaw >= 0
+        ? Math.floor(qaRoundRaw)
+        : 0;
     return {
       active_feature: row.active_feature,
       status: row.status,
@@ -186,6 +231,7 @@ export class SqliteHandoffStorage implements HandoffStorage {
       ...(row.last_agent ? { last_agent: row.last_agent } : {}),
       completed_tasks: JSON.parse(row.completed) as string[],
       pending_notes: JSON.parse(row.pending) as string[],
+      qa_round,
     };
   }
 
@@ -219,9 +265,13 @@ export class SqliteHandoffStorage implements HandoffStorage {
     pendingNotes: string[],
     blockingReason?: string,
     lastAgent?: string,
+    qaRound?: number,
   ): Promise<string> {
     const currentLastUpdated = this.fetchLastUpdated(workspacePath);
     verifyExtra(workspacePath, SNAPSHOT_KEY, currentLastUpdated);
+
+    const normalisedRound =
+      Number.isFinite(qaRound) && (qaRound as number) >= 0 ? Math.floor(qaRound as number) : 0;
 
     const now = new Date().toISOString();
     this.txUpsert(
@@ -233,6 +283,7 @@ export class SqliteHandoffStorage implements HandoffStorage {
       lastAgent ?? null,
       JSON.stringify(completedTasks),
       JSON.stringify(pendingNotes),
+      normalisedRound,
       currentLastUpdated,
     );
 
@@ -346,6 +397,43 @@ export class SqliteHandoffStorage implements HandoffStorage {
         storage: "sqlite",
       }),
     );
+  }
+
+  // ---------- QA evidence ----------
+
+  recordReview(
+    workspacePath: string,
+    taskIds: string[],
+    status: "PASS" | "FAIL",
+    reviewer: string,
+    notes: string,
+  ): Promise<void> {
+    const now = new Date().toISOString();
+    // Insert per id in a single implicit transaction. Duplicate (ws, id,
+    // created_at) is theoretically possible if called twice in the same ms;
+    // the PRIMARY KEY constraint then throws — caller's retry path.
+    const insertMany = this.db.transaction((ids: string[]) => {
+      for (const id of ids) {
+        this.insertReportStmt.run(workspacePath, id, status, reviewer, notes, now);
+      }
+    });
+    insertMany(taskIds);
+    return Promise.resolve();
+  }
+
+  hasEvidence(workspacePath: string, taskIds: string[]): Promise<EvidenceCheck> {
+    if (taskIds.length === 0) return Promise.resolve({ present: [], missing: [] });
+    const rows = this.selectReportsByTaskStmt.all(workspacePath, JSON.stringify(taskIds)) as Array<{
+      task_id: string;
+    }>;
+    const presentSet = new Set(rows.map((r) => r.task_id));
+    const present: string[] = [];
+    const missing: string[] = [];
+    for (const id of taskIds) {
+      if (presentSet.has(id)) present.push(id);
+      else missing.push(id);
+    }
+    return Promise.resolve({ present, missing });
   }
 
   close(): void {
