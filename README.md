@@ -32,6 +32,17 @@ It is **not a code-generation tool**, but a "governance layer" for collaboration
 
 > Analogy: It acts as the team's PM + QA + Employee Handbook—built specifically for AI, running 24/7.
 
+### Positioning: MCP server in form, Harness Engineering in function
+
+Technically this **is** an MCP server — it implements the Model Context Protocol and loads into any MCP-compatible client (Claude Code, Cursor, Continue, Anti-Gravity, Gemini Code, etc.).
+
+Functionally, however, it belongs to **Harness Engineering**: it does not expose data sources or wrap external APIs like a typical MCP server. Instead, it injects **governance, shared state, and role SOPs** into the agent's execution shell.
+
+- **Form** = MCP server (protocol / transport layer)
+- **Value** = harness (rules, state sync, role routing, drift detection)
+
+If you came expecting "an MCP that fetches X from service Y," this is not that. If you want multiple AI agents to share state and follow the same rules across IDEs and sessions, this is the right tool.
+
 ---
 
 ## Quick Guide for Non-Engineers
