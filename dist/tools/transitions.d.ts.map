@@ -1,0 +1,1 @@
+{"version":3,"file":"transitions.d.ts","sourceRoot":"","sources":["../../tools/transitions.ts"],"names":[],"mappings":"AAMA,MAAM,MAAM,SAAS,GACjB,IAAI,GACJ,YAAY,GACZ,WAAW,GACX,aAAa,GACb,aAAa,CAAC;AAElB,MAAM,WAAW,eAAe;IAC9B,EAAE,EAAE,OAAO,CAAC;IACZ,OAAO,CAAC,EAAE,MAAM,CAAC;CAClB;AAED,wBAAgB,iBAAiB,CAC/B,OAAO,EAAE,MAAM,GAAG,SAAS,EAC3B,QAAQ,EAAE,MAAM,GACf,eAAe,CASjB"}

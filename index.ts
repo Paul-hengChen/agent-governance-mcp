@@ -29,6 +29,7 @@ import { buildQaEngineerPrompt } from "./prompts/qa-engineer.js";
 import { buildTeamworkPrompt } from "./prompts/teamwork.js";
 import { buildArchitectPrompt } from "./prompts/architect.js";
 import { switchRole, type RoleName } from "./tools/role.js";
+import { requireQaEngineer } from "./tools/transitions.js";
 
 // ==========================================
 // Runtime validation schemas (zod)
@@ -42,20 +43,26 @@ const WorkspaceOnly = z.object({
   workspace_path: absoluteWorkspacePath,
 });
 
-const UpdateStateArgs = z.object({
-  workspace_path: absoluteWorkspacePath,
-  active_feature: z.string().min(1).max(500),
-  status: z.enum(["In_Progress", "PASS", "FAIL", "Blocked"]),
-  completed_tasks: z.array(z.string().max(500)).max(200).optional().default([]),
-  pending_notes: z.array(z.string().max(1000)).max(50).optional().default([]),
-  blocking_reason: z.string().max(2000).optional(),
-  agent_id: z.string().max(200).optional(),
-});
+const UpdateStateArgs = z
+  .object({
+    workspace_path: absoluteWorkspacePath,
+    active_feature: z.string().min(1).max(500),
+    status: z.enum(["In_Progress", "PASS", "FAIL", "Blocked"]),
+    completed_tasks: z.array(z.string().max(500)).max(200).optional().default([]),
+    pending_notes: z.array(z.string().max(1000)).max(50).optional().default([]),
+    blocking_reason: z.string().max(2000).optional(),
+    agent_id: z.string().max(200).optional(),
+  })
+  .refine((d) => d.status !== "PASS" || d.agent_id === "qa-engineer", {
+    message: 'status="PASS" requires agent_id="qa-engineer"',
+    path: ["agent_id"],
+  });
 
 const CompleteTaskArgs = z.object({
   workspace_path: absoluteWorkspacePath,
   task_id: z.string().min(1),
   note: z.string().optional(),
+  agent_id: z.string().max(200).optional(),
 });
 
 const RollbackTaskArgs = z.object({
@@ -270,7 +277,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "tw_complete_task",
-        description: "Mark task completed [x].",
+        description:
+          'Mark task completed [x]. Reserved for qa-engineer — pass agent_id="qa-engineer".',
         inputSchema: {
           type: "object" as const,
           properties: {
@@ -285,6 +293,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             note: {
               type: "string",
               description: "Optional note",
+            },
+            agent_id: {
+              type: "string",
+              description: 'Must be "qa-engineer". Other values rejected.',
             },
           },
           required: ["workspace_path", "task_id"],
@@ -419,14 +431,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "tw_update_state": {
         const parsed = UpdateStateArgs.parse(args);
         enforcePreFlight(parsed.workspace_path, "tw_update_state");
-        if (parsed.status === "PASS" && parsed.agent_id !== "qa-engineer") {
-          const who = parsed.agent_id ? `"${parsed.agent_id}"` : "unidentified agent (agent_id not set)";
-          return {
-            content: [{
-              type: "text" as const,
-              text: `⛔ BLOCKED: status=PASS is reserved for qa-engineer. Called by ${who}. Hand off to qa-engineer and pass agent_id="qa-engineer" when calling tw_update_state.`,
-            }],
-          };
+        if (parsed.status === "PASS") {
+          const gate = requireQaEngineer(parsed.agent_id, "tw_update_state(status=PASS)");
+          if (!gate.ok) {
+            return { content: [{ type: "text" as const, text: gate.message ?? "blocked" }] };
+          }
         }
         const result = await getActiveStorage().writeState(
           parsed.workspace_path,
@@ -443,6 +452,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "tw_complete_task": {
         const parsed = CompleteTaskArgs.parse(args);
         enforcePreFlight(parsed.workspace_path, "tw_complete_task");
+        const gate = requireQaEngineer(parsed.agent_id, "tw_complete_task");
+        if (!gate.ok) {
+          return { content: [{ type: "text" as const, text: gate.message ?? "blocked" }] };
+        }
         const result = await completeTask(parsed.workspace_path, parsed.task_id, parsed.note);
         return { content: [{ type: "text" as const, text: result }] };
       }
