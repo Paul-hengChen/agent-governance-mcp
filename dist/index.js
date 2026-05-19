@@ -6,6 +6,7 @@
 // Methodology-agnostic: defaults to a generic markdown checkbox task format;
 // teams override task pattern / paths / constitution via <workspace>/.current/.
 import * as path from "node:path";
+import * as fs from "node:fs";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { createHttpTransport } from "./transport/http.js";
@@ -22,6 +23,8 @@ import { buildQaEngineerPrompt } from "./prompts/qa-engineer.js";
 import { buildTeamworkPrompt } from "./prompts/teamwork.js";
 import { buildArchitectPrompt } from "./prompts/architect.js";
 import { switchRole } from "./tools/role.js";
+import { appendSpecContext } from "./prompts/build.js";
+import { buildPrdChunks, CHUNKER_VERSION, DEFAULT_EMBEDDING_MODEL } from "./tools/rag.js";
 import { requireQaEngineer, validateTransition, computeNewRound, } from "./tools/transitions.js";
 // ==========================================
 // Runtime validation schemas (zod)
@@ -72,11 +75,38 @@ const SwitchRoleArgs = z.object({
     workspace_path: absoluteWorkspacePath,
     role: z.enum(["pm", "researcher", "sr-engineer", "qa-engineer", "architect"]),
 });
+// Model name allowlist regex: HuggingFace-style "namespace/model-name" with
+// alphanumerics, dot, underscore, dash, slash. Bounds user-supplied input
+// before it reaches the dynamic loader.
+const EMBEDDING_MODEL_RE = /^[A-Za-z0-9._\-]+\/[A-Za-z0-9._\-]+$/;
+const IndexPrdArgs = z
+    .object({
+    workspace_path: absoluteWorkspacePath,
+    prd_path: z
+        .string()
+        .min(1)
+        .refine((p) => path.isAbsolute(p), { message: "prd_path must be absolute" }),
+    embedding_model: z
+        .string()
+        .max(200)
+        .regex(EMBEDDING_MODEL_RE, { message: "embedding_model must match 'namespace/name' format" })
+        .optional(),
+})
+    // Path-traversal guard: prd_path MUST resolve inside workspace_path.
+    // Without this, a remote HTTP caller could index /etc/passwd or ~/.ssh/config.
+    .refine((d) => {
+    const rel = path.relative(d.workspace_path, d.prd_path);
+    return rel !== "" && !rel.startsWith("..") && !path.isAbsolute(rel);
+}, { message: "prd_path must be inside workspace_path (no traversal)", path: ["prd_path"] });
 function formatZodError(err) {
     return err.issues
         .map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`)
         .join("; ");
 }
+// In-flight indexing coalesce map. Keyed by `${workspace_path}::${prd_path}`.
+// Promises live only for the duration of an active index call (cleared in
+// `finally`). Bounded by concurrent client count, so no eviction needed.
+const _indexingInFlight = new Map();
 // ==========================================
 // 1. Initialize Server (Tools + Prompts)
 // ==========================================
@@ -163,25 +193,29 @@ server.setRequestHandler(GetPromptRequestSchema, async (request) => {
     const resolvedPath = (typeof args?.workspace_path === "string" && args.workspace_path) ||
         process.env.CLAUDE_PROJECT_DIR ||
         process.cwd();
+    let promptResult;
     if (name === "sr-engineer") {
-        return buildSrEngineerPrompt(resolvedPath);
+        promptResult = buildSrEngineerPrompt(resolvedPath);
     }
     else if (name === "researcher") {
-        return buildResearcherPrompt(resolvedPath);
+        promptResult = buildResearcherPrompt(resolvedPath);
     }
     else if (name === "pm") {
-        return buildPmPrompt(resolvedPath);
+        promptResult = buildPmPrompt(resolvedPath);
     }
     else if (name === "qa-engineer") {
-        return buildQaEngineerPrompt(resolvedPath);
+        promptResult = buildQaEngineerPrompt(resolvedPath);
     }
     else if (name === "teamwork") {
-        return buildTeamworkPrompt(resolvedPath);
+        promptResult = buildTeamworkPrompt(resolvedPath);
     }
     else if (name === "architect") {
-        return buildArchitectPrompt(resolvedPath);
+        promptResult = buildArchitectPrompt(resolvedPath);
     }
-    throw new Error(`Prompt not found: ${name}`);
+    else {
+        throw new Error(`Prompt not found: ${name}`);
+    }
+    return appendSpecContext(promptResult, resolvedPath, name);
 });
 // ==========================================
 // 3. Register Tools (Layer 2: Structured APIs)
@@ -371,6 +405,19 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                     required: ["workspace_path", "role"],
                 },
             },
+            {
+                name: "tw_index_prd",
+                description: "Chunk and embed a PRD file into the SQLite RAG index. SQLite mode only.",
+                inputSchema: {
+                    type: "object",
+                    properties: {
+                        workspace_path: { type: "string", description: "Absolute workspace path" },
+                        prd_path: { type: "string", description: "Absolute path to the PRD/spec file to index" },
+                        embedding_model: { type: "string", description: `Embedding model name (default: ${DEFAULT_EMBEDDING_MODEL})` },
+                    },
+                    required: ["workspace_path", "prd_path"],
+                },
+            },
         ],
     };
 });
@@ -492,6 +539,53 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 enforcePreFlight(parsed.workspace_path, "tw_add_task");
                 const result = await addTask(parsed.workspace_path, parsed.task_id, parsed.description, parsed.section);
                 return { content: [{ type: "text", text: result }] };
+            }
+            case "tw_index_prd": {
+                const parsed = IndexPrdArgs.parse(args);
+                const storage = getActiveStorage();
+                if (!("upsertPrdChunks" in storage) || typeof storage.upsertPrdChunks !== "function") {
+                    return { content: [{ type: "text", text: "❌ tw_index_prd requires SQLite mode (--port flag). Not available in stdio/file mode." }], isError: true };
+                }
+                const model = parsed.embedding_model ?? DEFAULT_EMBEDDING_MODEL;
+                const ragStorage = storage;
+                // Concurrency guard: coalesce duplicate in-flight indexings for the
+                // same (workspace, prd_path). Without this, two parallel HTTP calls
+                // both run the slow embedding pipeline and race on DELETE+INSERT.
+                const inflightKey = `${parsed.workspace_path}::${parsed.prd_path}`;
+                const existing = _indexingInFlight.get(inflightKey);
+                if (existing) {
+                    const text = await existing;
+                    return { content: [{ type: "text", text }] };
+                }
+                const run = (async () => {
+                    const currentMtime = fs.existsSync(parsed.prd_path)
+                        ? Math.floor(fs.statSync(parsed.prd_path).mtimeMs)
+                        : -1;
+                    const existingMeta = ragStorage.getPrdIndexMeta(parsed.workspace_path);
+                    if (existingMeta &&
+                        existingMeta.prd_mtime === currentMtime &&
+                        existingMeta.chunker_version === CHUNKER_VERSION &&
+                        existingMeta.embedding_model === model) {
+                        return JSON.stringify({ upToDate: true, message: "Index is current — no reindex needed." });
+                    }
+                    const result = await buildPrdChunks(parsed.prd_path, model);
+                    if ("error" in result) {
+                        return `❌ ${result.error}`;
+                    }
+                    ragStorage.upsertPrdChunks(parsed.workspace_path, result);
+                    return JSON.stringify({ indexed: true, chunks: result.length, model, chunker_version: CHUNKER_VERSION });
+                })();
+                _indexingInFlight.set(inflightKey, run);
+                try {
+                    const text = await run;
+                    return {
+                        content: [{ type: "text", text }],
+                        ...(text.startsWith("❌") ? { isError: true } : {}),
+                    };
+                }
+                finally {
+                    _indexingInFlight.delete(inflightKey);
+                }
             }
             default:
                 return {

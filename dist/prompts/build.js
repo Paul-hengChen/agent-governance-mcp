@@ -24,6 +24,51 @@ function loadContent(filename, workspacePath) {
     }
     return fs.readFileSync(filePath, "utf-8");
 }
+function isRagCapable(s) {
+    return (typeof s === "object" && s !== null &&
+        "queryPrdSpec" in s && typeof s.queryPrdSpec === "function");
+}
+// Coordinator does triage; doesn't need PRD chunks. Skip injection there.
+const RAG_SKIP_ROLES = new Set(["teamwork"]);
+export async function appendSpecContext(result, workspacePath, role) {
+    if (role && RAG_SKIP_ROLES.has(role))
+        return result;
+    const storage = getActiveStorage();
+    if (!isRagCapable(storage))
+        return result;
+    const state = storage.parse(workspacePath);
+    if (!state)
+        return result;
+    // Query from semantic content only: active_feature + next uncompleted task description.
+    // pending_notes contain routing metadata ("next_role: qa-engineer") — low-signal noise
+    // that pollutes the embedding query, so we exclude them.
+    const tasks = storage.listTasks(workspacePath);
+    const nextTask = tasks?.find((t) => !t.completed);
+    const queryParts = [state.active_feature];
+    if (nextTask)
+        queryParts.push(nextTask.description);
+    const query = queryParts.join(" — ").slice(0, 500);
+    let spec = "";
+    try {
+        spec = await storage.queryPrdSpec(workspacePath, query, 5);
+    }
+    catch {
+        // Embedding pipeline / DB error — degrade silently to no injection rather
+        // than crash the entire prompt fetch.
+        return result;
+    }
+    if (!spec)
+        return result;
+    const last = result.messages[result.messages.length - 1];
+    const injected = last.content.text + `\n\n---\n\n## 📄 Spec Context (RAG — top-5 chunks)\n\n${spec}`;
+    return {
+        ...result,
+        messages: [
+            ...result.messages.slice(0, -1),
+            { ...last, content: { type: "text", text: injected } },
+        ],
+    };
+}
 export function buildPromptForRole(skillFile, description, workspacePath) {
     const constitution = loadContent("constitution.md", workspacePath);
     const skill = loadContent(skillFile, workspacePath);

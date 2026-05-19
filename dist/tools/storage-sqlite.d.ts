@@ -1,4 +1,5 @@
 import type { HandoffStorage, HandoffState, TaskRecord, EvidenceCheck } from "./storage.js";
+import { type PrdChunk, type InvalidationKey } from "./rag.js";
 export declare class SqliteHandoffStorage implements HandoffStorage {
     private db;
     private selectStmt;
@@ -13,6 +14,10 @@ export declare class SqliteHandoffStorage implements HandoffStorage {
     private rollbackTaskStmt;
     private insertReportStmt;
     private selectReportsByTaskStmt;
+    private deleteChunksStmt;
+    private insertChunkStmt;
+    private listChunksStmt;
+    private getChunkMetaStmt;
     constructor(dbPath: string);
     private fetchRow;
     private fetchLastUpdated;
@@ -26,6 +31,10 @@ export declare class SqliteHandoffStorage implements HandoffStorage {
     addTask(workspacePath: string, taskId: string, description: string, section?: string): Promise<string>;
     recordReview(workspacePath: string, taskIds: string[], status: "PASS" | "FAIL", reviewer: string, notes: string): Promise<void>;
     hasEvidence(workspacePath: string, taskIds: string[]): Promise<EvidenceCheck>;
+    upsertPrdChunks(workspacePath: string, chunks: PrdChunk[]): void;
+    listPrdChunks(workspacePath: string): PrdChunk[];
+    getPrdIndexMeta(workspacePath: string): InvalidationKey | null;
+    queryPrdSpec(workspacePath: string, query: string, topK?: number): Promise<string>;
     close(): void;
 }
 //# sourceMappingURL=storage-sqlite.d.ts.map

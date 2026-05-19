@@ -11,6 +11,14 @@ import {
   verifyExtra,
 } from "../guards/session.js";
 import type { HandoffStorage, HandoffState, TaskRecord, EvidenceCheck } from "./storage.js";
+import {
+  cosineSim,
+  embedText,
+  CHUNKER_VERSION,
+  DEFAULT_EMBEDDING_MODEL,
+  type PrdChunk,
+  type InvalidationKey,
+} from "./rag.js";
 
 interface HandoffRow {
   active_feature: string;
@@ -73,6 +81,19 @@ CREATE TABLE IF NOT EXISTS reports (
 
 CREATE INDEX IF NOT EXISTS idx_reports_ws_task
   ON reports (workspace_path, task_id, status);
+
+CREATE TABLE IF NOT EXISTS prd_chunks (
+  workspace_path   TEXT NOT NULL,
+  chunk_id         TEXT NOT NULL,
+  section          TEXT NOT NULL,
+  text             TEXT NOT NULL,
+  embedding        TEXT NOT NULL,
+  prd_path         TEXT NOT NULL,
+  prd_mtime        INTEGER NOT NULL,
+  chunker_version  TEXT NOT NULL,
+  embedding_model  TEXT NOT NULL,
+  PRIMARY KEY (workspace_path, chunk_id)
+);
 `;
 
 const SNAPSHOT_KEY = "sqlite:handoff.last_updated";
@@ -104,6 +125,11 @@ export class SqliteHandoffStorage implements HandoffStorage {
 
   private insertReportStmt: Database.Statement<[string, string, string, string, string, string]>;
   private selectReportsByTaskStmt: Database.Statement<[string, string]>;
+
+  private deleteChunksStmt: Database.Statement<[string]>;
+  private insertChunkStmt: Database.Statement<[string, string, string, string, string, string, number, string, string]>;
+  private listChunksStmt: Database.Statement<[string]>;
+  private getChunkMetaStmt: Database.Statement<[string]>;
 
   constructor(dbPath: string) {
     this.db = new Database(dbPath);
@@ -201,6 +227,21 @@ export class SqliteHandoffStorage implements HandoffStorage {
     this.selectReportsByTaskStmt = this.db.prepare<[string]>(
       `SELECT DISTINCT task_id FROM reports
        WHERE workspace_path = ? AND status = 'PASS' AND task_id IN (SELECT value FROM json_each(?))`,
+    );
+
+    this.deleteChunksStmt = this.db.prepare<[string]>(
+      "DELETE FROM prd_chunks WHERE workspace_path = ?",
+    );
+    this.insertChunkStmt = this.db.prepare<[string, string, string, string, string, string, number, string, string]>(
+      `INSERT OR REPLACE INTO prd_chunks
+         (workspace_path, chunk_id, section, text, embedding, prd_path, prd_mtime, chunker_version, embedding_model)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    );
+    this.listChunksStmt = this.db.prepare<[string]>(
+      "SELECT chunk_id, section, text, embedding, prd_path, prd_mtime, chunker_version, embedding_model FROM prd_chunks WHERE workspace_path = ?",
+    );
+    this.getChunkMetaStmt = this.db.prepare<[string]>(
+      "SELECT prd_mtime, chunker_version, embedding_model FROM prd_chunks WHERE workspace_path = ? LIMIT 1",
     );
   }
 
@@ -434,6 +475,67 @@ export class SqliteHandoffStorage implements HandoffStorage {
       else missing.push(id);
     }
     return Promise.resolve({ present, missing });
+  }
+
+  // ---------- RAG: prd_chunks ----------
+
+  upsertPrdChunks(workspacePath: string, chunks: PrdChunk[]): void {
+    const run = this.db.transaction((rows: PrdChunk[]) => {
+      this.deleteChunksStmt.run(workspacePath);
+      for (const c of rows) {
+        this.insertChunkStmt.run(
+          workspacePath,
+          c.chunk_id,
+          c.section,
+          c.text,
+          JSON.stringify(c.embedding),
+          c.prd_path,
+          c.prd_mtime,
+          c.chunker_version,
+          c.embedding_model,
+        );
+      }
+    });
+    run(chunks);
+  }
+
+  listPrdChunks(workspacePath: string): PrdChunk[] {
+    interface ChunkRow {
+      chunk_id: string; section: string; text: string; embedding: string;
+      prd_path: string; prd_mtime: number; chunker_version: string; embedding_model: string;
+    }
+    const rows = this.listChunksStmt.all(workspacePath) as ChunkRow[];
+    return rows.map(r => ({
+      chunk_id: r.chunk_id,
+      section: r.section,
+      text: r.text,
+      embedding: JSON.parse(r.embedding) as number[],
+      prd_path: r.prd_path,
+      prd_mtime: r.prd_mtime,
+      chunker_version: r.chunker_version,
+      embedding_model: r.embedding_model,
+    }));
+  }
+
+  getPrdIndexMeta(workspacePath: string): InvalidationKey | null {
+    interface MetaRow { prd_mtime: number; chunker_version: string; embedding_model: string; }
+    const row = this.getChunkMetaStmt.get(workspacePath) as MetaRow | undefined;
+    if (!row) return null;
+    return { prd_mtime: row.prd_mtime, chunker_version: row.chunker_version, embedding_model: row.embedding_model };
+  }
+
+  async queryPrdSpec(workspacePath: string, query: string, topK: number = 5): Promise<string> {
+    const chunks = this.listPrdChunks(workspacePath);
+    if (chunks.length === 0) return "";
+    const model = chunks[0].embedding_model ?? DEFAULT_EMBEDDING_MODEL;
+    const qVec = await embedText(query, model);
+    if (!qVec) return "";
+    return chunks
+      .map(c => ({ c, score: cosineSim(qVec, c.embedding) }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, topK)
+      .map(({ c }) => `### ${c.section}\n${c.text}`)
+      .join("\n\n---\n\n");
   }
 
   close(): void {

@@ -8,6 +8,7 @@ export type PromptResult = {
         };
     }>;
 };
+export declare function appendSpecContext(result: PromptResult, workspacePath: string, role?: string): Promise<PromptResult>;
 export declare function buildPromptForRole(skillFile: string, description: string, workspacePath: string): {
     description: string;
     messages: Array<{

@@ -5,6 +5,7 @@
 // task operations rely on per-row CHECK semantics inside transactions.
 import Database from "better-sqlite3";
 import { markStateRead, snapshotExtra, verifyExtra, } from "../guards/session.js";
+import { cosineSim, embedText, DEFAULT_EMBEDDING_MODEL, } from "./rag.js";
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS handoff_state (
   workspace_path  TEXT PRIMARY KEY,
@@ -45,6 +46,19 @@ CREATE TABLE IF NOT EXISTS reports (
 
 CREATE INDEX IF NOT EXISTS idx_reports_ws_task
   ON reports (workspace_path, task_id, status);
+
+CREATE TABLE IF NOT EXISTS prd_chunks (
+  workspace_path   TEXT NOT NULL,
+  chunk_id         TEXT NOT NULL,
+  section          TEXT NOT NULL,
+  text             TEXT NOT NULL,
+  embedding        TEXT NOT NULL,
+  prd_path         TEXT NOT NULL,
+  prd_mtime        INTEGER NOT NULL,
+  chunker_version  TEXT NOT NULL,
+  embedding_model  TEXT NOT NULL,
+  PRIMARY KEY (workspace_path, chunk_id)
+);
 `;
 const SNAPSHOT_KEY = "sqlite:handoff.last_updated";
 export class SqliteHandoffStorage {
@@ -61,6 +75,10 @@ export class SqliteHandoffStorage {
     rollbackTaskStmt;
     insertReportStmt;
     selectReportsByTaskStmt;
+    deleteChunksStmt;
+    insertChunkStmt;
+    listChunksStmt;
+    getChunkMetaStmt;
     constructor(dbPath) {
         this.db = new Database(dbPath);
         this.db.pragma("journal_mode = WAL");
@@ -109,6 +127,12 @@ export class SqliteHandoffStorage {
         // laxer (any file is enough) because pass/fail isn't decodable from disk.
         this.selectReportsByTaskStmt = this.db.prepare(`SELECT DISTINCT task_id FROM reports
        WHERE workspace_path = ? AND status = 'PASS' AND task_id IN (SELECT value FROM json_each(?))`);
+        this.deleteChunksStmt = this.db.prepare("DELETE FROM prd_chunks WHERE workspace_path = ?");
+        this.insertChunkStmt = this.db.prepare(`INSERT OR REPLACE INTO prd_chunks
+         (workspace_path, chunk_id, section, text, embedding, prd_path, prd_mtime, chunker_version, embedding_model)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+        this.listChunksStmt = this.db.prepare("SELECT chunk_id, section, text, embedding, prd_path, prd_mtime, chunker_version, embedding_model FROM prd_chunks WHERE workspace_path = ?");
+        this.getChunkMetaStmt = this.db.prepare("SELECT prd_mtime, chunker_version, embedding_model FROM prd_chunks WHERE workspace_path = ? LIMIT 1");
     }
     // ---------- handoff state ----------
     fetchRow(workspacePath) {
@@ -281,6 +305,50 @@ export class SqliteHandoffStorage {
                 missing.push(id);
         }
         return Promise.resolve({ present, missing });
+    }
+    // ---------- RAG: prd_chunks ----------
+    upsertPrdChunks(workspacePath, chunks) {
+        const run = this.db.transaction((rows) => {
+            this.deleteChunksStmt.run(workspacePath);
+            for (const c of rows) {
+                this.insertChunkStmt.run(workspacePath, c.chunk_id, c.section, c.text, JSON.stringify(c.embedding), c.prd_path, c.prd_mtime, c.chunker_version, c.embedding_model);
+            }
+        });
+        run(chunks);
+    }
+    listPrdChunks(workspacePath) {
+        const rows = this.listChunksStmt.all(workspacePath);
+        return rows.map(r => ({
+            chunk_id: r.chunk_id,
+            section: r.section,
+            text: r.text,
+            embedding: JSON.parse(r.embedding),
+            prd_path: r.prd_path,
+            prd_mtime: r.prd_mtime,
+            chunker_version: r.chunker_version,
+            embedding_model: r.embedding_model,
+        }));
+    }
+    getPrdIndexMeta(workspacePath) {
+        const row = this.getChunkMetaStmt.get(workspacePath);
+        if (!row)
+            return null;
+        return { prd_mtime: row.prd_mtime, chunker_version: row.chunker_version, embedding_model: row.embedding_model };
+    }
+    async queryPrdSpec(workspacePath, query, topK = 5) {
+        const chunks = this.listPrdChunks(workspacePath);
+        if (chunks.length === 0)
+            return "";
+        const model = chunks[0].embedding_model ?? DEFAULT_EMBEDDING_MODEL;
+        const qVec = await embedText(query, model);
+        if (!qVec)
+            return "";
+        return chunks
+            .map(c => ({ c, score: cosineSim(qVec, c.embedding) }))
+            .sort((a, b) => b.score - a.score)
+            .slice(0, topK)
+            .map(({ c }) => `### ${c.section}\n${c.text}`)
+            .join("\n\n---\n\n");
     }
     close() {
         this.db.close();
