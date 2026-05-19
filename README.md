@@ -580,7 +580,7 @@ A: No, they are complementary. The MCP Server acts as the source of truth, while
 | 3 | Multi-Agent Ecosystem (Researcher, PM, QA) | ✅ Done |
 | 3.5 | Per-role watermark as chat sign-off line | ✅ Done |
 | 3.6 | Architect role + skill enhancements (spec schema, BDD AC, security checklist, coverage gate, persona backstory) | ✅ Done |
-| 4 | Schema versioning — lazy auto-migrate-on-read across handoff YAML, tasks.md, SQLite, `.config.json` (T27 runner shipped; T28–T33 wiring + drift + docs pending) | 🚧 In Progress |
+| 4 | Schema versioning — lazy auto-migrate-on-read across handoff YAML, tasks.md, SQLite, `.config.json` | ✅ Done |
 | 5a | Unit + integration test suite | ✅ Done |
 | 5b | GitHub Actions CI | ✅ Done |
 | 6 | SSE / HTTP transport, SQLite storage, Docker deployment | ✅ Done |
@@ -588,6 +588,7 @@ A: No, they are complementary. The MCP Server acts as the source of truth, while
 | 7 | Task ops lifted into storage adapter — HTTP/SQLite mode no longer needs a mounted workspace; new `tw_add_task` tool | ✅ Done |
 | 8 | QA-flow enforcement (v3.2.0): `ALLOWED_TRANSITIONS` matrix, `agent_id="qa-engineer"` gate, `qa_round` counter, evidence-of-QA | ✅ Done |
 | 9 | RAG lifecycle automation (v3.3.0): lazy auto-reindex in `appendSpecContext`, `prd_path` in handoff state, PASS cleanup GC, tombstone sweep, `tw_clear_prd_chunks` tool | ✅ Done |
+| 9.1 | Token-efficiency improvements — drift response compression + `pending_notes` truncation to reduce per-turn context bloat | ✅ Done |
 | 10 | CI/CD hook — auto-update handoff on PR merge | Planning |
 
 ---
