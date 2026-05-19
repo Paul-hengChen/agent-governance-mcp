@@ -1,4 +1,4 @@
-// Per-workspace config loader for the teamwork-mcp-server.
+// Per-workspace config loader for the agent-governance-mcp server.
 // All fields optional — absent file means "use the generic markdown-checkbox defaults".
 //
 // .current/.config.json shape:

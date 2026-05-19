@@ -32,7 +32,7 @@ Dogfooding evidence: phase7 closed with `status=PASS, last_agent=sr-engineer`
 
 ## User Stories
 
-- As a teamwork-mcp-server maintainer, I want the server to reject any
+- As a agent-governance-mcp maintainer, I want the server to reject any
   state transition that skips a required chain step, so that an automated
   pipeline cannot silently shortcut from sr-engineer to PASS.
 - As a QA author, I want PASS to require a review artifact on disk, so that

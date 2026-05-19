@@ -1,12 +1,12 @@
 # Changelog
 
-All notable changes to `teamwork-mcp-server` are documented here.
+All notable changes to `agent-governance-mcp` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Versioning policy
 
-- **Install via tagged ref**: `npx -y github:Paul-hengChen/teamwork-mcp-server#v<version>`.
+- **Install via tagged ref**: `npx -y github:Paul-hengChen/agent-governance-mcp#v<version>`.
 - `main` is the development branch; pinning to a tag is the supported way to use this server.
 - **MAJOR** bumps signal breaking changes to the MCP tool surface, prompt schema, or
   handoff/state file format. Re-read this changelog before upgrading across a MAJOR.
@@ -68,7 +68,7 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ### Fixed
 - SessionStart hook hint now lists `/architect` alongside the other four roles
-  (`bin/teamwork-context.mjs`). Previously, users were never told the architect
+  (`bin/agent-governance-context.mjs`). Previously, users were never told the architect
   role existed via the auto-injected coordinator briefing, even though
   constitution §4 and the coordinator routing table both include it.
 - `markStateRead()` (`guards/session.ts`) no longer scans the workspace
@@ -106,7 +106,7 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 ### Fixed
 - Architect role prompt registered in `index.ts` (previously missing from the
   `ListPrompts` handler).
-- Stable hook bin path: `bin/teamwork-context.mjs` exposed as a `bin` entry so users
+- Stable hook bin path: `bin/agent-governance-context.mjs` exposed as a `bin` entry so users
   no longer have to dig into `~/.npm/_npx/<hash>/…`.
 - `better-sqlite3` is loaded lazily — stdio users without a C++ toolchain are no
   longer blocked at install time. HTTP mode still requires it.

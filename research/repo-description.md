@@ -6,7 +6,7 @@ date: 2026-05-18
 ## Summary
 
 - Current description references "SDD (Spec-Driven Development)" — old branding, misleading.
-- Coordinator proposed: `teamwork-mcp-server — shared project state & governance for multi-IDE / multi-session AI agents` — accurate but redundantly repeats the repo name.
+- Coordinator proposed: `agent-governance-mcp — shared project state & governance for multi-IDE / multi-session AI agents` — accurate but redundantly repeats the repo name.
 - README tagline is the best existing signal: *"governance layer + automated secretary via MCP"*.
 - Three strong candidates below, ordered by recommendation.
 
@@ -27,7 +27,7 @@ Rationale: doesn't repeat repo name; leads with "MCP" (searchable keyword); "gov
 ## Alternatives Considered
 
 **Option B (coordinator's proposal):**
-> `teamwork-mcp-server — shared project state & governance for multi-IDE / multi-session AI agents`
+> `agent-governance-mcp — shared project state & governance for multi-IDE / multi-session AI agents`
 
 Rejected: repeats repo name (GitHub already displays it); wordy.
 

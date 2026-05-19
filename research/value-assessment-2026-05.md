@@ -55,7 +55,7 @@
 
 ## 3. 與替代方案的比較（2026 市場）
 
-| 維度 | teamwork-mcp-server | 純 CLAUDE.md | Git commit 手動同步 | Linear/Jira + MCP | LangGraph/CrewAI |
+| 維度 | agent-governance-mcp | 純 CLAUDE.md | Git commit 手動同步 | Linear/Jira + MCP | LangGraph/CrewAI |
 |---|---|---|---|---|---|
 | MCP 原生 | ✅ | N/A | N/A | 部分 | ❌ (SDK) |
 | 跨 IDE | ✅ | ❌ Claude only | ✅ | ✅ | ❌ |

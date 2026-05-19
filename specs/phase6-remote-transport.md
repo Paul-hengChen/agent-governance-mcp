@@ -4,11 +4,11 @@
 
 ## Problem Statement
 
-teamwork-mcp-server currently operates exclusively over stdio, meaning it only works for a single machine. When two people (or two machines) need to share the same handoff state, there is no cross-machine lock or sync mechanism. Phase 6 adds an HTTP transport mode and a SQLite-backed storage adapter, enabling the server to be deployed as a persistent cloud service that any MCP client can connect to remotely.
+agent-governance-mcp currently operates exclusively over stdio, meaning it only works for a single machine. When two people (or two machines) need to share the same handoff state, there is no cross-machine lock or sync mechanism. Phase 6 adds an HTTP transport mode and a SQLite-backed storage adapter, enabling the server to be deployed as a persistent cloud service that any MCP client can connect to remotely.
 
 ## User Stories
 
-- As a developer on a remote machine, I want to connect my IDE to a cloud-hosted teamwork-mcp-server, so that I share handoff state with teammates without Git commits.
+- As a developer on a remote machine, I want to connect my IDE to a cloud-hosted agent-governance-mcp, so that I share handoff state with teammates without Git commits.
 - As a solo developer using multiple machines, I want the server to run persistently with a URL, so that all my sessions read the same project state.
 - As a team lead, I want to deploy the server with Docker in one command, so that onboarding new teammates requires zero local setup.
 

@@ -1,4 +1,4 @@
-# 🔍 Honest Evaluation: teamwork-mcp-server v3.0.0
+# 🔍 Honest Evaluation: agent-governance-mcp v3.0.0
 
 > Staff-level research audit — 2026-05-15
 > Scope: architecture, code quality, competitive position, actionable roadmap.
@@ -113,7 +113,7 @@ The constitution and skill files contain mixed English/Chinese headings (`## ✅
 
 ## 🏁 Competitive Landscape
 
-| Feature | teamwork-mcp-server | multi-agent-coordination-mcp | LangGraph | CrewAI |
+| Feature | agent-governance-mcp | multi-agent-coordination-mcp | LangGraph | CrewAI |
 |---|---|---|---|---|
 | MCP native | ✅ | ✅ | ❌ (SDK) | ❌ (SDK) |
 | State persistence | ✅ File + SQLite | ❌ In-memory | ✅ Checkpointer | ❌ |

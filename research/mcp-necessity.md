@@ -1,4 +1,4 @@
-# Research: Is MCP packaging necessary for teamwork-mcp-server?
+# Research: Is MCP packaging necessary for agent-governance-mcp?
 
 <!-- @researcher -->
 

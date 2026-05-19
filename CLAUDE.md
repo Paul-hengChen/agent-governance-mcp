@@ -1,4 +1,4 @@
-# CLAUDE.md — teamwork-mcp-server
+# CLAUDE.md — agent-governance-mcp
 
 This file is auto-loaded by Claude Code when working **inside this repo**. It
 describes the project itself (an MCP server). The *rules of conduct* enforced

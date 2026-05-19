@@ -28,7 +28,7 @@ constitution.md (4,683 B) + skill-<role>.md (N B) + state JSON (~200-800 B)
 | sr-engineer | 1,876 | ~6,759 | 28% |
 | **qa-engineer** | **3,765** | **~8,648** | **44%** |
 
-來源: [content/](file:///Users/paul.ph.chen/teamwork-mcp-server/content/) 檔案大小 + [prompts/build.ts](file:///Users/paul.ph.chen/teamwork-mcp-server/prompts/build.ts#L236) 組裝邏輯。
+來源: [content/](file:///Users/paul.ph.chen/agent-governance-mcp/content/) 檔案大小 + [prompts/build.ts](file:///Users/paul.ph.chen/agent-governance-mcp/prompts/build.ts#L236) 組裝邏輯。
 
 ### 各角色分析
 

@@ -1,12 +1,12 @@
 {
-  "name": "teamwork-mcp-server",
+  "name": "agent-governance-mcp",
   "version": "3.2.0",
   "description": "Teamwork MCP Server — methodology-agnostic state sync, drift detection, and constitution enforcement for AI coding agents across multiple IDEs and sessions",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "teamwork-mcp-server": "./dist/index.js",
-    "teamwork-context": "./bin/teamwork-context.mjs"
+    "agent-governance-mcp": "./dist/index.js",
+    "agent-governance-context": "./bin/agent-governance-context.mjs"
   },
   "scripts": {
     "check:version": "node scripts/check-version.mjs",

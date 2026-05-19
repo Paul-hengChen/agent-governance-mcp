@@ -16,7 +16,7 @@ const root = path.resolve(here, "..");
 const pkg = JSON.parse(readFileSync(path.join(root, "package.json"), "utf-8"));
 const indexSrc = readFileSync(path.join(root, "index.ts"), "utf-8");
 
-const m = indexSrc.match(/name:\s*"teamwork-mcp-server",\s*version:\s*"([^"]+)"/);
+const m = indexSrc.match(/name:\s*"agent-governance-mcp",\s*version:\s*"([^"]+)"/);
 if (!m) {
   console.error("check:version — could not find Server() version literal in index.ts");
   process.exit(1);

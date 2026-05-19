@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// SessionStart hook helper for teamwork-mcp-server.
+// SessionStart hook helper for agent-governance-mcp.
 //
 // Reads the constitution + skill (workspace override or server default) and
 // the current handoff state, then emits Claude Code's `additionalContext`
@@ -7,13 +7,13 @@
 // follow the rules.
 //
 // Behavior:
-// - If the workspace looks teamwork-managed (has .current/, tasks.md, or
+// - If the workspace looks agent-governance-managed (has .current/, tasks.md, or
 //   TODO.md), inject the full context block.
 // - Otherwise, exit silently with no output — unrelated projects stay clean.
 //
 // Env overrides:
-//   TEAMWORK_SERVER_ROOT (alias: SDD_SERVER_ROOT) — point at a different
-//     teamwork-mcp-server checkout.
+//   AGC_SERVER_ROOT (alias: TEAMWORK_SERVER_ROOT, SDD_SERVER_ROOT) — point at a different
+//     agent-governance-mcp checkout.
 //   CLAUDE_PROJECT_DIR — workspace path (set by Claude Code).
 
 import * as fs from "fs";
@@ -21,6 +21,7 @@ import * as path from "path";
 
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
 const SERVER_ROOT =
+  process.env.AGC_SERVER_ROOT ||
   process.env.TEAMWORK_SERVER_ROOT ||
   process.env.SDD_SERVER_ROOT ||
   path.resolve(__dirname, "..");
@@ -34,7 +35,7 @@ const markers = [
 ];
 const isManagedWorkspace = markers.some((p) => fs.existsSync(p));
 if (!isManagedWorkspace) {
-  // Silent no-op: not a teamwork-managed workspace.
+  // Silent no-op: not an agent-governance-managed workspace.
   process.exit(0);
 }
 
@@ -58,9 +59,9 @@ const skill = loadContent("skill-coordinator.md");
 
 if (!constitution || !skill) {
   // Server repo missing or moved — surface a hint instead of injecting nothing.
-  const hint = `## ⚠️ teamwork-context hook misconfigured
+  const hint = `## ⚠️ agent-governance-context hook misconfigured
 Could not load constitution/skill from ${SERVER_ROOT}.
-Set TEAMWORK_SERVER_ROOT in your Claude Code settings env, or update the
+Set AGC_SERVER_ROOT in your Claude Code settings env, or update the
 path in ~/.claude/settings.json's SessionStart hook.`;
   process.stdout.write(
     JSON.stringify({

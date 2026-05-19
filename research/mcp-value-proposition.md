@@ -1,4 +1,4 @@
-# Research: teamwork-mcp-server 完成後的真實價值
+# Research: agent-governance-mcp 完成後的真實價值
 
 <!-- @researcher -->
 
@@ -36,12 +36,12 @@
 
 | 方案 | 跨 IDE | 跨人員 | File lock | 自動規則注入 | 建置成本 |
 |---|---|---|---|---|---|
-| **teamwork-mcp-server（現況）** | ✅ | ❌（Phase 6 前） | ✅（單機） | ✅ | 零（npx） |
+| **agent-governance-mcp（現況）** | ✅ | ❌（Phase 6 前） | ✅（單機） | ✅ | 零（npx） |
 | 手動 Git commit handoff.md | ✅ | ✅（靠 commit 紀律） | ❌ | ❌ | 零 |
 | Linear/Jira + GitHub MCP | ✅ | ✅ | ✅（by design） | ❌ | 有成本 |
 | 純 CLAUDE.md + tasks.md | Claude Code only | ❌ | ❌ | ❌ | 零 |
 
-**結論**：teamwork-mcp-server 的獨特優勢是「單機多 IDE + 自動 constitution 注入 + local file lock」的組合。其他方案無法同時滿足這三點且零配置。
+**結論**：agent-governance-mcp 的獨特優勢是「單機多 IDE + 自動 constitution 注入 + local file lock」的組合。其他方案無法同時滿足這三點且零配置。
 
 ---
 
@@ -69,7 +69,7 @@
 
 ## 最終判斷
 
-**teamwork-mcp-server 是一個精準解決「單機多 AI 工具協作」問題的工具。** 它的 file lock 和 schema validation 是業界目前少數有技術保證的跨 IDE 同步方案。
+**agent-governance-mcp 是一個精準解決「單機多 AI 工具協作」問題的工具。** 它的 file lock 和 schema validation 是業界目前少數有技術保證的跨 IDE 同步方案。
 
 但它不是傳統意義上的「團隊開發工具」——它沒有 UI、沒有跨機器同步（Phase 6 前）、無法強制 AI 合規。
 
