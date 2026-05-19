@@ -105,7 +105,7 @@ This is injected into the AI's context.
 
 ### Layer 2: Tools — Structured APIs (Revoking Free-Text Privileges)
 
-The server exposes 8 MCP tools. **AI cannot edit `handoff.md` or tasks directly; it MUST use these tools:**
+The server exposes 10 MCP tools. **AI cannot edit `handoff.md` or tasks directly; it MUST use these tools:**
 
 | Tool | Function | Why this design? |
 |---|---|---|
@@ -117,6 +117,8 @@ The server exposes 8 MCP tools. **AI cannot edit `handoff.md` or tasks directly;
 | `tw_rollback_task` | `[x]` → `[ ] (reverted: reason)` | Used when implementations fail later |
 | `tw_detect_drift` | Compares handoff vs tasks | Catches synchronization issues |
 | `tw_switch_role` | Loads a role's SOP into context | Coordinator calls this to auto-route complex tasks without a full prompt reload |
+| `tw_index_prd` | Indexes a PRD file into RAG chunks | Embeds spec context for downstream roles (SQLite mode only); auto-triggered lazily |
+| `tw_clear_prd_chunks` | Purges RAG chunks for a workspace | Ops escape hatch for manual cleanup (SQLite mode only) |
 
 **In short**: AI works in a cleanroom. It can only report progress by pressing pre-defined buttons.
 
@@ -151,6 +153,25 @@ The server validates every `tw_update_state` write against an
 
 Rejections return a structured envelope (`error`, `attempted`, `allowed`,
 `hint`). Full design: `specs/qa-flow-enforcement-architecture.md`.
+
+#### (d) RAG Lifecycle Automation (v3.3.0)
+The server manages PRD-to-RAG indexing and garbage collection automatically:
+
+- **Lazy auto-reindex**: When any specialist role prompt is activated,
+  `appendSpecContext` checks the PRD's mtime against the stored invalidation
+  key. If stale or missing, it reindexes inline (coalesced via
+  `_indexingInFlight` map). Coordinator is skipped (`RAG_SKIP_ROLES`).
+- **Auto-discover**: If `state.prd_path` is not set, the server probes
+  `PRD.md` → `docs/PRD.md` → `specs/PRD.md` in the workspace root.
+  Graceful no-op if none found.
+- **PASS cleanup**: When `tw_update_state(status=PASS)` succeeds, all
+  `prd_chunks` rows for that workspace are deleted. In-flight reindexing
+  is awaited first to prevent INSERT-after-DELETE races.
+- **Tombstone sweep**: On first RAG operation per process, workspaces
+  whose directories no longer exist on disk have their chunks purged.
+- **Manual tool**: `tw_clear_prd_chunks(workspace_path)` for ops.
+
+Full design: `specs/rag-lifecycle-automation.md`.
 
 ---
 
@@ -651,7 +672,8 @@ The system now supports a complete autonomous development team with specialized 
 | 6.1 | HTTP-mode Bearer auth + Origin allowlist + `/healthz` | ✅ Done |
 | 7 | Task ops lifted into storage adapter — HTTP/SQLite mode no longer needs a mounted workspace; new `tw_add_task` tool | ✅ Done |
 | 8 | QA-flow enforcement (v3.2.0): `ALLOWED_TRANSITIONS` matrix, `agent_id="qa-engineer"` gate, `qa_round` counter, evidence-of-QA | ✅ Done |
-| 9 | CI/CD hook — auto-update handoff on PR merge | Planning |
+| 9 | RAG lifecycle automation (v3.3.0): lazy auto-reindex in `appendSpecContext`, `prd_path` in handoff state, PASS cleanup GC, tombstone sweep, `tw_clear_prd_chunks` tool | ✅ Done |
+| 10 | CI/CD hook — auto-update handoff on PR merge | Planning |
 
 ---
 
@@ -667,6 +689,7 @@ teamwork-mcp-server/
 │   ├── role.ts                    #   tw_switch_role
 │   ├── transitions.ts             #   ALLOWED_TRANSITIONS state machine (v3.2.0)
 │   ├── evidence-file.ts           #   QA evidence write/check (v3.2.0)
+│   ├── rag-coalesce.ts            #   shared _indexingInFlight registry (v3.3.0)
 │   ├── storage.ts / storage-sqlite.ts  # storage interface + SQLite adapter
 │   └── config.ts                  #   .current/.config.json loader
 ├── transport/                     # HTTP transport (Streamable HTTP + auth/origin guard)
