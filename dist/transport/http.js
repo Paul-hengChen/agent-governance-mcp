@@ -85,7 +85,7 @@ export function createHttpTransport(port, options = {}) {
             if (!presented || !constantTimeEqual(presented, authToken)) {
                 res.writeHead(401, {
                     "Content-Type": "text/plain",
-                    "WWW-Authenticate": 'Bearer realm="teamwork-mcp"',
+                    "WWW-Authenticate": 'Bearer realm="agent-governance-mcp"',
                 });
                 res.end("Unauthorized");
                 return;

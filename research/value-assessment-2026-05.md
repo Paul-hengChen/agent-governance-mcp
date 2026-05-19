@@ -1,4 +1,4 @@
-# 🎯 Teamwork MCP Server — 價值評估報告
+# 🎯 Agent Governance MCP — 價值評估報告
 
 > Researcher assessment — 2026-05-15
 > 問題：這個專案的價值是什麼？能幫助團隊提高效率嗎？目前值得繼續投入嗎？
@@ -101,7 +101,7 @@
 | 優先級 | 動作 | 理由 |
 |---|---|---|
 | **P0** | 補 HTTP transport + SQLite 測試 | 最暴露的攻擊面零覆蓋 |
-| **P0** | `teamwork init` CLI 命令 | 降低 onboarding friction（目前新用戶需 6 步才能啟動） |
+| **P0** | `agc init` CLI 命令 | 降低 onboarding friction（目前新用戶需 6 步才能啟動） |
 | **P1** | 發布到 npm（移除 `dist/` 提交） | 正規分發，proper semver |
 | **P1** | 結構化 logging | 從 `console.error` 升級到 JSON stderr，生產可觀察性 |
 | **P2** | 簡易 Web dashboard（HTTP mode 已有 transport） | 讓非工程師能看到 handoff 狀態 |
@@ -110,7 +110,7 @@
 
 ## 最終判斷
 
-> **Teamwork MCP Server 在「單人多 IDE 的 AI 協作治理」這個精準問題上，是目前生態中技術最紮實的方案。**
+> **Agent Governance MCP 在「單人多 IDE 的 AI 協作治理」這個精準問題上，是目前生態中技術最紮實的方案。**
 >
 > 它不該試圖成為 Jira 或 LangGraph。它的價值在於：**讓 AI agent 不再是無記憶、無紀律的臨時工，而是有進度、有規矩、有交接的隊友。**
 >

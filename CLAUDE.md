@@ -5,7 +5,7 @@ describes the project itself (an MCP server). The *rules of conduct* enforced
 by this server live in `content/constitution.md` and the `content/skill-*.md` files;
 those are loaded into other workspaces via role prompts (`teamwork`, `sr-engineer`,
 `pm`, `architect`, `researcher`, `qa-engineer`) or the SessionStart hook — not into this one. This repo is the server's own source,
-not a teamwork-managed workspace.
+not an agent-governance-managed workspace.
 
 ## What this repo is
 
@@ -46,7 +46,7 @@ prompts/pm.ts             pm role prompt
 prompts/architect.ts      architect role prompt
 prompts/researcher.ts     researcher role prompt
 prompts/qa-engineer.ts    qa-engineer role prompt
-bin/teamwork-context.mjs  SessionStart hook helper (emits additionalContext)
+bin/agent-governance-context.mjs  SessionStart hook helper (emits additionalContext)
 content/constitution.md   the rules agents must follow (source of truth)
 content/skill-coordinator.md  default coordinator SOP (loaded by SessionStart hook)
 content/skill-sr-engineer.md  sr-engineer SOP
@@ -103,7 +103,7 @@ node --input-type=module -e "import { writeHandoffState, parseHandoff } from './
 
 ## Auto-injection: SessionStart hook
 
-Configured in `~/.claude/settings.json` to run `bin/teamwork-context.mjs`
+Configured in `~/.claude/settings.json` to run `bin/agent-governance-context.mjs`
 on every session start. The script self-gates: it injects the full
 constitution/skill/state block only if the workspace has any of `.current/`,
 `tasks.md`, or `TODO.md`.
@@ -119,7 +119,7 @@ Override `TEAMWORK_SERVER_ROOT` env var if you move this checkout
 
 ## Pre-Flight Protocol (the one rule that matters in managed workspaces)
 
-The agent's first action in any teamwork-managed workspace — including this
+The agent's first action in any agent-governance-managed workspace — including this
 one — must be `tw_get_state`. Without it, `tw_update_state`, `tw_complete_task`,
 `tw_rollback_task`, and `tw_add_task` will be blocked by the guard. This is
 enforced server-side; you cannot bypass it from the client.

@@ -24,7 +24,7 @@
 
 ## What you already get WITHOUT MCP
 
-- **Constitution injection**: `bin/teamwork-context.mjs` SessionStart hook does this today.
+- **Constitution injection**: `bin/agent-governance-context.mjs` SessionStart hook does this today.
 - **State read**: agent reads `.current/handoff.md` directly via file tools.
 - **State write**: agent edits `.current/handoff.md` directly — no locking, no validation.
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Teamwork MCP Server — 3-Layer Defense Architecture
+// Agent Governance MCP — 3-Layer Defense Architecture
 // Layer 1: MCP Prompts (auto-inject constitution + skill + state)
 // Layer 2: Structured Tools (8 tw_* tools for state/task/drift/role)
 // Layer 3: Server-side Guards (pre-flight check enforcement)
@@ -220,7 +220,7 @@ server.setRequestHandler(ListPromptsRequestSchema, async () => {
       },
       {
         name: "teamwork",
-        description: "Teamwork Coordinator. Route tasks or execute them.",
+        description: "Agent Governance Coordinator. Route tasks or execute them.",
         arguments: [
           {
             name: "workspace_path",
@@ -805,7 +805,7 @@ setInterval(() => cleanupStaleSessions(60 * 60 * 1000), 30 * 60 * 1000).unref();
       }
 
       const dbArgIndex = process.argv.indexOf("--db");
-      const dbPath = dbArgIndex !== -1 ? process.argv[dbArgIndex + 1] : path.join(process.cwd(), "teamwork.db");
+      const dbPath = dbArgIndex !== -1 ? process.argv[dbArgIndex + 1] : path.join(process.cwd(), "agc.db");
       // Lazy load: HTTP mode is the only path that needs better-sqlite3 (a
       // native module). Stdio users on machines without build tools shouldn't
       // pay for it, hence it's an optionalDependency + dynamic import.
@@ -837,7 +837,7 @@ setInterval(() => cleanupStaleSessions(60 * 60 * 1000), 30 * 60 * 1000).unref();
       const { transport, listen, close } = createHttpTransport(port, { authToken, allowedOrigins });
       await listen();
       await server.connect(transport);
-      console.error(`🛡️ Teamwork MCP Server is online (HTTP :${port}). MCP endpoint: http://localhost:${port}/mcp`);
+      console.error(`🛡️ Agent Governance MCP is online (HTTP :${port}). MCP endpoint: http://localhost:${port}/mcp`);
       console.error(`   Storage: SQLite → ${dbPath}`);
       console.error(`   Auth: ${authToken ? "Bearer token required" : "DISABLED"}`);
       console.error(`   Allowed Origins: ${allowedOrigins.length > 0 ? allowedOrigins.join(", ") : "(any)"}`);
@@ -872,11 +872,11 @@ setInterval(() => cleanupStaleSessions(60 * 60 * 1000), 30 * 60 * 1000).unref();
     } else {
       const transport = new StdioServerTransport();
       await server.connect(transport);
-      console.error("🛡️ Teamwork MCP Server is online. (Tools + Prompts + Guards)");
+      console.error("🛡️ Agent Governance MCP is online. (Tools + Prompts + Guards)");
     }
   } catch (err: unknown) {
     const message = err instanceof Error ? (err.stack ?? err.message) : String(err);
-    console.error("❌ Teamwork MCP Server failed to start:", message);
+    console.error("❌ Agent Governance MCP failed to start:", message);
     process.exit(1);
   }
 })();

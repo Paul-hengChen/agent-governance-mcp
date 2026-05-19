@@ -1,6 +1,6 @@
 # Constitution v3.2.0
 
-Standing orders for any AI agent working in a teamwork-managed workspace.
+Standing orders for any AI agent working in an agent-governance-managed workspace.
 Methodology-agnostic. Skills inherit everything below — they MUST NOT
 restate these rules.
 

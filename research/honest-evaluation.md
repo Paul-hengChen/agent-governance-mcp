@@ -173,7 +173,7 @@ The project's biggest opportunity is **not** adding more features — it's **red
 6. Understand the constitution concept.
 
 That's a steep onboarding curve. Consider:
-- A `teamwork init` CLI command that scaffolds `.current/`, `tasks.md`, and a sample constitution.
+- A `agc init` CLI command that scaffolds `.current/`, `tasks.md`, and a sample constitution.
 - An interactive web dashboard (the HTTP transport is already there) for visualizing state and tasks.
 - A 2-minute video walkthrough linked from the README.
 

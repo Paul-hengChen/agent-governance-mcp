@@ -80,7 +80,7 @@ const stateBlock = fs.existsSync(handoffPath)
   : `## 📍 Current Project State\n\nNo handoff state found in this workspace. Call \`tw_get_state\` to initialize.`;
 
 const body = [
-  "# 🛡️ Teamwork Auto-Context (SessionStart hook)",
+  "# 🛡️ Agent Governance Auto-Context (SessionStart hook)",
   "",
   "The following constitution and SOP are now in effect for this session.",
   "You are currently in Coordinator mode. You can execute simple tasks, or advise the user to switch roles via `/pm`, `/architect`, `/researcher`, `/sr-engineer`, or `/qa-engineer`.",
