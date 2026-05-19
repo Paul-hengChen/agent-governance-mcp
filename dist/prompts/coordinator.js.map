@@ -1,0 +1,1 @@
+{"version":3,"file":"coordinator.js","sourceRoot":"","sources":["../../prompts/coordinator.ts"],"names":[],"mappings":"AAAA,wBAAwB;AACxB,2CAA2C;AAC3C,OAAO,EAAE,kBAAkB,EAAqB,MAAM,YAAY,CAAC;AAEnE,MAAM,UAAU,sBAAsB,CAAC,aAAqB;IAC1D,OAAO,kBAAkB,CACvB,sBAAsB,EACtB,4DAA4D,EAC5D,aAAa,CACd,CAAC;AACJ,CAAC"}

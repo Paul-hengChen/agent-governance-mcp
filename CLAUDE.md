@@ -40,7 +40,7 @@ tools/config.ts           .current/.config.json loader (taskPattern, taskPaths)
 guards/session.ts         per-(process,workspace) snapshot of "agent read state"
 guards/file-lock.ts       cross-process O_EXCL lock with stale-PID detection
 prompts/build.ts          shared buildPromptForRole() — all role prompts call into this
-prompts/teamwork.ts       coordinator prompt (default role on SessionStart)
+prompts/coordinator.ts       coordinator prompt (default role on SessionStart)
 prompts/sr-engineer.ts    sr-engineer role prompt
 prompts/pm.ts             pm role prompt
 prompts/architect.ts      architect role prompt

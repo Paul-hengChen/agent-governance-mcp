@@ -27,7 +27,7 @@ import { buildSrEngineerPrompt } from "./prompts/sr-engineer.js";
 import { buildResearcherPrompt } from "./prompts/researcher.js";
 import { buildPmPrompt } from "./prompts/pm.js";
 import { buildQaEngineerPrompt } from "./prompts/qa-engineer.js";
-import { buildTeamworkPrompt } from "./prompts/teamwork.js";
+import { buildCoordinatorPrompt } from "./prompts/coordinator.js";
 import { buildArchitectPrompt } from "./prompts/architect.js";
 import { switchRole, type RoleName } from "./tools/role.js";
 import { appendSpecContext } from "./prompts/build.js";
@@ -263,7 +263,7 @@ server.setRequestHandler(GetPromptRequestSchema, async (request) => {
   } else if (name === "qa-engineer") {
     promptResult = buildQaEngineerPrompt(resolvedPath);
   } else if (name === "teamwork") {
-    promptResult = buildTeamworkPrompt(resolvedPath);
+    promptResult = buildCoordinatorPrompt(resolvedPath);
   } else if (name === "architect") {
     promptResult = buildArchitectPrompt(resolvedPath);
   } else {
