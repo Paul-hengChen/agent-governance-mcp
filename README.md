@@ -580,7 +580,7 @@ A: No, they are complementary. The MCP Server acts as the source of truth, while
 | 3 | Multi-Agent Ecosystem (Researcher, PM, QA) | ✅ Done |
 | 3.5 | Per-role watermark as chat sign-off line | ✅ Done |
 | 3.6 | Architect role + skill enhancements (spec schema, BDD AC, security checklist, coverage gate, persona backstory) | ✅ Done |
-| 4 | Schema versioning | Backlog |
+| 4 | Schema versioning — lazy auto-migrate-on-read across handoff YAML, tasks.md, SQLite, `.config.json` (T27 runner shipped; T28–T33 wiring + drift + docs pending) | 🚧 In Progress |
 | 5a | Unit + integration test suite | ✅ Done |
 | 5b | GitHub Actions CI | ✅ Done |
 | 6 | SSE / HTTP transport, SQLite storage, Docker deployment | ✅ Done |
