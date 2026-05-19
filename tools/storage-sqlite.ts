@@ -20,6 +20,7 @@ import {
   type PrdChunk,
   type InvalidationKey,
 } from "./rag.js";
+import { runSqliteMigrations } from "../schema/migrations-sqlite.js";
 
 interface HandoffRow {
   active_feature: string;
@@ -158,6 +159,13 @@ export class SqliteHandoffStorage implements HandoffStorage {
     };
     addColumnIfMissing("ALTER TABLE handoff_state ADD COLUMN qa_round INTEGER NOT NULL DEFAULT 0");
     addColumnIfMissing("ALTER TABLE handoff_state ADD COLUMN prd_path TEXT");
+
+    // Schema-versioning lazy migrate (Phase 4). Creates schema_meta, stamps
+    // the sqlite version row, and runs any registered v(N)→v(N+1) DDL steps
+    // inside per-step transactions. Refuse-loud on a future on-disk version
+    // — propagates so the caller (HTTP boot) sees the error rather than
+    // operating against a half-understood DB.
+    runSqliteMigrations(this.db);
 
     this.selectStmt = this.db.prepare<[string]>(
       "SELECT * FROM handoff_state WHERE workspace_path = ?",

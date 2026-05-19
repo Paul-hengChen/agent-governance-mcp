@@ -9,6 +9,9 @@
 
 import * as fs from "fs";
 import * as path from "path";
+import { CURRENT_VERSIONS, runMigrations } from "../schema/versions.js";
+// Side-effect import: registers the config v0→v1 migration on module load.
+import "../schema/migrations-config.js";
 
 export interface WorkspaceConfig {
   taskPattern?: string;
@@ -50,18 +53,54 @@ export function loadConfig(workspacePath: string): WorkspaceConfig {
   } catch (err) {
     throw new Error(`Failed to read ${configPath}: ${(err as Error).message}`);
   }
-  let result: WorkspaceConfig;
+  let parsed: Record<string, unknown>;
   try {
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    const decoded = JSON.parse(raw);
+    if (!decoded || typeof decoded !== "object" || Array.isArray(decoded)) {
       throw new Error("config must be a JSON object");
     }
-    result = parsed as WorkspaceConfig;
+    parsed = decoded as Record<string, unknown>;
   } catch (err) {
     throw new Error(`Failed to parse ${configPath}: ${(err as Error).message}`);
   }
+
+  // Schema-versioning lazy migrate-on-read (Phase 4). Bumps an absent or
+  // older schema_version up to CURRENT_VERSIONS.config. Throws refuse-loud
+  // on future versions — propagates intentionally (AC-4).
+  const migration = runMigrations<Record<string, unknown>>("config", parsed);
+  if (migration.applied.length > 0) {
+    // Best-effort heal-on-read: persist the upgraded JSON. Failures here
+    // (concurrent writer, permission flap) are non-fatal; the in-memory shape
+    // returned below is already at CURRENT.
+    try {
+      atomicWriteConfig(configPath, migration.payload);
+    } catch {
+      /* swallowed — caller still receives migrated shape */
+    }
+  }
+
+  // Strip schema_version from the typed view so downstream callers stay on
+  // the existing WorkspaceConfig shape. Only known fields are surfaced;
+  // unknown keys are dropped from the typed result but preserved on disk.
+  const result: WorkspaceConfig = {};
+  const taskPattern = migration.payload.taskPattern;
+  if (typeof taskPattern === "string") result.taskPattern = taskPattern;
+  const taskPaths = migration.payload.taskPaths;
+  if (Array.isArray(taskPaths)) {
+    const filtered = taskPaths.filter((p): p is string => typeof p === "string");
+    if (filtered.length > 0) result.taskPaths = filtered;
+  }
   configCache.set(workspacePath, result);
   return result;
+}
+
+function atomicWriteConfig(configPath: string, payload: Record<string, unknown>): void {
+  // Re-stamp at CURRENT regardless of what the input carried, so the file
+  // converges even if an upstream migration forgot to set the field.
+  const stamped = { ...payload, schema_version: CURRENT_VERSIONS.config };
+  const tmpPath = `${configPath}.${process.pid}.${Date.now()}.tmp`;
+  fs.writeFileSync(tmpPath, `${JSON.stringify(stamped, null, 2)}\n`, "utf-8");
+  fs.renameSync(tmpPath, configPath);
 }
 
 export function resolveTaskPaths(workspacePath: string): string[] {

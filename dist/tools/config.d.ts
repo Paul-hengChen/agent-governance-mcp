@@ -1,3 +1,4 @@
+import "../schema/migrations-config.js";
 export interface WorkspaceConfig {
     taskPattern?: string;
     taskPaths?: string[];

@@ -7,6 +7,7 @@ import * as fs from "node:fs";
 import Database from "better-sqlite3";
 import { markStateRead, snapshotExtra, verifyExtra, } from "../guards/session.js";
 import { cosineSim, embedText, DEFAULT_EMBEDDING_MODEL, } from "./rag.js";
+import { runSqliteMigrations } from "../schema/migrations-sqlite.js";
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS handoff_state (
   workspace_path  TEXT PRIMARY KEY,
@@ -106,6 +107,12 @@ export class SqliteHandoffStorage {
         };
         addColumnIfMissing("ALTER TABLE handoff_state ADD COLUMN qa_round INTEGER NOT NULL DEFAULT 0");
         addColumnIfMissing("ALTER TABLE handoff_state ADD COLUMN prd_path TEXT");
+        // Schema-versioning lazy migrate (Phase 4). Creates schema_meta, stamps
+        // the sqlite version row, and runs any registered v(N)→v(N+1) DDL steps
+        // inside per-step transactions. Refuse-loud on a future on-disk version
+        // — propagates so the caller (HTTP boot) sees the error rather than
+        // operating against a half-understood DB.
+        runSqliteMigrations(this.db);
         this.selectStmt = this.db.prepare("SELECT * FROM handoff_state WHERE workspace_path = ?");
         this.selectLastUpdatedStmt = this.db.prepare("SELECT last_updated FROM handoff_state WHERE workspace_path = ?");
         this.upsertStmt = this.db.prepare(`INSERT OR REPLACE INTO handoff_state

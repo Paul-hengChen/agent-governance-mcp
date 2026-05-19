@@ -25,6 +25,10 @@ Three layers of defense, all in `index.ts`:
 3. **Guards** (`guards/{session,file-lock}.ts`) — pre-flight check, file
    lock, mtime freshness check.
 
+All four persisted artifacts (`handoff.md`, `tasks.md`, the SQLite DB,
+`.config.json`) carry a `schema_version`; older files are lazily migrated
+on first read. See `docs/schema-versions.md` for how to ship a new version.
+
 ## Layout
 
 ```
