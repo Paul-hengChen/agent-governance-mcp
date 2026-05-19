@@ -32,10 +32,18 @@ function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-// Long task-history projects produce dozens of identical-shape drift lines
-// ("Task list shows TNN completed, but handoff state doesn't mention it").
-// Collapse those into a single summary so the report stays readable; other
-// reasons are passed through verbatim.
+// Token-saving: when many drift items share the same pattern (only differing
+// by task ID), collapse them into a single summary line with a compact ID
+// range. Keeps small drifts individually visible (≤ 5 items) while preventing
+// 20+ identical lines from bloating the LLM context (~500 tokens saved per
+// call in typical long projects).
+const DRIFT_COMPRESS_THRESHOLD = 5;
+
+function formatIdRange(ids: string[]): string {
+  if (ids.length <= 3) return ids.join(", ");
+  return `${ids[0]}–${ids[ids.length - 1]}`;
+}
+
 function compressDriftDetails(details: string[]): string[] {
   const VIBE_RE = /^Task list shows (\S+) completed, but handoff state doesn't mention it\. Possible vibe-coding drift\.$/;
   const HANDOFF_AHEAD_RE = /^Handoff says (\S+) completed, but task list shows it as incomplete\.$/;
@@ -46,15 +54,9 @@ function compressDriftDetails(details: string[]): string[] {
 
   for (const d of details) {
     const v = d.match(VIBE_RE);
-    if (v) {
-      vibeIds.push(v[1]);
-      continue;
-    }
+    if (v) { vibeIds.push(v[1]); continue; }
     const h = d.match(HANDOFF_AHEAD_RE);
-    if (h) {
-      handoffAheadIds.push(h[1]);
-      continue;
-    }
+    if (h) { handoffAheadIds.push(h[1]); continue; }
     passthrough.push(d);
   }
 
@@ -63,18 +65,26 @@ function compressDriftDetails(details: string[]): string[] {
     out.push(
       `Task list shows ${vibeIds[0]} completed, but handoff state doesn't mention it. Possible vibe-coding drift.`,
     );
-  } else if (vibeIds.length > 1) {
+  } else if (vibeIds.length > 1 && vibeIds.length <= DRIFT_COMPRESS_THRESHOLD) {
     out.push(
       `Task list shows ${vibeIds.length} task(s) completed (${vibeIds.join(", ")}) that handoff state doesn't mention. Possible vibe-coding drift.`,
+    );
+  } else if (vibeIds.length > DRIFT_COMPRESS_THRESHOLD) {
+    out.push(
+      `${vibeIds.length} tasks (${formatIdRange(vibeIds)}) completed in task list but not in handoff state. Likely accumulated prior-session drift.`,
     );
   }
   if (handoffAheadIds.length === 1) {
     out.push(
       `Handoff says ${handoffAheadIds[0]} completed, but task list shows it as incomplete.`,
     );
-  } else if (handoffAheadIds.length > 1) {
+  } else if (handoffAheadIds.length > 1 && handoffAheadIds.length <= DRIFT_COMPRESS_THRESHOLD) {
     out.push(
       `Handoff says ${handoffAheadIds.length} task(s) completed (${handoffAheadIds.join(", ")}) that task list shows as incomplete.`,
+    );
+  } else if (handoffAheadIds.length > DRIFT_COMPRESS_THRESHOLD) {
+    out.push(
+      `${handoffAheadIds.length} tasks (${formatIdRange(handoffAheadIds)}) marked completed in handoff but incomplete in task list.`,
     );
   }
   out.push(...passthrough);
@@ -139,6 +149,7 @@ function checkVersionSkew(workspacePath: string): string[] {
   }
   return drifts;
 }
+
 
 export function detectDrift(workspacePath: string): string {
   // First-class version-skew check (Phase 4 AC-6). Runs BEFORE storage.parse

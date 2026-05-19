@@ -11,6 +11,10 @@ import "../schema/migrations-handoff.js";
 // Cap the completed_tasks array returned by readState() so long projects
 // don't bloat the LLM context. The full list is still in handoff.md.
 const COMPLETED_TASKS_RETURN_LIMIT = 50;
+// Cap the total character length of pending_notes returned by readState().
+// Long deliverable descriptions (common in sr-engineer handoffs) can bloat
+// the LLM context on every tw_get_state call. Full notes remain on disk.
+const PENDING_NOTES_CHAR_LIMIT = 3000;
 function getHandoffPath(workspacePath) {
     return path.join(workspacePath, ".current", "handoff.md");
 }
@@ -122,15 +126,46 @@ export function readHandoffState(workspacePath) {
         });
     }
     const truncated = state.completed_tasks.length > COMPLETED_TASKS_RETURN_LIMIT;
+    // Truncate pending_notes by total character count. Keep notes from the
+    // front (routing directives like "next_role: ..." appear first and are
+    // most important). Drop trailing notes that push past the limit.
+    let pendingNotes = state.pending_notes;
+    let pendingTruncated = false;
+    const totalChars = pendingNotes.reduce((sum, n) => sum + n.length, 0);
+    if (totalChars > PENDING_NOTES_CHAR_LIMIT) {
+        const kept = [];
+        let charBudget = PENDING_NOTES_CHAR_LIMIT;
+        for (const note of pendingNotes) {
+            if (charBudget <= 0)
+                break;
+            if (note.length <= charBudget) {
+                kept.push(note);
+                charBudget -= note.length;
+            }
+            else {
+                kept.push(note.slice(0, charBudget) + "…[truncated]");
+                charBudget = 0;
+            }
+        }
+        pendingNotes = kept;
+        pendingTruncated = true;
+    }
     const view = {
         ...state,
         completed_tasks: truncated
             ? state.completed_tasks.slice(-COMPLETED_TASKS_RETURN_LIMIT)
             : state.completed_tasks,
+        pending_notes: pendingNotes,
         ...(truncated && {
             completed_tasks_truncated: {
                 showing: COMPLETED_TASKS_RETURN_LIMIT,
                 total: state.completed_tasks.length,
+            },
+        }),
+        ...(pendingTruncated && {
+            pending_notes_truncated: {
+                total_chars: totalChars,
+                limit: PENDING_NOTES_CHAR_LIMIT,
             },
         }),
     };
