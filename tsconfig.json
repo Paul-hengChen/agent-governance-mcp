@@ -20,6 +20,7 @@
     "tools/**/*.ts",
     "guards/**/*.ts",
     "prompts/**/*.ts",
+    "schema/**/*.ts",
     "transport/**/*.ts"
   ],
   "exclude": ["node_modules", "dist"]
