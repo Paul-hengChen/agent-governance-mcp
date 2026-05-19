@@ -23,6 +23,10 @@ export interface HandoffState {
   // PM re-entry. Round-cap override (>= 4) blocks all transitions except
   // (pm, In_Progress). Backward-compat: parser defaults missing field to 0.
   qa_round: number;
+  // Optional absolute path to the workspace's PRD file. Consumed by the RAG
+  // lazy-reindex hook in prompts/build.ts:appendSpecContext. When absent, the
+  // hook falls back to discovering PRD.md/docs/PRD.md/specs/PRD.md.
+  prd_path?: string;
 }
 
 // Cap the completed_tasks array returned by readState() so long projects
@@ -91,6 +95,7 @@ export function parseHandoff(workspacePath: string): HandoffState | null {
 
   const blockingReason = asString(frontmatter.blocking_reason) || undefined;
   const lastAgent = asString(frontmatter.last_agent) || undefined;
+  const prdPath = asString(frontmatter.prd_path) || undefined;
   const qaRoundRaw = Number(frontmatter.qa_round);
   const qa_round = Number.isFinite(qaRoundRaw) && qaRoundRaw >= 0 ? Math.floor(qaRoundRaw) : 0;
 
@@ -100,6 +105,7 @@ export function parseHandoff(workspacePath: string): HandoffState | null {
     last_updated: asString(frontmatter.last_updated),
     ...(blockingReason && { blocking_reason: blockingReason }),
     ...(lastAgent && { last_agent: lastAgent }),
+    ...(prdPath && { prd_path: prdPath }),
     completed_tasks,
     pending_notes,
     qa_round,
@@ -149,6 +155,7 @@ export async function writeHandoffState(
   blockingReason?: string,
   lastAgent?: string,
   qaRound?: number,
+  prdPath?: string,
 ): Promise<string> {
   ensureDir(workspacePath);
   const handoffPath = getHandoffPath(workspacePath);
@@ -175,6 +182,14 @@ export async function writeHandoffState(
     };
     if (blockingReason) frontmatterData.blocking_reason = blockingReason;
     if (lastAgent) frontmatterData.last_agent = lastAgent;
+    // Preserve prd_path across writes that don't set it (PM sets once;
+    // downstream roles call writeState without re-passing the field).
+    let effectivePrdPath: string | undefined = prdPath;
+    if (effectivePrdPath === undefined) {
+      const existing = parseHandoff(workspacePath);
+      effectivePrdPath = existing?.prd_path;
+    }
+    if (effectivePrdPath) frontmatterData.prd_path = effectivePrdPath;
     // Always emit qa_round (even 0) so the field is discoverable; falsy
     // input (undefined/NaN) normalises to 0.
     const normalisedRound = Number.isFinite(qaRound) && (qaRound as number) >= 0 ? Math.floor(qaRound as number) : 0;

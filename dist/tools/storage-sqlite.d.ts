@@ -18,12 +18,15 @@ export declare class SqliteHandoffStorage implements HandoffStorage {
     private insertChunkStmt;
     private listChunksStmt;
     private getChunkMetaStmt;
+    private listChunkWorkspacesStmt;
+    private _tombstoneSwept;
     constructor(dbPath: string);
+    private ensureTombstoneSwept;
     private fetchRow;
     private fetchLastUpdated;
     parse(workspacePath: string): HandoffState | null;
     readState(workspacePath: string): string;
-    writeState(workspacePath: string, activeFeature: string, status: string, completedTasks: string[], pendingNotes: string[], blockingReason?: string, lastAgent?: string, qaRound?: number): Promise<string>;
+    writeState(workspacePath: string, activeFeature: string, status: string, completedTasks: string[], pendingNotes: string[], blockingReason?: string, lastAgent?: string, qaRound?: number, prdPath?: string): Promise<string>;
     listTasks(workspacePath: string): TaskRecord[] | null;
     getNextTask(workspacePath: string): string;
     completeTask(workspacePath: string, taskId: string, note?: string): Promise<string>;
@@ -32,6 +35,7 @@ export declare class SqliteHandoffStorage implements HandoffStorage {
     recordReview(workspacePath: string, taskIds: string[], status: "PASS" | "FAIL", reviewer: string, notes: string): Promise<void>;
     hasEvidence(workspacePath: string, taskIds: string[]): Promise<EvidenceCheck>;
     upsertPrdChunks(workspacePath: string, chunks: PrdChunk[]): void;
+    deletePrdChunks(workspacePath: string): number;
     listPrdChunks(workspacePath: string): PrdChunk[];
     getPrdIndexMeta(workspacePath: string): InvalidationKey | null;
     queryPrdSpec(workspacePath: string, query: string, topK?: number): Promise<string>;

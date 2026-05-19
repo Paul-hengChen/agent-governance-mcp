@@ -25,6 +25,7 @@ import { buildArchitectPrompt } from "./prompts/architect.js";
 import { switchRole } from "./tools/role.js";
 import { appendSpecContext } from "./prompts/build.js";
 import { buildPrdChunks, CHUNKER_VERSION, DEFAULT_EMBEDDING_MODEL } from "./tools/rag.js";
+import { getInflightKey, getInflight, setInflight, deleteInflight, awaitAllInflightFor, } from "./tools/rag-coalesce.js";
 import { requireQaEngineer, validateTransition, computeNewRound, } from "./tools/transitions.js";
 // ==========================================
 // Runtime validation schemas (zod)
@@ -49,11 +50,27 @@ const UpdateStateArgs = z
     // (agent_id === "qa-engineer"). Storage records the review to
     // qa_reports/review_<id>.md (file mode) or the reports table (SQLite).
     qa_review: z.string().max(10000).optional(),
+    // Optional absolute path to this workspace's PRD. PM typically sets it
+    // once; downstream roles can omit it (storage preserves the prior value).
+    // Consumed by the RAG lazy-reindex hook (prompts/build.ts:appendSpecContext).
+    prd_path: z
+        .string()
+        .min(1)
+        .refine((p) => path.isAbsolute(p), { message: "prd_path must be absolute" })
+        .optional(),
 })
     .refine((d) => d.status !== "PASS" || d.agent_id === "qa-engineer", {
     message: 'status="PASS" requires agent_id="qa-engineer"',
     path: ["agent_id"],
-});
+})
+    // Mirror tw_index_prd's path-traversal guard: if prd_path is given it MUST
+    // resolve inside workspace_path.
+    .refine((d) => {
+    if (!d.prd_path)
+        return true;
+    const rel = path.relative(d.workspace_path, d.prd_path);
+    return rel !== "" && !rel.startsWith("..") && !path.isAbsolute(rel);
+}, { message: "prd_path must be inside workspace_path (no traversal)", path: ["prd_path"] });
 const CompleteTaskArgs = z.object({
     workspace_path: absoluteWorkspacePath,
     task_id: z.string().min(1),
@@ -103,10 +120,8 @@ function formatZodError(err) {
         .map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`)
         .join("; ");
 }
-// In-flight indexing coalesce map. Keyed by `${workspace_path}::${prd_path}`.
-// Promises live only for the duration of an active index call (cleared in
-// `finally`). Bounded by concurrent client count, so no eviction needed.
-const _indexingInFlight = new Map();
+// In-flight indexing coalesce map is now in tools/rag-coalesce.ts so both
+// tw_index_prd and the lazy reindex in appendSpecContext share it.
 // ==========================================
 // 1. Initialize Server (Tools + Prompts)
 // ==========================================
@@ -278,6 +293,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                             type: "string",
                             description: "Review notes. Recorded as evidence when agent_id=qa-engineer and status in {PASS, FAIL}.",
                         },
+                        prd_path: {
+                            type: "string",
+                            description: "Optional absolute path to the workspace's PRD/spec file. Consumed by the RAG lazy-reindex hook.",
+                        },
                     },
                     required: ["workspace_path", "active_feature", "status"],
                 },
@@ -418,6 +437,17 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                     required: ["workspace_path", "prd_path"],
                 },
             },
+            {
+                name: "tw_clear_prd_chunks",
+                description: "Drop all RAG chunks for a workspace. Ops escape hatch for manual GC. SQLite mode only; no-op (informational) in file mode.",
+                inputSchema: {
+                    type: "object",
+                    properties: {
+                        workspace_path: { type: "string", description: "Absolute workspace path" },
+                    },
+                    required: ["workspace_path"],
+                },
+            },
         ],
     };
 });
@@ -515,7 +545,23 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 if (new_qa_round === 4 && prev_qa_round === 3) {
                     pending.unshift("⛔ Round 4: forced rollback to pm — no further QA allowed until PM resets.");
                 }
-                const result = await storage.writeState(parsed.workspace_path, parsed.active_feature, parsed.status, parsed.completed_tasks, pending, parsed.blocking_reason, parsed.agent_id, new_qa_round);
+                const result = await storage.writeState(parsed.workspace_path, parsed.active_feature, parsed.status, parsed.completed_tasks, pending, parsed.blocking_reason, parsed.agent_id, new_qa_round, parsed.prd_path);
+                // GC hook: when QA flips a feature to PASS, drop the workspace's RAG
+                // chunks so the next feature starts clean. Await any concurrent lazy
+                // reindex first so DELETE cannot race with INSERT.
+                // Best-effort: a failure here MUST NOT undo the successful state write.
+                if (parsed.status === "PASS" &&
+                    parsed.agent_id === "qa-engineer" &&
+                    "deletePrdChunks" in storage &&
+                    typeof storage.deletePrdChunks === "function") {
+                    try {
+                        await awaitAllInflightFor(parsed.workspace_path);
+                        storage.deletePrdChunks(parsed.workspace_path);
+                    }
+                    catch {
+                        // swallow — state write is the source of truth; cleanup is opportunistic
+                    }
+                }
                 return { content: [{ type: "text", text: result }] };
             }
             case "tw_complete_task": {
@@ -551,8 +597,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 // Concurrency guard: coalesce duplicate in-flight indexings for the
                 // same (workspace, prd_path). Without this, two parallel HTTP calls
                 // both run the slow embedding pipeline and race on DELETE+INSERT.
-                const inflightKey = `${parsed.workspace_path}::${parsed.prd_path}`;
-                const existing = _indexingInFlight.get(inflightKey);
+                // The registry is also shared with prompts/build.ts:appendSpecContext
+                // so its lazy reindex coalesces with explicit tw_index_prd calls.
+                const inflightKey = getInflightKey(parsed.workspace_path, parsed.prd_path);
+                const existing = getInflight(inflightKey);
                 if (existing) {
                     const text = await existing;
                     return { content: [{ type: "text", text }] };
@@ -575,7 +623,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     ragStorage.upsertPrdChunks(parsed.workspace_path, result);
                     return JSON.stringify({ indexed: true, chunks: result.length, model, chunker_version: CHUNKER_VERSION });
                 })();
-                _indexingInFlight.set(inflightKey, run);
+                setInflight(inflightKey, run);
                 try {
                     const text = await run;
                     return {
@@ -584,8 +632,35 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     };
                 }
                 finally {
-                    _indexingInFlight.delete(inflightKey);
+                    deleteInflight(inflightKey);
                 }
+            }
+            case "tw_clear_prd_chunks": {
+                const { workspace_path } = WorkspaceOnly.parse(args);
+                const storage = getActiveStorage();
+                if (!("deletePrdChunks" in storage) ||
+                    typeof storage.deletePrdChunks !== "function") {
+                    return {
+                        content: [{
+                                type: "text",
+                                text: JSON.stringify({
+                                    supported: false,
+                                    message: "tw_clear_prd_chunks requires SQLite mode (--port flag). No chunks in file mode.",
+                                }),
+                            }],
+                    };
+                }
+                // Await any in-flight reindex for this workspace so DELETE cannot
+                // race with a concurrent INSERT inside upsertPrdChunks.
+                await awaitAllInflightFor(workspace_path);
+                const ragStorage = storage;
+                const deleted = ragStorage.deletePrdChunks(workspace_path);
+                return {
+                    content: [{
+                            type: "text",
+                            text: JSON.stringify({ supported: true, cleared: true, deleted_rows: deleted }),
+                        }],
+                };
             }
             default:
                 return {

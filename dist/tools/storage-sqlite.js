@@ -3,6 +3,7 @@
 // where a process-shared DB beats per-workspace markdown files. Freshness for
 // handoff is enforced via the row's `last_updated` column rather than file mtime;
 // task operations rely on per-row CHECK semantics inside transactions.
+import * as fs from "node:fs";
 import Database from "better-sqlite3";
 import { markStateRead, snapshotExtra, verifyExtra, } from "../guards/session.js";
 import { cosineSim, embedText, DEFAULT_EMBEDDING_MODEL, } from "./rag.js";
@@ -16,7 +17,8 @@ CREATE TABLE IF NOT EXISTS handoff_state (
   last_agent      TEXT,
   completed       TEXT NOT NULL DEFAULT '[]',
   pending         TEXT NOT NULL DEFAULT '[]',
-  qa_round        INTEGER NOT NULL DEFAULT 0
+  qa_round        INTEGER NOT NULL DEFAULT 0,
+  prd_path        TEXT
 );
 
 CREATE TABLE IF NOT EXISTS tasks (
@@ -79,35 +81,44 @@ export class SqliteHandoffStorage {
     insertChunkStmt;
     listChunksStmt;
     getChunkMetaStmt;
+    listChunkWorkspacesStmt;
+    // Lazy tombstone-sweep guard: runs at most once per process lifetime, on
+    // the first RAG operation. Cheaper than constructor-time scan for users
+    // who don't use RAG.
+    _tombstoneSwept = false;
     constructor(dbPath) {
         this.db = new Database(dbPath);
         this.db.pragma("journal_mode = WAL");
         this.db.pragma("synchronous = NORMAL");
         this.db.pragma("foreign_keys = ON");
         this.db.exec(SCHEMA);
-        // Idempotent additive migration: pre-v3.2.0 DBs lack qa_round column. The
-        // ALTER throws if the column already exists; swallow that one error only.
-        try {
-            this.db.exec("ALTER TABLE handoff_state ADD COLUMN qa_round INTEGER NOT NULL DEFAULT 0");
-        }
-        catch (err) {
-            const msg = err instanceof Error ? err.message : String(err);
-            if (!/duplicate column name/i.test(msg))
-                throw err;
-        }
+        // Idempotent additive migrations: ALTER throws if the column already
+        // exists; swallow that one error only.
+        const addColumnIfMissing = (sql) => {
+            try {
+                this.db.exec(sql);
+            }
+            catch (err) {
+                const msg = err instanceof Error ? err.message : String(err);
+                if (!/duplicate column name/i.test(msg))
+                    throw err;
+            }
+        };
+        addColumnIfMissing("ALTER TABLE handoff_state ADD COLUMN qa_round INTEGER NOT NULL DEFAULT 0");
+        addColumnIfMissing("ALTER TABLE handoff_state ADD COLUMN prd_path TEXT");
         this.selectStmt = this.db.prepare("SELECT * FROM handoff_state WHERE workspace_path = ?");
         this.selectLastUpdatedStmt = this.db.prepare("SELECT last_updated FROM handoff_state WHERE workspace_path = ?");
         this.upsertStmt = this.db.prepare(`INSERT OR REPLACE INTO handoff_state
-        (workspace_path, active_feature, status, last_updated, blocking_reason, last_agent, completed, pending, qa_round)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-        this.txUpsert = this.db.transaction((workspacePath, activeFeature, status, now, blockingReason, lastAgent, completed, pending, qaRound, expectedLastUpdated) => {
+        (workspace_path, active_feature, status, last_updated, blocking_reason, last_agent, completed, pending, qa_round, prd_path)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+        this.txUpsert = this.db.transaction((workspacePath, activeFeature, status, now, blockingReason, lastAgent, completed, pending, qaRound, prdPath, expectedLastUpdated) => {
             const row = this.selectLastUpdatedStmt.get(workspacePath);
             const actual = row?.last_updated ?? null;
             if (actual !== expectedLastUpdated) {
                 throw new Error(`⛔ STATE DRIFT: handoff row changed between freshness check and write ` +
                     `(expected last_updated=${expectedLastUpdated}, actual=${actual}). Retry after tw_get_state.`);
             }
-            this.upsertStmt.run(workspacePath, activeFeature, status, now, blockingReason, lastAgent, completed, pending, qaRound);
+            this.upsertStmt.run(workspacePath, activeFeature, status, now, blockingReason, lastAgent, completed, pending, qaRound, prdPath);
         });
         this.listTasksStmt = this.db.prepare(`SELECT task_id, description, section, completed, note, reverted_reason, sort_order
        FROM tasks WHERE workspace_path = ? ORDER BY sort_order ASC`);
@@ -133,6 +144,27 @@ export class SqliteHandoffStorage {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
         this.listChunksStmt = this.db.prepare("SELECT chunk_id, section, text, embedding, prd_path, prd_mtime, chunker_version, embedding_model FROM prd_chunks WHERE workspace_path = ?");
         this.getChunkMetaStmt = this.db.prepare("SELECT prd_mtime, chunker_version, embedding_model FROM prd_chunks WHERE workspace_path = ? LIMIT 1");
+        this.listChunkWorkspacesStmt = this.db.prepare("SELECT DISTINCT workspace_path FROM prd_chunks");
+    }
+    // Run-once tombstone sweep: drop chunks whose workspace directory no longer
+    // exists on disk. Lazily fired by the first RAG operation in the process.
+    // Errors are swallowed because RAG is best-effort — a sweep failure must
+    // never break the calling query.
+    ensureTombstoneSwept() {
+        if (this._tombstoneSwept)
+            return;
+        this._tombstoneSwept = true;
+        try {
+            const rows = this.listChunkWorkspacesStmt.all();
+            for (const r of rows) {
+                if (!fs.existsSync(r.workspace_path)) {
+                    this.deleteChunksStmt.run(r.workspace_path);
+                }
+            }
+        }
+        catch {
+            // best-effort: swallow
+        }
     }
     // ---------- handoff state ----------
     fetchRow(workspacePath) {
@@ -156,6 +188,7 @@ export class SqliteHandoffStorage {
             last_updated: row.last_updated,
             ...(row.blocking_reason ? { blocking_reason: row.blocking_reason } : {}),
             ...(row.last_agent ? { last_agent: row.last_agent } : {}),
+            ...(row.prd_path ? { prd_path: row.prd_path } : {}),
             completed_tasks: JSON.parse(row.completed),
             pending_notes: JSON.parse(row.pending),
             qa_round,
@@ -182,12 +215,19 @@ export class SqliteHandoffStorage {
         };
         return JSON.stringify({ exists: true, ...view });
     }
-    writeState(workspacePath, activeFeature, status, completedTasks, pendingNotes, blockingReason, lastAgent, qaRound) {
+    writeState(workspacePath, activeFeature, status, completedTasks, pendingNotes, blockingReason, lastAgent, qaRound, prdPath) {
         const currentLastUpdated = this.fetchLastUpdated(workspacePath);
         verifyExtra(workspacePath, SNAPSHOT_KEY, currentLastUpdated);
         const normalisedRound = Number.isFinite(qaRound) && qaRound >= 0 ? Math.floor(qaRound) : 0;
+        // Preserve prd_path across writes that don't explicitly set it (PM sets
+        // once; downstream roles call writeState without re-passing the field).
+        let effectivePrdPath = prdPath ?? null;
+        if (effectivePrdPath === null) {
+            const existing = this.fetchRow(workspacePath);
+            effectivePrdPath = existing?.prd_path ?? null;
+        }
         const now = new Date().toISOString();
-        this.txUpsert(workspacePath, activeFeature, status, now, blockingReason ?? null, lastAgent ?? null, JSON.stringify(completedTasks), JSON.stringify(pendingNotes), normalisedRound, currentLastUpdated);
+        this.txUpsert(workspacePath, activeFeature, status, now, blockingReason ?? null, lastAgent ?? null, JSON.stringify(completedTasks), JSON.stringify(pendingNotes), normalisedRound, effectivePrdPath, currentLastUpdated);
         snapshotExtra(workspacePath, SNAPSHOT_KEY, now);
         return Promise.resolve(JSON.stringify({ success: true, storage: "sqlite", updated_at: now }));
     }
@@ -308,6 +348,7 @@ export class SqliteHandoffStorage {
     }
     // ---------- RAG: prd_chunks ----------
     upsertPrdChunks(workspacePath, chunks) {
+        this.ensureTombstoneSwept();
         const run = this.db.transaction((rows) => {
             this.deleteChunksStmt.run(workspacePath);
             for (const c of rows) {
@@ -316,7 +357,14 @@ export class SqliteHandoffStorage {
         });
         run(chunks);
     }
+    // GC primitive for the PASS-cleanup hook in index.ts:tw_update_state.
+    // Returns the number of rows deleted so callers can log / report.
+    deletePrdChunks(workspacePath) {
+        const info = this.deleteChunksStmt.run(workspacePath);
+        return info.changes;
+    }
     listPrdChunks(workspacePath) {
+        this.ensureTombstoneSwept();
         const rows = this.listChunksStmt.all(workspacePath);
         return rows.map(r => ({
             chunk_id: r.chunk_id,
@@ -330,12 +378,14 @@ export class SqliteHandoffStorage {
         }));
     }
     getPrdIndexMeta(workspacePath) {
+        this.ensureTombstoneSwept();
         const row = this.getChunkMetaStmt.get(workspacePath);
         if (!row)
             return null;
         return { prd_mtime: row.prd_mtime, chunker_version: row.chunker_version, embedding_model: row.embedding_model };
     }
     async queryPrdSpec(workspacePath, query, topK = 5) {
+        this.ensureTombstoneSwept();
         const chunks = this.listPrdChunks(workspacePath);
         if (chunks.length === 0)
             return "";

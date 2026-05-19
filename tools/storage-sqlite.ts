@@ -4,6 +4,7 @@
 // handoff is enforced via the row's `last_updated` column rather than file mtime;
 // task operations rely on per-row CHECK semantics inside transactions.
 
+import * as fs from "node:fs";
 import Database from "better-sqlite3";
 import {
   markStateRead,
@@ -29,6 +30,7 @@ interface HandoffRow {
   completed: string;
   pending: string;
   qa_round: number | null;
+  prd_path: string | null;
 }
 
 interface TaskRow {
@@ -51,7 +53,8 @@ CREATE TABLE IF NOT EXISTS handoff_state (
   last_agent      TEXT,
   completed       TEXT NOT NULL DEFAULT '[]',
   pending         TEXT NOT NULL DEFAULT '[]',
-  qa_round        INTEGER NOT NULL DEFAULT 0
+  qa_round        INTEGER NOT NULL DEFAULT 0,
+  prd_path        TEXT
 );
 
 CREATE TABLE IF NOT EXISTS tasks (
@@ -102,7 +105,7 @@ export class SqliteHandoffStorage implements HandoffStorage {
   private db: Database.Database;
   private selectStmt: Database.Statement<[string]>;
   private selectLastUpdatedStmt: Database.Statement<[string]>;
-  private upsertStmt: Database.Statement<[string, string, string, string, string | null, string | null, string, string, number]>;
+  private upsertStmt: Database.Statement<[string, string, string, string, string | null, string | null, string, string, number, string | null]>;
   private txUpsert: (
     workspacePath: string,
     activeFeature: string,
@@ -113,6 +116,7 @@ export class SqliteHandoffStorage implements HandoffStorage {
     completed: string,
     pending: string,
     qaRound: number,
+    prdPath: string | null,
     expectedLastUpdated: string | null,
   ) => void;
 
@@ -130,6 +134,11 @@ export class SqliteHandoffStorage implements HandoffStorage {
   private insertChunkStmt: Database.Statement<[string, string, string, string, string, string, number, string, string]>;
   private listChunksStmt: Database.Statement<[string]>;
   private getChunkMetaStmt: Database.Statement<[string]>;
+  private listChunkWorkspacesStmt: Database.Statement<[]>;
+  // Lazy tombstone-sweep guard: runs at most once per process lifetime, on
+  // the first RAG operation. Cheaper than constructor-time scan for users
+  // who don't use RAG.
+  private _tombstoneSwept = false;
 
   constructor(dbPath: string) {
     this.db = new Database(dbPath);
@@ -137,14 +146,18 @@ export class SqliteHandoffStorage implements HandoffStorage {
     this.db.pragma("synchronous = NORMAL");
     this.db.pragma("foreign_keys = ON");
     this.db.exec(SCHEMA);
-    // Idempotent additive migration: pre-v3.2.0 DBs lack qa_round column. The
-    // ALTER throws if the column already exists; swallow that one error only.
-    try {
-      this.db.exec("ALTER TABLE handoff_state ADD COLUMN qa_round INTEGER NOT NULL DEFAULT 0");
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      if (!/duplicate column name/i.test(msg)) throw err;
-    }
+    // Idempotent additive migrations: ALTER throws if the column already
+    // exists; swallow that one error only.
+    const addColumnIfMissing = (sql: string): void => {
+      try {
+        this.db.exec(sql);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (!/duplicate column name/i.test(msg)) throw err;
+      }
+    };
+    addColumnIfMissing("ALTER TABLE handoff_state ADD COLUMN qa_round INTEGER NOT NULL DEFAULT 0");
+    addColumnIfMissing("ALTER TABLE handoff_state ADD COLUMN prd_path TEXT");
 
     this.selectStmt = this.db.prepare<[string]>(
       "SELECT * FROM handoff_state WHERE workspace_path = ?",
@@ -152,10 +165,10 @@ export class SqliteHandoffStorage implements HandoffStorage {
     this.selectLastUpdatedStmt = this.db.prepare<[string]>(
       "SELECT last_updated FROM handoff_state WHERE workspace_path = ?",
     );
-    this.upsertStmt = this.db.prepare<[string, string, string, string, string | null, string | null, string, string, number]>(
+    this.upsertStmt = this.db.prepare<[string, string, string, string, string | null, string | null, string, string, number, string | null]>(
       `INSERT OR REPLACE INTO handoff_state
-        (workspace_path, active_feature, status, last_updated, blocking_reason, last_agent, completed, pending, qa_round)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (workspace_path, active_feature, status, last_updated, blocking_reason, last_agent, completed, pending, qa_round, prd_path)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
 
     this.txUpsert = this.db.transaction(
@@ -169,6 +182,7 @@ export class SqliteHandoffStorage implements HandoffStorage {
         completed: string,
         pending: string,
         qaRound: number,
+        prdPath: string | null,
         expectedLastUpdated: string | null,
       ) => {
         const row = this.selectLastUpdatedStmt.get(workspacePath) as { last_updated: string } | undefined;
@@ -189,6 +203,7 @@ export class SqliteHandoffStorage implements HandoffStorage {
           completed,
           pending,
           qaRound,
+          prdPath,
         );
       },
     );
@@ -243,6 +258,28 @@ export class SqliteHandoffStorage implements HandoffStorage {
     this.getChunkMetaStmt = this.db.prepare<[string]>(
       "SELECT prd_mtime, chunker_version, embedding_model FROM prd_chunks WHERE workspace_path = ? LIMIT 1",
     );
+    this.listChunkWorkspacesStmt = this.db.prepare<[]>(
+      "SELECT DISTINCT workspace_path FROM prd_chunks",
+    );
+  }
+
+  // Run-once tombstone sweep: drop chunks whose workspace directory no longer
+  // exists on disk. Lazily fired by the first RAG operation in the process.
+  // Errors are swallowed because RAG is best-effort — a sweep failure must
+  // never break the calling query.
+  private ensureTombstoneSwept(): void {
+    if (this._tombstoneSwept) return;
+    this._tombstoneSwept = true;
+    try {
+      const rows = this.listChunkWorkspacesStmt.all() as Array<{ workspace_path: string }>;
+      for (const r of rows) {
+        if (!fs.existsSync(r.workspace_path)) {
+          this.deleteChunksStmt.run(r.workspace_path);
+        }
+      }
+    } catch {
+      // best-effort: swallow
+    }
   }
 
   // ---------- handoff state ----------
@@ -270,6 +307,7 @@ export class SqliteHandoffStorage implements HandoffStorage {
       last_updated: row.last_updated,
       ...(row.blocking_reason ? { blocking_reason: row.blocking_reason } : {}),
       ...(row.last_agent ? { last_agent: row.last_agent } : {}),
+      ...(row.prd_path ? { prd_path: row.prd_path } : {}),
       completed_tasks: JSON.parse(row.completed) as string[],
       pending_notes: JSON.parse(row.pending) as string[],
       qa_round,
@@ -307,12 +345,21 @@ export class SqliteHandoffStorage implements HandoffStorage {
     blockingReason?: string,
     lastAgent?: string,
     qaRound?: number,
+    prdPath?: string,
   ): Promise<string> {
     const currentLastUpdated = this.fetchLastUpdated(workspacePath);
     verifyExtra(workspacePath, SNAPSHOT_KEY, currentLastUpdated);
 
     const normalisedRound =
       Number.isFinite(qaRound) && (qaRound as number) >= 0 ? Math.floor(qaRound as number) : 0;
+
+    // Preserve prd_path across writes that don't explicitly set it (PM sets
+    // once; downstream roles call writeState without re-passing the field).
+    let effectivePrdPath: string | null = prdPath ?? null;
+    if (effectivePrdPath === null) {
+      const existing = this.fetchRow(workspacePath);
+      effectivePrdPath = existing?.prd_path ?? null;
+    }
 
     const now = new Date().toISOString();
     this.txUpsert(
@@ -325,6 +372,7 @@ export class SqliteHandoffStorage implements HandoffStorage {
       JSON.stringify(completedTasks),
       JSON.stringify(pendingNotes),
       normalisedRound,
+      effectivePrdPath,
       currentLastUpdated,
     );
 
@@ -480,6 +528,7 @@ export class SqliteHandoffStorage implements HandoffStorage {
   // ---------- RAG: prd_chunks ----------
 
   upsertPrdChunks(workspacePath: string, chunks: PrdChunk[]): void {
+    this.ensureTombstoneSwept();
     const run = this.db.transaction((rows: PrdChunk[]) => {
       this.deleteChunksStmt.run(workspacePath);
       for (const c of rows) {
@@ -499,7 +548,15 @@ export class SqliteHandoffStorage implements HandoffStorage {
     run(chunks);
   }
 
+  // GC primitive for the PASS-cleanup hook in index.ts:tw_update_state.
+  // Returns the number of rows deleted so callers can log / report.
+  deletePrdChunks(workspacePath: string): number {
+    const info = this.deleteChunksStmt.run(workspacePath);
+    return info.changes;
+  }
+
   listPrdChunks(workspacePath: string): PrdChunk[] {
+    this.ensureTombstoneSwept();
     interface ChunkRow {
       chunk_id: string; section: string; text: string; embedding: string;
       prd_path: string; prd_mtime: number; chunker_version: string; embedding_model: string;
@@ -518,6 +575,7 @@ export class SqliteHandoffStorage implements HandoffStorage {
   }
 
   getPrdIndexMeta(workspacePath: string): InvalidationKey | null {
+    this.ensureTombstoneSwept();
     interface MetaRow { prd_mtime: number; chunker_version: string; embedding_model: string; }
     const row = this.getChunkMetaStmt.get(workspacePath) as MetaRow | undefined;
     if (!row) return null;
@@ -525,6 +583,7 @@ export class SqliteHandoffStorage implements HandoffStorage {
   }
 
   async queryPrdSpec(workspacePath: string, query: string, topK: number = 5): Promise<string> {
+    this.ensureTombstoneSwept();
     const chunks = this.listPrdChunks(workspacePath);
     if (chunks.length === 0) return "";
     const model = chunks[0].embedding_model ?? DEFAULT_EMBEDDING_MODEL;

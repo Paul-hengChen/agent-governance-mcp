@@ -7,7 +7,7 @@ export interface EvidenceCheck {
 }
 export interface HandoffStorage {
     readState(workspacePath: string): string;
-    writeState(workspacePath: string, activeFeature: string, status: string, completedTasks: string[], pendingNotes: string[], blockingReason?: string, lastAgent?: string, qaRound?: number): Promise<string>;
+    writeState(workspacePath: string, activeFeature: string, status: string, completedTasks: string[], pendingNotes: string[], blockingReason?: string, lastAgent?: string, qaRound?: number, prdPath?: string): Promise<string>;
     parse(workspacePath: string): HandoffState | null;
     listTasks(workspacePath: string): TaskRecord[] | null;
     getNextTask(workspacePath: string): string;
@@ -19,7 +19,7 @@ export interface HandoffStorage {
 }
 export declare class FileHandoffStorage implements HandoffStorage {
     readState(workspacePath: string): string;
-    writeState(workspacePath: string, activeFeature: string, status: string, completedTasks: string[], pendingNotes: string[], blockingReason?: string, lastAgent?: string, qaRound?: number): Promise<string>;
+    writeState(workspacePath: string, activeFeature: string, status: string, completedTasks: string[], pendingNotes: string[], blockingReason?: string, lastAgent?: string, qaRound?: number, prdPath?: string): Promise<string>;
     parse(workspacePath: string): HandoffState | null;
     listTasks(workspacePath: string): TaskRecord[] | null;
     getNextTask(workspacePath: string): string;

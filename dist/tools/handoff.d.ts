@@ -7,6 +7,7 @@ export interface HandoffState {
     completed_tasks: string[];
     pending_notes: string[];
     qa_round: number;
+    prd_path?: string;
 }
 /**
  * Parse handoff.md YAML frontmatter + section content into structured JSON.
@@ -22,5 +23,5 @@ export declare function readHandoffState(workspacePath: string): string;
  * Pending notes are written as plain list items (not checkboxes) to avoid
  * ambiguity with tracked task IDs in the completed section.
  */
-export declare function writeHandoffState(workspacePath: string, activeFeature: string, status: string, completedTasks: string[], pendingNotes: string[], blockingReason?: string, lastAgent?: string, qaRound?: number): Promise<string>;
+export declare function writeHandoffState(workspacePath: string, activeFeature: string, status: string, completedTasks: string[], pendingNotes: string[], blockingReason?: string, lastAgent?: string, qaRound?: number, prdPath?: string): Promise<string>;
 //# sourceMappingURL=handoff.d.ts.map
