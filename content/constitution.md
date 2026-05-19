@@ -31,27 +31,15 @@ restate these rules.
 
 ### 3.1 Server-enforced chain (v3.2.0)
 
-The server now validates every `tw_update_state` write against an
-`ALLOWED_TRANSITIONS` matrix (authoritative source:
-`specs/qa-flow-enforcement-architecture.md`). Skipping a chain step or
-self-declaring a finalisation role is rejected before the write reaches
-storage. Three enforcement layers stack:
+The routing chain is **server-enforced**, not advisory. Invalid
+`tw_update_state` writes are rejected before reaching storage. Key rules:
 
-- **Agent-id gate**: `tw_update_state(status=PASS)` and `tw_complete_task`
-  require `agent_id="qa-engineer"` (zod refinement + handler defense).
-- **Transition validation**: each `(prev_last_agent, prev_status) →
-  (new_agent, new_status)` write must appear in the matrix, or qualify for
-  the same-agent `In_Progress→In_Progress` self-loop fast path.
-- **Round counter** (`qa_round` persisted in handoff state): increments on
-  `(qa-engineer, FAIL)`, resets on PASS or PM re-entry. At Round 4 the
-  matrix collapses to `{(pm, In_Progress)}` until PM resets.
-- **Evidence-of-QA** (PASS path only): `qa_reports/review_<task-id>.md`
-  (file mode) or a `reports` table row (SQLite) must exist for every id
-  in `completed_tasks`. Attach `qa_review` on the PASS/FAIL write and the
-  server records the evidence atomically.
+- `status=PASS` and `tw_complete_task` require `agent_id="qa-engineer"`.
+- After 3 QA FAILs (Round 4), only `(pm, In_Progress)` is accepted.
+- PASS requires evidence: attach `qa_review`, or pre-write `qa_reports/review_<task-id>.md`.
 
-Rejections return a structured envelope (`error`, `attempted`, `allowed`,
-`hint`) so callers can self-correct without re-reading this document.
+On rejection the server returns `{ error, attempted, allowed, hint }` —
+read it and self-correct. Full matrix: `specs/qa-flow-enforcement-architecture.md`.
 
 ## 4. Routing Chain (multi-phase work)
 
