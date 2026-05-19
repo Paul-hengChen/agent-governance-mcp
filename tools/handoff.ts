@@ -10,6 +10,9 @@ import {
   refreshSnapshotFor,
 } from "../guards/session.js";
 import { withFileLock } from "../guards/file-lock.js";
+import { CURRENT_VERSIONS, runMigrations } from "../schema/versions.js";
+// Side-effect import: registers the handoff v0→v1 migration on module load.
+import "../schema/migrations-handoff.js";
 
 export interface HandoffState {
   active_feature: string;
@@ -53,30 +56,41 @@ function extractSectionContent(body: string, headingPattern: RegExp): string {
   return nextSection === -1 ? rest : rest.slice(0, nextSection);
 }
 
-/**
- * Parse handoff.md YAML frontmatter + section content into structured JSON.
- * Returns null if file doesn't exist.
- */
-export function parseHandoff(workspacePath: string): HandoffState | null {
+interface HandoffReadResult {
+  state: HandoffState;
+  migrationApplied: boolean;
+}
+
+// Internal helper. Reads + parses + runs schema migrations. Returns the
+// migrated state plus a flag that lets readHandoffState fire a write-back
+// to heal the on-disk file. Callers that don't need the flag use parseHandoff.
+function readAndMigrate(workspacePath: string): HandoffReadResult | null {
   const handoffPath = getHandoffPath(workspacePath);
   if (!fs.existsSync(handoffPath)) return null;
 
   const content = fs.readFileSync(handoffPath, "utf-8");
 
   // Parse YAML frontmatter with js-yaml (handles quotes, colons in values, etc.)
-  const frontmatter: Record<string, unknown> = {};
+  let rawFrontmatter: Record<string, unknown> = {};
   const yamlMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
   if (yamlMatch) {
     try {
       const parsed = yaml.load(yamlMatch[1]);
       if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-        Object.assign(frontmatter, parsed as Record<string, unknown>);
+        rawFrontmatter = parsed as Record<string, unknown>;
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       throw new Error(`Failed to parse handoff.md frontmatter: ${message}`);
     }
   }
+
+  // Schema-versioning lazy migrate-on-read (Phase 4). Bumps an absent or
+  // older schema_version up to CURRENT_VERSIONS.handoff. Throws refuse-loud
+  // on future versions — propagates to the caller intentionally.
+  const migration = runMigrations<Record<string, unknown>>("handoff", rawFrontmatter);
+  const frontmatter = migration.payload;
+  const migrationApplied = migration.applied.length > 0;
 
   const asString = (v: unknown): string => (typeof v === "string" ? v : v == null ? "" : String(v));
 
@@ -99,7 +113,7 @@ export function parseHandoff(workspacePath: string): HandoffState | null {
   const qaRoundRaw = Number(frontmatter.qa_round);
   const qa_round = Number.isFinite(qaRoundRaw) && qaRoundRaw >= 0 ? Math.floor(qaRoundRaw) : 0;
 
-  return {
+  const state: HandoffState = {
     active_feature: asString(frontmatter.active_feature),
     status: asString(frontmatter.status),
     last_updated: asString(frontmatter.last_updated),
@@ -110,21 +124,57 @@ export function parseHandoff(workspacePath: string): HandoffState | null {
     pending_notes,
     qa_round,
   };
+
+  return { state, migrationApplied };
+}
+
+/**
+ * Parse handoff.md YAML frontmatter + section content into structured JSON.
+ * Returns null if file doesn't exist. Runs schema migrations in-memory; does
+ * NOT write back (callers that need persistence go through readHandoffState).
+ */
+export function parseHandoff(workspacePath: string): HandoffState | null {
+  const result = readAndMigrate(workspacePath);
+  return result ? result.state : null;
 }
 
 /**
  * Read handoff state. Marks session as "state read" for guard enforcement.
+ * Triggers a fire-and-forget write-back when schema migrations were applied,
+ * so the on-disk file heals to CURRENT on the first read.
  */
 export function readHandoffState(workspacePath: string): string {
   markStateRead(workspacePath);
 
-  const state = parseHandoff(workspacePath);
-  if (!state) {
+  const result = readAndMigrate(workspacePath);
+  if (!result) {
     return JSON.stringify({
       exists: false,
       message: "No handoff state found. This is a fresh project — initialize by calling tw_update_state.",
     });
   }
+  const { state, migrationApplied } = result;
+
+  if (migrationApplied) {
+    // Defense-in-depth heal of stale on-disk files. Best-effort: a freshness
+    // error here just means another writer already healed the file (AC-5), so
+    // swallow it. Any other failure also non-fatal — the in-memory state we
+    // return is already at CURRENT.
+    void writeHandoffState(
+      workspacePath,
+      state.active_feature,
+      state.status,
+      state.completed_tasks,
+      state.pending_notes,
+      state.blocking_reason,
+      state.last_agent,
+      state.qa_round,
+      state.prd_path,
+    ).catch(() => {
+      /* swallowed — read still returns migrated state */
+    });
+  }
+
   const truncated = state.completed_tasks.length > COMPLETED_TASKS_RETURN_LIMIT;
   const view = {
     ...state,
@@ -176,6 +226,7 @@ export async function writeHandoffState(
       : "- 無";
 
     const frontmatterData: Record<string, string | number> = {
+      schema_version: CURRENT_VERSIONS.handoff,
       active_feature: activeFeature,
       status,
       last_updated: now,
