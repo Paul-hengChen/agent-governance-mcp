@@ -8,6 +8,27 @@ import * as path from "path";
 import { verifyFreshness, refreshSnapshotFor } from "../guards/session.js";
 import { withFileLock } from "../guards/file-lock.js";
 import { findTasksFile, resolveTaskPaths, resolveTaskRegex } from "./config.js";
+import { CURRENT_VERSIONS, runMigrations } from "../schema/versions.js";
+// Side-effect import: registers the tasks v0→v1 migration on module load.
+import { type TasksPayload } from "../schema/migrations-tasks.js";
+import "../schema/migrations-tasks.js";
+
+// Leading HTML comment that carries the on-disk schema_version for tasks.md.
+// Must be line 1. Re-emitted by atomicWrite on every mutation so the file
+// heals on the first write after a server upgrade.
+const SENTINEL_RE = /^<!--\s*schema_version:\s*(\d+)\s*-->\s*\r?\n/;
+
+function stripSentinel(content: string): { version?: number; body: string } {
+  const match = content.match(SENTINEL_RE);
+  if (!match) return { body: content };
+  const version = Number(match[1]);
+  if (!Number.isFinite(version)) return { body: content };
+  return { version: Math.floor(version), body: content.slice(match[0].length) };
+}
+
+function prependSentinel(body: string): string {
+  return `<!-- schema_version: ${CURRENT_VERSIONS.tasks} -->\n${body}`;
+}
 
 export interface TaskRecord {
   id: string;
@@ -31,6 +52,11 @@ function parseTaskLine(line: string, section: string, regex: RegExp): TaskRecord
 interface ParseResult {
   tasks: TaskRecord[];
   filePath: string;
+  // Body after sentinel stripping AND schema migrations. Callers persisting
+  // a heal-on-read use this — it carries the upgraded shape minus the leading
+  // sentinel (which atomicWrite re-prepends at CURRENT).
+  migratedBody: string;
+  migrationApplied: boolean;
 }
 
 function parseTasks(workspacePath: string): ParseResult | null {
@@ -38,8 +64,20 @@ function parseTasks(workspacePath: string): ParseResult | null {
   if (!filePath) return null;
 
   const regex = resolveTaskRegex(workspacePath);
-  const content = fs.readFileSync(filePath, "utf-8");
-  const lines = content.split("\n");
+  const rawContent = fs.readFileSync(filePath, "utf-8");
+
+  // Strip the leading version sentinel (if any), then run schema migrations
+  // on the envelope. Lazy migrate-on-read (Phase 4) — throws refuse-loud when
+  // the on-disk version exceeds CURRENT_VERSIONS.tasks.
+  const stripped = stripSentinel(rawContent);
+  const migration = runMigrations<TasksPayload>("tasks", {
+    schema_version: stripped.version,
+    body: stripped.body,
+  });
+  const migratedBody = migration.payload.body;
+  const migrationApplied = migration.applied.length > 0;
+
+  const lines = migratedBody.split("\n");
   const tasks: TaskRecord[] = [];
   let currentSection = "Unknown";
 
@@ -53,7 +91,7 @@ function parseTasks(workspacePath: string): ParseResult | null {
     if (task) tasks.push(task);
   }
 
-  return { tasks, filePath };
+  return { tasks, filePath, migratedBody, migrationApplied };
 }
 
 export function parseTasksFromFile(workspacePath: string): TaskRecord[] | null {
@@ -65,6 +103,18 @@ export function getNextTaskFromFile(workspacePath: string): string {
   const result = parseTasks(workspacePath);
   if (!result) {
     return JSON.stringify({ error: "No task list file found in workspace." });
+  }
+
+  // Heal-on-read for tasks.md: if the schema migration upgraded the in-memory
+  // body, persist the upgraded file with sentinel via atomicWrite. Best-effort
+  // (synchronous; failures here surface as a thrown error rather than fire-
+  // and-forget because we have no file lock here and atomicWrite is sync).
+  if (result.migrationApplied) {
+    try {
+      atomicWrite(result.filePath, result.migratedBody);
+    } catch {
+      /* swallowed — in-memory tasks already at CURRENT for the caller */
+    }
   }
 
   const next = result.tasks.find((t) => !t.completed);
@@ -86,9 +136,13 @@ export function getNextTaskFromFile(workspacePath: string): string {
   });
 }
 
+// Always prepends the schema_version sentinel at CURRENT before publishing.
+// Callers pass the body without sentinel; atomicWrite owns the stamping.
 function atomicWrite(filePath: string, content: string): void {
+  const stripped = stripSentinel(content);
+  const stamped = prependSentinel(stripped.body);
   const tmpPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
-  fs.writeFileSync(tmpPath, content, "utf-8");
+  fs.writeFileSync(tmpPath, stamped, "utf-8");
   fs.renameSync(tmpPath, filePath);
 }
 

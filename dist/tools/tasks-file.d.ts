@@ -1,3 +1,4 @@
+import "../schema/migrations-tasks.js";
 export interface TaskRecord {
     id: string;
     description: string;
