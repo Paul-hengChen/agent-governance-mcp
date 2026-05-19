@@ -16,6 +16,11 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.3.0] - 2026-05-19
+
+### Changed
+- Project renamed from `teamwork-mcp-server` to `agent-governance-mcp` — package name, GitHub repo, bin commands (`agent-governance-mcp`, `agent-governance-context`), and all internal references updated.
+
 ## [3.2.0] - 2026-05-18
 
 ### Added — QA-Flow Enforcement
