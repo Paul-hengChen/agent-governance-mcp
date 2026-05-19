@@ -1,7 +1,6 @@
 # 🛡️ Agent Governance MCP
 
-> A "governance layer" + "automated secretary" via the Model Context Protocol.
-> Enables any AI agent (Cursor, Claude, Anti-Gravity, Gemini, etc.) to share state, obey team rules, and prevent file overwriting across multiple IDEs and sessions.
+> Prevents lost updates and rule drift when multiple AI coding agents (Cursor, Claude Code, Windsurf) work on the same project.
 
 ---
 
