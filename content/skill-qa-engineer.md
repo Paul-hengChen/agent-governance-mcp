@@ -11,6 +11,7 @@ Chat output MUST be exactly 1 sentence. Details go in files.
 - **Review before tests**: Always Phase 1 review before Phase 3 tests.
 - **Spec-driven**: Every `specs/<feature>.md` Acceptance Criterion maps to ≥ 1 test. Document the mapping in the review doc.
 - **No simulating sr-engineer**: When awaiting their reply, set `status=Blocked` and STOP. Human must switch roles.
+- **Tests verify intent**: Each test must encode WHY (the contract / invariant), not just WHAT (the behavior). Future readers should understand the purpose without reading the implementation.
 - **Round time-box**: If sr-engineer hasn't replied to a round by your next session, escalate to human. Don't wait silently.
 
 ## Artifact

@@ -16,6 +16,52 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.5.1] - 2026-05-20
+
+### Added — Rule Completeness (Constitution v3.5.1)
+Three gaps in the v3.5.0 fusion (vs the original 12-rule template) closed —
+spec: `specs/constitution-v3.5.1-rule-completeness.md`.
+
+- **§1 Surgical changes** (new bullet, from R3): "Touch only what the task
+  requires. Don't 'improve' adjacent code, comments, or formatting. Clean
+  up only your own mess." Complements `MVP strict` (which limits *what*
+  is added) by limiting *what is edited*.
+- **§2 Match conventions** extended (from R11): "Conformance > personal
+  taste; if a convention is genuinely harmful, surface it — don't fork
+  silently." Prevents agents from quietly drifting from house style.
+- **§7 Fail loud** extended (from R12): `"Tests pass" is wrong if any
+  were skipped.` Explicit qa-engineer guardrail against partial-test PASS.
+
+### Migration
+- Content-only — no code or schema changes. Pin to `#v3.5.1` to receive
+  the updated constitution; agents will see the new rules on next
+  session-start.
+
+## [3.5.0] - 2026-05-20
+
+### Added — Cognitive Discipline (Constitution v3.5.0)
+Cross-references: research `research/claude-md-12-rule-fusion.md`, spec
+`specs/constitution-v3.5-cognitive-discipline.md`. Five high-value rules
+extracted from the 12-rule CLAUDE.md template (R1, R4, R7, R8, R12) and
+fused into a new constitution §7 — ~100-token addition for the
+"thinking quality" dimension the prior process-compliance rules lacked.
+
+- **New §7 Cognitive Discipline** with 5 bullets: Think first,
+  Goal-driven, Surface conflicts, Read before write, Fail loud.
+- **§2 new bullet — Match conventions** (from R11): follow existing
+  codebase style before introducing new patterns; grep when in doubt.
+- **`skill-qa-engineer` new Hard rule — Tests verify intent** (from R9):
+  tests must encode WHY (contract/invariant), not just WHAT.
+
+### Deferred (intentional)
+- R5 (use model only for judgment) — implicitly satisfied by the
+  tool-driven MCP architecture.
+- R6 (token budgets 4k/task, 30k/session) — needs server-side tracking
+  to be enforceable; deferred per research open question #1.
+
+### Migration
+- Content-only — no code or schema changes. No action required.
+
 ## [3.4.0] - 2026-05-20
 
 ### Added — Schema Versioning (Phase 4)

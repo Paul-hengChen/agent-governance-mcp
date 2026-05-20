@@ -1,3 +1,4 @@
+<!-- schema_version: 1 -->
 # Tasks: qa-flow-enforcement
 <!-- feature_id: qa-flow-enforcement | created_at: 2026-05-18 | created_by: @pm | supersedes: qa-gate-enforcement -->
 
@@ -53,6 +54,12 @@
 - [x] T31 [P1] Wire `.current/.config.json` migrations in `tools/config.ts`: add `schema_version` JSON key, register v0→v1 migration (absent → 1), upgrade on first read, atomic write-back (AC-1, AC-2). | depends_on: T27 (note: QA PASS — review at qa_reports/review_T30-T33.md)
 - [x] T32 [P1] Extend `tw_detect_drift` in `tools/drift.ts` to surface version skew across the four artifacts as a distinct drift reason, separate from completed-task drift (AC-6). | depends_on: T28, T29, T30, T31 (note: QA PASS — review at qa_reports/review_T30-T33.md)
 - [x] T33 [P2] Document the migration framework: add `docs/schema-versions.md` (how to author a new migration: bump CURRENT, add Migration object, fixtures), and update `CLAUDE.md` "What this server does" to mention schema versioning. No code changes. | depends_on: T32 (note: QA PASS — review at qa_reports/review_T30-T33.md)
+- [x] T34 [P0] Add §7 Cognitive Discipline to constitution.md (5 bullets: Think first, Goal-driven, Surface conflicts, Read before write, Fail loud) + bump version to v3.5.0 | depends_on: none
+- [x] T35 [P0] Add R11 'Match conventions' bullet to §2 Dev & Tech Standards | depends_on: T34
+- [x] T36 [P1] Add R9 'Tests verify intent' to skill-qa-engineer.md Hard rules | depends_on: T34
+- [x] T37 [P1] Add R3 'Surgical changes — don't touch adjacent code' bullet to constitution §1 | depends_on: none
+- [x] T38 [P1] Extend §7 Fail loud with R12 tests sub-clause ('Tests pass' wrong if skipped) | depends_on: none
+- [x] T39 [P1] Extend §2 Match conventions with R11 conformance>taste + surface-harmful clause; bump header to v3.5.1 | depends_on: none
 
 ## Completed
 
