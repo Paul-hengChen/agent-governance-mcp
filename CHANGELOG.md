@@ -16,6 +16,17 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.7.1] - 2026-05-20
+
+### Changed
+- **`handoff.md` write path emits English headers.** `bin/agc-init.mjs`
+  scaffold and `tools/handoff.ts` `writeHandoffState` now produce
+  `# Handoff State / ## Completed / ## Pending & Handoff Notes` (and
+  `- (none)` empty-section sentinel) instead of the mixed Chinese +
+  English template. Parser keeps bilingual section regex and continues
+  to recognize the legacy `無` sentinel, so existing handoff.md files
+  parse unchanged. No tool surface or schema change.
+
 ## [3.7.0] - 2026-05-20
 
 ### Added
