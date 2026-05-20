@@ -38,7 +38,8 @@ function canLazyReindex(s) {
         typeof rec.upsertPrdChunks === "function");
 }
 // Coordinator does triage; doesn't need PRD chunks. Skip injection there.
-const RAG_SKIP_ROLES = new Set(["teamwork"]);
+// Lite mode is solo-dev direct-execute; also skip.
+const RAG_SKIP_ROLES = new Set(["teamwork", "teamwork-lite"]);
 // Auto-discover fallback order when state.prd_path is absent.
 // Order matters: PRD.md at root is the most common convention; docs/ and
 // specs/ are alternates for repos that segregate documentation.

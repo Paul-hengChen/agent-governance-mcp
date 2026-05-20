@@ -16,6 +16,38 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.6.0] - 2026-05-20
+
+### Added — Lite Mode Coordinator (`/teamwork-lite`)
+First architectural response to the post-fusion value audit
+(`research/value-assessment.md`), which identified the multi-role chain
+as net overhead for solo-dev daily work. Spec:
+`specs/lite-mode-coordinator.md`.
+
+- **New prompt `teamwork-lite`** — solo-dev minimal-overhead entry
+  point. Loads the full constitution (single source of truth preserved)
+  plus a new lighter skill `content/skill-coordinator-lite.md` that
+  documents direct-execute orientation: no `tw_switch_role`, no
+  `tw_detect_drift` by default, no chain routing.
+- **Lite is server-read-only by design.** `tools/transitions.ts`
+  `AgentName` is intentionally unchanged — lite has no valid `agent_id`
+  in the routing chain, so it cannot call `tw_update_state` /
+  `tw_complete_task` / `tw_add_task` / `tw_rollback_task`. This is
+  documented as a hard rule in the skill. Work that needs handoff
+  tracking should use `/teamwork` (full).
+- **`RAG_SKIP_ROLES`** now also skips `teamwork-lite` — triage doesn't
+  need PRD chunks.
+- **6 new integration tests** (`test/teamwork-lite.test.mjs`) exercise
+  the prompt registration, dispatch, RAG skip, and skill content.
+  Total suite: 235/235 pass.
+- **README Step 5** documents when to use lite vs full and what lite
+  skips.
+
+### Migration
+- Additive only — existing prompts and behavior unchanged. Users opt
+  into lite mode by invoking the new prompt; no config flag, no
+  workspace change.
+
 ## [3.5.2] - 2026-05-20
 
 ### Added — YAGNI Single-Use (Constitution v3.5.2)

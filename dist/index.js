@@ -21,6 +21,7 @@ import { buildResearcherPrompt } from "./prompts/researcher.js";
 import { buildPmPrompt } from "./prompts/pm.js";
 import { buildQaEngineerPrompt } from "./prompts/qa-engineer.js";
 import { buildCoordinatorPrompt } from "./prompts/coordinator.js";
+import { buildCoordinatorLitePrompt } from "./prompts/coordinator-lite.js";
 import { buildArchitectPrompt } from "./prompts/architect.js";
 import { switchRole } from "./tools/role.js";
 import { appendSpecContext } from "./prompts/build.js";
@@ -126,7 +127,7 @@ function formatZodError(err) {
 // 1. Initialize Server (Tools + Prompts)
 // ==========================================
 // Storage adapter defaults to FileHandoffStorage; HTTP-mode boot switches it via setActiveStorage().
-const server = new Server({ name: "agent-governance-mcp", version: "3.5.2" }, { capabilities: { tools: {}, prompts: {} } });
+const server = new Server({ name: "agent-governance-mcp", version: "3.6.0" }, { capabilities: { tools: {}, prompts: {} } });
 // ==========================================
 // 2. Register Prompts (Layer 1: Auto-inject constitution)
 // ==========================================
@@ -189,6 +190,17 @@ server.setRequestHandler(ListPromptsRequestSchema, async () => {
                 ],
             },
             {
+                name: "teamwork-lite",
+                description: "Coordinator (lite). Solo-dev mode: direct execution, no chain, no state writes.",
+                arguments: [
+                    {
+                        name: "workspace_path",
+                        description: "Absolute workspace path (optional — defaults to current project dir)",
+                        required: false,
+                    },
+                ],
+            },
+            {
                 name: "architect",
                 description: "Architect role. Write system design, interface contracts.",
                 arguments: [
@@ -223,6 +235,9 @@ server.setRequestHandler(GetPromptRequestSchema, async (request) => {
     }
     else if (name === "teamwork") {
         promptResult = buildCoordinatorPrompt(resolvedPath);
+    }
+    else if (name === "teamwork-lite") {
+        promptResult = buildCoordinatorLitePrompt(resolvedPath);
     }
     else if (name === "architect") {
         promptResult = buildArchitectPrompt(resolvedPath);
