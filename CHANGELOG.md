@@ -16,6 +16,20 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.6.1] - 2026-05-20
+
+### Fixed
+- **`skill-coordinator-lite.md` slimmed** (2502 → 1097 bytes, -56%). The
+  v3.6.0 lite skill was paradoxically *larger* than the full coordinator
+  skill, making the `teamwork-lite` prompt 120 tokens heavier than
+  `teamwork` at load time — contradicting the lite-mode value
+  proposition. Trimmed to essentials while preserving the section
+  contract (`Persona`, `When to use`, `Hard rules`, `SOP`, `Output rule`)
+  the integration tests rely on.
+- **Result**: `teamwork-lite` prompt is now ~228 tokens (-13%) smaller
+  than `teamwork` at load time. Per-task savings (chain skipping) are
+  unchanged from v3.6.0.
+
 ## [3.6.0] - 2026-05-20
 
 ### Added — Lite Mode Coordinator (`/teamwork-lite`)
