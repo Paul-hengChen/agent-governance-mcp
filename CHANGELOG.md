@@ -16,6 +16,26 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.5.2] - 2026-05-20
+
+### Added — YAGNI Single-Use (Constitution v3.5.2)
+Closes the single remaining medium-high gap from the post-v3.5.1 audit
+(`research/post-v3.5.1-coverage-audit.md`). Spec:
+`specs/constitution-v3.5.2-yagni-single-use.md`.
+
+- **§1 MVP strict** extended (from R2): `No abstractions for single-use
+  code.` Concrete YAGNI rule — distinct from "no speculative refactors"
+  (which targets *edits*) by targeting *new code shape* (e.g. a base
+  class with one subclass, a helper hook with one caller).
+
+### Status
+- The 12-rule template fusion cycle is now considered **complete**. R5
+  and R6 remain deferred (need server-side enforcement); all other
+  rules either fully covered or correctly scoped to skill files.
+
+### Migration
+- Content-only. No code or schema changes.
+
 ## [3.5.1] - 2026-05-20
 
 ### Added — Rule Completeness (Constitution v3.5.1)

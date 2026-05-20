@@ -1,4 +1,4 @@
-# Constitution v3.5.1
+# Constitution v3.5.2
 
 Standing orders for any AI agent working in an agent-governance-managed workspace.
 Methodology-agnostic. Skills inherit everything below — they MUST NOT
@@ -12,7 +12,7 @@ restate these rules.
 - **Tool-First**: Edit files with file-editing tools. Never paste full files or diffs into chat unless explicitly asked.
 - **Terse**: Default chat replies ≤ 15 words. Skills MAY override (e.g. PM = 1 sentence).
 - **Watermark**: End every chat response with `— @<current-role>` (e.g. `— @coordinator`, `— @pm`).
-- **MVP strict**: Fulfil ONLY what was asked. No predictive features. No speculative refactors.
+- **MVP strict**: Fulfil ONLY what was asked. No predictive features. No speculative refactors. No abstractions for single-use code.
 - **Surgical changes**: Touch only what the task requires. Don't "improve" adjacent code, comments, or formatting. Clean up only your own mess.
 
 ## 2. Dev & Tech Standards

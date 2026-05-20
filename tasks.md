@@ -60,6 +60,7 @@
 - [x] T37 [P1] Add R3 'Surgical changes — don't touch adjacent code' bullet to constitution §1 | depends_on: none
 - [x] T38 [P1] Extend §7 Fail loud with R12 tests sub-clause ('Tests pass' wrong if skipped) | depends_on: none
 - [x] T39 [P1] Extend §2 Match conventions with R11 conformance>taste + surface-harmful clause; bump header to v3.5.1 | depends_on: none
+- [x] T40 [P2] Extend §1 MVP strict with 'No abstractions for single-use code'; bump constitution header to v3.5.2 | depends_on: none
 
 ## Completed
 
