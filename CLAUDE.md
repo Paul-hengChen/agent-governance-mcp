@@ -20,10 +20,14 @@ Three layers of defense, all in `index.ts`:
 
 1. **Prompts** — thin wrappers around `prompts/build.ts`, which bundles
    `content/constitution.md` + role-specific `content/skill-*.md` + live
-   handoff state. Six roles are registered: the prompt id `teamwork`
-   serves the Coordinator role (`prompts/coordinator.ts` +
-   `content/skill-coordinator.md`); the other five (`sr-engineer`, `pm`,
-   `architect`, `researcher`, `qa-engineer`) use matching file names.
+   handoff state. Seven prompts are registered: `teamwork` serves the
+   full Coordinator (`prompts/coordinator.ts` +
+   `content/skill-coordinator.md`); `teamwork-lite` serves the solo-dev
+   lite mode (`prompts/coordinator-lite.ts` +
+   `content/skill-coordinator-lite.md`, v3.6.0+) — server-read-only by
+   design, no `agent_id` in the routing chain; the other five
+   (`sr-engineer`, `pm`, `architect`, `researcher`, `qa-engineer`) use
+   matching file names.
 2. **Tools** (`tools/{handoff,tasks,tasks-file,drift,role,storage,storage-sqlite,config,transitions,evidence-file,rag,rag-coalesce}.ts`) — ten `tw_*` tools that
    read/write `.current/handoff.md`, `tasks.md`, and (in HTTP/SQLite mode)
    PRD-derived RAG chunks in target workspaces.
@@ -56,6 +60,7 @@ guards/session.ts         per-(process,workspace) snapshot of "agent read state"
 guards/file-lock.ts       cross-process O_EXCL lock with stale-PID detection
 prompts/build.ts          shared buildPromptForRole() — all role prompts call into this
 prompts/coordinator.ts       coordinator role (prompt id is "teamwork" for backwards compat)
+prompts/coordinator-lite.ts  coordinator-lite role (prompt id "teamwork-lite", v3.6.0)
 prompts/sr-engineer.ts    sr-engineer role prompt
 prompts/pm.ts             pm role prompt
 prompts/architect.ts      architect role prompt
@@ -64,6 +69,7 @@ prompts/qa-engineer.ts    qa-engineer role prompt
 bin/agent-governance-context.mjs  SessionStart hook helper (emits additionalContext)
 content/constitution.md   the rules agents must follow (source of truth)
 content/skill-coordinator.md  default coordinator SOP (loaded by SessionStart hook)
+content/skill-coordinator-lite.md  solo-dev lite-mode SOP (v3.6.0)
 content/skill-sr-engineer.md  sr-engineer SOP
 content/skill-pm.md           pm SOP
 content/skill-architect.md    architect SOP
