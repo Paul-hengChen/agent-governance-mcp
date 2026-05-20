@@ -3,9 +3,10 @@
 This file is auto-loaded by Claude Code when working **inside this repo**. It
 describes the project itself (an MCP server). The *rules of conduct* enforced
 by this server live in `content/constitution.md` and the `content/skill-*.md` files;
-those are loaded into other workspaces via role prompts (`teamwork`, `sr-engineer`,
-`pm`, `architect`, `researcher`, `qa-engineer`) or the SessionStart hook — not into this one. This repo is the server's own source,
-not an agent-governance-managed workspace.
+those are loaded into other workspaces via role prompts (`teamwork` for the
+Coordinator role, plus `sr-engineer`, `pm`, `architect`, `researcher`,
+`qa-engineer`) or the SessionStart hook — not into this one. This repo is the
+server's own source, not an agent-governance-managed workspace.
 
 ## What this repo is
 
@@ -17,11 +18,15 @@ no specific project-management framework assumed.
 
 Three layers of defense, all in `index.ts`:
 
-1. **Prompts** (`prompts/{teamwork,sr-engineer,pm,architect,researcher,qa-engineer}.ts`) — thin
-   wrappers around `prompts/build.ts`, which bundles `content/constitution.md` +
-   role-specific `content/skill-*.md` + live handoff state.
-2. **Tools** (`tools/{handoff,tasks,tasks-file,drift,role,storage,storage-sqlite,config}.ts`) — eight `tw_*` tools that
-   read/write `.current/handoff.md` and `tasks.md` in target workspaces.
+1. **Prompts** — thin wrappers around `prompts/build.ts`, which bundles
+   `content/constitution.md` + role-specific `content/skill-*.md` + live
+   handoff state. Six roles are registered: the prompt id `teamwork`
+   serves the Coordinator role (`prompts/coordinator.ts` +
+   `content/skill-coordinator.md`); the other five (`sr-engineer`, `pm`,
+   `architect`, `researcher`, `qa-engineer`) use matching file names.
+2. **Tools** (`tools/{handoff,tasks,tasks-file,drift,role,storage,storage-sqlite,config,transitions,evidence-file,rag,rag-coalesce}.ts`) — ten `tw_*` tools that
+   read/write `.current/handoff.md`, `tasks.md`, and (in HTTP/SQLite mode)
+   PRD-derived RAG chunks in target workspaces.
 3. **Guards** (`guards/{session,file-lock}.ts`) — pre-flight check, file
    lock, mtime freshness check.
 
@@ -36,15 +41,21 @@ index.ts                  MCP server entry: registers prompts, tools, dispatcher
 tools/handoff.ts          read/write .current/handoff.md (uses js-yaml)
 tools/tasks.ts            thin delegator — routes task ops through getActiveStorage()
 tools/tasks-file.ts       file-based task operations (markdown checkbox parsing)
-tools/drift.ts            compare handoff vs tasks for inconsistencies
+tools/drift.ts            compare handoff vs tasks for inconsistencies + drift compression
 tools/role.ts             tw_switch_role — loads role SOP text
 tools/storage.ts          HandoffStorage interface + getActiveStorage()/setActiveStorage()
 tools/storage-sqlite.ts   SQLite implementation of HandoffStorage (HTTP mode)
 tools/config.ts           .current/.config.json loader (taskPattern, taskPaths)
+tools/transitions.ts      ALLOWED_TRANSITIONS state machine (v3.2.0)
+tools/evidence-file.ts    file-mode QA evidence write/check (v3.2.0)
+tools/rag.ts              PRD chunking + embeddings (SQLite mode, v3.3.0)
+tools/rag-coalesce.ts     shared _indexingInFlight registry (v3.3.0)
+schema/versions.ts        schema_version constants + migration registries (v3.4.0)
+schema/migrations-*.ts    handoff / tasks / sqlite / config migration runners (v3.4.0)
 guards/session.ts         per-(process,workspace) snapshot of "agent read state"
 guards/file-lock.ts       cross-process O_EXCL lock with stale-PID detection
 prompts/build.ts          shared buildPromptForRole() — all role prompts call into this
-prompts/coordinator.ts       coordinator prompt (default role on SessionStart)
+prompts/coordinator.ts       coordinator role (prompt id is "teamwork" for backwards compat)
 prompts/sr-engineer.ts    sr-engineer role prompt
 prompts/pm.ts             pm role prompt
 prompts/architect.ts      architect role prompt
@@ -58,6 +69,8 @@ content/skill-pm.md           pm SOP
 content/skill-architect.md    architect SOP
 content/skill-researcher.md   researcher SOP
 content/skill-qa-engineer.md  qa-engineer SOP
+specs/                    design docs (qa-flow, rag-lifecycle, schema-versioning, etc.)
+docs/schema-versions.md   how to ship a new schema version (v3.4.0)
 scripts/check-version.mjs verify package.json version matches index.ts Server() literal
 test/                     unit & integration tests (session, file-lock, handoff, tasks)
 dist/                     compiled output (committed for npx remote usage)

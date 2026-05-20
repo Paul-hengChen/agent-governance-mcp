@@ -16,6 +16,40 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.4.0] - 2026-05-20
+
+### Added — Schema Versioning (Phase 4)
+- **Lazy migrate-on-read** across all four persisted artifacts: handoff YAML
+  frontmatter, `tasks.md` sentinel, SQLite (`PRAGMA user_version`), and
+  `.current/.config.json`. Older files are detected by missing/lower
+  `schema_version` and upgraded transparently on the next read; no manual
+  migration step.
+- New module `schema/versions.ts` (current version constants, registries).
+- New migration runners — `schema/migrations-handoff.ts`,
+  `schema/migrations-tasks.ts`, `schema/migrations-sqlite.ts`,
+  `schema/migrations-config.ts` — each exporting an ordered `MIGRATIONS`
+  array keyed by `from → to`.
+- `tw_detect_drift` now also surfaces schema-version skew (e.g. handoff at
+  v2 but tasks.md still at v1) so cross-artifact drift is visible.
+- New doc `docs/schema-versions.md` explaining how to ship a new schema
+  version (when to bump, where migrations live, test expectations).
+
+### Added — Token-Efficiency Improvements
+- **Drift response compression** (`tools/drift.ts:compressDriftDetails`)
+  collapses repeated drift lines and caps the response payload so
+  `tw_detect_drift` stops bloating per-turn context.
+- **`pending_notes` truncation** (`tools/handoff.ts`) enforces a total
+  character budget on `pending_notes` returned by `readState()`. Older
+  notes are dropped first; truncation metadata is attached so callers can
+  see what was trimmed.
+
+### Migration
+- All format upgrades are read-side and idempotent — no maintenance step
+  required. Files written by older versions continue to load; files
+  written by 3.4.0 carry the new `schema_version` field.
+- SQLite databases gain a `schema_version` row via additive migration on
+  first boot.
+
 ## [3.3.0] - 2026-05-19
 
 ### Changed
