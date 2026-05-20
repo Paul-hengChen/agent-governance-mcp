@@ -55,7 +55,10 @@ function loadContent(filename) {
 }
 
 const constitution = loadContent("constitution.md");
-const skill = loadContent("skill-coordinator.md");
+const skillVariant = process.env.AGC_DEFAULT_SKILL === "full"
+  ? "skill-coordinator.md"
+  : "skill-coordinator-lite.md";
+const skill = loadContent(skillVariant);
 
 if (!constitution || !skill) {
   // Server repo missing or moved — surface a hint instead of injecting nothing.
@@ -83,7 +86,9 @@ const body = [
   "# 🛡️ Agent Governance Auto-Context (SessionStart hook)",
   "",
   "The following constitution and SOP are now in effect for this session.",
-  "You are currently in Coordinator mode. You can execute simple tasks, or advise the user to switch roles via `/pm`, `/architect`, `/researcher`, `/sr-engineer`, or `/qa-engineer`.",
+  skillVariant === "skill-coordinator-lite.md"
+    ? "You are in Coordinator-Lite mode (solo-dev direct-execute). For cross-module work or multi-role chain, the user should invoke `/teamwork` (full mode). Set AGC_DEFAULT_SKILL=full to make full mode the default."
+    : "You are currently in Coordinator mode. You can execute simple tasks, or advise the user to switch roles via `/pm`, `/architect`, `/researcher`, `/sr-engineer`, or `/qa-engineer`.",
   "Call `tw_get_state` before any state-modifying tool.",
   "",
   "---",

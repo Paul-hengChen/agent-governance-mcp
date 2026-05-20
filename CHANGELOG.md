@@ -16,6 +16,36 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.7.0] - 2026-05-20
+
+### Added
+- **`agc init` CLI** (`bin/agc-init.mjs`). Scaffolds an
+  agent-governance-managed workspace in one command:
+  `.current/handoff.md`, `.current/.config.json`, and `tasks.md` with
+  sane defaults. Idempotent — existing files are skipped, no `--force`
+  flag. Wired as the `agc` bin in `package.json`; invoke via
+  `npx -y --package=github:Paul-hengChen/agent-governance-mcp#v3.7.0 agc init`.
+  Closes P0 onboarding item from `research/agc-value-proposition-2026-05-20.md`.
+
+### Changed
+- **SessionStart hook defaults to `skill-coordinator-lite.md`**
+  (`bin/agent-governance-context.mjs`). Solo-dev direct-execute is now
+  the default boot mode; the intro prose names "Coordinator-Lite mode"
+  and points at `/teamwork` for cross-module work. Existing managed
+  workspaces see the lite skill on next session start with no config
+  change.
+- **Full coordinator opt-in via `AGC_DEFAULT_SKILL=full`**. Setting this
+  env var in the Claude Code session env restores the previous full
+  coordinator skill + intro prose verbatim. No breaking change to the
+  `/teamwork` or `/teamwork-lite` prompts themselves — both keep their
+  v3.6.x behavior; only the hook default flipped.
+
+### Tests
+- 8 new tests in `test/p0-onboarding-lite-default.test.mjs` covering
+  scaffold happy path, idempotency, parseHandoff round-trip, bin
+  wiring, both hook variants, and CLI usage/silent-no-op smoke tests.
+  Suite: 243/243 passing.
+
 ## [3.6.1] - 2026-05-20
 
 ### Fixed

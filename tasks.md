@@ -63,6 +63,9 @@
 - [x] T40 [P2] Extend §1 MVP strict with 'No abstractions for single-use code'; bump constitution header to v3.5.2 | depends_on: none
 - [x] T41 [P1] Add /teamwork-lite entry point: skill-coordinator-lite.md + prompts/coordinator-lite.ts + index.ts registration + RAG_SKIP_ROLES update | depends_on: none
 - [x] T42 [P2] README section documenting /teamwork-lite (when to use, what it skips) | depends_on: T41
+- [x] T43 [P0] Implement bin/agc-init.mjs — scaffold .current/handoff.md, .current/.config.json, tasks.md; idempotent (skip existing); exit 0 with summary | depends_on: none
+- [x] T44 [P0] Wire `agc` CLI in package.json bin entry → bin/agc-init.mjs; README quickstart update with `npx agc init` | depends_on: T43
+- [x] T45 [P0] SessionStart hook: default to skill-coordinator-lite.md; AGC_DEFAULT_SKILL=full env opt-in; update intro prose to "Coordinator-Lite mode" | depends_on: none
 
 ## Completed
 
