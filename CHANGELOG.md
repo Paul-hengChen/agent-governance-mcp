@@ -16,6 +16,8 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.7.2] - 2026-05-21
+
 ### Added
 - **Constitution v3.5.3 — External-reference policy** (`content/constitution.md` §7).
   A spec referencing external artifacts (URLs, Figma/Sketch files, ticket IDs,
