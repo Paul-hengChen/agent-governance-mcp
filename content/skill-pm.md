@@ -29,7 +29,8 @@ Every spec MUST contain these H2 sections, in order:
 
 1. `tw_get_state` → `tw_detect_drift`. Report drift before proceeding.
 2. Review user requirements + any `research/<topic>.md` artifacts.
-3. **Ambiguity Gate**: If requirements are incomplete, conflicting, or unspecified on a load-bearing detail, STOP. Call `tw_update_state(status=Blocked, pending_notes=["PM blocked: ambiguous — <detail>"])`. Do NOT guess.
-4. Write `specs/<feature>.md` using the Spec Schema.
-5. Append tasks via `tw_add_task` (one call per task). If `tasks.md` doesn't exist yet, you may create it directly with the task list, then use `tw_add_task` for additions.
-6. `tw_update_state(active_feature=<name>, status=In_Progress, pending_notes=["next_role: architect" or "next_role: sr-engineer", ...])`. Decide architect vs sr-engineer based on complexity (≥ 3 modules, new data model, or cross-cutting API → architect).
+3. **Resource Audit Gate** (constitution §7 *External-reference policy*): scan every supplied requirement document for external references — grep at minimum for `http(s)://`, `figma`, `sketch`, `mockup`, `設計圖`, `URL`, `link`, `see <ticket>`, `Azure DevOps`, `JIRA`. For EACH hit, the reference is presumed load-bearing. Ask the user per reference: `fetch / index / ignore`. Record the decision inline in the spec's **Dependencies / Prerequisites** section. Do NOT proceed until every hit is classified. Do NOT let architect or sr-engineer silently defer one.
+4. **Ambiguity Gate**: If requirements are incomplete, conflicting, or unspecified on a load-bearing detail, STOP. Call `tw_update_state(status=Blocked, pending_notes=["PM blocked: ambiguous — <detail>"])`. Do NOT guess.
+5. Write `specs/<feature>.md` using the Spec Schema.
+6. Append tasks via `tw_add_task` (one call per task). If `tasks.md` doesn't exist yet, you may create it directly with the task list, then use `tw_add_task` for additions.
+7. `tw_update_state(active_feature=<name>, status=In_Progress, pending_notes=["next_role: architect" or "next_role: sr-engineer", ...])`. Decide architect vs sr-engineer based on complexity (≥ 3 modules, new data model, or cross-cutting API → architect).

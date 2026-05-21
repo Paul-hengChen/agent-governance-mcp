@@ -1,4 +1,4 @@
-# Constitution v3.5.2
+# Constitution v3.5.3
 
 Standing orders for any AI agent working in an agent-governance-managed workspace.
 Methodology-agnostic. Skills inherit everything below — they MUST NOT
@@ -69,6 +69,7 @@ Each role finishes with `tw_update_state` whose `pending_notes` start with `next
 - **Surface conflicts**: When patterns contradict, pick one (more recent / more tested), explain why, flag the other. Don't blend.
 - **Read before write**: Before adding code, read exports, callers, shared utilities. "Looks orthogonal" is not safe.
 - **Fail loud**: "Completed" is wrong if anything was skipped. "Tests pass" is wrong if any were skipped. Default to surfacing uncertainty.
+- **External-reference policy**: A spec referencing external artifacts (URLs, design files like Figma/Sketch, ticket IDs, mockups, "see XYZ for details") is presumed **incomplete** until each reference is either (a) fetched into the workspace, (b) indexed via `tw_index_prd` / equivalent, or (c) user-confirmed as ignorable. No role may unilaterally treat them as out-of-scope. PM owns the initial audit (see skill-pm §Resource Audit Gate); architect must surface any leftover refs in `Deferred Resources`.
 
 ## Document Priority
 

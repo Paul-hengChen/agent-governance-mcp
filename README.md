@@ -174,7 +174,27 @@ Migration runners live under `schema/migrations-*.ts`, keyed by `from → to`.
 `tw_detect_drift` also reports schema-version skew across artifacts. See
 `docs/schema-versions.md` for the upgrade-authoring checklist.
 
-#### (f) Token-Efficiency (v3.4.0)
+#### (f) External-reference Policy (constitution v3.5.3, 2026-05-20)
+The constitution and PM/architect SOPs now enforce a three-way classification
+of every external reference in a PRD (URL, Figma/Sketch mockup, ticket ID,
+"see XYZ" prose):
+
+- **PM Resource Audit Gate** (`skill-pm` SOP step 3): PM greps every supplied
+  requirement doc for `http(s)://`, `figma`, `sketch`, `mockup`, `設計圖`,
+  `URL`, `link`, `Azure DevOps`, `JIRA` and asks the user `fetch / index /
+  ignore` per hit. The decision lands in the spec's *Dependencies /
+  Prerequisites* section before the spec is finalized.
+- **Architect Sanity Gate** (`skill-architect` SOP step 4 + new
+  `Deferred Resources` H2): architect cross-checks every PM-deferred
+  reference against the spec; any spec reference missing from `Deferred
+  Resources` blocks the handoff back to PM.
+- **Constitutional backstop** (§7 *External-reference policy*): no role may
+  unilaterally treat an external reference as out-of-scope.
+
+Closed the failure mode where a Figma URL linked seven times in a PRD shipped
+without ever being fetched (`cde-oobe`, 2026-05-20).
+
+#### (g) Token-Efficiency (v3.4.0)
 Two write-side optimisations stop the governance layer from inflating
 per-turn context:
 

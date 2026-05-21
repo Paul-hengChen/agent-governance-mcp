@@ -16,6 +16,30 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+### Added
+- **Constitution v3.5.3 — External-reference policy** (`content/constitution.md` §7).
+  A spec referencing external artifacts (URLs, Figma/Sketch files, ticket IDs,
+  mockups, "see XYZ" prose) is presumed *incomplete* until each reference is
+  (a) fetched, (b) indexed via `tw_index_prd`, or (c) user-confirmed as
+  ignorable. No role may unilaterally treat a reference as out-of-scope.
+- **`skill-pm` Resource Audit Gate** (new SOP step 3). PM must grep every
+  supplied requirement doc for `http(s)://`, `figma`, `sketch`, `mockup`,
+  `設計圖`, `URL`, `link`, `Azure DevOps`, `JIRA` and ask the user
+  `fetch / index / ignore` per hit before writing the spec. Decisions are
+  recorded in the spec's *Dependencies / Prerequisites* section.
+- **`skill-architect` Deferred Resources section + Sanity Gate** (Artifact
+  Schema + new SOP step 4). Architect must cross-check every PM-deferred
+  reference against the spec and block if any spec reference is missing
+  from `Deferred Resources` — closes the loophole where architect
+  silently dropped a Figma URL during the `cde-oobe` rollout (2026-05-20).
+
+### Why
+First triggered when the CDE OOBE wizard shipped without ever loading the
+Figma mockup linked seven times in the PRD. Architect's own design doc had
+unilaterally declared the link out-of-scope; nothing in the SOPs forced a
+user confirmation. These three changes turn "did anyone fetch the link?"
+into a server-enforced gate via the spec/architecture artifacts.
+
 ## [3.7.1] - 2026-05-20
 
 ### Changed
