@@ -194,7 +194,33 @@ of every external reference in a PRD (URL, Figma/Sketch mockup, ticket ID,
 Closed the failure mode where a Figma URL linked seven times in a PRD shipped
 without ever being fetched (`cde-oobe`, 2026-05-20).
 
-#### (g) Token-Efficiency (v3.4.0)
+#### (g) `design-auditor` role + design-source detection (v3.8.0, 2026-05-21)
+A source-agnostic optional pre-PM role that closes the *"design was
+never read"* gap for UI-bearing work:
+
+- **Coordinator Design-source detection** (`skill-coordinator` new
+  section): every incoming PRD / ticket / user prompt is scanned for
+  host patterns (`figma.com`, `sketch.cloud`, `xd.adobe.com`,
+  `penpot.app`, `marvelapp`, `invisionapp`, `framer`), file extensions
+  (`.fig`, `.sketch`, `.xd`, `.penpot`, plus mockup-context `.pdf` /
+  `.png` / `.jpg`), and EN / 中文 / 日本語 design keywords (`mockup`,
+  `wireframe`, `設計稿`, `モックアップ`). On hit, the coordinator
+  routes to `design-auditor` *before* PM. On miss, the auditor's
+  skill is never loaded — zero per-prompt cost.
+- **`design-auditor` extracts** `design/<feature>.md` with verbatim
+  *Copy / Strings* (text) and *Visual Tokens* (hex / sp / dp /
+  weight / radius literals) tables. Mode-aware: prefers the matching
+  MCP tool when available (Figma MCP, etc.) and falls back to
+  `authored-here` annotations for OCR / paper / whiteboard sources.
+- **PM consumes** the audit verbatim — `skill-pm` SOP step 2 copies
+  the auditor's tables straight into the spec, eliminating the
+  paraphrase failure mode (`"Select your language"` instead of
+  Figma-canonical `"Language"`).
+- **No new MCP tools** — the role reuses the existing `tw_*` surface
+  and adds three `ALLOWED_TRANSITIONS` edges
+  (`null/researcher/pm → design-auditor`, `design-auditor → pm`).
+
+#### (h) Token-Efficiency (v3.4.0)
 Two write-side optimisations stop the governance layer from inflating
 per-turn context:
 
@@ -502,6 +528,7 @@ flowchart TD
     end
 
     COORD -- "research · investigate\ncompare · feasibility" --> RES
+    COORD -- "design source detected\n(Figma · Sketch · XD · 設計稿 · …)" --> DA
     COORD -- "plan · spec · create tasks\nbreak down" --> PM
     COORD -- "design · architecture\ninterface contract" --> ARCH
     COORD -- "implement · fix\nrefactor · add feature" --> ENG
@@ -511,7 +538,9 @@ flowchart TD
     subgraph PIPELINE ["🔄 Specialist Roles — each follows its own SOP"]
         RES["🔍 researcher\n① tw_get_state → tw_detect_drift\n② web search / file reads\n③ distil → write research/＊.md\n④ tw_update_state"]
 
-        PM["📋 pm\n① tw_get_state → tw_detect_drift\n② ambiguity gate — stop if unclear\n③ write specs/＊.md  ← enforced schema\n④ append tasks.md  ← priority + depends_on\n⑤ tw_update_state"]
+        DA["🎨 design-auditor  (optional — when design source detected)\n① tw_get_state → tw_detect_drift\n② detect mode (figma / sketch / xd / pdf / paper / no-design)\n③ extract verbatim → write design/＊.md\n   · Copy / Strings table\n   · Visual Tokens table\n④ tw_update_state → pm"]
+
+        PM["📋 pm\n① tw_get_state → tw_detect_drift\n② if design/＊.md exists — copy Copy / Visual tables verbatim\n③ ambiguity gate — stop if unclear\n④ write specs/＊.md  ← enforced schema\n⑤ append tasks.md  ← priority + depends_on\n⑥ tw_update_state"]
 
         ARCH["🏗️ architect  (optional — complex features)\n① tw_get_state → tw_detect_drift\n② read specs/＊.md\n③ write specs/＊-architecture.md\n   file list · data structs · interface contracts\n④ tw_update_state"]
 
@@ -520,6 +549,7 @@ flowchart TD
         QA["🧪 qa-engineer\n① tw_get_state → tw_detect_drift\n② Phase 1 — review code\n③ Phase 2 — 3-round discussion  ← time-boxed\n④ Phase 3 — write tests\n   · spec-to-AC mapping\n   · ≥ 80% coverage gate\n   · security smoke tests\n⑤ Phase 4 — run + CI runnability check\n⑥ tw_complete_task / tw_rollback_task\n   tw_update_state"]
     end
 
+    DA --> PM
     PM --> ARCH
     ARCH --> ENG
     ENG --> QA
@@ -640,6 +670,10 @@ A: No, they are complementary. The MCP Server acts as the source of truth, while
 | 8 | QA-flow enforcement (v3.2.0): `ALLOWED_TRANSITIONS` matrix, `agent_id="qa-engineer"` gate, `qa_round` counter, evidence-of-QA | ✅ Done |
 | 9 | RAG lifecycle automation (v3.3.0): lazy auto-reindex in `appendSpecContext`, `prd_path` in handoff state, PASS cleanup GC, tombstone sweep, `tw_clear_prd_chunks` tool | ✅ Done |
 | 9.1 | Token-efficiency improvements — drift response compression + `pending_notes` truncation to reduce per-turn context bloat | ✅ Done |
+| 9.2 | Constitution v3.5.3 — External-reference policy + PM Resource Audit Gate + architect Deferred Resources / Sanity Gate (v3.7.2) | ✅ Done |
+| 9.3 | PM Copy / Strings spec H2 + QA Copy Audit Gate (v3.7.3) | ✅ Done |
+| 9.4 | PM Visual Tokens spec H2 + QA Visual Audit Gate (v3.7.4) | ✅ Done |
+| 9.5 | `design-auditor` role + coordinator design-source detection (v3.8.0) — source-agnostic pre-PM role extracting Copy / Visual tables from Figma / Sketch / XD / Penpot / PDF / image / paper | ✅ Done |
 | 10 | CI/CD hook — auto-update handoff on PR merge | Planning |
 
 ---
@@ -665,8 +699,8 @@ agent-governance-mcp/
 │   └── migrations-{handoff,tasks,sqlite,config}.ts  # lazy migrate-on-read
 ├── transport/                     # HTTP transport (Streamable HTTP + auth/origin guard)
 ├── guards/                        # session.ts (pre-flight), file-lock.ts (O_EXCL)
-├── prompts/                       # teamwork (= coordinator), pm, architect, researcher, sr-engineer, qa-engineer
-├── content/                       # constitution.md + skill-<role>.md (6 roles)
+├── prompts/                       # teamwork (= coordinator), pm, architect, researcher, design-auditor (v3.8.0), sr-engineer, qa-engineer
+├── content/                       # constitution.md + skill-<role>.md (7 roles incl. design-auditor)
 ├── specs/                         # design docs (qa-flow, rag-lifecycle, schema-versioning, etc.)
 ├── docs/schema-versions.md        # how to ship a new schema version (v3.4.0)
 ├── bin/agent-governance-context.mjs       # SessionStart hook helper
