@@ -46,9 +46,15 @@ read it and self-correct. Full matrix: `specs/qa-flow-enforcement-architecture.m
 ## 4. Routing Chain (multi-phase work)
 
 ```
-researcher (optional) → pm → architect (if complex) → sr-engineer → qa-engineer
-                                                            ↑__________|  (Round 1-3 review)
+researcher (optional) → design-auditor (optional) → pm → architect (if complex) → sr-engineer → qa-engineer
+                                                                                       ↑__________|  (Round 1-3 review)
 ```
+
+`design-auditor` fires when the coordinator detects a design source
+(Figma / Sketch / XD / Penpot / mockup attachment / 設計稿 keyword) in the
+incoming PRD / ticket / prompt. It extracts Copy / Strings + Visual
+Tokens tables into `design/<feature>.md`; PM then copies those verbatim
+into the spec. Tasks with no design reference skip the auditor entirely.
 
 Each role finishes with `tw_update_state` whose `pending_notes` start with `next_role: <name>` so the coordinator (or human) knows where to route.
 

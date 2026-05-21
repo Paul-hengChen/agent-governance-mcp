@@ -30,6 +30,7 @@ import { buildQaEngineerPrompt } from "./prompts/qa-engineer.js";
 import { buildCoordinatorPrompt } from "./prompts/coordinator.js";
 import { buildCoordinatorLitePrompt } from "./prompts/coordinator-lite.js";
 import { buildArchitectPrompt } from "./prompts/architect.js";
+import { buildDesignAuditorPrompt } from "./prompts/design-auditor.js";
 import { switchRole, type RoleName } from "./tools/role.js";
 import { appendSpecContext } from "./prompts/build.js";
 import { buildPrdChunks, CHUNKER_VERSION, DEFAULT_EMBEDDING_MODEL } from "./tools/rag.js";
@@ -120,7 +121,7 @@ const AddTaskArgs = z.object({
 
 const SwitchRoleArgs = z.object({
   workspace_path: absoluteWorkspacePath,
-  role: z.enum(["pm", "researcher", "sr-engineer", "qa-engineer", "architect"]),
+  role: z.enum(["pm", "researcher", "design-auditor", "sr-engineer", "qa-engineer", "architect"]),
 });
 
 // Model name allowlist regex: HuggingFace-style "namespace/model-name" with
@@ -165,7 +166,7 @@ function formatZodError(err: z.ZodError): string {
 // ==========================================
 // Storage adapter defaults to FileHandoffStorage; HTTP-mode boot switches it via setActiveStorage().
 const server = new Server(
-  { name: "agent-governance-mcp", version: "3.7.4" },
+  { name: "agent-governance-mcp", version: "3.8.0" },
   { capabilities: { tools: {}, prompts: {} } }
 );
 
@@ -252,6 +253,17 @@ server.setRequestHandler(ListPromptsRequestSchema, async () => {
           },
         ],
       },
+      {
+        name: "design-auditor",
+        description: "Design audit. Extract Copy / Visual tokens from any design source.",
+        arguments: [
+          {
+            name: "workspace_path",
+            description: "Absolute workspace path (optional — defaults to current project dir)",
+            required: false,
+          },
+        ],
+      },
     ],
   };
 });
@@ -280,6 +292,8 @@ server.setRequestHandler(GetPromptRequestSchema, async (request) => {
     promptResult = buildCoordinatorLitePrompt(resolvedPath);
   } else if (name === "architect") {
     promptResult = buildArchitectPrompt(resolvedPath);
+  } else if (name === "design-auditor") {
+    promptResult = buildDesignAuditorPrompt(resolvedPath);
   } else {
     throw new Error(`Prompt not found: ${name}`);
   }
@@ -478,7 +492,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
             role: {
               type: "string",
-              enum: ["pm", "researcher", "sr-engineer", "qa-engineer", "architect"],
+              enum: ["pm", "researcher", "design-auditor", "sr-engineer", "qa-engineer", "architect"],
               description: "Target role to switch into",
             },
           },

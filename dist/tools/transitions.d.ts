@@ -1,4 +1,4 @@
-export type AgentName = "pm" | "researcher" | "architect" | "sr-engineer" | "qa-engineer";
+export type AgentName = "pm" | "researcher" | "design-auditor" | "architect" | "sr-engineer" | "qa-engineer";
 export type StatusName = "In_Progress" | "PASS" | "FAIL" | "Blocked";
 export interface AgentGateResult {
     ok: boolean;

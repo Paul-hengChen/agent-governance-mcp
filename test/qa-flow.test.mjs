@@ -65,6 +65,60 @@ test("validateTransition: null→(researcher, In_Progress) accepted", () => {
   );
 });
 
+test("validateTransition: null→(design-auditor, In_Progress) accepted — coordinator can route to auditor before PM (v3.8.0)", () => {
+  assert.equal(
+    validateTransition({
+      prev: { agent: null, status: null },
+      next: { agent: "design-auditor", status: "In_Progress" },
+      prev_qa_round: 0,
+    }),
+    null,
+  );
+});
+
+test("validateTransition: design-auditor→pm accepted — auditor hands off to PM (v3.8.0)", () => {
+  assert.equal(
+    validateTransition({
+      prev: { agent: "design-auditor", status: "In_Progress" },
+      next: { agent: "pm", status: "In_Progress" },
+      prev_qa_round: 0,
+    }),
+    null,
+  );
+});
+
+test("validateTransition: design-auditor→sr-engineer REJECTED — auditor must go via PM (v3.8.0)", () => {
+  const r = validateTransition({
+    prev: { agent: "design-auditor", status: "In_Progress" },
+    next: { agent: "sr-engineer", status: "In_Progress" },
+    prev_qa_round: 0,
+  });
+  assert.ok(r);
+  assert.equal(r.error, "TRANSITION_REJECTED");
+});
+
+test("validateTransition: researcher→design-auditor accepted — pre-PM chain (v3.8.0)", () => {
+  assert.equal(
+    validateTransition({
+      prev: { agent: "researcher", status: "In_Progress" },
+      next: { agent: "design-auditor", status: "In_Progress" },
+      prev_qa_round: 0,
+    }),
+    null,
+  );
+});
+
+test("validateTransition: pm→design-auditor accepted — PM re-routes when design refs surface late (v3.8.0)", () => {
+  assert.equal(
+    validateTransition({
+      prev: { agent: "pm", status: "In_Progress" },
+      next: { agent: "design-auditor", status: "In_Progress" },
+      prev_qa_round: 0,
+    }),
+    null,
+  );
+});
+
 test("validateTransition: null→(sr-engineer, In_Progress) REJECTED — must start at pm/researcher", () => {
   const r = validateTransition({
     prev: { agent: null, status: null },

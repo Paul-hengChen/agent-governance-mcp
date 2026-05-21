@@ -16,6 +16,52 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.8.0] - 2026-05-21
+
+### Added
+- **`design-auditor` role** — new optional pre-PM role registered in
+  `tools/transitions.ts`, `tools/role.ts`, `prompts/design-auditor.ts`,
+  and `index.ts` prompt list. Reads any design source — Figma, Sketch,
+  Adobe XD, Penpot, PDF mockup, PNG screenshot, paper photo — and
+  produces `design/<feature>.md` with verbatim *Copy / Strings* and
+  *Visual Tokens* tables that PM copies into the spec.
+  Source-agnostic: detects mode from the supplied design surface and
+  picks the matching extraction strategy. Never assumes Figma. Tasks
+  with no design reference skip the auditor entirely (zero per-prompt
+  overhead — the skill is not loaded).
+- **`skill-coordinator` Design-source detection** — coordinator scans
+  every incoming PRD / ticket / user prompt for design-source patterns
+  (`figma.com`, `sketch.cloud`, `xd.adobe.com`, `penpot.app`, `marvelapp`,
+  `invisionapp`, `framer`, `.fig` / `.sketch` / `.xd` / `.penpot`, plus
+  mockup-context `.pdf` / `.png` / `.jpg`, plus EN / 中文 / 日本語
+  design keywords). On hit → routes to `design-auditor` before PM.
+- **ALLOWED_TRANSITIONS** — three new edges:
+  `null → design-auditor:In_Progress` (coordinator entrypoint),
+  `researcher:In_Progress → design-auditor:In_Progress` (chain after
+  researcher), `pm:In_Progress → design-auditor:In_Progress` (PM
+  re-route when refs surface late). Exit edges:
+  `design-auditor:In_Progress → pm:In_Progress` and
+  `design-auditor:Blocked → {design-auditor, pm}:In_Progress`.
+
+### Changed
+- **`skill-pm` SOP step 2** — PM must now copy `design/<feature>.md`'s
+  *Copy / Strings* and *Visual Tokens* tables verbatim into the spec
+  when a design audit exists. Additional entries authored by PM stay
+  flagged `authored-here` per the existing spec schema rule.
+- **Constitution §4 routing chain** — adds the optional design-auditor
+  hop with a one-paragraph explanation of when it fires.
+
+### Token economy
+
+The design-auditor's skill markdown is only loaded when (a) the
+coordinator detects a design source and (b) routes to it via
+`tw_switch_role` or the dedicated prompt. The routine 80% case
+(refactors, infra, bug fixes, server-side work) bypasses it entirely.
+The new skill file is intentionally ≤ 80 lines so even active runs
+stay token-frugal — comparable to `skill-researcher` (24 lines) +
+`skill-pm` (44 lines). No new MCP tools added; the role reuses
+existing `tw_*` surface.
+
 ## [3.7.4] - 2026-05-21
 
 ### Added

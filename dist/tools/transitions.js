@@ -22,20 +22,32 @@ const ALLOWED = new Map([
             { agent: "pm", status: "Blocked" },
             { agent: "researcher", status: "In_Progress" },
             { agent: "researcher", status: "Blocked" },
+            { agent: "design-auditor", status: "In_Progress" },
+            { agent: "design-auditor", status: "Blocked" },
         ]],
     ["researcher:In_Progress", [
             { agent: "pm", status: "In_Progress" },
             { agent: "pm", status: "Blocked" },
             { agent: "researcher", status: "Blocked" },
+            { agent: "design-auditor", status: "In_Progress" },
         ]],
     ["researcher:Blocked", [
             { agent: "researcher", status: "In_Progress" },
+            { agent: "pm", status: "In_Progress" },
+        ]],
+    ["design-auditor:In_Progress", [
+            { agent: "pm", status: "In_Progress" },
+            { agent: "design-auditor", status: "Blocked" },
+        ]],
+    ["design-auditor:Blocked", [
+            { agent: "design-auditor", status: "In_Progress" },
             { agent: "pm", status: "In_Progress" },
         ]],
     ["pm:In_Progress", [
             { agent: "architect", status: "In_Progress" },
             { agent: "sr-engineer", status: "In_Progress" },
             { agent: "researcher", status: "In_Progress" },
+            { agent: "design-auditor", status: "In_Progress" },
             { agent: "pm", status: "Blocked" },
             { agent: "pm", status: "In_Progress" },
         ]],
@@ -85,7 +97,7 @@ function isStatus(s) {
     return s === "In_Progress" || s === "PASS" || s === "FAIL" || s === "Blocked";
 }
 function isAgent(a) {
-    return a === "pm" || a === "researcher" || a === "architect" || a === "sr-engineer" || a === "qa-engineer";
+    return a === "pm" || a === "researcher" || a === "design-auditor" || a === "architect" || a === "sr-engineer" || a === "qa-engineer";
 }
 function rejection(req, error, allowed, hint) {
     return {

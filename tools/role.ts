@@ -18,6 +18,7 @@ const CONTENT_DIR = fs.existsSync(path.join(PROJECT_ROOT, "content"))
 const ROLE_SKILL_MAP = {
   "pm": "skill-pm.md",
   "researcher": "skill-researcher.md",
+  "design-auditor": "skill-design-auditor.md",
   "sr-engineer": "skill-sr-engineer.md",
   "qa-engineer": "skill-qa-engineer.md",
   "architect": "skill-architect.md",

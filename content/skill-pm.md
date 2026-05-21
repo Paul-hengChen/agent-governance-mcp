@@ -30,7 +30,7 @@ Every spec MUST contain these H2 sections, in order:
 ## SOP
 
 1. `tw_get_state` → `tw_detect_drift`. Report drift before proceeding.
-2. Review user requirements + any `research/<topic>.md` artifacts.
+2. Review user requirements + any `research/<topic>.md` and `design/<feature>.md` artifacts. **If `design/<feature>.md` exists** (the coordinator routed through `design-auditor`), copy its *Copy / Strings* and *Visual Tokens* tables verbatim into your spec — do NOT paraphrase. Add additional entries only for strings/tokens the auditor did not surface; flag those as `authored-here`.
 3. **Resource Audit Gate** (constitution §7 *External-reference policy*): scan every supplied requirement document for external references — grep at minimum for `http(s)://`, `figma`, `sketch`, `mockup`, `設計圖`, `URL`, `link`, `see <ticket>`, `Azure DevOps`, `JIRA`. For EACH hit, the reference is presumed load-bearing. Ask the user per reference: `fetch / index / ignore`. Record the decision inline in the spec's **Dependencies / Prerequisites** section. Do NOT proceed until every hit is classified. Do NOT let architect or sr-engineer silently defer one.
 4. **Ambiguity Gate**: If requirements are incomplete, conflicting, or unspecified on a load-bearing detail, STOP. Call `tw_update_state(status=Blocked, pending_notes=["PM blocked: ambiguous — <detail>"])`. Do NOT guess.
 5. Write `specs/<feature>.md` using the Spec Schema.
