@@ -16,6 +16,28 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.7.3] - 2026-05-21
+
+### Added
+- **`skill-pm` Copy / Strings H2** (Spec Schema). Every spec must now
+  enumerate every user-facing string the feature introduces or changes
+  in a 3-column table `string id | exact text | source`. *Source* must
+  be a PRD section number, a Figma node id, a CSV/ticket ref, or the
+  literal token `authored-here` with a one-line justification. PM
+  blocks if any string lacks a source.
+- **`skill-qa-engineer` Copy Audit Gate** (Phase 1 step 3a). QA now
+  greps the source tree for each spec'd string and FAILs on either
+  drift (impl ≠ spec) or coverage gap (impl introduces a string not in
+  the spec — bounces back to PM, not sr-engineer).
+
+### Why
+The `cde-oobe` implementation shipped titles like `"Select your language"`
+that the engineer (correctly) had no source for — the PRD only said
+"功能：選取系統主要語系". The Figma title was literally `"Language"`.
+Stylistic ACs (font/color/size) passed cleanly because they tested
+the *style*, not the *text*. v3.5.3 closed the "did anyone fetch the
+design?" gap; v3.7.3 closes the "did anyone audit the words?" gap.
+
 ## [3.7.2] - 2026-05-21
 
 ### Added

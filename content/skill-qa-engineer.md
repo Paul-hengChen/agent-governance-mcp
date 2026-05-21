@@ -25,6 +25,12 @@ All review notes, questions, and bug reports → `qa_reports/review_<task-id>.md
 
 3. **Phase 1 — Review**: Read the implementation. Check correctness, edge cases, security. Write findings to `qa_reports/review_<task-id>.md`.
 
+   3a. **Copy Audit Gate**: open the spec's *Copy / Strings* H2 (required by skill-pm). For every entry, verify the implementation renders the documented text verbatim — grep the source tree for the string id AND for the documented text. Two failure modes:
+   - **Drift**: implementation text ≠ spec text → FAIL back to sr-engineer with the diff (escalate to Phase 2 round 1, do NOT proceed to Phase 3).
+   - **Coverage gap**: implementation introduces a user-facing string not listed in the spec → FAIL back to PM (`["QA: copy gap — '<text>' in <file> missing from spec Copy/Strings", "next_role: pm"]`). Do NOT let the spec ratify post-hoc; force PM to source the string.
+
+   Rationale: stylistic ACs (font, color, position) pass without catching paraphrased prose. The Copy Audit Gate is the only step that compares rendered text to the design contract.
+
 4. **Phase 2 — Discussion (only if issues found)**:
    - Append questions/concerns to the review doc under `## Round 1`.
    - `tw_update_state(status=Blocked, agent_id="qa-engineer", pending_notes=["Waiting for sr-engineer Round <N>", "next_role: sr-engineer"])`. STOP.

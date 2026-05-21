@@ -15,6 +15,7 @@ Every spec MUST contain these H2 sections, in order:
 - **Problem Statement** — one paragraph.
 - **User Stories** — `As a <user>, I want <goal>, so that <value>.`
 - **Acceptance Criteria** — BDD: `Given / When / Then`. Each AC must be testable.
+- **Copy / Strings** — every user-facing string the feature introduces or changes, in a 3-column table `string id | exact text (quote verbatim) | source`. *Source* MUST be one of: (a) a PRD section number, (b) a Figma node id, (c) a CSV / ticket reference, or (d) the literal token `authored-here` followed by a one-line justification. If a string has no canonical source AND you have not authored it deliberately, STOP — call `tw_update_state(status=Blocked, pending_notes=["PM blocked: copy missing source for <string id>"])`. Reason: implementations otherwise paraphrase from requirement prose, which silently drifts from the design (cde-oobe shipped `"Select your language"` because nobody pinned the Figma title `"Language"` in this section).
 - **Out of Scope** — explicit exclusions.
 - **Dependencies / Prerequisites** — blocking tasks or conditions.
 
