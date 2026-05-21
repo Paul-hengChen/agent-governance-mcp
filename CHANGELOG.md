@@ -16,6 +16,35 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.7.4] - 2026-05-21
+
+### Added
+- **`skill-pm` Visual Tokens H2** (Spec Schema, between Copy / Strings
+  and Out of Scope). Every concrete literal-valued visual property —
+  hex color, sp font size, dp dimension, weight, radius, stroke,
+  opacity — must be enumerated in a 4-column table `token id |
+  property | value | source` with the source quoted from a Figma node
+  id, fill / text-style name, design-system token name, or
+  `authored-here` with a one-line justification. Layout proportions
+  (`weight(1f)`), runtime values, and platform defaults are explicitly
+  excluded. PM blocks if any literal lacks a source.
+- **`skill-qa-engineer` Visual Audit Gate** (Phase 1 step 3b). QA
+  greps the source tree for each spec'd literal and FAILs on drift
+  (impl ≠ spec), coverage gap (impl literal missing from spec —
+  bounces to PM), or — when Figma MCP is available — source rot
+  (Figma value changed after spec was written).
+
+### Why
+v3.7.3's Copy Audit Gate fixed text drift. Visual properties (colors,
+spacing, typography literals) still relied on PM-authored stylistic
+ACs, which only catch what the spec already enumerates. An unsourced
+hex slipping into `OobeTheme.kt` — exactly what kicked off the
+`cde-oobe-figma-alignment` re-work — stayed invisible. v3.7.4 makes
+every literal a tracked, sourced contract, audited at QA time. This is
+the cheapest of the four design-fidelity options surveyed in
+`research/design-fidelity-enforcement.md`; pixel-baseline approaches
+(Paparazzi against Figma exports) remain out of scope.
+
 ## [3.7.3] - 2026-05-21
 
 ### Added

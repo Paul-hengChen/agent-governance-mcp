@@ -31,6 +31,13 @@ All review notes, questions, and bug reports → `qa_reports/review_<task-id>.md
 
    Rationale: stylistic ACs (font, color, position) pass without catching paraphrased prose. The Copy Audit Gate is the only step that compares rendered text to the design contract.
 
+   3b. **Visual Audit Gate**: open the spec's *Visual Tokens* H2 (required by skill-pm). For every entry, verify the implementation declares the documented value verbatim — grep the source tree for the property's literal (e.g. `0xFF2A2A2A`, `32.sp`, `184.dp`, `FontWeight.Bold`). Three failure modes:
+   - **Drift**: implementation literal ≠ spec literal → FAIL back to sr-engineer with the diff. Stylistic AC tests like `OobeThemeTokensTest` catch drift after the spec is right; the gate catches the inverse — when code is right but spec was stale, OR when code paraphrased the spec (e.g. `#3D5BAB` instead of `#3C5AAA`).
+   - **Coverage gap**: implementation hard-codes a literal property not listed in the spec → FAIL back to PM (`["QA: visual token gap — '<property>=<value>' in <file> missing from spec Visual Tokens", "next_role: pm"]`). Do NOT let the spec ratify post-hoc; force PM to source the token.
+   - **Source rot** (when feasible): if the spec cites a Figma node id and the team has Figma MCP access, sample at least one cited token by fetching the node; flag drift to PM rather than blocking the build.
+
+   Rationale: stylistic ACs only verify what the spec already enumerates. Without an explicit "every concrete literal must be sourced" gate, an unsourced hex / dp / sp / weight slipping into theme files goes undetected (this is the failure mode that drove the cde-oobe Figma re-alignment cycle). Layout proportions and platform defaults are out of scope for this gate by design — only literal-valued tokens are checked.
+
 4. **Phase 2 — Discussion (only if issues found)**:
    - Append questions/concerns to the review doc under `## Round 1`.
    - `tw_update_state(status=Blocked, agent_id="qa-engineer", pending_notes=["Waiting for sr-engineer Round <N>", "next_role: sr-engineer"])`. STOP.
