@@ -20,6 +20,11 @@ const PROJECT_ROOT = path.resolve(path.dirname(__filename), "..");
 
 const AUDITOR_PATH = path.join(PROJECT_ROOT, "content", "skill-design-auditor.md");
 const QA_PATH = path.join(PROJECT_ROOT, "content", "skill-qa-engineer.md");
+// v3.8.3 split: Phase 1.5 SOP body moved to skill-qa-visual.md. The QA
+// engineer file now only holds the lazy-load hook. Tests that assert
+// Phase 1.5 *content* must read the sub-skill; tests that assert the
+// *hook* still read QA_PATH.
+const QA_VISUAL_PATH = path.join(PROJECT_ROOT, "content", "skill-qa-visual.md");
 
 test("AC-1: design-auditor Artifact Schema declares OPTIONAL Visual Baselines H2 with 4-col schema", () => {
   // Why: AC-1 anchors the entire Phase 2 contract on a single schema entry.
@@ -63,8 +68,8 @@ test("AC-3: per-row compare contract reads both PNGs and emits 6-category diff i
   // QA agents will paraphrase impressions instead of comparing pixels.
   // The 6 categories are load-bearing: omitting "text content" loses the
   // copy-drift catch; omitting "spacing/alignment" loses the original Phase
-  // 2 motivation.
-  const body = fs.readFileSync(QA_PATH, "utf-8");
+  // 2 motivation. v3.8.3 split: this content lives in skill-qa-visual.md.
+  const body = fs.readFileSync(QA_VISUAL_PATH, "utf-8");
 
   // Read both files via Read tool
   assert.match(body, /Read both.*baseline path.*impl path.*via the Read tool/is, "both PNGs must be Read via the Read tool");
@@ -90,7 +95,8 @@ test("AC-4: three distinct failure routes (drift → sr-engineer; missing baseli
   // (they declared the path), a missing impl is the sr-engineer's (they
   // claimed ready-for-QA), and drift is the sr-engineer's (the code drifted).
   // Confusing these routes makes the wrong role get paged and slows resolution.
-  const body = fs.readFileSync(QA_PATH, "utf-8");
+  // v3.8.3 split: failure routes live in skill-qa-visual.md.
+  const body = fs.readFileSync(QA_VISUAL_PATH, "utf-8");
 
   // Drift → sr-engineer
   assert.match(body, /Drift.*visual drift.*next_role:\s*sr-engineer/is, "drift route must target sr-engineer");
@@ -106,16 +112,17 @@ test("AC-5: gating logic is source-agnostic (no Figma-only assumptions)", () => 
   // Why: Phase 1's source-agnostic promise (Sketch / XD / Penpot / PDF /
   // mockup / photo) must extend into Phase 2 — otherwise teams that don't
   // use Figma get a half-feature. Both files must avoid Figma-only narration
-  // in the gating logic.
+  // in the gating logic. v3.8.3 split: the source-agnostic claim lives in
+  // skill-qa-visual.md's Rationale paragraph.
   const auditor = fs.readFileSync(AUDITOR_PATH, "utf-8");
-  const qa = fs.readFileSync(QA_PATH, "utf-8");
+  const qaVisual = fs.readFileSync(QA_VISUAL_PATH, "utf-8");
 
   // Auditor Visual Baselines lists multiple sources
   for (const source of ["Figma", "Sketch", "XD", "Penpot", "PDF", "mockup", "photo"]) {
     assert.ok(auditor.includes(source), `Visual Baselines must mention ${source}`);
   }
-  // QA Phase 1.5 explicitly claims source-agnosticism
-  assert.match(qa, /Source-agnostic.*any image format/is, "QA Phase 1.5 must claim source-agnosticism");
+  // QA Phase 1.5 sub-skill explicitly claims source-agnosticism
+  assert.match(qaVisual, /Source-agnostic.*any image format/is, "qa-visual sub-skill must claim source-agnosticism");
 });
 
 test("AC-6: backwards-compat with v3.8.1 audits (no Visual Baselines = silent skip)", () => {
@@ -132,21 +139,18 @@ test("AC-6: backwards-compat with v3.8.1 audits (no Visual Baselines = silent sk
   assert.ok(absentIdx > 0 && presentIdx > absentIdx, "Absent branch must precede Present branch (safety default)");
 });
 
-test("AC-7: version literals stay coherent across package.json, index.ts, dist/index.js, CHANGELOG at 3.8.2", () => {
-  // Why: same invariant as v3.8.1 t6 — the server is consumed via tagged npx;
-  // if package.json says one version but the running server reports another,
-  // upstream clients pin one artifact and run a different one. This test
-  // extends the t6 invariant to 3.8.2 so future bumps keep all four sources
-  // synced.
-  const pkg = JSON.parse(fs.readFileSync(path.join(PROJECT_ROOT, "package.json"), "utf-8"));
-  const indexTs = fs.readFileSync(path.join(PROJECT_ROOT, "index.ts"), "utf-8");
-  const distJs = fs.readFileSync(path.join(PROJECT_ROOT, "dist", "index.js"), "utf-8");
+test("AC-7: v3.8.2 release entry is preserved in CHANGELOG (regression guard)", () => {
+  // Why: this test was written at the moment of the v3.8.2 release. Once
+  // shipped, its real job is to guard the [3.8.2] CHANGELOG entry against
+  // accidental deletion in future bumps (history must be append-only). The
+  // current-version coherence invariant is owned by the latest release's own
+  // test file (e.g. test/qa-visual-skill-split.test.mjs covers 3.8.3), so
+  // pinning package.json here would force this test to break every release.
+  // Same pattern as the v3.8.1 → v3.8.2 relaxation in
+  // test/pixel-perfect-design-coverage.test.mjs.
   const changelog = fs.readFileSync(path.join(PROJECT_ROOT, "CHANGELOG.md"), "utf-8");
 
-  assert.equal(pkg.version, "3.8.2", "package.json must be 3.8.2");
-  assert.match(indexTs, /name:\s*"agent-governance-mcp",\s*version:\s*"3\.8\.2"/, "index.ts Server literal must be 3.8.2");
-  assert.match(distJs, /name:\s*"agent-governance-mcp",\s*version:\s*"3\.8\.2"/, "dist/index.js (build output) must be 3.8.2");
-  assert.match(changelog, /^##\s*\[3\.8\.2\]/m, "CHANGELOG must carry [3.8.2] release section");
+  assert.match(changelog, /^##\s*\[3\.8\.2\]/m, "CHANGELOG must retain [3.8.2] release section");
 });
 
 test("regression: QA SOP step numbering is sequential 1..7 with no duplicates", () => {

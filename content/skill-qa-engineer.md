@@ -38,18 +38,9 @@ All review notes, questions, and bug reports → `qa_reports/review_<task-id>.md
 
    Rationale: stylistic ACs only verify what the spec already enumerates. Without an explicit "every concrete literal must be sourced" gate, an unsourced hex / dp / sp / weight slipping into theme files goes undetected (this is the failure mode that drove the cde-oobe Figma re-alignment cycle). Layout proportions and platform defaults are out of scope for this gate by design — only literal-valued tokens are checked.
 
-4. **Phase 1.5 — Visual Compare** (skip-if-absent): after Phase 1 PASS (3a + 3b), before Phase 2. Read `design/<feature>.md` for a `## Visual Baselines` H2 section.
-   - **Absent** → log `Phase 1.5: skipped (no Visual Baselines declared)` in the review doc and proceed to Phase 2. Non-UI features pay zero overhead.
-   - **Present** → for each row (`surface id | baseline path | impl path | notes`):
-     a. Read both `baseline path` and `impl path` via the Read tool. Both files are images; the Read tool renders them into the agent's multimodal context.
-     b. Emit a structured diff covering: (i) layout / position, (ii) spacing / alignment, (iii) element presence (missing or extra), (iv) color (where visually distinguishable), (v) text content (rendered string), (vi) image content where the surface contains photos / icons. Append the diff to `qa_reports/review_<task-id>.md` under a `## Phase 1.5 — Visual Compare` heading, with one sub-section per `surface id`.
-   - **Failure modes**:
-     - **Drift** (≥ 1 visual difference) → `tw_rollback_task(<task-id>, "QA: Phase 1.5 visual drift")` → `tw_update_state(status=FAIL, agent_id="qa-engineer", qa_review=<diff>, pending_notes=["QA: <task-id> Phase 1.5 FAIL — visual drift", "next_role: sr-engineer"])`. STOP.
-     - **Missing baseline file** (`baseline path` not on disk) → `tw_update_state(status=FAIL, agent_id="qa-engineer", qa_review=<missing path>, pending_notes=["QA: missing baseline — <path>", "next_role: design-auditor"])`. STOP.
-     - **Missing impl file** (`impl path` not on disk despite sr-engineer's "ready for QA") → `tw_update_state(status=FAIL, agent_id="qa-engineer", qa_review=<missing path>, pending_notes=["QA: missing impl screenshot — <path>", "next_role: sr-engineer"])`. STOP.
-   - **PASS sub-verdict** (no differences across all rows) → proceed to Phase 2.
-
-   Rationale: the literal Visual Audit Gate (3b) only catches drift on tokens the spec enumerated. Phase 1.5 catches the orthogonal class — non-literal visual drift (layout, spacing, alignment, missing elements, ~5px-grade positioning) — by leveraging the QA agent's multimodal vision against a user-supplied baseline image. Source-agnostic: any image format the design source produced is consumable.
+4. **Phase 1.5 — Visual Compare** (lazy-load, skip-if-absent): after Phase 1 PASS (3a + 3b), before Phase 2. Check `design/<feature>.md` for a `## Visual Baselines` H2.
+   - **Absent** (or no design file) → log `Phase 1.5: skipped (no Visual Baselines declared)` in the review doc and proceed to Phase 2. Do NOT Read `content/skill-qa-visual.md`. Non-UI features pay zero overhead.
+   - **Present** → Read `content/skill-qa-visual.md` (via the Read tool) and follow its SOP for each baseline row. The sub-skill carries the per-row Read+vision-diff contract, the six diff categories, and the three failure routes.
 
 5. **Phase 2 — Discussion (only if issues found)**:
    - Append questions/concerns to the review doc under `## Round 1`.

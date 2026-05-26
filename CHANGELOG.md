@@ -16,6 +16,41 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.8.3] - 2026-05-26
+
+### Changed
+- **`skill-qa-visual.md` extracted from `skill-qa-engineer.md`** — the
+  v3.8.2 Phase 1.5 SOP block (skip-if-absent gate, six diff categories,
+  three failure routes, PASS sub-verdict, rationale) was moved verbatim
+  into a new `content/skill-qa-visual.md`. `skill-qa-engineer.md` step 4
+  shrinks to a 3-line lazy-load hook that instructs the agent to Read
+  the sub-skill *only* when `design/<feature>.md` declares a
+  `## Visual Baselines` H2.
+- **Token impact** — non-UI workspaces (server logic, CLI, this MCP
+  repo) save ~300 input tokens on every qa-engineer load. UI workspaces
+  pay roughly the v3.8.2 total: the Read brings the sub-skill into
+  context on demand. Motivated by
+  `research/skill-token-cost-and-pixel-perfect-success-rate.md`
+  § Recommendation watch-item (`skill-qa-engineer.md` was 2.17K tokens,
+  27% larger than the next-biggest skill).
+
+### Backwards-compatible
+- Phase 1.5 contract is unchanged: same skip-if-absent gating, same six
+  diff categories, same three failure routes (visual drift → sr-engineer,
+  missing baseline → design-auditor, missing impl → sr-engineer), same
+  PASS sub-verdict. v3.8.2 `design/<feature>.md` files with Visual
+  Baselines declarations execute the same protocol.
+- No server tool surface, prompt schema, ALLOWED_TRANSITIONS, or
+  handoff/state format change. No new role registered. Pure SOP-text
+  reorganisation.
+- SOP step numbering 1..7 in `skill-qa-engineer.md` is preserved; Phase
+  N labels remain stable so internal cross-refs keep working.
+
+### Notes
+- Spec: `specs/qa-visual-skill-split.md`.
+- Mechanism chosen: SOP-only lazy Read (rejected alternatives:
+  server-side conditional inject, separate role with `tw_switch_role`).
+
 ## [3.8.2] - 2026-05-26
 
 ### Changed

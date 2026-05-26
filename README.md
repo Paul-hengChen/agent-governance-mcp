@@ -267,7 +267,30 @@ multi-pass did not address:
   capability is provided by the QA agent's host LLM (Claude / Gemini
   / GPT-class); the Figma REST API is NOT a runtime dependency.
 
-#### (j) Token-Efficiency (v3.4.0)
+#### (j) `qa-visual` sub-skill split (v3.8.3, 2026-05-26)
+Token-efficiency follow-up to v3.8.2 — the qa-engineer skill grew to
+2.17K tokens (27% larger than the next-biggest skill) because Phase 1.5
+Visual Compare was inlined. Now the visual sub-phase lives in its own
+file and is Read on demand:
+
+- **`content/skill-qa-visual.md`** carries the verbatim v3.8.2 Phase 1.5
+  SOP (gate / 6 diff categories / 3 failure routes / PASS sub-verdict
+  / rationale).
+- **`skill-qa-engineer.md` SOP step 4** is now a 3-line lazy-load hook
+  that Reads `content/skill-qa-visual.md` *only* when
+  `design/<feature>.md` declares a `## Visual Baselines` H2.
+- **Token impact** — non-UI workspaces (server logic, CLI, this MCP
+  repo) save ~300 input tokens per qa-engineer load forever. UI
+  workspaces pay roughly the v3.8.2 total: the Read brings the
+  sub-skill into context exactly when needed.
+- **Backwards-compatible** — Phase 1.5 contract is unchanged. Same
+  skip-if-absent gating, same diff categories, same failure routes,
+  same PASS sub-verdict. v3.8.2 `design/<feature>.md` files keep
+  working without migration.
+- **SOP-only delivery** — no new `tw_*` tool, no `prompts/build.ts`
+  change, no transitions edit. Pure markdown reorganisation.
+
+#### (k) Token-Efficiency (v3.4.0)
 Two write-side optimisations stop the governance layer from inflating
 per-turn context:
 
