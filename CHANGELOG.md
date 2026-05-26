@@ -16,6 +16,85 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.8.2] - 2026-05-26
+
+### Changed
+- **`design-auditor` Artifact Schema** (`content/skill-design-auditor.md`): new
+  OPTIONAL `**Visual Baselines**` H2 section. 4-column table
+  `surface id | baseline path | impl path | notes`. `surface id` MUST match a
+  *Source manifest* row; `baseline path` is workspace-relative to whatever
+  image file the design source produced (Figma / Sketch / XD / Penpot export,
+  PDF page rendered to PNG, raw mockup file, photo); `impl path` is
+  workspace-relative to where the QA agent expects the implementation
+  screenshot at QA time. Absence of the section is the explicit no-op signal
+  to QA Phase 1.5.
+- **`skill-qa-engineer` SOP** — new step 4 `**Phase 1.5 — Visual Compare**`
+  inserted between Phase 1 (3a Copy Audit / 3b Visual Audit) and Phase 2.
+  Skip-if-absent gating against `design/<feature>.md` *Visual Baselines*.
+  For each row, QA Reads both PNGs (multimodal context) and emits a
+  structured diff covering layout / spacing / alignment / element presence
+  / color / text / image content into the review doc. Three failure routes:
+  visual drift → sr-engineer; missing baseline file → design-auditor;
+  missing impl file → sr-engineer. Prior steps 4–6 renumber to 5–7
+  (`Phase 2 — Discussion`, `Phase 3 — Tests`, `Phase 4 — Run`); the
+  *Phase N* labels are unchanged so internal cross-refs remain stable.
+
+### Backwards-compatible
+- `design/<feature>.md` files written under v3.8.1 (Source manifest present,
+  no Visual Baselines section) cause QA Phase 1.5 to skip silently — no
+  retroactive migration. Phase 1 behavior is unchanged.
+- Non-UI features (server logic, CLI tools, this MCP repo) pay zero
+  Phase 1.5 overhead because they declare no Visual Baselines.
+- Server tool surface unchanged. No new `tw_*` tool, no
+  ALLOWED_TRANSITIONS edits, no handoff/state format change. Pure
+  skill-text refinement.
+
+### Notes
+- Phase 2 of `research/pixel-perfect-and-design-coverage.md` — the
+  vision-LLM screenshot-compare arm. Phase 3 (Playwright VRT) remains
+  out of scope.
+- SOP-only delivery (no `tw_visual_compare` tool); vision capability is
+  provided by the QA agent's host LLM, not via the Figma REST API or any
+  pixel-diff library.
+- Spec: `specs/pixel-perfect-visual-compare.md`.
+
+## [3.8.1] - 2026-05-26
+
+### Changed
+- **`design-auditor` Source manifest is now exhaustive + status-tagged**
+  (`content/skill-design-auditor.md` Artifact Schema): every surface in
+  the design source (Figma frame, Sketch / XD artboard, Penpot board,
+  PDF page, image / photo file) MUST appear in the manifest, tagged
+  `status: audited | deferred | out-of-scope` with a one-line reason for
+  non-`audited` rows. Replaces the old behaviour of audit-only-task-
+  referenced-frames + cite-the-rest-in-Out-of-Scope, which silently
+  dropped frames the task description did not name.
+- **`design-auditor` multi-pass is now explicit** — Hard rules upgraded
+  from single-pass `Token-frugal` to `Token-frugal multi-pass`: ≤ 250
+  lines per pass, up to 5 passes per feature, each follow-up pass MUST
+  flip ≥ 1 `deferred` row to `audited`. No-op passes forbidden
+  (constitution §5 anti-loop).
+- **`skill-pm` Deferred-surface gate** (`content/skill-pm.md` SOP step 2):
+  PM MUST enumerate every `status: deferred` manifest row (pointer +
+  reason) under the spec's *Dependencies / Prerequisites* section, so
+  the team knows which surfaces ship without coverage.
+
+### Backwards-compatible
+- Older `design/<feature>.md` artifacts written before v3.8.1 lack the
+  status column and require no retroactive migration. Downstream roles
+  treat the listed surfaces as `audited` and any unknown surfaces as
+  `unknown`.
+- `no-design` mode is unchanged: empty manifest, single pass, no gate
+  activation.
+- Server tool surface unchanged. No prompt schema, ALLOWED_TRANSITIONS,
+  or handoff/state format change. Pure skill-text refinement.
+
+### Notes
+- Phase 1 of `research/pixel-perfect-and-design-coverage.md`. Phase 2
+  (vision-LLM screenshot compare) and Phase 3 (Playwright VRT) remain
+  out of scope.
+- Spec: `specs/pixel-perfect-design-coverage.md`.
+
 ## [3.8.0] - 2026-05-21
 
 ### Added

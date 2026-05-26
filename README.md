@@ -220,7 +220,54 @@ never read"* gap for UI-bearing work:
   and adds three `ALLOWED_TRANSITIONS` edges
   (`null/researcher/pm → design-auditor`, `design-auditor → pm`).
 
-#### (h) Token-Efficiency (v3.4.0)
+#### (h) `design-auditor` multi-pass + Source manifest (v3.8.1, 2026-05-26)
+Closes the *"frames silently dropped"* coverage gap surfaced by
+`research/pixel-perfect-and-design-coverage.md`:
+
+- **Exhaustive *Source manifest***: the auditor now lists **every**
+  surface in the design source (Figma frame / Sketch artboard / XD
+  artboard / Penpot board / PDF page / image file), each tagged
+  `status: audited | deferred | out-of-scope` with a one-line reason.
+  Surfaces no longer disappear into *Out of Scope* by omission.
+- **Multi-pass audit**: when a design cannot fit in one ≤ 250-line
+  pass, the auditor may run additional passes (hard ceiling: 5 per
+  feature, constitution §5 anti-loop). Each follow-up pass MUST flip
+  ≥ 1 `deferred` row to `audited` — no-op passes are forbidden.
+- **PM Deferred-surface gate**: `skill-pm` SOP step 2 now requires
+  that any `status: deferred` manifest rows be enumerated under the
+  spec's *Dependencies / Prerequisites* section, so downstream roles
+  know which surfaces ship without coverage.
+- **Backwards-compatible**: pre-Phase-1 `design/<feature>.md` files
+  without the new status column are treated as `audited` for what
+  they list and `unknown` for the rest — no retroactive migration.
+- **Source-agnostic**: the manifest applies to all auditor modes,
+  not Figma-specific.
+
+#### (i) QA Phase 1.5 — Visual Compare (v3.8.2, 2026-05-26)
+Closes Phase 2 of `research/pixel-perfect-and-design-coverage.md` —
+the non-literal visual-drift gap that v3.8.1's Source manifest /
+multi-pass did not address:
+
+- **Auditor *Visual Baselines* schema** (OPTIONAL) — auditor MAY
+  append a `## Visual Baselines` H2 to `design/<feature>.md` with
+  `surface id | baseline path | impl path | notes`. Source-agnostic:
+  any image format the design source produces is accepted.
+- **QA Phase 1.5 sub-phase** — inserted between Phase 1
+  (Copy / Visual Audit Gates) and Phase 2 (Discussion). For each
+  baseline row, QA Reads both PNGs into multimodal context and emits
+  a structured diff (layout / spacing / alignment / element presence
+  / color / text / image content) into `qa_reports/review_<id>.md`.
+- **Skip-if-absent gating** — non-UI features (server logic, CLI,
+  this MCP repo) declare no `Visual Baselines` and Phase 1.5 silently
+  no-ops. Zero overhead.
+- **Three failure routes**: visual drift → sr-engineer; missing
+  baseline file → design-auditor; missing impl screenshot →
+  sr-engineer.
+- **SOP-only delivery** — no new `tw_*` tool, no TS changes. Vision
+  capability is provided by the QA agent's host LLM (Claude / Gemini
+  / GPT-class); the Figma REST API is NOT a runtime dependency.
+
+#### (j) Token-Efficiency (v3.4.0)
 Two write-side optimisations stop the governance layer from inflating
 per-turn context:
 
