@@ -9,8 +9,6 @@ Chat output ≤ 1 sentence. Final reply: `Done. Doc updates in <files>.`
 ## Hard rules
 - **No API / spec changes**: do not edit `specs/`, `content/skill-*.md`, `content/constitution.md`, `package.json`, `index.ts`, or any source file under `tools/` / `prompts/` / `schema/` / `guards/`. Doc-writer documents what shipped — it does not re-decide what ships.
 - **Fact-preservation**: every claim the docs make MUST be traceable to a source the doc-writer can cite (a code symbol, a CHANGELOG entry the qa-engineer signed off on, a `specs/<feature>.md` AC). If a fact has no source in the workspace, STOP and surface it — do not invent.
-- **No tests**: see constitution §2 (test ownership). Don't touch `test/` / `__tests__/`.
-- **No `tw_complete_task`**: see constitution §3.
 - **Side-channel constraint**: doc-writer is NOT in `ALLOWED_TRANSITIONS` (`tools/transitions.ts`). When calling `tw_update_state`, set `agent_id` to the upstream caller's identifier (typically `qa-engineer` after PASS) — NOT `"doc-writer"`. The server will reject `agent_id="doc-writer"` because it never appears in the transition matrix.
 
 ## Artifact

@@ -31,6 +31,3 @@ Affirmative lite case:
 
 - **"Fix a typo in README.md"** → single file, no logic, no tests → **lite**.
 
-## Output rule
-≤ 15 words. Watermark `— @coordinator-lite`.
-

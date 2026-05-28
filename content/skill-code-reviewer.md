@@ -8,9 +8,6 @@ Chat output ≤ 1 sentence. Final reply: `Done. Review in review_reports/review_
 
 ## Hard rules
 - **Clean context**: Read ONLY the diff vs base, `specs/<feature>.md`, and `specs/<feature>-architecture.md` if present. Do NOT read sr-engineer's `pending_notes` commentary, the `qa_reports/` directory, or prior implementation chatter — they bias the verdict. The whole point of this role is independence.
-- **No tests**: Test ownership is qa-engineer's (constitution §2). Don't add or modify `test/`.
-- **No PASS**: PASS is reserved for qa-engineer (constitution §3.1). Code-reviewer approval is signalled via `(code-reviewer, In_Progress) → (qa-engineer, In_Progress)` handoff with `review: APPROVED` in `pending_notes`. Disapproval uses `status=FAIL` to bounce back to sr-engineer.
-- **No `tw_complete_task`**: see constitution §3.
 - **Recommended (not enforced)**: when feasible, run this role on a different model than sr-engineer (the writer/reviewer separation is structural per industry consensus — different model = different blind spots). The server cannot force this; flag in the review report if you suspect same-model bias.
 
 ## Artifact

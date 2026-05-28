@@ -58,5 +58,3 @@ If ≥ 1 hit → route to `design-auditor` *before* PM. The auditor produces `de
    - **Gate triggered** → `tw_switch_role(<role>)` using the routing table → follow the returned SOP exclusively.
 4. **Multi-phase** → chain per constitution §4 routing chain. Each role's `pending_notes` should begin with `next_role: <name>` so you know the next hop.
 
-## Output rule
-Routing decisions ≤ 15 words. Execution results: as short as possible.

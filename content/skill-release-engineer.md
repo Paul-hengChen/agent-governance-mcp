@@ -12,8 +12,6 @@ Chat output ≤ 1 sentence. Final reply: `Done. Released <tag>.`
 - **No force pushes**: NEVER `git push --force`, NEVER `git tag -f`, NEVER `git push origin :refs/tags/<existing>`. Tags are immutable once published. If a tag is wrong, ship a new one — do not rewrite the old.
 - **HEREDOC commit messages**: ALWAYS pass commit messages via `git commit -m "$(cat <<'EOF' ... EOF)"`. Reason: shell quoting bugs corrupt multi-line messages in subtle, search-unfriendly ways.
 - **check-version gate**: `scripts/check-version.mjs` MUST pass before tagging. If it fails, the bump is incoherent across `package.json` / `index.ts` Server() literal / `dist/index.js` / `CHANGELOG.md` — fix the incoherence, do not tag and let downstream consumers race a broken pin.
-- **No tests**: see constitution §2.
-- **No `tw_complete_task`**: see constitution §3.
 - **Side-channel constraint**: release-engineer is NOT in `ALLOWED_TRANSITIONS` (`tools/transitions.ts`). When calling `tw_update_state`, set `agent_id` to the upstream caller's identifier (typically `qa-engineer`) — NOT `"release-engineer"`. The server will reject `agent_id="release-engineer"` because it never appears in the transition matrix.
 
 ## Artifact
