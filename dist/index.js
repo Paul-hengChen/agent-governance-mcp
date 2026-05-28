@@ -25,6 +25,8 @@ import { buildCoordinatorLitePrompt } from "./prompts/coordinator-lite.js";
 import { buildArchitectPrompt } from "./prompts/architect.js";
 import { buildDesignAuditorPrompt } from "./prompts/design-auditor.js";
 import { buildCodeReviewerPrompt } from "./prompts/code-reviewer.js";
+import { buildDocWriterPrompt } from "./prompts/doc-writer.js";
+import { buildReleaseEngineerPrompt } from "./prompts/release-engineer.js";
 import { switchRole } from "./tools/role.js";
 import { appendSpecContext } from "./prompts/build.js";
 import { buildPrdChunks, CHUNKER_VERSION, DEFAULT_EMBEDDING_MODEL } from "./tools/rag.js";
@@ -93,7 +95,7 @@ const AddTaskArgs = z.object({
 });
 const SwitchRoleArgs = z.object({
     workspace_path: absoluteWorkspacePath,
-    role: z.enum(["pm", "researcher", "design-auditor", "sr-engineer", "code-reviewer", "qa-engineer", "architect"]),
+    role: z.enum(["pm", "researcher", "design-auditor", "sr-engineer", "code-reviewer", "qa-engineer", "architect", "doc-writer", "release-engineer"]),
 });
 // Model name allowlist regex: HuggingFace-style "namespace/model-name" with
 // alphanumerics, dot, underscore, dash, slash. Bounds user-supplied input
@@ -129,7 +131,7 @@ function formatZodError(err) {
 // 1. Initialize Server (Tools + Prompts)
 // ==========================================
 // Storage adapter defaults to FileHandoffStorage; HTTP-mode boot switches it via setActiveStorage().
-const server = new Server({ name: "agent-governance-mcp", version: "3.10.0" }, { capabilities: { tools: {}, prompts: {} } });
+const server = new Server({ name: "agent-governance-mcp", version: "3.11.0" }, { capabilities: { tools: {}, prompts: {} } });
 // ==========================================
 // 2. Register Prompts (Layer 1: Auto-inject constitution)
 // ==========================================
@@ -235,6 +237,28 @@ server.setRequestHandler(ListPromptsRequestSchema, async () => {
                     },
                 ],
             },
+            {
+                name: "doc-writer",
+                description: "Documentation maintainer — keeps README / CHANGELOG / docs in sync after PASS.",
+                arguments: [
+                    {
+                        name: "workspace_path",
+                        description: "Absolute workspace path (optional — defaults to current project dir)",
+                        required: false,
+                    },
+                ],
+            },
+            {
+                name: "release-engineer",
+                description: "Release engineer — owns version bumps, CHANGELOG, git tag, and gh release after PASS.",
+                arguments: [
+                    {
+                        name: "workspace_path",
+                        description: "Absolute workspace path (optional — defaults to current project dir)",
+                        required: false,
+                    },
+                ],
+            },
         ],
     };
 });
@@ -271,6 +295,12 @@ server.setRequestHandler(GetPromptRequestSchema, async (request) => {
     }
     else if (name === "code-reviewer") {
         promptResult = buildCodeReviewerPrompt(resolvedPath);
+    }
+    else if (name === "doc-writer") {
+        promptResult = buildDocWriterPrompt(resolvedPath);
+    }
+    else if (name === "release-engineer") {
+        promptResult = buildReleaseEngineerPrompt(resolvedPath);
     }
     else {
         throw new Error(`Prompt not found: ${name}`);
@@ -462,7 +492,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                         },
                         role: {
                             type: "string",
-                            enum: ["pm", "researcher", "design-auditor", "sr-engineer", "code-reviewer", "qa-engineer", "architect"],
+                            enum: ["pm", "researcher", "design-auditor", "sr-engineer", "code-reviewer", "qa-engineer", "architect", "doc-writer", "release-engineer"],
                             description: "Target role to switch into",
                         },
                     },

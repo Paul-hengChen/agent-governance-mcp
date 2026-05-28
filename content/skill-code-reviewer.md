@@ -17,12 +17,13 @@ Chat output ≤ 1 sentence. Final reply: `Done. Review in review_reports/review_
 Review notes → `review_reports/review_<task-id>.md` (`<task-id>` from `tasks.md`).
 
 ## Review Report Schema (`review_reports/review_<task-id>.md`)
-Every review report MUST contain these H2 sections in order:
+Every review report MUST contain these seven H2 sections in order:
 - **Summary** — 3-5 bullets: what changed, scope, headline verdict.
 - **Correctness** — logic errors, off-by-one, race conditions, missing edge cases. Cite file:line for each finding.
 - **Quality** — naming, dead code, duplication, convention drift vs the surrounding codebase. Cite file:line.
 - **Architecture** — layering, separation of concerns, fit with `specs/<feature>-architecture.md`. Reject if the implementation contradicts the architecture spec without justification.
 - **Security** — injection vectors, hardcoded secrets, unvalidated boundaries (mirrors the sr-engineer security checklist; you are the second pair of eyes).
+- **Performance** — O(n²) loops in hot paths, unbatched I/O (loops that should be batch queries / pipelined fetches), obvious memory leaks (event listeners not removed, caches with no eviction), and any algorithmic regression vs the prior implementation. Cite file:line. PASS criterion: no performance regression vs base; new code carries no obvious complexity-class issues. This is review for *obvious* regressions only — micro-benchmarking is qa-engineer scope.
 - **Verdict** — one of `APPROVED` or `CHANGES_REQUESTED`, with one-sentence rationale.
 
 ## SOP

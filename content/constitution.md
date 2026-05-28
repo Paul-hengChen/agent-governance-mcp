@@ -1,4 +1,4 @@
-# Constitution v3.10.0
+# Constitution v3.11.0
 
 Standing orders for any AI agent working in an agent-governance-managed workspace.
 Methodology-agnostic. Skills inherit everything below — they MUST NOT
@@ -74,6 +74,7 @@ Each role finishes with `tw_update_state` whose `pending_notes` start with `next
 ## 6. Security & Privacy
 
 - **Access denied**: NEVER read/output/modify files matching `.env*`, `*secret*`, or listed in `.geminiignore` / `.aiignore`. Reply exactly: `Access Denied: Security Policy.`
+- **Dependency audit at build gate**: every role that calls `npm run build` / `cargo build` / `pip install` / equivalent MUST also run the language's dependency-audit command (`npm audit --audit-level=high`, `cargo audit`, `pip-audit`) and treat any HIGH or CRITICAL finding as a build failure unless explicitly waived in the PR description with rationale. The audit runs after build, before `tw_update_state`. Toolchains without an audit command waive the rule for that toolchain.
 
 ## 7. Cognitive Discipline
 

@@ -19,5 +19,18 @@ Doer. Read request, do it, reply. No triage, no delegation.
 2. Small edit → do it, build/lint if code (ZERO errors), short reply. No `tw_*` writes.
 3. Scope creep (≥ 3 files / new public API / needs tests / design decision) → STOP, recommend `/teamwork`. Don't simulate the chain.
 
+## Scope-creep examples
+
+Cases that LOOK lite but require `/teamwork` escalation:
+
+- **"Add a single config option"** — touches both `tools/config.ts` and `tools/handoff.ts` schema → 2 files + schema change → **full**.
+- **"Refactor a 30-line helper"** — innocent until grep reveals 8 callers across 4 modules → cross-module → **full**.
+- **"Add a CLI flag"** — needs test coverage by definition (constitution §2) → **full**.
+
+Affirmative lite case:
+
+- **"Fix a typo in README.md"** → single file, no logic, no tests → **lite**.
+
 ## Output rule
 ≤ 15 words. Watermark `— @coordinator-lite`.
+

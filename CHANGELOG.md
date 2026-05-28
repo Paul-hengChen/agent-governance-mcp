@@ -16,6 +16,45 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.11.0] - 2026-05-28
+
+### Added
+- **`doc-writer` side-channel role** — new `content/skill-doc-writer.md`,
+  `prompts/doc-writer.ts`, and MCP prompt registration. Keeps `README.md`,
+  `CHANGELOG.md`, and `docs/**` in sync after QA PASS. Staff-level technical
+  writer persona; fact-preservation hard rule; side-channel constraint
+  (not in `ALLOWED_TRANSITIONS`; uses upstream caller's `agent_id`).
+- **`release-engineer` side-channel role** — new
+  `content/skill-release-engineer.md`, `prompts/release-engineer.ts`, and MCP
+  prompt registration. Owns post-PASS version bumps, `CHANGELOG.md` entries,
+  `npm run build`, `git tag`, and `gh release create`. PASS-precondition
+  hard rule; major-bump opt-in gate; HEREDOC commit messages; immutable tags;
+  `scripts/check-version.mjs` gate; side-channel constraint.
+- **`tw_switch_role` enum widened** to include `doc-writer` and
+  `release-engineer` (zod schema + JSON inputSchema). Both roles loadable via
+  `tw_switch_role` and as standalone MCP prompts.
+- **`tools/role.ts` `ROLE_SKILL_MAP`** extended with both new role entries.
+
+### Changed
+- **`skill-researcher.md`** — new Hard rules `Depth` clause (`shallow` ≤ 15 min /
+  `deep` ≤ 60 min), `Source Credibility Tier` (T1/T2/T3 tags on Evidence
+  citations), and `Recency Gate` (sources > 18 months tagged `(stale)`;
+  deep research requires ≥ 1 source ≤ 12 months old per major claim).
+- **`skill-coordinator-lite.md`** — new `Scope-creep examples` H2 with 3
+  concrete escalate-to-`/teamwork` cases and 1 affirmative lite case.
+- **`skill-code-reviewer.md`** — new `Performance` section in Review Report
+  Schema (O(n²) loops, unbatched I/O, memory leaks, algorithmic regression).
+  Schema sections: 6 → 7.
+- **Constitution v3.11.0 §6** — new `Dependency audit at build gate` bullet:
+  `npm audit --audit-level=high` / `cargo audit` / `pip-audit` required after
+  build, before `tw_update_state`. HIGH/CRITICAL findings are build failures
+  unless explicitly waived.
+
+### Notes
+- **MINOR bump** — side-channel only. No `ALLOWED_TRANSITIONS` edges added;
+  no `AgentName` union widened; no schema version bumps (`handoff: 2`,
+  `sqlite: 2` unchanged). `#v3.10.0` consumers keep working unchanged.
+
 ## [3.10.0] - 2026-05-28
 
 ### Added
