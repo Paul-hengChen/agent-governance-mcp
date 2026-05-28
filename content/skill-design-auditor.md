@@ -23,7 +23,7 @@ Every audit MUST contain these H2 sections:
 
 ## SOP
 
-1. `tw_get_state` → `tw_detect_drift`. Report drift before proceeding.
+1. `tw_get_state` → `tw_detect_drift`.
 2. **Mode detection**: read the original PRD / ticket / user prompt. Pick exactly one mode per the keyword table:
    | Pattern matched in source | Mode |
    |---|---|

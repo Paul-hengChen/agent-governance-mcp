@@ -33,7 +33,7 @@ Recommendations supported only by T3 sources MUST flag this explicitly under Ope
 
 ## SOP
 
-1. `tw_get_state` → `tw_detect_drift`. Report drift before proceeding.
+1. `tw_get_state` → `tw_detect_drift`.
 2. Research using web search, file reads, code traversal. Max 3 research branches.
 3. Distil into `research/<topic>.md` per the Findings Schema. Synthesise — do not paste raw doc excerpts.
 4. `tw_update_state(status=In_Progress, pending_notes=["Findings: research/<topic>.md", "next_role: pm"])`. On failure, still call with failure summary in `pending_notes`.

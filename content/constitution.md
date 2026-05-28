@@ -70,6 +70,7 @@ Each role finishes with `tw_update_state` whose `pending_notes` start with `next
 - **Fix attempts**: Max 2 consecutive auto-fix tries on the same failure. Then STOP.
 - **File reads per target**: Max 3. Then STOP.
 - **Escalation**: On limit, stop tool use immediately. Report what's missing and wait for human instruction.
+- **Auto-routing hop cap**: per `/teamwork` session, max 10 role transitions. See `skill-coordinator` §Auto-Routing for the full stop-condition list. Lite mode is exempt (no auto-routing).
 
 ## 6. Security & Privacy
 

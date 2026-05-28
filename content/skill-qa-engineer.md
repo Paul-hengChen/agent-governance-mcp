@@ -37,7 +37,7 @@ All review notes, questions, and bug reports → `qa_reports/review_<task-id>.md
    - **Coverage gap**: implementation hard-codes a literal property not listed in the spec → FAIL back to PM (`["QA: visual token gap — '<property>=<value>' in <file> missing from spec Visual Tokens", "next_role: pm"]`). Do NOT let the spec ratify post-hoc; force PM to source the token.
    - **Source rot** (when feasible): if the spec cites a Figma node id and the team has Figma MCP access, sample at least one cited token by fetching the node; flag drift to PM rather than blocking the build.
 
-   Rationale: stylistic ACs only verify what the spec already enumerates. Without an explicit "every concrete literal must be sourced" gate, an unsourced hex / dp / sp / weight slipping into theme files goes undetected (this is the failure mode that drove the cde-oobe Figma re-alignment cycle). Layout proportions and platform defaults are out of scope for this gate by design — only literal-valued tokens are checked.
+   Rationale: stylistic ACs only verify what the spec enumerates; without a "every concrete literal must be sourced" gate, unsourced theme literals go undetected. Layout proportions and platform defaults are out of scope by design.
 
 4. **Phase 1.5 — Visual Compare** (lazy-load, skip-if-absent): after Phase 1 PASS (3a + 3b), before Phase 2. Check `design/<feature>.md` for a `## Visual Baselines` H2.
    - **Absent** (or no design file) → log `Phase 1.5: skipped (no Visual Baselines declared)` in the review doc and proceed to Phase 2. Do NOT Read `content/skill-qa-visual.md`. Non-UI features pay zero overhead.

@@ -20,11 +20,6 @@ Trigger phrase → candidate role. **Scope gate (below) overrides** — if all g
 | test, verify, validate, rollback | `qa-engineer` |
 | Q&A, status check, doc tweak | execute directly |
 
-Multi-phase implementation flows the full chain
-`pm → architect → sr-engineer ↔ code-reviewer → qa-engineer`. Mid-cycle
-loops do not require coordinator triage — each role's `pending_notes`
-declares `next_role:` for the next hop.
-
 ## Complexity Scope Gate
 
 Switch to a role only if **any one** of these is true:
@@ -49,12 +44,30 @@ Match any of:
 
 If ≥ 1 hit → route to `design-auditor` *before* PM. The auditor produces `design/<feature>.md`, PM copies its tables into `specs/<feature>.md`. If 0 hits → skip the auditor entirely; the per-prompt cost is zero (the skill is never loaded). This is the token-frugal default.
 
+## Auto-Routing
+
+Default-ON in `/teamwork`. Disabled in `/teamwork-lite` (different skill).
+
+After each role's handoff, read the just-written `pending_notes`. If a `next_role: <name>` line is present and none of the stop conditions below fire, immediately call `tw_switch_role(<next_role>)` and follow the returned SOP. Increment your in-memory hop counter by 1 per successful switch.
+
+**Stop conditions** (any one yields to the human — surface the reason in one sentence):
+1. `status: Blocked` on the last `tw_update_state`.
+2. `status: PASS` (terminal success; release-engineer is a deliberate human decision, not an auto-hop).
+3. `pending_notes` contains a line beginning with `next_role: human`.
+4. `pending_notes` contains NO line beginning with `next_role:` (the prior role forgot or finished without nominating a successor — surface as ambiguous).
+5. Hop counter ≥ `10` for this `/teamwork` session.
+
+**Opt-out**: if `AGC_AUTO_ROUTE=0` at session start, do NOT auto-hop — surface the `next_role:` recommendation in chat and wait for the human to issue `tw_switch_role` themselves.
+
+**Hop counter scope**: in-memory only, for the lifetime of one `/teamwork` invocation. Do NOT persist to `handoff.md` or any tool argument.
+
 ## SOP
 
-1. **Skip state sync for**: Q&A, doc edits, status checks. Go straight to step 3.
-2. **Otherwise**: `tw_get_state` → `tw_detect_drift`. Report drift before proceeding.
-3. **Apply Complexity Scope Gate** against the request.
-   - **No gate triggered** → execute directly → `tw_update_state` (if step 2 was run).
-   - **Gate triggered** → `tw_switch_role(<role>)` using the routing table → follow the returned SOP exclusively.
-4. **Multi-phase** → chain per constitution §4 routing chain. Each role's `pending_notes` should begin with `next_role: <name>` so you know the next hop.
+1. **Auto-routing pre-check**: read `AGC_AUTO_ROUTE` from the shell environment (e.g. `printenv AGC_AUTO_ROUTE`). Value exactly `0` → `auto_mode = off` for this session. Unset or any other value → `auto_mode = on` (default).
+2. **Skip state sync for**: Q&A, doc edits, status checks. Go straight to step 4.
+3. **Otherwise**: `tw_get_state` → `tw_detect_drift`.
+4. **Apply Complexity Scope Gate** against the request.
+   - **No gate triggered** → execute directly → `tw_update_state` (if step 3 was run).
+   - **Gate triggered** → `tw_switch_role(<role>)` using the routing table → follow the returned SOP exclusively. Increment hop counter.
+5. **Multi-phase** → chain per constitution §4. Between hops, apply the *Auto-Routing* section above: if `auto_mode = on`, self-hop on each `next_role:`; if `auto_mode = off`, surface the recommendation and wait.
 

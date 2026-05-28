@@ -143,19 +143,19 @@ test("AC-6: Phase 1.5 contract is preserved between v3.8.2 and v3.8.3 (combined 
   assert.match(combined, /PASS sub-verdict.*proceed to Phase 2/is, "PASS sub-verdict must exist");
 });
 
-test("AC-7: version literals stay coherent across package.json, index.ts, dist/index.js, CHANGELOG at 3.11.0", () => {
+test("AC-7: version literals stay coherent across package.json, index.ts, dist/index.js, CHANGELOG at 3.13.0", () => {
   // Why: same invariant as every prior release's t-version-coherence —
   // package.json, the Server() literal, the build output, and the
-  // CHANGELOG entry must all agree. Without this, `npx ...#v3.11.0`
+  // CHANGELOG entry must all agree. Without this, `npx ...#v3.13.0`
   // consumers pin one artifact and run a different one.
-  // (Was 3.10.0 in the previous release; v3.11.0 bumped for doc-writer / release-engineer.)
+  // (Was 3.11.0 in the previous release; v3.13.0 bundles v3.12 polish + auto-routing.)
   const pkg = JSON.parse(fs.readFileSync(path.join(PROJECT_ROOT, "package.json"), "utf-8"));
   const indexTs = fs.readFileSync(path.join(PROJECT_ROOT, "index.ts"), "utf-8");
   const distJs = fs.readFileSync(path.join(PROJECT_ROOT, "dist", "index.js"), "utf-8");
   const changelog = fs.readFileSync(path.join(PROJECT_ROOT, "CHANGELOG.md"), "utf-8");
 
-  assert.equal(pkg.version, "3.11.0", "package.json must be 3.11.0");
-  assert.match(indexTs, /name:\s*"agent-governance-mcp",\s*version:\s*"3\.11\.0"/, "index.ts Server literal must be 3.11.0");
-  assert.match(distJs, /name:\s*"agent-governance-mcp",\s*version:\s*"3\.11\.0"/, "dist/index.js must be 3.11.0");
-  assert.match(changelog, /^##\s*\[3\.11\.0\]/m, "CHANGELOG must carry [3.11.0] release section");
+  assert.equal(pkg.version, "3.13.0", "package.json must be 3.13.0");
+  assert.match(indexTs, /name:\s*"agent-governance-mcp",\s*version:\s*"3\.13\.0"/, "index.ts Server literal must be 3.13.0");
+  assert.match(distJs, /name:\s*"agent-governance-mcp",\s*version:\s*"3\.13\.0"/, "dist/index.js must be 3.13.0");
+  assert.match(changelog, /^##\s*\[3\.13\.0\]/m, "CHANGELOG must carry [3.13.0] release section");
 });

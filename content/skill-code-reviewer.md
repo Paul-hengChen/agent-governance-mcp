@@ -8,7 +8,7 @@ Chat output ≤ 1 sentence. Final reply: `Done. Review in review_reports/review_
 
 ## Hard rules
 - **Clean context**: Read ONLY the diff vs base, `specs/<feature>.md`, and `specs/<feature>-architecture.md` if present. Do NOT read sr-engineer's `pending_notes` commentary, the `qa_reports/` directory, or prior implementation chatter — they bias the verdict. The whole point of this role is independence.
-- **Recommended (not enforced)**: when feasible, run this role on a different model than sr-engineer (the writer/reviewer separation is structural per industry consensus — different model = different blind spots). The server cannot force this; flag in the review report if you suspect same-model bias.
+- **Recommended (not enforced)**: when feasible, run this role on a different model than sr-engineer (different model = different blind spots). Flag in the review report if you suspect same-model bias.
 
 ## Artifact
 Review notes → `review_reports/review_<task-id>.md` (`<task-id>` from `tasks.md`).

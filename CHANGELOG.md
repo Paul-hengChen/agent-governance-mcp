@@ -16,6 +16,77 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.13.0] - 2026-05-28
+
+Bundled MINOR release covering both the v3.12 polish pass and the v3.13
+auto-routing behaviour. No `tw_*` tool surface changes, no schema bump,
+no wire-protocol change — all behaviour lives in the prompt-injected
+constitution + skill files. Backwards-compatible with `#v3.11.0`
+consumers.
+
+### Added (auto-routing — v3.13 scope)
+- **`skill-coordinator.md` § Auto-Routing** — default-ON in `/teamwork`
+  (lite explicitly exempt). After each role's handoff the coordinator
+  self-calls `tw_switch_role(<next_role>)` based on `pending_notes`.
+  Five stop conditions yield to the human:
+  (1) `status: Blocked`,
+  (2) `status: PASS` (terminal — release-engineer remains a human decision),
+  (3) `pending_notes` contains `next_role: human`,
+  (4) `pending_notes` lacks any `next_role:` line (silent termination),
+  (5) Hop counter ≥ **10** per `/teamwork` session.
+- **`AGC_AUTO_ROUTE=0`** env-var opt-out — restores pre-v3.13 manual
+  routing. Read agent-side at coordinator SOP step 1; not validated
+  server-side.
+- **`skill-pm.md` § Question Batch Gate** — new SOP step 4 that batches
+  Resource Audit `fetch/index/ignore` decisions + Ambiguity Gate
+  clarifications into one upfront `AskUserQuestion` call (≤ 4 questions;
+  split into 2 batches if more). Empty-batch = no-op. Converts N
+  mid-chain `Blocked` round-trips into 1 upfront human interaction.
+- **`skill-coordinator-lite.md`** — new `No auto-routing` hard rule
+  preserves lite's single-shot zero-state-write contract.
+- **Constitution §5 Anti-Loop Circuit Breaker** — new bullet referencing
+  the 10-hop cap and naming lite as exempt.
+
+### Added (skill polish — v3.12 scope)
+- **`skill-architect.md` § Decision Records** — new H2 with a
+  `Context | Decision | Consequences` table; one row per non-trivial
+  trade-off. Empty section renders
+  `_No non-trivial trade-offs in this artifact._`.
+
+### Changed (token-frugality audit — v3.12 scope)
+- **Audit artifact** `research/token-frugality-audit-v3.12.md` —
+  per-file pass against the constitution §1 *Skills inherit everything
+  below — they MUST NOT restate these rules* contract.
+- **Subtractive trims** to 8 skill files:
+  - Removed restated `§3 drift-check` tails from
+    `skill-architect.md`, `skill-design-auditor.md`, `skill-pm.md`,
+    `skill-researcher.md`, `skill-sr-engineer.md`.
+  - Removed the restated `§4 routing chain` block from
+    `skill-coordinator.md` (5 lines).
+  - Compressed redundant `cde-oobe` incident narrative in
+    `skill-qa-engineer.md`.
+  - Compressed editorial parenthetical in
+    `skill-code-reviewer.md` L11.
+- **Net line reduction**: 580 → 576 (-0.7% at line level; character-level
+  reduction is materially larger due to in-line compressions). Audit's
+  *Aggregate* section documents that the spec's aspirational 5% floor
+  was unachievable without deleting load-bearing content; the OR-branch
+  of the spec AC was honoured by audit justification.
+
+### Notes
+- **Security coverage verified (v3.12 audit)** — constitution §6
+  already covers the v3.9 evaluation's two flagged Security gaps:
+  OWASP-level guidance lives at sr-engineer + code-reviewer role
+  checklists; the dependency-audit rule shipped in v3.10. No §6 edits
+  in this release.
+- **No `tw_*` tool surface, schema, or transition-matrix changes** —
+  this release is content-only. `prompts/build.ts` consumes
+  `content/*.md` as opaque blobs, so section additions/edits cannot
+  break the prompt-build path; build clean + 303/303 tests pass.
+- **Skipped tag `v3.12.0`** — v3.12 polish and v3.13 auto-routing were
+  bundled into one MINOR cut at user direction. No `#v3.12.0` install
+  pin is published; consumers go directly from `#v3.11.0` to `#v3.13.0`.
+
 ## [3.11.0] - 2026-05-28
 
 ### Added
