@@ -5,13 +5,13 @@
 // so remote / containerized deployments need no mounted workspace files.
 import { parseHandoff, readHandoffState, writeHandoffState } from "./handoff.js";
 import { parseTasksFromFile, getNextTaskFromFile, completeTaskInFile, rollbackTaskInFile, addTaskInFile, } from "./tasks-file.js";
-import { recordReviewInFile, hasEvidenceInFile } from "./evidence-file.js";
+import { recordReviewInFile, hasEvidenceInFile, recordCodeReviewInFile, hasCodeReviewEvidenceInFile, } from "./evidence-file.js";
 export class FileHandoffStorage {
     readState(workspacePath) {
         return readHandoffState(workspacePath);
     }
-    writeState(workspacePath, activeFeature, status, completedTasks, pendingNotes, blockingReason, lastAgent, qaRound, prdPath) {
-        return writeHandoffState(workspacePath, activeFeature, status, completedTasks, pendingNotes, blockingReason, lastAgent, qaRound, prdPath);
+    writeState(workspacePath, activeFeature, status, completedTasks, pendingNotes, blockingReason, lastAgent, qaRound, prdPath, reviewRound) {
+        return writeHandoffState(workspacePath, activeFeature, status, completedTasks, pendingNotes, blockingReason, lastAgent, qaRound, prdPath, reviewRound);
     }
     parse(workspacePath) {
         return parseHandoff(workspacePath);
@@ -36,6 +36,12 @@ export class FileHandoffStorage {
     }
     hasEvidence(workspacePath, taskIds) {
         return Promise.resolve(hasEvidenceInFile(workspacePath, taskIds));
+    }
+    recordCodeReview(workspacePath, taskIds, verdict, reviewer, notes) {
+        return recordCodeReviewInFile(workspacePath, taskIds, verdict, reviewer, notes);
+    }
+    hasCodeReviewEvidence(workspacePath, taskIds) {
+        return Promise.resolve(hasCodeReviewEvidenceInFile(workspacePath, taskIds));
     }
 }
 let active = new FileHandoffStorage();

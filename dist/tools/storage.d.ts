@@ -7,7 +7,7 @@ export interface EvidenceCheck {
 }
 export interface HandoffStorage {
     readState(workspacePath: string): string;
-    writeState(workspacePath: string, activeFeature: string, status: string, completedTasks: string[], pendingNotes: string[], blockingReason?: string, lastAgent?: string, qaRound?: number, prdPath?: string): Promise<string>;
+    writeState(workspacePath: string, activeFeature: string, status: string, completedTasks: string[], pendingNotes: string[], blockingReason?: string, lastAgent?: string, qaRound?: number, prdPath?: string, reviewRound?: number): Promise<string>;
     parse(workspacePath: string): HandoffState | null;
     listTasks(workspacePath: string): TaskRecord[] | null;
     getNextTask(workspacePath: string): string;
@@ -16,10 +16,12 @@ export interface HandoffStorage {
     addTask(workspacePath: string, taskId: string, description: string, section?: string): Promise<string>;
     recordReview(workspacePath: string, taskIds: string[], status: "PASS" | "FAIL", reviewer: string, notes: string): Promise<void>;
     hasEvidence(workspacePath: string, taskIds: string[]): Promise<EvidenceCheck>;
+    recordCodeReview(workspacePath: string, taskIds: string[], verdict: "APPROVED" | "CHANGES_REQUESTED", reviewer: string, notes: string): Promise<void>;
+    hasCodeReviewEvidence(workspacePath: string, taskIds: string[]): Promise<EvidenceCheck>;
 }
 export declare class FileHandoffStorage implements HandoffStorage {
     readState(workspacePath: string): string;
-    writeState(workspacePath: string, activeFeature: string, status: string, completedTasks: string[], pendingNotes: string[], blockingReason?: string, lastAgent?: string, qaRound?: number, prdPath?: string): Promise<string>;
+    writeState(workspacePath: string, activeFeature: string, status: string, completedTasks: string[], pendingNotes: string[], blockingReason?: string, lastAgent?: string, qaRound?: number, prdPath?: string, reviewRound?: number): Promise<string>;
     parse(workspacePath: string): HandoffState | null;
     listTasks(workspacePath: string): TaskRecord[] | null;
     getNextTask(workspacePath: string): string;
@@ -28,6 +30,8 @@ export declare class FileHandoffStorage implements HandoffStorage {
     addTask(workspacePath: string, taskId: string, description: string, section?: string): Promise<string>;
     recordReview(workspacePath: string, taskIds: string[], status: "PASS" | "FAIL", reviewer: string, notes: string): Promise<void>;
     hasEvidence(workspacePath: string, taskIds: string[]): Promise<EvidenceCheck>;
+    recordCodeReview(workspacePath: string, taskIds: string[], verdict: "APPROVED" | "CHANGES_REQUESTED", reviewer: string, notes: string): Promise<void>;
+    hasCodeReviewEvidence(workspacePath: string, taskIds: string[]): Promise<EvidenceCheck>;
 }
 export declare function getActiveStorage(): HandoffStorage;
 export declare function setActiveStorage(storage: HandoffStorage): void;

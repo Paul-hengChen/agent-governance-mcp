@@ -16,6 +16,7 @@ const ROLE_SKILL_MAP = {
     "researcher": "skill-researcher.md",
     "design-auditor": "skill-design-auditor.md",
     "sr-engineer": "skill-sr-engineer.md",
+    "code-reviewer": "skill-code-reviewer.md",
     "qa-engineer": "skill-qa-engineer.md",
     "architect": "skill-architect.md",
 };

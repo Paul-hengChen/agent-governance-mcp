@@ -26,6 +26,10 @@ export interface HandoffState {
   // PM re-entry. Round-cap override (>= 4) blocks all transitions except
   // (pm, In_Progress). Backward-compat: parser defaults missing field to 0.
   qa_round: number;
+  // Code-reviewer round counter — incremented on (code-reviewer, FAIL),
+  // reset on handoff to qa-engineer or PM re-entry. Symmetric to qa_round
+  // with its own REVIEW_ROUND_CAP. Backward-compat: parser defaults to 0.
+  review_round: number;
   // Optional absolute path to the workspace's PRD file. Consumed by the RAG
   // lazy-reindex hook in prompts/build.ts:appendSpecContext. When absent, the
   // hook falls back to discovering PRD.md/docs/PRD.md/specs/PRD.md.
@@ -117,6 +121,9 @@ function readAndMigrate(workspacePath: string): HandoffReadResult | null {
   const prdPath = asString(frontmatter.prd_path) || undefined;
   const qaRoundRaw = Number(frontmatter.qa_round);
   const qa_round = Number.isFinite(qaRoundRaw) && qaRoundRaw >= 0 ? Math.floor(qaRoundRaw) : 0;
+  const reviewRoundRaw = Number(frontmatter.review_round);
+  const review_round =
+    Number.isFinite(reviewRoundRaw) && reviewRoundRaw >= 0 ? Math.floor(reviewRoundRaw) : 0;
 
   const state: HandoffState = {
     active_feature: asString(frontmatter.active_feature),
@@ -128,7 +135,23 @@ function readAndMigrate(workspacePath: string): HandoffReadResult | null {
     completed_tasks,
     pending_notes,
     qa_round,
+    review_round,
   };
+
+  // One-shot stderr warning on v1→v2 migration when an in-flight ticket sits at
+  // sr-engineer:In_Progress. After v2, that tuple can no longer transition
+  // directly to qa-engineer; operator must manually re-route to code-reviewer.
+  if (
+    migration.applied.includes(2) &&
+    state.last_agent === "sr-engineer" &&
+    state.status === "In_Progress"
+  ) {
+    process.stderr.write(
+      "[code-reviewer migration] In-flight ticket detected at sr-engineer:In_Progress — " +
+        "next transition to qa-engineer will be rejected. " +
+        "Manually re-route to code-reviewer or roll back to pm.\n",
+    );
+  }
 
   return { state, migrationApplied };
 }
@@ -175,6 +198,7 @@ export function readHandoffState(workspacePath: string): string {
       state.last_agent,
       state.qa_round,
       state.prd_path,
+      state.review_round,
     ).catch(() => {
       /* swallowed — read still returns migrated state */
     });
@@ -242,6 +266,7 @@ export async function writeHandoffState(
   lastAgent?: string,
   qaRound?: number,
   prdPath?: string,
+  reviewRound?: number,
 ): Promise<string> {
   ensureDir(workspacePath);
   const handoffPath = getHandoffPath(workspacePath);
@@ -281,6 +306,11 @@ export async function writeHandoffState(
     // input (undefined/NaN) normalises to 0.
     const normalisedRound = Number.isFinite(qaRound) && (qaRound as number) >= 0 ? Math.floor(qaRound as number) : 0;
     frontmatterData.qa_round = normalisedRound;
+    const normalisedReviewRound =
+      Number.isFinite(reviewRound) && (reviewRound as number) >= 0
+        ? Math.floor(reviewRound as number)
+        : 0;
+    frontmatterData.review_round = normalisedReviewRound;
 
     const frontmatter = yaml
       .dump(frontmatterData, { lineWidth: -1, forceQuotes: true, quotingType: '"' })

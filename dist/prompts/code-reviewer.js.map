@@ -1,0 +1,1 @@
+{"version":3,"file":"code-reviewer.js","sourceRoot":"","sources":["../../prompts/code-reviewer.ts"],"names":[],"mappings":"AAAA,wBAAwB;AACxB,kCAAkC;AAClC,OAAO,EAAE,kBAAkB,EAAqB,MAAM,YAAY,CAAC;AAEnE,MAAM,UAAU,uBAAuB,CAAC,aAAqB;IAC3D,OAAO,kBAAkB,CACvB,wBAAwB,EACxB,kFAAkF,EAClF,aAAa,CACd,CAAC;AACJ,CAAC"}

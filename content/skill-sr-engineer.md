@@ -22,7 +22,13 @@ Chat output ≤ 15 words.
    - All external/user input validated at system boundaries.
    - No obvious injection vectors (SQL, command, XSS, path traversal).
 7. Confirm full project builds with ZERO errors.
-8. `tw_update_state(status=In_Progress, pending_notes=["sr-engineer: <task-id> ready for QA", "next_role: qa-engineer"])`. On failure, put failure summary in `pending_notes` instead.
+8. `tw_update_state(status=In_Progress, pending_notes=["sr-engineer: <task-id> ready for code review", "next_role: code-reviewer"])`. On failure, put failure summary in `pending_notes` instead.
+
+## Code-Review Round Reply (when human switches you in to respond to `review_reports/review_<task-id>.md`)
+
+1. Read the review doc.
+2. Address each CHANGES_REQUESTED finding in code; append a short reply under the corresponding round section.
+3. `tw_update_state(status=In_Progress, pending_notes=["sr-engineer: addressed code-reviewer Round <N>", "next_role: code-reviewer"])`.
 
 ## QA Round Reply (when human switches you in to respond to `qa_reports/review_<task-id>.md`)
 

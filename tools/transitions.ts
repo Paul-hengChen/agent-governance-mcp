@@ -9,6 +9,7 @@ export type AgentName =
   | "design-auditor"
   | "architect"
   | "sr-engineer"
+  | "code-reviewer"
   | "qa-engineer";
 
 export type StatusName = "In_Progress" | "PASS" | "FAIL" | "Blocked";
@@ -27,10 +28,11 @@ export interface TransitionRequest {
   prev: TransitionTuple;
   next: TransitionTuple;
   prev_qa_round: number;
+  prev_review_round: number;
 }
 
 export interface TransitionRejection {
-  error: "TRANSITION_REJECTED" | "QA_ROUND_EXCEEDED" | "AGENT_ID_REQUIRED";
+  error: "TRANSITION_REJECTED" | "QA_ROUND_EXCEEDED" | "REVIEW_ROUND_EXCEEDED" | "AGENT_ID_REQUIRED";
   attempted: {
     prev_agent: string | null;
     prev_status: string | null;
@@ -115,12 +117,25 @@ const ALLOWED: ReadonlyMap<string, AllowedNext> = new Map<string, AllowedNext>([
     { agent: "architect", status: "In_Progress" },
   ]],
   ["sr-engineer:In_Progress", [
-    { agent: "qa-engineer", status: "In_Progress" },
+    { agent: "code-reviewer", status: "In_Progress" },
     { agent: "sr-engineer", status: "Blocked" },
     { agent: "pm", status: "In_Progress" },
   ]],
   ["sr-engineer:Blocked", [
     { agent: "sr-engineer", status: "In_Progress" },
+    { agent: "pm", status: "In_Progress" },
+  ]],
+  ["code-reviewer:In_Progress", [
+    { agent: "code-reviewer", status: "FAIL" },
+    { agent: "code-reviewer", status: "Blocked" },
+    { agent: "qa-engineer", status: "In_Progress" },
+  ]],
+  ["code-reviewer:FAIL", [
+    { agent: "sr-engineer", status: "In_Progress" },
+    { agent: "pm", status: "In_Progress" },
+  ]],
+  ["code-reviewer:Blocked", [
+    { agent: "code-reviewer", status: "In_Progress" },
     { agent: "pm", status: "In_Progress" },
   ]],
   ["qa-engineer:In_Progress", [
@@ -145,13 +160,22 @@ const ALLOWED: ReadonlyMap<string, AllowedNext> = new Map<string, AllowedNext>([
 export const ALLOWED_TRANSITIONS = ALLOWED;
 
 const ROUND_CAP = 4;
+const REVIEW_ROUND_CAP = 4;
 
 function isStatus(s: string | null): s is StatusName {
   return s === "In_Progress" || s === "PASS" || s === "FAIL" || s === "Blocked";
 }
 
 function isAgent(a: string | null): a is AgentName {
-  return a === "pm" || a === "researcher" || a === "design-auditor" || a === "architect" || a === "sr-engineer" || a === "qa-engineer";
+  return (
+    a === "pm" ||
+    a === "researcher" ||
+    a === "design-auditor" ||
+    a === "architect" ||
+    a === "sr-engineer" ||
+    a === "code-reviewer" ||
+    a === "qa-engineer"
+  );
 }
 
 function rejection(
@@ -209,6 +233,17 @@ export function validateTransition(req: TransitionRequest): TransitionRejection 
       `qa_round=${req.prev_qa_round} exceeds cap. Only (pm, In_Progress) allowed to reset.`,
     );
   }
+  if (req.prev_review_round >= REVIEW_ROUND_CAP) {
+    const onlyAllowed: AllowedNext = [{ agent: "pm", status: "In_Progress" }];
+    const ok = req.next.agent === "pm" && req.next.status === "In_Progress";
+    if (ok) return null;
+    return rejection(
+      req,
+      "REVIEW_ROUND_EXCEEDED",
+      onlyAllowed,
+      `review_round=${req.prev_review_round} exceeds cap. Only (pm, In_Progress) allowed to reset.`,
+    );
+  }
 
   // 3. self-loop fast path
   if (
@@ -234,17 +269,46 @@ export function validateTransition(req: TransitionRequest): TransitionRejection 
 }
 
 /**
- * Compute the new qa_round from prior round + incoming tuple.
+ * Compute new round counters from prior counters + incoming tuple + prev tuple.
+ * Returns both qa_round and review_round so callers can persist them together.
+ *
+ * qa_round:
  *   - (qa-engineer, FAIL)         → prev + 1
  *   - (qa-engineer, PASS)         → 0
- *   - (pm, In_Progress)            → 0  (PM re-entry resets the counter)
- *   - everything else              → prev (hold steady)
+ *   - (pm, In_Progress)           → 0
+ *   - everything else             → prev_qa_round
+ *
+ * review_round:
+ *   - (code-reviewer, FAIL)       → prev + 1
+ *   - (qa-engineer, In_Progress) when prev was (code-reviewer, In_Progress) → 0
+ *   - (pm, In_Progress)           → 0
+ *   - everything else             → prev_review_round
  */
-export function computeNewRound(prev_qa_round: number, next: TransitionTuple): number {
-  if (next.agent === "qa-engineer" && next.status === "FAIL") return prev_qa_round + 1;
-  if (next.agent === "qa-engineer" && next.status === "PASS") return 0;
-  if (next.agent === "pm" && next.status === "In_Progress") return 0;
-  return prev_qa_round;
+export function computeNewRound(
+  prev_qa_round: number,
+  prev_review_round: number,
+  next: TransitionTuple,
+  prev?: TransitionTuple,
+): { qa_round: number; review_round: number } {
+  let qa_round = prev_qa_round;
+  let review_round = prev_review_round;
+  if (next.agent === "qa-engineer" && next.status === "FAIL") qa_round = prev_qa_round + 1;
+  else if (next.agent === "qa-engineer" && next.status === "PASS") qa_round = 0;
+  else if (next.agent === "pm" && next.status === "In_Progress") qa_round = 0;
+
+  if (next.agent === "code-reviewer" && next.status === "FAIL") review_round = prev_review_round + 1;
+  else if (
+    next.agent === "qa-engineer" &&
+    next.status === "In_Progress" &&
+    prev?.agent === "code-reviewer" &&
+    prev.status === "In_Progress"
+  ) {
+    review_round = 0;
+  } else if (next.agent === "pm" && next.status === "In_Progress") {
+    review_round = 0;
+  }
+  return { qa_round, review_round };
 }
 
 export const ROUND_CAP_EXPORTED = ROUND_CAP;
+export const REVIEW_ROUND_CAP_EXPORTED = REVIEW_ROUND_CAP;

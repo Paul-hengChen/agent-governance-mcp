@@ -13,7 +13,12 @@ import {
   addTaskInFile,
   type TaskRecord,
 } from "./tasks-file.js";
-import { recordReviewInFile, hasEvidenceInFile } from "./evidence-file.js";
+import {
+  recordReviewInFile,
+  hasEvidenceInFile,
+  recordCodeReviewInFile,
+  hasCodeReviewEvidenceInFile,
+} from "./evidence-file.js";
 
 export type { HandoffState, TaskRecord };
 
@@ -35,6 +40,7 @@ export interface HandoffStorage {
     lastAgent?: string,
     qaRound?: number,
     prdPath?: string,
+    reviewRound?: number,
   ): Promise<string>;
   parse(workspacePath: string): HandoffState | null;
 
@@ -59,6 +65,16 @@ export interface HandoffStorage {
     notes: string,
   ): Promise<void>;
   hasEvidence(workspacePath: string, taskIds: string[]): Promise<EvidenceCheck>;
+
+  // --- Code-reviewer evidence (mirrors QA pair; gates sr ↔ code-reviewer → qa) ---
+  recordCodeReview(
+    workspacePath: string,
+    taskIds: string[],
+    verdict: "APPROVED" | "CHANGES_REQUESTED",
+    reviewer: string,
+    notes: string,
+  ): Promise<void>;
+  hasCodeReviewEvidence(workspacePath: string, taskIds: string[]): Promise<EvidenceCheck>;
 }
 
 export class FileHandoffStorage implements HandoffStorage {
@@ -76,8 +92,9 @@ export class FileHandoffStorage implements HandoffStorage {
     lastAgent?: string,
     qaRound?: number,
     prdPath?: string,
+    reviewRound?: number,
   ): Promise<string> {
-    return writeHandoffState(workspacePath, activeFeature, status, completedTasks, pendingNotes, blockingReason, lastAgent, qaRound, prdPath);
+    return writeHandoffState(workspacePath, activeFeature, status, completedTasks, pendingNotes, blockingReason, lastAgent, qaRound, prdPath, reviewRound);
   }
 
   parse(workspacePath: string): HandoffState | null {
@@ -121,6 +138,20 @@ export class FileHandoffStorage implements HandoffStorage {
 
   hasEvidence(workspacePath: string, taskIds: string[]): Promise<EvidenceCheck> {
     return Promise.resolve(hasEvidenceInFile(workspacePath, taskIds));
+  }
+
+  recordCodeReview(
+    workspacePath: string,
+    taskIds: string[],
+    verdict: "APPROVED" | "CHANGES_REQUESTED",
+    reviewer: string,
+    notes: string,
+  ): Promise<void> {
+    return recordCodeReviewInFile(workspacePath, taskIds, verdict, reviewer, notes);
+  }
+
+  hasCodeReviewEvidence(workspacePath: string, taskIds: string[]): Promise<EvidenceCheck> {
+    return Promise.resolve(hasCodeReviewEvidenceInFile(workspacePath, taskIds));
   }
 }
 

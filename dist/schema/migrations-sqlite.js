@@ -19,6 +19,34 @@ const STEPS = [
             // intentionally empty — v1 shape == bootstrap shape
         },
     },
+    {
+        from: 1,
+        to: 2,
+        up: (db) => {
+            // Add review_round column to handoff_state. The idempotent-ALTER block in
+            // storage-sqlite.ts's constructor also adds it for already-bootstrapped
+            // DBs; this step exists so the version row + the column stay in sync
+            // inside the same transaction (AC-2 of schema-versioning architecture).
+            const cols = db.prepare("PRAGMA table_info(handoff_state)").all();
+            if (!cols.some((c) => c.name === "review_round")) {
+                db.exec("ALTER TABLE handoff_state ADD COLUMN review_round INTEGER NOT NULL DEFAULT 0");
+            }
+            // Code-reviewer evidence table. Distinct from `reports` (qa) because the
+            // verdict enum differs and conflating them would force the qa PASS gate
+            // at index.ts:619 to filter on reviewer column.
+            db.exec(`CREATE TABLE IF NOT EXISTS code_review_reports (
+        workspace_path TEXT NOT NULL,
+        task_id        TEXT NOT NULL,
+        verdict        TEXT NOT NULL CHECK (verdict IN ('APPROVED', 'CHANGES_REQUESTED')),
+        reviewer       TEXT NOT NULL,
+        notes          TEXT NOT NULL,
+        created_at     TEXT NOT NULL,
+        PRIMARY KEY (workspace_path, task_id, created_at)
+      )`);
+            db.exec(`CREATE INDEX IF NOT EXISTS idx_code_review_reports_ws_task
+        ON code_review_reports (workspace_path, task_id, verdict)`);
+        },
+    },
 ];
 /**
  * Run pending SQLite migrations against an open Database. Idempotent:

@@ -65,12 +65,25 @@ const ALLOWED = new Map([
             { agent: "architect", status: "In_Progress" },
         ]],
     ["sr-engineer:In_Progress", [
-            { agent: "qa-engineer", status: "In_Progress" },
+            { agent: "code-reviewer", status: "In_Progress" },
             { agent: "sr-engineer", status: "Blocked" },
             { agent: "pm", status: "In_Progress" },
         ]],
     ["sr-engineer:Blocked", [
             { agent: "sr-engineer", status: "In_Progress" },
+            { agent: "pm", status: "In_Progress" },
+        ]],
+    ["code-reviewer:In_Progress", [
+            { agent: "code-reviewer", status: "FAIL" },
+            { agent: "code-reviewer", status: "Blocked" },
+            { agent: "qa-engineer", status: "In_Progress" },
+        ]],
+    ["code-reviewer:FAIL", [
+            { agent: "sr-engineer", status: "In_Progress" },
+            { agent: "pm", status: "In_Progress" },
+        ]],
+    ["code-reviewer:Blocked", [
+            { agent: "code-reviewer", status: "In_Progress" },
             { agent: "pm", status: "In_Progress" },
         ]],
     ["qa-engineer:In_Progress", [
@@ -93,11 +106,18 @@ const ALLOWED = new Map([
 ]);
 export const ALLOWED_TRANSITIONS = ALLOWED;
 const ROUND_CAP = 4;
+const REVIEW_ROUND_CAP = 4;
 function isStatus(s) {
     return s === "In_Progress" || s === "PASS" || s === "FAIL" || s === "Blocked";
 }
 function isAgent(a) {
-    return a === "pm" || a === "researcher" || a === "design-auditor" || a === "architect" || a === "sr-engineer" || a === "qa-engineer";
+    return (a === "pm" ||
+        a === "researcher" ||
+        a === "design-auditor" ||
+        a === "architect" ||
+        a === "sr-engineer" ||
+        a === "code-reviewer" ||
+        a === "qa-engineer");
 }
 function rejection(req, error, allowed, hint) {
     return {
@@ -143,6 +163,13 @@ export function validateTransition(req) {
             return null;
         return rejection(req, "QA_ROUND_EXCEEDED", onlyAllowed, `qa_round=${req.prev_qa_round} exceeds cap. Only (pm, In_Progress) allowed to reset.`);
     }
+    if (req.prev_review_round >= REVIEW_ROUND_CAP) {
+        const onlyAllowed = [{ agent: "pm", status: "In_Progress" }];
+        const ok = req.next.agent === "pm" && req.next.status === "In_Progress";
+        if (ok)
+            return null;
+        return rejection(req, "REVIEW_ROUND_EXCEEDED", onlyAllowed, `review_round=${req.prev_review_round} exceeds cap. Only (pm, In_Progress) allowed to reset.`);
+    }
     // 3. self-loop fast path
     if (req.prev.agent !== null &&
         req.prev.agent === req.next.agent &&
@@ -159,20 +186,43 @@ export function validateTransition(req) {
     return rejection(req, "TRANSITION_REJECTED", allowed, `No edge ${key} → ${keyOf(req.next)} in ALLOWED_TRANSITIONS. See specs/qa-flow-enforcement-architecture.md.`);
 }
 /**
- * Compute the new qa_round from prior round + incoming tuple.
+ * Compute new round counters from prior counters + incoming tuple + prev tuple.
+ * Returns both qa_round and review_round so callers can persist them together.
+ *
+ * qa_round:
  *   - (qa-engineer, FAIL)         → prev + 1
  *   - (qa-engineer, PASS)         → 0
- *   - (pm, In_Progress)            → 0  (PM re-entry resets the counter)
- *   - everything else              → prev (hold steady)
+ *   - (pm, In_Progress)           → 0
+ *   - everything else             → prev_qa_round
+ *
+ * review_round:
+ *   - (code-reviewer, FAIL)       → prev + 1
+ *   - (qa-engineer, In_Progress) when prev was (code-reviewer, In_Progress) → 0
+ *   - (pm, In_Progress)           → 0
+ *   - everything else             → prev_review_round
  */
-export function computeNewRound(prev_qa_round, next) {
+export function computeNewRound(prev_qa_round, prev_review_round, next, prev) {
+    let qa_round = prev_qa_round;
+    let review_round = prev_review_round;
     if (next.agent === "qa-engineer" && next.status === "FAIL")
-        return prev_qa_round + 1;
-    if (next.agent === "qa-engineer" && next.status === "PASS")
-        return 0;
-    if (next.agent === "pm" && next.status === "In_Progress")
-        return 0;
-    return prev_qa_round;
+        qa_round = prev_qa_round + 1;
+    else if (next.agent === "qa-engineer" && next.status === "PASS")
+        qa_round = 0;
+    else if (next.agent === "pm" && next.status === "In_Progress")
+        qa_round = 0;
+    if (next.agent === "code-reviewer" && next.status === "FAIL")
+        review_round = prev_review_round + 1;
+    else if (next.agent === "qa-engineer" &&
+        next.status === "In_Progress" &&
+        prev?.agent === "code-reviewer" &&
+        prev.status === "In_Progress") {
+        review_round = 0;
+    }
+    else if (next.agent === "pm" && next.status === "In_Progress") {
+        review_round = 0;
+    }
+    return { qa_round, review_round };
 }
 export const ROUND_CAP_EXPORTED = ROUND_CAP;
+export const REVIEW_ROUND_CAP_EXPORTED = REVIEW_ROUND_CAP;
 //# sourceMappingURL=transitions.js.map

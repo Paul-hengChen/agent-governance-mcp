@@ -3,6 +3,7 @@ declare const ROLE_SKILL_MAP: {
     readonly researcher: "skill-researcher.md";
     readonly "design-auditor": "skill-design-auditor.md";
     readonly "sr-engineer": "skill-sr-engineer.md";
+    readonly "code-reviewer": "skill-code-reviewer.md";
     readonly "qa-engineer": "skill-qa-engineer.md";
     readonly architect: "skill-architect.md";
 };

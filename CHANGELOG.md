@@ -16,6 +16,61 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.9.0] - 2026-05-28
+
+### Added
+- **`code-reviewer` role** between `sr-engineer` and `qa-engineer` in the
+  routing chain. Owns code review (correctness / quality / architecture /
+  security) in a clean context — reads only the diff vs base, the PM spec,
+  and the architect handoff. Bias-free judgement is structural, not
+  optional, per 2025–2026 industry consensus
+  (`research/reviewer-role-extraction.md`).
+- **`review_round` counter** symmetric to `qa_round`. Incremented on
+  `(code-reviewer, FAIL)`, reset on handoff to qa or PM re-entry. Cap at
+  4 (3 FAILs allowed); Round 4 forces `(pm, In_Progress)` like the qa
+  circuit breaker.
+- **`review_reports/review_<task-id>.md` evidence gating.** The
+  `(code-reviewer, In_Progress) → (qa-engineer, In_Progress)` handoff
+  is rejected when any task id in `completed_tasks` lacks a review file
+  (file mode) or `code_review_reports` row (SQLite mode).
+- New skill `content/skill-code-reviewer.md`, new prompt
+  `prompts/code-reviewer.ts` (id `code-reviewer`), new SQLite table
+  `code_review_reports`. `tw_switch_role` accepts `"code-reviewer"`.
+
+### Changed
+- **Routing chain**: `sr-engineer → qa-engineer` direct edge replaced
+  with `sr-engineer ↔ code-reviewer → qa-engineer`. Constitution v3.9.0.
+- **`qa-engineer` scope narrowed**: rejects only for failing tests,
+  missing AC coverage, or test-infra defects. Style/architecture/
+  correctness review moved to code-reviewer; QA escalates rather than
+  FAILs on those grounds.
+- **`computeNewRound` signature**: now takes
+  `(prev_qa_round, prev_review_round, next, prev?)` and returns
+  `{ qa_round, review_round }`. Internal callers updated; external
+  callers must adopt the new shape.
+- **Schema bumps**: `CURRENT_VERSIONS.handoff: 1 → 2`,
+  `CURRENT_VERSIONS.sqlite: 1 → 2`. Migrations add `review_round=0` to
+  existing rows.
+
+### Breaking
+- **In-flight `sr-engineer:In_Progress` tickets** at upgrade time must
+  be manually re-routed to code-reviewer (or rolled back to pm). The
+  old `sr-engineer:In_Progress → qa-engineer:In_Progress` edge is
+  rejected by the new transition matrix. The v1→v2 handoff migration
+  emits a one-shot stderr warning on first parse when this state is
+  detected.
+- **`HandoffStorage.writeState`** gains a trailing optional
+  `reviewRound?: number` parameter. Trailing-optional is
+  backwards-compatible for positional callers; named-arg callers should
+  pass it for accurate persistence.
+
+### Notes
+- `teamwork-lite` (solo-dev mode) is **explicitly excluded** from the
+  code-reviewer step — lite is server-read-only same-context work
+  where the reviewer gate is structurally meaningless.
+- Spec: `specs/code-reviewer-role-extraction.md`.
+- Architecture: `specs/code-reviewer-role-extraction-architecture.md`.
+
 ## [3.8.3] - 2026-05-26
 
 ### Changed

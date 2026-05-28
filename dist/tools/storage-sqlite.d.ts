@@ -14,6 +14,8 @@ export declare class SqliteHandoffStorage implements HandoffStorage {
     private rollbackTaskStmt;
     private insertReportStmt;
     private selectReportsByTaskStmt;
+    private insertCodeReviewStmt;
+    private selectCodeReviewByTaskStmt;
     private deleteChunksStmt;
     private insertChunkStmt;
     private listChunksStmt;
@@ -26,7 +28,7 @@ export declare class SqliteHandoffStorage implements HandoffStorage {
     private fetchLastUpdated;
     parse(workspacePath: string): HandoffState | null;
     readState(workspacePath: string): string;
-    writeState(workspacePath: string, activeFeature: string, status: string, completedTasks: string[], pendingNotes: string[], blockingReason?: string, lastAgent?: string, qaRound?: number, prdPath?: string): Promise<string>;
+    writeState(workspacePath: string, activeFeature: string, status: string, completedTasks: string[], pendingNotes: string[], blockingReason?: string, lastAgent?: string, qaRound?: number, prdPath?: string, reviewRound?: number): Promise<string>;
     listTasks(workspacePath: string): TaskRecord[] | null;
     getNextTask(workspacePath: string): string;
     completeTask(workspacePath: string, taskId: string, note?: string): Promise<string>;
@@ -34,6 +36,8 @@ export declare class SqliteHandoffStorage implements HandoffStorage {
     addTask(workspacePath: string, taskId: string, description: string, section?: string): Promise<string>;
     recordReview(workspacePath: string, taskIds: string[], status: "PASS" | "FAIL", reviewer: string, notes: string): Promise<void>;
     hasEvidence(workspacePath: string, taskIds: string[]): Promise<EvidenceCheck>;
+    recordCodeReview(workspacePath: string, taskIds: string[], verdict: "APPROVED" | "CHANGES_REQUESTED", reviewer: string, notes: string): Promise<void>;
+    hasCodeReviewEvidence(workspacePath: string, taskIds: string[]): Promise<EvidenceCheck>;
     upsertPrdChunks(workspacePath: string, chunks: PrdChunk[]): void;
     deletePrdChunks(workspacePath: string): number;
     listPrdChunks(workspacePath: string): PrdChunk[];

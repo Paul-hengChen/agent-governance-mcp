@@ -1,4 +1,4 @@
-# Constitution v3.8.3
+# Constitution v3.9.0
 
 Standing orders for any AI agent working in an agent-governance-managed workspace.
 Methodology-agnostic. Skills inherit everything below — they MUST NOT
@@ -39,6 +39,8 @@ The routing chain is **server-enforced**, not advisory. Invalid
 - `status=PASS` and `tw_complete_task` require `agent_id="qa-engineer"`.
 - After 3 QA FAILs (Round 4), only `(pm, In_Progress)` is accepted.
 - PASS requires evidence: attach `qa_review`, or pre-write `qa_reports/review_<task-id>.md`.
+- Code-reviewer approval is signalled via `(code-reviewer, In_Progress) → (qa-engineer, In_Progress)` handoff with `pending_notes` containing `review: APPROVED` and a `review_reports/review_<task-id>.md` evidence file. Code-reviewer cannot use `status=PASS`; that remains qa-engineer-exclusive.
+- After 3 code-reviewer FAILs (Round 4 of `review_round`), only `(pm, In_Progress)` is accepted — symmetric to the `qa_round` circuit breaker.
 
 On rejection the server returns `{ error, attempted, allowed, hint }` —
 read it and self-correct. Full matrix: `specs/qa-flow-enforcement-architecture.md`.
@@ -46,9 +48,13 @@ read it and self-correct. Full matrix: `specs/qa-flow-enforcement-architecture.m
 ## 4. Routing Chain (multi-phase work)
 
 ```
-researcher (optional) → design-auditor (optional) → pm → architect (if complex) → sr-engineer → qa-engineer
-                                                                                       ↑__________|  (Round 1-3 review)
+researcher (optional) → design-auditor (optional) → pm → architect (if complex) → sr-engineer ↔ code-reviewer → qa-engineer
+                                                                                                                    ↑__________|  (Round 1-3 QA review)
 ```
+
+sr-engineer ↔ code-reviewer loops on `(code-reviewer, FAIL)` for up to 3
+rounds (`review_round` cap). The qa-engineer loop back to sr-engineer
+(Round 1-3 review) runs `qa_round` independently.
 
 `design-auditor` fires when the coordinator detects a design source
 (Figma / Sketch / XD / Penpot / mockup attachment / 設計稿 keyword) in the

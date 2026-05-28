@@ -79,6 +79,8 @@ function readAndMigrate(workspacePath) {
     const prdPath = asString(frontmatter.prd_path) || undefined;
     const qaRoundRaw = Number(frontmatter.qa_round);
     const qa_round = Number.isFinite(qaRoundRaw) && qaRoundRaw >= 0 ? Math.floor(qaRoundRaw) : 0;
+    const reviewRoundRaw = Number(frontmatter.review_round);
+    const review_round = Number.isFinite(reviewRoundRaw) && reviewRoundRaw >= 0 ? Math.floor(reviewRoundRaw) : 0;
     const state = {
         active_feature: asString(frontmatter.active_feature),
         status: asString(frontmatter.status),
@@ -89,7 +91,18 @@ function readAndMigrate(workspacePath) {
         completed_tasks,
         pending_notes,
         qa_round,
+        review_round,
     };
+    // One-shot stderr warning on v1→v2 migration when an in-flight ticket sits at
+    // sr-engineer:In_Progress. After v2, that tuple can no longer transition
+    // directly to qa-engineer; operator must manually re-route to code-reviewer.
+    if (migration.applied.includes(2) &&
+        state.last_agent === "sr-engineer" &&
+        state.status === "In_Progress") {
+        process.stderr.write("[code-reviewer migration] In-flight ticket detected at sr-engineer:In_Progress — " +
+            "next transition to qa-engineer will be rejected. " +
+            "Manually re-route to code-reviewer or roll back to pm.\n");
+    }
     return { state, migrationApplied };
 }
 /**
@@ -121,7 +134,7 @@ export function readHandoffState(workspacePath) {
         // error here just means another writer already healed the file (AC-5), so
         // swallow it. Any other failure also non-fatal — the in-memory state we
         // return is already at CURRENT.
-        void writeHandoffState(workspacePath, state.active_feature, state.status, state.completed_tasks, state.pending_notes, state.blocking_reason, state.last_agent, state.qa_round, state.prd_path).catch(() => {
+        void writeHandoffState(workspacePath, state.active_feature, state.status, state.completed_tasks, state.pending_notes, state.blocking_reason, state.last_agent, state.qa_round, state.prd_path, state.review_round).catch(() => {
             /* swallowed — read still returns migrated state */
         });
     }
@@ -176,7 +189,7 @@ export function readHandoffState(workspacePath) {
  * Pending notes are written as plain list items (not checkboxes) to avoid
  * ambiguity with tracked task IDs in the completed section.
  */
-export async function writeHandoffState(workspacePath, activeFeature, status, completedTasks, pendingNotes, blockingReason, lastAgent, qaRound, prdPath) {
+export async function writeHandoffState(workspacePath, activeFeature, status, completedTasks, pendingNotes, blockingReason, lastAgent, qaRound, prdPath, reviewRound) {
     ensureDir(workspacePath);
     const handoffPath = getHandoffPath(workspacePath);
     const lockPath = path.join(workspacePath, ".current", ".handoff.lock");
@@ -214,6 +227,10 @@ export async function writeHandoffState(workspacePath, activeFeature, status, co
         // input (undefined/NaN) normalises to 0.
         const normalisedRound = Number.isFinite(qaRound) && qaRound >= 0 ? Math.floor(qaRound) : 0;
         frontmatterData.qa_round = normalisedRound;
+        const normalisedReviewRound = Number.isFinite(reviewRound) && reviewRound >= 0
+            ? Math.floor(reviewRound)
+            : 0;
+        frontmatterData.review_round = normalisedReviewRound;
         const frontmatter = yaml
             .dump(frontmatterData, { lineWidth: -1, forceQuotes: true, quotingType: '"' })
             .trimEnd();

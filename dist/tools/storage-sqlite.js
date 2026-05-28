@@ -19,7 +19,8 @@ CREATE TABLE IF NOT EXISTS handoff_state (
   completed       TEXT NOT NULL DEFAULT '[]',
   pending         TEXT NOT NULL DEFAULT '[]',
   qa_round        INTEGER NOT NULL DEFAULT 0,
-  prd_path        TEXT
+  prd_path        TEXT,
+  review_round    INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS tasks (
@@ -50,6 +51,19 @@ CREATE TABLE IF NOT EXISTS reports (
 CREATE INDEX IF NOT EXISTS idx_reports_ws_task
   ON reports (workspace_path, task_id, status);
 
+CREATE TABLE IF NOT EXISTS code_review_reports (
+  workspace_path TEXT NOT NULL,
+  task_id        TEXT NOT NULL,
+  verdict        TEXT NOT NULL CHECK (verdict IN ('APPROVED', 'CHANGES_REQUESTED')),
+  reviewer       TEXT NOT NULL,
+  notes          TEXT NOT NULL,
+  created_at     TEXT NOT NULL,
+  PRIMARY KEY (workspace_path, task_id, created_at)
+);
+
+CREATE INDEX IF NOT EXISTS idx_code_review_reports_ws_task
+  ON code_review_reports (workspace_path, task_id, verdict);
+
 CREATE TABLE IF NOT EXISTS prd_chunks (
   workspace_path   TEXT NOT NULL,
   chunk_id         TEXT NOT NULL,
@@ -78,6 +92,8 @@ export class SqliteHandoffStorage {
     rollbackTaskStmt;
     insertReportStmt;
     selectReportsByTaskStmt;
+    insertCodeReviewStmt;
+    selectCodeReviewByTaskStmt;
     deleteChunksStmt;
     insertChunkStmt;
     listChunksStmt;
@@ -107,6 +123,7 @@ export class SqliteHandoffStorage {
         };
         addColumnIfMissing("ALTER TABLE handoff_state ADD COLUMN qa_round INTEGER NOT NULL DEFAULT 0");
         addColumnIfMissing("ALTER TABLE handoff_state ADD COLUMN prd_path TEXT");
+        addColumnIfMissing("ALTER TABLE handoff_state ADD COLUMN review_round INTEGER NOT NULL DEFAULT 0");
         // Schema-versioning lazy migrate (Phase 4). Creates schema_meta, stamps
         // the sqlite version row, and runs any registered v(N)→v(N+1) DDL steps
         // inside per-step transactions. Refuse-loud on a future on-disk version
@@ -116,16 +133,16 @@ export class SqliteHandoffStorage {
         this.selectStmt = this.db.prepare("SELECT * FROM handoff_state WHERE workspace_path = ?");
         this.selectLastUpdatedStmt = this.db.prepare("SELECT last_updated FROM handoff_state WHERE workspace_path = ?");
         this.upsertStmt = this.db.prepare(`INSERT OR REPLACE INTO handoff_state
-        (workspace_path, active_feature, status, last_updated, blocking_reason, last_agent, completed, pending, qa_round, prd_path)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-        this.txUpsert = this.db.transaction((workspacePath, activeFeature, status, now, blockingReason, lastAgent, completed, pending, qaRound, prdPath, expectedLastUpdated) => {
+        (workspace_path, active_feature, status, last_updated, blocking_reason, last_agent, completed, pending, qa_round, prd_path, review_round)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+        this.txUpsert = this.db.transaction((workspacePath, activeFeature, status, now, blockingReason, lastAgent, completed, pending, qaRound, prdPath, reviewRound, expectedLastUpdated) => {
             const row = this.selectLastUpdatedStmt.get(workspacePath);
             const actual = row?.last_updated ?? null;
             if (actual !== expectedLastUpdated) {
                 throw new Error(`⛔ STATE DRIFT: handoff row changed between freshness check and write ` +
                     `(expected last_updated=${expectedLastUpdated}, actual=${actual}). Retry after tw_get_state.`);
             }
-            this.upsertStmt.run(workspacePath, activeFeature, status, now, blockingReason, lastAgent, completed, pending, qaRound, prdPath);
+            this.upsertStmt.run(workspacePath, activeFeature, status, now, blockingReason, lastAgent, completed, pending, qaRound, prdPath, reviewRound);
         });
         this.listTasksStmt = this.db.prepare(`SELECT task_id, description, section, completed, note, reverted_reason, sort_order
        FROM tasks WHERE workspace_path = ? ORDER BY sort_order ASC`);
@@ -145,6 +162,11 @@ export class SqliteHandoffStorage {
         // laxer (any file is enough) because pass/fail isn't decodable from disk.
         this.selectReportsByTaskStmt = this.db.prepare(`SELECT DISTINCT task_id FROM reports
        WHERE workspace_path = ? AND status = 'PASS' AND task_id IN (SELECT value FROM json_each(?))`);
+        this.insertCodeReviewStmt = this.db.prepare(`INSERT INTO code_review_reports (workspace_path, task_id, verdict, reviewer, notes, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`);
+        // APPROVED rows satisfy hasCodeReviewEvidence() (parallel to qa PASS gating).
+        this.selectCodeReviewByTaskStmt = this.db.prepare(`SELECT DISTINCT task_id FROM code_review_reports
+       WHERE workspace_path = ? AND verdict = 'APPROVED' AND task_id IN (SELECT value FROM json_each(?))`);
         this.deleteChunksStmt = this.db.prepare("DELETE FROM prd_chunks WHERE workspace_path = ?");
         this.insertChunkStmt = this.db.prepare(`INSERT OR REPLACE INTO prd_chunks
          (workspace_path, chunk_id, section, text, embedding, prd_path, prd_mtime, chunker_version, embedding_model)
@@ -189,6 +211,10 @@ export class SqliteHandoffStorage {
         const qa_round = typeof qaRoundRaw === "number" && Number.isFinite(qaRoundRaw) && qaRoundRaw >= 0
             ? Math.floor(qaRoundRaw)
             : 0;
+        const reviewRoundRaw = row.review_round;
+        const review_round = typeof reviewRoundRaw === "number" && Number.isFinite(reviewRoundRaw) && reviewRoundRaw >= 0
+            ? Math.floor(reviewRoundRaw)
+            : 0;
         return {
             active_feature: row.active_feature,
             status: row.status,
@@ -199,6 +225,7 @@ export class SqliteHandoffStorage {
             completed_tasks: JSON.parse(row.completed),
             pending_notes: JSON.parse(row.pending),
             qa_round,
+            review_round,
         };
     }
     readState(workspacePath) {
@@ -222,10 +249,13 @@ export class SqliteHandoffStorage {
         };
         return JSON.stringify({ exists: true, ...view });
     }
-    writeState(workspacePath, activeFeature, status, completedTasks, pendingNotes, blockingReason, lastAgent, qaRound, prdPath) {
+    writeState(workspacePath, activeFeature, status, completedTasks, pendingNotes, blockingReason, lastAgent, qaRound, prdPath, reviewRound) {
         const currentLastUpdated = this.fetchLastUpdated(workspacePath);
         verifyExtra(workspacePath, SNAPSHOT_KEY, currentLastUpdated);
         const normalisedRound = Number.isFinite(qaRound) && qaRound >= 0 ? Math.floor(qaRound) : 0;
+        const normalisedReviewRound = Number.isFinite(reviewRound) && reviewRound >= 0
+            ? Math.floor(reviewRound)
+            : 0;
         // Preserve prd_path across writes that don't explicitly set it (PM sets
         // once; downstream roles call writeState without re-passing the field).
         let effectivePrdPath = prdPath ?? null;
@@ -234,7 +264,7 @@ export class SqliteHandoffStorage {
             effectivePrdPath = existing?.prd_path ?? null;
         }
         const now = new Date().toISOString();
-        this.txUpsert(workspacePath, activeFeature, status, now, blockingReason ?? null, lastAgent ?? null, JSON.stringify(completedTasks), JSON.stringify(pendingNotes), normalisedRound, effectivePrdPath, currentLastUpdated);
+        this.txUpsert(workspacePath, activeFeature, status, now, blockingReason ?? null, lastAgent ?? null, JSON.stringify(completedTasks), JSON.stringify(pendingNotes), normalisedRound, effectivePrdPath, normalisedReviewRound, currentLastUpdated);
         snapshotExtra(workspacePath, SNAPSHOT_KEY, now);
         return Promise.resolve(JSON.stringify({ success: true, storage: "sqlite", updated_at: now }));
     }
@@ -342,6 +372,31 @@ export class SqliteHandoffStorage {
         if (taskIds.length === 0)
             return Promise.resolve({ present: [], missing: [] });
         const rows = this.selectReportsByTaskStmt.all(workspacePath, JSON.stringify(taskIds));
+        const presentSet = new Set(rows.map((r) => r.task_id));
+        const present = [];
+        const missing = [];
+        for (const id of taskIds) {
+            if (presentSet.has(id))
+                present.push(id);
+            else
+                missing.push(id);
+        }
+        return Promise.resolve({ present, missing });
+    }
+    recordCodeReview(workspacePath, taskIds, verdict, reviewer, notes) {
+        const now = new Date().toISOString();
+        const insertMany = this.db.transaction((ids) => {
+            for (const id of ids) {
+                this.insertCodeReviewStmt.run(workspacePath, id, verdict, reviewer, notes, now);
+            }
+        });
+        insertMany(taskIds);
+        return Promise.resolve();
+    }
+    hasCodeReviewEvidence(workspacePath, taskIds) {
+        if (taskIds.length === 0)
+            return Promise.resolve({ present: [], missing: [] });
+        const rows = this.selectCodeReviewByTaskStmt.all(workspacePath, JSON.stringify(taskIds));
         const presentSet = new Set(rows.map((r) => r.task_id));
         const present = [];
         const missing = [];

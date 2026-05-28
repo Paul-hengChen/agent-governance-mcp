@@ -16,8 +16,14 @@ Trigger phrase → candidate role. **Scope gate (below) overrides** — if all g
 | plan, spec, break down, create tasks | `pm` |
 | design, architecture, interface contract | `architect` |
 | implement, fix, refactor, add feature | `sr-engineer` |
+| review, code review, judge diff | `code-reviewer` |
 | test, verify, validate, rollback | `qa-engineer` |
 | Q&A, status check, doc tweak | execute directly |
+
+Multi-phase implementation flows the full chain
+`pm → architect → sr-engineer ↔ code-reviewer → qa-engineer`. Mid-cycle
+loops do not require coordinator triage — each role's `pending_notes`
+declares `next_role:` for the next hop.
 
 ## Complexity Scope Gate
 

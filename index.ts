@@ -31,6 +31,7 @@ import { buildCoordinatorPrompt } from "./prompts/coordinator.js";
 import { buildCoordinatorLitePrompt } from "./prompts/coordinator-lite.js";
 import { buildArchitectPrompt } from "./prompts/architect.js";
 import { buildDesignAuditorPrompt } from "./prompts/design-auditor.js";
+import { buildCodeReviewerPrompt } from "./prompts/code-reviewer.js";
 import { switchRole, type RoleName } from "./tools/role.js";
 import { appendSpecContext } from "./prompts/build.js";
 import { buildPrdChunks, CHUNKER_VERSION, DEFAULT_EMBEDDING_MODEL } from "./tools/rag.js";
@@ -121,7 +122,7 @@ const AddTaskArgs = z.object({
 
 const SwitchRoleArgs = z.object({
   workspace_path: absoluteWorkspacePath,
-  role: z.enum(["pm", "researcher", "design-auditor", "sr-engineer", "qa-engineer", "architect"]),
+  role: z.enum(["pm", "researcher", "design-auditor", "sr-engineer", "code-reviewer", "qa-engineer", "architect"]),
 });
 
 // Model name allowlist regex: HuggingFace-style "namespace/model-name" with
@@ -166,7 +167,7 @@ function formatZodError(err: z.ZodError): string {
 // ==========================================
 // Storage adapter defaults to FileHandoffStorage; HTTP-mode boot switches it via setActiveStorage().
 const server = new Server(
-  { name: "agent-governance-mcp", version: "3.8.3" },
+  { name: "agent-governance-mcp", version: "3.9.0" },
   { capabilities: { tools: {}, prompts: {} } }
 );
 
@@ -264,6 +265,17 @@ server.setRequestHandler(ListPromptsRequestSchema, async () => {
           },
         ],
       },
+      {
+        name: "code-reviewer",
+        description: "Code review role — clean-context diff judge between sr-engineer and qa-engineer.",
+        arguments: [
+          {
+            name: "workspace_path",
+            description: "Absolute workspace path (optional — defaults to current project dir)",
+            required: false,
+          },
+        ],
+      },
     ],
   };
 });
@@ -294,6 +306,8 @@ server.setRequestHandler(GetPromptRequestSchema, async (request) => {
     promptResult = buildArchitectPrompt(resolvedPath);
   } else if (name === "design-auditor") {
     promptResult = buildDesignAuditorPrompt(resolvedPath);
+  } else if (name === "code-reviewer") {
+    promptResult = buildCodeReviewerPrompt(resolvedPath);
   } else {
     throw new Error(`Prompt not found: ${name}`);
   }
@@ -492,7 +506,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
             role: {
               type: "string",
-              enum: ["pm", "researcher", "design-auditor", "sr-engineer", "qa-engineer", "architect"],
+              enum: ["pm", "researcher", "design-auditor", "sr-engineer", "code-reviewer", "qa-engineer", "architect"],
               description: "Target role to switch into",
             },
           },
@@ -581,6 +595,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const storage = getActiveStorage();
         const prevState = storage.parse(parsed.workspace_path);
         const prev_qa_round = prevState?.qa_round ?? 0;
+        const prev_review_round = prevState?.review_round ?? 0;
         const prevTuple: TransitionTuple = {
           agent: (prevState?.last_agent as AgentName | undefined) ?? null,
           status: (prevState?.status as StatusName | undefined) ?? null,
@@ -590,7 +605,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           status: parsed.status,
         };
 
-        const rejection = validateTransition({ prev: prevTuple, next: nextTuple, prev_qa_round });
+        const rejection = validateTransition({ prev: prevTuple, next: nextTuple, prev_qa_round, prev_review_round });
         if (rejection) {
           return {
             content: [{ type: "text" as const, text: `⛔ ${rejection.error}\n${JSON.stringify(rejection, null, 2)}` }],
@@ -630,10 +645,43 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           }
         }
 
-        const new_qa_round = computeNewRound(prev_qa_round, nextTuple);
+        // Code-reviewer evidence gate. Mirrors the PASS gate above for the
+        // sr ↔ code-reviewer → qa handoff. Only fires when the previous tuple
+        // is (code-reviewer, In_Progress) AND the next tuple hands off to qa.
+        if (
+          prevTuple.agent === "code-reviewer" &&
+          prevTuple.status === "In_Progress" &&
+          nextTuple.agent === "qa-engineer" &&
+          nextTuple.status === "In_Progress" &&
+          parsed.completed_tasks.length > 0
+        ) {
+          const ev = await storage.hasCodeReviewEvidence(parsed.workspace_path, parsed.completed_tasks);
+          if (ev.missing.length > 0) {
+            return {
+              content: [{
+                type: "text" as const,
+                text:
+                  `⛔ MISSING_REVIEW_EVIDENCE: ${ev.missing.join(", ")}. ` +
+                  `Code-reviewer evidence missing: write review_reports/review_<task-id>.md ` +
+                  `before handing off to qa-engineer.`,
+              }],
+              isError: true,
+            };
+          }
+        }
+
+        const { qa_round: new_qa_round, review_round: new_review_round } = computeNewRound(
+          prev_qa_round,
+          prev_review_round,
+          nextTuple,
+          prevTuple,
+        );
         const pending = [...parsed.pending_notes];
         if (new_qa_round === 4 && prev_qa_round === 3) {
           pending.unshift("⛔ Round 4: forced rollback to pm — no further QA allowed until PM resets.");
+        }
+        if (new_review_round === 4 && prev_review_round === 3) {
+          pending.unshift("⛔ Review Round 4: forced rollback to pm — no further code-review allowed until PM resets.");
         }
 
         const result = await storage.writeState(
@@ -646,6 +694,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           parsed.agent_id,
           new_qa_round,
           parsed.prd_path,
+          new_review_round,
         );
 
         // GC hook: when QA flips a feature to PASS, drop the workspace's RAG
