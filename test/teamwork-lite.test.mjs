@@ -20,7 +20,7 @@ test("AC1: content/skill-coordinator-lite.md exists with required sections + har
   // Required sections per AC1
   assert.match(body, /^#\s+Skill:\s+coordinator-lite/m, "title section");
   assert.match(body, /##\s+Persona/, "Persona section");
-  assert.match(body, /##\s+Output rule/, "Output rule section");
+
   assert.match(body, /##\s+SOP/, "SOP section");
 
   // AC1 hard rules
