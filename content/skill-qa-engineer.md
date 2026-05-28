@@ -51,12 +51,13 @@ All review notes, questions, and bug reports → `qa_reports/review_<task-id>.md
    - **Phase 2 PASS** (all rounds resolved, or no issues found in Phase 1): proceed to Phase 3.
 
 6. **Phase 3 — Tests**:
-   a. **Spec-to-Test Map**: For each AC in `specs/<feature>.md`, write ≥ 1 test. Record the AC→test mapping in the review doc.
-   b. **Coverage Gate**: ≥ 80% line coverage on new/modified files. If tooling can't measure, note explicitly in the review doc.
-   c. **Security Smoke Tests** (always include):
+   a. **Test File Discovery**: Check if existing test files cover the current task's scope. If relevant test files exist, proceed to write or modify tests. If NO relevant test file exists, ask the user whether tests are needed — do not assume. If user declines, skip Phase 3 entirely, log `Phase 3: skipped (user declined — no existing test coverage)` in the review doc, and proceed to Phase 4.
+   b. **Spec-to-Test Map**: For each AC in `specs/<feature>.md`, write ≥ 1 test. Record the AC→test mapping in the review doc.
+   c. **Coverage Gate**: ≥ 80% line coverage on new/modified files. If tooling can't measure, note explicitly in the review doc.
+   d. **Security Smoke Tests** (always include):
       - Boundary inputs: null, empty string, oversized payload, special characters.
       - Auth/permission tests if the feature has access control.
-   d. Write the automated tests.
+   e. Write the automated tests.
 
 7. **Phase 4 — Run**:
    - Project build: ZERO errors.

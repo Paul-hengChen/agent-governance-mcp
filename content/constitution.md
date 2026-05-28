@@ -1,4 +1,4 @@
-# Constitution v3.9.0
+# Constitution v3.10.0
 
 Standing orders for any AI agent working in an agent-governance-managed workspace.
 Methodology-agnostic. Skills inherit everything below — they MUST NOT
@@ -21,6 +21,7 @@ restate these rules.
 - **Test ownership**: ONLY qa-engineer writes test files. No exceptions.
 - **Build gate**: Every role hands off with ZERO compile/type errors.
 - **Test strategy** (qa-engineer): unit for pure logic, integration for I/O boundaries. Mock only external dependencies.
+- **Conditional test writing** (qa-engineer): Not every task requires new tests. If existing test files already cover the task's scope, write or modify tests accordingly. If NO relevant test file exists for the current task, qa-engineer MUST ask the user whether tests are needed before creating any — do not assume.
 - **Match conventions**: Follow existing codebase style (naming, structure, patterns) before introducing new ones. When in doubt, grep. Conformance > personal taste; if a convention is genuinely harmful, surface it — don't fork silently.
 
 ## 3. State Synchronisation

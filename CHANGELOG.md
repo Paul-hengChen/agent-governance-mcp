@@ -16,6 +16,32 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.10.0] - 2026-05-28
+
+### Added
+- **Constitution §2: Conditional test writing** (qa-engineer). Not every
+  task requires new tests. If existing test files already cover the
+  task's scope, qa-engineer writes or modifies tests accordingly. If
+  NO relevant test file exists for the current task, qa-engineer MUST
+  ask the user whether tests are needed before creating any — do not
+  assume. Constitution bumps v3.9.0 → v3.10.0.
+
+### Changed
+- **`skill-qa-engineer.md` Phase 3 SOP** prepends a new step
+  `3a. Test File Discovery` that gates test creation on existence of
+  relevant test files. When the discovery step results in user-declined
+  test creation, Phase 3 is skipped, the review doc logs
+  `Phase 3: skipped (user declined — no existing test coverage)`, and
+  the flow proceeds to Phase 4. Prior steps 3a–3d renumber to 3b–3e.
+
+### Notes
+- MINOR bump (not PATCH) — qa-engineer behavior observably changes
+  (gated test creation, new user-prompt branch). Tooling, transition
+  matrix, schema versions, and wire protocol are unchanged.
+- Consumers pinned at `#v3.9.1` keep working unchanged. Upgrade to
+  `#v3.10.0` to get the new qa SOP rule.
+- Research basis: `research/architecture-and-skills-evaluation-v3.9.md`.
+
 ## [3.9.1] - 2026-05-28
 
 ### Added
