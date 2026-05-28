@@ -22,6 +22,11 @@ function mkDbPath(prefix = "sqlitever-") {
 test("T30 AC-1: runSqliteMigrations creates schema_meta and seeds sqlite at CURRENT", async () => {
   const db = new Database(mkDbPath());
   try {
+    // v3.9.0: the v1→v2 step ALTERs handoff_state. In production the
+    // SqliteHandoffStorage ctor bootstraps the SCHEMA constant (which creates
+    // handoff_state) before calling runSqliteMigrations, so the ALTER is safe.
+    // The standalone runner test must seed the table to mirror that contract.
+    db.exec("CREATE TABLE handoff_state (workspace_path TEXT PRIMARY KEY)");
     const result = runSqliteMigrations(db);
     const row = db.prepare("SELECT version FROM schema_meta WHERE kind = ?").get("sqlite");
     assert.equal(row?.version, CURRENT_VERSIONS.sqlite);
@@ -34,6 +39,8 @@ test("T30 AC-1: runSqliteMigrations creates schema_meta and seeds sqlite at CURR
 test("T30 AC-1: schema_meta primary key prevents duplicate kind rows", async () => {
   const db = new Database(mkDbPath());
   try {
+    // v3.9.0: seed handoff_state so the v1→v2 ALTER step inside runSqliteMigrations succeeds.
+    db.exec("CREATE TABLE handoff_state (workspace_path TEXT PRIMARY KEY)");
     runSqliteMigrations(db);
     // Second insert with same kind should violate PK.
     assert.throws(
@@ -57,12 +64,13 @@ test("T30 AC-2 legacy: pre-versioning DB (no schema_meta) migrates up to CURRENT
   const db = new Database(dbPath);
   try {
     const result = runSqliteMigrations(db);
-    assert.deepEqual(result.applied, [1]);
+    // v3.9.0: legacy DB at v0 now climbs through both v0→v1 and v1→v2.
+    assert.deepEqual(result.applied, [1, 2]);
     assert.equal(result.fromVersion, 0);
-    assert.equal(result.toVersion, 1);
+    assert.equal(result.toVersion, CURRENT_VERSIONS.sqlite);
 
     const row = db.prepare("SELECT version FROM schema_meta WHERE kind = ?").get("sqlite");
-    assert.equal(row?.version, 1);
+    assert.equal(row?.version, CURRENT_VERSIONS.sqlite);
   } finally {
     db.close();
   }
@@ -71,6 +79,8 @@ test("T30 AC-2 legacy: pre-versioning DB (no schema_meta) migrates up to CURRENT
 test("T30 AC-2 reopen: second runSqliteMigrations is a no-op (applied: [])", async () => {
   const dbPath = mkDbPath();
   let db = new Database(dbPath);
+  // v3.9.0: seed handoff_state so the first-run v1→v2 ALTER succeeds.
+  db.exec("CREATE TABLE handoff_state (workspace_path TEXT PRIMARY KEY)");
   runSqliteMigrations(db);
   db.close();
 
@@ -98,7 +108,7 @@ test("T30 AC-4: refuses-loud when on-disk sqlite version > CURRENT", async () =>
   try {
     assert.throws(
       () => runSqliteMigrations(db),
-      /sqlite on-disk version 99 > server max 1/,
+      /sqlite on-disk version 99 > server max 2/,
     );
   } finally {
     db.close();
@@ -107,12 +117,14 @@ test("T30 AC-4: refuses-loud when on-disk sqlite version > CURRENT", async () =>
 
 // ---------- AC-5: per-step atomicity (version bump in same tx as DDL) ----------
 
-test("T30 atomic tx: version bump happens with the step (single-step v0→v1 visible together)", async () => {
+test("T30 atomic tx: version bump happens with the step (multi-step v0→v1→v2 visible together)", async () => {
   const dbPath = mkDbPath();
   // No schema_meta row pre-existing.
   const db = new Database(dbPath);
   try {
-    // Before: no row.
+    // Seed handoff_state so v1→v2 ALTER finds its target (mirrors ctor flow).
+    db.exec("CREATE TABLE handoff_state (workspace_path TEXT PRIMARY KEY)");
+    // Before: no schema_meta.
     const meta = db.prepare(
       "SELECT name FROM sqlite_master WHERE type='table' AND name='schema_meta'",
     ).get();
@@ -120,9 +132,9 @@ test("T30 atomic tx: version bump happens with the step (single-step v0→v1 vis
 
     runSqliteMigrations(db);
 
-    // After: row exists with version 1 (single-step tx committed atomically).
+    // After: row exists at CURRENT (=2 in v3.9.0); chain ran atomically.
     const row = db.prepare("SELECT version FROM schema_meta WHERE kind = ?").get("sqlite");
-    assert.equal(row?.version, 1);
+    assert.equal(row?.version, CURRENT_VERSIONS.sqlite);
   } finally {
     db.close();
   }
@@ -139,7 +151,8 @@ test("T30 integration: SqliteHandoffStorage constructor stamps schema_meta", asy
     const inspect = new Database(dbPath);
     try {
       const row = inspect.prepare("SELECT version FROM schema_meta WHERE kind = ?").get("sqlite");
-      assert.equal(row?.version, 1);
+      // v3.9.0: ctor bootstraps schema then runs migrations → lands at CURRENT (=2).
+      assert.equal(row?.version, CURRENT_VERSIONS.sqlite);
     } finally {
       inspect.close();
     }
@@ -159,6 +172,6 @@ test("T30 integration: SqliteHandoffStorage constructor refuses-loud on future s
   const { SqliteHandoffStorage } = await import("../dist/tools/storage-sqlite.js");
   assert.throws(
     () => new SqliteHandoffStorage(dbPath),
-    /sqlite on-disk version 42 > server max 1/,
+    /sqlite on-disk version 42 > server max 2/,
   );
 });

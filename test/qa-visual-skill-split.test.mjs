@@ -139,18 +139,19 @@ test("AC-6: Phase 1.5 contract is preserved between v3.8.2 and v3.8.3 (combined 
   assert.match(combined, /PASS sub-verdict.*proceed to Phase 2/is, "PASS sub-verdict must exist");
 });
 
-test("AC-7: version literals stay coherent across package.json, index.ts, dist/index.js, CHANGELOG at 3.8.3", () => {
+test("AC-7: version literals stay coherent across package.json, index.ts, dist/index.js, CHANGELOG at 3.9.0", () => {
   // Why: same invariant as every prior release's t-version-coherence —
   // package.json, the Server() literal, the build output, and the
-  // CHANGELOG entry must all agree. Without this, `npx ...#v3.8.3`
+  // CHANGELOG entry must all agree. Without this, `npx ...#v3.9.0`
   // consumers pin one artifact and run a different one.
+  // (Was 3.8.3 in the previous release; v3.9.0 bumped for code-reviewer chain.)
   const pkg = JSON.parse(fs.readFileSync(path.join(PROJECT_ROOT, "package.json"), "utf-8"));
   const indexTs = fs.readFileSync(path.join(PROJECT_ROOT, "index.ts"), "utf-8");
   const distJs = fs.readFileSync(path.join(PROJECT_ROOT, "dist", "index.js"), "utf-8");
   const changelog = fs.readFileSync(path.join(PROJECT_ROOT, "CHANGELOG.md"), "utf-8");
 
-  assert.equal(pkg.version, "3.8.3", "package.json must be 3.8.3");
-  assert.match(indexTs, /name:\s*"agent-governance-mcp",\s*version:\s*"3\.8\.3"/, "index.ts Server literal must be 3.8.3");
-  assert.match(distJs, /name:\s*"agent-governance-mcp",\s*version:\s*"3\.8\.3"/, "dist/index.js must be 3.8.3");
-  assert.match(changelog, /^##\s*\[3\.8\.3\]/m, "CHANGELOG must carry [3.8.3] release section");
+  assert.equal(pkg.version, "3.9.0", "package.json must be 3.9.0");
+  assert.match(indexTs, /name:\s*"agent-governance-mcp",\s*version:\s*"3\.9\.0"/, "index.ts Server literal must be 3.9.0");
+  assert.match(distJs, /name:\s*"agent-governance-mcp",\s*version:\s*"3\.9\.0"/, "dist/index.js must be 3.9.0");
+  assert.match(changelog, /^##\s*\[3\.9\.0\]/m, "CHANGELOG must carry [3.9.0] release section");
 });

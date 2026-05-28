@@ -38,7 +38,7 @@ function yieldMacrotask() {
 
 // ---------- AC-1: schema_version stamped on writes ----------
 
-test("AC-1: writeHandoffState stamps schema_version: 1 in YAML", async () => {
+test("AC-1: writeHandoffState stamps schema_version: 2 in YAML (v3.9.0)", async () => {
   const ws = mkWorkspace();
   resetSession();
   // Initial parse to mark state read so writeHandoffState's freshness check
@@ -46,7 +46,8 @@ test("AC-1: writeHandoffState stamps schema_version: 1 in YAML", async () => {
   parseHandoff(ws);
   await writeHandoffState(ws, "feat-x", "In_Progress", [], ["next"], undefined, "pm", 0);
   const content = read(ws);
-  assert.match(content, /schema_version:\s*1/);
+  // v3.9.0 bump: handoff schema is now 2 (added review_round for code-reviewer chain).
+  assert.match(content, /schema_version:\s*2/);
 });
 
 test("AC-1: schema_version appears as the first frontmatter key (grep-stable)", async () => {
@@ -63,7 +64,7 @@ test("AC-1: schema_version appears as the first frontmatter key (grep-stable)", 
 
 // ---------- AC-2: lazy migrate-on-read ----------
 
-test("AC-2: readHandoffState heals v0 handoff to v1 on disk (fire-and-forget)", async () => {
+test("AC-2: readHandoffState heals v0 handoff to CURRENT (v2) on disk (fire-and-forget)", async () => {
   const ws = mkWorkspace();
   resetSession();
   // Pre-versioning shape: no schema_version key.
@@ -94,7 +95,8 @@ qa_round: 0
   await yieldMacrotask();
 
   const healed = read(ws);
-  assert.match(healed, /schema_version:\s*1/);
+  // v3.9.0: chain climbs v0→v1→v2; healed file lands at CURRENT (=2).
+  assert.match(healed, /schema_version:\s*2/);
 });
 
 test("AC-2 fast path: v1 file triggers no write-back", async () => {
@@ -147,7 +149,7 @@ qa_round: 0
   assert.equal(after, before, "parseHandoff is read-only on disk");
 });
 
-test("AC-2 regression: existing handoff missing schema_version round-trips to v1", async () => {
+test("AC-2 regression: existing handoff missing schema_version round-trips to CURRENT (v2)", async () => {
   const ws = mkWorkspace();
   resetSession();
   writeRaw(
@@ -173,7 +175,8 @@ qa_round: 0
   assert.equal(parsed.active_feature, "round-trip");
   assert.deepEqual(parsed.completed_tasks, ["T01"]);
   assert.deepEqual(parsed.pending_notes, ["next_role: pm"]);
-  assert.match(read(ws), /schema_version:\s*1/);
+  // v3.9.0: v0 → v1 → v2 chain lands at CURRENT.
+  assert.match(read(ws), /schema_version:\s*2/);
 });
 
 // ---------- AC-4: refuse-loud on future versions ----------
@@ -200,7 +203,7 @@ qa_round: 0
 
   assert.throws(
     () => readHandoffState(ws),
-    /handoff on-disk version 99 > server max 1/,
+    /handoff on-disk version 99 > server max 2/,
   );
 });
 
@@ -225,7 +228,7 @@ qa_round: 0
   );
   assert.throws(
     () => parseHandoff(ws),
-    /on-disk version 42 > server max 1/,
+    /on-disk version 42 > server max 2/,
   );
 });
 
@@ -262,7 +265,8 @@ qa_round: 0
   assert.equal(JSON.parse(json1).active_feature, "concurrent");
   assert.equal(JSON.parse(json2).active_feature, "concurrent");
   // File ended up healed (one of the writes won; the other swallowed quietly).
-  assert.match(read(ws), /schema_version:\s*1/);
+  // v3.9.0: chain lands at CURRENT (=2).
+  assert.match(read(ws), /schema_version:\s*2/);
 });
 
 // ---------- regression: missing / malformed files ----------

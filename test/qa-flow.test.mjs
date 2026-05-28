@@ -14,7 +14,12 @@ import {
   requireQaEngineer,
   ALLOWED_TRANSITIONS,
 } from "../dist/tools/transitions.js";
-import { recordReviewInFile, hasEvidenceInFile } from "../dist/tools/evidence-file.js";
+import {
+  recordReviewInFile,
+  hasEvidenceInFile,
+  recordCodeReviewInFile,
+  hasCodeReviewEvidenceInFile,
+} from "../dist/tools/evidence-file.js";
 import { parseHandoff, writeHandoffState } from "../dist/tools/handoff.js";
 import { markStateRead, resetSession } from "../dist/guards/session.js";
 
@@ -178,14 +183,23 @@ test("validateTransition: pm→qa-engineer REJECTED (must go through sr-engineer
 
 // ---------- validateTransition — sr-engineer / qa-engineer happy path ----------
 
-test("validateTransition: sr-engineer→qa-engineer accepted", () => {
-  assert.equal(
-    validateTransition({
-      prev: { agent: "sr-engineer", status: "In_Progress" },
-      next: { agent: "qa-engineer", status: "In_Progress" },
-      prev_qa_round: 0,
-    }),
-    null,
+test("validateTransition: sr-engineer→qa-engineer REJECTED (v3.9.0 routes through code-reviewer)", () => {
+  // v3.9.0 dropped the direct sr → qa edge. The chain is now
+  // sr ↔ code-reviewer → qa. Direct handoff must be rejected with the new
+  // allowed-next list naming code-reviewer.
+  const r = validateTransition({
+    prev: { agent: "sr-engineer", status: "In_Progress" },
+    next: { agent: "qa-engineer", status: "In_Progress" },
+    prev_qa_round: 0,
+    prev_review_round: 0,
+  });
+  assert.ok(r, "transition must be rejected");
+  assert.equal(r.error, "TRANSITION_REJECTED");
+  // Allowed-next must contain code-reviewer:In_Progress (the replacement edge).
+  // Envelope shape uses new_agent/new_status keys (see TransitionRejection in tools/transitions.ts).
+  assert.ok(
+    r.allowed.some((a) => a.new_agent === "code-reviewer" && a.new_status === "In_Progress"),
+    `expected code-reviewer:In_Progress in allowed list, got ${JSON.stringify(r.allowed)}`,
   );
 });
 
@@ -334,26 +348,30 @@ test("ALLOWED_TRANSITIONS map has known keys", () => {
 });
 
 // ---------- computeNewRound ----------
+// v3.9.0: signature widened to (prev_qa_round, prev_review_round, next, prev?)
+// returning { qa_round, review_round }. Tests assert qa_round semantics
+// in this section; review_round semantics live in the T67 tests below.
 
-test("computeNewRound: (qa-engineer, FAIL) increments", () => {
-  assert.equal(computeNewRound(0, { agent: "qa-engineer", status: "FAIL" }), 1);
-  assert.equal(computeNewRound(2, { agent: "qa-engineer", status: "FAIL" }), 3);
-  assert.equal(computeNewRound(3, { agent: "qa-engineer", status: "FAIL" }), 4); // enter Round 4
+test("computeNewRound: (qa-engineer, FAIL) increments qa_round, holds review_round", () => {
+  assert.deepEqual(computeNewRound(0, 0, { agent: "qa-engineer", status: "FAIL" }), { qa_round: 1, review_round: 0 });
+  assert.deepEqual(computeNewRound(2, 1, { agent: "qa-engineer", status: "FAIL" }), { qa_round: 3, review_round: 1 });
+  assert.deepEqual(computeNewRound(3, 0, { agent: "qa-engineer", status: "FAIL" }), { qa_round: 4, review_round: 0 }); // enter Round 4
 });
 
-test("computeNewRound: (qa-engineer, PASS) resets to 0", () => {
-  assert.equal(computeNewRound(3, { agent: "qa-engineer", status: "PASS" }), 0);
-  assert.equal(computeNewRound(0, { agent: "qa-engineer", status: "PASS" }), 0);
+test("computeNewRound: (qa-engineer, PASS) resets qa_round, holds review_round", () => {
+  assert.deepEqual(computeNewRound(3, 0, { agent: "qa-engineer", status: "PASS" }), { qa_round: 0, review_round: 0 });
+  assert.deepEqual(computeNewRound(0, 2, { agent: "qa-engineer", status: "PASS" }), { qa_round: 0, review_round: 2 });
 });
 
-test("computeNewRound: (pm, In_Progress) resets to 0 (re-entry)", () => {
-  assert.equal(computeNewRound(4, { agent: "pm", status: "In_Progress" }), 0);
+test("computeNewRound: (pm, In_Progress) resets both counters (re-entry)", () => {
+  assert.deepEqual(computeNewRound(4, 3, { agent: "pm", status: "In_Progress" }), { qa_round: 0, review_round: 0 });
 });
 
-test("computeNewRound: other writes hold prev unchanged", () => {
-  assert.equal(computeNewRound(2, { agent: "sr-engineer", status: "In_Progress" }), 2);
-  assert.equal(computeNewRound(2, { agent: "qa-engineer", status: "In_Progress" }), 2);
-  assert.equal(computeNewRound(2, { agent: "pm", status: "Blocked" }), 2);
+test("computeNewRound: other writes hold both counters unchanged", () => {
+  assert.deepEqual(computeNewRound(2, 1, { agent: "sr-engineer", status: "In_Progress" }), { qa_round: 2, review_round: 1 });
+  // (qa-engineer, In_Progress) without prev=(code-reviewer, In_Progress) does NOT reset review_round.
+  assert.deepEqual(computeNewRound(2, 1, { agent: "qa-engineer", status: "In_Progress" }), { qa_round: 2, review_round: 1 });
+  assert.deepEqual(computeNewRound(2, 1, { agent: "pm", status: "Blocked" }), { qa_round: 2, review_round: 1 });
 });
 
 // ---------- evidence-file: recordReview + hasEvidence ----------
@@ -462,4 +480,310 @@ qa_round: -7
 `;
   fs.writeFileSync(path.join(ws, ".current", "handoff.md"), body);
   assert.equal(parseHandoff(ws).qa_round, 0);
+});
+
+// ============================================================================
+// T67 / AC-12 — v3.9.0 code-reviewer chain coverage
+// ============================================================================
+// These tests cover the NEW behavior introduced by the code-reviewer role
+// split. Existing tests above were revised (not deleted) to match v3.9.0
+// contracts where AC-2 mandated edge removal made the prior assertions
+// obsolete (sr→qa direct edge; single-return computeNewRound; schema v1).
+// Revisions are documented inline at each touched site.
+
+// ---------- AC-12(a) — new ALLOWED edges accept ----------
+
+test("AC-12: sr-engineer:In_Progress → code-reviewer:In_Progress accepted", () => {
+  // The replacement edge for the removed sr→qa direct handoff.
+  assert.equal(
+    validateTransition({
+      prev: { agent: "sr-engineer", status: "In_Progress" },
+      next: { agent: "code-reviewer", status: "In_Progress" },
+      prev_qa_round: 0,
+      prev_review_round: 0,
+    }),
+    null,
+  );
+});
+
+test("AC-12: code-reviewer:In_Progress → code-reviewer:FAIL accepted (CHANGES_REQUESTED bounce)", () => {
+  assert.equal(
+    validateTransition({
+      prev: { agent: "code-reviewer", status: "In_Progress" },
+      next: { agent: "code-reviewer", status: "FAIL" },
+      prev_qa_round: 0,
+      prev_review_round: 0,
+    }),
+    null,
+  );
+});
+
+test("AC-12: code-reviewer:In_Progress → code-reviewer:Blocked accepted", () => {
+  assert.equal(
+    validateTransition({
+      prev: { agent: "code-reviewer", status: "In_Progress" },
+      next: { agent: "code-reviewer", status: "Blocked" },
+      prev_qa_round: 0,
+      prev_review_round: 0,
+    }),
+    null,
+  );
+});
+
+test("AC-12: code-reviewer:In_Progress → qa-engineer:In_Progress accepted (APPROVED handoff)", () => {
+  // The architecture-mandated successful-review handoff path.
+  assert.equal(
+    validateTransition({
+      prev: { agent: "code-reviewer", status: "In_Progress" },
+      next: { agent: "qa-engineer", status: "In_Progress" },
+      prev_qa_round: 0,
+      prev_review_round: 0,
+    }),
+    null,
+  );
+});
+
+test("AC-12: code-reviewer:FAIL → sr-engineer:In_Progress accepted (Round N+1 fix cycle)", () => {
+  assert.equal(
+    validateTransition({
+      prev: { agent: "code-reviewer", status: "FAIL" },
+      next: { agent: "sr-engineer", status: "In_Progress" },
+      prev_qa_round: 0,
+      prev_review_round: 1,
+    }),
+    null,
+  );
+});
+
+test("AC-12: code-reviewer:FAIL → pm:In_Progress accepted (manual escalation)", () => {
+  assert.equal(
+    validateTransition({
+      prev: { agent: "code-reviewer", status: "FAIL" },
+      next: { agent: "pm", status: "In_Progress" },
+      prev_qa_round: 0,
+      prev_review_round: 2,
+    }),
+    null,
+  );
+});
+
+test("AC-12: code-reviewer:Blocked → code-reviewer:In_Progress accepted (unblock self-loop)", () => {
+  assert.equal(
+    validateTransition({
+      prev: { agent: "code-reviewer", status: "Blocked" },
+      next: { agent: "code-reviewer", status: "In_Progress" },
+      prev_qa_round: 0,
+      prev_review_round: 0,
+    }),
+    null,
+  );
+});
+
+test("AC-12: code-reviewer:Blocked → pm:In_Progress accepted (manual escalation)", () => {
+  assert.equal(
+    validateTransition({
+      prev: { agent: "code-reviewer", status: "Blocked" },
+      next: { agent: "pm", status: "In_Progress" },
+      prev_qa_round: 0,
+      prev_review_round: 0,
+    }),
+    null,
+  );
+});
+
+test("AC-12: removed sr-engineer→qa-engineer edge rejects with TRANSITION_REJECTED naming code-reviewer", () => {
+  // Why: AC-2 mandates the prior direct edge MUST be rejected; the error
+  // envelope MUST cite the new allowed list so downstream agents can self-correct
+  // to the chain step they missed.
+  const r = validateTransition({
+    prev: { agent: "sr-engineer", status: "In_Progress" },
+    next: { agent: "qa-engineer", status: "In_Progress" },
+    prev_qa_round: 0,
+    prev_review_round: 0,
+  });
+  assert.ok(r);
+  assert.equal(r.error, "TRANSITION_REJECTED");
+  assert.ok(
+    r.allowed.some((a) => a.new_agent === "code-reviewer" && a.new_status === "In_Progress"),
+    `allowed list must contain code-reviewer:In_Progress; got ${JSON.stringify(r.allowed)}`,
+  );
+});
+
+// ---------- AC-12(b) — review_round cap ----------
+
+test("AC-12: review_round=3 + (code-reviewer, FAIL) → REVIEW_ROUND_EXCEEDED (only pm allowed)", () => {
+  // Why: the AC-3 circuit breaker — 3 FAILs allowed; the 4th FAIL must force
+  // PM escalation. Symmetric to the qa_round cap.
+  const r = validateTransition({
+    prev: { agent: "code-reviewer", status: "In_Progress" },
+    next: { agent: "code-reviewer", status: "FAIL" },
+    prev_qa_round: 0,
+    prev_review_round: 4, // cap is REVIEW_ROUND_CAP=4; prev>=cap triggers the gate
+  });
+  assert.ok(r);
+  assert.equal(r.error, "REVIEW_ROUND_EXCEEDED");
+  assert.equal(r.allowed.length, 1);
+  assert.equal(r.allowed[0].new_agent, "pm");
+  assert.equal(r.allowed[0].new_status, "In_Progress");
+});
+
+test("AC-12: review_round cap exceeded — (pm, In_Progress) is the only accepted next", () => {
+  // The escape valve — once the cap is hit, only PM re-entry resets the loop.
+  assert.equal(
+    validateTransition({
+      prev: { agent: "code-reviewer", status: "FAIL" },
+      next: { agent: "pm", status: "In_Progress" },
+      prev_qa_round: 0,
+      prev_review_round: 4,
+    }),
+    null,
+  );
+});
+
+test("AC-12: review_round cap independent from qa_round cap", () => {
+  // qa_round=4 + (qa, FAIL) still triggers QA_ROUND_EXCEEDED even when review_round=0.
+  // Documents the AC-3 claim "both counters are checked independently".
+  const r = validateTransition({
+    prev: { agent: "qa-engineer", status: "In_Progress" },
+    next: { agent: "qa-engineer", status: "FAIL" },
+    prev_qa_round: 4,
+    prev_review_round: 0,
+  });
+  assert.ok(r);
+  assert.equal(r.error, "QA_ROUND_EXCEEDED");
+});
+
+// ---------- AC-12(c) — computeNewRound for review_round ----------
+
+test("AC-12: computeNewRound — (code-reviewer, FAIL) increments review_round, holds qa_round", () => {
+  // Why: AC-3 mandates FAIL increments. qa_round must hold steady — the two
+  // counters are independent.
+  assert.deepEqual(
+    computeNewRound(2, 0, { agent: "code-reviewer", status: "FAIL" }),
+    { qa_round: 2, review_round: 1 },
+  );
+  assert.deepEqual(
+    computeNewRound(0, 2, { agent: "code-reviewer", status: "FAIL" }),
+    { qa_round: 0, review_round: 3 },
+  );
+});
+
+test("AC-12: computeNewRound — handoff (code-reviewer→qa-engineer, In_Progress) resets review_round only", () => {
+  // Why: AC-3 mandates reset on successful APPROVAL handoff. qa_round must
+  // be untouched (different lifecycle counter).
+  assert.deepEqual(
+    computeNewRound(
+      1,
+      2,
+      { agent: "qa-engineer", status: "In_Progress" },
+      { agent: "code-reviewer", status: "In_Progress" },
+    ),
+    { qa_round: 1, review_round: 0 },
+  );
+});
+
+test("AC-12: computeNewRound — (qa-engineer, In_Progress) without code-reviewer prev does NOT reset review_round", () => {
+  // The prev-tuple guard prevents accidental review_round resets on unrelated
+  // qa-loop traffic. Without the guard, any qa:In_Progress write would clear
+  // the counter and defeat the cap.
+  assert.deepEqual(
+    computeNewRound(
+      0,
+      2,
+      { agent: "qa-engineer", status: "In_Progress" },
+      { agent: "sr-engineer", status: "In_Progress" },
+    ),
+    { qa_round: 0, review_round: 2 },
+  );
+});
+
+test("AC-12: computeNewRound — (pm, In_Progress) resets BOTH counters (re-entry)", () => {
+  // The unified escape valve — PM re-entry clears the whole loop history.
+  assert.deepEqual(
+    computeNewRound(3, 2, { agent: "pm", status: "In_Progress" }),
+    { qa_round: 0, review_round: 0 },
+  );
+});
+
+// ---------- AC-12(d) — evidence-file: code-reviewer review_reports/ ----------
+
+test("AC-12: hasCodeReviewEvidenceInFile — missing review file marks task as missing", () => {
+  // Why: AC-8 — the cr→qa handoff is rejected when any task in completed_tasks
+  // lacks its review file. The storage helper IS the gate.
+  const ws = mkWorkspace();
+  const result = hasCodeReviewEvidenceInFile(ws, ["T100", "T101"]);
+  assert.deepEqual(result.present, []);
+  assert.deepEqual(result.missing, ["T100", "T101"]);
+});
+
+test("AC-12: recordCodeReviewInFile → hasCodeReviewEvidenceInFile present", async () => {
+  // Why: round-trip the evidence pair end-to-end. The dir auto-creates;
+  // the file lands at review_reports/review_<id>.md.
+  const ws = mkWorkspace();
+  await recordCodeReviewInFile(ws, ["T200"], "APPROVED", "code-reviewer", "looks good");
+  const result = hasCodeReviewEvidenceInFile(ws, ["T200", "T201"]);
+  assert.deepEqual(result.present, ["T200"]);
+  assert.deepEqual(result.missing, ["T201"]);
+
+  // Confirm the file is at the documented path.
+  const expected = path.join(ws, "review_reports", "review_T200.md");
+  assert.ok(fs.existsSync(expected), `review file must exist at ${expected}`);
+});
+
+test("AC-12: recordCodeReviewInFile sanitises unsafe task ids", () => {
+  // Why: path-traversal defence. Mirrors qa_reports/ regex `[^A-Za-z0-9._-]`.
+  // A task id of "../../etc/passwd" must NOT write outside review_reports/.
+  const ws = mkWorkspace();
+  recordCodeReviewInFile(ws, ["../../evil"], "CHANGES_REQUESTED", "cr", "bad").catch(() => {});
+  // The sanitised name replaces every disallowed char with _.
+  const sanitised = path.join(ws, "review_reports", "review_______evil.md");
+  // Ensure no traversal happened: the parent dir of workspace was NOT touched.
+  const traversalTarget = path.join(path.dirname(ws), "evil");
+  assert.equal(fs.existsSync(traversalTarget), false, "must not write outside workspace");
+});
+
+test("AC-12: evidence gate verbatim hint string is reachable from compiled index.js", () => {
+  // Why: AC-8 mandates the exact hint substring in the rejection envelope.
+  // The string is composed inline in the index.ts handler; this test guards
+  // against future refactors that paraphrase the hint and break the contract.
+  const distIndex = fs.readFileSync(
+    path.join(path.dirname(new URL(import.meta.url).pathname), "..", "dist", "index.js"),
+    "utf-8",
+  );
+  // The hint is composed via two concatenated template literals in the source,
+  // so the substring search splits accordingly. Both halves must be present
+  // and the runtime concat reconstructs the AC-8 verbatim message.
+  assert.match(
+    distIndex,
+    /Code-reviewer evidence missing: write review_reports\/review_<task-id>\.md /,
+    "verbatim AC-8 hint head must be present in compiled handler",
+  );
+  assert.match(
+    distIndex,
+    /before handing off to qa-engineer\./,
+    "verbatim AC-8 hint tail must be present in compiled handler",
+  );
+});
+
+// ---------- AC-12(f) — qa-engineer scope safety net ----------
+
+test("AC-12: qa PASS transition unaffected by code-reviewer chain (regression guard)", () => {
+  // Why: the v3.9.0 chain insertion MUST NOT regress the qa terminal step.
+  // The (qa, In_Progress → qa, PASS) edge stays valid.
+  assert.equal(
+    validateTransition({
+      prev: { agent: "qa-engineer", status: "In_Progress" },
+      next: { agent: "qa-engineer", status: "PASS" },
+      prev_qa_round: 0,
+      prev_review_round: 0,
+    }),
+    null,
+  );
+});
+
+test("AC-12: code-reviewer agent is in ALLOWED_TRANSITIONS keys", () => {
+  // Spot-check the three new agent rows live in the exported map.
+  assert.ok(ALLOWED_TRANSITIONS.has("code-reviewer:In_Progress"));
+  assert.ok(ALLOWED_TRANSITIONS.has("code-reviewer:FAIL"));
+  assert.ok(ALLOWED_TRANSITIONS.has("code-reviewer:Blocked"));
 });

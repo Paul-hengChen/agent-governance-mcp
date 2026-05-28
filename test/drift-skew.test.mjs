@@ -71,7 +71,7 @@ qa_round: 0
   const report = JSON.parse(detectDrift(ws));
   assert.equal(report.driftDetected, true);
   assert.ok(
-    report.details.some((d) => /Schema version skew: handoff on-disk v99 > server max v1/.test(d)),
+    report.details.some((d) => /Schema version skew: handoff on-disk v99 > server max v2/.test(d)),
     `expected handoff skew reason in ${JSON.stringify(report.details)}`,
   );
 });
