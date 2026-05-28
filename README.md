@@ -718,23 +718,36 @@ flowchart TD
 
         ARCH["🏗️ architect  (optional — complex features)\n① tw_get_state → tw_detect_drift\n② read specs/＊.md\n③ write specs/＊-architecture.md\n   file list · data structs · interface contracts\n④ tw_update_state"]
 
-        ENG["⚙️ sr-engineer\n① tw_get_state → tw_detect_drift\n② clarification gate — block if ambiguous\n③ task-size check — block if > 5 files / 300 lines\n④ modify files\n⑤ tsc / mypy / cargo check — ZERO errors\n⑥ security checklist  ← OWASP basics\n⑦ tw_complete_task → tw_update_state"]
+        ENG["⚙️ sr-engineer\n① tw_get_state → tw_detect_drift\n② clarification gate — block if ambiguous\n③ task-size check — block if > 5 files / 300 lines\n④ modify files\n⑤ tsc / mypy / cargo check — ZERO errors\n⑥ security checklist  ← OWASP basics\n⑦ tw_update_state → code-reviewer"]
 
-        QA["🧪 qa-engineer\n① tw_get_state → tw_detect_drift\n② Phase 1 — review code\n③ Phase 2 — 3-round discussion  ← time-boxed\n④ Phase 3 — write tests\n   · spec-to-AC mapping\n   · ≥ 80% coverage gate\n   · security smoke tests\n⑤ Phase 4 — run + CI runnability check\n⑥ tw_complete_task / tw_rollback_task\n   tw_update_state"]
+        CR["👀 code-reviewer\n① tw_get_state → tw_detect_drift\n② read modified files\n③ write review_reports/review_＊.md\n④ tw_update_state (status=In_Progress)\n   · approved → qa-engineer\n   · rejected → sr-engineer"]
+
+        QA["🧪 qa-engineer\n① tw_get_state → tw_detect_drift\n② Phase 1 — review code (if needed)\n③ Phase 2 — 3-round discussion\n④ Phase 3 — write tests (conditional)\n   · spec-to-AC mapping\n   · ≥ 80% coverage gate\n   · security smoke tests\n⑤ Phase 4 — run + CI runnability check\n⑥ tw_complete_task / tw_rollback_task\n   tw_update_state"]
+    end
+
+    subgraph SIDE_CHANNELS ["🔧 Side-Channel Roles (post-PASS)"]
+        DW["✍️ doc-writer\n① verify PASS state\n② update README / CHANGELOG / docs\n③ tw_update_state (impersonates caller)"]
+        RE["🚀 release-engineer\n① verify PASS state\n② bump version / tag / build\n③ tw_update_state (impersonates caller)"]
     end
 
     DA --> PM
     PM --> ARCH
     ARCH --> ENG
-    ENG --> QA
-
+    ENG --> CR
+    CR -- "❌ rejected" --> ENG
+    CR -- "✅ approved" --> QA
+    
     QA -- "✅ PASS" --> DONE(["handoff.md\nstatus = PASS"])
     QA -- "❌ FAIL" --> ROLL["tw_rollback_task\ntask checkbox reverted"]
     ROLL --> ENG
+    
+    DONE -. "manual /tw_switch_role" .-> DW
+    DONE -. "manual /tw_switch_role" .-> RE
 
     style BOOT fill:#e3f2fd,stroke:#1976D2,color:#000
     style ROUTING fill:#fff8e1,stroke:#F57F17,color:#000
     style PIPELINE fill:#f3e5f5,stroke:#7B1FA2,color:#000
+    style SIDE_CHANNELS fill:#e8f5e9,stroke:#388E3C,color:#000
 ```
 ### Typical Multi-Phase Feature Flow
 
@@ -743,8 +756,9 @@ User: "add dark mode"
   └─▶ pm        → specs/dark-mode.md + tasks.md (T01–T04)
        └─▶ architect  → specs/dark-mode-architecture.md
             └─▶ sr-engineer  → implements T01–T04, build PASS
-                 └─▶ qa-engineer → reviews, writes tests, PASS
-                      └─▶ handoff.md: status = PASS ✅
+                 └─▶ code-reviewer → reviews, approves
+                      └─▶ qa-engineer → reviews, writes tests, PASS
+                           └─▶ handoff.md: status = PASS ✅
 ```
 
 ### Automated Per-Write Pipeline (v3.2.0)
