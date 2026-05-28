@@ -16,6 +16,42 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.9.1] - 2026-05-28
+
+### Added
+- QA test coverage for the v3.9.0 code-reviewer chain (T67 / AC-12).
+  33 new tests across `test/qa-flow.test.mjs` and the new
+  `test/handoff-migration.test.mjs`: every new `code-reviewer:*`
+  ALLOWED edge accepts; the removed `sr-engineer:In_Progress →
+  qa-engineer:In_Progress` edge rejects with allowed-list naming
+  code-reviewer; `REVIEW_ROUND_EXCEEDED` cap symmetric to qa_round;
+  `computeNewRound` review_round semantics (FAIL increments,
+  APPROVED-handoff reset gated on `prev=(code-reviewer, In_Progress)`,
+  PM resets both counters); evidence-file round-trip + sanitisation;
+  AC-8 verbatim hint reachability in compiled `dist/index.js`; AC-9
+  stderr migration warning fires on `sr-engineer:In_Progress` and is
+  silent otherwise (and on already-v2 files).
+
+### Changed
+- Revised 26 v3.8.3-era contract tests in-place across
+  `schema-versions.test.mjs`, `handoff-versioning.test.mjs`,
+  `sqlite-versioning.test.mjs`, `qa-flow.test.mjs`,
+  `qa-visual-skill-split.test.mjs`, `drift-skew.test.mjs`. The
+  pre-existing assertions encoded contracts removed by v3.9.0 AC-2
+  (direct sr→qa edge, single-return `computeNewRound`, schema v1
+  CURRENT). "Additive only" wording in AC-12(f) was structurally
+  impossible alongside AC-2; this release ships the resolution.
+- Sqlite-versioning tests now bootstrap `handoff_state` before calling
+  `runSqliteMigrations` standalone, mirroring the production ctor
+  flow where the schema is created before migration runs.
+
+### Notes
+- 297/297 tests pass; `tsc` clean; `scripts/check-version.mjs` OK.
+- No runtime / wire-protocol changes vs v3.9.0 — patch-only test
+  coverage + version bump. Consumers pinned at `#v3.9.0` keep working;
+  `#v3.9.1` is recommended for anyone running `npm test` against the
+  shipped checkout.
+
 ## [3.9.0] - 2026-05-28
 
 ### Added
