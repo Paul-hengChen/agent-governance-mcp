@@ -1,4 +1,5 @@
 import type { HandoffStorage, HandoffState, TaskRecord, EvidenceCheck } from "./storage.js";
+import type { WriteHandoffStateOptions } from "./handoff.js";
 import { type PrdChunk, type InvalidationKey } from "./rag.js";
 export declare class SqliteHandoffStorage implements HandoffStorage {
     private db;
@@ -28,6 +29,8 @@ export declare class SqliteHandoffStorage implements HandoffStorage {
     private fetchLastUpdated;
     parse(workspacePath: string): HandoffState | null;
     readState(workspacePath: string): string;
+    writeState(opts: WriteHandoffStateOptions): Promise<string>;
+    /** @deprecated v3.15.0: prefer the options-object overload. */
     writeState(workspacePath: string, activeFeature: string, status: string, completedTasks: string[], pendingNotes: string[], blockingReason?: string, lastAgent?: string, qaRound?: number, prdPath?: string, reviewRound?: number, visualRound?: number): Promise<string>;
     listTasks(workspacePath: string): TaskRecord[] | null;
     getNextTask(workspacePath: string): string;

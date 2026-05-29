@@ -4,7 +4,13 @@
 // SqliteHandoffStorage (HTTP mode) implements the same interface against a DB
 // so remote / containerized deployments need no mounted workspace files.
 
-import { parseHandoff, readHandoffState, writeHandoffState, type HandoffState } from "./handoff.js";
+import {
+  parseHandoff,
+  readHandoffState,
+  writeHandoffState,
+  type HandoffState,
+  type WriteHandoffStateOptions,
+} from "./handoff.js";
 import {
   parseTasksFromFile,
   getNextTaskFromFile,
@@ -30,6 +36,14 @@ export interface EvidenceCheck {
 export interface HandoffStorage {
   // --- Handoff state ---
   readState(workspacePath: string): string;
+  // v3.15.0 dual API: prefer the options-object overload; positional is
+  // @deprecated and slated for removal in v4.0.0.
+  writeState(opts: WriteHandoffStateOptions): Promise<string>;
+  /**
+   * @deprecated v3.15.0: prefer the options-object overload
+   * `writeState({ workspacePath, activeFeature, status, ... })`.
+   * Positional signature retained for backwards-compat; planned removal in v4.0.0.
+   */
   writeState(
     workspacePath: string,
     activeFeature: string,
@@ -83,6 +97,8 @@ export class FileHandoffStorage implements HandoffStorage {
     return readHandoffState(workspacePath);
   }
 
+  writeState(opts: WriteHandoffStateOptions): Promise<string>;
+  /** @deprecated v3.15.0: prefer the options-object overload. */
   writeState(
     workspacePath: string,
     activeFeature: string,
@@ -95,8 +111,37 @@ export class FileHandoffStorage implements HandoffStorage {
     prdPath?: string,
     reviewRound?: number,
     visualRound?: number,
+  ): Promise<string>;
+  writeState(
+    workspacePathOrOpts: string | WriteHandoffStateOptions,
+    activeFeature?: string,
+    status?: string,
+    completedTasks?: string[],
+    pendingNotes?: string[],
+    blockingReason?: string,
+    lastAgent?: string,
+    qaRound?: number,
+    prdPath?: string,
+    reviewRound?: number,
+    visualRound?: number,
   ): Promise<string> {
-    return writeHandoffState(workspacePath, activeFeature, status, completedTasks, pendingNotes, blockingReason, lastAgent, qaRound, prdPath, reviewRound, visualRound);
+    // Forward to writeHandoffState whichever overload matches the caller.
+    if (typeof workspacePathOrOpts === "object" && !Array.isArray(workspacePathOrOpts)) {
+      return writeHandoffState(workspacePathOrOpts);
+    }
+    return writeHandoffState(
+      workspacePathOrOpts as string,
+      activeFeature as string,
+      status as string,
+      completedTasks ?? [],
+      pendingNotes ?? [],
+      blockingReason,
+      lastAgent,
+      qaRound,
+      prdPath,
+      reviewRound,
+      visualRound,
+    );
   }
 
   parse(workspacePath: string): HandoffState | null {

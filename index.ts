@@ -55,6 +55,7 @@ import {
 import {
   hasVisualBaselinesInDesign,
   hasVisualEvidenceInFile,
+  hasUncheckedWidgets,
 } from "./tools/evidence-file.js";
 
 // ==========================================
@@ -196,7 +197,7 @@ function formatZodError(err: z.ZodError): string {
 // ==========================================
 // Storage adapter defaults to FileHandoffStorage; HTTP-mode boot switches it via setActiveStorage().
 const server = new Server(
-  { name: "agent-governance-mcp", version: "3.14.1" },
+  { name: "agent-governance-mcp", version: "3.15.0" },
   { capabilities: { tools: {}, prompts: {} } }
 );
 
@@ -726,6 +727,30 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 isError: true,
               };
             }
+            // v3.15.0 — R6 server-enforced Widget Shape Verification gate.
+            // The previous gate confirmed every required visual_<id>.md exists.
+            // This gate now verifies the contents: any unchecked `[ ]` row in
+            // `## Widget Shape Verification` rejects PASS with the full list
+            // (per AC-4: one round-trip to surface every offending widget).
+            // Backwards-compat: visual reports without the `## Widget Shape
+            // Verification` section pass through (per AC-2/AC-3 — pre-v3.15.0
+            // reports didn't have the section, so absence = no claim).
+            const widgetsCheck = hasUncheckedWidgets(parsed.workspace_path, parsed.completed_tasks);
+            if (!widgetsCheck.ok) {
+              const listing = Object.entries(widgetsCheck.uncheckedByTaskId)
+                .map(([taskId, widgets]) => `${taskId}: [${widgets.join(", ")}]`)
+                .join("; ");
+              return {
+                content: [{
+                  type: "text" as const,
+                  text:
+                    `⛔ VISUAL_WIDGETS_UNVERIFIED: ${listing}. ` +
+                    `Unchecked widget row(s) in qa_reports/visual_<id>.md. ` +
+                    `Edit the visual report to mark each verified widget as [x] before retrying PASS.`,
+                }],
+                isError: true,
+              };
+            }
           }
         }
 
@@ -767,10 +792,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           parsed.pending_notes,
         );
         const pending = [...parsed.pending_notes];
-        if (new_qa_round === 4 && prev_qa_round === 3) {
+        // v3.15.0 — symmetric cap-cross predicate fix.
+        // v3.14.0 used `=== 4 && === 3` which would skip the sentinel when
+        // prev_round arrived at the handler at a value already past 3
+        // (migration / hand-edit). v3.14.1 fixed visual_round; v3.15.0 brings
+        // qa_round and review_round in line. Predicate: `new >= 4 && prev < 4`
+        // fires exactly once per cap-cross from any prior value.
+        if (new_qa_round >= 4 && prev_qa_round < 4) {
           pending.unshift("⛔ Round 4: forced rollback to pm — no further QA allowed until PM resets.");
         }
-        if (new_review_round === 4 && prev_review_round === 3) {
+        if (new_review_round >= 4 && prev_review_round < 4) {
           pending.unshift("⛔ Review Round 4: forced rollback to pm — no further code-review allowed until PM resets.");
         }
         // v3.14.0 — visual_round Round 6 lock (5 visual FAILs accumulated).
@@ -783,19 +814,23 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           pending.unshift("⛔ Visual Round 6: forced rollback to pm — no further pixel iteration allowed until PM rebudgets scope or threshold.");
         }
 
-        const result = await storage.writeState(
-          parsed.workspace_path,
-          parsed.active_feature,
-          parsed.status,
-          parsed.completed_tasks,
-          pending,
-          parsed.blocking_reason,
-          parsed.agent_id,
-          new_qa_round,
-          parsed.prd_path,
-          new_review_round,
-          new_visual_round,
-        );
+        // v3.15.0 — call site uses the new options-object overload of
+        // storage.writeState. Each field is named, eliminating the
+        // 11-positional risk that motivated the refactor. The positional
+        // overload remains @deprecated for backwards-compat callers.
+        const result = await storage.writeState({
+          workspacePath: parsed.workspace_path,
+          activeFeature: parsed.active_feature,
+          status: parsed.status,
+          completedTasks: parsed.completed_tasks,
+          pendingNotes: pending,
+          blockingReason: parsed.blocking_reason,
+          lastAgent: parsed.agent_id,
+          qaRound: new_qa_round,
+          prdPath: parsed.prd_path,
+          reviewRound: new_review_round,
+          visualRound: new_visual_round,
+        });
 
         // GC hook: when QA flips a feature to PASS, drop the workspace's RAG
         // chunks so the next feature starts clean. Await any concurrent lazy

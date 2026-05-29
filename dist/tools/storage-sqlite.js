@@ -256,7 +256,32 @@ export class SqliteHandoffStorage {
         };
         return JSON.stringify({ exists: true, ...view });
     }
-    writeState(workspacePath, activeFeature, status, completedTasks, pendingNotes, blockingReason, lastAgent, qaRound, prdPath, reviewRound, visualRound) {
+    writeState(workspacePathOrOpts, activeFeature, status, completedTasks, pendingNotes, blockingReason, lastAgent, qaRound, prdPath, reviewRound, visualRound) {
+        // v3.15.0 dual API: discriminate by first-arg shape.
+        let workspacePath;
+        if (typeof workspacePathOrOpts === "object" && !Array.isArray(workspacePathOrOpts)) {
+            const o = workspacePathOrOpts;
+            workspacePath = o.workspacePath;
+            activeFeature = o.activeFeature;
+            status = o.status;
+            completedTasks = o.completedTasks ?? [];
+            pendingNotes = o.pendingNotes ?? [];
+            blockingReason = o.blockingReason;
+            lastAgent = o.lastAgent;
+            qaRound = o.qaRound;
+            prdPath = o.prdPath;
+            reviewRound = o.reviewRound;
+            visualRound = o.visualRound;
+        }
+        else {
+            workspacePath = workspacePathOrOpts;
+            completedTasks = completedTasks ?? [];
+            pendingNotes = pendingNotes ?? [];
+        }
+        const _activeFeature = activeFeature;
+        const _status = status;
+        const _completedTasks = completedTasks;
+        const _pendingNotes = pendingNotes;
         const currentLastUpdated = this.fetchLastUpdated(workspacePath);
         verifyExtra(workspacePath, SNAPSHOT_KEY, currentLastUpdated);
         const normalisedRound = Number.isFinite(qaRound) && qaRound >= 0 ? Math.floor(qaRound) : 0;
@@ -274,7 +299,7 @@ export class SqliteHandoffStorage {
             effectivePrdPath = existing?.prd_path ?? null;
         }
         const now = new Date().toISOString();
-        this.txUpsert(workspacePath, activeFeature, status, now, blockingReason ?? null, lastAgent ?? null, JSON.stringify(completedTasks), JSON.stringify(pendingNotes), normalisedRound, effectivePrdPath, normalisedReviewRound, normalisedVisualRound, currentLastUpdated);
+        this.txUpsert(workspacePath, _activeFeature, _status, now, blockingReason ?? null, lastAgent ?? null, JSON.stringify(_completedTasks), JSON.stringify(_pendingNotes), normalisedRound, effectivePrdPath, normalisedReviewRound, normalisedVisualRound, currentLastUpdated);
         snapshotExtra(workspacePath, SNAPSHOT_KEY, now);
         return Promise.resolve(JSON.stringify({ success: true, storage: "sqlite", updated_at: now }));
     }

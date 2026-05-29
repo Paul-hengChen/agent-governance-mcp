@@ -16,6 +16,99 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.15.0] - 2026-05-29
+
+MINOR release activating the R6 server-enforced widget verification gate
+that v3.14.0 architecture §A intentionally reserved for v3.15.0, refactoring
+`writeHandoffState` / `HandoffStorage.writeState` to a dual API (positional
+`@deprecated`, options-object new), and bringing the `qa_round` / `review_round`
+Round 4 sentinel predicates in line with v3.14.1's `visual_round` Round 6 fix.
+
+Backwards-compatible: workspaces without `design/<feature>.md` see no
+behaviour change; v3.14.x visual reports without a `## Widget Shape
+Verification` H2 still accept (the gate verifies CLAIMED checks, not
+mandates the claim shape); positional `writeState` callers still work.
+
+### Added
+
+- **R6 server-enforced Widget Shape Verification gate** —
+  `index.ts` runs `hasUncheckedWidgets(workspace, completed_tasks)` after
+  the v3.14.0 `VISUAL_EVIDENCE_MISSING` gate. The new helper in
+  `tools/evidence-file.ts` parses each `qa_reports/visual_<id>.md`,
+  locates the `## Widget Shape Verification` H2 section, and reports
+  rows whose bracket is not `[x]` / `[X]`. Any unchecked row → server
+  rejects PASS with the new error code `VISUAL_WIDGETS_UNVERIFIED`,
+  listing every offending task-id and widget-id inline so the operator
+  fixes everything in one round-trip. The error code was reserved in
+  v3.14.0 architecture §A — it is now active.
+- **`parseVisualWidgetsChecklist`** and **`hasUncheckedWidgets`** exports
+  in `tools/evidence-file.ts`. Pure parser + composition helper. Permissive
+  on whitespace, strict on bracket content (`[Y]` / `[ ]` / `[garbage]`
+  → unchecked, catching operator typos rather than silently accepting).
+- **`WriteHandoffStateOptions`** interface in `tools/handoff.ts`. The
+  options-object overload accepts every field that the 11-positional
+  signature used to require, with sensible defaults for the optional
+  ones.
+
+### Changed
+
+- **`writeHandoffState` dual API** — `tools/handoff.ts` now exposes
+  both the legacy positional signature (now `@deprecated v3.15.0` with
+  `removal in v4.0.0` migration hint) and a new options-object overload.
+  Discrimination is runtime-`typeof` on the first argument.
+- **`HandoffStorage.writeState` dual API** — `tools/storage.ts` interface
+  + `FileHandoffStorage` + `SqliteHandoffStorage` implementations all
+  support both call shapes. Implementations delegate to
+  `writeHandoffState` for both branches.
+- **`index.ts` handler call site** switched to the options-object form —
+  each field is named, eliminating the 11-positional risk that motivated
+  the refactor. Positional remains supported for backwards-compat callers.
+- **Round 4 sentinel predicates symmetric fix** — `index.ts:795-805`
+  predicates for `qa_round` and `review_round` Round 4 lock-injection
+  changed from `=== 4 && === 3` to `>= 4 && < 4`, matching v3.14.1's
+  `visual_round` Round 6 fix. All three counters now share the same
+  cap-cross detection semantics: fires exactly once per crossing from
+  any prior value (handles migration / hand-edit edge cases).
+
+### Tests
+
+- **+27 tests across 3 files**:
+  - `test/visual-widgets-unverified-gate.test.mjs` (new) — 14 tests
+    covering AC-1 through AC-5: unchecked-rejection, all-checked
+    acceptance, backwards-compat (missing section), error aggregation
+    across multiple task ids, permissive whitespace + strict bracket
+    content (`[x]` / `[X]` / `[Y]` / `[ ]` cases), case-insensitive
+    section heading, defensive edge cases (empty input, missing file,
+    section bounded by next `## `).
+  - `test/writestate-options-object.test.mjs` (new) — 8 tests covering
+    AC-6 through AC-10: options-object parity with positional,
+    all-fields persistence, compiled-handler call-site shape grep,
+    `@deprecated` JSDoc presence in both `handoff.ts` and `storage.ts`,
+    8-arg backwards-compat positional defaults, minimal options
+    defaults.
+  - `test/qa-flow.test.mjs` (extended) — 6 new tests covering
+    AC-11/AC-12/AC-13: qa_round + review_round Round 4 cap-cross
+    predicate from prev=3 (normal), from prev<3 (external-bump
+    handling), no-fire-past-cap, sentinel wording unchanged.
+- **Tally**: 371/371 (v3.14.1 baseline) → **398/398** passing.
+
+### Deferred to v3.16+
+
+- README "Why not spec-kit?" FAQ entry (positioning improvement; no
+  community pull yet).
+- spec-kit compatible command bridge.
+- tasks.md historical drift cleanup (105+ entries).
+- doc-writer / release-engineer routing-chain integration.
+
+### Notes
+
+- `npm audit` waiver unchanged from v3.14.1 (the `embedding_model`
+  allowlist closes the exploit path; transitive dep tree unchanged
+  because no patched upstream release exists).
+- Handoff schema NOT bumped — v3.15.0 changes API signatures and adds
+  one error code, but no new field is added to `HandoffState`.
+  `CURRENT_VERSIONS.handoff` stays at 3.
+
 ## [3.14.1] - 2026-05-29
 
 PATCH release closing three findings + six missing tests from the post-v3.14.0

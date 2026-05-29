@@ -12,6 +12,7 @@ import {
   verifyExtra,
 } from "../guards/session.js";
 import type { HandoffStorage, HandoffState, TaskRecord, EvidenceCheck } from "./storage.js";
+import type { WriteHandoffStateOptions } from "./handoff.js";
 import {
   cosineSim,
   embedText,
@@ -393,6 +394,8 @@ export class SqliteHandoffStorage implements HandoffStorage {
     return JSON.stringify({ exists: true, ...view });
   }
 
+  writeState(opts: WriteHandoffStateOptions): Promise<string>;
+  /** @deprecated v3.15.0: prefer the options-object overload. */
   writeState(
     workspacePath: string,
     activeFeature: string,
@@ -405,7 +408,44 @@ export class SqliteHandoffStorage implements HandoffStorage {
     prdPath?: string,
     reviewRound?: number,
     visualRound?: number,
+  ): Promise<string>;
+  writeState(
+    workspacePathOrOpts: string | WriteHandoffStateOptions,
+    activeFeature?: string,
+    status?: string,
+    completedTasks?: string[],
+    pendingNotes?: string[],
+    blockingReason?: string,
+    lastAgent?: string,
+    qaRound?: number,
+    prdPath?: string,
+    reviewRound?: number,
+    visualRound?: number,
   ): Promise<string> {
+    // v3.15.0 dual API: discriminate by first-arg shape.
+    let workspacePath: string;
+    if (typeof workspacePathOrOpts === "object" && !Array.isArray(workspacePathOrOpts)) {
+      const o = workspacePathOrOpts;
+      workspacePath = o.workspacePath;
+      activeFeature = o.activeFeature;
+      status = o.status;
+      completedTasks = o.completedTasks ?? [];
+      pendingNotes = o.pendingNotes ?? [];
+      blockingReason = o.blockingReason;
+      lastAgent = o.lastAgent;
+      qaRound = o.qaRound;
+      prdPath = o.prdPath;
+      reviewRound = o.reviewRound;
+      visualRound = o.visualRound;
+    } else {
+      workspacePath = workspacePathOrOpts as string;
+      completedTasks = completedTasks ?? [];
+      pendingNotes = pendingNotes ?? [];
+    }
+    const _activeFeature: string = activeFeature as string;
+    const _status: string = status as string;
+    const _completedTasks: string[] = completedTasks;
+    const _pendingNotes: string[] = pendingNotes;
     const currentLastUpdated = this.fetchLastUpdated(workspacePath);
     verifyExtra(workspacePath, SNAPSHOT_KEY, currentLastUpdated);
 
@@ -431,13 +471,13 @@ export class SqliteHandoffStorage implements HandoffStorage {
     const now = new Date().toISOString();
     this.txUpsert(
       workspacePath,
-      activeFeature,
-      status,
+      _activeFeature,
+      _status,
       now,
       blockingReason ?? null,
       lastAgent ?? null,
-      JSON.stringify(completedTasks),
-      JSON.stringify(pendingNotes),
+      JSON.stringify(_completedTasks),
+      JSON.stringify(_pendingNotes),
       normalisedRound,
       effectivePrdPath,
       normalisedReviewRound,

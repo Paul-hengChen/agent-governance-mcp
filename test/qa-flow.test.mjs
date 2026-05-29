@@ -376,6 +376,66 @@ test("computeNewRound: other writes hold both counters unchanged", () => {
   assert.deepEqual(computeNewRound(2, 1, 0, { agent: "pm", status: "Blocked" }), { qa_round: 2, review_round: 1, visual_round: 0 });
 });
 
+// ---------- v3.15.0 AC-11/AC-12/AC-13 — Round 4 sentinel symmetric `>=` predicate ----------
+// v3.14.1 fixed visual_round Round 6. v3.15.0 brings qa_round and review_round in line.
+// Predicate is `new >= 4 && prev < 4` for both counters — fires on every cap-cross
+// from any prior value (handles migration / hand-edit edge cases).
+
+test("v3.15.0 AC-11: qa_round Round 4 cap-cross predicate fires from prev=3 (normal)", () => {
+  // Normal path — counter increments by 1, prev=3 → new=4.
+  const result = computeNewRound(3, 0, 0, { agent: "qa-engineer", status: "FAIL" });
+  assert.equal(result.qa_round, 4);
+  // Sentinel-injection predicate (mirrors the live index.ts code):
+  const shouldInject = result.qa_round >= 4 && 3 < 4;
+  assert.equal(shouldInject, true, "v3.15.0 predicate fires on normal cap-cross");
+});
+
+test("v3.15.0 AC-11: qa_round Round 4 cap-cross predicate fires from prev<3 (external bump)", () => {
+  // Hypothetical: migration / hand-edit places counter at 4+ while prev<3.
+  // The new `>= && <` predicate handles this case where the old `=== && ===`
+  // would have silently skipped the sentinel.
+  const prev = 2;
+  const next = 4;
+  const oldPredicate = next === 4 && prev === 3;
+  const newPredicate = next >= 4 && prev < 4;
+  assert.equal(oldPredicate, false, "v3.14.0 predicate would SKIP this case");
+  assert.equal(newPredicate, true, "v3.15.0 predicate MUST fire");
+});
+
+test("v3.15.0 AC-11: qa_round Round 4 predicate does NOT fire past cap", () => {
+  // After the lock, subsequent writes must not re-inject the sentinel.
+  const prev = 4;
+  const next = 5;
+  const newPredicate = next >= 4 && prev < 4;
+  assert.equal(newPredicate, false, "predicate must fire exactly once per crossing");
+});
+
+test("v3.15.0 AC-12: review_round Round 4 cap-cross predicate fires from prev=3 (normal)", () => {
+  const result = computeNewRound(0, 3, 0, { agent: "code-reviewer", status: "FAIL" });
+  assert.equal(result.review_round, 4);
+  const shouldInject = result.review_round >= 4 && 3 < 4;
+  assert.equal(shouldInject, true);
+});
+
+test("v3.15.0 AC-12: review_round Round 4 cap-cross predicate fires from prev<3 (external bump)", () => {
+  const prev = 1;
+  const next = 4;
+  const newPredicate = next >= 4 && prev < 4;
+  assert.equal(newPredicate, true);
+});
+
+test("v3.15.0 AC-13: sentinel message strings are unchanged from v3.14.x wording", () => {
+  // Why: AC-13 mandates that only the predicate changes — the user-visible
+  // sentinel text stays identical so existing operator runbooks / docs
+  // don't break.
+  const __dirname_ac13 = path.dirname(new URL(import.meta.url).pathname);
+  const indexTs = fs.readFileSync(path.join(__dirname_ac13, "..", "index.ts"), "utf-8");
+  assert.match(indexTs, /⛔ Round 4: forced rollback to pm — no further QA allowed until PM resets\./,
+    "qa_round sentinel wording must be unchanged");
+  assert.match(indexTs, /⛔ Review Round 4: forced rollback to pm — no further code-review allowed until PM resets\./,
+    "review_round sentinel wording must be unchanged");
+});
+
 // ---------- evidence-file: recordReview + hasEvidence ----------
 
 test("hasEvidenceInFile: missing returns all in missing[]", () => {

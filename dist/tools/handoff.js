@@ -187,12 +187,37 @@ export function readHandoffState(workspacePath) {
     };
     return JSON.stringify({ exists: true, ...view });
 }
-/**
- * Write handoff state with enforced formatting.
- * Pending notes are written as plain list items (not checkboxes) to avoid
- * ambiguity with tracked task IDs in the completed section.
- */
-export async function writeHandoffState(workspacePath, activeFeature, status, completedTasks, pendingNotes, blockingReason, lastAgent, qaRound, prdPath, reviewRound, visualRound) {
+export async function writeHandoffState(workspacePathOrOpts, activeFeature, status, completedTasks, pendingNotes, blockingReason, lastAgent, qaRound, prdPath, reviewRound, visualRound) {
+    // Discriminate by first-arg shape. Options-object branch when the first
+    // argument is a non-null, non-array object. After this block, all locals
+    // below are guaranteed non-undefined for the required fields.
+    let workspacePath;
+    if (typeof workspacePathOrOpts === "object" &&
+        !Array.isArray(workspacePathOrOpts)) {
+        const o = workspacePathOrOpts;
+        workspacePath = o.workspacePath;
+        activeFeature = o.activeFeature;
+        status = o.status;
+        completedTasks = o.completedTasks ?? [];
+        pendingNotes = o.pendingNotes ?? [];
+        blockingReason = o.blockingReason;
+        lastAgent = o.lastAgent;
+        qaRound = o.qaRound;
+        prdPath = o.prdPath;
+        reviewRound = o.reviewRound;
+        visualRound = o.visualRound;
+    }
+    else {
+        workspacePath = workspacePathOrOpts;
+        // Positional defaults preserved for backwards-compat callers passing < 11 args.
+        completedTasks = completedTasks ?? [];
+        pendingNotes = pendingNotes ?? [];
+    }
+    // Hoist required-from-overload strings to non-optional locals; the
+    // overload signatures (positional + options) both make these required, so
+    // the narrowing here is a compile-time assertion only.
+    const _activeFeature = activeFeature;
+    const _status = status;
     ensureDir(workspacePath);
     const handoffPath = getHandoffPath(workspacePath);
     const lockPath = path.join(workspacePath, ".current", ".handoff.lock");
@@ -209,8 +234,8 @@ export async function writeHandoffState(workspacePath, activeFeature, status, co
             : "- (none)";
         const frontmatterData = {
             schema_version: CURRENT_VERSIONS.handoff,
-            active_feature: activeFeature,
-            status,
+            active_feature: _activeFeature,
+            status: _status,
             last_updated: now,
         };
         if (blockingReason)

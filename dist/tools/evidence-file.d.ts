@@ -16,4 +16,15 @@ export declare function hasVisualEvidenceInFile(workspacePath: string, taskIds: 
     present: string[];
     missing: string[];
 };
+export interface VisualWidgetRow {
+    widgetId: string;
+    checked: boolean;
+    rawLine: string;
+}
+export declare function parseVisualWidgetsChecklist(visualReportContent: string): VisualWidgetRow[];
+export interface UncheckedWidgetsCheck {
+    ok: boolean;
+    uncheckedByTaskId: Record<string, string[]>;
+}
+export declare function hasUncheckedWidgets(workspacePath: string, taskIds: string[]): UncheckedWidgetsCheck;
 //# sourceMappingURL=evidence-file.d.ts.map

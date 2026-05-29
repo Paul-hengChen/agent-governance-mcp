@@ -17,7 +17,7 @@ export interface TransitionRequest {
     next_pending_notes?: ReadonlyArray<string>;
 }
 export interface TransitionRejection {
-    error: "TRANSITION_REJECTED" | "QA_ROUND_EXCEEDED" | "REVIEW_ROUND_EXCEEDED" | "VISUAL_ROUND_EXCEEDED" | "AGENT_ID_REQUIRED";
+    error: "TRANSITION_REJECTED" | "QA_ROUND_EXCEEDED" | "REVIEW_ROUND_EXCEEDED" | "VISUAL_ROUND_EXCEEDED" | "VISUAL_WIDGETS_UNVERIFIED" | "AGENT_ID_REQUIRED";
     attempted: {
         prev_agent: string | null;
         prev_status: string | null;

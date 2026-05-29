@@ -263,11 +263,43 @@ export function readHandoffState(workspacePath: string): string {
 }
 
 /**
- * Write handoff state with enforced formatting.
+ * v3.15.0 options-object shape for writeHandoffState's modern overload.
+ * Prefer this form at all new call sites. The legacy positional signature
+ * is retained for backwards-compat until v4.0.0.
+ */
+export interface WriteHandoffStateOptions {
+  workspacePath: string;
+  activeFeature: string;
+  status: string;
+  completedTasks?: string[];
+  pendingNotes?: string[];
+  blockingReason?: string;
+  lastAgent?: string;
+  qaRound?: number;
+  prdPath?: string;
+  reviewRound?: number;
+  visualRound?: number;
+}
+
+/**
+ * Write handoff state. v3.15.0 dual API:
+ *   - Modern (preferred): `writeHandoffState(options)` — pass a
+ *     {@link WriteHandoffStateOptions} object. New call sites should use this
+ *     form.
+ *   - Legacy (deprecated): `writeHandoffState(workspacePath, activeFeature, …)`
+ *     — 11 positional params. Retained for backwards-compat with v3.14.x
+ *     callers; planned removal in v4.0.0.
+ *
  * Pending notes are written as plain list items (not checkboxes) to avoid
  * ambiguity with tracked task IDs in the completed section.
  */
-export async function writeHandoffState(
+export function writeHandoffState(opts: WriteHandoffStateOptions): Promise<string>;
+/**
+ * @deprecated v3.15.0: prefer the options-object overload
+ * `writeHandoffState({ workspacePath, activeFeature, status, ... })`.
+ * Positional signature retained for backwards-compat; planned removal in v4.0.0.
+ */
+export function writeHandoffState(
   workspacePath: string,
   activeFeature: string,
   status: string,
@@ -279,7 +311,51 @@ export async function writeHandoffState(
   prdPath?: string,
   reviewRound?: number,
   visualRound?: number,
+): Promise<string>;
+export async function writeHandoffState(
+  workspacePathOrOpts: string | WriteHandoffStateOptions,
+  activeFeature?: string,
+  status?: string,
+  completedTasks?: string[],
+  pendingNotes?: string[],
+  blockingReason?: string,
+  lastAgent?: string,
+  qaRound?: number,
+  prdPath?: string,
+  reviewRound?: number,
+  visualRound?: number,
 ): Promise<string> {
+  // Discriminate by first-arg shape. Options-object branch when the first
+  // argument is a non-null, non-array object. After this block, all locals
+  // below are guaranteed non-undefined for the required fields.
+  let workspacePath: string;
+  if (
+    typeof workspacePathOrOpts === "object" &&
+    !Array.isArray(workspacePathOrOpts)
+  ) {
+    const o = workspacePathOrOpts;
+    workspacePath = o.workspacePath;
+    activeFeature = o.activeFeature;
+    status = o.status;
+    completedTasks = o.completedTasks ?? [];
+    pendingNotes = o.pendingNotes ?? [];
+    blockingReason = o.blockingReason;
+    lastAgent = o.lastAgent;
+    qaRound = o.qaRound;
+    prdPath = o.prdPath;
+    reviewRound = o.reviewRound;
+    visualRound = o.visualRound;
+  } else {
+    workspacePath = workspacePathOrOpts as string;
+    // Positional defaults preserved for backwards-compat callers passing < 11 args.
+    completedTasks = completedTasks ?? [];
+    pendingNotes = pendingNotes ?? [];
+  }
+  // Hoist required-from-overload strings to non-optional locals; the
+  // overload signatures (positional + options) both make these required, so
+  // the narrowing here is a compile-time assertion only.
+  const _activeFeature: string = activeFeature as string;
+  const _status: string = status as string;
   ensureDir(workspacePath);
   const handoffPath = getHandoffPath(workspacePath);
   const lockPath = path.join(workspacePath, ".current", ".handoff.lock");
@@ -290,18 +366,18 @@ export async function writeHandoffState(
 
     const now = new Date().toISOString();
 
-    const completedList = completedTasks.length
-      ? completedTasks.map((t) => `- [x] ${t}`).join("\n")
+    const completedList = (completedTasks as string[]).length
+      ? (completedTasks as string[]).map((t) => `- [x] ${t}`).join("\n")
       : "- (none)";
     // Plain list items (no checkbox) so they are visually distinct from task IDs.
-    const pendingList = pendingNotes.length
-      ? pendingNotes.map((t) => `- ${t}`).join("\n")
+    const pendingList = (pendingNotes as string[]).length
+      ? (pendingNotes as string[]).map((t) => `- ${t}`).join("\n")
       : "- (none)";
 
     const frontmatterData: Record<string, string | number> = {
       schema_version: CURRENT_VERSIONS.handoff,
-      active_feature: activeFeature,
-      status,
+      active_feature: _activeFeature,
+      status: _status,
       last_updated: now,
     };
     if (blockingReason) frontmatterData.blocking_reason = blockingReason;

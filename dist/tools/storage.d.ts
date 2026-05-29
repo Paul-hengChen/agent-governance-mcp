@@ -1,4 +1,4 @@
-import { type HandoffState } from "./handoff.js";
+import { type HandoffState, type WriteHandoffStateOptions } from "./handoff.js";
 import { type TaskRecord } from "./tasks-file.js";
 export type { HandoffState, TaskRecord };
 export interface EvidenceCheck {
@@ -7,6 +7,12 @@ export interface EvidenceCheck {
 }
 export interface HandoffStorage {
     readState(workspacePath: string): string;
+    writeState(opts: WriteHandoffStateOptions): Promise<string>;
+    /**
+     * @deprecated v3.15.0: prefer the options-object overload
+     * `writeState({ workspacePath, activeFeature, status, ... })`.
+     * Positional signature retained for backwards-compat; planned removal in v4.0.0.
+     */
     writeState(workspacePath: string, activeFeature: string, status: string, completedTasks: string[], pendingNotes: string[], blockingReason?: string, lastAgent?: string, qaRound?: number, prdPath?: string, reviewRound?: number, visualRound?: number): Promise<string>;
     parse(workspacePath: string): HandoffState | null;
     listTasks(workspacePath: string): TaskRecord[] | null;
@@ -21,6 +27,8 @@ export interface HandoffStorage {
 }
 export declare class FileHandoffStorage implements HandoffStorage {
     readState(workspacePath: string): string;
+    writeState(opts: WriteHandoffStateOptions): Promise<string>;
+    /** @deprecated v3.15.0: prefer the options-object overload. */
     writeState(workspacePath: string, activeFeature: string, status: string, completedTasks: string[], pendingNotes: string[], blockingReason?: string, lastAgent?: string, qaRound?: number, prdPath?: string, reviewRound?: number, visualRound?: number): Promise<string>;
     parse(workspacePath: string): HandoffState | null;
     listTasks(workspacePath: string): TaskRecord[] | null;

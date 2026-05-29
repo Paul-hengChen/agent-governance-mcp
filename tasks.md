@@ -119,6 +119,15 @@
 - [x] T205 [P0] qa-engineer: test/visual-round-sqlite.test.mjs AC-8 SQLite round-trip | depends_on: T201, T202
 - [x] T206 [P0] qa-engineer: extend visual-evidence-gate.test.mjs AC-9 + AC-3 sanitiser .. reject test | depends_on: T201
 - [x] T207 [P1] sr-engineer: version 3.14.0 → 3.14.1 + CHANGELOG [3.14.1] + README §(r) | depends_on: T203, T204, T205, T206
+- [x] T300 [P0] sr-engineer: tools/transitions.ts — add VISUAL_WIDGETS_UNVERIFIED to TransitionRejection.error union | depends_on: none
+- [x] T301 [P0] sr-engineer: tools/evidence-file.ts — parseVisualWidgetsChecklist + hasUncheckedWidgets exports | depends_on: T300
+- [x] T302 [P0] sr-engineer: index.ts — wire VISUAL_WIDGETS_UNVERIFIED gate after VISUAL_EVIDENCE_MISSING | depends_on: T301
+- [x] T303 [P0] sr-engineer: writeHandoffState dual API — options-object overload + @deprecated positional + handoff/storage/storage-sqlite + index.ts call site | depends_on: none
+- [x] T304 [P1] sr-engineer: index.ts — qa_round / review_round Round 4 sentinel >= cap-cross predicate fix | depends_on: none
+- [x] T305 [P0] qa-engineer: test/visual-widgets-unverified-gate.test.mjs — AC-1..AC-5 | depends_on: T302
+- [x] T306 [P0] qa-engineer: test/writestate-options-object.test.mjs — AC-6..AC-10 dual API equivalence | depends_on: T303
+- [x] T307 [P0] qa-engineer: extend test/qa-flow.test.mjs — AC-11/AC-12/AC-13 Round 4 sentinel symmetric predicate | depends_on: T304
+- [x] T308 [P1] sr-engineer: version 3.14.1 → 3.15.0 + CHANGELOG [3.15.0] + README §(s) | depends_on: T305, T306, T307
 
 ## Completed
 

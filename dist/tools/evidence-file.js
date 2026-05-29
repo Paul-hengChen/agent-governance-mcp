@@ -133,4 +133,71 @@ export function hasVisualEvidenceInFile(workspacePath, taskIds) {
     }
     return { present, missing };
 }
+// Pure parser. Locates the `## Widget Shape Verification` section
+// (case-insensitive, multiline) in the report content and emits one row per
+// `- [<mark>] <widget-id>` line found within it. Permissive on whitespace;
+// case-sensitive on bracket content ([x] or [X] = checked; [ ] / [Y] /
+// [garbage] = unchecked, catching operator typos rather than silently
+// accepting them).
+export function parseVisualWidgetsChecklist(visualReportContent) {
+    if (!visualReportContent)
+        return [];
+    // Find the section heading. JS regex has no `\Z` (end-of-string) anchor,
+    // so locate the heading then slice manually to the next `## ` heading
+    // (or EOF). Mirrors the existing extractSectionContent pattern in
+    // tools/handoff.ts.
+    const headRe = /^##\s+Widget\s+Shape\s+Verification\b[^\n]*/im;
+    const headMatch = headRe.exec(visualReportContent);
+    if (!headMatch || headMatch.index === undefined)
+        return [];
+    const startIdx = headMatch.index + headMatch[0].length;
+    const restAfter = visualReportContent.slice(startIdx);
+    const nextHeadingIdx = restAfter.search(/\n##\s/);
+    const sectionBody = nextHeadingIdx === -1 ? restAfter : restAfter.slice(0, nextHeadingIdx);
+    const lineRe = /^-\s+\[(.)\]\s+(.+)$/gm;
+    const rows = [];
+    let m;
+    while ((m = lineRe.exec(sectionBody)) !== null) {
+        const mark = m[1];
+        const rest = m[2];
+        const checked = mark === "x" || mark === "X";
+        // Split widget-id from optional description at the first em-dash or
+        // hyphen separator. Falls back to the full remainder if no separator
+        // is found (operator wrote just the widget id with no description).
+        const splitIdx = rest.search(/\s+—\s+|\s+-\s+/);
+        const widgetId = (splitIdx === -1 ? rest : rest.slice(0, splitIdx)).trim();
+        rows.push({ widgetId, checked, rawLine: m[0] });
+    }
+    return rows;
+}
+// Composition helper. For each task id, reads visual_<id>.md (if present),
+// parses the checklist, and collects unchecked widget ids. Missing files
+// are silently skipped — the index.ts handler calls `hasVisualEvidenceInFile`
+// FIRST and only routes surviving ids here, so this function is unreachable
+// for missing-file cases in production. The skip is a defensive belt for
+// callers that don't follow that ordering.
+export function hasUncheckedWidgets(workspacePath, taskIds) {
+    const uncheckedByTaskId = {};
+    for (const id of taskIds) {
+        const filePath = visualEvidencePath(workspacePath, id);
+        if (!fs.existsSync(filePath))
+            continue;
+        let content;
+        try {
+            content = fs.readFileSync(filePath, "utf-8");
+        }
+        catch {
+            continue;
+        }
+        const rows = parseVisualWidgetsChecklist(content);
+        const unchecked = rows.filter((r) => !r.checked).map((r) => r.widgetId);
+        if (unchecked.length > 0) {
+            uncheckedByTaskId[id] = unchecked;
+        }
+    }
+    return {
+        ok: Object.keys(uncheckedByTaskId).length === 0,
+        uncheckedByTaskId,
+    };
+}
 //# sourceMappingURL=evidence-file.js.map

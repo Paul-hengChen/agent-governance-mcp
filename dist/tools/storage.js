@@ -3,15 +3,19 @@
 // FileHandoffStorage is the stdio default (markdown + filesystem).
 // SqliteHandoffStorage (HTTP mode) implements the same interface against a DB
 // so remote / containerized deployments need no mounted workspace files.
-import { parseHandoff, readHandoffState, writeHandoffState } from "./handoff.js";
+import { parseHandoff, readHandoffState, writeHandoffState, } from "./handoff.js";
 import { parseTasksFromFile, getNextTaskFromFile, completeTaskInFile, rollbackTaskInFile, addTaskInFile, } from "./tasks-file.js";
 import { recordReviewInFile, hasEvidenceInFile, recordCodeReviewInFile, hasCodeReviewEvidenceInFile, } from "./evidence-file.js";
 export class FileHandoffStorage {
     readState(workspacePath) {
         return readHandoffState(workspacePath);
     }
-    writeState(workspacePath, activeFeature, status, completedTasks, pendingNotes, blockingReason, lastAgent, qaRound, prdPath, reviewRound, visualRound) {
-        return writeHandoffState(workspacePath, activeFeature, status, completedTasks, pendingNotes, blockingReason, lastAgent, qaRound, prdPath, reviewRound, visualRound);
+    writeState(workspacePathOrOpts, activeFeature, status, completedTasks, pendingNotes, blockingReason, lastAgent, qaRound, prdPath, reviewRound, visualRound) {
+        // Forward to writeHandoffState whichever overload matches the caller.
+        if (typeof workspacePathOrOpts === "object" && !Array.isArray(workspacePathOrOpts)) {
+            return writeHandoffState(workspacePathOrOpts);
+        }
+        return writeHandoffState(workspacePathOrOpts, activeFeature, status, completedTasks ?? [], pendingNotes ?? [], blockingReason, lastAgent, qaRound, prdPath, reviewRound, visualRound);
     }
     parse(workspacePath) {
         return parseHandoff(workspacePath);

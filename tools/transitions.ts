@@ -44,6 +44,11 @@ export interface TransitionRejection {
     | "QA_ROUND_EXCEEDED"
     | "REVIEW_ROUND_EXCEEDED"
     | "VISUAL_ROUND_EXCEEDED"
+    | "VISUAL_WIDGETS_UNVERIFIED"   // v3.15.0 — emitted by index.ts handler when
+                                    // qa_reports/visual_<id>.md contains unchecked
+                                    // `## Widget Shape Verification` rows. NOT produced
+                                    // by validateTransition; the union extension is for
+                                    // handler-side type narrowing + envelope consistency.
     | "AGENT_ID_REQUIRED";
   attempted: {
     prev_agent: string | null;
