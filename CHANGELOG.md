@@ -16,6 +16,86 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.14.1] - 2026-05-29
+
+PATCH release closing three findings + six missing tests from the post-v3.14.0
+audit. No public API change, no schema bump, no behavioural regression on
+default flow. Backwards-compatible with `#v3.14.0` consumers.
+
+### Security
+
+- **`embedding_model` allowlist** (`index.ts:139-180`) — the v3.13.0 / v3.14.0
+  waiver claim that `@xenova/transformers` → `onnxruntime-web` → `protobufjs`
+  CRITICAL chain (CVE-2026-41242 / GHSA-xq3m-2v4x-88gg) was "not reachable"
+  was **incorrect** in HTTP mode. The `tw_index_prd` MCP tool accepts a
+  client-controlled `embedding_model` parameter; the v3.14.0 regex
+  `/^[A-Za-z0-9._\-]+\/[A-Za-z0-9._\-]+$/` admitted any HF Hub repo, including
+  attacker-controlled ones. A malicious .onnx file's protobuf schema would
+  trigger the protobufjs RCE during model load.
+  v3.14.1 adds an explicit allowlist (`Xenova/all-MiniLM-L6-v2`,
+  `Xenova/bge-small-en-v1.5`, `Xenova/multilingual-e5-small`) gated by a zod
+  `refine`. Default-flow callers (no `embedding_model`) are unaffected. Full
+  reachability trace in `research/xenova-reachability.md`.
+  Audit waiver REFRAMED from "not reachable" to "reachable but path closed
+  by allowlist" — `npm audit` still shows the transitive vuln chain because
+  the dep tree is unchanged, but the exploit path through the MCP surface
+  is mitigated.
+
+### Fixed
+
+- **Path sanitiser collapse for `..` literal** (`tools/evidence-file.ts:115-123`)
+  — the v3.14.0 sanitiser `replace(/[^A-Za-z0-9._-]/g, "_")` collapsed `/` to
+  `_` (blocking traversal) but preserved the literal `..` in filenames. A
+  hostile `active_feature` like `..feat` produced `..feat.md` — not a
+  traversal exploit, but a cosmetic surprise that could mislead grep / audit
+  logs. v3.14.1 chains a second `replace(/\.\.+/g, "_")` after the first to
+  collapse any run of 2+ dots. Single `.` survives (legitimate filename
+  character — `feat.v2.md` is allowed).
+- **Round 6 sentinel cap-cross predicate** (`index.ts:775-784`) — v3.14.0
+  injected the `⛔ Visual Round 6: forced rollback to pm…` pending_notes
+  sentinel using `new_visual_round === 6 && prev_visual_round === 5`. If
+  `prev_visual_round` ever arrived at the handler at a value < 5 with the
+  new counter going to 6+ (migration / hand-edit), the sentinel would not
+  fire. Fixed to `new >= 6 && prev < 6` — correct cap-cross predicate that
+  fires exactly once per crossing. Symmetric fix for `qa_round` /
+  `review_round` sentinels at `index.ts:747-752` deferred to v3.14.2
+  (trigger path is migration-only; not blocking).
+
+### Tests
+
+- **+18 tests across 3 files**:
+  - `test/visual-gate-e2e.test.mjs` (new) — 11 tests covering AC-5 / AC-6
+    / AC-7 / AC-10: handler composition through `validateTransition` +
+    visual evidence gate + `computeNewRound` + `writeState` round-trip,
+    Round 6 sentinel cap-cross from `prev < 5`, visual_round persistence
+    through subsequent read+write cycles, `VISUAL_ROUND_EXCEEDED` PM-only
+    acceptance at cap.
+  - `test/visual-round-sqlite.test.mjs` (new) — 4 tests gated on
+    `better-sqlite3` availability: `visualRound` round-trip via
+    `SqliteHandoffStorage.writeState` + `parse`, default-to-0 when omitted,
+    update-not-append semantics, PASS-resets-to-0.
+  - `test/visual-evidence-gate.test.mjs` (extended) — 3 new v3.14.1 cases:
+    `..` literal collapse (leading / middle / triple-dot), single-dot
+    survival, read-error silent-swallow contract pin.
+
+- **Tally**: 353/353 (v3.14.0 baseline) → **371/371** passing.
+
+### Research
+
+- **`research/xenova-reachability.md`** (new) — deep dive into the
+  `@xenova/transformers` → `onnxruntime-web` → `protobufjs` call graph
+  from `tools/rag.ts`. Verdict: **REACHABLE in HTTP mode** via
+  `embedding_model` parameter; MODERATE in stdio mode (trust-equivalent
+  to existing local-process surface). Includes the CVE detail, the exact
+  exploit path, and three rejected alternatives (upgrade Xenova,
+  override-transitively, drop RAG).
+
+### Deferred to v3.15.0 (Question Batch decisions)
+
+- R6 server-enforced widget verification (`VISUAL_WIDGETS_UNVERIFIED`)
+- `writeHandoffState` / `storage.writeState` options-object refactor
+  (dual API: positional deprecated, options-object new)
+
 ## [3.14.0] - 2026-05-29
 
 MINOR release closing the **pixel-perfect framework gap** uncovered by

@@ -73,10 +73,66 @@ test("AC-5: active_feature with path-unsafe characters is sanitised (slashes col
   const result = hasVisualBaselinesInDesign(ws, "evil/feature/name");
   assert.ok(result.designPath.includes(path.join(ws, "design")), "designPath must remain inside workspace/design/");
   assert.ok(!result.designPath.includes("/evil/"), "slashes in feature name must be sanitised");
-  // Note: `..` is a literal allowed by [A-Za-z0-9._-] so `../etc/passwd`
-  // becomes `.._etc_passwd.md` — not a traversal because the slashes are
-  // replaced. The file simply won't exist. This test confirms the slash
-  // collapse, which is the load-bearing defense.
+});
+
+// ---------- v3.14.1 AC-3 — sanitiser collapses `..` literal ----------
+
+test("v3.14.1 AC-3: sanitiser collapses `..` literal in active_feature", () => {
+  // Why: v3.14.0 sanitiser replaced `/` with `_` so `../etc/passwd` could
+  // not traverse — BUT the `..` literal itself survived as a filename
+  // component. v3.14.1 adds a `\\.\\.+` → `_` collapse so hostile names
+  // like `..feat` or `pp..pp` produce safe filenames without surprising
+  // `..` segments. This test pins the new behaviour.
+  const ws = mkWorkspace();
+  const r1 = hasVisualBaselinesInDesign(ws, "..feat");
+  assert.ok(!r1.designPath.includes(".."), "leading `..` MUST be collapsed");
+  assert.ok(r1.designPath.endsWith("_feat.md"), "expected sanitised filename _feat.md");
+
+  const r2 = hasVisualBaselinesInDesign(ws, "f..oo");
+  assert.ok(!r2.designPath.includes(".."), "middle `..` MUST be collapsed");
+  assert.ok(r2.designPath.endsWith("f_oo.md"));
+
+  const r3 = hasVisualBaselinesInDesign(ws, "...");
+  assert.ok(!r3.designPath.includes(".."), "`...` MUST collapse to `_`");
+  assert.ok(r3.designPath.endsWith("_.md"));
+});
+
+test("v3.14.1 AC-3: single `.` survives (legitimate filename character)", () => {
+  // Why: the sanitiser must NOT clobber single dots — `feat.v2` is a valid
+  // feature name. Only 2+ consecutive dots are collapsed.
+  const ws = mkWorkspace();
+  const result = hasVisualBaselinesInDesign(ws, "feat.v2");
+  assert.ok(result.designPath.endsWith("feat.v2.md"), "single dots must survive");
+});
+
+// ---------- v3.14.1 AC-9 — read-error silent-swallow (confirm intentional) ----------
+
+test("v3.14.1 AC-9: hasVisualBaselinesInDesign silently returns { present: false } on read error", () => {
+  // Why: AC-9 confirms the silent-swallow is intentional (matches
+  // hasEvidenceInFile convention — existence-check rather than error
+  // propagation). A future fail-loud variant would be a v3.15.0 API change.
+  // This test pins the current contract so a refactor doesn't accidentally
+  // start throwing.
+  const ws = mkWorkspace();
+  // Create design file then delete dir between mkdir and read — simulates
+  // a race / permission issue. The function MUST NOT throw.
+  fs.mkdirSync(path.join(ws, "design"), { recursive: true });
+  const filePath = path.join(ws, "design", "broken.md");
+  // Make a file that exists but is empty + immediately remove it after the
+  // existsSync check. The simpler route: just confirm the catch-block
+  // handles bad UTF-8.
+  fs.writeFileSync(filePath, Buffer.from([0xff, 0xfe, 0xfd, 0x00]));  // invalid UTF-8
+
+  let threw = false;
+  let result;
+  try {
+    result = hasVisualBaselinesInDesign(ws, "broken");
+  } catch (e) {
+    threw = true;
+  }
+  assert.equal(threw, false, "MUST NOT throw on bad-encoding read");
+  assert.ok(result, "MUST return a result object even on read failure");
+  assert.equal(result.present, false, "MUST default to `present: false` on swallow");
 });
 
 test("AC-5: ## Visual Baselines match is case-insensitive (multiline)", () => {

@@ -111,6 +111,14 @@
 - [x] T108 [P1] specs/qa-flow-enforcement-architecture.md matrix update | depends_on: T107
 - [x] T109 [P0] Tests: visual-evidence-gate / visual-round-transitions / widget-shape-spec / phase-0-5-sop | depends_on: T107
 - [x] T110 [P1] CHANGELOG / README / package.json + index.ts version 3.13.0 → 3.14.0 | depends_on: T109
+- [x] T200 [P0] researcher: trace xenova/transformers → protobufjs reachability from tools/rag.ts | depends_on: none
+- [x] T201 [P0] sr-engineer: hasVisualBaselinesInDesign sanitiser — reject `..` literal | depends_on: none
+- [x] T202 [P0] sr-engineer: index.ts Round 6 sentinel — change `===` to `>= && <` | depends_on: none
+- [x] T203 [P0] sr-engineer: implement T200 xenova mitigation if REACHABLE (close RAG path, downgrade, or document waiver) | depends_on: T200
+- [x] T204 [P0] qa-engineer: test/visual-gate-e2e.test.mjs covering AC-5/6/7/10 (4 e2e tests) | depends_on: T201, T202
+- [x] T205 [P0] qa-engineer: test/visual-round-sqlite.test.mjs AC-8 SQLite round-trip | depends_on: T201, T202
+- [x] T206 [P0] qa-engineer: extend visual-evidence-gate.test.mjs AC-9 + AC-3 sanitiser .. reject test | depends_on: T201
+- [x] T207 [P1] sr-engineer: version 3.14.0 → 3.14.1 + CHANGELOG [3.14.1] + README §(r) | depends_on: T203, T204, T205, T206
 
 ## Completed
 

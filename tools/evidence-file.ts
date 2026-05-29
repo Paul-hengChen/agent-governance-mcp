@@ -112,7 +112,15 @@ function visualEvidencePath(workspacePath: string, taskId: string): string {
 }
 
 function designFilePath(workspacePath: string, activeFeature: string): string {
-  const safe = activeFeature.replace(/[^A-Za-z0-9._-]/g, "_");
+  // v3.14.1 — sanitiser hardening: replace non-allowed chars AND collapse any
+  // resulting `..` to `_` so a hostile feature name like `..feat` or `pp..pp`
+  // never produces a path with `..` segments. The earlier v3.14.0 sanitiser
+  // already replaced `/` with `_` (so `../etc/passwd` collapsed to
+  // `.._etc_passwd`, blocking traversal), but the literal `..` survived as a
+  // filename. This pass closes the cosmetic / surprising-behaviour gap.
+  const safe = activeFeature
+    .replace(/[^A-Za-z0-9._-]/g, "_")
+    .replace(/\.\.+/g, "_");
   return path.join(workspacePath, "design", `${safe}.md`);
 }
 

@@ -102,6 +102,19 @@ const SwitchRoleArgs = z.object({
 // alphanumerics, dot, underscore, dash, slash. Bounds user-supplied input
 // before it reaches the dynamic loader.
 const EMBEDDING_MODEL_RE = /^[A-Za-z0-9._\-]+\/[A-Za-z0-9._\-]+$/;
+// v3.14.1 — explicit allowlist on top of the format regex.
+// Background: regex-only validation let any HF Hub repo through. A client
+// passing `embedding_model: "attacker/evil-model"` would download a crafted
+// .onnx, parsed by onnxruntime-web → protobufjs (CVE-2026-41242 / RCE).
+// Closing the schema attack surface by trusting only Xenova-org-hosted models.
+// See research/xenova-reachability.md for the full reachability trace.
+// To add a model: open a PR amending this set + spot-checking the .onnx
+// provenance (HF commit history + Xenova-org membership).
+const ALLOWED_EMBEDDING_MODELS = new Set([
+    "Xenova/all-MiniLM-L6-v2", // DEFAULT — small, English, 384-d
+    "Xenova/bge-small-en-v1.5", // alternative — BGE small English
+    "Xenova/multilingual-e5-small", // alternative — multilingual small
+]);
 const IndexPrdArgs = z
     .object({
     workspace_path: absoluteWorkspacePath,
@@ -113,6 +126,11 @@ const IndexPrdArgs = z
         .string()
         .max(200)
         .regex(EMBEDDING_MODEL_RE, { message: "embedding_model must match 'namespace/name' format" })
+        .refine((m) => ALLOWED_EMBEDDING_MODELS.has(m), {
+        message: "embedding_model must be one of: " +
+            [...ALLOWED_EMBEDDING_MODELS].join(", ") +
+            ". Open an issue to request additions (the allowlist guards against the protobufjs RCE chain — see research/xenova-reachability.md).",
+    })
         .optional(),
 })
     // Path-traversal guard: prd_path MUST resolve inside workspace_path.
@@ -132,7 +150,7 @@ function formatZodError(err) {
 // 1. Initialize Server (Tools + Prompts)
 // ==========================================
 // Storage adapter defaults to FileHandoffStorage; HTTP-mode boot switches it via setActiveStorage().
-const server = new Server({ name: "agent-governance-mcp", version: "3.14.0" }, { capabilities: { tools: {}, prompts: {} } });
+const server = new Server({ name: "agent-governance-mcp", version: "3.14.1" }, { capabilities: { tools: {}, prompts: {} } });
 // ==========================================
 // 2. Register Prompts (Layer 1: Auto-inject constitution)
 // ==========================================
@@ -676,7 +694,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 }
                 // v3.14.0 — visual_round Round 6 lock (5 visual FAILs accumulated).
                 // Symmetric to qa_round / review_round Round 4 lock.
-                if (new_visual_round === 6 && prev_visual_round === 5) {
+                // v3.14.1 — fire on every cap-cross, not only the exact 5→6 step.
+                // Earlier v3.14.0 used `=== 6 && === 5`, which skipped the sentinel
+                // when the prior counter was already at cap due to migration or
+                // hand-edit. `>=6 && <6` is the correct cap-cross predicate.
+                if (new_visual_round >= 6 && prev_visual_round < 6) {
                     pending.unshift("⛔ Visual Round 6: forced rollback to pm — no further pixel iteration allowed until PM rebudgets scope or threshold.");
                 }
                 const result = await storage.writeState(parsed.workspace_path, parsed.active_feature, parsed.status, parsed.completed_tasks, pending, parsed.blocking_reason, parsed.agent_id, new_qa_round, parsed.prd_path, new_review_round, new_visual_round);
