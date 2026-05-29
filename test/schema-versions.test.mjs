@@ -21,10 +21,12 @@ function reset() {
 
 // ---------- CURRENT_VERSIONS / VERSION_WHEN_ABSENT ----------
 
-test("CURRENT_VERSIONS exposes the four kinds at their v3.9.0 levels", () => {
-  // v3.9.0 bumped handoff + sqlite to 2 for the code-reviewer chain (review_round
-  // column + code_review_reports table). tasks + config remain at v1.
-  assert.equal(CURRENT_VERSIONS.handoff, 2);
+test("CURRENT_VERSIONS exposes the four kinds at their v3.14.0 levels", () => {
+  // v3.14.0 bumped handoff to 3 (added visual_round for pixel-fidelity sub-loop).
+  // sqlite stays at 2 — the visual_round column is added by ALTER TABLE in
+  // SqliteHandoffStorage.init, not a sqlite schema version bump (no new tables,
+  // no breaking column changes). tasks + config remain at v1.
+  assert.equal(CURRENT_VERSIONS.handoff, 3);
   assert.equal(CURRENT_VERSIONS.tasks, 1);
   assert.equal(CURRENT_VERSIONS.sqlite, 2);
   assert.equal(CURRENT_VERSIONS.config, 1);
@@ -93,14 +95,15 @@ test("registerMigration rejects negative from/to", () => {
 
 test("registerMigration idempotent overwrite — last write wins", () => {
   reset();
-  // Register v0→v1 twice (overwrite test); also register v1→v2 since
-  // CURRENT_VERSIONS.handoff is now 2 — the runner must climb the full chain.
+  // Register v0→v1 twice (overwrite test); also register v1→v2 and v2→v3 since
+  // CURRENT_VERSIONS.handoff is now 3 (v3.14.0) — the runner must climb the full chain.
   registerMigration({ kind: "handoff", from: 0, to: 1, up: () => ({ schema_version: 1, who: "first" }) });
   registerMigration({ kind: "handoff", from: 0, to: 1, up: () => ({ schema_version: 1, who: "second" }) });
   registerMigration({ kind: "handoff", from: 1, to: 2, up: (input) => ({ ...input, schema_version: 2 }) });
+  registerMigration({ kind: "handoff", from: 2, to: 3, up: (input) => ({ ...input, schema_version: 3 }) });
   const result = runMigrations("handoff", { /* no schema_version → v0 */ });
   // Overwrite semantics: the second v0→v1 registration is the one that runs;
-  // its `who: "second"` field threads through the v1→v2 step unchanged.
+  // its `who: "second"` field threads through the v1→v2→v3 steps unchanged.
   assert.equal(result.payload.who, "second");
 });
 
@@ -160,11 +163,11 @@ test("peekVersion handles array as non-object payload", () => {
 
 test("runMigrations no-op when current === target", () => {
   reset();
-  // CURRENT_VERSIONS.handoff === 2 in v3.9.0; payload already at v2.
-  const result = runMigrations("handoff", { schema_version: 2, kept: true });
+  // CURRENT_VERSIONS.handoff === 3 in v3.14.0; payload already at v3.
+  const result = runMigrations("handoff", { schema_version: 3, kept: true });
   assert.deepEqual(result.applied, []);
-  assert.equal(result.fromVersion, 2);
-  assert.equal(result.toVersion, 2);
+  assert.equal(result.fromVersion, 3);
+  assert.equal(result.toVersion, 3);
   assert.equal(result.payload.kept, true);
 });
 
@@ -191,11 +194,11 @@ test("runMigrations applies single v0→v1 step", () => {
 
 test("runMigrations refuses-loud when on-disk version > current (AC-4)", () => {
   reset();
-  // v3.9.0: CURRENT_VERSIONS.handoff === 2, so the "server max" surfaced in
+  // v3.14.0: CURRENT_VERSIONS.handoff === 3, so the "server max" surfaced in
   // the refuse-loud error tracks the bumped value.
   assert.throws(
     () => runMigrations("handoff", { schema_version: 99 }),
-    /on-disk version 99 > server max 2/
+    /on-disk version 99 > server max 3/
   );
 });
 

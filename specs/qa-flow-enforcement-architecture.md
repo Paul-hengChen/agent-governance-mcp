@@ -396,3 +396,154 @@ Each row → one `node --test` case:
 ## Open Questions
 
 *(none — all design decisions resolved above. Architecture is ready to encode.)*
+
+---
+
+## v3.14.0 Amendment — `visual_round` Sub-Loop + Visual Evidence Gate
+
+This v3.2.0 doc remains authoritative for `qa_round` semantics. v3.9.0 added
+`review_round` along the same pattern. v3.14.0 adds a third counter,
+`visual_round`, with its own evidence gate. The amendments below extend
+(not replace) the v3.2.0 matrix.
+
+### New TypeScript types (v3.14.0)
+
+```ts
+// tools/transitions.ts — TransitionRequest gains two optional fields
+export interface TransitionRequest {
+  prev: TransitionTuple;
+  next: TransitionTuple;
+  prev_qa_round: number;
+  prev_review_round: number;
+  prev_visual_round?: number;      // NEW — defaults to 0 (backwards-compat with pre-v3.14 callers)
+  next_pending_notes?: ReadonlyArray<string>;  // NEW — inspected for `visual_fail:` token
+}
+
+// TransitionRejection.error union extended
+type RejectionError =
+  | "TRANSITION_REJECTED"
+  | "QA_ROUND_EXCEEDED"
+  | "REVIEW_ROUND_EXCEEDED"
+  | "VISUAL_ROUND_EXCEEDED"   // NEW
+  | "AGENT_ID_REQUIRED";
+
+// HandoffState gains visual_round (handoff schema v2 → v3)
+export interface HandoffState {
+  // ... fields unchanged ...
+  qa_round: number;
+  review_round: number;
+  visual_round: number;  // NEW — defaults to 0; v2→v3 migration stamps the field
+}
+```
+
+### Round-counter logic (v3.14.0 — `computeNewRound`)
+
+Signature widens to include `prev_visual_round` + `next_pending_notes`:
+
+```ts
+export function computeNewRound(
+  prev_qa_round: number,
+  prev_review_round: number,
+  prev_visual_round: number,
+  next: TransitionTuple,
+  prev?: TransitionTuple,
+  next_pending_notes?: ReadonlyArray<string>,
+): { qa_round: number; review_round: number; visual_round: number };
+```
+
+| Incoming tuple | `pending_notes` carries `visual_fail:` | `visual_round` result |
+|---|---|---|
+| `(qa-engineer, FAIL)` | yes | `prev + 1` |
+| `(qa-engineer, FAIL)` | no (plain test-logic FAIL) | `prev` (unchanged) |
+| `(qa-engineer, PASS)` | — | `0` |
+| `(pm, In_Progress)` | — | `0` |
+| any other | — | `prev` (unchanged) |
+
+Detection: `pending_notes.some(n => n.trim().startsWith("visual_fail:"))`.
+Trim-then-startsWith (not substring) so a freeform note "no visual_fail
+observed" does NOT trigger the bump.
+
+### Round-cap override (v3.14.0 — `validateTransition`)
+
+```ts
+const VISUAL_ROUND_CAP = 6;  // 5 fails then Round 6 lock — off-by-one symmetric to ROUND_CAP=4
+
+if (req.prev_visual_round ?? 0) >= VISUAL_ROUND_CAP) {
+  // Only (pm, In_Progress) is accepted
+  if (!(req.next.agent === "pm" && req.next.status === "In_Progress")) {
+    return rejection(req, "VISUAL_ROUND_EXCEEDED", [{ agent: "pm", status: "In_Progress" }], ...);
+  }
+}
+```
+
+### Visual evidence gate (v3.14.0 — index.ts handler)
+
+Mirrors the existing `MISSING_EVIDENCE` PASS gate. Fires only when
+`design/<active_feature>.md` declares `## Visual Baselines`:
+
+```mermaid
+sequenceDiagram
+    participant QA as qa-engineer
+    participant H as index.ts handler
+    participant FS as filesystem
+    QA->>H: tw_update_state(status=PASS, completed_tasks=[T1, T2])
+    H->>FS: hasVisualBaselinesInDesign(ws, active_feature)
+    alt design file absent OR no ## Visual Baselines H2
+        H->>H: gate dormant; proceed to writeState
+        H-->>QA: success (backwards-compat AC-13)
+    else baselines declared
+        H->>FS: hasVisualEvidenceInFile(ws, [T1, T2])
+        alt all tasks have qa_reports/visual_<id>.md
+            H-->>QA: success
+        else any missing
+            H-->>QA: ⛔ VISUAL_EVIDENCE_MISSING: <missing_ids>
+        end
+    end
+```
+
+`hasVisualBaselinesInDesign` runs the regex `/^##\s+Visual\s+Baselines\b/im`
+against `design/<sanitised(active_feature)>.md`. Permissive multiline
+case-insensitive match; no content parsing of baseline rows.
+
+### Split escalation (v3.14.0, R4a)
+
+At `visual_round >= 3`, sr-engineer may transition
+`(sr-engineer, In_Progress) → (pm, In_Progress)` with `pending_notes`
+containing the literal token `visual_split_requested:`. This is
+*allowed by the standard ALLOWED_TRANSITIONS matrix* — no special
+case in `validateTransition`. The convention is operator-side: skill
+SOPs name the token; the server treats it like any other pending note.
+Round 6+ is mandatory PM-route per `VISUAL_ROUND_EXCEEDED`.
+
+### Pending-notes synthesis (v3.14.0)
+
+`index.ts` injects a sentinel when `visual_round` crosses cap:
+
+```ts
+if (new_visual_round === 6 && prev_visual_round === 5) {
+  pending.unshift("⛔ Visual Round 6: forced rollback to pm — no further pixel iteration allowed until PM rebudgets scope or threshold.");
+}
+```
+
+Symmetric to the `qa_round === 4` and `review_round === 4` synthesis lines
+from v3.2.0 / v3.9.0 respectively.
+
+### Test surface delta (v3.14.0)
+
+Added in T109:
+- `test/visual-evidence-gate.test.mjs` — 13 tests covering AC-5 (gate trigger) + AC-10 (evidence file lookup).
+- `test/visual-round-transitions.test.mjs` — 13 tests covering AC-8 (counter semantics + cap) + AC-9 (split escalation) + AC-11 (backwards-compat + token-detection edge cases).
+- `test/widget-shape-spec.test.mjs` — 12 tests linting the SOP markdown for AC-1, AC-2, R5, R6 contracts.
+- `test/phase-0-5-sop.test.mjs` — 10 tests linting AC-3 (Visual Harness in skill-architect) + AC-4 (Phase 0.5 in skill-sr-engineer).
+
+Existing test files migrated:
+- `test/handoff-versioning.test.mjs` — schema_version 2 → 3 assertions.
+- `test/handoff-migration.test.mjs` — v0→v3 chain + visual_round=0 defaults.
+- `test/schema-versions.test.mjs` — `CURRENT_VERSIONS.handoff: 3`.
+- `test/drift-skew.test.mjs` — drift skew sentinel raised to v3.
+- `test/qa-flow.test.mjs` — `computeNewRound` 6-arg signature + visual_round in expected returns.
+- `test/qa-visual-skill-split.test.mjs` — v3.14.0 contract migrations.
+- `test/pixel-perfect-visual-compare.test.mjs` — v3.14.0 4-route + Pixel Diff + multimodal-vision wording migrations.
+- `test/skill-evolution-v3.11.test.mjs` — `versions.ts` handoff value updated to 3.
+
+Total: 353 tests, 0 failures (was 303/275 pre-migration).

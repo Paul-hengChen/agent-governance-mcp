@@ -107,6 +107,11 @@ const ALLOWED = new Map([
 export const ALLOWED_TRANSITIONS = ALLOWED;
 const ROUND_CAP = 4;
 const REVIEW_ROUND_CAP = 4;
+// v3.14.0 — visual_round caps at 6 (5 failed pixel iterations then lock to
+// pm) — symmetric to ROUND_CAP=4 (3 fails then Round 4 lock). Constitution
+// §3.1 documents the user-visible "5 rounds" framing; cap=6 reflects the
+// off-by-one between "rounds completed" and "next write index".
+const VISUAL_ROUND_CAP = 6;
 function isStatus(s) {
     return s === "In_Progress" || s === "PASS" || s === "FAIL" || s === "Blocked";
 }
@@ -128,6 +133,7 @@ function rejection(req, error, allowed, hint) {
             new_agent: req.next.agent,
             new_status: req.next.status,
             qa_round: req.prev_qa_round,
+            ...(req.prev_visual_round !== undefined && { visual_round: req.prev_visual_round }),
         },
         allowed: allowed.map((c) => ({ new_agent: c.agent, new_status: c.status })),
         hint,
@@ -170,6 +176,17 @@ export function validateTransition(req) {
             return null;
         return rejection(req, "REVIEW_ROUND_EXCEEDED", onlyAllowed, `review_round=${req.prev_review_round} exceeds cap. Only (pm, In_Progress) allowed to reset.`);
     }
+    // v3.14.0 — visual_round cap. Symmetric to qa_round / review_round.
+    // Only fires when prev_visual_round is provided AND has reached cap; the
+    // counter is opt-in for callers that pre-date v3.14.0.
+    const prev_visual_round = req.prev_visual_round ?? 0;
+    if (prev_visual_round >= VISUAL_ROUND_CAP) {
+        const onlyAllowed = [{ agent: "pm", status: "In_Progress" }];
+        const ok = req.next.agent === "pm" && req.next.status === "In_Progress";
+        if (ok)
+            return null;
+        return rejection(req, "VISUAL_ROUND_EXCEEDED", onlyAllowed, `visual_round=${prev_visual_round} exceeds cap. Only (pm, In_Progress) allowed for pixel/widget rebudget.`);
+    }
     // 3. self-loop fast path
     if (req.prev.agent !== null &&
         req.prev.agent === req.next.agent &&
@@ -187,7 +204,8 @@ export function validateTransition(req) {
 }
 /**
  * Compute new round counters from prior counters + incoming tuple + prev tuple.
- * Returns both qa_round and review_round so callers can persist them together.
+ * Returns qa_round, review_round AND visual_round (v3.14.0) so callers can
+ * persist them together.
  *
  * qa_round:
  *   - (qa-engineer, FAIL)         → prev + 1
@@ -200,10 +218,19 @@ export function validateTransition(req) {
  *   - (qa-engineer, In_Progress) when prev was (code-reviewer, In_Progress) → 0
  *   - (pm, In_Progress)           → 0
  *   - everything else             → prev_review_round
+ *
+ * visual_round (v3.14.0):
+ *   - (qa-engineer, FAIL) AND pending_notes contains `visual_fail:` → prev + 1
+ *     (distinguishes pixel/widget drift from test-logic FAIL; only the former
+ *     ticks the visual counter)
+ *   - (qa-engineer, PASS)         → 0
+ *   - (pm, In_Progress)           → 0
+ *   - everything else             → prev_visual_round
  */
-export function computeNewRound(prev_qa_round, prev_review_round, next, prev) {
+export function computeNewRound(prev_qa_round, prev_review_round, prev_visual_round, next, prev, next_pending_notes) {
     let qa_round = prev_qa_round;
     let review_round = prev_review_round;
+    let visual_round = prev_visual_round;
     if (next.agent === "qa-engineer" && next.status === "FAIL")
         qa_round = prev_qa_round + 1;
     else if (next.agent === "qa-engineer" && next.status === "PASS")
@@ -221,8 +248,23 @@ export function computeNewRound(prev_qa_round, prev_review_round, next, prev) {
     else if (next.agent === "pm" && next.status === "In_Progress") {
         review_round = 0;
     }
-    return { qa_round, review_round };
+    // v3.14.0 visual_round logic. Only ticks on qa-engineer FAIL accompanied by
+    // a `visual_fail:` token in pending_notes; pure test-logic FAILs leave the
+    // counter untouched.
+    const hasVisualFailToken = Array.isArray(next_pending_notes) &&
+        next_pending_notes.some((n) => typeof n === "string" && n.trim().startsWith("visual_fail:"));
+    if (next.agent === "qa-engineer" && next.status === "FAIL" && hasVisualFailToken) {
+        visual_round = prev_visual_round + 1;
+    }
+    else if (next.agent === "qa-engineer" && next.status === "PASS") {
+        visual_round = 0;
+    }
+    else if (next.agent === "pm" && next.status === "In_Progress") {
+        visual_round = 0;
+    }
+    return { qa_round, review_round, visual_round };
 }
 export const ROUND_CAP_EXPORTED = ROUND_CAP;
 export const REVIEW_ROUND_CAP_EXPORTED = REVIEW_ROUND_CAP;
+export const VISUAL_ROUND_CAP_EXPORTED = VISUAL_ROUND_CAP;
 //# sourceMappingURL=transitions.js.map

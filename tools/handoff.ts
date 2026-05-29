@@ -30,6 +30,12 @@ export interface HandoffState {
   // reset on handoff to qa-engineer or PM re-entry. Symmetric to qa_round
   // with its own REVIEW_ROUND_CAP. Backward-compat: parser defaults to 0.
   review_round: number;
+  // Visual-fidelity round counter (v3.14.0) — incremented on (qa-engineer,
+  // FAIL) when pending_notes contains `visual_fail:`. Independent of
+  // qa_round / review_round; tracks pixel-perfect iteration only.
+  // Backward-compat: parser defaults missing field to 0 (v2→v3 migration
+  // also stamps the field).
+  visual_round: number;
   // Optional absolute path to the workspace's PRD file. Consumed by the RAG
   // lazy-reindex hook in prompts/build.ts:appendSpecContext. When absent, the
   // hook falls back to discovering PRD.md/docs/PRD.md/specs/PRD.md.
@@ -124,6 +130,9 @@ function readAndMigrate(workspacePath: string): HandoffReadResult | null {
   const reviewRoundRaw = Number(frontmatter.review_round);
   const review_round =
     Number.isFinite(reviewRoundRaw) && reviewRoundRaw >= 0 ? Math.floor(reviewRoundRaw) : 0;
+  const visualRoundRaw = Number(frontmatter.visual_round);
+  const visual_round =
+    Number.isFinite(visualRoundRaw) && visualRoundRaw >= 0 ? Math.floor(visualRoundRaw) : 0;
 
   const state: HandoffState = {
     active_feature: asString(frontmatter.active_feature),
@@ -136,6 +145,7 @@ function readAndMigrate(workspacePath: string): HandoffReadResult | null {
     pending_notes,
     qa_round,
     review_round,
+    visual_round,
   };
 
   // One-shot stderr warning on v1→v2 migration when an in-flight ticket sits at
@@ -199,6 +209,7 @@ export function readHandoffState(workspacePath: string): string {
       state.qa_round,
       state.prd_path,
       state.review_round,
+      state.visual_round,
     ).catch(() => {
       /* swallowed — read still returns migrated state */
     });
@@ -267,6 +278,7 @@ export async function writeHandoffState(
   qaRound?: number,
   prdPath?: string,
   reviewRound?: number,
+  visualRound?: number,
 ): Promise<string> {
   ensureDir(workspacePath);
   const handoffPath = getHandoffPath(workspacePath);
@@ -311,6 +323,11 @@ export async function writeHandoffState(
         ? Math.floor(reviewRound as number)
         : 0;
     frontmatterData.review_round = normalisedReviewRound;
+    const normalisedVisualRound =
+      Number.isFinite(visualRound) && (visualRound as number) >= 0
+        ? Math.floor(visualRound as number)
+        : 0;
+    frontmatterData.visual_round = normalisedVisualRound;
 
     const frontmatter = yaml
       .dump(frontmatterData, { lineWidth: -1, forceQuotes: true, quotingType: '"' })

@@ -56,11 +56,11 @@ qa_round: 2
   assert.equal(state.review_round, 0, "review_round defaults to 0 on v1→v2 migration");
 });
 
-test("AC-12(e): pre-versioning handoff (no schema_version at all) migrates v0→v2 with review_round=0", () => {
+test("AC-12(e): pre-versioning handoff (no schema_version at all) migrates v0→v3 with review_round=0 and visual_round=0", () => {
   // Why: the runner walks the full chain. A truly-legacy file with no
-  // schema_version key starts at v0, climbs through v1, lands at v2. Both
-  // intermediate defaults (qa_round=0 from v0→v1; review_round=0 from v1→v2)
-  // must hold.
+  // schema_version key starts at v0, climbs v0→v1→v2→v3 (v3.14.0). All
+  // intermediate defaults (qa_round=0 from v0→v1; review_round=0 from
+  // v1→v2; visual_round=0 from v2→v3) must hold.
   const ws = mkWorkspace();
   resetSession();
   writeRaw(
@@ -82,11 +82,12 @@ last_agent: "pm"
   const state = parseHandoff(ws);
   assert.equal(state.qa_round, 0);
   assert.equal(state.review_round, 0);
+  assert.equal(state.visual_round, 0, "v3.14.0: visual_round defaults to 0 on v2→v3 migration");
 });
 
-test("AC-12(e): v2 handoff with explicit review_round=3 round-trips unchanged", () => {
-  // Why: forward-compat regression — a file already at CURRENT must not be
-  // mutated by the migration runner, and the field must survive the parse.
+test("AC-12(e): v2 handoff with explicit review_round=3 migrates to v3 (review_round preserved, visual_round=0)", () => {
+  // Why: v3.14.0 migration regression — a v2 file climbs to v3, preserving
+  // existing fields (review_round=3) and adding the new visual_round=0.
   const ws = mkWorkspace();
   resetSession();
   writeRaw(
@@ -110,6 +111,7 @@ review_round: 3
 
   const state = parseHandoff(ws);
   assert.equal(state.review_round, 3);
+  assert.equal(state.visual_round, 0, "v3.14.0: visual_round stamped to 0 on v2→v3 migration");
 });
 
 // ---------- AC-12(e) part 2: AC-9 stderr migration warning ----------

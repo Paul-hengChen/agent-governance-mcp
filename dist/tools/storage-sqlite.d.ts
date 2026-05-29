@@ -28,7 +28,7 @@ export declare class SqliteHandoffStorage implements HandoffStorage {
     private fetchLastUpdated;
     parse(workspacePath: string): HandoffState | null;
     readState(workspacePath: string): string;
-    writeState(workspacePath: string, activeFeature: string, status: string, completedTasks: string[], pendingNotes: string[], blockingReason?: string, lastAgent?: string, qaRound?: number, prdPath?: string, reviewRound?: number): Promise<string>;
+    writeState(workspacePath: string, activeFeature: string, status: string, completedTasks: string[], pendingNotes: string[], blockingReason?: string, lastAgent?: string, qaRound?: number, prdPath?: string, reviewRound?: number, visualRound?: number): Promise<string>;
     listTasks(workspacePath: string): TaskRecord[] | null;
     getNextTask(workspacePath: string): string;
     completeTask(workspacePath: string, taskId: string, note?: string): Promise<string>;

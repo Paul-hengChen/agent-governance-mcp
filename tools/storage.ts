@@ -41,6 +41,7 @@ export interface HandoffStorage {
     qaRound?: number,
     prdPath?: string,
     reviewRound?: number,
+    visualRound?: number,
   ): Promise<string>;
   parse(workspacePath: string): HandoffState | null;
 
@@ -93,8 +94,9 @@ export class FileHandoffStorage implements HandoffStorage {
     qaRound?: number,
     prdPath?: string,
     reviewRound?: number,
+    visualRound?: number,
   ): Promise<string> {
-    return writeHandoffState(workspacePath, activeFeature, status, completedTasks, pendingNotes, blockingReason, lastAgent, qaRound, prdPath, reviewRound);
+    return writeHandoffState(workspacePath, activeFeature, status, completedTasks, pendingNotes, blockingReason, lastAgent, qaRound, prdPath, reviewRound, visualRound);
   }
 
   parse(workspacePath: string): HandoffState | null {

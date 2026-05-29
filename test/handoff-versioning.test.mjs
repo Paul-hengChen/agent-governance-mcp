@@ -38,7 +38,7 @@ function yieldMacrotask() {
 
 // ---------- AC-1: schema_version stamped on writes ----------
 
-test("AC-1: writeHandoffState stamps schema_version: 2 in YAML (v3.9.0)", async () => {
+test("AC-1: writeHandoffState stamps schema_version: 3 in YAML (v3.14.0)", async () => {
   const ws = mkWorkspace();
   resetSession();
   // Initial parse to mark state read so writeHandoffState's freshness check
@@ -46,8 +46,8 @@ test("AC-1: writeHandoffState stamps schema_version: 2 in YAML (v3.9.0)", async 
   parseHandoff(ws);
   await writeHandoffState(ws, "feat-x", "In_Progress", [], ["next"], undefined, "pm", 0);
   const content = read(ws);
-  // v3.9.0 bump: handoff schema is now 2 (added review_round for code-reviewer chain).
-  assert.match(content, /schema_version:\s*2/);
+  // v3.14.0 bump: handoff schema is now 3 (added visual_round for pixel-fidelity sub-loop).
+  assert.match(content, /schema_version:\s*3/);
 });
 
 test("AC-1: schema_version appears as the first frontmatter key (grep-stable)", async () => {
@@ -64,7 +64,7 @@ test("AC-1: schema_version appears as the first frontmatter key (grep-stable)", 
 
 // ---------- AC-2: lazy migrate-on-read ----------
 
-test("AC-2: readHandoffState heals v0 handoff to CURRENT (v2) on disk (fire-and-forget)", async () => {
+test("AC-2: readHandoffState heals v0 handoff to CURRENT (v3) on disk (fire-and-forget)", async () => {
   const ws = mkWorkspace();
   resetSession();
   // Pre-versioning shape: no schema_version key.
@@ -95,8 +95,8 @@ qa_round: 0
   await yieldMacrotask();
 
   const healed = read(ws);
-  // v3.9.0: chain climbs v0→v1→v2; healed file lands at CURRENT (=2).
-  assert.match(healed, /schema_version:\s*2/);
+  // v3.14.0: chain climbs v0→v1→v2→v3; healed file lands at CURRENT (=3).
+  assert.match(healed, /schema_version:\s*3/);
 });
 
 test("AC-2 fast path: v1 file triggers no write-back", async () => {
@@ -149,7 +149,7 @@ qa_round: 0
   assert.equal(after, before, "parseHandoff is read-only on disk");
 });
 
-test("AC-2 regression: existing handoff missing schema_version round-trips to CURRENT (v2)", async () => {
+test("AC-2 regression: existing handoff missing schema_version round-trips to CURRENT (v3)", async () => {
   const ws = mkWorkspace();
   resetSession();
   writeRaw(
@@ -176,7 +176,7 @@ qa_round: 0
   assert.deepEqual(parsed.completed_tasks, ["T01"]);
   assert.deepEqual(parsed.pending_notes, ["next_role: pm"]);
   // v3.9.0: v0 → v1 → v2 chain lands at CURRENT.
-  assert.match(read(ws), /schema_version:\s*2/);
+  assert.match(read(ws), /schema_version:\s*3/);
 });
 
 // ---------- AC-4: refuse-loud on future versions ----------
@@ -203,7 +203,7 @@ qa_round: 0
 
   assert.throws(
     () => readHandoffState(ws),
-    /handoff on-disk version 99 > server max 2/,
+    /handoff on-disk version 99 > server max 3/,
   );
 });
 
@@ -228,7 +228,7 @@ qa_round: 0
   );
   assert.throws(
     () => parseHandoff(ws),
-    /on-disk version 42 > server max 2/,
+    /on-disk version 42 > server max 3/,
   );
 });
 
@@ -266,7 +266,7 @@ qa_round: 0
   assert.equal(JSON.parse(json2).active_feature, "concurrent");
   // File ended up healed (one of the writes won; the other swallowed quietly).
   // v3.9.0: chain lands at CURRENT (=2).
-  assert.match(read(ws), /schema_version:\s*2/);
+  assert.match(read(ws), /schema_version:\s*3/);
 });
 
 // ---------- regression: missing / malformed files ----------

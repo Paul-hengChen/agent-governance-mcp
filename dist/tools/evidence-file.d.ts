@@ -8,4 +8,12 @@ export declare function hasCodeReviewEvidenceInFile(workspacePath: string, taskI
     present: string[];
     missing: string[];
 };
+export declare function hasVisualBaselinesInDesign(workspacePath: string, activeFeature: string): {
+    present: boolean;
+    designPath: string;
+};
+export declare function hasVisualEvidenceInFile(workspacePath: string, taskIds: string[]): {
+    present: string[];
+    missing: string[];
+};
 //# sourceMappingURL=evidence-file.d.ts.map

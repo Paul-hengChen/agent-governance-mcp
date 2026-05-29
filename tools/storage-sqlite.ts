@@ -33,6 +33,7 @@ interface HandoffRow {
   qa_round: number | null;
   prd_path: string | null;
   review_round: number | null;
+  visual_round: number | null;
 }
 
 interface TaskRow {
@@ -57,7 +58,8 @@ CREATE TABLE IF NOT EXISTS handoff_state (
   pending         TEXT NOT NULL DEFAULT '[]',
   qa_round        INTEGER NOT NULL DEFAULT 0,
   prd_path        TEXT,
-  review_round    INTEGER NOT NULL DEFAULT 0
+  review_round    INTEGER NOT NULL DEFAULT 0,
+  visual_round    INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS tasks (
@@ -121,7 +123,7 @@ export class SqliteHandoffStorage implements HandoffStorage {
   private db: Database.Database;
   private selectStmt: Database.Statement<[string]>;
   private selectLastUpdatedStmt: Database.Statement<[string]>;
-  private upsertStmt: Database.Statement<[string, string, string, string, string | null, string | null, string, string, number, string | null, number]>;
+  private upsertStmt: Database.Statement<[string, string, string, string, string | null, string | null, string, string, number, string | null, number, number]>;
   private txUpsert: (
     workspacePath: string,
     activeFeature: string,
@@ -134,6 +136,7 @@ export class SqliteHandoffStorage implements HandoffStorage {
     qaRound: number,
     prdPath: string | null,
     reviewRound: number,
+    visualRound: number,
     expectedLastUpdated: string | null,
   ) => void;
 
@@ -178,6 +181,7 @@ export class SqliteHandoffStorage implements HandoffStorage {
     addColumnIfMissing("ALTER TABLE handoff_state ADD COLUMN qa_round INTEGER NOT NULL DEFAULT 0");
     addColumnIfMissing("ALTER TABLE handoff_state ADD COLUMN prd_path TEXT");
     addColumnIfMissing("ALTER TABLE handoff_state ADD COLUMN review_round INTEGER NOT NULL DEFAULT 0");
+    addColumnIfMissing("ALTER TABLE handoff_state ADD COLUMN visual_round INTEGER NOT NULL DEFAULT 0");
 
     // Schema-versioning lazy migrate (Phase 4). Creates schema_meta, stamps
     // the sqlite version row, and runs any registered v(N)→v(N+1) DDL steps
@@ -192,10 +196,10 @@ export class SqliteHandoffStorage implements HandoffStorage {
     this.selectLastUpdatedStmt = this.db.prepare<[string]>(
       "SELECT last_updated FROM handoff_state WHERE workspace_path = ?",
     );
-    this.upsertStmt = this.db.prepare<[string, string, string, string, string | null, string | null, string, string, number, string | null, number]>(
+    this.upsertStmt = this.db.prepare<[string, string, string, string, string | null, string | null, string, string, number, string | null, number, number]>(
       `INSERT OR REPLACE INTO handoff_state
-        (workspace_path, active_feature, status, last_updated, blocking_reason, last_agent, completed, pending, qa_round, prd_path, review_round)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (workspace_path, active_feature, status, last_updated, blocking_reason, last_agent, completed, pending, qa_round, prd_path, review_round, visual_round)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
 
     this.txUpsert = this.db.transaction(
@@ -211,6 +215,7 @@ export class SqliteHandoffStorage implements HandoffStorage {
         qaRound: number,
         prdPath: string | null,
         reviewRound: number,
+        visualRound: number,
         expectedLastUpdated: string | null,
       ) => {
         const row = this.selectLastUpdatedStmt.get(workspacePath) as { last_updated: string } | undefined;
@@ -233,6 +238,7 @@ export class SqliteHandoffStorage implements HandoffStorage {
           qaRound,
           prdPath,
           reviewRound,
+          visualRound,
         );
       },
     );
@@ -345,6 +351,11 @@ export class SqliteHandoffStorage implements HandoffStorage {
       typeof reviewRoundRaw === "number" && Number.isFinite(reviewRoundRaw) && reviewRoundRaw >= 0
         ? Math.floor(reviewRoundRaw)
         : 0;
+    const visualRoundRaw = row.visual_round;
+    const visual_round =
+      typeof visualRoundRaw === "number" && Number.isFinite(visualRoundRaw) && visualRoundRaw >= 0
+        ? Math.floor(visualRoundRaw)
+        : 0;
     return {
       active_feature: row.active_feature,
       status: row.status,
@@ -356,6 +367,7 @@ export class SqliteHandoffStorage implements HandoffStorage {
       pending_notes: JSON.parse(row.pending) as string[],
       qa_round,
       review_round,
+      visual_round,
     };
   }
 
@@ -392,6 +404,7 @@ export class SqliteHandoffStorage implements HandoffStorage {
     qaRound?: number,
     prdPath?: string,
     reviewRound?: number,
+    visualRound?: number,
   ): Promise<string> {
     const currentLastUpdated = this.fetchLastUpdated(workspacePath);
     verifyExtra(workspacePath, SNAPSHOT_KEY, currentLastUpdated);
@@ -401,6 +414,10 @@ export class SqliteHandoffStorage implements HandoffStorage {
     const normalisedReviewRound =
       Number.isFinite(reviewRound) && (reviewRound as number) >= 0
         ? Math.floor(reviewRound as number)
+        : 0;
+    const normalisedVisualRound =
+      Number.isFinite(visualRound) && (visualRound as number) >= 0
+        ? Math.floor(visualRound as number)
         : 0;
 
     // Preserve prd_path across writes that don't explicitly set it (PM sets
@@ -424,6 +441,7 @@ export class SqliteHandoffStorage implements HandoffStorage {
       normalisedRound,
       effectivePrdPath,
       normalisedReviewRound,
+      normalisedVisualRound,
       currentLastUpdated,
     );
 

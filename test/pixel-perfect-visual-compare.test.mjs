@@ -45,35 +45,32 @@ test("AC-1: design-auditor Artifact Schema declares OPTIONAL Visual Baselines H2
   assert.match(body, /Absence.*MUST cause QA Phase 1\.5 to skip silently/is, "absence must mandate Phase 1.5 skip");
 });
 
-test("AC-2: QA Phase 1.5 skips silently when Visual Baselines absent", () => {
-  // Why: the no-overhead promise for non-UI features. Without an explicit
-  // absent-branch, QA either FAILs every server-logic feature for not having
-  // a baseline OR silently passes baselines that should have existed. Both
-  // outcomes break trust. The absent branch must log + proceed.
+test("AC-2: QA Phase 1.5 skips silently when Visual Baselines absent (v3.14.0 upgrade)", () => {
+  // v3.14.0: the skip-if-absent contract is preserved AND upgraded to
+  // "lazy-load + PASS-gated" when baselines ARE present. Absent branch
+  // still pays zero overhead.
   const body = fs.readFileSync(QA_PATH, "utf-8");
 
   // Phase 1.5 step exists
   assert.match(body, /\*\*Phase 1\.5\s*—\s*Visual Compare\*\*/, "Phase 1.5 step must be named");
-  // skip-if-absent labeling
-  assert.match(body, /skip-if-absent/i, "skip-if-absent must be the gating label");
+  // v3.14.0 label includes PASS-gated
+  assert.match(body, /lazy-load \+ PASS-gated/i, "v3.14.0 label must declare PASS-gated");
   // Absent branch: explicit log + proceed to Phase 2
   assert.match(body, /Absent.*log.*skipped.*proceed to Phase 2/is, "absent branch must log skip and proceed to Phase 2");
   // Non-UI overhead claim
   assert.match(body, /zero overhead/i, "absent branch must promise zero overhead");
 });
 
-test("AC-3: per-row compare contract reads both PNGs and emits 6-category diff into review doc", () => {
-  // Why: the actual mechanism. If the SOP doesn't enforce (a) reading BOTH
-  // images via the Read tool and (b) emitting a diff structured by category,
-  // QA agents will paraphrase impressions instead of comparing pixels.
-  // The 6 categories are load-bearing: omitting "text content" loses the
-  // copy-drift catch; omitting "spacing/alignment" loses the original Phase
-  // 2 motivation. v3.8.3 split: this content lives in skill-qa-visual.md.
+test("AC-3: per-row compare contract reads both PNGs and emits 6-category diff (v3.14.0: into visual_<task-id>.md under Pixel Diff)", () => {
+  // v3.14.0: output filename changed from review_<task-id>.md to
+  // visual_<task-id>.md (Constitution §3.1 PASS gate). Diff heading changed
+  // from "## Phase 1.5 — Visual Compare" to "## Pixel Diff" (Step B). The
+  // 6 categories and Read-tool contract are preserved.
   const body = fs.readFileSync(QA_VISUAL_PATH, "utf-8");
 
   // Read both files via Read tool
   assert.match(body, /Read both.*baseline path.*impl path.*via the Read tool/is, "both PNGs must be Read via the Read tool");
-  // 6 enumerated categories
+  // 6 enumerated categories (preserved from v3.8.2)
   for (const category of [
     /\(i\).*layout.*position/i,
     /\(ii\).*spacing.*alignment/i,
@@ -84,56 +81,59 @@ test("AC-3: per-row compare contract reads both PNGs and emits 6-category diff i
   ]) {
     assert.match(body, category, `diff must enumerate category ${category}`);
   }
-  // Output destination + heading + per-surface sub-sectioning
-  assert.match(body, /qa_reports\/review_<task-id>\.md/, "output must land in the review doc");
-  assert.match(body, /##\s*Phase 1\.5\s*—\s*Visual Compare/, "diff goes under a `## Phase 1.5 — Visual Compare` heading");
+  // v3.14.0 output destination + heading
+  assert.match(body, /qa_reports\/visual_<task-id>\.md/, "v3.14.0: output must land in visual_<task-id>.md (PASS gate)");
+  assert.match(body, /##\s*Pixel Diff/, "v3.14.0: diff goes under `## Pixel Diff` (Step B)");
   assert.match(body, /sub-section per\s*`?surface id`?/i, "one sub-section per surface id");
 });
 
-test("AC-4: three distinct failure routes (drift → sr-engineer; missing baseline → design-auditor; missing impl → sr-engineer)", () => {
-  // Why: routing accuracy. A missing baseline is the auditor's responsibility
-  // (they declared the path), a missing impl is the sr-engineer's (they
-  // claimed ready-for-QA), and drift is the sr-engineer's (the code drifted).
-  // Confusing these routes makes the wrong role get paged and slows resolution.
-  // v3.8.3 split: failure routes live in skill-qa-visual.md.
+test("AC-4: v3.14.0 — four distinct failure routes (widget shape + pixel drift + missing baseline + missing impl)", () => {
+  // v3.14.0: routes expanded from 3 to 4. Widget shape miss is new; pixel
+  // drift retains the prior drift slot. Missing baseline → design-auditor;
+  // implementation routes carry visual_fail: token for visual_round bump.
   const body = fs.readFileSync(QA_VISUAL_PATH, "utf-8");
 
-  // Drift → sr-engineer
-  assert.match(body, /Drift.*visual drift.*next_role:\s*sr-engineer/is, "drift route must target sr-engineer");
-  // Missing baseline → design-auditor
+  // Widget shape miss (new in v3.14.0) → sr-engineer with visual_fail token
+  assert.match(body, /Widget shape miss.*visual_fail:.*next_role:\s*sr-engineer/is, "widget shape route must target sr-engineer with visual_fail token");
+  // Pixel drift (renamed from "visual drift") → sr-engineer with visual_fail: pixel
+  assert.match(body, /Pixel drift.*visual_fail:\s*pixel.*next_role:\s*sr-engineer/is, "pixel drift must carry visual_fail: pixel token");
+  // Missing baseline → design-auditor (no visual_fail; auditor defect, not implementation)
   assert.match(body, /Missing baseline.*next_role:\s*design-auditor/is, "missing baseline must route to design-auditor");
-  // Missing impl → sr-engineer
-  assert.match(body, /Missing impl.*next_role:\s*sr-engineer/is, "missing impl must route to sr-engineer");
-  // PASS sub-verdict
-  assert.match(body, /PASS sub-verdict.*proceed to Phase 2/is, "PASS sub-verdict must proceed to Phase 2");
+  // Missing impl → sr-engineer with visual_fail: missing_impl
+  assert.match(body, /Missing impl.*visual_fail:\s*missing_impl.*next_role:\s*sr-engineer/is, "missing impl must carry visual_fail: missing_impl token");
+  // PASS sub-verdict heading exists (v3.14.0 promotes it to its own H3 section)
+  assert.match(body, /PASS sub-verdict/is, "PASS sub-verdict must exist");
 });
 
-test("AC-5: gating logic is source-agnostic (no Figma-only assumptions)", () => {
+test("AC-5: gating logic is source-agnostic (no Figma-only assumptions) — preserved in v3.14.0", () => {
   // Why: Phase 1's source-agnostic promise (Sketch / XD / Penpot / PDF /
   // mockup / photo) must extend into Phase 2 — otherwise teams that don't
-  // use Figma get a half-feature. Both files must avoid Figma-only narration
-  // in the gating logic. v3.8.3 split: the source-agnostic claim lives in
-  // skill-qa-visual.md's Rationale paragraph.
+  // use Figma get a half-feature. v3.14.0: source-agnostic claim moved
+  // into the Rationale H3 section of skill-qa-visual.md (was a trailing
+  // paragraph in v3.8.3).
   const auditor = fs.readFileSync(AUDITOR_PATH, "utf-8");
   const qaVisual = fs.readFileSync(QA_VISUAL_PATH, "utf-8");
 
-  // Auditor Visual Baselines lists multiple sources
+  // Auditor Visual Baselines lists multiple sources (unchanged)
   for (const source of ["Figma", "Sketch", "XD", "Penpot", "PDF", "mockup", "photo"]) {
     assert.ok(auditor.includes(source), `Visual Baselines must mention ${source}`);
   }
-  // QA Phase 1.5 sub-skill explicitly claims source-agnosticism
-  assert.match(qaVisual, /Source-agnostic.*any image format/is, "qa-visual sub-skill must claim source-agnosticism");
+  // v3.14.0 qa-visual sub-skill: source-agnostic claim now in Rationale's
+  // pixel-diff bullet ("via multimodal vision against a user-supplied
+  // baseline"). The literal phrase "Source-agnostic" was retired in favour
+  // of the more specific multimodal-vision wording.
+  assert.match(qaVisual, /multimodal vision against a user-supplied baseline/i, "qa-visual must declare multimodal vision contract");
 });
 
-test("AC-6: backwards-compat with v3.8.1 audits (no Visual Baselines = silent skip)", () => {
-  // Why: a v3.8.1 audit has Source manifest but no Visual Baselines H2.
-  // QA Phase 1.5 must treat this as the absent case and skip — not error,
-  // not block. The skip-if-absent contract IS the backwards-compat guarantee;
-  // any other behaviour breaks migrations.
+test("AC-6: backwards-compat — v3.8.1 audits + non-UI workspaces still skip silently in v3.14.0", () => {
+  // v3.14.0 preserves the absent-branch contract. The skip-if-absent
+  // labelling is replaced by "lazy-load + PASS-gated when Visual Baselines
+  // present" — same skip-on-absent semantics, just with a clearer name.
   const qaBody = fs.readFileSync(QA_PATH, "utf-8");
 
-  // Skip-if-absent literally + absent branch ordering (Absent then Present)
-  assert.match(qaBody, /skip-if-absent/i, "skip-if-absent labeling required");
+  // v3.14.0 labelling
+  assert.match(qaBody, /lazy-load \+ PASS-gated/i, "v3.14.0 label must describe both arms");
+  // Absent branch comes BEFORE Present branch (safety default)
   const absentIdx = qaBody.search(/-\s*\*\*Absent\*\*/);
   const presentIdx = qaBody.search(/-\s*\*\*Present\*\*/);
   assert.ok(absentIdx > 0 && presentIdx > absentIdx, "Absent branch must precede Present branch (safety default)");

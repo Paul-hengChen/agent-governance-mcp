@@ -25,6 +25,18 @@ registerMigration<Record<string, unknown>, Record<string, unknown>>({
   up: (input) => ({ ...input, schema_version: 2, review_round: 0 }),
 });
 
+// v2 → v3: add visual_round counter for the pixel-fidelity sub-loop
+// (Constitution §3.1, v3.14.0). Bumps only when pending_notes contains
+// `visual_fail:` and design/<feature>.md declares ## Visual Baselines.
+// Pure transform — the round counter is initialised to 0 for in-flight
+// tickets, identical to the v1→v2 pattern.
+registerMigration<Record<string, unknown>, Record<string, unknown>>({
+  kind: "handoff",
+  from: 2,
+  to: 3,
+  up: (input) => ({ ...input, schema_version: 3, visual_round: 0 }),
+});
+
 // Compile-time guard: if CURRENT_VERSIONS.handoff is ever bumped without a
 // matching registration added above, the runner's missing-step error fires
 // at read time. This reference makes the dependency explicit for grep.

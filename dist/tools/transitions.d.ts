@@ -13,15 +13,18 @@ export interface TransitionRequest {
     next: TransitionTuple;
     prev_qa_round: number;
     prev_review_round: number;
+    prev_visual_round?: number;
+    next_pending_notes?: ReadonlyArray<string>;
 }
 export interface TransitionRejection {
-    error: "TRANSITION_REJECTED" | "QA_ROUND_EXCEEDED" | "REVIEW_ROUND_EXCEEDED" | "AGENT_ID_REQUIRED";
+    error: "TRANSITION_REJECTED" | "QA_ROUND_EXCEEDED" | "REVIEW_ROUND_EXCEEDED" | "VISUAL_ROUND_EXCEEDED" | "AGENT_ID_REQUIRED";
     attempted: {
         prev_agent: string | null;
         prev_status: string | null;
         new_agent: string | null;
         new_status: string | null;
         qa_round: number;
+        visual_round?: number;
     };
     allowed: Array<{
         new_agent: AgentName;
@@ -49,7 +52,8 @@ export declare const ALLOWED_TRANSITIONS: ReadonlyMap<string, AllowedNext>;
 export declare function validateTransition(req: TransitionRequest): TransitionRejection | null;
 /**
  * Compute new round counters from prior counters + incoming tuple + prev tuple.
- * Returns both qa_round and review_round so callers can persist them together.
+ * Returns qa_round, review_round AND visual_round (v3.14.0) so callers can
+ * persist them together.
  *
  * qa_round:
  *   - (qa-engineer, FAIL)         → prev + 1
@@ -62,12 +66,22 @@ export declare function validateTransition(req: TransitionRequest): TransitionRe
  *   - (qa-engineer, In_Progress) when prev was (code-reviewer, In_Progress) → 0
  *   - (pm, In_Progress)           → 0
  *   - everything else             → prev_review_round
+ *
+ * visual_round (v3.14.0):
+ *   - (qa-engineer, FAIL) AND pending_notes contains `visual_fail:` → prev + 1
+ *     (distinguishes pixel/widget drift from test-logic FAIL; only the former
+ *     ticks the visual counter)
+ *   - (qa-engineer, PASS)         → 0
+ *   - (pm, In_Progress)           → 0
+ *   - everything else             → prev_visual_round
  */
-export declare function computeNewRound(prev_qa_round: number, prev_review_round: number, next: TransitionTuple, prev?: TransitionTuple): {
+export declare function computeNewRound(prev_qa_round: number, prev_review_round: number, prev_visual_round: number, next: TransitionTuple, prev?: TransitionTuple, next_pending_notes?: ReadonlyArray<string>): {
     qa_round: number;
     review_round: number;
+    visual_round: number;
 };
 export declare const ROUND_CAP_EXPORTED = 4;
 export declare const REVIEW_ROUND_CAP_EXPORTED = 4;
+export declare const VISUAL_ROUND_CAP_EXPORTED = 6;
 export {};
 //# sourceMappingURL=transitions.d.ts.map

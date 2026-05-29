@@ -39,9 +39,9 @@ All review notes, questions, and bug reports → `qa_reports/review_<task-id>.md
 
    Rationale: stylistic ACs only verify what the spec enumerates; without a "every concrete literal must be sourced" gate, unsourced theme literals go undetected. Layout proportions and platform defaults are out of scope by design.
 
-4. **Phase 1.5 — Visual Compare** (lazy-load, skip-if-absent): after Phase 1 PASS (3a + 3b), before Phase 2. Check `design/<feature>.md` for a `## Visual Baselines` H2.
+4. **Phase 1.5 — Visual Compare** (v3.14.0: lazy-load + PASS-gated when Visual Baselines present): after Phase 1 PASS (3a + 3b), before Phase 2. Check `design/<feature>.md` for a `## Visual Baselines` H2.
    - **Absent** (or no design file) → log `Phase 1.5: skipped (no Visual Baselines declared)` in the review doc and proceed to Phase 2. Do NOT Read `content/skill-qa-visual.md`. Non-UI features pay zero overhead.
-   - **Present** → Read `content/skill-qa-visual.md` (via the Read tool) and follow its SOP for each baseline row. The sub-skill carries the per-row Read+vision-diff contract, the six diff categories, and the three failure routes.
+   - **Present** → Read `content/skill-qa-visual.md` (via the Read tool) and follow its SOP for each baseline row. The sub-skill carries the per-row Read+vision-diff contract, the six diff categories, the three failure routes, AND the v3.14.0 Visual Widgets shape checklist. **PASS GATE (v3.14.0)**: a `qa_reports/visual_<task-id>.md` file MUST be written before PASS can be issued — Constitution §3.1 visual evidence gate. The server rejects PASS with `VISUAL_EVIDENCE_MISSING` if the file is absent. The escape clause "Phase 1.5 deferred" in `pending_notes` is REMOVED — no PASS without diff evidence when baselines exist.
 
 5. **Phase 2 — Discussion (only if issues found)**:
    - Append questions/concerns to the review doc under `## Round 1`.

@@ -81,6 +81,8 @@ function readAndMigrate(workspacePath) {
     const qa_round = Number.isFinite(qaRoundRaw) && qaRoundRaw >= 0 ? Math.floor(qaRoundRaw) : 0;
     const reviewRoundRaw = Number(frontmatter.review_round);
     const review_round = Number.isFinite(reviewRoundRaw) && reviewRoundRaw >= 0 ? Math.floor(reviewRoundRaw) : 0;
+    const visualRoundRaw = Number(frontmatter.visual_round);
+    const visual_round = Number.isFinite(visualRoundRaw) && visualRoundRaw >= 0 ? Math.floor(visualRoundRaw) : 0;
     const state = {
         active_feature: asString(frontmatter.active_feature),
         status: asString(frontmatter.status),
@@ -92,6 +94,7 @@ function readAndMigrate(workspacePath) {
         pending_notes,
         qa_round,
         review_round,
+        visual_round,
     };
     // One-shot stderr warning on v1→v2 migration when an in-flight ticket sits at
     // sr-engineer:In_Progress. After v2, that tuple can no longer transition
@@ -134,7 +137,7 @@ export function readHandoffState(workspacePath) {
         // error here just means another writer already healed the file (AC-5), so
         // swallow it. Any other failure also non-fatal — the in-memory state we
         // return is already at CURRENT.
-        void writeHandoffState(workspacePath, state.active_feature, state.status, state.completed_tasks, state.pending_notes, state.blocking_reason, state.last_agent, state.qa_round, state.prd_path, state.review_round).catch(() => {
+        void writeHandoffState(workspacePath, state.active_feature, state.status, state.completed_tasks, state.pending_notes, state.blocking_reason, state.last_agent, state.qa_round, state.prd_path, state.review_round, state.visual_round).catch(() => {
             /* swallowed — read still returns migrated state */
         });
     }
@@ -189,7 +192,7 @@ export function readHandoffState(workspacePath) {
  * Pending notes are written as plain list items (not checkboxes) to avoid
  * ambiguity with tracked task IDs in the completed section.
  */
-export async function writeHandoffState(workspacePath, activeFeature, status, completedTasks, pendingNotes, blockingReason, lastAgent, qaRound, prdPath, reviewRound) {
+export async function writeHandoffState(workspacePath, activeFeature, status, completedTasks, pendingNotes, blockingReason, lastAgent, qaRound, prdPath, reviewRound, visualRound) {
     ensureDir(workspacePath);
     const handoffPath = getHandoffPath(workspacePath);
     const lockPath = path.join(workspacePath, ".current", ".handoff.lock");
@@ -231,6 +234,10 @@ export async function writeHandoffState(workspacePath, activeFeature, status, co
             ? Math.floor(reviewRound)
             : 0;
         frontmatterData.review_round = normalisedReviewRound;
+        const normalisedVisualRound = Number.isFinite(visualRound) && visualRound >= 0
+            ? Math.floor(visualRound)
+            : 0;
+        frontmatterData.visual_round = normalisedVisualRound;
         const frontmatter = yaml
             .dump(frontmatterData, { lineWidth: -1, forceQuotes: true, quotingType: '"' })
             .trimEnd();

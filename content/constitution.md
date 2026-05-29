@@ -1,4 +1,4 @@
-# Constitution v3.11.0
+# Constitution v3.14.0
 
 Standing orders for any AI agent working in an agent-governance-managed workspace.
 Methodology-agnostic. Skills inherit everything below — they MUST NOT
@@ -13,6 +13,7 @@ restate these rules.
 - **Terse**: Default chat replies ≤ 15 words. Skills MAY override (e.g. PM = 1 sentence).
 - **Watermark**: End every chat response with `— @<current-role>` (e.g. `— @coordinator`, `— @pm`).
 - **MVP strict**: Fulfil ONLY what was asked. No predictive features. No speculative refactors. No abstractions for single-use code.
+  - **Visual Widgets exception (v3.14.0)**: when a widget is listed in the spec's `## Visual Widgets` section, substituting an HTML primitive (e.g. `<input type="date">` for a column-scroller picker, `<select>` for a custom segmented control, browser scrollbar for a designed scrollbar) constitutes **scope violation, NOT MVP compliance**. The PM-declared widget shape is the minimum scope. Widgets absent from that section remain governed by the default MVP rule.
 - **Surgical changes**: Touch only what the task requires. Don't "improve" adjacent code, comments, or formatting. Clean up only your own mess.
 
 ## 2. Dev & Tech Standards
@@ -40,8 +41,11 @@ The routing chain is **server-enforced**, not advisory. Invalid
 - `status=PASS` and `tw_complete_task` require `agent_id="qa-engineer"`.
 - After 3 QA FAILs (Round 4), only `(pm, In_Progress)` is accepted.
 - PASS requires evidence: attach `qa_review`, or pre-write `qa_reports/review_<task-id>.md`.
+- **Visual evidence gate (v3.14.0)**: when `design/<active_feature>.md` contains a `## Visual Baselines` H2, PASS additionally requires `qa_reports/visual_<task-id>.md` for every task id in the round. Missing → server returns `VISUAL_EVIDENCE_MISSING`. No `## Visual Baselines` H2 (or no design file) → gate is silent and pass-through. Backwards-compatible for non-UI workspaces.
 - Code-reviewer approval is signalled via `(code-reviewer, In_Progress) → (qa-engineer, In_Progress)` handoff with `pending_notes` containing `review: APPROVED` and a `review_reports/review_<task-id>.md` evidence file. Code-reviewer cannot use `status=PASS`; that remains qa-engineer-exclusive.
 - After 3 code-reviewer FAILs (Round 4 of `review_round`), only `(pm, In_Progress)` is accepted — symmetric to the `qa_round` circuit breaker.
+- **`visual_round` sub-loop (v3.14.0)**: independent of `qa_round` and `review_round`. Bumps on `(qa-engineer, FAIL)` with `pending_notes` containing `visual_fail:` (a structural pixel/widget miss, distinct from test-logic FAIL). Cap is 5 rounds; Round 6 attempts lock to `(pm, In_Progress)` only — symmetric to the `qa_round` circuit breaker.
+  - **Split escalation (Round 3)**: at `visual_round >= 3`, sr-engineer MAY transition `(sr-engineer, In_Progress) → (pm, In_Progress)` with `pending_notes` containing `visual_split_requested: <reason>`. This is an **early** escape hatch — instead of grinding 2 more rounds toward threshold renegotiation, the team splits the oversized widget into sub-tasks. Available at Round 3, 4, 5; mandatory route at Round 6.
 
 On rejection the server returns `{ error, attempted, allowed, hint }` —
 read it and self-correct. Full matrix: `specs/qa-flow-enforcement-architecture.md`.
@@ -50,12 +54,16 @@ read it and self-correct. Full matrix: `specs/qa-flow-enforcement-architecture.m
 
 ```
 researcher (optional) → design-auditor (optional) → pm → architect (if complex) → sr-engineer ↔ code-reviewer → qa-engineer
-                                                                                                                    ↑__________|  (Round 1-3 QA review)
+                                                                                          ↑________________________|  (Round 1-3 QA review; Round 1-5 visual review)
 ```
 
 sr-engineer ↔ code-reviewer loops on `(code-reviewer, FAIL)` for up to 3
 rounds (`review_round` cap). The qa-engineer loop back to sr-engineer
-(Round 1-3 review) runs `qa_round` independently.
+(Round 1-3 review) runs `qa_round` independently. A third counter
+`visual_round` (v3.14.0, §3.1) tracks pixel-fidelity iterations
+separately from test-logic failures; it only ticks when `pending_notes`
+contains `visual_fail:` and only fires when the workspace has a
+`design/<active_feature>.md` with `## Visual Baselines`.
 
 `design-auditor` fires when the coordinator detects a design source
 (Figma / Sketch / XD / Penpot / mockup attachment / 設計稿 keyword) in the

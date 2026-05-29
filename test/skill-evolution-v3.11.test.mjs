@@ -50,10 +50,12 @@ test("AC-10: transitions.ts AgentName union is UNCHANGED (side-channel constrain
   assert.doesNotMatch(transitionsTs, /release-engineer/, "release-engineer must NOT be in transitions.ts");
 });
 
-test("AC-10: schema/versions.ts schema versions are unchanged", () => {
+test("AC-10: schema/versions.ts schema versions track v3.14.0", () => {
+  // v3.14.0 bumped handoff to 3 (visual_round). sqlite stays at 2 — the
+  // visual_round column is added via ALTER TABLE, not a new sqlite migration.
   const versionsTs = fs.readFileSync(path.join(PROJECT_ROOT, "schema", "versions.ts"), "utf-8");
-  assert.match(versionsTs, /handoff:\s*2,/, "CURRENT_VERSIONS.handoff must be 2");
-  assert.match(versionsTs, /sqlite:\s*2,/, "CURRENT_VERSIONS.sqlite must be 2");
+  assert.match(versionsTs, /handoff:\s*3,/, "CURRENT_VERSIONS.handoff must be 3 (v3.14.0)");
+  assert.match(versionsTs, /sqlite:\s*2,/, "CURRENT_VERSIONS.sqlite must remain 2");
 });
 
 test("AC-10: skill-file schema sanity checks (grep assertions)", () => {

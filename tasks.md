@@ -100,6 +100,17 @@
 - [x] T89 [P1] Sr-engineer: add single-line "Auto-routing is NOT applied in lite mode." disclaimer to content/skill-coordinator-lite.md Hard rules section | depends_on: none
 - [x] T90 [P1] Sr-engineer: add one-line auto-routing hop-cap pointer bullet to constitution §5 Anti-Loop Circuit Breaker | depends_on: T87
 - [x] T91 [P0] Sr-engineer: build + test gate — npm run build (zero TS errors) + npm test (all pass) before handoff to code-reviewer | depends_on: T87, T88, T89, T90
+- [x] T100 [P0] Constitution §1 MVP exception + §3.1 visual_round + §4 chain note | depends_on: none
+- [x] T101 [P0] skill-pm Visual Widgets schema + R5 cross-ref | depends_on: T100
+- [x] T102 [P0] skill-design-auditor Visual Widgets extraction contract | depends_on: T101
+- [x] T103 [P0] skill-architect Visual Harness Artifact Schema + harness task ordering | depends_on: T100
+- [x] T104 [P0] skill-sr-engineer Phase 0.5 Design-Aware Pre-Flight | depends_on: T100
+- [x] T105 [P0] skill-qa-engineer Phase 1.5 PASS-gated + skill-qa-visual widget-shape verify | depends_on: T100
+- [x] T106 [P0] handoff schema bump (visual_round field) + migration | depends_on: T100
+- [x] T107 [P0] tools/transitions.ts visual_round + R1 evidence gate + R4a split; tools/evidence-file.ts visual check | depends_on: T106
+- [x] T108 [P1] specs/qa-flow-enforcement-architecture.md matrix update | depends_on: T107
+- [x] T109 [P0] Tests: visual-evidence-gate / visual-round-transitions / widget-shape-spec / phase-0-5-sop | depends_on: T107
+- [x] T110 [P1] CHANGELOG / README / package.json + index.ts version 3.13.0 → 3.14.0 | depends_on: T109
 
 ## Completed
 

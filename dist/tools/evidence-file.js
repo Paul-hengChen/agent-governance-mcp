@@ -76,4 +76,53 @@ export function hasCodeReviewEvidenceInFile(workspacePath, taskIds) {
     }
     return { present, missing };
 }
+// ---------- visual evidence (v3.14.0) ----------
+// Constitution §3.1 visual evidence gate: when `design/<active_feature>.md`
+// contains a `## Visual Baselines` H2, PASS additionally requires
+// `qa_reports/visual_<task-id>.md` for every task id in the round.
+function visualEvidencePath(workspacePath, taskId) {
+    const safe = taskId.replace(/[^A-Za-z0-9._-]/g, "_");
+    return path.join(workspacePath, "qa_reports", `visual_${safe}.md`);
+}
+function designFilePath(workspacePath, activeFeature) {
+    const safe = activeFeature.replace(/[^A-Za-z0-9._-]/g, "_");
+    return path.join(workspacePath, "design", `${safe}.md`);
+}
+// Detects whether the workspace's design file declares any Visual Baselines.
+// Returns existence + the resolved path so callers can include the path in
+// error hints. Reads the file once per call (no caching — design files are
+// small and PASS attempts are infrequent enough that fs cost is negligible).
+// Match is permissive: any H2 line beginning with `## Visual Baselines`
+// (case-insensitive, optional trailing text) triggers the gate.
+export function hasVisualBaselinesInDesign(workspacePath, activeFeature) {
+    const designPath = designFilePath(workspacePath, activeFeature);
+    if (!activeFeature || !fs.existsSync(designPath)) {
+        return { present: false, designPath };
+    }
+    try {
+        const content = fs.readFileSync(designPath, "utf-8");
+        const hasBaselines = /^##\s+Visual\s+Baselines\b/im.test(content);
+        return { present: hasBaselines, designPath };
+    }
+    catch {
+        return { present: false, designPath };
+    }
+}
+// Per-task existence check for `qa_reports/visual_<task-id>.md`.
+// Mirror of hasEvidenceInFile / hasCodeReviewEvidenceInFile — existence is
+// sufficient; the qa-engineer + skill-qa-visual SOP enforce the contents
+// (widget shape checklist, pixel diff sections). Server does NOT parse.
+export function hasVisualEvidenceInFile(workspacePath, taskIds) {
+    const present = [];
+    const missing = [];
+    for (const id of taskIds) {
+        if (fs.existsSync(visualEvidencePath(workspacePath, id))) {
+            present.push(id);
+        }
+        else {
+            missing.push(id);
+        }
+    }
+    return { present, missing };
+}
 //# sourceMappingURL=evidence-file.js.map

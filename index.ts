@@ -52,6 +52,10 @@ import {
   type StatusName,
   type TransitionTuple,
 } from "./tools/transitions.js";
+import {
+  hasVisualBaselinesInDesign,
+  hasVisualEvidenceInFile,
+} from "./tools/evidence-file.js";
 
 // ==========================================
 // Runtime validation schemas (zod)
@@ -169,7 +173,7 @@ function formatZodError(err: z.ZodError): string {
 // ==========================================
 // Storage adapter defaults to FileHandoffStorage; HTTP-mode boot switches it via setActiveStorage().
 const server = new Server(
-  { name: "agent-governance-mcp", version: "3.13.0" },
+  { name: "agent-governance-mcp", version: "3.14.0" },
   { capabilities: { tools: {}, prompts: {} } }
 );
 
@@ -624,6 +628,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const prevState = storage.parse(parsed.workspace_path);
         const prev_qa_round = prevState?.qa_round ?? 0;
         const prev_review_round = prevState?.review_round ?? 0;
+        const prev_visual_round = prevState?.visual_round ?? 0;
         const prevTuple: TransitionTuple = {
           agent: (prevState?.last_agent as AgentName | undefined) ?? null,
           status: (prevState?.status as StatusName | undefined) ?? null,
@@ -633,7 +638,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           status: parsed.status,
         };
 
-        const rejection = validateTransition({ prev: prevTuple, next: nextTuple, prev_qa_round, prev_review_round });
+        const rejection = validateTransition({
+          prev: prevTuple,
+          next: nextTuple,
+          prev_qa_round,
+          prev_review_round,
+          prev_visual_round,
+          next_pending_notes: parsed.pending_notes,
+        });
         if (rejection) {
           return {
             content: [{ type: "text" as const, text: `⛔ ${rejection.error}\n${JSON.stringify(rejection, null, 2)}` }],
@@ -671,6 +683,27 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               isError: true,
             };
           }
+          // v3.14.0 — Visual evidence gate (Constitution §3.1).
+          // Only fires when `design/<active_feature>.md` declares `## Visual
+          // Baselines`. Pass-through (silent) on non-UI workspaces — keeps
+          // the existing v3.13.0 behaviour for everyone without a design file.
+          const visualGate = hasVisualBaselinesInDesign(parsed.workspace_path, parsed.active_feature);
+          if (visualGate.present) {
+            const visEv = hasVisualEvidenceInFile(parsed.workspace_path, parsed.completed_tasks);
+            if (visEv.missing.length > 0) {
+              return {
+                content: [{
+                  type: "text" as const,
+                  text:
+                    `⛔ VISUAL_EVIDENCE_MISSING: ${visEv.missing.join(", ")}. ` +
+                    `design/<feature>.md declares ## Visual Baselines (at ${visualGate.designPath}) ` +
+                    `but qa_reports/visual_<task-id>.md is absent for the listed task(s). ` +
+                    `Run Phase 1.5 (skill-qa-visual) and write the visual report before PASS.`,
+                }],
+                isError: true,
+              };
+            }
+          }
         }
 
         // Code-reviewer evidence gate. Mirrors the PASS gate above for the
@@ -698,11 +731,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           }
         }
 
-        const { qa_round: new_qa_round, review_round: new_review_round } = computeNewRound(
+        const {
+          qa_round: new_qa_round,
+          review_round: new_review_round,
+          visual_round: new_visual_round,
+        } = computeNewRound(
           prev_qa_round,
           prev_review_round,
+          prev_visual_round,
           nextTuple,
           prevTuple,
+          parsed.pending_notes,
         );
         const pending = [...parsed.pending_notes];
         if (new_qa_round === 4 && prev_qa_round === 3) {
@@ -710,6 +749,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
         if (new_review_round === 4 && prev_review_round === 3) {
           pending.unshift("⛔ Review Round 4: forced rollback to pm — no further code-review allowed until PM resets.");
+        }
+        // v3.14.0 — visual_round Round 6 lock (5 visual FAILs accumulated).
+        // Symmetric to qa_round / review_round Round 4 lock.
+        if (new_visual_round === 6 && prev_visual_round === 5) {
+          pending.unshift("⛔ Visual Round 6: forced rollback to pm — no further pixel iteration allowed until PM rebudgets scope or threshold.");
         }
 
         const result = await storage.writeState(
@@ -723,6 +767,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           new_qa_round,
           parsed.prd_path,
           new_review_round,
+          new_visual_round,
         );
 
         // GC hook: when QA flips a feature to PASS, drop the workspace's RAG

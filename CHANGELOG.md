@@ -16,6 +16,156 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.14.0] - 2026-05-29
+
+MINOR release closing the **pixel-perfect framework gap** uncovered by
+`research/why-pixel-perfect-missed.md`. Adds a third independent
+feedback loop (`visual_round`) to the routing chain, a server-side
+PASS-evidence gate for visual diff reports, and four new schema
+sections distributed across PM / design-auditor / architect /
+sr-engineer SOPs.
+
+**Backwards-compatible**: workspaces without `design/<feature>.md`
+(server logic, CLI, this MCP repo itself) pay zero overhead and see
+no behaviour change. The new gates fire only when a feature declares
+`## Visual Baselines` in its design file.
+
+### Added
+
+- **Constitution §1 Visual Widgets exception** — sub-bullet under
+  *MVP strict*. When a widget is listed in a spec's `## Visual Widgets`
+  section, substituting an HTML primitive (e.g. `<input type="date">`
+  for a column-scroller picker) is now **scope violation**, NOT MVP
+  compliance. Closes the gap where sr-engineer rationally chose
+  primitives because the spec didn't enumerate widget shapes.
+- **Constitution §3.1 visual evidence gate** — `(qa-engineer, PASS)`
+  requires `qa_reports/visual_<task-id>.md` when
+  `design/<active_feature>.md` declares `## Visual Baselines`. Server
+  rejects with `VISUAL_EVIDENCE_MISSING` on the missing file. No
+  baselines declared → gate is silent and pass-through.
+- **Constitution §3.1 `visual_round` sub-loop** — third feedback
+  counter, independent of `qa_round` and `review_round`. Ticks on
+  `(qa-engineer, FAIL)` when `pending_notes` contains `visual_fail:`
+  (pixel/widget drift, NOT test-logic FAIL). Cap is 5 rounds; Round 6
+  locks to `(pm, In_Progress)` only. Symmetric to the v3.2.0 qa_round
+  Round 4 circuit breaker.
+- **Constitution §3.1 split escalation** — at `visual_round >= 3`,
+  sr-engineer MAY route `(sr-engineer, In_Progress) → (pm, In_Progress)`
+  with `pending_notes` containing `visual_split_requested:`. Early
+  escape hatch: instead of grinding two more rounds toward threshold
+  renegotiation, the team splits an oversized widget into sub-tasks.
+- **`skill-pm.md` § Visual Widgets schema bullet** — new required H2
+  section between *Visual Tokens* and *Out of Scope*. 3-column table
+  `widget id | description | source-node`. Mandatory `N/A | — | …` row
+  for features without widgets (absence must be explicit).
+- **`skill-design-auditor.md` § Visual Widgets extraction** — schema
+  bullet + 8-row widget-shape heuristics table (Picker, Wheel,
+  Keyboard, Segmented, Scrollbar, Stepper, Accordion, Slider, Toggle)
+  + "verify with PM" uncertainty tag + out-of-scope clause for restyled
+  primitives.
+- **`skill-architect.md` § Visual Harness Artifact Schema bullet**
+  (MANDATORY when `design/<feature>.md` declares `## Visual Baselines`;
+  OMIT entirely otherwise) — specifies test runner, viewport list,
+  diff library + threshold, CI command, font/rendering pinning, task
+  ordering rule. New SOP gate 4a blocks back to PM when the spec's
+  task list lacks a `[P0] Build visual-diff harness` task.
+- **`skill-sr-engineer.md` § Phase 0.5 Design-Aware Pre-Flight** — new
+  SOP step 3a positioned BETWEEN Task-Size Check (3) and Implement (4).
+  Mandates reading `design/<active_feature>.md` end-to-end + relevant
+  `## Visual Widgets` row + baseline paths BEFORE any file edit. Skips
+  silently on non-UI workspaces. References split escalation at
+  `visual_round >= 3`.
+- **`skill-qa-engineer.md` § Phase 1.5 PASS-gated** — Phase 1.5 label
+  upgraded from "lazy-load, skip-if-absent" to "lazy-load + PASS-gated
+  when Visual Baselines present". Names the server error code
+  (`VISUAL_EVIDENCE_MISSING`) operators will see. The "Phase 1.5
+  deferred" escape clause is REMOVED.
+- **`skill-qa-visual.md` § Widget Shape Checklist** — new Step A
+  preceding the v3.8.2 Pixel Diff (now Step B). One markdown checkbox
+  per spec `## Visual Widgets` row. Unchecked `[ ]` → "widget shape
+  miss" failure mode (`visual_fail: <widgets>` token in pending_notes).
+  Shape FAIL gates Step B — pixel-perfect on the wrong widget is
+  meaningless. Output filename changed from `qa_reports/review_<id>.md`
+  to `qa_reports/visual_<id>.md` (Constitution §3.1 PASS gate target).
+- **`tools/evidence-file.ts` new exports** —
+  `hasVisualBaselinesInDesign(workspace, activeFeature)` and
+  `hasVisualEvidenceInFile(workspace, taskIds)`. Mirror existing
+  `hasEvidenceInFile` / `hasCodeReviewEvidenceInFile` patterns. Path
+  sanitisation reuses the `[^A-Za-z0-9._-]` filter.
+- **`tools/transitions.ts` new exports** — `VISUAL_ROUND_CAP_EXPORTED`
+  constant (=6). `TransitionRejection.error` union extends with
+  `VISUAL_ROUND_EXCEEDED`. `validateTransition` consults
+  `prev_visual_round` (optional; defaults to 0). `computeNewRound`
+  signature widens by two positional params and returns
+  `{ qa_round, review_round, visual_round }`.
+
+### Changed
+
+- **Handoff schema v2 → v3** — new `visual_round: number` field.
+  v2→v3 migration registered in `schema/migrations-handoff.ts` stamps
+  the field to 0 for in-flight tickets. SQLite mode adds a
+  `visual_round INTEGER NOT NULL DEFAULT 0` column via
+  `ALTER TABLE handoff_state` (no sqlite schema_version bump because
+  no new tables / no breaking column changes).
+- **`writeHandoffState` + `HandoffStorage.writeState`** — eleventh
+  positional parameter `visualRound?: number` added. All call sites
+  in `tools/handoff.ts`, `tools/storage.ts`, `tools/storage-sqlite.ts`,
+  and `index.ts` updated. Pre-v3.14 callers passing 10 params
+  continue to work (visualRound defaults to 0).
+- **Constitution §4 routing chain** — diagram annotation updated to
+  reflect "Round 1-3 QA review; Round 1-5 visual review" feedback
+  arrow scope. Textual paragraph documents `visual_round`'s gating
+  conditions.
+
+### Server enforcement summary
+
+| State | Server check (new in v3.14.0) | Trigger condition |
+|---|---|---|
+| PASS attempt | `hasVisualBaselinesInDesign` → if true, `hasVisualEvidenceInFile` for every completed_tasks id | `design/<active_feature>.md` declares `## Visual Baselines` |
+| Any transition | `visual_round >= 6` → only `(pm, In_Progress)` accepted | counter independent of `qa_round` / `review_round` |
+| `pending_notes` synthesis | `⛔ Visual Round 6: forced rollback to pm…` prepended | when `new_visual_round === 6 && prev_visual_round === 5` |
+
+### Backwards-compatibility
+
+- Workspaces without `design/<feature>.md`: no behaviour change.
+- Workspaces with `design/<feature>.md` but no `## Visual Baselines`
+  H2: no behaviour change (v3.8.2/v3.8.3 audit format still supported).
+- Existing specs (pre-v3.14) without `## Visual Widgets` section: no
+  retroactive enforcement; the section becomes mandatory only for
+  features authored after v3.14.0.
+- Handoff files at schema_version 0/1/2 lazy-migrate to v3 on first
+  read, identical to the v3.9.0 v1→v2 mechanism. v3.13.0 callers that
+  omit `visualRound` continue to work — the parameter defaults to 0.
+
+### Tests
+
+- 4 new test files (T109): `visual-evidence-gate.test.mjs`,
+  `visual-round-transitions.test.mjs`, `widget-shape-spec.test.mjs`,
+  `phase-0-5-sop.test.mjs`.
+- 8 existing test files migrated for the schema_version bump +
+  signature widening: `handoff-versioning.test.mjs`,
+  `handoff-migration.test.mjs`, `schema-versions.test.mjs`,
+  `drift-skew.test.mjs`, `qa-flow.test.mjs`,
+  `qa-visual-skill-split.test.mjs`,
+  `pixel-perfect-visual-compare.test.mjs`,
+  `skill-evolution-v3.11.test.mjs`.
+- Final tally: **353/353 passing**.
+
+### Notes
+
+- `npm audit` waiver from v3.13.0 carries forward unchanged: 3 HIGH +
+  1 CRITICAL transitive findings under `@xenova/transformers` (not
+  reachable). 1 moderate `qs` finding is new but below audit threshold.
+- Root-cause analysis lives in
+  `research/why-pixel-perfect-missed.md`. The R1-R6 recommendations
+  in that document map to ACs in `specs/pixel-perfect-fixes-v3.14.md`:
+  R1+R6 → AC-5/AC-6 (qa gate + widget checklist),
+  R2+R2a → AC-1/AC-2 (PM + design-auditor widgets),
+  R3 → AC-3 (architect harness),
+  R3a → AC-4 (sr Phase 0.5),
+  R4+R4a → AC-8/AC-9 (visual_round + split escalation),
+  R5 → AC-7 (Constitution §1 exception).
+
 ## [3.13.0] - 2026-05-28
 
 Bundled MINOR release covering both the v3.12 polish pass and the v3.13

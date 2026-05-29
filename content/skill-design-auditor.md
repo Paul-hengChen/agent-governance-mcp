@@ -18,6 +18,7 @@ Every audit MUST contain these H2 sections:
 - **Source manifest** — exhaustive list of every surface in the design source. One row per surface: `<medium> | <pointer> | <fetched? yes/no> | <status: audited \| deferred \| out-of-scope> | <reason>`. Pointer is a Figma node id, Sketch artboard id, XD artboard id, Penpot board id, PDF page number, image filename, photo filename, etc. Manifest MUST cover every frame / artboard / board / page / file in the source — not just the ones referenced by the current task. `reason` is required for `deferred` and `out-of-scope`; optional for `audited`. **Backwards-compat**: pre-Phase-1 audits lacking the status column are treated by downstream roles as `audited` for surfaces they list and `unknown` for the rest — no retroactive migration.
 - **Copy / Strings** — same 3-column table the PM spec schema demands. PM copies this verbatim into `specs/<feature>.md`.
 - **Visual Tokens** — same 4-column table the PM spec schema demands. PM copies this verbatim into `specs/<feature>.md`.
+- **Visual Widgets** (v3.14.0) — same 3-column table the PM spec schema demands (`widget id | description | source-node`). PM copies this verbatim into `specs/<feature>.md`. Run the **widget-shape heuristics** below against every audited surface; emit one row per non-primitive control. If none found, write the literal row `N/A | — | no non-primitive widgets in audited surfaces`. Closes the gap where PM-only widget enumeration relied on free-form judgement; design-auditor is the upstream owner because the design source carries the component names.
 - **Visual Baselines** *(OPTIONAL — present only when the design source produced comparable images)* — 4-column table `surface id | baseline path | impl path | notes`. `surface id` MUST match a row in *Source manifest*. `baseline path` is workspace-relative to an image file the design source produced (Figma export PNG, Sketch / XD / Penpot export, PDF page rendered to PNG, raw mockup file, photo). `impl path` is workspace-relative to where the QA agent expects the implementation screenshot to live at QA time (file or glob). `notes` is free text. Absence of this section MUST cause QA Phase 1.5 to skip silently — non-UI features pay zero overhead.
 - **Out of Scope** — frames / surfaces deliberately not audited this round, with a reason.
 
@@ -41,7 +42,20 @@ Every audit MUST contain these H2 sections:
    - `sketch` / `xd` / `penpot`: use the corresponding MCP if available; else ask the user to export Copy / Visual values manually.
    - `pdf` / `image` / `paper`: OCR is brittle. Ask the user to confirm every value before recording — these become `authored-here` with the source filename as justification.
    Hard limits: max 3 extraction attempts per surface; max 5 files read per surface (constitution §5 Anti-Loop). On limit, stop and surface what you have so far.
-4. **Audit**: fill the Copy / Strings + Visual Tokens tables. Quote verbatim. For values that must be paraphrased (translated, OCR'd), record `authored-here` and explain why. If the design exceeds the 250-line cap for this pass, mark uncovered surfaces as `deferred` in the *Source manifest* with a one-line reason and hand back — the coordinator may route you again for a follow-up pass that flips `deferred` → `audited`. `no-design` mode skips multi-pass and manifest entirely (empty manifest, single pass).
+4. **Audit**: fill the Copy / Strings + Visual Tokens + Visual Widgets tables. Quote verbatim. For values that must be paraphrased (translated, OCR'd), record `authored-here` and explain why. If the design exceeds the 250-line cap for this pass, mark uncovered surfaces as `deferred` in the *Source manifest* with a one-line reason and hand back — the coordinator may route you again for a follow-up pass that flips `deferred` → `audited`. `no-design` mode skips multi-pass and manifest entirely (empty manifest, single pass).
+
+   **Widget-shape heuristics (v3.14.0)** — for the *Visual Widgets* table, emit a row whenever any of the following match on a layer / component / frame:
+   | Match pattern (component name OR layer name, case-insensitive) | Likely widget shape | Primitive that must NOT be substituted |
+   |---|---|---|
+   | `Picker`, `Wheel`, `ColumnScroller`, `DateTimePicker`, `TimeWheel` | column-scroller picker | `<input type="date">`, `<input type="time">`, `<select>` |
+   | `Keyboard`, `Virtual Keyboard`, `OnScreen Keyboard`, `OSK` | virtual on-screen keyboard | hardware keyboard reliance, plain `<input>` |
+   | `Segmented`, `SegmentedControl`, `TabSwitch` | custom segmented control | `<select>`, `<input type="radio">` group with default styling |
+   | `Scrollbar`, `CustomScroll`, `ScrollIndicator` | custom scrollbar | browser default scrollbar |
+   | `Stepper`, `WizardStepper`, `Progress` (animated) | animated stepper | `<progress>`, static dots |
+   | `Accordion`, `Collapsible`, `ExpansionPanel` | accordion card | `<details>` |
+   | `Slider` (custom track), `RangeBar`, `RotaryDial` | custom slider / dial | `<input type="range">` |
+   | `Toggle` (custom shape), `SwitchPill` | custom toggle | `<input type="checkbox">` |
+   For uncertain matches, list the widget and tag the description `verify with PM` — let PM decide whether it stays. Out-of-scope: pure primitives with restyled CSS (a `<button>` with brand color is NOT a widget — it's a Visual Token).
 5. **Write** `design/<feature>.md` per the Artifact Schema.
 6. `tw_update_state(active_feature=<name>, status=In_Progress, agent_id="design-auditor", pending_notes=["Audit: design/<feature>.md", "next_role: pm"])`. On failure, still call with the failure summary in `pending_notes`.
 
