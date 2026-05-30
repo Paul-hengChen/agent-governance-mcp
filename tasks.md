@@ -128,6 +128,8 @@
 - [x] T306 [P0] qa-engineer: test/writestate-options-object.test.mjs — AC-6..AC-10 dual API equivalence | depends_on: T303
 - [x] T307 [P0] qa-engineer: extend test/qa-flow.test.mjs — AC-11/AC-12/AC-13 Round 4 sentinel symmetric predicate | depends_on: T304
 - [x] T308 [P1] sr-engineer: version 3.14.1 → 3.15.0 + CHANGELOG [3.15.0] + README §(s) | depends_on: T305, T306, T307
+- [x] T310 [P0] sr-engineer: edit content/skill-researcher.md — (a) Depth hard rule: standalone invocation with no `researcher_depth:` declared defaults to `deep`; (b) SOP research step: at deep depth invoke `/deep-research` skill (if available) for multi-source cited report then distil into Findings Schema, fallback to manual web search if unavailable; shallow path unchanged | depends_on: none (note: SOP edit verified by AC-1..AC-4 tests; suite 403/403)
+- [x] T311 [P1] qa-engineer: add content-assertion test (test/researcher-deep-research.test.mjs) verifying skill-researcher.md contains default-deep standalone directive (AC-1) + `/deep-research` deep-depth invocation directive (AC-2) + fallback wording (AC-3); assert shallow not forced (AC-4) | depends_on: T310 (note: 5 content-assertion tests, AC-1..AC-5 mapped, all pass)
 
 ## Completed
 

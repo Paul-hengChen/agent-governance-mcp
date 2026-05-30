@@ -16,6 +16,50 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.16.0] - 2026-05-30
+
+MINOR release wiring the `researcher` role to the Claude Code `/deep-research`
+skill. At `deep` depth the researcher now invokes `/deep-research` to gather a
+multi-source, cited report before distilling it into the Findings Schema, and a
+**standalone** invocation (one not routed through coordinator/PM, so no
+`researcher_depth:` is declared in `pending_notes`) now defaults to `deep` —
+making a bare `researcher` call auto-run the harness.
+
+Backwards-compatible: the routed `shallow` path is unchanged and explicitly does
+NOT invoke `/deep-research` (cost-frugal). The directive is prompt-layer
+guidance — the server still enforces only routing/state, not skill invocation —
+and degrades gracefully to manual web search when `/deep-research` is
+unavailable in the session.
+
+### Added
+
+- **`/deep-research` invocation at `deep` depth** — `content/skill-researcher.md`
+  SOP step 2 now directs the agent to invoke the `/deep-research` skill (when
+  available in the session) to gather a multi-source, cited report, then distil
+  it into the Findings Schema, with a manual-web-search fallback when the skill
+  is absent.
+- **Standalone default depth = `deep`** — the Depth Hard-rule gains a
+  `Standalone default` bullet: an invocation with no `researcher_depth:`
+  declared defaults to `deep`, so a bare `researcher` call auto-runs the
+  harness.
+- **`test/researcher-deep-research.test.mjs`** — 5 content-assertion tests
+  (AC-1..AC-5) pinning the standalone-default-deep rule, the `/deep-research`
+  invocation directive, the fallback wording, the unchanged shallow path, and
+  the end-to-end presence of all directives in the assembled prompt via
+  `buildResearcherPrompt`.
+
+### Changed
+
+- **`content/skill-researcher.md` SOP step 2** — reworded from "Research using
+  web search, file reads, code traversal" to the depth-aware
+  invoke-`/deep-research`-then-distil flow described above. `shallow` explicitly
+  skips the harness.
+
+### Notes
+
+- Prompt-layer only: no `tools/` / `prompts/` / `schema/` source changed, so
+  `dist/` is byte-identical. The constitution version is unchanged.
+
 ## [3.15.0] - 2026-05-29
 
 MINOR release activating the R6 server-enforced widget verification gate

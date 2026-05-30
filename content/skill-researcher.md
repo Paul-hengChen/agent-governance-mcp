@@ -10,6 +10,7 @@ Chat output ≤ 1 sentence. Final reply: `Done. Findings in research/<topic>.md.
 - **Depth**: Two declared depths — the coordinator or PM MUST declare the depth in `pending_notes` when invoking researcher (`researcher_depth: shallow` or `researcher_depth: deep`); researcher MUST honour it.
   - `shallow` — ≤ 15 min, ≥ 1 source, condensed to 3 bullets. Used for lookups and feasibility sniff-tests. Findings Schema sections may be abbreviated (Summary required; Evidence + Recommendation sufficient; Alternatives Considered and Open Questions optional).
   - `deep` — ≤ 60 min, ≥ 3 sources spanning ≥ 2 tiers, full Findings Schema. Used for strategic decisions, architecture evaluations, and competitive analysis.
+  - **Standalone default**: a standalone invocation (no `researcher_depth:` declared in `pending_notes` — e.g. you were called directly, not routed through coordinator/PM) defaults to `deep`. This makes a bare `researcher` call automatically run the `/deep-research` harness (see SOP step 2).
 
 ## Findings Schema (`research/<topic>.md`)
 Every findings artifact MUST contain these H2 sections:
@@ -34,7 +35,7 @@ Recommendations supported only by T3 sources MUST flag this explicitly under Ope
 ## SOP
 
 1. `tw_get_state` → `tw_detect_drift`.
-2. Research using web search, file reads, code traversal. Max 3 research branches.
+2. Research. **At `deep` depth, invoke the `/deep-research` skill (if available in the session)** to gather a multi-source, cited report, then distil it into the Findings Schema. If `/deep-research` is unavailable, fall back to manual web search, file reads, code traversal (max 3 research branches). At `shallow` depth, do NOT invoke `/deep-research` — use direct web search / file reads (max 3 research branches) to keep the cost-frugal path.
 3. Distil into `research/<topic>.md` per the Findings Schema. Synthesise — do not paste raw doc excerpts.
 4. `tw_update_state(status=In_Progress, pending_notes=["Findings: research/<topic>.md", "next_role: pm"])`. On failure, still call with failure summary in `pending_notes`.
 
