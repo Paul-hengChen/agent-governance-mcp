@@ -16,6 +16,28 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.16.1] - 2026-05-31
+
+PATCH release flipping the **standalone** `researcher` default from `deep` back
+to `shallow`. A bare `researcher` invocation (no `researcher_depth:` in
+`pending_notes`) no longer auto-spawns the token-expensive `/deep-research`
+harness; `deep` is now opt-in only. This reverses the cost exposure introduced
+in v3.16.0 while keeping the `deep`→`/deep-research` wiring intact.
+
+### Changed
+
+- **Standalone default is `shallow`** — `content/skill-researcher.md` Hard rules
+  + SOP step 2: a standalone researcher call defaults to the cost-frugal
+  `shallow` path (direct web search / file reads, no `/deep-research` harness).
+  `deep` runs only when explicitly requested or when the question is genuinely
+  strategic.
+- **Token-cost warning before `deep`** — at `deep` depth the researcher MUST
+  first warn the user that `/deep-research` is token-expensive (≈ 100+
+  verification sub-agents, > 1M tokens typical) and confirm before launching.
+- **`shallow` corroboration floor** — `shallow` now requires ≥ 3 sources
+  spanning ≥ 2 credibility tiers (was ≥ 1 source); a single-source answer is no
+  longer acceptable.
+
 ## [3.16.0] - 2026-05-30
 
 MINOR release wiring the `researcher` role to the Claude Code `/deep-research`
