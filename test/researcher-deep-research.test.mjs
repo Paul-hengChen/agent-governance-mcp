@@ -7,7 +7,8 @@
 // (skill-researcher.md), loaded verbatim by buildPromptForRole. There is no
 // server-enforced trigger — the contract IS the SOP wording reaching the agent.
 // These tests pin that wording so a future edit can't silently drop the
-// standalone-default-deep rule or the /deep-research invocation directive.
+// standalone-default-shallow rule (v3.16.1: standalone is the cost-frugal path,
+// deep is opt-in and must warn on token cost) or the /deep-research directive.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -22,21 +23,34 @@ const SKILL = fs.readFileSync(
   "utf-8",
 );
 
-test("AC-1: standalone invocation with no declared depth defaults to deep", () => {
-  // Contract: a bare researcher call (no `researcher_depth:` in pending_notes)
-  // must default to `deep` so it auto-runs the deep-research harness.
+test("AC-1: standalone invocation with no declared depth defaults to shallow", () => {
+  // Contract (v3.16.1): a bare researcher call (no `researcher_depth:` in
+  // pending_notes) must default to `shallow` — the cost-frugal path that does
+  // NOT spawn the /deep-research harness. deep is opt-in only.
   assert.match(
     SKILL,
-    /Standalone default[\s\S]*?no `researcher_depth:` declared[\s\S]*?defaults to `deep`/,
-    "Depth clause must declare standalone (undeclared) default = deep",
+    /Standalone default[\s\S]*?no `researcher_depth:` declared[\s\S]*?defaults to `shallow`/,
+    "Depth clause must declare standalone (undeclared) default = shallow",
+  );
+  assert.match(
+    SKILL,
+    /`deep` is \*\*opt-in only\*\*/,
+    "deep must be opt-in only, not the standalone default",
   );
 });
 
-test("AC-2: deep depth directs invoking the /deep-research skill then distilling", () => {
+test("AC-2: deep depth warns on token cost, then invokes /deep-research and distils", () => {
+  // v3.16.1: deep must FIRST warn the user the harness is token-expensive and
+  // confirm before launching — the cost guardrail that justifies the default flip.
   assert.match(
     SKILL,
-    /At `deep` depth, invoke the `\/deep-research` skill/,
-    "SOP must direct /deep-research invocation at deep depth",
+    /At `deep` depth, FIRST warn[\s\S]*?token-expensive[\s\S]*?confirm before launching/,
+    "SOP must warn + confirm before launching /deep-research at deep depth",
+  );
+  assert.match(
+    SKILL,
+    /Then invoke the `\/deep-research` skill/,
+    "SOP must still direct /deep-research invocation at deep depth (after the warning)",
   );
   assert.match(
     SKILL,
@@ -53,11 +67,11 @@ test("AC-3: graceful fallback when /deep-research is unavailable", () => {
   );
 });
 
-test("AC-4: shallow depth does NOT force /deep-research (cost-frugal path preserved)", () => {
+test("AC-4: shallow depth (the default) does NOT force /deep-research (cost-frugal path preserved)", () => {
   assert.match(
     SKILL,
-    /At `shallow` depth, do NOT invoke `\/deep-research`/,
-    "shallow path must explicitly skip /deep-research",
+    /At `shallow` depth \(the \*\*default\*\*\), do NOT invoke `\/deep-research`/,
+    "shallow path must explicitly skip /deep-research and be marked the default",
   );
 });
 
@@ -69,7 +83,8 @@ test("AC-5: built researcher prompt carries the deep-research directives (trigge
     path.join(PROJECT_ROOT, "dist", "prompts", "researcher.js")
   );
   const text = buildResearcherPrompt(PROJECT_ROOT).messages[0].content.text;
-  assert.match(text, /Standalone default[\s\S]*?defaults to `deep`/, "built prompt must carry default-deep rule");
+  assert.match(text, /Standalone default[\s\S]*?defaults to `shallow`/, "built prompt must carry default-shallow rule");
+  assert.match(text, /At `deep` depth, FIRST warn[\s\S]*?token-expensive/, "built prompt must carry the deep-depth token-cost warning");
   assert.match(text, /invoke the `\/deep-research` skill/, "built prompt must carry deep-research invocation");
   assert.match(text, /fall back to manual web search/, "built prompt must carry fallback wording");
 });

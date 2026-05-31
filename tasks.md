@@ -130,6 +130,10 @@
 - [x] T308 [P1] sr-engineer: version 3.14.1 → 3.15.0 + CHANGELOG [3.15.0] + README §(s) | depends_on: T305, T306, T307
 - [x] T310 [P0] sr-engineer: edit content/skill-researcher.md — (a) Depth hard rule: standalone invocation with no `researcher_depth:` declared defaults to `deep`; (b) SOP research step: at deep depth invoke `/deep-research` skill (if available) for multi-source cited report then distil into Findings Schema, fallback to manual web search if unavailable; shallow path unchanged | depends_on: none (note: SOP edit verified by AC-1..AC-4 tests; suite 403/403)
 - [x] T311 [P1] qa-engineer: add content-assertion test (test/researcher-deep-research.test.mjs) verifying skill-researcher.md contains default-deep standalone directive (AC-1) + `/deep-research` deep-depth invocation directive (AC-2) + fallback wording (AC-3); assert shallow not forced (AC-4) | depends_on: T310 (note: 5 content-assertion tests, AC-1..AC-5 mapped, all pass)
+- [x] T320 [P0] Measurement spike: scripts/measure-context-cost.mjs — print per-artifact token table (constitution, each skill-*.md, SessionStart hook lite+full, 7 role-prompt bundles) + always-on total. Deterministic, exit 0. (AC1) | depends_on: none
+- [x] T321 [P0] Architect: from T320 baseline, design the lean-always-on / on-demand split (which constitution sections stay always-on vs load on demand; skill-body lazy-load mechanism for hook + buildPromptForRole). Set concrete reduction target. Design doc in specs/. (AC2 prep) | depends_on: T320
+- [x] T322 [P1] Sr-engineer: implement the reduction per T321 design in bin/agent-governance-context.mjs + prompts/build.ts (no normative rule deleted; transition logic untouched). Re-run measurement to confirm target met. (AC2, AC4) | depends_on: T321
+- [x] T323 [P1] QA: tests asserting (a) reduced always-on token count vs T320 baseline, (b) every constitution rule still reachable by its enforcing role, (c) existing test/ suite green, (d) routing/transition behavior unchanged. (AC2, AC3, AC4) | depends_on: T322
 
 ## Completed
 

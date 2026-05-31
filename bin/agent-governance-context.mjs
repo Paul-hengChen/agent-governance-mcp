@@ -54,10 +54,26 @@ function loadContent(filename) {
   return readSafe(path.join(SERVER_ROOT, "content", filename));
 }
 
-const constitution = loadContent("constitution.md");
+// Duplicate of stripChainOnly() in prompts/build.ts (different module system —
+// see specs/context-budget-reduction-architecture.md DR-3); keep the regex in
+// sync. Removes <!-- chain-only:start --> … <!-- chain-only:end --> blocks so the
+// lite SessionStart bootstrap doesn't pay for chain rules it cannot exercise.
+function stripChainOnly(text) {
+  return text
+    .replace(/<!-- chain-only:start -->[\s\S]*?<!-- chain-only:end -->\n?/g, "")
+    .replace(/\n{3,}/g, "\n\n");
+}
+
 const skillVariant = process.env.AGC_DEFAULT_SKILL === "full"
   ? "skill-coordinator.md"
   : "skill-coordinator-lite.md";
+// Lite bootstrap (the default) is server-read-only with no chain → strip the
+// chain-only sections. Full coordinator keeps the complete constitution.
+const rawConstitution = loadContent("constitution.md");
+const constitution =
+  skillVariant === "skill-coordinator-lite.md"
+    ? stripChainOnly(rawConstitution)
+    : rawConstitution;
 const skill = loadContent(skillVariant);
 
 if (!constitution || !skill) {

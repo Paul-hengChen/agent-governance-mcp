@@ -16,6 +16,53 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.16.2] - 2026-05-31
+
+PATCH release trimming the **always-on context budget**. The constitution's
+chain-only sections (§3.1 Server-enforced chain, §4 Routing Chain) are now fenced
+and stripped from **lite contexts only** (the SessionStart hook's default lite
+bootstrap and the `teamwork-lite` prompt), which never enter the role-to-role
+chain. Chain roles (`teamwork` full + `pm`/`architect`/`sr-engineer`/
+`code-reviewer`/`researcher`/`qa-engineer`) still receive the full, unmodified
+constitution — no normative rule is dropped from any path that enforces it.
+
+Measured effect: the default always-on bundle drops from ~2837 to ~1961 approx
+tokens per session (−31%). Single source of truth (one `constitution.md` with
+HTML-comment fences), so there is no dual-file drift risk.
+
+### Added
+
+- **`scripts/measure-context-cost.mjs`** — deterministic (chars/4) measurement of
+  the always-on bundle: per-artifact token table for `constitution.md`, every
+  `skill-*.md`, both SessionStart hook variants, and all 7 role-prompt bundles,
+  plus the pre/post-strip lite total. The baseline tool behind this change.
+- **`test/context-budget.test.mjs`** — asserts the reduction, that lite omits only
+  the chain-only sections while retaining every universal rule, that chain roles
+  keep the full constitution, and that the three `stripChainOnly` regex copies
+  stay identical.
+
+### Changed
+
+- **`content/constitution.md`** — §3.1 + §4 wrapped in a single
+  `<!-- chain-only:start -->` … `<!-- chain-only:end -->` fence (rule text
+  unchanged).
+- **`prompts/build.ts`** — new exported `stripChainOnly()`; `buildPromptForRole`
+  strips the fenced sections when the skill is `skill-coordinator-lite.md`.
+- **`bin/agent-governance-context.mjs`** — strips the fenced sections for the lite
+  SessionStart variant (duplicate stripper across the TS/.mjs module boundary,
+  kept in sync by a regex-equivalence test).
+- **`test/researcher-deep-research.test.mjs`** — updated AC-1/2/4/5 to the v3.16.1
+  shallow-default contract (they had been left asserting the superseded `deep`
+  standalone default).
+
+### Notes
+
+- Dependency audit: pre-existing HIGH/CRITICAL advisories in `protobufjs`
+  (transitive via `@xenova/transformers` → onnxruntime-web → onnx-proto, the RAG
+  embedding chain) remain. **Waived** for this release — unrelated to the change,
+  and the available fix is a breaking downgrade of `@xenova/transformers`. Tracked
+  separately for a dedicated dependency-bump pass.
+
 ## [3.16.1] - 2026-05-31
 
 PATCH release flipping the **standalone** `researcher` default from `deep` back

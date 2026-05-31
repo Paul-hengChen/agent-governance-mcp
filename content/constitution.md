@@ -33,6 +33,7 @@ restate these rules.
 - **Task list edits go through tools**: Use `tw_add_task` to append, `tw_complete_task` to mark `[x]`, `tw_rollback_task` to revert. Do NOT hand-edit the task-list file from a role — only PM's initial bootstrapping write is exempt (when no list exists yet).
 - **`tw_complete_task` ownership**: ONLY qa-engineer flips the final `[x]` (after Phase 4 PASS). Sr-engineer signals "ready for QA" via `pending_notes` in `tw_update_state`. This prevents double-completion races.
 
+<!-- chain-only:start -->
 ### 3.1 Server-enforced chain (v3.2.0)
 
 The routing chain is **server-enforced**, not advisory. Invalid
@@ -72,6 +73,7 @@ Tokens tables into `design/<feature>.md`; PM then copies those verbatim
 into the spec. Tasks with no design reference skip the auditor entirely.
 
 Each role finishes with `tw_update_state` whose `pending_notes` start with `next_role: <name>` so the coordinator (or human) knows where to route.
+<!-- chain-only:end -->
 
 ## 5. Anti-Loop Circuit Breaker
 

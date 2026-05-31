@@ -43,6 +43,23 @@ function loadContent(filename: string, workspacePath?: string): string {
   return fs.readFileSync(filePath, "utf-8");
 }
 
+// Remove every <!-- chain-only:start --> … <!-- chain-only:end --> block
+// (markers inclusive) and collapse the blank lines left behind. Idempotent;
+// text with no markers is returned unchanged (full-constitution safety default).
+// Chain-only sections (constitution §3.1, §4) govern role-to-role transitions
+// that lite contexts cannot exercise — stripping them trims the always-on budget
+// without dropping any rule a lite agent could use. A duplicate of this function
+// lives in bin/agent-governance-context.mjs (different module system — see
+// specs/context-budget-reduction-architecture.md DR-3); keep the regex in sync.
+export function stripChainOnly(text: string): string {
+  return text
+    .replace(/<!-- chain-only:start -->[\s\S]*?<!-- chain-only:end -->\n?/g, "")
+    .replace(/\n{3,}/g, "\n\n");
+}
+
+// The lite coordinator skill marks a server-read-only, no-chain context.
+const LITE_SKILL_FILE = "skill-coordinator-lite.md";
+
 export type PromptResult = {
   description: string;
   messages: Array<{ role: "user"; content: { type: "text"; text: string } }>;
@@ -221,7 +238,11 @@ export function buildPromptForRole(
   description: string;
   messages: Array<{ role: "user"; content: { type: "text"; text: string } }>;
 } {
-  const constitution = loadContent("constitution.md", workspacePath);
+  const rawConstitution = loadContent("constitution.md", workspacePath);
+  // Lite contexts (teamwork-lite) get the chain-only sections stripped; chain
+  // roles keep the full constitution because those rules become load-bearing.
+  const constitution =
+    skillFile === LITE_SKILL_FILE ? stripChainOnly(rawConstitution) : rawConstitution;
   const skill = loadContent(skillFile, workspacePath);
 
   let state: HandoffState | null = null;
