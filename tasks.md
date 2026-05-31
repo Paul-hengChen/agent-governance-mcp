@@ -134,6 +134,8 @@
 - [x] T321 [P0] Architect: from T320 baseline, design the lean-always-on / on-demand split (which constitution sections stay always-on vs load on demand; skill-body lazy-load mechanism for hook + buildPromptForRole). Set concrete reduction target. Design doc in specs/. (AC2 prep) | depends_on: T320
 - [x] T322 [P1] Sr-engineer: implement the reduction per T321 design in bin/agent-governance-context.mjs + prompts/build.ts (no normative rule deleted; transition logic untouched). Re-run measurement to confirm target met. (AC2, AC4) | depends_on: T321
 - [x] T323 [P1] QA: tests asserting (a) reduced always-on token count vs T320 baseline, (b) every constitution rule still reachable by its enforcing role, (c) existing test/ suite green, (d) routing/transition behavior unchanged. (AC2, AC3, AC4) | depends_on: T322
+- [x] T330 [P0] sr-engineer: add package.json overrides pinning protobufjs to lowest patched version clearing all advisories; npm install; verify npm audit --audit-level=high = 0 high/crit; confirm RAG embedding path loads + npm test green + no tools/rag.ts API change. If protobufjs pin incompatible with onnxruntime-web, escalate Blocked to PM. (AC1-AC4) | depends_on: none
+- [x] T331 [P1] qa-engineer: verify AC1 (audit 0 high/crit), AC2 (RAG embedding path functions, no rag.ts API regression), AC3 (build clean + full suite green), AC4 (override is minimal + documented). Add/adjust test coverage for the embedding path if a relevant test exists; else ask user. | depends_on: T330
 
 ## Completed
 

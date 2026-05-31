@@ -16,6 +16,34 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.16.3] - 2026-05-31
+
+PATCH release clearing the `npm audit` advisories waived in v3.16.2. Adds
+`package.json` `overrides` pinning the two vulnerable transitive dependencies to
+their first patched releases. `npm audit` goes from 5 advisories (1 critical, 3
+high, 1 moderate) to **0**.
+
+### Changed
+
+- **`package.json` `overrides`** — `protobufjs: ^7.5.8` (resolved 7.6.2) clears the
+  critical RCE (GHSA-xq3m-2v4x-88gg) + several high/moderate advisories reaching
+  the tree via the optional embedding dep `@xenova/transformers` → `onnxruntime-web`
+  → `onnx-proto`. `qs: ^6.15.2` clears the moderate DoS (GHSA-q8mj-m7cp-5q26) via
+  the MCP SDK's `express` → `qs` chain.
+
+### Added
+
+- **`test/dependency-overrides.test.mjs`** — pin-regression test asserting the
+  override floors (`protobufjs ≥ 7.5.8`, `qs ≥ 6.15.2`) stay in place so the
+  advisories cannot silently return on a future dependency edit.
+
+### Notes
+
+- The `protobufjs` override is a deliberate major bump (6 → 7) past `onnx-proto`'s
+  declared `^6.8.8` range. Verified at runtime, not just install: the RAG embedding
+  path (`@xenova/transformers`) still produces a correct 384-dim vector under the
+  forced version, and `tools/rag.ts` is unchanged. Full suite 417/417.
+
 ## [3.16.2] - 2026-05-31
 
 PATCH release trimming the **always-on context budget**. The constitution's
