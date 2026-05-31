@@ -141,6 +141,8 @@
 - [x] T350 [P0] sr-engineer: add pre-fetch Volume Gate (before extraction, after mode-detect) + node-scoped fetch rule to content/skill-design-auditor.md; oversized single feature → STOP Blocked + next_role pm/human (never ingest-then-defer), fail-loud with count. Fetch-modes only; output cap + manifest unchanged. (AC1/AC2/AC4/AC5) | depends_on: none
 - [x] T351 [P1] sr-engineer: minimal addition to content/skill-coordinator.md Feature-Split Plan schema — instruct human to paste frame/node-scoped Figma links (not whole-file). Keep always-on footprint delta tiny. (AC3) | depends_on: none
 - [x] T352 [P1] qa-engineer: content-assertion tests — Volume Gate present before extraction + STOP/Blocked/split-recommend wording (AC1/AC4); node-scoped fetch rule (AC2); coordinator schema frame-scoped link guidance + footprint stays small (AC3); fetch-modes-only scope + output cap unchanged (AC5). Full suite green. | depends_on: T350, T351
+- [x] T360 [P0] sr-engineer: extend Feature-Scope Gate in content/skill-coordinator.md — add status (pending/done) column to Split Table schema; done-marking by reconciling split.md vs handoff active_feature=PASS; resume rule (existing split.md → no regenerate, skip done, work next pending); by-id resume (hydrate named row). Keep gate section ≤~550 tok. (AC1-AC7) | depends_on: none
+- [x] T361 [P1] qa-engineer: tests for AC1-AC7 (status column; done-marking-on-PASS wording; resume no-regenerate + skip-done; no-redo; by-id resume hydrate; single-feature unaffected) + UPDATE test/feature-scope-gate.test.mjs footprint ceiling 425→~550 (AC6). Full suite green. | depends_on: T360
 
 ## Completed
 

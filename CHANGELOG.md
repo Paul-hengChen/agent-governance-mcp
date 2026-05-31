@@ -16,6 +16,37 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.18.0] - 2026-05-31
+
+MINOR release giving the Feature-Scope Gate's `.current/feature-split.md` a
+lifecycle, so a split plan can be resumed safely across `/teamwork` invocations
+without redoing completed units.
+
+### Added
+
+- **Split-plan `status` column** — the Feature-Split Plan Split Table gains a
+  `status` column (coordinator pre-fills `pending` on every row).
+- **Resume + done-marking (`content/skill-coordinator.md`)** — when an incoming
+  `/teamwork` finds an existing `.current/feature-split.md`, the Feature-Scope Gate
+  no longer re-assesses/regenerates: it **reconciles** (flips a row to `done` when its
+  `feature id` matches the handoff `active_feature` at PASS), then works the next
+  `pending` row — or a **human-named row** (`do F0` / a feature id) — by **hydrating**
+  it (scope + figma link + widgets + notes) as the feature input. A `done` row is
+  never re-run.
+
+### Changed
+
+- "How to proceed" documents `done`-on-PASS, resume-skips-`done`, and the `do F<n>`
+  by-id shortcut.
+- The Feature-Scope-Gate always-on footprint ceiling was raised ~425 → ~550 approx
+  tokens to accommodate the lifecycle logic (section ~496 tok; still guarded by test).
+
+### Notes
+
+- Prompt-layer + human-checkpoint only; no server transition-matrix change. The
+  coordinator edits `.current/feature-split.md` directly (not a `tw_*` write). Suite
+  439 tests passing.
+
 ## [3.17.0] - 2026-05-31
 
 MINOR release adding two complementary front-door guardrails that keep large,

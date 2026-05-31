@@ -34,24 +34,27 @@ Otherwise (single-file edit, typo, comment, doc tweak, one-liner fix, status que
 
 ## Feature-Scope Gate
 
-On an incoming PRD/ticket of non-trivial size, AFTER state-sync, BEFORE Design-source detection (single-file edits / Q&A skip silently). **Text-only — never open a design.** Judge split-need from PRD text: self-enumerated steps/sections; **count** of design-source refs (grep URLs, don't fetch); a cross-cutting shared layer; size.
+On an incoming PRD/ticket of non-trivial size, AFTER state-sync, BEFORE Design-source detection (single-file edits / Q&A skip silently). **Text-only — never open a design.**
 
+**No existing `.current/feature-split.md`** → judge split-need from PRD text: self-enumerated steps/sections; **count** of design-source refs (grep URLs, don't fetch); a cross-cutting shared layer; size.
 - **single-feature** → continue to Design-source detection + routing.
-- **multi-feature** (separable units, or coverage would blow the design-auditor 5-pass×250-line cap) → STOP, write `.current/feature-split.md` (below), surface a one-line rec + hint, wait. Don't route until the human fills it in and re-invokes per unit.
+- **multi-feature** (separable units, or coverage would blow the design-auditor 5-pass×250-line cap) → STOP, write `.current/feature-split.md` (below, every row `status: pending`), surface a one-line rec + hint, wait.
 
-`.current/feature-split.md` — coordinator pre-fills all columns except `figma link` + `notes / 注意事項` (human-owned):
+**Existing `.current/feature-split.md`** (resume) → do NOT re-assess or regenerate. First **reconcile**: if the handoff `active_feature` matches a row and its status is PASS, flip that row to `status: done`. Then take the next `pending` row — or, if the human named one (e.g. "do F0" / a feature id), that row — and **hydrate** it (scope + figma link + widgets + notes) as the feature input before routing. Never re-run a `done` row.
+
+`.current/feature-split.md` — coordinator pre-fills every column except `figma link` + `notes / 注意事項` (human-owned); `status` starts `pending`:
 
 ````markdown
 # Feature Split Plan: <PRD>   (text-only assessment — no design read)
 ## Assessment
 - verdict: multi-feature (<N> units) — signals: <which fired>
 ## Split Table
-| order | feature id | scope | figma link | depends_on | key visual widgets | notes / 注意事項 |
-|---|---|---|---|---|---|---|
-| 0 | <shared-foundation> | <scope> |  | none | <widget/—> |  |
-| 1 | <feature> | <scope> |  | F0 | <widget/—> |  |
+| order | feature id | scope | figma link | depends_on | key visual widgets | notes / 注意事項 | status |
+|---|---|---|---|---|---|---|---|
+| 0 | <shared-foundation> | <scope> |  | none | <widget/—> |  | pending |
+| 1 | <feature> | <scope> |  | F0 | <widget/—> |  | pending |
 ## How to proceed
-Fill blanks (use a **frame-scoped** Figma link per row, not the whole-file link) → build order 0 (shared) first → re-invoke /teamwork per row in `order`.
+Fill blanks (use a **frame-scoped** Figma link per row, not the whole-file link) → build order 0 (shared) first → re-invoke /teamwork per row in `order` (or say "do F<n>"). Coordinator flips each row to `done` on PASS; resume skips `done`.
 ````
 
 ## Design-source detection

@@ -69,5 +69,5 @@ test("AC3: coordinator gate section stays within the always-on footprint budget"
   const b = COORD.indexOf("## Design-source detection", a);
   assert.ok(a >= 0 && b > a, "gate section must exist");
   const approxTokens = Math.ceil(COORD.slice(a, b).length / 4);
-  assert.ok(approxTokens <= 425, `gate section ~${approxTokens} tok must stay <= ~425`);
+  assert.ok(approxTokens <= 550, `gate section ~${approxTokens} tok must stay <= ~550`);
 });
