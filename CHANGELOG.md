@@ -16,6 +16,40 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.17.0] - 2026-05-31
+
+MINOR release adding two complementary front-door guardrails that keep large,
+design-heavy PRDs from overrunning the design-auditor — a feature-level split
+gate in the coordinator, and an input-volume guard in the design-auditor.
+
+### Added
+
+- **Feature-Scope Gate (`content/skill-coordinator.md`)** — a new coordinator SOP
+  step (after state-sync, before Design-source detection) that judges, **text-only**
+  (never fetching a design), whether an incoming PRD is one feature or many. Single
+  → continue automation uninterrupted; multi → STOP, write a `.current/feature-split.md`
+  **Feature-Split Plan** (coordinator pre-fills every column except `figma link` +
+  `notes / 注意事項`, which the human completes), surface a recommendation + hint, and
+  wait for the human to split + re-invoke per unit. Lite mode is unaffected.
+- **design-auditor Volume Gate + node-scoped fetch (`content/skill-design-auditor.md`)**
+  — a pre-fetch input-side gate (fetch-based modes only) that estimates a single
+  feature's surface/frame count from cheap metadata and STOPs (`Blocked → pm`,
+  fail-loud) when it exceeds ~one feature's worth, recommending a further split
+  instead of ingest-then-defer; plus a node-scoped-fetch rule so the auditor pulls
+  only the frames it audits this pass. The coordinator split-schema now asks for
+  **frame-scoped** Figma links (not whole-file) to bound the fetch at the source.
+
+### Changed
+
+- The Feature-Split Plan "How to proceed" line instructs the human to use a
+  frame-scoped Figma link per row.
+
+### Notes
+
+- Both additions are **prompt-layer + human-checkpoint** (advisory, like Design-source
+  detection); no server transition-matrix change. The coordinator gate's always-on
+  footprint is held to ~350 tok (guarded by test). Suite: 432 tests passing.
+
 ## [3.16.3] - 2026-05-31
 
 PATCH release clearing the `npm audit` advisories waived in v3.16.2. Adds

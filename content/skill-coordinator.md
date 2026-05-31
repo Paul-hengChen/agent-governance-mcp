@@ -32,6 +32,28 @@ Switch to a role only if **any one** of these is true:
 
 Otherwise (single-file edit, typo, comment, doc tweak, one-liner fix, status query) → **execute directly**, even if the trigger phrase matches a role.
 
+## Feature-Scope Gate
+
+On an incoming PRD/ticket of non-trivial size, AFTER state-sync, BEFORE Design-source detection (single-file edits / Q&A skip silently). **Text-only — never open a design.** Judge split-need from PRD text: self-enumerated steps/sections; **count** of design-source refs (grep URLs, don't fetch); a cross-cutting shared layer; size.
+
+- **single-feature** → continue to Design-source detection + routing.
+- **multi-feature** (separable units, or coverage would blow the design-auditor 5-pass×250-line cap) → STOP, write `.current/feature-split.md` (below), surface a one-line rec + hint, wait. Don't route until the human fills it in and re-invokes per unit.
+
+`.current/feature-split.md` — coordinator pre-fills all columns except `figma link` + `notes / 注意事項` (human-owned):
+
+````markdown
+# Feature Split Plan: <PRD>   (text-only assessment — no design read)
+## Assessment
+- verdict: multi-feature (<N> units) — signals: <which fired>
+## Split Table
+| order | feature id | scope | figma link | depends_on | key visual widgets | notes / 注意事項 |
+|---|---|---|---|---|---|---|
+| 0 | <shared-foundation> | <scope> |  | none | <widget/—> |  |
+| 1 | <feature> | <scope> |  | F0 | <widget/—> |  |
+## How to proceed
+Fill blanks (use a **frame-scoped** Figma link per row, not the whole-file link) → build order 0 (shared) first → re-invoke /teamwork per row in `order`.
+````
+
 ## Design-source detection
 
 Before applying the Complexity Scope Gate, scan the incoming PRD / ticket / user prompt / attached files for a **design reference**. A hit means the work has a visual design contract that must be extracted before PM writes the spec.
@@ -66,8 +88,9 @@ After each role's handoff, read the just-written `pending_notes`. If a `next_rol
 1. **Auto-routing pre-check**: read `AGC_AUTO_ROUTE` from the shell environment (e.g. `printenv AGC_AUTO_ROUTE`). Value exactly `0` → `auto_mode = off` for this session. Unset or any other value → `auto_mode = on` (default).
 2. **Skip state sync for**: Q&A, doc edits, status checks. Go straight to step 4.
 3. **Otherwise**: `tw_get_state` → `tw_detect_drift`.
-4. **Apply Complexity Scope Gate** against the request.
+4. **Feature-Scope Gate** (incoming PRD/ticket only; text-only): judge single vs multi-feature. **Multi** → STOP, write `.current/feature-split.md`, surface the recommendation + hint, wait for the human (do NOT route until they confirm + re-invoke per unit). **Single / not a PRD** → continue.
+5. **Apply Complexity Scope Gate** against the request.
    - **No gate triggered** → execute directly → `tw_update_state` (if step 3 was run).
    - **Gate triggered** → `tw_switch_role(<role>)` using the routing table → follow the returned SOP exclusively. Increment hop counter.
-5. **Multi-phase** → chain per constitution §4. Between hops, apply the *Auto-Routing* section above: if `auto_mode = on`, self-hop on each `next_role:`; if `auto_mode = off`, surface the recommendation and wait.
+6. **Multi-phase** → chain per constitution §4. Between hops, apply the *Auto-Routing* section above: if `auto_mode = on`, self-hop on each `next_role:`; if `auto_mode = off`, surface the recommendation and wait.
 
