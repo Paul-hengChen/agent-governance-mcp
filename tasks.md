@@ -150,6 +150,11 @@
 - [x] T404 [P1] Add Per-Role Model Routing section to README.md (or docs/ per existing split) with tier table + Claude Code subagent example (AC5) | depends_on: T401, T402
 - [x] T405 [P1] Bump package.json 3.18.x -> 3.19.0 and update index.ts Server() literal to match; verify scripts/check-version.mjs (AC6) | depends_on: T401, T402, T403
 - [x] T406 [P0] QA: add unit tests for tools/role.ts frontmatter parsing (positive/missing/malformed), run npm test + npm run build + npm audit --audit-level=high; produce qa_reports/review_T400-T405.md evidence (AC7+AC8) | depends_on: T405
+- [x] T410 [P0] Create templates/claude-code-agents/ with 11 subagent files (pm, researcher, architect, design-auditor, sr-engineer, code-reviewer, qa-engineer, qa-visual, doc-writer, release-engineer, coordinator-lite). Each carries name/model/description frontmatter + S04 body. Model tier MUST match content/skill-<role>.md recommended_model. (AC1, AC2) | depends_on: none
+- [x] T411 [P0] Upgrade content/skill-coordinator.md ## Auto-Routing with Subagent Dispatch (Claude Code) sub-bullet: prefer Task tool with subagent_type=<role> when available, fallback to tw_switch_role otherwise. Preserve server-enforced ALLOWED_TRANSITIONS narrative. (AC3, AC4) | depends_on: T410
+- [x] T412 [P1] Add README sub-section ### Claude Code subagent install (auto model-routing) under existing ## Per-Role Model Routing — install snippet + degradation callout. Reuse v3.19.0 tier table (no duplication). (AC5) | depends_on: T410, T411
+- [x] T413 [P1] Bump package.json 3.19.1 -> 3.20.0, index.ts Server() literal, add CHANGELOG [3.20.0] entry; run check-version. (AC6) | depends_on: T410, T411, T412
+- [x] T414 [P0] QA: add test/subagent-templates.test.mjs verifying each templates/claude-code-agents/<role>.md tier == content/skill-<role>.md recommended_model; assert all 11 files present + coordinator.md absent; grep skill-coordinator.md for Subagent Dispatch sub-bullet; run npm test + build + audit; write qa_reports/review_T410-T414.md. (AC7, AC8) | depends_on: T413
 
 ## Completed
 

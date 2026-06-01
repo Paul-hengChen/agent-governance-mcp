@@ -16,6 +16,51 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.20.0] - 2026-06-01
+
+MINOR release shipping **Claude Code subagent dispatch** — turning v3.19.0's
+advisory `recommended_model` hint into actual per-role auto model-routing for
+Claude Code users. Other clients (Cursor, Continue, Anti-Gravity, plain MCP)
+keep the existing `tw_switch_role` text-load path with no behavior change.
+
+### Added
+
+- **`templates/claude-code-agents/*.md`** — 11 pre-pinned subagent template
+  files (pm, researcher, architect, design-auditor, sr-engineer,
+  code-reviewer, qa-engineer, qa-visual, doc-writer, release-engineer,
+  coordinator-lite). Each carries `name` / `model` / `description`
+  frontmatter; the `model:` tier mirrors the corresponding
+  `content/skill-<role>.md` `recommended_model`. Users copy into
+  `~/.claude/agents/` to enable per-role model pinning under Claude Code's
+  Task-tool dispatch (Dynamic Workflows / parallel subagents).
+- **`content/skill-coordinator.md` §Auto-Routing — Subagent Dispatch
+  (Claude Code)** sub-bullet: coordinator now prefers
+  `Task(subagent_type=<role>)` when available, falls back to
+  `tw_switch_role` otherwise. Server-enforced `ALLOWED_TRANSITIONS` is
+  unchanged — dispatch only chooses WHICH MODEL runs the role.
+- **README §Claude Code subagent install (auto model-routing)** — install
+  snippet + degradation callout + design link.
+- **`specs/subagent-dispatch.md`** — PRD (AC1–AC8).
+
+### Changed
+
+- Coordinator full skill SOP §5 reworded: gate-triggered routes now read
+  "dispatch via the Auto-Routing preference order" instead of hard-coding
+  `tw_switch_role`. Behavior preserved for non-Claude-Code hosts via the
+  fallback path.
+
+### Notes
+
+- **`tw_switch_role` tool surface is unchanged** — backwards-compatible.
+- No persisted-state `schema_version` bump (content + templates + skill
+  SOP only).
+- Coordinator full template is deliberately NOT shipped — it's the parent
+  dispatcher; spawning it as a subagent would be recursive.
+  `coordinator-lite` IS shipped for solo-dev Haiku-tier work.
+- Track 2 (`tw_dispatch_role` MCP tool for cross-IDE dispatch) and the
+  cost-telemetry `dispatch_ack` audit are deferred — see
+  `research/multi-agent-auto-model-routing-directions.md`.
+
 ## [3.19.1] - 2026-06-01
 
 PATCH release — constitution v3.14.1 extends the watermark format from

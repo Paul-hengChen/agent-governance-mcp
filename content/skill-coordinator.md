@@ -76,7 +76,11 @@ If ≥ 1 hit → route to `design-auditor` *before* PM. The auditor produces `de
 
 Default-ON in `/teamwork`. Disabled in `/teamwork-lite` (different skill).
 
-After each role's handoff, read the just-written `pending_notes`. If a `next_role: <name>` line is present and none of the stop conditions below fire, immediately call `tw_switch_role(<next_role>)` and follow the returned SOP. Increment your in-memory hop counter by 1 per successful switch.
+After each role's handoff, read the just-written `pending_notes`. If a `next_role: <name>` line is present and none of the stop conditions below fire, dispatch to the next role per the preference order below and follow its SOP. Increment your in-memory hop counter by 1 per successful dispatch.
+
+**Subagent Dispatch (Claude Code)** — preferred when available. If the host advertises a `Task` tool with `subagent_type=<role>` AND a subagent named `<role>` is registered (heuristic: attempt the call once; on tool-error or unknown-subagent-type, fall back), dispatch via `Task(subagent_type="<next_role>", prompt="<one-paragraph brief summarising the upstream pending_notes>")` INSTEAD of `tw_switch_role`. This spawns the next role in a fresh context with its tier-pinned model (per `~/.claude/agents/<role>.md` frontmatter — copy from `templates/claude-code-agents/`). The dispatched subagent's first action remains `tw_get_state` → `tw_detect_drift` (Constitution §3); the **server-enforced `ALLOWED_TRANSITIONS` matrix in `tools/transitions.ts` still gates every `tw_update_state` write** — Task-tool dispatch changes WHICH MODEL runs the role, NOT the routing chain itself.
+
+**Fallback (`tw_switch_role`)** — used when Task tool / subagents are unavailable (Cursor, Continue, Anti-Gravity, plain MCP clients, or Claude Code without the templates installed). Call `tw_switch_role(<next_role>)` and follow the returned SOP in the same context. This is the pre-v3.20.0 behavior — degradation is graceful and silent; no tw_* tool surface has changed.
 
 **Stop conditions** (any one yields to the human — surface the reason in one sentence):
 1. `status: Blocked` on the last `tw_update_state`.
@@ -97,6 +101,6 @@ After each role's handoff, read the just-written `pending_notes`. If a `next_rol
 4. **Feature-Scope Gate** (incoming PRD/ticket only; text-only): judge single vs multi-feature. **Multi** → STOP, write `.current/feature-split.md`, surface the recommendation + hint, wait for the human (do NOT route until they confirm + re-invoke per unit). **Single / not a PRD** → continue.
 5. **Apply Complexity Scope Gate** against the request.
    - **No gate triggered** → execute directly → `tw_update_state` (if step 3 was run).
-   - **Gate triggered** → `tw_switch_role(<role>)` using the routing table → follow the returned SOP exclusively. Increment hop counter.
+   - **Gate triggered** → dispatch via the Auto-Routing preference order (Task-tool subagent if available, else `tw_switch_role(<role>)`) → follow the SOP exclusively. Increment hop counter.
 6. **Multi-phase** → chain per constitution §4. Between hops, apply the *Auto-Routing* section above: if `auto_mode = on`, self-hop on each `next_role:`; if `auto_mode = off`, surface the recommendation and wait.
 
