@@ -16,6 +16,26 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.21.1] - 2026-06-01
+
+PATCH release adding an explicit watermark reminder line to all 12
+`templates/claude-code-agents/*.md` subagent shims. Closes the gap where
+short replies from dispatched subagents omitted the `— @<role> (<tier>)`
+watermark mandated by Constitution §1.
+
+### Changed
+
+- **All 12 `templates/claude-code-agents/*.md`** — each template body now
+  includes `End every reply with \`— @<name> (<tier>)\` per Constitution §1
+  (watermark).` with `<name>` and `<tier>` filled from the file's own
+  frontmatter `name:` and `model:` values.
+
+### Notes
+
+- Template-only change. No server-side tool, schema, or transition-matrix
+  modification. Existing `~/.claude/agents/` copies continue working;
+  users re-copy from this release to pick up the reminder.
+
 ## [3.21.0] - 2026-06-01
 
 MINOR release shortening Claude Code subagent entry points + adding the

@@ -5,3 +5,5 @@ description: Translates PM specs into precise architecture blueprints (specs/<fe
 ---
 
 This subagent runs the agc architect SOP under a pinned model tier. On invocation, call `tw_get_state` then `tw_switch_role("architect")` and follow the returned SOP exclusively.
+
+End every reply with `— @architect (opus)` per Constitution §1 (watermark).

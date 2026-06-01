@@ -1,6 +1,7 @@
 // Coded by @qa-engineer
-// Tests for v3.20.0+ Claude Code subagent dispatch (specs/subagent-dispatch.md)
-// and v3.21.0 short-name + teamwork-template additions (specs/subagent-short-names.md).
+// Tests for v3.20.0+ Claude Code subagent dispatch (specs/subagent-dispatch.md),
+// v3.21.0 short-name + teamwork-template additions (specs/subagent-short-names.md),
+// and v3.21.1 watermark reminder (specs/subagent-watermark-reminder.md).
 // Locks the tier-consistency contract between templates/claude-code-agents/
 // and content/skill-*.md so a future tier change in one MUST be reflected in
 // the other. v3.21.0 reverses v3.20.0 AC2 (coordinator template now SHIPS as
@@ -241,17 +242,56 @@ test("v3.21.0 AC4: README surfaces @teamwork and @lite primaries + migration not
 });
 
 // ---------------------------------------------------------------------------
+// v3.21.1 AC1 / AC2: watermark reminder in every template
+// ---------------------------------------------------------------------------
+
+test("v3.21.1 AC1: every template body contains the watermark reminder with correct name+tier", () => {
+  for (const role of EXPECTED_ROLES) {
+    const raw = readTemplateRaw(role);
+    const nameMatch = raw.match(/^name:\s*(\S+)/m);
+    const modelMatch = raw.match(/^model:\s*(\S+)/m);
+    assert.ok(nameMatch, `${role}.md: name: not found`);
+    assert.ok(modelMatch, `${role}.md: model: not found`);
+    const name = nameMatch[1];
+    const tier = modelMatch[1];
+    const expected = `End every reply with \`— @${name} (${tier})\` per Constitution §1 (watermark).`;
+    assert.ok(
+      raw.includes(expected),
+      `${role}.md: missing watermark reminder line. Expected: ${expected}`,
+    );
+  }
+});
+
+test("v3.21.1 AC3: adding watermark line did not mutate any template frontmatter", () => {
+  // Frontmatter keys must still be parseable and unchanged from AC1 tests above.
+  // This is a structural guard — if the watermark edit accidentally touched
+  // the --- fences or frontmatter keys, this will catch it.
+  for (const role of EXPECTED_ROLES) {
+    const raw = readTemplateRaw(role);
+    assert.match(raw, /^---\r?\n/, `${role}.md: must start with --- fence`);
+    assert.match(raw, /\n---\r?\n/, `${role}.md: must have closing --- fence`);
+    const body = raw.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, "");
+    // Body must have at least two non-empty lines (delegation + watermark)
+    const nonEmpty = body.split(/\r?\n/).filter((l) => l.trim().length > 0);
+    assert.ok(
+      nonEmpty.length >= 2,
+      `${role}.md: body must have delegation line + watermark line (got ${nonEmpty.length} non-empty lines)`,
+    );
+  }
+});
+
+// ---------------------------------------------------------------------------
 // Version checks
 // ---------------------------------------------------------------------------
 
-test("v3.21.0 AC7: package.json + index.ts both at 3.21.0", () => {
+test("v3.21.1 AC4: package.json + index.ts both at 3.21.1", () => {
   const pkg = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, "package.json"), "utf-8"));
-  assert.equal(pkg.version, "3.21.0", "package.json version must be 3.21.0");
+  assert.equal(pkg.version, "3.21.1", "package.json version must be 3.21.1");
   const idx = fs.readFileSync(path.join(REPO_ROOT, "index.ts"), "utf-8");
   assert.match(
     idx,
-    /name: "agent-governance-mcp", version: "3\.21\.0"/,
-    "index.ts Server() literal must read 3.21.0",
+    /name: "agent-governance-mcp", version: "3\.21\.1"/,
+    "index.ts Server() literal must read 3.21.1",
   );
 });
 

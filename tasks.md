@@ -160,6 +160,9 @@
 - [x] T422 [P1] Update README ### Claude Code subagent install sub-section — list @lite + @teamwork as primary entry points; add S06 migration note for v3.20.0 users. (AC4) | depends_on: T420, T421
 - [x] T423 [P1] Bump package.json + index.ts -> 3.21.0; CHANGELOG [3.21.0] entry citing AC1-AC6 and v3.20.0 AC2 reversal (Dynamic Workflows). (AC7) | depends_on: T420, T421, T422
 - [x] T424 [P0] QA: update test/subagent-templates.test.mjs — EXPECTED_ROLES (drop coordinator-lite, add lite + teamwork; total 12), LITE_EXEMPT ({lite, teamwork}), ROLE_TO_SKILL maps. Remove the FORBIDDEN_ROLES "coordinator absent" test (v3.20.0 AC2 reversed). Run npm test + build + audit; write qa_reports/review_T420-T424.md. (AC5, AC8) | depends_on: T423
+- [x] T430 [P0] Add watermark reminder line to all 12 templates/claude-code-agents/*.md, filling `<name>` and `<tier>` from each file's frontmatter literally | depends_on: none
+- [x] T431 [P1] Extend test/subagent-templates.test.mjs with AC1 regression: every EXPECTED_ROLES template body contains the watermark reminder line with literal name+tier substitution | depends_on: T430
+- [x] T432 [P2] Patch bump 3.21.0 → 3.21.1 in package.json + index.ts Server() literal; CHANGELOG entry | depends_on: T431
 
 ## Completed
 

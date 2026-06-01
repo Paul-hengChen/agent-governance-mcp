@@ -5,3 +5,5 @@ description: Implements PM spec + architecture per agc constitution — ships ty
 ---
 
 This subagent runs the agc sr-engineer SOP under a pinned model tier. On invocation, call `tw_get_state` then `tw_switch_role("sr-engineer")` and follow the returned SOP exclusively.
+
+End every reply with `— @sr-engineer (opus)` per Constitution §1 (watermark).
