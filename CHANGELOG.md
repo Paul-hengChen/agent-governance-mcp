@@ -16,6 +16,34 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.21.2] - 2026-06-01
+
+PATCH release tightening haiku-tier watermark compliance. Empirical testing
+on v3.21.1 showed haiku subagents (`@lite`, `@doc-writer`,
+`@release-engineer`) still omitted the `— @<name> (<tier>)` watermark on
+short replies because the reminder lived after the SOP paragraph at the
+bottom of the template, where haiku attention is weakest. This release
+repositions the reminder to the FIRST body line of every template, adds a
+`CRITICAL:` prefix to raise salience, and appends a one-shot example reply
+line to the three haiku templates for output-shape grounding.
+
+### Changed
+
+- **All 12 `templates/claude-code-agents/*.md`** — the watermark reminder
+  is now the first non-blank line after frontmatter and reads
+  `CRITICAL: End every reply with \`— @<name> (<tier>)\` per Constitution §1 (watermark).`
+  with `<name>` and `<tier>` filled from the file's own frontmatter
+  `name:` and `model:` values.
+- **`lite.md`, `doc-writer.md`, `release-engineer.md`** (haiku tier) —
+  body now ends with `Example reply suffix: … — @<name> (haiku)` as a
+  one-shot grounding for the watermark suffix shape.
+
+### Notes
+
+- Template-only change. No server-side tool, schema, or transition-matrix
+  modification. Existing `~/.claude/agents/` copies keep working; users
+  re-copy from this release to pick up the haiku-compliance fix.
+
 ## [3.21.1] - 2026-06-01
 
 PATCH release adding an explicit watermark reminder line to all 12
