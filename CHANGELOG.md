@@ -16,6 +16,26 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.19.1] - 2026-06-01
+
+PATCH release — constitution v3.14.1 extends the watermark format from
+`— @<role>` to `— @<role> (<model>)` so the running model tier is visible
+alongside the role. Pairs with the per-role `recommended_model` shipped in
+v3.19.0: drift between recommended and actual tier is now visible at a
+glance in chat.
+
+### Changed
+
+- `content/constitution.md` §1 Output Directives — Watermark rule rewritten;
+  examples now show `— @coordinator (opus)`, `— @pm (sonnet)`. Constitution
+  header bumped v3.14.0 → v3.14.1.
+
+### Notes
+
+- Content-only patch. No tool surface or schema change.
+- Lean always-on bundle remains under the 2000-token budget enforced by
+  `test/context-budget.test.mjs` AC2.
+
 ## [3.19.0] - 2026-06-01
 
 MINOR release adding per-role model-routing hints — an advisory tier (`opus` /
