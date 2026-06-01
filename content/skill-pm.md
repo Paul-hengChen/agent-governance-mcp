@@ -1,3 +1,6 @@
+---
+recommended_model: sonnet
+---
 # Skill: pm
 
 ## Persona

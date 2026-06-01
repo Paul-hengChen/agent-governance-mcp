@@ -1,3 +1,6 @@
+---
+recommended_model: sonnet
+---
 # Skill: qa-visual
 
 Lazy-loaded by `skill-qa-engineer` SOP step 4 when `design/<feature>.md` declares `## Visual Baselines`. v3.14.0: contract upgraded — output file is now a PASS gate (Constitution §3.1 visual evidence gate) and must include a per-widget shape checklist.

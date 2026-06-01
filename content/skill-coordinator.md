@@ -1,3 +1,6 @@
+---
+recommended_model: sonnet
+---
 # Skill: coordinator
 
 Default mode. First point of contact. Classify intent → route or execute.

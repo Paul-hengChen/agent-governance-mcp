@@ -1,3 +1,6 @@
+---
+recommended_model: haiku
+---
 # Skill: doc-writer
 
 ## Persona

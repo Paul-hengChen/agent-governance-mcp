@@ -16,6 +16,49 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.19.0] - 2026-06-01
+
+MINOR release adding per-role model-routing hints — an advisory tier (`opus` /
+`sonnet` / `haiku`) declared in each skill's YAML frontmatter so multi-IDE
+clients can stop running flagship-tier inference on Haiku-class work. The
+server cannot enforce client-side inference; the hint is surfaced via
+`tw_switch_role`, the prompt builder, and the SessionStart hook so client
+wrappers (Claude Code subagents, `/model` switches) can honor it.
+
+### Added
+
+- **`recommended_model` frontmatter** on all 12 `content/skill-*.md` files.
+  Tier table: researcher / architect / code-reviewer / design-auditor /
+  sr-engineer = `opus`; coordinator / pm / qa-engineer / qa-visual =
+  `sonnet`; coordinator-lite / doc-writer / release-engineer = `haiku`.
+- **`tools/skill-frontmatter.ts`** — shared YAML-frontmatter parser and
+  stripper consumed by `tools/role.ts`, `prompts/build.ts`, and
+  `bin/agent-governance-context.mjs`. Soft-degrades on missing/malformed
+  frontmatter (no throw); never leaks raw `---` blocks into context.
+- **`recommended_model` field in `tw_switch_role` response** — additive;
+  absent when the skill file has no frontmatter (backwards-compat).
+- **Recommended-model banner line** in SessionStart hook output
+  (`Recommended model: <model> (tier <tier>)`).
+- **README §Per-Role Model Routing** with the full tier table plus a
+  Claude Code `~/.claude/agents/<role>.md` example.
+- **`specs/model-routing.md` + `specs/model-routing-architecture.md`** —
+  PRD and architecture blueprint.
+
+### Changed
+
+- `tw_switch_role` `sop` field now returns the skill body with the
+  YAML frontmatter stripped (the frontmatter is parsed into the new
+  `recommended_model` field instead). Callers consuming `sop` as the
+  rendered SOP see no functional change.
+- `prompts/build.ts` appends `Recommended model for this role: <model>.`
+  between skill body and handoff state block when frontmatter declares it.
+
+### Notes
+
+- Advisory only — no server-side enforcement of client inference.
+- No persisted-state schema bump (content-only change). Suite tests
+  passing; new unit coverage added for the shared parser.
+
 ## [3.18.0] - 2026-05-31
 
 MINOR release giving the Feature-Scope Gate's `.current/feature-split.md` a

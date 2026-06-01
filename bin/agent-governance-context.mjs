@@ -18,6 +18,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
+import { pathToFileURL } from "url";
 
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
 const SERVER_ROOT =
@@ -64,6 +65,28 @@ function stripChainOnly(text) {
     .replace(/\n{3,}/g, "\n\n");
 }
 
+// Tier mapping for the SessionStart banner. Mirrors specs/model-routing.md.
+const MODEL_TIER_LABEL = { opus: "high", sonnet: "medium", haiku: "low" };
+
+// Prefer the compiled shared parser (single source of truth). If the dynamic
+// import fails (dist/ missing during a partial install) fall back to a
+// last-resort regex strip so raw `---` frontmatter never leaks into context.
+async function parseSkill(rawText) {
+  try {
+    const mod = await import(
+      pathToFileURL(path.join(SERVER_ROOT, "dist", "tools", "skill-frontmatter.js")).href
+    );
+    return mod.parseSkillFile(rawText);
+  } catch {
+    const m = rawText.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
+    if (!m) return { frontmatter: {}, body: rawText };
+    const fm = {};
+    const modelMatch = m[1].match(/^\s*recommended_model\s*:\s*(opus|sonnet|haiku)\s*$/m);
+    if (modelMatch) fm.recommended_model = modelMatch[1];
+    return { frontmatter: fm, body: rawText.slice(m[0].length) };
+  }
+}
+
 const skillVariant = process.env.AGC_DEFAULT_SKILL === "full"
   ? "skill-coordinator.md"
   : "skill-coordinator-lite.md";
@@ -74,9 +97,9 @@ const constitution =
   skillVariant === "skill-coordinator-lite.md"
     ? stripChainOnly(rawConstitution)
     : rawConstitution;
-const skill = loadContent(skillVariant);
+const rawSkill = loadContent(skillVariant);
 
-if (!constitution || !skill) {
+if (!constitution || !rawSkill) {
   // Server repo missing or moved — surface a hint instead of injecting nothing.
   const hint = `## ⚠️ agent-governance-context hook misconfigured
 Could not load constitution/skill from ${SERVER_ROOT}.
@@ -93,12 +116,18 @@ path in ~/.claude/settings.json's SessionStart hook.`;
   process.exit(0);
 }
 
+const { frontmatter, body: skill } = await parseSkill(rawSkill);
+
 const handoffPath = path.join(workspace, ".current", "handoff.md");
 const stateBlock = fs.existsSync(handoffPath)
   ? `## 📍 Current Project State (auto-injected at session start)\n\n\`\`\`yaml\n${readSafe(handoffPath)}\n\`\`\``
   : `## 📍 Current Project State\n\nNo handoff state found in this workspace. Call \`tw_get_state\` to initialize.`;
 
-const body = [
+const modelHintLine = frontmatter.recommended_model
+  ? `Recommended model: ${frontmatter.recommended_model} (tier ${MODEL_TIER_LABEL[frontmatter.recommended_model]})`
+  : null;
+
+const headerLines = [
   "# 🛡️ Agent Governance Auto-Context (SessionStart hook)",
   "",
   "The following constitution and SOP are now in effect for this session.",
@@ -106,6 +135,11 @@ const body = [
     ? "You are in Coordinator-Lite mode (solo-dev direct-execute). For cross-module work or multi-role chain, the user should invoke `/teamwork` (full mode). Set AGC_DEFAULT_SKILL=full to make full mode the default."
     : "You are currently in Coordinator mode. You can execute simple tasks, or advise the user to switch roles via `/pm`, `/architect`, `/researcher`, `/sr-engineer`, or `/qa-engineer`.",
   "Call `tw_get_state` before any state-modifying tool.",
+];
+if (modelHintLine) headerLines.push(modelHintLine);
+
+const body = [
+  ...headerLines,
   "",
   "---",
   constitution,

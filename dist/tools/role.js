@@ -3,6 +3,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
+import { parseSkillFile } from "./skill-frontmatter.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.resolve(__dirname, "..");
@@ -37,13 +38,24 @@ export function switchRole(role, workspacePath) {
     if (!fs.existsSync(filePath)) {
         return JSON.stringify({ error: `Skill file not found for role "${role}": ${filePath}` });
     }
-    const skill = fs.readFileSync(filePath, "utf-8");
-    return JSON.stringify({
+    const raw = fs.readFileSync(filePath, "utf-8");
+    const { frontmatter, body } = parseSkillFile(raw);
+    let instruction = `Context-loading only: the server is returning the "${role}" SOP for you to follow. ` +
+        `No server-side role enforcement exists — other tw_* tools remain callable regardless. ` +
+        `Follow the SOP below exclusively until the task is complete or you switch roles again.`;
+    if (frontmatter.recommended_model) {
+        instruction +=
+            ` Recommended model for this role: ${frontmatter.recommended_model}. ` +
+                `Honor via client subagent config or /model switch.`;
+    }
+    const response = {
         role,
-        instruction: `Context-loading only: the server is returning the "${role}" SOP for you to follow. ` +
-            `No server-side role enforcement exists — other tw_* tools remain callable regardless. ` +
-            `Follow the SOP below exclusively until the task is complete or you switch roles again.`,
-        sop: skill,
-    });
+        instruction,
+        sop: body,
+    };
+    if (frontmatter.recommended_model) {
+        response.recommended_model = frontmatter.recommended_model;
+    }
+    return JSON.stringify(response);
 }
 //# sourceMappingURL=role.js.map

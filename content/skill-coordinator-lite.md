@@ -1,3 +1,6 @@
+---
+recommended_model: haiku
+---
 # Skill: coordinator-lite
 
 Solo-dev direct-execute mode. No chain, no role switching, no state writes.

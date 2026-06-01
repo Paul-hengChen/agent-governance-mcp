@@ -77,6 +77,44 @@ Every `tw_update_state` runs the full 9-step pipeline before touching disk. A re
 
 ---
 
+## Per-Role Model Routing
+
+Every `content/skill-*.md` declares a `recommended_model` in its YAML frontmatter. The recommendation is **advisory** — the MCP server does not control client-side inference. Honor it via Claude Code's `~/.claude/agents/*.md` (per-subagent model pinning) or manual `/model` switches; old clients that ignore the field keep working.
+
+| Role             | Tier   | Recommended model | Rationale                                                            |
+| ---------------- | ------ | ----------------- | -------------------------------------------------------------------- |
+| researcher       | high   | `opus`            | Heavy reasoning, long-context synthesis.                             |
+| architect        | high   | `opus`            | Cross-module design decisions; subtle interface trade-offs.          |
+| code-reviewer    | high   | `opus`            | Detail sensitivity; correctness gate before QA.                      |
+| design-auditor   | high   | `opus`            | Verbatim copy/tokens extraction; precision on visual contracts.      |
+| sr-engineer      | high   | `opus`            | Hot path — every FAIL re-runs the whole chain; quality > cost.       |
+| coordinator      | medium | `sonnet`          | Triage + routing; structured decisions but not deep reasoning.       |
+| pm               | medium | `sonnet`          | Spec drafting; structured output, bounded scope per call.            |
+| qa-engineer      | medium | `sonnet`          | Test execution & evidence; high determinism.                         |
+| qa-visual        | medium | `sonnet`          | Lazy sub-mode of qa-engineer; inherits its tier.                     |
+| coordinator-lite | low    | `haiku`           | Single-file doer; no chain, no design decisions.                     |
+| doc-writer       | low    | `haiku`           | Doc-only side-channel; deterministic formatting.                     |
+| release-engineer | low    | `haiku`           | Mechanical release packaging; no novel reasoning.                    |
+
+Pinning a model in Claude Code — create one file per role under `~/.claude/agents/`. Example for sr-engineer:
+
+```markdown
+---
+name: sr-engineer
+model: opus
+description: Implements PM spec + architecture per agent-governance-mcp constitution.
+---
+
+(SOP body is loaded dynamically via `tw_switch_role` — leave this section empty
+or paste a one-line reminder to call /sr-engineer.)
+```
+
+Repeat with `model: sonnet` for pm / qa-engineer / coordinator and `model: haiku` for coordinator-lite / doc-writer / release-engineer. `tw_switch_role` returns the same tier in its `recommended_model` field, and the SessionStart hook prints `Recommended model: <model> (tier <tier>)` in its banner — wrappers can read either to set `--model` automatically.
+
+The hint is the only enforcement — see [specs/model-routing.md](specs/model-routing.md) for the full design and out-of-scope list.
+
+---
+
 ## Limits (read before adopting)
 
 - **Cannot force AI to follow the constitution** — only injects it into context. AI can still hallucinate. The gates stop *state writes*, not bad reasoning.

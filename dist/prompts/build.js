@@ -7,6 +7,7 @@ import { fileURLToPath } from "url";
 import { getActiveStorage } from "../tools/storage.js";
 import { buildPrdChunks, CHUNKER_VERSION, DEFAULT_EMBEDDING_MODEL, } from "../tools/rag.js";
 import { getInflightKey, getInflight, setInflight, deleteInflight, } from "../tools/rag-coalesce.js";
+import { parseSkillFile } from "../tools/skill-frontmatter.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.resolve(__dirname, "..");
@@ -182,7 +183,8 @@ export function buildPromptForRole(skillFile, description, workspacePath) {
     // Lite contexts (teamwork-lite) get the chain-only sections stripped; chain
     // roles keep the full constitution because those rules become load-bearing.
     const constitution = skillFile === LITE_SKILL_FILE ? stripChainOnly(rawConstitution) : rawConstitution;
-    const skill = loadContent(skillFile, workspacePath);
+    const rawSkill = loadContent(skillFile, workspacePath);
+    const { frontmatter, body: skill } = parseSkillFile(rawSkill);
     let state = null;
     try {
         state = getActiveStorage().parse(workspacePath);
@@ -193,7 +195,10 @@ export function buildPromptForRole(skillFile, description, workspacePath) {
     const stateBlock = state
         ? `## 📍 Current Project State (Auto-injected)\n\`\`\`json\n${JSON.stringify(state, null, 2)}\n\`\`\``
         : `## 📍 Current Project State\nNo handoff state found. Fresh project — call \`tw_get_state\` to initialize.`;
-    const prompt = `${constitution}\n\n---\n\n${skill}\n\n---\n\n${stateBlock}`;
+    const modelHint = frontmatter.recommended_model
+        ? `\n\nRecommended model for this role: ${frontmatter.recommended_model}.`
+        : "";
+    const prompt = `${constitution}\n\n---\n\n${skill}${modelHint}\n\n---\n\n${stateBlock}`;
     return {
         description,
         messages: [

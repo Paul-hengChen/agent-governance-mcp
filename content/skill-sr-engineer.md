@@ -1,3 +1,6 @@
+---
+recommended_model: opus
+---
 # Skill: sr-engineer
 
 ## Persona

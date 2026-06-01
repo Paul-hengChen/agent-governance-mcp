@@ -143,6 +143,13 @@
 - [x] T352 [P1] qa-engineer: content-assertion tests — Volume Gate present before extraction + STOP/Blocked/split-recommend wording (AC1/AC4); node-scoped fetch rule (AC2); coordinator schema frame-scoped link guidance + footprint stays small (AC3); fetch-modes-only scope + output cap unchanged (AC5). Full suite green. | depends_on: T350, T351
 - [x] T360 [P0] sr-engineer: extend Feature-Scope Gate in content/skill-coordinator.md — add status (pending/done) column to Split Table schema; done-marking by reconciling split.md vs handoff active_feature=PASS; resume rule (existing split.md → no regenerate, skip done, work next pending); by-id resume (hydrate named row). Keep gate section ≤~550 tok. (AC1-AC7) | depends_on: none
 - [x] T361 [P1] qa-engineer: tests for AC1-AC7 (status column; done-marking-on-PASS wording; resume no-regenerate + skip-done; no-redo; by-id resume hydrate; single-feature unaffected) + UPDATE test/feature-scope-gate.test.mjs footprint ceiling 425→~550 (AC6). Full suite green. | depends_on: T360
+- [x] T400 [P0] Add recommended_model YAML frontmatter to all 12 content/skill-*.md files per Tier Mapping in specs/model-routing.md | depends_on: none
+- [x] T401 [P0] Extend tools/role.ts to parse frontmatter, strip it from sop, and surface recommended_model + S02 in switch_role response (AC2) | depends_on: T400
+- [x] T402 [P0] Update prompts/build.ts to strip frontmatter and append the recommendation line for all 7 registered prompts (AC3) | depends_on: T400
+- [x] T403 [P1] Update bin/agent-governance-context.mjs to emit S03 recommended-model line after the banner when frontmatter declares one (AC4) | depends_on: T400
+- [x] T404 [P1] Add Per-Role Model Routing section to README.md (or docs/ per existing split) with tier table + Claude Code subagent example (AC5) | depends_on: T401, T402
+- [x] T405 [P1] Bump package.json 3.18.x -> 3.19.0 and update index.ts Server() literal to match; verify scripts/check-version.mjs (AC6) | depends_on: T401, T402, T403
+- [x] T406 [P0] QA: add unit tests for tools/role.ts frontmatter parsing (positive/missing/malformed), run npm test + npm run build + npm audit --audit-level=high; produce qa_reports/review_T400-T405.md evidence (AC7+AC8) | depends_on: T405
 
 ## Completed
 
