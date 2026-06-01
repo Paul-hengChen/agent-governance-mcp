@@ -155,6 +155,11 @@
 - [x] T412 [P1] Add README sub-section ### Claude Code subagent install (auto model-routing) under existing ## Per-Role Model Routing — install snippet + degradation callout. Reuse v3.19.0 tier table (no duplication). (AC5) | depends_on: T410, T411
 - [x] T413 [P1] Bump package.json 3.19.1 -> 3.20.0, index.ts Server() literal, add CHANGELOG [3.20.0] entry; run check-version. (AC6) | depends_on: T410, T411, T412
 - [x] T414 [P0] QA: add test/subagent-templates.test.mjs verifying each templates/claude-code-agents/<role>.md tier == content/skill-<role>.md recommended_model; assert all 11 files present + coordinator.md absent; grep skill-coordinator.md for Subagent Dispatch sub-bullet; run npm test + build + audit; write qa_reports/review_T410-T414.md. (AC7, AC8) | depends_on: T413
+- [x] T420 [P0] Rename templates/claude-code-agents/coordinator-lite.md -> lite.md and change frontmatter name: coordinator-lite -> lite. Preserve model/description/body. (AC1) | depends_on: none
+- [x] T421 [P0] Create templates/claude-code-agents/teamwork.md with name: teamwork, model: sonnet, description S04, body S05 — delegates to content/skill-coordinator.md by file path (NOT tw_switch_role). (AC2, AC3 reversal) | depends_on: none
+- [x] T422 [P1] Update README ### Claude Code subagent install sub-section — list @lite + @teamwork as primary entry points; add S06 migration note for v3.20.0 users. (AC4) | depends_on: T420, T421
+- [x] T423 [P1] Bump package.json + index.ts -> 3.21.0; CHANGELOG [3.21.0] entry citing AC1-AC6 and v3.20.0 AC2 reversal (Dynamic Workflows). (AC7) | depends_on: T420, T421, T422
+- [x] T424 [P0] QA: update test/subagent-templates.test.mjs — EXPECTED_ROLES (drop coordinator-lite, add lite + teamwork; total 12), LITE_EXEMPT ({lite, teamwork}), ROLE_TO_SKILL maps. Remove the FORBIDDEN_ROLES "coordinator absent" test (v3.20.0 AC2 reversed). Run npm test + build + audit; write qa_reports/review_T420-T424.md. (AC5, AC8) | depends_on: T423
 
 ## Completed
 

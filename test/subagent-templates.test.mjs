@@ -1,10 +1,12 @@
 // Coded by @qa-engineer
-// Tests for v3.20.0 Claude Code subagent dispatch (specs/subagent-dispatch.md).
+// Tests for v3.20.0+ Claude Code subagent dispatch (specs/subagent-dispatch.md)
+// and v3.21.0 short-name + teamwork-template additions (specs/subagent-short-names.md).
 // Locks the tier-consistency contract between templates/claude-code-agents/
 // and content/skill-*.md so a future tier change in one MUST be reflected in
-// the other. Also locks the deliberate omission of the full coordinator
-// template (AC2 — recursive-spawn avoidance) and the load-bearing prose in
-// content/skill-coordinator.md / README.md.
+// the other. v3.21.0 reverses v3.20.0 AC2 (coordinator template now SHIPS as
+// `teamwork.md`); the FORBIDDEN_ROLES "coordinator absent" test is removed
+// accordingly. The load-bearing prose in content/skill-coordinator.md and
+// README.md is still verified.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -19,8 +21,8 @@ const REPO_ROOT = path.resolve(__dirname, "..");
 const TEMPLATE_DIR = path.join(REPO_ROOT, "templates", "claude-code-agents");
 const SKILL_DIR = path.join(REPO_ROOT, "content");
 
-// Source of truth: which roles ship as Claude Code subagents (AC1) and which
-// don't (AC2 — full coordinator excluded).
+// Source of truth: which roles ship as Claude Code subagents (AC1).
+// v3.21.0: 12 templates — `coordinator-lite` renamed to `lite`, NEW `teamwork`.
 const EXPECTED_ROLES = [
   "pm",
   "researcher",
@@ -32,13 +34,15 @@ const EXPECTED_ROLES = [
   "qa-visual",
   "doc-writer",
   "release-engineer",
-  "coordinator-lite",
+  "lite",
+  "teamwork",
 ];
-const FORBIDDEN_ROLES = ["coordinator"];
 
 // Map subagent name -> corresponding content/skill-*.md. qa-visual's subagent
 // delegates to the qa-engineer top-level role (it's a lazy sub-skill, not in
 // the RoleName enum) — but its model tier comes from skill-qa-visual.md.
+// v3.21.0: `lite` maps to the unchanged skill-coordinator-lite.md;
+// `teamwork` maps to skill-coordinator.md (full coordinator subagent).
 const ROLE_TO_SKILL = {
   "pm": "skill-pm.md",
   "researcher": "skill-researcher.md",
@@ -50,7 +54,22 @@ const ROLE_TO_SKILL = {
   "qa-visual": "skill-qa-visual.md",
   "doc-writer": "skill-doc-writer.md",
   "release-engineer": "skill-release-engineer.md",
-  "coordinator-lite": "skill-coordinator-lite.md",
+  "lite": "skill-coordinator-lite.md",
+  "teamwork": "skill-coordinator.md",
+};
+
+// Templates whose body legitimately delegates by file path instead of
+// tw_switch_role:
+//   - `lite`: lite mode is server-read-only (tools/transitions.ts rejects
+//     lite agent_id for any tw_* write). It references
+//     content/skill-coordinator-lite.md directly.
+//   - `teamwork`: the full coordinator role is NOT in the RoleName enum
+//     exposed by tw_switch_role (tools/role.ts ROLE_SKILL_MAP) — it's the
+//     dispatcher, not a destination. It references content/skill-coordinator.md
+//     directly.
+const FILE_PATH_DELEGATES = {
+  "lite": /content\/skill-coordinator-lite\.md/,
+  "teamwork": /content\/skill-coordinator\.md/,
 };
 
 function readTemplateRaw(role) {
@@ -58,10 +77,10 @@ function readTemplateRaw(role) {
 }
 
 // ---------------------------------------------------------------------------
-// AC1: 11 templates exist with the expected file names
+// AC1 (v3.20.0) + AC1/AC2 (v3.21.0): templates exist with expected file names
 // ---------------------------------------------------------------------------
 
-test("AC1: templates/claude-code-agents/ contains the expected 11 subagent files", () => {
+test("AC1: templates/claude-code-agents/ contains the expected 12 subagent files", () => {
   const files = fs.readdirSync(TEMPLATE_DIR).filter((f) => f.endsWith(".md"));
   assert.equal(files.length, EXPECTED_ROLES.length, `expected ${EXPECTED_ROLES.length} files, got ${files.length}`);
   for (const role of EXPECTED_ROLES) {
@@ -85,13 +104,10 @@ test("AC1: every template carries name / model / description frontmatter (S01-S0
 
 test("AC1: every template body delegates to tw_get_state + tw_switch_role (S04 contract)", () => {
   // Single source of truth principle — templates must NOT inline a SOP body;
-  // they must delegate to tw_switch_role so content/skill-*.md remains the
-  // source of truth (matches v3.19.0 parseSkillFile design).
-  // EXCEPTION: coordinator-lite is server-read-only — tw_switch_role calls are
-  // rejected for the lite agent_id (tools/transitions.ts). Its template
-  // legitimately delegates by file path instead. This is an architectural
-  // constraint, not a spec violation.
-  const LITE_EXEMPT = new Set(["coordinator-lite"]);
+  // they must delegate so content/skill-*.md remains the source of truth.
+  // EXEMPTIONS (v3.21.0): two templates legitimately delegate by file path
+  // instead of tw_switch_role — see FILE_PATH_DELEGATES above for the
+  // per-template reason.
   for (const role of EXPECTED_ROLES) {
     const raw = readTemplateRaw(role);
     const body = raw.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, "");
@@ -100,12 +116,11 @@ test("AC1: every template body delegates to tw_get_state + tw_switch_role (S04 c
       /tw_get_state/,
       `${role}.md body must reference tw_get_state (pre-flight per Constitution §3)`,
     );
-    if (LITE_EXEMPT.has(role)) {
-      // Lite must reference its SOP file directly since tw_switch_role is rejected for lite.
+    if (role in FILE_PATH_DELEGATES) {
       assert.match(
         body,
-        /content\/skill-coordinator-lite\.md/,
-        `${role}.md (lite-exempt) must point readers to content/skill-coordinator-lite.md for the SOP`,
+        FILE_PATH_DELEGATES[role],
+        `${role}.md (file-path delegate) must point readers to the documented skill file path`,
       );
     } else {
       assert.match(
@@ -117,25 +132,14 @@ test("AC1: every template body delegates to tw_get_state + tw_switch_role (S04 c
   }
 });
 
-// ---------------------------------------------------------------------------
-// AC2: coordinator full template is deliberately absent
-// ---------------------------------------------------------------------------
-
-test("AC2: full coordinator template is NOT shipped (recursive-spawn avoidance)", () => {
-  for (const role of FORBIDDEN_ROLES) {
-    const candidate = path.join(TEMPLATE_DIR, `${role}.md`);
-    assert.ok(
-      !fs.existsSync(candidate),
-      `${role}.md must NOT exist — full coordinator IS the parent dispatcher (AC2)`,
-    );
-  }
-});
+// v3.21.0: the v3.20.0 "full coordinator template is NOT shipped" assertion is
+// REMOVED. v3.20.0 AC2 (recursive-spawn avoidance) was reversed once Claude
+// Code Dynamic Workflows (May 2026) confirmed nested subagent spawn is
+// supported. The `teamwork.md` template now ships — covered by the
+// EXPECTED_ROLES membership tests above. See specs/subagent-short-names.md §AC3.
 
 // ---------------------------------------------------------------------------
-// AC1 contract: tier in template MUST match recommended_model in skill file
-// This is the regression guard the spec relies on — if v3.19.0's tier
-// mapping ever changes in content/skill-*.md, this test forces the templates
-// to change in lock-step (no silent drift).
+// Tier-consistency regression guard
 // ---------------------------------------------------------------------------
 
 test("AC1 contract: each template tier mirrors content/skill-*.md recommended_model", () => {
@@ -157,7 +161,7 @@ test("AC1 contract: each template tier mirrors content/skill-*.md recommended_mo
 });
 
 // ---------------------------------------------------------------------------
-// AC3 / AC4: skill-coordinator.md has the new dispatch sub-bullets
+// AC3 / AC4 (v3.20.0): skill-coordinator.md dispatch sub-bullets — unchanged
 // ---------------------------------------------------------------------------
 
 test("AC3: skill-coordinator.md §Auto-Routing has Subagent Dispatch sub-bullet (S06)", () => {
@@ -167,14 +171,11 @@ test("AC3: skill-coordinator.md §Auto-Routing has Subagent Dispatch sub-bullet 
     /\*\*Subagent Dispatch \(Claude Code\)\*\*/,
     "skill-coordinator.md must surface a **Subagent Dispatch (Claude Code)** sub-bullet under §Auto-Routing",
   );
-  // The sub-bullet must explicitly preserve the server-enforced chain (AC3
-  // requirement: "routing chain is unchanged").
   assert.match(
     raw,
     /ALLOWED_TRANSITIONS/,
     "Subagent Dispatch sub-bullet must reiterate that server-enforced ALLOWED_TRANSITIONS still gates writes",
   );
-  // And explicitly say the dispatched subagent's first action is tw_get_state.
   assert.match(
     raw,
     /tw_get_state.*tw_detect_drift|tw_detect_drift.*tw_get_state/,
@@ -189,7 +190,6 @@ test("AC4: skill-coordinator.md §Auto-Routing documents tw_switch_role fallback
     /\*\*Fallback \(`tw_switch_role`\)\*\*/,
     "skill-coordinator.md must surface a **Fallback (`tw_switch_role`)** paragraph",
   );
-  // Fallback paragraph must call out backwards-compatibility explicitly.
   assert.match(
     raw,
     /no tw_\* tool surface has changed/i,
@@ -198,7 +198,7 @@ test("AC4: skill-coordinator.md §Auto-Routing documents tw_switch_role fallback
 });
 
 // ---------------------------------------------------------------------------
-// AC5: README sub-section under existing ## Per-Role Model Routing
+// AC5 (v3.20.0): README sub-section heading
 // ---------------------------------------------------------------------------
 
 test("AC5: README adds ### Claude Code subagent install (auto model-routing) sub-section (S05)", () => {
@@ -208,13 +208,11 @@ test("AC5: README adds ### Claude Code subagent install (auto model-routing) sub
     /^### Claude Code subagent install \(auto model-routing\)$/m,
     "README must contain the literal S05 heading verbatim",
   );
-  // Must reference the templates dir path so install instructions work.
   assert.match(
     raw,
     /templates\/claude-code-agents/,
     "README sub-section must reference the templates/claude-code-agents/ path",
   );
-  // Must explain the fallback envelope (degradation callout).
   assert.match(
     raw,
     /tw_switch_role/,
@@ -222,34 +220,46 @@ test("AC5: README adds ### Claude Code subagent install (auto model-routing) sub
   );
 });
 
+// v3.21.0: README must surface @teamwork + @lite as primary entry points + S06 migration note.
+test("v3.21.0 AC4: README surfaces @teamwork and @lite primaries + migration note (S06)", () => {
+  const raw = fs.readFileSync(path.join(REPO_ROOT, "README.md"), "utf-8");
+  assert.match(
+    raw,
+    /@teamwork/,
+    "README must surface @teamwork as a primary entry point",
+  );
+  assert.match(
+    raw,
+    /@lite/,
+    "README must surface @lite as a primary entry point",
+  );
+  assert.match(
+    raw,
+    /rm\s+~\/\.claude\/agents\/coordinator-lite\.md/,
+    "README must include the v3.20.0 -> v3.21.0 migration command (rm coordinator-lite.md)",
+  );
+});
+
 // ---------------------------------------------------------------------------
-// AC6: version is 3.20.0 and no persisted schema_version bumped
+// Version checks
 // ---------------------------------------------------------------------------
 
-test("AC6: package.json + index.ts both at 3.20.0", () => {
+test("v3.21.0 AC7: package.json + index.ts both at 3.21.0", () => {
   const pkg = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, "package.json"), "utf-8"));
-  assert.equal(pkg.version, "3.20.0", "package.json version must be 3.20.0");
+  assert.equal(pkg.version, "3.21.0", "package.json version must be 3.21.0");
   const idx = fs.readFileSync(path.join(REPO_ROOT, "index.ts"), "utf-8");
   assert.match(
     idx,
-    /name: "agent-governance-mcp", version: "3.20\.0"/,
-    "index.ts Server() literal must read 3.20.0",
+    /name: "agent-governance-mcp", version: "3\.21\.0"/,
+    "index.ts Server() literal must read 3.21.0",
   );
 });
 
 test("AC6: no persisted-state schema_version bumped (content-only feature)", () => {
-  // The feature ships only content + templates + skill SOP. Any change to a
-  // persisted schema constant would signal scope creep into storage layer.
   const versionsSrc = fs.readFileSync(
     path.join(REPO_ROOT, "schema", "versions.ts"),
     "utf-8",
   );
-  // We don't know which constants might exist, so just sanity-check the file
-  // is unchanged in semantically observable ways by confirming the public
-  // CURRENT_VERSIONS export still parses an object literal (proxy for "no
-  // accidental breakage"). A surgical "no version bumped" assertion lives in
-  // the existing handoff-versioning / config-versioning suites — those still
-  // pass per the prebuild gate.
   assert.match(
     versionsSrc,
     /export\s+const\s+CURRENT_VERSIONS/,

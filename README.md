@@ -115,23 +115,29 @@ The hint is the only enforcement — see [specs/model-routing.md](specs/model-ro
 
 ### Claude Code subagent install (auto model-routing)
 
-v3.20.0 ships pre-pinned Claude Code subagent templates under `templates/claude-code-agents/`. Install them once and `/teamwork` dispatches each role to a fresh context running its tier-pinned model — no more whole-chain-on-Opus or whole-chain-on-Sonnet.
+v3.20.0+ ships pre-pinned Claude Code subagent templates under `templates/claude-code-agents/`. Install them once and Claude Code dispatches each role to a fresh context running its tier-pinned model — no more whole-chain-on-Opus or whole-chain-on-Sonnet.
 
 ```bash
 # After installing agc via npx (e.g. ~/.npm/_npx/<hash>/node_modules/agent-governance-mcp/...)
-# or a local clone, copy the 11 templates into your Claude Code agents dir:
+# or a local clone, copy the 12 templates into your Claude Code agents dir:
 mkdir -p ~/.claude/agents
 cp -r path/to/agent-governance-mcp/templates/claude-code-agents/*.md ~/.claude/agents/
 ```
 
+Primary entry points after install (v3.21.0):
+
+- **`@teamwork <task>`** — Sonnet-pinned coordinator subagent in a fresh context. Use this instead of `/teamwork` when you want the orchestrator itself pinned to its tier (Sonnet) rather than running on your main session's model. The chain still dispatches downstream roles per their own templates.
+- **`@lite <task>`** — Haiku-pinned solo-doer for single-shot work (renamed from v3.20.0's `@coordinator-lite`). The cheapest entry point for daily 1-file edits, doc tweaks, Q&A.
+- **`@pm` / `@sr-engineer` / `@qa-engineer` / `@code-reviewer` / etc.** — invoke an individual role directly, each at its tier (see table above).
+
 What changes after install:
 
-- **Inside Claude Code with `/teamwork`** — coordinator dispatches via the Task tool to each role's subagent; each subagent runs in a **fresh context with the model pinned in its frontmatter** (see tier table above). Anthropic-reported cost: Opus orchestrator + Sonnet workers ≈ 40 % cheaper than all-Opus.
+- **Inside Claude Code with `@teamwork` (or `/teamwork`)** — coordinator dispatches via the Task tool to each role's subagent; each subagent runs in a **fresh context with the model pinned in its frontmatter** (see tier table above). Anthropic-reported cost: Opus workers + Sonnet orchestrator ≈ 40 % cheaper than all-Opus.
 - **Without the templates installed, or outside Claude Code** (Cursor, Continue, Anti-Gravity, plain MCP clients) — coordinator silently falls back to the existing `tw_switch_role` text-load path. Behavior is **identical to v3.19.x**. No tw_* tool surface has changed.
 
-The **full coordinator** has no template by design (it's the parent dispatcher — spawning it as a subagent would be recursive). `coordinator-lite` IS shipped so lite-mode users can pin Haiku for everyday solo-doer work.
+**Upgrade note for v3.20.0 users**: If you previously installed v3.20.0 templates, run `rm ~/.claude/agents/coordinator-lite.md` then re-copy from `templates/claude-code-agents/`. Your existing `coordinator-lite.md` install will keep working (Claude Code reads the `name:` field) — but `@lite` will not resolve until you re-copy.
 
-See [specs/subagent-dispatch.md](specs/subagent-dispatch.md) and [research/multi-agent-auto-model-routing-directions.md](research/multi-agent-auto-model-routing-directions.md) for the full design + roadmap.
+See [specs/subagent-dispatch.md](specs/subagent-dispatch.md) + [specs/subagent-short-names.md](specs/subagent-short-names.md) + [research/multi-agent-auto-model-routing-directions.md](research/multi-agent-auto-model-routing-directions.md) for the full design + roadmap.
 
 ---
 

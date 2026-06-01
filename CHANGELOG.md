@@ -16,6 +16,64 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.21.0] - 2026-06-01
+
+MINOR release shortening Claude Code subagent entry points + adding the
+coordinator subagent that v3.20.0 deliberately omitted. Template-layer-only
+change — all server-side identifiers (`content/skill-*.md`,
+`prompts/*.ts`, `/teamwork-lite` and `/teamwork` MCP prompt names,
+`tools/transitions.ts`) are unchanged; backwards-compatible at the wire
+contract.
+
+### Added
+
+- **`templates/claude-code-agents/teamwork.md`** — Sonnet-pinned
+  coordinator subagent. Entry via `@teamwork <task>` spawns a fresh
+  context running the full coordinator SOP at its recommended tier
+  (instead of inheriting the user's main session model). The
+  subagent's body delegates by file path (`content/skill-coordinator.md`)
+  rather than `tw_switch_role`, because the full coordinator is not in
+  the `RoleName` enum exposed by that tool (it's the dispatcher, not a
+  destination).
+
+### Changed
+
+- **`@coordinator-lite` → `@lite`** — `templates/claude-code-agents/coordinator-lite.md`
+  renamed to `lite.md`; frontmatter `name:` field updated. Model
+  (`haiku`), description, and body are unchanged. Shorter to type for
+  everyday solo-doer work.
+- README `### Claude Code subagent install (auto model-routing)`
+  sub-section now lists `@teamwork` + `@lite` as primary entry points
+  alongside the per-role subagents, plus a migration note for v3.20.0
+  users.
+- Test suite regression-guard updated: `test/subagent-templates.test.mjs`
+  now expects 12 templates (was 11); `LITE_EXEMPT` Set extended to
+  `{ lite, teamwork }` (both delegate by file path); the v3.20.0
+  "coordinator template absent" assertion is removed.
+
+### Reversed (from v3.20.0)
+
+- **v3.20.0 AC2** — "the full coordinator MUST NOT have a template
+  (recursive-spawn avoidance)" — is reversed. Claude Code's Dynamic
+  Workflows research preview (May 2026) confirms subagents support
+  nested spawn (up to 1,000 in parallel), invalidating the original
+  concern. See `research/multi-agent-auto-model-routing-directions.md`
+  §E1 and `specs/subagent-short-names.md` §AC3.
+
+### Notes
+
+- **No server-side identifier renamed** — `coordinator-lite` /
+  `coordinator` still live as their full names in
+  `content/skill-*.md`, `prompts/*.ts`, MCP prompt names, transition
+  tables. A server-side rename would be MAJOR (v4.0.0) and is
+  deliberately out of scope.
+- **v3.20.0 install survives** — users who already copied
+  `coordinator-lite.md` into `~/.claude/agents/` keep working
+  (Claude Code reads the frontmatter `name:` field). `@coordinator-lite`
+  continues to resolve until they re-copy from this release.
+- No persisted-state `schema_version` bump (template + docs only).
+  Suite tests passing; build zero-error.
+
 ## [3.20.0] - 2026-06-01
 
 MINOR release shipping **Claude Code subagent dispatch** — turning v3.19.0's

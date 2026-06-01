@@ -1,5 +1,5 @@
 ---
-name: coordinator-lite
+name: lite
 model: haiku
 description: Solo-dev direct-execute single-shot mode — no chain, no state writes, no role switching.
 ---
