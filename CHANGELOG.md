@@ -16,6 +16,26 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.24.0] - 2026-06-02
+
+MINOR release delivering a backlog batch (B1–B5): spec wording relaxation, context budget increase, dynamic version pinning test, release staging dir completeness, and code-review transport fixes.
+
+### Added (B2 — context budget increase)
+
+- Increased context budget cap from 2100 to 2300 tokens across all role prompts to accommodate larger PRD and multi-source workspace contexts without truncation warnings.
+
+### Changed (B1 — Constitution §4.1 watermark spec wording)
+
+- Relaxed watermark specification language to accommodate model-tier variations (`@sr-engineer (haiku)`, `@release-engineer (sonnet)`, etc.) while preserving SOP compliance.
+
+### Fixed (B3 — dynamic version-pin test)
+
+- Updated `test/release-staging.test.mjs` and `test/version-pin-dynamic.test.mjs` to read `package.json` version dynamically at test runtime instead of hardcoding semver strings, ensuring future PATCH/MINOR/MAJOR releases do not require updating test assertions.
+
+### Completeness (B5 — release staging directory inventory)
+
+- Updated `content/skill-release-engineer.md` SOP step 7 staging list to include `transport/` directory alongside existing `lib/`, `content/`, `templates/`, `specs/`, `test/`, `qa_reports/`, `review_reports/` — all code-review fixes to HTTP/stdio transport layer are now included in release commits.
+
 ## [3.23.1] - 2026-06-02
 
 PATCH release combining two fixes: drift false-positive exclusion (B3) and

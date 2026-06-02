@@ -5,6 +5,18 @@
 ## Active
 
 _(No active tasks — ready for the next feature.)_
+- [ ] T470 [P0] In `tools/drift.ts`: add `isArchivedSection` helper + Active/Completed convention detection; filter archived tasks from drift comparison before calling `partitionTasks()`; update `tasksCompleted`/`tasksIncomplete` in returned JSON to reflect active-scope only | depends_on: none
+- [x] T471 [P1] Bump version 3.23.0 → 3.23.1 in `package.json` + `index.ts` Server literal + prepend `## [3.23.1]` entry in `CHANGELOG.md`; run `npm run build` | depends_on: T470 (note: QA PASS — version bump 3.23.1 verified via check:version and package.json/index.ts literals)
+- [x] T472 [P1] QA: write tests in `test/drift-archived-tasks.test.mjs` covering AC-1 through AC-7 | depends_on: T470 (note: QA PASS — 11 tests in test/drift-archived-tasks.test.mjs covering AC-1..AC-7 all green)
+- [x] T473 [P0] B5: Update content/skill-release-engineer.md SOP step 7 — add tools/ schema/ guards/ prompts/ bin/ to git add enumeration + pre-commit FEATURE_DIRS description | depends_on: none
+- [x] T474 [P0] B5: Update templates/claude-code-agents/release-engineer.md — add missing dirs to staging scope hint | depends_on: none
+- [x] T475 [P0] B5+B2+B3: Update test/release-staging.test.mjs — expand FEATURE_DIRS + add repo-scan guard test; update test/context-budget.test.mjs — raise cap to 2300; update test/subagent-templates.test.mjs — dynamic version read | depends_on: T473
+- [x] T476 [P2] B1: Update specs/watermark-hide-model-tier.md — relax verbatim to load-bearing semantics preserved in AC1 + Copy/Strings source | depends_on: none
+- [x] T477 [P1] Update docs/backlog.md — mark B5, B2, B3, B1 as done with version ref | depends_on: T473, T474, T475, T476
+- [ ] T478 [P0] B5-fix transport/ (sr-engineer): In `content/skill-release-engineer.md` SOP step 7, add `transport/` to the git add enumeration and to the pre-commit FEATURE_DIRS description. In `templates/claude-code-agents/release-engineer.md`, add `transport/` to the staging scope hint. Ref AC-B5.1, AC-B5.2, AC-B5.3, AC-B5.6. | depends_on: none
+- [ ] T479 [P0] B5-fix transport/ guard (qa-engineer): In `test/release-staging.test.mjs`, add `transport/` to the `FEATURE_DIRS` array and remove it from `EXCLUDED_DIRS`. Verify the repo-scan guard test (AC-B5.5) now flags any future transport/ omission. Run full test suite — must stay green. Ref AC-B5.4, AC-B5.5, AC-B5.6. | depends_on: T478
+- [ ] T480 [P2] B3-fix regex metachar (qa-engineer): In `test/subagent-templates.test.mjs`, fix the version regex so all semver metacharacters are escaped (not only `.`), or replace the regex match with `===` literal comparison. Ref AC-B3.4. | depends_on: none
+- [ ] T481 [P1] Version bump 3.23.1 → 3.24.0 (sr-engineer): Bump `package.json` version to `3.24.0`, bump the `Server()` literal in `index.ts` to `3.24.0`, prepend `## [3.24.0]` entry in `CHANGELOG.md` summarising B5+B2+B3+B1+transport-fix. Run `npm run build`. Ref check-version gate. | depends_on: T478, T479, T480
 
 ## Completed
 

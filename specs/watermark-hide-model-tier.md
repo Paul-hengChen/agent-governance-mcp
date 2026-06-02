@@ -17,7 +17,7 @@ The current watermark format `— @<role> (<tier>)` appears on every reply — i
   - Given `content/constitution.md`, when the file is read, then §1 Watermark MUST state:
     - **Subagent context** (agent is running as a fresh Task-dispatched subagent — see self-detection rule below): end reply with `— @<role> (<tier>)`.
     - **Non-subagent context** (coordinator main loop, coordinator-lite, or same-context `tw_switch_role` switch): end reply with `— @<role>` (no model token).
-    - Self-detection rule (verbatim, load-bearing): "An agent is in subagent context if and only if its `model:` frontmatter was set by the dispatching parent at Task creation time — i.e., the agent file `~/.claude/agents/<role>.md` exists and was used as the execution template for this turn. In practice: if you are running because a `Task(subagent_type=…)` call spawned you, you are a subagent; if you are running as the initial session agent or switched in-context via `tw_switch_role`, you are not."
+    - Self-detection rule (load-bearing — semantics preserved; paraphrase acceptable): "An agent is in subagent context if and only if its `model:` frontmatter was set by the dispatching parent at Task creation time — i.e., the agent file `~/.claude/agents/<role>.md` exists and was used as the execution template for this turn. In practice: if you are running because a `Task(subagent_type=…)` call spawned you, you are a subagent; if you are running as the initial session agent or switched in-context via `tw_switch_role`, you are not."
 
 - **AC2 — skill-coordinator.md updated**
   - Given `content/skill-coordinator.md`, when the file is read, then:
@@ -96,7 +96,7 @@ Grep for `— @` in each skill file to find watermark examples. Files without an
 |---|---|---|
 | wm.nomodel.format | `— @<role>` | authored-here — new non-subagent watermark format; `<role>` substituted at runtime from current role name |
 | wm.subagent.format | `— @<role> (<tier>)` | authored-here — unchanged subagent watermark format carried forward from v3.22.1 |
-| wm.selfdetect.rule | `An agent is in subagent context if and only if its model: frontmatter was set by the dispatching parent at Task creation time — i.e., the agent file ~/.claude/agents/<role>.md exists and was used as the execution template for this turn.` | authored-here — canonical self-detection rule to be inserted verbatim into constitution §1 |
+| wm.selfdetect.rule | `An agent is in subagent context if and only if its model: frontmatter was set by the dispatching parent at Task creation time — i.e., the agent file ~/.claude/agents/<role>.md exists and was used as the execution template for this turn.` | authored-here — canonical self-detection rule; load-bearing semantics preserved in constitution §1 (paraphrase acceptable) |
 | wm.constitution.rule.updated | `End every reply with — @<role> (<tier>) if running as a Task-dispatched subagent (model pinned by agent frontmatter), or — @<role> if running as coordinator main loop, coordinator-lite, or a same-context tw_switch_role switch.` | authored-here — updated §1 Watermark directive |
 
 ## Visual Tokens
@@ -131,7 +131,7 @@ Grep for `— @` in each skill file to find watermark examples. Files without an
 
 ## Tasks
 
-- [ ] T463 [P0] Update `content/constitution.md` §1 Watermark: replace single-format rule with two-format rule (subagent → with tier; non-subagent → no tier) + self-detection criterion (verbatim wm.selfdetect.rule string) | depends_on: none
+- [ ] T463 [P0] Update `content/constitution.md` §1 Watermark: replace single-format rule with two-format rule (subagent → with tier; non-subagent → no tier) + self-detection criterion (load-bearing semantics from wm.selfdetect.rule; paraphrase acceptable) | depends_on: none
 - [ ] T464 [P0] Update `content/skill-coordinator.md`: change coordinator main-loop watermark example to no-tier form; update §Subagent Reply Watermark Validation out-of-scope guard to explicitly state coordinator own output ends with `— @coordinator` (no tier) | depends_on: T463
 - [ ] T465 [P0] Update `content/skill-coordinator-lite.md`: change watermark example to `— @lite` (no tier); confirm §Subagent Reply Watermark Validation cross-reference is unchanged | depends_on: T463
 - [ ] T466 [P1] Grep each `content/skill-{pm,architect,sr-engineer,researcher,qa-engineer,code-reviewer,design-auditor,doc-writer,release-engineer,qa-visual}.md` for `— @` watermark examples; update any found to show both forms (subagent with tier, same-context without tier); skip files with no watermark example | depends_on: T463

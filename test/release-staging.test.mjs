@@ -44,7 +44,7 @@ const SHIM = fs.readFileSync(
 // ---------------------------------------------------------------------------
 
 // The directories the SOP declares as feature source dirs (AC1, AC2, AC3).
-const FEATURE_DIRS = ["lib/", "content/", "templates/", "specs/", "test/", "qa_reports/", "review_reports/"];
+const FEATURE_DIRS = ["lib/", "tools/", "schema/", "guards/", "prompts/", "bin/", "scripts/", "content/", "templates/", "specs/", "test/", "qa_reports/", "review_reports/", "transport/"];
 
 /**
  * Simulate the pre-commit verification logic described in AC2:
@@ -335,4 +335,44 @@ test("Fixture D (AC4, AC6): post-commit check passes silently when spec file pre
   const result = simulatePostCommitCheck(gitDiffHeadNameOnly, activeFeature);
   assert.equal(result.pass, true, "Fixture D: spec file present must produce PASS");
   assert.equal(result.errorMsg, null, "Fixture D: no error message when spec file is present");
+});
+
+// ---------------------------------------------------------------------------
+// Phase 3 — Repo-scan guard: no source dir silently falls out of releases
+// ---------------------------------------------------------------------------
+
+// Directories that are NOT source code and are excluded from staging.
+const EXCLUDED_DIRS = new Set([
+  "node_modules", "dist", ".git", ".backup", ".current", ".github", ".claude",
+  "docs", "research",
+]);
+
+// Metadata files explicitly staged (not dirs).
+const METADATA_PATTERNS = ["tsconfig.json", "package.json", "index.ts", "CHANGELOG.md", "README.md"];
+
+test("AC-B5.5: every repo source directory appears in FEATURE_DIRS or metadata list", () => {
+  // Scan the repo root for directories that contain .ts or .mjs source files.
+  // Any such directory that is NOT in EXCLUDED_DIRS must appear in FEATURE_DIRS
+  // so that a new source dir can't silently fall out of releases.
+  const entries = fs.readdirSync(ROOT, { withFileTypes: true });
+  const sourceDirs = entries
+    .filter((e) => e.isDirectory() && !e.name.startsWith(".") && !EXCLUDED_DIRS.has(e.name))
+    .filter((e) => {
+      // Check if directory contains at least one .ts or .mjs file (direct children)
+      try {
+        const children = fs.readdirSync(path.join(ROOT, e.name));
+        return children.some((c) => c.endsWith(".ts") || c.endsWith(".mjs"));
+      } catch {
+        return false;
+      }
+    })
+    .map((e) => `${e.name}/`);
+
+  const missing = sourceDirs.filter((d) => !FEATURE_DIRS.includes(d));
+  assert.deepEqual(
+    missing,
+    [],
+    `Source directories missing from FEATURE_DIRS (would be omitted from releases): ${missing.join(", ")}. ` +
+    `Add them to FEATURE_DIRS in this test and to the git add enumeration in content/skill-release-engineer.md SOP step 7.`,
+  );
 });

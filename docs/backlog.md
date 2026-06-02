@@ -8,11 +8,11 @@ candidate for a future `/teamwork` feature; none blocks a release on its own.
 
 | # | Item | Priority | Origin | Status |
 |---|------|----------|--------|--------|
-| B1 | Constitution §1 verbatim-wording relax | P2 | watermark-hide-model-tier (v3.23.0) | open |
-| B2 | Always-on bundle headroom (2-token margin) | P1 | watermark-hide-model-tier (v3.23.0) | open |
-| B3 | Version-pin test refactor (recurring break) | P1 | watermark (v3.23.0) + drift (v3.23.1) | open |
+| B1 | Constitution §1 verbatim-wording relax | P2 | watermark-hide-model-tier (v3.23.0) | **done (v3.24.0)** |
+| B2 | Always-on bundle headroom (2-token margin) | P1 | watermark-hide-model-tier (v3.23.0) | **done (v3.24.0)** |
+| B3 | Version-pin test refactor (recurring break) | P1 | watermark (v3.23.0) + drift (v3.23.1) | **done (v3.24.0)** |
 | B4 | Add `.nvmrc` + `engines` (Node version pin) | P1 | drift-archived-task-exclusion (v3.23.1) | **done (v3.23.1, Option Y)** |
-| B5 | release-engineer staging list omits source dirs | **P0** | v3.23.1 release (post-mortem) | open |
+| B5 | release-engineer staging list omits source dirs | **P0** | v3.23.1 release (post-mortem) | **done (v3.24.0)** |
 
 ---
 
