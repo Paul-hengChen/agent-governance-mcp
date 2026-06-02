@@ -4,6 +4,12 @@
 
 ## Active
 
+_(No active tasks — ready for the next feature.)_
+
+## Completed
+
+<!-- Historical tasks T01–T469, completed across prior features (qa-flow-enforcement, rag-lifecycle, schema-versioning, code-reviewer extraction, model-routing, subagent dispatch, watermark). Archived 2026-06-02 via owner-authorized §3 override — move-only, zero deletion. -->
+
 ### Architect phase
 
 - [x] T01 [P0] Produce `design/qa-flow-enforcement.md` covering: (1) full ALLOWED_TRANSITIONS matrix for `(prev_agent, prev_status) → (new_agent, new_status)`, (2) `qa_round` persistence — handoff frontmatter field + SQLite column migration shape, (3) evidence convention — `qa_reports/review_<task-id>.md` path rule + SQLite `reports` table schema, (4) error envelope format for rejected transitions / missing evidence (must include `attempted` + `allowed` sets), (5) module split — whether transition logic lives in new `tools/transitions.ts` or inline in `index.ts`, (6) helper signatures `validateTransition()`, `incrementRound()`, `assertEvidence()`. No code. | depends_on: none (note: architect blueprint shipped)
@@ -175,8 +181,10 @@
 - [x] T460 [P0] Sr-engineer: edit `content/skill-release-engineer.md` SOP step 7 — replace `git add &lt;touched files including dist/&gt;` with an explicit enumerated directory list per AC1 (lib/, content/, templates/, specs/, test/, qa_reports/, review_reports/, tsconfig.json if changed, plus metadata files); add pre-commit `git diff --cached --stat` verify step per AC2; fix Failure modes "release-artifact whitelist" wording per AC3 (source directories are EXPECTED, only unrelated paths trigger STOP); add post-commit `git diff HEAD~1 --name-only` spec-file sanity check per AC4. | depends_on: none (note: AC1-AC4 verified: skill-release-engineer.md has explicit dir list, pre-commit verify, inverted failure-mode, post-commit spec check. All strings match spec verbatim.)
 - [x] T461 [P1] Sr-engineer: edit `templates/claude-code-agents/release-engineer.md` — add a ≤ 2-sentence reinforcement hint reminding the haiku-tier model that its staging scope includes all upstream feature work (lib/, content/, templates/, specs/, test/, qa_reports/, review_reports/), not only files edited in the current turn. Preserve watermark line and tw_get_state/tw_switch_role instruction verbatim. | depends_on: T460 (note: AC5 verified: templates/claude-code-agents/release-engineer.md has 1-sentence hint covering 'ALL uncommitted upstream work, not just files you edited this turn'. Watermark + tw_get_state/tw_switch_role preserved verbatim.)
 - [x] T462 [P0] QA-engineer: create `test/release-staging.test.mjs` — content-assertion + behavioral-simulation tests per AC6 (4 required fixtures: incomplete staging FAIL signal, complete staging pass, post-commit missing spec FAIL with AC4 verbatim string, post-commit spec present passes); also assert AC1 directory list present in skill-release-engineer.md, AC2 verify-command present, AC3 expected-directories framing present, AC4 spec-file check present, AC5 shim hint present in templates/release-engineer.md. Run `npm run build` + `npm test` — zero errors required. Write `qa_reports/review_T460-T462.md`. | depends_on: T460, T461 (note: test/release-staging.test.mjs created: 9 tests covering AC1-AC6 (4 behavioral-simulation fixtures + 5 content assertions). AC7 carryover fix applied in subagent-templates.test.mjs:368-382 (3.22.0→3.22.1, label v3.22.1 AC9). npm test: 488 pass, 0 fail.)
-- [ ] T463 [P1] Release-engineer: bump `package.json` + `index.ts` Server() literal `3.22.0` → `3.22.1`; add CHANGELOG [3.22.1] entry; run `npm run build` + `node scripts/check-version.mjs`; stage all feature files per new SOP (lib/, content/, templates/, specs/, test/, qa_reports/, review_reports/ plus metadata); commit + tag + push + gh release. | depends_on: T462
-
-## Completed
-
-<!-- tw_complete_task will move items here -->
+- [x] T463 [P1] Release-engineer: bump `package.json` + `index.ts` Server() literal `3.22.0` → `3.22.1`; add CHANGELOG [3.22.1] entry; run `npm run build` + `node scripts/check-version.mjs`; stage all feature files per new SOP (lib/, content/, templates/, specs/, test/, qa_reports/, review_reports/ plus metadata); commit + tag + push + gh release. | depends_on: T462
+- [x] T464 [P0] Update content/skill-coordinator.md: change coordinator main-loop watermark example to no-tier form; update §Subagent Reply Watermark Validation out-of-scope guard to explicitly state coordinator own output ends with — @coordinator (no tier) | depends_on: T463
+- [x] T465 [P0] Update content/skill-coordinator-lite.md: change watermark example to — @lite (no tier); confirm §Subagent Reply Watermark Validation cross-reference is unchanged | depends_on: T463
+- [x] T466 [P1] Grep each content/skill-{pm,architect,sr-engineer,researcher,qa-engineer,code-reviewer,design-auditor,doc-writer,release-engineer,qa-visual}.md for — @ watermark examples; update any found to show both forms (subagent with tier, same-context without tier); skip files with no watermark example | depends_on: T463
+- [x] T467 [P0] Bump package.json and index.ts Server() literal from 3.22.1 to 3.23.0; run node scripts/check-version.mjs to confirm | depends_on: T463
+- [x] T468 [P1] Add v3.23.0 CHANGELOG entry describing the two-format watermark regime (subagent with tier, non-subagent without tier) | depends_on: T467
+- [x] T469 [P1] QA: run npm test and confirm full suite passes — especially test/subagent-templates.test.mjs and test/watermark-check.test.mjs with zero modifications to those test files | depends_on: T464, T465, T466, T467
