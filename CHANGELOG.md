@@ -16,6 +16,49 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.22.0] - 2026-06-02
+
+MINOR release adding parent-level watermark post-validation to the
+`/teamwork` and `/teamwork-lite` coordinator SOPs. Template-side hardening
+in v3.21.2 raised haiku compliance to 3/3 in controlled dispatch, but a
+subsequent live `@lite hi` invocation in a lite-mode main session still
+dropped the suffix — no instruction inside the subagent template can
+deterministically force a haiku model to append a trailing string on every
+reply. v3.22.0 closes the gap at the parent layer, which has guaranteed
+execution regardless of subagent attention drift.
+
+### Added
+
+- **`lib/watermark-check.ts`** — new pure util exporting
+  `validateWatermark(reply, name, tier)` and `buildWatermark(name, tier)`.
+  Detects the canonical `— @<name> (<tier>)` suffix on the last non-empty
+  line of a subagent reply using regex `/^—\s@[\w-]+\s\([\w-]+\)$/i` (U+2014
+  EM DASH required, case-insensitive). Returns `{ present, corrected }`;
+  callers relay the `corrected` value. Verifies the captured name and tier
+  match the expected dispatched subagent. Pure (no I/O), idempotent. Now
+  included in `tsconfig.json` `include` glob and compiled into
+  `dist/lib/watermark-check.js`.
+- **`## Subagent Reply Watermark Validation`** section in both
+  `content/skill-coordinator.md` and `content/skill-coordinator-lite.md`
+  (verbatim-equivalent). Documents the detection regex, append-on-miss
+  correction strategy, and the out-of-scope guard that limits validation to
+  replies relayed from a `Task` / Agent tool call (never the coordinator's
+  own non-Task tool turns).
+
+### Changed
+
+- **`package.json` + `index.ts`** — version bumped from `3.21.2` to `3.22.0`
+  (MINOR — new observable behavior in both coordinator SOP files, no
+  breaking changes).
+
+### Notes
+
+- No change to `tools/transitions.ts`, `content/constitution.md`, or any
+  `templates/claude-code-agents/*.md` file. No new `tw_*` MCP tool;
+  `validateWatermark` is internal SOP logic.
+- ALLOWED_TRANSITIONS matrix unchanged. Template format unchanged. Existing
+  `~/.claude/agents/` copies keep working unmodified.
+
 ## [3.21.2] - 2026-06-01
 
 PATCH release tightening haiku-tier watermark compliance. Empirical testing
