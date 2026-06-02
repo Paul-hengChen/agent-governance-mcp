@@ -16,6 +16,49 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.23.1] - 2026-06-02
+
+PATCH release combining two fixes: drift false-positive exclusion (B3) and
+Node version pinning for dev/CI environment consistency (B4).
+
+### Added (B4 — Node version pin)
+
+- `.nvmrc` pinned to `22` — `nvm use` / `fnm use` will switch to Node 22
+  automatically in dev, matching the CI matrix (`[20, 22]`).
+- `engines.node` set to `">=20"` in `package.json`. Lower bound enforced to
+  match the oldest CI target; no upper bound set (Option Y) because
+  `better-sqlite3` is rebuilt from source on `npx` install, so consumers on
+  Node 23+ do not hit ABI issues — adding `<23` would produce spurious engine
+  warnings for them with no safety benefit. Dev-environment consistency is
+  handled by `.nvmrc` + CI matrix, not by the engines upper bound.
+
+### Fixed (B3 — drift archived-task exclusion)
+
+PATCH release fixing a long-standing false-positive in `tw_detect_drift`.
+Previously the drift comparison fed every `[x]` task — including those
+already migrated to the `## Completed` archive section by `tw_complete_task`
+— into the "completed in task list but not in handoff" check, producing one
+spurious vibe-coding-drift line per archived task (161 in this repo) on every
+call.
+
+`tools/drift.ts` now excludes archived tasks at read time:
+
+- Adds an `isArchivedSection()` helper matching `## Completed`
+  case-insensitively with trimmed whitespace (consistent with
+  `tasks-file.ts` section parsing).
+- Detects the Active/Completed convention by checking whether any task carries
+  an `Active` or `Completed` section; filters `## Completed` tasks out of the
+  drift comparison only when the convention is present.
+- Backward-compatible: legacy `tasks.md` files with neither `## Active` nor
+  `## Completed` headings retain full-file drift behaviour unchanged. Tasks
+  under unknown sections (e.g. `## Sprint-3`) are treated as active so genuine
+  drift is never silently dropped.
+- Returned `tasksCompleted` / `tasksIncomplete` now reflect active-scope tasks
+  only.
+
+Read-time filter only — no on-disk format change, no migration, no
+`schema_version` bump.
+
 ## [3.23.0] - 2026-06-02
 
 MINOR release introducing a two-format watermark regime. Previously every reply

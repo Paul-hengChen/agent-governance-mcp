@@ -8,6 +8,15 @@ import * as yaml from "js-yaml";
 import { getActiveStorage } from "./storage.js";
 import { findTasksFile } from "./config.js";
 import { CURRENT_VERSIONS, peekVersion } from "../schema/versions.js";
+// A task is "archived" when it lives under a `## Completed` H2 section. The
+// match mirrors tasks-file.ts (sectionMatch[1].trim()) plus a lower-case fold,
+// so `## completed`, `##  Completed  `, and `## COMPLETED` all qualify (AC-6).
+// Any other section name — including unknown ones like `## Sprint-3` — is
+// treated as active (conservative; AC-7), so genuine drift is never silently
+// dropped.
+function isArchivedSection(section) {
+    return section.trim().toLowerCase() === "completed";
+}
 function partitionTasks(tasks) {
     const completed = [];
     const incomplete = [];
@@ -181,7 +190,22 @@ export function detectDrift(workspacePath) {
             tasksIncomplete: [],
         });
     }
-    const { completed: completedTasks, incomplete: incompleteTasks } = partitionTasks(tasks);
+    // Exclude archived (`## Completed`) tasks from drift comparison so that
+    // tasks migrated by tw_complete_task don't misfire as "completed in task
+    // list but not in handoff" forever (AC-1). Backward-compat gate: only filter
+    // when the file actually uses the Active/Completed convention — i.e. some
+    // task carries an `Active` or `Completed` section. Legacy files with neither
+    // section name keep full-file behaviour unchanged (AC-3, AC-4). Active `[x]`
+    // tasks absent from handoff still surface as drift (AC-2); the returned
+    // tasksCompleted/tasksIncomplete reflect active scope only (AC-5).
+    const usesActiveCompletedConvention = tasks.some((t) => {
+        const s = t.section.trim().toLowerCase();
+        return s === "active" || s === "completed";
+    });
+    const activeScopeTasks = usesActiveCompletedConvention
+        ? tasks.filter((t) => !isArchivedSection(t.section))
+        : tasks;
+    const { completed: completedTasks, incomplete: incompleteTasks } = partitionTasks(activeScopeTasks);
     const drifts = [];
     // Pre-compile one regex per known task ID so handoff-string scanning stays O(handoff × matches)
     // instead of recompiling on every iteration.

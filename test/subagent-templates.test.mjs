@@ -365,20 +365,19 @@ test("v3.21.2 AC2: non-haiku templates do NOT contain an example reply suffix li
 // Version checks
 // ---------------------------------------------------------------------------
 
-test("v3.23.0 AC8: package.json + index.ts both at 3.23.0", () => {
-  // v3.23.0 ships the watermark-hide-model-tier feature
-  // (specs/watermark-hide-model-tier.md): two-format watermark regime —
-  // subagent context (Task-dispatched, model pinned) → — @<role> (<tier>);
-  // non-subagent context (coordinator, coordinator-lite, tw_switch_role) → — @<role> (no tier).
-  // constitution §1, skill-coordinator.md, skill-coordinator-lite.md updated accordingly.
-  // MINOR bump from 3.22.1 — new observable output format, no breaking API changes.
+test("v3.23.1 AC8: package.json + index.ts both at 3.23.1", () => {
+  // v3.23.1 ships the drift-archived-task-exclusion fix
+  // (specs/drift-archived-task-exclusion.md): tw_detect_drift no longer
+  // flags archived/completed tasks as drift — PATCH bump from 3.23.0.
+  // constitution §1, skill-coordinator.md, skill-coordinator-lite.md unchanged.
+  // PATCH bump from 3.23.0 — bug fix only, no new observable API changes.
   const pkg = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, "package.json"), "utf-8"));
-  assert.equal(pkg.version, "3.23.0", "package.json version must be 3.23.0");
+  assert.equal(pkg.version, "3.23.1", "package.json version must be 3.23.1");
   const idx = fs.readFileSync(path.join(REPO_ROOT, "index.ts"), "utf-8");
   assert.match(
     idx,
-    /name: "agent-governance-mcp", version: "3\.23\.0"/,
-    "index.ts Server() literal must read 3.23.0",
+    /name: "agent-governance-mcp", version: "3\.23\.1"/,
+    "index.ts Server() literal must read 3.23.1",
   );
 });
 
