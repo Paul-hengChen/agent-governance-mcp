@@ -12,6 +12,7 @@ candidate for a future `/teamwork` feature; none blocks a release on its own.
 | B2 | Always-on bundle headroom (2-token margin) | P1 | watermark-hide-model-tier (v3.23.0) | open |
 | B3 | Version-pin test refactor (recurring break) | P1 | watermark (v3.23.0) + drift (v3.23.1) | open |
 | B4 | Add `.nvmrc` + `engines` (Node version pin) | P1 | drift-archived-task-exclusion (v3.23.1) | **done (v3.23.1, Option Y)** |
+| B5 | release-engineer staging list omits source dirs | **P0** | v3.23.1 release (post-mortem) | open |
 
 ---
 
@@ -45,6 +46,22 @@ candidate for a future `/teamwork` feature; none blocks a release on its own.
 - **Owner:** qa-engineer (test file — Constitution §2).
 - **Risk if skipped:** Every release stalls on a spurious red test; easy to mistake for a
   real regression.
+
+## B5 — release-engineer staging list omits source directories (P0)
+- **What:** `content/skill-release-engineer.md` SOP step 7 + `templates/claude-code-agents/release-engineer.md`
+  enumerate the staging set as `lib/ content/ templates/ specs/ test/ qa_reports/ review_reports/`
+  + metadata. It **omits `tools/ schema/ guards/ prompts/ bin/`** — i.e. every source directory
+  except `lib/`. The post-commit sanity check only verifies `specs/<feature>.md`, so the gap is silent.
+- **Symptom (v3.23.1 post-mortem):** the drift fix lived in `tools/drift.ts`; the release commit shipped
+  the compiled `dist/tools/drift.js` (correct) but **not** the `tools/drift.ts` source. The tag therefore
+  has source lagging dist. npx consumers run `dist/` so they are unaffected, but the repo tree is
+  internally inconsistent. Required a backfill commit on `main` (tags are immutable — not retagged).
+- **Fix:** add `tools/ schema/ guards/ prompts/ bin/` to the SOP step-7 staging enumeration and the
+  template hint; extend `test/release-staging.test.mjs` to assert every top-level source dir in the repo
+  appears in the staged-paths list (so a new source dir can't silently fall out of releases).
+- **Owner:** /teamwork (edits governance SOP `content/skill-release-engineer.md` + template + test — pm→sr→reviewer→qa).
+- **Risk if skipped:** every feature touching `tools/`/`schema/`/`guards/`/`prompts/`/`bin/` ships with
+  source/dist divergence in its tag; future readers `git checkout`-ing a tag get stale source.
 
 ## B4 — No `.nvmrc` / `engines` → Node version drift
 - **What:** Repo has no `.nvmrc`, no `.node-version`, and no `engines` field in
