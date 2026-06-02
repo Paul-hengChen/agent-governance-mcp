@@ -16,6 +16,43 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.23.0] - 2026-06-02
+
+MINOR release introducing a two-format watermark regime. Previously every reply
+ended with `— @<role> (<tier>)`, which led users to read the visible `(<tier>)`
+as "the whole conversation ran on this model" — true only for Task-dispatched
+subagents whose model is pinned by agent frontmatter. Now the watermark format
+depends on execution context.
+
+### Changed
+
+- **`content/constitution.md` §1 Watermark** — replaced the single-format rule
+  with a two-format rule. **Subagent context** (running as a fresh
+  Task-dispatched subagent, model pinned by `~/.claude/agents/<role>.md`
+  frontmatter): end reply with `— @<role> (<tier>)`. **Non-subagent context**
+  (coordinator main loop, coordinator-lite, or a same-context `tw_switch_role`
+  switch): end reply with `— @<role>` (no model token). Added the load-bearing
+  self-detection rule for distinguishing the two contexts.
+- **`content/skill-coordinator.md`** — §Subagent Reply Watermark Validation now
+  states up front that validation applies only to Task-dispatched subagent
+  replies (which still emit the with-tier form), and that the coordinator's own
+  main-loop replies end with `— @coordinator` (no tier) and are excluded from
+  `validateWatermark` processing.
+- **`content/skill-coordinator-lite.md`** — clarified that coordinator-lite's
+  own replies end with `— @lite` (no tier); the subagent-relay cross-reference
+  is unchanged.
+
+### Unchanged (intentional)
+
+- **`lib/watermark-check.ts`** and **`test/watermark-check.test.mjs`** — the
+  `validateWatermark` signature, regex, and logic are untouched. It validates
+  subagent relays, which still emit `— @<role> (<tier>)`.
+- **`templates/claude-code-agents/*.md`** and **`test/subagent-templates.test.mjs`**
+  — subagent templates still emit the with-tier form; the `CRITICAL:` reminders
+  stay verbatim and the suite passes without modification.
+- **`schema/versions.ts`** — content/SOP-only change; no persisted-state schema
+  is touched.
+
 ## [3.22.1] - 2026-06-02
 
 PATCH release fixing the release-engineer SOP that produced two consecutive

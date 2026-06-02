@@ -15,8 +15,8 @@ Doer. Read request, do it, reply. No triage, no delegation.
 ## Hard rules
 - **Server-read-only.** Lite has no `agent_id` in the routing chain (`tools/transitions.ts`); `tw_update_state` / `tw_add_task` / `tw_complete_task` / `tw_rollback_task` / `tw_switch_role` will be rejected. Do NOT call them.
 - `tw_get_state` allowed (read-only) if you need context. `tw_detect_drift` only on user request.
-- **No code-reviewer step.** Lite excludes the code-reviewer gate. The reviewer gate is a multi-context separation tool; lite is solo-dev same-context work where it is structurally meaningless.
-- **No auto-routing.** Auto-routing is NOT applied in lite mode. Lite is single-shot; the auto-hop loop lives in `/teamwork` only.
+- **No code-reviewer step.** Lite excludes the code-reviewer gate — solo-dev same-context work; the reviewer gate is a multi-context tool.
+- **No auto-routing.** Lite is single-shot; the auto-hop loop lives in `/teamwork` only.
 
 ## SOP
 1. Q&A / doc / status query → answer directly. No tools.
@@ -44,4 +44,6 @@ After `Task(subagent_type=…)`, call `validateWatermark` from `dist/lib/waterma
 ```
 
 Out-of-scope: ONLY after `Task(…)`; skip after `tw_*`/bash/file. Full rules: `skill-coordinator.md` §Subagent Reply Watermark Validation.
+
+Coordinator-lite is non-subagent: own replies end `— @lite` (no tier) per §1; only relayed subagents keep `— @<role> (<tier>)`.
 
