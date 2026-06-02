@@ -13,6 +13,7 @@ candidate for a future `/teamwork` feature; none blocks a release on its own.
 | B3 | Version-pin test refactor (recurring break) | P1 | watermark (v3.23.0) + drift (v3.23.1) | **done (v3.24.0)** |
 | B4 | Add `.nvmrc` + `engines` (Node version pin) | P1 | drift-archived-task-exclusion (v3.23.1) | **done (v3.23.1, Option Y)** |
 | B5 | release-engineer staging list omits source dirs | **P0** | v3.23.1 release (post-mortem) | **done (v3.24.0)** |
+| B6 | Derive release-staging guard from `tsconfig.include` (root-cause) | P2 | v3.24.0 independent review (F2) | open |
 
 ---
 
@@ -46,6 +47,22 @@ candidate for a future `/teamwork` feature; none blocks a release on its own.
 - **Owner:** qa-engineer (test file — Constitution §2).
 - **Risk if skipped:** Every release stalls on a spurious red test; easy to mistake for a
   real regression.
+
+## B6 — Derive the release-staging guard from `tsconfig.include` (P2, deferred from v3.24.0)
+- **What:** The AC-B5.5 guard test in `test/release-staging.test.mjs` detects source dirs by scanning
+  for `.ts/.mjs` files and subtracting a hand-maintained `EXCLUDED_DIRS` set. The authoritative list of
+  TS source roots already exists: `tsconfig.json` `include` (`tools, guards, prompts, schema, transport, lib`).
+- **Why it matters:** the hand-maintained `EXCLUDED_DIRS` is exactly what let `transport/` slip through in
+  v3.24.0 (it was wrongly placed in the exclusion set, masking the staging gap until the independent review).
+  The guard works today for all known dirs, but a future new source dir wrongly added to `EXCLUDED_DIRS`
+  could drift again — same failure class.
+- **Fix:** have the guard parse `tsconfig.json` `include`, map each glob to its top-level dir, and assert
+  every one appears in `FEATURE_DIRS` (+ the staging enumeration). Removes the hand-maintained exclusion list
+  as a drift source. Recorded in `specs/backlog-batch-v3.24.0.md` Dependencies as "deferred — out of scope
+  for the T479 patch; the remove-from-EXCLUDED + add-to-FEATURE_DIRS patch is sufficient for MVP correctness."
+- **Owner:** /teamwork (qa-engineer owns the test; sr-engineer if a shared helper is extracted).
+- **Risk if skipped:** low/latent — current guard is correct for known dirs; this is future-proofing against
+  the next hand-maintained-list drift.
 
 ## B5 — release-engineer staging list omits source directories (P0)
 - **What:** `content/skill-release-engineer.md` SOP step 7 + `templates/claude-code-agents/release-engineer.md`
