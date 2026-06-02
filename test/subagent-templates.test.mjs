@@ -1,7 +1,8 @@
 // Coded by @qa-engineer
 // Tests for v3.20.0+ Claude Code subagent dispatch (specs/subagent-dispatch.md),
 // v3.21.0 short-name + teamwork-template additions (specs/subagent-short-names.md),
-// and v3.21.1 watermark reminder (specs/subagent-watermark-reminder.md).
+// v3.21.1 watermark reminder (specs/subagent-watermark-reminder.md),
+// and v3.21.2 haiku watermark compliance (specs/subagent-watermark-haiku-compliance.md).
 // Locks the tier-consistency contract between templates/claude-code-agents/
 // and content/skill-*.md so a future tier change in one MUST be reflected in
 // the other. v3.21.0 reverses v3.20.0 AC2 (coordinator template now SHIPS as
@@ -281,17 +282,102 @@ test("v3.21.1 AC3: adding watermark line did not mutate any template frontmatter
 });
 
 // ---------------------------------------------------------------------------
+// v3.21.2 AC1: CRITICAL: must be the FIRST non-blank body line in every template
+// ---------------------------------------------------------------------------
+
+test("v3.21.2 AC1: every template body's FIRST non-blank line is the CRITICAL: watermark reminder", () => {
+  // Contract: haiku models attend strongly to top-of-context content.
+  // The watermark instruction MUST be the first thing a subagent reads after
+  // the frontmatter fence — not buried after SOP prose — so it cannot be
+  // deferred or skipped regardless of reply length.
+  for (const role of EXPECTED_ROLES) {
+    const raw = readTemplateRaw(role);
+    const nameMatch = raw.match(/^name:\s*(\S+)/m);
+    const modelMatch = raw.match(/^model:\s*(\S+)/m);
+    assert.ok(nameMatch, `${role}.md: name: not found`);
+    assert.ok(modelMatch, `${role}.md: model: not found`);
+    const name = nameMatch[1];
+    const tier = modelMatch[1];
+    // Strip frontmatter (everything up to and including the closing --- fence).
+    const body = raw.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, "");
+    // First non-blank line of the body must be the CRITICAL: reminder verbatim.
+    const firstNonBlank = body.split(/\r?\n/).find((l) => l.trim().length > 0);
+    const expected = `CRITICAL: End every reply with \`— @${name} (${tier})\` per Constitution §1 (watermark).`;
+    assert.equal(
+      firstNonBlank,
+      expected,
+      `${role}.md: first non-blank body line must be the CRITICAL: reminder. Got: "${firstNonBlank}"`,
+    );
+  }
+});
+
+// ---------------------------------------------------------------------------
+// v3.21.2 AC2: haiku templates must contain an example reply suffix block
+// ---------------------------------------------------------------------------
+
+const HAIKU_ROLES = ["lite", "doc-writer", "release-engineer"];
+
+test("v3.21.2 AC2: haiku templates each contain an example reply suffix line preceded by a blank line", () => {
+  // Contract: a one-shot output-shape example is required for haiku-tier templates
+  // because haiku models show compliance gaps on short replies without it.
+  // The example must appear AFTER the main SOP body (at file end) and must be
+  // preceded by a blank line so it reads as a distinct block, not inline prose.
+  for (const role of HAIKU_ROLES) {
+    const raw = readTemplateRaw(role);
+    const nameMatch = raw.match(/^name:\s*(\S+)/m);
+    assert.ok(nameMatch, `${role}.md: name: not found`);
+    const name = nameMatch[1];
+    const exampleLine = `Example reply suffix: … — @${name} (haiku)`;
+    // The exact example line must be present.
+    assert.ok(
+      raw.includes(exampleLine),
+      `${role}.md: missing example reply suffix line. Expected: "${exampleLine}"`,
+    );
+    // The line preceding the example must be blank (empty or whitespace-only)
+    // so it forms a visually distinct block — this is load-bearing for the
+    // output-shape grounding contract.
+    const lines = raw.split(/\r?\n/);
+    const exampleIdx = lines.findIndex((l) => l === exampleLine);
+    assert.ok(exampleIdx > 0, `${role}.md: example line must not be the first line`);
+    const prevLine = lines[exampleIdx - 1];
+    assert.equal(
+      prevLine.trim(),
+      "",
+      `${role}.md: line before "${exampleLine}" must be blank. Got: "${prevLine}"`,
+    );
+  }
+});
+
+test("v3.21.2 AC2: non-haiku templates do NOT contain an example reply suffix line", () => {
+  // Contract: the example-reply addition is haiku-only (spec §Out of Scope).
+  // Non-haiku templates must not drift toward adding the example block.
+  const nonHaikuRoles = EXPECTED_ROLES.filter((r) => !HAIKU_ROLES.includes(r));
+  for (const role of nonHaikuRoles) {
+    const raw = readTemplateRaw(role);
+    assert.ok(
+      !raw.includes("Example reply suffix:"),
+      `${role}.md: non-haiku template must NOT contain an "Example reply suffix:" line`,
+    );
+  }
+});
+
+// ---------------------------------------------------------------------------
 // Version checks
 // ---------------------------------------------------------------------------
 
-test("v3.21.1 AC4: package.json + index.ts both at 3.21.1", () => {
+test("v3.22.0 AC8: package.json + index.ts both at 3.22.0", () => {
+  // v3.22.0 ships subagent watermark parent-validation
+  // (specs/subagent-watermark-parent-validation.md): coordinator + coordinator-lite
+  // both carry the new ## Subagent Reply Watermark Validation section, and
+  // lib/watermark-check.ts provides the validateWatermark() pure util.
+  // MINOR bump from 3.21.2 — new observable SOP behavior, no breaking changes.
   const pkg = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, "package.json"), "utf-8"));
-  assert.equal(pkg.version, "3.21.1", "package.json version must be 3.21.1");
+  assert.equal(pkg.version, "3.22.0", "package.json version must be 3.22.0");
   const idx = fs.readFileSync(path.join(REPO_ROOT, "index.ts"), "utf-8");
   assert.match(
     idx,
-    /name: "agent-governance-mcp", version: "3\.21\.1"/,
-    "index.ts Server() literal must read 3.21.1",
+    /name: "agent-governance-mcp", version: "3\.22\.0"/,
+    "index.ts Server() literal must read 3.22.0",
   );
 });
 

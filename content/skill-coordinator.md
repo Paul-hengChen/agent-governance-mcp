@@ -93,6 +93,30 @@ After each role's handoff, read the just-written `pending_notes`. If a `next_rol
 
 **Hop counter scope**: in-memory only, for the lifetime of one `/teamwork` invocation. Do NOT persist to `handoff.md` or any tool argument.
 
+## Subagent Reply Watermark Validation
+
+When the parent (this coordinator) dispatches a role via `Task(subagent_type="<role>", …)` and receives back a reply, the parent MUST verify the watermark before relaying the reply to the user. Haiku-tier subagents (`@lite`, `@doc-writer`, `@release-engineer`) sometimes omit the `— @<name> (<tier>)` suffix mandated by Constitution §1 even with `CRITICAL:` template reminders; this step closes that gap at the layer that has guaranteed execution.
+
+**Detection regex** — applied to the last non-empty line of the subagent reply, after stripping leading/trailing whitespace from that line:
+
+```
+/^—\s@[\w-]+\s\([\w-]+\)$/i
+```
+
+The leading character MUST be U+2014 (EM DASH, `—`), not a hyphen-minus or en-dash. The `<name>` and `<tier>` captured tokens MUST also match the dispatched subagent's `name` frontmatter and `model` frontmatter (case-insensitive). A mismatched name (e.g. reply ends `— @wrong-name (haiku)` while dispatched as `@lite`) is treated as absent.
+
+**Correction strategy** — when the watermark is absent or mismatched, append the canonical suffix `\n— @<name> (<tier>)` to the relayed text. Do NOT re-dispatch (doubles cost, risks loops) and do NOT add a visible warning (operator wants the suffix, not a debugging trace). Cost is one string concatenation per miss.
+
+**Implementation** — call the pure util `validateWatermark(reply, name, tier)` exported from `lib/watermark-check.ts` (compiled to `dist/lib/watermark-check.js`). It returns `{ present: boolean, corrected: string }`; relay the `corrected` value, not the raw reply.
+
+**Out-of-scope guard** — apply this validation ONLY when the parent's current reply is a relay of a just-completed `Task(subagent_type=…)` tool result containing subagent text. Do NOT apply when:
+
+- the prior tool call was `tw_get_state`, `tw_detect_drift`, or any other `tw_*` tool;
+- the prior tool call was a bash command, file read, or any non-Task tool;
+- the coordinator is composing its own independent analysis or answer without having just received a subagent reply.
+
+Stamping the coordinator's own thoughts with `— @lite (haiku)` would be semantically wrong; the guard prevents that.
+
 ## SOP
 
 1. **Auto-routing pre-check**: read `AGC_AUTO_ROUTE` from the shell environment (e.g. `printenv AGC_AUTO_ROUTE`). Value exactly `0` → `auto_mode = off` for this session. Unset or any other value → `auto_mode = on` (default).

@@ -45,13 +45,18 @@ test("AC2: stripChainOnly removes the chain-only block and is idempotent", () =>
   assert.equal(stripChainOnly("no markers here"), "no markers here", "text without markers is unchanged");
 });
 
-test("AC2: lean always-on bundle is below the raw baseline and within target (<= 2000 ~tok)", () => {
+test("AC2: lean always-on bundle is below the raw baseline and within target (<= 2100 ~tok)", () => {
+  // v3.22.0 Decision 7: cap raised from 2000 → 2100 to accommodate the new
+  // ## Subagent Reply Watermark Validation section (~84 tokens) added to
+  // skill-coordinator-lite.md. The pre-v3.22 lean bundle sat at 1996/2000;
+  // after the watermark section it reached 2080. 2100 is a +5% relaxation
+  // still well below the full coordinator bundle (~3500+ tokens).
   const liteSkill = fs.readFileSync(path.join(ROOT, "content", "skill-coordinator-lite.md"), "utf-8");
   const SEP = "\n\n---\n\n";
   const raw = approxTokens(CONSTITUTION + SEP + liteSkill);
   const lean = approxTokens(stripChainOnly(CONSTITUTION) + SEP + liteSkill);
   assert.ok(lean < raw, `lean (${lean}) must be < raw (${raw})`);
-  assert.ok(lean <= 2000, `lean always-on (${lean} ~tok) must meet the <= 2000 target`);
+  assert.ok(lean <= 2100, `lean always-on (${lean} ~tok) must meet the <= 2100 target`);
 });
 
 // --- AC3: enforcement preserved ------------------------------------------

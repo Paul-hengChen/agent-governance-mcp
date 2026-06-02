@@ -35,3 +35,13 @@ Affirmative lite case:
 
 - **"Fix a typo in README.md"** → single file, no logic, no tests → **lite**.
 
+## Subagent Reply Watermark Validation
+
+After `Task(subagent_type=…)`, call `validateWatermark` from `dist/lib/watermark-check.js`; relay `corrected`. Regex:
+
+```
+/^—\s@[\w-]+\s\([\w-]+\)$/i
+```
+
+Out-of-scope: ONLY after `Task(…)`; skip after `tw_*`/bash/file. Full rules: `skill-coordinator.md` §Subagent Reply Watermark Validation.
+
