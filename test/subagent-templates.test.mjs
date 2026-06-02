@@ -365,19 +365,20 @@ test("v3.21.2 AC2: non-haiku templates do NOT contain an example reply suffix li
 // Version checks
 // ---------------------------------------------------------------------------
 
-test("v3.22.0 AC8: package.json + index.ts both at 3.22.0", () => {
-  // v3.22.0 ships subagent watermark parent-validation
-  // (specs/subagent-watermark-parent-validation.md): coordinator + coordinator-lite
-  // both carry the new ## Subagent Reply Watermark Validation section, and
-  // lib/watermark-check.ts provides the validateWatermark() pure util.
-  // MINOR bump from 3.21.2 — new observable SOP behavior, no breaking changes.
+test("v3.22.1 AC9: package.json + index.ts both at 3.22.1", () => {
+  // v3.22.1 ships the release-engineer-complete-staging SOP fix
+  // (specs/release-engineer-complete-staging.md): content/skill-release-engineer.md
+  // gains explicit directory enumeration (AC1), pre-commit verify step (AC2),
+  // inverted failure-mode wording (AC3), and post-commit spec-file sanity check (AC4).
+  // templates/claude-code-agents/release-engineer.md gains a <=2-sentence haiku hint (AC5).
+  // PATCH bump from 3.22.0 — prompt-only SOP fix, no API surface changes.
   const pkg = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, "package.json"), "utf-8"));
-  assert.equal(pkg.version, "3.22.0", "package.json version must be 3.22.0");
+  assert.equal(pkg.version, "3.22.1", "package.json version must be 3.22.1");
   const idx = fs.readFileSync(path.join(REPO_ROOT, "index.ts"), "utf-8");
   assert.match(
     idx,
-    /name: "agent-governance-mcp", version: "3\.22\.0"/,
-    "index.ts Server() literal must read 3.22.0",
+    /name: "agent-governance-mcp", version: "3\.22\.1"/,
+    "index.ts Server() literal must read 3.22.1",
   );
 });
 

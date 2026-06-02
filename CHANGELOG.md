@@ -16,6 +16,52 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.22.1] - 2026-06-02
+
+PATCH release fixing the release-engineer SOP that produced two consecutive
+incomplete release commits (v3.21.2 `a14b15f` and v3.22.0 `f5a0b4d`). Both
+staged only version-bump metadata and silently omitted feature source files,
+requiring backfill commit `6aaa042` to repair v3.22.0. Root cause: the SOP's
+ambiguous `git add <touched files including dist/>` instruction read at
+haiku-tier as "files I edited this turn" (just the metadata), and the
+"release-artifact whitelist" failure-mode wording implicitly taught that
+staging source dirs was abnormal — the exact opposite of correct behavior.
+
+### Changed
+
+- **`content/skill-release-engineer.md`** — SOP step 7 rewritten. The `git add`
+  instruction now enumerates explicit directories (`lib/ content/ templates/
+  specs/ test/ qa_reports/ review_reports/ tsconfig.json`) plus metadata
+  files (`package.json index.ts CHANGELOG.md README.md dist/`) instead of the
+  vague "touched files" phrase. Added pre-commit verification step
+  (`git diff --cached --stat`) that cross-references against
+  `git status --short` to catch metadata-only staging when source dirs have
+  pending edits. Added post-commit sanity check
+  (`git diff HEAD~1 --name-only`) requiring `specs/<active_feature>.md` to
+  appear in the commit — if absent, STOP with a specific recommend-backfill
+  error string.
+- **`content/skill-release-engineer.md`** — Failure modes section reworded.
+  The old "release-artifact whitelist" framing implied feature source dirs
+  were OUTSIDE the acceptable staging set. The new wording inverts the
+  framing: feature source dirs (`lib/`, `content/`, `templates/`, `specs/`,
+  `test/`, `qa_reports/`, `review_reports/`) are EXPECTED in every release
+  commit and never trigger STOP. Only UNRELATED uncommitted paths (editor
+  swap files, `.DS_Store`, `.env*`, secrets, scratch dirs, unrelated source
+  edits) trigger the stop condition.
+- **`templates/claude-code-agents/release-engineer.md`** — Added a 2-sentence
+  reinforcement hint to the subagent shim body, naming the explicit staging
+  directories and the pre-commit verify step. Reinforces dual-anchoring for
+  haiku-tier without altering the watermark line or the `tw_get_state` /
+  `tw_switch_role` invocation lines.
+
+### Notes
+
+- Pure prompt/SOP fix — no code, schema, transitions, or MCP tool changes.
+- `ALLOWED_TRANSITIONS` matrix unchanged.
+- Backwards compatible — existing release commits and tags untouched.
+- The v3.22.0 backfill commit `6aaa042` already repaired the prior incomplete
+  release; this v3.22.1 ships only the SOP fix that prevents recurrence.
+
 ## [3.22.0] - 2026-06-02
 
 MINOR release adding parent-level watermark post-validation to the
