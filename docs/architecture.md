@@ -115,6 +115,102 @@ Auto-routing in full mode: after each role's handoff, the coordinator self-calls
 
 ---
 
+## Entry points & model routing
+
+Two **independent** axes decide (a) who runs the coordinator and (b) whether each role hop switches model. Don't conflate them — slash-vs-`@` is *not* the same as single-model-vs-routing.
+
+```
+                          entry point (two commands)
+                                │
+        ┌───────────────────────┴───────────────────────┐
+        │                                                 │
+   /teamwork (slash)                              @teamwork (mention)
+   MCP prompt loaded                              spawn subagent
+        │                                                 │
+        ▼                                                 ▼
+ ┌──────────────────┐                          ┌──────────────────────┐
+ │ COORDINATOR brain │                          │ COORDINATOR brain     │
+ │ = your session    │                          │ = Sonnet subagent     │
+ │   model (e.g Opus)│                          │   (pinned sonnet)     │
+ │ same context      │                          │ fresh, isolated ctx   │
+ │ — @teamwork       │                          │ — @teamwork (sonnet)  │
+ └────────┬─────────┘                           └──────────┬───────────┘
+          │                                                │
+          └──────────────────┬─────────────────────────────┘
+                             │
+                  downstream is identical ↓
+                             │
+              tw_get_state → tw_detect_drift
+                             │
+                    coordinator SOP triage
+                             │
+                  on each role hop, pick one:
+                             │
+            ┌────────────────┴─────────────────┐
+            │                                   │
+   ① Task dispatch (preferred)        ② tw_switch_role (fallback)
+   host advertises Task tool          host has no Task tool
+            │                                   │
+   role spawned as subagent           role switched in same ctx
+   each tier-pinned model             no model switch
+   pm(sonnet) architect(opus)         one model runs the chain
+   sr-engineer(opus) qa(sonnet)…
+            │                                   │
+   ← this is "model-routing"          ← this is "single model"
+            │                                   │
+            └────────────────┬─────────────────┘
+                             │
+              same ALLOWED_TRANSITIONS chain throughout
+              (tools/transitions.ts, server-enforced)
+                             │
+                          PASS / done
+```
+
+### Axis 1 — entry point (who is the coordinator)
+
+| Start | Coordinator runs on | Context | Watermark |
+|---|---|---|---|
+| `/teamwork` (slash → MCP prompt) | your current session model (e.g. Opus) | same context, inline | `— @teamwork` |
+| `@teamwork` (subagent mention) | pinned Sonnet (`templates/claude-code-agents/teamwork.md` → `model: sonnet`) | fresh, isolated — you get only the final reply | `— @teamwork (sonnet)` |
+| `/teamwork-lite` / `@lite` | session model / pinned Haiku | lite — single-shot, no chain, server-read-only | `— @lite` / `— @lite (haiku)` |
+
+Both `/teamwork` and `@teamwork` then run the **same** coordinator SOP, the same `tw_get_state → tw_detect_drift` pre-flight, and the same `ALLOWED_TRANSITIONS` chain. The only difference is which model hosts the coordinator brain and whether it shares your context.
+
+### Axis 2 — role-hop dispatch (does the model switch)
+
+When the coordinator hands off to the next role it picks one of two mechanisms — auto-selected, not configured:
+
+1. **Task subagent dispatch** (preferred) — `Task(subagent_type="<role>")` spawns the role in a fresh context on **its own tier-pinned model** (`~/.claude/agents/<role>.md` frontmatter). This *is* "auto model-routing": pm on Sonnet, sr-engineer on Opus, etc.
+2. **`tw_switch_role` fallback** — same context, **no model switch**; one model runs the whole chain.
+
+> `skill-coordinator.md`: *Task-tool dispatch changes WHICH MODEL runs the role, NOT the routing chain itself.*
+
+Because the axes are orthogonal, `/teamwork` **also** does model-routing when Task dispatch is available — the single-model path is specifically the `tw_switch_role` fallback, independent of how you started.
+
+**Detection is runtime trial-and-fallback, not a hardcoded client list.** The coordinator attempts the Task dispatch once; on tool-error or unknown-subagent-type it falls back to `tw_switch_role`. So model-routing happens iff **both** hold:
+
+- the host advertises a `Task` tool — Claude Code does; Cursor / Continue / Anti-Gravity / plain MCP clients currently do not — **and**
+- the `<role>` subagent is registered (templates copied to `~/.claude/agents/`).
+
+Miss either and the chain degrades gracefully to single-model `tw_switch_role`; behavior is otherwise identical. A client that later adds a subagent mechanism gets model-routing for free — no code change here.
+
+### Registering the role subagents (enables model-routing)
+
+```bash
+mkdir -p ~/.claude/agents
+cp -r path/to/agent-governance-mcp/templates/claude-code-agents/*.md ~/.claude/agents/
+```
+
+12 templates ship pre-pinned (v3.20.0+). After install:
+
+- **`@teamwork <task>`** — Sonnet coordinator in a fresh context; dispatches each downstream role at its own tier.
+- **`@lite <task>`** — Haiku solo-doer for single-file / doc / Q&A work.
+- **`@pm` / `@sr-engineer` / `@qa-engineer` / `@code-reviewer` / …** — invoke one role directly, each at its tier.
+
+Each template carries only `name` + `model` + `description` frontmatter; the SOP body loads at runtime (`tw_switch_role` / Read), so **re-copy after upgrading templates**. Full design: [specs/subagent-dispatch.md](../specs/subagent-dispatch.md), [specs/subagent-short-names.md](../specs/subagent-short-names.md). README quick-start: *Per-Role Model Routing* → *Claude Code subagent install*.
+
+---
+
 ## Three round counters
 
 | Counter | FAIL cap | Increments on | Resets on | Round-cap collapse target |

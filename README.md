@@ -137,6 +137,8 @@ What changes after install:
 
 **Upgrade note for v3.20.0 users**: If you previously installed v3.20.0 templates, run `rm ~/.claude/agents/coordinator-lite.md` then re-copy from `templates/claude-code-agents/`. Your existing `coordinator-lite.md` install will keep working (Claude Code reads the `name:` field) — but `@lite` will not resolve until you re-copy.
 
+For the conceptual model — the two orthogonal axes (slash `/teamwork` vs `@teamwork` entry point ⊥ Task-dispatch vs `tw_switch_role`), and why `/teamwork` also model-routes when a host advertises a `Task` tool — see [docs/architecture.md → Entry points & model routing](docs/architecture.md#entry-points--model-routing).
+
 See [specs/subagent-dispatch.md](specs/subagent-dispatch.md) + [specs/subagent-short-names.md](specs/subagent-short-names.md) + [research/multi-agent-auto-model-routing-directions.md](research/multi-agent-auto-model-routing-directions.md) for the full design + roadmap.
 
 ---
