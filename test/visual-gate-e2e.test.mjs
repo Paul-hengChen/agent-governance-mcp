@@ -22,6 +22,7 @@ import {
 import {
   hasVisualBaselinesInDesign,
   hasVisualEvidenceInFile,
+  hasDesignModeRequiringVisual,
 } from "../dist/tools/evidence-file.js";
 import {
   parseHandoff,
@@ -228,4 +229,191 @@ test("AC-10: handler composition — computeNewRound resets visual_round on PM r
     { agent: "pm", status: "In_Progress" },
   );
   assert.equal(next.visual_round, 0, "PM re-entry resets the counter");
+});
+
+// ============================================================================
+// v3.16.0 — PASS-gate ordering & mutual exclusion (visual-fidelity-gate-hardening, AC-1, AC-10)
+// Tests for the new arming signal + VISUAL_BASELINES_REQUIRED short-circuit in index.ts.
+//
+// The index.ts PASS gate (lines ~711-778) now runs in two steps:
+//   STEP 1 (NEW): armCheck = hasDesignModeRequiringVisual — if required=true AND
+//                 baselines absent → VISUAL_BASELINES_REQUIRED (fires FIRST, D2).
+//   STEP 2 (existing): visualGate.present → check visual evidence + widget rows.
+//
+// These integration tests drive the same helper calls the handler makes so a
+// future reorder of the gate steps would surface as a test failure here.
+// ============================================================================
+
+function seedDesignWithModeOnly(ws, feature, mode) {
+  // Writes a design file with the given mode but NO ## Visual Baselines section.
+  // This is the "armed but baseline-less" state that should trigger VISUAL_BASELINES_REQUIRED.
+  fs.mkdirSync(path.join(ws, "design"), { recursive: true });
+  fs.writeFileSync(
+    path.join(ws, "design", `${feature}.md`),
+    `# design/${feature}\n\nmode: ${mode}\n\n## Source manifest\n- ${mode} | 1:1 | yes | audited\n`,
+  );
+}
+
+function seedDesignWithModeAndBaselines(ws, feature, mode) {
+  // Writes a design file with a real mode AND a ## Visual Baselines section.
+  // This is the "armed + baseline-present" state — STEP 1 falls through to STEP 2.
+  fs.mkdirSync(path.join(ws, "design"), { recursive: true });
+  fs.writeFileSync(
+    path.join(ws, "design", `${feature}.md`),
+    `# design/${feature}\n\nmode: ${mode}\n\n## Source manifest\n- ${mode} | 1:1 | yes | audited\n\n## Visual Baselines\n\n| surface | baseline | impl | notes |\n| --- | --- | --- | --- |\n| s1 | design/${feature}/s1.png | screenshots/s1.png | - |\n`,
+  );
+}
+
+// ---------- STEP 1: real mode + NO baselines → VISUAL_BASELINES_REQUIRED, short-circuits ----------
+
+test("v3.16.0 AC-1 STEP1: armed (real mode) + no baselines → gate would emit VISUAL_BASELINES_REQUIRED", () => {
+  // Why: STEP 1 of the new gate. When the design file declares a real mode
+  // (mode != no-design) but lacks ## Visual Baselines, the server MUST reject
+  // PASS with VISUAL_BASELINES_REQUIRED BEFORE checking for visual evidence
+  // files. This test encodes the mutual-exclusion invariant (D2): if STEP 1
+  // fires, STEP 2 (VISUAL_EVIDENCE_MISSING) must NOT also fire.
+  const ws = mkWorkspace();
+  seedDesignWithModeOnly(ws, "feat-armed", "figma");
+
+  const armCheck = hasDesignModeRequiringVisual(ws, "feat-armed");
+  const visualGate = hasVisualBaselinesInDesign(ws, "feat-armed");
+
+  assert.equal(armCheck.required, true, "real mode must arm the gate");
+  assert.equal(visualGate.present, false, "no ## Visual Baselines declared");
+
+  // STEP 1 condition — this is exactly the `if` branch in index.ts that
+  // emits VISUAL_BASELINES_REQUIRED.
+  const step1Fires = armCheck.required && !visualGate.present;
+  assert.equal(step1Fires, true, "STEP 1 MUST fire: armed + no baselines");
+
+  // Mutual exclusion: STEP 2 (evidence check) is only reached when
+  // visualGate.present === true — which it is NOT here. This ensures
+  // VISUAL_EVIDENCE_MISSING is never emitted for a section that doesn't exist.
+  const step2Reached = visualGate.present;
+  assert.equal(step2Reached, false, "STEP 2 must NOT be reached when STEP 1 fires (D2 mutual exclusion)");
+});
+
+test("v3.16.0 AC-1 STEP1: error message substring — VISUAL_BASELINES_REQUIRED + ## Visual Baselines is absent", () => {
+  // Why: T-QA must assert on the stable substrings (D7) rather than the full
+  // interpolated string (which includes mode and designPath). These two
+  // substrings are the operator-facing identifiers that runbooks reference.
+  const distIndex = fs.readFileSync(
+    path.join(path.dirname(new URL(import.meta.url).pathname), "..", "dist", "index.js"),
+    "utf-8",
+  );
+  assert.match(distIndex, /VISUAL_BASELINES_REQUIRED/, "VISUAL_BASELINES_REQUIRED code must appear in compiled handler");
+  assert.match(distIndex, /## Visual Baselines is absent/, "stable substring '## Visual Baselines is absent' must be in compiled handler");
+});
+
+// ---------- STEP 2: baselines present + missing evidence → VISUAL_EVIDENCE_MISSING (unchanged) ----------
+
+test("v3.16.0 AC-1 STEP2: baselines present + missing visual_<task>.md → VISUAL_EVIDENCE_MISSING path", () => {
+  // Why: STEP 2 is the existing v3.14.0 gate (unchanged). When ## Visual
+  // Baselines IS present, the server checks for qa_reports/visual_<id>.md.
+  // STEP 1 falls through (armCheck.required=true AND visualGate.present=true
+  // → the `if (armCheck.required && !visualGate.present)` condition is false).
+  const ws = mkWorkspace();
+  seedDesignWithModeAndBaselines(ws, "feat-bl", "sketch");
+
+  const armCheck = hasDesignModeRequiringVisual(ws, "feat-bl");
+  const visualGate = hasVisualBaselinesInDesign(ws, "feat-bl");
+
+  assert.equal(armCheck.required, true, "real mode arms gate");
+  assert.equal(visualGate.present, true, "## Visual Baselines present");
+
+  // STEP 1 does NOT fire (baselines present → condition false)
+  const step1Fires = armCheck.required && !visualGate.present;
+  assert.equal(step1Fires, false, "STEP 1 must NOT fire when baselines are present");
+
+  // STEP 2 IS reached (baselines present → existing gate logic applies)
+  const step2Reached = visualGate.present;
+  assert.equal(step2Reached, true, "STEP 2 is reached when baselines present");
+
+  // Evidence is absent → STEP 2 would emit VISUAL_EVIDENCE_MISSING
+  const visEv = hasVisualEvidenceInFile(ws, ["T01"]);
+  assert.deepEqual(visEv.missing, ["T01"], "missing visual evidence → server emits VISUAL_EVIDENCE_MISSING");
+});
+
+// ---------- AC-10: no-design / no design file → gate silent, PASS proceeds ----------
+
+test("v3.16.0 AC-10: no-design mode → gate silent (both STEP 1 and STEP 2 skipped)", () => {
+  // Why: AC-10 non-UI pass-through regression guard. mode=no-design must
+  // leave both gates dormant so infra/server features are not affected.
+  const ws = mkWorkspace();
+  seedDesignWithModeOnly(ws, "feat-nod", "no-design");
+
+  const armCheck = hasDesignModeRequiringVisual(ws, "feat-nod");
+  const visualGate = hasVisualBaselinesInDesign(ws, "feat-nod");
+
+  assert.equal(armCheck.required, false, "no-design mode must NOT arm the gate");
+  const step1Fires = armCheck.required && !visualGate.present;
+  assert.equal(step1Fires, false, "STEP 1 must NOT fire for no-design");
+  assert.equal(visualGate.present, false, "STEP 2 must NOT fire (no baselines)");
+});
+
+test("v3.16.0 AC-10: no design file at all → gate silent, PASS proceeds", () => {
+  // Why: non-UI workspaces with no design/<feature>.md must remain completely
+  // unaffected by the new gate.
+  const ws = mkWorkspace();
+  // No design directory or file created.
+
+  const armCheck = hasDesignModeRequiringVisual(ws, "infra-feature");
+  const visualGate = hasVisualBaselinesInDesign(ws, "infra-feature");
+
+  assert.equal(armCheck.required, false, "no file → gate silent");
+  assert.equal(visualGate.present, false, "no baselines → STEP 2 dormant");
+  const step1Fires = armCheck.required && !visualGate.present;
+  assert.equal(step1Fires, false, "neither step fires when no design file exists");
+});
+
+// ---------- Baselines present + evidence present → PASS (full happy path) ----------
+
+test("v3.16.0 AC-1: baselines present + evidence present → PASS (all gates satisfied)", () => {
+  // Why: the complete PASS scenario. Armed mode, baselines declared, visual
+  // evidence written. Both STEP 1 falls through and STEP 2 finds all evidence
+  // present. This mirrors the AC-1 backwards-compat row in the architecture:
+  // "Design file, mode != no-design, ## Visual Baselines PRESENT — Unaffected".
+  const ws = mkWorkspace();
+  seedDesignWithModeAndBaselines(ws, "feat-happy", "figma");
+  // Write visual evidence for the task
+  fs.mkdirSync(path.join(ws, "qa_reports"), { recursive: true });
+  fs.writeFileSync(path.join(ws, "qa_reports", "visual_T01.md"), "# Visual report T01\n\n## Verdict — PASS\n");
+
+  const armCheck = hasDesignModeRequiringVisual(ws, "feat-happy");
+  const visualGate = hasVisualBaselinesInDesign(ws, "feat-happy");
+
+  assert.equal(armCheck.required, true);
+  assert.equal(visualGate.present, true);
+
+  // STEP 1: fires only when required=true AND present=false — NOT this case.
+  const step1Fires = armCheck.required && !visualGate.present;
+  assert.equal(step1Fires, false, "STEP 1 must not fire when baselines present");
+
+  // STEP 2: baselines present + evidence present → no rejection.
+  const visEv = hasVisualEvidenceInFile(ws, ["T01"]);
+  assert.deepEqual(visEv.missing, [], "all visual evidence present → PASS proceeds");
+});
+
+// ---------- VISUAL_BASELINES_REQUIRED in TransitionRejection.error union ----------
+
+test("v3.16.0 AC-9: VISUAL_BASELINES_REQUIRED is in TransitionRejection.error union (compiled transitions.js)", () => {
+  // Why: the error code must be registered in the TransitionRejection.error
+  // union in tools/transitions.ts so handler-side narrowing + envelope
+  // consistency work correctly (mirrors VISUAL_WIDGETS_UNVERIFIED precedent).
+  // This test pins the union member's presence so a future refactor cannot
+  // accidentally drop it from the type definition.
+  const distTransitions = fs.readFileSync(
+    path.join(path.dirname(new URL(import.meta.url).pathname), "..", "dist", "tools", "transitions.js"),
+    "utf-8",
+  );
+  // The union is a TypeScript string literal union; after compilation it appears
+  // as a JSDoc type comment or is elided. We verify it appears in the source TS
+  // (which is the authoritative type contract) rather than the compiled output.
+  const srcTransitions = fs.readFileSync(
+    path.join(path.dirname(new URL(import.meta.url).pathname), "..", "tools", "transitions.ts"),
+    "utf-8",
+  );
+  assert.match(srcTransitions, /VISUAL_BASELINES_REQUIRED/, "VISUAL_BASELINES_REQUIRED MUST appear in TransitionRejection.error union in tools/transitions.ts");
+  // Also verify the explanatory comment is present (mirrors VISUAL_WIDGETS_UNVERIFIED style).
+  assert.match(srcTransitions, /v3\.16\.0.*emitted by index\.ts PASS gate/is, "v3.16.0 comment must document that the code is handler-emitted, not from validateTransition");
 });

@@ -16,6 +16,27 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.25.0] - 2026-06-05
+
+MINOR release delivering visual-fidelity gate hardening: server-enforced baselines validation for design-backed features, mandatory canvas/layout auditing, and geometry assertions at sr-engineer screen-1 gate.
+
+### Added (Visual Fidelity Gate Hardening)
+
+- **Server enforcement** — new helper `hasDesignModeRequiringVisual()` in `tools/evidence-file.ts` reads `## Mode` from design files; when mode ≠ `no-design`, the PASS gate now requires `## Visual Baselines` section and emits a new error code `VISUAL_BASELINES_REQUIRED` if absent. Non-UI features with mode `no-design` or no design file continue to pass silently.
+- **Helper function** — `parseDesignMode()` in `tools/evidence-file.ts` extracts and validates `## Mode` from design files; used to arm the visual gate.
+- **Auditor template** — `content/skill-design-auditor.md` now mandates `## Layout / Canvas` section (captures root canvas type, dimensions, responsive behavior); clarified that `## Visual Baselines` absence only skips silently when `mode = no-design`, all other cases block at server PASS.
+- **PM spec schema** — `content/skill-pm.md` Dependencies / Prerequisites bullet now instructs copying `## Layout / Canvas` decision (fixed vs. responsive, dimensions) verbatim from design doc to spec.
+- **sr-engineer geometry assertion** — `content/skill-sr-engineer.md` step 3a adds Screen-1 Geometry Assertion (reads CSS/style literals, no headless renderer); verifies root canvas dimensions match design spec before multi-screen build.
+
+### Changed (Specs & Constitution Alignment)
+
+- **`content/constitution.md` §3.1 & §4** — updated visual-evidence gate description and `visual_round` semantics to reflect new arming logic (design-mode detection instead of `## Visual Baselines` H2 presence).
+- **`specs/qa-flow-enforcement-architecture.md`** — reconciled with new visual-fidelity behavior (v3.16.0 gate amendment); clarifies that design-backed features without baselines now block PASS instead of silently skipping.
+
+### Migration & Behavior Change
+
+Design-backed features (with `design/<feature>.md` where mode ≠ `no-design`) that previously PASSED without a `## Visual Baselines` section will now encounter the `VISUAL_BASELINES_REQUIRED` error at the server PASS gate. This is intentional: the feature closes a gap where design sources could bypass the visual-quality pipeline. Non-UI features and those with no design file are unaffected.
+
 ## [3.24.0] - 2026-06-02
 
 MINOR release delivering a backlog batch (B1–B5): spec wording relaxation, context budget increase, dynamic version pinning test, release staging dir completeness, and code-review transport fixes.

@@ -12,6 +12,11 @@ export declare function hasVisualBaselinesInDesign(workspacePath: string, active
     present: boolean;
     designPath: string;
 };
+export declare function hasDesignModeRequiringVisual(workspacePath: string, activeFeature: string): {
+    required: boolean;
+    mode: string | null;
+    designPath: string;
+};
 export declare function hasVisualEvidenceInFile(workspacePath: string, taskIds: string[]): {
     present: string[];
     missing: string[];

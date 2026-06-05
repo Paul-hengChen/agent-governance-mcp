@@ -26,23 +26,32 @@ const QA_PATH = path.join(PROJECT_ROOT, "content", "skill-qa-engineer.md");
 // *hook* still read QA_PATH.
 const QA_VISUAL_PATH = path.join(PROJECT_ROOT, "content", "skill-qa-visual.md");
 
-test("AC-1: design-auditor Artifact Schema declares OPTIONAL Visual Baselines H2 with 4-col schema", () => {
+test("AC-1: design-auditor Artifact Schema declares Visual Baselines H2 with 4-col schema (v3.16.0: MANDATORY when mode != no-design)", () => {
   // Why: AC-1 anchors the entire Phase 2 contract on a single schema entry.
   // If the auditor doesn't declare *where* baselines live and *what* columns
   // they carry, QA Phase 1.5 has no place to look — the gate degrades to
   // permanent skip silently, defeating the feature. Surface id must FK to
   // Source manifest so deferred / out-of-scope rows can't masquerade as
   // baseline-capable.
+  //
+  // v3.16.0 (visual-fidelity-gate-hardening AC-2): the section changed from
+  // OPTIONAL to "MANDATORY when mode != no-design". The server now arms the
+  // visual gate on mode != no-design rather than on Visual Baselines presence,
+  // so absence with a real mode BLOCKS PASS (VISUAL_BASELINES_REQUIRED).
+  // The old "Absence MUST cause QA Phase 1.5 to skip silently" sentence is
+  // intentionally removed; absence is now only legitimate for mode = no-design.
   const body = fs.readFileSync(AUDITOR_PATH, "utf-8");
 
-  // Section heading present + marked OPTIONAL
-  assert.match(body, /\*\*Visual Baselines\*\*\s*\*\(OPTIONAL/i, "Visual Baselines H2 must exist and be marked OPTIONAL");
+  // Section heading present + marked MANDATORY when mode != no-design (v3.16.0)
+  assert.match(body, /\*\*Visual Baselines\*\*\s*\*\(MANDATORY when mode/i, "Visual Baselines must be MANDATORY when mode != no-design (v3.16.0)");
   // 4-column schema with all required columns
   assert.match(body, /surface id\s*\|\s*baseline path\s*\|\s*impl path\s*\|\s*notes/i, "4-column header must be present");
   // Surface id foreign-keys to Source manifest
   assert.match(body, /surface id.*MUST match.*Source manifest/is, "surface id must FK to Source manifest");
-  // Absence = skip Phase 1.5 (gating signal lives in the auditor schema, not just in QA)
-  assert.match(body, /Absence.*MUST cause QA Phase 1\.5 to skip silently/is, "absence must mandate Phase 1.5 skip");
+  // v3.16.0: absence is only legitimate for mode = no-design; other modes block at server
+  assert.match(body, /Absence.*legitimate ONLY when.*mode\s*=\s*no-design/is, "absence must be legitimate ONLY for mode=no-design");
+  // v3.16.0: absent + non-no-design mode blocks PASS via VISUAL_BASELINES_REQUIRED
+  assert.match(body, /VISUAL_BASELINES_REQUIRED/i, "server blocks PASS with VISUAL_BASELINES_REQUIRED when baselines absent and mode != no-design");
 });
 
 test("AC-2: QA Phase 1.5 skips silently when Visual Baselines absent (v3.14.0 upgrade)", () => {

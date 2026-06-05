@@ -116,6 +116,62 @@ export function hasVisualBaselinesInDesign(workspacePath, activeFeature) {
         return { present: false, designPath };
     }
 }
+// v3.16.0 — Visual gate self-arming signal (visual-fidelity-gate-hardening, AC-1).
+// Moves the arm-condition off "## Visual Baselines present" and onto
+// "design file exists AND mode != no-design". Returns the parsed mode for
+// error-context. Parallels hasVisualBaselinesInDesign: reuses designFilePath,
+// reads once, never throws (fs errors → {required:false}).
+export function hasDesignModeRequiringVisual(workspacePath, activeFeature) {
+    const designPath = designFilePath(workspacePath, activeFeature);
+    if (!activeFeature || !fs.existsSync(designPath)) {
+        return { required: false, mode: null, designPath };
+    }
+    try {
+        const content = fs.readFileSync(designPath, "utf-8");
+        const mode = parseDesignMode(content); // null if no Mode line found
+        // Locked Q-OQ1: arm for every mode except no-design. Encoded as an
+        // EXCLUSION (not an allow-list) so future modes auto-arm — see D3.
+        const required = mode !== null && mode !== "no-design";
+        return { required, mode, designPath };
+    }
+    catch {
+        return { required: false, mode: null, designPath };
+    }
+}
+// Permissive Mode extractor. Accepts BOTH the H2-section style
+// (`## Mode` heading, value on a following line) AND the inline/bullet style
+// (`**Mode** — <value>` or `mode: <value>`). Returns the first token that
+// matches a known mode enum value, lowercased; null if none found. Tolerant of
+// surrounding markdown (backticks, bold, em-dash) per design-auditor template.
+const KNOWN_MODES = ["figma", "sketch", "xd", "penpot", "pdf", "image", "paper", "no-design"];
+function parseDesignMode(content) {
+    // 1. Inline form: `mode: no-design` (no-design fast path, design-auditor L14)
+    //    or `**Mode** — figma` (bullet form, L20). Scan the whole doc for the
+    //    FIRST line carrying a Mode declaration, then pull the first known-mode
+    //    token from it (handles backtick-wrapped values like `figma`).
+    const lineRe = /^\s*(?:[-*]\s*)?(?:\*\*\s*mode\s*\*\*|mode)\s*(?:[—:-])\s*(.+)$/im;
+    // 2. H2 form: `## Mode` then value on next content line.
+    const h2Re = /^##\s+Mode\b[^\n]*\n+\s*(?:[-*]\s*)?(.+)$/im;
+    const candidates = [];
+    const mInline = lineRe.exec(content);
+    if (mInline)
+        candidates.push(mInline[1]);
+    const mH2 = h2Re.exec(content);
+    if (mH2)
+        candidates.push(mH2[1]);
+    for (const raw of candidates) {
+        const lc = raw.toLowerCase();
+        for (const mode of KNOWN_MODES) {
+            // word-boundary-ish: `no-design` must win over `design`; check longest first
+            // (KNOWN_MODES has no overlap risk except substring `design`, which is not
+            // a listed mode, so first-match over the enum is safe).
+            if (new RegExp(`\\b${mode.replace(/[-]/g, "\\-")}\\b`).test(lc)) {
+                return mode;
+            }
+        }
+    }
+    return null;
+}
 // Per-task existence check for `qa_reports/visual_<task-id>.md`.
 // Mirror of hasEvidenceInFile / hasCodeReviewEvidenceInFile — existence is
 // sufficient; the qa-engineer + skill-qa-visual SOP enforce the contents

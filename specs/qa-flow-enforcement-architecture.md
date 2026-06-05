@@ -547,3 +547,33 @@ Existing test files migrated:
 - `test/skill-evolution-v3.11.test.mjs` — `versions.ts` handoff value updated to 3.
 
 Total: 353 tests, 0 failures (was 303/275 pre-migration).
+
+## v3.16.0 Amendment — Visual Gate Self-Arming + Tiers (visual-fidelity-gate-hardening)
+
+v3.16.0 moves the visual-gate arming signal off "`## Visual Baselines` H2 present" and onto
+"design file exists AND `## Mode` ≠ `no-design`", and adds the `VISUAL_BASELINES_REQUIRED` block
+for the armed-but-baseline-less case. The PASS-gate ordering becomes a strict two-step
+arm-then-evidence sequence: the missing-baselines block (`VISUAL_BASELINES_REQUIRED`) fires FIRST
+and is mutually exclusive with `VISUAL_EVIDENCE_MISSING` (reached only when `## Visual Baselines`
+is present). Arming is encoded as the exclusion `mode !== "no-design"` (no allow-list), so future
+modes auto-arm. A design file with an unparseable `## Mode` fails open (`required:false`).
+
+### Visual Gate Tiers (v3.16.0)
+
+- **Tier A — Geometry assertion (cheap, upstream).** Owner: sr-engineer, screen 1, once. Method:
+  number-vs-number compare of `## Layout / Canvas` declared dimensions against the implementation's
+  CSS/SCSS/Tailwind literals. No vision model, no headless render, near-free. Build-gate only —
+  does NOT touch `visual_round`. Skips silently when no design file or no `## Layout / Canvas`.
+- **Tier B — Pixel / fidelity diff (expensive, end-of-cycle).** Owner: qa-visual Phase 1.5, once at
+  the end. Method: screenshot + vision-model reasoning per baseline. Drives `visual_round`.
+  Unchanged by this feature; now actually fires because the gate self-arms (AC-1).
+- **Rationale:** mirrors Figma's `get_metadata` → `get_design_context` two-tier guidance. The early
+  cheap check is one-time insurance against the most expensive failure (foundational rework across
+  all screens); the expensive diff stays once-at-the-end, preserving the original token-saving
+  intent.
+
+### Error-code row (v3.16.0)
+
+| Error code | Trigger | Resolution |
+|---|---|---|
+| `VISUAL_BASELINES_REQUIRED` (v3.16.0) | `design/<feature>.md` exists with `## Mode` ≠ `no-design` AND `## Visual Baselines` H2 is absent, at `tw_update_state(status=PASS)`. | design-auditor adds the `## Visual Baselines` section (design-auditor SOP §Artifact Schema) before PASS is retried. |

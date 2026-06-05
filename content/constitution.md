@@ -42,7 +42,7 @@ The routing chain is **server-enforced**, not advisory. Invalid
 - `status=PASS` and `tw_complete_task` require `agent_id="qa-engineer"`.
 - After 3 QA FAILs (Round 4), only `(pm, In_Progress)` is accepted.
 - PASS requires evidence: attach `qa_review`, or pre-write `qa_reports/review_<task-id>.md`.
-- **Visual evidence gate (v3.14.0)**: when `design/<active_feature>.md` contains a `## Visual Baselines` H2, PASS additionally requires `qa_reports/visual_<task-id>.md` for every task id in the round. Missing → server returns `VISUAL_EVIDENCE_MISSING`. No `## Visual Baselines` H2 (or no design file) → gate is silent and pass-through. Backwards-compatible for non-UI workspaces.
+- **Visual evidence gate (v3.16.0)**: the gate arms whenever `design/<active_feature>.md` exists with a `## Mode` ≠ `no-design` (not on `## Visual Baselines` H2 presence). When armed: if the design file lacks a `## Visual Baselines` H2, PASS is blocked with `VISUAL_BASELINES_REQUIRED` (the design-auditor must add the section — it is NOT a silent pass-through). When the `## Visual Baselines` H2 IS present, PASS additionally requires `qa_reports/visual_<task-id>.md` for every task id in the round; missing → `VISUAL_EVIDENCE_MISSING`. The two checks are mutually exclusive: the missing-baselines block fires first and short-circuits the evidence-file lookup. No design file, or `## Mode` = `no-design` (or unparseable mode), → gate is silent and pass-through. Backwards-compatible for non-UI workspaces.
 - Code-reviewer approval is signalled via `(code-reviewer, In_Progress) → (qa-engineer, In_Progress)` handoff with `pending_notes` containing `review: APPROVED` and a `review_reports/review_<task-id>.md` evidence file. Code-reviewer cannot use `status=PASS`; that remains qa-engineer-exclusive.
 - After 3 code-reviewer FAILs (Round 4 of `review_round`), only `(pm, In_Progress)` is accepted — symmetric to the `qa_round` circuit breaker.
 - **`visual_round` sub-loop (v3.14.0)**: independent of `qa_round` and `review_round`. Bumps on `(qa-engineer, FAIL)` with `pending_notes` containing `visual_fail:` (a structural pixel/widget miss, distinct from test-logic FAIL). Cap is 5 rounds; Round 6 attempts lock to `(pm, In_Progress)` only — symmetric to the `qa_round` circuit breaker.
@@ -64,7 +64,10 @@ rounds (`review_round` cap). The qa-engineer loop back to sr-engineer
 `visual_round` (v3.14.0, §3.1) tracks pixel-fidelity iterations
 separately from test-logic failures; it only ticks when `pending_notes`
 contains `visual_fail:` and only fires when the workspace has a
-`design/<active_feature>.md` with `## Visual Baselines`.
+`design/<active_feature>.md` whose `## Mode` is ≠ `no-design` (the v3.16.0
+self-arming signal). An armed workspace missing the `## Visual Baselines`
+section is blocked at PASS with `VISUAL_BASELINES_REQUIRED` rather than
+silently passing through.
 
 `design-auditor` fires when the coordinator detects a design source
 (Figma / Sketch / XD / Penpot / mockup attachment / 設計稿 keyword) in the

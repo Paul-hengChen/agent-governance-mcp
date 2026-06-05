@@ -49,6 +49,11 @@ export interface TransitionRejection {
                                     // `## Widget Shape Verification` rows. NOT produced
                                     // by validateTransition; the union extension is for
                                     // handler-side type narrowing + envelope consistency.
+    | "VISUAL_BASELINES_REQUIRED"   // v3.16.0 — emitted by index.ts PASS gate when
+                                    // design mode != no-design but ## Visual Baselines
+                                    // is absent. NOT produced by validateTransition;
+                                    // union extension is for handler-side narrowing +
+                                    // envelope consistency (mirrors VISUAL_WIDGETS_UNVERIFIED).
     | "AGENT_ID_REQUIRED";
   attempted: {
     prev_agent: string | null;

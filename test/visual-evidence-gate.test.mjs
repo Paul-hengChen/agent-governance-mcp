@@ -14,6 +14,7 @@ import * as path from "node:path";
 import {
   hasVisualBaselinesInDesign,
   hasVisualEvidenceInFile,
+  hasDesignModeRequiringVisual,
 } from "../dist/tools/evidence-file.js";
 
 function mkWorkspace() {
@@ -200,4 +201,170 @@ test("AC-5 + AC-10: gate fires but evidence missing — PASS would be rejected",
   assert.equal(gate.present, true);
   const evidence = hasVisualEvidenceInFile(ws, ["T01"]);
   assert.deepEqual(evidence.missing, ["T01"], "evidence missing → server would return VISUAL_EVIDENCE_MISSING");
+});
+
+// ============================================================================
+// v3.16.0 — hasDesignModeRequiringVisual (visual-fidelity-gate-hardening, AC-1, AC-10)
+// Tests for the new self-arming signal helper (tools/evidence-file.ts).
+// parseDesignMode is private; all branches are exercised indirectly via
+// hasDesignModeRequiringVisual, which is the exported gate contract.
+// ============================================================================
+
+// ---------- Helpers ----------
+
+function writeDesignWithMode(ws, feature, modeText) {
+  // modeText is the full file body; caller controls Mode line shape.
+  const dir = path.join(ws, "design");
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, `${feature}.md`), modeText);
+}
+
+// ---------- AC-1 — hasDesignModeRequiringVisual: all three Mode shapes ----------
+
+test("v3.16.0 AC-1: ## Mode H2 section style — figma → required:true", () => {
+  // Why: the design-auditor template may emit a `## Mode` H2 heading with the
+  // mode value on the next content line. The parser MUST accept this shape
+  // (D4 — permissive parser for both real-world forms).
+  const ws = mkWorkspace();
+  writeDesignWithMode(ws, "feat", "# design/feat\n\n## Mode\n\nfigma\n\n## Source manifest\n- figma | 1:1 | yes | audited\n");
+  const r = hasDesignModeRequiringVisual(ws, "feat");
+  assert.equal(r.required, true, "H2-style figma mode must arm the gate");
+  assert.equal(r.mode, "figma");
+});
+
+test("v3.16.0 AC-1: **Mode** bullet (em-dash) style — sketch → required:true", () => {
+  // Why: the design-auditor template bullet emits `**Mode** — <value>`.
+  // The em-dash separator must be tolerated (D4).
+  const ws = mkWorkspace();
+  writeDesignWithMode(ws, "feat", "# design/feat\n\n- **Mode** — sketch\n\n## Source manifest\n");
+  const r = hasDesignModeRequiringVisual(ws, "feat");
+  assert.equal(r.required, true, "**Mode** bullet em-dash style must arm the gate");
+  assert.equal(r.mode, "sketch");
+});
+
+test("v3.16.0 AC-1: mode: inline key style — no-design → required:false", () => {
+  // Why: the no-design fast-path (design-auditor L14) writes `mode: no-design`.
+  // This is the colon-inline form. The parser MUST detect it AND return
+  // required:false, so these workspaces remain silent pass-through (AC-10).
+  const ws = mkWorkspace();
+  writeDesignWithMode(ws, "feat", "# design/feat\n\nmode: no-design\n\nReason: server-only feature.\n");
+  const r = hasDesignModeRequiringVisual(ws, "feat");
+  assert.equal(r.required, false, "mode: no-design MUST NOT arm the gate");
+  assert.equal(r.mode, "no-design");
+});
+
+// ---------- AC-1 — real modes arm the gate ----------
+
+test("v3.16.0 AC-1: real mode (figma) → required:true (via inline bullet form)", () => {
+  // Why: asserts the core AC-1 invariant — any real mode other than no-design
+  // MUST set required:true. Contrast with the no-design fast-path above.
+  const ws = mkWorkspace();
+  writeDesignWithMode(ws, "feat", "- **Mode** — figma\n");
+  const r = hasDesignModeRequiringVisual(ws, "feat");
+  assert.equal(r.required, true, "figma mode must arm the gate");
+});
+
+// ---------- AC-10 — no design file → gate silent ----------
+
+test("v3.16.0 AC-10: no design file → required:false (non-UI workspace)", () => {
+  // Why: the most common non-UI case. No design/<feature>.md means the gate
+  // must be completely silent — required:false, mode:null.
+  const ws = mkWorkspace();
+  const r = hasDesignModeRequiringVisual(ws, "server-feature");
+  assert.equal(r.required, false, "absent design file must not arm the gate");
+  assert.equal(r.mode, null, "mode must be null when no file exists");
+  assert.ok(r.designPath.endsWith("design/server-feature.md"), "designPath must surface resolved path");
+});
+
+// ---------- Fail-open: malformed / absent Mode line ----------
+
+test("v3.16.0 AC-1 D6: missing Mode line in existing design file → required:false (fail-open)", () => {
+  // Why: a malformed design doc must NOT arm the gate (D6 — fail-open).
+  // A positive non-`no-design` mode is required to arm; absence of any Mode
+  // line defaults to {required:false}, not fail-closed.
+  const ws = mkWorkspace();
+  writeDesignWithMode(ws, "feat", "# design/feat\n\n## Source manifest\n- figma | 1:1 | yes | audited\n\n## Visual Baselines\n\n| surface | baseline | impl | notes |\n");
+  const r = hasDesignModeRequiringVisual(ws, "feat");
+  assert.equal(r.required, false, "no Mode line → fail-open, gate stays silent");
+  assert.equal(r.mode, null, "mode must be null when no Mode line found");
+});
+
+test("v3.16.0 AC-1: read error (bad bytes) → required:false (fail-open, never throws)", () => {
+  // Why: mirrors hasVisualBaselinesInDesign's silent-swallow contract (AC-9).
+  // The helper must never throw on I/O or parse failure.
+  const ws = mkWorkspace();
+  const dir = path.join(ws, "design");
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, "broken.md"), Buffer.from([0xff, 0xfe, 0xfd]));
+  let threw = false;
+  let r;
+  try { r = hasDesignModeRequiringVisual(ws, "broken"); } catch { threw = true; }
+  assert.equal(threw, false, "MUST NOT throw on bad-encoding read");
+  assert.ok(r, "must return a result object");
+  assert.equal(r.required, false, "fail-open on read error");
+  assert.equal(r.mode, null);
+});
+
+// ---------- Parser tolerance: case / backtick / em-dash ----------
+
+test("v3.16.0 AC-1: backtick-wrapped mode value in bullet — `figma` → required:true", () => {
+  // Why: the design-auditor template may emit backtick-wrapped mode names
+  // like `figma`. The parser must strip markdown markup to find the token.
+  const ws = mkWorkspace();
+  writeDesignWithMode(ws, "feat", "- **Mode** — `figma`\n");
+  const r = hasDesignModeRequiringVisual(ws, "feat");
+  assert.equal(r.required, true, "backtick-wrapped figma must arm the gate");
+  assert.equal(r.mode, "figma");
+});
+
+test("v3.16.0 AC-1: uppercase MODE in inline key — MODE: SKETCH → required:true", () => {
+  // Why: the parser uses case-insensitive matching on the key. Even if an
+  // operator typos `MODE: sketch` the mode value must still be parsed.
+  const ws = mkWorkspace();
+  writeDesignWithMode(ws, "feat", "MODE: SKETCH\n");
+  const r = hasDesignModeRequiringVisual(ws, "feat");
+  assert.equal(r.required, true, "case-insensitive key+value must arm the gate");
+  assert.equal(r.mode, "sketch");
+});
+
+test("v3.16.0 AC-1: em-dash separator is handled — **Mode** — xd", () => {
+  // Why: em-dash (U+2014) vs en-dash vs ASCII dash must all parse. The
+  // architecture regex includes [—:-] to tolerate all three.
+  const ws = mkWorkspace();
+  writeDesignWithMode(ws, "feat", "- **Mode** — xd\n");
+  const r = hasDesignModeRequiringVisual(ws, "feat");
+  assert.equal(r.required, true, "em-dash separator must be parsed");
+  assert.equal(r.mode, "xd");
+});
+
+// ---------- D3 — exclusion encoding: no-design is the only exempt mode ----------
+
+test("v3.16.0 D3: paper mode arms the gate (no raster-only exemption list)", () => {
+  // Why: locked Q-OQ1 decided ALL modes except no-design arm the gate.
+  // paper/image/pdf are NOT exempt — they arm exactly like figma/sketch/xd.
+  // This test encodes the locked human decision so it cannot be quietly
+  // reverted by adding an exemption list later.
+  const ws = mkWorkspace();
+  writeDesignWithMode(ws, "feat", "mode: paper\n");
+  const r = hasDesignModeRequiringVisual(ws, "feat");
+  assert.equal(r.required, true, "paper mode must arm the gate (no exemption list)");
+  assert.equal(r.mode, "paper");
+});
+
+test("v3.16.0 D3: image mode arms the gate (no raster-only exemption list)", () => {
+  const ws = mkWorkspace();
+  writeDesignWithMode(ws, "feat", "mode: image\n");
+  const r = hasDesignModeRequiringVisual(ws, "feat");
+  assert.equal(r.required, true, "image mode must arm the gate");
+  assert.equal(r.mode, "image");
+});
+
+// ---------- empty active_feature safety ----------
+
+test("v3.16.0 AC-1: empty active_feature → required:false (defensive)", () => {
+  // Mirrors the existing empty-feature test for hasVisualBaselinesInDesign.
+  const ws = mkWorkspace();
+  const r = hasDesignModeRequiringVisual(ws, "");
+  assert.equal(r.required, false, "empty feature name must not arm the gate");
+  assert.equal(r.mode, null);
 });

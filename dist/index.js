@@ -32,7 +32,7 @@ import { appendSpecContext } from "./prompts/build.js";
 import { buildPrdChunks, CHUNKER_VERSION, DEFAULT_EMBEDDING_MODEL } from "./tools/rag.js";
 import { getInflightKey, getInflight, setInflight, deleteInflight, awaitAllInflightFor, } from "./tools/rag-coalesce.js";
 import { requireQaEngineer, validateTransition, computeNewRound, } from "./tools/transitions.js";
-import { hasVisualBaselinesInDesign, hasVisualEvidenceInFile, hasUncheckedWidgets, } from "./tools/evidence-file.js";
+import { hasVisualBaselinesInDesign, hasVisualEvidenceInFile, hasUncheckedWidgets, hasDesignModeRequiringVisual, } from "./tools/evidence-file.js";
 // ==========================================
 // Runtime validation schemas (zod)
 // ==========================================
@@ -150,7 +150,7 @@ function formatZodError(err) {
 // 1. Initialize Server (Tools + Prompts)
 // ==========================================
 // Storage adapter defaults to FileHandoffStorage; HTTP-mode boot switches it via setActiveStorage().
-const server = new Server({ name: "agent-governance-mcp", version: "3.24.0" }, { capabilities: { tools: {}, prompts: {} } });
+const server = new Server({ name: "agent-governance-mcp", version: "3.25.0" }, { capabilities: { tools: {}, prompts: {} } });
 // ==========================================
 // 2. Register Prompts (Layer 1: Auto-inject constitution)
 // ==========================================
@@ -642,11 +642,30 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                             isError: true,
                         };
                     }
-                    // v3.14.0 — Visual evidence gate (Constitution §3.1).
-                    // Only fires when `design/<active_feature>.md` declares `## Visual
-                    // Baselines`. Pass-through (silent) on non-UI workspaces — keeps
-                    // the existing v3.13.0 behaviour for everyone without a design file.
+                    // v3.16.0 — Visual gate self-arming (visual-fidelity-gate-hardening, AC-1).
+                    // Arming moved off "## Visual Baselines present" onto "design mode != no-design".
+                    // STEP 1 (arm-check) fires BEFORE the evidence-file lookup; the two paths are
+                    // mutually exclusive (D2): an armed-but-baseline-less workspace gets the single
+                    // actionable VISUAL_BASELINES_REQUIRED error, never the confusing evidence-missing
+                    // error for a section that doesn't exist. STEP 2 (the v3.14.0 gate below) is
+                    // unchanged and reached only when ## Visual Baselines IS present.
+                    const armCheck = hasDesignModeRequiringVisual(parsed.workspace_path, parsed.active_feature);
                     const visualGate = hasVisualBaselinesInDesign(parsed.workspace_path, parsed.active_feature);
+                    // STEP 1 — armed (mode != no-design) but no baselines section → block (NEW path).
+                    if (armCheck.required && !visualGate.present) {
+                        return {
+                            content: [{
+                                    type: "text",
+                                    text: `⛔ VISUAL_BASELINES_REQUIRED: design/<feature>.md declares mode != no-design ` +
+                                        `(mode=${armCheck.mode}, at ${armCheck.designPath}) but ## Visual Baselines is absent. ` +
+                                        `Add the Visual Baselines section (design-auditor SOP §Artifact Schema) before retrying PASS.`,
+                                }],
+                            isError: true,
+                        };
+                    }
+                    // STEP 2 — v3.14.0 Visual evidence gate (Constitution §3.1), UNCHANGED.
+                    // Reached only when `## Visual Baselines` is present; non-UI workspaces
+                    // (no design file, or mode = no-design) fall straight through here.
                     if (visualGate.present) {
                         const visEv = hasVisualEvidenceInFile(parsed.workspace_path, parsed.completed_tasks);
                         if (visEv.missing.length > 0) {
