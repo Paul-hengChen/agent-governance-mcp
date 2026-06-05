@@ -16,6 +16,69 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.26.0] - 2026-06-05
+
+MINOR release delivering **visual-verdict integrity** — the response to the CDE-OOBE
+retrospective (`research/cde-oobe-visual-fidelity-retrospective-2026-06-05.md`), where a run burned
+heavy tokens and shipped a UI far from Figma under a *nominal* PASS. v3.25.0 made visual evidence
+*exist*; v3.26.0 makes the visual verdict *hard to corrupt*: authority separation, canonical-state
+parity, structural assertions, server-validated report schema, and a ledger-reconcile op. All
+changes are backwards-compatible (new gates are opt-in via the design contract; chain-only additions
+stay off the always-on bundle).
+
+### Added
+
+- **`tw_sync` tool** (`tools/sync.ts`) — reconciles `tasks.md` checkboxes to the authoritative
+  `handoff.completed_tasks` (handoff → tasks direction only). Heals the drift that background/parallel
+  subagents + inline-coordinator execution produce. SAFETY: never writes `handoff`, never promotes a
+  `tasks.md`-only `[x]` into completed_tasks (still needs a qa-engineer PASS); vibe-drift is reported,
+  not reconciled. No `agent_id` gate (can only mirror already-qa-blessed completions). [R10]
+- **Server report-schema validation** (`tools/evidence-file.ts`) — `validateVisualReport` /
+  `validateVisualReports` parse `qa_reports/visual_<id>.md` and reject PASS on a missing required
+  section (Widget Shape / Canonical State / Structural Assertions / Region Diff / Verdict), any
+  unchecked canonical-state row, any structural assertion whose result ≠ `pass`, or a non-PASS
+  verdict. New error code `VISUAL_REPORT_INCOMPLETE`. Gated opt-in by
+  `designDeclaresStructuralAssertions()` so pre-v3.26 workspaces are unaffected. [R1 Tier 2]
+- **Constitution §3.2 — Visual Verdict Authority & Separation of Duties** (chain-only): the visual
+  verdict is qa-visual-owned; coordinator/non-qa roles pass context only and may not define / override
+  / relax / pre-accept any visual difference (a coordinator accept-policy is void). Builder ≠ judge:
+  an inline-run role under subagent limits cannot self-issue a visual PASS → `Blocked`. Whole-frame
+  pixel-% banned as a PASS metric. Plus the R10 sequential-context + reconcile rule. [R1/R9/R10]
+
+### Changed
+
+- **skill-qa-visual** — added Step A.5 Canonical-State Verification (state mismatch = capture defect,
+  not accepted drift); renamed Step B → Region Diff (whole-frame % banned, compare declared region);
+  added Step C Structural Assertions (focus bar / group box / primary accent / selected-card desc /
+  declared-token-rendered); qa-owned `## Allowed Differences`; per-widget kitchen-sink isolation;
+  declared the server-validated report schema. [R2/R3/R4]
+- **skill-design-auditor** — `## Layout / Canvas` now records auto-layout metadata (layoutMode/align/
+  itemSpacing/padding/sizing/fills + group containers), not prose; Visual Widgets must inventory
+  per-state deltas (default/focused/selected/disabled); new `## Visual Structural Assertions` section;
+  Visual Baselines schema extended (source node, viewport, route, canonical state, compare region);
+  content-verified node ids (name-match insufficient → fixes the wrong-baseline class). [R6/R8]
+- **skill-sr-engineer** — added a scoped render self-check for custom widgets / focus-selected / group
+  rows / drawers / modals / primary buttons (render in isolation, screenshot, compare to the Figma
+  node in-loop before handoff); flag-don't-assume for unspecified structure; declared state tokens
+  must render (build-gate failure otherwise). [R5/R7]
+- **skill-pm** — copies `## Visual Structural Assertions` verbatim into the spec; new visual
+  state-count split gate (>~8–10 canonical states → surface-state tasks, shared shell/widgets first).
+  [R4]
+- **skill-coordinator** — Visual Verdict Boundary (no accept-policy injection in qa-visual dispatch;
+  unavailable judge → `Blocked`, never self-PASS) + Drift Reconcile guidance (`tw_detect_drift` →
+  `tw_sync` after out-of-band/inline execution). [R1/R9/R10]
+- `tools/transitions.ts` — `VISUAL_REPORT_INCOMPLETE` added to the rejection error union.
+
+### Tests
+
+- `test/visual-report-schema-validation.test.mjs` (10 cases — all fail branches of the schema
+  validator + the opt-in gating signal).
+- `test/tw-sync-reconcile.test.mjs` (5 cases — safe sync / refused vibe-drift / in-sync / no-handoff /
+  idempotent).
+- Updated stale assertions in `test/pixel-perfect-visual-compare.test.mjs` (extended Baselines schema;
+  Region Diff rename) and raised the lazy-loaded `skill-qa-visual` byte cap (4700 → 9000) in
+  `test/qa-visual-skill-split.test.mjs`.
+
 ## [3.25.0] - 2026-06-05
 
 MINOR release delivering visual-fidelity gate hardening: server-enforced baselines validation for design-backed features, mandatory canvas/layout auditing, and geometry assertions at sr-engineer screen-1 gate.
