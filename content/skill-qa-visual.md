@@ -25,12 +25,65 @@ Rules:
 - `[ ]` = widget shape missing OR substituted with a primitive (the very gap §1 Visual Widgets exception was designed to catch).
 - Any `[ ]` row → **shape FAIL precedes pixel diff**. Route per "Widget shape miss" failure mode below — do NOT proceed to Step B for those surfaces; pixel-perfect on the wrong widget is meaningless.
 
-### Step B — Pixel Diff Per Baseline
+### Step A.5 — Canonical-State Verification (v3.26.0, R2)
 
-For each `## Visual Baselines` row (`surface id | baseline path | impl path | notes`):
+Before any diff, the implementation capture MUST be in the SAME state the baseline depicts.
+Each `## Visual Baselines` row carries a `canonical state` (selected item / focused row / scroll
+offset / drawer-or-modal open / toggle + segmented values / expected default data). Emit one row per
+surface under H2 `## Canonical State Verification`:
+
+```
+## Canonical State Verification
+- [x] language — baseline state {selected:English, focus:English, scroll:centered}; impl captured in same state
+- [ ] network — baseline {drawer:wifi-list open}; impl captured at top-level (STATE MISMATCH)
+```
+
+Rules:
+- A `[ ]` (state mismatch) is a **capture defect**, NOT visual drift. Do NOT diff it and do NOT
+  "accept" it as a difference — recapture the impl in the baseline's state, or FAIL.
+- A state mismatch left unresolved blocks PASS (server-checked). The canonical state to drive to is
+  supplied by design-auditor/PM/coordinator as context; reaching it is the engineer's/QA's job.
+
+### Step B — Region Diff Per Baseline (v3.26.0, R3)
+
+**Whole-frame pixel-percentage is BANNED as a PASS metric** — a sparse canvas dilutes a localized
+structural error (CDE-OOBE Language scored 6% while structurally wrong). Compare the **content/
+component region** declared by the baseline's `compare region`, not the full frame.
+
+For each `## Visual Baselines` row:
 
 a. Read both `baseline path` and `impl path` via the Read tool (images render into multimodal context).
-b. Emit a structured diff covering: (i) layout / position, (ii) spacing / alignment, (iii) element presence, (iv) color, (v) text content, (vi) image content. Append under `## Pixel Diff` in `qa_reports/visual_<task-id>.md`, one sub-section per `surface id`.
+b. Emit a structured diff over the declared region covering: (i) layout / position, (ii) spacing /
+   alignment, (iii) element presence, (iv) color, (v) text content, (vi) image content. Append under
+   `## Region Diff` in `qa_reports/visual_<task-id>.md`, one sub-section per `surface id`. Any material
+   difference (not in the qa-owned `## Allowed Differences`) is a drift → FAIL.
+
+### Step C — Structural Assertions (v3.26.0, R3/R-VIS)
+
+Vision "looks similar" is not enough; assert specific structures the design requires. Copy the
+spec's `## Visual Structural Assertions` rows (authored by design-auditor) and mark each pass/fail
+under H2 `## Structural Assertions`:
+
+```
+## Structural Assertions
+| assertion id | surface | required element/state | source node/token | result |
+|---|---|---|---|---|
+| primary.button.accent | all action screens | primary button uses accent #3C5AAA | token | pass |
+| focus.row.bar | language/network/time/mode-adjust | full-width focused-row bar rendered | node | fail |
+| group.container.box | mode-adjust/network/time | settings group has bordered container | node | fail |
+| mode.selected.description | mode-list | selected card expands + shows description | node | fail |
+| declared.token.rendered | per state token | declared focus/selected token renders in that state | token | fail |
+```
+
+Any `fail` or unverified row blocks PASS (server-checked). This is what catches the CDE-OOBE class
+(missing blue focus bar, flat groups, grey primary button, title-only mode card).
+
+### Allowed Differences (qa-visual-owned ONLY — v3.26.0, R1)
+
+If a difference is acceptable, qa-visual records it under H2 `## Allowed Differences` with a per-item
+reason, in THIS report, under a qa-visual / qa-engineer handoff. A coordinator- or builder-authored
+acceptance is **void** (Constitution §3.2); the server rejects a PASS whose allowed-diffs were not
+qa-authored. An empty `## Allowed Differences` section is valid (means: none).
 
 ### Failure modes
 
@@ -41,7 +94,30 @@ b. Emit a structured diff covering: (i) layout / position, (ii) spacing / alignm
 
 ### PASS sub-verdict
 
-All Step A checkboxes `[x]` AND all Step B diffs report no differences → write final `## Verdict — PASS` section to `qa_reports/visual_<task-id>.md` and proceed to Phase 2. The file's existence + PASS verdict together satisfy Constitution §3.1 visual evidence gate.
+PASS requires ALL of: every Step A widget checkbox `[x]`; every Step A.5 canonical-state row `[x]`;
+every Step C structural assertion `pass`; every Step B region diff reporting no material difference
+outside `## Allowed Differences`. Then write final `## Verdict — PASS`. Any unchecked/failed/unverified
+row in A, A.5, or C — or a material region diff — blocks PASS.
+
+### Report schema (server-validated — v3.26.0)
+
+`qa_reports/visual_<task-id>.md` MUST contain these H2 sections; the PASS server-parser
+(`tools/evidence-file.ts`) rejects PASS on any missing section, any failed/unverified row, or an
+`## Allowed Differences` not authored under a qa-visual/qa-engineer handoff:
+
+- `## Widget Shape Verification` (Step A)
+- `## Canonical State Verification` (Step A.5)
+- `## Structural Assertions` (Step C)
+- `## Region Diff` (Step B)
+- `## Allowed Differences` (qa-owned; may be empty)
+- `## Verdict` (final value `PASS` only when all the above clear)
+
+### Per-widget isolation (v3.26.0, R4)
+
+For custom widgets (every non-`N/A` `## Visual Widgets` row), verify the widget **in isolation** in
+`/dev/kitchen-sink` (or the story route) against its Figma component node BEFORE screen-level
+assembly diffs. PASS each widget's states (default / focused / selected / disabled / drawer-open /
+modal-open) individually. This shrinks blast radius and stops fix-A-break-B screen loops.
 
 ### Rationale
 
