@@ -16,6 +16,50 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.27.0] - 2026-06-05
+
+PATCH-plus follow-up hardening the v3.26.0 visual-verdict gate after an external code review
+(Codex/GPT-5) found the headline guarantee ("visual PASS can't be softened by prose") was not yet
+fully true. Closes five gaps. One behavior change (missing structural assertions becomes a hard
+error) makes this a MINOR.
+
+### Fixed / Hardened
+
+- **Verdict parser was too loose (Codex #1).** `validateVisualReport` matched `\bPASS\b` anywhere, so
+  "NOT PASS" / "PASS blocked" / "not ready to PASS" could set `verdictPass=true`. Now the verdict
+  value must normalize to exactly `PASS` (first alphabetic token) and is rejected on any negation token
+  (not/fail/blocked/changes requested/incomplete/pending).
+- **Strict validation no longer silently opt-out (Codex #3).** Report-schema validation now runs
+  whenever the visual gate is armed (`mode != no-design`). A design that omits `## Visual Structural
+  Assertions` is a **hard error `VISUAL_ASSERTIONS_REQUIRED`** (design-auditor must add it), not a
+  backwards-compatible bypass — mirrors how a missing `## Visual Baselines` blocks since v3.16.0.
+  **Behavior change:** pre-v3.26 design-backed workspaces (mode≠no-design, no assertions section) now
+  block at PASS until the section is added.
+- **Region Diff is now interpreted (Codex #4).** Previously a required-but-unparsed section. qa-visual
+  emits a per-surface result table `| surface | result |` (`pass`/`accepted`/`fail`); any non-pass/
+  accepted row blocks PASS via `failedRegionDiffs`.
+- **Constitution claim corrected to match the code (Codex #2).** §3.2 no longer claims the server
+  rejects non-qa-authored allowed-diffs (infeasible — the report is plain markdown with no agent_id).
+  Authorship is enforced *by construction* (PASS is qa-exclusive; the report is consulted only on a qa
+  PASS). The server now requires `## Allowed Differences` as a schema section but does not content-sniff
+  authorship.
+- **Docs refreshed (Codex #5).** README → v3.27.0 / 539 tests; architecture doc → 11 tools incl.
+  `tw_sync`.
+
+### Changed
+
+- `tools/evidence-file.ts` — `REQUIRED_VISUAL_SECTIONS` adds `Allowed Differences`;
+  `VisualReportValidation` adds `failedRegionDiffs`; new `verdictIsPass` + `parseRegionDiffFailures`.
+- `index.ts` PASS gate — mandatory-when-armed flow + `VISUAL_ASSERTIONS_REQUIRED`; region-diff failures
+  surfaced in `VISUAL_REPORT_INCOMPLETE`.
+- `tools/transitions.ts` — `VISUAL_ASSERTIONS_REQUIRED` added to the rejection union.
+- `content/skill-qa-visual.md` — Region Diff per-surface result-row format.
+
+### Tests
+
+- `test/visual-report-schema-validation.test.mjs` — +5 cases (verdict false-positive rejection,
+  body-form verdict, region-diff fail/accepted, mandatory Allowed Differences). Suite 539/539.
+
 ## [3.26.0] - 2026-06-05
 
 MINOR release delivering **visual-verdict integrity** — the response to the CDE-OOBE

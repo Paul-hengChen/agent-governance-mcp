@@ -151,7 +151,7 @@ function formatZodError(err) {
 // 1. Initialize Server (Tools + Prompts)
 // ==========================================
 // Storage adapter defaults to FileHandoffStorage; HTTP-mode boot switches it via setActiveStorage().
-const server = new Server({ name: "agent-governance-mcp", version: "3.26.0" }, { capabilities: { tools: {}, prompts: {} } });
+const server = new Server({ name: "agent-governance-mcp", version: "3.27.0" }, { capabilities: { tools: {}, prompts: {} } });
 // ==========================================
 // 2. Register Prompts (Layer 1: Auto-inject constitution)
 // ==========================================
@@ -731,16 +731,29 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                                 isError: true,
                             };
                         }
-                        // v3.26.0 — Visual report SCHEMA validation (Constitution §3.2).
+                        // v3.27.0 — Visual report SCHEMA validation (Constitution §3.2).
                         // Existence + widget-shape was insufficient: CDE-OOBE shipped a bad
                         // UI under a nominal PASS because the report carried no canonical-state
-                        // or structural-assertion claims. This gate parses the report and
-                        // rejects PASS on a missing required section, any failed/unverified
-                        // canonical-state row, any failed/unverified structural assertion, or a
-                        // non-PASS verdict. OPT-IN for backwards-compat: only enforced when the
-                        // design file declares `## Visual Structural Assertions` (v3.26 contract);
-                        // pre-v3.26 designs/reports keep passing on the gates above.
-                        if (designDeclaresStructuralAssertions(parsed.workspace_path, parsed.active_feature)) {
+                        // or structural-assertion claims. MANDATORY when the visual gate is
+                        // armed (mode != no-design): the design MUST declare
+                        // `## Visual Structural Assertions`. Missing it is NOT a silent
+                        // backwards-compatible fallback (the v3.26.0 bug Codex flagged) — it
+                        // is its own hard error VISUAL_ASSERTIONS_REQUIRED, mirroring how a
+                        // missing `## Visual Baselines` blocks at v3.16.0.
+                        if (armCheck.required) {
+                            if (!designDeclaresStructuralAssertions(parsed.workspace_path, parsed.active_feature)) {
+                                return {
+                                    content: [{
+                                            type: "text",
+                                            text: `⛔ VISUAL_ASSERTIONS_REQUIRED: design/<feature>.md declares mode != no-design ` +
+                                                `(mode=${armCheck.mode}, at ${armCheck.designPath}) but ## Visual Structural ` +
+                                                `Assertions is absent. The design-auditor MUST emit it (skill-design-auditor ` +
+                                                `§Artifact Schema) and PM copy it into the spec; qa-visual marks each row pass/fail. ` +
+                                                `Add the section before retrying PASS.`,
+                                        }],
+                                    isError: true,
+                                };
+                            }
                             const schema = validateVisualReports(parsed.workspace_path, parsed.completed_tasks);
                             if (!schema.ok) {
                                 const listing = Object.entries(schema.byTaskId)
@@ -752,6 +765,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                                         reasons.push(`canonical-state fail: ${v.failedCanonicalStates.join("/")}`);
                                     if (v.failedStructuralAssertions.length)
                                         reasons.push(`structural fail: ${v.failedStructuralAssertions.join("/")}`);
+                                    if (v.failedRegionDiffs.length)
+                                        reasons.push(`region-diff fail: ${v.failedRegionDiffs.join("/")}`);
                                     if (!v.verdictPass)
                                         reasons.push("verdict != PASS");
                                     return `${taskId} {${reasons.join("; ")}}`;
@@ -762,7 +777,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                                             type: "text",
                                             text: `⛔ VISUAL_REPORT_INCOMPLETE: ${listing}. ` +
                                                 `qa_reports/visual_<id>.md must contain Canonical State Verification, ` +
-                                                `Structural Assertions, Region Diff, and a PASS Verdict with every row ` +
+                                                `Structural Assertions, Region Diff (per-surface pass/accepted), Allowed ` +
+                                                `Differences, and a Verdict that normalizes to exactly PASS — every row ` +
                                                 `cleared (skill-qa-visual §Report schema). Resolve the failed/unverified ` +
                                                 `rows — do NOT pre-accept them (visual verdict is qa-visual-owned, ` +
                                                 `Constitution §3.2).`,

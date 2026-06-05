@@ -37,6 +37,7 @@ export interface VisualReportValidation {
     missingSections: string[];
     failedCanonicalStates: string[];
     failedStructuralAssertions: string[];
+    failedRegionDiffs: string[];
     verdictPass: boolean;
 }
 export declare function validateVisualReport(content: string): VisualReportValidation;

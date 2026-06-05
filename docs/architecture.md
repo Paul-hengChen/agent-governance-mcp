@@ -15,12 +15,13 @@ How the three layers fit together, what gates a state write, and how the routing
 │                                                            │
 │  Registered prompts: teamwork, teamwork-lite, pm,         │
 │    architect, researcher, sr-engineer, qa-engineer        │
-├── Layer 2: Tools (10 tw_* MCP tools) ─────────────────────┤
+├── Layer 2: Tools (11 tw_* MCP tools) ─────────────────────┤
 │  tw_get_state           tw_update_state                   │
 │  tw_get_next_task       tw_add_task                       │
 │  tw_complete_task       tw_rollback_task                  │
 │  tw_detect_drift        tw_switch_role                    │
 │  tw_index_prd           tw_clear_prd_chunks               │
+│  tw_sync (R10 reconcile)                                  │
 │                                                            │
 │  AI cannot edit handoff/tasks directly — MUST go through  │
 │  these tools (zod-validated args).                        │

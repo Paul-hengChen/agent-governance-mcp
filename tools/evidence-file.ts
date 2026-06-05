@@ -344,6 +344,7 @@ const REQUIRED_VISUAL_SECTIONS = [
   "Canonical State Verification",
   "Structural Assertions",
   "Region Diff",
+  "Allowed Differences",
   "Verdict",
 ] as const;
 
@@ -398,11 +399,60 @@ function parseAssertionFailures(section: string): string[] {
   return failures;
 }
 
+// Region Diff rows `| surface | result |` where result ∈ {pass, accepted}.
+// Anything else (fail, material, unresolved, blank, drift) is a failure.
+// "accepted" is allowed because a difference qa-visual deliberately accepts is
+// recorded in `## Allowed Differences`; here it signals "diff exists but cleared".
+function parseRegionDiffFailures(section: string): string[] {
+  const failures: string[] = [];
+  for (const line of section.split("\n")) {
+    const t = line.trim();
+    if (!t.startsWith("|")) continue;
+    if (/^\|[\s:|-]+\|?$/.test(t)) continue;
+    const parts = t.split("|");
+    if (parts.length && parts[0].trim() === "") parts.shift();
+    if (parts.length && parts[parts.length - 1].trim() === "") parts.pop();
+    const cells = parts.map((c) => c.trim());
+    if (cells.length < 2) continue;
+    const id = cells[0];
+    if (id === "" || /surface(\s*id)?/i.test(id)) continue; // header row
+    const result = cells[cells.length - 1].toLowerCase();
+    if (result !== "pass" && result !== "accepted") failures.push(id);
+  }
+  return failures;
+}
+
+// Verdict gate (HARD): the verdict's value must normalize to exactly PASS.
+// Guards against `\bPASS\b`-anywhere false positives like "NOT PASS",
+// "PASS blocked", "not ready to PASS". Reads the trailing value of the
+// `## Verdict — <value>` heading, else the first non-empty body line.
+function verdictIsPass(content: string): boolean {
+  const head = /^##\s+Verdict\b[^\n]*/im.exec(content);
+  const body = sliceH2Section(content, "Verdict");
+  let text = "";
+  if (head) {
+    text = head[0].replace(/^##\s+Verdict\b/i, "").replace(/^[\s—:–-]+/, "").trim();
+  }
+  if (!text && body !== null) {
+    const firstLine = body.split("\n").map((s) => s.trim()).find((s) => s.length > 0) ?? "";
+    text = firstLine.replace(/^[-*]\s*/, "").replace(/^[\s—:–-]+/, "").trim();
+  }
+  if (!text) return false;
+  // Any explicit negation/failure token anywhere in the verdict value → not pass.
+  if (/\b(not|fail|failed|blocked?|changes?\s*requested|incomplete|pending)\b/i.test(text)) {
+    return false;
+  }
+  // First alphabetic token must be exactly PASS.
+  const firstToken = (text.match(/[A-Za-z]+/)?.[0] ?? "").toUpperCase();
+  return firstToken === "PASS";
+}
+
 export interface VisualReportValidation {
   ok: boolean;
   missingSections: string[];
   failedCanonicalStates: string[];
   failedStructuralAssertions: string[];
+  failedRegionDiffs: string[];
   verdictPass: boolean;
 }
 
@@ -416,19 +466,23 @@ export function validateVisualReport(content: string): VisualReportValidation {
   const failedCanonicalStates = canonical ? parseUncheckedLabels(canonical) : [];
   const structural = sliceH2Section(content, "Structural Assertions");
   const failedStructuralAssertions = structural ? parseAssertionFailures(structural) : [];
-  // Verdict may be written inline on the heading (`## Verdict — PASS`) or in the
-  // section body — accept either.
-  const verdictHead = /^##\s+Verdict\b[^\n]*/im.exec(content);
-  const verdictBody = sliceH2Section(content, "Verdict");
-  const verdictPass =
-    (verdictHead !== null && /\bPASS\b/i.test(verdictHead[0])) ||
-    (verdictBody !== null && /\bPASS\b/i.test(verdictBody));
+  const region = sliceH2Section(content, "Region Diff");
+  const failedRegionDiffs = region ? parseRegionDiffFailures(region) : [];
+  const verdictPass = verdictIsPass(content);
   const ok =
     missingSections.length === 0 &&
     failedCanonicalStates.length === 0 &&
     failedStructuralAssertions.length === 0 &&
+    failedRegionDiffs.length === 0 &&
     verdictPass;
-  return { ok, missingSections, failedCanonicalStates, failedStructuralAssertions, verdictPass };
+  return {
+    ok,
+    missingSections,
+    failedCanonicalStates,
+    failedStructuralAssertions,
+    failedRegionDiffs,
+    verdictPass,
+  };
 }
 
 // True when the design file declares a `## Visual Structural Assertions` section

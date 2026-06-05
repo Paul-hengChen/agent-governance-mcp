@@ -60,12 +60,17 @@ proved insufficient, so these are also server-enforced (§3.1 visual evidence ga
 validation).
 
 - **Visual verdict is qa-visual-owned.** ONLY qa-visual may define visual PASS criteria, accepted-diff
-  tolerance, or pre-excused divergence classes — and only inside the qa-visual-authored
-  `## Allowed Differences` section of `qa_reports/visual_<task-id>.md` (or PM/spec, before
-  implementation). The coordinator and every non-qa role MAY pass context (baseline paths, Figma node
-  ids, route, canonical-state setup) but MUST NOT define, override, relax, or pre-accept any visual
-  difference. A coordinator-authored accept-policy is **void**; the server rejects a PASS whose
-  allowed-diffs are not authored under a qa-visual / qa-engineer handoff.
+  tolerance, or pre-excused divergence classes — and only inside the `## Allowed Differences` section
+  of `qa_reports/visual_<task-id>.md` (or PM/spec, before implementation). The coordinator and every
+  non-qa role MAY pass context (baseline paths, Figma node ids, route, canonical-state setup) but MUST
+  NOT define, override, relax, or pre-accept any visual difference. **Enforcement:** allowed-diffs are
+  qa-owned *by construction* — the visual report is consulted only on a qa-engineer PASS, and
+  `status=PASS` is server-restricted to `agent_id="qa-engineer"`, so the report (incl. its
+  `## Allowed Differences`) is authored under the qa chain, not the coordinator. The server validates
+  that the report SCHEMA is complete (`## Allowed Differences` is a required section) but does NOT
+  inspect prose for authorship — authorship is enforced by the chain (PASS is qa-exclusive), not by
+  content-sniffing. A coordinator-authored accept-policy injected into a dispatch prompt is **void**
+  by this rule (prompt-governed; see skill-coordinator).
 - **Builder ≠ judge (role-collapse guard).** If subagent limits force a role to run inline in the
   coordinator's context, that actor MAY build/edit but MUST NOT author the visual verdict nor
   self-issue a visual PASS. With no independent qa-visual / qa-engineer context available,

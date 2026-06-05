@@ -60,6 +60,10 @@ export interface TransitionRejection {
                                     // section, has a failed/unverified canonical-state or
                                     // structural-assertion row, or lacks a PASS verdict.
                                     // Handler-side only (like the two above).
+    | "VISUAL_ASSERTIONS_REQUIRED"  // v3.27.0 — emitted by index.ts PASS gate when the
+                                    // visual gate is armed (mode != no-design) but the design
+                                    // omits ## Visual Structural Assertions. Hard error, not a
+                                    // silent fallback (Codex review #3). Handler-side only.
     | "AGENT_ID_REQUIRED";
   attempted: {
     prev_agent: string | null;

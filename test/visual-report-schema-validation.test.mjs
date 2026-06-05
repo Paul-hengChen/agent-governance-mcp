@@ -34,8 +34,9 @@ const GOOD = `# Visual — T01
 | focus.row.bar | language | full-width bar | node | pass |
 
 ## Region Diff
-### language
-No material difference in compare region.
+| surface | result |
+|---|---|
+| language | pass |
 
 ## Allowed Differences
 
@@ -106,6 +107,47 @@ test("AC-6: a non-PASS verdict blocks even when rows clear", () => {
   const v = validateVisualReport(bad);
   assert.equal(v.ok, false);
   assert.equal(v.verdictPass, false);
+});
+
+test("AC-6b: '\\bPASS\\b'-anywhere false positives are rejected (Codex #1)", () => {
+  for (const verdict of [
+    "## Verdict — NOT PASS",
+    "## Verdict — PASS blocked by structural fail",
+    "## Verdict — not ready to PASS",
+    "## Verdict — CHANGES REQUESTED",
+  ]) {
+    const bad = GOOD.replace("## Verdict — PASS", verdict);
+    const v = validateVisualReport(bad);
+    assert.equal(v.verdictPass, false, `must reject verdict "${verdict}"`);
+    assert.equal(v.ok, false);
+  }
+});
+
+test("AC-6c: body-form verdict 'Verdict\\n PASS' still passes", () => {
+  const ok = GOOD.replace("## Verdict — PASS", "## Verdict\n\nPASS");
+  const v = validateVisualReport(ok);
+  assert.equal(v.verdictPass, true, JSON.stringify(v));
+});
+
+test("AC-10: a Region Diff row with result != pass/accepted is a failure (Codex #4)", () => {
+  const bad = GOOD.replace("| language | pass |", "| language | material |");
+  const v = validateVisualReport(bad);
+  assert.equal(v.ok, false);
+  assert.deepEqual(v.failedRegionDiffs, ["language"]);
+});
+
+test("AC-10b: Region Diff 'accepted' clears (qa-accepted diff)", () => {
+  const ok = GOOD.replace("| language | pass |", "| language | accepted |");
+  const v = validateVisualReport(ok);
+  assert.deepEqual(v.failedRegionDiffs, []);
+  assert.equal(v.ok, true);
+});
+
+test("AC-11: missing ## Allowed Differences blocks (now required, Codex #2)", () => {
+  const bad = GOOD.replace("## Allowed Differences\n\n", "");
+  const v = validateVisualReport(bad);
+  assert.equal(v.ok, false);
+  assert.ok(v.missingSections.includes("Allowed Differences"));
 });
 
 test("AC-7: validateVisualReports aggregates only failing task ids", () => {
