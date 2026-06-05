@@ -14,6 +14,7 @@ candidate for a future `/teamwork` feature; none blocks a release on its own.
 | B4 | Add `.nvmrc` + `engines` (Node version pin) | P1 | drift-archived-task-exclusion (v3.23.1) | **done (v3.23.1, Option Y)** |
 | B5 | release-engineer staging list omits source dirs | **P0** | v3.23.1 release (post-mortem) | **done (v3.24.0)** |
 | B6 | Derive release-staging guard from `tsconfig.include` (root-cause) | P2 | v3.24.0 independent review (F2) | open |
+| B7 | Visual fidelity un-owned until optional last gate (structural drift, all gates green) — see [postmortem-visual-fidelity-gate.md](postmortem-visual-fidelity-gate.md) | **P0** | oobe-setup-wizard (2026-06-04) | open |
 
 ---
 
