@@ -74,6 +74,13 @@ validation).
 - **No global-frame metric.** Whole-frame pixel-percentage MUST NOT be the visual PASS metric; a
   sparse canvas dilutes localized structural errors. Comparison is per-surface / region-weighted with
   explicit structural assertions and canonical-state parity (see `skill-qa-visual`).
+- **Sequential-context assumption + reconcile (R10).** The chain assumes sequential single-context
+  handoffs. Background/parallel `Task` fan-out and inline-coordinator execution can desync `tasks.md`
+  from the authoritative `handoff.completed_tasks`. After any out-of-band/inline execution, before a
+  PASS or hand-back, `tw_detect_drift`; on handoff-ahead drift run **`tw_sync`** (mirrors the ledger
+  onto `tasks.md` — bookkeeping only; NEVER writes `handoff`, NEVER promotes a `tasks.md`-only `[x]`,
+  which still needs a qa PASS). Vibe-drift (tasks-ahead) is reported, not reconciled → qa or
+  `tw_rollback_task`.
 
 ## 4. Routing Chain (multi-phase work)
 

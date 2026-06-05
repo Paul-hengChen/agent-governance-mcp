@@ -21,6 +21,7 @@ import { z } from "zod";
 
 import { getNextTask, completeTask, rollbackTask, addTask } from "./tools/tasks.js";
 import { detectDrift } from "./tools/drift.js";
+import { reconcileTasks } from "./tools/sync.js";
 import { enforcePreFlight, cleanupStaleSessions } from "./guards/session.js";
 import { getActiveStorage, setActiveStorage } from "./tools/storage.js";
 import { buildSrEngineerPrompt } from "./prompts/sr-engineer.js";
@@ -551,6 +552,24 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
+        name: "tw_sync",
+        description:
+          "Reconcile tasks.md checkboxes to the authoritative handoff.completed_tasks " +
+          "(handoff → tasks only). Use after background/parallel subagents or inline-coordinator " +
+          "execution leaves drift (run tw_detect_drift first). NEVER promotes a tasks.md-only " +
+          "completion into handoff (that needs a qa-engineer PASS); vibe-drift is reported, not synced.",
+        inputSchema: {
+          type: "object" as const,
+          properties: {
+            workspace_path: {
+              type: "string",
+              description: "Absolute workspace path",
+            },
+          },
+          required: ["workspace_path"],
+        },
+      },
+      {
         name: "tw_switch_role",
         description:
           "Return the named role's SOP text for the agent to read. " +
@@ -620,6 +639,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "tw_detect_drift": {
         const { workspace_path } = WorkspaceOnly.parse(args);
         const result = detectDrift(workspace_path);
+        return { content: [{ type: "text" as const, text: result }] };
+      }
+
+      // tw_sync (R10) — mirrors the authoritative ledger onto tasks.md. Mutating
+      // (writes tasks.md) so it honours the pre-flight read; needs no agent_id
+      // gate because it can only mirror completions already in handoff (qa-blessed),
+      // never invent one. See tools/sync.ts safety note.
+      case "tw_sync": {
+        const { workspace_path } = WorkspaceOnly.parse(args);
+        enforcePreFlight(workspace_path, "tw_sync");
+        const result = await reconcileTasks(workspace_path);
         return { content: [{ type: "text" as const, text: result }] };
       }
 

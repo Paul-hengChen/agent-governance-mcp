@@ -138,6 +138,21 @@ Per Constitution §3.2, the coordinator routes and summarizes — it does NOT ju
 This is a stop-condition addition: treat "visual work complete but no independent qa-visual context
 available" as a hand-to-human event, not an auto-hop.
 
+## Drift Reconcile after out-of-band execution (v3.26.0, R10)
+
+The routing chain assumes sequential single-context handoffs. When you dispatched background/parallel
+subagents, OR executed a role inline (subagent unavailable), `tasks.md` can desync from the
+authoritative `handoff.completed_tasks`. Before any PASS or hand-back in those cases:
+
+1. `tw_detect_drift`.
+2. If it reports **handoff-ahead** drift (handoff says complete, tasks.md shows incomplete) → `tw_sync`
+   to mirror the ledger onto tasks.md. Safe + bookkeeping-only.
+3. If it reports **vibe drift** (tasks.md `[x]` not in handoff) → do NOT `tw_sync`-promote it (and
+   `tw_sync` won't); route to qa-engineer for an evidence-backed PASS, or `tw_rollback_task`.
+
+Never hand-edit `tasks.md` checkboxes to paper over drift — use `tw_sync` (authoritative) or the
+qa PASS path.
+
 ## SOP
 
 1. **Auto-routing pre-check**: read `AGC_AUTO_ROUTE` from the shell environment (e.g. `printenv AGC_AUTO_ROUTE`). Value exactly `0` → `auto_mode = off` for this session. Unset or any other value → `auto_mode = on` (default).
