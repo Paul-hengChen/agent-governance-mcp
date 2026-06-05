@@ -51,6 +51,30 @@ The routing chain is **server-enforced**, not advisory. Invalid
 On rejection the server returns `{ error, attempted, allowed, hint }` —
 read it and self-correct. Full matrix: `specs/qa-flow-enforcement-architecture.md`.
 
+### 3.2 Visual Verdict Authority & Separation of Duties (v3.26.0)
+
+Hard governance rules that emerged from the CDE-OOBE false-PASS retrospective
+(`research/cde-oobe-visual-fidelity-retrospective-2026-06-05.md`). The decisive failure was a
+coordinator-authored accept-policy that pre-excused the exact visual defect; prompt-advisory rules
+proved insufficient, so these are also server-enforced (§3.1 visual evidence gate + report-schema
+validation).
+
+- **Visual verdict is qa-visual-owned.** ONLY qa-visual may define visual PASS criteria, accepted-diff
+  tolerance, or pre-excused divergence classes — and only inside the qa-visual-authored
+  `## Allowed Differences` section of `qa_reports/visual_<task-id>.md` (or PM/spec, before
+  implementation). The coordinator and every non-qa role MAY pass context (baseline paths, Figma node
+  ids, route, canonical-state setup) but MUST NOT define, override, relax, or pre-accept any visual
+  difference. A coordinator-authored accept-policy is **void**; the server rejects a PASS whose
+  allowed-diffs are not authored under a qa-visual / qa-engineer handoff.
+- **Builder ≠ judge (role-collapse guard).** If subagent limits force a role to run inline in the
+  coordinator's context, that actor MAY build/edit but MUST NOT author the visual verdict nor
+  self-issue a visual PASS. With no independent qa-visual / qa-engineer context available,
+  visual-backed work stops at `status=Blocked` ("awaiting independent QA") — never a builder-signed
+  PASS.
+- **No global-frame metric.** Whole-frame pixel-percentage MUST NOT be the visual PASS metric; a
+  sparse canvas dilutes localized structural errors. Comparison is per-surface / region-weighted with
+  explicit structural assertions and canonical-state parity (see `skill-qa-visual`).
+
 ## 4. Routing Chain (multi-phase work)
 
 ```

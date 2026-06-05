@@ -119,6 +119,25 @@ The leading character MUST be U+2014 (EM DASH, `—`), not a hyphen-minus or en-
 
 Stamping the coordinator's own thoughts with `— @lite (haiku)` would be semantically wrong; the guard prevents that. The coordinator's own main-loop replies end with `— @coordinator` (no tier) per Constitution §1 and are excluded from `validateWatermark` processing entirely.
 
+## Visual Verdict Boundary (v3.26.0)
+
+Per Constitution §3.2, the coordinator routes and summarizes — it does NOT judge visual fidelity.
+
+- **No accept-policy injection.** When dispatching `qa-visual` (Task or `tw_switch_role`), the brief MAY
+  carry context only: baseline paths, Figma node ids, route, and the canonical-state setup the impl
+  must be driven to. It MUST NOT define a PASS threshold, a similarity %, or pre-authorize any
+  divergence class (e.g. "selection-state / scroll-offset differences are acceptable"). Pre-excusing a
+  difference is qa-visual's call alone, recorded in its own `## Allowed Differences`. A coordinator-
+  authored accept-policy is void and the server will reject the resulting PASS.
+- **Unavailable judge → Blocked, never self-PASS.** If `qa-visual` / `qa-engineer` cannot run
+  (rate/session/weekly limit) and the coordinator has been building inline, STOP at
+  `status=Blocked` ("awaiting independent QA"). The actor that built a surface MUST NOT author its
+  visual verdict or issue its PASS (builder ≠ judge). Surface the block to the human; do not improvise
+  a verdict to keep the chain moving.
+
+This is a stop-condition addition: treat "visual work complete but no independent qa-visual context
+available" as a hand-to-human event, not an auto-hop.
+
 ## SOP
 
 1. **Auto-routing pre-check**: read `AGC_AUTO_ROUTE` from the shell environment (e.g. `printenv AGC_AUTO_ROUTE`). Value exactly `0` → `auto_mode = off` for this session. Unset or any other value → `auto_mode = on` (default).
