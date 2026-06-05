@@ -256,4 +256,147 @@ export function hasUncheckedWidgets(workspacePath, taskIds) {
         uncheckedByTaskId,
     };
 }
+// ---------- v3.26.0 — Visual report schema validation ----------
+// Constitution §3.2 + skill-qa-visual report schema. The pre-v3.26 gate checked
+// only file existence + unchecked widget rows; the CDE-OOBE false-PASS showed
+// "evidence exists" != "evidence is meaningful". This validator parses the
+// required sections and rejects PASS on: a missing required section, any
+// failed/unverified canonical-state row, any failed/unverified structural
+// assertion, or a non-PASS verdict.
+//
+// Authorship note (R1): `## Allowed Differences` is qa-owned BY CONSTRUCTION —
+// the visual report is consulted only on a qa-engineer PASS, so its contents are
+// already within qa authority. The coordinator override that broke CDE-OOBE
+// happened via the dispatch PROMPT (now blocked by Constitution §3.2 +
+// skill-coordinator), NOT by writing this file. We therefore do NOT keyword-sniff
+// for "coordinator policy" markers (brittle / gameable).
+//
+// Backwards-compat: strictness is OPT-IN via the design contract. The caller
+// applies this validator only when the design file declares
+// `## Visual Structural Assertions` (a v3.26 design-auditor always emits it for
+// mode != no-design). Pre-v3.26 designs lack that section → old visual reports
+// keep passing on the existence + widget-shape gate alone.
+const REQUIRED_VISUAL_SECTIONS = [
+    "Widget Shape Verification",
+    "Canonical State Verification",
+    "Structural Assertions",
+    "Region Diff",
+    "Verdict",
+];
+function escapeRegex(s) {
+    return s.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&");
+}
+// Slice a markdown H2 section body (heading exclusive) up to the next `## ` or EOF.
+function sliceH2Section(content, heading) {
+    const headRe = new RegExp(`^##\\s+${escapeRegex(heading)}\\b[^\\n]*`, "im");
+    const m = headRe.exec(content);
+    if (!m || m.index === undefined)
+        return null;
+    const start = m.index + m[0].length;
+    const rest = content.slice(start);
+    const nextIdx = rest.search(/\n##\s/);
+    return nextIdx === -1 ? rest : rest.slice(0, nextIdx);
+}
+// `- [mark] label` rows → labels whose mark is not x/X (unchecked/unverified).
+function parseUncheckedLabels(section) {
+    const lineRe = /^-\s+\[(.)\]\s+(.+)$/gm;
+    const unchecked = [];
+    let m;
+    while ((m = lineRe.exec(section)) !== null) {
+        if (m[1] === "x" || m[1] === "X")
+            continue;
+        const rest = m[2];
+        const splitIdx = rest.search(/\s+—\s+|\s+-\s+/);
+        unchecked.push((splitIdx === -1 ? rest : rest.slice(0, splitIdx)).trim());
+    }
+    return unchecked;
+}
+// Markdown table rows whose LAST cell is the pass/fail result. Returns the
+// first-cell ids whose result is not exactly "pass" (case-insensitive): fail,
+// blank, or any other token counts as unverified. Header + separator rows skipped.
+function parseAssertionFailures(section) {
+    const failures = [];
+    for (const line of section.split("\n")) {
+        const t = line.trim();
+        if (!t.startsWith("|"))
+            continue;
+        if (/^\|[\s:|-]+\|?$/.test(t))
+            continue; // separator row
+        const parts = t.split("|");
+        if (parts.length && parts[0].trim() === "")
+            parts.shift();
+        if (parts.length && parts[parts.length - 1].trim() === "")
+            parts.pop();
+        const cells = parts.map((c) => c.trim());
+        if (cells.length < 2)
+            continue;
+        const id = cells[0];
+        if (id === "" || /assertion\s*id/i.test(id))
+            continue; // header row
+        const result = cells[cells.length - 1].toLowerCase();
+        if (result !== "pass")
+            failures.push(id);
+    }
+    return failures;
+}
+// Pure validator over a single visual report's content.
+export function validateVisualReport(content) {
+    const missingSections = [];
+    for (const sec of REQUIRED_VISUAL_SECTIONS) {
+        if (sliceH2Section(content, sec) === null)
+            missingSections.push(sec);
+    }
+    const canonical = sliceH2Section(content, "Canonical State Verification");
+    const failedCanonicalStates = canonical ? parseUncheckedLabels(canonical) : [];
+    const structural = sliceH2Section(content, "Structural Assertions");
+    const failedStructuralAssertions = structural ? parseAssertionFailures(structural) : [];
+    // Verdict may be written inline on the heading (`## Verdict — PASS`) or in the
+    // section body — accept either.
+    const verdictHead = /^##\s+Verdict\b[^\n]*/im.exec(content);
+    const verdictBody = sliceH2Section(content, "Verdict");
+    const verdictPass = (verdictHead !== null && /\bPASS\b/i.test(verdictHead[0])) ||
+        (verdictBody !== null && /\bPASS\b/i.test(verdictBody));
+    const ok = missingSections.length === 0 &&
+        failedCanonicalStates.length === 0 &&
+        failedStructuralAssertions.length === 0 &&
+        verdictPass;
+    return { ok, missingSections, failedCanonicalStates, failedStructuralAssertions, verdictPass };
+}
+// True when the design file declares a `## Visual Structural Assertions` section
+// (the v3.26 signal that the workspace is on the structured-visual contract).
+// Gates strict report validation so pre-v3.26 workspaces stay backwards-compatible.
+export function designDeclaresStructuralAssertions(workspacePath, activeFeature) {
+    const designPath = designFilePath(workspacePath, activeFeature);
+    if (!activeFeature || !fs.existsSync(designPath))
+        return false;
+    try {
+        const content = fs.readFileSync(designPath, "utf-8");
+        return /^##\s+Visual\s+Structural\s+Assertions\b/im.test(content);
+    }
+    catch {
+        return false;
+    }
+}
+// Composition helper. Validates each present visual_<id>.md against the v3.26
+// schema. Missing files are skipped (existence is enforced upstream by
+// hasVisualEvidenceInFile). Returns the failing task ids with their detail.
+export function validateVisualReports(workspacePath, taskIds) {
+    const byTaskId = {};
+    for (const id of taskIds) {
+        const filePath = visualEvidencePath(workspacePath, id);
+        if (!fs.existsSync(filePath))
+            continue;
+        let content;
+        try {
+            content = fs.readFileSync(filePath, "utf-8");
+        }
+        catch {
+            continue;
+        }
+        const v = validateVisualReport(content);
+        if (!v.ok)
+            byTaskId[id] = v;
+    }
+    return { ok: Object.keys(byTaskId).length === 0, byTaskId };
+}
 //# sourceMappingURL=evidence-file.js.map

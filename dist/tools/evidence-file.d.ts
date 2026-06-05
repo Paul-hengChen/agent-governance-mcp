@@ -32,4 +32,18 @@ export interface UncheckedWidgetsCheck {
     uncheckedByTaskId: Record<string, string[]>;
 }
 export declare function hasUncheckedWidgets(workspacePath: string, taskIds: string[]): UncheckedWidgetsCheck;
+export interface VisualReportValidation {
+    ok: boolean;
+    missingSections: string[];
+    failedCanonicalStates: string[];
+    failedStructuralAssertions: string[];
+    verdictPass: boolean;
+}
+export declare function validateVisualReport(content: string): VisualReportValidation;
+export declare function designDeclaresStructuralAssertions(workspacePath: string, activeFeature: string): boolean;
+export interface VisualReportsCheck {
+    ok: boolean;
+    byTaskId: Record<string, VisualReportValidation>;
+}
+export declare function validateVisualReports(workspacePath: string, taskIds: string[]): VisualReportsCheck;
 //# sourceMappingURL=evidence-file.d.ts.map

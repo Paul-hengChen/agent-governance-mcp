@@ -53,10 +53,7 @@ component region** declared by the baseline's `compare region`, not the full fra
 For each `## Visual Baselines` row:
 
 a. Read both `baseline path` and `impl path` via the Read tool (images render into multimodal context).
-b. Emit a structured diff over the declared region covering: (i) layout / position, (ii) spacing /
-   alignment, (iii) element presence, (iv) color, (v) text content, (vi) image content. Append under
-   `## Region Diff` in `qa_reports/visual_<task-id>.md`, one sub-section per `surface id`. Any material
-   difference (not in the qa-owned `## Allowed Differences`) is a drift → FAIL.
+b. Emit a structured diff over the declared region covering: (i) layout / position, (ii) spacing / alignment, (iii) element presence, (iv) color, (v) text content, (vi) image content. Append under `## Region Diff` in `qa_reports/visual_<task-id>.md`, one sub-section per `surface id`. Any material difference (not in the qa-owned `## Allowed Differences`) is a drift → FAIL.
 
 ### Step C — Structural Assertions (v3.26.0, R3/R-VIS)
 

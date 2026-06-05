@@ -54,6 +54,12 @@ export interface TransitionRejection {
                                     // is absent. NOT produced by validateTransition;
                                     // union extension is for handler-side narrowing +
                                     // envelope consistency (mirrors VISUAL_WIDGETS_UNVERIFIED).
+    | "VISUAL_REPORT_INCOMPLETE"    // v3.26.0 — emitted by index.ts PASS gate when the
+                                    // design declares ## Visual Structural Assertions but
+                                    // qa_reports/visual_<id>.md is missing a required
+                                    // section, has a failed/unverified canonical-state or
+                                    // structural-assertion row, or lacks a PASS verdict.
+                                    // Handler-side only (like the two above).
     | "AGENT_ID_REQUIRED";
   attempted: {
     prev_agent: string | null;

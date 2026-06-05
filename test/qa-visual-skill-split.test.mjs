@@ -119,9 +119,13 @@ test("AC-5: byte counts stay within v3.14.0-relaxed budgets (savings invariant v
   // v3.14.0 adds ~600 bytes for the PASS-gate clause — raise cap to 8500
   // (still under v3.8.2 baseline).
   assert.ok(qaSize <= 8500, `qa-engineer.md must be <= 8500 bytes (got ${qaSize})`);
-  // qa-visual.md: v3.14.0 carries shape checklist + widget routes; cap
-  // raised from 2400 to 4700 to accommodate the new contract.
-  assert.ok(qaVisualSize <= 4700, `qa-visual.md must be <= 4700 bytes (got ${qaVisualSize})`);
+  // qa-visual.md: v3.26.0 adds the structured-visual contract — Canonical State
+  // Verification (Step A.5), Region Diff (renamed, whole-frame % banned),
+  // Structural Assertions (Step C), qa-owned Allowed Differences, the
+  // server-validated Report schema, and per-widget isolation. Cap raised
+  // 4700 → 9000. This is a scoped cost: qa-visual is lazy-loaded ONLY when the
+  // visual gate arms (design mode != no-design), so non-visual tasks pay zero.
+  assert.ok(qaVisualSize <= 9000, `qa-visual.md must be <= 9000 bytes (got ${qaVisualSize})`);
 });
 
 test("AC-6: Phase 1.5 v3.8.2 contract is preserved AND extended in v3.14.0 (combined assertion)", () => {

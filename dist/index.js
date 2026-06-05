@@ -32,7 +32,7 @@ import { appendSpecContext } from "./prompts/build.js";
 import { buildPrdChunks, CHUNKER_VERSION, DEFAULT_EMBEDDING_MODEL } from "./tools/rag.js";
 import { getInflightKey, getInflight, setInflight, deleteInflight, awaitAllInflightFor, } from "./tools/rag-coalesce.js";
 import { requireQaEngineer, validateTransition, computeNewRound, } from "./tools/transitions.js";
-import { hasVisualBaselinesInDesign, hasVisualEvidenceInFile, hasUncheckedWidgets, hasDesignModeRequiringVisual, } from "./tools/evidence-file.js";
+import { hasVisualBaselinesInDesign, hasVisualEvidenceInFile, hasUncheckedWidgets, hasDesignModeRequiringVisual, designDeclaresStructuralAssertions, validateVisualReports, } from "./tools/evidence-file.js";
 // ==========================================
 // Runtime validation schemas (zod)
 // ==========================================
@@ -702,6 +702,46 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                                     }],
                                 isError: true,
                             };
+                        }
+                        // v3.26.0 — Visual report SCHEMA validation (Constitution §3.2).
+                        // Existence + widget-shape was insufficient: CDE-OOBE shipped a bad
+                        // UI under a nominal PASS because the report carried no canonical-state
+                        // or structural-assertion claims. This gate parses the report and
+                        // rejects PASS on a missing required section, any failed/unverified
+                        // canonical-state row, any failed/unverified structural assertion, or a
+                        // non-PASS verdict. OPT-IN for backwards-compat: only enforced when the
+                        // design file declares `## Visual Structural Assertions` (v3.26 contract);
+                        // pre-v3.26 designs/reports keep passing on the gates above.
+                        if (designDeclaresStructuralAssertions(parsed.workspace_path, parsed.active_feature)) {
+                            const schema = validateVisualReports(parsed.workspace_path, parsed.completed_tasks);
+                            if (!schema.ok) {
+                                const listing = Object.entries(schema.byTaskId)
+                                    .map(([taskId, v]) => {
+                                    const reasons = [];
+                                    if (v.missingSections.length)
+                                        reasons.push(`missing: ${v.missingSections.join("/")}`);
+                                    if (v.failedCanonicalStates.length)
+                                        reasons.push(`canonical-state fail: ${v.failedCanonicalStates.join("/")}`);
+                                    if (v.failedStructuralAssertions.length)
+                                        reasons.push(`structural fail: ${v.failedStructuralAssertions.join("/")}`);
+                                    if (!v.verdictPass)
+                                        reasons.push("verdict != PASS");
+                                    return `${taskId} {${reasons.join("; ")}}`;
+                                })
+                                    .join(" | ");
+                                return {
+                                    content: [{
+                                            type: "text",
+                                            text: `⛔ VISUAL_REPORT_INCOMPLETE: ${listing}. ` +
+                                                `qa_reports/visual_<id>.md must contain Canonical State Verification, ` +
+                                                `Structural Assertions, Region Diff, and a PASS Verdict with every row ` +
+                                                `cleared (skill-qa-visual §Report schema). Resolve the failed/unverified ` +
+                                                `rows — do NOT pre-accept them (visual verdict is qa-visual-owned, ` +
+                                                `Constitution §3.2).`,
+                                        }],
+                                    isError: true,
+                                };
+                            }
                         }
                     }
                 }

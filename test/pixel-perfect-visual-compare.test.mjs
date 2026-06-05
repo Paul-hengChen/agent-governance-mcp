@@ -44,8 +44,9 @@ test("AC-1: design-auditor Artifact Schema declares Visual Baselines H2 with 4-c
 
   // Section heading present + marked MANDATORY when mode != no-design (v3.16.0)
   assert.match(body, /\*\*Visual Baselines\*\*\s*\*\(MANDATORY when mode/i, "Visual Baselines must be MANDATORY when mode != no-design (v3.16.0)");
-  // 4-column schema with all required columns
-  assert.match(body, /surface id\s*\|\s*baseline path\s*\|\s*impl path\s*\|\s*notes/i, "4-column header must be present");
+  // v3.26.0: extended schema — surface id + source node + baseline/impl paths +
+  // viewport + route + canonical state + compare region + notes.
+  assert.match(body, /surface id\s*\|\s*source node\s*\|\s*baseline path\s*\|\s*impl path\s*\|\s*viewport\s*\|\s*route\s*\|\s*canonical state\s*\|\s*compare region\s*\|\s*notes/i, "extended (v3.26.0) Visual Baselines header must be present");
   // Surface id foreign-keys to Source manifest
   assert.match(body, /surface id.*MUST match.*Source manifest/is, "surface id must FK to Source manifest");
   // v3.16.0: absence is only legitimate for mode = no-design; other modes block at server
@@ -92,7 +93,7 @@ test("AC-3: per-row compare contract reads both PNGs and emits 6-category diff (
   }
   // v3.14.0 output destination + heading
   assert.match(body, /qa_reports\/visual_<task-id>\.md/, "v3.14.0: output must land in visual_<task-id>.md (PASS gate)");
-  assert.match(body, /##\s*Pixel Diff/, "v3.14.0: diff goes under `## Pixel Diff` (Step B)");
+  assert.match(body, /##\s*Region Diff/, "v3.26.0: diff goes under `## Region Diff` (Step B; renamed from Pixel Diff — whole-frame %% banned)");
   assert.match(body, /sub-section per\s*`?surface id`?/i, "one sub-section per surface id");
 });
 
