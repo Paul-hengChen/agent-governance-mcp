@@ -16,6 +16,20 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.27.1] - 2026-06-08
+
+PATCH — documentation/research only; no code or behavior change. Captures the CDE-OOBE analysis
+and the cross-AI review trail that drove v3.26.0–v3.27.0.
+
+### Added (docs)
+
+- `docs/postmortem-visual-fidelity-gate.md` — postmortem of the visual-fidelity gate failure.
+- `research/cde-oobe-visual-fidelity-governance-recommendations-2026-06-05.md` — Codex/GPT-5
+  governance recommendations.
+- `research/oobe-visual-fidelity-improvement-plan.md` — Antigravity/Gemini 3.1 Pro improvement plan.
+- `research/design-fidelity-workflow.md`, `research/multi-ai-agent-pipeline-report.md` — supporting
+  analysis.
+
 ## [3.27.0] - 2026-06-05
 
 PATCH-plus follow-up hardening the v3.26.0 visual-verdict gate after an external code review
