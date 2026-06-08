@@ -16,6 +16,37 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.28.0] - 2026-06-08
+
+MINOR — adds the `release-engineer` role to the routing state machine and syncs the constitution
+(now self-versioned v3.27.0) with shipped server behavior. Closes the doc-vs-code drift (A1–A4) and
+internal-consistency (B1–B3) items from the two-AI review.
+
+### Fixed
+
+- **`release-engineer` was absent from `ALLOWED_TRANSITIONS` (matrix gap A5).** A `release-engineer:PASS`
+  write hit an empty allowed set, wedging the chain (no valid escape transition). Added
+  `release-engineer` to the `AgentName` union and `isAgent()` guard, plus an `ALLOWED` row
+  `release-engineer:PASS → (pm, In_Progress), (researcher, In_Progress)` mirroring `qa-engineer:PASS`
+  (`tools/transitions.ts`). Mirrored into `specs/qa-flow-enforcement-architecture.md`.
+
+### Changed (governance docs)
+
+- **`content/constitution.md` synced to shipped behavior and self-versioned v3.27.0** (independent of
+  `package.json`; `check-version.mjs` does not read the header). §3 pre-flight list and "Task list edits"
+  rule now name `tw_sync` (A1); §3.1 + §4 document `VISUAL_REPORT_INCOMPLETE` / `VISUAL_ASSERTIONS_REQUIRED`
+  with the six required report sections verbatim (A2); §3.2 authorship wording softened to "accepted and
+  owned by the qa chain at PASS time (server validates report schema, not file authorship)" (A4).
+- **§1 internal-consistency carve-outs.** Terse ≤15-word cap no longer applies when surfacing a blocker,
+  flagging an assumption gap (§7), or stating acceptance criteria (B1). Added a design-baseline rule:
+  for design-backed work the canonical design is the scope baseline; omitting a design-present element is
+  a fidelity defect, not MVP compliance (B2).
+- **`## Document Priority` intra-constitution tie-breaker (B3).** Safety/correctness rules (§2/§3/§6/§7)
+  override efficiency/style rules (§1); a §5 anti-loop trip hands back Blocked/FAIL — never an error-laden
+  PASS.
+- **Skill forward-references.** `content/skill-sr-engineer.md` and `content/skill-design-auditor.md` each
+  point to the §1 B2 design-baseline rule (forward-ref only, no restatement).
+
 ## [3.27.1] - 2026-06-08
 
 PATCH — documentation/research only; no code or behavior change. Captures the CDE-OOBE analysis

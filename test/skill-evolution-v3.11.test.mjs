@@ -44,10 +44,16 @@ test("AC-10/11: tw_switch_role logic and index.ts registration", async () => {
   assert.match(indexTs, /else if \(name === "release-engineer"\)/, "index.ts must route release-engineer prompt");
 });
 
-test("AC-10: transitions.ts AgentName union is UNCHANGED (side-channel constraint)", () => {
+test("AC-10: transitions.ts AgentName union constraint (side-channel)", () => {
+  // v3.11 constraint: doc-writer is a content-only role and must NOT appear in the
+  // ALLOWED_TRANSITIONS state machine — it has no qa-flow routing.
+  // v3.28.0 (A5 matrix fix): release-engineer WAS deliberately added to transitions.ts
+  // as a terminal PASS role so the state machine can route qa-engineer:PASS →
+  // release-engineer:In_Progress without a human-break. This is an intentional
+  // promotion of release-engineer from "human decision" to a first-class chain role.
   const transitionsTs = fs.readFileSync(path.join(PROJECT_ROOT, "tools", "transitions.ts"), "utf-8");
-  assert.doesNotMatch(transitionsTs, /doc-writer/, "doc-writer must NOT be in transitions.ts");
-  assert.doesNotMatch(transitionsTs, /release-engineer/, "release-engineer must NOT be in transitions.ts");
+  assert.doesNotMatch(transitionsTs, /doc-writer/, "doc-writer must NOT be in transitions.ts (content-only role, no qa-flow routing)");
+  assert.match(transitionsTs, /release-engineer/, "release-engineer MUST be in transitions.ts (v3.28.0 A5 matrix promotion — terminal PASS role)");
 });
 
 test("AC-10: schema/versions.ts schema versions track v3.14.0", () => {

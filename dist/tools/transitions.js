@@ -103,6 +103,10 @@ const ALLOWED = new Map([
             { agent: "pm", status: "In_Progress" },
             { agent: "researcher", status: "In_Progress" },
         ]],
+    ["release-engineer:PASS", [
+            { agent: "pm", status: "In_Progress" },
+            { agent: "researcher", status: "In_Progress" },
+        ]],
 ]);
 export const ALLOWED_TRANSITIONS = ALLOWED;
 const ROUND_CAP = 4;
@@ -122,7 +126,8 @@ function isAgent(a) {
         a === "architect" ||
         a === "sr-engineer" ||
         a === "code-reviewer" ||
-        a === "qa-engineer");
+        a === "qa-engineer" ||
+        a === "release-engineer");
 }
 function rejection(req, error, allowed, hint) {
     return {

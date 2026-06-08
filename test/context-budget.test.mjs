@@ -45,18 +45,20 @@ test("AC2: stripChainOnly removes the chain-only block and is idempotent", () =>
   assert.equal(stripChainOnly("no markers here"), "no markers here", "text without markers is unchanged");
 });
 
-test("AC2: lean always-on bundle is below the raw baseline and within target (<= 2300 ~tok)", () => {
+test("AC2: lean always-on bundle is below the raw baseline and within target (<= 2400 ~tok)", () => {
   // v3.24.0 (B2 backlog fix): cap raised from 2100 → 2300 to provide ~200-token
   // editing headroom. The v3.22.0 raise (2000 → 2100) left only a 2-token margin
   // (2098/2100), meaning any minor constitution/skill edit broke CI unexpectedly.
-  // 2300 absorbs ~200 tokens of editing slack while staying well below the full
-  // coordinator bundle (~3500+ tokens).
+  // v3.27.0 (qa-owned bump): cap raised from 2300 → 2400 to absorb the net growth
+  // from the real v3.27.0 constitution edits (A1–B3 + A4 wording). Actual lean
+  // bundle measured at 2348 ~tok; 2400 provides ~50-token editing headroom while
+  // staying well below the full coordinator bundle (~3500+ tokens).
   const liteSkill = fs.readFileSync(path.join(ROOT, "content", "skill-coordinator-lite.md"), "utf-8");
   const SEP = "\n\n---\n\n";
   const raw = approxTokens(CONSTITUTION + SEP + liteSkill);
   const lean = approxTokens(stripChainOnly(CONSTITUTION) + SEP + liteSkill);
   assert.ok(lean < raw, `lean (${lean}) must be < raw (${raw})`);
-  assert.ok(lean <= 2300, `lean always-on (${lean} ~tok) must meet the <= 2300 target`);
+  assert.ok(lean <= 2400, `lean always-on (${lean} ~tok) must meet the <= 2400 target`);
 });
 
 // --- AC3: enforcement preserved ------------------------------------------

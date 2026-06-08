@@ -852,3 +852,106 @@ test("AC-12: code-reviewer agent is in ALLOWED_TRANSITIONS keys", () => {
   assert.ok(ALLOWED_TRANSITIONS.has("code-reviewer:FAIL"));
   assert.ok(ALLOWED_TRANSITIONS.has("code-reviewer:Blocked"));
 });
+
+// ============================================================================
+// T-MATRIX-A5 — release-engineer added to routing chain (v3.28.0)
+// ============================================================================
+// WHY: release-engineer was absent from the AgentName union, the isAgent()
+// guard, and the ALLOWED map. Any handoff that landed in state
+// (release-engineer, PASS) returned an empty allowed set — the chain was
+// permanently wedged with no valid next transition. A5 fixes all three sites.
+// These tests encode the contract; a regression that removes any of the three
+// sites would make one or more fail.
+
+// ---------- T-MATRIX-A5(a): isAgent recognises release-engineer ----------
+
+test("T-MATRIX-A5: release-engineer is a valid agent_id (unknown-agent gate does not fire)", () => {
+  // WHY: the isAgent() guard rejects unknown agent_id values with
+  // AGENT_ID_REQUIRED. Before A5, "release-engineer" fell through as unknown.
+  // Now it must be accepted so the write can reach the table-lookup step.
+  // We verify by requesting a known-valid transition; AGENT_ID_REQUIRED would
+  // fire before TRANSITION_REJECTED, so absence of that error code is the proof.
+  const r = validateTransition({
+    prev: { agent: "release-engineer", status: "PASS" },
+    next: { agent: "pm", status: "In_Progress" },
+    prev_qa_round: 0,
+    prev_review_round: 0,
+  });
+  // null means accepted — the agent was recognised and the edge is in ALLOWED.
+  assert.equal(r, null, "release-engineer:PASS → pm:In_Progress must be accepted");
+});
+
+// ---------- T-MATRIX-A5(b): allowed edges from release-engineer:PASS ----------
+
+test("T-MATRIX-A5: release-engineer:PASS → pm:In_Progress accepted", () => {
+  // WHY: mirrors qa-engineer:PASS → pm:In_Progress (post-release PM entry).
+  assert.equal(
+    validateTransition({
+      prev: { agent: "release-engineer", status: "PASS" },
+      next: { agent: "pm", status: "In_Progress" },
+      prev_qa_round: 0,
+      prev_review_round: 0,
+    }),
+    null,
+  );
+});
+
+test("T-MATRIX-A5: release-engineer:PASS → researcher:In_Progress accepted", () => {
+  // WHY: mirrors qa-engineer:PASS → researcher:In_Progress (next-feature
+  // research path directly from release gate).
+  assert.equal(
+    validateTransition({
+      prev: { agent: "release-engineer", status: "PASS" },
+      next: { agent: "researcher", status: "In_Progress" },
+      prev_qa_round: 0,
+      prev_review_round: 0,
+    }),
+    null,
+  );
+});
+
+// ---------- T-MATRIX-A5(c): rejected edge from release-engineer:PASS ----------
+
+test("T-MATRIX-A5: release-engineer:PASS → sr-engineer:In_Progress REJECTED", () => {
+  // WHY: the row only grants (pm, In_Progress) and (researcher, In_Progress).
+  // Jumping back to sr-engineer would bypass PM triage, which the matrix
+  // forbids. The rejection envelope's allowed list must NOT contain sr-engineer.
+  const r = validateTransition({
+    prev: { agent: "release-engineer", status: "PASS" },
+    next: { agent: "sr-engineer", status: "In_Progress" },
+    prev_qa_round: 0,
+    prev_review_round: 0,
+  });
+  assert.ok(r, "transition must be rejected");
+  assert.equal(r.error, "TRANSITION_REJECTED");
+  assert.ok(
+    !r.allowed.some((a) => a.new_agent === "sr-engineer"),
+    `allowed list must NOT contain sr-engineer; got ${JSON.stringify(r.allowed)}`,
+  );
+  // Positive assertion: the two valid targets must appear in the allowed list.
+  assert.ok(
+    r.allowed.some((a) => a.new_agent === "pm" && a.new_status === "In_Progress"),
+    "allowed list must contain (pm, In_Progress)",
+  );
+  assert.ok(
+    r.allowed.some((a) => a.new_agent === "researcher" && a.new_status === "In_Progress"),
+    "allowed list must contain (researcher, In_Progress)",
+  );
+});
+
+// ---------- T-MATRIX-A5(d): prior-wedge regression guard ----------
+
+test("T-MATRIX-A5: release-engineer:PASS row is present in ALLOWED_TRANSITIONS (empty-set wedge regression)", () => {
+  // WHY: before A5 the ALLOWED map had no "release-engineer:PASS" key.
+  // ALLOWED.get("release-engineer:PASS") returned undefined, which the
+  // validator treated as an empty allowed set — validateTransition would
+  // return TRANSITION_REJECTED with allowed=[] for EVERY next tuple,
+  // permanently wedging the chain with no valid exit. This test encodes that
+  // exact regression: the key MUST be present AND its value must be non-empty.
+  assert.ok(
+    ALLOWED_TRANSITIONS.has("release-engineer:PASS"),
+    "ALLOWED_TRANSITIONS must have a 'release-engineer:PASS' key (absent before A5 — the wedge)",
+  );
+  const row = ALLOWED_TRANSITIONS.get("release-engineer:PASS");
+  assert.ok(row && row.length > 0, "release-engineer:PASS row must have at least one allowed target");
+});

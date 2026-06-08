@@ -10,7 +10,8 @@ export type AgentName =
   | "architect"
   | "sr-engineer"
   | "code-reviewer"
-  | "qa-engineer";
+  | "qa-engineer"
+  | "release-engineer";
 
 export type StatusName = "In_Progress" | "PASS" | "FAIL" | "Blocked";
 
@@ -188,6 +189,10 @@ const ALLOWED: ReadonlyMap<string, AllowedNext> = new Map<string, AllowedNext>([
     { agent: "pm", status: "In_Progress" },
     { agent: "researcher", status: "In_Progress" },
   ]],
+  ["release-engineer:PASS", [
+    { agent: "pm", status: "In_Progress" },
+    { agent: "researcher", status: "In_Progress" },
+  ]],
 ]);
 
 export const ALLOWED_TRANSITIONS = ALLOWED;
@@ -212,7 +217,8 @@ function isAgent(a: string | null): a is AgentName {
     a === "architect" ||
     a === "sr-engineer" ||
     a === "code-reviewer" ||
-    a === "qa-engineer"
+    a === "qa-engineer" ||
+    a === "release-engineer"
   );
 }
 
