@@ -133,7 +133,9 @@ test("security smoke: agc with no subcommand exits non-zero and prints usage to 
   const ws = mkTmp("agc-init-usage-");
   const r = runInit(ws, []);
   assert.notEqual(r.status, 0, "exits non-zero");
-  assert.match(r.stderr, /Usage: agc init/);
+  assert.match(r.stderr, /Usage: agc <command>/);
+  assert.match(r.stderr, /\binit\b/);
+  assert.match(r.stderr, /\bcheck\b/);
   // Idempotency invariant: nothing should be written when usage is shown.
   assert.equal(fs.existsSync(path.join(ws, ".current")), false);
   assert.equal(fs.existsSync(path.join(ws, "tasks.md")), false);

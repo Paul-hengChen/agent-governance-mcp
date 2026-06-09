@@ -1,26 +1,106 @@
 #!/usr/bin/env node
-// `agc init` — scaffold an agent-governance-mcp workspace.
+// `agc` — agent-governance-mcp workspace CLI.
 //
-// Creates .current/handoff.md, .current/.config.json, tasks.md with sane
-// defaults. Idempotent: existing files are left untouched.
+//   agc init   Scaffold .current/handoff.md, .current/.config.json, tasks.md,
+//              and per-agent entry adapters (CLAUDE.md, AGENTS.md,
+//              .antigravityrules). Idempotent: existing files are skipped;
+//              the CLAUDE.md adapter block is upserted in place.
+//   agc check  Warn if any deployed adapter is stamped with an older agc
+//              version than the one installed; exit 1 if any are stale.
 
 import * as fs from "fs";
 import * as path from "path";
+import { fileURLToPath } from "node:url";
 
-const sub = process.argv[2];
-if (sub !== "init") {
-  process.stderr.write(
-    "Usage: agc init\n" +
-      "Scaffold .current/handoff.md, .current/.config.json, and tasks.md\n" +
-      "in the current directory. Existing files are skipped.\n"
-  );
-  process.exit(sub === undefined ? 1 : 2);
+// --- version-stamp parsing -------------------------------------------------
+// Matches "<!-- agc-version: 3.28.0 -->" and "# agc-version: 3.28.0".
+const STAMP_RE = /agc-version:\s*([0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?)/;
+
+// CLAUDE.md marker block (exact; used by both write and check).
+const CLAUDE_BEGIN = "<!-- BEGIN agc-adapter -->";
+const CLAUDE_END = "<!-- END agc-adapter -->";
+
+// Adapter registry — drives init write + check scan.
+//   rel  = path in the target workspace
+//   tpl  = template filename under templates/agent-adapters/
+//   mode = "skip" (skip-if-exists, whole-file) | "upsert" (marker-block)
+const ADAPTERS = [
+  { rel: "CLAUDE.md", tpl: "claude.md", mode: "upsert" },
+  { rel: "AGENTS.md", tpl: "codex.md", mode: "skip" },
+  { rel: ".antigravityrules", tpl: "antigravity.md", mode: "skip" },
+];
+
+const STR_USAGE =
+  "Usage: agc <command>\n" +
+  "  init    Scaffold .current/handoff.md, .current/.config.json, tasks.md, and\n" +
+  "          per-agent entry adapters (CLAUDE.md, AGENTS.md, .antigravityrules)\n" +
+  "          in the current directory. Existing files are skipped.\n" +
+  "  check   Warn if any generated adapter files are stale vs the installed\n" +
+  "          agent-governance-mcp version.\n";
+
+// --- version / template helpers --------------------------------------------
+
+// Resolve the agc package root from this script's own location (mirror
+// scripts/check-version.mjs:13-16). NOT process.cwd(): `agc` runs inside a
+// target workspace whose package.json is unrelated. import.meta.url reflects
+// the real module path in both local-dev and `npx github:` modes.
+function pkgRoot() {
+  const here = path.dirname(fileURLToPath(import.meta.url)); // <pkg>/bin
+  return path.resolve(here, ".."); // <pkg>
 }
 
-const cwd = process.cwd();
-const now = new Date().toISOString();
+// Read installed agc version from <pkgRoot>/package.json. Throws if unreadable
+// — a broken install should fail loudly, not compare against undefined.
+function installedVersion() {
+  return JSON.parse(
+    fs.readFileSync(path.join(pkgRoot(), "package.json"), "utf-8")
+  ).version;
+}
 
-const handoffTemplate = `---
+// Read a template, replace every {{AGC_VERSION}} with `version`, return text.
+function stampTemplate(tplName, version) {
+  const tplPath = path.join(pkgRoot(), "templates/agent-adapters", tplName);
+  const raw = fs.readFileSync(tplPath, "utf-8");
+  return raw.split("{{AGC_VERSION}}").join(version);
+}
+
+// Upsert the marker-delimited block into CLAUDE.md.
+//   file absent           -> create CLAUDE.md containing just the block.
+//   file present, no block-> append a blank line + block.
+//   file present, block   -> replace text between markers (inclusive); prose untouched.
+// Returns "created" | "appended" | "updated".
+function writeClaudeBlock(cwd, stampedBlock) {
+  const target = path.join(cwd, "CLAUDE.md");
+  const block = stampedBlock.replace(/\n+$/, ""); // normalize trailing newlines
+
+  if (!fs.existsSync(target)) {
+    fs.writeFileSync(target, block + "\n");
+    return "created";
+  }
+
+  const existing = fs.readFileSync(target, "utf-8");
+  const beginIdx = existing.indexOf(CLAUDE_BEGIN);
+  const endIdx = existing.indexOf(CLAUDE_END);
+
+  if (beginIdx !== -1 && endIdx !== -1 && endIdx > beginIdx) {
+    // Replace the existing block in place (markers inclusive).
+    const before = existing.slice(0, beginIdx);
+    const after = existing.slice(endIdx + CLAUDE_END.length);
+    fs.writeFileSync(target, before + block + after);
+    return "updated";
+  }
+
+  // No block present — append after the user's prose.
+  const sep = existing.endsWith("\n") ? "\n" : "\n\n";
+  fs.writeFileSync(target, existing + sep + block + "\n");
+  return "appended";
+}
+
+// --- subcommand: init ------------------------------------------------------
+function runInit(cwd) {
+  const now = new Date().toISOString();
+
+  const handoffTemplate = `---
 schema_version: 1
 active_feature: ""
 status: "Not_Started"
@@ -38,12 +118,12 @@ qa_round: 0
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.
 `;
 
-const configTemplate = `{
+  const configTemplate = `{
   "schema_version": 1
 }
 `;
 
-const tasksTemplate = `# Tasks
+  const tasksTemplate = `# Tasks
 
 <!-- Append via tw_add_task. -->
 
@@ -52,32 +132,109 @@ const tasksTemplate = `# Tasks
 <!-- tw_complete_task will move items here -->
 `;
 
-const files = [
-  { rel: ".current/handoff.md", content: handoffTemplate },
-  { rel: ".current/.config.json", content: configTemplate },
-  { rel: "tasks.md", content: tasksTemplate },
-];
+  const files = [
+    { rel: ".current/handoff.md", content: handoffTemplate },
+    { rel: ".current/.config.json", content: configTemplate },
+    { rel: "tasks.md", content: tasksTemplate },
+  ];
 
-const created = [];
-const skipped = [];
+  const created = [];
+  const skipped = [];
+  const updated = [];
 
-for (const { rel, content } of files) {
-  const abs = path.join(cwd, rel);
-  if (fs.existsSync(abs)) {
-    skipped.push(rel);
-    continue;
+  // Existing .current/ + tasks.md scaffolding (preserved verbatim).
+  for (const { rel, content } of files) {
+    const abs = path.join(cwd, rel);
+    if (fs.existsSync(abs)) {
+      skipped.push(rel);
+      continue;
+    }
+    fs.mkdirSync(path.dirname(abs), { recursive: true });
+    fs.writeFileSync(abs, content);
+    created.push(rel);
   }
-  fs.mkdirSync(path.dirname(abs), { recursive: true });
-  fs.writeFileSync(abs, content);
-  created.push(rel);
+
+  // Per-agent entry adapters.
+  const ver = installedVersion();
+  for (const { rel, tpl, mode } of ADAPTERS) {
+    if (mode === "upsert") {
+      const result = writeClaudeBlock(cwd, stampTemplate(tpl, ver));
+      if (result === "updated") {
+        updated.push(rel);
+      } else {
+        created.push(rel); // "created" or "appended"
+      }
+      continue;
+    }
+    // mode === "skip"
+    const abs = path.join(cwd, rel);
+    if (fs.existsSync(abs)) {
+      skipped.push(rel);
+      continue;
+    }
+    fs.writeFileSync(abs, stampTemplate(tpl, ver));
+    created.push(rel);
+  }
+
+  if (created.length > 0) {
+    process.stdout.write(`Created: ${created.join(", ")}\n`);
+  }
+  if (updated.length > 0) {
+    process.stdout.write(`Updated: ${updated.join(", ")}\n`);
+  }
+  if (skipped.length > 0) {
+    process.stdout.write(`Skipped (already exists): ${skipped.join(", ")}\n`);
+  }
+  if (created.length === 0 && updated.length === 0 && skipped.length > 0) {
+    process.stdout.write("All files already exist — nothing to do.\n");
+  }
 }
 
-if (created.length > 0) {
-  process.stdout.write(`Created: ${created.join(", ")}\n`);
+// --- subcommand: check -----------------------------------------------------
+function runCheck(cwd) {
+  const ver = installedVersion();
+  const stale = [];
+  let present = 0;
+
+  for (const { rel } of ADAPTERS) {
+    const target = path.join(cwd, rel);
+    if (!fs.existsSync(target)) continue; // absent is not a stale condition
+    present++;
+    const m = STAMP_RE.exec(fs.readFileSync(target, "utf-8"));
+    const stamped = m ? m[1] : "(none)";
+    if (stamped !== ver) {
+      stale.push({ file: rel, stamped, installed: ver });
+    }
+  }
+
+  if (stale.length > 0) {
+    for (const s of stale) {
+      process.stderr.write(
+        `agc check — stale adapter: ${s.file} (stamped ${s.stamped}, installed ${s.installed})\n`
+      );
+    }
+    process.exit(1);
+  }
+
+  if (present > 0) {
+    process.stdout.write(`agc check — OK (${ver}) — all adapters current\n`);
+    process.exit(0);
+  }
+
+  // No adapters present — silent, exit 0.
+  process.exit(0);
 }
-if (skipped.length > 0) {
-  process.stdout.write(`Skipped (already exists): ${skipped.join(", ")}\n`);
-}
-if (created.length === 0 && skipped.length === files.length) {
-  process.stdout.write("All files already exist — nothing to do.\n");
+
+// --- dispatch --------------------------------------------------------------
+const sub = process.argv[2];
+switch (sub) {
+  case "init":
+    runInit(process.cwd());
+    break;
+  case "check":
+    runCheck(process.cwd()); // calls process.exit
+    break;
+  default:
+    process.stderr.write(STR_USAGE);
+    process.exit(sub === undefined ? 1 : 2);
 }

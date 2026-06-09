@@ -16,6 +16,31 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.29.0] - 2026-06-09
+
+### Added
+- **Cross-agent adapter scaffolding (`agc init` + `agc check`).** `agc init` now also
+  writes three per-project entry adapters — `AGENTS.md` (Codex), `.antigravityrules`
+  (Antigravity), and a marker-delimited block in `CLAUDE.md` (Claude Code) — from
+  `templates/agent-adapters/`. Each adapter is a **thin loader** (points at the
+  constitution served by the MCP server + the agent's execution profile: subagent
+  dispatch availability, watermark applicability, layering note) — it does **not**
+  duplicate constitution rules, preserving a single source of truth.
+- Adapters carry an `agc-version:` stamp (HTML comment in `CLAUDE.md`, `#` comment in the
+  others). New **`agc check`** subcommand compares each deployed stamp against the installed
+  agc package version (resolved via `import.meta.url`, cwd-poison-immune) and exits 1 on any
+  stale adapter — making drift detectable, not silent.
+- `agc init` adapter writes are idempotent: skip-existing for `AGENTS.md` / `.antigravityrules`;
+  marker-block upsert for `CLAUDE.md` (preserves surrounding user prose, refreshes the stamp).
+- `test/agc-adapters.test.mjs` (12 tests) covering init/check behavior, idempotency, the
+  zero-duplicated-clauses invariant, exit codes, and version-resolution immunity.
+
+### Notes
+- Research: `research/cross-agent-governance-single-source-strategy-2026-06-08.md` (the
+  architecture + the three-party Codex/Gemini/Claude convergence) underpins this feature.
+- Deferred follow-ups: `agc update`, live-reference (Mode A) delivery, Cursor adapter, agent
+  auto-detection, constitution pruning + §1 watermark-mechanic relocation.
+
 ## [3.28.0] - 2026-06-08
 
 MINOR — adds the `release-engineer` role to the routing state machine and syncs the constitution
