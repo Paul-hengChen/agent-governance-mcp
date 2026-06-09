@@ -4,7 +4,7 @@
 
 Lost updates, rule drift across `.cursorrules` / `CLAUDE.md` / `.windsurfrules`, and silent overwrites when two IDEs write at once — solved at the protocol layer, not by hoping the AI behaves.
 
-> **Status**: production-used, v3.27.0. Suite **539/0**. Stdio mode is solo/single-machine; HTTP+SQLite mode is for multi-machine teams.
+> **Status**: production-used, v3.30.0. Suite **595/0**. Stdio mode is solo/single-machine; HTTP+SQLite mode is for multi-machine teams.
 
 ---
 
@@ -14,7 +14,7 @@ Lost updates, rule drift across `.cursorrules` / `CLAUDE.md` / `.windsurfrules`,
 |---|---|
 | **Lost updates** — two IDEs write `handoff.md` simultaneously, later one silently overwrites | `O_EXCL` file lock + mtime freshness check; concurrent writer gets `⛔ STATE DRIFT` |
 | **Rule drift** — same rules duplicated across `.cursorrules`, `CLAUDE.md`, `AGENTS.md`, … | Single `constitution.md` injected into every session via SessionStart hook + MCP prompts |
-| **Format drift** — AI hand-edits `handoff.md` and breaks YAML / checkboxes | Free-text edits revoked; AI MUST go through 10 `tw_*` tools with zod-validated args |
+| **Format drift** — AI hand-edits `handoff.md` and breaks YAML / checkboxes | Free-text edits revoked; AI MUST go through 11 `tw_*` tools with zod-validated args |
 | **No iteration discipline** — AI declares PASS without testing, or loops forever on the same fail | Server-enforced state machine: `qa_round` / `review_round` / `visual_round` caps; PASS requires evidence files |
 
 Existing tools in the same category (GitHub Spec Kit, OpenSpec) ship **templates + slash commands** — enforcement is advisory. This ships **server-side gates** — AI gets `⛔ BLOCKED` envelopes on rule violations. See [vs. alternatives](#vs-alternatives) below.
@@ -25,9 +25,12 @@ Existing tools in the same category (GitHub Spec Kit, OpenSpec) ship **templates
 
 ```bash
 # 1. Register the MCP server
-claude mcp add -s user agent-governance-mcp -- npx -y github:Paul-hengChen/agent-governance-mcp#v3.27.0
+claude mcp add -s user agent-governance-mcp -- npx -y github:Paul-hengChen/agent-governance-mcp#v3.30.0
 
 # 2. Mark the current workspace as managed (REQUIRED — hook is a silent no-op without this)
+# Recommended: use agc init (writes .current/, tasks.md, AND cross-agent adapter files)
+npx -y github:Paul-hengChen/agent-governance-mcp#v3.30.0 agc init
+# Alternative (bare scaffold, no adapter files):
 mkdir -p .current
 
 # 3. Add the SessionStart hook to ~/.claude/settings.json (see Setup → Hook below)
@@ -46,11 +49,13 @@ Then `claude mcp list` should show `✓ Connected`, and opening Claude Code in t
 │  /teamwork, /pm, /architect, /sr-engineer, /qa-engineer,  │
 │  …  →  inject constitution + role SOP + handoff state     │
 ├── Layer 2: Tools ─────────────────────────────────────────┤
-│  10 tw_* MCP tools — the ONLY way to mutate handoff/tasks │
+│  11 tw_* MCP tools — the ONLY way to mutate handoff/tasks │
 │  (zod-validated args; free-text edits revoked)            │
 ├── Layer 3: Guards ────────────────────────────────────────┤
 │  Pre-flight read ▸ file lock ▸ mtime freshness ▸          │
 │  ALLOWED_TRANSITIONS ▸ round caps ▸ evidence-of-QA ▸      │
+│  SCOPE_DECISION_REQUIRED ▸ VISUAL_BASELINES_REQUIRED ▸    │
+│  VISUAL_ASSERTIONS_REQUIRED ▸ VISUAL_REPORT_INCOMPLETE ▸  │
 │  atomic tmp+rename                                        │
 └────────────────────────────────────────────────────────────┘
 ```
@@ -143,6 +148,58 @@ See [specs/subagent-dispatch.md](specs/subagent-dispatch.md) + [specs/subagent-s
 
 ---
 
+## Cross-Agent Adapters (v3.29.0+)
+
+`agc init` writes three thin per-project adapter files alongside the `.current/` scaffold:
+
+| File | Agent | Strategy |
+|---|---|---|
+| `CLAUDE.md` | Claude Code | Marker-delimited block (`<!-- BEGIN agc-adapter -->`) upserted into any existing file |
+| `AGENTS.md` | OpenAI Codex | Created fresh; skip-if-exists on subsequent runs |
+| `.antigravityrules` | Anti-Gravity | Created fresh; skip-if-exists on subsequent runs |
+
+Each adapter is a **thin loader** — it points at the constitution served by the MCP server and records the agent's execution profile (subagent dispatch availability, watermark applicability). It does **not** duplicate constitution rules, so there is a single source of truth: the server.
+
+Adapters carry an `agc-version:` stamp (HTML comment in `CLAUDE.md`, `#` comment in the others). The companion **`agc check`** subcommand compares each deployed stamp against the installed package version and exits 1 on any stale adapter — making drift detectable rather than silent.
+
+```bash
+# Write adapters (idempotent — safe to re-run)
+npx -y github:Paul-hengChen/agent-governance-mcp#v3.30.0 agc init
+
+# Check for stale adapters after upgrading agc
+npx -y github:Paul-hengChen/agent-governance-mcp#v3.30.0 agc check
+```
+
+Write behaviour is idempotent: `AGENTS.md` and `.antigravityrules` are skipped if they already exist; the `CLAUDE.md` block is upserted in-place (surrounding user prose preserved, stamp refreshed).
+
+See [specs/cross-agent-adapter-scaffolding.md](specs/cross-agent-adapter-scaffolding.md) for the full design and deferred follow-ups (Cursor adapter, `agc update`, live-reference delivery).
+
+---
+
+## Visual Fidelity Gates (v3.25.0–v3.27.0)
+
+For design-backed features (where `design/<feature>.md` declares `## Mode` ≠ `no-design`), the server enforces a layered visual-evidence pipeline before accepting a QA PASS:
+
+| Gate | Error code | Condition |
+|---|---|---|
+| Baselines present | `VISUAL_BASELINES_REQUIRED` | No `## Visual Baselines` section in the design file |
+| Assertions present | `VISUAL_ASSERTIONS_REQUIRED` | No `## Visual Structural Assertions` section (v3.27.0 — hard error, not bypass) |
+| Report complete | `VISUAL_REPORT_INCOMPLETE` | Report missing a required section, unchecked canonical-state row, failing region-diff row, or non-PASS verdict |
+
+**Separation of duties (v3.26.0):** the visual verdict is qa-visual-owned. Coordinators and non-qa roles may not define, override, relax, or pre-accept any visual difference — a coordinator accept-policy is void. Builder ≠ judge: a role running inline under subagent limits cannot self-issue a visual PASS; the result is `Blocked`. Whole-frame pixel-% is banned as a PASS metric; per-region diff tables are required.
+
+Non-UI features and those with `mode: no-design` are unaffected by all three gates.
+
+---
+
+## Scope Decision Gate (v3.30.0)
+
+Handoff schema v4 adds a `scope_decision` field. When a coordinator or sr-engineer attempts to transition into a build role on design-armed work, the server checks for a recorded scope decision (either `.current/feature-split.md` present or `scope_decision: single-feature` in the handoff). If neither exists, the transition is rejected with `SCOPE_DECISION_REQUIRED`.
+
+This gate enforces scope decisions at the MCP-tool layer. It does not stop a coordinator from bypassing via direct in-context edits to `handoff.md` — those remain detectable via `tw_detect_drift` but not server-blocked.
+
+---
+
 ## Limits (read before adopting)
 
 - **Cannot force AI to follow the constitution** — only injects it into context. AI can still hallucinate. The gates stop *state writes*, not bad reasoning.
@@ -170,7 +227,7 @@ Add to `~/.claude/settings.json`:
       "matcher": "",
       "hooks": [{
         "type": "command",
-        "command": "npx -y -p github:Paul-hengChen/agent-governance-mcp#v3.23.0 agent-governance-context",
+        "command": "npx -y -p github:Paul-hengChen/agent-governance-mcp#v3.30.0 agent-governance-context",
         "timeout": 60
       }]
     }]

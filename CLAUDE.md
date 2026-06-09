@@ -28,7 +28,7 @@ Three layers of defense, all in `index.ts`:
    design, no `agent_id` in the routing chain; the other five
    (`sr-engineer`, `pm`, `architect`, `researcher`, `qa-engineer`) use
    matching file names.
-2. **Tools** (`tools/{handoff,tasks,tasks-file,drift,role,storage,storage-sqlite,config,transitions,evidence-file,rag,rag-coalesce}.ts`) — ten `tw_*` tools that
+2. **Tools** (`tools/{handoff,tasks,tasks-file,drift,role,storage,storage-sqlite,config,transitions,evidence-file,rag,rag-coalesce}.ts`) — eleven `tw_*` tools that
    read/write `.current/handoff.md`, `tasks.md`, and (in HTTP/SQLite mode)
    PRD-derived RAG chunks in target workspaces.
 3. **Guards** (`guards/{session,file-lock}.ts`) — pre-flight check, file
