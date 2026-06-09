@@ -65,6 +65,13 @@ export interface TransitionRejection {
                                     // visual gate is armed (mode != no-design) but the design
                                     // omits ## Visual Structural Assertions. Hard error, not a
                                     // silent fallback (Codex review #3). Handler-side only.
+    | "SCOPE_DECISION_REQUIRED"     // v3.30.0 — emitted by the index.ts tw_update_state guard at the
+                                    // pm → {architect,sr-engineer}:In_Progress edge when the design is
+                                    // armed (mode != no-design) but neither .current/feature-split.md
+                                    // nor handoff scope_decision === "single-feature" is present. NOT
+                                    // produced by validateTransition (it reads fs + handoff state);
+                                    // union extension is for handler-side narrowing + envelope
+                                    // consistency (mirrors VISUAL_BASELINES_REQUIRED).
     | "AGENT_ID_REQUIRED";
   attempted: {
     prev_agent: string | null;

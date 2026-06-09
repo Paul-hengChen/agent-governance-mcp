@@ -40,6 +40,15 @@ export interface HandoffState {
   // lazy-reindex hook in prompts/build.ts:appendSpecContext. When absent, the
   // hook falls back to discovering PRD.md/docs/PRD.md/specs/PRD.md.
   prd_path?: string;
+  // Scope-decision attestation (handoff schema v4, server-scope-decision-gate).
+  // Set to "single-feature" by the PM to attest the feature is appropriately
+  // scoped as-is; satisfies the SCOPE_DECISION_REQUIRED gate in index.ts.
+  // ABSENT by default — undefined === "no attestation recorded" === gate may
+  // fire. No synthetic default is ever seeded (v3→v4 migration is a no-op).
+  scope_decision?: string;
+  // Optional free-text rationale accompanying scope_decision. Not validated by
+  // the server; recorded for the audit trail / next reader.
+  scope_decision_why?: string;
 }
 
 // Cap the completed_tasks array returned by readState() so long projects
@@ -125,6 +134,10 @@ function readAndMigrate(workspacePath: string): HandoffReadResult | null {
   const blockingReason = asString(frontmatter.blocking_reason) || undefined;
   const lastAgent = asString(frontmatter.last_agent) || undefined;
   const prdPath = asString(frontmatter.prd_path) || undefined;
+  // v4 — scope-decision attestation. `|| undefined` keeps the field ABSENT when
+  // unset, so undefined flows to hasScopeDecision and the gate is free to fire.
+  const scopeDecision = asString(frontmatter.scope_decision) || undefined;
+  const scopeDecisionWhy = asString(frontmatter.scope_decision_why) || undefined;
   const qaRoundRaw = Number(frontmatter.qa_round);
   const qa_round = Number.isFinite(qaRoundRaw) && qaRoundRaw >= 0 ? Math.floor(qaRoundRaw) : 0;
   const reviewRoundRaw = Number(frontmatter.review_round);
@@ -141,6 +154,8 @@ function readAndMigrate(workspacePath: string): HandoffReadResult | null {
     ...(blockingReason && { blocking_reason: blockingReason }),
     ...(lastAgent && { last_agent: lastAgent }),
     ...(prdPath && { prd_path: prdPath }),
+    ...(scopeDecision && { scope_decision: scopeDecision }),
+    ...(scopeDecisionWhy && { scope_decision_why: scopeDecisionWhy }),
     completed_tasks,
     pending_notes,
     qa_round,
@@ -279,6 +294,10 @@ export interface WriteHandoffStateOptions {
   prdPath?: string;
   reviewRound?: number;
   visualRound?: number;
+  // v4 — scope-decision attestation (server-scope-decision-gate). Emitted into
+  // frontmatter only when truthy; preserved across writes that omit it.
+  scopeDecision?: string;
+  scopeDecisionWhy?: string;
 }
 
 /**
@@ -329,6 +348,8 @@ export async function writeHandoffState(
   // argument is a non-null, non-array object. After this block, all locals
   // below are guaranteed non-undefined for the required fields.
   let workspacePath: string;
+  let scopeDecision: string | undefined;
+  let scopeDecisionWhy: string | undefined;
   if (
     typeof workspacePathOrOpts === "object" &&
     !Array.isArray(workspacePathOrOpts)
@@ -345,6 +366,8 @@ export async function writeHandoffState(
     prdPath = o.prdPath;
     reviewRound = o.reviewRound;
     visualRound = o.visualRound;
+    scopeDecision = o.scopeDecision;
+    scopeDecisionWhy = o.scopeDecisionWhy;
   } else {
     workspacePath = workspacePathOrOpts as string;
     // Positional defaults preserved for backwards-compat callers passing < 11 args.
@@ -382,14 +405,28 @@ export async function writeHandoffState(
     };
     if (blockingReason) frontmatterData.blocking_reason = blockingReason;
     if (lastAgent) frontmatterData.last_agent = lastAgent;
-    // Preserve prd_path across writes that don't set it (PM sets once;
-    // downstream roles call writeState without re-passing the field).
+    // Preserve prd_path AND the scope_decision attestation across writes that
+    // don't set them (PM sets each once; downstream roles call writeState
+    // without re-passing the fields, and must not drop them). A single existing
+    // read services all three.
     let effectivePrdPath: string | undefined = prdPath;
-    if (effectivePrdPath === undefined) {
+    let effectiveScopeDecision: string | undefined = scopeDecision;
+    let effectiveScopeDecisionWhy: string | undefined = scopeDecisionWhy;
+    if (
+      effectivePrdPath === undefined ||
+      effectiveScopeDecision === undefined ||
+      effectiveScopeDecisionWhy === undefined
+    ) {
       const existing = parseHandoff(workspacePath);
-      effectivePrdPath = existing?.prd_path;
+      if (effectivePrdPath === undefined) effectivePrdPath = existing?.prd_path;
+      if (effectiveScopeDecision === undefined) effectiveScopeDecision = existing?.scope_decision;
+      if (effectiveScopeDecisionWhy === undefined) effectiveScopeDecisionWhy = existing?.scope_decision_why;
     }
     if (effectivePrdPath) frontmatterData.prd_path = effectivePrdPath;
+    // String attestation: emit only when set (empty string is indistinguishable
+    // from "not set", so guard the write).
+    if (effectiveScopeDecision) frontmatterData.scope_decision = effectiveScopeDecision;
+    if (effectiveScopeDecisionWhy) frontmatterData.scope_decision_why = effectiveScopeDecisionWhy;
     // Always emit qa_round (even 0) so the field is discoverable; falsy
     // input (undefined/NaN) normalises to 0.
     const normalisedRound = Number.isFinite(qaRound) && (qaRound as number) >= 0 ? Math.floor(qaRound as number) : 0;

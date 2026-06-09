@@ -578,3 +578,229 @@ modes auto-arm. A design file with an unparseable `## Mode` fails open (`require
 | Error code | Trigger | Resolution |
 |---|---|---|
 | `VISUAL_BASELINES_REQUIRED` (v3.16.0) | `design/<feature>.md` exists with `## Mode` ≠ `no-design` AND `## Visual Baselines` H2 is absent, at `tw_update_state(status=PASS)`. | design-auditor adds the `## Visual Baselines` section (design-auditor SOP §Artifact Schema) before PASS is retried. |
+
+## Scope Decision Gate
+
+> Feature: `server-scope-decision-gate` (v3.30.0 proposed). Spec: `specs/server-scope-decision-gate.md`.
+> Closes CDE-OOBE retro finding A0 (the "entered build via the routing chain with no recorded
+> scope decision" half only — see Out of Scope below). Adds a server-side transition reject
+> `SCOPE_DECISION_REQUIRED` at the `pm → {architect, sr-engineer}` edge, structurally analogous to
+> `VISUAL_BASELINES_REQUIRED` but firing at a **different point in the handler** (transition-in, not
+> PASS) and on a **different trigger** (entry into build, not exit to PASS). The two gates are
+> independent and never interact.
+
+### Affected Files
+
+| File | Change |
+|---|---|
+| `tools/transitions.ts` | Add `SCOPE_DECISION_REQUIRED` to the `TransitionRejection["error"]` union (handler-side-only, commented like `VISUAL_BASELINES_REQUIRED`). No matrix change. |
+| `tools/evidence-file.ts` | New exported `hasScopeDecision(workspacePath, handoffState)`; reuse existing `hasDesignModeRequiringVisual` for arming. |
+| `index.ts` | New guard block in the `tw_update_state` handler, placed immediately after the `validateTransition` rejection block (≈ line 711) and before the evidence-record block (≈ line 713). Import `hasScopeDecision`. Extend the `UpdateStateArgs` zod schema with optional `scope_decision` + `scope_decision_why`; thread both into the `storage.writeState({...})` call. |
+| `schema/versions.ts` | Bump `CURRENT_VERSIONS.handoff` 3 → 4. |
+| `schema/migrations-handoff.ts` | Register handoff v3 → v4 additive no-op migration. |
+| `tools/handoff.ts` | Add optional `scope_decision` + `scope_decision_why` to `HandoffState` and `WriteHandoffStateOptions`; parse from frontmatter in `readAndMigrate`; emit into `frontmatterData` in `writeHandoffState` (round-trip through js-yaml). |
+| `tools/storage-sqlite.ts` | SQLite parity: `ALTER TABLE handoff_state ADD COLUMN scope_decision TEXT` + `scope_decision_why TEXT` via the existing `addColumnIfMissing` idempotent-migrate pattern; read in `parse()`, write in `writeState`. (HTTP mode only; file mode is the primary target.) |
+| `content/constitution.md`, `content/skill-pm.md` | Doc-writer / PM-owned (AC-9), out of architecture scope — listed for the impl touchpoint manifest only. |
+
+### Arming condition and placement (Decision 1)
+
+The gate fires on `tw_update_state` when **all** of the following hold, evaluated against the
+**prev** (on-disk) tuple and the **next** (incoming) tuple:
+
+1. `next.agent ∈ {architect, sr-engineer}` AND `next.status === "In_Progress"` (the build-entry edge).
+2. `prev.agent === "pm"` AND `prev.status === "In_Progress"` (the only predecessor the matrix routes
+   into build from — see the `pm:In_Progress` row, which lists both `architect:In_Progress` and
+   `sr-engineer:In_Progress`). Pinning the predecessor is what makes **re-entry/resume safe** (see
+   Edge Cases): `architect:In_Progress → sr-engineer:In_Progress` and the self-loop
+   `sr-engineer:In_Progress → sr-engineer:In_Progress` both have a non-`pm` predecessor and are
+   therefore never gated.
+3. `hasDesignModeRequiringVisual(workspace, active_feature).required === true` (design file exists
+   AND `## Mode` ≠ `no-design` — identical arm signal to the visual gate; no new scanner).
+4. `hasScopeDecision(workspace, prevState) === false` (neither satisfying artifact present).
+
+When all four are true the handler returns the `SCOPE_DECISION_REQUIRED` envelope with
+`isError: true` and does **not** write state.
+
+**Decision: the guard lives in `index.ts`, NOT in `transitions.ts`. Recommended and justified.**
+
+| Context | Decision | Consequences |
+|---|---|---|
+| The gate must read the filesystem (`design/<feature>.md`, `.current/feature-split.md`) and the parsed handoff field `scope_decision`. `validateTransition` in `tools/transitions.ts` is a **pure** function over tuples + round counters (file header: "Pure state-machine logic"; no `fs` import). | Implement as a handler-side guard in `index.ts`, placed after `validateTransition` returns accepted and before the evidence-record block. Add the error code to the `TransitionRejection` union for envelope/type-narrowing consistency, but do **not** call it from `validateTransition`. | Keeps `transitions.ts` pure and unit-testable without fs mocks. Exactly mirrors the precedent set by `VISUAL_BASELINES_REQUIRED`, `VISUAL_WIDGETS_UNVERIFIED`, `VISUAL_REPORT_INCOMPLETE`, `VISUAL_ASSERTIONS_REQUIRED` — all union members emitted handler-side, none produced by `validateTransition` (see the inline comments at transitions.ts L48–67). The matrix stays a clean reachability table; "did the human record a decision" is a side-condition, not a reachability edge. |
+
+The placement is **before** the evidence-record / PASS-evidence blocks because those only fire on a
+QA `PASS`/`FAIL` write; the scope gate fires on a build-entry `In_Progress` write, so the two regions
+are mutually exclusive at runtime and ordering between them is moot — but putting it directly after
+`validateTransition` keeps the "all transition-shaped rejects first, then evidence rejects" reading
+order the handler already follows.
+
+### `hasScopeDecision` contract (Decision 2)
+
+```ts
+// tools/evidence-file.ts — new exported helper.
+// Returns true when EITHER satisfying artifact is present:
+//   (a) .current/feature-split.md exists (multi-feature split recorded), OR
+//   (b) handoff field scope_decision === "single-feature" (attestation recorded).
+// Existence/equality only — never parses file content (mirrors hasEvidenceInFile
+// and the "existence is sufficient" convention). Never throws.
+export function hasScopeDecision(
+  workspacePath: string,
+  handoffState: { scope_decision?: string } | null | undefined,
+): boolean {
+  const splitPath = path.join(workspacePath, ".current", "feature-split.md");
+  if (fs.existsSync(splitPath)) return true;
+  return handoffState?.scope_decision === "single-feature";
+}
+```
+
+Note the signature takes the already-parsed `handoffState` (the `prevState` the handler reads at
+≈ line 685) rather than re-reading handoff.md — the field is read off the `prev` state because the
+attestation must have been recorded by the **preceding** `pm:In_Progress` write. (The PM sets
+`scope_decision: single-feature` on its own `tw_update_state` write; that persists to handoff.md;
+the build-entry write then reads it back as `prevState.scope_decision`.) This differs deliberately
+from `hasDesignModeRequiringVisual`, which re-reads the design file by `(workspacePath, activeFeature)`
+because the design file is not part of handoff state.
+
+### Handoff v3 → v4 migration (Decision 3)
+
+Per `docs/schema-versions.md`, exactly two source edits ship the bump:
+
+1. **`schema/versions.ts`** — `CURRENT_VERSIONS.handoff: 3 → 4`.
+2. **`schema/migrations-handoff.ts`** — register the adjacent step (the registry enforces
+   `to === from + 1`):
+
+```ts
+// v3 → v4: add optional scope_decision attestation field (server-scope-decision-gate).
+// Additive NO-OP: stamps the version but adds NO default value for scope_decision.
+// Absence is meaningful — undefined === "no attestation recorded" === gate may fire.
+// Mirrors the v1→v2 / v2→v3 pattern EXCEPT it seeds no field default (those seeded a
+// 0 counter; here a defaulted value would be a false attestation, so we add nothing).
+registerMigration<Record<string, unknown>, Record<string, unknown>>({
+  kind: "handoff",
+  from: 3,
+  to: 4,
+  up: (input) => ({ ...input, schema_version: 4 }),
+});
+```
+
+**Read semantics of absence.** In `tools/handoff.ts:readAndMigrate`, parse with the existing
+`asString(...) || undefined` idiom (same as `prd_path`, `blocking_reason`):
+
+```ts
+const scopeDecision = asString(frontmatter.scope_decision) || undefined;       // undefined when absent
+const scopeDecisionWhy = asString(frontmatter.scope_decision_why) || undefined;
+// ...spread conditionally into the state object so the field stays absent when unset:
+...(scopeDecision && { scope_decision: scopeDecision }),
+...(scopeDecisionWhy && { scope_decision_why: scopeDecisionWhy }),
+```
+
+`undefined` flows to `hasScopeDecision`, where `undefined === "single-feature"` is `false` → the
+gate is free to fire. No v3 file gains a synthetic attestation on migrate-on-read. The future-version
+refuse-loud path (v5 read against a v4 server) is already handled by `runMigrations` throwing on
+`current > target` — AC-10(g) is satisfied with no new code.
+
+`tools/handoff.ts:writeHandoffState` emits the fields only when set (the round counters are always
+emitted even at 0, but `scope_decision` is a string attestation — emitting an empty string would be
+indistinguishable from "not set", so guard the write):
+
+```ts
+if (scopeDecision) frontmatterData.scope_decision = scopeDecision;
+if (scopeDecisionWhy) frontmatterData.scope_decision_why = scopeDecisionWhy;
+```
+
+### Error code wiring + envelope (Decision 4)
+
+`tools/transitions.ts` — extend the union, handler-side-only, commented in the established style:
+
+```ts
+| "SCOPE_DECISION_REQUIRED"     // v3.30.0 — emitted by the index.ts tw_update_state guard at the
+                                // pm → {architect,sr-engineer}:In_Progress edge when the design is
+                                // armed (mode != no-design) but neither .current/feature-split.md
+                                // nor handoff scope_decision === "single-feature" is present. NOT
+                                // produced by validateTransition (it reads fs + handoff state);
+                                // union extension is for handler-side narrowing + envelope
+                                // consistency (mirrors VISUAL_BASELINES_REQUIRED).
+```
+
+The handler builds the standard `{ error, attempted, allowed, hint }` envelope. Because the
+transition itself is *valid* (the matrix would accept it), `allowed` echoes the matrix's allowed-next
+set for `pm:In_Progress` so the caller still sees the legal edges; `attempted` carries the build-entry
+tuple. The handler emits it the same way the visual gate does — `isError: true`, text
+`⛔ SCOPE_DECISION_REQUIRED\n<JSON envelope>`:
+
+```ts
+// after the validateTransition rejection block, before the evidence-record block:
+if (
+  (nextTuple.agent === "architect" || nextTuple.agent === "sr-engineer") &&
+  nextTuple.status === "In_Progress" &&
+  prevTuple.agent === "pm" &&
+  prevTuple.status === "In_Progress"
+) {
+  const arm = hasDesignModeRequiringVisual(parsed.workspace_path, parsed.active_feature);
+  if (arm.required && !hasScopeDecision(parsed.workspace_path, prevState)) {
+    const hint =
+      "Scope decision missing. Either: (a) create .current/feature-split.md documenting the " +
+      "multi-feature split decision, or (b) set scope_decision: single-feature in this " +
+      "tw_update_state call with a why field explaining why this feature is appropriately " +
+      "scoped. Gate only fires when design/<feature>.md declares mode != no-design. " +
+      "See specs/server-scope-decision-gate.md.";
+    const envelope = {
+      error: "SCOPE_DECISION_REQUIRED",
+      attempted: {
+        prev_agent: prevTuple.agent, prev_status: prevTuple.status,
+        new_agent: nextTuple.agent, new_status: nextTuple.status,
+      },
+      allowed: (ALLOWED_TRANSITIONS.get("pm:In_Progress") ?? [])
+        .map((c) => ({ new_agent: c.agent, new_status: c.status })),
+      hint,
+    };
+    return {
+      content: [{ type: "text" as const, text: `⛔ SCOPE_DECISION_REQUIRED\n${JSON.stringify(envelope, null, 2)}` }],
+      isError: true,
+    };
+  }
+}
+```
+
+The `hint` string is the **verbatim** value from the spec's Copy / Strings table (AC-4) — sr-engineer
+must copy it character-for-character, including the `(a)`/`(b)` enumeration and the trailing spec
+reference. A subtlety the impl must honor: the PM's `scope_decision: single-feature` attestation and
+the build-entry write that the gate inspects are **two separate `tw_update_state` calls**. The hint's
+phrase "set scope_decision: single-feature in this tw_update_state call" is from the PM's POV — i.e.
+the PM records it on the `pm:In_Progress` write; by the time the *build* write is evaluated, the value
+is read off `prevState`. The hint text stays verbatim regardless; this note is for the impl's mental
+model, not a copy change.
+
+### Edge Cases (Decision 5)
+
+| Case | Behavior | Mechanism |
+|---|---|---|
+| **Re-entry / resume into build after a decision was recorded** | Never re-blocks. | (a) Once recorded, `scope_decision: single-feature` persists in handoff.md and is read on every subsequent `prevState`, so `hasScopeDecision` stays true. (b) The `architect → sr-engineer` and `sr-engineer → sr-engineer` (self-loop) edges have a non-`pm` predecessor, so condition 2 of the arm check is false — the gate is structurally skipped on every build-internal hop. A FAIL→pm→build re-route re-arms (predecessor is `pm` again), which is correct: a fresh `pm:In_Progress` had the chance to re-attest or split, and the persisted attestation still satisfies the gate. |
+| **Non-design workspaces** (`design/<feature>.md` absent OR `## Mode` = `no-design`) | Gate silent, pass-through (AC-5). | `hasDesignModeRequiringVisual().required === false` short-circuits before `hasScopeDecision` is even consulted. Identical fail-open semantics to the visual gate (unparseable Mode → `required:false`). |
+| **Non-build transition target** (any `next` other than `{architect,sr-engineer}:In_Progress`) | Gate silent (AC-6). | Condition 1 false; the whole guard block is skipped regardless of design-file presence. |
+| **Lite-mode / researcher-direct / in-context paths** | No effect. | These paths emit no `tw_update_state` call into a build role via the routing chain, so the handler hook never runs (documented Out of Scope; not an architectural gap to close here). |
+| **Interaction with the visual gate** | Fully independent. | Different trigger (build-entry `In_Progress` vs `PASS`), different handler region (post-`validateTransition` vs PASS-evidence block), different artifact (`feature-split.md`/`scope_decision` vs `## Visual Baselines`/`visual_<id>.md`). They share only the `hasDesignModeRequiringVisual` arm helper. No ordering dependency; both can be armed in the same feature without coupling. |
+
+### Out of Scope (carried from spec, architecturally relevant)
+
+- Does **not** close all of A0 — only the routing-chain-entry half. In-context / lite paths emit no
+  transition and are structurally unreachable by a `tw_update_state` guard.
+- Does **not** judge size — enforces that a decision was *recorded*, not that it was *correct*.
+- Does **not** add a `multi-feature` field — `.current/feature-split.md` existence is the
+  multi-feature signal.
+- Does **not** validate `feature-split.md` content — existence only (mirrors the visual-baselines
+  existence check).
+
+### Error-code row (v3.30.0)
+
+| Error code | Trigger | Resolution |
+|---|---|---|
+| `SCOPE_DECISION_REQUIRED` (v3.30.0) | `tw_update_state` at the `pm:In_Progress → {architect,sr-engineer}:In_Progress` edge when `design/<feature>.md` declares `## Mode` ≠ `no-design` AND neither `.current/feature-split.md` exists nor handoff `scope_decision === "single-feature"`. | PM creates `.current/feature-split.md` (multi-feature split) OR sets `scope_decision: single-feature` (+ optional `scope_decision_why`) on its `pm:In_Progress` write, then re-hands off to build. |
+
+### Deferred Resources
+
+| Reference | Classification | Reason (PM Resource Audit, spec §Dependencies) |
+|---|---|---|
+| `research/cde-oobe-visual-fidelity-retrospective-2026-06-05.md` (finding A0) | **ignore** | Already in-repo; no fetch needed. Content consumed directly in the spec. |
+
+No HTTP / Figma / Azure DevOps / Jira URLs present in the requirement documents. No `## Visual Baselines`
+in this feature's design (mode = `no-design`), so no Visual Harness section applies. No Open Questions.

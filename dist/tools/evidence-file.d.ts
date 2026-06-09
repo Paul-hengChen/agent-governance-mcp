@@ -21,6 +21,9 @@ export declare function hasVisualEvidenceInFile(workspacePath: string, taskIds: 
     present: string[];
     missing: string[];
 };
+export declare function hasScopeDecision(workspacePath: string, handoffState: {
+    scope_decision?: string;
+} | null | undefined): boolean;
 export interface VisualWidgetRow {
     widgetId: string;
     checked: boolean;

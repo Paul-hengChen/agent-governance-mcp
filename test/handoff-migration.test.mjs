@@ -10,7 +10,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
-import { parseHandoff } from "../dist/tools/handoff.js";
+import { parseHandoff, writeHandoffState } from "../dist/tools/handoff.js";
 import { resetSession } from "../dist/guards/session.js";
 
 function mkWorkspace(prefix = "twmig-") {
@@ -252,5 +252,190 @@ review_round: 0
     joined,
     /\[code-reviewer migration\]/,
     `warning must NOT fire on already-v2 files; got: ${joined}`,
+  );
+});
+
+// ============================================================================
+// v3.30.0 — handoff schema v3 → v4 migration + scope_decision round-trip
+// Tests for specs/server-scope-decision-gate.md AC-7, AC-10(f), AC-10(g) and
+// the field-preservation invariant (downstream omitting write must NOT drop
+// scope_decision NOR prd_path). The v3→v4 step is an additive NO-OP: it stamps
+// the version but seeds NO default for scope_decision, because absence is
+// meaningful (undefined === "no attestation recorded" === gate may fire). A
+// defaulted value would be a false attestation.
+// ============================================================================
+
+function readRaw(ws) {
+  return fs.readFileSync(path.join(ws, ".current", "handoff.md"), "utf-8");
+}
+
+test("AC-7 / AC-10(f): v3 handoff migrates to v4 on read — scope_decision undefined, other fields preserved", () => {
+  // Why: the no-seed contract. A legacy v3 file (no scope_decision key) must
+  // climb to v4 WITHOUT gaining a synthetic attestation — scope_decision stays
+  // undefined so the gate is free to fire. All pre-existing fields (prd_path,
+  // active_feature, last_agent, round counters) must survive untouched.
+  const ws = mkWorkspace();
+  resetSession();
+  writeRaw(
+    ws,
+    `---
+schema_version: 3
+active_feature: "legacy-v3-feat"
+status: "In_Progress"
+last_updated: "2026-06-01T00:00:00.000Z"
+last_agent: "pm"
+qa_round: 1
+review_round: 2
+visual_round: 0
+prd_path: "/abs/specs/legacy-v3-feat.md"
+---
+## ✅ Completed
+- 無
+
+## ⚠️ Pending & Handoff Notes
+- next_role: sr-engineer
+`,
+  );
+
+  const state = parseHandoff(ws);
+  // No-seed: the migration adds NO scope_decision default.
+  assert.equal(state.scope_decision, undefined, "v3→v4 must NOT seed a scope_decision (absence is meaningful)");
+  assert.equal(state.scope_decision_why, undefined, "v3→v4 must NOT seed scope_decision_why either");
+  // Pre-existing fields preserved.
+  assert.equal(state.active_feature, "legacy-v3-feat");
+  assert.equal(state.last_agent, "pm");
+  assert.equal(state.qa_round, 1, "qa_round preserved across v3→v4");
+  assert.equal(state.review_round, 2, "review_round preserved across v3→v4");
+  assert.equal(state.prd_path, "/abs/specs/legacy-v3-feat.md", "prd_path preserved across v3→v4");
+});
+
+test("AC-7: v4 file with scope_decision parses the attestation back", () => {
+  // Why: round-trip read of an already-v4 file carrying the attestation. The
+  // field must surface on the parsed state so hasScopeDecision(prevState) sees it.
+  const ws = mkWorkspace();
+  resetSession();
+  writeRaw(
+    ws,
+    `---
+schema_version: 4
+active_feature: "scoped-feat"
+status: "In_Progress"
+last_updated: "2026-06-01T00:00:00.000Z"
+last_agent: "pm"
+qa_round: 0
+review_round: 0
+visual_round: 0
+scope_decision: "single-feature"
+scope_decision_why: "one screen, no sub-flows"
+---
+## ✅ Completed
+- 無
+
+## ⚠️ Pending & Handoff Notes
+- next_role: sr-engineer
+`,
+  );
+
+  const state = parseHandoff(ws);
+  assert.equal(state.scope_decision, "single-feature");
+  assert.equal(state.scope_decision_why, "one screen, no sub-flows");
+});
+
+test("AC-7: scope_decision round-trips through writeHandoffState → readback (v4 stamp)", async () => {
+  // Why: the modern options-object write must emit scope_decision into YAML and
+  // parse it back identically, stamped at v4. This is the PM attestation write path.
+  const ws = mkWorkspace();
+  resetSession();
+  parseHandoff(ws);
+  await writeHandoffState({
+    workspacePath: ws,
+    activeFeature: "rt-feat",
+    status: "In_Progress",
+    completedTasks: [],
+    pendingNotes: ["next_role: sr-engineer"],
+    lastAgent: "pm",
+    scopeDecision: "single-feature",
+    scopeDecisionWhy: "small, self-contained",
+  });
+
+  const raw = readRaw(ws);
+  assert.match(raw, /schema_version:\s*4/, "write stamps current handoff schema v4");
+  assert.match(raw, /scope_decision:\s*["']?single-feature["']?/, "scope_decision emitted into YAML");
+
+  const state = parseHandoff(ws);
+  assert.equal(state.scope_decision, "single-feature", "scope_decision survives write→read");
+  assert.equal(state.scope_decision_why, "small, self-contained", "scope_decision_why survives write→read");
+});
+
+test("field preservation: a downstream write omitting scope_decision does NOT drop it (nor prd_path)", async () => {
+  // Why (the scrutinized invariant): after PM records scope_decision +
+  // prd_path, a later build-role write that omits BOTH must preserve them off
+  // the on-disk read — otherwise the gate would re-fire on a FAIL→pm→build
+  // re-route and prd_path (RAG hook input) would be lost. This pins the
+  // preserve-merge in tools/handoff.ts:writeHandoffState.
+  const ws = mkWorkspace();
+  resetSession();
+  parseHandoff(ws);
+  // PM write: records attestation + prd_path.
+  await writeHandoffState({
+    workspacePath: ws,
+    activeFeature: "preserve-feat",
+    status: "In_Progress",
+    completedTasks: [],
+    pendingNotes: ["next_role: sr-engineer"],
+    lastAgent: "pm",
+    prdPath: "/abs/specs/preserve-feat.md",
+    scopeDecision: "single-feature",
+    scopeDecisionWhy: "tiny feature",
+  });
+
+  // Downstream sr-engineer write: omits scope_decision, scope_decision_why, prd_path.
+  resetSession();
+  parseHandoff(ws);
+  await writeHandoffState({
+    workspacePath: ws,
+    activeFeature: "preserve-feat",
+    status: "In_Progress",
+    completedTasks: [],
+    pendingNotes: ["building"],
+    lastAgent: "sr-engineer",
+  });
+
+  const state = parseHandoff(ws);
+  assert.equal(state.scope_decision, "single-feature", "omitting write MUST preserve scope_decision");
+  assert.equal(state.scope_decision_why, "tiny feature", "omitting write MUST preserve scope_decision_why");
+  assert.equal(state.prd_path, "/abs/specs/preserve-feat.md", "omitting write MUST preserve prd_path");
+  assert.equal(state.last_agent, "sr-engineer", "the new write's own fields still apply");
+});
+
+test("AC-10(g): future v5 handoff refuses-loud against a v4 server (no silent downgrade)", () => {
+  // Why: forward-compat safety. A handoff written by a newer server (v5) must
+  // NOT be silently parsed by this v4 server — runMigrations throws because
+  // on-disk version > server max. No new code; this pins the behavior for the
+  // scope-gate version bump specifically.
+  const ws = mkWorkspace();
+  resetSession();
+  writeRaw(
+    ws,
+    `---
+schema_version: 5
+active_feature: "from-the-future"
+status: "In_Progress"
+last_updated: "2099-01-01T00:00:00.000Z"
+last_agent: "pm"
+qa_round: 0
+---
+## ✅ Completed
+- 無
+
+## ⚠️ Pending & Handoff Notes
+- 無
+`,
+  );
+
+  assert.throws(
+    () => parseHandoff(ws),
+    /on-disk version 5 > server max 4/,
+    "v5 file must refuse-loud against a v4 server",
   );
 });

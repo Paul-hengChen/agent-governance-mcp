@@ -21,7 +21,9 @@ CREATE TABLE IF NOT EXISTS handoff_state (
   qa_round        INTEGER NOT NULL DEFAULT 0,
   prd_path        TEXT,
   review_round    INTEGER NOT NULL DEFAULT 0,
-  visual_round    INTEGER NOT NULL DEFAULT 0
+  visual_round    INTEGER NOT NULL DEFAULT 0,
+  scope_decision      TEXT,
+  scope_decision_why  TEXT
 );
 
 CREATE TABLE IF NOT EXISTS tasks (
@@ -126,6 +128,10 @@ export class SqliteHandoffStorage {
         addColumnIfMissing("ALTER TABLE handoff_state ADD COLUMN prd_path TEXT");
         addColumnIfMissing("ALTER TABLE handoff_state ADD COLUMN review_round INTEGER NOT NULL DEFAULT 0");
         addColumnIfMissing("ALTER TABLE handoff_state ADD COLUMN visual_round INTEGER NOT NULL DEFAULT 0");
+        // v4 — scope-decision attestation (server-scope-decision-gate). Nullable,
+        // no default — absence is meaningful (no attestation → gate may fire).
+        addColumnIfMissing("ALTER TABLE handoff_state ADD COLUMN scope_decision TEXT");
+        addColumnIfMissing("ALTER TABLE handoff_state ADD COLUMN scope_decision_why TEXT");
         // Schema-versioning lazy migrate (Phase 4). Creates schema_meta, stamps
         // the sqlite version row, and runs any registered v(N)→v(N+1) DDL steps
         // inside per-step transactions. Refuse-loud on a future on-disk version
@@ -135,16 +141,16 @@ export class SqliteHandoffStorage {
         this.selectStmt = this.db.prepare("SELECT * FROM handoff_state WHERE workspace_path = ?");
         this.selectLastUpdatedStmt = this.db.prepare("SELECT last_updated FROM handoff_state WHERE workspace_path = ?");
         this.upsertStmt = this.db.prepare(`INSERT OR REPLACE INTO handoff_state
-        (workspace_path, active_feature, status, last_updated, blocking_reason, last_agent, completed, pending, qa_round, prd_path, review_round, visual_round)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-        this.txUpsert = this.db.transaction((workspacePath, activeFeature, status, now, blockingReason, lastAgent, completed, pending, qaRound, prdPath, reviewRound, visualRound, expectedLastUpdated) => {
+        (workspace_path, active_feature, status, last_updated, blocking_reason, last_agent, completed, pending, qa_round, prd_path, review_round, visual_round, scope_decision, scope_decision_why)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+        this.txUpsert = this.db.transaction((workspacePath, activeFeature, status, now, blockingReason, lastAgent, completed, pending, qaRound, prdPath, reviewRound, visualRound, scopeDecision, scopeDecisionWhy, expectedLastUpdated) => {
             const row = this.selectLastUpdatedStmt.get(workspacePath);
             const actual = row?.last_updated ?? null;
             if (actual !== expectedLastUpdated) {
                 throw new Error(`⛔ STATE DRIFT: handoff row changed between freshness check and write ` +
                     `(expected last_updated=${expectedLastUpdated}, actual=${actual}). Retry after tw_get_state.`);
             }
-            this.upsertStmt.run(workspacePath, activeFeature, status, now, blockingReason, lastAgent, completed, pending, qaRound, prdPath, reviewRound, visualRound);
+            this.upsertStmt.run(workspacePath, activeFeature, status, now, blockingReason, lastAgent, completed, pending, qaRound, prdPath, reviewRound, visualRound, scopeDecision, scopeDecisionWhy);
         });
         this.listTasksStmt = this.db.prepare(`SELECT task_id, description, section, completed, note, reverted_reason, sort_order
        FROM tasks WHERE workspace_path = ? ORDER BY sort_order ASC`);
@@ -228,6 +234,8 @@ export class SqliteHandoffStorage {
             ...(row.blocking_reason ? { blocking_reason: row.blocking_reason } : {}),
             ...(row.last_agent ? { last_agent: row.last_agent } : {}),
             ...(row.prd_path ? { prd_path: row.prd_path } : {}),
+            ...(row.scope_decision ? { scope_decision: row.scope_decision } : {}),
+            ...(row.scope_decision_why ? { scope_decision_why: row.scope_decision_why } : {}),
             completed_tasks: JSON.parse(row.completed),
             pending_notes: JSON.parse(row.pending),
             qa_round,
@@ -259,6 +267,8 @@ export class SqliteHandoffStorage {
     writeState(workspacePathOrOpts, activeFeature, status, completedTasks, pendingNotes, blockingReason, lastAgent, qaRound, prdPath, reviewRound, visualRound) {
         // v3.15.0 dual API: discriminate by first-arg shape.
         let workspacePath;
+        let scopeDecision;
+        let scopeDecisionWhy;
         if (typeof workspacePathOrOpts === "object" && !Array.isArray(workspacePathOrOpts)) {
             const o = workspacePathOrOpts;
             workspacePath = o.workspacePath;
@@ -272,6 +282,8 @@ export class SqliteHandoffStorage {
             prdPath = o.prdPath;
             reviewRound = o.reviewRound;
             visualRound = o.visualRound;
+            scopeDecision = o.scopeDecision;
+            scopeDecisionWhy = o.scopeDecisionWhy;
         }
         else {
             workspacePath = workspacePathOrOpts;
@@ -291,15 +303,25 @@ export class SqliteHandoffStorage {
         const normalisedVisualRound = Number.isFinite(visualRound) && visualRound >= 0
             ? Math.floor(visualRound)
             : 0;
-        // Preserve prd_path across writes that don't explicitly set it (PM sets
-        // once; downstream roles call writeState without re-passing the field).
+        // Preserve prd_path AND the scope_decision attestation across writes that
+        // don't explicitly set them (PM sets each once; downstream roles call
+        // writeState without re-passing the fields). One existing read services all.
         let effectivePrdPath = prdPath ?? null;
-        if (effectivePrdPath === null) {
+        let effectiveScopeDecision = scopeDecision ?? null;
+        let effectiveScopeDecisionWhy = scopeDecisionWhy ?? null;
+        if (effectivePrdPath === null ||
+            effectiveScopeDecision === null ||
+            effectiveScopeDecisionWhy === null) {
             const existing = this.fetchRow(workspacePath);
-            effectivePrdPath = existing?.prd_path ?? null;
+            if (effectivePrdPath === null)
+                effectivePrdPath = existing?.prd_path ?? null;
+            if (effectiveScopeDecision === null)
+                effectiveScopeDecision = existing?.scope_decision ?? null;
+            if (effectiveScopeDecisionWhy === null)
+                effectiveScopeDecisionWhy = existing?.scope_decision_why ?? null;
         }
         const now = new Date().toISOString();
-        this.txUpsert(workspacePath, _activeFeature, _status, now, blockingReason ?? null, lastAgent ?? null, JSON.stringify(_completedTasks), JSON.stringify(_pendingNotes), normalisedRound, effectivePrdPath, normalisedReviewRound, normalisedVisualRound, currentLastUpdated);
+        this.txUpsert(workspacePath, _activeFeature, _status, now, blockingReason ?? null, lastAgent ?? null, JSON.stringify(_completedTasks), JSON.stringify(_pendingNotes), normalisedRound, effectivePrdPath, normalisedReviewRound, normalisedVisualRound, effectiveScopeDecision, effectiveScopeDecisionWhy, currentLastUpdated);
         snapshotExtra(workspacePath, SNAPSHOT_KEY, now);
         return Promise.resolve(JSON.stringify({ success: true, storage: "sqlite", updated_at: now }));
     }

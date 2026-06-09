@@ -144,6 +144,7 @@ Figma — many states the run did not match:
 ## 2. Problem Taxonomy (the framework-level causes)
 
 ### A. Output far from design (fidelity)
+- **A0 — The "oversized → ask the human" gate never fired (upstream miss).** The mechanisms existed *before* this run: design-auditor **Volume Gate** (v3.17.0, 2026-05-31 — Block when a single feature's design source exceeds ~one feature's worth, recommend re-split), the feature-split **`figma link` human-owned column** (v3.18.0, 2026-05-31), and PM's **Resource Audit Gate** (constitution §7). None triggered because the work bypassed the path that arms them: the whole 9-screen OOBE was scoped as **one feature** (`agc-test-setup-wizard`) and driven **in-context by researcher** — never decomposed through PM → feature-split → design-auditor, so the human-fills-Figma prompt never appeared. design-auditor then hit limits and collapsed inline (see C5/A6) with no clean pre-fetch metadata estimate, so the Volume Gate's STOP was skipped on a Figma source that plainly exceeded one feature. **The original taxonomy missed this entirely** — A1–A6 start *after* the feature was already (wrongly) ingested whole; the most upstream failure was that nobody stopped to ask the human to split it. (skill-design-auditor Volume Gate enforcement under inline collapse + coordinator feature-split routing)
 - **A1 — Layout serialized to lossy prose.** Figma autolayout (flex/align/itemSpacing, **group-box containers**, **cycling selectors**) is dropped when the design-auditor transcribes to prose tokens; the engineer then flat-lays its own guess. (design-auditor output + handoff format)
 - **A2 — focused/selection state never specced or asserted.** Full-width blue selection/focus bar is everywhere in Figma (Language, Mode, Network, Time) and **nowhere** in the build. (design-auditor under-spec + qa never asserts state)
 - **A3 — Engineer writes blind.** `skill-sr-engineer` self-check is **render-free** (string-compares declared root dimensions only); it cannot see component-internal layout, so wrong row style / missing bar / flat groups pass its gate. The engineer also did not re-query the Figma node's autolayout. (skill-sr-engineer)
@@ -171,7 +172,7 @@ Figma — many states the run did not match:
 - **D2 — Same actor could build, judge, and sign PASS.** Under limits the coordinator wrote code, authored the verdict criteria, and issued the PASS — no separation.
 
 ### Causal chain (one line)
-`design → lossy prose (A1/A2)` → `engineer blind-writes, fills gaps by assumption, doesn't apply tokens (A3/A4/A5)` → **output far from design** → `QA uses a diluting metric (B2/B3/B5) and is overridden by a coordinator accept-policy (B1/B4)` → **false PASS (B6)** → `reopen + whole-app re-runs (C1/C2)` → **token burn**, with `state-machine desync (D1)` and `limit-driven role collapse (C5/D2)` amplifying throughout.
+`feature scoped whole + driven in-context → oversized/ask-human gate bypassed (A0)` → `design → lossy prose (A1/A2)` → `engineer blind-writes, fills gaps by assumption, doesn't apply tokens (A3/A4/A5)` → **output far from design** → `QA uses a diluting metric (B2/B3/B5) and is overridden by a coordinator accept-policy (B1/B4)` → **false PASS (B6)** → `reopen + whole-app re-runs (C1/C2)` → **token burn**, with `state-machine desync (D1)` and `limit-driven role collapse (C5/D2)` amplifying throughout.
 
 ---
 

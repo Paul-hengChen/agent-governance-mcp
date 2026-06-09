@@ -16,6 +16,23 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.30.0] - 2026-06-09
+
+### Added
+- **`SCOPE_DECISION_REQUIRED` server-side transition gate.** The MCP server now
+  enforces a new `SCOPE_DECISION_REQUIRED` status in the allowed-transitions state
+  machine. When a coordinator or sr-engineer attempts to transition out of a scoped
+  decision checkpoint without an explicit acceptance record, the server rejects the
+  transition and surfaces a structured error, preventing silent scope drift.
+- Handoff schema bumped to v4: new `scope_decision` field carries the gate payload
+  (decision text, timestamp, accepting agent).
+- +23 tests covering the new gate, schema migration v3→v4, and rejection paths.
+
+### Notes
+- This gate enforces scope decisions at the MCP-tool layer. It does NOT stop a
+  coordinator from bypassing the gate via direct in-context edits to `handoff.md`
+  or via constitution-only paths — those remain out-of-scope for server-side enforcement.
+
 ## [3.29.1] - 2026-06-09
 
 ### Fixed

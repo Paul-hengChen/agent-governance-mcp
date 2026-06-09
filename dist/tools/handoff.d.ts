@@ -11,6 +11,8 @@ export interface HandoffState {
     review_round: number;
     visual_round: number;
     prd_path?: string;
+    scope_decision?: string;
+    scope_decision_why?: string;
 }
 /**
  * Parse handoff.md YAML frontmatter + section content into structured JSON.
@@ -41,6 +43,8 @@ export interface WriteHandoffStateOptions {
     prdPath?: string;
     reviewRound?: number;
     visualRound?: number;
+    scopeDecision?: string;
+    scopeDecisionWhy?: string;
 }
 /**
  * Write handoff state. v3.15.0 dual API:

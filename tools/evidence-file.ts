@@ -228,6 +228,26 @@ export function hasVisualEvidenceInFile(
   return { present, missing };
 }
 
+// ---------- v3.30.0 — Scope Decision Gate (server-scope-decision-gate) ----------
+// Constitution §3 scope-decision gate: when design/<feature>.md declares
+// mode != no-design, a transition INTO build (architect/sr-engineer:In_Progress)
+// from pm:In_Progress requires a recorded scope decision. This helper reports
+// whether EITHER satisfying artifact is present:
+//   (a) .current/feature-split.md exists (multi-feature split recorded), OR
+//   (b) handoff field scope_decision === "single-feature" (attestation recorded).
+// Existence/equality only — never parses file content (mirrors hasEvidenceInFile
+// and the "existence is sufficient" convention). Never throws. The handoffState
+// is the already-parsed PREV state (the attestation must have been recorded by
+// the preceding pm:In_Progress write), so this does NOT re-read handoff.md.
+export function hasScopeDecision(
+  workspacePath: string,
+  handoffState: { scope_decision?: string } | null | undefined,
+): boolean {
+  const splitPath = path.join(workspacePath, ".current", "feature-split.md");
+  if (fs.existsSync(splitPath)) return true;
+  return handoffState?.scope_decision === "single-feature";
+}
+
 // ---------- v3.15.0 — Widget Shape Verification checkbox parsing ----------
 // Activates the R6 gate that v3.14.0 architecture §A reserved
 // (`VISUAL_WIDGETS_UNVERIFIED` error code). Server reads visual_<id>.md,

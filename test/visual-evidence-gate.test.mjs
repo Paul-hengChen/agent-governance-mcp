@@ -15,6 +15,7 @@ import {
   hasVisualBaselinesInDesign,
   hasVisualEvidenceInFile,
   hasDesignModeRequiringVisual,
+  hasScopeDecision,
 } from "../dist/tools/evidence-file.js";
 
 function mkWorkspace() {
@@ -367,4 +368,278 @@ test("v3.16.0 AC-1: empty active_feature → required:false (defensive)", () => 
   const r = hasDesignModeRequiringVisual(ws, "");
   assert.equal(r.required, false, "empty feature name must not arm the gate");
   assert.equal(r.mode, null);
+});
+
+// ============================================================================
+// v3.30.0 — Scope Decision Gate (server-scope-decision-gate)
+// Tests for specs/server-scope-decision-gate.md AC-1..AC-6, AC-10 (a)-(e) and
+// specs/qa-flow-enforcement-architecture.md → ## Scope Decision Gate edge cases.
+//
+// The SCOPE_DECISION_REQUIRED gate lives handler-side in index.ts at the
+// build-entry edge (pm:In_Progress → {architect,sr-engineer}:In_Progress). It
+// is built from two primitives the handler ANDs:
+//   (1) hasDesignModeRequiringVisual(ws, feature).required  (arm signal)
+//   (2) hasScopeDecision(ws, prevState)                     (satisfying artifact)
+// alongside the four tuple conditions. These tests exercise hasScopeDecision
+// directly (the new primitive) AND replicate the handler's exact predicate so a
+// refactor that re-orders the conditions in index.ts regresses an assertion
+// here — mirroring the composition convention in visual-gate-e2e.test.mjs.
+// ============================================================================
+
+// Mirrors the index.ts:741-748 guard predicate verbatim. Returns true iff the
+// handler WOULD emit SCOPE_DECISION_REQUIRED for this (prev,next,ws,feature).
+// WHY a local copy: the handler block is not separately exported; encoding the
+// contract here pins it so a re-order/short-circuit change in index.ts must be
+// reflected (or it breaks these tests), exactly as visual-gate-e2e mirrors the
+// visual-evidence decision.
+function gateWouldFire(ws, feature, prevState, nextTuple) {
+  const isBuildEntry =
+    (nextTuple.agent === "architect" || nextTuple.agent === "sr-engineer") &&
+    nextTuple.status === "In_Progress" &&
+    prevState?.last_agent === "pm" &&
+    prevState?.status === "In_Progress";
+  if (!isBuildEntry) return false;
+  const arm = hasDesignModeRequiringVisual(ws, feature);
+  if (!arm.required) return false;
+  return !hasScopeDecision(ws, prevState);
+}
+
+function seedArmedDesign(ws, feature) {
+  // mode: figma (≠ no-design) → arms the gate, identical signal to visual gate.
+  writeDesignWithMode(ws, feature, `# design/${feature}\n\nmode: figma\n`);
+}
+
+function seedFeatureSplit(ws) {
+  fs.mkdirSync(path.join(ws, ".current"), { recursive: true });
+  fs.writeFileSync(path.join(ws, ".current", "feature-split.md"), "# split decision\n\n- feat A\n- feat B\n");
+}
+
+// ---------- hasScopeDecision primitive (Decision 2 contract) ----------
+
+test("AC-3: hasScopeDecision true when handoff scope_decision === 'single-feature'", () => {
+  // Why: the PM attestation path. The field is read off prevState (the
+  // preceding pm:In_Progress write), so equality on that one value clears the gate.
+  const ws = mkWorkspace();
+  assert.equal(hasScopeDecision(ws, { scope_decision: "single-feature" }), true);
+});
+
+test("AC-2: hasScopeDecision true when .current/feature-split.md exists (existence only)", () => {
+  // Why: the multi-feature split path. Existence is sufficient — the helper
+  // never parses content (mirrors hasEvidenceInFile). Even with NO handoff
+  // attestation, the split file alone clears the gate.
+  const ws = mkWorkspace();
+  seedFeatureSplit(ws);
+  assert.equal(hasScopeDecision(ws, { scope_decision: undefined }), true);
+});
+
+test("AC-1: hasScopeDecision false when neither artifact present", () => {
+  // Why: the gate-fires precondition. No split file + no attestation ⇒ the
+  // handler proceeds to emit SCOPE_DECISION_REQUIRED.
+  const ws = mkWorkspace();
+  assert.equal(hasScopeDecision(ws, { scope_decision: undefined }), false);
+});
+
+test("hasScopeDecision: only the literal 'single-feature' clears — wrong value rejected", () => {
+  // Why: zod constrains the write to z.enum(["single-feature"]) but the helper
+  // must independently reject any other value so a hand-edited handoff carrying
+  // scope_decision: multi-feature does NOT silently satisfy the gate.
+  const ws = mkWorkspace();
+  assert.equal(hasScopeDecision(ws, { scope_decision: "multi-feature" }), false);
+  assert.equal(hasScopeDecision(ws, { scope_decision: "" }), false);
+});
+
+test("hasScopeDecision: null / undefined handoffState never throws → false", () => {
+  // Why: the handler may call this with a missing prevState (fresh workspace).
+  // Optional chaining must default to false, not throw (Decision 2: never throws).
+  const ws = mkWorkspace();
+  let threw = false;
+  try {
+    assert.equal(hasScopeDecision(ws, null), false);
+    assert.equal(hasScopeDecision(ws, undefined), false);
+  } catch {
+    threw = true;
+  }
+  assert.equal(threw, false, "MUST NOT throw on null/undefined handoffState");
+});
+
+// ---------- Gate FIRES: armed + build-entry + no decision (AC-1) ----------
+
+test("AC-1: gate FIRES — design armed + pm→sr-engineer build entry + no scope decision", () => {
+  // Why: the core enforcement edge from CDE-OOBE finding A0. A design-backed
+  // feature entering build via sr-engineer with no recorded decision must be
+  // rejected so an oversized un-split feature cannot slip into build silently.
+  const ws = mkWorkspace();
+  seedArmedDesign(ws, "feat-x");
+  const prev = { last_agent: "pm", status: "In_Progress", scope_decision: undefined };
+  const next = { agent: "sr-engineer", status: "In_Progress" };
+  assert.equal(gateWouldFire(ws, "feat-x", prev, next), true);
+});
+
+test("AC-1: gate FIRES on the architect build-entry edge too (pm→architect)", () => {
+  // Why: AC-1 lists BOTH architect and sr-engineer as gated build-entry targets;
+  // architect-first routing (this feature's own routing) must also be gated.
+  const ws = mkWorkspace();
+  seedArmedDesign(ws, "feat-x");
+  const prev = { last_agent: "pm", status: "In_Progress", scope_decision: undefined };
+  const next = { agent: "architect", status: "In_Progress" };
+  assert.equal(gateWouldFire(ws, "feat-x", prev, next), true);
+});
+
+// ---------- Gate CLEARED by attestation / split file (AC-2, AC-3) ----------
+
+test("AC-3: gate CLEARED by scope_decision: single-feature in handoff (attestation)", () => {
+  // Why: the small-feature path. PM attests on its pm:In_Progress write; that
+  // value persists and is read off prevState at build entry, clearing the gate
+  // without creating a split file.
+  const ws = mkWorkspace();
+  seedArmedDesign(ws, "feat-x");
+  const prev = { last_agent: "pm", status: "In_Progress", scope_decision: "single-feature" };
+  const next = { agent: "sr-engineer", status: "In_Progress" };
+  assert.equal(gateWouldFire(ws, "feat-x", prev, next), false);
+});
+
+test("AC-2: gate CLEARED by .current/feature-split.md existence (multi-feature)", () => {
+  // Why: the multi-feature path. The split artifact's existence clears the gate
+  // even when no handoff attestation is set.
+  const ws = mkWorkspace();
+  seedArmedDesign(ws, "feat-x");
+  seedFeatureSplit(ws);
+  const prev = { last_agent: "pm", status: "In_Progress", scope_decision: undefined };
+  const next = { agent: "sr-engineer", status: "In_Progress" };
+  assert.equal(gateWouldFire(ws, "feat-x", prev, next), false);
+});
+
+// ---------- Gate SILENT for non-design workspaces (AC-5) ----------
+
+test("AC-5: gate SILENT when no design file (non-UI workspace) — transition allowed", () => {
+  // Why: the most common server-feature case. No design/<feature>.md means
+  // arm.required is false, short-circuiting before hasScopeDecision is consulted.
+  const ws = mkWorkspace();
+  // NO design file written.
+  const prev = { last_agent: "pm", status: "In_Progress", scope_decision: undefined };
+  const next = { agent: "sr-engineer", status: "In_Progress" };
+  assert.equal(gateWouldFire(ws, "no-design-feat", prev, next), false);
+});
+
+test("AC-5: gate SILENT when design mode === no-design — transition allowed", () => {
+  // Why: a design file that explicitly declares mode: no-design (e.g. this very
+  // feature's design) must NOT arm the gate. Identical exemption to the visual gate.
+  const ws = mkWorkspace();
+  writeDesignWithMode(ws, "server-feat", "# design/server-feat\n\nmode: no-design\n\nReason: server-only.\n");
+  const prev = { last_agent: "pm", status: "In_Progress", scope_decision: undefined };
+  const next = { agent: "sr-engineer", status: "In_Progress" };
+  assert.equal(gateWouldFire(ws, "server-feat", prev, next), false);
+});
+
+// ---------- Gate SILENT for non-build transition targets (AC-6) ----------
+
+test("AC-6: gate SILENT for non-build transition target even when design armed", () => {
+  // Why: condition 1 of the arm check fails for any next-agent outside
+  // {architect,sr-engineer} — e.g. pm→qa-engineer or pm→pm — so the whole guard
+  // block is skipped regardless of design presence + missing decision.
+  const ws = mkWorkspace();
+  seedArmedDesign(ws, "feat-x");
+  const prev = { last_agent: "pm", status: "In_Progress", scope_decision: undefined };
+  assert.equal(gateWouldFire(ws, "feat-x", prev, { agent: "qa-engineer", status: "In_Progress" }), false);
+  assert.equal(gateWouldFire(ws, "feat-x", prev, { agent: "researcher", status: "In_Progress" }), false);
+});
+
+test("AC-6: gate SILENT when build target status is not In_Progress (e.g. PASS/FAIL)", () => {
+  // Why: condition 1 also requires next.status === In_Progress. A sr-engineer
+  // write at any non-In_Progress status is not a build-ENTRY and must not gate.
+  const ws = mkWorkspace();
+  seedArmedDesign(ws, "feat-x");
+  const prev = { last_agent: "pm", status: "In_Progress", scope_decision: undefined };
+  assert.equal(gateWouldFire(ws, "feat-x", prev, { agent: "sr-engineer", status: "Blocked" }), false);
+});
+
+// ---------- Re-entry / resume safety (arch Edge Case row 1) ----------
+
+test("Edge: re-entry architect→sr-engineer NOT blocked (non-pm predecessor)", () => {
+  // Why: pinning prev=pm is what makes resume safe. Once build has begun, the
+  // architect→sr-engineer hop has a non-pm predecessor, so condition 2 is false
+  // and the gate is structurally skipped — even with armed design + no decision.
+  const ws = mkWorkspace();
+  seedArmedDesign(ws, "feat-x");
+  const prev = { last_agent: "architect", status: "In_Progress", scope_decision: undefined };
+  const next = { agent: "sr-engineer", status: "In_Progress" };
+  assert.equal(gateWouldFire(ws, "feat-x", prev, next), false);
+});
+
+test("Edge: sr-engineer self-loop NOT blocked (non-pm predecessor)", () => {
+  // Why: the sr-engineer:In_Progress → sr-engineer:In_Progress self-loop (a
+  // mid-build state refresh) must never re-trigger the gate.
+  const ws = mkWorkspace();
+  seedArmedDesign(ws, "feat-x");
+  const prev = { last_agent: "sr-engineer", status: "In_Progress", scope_decision: undefined };
+  const next = { agent: "sr-engineer", status: "In_Progress" };
+  assert.equal(gateWouldFire(ws, "feat-x", prev, next), false);
+});
+
+// ---------- AC-4 — rejection envelope + verbatim hint (Copy Audit Gate) ----------
+
+test("AC-4: SCOPE_DECISION_REQUIRED hint in index.ts matches the spec Copy/Strings verbatim", () => {
+  // Why (Copy Audit Gate): AC-4 mandates the hint be the verbatim string from
+  // the spec's Copy / Strings table. The handler concatenates the hint across
+  // source lines; this test reconstructs both and asserts char-for-char equality
+  // so a paraphrase in either the spec or the impl is caught (drift detection).
+  const root = path.resolve(import.meta.dirname, "..");
+  const indexTs = fs.readFileSync(path.join(root, "index.ts"), "utf-8");
+  const specMd = fs.readFileSync(path.join(root, "specs", "server-scope-decision-gate.md"), "utf-8");
+
+  const expected =
+    "Scope decision missing. Either: (a) create .current/feature-split.md documenting the " +
+    "multi-feature split decision, or (b) set scope_decision: single-feature in this " +
+    "tw_update_state call with a why field explaining why this feature is appropriately " +
+    "scoped. Gate only fires when design/<feature>.md declares mode != no-design. " +
+    "See specs/server-scope-decision-gate.md.";
+
+  // (1) The spec's Copy/Strings row carries the exact text (spec is the source
+  // of truth; it lives on one line so a literal substring match is valid).
+  assert.ok(
+    specMd.includes(expected),
+    "spec Copy/Strings hint must match the expected text verbatim; spec drift detected",
+  );
+  // (2) The impl emits the same text. index.ts assembles the hint via JS string
+  // concatenation across indented source lines, so reconstruct the runtime
+  // literal by collapsing the `" + <newline+ws> "` continuations, then assert
+  // the assembled hint contains the expected verbatim string. This catches a
+  // paraphrase in the impl even though the raw source is not a single literal.
+  const assembled = indexTs.replace(/"\s*\+\s*\n\s*"/g, "");
+  assert.ok(
+    assembled.includes(expected),
+    "index.ts must emit the verbatim hint; impl-vs-spec copy drift detected",
+  );
+});
+
+test("AC-4: rejection envelope shape — error/attempted/allowed/hint keys present in handler", () => {
+  // Why: AC-4 fixes the envelope to { error, attempted, allowed, hint } with
+  // isError:true, mirroring the VISUAL_* precedent. The handler block builds
+  // these keys literally; pin them so a refactor that drops `allowed` (the
+  // legal-edges echo) or `attempted` is caught.
+  const root = path.resolve(import.meta.dirname, "..");
+  const indexTs = fs.readFileSync(path.join(root, "index.ts"), "utf-8");
+  // Scope the search to the guard block to avoid matching the visual gate's envelope.
+  const block = indexTs.slice(indexTs.indexOf('error: "SCOPE_DECISION_REQUIRED"'));
+  assert.match(block, /error:\s*"SCOPE_DECISION_REQUIRED"/, "error code token");
+  assert.match(block.slice(0, 1200), /attempted:\s*\{/, "attempted tuple");
+  assert.match(block.slice(0, 1200), /allowed:\s*\(ALLOWED_TRANSITIONS\.get\("pm:In_Progress"\)/, "allowed echoes pm:In_Progress edges");
+  assert.match(block.slice(0, 1200), /hint,/, "hint field");
+  assert.match(block.slice(0, 1600), /isError:\s*true/, "isError:true rejection");
+});
+
+// ---------- AC-8 — union member, handler-side-only ----------
+
+test("AC-8: SCOPE_DECISION_REQUIRED is in the TransitionRejection.error union (transitions.ts)", () => {
+  // Why: AC-8 requires the error token be added to the union for handler-side
+  // narrowing + envelope consistency, commented as handler-side-only (like the
+  // VISUAL_* members). transitions.ts must stay pure — assert no fs import crept in.
+  const root = path.resolve(import.meta.dirname, "..");
+  const transitionsTs = fs.readFileSync(path.join(root, "tools", "transitions.ts"), "utf-8");
+  assert.match(transitionsTs, /\|\s*"SCOPE_DECISION_REQUIRED"/, "union must include the token");
+  assert.doesNotMatch(
+    transitionsTs,
+    /from\s+["']node:fs["']|from\s+["']fs["']|require\(["']fs["']\)/,
+    "transitions.ts must stay pure (no fs import) — gate reads fs handler-side only",
+  );
 });

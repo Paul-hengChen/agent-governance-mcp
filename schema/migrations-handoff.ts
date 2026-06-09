@@ -37,6 +37,18 @@ registerMigration<Record<string, unknown>, Record<string, unknown>>({
   up: (input) => ({ ...input, schema_version: 3, visual_round: 0 }),
 });
 
+// v3 → v4: add optional scope_decision attestation field (server-scope-decision-gate).
+// Additive NO-OP: stamps the version but adds NO default value for scope_decision.
+// Absence is meaningful — undefined === "no attestation recorded" === gate may fire.
+// Mirrors the v1→v2 / v2→v3 pattern EXCEPT it seeds no field default (those seeded a
+// 0 counter; here a defaulted value would be a false attestation, so we add nothing).
+registerMigration<Record<string, unknown>, Record<string, unknown>>({
+  kind: "handoff",
+  from: 3,
+  to: 4,
+  up: (input) => ({ ...input, schema_version: 4 }),
+});
+
 // Compile-time guard: if CURRENT_VERSIONS.handoff is ever bumped without a
 // matching registration added above, the runner's missing-step error fires
 // at read time. This reference makes the dependency explicit for grep.

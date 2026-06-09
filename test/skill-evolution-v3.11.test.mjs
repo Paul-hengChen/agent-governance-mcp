@@ -56,11 +56,13 @@ test("AC-10: transitions.ts AgentName union constraint (side-channel)", () => {
   assert.match(transitionsTs, /release-engineer/, "release-engineer MUST be in transitions.ts (v3.28.0 A5 matrix promotion — terminal PASS role)");
 });
 
-test("AC-10: schema/versions.ts schema versions track v3.14.0", () => {
-  // v3.14.0 bumped handoff to 3 (visual_round). sqlite stays at 2 — the
-  // visual_round column is added via ALTER TABLE, not a new sqlite migration.
+test("AC-10: schema/versions.ts schema versions track v3.30.0", () => {
+  // v3.30.0 bumped handoff to 4 (scope_decision for the server-scope-decision-gate).
+  // v3.14.0 had bumped it to 3 (visual_round). sqlite stays at 2 — the new
+  // scope_decision / scope_decision_why columns are added via idempotent ALTER
+  // TABLE, not a new sqlite migration.
   const versionsTs = fs.readFileSync(path.join(PROJECT_ROOT, "schema", "versions.ts"), "utf-8");
-  assert.match(versionsTs, /handoff:\s*3,/, "CURRENT_VERSIONS.handoff must be 3 (v3.14.0)");
+  assert.match(versionsTs, /handoff:\s*4,/, "CURRENT_VERSIONS.handoff must be 4 (v3.30.0)");
   assert.match(versionsTs, /sqlite:\s*2,/, "CURRENT_VERSIONS.sqlite must remain 2");
 });
 

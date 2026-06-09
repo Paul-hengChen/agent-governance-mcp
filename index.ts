@@ -49,6 +49,7 @@ import {
   requireQaEngineer,
   validateTransition,
   computeNewRound,
+  ALLOWED_TRANSITIONS,
   type AgentName,
   type StatusName,
   type TransitionTuple,
@@ -60,6 +61,7 @@ import {
   hasDesignModeRequiringVisual,
   designDeclaresStructuralAssertions,
   validateVisualReports,
+  hasScopeDecision,
 } from "./tools/evidence-file.js";
 
 // ==========================================
@@ -95,6 +97,11 @@ const UpdateStateArgs = z
       .min(1)
       .refine((p) => path.isAbsolute(p), { message: "prd_path must be absolute" })
       .optional(),
+    // v4 — scope-decision attestation (server-scope-decision-gate). The PM sets
+    // scope_decision: "single-feature" on its pm:In_Progress write to clear the
+    // SCOPE_DECISION_REQUIRED gate; scope_decision_why is optional free text.
+    scope_decision: z.enum(["single-feature"]).optional(),
+    scope_decision_why: z.string().max(2000).optional(),
   })
   .refine((d) => d.status !== "PASS" || d.agent_id === "qa-engineer", {
     message: 'status="PASS" requires agent_id="qa-engineer"',
@@ -201,7 +208,7 @@ function formatZodError(err: z.ZodError): string {
 // ==========================================
 // Storage adapter defaults to FileHandoffStorage; HTTP-mode boot switches it via setActiveStorage().
 const server = new Server(
-  { name: "agent-governance-mcp", version: "3.29.1" },
+  { name: "agent-governance-mcp", version: "3.30.0" },
   { capabilities: { tools: {}, prompts: {} } }
 );
 
@@ -442,6 +449,17 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: "string",
               description:
                 "Optional absolute path to the workspace's PRD/spec file. Consumed by the RAG lazy-reindex hook.",
+            },
+            scope_decision: {
+              type: "string",
+              enum: ["single-feature"],
+              description:
+                'Scope attestation. PM sets "single-feature" on its pm:In_Progress write to clear the SCOPE_DECISION_REQUIRED gate when the feature is appropriately scoped as-is (vs creating .current/feature-split.md for a multi-feature split).',
+            },
+            scope_decision_why: {
+              type: "string",
+              description:
+                "Optional free-text rationale for scope_decision. Recorded for the audit trail; not validated by the server.",
             },
           },
           required: ["workspace_path", "active_feature", "status"],
@@ -710,6 +728,54 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           };
         }
 
+        // v3.30.0 — Scope Decision Gate (server-scope-decision-gate). Fires on
+        // the build-entry edge (pm:In_Progress → {architect,sr-engineer}:In_Progress)
+        // when the design is armed (mode != no-design) but no scope decision is
+        // recorded. Pinning prev=pm makes re-entry/resume safe: the
+        // architect→sr-engineer and sr-engineer self-loop edges have a non-pm
+        // predecessor and are never gated. Structurally independent of the visual
+        // gate (different edge, different artifacts; shares only the arm helper).
+        // Placed here — after validateTransition accepts, before the evidence
+        // blocks — so all transition-shaped rejects read first. NOT in
+        // transitions.ts (that stays pure / fs-free; mirrors VISUAL_BASELINES_REQUIRED).
+        if (
+          (nextTuple.agent === "architect" || nextTuple.agent === "sr-engineer") &&
+          nextTuple.status === "In_Progress" &&
+          prevTuple.agent === "pm" &&
+          prevTuple.status === "In_Progress"
+        ) {
+          const arm = hasDesignModeRequiringVisual(parsed.workspace_path, parsed.active_feature);
+          if (arm.required && !hasScopeDecision(parsed.workspace_path, prevState)) {
+            const hint =
+              "Scope decision missing. Either: (a) create .current/feature-split.md documenting the " +
+              "multi-feature split decision, or (b) set scope_decision: single-feature in this " +
+              "tw_update_state call with a why field explaining why this feature is appropriately " +
+              "scoped. Gate only fires when design/<feature>.md declares mode != no-design. " +
+              "See specs/server-scope-decision-gate.md.";
+            const envelope = {
+              error: "SCOPE_DECISION_REQUIRED",
+              attempted: {
+                prev_agent: prevTuple.agent,
+                prev_status: prevTuple.status,
+                new_agent: nextTuple.agent,
+                new_status: nextTuple.status,
+              },
+              allowed: (ALLOWED_TRANSITIONS.get("pm:In_Progress") ?? []).map((c) => ({
+                new_agent: c.agent,
+                new_status: c.status,
+              })),
+              hint,
+            };
+            return {
+              content: [{
+                type: "text" as const,
+                text: `⛔ SCOPE_DECISION_REQUIRED\n${JSON.stringify(envelope, null, 2)}`,
+              }],
+              isError: true,
+            };
+          }
+        }
+
         // Evidence record FIRST so the PASS gate below can observe the row /
         // file just written. Only fires when QA attaches qa_review on a
         // PASS or FAIL write.
@@ -938,6 +1004,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           prdPath: parsed.prd_path,
           reviewRound: new_review_round,
           visualRound: new_visual_round,
+          scopeDecision: parsed.scope_decision,
+          scopeDecisionWhy: parsed.scope_decision_why,
         });
 
         // GC hook: when QA flips a feature to PASS, drop the workspace's RAG

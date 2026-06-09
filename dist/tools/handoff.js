@@ -77,6 +77,10 @@ function readAndMigrate(workspacePath) {
     const blockingReason = asString(frontmatter.blocking_reason) || undefined;
     const lastAgent = asString(frontmatter.last_agent) || undefined;
     const prdPath = asString(frontmatter.prd_path) || undefined;
+    // v4 — scope-decision attestation. `|| undefined` keeps the field ABSENT when
+    // unset, so undefined flows to hasScopeDecision and the gate is free to fire.
+    const scopeDecision = asString(frontmatter.scope_decision) || undefined;
+    const scopeDecisionWhy = asString(frontmatter.scope_decision_why) || undefined;
     const qaRoundRaw = Number(frontmatter.qa_round);
     const qa_round = Number.isFinite(qaRoundRaw) && qaRoundRaw >= 0 ? Math.floor(qaRoundRaw) : 0;
     const reviewRoundRaw = Number(frontmatter.review_round);
@@ -90,6 +94,8 @@ function readAndMigrate(workspacePath) {
         ...(blockingReason && { blocking_reason: blockingReason }),
         ...(lastAgent && { last_agent: lastAgent }),
         ...(prdPath && { prd_path: prdPath }),
+        ...(scopeDecision && { scope_decision: scopeDecision }),
+        ...(scopeDecisionWhy && { scope_decision_why: scopeDecisionWhy }),
         completed_tasks,
         pending_notes,
         qa_round,
@@ -192,6 +198,8 @@ export async function writeHandoffState(workspacePathOrOpts, activeFeature, stat
     // argument is a non-null, non-array object. After this block, all locals
     // below are guaranteed non-undefined for the required fields.
     let workspacePath;
+    let scopeDecision;
+    let scopeDecisionWhy;
     if (typeof workspacePathOrOpts === "object" &&
         !Array.isArray(workspacePathOrOpts)) {
         const o = workspacePathOrOpts;
@@ -206,6 +214,8 @@ export async function writeHandoffState(workspacePathOrOpts, activeFeature, stat
         prdPath = o.prdPath;
         reviewRound = o.reviewRound;
         visualRound = o.visualRound;
+        scopeDecision = o.scopeDecision;
+        scopeDecisionWhy = o.scopeDecisionWhy;
     }
     else {
         workspacePath = workspacePathOrOpts;
@@ -242,15 +252,32 @@ export async function writeHandoffState(workspacePathOrOpts, activeFeature, stat
             frontmatterData.blocking_reason = blockingReason;
         if (lastAgent)
             frontmatterData.last_agent = lastAgent;
-        // Preserve prd_path across writes that don't set it (PM sets once;
-        // downstream roles call writeState without re-passing the field).
+        // Preserve prd_path AND the scope_decision attestation across writes that
+        // don't set them (PM sets each once; downstream roles call writeState
+        // without re-passing the fields, and must not drop them). A single existing
+        // read services all three.
         let effectivePrdPath = prdPath;
-        if (effectivePrdPath === undefined) {
+        let effectiveScopeDecision = scopeDecision;
+        let effectiveScopeDecisionWhy = scopeDecisionWhy;
+        if (effectivePrdPath === undefined ||
+            effectiveScopeDecision === undefined ||
+            effectiveScopeDecisionWhy === undefined) {
             const existing = parseHandoff(workspacePath);
-            effectivePrdPath = existing?.prd_path;
+            if (effectivePrdPath === undefined)
+                effectivePrdPath = existing?.prd_path;
+            if (effectiveScopeDecision === undefined)
+                effectiveScopeDecision = existing?.scope_decision;
+            if (effectiveScopeDecisionWhy === undefined)
+                effectiveScopeDecisionWhy = existing?.scope_decision_why;
         }
         if (effectivePrdPath)
             frontmatterData.prd_path = effectivePrdPath;
+        // String attestation: emit only when set (empty string is indistinguishable
+        // from "not set", so guard the write).
+        if (effectiveScopeDecision)
+            frontmatterData.scope_decision = effectiveScopeDecision;
+        if (effectiveScopeDecisionWhy)
+            frontmatterData.scope_decision_why = effectiveScopeDecisionWhy;
         // Always emit qa_round (even 0) so the field is discoverable; falsy
         // input (undefined/NaN) normalises to 0.
         const normalisedRound = Number.isFinite(qaRound) && qaRound >= 0 ? Math.floor(qaRound) : 0;
