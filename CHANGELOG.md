@@ -16,6 +16,18 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.29.1] - 2026-06-09
+
+### Fixed
+- `agc init` now reports a pre-existing `CLAUDE.md` that received the adapter block as
+  **Updated**, not **Created**. The `writeClaudeBlock` `"appended"` result (block added to an
+  existing file) was wrongly mapped to the `created` list; an appended block means the file
+  pre-existed, so it now joins `updated`. Behavior was already correct (prose preserved, block
+  appended once) — only the printed label was misleading.
+- `test/agc-adapters.test.mjs`: +2 regression tests covering the missing case (existing
+  CLAUDE.md without the block → Updated label) and the truly-fresh-dir → Created complement
+  (over-correction guard).
+
 ## [3.29.0] - 2026-06-09
 
 ### Added

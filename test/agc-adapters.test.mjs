@@ -322,6 +322,64 @@ test("AC-9b: bogus subcommand exits 2 and prints usage to stderr", () => {
 });
 
 // ---------------------------------------------------------------------------
+// T-LABEL-FIX regression: existing CLAUDE.md (no agc block) → Updated, not Created
+// ---------------------------------------------------------------------------
+
+test("T-LABEL-FIX: agc init reports CLAUDE.md under Updated when file exists without an agc block", () => {
+  // Contract: when CLAUDE.md already exists in the workspace but contains NO
+  // <!-- BEGIN agc-adapter --> block, `agc init` must:
+  //   1. Report CLAUDE.md under "Updated:" in stdout, NOT under "Created:".
+  //   2. Preserve the pre-existing prose (it must still be present after init).
+  //   3. Append exactly one BEGIN agc-adapter block (count === 1).
+  // This is the direct regression test for the bug that let "appended" fall into
+  // the "Created" list instead of "Updated".
+  const ws = mkTmp("agc-label-fix-update-");
+
+  const PRIOR_PROSE = "# My Project\n\nPre-existing user content — must survive agc init.\n";
+  fs.writeFileSync(path.join(ws, "CLAUDE.md"), PRIOR_PROSE);
+
+  const r = runAgc(ws, ["init"]);
+  assert.equal(r.status, 0, `exit code (stderr=${r.stderr})`);
+
+  // 1. stdout must list CLAUDE.md under Updated, NOT Created.
+  assert.match(r.stdout, /Updated:.*CLAUDE\.md/, "stdout must report CLAUDE.md under Updated:");
+  assert.doesNotMatch(
+    r.stdout,
+    /Created:.*CLAUDE\.md/,
+    "stdout must NOT report CLAUDE.md under Created: when file pre-existed",
+  );
+
+  const after = fs.readFileSync(path.join(ws, "CLAUDE.md"), "utf-8");
+
+  // 2. Prior prose must be preserved.
+  assert.ok(
+    after.includes("Pre-existing user content — must survive agc init."),
+    "pre-existing user prose must be preserved after init",
+  );
+
+  // 3. Exactly one BEGIN agc-adapter block must be present.
+  const beginCount = (after.match(/<!-- BEGIN agc-adapter -->/g) || []).length;
+  assert.equal(beginCount, 1, `CLAUDE.md must have exactly 1 BEGIN agc-adapter block, got ${beginCount}`);
+});
+
+test("T-LABEL-FIX complement: agc init reports CLAUDE.md under Created in a truly-fresh dir (over-correction guard)", () => {
+  // Contract: when NO CLAUDE.md exists at all, `agc init` must still report it
+  // under "Created:" — not "Updated:". Guards against any over-correction that
+  // would move every CLAUDE.md outcome into the Updated bucket.
+  const ws = mkTmp("agc-label-fix-create-");
+
+  const r = runAgc(ws, ["init"]);
+  assert.equal(r.status, 0, `exit code (stderr=${r.stderr})`);
+
+  assert.match(r.stdout, /Created:.*CLAUDE\.md/, "stdout must report CLAUDE.md under Created: for a fresh dir");
+  assert.doesNotMatch(
+    r.stdout,
+    /Updated:.*CLAUDE\.md/,
+    "stdout must NOT report CLAUDE.md under Updated: for a fresh dir",
+  );
+});
+
+// ---------------------------------------------------------------------------
 // Version resolution is cwd-poison-immune
 // ---------------------------------------------------------------------------
 

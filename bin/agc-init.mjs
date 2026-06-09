@@ -159,10 +159,10 @@ qa_round: 0
   for (const { rel, tpl, mode } of ADAPTERS) {
     if (mode === "upsert") {
       const result = writeClaudeBlock(cwd, stampTemplate(tpl, ver));
-      if (result === "updated") {
-        updated.push(rel);
+      if (result === "updated" || result === "appended") {
+        updated.push(rel); // both mean the file pre-existed
       } else {
-        created.push(rel); // "created" or "appended"
+        created.push(rel); // "created" — brand-new file
       }
       continue;
     }
