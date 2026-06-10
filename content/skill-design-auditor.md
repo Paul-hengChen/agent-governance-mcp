@@ -65,6 +65,8 @@ Every audit MUST contain these H2 sections:
    | `Slider` (custom track), `RangeBar`, `RotaryDial` | custom slider / dial | `<input type="range">` |
    | `Toggle` (custom shape), `SwitchPill` | custom toggle | `<input type="checkbox">` |
    For uncertain matches, list the widget and tag the description `verify with PM` — let PM decide whether it stays. Out-of-scope: pure primitives with restyled CSS (a `<button>` with brand color is NOT a widget — it's a Visual Token).
+
+   **Geometric-density flag (v3.31.0, awareness-only)** — while auditing a surface's `## Layout / Canvas` structure, count its **independently-constrained geometry layers** (stacked container constraints, asymmetric padding, nested components with independent fill/sizing rules) — distinct from canonical state-count. When a single surface has **≥ 3 independently-constrained geometry layers**, note it in the surface's *Source manifest* `reason` (or *Out of Scope* note) and flag it so PM can apply the authoritative **Geometric-Density Split Gate** (`skill-pm` step 2a-bis). Design-auditor only **flags**; PM owns the split decision and writes `.current/feature-split.md`. This does not change the 8–10 state-count threshold.
 5. **Write** `design/<feature>.md` per the Artifact Schema.
 6. `tw_update_state(active_feature=<name>, status=In_Progress, agent_id="design-auditor", pending_notes=["Audit: design/<feature>.md", "next_role: pm"])`. On failure, still call with the failure summary in `pending_notes`.
 

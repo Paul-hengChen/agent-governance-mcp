@@ -16,6 +16,12 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.31.0] - 2026-06-10
+
+### Added
+- **F-A: `visual-selfconverge` — Scoped Render Self-Check with in-context region-diff + VSA structural-assertion loop.** SR-engineer role extended to run per-widget→whole-surface visual validation before QA handoff, reducing visual-rework reject cycles. Coordinator subagent-token observability and PM geometric-density split gate (2a-bis) included; architect Visual Harness per-region numbers. Prompt-doc-only, no server-code changes. Constitution §1 bounded self-converge relaxation honored.
+- **F-B: `governance-text-load` — Rationale-stripping to reduce prompt context burden.** New `stripRationale()` in `prompts/build.ts` removes `<!-- rationale -->`-fenced prose from skill bodies on every dispatch (−261 tok/pm, −154 tok/sr-engineer). Rationale fences added to `skill-pm.md` and `skill-sr-engineer.md` without altering rules or SOP steps. 6 new losslessness + token-cap tests added. Constitution unchanged; AC-3 guard satisfied.
+
 ## [3.30.0] - 2026-06-09
 
 ### Added

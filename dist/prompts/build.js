@@ -40,6 +40,21 @@ export function stripChainOnly(text) {
         .replace(/<!-- chain-only:start -->[\s\S]*?<!-- chain-only:end -->\n?/g, "")
         .replace(/\n{3,}/g, "\n\n");
 }
+// Remove every <!-- rationale:start --> … <!-- rationale:end --> block (markers
+// inclusive) and collapse blank lines left behind. Idempotent; text with no
+// markers is returned unchanged (full-detail safety default). Rationale blocks
+// carry only "why" prose (war-story / Reason: paragraphs) that onboards humans
+// and forms audit trail — never a rule a role acts on — so stripping them for
+// chain-role dispatch trims per-dispatch budget without dropping enforcement.
+// Single-copy by design (see governance-text-load-architecture DR-2, v3.31.0):
+// only buildPromptForRole calls it; NOT duplicated in the hook or measure script
+// as a load-bearing copy, so DR-3's 3-copy parity rule does not apply here.
+export function stripRationale(text) {
+    return text
+        .replace(/<!-- rationale:start -->[\s\S]*?<!-- rationale:end -->\n?/g, "")
+        .replace(/[ \t]+\n/g, "\n") // trim trailing spaces left by an inline strip
+        .replace(/\n{3,}/g, "\n\n");
+}
 // The lite coordinator skill marks a server-read-only, no-chain context.
 const LITE_SKILL_FILE = "skill-coordinator-lite.md";
 function isRagCapable(s) {
@@ -178,13 +193,19 @@ export async function appendSpecContext(result, workspacePath, role) {
         ],
     };
 }
-export function buildPromptForRole(skillFile, description, workspacePath) {
+export function buildPromptForRole(skillFile, description, workspacePath, fullDetail = false) {
     const rawConstitution = loadContent("constitution.md", workspacePath);
     // Lite contexts (teamwork-lite) get the chain-only sections stripped; chain
     // roles keep the full constitution because those rules become load-bearing.
     const constitution = skillFile === LITE_SKILL_FILE ? stripChainOnly(rawConstitution) : rawConstitution;
     const rawSkill = loadContent(skillFile, workspacePath);
-    const { frontmatter, body: skill } = parseSkillFile(rawSkill);
+    const { frontmatter, body: rawBody } = parseSkillFile(rawSkill);
+    // Chain-role skill dispatch strips verbose rationale unless fullDetail is set
+    // (DR-5, v3.31.0). Default false = strip on every buildPromptForRole dispatch,
+    // including the full teamwork coordinator — lossless because only the pm+sr
+    // skills are fenced and their fences hold no rule text (no-marker passthrough
+    // elsewhere). The constitution body is untouched (chain-only handled above).
+    const skill = fullDetail ? rawBody : stripRationale(rawBody);
     let state = null;
     try {
         state = getActiveStorage().parse(workspacePath);

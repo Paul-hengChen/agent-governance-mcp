@@ -153,6 +153,18 @@ authoritative `handoff.completed_tasks`. Before any PASS or hand-back in those c
 Never hand-edit `tasks.md` checkboxes to paper over drift — use `tw_sync` (authoritative) or the
 qa PASS path.
 
+## Subagent Token Observability (v3.31.0)
+
+For a retrospective or post-feature cost review, you MAY read the workspace's `agent-*.jsonl` dispatch
+logs to extract per-dispatch token telemetry. The canonical cost-attribution fields are the four
+`usage.*` numbers on each entry: `usage.input_tokens`, `usage.output_tokens`,
+`usage.cache_read_input_tokens`, and `usage.cache_creation_input_tokens`. These four fields — NOT
+`subagent_tokens` alone — are the authoritative source for cost attribution: `subagent_tokens` has an
+unknown denominator (it conflates cached vs fresh input), whereas the `usage.*` breakdown from
+`agent-*.jsonl` gives a precise denominator per dispatch. Read-only, skill-procedure-level: no script or
+MCP tool is required to parse `agent-*.jsonl` (automated tooling is deferred). Use these fields so
+future retrospectives report measured costs, not estimates.
+
 ## SOP
 
 1. **Auto-routing pre-check**: read `AGC_AUTO_ROUTE` from the shell environment (e.g. `printenv AGC_AUTO_ROUTE`). Value exactly `0` → `auto_mode = off` for this session. Unset or any other value → `auto_mode = on` (default).

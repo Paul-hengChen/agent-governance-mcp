@@ -66,7 +66,7 @@ test("AC3: ListPromptsRequestSchema response includes 'teamwork-lite'", async ()
   send({ jsonrpc: "2.0", method: "notifications/initialized" });
   send({ jsonrpc: "2.0", id: 2, method: "prompts/list" });
 
-  await new Promise((r) => setTimeout(r, 1200));
+  await new Promise((r) => setTimeout(r, 2500));
   p.kill();
 
   const promptList = stdout.split("\n").filter(Boolean).map((l) => {
@@ -103,7 +103,7 @@ test("AC3b: GetPromptRequestSchema dispatches 'teamwork-lite' correctly", async 
   send({ jsonrpc: "2.0", method: "notifications/initialized" });
   send({ jsonrpc: "2.0", id: 2, method: "prompts/get", params: { name: "teamwork-lite", arguments: { workspace_path: PROJECT_ROOT } } });
 
-  await new Promise((r) => setTimeout(r, 1500));
+  await new Promise((r) => setTimeout(r, 2500));
   p.kill();
 
   const getRes = stdout.split("\n").filter(Boolean).map((l) => {

@@ -1,5 +1,6 @@
 import type { HandoffState } from "../tools/handoff.js";
 export declare function stripChainOnly(text: string): string;
+export declare function stripRationale(text: string): string;
 export type PromptResult = {
     description: string;
     messages: Array<{
@@ -12,7 +13,7 @@ export type PromptResult = {
 };
 export declare function resolvePrdPath(workspacePath: string, state: HandoffState | null): string | null;
 export declare function appendSpecContext(result: PromptResult, workspacePath: string, role?: string): Promise<PromptResult>;
-export declare function buildPromptForRole(skillFile: string, description: string, workspacePath: string): {
+export declare function buildPromptForRole(skillFile: string, description: string, workspacePath: string, fullDetail?: boolean): {
     description: string;
     messages: Array<{
         role: "user";

@@ -22,7 +22,7 @@
 | Gemini CLI / Code Assist | [↓ here](#gemini-cli--code-assist) |
 | Google Anti-Gravity | [↓ here](#google-anti-gravity) |
 
-All clients point at the same command: `npx -y github:Paul-hengChen/agent-governance-mcp#v3.18.0`.
+All clients point at the same command: `npx -y github:Paul-hengChen/agent-governance-mcp#v3.30.0`.
 
 ---
 
@@ -31,7 +31,7 @@ All clients point at the same command: `npx -y github:Paul-hengChen/agent-govern
 Writes to `~/.claude.json`. Uses the CLI's own command:
 
 ```bash
-claude mcp add -s user agent-governance-mcp -- npx -y github:Paul-hengChen/agent-governance-mcp#v3.18.0
+claude mcp add -s user agent-governance-mcp -- npx -y github:Paul-hengChen/agent-governance-mcp#v3.30.0
 claude mcp list
 # agent-governance-mcp: ... - ✓ Connected
 ```
@@ -53,7 +53,7 @@ Edit `claude_desktop_config.json`:
   "mcpServers": {
     "agent-governance-mcp": {
       "command": "npx",
-      "args": ["-y", "github:Paul-hengChen/agent-governance-mcp#v3.18.0"]
+      "args": ["-y", "github:Paul-hengChen/agent-governance-mcp#v3.30.0"]
     }
   }
 }
@@ -85,7 +85,7 @@ mcpServers:
     command: npx
     args:
       - "-y"
-      - "github:Paul-hengChen/agent-governance-mcp#v3.18.0"
+      - "github:Paul-hengChen/agent-governance-mcp#v3.30.0"
 ```
 
 ## Zed
@@ -98,7 +98,7 @@ Edit `~/.config/zed/settings.json` (uses `context_servers`, not `mcpServers`):
     "agent-governance-mcp": {
       "command": {
         "path": "npx",
-        "args": ["-y", "github:Paul-hengChen/agent-governance-mcp#v3.18.0"]
+        "args": ["-y", "github:Paul-hengChen/agent-governance-mcp#v3.30.0"]
       }
     }
   }
@@ -111,7 +111,7 @@ Edit `~/.gemini/settings.json`. Same JSON block as Claude Desktop.
 
 ## Google Anti-Gravity
 
-Open the in-app MCP Server settings UI → add entry: command `npx`, args `-y github:Paul-hengChen/agent-governance-mcp#v3.18.0`.
+Open the in-app MCP Server settings UI → add entry: command `npx`, args `-y github:Paul-hengChen/agent-governance-mcp#v3.30.0`.
 
 ---
 
@@ -127,7 +127,7 @@ mkdir -p .current
 
 Or use the bundled scaffolder:
 ```bash
-npx -y --package=github:Paul-hengChen/agent-governance-mcp#v3.18.0 agc init
+npx -y --package=github:Paul-hengChen/agent-governance-mcp#v3.30.0 agc init
 ```
 
 ---
@@ -143,7 +143,7 @@ Auto-injects the constitution + Coordinator SOP + handoff state every session. E
       "matcher": "",
       "hooks": [{
         "type": "command",
-        "command": "npx -y -p github:Paul-hengChen/agent-governance-mcp#v3.18.0 agent-governance-context",
+        "command": "npx -y -p github:Paul-hengChen/agent-governance-mcp#v3.30.0 agent-governance-context",
         "timeout": 60
       }]
     }]
@@ -166,7 +166,7 @@ claude mcp list
 
 # 2. SessionStart hook helper works (cd into a managed workspace first)
 cd <your-project-with-.current>
-npx -y -p github:Paul-hengChen/agent-governance-mcp#v3.18.0 agent-governance-context
+npx -y -p github:Paul-hengChen/agent-governance-mcp#v3.30.0 agent-governance-context
 # → JSON blob containing "additionalContext" with the constitution
 ```
 
@@ -199,7 +199,7 @@ In other clients: in-app prompt picker (Claude Desktop), `@`-mention (Cursor's M
 
 ## Upgrade / pin a version
 
-Replace `#v3.18.0` in the install command with another tag (or `#main` for bleeding edge). Then clear the npx cache:
+Replace `#v3.30.0` in the install command with another tag (or `#main` for bleeding edge). Then clear the npx cache:
 
 ```bash
 npx clear-npx-cache

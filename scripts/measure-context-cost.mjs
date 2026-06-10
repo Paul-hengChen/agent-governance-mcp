@@ -37,6 +37,19 @@ function stripChainOnly(text) {
     .replace(/\n{3,}/g, "\n\n");
 }
 
+// Reporting mirror of stripRationale() in prompts/build.ts (governance-text-load
+// F-B, v3.31.0) — lets this script report the post-rationale-strip role-prompt
+// budget so AC1/AC2 reductions are diff-able here. DR-2/DR-6: this is a REPORTING
+// copy, NOT a load-bearing prompt-assembly copy, so DR-3's 3-copy parity test
+// does NOT apply (only buildPromptForRole's copy feeds a live prompt). Keep the
+// regex in sync with prompts/build.ts by inspection.
+function stripRationale(text) {
+  return text
+    .replace(/<!-- rationale:start -->[\s\S]*?<!-- rationale:end -->\n?/g, "")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n");
+}
+
 function read(rel) {
   return fs.readFileSync(path.join(CONTENT, rel), "utf-8");
 }
@@ -101,6 +114,22 @@ printTable("SessionStart hook (constitution + skill)", [
 // 3. Role-prompt bundles (constitution + role skill; volatile state excluded).
 printTable("Role-prompt bundles (constitution + skill, state excluded)", [
   ...ROLE_PROMPTS.map(([id, file]) => row(`${id}  [${file}]`, constitution + SEP + read(file))),
+]);
+
+// 3b. Role-prompt bundles AFTER stripRationale() on the skill body (F-B, v3.31.0).
+//     This mirrors buildPromptForRole's default (fullDetail=false) dispatch: the
+//     constitution is unchanged, only the skill body has rationale fences removed.
+//     Un-fenced skills pass through byte-identical (no-marker passthrough), so only
+//     pm/sr move — exactly the AC1/AC2 reduction targets.
+printTable("Role-prompt bundles (rationale-stripped)", [
+  ...ROLE_PROMPTS.map(([id, file]) => {
+    const skill = read(file);
+    const stripped = stripRationale(skill);
+    const bundle = constitution + SEP + stripped;
+    const skillSaved = approxTokens(skill) - approxTokens(stripped);
+    const tag = skillSaved > 0 ? `  (skill −${skillSaved} ~tok)` : "";
+    return row(`${id}  [${file}]${tag}`, bundle);
+  }),
 ]);
 
 // 4. Always-on total (hook default path = constitution + lite skill).
