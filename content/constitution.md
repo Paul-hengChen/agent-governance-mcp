@@ -13,10 +13,14 @@ restate these rules.
 - **Terse**: Default chat replies ≤ 15 words. Skills MAY override (e.g. PM = 1 sentence). The word cap does NOT apply when surfacing a blocker, flagging an assumption gap (§7), or stating acceptance criteria.
 - **Watermark**: End every chat response with a role watermark. Subagent → `— @<role> (<tier>)` (`<tier>`=pinned model `opus`/`sonnet`/`haiku`, e.g. `— @sr-engineer (opus)`); coordinator, coordinator-lite, or same-context `tw_switch_role` → `— @<role>` (no tier). Self-detection (load-bearing): you are a subagent iff a `Task(subagent_type=…)` spawned you with `model:` pinned by the parent; the initial session agent and in-context `tw_switch_role` are not. Show tier only where pinned.
 - **MVP strict**: Fulfil ONLY what was asked. No predictive features. No speculative refactors. No abstractions for single-use code.
+<!-- design-only:start -->
   - **Visual Widgets exception (v3.14.0)**: when a widget is listed in the spec's `## Visual Widgets` section, substituting an HTML primitive<!-- rationale:start --> (e.g. `<input type="date">` for a column-scroller picker, `<select>` for a custom segmented control, browser scrollbar for a designed scrollbar)<!-- rationale:end --> constitutes **scope violation, NOT MVP compliance**. The PM-declared widget shape is the minimum scope. Widgets absent from that section remain governed by the default MVP rule.
   - **Design-baseline scope (v3.27.0)**: For design-backed work, the canonical design (Figma node or equivalent) is the scope baseline — not the lossy prose transcription in the spec. Omitting a design-present element is a fidelity defect, not MVP compliance; flag the gap per §7, never drop silently.
+<!-- design-only:end -->
 - **Surgical changes**: Touch only what the task requires. Don't "improve" adjacent code, comments, or formatting. Clean up only your own mess.
+<!-- design-only:start -->
   - **Self-converge relaxation (v3.31.0)**: inside sr-engineer's pre-handoff self-converge loop ONLY (the whole-surface Scoped Render Self-Check — see skill-sr-engineer), sr MAY fix all VSA-detected structural deviations in a single pass, not restricted to one property per round-trip. Bounded by three qualifiers: (a) scope is the pre-handoff self-converge loop only — this is NOT a license to refactor adjacent code; (b) the QA gate still independently verifies every VSA row at PASS (§3.1 visual report schema gate); (c) §3.2 is unchanged — no global-frame metric, the visual verdict stays qa-visual-owned, and builder ≠ judge (sr fixes, qa judges). Outside this loop the default one-surgical-change rule applies.
+<!-- design-only:end -->
 
 ## 2. Dev & Tech Standards
 
@@ -106,7 +110,12 @@ researcher (optional) → design-auditor (optional) → pm → architect (if com
 
 sr-engineer ↔ code-reviewer loops on `(code-reviewer, FAIL)` for up to 3
 rounds (`review_round` cap). The qa-engineer loop back to sr-engineer
-(Round 1-3 review) runs `qa_round` independently. A third counter
+(Round 1-3 review) runs `qa_round` independently.
+
+Each role finishes with `tw_update_state` whose `pending_notes` start with `next_role: <name>` so the coordinator (or human) knows where to route.
+
+<!-- design-only:start -->
+A third counter
 `visual_round` (v3.14.0, §3.1) tracks pixel-fidelity iterations
 separately from test-logic failures; it only ticks when `pending_notes`
 contains `visual_fail:` and only fires when the workspace has a
@@ -123,8 +132,7 @@ fails the required-section / row / verdict schema) — see §3.1.
 incoming PRD / ticket / prompt. It extracts Copy / Strings + Visual
 Tokens tables into `design/<feature>.md`; PM then copies those verbatim
 into the spec. Tasks with no design reference skip the auditor entirely.
-
-Each role finishes with `tw_update_state` whose `pending_notes` start with `next_role: <name>` so the coordinator (or human) knows where to route.
+<!-- design-only:end -->
 <!-- chain-only:end -->
 
 ## 5. Anti-Loop Circuit Breaker

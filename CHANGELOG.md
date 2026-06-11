@@ -16,6 +16,11 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.34.0] - 2026-06-11
+
+### Added
+- **`constitution-conditional-load` — Phase 2 extension (§4 visual prose + §1 governance exceptions).** Extends the design-only fence axis from v3.33.0 to two additional spans: (1) §4 visual governance prose (the `visual_round` description, arming-signal, `VISUAL_*` error-code sentences, and design-auditor paragraph following a reflow-only reordering that preserves byte-identical rule sentences), and (2) §1 L16/L17/L19 governance exceptions (Visual-Widgets-exception, Design-baseline-scope, Self-converge-relaxation — two `<!-- design-only -->` fences with L16's existing rationale fence nested inside the outer design-fence). Non-design constitution now ~2409 ~tok (down from 4200 pre-v3.33.0 baseline; ~1790 tok lighter per non-design dispatch). Design-mode features load the full, unchanged constitution. No build.ts change (reuses v3.33.0 `stripDesignOnly()` mechanism); rule semantics unchanged (only §4 sentence reorder + marker insertion). AC-P2-1…8 assertions in `test/context-budget.test.mjs` verify Phase-2 strips and design loads; full test suite 629/629 passing.
+
 ## [3.33.0] - 2026-06-11
 
 ### Added

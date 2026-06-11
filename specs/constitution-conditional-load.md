@@ -244,3 +244,170 @@ state. This is the real added surface and the main thing for the human to weigh.
 - Existing static strip axes in `prompts/build.ts` (`stripChainOnly` L55, `stripRationale` L70) — the
   new axis mirrors these.
 - No external references; no Figma/URL/ticket artifacts (Resource Audit Gate: clean).
+
+---
+
+## Phase 2 (v3.34.0 target)
+
+> Status: **DESIGN — routes to sr-engineer for implementation.** Phase 1 shipped the `design-only`
+> fence axis in v3.33.0 (`stripDesignOnly()` in `prompts/build.ts`, triggered by the design-arm probe
+> reusing `hasDesignModeRequiringVisual()`), gating §3.2-minus-R10 + four §3.1 visual bullets. Phase 2
+> extends the SAME axis (no new mechanism — reuse `stripDesignOnly` + the `<!-- design-only:start/end -->`
+> marker pair) to the TWO spans that Phase 1 classified FEATURE-INERT but DEFERRED: §4 visual prose
+> (Span A, needs a reflow first) and §1 L16/L17/L19 (Span B, needs anti-sweep fence placement around
+> a universal bullet). NO server-gate change, NO rule reword.
+
+### Carry-forward Hard Constraints (Phase 1 → Phase 2)
+
+- **HC2 (tightened) — reflow is REORDER-ONLY.** No rule may be reworded. The §4 reflow may ONLY
+  reorder existing sentences and split a paragraph; every sentence's text stays **byte-identical**,
+  only its line position changes. If a sentence fuses a visual and a non-visual clause and cannot be
+  separated without rewording, it is FLAGGED and left UNFENCED (visual clause stays loaded on both
+  arms) — rewording is never permitted to win a fence.
+- **HC5 (carried) — composition safety / non-greedy nesting.** All `design-only`/`rationale`/`chain-only`
+  regexes stay non-greedy; markers must nest properly, never cross.
+
+### Span A — §4 visual prose (REFLOW + one design-only fence)
+
+**Current §4 sentence inventory** (post-Phase-1 line numbers in `content/constitution.md`; re-confirmed
+by reading the live file — the prior `~L104–119` estimate shifted to the numbers below):
+
+| Tag | Current lines | Sentence (verbatim opener) | Class |
+|---|---|---|---|
+| HEADER | L100 | `## 4. Routing Chain (multi-phase work)` | non-visual |
+| DIAGRAM | L102–105 | the fenced routing-chain diagram block | non-visual (CONTRACT) |
+| S1 | L107–108 | "sr-engineer ↔ code-reviewer loops on `(code-reviewer, FAIL)` for up to 3 rounds (`review_round` cap)." | non-visual |
+| S2 | L108–109 | "The qa-engineer loop back to sr-engineer (Round 1-3 review) runs `qa_round` independently." | non-visual |
+| S3 | L109–114 | "A third counter `visual_round` (v3.14.0, §3.1) tracks pixel-fidelity iterations separately from test-logic failures; it only ticks when `pending_notes` contains `visual_fail:` and only fires when the workspace has a `design/<active_feature>.md` whose `## Mode` is ≠ `no-design` (the v3.16.0 self-arming signal)." | **VISUAL** (fuses `visual_round` description + self-arming signal via a semicolon — see Reflow Note) |
+| S4 | L114–116 | "An armed workspace missing the `## Visual Baselines` section is blocked at PASS with `VISUAL_BASELINES_REQUIRED` rather than silently passing through." | **VISUAL** |
+| S5 | L116–119 | "Beyond `VISUAL_BASELINES_REQUIRED`, an armed workspace also rejects PASS with `VISUAL_ASSERTIONS_REQUIRED` … or `VISUAL_REPORT_INCOMPLETE` … — see §3.1." | **VISUAL** |
+| P-AUDITOR | L121–125 | the `design-auditor` paragraph ("`design-auditor` fires when the coordinator detects a design source … Tasks with no design reference skip the auditor entirely.") | **VISUAL / design-only** (whole paragraph) |
+| S6 | L127 | "Each role finishes with `tw_update_state` whose `pending_notes` start with `next_role: …` …" | non-visual (universal handoff convention) |
+
+**Key finding — minimal reflow.** The visual sentences are ALREADY mostly contiguous: S3+S4+S5 form the
+back half of the first §4 prose paragraph, and S1+S2 form the front half. The ONLY non-visual material
+sitting *after* the visual block is S6, which is separated from S3–S5 by the (also-visual) P-AUDITOR
+paragraph. So the reflow is NOT a sentence shuffle within the block — it is: (1) split the first prose
+paragraph between S2 and S3 so S3–S5 stand alone, and (2) relocate S6 to sit BEFORE the P-AUDITOR
+paragraph so that S3–S5 + P-AUDITOR become one CONTIGUOUS design-only region with no non-visual text
+between the fence markers.
+
+**Before order (current):** HEADER · DIAGRAM · [S1 S2 S3 S4 S5 in one paragraph] · P-AUDITOR · S6
+**After order (reflow):** HEADER · DIAGRAM · [S1 S2 in one paragraph] · S6 · `<!-- design-only:start -->` · [S3 S4 S5 in one paragraph] · P-AUDITOR · `<!-- design-only:end -->`
+
+Mechanical steps for sr (each step preserves every sentence byte-for-byte; only position/paragraph
+breaks change):
+
+1. **Split** the first §4 prose paragraph after S2: end the paragraph at "…runs `qa_round`
+   independently." (S2), then start a new paragraph at "A third counter `visual_round`…" (S3).
+2. **Move** S6 ("Each role finishes with `tw_update_state`…") to sit immediately AFTER S2's paragraph
+   and BEFORE the visual block. S6 text is unchanged; only its position moves up.
+3. **Wrap** the contiguous region [S3 S4 S5 paragraph] + [blank line] + [P-AUDITOR paragraph] in a
+   single `<!-- design-only:start -->` … `<!-- design-only:end -->` fence. The fence start goes on its
+   own line immediately before S3's paragraph; the fence end on its own line immediately after
+   P-AUDITOR's last line ("…skip the auditor entirely."). This fence is NESTED inside the existing
+   `chain-only` fence (which ends at the current L128 `<!-- chain-only:end -->`); the `design-only:end`
+   marker must precede `chain-only:end` (proper nesting, HC5).
+4. **Anti-sweep verification:** DIAGRAM, S1, S2, and S6 sit OUTSIDE the new fence and survive both arms.
+
+**Reflow Note — S3 fused clause (HC2 disposition).** S3 fuses the `visual_round` *description* (visual)
+with the self-arming-signal clause (also visual) — both halves are visual, so the whole sentence is
+cleanly fenceable; no HC2 flag is triggered for S3. The dispatch brief named "the v3.16.0
+self-arming-signal sentence" as a distinct visual sentence; in the live text it is the SECOND clause of
+S3 (after the semicolon), not a standalone sentence, and since both clauses are visual the entire S3 is
+gated as one unit. **No sentence in §4 fuses a visual + non-visual clause**, so the HC2 escape hatch
+(leave-unfenced) is NOT needed for Span A — every visual sentence separates cleanly.
+
+**P-AUDITOR — whole-paragraph fence confirmed.** The design-auditor paragraph is entirely design-only:
+the auditor only fires when the coordinator detects a design source, and its own closing sentence
+("Tasks with no design reference skip the auditor entirely.") makes it self-evidently inert on
+non-design features — it binds no role there. It is gatable as a whole-paragraph unit and is folded
+into the single Span-A fence (step 3) rather than getting its own fence, since after the reflow it is
+contiguous with S3–S5.
+
+### Span B — §1 L16/L17/L19 (TWO fences, anti-sweep on L15/L18)
+
+**Current §1 order** (post-Phase-1 line numbers, re-confirmed against the live file):
+
+| Line | Bullet | Class | Gate |
+|---|---|---|---|
+| L15 | **MVP strict** | CONTRACT (universal) | **NO — stays outside (anti-sweep)** |
+| L16 | **Visual Widgets exception (v3.14.0)** — contains a `<!-- rationale:start/end -->` fence (governance-text-load v3.31.0) | FEATURE-INERT | **Yes — fence #1** |
+| L17 | **Design-baseline scope (v3.27.0)** | FEATURE-INERT | **Yes — fence #1** |
+| L18 | **Surgical changes** | CONTRACT (universal) | **NO — stays outside (anti-sweep)** |
+| L19 | **Self-converge relaxation (v3.31.0)** | FEATURE-INERT | **Yes — fence #2** |
+
+Because the universal bullet **L18 (Surgical changes) sits BETWEEN** the gatable bullets L16–L17 and
+L19, a single fence would swallow L18. Therefore **TWO design-only fences**:
+
+- **Fence #1** wraps **L16–L17**: `<!-- design-only:start -->` on its own line immediately before the
+  L16 bullet; `<!-- design-only:end -->` on its own line immediately after the L17 bullet and BEFORE
+  the L18 bullet.
+- **Fence #2** wraps **L19**: `<!-- design-only:start -->` immediately before the L19 bullet;
+  `<!-- design-only:end -->` immediately after it. (L19 is the last sub-bullet under L18's Surgical
+  bullet — the fence wraps only L19's bullet text, not L18.)
+- **L15 and L18 stay OUTSIDE both fences** — anti-sweep, they are universal contracts.
+
+No reflow is needed for Span B (the bullets are already in the right relative order; only fence markers
+are inserted). HC2 holds trivially — no §1 bullet text changes.
+
+**NESTED-FENCE composition rule (critical — Span B, fence #1).** L16's Visual-Widgets bullet ALREADY
+carries a `<!-- rationale:start -->…<!-- rationale:end -->` fence (the parenthetical HTML-primitive
+example list, added by governance-text-load v3.31.0). The new design-only fence #1 wraps L16–L17 and
+therefore CONTAINS that rationale fence. Required nesting (OUTER → INNER): `design-only:start` →
+`rationale:start` → `rationale:end` → `design-only:end`. The markers must never cross.
+
+- **HC-NEST (new Phase-2 hard constraint):** both the `stripDesignOnly` and `stripRationale` regexes
+  MUST be non-greedy, and the two marker types MUST remain properly nested (design-only OUTSIDE,
+  rationale INSIDE) so that ANY strip combination yields neither an orphan marker nor corrupted prose.
+  The permutation set the build must keep clean: {design-only only} · {rationale only} · {both} ·
+  {neither} — each additionally crossed with {chain-only on (lite)} and {chain-only off}. (Note: §1 is
+  OUTSIDE the `chain-only` fence, so chain-only does not strip §1 bullets; but the permutation matrix
+  must still confirm no interaction.) This is a **qa permutation-test requirement** — see AC-P2-4.
+
+### Additional gatable token estimate (Phase 2)
+
+Phase-1 canonical figures (`scripts/measure-context-cost.mjs`): raw 4233 / rationale-stripped 4161 /
+lite-lean 1979 ~tok. Phase 2 adds (non-design dispatch, on top of Phase-1's ~900–1000 tok):
+
+- **Span A** (§4 S3–S5 visual paragraph + P-AUDITOR paragraph): ~110–140 ~tok.
+- **Span B** (§1 L16 + L17 + L19 bullets; L16 incl. its rationale example clause): ~120–160 ~tok.
+- **Phase-2 incremental:** ~230–300 ~tok/non-design-dispatch, ON TOP OF Phase-1. qa MUST re-run
+  `measure-context-cost.mjs` to replace these estimates with measured figures and re-establish the AC8
+  floor (see AC-P2-7).
+
+### Phase-2 Acceptance Criteria (qa authors the executable contract; floors re-measured)
+
+- **AC-P2-1 (§4 visual block — non-design strips):** On a non-design feature, the emitted §4 contains
+  HEADER, DIAGRAM, S1, S2, and S6 byte-for-byte, and does NOT contain S3, S4, S5, or the P-AUDITOR
+  paragraph.
+- **AC-P2-2 (§4 visual block — design loads full):** On a design feature (`## Mode` ≠ `no-design`), the
+  emitted §4 contains S3, S4, S5, and P-AUDITOR present and byte-identical to the post-reflow source.
+- **AC-P2-3 (§1 L16-17 + L19 — non-design strips / design loads):** On a non-design feature the emitted
+  §1 omits L16, L17, and L19 but retains L15 and L18 byte-for-byte; on a design feature all five bullets
+  (L15–L19) are present and byte-identical.
+- **AC-P2-4 (nested rationale-inside-design-only composition clean across all permutations):** For the
+  permutation set {design-only only, rationale only, both, neither} × {chain-only on, chain-only off},
+  the emitted §1 has NO orphan `design-only`/`rationale` marker and no truncated/corrupted bullet text;
+  every surviving bullet is byte-identical to its source.
+- **AC-P2-5 (reflow is reorder-only — §4 byte-identity modulo position):** Every §4 rule sentence
+  (S1–S6, DIAGRAM, P-AUDITOR) present in the post-reflow `content/constitution.md` is byte-identical to
+  its pre-reflow text; the diff between pre- and post-reflow §4 consists ONLY of line-position changes,
+  paragraph splits, and inserted fence-marker lines — zero character changes inside any sentence.
+  (Suggested check: normalize-whitespace + set-equality of sentences pre/post, asserting the multiset of
+  sentence texts is unchanged.)
+- **AC-P2-6 (non-visual §4 survives BOTH arms):** DIAGRAM, S1 (`review_round`), S2 (`qa_round`), and S6
+  ("Each role finishes…") are present byte-for-byte on BOTH the design and non-design arms.
+- **AC-P2-7 (AC8 floor re-measured):** Re-run `scripts/measure-context-cost.mjs`; record the new
+  non-design-dispatch token figure (Phase-1 strip + Span A + Span B) and update the AC8 budget floor
+  assertion to the measured value. The design-arm figure must be unchanged from Phase 1 (full text
+  loads on design).
+- **AC-P2-8 (composition with prior axes order-independent):** Span A + Span B strips compose
+  order-independently with `stripChainOnly`/`stripRationale`/Phase-1 `stripDesignOnly` regions; no
+  surviving rule is double-stripped or corrupted (extends Phase-1 AC5).
+
+### Phase-2 Out of Scope
+
+- No new strip mechanism — Phase 2 reuses `stripDesignOnly` + the `design-only` marker pair only.
+- No server-side gate change.
+- No rule reword (HC2 absolute).

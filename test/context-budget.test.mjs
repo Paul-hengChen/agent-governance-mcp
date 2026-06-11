@@ -327,44 +327,42 @@ test("AC7: exactly two balanced rationale fences, both outside §3.x", () => {
   assert.equal(ends, 2, "exactly two rationale:end markers");
 });
 
-test("AC8: rationale-stripped constitution is at/below the measured floor (≤ 4200 ~tok)", () => {
-  // WHY: floor REBASELINED by constitution-conditional-load. The feature adds 6
-  // marker-comment lines (3 `<!-- design-only:start -->` / `<!-- design-only:end -->`
-  // pairs) wrapping the visual-governance span (§3.1 visual bullets + §3.2 minus R10).
-  // Those 6 lines are load-bearing fence DELIMITERS (the design-only strip axis keys
-  // off them), not rule text — but on the DESIGN arm (and in the raw/rationale-stripped
-  // measurement here) they are NOT stripped, so they cost +39 ~tok: 4161 → 4200 ~tok.
-  // This is the irreducible marker cost on the kept path; it is the price of the
-  // ~1187 ~tok saving on the NON-DESIGN dispatch path (pinned by the
-  // "design-only strip saves ~1187" test below). MEASURED against this working tree
-  // with the test's own chars/4 estimator (NOT assumed): raw 4272 → rationale-stripped
-  // 4200 ~tok (exact). The prior floor was 4161 (pre-marker). package.json stays 3.32.0.
+test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the measured floor (≤ 4239 ~tok)", () => {
+  // WHY: floor REBASELINED by constitution-conditional-load PHASE 2. Phase 2 extends the
+  // design-only axis to two more spans (§4 visual prose S3–S5 + P-AUDITOR, and §1 L16/L17/L19),
+  // adding 3 MORE design-only fence pairs (now 6 pairs / 12 marker lines total, up from
+  // Phase-1's 3 pairs). On the DESIGN arm those markers are NOT stripped (full visual text
+  // loads), so the rationale-stripped figure grows vs Phase 1. MEASURED on THIS working tree
+  // with the test's own chars/4 estimator (NOT assumed): raw 4311 → rationale-stripped
+  // 4239 ~tok (exact). This is the design-arm (kept-path) cost; it is the price of the
+  // ~1830 ~tok saving on the NON-DESIGN dispatch path (pinned by the AC8 non-design test
+  // below). package.json stays 3.33.0 (release human-owned).
   const raw = approxTokens(CONSTITUTION);
   const stripped = approxTokens(stripRationale(CONSTITUTION));
-  assert.ok(stripped <= 4200, `stripped constitution (${stripped} ~tok) must be ≤ 4200 (AC8 floor, +39 marker cost)`);
+  assert.ok(stripped <= 4239, `stripped constitution (${stripped} ~tok) must be ≤ 4239 (AC8 design-arm floor, Phase-2 marker cost)`);
   assert.ok(
     raw - stripped >= 49,
-    `constitution saving (${raw - stripped} ~tok) must be ≥ 49 (AC8 measured min)`,
+    `constitution rationale saving (${raw - stripped} ~tok) must be ≥ 49 (AC8 measured min)`,
   );
 });
 
-test("AC8: teamwork coordinator bundle (both strips) is at/below the floor (≤ 7665 ~tok)", () => {
+test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 7703 ~tok)", () => {
   // WHY: the constitution is injected on every dispatch; the full coordinator bundle is
   // the worst case. Compose the chain-role bundle the way buildPromptForRole does:
   // rationale-stripped constitution + SEP + rationale-stripped skill body. Floor
-  // REBASELINED by constitution-conditional-load: the 6 design-only marker lines add
-  // +39 ~tok to the constitution on this (design-arm) path, so 7626 → 7664 ~tok.
+  // REBASELINED by constitution-conditional-load PHASE 2: the now-6 design-only marker
+  // pairs (12 lines) are NOT stripped on the design arm, so the design-arm bundle grows.
   // Coordinator is a CHAIN role: on a DESIGN feature it must keep the full §3.2 (the
   // CDE-OOBE incident was a coordinator-authored accept-policy — §3.2 binds the
   // coordinator on design work), so this worst-case bundle is the design-arm size.
-  // MEASURED on this working tree (chars/4): 7664 ~tok; 7665 floor = +1 margin.
+  // MEASURED on this working tree (chars/4): 7703 ~tok (exact). package.json stays 3.33.0.
   const skillCoord = fs.readFileSync(path.join(ROOT, "content", "skill-coordinator.md"), "utf-8");
   const body = skillCoord.startsWith("---")
     ? skillCoord.slice(skillCoord.indexOf("---", 3) + 3).trimStart()
     : skillCoord;
   const SEP = "\n\n---\n\n";
   const bundle = approxTokens(stripRationale(CONSTITUTION) + SEP + stripRationale(body));
-  assert.ok(bundle <= 7665, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 7665 (AC8 floor, +39 marker cost)`);
+  assert.ok(bundle <= 7703, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 7703 (AC8 design-arm floor, Phase-2 marker cost)`);
 });
 
 test("AC9: every operative rule/gate/heading survives stripRationale on the constitution", () => {
@@ -380,18 +378,32 @@ test("AC9: every operative rule/gate/heading survives stripRationale on the cons
   }
 });
 
-test("AC9: fullDetail retains both example lists verbatim (round-trip lossless)", () => {
-  // WHY: the fence is opt-out, not deletion — fullDetail dispatch (AC3 path) must carry
-  // the constitution verbatim, including both fenced example lists. Source file always
-  // retains them (raw); the buildPromptForRole(fullDetail=true) path keeps them too.
-  // This pins the round-trip property: stripping is reversible via the fullDetail flag.
+test("AC9/AC-P2-3: fullDetail retains both example lists verbatim (design-arm-aware round-trip)", async () => {
+  // WHY: the rationale fence is opt-out, not deletion — fullDetail dispatch (AC3 path)
+  // must carry the constitution verbatim, including both fenced example lists. Source file
+  // always retains them (raw). BUT post-Phase-2 (constitution-conditional-load P2) the §1
+  // L16 "column-scroller picker" rationale fence now sits INSIDE a design-only fence
+  // (Span-B fence #1, L16–L17 — HC-NEST: rationale nested inside design-only). The
+  // design-only strip fires on the NON-design arm REGARDLESS of fullDetail (fullDetail
+  // only opts out of stripRationale, not stripDesignOnly — see build.ts L310 vs L315), so
+  // "column-scroller picker" is gone on a non-design dispatch even with fullDetail=true.
+  // The §7 "see XYZ" rationale fence is NOT inside any design-only fence, so it survives on
+  // both arms with fullDetail. Therefore the round-trip assertion is now DESIGN-ARM-AWARE.
   for (const m of CONST_FENCED_INTERIORS) {
     assert.ok(CONSTITUTION.includes(m), `raw constitution must retain example-list interior: ${JSON.stringify(m)}`);
   }
-  const full = buildPromptForRole("skill-coordinator.md", "fd", ROOT, true);
-  const text = full.messages[0].content.text;
+  // §7 "see XYZ" is design-arm-independent: present on any fullDetail dispatch.
+  const ndFull = await buildOnFixture({ mode: null, skillFile: "skill-coordinator.md", fullDetail: true });
+  assert.ok(ndFull.includes("see XYZ"), "fullDetail (non-design) must retain §7 rationale example: \"see XYZ\"");
+  // §1 "column-scroller picker" is design-conditional post-P2: ABSENT on non-design even with
+  // fullDetail (design-only strip runs regardless of fullDetail), PRESENT on the design arm.
+  assert.ok(
+    !ndFull.includes("column-scroller picker"),
+    "fullDetail NON-design dispatch must NOT retain §1 design-only example (stripDesignOnly fires regardless of fullDetail)",
+  );
+  const dFull = await buildOnFixture({ mode: "figma", skillFile: "skill-coordinator.md", fullDetail: true });
   for (const m of CONST_FENCED_INTERIORS) {
-    assert.ok(text.includes(m), `fullDetail bundle must retain example-list interior: ${JSON.stringify(m)}`);
+    assert.ok(dFull.includes(m), `fullDetail DESIGN-arm bundle must retain example-list interior: ${JSON.stringify(m)}`);
   }
 });
 
@@ -451,10 +463,52 @@ const ANTI_SWEEP_SENTINELS = [
   "4. Routing Chain",                                 // §4 routing diagram
 ];
 
+// ── Phase 2 (constitution-conditional-load P2) ──────────────────────────────
+// Phase 2 extends stripDesignOnly to TWO more spans: §4 visual prose (Span A,
+// reflow + 1 fence) and §1 L16/L17/L19 (Span B, 2 fences). These sentinels drive
+// the AC-P2-1…6 assertions below.
+
+// §4 Span A — VISUAL sentences (S3, S4, S5) + the design-auditor paragraph.
+// ABSENT on non-design, PRESENT on design. Byte-exact verbatim openers from §4.
+const P2_S4_VISUAL_SENTINELS = [
+  "A third counter",                                              // S3 opener (visual_round description)
+  "the v3.16.0\nself-arming signal",                             // S3 self-arming-signal clause (2nd clause, post-semicolon)
+  "VISUAL_BASELINES_REQUIRED",                                   // S4 — the v3.16.0 baselines code
+  "VISUAL_ASSERTIONS_REQUIRED",                                  // S5 — assertions code
+  "VISUAL_REPORT_INCOMPLETE",                                    // S5 — report-incomplete code
+  "`design-auditor` fires when the coordinator detects",         // P-AUDITOR paragraph opener
+  "Tasks with no design reference skip the auditor entirely",    // P-AUDITOR closing sentence
+];
+
+// §1 Span B — the three FEATURE-INERT bullets. ABSENT non-design, PRESENT design.
+// Full-bullet anchors (NOT just the bold tag) — the bold-only forms collide with
+// constitution cross-references inside skill-*.md bodies (e.g. skill-sr-engineer cites
+// "§1 Design-baseline scope (v3.27.0)"), which would make a §1-strip assertion falsely
+// fail on a sentinel that survived in the SKILL, not §1. These openers are unique to
+// content/constitution.md §1 (verified: absent from skill-sr / skill-coordinator).
+const P2_S1_DESIGN_SENTINELS = [
+  "**Visual Widgets exception (v3.14.0)**: when a widget is listed in the spec",      // L16, fence #1
+  "**Design-baseline scope (v3.27.0)**: For design-backed work, the canonical design", // L17, fence #1
+  "**Self-converge relaxation (v3.31.0)**: inside sr-engineer",                        // L19, fence #2
+];
+
+// Anti-sweep §1 universal bullets (L15 MVP-strict, L18 Surgical) — PRESENT on BOTH
+// arms; they sit OUTSIDE both Span-B fences (L15 before #1, L18 between #1 and #2).
+const P2_S1_ANTISWEEP_SENTINELS = ["**MVP strict**", "**Surgical changes**"];
+
+// Anti-sweep §4 non-visual rule sentences — PRESENT byte-for-byte on BOTH arms.
+// DIAGRAM, S1 (review_round), S2 (qa_round loop), S6 (Each role finishes…).
+const P2_S4_ANTISWEEP_SENTINELS = [
+  "researcher (optional) → design-auditor",                      // DIAGRAM
+  "loops on `(code-reviewer, FAIL)` for up to 3",                // S1 review_round mechanics
+  "The qa-engineer loop back to sr-engineer",                    // S2 qa_round mechanics
+  "Each role finishes with `tw_update_state`",                   // S6 universal handoff convention
+];
+
 // Build a chain-role dispatch on a fresh temp workspace with the given design
 // setup. `mode` of `null` => no design file at all; otherwise writes a design
 // file with that `## Mode`. Returns the emitted constitution+skill+state text.
-async function buildOnFixture({ mode, skillFile = "skill-sr-engineer.md", noState = false } = {}) {
+async function buildOnFixture({ mode, skillFile = "skill-sr-engineer.md", noState = false, fullDetail = false } = {}) {
   setActiveStorage(new FileHandoffStorage());
   const ws = fs.mkdtempSync(path.join(os.tmpdir(), "twccl-"));
   const feature = "ccl-fixture-feat";
@@ -466,7 +520,7 @@ async function buildOnFixture({ mode, skillFile = "skill-sr-engineer.md", noStat
     fs.mkdirSync(path.join(ws, "design"), { recursive: true });
     fs.writeFileSync(path.join(ws, "design", `${feature}.md`), `# Design\n\n## Mode\n\n${mode}\n`);
   }
-  const text = buildPromptForRole(skillFile, "ccl", ws, false).messages[0].content.text;
+  const text = buildPromptForRole(skillFile, "ccl", ws, fullDetail).messages[0].content.text;
   fs.rmSync(ws, { recursive: true, force: true });
   return text;
 }
@@ -617,8 +671,15 @@ test("AC5/HC5: every strip permutation leaves ZERO orphan markers", () => {
   const raw = {
     chain: countMarkers(CONSTITUTION, "chain-only"),       // 2 (1 pair)
     rationale: countMarkers(CONSTITUTION, "rationale"),    // 4 (2 pairs)
-    design: countMarkers(CONSTITUTION, "design-only"),     // 6 (3 pairs)
+    design: countMarkers(CONSTITUTION, "design-only"),     // 12 (6 pairs) — Phase-2: 3 nested-in-chain-only (§3.1×2 fences, §3.2, §4) + 2 in §1 (Span-B) ... see breakdown below
   };
+  // Phase-2 fence inventory (MEASURED, not assumed): 6 design-only PAIRS total —
+  //   §1 Span-B fence #1 (L16–L17) and #2 (L19): 2 pairs, OUTSIDE chain-only.
+  //   §3.1 fence A (visual evidence + report schema) + fence B (visual_round + split): 2 pairs.
+  //   §3.2 body fence (header → No-global-frame, minus R10): 1 pair.
+  //   §4 visual prose fence (S3–S5 + P-AUDITOR, post-reflow): 1 pair.
+  //   → the LAST 4 pairs (§3.1×2, §3.2, §4) are NESTED inside chain-only; the first 2 (§1) are NOT.
+  assert.equal(raw.design, 12, "Phase-2: exactly 6 design-only fence pairs (12 markers) — 2 in §1, 4 nested in chain-only");
   // (1) all three applied → zero of anything.
   const fullyStripped = stripDesignOnly(stripRationale(stripChainOnly(CONSTITUTION)));
   for (const marker of ["chain-only:start", "chain-only:end", "rationale:start", "rationale:end", "design-only:start", "design-only:end"]) {
@@ -628,19 +689,25 @@ test("AC5/HC5: every strip permutation leaves ZERO orphan markers", () => {
   const chainOut = stripChainOnly(CONSTITUTION);
   assert.equal(countMarkers(chainOut, "chain-only"), 0, "stripChainOnly removes its own markers");
   assert.equal(countMarkers(chainOut, "rationale"), raw.rationale, "stripChainOnly must NOT touch rationale markers");
-  // chain-only WRAPS the design-only fences (nested), so removing it legitimately removes
-  // the nested design markers too — assert that's the ONLY way design markers vanish here.
-  assert.equal(countMarkers(chainOut, "design-only"), 0, "design-only fences are nested inside chain-only → removed with it");
+  // chain-only WRAPS the 4 design-only fences in §3.1/§3.2/§4 (nested), so removing it
+  // legitimately removes those 4 PAIRS too. But the 2 §1 Span-B fences (L16–L19) sit OUTSIDE
+  // chain-only (§1 is before the chain-only:start at §3.1), so they MUST survive: 4 markers
+  // (2 pairs) remain. Pre-Phase-2 the §1 fences did not exist, so this was 0; the premise
+  // "all design-only nested inside chain-only" is now FALSE and the count is 4 (MEASURED).
+  assert.equal(countMarkers(chainOut, "design-only"), 4, "the 2 §1 (Span-B) design-only fences survive stripChainOnly (they are OUTSIDE chain-only); only the 4 nested §3.x/§4 fences are removed with it");
 
   const ratOut = stripRationale(CONSTITUTION);
   assert.equal(countMarkers(ratOut, "rationale"), 0, "stripRationale removes its own markers");
   assert.equal(countMarkers(ratOut, "chain-only"), raw.chain, "stripRationale must NOT touch chain-only markers");
-  assert.equal(countMarkers(ratOut, "design-only"), raw.design, "stripRationale must NOT touch design-only markers (disjoint regions)");
+  assert.equal(countMarkers(ratOut, "design-only"), raw.design, "stripRationale must NOT touch design-only markers (rationale nests INSIDE design-only on §1 fence #1, but its non-greedy regex removes only its own pair)");
 
   const desOut = stripDesignOnly(CONSTITUTION);
   assert.equal(countMarkers(desOut, "design-only"), 0, "stripDesignOnly removes its own markers");
   assert.equal(countMarkers(desOut, "chain-only"), raw.chain, "stripDesignOnly must NOT touch chain-only markers (it strips a nested subset)");
-  assert.equal(countMarkers(desOut, "rationale"), raw.rationale, "stripDesignOnly must NOT touch rationale markers");
+  // HC-NEST: §1 fence #1 (L16–L17) CONTAINS a rationale fence. stripDesignOnly removes the
+  // whole design-only span including that nested rationale pair — so the §7 rationale fence
+  // (outside any design-only fence) must remain: 2 markers (1 pair) survive, not all 4.
+  assert.equal(countMarkers(desOut, "rationale"), 2, "stripDesignOnly removes the §1-nested rationale pair (inside design-only fence #1) but leaves the §7 rationale fence (outside any design-only span) → 2 markers remain (HC-NEST)");
 });
 
 // --- AC6: anti-sweep — non-visual contracts survive BOTH arms -------------
@@ -680,28 +747,31 @@ test("AC7: lite + non-design strips §3.2 once (no reintroduction), consistent w
 
 // --- AC8: rebaseline + pin the new non-design figure ----------------------
 
-test("AC8: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 3013 ~tok)", () => {
+test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 2409 ~tok)", () => {
   // WHY: this is the BUDGET WIN that justified the feature, and it must be regression-guarded.
   // On a non-design chain dispatch buildPromptForRole emits stripDesignOnly(stripRationale(source)).
-  // MEASURED on this working tree (chars/4): 3013 ~tok exactly. That is 1187 ~tok BELOW the
-  // rationale-stripped (design-arm) figure of 4200 — the per-dispatch saving on non-design
-  // features. Pin both the floor AND the saving so a fence-shrink regression (less stripped)
-  // or a marker-cost blowout is caught. The +39 marker cost on the kept path is the price of
-  // this 1187 saving on the stripped path.
-  const ratStripped = approxTokens(stripRationale(CONSTITUTION));         // design-arm path: 4200
-  const nonDesign = approxTokens(stripDesignOnly(stripRationale(CONSTITUTION))); // non-design path: 3013
-  assert.ok(nonDesign <= 3013, `non-design constitution (${nonDesign} ~tok) must be ≤ 3013 (AC8 non-design floor)`);
+  // REBASELINED by constitution-conditional-load PHASE 2: Phase 2 strips two MORE spans on the
+  // non-design arm (§4 visual prose S3–S5 + P-AUDITOR, and §1 L16/L17/L19), so the non-design
+  // figure drops further vs Phase-1's 3013. MEASURED on THIS working tree (chars/4): 2409 ~tok
+  // exactly. That is 1830 ~tok BELOW the rationale-stripped (design-arm) figure of 4239 — the
+  // per-dispatch saving on non-design features (vs the original full-load ~4200, the net win is
+  // ~1790 tok/dispatch). Pin both the floor AND the saving so a fence-shrink regression (less
+  // stripped) or a marker-cost blowout is caught.
+  const ratStripped = approxTokens(stripRationale(CONSTITUTION));         // design-arm path: 4239
+  const nonDesign = approxTokens(stripDesignOnly(stripRationale(CONSTITUTION))); // non-design path: 2409
+  assert.ok(nonDesign <= 2409, `non-design constitution (${nonDesign} ~tok) must be ≤ 2409 (AC8 non-design floor, Phase-2)`);
   assert.ok(
-    ratStripped - nonDesign >= 1187,
-    `design-only strip saving (${ratStripped - nonDesign} ~tok) must be ≥ 1187 (the budget win)`,
+    ratStripped - nonDesign >= 1830,
+    `design-only strip saving (${ratStripped - nonDesign} ~tok) must be ≥ 1830 (the Phase-2 budget win)`,
   );
 });
 
-test("AC8: chain-role non-design bundle is ~1187 ~tok lighter than the design-armed bundle", () => {
+test("AC8/AC-P2-7: chain-role non-design bundle is ~1830 ~tok lighter than the design-armed bundle", () => {
   // WHY: end-to-end budget confirmation at the BUNDLE level (constitution + skill body), the
   // thing actually injected per dispatch. The non-design sr-engineer bundle must be materially
   // lighter than the design-armed one by the design-only span size — proving the saving lands
-  // in the real dispatch, not just the isolated stripper.
+  // in the real dispatch, not just the isolated stripper. REBASELINED for Phase 2: the saving
+  // grows from Phase-1's 1187 to 1830 ~tok (the two added spans). MEASURED on this working tree.
   const skillSr = fs.readFileSync(path.join(ROOT, "content", "skill-sr-engineer.md"), "utf-8");
   const body = skillSr.startsWith("---")
     ? skillSr.slice(skillSr.indexOf("---", 3) + 3).trimStart()
@@ -710,8 +780,8 @@ test("AC8: chain-role non-design bundle is ~1187 ~tok lighter than the design-ar
   const designBundle = approxTokens(stripRationale(CONSTITUTION) + SEP + skillBody);
   const nonDesignBundle = approxTokens(stripDesignOnly(stripRationale(CONSTITUTION)) + SEP + skillBody);
   assert.ok(
-    designBundle - nonDesignBundle >= 1187,
-    `non-design bundle must be ≥ 1187 ~tok lighter (design ${designBundle} − non-design ${nonDesignBundle})`,
+    designBundle - nonDesignBundle >= 1830,
+    `non-design bundle must be ≥ 1830 ~tok lighter (design ${designBundle} − non-design ${nonDesignBundle})`,
   );
 });
 
@@ -728,4 +798,159 @@ test("AC8/HC3: build.ts arm probe uses the SAME helper as the server PASS gates"
     "build.ts arm probe must read .required off the shared helper");
   assert.match(indexSrc, /import[\s\S]*hasDesignModeRequiringVisual[\s\S]*from\s*["']\.\/tools\/evidence-file\.js["']/,
     "index.ts must import the same helper the server PASS gates call");
+});
+
+// ============================================================================
+// constitution-conditional-load PHASE 2 (AC-P2-1…8): extend the design-only axis
+// to two MORE feature-inert spans deferred in Phase 1 — §4 visual prose (Span A,
+// reflow + 1 fence) and §1 L16/L17/L19 (Span B, 2 fences, with a rationale fence
+// NESTED inside §1 fence #1 → HC-NEST). NO new mechanism (reuse stripDesignOnly +
+// the design-only marker pair), NO server-gate change, NO rule reword (HC2 absolute;
+// the §4 reflow is REORDER-ONLY). Spec: specs/constitution-conditional-load.md §Phase 2.
+//
+// Spec-to-Test map:
+//   AC-P2-1 (§4 visual block strips on non-design)  -> t-p2-s4-nondesign-strips
+//   AC-P2-2 (§4 visual block loads on design)        -> t-p2-s4-design-loads
+//   AC-P2-3 (§1 L16/17 + L19 strip / load)           -> t-p2-s1-strip-load,
+//                                                       t-p2-fullDetail-design-aware (above)
+//   AC-P2-4 (HC-NEST permutation sweep)              -> t-p2-hcnest-permutations
+//   AC-P2-5 (reflow is reorder-only)                 -> t-p2-reflow-reorder-only
+//   AC-P2-6 (non-visual §4/§1 survives both arms)    -> t-p2-antisweep-both-arms
+//   AC-P2-7 (AC8 floor re-measured)                  -> the four AC8/AC-P2-7 floors above
+//   AC-P2-8 (composition order-independent)          -> t-ccl-six-permutations (above) +
+//                                                       t-p2-hcnest-permutations
+// ============================================================================
+
+test("AC-P2-1: §4 visual block (S3/S4/S5 + design-auditor) is ABSENT on the non-design arm", async () => {
+  // WHY: Span A is FEATURE-INERT on non-design (no visual_round can tick, no design-auditor
+  // fires). On a non-design dispatch the §4 visual sentences and the whole P-AUDITOR paragraph
+  // must be stripped — none of the visual codes or the auditor prose may leak.
+  const text = await buildOnFixture({ mode: null });
+  for (const s of P2_S4_VISUAL_SENTINELS) {
+    assert.ok(!text.includes(s), `non-design §4 must OMIT visual sentinel: ${JSON.stringify(s)}`);
+  }
+  assert.ok(!text.includes("design-only:start"), "non-design dispatch must not leak fence markers");
+});
+
+test("AC-P2-2: §4 visual block (S3/S4/S5 + design-auditor) is PRESENT on the design arm", async () => {
+  // WHY: the inverse contract. On a design-armed feature (`## Mode` = figma) the full §4 visual
+  // governance must load — the visual_round description, all three VISUAL_* codes, and the
+  // design-auditor paragraph — unchanged.
+  const text = await buildOnFixture({ mode: "figma" });
+  for (const s of P2_S4_VISUAL_SENTINELS) {
+    assert.ok(text.includes(s), `design arm §4 must LOAD visual sentinel: ${JSON.stringify(s)}`);
+  }
+});
+
+test("AC-P2-3: §1 L16/L17 + L19 are ABSENT on non-design, PRESENT on design; L15/L18 retained on both", async () => {
+  // WHY: Span B gates the three FEATURE-INERT §1 bullets (Visual-Widgets exception, Design-baseline
+  // scope, Self-converge relaxation) behind TWO design-only fences, while the universal bullets
+  // L15 (MVP strict) and L18 (Surgical changes) sit OUTSIDE both fences (anti-sweep). On non-design
+  // the three inert bullets strip and the two universals survive; on design all five are present.
+  const nonDesign = await buildOnFixture({ mode: null });
+  const design = await buildOnFixture({ mode: "figma" });
+  for (const s of P2_S1_DESIGN_SENTINELS) {
+    assert.ok(!nonDesign.includes(s), `non-design §1 must OMIT inert bullet: ${JSON.stringify(s)}`);
+    assert.ok(design.includes(s), `design arm §1 must LOAD inert bullet: ${JSON.stringify(s)}`);
+  }
+  for (const s of P2_S1_ANTISWEEP_SENTINELS) {
+    assert.ok(nonDesign.includes(s), `non-design §1 must RETAIN universal bullet (anti-sweep): ${JSON.stringify(s)}`);
+    assert.ok(design.includes(s), `design arm §1 must retain universal bullet: ${JSON.stringify(s)}`);
+  }
+});
+
+test("AC-P2-4/HC-NEST: rationale-inside-design-only nests clean across every strip permutation (zero orphans)", () => {
+  // WHY: §1 fence #1 (L16–L17) CONTAINS a rationale fence (the column-scroller example list) —
+  // OUTER design-only, INNER rationale (HC-NEST). Both regexes are non-greedy; any strip
+  // combination must leave NO orphan marker and NO corrupted bullet. The dispatch brief's
+  // reviewer reproduced the full permutation sweep: {design-only, rationale, both, neither}
+  // × {chain-only on (lite), chain-only off} × {fullDetail on/off-equivalent}. We encode it by
+  // applying every subset of the three strippers and asserting (a) zero orphan markers of any
+  // axis, (b) no half-marker fragment (`design-only:` / `rationale:` / `chain-only:` text), and
+  // (c) the surviving universal §1 bullets are intact (byte-substring present).
+  const a = stripChainOnly, b = stripRationale, c = stripDesignOnly;
+  // All 8 subsets of {a,b,c}, applied in a fixed inner order where present.
+  const id = (t) => t;
+  const subsets = [
+    [id, id, id],          // neither
+    [c, id, id],           // design-only only
+    [id, b, id],           // rationale only
+    [id, id, a],           // chain-only only (lite)
+    [c, b, id],            // design-only + rationale (both, chain-only off)
+    [c, id, a],            // design-only + chain-only (lite, no rationale)
+    [id, b, a],            // rationale + chain-only (lite)
+    [c, b, a],             // all three (lite + non-design + non-full-detail worst case)
+  ];
+  for (const [s1, s2, s3] of subsets) {
+    const out = s3(s2(s1(CONSTITUTION)));
+    // (a)+(b) zero orphan markers of any axis. A marker is orphaned only if it survives
+    // without its pair; the invariant is balanced counts (start === end) per axis after
+    // every permutation — an unbalanced count means a non-greedy regex crossed the other's
+    // markers (HC-NEST corruption). Additionally a fully-applied subset that includes an
+    // axis must drop that axis to ZERO (asserted via the count-equality + the all-three case
+    // below, which already pins zero in the "ZERO orphan markers" test above).
+    for (const axis of ["design-only", "rationale", "chain-only"]) {
+      const starts = (out.match(new RegExp(`${axis}:start`, "g")) || []).length;
+      const ends = (out.match(new RegExp(`${axis}:end`, "g")) || []).length;
+      assert.equal(starts, ends, `permutation [${[s1, s2, s3].map((f) => f.name || "id").join(",")}] left unbalanced ${axis} markers (${starts} start / ${ends} end) — orphan/corruption`);
+    }
+    // (c) no half-bullet corruption: a surviving universal §1 bullet must keep its full text.
+    // L15 (MVP strict) and L18 (Surgical) are universal — present in every permutation because
+    // neither axis fences them (chain-only does not cover §1; design-only/rationale fence other spans).
+    assert.ok(out.includes("**MVP strict**: Fulfil ONLY what was asked."), "MVP-strict bullet must stay byte-intact in every permutation");
+    assert.ok(out.includes("**Surgical changes**: Touch only what the task requires."), "Surgical-changes bullet must stay byte-intact in every permutation");
+  }
+});
+
+test("AC-P2-5: §4 reflow is REORDER-ONLY — every §4 rule sentence is byte-present (no reword)", async () => {
+  // WHY: HC2 (tightened) — the §4 reflow may ONLY reorder sentences / split paragraphs / insert
+  // fence-marker lines; every sentence's text stays BYTE-IDENTICAL. We pin this by asserting the
+  // verbatim text of every §4 rule sentence (DIAGRAM, S1, S2, S3, S4, S5, P-AUDITOR, S6) is
+  // present byte-for-byte in the post-reflow source constitution. If any sentence were reworded
+  // to win a fence, its verbatim anchor would vanish and this fails. (Set-presence of every
+  // sentence ⇒ the reflow dropped/reworded none; the diff is position-only.)
+  const S4_SENTENCE_ANCHORS = [
+    // DIAGRAM (non-visual)
+    "researcher (optional) → design-auditor (optional) → pm → architect (if complex) → sr-engineer ↔ code-reviewer → qa-engineer",
+    // S1 (non-visual) — review_round
+    "sr-engineer ↔ code-reviewer loops on `(code-reviewer, FAIL)` for up to 3",
+    // S2 (non-visual) — qa_round
+    "The qa-engineer loop back to sr-engineer",
+    // S6 (non-visual) — universal handoff convention
+    "Each role finishes with `tw_update_state` whose `pending_notes` start with `next_role: <name>`",
+    // S3 (visual) — visual_round description + self-arming signal
+    "A third counter\n`visual_round` (v3.14.0, §3.1) tracks pixel-fidelity iterations",
+    // S4 (visual) — VISUAL_BASELINES_REQUIRED
+    "is blocked at PASS with `VISUAL_BASELINES_REQUIRED` rather than",
+    // S5 (visual) — VISUAL_ASSERTIONS_REQUIRED / VISUAL_REPORT_INCOMPLETE
+    "rejects PASS with `VISUAL_ASSERTIONS_REQUIRED`",
+    // P-AUDITOR (visual/design-only)
+    "`design-auditor` fires when the coordinator detects a design source",
+  ];
+  for (const s of S4_SENTENCE_ANCHORS) {
+    assert.ok(CONSTITUTION.includes(s), `§4 reflow must keep sentence byte-identical (reorder-only): ${JSON.stringify(s.slice(0, 60))}`);
+  }
+  // Belt-and-braces: the design-arm dispatch (full §4 loaded) carries the reflowed visual block
+  // byte-equal — extract the post-reflow §4 visual paragraph from source and assert containment.
+  const design = await buildOnFixture({ mode: "figma" });
+  const visStart = CONSTITUTION.indexOf("A third counter");
+  const visEnd = CONSTITUTION.indexOf("skip the auditor entirely.") + "skip the auditor entirely.".length;
+  assert.ok(visStart > -1 && visEnd > visStart, "§4 visual block anchors must resolve in source");
+  const visBlockSrc = CONSTITUTION.slice(visStart, visEnd);
+  assert.ok(design.includes(visBlockSrc), "design-arm §4 visual block must be byte-identical to post-reflow source (no reword)");
+});
+
+test("AC-P2-6: non-visual §4 (DIAGRAM/S1/S2/S6) + §1 (L15/L18) survive byte-for-byte on BOTH arms", async () => {
+  // WHY: anti-sweep contract for Phase 2. The §4 routing diagram, the review_round (S1) and
+  // qa_round (S2) loop mechanics, and the universal "Each role finishes…" handoff convention (S6)
+  // are CONTRACT — they sit OUTSIDE the Span-A fence and MUST survive on BOTH arms. Same for the
+  // §1 universal bullets L15/L18 (outside Span-B fences). A too-greedy fence or a mis-placed reflow
+  // would sweep them; this is the load-bearing safety check that conditional-load never weakened a
+  // cross-role routing contract.
+  const nonDesign = await buildOnFixture({ mode: null });
+  const design = await buildOnFixture({ mode: "figma" });
+  for (const s of [...P2_S4_ANTISWEEP_SENTINELS, ...P2_S1_ANTISWEEP_SENTINELS]) {
+    assert.ok(nonDesign.includes(s), `anti-sweep contract must SURVIVE the non-design strip: ${JSON.stringify(s)}`);
+    assert.ok(design.includes(s), `anti-sweep contract must be present on the design arm: ${JSON.stringify(s)}`);
+  }
 });
