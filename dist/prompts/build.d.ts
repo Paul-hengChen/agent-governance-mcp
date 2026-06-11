@@ -1,6 +1,7 @@
 import type { HandoffState } from "../tools/handoff.js";
 export declare function stripChainOnly(text: string): string;
 export declare function stripRationale(text: string): string;
+export declare function stripDesignOnly(text: string): string;
 export type PromptResult = {
     description: string;
     messages: Array<{

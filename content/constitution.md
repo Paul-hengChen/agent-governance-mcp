@@ -44,17 +44,22 @@ The routing chain is **server-enforced**, not advisory. Invalid
 - `status=PASS` and `tw_complete_task` require `agent_id="qa-engineer"`.
 - After 3 QA FAILs (Round 4), only `(pm, In_Progress)` is accepted.
 - PASS requires evidence: attach `qa_review`, or pre-write `qa_reports/review_<task-id>.md`.
+<!-- design-only:start -->
 - **Visual evidence gate (v3.16.0)**: the gate arms whenever `design/<active_feature>.md` exists with a `## Mode` ≠ `no-design` (not on `## Visual Baselines` H2 presence). When armed: if the design file lacks a `## Visual Baselines` H2, PASS is blocked with `VISUAL_BASELINES_REQUIRED` (the design-auditor must add the section — it is NOT a silent pass-through). When the `## Visual Baselines` H2 IS present, PASS additionally requires `qa_reports/visual_<task-id>.md` for every task id in the round; missing → `VISUAL_EVIDENCE_MISSING`. The two checks are mutually exclusive: the missing-baselines block fires first and short-circuits the evidence-file lookup. No design file, or `## Mode` = `no-design` (or unparseable mode), → gate is silent and pass-through. Backwards-compatible for non-UI workspaces.
 - **Visual report schema gate (v3.26.0/v3.27.0)**: when the design declares `## Visual Structural Assertions`, PASS additionally validates `qa_reports/visual_<id>.md` against `REQUIRED_VISUAL_SECTIONS`. A missing section, failed/unverified canonical-state or structural row, or a non-PASS verdict returns `VISUAL_REPORT_INCOMPLETE` (v3.26.0). If the gate is armed (mode != no-design) but the design omits `## Visual Structural Assertions`, PASS returns `VISUAL_ASSERTIONS_REQUIRED` (v3.27.0) — a hard error, not a silent fallback. Required sections (verbatim): Widget Shape Verification, Canonical State Verification, Structural Assertions, Region Diff, Allowed Differences, Verdict.
+<!-- design-only:end -->
 - **Scope decision gate (v3.30.0)**: a transition INTO build — `(pm, In_Progress) → (architect, In_Progress)` or `(pm, In_Progress) → (sr-engineer, In_Progress)` — is blocked with `SCOPE_DECISION_REQUIRED` when `design/<active_feature>.md` is armed (`## Mode` ≠ `no-design`) but no scope decision is recorded. The gate clears when EITHER `.current/feature-split.md` exists (multi-feature split recorded) OR handoff `scope_decision: single-feature` is set (single-feature attestation). The predecessor is pinned to `pm:In_Progress`, so re-entry/resume (architect→sr-engineer, sr-engineer self-loop) is never re-blocked. Independent of the visual evidence gate (different edge, different artifacts; shares only the arm signal). Non-design workspaces (no design file or `## Mode` = `no-design`) pass through silently. Closes the routing-chain half of the scope-creep finding (see `content/constitution-rationale.md`) — it does NOT stop in-context / lite-mode work that emits no transition.
 - Code-reviewer approval is signalled via `(code-reviewer, In_Progress) → (qa-engineer, In_Progress)` handoff with `pending_notes` containing `review: APPROVED` and a `review_reports/review_<task-id>.md` evidence file. Code-reviewer cannot use `status=PASS`; that remains qa-engineer-exclusive.
 - After 3 code-reviewer FAILs (Round 4 of `review_round`), only `(pm, In_Progress)` is accepted — symmetric to the `qa_round` circuit breaker.
+<!-- design-only:start -->
 - **`visual_round` sub-loop (v3.14.0)**: independent of `qa_round` and `review_round`. Bumps on `(qa-engineer, FAIL)` with `pending_notes` containing `visual_fail:` (a structural pixel/widget miss, distinct from test-logic FAIL). Cap is 5 rounds; Round 6 attempts lock to `(pm, In_Progress)` only — symmetric to the `qa_round` circuit breaker.
   - **Split escalation (Round 3)**: at `visual_round >= 3`, sr-engineer MAY transition `(sr-engineer, In_Progress) → (pm, In_Progress)` with `pending_notes` containing `visual_split_requested: <reason>`. This is an **early** escape hatch — instead of grinding 2 more rounds toward threshold renegotiation, the team splits the oversized widget into sub-tasks. Available at Round 3, 4, 5; mandatory route at Round 6.
+<!-- design-only:end -->
 
 On rejection the server returns `{ error, attempted, allowed, hint }` —
 read it and self-correct. Full matrix: `specs/qa-flow-enforcement-architecture.md`.
 
+<!-- design-only:start -->
 ### 3.2 Visual Verdict Authority & Separation of Duties (v3.26.0)
 
 Hard governance rules that emerged from a visual false-PASS retrospective
@@ -83,6 +88,7 @@ validation).
 - **No global-frame metric.** Whole-frame pixel-percentage MUST NOT be the visual PASS metric; a
   sparse canvas dilutes localized structural errors. Comparison is per-surface / region-weighted with
   explicit structural assertions and canonical-state parity (see `skill-qa-visual`).
+<!-- design-only:end -->
 - **Sequential-context assumption + reconcile (R10).** The chain assumes sequential single-context
   handoffs. Background/parallel `Task` fan-out and inline-coordinator execution can desync `tasks.md`
   from the authoritative `handoff.completed_tasks`. After any out-of-band/inline execution, before a

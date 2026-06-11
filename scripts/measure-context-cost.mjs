@@ -50,6 +50,18 @@ function stripRationale(text) {
     .replace(/\n{3,}/g, "\n\n");
 }
 
+// Reporting mirror of stripDesignOnly() in prompts/build.ts (constitution-conditional-load).
+// Lets this script report the post-design-strip constitution figure — the budget the
+// design-only axis removes on NON-design feature dispatches (§3.2 minus R10 + the §3.1
+// visual bullets). Reporting-only: only buildPromptForRole's copy feeds a live prompt,
+// and that strip is gated on the runtime design-arm probe. Keep the regex in sync with
+// prompts/build.ts by inspection.
+function stripDesignOnly(text) {
+  return text
+    .replace(/<!-- design-only:start -->[\s\S]*?<!-- design-only:end -->\n?/g, "")
+    .replace(/\n{3,}/g, "\n\n");
+}
+
 function read(rel) {
   return fs.readFileSync(path.join(CONTENT, rel), "utf-8");
 }
@@ -125,6 +137,10 @@ printTable("Role-prompt bundles (constitution + skill, state excluded)", [
 //     skill rationale — the AC1/AC2/AC8 reduction targets. Reporting-only (DR-2/DR-6).
 const constitutionStripped = stripRationale(constitution);
 const constitutionSaved = constitutionTok - approxTokens(constitutionStripped);
+// Non-design chain-role dispatch: rationale-stripped AND design-only-stripped. This is
+// the budget a chain role gets on a feature with no (or no-design) design file.
+const constitutionNonDesign = stripDesignOnly(constitutionStripped);
+const designOnlySaved = approxTokens(constitutionStripped) - approxTokens(constitutionNonDesign);
 printTable("Role-prompt bundles (rationale-stripped: constitution + skill)", [
   ...ROLE_PROMPTS.map(([id, file]) => {
     const skill = read(file);
@@ -151,6 +167,7 @@ console.log("\n" + "=".repeat(50));
 console.log(`TOTAL always-on (constitution + default skill)`);
 console.log(`  constitution.md (raw)      : ${constitutionTok.toString().padStart(6)} ~tokens`);
 console.log(`  constitution.md (rat-strip): ${approxTokens(constitutionStripped).toString().padStart(6)} ~tokens  (chain-role AC8 floor; −${constitutionSaved})`);
+console.log(`  constitution.md (non-design): ${approxTokens(constitutionNonDesign).toString().padStart(5)} ~tokens  (rat-strip + design-only strip; −${designOnlySaved} vs rat-strip)`);
 console.log(`  constitution.md (lite-lean): ${approxTokens(leanConstitution).toString().padStart(6)} ~tokens`);
 console.log(`  skill-coordinator-lite.md  : ${approxTokens(liteSkill).toString().padStart(6)} ~tokens`);
 console.log(`  bundle raw  (pre-strip)    : ${rawTok.toString().padStart(6)} ~tokens`);

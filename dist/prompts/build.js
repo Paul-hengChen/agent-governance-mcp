@@ -8,6 +8,7 @@ import { getActiveStorage } from "../tools/storage.js";
 import { buildPrdChunks, CHUNKER_VERSION, DEFAULT_EMBEDDING_MODEL, } from "../tools/rag.js";
 import { getInflightKey, getInflight, setInflight, deleteInflight, } from "../tools/rag-coalesce.js";
 import { parseSkillFile } from "../tools/skill-frontmatter.js";
+import { hasDesignModeRequiringVisual } from "../tools/evidence-file.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.resolve(__dirname, "..");
@@ -53,6 +54,23 @@ export function stripRationale(text) {
     return text
         .replace(/<!-- rationale:start -->[\s\S]*?<!-- rationale:end -->\n?/g, "")
         .replace(/[ \t]+\n/g, "\n") // trim trailing spaces left by an inline strip
+        .replace(/\n{3,}/g, "\n\n");
+}
+// Remove every <!-- design-only:start --> … <!-- design-only:end --> block
+// (markers inclusive) and collapse the blank lines left behind. Idempotent;
+// text with no markers is returned unchanged (full-constitution safety default).
+// Design-only spans (constitution §3.2 minus R10, plus the §3.1 visual evidence /
+// report-schema / visual_round bullets) are FEATURE-INERT: on a non-design feature
+// (no `design/<feature>.md`, or its `## Mode` = no-design) the server-side visual
+// gates self-disarm, so this visual governance binds no role — stripping it trims
+// the per-dispatch budget without dropping a rule any role could act on. Gated on
+// the SAME arm signal the server uses (hasDesignModeRequiringVisual), so the text is
+// present exactly when the gate can fire (HC3). DISTINCT marker from chain-only /
+// rationale so the non-greedy regexes never cross (HC5); the design-only fences are
+// nested inside chain-only (§3.1/§3.2 sit between its markers) — disjoint, nest-safe.
+export function stripDesignOnly(text) {
+    return text
+        .replace(/<!-- design-only:start -->[\s\S]*?<!-- design-only:end -->\n?/g, "")
         .replace(/\n{3,}/g, "\n\n");
 }
 // The lite coordinator skill marks a server-read-only, no-chain context.
@@ -194,6 +212,27 @@ export async function appendSpecContext(result, workspacePath, role) {
     };
 }
 export function buildPromptForRole(skillFile, description, workspacePath, fullDetail = false) {
+    // Read handoff state BEFORE constitution resolution: the design-only axis is the
+    // first state-dependent strip (the chain-only / rationale axes are static-arg-driven),
+    // so `active_feature` must be known to probe the design arm below. Reused for the
+    // state block at the end of this function. Try/catch preserved — a parse failure
+    // degrades to "no state" (and, per AC3, to the non-design strip default).
+    let state = null;
+    try {
+        state = getActiveStorage().parse(workspacePath);
+    }
+    catch {
+        // fall through to "no state" block (and non-design strip default)
+    }
+    // Design-arm probe (NET-NEW I/O). Strip the design-only span unless the feature is
+    // design-armed. AGREES WITH the server-side visual gate by construction: it calls the
+    // SAME helper (hasDesignModeRequiringVisual) the PASS-time visual gate uses, so the
+    // text is present exactly when those gates can fire (HC3). Safe default (AC3): no
+    // state / no active_feature → required=false → strip, which is provably safe because
+    // no design ⇒ no visual binding. Never throws (the helper swallows fs errors).
+    const isDesignFeature = state?.active_feature
+        ? hasDesignModeRequiringVisual(workspacePath, state.active_feature).required
+        : false;
     const rawConstitution = loadContent("constitution.md", workspacePath);
     // Lite contexts (teamwork-lite) get the chain-only sections stripped; chain
     // roles keep the full constitution because those rules become load-bearing.
@@ -203,7 +242,12 @@ export function buildPromptForRole(skillFile, description, workspacePath, fullDe
     // the skill body. Composes after stripChainOnly: order-independent (DR-9), the
     // fences are disjoint regions (chain-only wraps §3.1+§4; rationale fences sit in
     // §1/§7), so neither non-greedy regex crosses the other's markers.
-    const constitution = fullDetail ? chainResolved : stripRationale(chainResolved);
+    const rationaleResolved = fullDetail ? chainResolved : stripRationale(chainResolved);
+    // Design-only axis (constitution-conditional-load): strip §3.2 (minus R10) + the
+    // §3.1 visual bullets on non-design features. Composes order-independently with the
+    // other two strips — the design-only fences are DISJOINT from rationale fences and
+    // NESTED inside chain-only, so the non-greedy regexes never cross markers (HC5).
+    const constitution = isDesignFeature ? rationaleResolved : stripDesignOnly(rationaleResolved);
     const rawSkill = loadContent(skillFile, workspacePath);
     const { frontmatter, body: rawBody } = parseSkillFile(rawSkill);
     // Chain-role skill dispatch strips verbose rationale unless fullDetail is set
@@ -212,13 +256,6 @@ export function buildPromptForRole(skillFile, description, workspacePath, fullDe
     // rule text (no-marker passthrough on un-fenced files). The constitution is
     // ALSO rationale-stripped above (T-GTL-07), gated on the same fullDetail flag.
     const skill = fullDetail ? rawBody : stripRationale(rawBody);
-    let state = null;
-    try {
-        state = getActiveStorage().parse(workspacePath);
-    }
-    catch {
-        // fall through to "no state" block
-    }
     const stateBlock = state
         ? `## 📍 Current Project State (Auto-injected)\n\`\`\`json\n${JSON.stringify(state, null, 2)}\n\`\`\``
         : `## 📍 Current Project State\nNo handoff state found. Fresh project — call \`tw_get_state\` to initialize.`;

@@ -16,6 +16,11 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.33.0] - 2026-06-11
+
+### Added
+- **`constitution-conditional-load` — Feature-conditional design-only constitution load axis.** New `stripDesignOnly()` in `prompts/build.ts` removes `<!-- design-only -->`-fenced visual-governance spans from the constitution when a feature has no design file (absent `design/<active_feature>.md` or its `## Mode` = `no-design`). On non-design features, this strips §3.2 (Visual Verdict Authority & Separation of Duties) and the four §3.1 visual bullets (L47, L48, L52, L53), which are inert when no visual verdict can exist. The arm probe reuses `hasDesignModeRequiringVisual()` (tools/evidence-file.ts:155) — the identical signal the server PASS gates use (index.ts:747/816) — guaranteeing the strip and the server gates cannot drift from each other (HC1 identity-by-construction). On design-armed features, the full constitution loads byte-identical to source (AC2/HC2). Design-only marker comments added to `content/constitution.md` (3 fenced regions: L47–48, L52–53, L58–85); R10 (tw_sync/reconcile) left unmodified in §3.2 per anti-sweep policy. Saves −1,187 ~tok/dispatch on non-design chain hops; +39 on the design path (marker-line cost). Composition verified safe with existing `stripChainOnly` and `stripRationale` axes (all permutations tested). AC1–AC8 assertions in `test/context-budget.test.mjs` confirm non-design strips, design loads unchanged, anti-sweep boundaries preserved, and measured token impact.
+
 ## [3.32.0] - 2026-06-11
 
 ### Added
