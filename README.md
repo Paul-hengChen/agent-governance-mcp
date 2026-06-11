@@ -4,7 +4,7 @@
 
 Lost updates, rule drift across `.cursorrules` / `CLAUDE.md` / `.windsurfrules`, and silent overwrites when two IDEs write at once — solved at the protocol layer, not by hoping the AI behaves.
 
-> **Status**: production-used, v3.30.0. Suite **595/0**. Stdio mode is solo/single-machine; HTTP+SQLite mode is for multi-machine teams.
+> **Status**: production-used, v3.34.0. Suite **629/0**. Stdio mode is solo/single-machine; HTTP+SQLite mode is for multi-machine teams.
 
 ---
 
@@ -25,11 +25,11 @@ Existing tools in the same category (GitHub Spec Kit, OpenSpec) ship **templates
 
 ```bash
 # 1. Register the MCP server
-claude mcp add -s user agent-governance-mcp -- npx -y github:Paul-hengChen/agent-governance-mcp#v3.30.0
+claude mcp add -s user agent-governance-mcp -- npx -y github:Paul-hengChen/agent-governance-mcp#v3.34.0
 
 # 2. Mark the current workspace as managed (REQUIRED — hook is a silent no-op without this)
 # Recommended: use agc init (writes .current/, tasks.md, AND cross-agent adapter files)
-npx -y github:Paul-hengChen/agent-governance-mcp#v3.30.0 agc init
+npx -y github:Paul-hengChen/agent-governance-mcp#v3.34.0 agc init
 # Alternative (bare scaffold, no adapter files):
 mkdir -p .current
 
@@ -164,10 +164,10 @@ Adapters carry an `agc-version:` stamp (HTML comment in `CLAUDE.md`, `#` comment
 
 ```bash
 # Write adapters (idempotent — safe to re-run)
-npx -y github:Paul-hengChen/agent-governance-mcp#v3.30.0 agc init
+npx -y github:Paul-hengChen/agent-governance-mcp#v3.34.0 agc init
 
 # Check for stale adapters after upgrading agc
-npx -y github:Paul-hengChen/agent-governance-mcp#v3.30.0 agc check
+npx -y github:Paul-hengChen/agent-governance-mcp#v3.34.0 agc check
 ```
 
 Write behaviour is idempotent: `AGENTS.md` and `.antigravityrules` are skipped if they already exist; the `CLAUDE.md` block is upserted in-place (surrounding user prose preserved, stamp refreshed).
@@ -200,6 +200,22 @@ This gate enforces scope decisions at the MCP-tool layer. It does not stop a coo
 
 ---
 
+## Context-Frugal Loading (v3.31.0–v3.34.0)
+
+The constitution is injected into *every* role dispatch, so its size is a per-dispatch tax. A series of releases drove that cost down without weakening any rule, on three conditional-load axes in `prompts/build.ts`:
+
+| Axis | Helper | Strips | When |
+|---|---|---|---|
+| **chain-only** | `stripChainOnly` | §3.1 + §3.2 + §4 (the routing-chain block) | lite mode (`/teamwork-lite`) |
+| **rationale** | `stripRationale` | `<!-- rationale -->`-fenced explanatory prose in §1/§7 (and the skill body) | every non-`fullDetail` chain dispatch |
+| **design-only** | `stripDesignOnly` | `<!-- design-only -->`-fenced visual governance (§3.2 minus R10, the §3.1 visual gates, the §4 `visual_round`/design-auditor prose, §1 visual exceptions) | non-design features only |
+
+The **design-only** axis (v3.33.0–v3.34.0) is the key idea: visual-fidelity governance is *inert* on a non-design feature (the server visual gates self-arm only when `design/<feature>.md` has `## Mode ≠ no-design`), so it is stripped from chain-role dispatches there. The strip's trigger **reuses the same `hasDesignModeRequiringVisual()` helper the server PASS gates use** — so the constitution text is present exactly when the gates can fire and stripped exactly when they're inert; the two cannot drift.
+
+Net effect: on a non-design chain hop the constitution dropped from ~4,233 → **~2,409 ~tok** (≈1,790 lighter), while design features load the full governance contract unchanged. Companion: `content/constitution-rationale.md` (v3.32.0) holds the non-normative "why" behind the rules, keeping the always-loaded constitution lean. Measured by `scripts/measure-context-cost.mjs`; pinned by assertions in `test/context-budget.test.mjs`.
+
+---
+
 ## Limits (read before adopting)
 
 - **Cannot force AI to follow the constitution** — only injects it into context. AI can still hallucinate. The gates stop *state writes*, not bad reasoning.
@@ -227,7 +243,7 @@ Add to `~/.claude/settings.json`:
       "matcher": "",
       "hooks": [{
         "type": "command",
-        "command": "npx -y -p github:Paul-hengChen/agent-governance-mcp#v3.30.0 agent-governance-context",
+        "command": "npx -y -p github:Paul-hengChen/agent-governance-mcp#v3.34.0 agent-governance-context",
         "timeout": 60
       }]
     }]

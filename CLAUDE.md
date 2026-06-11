@@ -20,7 +20,12 @@ Three layers of defense, all in `index.ts`:
 
 1. **Prompts** — thin wrappers around `prompts/build.ts`, which bundles
    `content/constitution.md` + role-specific `content/skill-*.md` + live
-   handoff state. Seven prompts are registered: `teamwork` serves the
+   handoff state. The bundle is context-frugal: `build.ts` conditionally
+   strips constitution spans per dispatch — `chain-only` (§3.1/§3.2/§4) for
+   lite mode, `rationale` fences for non-`fullDetail`, and `design-only`
+   visual governance on non-design features (v3.33.0+, triggered by the same
+   `hasDesignModeRequiringVisual()` arm signal the server PASS gates use, so
+   the text loads exactly when the gates can fire). Seven prompts are registered: `teamwork` serves the
    full Coordinator (`prompts/coordinator.ts` +
    `content/skill-coordinator.md`); `teamwork-lite` serves the solo-dev
    lite mode (`prompts/coordinator-lite.ts` +
@@ -58,7 +63,7 @@ schema/versions.ts        schema_version constants + migration registries (v3.4.
 schema/migrations-*.ts    handoff / tasks / sqlite / config migration runners (v3.4.0)
 guards/session.ts         per-(process,workspace) snapshot of "agent read state"
 guards/file-lock.ts       cross-process O_EXCL lock with stale-PID detection
-prompts/build.ts          shared buildPromptForRole() — all role prompts call into this
+prompts/build.ts          shared buildPromptForRole() — all role prompts call into this; conditionally strips constitution spans via stripChainOnly (lite) / stripRationale (non-fullDetail) / stripDesignOnly (non-design features, v3.33.0+)
 prompts/coordinator.ts       coordinator role (prompt id is "teamwork" for backwards compat)
 prompts/coordinator-lite.ts  coordinator-lite role (prompt id "teamwork-lite", v3.6.0)
 prompts/sr-engineer.ts    sr-engineer role prompt
