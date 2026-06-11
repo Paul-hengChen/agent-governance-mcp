@@ -2,7 +2,7 @@
 schema_version: 4
 active_feature: "constitution-conditional-load-p2"
 status: "PASS"
-last_updated: "2026-06-11T06:30:26.096Z"
+last_updated: "2026-06-11T07:15:42.000Z"
 last_agent: "qa-engineer"
 prd_path: "/Users/paul.ph.chen/agent-governance-mcp/specs/constitution-restructure.md"
 scope_decision: "single-feature"
@@ -16,10 +16,19 @@ visual_round: 0
 ## Completed
 - [x] T-CCL-P2-01
 
+## Release Completion (v3.34.0)
+- **Commit**: 53126f7 — chore(release): v3.34.0
+- **Tag**: v3.34.0 (annotated)
+- **Release URL**: https://github.com/Paul-hengChen/agent-governance-mcp/releases/tag/v3.34.0
+- **Push**: Both commit and tag pushed to origin/main
+
 ## Pending & Handoff Notes
 - QA: T-CCL-P2-01 PASS — feature complete
-- new non-design constitution figure ~2409 ~tok; total saving vs original ~4200 = ~1790 tok/dispatch on non-design
-- package.json stays 3.33.0 (release human-owned)
+- Phase 2 release gates all passed: build (tsc OK), audit (MODERATE hono only, not gating), check-version (3.34.0 ✓), test (629/629 passing)
+- non-design constitution figure ~2409 ~tok (−1790 tok/dispatch vs v3.33.0 baseline)
+- constitution.md: §4 visual prose + §1 L16/L17/L19 exceptions now design-gated; rule semantics unchanged
+- package.json + index.ts both bumped to 3.34.0 (matching check-version gate)
+- CHANGELOG entry added for v3.34.0
 - next_role: human
 
 ---
