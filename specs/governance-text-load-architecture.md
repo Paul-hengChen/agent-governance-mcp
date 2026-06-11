@@ -362,6 +362,37 @@ always-on win that stacks on top of the Round-1 skill savings (pm −253, sr −
 AC8's spec numbers to ≤ 4,153 / ≤ 7,626 (or accept this architecture doc as the authoritative floor)
 before/at QA; this is recorded, not an Open Question.**
 
+### AC8 — VERIFIED measurement at T-GTL-06 implementation (sr-engineer, 2026-06-11)
+
+After the two fence spans were applied to `content/constitution.md`, the actual `chars/4 approxTokens`
+figures (same estimator as `test/context-budget.test.mjs` / `scripts/measure-context-cost.mjs`) are:
+
+| Metric | Raw (chain-role) | rationale-stripped | Saved |
+|---|---|---|---|
+| `constitution.md` | 4,225 ~tok | **4,153 ~tok** | **72 ~tok** |
+| `teamwork` coordinator bundle (constitution + skill-coordinator, both rationale-stripped) | 7,698 ~tok | **7,626 ~tok** | **72 ~tok** |
+
+**AC8 constitution-bundle-floor (authoritative, measured): `approxTokens(stripRationale(constitution)) ≤ 4,153 ~tok`; `teamwork` bundle ≤ 7,626 ~tok.**
+The stripped floor (4,153 / 7,626) matches DR-12 exactly. The raw baseline is now 4,225 (not the
+4,202 quoted in DR-12) because the constitution itself grew since that estimate (current v3.27.0 header,
+v3.30.0 scope-decision-gate text), so the measured **saving is 72 ~tok**, higher than DR-12's
+conservative 49 estimate — the architect under-counted, the realized win is larger. Losslessness
+re-verified: after `stripRationale`, all §1–§7 section titles, `3.1 Server-enforced chain`,
+`3.2 Visual Verdict Authority`, every named gate (`VISUAL_BASELINES_REQUIRED`, `SCOPE_DECISION_REQUIRED`,
+…), `MVP strict`, `Self-converge relaxation`, `Design-baseline scope`, `External-reference policy`,
+`Figma node or equivalent`, and `skill-pm §Resource Audit Gate` are present; both example-list interiors
+(`column-scroller picker`, `see XYZ`) are absent. §3.1–§3.2 byte-range (L39–L93) is byte-identical to
+HEAD (AC7). Compose order verified irrelevant (DR-9): `stripRationale(stripChainOnly(c)) === stripChainOnly(stripRationale(c))`.
+
+**Implementation deviation from this doc's task-mapping vs the dispatch prompt (flagged loudly):** the
+T-GTL-06 dispatch prompt named four §1/§7 bullets (Visual Widgets, Design-baseline scope, Self-converge
+relaxation, External-reference policy). Applying the clause-granular safety rule that BOTH the prompt and
+this doc mandate (no rule sentence / no §-reference inside a fence — DR-8/DR-10/AC7/AC9), only the
+**two** spans above contain pure-illustration prose. §1 Design-baseline (L17) and §1 Self-converge (L19)
+have **zero** safely-fenceable bytes (L17 = rule + §7 ref + the definitional `(Figma node or equivalent)`
+clarifier; L19 = rule + §3.1/§3.2 references = hard exclusion). Fencing them would weaken governance and
+violate AC7/AC9. The spec-correct two-span fencing was implemented; this matches DR-8 exactly.
+
 ## R2 — Lossless guarantee (AC9, DR-11)
 
 Every constitution section title (§1–§7), every named gate in §3.1/§3.2

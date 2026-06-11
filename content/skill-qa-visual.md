@@ -47,7 +47,7 @@ Rules:
 ### Step B — Region Diff Per Baseline (v3.26.0, R3)
 
 **Whole-frame pixel-percentage is BANNED as a PASS metric** — a sparse canvas dilutes a localized
-structural error (CDE-OOBE Language scored 6% while structurally wrong). Compare the **content/
+structural error (a prior surface scored 6% while structurally wrong). Compare the **content/
 component region** declared by the baseline's `compare region`, not the full frame.
 
 For each `## Visual Baselines` row:
@@ -72,7 +72,7 @@ under H2 `## Structural Assertions`:
 | declared.token.rendered | per state token | declared focus/selected token renders in that state | token | fail |
 ```
 
-Any `fail` or unverified row blocks PASS (server-checked). This is what catches the CDE-OOBE class
+Any `fail` or unverified row blocks PASS (server-checked). This is what catches the false-PASS class
 (missing blue focus bar, flat groups, grey primary button, title-only mode card).
 
 ### Allowed Differences (qa-visual-owned ONLY — v3.26.0, R1)
@@ -119,7 +119,7 @@ modal-open) individually. This shrinks blast radius and stops fix-A-break-B scre
 ### Rationale
 
 - qa-engineer 3b only catches literal-token drift.
-- Step A (widget shape) catches the cde-oobe class of failure: correct color/font on the **wrong widget** (`<input type="date">` with the brand palette is still wrong). Shape verification gates pixel diff — getting pixels right on a primitive that should have been a column-scroller wastes iterations.
+- Step A (widget shape) catches the wrong-widget class of failure: correct color/font on the **wrong widget** (`<input type="date">` with the brand palette is still wrong). Shape verification gates pixel diff — getting pixels right on a primitive that should have been a column-scroller wastes iterations.
 - Step B (pixel diff) catches non-literal visual drift (layout, spacing, alignment, missing elements, ~5px-grade positioning) via multimodal vision against a user-supplied baseline.
 - Output filename `visual_<task-id>.md` is server-checked (Constitution §3.1); using `review_<task-id>.md` instead does NOT satisfy the gate.
 - `visual_fail:` `pending_notes` prefix is the trigger token for `visual_round` increment — without it, a pure test-logic FAIL bumps only `qa_round`.

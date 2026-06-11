@@ -197,14 +197,20 @@ export function buildPromptForRole(skillFile, description, workspacePath, fullDe
     const rawConstitution = loadContent("constitution.md", workspacePath);
     // Lite contexts (teamwork-lite) get the chain-only sections stripped; chain
     // roles keep the full constitution because those rules become load-bearing.
-    const constitution = skillFile === LITE_SKILL_FILE ? stripChainOnly(rawConstitution) : rawConstitution;
+    const chainResolved = skillFile === LITE_SKILL_FILE ? stripChainOnly(rawConstitution) : rawConstitution;
+    // v3.31.0 (T-GTL-07): the §1/§7 rationale fences wrap explanatory example-lists,
+    // not rules, so strip them for non-full-detail dispatch — same fullDetail flag as
+    // the skill body. Composes after stripChainOnly: order-independent (DR-9), the
+    // fences are disjoint regions (chain-only wraps §3.1+§4; rationale fences sit in
+    // §1/§7), so neither non-greedy regex crosses the other's markers.
+    const constitution = fullDetail ? chainResolved : stripRationale(chainResolved);
     const rawSkill = loadContent(skillFile, workspacePath);
     const { frontmatter, body: rawBody } = parseSkillFile(rawSkill);
     // Chain-role skill dispatch strips verbose rationale unless fullDetail is set
     // (DR-5, v3.31.0). Default false = strip on every buildPromptForRole dispatch,
-    // including the full teamwork coordinator — lossless because only the pm+sr
-    // skills are fenced and their fences hold no rule text (no-marker passthrough
-    // elsewhere). The constitution body is untouched (chain-only handled above).
+    // including the full teamwork coordinator — lossless because the fences hold no
+    // rule text (no-marker passthrough on un-fenced files). The constitution is
+    // ALSO rationale-stripped above (T-GTL-07), gated on the same fullDetail flag.
     const skill = fullDetail ? rawBody : stripRationale(rawBody);
     let state = null;
     try {

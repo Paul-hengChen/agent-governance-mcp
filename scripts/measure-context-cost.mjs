@@ -116,18 +116,25 @@ printTable("Role-prompt bundles (constitution + skill, state excluded)", [
   ...ROLE_PROMPTS.map(([id, file]) => row(`${id}  [${file}]`, constitution + SEP + read(file))),
 ]);
 
-// 3b. Role-prompt bundles AFTER stripRationale() on the skill body (F-B, v3.31.0).
-//     This mirrors buildPromptForRole's default (fullDetail=false) dispatch: the
-//     constitution is unchanged, only the skill body has rationale fences removed.
-//     Un-fenced skills pass through byte-identical (no-marker passthrough), so only
-//     pm/sr move — exactly the AC1/AC2 reduction targets.
-printTable("Role-prompt bundles (rationale-stripped)", [
+// 3b. Role-prompt bundles AFTER stripRationale() on BOTH the constitution AND the
+//     skill body (F-B Round-2, v3.31.0 — T-GTL-07). This mirrors buildPromptForRole's
+//     default (fullDetail=false) chain-role dispatch: the constitution now also has
+//     its §1/§7 rationale example-lists removed (−72 ~tok), in addition to the skill
+//     body strip. Un-fenced skills pass through byte-identical (no-marker passthrough),
+//     so the constitution delta applies to EVERY bundle while pm/sr also drop their
+//     skill rationale — the AC1/AC2/AC8 reduction targets. Reporting-only (DR-2/DR-6).
+const constitutionStripped = stripRationale(constitution);
+const constitutionSaved = constitutionTok - approxTokens(constitutionStripped);
+printTable("Role-prompt bundles (rationale-stripped: constitution + skill)", [
   ...ROLE_PROMPTS.map(([id, file]) => {
     const skill = read(file);
     const stripped = stripRationale(skill);
-    const bundle = constitution + SEP + stripped;
+    const bundle = constitutionStripped + SEP + stripped;
     const skillSaved = approxTokens(skill) - approxTokens(stripped);
-    const tag = skillSaved > 0 ? `  (skill −${skillSaved} ~tok)` : "";
+    const parts = [];
+    if (constitutionSaved > 0) parts.push(`const −${constitutionSaved}`);
+    if (skillSaved > 0) parts.push(`skill −${skillSaved}`);
+    const tag = parts.length ? `  (${parts.join(", ")} ~tok)` : "";
     return row(`${id}  [${file}]${tag}`, bundle);
   }),
 ]);
@@ -143,6 +150,7 @@ const leanTok = approxTokens(alwaysOnLean);
 console.log("\n" + "=".repeat(50));
 console.log(`TOTAL always-on (constitution + default skill)`);
 console.log(`  constitution.md (raw)      : ${constitutionTok.toString().padStart(6)} ~tokens`);
+console.log(`  constitution.md (rat-strip): ${approxTokens(constitutionStripped).toString().padStart(6)} ~tokens  (chain-role AC8 floor; −${constitutionSaved})`);
 console.log(`  constitution.md (lite-lean): ${approxTokens(leanConstitution).toString().padStart(6)} ~tokens`);
 console.log(`  skill-coordinator-lite.md  : ${approxTokens(liteSkill).toString().padStart(6)} ~tokens`);
 console.log(`  bundle raw  (pre-strip)    : ${rawTok.toString().padStart(6)} ~tokens`);

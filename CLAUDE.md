@@ -68,6 +68,7 @@ prompts/researcher.ts     researcher role prompt
 prompts/qa-engineer.ts    qa-engineer role prompt
 bin/agent-governance-context.mjs  SessionStart hook helper (emits additionalContext)
 content/constitution.md   the rules agents must follow (source of truth)
+content/constitution-rationale.md  non-normative "why" behind §1/§3.1/§3.2/§5/§7 (one-way refs into constitution; v3.32.0)
 content/skill-coordinator.md  default coordinator SOP (loaded by SessionStart hook)
 content/skill-coordinator-lite.md  solo-dev lite-mode SOP (v3.6.0)
 content/skill-sr-engineer.md  sr-engineer SOP

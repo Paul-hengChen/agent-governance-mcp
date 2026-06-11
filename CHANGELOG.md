@@ -16,6 +16,16 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.32.0] - 2026-06-11
+
+### Added
+- **F-C1: `constitution-restructure` — Non-normative rationale companion document.** New `content/constitution-rationale.md` provides extended "why" commentary for §1 (Constitution preamble), §3.1/§3.2 (Pre-Flight Protocol), §5 (Evidence Taxonomy), and §7 (Watermark § 1 enforcement). Constitution.md itself byte-unchanged; rationale document is authoritative for design rationale only. CLAUDE.md layout updated to include rationale file. Backwards compatible.
+- **F-C2: `governance-text-load` — Rationale-stripping on chain-role dispatch.** `prompts/build.ts` now removes `<!-- rationale -->`-fenced prose from skill bodies when building role prompts (−72 tok/typical dispatch). Rationale fences added to `constitution.md` §1 and §7 (documentation only, no rule change). `scripts/measure-context-cost.mjs` mirror updated. AC7/AC8/AC9 assertions added to `test/context-budget.test.mjs` covering losslessness and token-cap enforcement. AC8 token floor raised 4153→4161 to account for new assertions; no rule bytes changed.
+- **F-C3: `decodename-cleanup` — Genericized private-codename provenance refs.** 18 "CDE-OOBE" private-codename mentions across `constitution.md`, `skill-pm.md`, `skill-sr-engineer.md`, `skill-qa-visual.md`, and `skill-design-auditor.md` genericized to reference patterns (e.g., "internal codename X"). Rules byte-unchanged; evidence taxonomy (§5) unaffected. Reduces coupling to legacy project names.
+
+### Fixed
+- **Ledger cleanup (QA maintenance).** 4 stale task rows (T-CR-01 descoped; T-CR-02/03/04 superseded by -REV variants) closed via `tw_complete_task`. T-CR-02-REV and T-CR-04-REV records confirm constitution-restructure feature (v3.32.0, constitution-rationale.md shipped). Test-label cosmetic fix: `test/context-budget.test.mjs` L80 name updated from '(<= 2400 ~tok)' → '(<= 2600 ~tok)' to match L96 assertion floor.
+
 ## [3.31.0] - 2026-06-10
 
 ### Added
