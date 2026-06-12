@@ -50,10 +50,80 @@ Rules:
 structural error (a prior surface scored 6% while structurally wrong). Compare the **content/
 component region** declared by the baseline's `compare region`, not the full frame.
 
-For each `## Visual Baselines` row:
+Step B runs in stages: a round-≥2 carry-forward gate (**Step B0**) that skips already-passing
+untouched surfaces entirely, a deterministic pixel-diff pre-screen (**Step B1**) that decides which
+remaining surfaces need eyes, then the LLM region diff (**Step B2**) for only the surfaces that
+pre-screen escalates. The multimodal image Read happens in **B2 only** — neither B0 nor B1 loads an
+image into context.
+
+#### Step B0 — Round-≥2 Carry-Forward Gate (v3.36.0, B10)
+
+On the FIRST visual round (`visual_round` is `0`/`1`, or no prior `qa_reports/visual_<task-id>.md`
+`## Region Diff` table exists) this step is a no-op: diff every surface via Step B1/B2 below.
+
+From `visual_round ≥ 2`, re-verify ONLY the surfaces that could have regressed and carry the rest
+forward without re-reading images. For each `## Visual Baselines` row:
+
+a. **Always re-diff (Step B1/B2)** any surface whose result in the prior round's `## Region Diff`
+   table was `fail` or `accepted`, OR that was newly recaptured this round (a Step A.5 canonical-state
+   mismatch corrected since last round). These surfaces get a full diff regardless of `git diff`.
+b. For a surface whose prior-round result was `pass`, check `git diff` scoped to the files/paths the
+   sr-engineer's fix touched this round (the handoff/`pending_notes` and the actual changed paths):
+   - **`git diff` confirms that surface's source is untouched** → carry it forward: write the surface
+     as a `pass` row in this round's `## Region Diff` result table WITHOUT reading its `baseline path`
+     or `impl path`. Put the annotation `pass (carried forward — git diff confirms source untouched)`
+     in the surface's prose sub-section under `## Region Diff`; the parsed result **cell** stays exactly
+     `pass` (see Step B2 — annotations never go in the result cell, or the server parser stops seeing
+     the row).
+   - **`git diff` cannot prove the surface untouched** — diff unavailable, the surface's source path is
+     unknown, or the diff touches a shared/common file (shared component, global stylesheet, design
+     token) that could affect the surface — → **fall back to a full re-diff** of that surface via Step
+     B1/B2, exactly as if it were round 1. When in doubt, re-diff; carry-forward is only for a
+     provably-untouched surface.
+
+Carried-forward surfaces still appear in the `## Region Diff` table and in the `## Verdict` accounting,
+so a round-≥2 report stays self-contained: every `## Visual Baselines` surface has a row every round.
+
+#### Step B1 — Deterministic Pixel-Diff (tool-first gate)
+
+Before loading ANY image into multimodal context, run a deterministic CLI pixel-diff tool over each
+baseline's declared `compare region` (NOT the full frame — see the ban above; running over the full
+frame would reintroduce the banned whole-frame metric by a different path). No wrapper script and no
+new npm dependency exists at MVP; invoke an already-installed CLI directly via Bash. Use whichever of
+these is available:
+
+- `odiff <baseline> <impl> <diff-out>` — reports a changed-pixel count / percentage and exit code.
+- `pixelmatch` (CLI) — reports the number of differing pixels.
+- ImageMagick `compare -metric AE <baseline> <impl> <diff-out>` — reports an absolute pixel-difference count.
+
+Crop both `baseline path` and `impl path` to the declared `compare region` before diffing (e.g. via
+`magick <img> -crop <WxH+X+Y> <region-out>`), so the deterministic metric is computed over the SAME
+region the LLM would judge, never the full frame.
+
+For each `## Visual Baselines` row not already carried forward by Step B0:
+
+a. Run the tool over the cropped `compare region`.
+b. Compare the tool's numeric output (diff percentage or differing-pixel count) against the baseline's
+   per-baseline declared threshold (default: `0%` / `0` differing pixels / tool-reported "identical").
+   - **At or below threshold** → record the surface as `pass` directly in the `## Region Diff` result
+     table WITHOUT reading either image into multimodal context. Note `pre-screened by <tool>: <metric>`
+     in that surface's prose sub-section.
+   - **Above threshold** → escalate the surface to Step B2 (do not record a verdict yet).
+- **Tool unavailable** (binary absent, Bash not permitted, or crop/diff errors) → fall back to the
+  Step B2 LLM path for that surface (treat it as escalated), and note `B1 tool unavailable — LLM
+  fallback` in its prose sub-section.
+
+#### Step B2 — LLM Region Diff (escalated surfaces only)
+
+For each surface escalated by Step B1 (above threshold, or tool unavailable):
 
 a. Read both `baseline path` and `impl path` via the Read tool (images render into multimodal context).
 b. Emit a structured diff over the declared region covering: (i) layout / position, (ii) spacing / alignment, (iii) element presence, (iv) color, (v) text content, (vi) image content. Append under `## Region Diff` in `qa_reports/visual_<task-id>.md`, one prose sub-section per `surface id`, AND a **per-surface result table** the server parses: `| surface | result |` where `result` ∈ `pass` (no material difference) / `accepted` (difference recorded in `## Allowed Differences`) / `fail` (material drift). Any row not `pass`/`accepted` blocks PASS.
+
+Every surface — whether B1-pre-screened `pass` or B2-judged — MUST appear as a row in the single
+`## Region Diff` `| surface | result |` table. The result cell value MUST be exactly `pass` /
+`accepted` / `fail` (no trailing annotation in that cell); any explanatory note goes in the surface's
+prose sub-section, never in the parsed result cell.
 
 ### Step C — Structural Assertions (v3.26.0, R3/R-VIS)
 
@@ -121,5 +191,7 @@ modal-open) individually. This shrinks blast radius and stops fix-A-break-B scre
 - qa-engineer 3b only catches literal-token drift.
 - Step A (widget shape) catches the wrong-widget class of failure: correct color/font on the **wrong widget** (`<input type="date">` with the brand palette is still wrong). Shape verification gates pixel diff — getting pixels right on a primitive that should have been a column-scroller wastes iterations.
 - Step B (pixel diff) catches non-literal visual drift (layout, spacing, alignment, missing elements, ~5px-grade positioning) via multimodal vision against a user-supplied baseline.
+- Step B0 (carry-forward, B10) cuts cross-round redundancy: from round ≥2 it skips re-reading images for surfaces that already passed and whose source `git diff` proves untouched, so image-read cost is paid only for surfaces that could have regressed. Re-diff is the safe default — carry-forward fires only on provable evidence.
+- Step B1 (deterministic pre-screen, B11) cuts within-round per-surface cost: a CLI pixel-diff over the `compare region` decides which surfaces need eyes, so identical/sub-threshold surfaces never consume multimodal tokens. It runs over the `compare region`, never the full frame, so the whole-frame-ban metric is not reintroduced.
 - Output filename `visual_<task-id>.md` is server-checked (Constitution §3.1); using `review_<task-id>.md` instead does NOT satisfy the gate.
 - `visual_fail:` `pending_notes` prefix is the trigger token for `visual_round` increment — without it, a pure test-logic FAIL bumps only `qa_round`.

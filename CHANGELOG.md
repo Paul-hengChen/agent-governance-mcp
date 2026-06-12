@@ -16,6 +16,17 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.37.0] - 2026-06-12
+
+### Added
+- **`qa-visual-token-reduction` — Token-optimized visual QA skill gates.** Backlog items B10 and B11 shipping together: (1) **B10 — Step B0 carry-forward gate.** When re-diffing a visual fixture (round N > 1), skip re-running Step B0 (deterministic pixel-diff) if no content-significant changes detected since the previous round; carry forward the baseline. Reduces token spend for iterative visual refinement. (2) **B11 — Deterministic-diff-first gate in Step B2.** Escalate to Step B2 LLM visual assessment only if deterministic pixel-diff (Step B1) exhausts its ~7k-token budget AND returns inconclusive. Closes token leakage from premature LLM escalation. Whole-frame-% PASS ban preserved. New skill prose in `content/skill-qa-visual.md` with clear AC-B10.1…3 and AC-B11.1…3 assertions; updated `test/qa-visual-skill-split.test.mjs` byte cap (9000→15000) for test doc growth.
+
+### Changed
+- `test/qa-visual-skill-split.test.mjs` byte-cap assertion updated to 15000 (from 9000) to accommodate new carry-forward and deterministic-diff-first gate prose in the skill definition.
+
+### Notes
+- Both B10 and B11 complete with full qa-engineer, design-auditor, and sr-engineer reviews. Full test suite passing; all release gates green.
+
 ## [3.36.0] - 2026-06-12
 
 ### Added

@@ -17,6 +17,8 @@ candidate for a future `/teamwork` feature; none blocks a release on its own.
 | B7 | Visual fidelity un-owned until optional last gate (structural drift, all gates green) — see [postmortem-visual-fidelity-gate.md](postmortem-visual-fidelity-gate.md) | **P0** | oobe-setup-wizard (2026-06-04) | **done** — constitution §3.2 visual gates, content/skill-qa-visual.md, visual_round caps, and Visual Verdict Boundary (v3.26.0) own visual fidelity |
 | B8 | §7 external-reference policy has no server-side enforcement gate | P1 | figma-url-placeholder analysis (2026-06-11) | open |
 | B9 | Per-feature token budget + coordinator STOP at ceiling | P2 | Language process-retrospective (migrated from `.current/feature-split.md` F2) | open |
+| B10 | qa-visual round ≥2 delta-only re-diff (skip prior-`pass` surfaces) | P2 | qa-visual token-burn analysis (2026-06-12) | **done** — `skill-qa-visual.md` Step B0 carry-forward gate (T-QAVTR-01, PASS 2026-06-12; pending release) |
+| B11 | qa-visual Step B deterministic pixel-diff first; LLM reads images only on tool-flagged surfaces | P2 | qa-visual token-burn analysis (2026-06-12) | **done** — `skill-qa-visual.md` Step B1 deterministic-diff gate + B2 escalation (T-QAVTR-02, PASS 2026-06-12; pending release) |
 
 ---
 
@@ -130,6 +132,45 @@ candidate for a future `/teamwork` feature; none blocks a release on its own.
 - **Owner:** /teamwork (touches coordinator SOP + likely a handoff/config field; pm→…→qa).
 - **Risk if skipped:** low — round caps already bound worst-case cost; this is a finer cost-side brake,
   not a correctness gate.
+
+## B10 — qa-visual round ≥2 re-reads every baseline+impl image (no delta-only re-diff) (P2)
+- **What:** `content/skill-qa-visual.md` Phase 1.5 SOP runs Step A/A.5/B/C over **every** `## Visual
+  Baselines` row each round, and Step B explicitly `Read`s both `baseline path` and `impl path` into
+  multimodal context per surface. On a FAIL, `visual_round` increments but the SOP has **no delta-only
+  clause** — round ≥2 re-reads all surface images again, so cost = `rounds × all surfaces` instead of
+  `rounds × failed surfaces`. This is the primary qa-visual token sink.
+- **Fix:** from round ≥2, re-verify only surfaces that were `fail` / `accepted` / recaptured in the
+  prior round; carry forward prior-`pass` rows without re-reading their images — **gated on evidence
+  the engineer's fix was scoped** (e.g. `git diff` shows no change touching that surface's source).
+  If the diff cannot prove a surface untouched, fall back to re-diffing it. Pairs with B-(deterministic
+  pixel-diff) so the LLM only reads images for tool-flagged surfaces.
+- **Owner:** /teamwork (edits governance SOP `content/skill-qa-visual.md`; may touch the
+  `visual_round` evidence parser in `tools/evidence-file.ts`; pm→sr→reviewer→qa).
+- **Risk if skipped:** low correctness / high cost — every visual-rework round pays full re-read; the
+  Language retrospective measured ~1.05M tokens across 4 visual rounds, much of it avoidable re-reads.
+  Complements B9 (cost ceiling) and the deterministic-diff idea (per-read cost).
+
+## B11 — qa-visual Step B reads every image into multimodal context; gate with a deterministic diff first (P2)
+- **What:** `content/skill-qa-visual.md` Step B (Region Diff) instructs QA to `Read` both `baseline
+  path` and `impl path` into multimodal context for **every** surface, then have the model eyeball the
+  difference. Loading images into context is the per-read token cost — paid for every surface every
+  round, even surfaces with zero pixel difference.
+- **Fix (two-stage):** (1) run a deterministic CLI image-diff first (`odiff` / `pixelmatch` /
+  ImageMagick `compare`) over each surface's `compare region`; it returns a numeric diff (% or pixel
+  count) at zero token cost — QA reads only the number. (2) Only surfaces whose diff exceeds the
+  per-baseline threshold get escalated to the LLM, which then `Read`s the images to judge real drift
+  vs. acceptable anti-aliasing/font-hinting noise (the judgment a tool can't make). Surfaces under
+  threshold pass without ever loading an image.
+- **Interaction with region-diff ban:** Step B already bans whole-frame pixel-percentage as a PASS
+  metric (a sparse canvas dilutes localized errors). The deterministic diff MUST run over the declared
+  `compare region`, not the full frame, to preserve that property — otherwise it reintroduces the
+  banned metric. The numeric tool gates *which surfaces the LLM looks at*; it does NOT replace the
+  structural/region judgment that decides PASS.
+- **Owner:** /teamwork (edits governance SOP `content/skill-qa-visual.md` Step B; adds a diff-binary
+  dependency + likely a CI/tool wrapper; pm→sr→reviewer→qa).
+- **Risk if skipped:** low correctness / high cost — every passing surface still pays full image-read
+  cost each round. Composes with B10 (skip prior-`pass` across rounds) and B9 (overall cost ceiling):
+  B11 cuts within-round per-surface reads, B10 cuts cross-round re-reads.
 
 ## B4 — No `.nvmrc` / `engines` → Node version drift
 - **What:** Repo has no `.nvmrc`, no `.node-version`, and no `engines` field in
