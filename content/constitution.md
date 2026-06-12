@@ -1,4 +1,4 @@
-# Constitution v3.27.0 <!-- versioned independently of package.json; tracks the highest behavior the document describes; check-version.mjs does NOT read this header -->
+# Constitution v3.28.0 <!-- versioned independently of package.json; tracks the highest behavior the document describes; check-version.mjs does NOT read this header -->
 
 Standing orders for any AI agent working in an agent-governance-managed workspace.
 Methodology-agnostic. Skills inherit everything below — they MUST NOT
@@ -16,6 +16,7 @@ restate these rules.
 <!-- design-only:start -->
   - **Visual Widgets exception (v3.14.0)**: when a widget is listed in the spec's `## Visual Widgets` section, substituting an HTML primitive<!-- rationale:start --> (e.g. `<input type="date">` for a column-scroller picker, `<select>` for a custom segmented control, browser scrollbar for a designed scrollbar)<!-- rationale:end --> constitutes **scope violation, NOT MVP compliance**. The PM-declared widget shape is the minimum scope. Widgets absent from that section remain governed by the default MVP rule.
   - **Design-baseline scope (v3.27.0)**: For design-backed work, the canonical design (Figma node or equivalent) is the scope baseline — not the lossy prose transcription in the spec. Omitting a design-present element is a fidelity defect, not MVP compliance; flag the gap per §7, never drop silently.
+  - **Design-sourced assets (v3.28.0)**: design-sourced raster/vector assets (icons, logos, illustrations) MUST be sourced via export (e.g., `download_figma_images`), not redrawn by hand; hand-authored approximation of a design asset is a **fidelity defect**.
 <!-- design-only:end -->
 - **Surgical changes**: Touch only what the task requires. Don't "improve" adjacent code, comments, or formatting. Clean up only your own mess.
 <!-- design-only:start -->

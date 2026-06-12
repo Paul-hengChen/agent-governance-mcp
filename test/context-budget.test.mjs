@@ -79,7 +79,7 @@ test("AC2: stripChainOnly removes the chain-only block and is idempotent", () =>
   assert.equal(stripChainOnly("no markers here"), "no markers here", "text without markers is unchanged");
 });
 
-test("AC2: lean always-on bundle is below the raw baseline and within target (<= 2600 ~tok)", () => {
+test("AC2: lean always-on bundle is below the raw baseline and within target (<= 2700 ~tok)", () => {
   // v3.24.0 (B2 backlog fix): cap raised from 2100 → 2300 to provide ~200-token
   // editing headroom. The v3.22.0 raise (2000 → 2100) left only a 2-token margin
   // (2098/2100), meaning any minor constitution/skill edit broke CI unexpectedly.
@@ -90,12 +90,17 @@ test("AC2: lean always-on bundle is below the raw baseline and within target (<=
   // v3.31.0 (qa-owned bump): cap raised from 2400 → 2600 to absorb the §1
   // Self-converge relaxation clause (visual-selfconverge feature). Actual lean
   // bundle measured at 2528 ~tok; 2600 provides ~70-token editing headroom.
+  // v3.28.0 (qa-owned bump): cap raised from 2600 → 2700 to absorb the §1
+  // Design-sourced assets line (design-asset-source-rule feature). Lean applies
+  // stripChainOnly only (not stripDesignOnly) — the new §1 design-only line counts
+  // on this path. Actual lean bundle measured at 2641 ~tok; 2700 provides ~59-token
+  // editing headroom, consistent with the v3.31.0 ~70-token convention.
   const liteSkill = fs.readFileSync(path.join(ROOT, "content", "skill-coordinator-lite.md"), "utf-8");
   const SEP = "\n\n---\n\n";
   const raw = approxTokens(CONSTITUTION + SEP + liteSkill);
   const lean = approxTokens(stripChainOnly(CONSTITUTION) + SEP + liteSkill);
   assert.ok(lean < raw, `lean (${lean}) must be < raw (${raw})`);
-  assert.ok(lean <= 2600, `lean always-on (${lean} ~tok) must meet the <= 2600 target`);
+  assert.ok(lean <= 2700, `lean always-on (${lean} ~tok) must meet the <= 2700 target`);
 });
 
 // --- AC3: enforcement preserved ------------------------------------------
@@ -263,15 +268,19 @@ test("AC1/AC2: skill-pm stripped token count meets ≤ 2322 cap", () => {
   assert.ok(toks <= 2322, `skill-pm stripped body (${toks} ~tok) must be ≤ 2322 (AC1)`);
 });
 
-test("AC1/AC2: skill-sr-engineer stripped token count meets ≤ 2048 cap", () => {
+test("AC1/AC2: skill-sr-engineer stripped token count meets ≤ 2210 cap", () => {
   // WHY: the spec's re-grounded AC2 target must hold for sr-engineer dispatch budget.
+  // v3.28.0 (qa-owned bump): cap raised from 2048 → 2210 to absorb the
+  // design-asset-source-rule feature's "Source assets, don't redraw them (v3.28.0)"
+  // rule added to skill-sr-engineer's Design-Aware Pre-Flight step 3a. Actual
+  // stripped body measured at 2160 ~tok; 2210 provides ~50-token editing headroom.
   const SKILL_SR = fs.readFileSync(path.join(ROOT, "content", "skill-sr-engineer.md"), "utf-8");
   const body = SKILL_SR.startsWith("---")
     ? SKILL_SR.slice(SKILL_SR.indexOf("---", 3) + 3).trimStart()
     : SKILL_SR;
   const stripped = stripRationale(body);
   const toks = approxTokens(stripped);
-  assert.ok(toks <= 2048, `skill-sr stripped body (${toks} ~tok) must be ≤ 2048 (AC2)`);
+  assert.ok(toks <= 2210, `skill-sr stripped body (${toks} ~tok) must be ≤ 2210 (AC2)`);
 });
 
 // --- governance-text-load Round-2: constitution rationale fencing (T-GTL-06/07) ---
@@ -327,7 +336,7 @@ test("AC7: exactly two balanced rationale fences, both outside §3.x", () => {
   assert.equal(ends, 2, "exactly two rationale:end markers");
 });
 
-test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the measured floor (≤ 4239 ~tok)", () => {
+test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the measured floor (≤ 4304 ~tok)", () => {
   // WHY: floor REBASELINED by constitution-conditional-load PHASE 2. Phase 2 extends the
   // design-only axis to two more spans (§4 visual prose S3–S5 + P-AUDITOR, and §1 L16/L17/L19),
   // adding 3 MORE design-only fence pairs (now 6 pairs / 12 marker lines total, up from
@@ -337,16 +346,22 @@ test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the 
   // 4239 ~tok (exact). This is the design-arm (kept-path) cost; it is the price of the
   // ~1830 ~tok saving on the NON-DESIGN dispatch path (pinned by the AC8 non-design test
   // below). package.json stays 3.33.0 (release human-owned).
+  // v3.28.0 (qa-owned bump): cap raised from 4239 → 4304 to absorb the
+  // design-asset-source-rule constitution §1 Design-sourced assets line (sits inside
+  // design-only fence — on the design arm the marker lines count). Actual
+  // rationale-stripped constitution measured at 4304 ~tok (exact); cap set to exact
+  // measured value per the Phase-2 convention (no additional headroom, matches the
+  // non-design floor pin style).
   const raw = approxTokens(CONSTITUTION);
   const stripped = approxTokens(stripRationale(CONSTITUTION));
-  assert.ok(stripped <= 4239, `stripped constitution (${stripped} ~tok) must be ≤ 4239 (AC8 design-arm floor, Phase-2 marker cost)`);
+  assert.ok(stripped <= 4304, `stripped constitution (${stripped} ~tok) must be ≤ 4304 (AC8 design-arm floor, constitution v3.28.0)`);
   assert.ok(
     raw - stripped >= 49,
     `constitution rationale saving (${raw - stripped} ~tok) must be ≥ 49 (AC8 measured min)`,
   );
 });
 
-test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 7703 ~tok)", () => {
+test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 7768 ~tok)", () => {
   // WHY: the constitution is injected on every dispatch; the full coordinator bundle is
   // the worst case. Compose the chain-role bundle the way buildPromptForRole does:
   // rationale-stripped constitution + SEP + rationale-stripped skill body. Floor
@@ -356,13 +371,18 @@ test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/b
   // CDE-OOBE incident was a coordinator-authored accept-policy — §3.2 binds the
   // coordinator on design work), so this worst-case bundle is the design-arm size.
   // MEASURED on this working tree (chars/4): 7703 ~tok (exact). package.json stays 3.33.0.
+  // v3.28.0 (qa-owned bump): cap raised from 7703 → 7768 to absorb the
+  // design-asset-source-rule constitution §1 Design-sourced assets line and the
+  // corresponding skill-sr-engineer rule (design-arm bundle includes constitution
+  // marker-line cost). Actual design-arm bundle measured at 7768 ~tok (exact); cap
+  // set to exact measured value per the Phase-2 convention.
   const skillCoord = fs.readFileSync(path.join(ROOT, "content", "skill-coordinator.md"), "utf-8");
   const body = skillCoord.startsWith("---")
     ? skillCoord.slice(skillCoord.indexOf("---", 3) + 3).trimStart()
     : skillCoord;
   const SEP = "\n\n---\n\n";
   const bundle = approxTokens(stripRationale(CONSTITUTION) + SEP + stripRationale(body));
-  assert.ok(bundle <= 7703, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 7703 (AC8 design-arm floor, Phase-2 marker cost)`);
+  assert.ok(bundle <= 7768, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 7768 (AC8 design-arm floor, constitution v3.28.0)`);
 });
 
 test("AC9: every operative rule/gate/heading survives stripRationale on the constitution", () => {

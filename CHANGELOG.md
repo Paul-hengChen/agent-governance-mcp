@@ -16,6 +16,19 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.36.0] - 2026-06-12
+
+### Added
+- **`design-asset-source-rule` — Governance mandate for exported (not hand-drawn) design assets.** New governance rule requiring that all raster/vector assets sourced from design files be EXPORTED from Figma (via `download_figma_images`) and imported, never reconstructed as approximate hand-drawn SVG (fidelity defect). CSS/geometric primitives exempt. Three content edits: (1) `content/skill-design-auditor.md` — asset export workflow + manifest table in `design/<feature>.md`; (2) `content/skill-sr-engineer.md` — asset import mandate and fidelity-defect classification for hand-drawn approximation; (3) `content/constitution.md` §1 — one design-only-fenced governance line (constitution header already v3.28.0, independent of package version). Feature PASS with design-auditor, sr-engineer, and qa-engineer reviews completing v3.36.0.
+
+### Changed
+- `test/context-budget.test.mjs` re-baselined 4 context-budget caps to account for design-asset-source-rule governance additions: lean always-on 2600→2700; skill-sr-engineer stripped 2048→2210; design-arm constitution 4239→4304; teamwork bundle 7703→7768. Rationale: design-asset rule adds ~70 tok to constitution and skill-sr prose; all margins remain comfortable for tooling headroom and future governance growth.
+
+### Notes
+- Constitution header remains v3.28.0 (set independently during constitution-conditional-load v3.33.0 / Phase 2 v3.34.0; unrelated to package version bumps).
+- All context-budget, schema-versioning, and release-staging guards green; full test suite 634/634 passing.
+- Untracked `research/orientation-process-retrospective.md` from v3.35.0 omission included in this release.
+
 ## [3.35.0] - 2026-06-12
 
 ### Added
