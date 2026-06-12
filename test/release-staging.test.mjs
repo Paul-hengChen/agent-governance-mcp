@@ -27,6 +27,7 @@ import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
+import { getTsConfigSourceDirs } from "../dist/lib/tsconfig-source-dirs.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SKILL = fs.readFileSync(
@@ -341,38 +342,40 @@ test("Fixture D (AC4, AC6): post-commit check passes silently when spec file pre
 // Phase 3 — Repo-scan guard: no source dir silently falls out of releases
 // ---------------------------------------------------------------------------
 
-// Directories that are NOT source code and are excluded from staging.
-const EXCLUDED_DIRS = new Set([
-  "node_modules", "dist", ".git", ".backup", ".current", ".github", ".claude",
-  "docs", "research",
-]);
-
-// Metadata files explicitly staged (not dirs).
-const METADATA_PATTERNS = ["tsconfig.json", "package.json", "index.ts", "CHANGELOG.md", "README.md"];
-
 test("AC-B5.5: every repo source directory appears in FEATURE_DIRS or metadata list", () => {
-  // Scan the repo root for directories that contain .ts or .mjs source files.
-  // Any such directory that is NOT in EXCLUDED_DIRS must appear in FEATURE_DIRS
-  // so that a new source dir can't silently fall out of releases.
-  const entries = fs.readdirSync(ROOT, { withFileTypes: true });
-  const sourceDirs = entries
-    .filter((e) => e.isDirectory() && !e.name.startsWith(".") && !EXCLUDED_DIRS.has(e.name))
-    .filter((e) => {
-      // Check if directory contains at least one .ts or .mjs file (direct children)
-      try {
-        const children = fs.readdirSync(path.join(ROOT, e.name));
-        return children.some((c) => c.endsWith(".ts") || c.endsWith(".mjs"));
-      } catch {
-        return false;
-      }
-    })
-    .map((e) => `${e.name}/`);
+  // WHY: the authoritative list of TypeScript source roots is tsconfig.json
+  // `include`. Deriving the expected dirs from it means a newly added source
+  // directory triggers a guard failure automatically — no manual update to any
+  // test-side list required. This replaces the old hand-maintained EXCLUDED_DIRS
+  // heuristic, which was the drift source that let transport/ slip out of
+  // release staging in v3.24.0.
+  //
+  // AC-B6.3: guard uses getTsConfigSourceDirs, not EXCLUDED_DIRS.
+  // AC-B6.4: if tsconfig lists a dir absent from FEATURE_DIRS, the assertion
+  //           surfaces it automatically (naming the missing dir).
+  const tsconfigPath = path.join(ROOT, "tsconfig.json");
+  const tsconfigDirs = getTsConfigSourceDirs(tsconfigPath);
 
-  const missing = sourceDirs.filter((d) => !FEATURE_DIRS.includes(d));
+  // The helper returns dir names without trailing slashes; FEATURE_DIRS uses
+  // trailing slashes — normalise before comparing.
+  const tsconfigDirsWithSlash = tsconfigDirs.map((d) => `${d}/`);
+
+  const missing = tsconfigDirsWithSlash.filter((d) => !FEATURE_DIRS.includes(d));
   assert.deepEqual(
     missing,
     [],
-    `Source directories missing from FEATURE_DIRS (would be omitted from releases): ${missing.join(", ")}. ` +
-    `Add them to FEATURE_DIRS in this test and to the git add enumeration in content/skill-release-engineer.md SOP step 7.`,
+    `Source directories from tsconfig.json missing from FEATURE_DIRS: ${missing.join(", ")}. ` +
+    `Add them to FEATURE_DIRS in this test and to the git add enumeration in content/skill-release-engineer.md.`,
   );
+
+  // Sanity: the helper must return at least the six dirs known to be in tsconfig
+  // at the time this test was written — guards against a broken import or a
+  // tsconfig that was accidentally emptied.
+  const knownDirs = ["tools/", "guards/", "prompts/", "schema/", "transport/", "lib/"];
+  for (const d of knownDirs) {
+    assert.ok(
+      tsconfigDirsWithSlash.includes(d),
+      `getTsConfigSourceDirs must return '${d}' (present in tsconfig.json include at B6 authoring time)`,
+    );
+  }
 });

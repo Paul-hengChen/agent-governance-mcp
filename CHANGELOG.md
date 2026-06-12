@@ -16,6 +16,21 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.35.0] - 2026-06-12
+
+### Added
+- **`orientation-reach-matrix` — Baseline Reachability Matrix architect deliverable.** Architect role now produces a mandatory Baseline Reachability Matrix documenting which roles/steps/PRD zones are reachable under each dispatch mode (design-only, lite, standard). New `content/skill-architect.md` §5 guidance; reach-hook co-location rule (§4) ensuring reachability spec is committed alongside arc spec; pre-build `test/phase-0-5-sop.test.mjs` self-check validates matrix against handoff scopes. Closes backlog B7.
+- **`backlog-b6` — Derive tsconfig source dirs dynamically.** New `lib/tsconfig-source-dirs.ts` helper extracts include paths from `tsconfig.json` at build time, replacing the hand-maintained `EXCLUDED_DIRS` constant in `test/release-staging.test.mjs` (AC-B5.5). Reduces hardcoding and future-proofs staging verification as the project grows. Test suite verifies all staged directories are present in cached diff. Closes backlog B6.
+- **Backlog B9 documentation.** Deferred B9 scope-audit backlog entry documented in `docs/backlog.md` for future visibility.
+
+### Changed
+- `test/release-staging.test.mjs` now derives source directories from `tsconfig.json` `include` instead of a static list, improving maintainability.
+- `content/skill-architect.md` extended with mandatory reachability matrix section and reach-hook rules.
+
+### Notes
+- Both orientation-reach-matrix and backlog-b6 features shipped in this release (v3.35.0 bundles two completed PASS features).
+- Full test suite: 634/634 passing; all context-budget, schema-versioning, and release-staging guards green.
+
 ## [3.34.0] - 2026-06-11
 
 ### Added

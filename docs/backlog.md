@@ -13,8 +13,10 @@ candidate for a future `/teamwork` feature; none blocks a release on its own.
 | B3 | Version-pin test refactor (recurring break) | P1 | watermark (v3.23.0) + drift (v3.23.1) | **done (v3.24.0)** |
 | B4 | Add `.nvmrc` + `engines` (Node version pin) | P1 | drift-archived-task-exclusion (v3.23.1) | **done (v3.23.1, Option Y)** |
 | B5 | release-engineer staging list omits source dirs | **P0** | v3.23.1 release (post-mortem) | **done (v3.24.0)** |
-| B6 | Derive release-staging guard from `tsconfig.include` (root-cause) | P2 | v3.24.0 independent review (F2) | open |
-| B7 | Visual fidelity un-owned until optional last gate (structural drift, all gates green) — see [postmortem-visual-fidelity-gate.md](postmortem-visual-fidelity-gate.md) | **P0** | oobe-setup-wizard (2026-06-04) | open |
+| B6 | Derive release-staging guard from `tsconfig.include` (root-cause) | P2 | v3.24.0 independent review (F2) | **done (v3.35.0)** |
+| B7 | Visual fidelity un-owned until optional last gate (structural drift, all gates green) — see [postmortem-visual-fidelity-gate.md](postmortem-visual-fidelity-gate.md) | **P0** | oobe-setup-wizard (2026-06-04) | **done** — constitution §3.2 visual gates, content/skill-qa-visual.md, visual_round caps, and Visual Verdict Boundary (v3.26.0) own visual fidelity |
+| B8 | §7 external-reference policy has no server-side enforcement gate | P1 | figma-url-placeholder analysis (2026-06-11) | open |
+| B9 | Per-feature token budget + coordinator STOP at ceiling | P2 | Language process-retrospective (migrated from `.current/feature-split.md` F2) | open |
 
 ---
 
@@ -50,6 +52,9 @@ candidate for a future `/teamwork` feature; none blocks a release on its own.
   real regression.
 
 ## B6 — Derive the release-staging guard from `tsconfig.include` (P2, deferred from v3.24.0)
+- **Status: done (v3.35.0)** — `lib/tsconfig-source-dirs.ts` extracts source roots from `tsconfig.json`
+  `include`; the AC-B5.5 guard now derives expected dirs from it instead of the hand-maintained
+  `EXCLUDED_DIRS` set.
 - **What:** The AC-B5.5 guard test in `test/release-staging.test.mjs` detects source dirs by scanning
   for `.ts/.mjs` files and subtracting a hand-maintained `EXCLUDED_DIRS` set. The authoritative list of
   TS source roots already exists: `tsconfig.json` `include` (`tools, guards, prompts, schema, transport, lib`).
@@ -80,6 +85,51 @@ candidate for a future `/teamwork` feature; none blocks a release on its own.
 - **Owner:** /teamwork (edits governance SOP `content/skill-release-engineer.md` + template + test — pm→sr→reviewer→qa).
 - **Risk if skipped:** every feature touching `tools/`/`schema/`/`guards/`/`prompts/`/`bin/` ships with
   source/dist divergence in its tag; future readers `git checkout`-ing a tag get stale source.
+
+## B8 — §7 external-reference policy is text-only, no server-side enforcement (P1)
+- **What:** Constitution §7 External-reference policy says a spec referencing external
+  artifacts is "presumed incomplete until each reference is (a) fetched, (b) indexed via
+  `tw_index_prd`, or (c) user-confirmed ignorable." But this is **prose only** — `tw_update_state`
+  does not verify that each external reference in the spec reached one of those three states.
+  Compare §3 pre-flight, which IS server-enforced (`⛔ BLOCKED`).
+- **Origin (2026-06-11):** `agc-SetupWizard/docs/CDE-OOBE-PRD-full.txt` has per-section
+  `UI設計圖：Figma URL` **placeholder text** (lines 450/474/513/870/902/922/950) while the real
+  Figma link sits only in the文末 `相關連結` section (line 970:
+  `https://www.figma.com/design/mb8UaOE6OYac3BFWNB4PNh/CDE_OOBE?node-id=72-3455`).
+  A PM reading section-by-section can self-judge "no design稿" and skip — exactly what §7 forbids,
+  but nothing stops the handoff.
+- **Fix (refined — do NOT couple to `design/*.md`):** §7 covers *all* external refs (Figma, Azure
+  DevOps tickets, API specs), not just design. Wrong design: rejecting `tw_update_state(next_role:
+  sr-engineer)` only when no `design/*.md` exists conflates design refs with the general class and
+  misses the PM→architect hop. Right design: maintain a per-spec **external-reference ledger** (each
+  ref + its state: `fetched`/`indexed`/`user-confirmed-ignorable`/`unresolved`), and have
+  `tw_update_state` reject the outbound hop while any ref is `unresolved`. Gate at the PM→architect
+  hop, not only PM→sr.
+- **Detection caveat:** server must discover "spec cites an external artifact" — URL-scan of the
+  spec is heuristic and error-prone; prefer an explicit ledger PM populates (skill-pm §Resource Audit
+  Gate already owns the initial audit) over silent scraping.
+- **Owner:** /teamwork (cross-module — `tools/transitions.ts` hop gate + an evidence/ledger check +
+  constitution §7 wording; pm→sr→reviewer→qa).
+- **Risk if skipped:** a PM can silently drop a real external design/spec reference; downstream
+  builds proceed against an incomplete spec with all gates green — same failure class as B7
+  (un-owned check, green pipeline).
+
+## B9 — Per-feature token budget + coordinator STOP at ceiling (P2)
+- **What:** The routing chain bounds cost only *implicitly* via round caps (`qa_round`/`review_round`
+  ≤ 3-4, the §5 anti-loop hop cap ≤ 10). There is no *explicit* per-feature token budget, and no
+  coordinator stop-condition that fires when a feature approaches a token ceiling. The Language
+  process-retrospective measured a single feature burn ~1.05M tokens across 4 visual-rework rounds with
+  no budget-based brake; the orientation retrospective added a second avoidable-rework data point.
+- **Fix (sketch):** add an optional per-feature token budget (e.g. handoff field or `.config.json`),
+  have the coordinator read accumulated `agent-*.jsonl` `usage.*` (per skill-coordinator §Subagent Token
+  Observability, v3.31.0) and STOP / hand to human when spend approaches the ceiling — a cost-side
+  circuit breaker complementing the existing count-side round caps.
+- **Origin:** `.current/feature-split.md` F2 (`token-budget-gate`), Language process-retrospective. The
+  sibling F-rows (visual-selfconverge, governance-text-load, constitution-restructure) all shipped
+  (v3.32.0–v3.34.0); F2 was the lone un-shipped leftover and is migrated here so it is not lost.
+- **Owner:** /teamwork (touches coordinator SOP + likely a handoff/config field; pm→…→qa).
+- **Risk if skipped:** low — round caps already bound worst-case cost; this is a finer cost-side brake,
+  not a correctness gate.
 
 ## B4 — No `.nvmrc` / `engines` → Node version drift
 - **What:** Repo has no `.nvmrc`, no `.node-version`, and no `engines` field in

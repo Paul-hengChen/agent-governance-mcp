@@ -113,3 +113,72 @@ test("AC-3: skill-architect Visual Harness Gate (4a) blocks back to PM if harnes
   assert.match(body, /visual harness task missing/i, "block message must name the missing task");
   assert.match(body, /next_role:\s*pm/, "block must route back to PM");
 });
+
+// ---------- orientation-reach-matrix: Baseline Reachability Matrix (AC-01, AC-02, AC-03) ----------
+
+test("ORM AC-01: skill-architect contains a Baseline Reachability Matrix block declared MANDATORY", () => {
+  // Why: the matrix is the paper-verifiable deliverable that ensures every
+  // frozen baseline has a concrete reach mechanism before any build begins.
+  // Without MANDATORY wording, architects can treat it as optional.
+  const body = fs.readFileSync(SKILL_ARCHITECT, "utf-8");
+  assert.match(body, /Baseline Reachability Matrix/i, "Baseline Reachability Matrix heading must exist");
+  assert.match(body, /MANDATORY/i, "block must be declared MANDATORY");
+});
+
+test("ORM AC-01: Baseline Reachability Matrix requires exactly the 4 specified columns", () => {
+  // Why: the 4-column schema is the contract — omitting or reordering columns
+  // breaks the paper-verifiability invariant. All four must be stated verbatim.
+  const body = fs.readFileSync(SKILL_ARCHITECT, "utf-8");
+  assert.match(body, /baseline id/, "column 1 (baseline id) must be present");
+  assert.match(body, /canonical state description/, "column 2 (canonical state description) must be present");
+  assert.match(body, /reach mechanism \(URL param \/ store seed \/ prop \+ exact value\)/, "column 3 with exact wording must be present");
+  assert.match(body, /paper-verifiable \(yes\/no\)/, "column 4 (paper-verifiable yes/no) must be present");
+});
+
+test("ORM AC-01: Baseline Reachability Matrix is stated as precondition to the Visual Harness Gate", () => {
+  // Why: the gate must not open when any baseline lacks a paper-verifiable
+  // reach mechanism. The precondition must be explicit so QA and architect
+  // know which check gates which deliverable.
+  const body = fs.readFileSync(SKILL_ARCHITECT, "utf-8");
+  assert.match(
+    body,
+    /Visual Harness Gate may not pass until every row has `paper-verifiable: yes`/i,
+    "precondition wording must state the gate blocks on paper-verifiable: yes"
+  );
+});
+
+test("ORM AC-02: reach-hook co-location rule mandates shipping hooks in the SAME task as the surface", () => {
+  // Why: deferred reach-hook tasks are the root cause of the Orientation
+  // incident (~529k tokens). The rule must forbid the deferred-task pattern
+  // to prevent recurrence.
+  const body = fs.readFileSync(SKILL_ARCHITECT, "utf-8");
+  assert.match(body, /Reach-hook co-location rule/i, "co-location rule heading must exist");
+  assert.match(
+    body,
+    /SAME task as the surface being built/i,
+    "co-location rule must require hooks in the same task as the surface"
+  );
+  assert.match(
+    body,
+    /NOT a reactive second task/i,
+    "rule must explicitly forbid the reactive second-task pattern"
+  );
+});
+
+test("ORM AC-03: cheap pre-build reachability self-check instruction is present", () => {
+  // Why: moving discovery cost from the expensive QA playwright stage to the
+  // inexpensive pre-build stage is the concrete saving this governance rule
+  // provides. The instruction must name BOTH stages to clarify the tradeoff.
+  const body = fs.readFileSync(SKILL_ARCHITECT, "utf-8");
+  assert.match(body, /Pre-build reachability self-check/i, "pre-build self-check heading must exist");
+  assert.match(
+    body,
+    /BEFORE the full visual build/i,
+    "instruction must require the check BEFORE the full visual build"
+  );
+  assert.match(
+    body,
+    /QA playwright stage/i,
+    "instruction must name the QA playwright stage as the expensive stage to avoid"
+  );
+});
