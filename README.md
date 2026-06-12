@@ -4,7 +4,7 @@
 
 Lost updates, rule drift across `.cursorrules` / `CLAUDE.md` / `.windsurfrules`, and silent overwrites when two IDEs write at once — solved at the protocol layer, not by hoping the AI behaves.
 
-> **Status**: production-used, v3.34.0. Suite **629/0**. Stdio mode is solo/single-machine; HTTP+SQLite mode is for multi-machine teams.
+> **Status**: production-used, v3.37.0. Suite **629/0**. Stdio mode is solo/single-machine; HTTP+SQLite mode is for multi-machine teams.
 
 ---
 
@@ -25,11 +25,11 @@ Existing tools in the same category (GitHub Spec Kit, OpenSpec) ship **templates
 
 ```bash
 # 1. Register the MCP server
-claude mcp add -s user agent-governance-mcp -- npx -y github:Paul-hengChen/agent-governance-mcp#v3.34.0
+claude mcp add -s user agent-governance-mcp -- npx -y github:Paul-hengChen/agent-governance-mcp#v3.37.0
 
 # 2. Mark the current workspace as managed (REQUIRED — hook is a silent no-op without this)
 # Recommended: use agc init (writes .current/, tasks.md, AND cross-agent adapter files)
-npx -y github:Paul-hengChen/agent-governance-mcp#v3.34.0 agc init
+npx -y github:Paul-hengChen/agent-governance-mcp#v3.37.0 agc init
 # Alternative (bare scaffold, no adapter files):
 mkdir -p .current
 
@@ -164,10 +164,10 @@ Adapters carry an `agc-version:` stamp (HTML comment in `CLAUDE.md`, `#` comment
 
 ```bash
 # Write adapters (idempotent — safe to re-run)
-npx -y github:Paul-hengChen/agent-governance-mcp#v3.34.0 agc init
+npx -y github:Paul-hengChen/agent-governance-mcp#v3.37.0 agc init
 
 # Check for stale adapters after upgrading agc
-npx -y github:Paul-hengChen/agent-governance-mcp#v3.34.0 agc check
+npx -y github:Paul-hengChen/agent-governance-mcp#v3.37.0 agc check
 ```
 
 Write behaviour is idempotent: `AGENTS.md` and `.antigravityrules` are skipped if they already exist; the `CLAUDE.md` block is upserted in-place (surrounding user prose preserved, stamp refreshed).
@@ -216,6 +216,19 @@ Net effect: on a non-design chain hop the constitution dropped from ~4,233 → *
 
 ---
 
+## QA-Visual Token Reduction (v3.37.0)
+
+qa-visual mode applies two deterministic gates to reduce token burn on repeated visual diff cycles:
+
+| Gate | Name | Behavior |
+|---|---|---|
+| **Step B0** | Round ≥ 2 carry-forward | On `visual_round ≥ 2`, surfaces that passed in a prior round + remain untouched by git diff are carried forward as `pass` without re-reading images; prior `fail` / `accepted` / recaptured surfaces always re-diff; falls back to full re-diff when git-diff cannot prove a surface untouched |
+| **Step B1** | Deterministic-pixel-diff-first | A deterministic CLI tool (`odiff` / `pixelmatch` / ImageMagick `compare`) runs over each baseline's `compare region` first; LLM reads images into multimodal context only for surfaces the tool flags above threshold; whole-frame pixel-% PASS ban preserved |
+
+Both reduce qa-visual token burn while preserving visual fidelity: prior-pass surfaces are skipped on repeat rounds, and the LLM sees only pixel-diff-flagged regions in round 1.
+
+---
+
 ## Limits (read before adopting)
 
 - **Cannot force AI to follow the constitution** — only injects it into context. AI can still hallucinate. The gates stop *state writes*, not bad reasoning.
@@ -243,7 +256,7 @@ Add to `~/.claude/settings.json`:
       "matcher": "",
       "hooks": [{
         "type": "command",
-        "command": "npx -y -p github:Paul-hengChen/agent-governance-mcp#v3.34.0 agent-governance-context",
+        "command": "npx -y -p github:Paul-hengChen/agent-governance-mcp#v3.37.0 agent-governance-context",
         "timeout": 60
       }]
     }]
