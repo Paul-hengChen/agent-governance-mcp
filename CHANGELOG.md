@@ -16,6 +16,12 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.37.1] - 2026-06-15
+
+### Changed
+- Removed redundant initialization steps (step 1 and step 2) from agent adapter templates.
+- Enabled watermark requirements by default for Codex and Antigravity execution profiles.
+
 ## [3.37.0] - 2026-06-12
 
 ### Added
