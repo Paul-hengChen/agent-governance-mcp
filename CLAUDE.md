@@ -160,9 +160,7 @@ enforced server-side; you cannot bypass it from the client.
 ## Agent Governance (agent-governance-mcp)
 
 This project is managed by agent-governance-mcp. Before acting:
-1. Call `tw_get_state` (Constitution §3 — mandatory first action).
-2. Follow the SOP returned by `tw_switch_role` for your role.
-3. Obey all rules in `content/constitution.md` (served via the MCP server).
+- Follow all rules in the constitution (MCP server: agent-governance-mcp).
 
 ## Execution Profile — Claude Code
 

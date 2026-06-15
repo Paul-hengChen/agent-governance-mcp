@@ -4,12 +4,10 @@
 ## Agent Governance (agent-governance-mcp)
 
 This project is managed by agent-governance-mcp. Before acting:
-1. Call `tw_get_state` (mandatory first action — other writes blocked without it).
-2. Call `tw_switch_role` with your role to load the SOP.
-3. Follow all rules in the constitution (MCP server: agent-governance-mcp).
+- Follow all rules in the constitution (MCP server: agent-governance-mcp).
 
 ## Execution Profile — Antigravity
 
 - Subagent dispatch: unverified — fall back to `tw_switch_role` for same-context role switching.
-- Watermark: not required (Antigravity does not support the watermark mechanic).
+- Watermark: required. End every chat response with a role watermark containing the active skill/role and model (e.g., `— @<role> (<model>)`).
 - .antigravityrules layering: global .antigravityrules holds personal preferences only; this file holds project governance.
