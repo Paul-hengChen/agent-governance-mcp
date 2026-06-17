@@ -16,6 +16,22 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.38.0] - 2026-06-17
+
+### Added
+- **`qa-visual-baseline-provenance-gate` — QA-visual provenance guard (F0, v3.38.0).** New `VISUAL_PROVENANCE_MISSING` gate in `checkVisualProvenance()` enforces that visual baseline evidence carries provenance metadata (creation timestamp, agent role, context hash) before release. Prevents stale or unattributed baseline data. Implementation in `tools/evidence-file.ts`; SOP in `content/skill-qa-visual.md` Step A.4 (Provenance Validation); test coverage in `test/evidence-provenance.test.mjs`.
+- **`retro-sop-hardening` — Design-auditor source-credibility classification and context-dependent guards (F2, v3.38.0).** Three SOP additions: (1) **Design-auditor Step 2b source-credibility classification** — new rule in `content/skill-design-auditor.md` requiring asset sources be marked as `credible: [✓—external-vendor, ✓—in-house-tool, ⚠️—preliminary, ✗—deprecated]` with rationale; (2) **Context-dependent design-auditor multi-value guard** — design-auditor checks source-credibility classification before asset import approval; (3) **QA-visual Step A.5 fidelity-baseline scope guard** — qa-visual validates fidelity baseline target against visual-complexity (pixel-budget vs. geometry) in scope; (4) **Coordinator-lite scope-creep visual-fidelity example** — lite-mode SOP extended with concrete scope-creep scenario (visual-fidelity creep in responsive layouts). All QA evidence in companion review files.
+
+### Changed
+- `content/skill-qa-visual.md` Step A.5 now includes fidelity-baseline scope validation (pixel-budget vs. visual-complexity).
+- `content/skill-coordinator-lite.md` Step 2b extended with visual-fidelity scope-creep example.
+- `content/skill-design-auditor.md` Step 2b now includes source-credibility classification requirement.
+
+### Notes
+- F0 (baseline-provenance gate) shipped in commit c02372a; F2 (retro-sop-hardening) shipped in commit 258435a. Both carry v3.38.0 markers and ship as a single minor release.
+- Pre-existing HIGH vulns in RAG embeddings stack (@xenova/transformers → onnxruntime-web → onnx-proto) waived per Constitution §6; not introduced by this release, fixable only via breaking --force override.
+- Full qa-engineer, code-reviewer, and release-engineer reviews green; all tests passing.
+
 ## [3.37.1] - 2026-06-15
 
 ### Changed
