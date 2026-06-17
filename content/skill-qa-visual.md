@@ -42,6 +42,15 @@ Rules:
 - A `[ ]` (state mismatch) is a **capture defect**, NOT visual drift. Do NOT diff or "accept" it —
   recapture the impl in the baseline's state, or FAIL. Unresolved, it blocks PASS (server-checked).
   The canonical state to drive to is supplied as context; reaching it is the engineer's/QA's job.
+- **Context-dependent multi-value guard (v3.38.0):** if, during Step A.5 or Step B adjudication, you
+  discover a visual property that has MORE than one correct value depending on context (e.g. a
+  component that renders differently when focused vs. unfocused, or selected vs. unselected), you
+  MUST NOT pick one value as "correct" and accept/fail on the other. Instead, record BOTH contexts as
+  separate baselines (or flag the surface as needing a re-audit with per-context baselines) and FAIL
+  the current surface with note: "context-dependent property requires per-context baseline — see
+  §四#7 in `research/mode-feature-process-retrospective.md`". Per Constitution §3.2 (builder≠judge),
+  adjudicating a multi-value property as single-choice is a contract defect, not an implementation
+  defect.
 
 ### Step B — Region Diff Per Baseline (v3.26.0, R3)
 

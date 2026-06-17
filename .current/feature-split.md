@@ -1,16 +1,18 @@
-# Feature Split Plan: process-retrospective remediation   (text-only assessment — no design read)
+# Feature Split Plan: mode-retrospective 架構調整   (text-only assessment — no design read)
+
+來源：`research/mode-feature-process-retrospective.md` §四（合併 Mode 四階段根因與可前移改進）。
+（前一份 split = `process-retrospective.md` Language 線，已全數 done/migrated，見 git 歷史。）
 
 ## Assessment
-- verdict: multi-feature (3 units) — signals: human-directed split; 3 separable governance concerns (visual-rework loop vs context-cost vs budget-ceiling); no shared code foundation; non-design (no Figma source).
-- source: `research/process-retrospective.md` (CDE-OOBE Language run) — 55.6% of tokens spent on 4 rounds of visual rework; sr-engineer rejected 4× by qa-engineer.
+- verdict: multi-feature (3 units) — signals: 三個可分離關注點橫跨 server-parse / build-gate / SOP-text，分別改動不同檔案、彼此無相依、可獨立交付。
+- 已落地（不重做）：§四#3 區域diff、#4 per-widget isolation、#6 artifact-first 已在 v3.26.0/v3.36.0 存在於 `skill-qa-visual.md` / 既有實務。
 
 ## Split Table
 | order | feature id | scope | figma link | depends_on | key visual widgets | notes / 注意事項 | status |
 |---|---|---|---|---|---|---|---|
-| 0 | visual-selfconverge | Collapse the sr↔qa visual-rework loop: sr runs qa's region-diff + VSA structural assertions whole-surface, in-context, looping until all VSA rows pass BEFORE handoff (4 cross-context round-trips → 1 dispatch). §1 surgical bounded-relaxation inside the self-converge loop. §3.2 global-frame ban UNCHANGED. + #3 reusable region-measure harness (architect Visual Harness emits per-region numbers, shared by sr+qa). + #4 single-surface geometric-density split gate (state-count ≠ density). + #5 subagent_tokens observability (read agent-*.jsonl usage). Touches: constitution.md, skill-sr-engineer.md, skill-design-auditor.md, skill-qa-visual.md, possibly tools/evidence-file.ts. | — | none | — | 主修法。直接對應報告的 55.6% 返工 + sr 被 reject 4 次。 | done |
-| 1 | governance-text-load | Trim/layer-load constitution + skills to cut the per-dispatch context tax (full constitution + claude-api skill re-injected every dispatch, ~40k+ tokens unmeasured). Build on existing chain-only block mechanism. | — | none | — | 與視覺返工無關的全局成本問題,獨立開。 | done |
-| 2 | token-budget-gate | Add explicit per-feature token budget + coordinator STOP when approaching ceiling (currently only implicit round-caps bound cost). | — | none | — | 與視覺返工無關的全局問題,獨立開。 **Migrated to `docs/backlog.md` B9 (2026-06-12)** — track there, not here. | migrated → backlog B9 |
-| 3 | constitution-restructure | Slim the per-dispatch constitution bundle by RESTRUCTURING (move §1/§3.2 cde-oobe war-story rationale into an on-demand referenced doc), not fencing. | — | none | — | F-B option-(b) finding: safe rationale-fencing of the constitution yields only ~49 tok because the verbose prose lives in the §3.2 AC-3 exclusion zone or is entangled with rule text in bullets. Real slimming needs restructuring + on-demand load — bigger than fence markers. Follow-up, not urgent. Shipped as `constitution-conditional-load` v3.32.0–v3.34.0 (rationale extracted to `constitution-rationale.md` + design-only conditional strip). | done |
+| 0 | qa-visual-baseline-provenance | §四#1：把「baseline 必須是真 Figma 匯出 + 真 render 區域像素 diff」從 SOP 自律升級為 **server 可驗**。`visual_<id>.md` 的 `## Region Diff` 須帶 baseline 來源指紋（檔案 hash 或 Figma node id）+ B1 diff 工具數值；`tools/evidence-file.ts` 解析驗證，缺則擋 PASS。改 `evidence-file.ts` + `skill-qa-visual.md` + 測試，可能 schema bump。 | — (no-design) | none | — | 核心缺口；最高價值。指紋形式（hash vs node-id）由 PM/architect 定。 | done |
+| 1 | paired-token-build-check | §四#5：build-gate lint 偵測成對 token（`w/h`、`min/max`）只定義一半（防 `osd-toggle-handle` 的 `height:0` 隱形繼承）。新 script + 接 build gate + 測試；§2 build gate 範疇。 | — (no-design) | none（與 F0 並行可） | — | 此 repo 是 MCP server（TS）無 tailwind；lint 目標（掃 token 定義檔 vs 泛用）需 PM 釐清。 | descoped |
+| 2 | retro-sop-hardening | §四#2/#7/#8：design-auditor 第一步查核設計來源可信度（frame/variant/readonly 判定）；context-dependent 狀態別框成單選；lite 定位（跨多檔視覺保真不長期 lite 眼測）。純 `content/*.md` SOP 文字強化，無 server/build 變更。 | — (no-design) | none | — | 低風險純文字；可收尾或視需要略過。 | done |
 
 ## How to proceed
-Build order 0 (visual-selfconverge) first — re-invoke /teamwork per row in `order` (or say "do F<n>"). Coordinator flips each row to `done` on PASS; resume skips `done`. Features are independent (no shared foundation); order is sequencing preference, not a dependency chain.
+無設計稿（全 no-design），免 design-auditor。建議順序：**F0（核心 server gate）優先** → F1 可並行 → F2 收尾。逐單元 re-invoke `/teamwork`（或說「do F0」）。Coordinator 在每單元 PASS 後翻 `done`，resume 跳過 `done`。

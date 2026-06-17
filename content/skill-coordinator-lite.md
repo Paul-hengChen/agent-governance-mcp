@@ -30,6 +30,7 @@ Cases that LOOK lite but require `/teamwork` escalation:
 - **"Add a single config option"** — touches both `tools/config.ts` and `tools/handoff.ts` schema → 2 files + schema change → **full**.
 - **"Refactor a 30-line helper"** — innocent until grep reveals 8 callers across 4 modules → cross-module → **full**.
 - **"Add a CLI flag"** — needs test coverage by definition (constitution §2) → **full**.
+- **"Fix the visual / make it match Figma"** (cross-file visual-fidelity iteration) — compares rendered output to Figma across multiple UI files, then applies fixes and re-checks; each iteration is a new cross-context visual comparison, and iterative eyeball loops on visual work hit Constitution §5 anti-loop → this is `/teamwork` + `qa-visual` work by design → **full**. Lite is appropriate ONLY for a one-shot environment-exclusion diagnosis (e.g. confirming a stale build is the cause): run one diagnostic pass, report the finding, then escalate. Long-running lite visual iteration → **full**.
 
 Affirmative lite case:
 
