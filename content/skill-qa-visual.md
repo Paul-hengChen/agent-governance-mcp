@@ -9,6 +9,30 @@ Lazy-loaded by `skill-qa-engineer` SOP step 4 when `design/<feature>.md` declare
 
 After Phase 1 PASS, before Phase 2. **Output file is `qa_reports/visual_<task-id>.md`** — separate from the main `review_<task-id>.md`. The server checks for this file by name during PASS validation; absence triggers `VISUAL_EVIDENCE_MISSING`.
 
+### Step A.0 — Baseline Source-of-Truth (v3.39.0)
+
+Before any widget/state/diff work, fix WHICH baseline node ids you are comparing against. The
+authoritative source is the design-auditor's frozen **Source manifest** in `design/<feature>.md`
+(produced by `skill-design-auditor` step 2c, *Mechanical baseline selection*). You MUST copy that
+manifest's baseline node-id list — and its declared `## Visual Baselines` rows — **verbatim**. You
+MUST NOT re-derive the baseline set from the Figma URL (or any source URL): no re-fetching the board
+and re-picking frames, no name-globbing or spatial/`componentId` grouping of your own. The node-id
+list was locked, with filter conditions and exclusion reasons, at audit time precisely so baseline
+identity does not drift between audit and verification — re-deriving it here reintroduces the
+non-determinism (漏抓 / 誤收) that step 2c exists to eliminate. If the Source manifest is missing or
+its frozen node-id list is absent, this is a design-auditor defect: STOP and
+`tw_update_state(status=FAIL, agent_id="qa-engineer", qa_review="Source manifest missing frozen baseline node-id list", pending_notes=["QA: baseline node-id manifest absent — re-derivation forbidden", "next_role: design-auditor"])`.
+Do NOT substitute your own URL-derived set. (Paired downstream half of Constitution §3.2 builder≠judge
+provenance; method: `research/figma-baseline-mechanical-filtering-method.md`.)
+
+**Server-enforced at PASS (v3.40.0 baseline manifest gate, Constitution §3.1).** The Source manifest
+is now machine-checked, so the manual STOP above is backstopped by the server: an armed design whose
+`## Source` manifest has zero `status: audited` rows blocks PASS with `BASELINE_MANIFEST_MISSING`, and a
+multi-surface manifest (≥2 audited rows) missing a `## Baseline Selection Provenance` section with both
+`filter-conditions:` and `exclusion-reasons:` lines blocks PASS with `BASELINE_PROVENANCE_INCOMPLETE`.
+You still do the Step A.0 verbatim copy and the FAIL-back on a missing manifest — the gate cannot
+catch URL re-derivation, only manifest absence/incompleteness.
+
 ### Step A — Widget Shape Checklist (v3.14.0, R6)
 
 Open the spec's `## Visual Widgets` H2 (required by skill-pm). For each widget id in the table, emit one markdown checkbox row in `qa_reports/visual_<task-id>.md` under H2 `## Widget Shape Verification`:

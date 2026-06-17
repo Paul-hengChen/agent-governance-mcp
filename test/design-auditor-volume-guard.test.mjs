@@ -71,3 +71,19 @@ test("AC3: coordinator gate section stays within the always-on footprint budget"
   const approxTokens = Math.ceil(COORD.slice(a, b).length / 4);
   assert.ok(approxTokens <= 550, `gate section ~${approxTokens} tok must stay <= ~550`);
 });
+
+// figma-baseline-mechanical-selection AC-1 (v3.39.0): step 2c pins the
+// mechanical baseline-selection contract. WHY: without a written rule, the
+// auditor may eyeball-pick frames from a multi-surface board (漏抓/誤收),
+// which is unreproducible. Pin the deterministic-filter contract so a future
+// edit can't drop it, and so the id-prefix anti-pattern stays explicitly banned.
+test("AC-1: skill-design-auditor.md step 2c forbids eyeball-pick and mandates a deterministic baseline filter", () => {
+  const block = AUDITOR.slice(AUDITOR.indexOf("Mechanical baseline selection"));
+  assert.match(AUDITOR, /2c\.\s+\*\*Mechanical baseline selection \(v3\.39\.0\)\*\*/, "step 2c must be present");
+  assert.match(block, /Do NOT eyeball-scan/, "must forbid eyeball-scan selection");
+  assert.match(block, /deterministic structural filter/, "must require a deterministic structural filter");
+  assert.match(block, /componentId/, "must mention componentId grouping");
+  assert.match(block, /NOT by Figma `id` prefix/, "must explicitly reject id-prefix grouping");
+  assert.match(block, /Source manifest/, "must freeze the selection into the Source manifest");
+  assert.match(block, /MUST NOT re-derive the set from the URL/, "must bar downstream URL re-derivation");
+});

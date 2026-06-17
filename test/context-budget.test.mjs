@@ -357,9 +357,13 @@ test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the 
   // rationale-stripped constitution measured at 4304 ~tok (exact); cap set to exact
   // measured value per the Phase-2 convention (no additional headroom, matches the
   // non-design floor pin style).
+  // v3.40.0 (qa-owned bump): cap raised from 4304 → 4523 to absorb the
+  // figma-baseline-manifest-gate §3.1 Baseline manifest gate bullet (inside
+  // design-only fence) plus the matching skill-qa-visual.md Step A.0 enforcement note.
+  // Actual rationale-stripped constitution measured at 4523 ~tok (exact).
   const raw = approxTokens(CONSTITUTION);
   const stripped = approxTokens(stripRationale(CONSTITUTION));
-  assert.ok(stripped <= 4304, `stripped constitution (${stripped} ~tok) must be ≤ 4304 (AC8 design-arm floor, constitution v3.28.0)`);
+  assert.ok(stripped <= 4523, `stripped constitution (${stripped} ~tok) must be ≤ 4523 (AC8 design-arm floor, constitution v3.40.0)`);
   assert.ok(
     raw - stripped >= 49,
     `constitution rationale saving (${raw - stripped} ~tok) must be ≥ 49 (AC8 measured min)`,
@@ -381,13 +385,17 @@ test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/b
   // corresponding skill-sr-engineer rule (design-arm bundle includes constitution
   // marker-line cost). Actual design-arm bundle measured at 7768 ~tok (exact); cap
   // set to exact measured value per the Phase-2 convention.
+  // v3.40.0 (qa-owned bump): cap raised from 7768 → 7987 to absorb the
+  // figma-baseline-manifest-gate §3.1 Baseline manifest gate bullet (design-only fence)
+  // plus skill-qa-visual Step A.0 enforcement note. Actual design-arm bundle
+  // measured at 7987 ~tok (exact).
   const skillCoord = fs.readFileSync(path.join(ROOT, "content", "skill-coordinator.md"), "utf-8");
   const body = skillCoord.startsWith("---")
     ? skillCoord.slice(skillCoord.indexOf("---", 3) + 3).trimStart()
     : skillCoord;
   const SEP = "\n\n---\n\n";
   const bundle = approxTokens(stripRationale(CONSTITUTION) + SEP + stripRationale(body));
-  assert.ok(bundle <= 7768, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 7768 (AC8 design-arm floor, constitution v3.28.0)`);
+  assert.ok(bundle <= 7987, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 7987 (AC8 design-arm floor, constitution v3.40.0)`);
 });
 
 test("AC9: every operative rule/gate/heading survives stripRationale on the constitution", () => {

@@ -132,7 +132,18 @@ test("AC-5: byte counts stay within v3.14.0-relaxed budgets (savings invariant v
   // Step A.5 fidelity baseline scope validation guard. Both additions are
   // intentionally shipped content; actual size is 15804 bytes. Cap of 16200
   // provides ~396-byte headroom consistent with the ~350–550-byte convention.
-  assert.ok(qaVisualSize <= 16200, `qa-visual.md must be <= 16200 bytes (got ${qaVisualSize})`);
+  // v3.39.0 (qa-owned bump): cap raised from 16200 → 17600 to absorb the
+  // figma-baseline-mechanical-selection Step A.0 (Baseline Source-of-Truth)
+  // SOP prose — requires copying the design-auditor Source manifest's frozen
+  // baseline node-id list verbatim and forbids URL re-derivation (~1043 bytes).
+  // Intentionally shipped content; actual size is 17247 bytes. Cap of 17600
+  // provides ~353-byte headroom consistent with the ~350–550-byte convention.
+  // v3.40.0 (qa-owned bump): cap raised from 17600 → 18100 to absorb the
+  // figma-baseline-manifest-gate Step A.0 server-enforcement note in
+  // skill-qa-visual.md (BASELINE_MANIFEST_MISSING / BASELINE_PROVENANCE_INCOMPLETE
+  // error code documentation + gate-dormancy opt-in note). Actual size is
+  // 17928 bytes. Cap of 18100 provides ~172-byte headroom.
+  assert.ok(qaVisualSize <= 18100, `qa-visual.md must be <= 18100 bytes (got ${qaVisualSize})`);
 });
 
 test("AC-6: Phase 1.5 v3.8.2 contract is preserved AND extended in v3.14.0 (combined assertion)", () => {
@@ -171,4 +182,18 @@ test("AC-7: [3.13.0] CHANGELOG entry preserved (history-append-only regression g
   // check:version` in `prebuild`).
   const changelog = fs.readFileSync(path.join(PROJECT_ROOT, "CHANGELOG.md"), "utf-8");
   assert.match(changelog, /^##\s*\[3\.13\.0\]/m, "CHANGELOG must retain [3.13.0] release section");
+});
+
+// figma-baseline-mechanical-selection AC-2 (v3.39.0): Step A.0 is the
+// consumer half of step 2c — qa-visual must copy the frozen baseline node-id
+// list from the design-auditor Source manifest verbatim and must not
+// re-derive it from the URL. WHY: re-deriving at verification time
+// reintroduces the non-determinism the audit-time freeze exists to eliminate.
+test("AC-2: skill-qa-visual.md Step A.0 requires copying the frozen baseline manifest, no URL re-derivation", () => {
+  const body = fs.readFileSync(QA_VISUAL_PATH, "utf-8");
+  const block = body.slice(body.indexOf("Baseline Source-of-Truth"));
+  assert.match(body, /### Step A\.0 — Baseline Source-of-Truth \(v3\.39\.0\)/, "Step A.0 must be present");
+  assert.match(block, /Source manifest/, "must cite the Source manifest as authoritative");
+  assert.match(block, /\*\*verbatim\*\*/, "must require verbatim copy");
+  assert.match(block, /MUST NOT re-derive the baseline set from the Figma URL/, "must forbid URL re-derivation");
 });

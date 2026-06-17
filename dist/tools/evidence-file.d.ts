@@ -63,4 +63,21 @@ export interface VisualProvenanceCheck {
 }
 export declare function parseVisualProvenanceRows(content: string): VisualProvenanceRow[];
 export declare function checkVisualProvenance(workspacePath: string, taskIds: string[]): VisualProvenanceCheck;
+export interface BaselineManifestRow {
+    medium: string;
+    pointer: string;
+    status: string;
+    isAudited: boolean;
+    rawLine: string;
+}
+export interface BaselineManifestCheck {
+    ok: boolean;
+    code: null | "BASELINE_MANIFEST_MISSING" | "BASELINE_PROVENANCE_INCOMPLETE";
+    detail: string;
+    designPath: string;
+    auditedCount: number;
+}
+export declare function parseBaselineManifestRows(content: string): BaselineManifestRow[];
+export declare function hasBaselineProvenance(content: string): boolean;
+export declare function checkBaselineManifest(workspacePath: string, activeFeature: string): BaselineManifestCheck;
 //# sourceMappingURL=evidence-file.d.ts.map

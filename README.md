@@ -4,7 +4,7 @@
 
 Lost updates, rule drift across `.cursorrules` / `CLAUDE.md` / `.windsurfrules`, and silent overwrites when two IDEs write at once — solved at the protocol layer, not by hoping the AI behaves.
 
-> **Status**: production-used, v3.38.0. Suite **634/634**. Stdio mode is solo/single-machine; HTTP+SQLite mode is for multi-machine teams.
+> **Status**: production-used, v3.40.0. Suite **713/713**. Stdio mode is solo/single-machine; HTTP+SQLite mode is for multi-machine teams.
 
 ---
 
@@ -25,7 +25,7 @@ Existing tools in the same category (GitHub Spec Kit, OpenSpec) ship **templates
 
 ```bash
 # 1. Register the MCP server
-claude mcp add -s user agent-governance-mcp -- npx -y github:Paul-hengChen/agent-governance-mcp#v3.38.0
+claude mcp add -s user agent-governance-mcp -- npx -y github:Paul-hengChen/agent-governance-mcp#v3.40.0
 
 # 2. Mark the current workspace as managed (REQUIRED — hook is a silent no-op without this)
 # Recommended: use agc init (writes .current/, tasks.md, AND cross-agent adapter files)
@@ -242,6 +242,30 @@ Gate is dormant for features with no design file or `mode: no-design`, same as t
 
 ---
 
+## Baseline Mechanical Selection SOP (v3.39.0)
+
+v3.39.0 ships deterministic baseline selection (no eyeball-picking). Design-auditor SOP step 2c establishes the process:
+
+- **Structural filter** — apply a deterministic filter to select candidate baseline nodes (spatial proximity, componentId grouping, no id-prefix matching).
+- **Node-id freeze** — freeze the selected node ids into the `## Source` manifest as `status: audited` rows.
+- **Manifest publication** — the Source section becomes read-only after this step; qa-visual carries the frozen manifest verbatim without re-deriving node ids.
+
+This ensures baseline selection is reproducible and auditable. SOP: `content/skill-design-auditor.md` Step 2c; qa-visual counterpart: `content/skill-qa-visual.md` Step A.0.
+
+---
+
+## Baseline Manifest Gate (v3.40.0)
+
+The sixth and final visual PASS sub-gate enforces observable artifact completeness. When `design/<feature>.md` declares a `## Source` manifest (design-backed baseline work):
+
+- **Audited baseline required** — PASS requires ≥1 row with `status: audited` in the manifest. Zero audited rows → `BASELINE_MANIFEST_MISSING`. Enforces that a real baseline was frozen (not a placeholder or incomplete manifest).
+- **Provenance for multi-surface** — manifests with ≥2 audited rows additionally require a `## Baseline Selection Provenance` section carrying both a `filter-conditions:` field and an `exclusion-reasons:` field. Missing either → `BASELINE_PROVENANCE_INCOMPLETE`. Documents *why* these specific nodes were selected.
+- **Single-surface exempt** — manifests with exactly 1 audited row are exempt from the provenance requirement (the selection is self-evident).
+
+Gate is dormant when `## Source` is absent (pre-v3.40.0 designs are not retro-blocked); non-design features pass through silently. Implementation: `tools/evidence-file.ts` (`checkBaselineManifest()`); wired as the 6th visual sub-gate in `index.ts`; SOP integration: `content/skill-qa-visual.md` Step A.0 (copy manifest verbatim), `content/skill-design-auditor.md` Step 2c (freeze selection). Complements v3.38.0 provenance gate — provenance validates *how* the baseline was captured; manifest gate validates *that* a baseline was captured.
+
+---
+
 ## Limits (read before adopting)
 
 - **Cannot force AI to follow the constitution** — only injects it into context. AI can still hallucinate. The gates stop *state writes*, not bad reasoning.
@@ -269,7 +293,7 @@ Add to `~/.claude/settings.json`:
       "matcher": "",
       "hooks": [{
         "type": "command",
-        "command": "npx -y -p github:Paul-hengChen/agent-governance-mcp#v3.38.0 agent-governance-context",
+        "command": "npx -y -p github:Paul-hengChen/agent-governance-mcp#v3.40.0 agent-governance-context",
         "timeout": 60
       }]
     }]

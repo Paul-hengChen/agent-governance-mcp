@@ -16,6 +16,16 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.40.0] - 2026-06-17
+
+### Added
+- **`figma-baseline-manifest-gate` — Server-enforced baseline manifest gate (v3.40.0).** Promotes the v3.39.0 prose-only baseline-selection SOP to a server-checked PASS gate, the SIXTH and last visual sub-gate (after the v3.38.0 provenance gate). New pure parsers `parseBaselineManifestRows()` / `hasBaselineProvenance()` plus the fs composition `checkBaselineManifest()` in `tools/evidence-file.ts`, wired into `index.ts` inside the armed `if (armCheck.required)` block. When `design/<feature>.md` is armed (`## Mode` ≠ `no-design`) and carries a `## Source` manifest, PASS now requires ≥1 audited baseline row (`status: audited` + non-empty node-id pointer): zero audited rows → **`BASELINE_MANIFEST_MISSING`**. Multi-surface manifests (≥2 audited rows) additionally require a `## Baseline Selection Provenance` section with both a `filter-conditions:` line and an `exclusion-reasons:` line → else **`BASELINE_PROVENANCE_INCOMPLETE`**. Opt-in / backwards-compatible: dormant when `## Source` is absent (pre-v3.40 designs never retro-blocked, AC-N3); single-surface (exactly 1 audited row) is exempt from the provenance section (AC-3). No `schema_version` bump (the gate reads `design/<feature>.md`, not a versioned artifact). SOP enforcement notes added to `content/skill-design-auditor.md` step 2c and `content/skill-qa-visual.md` Step A.0; Constitution §3.1 gate bullet added and header advanced to v3.40.0. Deferred: `## Visual Baselines`↔`## Source` cross-reference check (`figma-baseline-crossref-gate`), `tw_extract_figma_baseline` tooling, pointer-format validation.
+
+## [3.39.0] - 2026-06-17
+
+### Added
+- **`figma-baseline-mechanical-selection` — Mechanical baseline selection + qa-visual baseline-copy rule (v3.39.0).** Two SOP additions, no server/schema/build-logic change: (1) **Design-auditor Step 2c "Mechanical baseline selection"** in `content/skill-design-auditor.md` — when a single Figma URL expands to a multi-surface board, forbids eyeball-picking baseline frames and requires a deterministic structural filter (frame-type + name-glob + semantic-anchor descendant) with grouping by spatial proximity (`absoluteBoundingBox`) and/or `componentId` (explicitly NOT by fragile Figma `id` prefix), freezing the node-id list plus filter conditions and exclusion reasons into the Source manifest; (2) **QA-visual Step A.0 "Baseline Source-of-Truth"** in `content/skill-qa-visual.md` — requires qa-visual to copy the frozen baseline node-id list from the design-auditor Source manifest verbatim and forbids re-deriving the set from the Figma URL. Method docs: `research/figma-baseline-mechanical-filtering-method.md`, `research/figma-extraction-analysis.md`. Deferred (out of scope): `tw_extract_figma_baseline` tooling, pHash state-grouping.
+
 ## [3.38.0] - 2026-06-17
 
 ### Added

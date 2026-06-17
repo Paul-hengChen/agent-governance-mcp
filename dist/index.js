@@ -33,7 +33,7 @@ import { appendSpecContext } from "./prompts/build.js";
 import { buildPrdChunks, CHUNKER_VERSION, DEFAULT_EMBEDDING_MODEL } from "./tools/rag.js";
 import { getInflightKey, getInflight, setInflight, deleteInflight, awaitAllInflightFor, } from "./tools/rag-coalesce.js";
 import { requireQaEngineer, validateTransition, computeNewRound, ALLOWED_TRANSITIONS, } from "./tools/transitions.js";
-import { hasVisualBaselinesInDesign, hasVisualEvidenceInFile, hasUncheckedWidgets, hasDesignModeRequiringVisual, designDeclaresStructuralAssertions, validateVisualReports, checkVisualProvenance, hasScopeDecision, } from "./tools/evidence-file.js";
+import { hasVisualBaselinesInDesign, hasVisualEvidenceInFile, hasUncheckedWidgets, hasDesignModeRequiringVisual, designDeclaresStructuralAssertions, validateVisualReports, checkVisualProvenance, checkBaselineManifest, hasScopeDecision, } from "./tools/evidence-file.js";
 // ==========================================
 // Runtime validation schemas (zod)
 // ==========================================
@@ -156,7 +156,7 @@ function formatZodError(err) {
 // 1. Initialize Server (Tools + Prompts)
 // ==========================================
 // Storage adapter defaults to FileHandoffStorage; HTTP-mode boot switches it via setActiveStorage().
-const server = new Server({ name: "agent-governance-mcp", version: "3.38.0" }, { capabilities: { tools: {}, prompts: {} } });
+const server = new Server({ name: "agent-governance-mcp", version: "3.40.0" }, { capabilities: { tools: {}, prompts: {} } });
 // ==========================================
 // 2. Register Prompts (Layer 1: Auto-inject constitution)
 // ==========================================
@@ -872,6 +872,23 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                                         }],
                                     isError: true,
                                 };
+                            }
+                            // v3.40.0 — Baseline manifest gate (figma-baseline-manifest-gate).
+                            // SIXTH and LAST visual sub-gate. The v3.38 provenance gate confirmed
+                            // each diffed surface carries a real baseline+diff; this gate confirms
+                            // the design-auditor FROZE the baseline node-id selection in the
+                            // design file's ## Source manifest (step 2c) rather than eyeball-picking
+                            // or re-deriving it. Opt-in (AC-N3): dormant when ## Source is absent
+                            // (pre-v3.40 designs). Single-surface (1 audited row) is exempt from
+                            // the provenance-section requirement (AC-3); multi-surface (>=2) must
+                            // record filter-conditions + exclusion-reasons in
+                            // ## Baseline Selection Provenance (AC-2).
+                            const manifest = checkBaselineManifest(parsed.workspace_path, parsed.active_feature);
+                            if (!manifest.ok) {
+                                const text = manifest.code === "BASELINE_MANIFEST_MISSING"
+                                    ? `⛔ BASELINE_MANIFEST_MISSING: design/<feature>.md declares mode != no-design but the Source manifest (## Source section) contains no audited baseline rows. The design-auditor must complete step 2c (Mechanical baseline selection) — run the deterministic structural filter, freeze the resulting node-id list with status: audited in the Source manifest, and record filter-conditions + exclusion-reasons in a ## Baseline Selection Provenance section (required for multi-surface selections). See specs/figma-baseline-manifest-gate.md.`
+                                    : `⛔ BASELINE_PROVENANCE_INCOMPLETE: design/<feature>.md has a multi-surface Source manifest (>=2 audited rows) but the ## Baseline Selection Provenance section is absent or incomplete (requires both filter-conditions: and exclusion-reasons: lines). Record the filter criteria used to select the baseline set per design-auditor SOP step 2c. See specs/figma-baseline-manifest-gate.md.`;
+                                return { content: [{ type: "text", text }], isError: true };
                             }
                         }
                     }

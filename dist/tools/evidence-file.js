@@ -582,4 +582,156 @@ export function checkVisualProvenance(workspacePath, taskIds) {
     }
     return { ok: Object.keys(offendingByTaskId).length === 0, offendingByTaskId };
 }
+// Split a markdown table line into trimmed cells, dropping the leading/trailing
+// empty cells produced by the outer pipes. Mirrors the proven cell-splitting in
+// parseAssertionFailures / parseRegionDiffFailures.
+function splitTableCells(line) {
+    const parts = line.split("|");
+    if (parts.length && parts[0].trim() === "")
+        parts.shift();
+    if (parts.length && parts[parts.length - 1].trim() === "")
+        parts.pop();
+    return parts.map((c) => c.trim());
+}
+// Normalize a raw status cell to a canonical token (substring-tolerant, so
+// `audited ✅` / `audited (frozen)` still count). Empty → "unknown".
+function normalizeStatus(rawCell) {
+    const lc = rawCell.toLowerCase().replace(/`/g, "").trim();
+    if (lc === "")
+        return "unknown";
+    if (lc.includes("audited"))
+        return "audited";
+    if (lc.includes("defer"))
+        return "deferred";
+    if (lc.includes("out-of-scope") || lc.includes("out of scope"))
+        return "out-of-scope";
+    return lc;
+}
+// Pure parser (AC-6/AC-7 — no I/O, never throws). Returns one row per DATA line of
+// the markdown table under the `## Source` H2. Header + separator rows are skipped.
+// Empty array when content is empty, no `## Source` section, or no table.
+export function parseBaselineManifestRows(content) {
+    if (!content)
+        return [];
+    const section = sliceH2Section(content, "Source");
+    if (section === null)
+        return [];
+    // Collect candidate table lines (trimmed lines starting with `|`).
+    const tableLines = section
+        .split("\n")
+        .map((l) => l.trim())
+        .filter((l) => l.startsWith("|"));
+    if (tableLines.length === 0)
+        return [];
+    // Header detection (AC-7): the first `|`-line whose cells include a `status`
+    // cell. Record column indices; fall back to positional when no header found.
+    let statusIdx = -1;
+    let pointerIdx = -1;
+    let mediumIdx = -1;
+    let headerLine = null;
+    for (const line of tableLines) {
+        if (/^\|[\s:|-]+\|?$/.test(line))
+            continue; // separator row never a header
+        const cells = splitTableCells(line).map((c) => c.toLowerCase());
+        const si = cells.findIndex((c) => /^status$/.test(c));
+        if (si !== -1) {
+            statusIdx = si;
+            pointerIdx = cells.findIndex((c) => /^(pointer|node-?id)$/.test(c));
+            mediumIdx = cells.findIndex((c) => /^medium$/.test(c));
+            headerLine = line;
+            break;
+        }
+    }
+    // AC-7 backwards-compat: no `status` column → treat every data row as audited.
+    const noStatusColumn = statusIdx === -1;
+    // Positional fallbacks when a header was found but lacked pointer/medium cells.
+    if (pointerIdx === -1)
+        pointerIdx = 1;
+    if (mediumIdx === -1)
+        mediumIdx = 0;
+    const effStatusIdx = noStatusColumn ? 3 : statusIdx;
+    const rows = [];
+    for (const line of tableLines) {
+        if (/^\|[\s:|-]+\|?$/.test(line))
+            continue; // separator row
+        if (headerLine !== null && line === headerLine)
+            continue; // header row
+        const cells = splitTableCells(line);
+        // Heuristic header skip when no status column was detected: a row whose
+        // first cell is literally "medium" is the header of a status-less table.
+        if (noStatusColumn && cells.length && /^(medium|pointer|node-?id)$/i.test(cells[0])) {
+            continue;
+        }
+        const medium = mediumIdx >= 0 && mediumIdx < cells.length ? cells[mediumIdx] : "";
+        const pointer = pointerIdx >= 0 && pointerIdx < cells.length ? cells[pointerIdx] : "";
+        const status = noStatusColumn
+            ? "audited"
+            : normalizeStatus(effStatusIdx < cells.length ? cells[effStatusIdx] : "");
+        const isAudited = status === "audited" && pointer.trim().length > 0;
+        rows.push({ medium, pointer, status, isAudited, rawLine: line });
+    }
+    return rows;
+}
+// Pure predicate (AC-8 — no I/O, never throws). True iff the document contains a
+// `## Baseline Selection Provenance` H2 section whose body carries BOTH a
+// `filter-conditions:` line AND an `exclusion-reasons:` line. Section-scoped so a
+// stray label elsewhere in the doc cannot falsely satisfy the gate.
+export function hasBaselineProvenance(content) {
+    if (!content)
+        return false;
+    const body = sliceH2Section(content, "Baseline Selection Provenance");
+    if (body === null)
+        return false;
+    const hasFilter = /^[^\S\n]*(?:[-*][^\S\n]*)?(?:\*\*[^\S\n]*)?filter-conditions(?:[^\S\n]*\*\*)?[^\S\n]*[:—-]/im.test(body);
+    const hasExclusion = /^[^\S\n]*(?:[-*][^\S\n]*)?(?:\*\*[^\S\n]*)?exclusion-reasons(?:[^\S\n]*\*\*)?[^\S\n]*[:—-]/im.test(body);
+    return hasFilter && hasExclusion;
+}
+// Composition helper (fs). Reads design/<feature>.md once via the existing
+// designFilePath() helper, calls the two pure parsers, applies the AC decision
+// tree, returns the typed result. Never throws (fs errors → dormant silent pass).
+// `mode != no-design` is NOT re-checked here — the index.ts caller only reaches
+// this gate inside `if (armCheck.required)` + `if (visualGate.present)`, so the arm
+// signal is enforced by gate placement (mirrors the v3.27/v3.38 gates).
+export function checkBaselineManifest(workspacePath, activeFeature) {
+    const designPath = designFilePath(workspacePath, activeFeature);
+    const dormant = { ok: true, code: null, detail: "", designPath, auditedCount: 0 };
+    if (!activeFeature || !fs.existsSync(designPath))
+        return dormant; // AC-4 (no design file)
+    let content;
+    try {
+        content = fs.readFileSync(designPath, "utf-8");
+    }
+    catch {
+        return dormant;
+    }
+    // Opt-in arm (AC-N3): dormant when there is NO `## Source` section at all.
+    if (sliceH2Section(content, "Source") === null)
+        return dormant;
+    const rows = parseBaselineManifestRows(content);
+    const auditedCount = rows.filter((r) => r.isAudited).length;
+    // AC-1(b) / AC-N4: `## Source` present but zero audited rows → manifest missing.
+    if (auditedCount === 0) {
+        return {
+            ok: false,
+            code: "BASELINE_MANIFEST_MISSING",
+            detail: `## Source present but 0 audited rows (${rows.length} total row(s))`,
+            designPath,
+            auditedCount: 0,
+        };
+    }
+    // AC-3 / AC-N2: exactly 1 audited row → single-surface; provenance EXEMPT.
+    if (auditedCount === 1)
+        return { ok: true, code: null, detail: "", designPath, auditedCount };
+    // auditedCount >= 2 → multi-surface; require complete provenance section (AC-2).
+    if (!hasBaselineProvenance(content)) {
+        return {
+            ok: false,
+            code: "BASELINE_PROVENANCE_INCOMPLETE",
+            detail: `${auditedCount} audited rows but ## Baseline Selection Provenance absent or missing filter-conditions:/exclusion-reasons:`,
+            designPath,
+            auditedCount,
+        };
+    }
+    return { ok: true, code: null, detail: "", designPath, auditedCount };
+}
 //# sourceMappingURL=evidence-file.js.map

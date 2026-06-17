@@ -796,6 +796,49 @@ model, not a copy change.
 |---|---|---|
 | `SCOPE_DECISION_REQUIRED` (v3.30.0) | `tw_update_state` at the `pm:In_Progress → {architect,sr-engineer}:In_Progress` edge when `design/<feature>.md` declares `## Mode` ≠ `no-design` AND neither `.current/feature-split.md` exists nor handoff `scope_decision === "single-feature"`. | PM creates `.current/feature-split.md` (multi-feature split) OR sets `scope_decision: single-feature` (+ optional `scope_decision_why`) on its `pm:In_Progress` write, then re-hands off to build. |
 
+## v3.40.0 Amendment — Baseline Manifest Gate
+
+v3.40.0 adds the sixth and final visual sub-gate, enforcing that design-backed baseline work has an observable frozen baseline manifest with auditable selection provenance.
+
+### Affected Files
+
+| File | Change |
+|---|---|
+| `tools/evidence-file.ts` | New exported `checkBaselineManifest()` gate function; reads `design/<sanitised(active_feature)>.md` for `## Source` manifest and `## Baseline Selection Provenance` section. |
+| `index.ts` | New guard block in the `tw_update_state` handler after all prior visual gates (provenance, assertions, report schema); wired as the 6th visual sub-gate. Calls `checkBaselineManifest()` before PASS is written. |
+| `content/constitution.md` | Version bump 3.39.0 → 3.40.0; §3.1 visual evidence gate documentation updated to list the baseline-manifest gate and both error codes. |
+| `content/skill-design-auditor.md` | Step 2c updated to reference mechanical baseline selection (v3.39.0 SOP) and the freeze of node-id list into the Source manifest. |
+| `content/skill-qa-visual.md` | Step A.0 updated to reference carrying the frozen manifest verbatim without re-deriving node ids. |
+
+### Gate Logic (v3.40.0)
+
+The gate arms when **both** of the following hold:
+1. `design/<active_feature>.md` exists with `## Mode` ≠ `no-design` (identical arm signal to other visual gates).
+2. A `## Source` section is present in the design file (indicates baseline-backed work).
+
+When armed:
+- **Audited baseline required** — PASS requires ≥1 row in the Source manifest with `status: audited`. If zero audited rows, gate returns error `BASELINE_MANIFEST_MISSING`. The requirement enforces that a real baseline was frozen (not a placeholder or WIP manifest).
+- **Multi-surface provenance required** — if ≥2 audited rows exist, gate requires a `## Baseline Selection Provenance` section carrying both a `filter-conditions:` line and an `exclusion-reasons:` line. Missing either line → error `BASELINE_PROVENANCE_INCOMPLETE`. Single-surface (exactly 1 audited row) is exempt from the provenance requirement.
+
+When dormant (no `## Source`, or design file absent, or `## Mode` = `no-design`):
+- Gate is silent; PASS proceeds without baseline-manifest validation.
+
+### Error-code row (v3.40.0)
+
+| Error code | Trigger | Resolution |
+|---|---|---|
+| `BASELINE_MANIFEST_MISSING` (v3.40.0) | `tw_update_state(status=PASS)` when `design/<feature>.md` has `## Mode` ≠ `no-design` AND a `## Source` manifest, but zero rows carry `status: audited`. | design-auditor freezes the baseline node-id list into the manifest via the mechanical-selection process (SOP step 2c), ensuring ≥1 audited row is present before qa-engineer retries PASS. |
+| `BASELINE_PROVENANCE_INCOMPLETE` (v3.40.0) | `tw_update_state(status=PASS)` when the design file has ≥2 audited rows but the `## Baseline Selection Provenance` section is missing, incomplete (lacks `filter-conditions:` or `exclusion-reasons:`), or malformed. | design-auditor adds/completes the provenance section with both required fields, documenting the structural filter and exclusion rationale; qa-engineer retries PASS. |
+
+### Design Intent (v3.40.0)
+
+Baseline selection must be deterministic and auditable:
+- **Eyeball-picking is forbidden** — the mechanical-filter process is the only valid selection method (SOP step 2c, v3.39.0).
+- **Retroactive manifest derivation is forbidden** — the frozen node-id list must not be re-derived or post-hoc-modified by qa-visual; it is copied verbatim from the auditor's freeze step.
+- **Multi-surface rationale must be recorded** — when multiple surfaces are chosen, the *why* (filter criteria + exceptions) is as important as the *what* (node ids); single-surface choices are self-evident and exempt.
+
+This gate complements v3.38.0 provenance gate — provenance validates *how* the baseline was captured (Figma export fingerprint + diff metrics); manifest gate validates *that* a baseline was captured and frozen (non-zero audited rows + documented selection rationale).
+
 ### Deferred Resources
 
 | Reference | Classification | Reason (PM Resource Audit, spec §Dependencies) |
