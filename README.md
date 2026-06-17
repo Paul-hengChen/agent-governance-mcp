@@ -4,7 +4,7 @@
 
 Lost updates, rule drift across `.cursorrules` / `CLAUDE.md` / `.windsurfrules`, and silent overwrites when two IDEs write at once — solved at the protocol layer, not by hoping the AI behaves.
 
-> **Status**: production-used, v3.38.0. Suite **629/0**. Stdio mode is solo/single-machine; HTTP+SQLite mode is for multi-machine teams.
+> **Status**: production-used, v3.38.0. Suite **634/634**. Stdio mode is solo/single-machine; HTTP+SQLite mode is for multi-machine teams.
 
 ---
 
@@ -164,10 +164,10 @@ Adapters carry an `agc-version:` stamp (HTML comment in `CLAUDE.md`, `#` comment
 
 ```bash
 # Write adapters (idempotent — safe to re-run)
-npx -y github:Paul-hengChen/agent-governance-mcp#v3.37.0 agc init
+npx -y github:Paul-hengChen/agent-governance-mcp#v3.38.0 agc init
 
 # Check for stale adapters after upgrading agc
-npx -y github:Paul-hengChen/agent-governance-mcp#v3.37.0 agc check
+npx -y github:Paul-hengChen/agent-governance-mcp#v3.38.0 agc check
 ```
 
 Write behaviour is idempotent: `AGENTS.md` and `.antigravityrules` are skipped if they already exist; the `CLAUDE.md` block is upserted in-place (surrounding user prose preserved, stamp refreshed).
