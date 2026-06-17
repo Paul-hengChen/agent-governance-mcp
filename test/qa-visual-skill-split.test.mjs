@@ -126,7 +126,13 @@ test("AC-5: byte counts stay within v3.14.0-relaxed budgets (savings invariant v
   // 9000 → 15000 with ~550-byte headroom for future minor amendments.
   // This is a scoped cost: qa-visual is lazy-loaded ONLY when the visual
   // gate arms (design mode != no-design), so non-visual tasks pay zero.
-  assert.ok(qaVisualSize <= 15000, `qa-visual.md must be <= 15000 bytes (got ${qaVisualSize})`);
+  // v3.38.0 (qa-owned bump): cap raised from 15000 → 16200 to absorb the
+  // F0 baseline-provenance gate SOP prose (provenance metadata rules,
+  // baseline:/diff-metric: line conventions) plus the F2 retro-sop-hardening
+  // Step A.5 fidelity baseline scope validation guard. Both additions are
+  // intentionally shipped content; actual size is 15804 bytes. Cap of 16200
+  // provides ~396-byte headroom consistent with the ~350–550-byte convention.
+  assert.ok(qaVisualSize <= 16200, `qa-visual.md must be <= 16200 bytes (got ${qaVisualSize})`);
 });
 
 test("AC-6: Phase 1.5 v3.8.2 contract is preserved AND extended in v3.14.0 (combined assertion)", () => {

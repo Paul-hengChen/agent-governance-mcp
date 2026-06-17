@@ -95,12 +95,17 @@ test("AC2: lean always-on bundle is below the raw baseline and within target (<=
   // stripChainOnly only (not stripDesignOnly) — the new §1 design-only line counts
   // on this path. Actual lean bundle measured at 2641 ~tok; 2700 provides ~59-token
   // editing headroom, consistent with the v3.31.0 ~70-token convention.
+  // v3.38.0 (qa-owned bump): cap raised from 2700 → 2850 to absorb the F2
+  // retro-sop-hardening scope-creep visual-fidelity example added to
+  // skill-coordinator-lite.md (one long line, +91 ~tok net). Actual lean bundle
+  // measured at 2791 ~tok; 2850 provides ~59-token editing headroom, consistent
+  // with the v3.28.0 ~59-token convention.
   const liteSkill = fs.readFileSync(path.join(ROOT, "content", "skill-coordinator-lite.md"), "utf-8");
   const SEP = "\n\n---\n\n";
   const raw = approxTokens(CONSTITUTION + SEP + liteSkill);
   const lean = approxTokens(stripChainOnly(CONSTITUTION) + SEP + liteSkill);
   assert.ok(lean < raw, `lean (${lean}) must be < raw (${raw})`);
-  assert.ok(lean <= 2700, `lean always-on (${lean} ~tok) must meet the <= 2700 target`);
+  assert.ok(lean <= 2850, `lean always-on (${lean} ~tok) must meet the <= 2850 target`);
 });
 
 // --- AC3: enforcement preserved ------------------------------------------
