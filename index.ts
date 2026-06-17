@@ -61,6 +61,7 @@ import {
   hasDesignModeRequiringVisual,
   designDeclaresStructuralAssertions,
   validateVisualReports,
+  checkVisualProvenance,
   hasScopeDecision,
 } from "./tools/evidence-file.js";
 
@@ -920,6 +921,36 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                       `cleared (skill-qa-visual §Report schema). Resolve the failed/unverified ` +
                       `rows — do NOT pre-accept them (visual verdict is qa-visual-owned, ` +
                       `Constitution §3.2).`,
+                  }],
+                  isError: true,
+                };
+              }
+              // v3.38.0 — Baseline provenance gate (qa-visual-baseline-provenance, AC-1/AC-2).
+              // The v3.27 schema gate confirmed the report's STRUCTURE is complete and every
+              // row reads pass/accepted; it could NOT confirm the agent diffed a real baseline.
+              // This gate parses each per-surface prose sub-section under ## Region Diff and
+              // rejects PASS when a diffed (non-carry-forward) surface lacks a baseline:
+              // fingerprint or a diff-metric: value. Opt-in (D2): dormant for reports with no
+              // baseline: line anywhere (legacy/pre-provenance). Carry-forward surfaces are
+              // exempt (AC-3); a "B1 tool unavailable — LLM fallback" note satisfies the
+              // metric requirement (AC-4). FIFTH and LAST visual sub-gate — runs only on an
+              // otherwise-clean, armed report.
+              const prov = checkVisualProvenance(parsed.workspace_path, parsed.completed_tasks);
+              if (!prov.ok) {
+                const listing = Object.entries(prov.offendingByTaskId)
+                  .map(([taskId, offenses]) => `${taskId} {${offenses.join("; ")}}`)
+                  .join(" | ");
+                return {
+                  content: [{
+                    type: "text" as const,
+                    text:
+                      `⛔ VISUAL_PROVENANCE_MISSING: ${listing}. Each diffed surface in ` +
+                      `qa_reports/visual_<id>.md must carry a baseline: fingerprint and a ` +
+                      `diff-metric: value in its prose sub-section under ## Region Diff. ` +
+                      `Carry-forward surfaces (annotated "pass (carried forward — git diff ` +
+                      `confirms source untouched)") are exempt; "B1 tool unavailable — LLM ` +
+                      `fallback" satisfies the diff-metric requirement. ` +
+                      `See specs/qa-visual-baseline-provenance.md.`,
                   }],
                   isError: true,
                 };

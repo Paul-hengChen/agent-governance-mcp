@@ -549,3 +549,145 @@ export function validateVisualReports(
   }
   return { ok: Object.keys(byTaskId).length === 0, byTaskId };
 }
+
+// ---------- v3.38.0 — Baseline provenance gate (qa-visual-baseline-provenance) ----------
+// Constitution §3.2 last-mile gate. The v3.27 schema gate (validateVisualReports)
+// confirms the report's STRUCTURE is complete and every row reads pass/accepted;
+// it cannot confirm the agent actually downloaded a real Figma baseline and ran a
+// real diff. This parser reads each per-surface PROSE sub-section under
+// `## Region Diff` and exposes the two machine-parsed provenance fields:
+//   - `baseline:` <fingerprint>  — content-hash of the downloaded export OR the
+//     Figma node id passed to mcp__figma__download_figma_images (D1).
+//   - `diff-metric:` <value>     — numeric tool output, OR the
+//     `B1 tool unavailable — LLM fallback` token (D4).
+// The gate (checkVisualProvenance) is presence-gated opt-in (D2): dormant for any
+// report with zero `baseline:` lines (legacy/pre-provenance). It applies the
+// carry-forward (AC-3) and B1-fallback (AC-4) exemptions. The PARSER stays pure
+// (AC-9) and applies no exemptions — it returns every row in source order.
+
+export interface VisualProvenanceRow {
+  surfaceId: string;       // surface id from the prose sub-section heading
+  fingerprint: string | null;   // value after `baseline:` (backtick-stripped, trimmed); null if absent/empty/placeholder
+  diffMetric: string | null;    // value after `diff-metric:` (trimmed); null if absent/empty
+  isCarryForward: boolean; // prose contains the literal carry-forward token
+  isFallback: boolean;     // prose contains the literal B1-unavailable token
+}
+
+export interface VisualProvenanceCheck {
+  ok: boolean;
+  // task id -> list of surface ids missing required provenance, with the reason
+  // (e.g. "checkout-panel: no baseline:"; "hero: no diff-metric:")
+  offendingByTaskId: Record<string, string[]>;
+}
+
+// Verbatim tokens from spec Copy/Strings — AC-3/AC-4 require exact-substring match.
+const CARRY_FORWARD_TOKEN = "pass (carried forward — git diff confirms source untouched)";
+const B1_UNAVAILABLE_TOKEN = "B1 tool unavailable — LLM fallback";
+// Placeholder values that must NOT satisfy the non-empty fingerprint test (D1).
+// Lowercased compare; the empty string is included so a bare `baseline:` fails.
+const FINGERPRINT_PLACEHOLDERS = new Set(["<fingerprint>", "todo", "tbd", "n/a", "none", "-", ""]);
+
+// Permissive label-line regexes (D1 parse contract): optional leading bullet
+// (`-`/`*`), optional surrounding markdown bold (`**`), case-insensitive label,
+// `:`/`—`/`-` separator, capture the remainder. `m` for per-line, `i` for case.
+const BASELINE_LINE_RE = /^[^\S\n]*(?:[-*][^\S\n]*)?(?:\*\*[^\S\n]*)?baseline(?:[^\S\n]*\*\*)?[^\S\n]*[:—-][^\S\n]*([^\n]+?)[^\S\n]*$/im;
+const DIFF_METRIC_LINE_RE = /^[^\S\n]*(?:[-*][^\S\n]*)?(?:\*\*[^\S\n]*)?diff-metric(?:[^\S\n]*\*\*)?[^\S\n]*[:—-][^\S\n]*([^\n]+?)[^\S\n]*$/im;
+
+// Pure parser (AC-9 — no I/O, never throws). Returns one row per per-surface
+// prose sub-section (a `### `..`###### ` heading) under `## Region Diff`. The
+// surface id is the sub-heading text (backtick-stripped). The table rows
+// `| surface | result |` are NOT used here — they are parsed by
+// parseRegionDiffFailures for pass/fail; provenance lives only in the prose.
+export function parseVisualProvenanceRows(content: string): VisualProvenanceRow[] {
+  if (!content) return [];
+  const section = sliceH2Section(content, "Region Diff");
+  if (section === null) return [];
+
+  // Split the Region-Diff body into blocks on sub-headings (### .. ######).
+  const headRe = /^(#{3,6})\s+(.+?)\s*$/gm;
+  const heads: { surfaceId: string; bodyStart: number }[] = [];
+  let hm: RegExpExecArray | null;
+  while ((hm = headRe.exec(section)) !== null) {
+    const surfaceId = hm[2].replace(/`/g, "").trim();
+    heads.push({ surfaceId, bodyStart: hm.index + hm[0].length });
+  }
+
+  const rows: VisualProvenanceRow[] = [];
+  for (let i = 0; i < heads.length; i++) {
+    const start = heads[i].bodyStart;
+    const end = i + 1 < heads.length
+      ? section.slice(start).search(/^#{3,6}\s+/m)
+      : -1;
+    const body = end === -1 ? section.slice(start) : section.slice(start, start + end);
+
+    const isCarryForward = body.includes(CARRY_FORWARD_TOKEN);
+    const isFallback = body.includes(B1_UNAVAILABLE_TOKEN);
+
+    let fingerprint: string | null = null;
+    const bm = BASELINE_LINE_RE.exec(body);
+    if (bm) {
+      // Strip backticks + any residual surrounding emphasis (`**`/`*`/`_`) the
+      // label-line regex leaves on the value for the `**baseline:**` (closing
+      // emphasis after the colon) variant, so the fingerprint is the bare token.
+      const raw = bm[1].replace(/`/g, "").replace(/^[*_]+|[*_]+$/g, "").trim();
+      if (raw && !FINGERPRINT_PLACEHOLDERS.has(raw.toLowerCase())) {
+        fingerprint = raw;
+      }
+    }
+
+    let diffMetric: string | null = null;
+    const dm = DIFF_METRIC_LINE_RE.exec(body);
+    if (dm) {
+      const raw = dm[1].replace(/^[*_]+|[*_]+$/g, "").trim();
+      if (raw) diffMetric = raw;
+    }
+
+    rows.push({ surfaceId: heads[i].surfaceId, fingerprint, diffMetric, isCarryForward, isFallback });
+  }
+  return rows;
+}
+
+// Composition helper (fs). Mirrors validateVisualReports. For each task id, reads
+// visual_<id>.md (skips if absent — existence is enforced upstream by
+// hasVisualEvidenceInFile), parses the provenance rows, and applies the gate.
+//
+// Opt-in (D2): a report with NO non-null fingerprint anywhere is legacy /
+// pre-provenance — it contributes no offenses (the gate is dormant for it). Once
+// any surface declares a real `baseline:`, the whole report opts into strict mode
+// and EVERY non-carry-forward surface must carry both a fingerprint (AC-1) and a
+// diff metric OR the B1-fallback token (AC-2 + AC-4). Carry-forward surfaces are
+// exempt from both (AC-3).
+export function checkVisualProvenance(
+  workspacePath: string,
+  taskIds: string[],
+): VisualProvenanceCheck {
+  const offendingByTaskId: Record<string, string[]> = {};
+  for (const id of taskIds) {
+    const filePath = visualEvidencePath(workspacePath, id);
+    if (!fs.existsSync(filePath)) continue;
+    let content: string;
+    try {
+      content = fs.readFileSync(filePath, "utf-8");
+    } catch {
+      continue;
+    }
+    const rows = parseVisualProvenanceRows(content);
+    // D2 opt-in: dormant unless the report declares at least one baseline.
+    if (!rows.some((r) => r.fingerprint !== null)) continue;
+
+    const offenses: string[] = [];
+    for (const row of rows) {
+      if (row.isCarryForward) continue; // AC-3 — exempt
+      if (row.fingerprint === null) {
+        offenses.push(`${row.surfaceId}: no baseline:`);
+        continue;
+      }
+      // AC-2 + AC-4: a real diff metric OR the B1-fallback token satisfies it.
+      if (row.diffMetric === null && !row.isFallback) {
+        offenses.push(`${row.surfaceId}: no diff-metric:`);
+      }
+    }
+    if (offenses.length > 0) offendingByTaskId[id] = offenses;
+  }
+  return { ok: Object.keys(offendingByTaskId).length === 0, offendingByTaskId };
+}

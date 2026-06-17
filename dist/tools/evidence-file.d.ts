@@ -50,4 +50,17 @@ export interface VisualReportsCheck {
     byTaskId: Record<string, VisualReportValidation>;
 }
 export declare function validateVisualReports(workspacePath: string, taskIds: string[]): VisualReportsCheck;
+export interface VisualProvenanceRow {
+    surfaceId: string;
+    fingerprint: string | null;
+    diffMetric: string | null;
+    isCarryForward: boolean;
+    isFallback: boolean;
+}
+export interface VisualProvenanceCheck {
+    ok: boolean;
+    offendingByTaskId: Record<string, string[]>;
+}
+export declare function parseVisualProvenanceRows(content: string): VisualProvenanceRow[];
+export declare function checkVisualProvenance(workspacePath: string, taskIds: string[]): VisualProvenanceCheck;
 //# sourceMappingURL=evidence-file.d.ts.map
