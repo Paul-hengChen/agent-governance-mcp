@@ -4,7 +4,7 @@
 
 Lost updates, rule drift across `.cursorrules` / `CLAUDE.md` / `.windsurfrules`, and silent overwrites when two IDEs write at once — solved at the protocol layer, not by hoping the AI behaves.
 
-> **Status**: production-used, v3.37.0. Suite **629/0**. Stdio mode is solo/single-machine; HTTP+SQLite mode is for multi-machine teams.
+> **Status**: production-used, v3.38.0. Suite **629/0**. Stdio mode is solo/single-machine; HTTP+SQLite mode is for multi-machine teams.
 
 ---
 
@@ -25,11 +25,11 @@ Existing tools in the same category (GitHub Spec Kit, OpenSpec) ship **templates
 
 ```bash
 # 1. Register the MCP server
-claude mcp add -s user agent-governance-mcp -- npx -y github:Paul-hengChen/agent-governance-mcp#v3.37.0
+claude mcp add -s user agent-governance-mcp -- npx -y github:Paul-hengChen/agent-governance-mcp#v3.38.0
 
 # 2. Mark the current workspace as managed (REQUIRED — hook is a silent no-op without this)
 # Recommended: use agc init (writes .current/, tasks.md, AND cross-agent adapter files)
-npx -y github:Paul-hengChen/agent-governance-mcp#v3.37.0 agc init
+npx -y github:Paul-hengChen/agent-governance-mcp#v3.38.0 agc init
 # Alternative (bare scaffold, no adapter files):
 mkdir -p .current
 
@@ -176,7 +176,7 @@ See [specs/cross-agent-adapter-scaffolding.md](specs/cross-agent-adapter-scaffol
 
 ---
 
-## Visual Fidelity Gates (v3.25.0–v3.27.0)
+## Visual Fidelity Gates (v3.25.0–v3.38.0)
 
 For design-backed features (where `design/<feature>.md` declares `## Mode` ≠ `no-design`), the server enforces a layered visual-evidence pipeline before accepting a QA PASS:
 
@@ -185,10 +185,11 @@ For design-backed features (where `design/<feature>.md` declares `## Mode` ≠ `
 | Baselines present | `VISUAL_BASELINES_REQUIRED` | No `## Visual Baselines` section in the design file |
 | Assertions present | `VISUAL_ASSERTIONS_REQUIRED` | No `## Visual Structural Assertions` section (v3.27.0 — hard error, not bypass) |
 | Report complete | `VISUAL_REPORT_INCOMPLETE` | Report missing a required section, unchecked canonical-state row, failing region-diff row, or non-PASS verdict |
+| Provenance recorded | `VISUAL_PROVENANCE_MISSING` | (v3.38.0) Diffed surface in `## Region Diff` lacks baseline fingerprint or diff-metric evidence; carry-forward surfaces and B1-tool-unavailable fallback paths exempt |
 
 **Separation of duties (v3.26.0):** the visual verdict is qa-visual-owned. Coordinators and non-qa roles may not define, override, relax, or pre-accept any visual difference — a coordinator accept-policy is void. Builder ≠ judge: a role running inline under subagent limits cannot self-issue a visual PASS; the result is `Blocked`. Whole-frame pixel-% is banned as a PASS metric; per-region diff tables are required.
 
-Non-UI features and those with `mode: no-design` are unaffected by all three gates.
+Non-UI features and those with `mode: no-design` are unaffected by all four gates.
 
 ---
 
@@ -229,6 +230,18 @@ Both reduce qa-visual token burn while preserving visual fidelity: prior-pass su
 
 ---
 
+## QA-Visual Baseline Provenance Gate (v3.38.0)
+
+The visual PASS gate enforces baseline provenance — diffed surfaces in a visual report must carry verifiable evidence that a real Figma export was obtained and a pixel-diff execution ran:
+
+- **Baseline fingerprint required** — each diffed (non-carry-forward) surface's prose sub-section in `## Region Diff` must include a `baseline:` field (content-hash of the Figma export, or the node id).
+- **Diff metric required** — each diffed surface must record a `diff-metric:` value (numeric pixel count/percentage, or `B1 tool unavailable — LLM fallback` for deterministic-tool unavailability with LLM fallback).
+- **Carry-forward exempt** — surfaces marked `pass (carried forward — git diff confirms source untouched)` are not required to carry provenance; B1-tool-unavailable fallback paths are accepted.
+
+Gate is dormant for features with no design file or `mode: no-design`, same as the other visual gates. Implementation: `tools/evidence-file.ts` (`checkVisualProvenance()`); SOP: `content/skill-qa-visual.md` Step A.4 "Provenance Validation"; tests: `test/evidence-provenance.test.mjs`.
+
+---
+
 ## Limits (read before adopting)
 
 - **Cannot force AI to follow the constitution** — only injects it into context. AI can still hallucinate. The gates stop *state writes*, not bad reasoning.
@@ -256,7 +269,7 @@ Add to `~/.claude/settings.json`:
       "matcher": "",
       "hooks": [{
         "type": "command",
-        "command": "npx -y -p github:Paul-hengChen/agent-governance-mcp#v3.37.0 agent-governance-context",
+        "command": "npx -y -p github:Paul-hengChen/agent-governance-mcp#v3.38.0 agent-governance-context",
         "timeout": 60
       }]
     }]
