@@ -616,26 +616,26 @@ test("E6: AC — exact error strings match ERR-BMM-01 / ERR-BPI-01 verbatim (ful
 });
 
 // ===========================================================================
-// AC-9: Version bump assertion — package.json + index.ts Server() = "3.40.0"
+// AC-9: Version bump assertion — package.json + index.ts Server() = "3.40.1"
 // ===========================================================================
 
-test("AC-9: package.json version field equals 3.40.0", () => {
+test("AC-9: package.json version field equals 3.40.1", () => {
   // Why: AC-9 pins the version contract. Both package.json and the Server() literal
-  // must be "3.40.0" for the release to be self-consistent.
+  // must be "3.40.1" for the release to be self-consistent.
   const pkgPath = path.join(path.dirname(new URL(import.meta.url).pathname), "..", "package.json");
   const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
-  assert.equal(pkg.version, "3.40.0", `package.json version must be "3.40.0", got "${pkg.version}"`);
+  assert.equal(pkg.version, "3.40.1", `package.json version must be "3.40.1", got "${pkg.version}"`);
 });
 
-test("AC-9: index.ts Server() literal equals 3.40.0", () => {
+test("AC-9: index.ts Server() literal equals 3.40.1", () => {
   // Why: the Server() version literal in index.ts is the operational version broadcast
   // to MCP clients. It must match package.json.
   const srcIndex = fs.readFileSync(
     path.join(path.dirname(new URL(import.meta.url).pathname), "..", "index.ts"),
     "utf-8",
   );
-  assert.match(srcIndex, /Server\(\s*\{[^}]*version:\s*["']3\.40\.0["']/s,
-    "Server() version literal in index.ts must equal 3.40.0");
+  assert.match(srcIndex, /Server\(\s*\{[^}]*version:\s*["']3\.40\.1["']/s,
+    "Server() version literal in index.ts must equal 3.40.1");
 });
 
 // ===========================================================================

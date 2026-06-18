@@ -118,7 +118,24 @@ const UpdateStateArgs = z
       return rel !== "" && !rel.startsWith("..") && !path.isAbsolute(rel);
     },
     { message: "prd_path must be inside workspace_path (no traversal)", path: ["prd_path"] },
-  );
+  )
+  // Reject a workspace_path that points at the .current state directory rather
+  // than the workspace root. The server appends ".current/handoff.md" to this
+  // path; a basename of ".current" would write a doubly-nested
+  // .current/.current/handoff.md instead of failing loud.
+  .refine((d) => path.basename(d.workspace_path) !== ".current", {
+    message: "workspace_path must be the workspace root, not the .current state directory",
+    path: ["workspace_path"],
+  })
+  // Reject the canonical JS object-stringification sentinel. When a caller
+  // passes active_feature as an object, the MCP transport stringifies it to
+  // "[object Object]" before Zod sees it; persisting that verbatim corrupts
+  // the handoff. Exact-string equality is the only check possible here — the
+  // object is already stringified before this layer runs.
+  .refine((d) => d.active_feature !== "[object Object]", {
+    message: "active_feature must be a plain string id, not a serialised object",
+    path: ["active_feature"],
+  });
 
 const CompleteTaskArgs = z.object({
   workspace_path: absoluteWorkspacePath,
@@ -210,7 +227,7 @@ function formatZodError(err: z.ZodError): string {
 // ==========================================
 // Storage adapter defaults to FileHandoffStorage; HTTP-mode boot switches it via setActiveStorage().
 const server = new Server(
-  { name: "agent-governance-mcp", version: "3.40.0" },
+  { name: "agent-governance-mcp", version: "3.40.1" },
   { capabilities: { tools: {}, prompts: {} } }
 );
 

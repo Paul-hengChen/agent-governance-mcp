@@ -16,6 +16,11 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.40.1] - 2026-06-18
+
+### Fixed
+- **`handoff-write-arg-guard` — Reject two malformed `tw_update_state` args (v3.40.1).** Two `.refine()` guards added to the `UpdateStateArgs` Zod schema in `index.ts`, hardening the input boundary so the server fails loud (Constitution §7) instead of writing corrupt handoff state. (1) **`workspace_path` basename `.current` guard** — when a caller passes the `.current/` state directory instead of the workspace root, the server appended `.current/handoff.md` to it, silently writing a doubly-nested `.current/.current/handoff.md`; the call is now rejected with `workspace_path must be the workspace root, not the .current state directory`. (2) **`active_feature` `"[object Object]"` sentinel guard** — when a caller passes `active_feature` as an object, the MCP transport stringifies it to the literal `"[object Object]"` before Zod sees it, and the prior `z.string()` check persisted the corrupt sentinel verbatim; the call is now rejected with `active_feature must be a plain string id, not a serialised object`. PATCH-only: no tool-surface, schema, or migration change — exact-string equality is the only check possible at this layer since the object is already stringified before Zod runs (deeper artifacts like `"[object Array]"` are out of scope). Valid args (absolute non-`.current` root + plain string id) still pass. No constitution header bump.
+
 ## [3.40.0] - 2026-06-17
 
 ### Added
