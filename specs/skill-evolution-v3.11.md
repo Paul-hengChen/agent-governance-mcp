@@ -1,10 +1,10 @@
-<!-- @pm | feature_id: skill-evolution-v3.11 | created_at: 2026-05-28 | research_basis: research/architecture-and-skills-evaluation-v3.9.md -->
+<!-- @pm | feature_id: skill-evolution-v3.11 | created_at: 2026-05-28 | research_basis: research/process-retrospective.md -->
 
 # Skill Evolution v3.11 — researcher / coordinator-lite / code-reviewer refinement + doc-writer + release-engineer
 
 ## Problem Statement
 
-The v3.9 architecture-and-skills evaluation (`research/architecture-and-skills-evaluation-v3.9.md`) surfaced three pieces of skill debt: (1) **researcher / coordinator-lite are too terse** vs the rest of the role family — researcher has no depth control or source-quality discipline; coordinator-lite has no concrete scope-creep examples to teach the boundary with `/teamwork`; (2) **code-reviewer's Review Report Schema lacks a Performance section** — O(n²) loops, unbatched I/O, and obvious memory leaks slip through into qa; (3) **two high-value roles are missing**: a `doc-writer` to keep CHANGELOG / README / docs synchronised with code after PASS, and a `release-engineer` to own version bumps, tags, and GitHub releases (today these are ad-hoc human work, with this very session producing v3.9.0 → v3.9.1 → v3.10.0 manually). Constitution §6 additionally lacks any dependency-audit rule even though the build gate is the natural place to run `npm audit` / `cargo audit`.
+The v3.9 architecture-and-skills evaluation (`research/process-retrospective.md`) surfaced three pieces of skill debt: (1) **researcher / coordinator-lite are too terse** vs the rest of the role family — researcher has no depth control or source-quality discipline; coordinator-lite has no concrete scope-creep examples to teach the boundary with `/teamwork`; (2) **code-reviewer's Review Report Schema lacks a Performance section** — O(n²) loops, unbatched I/O, and obvious memory leaks slip through into qa; (3) **two high-value roles are missing**: a `doc-writer` to keep CHANGELOG / README / docs synchronised with code after PASS, and a `release-engineer` to own version bumps, tags, and GitHub releases (today these are ad-hoc human work, with this very session producing v3.9.0 → v3.9.1 → v3.10.0 manually). Constitution §6 additionally lacks any dependency-audit rule even though the build gate is the natural place to run `npm audit` / `cargo audit`.
 
 This release ships the **minimum-surface** version of all five fixes: both new roles are **side-channel agents** (skill files + prompts + `tw_switch_role` enum widening only — NOT inserted into `ALLOWED_TRANSITIONS`, so no schema bump and no breaking change for in-flight tickets). Multi-agent chain semantics (qa → release-engineer terminal step) are explicitly **deferred** to a later release once usage data justifies the schema cost.
 
@@ -147,7 +147,7 @@ N/A — internal MCP-server infrastructure; no UI surface introduced or changed.
 
 ## Dependencies / Prerequisites
 
-- Research artifact `research/architecture-and-skills-evaluation-v3.9.md` (audited 2026-05-28 by PM; all external references resolve to workspace-internal `file:///` paths — no fetch required).
+- Research artifact `research/process-retrospective.md` (audited 2026-05-28 by PM; all external references resolve to workspace-internal `file:///` paths — no fetch required).
 - Existing prompt-builder infrastructure (`prompts/build.ts:buildPromptForRole`) — reused by both new prompts.
 - Existing `tools/role.ts` `ROLE_SKILL_MAP` — extended, not rewritten.
 - Existing constitution authoring conventions (header version, §-numbered sections) — followed verbatim.

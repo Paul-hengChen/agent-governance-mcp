@@ -2,7 +2,7 @@
 
 ## Problem Statement
 
-The [post-v3.5.1-coverage-audit](file:///Users/paul.ph.chen/agent-governance-mcp/research/post-v3.5.1-coverage-audit.md) identified one Medium-High value gap remaining from R2 (Simplicity First): "No abstractions for single-use code." The current §1 MVP strict bullet covers *speculative refactors* and *predictive features* but does not explicitly prohibit single-use abstractions (e.g., introducing a `BaseFooHandler` with one subclass, or a `useXyzHelper` hook called from one site). This is a concrete YAGNI failure mode worth naming.
+The [post-v3.5.1-coverage-audit](file:///Users/paul.ph.chen/agent-governance-mcp/research/process-retrospective.md) identified one Medium-High value gap remaining from R2 (Simplicity First): "No abstractions for single-use code." The current §1 MVP strict bullet covers *speculative refactors* and *predictive features* but does not explicitly prohibit single-use abstractions (e.g., introducing a `BaseFooHandler` with one subclass, or a `useXyzHelper` hook called from one site). This is a concrete YAGNI failure mode worth naming.
 
 ## User Stories
 
@@ -32,5 +32,5 @@ The [post-v3.5.1-coverage-audit](file:///Users/paul.ph.chen/agent-governance-mcp
 
 ## Dependencies / Prerequisites
 
-- Audit artifact: [post-v3.5.1-coverage-audit.md](file:///Users/paul.ph.chen/agent-governance-mcp/research/post-v3.5.1-coverage-audit.md).
+- Audit artifact: [post-v3.5.1-coverage-audit.md](file:///Users/paul.ph.chen/agent-governance-mcp/research/process-retrospective.md).
 - Prior release: v3.5.1 ([CHANGELOG](file:///Users/paul.ph.chen/agent-governance-mcp/CHANGELOG.md)).

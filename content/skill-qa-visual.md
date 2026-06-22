@@ -23,7 +23,7 @@ non-determinism (漏抓 / 誤收) that step 2c exists to eliminate. If the Sourc
 its frozen node-id list is absent, this is a design-auditor defect: STOP and
 `tw_update_state(status=FAIL, agent_id="qa-engineer", qa_review="Source manifest missing frozen baseline node-id list", pending_notes=["QA: baseline node-id manifest absent — re-derivation forbidden", "next_role: design-auditor"])`.
 Do NOT substitute your own URL-derived set. (Paired downstream half of Constitution §3.2 builder≠judge
-provenance; method: `research/figma-baseline-mechanical-filtering-method.md`.)
+provenance; method: `research/figma-baselines.md`.)
 
 **Server-enforced at PASS (v3.40.0 baseline manifest gate, Constitution §3.1).** The Source manifest
 is now machine-checked, so the manual STOP above is backstopped by the server: an armed design whose

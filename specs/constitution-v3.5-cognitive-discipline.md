@@ -2,7 +2,7 @@
 
 ## Problem Statement
 
-Constitution v3.4.0 excels at process compliance (state sync, routing chain, QA enforcement) but lacks "thinking quality" guardrails. The [claude-md-12-rule-fusion.md](file:///Users/paul.ph.chen/agent-governance-mcp/research/claude-md-12-rule-fusion.md) research identified 5 high-value rules (R1, R4, R7, R8, R12) that fill this gap at minimal token cost (~100 tokens).
+Constitution v3.4.0 excels at process compliance (state sync, routing chain, QA enforcement) but lacks "thinking quality" guardrails. The [claude-md-12-rule-fusion.md](file:///Users/paul.ph.chen/agent-governance-mcp/research/cross-agent-governance.md) research identified 5 high-value rules (R1, R4, R7, R8, R12) that fill this gap at minimal token cost (~100 tokens).
 
 ## User Stories
 
@@ -46,5 +46,5 @@ Constitution v3.4.0 excels at process compliance (state sync, routing chain, QA 
 
 ## Dependencies / Prerequisites
 
-- Research artifact: [claude-md-12-rule-fusion.md](file:///Users/paul.ph.chen/agent-governance-mcp/research/claude-md-12-rule-fusion.md) (completed).
+- Research artifact: [claude-md-12-rule-fusion.md](file:///Users/paul.ph.chen/agent-governance-mcp/research/cross-agent-governance.md) (completed).
 - Current constitution: [constitution.md](file:///Users/paul.ph.chen/agent-governance-mcp/content/constitution.md) at v3.4.0.

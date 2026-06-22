@@ -1,7 +1,7 @@
 # Spec: qa-visual-skill-split (v3.8.3)
 
 > Scope: implement the Token-cost watch-item from
-> `research/skill-token-cost-and-pixel-perfect-success-rate.md` § Recommendation —
+> `research/token-economics.md` § Recommendation —
 > split `content/skill-qa-engineer.md` into two files so non-UI workspaces no
 > longer load the Phase 1.5 Visual Compare SOP.
 
@@ -72,14 +72,14 @@ N/A — markdown only.
 - **Server-side conditional inject** — explicitly rejected by user during scope clarification; SOP-only lazy Read keeps `prompts/build.ts` unchanged.
 - **Separate role + tw_switch_role** — explicitly rejected; would double-load the constitution and add 5 files (prompt, transitions, schema enum, role-skill map, index wire-up) for no fidelity gain.
 - **Further splitting** (e.g., separate copy-audit-gate / visual-audit-gate sub-skills) — premature. The two literal gates remain in the core qa-engineer skill since they fire on *every* feature with a spec, not just UI ones.
-- **Baseline mtime staleness check** — `research/skill-token-cost-and-pixel-perfect-success-rate.md` § Recommendation §2 deferred.
+- **Baseline mtime staleness check** — `research/token-economics.md` § Recommendation §2 deferred.
 - **Phase 3 (Playwright VRT)** — still out of scope per the original research.
 
 ## Dependencies / Prerequisites
 
 - **v3.8.2** — Phase 1.5 source-of-truth content lives here; T52 transplants it verbatim into `content/skill-qa-visual.md`. Already shipped.
-- **research/skill-token-cost-and-pixel-perfect-success-rate.md** — `index` (workspace-internal; this spec implements its Recommendation watch-item).
-- **research/pixel-perfect-and-design-coverage.md** — `index` (workspace-internal; the Phase 1.5 origin).
+- **research/token-economics.md** — `index` (workspace-internal; this spec implements its Recommendation watch-item).
+- **research/visual-fidelity.md** — `index` (workspace-internal; the Phase 1.5 origin).
 - **content/skill-qa-engineer.md** — must exist; primary edit target.
 - **No external references** require fetching. All `file://` links in the prerequisite research files are workspace-internal.
 - **Version bump** — backwards-compatible reorganisation (AC-6 guarantees v3.8.2 audits keep working). Ship as **v3.8.3** (patch).

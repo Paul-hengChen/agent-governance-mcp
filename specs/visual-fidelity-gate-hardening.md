@@ -21,7 +21,7 @@ near-free geometry assertion at the sr-engineer screen-1 build gate.
 
 ## Research-to-AC Coverage Map
 
-The five recommendations in `research/design-fidelity-workflow.md` are mapped to acceptance
+The five recommendations in `research/visual-fidelity.md` are mapped to acceptance
 criteria below so coverage is auditable.
 
 | Research Rec | AC(s) |
@@ -211,7 +211,7 @@ features, not this one.
 
 ### Open Questions requiring human decisions (Question Batch Gate)
 
-The following Open Questions from `research/design-fidelity-workflow.md` require a PM/maintainer
+The following Open Questions from `research/visual-fidelity.md` require a PM/maintainer
 ruling before the affected acceptance criteria can be finalised. They are flagged here rather than
 blocking the feature because AC-1 through AC-10 above are complete without them; the questions
 affect future policy, not this implementation.

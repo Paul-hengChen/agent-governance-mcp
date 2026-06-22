@@ -1,7 +1,7 @@
 # Spec: P0 Onboarding (`agc init`) + Default to Lite Mode
 
 > @pm · 2026-05-20
-> Source: `research/agc-value-proposition-2026-05-20.md` §Recommendation P0 + Open Question #1
+> Source: `research/value-proposition.md` §Recommendation P0 + Open Question #1
 
 ## Problem Statement
 

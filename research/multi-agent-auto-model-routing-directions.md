@@ -118,5 +118,5 @@ Wrapping LiteLLM / OpenRouter inside an `agc run` CLI would give agc real infere
 
 - `research/agent-governance-framework-industry-comparison.md` — Q1–Q5: identifies "no model-routing / cost control" as one of the three big gaps; documents Anthropic orchestrator-worker pattern. [T1-citing-T1]
 - `research/architecture-vs-industry-and-token-frugality-zh.md` — same gap analysis in Chinese with `per-role model-routing` framed as the recommended remedy. [T2-internal]
-- `research/token-burn-mitigations-zh.md` — §model-routing: Claude Code subagent pattern cited as the route-to-Haiku mechanism. [T2-internal]
+- `research/token-economics.md` — §model-routing: Claude Code subagent pattern cited as the route-to-Haiku mechanism. [T2-internal]
 - `specs/model-routing.md`, `specs/model-routing-architecture.md` — v3.19.0 surfaced the hint; this research is the natural follow-up on enforcement. [T1-internal]

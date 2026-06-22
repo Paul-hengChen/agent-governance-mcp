@@ -2,7 +2,7 @@
 
 ## Problem Statement
 
-The v3.5.0 fusion (per [claude-md-12-rule-fusion.md](file:///Users/paul.ph.chen/agent-governance-mcp/research/claude-md-12-rule-fusion.md)) merged 7 of the 12-rule template's high-value rules, but cross-checking against the original 12-rule source revealed 3 material gaps: R3's "don't touch adjacent code" anti-scope-creep clause, R12's "tests pass is wrong if any skipped" sub-clause, and R11's "conformance > taste / surface harmful conventions" decision logic. These are silent omissions that weaken the cognitive guardrails v3.5.0 was meant to install.
+The v3.5.0 fusion (per [claude-md-12-rule-fusion.md](file:///Users/paul.ph.chen/agent-governance-mcp/research/cross-agent-governance.md)) merged 7 of the 12-rule template's high-value rules, but cross-checking against the original 12-rule source revealed 3 material gaps: R3's "don't touch adjacent code" anti-scope-creep clause, R12's "tests pass is wrong if any skipped" sub-clause, and R11's "conformance > taste / surface harmful conventions" decision logic. These are silent omissions that weaken the cognitive guardrails v3.5.0 was meant to install.
 
 ## User Stories
 

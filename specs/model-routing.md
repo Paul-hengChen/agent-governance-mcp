@@ -9,7 +9,7 @@ runs on whatever model the client happens to be using, typically the
 flagship (Opus). Industry-comparison research lists this as one of the three
 biggest gaps versus 2025–2026 best practice (see
 `research/agent-governance-framework-industry-comparison.md` Q1–Q5 and
-`research/token-burn-mitigations-zh.md` §Model-routing). Concrete consequence
+`research/token-economics.md` §Model-routing). Concrete consequence
 already observed: a deep-research run burned out on token cost because every
 hop ran on Opus. Anthropic's own multi-agent system uses an orchestrator-worker
 topology with a heterogeneous tier (Opus lead, Sonnet / Haiku workers) and
@@ -189,7 +189,7 @@ client's responsibility.
 - `research/agent-governance-framework-industry-comparison.md` — internal
   artifact, already in workspace; load-bearing for the tier-mapping
   rationale. Status: **indexed-in-workspace**, no external fetch needed.
-- `research/token-burn-mitigations-zh.md` — internal artifact, already
+- `research/token-economics.md` — internal artifact, already
   in workspace; corroborates Anthropic Claude Code "route to cheaper Haiku"
   guidance citation. Status: **indexed-in-workspace**.
 - No Figma / Sketch / external URLs / ticket IDs / mockup attachments are

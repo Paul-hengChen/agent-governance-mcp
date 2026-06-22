@@ -5,7 +5,7 @@
 > Date: 2026-06-09
 > Author: architect subagent (opus)
 > Source spec: `specs/agc-cross-agent-adapter-scaffolding.md` (v1.0.0)
-> Research basis: `research/cross-agent-governance-single-source-strategy-2026-06-08.md`
+> Research basis: `research/cross-agent-governance.md`
 >   (incl. 2026-06-09 Codex-convergence update)
 > Status: In_Progress → next_role: sr-engineer
 

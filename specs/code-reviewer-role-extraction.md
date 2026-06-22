@@ -1,10 +1,10 @@
-<!-- @pm | feature_id: code-reviewer-role-extraction | created_at: 2026-05-28 | research_basis: research/reviewer-role-extraction.md -->
+<!-- @pm | feature_id: code-reviewer-role-extraction | created_at: 2026-05-28 | research_basis: research/process-retrospective.md -->
 
 # Code-Reviewer Role Extraction (v3.9.0)
 
 ## Problem Statement
 
-The current routing chain `sr-engineer → qa-engineer` conflates two distinct judgement tasks: **code review** (correctness, quality, architecture, security of the diff) and **test authorship** (writing and running tests). Industry consensus (2025–2026) treats writer/reviewer separation as a structural requirement — a model "too close" to code it co-authored rationalises its own logic, and the same context-degraded review-then-test combo produces tests that pass flawed logic [research/reviewer-role-extraction.md §E1–E2]. The current chain reaches only the two-agent baseline; this spec promotes it to three-agent (`sr ↔ code-reviewer → qa`), which the literature shows "catches categorically more, especially on complex diffs."
+The current routing chain `sr-engineer → qa-engineer` conflates two distinct judgement tasks: **code review** (correctness, quality, architecture, security of the diff) and **test authorship** (writing and running tests). Industry consensus (2025–2026) treats writer/reviewer separation as a structural requirement — a model "too close" to code it co-authored rationalises its own logic, and the same context-degraded review-then-test combo produces tests that pass flawed logic [research/process-retrospective.md §E1–E2]. The current chain reaches only the two-agent baseline; this spec promotes it to three-agent (`sr ↔ code-reviewer → qa`), which the literature shows "catches categorically more, especially on complex diffs."
 
 Out-of-band, this also clarifies qa-engineer's mandate — currently silently overloaded with both review and test duties — by making test authorship its sole responsibility.
 
@@ -155,7 +155,7 @@ N/A — this is internal MCP-server infrastructure; no UI surface introduced or 
 
 ## Dependencies / Prerequisites
 
-- Research artifact `research/reviewer-role-extraction.md` (audited; user has read and made decisions on all open questions relevant to scope).
+- Research artifact `research/process-retrospective.md` (audited; user has read and made decisions on all open questions relevant to scope).
 - Existing schema-versioning infrastructure (`schema/versions.ts`, `schema/migrations-*.ts`) from v3.4.0 — must be reused, not reinvented.
 - Existing transition state machine in `tools/transitions.ts` — extended, not rewritten.
 - Existing evidence-file mechanism in `tools/evidence-file.ts` for `qa_reports/` — paralleled for `review_reports/`.

@@ -1,6 +1,6 @@
 # Spec: context-budget-reduction
 
-> Source requirements: `research/token-burn-mitigations-zh.md` (Recommendation #1–#2),
+> Source requirements: `research/token-economics.md` (Recommendation #1–#2),
 > `research/architecture-vs-industry-and-token-frugality-zh.md` (always-on bundle gap).
 > Scope confirmed with user: **measure first, then implement** the on-demand / lean
 > always-on split. Items #1 (prompt caching, harness-side), #3 (sub-agent summaries,

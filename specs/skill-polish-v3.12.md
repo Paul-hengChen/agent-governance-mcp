@@ -2,7 +2,7 @@
 
 ## Problem Statement
 
-The v3.9 evaluation report (`research/architecture-and-skills-evaluation-v3.9.md`) flagged residual improvements after v3.10/v3.11 shipped. Three gaps remain: (1) architect skill lacks an Architecture Decision Record (ADR) section for trade-off persistence; (2) the constitution's §6 Security chapter and all 13 skill files have never been audited as a set for token-frugality (duplication of constitution rules, padding, redundant examples); (3) the user has explicitly asked for a sweep across code-reviewer, architect, coordinator, coordinator-lite, researcher to confirm v3.11 closed the v3.9-era gaps and to apply final polish. Without this pass, the prompt payload (currently ~580 lines across content/) grows monotonically as each release appends.
+The v3.9 evaluation report (`research/process-retrospective.md`) flagged residual improvements after v3.10/v3.11 shipped. Three gaps remain: (1) architect skill lacks an Architecture Decision Record (ADR) section for trade-off persistence; (2) the constitution's §6 Security chapter and all 13 skill files have never been audited as a set for token-frugality (duplication of constitution rules, padding, redundant examples); (3) the user has explicitly asked for a sweep across code-reviewer, architect, coordinator, coordinator-lite, researcher to confirm v3.11 closed the v3.9-era gaps and to apply final polish. Without this pass, the prompt payload (currently ~580 lines across content/) grows monotonically as each release appends.
 
 ## User Stories
 
@@ -14,7 +14,7 @@ The v3.9 evaluation report (`research/architecture-and-skills-evaluation-v3.9.md
 
 - **Given** the architect skill at `content/skill-architect.md`, **when** the file is read after this feature, **then** it MUST contain a new H2 `## Decision Records` section that defines an ADR table format (Context / Decision / Consequences) and instructs the architect to emit one ADR row per non-trivial trade-off into `specs/<feature>-architecture.md`.
 - **Given** the constitution at `content/constitution.md`, **when** §6 is read, **then** it MUST explicitly call out the dependency-audit rule (already present) AND retain the `.env*` / `*secret*` access-denied rule. The audit report (see Token-Frugality Audit below) MUST confirm no additional Security rules are required (or list exactly what is being added with rationale).
-- **Given** all 13 files under `content/`, **when** the token-frugality audit completes, **then** an audit artifact `research/token-frugality-audit-v3.12.md` MUST exist listing: (a) any line that restates a constitution rule inside a skill (constitution §1 *Skills inherit everything below — they MUST NOT restate these rules.*), (b) any redundant example/padding that can be deleted without semantic loss, (c) per-file before/after line count.
+- **Given** all 13 files under `content/`, **when** the token-frugality audit completes, **then** an audit artifact `research/token-economics.md` MUST exist listing: (a) any line that restates a constitution rule inside a skill (constitution §1 *Skills inherit everything below — they MUST NOT restate these rules.*), (b) any redundant example/padding that can be deleted without semantic loss, (c) per-file before/after line count.
 - **Given** the audit findings, **when** the cleanup pass is applied, **then** each flagged file MUST be edited to remove the duplication/padding, and the constitution + skill files combined MUST shrink by ≥ 5% (≥ 29 lines below the current 580 total) OR the audit MUST justify why no cleanup is warranted.
 - **Given** the coordinator-lite skill, **when** read after this feature, **then** it MUST NOT contain any restated `tw_get_state`/`tw_detect_drift`/`tool-first`/`watermark` rule already present in the constitution (the lite skill is the most token-sensitive surface and is loaded on every solo session).
 - **Given** the coordinator skill, **when** read after this feature, **then** the Routing Table + Complexity Scope Gate + Design-source detection sections MUST remain intact (no removal of behavioural rules); only restated constitution clauses and verbose prose may be trimmed.
@@ -44,5 +44,5 @@ _Not applicable — this feature edits only Markdown prompt content; no UI, no v
 
 ## Dependencies / Prerequisites
 
-- `research/architecture-and-skills-evaluation-v3.9.md` — primary input. Local file, already in workspace, classified as **fetched**.
+- `research/process-retrospective.md` — primary input. Local file, already in workspace, classified as **fetched**.
 - No external URLs (Figma, ticket links, design files) in the source material; the eval report uses only `file://` local references.

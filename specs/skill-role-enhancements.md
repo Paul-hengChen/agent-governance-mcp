@@ -55,5 +55,5 @@ Current `pm`, `sr-engineer`, and `qa-engineer` skill files lack structure and gu
 
 ## Dependencies / Prerequisites
 
-- Research artifact: `research/skill-role-gap-analysis.md` (complete)
+- Research artifact: `research/process-retrospective.md` (complete)
 - No blocking tasks

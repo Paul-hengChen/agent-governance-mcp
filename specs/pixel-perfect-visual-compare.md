@@ -1,6 +1,6 @@
 # Spec: pixel-perfect-visual-compare (Phase 2 — Option B)
 
-> Scope: implement Phase 2 of `research/pixel-perfect-and-design-coverage.md` — vision-LLM screenshot compare.
+> Scope: implement Phase 2 of `research/visual-fidelity.md` — vision-LLM screenshot compare.
 > Builds on Phase 1 (`pixel-perfect-design-coverage`, v3.8.1) which shipped the Source manifest + multi-pass auditor.
 > Phase 3 (Playwright VRT) remains out of scope.
 
@@ -78,7 +78,7 @@ N/A — no UI or visual change. The feature edits markdown only.
 ## Dependencies / Prerequisites
 
 - **v3.8.1 (Phase 1)** — Source manifest + multi-pass auditor. Already shipped; provides the `surface id` foreign key Visual Baselines references.
-- **research/pixel-perfect-and-design-coverage.md** — `index` (already in workspace; the research source).
+- **research/visual-fidelity.md** — `index` (already in workspace; the research source).
 - **content/skill-design-auditor.md** — must exist; primary edit target (adds Visual Baselines schema row to Artifact Schema H2 list).
 - **content/skill-qa-engineer.md** — must exist; primary edit target (inserts Phase 1.5 sub-section).
 - **No external references** require fetching. The research file's web citations (Gemini pricing, Figma REST API, Playwright) are background and NOT load-bearing for Phase 2 — vision capability is provided by the QA agent's host LLM, not via the Figma API.

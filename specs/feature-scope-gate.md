@@ -1,6 +1,6 @@
 # Spec: feature-scope-gate
 
-> Source: user request (this session) + `research/automation-flow-per-skill-token-zh.md`.
+> Source: user request (this session) + `research/automation-and-rag.md`.
 > Adds a coordinator front-door gate that assesses whether an incoming PRD should be
 > split into multiple features BEFORE routing, stops for human confirmation when a
 > split is warranted, and emits a fill-in schema to assist the human split.

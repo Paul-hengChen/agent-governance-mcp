@@ -1,6 +1,6 @@
 # Spec: pixel-perfect-design-coverage (Phase 1 — A1 + A2)
 
-> Scope: implement Phase 1 of `research/pixel-perfect-and-design-coverage.md`.
+> Scope: implement Phase 1 of `research/visual-fidelity.md`.
 > Phase 2 (vision-LLM compare) and Phase 3 (Playwright VRT) are out of scope.
 
 ## Problem Statement
@@ -68,8 +68,8 @@ N/A — no UI or visual change. The feature edits markdown only.
 
 ## Dependencies / Prerequisites
 
-- **research/pixel-perfect-and-design-coverage.md** — `index` (already in workspace; the canonical research artifact this spec implements).
-- **research/design-fidelity-enforcement.md** — `index` (already in workspace; prior research the new one builds on).
+- **research/visual-fidelity.md** — `index` (already in workspace; the canonical research artifact this spec implements).
+- **research/visual-fidelity.md** — `index` (already in workspace; prior research the new one builds on).
 - **content/skill-design-auditor.md** — must exist; primary edit target.
 - **content/skill-pm.md** — must exist; secondary edit target.
 - **No external references** require fetching. The research file's `file://` links are workspace-internal; its web-research citations (Figma MCP, Gemini pricing, Playwright) are background for Phase 2/3 and not load-bearing for Phase 1.

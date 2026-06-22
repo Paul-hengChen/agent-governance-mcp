@@ -114,3 +114,84 @@
 - **`subagent_tokens` 的確切定義未知**：本報告假設其 ≈ output token（依每工具呼叫 ~1,020 token 的比例推斷）。若其實為「總計費 token」或「含 input」，成本與佔比結論需重算。建議：之後從各 `agent-*.jsonl` 轉錄檔讀 `usage.input_tokens` / `output_tokens` / `cache_*` 以精算。**此為成本估算僅低信心的主因。**
 - **coordinator 自身 context 開銷未量測**：每次 /teamwork 注入完整憲法、claude-api skill 注入大量文件，這些不在 subagent_tokens 內。
 - 來源信心：本報告硬數字皆 T1（session 遙測 + 官方 skill 定價），無 T3 依賴；唯成本「總帳單」因 input 拆分不明而為估算。
+
+---
+
+## Historical Snapshot: Post-v3.5.1 Coverage Audit (2026-05-15)
+
+> Folded from `post-v3.5.1-coverage-audit.md`. Records the final state of the Constitution v3.5.0/v3.5.1 12-rule fusion. Preserved for audit-trail purposes.
+
+After the v3.5.0 + v3.5.1 fusion, substantive coverage was ~90%: all 12 rules' headline ideas are present in the constitution or role skills; only sub-clauses remain as gaps.
+
+**Remaining gaps (3 sub-clauses, all medium-or-lower):**
+- R1 "Present multiple interpretations when ambiguity exists" — skip; overlaps with "If ambiguous, ask"
+- R2 "No abstractions for single-use code" — optional add (~10 tokens closes the only Medium-High gap)
+- R9 "A test that can't fail when business logic changes is wrong" — skip; assertive restatement of "encode intent"
+
+**Deliberately NOT fused:** R4 "Don't follow steps" (conflicts with PM-driven task lists), R5 (tool-driven MCP satisfies architecturally), R6 (requires server-side metering).
+
+**Final recommendation:** treat fusion as complete. Optionally add one phrase to §1 MVP strict: "No abstractions for single-use code." Beyond that, stop — further additions degrade signal density. The constitution now exceeds the 12-rule template in scope (§3/§4 multi-agent rules have no template equivalent).
+
+---
+
+## Historical Snapshot: Architecture and Skills Evaluation v3.9 (2026-05-28)
+
+> Folded from `architecture-and-skills-evaluation-v3.9.md`. Records the state of the system at v3.9.0 including architecture maturity, skill quality ratings, and new skill recommendations.
+
+**Architecture maturity assessment (v3.9.0):** 3-Layer Defense (Prompts → Tools → Guards) + server-enforced transition matrix is the most complete governance implementation in the MCP ecosystem at time of assessment. The v3.9.0 addition of code-reviewer brought the routing chain to a 7-role pipeline matching industry best-practice.
+
+**Architecture weaknesses identified (2026-05-28 baseline):**
+- No observability: governance layer has no structured logging or per-action audit trail; only `console.error`.
+- No agent identity binding: `agent_id` is self-declared; MCP protocol has no caller-ID.
+- Config cache never invalidates: `tools/config.ts` has no TTL; runtime changes to `.current/.config.json` require server restart.
+
+**Skill quality ratings (v3.9.0):**
+
+| Skill | Stars | Key gap |
+|---|---|---|
+| skill-pm | 5/5 | Most complete skill |
+| skill-qa-engineer | 5/5 | Conditional test writing (addressed) |
+| skill-code-reviewer | 4.5/5 | Missing performance review dimension |
+| skill-design-auditor | 5/5 | Very complete, token-frugal |
+| skill-coordinator | 4/5 | Missing multi-task priority scheduling |
+| skill-sr-engineer | 4/5 | Missing commit message format |
+| skill-architect | 3.5/5 | Missing ADR (Architecture Decision Record) mechanism |
+| skill-researcher | 3/5 | Missing depth control (shallow/deep) and source credibility |
+| skill-coordinator-lite | 3/5 | Missing concrete scope-creep examples |
+
+**New skills recommended (v3.9.0):**
+- `skill-doc-writer` (P1): user-facing docs (README, API reference, migration guides) — non-routing, post-QA hook. Added in subsequent version.
+- `skill-release-engineer` (P2): version bump, CHANGELOG, build, git tag — guard on `status=PASS`. Added in subsequent version.
+- `skill-refactor-planner` (P2): tech-debt assessment triggered by sr-engineer `pending_notes: tech-debt: <desc>`. Not yet added as of synthesis date.
+
+---
+
+## Historical Snapshot: Skill Role Gap Analysis (2026-05-15)
+
+> Folded from `skill-role-gap-analysis.md`. Records the pre-v3.9 gap analysis for PM, sr-engineer, and qa-engineer vs industry benchmarks. Most gaps were addressed by v3.9.0.
+
+**Scope:** benchmarked against MetaGPT 5-role model, CrewAI best practices, 2026 Agentic Coding Trends Report, GitHub Context Engineering guide.
+
+**PM role gaps identified (pre-v3.9):** No enforced spec schema, no architect phase, no dependency/blocker metadata in tasks, no priority/risk tagging, no ambiguity escalation gate. **Resolution:** all added by v3.9.0 — `specs/<feature>.md` 7-section schema, architect role, `depends_on:` task metadata, `[P0/P1/P2]` priority tags, Ambiguity Gate.
+
+**Sr-engineer role gaps identified (pre-v3.9):** No clarification protocol, no security checklist, no task-size circuit breaker. **Resolution:** Clarification Gate, Security Checklist (no hardcoded secrets, input validation, injection vectors), and Task-Size Check (>5 files or >300 lines → block) added.
+
+**QA-engineer role gaps identified (pre-v3.9):** No spec-driven test mapping, no CI runnability check, no security smoke tests. **Resolution:** Copy Audit Gate, Visual Audit Gate, spec-to-test AC mapping, and CI runnability confirmation added.
+
+**Cross-cutting gaps addressed:** Architect role added (PM → architect → sr-engineer for complex features); priority tagging added; observability metadata deferred as architectural limitation.
+
+---
+
+## Historical Snapshot: Reviewer Role Extraction (2026-05-21)
+
+> Folded from `reviewer-role-extraction.md`. Records the research and decision for extracting code-reviewer as a dedicated role between sr-engineer and qa-engineer.
+
+**Question:** split code review out of qa-engineer into a dedicated `code-reviewer` role (`sr ↔ reviewer → qa`). Sound?
+
+**Finding:** yes. Writer/reviewer separation is a structural requirement, not optional polish. The dominant failure mode of single-agent self-review is bias: a model "too close" to code it wrote will rationalise its own logic. Splitting roles removes that bias. A `sr → reviewer → qa` chain reaches the three-agent tier (architect/security/QA) which catches categorically more failures than two-agent.
+
+**Critical constraint added:** reviewer must run in a **clean context** — receive only the diff + original PM spec + architect handoff. Must NOT inherit sr-engineer's `pending_notes` reasoning; that defeats the bias-removal purpose.
+
+**Required server changes (implemented in v3.9.0):** `reviewer` added to `AgentName` union in `tools/transitions.ts`; new transition edges (`sr-engineer:In_Progress` → `reviewer:In_Progress` → `qa-engineer:In_Progress`); `review_round` counter symmetric to `qa_round`; `review_reports/<task-id>.md` as evidence artifact; constitution §3.1/§4 updated; `schema_version` bumped.
+
+**Alternative rejected:** sr-engineer spawning a self-review sub-agent (same model family, no independent state-machine gate — materially weaker; not worth the architectural ambiguity).

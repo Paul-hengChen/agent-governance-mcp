@@ -2,7 +2,7 @@
 
 ## Problem Statement
 
-`research/why-pixel-perfect-missed.md` 揭露 framework 在 pixel-perfect 工作上有六道**同向**的結構性破口（QA scope 排除 style、code-reviewer clean-context、MVP strict 反向獎勵 primitive、PM 無 widget-shape schema、architect 無 harness schema、無人擁有 harness、Phase 1.5 lazy-skip 無 server gate），加上 operator 在 §7 "Fail loud" 的可規避性。線性鏈僅有一個 feedback loop（`qa_round`），pixel convergence 無專屬迴圈。結果：visual fidelity 在 cde-oobe rollout 漏失 ~60%，且每一步都符合既有規約。本 feature 套用報告 R1-R4 + 後續討論的 R2a/R3a/R4a/R5/R6 共九項修法，封堵全部六道破口。
+`research/visual-fidelity.md` 揭露 framework 在 pixel-perfect 工作上有六道**同向**的結構性破口（QA scope 排除 style、code-reviewer clean-context、MVP strict 反向獎勵 primitive、PM 無 widget-shape schema、architect 無 harness schema、無人擁有 harness、Phase 1.5 lazy-skip 無 server gate），加上 operator 在 §7 "Fail loud" 的可規避性。線性鏈僅有一個 feedback loop（`qa_round`），pixel convergence 無專屬迴圈。結果：visual fidelity 在 cde-oobe rollout 漏失 ~60%，且每一步都符合既有規約。本 feature 套用報告 R1-R4 + 後續討論的 R2a/R3a/R4a/R5/R6 共九項修法，封堵全部六道破口。
 
 ## User Stories
 
@@ -70,7 +70,7 @@ N/A — 本 feature 無 widget shape 需求（無 UI）。本段示範 Visual Wi
 ## Dependencies / Prerequisites
 
 - 答題批次決策（locked）：v3.14.0 MINOR / new-feature scope / strict server gate。
-- `research/why-pixel-perfect-missed.md` 為唯一外部 ref，已於 workspace，無需 fetch / index。
+- `research/visual-fidelity.md` 為唯一外部 ref，已於 workspace，無需 fetch / index。
 - `specs/qa-flow-enforcement-architecture.md` 需同步更新 transition matrix（列為 T09 任務）。
 - `bin/agent-governance-context.mjs` SessionStart hook 行為不變（不需動）。
 - `prompts/build.ts` 不需動（skills 自動納入）。

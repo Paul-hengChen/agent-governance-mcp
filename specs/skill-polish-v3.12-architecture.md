@@ -17,7 +17,7 @@
 | `content/skill-doc-writer.md` | EDIT (subtractive) — trim restated rules if any | T83 |
 | `content/skill-release-engineer.md` | EDIT (subtractive) — trim restated rules if any | T83 |
 | `content/skill-qa-visual.md` | NO CHANGE expected — lazy-loaded sub-skill already 19 lines | T83 verification |
-| `research/token-frugality-audit-v3.12.md` | CREATE | T82 |
+| `research/token-economics.md` | CREATE | T82 |
 | `specs/skill-polish-v3.12-architecture.md` | CREATE (this file) | architect |
 
 **No production-code (`.ts`) changes.** `prompts/build.ts` reads `content/*.md` as opaque blobs concatenated into the prompt; no anchor or section-id is parsed, so subtractive edits within those files cannot break the build.
@@ -42,7 +42,7 @@ A single Architecture Decision Record is a row in a 3-column markdown table insi
 
 ### Token-frugality audit artifact schema
 
-`research/token-frugality-audit-v3.12.md` MUST contain these H2 sections in order:
+`research/token-economics.md` MUST contain these H2 sections in order:
 
 ```markdown
 ## Methodology
@@ -105,7 +105,7 @@ sequenceDiagram
     participant Arch as architect
     participant SR as sr-engineer
     participant Files as content/*.md
-    participant Audit as research/token-frugality-audit-v3.12.md
+    participant Audit as research/token-economics.md
     participant Build as npm run build/test
     participant CR as code-reviewer
     participant QA as qa-engineer
@@ -128,7 +128,7 @@ sequenceDiagram
 
 ## Deferred Resources
 
-_Empty — spec's *Dependencies / Prerequisites* lists only one local file (`research/architecture-and-skills-evaluation-v3.9.md`) which is already fetched. No external references to defer._
+_Empty — spec's *Dependencies / Prerequisites* lists only one local file (`research/process-retrospective.md`) which is already fetched. No external references to defer._
 
 ## Open Questions
 

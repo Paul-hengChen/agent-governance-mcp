@@ -2,7 +2,7 @@
 
 ## Problem Statement
 
-The post-fusion architecture audit ([research/value-assessment.md](file:///Users/paul.ph.chen/agent-governance-mcp/research/value-assessment.md)) identified the multi-role chain (~15K tokens/task) as net overhead for solo-dev daily work where most tasks are 1-file edits, doc tweaks, or single-fix bugs. The proposed remedy is a parallel entry point that loads a lighter coordinator skill, skips drift checks, and direct-executes without routing — targeting ~3K tokens/task. This MVP introduces only the new entry point (`/teamwork-lite` prompt + skill). The existing 6 prompts and server-enforced chain remain unchanged; users opt into lite mode by choosing the new prompt.
+The post-fusion architecture audit ([research/value-proposition.md](file:///Users/paul.ph.chen/agent-governance-mcp/research/value-proposition.md)) identified the multi-role chain (~15K tokens/task) as net overhead for solo-dev daily work where most tasks are 1-file edits, doc tweaks, or single-fix bugs. The proposed remedy is a parallel entry point that loads a lighter coordinator skill, skips drift checks, and direct-executes without routing — targeting ~3K tokens/task. This MVP introduces only the new entry point (`/teamwork-lite` prompt + skill). The existing 6 prompts and server-enforced chain remain unchanged; users opt into lite mode by choosing the new prompt.
 
 ## User Stories
 
@@ -55,4 +55,4 @@ The post-fusion architecture audit ([research/value-assessment.md](file:///Users
 
 - Existing prompt infrastructure: [prompts/build.ts](file:///Users/paul.ph.chen/agent-governance-mcp/prompts/build.ts) (`buildPromptForRole`, `RAG_SKIP_ROLES`, `appendSpecContext`).
 - Existing constitution: [content/constitution.md](file:///Users/paul.ph.chen/agent-governance-mcp/content/constitution.md) at v3.5.2 — loaded as-is.
-- Audit source: [research/value-assessment.md](file:///Users/paul.ph.chen/agent-governance-mcp/research/value-assessment.md).
+- Audit source: [research/value-proposition.md](file:///Users/paul.ph.chen/agent-governance-mcp/research/value-proposition.md).

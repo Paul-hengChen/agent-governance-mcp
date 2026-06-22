@@ -1,7 +1,7 @@
 # Spec — RAG Lifecycle Automation
 
 > @pm · 2026-05-19
-> Source: `research/rag-lifecycle-automation.md`
+> Source: `research/automation-and-rag.md`
 
 ## Problem Statement
 
