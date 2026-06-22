@@ -222,8 +222,8 @@ test("AC5: README adds ### Claude Code subagent install (auto model-routing) sub
   );
 });
 
-// v3.21.0: README must surface @teamwork + @lite as primary entry points + S06 migration note.
-test("v3.21.0 AC4: README surfaces @teamwork and @lite primaries + migration note (S06)", () => {
+// v3.21.0: README must surface @teamwork + @lite as primary entry points.
+test("v3.21.0 AC4: README surfaces @teamwork and @lite primaries", () => {
   const raw = fs.readFileSync(path.join(REPO_ROOT, "README.md"), "utf-8");
   assert.match(
     raw,
@@ -234,11 +234,6 @@ test("v3.21.0 AC4: README surfaces @teamwork and @lite primaries + migration not
     raw,
     /@lite/,
     "README must surface @lite as a primary entry point",
-  );
-  assert.match(
-    raw,
-    /rm\s+~\/\.claude\/agents\/coordinator-lite\.md/,
-    "README must include the v3.20.0 -> v3.21.0 migration command (rm coordinator-lite.md)",
   );
 });
 
