@@ -6,6 +6,8 @@ Lost updates, rule drift across `.cursorrules` / `CLAUDE.md` / `.windsurfrules`,
 
 > **Status**: production-used, v3.40.1. Suite **727/727**. Stdio mode is solo/single-machine; HTTP+SQLite mode is for multi-machine teams.
 
+*Solo-built and self-hosting: this repo dogfoods its own server — development of agent-governance-mcp itself runs through the constitution and `tw_*` gates it ships.*
+
 ---
 
 ## Why this exists
@@ -73,7 +75,7 @@ Every `tw_update_state` runs the full 9-step pipeline before touching disk. A re
 | Category | MCP server + hard gates | Slash-command + templates | Slash-command + templates |
 | Enforcement | **Server-side** (`⛔ BLOCKED`) | Prompt-level (advisory) | Prompt-level (advisory) |
 | Concurrent-write safety | **O_EXCL lock + mtime check** | None | None |
-| Role separation | **9 roles + ALLOWED_TRANSITIONS** | Single agent per session | Human-AI pair |
+| Role separation | **12 roles + ALLOWED_TRANSITIONS** | Single agent per session | Human-AI pair |
 | Retry / feedback loops | **3 round counters w/ caps** | Undefined | Undefined |
 | Multi-IDE shared state | **Yes** (stdio fs, or HTTP+SQLite) | Filesystem only | Filesystem only |
 | Install weight | Heavier (MCP server) | Lighter (CLI scaffold) | Lighter (CLI scaffold) |
@@ -138,9 +140,7 @@ Primary entry points after install (v3.21.0):
 What changes after install:
 
 - **Inside Claude Code with `@teamwork` (or `/teamwork`)** — coordinator dispatches via the Task tool to each role's subagent; each subagent runs in a **fresh context with the model pinned in its frontmatter** (see tier table above). Anthropic-reported cost: Opus workers + Sonnet orchestrator ≈ 40 % cheaper than all-Opus.
-- **Without the templates installed, or outside Claude Code** (Cursor, Continue, Anti-Gravity, plain MCP clients) — coordinator silently falls back to the existing `tw_switch_role` text-load path. Behavior is **identical to v3.19.x**. No tw_* tool surface has changed.
-
-**Upgrade note for v3.20.0 users**: If you previously installed v3.20.0 templates, run `rm ~/.claude/agents/coordinator-lite.md` then re-copy from `templates/claude-code-agents/`. Your existing `coordinator-lite.md` install will keep working (Claude Code reads the `name:` field) — but `@lite` will not resolve until you re-copy.
+- **Without the templates installed, or outside Claude Code** (Cursor, Continue, Anti-Gravity, plain MCP clients) — coordinator silently falls back to the existing `tw_switch_role` text-load path. No tw_* tool surface changes.
 
 For the conceptual model — the two orthogonal axes (slash `/teamwork` vs `@teamwork` entry point ⊥ Task-dispatch vs `tw_switch_role`), and why `/teamwork` also model-routes when a host advertises a `Task` tool — see [docs/architecture.md → Entry points & model routing](docs/architecture.md#entry-points--model-routing).
 
@@ -158,7 +158,6 @@ See [specs/subagent-dispatch.md](specs/subagent-dispatch.md) + [specs/subagent-s
 
 ---
 
-<!-- HIDDEN (temporarily) — Setup (full): all-clients/hook install, HTTP/Docker/remote mode, workspace customisation, SessionStart hook config
 ## Setup (full)
 
 - **All clients + hook config**: [docs/install.md](docs/install.md)
@@ -187,8 +186,6 @@ Add to `~/.claude/settings.json`:
 The hook is a silent no-op outside managed workspaces (no `.current/`, `tasks.md`, or `TODO.md`) — by design.
 
 ---
--->
-
 
 ## Links
 
