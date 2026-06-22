@@ -4,7 +4,7 @@
 
 Lost updates, rule drift across `.cursorrules` / `CLAUDE.md` / `.windsurfrules`, and silent overwrites when two IDEs write at once — solved at the protocol layer, not by hoping the AI behaves.
 
-> **Status**: production-used, v3.40.0. Suite **713/713**. Stdio mode is solo/single-machine; HTTP+SQLite mode is for multi-machine teams.
+> **Status**: production-used, v3.40.1. Suite **727/727**. Stdio mode is solo/single-machine; HTTP+SQLite mode is for multi-machine teams.
 
 ---
 
@@ -25,11 +25,11 @@ Existing tools in the same category (GitHub Spec Kit, OpenSpec) ship **templates
 
 ```bash
 # 1. Register the MCP server
-claude mcp add -s user agent-governance-mcp -- npx -y github:Paul-hengChen/agent-governance-mcp#v3.40.0
+claude mcp add -s user agent-governance-mcp -- npx -y github:Paul-hengChen/agent-governance-mcp#v3.40.1
 
 # 2. Mark the current workspace as managed (REQUIRED — hook is a silent no-op without this)
 # Recommended: use agc init (writes .current/, tasks.md, AND cross-agent adapter files)
-npx -y github:Paul-hengChen/agent-governance-mcp#v3.38.0 agc init
+npx -y github:Paul-hengChen/agent-governance-mcp#v3.40.1 agc init
 # Alternative (bare scaffold, no adapter files):
 mkdir -p .current
 
@@ -164,10 +164,10 @@ Adapters carry an `agc-version:` stamp (HTML comment in `CLAUDE.md`, `#` comment
 
 ```bash
 # Write adapters (idempotent — safe to re-run)
-npx -y github:Paul-hengChen/agent-governance-mcp#v3.38.0 agc init
+npx -y github:Paul-hengChen/agent-governance-mcp#v3.40.1 agc init
 
 # Check for stale adapters after upgrading agc
-npx -y github:Paul-hengChen/agent-governance-mcp#v3.38.0 agc check
+npx -y github:Paul-hengChen/agent-governance-mcp#v3.40.1 agc check
 ```
 
 Write behaviour is idempotent: `AGENTS.md` and `.antigravityrules` are skipped if they already exist; the `CLAUDE.md` block is upserted in-place (surrounding user prose preserved, stamp refreshed).
@@ -293,7 +293,7 @@ Add to `~/.claude/settings.json`:
       "matcher": "",
       "hooks": [{
         "type": "command",
-        "command": "npx -y -p github:Paul-hengChen/agent-governance-mcp#v3.40.0 agent-governance-context",
+        "command": "npx -y -p github:Paul-hengChen/agent-governance-mcp#v3.40.1 agent-governance-context",
         "timeout": 60
       }]
     }]
