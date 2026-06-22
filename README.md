@@ -28,9 +28,9 @@ Existing tools in the same category (GitHub Spec Kit, OpenSpec) ship **templates
 claude mcp add -s user agent-governance-mcp -- npx -y github:Paul-hengChen/agent-governance-mcp#v3.40.1
 
 # 2. Mark the current workspace as managed (REQUIRED — hook is a silent no-op without this)
-# Recommended: use agc init (writes .current/, tasks.md, AND cross-agent adapter files)
+# Recommended: use agc init (writes .current/ + tasks.md)
 npx -y github:Paul-hengChen/agent-governance-mcp#v3.40.1 agc init
-# Alternative (bare scaffold, no adapter files):
+# Alternative (bare scaffold):
 mkdir -p .current
 
 # 3. Add the SessionStart hook to ~/.claude/settings.json (see Setup → Hook below)
@@ -148,124 +148,6 @@ See [specs/subagent-dispatch.md](specs/subagent-dispatch.md) + [specs/subagent-s
 
 ---
 
-## Cross-Agent Adapters (v3.29.0+)
-
-`agc init` writes three thin per-project adapter files alongside the `.current/` scaffold:
-
-| File | Agent | Strategy |
-|---|---|---|
-| `CLAUDE.md` | Claude Code | Marker-delimited block (`<!-- BEGIN agc-adapter -->`) upserted into any existing file |
-| `AGENTS.md` | OpenAI Codex | Created fresh; skip-if-exists on subsequent runs |
-| `.antigravityrules` | Anti-Gravity | Created fresh; skip-if-exists on subsequent runs |
-
-Each adapter is a **thin loader** — it points at the constitution served by the MCP server and records the agent's execution profile (subagent dispatch availability, watermark applicability). It does **not** duplicate constitution rules, so there is a single source of truth: the server.
-
-Adapters carry an `agc-version:` stamp (HTML comment in `CLAUDE.md`, `#` comment in the others). The companion **`agc check`** subcommand compares each deployed stamp against the installed package version and exits 1 on any stale adapter — making drift detectable rather than silent.
-
-```bash
-# Write adapters (idempotent — safe to re-run)
-npx -y github:Paul-hengChen/agent-governance-mcp#v3.40.1 agc init
-
-# Check for stale adapters after upgrading agc
-npx -y github:Paul-hengChen/agent-governance-mcp#v3.40.1 agc check
-```
-
-Write behaviour is idempotent: `AGENTS.md` and `.antigravityrules` are skipped if they already exist; the `CLAUDE.md` block is upserted in-place (surrounding user prose preserved, stamp refreshed).
-
-See [specs/cross-agent-adapter-scaffolding.md](specs/cross-agent-adapter-scaffolding.md) for the full design and deferred follow-ups (Cursor adapter, `agc update`, live-reference delivery).
-
----
-
-## Visual Fidelity Gates (v3.25.0–v3.38.0)
-
-For design-backed features (where `design/<feature>.md` declares `## Mode` ≠ `no-design`), the server enforces a layered visual-evidence pipeline before accepting a QA PASS:
-
-| Gate | Error code | Condition |
-|---|---|---|
-| Baselines present | `VISUAL_BASELINES_REQUIRED` | No `## Visual Baselines` section in the design file |
-| Assertions present | `VISUAL_ASSERTIONS_REQUIRED` | No `## Visual Structural Assertions` section (v3.27.0 — hard error, not bypass) |
-| Report complete | `VISUAL_REPORT_INCOMPLETE` | Report missing a required section, unchecked canonical-state row, failing region-diff row, or non-PASS verdict |
-| Provenance recorded | `VISUAL_PROVENANCE_MISSING` | (v3.38.0) Diffed surface in `## Region Diff` lacks baseline fingerprint or diff-metric evidence; carry-forward surfaces and B1-tool-unavailable fallback paths exempt |
-
-**Separation of duties (v3.26.0):** the visual verdict is qa-visual-owned. Coordinators and non-qa roles may not define, override, relax, or pre-accept any visual difference — a coordinator accept-policy is void. Builder ≠ judge: a role running inline under subagent limits cannot self-issue a visual PASS; the result is `Blocked`. Whole-frame pixel-% is banned as a PASS metric; per-region diff tables are required.
-
-Non-UI features and those with `mode: no-design` are unaffected by all four gates.
-
----
-
-## Scope Decision Gate (v3.30.0)
-
-Handoff schema v4 adds a `scope_decision` field. When a coordinator or sr-engineer attempts to transition into a build role on design-armed work, the server checks for a recorded scope decision (either `.current/feature-split.md` present or `scope_decision: single-feature` in the handoff). If neither exists, the transition is rejected with `SCOPE_DECISION_REQUIRED`.
-
-This gate enforces scope decisions at the MCP-tool layer. It does not stop a coordinator from bypassing via direct in-context edits to `handoff.md` — those remain detectable via `tw_detect_drift` but not server-blocked.
-
----
-
-## Context-Frugal Loading (v3.31.0–v3.34.0)
-
-The constitution is injected into *every* role dispatch, so its size is a per-dispatch tax. A series of releases drove that cost down without weakening any rule, on three conditional-load axes in `prompts/build.ts`:
-
-| Axis | Helper | Strips | When |
-|---|---|---|---|
-| **chain-only** | `stripChainOnly` | §3.1 + §3.2 + §4 (the routing-chain block) | lite mode (`/teamwork-lite`) |
-| **rationale** | `stripRationale` | `<!-- rationale -->`-fenced explanatory prose in §1/§7 (and the skill body) | every non-`fullDetail` chain dispatch |
-| **design-only** | `stripDesignOnly` | `<!-- design-only -->`-fenced visual governance (§3.2 minus R10, the §3.1 visual gates, the §4 `visual_round`/design-auditor prose, §1 visual exceptions) | non-design features only |
-
-The **design-only** axis (v3.33.0–v3.34.0) is the key idea: visual-fidelity governance is *inert* on a non-design feature (the server visual gates self-arm only when `design/<feature>.md` has `## Mode ≠ no-design`), so it is stripped from chain-role dispatches there. The strip's trigger **reuses the same `hasDesignModeRequiringVisual()` helper the server PASS gates use** — so the constitution text is present exactly when the gates can fire and stripped exactly when they're inert; the two cannot drift.
-
-Net effect: on a non-design chain hop the constitution dropped from ~4,233 → **~2,409 ~tok** (≈1,790 lighter), while design features load the full governance contract unchanged. Companion: `content/constitution-rationale.md` (v3.32.0) holds the non-normative "why" behind the rules, keeping the always-loaded constitution lean. Measured by `scripts/measure-context-cost.mjs`; pinned by assertions in `test/context-budget.test.mjs`.
-
----
-
-## QA-Visual Token Reduction (v3.37.0)
-
-qa-visual mode applies two deterministic gates to reduce token burn on repeated visual diff cycles:
-
-| Gate | Name | Behavior |
-|---|---|---|
-| **Step B0** | Round ≥ 2 carry-forward | On `visual_round ≥ 2`, surfaces that passed in a prior round + remain untouched by git diff are carried forward as `pass` without re-reading images; prior `fail` / `accepted` / recaptured surfaces always re-diff; falls back to full re-diff when git-diff cannot prove a surface untouched |
-| **Step B1** | Deterministic-pixel-diff-first | A deterministic CLI tool (`odiff` / `pixelmatch` / ImageMagick `compare`) runs over each baseline's `compare region` first; LLM reads images into multimodal context only for surfaces the tool flags above threshold; whole-frame pixel-% PASS ban preserved |
-
-Both reduce qa-visual token burn while preserving visual fidelity: prior-pass surfaces are skipped on repeat rounds, and the LLM sees only pixel-diff-flagged regions in round 1.
-
----
-
-## QA-Visual Baseline Provenance Gate (v3.38.0)
-
-The visual PASS gate enforces baseline provenance — diffed surfaces in a visual report must carry verifiable evidence that a real Figma export was obtained and a pixel-diff execution ran:
-
-- **Baseline fingerprint required** — each diffed (non-carry-forward) surface's prose sub-section in `## Region Diff` must include a `baseline:` field (content-hash of the Figma export, or the node id).
-- **Diff metric required** — each diffed surface must record a `diff-metric:` value (numeric pixel count/percentage, or `B1 tool unavailable — LLM fallback` for deterministic-tool unavailability with LLM fallback).
-- **Carry-forward exempt** — surfaces marked `pass (carried forward — git diff confirms source untouched)` are not required to carry provenance; B1-tool-unavailable fallback paths are accepted.
-
-Gate is dormant for features with no design file or `mode: no-design`, same as the other visual gates. Implementation: `tools/evidence-file.ts` (`checkVisualProvenance()`); SOP: `content/skill-qa-visual.md` Step A.4 "Provenance Validation"; tests: `test/evidence-provenance.test.mjs`.
-
----
-
-## Baseline Mechanical Selection SOP (v3.39.0)
-
-v3.39.0 ships deterministic baseline selection (no eyeball-picking). Design-auditor SOP step 2c establishes the process:
-
-- **Structural filter** — apply a deterministic filter to select candidate baseline nodes (spatial proximity, componentId grouping, no id-prefix matching).
-- **Node-id freeze** — freeze the selected node ids into the `## Source` manifest as `status: audited` rows.
-- **Manifest publication** — the Source section becomes read-only after this step; qa-visual carries the frozen manifest verbatim without re-deriving node ids.
-
-This ensures baseline selection is reproducible and auditable. SOP: `content/skill-design-auditor.md` Step 2c; qa-visual counterpart: `content/skill-qa-visual.md` Step A.0.
-
----
-
-## Baseline Manifest Gate (v3.40.0)
-
-The sixth and final visual PASS sub-gate enforces observable artifact completeness. When `design/<feature>.md` declares a `## Source` manifest (design-backed baseline work):
-
-- **Audited baseline required** — PASS requires ≥1 row with `status: audited` in the manifest. Zero audited rows → `BASELINE_MANIFEST_MISSING`. Enforces that a real baseline was frozen (not a placeholder or incomplete manifest).
-- **Provenance for multi-surface** — manifests with ≥2 audited rows additionally require a `## Baseline Selection Provenance` section carrying both a `filter-conditions:` field and an `exclusion-reasons:` field. Missing either → `BASELINE_PROVENANCE_INCOMPLETE`. Documents *why* these specific nodes were selected.
-- **Single-surface exempt** — manifests with exactly 1 audited row are exempt from the provenance requirement (the selection is self-evident).
-
-Gate is dormant when `## Source` is absent (pre-v3.40.0 designs are not retro-blocked); non-design features pass through silently. Implementation: `tools/evidence-file.ts` (`checkBaselineManifest()`); wired as the 6th visual sub-gate in `index.ts`; SOP integration: `content/skill-qa-visual.md` Step A.0 (copy manifest verbatim), `content/skill-design-auditor.md` Step 2c (freeze selection). Complements v3.38.0 provenance gate — provenance validates *how* the baseline was captured; manifest gate validates *that* a baseline was captured.
-
----
-
 ## Limits (read before adopting)
 
 - **Cannot force AI to follow the constitution** — only injects it into context. AI can still hallucinate. The gates stop *state writes*, not bad reasoning.
@@ -276,6 +158,7 @@ Gate is dormant when `## Source` is absent (pre-v3.40.0 designs are not retro-bl
 
 ---
 
+<!-- HIDDEN (temporarily) — Setup (full): all-clients/hook install, HTTP/Docker/remote mode, workspace customisation, SessionStart hook config
 ## Setup (full)
 
 - **All clients + hook config**: [docs/install.md](docs/install.md)
@@ -304,6 +187,8 @@ Add to `~/.claude/settings.json`:
 The hook is a silent no-op outside managed workspaces (no `.current/`, `tasks.md`, or `TODO.md`) — by design.
 
 ---
+-->
+
 
 ## Links
 
