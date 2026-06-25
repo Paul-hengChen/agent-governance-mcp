@@ -33,7 +33,7 @@ import { appendSpecContext } from "./prompts/build.js";
 import { buildPrdChunks, CHUNKER_VERSION, DEFAULT_EMBEDDING_MODEL } from "./tools/rag.js";
 import { getInflightKey, getInflight, setInflight, deleteInflight, awaitAllInflightFor, } from "./tools/rag-coalesce.js";
 import { requireQaEngineer, validateTransition, computeNewRound, ALLOWED_TRANSITIONS, } from "./tools/transitions.js";
-import { hasVisualBaselinesInDesign, hasVisualEvidenceInFile, hasUncheckedWidgets, hasDesignModeRequiringVisual, designDeclaresStructuralAssertions, validateVisualReports, checkVisualProvenance, checkBaselineManifest, hasScopeDecision, } from "./tools/evidence-file.js";
+import { hasVisualBaselinesInDesign, hasVisualEvidenceInFile, hasUncheckedWidgets, hasDesignModeRequiringVisual, designDeclaresStructuralAssertions, validateVisualReports, checkVisualProvenance, checkBaselineManifest, checkPixelGateAttestation, hasScopeDecision, } from "./tools/evidence-file.js";
 // ==========================================
 // Runtime validation schemas (zod)
 // ==========================================
@@ -173,7 +173,7 @@ function formatZodError(err) {
 // 1. Initialize Server (Tools + Prompts)
 // ==========================================
 // Storage adapter defaults to FileHandoffStorage; HTTP-mode boot switches it via setActiveStorage().
-const server = new Server({ name: "agent-governance-mcp", version: "3.40.1" }, { capabilities: { tools: {}, prompts: {} } });
+const server = new Server({ name: "agent-governance-mcp", version: "3.42.0" }, { capabilities: { tools: {}, prompts: {} } });
 // ==========================================
 // 2. Register Prompts (Layer 1: Auto-inject constitution)
 // ==========================================
@@ -906,6 +906,37 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                                     ? `⛔ BASELINE_MANIFEST_MISSING: design/<feature>.md declares mode != no-design but the Source manifest (## Source section) contains no audited baseline rows. The design-auditor must complete step 2c (Mechanical baseline selection) — run the deterministic structural filter, freeze the resulting node-id list with status: audited in the Source manifest, and record filter-conditions + exclusion-reasons in a ## Baseline Selection Provenance section (required for multi-surface selections). See specs/figma-baseline-manifest-gate.md.`
                                     : `⛔ BASELINE_PROVENANCE_INCOMPLETE: design/<feature>.md has a multi-surface Source manifest (>=2 audited rows) but the ## Baseline Selection Provenance section is absent or incomplete (requires both filter-conditions: and exclusion-reasons: lines). Record the filter criteria used to select the baseline set per design-auditor SOP step 2c. See specs/figma-baseline-manifest-gate.md.`;
                                 return { content: [{ type: "text", text }], isError: true };
+                            }
+                            // v3.42.0 — Pixel-gate attestation (qa-visual-pixel-gate-attestation,
+                            // AC-2/AC-5). SEVENTH and LAST visual sub-gate. The v3.38 provenance
+                            // gate (now tightened by DIFF_METRIC_PLACEHOLDERS, AC-1) confirms each
+                            // diffed surface carries a REAL baseline + non-placeholder diff-metric;
+                            // this gate confirms qa-visual POSITIVELY attested the pixel gate ran
+                            // to completion (`pixel_gate_complete: true`) per surface. Closes the
+                            // F2 false-pass: a skipped diff can no longer ride structural assertions
+                            // to PASS. Opt-in (mirrors provenance D2): dormant for reports with no
+                            // baseline: line anywhere. Carry-forward surfaces are exempt (AC-4);
+                            // the B1 LLM-fallback path STILL requires the attestation (AC-5).
+                            const attestation = checkPixelGateAttestation(parsed.workspace_path, parsed.completed_tasks);
+                            if (!attestation.ok) {
+                                const listing = Object.entries(attestation.offendingByTaskId)
+                                    .map(([taskId, offenses]) => {
+                                    const surfaces = offenses
+                                        .map((o) => o.replace(/^missing-attestation:/, ""))
+                                        .join(", ");
+                                    return `${taskId} {${surfaces}}`;
+                                })
+                                    .join(" | ");
+                                return {
+                                    content: [{
+                                            type: "text",
+                                            text: `⛔ PIXEL_GATE_ATTESTATION_MISSING: ${listing}. Each non-carry-forward ` +
+                                                `surface in qa_reports/visual_<id>.md must carry '- pixel_gate_complete: true' ` +
+                                                `in its ### <surface id> prose sub-section under ## Region Diff. Carry-forward ` +
+                                                `surfaces are exempt. See specs/qa-visual-pixel-gate-attestation.md.`,
+                                        }],
+                                    isError: true,
+                                };
                             }
                         }
                     }

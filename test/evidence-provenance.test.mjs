@@ -324,7 +324,11 @@ test("AC-1: diffed surface missing baseline: → flagged with 'no baseline:'", (
 // AC-2: missing diff-metric → flagged
 // ---------------------------------------------------------------------------
 
-test("AC-2: diffed surface missing diff-metric: → flagged with 'no diff-metric:'", () => {
+test("AC-2: diffed surface missing diff-metric: → flagged with 'invalid diff-metric value'", () => {
+  // v3.42.0: checkVisualProvenance now uses isPlaceholderDiffMetric to evaluate the
+  // diff-metric field. A missing/absent diff-metric is null, which isPlaceholderDiffMetric
+  // treats as a placeholder (null → true), so the offense message changed from
+  // "no diff-metric:" to "invalid diff-metric value \"\"" to match the AC-9 hint format.
   const ws = tmpWs();
   writeVisual(ws, "T01", `## Region Diff
 | surface | result |
@@ -344,8 +348,8 @@ test("AC-2: diffed surface missing diff-metric: → flagged with 'no diff-metric
   const result = checkVisualProvenance(ws, ["T01"]);
   assert.equal(result.ok, false);
   const offenses = result.offendingByTaskId["T01"];
-  assert.ok(offenses.some((o) => o.startsWith("panel") && o.includes("no diff-metric:")),
-    `expected 'panel: no diff-metric:' in ${JSON.stringify(offenses)}`);
+  assert.ok(offenses.some((o) => o.startsWith("panel") && o.includes("invalid diff-metric value")),
+    `expected 'panel: invalid diff-metric value ...' in ${JSON.stringify(offenses)}`);
 });
 
 // ---------------------------------------------------------------------------

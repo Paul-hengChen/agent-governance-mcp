@@ -568,9 +568,12 @@ export function validateVisualReports(
 export interface VisualProvenanceRow {
   surfaceId: string;       // surface id from the prose sub-section heading
   fingerprint: string | null;   // value after `baseline:` (backtick-stripped, trimmed); null if absent/empty/placeholder
-  diffMetric: string | null;    // value after `diff-metric:` (trimmed); null if absent/empty
+  diffMetric: string | null;    // value after `diff-metric:` (trimmed); null if absent/empty — RAW value kept
+                                 // (placeholder REJECTION is applied at the gate via isPlaceholderDiffMetric,
+                                 // NOT here, so the raw value stays visible for AC-9 hints).
   isCarryForward: boolean; // prose contains the literal carry-forward token
   isFallback: boolean;     // prose contains the literal B1-unavailable token
+  pixelGateComplete: boolean;   // true iff a `pixel_gate_complete:` line is present and normalizes to "true"
 }
 
 export interface VisualProvenanceCheck {
@@ -587,11 +590,57 @@ const B1_UNAVAILABLE_TOKEN = "B1 tool unavailable — LLM fallback";
 // Lowercased compare; the empty string is included so a bare `baseline:` fails.
 const FINGERPRINT_PLACEHOLDERS = new Set(["<fingerprint>", "todo", "tbd", "n/a", "none", "-", ""]);
 
+// v3.42.0 — qa-visual-pixel-gate-attestation AC-1. Lowercased-trimmed tokens that a
+// `diff-metric:` value must NOT equal. A placeholder means the pixel gate did not run
+// to completion (skipped / dimension mismatch / not-yet-done), so it counts as absent.
+// `"dimensionsmatch=false"` is the normalized form of the comparator's
+// `dimensionsMatch=false` emit; `"dimensions mismatch"` covers the human-prose variant.
+// The empty string is a member so a bare `diff-metric:` (no value) is rejected by the
+// same path. The B1-fallback token (`B1 tool unavailable — LLM fallback`) is deliberately
+// NOT a member (AC-5) — it proves the LLM-fallback path ran to completion.
+const DIFF_METRIC_PLACEHOLDERS: ReadonlySet<string> = new Set([
+  "n/a",
+  "skipped",
+  "skip",
+  "dimensionsmatch=false",
+  "dimensions mismatch",
+  "todo",
+  "tbd",
+  "none",
+  "-",
+  "",
+]);
+
 // Permissive label-line regexes (D1 parse contract): optional leading bullet
 // (`-`/`*`), optional surrounding markdown bold (`**`), case-insensitive label,
 // `:`/`—`/`-` separator, capture the remainder. `m` for per-line, `i` for case.
 const BASELINE_LINE_RE = /^[^\S\n]*(?:[-*][^\S\n]*)?(?:\*\*[^\S\n]*)?baseline(?:[^\S\n]*\*\*)?[^\S\n]*[:—-][^\S\n]*([^\n]+?)[^\S\n]*$/im;
 const DIFF_METRIC_LINE_RE = /^[^\S\n]*(?:[-*][^\S\n]*)?(?:\*\*[^\S\n]*)?diff-metric(?:[^\S\n]*\*\*)?[^\S\n]*[:—-][^\S\n]*([^\n]+?)[^\S\n]*$/im;
+// v3.42.0 — AC-3: same permissive label-line shape as the two above; only the label
+// literal differs (underscores are literal, no escaping needed in a regex char run).
+const PIXEL_GATE_COMPLETE_LINE_RE = /^[^\S\n]*(?:[-*][^\S\n]*)?(?:\*\*[^\S\n]*)?pixel_gate_complete(?:[^\S\n]*\*\*)?[^\S\n]*[:—-][^\S\n]*([^\n]+?)[^\S\n]*$/im;
+
+// Pure (AC-10). True iff `value` is absent OR normalizes to a member of
+// DIFF_METRIC_PLACEHOLDERS. Normalization: trim, lowercase, collapse internal
+// whitespace runs to a single space. null → true (absent counts as placeholder).
+// Single source of truth for "is this diff-metric a non-execution placeholder" —
+// both checkVisualProvenance and checkPixelGateAttestation call it.
+export function isPlaceholderDiffMetric(value: string | null): boolean {
+  if (value === null) return true;
+  const s = value.trim().toLowerCase().replace(/\s+/g, " ");
+  return DIFF_METRIC_PLACEHOLDERS.has(s);
+}
+
+// Pure (AC-3/AC-10). True iff `body` contains a `pixel_gate_complete:` label-line
+// whose value (emphasis-stripped, trimmed, lowercased) is exactly "true". Absent or
+// any other value (false, yes, 1, "") → false.
+export function parsePixelGateAttestation(body: string): boolean {
+  if (!body) return false;
+  const m = PIXEL_GATE_COMPLETE_LINE_RE.exec(body);
+  if (!m) return false;
+  const value = m[1].replace(/^[*_]+|[*_]+$/g, "").trim().toLowerCase();
+  return value === "true";
+}
 
 // Pure parser (AC-9 — no I/O, never throws). Returns one row per per-surface
 // prose sub-section (a `### `..`###### ` heading) under `## Region Diff`. The
@@ -642,7 +691,9 @@ export function parseVisualProvenanceRows(content: string): VisualProvenanceRow[
       if (raw) diffMetric = raw;
     }
 
-    rows.push({ surfaceId: heads[i].surfaceId, fingerprint, diffMetric, isCarryForward, isFallback });
+    const pixelGateComplete = parsePixelGateAttestation(body);
+
+    rows.push({ surfaceId: heads[i].surfaceId, fingerprint, diffMetric, isCarryForward, isFallback, pixelGateComplete });
   }
   return rows;
 }
@@ -682,10 +733,66 @@ export function checkVisualProvenance(
         offenses.push(`${row.surfaceId}: no baseline:`);
         continue;
       }
-      // AC-2 + AC-4: a real diff metric OR the B1-fallback token satisfies it.
-      if (row.diffMetric === null && !row.isFallback) {
-        offenses.push(`${row.surfaceId}: no diff-metric:`);
+      // v3.42.0 AC-1/AC-6: a placeholder diff-metric (N/A, skipped, dimensionsMatch=false, …)
+      // counts as absent. The B1-fallback path is still accepted via isFallback (AC-5): its
+      // token is NOT a placeholder, but isFallback short-circuits regardless.
+      if (!row.isFallback && isPlaceholderDiffMetric(row.diffMetric)) {
+        offenses.push(`${row.surfaceId}: invalid diff-metric value "${row.diffMetric ?? ""}"`);
       }
+    }
+    if (offenses.length > 0) offendingByTaskId[id] = offenses;
+  }
+  return { ok: Object.keys(offendingByTaskId).length === 0, offendingByTaskId };
+}
+
+// ---------- v3.42.0 — Pixel-gate attestation (qa-visual-pixel-gate-attestation) ----------
+// SEVENTH/LAST visual sub-gate (AC-2/AC-5). The v3.38 provenance gate (now tightened by
+// DIFF_METRIC_PLACEHOLDERS, AC-1) confirms each diffed surface carries a REAL baseline +
+// non-placeholder diff-metric; this gate confirms qa-visual POSITIVELY attested the pixel
+// gate ran to completion (`pixel_gate_complete: true`) per surface. Closes the F2
+// false-pass: a skipped diff can no longer ride structural assertions to PASS.
+
+export interface PixelGateAttestationCheck {
+  ok: boolean;
+  // task id -> per-surface offense strings (currently the single kind
+  // "missing-attestation:<surface>"). Tagged so the index.ts handler can render
+  // AC-9's "which condition failed" without re-deriving it.
+  offendingByTaskId: Record<string, string[]>;
+}
+
+// fs composition helper (mirrors checkVisualProvenance, AC-10). For each task id: read
+// visual_<id>.md (skip if absent — existence is enforced upstream by
+// hasVisualEvidenceInFile), parse rows, apply the gate. Never throws (fs errors → skip).
+//
+// Opt-in (mirrors provenance D2): dormant for a report with no non-null fingerprint
+// anywhere (legacy/pre-provenance) — this is what makes AC-8 hold. Once any surface
+// declares a real `baseline:`, EVERY non-carry-forward surface must carry
+// `pixel_gate_complete: true`. Carry-forward surfaces are exempt (AC-4). The B1
+// LLM-fallback path is NOT exempt — it must STILL attest (AC-5): a valid execution of
+// the pixel gate, not a skip.
+export function checkPixelGateAttestation(
+  workspacePath: string,
+  taskIds: string[],
+): PixelGateAttestationCheck {
+  const offendingByTaskId: Record<string, string[]> = {};
+  for (const id of taskIds) {
+    const filePath = visualEvidencePath(workspacePath, id);
+    if (!fs.existsSync(filePath)) continue;
+    let content: string;
+    try {
+      content = fs.readFileSync(filePath, "utf-8");
+    } catch {
+      continue;
+    }
+    const rows = parseVisualProvenanceRows(content);
+    // Opt-in: dormant unless the report declares at least one baseline (AC-8).
+    if (!rows.some((r) => r.fingerprint !== null)) continue;
+
+    const offenses: string[] = [];
+    for (const row of rows) {
+      if (row.isCarryForward) continue; // AC-4 — exempt
+      // AC-5: isFallback rows are NOT exempt — no early-continue here.
+      if (!row.pixelGateComplete) offenses.push(`missing-attestation:${row.surfaceId}`);
     }
     if (offenses.length > 0) offendingByTaskId[id] = offenses;
   }

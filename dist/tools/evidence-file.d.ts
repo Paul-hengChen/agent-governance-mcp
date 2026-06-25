@@ -56,13 +56,21 @@ export interface VisualProvenanceRow {
     diffMetric: string | null;
     isCarryForward: boolean;
     isFallback: boolean;
+    pixelGateComplete: boolean;
 }
 export interface VisualProvenanceCheck {
     ok: boolean;
     offendingByTaskId: Record<string, string[]>;
 }
+export declare function isPlaceholderDiffMetric(value: string | null): boolean;
+export declare function parsePixelGateAttestation(body: string): boolean;
 export declare function parseVisualProvenanceRows(content: string): VisualProvenanceRow[];
 export declare function checkVisualProvenance(workspacePath: string, taskIds: string[]): VisualProvenanceCheck;
+export interface PixelGateAttestationCheck {
+    ok: boolean;
+    offendingByTaskId: Record<string, string[]>;
+}
+export declare function checkPixelGateAttestation(workspacePath: string, taskIds: string[]): PixelGateAttestationCheck;
 export interface BaselineManifestRow {
     medium: string;
     pointer: string;

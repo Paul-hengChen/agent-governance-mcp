@@ -16,6 +16,11 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.42.0] - 2026-06-25
+
+### Added
+- **`qa-visual-pixel-gate-attestation` — Pixel-gate attestation, the SEVENTH visual sub-gate (v3.42.0).** Closes the F2 false-pass (`research/104445-F2-qa-visual-false-pass-postmortem.md`): a qa-visual session that skipped the pixel diff could write `diff-metric: N/A` (or `dimensionsMatch=false`) and still PASS the v3.38.0 provenance gate, which only checked the line was non-empty. Two changes in `tools/evidence-file.ts`: (1) **AC-1 — placeholder rejection.** New pure `isPlaceholderDiffMetric()` + `DIFF_METRIC_PLACEHOLDERS` set (`n/a`, `skipped`, `skip`, `dimensionsmatch=false`, `dimensions mismatch`, `todo`, `tbd`, `none`, `-`, empty); `checkVisualProvenance` now treats a placeholder diff-metric as absent, emitting `VISUAL_PROVENANCE_MISSING` with the invalid value listed. The B1 LLM-fallback token is deliberately NOT a placeholder (AC-5). (2) **AC-2 — new gate.** New pure `parsePixelGateAttestation()` + fs composition `checkPixelGateAttestation()` require a positive `pixel_gate_complete: true` line in each non-carry-forward surface's `### <surface id>` prose sub-section under `## Region Diff`; missing → **`PIXEL_GATE_ATTESTATION_MISSING`**. Wired into `index.ts` inside the armed `if (armCheck.required)` block immediately after the baseline-manifest gate. Opt-in / backwards-compatible (AC-8): dormant for reports with no `baseline:` line. Carry-forward surfaces exempt (AC-4); the B1 LLM-fallback path still requires the attestation (AC-5). `diffMetric` is kept RAW in the parser so the error can name the offending value (AC-9). `PIXEL_GATE_ATTESTATION_MISSING` added to the `TransitionRejection["error"]` union (handler-side type only; not produced by `validateTransition`). `content/skill-qa-visual.md` updated (Step B1/B2, B1-fallback path, Report schema, Failure modes — AC-11). No schema/migration change.
+
 ## [3.40.1] - 2026-06-18
 
 ### Fixed

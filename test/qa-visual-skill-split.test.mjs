@@ -143,7 +143,12 @@ test("AC-5: byte counts stay within v3.14.0-relaxed budgets (savings invariant v
   // skill-qa-visual.md (BASELINE_MANIFEST_MISSING / BASELINE_PROVENANCE_INCOMPLETE
   // error code documentation + gate-dormancy opt-in note). Actual size is
   // 17928 bytes. Cap of 18100 provides ~172-byte headroom.
-  assert.ok(qaVisualSize <= 18100, `qa-visual.md must be <= 18100 bytes (got ${qaVisualSize})`);
+  // v3.42.0 (qa-owned bump): cap raised from 18100 → 20700 to absorb the
+  // qa-visual-pixel-gate-attestation AC-11 additions — Step B1/B2 pixel_gate_complete
+  // requirement, B1-fallback path attestation note, Report schema update, and
+  // dimensionsMatch=false failure-mode instruction. Intentionally shipped content;
+  // actual size is 20180 bytes. Cap of 20700 provides ~520-byte headroom.
+  assert.ok(qaVisualSize <= 20700, `qa-visual.md must be <= 20700 bytes (got ${qaVisualSize})`);
 });
 
 test("AC-6: Phase 1.5 v3.8.2 contract is preserved AND extended in v3.14.0 (combined assertion)", () => {

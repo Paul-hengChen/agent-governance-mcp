@@ -72,6 +72,12 @@ export interface TransitionRejection {
                                     // produced by validateTransition (it reads fs + handoff state);
                                     // union extension is for handler-side narrowing + envelope
                                     // consistency (mirrors VISUAL_BASELINES_REQUIRED).
+    | "PIXEL_GATE_ATTESTATION_MISSING" // v3.42.0 — emitted by the index.ts PASS gate (seventh
+                                    // visual sub-gate) when an armed, provenance-bearing visual
+                                    // report has a non-carry-forward surface lacking
+                                    // `pixel_gate_complete: true`. NOT produced by
+                                    // validateTransition; union extension is for handler-side
+                                    // narrowing + envelope consistency (mirrors VISUAL_BASELINES_REQUIRED).
     | "AGENT_ID_REQUIRED";
   attempted: {
     prev_agent: string | null;

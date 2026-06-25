@@ -136,7 +136,12 @@ b. Compare the numeric output against the baseline's declared threshold (default
      ```
      - baseline: <fingerprint — content-hash of the downloaded Figma export, OR the Figma node id passed to mcp__figma__download_figma_images>
      - diff-metric: <tool output — e.g. "odiff: 0 px (0%)" or "ImageMagick AE: 0">
+     - pixel_gate_complete: true
      ```
+     The `pixel_gate_complete: true` line is REQUIRED (v3.42.0 `PIXEL_GATE_ATTESTATION_MISSING` gate):
+     it positively attests the pixel diff ran to completion for this surface. A placeholder
+     `diff-metric:` (`N/A`, `skipped`, `dimensionsMatch=false`, …) is rejected by
+     `VISUAL_PROVENANCE_MISSING` — record a real metric or take the FAIL path.
    - **Above threshold** → escalate to Step B2 (no verdict yet).
 - **Tool unavailable** (binary absent, Bash blocked, or crop/diff errors) → treat the surface as
   escalated to the Step B2 LLM path, noting `B1 tool unavailable — LLM fallback` in its prose
@@ -145,9 +150,14 @@ b. Compare the numeric output against the baseline's declared threshold (default
   ```
   - baseline: <fingerprint>
   - diff-metric: B1 tool unavailable — LLM fallback
+  - pixel_gate_complete: true
   ```
   The `B1 tool unavailable — LLM fallback` token is the `diff-metric:` value here; the gate accepts a
-  null numeric metric when it is present (AC-4), but a missing `baseline:` still fails.
+  null numeric metric when it is present (AC-4), but a missing `baseline:` still fails. The
+  `B1 tool unavailable — LLM fallback` token exempts the surface from a *numeric* diff-metric only —
+  it does NOT exempt it from `pixel_gate_complete: true` (v3.42.0 AC-5). The LLM-fallback path is a
+  valid *execution* of the pixel gate (the LLM completes the comparison in Step B2), not a skip, so
+  the attestation is still required once the comparison finishes.
 
 #### Step B2 — LLM Region Diff (escalated surfaces only)
 
@@ -161,11 +171,15 @@ b. Emit a structured diff over the region covering: (i) layout/position, (ii) sp
    nest deeper `####` sub-headings under it — each `###`–`######` heading is parsed as its own
    surface) under `## Region Diff`, where `<surface id>` matches the `| surface | result |` table.
    Prose without such a sub-heading is NOT parsed as a provenance row. Each non-carry-forward
-   sub-section MUST also include the two lines the `VISUAL_PROVENANCE_MISSING` gate reads:
+   sub-section MUST also include the three lines the provenance + attestation gates read:
    ```
    - baseline: <fingerprint of the baseline image read via the Read tool>
    - diff-metric: <quantified region delta — pixel/% estimate, or the qualitative judgement behind the cell>
+   - pixel_gate_complete: true
    ```
+   `pixel_gate_complete: true` is REQUIRED once the LLM comparison completes (v3.42.0
+   `PIXEL_GATE_ATTESTATION_MISSING` gate) — it attests the pixel gate ran to completion for this
+   surface. Carry-forward surfaces (Step B0) are exempt.
 
 Every surface — B1-pre-screened `pass` or B2-judged — MUST appear as a row in the single `## Region
 Diff` `| surface | result |` table. The result cell MUST be exactly `pass`/`accepted`/`fail` (no
@@ -203,6 +217,7 @@ qa-authored. An empty section is valid (means: none).
 - **Widget shape miss** (any unchecked `[ ]` in Step A) → `tw_rollback_task(<task-id>, "QA: Visual Widgets shape miss")` → `tw_update_state(status=FAIL, agent_id="qa-engineer", qa_review=<list of missing widgets>, pending_notes=["QA: <task-id> Phase 1.5 FAIL — widget shape miss", "visual_fail: <widget-id-list>", "next_role: sr-engineer"])`. STOP. The `visual_fail:` prefix in `pending_notes` triggers `visual_round` increment (Constitution §3.1).
 - **Pixel drift** (≥ 1 visual difference in Step B with all widget shapes verified) → `tw_rollback_task(<task-id>, "QA: Phase 1.5 pixel drift")` → `tw_update_state(status=FAIL, agent_id="qa-engineer", qa_review=<diff>, pending_notes=["QA: <task-id> Phase 1.5 FAIL — pixel drift", "visual_fail: pixel", "next_role: sr-engineer"])`. STOP.
 - **Missing baseline file** → `tw_update_state(status=FAIL, agent_id="qa-engineer", qa_review=<path>, pending_notes=["QA: missing baseline — <path>", "next_role: design-auditor"])`. STOP. No `visual_fail:` prefix (this is a design-auditor defect, not implementation drift).
+- **Dimension/scale mismatch** (`comparePngRegion`/tool reports `dimensionsMatch=false` — e.g. baseline exported @1× but impl captured @2×) → this is a hard FAIL, NOT a graceful skip and NOT an Allowed Difference. The surface MUST NOT be recorded `pass`/`accepted`. Re-export the baseline at the correct scale and re-run the diff; if it cannot be re-exported now, take the missing-baseline path: `tw_update_state(status=FAIL, agent_id="qa-engineer", qa_review=<detail>, pending_notes=["QA: missing baseline — dimension mismatch @Nx vs @Nx <surface>", "next_role: design-auditor"])`. STOP. Do NOT write `diff-metric: dimensionsMatch=false` and claim `pass` — the server rejects `dimensionsMatch=false` as a placeholder diff-metric (v3.42.0 AC-6, `VISUAL_PROVENANCE_MISSING`).
 - **Missing impl file** → `tw_update_state(status=FAIL, agent_id="qa-engineer", qa_review=<path>, pending_notes=["QA: missing impl screenshot — <path>", "visual_fail: missing_impl", "next_role: sr-engineer"])`. STOP.
 
 ### PASS sub-verdict
@@ -222,9 +237,13 @@ A, A.5, or C — or a material region diff — blocks PASS.
 - `## Canonical State Verification` (Step A.5)
 - `## Structural Assertions` (Step C)
 - `## Region Diff` (Step B) — each non-carry-forward surface's `### <surface id>` sub-section carries
-  a `baseline:` fingerprint and a `diff-metric:` value, read by the `VISUAL_PROVENANCE_MISSING` gate
-  (carry-forward surfaces exempt; the `B1 tool unavailable — LLM fallback` token satisfies diff-metric).
-  See `specs/qa-visual-baseline-provenance.md`.
+  THREE required prose fields: a `baseline:` fingerprint and a `diff-metric:` value (read by the
+  `VISUAL_PROVENANCE_MISSING` gate), plus `pixel_gate_complete: true` (read by the v3.42.0
+  `PIXEL_GATE_ATTESTATION_MISSING` gate, attesting the pixel diff ran to completion). Carry-forward
+  surfaces are exempt from all three; the `B1 tool unavailable — LLM fallback` token satisfies
+  diff-metric but does NOT exempt the surface from `pixel_gate_complete: true` (AC-5). A placeholder
+  diff-metric (`N/A`, `skipped`, `dimensionsMatch=false`, …) is rejected as absent (AC-1/AC-6).
+  See `specs/qa-visual-baseline-provenance.md` and `specs/qa-visual-pixel-gate-attestation.md`.
 - `## Allowed Differences` (qa-owned; may be empty)
 - `## Verdict` (final value `PASS` only when all the above clear)
 
