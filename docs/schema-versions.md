@@ -21,6 +21,18 @@ Single source of truth for the current version is `CURRENT_VERSIONS` in
 `schema/versions.ts`. Bumping a kind here is the only edit to the runner
 itself when shipping a new version.
 
+### Handoff version history
+
+| Version | Change | Migration |
+| ------- | ------ | --------- |
+| v2 | adds `review_round` counter | v1→v2 stamps version + seeds `review_round: 0` |
+| v3 | adds `visual_round` counter | v2→v3 stamps version + seeds `visual_round: 0` |
+| v4 | adds optional `scope_decision` attestation | v3→v4 stamp-only, seeds nothing (absence === no attestation) |
+| v5 | adds optional `cut_approved?: boolean` (pm-cut-approval-gate) | v4→v5 stamp-only, seeds nothing — **absence === unapproved**; a defaulted `false` would redundantly materialize absence and a defaulted `true` would be a false attestation, so nothing is seeded. Mirrors v3→v4 exactly. |
+
+`sqlite` stays at v2 — `cut_approved` lives in the handoff YAML frontmatter only
+and is not mirrored to the SQLite schema (the cut-approval gate is file-mode only).
+
 ## Authoring a v(N) → v(N+1) migration
 
 The framework is closed-for-modification, open-for-extension. Adding a new

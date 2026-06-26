@@ -88,6 +88,7 @@ After each role's handoff, read the just-written `pending_notes`. If a `next_rol
 3. `pending_notes` contains a line beginning with `next_role: human`.
 4. `pending_notes` contains NO line beginning with `next_role:` (the prior role forgot or finished without nominating a successor — surface as ambiguous).
 5. Hop counter ≥ `10` for this `/teamwork` session.
+6. **Cut-approval gate** (pm-cut-approval-gate): `pending_notes` contains `next_role: architect` or `next_role: sr-engineer` but `cut_approved` is not set on the handoff — surface the cut draft to the human and wait. Do NOT auto-hop through to build: the PM must present the ticket cut inline and obtain human approval before any build role receives the handoff (the server enforces this on the `pm:In_Progress → {architect,sr-engineer}:In_Progress` edge with `CUT_APPROVAL_REQUIRED`).
 
 **Opt-out**: if `AGC_AUTO_ROUTE=0` at session start, do NOT auto-hop — surface the `next_role:` recommendation in chat and wait for the human to issue `tw_switch_role` themselves.
 

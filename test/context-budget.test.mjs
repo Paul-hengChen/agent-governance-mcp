@@ -100,12 +100,16 @@ test("AC2: lean always-on bundle is below the raw baseline and within target (<=
   // skill-coordinator-lite.md (one long line, +91 ~tok net). Actual lean bundle
   // measured at 2791 ~tok; 2850 provides ~59-token editing headroom, consistent
   // with the v3.28.0 ~59-token convention.
+  // pm-cut-approval-gate (qa-owned bump): cap raised from 2850 → 3010 to absorb
+  // the cut-approval SOP text added to skill-coordinator-lite.md (halt instruction)
+  // and the skill-pm.md step 7a expansion. Actual lean bundle measured at 2958 ~tok;
+  // 3010 provides ~52-token editing headroom, consistent with prior conventions.
   const liteSkill = fs.readFileSync(path.join(ROOT, "content", "skill-coordinator-lite.md"), "utf-8");
   const SEP = "\n\n---\n\n";
   const raw = approxTokens(CONSTITUTION + SEP + liteSkill);
   const lean = approxTokens(stripChainOnly(CONSTITUTION) + SEP + liteSkill);
   assert.ok(lean < raw, `lean (${lean}) must be < raw (${raw})`);
-  assert.ok(lean <= 2850, `lean always-on (${lean} ~tok) must meet the <= 2850 target`);
+  assert.ok(lean <= 3010, `lean always-on (${lean} ~tok) must meet the <= 3010 target`);
 });
 
 // --- AC3: enforcement preserved ------------------------------------------
@@ -260,9 +264,13 @@ test("AC9: every operative rule/gate/SOP marker survives stripRationale in skill
   }
 });
 
-test("AC1/AC2: skill-pm stripped token count meets ≤ 2322 cap", () => {
+test("AC1/AC2: skill-pm stripped token count meets ≤ 2850 cap", () => {
   // WHY: the spec's re-grounded AC1 target (measured lossless, current file size
   // including F-A growth) must hold so each pm role dispatch is within budget.
+  // pm-cut-approval-gate (qa-owned bump): cap raised from 2322 → 2850 to absorb
+  // the step 7a Cut-Approval Gate SOP addition to skill-pm.md (inline cut draft
+  // workflow, design-link rule, re-arm description). Actual stripped body measured
+  // at 2800 ~tok; 2850 provides ~50-token editing headroom.
   const SKILL_PM = fs.readFileSync(path.join(ROOT, "content", "skill-pm.md"), "utf-8");
   // Strip frontmatter (--- block) before token-counting the body, matching buildPromptForRole.
   const body = SKILL_PM.startsWith("---")
@@ -270,7 +278,7 @@ test("AC1/AC2: skill-pm stripped token count meets ≤ 2322 cap", () => {
     : SKILL_PM;
   const stripped = stripRationale(body);
   const toks = approxTokens(stripped);
-  assert.ok(toks <= 2322, `skill-pm stripped body (${toks} ~tok) must be ≤ 2322 (AC1)`);
+  assert.ok(toks <= 2850, `skill-pm stripped body (${toks} ~tok) must be ≤ 2850 (AC1)`);
 });
 
 test("AC1/AC2: skill-sr-engineer stripped token count meets ≤ 2210 cap", () => {
@@ -389,13 +397,17 @@ test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/b
   // figma-baseline-manifest-gate §3.1 Baseline manifest gate bullet (design-only fence)
   // plus skill-qa-visual Step A.0 enforcement note. Actual design-arm bundle
   // measured at 7987 ~tok (exact).
+  // pm-cut-approval-gate (qa-owned bump): cap raised from 7987 → 8160 to absorb the
+  // cut-approval stop-condition entry added to skill-coordinator.md Auto-Routing
+  // section (S04 text + gate description). Actual design-arm bundle measured at
+  // 8109 ~tok; 8160 provides ~51-token editing headroom.
   const skillCoord = fs.readFileSync(path.join(ROOT, "content", "skill-coordinator.md"), "utf-8");
   const body = skillCoord.startsWith("---")
     ? skillCoord.slice(skillCoord.indexOf("---", 3) + 3).trimStart()
     : skillCoord;
   const SEP = "\n\n---\n\n";
   const bundle = approxTokens(stripRationale(CONSTITUTION) + SEP + stripRationale(body));
-  assert.ok(bundle <= 7987, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 7987 (AC8 design-arm floor, constitution v3.40.0)`);
+  assert.ok(bundle <= 8160, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 8160 (AC8 design-arm floor, pm-cut-approval-gate)`);
 });
 
 test("AC9: every operative rule/gate/heading survives stripRationale on the constitution", () => {

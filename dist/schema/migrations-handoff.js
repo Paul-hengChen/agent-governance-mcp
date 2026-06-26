@@ -43,6 +43,17 @@ registerMigration({
     to: 4,
     up: (input) => ({ ...input, schema_version: 4 }),
 });
+// v4 → v5: add optional cut_approved attestation (pm-cut-approval-gate).
+// Additive STAMP-ONLY: bumps the version, seeds NO default for cut_approved.
+// Absence is the unapproved sentinel (AC-7) — a defaulted `false` would be a
+// redundant materialization of absence and a defaulted `true` a false
+// attestation, so we add nothing. Mirrors the v3→v4 scope_decision pattern.
+registerMigration({
+    kind: "handoff",
+    from: 4,
+    to: 5,
+    up: (input) => ({ ...input, schema_version: 5 }),
+});
 // Compile-time guard: if CURRENT_VERSIONS.handoff is ever bumped without a
 // matching registration added above, the runner's missing-step error fires
 // at read time. This reference makes the dependency explicit for grep.

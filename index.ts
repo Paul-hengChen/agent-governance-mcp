@@ -23,7 +23,7 @@ import { getNextTask, completeTask, rollbackTask, addTask } from "./tools/tasks.
 import { detectDrift } from "./tools/drift.js";
 import { reconcileTasks } from "./tools/sync.js";
 import { enforcePreFlight, cleanupStaleSessions } from "./guards/session.js";
-import { getActiveStorage, setActiveStorage } from "./tools/storage.js";
+import { getActiveStorage, setActiveStorage, FileHandoffStorage } from "./tools/storage.js";
 import { buildSrEngineerPrompt } from "./prompts/sr-engineer.js";
 import { buildResearcherPrompt } from "./prompts/researcher.js";
 import { buildPmPrompt } from "./prompts/pm.js";
@@ -65,6 +65,7 @@ import {
   checkBaselineManifest,
   checkPixelGateAttestation,
   hasScopeDecision,
+  hasCutApproval,
 } from "./tools/evidence-file.js";
 
 // ==========================================
@@ -105,6 +106,11 @@ const UpdateStateArgs = z
     // SCOPE_DECISION_REQUIRED gate; scope_decision_why is optional free text.
     scope_decision: z.enum(["single-feature"]).optional(),
     scope_decision_why: z.string().max(2000).optional(),
+    // v5 — cut-approval attestation (pm-cut-approval-gate). PM sets
+    // cut_approved: true on its pm:In_Progress write AFTER inline cut draft +
+    // human approval, to clear the CUT_APPROVAL_REQUIRED gate on the
+    // pm:In_Progress → {architect,sr-engineer}:In_Progress build-entry edge.
+    cut_approved: z.boolean().optional(),
   })
   .refine((d) => d.status !== "PASS" || d.agent_id === "qa-engineer", {
     message: 'status="PASS" requires agent_id="qa-engineer"',
@@ -228,7 +234,7 @@ function formatZodError(err: z.ZodError): string {
 // ==========================================
 // Storage adapter defaults to FileHandoffStorage; HTTP-mode boot switches it via setActiveStorage().
 const server = new Server(
-  { name: "agent-governance-mcp", version: "3.42.0" },
+  { name: "agent-governance-mcp", version: "3.43.0" },
   { capabilities: { tools: {}, prompts: {} } }
 );
 
@@ -480,6 +486,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: "string",
               description:
                 "Optional free-text rationale for scope_decision. Recorded for the audit trail; not validated by the server.",
+            },
+            cut_approved: {
+              type: "boolean",
+              description:
+                "Ticket-cut approval attestation. PM sets cut_approved: true on its pm:In_Progress write AFTER presenting the ticket cut inline in chat and obtaining human approval, to clear the CUT_APPROVAL_REQUIRED gate before routing to architect/sr-engineer. Feature-scoped: re-armed on every PM In_Progress re-entry and on any active_feature change.",
             },
           },
           required: ["workspace_path", "active_feature", "status"],
@@ -790,6 +801,56 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               content: [{
                 type: "text" as const,
                 text: `⛔ SCOPE_DECISION_REQUIRED\n${JSON.stringify(envelope, null, 2)}`,
+              }],
+              isError: true,
+            };
+          }
+        }
+
+        // v5 — Cut-Approval Gate (pm-cut-approval-gate). Fires on the same
+        // build-entry edge (pm:In_Progress → {architect,sr-engineer}:In_Progress)
+        // as the scope-decision gate, but is UNCONDITIONAL (not arm-gated): a
+        // human must approve the ticket cut before ANY build role receives the
+        // handoff, visual feature or not. Runs SECOND, directly after the
+        // scope-decision gate (D1): independent error code, no merged envelope,
+        // so each hint stays actionable and tests assert each in isolation.
+        // Pinning prev=pm keeps resume/re-entry safe — architect→sr-engineer and
+        // the sr self-loop have a non-pm predecessor and are never gated.
+        // FILE-MODE ONLY (D5): cut_approved lives in the handoff YAML frontmatter
+        // only; in SQLite/HTTP mode the parsed prev-state never carries it, so
+        // the gate would always fire. Skip the gate unless the active storage is
+        // the file implementation. NOT in transitions.ts (that stays pure /
+        // fs-free; mirrors SCOPE_DECISION_REQUIRED).
+        if (
+          getActiveStorage() instanceof FileHandoffStorage &&
+          (nextTuple.agent === "architect" || nextTuple.agent === "sr-engineer") &&
+          nextTuple.status === "In_Progress" &&
+          prevTuple.agent === "pm" &&
+          prevTuple.status === "In_Progress"
+        ) {
+          if (!hasCutApproval(prevState)) {
+            const hint =
+              "Cut approval missing. PM must present the ticket cut inline in chat and " +
+              "obtain human approval before routing to build. Set cut_approved: true on " +
+              "the pm:In_Progress write after approval. See content/skill-pm.md §SOP step 7a.";
+            const envelope = {
+              error: "CUT_APPROVAL_REQUIRED",
+              attempted: {
+                prev_agent: prevTuple.agent,
+                prev_status: prevTuple.status,
+                new_agent: nextTuple.agent,
+                new_status: nextTuple.status,
+              },
+              allowed: (ALLOWED_TRANSITIONS.get("pm:In_Progress") ?? []).map((c) => ({
+                new_agent: c.agent,
+                new_status: c.status,
+              })),
+              hint,
+            };
+            return {
+              content: [{
+                type: "text" as const,
+                text: `⛔ CUT_APPROVAL_REQUIRED\n${JSON.stringify(envelope, null, 2)}`,
               }],
               isError: true,
             };
@@ -1110,6 +1171,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           visualRound: new_visual_round,
           scopeDecision: parsed.scope_decision,
           scopeDecisionWhy: parsed.scope_decision_why,
+          cutApproved: parsed.cut_approved,
         });
 
         // GC hook: when QA flips a feature to PASS, drop the workspace's RAG

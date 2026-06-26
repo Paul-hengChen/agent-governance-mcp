@@ -206,6 +206,18 @@ export function hasScopeDecision(workspacePath, handoffState) {
         return true;
     return handoffState?.scope_decision === "single-feature";
 }
+// pm-cut-approval-gate. Reports whether the PREV handoff state carries an
+// explicit cut approval. Pure equality check — never touches the filesystem,
+// never throws. The handoffState passed in is the already-parsed PREV state
+// (the attestation must have been recorded by the preceding pm:In_Progress
+// write), mirroring hasScopeDecision's prev-state contract. Strict `=== true`:
+// absence (undefined) and a literal `false` both fail the gate. There is NO
+// filesystem fallback (unlike hasScopeDecision, which also honors
+// .current/feature-split.md) — cut approval is a pure boolean with one source
+// of truth, the handoff field.
+export function hasCutApproval(handoffState) {
+    return handoffState?.cut_approved === true;
+}
 // Pure parser. Locates the `## Widget Shape Verification` section
 // (case-insensitive, multiline) in the report content and emits one row per
 // `- [<mark>] <widget-id>` line found within it. Permissive on whitespace;

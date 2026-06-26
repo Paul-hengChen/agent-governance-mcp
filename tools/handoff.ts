@@ -49,6 +49,17 @@ export interface HandoffState {
   // Optional free-text rationale accompanying scope_decision. Not validated by
   // the server; recorded for the audit trail / next reader.
   scope_decision_why?: string;
+  // Ticket-cut approval attestation (handoff schema v5, pm-cut-approval-gate).
+  // Set to `true` by the PM on its pm:In_Progress write AFTER presenting the
+  // cut draft inline and obtaining human approval. Satisfies the
+  // CUT_APPROVAL_REQUIRED gate on the build-entry edge.
+  // ABSENT by default — undefined === "no approval recorded" === gate may fire.
+  // Pure boolean: the ONLY meaningful set value is `true`. A literal `false`
+  // is treated identically to absence by the gate (gate fires unless === true).
+  // FEATURE-SCOPED (see writeHandoffState reset/preserve rule): NOT preserved
+  // across an active_feature change, and reset to undefined on every PM
+  // In_Progress re-entry that does not explicitly re-pass it.
+  cut_approved?: boolean;
 }
 
 // Cap the completed_tasks array returned by readState() so long projects
@@ -138,6 +149,11 @@ function readAndMigrate(workspacePath: string): HandoffReadResult | null {
   // unset, so undefined flows to hasScopeDecision and the gate is free to fire.
   const scopeDecision = asString(frontmatter.scope_decision) || undefined;
   const scopeDecisionWhy = asString(frontmatter.scope_decision_why) || undefined;
+  // v5 — cut-approval attestation (pm-cut-approval-gate). Strict boolean:
+  // only YAML boolean `true` surfaces as `true`; anything else (false, absent,
+  // a string) collapses to `undefined` so the field is omitted via the
+  // spread-guard below and the gate is free to fire.
+  const cutApproved = frontmatter.cut_approved === true ? true : undefined;
   const qaRoundRaw = Number(frontmatter.qa_round);
   const qa_round = Number.isFinite(qaRoundRaw) && qaRoundRaw >= 0 ? Math.floor(qaRoundRaw) : 0;
   const reviewRoundRaw = Number(frontmatter.review_round);
@@ -156,6 +172,7 @@ function readAndMigrate(workspacePath: string): HandoffReadResult | null {
     ...(prdPath && { prd_path: prdPath }),
     ...(scopeDecision && { scope_decision: scopeDecision }),
     ...(scopeDecisionWhy && { scope_decision_why: scopeDecisionWhy }),
+    ...(cutApproved && { cut_approved: cutApproved }),
     completed_tasks,
     pending_notes,
     qa_round,
@@ -298,6 +315,12 @@ export interface WriteHandoffStateOptions {
   // frontmatter only when truthy; preserved across writes that omit it.
   scopeDecision?: string;
   scopeDecisionWhy?: string;
+  // v5 — cut-approval attestation (pm-cut-approval-gate). Emitted into
+  // frontmatter only when === true. Unlike scopeDecision, this field is NOT
+  // blindly preserved across omitting writes — see the feature-scoped reset
+  // rule in writeHandoffState (it re-arms on every PM In_Progress re-entry and
+  // on any active_feature change).
+  cutApproved?: boolean;
 }
 
 /**
@@ -350,6 +373,7 @@ export async function writeHandoffState(
   let workspacePath: string;
   let scopeDecision: string | undefined;
   let scopeDecisionWhy: string | undefined;
+  let cutApproved: boolean | undefined;
   if (
     typeof workspacePathOrOpts === "object" &&
     !Array.isArray(workspacePathOrOpts)
@@ -368,6 +392,7 @@ export async function writeHandoffState(
     visualRound = o.visualRound;
     scopeDecision = o.scopeDecision;
     scopeDecisionWhy = o.scopeDecisionWhy;
+    cutApproved = o.cutApproved;
   } else {
     workspacePath = workspacePathOrOpts as string;
     // Positional defaults preserved for backwards-compat callers passing < 11 args.
@@ -397,7 +422,7 @@ export async function writeHandoffState(
       ? (pendingNotes as string[]).map((t) => `- ${t}`).join("\n")
       : "- (none)";
 
-    const frontmatterData: Record<string, string | number> = {
+    const frontmatterData: Record<string, string | number | boolean> = {
       schema_version: CURRENT_VERSIONS.handoff,
       active_feature: _activeFeature,
       status: _status,
@@ -412,21 +437,57 @@ export async function writeHandoffState(
     let effectivePrdPath: string | undefined = prdPath;
     let effectiveScopeDecision: string | undefined = scopeDecision;
     let effectiveScopeDecisionWhy: string | undefined = scopeDecisionWhy;
+    // v5 — cut-approval is FEATURE-SCOPED, not write-sticky (pm-cut-approval-gate).
+    // It needs the on-disk active_feature for the same-feature carry-forward, so
+    // it shares the single existing-state read below with the prd_path /
+    // scope_decision preserve logic (no extra I/O). The consolidated algorithm:
+    //   1. option cutApproved === true                  → true   (PM approving now)
+    //   2. agent is pm && status In_Progress            → undefined (every PM
+    //                                                      re-entry re-arms — new
+    //                                                      feature, QA-FAIL bounce,
+    //                                                      scope rework all funnel
+    //                                                      here; closes the stale-
+    //                                                      true hole, so we do NOT
+    //                                                      copy scope_decision's
+    //                                                      blind preserve)
+    //   3. existing.active_feature === this active_feature → carry existing value
+    //                                                      forward (non-PM same-
+    //                                                      feature self-progression)
+    //   4. otherwise (feature changed)                  → undefined (drop stale)
+    let effectiveCutApproved: boolean | undefined;
+    const isPmReentry = lastAgent === "pm" && _status === "In_Progress";
+    const cutApprovalNeedsExisting = cutApproved !== true && !isPmReentry;
     if (
       effectivePrdPath === undefined ||
       effectiveScopeDecision === undefined ||
-      effectiveScopeDecisionWhy === undefined
+      effectiveScopeDecisionWhy === undefined ||
+      cutApprovalNeedsExisting
     ) {
       const existing = parseHandoff(workspacePath);
       if (effectivePrdPath === undefined) effectivePrdPath = existing?.prd_path;
       if (effectiveScopeDecision === undefined) effectiveScopeDecision = existing?.scope_decision;
       if (effectiveScopeDecisionWhy === undefined) effectiveScopeDecisionWhy = existing?.scope_decision_why;
+      if (cutApprovalNeedsExisting) {
+        // clauses (3)/(4): carry forward only within the same feature.
+        effectiveCutApproved =
+          existing?.active_feature === _activeFeature ? existing?.cut_approved : undefined;
+      }
+    }
+    // clauses (1)/(2): explicit PM approval, or PM re-entry re-arm. These do not
+    // depend on `existing`, so they resolve regardless of the read above.
+    if (cutApproved === true) {
+      effectiveCutApproved = true;
+    } else if (isPmReentry) {
+      effectiveCutApproved = undefined;
     }
     if (effectivePrdPath) frontmatterData.prd_path = effectivePrdPath;
     // String attestation: emit only when set (empty string is indistinguishable
     // from "not set", so guard the write).
     if (effectiveScopeDecision) frontmatterData.scope_decision = effectiveScopeDecision;
     if (effectiveScopeDecisionWhy) frontmatterData.scope_decision_why = effectiveScopeDecisionWhy;
+    // Boolean attestation: emit `true` only when effective === true. A falsy
+    // value is indistinguishable from "not set", so never emit `false`.
+    if (effectiveCutApproved === true) frontmatterData.cut_approved = true;
     // Always emit qa_round (even 0) so the field is discoverable; falsy
     // input (undefined/NaN) normalises to 0.
     const normalisedRound = Number.isFinite(qaRound) && (qaRound as number) >= 0 ? Math.floor(qaRound as number) : 0;

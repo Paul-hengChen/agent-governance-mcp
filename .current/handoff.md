@@ -1,12 +1,12 @@
 ---
 schema_version: 4
-active_feature: "handoff-write-arg-guard"
+active_feature: "pm-cut-approval-gate"
 status: "PASS"
-last_updated: "2026-06-18T02:43:13.136Z"
+last_updated: "2026-06-26T08:24:39.416Z"
 last_agent: "qa-engineer"
-prd_path: "/Users/paul.ph.chen/agent-governance-mcp/specs/handoff-write-arg-guard.md"
+prd_path: "/Users/paul.ph.chen/agent-governance-mcp/specs/pm-cut-approval-gate.md"
 scope_decision: "single-feature"
-scope_decision_why: "Two .refine() additions to one Zod schema (UpdateStateArgs in index.ts) plus tests. No new interface, no data-model or migration change, no cross-cutting API surface. Localized input-validation hardening only."
+scope_decision_why: "Server-behavior-only feature: new parser functions + one new index.ts sub-gate + skill-text update + tests. No new data model, no handoff schema change, no SQLite migration. Touches tools/evidence-file.ts, tools/transitions.ts, index.ts, content/skill-qa-visual.md, schema/versions.ts, and test/. All changes are localized to the existing visual gate stack. Single-feature appropriate."
 qa_round: 0
 review_round: 0
 visual_round: 0
@@ -14,13 +14,10 @@ visual_round: 0
 # Handoff State
 
 ## Completed
-- [x] T-HWAG-01
-- [x] T-HWAG-02
-- [x] T-HWAG-03
+- [x] T-PCAG-QA
 
 ## Pending & Handoff Notes
-- QA: T-HWAG-01/02/03 PASS
-- note: baseline-manifest-gate.test.mjs AC-9 version assertions need update to 3.40.1 by release-engineer
+- QA: T-PCAG-QA PASS
 - next_role: release-engineer
 
 ---

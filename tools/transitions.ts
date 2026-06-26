@@ -78,6 +78,13 @@ export interface TransitionRejection {
                                     // `pixel_gate_complete: true`. NOT produced by
                                     // validateTransition; union extension is for handler-side
                                     // narrowing + envelope consistency (mirrors VISUAL_BASELINES_REQUIRED).
+    | "CUT_APPROVAL_REQUIRED"       // v5 — emitted by the index.ts tw_update_state guard at the
+                                    // pm → {architect,sr-engineer}:In_Progress edge when the prev
+                                    // handoff state lacks cut_approved === true. Unconditional (not
+                                    // arm-gated); file-storage mode only. NOT produced by
+                                    // validateTransition (it reads handoff state + storage kind);
+                                    // union extension is for handler-side narrowing + envelope
+                                    // consistency (mirrors SCOPE_DECISION_REQUIRED).
     | "AGENT_ID_REQUIRED";
   attempted: {
     prev_agent: string | null;

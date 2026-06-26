@@ -16,6 +16,11 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.43.0] - 2026-06-26
+
+### Added
+- **`pm-cut-approval-gate` — PM ticket-cut approval gate, a server-enforced checkpoint before build entry (v3.43.0).** Closes the ticket-splitting accuracy gap (`research/ticket-splitting-for-ai-agents.md`): after PM splits tickets, a human checkpoint is required before the cut enters architect/sr-engineer context. New server gate on `pm:In_Progress → {architect,sr-engineer}:In_Progress` edge: transition blocked with `error: "CUT_APPROVAL_REQUIRED"` + hint unless `cut_approved === true` in handoff. Handoff schema v4→v5 migration (stamp-only; `cut_approved` absent = unapproved sentinel, no default seeding). PM SOP updated (skill-pm.md §7a): inline cut-draft table (id | desc | depends_on | est. files | design-link) with halt-for-approval pattern; per-ticket Figma node-id + URL in design-link column when `hasDesignModeRequiringVisual()` is armed. Coordinator skill (skill-coordinator.md) updated with cut-approval gate as documented Auto-Routing stop-condition. Coordinator-lite SOP ceiling enforcement (skill-coordinator-lite.md): lite mode is read-only; PM enforces cut-approval SOP text (AC-3), cannot server-gate. New gate wired into `tools/transitions.ts` `validateTransition()` call in `index.ts` (handles CUT_APPROVAL_REQUIRED error); new helper `isCutApprovalRequired()` in `tools/transitions.ts`. Lite enforcement at SOP-ceiling per Constitution §3.1. Full spec: `specs/pm-cut-approval-gate.md`.
+
 ## [3.42.0] - 2026-06-25
 
 ### Added

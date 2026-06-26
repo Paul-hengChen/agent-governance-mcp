@@ -341,9 +341,9 @@ scope_decision_why: "one screen, no sub-flows"
   assert.equal(state.scope_decision_why, "one screen, no sub-flows");
 });
 
-test("AC-7: scope_decision round-trips through writeHandoffState → readback (v4 stamp)", async () => {
+test("AC-7: scope_decision round-trips through writeHandoffState → readback (v5 stamp)", async () => {
   // Why: the modern options-object write must emit scope_decision into YAML and
-  // parse it back identically, stamped at v4. This is the PM attestation write path.
+  // parse it back identically, stamped at v5 (pm-cut-approval-gate). This is the PM attestation write path.
   const ws = mkWorkspace();
   resetSession();
   parseHandoff(ws);
@@ -359,7 +359,7 @@ test("AC-7: scope_decision round-trips through writeHandoffState → readback (v
   });
 
   const raw = readRaw(ws);
-  assert.match(raw, /schema_version:\s*4/, "write stamps current handoff schema v4");
+  assert.match(raw, /schema_version:\s*5/, "write stamps current handoff schema v5");
   assert.match(raw, /scope_decision:\s*["']?single-feature["']?/, "scope_decision emitted into YAML");
 
   const state = parseHandoff(ws);
@@ -408,17 +408,18 @@ test("field preservation: a downstream write omitting scope_decision does NOT dr
   assert.equal(state.last_agent, "sr-engineer", "the new write's own fields still apply");
 });
 
-test("AC-10(g): future v5 handoff refuses-loud against a v4 server (no silent downgrade)", () => {
-  // Why: forward-compat safety. A handoff written by a newer server (v5) must
-  // NOT be silently parsed by this v4 server — runMigrations throws because
+test("AC-10(g): future v6 handoff refuses-loud against a v5 server (no silent downgrade)", () => {
+  // Why: forward-compat safety. A handoff written by a newer server (v6) must
+  // NOT be silently parsed by this v5 server — runMigrations throws because
   // on-disk version > server max. No new code; this pins the behavior for the
-  // scope-gate version bump specifically.
+  // pm-cut-approval-gate version bump specifically (v4→v5). A hypothetical v6
+  // file must still refuse-loud against the current v5 server.
   const ws = mkWorkspace();
   resetSession();
   writeRaw(
     ws,
     `---
-schema_version: 5
+schema_version: 6
 active_feature: "from-the-future"
 status: "In_Progress"
 last_updated: "2099-01-01T00:00:00.000Z"
@@ -435,7 +436,7 @@ qa_round: 0
 
   assert.throws(
     () => parseHandoff(ws),
-    /on-disk version 5 > server max 4/,
-    "v5 file must refuse-loud against a v4 server",
+    /on-disk version 6 > server max 5/,
+    "v6 file must refuse-loud against a v5 server",
   );
 });
