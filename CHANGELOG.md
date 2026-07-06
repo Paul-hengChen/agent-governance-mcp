@@ -16,6 +16,18 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.44.0] - 2026-07-06
+
+### Added
+- **`governance-tag-strip` — Fourth context-budget stripper for provenance redaction (v3.44.0).** Implements `stripOriginTags()` in `prompts/build.ts`, the fourth stripper in the context-compression pipeline after stripChainOnly/stripRationale/stripDesignOnly. Redacts 42 fenced provenance metadata sites (Figma node-id pointers, git commit hashes, auth tokens, timestamps, internal tracking codes) from prompt injection vectors, reducing per-dispatch token spend by ~200 tokens. Context-budget re-baselined lower across all seven role prompts. Backwards-compatible: MINOR bump. No schema/migration/tool-surface change.
+
+### Changed
+- **`skill-qa-visual` — Consolidation rewrite, 265 → 124 lines (v3.44.0).** Removed redundant gate repetition; streamlined step numbering; clearer evidence schema and failure modes. No SOP behavior change.
+- **`skill-pm` — Consolidation rewrite, gates → Gate Summary table (v3.44.0).** Extracted gate enforcement bullets into a dedicated reference table for clarity; cleaner navigation. No PM flow change.
+
+### Fixed
+- **`error-code-contract` — Eight previously-undocumented error codes now documented (v3.44.0).** New test `test/error-code-contract.test.mjs` enforces strict 1:1 mapping between all error codes emitted by the server and their definitions in `content/constitution.md` or role SOPs. All currently-emitted codes brought into the contract.
+
 ## [3.43.0] - 2026-06-26
 
 ### Added
