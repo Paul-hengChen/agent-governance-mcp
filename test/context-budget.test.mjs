@@ -253,6 +253,26 @@ test("AC9: every operative rule/gate/SOP marker survives stripRationale in skill
   }
 });
 
+// skill-pm-consolidation (T-PMC-01, v3.44.0 pending): the gate-sub-step ->
+// Gate Summary table rewrite relocated the Ambiguity Gate's STOP payload
+// (spec Copy/Strings AC-8) from a standalone numbered sub-step into a table
+// cell. specs/skill-pm-consolidation.md AC-8 calls out that this string must
+// survive BYTE-EXACT, specifically preserving the em-dash (U+2014) separator
+// rather than a hyphen -- a paraphrase an editor could introduce without any
+// visual difference in most fonts/renderers. Nothing previously pinned this
+// literal against the SKILL DOC TEXT itself (only the constitution's general
+// pending_notes shape is tested elsewhere) -- this closes that gap so a
+// future doc edit that silently swaps the em-dash for a hyphen fails CI
+// instead of silently corrupting the Blocked-state payload an escalation
+// handler reads verbatim.
+test("AC8 (skill-pm-consolidation): Ambiguity Gate STOP payload is byte-exact (em-dash, not hyphen)", () => {
+  const SKILL_PM = fs.readFileSync(path.join(ROOT, "content", "skill-pm.md"), "utf-8");
+  assert.ok(
+    SKILL_PM.includes("PM blocked: ambiguous — <detail>"),
+    "skill-pm.md must contain the Ambiguity Gate STOP payload byte-exact, including U+2014 em-dash",
+  );
+});
+
 test("AC9: every operative rule/gate/SOP marker survives stripRationale in skill-sr-engineer.md", () => {
   // WHY: same contract for sr-engineer — stripped dispatch must carry the full
   // operative SOP even after rationale-only prose is removed.
