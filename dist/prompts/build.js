@@ -73,6 +73,28 @@ export function stripDesignOnly(text) {
         .replace(/<!-- design-only:start -->[\s\S]*?<!-- design-only:end -->\n?/g, "")
         .replace(/\n{3,}/g, "\n\n");
 }
+// Remove every <!-- origin:start --> … <!-- origin:end --> span (markers
+// inclusive) and clean up whitespace left behind. Idempotent; text with no
+// markers is returned unchanged (safety default). Origin spans carry only
+// maintainer provenance — version stamps ("(v3.26.0)"), backlog/finding codes
+// ("(R10)", "A1"), retrospective pointers — never a rule any role acts on, so
+// stripping them trims per-dispatch budget at EVERY detail level: applied
+// unconditionally in buildPromptForRole, FIRST, before the three conditional
+// strips (no fullDetail / lite / design-arm gate). Unlike the block-level
+// fences above, origin fences are INLINE (mid-sentence / end-of-heading), so
+// the regex deliberately does NOT consume a trailing newline — doing so would
+// join a fenced heading with the line below it. Origin fences never straddle
+// a chain-only / rationale / design-only boundary (they may nest inside one),
+// so the four strippers compose order-independently. Single-copy by design
+// (governance-text-load-architecture DR-2, same as stripRationale /
+// stripDesignOnly): only buildPromptForRole calls it; NOT duplicated into
+// bin/agent-governance-context.mjs, so DR-3's parity rule does not apply.
+export function stripOriginTags(text) {
+    return text
+        .replace(/<!-- origin:start -->[\s\S]*?<!-- origin:end -->/g, "")
+        .replace(/[ \t]+\n/g, "\n") // trim trailing spaces left by an inline strip
+        .replace(/\n{3,}/g, "\n\n");
+}
 // The lite coordinator skill marks a server-read-only, no-chain context.
 const LITE_SKILL_FILE = "skill-coordinator-lite.md";
 function isRagCapable(s) {
@@ -233,7 +255,11 @@ export function buildPromptForRole(skillFile, description, workspacePath, fullDe
     const isDesignFeature = state?.active_feature
         ? hasDesignModeRequiringVisual(workspacePath, state.active_feature).required
         : false;
-    const rawConstitution = loadContent("constitution.md", workspacePath);
+    // Origin-tag strip is FIRST and unconditional on both raw inputs (constitution
+    // here, skill body below): provenance tags are pure archaeology at every detail
+    // level, so no fullDetail / lite / design-arm gate applies (governance-tag-strip
+    // AC4). The remaining strips compose order-independently with it.
+    const rawConstitution = stripOriginTags(loadContent("constitution.md", workspacePath));
     // Lite contexts (teamwork-lite) get the chain-only sections stripped; chain
     // roles keep the full constitution because those rules become load-bearing.
     const chainResolved = skillFile === LITE_SKILL_FILE ? stripChainOnly(rawConstitution) : rawConstitution;
@@ -249,7 +275,10 @@ export function buildPromptForRole(skillFile, description, workspacePath, fullDe
     // NESTED inside chain-only, so the non-greedy regexes never cross markers (HC5).
     const constitution = isDesignFeature ? rationaleResolved : stripDesignOnly(rationaleResolved);
     const rawSkill = loadContent(skillFile, workspacePath);
-    const { frontmatter, body: rawBody } = parseSkillFile(rawSkill);
+    const { frontmatter, body: taggedBody } = parseSkillFile(rawSkill);
+    // Same unconditional origin-tag strip as the constitution above (frontmatter
+    // is parsed off first — origin fences live in body prose, never in YAML).
+    const rawBody = stripOriginTags(taggedBody);
     // Chain-role skill dispatch strips verbose rationale unless fullDetail is set
     // (DR-5, v3.31.0). Default false = strip on every buildPromptForRole dispatch,
     // including the full teamwork coordinator — lossless because the fences hold no

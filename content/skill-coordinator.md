@@ -120,7 +120,7 @@ The leading character MUST be U+2014 (EM DASH, `—`), not a hyphen-minus or en-
 
 Stamping the coordinator's own thoughts with `— @lite (haiku)` would be semantically wrong; the guard prevents that. The coordinator's own main-loop replies end with `— @coordinator` (no tier) per Constitution §1 and are excluded from `validateWatermark` processing entirely.
 
-## Visual Verdict Boundary (v3.26.0)
+## Visual Verdict Boundary<!-- origin:start --> (v3.26.0)<!-- origin:end -->
 
 Per Constitution §3.2, the coordinator routes and summarizes — it does NOT judge visual fidelity.
 
@@ -139,7 +139,7 @@ Per Constitution §3.2, the coordinator routes and summarizes — it does NOT ju
 This is a stop-condition addition: treat "visual work complete but no independent qa-visual context
 available" as a hand-to-human event, not an auto-hop.
 
-## Drift Reconcile after out-of-band execution (v3.26.0, R10)
+## Drift Reconcile after out-of-band execution<!-- origin:start --> (v3.26.0, R10)<!-- origin:end -->
 
 The routing chain assumes sequential single-context handoffs. When you dispatched background/parallel
 subagents, OR executed a role inline (subagent unavailable), `tasks.md` can desync from the
@@ -154,7 +154,7 @@ authoritative `handoff.completed_tasks`. Before any PASS or hand-back in those c
 Never hand-edit `tasks.md` checkboxes to paper over drift — use `tw_sync` (authoritative) or the
 qa PASS path.
 
-## Subagent Token Observability (v3.31.0)
+## Subagent Token Observability<!-- origin:start --> (v3.31.0)<!-- origin:end -->
 
 For a retrospective or post-feature cost review, you MAY read the workspace's `agent-*.jsonl` dispatch
 logs to extract per-dispatch token telemetry. The canonical cost-attribution fields are the four

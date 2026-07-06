@@ -30,7 +30,7 @@ const ROOT = path.resolve(path.dirname(__filename), "..");
 const CONSTITUTION = fs.readFileSync(path.join(ROOT, "content", "constitution.md"), "utf-8");
 const approxTokens = (t) => Math.ceil(t.length / 4);
 
-const { stripChainOnly, stripRationale, stripDesignOnly, buildPromptForRole } = await import(path.join(ROOT, "dist", "prompts", "build.js"));
+const { stripChainOnly, stripRationale, stripDesignOnly, stripOriginTags, buildPromptForRole } = await import(path.join(ROOT, "dist", "prompts", "build.js"));
 const { setActiveStorage, FileHandoffStorage } = await import(path.join(ROOT, "dist", "tools", "storage.js"));
 
 // Markers that prove a section is present/absent in a rendered bundle.
@@ -219,6 +219,99 @@ test("DR-3: all three stripChainOnly regex copies are identical", () => {
   assert.equal(hits[1], hits[2], "hook and measure-script regex must match");
 });
 
+// ============================================================================
+// governance-tag-strip (T-GTS-07): new coverage for the fourth sibling stripper,
+// stripOriginTags. Mirrors the AC1 (stripDesignOnly)/AC9 (stripRationale) unit-test
+// pattern already established above: idempotence, no-marker passthrough, and
+// span-removal at the unit level; a mixed-content site (paren shared between a
+// provenance tag and real normative text) at both the string level and end-to-end
+// through buildPromptForRole; and a representative (not exhaustive 4!=24) composition-
+// order check against the other three strippers. Spec: specs/governance-tag-strip.md
+// AC1-AC4.
+// ============================================================================
+
+test("T-GTS-07/AC3: stripOriginTags is idempotent, no-marker passthrough, and removes fenced spans", () => {
+  // WHY: same unit contract as the three sibling strippers (AC3 of the spec) — a
+  // safety-default no-op on unfenced text, idempotent on already-stripped text, and a
+  // real content shrink on fenced text with zero orphan markers left behind.
+  const noop = "no markers here";
+  assert.equal(stripOriginTags(noop), noop, "text without markers is unchanged (safety default)");
+  assert.equal(stripOriginTags(""), "", "empty string passthrough");
+  const stripped = stripOriginTags(CONSTITUTION);
+  assert.ok(stripped.length < CONSTITUTION.length, "stripped constitution must be shorter than raw");
+  assert.equal(stripOriginTags(stripped), stripped, "stripOriginTags must be idempotent");
+  assert.ok(!stripped.includes("origin:start"), "origin:start markers must be removed");
+  assert.ok(!stripped.includes("origin:end"), "origin:end markers must be removed");
+  // Span-removal at a known site: the §3.1 heading version stamp is fenced in source
+  // and must be gone post-strip, while the un-fenced heading text survives.
+  assert.ok(
+    CONSTITUTION.includes("3.1 Server-enforced chain<!-- origin:start --> (v3.2.0)<!-- origin:end -->"),
+    "fixture assumption: raw source carries this fenced site (test would be vacuous otherwise)",
+  );
+  assert.ok(!stripped.includes("(v3.2.0)"), "the fenced version stamp must be removed by the span-removal");
+  assert.ok(stripped.includes("3.1 Server-enforced chain"), "the un-fenced heading text must survive");
+});
+
+test("T-GTS-07/AC2: mixed-content site keeps its normative half after stripOriginTags (string-level)", () => {
+  // WHY: AC2's disqualifying-finding contract, pinned directly against a known
+  // mixed-content site (skill-pm.md's Visual Structural Assertions gate) — the fence
+  // wraps ONLY the "v3.26.0;" provenance substring, sharing a parenthetical with the
+  // real MUST-clause qualifier "MANDATORY when …". Deleting the whole paren (the
+  // rejected blind-regex approach) would silently drop that qualifier; fencing must not.
+  const SKILL_PM = fs.readFileSync(path.join(ROOT, "content", "skill-pm.md"), "utf-8");
+  assert.ok(
+    SKILL_PM.includes("**Visual Structural Assertions** (<!-- origin:start -->v3.26.0; <!-- origin:end -->MANDATORY when"),
+    "fixture assumption: raw skill-pm.md carries this mixed-content fenced site",
+  );
+  const stripped = stripOriginTags(SKILL_PM);
+  assert.ok(
+    stripped.includes("**Visual Structural Assertions** (MANDATORY when `design/<feature>.md` mode ≠ no-design)"),
+    "the normative MUST-clause qualifier must survive verbatim after the provenance substring is stripped",
+  );
+  assert.ok(!stripped.includes("v3.26.0"), "the provenance version stamp must be gone");
+});
+
+test("T-GTS-07/AC1/AC2: mixed-content site survives end-to-end through buildPromptForRole (design arm)", async () => {
+  // WHY: the same mixed-content contract as above, but exercised through the real
+  // dispatch pipeline (not just the bare stripper) — the constitution's §4 visual_round
+  // description shares a parenthetical between the "v3.14.0," provenance stamp and the
+  // legitimate "§3.1" cross-reference. On a design-armed chain-role dispatch the whole
+  // sentence loads (§4 visual block is design-only-gated, not origin-gated), so the
+  // built prompt must carry the cross-reference and lose only the tag.
+  const text = await buildOnFixture({ mode: "figma" });
+  assert.ok(
+    text.includes("`visual_round` (§3.1) tracks pixel-fidelity iterations"),
+    "the surviving cross-reference clause must be present verbatim in the built prompt",
+  );
+  assert.ok(!text.includes("v3.14.0, §3.1"), "the provenance-tagged form must not leak into the built prompt");
+  assert.ok(!text.includes("origin:start"), "no origin fence marker may leak into the built prompt");
+});
+
+test("T-GTS-07/AC4: stripOriginTags composes order-independently with the other three strippers", () => {
+  // WHY: AC4 extends the existing AC5/HC5 order-independence contract (already pinned
+  // for the chain-only/rationale/design-only triple) to the fourth axis. A full 4!=24
+  // permutation sweep would be redundant with the spirit of the existing 6-permutation
+  // test above; this is a REPRESENTATIVE sample — origin-tags first (the real
+  // buildPromptForRole order), origin-tags last, and origin-tags interleaved in two
+  // different middle positions — proving no ordering corrupts another axis's fences
+  // (origin fences nest inside/beside the other three, never straddling them, per the
+  // spec's Ordering/Idempotence Specification).
+  const a = stripChainOnly, b = stripRationale, c = stripDesignOnly, d = stripOriginTags;
+  const orders = [
+    (t) => a(b(c(d(t)))), // production order: origin (d) first
+    (t) => d(a(b(c(t)))), // origin last
+    (t) => a(d(b(c(t)))), // origin interleaved (2nd)
+    (t) => c(b(d(a(t)))), // origin interleaved (3rd), reverse triple order
+  ];
+  const results = orders.map((f) => f(CONSTITUTION));
+  for (let i = 1; i < results.length; i++) {
+    assert.equal(results[i], results[0], `permutation ${i} must equal permutation 0 (order-independent incl. stripOriginTags)`);
+  }
+  for (const marker of ["chain-only:start", "chain-only:end", "rationale:start", "rationale:end", "design-only:start", "design-only:end", "origin:start", "origin:end"]) {
+    assert.ok(!results[0].includes(marker), `fully-stripped (4-axis) constitution must contain ZERO orphan markers: ${marker}`);
+  }
+});
+
 // --- governance-text-load AC9: stripRationale losslessness -------------------
 // WHY: stripRationale fences must only wrap "Reason:/Rationale:" prose — never a
 // rule heading, gate name, MUST clause, or numbered SOP step. These tests pin the
@@ -284,36 +377,56 @@ test("AC9: every operative rule/gate/SOP marker survives stripRationale in skill
   }
 });
 
-test("AC1/AC2: skill-pm stripped token count meets ≤ 2850 cap", () => {
+test("AC1/AC2: skill-pm stripped token count meets ≤ 2817 cap", () => {
   // WHY: the spec's re-grounded AC1 target (measured lossless, current file size
   // including F-A growth) must hold so each pm role dispatch is within budget.
   // pm-cut-approval-gate (qa-owned bump): cap raised from 2322 → 2850 to absorb
   // the step 7a Cut-Approval Gate SOP addition to skill-pm.md (inline cut draft
   // workflow, design-link rule, re-arm description). Actual stripped body measured
   // at 2800 ~tok; 2850 provides ~50-token editing headroom.
+  // governance-tag-strip (T-GTS-06, qa-owned re-baseline): cap LOWERED from 2850 → 2817.
+  // The real buildPromptForRole pipeline now runs stripOriginTags on the skill body BEFORE
+  // stripRationale (build.ts, unconditional). skill-pm.md carries one origin fence (the
+  // Geometric-Density Split Gate's "(v3.26.0; …)" rationale-nested tag), so folding
+  // stripOriginTags into this test's composition (matching production) trims a few more
+  // bytes than the raw-only 2830 this test previously measured. Actual stripRationale(
+  // stripOriginTags(body)) measured at 2817 ~tok exactly; cap set to the exact measured
+  // value (no headroom) per the constitution-conditional-load Phase-2 convention — the
+  // point of this feature is the cap ending LOWER, not gaining fresh editing slack.
   const SKILL_PM = fs.readFileSync(path.join(ROOT, "content", "skill-pm.md"), "utf-8");
   // Strip frontmatter (--- block) before token-counting the body, matching buildPromptForRole.
   const body = SKILL_PM.startsWith("---")
     ? SKILL_PM.slice(SKILL_PM.indexOf("---", 3) + 3).trimStart()
     : SKILL_PM;
-  const stripped = stripRationale(body);
+  const stripped = stripRationale(stripOriginTags(body));
   const toks = approxTokens(stripped);
-  assert.ok(toks <= 2850, `skill-pm stripped body (${toks} ~tok) must be ≤ 2850 (AC1)`);
+  assert.ok(toks <= 2817, `skill-pm stripped body (${toks} ~tok) must be ≤ 2817 (AC1, governance-tag-strip re-baseline)`);
 });
 
-test("AC1/AC2: skill-sr-engineer stripped token count meets ≤ 2210 cap", () => {
+test("AC1/AC2: skill-sr-engineer stripped token count meets ≤ 2138 cap", () => {
   // WHY: the spec's re-grounded AC2 target must hold for sr-engineer dispatch budget.
   // v3.28.0 (qa-owned bump): cap raised from 2048 → 2210 to absorb the
   // design-asset-source-rule feature's "Source assets, don't redraw them (v3.28.0)"
   // rule added to skill-sr-engineer's Design-Aware Pre-Flight step 3a. Actual
   // stripped body measured at 2160 ~tok; 2210 provides ~50-token editing headroom.
+  // governance-tag-strip (T-GTS-06, qa-owned re-baseline — the "5th cap" sr-engineer
+  // flagged and code-reviewer confirmed the spec's Affected Tests section undercounted):
+  // cap LOWERED from 2210 → 2138. skill-sr-engineer.md is the densest origin-tag site
+  // among the skill files (8 fences: Design-Aware Pre-Flight, Scoped Render Self-Check,
+  // Flag-don't-assume, Declared-token, Whole-surface self-converge, Source-assets, plus
+  // 2 more). Folding stripOriginTags into this test's composition (matching the real
+  // buildPromptForRole pipeline, which strips origin tags before rationale) measures
+  // stripRationale(stripOriginTags(body)) at 2138 ~tok exactly; cap set to the exact
+  // measured value (no headroom) per the Phase-2 convention — leaving raw-only would
+  // have left this cap at 2210 despite the body actually shrinking, silently masking
+  // the feature's real saving.
   const SKILL_SR = fs.readFileSync(path.join(ROOT, "content", "skill-sr-engineer.md"), "utf-8");
   const body = SKILL_SR.startsWith("---")
     ? SKILL_SR.slice(SKILL_SR.indexOf("---", 3) + 3).trimStart()
     : SKILL_SR;
-  const stripped = stripRationale(body);
+  const stripped = stripRationale(stripOriginTags(body));
   const toks = approxTokens(stripped);
-  assert.ok(toks <= 2210, `skill-sr stripped body (${toks} ~tok) must be ≤ 2210 (AC2)`);
+  assert.ok(toks <= 2138, `skill-sr stripped body (${toks} ~tok) must be ≤ 2138 (AC2, governance-tag-strip re-baseline)`);
 });
 
 // --- governance-text-load Round-2: constitution rationale fencing (T-GTL-06/07) ---
@@ -369,7 +482,7 @@ test("AC7: exactly two balanced rationale fences, both outside §3.x", () => {
   assert.equal(ends, 2, "exactly two rationale:end markers");
 });
 
-test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the measured floor (≤ 4304 ~tok)", () => {
+test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the measured floor (≤ 4487 ~tok)", () => {
   // WHY: floor REBASELINED by constitution-conditional-load PHASE 2. Phase 2 extends the
   // design-only axis to two more spans (§4 visual prose S3–S5 + P-AUDITOR, and §1 L16/L17/L19),
   // adding 3 MORE design-only fence pairs (now 6 pairs / 12 marker lines total, up from
@@ -389,16 +502,25 @@ test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the 
   // figma-baseline-manifest-gate §3.1 Baseline manifest gate bullet (inside
   // design-only fence) plus the matching skill-qa-visual.md Step A.0 enforcement note.
   // Actual rationale-stripped constitution measured at 4523 ~tok (exact).
+  // governance-tag-strip (T-GTS-06, qa-owned re-baseline): cap LOWERED from 4523 → 4487.
+  // buildPromptForRole now runs stripOriginTags FIRST, unconditionally, on the raw
+  // constitution (build.ts) — folding it into this test's composition (matching
+  // production) measures stripRationale(stripOriginTags(CONSTITUTION)) at 4487 ~tok
+  // exactly; cap set to the exact measured value (no headroom) per the Phase-2
+  // convention. Leaving this test raw-only (no stripOriginTags) would have measured
+  // the constitution's RAW size (now inflated by ~14 origin-fence pairs' marker bytes)
+  // against the OLD 4523 cap and failed at 4735 raw / un-folded-stripped, which is the
+  // exact regression this fold prevents — the cap must reflect what actually ships.
   const raw = approxTokens(CONSTITUTION);
-  const stripped = approxTokens(stripRationale(CONSTITUTION));
-  assert.ok(stripped <= 4523, `stripped constitution (${stripped} ~tok) must be ≤ 4523 (AC8 design-arm floor, constitution v3.40.0)`);
+  const stripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));
+  assert.ok(stripped <= 4487, `stripped constitution (${stripped} ~tok) must be ≤ 4487 (AC8 design-arm floor, governance-tag-strip re-baseline)`);
   assert.ok(
-    raw - stripped >= 49,
-    `constitution rationale saving (${raw - stripped} ~tok) must be ≥ 49 (AC8 measured min)`,
+    raw - stripped >= 240,
+    `constitution rationale+origin-tag saving (${raw - stripped} ~tok) must be ≥ 240 (AC8 measured min, governance-tag-strip re-baseline)`,
   );
 });
 
-test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 7768 ~tok)", () => {
+test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 8078 ~tok)", () => {
   // WHY: the constitution is injected on every dispatch; the full coordinator bundle is
   // the worst case. Compose the chain-role bundle the way buildPromptForRole does:
   // rationale-stripped constitution + SEP + rationale-stripped skill body. Floor
@@ -421,13 +543,22 @@ test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/b
   // cut-approval stop-condition entry added to skill-coordinator.md Auto-Routing
   // section (S04 text + gate description). Actual design-arm bundle measured at
   // 8109 ~tok; 8160 provides ~51-token editing headroom.
+  // governance-tag-strip (T-GTS-06, qa-owned re-baseline): cap LOWERED from 8160 → 8078.
+  // buildPromptForRole runs stripOriginTags on BOTH the constitution and the skill body
+  // FIRST, unconditionally — folding it into this test's composition (matching
+  // production) measures stripRationale(stripOriginTags(CONSTITUTION)) + SEP +
+  // stripRationale(stripOriginTags(body)) at 8078 ~tok exactly (skill-coordinator.md
+  // carries 3 origin fences: Visual Verdict Boundary, Drift Reconcile, Subagent Token
+  // Observability). Cap set to the exact measured value (no headroom) per the Phase-2
+  // convention — this is the worst-case per-dispatch bundle, so its shrinkage is the
+  // headline number for this feature's saving.
   const skillCoord = fs.readFileSync(path.join(ROOT, "content", "skill-coordinator.md"), "utf-8");
   const body = skillCoord.startsWith("---")
     ? skillCoord.slice(skillCoord.indexOf("---", 3) + 3).trimStart()
     : skillCoord;
   const SEP = "\n\n---\n\n";
-  const bundle = approxTokens(stripRationale(CONSTITUTION) + SEP + stripRationale(body));
-  assert.ok(bundle <= 8160, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 8160 (AC8 design-arm floor, pm-cut-approval-gate)`);
+  const bundle = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)) + SEP + stripRationale(stripOriginTags(body)));
+  assert.ok(bundle <= 8078, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 8078 (AC8 design-arm floor, governance-tag-strip re-baseline)`);
 });
 
 test("AC9: every operative rule/gate/heading survives stripRationale on the constitution", () => {
@@ -509,10 +640,15 @@ const SEP = "\n\n---\n\n";
 
 // Sentinels that uniquely identify each GATABLE span (must be ABSENT on the
 // non-design arm, PRESENT on the design arm). One per fenced span.
+// governance-tag-strip (T-GTS-04): "Visual evidence gate" and "`visual_round` sub-loop"
+// lost their "(vX.Y.Z)" suffix — stripOriginTags now removes it unconditionally, before
+// this array's sentinels are ever checked. Both literals are updated to the post-fence
+// form (version-tag substring dropped); the other five entries never carried a version
+// tag in the pinned sentinel and are unaffected.
 const DESIGN_ONLY_SENTINELS = [
-  "Visual evidence gate (v3.16.0)",       // §3.1 fence 1, bullet 1
+  "Visual evidence gate",                 // §3.1 fence 1, bullet 1 (was "Visual evidence gate (v3.16.0)")
   "Visual report schema gate",            // §3.1 fence 1, bullet 2
-  "`visual_round` sub-loop (v3.14.0)",    // §3.1 fence 2, bullet 1
+  "`visual_round` sub-loop",              // §3.1 fence 2, bullet 1 (was "`visual_round` sub-loop (v3.14.0)")
   "Split escalation (Round 3)",           // §3.1 fence 2, bullet 2
   "3.2 Visual Verdict Authority",         // §3.2 header (fence 3)
   "Visual verdict is qa-visual-owned",    // §3.2 body
@@ -522,9 +658,12 @@ const DESIGN_ONLY_SENTINELS = [
 // Anti-sweep CONTRACT sentinels: NON-visual rules that physically sit inside or
 // adjacent to the gated spans and MUST survive on BOTH arms (HC4). These are the
 // cross-role contracts the gate must never sweep away.
+// governance-tag-strip (T-GTS-04): the R10 sentinel lost its "(R10)" suffix — the bare
+// finding code is now inside an origin fence (`reconcile<!-- origin:start --> (R10)<!--
+// origin:end -->.**`), stripped unconditionally before this sentinel is checked.
 const ANTI_SWEEP_SENTINELS = [
   "SCOPE_DECISION_REQUIRED",                          // §3.1 scope-decision gate (v3.30.0), sits BETWEEN two gated visual bullets
-  "Sequential-context assumption + reconcile (R10)",  // §3.2 R10 (tw_sync/reconcile), ends §3.2 — carved OUT of the fence
+  "Sequential-context assumption + reconcile",        // §3.2 R10 (tw_sync/reconcile), ends §3.2 — carved OUT of the fence (was "... (R10)")
   "4. Routing Chain",                                 // §4 routing diagram
 ];
 
@@ -551,10 +690,17 @@ const P2_S4_VISUAL_SENTINELS = [
 // "§1 Design-baseline scope (v3.27.0)"), which would make a §1-strip assertion falsely
 // fail on a sentinel that survived in the SKILL, not §1. These openers are unique to
 // content/constitution.md §1 (verified: absent from skill-sr / skill-coordinator).
+// governance-tag-strip (T-GTS-04): the L17 and L19 sentinels lost their "(vX.Y.Z)"
+// suffix — both are now origin-fenced (`scope<!-- origin:start --> (v3.27.0)<!--
+// origin:end -->**: …`, `relaxation<!-- origin:start --> (v3.31.0)<!-- origin:end
+// -->**: …`), stripped unconditionally. The L16 "Visual Widgets exception (v3.14.0)"
+// literal is DELIBERATELY left UNCHANGED — that site was intentionally left un-fenced
+// (test-pinned, per sr-engineer/code-reviewer's skip-site list) so its version tag
+// still ships and this sentinel must NOT be updated.
 const P2_S1_DESIGN_SENTINELS = [
-  "**Visual Widgets exception (v3.14.0)**: when a widget is listed in the spec",      // L16, fence #1
-  "**Design-baseline scope (v3.27.0)**: For design-backed work, the canonical design", // L17, fence #1
-  "**Self-converge relaxation (v3.31.0)**: inside sr-engineer",                        // L19, fence #2
+  "**Visual Widgets exception (v3.14.0)**: when a widget is listed in the spec",      // L16, fence #1 (un-fenced by design — do not touch)
+  "**Design-baseline scope**: For design-backed work, the canonical design",           // L17, fence #1 (was "... (v3.27.0)**: ...")
+  "**Self-converge relaxation**: inside sr-engineer",                                  // L19, fence #2 (was "... (v3.31.0)**: ...")
 ];
 
 // Anti-sweep §1 universal bullets (L15 MVP-strict, L18 Surgical) — PRESENT on BOTH
@@ -647,8 +793,14 @@ test("AC2/AC4: the gated spans on the DESIGN arm are byte-equal to the constitut
   const srcStart = CONSTITUTION.indexOf("### 3.2 Visual Verdict Authority");
   const srcEndAnchor = CONSTITUTION.indexOf("explicit structural assertions and canonical-state parity");
   assert.ok(srcStart > -1 && srcEndAnchor > srcStart, "§3.2 source span anchors must resolve");
-  const srcSpan = CONSTITUTION.slice(srcStart, CONSTITUTION.indexOf("\n", srcEndAnchor));
-  assert.ok(text.includes(srcSpan), "design-arm §3.2 span must be byte-identical to constitution source");
+  // governance-tag-strip (T-GTS-05): srcSpan is sliced raw out of CONSTITUTION, so it still
+  // carries the "### 3.2 Visual Verdict Authority…<!-- origin:start --> (v3.26.0)<!-- origin:end
+  // -->" fence markup on its header line. `text` came through buildPromptForRole, which runs
+  // stripOriginTags unconditionally BEFORE the design-arm strip, so the fence is already gone
+  // from `text`. Route srcSpan through the same stripper before the containment check, or this
+  // assertion compares fenced source against unfenced output and always fails.
+  const srcSpan = stripOriginTags(CONSTITUTION.slice(srcStart, CONSTITUTION.indexOf("\n", srcEndAnchor)));
+  assert.ok(text.includes(srcSpan), "design-arm §3.2 span must be byte-identical to constitution source (post stripOriginTags)");
 });
 
 // --- AC3: safe default — no state / no design file => strip ---------------
@@ -682,14 +834,21 @@ test("AC4: §3.2 R10 (carve-out) survives byte-equal on BOTH arms — the gate n
   // NON-visual (tw_detect_drift / tw_sync after fan-out) — it is carved OUT of fence 3,
   // which ends BEFORE R10. It must appear byte-identical to source on BOTH the design and
   // non-design arms (HC2/HC4). Extract the R10 bullet from source and assert containment.
-  const srcStart = CONSTITUTION.indexOf("- **Sequential-context assumption + reconcile (R10).**");
+  // governance-tag-strip (T-GTS-04): the raw anchor shifted — the bare "(R10)" finding
+  // code is now wrapped in an inline origin fence mid-sentence
+  // (`reconcile<!-- origin:start --> (R10)<!-- origin:end -->.**`), so the old
+  // fence-free literal no longer occurs in CONSTITUTION and indexOf returned -1.
+  const srcStart = CONSTITUTION.indexOf("- **Sequential-context assumption + reconcile<!-- origin:start --> (R10)<!-- origin:end -->.**");
   const srcEnd = CONSTITUTION.indexOf("## 4. Routing Chain");
   assert.ok(srcStart > -1 && srcEnd > srcStart, "R10 source span anchors must resolve");
-  const r10 = CONSTITUTION.slice(srcStart, srcEnd).trimEnd();
+  // governance-tag-strip (T-GTS-05): the sliced span still carries the fence markup (raw
+  // source); route it through stripOriginTags before comparing against nonDesign/design,
+  // both of which went through buildPromptForRole and are already origin-stripped.
+  const r10 = stripOriginTags(CONSTITUTION.slice(srcStart, srcEnd).trimEnd());
   const nonDesign = await buildOnFixture({ mode: null });
   const design = await buildOnFixture({ mode: "figma" });
-  assert.ok(nonDesign.includes(r10), "R10 must survive byte-equal on the NON-design arm");
-  assert.ok(design.includes(r10), "R10 must survive byte-equal on the DESIGN arm");
+  assert.ok(nonDesign.includes(r10), "R10 must survive byte-equal on the NON-design arm (post stripOriginTags)");
+  assert.ok(design.includes(r10), "R10 must survive byte-equal on the DESIGN arm (post stripOriginTags)");
 });
 
 test("AC4: every surviving (non-gated) rule on the non-design arm is byte-identical to source", async () => {
@@ -698,10 +857,15 @@ test("AC4: every surviving (non-gated) rule on the non-design arm is byte-identi
   // this by reconstructing the expected arm output from the source and the two strippers,
   // then asserting the emitted constitution prefix matches it byte-for-byte.
   const text = await buildOnFixture({ mode: null });
-  const expectedConstitution = stripDesignOnly(stripRationale(CONSTITUTION));
+  // governance-tag-strip (T-GTS-05): buildPromptForRole now runs stripOriginTags FIRST,
+  // unconditionally, on the raw constitution (build.ts) — so the actual non-design
+  // dispatch is stripDesignOnly∘stripRationale∘stripOriginTags(source), not just the
+  // two pre-existing strips. Add stripOriginTags to the expected composition or this
+  // reconstruction is missing a strip the real pipeline applies.
+  const expectedConstitution = stripDesignOnly(stripRationale(stripOriginTags(CONSTITUTION)));
   assert.ok(
     text.startsWith(expectedConstitution),
-    "non-design dispatch constitution must be byte-identical to stripDesignOnly∘stripRationale(source)",
+    "non-design dispatch constitution must be byte-identical to stripDesignOnly∘stripRationale∘stripOriginTags(source)",
   );
 });
 
@@ -812,7 +976,7 @@ test("AC7: lite + non-design strips §3.2 once (no reintroduction), consistent w
 
 // --- AC8: rebaseline + pin the new non-design figure ----------------------
 
-test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 2409 ~tok)", () => {
+test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 2403 ~tok)", () => {
   // WHY: this is the BUDGET WIN that justified the feature, and it must be regression-guarded.
   // On a non-design chain dispatch buildPromptForRole emits stripDesignOnly(stripRationale(source)).
   // REBASELINED by constitution-conditional-load PHASE 2: Phase 2 strips two MORE spans on the
@@ -822,12 +986,20 @@ test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is
   // per-dispatch saving on non-design features (vs the original full-load ~4200, the net win is
   // ~1790 tok/dispatch). Pin both the floor AND the saving so a fence-shrink regression (less
   // stripped) or a marker-cost blowout is caught.
-  const ratStripped = approxTokens(stripRationale(CONSTITUTION));         // design-arm path: 4239
-  const nonDesign = approxTokens(stripDesignOnly(stripRationale(CONSTITUTION))); // non-design path: 2409
-  assert.ok(nonDesign <= 2409, `non-design constitution (${nonDesign} ~tok) must be ≤ 2409 (AC8 non-design floor, Phase-2)`);
+  // governance-tag-strip (T-GTS-06, qa-owned re-baseline): both sides folded to include
+  // stripOriginTags, matching the real buildPromptForRole pipeline (origin strip runs
+  // FIRST, unconditionally, before the rationale/design-only axes). Without the fold,
+  // the raw constitution's added origin-fence marker bytes (~14 pairs) would tick this
+  // floor UP, not down — the exact regression this fold prevents. Cap LOWERED from
+  // 2409 → 2403; the design-only strip saving grows from 1830 → 2084 (more of the
+  // now-larger raw-with-fences delta lands on the design-arm side, since the design-only
+  // fenced spans in §3.1/§3.2/§4 also each carry an origin tag that only the fold removes).
+  const ratStripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));         // design-arm path: 4487
+  const nonDesign = approxTokens(stripDesignOnly(stripRationale(stripOriginTags(CONSTITUTION)))); // non-design path: 2403
+  assert.ok(nonDesign <= 2403, `non-design constitution (${nonDesign} ~tok) must be ≤ 2403 (AC8 non-design floor, governance-tag-strip re-baseline)`);
   assert.ok(
-    ratStripped - nonDesign >= 1830,
-    `design-only strip saving (${ratStripped - nonDesign} ~tok) must be ≥ 1830 (the Phase-2 budget win)`,
+    ratStripped - nonDesign >= 2080,
+    `design-only strip saving (${ratStripped - nonDesign} ~tok) must be ≥ 2080 (governance-tag-strip re-baseline)`,
   );
 });
 
@@ -984,7 +1156,11 @@ test("AC-P2-5: §4 reflow is REORDER-ONLY — every §4 rule sentence is byte-pr
     // S6 (non-visual) — universal handoff convention
     "Each role finishes with `tw_update_state` whose `pending_notes` start with `next_role: <name>`",
     // S3 (visual) — visual_round description + self-arming signal
-    "A third counter\n`visual_round` (v3.14.0, §3.1) tracks pixel-fidelity iterations",
+    // governance-tag-strip (T-GTS-04): the raw anchor shifted — "v3.14.0" is now wrapped
+    // in an inline origin fence inside the same parenthetical as the "§3.1" cross-ref
+    // (`(<!-- origin:start -->v3.14.0, <!-- origin:end -->§3.1)`), so the old fence-free
+    // literal no longer occurs in CONSTITUTION.
+    "A third counter\n`visual_round` (<!-- origin:start -->v3.14.0, <!-- origin:end -->§3.1) tracks pixel-fidelity iterations",
     // S4 (visual) — VISUAL_BASELINES_REQUIRED
     "is blocked at PASS with `VISUAL_BASELINES_REQUIRED` rather than",
     // S5 (visual) — VISUAL_ASSERTIONS_REQUIRED / VISUAL_REPORT_INCOMPLETE
@@ -1001,8 +1177,12 @@ test("AC-P2-5: §4 reflow is REORDER-ONLY — every §4 rule sentence is byte-pr
   const visStart = CONSTITUTION.indexOf("A third counter");
   const visEnd = CONSTITUTION.indexOf("skip the auditor entirely.") + "skip the auditor entirely.".length;
   assert.ok(visStart > -1 && visEnd > visStart, "§4 visual block anchors must resolve in source");
-  const visBlockSrc = CONSTITUTION.slice(visStart, visEnd);
-  assert.ok(design.includes(visBlockSrc), "design-arm §4 visual block must be byte-identical to post-reflow source (no reword)");
+  // governance-tag-strip (T-GTS-04/05): the raw slice still carries the S3 origin fence
+  // around "v3.14.0" (see anchor above); `design` came through buildPromptForRole, which
+  // strips origin tags unconditionally, so route visBlockSrc through the same stripper
+  // before the containment check — same class as the R10 / §3.2 byte-equal fixes above.
+  const visBlockSrc = stripOriginTags(CONSTITUTION.slice(visStart, visEnd));
+  assert.ok(design.includes(visBlockSrc), "design-arm §4 visual block must be byte-identical to post-reflow source (no reword, post stripOriginTags)");
 });
 
 test("AC-P2-6: non-visual §4 (DIAGRAM/S1/S2/S6) + §1 (L15/L18) survive byte-for-byte on BOTH arms", async () => {
