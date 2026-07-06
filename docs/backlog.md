@@ -1,186 +1,251 @@
-# Backlog — deferred follow-ups
+# Backlog — architecture-improvement tickets
 
-Non-blocking items surfaced during feature work but deliberately left out of
-the shipping feature's scope (MVP / surgical-change discipline). Each row is a
-candidate for a future `/teamwork` feature; none blocks a release on its own.
+Tickets from the 2026-07-06 architecture review. Each is a candidate for a
+future `/teamwork` feature; none blocks a release on its own.
 
-> Recorded 2026-06-02. Origin tags reference the feature that surfaced the item.
+> Recorded 2026-07-06. Prior backlog (B1–B11, recorded 2026-06-02) cleared;
+> done rows dropped, still-open B8/B9 carried forward below.
 
-| # | Item | Priority | Origin | Status |
-|---|------|----------|--------|--------|
-| B1 | Constitution §1 verbatim-wording relax | P2 | watermark-hide-model-tier (v3.23.0) | **done (v3.24.0)** |
-| B2 | Always-on bundle headroom (2-token margin) | P1 | watermark-hide-model-tier (v3.23.0) | **done (v3.24.0)** |
-| B3 | Version-pin test refactor (recurring break) | P1 | watermark (v3.23.0) + drift (v3.23.1) | **done (v3.24.0)** |
-| B4 | Add `.nvmrc` + `engines` (Node version pin) | P1 | drift-archived-task-exclusion (v3.23.1) | **done (v3.23.1, Option Y)** |
-| B5 | release-engineer staging list omits source dirs | **P0** | v3.23.1 release (post-mortem) | **done (v3.24.0)** |
-| B6 | Derive release-staging guard from `tsconfig.include` (root-cause) | P2 | v3.24.0 independent review (F2) | **done (v3.35.0)** |
-| B7 | Visual fidelity un-owned until optional last gate (structural drift, all gates green) — see [postmortem-visual-fidelity-gate.md](postmortem-visual-fidelity-gate.md) | **P0** | oobe-setup-wizard (2026-06-04) | **done** — constitution §3.2 visual gates, content/skill-qa-visual.md, visual_round caps, and Visual Verdict Boundary (v3.26.0) own visual fidelity |
-| B8 | §7 external-reference policy has no server-side enforcement gate | P1 | figma-url-placeholder analysis (2026-06-11) | open |
-| B9 | Per-feature token budget + coordinator STOP at ceiling | P2 | Language process-retrospective (migrated from `.current/feature-split.md` F2) | open |
-| B10 | qa-visual round ≥2 delta-only re-diff (skip prior-`pass` surfaces) | P2 | qa-visual token-burn analysis (2026-06-12) | **done** — `skill-qa-visual.md` Step B0 carry-forward gate (T-QAVTR-01, PASS 2026-06-12; pending release) |
-| B11 | qa-visual Step B deterministic pixel-diff first; LLM reads images only on tool-flagged surfaces | P2 | qa-visual token-burn analysis (2026-06-12) | **done** — `skill-qa-visual.md` Step B1 deterministic-diff gate + B2 escalation (T-QAVTR-02, PASS 2026-06-12; pending release) |
+| id | desc | priority | depends_on | est. files | design-link |
+|----|------|----------|------------|------------|-------------|
+| A1 | Tool/prompt registry pattern — de-triplicate `index.ts` registration | P1 | — | ~14 (`index.ts` + every `tools/*.ts` + prompt registration) | — |
+| A2 | Split `tools/evidence-file.ts` (994 lines) into per-gate `gates/` modules | P1 | — | ~8 (`evidence-file.ts` → `gates/*.ts`, `transitions.ts`, tests) | — |
+| A3 | Build-time validator for constitution span-strip markers — **superseded by A9** | P2 | — | ~3 (`scripts/check-spans.mjs` new, `package.json`, test) | — |
+| A4 | Strip version/origin tags from governance text at build time | P1 | — | ~4 (`prompts/build.ts`, `content/*.md`, test) | — |
+| A5 | Error-code contract test: `content/*.md` ↔ code | P1 | — | ~2 (new test, maybe a shared error-code export) | — |
+| A6 | Consolidation rewrite of `skill-qa-visual.md` (265 → ~120 lines) | P1 | — | ~2 (`content/skill-qa-visual.md`, evidence-parser test run) | — |
+| A7 | Consolidation rewrite of `skill-pm.md` (renumber 2/2a/2a-bis/2b) | P1 | — | ~2 (`content/skill-pm.md`, tests) | — |
+| A8 | Single-owner dedup of multi-told mechanisms (cut-approval ×4, self-converge ×2) | P2 | — | ~5 (constitution + coordinator + pm + lite + sr skills) | — |
+| A9 | Compose-not-strip: overlay modules replace fence stripping in `build.ts` | P2 | — | ~8 (`prompts/build.ts`, split `content/constitution*.md`, tests) | — |
+| A10 | Gate registry as structured data → code + rendered prose | P2 | A9 | ~10 (`gates` data file, `transitions.ts`, `evidence-file.ts`, `build.ts`, content, tests) | — |
+| A11 | Escalation-route tables + unified WHEN/DO/ELSE rule grammar across skills | P2 | A6, A7 | ~12 (all `content/skill-*.md`, constitution) | — |
+| A12 | Shared SOP partials + Limits number registry | P2 | A9 | ~14 (all content files, `build.ts`) | — |
+| A13 | §1 polish: unified output policy, watermark decision table, positive examples per schema | P2 | — | ~6 (constitution + several skills) | — |
+| B8 | §7 external-reference policy has no server-side enforcement gate (carried forward) | P1 | — | ~4 (`tools/transitions.ts`, evidence/ledger check, constitution §7) | — |
+| B9 | Per-feature token budget + coordinator STOP at ceiling (carried forward) | P2 | — | ~3 (coordinator SOP, handoff/config field) | — |
 
 ---
 
-## B1 — Constitution §1 self-detection wording is a paraphrase, not verbatim
-- **What:** `specs/watermark-hide-model-tier.md` AC1 quotes a "verbatim" self-detection
-  string. To fit the always-on token budget, the shipped constitution §1 text is a
-  **semantics-equivalent paraphrase**, not the literal AC1 string. Meaning is fully
-  preserved (verified by code-reviewer, Round 2).
-- **Fix:** Relax AC1 wording to "load-bearing semantics preserved" rather than
-  "verbatim string". Spec-text-only change.
-- **Risk if skipped:** None functional — purely a spec/AC documentation accuracy nit.
+## A1 — Registry pattern for tool & prompt registration (P1)
+- **What:** `index.ts` is 1436 lines; adding a tool requires touching three
+  places (`ListToolsRequestSchema` list, zod schema, `CallToolRequestSchema`
+  dispatcher case — per CLAUDE.md), and prompt registration is an 11-branch
+  if-chain (`index.ts:382-402`). The three registration sites can drift.
+- **Fix:** each `tools/*.ts` exports `{ name, schema, handler }`; `index.ts`
+  iterates a registry to build the tool list, validate args, and dispatch.
+  Same for prompts: a `Map<promptId, buildFn>` replaces the if-chain.
+- **Owner:** /teamwork (cross-module refactor; pm→architect→sr→reviewer→qa).
+- **Risk if skipped:** every new tool/prompt re-pays the triple-registration
+  tax; a missed site ships a tool that lists but doesn't dispatch (or vice
+  versa).
 
-## B2 — Always-on lean bundle at 2098/2100 tokens (2-token margin)
-- **What:** The stripped constitution + `skill-coordinator-lite.md` lean always-on
-  bundle measures 2098 tokens against the `test/context-budget.test.mjs` cap of 2100.
-  The next ~8-char edit to any always-on text will break that test.
-- **Fix (pick one):** raise the cap with rationale, OR reclaim headroom by compressing
-  constitution §1 further. Decide a target margin (e.g. ≥ 100 tokens).
-- **Risk if skipped:** Brittle — an unrelated future constitution/skill edit fails CI
-  unexpectedly with no obvious connection to the editor's change.
+## A2 — Split `evidence-file.ts` into per-gate modules (P1)
+- **What:** `tools/evidence-file.ts` (994 lines) has grown from "file-mode QA
+  evidence write/check" into gate-central: review, code-review, visual
+  baselines/evidence, design-mode arm signal, scope-decision, cut-approval —
+  10+ `has*` predicates in one file, each consumed by a different
+  `transitions.ts` gate.
+- **Fix:** extract a `gates/` directory, one module per gate (e.g.
+  `gates/qa-review.ts`, `gates/code-review.ts`, `gates/visual.ts`,
+  `gates/cut-approval.ts`, `gates/scope-decision.ts`), aligned with the gate
+  trigger points in `tools/transitions.ts`. `evidence-file.ts` keeps only the
+  shared read/write plumbing.
+- **Owner:** /teamwork (pure refactor but wide import surface; sr→reviewer→qa).
+- **Risk if skipped:** the file keeps absorbing every new gate; predicates
+  entangle and a change to one gate's parsing silently affects another's.
 
-## B3 — Version-pin test breaks on every release
-- **What:** `test/subagent-templates.test.mjs` (the `"vX.Y.Z AC8: ..."` test) hard-codes
-  the version string in the test name, comments, and **two assert values**. Every PATCH/
-  MINOR bump breaks it, forcing a manual qa-engineer edit. Hit on v3.23.0 (watermark)
-  and again on v3.23.1 (drift) — confirmed recurring.
-- **Fix (pick one):** (a) read `JSON.parse(package.json).version` dynamically at the top
-  of the file so the test verifies the real invariant (`index.ts` literal == `package.json`)
-  without per-release edits; (b) drop the test entirely and rely on the existing
-  `scripts/check-version.mjs` pre-build gate.
-- **Owner:** qa-engineer (test file — Constitution §2).
-- **Risk if skipped:** Every release stalls on a spurious red test; easy to mistake for a
-  real regression.
+## A3 — Validate constitution span-strip markers at build time (P2) — SUPERSEDED by A9
+> A9 (compose-not-strip) eliminates the fence-stripping mechanism entirely, removing the
+> unbalanced-marker failure class this validator guards. Implement A3 only if A9 is rejected.
+- **What:** `prompts/build.ts` strips constitution spans via markdown fence
+  markers (`stripChainOnly` / `stripRationale` / `stripDesignOnly`). A typo or
+  unbalanced marker in `content/constitution.md` silently changes the
+  governance text agents receive — no error, no test failure tied to the
+  marker itself.
+- **Fix:** add a build-time check (pattern: `scripts/check-version.mjs`) that
+  asserts every strip marker is paired, spans are non-empty, and each strip
+  mode produces non-identical output where expected. Wire into `npm run build`
+  / `npm test`.
+- **Owner:** /teamwork (qa-engineer owns the test; small script).
+- **Risk if skipped:** governance text corruption is silent and only surfaces
+  as agent misbehavior in downstream workspaces — the hardest failure class to
+  trace back.
 
-## B6 — Derive the release-staging guard from `tsconfig.include` (P2, deferred from v3.24.0)
-- **Status: done (v3.35.0)** — `lib/tsconfig-source-dirs.ts` extracts source roots from `tsconfig.json`
-  `include`; the AC-B5.5 guard now derives expected dirs from it instead of the hand-maintained
-  `EXCLUDED_DIRS` set.
-- **What:** The AC-B5.5 guard test in `test/release-staging.test.mjs` detects source dirs by scanning
-  for `.ts/.mjs` files and subtracting a hand-maintained `EXCLUDED_DIRS` set. The authoritative list of
-  TS source roots already exists: `tsconfig.json` `include` (`tools, guards, prompts, schema, transport, lib`).
-- **Why it matters:** the hand-maintained `EXCLUDED_DIRS` is exactly what let `transport/` slip through in
-  v3.24.0 (it was wrongly placed in the exclusion set, masking the staging gap until the independent review).
-  The guard works today for all known dirs, but a future new source dir wrongly added to `EXCLUDED_DIRS`
-  could drift again — same failure class.
-- **Fix:** have the guard parse `tsconfig.json` `include`, map each glob to its top-level dir, and assert
-  every one appears in `FEATURE_DIRS` (+ the staging enumeration). Removes the hand-maintained exclusion list
-  as a drift source. Recorded in `specs/backlog-batch-v3.24.0.md` Dependencies as "deferred — out of scope
-  for the T479 patch; the remove-from-EXCLUDED + add-to-FEATURE_DIRS patch is sufficient for MVP correctness."
-- **Owner:** /teamwork (qa-engineer owns the test; sr-engineer if a shared helper is extracted).
-- **Risk if skipped:** low/latent — current guard is correct for known dirs; this is future-proofing against
-  the next hand-maintained-list drift.
+## A4 — Strip version/origin tags from governance text at build time (P1)
+- **What:** Nearly every rule in `content/constitution.md` and `content/skill-*.md`
+  carries inline provenance tags — `(v3.26.0, R5)`, `(B10)`, `root cause C1`,
+  `§四#7`, references to retrospectives the executing agent cannot read. For the
+  agent consuming the prompt these are pure noise: they change no behavior, cost
+  tokens on every dispatch, and add cognitive load.
+- **Fix:** extend the existing strip infrastructure in `prompts/build.ts` — either a
+  new `<!-- origin:start/end -->` fence or a regex pass that removes `(vX.Y.Z…)` /
+  root-cause-code tags at bundle time. Source files keep full provenance for
+  maintainers; agents receive clean normative text. Estimated 5–10% token saving
+  per role prompt.
+- **Owner:** /teamwork (build.ts + content markup; qa verifies bundle output).
+- **Risk if skipped:** every dispatch pays the tag tax; rules read as archaeology
+  instead of instructions.
 
-## B5 — release-engineer staging list omits source directories (P0)
-- **What:** `content/skill-release-engineer.md` SOP step 7 + `templates/claude-code-agents/release-engineer.md`
-  enumerate the staging set as `lib/ content/ templates/ specs/ test/ qa_reports/ review_reports/`
-  + metadata. It **omits `tools/ schema/ guards/ prompts/ bin/`** — i.e. every source directory
-  except `lib/`. The post-commit sanity check only verifies `specs/<feature>.md`, so the gap is silent.
-- **Symptom (v3.23.1 post-mortem):** the drift fix lived in `tools/drift.ts`; the release commit shipped
-  the compiled `dist/tools/drift.js` (correct) but **not** the `tools/drift.ts` source. The tag therefore
-  has source lagging dist. npx consumers run `dist/` so they are unaffected, but the repo tree is
-  internally inconsistent. Required a backfill commit on `main` (tags are immutable — not retagged).
-- **Fix:** add `tools/ schema/ guards/ prompts/ bin/` to the SOP step-7 staging enumeration and the
-  template hint; extend `test/release-staging.test.mjs` to assert every top-level source dir in the repo
-  appears in the staged-paths list (so a new source dir can't silently fall out of releases).
-- **Owner:** /teamwork (edits governance SOP `content/skill-release-engineer.md` + template + test — pm→sr→reviewer→qa).
-- **Risk if skipped:** every feature touching `tools/`/`schema/`/`guards/`/`prompts/`/`bin/` ships with
-  source/dist divergence in its tag; future readers `git checkout`-ing a tag get stale source.
+## A5 — Error-code contract test: content ↔ code (P1)
+- **What:** Governance prose asserts server behavior by name —
+  `VISUAL_PROVENANCE_MISSING`, `CUT_APPROVAL_REQUIRED`, `BASELINE_MANIFEST_MISSING`,
+  etc. Nothing prevents those claims drifting from what `tools/transitions.ts` /
+  `tools/evidence-file.ts` actually throw.
+- **Fix:** a test that (a) extracts every `SCREAMING_CASE` error code mentioned in
+  `content/*.md`, asserting each exists in code; (b) reverse direction: every
+  gate error code in code is mentioned in at least one content file. Cheap; no
+  behavior change. Interim guard until A10 makes the relationship generative.
+- **Owner:** /teamwork (qa-engineer owns the test).
+- **Risk if skipped:** doc rot — agents follow prose describing gates that no
+  longer exist or miss ones that do; the failure surfaces as confusing `⛔` rejections.
 
-## B8 — §7 external-reference policy is text-only, no server-side enforcement (P1)
-- **What:** Constitution §7 External-reference policy says a spec referencing external
-  artifacts is "presumed incomplete until each reference is (a) fetched, (b) indexed via
-  `tw_index_prd`, or (c) user-confirmed ignorable." But this is **prose only** — `tw_update_state`
-  does not verify that each external reference in the spec reached one of those three states.
-  Compare §3 pre-flight, which IS server-enforced (`⛔ BLOCKED`).
-- **Origin (2026-06-11):** `agc-SetupWizard/docs/CDE-OOBE-PRD-full.txt` has per-section
-  `UI設計圖：Figma URL` **placeholder text** (lines 450/474/513/870/902/922/950) while the real
-  Figma link sits only in the文末 `相關連結` section (line 970:
-  `https://www.figma.com/design/mb8UaOE6OYac3BFWNB4PNh/CDE_OOBE?node-id=72-3455`).
-  A PM reading section-by-section can self-judge "no design稿" and skip — exactly what §7 forbids,
-  but nothing stops the handoff.
-- **Fix (refined — do NOT couple to `design/*.md`):** §7 covers *all* external refs (Figma, Azure
-  DevOps tickets, API specs), not just design. Wrong design: rejecting `tw_update_state(next_role:
-  sr-engineer)` only when no `design/*.md` exists conflates design refs with the general class and
-  misses the PM→architect hop. Right design: maintain a per-spec **external-reference ledger** (each
-  ref + its state: `fetched`/`indexed`/`user-confirmed-ignorable`/`unresolved`), and have
-  `tw_update_state` reject the outbound hop while any ref is `unresolved`. Gate at the PM→architect
-  hop, not only PM→sr.
-- **Detection caveat:** server must discover "spec cites an external artifact" — URL-scan of the
-  spec is heuristic and error-prone; prefer an explicit ledger PM populates (skill-pm §Resource Audit
-  Gate already owns the initial audit) over silent scraping.
-- **Owner:** /teamwork (cross-module — `tools/transitions.ts` hop gate + an evidence/ledger check +
-  constitution §7 wording; pm→sr→reviewer→qa).
-- **Risk if skipped:** a PM can silently drop a real external design/spec reference; downstream
-  builds proceed against an incomplete spec with all gates green — same failure class as B7
-  (un-owned check, green pipeline).
+## A6 — Consolidation rewrite of `skill-qa-visual.md` (P1)
+- **What:** 265 lines accreted from successive postmortems: B0/B1/B2 staged gates,
+  three attestation fields (`baseline:` / `diff-metric:` / `pixel_gate_complete:`),
+  carry-forward exemption prose spread across four sections ("fallback token
+  satisfies diff-metric but does NOT exempt pixel_gate_complete (AC-5)"…). The
+  exemption logic is near-unfollowable as prose.
+- **Fix:** behavior-preserving rewrite as if authored fresh: one **exemption
+  matrix table** (`surface class × required fields`), one error-code trigger
+  table, renumbered steps, one minimal complete example of a passing
+  `visual_<id>.md` report. Target ~120 lines. Server parser
+  (`tools/evidence-file.ts`) unchanged — the rewrite must keep every
+  server-checked token/format identical (verify against parser tests).
+- **Owner:** /teamwork (content-only but high blast radius; pm→sr→reviewer→qa).
+- **Risk if skipped:** each new visual gate compounds the prose debt; agent
+  compliance degrades as exemption logic gets harder to hold in context.
 
-## B9 — Per-feature token budget + coordinator STOP at ceiling (P2)
-- **What:** The routing chain bounds cost only *implicitly* via round caps (`qa_round`/`review_round`
-  ≤ 3-4, the §5 anti-loop hop cap ≤ 10). There is no *explicit* per-feature token budget, and no
-  coordinator stop-condition that fires when a feature approaches a token ceiling. The Language
-  process-retrospective measured a single feature burn ~1.05M tokens across 4 visual-rework rounds with
-  no budget-based brake; the orientation retrospective added a second avoidable-rework data point.
-- **Fix (sketch):** add an optional per-feature token budget (e.g. handoff field or `.config.json`),
-  have the coordinator read accumulated `agent-*.jsonl` `usage.*` (per skill-coordinator §Subagent Token
-  Observability, v3.31.0) and STOP / hand to human when spend approaches the ceiling — a cost-side
-  circuit breaker complementing the existing count-side round caps.
-- **Origin:** `.current/feature-split.md` F2 (`token-budget-gate`), Language process-retrospective. The
-  sibling F-rows (visual-selfconverge, governance-text-load, constitution-restructure) all shipped
-  (v3.32.0–v3.34.0); F2 was the lone un-shipped leftover and is migrated here so it is not lost.
-- **Owner:** /teamwork (touches coordinator SOP + likely a handoff/config field; pm→…→qa).
-- **Risk if skipped:** low — round caps already bound worst-case cost; this is a finer cost-side brake,
-  not a correctness gate.
+## A7 — Consolidation rewrite of `skill-pm.md` (P1)
+- **What:** SOP numbering 2 → 2a → 2a-bis → 2b → … → 7a is patch-layering
+  sediment; gates (state-count split, geometric-density split, scope decision,
+  resource audit, question batch, ambiguity, cut-approval) each live in their own
+  accreted paragraph with duplicated STOP incantations.
+- **Fix:** behavior-preserving rewrite: clean sequential numbering, a single
+  gate-summary table (gate → trigger → clearing action), keep verbatim-table
+  schema sections. Same server-token constraint as A6.
+- **Owner:** /teamwork.
+- **Risk if skipped:** same as A6 — PM is the chain's entry role; its SOP being
+  hard to follow costs every feature.
 
-## B10 — qa-visual round ≥2 re-reads every baseline+impl image (no delta-only re-diff) (P2)
-- **What:** `content/skill-qa-visual.md` Phase 1.5 SOP runs Step A/A.5/B/C over **every** `## Visual
-  Baselines` row each round, and Step B explicitly `Read`s both `baseline path` and `impl path` into
-  multimodal context per surface. On a FAIL, `visual_round` increments but the SOP has **no delta-only
-  clause** — round ≥2 re-reads all surface images again, so cost = `rounds × all surfaces` instead of
-  `rounds × failed surfaces`. This is the primary qa-visual token sink.
-- **Fix:** from round ≥2, re-verify only surfaces that were `fail` / `accepted` / recaptured in the
-  prior round; carry forward prior-`pass` rows without re-reading their images — **gated on evidence
-  the engineer's fix was scoped** (e.g. `git diff` shows no change touching that surface's source).
-  If the diff cannot prove a surface untouched, fall back to re-diffing it. Pairs with B-(deterministic
-  pixel-diff) so the LLM only reads images for tool-flagged surfaces.
-- **Owner:** /teamwork (edits governance SOP `content/skill-qa-visual.md`; may touch the
-  `visual_round` evidence parser in `tools/evidence-file.ts`; pm→sr→reviewer→qa).
-- **Risk if skipped:** low correctness / high cost — every visual-rework round pays full re-read; the
-  Language retrospective measured ~1.05M tokens across 4 visual rounds, much of it avoidable re-reads.
-  Complements B9 (cost ceiling) and the deterministic-diff idea (per-read cost).
+## A8 — Single-owner dedup of multi-told mechanisms (P2)
+- **What:** The constitution's own header says skills "MUST NOT restate" it, yet:
+  cut-approval is told 4× (constitution, skill-coordinator stop-condition 6,
+  skill-pm 7a, skill-coordinator-lite) with divergent wording; self-converge
+  relaxation is told 2× (constitution §1, skill-sr-engineer) with overlapping
+  qualifiers. Every copy is a future drift source — edit one, miss three.
+- **Fix:** single-owner principle. Each mechanism's full definition lives in
+  exactly one document (server-gate class → constitution §3.1; process class →
+  the owning skill); every other mention shrinks to one pointer line ("see X").
+- **Owner:** /teamwork (touches constitution + 4 skills; content-only).
+- **Risk if skipped:** wording drift between copies produces contradictory
+  instructions; Document Priority resolves conflicts but agents burn context
+  reconciling them.
 
-## B11 — qa-visual Step B reads every image into multimodal context; gate with a deterministic diff first (P2)
-- **What:** `content/skill-qa-visual.md` Step B (Region Diff) instructs QA to `Read` both `baseline
-  path` and `impl path` into multimodal context for **every** surface, then have the model eyeball the
-  difference. Loading images into context is the per-read token cost — paid for every surface every
-  round, even surfaces with zero pixel difference.
-- **Fix (two-stage):** (1) run a deterministic CLI image-diff first (`odiff` / `pixelmatch` /
-  ImageMagick `compare`) over each surface's `compare region`; it returns a numeric diff (% or pixel
-  count) at zero token cost — QA reads only the number. (2) Only surfaces whose diff exceeds the
-  per-baseline threshold get escalated to the LLM, which then `Read`s the images to judge real drift
-  vs. acceptable anti-aliasing/font-hinting noise (the judgment a tool can't make). Surfaces under
-  threshold pass without ever loading an image.
-- **Interaction with region-diff ban:** Step B already bans whole-frame pixel-percentage as a PASS
-  metric (a sparse canvas dilutes localized errors). The deterministic diff MUST run over the declared
-  `compare region`, not the full frame, to preserve that property — otherwise it reintroduces the
-  banned metric. The numeric tool gates *which surfaces the LLM looks at*; it does NOT replace the
-  structural/region judgment that decides PASS.
-- **Owner:** /teamwork (edits governance SOP `content/skill-qa-visual.md` Step B; adds a diff-binary
-  dependency + likely a CI/tool wrapper; pm→sr→reviewer→qa).
-- **Risk if skipped:** low correctness / high cost — every passing surface still pays full image-read
-  cost each round. Composes with B10 (skip prior-`pass` across rounds) and B9 (overall cost ceiling):
-  B11 cuts within-round per-surface reads, B10 cuts cross-round re-reads.
+## A9 — Compose-not-strip: overlay modules replace fence stripping (P2, supersedes A3)
+- **What:** `prompts/build.ts` assembles role prompts **subtractively**: one large
+  constitution file minus `<!-- chain-only -->` / `<!-- rationale -->` /
+  `<!-- design-only -->` fenced spans. A single malformed fence silently changes
+  the governance text agents receive (the failure class A3 wanted to guard).
+- **Fix:** invert to **additive composition**:
+  `constitution-core.md` (always) + `overlay-chain.md` (full mode) +
+  `overlay-design.md` (design-armed) + `rationale/` (never shipped).
+  `build.ts` concatenates instead of stripping. Each module is independently
+  lintable and token-countable; the unbalanced-fence failure class disappears
+  structurally instead of being guarded (hence A3 superseded).
+- **Owner:** /teamwork (build.ts + content split + `test/context-budget.test.mjs`
+  rework; pm→architect→sr→reviewer→qa).
+- **Risk if skipped:** fence fragility persists; every conditional-content
+  feature adds more strip markers to get wrong.
 
-## B4 — No `.nvmrc` / `engines` → Node version drift
-- **What:** Repo has no `.nvmrc`, no `.node-version`, and no `engines` field in
-  `package.json`. The dev shell silently drifted to Node 26, which mismatched the
-  `better-sqlite3` native ABI (compiled for Node 22, `NODE_MODULE_VERSION 127`),
-  producing 55 `ERR_DLOPEN_FAILED` test failures. CI matrix is `[20, 22]` only.
-- **Shipped (v3.23.1, Option Y):** Added `.nvmrc` (`22`) and `package.json`
-  `"engines": { "node": ">=20" }` — **lower-bound only**. An upper bound (`<23`) was
-  rejected: `better-sqlite3` recompiles against the consumer's Node ABI at `npx`-install
-  time, so Node 23+ consumers have no mismatch; a ceiling would only emit spurious
-  `EBADENGINE` warnings. Dev/CI determinism is owned by `.nvmrc` + the CI matrix `[20,22]`.
-- **Risk if skipped (historical):** Recurring environment drift; full SQLite/RAG suite goes
-  red on any machine running Node outside the CI matrix, masking real failures.
+## A10 — Gate registry as structured data → code + rendered prose (P2, depends A9)
+- **What:** Gate definitions (error code, trigger edge, arm condition, clearing
+  artifact) currently exist in triplicate: `transitions.ts`/`evidence-file.ts`
+  (code), constitution §3.1 (prose), per-role skills (prose again). All three
+  drift independently; A5's contract test only detects divergence, it doesn't
+  prevent it.
+- **Fix:** one structured source (e.g. `gates.yaml` or a TS constants module)
+  with three consumers: (a) `transitions.ts` / `evidence-file.ts` import it;
+  (b) `build.ts` renders constitution §3.1 tables and each skill's
+  "gates you must clear" section from templates; (c) contract tests become
+  free — data is the test. Doc↔code drift becomes structurally impossible.
+- **Owner:** /teamwork (full feature: code + content + build + tests;
+  pm→architect→sr→reviewer→qa).
+- **Risk if skipped:** every new gate re-pays the triple-authoring tax and
+  reopens the drift window A5 can only detect after the fact.
+
+## A11 — Escalation-route tables + unified rule grammar (P2, depends A6/A7)
+- **What:** Every skill carries 5–8 scattered
+  `tw_update_state(status=Blocked, pending_notes=["…", "next_role: …"])`
+  incantations with slightly different phrasing (~40% of `skill-architect.md` is
+  this boilerplate). Rule conditions/actions/escapes are buried in varied prose.
+- **Fix:** (a) constitution defines the escalation **call format once**; each
+  skill replaces its incantations with one table:
+  `| situation | status | note token | next_role |`. (b) Normative rules adopt a
+  consistent WHEN → DO → ELSE shape so trigger/action/escape are scannable.
+- **Owner:** /teamwork (all skill files + constitution; content-only but wide).
+- **Risk if skipped:** boilerplate divergence — near-identical escalations with
+  different note formats confuse downstream parsers and readers.
+
+## A12 — Shared SOP partials + Limits number registry (P2, depends A9)
+- **What:** (a) Verbatim-repeated blocks across all skills: step 1
+  (`tw_get_state` → `tw_detect_drift`), output-rule lines, "on failure still
+  call `tw_update_state` with the failure summary". (b) Magic numbers scattered
+  everywhere: qa_round 3, review_round 3, visual_round 5, hop cap 10, 2 fix
+  tries, 3 reads, 250 lines × 5 passes, ≤5 files / 300 lines — changing one cap
+  means grepping all of `content/`.
+- **Fix:** (a) extract shared partials composed by `build.ts` (natural extension
+  of A9's composition model). (b) one **Limits table** at the top of the
+  constitution; body text references limits by name.
+- **Owner:** /teamwork.
+- **Risk if skipped:** cap changes silently miss copies; repeated blocks drift
+  in wording.
+
+## A13 — §1 polish: output policy, watermark table, positive examples (P2)
+- **What:** three small text-quality issues: (a) output directives conflict —
+  PM's "≤ 1 sentence" vs step 7a's mandatory inline cut table; exceptions are
+  implicit and growing. (b) §1 watermark self-detection is the constitution's
+  most convoluted sentence. (c) governance text is prohibition-heavy
+  ("do NOT ×N") while models comply better with positive canonical examples;
+  most schemas lack a minimal complete passing example.
+- **Fix:** (a) constitution states once: "terse by default; structured artifacts
+  (tables / blockers / ACs) exempt" — skills stop defining their own word caps.
+  (b) watermark rule becomes a two-row decision table
+  (`Task-spawned + pinned model → — @role (tier)` / `otherwise → — @role`).
+  (c) each artifact schema (spec, review report, visual report, architecture)
+  gains one minimal passing example.
+- **Owner:** /teamwork (constitution + several skills; content-only).
+- **Risk if skipped:** minor per item, but these are the highest-frequency
+  friction points — every role reads §1 every session.
+
+## B8 — §7 external-reference policy is text-only, no server-side enforcement (P1, carried forward 2026-06-11)
+- **What:** Constitution §7 says a spec referencing external artifacts is
+  presumed incomplete until each ref is fetched / indexed via `tw_index_prd` /
+  user-confirmed ignorable — but this is prose only; `tw_update_state` never
+  verifies it. Compare §3 pre-flight, which IS server-enforced (`⛔ BLOCKED`).
+- **Origin:** `agc-SetupWizard` OOBE PRD had per-section `UI設計圖：Figma URL`
+  placeholders while the real Figma link sat only in the文末 `相關連結`
+  section; a PM reading section-by-section could skip it with all gates green.
+- **Fix (refined):** per-spec external-reference **ledger** (each ref +
+  `fetched`/`indexed`/`user-confirmed-ignorable`/`unresolved`); `tw_update_state`
+  rejects the outbound hop while any ref is `unresolved`. Gate at PM→architect,
+  not only PM→sr. Prefer an explicit PM-populated ledger over URL-scraping the
+  spec (heuristic, error-prone).
+- **Owner:** /teamwork (cross-module — `tools/transitions.ts` hop gate +
+  ledger check + constitution §7 wording).
+- **Risk if skipped:** a PM can silently drop a real external design/spec
+  reference; downstream builds proceed against an incomplete spec with all
+  gates green.
+
+## B9 — Per-feature token budget + coordinator STOP at ceiling (P2, carried forward)
+- **What:** The routing chain bounds cost only implicitly (round caps ≤ 3-4,
+  §5 hop cap ≤ 10). No explicit per-feature token budget, no coordinator
+  stop-condition on spend. Language process-retrospective measured ~1.05M
+  tokens on one feature across 4 visual-rework rounds with no budget brake.
+- **Fix (sketch):** optional per-feature token budget (handoff field or
+  `.config.json`); coordinator reads accumulated `agent-*.jsonl` `usage.*`
+  (skill-coordinator §Subagent Token Observability, v3.31.0) and STOPs / hands
+  to human near the ceiling — a cost-side circuit breaker complementing the
+  count-side round caps.
+- **Owner:** /teamwork (coordinator SOP + handoff/config field).
+- **Risk if skipped:** low — round caps bound worst-case cost; this is a finer
+  cost-side brake, not a correctness gate.
