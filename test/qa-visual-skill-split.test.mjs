@@ -202,3 +202,28 @@ test("AC-2: skill-qa-visual.md Step A.0 requires copying the frozen baseline man
   assert.match(block, /\*\*verbatim\*\*/, "must require verbatim copy");
   assert.match(block, /MUST NOT re-derive the baseline set from the Figma URL/, "must forbid URL re-derivation");
 });
+
+// qa-visual-consolidation (T-QVC-01, v3.44.0 pending): the 265→124-line
+// consolidation rewrite folded four scattered exemption paragraphs into one
+// provenance matrix and two failure narratives into one error-code table.
+// specs/qa-visual-consolidation.md Copy/Strings S15/S16 call out that these
+// two annotation tokens must survive BYTE-EXACT, specifically preserving the
+// em-dash (U+2014) separator rather than a hyphen — a paraphrase an editor
+// could introduce without any visual difference in most fonts. The server
+// parser (tools/evidence-file.ts CARRY_FORWARD_TOKEN / B1_UNAVAILABLE_TOKEN)
+// is tested against its own constants elsewhere (evidence-provenance.test.mjs,
+// pixel-gate-attestation.test.mjs) but nothing previously pinned these two
+// literals against the SKILL DOC TEXT itself — this closes that gap so a
+// future doc edit that silently swaps the em-dash for a hyphen fails CI
+// instead of silently breaking the carry-forward/B1-fallback prose contract.
+test("AC-3 (qa-visual-consolidation S15/S16): carry-forward and B1-fallback annotation tokens are byte-exact (em-dash, not hyphen)", () => {
+  const body = fs.readFileSync(QA_VISUAL_PATH, "utf-8");
+  assert.ok(
+    body.includes("pass (carried forward — git diff confirms source untouched)"),
+    "S15: carry-forward annotation must be byte-exact, including U+2014 em-dash",
+  );
+  assert.ok(
+    body.includes("B1 tool unavailable — LLM fallback"),
+    "S16: B1-unavailable annotation must be byte-exact, including U+2014 em-dash",
+  );
+});

@@ -12,7 +12,7 @@ future `/teamwork` feature; none blocks a release on its own.
 | A2 | Split `tools/evidence-file.ts` (994 lines) into per-gate `gates/` modules | P1 | — | ~8 (`evidence-file.ts` → `gates/*.ts`, `transitions.ts`, tests) | — |
 | A3 | Build-time validator for constitution span-strip markers — **superseded by A9** | P2 | — | ~3 (`scripts/check-spans.mjs` new, `package.json`, test) | — |
 | A4 | Strip version/origin tags from governance text at build time | P1 | — | ~4 (`prompts/build.ts`, `content/*.md`, test) | — |
-| A5 | Error-code contract test: `content/*.md` ↔ code | P1 | — | ~2 (new test, maybe a shared error-code export) | — |
+| A5 | Error-code contract test: `content/*.md` ↔ code — **done (3360c68)** | P1 | — | ~2 (new test, maybe a shared error-code export) | — |
 | A6 | Consolidation rewrite of `skill-qa-visual.md` (265 → ~120 lines) | P1 | — | ~2 (`content/skill-qa-visual.md`, evidence-parser test run) | — |
 | A7 | Consolidation rewrite of `skill-pm.md` (renumber 2/2a/2a-bis/2b) | P1 | — | ~2 (`content/skill-pm.md`, tests) | — |
 | A8 | Single-owner dedup of multi-told mechanisms (cut-approval ×4, self-converge ×2) | P2 | — | ~5 (constitution + coordinator + pm + lite + sr skills) | — |
