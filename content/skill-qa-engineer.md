@@ -25,7 +25,7 @@ All review notes, questions, and bug reports → `qa_reports/review_<task-id>.md
 
 1. `tw_get_state` → `tw_detect_drift`. Confirm sr-engineer's `pending_notes` indicate readiness.
 
-2. **Phase 0 — Claim review**: `tw_update_state(status=In_Progress, agent_id="qa-engineer", pending_notes=["QA: claiming review of <task-ids>"])`. This advances the state machine from `(sr-engineer, In_Progress)` to `(qa-engineer, In_Progress)` — required before any later PASS/FAIL is accepted by the server.
+2. **Phase 0 — Claim review**: `tw_update_state(status=In_Progress, agent_id="qa-engineer", pending_notes=["QA: claiming review of <task-ids>"])`. This advances the state machine from `(sr-engineer, In_Progress)` to `(qa-engineer, In_Progress)` — required before any later PASS/FAIL is accepted by the server (any state write lacking a valid `agent_id` is rejected with `AGENT_ID_REQUIRED`).
 
 3. **Phase 1 — Review**: Read the implementation. Check correctness, edge cases, security. Write findings to `qa_reports/review_<task-id>.md`.
 
@@ -65,5 +65,5 @@ All review notes, questions, and bug reports → `qa_reports/review_<task-id>.md
 7. **Phase 4 — Run**:
    - Project build: ZERO errors.
    - **CI Runnability**: `npm test` / `pytest` / `cargo test` runs headlessly with zero human interaction. Flag if not.
-   - **PASS** → `tw_update_state(status=PASS, agent_id="qa-engineer", completed_tasks=[<ids>], qa_review="<summary>", pending_notes=["QA: <task-id> PASS"])`. Server auto-records the review (file mode: `qa_reports/review_<id>.md`; SQLite: `reports` row) AND verifies evidence exists before persisting PASS. Then call `tw_complete_task(<task-id>, agent_id="qa-engineer")` per completed id.
-   - **FAIL** → `tw_rollback_task(<task-id>, <reason>)` → `tw_update_state(status=FAIL, agent_id="qa-engineer", qa_review="<failure detail>", pending_notes=["QA: <task-id> FAIL — <reason>", "next_role: sr-engineer"])`. `qa_round` auto-increments. At Round 4 (after 3 prior FAILs), only `(pm, In_Progress)` is accepted next — escalate.
+   - **PASS** → `tw_update_state(status=PASS, agent_id="qa-engineer", completed_tasks=[<ids>], qa_review="<summary>", pending_notes=["QA: <task-id> PASS"])`. Server auto-records the review (file mode: `qa_reports/review_<id>.md`; SQLite: `reports` row) AND verifies evidence exists (else `MISSING_EVIDENCE`) before persisting PASS. Then call `tw_complete_task(<task-id>, agent_id="qa-engineer")` per completed id.
+   - **FAIL** → `tw_rollback_task(<task-id>, <reason>)` → `tw_update_state(status=FAIL, agent_id="qa-engineer", qa_review="<failure detail>", pending_notes=["QA: <task-id> FAIL — <reason>", "next_role: sr-engineer"])`. `qa_round` auto-increments. At Round 4 (after 3 prior FAILs), only `(pm, In_Progress)` is accepted next (else `QA_ROUND_EXCEEDED`) — escalate.

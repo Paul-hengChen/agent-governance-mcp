@@ -47,7 +47,7 @@ Rules:
 - ONE checkbox per spec `## Visual Widgets` row (skip `widget id == N/A`).
 - `[x]` = widget shape rendered correctly in the corresponding `impl path` screenshot.
 - `[ ]` = widget shape missing OR substituted with a primitive (the gap §1 Visual Widgets catches).
-- Any `[ ]` → **shape FAIL precedes pixel diff**. Route per "Widget shape miss" below; do NOT proceed to Step B for those surfaces — pixel-perfect on the wrong widget is meaningless.
+- Any `[ ]` → **shape FAIL precedes pixel diff**. Route per "Widget shape miss" below; do NOT proceed to Step B for those surfaces — pixel-perfect on the wrong widget is meaningless. The server likewise rejects PASS while any row is unchecked (`VISUAL_WIDGETS_UNVERIFIED`).
 
 ### Step A.5 — Canonical-State Verification (v3.26.0, R2)
 
@@ -262,4 +262,4 @@ individually. This shrinks blast radius and stops fix-A-break-B screen loops.
 - Step B0 (carry-forward, B10) cuts cross-round redundancy: from round ≥2, surfaces that already passed and whose source `git diff` proves untouched skip the image re-read. Re-diff is the safe default; carry-forward needs provable evidence.
 - Step B1 (deterministic pre-screen, B11) cuts within-round cost: a CLI pixel-diff over the `compare region` (never the full frame) decides which surfaces need eyes, so identical/sub-threshold surfaces consume no multimodal tokens.
 - Output filename `visual_<task-id>.md` is server-checked (Constitution §3.1); using `review_<task-id>.md` instead does NOT satisfy the gate.
-- `visual_fail:` `pending_notes` prefix is the trigger token for `visual_round` increment — without it, a pure test-logic FAIL bumps only `qa_round`.
+- `visual_fail:` `pending_notes` prefix is the trigger token for `visual_round` increment — without it, a pure test-logic FAIL bumps only `qa_round`. Past the cap (Round 6), only `(pm, In_Progress)` is accepted (else `VISUAL_ROUND_EXCEEDED`).

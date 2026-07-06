@@ -37,8 +37,8 @@ Every review report MUST contain these seven H2 sections in order:
    - Do NOT read `qa_reports/`, prior PR comments, or sr-engineer's pending_notes commentary.
 4. **Review** — produce `review_reports/review_<task-id>.md` per the Schema above. One file per task id reviewed.
 5. **Verdict**:
-   - **APPROVED** → `tw_update_state(status=In_Progress, agent_id="qa-engineer", completed_tasks=[<task-ids>], pending_notes=["review: APPROVED", "review_report: review_reports/review_<task-id>.md", "next_role: qa-engineer"])`. The server verifies a `review_reports/review_<id>.md` exists for each id in `completed_tasks` before accepting the handoff to qa.
-   - **CHANGES_REQUESTED** → `tw_update_state(status=FAIL, agent_id="code-reviewer", completed_tasks=[<task-ids>], blocking_reason="<one-line summary>", qa_review=<omit; reserved for qa>, pending_notes=["review: CHANGES_REQUESTED", "review_report: review_reports/review_<task-id>.md", "next_role: sr-engineer"])`. The server increments `review_round`. After 3 FAILs the next valid transition is `(pm, In_Progress)` — escalate.
+   - **APPROVED** → `tw_update_state(status=In_Progress, agent_id="qa-engineer", completed_tasks=[<task-ids>], pending_notes=["review: APPROVED", "review_report: review_reports/review_<task-id>.md", "next_role: qa-engineer"])`. The server verifies a `review_reports/review_<id>.md` exists for each id in `completed_tasks` before accepting the handoff to qa (else `MISSING_REVIEW_EVIDENCE`).
+   - **CHANGES_REQUESTED** → `tw_update_state(status=FAIL, agent_id="code-reviewer", completed_tasks=[<task-ids>], blocking_reason="<one-line summary>", qa_review=<omit; reserved for qa>, pending_notes=["review: CHANGES_REQUESTED", "review_report: review_reports/review_<task-id>.md", "next_role: sr-engineer"])`. The server increments `review_round`. After 3 FAILs the next valid transition is `(pm, In_Progress)` (else `REVIEW_ROUND_EXCEEDED`) — escalate.
 
 ## Notes
 - `completed_tasks` on the handoff to qa is a **review-scope manifest** (which task ids were reviewed this round), NOT a completion signal. `tw_complete_task` remains qa-engineer-exclusive.
