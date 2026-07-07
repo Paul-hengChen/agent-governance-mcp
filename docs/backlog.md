@@ -41,6 +41,7 @@ future `/teamwork` feature; none blocks a release on its own.
 | C9 | pending_notes free-text protocol tokens (`next_role:`/`resume_of:`/`review: APPROVED`) → structured handoff fields | P2 | A10 ✓ | ~6 (`tools/handoff.ts` schema, `transitions.ts`, orchestrator, skills, tests) | — |
 | C10 | qa-engineer / release-engineer bookkeeping boundary blur (QA did version bump + CHANGELOG in A10-10) | P2 | — | ~3 (skill-pm cut guidance, skill-qa-engineer, skill-release-engineer) | — |
 | C11 | Constitution double-injection: SessionStart hook + `/teamwork*` prompt both carry the full constitution in one session | P2 | — | ~3 (`prompts/build.ts`, `bin/agent-governance-context.mjs`) | — |
+| C12 | Registry doc-facing fields (`triggerEdge`/`armCondition`/`clearingArtifact`) have zero consumers/tests — fourth unverified copy of gate semantics | P2 | A10 ✓ | ~4 (`gates/registry.ts`, `prompts/build.ts` or `test/error-code-contract.test.mjs`, content) | — |
 
 ---
 
@@ -483,6 +484,30 @@ future `/teamwork` feature; none blocks a release on its own.
 - **Owner:** /teamwork (`prompts/build.ts` + `bin/agent-governance-context.mjs`).
 - **Risk if skipped:** every dual-path session pays double governance tokens —
   directly against the context-frugality design goal (cf. B9).
+
+## C12 — Registry doc-facing fields are dead data — the drift class A10 killed, recreated inside the registry (P2, observed 2026-07-08, depends A10 ✓)
+- **What:** `gates/registry.ts` carries three doc-facing prose fields per gate —
+  `triggerEdge`, `armCondition`, `clearingArtifact` — with **zero consumers and
+  zero test assertions** (the generative parity test verifies only `errorCode`
+  tokens bidirectionally + `hintStatic` presence at the producer file;
+  `documentedInProse` is the only other field it reads). These 3×18 strings are
+  a fourth hand-written copy of gate semantics that nothing verifies — exactly
+  the unverified-copy drift class A10 was cut to eliminate. Root cause: DR-3
+  deliberately chose parity-check over generation (safe, no content byte
+  edits), which left the registry's prose fields with no downstream role.
+  Found in the post-ship Fable-5 review of the Opus 4.8 implementation.
+- **Fix (pick one):** (a) complete the original A10 option-(b) vision —
+  `build.ts` renders the constitution §3.1 gate table / skill "gates you must
+  clear" sections FROM these fields, making them load-bearing (preferred;
+  turns detection into generation); (b) extend
+  `test/error-code-contract.test.mjs` to assert the three fields against the
+  prose (weaker — keyword-level parity); (c) delete the three fields until a
+  consumer exists (MVP-strict; zero dead data, loses the captured semantics).
+- **Owner:** /teamwork (option (a): `prompts/build.ts` + content restructure +
+  tests; options (b)/(c): registry + test only).
+- **Risk if skipped:** the three fields silently rot; a future consumer (or
+  human reader) trusts stale trigger/arm/clear descriptions — an unverified
+  fourth copy is worse than no copy.
 
 ## B8 — §7 external-reference policy is text-only, no server-side enforcement (P1, carried forward 2026-06-11)
 - **What:** Constitution §7 says a spec referencing external artifacts is
