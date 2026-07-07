@@ -5,11 +5,18 @@ future `/teamwork` feature; none blocks a release on its own.
 
 > Recorded 2026-07-06. Prior backlog (B1–B11, recorded 2026-06-02) cleared;
 > done rows dropped, still-open B8/B9 carried forward below.
+>
+> **2026-07-07 revision** (after shipping A1/A4–A7/A9 through the /teamwork
+> chain, v3.44.0–v3.45.0): C1–C5 added from live process friction observed
+> during those runs. Priorities revised: A10 P2→P1 (its prerequisites A9 +
+> the A1 orchestrator extraction both landed, cost dropped); A2 recommended
+> to fold into A10 (split gates/ while data-fying them, one QA round); A12
+> deprioritized (A9 shrank its marginal benefit).
 
 | id | desc | priority | depends_on | est. files | design-link |
 |----|------|----------|------------|------------|-------------|
 | A1 | Tool/prompt registry pattern — de-triplicate `index.ts` registration — **done (2026-07-07)** | P1 | — | ~14 (`index.ts` + every `tools/*.ts` + prompt registration) | — |
-| A2 | Split `tools/evidence-file.ts` (994 lines) into per-gate `gates/` modules | P1 | — | ~8 (`evidence-file.ts` → `gates/*.ts`, `transitions.ts`, tests) | — |
+| A2 | Split `tools/evidence-file.ts` (994 lines) into per-gate `gates/` modules — *recommend folding into A10* | P1 | — | ~8 (`evidence-file.ts` → `gates/*.ts`, `transitions.ts`, tests) | — |
 | A3 | Build-time validator for constitution span-strip markers — **superseded by A9** | P2 | — | ~3 (`scripts/check-spans.mjs` new, `package.json`, test) | — |
 | A4 | Strip version/origin tags from governance text at build time — **done (2026-07-06)** | P1 | — | ~4 (`prompts/build.ts`, `content/*.md`, test) | — |
 | A5 | Error-code contract test: `content/*.md` ↔ code — **done (3360c68)** | P1 | — | ~2 (new test, maybe a shared error-code export) | — |
@@ -17,12 +24,17 @@ future `/teamwork` feature; none blocks a release on its own.
 | A7 | Consolidation rewrite of `skill-pm.md` (gates → Gate Summary table) — **done (2026-07-06)** | P1 | — | ~2 (`content/skill-pm.md`, tests) | — |
 | A8 | Single-owner dedup of multi-told mechanisms (cut-approval ×4, self-converge ×2) | P2 | — | ~5 (constitution + coordinator + pm + lite + sr skills) | — |
 | A9 | Compose-not-strip: overlay modules replace fence stripping in `build.ts` — **done (2026-07-07)** | P2 | — | ~8 (`prompts/build.ts`, split `content/constitution*.md`, tests) | — |
-| A10 | Gate registry as structured data → code + rendered prose | P2 | A9 | ~10 (`gates` data file, `transitions.ts`, `evidence-file.ts`, `build.ts`, content, tests) | — |
+| A10 | Gate registry as structured data → code + rendered prose — *P2→P1 2026-07-07: prereqs landed (A9 ✓, A1 orchestrator ✓)* | P1 | A9 ✓ | ~10 (`gates` data file, `transitions.ts`, `handoff-orchestrator.ts`, `build.ts`, content, tests) | — |
 | A11 | Escalation-route tables + unified WHEN/DO/ELSE rule grammar across skills | P2 | A6, A7 | ~12 (all `content/skill-*.md`, constitution) | — |
 | A12 | Shared SOP partials + Limits number registry | P2 | A9 | ~14 (all content files, `build.ts`) | — |
 | A13 | §1 polish: unified output policy, watermark decision table, positive examples per schema | P2 | — | ~6 (constitution + several skills) | — |
 | B8 | §7 external-reference policy has no server-side enforcement gate (carried forward) | P1 | — | ~4 (`tools/transitions.ts`, evidence/ledger check, constitution §7) | — |
 | B9 | Per-feature token budget + coordinator STOP at ceiling (carried forward) | P2 | — | ~3 (coordinator SOP, handoff/config field) | — |
+| C1 | Transitions matrix lacks amend/repair semantics (pm re-entry strands downstream roles) | P1 | — | ~4 (`tools/transitions.ts`, constitution §3.1, skill-coordinator, tests) | — |
+| C2 | Cut-approval cannot cross the subagent boundary — formalize coordinator-attested approval | P1 | — | ~5 (`handoff` field, `transitions.ts`/orchestrator, skill-pm, skill-coordinator, tests) | — |
+| C3 | Per-task-id evidence check forces stub pointer files — accept covering review + id manifest | P2 | — | ~3 (evidence check in orchestrator/evidence-file, skills, tests) | — |
+| C4 | Drift detector drowned by historical noise — acknowledged-baseline / archive mechanism | P2 | — | ~4 (`tools/drift.ts`, maybe `tw_sync`/config, tests) | — |
+| C5 | Watermark toolchain: template hardcodes tier; validateWatermark appends instead of replacing on mismatch | P2 | — | ~4 (`lib/watermark-check.ts`, `templates/claude-code-agents/*`, tests) | — |
 
 ---
 
@@ -216,6 +228,89 @@ future `/teamwork` feature; none blocks a release on its own.
 - **Owner:** /teamwork (constitution + several skills; content-only).
 - **Risk if skipped:** minor per item, but these are the highest-frequency
   friction points — every role reads §1 every session.
+
+## C1 — Transitions matrix lacks amend/repair semantics (P1, observed 2026-07-07)
+- **What:** During the A1 run, PM re-entered `pm:In_Progress` mid-feature to amend
+  the spec's Test Impact table (a legitimate §7 flag from sr-engineer). Result:
+  the state machine stranded the chain — no `pm:In_Progress → code-reviewer` edge
+  exists, so the reviewer could not claim; the cut-approval gate re-armed and
+  re-blocked; the coordinator had to hand-author three transition writes
+  (pm→sr re-claim→reviewer claim) to repair routing. The matrix models the ideal
+  forward flow only; real development has sanctioned backtracking.
+- **Fix (design space):** either (a) an explicit `spec-amend` write mode that
+  preserves the prior chain position (pm writes the amendment note WITHOUT
+  becoming the current tuple), or (b) conditional edges from `pm:In_Progress`
+  to the role that was stranded (guarded by a `resume_of:` note), or (c) a
+  sanctioned coordinator `repair` transition documented in §3.1. Weigh
+  against gate re-arm semantics — a real cut change SHOULD re-arm (that part
+  worked correctly); only the routing strand is the defect.
+- **Owner:** /teamwork (transitions.ts + constitution §3.1 + skill-coordinator).
+- **Risk if skipped:** every mid-feature spec amendment costs manual routing
+  surgery by whoever coordinates; done wrong it corrupts the chain audit trail.
+
+## C2 — Cut-approval cannot cross the subagent boundary (P1, observed 2026-07-06/07)
+- **What:** The cut-approval gate assumes the PM who presents the cut also sees
+  the human's approval. Under the RECOMMENDED dispatch model (fresh-context Task
+  subagent), the PM subagent ends its turn after presenting the cut; when resumed
+  with "the human approved", it (correctly, per its own rules) refused to set
+  `cut_approved` on an agent's relayed word. Every run this session worked around
+  it via coordinator same-context writes with `agent_id="pm"` — a workaround,
+  not a design.
+- **Fix:** formalize ONE of: (a) coordinator-attested approval — the coordinator
+  (the context that directly witnessed the human's chat approval) is the
+  sanctioned writer of `cut_approved`, documented in constitution §3.1 +
+  skill-pm + skill-coordinator; or (b) an approval token the human's client
+  writes (out of scope for stdio mode). (a) is honest about the trust chain and
+  cheap. Fold the A8 dedup of the four cut-approval retellings into this same
+  feature.
+- **Owner:** /teamwork (governance text + possibly an orchestrator check;
+  absorbs part of A8).
+- **Risk if skipped:** strict PM subagents deadlock the chain on every cut;
+  lenient ones accept relayed approval inconsistently — both are wrong.
+
+## C3 — Per-task-id evidence check forces stub pointer files (P2, observed 2026-07-07)
+- **What:** `review: APPROVED` handoff and QA PASS verify
+  `review_reports/review_<id>.md` / `qa_reports/review_<id>.md` exist for EACH
+  id in `completed_tasks`. A single review round covering 7 tasks (T-REG-01..07)
+  forced creation of 6 one-line pointer stubs (precedent set in T-GTS, repeated
+  since). Bookkeeping noise that buries the real reports.
+- **Fix:** evidence check accepts a covering report: a `covers: <id list>` line
+  (or the ids in the filename/frontmatter) lets one file satisfy N ids. Keep
+  per-id files valid for multi-round features.
+- **Owner:** /teamwork (evidence check in `tools/handoff-orchestrator.ts` /
+  `evidence-file.ts` + skill-code-reviewer/qa text + tests).
+- **Risk if skipped:** every batched review round generates stub litter; future
+  readers open pointer files instead of evidence.
+
+## C4 — Drift detector drowned by historical noise (P2, observed 2026-07-06/07)
+- **What:** `tw_detect_drift` reports the same ~98 pre-existing completed-in-
+  tasks.md-but-not-in-handoff rows on EVERY pre-flight; every subagent brief this
+  session needed an explicit "known drift, ignore it" clause. Real new drift
+  would be invisible inside the noise. tasks-ahead direction, so `tw_sync`
+  cannot reconcile it by design.
+- **Fix:** an acknowledged-baseline mechanism — e.g. archive completed tasks
+  older than the last release into a `## Archived` section drift ignores, or a
+  `drift_baseline` config/handoff field recording acknowledged ids; report only
+  NEW drift since baseline.
+- **Owner:** /teamwork (`tools/drift.ts` + maybe config field + tests).
+- **Risk if skipped:** alert fatigue — the one drift report that matters gets
+  ignored like the 98 that don't.
+
+## C5 — Watermark toolchain defects (P2, observed 2026-07-06)
+- **What:** two related defects seen live: (a) agent templates hardcode the tier
+  in the CRITICAL reminder line (`— @sr-engineer (opus)`), so a dispatch-time
+  model override (fable) produced a mis-signed watermark; (b)
+  `validateWatermark` on a MISMATCHED (not absent) watermark appends the
+  canonical line instead of replacing, yielding a double watermark in the relay.
+- **Fix:** (a) templates phrase the reminder as "end with `— @<role> (<the
+  model you are actually pinned to>)`" or the dispatching coordinator injects
+  the tier into the brief; (b) validateWatermark strips a detected-but-wrong
+  trailing watermark line before appending. Also add `fable` to the §1 tier
+  enum (constitution mentions opus/sonnet/haiku only — fold into A13 if that
+  ships first).
+- **Owner:** /teamwork (lib/watermark-check.ts + templates + tests; small).
+- **Risk if skipped:** cosmetic but user-facing on every relay; tier attribution
+  in the audit trail is wrong for overridden dispatches.
 
 ## B8 — §7 external-reference policy is text-only, no server-side enforcement (P1, carried forward 2026-06-11)
 - **What:** Constitution §7 says a spec referencing external artifacts is
