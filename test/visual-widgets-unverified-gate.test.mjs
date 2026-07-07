@@ -15,7 +15,7 @@ import * as path from "node:path";
 import {
   parseVisualWidgetsChecklist,
   hasUncheckedWidgets,
-} from "../dist/tools/evidence-file.js";
+} from "../dist/gates/visual.js";
 
 function mkWorkspace() {
   return fs.mkdtempSync(path.join(os.tmpdir(), "vwug-"));

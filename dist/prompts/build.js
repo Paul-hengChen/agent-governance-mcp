@@ -8,7 +8,7 @@ import { getActiveStorage } from "../tools/storage.js";
 import { buildPrdChunks, CHUNKER_VERSION, DEFAULT_EMBEDDING_MODEL, } from "../tools/rag.js";
 import { getInflightKey, getInflight, setInflight, deleteInflight, } from "../tools/rag-coalesce.js";
 import { parseSkillFile } from "../tools/skill-frontmatter.js";
-import { hasDesignModeRequiringVisual } from "../tools/evidence-file.js";
+import { hasDesignModeRequiringVisual } from "../gates/visual.js";
 import { CONSTITUTION_SEGMENTS, includeSegment } from "./constitution-manifest.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

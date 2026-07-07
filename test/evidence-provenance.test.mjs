@@ -21,7 +21,7 @@ import * as path from "node:path";
 import {
   parseVisualProvenanceRows,
   checkVisualProvenance,
-} from "../dist/tools/evidence-file.js";
+} from "../dist/gates/visual.js";
 
 // ---- helpers ----------------------------------------------------------------
 

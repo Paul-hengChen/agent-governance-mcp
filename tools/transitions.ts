@@ -3,6 +3,8 @@
 // See specs/qa-flow-enforcement-architecture.md §ALLOWED_TRANSITIONS for the
 // authoritative matrix. Any change here MUST be mirrored in the design doc.
 
+import { gate } from "../gates/registry.js";
+
 export type AgentName =
   | "pm"
   | "researcher"
@@ -291,7 +293,7 @@ function rejection(
 export function validateTransition(req: TransitionRequest): TransitionRejection | null {
   // 1. agent_id required
   if (req.next.agent === null) {
-    return rejection(req, "AGENT_ID_REQUIRED", [], "All state writes must declare agent_id.");
+    return rejection(req, "AGENT_ID_REQUIRED", [], gate("AGENT_ID_REQUIRED").hintStatic);
   }
   if (!isAgent(req.next.agent)) {
     return rejection(req, "AGENT_ID_REQUIRED", [], `Unknown agent_id "${req.next.agent}".`);
@@ -309,7 +311,7 @@ export function validateTransition(req: TransitionRequest): TransitionRejection 
       req,
       "QA_ROUND_EXCEEDED",
       onlyAllowed,
-      `qa_round=${req.prev_qa_round} exceeds cap. Only (pm, In_Progress) allowed to reset.`,
+      `qa_round=${req.prev_qa_round}${gate("QA_ROUND_EXCEEDED").hintStatic}`,
     );
   }
   if (req.prev_review_round >= REVIEW_ROUND_CAP) {
@@ -320,7 +322,7 @@ export function validateTransition(req: TransitionRequest): TransitionRejection 
       req,
       "REVIEW_ROUND_EXCEEDED",
       onlyAllowed,
-      `review_round=${req.prev_review_round} exceeds cap. Only (pm, In_Progress) allowed to reset.`,
+      `review_round=${req.prev_review_round}${gate("REVIEW_ROUND_EXCEEDED").hintStatic}`,
     );
   }
   // v3.14.0 — visual_round cap. Symmetric to qa_round / review_round.
@@ -335,7 +337,7 @@ export function validateTransition(req: TransitionRequest): TransitionRejection 
       req,
       "VISUAL_ROUND_EXCEEDED",
       onlyAllowed,
-      `visual_round=${prev_visual_round} exceeds cap. Only (pm, In_Progress) allowed for pixel/widget rebudget.`,
+      `visual_round=${prev_visual_round}${gate("VISUAL_ROUND_EXCEEDED").hintStatic}`,
     );
   }
 
@@ -375,7 +377,7 @@ export function validateTransition(req: TransitionRequest): TransitionRejection 
     req,
     "TRANSITION_REJECTED",
     allowed,
-    `No edge ${key} → ${keyOf(req.next)} in ALLOWED_TRANSITIONS. See specs/qa-flow-enforcement-architecture.md.`,
+    `No edge ${key} → ${keyOf(req.next)}${gate("TRANSITION_REJECTED").hintStatic}`,
   );
 }
 

@@ -2,6 +2,7 @@
 // Pure state-machine logic for routing-chain enforcement.
 // See specs/qa-flow-enforcement-architecture.md §ALLOWED_TRANSITIONS for the
 // authoritative matrix. Any change here MUST be mirrored in the design doc.
+import { gate } from "../gates/registry.js";
 // ----- agent-id helper (shared with handler-side defense) -----
 export function requireQaEngineer(agentId, toolName) {
     if (agentId === "qa-engineer")
@@ -169,7 +170,7 @@ function rejection(req, error, allowed, hint) {
 export function validateTransition(req) {
     // 1. agent_id required
     if (req.next.agent === null) {
-        return rejection(req, "AGENT_ID_REQUIRED", [], "All state writes must declare agent_id.");
+        return rejection(req, "AGENT_ID_REQUIRED", [], gate("AGENT_ID_REQUIRED").hintStatic);
     }
     if (!isAgent(req.next.agent)) {
         return rejection(req, "AGENT_ID_REQUIRED", [], `Unknown agent_id "${req.next.agent}".`);
@@ -183,14 +184,14 @@ export function validateTransition(req) {
         const ok = req.next.agent === "pm" && req.next.status === "In_Progress";
         if (ok)
             return null;
-        return rejection(req, "QA_ROUND_EXCEEDED", onlyAllowed, `qa_round=${req.prev_qa_round} exceeds cap. Only (pm, In_Progress) allowed to reset.`);
+        return rejection(req, "QA_ROUND_EXCEEDED", onlyAllowed, `qa_round=${req.prev_qa_round}${gate("QA_ROUND_EXCEEDED").hintStatic}`);
     }
     if (req.prev_review_round >= REVIEW_ROUND_CAP) {
         const onlyAllowed = [{ agent: "pm", status: "In_Progress" }];
         const ok = req.next.agent === "pm" && req.next.status === "In_Progress";
         if (ok)
             return null;
-        return rejection(req, "REVIEW_ROUND_EXCEEDED", onlyAllowed, `review_round=${req.prev_review_round} exceeds cap. Only (pm, In_Progress) allowed to reset.`);
+        return rejection(req, "REVIEW_ROUND_EXCEEDED", onlyAllowed, `review_round=${req.prev_review_round}${gate("REVIEW_ROUND_EXCEEDED").hintStatic}`);
     }
     // v3.14.0 — visual_round cap. Symmetric to qa_round / review_round.
     // Only fires when prev_visual_round is provided AND has reached cap; the
@@ -201,7 +202,7 @@ export function validateTransition(req) {
         const ok = req.next.agent === "pm" && req.next.status === "In_Progress";
         if (ok)
             return null;
-        return rejection(req, "VISUAL_ROUND_EXCEEDED", onlyAllowed, `visual_round=${prev_visual_round} exceeds cap. Only (pm, In_Progress) allowed for pixel/widget rebudget.`);
+        return rejection(req, "VISUAL_ROUND_EXCEEDED", onlyAllowed, `visual_round=${prev_visual_round}${gate("VISUAL_ROUND_EXCEEDED").hintStatic}`);
     }
     // 3. self-loop fast path
     if (req.prev.agent !== null &&
@@ -230,7 +231,7 @@ export function validateTransition(req) {
     const accepted = allowed.some((c) => c.agent === req.next.agent && c.status === req.next.status);
     if (accepted)
         return null;
-    return rejection(req, "TRANSITION_REJECTED", allowed, `No edge ${key} → ${keyOf(req.next)} in ALLOWED_TRANSITIONS. See specs/qa-flow-enforcement-architecture.md.`);
+    return rejection(req, "TRANSITION_REJECTED", allowed, `No edge ${key} → ${keyOf(req.next)}${gate("TRANSITION_REJECTED").hintStatic}`);
 }
 /**
  * Compute new round counters from prior counters + incoming tuple + prev tuple.

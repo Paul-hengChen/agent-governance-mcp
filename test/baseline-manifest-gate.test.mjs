@@ -25,7 +25,7 @@ import {
   hasVisualBaselinesInDesign,
   hasVisualEvidenceInFile,
   hasDesignModeRequiringVisual,
-} from "../dist/tools/evidence-file.js";
+} from "../dist/gates/visual.js";
 import {
   parseHandoff,
   writeHandoffState,
@@ -520,7 +520,7 @@ test("E2: AC-1 — verbatim BASELINE_MANIFEST_MISSING error string in dist/index
   // body (including these baseline-manifest gate strings) compiles into
   // dist/tools/handoff-orchestrator.js, not dist/index.js.
   const distIndex = fs.readFileSync(
-    path.join(path.dirname(new URL(import.meta.url).pathname), "..", "dist", "tools", "handoff-orchestrator.js"),
+    path.join(path.dirname(new URL(import.meta.url).pathname), "..", "dist", "gates", "registry.js"),
     "utf-8",
   );
   // Verbatim ERR-BMM-01 canonical string (spec Copy/Strings table)
@@ -545,7 +545,7 @@ test("E3: AC-2 — verbatim BASELINE_PROVENANCE_INCOMPLETE error string in dist/
   // body (including these baseline-manifest gate strings) compiles into
   // dist/tools/handoff-orchestrator.js, not dist/index.js.
   const distIndex = fs.readFileSync(
-    path.join(path.dirname(new URL(import.meta.url).pathname), "..", "dist", "tools", "handoff-orchestrator.js"),
+    path.join(path.dirname(new URL(import.meta.url).pathname), "..", "dist", "gates", "registry.js"),
     "utf-8",
   );
   // Verbatim ERR-BPI-01 canonical string
@@ -611,7 +611,7 @@ test("E6: AC — exact error strings match ERR-BMM-01 / ERR-BPI-01 verbatim (ful
   // body (including these baseline-manifest gate strings) compiles into
   // dist/tools/handoff-orchestrator.js, not dist/index.js.
   const distIndex = fs.readFileSync(
-    path.join(path.dirname(new URL(import.meta.url).pathname), "..", "dist", "tools", "handoff-orchestrator.js"),
+    path.join(path.dirname(new URL(import.meta.url).pathname), "..", "dist", "gates", "registry.js"),
     "utf-8",
   );
   assert.ok(
@@ -628,25 +628,25 @@ test("E6: AC — exact error strings match ERR-BMM-01 / ERR-BPI-01 verbatim (ful
 // AC-9: Version bump assertion — package.json + index.ts Server() = "3.40.1"
 // ===========================================================================
 
-test("AC-9: package.json version field equals 3.46.0", () => {
+test("AC-9: package.json version field equals 3.46.1", () => {
   // Why: AC-9 pins the version contract. Both package.json and the Server() literal
-  // must be "3.46.0" for the release to be self-consistent. Updated from 3.45.0
-  // to 3.46.0 when cut-approval-coordinator-attestation + pm-repair-resume-routing + drift-baseline-exemption shipped.
+  // must be "3.46.1" for the release to be self-consistent. Updated from 3.46.0
+  // to 3.46.1 when gate-registry (A10+A2) shipped.
   const pkgPath = path.join(path.dirname(new URL(import.meta.url).pathname), "..", "package.json");
   const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
-  assert.equal(pkg.version, "3.46.0", `package.json version must be "3.46.0", got "${pkg.version}"`);
+  assert.equal(pkg.version, "3.46.1", `package.json version must be "3.46.1", got "${pkg.version}"`);
 });
 
-test("AC-9: index.ts Server() literal equals 3.46.0", () => {
+test("AC-9: index.ts Server() literal equals 3.46.1", () => {
   // Why: the Server() version literal in index.ts is the operational version broadcast
-  // to MCP clients. It must match package.json. Updated from 3.45.0 to 3.46.0 when
-  // cut-approval-coordinator-attestation + pm-repair-resume-routing + drift-baseline-exemption shipped.
+  // to MCP clients. It must match package.json. Updated from 3.46.0 to 3.46.1 when
+  // gate-registry (A10+A2) shipped.
   const srcIndex = fs.readFileSync(
     path.join(path.dirname(new URL(import.meta.url).pathname), "..", "index.ts"),
     "utf-8",
   );
-  assert.match(srcIndex, /Server\(\s*\{[^}]*version:\s*["']3\.46\.0["']/s,
-    "Server() version literal in index.ts must equal 3.46.0");
+  assert.match(srcIndex, /Server\(\s*\{[^}]*version:\s*["']3\.46\.1["']/s,
+    "Server() version literal in index.ts must equal 3.46.1");
 });
 
 // ===========================================================================

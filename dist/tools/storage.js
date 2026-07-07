@@ -5,7 +5,8 @@
 // so remote / containerized deployments need no mounted workspace files.
 import { parseHandoff, readHandoffState, writeHandoffState, } from "./handoff.js";
 import { parseTasksFromFile, getNextTaskFromFile, completeTaskInFile, rollbackTaskInFile, addTaskInFile, } from "./tasks-file.js";
-import { recordReviewInFile, hasEvidenceInFile, recordCodeReviewInFile, hasCodeReviewEvidenceInFile, } from "./evidence-file.js";
+import { recordReviewInFile, hasEvidenceInFile, } from "../gates/qa-review.js";
+import { recordCodeReviewInFile, hasCodeReviewEvidenceInFile, } from "../gates/code-review.js";
 export class FileHandoffStorage {
     readState(workspacePath) {
         return readHandoffState(workspacePath);

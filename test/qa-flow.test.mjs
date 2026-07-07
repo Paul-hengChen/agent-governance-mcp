@@ -17,9 +17,11 @@ import {
 import {
   recordReviewInFile,
   hasEvidenceInFile,
+} from "../dist/gates/qa-review.js";
+import {
   recordCodeReviewInFile,
   hasCodeReviewEvidenceInFile,
-} from "../dist/tools/evidence-file.js";
+} from "../dist/gates/code-review.js";
 import { parseHandoff, writeHandoffState } from "../dist/tools/handoff.js";
 import { markStateRead, resetSession } from "../dist/guards/session.js";
 import { setActiveStorage, FileHandoffStorage } from "../dist/tools/storage.js";
@@ -816,10 +818,12 @@ test("AC-12: evidence gate verbatim hint string is reachable from compiled hando
   // Why: AC-8 mandates the exact hint substring in the rejection envelope.
   // The string is composed inline in the handler; this test guards
   // against future refactors that paraphrase the hint and break the contract.
-  // Relocated by the registry-pattern refactor: the tw_update_state gate-orchestration
-  // body compiles into dist/tools/handoff-orchestrator.js, not dist/index.js.
+  // Relocated by the gate-registry refactor (A10): the MISSING_REVIEW_EVIDENCE
+  // hint body is sourced from gates/registry.ts (gate("...").hintStatic), so its
+  // verbatim text compiles into dist/gates/registry.js. The `⛔ CODE: ${listing}. `
+  // prefix stays at the orchestrator emit site.
   const distIndex = fs.readFileSync(
-    path.join(path.dirname(new URL(import.meta.url).pathname), "..", "dist", "tools", "handoff-orchestrator.js"),
+    path.join(path.dirname(new URL(import.meta.url).pathname), "..", "dist", "gates", "registry.js"),
     "utf-8",
   );
   // The hint is composed via two concatenated template literals in the source,

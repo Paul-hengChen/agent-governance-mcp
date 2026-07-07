@@ -15,8 +15,8 @@ import {
   hasVisualBaselinesInDesign,
   hasVisualEvidenceInFile,
   hasDesignModeRequiringVisual,
-  hasScopeDecision,
-} from "../dist/tools/evidence-file.js";
+} from "../dist/gates/visual.js";
+import { hasScopeDecision } from "../dist/gates/scope-decision.js";
 
 function mkWorkspace() {
   return fs.mkdtempSync(path.join(os.tmpdir(), "visgate-"));
@@ -583,10 +583,11 @@ test("AC-4: SCOPE_DECISION_REQUIRED hint in tools/handoff-orchestrator.ts matche
   // the spec's Copy / Strings table. The handler concatenates the hint across
   // source lines; this test reconstructs both and asserts char-for-char equality
   // so a paraphrase in either the spec or the impl is caught (drift detection).
-  // Relocated by the registry-pattern refactor: the tw_update_state gate-orchestration
-  // body (including this hint) moved verbatim from index.ts to tools/handoff-orchestrator.ts.
+  // Relocated by the gate-registry refactor (A10): the SCOPE_DECISION_REQUIRED
+  // hint string is now sourced from gates/registry.ts (gate("...").hintStatic),
+  // so its verbatim text lives there rather than in handoff-orchestrator.ts.
   const root = path.resolve(import.meta.dirname, "..");
-  const indexTs = fs.readFileSync(path.join(root, "tools", "handoff-orchestrator.ts"), "utf-8");
+  const indexTs = fs.readFileSync(path.join(root, "gates", "registry.ts"), "utf-8");
   const specMd = fs.readFileSync(path.join(root, "specs", "server-scope-decision-gate.md"), "utf-8");
 
   const expected =

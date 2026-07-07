@@ -16,6 +16,11 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.46.1] - 2026-07-08
+
+### Changed
+- **`gate-registry` (backlog A10 + A2 folded in) — single structured source of truth for the 18-gate catalog (v3.46.1).** Introduces `gates/registry.ts` (`GATE_REGISTRY` — 18 typed `GateDefinition` entries: `errorCode`, `producer`, `envelope`, `triggerEdge`, `armCondition`, `clearingArtifact`, `hintStatic`, `documentedInProse`) as the single source `tools/transitions.ts` and the new `gates/*.ts` predicate modules source their error codes and hint text from, replacing three independently-drifting copies (code, constitution prose, skill prose) with one. `tools/evidence-file.ts` (994 lines) is split per backlog A2 into `gates/qa-review.ts`, `gates/code-review.ts`, `gates/visual.ts`, `gates/scope-decision.ts`, `gates/cut-approval.ts` — verbatim predicate moves, no behavior change — leaving `evidence-file.ts` as shared read/write plumbing only. Reconciled the gate catalog from the spec's stated 17 codes to the actual 18 (the spec omitted `MISSING_REVIEW_EVIDENCE`; see `specs/gate-registry-architecture.md`). `test/error-code-contract.test.mjs` rewritten as a generative parity test: imports the built registry and asserts registry↔code↔doc parity by construction (registry ⊆/⊇ doc-side backtick tokens, registry ⊆/⊇ code-side shape-rule harvest, `TransitionRejection["error"]` 12-member union ⊆ `ALL_GATE_CODES`) instead of a doc↔code regex-scrape. Pure re-plumbing: error codes, hint text, JSON/plain-text envelope shapes, frozen `tw_update_state` gate check order, and all `content/*.md` bytes are unchanged (zero `content/*.md` diff) — no schema_version bump, no new/removed gate, no observable behavior change. See `specs/gate-registry.md`, `specs/gate-registry-architecture.md`, `review_reports/review_A10-09.md`.
+
 ## [3.46.0] - 2026-07-07
 
 ### Added

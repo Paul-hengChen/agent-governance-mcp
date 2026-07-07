@@ -23,7 +23,7 @@ import {
   hasVisualBaselinesInDesign,
   hasVisualEvidenceInFile,
   hasDesignModeRequiringVisual,
-} from "../dist/tools/evidence-file.js";
+} from "../dist/gates/visual.js";
 import {
   parseHandoff,
   writeHandoffState,

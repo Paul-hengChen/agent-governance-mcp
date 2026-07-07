@@ -27,7 +27,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   hasCutApproval,
-} from "../dist/tools/evidence-file.js";
+} from "../dist/gates/cut-approval.js";
 import {
   parseHandoff,
   writeHandoffState,
@@ -45,6 +45,14 @@ import { _clearRegistryForTests, runMigrations, registerMigration } from "../dis
 // dist/tools/handoff-orchestrator.js, not dist/index.js.
 const DIST_INDEX = fs.readFileSync(
   path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "dist", "tools", "handoff-orchestrator.js"),
+  "utf-8",
+);
+// gate-registry refactor (A10): the CUT_APPROVAL_REQUIRED hint string (S02) is
+// now sourced from gates/registry.ts, so its verbatim text compiles into
+// dist/gates/registry.js. The S01 error code token stays in the orchestrator
+// envelope (dist/tools/handoff-orchestrator.js) via DIST_INDEX above.
+const DIST_REGISTRY = fs.readFileSync(
+  path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "dist", "gates", "registry.js"),
   "utf-8",
 );
 
@@ -522,16 +530,16 @@ test("C2: S02 — verbatim hint string in dist/index.js", () => {
   const S02_MID = "obtain human approval before routing to build.";
   const S02_SUFFIX = "See content/skill-pm.md §SOP step 7a.";
   assert.ok(
-    DIST_INDEX.includes(S02_PREFIX),
-    `dist/index.js must contain verbatim S02 prefix: "${S02_PREFIX}"`,
+    DIST_REGISTRY.includes(S02_PREFIX),
+    `dist/gates/registry.js must contain verbatim S02 prefix: "${S02_PREFIX}"`,
   );
   assert.ok(
-    DIST_INDEX.includes(S02_MID),
-    `dist/index.js must contain verbatim S02 mid: "${S02_MID}"`,
+    DIST_REGISTRY.includes(S02_MID),
+    `dist/gates/registry.js must contain verbatim S02 mid: "${S02_MID}"`,
   );
   assert.ok(
-    DIST_INDEX.includes(S02_SUFFIX),
-    `dist/index.js must contain verbatim S02 suffix: "${S02_SUFFIX}"`,
+    DIST_REGISTRY.includes(S02_SUFFIX),
+    `dist/gates/registry.js must contain verbatim S02 suffix: "${S02_SUFFIX}"`,
   );
 });
 

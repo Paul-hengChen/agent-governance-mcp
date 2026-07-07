@@ -52,7 +52,7 @@ const { REQUIRED_VISUAL_SECTIONS_EXPORT } = await (async () => {
   // that returns the missingSections array. A simpler approach: parse the TS
   // source for the array literal so we don't need an export.
   const src = fs.readFileSync(
-    path.join(ROOT, "tools", "evidence-file.ts"),
+    path.join(ROOT, "gates", "visual.ts"),
     "utf-8",
   );
   // Match the REQUIRED_VISUAL_SECTIONS array literal in tools/evidence-file.ts.

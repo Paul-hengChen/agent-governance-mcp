@@ -22,9 +22,11 @@ import {
 import {
   recordReviewInFile,
   hasEvidenceInFile,
+} from "../gates/qa-review.js";
+import {
   recordCodeReviewInFile,
   hasCodeReviewEvidenceInFile,
-} from "./evidence-file.js";
+} from "../gates/code-review.js";
 
 export type { HandoffState, TaskRecord };
 

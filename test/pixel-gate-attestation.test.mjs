@@ -31,7 +31,7 @@ import {
   checkVisualProvenance,
   hasDesignModeRequiringVisual,
   hasVisualBaselinesInDesign,
-} from "../dist/tools/evidence-file.js";
+} from "../dist/gates/visual.js";
 
 // ---- helpers ----------------------------------------------------------------
 
@@ -644,6 +644,15 @@ const DIST_INDEX = fs.readFileSync(
   path.join(path.dirname(new URL(import.meta.url).pathname), "..", "dist", "tools", "handoff-orchestrator.js"),
   "utf-8",
 );
+// gate-registry refactor (A10): the PIXEL_GATE_ATTESTATION_MISSING hint body
+// (everything after the `⛔ CODE: ${listing}. ` prefix) is now sourced from
+// gates/registry.ts (gate("...").hintStatic), so its verbatim text compiles
+// into dist/gates/registry.js. The `⛔ PIXEL_GATE_ATTESTATION_MISSING:` prefix
+// stays at the orchestrator emit site (DIST_INDEX above).
+const DIST_REGISTRY = fs.readFileSync(
+  path.join(path.dirname(new URL(import.meta.url).pathname), "..", "dist", "gates", "registry.js"),
+  "utf-8",
+);
 
 test("E1: AC-9 — verbatim PIXEL_GATE_ATTESTATION_MISSING error prefix in dist/index.js", () => {
   // Why: the operator runbook and error envelope require the exact ⛔ prefix.
@@ -658,7 +667,7 @@ test("E2: AC-9 — PIXEL_GATE_ATTESTATION_MISSING message names the required fix
   // Why: AC-9 says the error must name "the exact line the agent must add to fix it."
   // The spec Copy/Strings pins this as '- pixel_gate_complete: true'.
   assert.ok(
-    DIST_INDEX.includes("'- pixel_gate_complete: true'"),
+    DIST_REGISTRY.includes("'- pixel_gate_complete: true'"),
     "error message must include the exact fix line '- pixel_gate_complete: true' (AC-9)",
   );
 });
@@ -668,11 +677,11 @@ test("E3: AC-9 — PIXEL_GATE_ATTESTATION_MISSING message mentions carry-forward
   // The compiled dist splits the string across template literal lines, so we check for
   // the carry-forward token that must appear adjacent in the concatenation.
   assert.ok(
-    DIST_INDEX.includes("Carry-forward"),
+    DIST_REGISTRY.includes("Carry-forward"),
     "error message must mention carry-forward exemption (AC-9)",
   );
   assert.ok(
-    DIST_INDEX.includes("surfaces are exempt"),
+    DIST_REGISTRY.includes("surfaces are exempt"),
     "error message must include 'surfaces are exempt' (AC-9)",
   );
 });
@@ -681,7 +690,7 @@ test("E4: AC-9 — PIXEL_GATE_ATTESTATION_MISSING message includes spec referenc
   // Why: AC-9 actionable-error requirement: the spec reference tells the agent where
   // to find the full requirement. Must appear verbatim.
   assert.ok(
-    DIST_INDEX.includes("See specs/qa-visual-pixel-gate-attestation.md"),
+    DIST_REGISTRY.includes("See specs/qa-visual-pixel-gate-attestation.md"),
     "error message must include the spec reference (AC-9)",
   );
 });
@@ -701,20 +710,20 @@ test("E5: AC-9 — full verbatim PIXEL_GATE_ATTESTATION_MISSING copy string in d
     "PIXEL_GATE_ATTESTATION_MISSING prefix (clause 1) must appear in dist/index.js",
   );
   assert.ok(
-    DIST_INDEX.includes("Each non-carry-forward"),
-    "clause 'Each non-carry-forward' must appear in dist/index.js",
+    DIST_REGISTRY.includes("Each non-carry-forward"),
+    "clause 'Each non-carry-forward' must appear in dist/gates/registry.js",
   );
   assert.ok(
-    DIST_INDEX.includes("surface in qa_reports/visual_<id>.md must carry '- pixel_gate_complete: true'"),
-    "clause naming the fix file and line must appear verbatim in dist/index.js",
+    DIST_REGISTRY.includes("surface in qa_reports/visual_<id>.md must carry '- pixel_gate_complete: true'"),
+    "clause naming the fix file and line must appear verbatim in dist/gates/registry.js",
   );
   assert.ok(
-    DIST_INDEX.includes("in its ### <surface id> prose sub-section under ## Region Diff."),
-    "clause naming the sub-section location must appear verbatim in dist/index.js",
+    DIST_REGISTRY.includes("in its ### <surface id> prose sub-section under ## Region Diff."),
+    "clause naming the sub-section location must appear verbatim in dist/gates/registry.js",
   );
   assert.ok(
-    DIST_INDEX.includes("surfaces are exempt. See specs/qa-visual-pixel-gate-attestation.md."),
-    "exemption + spec-reference clause must appear verbatim in dist/index.js",
+    DIST_REGISTRY.includes("surfaces are exempt. See specs/qa-visual-pixel-gate-attestation.md."),
+    "exemption + spec-reference clause must appear verbatim in dist/gates/registry.js",
   );
 });
 
@@ -722,15 +731,15 @@ test("E5: AC-9 — full verbatim PIXEL_GATE_ATTESTATION_MISSING copy string in d
 // AC-9: Version bump assertions — package.json + index.ts Server() = "3.42.0"
 // ===========================================================================
 
-test("AC-9: package.json version field equals 3.46.0", () => {
+test("AC-9: package.json version field equals 3.46.1", () => {
   // Why: AC-9 requires the server version to be bumped with the new gate. Both
-  // package.json and the Server() literal must agree on 3.46.0.
+  // package.json and the Server() literal must agree on 3.46.1.
   const pkgPath = path.join(path.dirname(new URL(import.meta.url).pathname), "..", "package.json");
   const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
-  assert.equal(pkg.version, "3.46.0", `package.json version must be "3.46.0", got "${pkg.version}"`);
+  assert.equal(pkg.version, "3.46.1", `package.json version must be "3.46.1", got "${pkg.version}"`);
 });
 
-test("AC-9: index.ts Server() literal equals 3.46.0", () => {
+test("AC-9: index.ts Server() literal equals 3.46.1", () => {
   // Why: the Server() version literal is broadcast to MCP clients. It must match package.json.
   const srcIndex = fs.readFileSync(
     path.join(path.dirname(new URL(import.meta.url).pathname), "..", "index.ts"),
@@ -738,8 +747,8 @@ test("AC-9: index.ts Server() literal equals 3.46.0", () => {
   );
   assert.match(
     srcIndex,
-    /Server\(\s*\{[^}]*version:\s*["']3\.46\.0["']/s,
-    "Server() version literal in index.ts must equal 3.46.0",
+    /Server\(\s*\{[^}]*version:\s*["']3\.46\.1["']/s,
+    "Server() version literal in index.ts must equal 3.46.1",
   );
 });
 

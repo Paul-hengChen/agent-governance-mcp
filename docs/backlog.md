@@ -16,7 +16,7 @@ future `/teamwork` feature; none blocks a release on its own.
 | id | desc | priority | depends_on | est. files | design-link |
 |----|------|----------|------------|------------|-------------|
 | A1 | Tool/prompt registry pattern — de-triplicate `index.ts` registration — **done (2026-07-07)** | P1 | — | ~14 (`index.ts` + every `tools/*.ts` + prompt registration) | — |
-| A2 | Split `tools/evidence-file.ts` (994 lines) into per-gate `gates/` modules — *recommend folding into A10* | P1 | — | ~8 (`evidence-file.ts` → `gates/*.ts`, `transitions.ts`, tests) | — |
+| A2 | Split `tools/evidence-file.ts` (994 lines) into per-gate `gates/` modules — **done (2026-07-08, via A10)** | P1 | — | ~8 (`evidence-file.ts` → `gates/*.ts`, `transitions.ts`, tests) | — |
 | A3 | Build-time validator for constitution span-strip markers — **superseded by A9** | P2 | — | ~3 (`scripts/check-spans.mjs` new, `package.json`, test) | — |
 | A4 | Strip version/origin tags from governance text at build time — **done (2026-07-06)** | P1 | — | ~4 (`prompts/build.ts`, `content/*.md`, test) | — |
 | A5 | Error-code contract test: `content/*.md` ↔ code — **done (3360c68)** | P1 | — | ~2 (new test, maybe a shared error-code export) | — |
@@ -24,7 +24,7 @@ future `/teamwork` feature; none blocks a release on its own.
 | A7 | Consolidation rewrite of `skill-pm.md` (gates → Gate Summary table) — **done (2026-07-06)** | P1 | — | ~2 (`content/skill-pm.md`, tests) | — |
 | A8 | Single-owner dedup of multi-told mechanisms (cut-approval ×3 — *resolved via C2, 2026-07-07*; self-converge ×2 still open) | P2 | — | ~5 (constitution + coordinator + pm + lite + sr skills) | — |
 | A9 | Compose-not-strip: overlay modules replace fence stripping in `build.ts` — **done (2026-07-07)** | P2 | — | ~8 (`prompts/build.ts`, split `content/constitution*.md`, tests) | — |
-| A10 | Gate registry as structured data → code + rendered prose — *P2→P1 2026-07-07: prereqs landed (A9 ✓, A1 orchestrator ✓)* | P1 | A9 ✓ | ~10 (`gates` data file, `transitions.ts`, `handoff-orchestrator.ts`, `build.ts`, content, tests) | — |
+| A10 | Gate registry as structured data → code + rendered prose — **done (2026-07-08)** | P1 | A9 ✓ | ~10 (`gates` data file, `transitions.ts`, `handoff-orchestrator.ts`, `build.ts`, content, tests) | — |
 | A11 | Escalation-route tables + unified WHEN/DO/ELSE rule grammar across skills | P2 | A6, A7 | ~12 (all `content/skill-*.md`, constitution) | — |
 | A12 | Shared SOP partials + Limits number registry | P2 | A9 | ~14 (all content files, `build.ts`) | — |
 | A13 | §1 polish: unified output policy, watermark decision table, positive examples per schema | P2 | — | ~6 (constitution + several skills) | — |
@@ -51,7 +51,17 @@ future `/teamwork` feature; none blocks a release on its own.
   tax; a missed site ships a tool that lists but doesn't dispatch (or vice
   versa).
 
-## A2 — Split `evidence-file.ts` into per-gate modules (P1)
+## A2 — Split `evidence-file.ts` into per-gate modules (P1) — DONE 2026-07-08 (via A10)
+- **Done:** folded into and shipped as part of feature `gate-registry` (spec
+  `specs/gate-registry.md` + architecture `specs/gate-registry-architecture.md`;
+  v3.46.1). `tools/evidence-file.ts` (994 lines) drained to shared read/write
+  plumbing only (path helpers, section slicing, cell parsers); its 15
+  `has*`/`check*`/`validate*` predicates moved verbatim (no behavior change)
+  into `gates/qa-review.ts`, `gates/code-review.ts`, `gates/visual.ts`,
+  `gates/scope-decision.ts`, `gates/cut-approval.ts`. Every caller
+  (`tools/handoff-orchestrator.ts`, `prompts/build.ts`) retargeted to the new
+  import paths. Import DAG acyclic (`evidence-file.ts` has zero `gates/`
+  imports). See A10 below for the fold-in rationale.
 - **What:** `tools/evidence-file.ts` (994 lines) has grown from "file-mode QA
   evidence write/check" into gate-central: review, code-review, visual
   baselines/evidence, design-mode arm signal, scope-decision, cut-approval —
@@ -174,7 +184,27 @@ future `/teamwork` feature; none blocks a release on its own.
 - **Risk if skipped:** fence fragility persists; every conditional-content
   feature adds more strip markers to get wrong.
 
-## A10 — Gate registry as structured data → code + rendered prose (P2, depends A9)
+## A10 — Gate registry as structured data → code + rendered prose (P2, depends A9) — DONE 2026-07-08
+- **Done:** shipped as feature `gate-registry` (A2 folded in; spec
+  `specs/gate-registry.md`, architecture `specs/gate-registry-architecture.md`;
+  v3.46.1). `gates/registry.ts` is the single structured source of truth:
+  `GATE_REGISTRY` — 18 typed `GateDefinition` entries (`errorCode`, `producer`,
+  `envelope`, `triggerEdge`, `armCondition`, `clearingArtifact`, `hintStatic`,
+  `documentedInProse`), reconciled up from the spec's stated 17 codes (the
+  spec omitted `MISSING_REVIEW_EVIDENCE`). `tools/transitions.ts` and the new
+  `gates/*.ts` predicate modules (A2) source their error codes/hint text from
+  it. Rendering mechanism for AC-3/AC-4 (constitution + skill prose): chosen
+  as a generative **parity check** (rewritten `test/error-code-contract.test.mjs`,
+  DR-3) rather than in-band file generation — the A9 compose-not-strip
+  pipeline and `constitution-monolith.txt` golden baseline are untouched by
+  construction; zero `content/*.md` bytes changed. `TransitionRejection["error"]`
+  12-member union kept byte-identical, not narrowed to the registry (DR-8) —
+  non-drift enforced by a `union ⊆ ALL_GATE_CODES` test assertion instead.
+  Frozen `tw_update_state` gate check order (AC-7) and all four
+  `schema_version` constants (AC-8) unchanged. Full chain: sr-engineer
+  implemented, code-reviewer APPROVED (`review_reports/review_A10-09.md`),
+  qa-engineer rewrote the generative test + verified build/audit/test/smoke
+  green (`qa_reports/review_A10-10.md`).
 - **What:** Gate definitions (error code, trigger edge, arm condition, clearing
   artifact) currently exist in triplicate: `transitions.ts`/`evidence-file.ts`
   (code), constitution §3.1 (prose), per-role skills (prose again). All three

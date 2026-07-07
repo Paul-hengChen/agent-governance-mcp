@@ -1027,11 +1027,14 @@ test("AC8/HC3: build.ts arm probe uses the SAME helper as the server PASS gates"
   // tools/handoff-orchestrator.ts; index.ts itself no longer imports this helper directly.
   const buildSrc = fs.readFileSync(path.join(ROOT, "prompts", "build.ts"), "utf-8");
   const orchestratorSrc = fs.readFileSync(path.join(ROOT, "tools", "handoff-orchestrator.ts"), "utf-8");
-  assert.match(buildSrc, /import\s*\{\s*hasDesignModeRequiringVisual\s*\}\s*from\s*["']\.\.\/tools\/evidence-file\.js["']/,
-    "build.ts must import hasDesignModeRequiringVisual from tools/evidence-file");
+  // gate-registry refactor (A10 + A2): hasDesignModeRequiringVisual moved from
+  // tools/evidence-file.ts to gates/visual.ts; both call sites now import it from
+  // the gates/visual module (still the SAME single helper — identity preserved).
+  assert.match(buildSrc, /import\s*\{\s*hasDesignModeRequiringVisual\s*\}\s*from\s*["']\.\.\/gates\/visual\.js["']/,
+    "build.ts must import hasDesignModeRequiringVisual from gates/visual");
   assert.match(buildSrc, /hasDesignModeRequiringVisual\(workspacePath,\s*state\.active_feature\)\.required/,
     "build.ts arm probe must read .required off the shared helper");
-  assert.match(orchestratorSrc, /import[\s\S]*hasDesignModeRequiringVisual[\s\S]*from\s*["']\.\/evidence-file\.js["']/,
+  assert.match(orchestratorSrc, /import[\s\S]*hasDesignModeRequiringVisual[\s\S]*from\s*["']\.\.\/gates\/visual\.js["']/,
     "tools/handoff-orchestrator.ts must import the same helper the server PASS gates call");
 });
 

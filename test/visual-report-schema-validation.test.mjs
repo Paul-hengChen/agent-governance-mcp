@@ -17,7 +17,7 @@ import {
   validateVisualReport,
   validateVisualReports,
   designDeclaresStructuralAssertions,
-} from "../dist/tools/evidence-file.js";
+} from "../dist/gates/visual.js";
 
 // A fully-clearing v3.26 report.
 const GOOD = `# Visual — T01

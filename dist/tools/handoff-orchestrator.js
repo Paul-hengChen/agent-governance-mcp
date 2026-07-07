@@ -17,7 +17,10 @@
 import { enforcePreFlight } from "../guards/session.js";
 import { getActiveStorage, FileHandoffStorage } from "./storage.js";
 import { requireQaEngineer, validateTransition, computeNewRound, ALLOWED_TRANSITIONS, } from "./transitions.js";
-import { hasVisualBaselinesInDesign, hasVisualEvidenceInFile, hasUncheckedWidgets, hasDesignModeRequiringVisual, designDeclaresStructuralAssertions, validateVisualReports, checkVisualProvenance, checkBaselineManifest, checkPixelGateAttestation, hasScopeDecision, hasCutApproval, } from "./evidence-file.js";
+import { hasVisualBaselinesInDesign, hasVisualEvidenceInFile, hasUncheckedWidgets, hasDesignModeRequiringVisual, designDeclaresStructuralAssertions, validateVisualReports, checkVisualProvenance, checkBaselineManifest, checkPixelGateAttestation, } from "../gates/visual.js";
+import { hasScopeDecision } from "../gates/scope-decision.js";
+import { hasCutApproval } from "../gates/cut-approval.js";
+import { gate } from "../gates/registry.js";
 import { awaitAllInflightFor } from "./rag-coalesce.js";
 // --- GUARDED: must call tw_get_state first ---
 export async function handleUpdateState(parsed) {
@@ -73,11 +76,7 @@ export async function handleUpdateState(parsed) {
         prevTuple.status === "In_Progress") {
         const arm = hasDesignModeRequiringVisual(parsed.workspace_path, parsed.active_feature);
         if (arm.required && !hasScopeDecision(parsed.workspace_path, prevState)) {
-            const hint = "Scope decision missing. Either: (a) create .current/feature-split.md documenting the " +
-                "multi-feature split decision, or (b) set scope_decision: single-feature in this " +
-                "tw_update_state call with a why field explaining why this feature is appropriately " +
-                "scoped. Gate only fires when design/<feature>.md declares mode != no-design. " +
-                "See specs/server-scope-decision-gate.md.";
+            const hint = gate("SCOPE_DECISION_REQUIRED").hintStatic;
             const envelope = {
                 error: "SCOPE_DECISION_REQUIRED",
                 attempted: {
@@ -121,9 +120,7 @@ export async function handleUpdateState(parsed) {
         prevTuple.agent === "pm" &&
         prevTuple.status === "In_Progress") {
         if (!hasCutApproval(prevState)) {
-            const hint = "Cut approval missing. PM must present the ticket cut inline in chat and " +
-                "obtain human approval before routing to build. Set cut_approved: true on " +
-                "the pm:In_Progress write after approval. See content/skill-pm.md §SOP step 7a.";
+            const hint = gate("CUT_APPROVAL_REQUIRED").hintStatic;
             const envelope = {
                 error: "CUT_APPROVAL_REQUIRED",
                 attempted: {
@@ -169,7 +166,7 @@ export async function handleUpdateState(parsed) {
             return {
                 content: [{
                         type: "text",
-                        text: `⛔ MISSING_EVIDENCE: ${ev.missing.join(", ")}. Provide qa_review or write qa_reports/review_<id>.md (file mode) / insert reports row (SQLite) before PASS.`,
+                        text: `⛔ MISSING_EVIDENCE: ${ev.missing.join(", ")}. ${gate("MISSING_EVIDENCE").hintStatic}`,
                     }],
                 isError: true,
             };
@@ -190,7 +187,7 @@ export async function handleUpdateState(parsed) {
                         type: "text",
                         text: `⛔ VISUAL_BASELINES_REQUIRED: design/<feature>.md declares mode != no-design ` +
                             `(mode=${armCheck.mode}, at ${armCheck.designPath}) but ## Visual Baselines is absent. ` +
-                            `Add the Visual Baselines section (design-auditor SOP §Artifact Schema) before retrying PASS.`,
+                            gate("VISUAL_BASELINES_REQUIRED").hintStatic,
                     }],
                 isError: true,
             };
@@ -207,7 +204,7 @@ export async function handleUpdateState(parsed) {
                             text: `⛔ VISUAL_EVIDENCE_MISSING: ${visEv.missing.join(", ")}. ` +
                                 `design/<feature>.md declares ## Visual Baselines (at ${visualGate.designPath}) ` +
                                 `but qa_reports/visual_<task-id>.md is absent for the listed task(s). ` +
-                                `Run Phase 1.5 (skill-qa-visual) and write the visual report before PASS.`,
+                                gate("VISUAL_EVIDENCE_MISSING").hintStatic,
                         }],
                     isError: true,
                 };
@@ -229,8 +226,7 @@ export async function handleUpdateState(parsed) {
                     content: [{
                             type: "text",
                             text: `⛔ VISUAL_WIDGETS_UNVERIFIED: ${listing}. ` +
-                                `Unchecked widget row(s) in qa_reports/visual_<id>.md. ` +
-                                `Edit the visual report to mark each verified widget as [x] before retrying PASS.`,
+                                gate("VISUAL_WIDGETS_UNVERIFIED").hintStatic,
                         }],
                     isError: true,
                 };
@@ -251,9 +247,8 @@ export async function handleUpdateState(parsed) {
                                 type: "text",
                                 text: `⛔ VISUAL_ASSERTIONS_REQUIRED: design/<feature>.md declares mode != no-design ` +
                                     `(mode=${armCheck.mode}, at ${armCheck.designPath}) but ## Visual Structural ` +
-                                    `Assertions is absent. The design-auditor MUST emit it (skill-design-auditor ` +
-                                    `§Artifact Schema) and PM copy it into the spec; qa-visual marks each row pass/fail. ` +
-                                    `Add the section before retrying PASS.`,
+                                    `Assertions is absent. ` +
+                                    gate("VISUAL_ASSERTIONS_REQUIRED").hintStatic,
                             }],
                         isError: true,
                     };
@@ -280,12 +275,7 @@ export async function handleUpdateState(parsed) {
                         content: [{
                                 type: "text",
                                 text: `⛔ VISUAL_REPORT_INCOMPLETE: ${listing}. ` +
-                                    `qa_reports/visual_<id>.md must contain Canonical State Verification, ` +
-                                    `Structural Assertions, Region Diff (per-surface pass/accepted), Allowed ` +
-                                    `Differences, and a Verdict that normalizes to exactly PASS — every row ` +
-                                    `cleared (skill-qa-visual §Report schema). Resolve the failed/unverified ` +
-                                    `rows — do NOT pre-accept them (visual verdict is qa-visual-owned, ` +
-                                    `Constitution §3.2).`,
+                                    gate("VISUAL_REPORT_INCOMPLETE").hintStatic,
                             }],
                         isError: true,
                     };
@@ -308,13 +298,8 @@ export async function handleUpdateState(parsed) {
                     return {
                         content: [{
                                 type: "text",
-                                text: `⛔ VISUAL_PROVENANCE_MISSING: ${listing}. Each diffed surface in ` +
-                                    `qa_reports/visual_<id>.md must carry a baseline: fingerprint and a ` +
-                                    `diff-metric: value in its prose sub-section under ## Region Diff. ` +
-                                    `Carry-forward surfaces (annotated "pass (carried forward — git diff ` +
-                                    `confirms source untouched)") are exempt; "B1 tool unavailable — LLM ` +
-                                    `fallback" satisfies the diff-metric requirement. ` +
-                                    `See specs/qa-visual-baseline-provenance.md.`,
+                                text: `⛔ VISUAL_PROVENANCE_MISSING: ${listing}. ` +
+                                    gate("VISUAL_PROVENANCE_MISSING").hintStatic,
                             }],
                         isError: true,
                     };
@@ -332,8 +317,8 @@ export async function handleUpdateState(parsed) {
                 const manifest = checkBaselineManifest(parsed.workspace_path, parsed.active_feature);
                 if (!manifest.ok) {
                     const text = manifest.code === "BASELINE_MANIFEST_MISSING"
-                        ? `⛔ BASELINE_MANIFEST_MISSING: design/<feature>.md declares mode != no-design but the Source manifest (## Source section) contains no audited baseline rows. The design-auditor must complete step 2c (Mechanical baseline selection) — run the deterministic structural filter, freeze the resulting node-id list with status: audited in the Source manifest, and record filter-conditions + exclusion-reasons in a ## Baseline Selection Provenance section (required for multi-surface selections). See specs/figma-baseline-manifest-gate.md.`
-                        : `⛔ BASELINE_PROVENANCE_INCOMPLETE: design/<feature>.md has a multi-surface Source manifest (>=2 audited rows) but the ## Baseline Selection Provenance section is absent or incomplete (requires both filter-conditions: and exclusion-reasons: lines). Record the filter criteria used to select the baseline set per design-auditor SOP step 2c. See specs/figma-baseline-manifest-gate.md.`;
+                        ? gate("BASELINE_MANIFEST_MISSING").hintStatic
+                        : gate("BASELINE_PROVENANCE_INCOMPLETE").hintStatic;
                     return { content: [{ type: "text", text }], isError: true };
                 }
                 // v3.42.0 — Pixel-gate attestation (qa-visual-pixel-gate-attestation,
@@ -359,10 +344,8 @@ export async function handleUpdateState(parsed) {
                     return {
                         content: [{
                                 type: "text",
-                                text: `⛔ PIXEL_GATE_ATTESTATION_MISSING: ${listing}. Each non-carry-forward ` +
-                                    `surface in qa_reports/visual_<id>.md must carry '- pixel_gate_complete: true' ` +
-                                    `in its ### <surface id> prose sub-section under ## Region Diff. Carry-forward ` +
-                                    `surfaces are exempt. See specs/qa-visual-pixel-gate-attestation.md.`,
+                                text: `⛔ PIXEL_GATE_ATTESTATION_MISSING: ${listing}. ` +
+                                    gate("PIXEL_GATE_ATTESTATION_MISSING").hintStatic,
                             }],
                         isError: true,
                     };
@@ -384,8 +367,7 @@ export async function handleUpdateState(parsed) {
                 content: [{
                         type: "text",
                         text: `⛔ MISSING_REVIEW_EVIDENCE: ${ev.missing.join(", ")}. ` +
-                            `Code-reviewer evidence missing: write review_reports/review_<task-id>.md ` +
-                            `before handing off to qa-engineer.`,
+                            gate("MISSING_REVIEW_EVIDENCE").hintStatic,
                     }],
                 isError: true,
             };

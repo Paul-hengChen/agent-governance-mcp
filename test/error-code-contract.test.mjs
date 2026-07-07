@@ -1,13 +1,31 @@
 // Coded by @qa-engineer
-// Tests for spec: error-code-contract-test (T-ECCT-02).
-// Static contract: every SCREAMING_CASE gate error code named in
-// content/*.md must exist as a real code-side token in index.ts /
-// tools/*.ts / schema/*.ts / guards/*.ts, and vice versa. Interim guard
-// (backlog A5) until A10 makes this generative. Zero behavior change —
-// this file only reads source text via fs.readFileSync, never imports
-// from dist/, so it stays valid against an unbuilt tree (AC-7).
+// Tests for spec: gate-registry (A10 + A2 folded in), AC-5.
+// Generative registry↔code↔doc parity test — supersedes the interim
+// regex-scan guard (backlog A5 / T-ECCT-02). Now imports the real
+// GATE_REGISTRY/ALL_GATE_CODES from the built gates/registry.ts (the single
+// structured source of truth, spec AC-1) and asserts parity BY CONSTRUCTION:
+// the registry's code set must equal the code-side shape-rule harvest, the
+// doc-side backtick-token harvest must be a subset of the registry, every
+// `documentedInProse` entry must appear in >=1 content/*.md, and each entry's
+// internal fields (hintStatic non-empty, errorCode literally present in its
+// producer file) must be self-consistent. This is the qualitative upgrade
+// over A5 the architecture calls for (specs/gate-registry-architecture.md
+// "What the parity check guarantees").
 //
-// Spec-to-Test map lives in qa_reports/review_T-ECCT-01.md.
+// DR-8 (architecture): TransitionRejection["error"] in tools/transitions.ts
+// is a deliberately-NOT-registry-sourced 12-member union (5 emitted by
+// validateTransition + 7 handler-side envelope-consistency codes it must
+// carry for narrowing). Non-drift is enforced here, not by re-typing: assert
+// the union stays byte-identical at 12 members AND is a subset of
+// ALL_GATE_CODES.
+//
+// AC-7 (relaxed per architecture Test Impact): this file now intentionally
+// depends on a built tree (imports dist/gates/registry.js) — the old
+// "never import from dist/" invariant no longer holds, by design, because
+// AC-5 requires importing the real registry. `npm test`'s prebuild step
+// already guarantees dist/ exists before this file runs.
+//
+// Spec-to-Test map lives in qa_reports/review_A10-10.md.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -17,6 +35,10 @@ import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
 const PROJECT_ROOT = path.resolve(path.dirname(__filename), "..");
+
+const { GATE_REGISTRY, ALL_GATE_CODES } = await import(
+  path.join(PROJECT_ROOT, "dist", "gates", "registry.js")
+);
 
 // ---------------------------------------------------------------------------
 // Shape rule (spec: "Shape rule (used identically by both extraction sides)")
@@ -41,21 +63,29 @@ function listFiles(dir, ext) {
     .map((f) => path.join(dir, f));
 }
 
-// Code-side source set: index.ts, tools/*.ts, schema/*.ts, guards/*.ts.
+// Code-side source set: index.ts, tools/*.ts, schema/*.ts, guards/*.ts, and
+// (architecture Test Impact: "the listFiles('tools','.ts') glob does NOT
+// reach gates/, so add ...listFiles('gates','.ts')") gates/*.ts — the new
+// registry + gate modules this feature introduced.
 const CODE_SOURCE_FILES = [
   "index.ts",
   ...listFiles("tools", ".ts"),
   ...listFiles("schema", ".ts"),
   ...listFiles("guards", ".ts"),
+  ...listFiles("gates", ".ts"),
 ];
 
 // Doc-side source set: every file in content/*.md.
 const DOC_SOURCE_FILES = listFiles("content", ".md");
 
+function readSource(rel) {
+  return fs.readFileSync(path.join(PROJECT_ROOT, rel), "utf-8");
+}
+
 function extractCodeCodes() {
   const codes = new Map(); // code -> Set(file)
   for (const rel of CODE_SOURCE_FILES) {
-    const text = fs.readFileSync(path.join(PROJECT_ROOT, rel), "utf-8");
+    const text = readSource(rel);
     const matches = text.match(TOKEN_RE) || [];
     for (const token of matches) {
       if (!isGateErrorCode(token)) continue;
@@ -80,7 +110,7 @@ const BACKTICK_TOKEN_RE = /`([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*)`/g;
 function extractDocCodes() {
   const codes = new Map(); // code -> Set(file)
   for (const rel of DOC_SOURCE_FILES) {
-    const text = fs.readFileSync(path.join(PROJECT_ROOT, rel), "utf-8");
+    const text = readSource(rel);
     let m;
     while ((m = BACKTICK_TOKEN_RE.exec(text))) {
       const inner = m[1];
@@ -99,67 +129,174 @@ function fmt(codeMap, codes) {
 }
 
 // ---------------------------------------------------------------------------
-// AC-1: code-side extraction, non-vacuous (sanity floor >= 18)
+// AC-1 / AC-5: GATE_REGISTRY is the single source of truth, exactly 18
+// entries, no gate dropped or added by the refactor (18 in, 18 out).
 // ---------------------------------------------------------------------------
 
-test("AC-1: CODE_CODES extraction is non-vacuous (>= 18 known gate codes)", () => {
-  const codeCodes = extractCodeCodes();
-  assert.ok(
-    codeCodes.size >= 18,
-    `expected >= 18 code-side gate error codes, got ${codeCodes.size}: ${[...codeCodes.keys()].sort().join(", ")}`,
+test("AC-1/AC-5: GATE_REGISTRY has exactly 18 entries (18 in, 18 out — no gate dropped or added)", () => {
+  assert.equal(
+    GATE_REGISTRY.length,
+    18,
+    `expected exactly 18 GateDefinition entries, got ${GATE_REGISTRY.length}: ${GATE_REGISTRY.map((g) => g.errorCode).join(", ")}`,
+  );
+  assert.equal(
+    ALL_GATE_CODES.length,
+    18,
+    "ALL_GATE_CODES must be GATE_REGISTRY.map(g => g.errorCode) — same length",
+  );
+  assert.deepEqual(
+    [...ALL_GATE_CODES],
+    GATE_REGISTRY.map((g) => g.errorCode),
+    "ALL_GATE_CODES must preserve GATE_REGISTRY's catalog order",
   );
 });
 
 // ---------------------------------------------------------------------------
-// AC-2: doc-side extraction, non-vacuous (sanity floor >= 1)
+// AC-5 (generative core): the registry's code set is BY CONSTRUCTION equal
+// to the code-side shape-rule harvest over the real source tree — not a
+// hand-maintained allowlist. A gate added to code without a registry entry,
+// or vice versa, fails this test.
 // ---------------------------------------------------------------------------
 
-test("AC-2: DOC_CODES extraction is non-vacuous (>= 1 backtick-mentioned gate code)", () => {
-  const docCodes = extractDocCodes();
-  assert.ok(
-    docCodes.size >= 1,
-    `expected >= 1 doc-side gate error code, got ${docCodes.size}`,
+test("AC-5: ALL_GATE_CODES === code-side shape-rule harvest (registry <-> code source parity)", () => {
+  const codeCodes = extractCodeCodes();
+  const registrySet = new Set(ALL_GATE_CODES);
+  const codeSet = new Set(codeCodes.keys());
+
+  const registryOnly = [...registrySet].filter((c) => !codeSet.has(c));
+  const codeOnly = [...codeSet].filter((c) => !registrySet.has(c));
+
+  assert.deepEqual(
+    registryOnly,
+    [],
+    `registry entries with no code-side token match: ${registryOnly.join(", ")}`,
+  );
+  assert.deepEqual(
+    codeOnly,
+    [],
+    `code-side gate-shaped tokens with no registry entry: ${fmt(codeCodes, codeOnly)}`,
   );
 });
 
 // ---------------------------------------------------------------------------
-// AC-3 / AC-4: mutual subset (the actual contract)
+// AC-3/AC-4 (doc <-> registry, replaces the old doc <-> code regex-scrape):
+// doc-mentioned codes must all be real registry entries (no doc naming a
+// phantom gate), and every documentedInProse registry entry must be
+// backtick-quoted in >=1 content/*.md (no silently-undocumented gate).
 // ---------------------------------------------------------------------------
 
-test("AC-3: every doc-mentioned gate error code exists in code (DOC_CODES subset of CODE_CODES)", () => {
-  const codeCodes = extractCodeCodes();
+test("doc ⊆ registry: every doc-mentioned gate error code exists in GATE_REGISTRY", () => {
   const docCodes = extractDocCodes();
+  const registrySet = new Set(ALL_GATE_CODES);
 
-  const orphaned = [...docCodes.keys()].filter((c) => !codeCodes.has(c));
+  const orphaned = [...docCodes.keys()].filter((c) => !registrySet.has(c));
 
   assert.deepEqual(
     orphaned,
     [],
-    `doc-only codes with no code-side emit site: ${fmt(docCodes, orphaned)}`,
+    `doc-only codes with no registry entry: ${fmt(docCodes, orphaned)}`,
   );
 });
 
-test("AC-4: every code-side gate error code is documented (CODE_CODES subset of DOC_CODES)", () => {
-  const codeCodes = extractCodeCodes();
+test("registry ⊆ doc: every documentedInProse:true entry is backtick-quoted in >=1 content/*.md", () => {
   const docCodes = extractDocCodes();
 
-  const undocumented = [...codeCodes.keys()].filter((c) => !docCodes.has(c));
+  const undocumented = GATE_REGISTRY.filter(
+    (g) => g.documentedInProse && !docCodes.has(g.errorCode),
+  ).map((g) => g.errorCode);
 
   assert.deepEqual(
     undocumented,
     [],
-    `code-only codes with no content/*.md mention: ${fmt(codeCodes, undocumented)}`,
+    `registry entries marked documentedInProse but not found backtick-quoted in content/*.md: ${undocumented.join(", ")}`,
   );
 });
 
 // ---------------------------------------------------------------------------
-// AC-5: green on introduction — folded into AC-3/AC-4 above. Both must pass
-// with zero hardcoded allowlist/exclude entries (there are none in this
-// file — the two tests above compare the live-extracted sets directly).
+// Internal consistency: hintStatic is non-empty, and — for the emit-site
+// producers this ticket actually touched — the entry's errorCode string
+// literally appears in its producer's source file. Anchors the "code side"
+// to the typed registry instead of a blind regex scrape (the qualitative
+// upgrade over A5 the architecture calls out).
 // ---------------------------------------------------------------------------
 
+test("internal consistency: every GATE_REGISTRY entry has a non-empty hintStatic", () => {
+  const empty = GATE_REGISTRY.filter((g) => !g.hintStatic || g.hintStatic.length === 0).map(
+    (g) => g.errorCode,
+  );
+  assert.deepEqual(empty, [], `entries with empty hintStatic: ${empty.join(", ")}`);
+});
+
+test("internal consistency: validateTransition-producer entries' errorCode literally appears in tools/transitions.ts", () => {
+  const transitionsSrc = readSource(path.join("tools", "transitions.ts"));
+  const missing = GATE_REGISTRY.filter((g) => g.producer === "validateTransition")
+    .filter((g) => !transitionsSrc.includes(g.errorCode))
+    .map((g) => g.errorCode);
+  assert.deepEqual(
+    missing,
+    [],
+    `validateTransition-producer codes not found literally in tools/transitions.ts: ${missing.join(", ")}`,
+  );
+});
+
+test("internal consistency: orchestrator-producer entries' errorCode literally appears in tools/handoff-orchestrator.ts", () => {
+  const orchestratorSrc = readSource(path.join("tools", "handoff-orchestrator.ts"));
+  const missing = GATE_REGISTRY.filter((g) => g.producer === "orchestrator")
+    .filter((g) => !orchestratorSrc.includes(g.errorCode))
+    .map((g) => g.errorCode);
+  assert.deepEqual(
+    missing,
+    [],
+    `orchestrator-producer codes not found literally in tools/handoff-orchestrator.ts: ${missing.join(", ")}`,
+  );
+});
+
 // ---------------------------------------------------------------------------
-// AC-6: shape-rule precision — known noise tokens must NOT classify as codes
+// DR-8 (architecture Interface Contracts / Decision Records): the
+// TransitionRejection["error"] union in tools/transitions.ts is deliberately
+// NOT re-sourced from the registry (it carries 5 emitted + 7 handler-side
+// envelope-consistency codes, not a clean by-producer subset — narrowing it
+// would silently delete 7 documented members). Guard against drift the cheap
+// way instead: pin the union at exactly 12 members and assert it is a subset
+// of ALL_GATE_CODES.
+// ---------------------------------------------------------------------------
+
+test("DR-8: TransitionRejection[\"error\"] union stays byte-identical at 12 members, all ⊆ ALL_GATE_CODES", () => {
+  const transitionsSrc = readSource(path.join("tools", "transitions.ts"));
+  const unionMatch = transitionsSrc.match(
+    /export interface TransitionRejection \{\s*error:\s*([\s\S]*?);\s*\n\s*attempted:/,
+  );
+  assert.ok(
+    unionMatch,
+    "could not locate the `error:` union inside `export interface TransitionRejection { ... attempted:` in tools/transitions.ts — DR-8 assertion is stale, update the anchor regex",
+  );
+
+  const members = [...unionMatch[1].matchAll(/"([A-Z_]+)"/g)].map((m) => m[1]);
+
+  assert.equal(
+    members.length,
+    12,
+    `TransitionRejection["error"] must stay byte-identical at 12 members (DR-8) — found ${members.length}: ${members.join(", ")}`,
+  );
+  assert.equal(
+    new Set(members).size,
+    12,
+    "TransitionRejection[\"error\"] union members must be unique",
+  );
+
+  const registrySet = new Set(ALL_GATE_CODES);
+  const notInRegistry = members.filter((m) => !registrySet.has(m));
+  assert.deepEqual(
+    notInRegistry,
+    [],
+    `TransitionRejection["error"] members not present in ALL_GATE_CODES: ${notInRegistry.join(", ")}`,
+  );
+});
+
+// ---------------------------------------------------------------------------
+// AC-6: shape-rule precision — known noise tokens must NOT classify as codes.
+// Unchanged from the interim A5 guard; still load-bearing (the shape rule is
+// reused above for both the code-side and doc-side harvests).
 // ---------------------------------------------------------------------------
 
 test("AC-6: ALLOWED_TRANSITIONS is not classified as a gate error code (transition-matrix export name)", () => {
@@ -179,17 +316,21 @@ test("AC-6: CHANGES_REQUESTED is not classified as a gate error code (code-revie
 });
 
 // ---------------------------------------------------------------------------
-// AC-7: no build dependency — this file itself only ever reads source .ts
-// and content/*.md text via fs.readFileSync; it never imports from dist/.
-// Enforced structurally (see imports above) and asserted here so a future
-// edit that adds a dist/ import trips a visible failure.
+// AC-7 (relaxed, gate-registry era — architecture Test Impact, DR table):
+// this test file now INTENTIONALLY depends on a built tree, because AC-5
+// requires importing the real gates/registry.ts. The old "never import from
+// dist/, stays valid against an unbuilt tree" invariant is superseded by the
+// generative rewrite. This assertion pins the intentional dependency (so a
+// future edit that reverts to source-text scanning under the same filename
+// is a visible, deliberate choice rather than a silent regression) instead
+// of forbidding it.
 // ---------------------------------------------------------------------------
 
-test("AC-7: this test file does not import from dist/ (source-only, no build dependency)", () => {
-  const selfText = fs.readFileSync(__filename, "utf-8");
-  assert.equal(
-    /from\s+["'].*\/dist\//.test(selfText),
-    false,
-    "error-code-contract.test.mjs must not import from dist/ — it must remain valid against an unbuilt tree",
+test("AC-7 (relaxed): this test file intentionally imports dist/gates/registry.js (requires a built tree; npm test's prebuild step guarantees it)", () => {
+  const selfText = readSource(path.join("test", "error-code-contract.test.mjs"));
+  assert.match(
+    selfText,
+    /from\s+["'].*dist\/gates\/registry\.js["']|import\(\s*path\.join\([\s\S]*?"dist",\s*"gates",\s*"registry\.js"/,
+    "error-code-contract.test.mjs must import the built gates/registry.js — AC-5 requires the generative check to consume the real registry",
   );
 });
