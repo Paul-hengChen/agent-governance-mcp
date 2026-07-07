@@ -16,6 +16,15 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.45.0] - 2026-07-07
+
+### Added
+- **`registry-pattern` — Tools and prompts now use centralized registry for cleaner maintainability (v3.45.0).** Refactored `index.ts` from 1436 → 201 lines by extracting tool definitions and handlers into `tools/registry.ts`, prompt definitions into shared `PROMPT_REGISTRY`. Introduced `tools/handoff-orchestrator.ts` for unified handoff orchestration. Wire surface is byte-compatible with v3.44.0 — no MCP interface change, no schema bump, no migration. MINOR bump for architectural cleanup.
+- **`compose-not-strip-overlays` — Constitution overlay composition replaces fence stripping in build pipeline (v3.45.0).** Refactored `prompts/build.ts` to compose constitution overlays (rationale spans, design-only sections, chain-only gates) additively instead of stripping them post-render. Captured golden fixtures pre-refactor in test suite. Behavior is identical; token efficiency per-dispatch is preserved. MINOR bump for build-time refactor. Backwards-compatible; no prompt schema or content change.
+
+### Changed
+- **`prompts/build.ts` — Composition-based overlay architecture replaces conditional stripping (v3.45.0).** Overlays (rationale, design-only, chain-only) are now conditionally included during template render rather than stripped post-render, improving reasoning clarity during development and simplifying maintenance. No observable output change; token spend is identical to v3.44.0.
+
 ## [3.44.0] - 2026-07-06
 
 ### Added
