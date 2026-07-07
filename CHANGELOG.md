@@ -16,6 +16,20 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.46.0] - 2026-07-07
+
+### Added
+- **`cut-approval-coordinator-attestation` — Constitution §3.1 single-owner Cut-Approval Gate + coordinator-attested trust rule (v3.46.0).** Extends the pm:In_Progress → architect/sr-engineer build-entry edge with coordinator attestation semantics: `cut_approved` may be set ONLY by the context that witnessed the human's chat-turn approval — in subagent dispatch, that is the coordinator itself via `tw_update_state(agent_id="pm", cut_approved: true, ...)`. Adds `Sanctioned writer (coordinator-attested approval)` section to §3.1, wiring the trust boundary at the handoff read side. New SOP step in skill-coordinator.md stop-condition 6. File-mode only (SQLite/HTTP skip the gate); backwards-compatible with existing ALLOWED_TRANSITIONS. Constitution header unchanged (v3.40.0 supersedes the feature).
+- **`pm-repair-resume-routing` — Amend-Resume guarded edges pm→{code-reviewer,qa-engineer} via resume_of marker in tools/transitions.ts (v3.46.0).** Adds two new guarded edges to the ALLOWED_TRANSITIONS state machine: `pm:In_Progress → code-reviewer:In_Progress` and `pm:In_Progress → qa-engineer:In_Progress`, armed only when the write carries `resume_of: <role>` in pending_notes. Enables PM mid-chain spec amendments without manufacturing a detour through sr-engineer, addressing the "stranded downstream role" gap (see specs/pm-repair-resume-routing-architecture.md). Honest-attestation trust class (like `cut_approved`). Does NOT interact with Scope Decision or Cut-Approval gates. New §3.1 Amend-Resume Edge bullet. 34 new regression tests in test/qa-flow.test.mjs.
+- **`drift-baseline-exemption` — driftBaselineIds config exemption in tools/drift.ts + 144-id backfill (v3.46.0).** Closes the tw_detect_drift historical-noise flooding issue: new optional `driftBaselineIds: string[]` config array in `.current/.config.json` exempts specified task ids from drift-detector output. Allows teams to whitelist known-benign task reachability differences (archived ephemeral tasks, pre-migration historical runs, etc.). Backfilled with 144 historical ids; new tasks are explicitly appended at each release. No schema version bump (field is optional). Backwards-compatible; dormant if absent. Wired into drift.ts `shouldSkipDrift()` check before the baseline-manifest gate.
+
+### Changed
+- **`origin-marker-reconciliation` — Amend-Resume Edge marker corrected from v3.47.0 to v3.46.0.** The forward-looking origin tag on the new Amend-Resume Edge bullet (§3.1) was set speculatively to v3.47.0 during C1 implementation; reconciled to v3.46.0 for this release as this feature ships in v3.46.0, not v3.47.0.
+
+### Notes
+- Constitution header remains v3.40.0 (versioned independently per convention; tracks highest documented behavior). C1/C2 add new §3.1 bullets (subsumbed by v3.40.0 scope).
+- 144 historical task ids backfilled into driftBaselineIds per C4 scope. New released features (C1-01..C1-10, C2-01..C2-07, C4-01..C4-07) appended to baseline for next release drift filtering.
+
 ## [3.45.0] - 2026-07-07
 
 ### Added
