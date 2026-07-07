@@ -43,6 +43,8 @@ Every spec MUST contain these H2 sections, in order:
 7. Append tasks via `tw_add_task` (one call per task). If `tasks.md` doesn't exist yet, you may create it directly with the task list, then use `tw_add_task` for additions. Then clear the **Cut-Approval Gate** (Gate Summary): present the ticket cut inline in chat and HALT for human approval before step 8.
 8. `tw_update_state(active_feature=<name>, status=In_Progress, pending_notes=["next_role: architect" or "next_role: sr-engineer", ...])` — include `cut_approved: true` only per the Cut-Approval Gate dispatch branch (Gate Summary; full mechanism and trust rule: Constitution §3.1). Decide architect vs sr-engineer based on complexity (≥ 3 modules, new data model, or cross-cutting API → architect).
 
+**Amend-Resume declaration** (mid-chain spec amendment only): when your `pm:In_Progress` write amends a spec-only issue and resumes a specific stranded downstream role (`code-reviewer` or `qa-engineer`), record `resume_of: <role>` in `pending_notes` (alongside `next_role: <role>`) as the resume declaration — it tells the next writer which role to resume and lands the intent in the audit trail. Full mechanism: Constitution §3.1.
+
 ## Gate Summary
 
 Single source of truth for every PM gate. Work each row when its trigger holds.

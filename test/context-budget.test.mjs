@@ -384,7 +384,7 @@ test("AC9: every operative rule/gate/SOP marker survives stripRationale in skill
   }
 });
 
-test("AC1/AC2: skill-pm stripped token count meets ≤ 2817 cap", () => {
+test("AC1/AC2: skill-pm stripped token count meets ≤ 2918 cap", () => {
   // WHY: the spec's re-grounded AC1 target (measured lossless, current file size
   // including F-A growth) must hold so each pm role dispatch is within budget.
   // pm-cut-approval-gate (qa-owned bump): cap raised from 2322 → 2850 to absorb
@@ -400,6 +400,11 @@ test("AC1/AC2: skill-pm stripped token count meets ≤ 2817 cap", () => {
   // stripOriginTags(body)) measured at 2817 ~tok exactly; cap set to the exact measured
   // value (no headroom) per the constitution-conditional-load Phase-2 convention — the
   // point of this feature is the cap ending LOWER, not gaining fresh editing slack.
+  // pm-repair-resume-routing (v3.47.0, qa-owned bump, C1-09/AC-11): cap raised from
+  // 2817 → 2918 to absorb the AC-7 PM SOP addition (PM records `resume_of: <role>` on
+  // its pm:In_Progress amend write, pointing to Constitution §3.1). Actual stripped
+  // body re-measured at 2918 ~tok exactly; cap set to the exact measured value (no
+  // headroom) per the established convention.
   const SKILL_PM = fs.readFileSync(path.join(ROOT, "content", "skill-pm.md"), "utf-8");
   // Strip frontmatter (--- block) before token-counting the body, matching buildPromptForRole.
   const body = SKILL_PM.startsWith("---")
@@ -407,7 +412,7 @@ test("AC1/AC2: skill-pm stripped token count meets ≤ 2817 cap", () => {
     : SKILL_PM;
   const stripped = stripRationale(stripOriginTags(body));
   const toks = approxTokens(stripped);
-  assert.ok(toks <= 2817, `skill-pm stripped body (${toks} ~tok) must be ≤ 2817 (AC1, governance-tag-strip re-baseline)`);
+  assert.ok(toks <= 2918, `skill-pm stripped body (${toks} ~tok) must be ≤ 2918 (AC1, pm-repair-resume-routing re-baseline)`);
 });
 
 test("AC1/AC2: skill-sr-engineer stripped token count meets ≤ 2138 cap", () => {
@@ -489,7 +494,7 @@ test("AC7: exactly two balanced rationale fences, both outside §3.x", () => {
   assert.equal(ends, 2, "exactly two rationale:end markers");
 });
 
-test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the measured floor (≤ 4957 ~tok)", () => {
+test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the measured floor (≤ 5260 ~tok)", () => {
   // WHY: floor REBASELINED by constitution-conditional-load PHASE 2. Phase 2 extends the
   // design-only axis to two more spans (§4 visual prose S3–S5 + P-AUDITOR, and §1 L16/L17/L19),
   // adding 3 MORE design-only fence pairs (now 6 pairs / 12 marker lines total, up from
@@ -523,16 +528,23 @@ test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the 
   // const-08-chain-31-mid.md (§3.1, chain-tagged — loads on this design-arm path).
   // Actual rationale-stripped constitution measured at 4957 ~tok (exact); cap set
   // to the exact measured value per the Phase-2 convention (no additional headroom).
+  // pm-repair-resume-routing (v3.47.0, qa-owned bump, C1-09/AC-11): cap raised from
+  // 4957 → 5260 to absorb the new Amend-Resume Edge bullet added to
+  // const-08-chain-31-mid.md (§3.1, chain-tagged — loads on this design-arm path,
+  // same as the Cut-Approval Gate bullet before it). Actual rationale-stripped
+  // constitution re-measured at 5260 ~tok (exact); cap set to the exact measured
+  // value per the established convention (no additional headroom). Saving margin
+  // re-verified: raw 5533 − stripped 5260 = 273 ~tok, still ≥ 240.
   const raw = approxTokens(CONSTITUTION);
   const stripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));
-  assert.ok(stripped <= 4957, `stripped constitution (${stripped} ~tok) must be ≤ 4957 (AC8 design-arm floor, governance-tag-strip re-baseline)`);
+  assert.ok(stripped <= 5260, `stripped constitution (${stripped} ~tok) must be ≤ 5260 (AC8 design-arm floor, pm-repair-resume-routing re-baseline)`);
   assert.ok(
     raw - stripped >= 240,
-    `constitution rationale+origin-tag saving (${raw - stripped} ~tok) must be ≥ 240 (AC8 measured min, governance-tag-strip re-baseline)`,
+    `constitution rationale+origin-tag saving (${raw - stripped} ~tok) must be ≥ 240 (AC8 measured min, pm-repair-resume-routing re-baseline)`,
   );
 });
 
-test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 8635 ~tok)", () => {
+test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 9050 ~tok)", () => {
   // WHY: the constitution is injected on every dispatch; the full coordinator bundle is
   // the worst case. Compose the chain-role bundle the way buildPromptForRole does:
   // rationale-stripped constitution + SEP + rationale-stripped skill body. Floor
@@ -571,13 +583,20 @@ test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/b
   // re-confirms the measured value independently of sr-engineer's handoff note (which
   // said 8625); cap set to the exact re-measured value per the Phase-2 convention
   // (no additional headroom).
+  // pm-repair-resume-routing (v3.47.0, qa-owned bump, C1-09/AC-11): cap raised from
+  // 8635 → 9050 to absorb the new Amend-Resume Edge bullet in const-08-chain-31-mid.md
+  // (constitution side, same bundle-wide cost as the Cut-Approval Gate bullet before it)
+  // plus the skill-coordinator.md Auto-Routing stop-condition 7 entry (AC-6: coordinator
+  // carries `resume_of: <role>` onto the routing write when relaying a PM amendment).
+  // Actual design-arm bundle re-measured at 9050 ~tok (exact); cap set to the exact
+  // measured value per the established convention (no additional headroom).
   const skillCoord = fs.readFileSync(path.join(ROOT, "content", "skill-coordinator.md"), "utf-8");
   const body = skillCoord.startsWith("---")
     ? skillCoord.slice(skillCoord.indexOf("---", 3) + 3).trimStart()
     : skillCoord;
   const SEP = "\n\n---\n\n";
   const bundle = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)) + SEP + stripRationale(stripOriginTags(body)));
-  assert.ok(bundle <= 8635, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 8635 (AC8 design-arm floor, governance-tag-strip re-baseline)`);
+  assert.ok(bundle <= 9050, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 9050 (AC8 design-arm floor, pm-repair-resume-routing re-baseline)`);
 });
 
 test("AC9: every operative rule/gate/heading survives stripRationale on the constitution", () => {
@@ -928,7 +947,7 @@ test("AC7: lite + non-design strips §3.2 once (no reintroduction), consistent w
 
 // --- AC8: rebaseline + pin the new non-design figure ----------------------
 
-test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 2872 ~tok)", () => {
+test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 3175 ~tok)", () => {
   // WHY: this is the BUDGET WIN that justified the feature, and it must be regression-guarded.
   // On a non-design chain dispatch buildPromptForRole emits stripDesignOnly(stripRationale(source)).
   // REBASELINED by constitution-conditional-load PHASE 2: Phase 2 strips two MORE spans on the
@@ -957,12 +976,20 @@ test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is
   // the non-design floor grows by the same bullet the design-arm floor absorbed.
   // Actual non-design constitution measured at 2872 ~tok (exact); cap set to the
   // exact measured value per the Phase-2 convention (no additional headroom).
-  const ratStripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));         // design-arm path: 4957
-  const nonDesign = approxTokens(stripRationale(stripOriginTags(composeConstitution({ chain: true, design: false })))); // non-design path: 2872
-  assert.ok(nonDesign <= 2872, `non-design constitution (${nonDesign} ~tok) must be ≤ 2872 (AC8 non-design floor, governance-tag-strip re-baseline)`);
+  // pm-repair-resume-routing (v3.47.0, qa-owned bump, C1-09/AC-11): cap raised from
+  // 2872 → 3175. The new Amend-Resume Edge bullet lives in const-08-chain-31-mid.md,
+  // a `chain`-tagged (not `design`-tagged) fragment, so it is INCLUDED on the
+  // non-design path too — the non-design floor grows by the same bullet the
+  // design-arm floor absorbed. Actual non-design constitution re-measured at 3175
+  // ~tok (exact); cap set to the exact measured value per the established convention
+  // (no additional headroom). Saving margin re-verified: design-arm 5260 − non-design
+  // 3175 = 2085 ~tok, still ≥ 2080.
+  const ratStripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));         // design-arm path: 5260
+  const nonDesign = approxTokens(stripRationale(stripOriginTags(composeConstitution({ chain: true, design: false })))); // non-design path: 3175
+  assert.ok(nonDesign <= 3175, `non-design constitution (${nonDesign} ~tok) must be ≤ 3175 (AC8 non-design floor, pm-repair-resume-routing re-baseline)`);
   assert.ok(
     ratStripped - nonDesign >= 2080,
-    `design-only strip saving (${ratStripped - nonDesign} ~tok) must be ≥ 2080 (governance-tag-strip re-baseline)`,
+    `design-only strip saving (${ratStripped - nonDesign} ~tok) must be ≥ 2080 (pm-repair-resume-routing re-baseline)`,
   );
 });
 

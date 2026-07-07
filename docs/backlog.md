@@ -30,7 +30,7 @@ future `/teamwork` feature; none blocks a release on its own.
 | A13 | §1 polish: unified output policy, watermark decision table, positive examples per schema | P2 | — | ~6 (constitution + several skills) | — |
 | B8 | §7 external-reference policy has no server-side enforcement gate (carried forward) | P1 | — | ~4 (`tools/transitions.ts`, evidence/ledger check, constitution §7) | — |
 | B9 | Per-feature token budget + coordinator STOP at ceiling (carried forward) | P2 | — | ~3 (coordinator SOP, handoff/config field) | — |
-| C1 | Transitions matrix lacks amend/repair semantics (pm re-entry strands downstream roles) | P1 | — | ~4 (`tools/transitions.ts`, constitution §3.1, skill-coordinator, tests) | — |
+| C1 | Transitions matrix lacks amend/repair semantics (pm re-entry strands downstream roles) — **done (2026-07-07)** | P1 | — | ~4 (`tools/transitions.ts`, constitution §3.1, skill-coordinator, tests) | — |
 | C2 | Cut-approval cannot cross the subagent boundary — formalize coordinator-attested approval — **done (2026-07-07)** | P1 | — | ~5 (`handoff` field, `transitions.ts`/orchestrator, skill-pm, skill-coordinator, tests) | — |
 | C3 | Per-task-id evidence check forces stub pointer files — accept covering review + id manifest | P2 | — | ~3 (evidence check in orchestrator/evidence-file, skills, tests) | — |
 | C4 | Drift detector drowned by historical noise — acknowledged-baseline / archive mechanism | P2 | — | ~4 (`tools/drift.ts`, maybe `tw_sync`/config, tests) | — |
@@ -234,7 +234,19 @@ future `/teamwork` feature; none blocks a release on its own.
 - **Risk if skipped:** minor per item, but these are the highest-frequency
   friction points — every role reads §1 every session.
 
-## C1 — Transitions matrix lacks amend/repair semantics (P1, observed 2026-07-07)
+## C1 — Transitions matrix lacks amend/repair semantics (P1, observed 2026-07-07) — DONE 2026-07-07
+- **Done:** shipped as feature `pm-repair-resume-routing` (spec
+  `specs/pm-repair-resume-routing.md` + architecture
+  `specs/pm-repair-resume-routing-architecture.md`; single-feature commit
+  follows PASS per workspace convention). Mechanism: option (b) — guarded
+  Amend-Resume edges `pm:In_Progress → {code-reviewer,qa-engineer}:In_Progress`
+  in `tools/transitions.ts` (step-3.5 precedence check), gated by a
+  self-attested `resume_of: <role>` pending_notes token (honest-attestation
+  trust class, matching `cut_approved`). No schema bump, no new error code,
+  no orchestrator change; Scope Decision / Cut-Approval gate re-arm semantics
+  untouched (they fire only on pm→{architect,sr-engineer}). Constitution §3.1
+  Amend-Resume Edge bullet is the single owner; skill-coordinator
+  stop-condition 7 + skill-pm declaration paragraph are pointers.
 - **What:** During the A1 run, PM re-entered `pm:In_Progress` mid-feature to amend
   the spec's Test Impact table (a legitimate §7 flag from sr-engineer). Result:
   the state machine stranded the chain — no `pm:In_Progress → code-reviewer` edge

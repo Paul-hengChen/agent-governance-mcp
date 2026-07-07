@@ -47,6 +47,8 @@ export declare const ALLOWED_TRANSITIONS: ReadonlyMap<string, AllowedNext>;
  *   1. agent_id required when next.status is non-null
  *   2. round-cap override (qa_round >= 4 → only (pm, In_Progress))
  *   3. self-loop fast path on same-agent In_Progress→In_Progress
+ *   3.5 Amend-Resume Edge (C1): pm:In_Progress → {code-reviewer,qa-engineer}:In_Progress
+ *       iff next_pending_notes self-attests `resume_of: <that exact role>`
  *   4. table lookup
  */
 export declare function validateTransition(req: TransitionRequest): TransitionRejection | null;
