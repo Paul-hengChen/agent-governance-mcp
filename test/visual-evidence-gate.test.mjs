@@ -578,13 +578,15 @@ test("Edge: sr-engineer self-loop NOT blocked (non-pm predecessor)", () => {
 
 // ---------- AC-4 — rejection envelope + verbatim hint (Copy Audit Gate) ----------
 
-test("AC-4: SCOPE_DECISION_REQUIRED hint in index.ts matches the spec Copy/Strings verbatim", () => {
+test("AC-4: SCOPE_DECISION_REQUIRED hint in tools/handoff-orchestrator.ts matches the spec Copy/Strings verbatim", () => {
   // Why (Copy Audit Gate): AC-4 mandates the hint be the verbatim string from
   // the spec's Copy / Strings table. The handler concatenates the hint across
   // source lines; this test reconstructs both and asserts char-for-char equality
   // so a paraphrase in either the spec or the impl is caught (drift detection).
+  // Relocated by the registry-pattern refactor: the tw_update_state gate-orchestration
+  // body (including this hint) moved verbatim from index.ts to tools/handoff-orchestrator.ts.
   const root = path.resolve(import.meta.dirname, "..");
-  const indexTs = fs.readFileSync(path.join(root, "index.ts"), "utf-8");
+  const indexTs = fs.readFileSync(path.join(root, "tools", "handoff-orchestrator.ts"), "utf-8");
   const specMd = fs.readFileSync(path.join(root, "specs", "server-scope-decision-gate.md"), "utf-8");
 
   const expected =
@@ -617,8 +619,9 @@ test("AC-4: rejection envelope shape — error/attempted/allowed/hint keys prese
   // isError:true, mirroring the VISUAL_* precedent. The handler block builds
   // these keys literally; pin them so a refactor that drops `allowed` (the
   // legal-edges echo) or `attempted` is caught.
+  // Relocated by the registry-pattern refactor: see note above.
   const root = path.resolve(import.meta.dirname, "..");
-  const indexTs = fs.readFileSync(path.join(root, "index.ts"), "utf-8");
+  const indexTs = fs.readFileSync(path.join(root, "tools", "handoff-orchestrator.ts"), "utf-8");
   // Scope the search to the guard block to avoid matching the visual gate's envelope.
   const block = indexTs.slice(indexTs.indexOf('error: "SCOPE_DECISION_REQUIRED"'));
   assert.match(block, /error:\s*"SCOPE_DECISION_REQUIRED"/, "error code token");

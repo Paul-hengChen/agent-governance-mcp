@@ -8,7 +8,7 @@ future `/teamwork` feature; none blocks a release on its own.
 
 | id | desc | priority | depends_on | est. files | design-link |
 |----|------|----------|------------|------------|-------------|
-| A1 | Tool/prompt registry pattern — de-triplicate `index.ts` registration | P1 | — | ~14 (`index.ts` + every `tools/*.ts` + prompt registration) | — |
+| A1 | Tool/prompt registry pattern — de-triplicate `index.ts` registration — **done (2026-07-07)** | P1 | — | ~14 (`index.ts` + every `tools/*.ts` + prompt registration) | — |
 | A2 | Split `tools/evidence-file.ts` (994 lines) into per-gate `gates/` modules | P1 | — | ~8 (`evidence-file.ts` → `gates/*.ts`, `transitions.ts`, tests) | — |
 | A3 | Build-time validator for constitution span-strip markers — **superseded by A9** | P2 | — | ~3 (`scripts/check-spans.mjs` new, `package.json`, test) | — |
 | A4 | Strip version/origin tags from governance text at build time — **done (2026-07-06)** | P1 | — | ~4 (`prompts/build.ts`, `content/*.md`, test) | — |

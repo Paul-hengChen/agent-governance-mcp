@@ -40,8 +40,11 @@ import {
 import { resetSession, markStateRead } from "../dist/guards/session.js";
 import { _clearRegistryForTests, runMigrations, registerMigration } from "../dist/schema/versions.js";
 
+// Relocated by the registry-pattern refactor: the tw_update_state gate-orchestration
+// body (including the cut-approval gate's S01/S02 strings) compiles into
+// dist/tools/handoff-orchestrator.js, not dist/index.js.
 const DIST_INDEX = fs.readFileSync(
-  path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "dist", "index.js"),
+  path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "dist", "tools", "handoff-orchestrator.js"),
   "utf-8",
 );
 

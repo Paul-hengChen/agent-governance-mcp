@@ -58,4 +58,14 @@ export function switchRole(role, workspacePath) {
     }
     return JSON.stringify(response);
 }
+// ==========================================
+// MCP tool handler (registry-pattern) — verbatim relocation of the
+// index.ts `tw_switch_role` dispatcher case.
+// ==========================================
+// --- No guard: role switching is read-only ---
+export async function handleSwitchRole(args) {
+    const { workspace_path, role } = args;
+    const result = switchRole(role, workspace_path);
+    return { content: [{ type: "text", text: result }] };
+}
 //# sourceMappingURL=role.js.map

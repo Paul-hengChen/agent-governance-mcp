@@ -7,6 +7,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as yaml from "js-yaml";
 import { getActiveStorage, type TaskRecord } from "./storage.js";
+import type { ToolResult, WorkspaceOnlyInput } from "./registry.js";
 import { findTasksFile } from "./config.js";
 import { CURRENT_VERSIONS, peekVersion, type SchemaKind } from "../schema/versions.js";
 
@@ -273,4 +274,16 @@ export function detectDrift(workspacePath: string): string {
   };
 
   return JSON.stringify(report);
+}
+
+// ==========================================
+// MCP tool handler (registry-pattern) — verbatim relocation of the
+// index.ts `tw_detect_drift` dispatcher case.
+// ==========================================
+
+// --- No guard: drift detection is read-only ---
+export async function handleDetectDrift(args: WorkspaceOnlyInput): Promise<ToolResult> {
+  const { workspace_path } = args;
+  const result = detectDrift(workspace_path);
+  return { content: [{ type: "text" as const, text: result }] };
 }

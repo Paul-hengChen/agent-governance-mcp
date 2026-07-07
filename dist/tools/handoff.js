@@ -5,6 +5,7 @@ import * as path from "path";
 import * as yaml from "js-yaml";
 import { markStateRead, verifyFreshness, refreshSnapshotFor, } from "../guards/session.js";
 import { withFileLock } from "../guards/file-lock.js";
+import { getActiveStorage } from "./storage.js";
 import { CURRENT_VERSIONS, runMigrations } from "../schema/versions.js";
 // Side-effect import: registers the handoff v0→v1 migration on module load.
 import "../schema/migrations-handoff.js";
@@ -360,5 +361,17 @@ ${pendingList}
         refreshSnapshotFor(workspacePath, handoffPath, "handoff");
         return JSON.stringify({ success: true, path: handoffPath, updated_at: now });
     });
+}
+// ==========================================
+// MCP tool handler (registry-pattern) — verbatim relocation of the
+// index.ts `tw_get_state` dispatcher case. args arrive pre-parsed by
+// tools/registry.ts defineTool.run; type import is erased at compile so
+// the runtime graph stays one-directional (registry.ts → handoff.ts).
+// ==========================================
+// --- No guard: reading state IS the pre-flight check ---
+export async function handleGetState(args) {
+    const { workspace_path } = args;
+    const result = getActiveStorage().readState(workspace_path);
+    return { content: [{ type: "text", text: result }] };
 }
 //# sourceMappingURL=handoff.js.map

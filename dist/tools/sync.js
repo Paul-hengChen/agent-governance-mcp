@@ -17,6 +17,7 @@
 // tw_sync needs no agent_id gate — it cannot create a completion that wasn't
 // already recorded.
 import { getActiveStorage } from "./storage.js";
+import { enforcePreFlight } from "../guards/session.js";
 function escapeRegExp(s) {
     return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -75,5 +76,19 @@ export async function reconcileTasks(workspacePath) {
             `route to qa-engineer for evidence-backed PASS or tw_rollback_task: ${refusedVibeDrift.join(", ")}.`
         : base;
     return JSON.stringify({ ok: true, synced, refusedVibeDrift, message });
+}
+// ==========================================
+// MCP tool handler (registry-pattern) — verbatim relocation of the
+// index.ts `tw_sync` dispatcher case.
+// ==========================================
+// tw_sync (R10) — mirrors the authoritative ledger onto tasks.md. Mutating
+// (writes tasks.md) so it honours the pre-flight read; needs no agent_id
+// gate because it can only mirror completions already in handoff (qa-blessed),
+// never invent one. See the safety note above.
+export async function handleSync(args) {
+    const { workspace_path } = args;
+    enforcePreFlight(workspace_path, "tw_sync");
+    const result = await reconcileTasks(workspace_path);
+    return { content: [{ type: "text", text: result }] };
 }
 //# sourceMappingURL=sync.js.map

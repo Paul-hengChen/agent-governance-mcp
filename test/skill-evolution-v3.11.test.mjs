@@ -23,25 +23,29 @@ test("AC-10: ROLE_SKILL_MAP contains doc-writer and release-engineer, and their 
   assert.ok(fs.existsSync(releaseEngineerPath), "skill-release-engineer.md must exist");
 });
 
-test("AC-10/11: tw_switch_role logic and index.ts registration", async () => {
+test("AC-10/11: tw_switch_role logic and registry registration", async () => {
   // Use dynamic import to avoid ESM static resolution issues with dist/
   const { switchRole } = await import(path.join(PROJECT_ROOT, "dist", "tools", "role.js"));
-  
+
   // AC-11: `switchRole` returns the SOP body correctly
   const docWriterRes = JSON.parse(switchRole("doc-writer", PROJECT_ROOT));
   assert.match(docWriterRes.sop, /# Skill: doc-writer/, "doc-writer skill file must contain its header");
-  
+
   const releaseEngineerRes = JSON.parse(switchRole("release-engineer", PROJECT_ROOT));
   assert.match(releaseEngineerRes.sop, /# Skill: release-engineer/, "release-engineer skill file must contain its header");
 
-  // Verify the zod enum strings in index.ts
-  const indexTs = fs.readFileSync(path.join(PROJECT_ROOT, "index.ts"), "utf-8");
-  assert.match(indexTs, /role: z\.enum\(\[[^\]]*"doc-writer"[^\]]*\]\)/, "index.ts zod enum must contain doc-writer");
-  assert.match(indexTs, /role: z\.enum\(\[[^\]]*"release-engineer"[^\]]*\]\)/, "index.ts zod enum must contain release-engineer");
+  // Verify the zod enum strings — relocated from index.ts to tools/registry.ts by
+  // the registry-pattern refactor (registration mechanics only, same enum literal).
+  const registryTs = fs.readFileSync(path.join(PROJECT_ROOT, "tools", "registry.ts"), "utf-8");
+  assert.match(registryTs, /role: z\.enum\(\[[^\]]*"doc-writer"[^\]]*\]\)/, "tools/registry.ts zod enum must contain doc-writer");
+  assert.match(registryTs, /role: z\.enum\(\[[^\]]*"release-engineer"[^\]]*\]\)/, "tools/registry.ts zod enum must contain release-engineer");
 
-  // Verify the dispatcher routing in index.ts
-  assert.match(indexTs, /else if \(name === "doc-writer"\)/, "index.ts must route doc-writer prompt");
-  assert.match(indexTs, /else if \(name === "release-engineer"\)/, "index.ts must route release-engineer prompt");
+  // Verify the dispatcher routing — the 11-branch if-chain was replaced by
+  // PROMPT_REGISTRY, a declarative array iterated/looked-up by name. Drive the
+  // actual registered behavior instead of regexing dispatch source text.
+  const { PROMPT_REGISTRY } = await import(path.join(PROJECT_ROOT, "dist", "tools", "registry.js"));
+  assert.ok(PROMPT_REGISTRY.some((p) => p.name === "doc-writer"), "PROMPT_REGISTRY must route doc-writer prompt");
+  assert.ok(PROMPT_REGISTRY.some((p) => p.name === "release-engineer"), "PROMPT_REGISTRY must route release-engineer prompt");
 });
 
 test("AC-10: transitions.ts AgentName union constraint (side-channel)", () => {

@@ -104,15 +104,18 @@ test("AC-6: options-object accepts all fields and persists them", async () => {
 
 // ---------- AC-8 — index.ts handler uses options-object form ----------
 
-test("AC-8: dist/index.js source contains the options-object call site (no positional regression)", () => {
+test("AC-8: dist/tools/handoff-orchestrator.js source contains the options-object call site (no positional regression)", () => {
   // Why: the handler MUST use the new form per AC-8. A regression to the
   // positional 11-arg form would mean the dual API isn't being dogfooded.
-  const compiledIndex = fs.readFileSync(path.join(PROJECT_ROOT, "dist", "index.js"), "utf-8");
+  // Relocated by the registry-pattern refactor: the tw_update_state gate-orchestration
+  // body (including this storage.writeState call site) compiles into
+  // dist/tools/handoff-orchestrator.js, not dist/index.js.
+  const compiledIndex = fs.readFileSync(path.join(PROJECT_ROOT, "dist", "tools", "handoff-orchestrator.js"), "utf-8");
   // The new call site sets the `workspacePath:` named key.
   assert.match(
     compiledIndex,
     /storage\.writeState\(\s*\{[\s\S]*?workspacePath:/,
-    "compiled index.js must call storage.writeState with an options object",
+    "compiled dist/tools/handoff-orchestrator.js must call storage.writeState with an options object",
   );
 });
 

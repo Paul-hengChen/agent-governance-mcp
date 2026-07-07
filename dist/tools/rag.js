@@ -2,6 +2,8 @@
 // Pure RAG utilities: markdown chunking, local embedding via @xenova/transformers, cosine similarity.
 // @xenova/transformers is an optional dep — all exports silently no-op when absent.
 import * as fs from "node:fs";
+import { getActiveStorage } from "./storage.js";
+import { getInflightKey, getInflight, setInflight, deleteInflight, awaitAllInflightFor, } from "./rag-coalesce.js";
 export const CHUNKER_VERSION = "1.0";
 export const DEFAULT_EMBEDDING_MODEL = "Xenova/all-MiniLM-L6-v2";
 const MAX_CHUNK_CHARS = 2048; // ~512 tokens
@@ -121,5 +123,85 @@ export async function buildPrdChunks(prdPath, model = DEFAULT_EMBEDDING_MODEL) {
         });
     }
     return chunks;
+}
+// ==========================================
+// MCP tool handlers (registry-pattern) — verbatim relocations of the
+// index.ts dispatcher cases for tw_index_prd and tw_clear_prd_chunks.
+// args arrive pre-parsed by tools/registry.ts defineTool.run.
+// ==========================================
+export async function handleIndexPrd(parsed) {
+    const storage = getActiveStorage();
+    if (!("upsertPrdChunks" in storage) || typeof storage.upsertPrdChunks !== "function") {
+        return { content: [{ type: "text", text: "❌ tw_index_prd requires SQLite mode (--port flag). Not available in stdio/file mode." }], isError: true };
+    }
+    const model = parsed.embedding_model ?? DEFAULT_EMBEDDING_MODEL;
+    const ragStorage = storage;
+    // Concurrency guard: coalesce duplicate in-flight indexings for the
+    // same (workspace, prd_path). Without this, two parallel HTTP calls
+    // both run the slow embedding pipeline and race on DELETE+INSERT.
+    // The registry is also shared with prompts/build.ts:appendSpecContext
+    // so its lazy reindex coalesces with explicit tw_index_prd calls.
+    const inflightKey = getInflightKey(parsed.workspace_path, parsed.prd_path);
+    const existing = getInflight(inflightKey);
+    if (existing) {
+        const text = await existing;
+        return { content: [{ type: "text", text }] };
+    }
+    const run = (async () => {
+        const currentMtime = fs.existsSync(parsed.prd_path)
+            ? Math.floor(fs.statSync(parsed.prd_path).mtimeMs)
+            : -1;
+        const existingMeta = ragStorage.getPrdIndexMeta(parsed.workspace_path);
+        if (existingMeta &&
+            existingMeta.prd_mtime === currentMtime &&
+            existingMeta.chunker_version === CHUNKER_VERSION &&
+            existingMeta.embedding_model === model) {
+            return JSON.stringify({ upToDate: true, message: "Index is current — no reindex needed." });
+        }
+        const result = await buildPrdChunks(parsed.prd_path, model);
+        if ("error" in result) {
+            return `❌ ${result.error}`;
+        }
+        ragStorage.upsertPrdChunks(parsed.workspace_path, result);
+        return JSON.stringify({ indexed: true, chunks: result.length, model, chunker_version: CHUNKER_VERSION });
+    })();
+    setInflight(inflightKey, run);
+    try {
+        const text = await run;
+        return {
+            content: [{ type: "text", text }],
+            ...(text.startsWith("❌") ? { isError: true } : {}),
+        };
+    }
+    finally {
+        deleteInflight(inflightKey);
+    }
+}
+export async function handleClearPrdChunks(args) {
+    const { workspace_path } = args;
+    const storage = getActiveStorage();
+    if (!("deletePrdChunks" in storage) ||
+        typeof storage.deletePrdChunks !== "function") {
+        return {
+            content: [{
+                    type: "text",
+                    text: JSON.stringify({
+                        supported: false,
+                        message: "tw_clear_prd_chunks requires SQLite mode (--port flag). No chunks in file mode.",
+                    }),
+                }],
+        };
+    }
+    // Await any in-flight reindex for this workspace so DELETE cannot
+    // race with a concurrent INSERT inside upsertPrdChunks.
+    await awaitAllInflightFor(workspace_path);
+    const ragStorage = storage;
+    const deleted = ragStorage.deletePrdChunks(workspace_path);
+    return {
+        content: [{
+                type: "text",
+                text: JSON.stringify({ supported: true, cleared: true, deleted_rows: deleted }),
+            }],
+    };
 }
 //# sourceMappingURL=rag.js.map

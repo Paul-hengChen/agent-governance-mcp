@@ -149,22 +149,27 @@ function findById(responses, id) {
 // dist was not rebuilt.
 // ---------------------------------------------------------------------------
 
-test("dist/index.js contains verbatim ERR_WORKSPACE_CURRENT string", () => {
+// Relocated by the registry-pattern refactor: these zod .refine() messages on
+// UpdateStateArgs moved from index.ts into tools/registry.ts, so the compiled
+// text now lives in dist/tools/registry.js, not dist/index.js.
+const DIST_REGISTRY = path.join(PROJECT_ROOT, "dist", "tools", "registry.js");
+
+test("dist/tools/registry.js contains verbatim ERR_WORKSPACE_CURRENT string", () => {
   // Why: the Copy/Strings table in the spec mandates this exact text. A typo
   // or rephrasing would break AC-2 callers who match on the message.
-  const compiled = fs.readFileSync(DIST_INDEX, "utf-8");
+  const compiled = fs.readFileSync(DIST_REGISTRY, "utf-8");
   assert.ok(
     compiled.includes("workspace_path must be the workspace root, not the .current state directory"),
-    "ERR_WORKSPACE_CURRENT must appear verbatim in compiled dist/index.js",
+    "ERR_WORKSPACE_CURRENT must appear verbatim in compiled dist/tools/registry.js",
   );
 });
 
-test("dist/index.js contains verbatim ERR_ACTIVE_FEATURE_OBJECT string", () => {
+test("dist/tools/registry.js contains verbatim ERR_ACTIVE_FEATURE_OBJECT string", () => {
   // Why: same contract — exact text from Copy/Strings table.
-  const compiled = fs.readFileSync(DIST_INDEX, "utf-8");
+  const compiled = fs.readFileSync(DIST_REGISTRY, "utf-8");
   assert.ok(
     compiled.includes("active_feature must be a plain string id, not a serialised object"),
-    "ERR_ACTIVE_FEATURE_OBJECT must appear verbatim in compiled dist/index.js",
+    "ERR_ACTIVE_FEATURE_OBJECT must appear verbatim in compiled dist/tools/registry.js",
   );
 });
 

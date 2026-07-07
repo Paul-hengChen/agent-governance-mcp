@@ -637,8 +637,11 @@ B1 tool unavailable — LLM fallback
 // E1-E5: End-to-end verbatim error strings (dist/index.js) — Copy/Strings gate (AC-9)
 // ===========================================================================
 
+// Relocated by the registry-pattern refactor: the tw_update_state gate-orchestration
+// body (including the pixel-gate attestation strings) compiles into
+// dist/tools/handoff-orchestrator.js, not dist/index.js.
 const DIST_INDEX = fs.readFileSync(
-  path.join(path.dirname(new URL(import.meta.url).pathname), "..", "dist", "index.js"),
+  path.join(path.dirname(new URL(import.meta.url).pathname), "..", "dist", "tools", "handoff-orchestrator.js"),
   "utf-8",
 );
 

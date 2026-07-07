@@ -297,8 +297,11 @@ test("v3.16.0 AC-1 STEP1: error message substring — VISUAL_BASELINES_REQUIRED 
   // Why: T-QA must assert on the stable substrings (D7) rather than the full
   // interpolated string (which includes mode and designPath). These two
   // substrings are the operator-facing identifiers that runbooks reference.
+  // Relocated by the registry-pattern refactor: the tw_update_state gate-orchestration
+  // body (including this gate) compiles into dist/tools/handoff-orchestrator.js,
+  // not dist/index.js.
   const distIndex = fs.readFileSync(
-    path.join(path.dirname(new URL(import.meta.url).pathname), "..", "dist", "index.js"),
+    path.join(path.dirname(new URL(import.meta.url).pathname), "..", "dist", "tools", "handoff-orchestrator.js"),
     "utf-8",
   );
   assert.match(distIndex, /VISUAL_BASELINES_REQUIRED/, "VISUAL_BASELINES_REQUIRED code must appear in compiled handler");

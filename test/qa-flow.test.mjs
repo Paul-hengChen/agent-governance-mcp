@@ -428,8 +428,11 @@ test("v3.15.0 AC-13: sentinel message strings are unchanged from v3.14.x wording
   // Why: AC-13 mandates that only the predicate changes — the user-visible
   // sentinel text stays identical so existing operator runbooks / docs
   // don't break.
+  // Relocated by the registry-pattern refactor: the tw_update_state gate-orchestration
+  // body (including these sentinels) moved verbatim from index.ts to
+  // tools/handoff-orchestrator.ts.
   const __dirname_ac13 = path.dirname(new URL(import.meta.url).pathname);
-  const indexTs = fs.readFileSync(path.join(__dirname_ac13, "..", "index.ts"), "utf-8");
+  const indexTs = fs.readFileSync(path.join(__dirname_ac13, "..", "tools", "handoff-orchestrator.ts"), "utf-8");
   assert.match(indexTs, /⛔ Round 4: forced rollback to pm — no further QA allowed until PM resets\./,
     "qa_round sentinel wording must be unchanged");
   assert.match(indexTs, /⛔ Review Round 4: forced rollback to pm — no further code-review allowed until PM resets\./,
@@ -807,12 +810,14 @@ test("AC-12: recordCodeReviewInFile sanitises unsafe task ids", () => {
   assert.equal(fs.existsSync(traversalTarget), false, "must not write outside workspace");
 });
 
-test("AC-12: evidence gate verbatim hint string is reachable from compiled index.js", () => {
+test("AC-12: evidence gate verbatim hint string is reachable from compiled handoff-orchestrator.js", () => {
   // Why: AC-8 mandates the exact hint substring in the rejection envelope.
-  // The string is composed inline in the index.ts handler; this test guards
+  // The string is composed inline in the handler; this test guards
   // against future refactors that paraphrase the hint and break the contract.
+  // Relocated by the registry-pattern refactor: the tw_update_state gate-orchestration
+  // body compiles into dist/tools/handoff-orchestrator.js, not dist/index.js.
   const distIndex = fs.readFileSync(
-    path.join(path.dirname(new URL(import.meta.url).pathname), "..", "dist", "index.js"),
+    path.join(path.dirname(new URL(import.meta.url).pathname), "..", "dist", "tools", "handoff-orchestrator.js"),
     "utf-8",
   );
   // The hint is composed via two concatenated template literals in the source,

@@ -5,6 +5,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { parseSkillFile, type ModelTier } from "./skill-frontmatter.js";
+import type { ToolResult, SwitchRoleInput } from "./registry.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -77,4 +78,16 @@ export function switchRole(role: RoleName, workspacePath: string): string {
     response.recommended_model = frontmatter.recommended_model;
   }
   return JSON.stringify(response);
+}
+
+// ==========================================
+// MCP tool handler (registry-pattern) — verbatim relocation of the
+// index.ts `tw_switch_role` dispatcher case.
+// ==========================================
+
+// --- No guard: role switching is read-only ---
+export async function handleSwitchRole(args: SwitchRoleInput): Promise<ToolResult> {
+  const { workspace_path, role } = args;
+  const result = switchRole(role as RoleName, workspace_path);
+  return { content: [{ type: "text" as const, text: result }] };
 }

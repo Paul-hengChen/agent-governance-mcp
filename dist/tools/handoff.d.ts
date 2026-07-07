@@ -1,3 +1,4 @@
+import type { ToolResult, WorkspaceOnlyInput } from "./registry.js";
 import "../schema/migrations-handoff.js";
 export interface HandoffState {
     active_feature: string;
@@ -67,4 +68,5 @@ export declare function writeHandoffState(opts: WriteHandoffStateOptions): Promi
  * Positional signature retained for backwards-compat; planned removal in v4.0.0.
  */
 export declare function writeHandoffState(workspacePath: string, activeFeature: string, status: string, completedTasks: string[], pendingNotes: string[], blockingReason?: string, lastAgent?: string, qaRound?: number, prdPath?: string, reviewRound?: number, visualRound?: number): Promise<string>;
+export declare function handleGetState(args: WorkspaceOnlyInput): Promise<ToolResult>;
 //# sourceMappingURL=handoff.d.ts.map

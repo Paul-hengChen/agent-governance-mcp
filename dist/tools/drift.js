@@ -239,4 +239,14 @@ export function detectDrift(workspacePath) {
     };
     return JSON.stringify(report);
 }
+// ==========================================
+// MCP tool handler (registry-pattern) — verbatim relocation of the
+// index.ts `tw_detect_drift` dispatcher case.
+// ==========================================
+// --- No guard: drift detection is read-only ---
+export async function handleDetectDrift(args) {
+    const { workspace_path } = args;
+    const result = detectDrift(workspace_path);
+    return { content: [{ type: "text", text: result }] };
+}
 //# sourceMappingURL=drift.js.map

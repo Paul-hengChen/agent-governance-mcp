@@ -516,8 +516,11 @@ test("E1b: AC-N1 — no design file at all, gate silent", () => {
 test("E2: AC-1 — verbatim BASELINE_MANIFEST_MISSING error string in dist/index.js", () => {
   // Why: the e2e wiring asserts the exact Copy/Strings (ERR-BMM-01) text is compiled
   // into the handler. State-not-written is verified by the isError:true return path.
+  // Relocated by the registry-pattern refactor: the tw_update_state gate-orchestration
+  // body (including these baseline-manifest gate strings) compiles into
+  // dist/tools/handoff-orchestrator.js, not dist/index.js.
   const distIndex = fs.readFileSync(
-    path.join(path.dirname(new URL(import.meta.url).pathname), "..", "dist", "index.js"),
+    path.join(path.dirname(new URL(import.meta.url).pathname), "..", "dist", "tools", "handoff-orchestrator.js"),
     "utf-8",
   );
   // Verbatim ERR-BMM-01 canonical string (spec Copy/Strings table)
@@ -538,8 +541,11 @@ test("E2: AC-1 — verbatim BASELINE_MANIFEST_MISSING error string in dist/index
 test("E3: AC-2 — verbatim BASELINE_PROVENANCE_INCOMPLETE error string in dist/index.js", () => {
   // Why: the e2e wiring asserts the exact Copy/Strings (ERR-BPI-01) text is compiled
   // into the handler. Verbatim string match is the spec contract.
+  // Relocated by the registry-pattern refactor: the tw_update_state gate-orchestration
+  // body (including these baseline-manifest gate strings) compiles into
+  // dist/tools/handoff-orchestrator.js, not dist/index.js.
   const distIndex = fs.readFileSync(
-    path.join(path.dirname(new URL(import.meta.url).pathname), "..", "dist", "index.js"),
+    path.join(path.dirname(new URL(import.meta.url).pathname), "..", "dist", "tools", "handoff-orchestrator.js"),
     "utf-8",
   );
   // Verbatim ERR-BPI-01 canonical string
@@ -601,8 +607,11 @@ test("E6: AC — exact error strings match ERR-BMM-01 / ERR-BPI-01 verbatim (ful
   const ERR_BMM_01 = "⛔ BASELINE_MANIFEST_MISSING: design/<feature>.md declares mode != no-design but the Source manifest (## Source section) contains no audited baseline rows. The design-auditor must complete step 2c (Mechanical baseline selection) — run the deterministic structural filter, freeze the resulting node-id list with status: audited in the Source manifest, and record filter-conditions + exclusion-reasons in a ## Baseline Selection Provenance section (required for multi-surface selections). See specs/figma-baseline-manifest-gate.md.";
   const ERR_BPI_01 = "⛔ BASELINE_PROVENANCE_INCOMPLETE: design/<feature>.md has a multi-surface Source manifest (>=2 audited rows) but the ## Baseline Selection Provenance section is absent or incomplete (requires both filter-conditions: and exclusion-reasons: lines). Record the filter criteria used to select the baseline set per design-auditor SOP step 2c. See specs/figma-baseline-manifest-gate.md.";
 
+  // Relocated by the registry-pattern refactor: the tw_update_state gate-orchestration
+  // body (including these baseline-manifest gate strings) compiles into
+  // dist/tools/handoff-orchestrator.js, not dist/index.js.
   const distIndex = fs.readFileSync(
-    path.join(path.dirname(new URL(import.meta.url).pathname), "..", "dist", "index.js"),
+    path.join(path.dirname(new URL(import.meta.url).pathname), "..", "dist", "tools", "handoff-orchestrator.js"),
     "utf-8",
   );
   assert.ok(

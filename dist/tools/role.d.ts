@@ -1,3 +1,4 @@
+import type { ToolResult, SwitchRoleInput } from "./registry.js";
 declare const ROLE_SKILL_MAP: {
     readonly pm: "skill-pm.md";
     readonly researcher: "skill-researcher.md";
@@ -11,5 +12,6 @@ declare const ROLE_SKILL_MAP: {
 };
 export type RoleName = keyof typeof ROLE_SKILL_MAP;
 export declare function switchRole(role: RoleName, workspacePath: string): string;
+export declare function handleSwitchRole(args: SwitchRoleInput): Promise<ToolResult>;
 export {};
 //# sourceMappingURL=role.d.ts.map

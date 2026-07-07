@@ -967,17 +967,21 @@ test("AC8/AC-P2-7: chain-role non-design bundle is ~1830 ~tok lighter than the d
 
 test("AC8/HC3: build.ts arm probe uses the SAME helper as the server PASS gates", () => {
   // WHY: identity-by-construction — the gate and the constitution text agree iff they key
-  // off the same arm signal. build.ts and index.ts both import hasDesignModeRequiringVisual
-  // from tools/evidence-file. A cheap source grep pins that the import is shared (reviewer
-  // proved behavioral identity; this guards against a future divergent re-implementation).
+  // off the same arm signal. build.ts and the tw_update_state gate handler both import
+  // hasDesignModeRequiringVisual from tools/evidence-file. A cheap source grep pins that
+  // the import is shared (reviewer proved behavioral identity; this guards against a
+  // future divergent re-implementation).
+  // Relocated by the registry-pattern refactor: the tw_update_state gate-orchestration
+  // body (and its hasDesignModeRequiringVisual import) moved verbatim from index.ts to
+  // tools/handoff-orchestrator.ts; index.ts itself no longer imports this helper directly.
   const buildSrc = fs.readFileSync(path.join(ROOT, "prompts", "build.ts"), "utf-8");
-  const indexSrc = fs.readFileSync(path.join(ROOT, "index.ts"), "utf-8");
+  const orchestratorSrc = fs.readFileSync(path.join(ROOT, "tools", "handoff-orchestrator.ts"), "utf-8");
   assert.match(buildSrc, /import\s*\{\s*hasDesignModeRequiringVisual\s*\}\s*from\s*["']\.\.\/tools\/evidence-file\.js["']/,
     "build.ts must import hasDesignModeRequiringVisual from tools/evidence-file");
   assert.match(buildSrc, /hasDesignModeRequiringVisual\(workspacePath,\s*state\.active_feature\)\.required/,
     "build.ts arm probe must read .required off the shared helper");
-  assert.match(indexSrc, /import[\s\S]*hasDesignModeRequiringVisual[\s\S]*from\s*["']\.\/tools\/evidence-file\.js["']/,
-    "index.ts must import the same helper the server PASS gates call");
+  assert.match(orchestratorSrc, /import[\s\S]*hasDesignModeRequiringVisual[\s\S]*from\s*["']\.\/evidence-file\.js["']/,
+    "tools/handoff-orchestrator.ts must import the same helper the server PASS gates call");
 });
 
 // ============================================================================
