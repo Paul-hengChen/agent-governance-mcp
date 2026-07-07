@@ -35,6 +35,12 @@ future `/teamwork` feature; none blocks a release on its own.
 | C3 | Per-task-id evidence check forces stub pointer files — accept covering review + id manifest | P2 | — | ~3 (evidence check in orchestrator/evidence-file, skills, tests) | — |
 | C4 | Drift detector drowned by historical noise — acknowledged-baseline / archive mechanism — **done (2026-07-07)** | P2 | — | ~4 (`tools/drift.ts`, maybe `tw_sync`/config, tests) | — |
 | C5 | Watermark toolchain: template hardcodes tier; validateWatermark appends instead of replacing on mismatch | P2 | — | ~4 (`lib/watermark-check.ts`, `templates/claude-code-agents/*`, tests) | — |
+| C6 | Prompt-injection state footer reports "No handoff state found" while handoff exists; stale `prd_path` suspect | P1 | — | ~3 (`prompts/build.ts` state loader, `bin/agent-governance-context.mjs`, test) | — |
+| C7 | §2 test-ownership absolutism collides with mechanical version-literal edits at release | P2 | — | ~3 (constitution §2, skill-release-engineer, version-assertion tests) | — |
+| C8 | Crash-resume protocol: mid-role kill leaves no §3 failure write; resume drops dispatch-time model pin | P2 | — | ~2 (skill-coordinator SOP, maybe handoff field) | — |
+| C9 | pending_notes free-text protocol tokens (`next_role:`/`resume_of:`/`review: APPROVED`) → structured handoff fields | P2 | A10 ✓ | ~6 (`tools/handoff.ts` schema, `transitions.ts`, orchestrator, skills, tests) | — |
+| C10 | qa-engineer / release-engineer bookkeeping boundary blur (QA did version bump + CHANGELOG in A10-10) | P2 | — | ~3 (skill-pm cut guidance, skill-qa-engineer, skill-release-engineer) | — |
+| C11 | Constitution double-injection: SessionStart hook + `/teamwork*` prompt both carry the full constitution in one session | P2 | — | ~3 (`prompts/build.ts`, `bin/agent-governance-context.mjs`) | — |
 
 ---
 
@@ -379,6 +385,104 @@ future `/teamwork` feature; none blocks a release on its own.
 - **Owner:** /teamwork (lib/watermark-check.ts + templates + tests; small).
 - **Risk if skipped:** cosmetic but user-facing on every relay; tier attribution
   in the audit trail is wrong for overridden dispatches.
+
+## C6 — Prompt-injection state footer blind to existing handoff (P1, observed 2026-07-08)
+- **What:** During the A10 run, BOTH `/teamwork` and `/teamwork-lite` prompt
+  injections ended with "📍 Current Project State — No handoff state found.
+  Fresh project" while `tw_get_state` returned a full, current handoff for the
+  same workspace. Additionally the persisted `prd_path` still pointed at the
+  pre-rename home directory (`/Users/paul.ph.chen/...` vs the current
+  `/Users/paulchen/...`), suggesting workspace/path resolution in the prompt
+  build reads a stale or differently-resolved root. The prompt state footer is
+  the first-layer defense (context before any tool call); it silently failing
+  degrades every session that trusts it.
+- **Fix:** diagnose the prompt-build state loader's workspace resolution
+  (symlinks? env root? cwd at prompt-request time vs tool-call time); make the
+  footer fail loud ("state lookup failed at <path>") instead of masquerading as
+  a fresh project; migrate/normalize stale absolute paths on read.
+- **Owner:** /teamwork (`prompts/build.ts` state section + possibly
+  `bin/agent-governance-context.mjs`; add a regression test).
+- **Risk if skipped:** agents in managed workspaces boot believing the project
+  is fresh; pre-flight still catches writes, but read-side context (active
+  feature, pending_notes routing) is lost exactly where it's cheapest to have.
+
+## C7 — §2 test-ownership absolutism vs mechanical release edits (P2, observed 2026-07-08)
+- **What:** Constitution §2 says "ONLY qa-engineer writes test files. No
+  exceptions." At the v3.46.1 release, release-engineer had to update 4
+  version-assertion tests (3.46.0 → 3.46.1 literals) to keep the suite green —
+  a quiet, sanctioned-in-practice violation. Rules that are routinely violated
+  erode; the next violation won't be mechanical.
+- **Fix:** either (a) explicit carve-out in §2: mechanical literal retargets
+  (version strings, moved import paths) are refactor plumbing, not test
+  authorship — mirroring the A10 precedent where sr-engineer's import
+  retargeting was ruled acceptable; or (b) remove the need: version assertions
+  read `package.json` at test time instead of hardcoding.  (b) is stronger.
+- **Owner:** /teamwork (constitution §2 wording + skill-release-engineer +
+  the version-assertion tests; content-heavy, small).
+- **Risk if skipped:** §2's bright line blurs by precedent instead of by
+  decision.
+
+## C8 — No crash-resume protocol; resume drops the dispatch-time model pin (P2, observed 2026-07-08)
+- **What:** The sr-engineer subagent was killed mid-task by a session usage
+  limit — it could not honor §3's "on crash, still call tw_update_state", so
+  the chain had no failure record. The coordinator improvised: ground-truthed
+  the working tree via `git status`, then resumed the agent from transcript.
+  The resume path also dropped the dispatch-time `model: fable` pin — the agent
+  came back on its frontmatter default (opus), silently violating a human
+  directive (related: C5(a) covers the watermark side of tier attribution).
+- **Fix:** skill-coordinator gains a **resume protocol**: before re-dispatching
+  or resuming a role that died without a state write, (1) ground-truth the
+  working tree vs the role's last claims, (2) restate findings in the resume
+  brief, (3) re-assert any dispatch-time overrides (model pin) and verify the
+  resumed run honors them — pin recorded in `pending_notes` at dispatch so it
+  survives context loss.
+- **Owner:** /teamwork (skill-coordinator SOP; optionally a `dispatch_pins`
+  note convention; content-only).
+- **Risk if skipped:** every externally-killed role becomes an improvised
+  recovery; model-pin directives silently degrade on resume.
+
+## C9 — pending_notes is a free-text protocol channel (P2, observed 2026-07-08; natural A10 follow-on)
+- **What:** Load-bearing routing/gating signals — `next_role:`, `resume_of:`,
+  `review: APPROVED`, cut-attestation notes — all live as string conventions
+  inside `pending_notes`. The server greps for exact tokens; coordinators parse
+  by convention. A10 data-fied the gate *definitions* but the *signals* that
+  clear/route them remain stringly-typed.
+- **Fix:** promote recurring protocol tokens to first-class handoff fields
+  (`next_role`, `resume_of`, `review_verdict`), schema-versioned per
+  `docs/schema-versions.md`; `pending_notes` reverts to prose for humans.
+  Server validates enums instead of substring-matching.
+- **Owner:** /teamwork (handoff schema bump + `transitions.ts`/orchestrator
+  consumers + skill text; medium).
+- **Risk if skipped:** token-format drift between skills and server grep
+  (exactly the drift class A10 just eliminated for gate definitions).
+
+## C10 — qa-engineer / release-engineer bookkeeping boundary blur (P2, observed 2026-07-08)
+- **What:** The A10 cut assigned version bump + CHANGELOG + backlog-marking to
+  qa-engineer (A10-10); release-engineer then re-ran build/tests and did the
+  commit/tag/release. Result: release bookkeeping split across two roles, QA's
+  version bump forced the C7 test edits at release time, and build/test ran
+  twice.
+- **Fix:** cut-template guidance (skill-pm) + skill-qa/skill-release wording:
+  QA owns verification + evidence + task completion; ALL release bookkeeping
+  (version, CHANGELOG, backlog done-marking) belongs to release-engineer
+  post-PASS. QA's PASS is on the feature diff, not the release artifacts.
+- **Owner:** /teamwork (3 skill files; content-only).
+- **Risk if skipped:** duplicated build/test cost each release and recurring
+  C7-style boundary violations.
+
+## C11 — Constitution double-injection in one session (P2, observed 2026-07-08)
+- **What:** A session that receives the SessionStart hook context AND invokes a
+  `/teamwork*` prompt carries the full constitution twice (hook block + prompt
+  bundle) — observed live when `/teamwork` then `/teamwork-lite` were invoked
+  in the same conversation, tripling the governance text in context. Pure
+  token waste; also two copies can drift mid-session after an upgrade.
+- **Fix:** the prompt bundle detects hook presence (marker line in the hook's
+  additionalContext) and degrades to skill + state only; or the hook self-gates
+  when the client is known to fetch prompts. Cheapest: a one-line "constitution
+  already in context via hook — omitted" sentinel the build emits.
+- **Owner:** /teamwork (`prompts/build.ts` + `bin/agent-governance-context.mjs`).
+- **Risk if skipped:** every dual-path session pays double governance tokens —
+  directly against the context-frugality design goal (cf. B9).
 
 ## B8 — §7 external-reference policy is text-only, no server-side enforcement (P1, carried forward 2026-06-11)
 - **What:** Constitution §7 says a spec referencing external artifacts is
