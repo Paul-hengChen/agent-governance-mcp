@@ -1,0 +1,4 @@
+<!-- design-only:start -->
+- **`visual_round` sub-loop<!-- origin:start --> (v3.14.0)<!-- origin:end -->**: independent of `qa_round` and `review_round`. Bumps on `(qa-engineer, FAIL)` with `pending_notes` containing `visual_fail:` (a structural pixel/widget miss, distinct from test-logic FAIL). Cap is 5 rounds; Round 6 attempts lock to `(pm, In_Progress)` only — symmetric to the `qa_round` circuit breaker.
+  - **Split escalation (Round 3)**: at `visual_round >= 3`, sr-engineer MAY transition `(sr-engineer, In_Progress) → (pm, In_Progress)` with `pending_notes` containing `visual_split_requested: <reason>`. This is an **early** escape hatch — instead of grinding 2 more rounds toward threshold renegotiation, the team splits the oversized widget into sub-tasks. Available at Round 3, 4, 5; mandatory route at Round 6.
+<!-- design-only:end -->

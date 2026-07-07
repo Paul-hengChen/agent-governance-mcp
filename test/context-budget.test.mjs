@@ -8,13 +8,25 @@
 //   AC4 (no routing regression)-> t-full-keeps-chain (chain roles still receive
 //                                 §3.1/§4 verbatim; transition logic untouched —
 //                                 covered by the existing transitions test suite)
-//   DR-3 (3-copy regex parity) -> t-regex-equivalence
+//   DR-4 (manifest imported, not regex-copied) -> t-manifest-not-duplicated
 //
-// WHY: the always-on token reduction works by stripping the chain-only sections
-// (constitution §3.1, §4) from LITE contexts only. The risk is twofold — (a) the
-// strip silently drops a rule a lite agent still needs, or (b) the three copies
-// of the stripper regex drift. These tests pin both: lite loses ONLY chain rules,
-// chain roles keep everything, and all three regex copies stay identical.
+// WHY: the always-on token reduction works by composing OUT the chain-only
+// fragments (constitution §3.1, §4) for LITE contexts only. The risk is twofold —
+// (a) the composition silently drops a rule a lite agent still needs, or (b) a
+// consumer re-derives its own fragment list and drifts from the shared manifest.
+// These tests pin both: lite loses ONLY chain rules, chain roles keep everything,
+// and the hook + measure script both import the one shared manifest.
+//
+// compose-not-strip (ticket A9, T-CNSO-07): this file previously exercised
+// stripChainOnly/stripDesignOnly directly as the mechanism under test — both
+// functions are DELETED (prompts/build.ts now composes fragments additively via
+// composeConstitution(), never strips a monolith). Every test below that probed
+// those two strippers' internals (unit tests, DR-3 regex parity, cross-axis
+// permutation/orphan-marker sweeps) is removed; tests that probed OUTCOMES (what
+// a dispatch mode contains/omits) are re-pointed to composeConstitution() and
+// continue to hold — proving AC2/AC3/AC4 equivalence empirically, not just by
+// construction. stripRationale/stripOriginTags are UNCHANGED and every test of
+// them below is kept verbatim.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -27,11 +39,24 @@ import { fileURLToPath } from "node:url";
 const __filename = fileURLToPath(import.meta.url);
 const ROOT = path.resolve(path.dirname(__filename), "..");
 
-const CONSTITUTION = fs.readFileSync(path.join(ROOT, "content", "constitution.md"), "utf-8");
 const approxTokens = (t) => Math.ceil(t.length / 4);
 
-const { stripChainOnly, stripRationale, stripDesignOnly, stripOriginTags, buildPromptForRole } = await import(path.join(ROOT, "dist", "prompts", "build.js"));
+const { stripRationale, stripOriginTags, buildPromptForRole, composeConstitution } = await import(path.join(ROOT, "dist", "prompts", "build.js"));
 const { setActiveStorage, FileHandoffStorage } = await import(path.join(ROOT, "dist", "tools", "storage.js"));
+
+// compose-not-strip (ticket A9, T-CNSO-07): CONSTITUTION was `fs.readFileSync(content/
+// constitution.md)`; it is now the composed-all bundle, which Option R (architecture
+// DR-1) guarantees is byte-identical to the retired monolith — composeConstitution's
+// own equivalence is independently pinned in test/compose-equivalence.test.mjs (T-CNSO-08)
+// against a pre-refactor golden fixture, so every downstream assertion in this file that
+// slices/searches CONSTITUTION is unaffected by the migration.
+const CONSTITUTION = composeConstitution({ chain: true, design: true });
+
+// The hook's lite composition (chain fragments excluded, design fragments kept — the
+// hook never stripped design; see architecture Hook Parity Contract) with the blank-run
+// collapse the old stripChainOnly performed. Reused by the AC2/AC3 lean-bundle tests
+// below, which previously called the now-deleted stripChainOnly(CONSTITUTION) directly.
+const LEAN_CONSTITUTION = composeConstitution({ chain: false, design: true }).replace(/\n{3,}/g, "\n\n");
 
 // Markers that prove a section is present/absent in a rendered bundle.
 const CHAIN_MARKERS = ["3.1 Server-enforced chain", "4. Routing Chain"];
@@ -71,14 +96,6 @@ const SR_RULE_MARKERS = [
 
 // --- AC2: reduction -------------------------------------------------------
 
-test("AC2: stripChainOnly removes the chain-only block and is idempotent", () => {
-  const lean = stripChainOnly(CONSTITUTION);
-  assert.ok(lean.length < CONSTITUTION.length, "stripped constitution must be shorter than raw");
-  assert.equal(stripChainOnly(lean), lean, "stripChainOnly must be idempotent");
-  // no-marker passthrough is the safety default (workspace override without fences)
-  assert.equal(stripChainOnly("no markers here"), "no markers here", "text without markers is unchanged");
-});
-
 test("AC2: lean always-on bundle is below the raw baseline and within target (<= 2700 ~tok)", () => {
   // v3.24.0 (B2 backlog fix): cap raised from 2100 → 2300 to provide ~200-token
   // editing headroom. The v3.22.0 raise (2000 → 2100) left only a 2-token margin
@@ -107,7 +124,7 @@ test("AC2: lean always-on bundle is below the raw baseline and within target (<=
   const liteSkill = fs.readFileSync(path.join(ROOT, "content", "skill-coordinator-lite.md"), "utf-8");
   const SEP = "\n\n---\n\n";
   const raw = approxTokens(CONSTITUTION + SEP + liteSkill);
-  const lean = approxTokens(stripChainOnly(CONSTITUTION) + SEP + liteSkill);
+  const lean = approxTokens(LEAN_CONSTITUTION + SEP + liteSkill);
   assert.ok(lean < raw, `lean (${lean}) must be < raw (${raw})`);
   assert.ok(lean <= 3010, `lean always-on (${lean} ~tok) must meet the <= 3010 target`);
 });
@@ -115,17 +132,15 @@ test("AC2: lean always-on bundle is below the raw baseline and within target (<=
 // --- AC3: enforcement preserved ------------------------------------------
 
 test("AC3: lite (stripped) constitution OMITS chain-only sections", () => {
-  const lean = stripChainOnly(CONSTITUTION);
   for (const m of CHAIN_MARKERS) {
-    assert.ok(!lean.includes(m), `lite constitution must NOT contain chain-only marker: ${m}`);
+    assert.ok(!LEAN_CONSTITUTION.includes(m), `lite constitution must NOT contain chain-only marker: ${m}`);
   }
-  assert.ok(!lean.includes("chain-only:start"), "fence markers themselves must be removed");
+  assert.ok(!LEAN_CONSTITUTION.includes("chain-only:start"), "fence markers themselves must be removed");
 });
 
 test("AC3: lite (stripped) constitution RETAINS all universal rules", () => {
-  const lean = stripChainOnly(CONSTITUTION);
   for (const m of UNIVERSAL_MARKERS) {
-    assert.ok(lean.includes(m), `lite constitution must still contain universal rule: ${m}`);
+    assert.ok(LEAN_CONSTITUTION.includes(m), `lite constitution must still contain universal rule: ${m}`);
   }
 });
 
@@ -137,19 +152,13 @@ test("AC3/AC4: full (chain-role) constitution RETAINS chain-only sections verbat
   }
 });
 
-test("AC3: exactly one balanced chain-only fence wraps §3.1 + §4", () => {
-  const starts = (CONSTITUTION.match(/<!-- chain-only:start -->/g) || []).length;
-  const ends = (CONSTITUTION.match(/<!-- chain-only:end -->/g) || []).length;
-  assert.equal(starts, 1, "exactly one chain-only:start marker");
-  assert.equal(ends, 1, "exactly one chain-only:end marker");
-  const block = CONSTITUTION.slice(
-    CONSTITUTION.indexOf("<!-- chain-only:start -->"),
-    CONSTITUTION.indexOf("<!-- chain-only:end -->"),
-  );
-  for (const m of CHAIN_MARKERS) {
-    assert.ok(block.includes(m), `fence must wrap chain section: ${m}`);
-  }
-});
+// compose-not-strip (ticket A9): the "exactly one balanced chain-only fence"
+// test that lived here is REMOVED (T-CNSO-07) — it asserted on the marker-pairing
+// mechanics of a strip pipeline that no longer exists. Composition now selects
+// fragments by tag, never parses markers (AC11: the unbalanced-fence failure
+// class is gone structurally, not guarded against). See T-manifest-not-duplicated
+// below and test/compose-equivalence.test.mjs for the replacement equivalence
+// contract.
 
 // --- AC3: SessionStart hook integration ----------------------------------
 
@@ -197,26 +206,29 @@ test("AC1: measure script prints the spec'd Copy/Strings labels + token table", 
   assert.match(out, /~tokens/, "must print a token column");
 });
 
-// --- DR-3: 3-copy regex parity -------------------------------------------
+// --- DR-4: shared manifest, not duplicated regex --------------------------
 
-test("DR-3: all three stripChainOnly regex copies are identical", () => {
-  // build.ts (TS→dist) and the hook (.mjs) intentionally duplicate the stripper
-  // across a module boundary; the measure script holds a third copy. They MUST
-  // stay byte-identical or lite/full contexts diverge silently.
+test("DR-4: hook and measure script import the shared constitution-manifest (no duplicated chain-only regex)", () => {
+  // WHY: DR-3 ("keep 3 stripChainOnly regex copies in sync by inspection") is
+  // replaced by DR-4 ("one exported CONSTITUTION_SEGMENTS + includeSegment,
+  // imported by build.ts, the hook, and the measure script") — architecture
+  // compose-not-strip-overlays-architecture.md. The parity contract is now
+  // STRUCTURAL (one shared list) instead of TEXTUAL (matching regex literals).
+  // This pins both halves: the import exists, AND the old duplicated regex is gone.
   const files = [
-    path.join(ROOT, "prompts", "build.ts"),
-    path.join(ROOT, "bin", "agent-governance-context.mjs"),
-    path.join(ROOT, "scripts", "measure-context-cost.mjs"),
+    ["build.ts", path.join(ROOT, "prompts", "build.ts")],
+    ["hook", path.join(ROOT, "bin", "agent-governance-context.mjs")],
+    ["measure script", path.join(ROOT, "scripts", "measure-context-cost.mjs")],
   ];
-  const re = /\.replace\(\/<!-- chain-only:start -->\[\\s\\S\]\*\?<!-- chain-only:end -->\\n\?\/g, ""\)/;
-  const hits = files.map((f) => {
-    const src = fs.readFileSync(f, "utf-8");
-    const m = src.match(re);
-    assert.ok(m, `chain-only strip regex must be present in ${path.basename(f)}`);
-    return m[0];
-  });
-  assert.equal(hits[0], hits[1], "build.ts and hook regex must match");
-  assert.equal(hits[1], hits[2], "hook and measure-script regex must match");
+  const chainOnlyRegexLiteral = /<!-- chain-only:start -->\[\\s\\S\]\*\?<!-- chain-only:end -->/;
+  for (const [name, file] of files) {
+    const src = fs.readFileSync(file, "utf-8");
+    assert.match(src, /constitution-manifest(\.js)?["']/, `${name} must import the shared constitution-manifest module`);
+    assert.ok(
+      !chainOnlyRegexLiteral.test(src),
+      `${name} must not hold its own duplicated chain-only-span regex (DR-4: structural import replaces textual regex-parity)`,
+    );
+  }
 });
 
 // ============================================================================
@@ -287,28 +299,18 @@ test("T-GTS-07/AC1/AC2: mixed-content site survives end-to-end through buildProm
   assert.ok(!text.includes("origin:start"), "no origin fence marker may leak into the built prompt");
 });
 
-test("T-GTS-07/AC4: stripOriginTags composes order-independently with the other three strippers", () => {
-  // WHY: AC4 extends the existing AC5/HC5 order-independence contract (already pinned
-  // for the chain-only/rationale/design-only triple) to the fourth axis. A full 4!=24
-  // permutation sweep would be redundant with the spirit of the existing 6-permutation
-  // test above; this is a REPRESENTATIVE sample — origin-tags first (the real
-  // buildPromptForRole order), origin-tags last, and origin-tags interleaved in two
-  // different middle positions — proving no ordering corrupts another axis's fences
-  // (origin fences nest inside/beside the other three, never straddling them, per the
-  // spec's Ordering/Idempotence Specification).
-  const a = stripChainOnly, b = stripRationale, c = stripDesignOnly, d = stripOriginTags;
-  const orders = [
-    (t) => a(b(c(d(t)))), // production order: origin (d) first
-    (t) => d(a(b(c(t)))), // origin last
-    (t) => a(d(b(c(t)))), // origin interleaved (2nd)
-    (t) => c(b(d(a(t)))), // origin interleaved (3rd), reverse triple order
-  ];
-  const results = orders.map((f) => f(CONSTITUTION));
-  for (let i = 1; i < results.length; i++) {
-    assert.equal(results[i], results[0], `permutation ${i} must equal permutation 0 (order-independent incl. stripOriginTags)`);
-  }
-  for (const marker of ["chain-only:start", "chain-only:end", "rationale:start", "rationale:end", "design-only:start", "design-only:end", "origin:start", "origin:end"]) {
-    assert.ok(!results[0].includes(marker), `fully-stripped (4-axis) constitution must contain ZERO orphan markers: ${marker}`);
+test("T-GTS-07/AC4: stripOriginTags composes order-independently with stripRationale", () => {
+  // WHY: AC4's order-independence contract, narrowed post-compose-not-strip (T-CNSO-07)
+  // to the two text-transform strippers that still exist — stripChainOnly/stripDesignOnly
+  // are DELETED; chain/design selection is now a fragment-file-inclusion decision made
+  // BEFORE either stripper runs, not a regex race the strippers could interact with. Origin
+  // fences never straddle a rationale boundary (they may nest inside one), so applying the
+  // two remaining strippers in either order on the fully-composed constitution must agree.
+  const order1 = stripRationale(stripOriginTags(CONSTITUTION));
+  const order2 = stripOriginTags(stripRationale(CONSTITUTION));
+  assert.equal(order1, order2, "stripRationale and stripOriginTags must compose order-independently");
+  for (const marker of ["rationale:start", "rationale:end", "origin:start", "origin:end"]) {
+    assert.ok(!order1.includes(marker), `fully-stripped constitution must contain ZERO orphan markers: ${marker}`);
   }
 });
 
@@ -603,17 +605,12 @@ test("AC9/AC-P2-3: fullDetail retains both example lists verbatim (design-arm-aw
   }
 });
 
-test("AC9/DR-9: stripChainOnly ∘ stripRationale compose order is irrelevant on the constitution", () => {
-  // WHY: T-GTL-07 runs both strippers on the constitution. The two fence types occupy
-  // disjoint regions (chain-only wraps §3.1+§4; rationale fences sit in §1/§7), so the
-  // result must be identical regardless of order — proving no marker pair nests in the
-  // other and neither non-greedy regex crosses the other's markers (DR-9).
-  assert.equal(
-    stripRationale(stripChainOnly(CONSTITUTION)),
-    stripChainOnly(stripRationale(CONSTITUTION)),
-    "compose order of the two strippers must not change the result",
-  );
-});
+// compose-not-strip (ticket A9, T-CNSO-07): the "AC9/DR-9: stripChainOnly ∘
+// stripRationale compose order" test that lived here is REMOVED — stripChainOnly
+// is deleted; chain-fragment selection now happens at composeConstitution() time,
+// before either remaining stripper runs, so there is no order to test between it
+// and stripRationale. The equivalent order-independence contract for the two
+// SURVIVING strippers is pinned above (T-GTS-07/AC4).
 
 // ============================================================================
 // constitution-conditional-load (AC1–AC8): the THIRD, feature-conditional strip
@@ -738,20 +735,14 @@ async function buildOnFixture({ mode, skillFile = "skill-sr-engineer.md", noStat
 
 // --- AC1: non-design strips the gatable visual span ----------------------
 
-test("AC1: stripDesignOnly removes the design-only span and is idempotent", () => {
-  // WHY: the helper is the unit primitive of the third axis. On the non-design arm
-  // buildPromptForRole applies it to the (rationale-stripped) constitution. It must
-  // delete every fenced visual span, leave no marker, be idempotent, and pass text
-  // without markers through unchanged (the full-constitution safety default = design arm).
-  const stripped = stripDesignOnly(CONSTITUTION);
-  assert.ok(stripped.length < CONSTITUTION.length, "stripped constitution must be shorter than raw");
-  assert.equal(stripDesignOnly(stripped), stripped, "stripDesignOnly must be idempotent");
-  assert.equal(stripDesignOnly("no markers here"), "no markers here", "text without markers is unchanged");
-  for (const s of DESIGN_ONLY_SENTINELS) {
-    assert.ok(!stripped.includes(s), `non-design constitution must NOT contain gated sentinel: ${JSON.stringify(s)}`);
-  }
-  assert.ok(!stripped.includes("design-only:start"), "design-only fence markers must be removed on the strip arm");
-});
+// compose-not-strip (ticket A9, T-CNSO-07): the "AC1: stripDesignOnly removes the
+// design-only span and is idempotent" unit test that lived here is REMOVED —
+// stripDesignOnly is deleted; design-fragment inclusion/exclusion is now a file
+// list decision (composeConstitution / includeSegment), not a string-stripping
+// primitive with its own idempotence contract to unit-test. The OUTCOME this test
+// protected — non-design dispatch omits every gated sentinel — is still pinned
+// end-to-end by the test immediately below (through the real buildPromptForRole
+// pipeline) and by test/compose-equivalence.test.mjs (byte-identity, T-CNSO-08).
 
 test("AC1: chain-role build on a NON-design workspace OMITS the §3.2 body + the §3.1 visual bullets", async () => {
   // WHY: end-to-end. A real buildPromptForRole dispatch for a chain role (sr-engineer)
@@ -857,87 +848,31 @@ test("AC4: every surviving (non-gated) rule on the non-design arm is byte-identi
   // this by reconstructing the expected arm output from the source and the two strippers,
   // then asserting the emitted constitution prefix matches it byte-for-byte.
   const text = await buildOnFixture({ mode: null });
-  // governance-tag-strip (T-GTS-05): buildPromptForRole now runs stripOriginTags FIRST,
-  // unconditionally, on the raw constitution (build.ts) — so the actual non-design
-  // dispatch is stripDesignOnly∘stripRationale∘stripOriginTags(source), not just the
-  // two pre-existing strips. Add stripOriginTags to the expected composition or this
-  // reconstruction is missing a strip the real pipeline applies.
-  const expectedConstitution = stripDesignOnly(stripRationale(stripOriginTags(CONSTITUTION)));
+  // compose-not-strip (ticket A9, T-CNSO-07): stripDesignOnly is deleted — the
+  // non-design arm's expected constitution is now reconstructed by composing
+  // WITHOUT the design axis (design:false excludes both `design` and `chain-design`
+  // fragments, the exact set the old stripDesignOnly regex removed — see architecture
+  // Composition Contract) instead of stripping the design-armed composed text.
+  const expectedConstitution = stripRationale(stripOriginTags(composeConstitution({ chain: true, design: false })));
   assert.ok(
     text.startsWith(expectedConstitution),
-    "non-design dispatch constitution must be byte-identical to stripDesignOnly∘stripRationale∘stripOriginTags(source)",
+    "non-design dispatch constitution must be byte-identical to stripRationale∘stripOriginTags∘composeConstitution({chain:true,design:false})",
   );
 });
 
 // --- AC5 / HC5: composition across all three axes -------------------------
 
-test("AC5/HC5: all 6 strip-order permutations are byte-identical (disjoint/nested fences)", () => {
-  // WHY: the three axes (chainOnly, rationale, designOnly) must compose order-INDEPENDENTLY.
-  // design-only fences are NESTED inside chain-only (§3.1/§3.2 sit between its markers) and
-  // DISJOINT from rationale fences (§1/§7). Non-greedy regexes + distinct markers guarantee
-  // no marker pair crosses another. Apply all 6 orderings of the three strippers and assert
-  // a single canonical result — proves no axis corrupts another's span (the reviewer verified
-  // 6 permutations byte-clean; this encodes it).
-  const a = stripChainOnly, b = stripRationale, c = stripDesignOnly;
-  const orders = [
-    (t) => a(b(c(t))), (t) => a(c(b(t))),
-    (t) => b(a(c(t))), (t) => b(c(a(t))),
-    (t) => c(a(b(t))), (t) => c(b(a(t))),
-  ];
-  const results = orders.map((f) => f(CONSTITUTION));
-  for (let i = 1; i < results.length; i++) {
-    assert.equal(results[i], results[0], `permutation ${i} must equal permutation 0 (order-independent)`);
-  }
-});
-
-test("AC5/HC5: every strip permutation leaves ZERO orphan markers", () => {
-  // WHY: a corrupted nest (one regex eating the other's start/end) would leave a dangling
-  // marker. Two invariants: (1) applying ALL three strippers (worst case = lite + non-design
-  // + non-full-detail) leaves ZERO markers of any axis; (2) each stripper acting ALONE removes
-  // EXACTLY its own marker pairs and leaves the other two axes' markers byte-for-byte intact
-  // (count-preserving) — proving no regex crosses another axis's markers.
-  const countMarkers = (t, name) => (t.match(new RegExp(`${name}:(start|end)`, "g")) || []).length;
-  const raw = {
-    chain: countMarkers(CONSTITUTION, "chain-only"),       // 2 (1 pair)
-    rationale: countMarkers(CONSTITUTION, "rationale"),    // 4 (2 pairs)
-    design: countMarkers(CONSTITUTION, "design-only"),     // 12 (6 pairs) — Phase-2: 3 nested-in-chain-only (§3.1×2 fences, §3.2, §4) + 2 in §1 (Span-B) ... see breakdown below
-  };
-  // Phase-2 fence inventory (MEASURED, not assumed): 6 design-only PAIRS total —
-  //   §1 Span-B fence #1 (L16–L17) and #2 (L19): 2 pairs, OUTSIDE chain-only.
-  //   §3.1 fence A (visual evidence + report schema) + fence B (visual_round + split): 2 pairs.
-  //   §3.2 body fence (header → No-global-frame, minus R10): 1 pair.
-  //   §4 visual prose fence (S3–S5 + P-AUDITOR, post-reflow): 1 pair.
-  //   → the LAST 4 pairs (§3.1×2, §3.2, §4) are NESTED inside chain-only; the first 2 (§1) are NOT.
-  assert.equal(raw.design, 12, "Phase-2: exactly 6 design-only fence pairs (12 markers) — 2 in §1, 4 nested in chain-only");
-  // (1) all three applied → zero of anything.
-  const fullyStripped = stripDesignOnly(stripRationale(stripChainOnly(CONSTITUTION)));
-  for (const marker of ["chain-only:start", "chain-only:end", "rationale:start", "rationale:end", "design-only:start", "design-only:end"]) {
-    assert.ok(!fullyStripped.includes(marker), `fully-stripped constitution must contain ZERO orphan markers: ${marker}`);
-  }
-  // (2) each stripper alone removes its own pairs, leaves the other axes untouched.
-  const chainOut = stripChainOnly(CONSTITUTION);
-  assert.equal(countMarkers(chainOut, "chain-only"), 0, "stripChainOnly removes its own markers");
-  assert.equal(countMarkers(chainOut, "rationale"), raw.rationale, "stripChainOnly must NOT touch rationale markers");
-  // chain-only WRAPS the 4 design-only fences in §3.1/§3.2/§4 (nested), so removing it
-  // legitimately removes those 4 PAIRS too. But the 2 §1 Span-B fences (L16–L19) sit OUTSIDE
-  // chain-only (§1 is before the chain-only:start at §3.1), so they MUST survive: 4 markers
-  // (2 pairs) remain. Pre-Phase-2 the §1 fences did not exist, so this was 0; the premise
-  // "all design-only nested inside chain-only" is now FALSE and the count is 4 (MEASURED).
-  assert.equal(countMarkers(chainOut, "design-only"), 4, "the 2 §1 (Span-B) design-only fences survive stripChainOnly (they are OUTSIDE chain-only); only the 4 nested §3.x/§4 fences are removed with it");
-
-  const ratOut = stripRationale(CONSTITUTION);
-  assert.equal(countMarkers(ratOut, "rationale"), 0, "stripRationale removes its own markers");
-  assert.equal(countMarkers(ratOut, "chain-only"), raw.chain, "stripRationale must NOT touch chain-only markers");
-  assert.equal(countMarkers(ratOut, "design-only"), raw.design, "stripRationale must NOT touch design-only markers (rationale nests INSIDE design-only on §1 fence #1, but its non-greedy regex removes only its own pair)");
-
-  const desOut = stripDesignOnly(CONSTITUTION);
-  assert.equal(countMarkers(desOut, "design-only"), 0, "stripDesignOnly removes its own markers");
-  assert.equal(countMarkers(desOut, "chain-only"), raw.chain, "stripDesignOnly must NOT touch chain-only markers (it strips a nested subset)");
-  // HC-NEST: §1 fence #1 (L16–L17) CONTAINS a rationale fence. stripDesignOnly removes the
-  // whole design-only span including that nested rationale pair — so the §7 rationale fence
-  // (outside any design-only fence) must remain: 2 markers (1 pair) survive, not all 4.
-  assert.equal(countMarkers(desOut, "rationale"), 2, "stripDesignOnly removes the §1-nested rationale pair (inside design-only fence #1) but leaves the §7 rationale fence (outside any design-only span) → 2 markers remain (HC-NEST)");
-});
+// compose-not-strip (ticket A9, T-CNSO-07): the two "AC5/HC5" tests that lived
+// here — "all 6 strip-order permutations are byte-identical" and "every strip
+// permutation leaves ZERO orphan markers" — are REMOVED. Both exercised
+// stripChainOnly/stripDesignOnly's regex-marker interaction, which no longer
+// exists: chain/design fragment selection happens once, structurally, in
+// composeConstitution() BEFORE either surviving stripper runs — there is no
+// regex race left to permute, and markers are never parsed (AC11), so an
+// "orphan marker" cannot occur by construction. See T-GTS-07/AC4 above for the
+// narrowed 2-stripper (stripRationale/stripOriginTags) order-independence pin,
+// and test/compose-equivalence.test.mjs for the byte-identity contract that
+// makes the structural claim empirical rather than assumed.
 
 // --- AC6: anti-sweep — non-visual contracts survive BOTH arms -------------
 
@@ -994,8 +929,12 @@ test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is
   // 2409 → 2403; the design-only strip saving grows from 1830 → 2084 (more of the
   // now-larger raw-with-fences delta lands on the design-arm side, since the design-only
   // fenced spans in §3.1/§3.2/§4 also each carry an origin tag that only the fold removes).
+  // compose-not-strip (ticket A9, T-CNSO-07): stripDesignOnly is deleted — the
+  // non-design path is now composeConstitution({chain:true,design:false}) (drops
+  // exactly the `design`/`chain-design` fragments the old regex stripped) run
+  // through the SAME stripOriginTags→stripRationale pipeline as the design-arm path.
   const ratStripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));         // design-arm path: 4487
-  const nonDesign = approxTokens(stripDesignOnly(stripRationale(stripOriginTags(CONSTITUTION)))); // non-design path: 2403
+  const nonDesign = approxTokens(stripRationale(stripOriginTags(composeConstitution({ chain: true, design: false })))); // non-design path: 2403
   assert.ok(nonDesign <= 2403, `non-design constitution (${nonDesign} ~tok) must be ≤ 2403 (AC8 non-design floor, governance-tag-strip re-baseline)`);
   assert.ok(
     ratStripped - nonDesign >= 2080,
@@ -1014,8 +953,12 @@ test("AC8/AC-P2-7: chain-role non-design bundle is ~1830 ~tok lighter than the d
     ? skillSr.slice(skillSr.indexOf("---", 3) + 3).trimStart()
     : skillSr;
   const skillBody = stripRationale(body);
+  // compose-not-strip (ticket A9, T-CNSO-07): non-design bundle re-pointed from
+  // stripDesignOnly(stripRationale(CONSTITUTION)) (deleted) to
+  // stripRationale(composeConstitution({chain:true,design:false})) — same design
+  // axis exclusion, expressed as fragment selection instead of a regex strip.
   const designBundle = approxTokens(stripRationale(CONSTITUTION) + SEP + skillBody);
-  const nonDesignBundle = approxTokens(stripDesignOnly(stripRationale(CONSTITUTION)) + SEP + skillBody);
+  const nonDesignBundle = approxTokens(stripRationale(composeConstitution({ chain: true, design: false })) + SEP + skillBody);
   assert.ok(
     designBundle - nonDesignBundle >= 1830,
     `non-design bundle must be ≥ 1830 ~tok lighter (design ${designBundle} − non-design ${nonDesignBundle})`,
@@ -1096,48 +1039,19 @@ test("AC-P2-3: §1 L16/L17 + L19 are ABSENT on non-design, PRESENT on design; L1
   }
 });
 
-test("AC-P2-4/HC-NEST: rationale-inside-design-only nests clean across every strip permutation (zero orphans)", () => {
-  // WHY: §1 fence #1 (L16–L17) CONTAINS a rationale fence (the column-scroller example list) —
-  // OUTER design-only, INNER rationale (HC-NEST). Both regexes are non-greedy; any strip
-  // combination must leave NO orphan marker and NO corrupted bullet. The dispatch brief's
-  // reviewer reproduced the full permutation sweep: {design-only, rationale, both, neither}
-  // × {chain-only on (lite), chain-only off} × {fullDetail on/off-equivalent}. We encode it by
-  // applying every subset of the three strippers and asserting (a) zero orphan markers of any
-  // axis, (b) no half-marker fragment (`design-only:` / `rationale:` / `chain-only:` text), and
-  // (c) the surviving universal §1 bullets are intact (byte-substring present).
-  const a = stripChainOnly, b = stripRationale, c = stripDesignOnly;
-  // All 8 subsets of {a,b,c}, applied in a fixed inner order where present.
-  const id = (t) => t;
-  const subsets = [
-    [id, id, id],          // neither
-    [c, id, id],           // design-only only
-    [id, b, id],           // rationale only
-    [id, id, a],           // chain-only only (lite)
-    [c, b, id],            // design-only + rationale (both, chain-only off)
-    [c, id, a],            // design-only + chain-only (lite, no rationale)
-    [id, b, a],            // rationale + chain-only (lite)
-    [c, b, a],             // all three (lite + non-design + non-full-detail worst case)
-  ];
-  for (const [s1, s2, s3] of subsets) {
-    const out = s3(s2(s1(CONSTITUTION)));
-    // (a)+(b) zero orphan markers of any axis. A marker is orphaned only if it survives
-    // without its pair; the invariant is balanced counts (start === end) per axis after
-    // every permutation — an unbalanced count means a non-greedy regex crossed the other's
-    // markers (HC-NEST corruption). Additionally a fully-applied subset that includes an
-    // axis must drop that axis to ZERO (asserted via the count-equality + the all-three case
-    // below, which already pins zero in the "ZERO orphan markers" test above).
-    for (const axis of ["design-only", "rationale", "chain-only"]) {
-      const starts = (out.match(new RegExp(`${axis}:start`, "g")) || []).length;
-      const ends = (out.match(new RegExp(`${axis}:end`, "g")) || []).length;
-      assert.equal(starts, ends, `permutation [${[s1, s2, s3].map((f) => f.name || "id").join(",")}] left unbalanced ${axis} markers (${starts} start / ${ends} end) — orphan/corruption`);
-    }
-    // (c) no half-bullet corruption: a surviving universal §1 bullet must keep its full text.
-    // L15 (MVP strict) and L18 (Surgical) are universal — present in every permutation because
-    // neither axis fences them (chain-only does not cover §1; design-only/rationale fence other spans).
-    assert.ok(out.includes("**MVP strict**: Fulfil ONLY what was asked."), "MVP-strict bullet must stay byte-intact in every permutation");
-    assert.ok(out.includes("**Surgical changes**: Touch only what the task requires."), "Surgical-changes bullet must stay byte-intact in every permutation");
-  }
-});
+// compose-not-strip (ticket A9, T-CNSO-07): the "AC-P2-4/HC-NEST: rationale-
+// inside-design-only nests clean across every strip permutation" test that lived
+// here is REMOVED — it swept 8 subsets of {stripChainOnly, stripRationale,
+// stripDesignOnly} to prove no regex-marker corruption at the HC-NEST site (a
+// rationale fence nested inside a design-only fence, §1 fence #1 / now fragment
+// const-02-design-mvp.md). stripChainOnly/stripDesignOnly are deleted, so there
+// is no marker-parsing interaction left to sweep: chain/design selection is file
+// inclusion (composeConstitution), decided before stripRationale ever runs; the
+// nested rationale span physically lives inside const-02-design-mvp.md and is
+// stripped by stripRationale exactly like any other rationale fence, regardless
+// of which fragment it landed in post-split. The universal-bullet byte-intact
+// contract this test also checked is covered by AC-P2-3/AC-P2-6 below (L15/L18
+// survive both arms) and by the T-GTS-07 stripRationale unit tests above.
 
 test("AC-P2-5: §4 reflow is REORDER-ONLY — every §4 rule sentence is byte-present (no reword)", async () => {
   // WHY: HC2 (tightened) — the §4 reflow may ONLY reorder sentences / split paragraphs / insert

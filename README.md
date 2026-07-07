@@ -15,7 +15,7 @@ Lost updates, rule drift across `.cursorrules` / `CLAUDE.md` / `.windsurfrules`,
 | Problem | What this fixes |
 |---|---|
 | **Lost updates** — two IDEs write `handoff.md` simultaneously, later one silently overwrites | `O_EXCL` file lock + mtime freshness check; concurrent writer gets `⛔ STATE DRIFT` |
-| **Rule drift** — same rules duplicated across `.cursorrules`, `CLAUDE.md`, `AGENTS.md`, … | Single `constitution.md` injected into every session via SessionStart hook + MCP prompts |
+| **Rule drift** — same rules duplicated across `.cursorrules`, `CLAUDE.md`, `AGENTS.md`, … | Constitution (composed from fragments) injected into every session via SessionStart hook + MCP prompts |
 | **Format drift** — AI hand-edits `handoff.md` and breaks YAML / checkboxes | Free-text edits revoked; AI MUST go through 11 `tw_*` tools with zod-validated args |
 | **No iteration discipline** — AI declares PASS without testing, or loops forever on the same fail | Server-enforced state machine: `qa_round` / `review_round` / `visual_round` caps; PASS requires evidence files |
 

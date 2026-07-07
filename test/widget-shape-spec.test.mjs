@@ -16,7 +16,13 @@ const PROJECT_ROOT = path.resolve(path.dirname(__filename), "..");
 const SKILL_PM = path.join(PROJECT_ROOT, "content", "skill-pm.md");
 const SKILL_DESIGN_AUDITOR = path.join(PROJECT_ROOT, "content", "skill-design-auditor.md");
 const SKILL_QA_VISUAL = path.join(PROJECT_ROOT, "content", "skill-qa-visual.md");
-const CONSTITUTION = path.join(PROJECT_ROOT, "content", "constitution.md");
+// compose-not-strip (ticket A9, DR-6): content/constitution.md is retired (AC8);
+// composeConstitution({chain:true,design:true}) reproduces it byte-for-byte
+// (Option R, architecture DR-1). CONSTITUTION is now the composed TEXT itself
+// (was a path) — both `fs.readFileSync(CONSTITUTION, ...)` call sites below are
+// updated to use the text directly.
+const { composeConstitution } = await import(path.join(PROJECT_ROOT, "dist", "prompts", "build.js"));
+const CONSTITUTION = composeConstitution({ chain: true, design: true });
 
 // ---------- AC-1: skill-pm Visual Widgets schema ----------
 
@@ -125,7 +131,7 @@ test("R6: checklist rule — shape miss precedes pixel diff (gates Step B)", () 
 // ---------- R5: Constitution §1 MVP exception ----------
 
 test("R5: Constitution §1 carries the Visual Widgets exception clause", () => {
-  const body = fs.readFileSync(CONSTITUTION, "utf-8");
+  const body = CONSTITUTION;
   // The exception MUST be a sub-bullet of **MVP strict** (per arch),
   // and MUST name "scope violation" explicitly.
   assert.match(body, /Visual Widgets exception\s*\(v3\.14\.0\)/, "exception clause must be tagged v3.14.0");
@@ -135,7 +141,7 @@ test("R5: Constitution §1 carries the Visual Widgets exception clause", () => {
 test("R5: exception clause is nested under MVP strict (not a top-level rule)", () => {
   // Why: keeping the exception adjacent to the rule it modifies is what
   // makes the contract readable. A floating top-level clause would be lost.
-  const body = fs.readFileSync(CONSTITUTION, "utf-8");
+  const body = CONSTITUTION;
   const mvpIdx = body.indexOf("**MVP strict**");
   const exceptionIdx = body.indexOf("Visual Widgets exception");
   const surgicalIdx = body.indexOf("**Surgical changes**");

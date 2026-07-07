@@ -140,9 +140,18 @@ await captureHook("hook-lite.txt", {}); // default env => lite skill variant
 await captureHook("hook-full.txt", { AGC_DEFAULT_SKILL: "full" });
 
 // --- monolith baseline (cat == original invariant, T-CNSO-08) --------------
-const monolith = fs.readFileSync(path.join(ROOT, "content", "constitution.md"), "utf-8");
-fs.writeFileSync(path.join(OUT_DIR, "constitution-monolith.txt"), monolith);
-written.push(["constitution-monolith.txt", monolith.length]);
+// Only capturable while the pre-refactor monolith still exists (it is deleted
+// by T-CNSO-09/AC8). Post-delete re-runs of this script still regression-check
+// the 10 dispatch fixtures; the committed constitution-monolith.txt stays the
+// frozen baseline.
+const monolithPath = path.join(ROOT, "content", "constitution.md");
+if (fs.existsSync(monolithPath)) {
+  const monolith = fs.readFileSync(monolithPath, "utf-8");
+  fs.writeFileSync(path.join(OUT_DIR, "constitution-monolith.txt"), monolith);
+  written.push(["constitution-monolith.txt", monolith.length]);
+} else {
+  console.log("note: content/constitution.md absent (post-AC8 delete) — monolith baseline not re-captured; committed fixture remains authoritative");
+}
 
 console.log(`Captured ${written.length} golden fixtures into ${path.relative(ROOT, OUT_DIR)}/`);
 for (const [file, bytes] of written) {

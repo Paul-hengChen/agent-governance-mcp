@@ -55,14 +55,32 @@ function loadContent(filename) {
   return readSafe(path.join(SERVER_ROOT, "content", filename));
 }
 
-// Duplicate of stripChainOnly() in prompts/build.ts (different module system —
-// see specs/context-budget-reduction-architecture.md DR-3); keep the regex in
-// sync. Removes <!-- chain-only:start --> … <!-- chain-only:end --> blocks so the
-// lite SessionStart bootstrap doesn't pay for chain rules it cannot exercise.
-function stripChainOnly(text) {
-  return text
-    .replace(/<!-- chain-only:start -->[\s\S]*?<!-- chain-only:end -->\n?/g, "")
-    .replace(/\n{3,}/g, "\n\n");
+// Compose-not-strip (ticket A9): the constitution is assembled additively from
+// the ordered fragment manifest (single source of truth, shared with
+// prompts/build.ts and scripts/measure-context-cost.mjs via the compiled
+// dist/prompts/constitution-manifest.js). This replaces the old duplicated
+// stripChainOnly regex + monolithic content/constitution.md read — the DR-3
+// "keep the regex in sync" contract is now structural (one imported manifest),
+// see specs/compose-not-strip-overlays-architecture.md DR-4. The hook ALWAYS
+// includes the design-tagged fragments (it never stripped design-only text);
+// lite additionally applies the \n{3,} blank-run collapse the old
+// stripChainOnly performed, so lite output stays byte-identical.
+// Fail-loud: if the manifest import fails (dist/ missing during a partial
+// install), return "" so the existing "hook misconfigured" hint fires below —
+// never silently ship a partial bundle.
+async function composeConstitution(wantChain) {
+  try {
+    const mod = await import(
+      pathToFileURL(path.join(SERVER_ROOT, "dist", "prompts", "constitution-manifest.js")).href
+    );
+    const text = mod.CONSTITUTION_SEGMENTS
+      .filter((s) => mod.includeSegment(s.tag, { chain: wantChain, design: true }))
+      .map((s) => loadContent(s.file))
+      .join("");
+    return wantChain ? text : text.replace(/\n{3,}/g, "\n\n");
+  } catch {
+    return "";
+  }
 }
 
 // Tier mapping for the SessionStart banner. Mirrors specs/model-routing.md.
@@ -90,13 +108,9 @@ async function parseSkill(rawText) {
 const skillVariant = process.env.AGC_DEFAULT_SKILL === "full"
   ? "skill-coordinator.md"
   : "skill-coordinator-lite.md";
-// Lite bootstrap (the default) is server-read-only with no chain → strip the
-// chain-only sections. Full coordinator keeps the complete constitution.
-const rawConstitution = loadContent("constitution.md");
-const constitution =
-  skillVariant === "skill-coordinator-lite.md"
-    ? stripChainOnly(rawConstitution)
-    : rawConstitution;
+// Lite bootstrap (the default) is server-read-only with no chain → the chain
+// fragments are excluded. Full coordinator composes the complete constitution.
+const constitution = await composeConstitution(skillVariant === "skill-coordinator.md");
 const rawSkill = loadContent(skillVariant);
 
 if (!constitution || !rawSkill) {

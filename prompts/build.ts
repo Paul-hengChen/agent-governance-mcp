@@ -22,6 +22,7 @@ import {
 } from "../tools/rag-coalesce.js";
 import { parseSkillFile } from "../tools/skill-frontmatter.js";
 import { hasDesignModeRequiringVisual } from "../tools/evidence-file.js";
+import { CONSTITUTION_SEGMENTS, includeSegment } from "./constitution-manifest.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -45,18 +46,26 @@ function loadContent(filename: string, workspacePath?: string): string {
   return fs.readFileSync(filePath, "utf-8");
 }
 
-// Remove every <!-- chain-only:start --> … <!-- chain-only:end --> block
-// (markers inclusive) and collapse the blank lines left behind. Idempotent;
-// text with no markers is returned unchanged (full-constitution safety default).
-// Chain-only sections (constitution §3.1, §4) govern role-to-role transitions
-// that lite contexts cannot exercise — stripping them trims the always-on budget
-// without dropping any rule a lite agent could use. A duplicate of this function
-// lives in bin/agent-governance-context.mjs (different module system — see
-// specs/context-budget-reduction-architecture.md DR-3); keep the regex in sync.
-export function stripChainOnly(text: string): string {
-  return text
-    .replace(/<!-- chain-only:start -->[\s\S]*?<!-- chain-only:end -->\n?/g, "")
-    .replace(/\n{3,}/g, "\n\n");
+// Compose-not-strip (ticket A9): assemble the constitution ADDITIVELY from the
+// ordered fragment manifest instead of stripping fenced spans out of a
+// monolith. A fragment ships iff its tag's predicate holds for the dispatch
+// (`chain` = non-lite dispatch, `design` = design-armed feature); excluded
+// fragments simply never load, so the old unbalanced-fence failure class is
+// gone structurally (spec AC11 — stripChainOnly / stripDesignOnly are deleted,
+// no fence validator replaces them). Fragments are verbatim monolith slices
+// with structural markers retained as inert text (DR-1, Option R):
+// composeConstitution({ chain: true, design: true }) reproduces the retired
+// content/constitution.md byte-for-byte. Exported so tests (and any script)
+// can snapshot the full document directly. join("") — fragments carry their
+// own newlines (they partition the monolith with no gaps or overlaps).
+export function composeConstitution(
+  opts: { chain: boolean; design: boolean },
+  workspacePath?: string,
+): string {
+  return CONSTITUTION_SEGMENTS
+    .filter((s) => includeSegment(s.tag, opts))
+    .map((s) => loadContent(s.file, workspacePath))
+    .join("");
 }
 
 // Remove every <!-- rationale:start --> … <!-- rationale:end --> block (markers
@@ -75,40 +84,24 @@ export function stripRationale(text: string): string {
     .replace(/\n{3,}/g, "\n\n");
 }
 
-// Remove every <!-- design-only:start --> … <!-- design-only:end --> block
-// (markers inclusive) and collapse the blank lines left behind. Idempotent;
-// text with no markers is returned unchanged (full-constitution safety default).
-// Design-only spans (constitution §3.2 minus R10, plus the §3.1 visual evidence /
-// report-schema / visual_round bullets) are FEATURE-INERT: on a non-design feature
-// (no `design/<feature>.md`, or its `## Mode` = no-design) the server-side visual
-// gates self-disarm, so this visual governance binds no role — stripping it trims
-// the per-dispatch budget without dropping a rule any role could act on. Gated on
-// the SAME arm signal the server uses (hasDesignModeRequiringVisual), so the text is
-// present exactly when the gate can fire (HC3). DISTINCT marker from chain-only /
-// rationale so the non-greedy regexes never cross (HC5); the design-only fences are
-// nested inside chain-only (§3.1/§3.2 sit between its markers) — disjoint, nest-safe.
-export function stripDesignOnly(text: string): string {
-  return text
-    .replace(/<!-- design-only:start -->[\s\S]*?<!-- design-only:end -->\n?/g, "")
-    .replace(/\n{3,}/g, "\n\n");
-}
-
 // Remove every <!-- origin:start --> … <!-- origin:end --> span (markers
 // inclusive) and clean up whitespace left behind. Idempotent; text with no
 // markers is returned unchanged (safety default). Origin spans carry only
 // maintainer provenance — version stamps ("(v3.26.0)"), backlog/finding codes
 // ("(R10)", "A1"), retrospective pointers — never a rule any role acts on, so
 // stripping them trims per-dispatch budget at EVERY detail level: applied
-// unconditionally in buildPromptForRole, FIRST, before the three conditional
-// strips (no fullDetail / lite / design-arm gate). Unlike the block-level
-// fences above, origin fences are INLINE (mid-sentence / end-of-heading), so
-// the regex deliberately does NOT consume a trailing newline — doing so would
-// join a fenced heading with the line below it. Origin fences never straddle
-// a chain-only / rationale / design-only boundary (they may nest inside one),
-// so the four strippers compose order-independently. Single-copy by design
-// (governance-text-load-architecture DR-2, same as stripRationale /
-// stripDesignOnly): only buildPromptForRole calls it; NOT duplicated into
-// bin/agent-governance-context.mjs, so DR-3's parity rule does not apply.
+// unconditionally in buildPromptForRole over the composed constitution, FIRST,
+// before the fullDetail-gated stripRationale pass (compose-not-strip pipeline:
+// compose → stripOriginTags → stripRationale unless fullDetail). Unlike
+// rationale fences, origin fences are INLINE (mid-sentence / end-of-heading),
+// so the regex deliberately does NOT consume a trailing newline — doing so
+// would join a fenced heading with the line below it. Origin fences never
+// straddle a rationale boundary or a fragment seam (they may nest inside a
+// rationale span), so the two strippers compose order-independently, and its
+// \n{3,} collapse also normalizes any blank-run left at a fragment seam.
+// Single-copy by design (governance-text-load-architecture DR-2, same as
+// stripRationale): only buildPromptForRole calls it; NOT duplicated into
+// bin/agent-governance-context.mjs.
 export function stripOriginTags(text: string): string {
   return text
     .replace(/<!-- origin:start -->[\s\S]*?<!-- origin:end -->/g, "")
@@ -298,48 +291,41 @@ export function buildPromptForRole(
   description: string;
   messages: Array<{ role: "user"; content: { type: "text"; text: string } }>;
 } {
-  // Read handoff state BEFORE constitution resolution: the design-only axis is the
-  // first state-dependent strip (the chain-only / rationale axes are static-arg-driven),
-  // so `active_feature` must be known to probe the design arm below. Reused for the
-  // state block at the end of this function. Try/catch preserved — a parse failure
-  // degrades to "no state" (and, per AC3, to the non-design strip default).
+  // Read handoff state BEFORE constitution composition: the design axis is
+  // state-dependent (the chain axis is static-arg-driven), so `active_feature`
+  // must be known to probe the design arm below. Reused for the state block at
+  // the end of this function. Try/catch preserved — a parse failure degrades
+  // to "no state" (and, per AC3, to the non-design compose default).
   let state: HandoffState | null = null;
   try {
     state = getActiveStorage().parse(workspacePath);
   } catch {
-    // fall through to "no state" block (and non-design strip default)
+    // fall through to "no state" block (and non-design compose default)
   }
 
-  // Design-arm probe (NET-NEW I/O). Strip the design-only span unless the feature is
-  // design-armed. AGREES WITH the server-side visual gate by construction: it calls the
-  // SAME helper (hasDesignModeRequiringVisual) the PASS-time visual gate uses, so the
-  // text is present exactly when those gates can fire (HC3). Safe default (AC3): no
-  // state / no active_feature → required=false → strip, which is provably safe because
-  // no design ⇒ no visual binding. Never throws (the helper swallows fs errors).
+  // Design-arm probe. Include the design-tagged fragments only when the feature
+  // is design-armed. AGREES WITH the server-side visual gate by construction: it
+  // calls the SAME helper (hasDesignModeRequiringVisual) the PASS-time visual
+  // gate uses, so the text is present exactly when those gates can fire (HC3).
+  // Safe default (AC3): no state / no active_feature → required=false → design
+  // fragments excluded, which is provably safe because no design ⇒ no visual
+  // binding. Never throws (the helper swallows fs errors).
   const isDesignFeature = state?.active_feature
     ? hasDesignModeRequiringVisual(workspacePath, state.active_feature).required
     : false;
 
-  // Origin-tag strip is FIRST and unconditional on both raw inputs (constitution
-  // here, skill body below): provenance tags are pure archaeology at every detail
-  // level, so no fullDetail / lite / design-arm gate applies (governance-tag-strip
-  // AC4). The remaining strips compose order-independently with it.
-  const rawConstitution = stripOriginTags(loadContent("constitution.md", workspacePath));
-  // Lite contexts (teamwork-lite) get the chain-only sections stripped; chain
-  // roles keep the full constitution because those rules become load-bearing.
-  const chainResolved =
-    skillFile === LITE_SKILL_FILE ? stripChainOnly(rawConstitution) : rawConstitution;
-  // v3.31.0 (T-GTL-07): the §1/§7 rationale fences wrap explanatory example-lists,
-  // not rules, so strip them for non-full-detail dispatch — same fullDetail flag as
-  // the skill body. Composes after stripChainOnly: order-independent (DR-9), the
-  // fences are disjoint regions (chain-only wraps §3.1+§4; rationale fences sit in
-  // §1/§7), so neither non-greedy regex crosses the other's markers.
-  const rationaleResolved = fullDetail ? chainResolved : stripRationale(chainResolved);
-  // Design-only axis (constitution-conditional-load): strip §3.2 (minus R10) + the
-  // §3.1 visual bullets on non-design features. Composes order-independently with the
-  // other two strips — the design-only fences are DISJOINT from rationale fences and
-  // NESTED inside chain-only, so the non-greedy regexes never cross markers (HC5).
-  const constitution = isDesignFeature ? rationaleResolved : stripDesignOnly(rationaleResolved);
+  // Compose-not-strip pipeline (ticket A9): compose → stripOriginTags (always,
+  // AC7) → stripRationale (unless fullDetail, AC5/AC6). Lite contexts
+  // (teamwork-lite) exclude the chain fragments (§3.1/§4 govern role-to-role
+  // transitions a lite context cannot exercise); chain roles include them
+  // because those rules become load-bearing.
+  const isLite = skillFile === LITE_SKILL_FILE;
+  const assembled = composeConstitution(
+    { chain: !isLite, design: isDesignFeature },
+    workspacePath,
+  );
+  const originClean = stripOriginTags(assembled);
+  const constitution = fullDetail ? originClean : stripRationale(originClean);
   const rawSkill = loadContent(skillFile, workspacePath);
   const { frontmatter, body: taggedBody } = parseSkillFile(rawSkill);
   // Same unconditional origin-tag strip as the constitution above (frontmatter

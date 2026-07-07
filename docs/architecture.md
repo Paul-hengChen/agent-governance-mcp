@@ -8,10 +8,11 @@ How the three layers fit together, what gates a state write, and how the routing
 
 ```
 ┌── Layer 1: Prompts ───────────────────────────────────────┐
-│  prompts/build.ts assembles per-session:                  │
-│    content/constitution.md                                │
+│  prompts/build.ts assembles per-session via composition:  │
+│    content/const-*.md (15 ordered fragments)              │
 │  + content/skill-<role>.md                                │
 │  + .current/handoff.md state                              │
+│  (Fragment selection per dispatch mode via manifest)      │
 │                                                            │
 │  Registered prompts: teamwork, teamwork-lite, pm,         │
 │    architect, researcher, sr-engineer, qa-engineer        │

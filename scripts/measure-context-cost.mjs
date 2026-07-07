@@ -18,7 +18,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import { fileURLToPath } from "url";
+import { fileURLToPath, pathToFileURL } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -29,41 +29,34 @@ function approxTokens(text) {
   return Math.ceil(text.length / 4);
 }
 
-// Mirror of stripChainOnly() in prompts/build.ts — lets this script report the
-// post-strip lite budget so AC2 (context-budget-reduction) is verifiable here.
-function stripChainOnly(text) {
-  return text
-    .replace(/<!-- chain-only:start -->[\s\S]*?<!-- chain-only:end -->\n?/g, "")
-    .replace(/\n{3,}/g, "\n\n");
-}
-
-// Reporting mirror of stripRationale() in prompts/build.ts (governance-text-load
-// F-B, v3.31.0) — lets this script report the post-rationale-strip role-prompt
-// budget so AC1/AC2 reductions are diff-able here. DR-2/DR-6: this is a REPORTING
-// copy, NOT a load-bearing prompt-assembly copy, so DR-3's 3-copy parity test
-// does NOT apply (only buildPromptForRole's copy feeds a live prompt). Keep the
-// regex in sync with prompts/build.ts by inspection.
-function stripRationale(text) {
-  return text
-    .replace(/<!-- rationale:start -->[\s\S]*?<!-- rationale:end -->\n?/g, "")
-    .replace(/[ \t]+\n/g, "\n")
-    .replace(/\n{3,}/g, "\n\n");
-}
-
-// Reporting mirror of stripDesignOnly() in prompts/build.ts (constitution-conditional-load).
-// Lets this script report the post-design-strip constitution figure — the budget the
-// design-only axis removes on NON-design feature dispatches (§3.2 minus R10 + the §3.1
-// visual bullets). Reporting-only: only buildPromptForRole's copy feeds a live prompt,
-// and that strip is gated on the runtime design-arm probe. Keep the regex in sync with
-// prompts/build.ts by inspection.
-function stripDesignOnly(text) {
-  return text
-    .replace(/<!-- design-only:start -->[\s\S]*?<!-- design-only:end -->\n?/g, "")
-    .replace(/\n{3,}/g, "\n\n");
-}
+// Compose-not-strip (ticket A9): every constitution figure below is composed
+// from the shared fragment manifest (dist/prompts/constitution-manifest.js) —
+// the same single source of truth prompts/build.ts and the SessionStart hook
+// use — instead of reading a monolithic constitution.md and mirroring the
+// deleted stripChainOnly/stripDesignOnly regexes locally (old DR-3 "keep in
+// sync by inspection" is replaced by the structural import, architecture DR-4).
+// stripRationale is imported from the compiled build.js for the same reason
+// (no local reporting mirror to drift).
+const { CONSTITUTION_SEGMENTS, includeSegment } = await import(
+  pathToFileURL(path.join(ROOT, "dist", "prompts", "constitution-manifest.js")).href
+);
+const { stripRationale } = await import(
+  pathToFileURL(path.join(ROOT, "dist", "prompts", "build.js")).href
+);
 
 function read(rel) {
   return fs.readFileSync(path.join(CONTENT, rel), "utf-8");
+}
+
+// Compose the constitution for a given dispatch mode. `collapse` mirrors the
+// \n{3,} blank-run normalization the lite paths apply post-composition
+// (stripOriginTags in build.ts / the inline collapse in the hook).
+function composeConstitution({ chain, design }, collapse = false) {
+  const text = CONSTITUTION_SEGMENTS
+    .filter((s) => includeSegment(s.tag, { chain, design }))
+    .map((s) => read(s.file))
+    .join("");
+  return collapse ? text.replace(/\n{3,}/g, "\n\n") : text;
 }
 
 // The 7 registered prompts → their skill file (mirrors index.ts / prompts/*.ts).
@@ -79,7 +72,8 @@ const ROLE_PROMPTS = [
 
 const SEP = "\n\n---\n\n"; // matches buildPromptForRole's joiner
 
-const constitution = read("constitution.md");
+// Full document (all fragments) — byte-identical to the retired monolith.
+const constitution = composeConstitution({ chain: true, design: true });
 const constitutionTok = approxTokens(constitution);
 
 // Every skill file on disk (raw weight).
@@ -111,7 +105,7 @@ console.log("(chars/4 token approximation — deterministic baseline for spec co
 // 1. Raw artifacts
 printTable(
   "Raw artifacts",
-  [row("constitution.md", constitution), ...skillFiles.map((f) => row(f, read(f)))],
+  [row("constitution (composed, all fragments)", constitution), ...skillFiles.map((f) => row(f, read(f)))],
 );
 
 // 2. SessionStart hook output (constitution + default skill). Header/state are
@@ -139,7 +133,7 @@ const constitutionStripped = stripRationale(constitution);
 const constitutionSaved = constitutionTok - approxTokens(constitutionStripped);
 // Non-design chain-role dispatch: rationale-stripped AND design-only-stripped. This is
 // the budget a chain role gets on a feature with no (or no-design) design file.
-const constitutionNonDesign = stripDesignOnly(constitutionStripped);
+const constitutionNonDesign = stripRationale(composeConstitution({ chain: true, design: false }));
 const designOnlySaved = approxTokens(constitutionStripped) - approxTokens(constitutionNonDesign);
 printTable("Role-prompt bundles (rationale-stripped: constitution + skill)", [
   ...ROLE_PROMPTS.map(([id, file]) => {
@@ -158,17 +152,19 @@ printTable("Role-prompt bundles (rationale-stripped: constitution + skill)", [
 // 4. Always-on total (hook default path = constitution + lite skill).
 //    Lite contexts strip the chain-only sections (§3.1, §4) — report both the
 //    raw and the post-strip figure so the AC2 reduction is visible here.
-const leanConstitution = stripChainOnly(constitution);
+// Lite-lean = the hook's default composition: chain fragments excluded, design
+// kept (the hook never stripped design), blank-run collapse applied.
+const leanConstitution = composeConstitution({ chain: false, design: true }, true);
 const alwaysOnRaw = constitution + SEP + liteSkill;
 const alwaysOnLean = leanConstitution + SEP + liteSkill;
 const rawTok = approxTokens(alwaysOnRaw);
 const leanTok = approxTokens(alwaysOnLean);
 console.log("\n" + "=".repeat(50));
 console.log(`TOTAL always-on (constitution + default skill)`);
-console.log(`  constitution.md (raw)      : ${constitutionTok.toString().padStart(6)} ~tokens`);
-console.log(`  constitution.md (rat-strip): ${approxTokens(constitutionStripped).toString().padStart(6)} ~tokens  (chain-role AC8 floor; −${constitutionSaved})`);
-console.log(`  constitution.md (non-design): ${approxTokens(constitutionNonDesign).toString().padStart(5)} ~tokens  (rat-strip + design-only strip; −${designOnlySaved} vs rat-strip)`);
-console.log(`  constitution.md (lite-lean): ${approxTokens(leanConstitution).toString().padStart(6)} ~tokens`);
+console.log(`  constitution (raw, composed): ${constitutionTok.toString().padStart(6)} ~tokens`);
+console.log(`  constitution (rat-strip)    : ${approxTokens(constitutionStripped).toString().padStart(6)} ~tokens  (chain-role AC8 floor; −${constitutionSaved})`);
+console.log(`  constitution (non-design)   : ${approxTokens(constitutionNonDesign).toString().padStart(5)} ~tokens  (rat-strip + design-only strip; −${designOnlySaved} vs rat-strip)`);
+console.log(`  constitution (lite-lean)    : ${approxTokens(leanConstitution).toString().padStart(6)} ~tokens`);
 console.log(`  skill-coordinator-lite.md  : ${approxTokens(liteSkill).toString().padStart(6)} ~tokens`);
 console.log(`  bundle raw  (pre-strip)    : ${rawTok.toString().padStart(6)} ~tokens`);
 console.log(`  bundle lean (post-strip)   : ${leanTok.toString().padStart(6)} ~tokens`);

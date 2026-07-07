@@ -16,7 +16,7 @@ future `/teamwork` feature; none blocks a release on its own.
 | A6 | Consolidation rewrite of `skill-qa-visual.md` (265 → 124 lines) — **done (77a6373)** | P1 | — | ~2 (`content/skill-qa-visual.md`, evidence-parser test run) | — |
 | A7 | Consolidation rewrite of `skill-pm.md` (gates → Gate Summary table) — **done (2026-07-06)** | P1 | — | ~2 (`content/skill-pm.md`, tests) | — |
 | A8 | Single-owner dedup of multi-told mechanisms (cut-approval ×4, self-converge ×2) | P2 | — | ~5 (constitution + coordinator + pm + lite + sr skills) | — |
-| A9 | Compose-not-strip: overlay modules replace fence stripping in `build.ts` | P2 | — | ~8 (`prompts/build.ts`, split `content/constitution*.md`, tests) | — |
+| A9 | Compose-not-strip: overlay modules replace fence stripping in `build.ts` — **done (2026-07-07)** | P2 | — | ~8 (`prompts/build.ts`, split `content/constitution*.md`, tests) | — |
 | A10 | Gate registry as structured data → code + rendered prose | P2 | A9 | ~10 (`gates` data file, `transitions.ts`, `evidence-file.ts`, `build.ts`, content, tests) | — |
 | A11 | Escalation-route tables + unified WHEN/DO/ELSE rule grammar across skills | P2 | A6, A7 | ~12 (all `content/skill-*.md`, constitution) | — |
 | A12 | Shared SOP partials + Limits number registry | P2 | A9 | ~14 (all content files, `build.ts`) | — |

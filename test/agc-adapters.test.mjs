@@ -259,14 +259,17 @@ test("AC-7: agc check exits 0 and produces no output when no adapters are presen
 // AC-8: no verbatim constitution rule line appears in any adapter
 // ---------------------------------------------------------------------------
 
-test("AC-8: no verbatim constitution line appears in any adapter template (pointer-only)", () => {
+test("AC-8: no verbatim constitution line appears in any adapter template (pointer-only)", async () => {
   // Contract: adapter files are entry-pointers to the governance server, NOT copies
-  // of the constitution. Any line that appears verbatim in content/constitution.md
+  // of the constitution. Any line that appears verbatim in the composed constitution
   // must not appear in any adapter template. (Programmatic line-intersection —
   // the same check the code-reviewer ran independently.)
-  const constitutionPath = path.join(PROJECT_ROOT, "content", "constitution.md");
+  // compose-not-strip (ticket A9, DR-6): content/constitution.md is retired (AC8);
+  // composeConstitution({chain:true,design:true}) reproduces it byte-for-byte
+  // (Option R, architecture DR-1), so this mechanical swap changes no assertion.
+  const { composeConstitution } = await import(path.join(PROJECT_ROOT, "dist", "prompts", "build.js"));
   const constitutionLines = new Set(
-    fs.readFileSync(constitutionPath, "utf-8")
+    composeConstitution({ chain: true, design: true })
       .split("\n")
       .map((l) => l.trim())
       .filter((l) => l.length > 0),

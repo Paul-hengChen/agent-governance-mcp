@@ -25,14 +25,14 @@
 Every role prompt is assembled by `buildPromptForRole()` in `prompts/build.ts`:
 
 ```
-constitution.md + skill-<role>.md + current handoff state (JSON) + [RAG spec context]
+composed constitution (const-*.md fragments) + skill-<role>.md + current handoff state (JSON) + [RAG spec context]
 ```
 
 Automation details:
-- Constitution + skill content loaded from `content/`; per-workspace override via `.current/<filename>`.
+- Constitution assembled additively from 15 fragment files (content/const-*.md) via `composeConstitution()` in `prompts/build.ts`, which consumes the `CONSTITUTION_SEGMENTS` manifest from `prompts/constitution-manifest.ts` to select fragments by dispatch mode; skill content loaded from `content/`. Per-workspace override via `.current/<filename>`.
 - Project state auto-injected as JSON from `storage.parse()`.
 - RAG spec context appended via `appendSpecContext()` for non-coordinator roles.
-- Conditional strip passes: `stripChainOnly` (lite mode), `stripRationale` (non-fullDetail), `stripDesignOnly` (non-design features) keep bundle size minimal.
+- Conditional text-transform passes after composition: `stripOriginTags` (always) + `stripRationale` (non-fullDetail) keep bundle size minimal.
 
 ### Layer 2 — Structured Tools (10 `tw_*` APIs)
 

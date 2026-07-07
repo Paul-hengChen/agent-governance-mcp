@@ -2,7 +2,7 @@
 
 This file is auto-loaded by Claude Code when working **inside this repo**. It
 describes the project itself (an MCP server). The *rules of conduct* enforced
-by this server live in `content/constitution.md` and the `content/skill-*.md` files;
+by this server live in `content/const-*.md` (15 ordered fragments, composed by dispatch mode per `prompts/constitution-manifest.ts`) and the `content/skill-*.md` files;
 those are loaded into other workspaces via role prompts (`teamwork` for the
 Coordinator role, plus `sr-engineer`, `pm`, `architect`, `researcher`,
 `qa-engineer`) or the SessionStart hook — not into this one. This repo is the
@@ -18,14 +18,11 @@ no specific project-management framework assumed.
 
 Three layers of defense, all in `index.ts`:
 
-1. **Prompts** — thin wrappers around `prompts/build.ts`, which bundles
-   `content/constitution.md` + role-specific `content/skill-*.md` + live
-   handoff state. The bundle is context-frugal: `build.ts` conditionally
-   strips constitution spans per dispatch — `chain-only` (§3.1/§3.2/§4) for
-   lite mode, `rationale` fences for non-`fullDetail`, and `design-only`
-   visual governance on non-design features (v3.33.0+, triggered by the same
-   `hasDesignModeRequiringVisual()` arm signal the server PASS gates use, so
-   the text loads exactly when the gates can fire). Seven prompts are registered: `teamwork` serves the
+1. **Prompts** — thin wrappers around `prompts/build.ts`, which assembles
+   the constitution via additive composition (see below) + role-specific `content/skill-*.md` + live
+   handoff state. The bundle is context-frugal: `build.ts` composes constitution fragments
+   per dispatch mode (lite vs chain, design-armed vs non-design), then applies text-transform passes
+   (`stripOriginTags` always, `stripRationale` for non-`fullDetail`) for size efficiency. Seven prompts are registered: `teamwork` serves the
    full Coordinator (`prompts/coordinator.ts` +
    `content/skill-coordinator.md`); `teamwork-lite` serves the solo-dev
    lite mode (`prompts/coordinator-lite.ts` +
@@ -63,7 +60,8 @@ schema/versions.ts        schema_version constants + migration registries (v3.4.
 schema/migrations-*.ts    handoff / tasks / sqlite / config migration runners (v3.4.0)
 guards/session.ts         per-(process,workspace) snapshot of "agent read state"
 guards/file-lock.ts       cross-process O_EXCL lock with stale-PID detection
-prompts/build.ts          shared buildPromptForRole() — all role prompts call into this; conditionally strips constitution spans via stripChainOnly (lite) / stripRationale (non-fullDetail) / stripDesignOnly (non-design features, v3.33.0+)
+prompts/build.ts          shared buildPromptForRole() — assembles constitution via composeConstitution() then applies stripOriginTags / stripRationale per mode
+prompts/constitution-manifest.ts  ordered segment registry (CONSTITUTION_SEGMENTS + includeSegment predicate); replaces subtractive strip model (v3.44.0+)
 prompts/coordinator.ts       coordinator role (prompt id is "teamwork" for backwards compat)
 prompts/coordinator-lite.ts  coordinator-lite role (prompt id "teamwork-lite", v3.6.0)
 prompts/sr-engineer.ts    sr-engineer role prompt
@@ -71,8 +69,8 @@ prompts/pm.ts             pm role prompt
 prompts/architect.ts      architect role prompt
 prompts/researcher.ts     researcher role prompt
 prompts/qa-engineer.ts    qa-engineer role prompt
-bin/agent-governance-context.mjs  SessionStart hook helper (emits additionalContext)
-content/constitution.md   the rules agents must follow (source of truth)
+bin/agent-governance-context.mjs  SessionStart hook helper (emits additionalContext; imports manifest for composition)
+content/const-*.md (15 fragments)  the rules agents must follow, composed by dispatch mode; see prompts/constitution-manifest.ts for fragment order/tags
 content/constitution-rationale.md  non-normative "why" behind §1/§3.1/§3.2/§5/§7 (one-way refs into constitution; v3.32.0)
 content/skill-coordinator.md  default coordinator SOP (loaded by SessionStart hook)
 content/skill-coordinator-lite.md  solo-dev lite-mode SOP (v3.6.0)

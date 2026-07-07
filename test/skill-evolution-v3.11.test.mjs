@@ -92,7 +92,11 @@ test("AC-10: skill-file schema sanity checks (grep assertions)", () => {
   assert.match(codeReviewerContent, /\*\*Performance\*\*/, "code-reviewer requires Performance section");
 });
 
-test("AC-10: Constitution §6 contains the dependency-audit bullet", () => {
-  const constitutionContent = fs.readFileSync(path.join(PROJECT_ROOT, "content", "constitution.md"), "utf-8");
+test("AC-10: Constitution §6 contains the dependency-audit bullet", async () => {
+  // compose-not-strip (ticket A9, DR-6): content/constitution.md is retired (AC8);
+  // composeConstitution({chain:true,design:true}) reproduces it byte-for-byte
+  // (Option R, architecture DR-1), so this mechanical swap changes no assertion.
+  const { composeConstitution } = await import(path.join(PROJECT_ROOT, "dist", "prompts", "build.js"));
+  const constitutionContent = composeConstitution({ chain: true, design: true });
   assert.match(constitutionContent, /Dependency audit at build gate/, "constitution §6 must contain dependency-audit bullet");
 });

@@ -27,10 +27,14 @@ import { fileURLToPath } from "node:url";
 const __filename = fileURLToPath(import.meta.url);
 const ROOT = path.resolve(path.dirname(__filename), "..");
 
-const CONSTITUTION = fs.readFileSync(
-  path.join(ROOT, "content", "constitution.md"),
-  "utf-8",
+// compose-not-strip (ticket A9, DR-6): content/constitution.md is retired (AC8);
+// composeConstitution({chain:true,design:true}) reproduces it byte-for-byte
+// (Option R, architecture DR-1), so every marker-string assertion below is
+// unaffected by this mechanical swap.
+const { composeConstitution } = await import(
+  path.join(ROOT, "dist", "prompts", "build.js")
 );
+const CONSTITUTION = composeConstitution({ chain: true, design: true });
 
 // ---------------------------------------------------------------------------
 // REQUIRED_VISUAL_SECTIONS is read directly from the compiled output of
