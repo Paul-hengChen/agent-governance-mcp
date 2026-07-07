@@ -22,7 +22,7 @@ future `/teamwork` feature; none blocks a release on its own.
 | A5 | Error-code contract test: `content/*.md` ↔ code — **done (3360c68)** | P1 | — | ~2 (new test, maybe a shared error-code export) | — |
 | A6 | Consolidation rewrite of `skill-qa-visual.md` (265 → 124 lines) — **done (77a6373)** | P1 | — | ~2 (`content/skill-qa-visual.md`, evidence-parser test run) | — |
 | A7 | Consolidation rewrite of `skill-pm.md` (gates → Gate Summary table) — **done (2026-07-06)** | P1 | — | ~2 (`content/skill-pm.md`, tests) | — |
-| A8 | Single-owner dedup of multi-told mechanisms (cut-approval ×4, self-converge ×2) | P2 | — | ~5 (constitution + coordinator + pm + lite + sr skills) | — |
+| A8 | Single-owner dedup of multi-told mechanisms (cut-approval ×3 — *resolved via C2, 2026-07-07*; self-converge ×2 still open) | P2 | — | ~5 (constitution + coordinator + pm + lite + sr skills) | — |
 | A9 | Compose-not-strip: overlay modules replace fence stripping in `build.ts` — **done (2026-07-07)** | P2 | — | ~8 (`prompts/build.ts`, split `content/constitution*.md`, tests) | — |
 | A10 | Gate registry as structured data → code + rendered prose — *P2→P1 2026-07-07: prereqs landed (A9 ✓, A1 orchestrator ✓)* | P1 | A9 ✓ | ~10 (`gates` data file, `transitions.ts`, `handoff-orchestrator.ts`, `build.ts`, content, tests) | — |
 | A11 | Escalation-route tables + unified WHEN/DO/ELSE rule grammar across skills | P2 | A6, A7 | ~12 (all `content/skill-*.md`, constitution) | — |
@@ -31,7 +31,7 @@ future `/teamwork` feature; none blocks a release on its own.
 | B8 | §7 external-reference policy has no server-side enforcement gate (carried forward) | P1 | — | ~4 (`tools/transitions.ts`, evidence/ledger check, constitution §7) | — |
 | B9 | Per-feature token budget + coordinator STOP at ceiling (carried forward) | P2 | — | ~3 (coordinator SOP, handoff/config field) | — |
 | C1 | Transitions matrix lacks amend/repair semantics (pm re-entry strands downstream roles) | P1 | — | ~4 (`tools/transitions.ts`, constitution §3.1, skill-coordinator, tests) | — |
-| C2 | Cut-approval cannot cross the subagent boundary — formalize coordinator-attested approval | P1 | — | ~5 (`handoff` field, `transitions.ts`/orchestrator, skill-pm, skill-coordinator, tests) | — |
+| C2 | Cut-approval cannot cross the subagent boundary — formalize coordinator-attested approval — **done (2026-07-07)** | P1 | — | ~5 (`handoff` field, `transitions.ts`/orchestrator, skill-pm, skill-coordinator, tests) | — |
 | C3 | Per-task-id evidence check forces stub pointer files — accept covering review + id manifest | P2 | — | ~3 (evidence check in orchestrator/evidence-file, skills, tests) | — |
 | C4 | Drift detector drowned by historical noise — acknowledged-baseline / archive mechanism | P2 | — | ~4 (`tools/drift.ts`, maybe `tw_sync`/config, tests) | — |
 | C5 | Watermark toolchain: template hardcodes tier; validateWatermark appends instead of replacing on mismatch | P2 | — | ~4 (`lib/watermark-check.ts`, `templates/claude-code-agents/*`, tests) | — |
@@ -141,10 +141,15 @@ future `/teamwork` feature; none blocks a release on its own.
 
 ## A8 — Single-owner dedup of multi-told mechanisms (P2)
 - **What:** The constitution's own header says skills "MUST NOT restate" it, yet:
-  cut-approval is told 4× (constitution, skill-coordinator stop-condition 6,
-  skill-pm 7a, skill-coordinator-lite) with divergent wording; self-converge
-  relaxation is told 2× (constitution §1, skill-sr-engineer) with overlapping
-  qualifiers. Every copy is a future drift source — edit one, miss three.
+  cut-approval is told 3× (skill-coordinator stop-condition 6, skill-pm 7a,
+  skill-coordinator-lite) with divergent wording — *(correction 2026-07-07:
+  the original "4×" claim assumed a constitution copy that never existed;
+  grep across `content/const-*.md` returned zero pre-fix hits. **Resolved via
+  C2**: the mechanism now lives once in Constitution §3.1
+  (`content/const-08-chain-31-mid.md`) and the three skill retellings are
+  pointer lines.)* — and self-converge relaxation is told 2× (constitution §1,
+  skill-sr-engineer) with overlapping qualifiers — **still open under A8**.
+  Every copy is a future drift source — edit one, miss the others.
 - **Fix:** single-owner principle. Each mechanism's full definition lives in
   exactly one document (server-gate class → constitution §3.1; process class →
   the owning skill); every other mention shrinks to one pointer line ("see X").
@@ -248,7 +253,17 @@ future `/teamwork` feature; none blocks a release on its own.
 - **Risk if skipped:** every mid-feature spec amendment costs manual routing
   surgery by whoever coordinates; done wrong it corrupts the chain audit trail.
 
-## C2 — Cut-approval cannot cross the subagent boundary (P1, observed 2026-07-06/07)
+## C2 — Cut-approval cannot cross the subagent boundary (P1, observed 2026-07-06/07) — DONE 2026-07-07
+- **Done:** shipped as feature `cut-approval-coordinator-attestation`
+  (spec `specs/cut-approval-coordinator-attestation.md`; single-feature commit
+  follows QA PASS per workspace convention). Mechanism: option (a),
+  coordinator-attested approval — one new Cut-Approval Gate bullet in
+  Constitution §3.1 (`content/const-08-chain-31-mid.md`) owns the full
+  mechanism + sanctioned-writer trust rule; the 3 skill retellings
+  (skill-pm step 8 / Gate Summary row, skill-coordinator stop-condition 6,
+  skill-coordinator-lite hard-rules bullet) trimmed to pointers plus
+  role-specific actions only. No server code change — the gate stays a pure
+  boolean check (spec AC-6). Absorbs A8's cut-approval dedup bullet.
 - **What:** The cut-approval gate assumes the PM who presents the cut also sees
   the human's approval. Under the RECOMMENDED dispatch model (fresh-context Task
   subagent), the PM subagent ends its turn after presenting the cut; when resumed

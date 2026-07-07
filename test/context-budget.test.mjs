@@ -121,12 +121,17 @@ test("AC2: lean always-on bundle is below the raw baseline and within target (<=
   // the cut-approval SOP text added to skill-coordinator-lite.md (halt instruction)
   // and the skill-pm.md step 7a expansion. Actual lean bundle measured at 2958 ~tok;
   // 3010 provides ~52-token editing headroom, consistent with prior conventions.
+  // cut-approval-coordinator-attestation (qa-owned bump, C2-06): cap raised from
+  // 3010 → 3030 to absorb the new Cut-Approval Gate bullet in const-08-chain-31-mid.md
+  // (chain-tagged, included on this lean path) plus the skill-pm.md/skill-coordinator-lite.md
+  // pointer-line dedup edits. Actual lean bundle measured at 3030 ~tok (exact); cap set
+  // to the exact measured value per the Phase-2 convention (no additional headroom).
   const liteSkill = fs.readFileSync(path.join(ROOT, "content", "skill-coordinator-lite.md"), "utf-8");
   const SEP = "\n\n---\n\n";
   const raw = approxTokens(CONSTITUTION + SEP + liteSkill);
   const lean = approxTokens(LEAN_CONSTITUTION + SEP + liteSkill);
   assert.ok(lean < raw, `lean (${lean}) must be < raw (${raw})`);
-  assert.ok(lean <= 3010, `lean always-on (${lean} ~tok) must meet the <= 3010 target`);
+  assert.ok(lean <= 3030, `lean always-on (${lean} ~tok) must meet the <= 3030 target`);
 });
 
 // --- AC3: enforcement preserved ------------------------------------------
@@ -484,7 +489,7 @@ test("AC7: exactly two balanced rationale fences, both outside §3.x", () => {
   assert.equal(ends, 2, "exactly two rationale:end markers");
 });
 
-test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the measured floor (≤ 4487 ~tok)", () => {
+test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the measured floor (≤ 4957 ~tok)", () => {
   // WHY: floor REBASELINED by constitution-conditional-load PHASE 2. Phase 2 extends the
   // design-only axis to two more spans (§4 visual prose S3–S5 + P-AUDITOR, and §1 L16/L17/L19),
   // adding 3 MORE design-only fence pairs (now 6 pairs / 12 marker lines total, up from
@@ -513,16 +518,21 @@ test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the 
   // the constitution's RAW size (now inflated by ~14 origin-fence pairs' marker bytes)
   // against the OLD 4523 cap and failed at 4735 raw / un-folded-stripped, which is the
   // exact regression this fold prevents — the cap must reflect what actually ships.
+  // cut-approval-coordinator-attestation (qa-owned bump, C2-06): cap raised from
+  // 4487 → 4957 to absorb the new Cut-Approval Gate bullet added to
+  // const-08-chain-31-mid.md (§3.1, chain-tagged — loads on this design-arm path).
+  // Actual rationale-stripped constitution measured at 4957 ~tok (exact); cap set
+  // to the exact measured value per the Phase-2 convention (no additional headroom).
   const raw = approxTokens(CONSTITUTION);
   const stripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));
-  assert.ok(stripped <= 4487, `stripped constitution (${stripped} ~tok) must be ≤ 4487 (AC8 design-arm floor, governance-tag-strip re-baseline)`);
+  assert.ok(stripped <= 4957, `stripped constitution (${stripped} ~tok) must be ≤ 4957 (AC8 design-arm floor, governance-tag-strip re-baseline)`);
   assert.ok(
     raw - stripped >= 240,
     `constitution rationale+origin-tag saving (${raw - stripped} ~tok) must be ≥ 240 (AC8 measured min, governance-tag-strip re-baseline)`,
   );
 });
 
-test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 8078 ~tok)", () => {
+test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 8635 ~tok)", () => {
   // WHY: the constitution is injected on every dispatch; the full coordinator bundle is
   // the worst case. Compose the chain-role bundle the way buildPromptForRole does:
   // rationale-stripped constitution + SEP + rationale-stripped skill body. Floor
@@ -554,13 +564,20 @@ test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/b
   // Observability). Cap set to the exact measured value (no headroom) per the Phase-2
   // convention — this is the worst-case per-dispatch bundle, so its shrinkage is the
   // headline number for this feature's saving.
+  // cut-approval-coordinator-attestation (qa-owned bump, C2-06): cap raised from
+  // 8078 → 8635 to absorb the new Cut-Approval Gate bullet in const-08-chain-31-mid.md
+  // (constitution side) plus the skill-coordinator.md stop-condition 6 dedup/self-check
+  // rewrite (S04 text). Actual design-arm bundle measured at 8635 ~tok (exact) — this
+  // re-confirms the measured value independently of sr-engineer's handoff note (which
+  // said 8625); cap set to the exact re-measured value per the Phase-2 convention
+  // (no additional headroom).
   const skillCoord = fs.readFileSync(path.join(ROOT, "content", "skill-coordinator.md"), "utf-8");
   const body = skillCoord.startsWith("---")
     ? skillCoord.slice(skillCoord.indexOf("---", 3) + 3).trimStart()
     : skillCoord;
   const SEP = "\n\n---\n\n";
   const bundle = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)) + SEP + stripRationale(stripOriginTags(body)));
-  assert.ok(bundle <= 8078, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 8078 (AC8 design-arm floor, governance-tag-strip re-baseline)`);
+  assert.ok(bundle <= 8635, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 8635 (AC8 design-arm floor, governance-tag-strip re-baseline)`);
 });
 
 test("AC9: every operative rule/gate/heading survives stripRationale on the constitution", () => {
@@ -911,7 +928,7 @@ test("AC7: lite + non-design strips §3.2 once (no reintroduction), consistent w
 
 // --- AC8: rebaseline + pin the new non-design figure ----------------------
 
-test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 2403 ~tok)", () => {
+test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 2872 ~tok)", () => {
   // WHY: this is the BUDGET WIN that justified the feature, and it must be regression-guarded.
   // On a non-design chain dispatch buildPromptForRole emits stripDesignOnly(stripRationale(source)).
   // REBASELINED by constitution-conditional-load PHASE 2: Phase 2 strips two MORE spans on the
@@ -933,9 +950,16 @@ test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is
   // non-design path is now composeConstitution({chain:true,design:false}) (drops
   // exactly the `design`/`chain-design` fragments the old regex stripped) run
   // through the SAME stripOriginTags→stripRationale pipeline as the design-arm path.
-  const ratStripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));         // design-arm path: 4487
-  const nonDesign = approxTokens(stripRationale(stripOriginTags(composeConstitution({ chain: true, design: false })))); // non-design path: 2403
-  assert.ok(nonDesign <= 2403, `non-design constitution (${nonDesign} ~tok) must be ≤ 2403 (AC8 non-design floor, governance-tag-strip re-baseline)`);
+  // cut-approval-coordinator-attestation (qa-owned bump, C2-06): cap raised from
+  // 2403 → 2872. The new Cut-Approval Gate bullet lives in const-08-chain-31-mid.md,
+  // a `chain`-tagged (not `design`-tagged) fragment, so it is INCLUDED on the
+  // non-design path too (chain:true, design:false still keeps all chain fragments) —
+  // the non-design floor grows by the same bullet the design-arm floor absorbed.
+  // Actual non-design constitution measured at 2872 ~tok (exact); cap set to the
+  // exact measured value per the Phase-2 convention (no additional headroom).
+  const ratStripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));         // design-arm path: 4957
+  const nonDesign = approxTokens(stripRationale(stripOriginTags(composeConstitution({ chain: true, design: false })))); // non-design path: 2872
+  assert.ok(nonDesign <= 2872, `non-design constitution (${nonDesign} ~tok) must be ≤ 2872 (AC8 non-design floor, governance-tag-strip re-baseline)`);
   assert.ok(
     ratStripped - nonDesign >= 2080,
     `design-only strip saving (${ratStripped - nonDesign} ~tok) must be ≥ 2080 (governance-tag-strip re-baseline)`,
