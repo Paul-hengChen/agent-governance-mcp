@@ -6,7 +6,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as yaml from "js-yaml";
 import { getActiveStorage } from "./storage.js";
-import { findTasksFile } from "./config.js";
+import { findTasksFile, loadConfig } from "./config.js";
 import { CURRENT_VERSIONS, peekVersion } from "../schema/versions.js";
 // A task is "archived" when it lives under a `## Completed` H2 section. The
 // match mirrors tasks-file.ts (sectionMatch[1].trim()) plus a lower-case fold,
@@ -206,6 +206,19 @@ export function detectDrift(workspacePath) {
         ? tasks.filter((t) => !isArchivedSection(t.section))
         : tasks;
     const { completed: completedTasks, incomplete: incompleteTasks } = partitionTasks(activeScopeTasks);
+    // Drift-baseline exemption (drift-baseline-exemption): task IDs listed in
+    // `.current/.config.json` → `driftBaselineIds` have been explicitly
+    // acknowledged as already-shipped-and-reconciled (sanctioned writer:
+    // release-engineer, post-PASS). They are excluded from the vibe-coding-drift
+    // comparison and from the reported tasksCompleted array ONLY (AC-1) —
+    // non-baselined IDs still surface (AC-2), and the handoff-ahead /
+    // FAIL-Blocked drift directions are untouched (AC-5). Absent file or absent
+    // field yields an empty set: zero behavior change (AC-3); in SQLite/HTTP
+    // mode the config file typically doesn't exist, so loadConfig() returns {}
+    // and this is a graceful no-op (AC-7). Composes independently with the
+    // archived-section filter above (AC-4): the baseline is checked against the
+    // already-active-scoped task set.
+    const baselineIds = new Set(loadConfig(workspacePath).driftBaselineIds ?? []);
     const drifts = [];
     // Pre-compile one regex per known task ID so handoff-string scanning stays O(handoff × matches)
     // instead of recompiling on every iteration.
@@ -221,6 +234,8 @@ export function detectDrift(workspacePath) {
         }
     }
     for (const taskId of completedTasks) {
+        if (baselineIds.has(taskId))
+            continue; // acknowledged baseline — not vibe-coding drift (AC-1)
         if (!handoffTaskIds.includes(taskId)) {
             drifts.push(`Task list shows ${taskId} completed, but handoff state doesn't mention it. Possible vibe-coding drift.`);
         }
@@ -234,7 +249,10 @@ export function detectDrift(workspacePath) {
         driftDetected: drifts.length > 0,
         details: drifts.length > 0 ? compressDriftDetails(drifts) : ["No drift detected. Handoff and tasks are synchronized."],
         handoffLastTask: handoff.active_feature,
-        tasksCompleted: completedTasks,
+        // Baseline-acknowledged IDs are suppressed from the report (AC-1); the
+        // unfiltered completedTasks above still feeds the handoff-ahead check so
+        // a baselined id recorded in handoff never misreports as incomplete.
+        tasksCompleted: completedTasks.filter((id) => !baselineIds.has(id)),
         tasksIncomplete: incompleteTasks,
     };
     return JSON.stringify(report);

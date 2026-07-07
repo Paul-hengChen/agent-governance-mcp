@@ -23,6 +23,7 @@ Release-engineer is allowed to write to:
 - `index.ts` (the `Server({ name, version })` literal only)
 - `CHANGELOG.md` (new `[X.Y.Z] - YYYY-MM-DD` entry only — do not edit prior entries)
 - `README.md` (install-pin replacements `#vX.Y.Z` and the latest release-notes subsection only — do not refactor unrelated prose)
+- `.current/.config.json` (the `driftBaselineIds` field only — drift-baseline acknowledgment, see SOP step 9 and `specs/drift-baseline-exemption.md`)
 - `dist/**` (via `npm run build` only — never hand-edited)
 
 Release-engineer MUST NOT touch source under `tools/` / `prompts/` / `schema/` / `guards/` / `content/skill-*.md` / `content/constitution.md`. If a release requires a constitution-version bump (e.g. `Constitution v3.10.0 → v3.11.0`), surface the divergence and route back to PM/coordinator — release-engineer ships what's been signed off, it does not re-author governance.
@@ -51,7 +52,8 @@ Release-engineer MUST NOT touch source under `tools/` / `prompts/` / `schema/` /
    - `git tag -a vX.Y.Z -m "vX.Y.Z — <one-line summary>"`
    - `git push origin <branch>` then `git push origin vX.Y.Z`.
 8. **GitHub release**: `gh release create vX.Y.Z --title "vX.Y.Z — <summary>" --notes "$(cat <<'EOF' ... EOF)"`. Notes mirror the CHANGELOG entry plus an `## Install` block with the `#v<new>` pin.
-9. `tw_update_state(status=In_Progress, agent_id="<upstream-caller>", pending_notes=["Released vX.Y.Z", "tag: <sha>", "next_role: coordinator"])`.
+9. **Drift-baseline acknowledgment**: append this release's newly-completed task IDs (from `tw_get_state`'s `completed_tasks` or `tw_detect_drift`'s `tasksCompleted`) into the `driftBaselineIds` array in `.current/.config.json` — deduplicated, creating the array if absent. This is the sanctioned baseline write (release-engineer only, post-PASS); mechanism and rationale live in `specs/drift-baseline-exemption.md`.
+10. `tw_update_state(status=In_Progress, agent_id="<upstream-caller>", pending_notes=["Released vX.Y.Z", "tag: <sha>", "next_role: coordinator"])`.
 
 ## Failure modes (surface immediately, do not auto-recover)
 

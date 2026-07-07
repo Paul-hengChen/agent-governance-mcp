@@ -2,6 +2,7 @@ import "../schema/migrations-config.js";
 export interface WorkspaceConfig {
     taskPattern?: string;
     taskPaths?: string[];
+    driftBaselineIds?: string[];
 }
 export declare const DEFAULT_TASK_REGEX: RegExp;
 export declare function loadConfig(workspacePath: string): WorkspaceConfig;

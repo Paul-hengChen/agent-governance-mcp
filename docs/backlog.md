@@ -33,7 +33,7 @@ future `/teamwork` feature; none blocks a release on its own.
 | C1 | Transitions matrix lacks amend/repair semantics (pm re-entry strands downstream roles) — **done (2026-07-07)** | P1 | — | ~4 (`tools/transitions.ts`, constitution §3.1, skill-coordinator, tests) | — |
 | C2 | Cut-approval cannot cross the subagent boundary — formalize coordinator-attested approval — **done (2026-07-07)** | P1 | — | ~5 (`handoff` field, `transitions.ts`/orchestrator, skill-pm, skill-coordinator, tests) | — |
 | C3 | Per-task-id evidence check forces stub pointer files — accept covering review + id manifest | P2 | — | ~3 (evidence check in orchestrator/evidence-file, skills, tests) | — |
-| C4 | Drift detector drowned by historical noise — acknowledged-baseline / archive mechanism | P2 | — | ~4 (`tools/drift.ts`, maybe `tw_sync`/config, tests) | — |
+| C4 | Drift detector drowned by historical noise — acknowledged-baseline / archive mechanism — **done (2026-07-07)** | P2 | — | ~4 (`tools/drift.ts`, maybe `tw_sync`/config, tests) | — |
 | C5 | Watermark toolchain: template hardcodes tier; validateWatermark appends instead of replacing on mismatch | P2 | — | ~4 (`lib/watermark-check.ts`, `templates/claude-code-agents/*`, tests) | — |
 
 ---
@@ -309,7 +309,18 @@ future `/teamwork` feature; none blocks a release on its own.
 - **Risk if skipped:** every batched review round generates stub litter; future
   readers open pointer files instead of evidence.
 
-## C4 — Drift detector drowned by historical noise (P2, observed 2026-07-06/07)
+## C4 — Drift detector drowned by historical noise (P2, observed 2026-07-06/07) — DONE 2026-07-07
+- **Done:** shipped as feature `drift-baseline-exemption` (spec
+  `specs/drift-baseline-exemption.md`; single-feature commit follows PASS
+  per workspace convention). Mechanism: `driftBaselineIds: string[]` in
+  `.current/.config.json` (config, NOT handoff — handoff is echoed to agents
+  on every pre-flight, config is a server-side Set-lookup). File-mode only
+  (mirrors `cut_approved` scoping); no config schema bump (optional field,
+  `taskPaths` precedent); release-engineer is the sanctioned baseline writer
+  (post-PASS trust boundary, skill SOP step 9). One-time backfill: 144
+  historical ids. The v3.23.1 archived-section filter (`## Completed`
+  heading) remains valid and composes; it was never adopted because the
+  repo's convention is per-feature headings — root cause noted in the spec.
 - **What:** `tw_detect_drift` reports the same ~98 pre-existing completed-in-
   tasks.md-but-not-in-handoff rows on EVERY pre-flight; every subagent brief this
   session needed an explicit "known drift, ignore it" clause. Real new drift

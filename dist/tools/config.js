@@ -4,7 +4,8 @@
 // .current/.config.json shape:
 //   {
 //     "taskPattern": "<JS regex source string>",   // matched against trimmed line; group 1 = " "|"x" checkmark, group 2 = task ID, group 3 = description
-//     "taskPaths": ["tasks.md", "TODO.md"]          // workspace-relative candidate paths, tried in order
+//     "taskPaths": ["tasks.md", "TODO.md"],         // workspace-relative candidate paths, tried in order
+//     "driftBaselineIds": ["T470", "T471"]          // task IDs acknowledged as shipped+reconciled; excluded from vibe-coding drift (tw_detect_drift)
 //   }
 import * as fs from "fs";
 import * as path from "path";
@@ -82,6 +83,14 @@ export function loadConfig(workspacePath) {
         const filtered = taskPaths.filter((p) => typeof p === "string");
         if (filtered.length > 0)
             result.taskPaths = filtered;
+    }
+    // Additive-optional field (no schema_version bump — same precedent as
+    // taskPattern/taskPaths: absence == empty, no transform required).
+    const driftBaselineIds = migration.payload.driftBaselineIds;
+    if (Array.isArray(driftBaselineIds)) {
+        const filtered = driftBaselineIds.filter((p) => typeof p === "string");
+        if (filtered.length > 0)
+            result.driftBaselineIds = filtered;
     }
     configCache.set(workspacePath, result);
     return result;

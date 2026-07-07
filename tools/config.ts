@@ -4,7 +4,8 @@
 // .current/.config.json shape:
 //   {
 //     "taskPattern": "<JS regex source string>",   // matched against trimmed line; group 1 = " "|"x" checkmark, group 2 = task ID, group 3 = description
-//     "taskPaths": ["tasks.md", "TODO.md"]          // workspace-relative candidate paths, tried in order
+//     "taskPaths": ["tasks.md", "TODO.md"],         // workspace-relative candidate paths, tried in order
+//     "driftBaselineIds": ["T470", "T471"]          // task IDs acknowledged as shipped+reconciled; excluded from vibe-coding drift (tw_detect_drift)
 //   }
 
 import * as fs from "fs";
@@ -16,6 +17,7 @@ import "../schema/migrations-config.js";
 export interface WorkspaceConfig {
   taskPattern?: string;
   taskPaths?: string[];
+  driftBaselineIds?: string[];
 }
 
 // Methodology-agnostic defaults. Common task-list filenames in workspace root
@@ -89,6 +91,13 @@ export function loadConfig(workspacePath: string): WorkspaceConfig {
   if (Array.isArray(taskPaths)) {
     const filtered = taskPaths.filter((p): p is string => typeof p === "string");
     if (filtered.length > 0) result.taskPaths = filtered;
+  }
+  // Additive-optional field (no schema_version bump — same precedent as
+  // taskPattern/taskPaths: absence == empty, no transform required).
+  const driftBaselineIds = migration.payload.driftBaselineIds;
+  if (Array.isArray(driftBaselineIds)) {
+    const filtered = driftBaselineIds.filter((p): p is string => typeof p === "string");
+    if (filtered.length > 0) result.driftBaselineIds = filtered;
   }
   configCache.set(workspacePath, result);
   return result;
