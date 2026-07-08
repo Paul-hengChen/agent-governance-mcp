@@ -133,7 +133,7 @@ _(No active tasks — ready for the next feature.)_
 - [x] C13-05 qa-engineer: test/qa-flow.test.mjs — new T-MATRIX-C13 block: accept qa:PASS->release-engineer:In_Progress, accept release-engineer:In_Progress->pm:In_Progress, reject release-engineer:In_Progress->sr-engineer, wedge-regression guard, existing qa:PASS edges unaffected, round-counter pin. Per spec AC4. (note: T-MATRIX-C13 block (10 tests) added to test/qa-flow.test.mjs, all passing; covered by review_C13-QA.md)
 - [x] C13-06 qa-engineer: extend test/subagent-templates.test.mjs or test/release-staging.test.mjs — assert AC6 template hints and AC5 CRITICAL rule text are present verbatim. Per spec AC7. (note: 5 tests added to test/release-staging.test.mjs pinning AC5/AC6/AC7 literals, all passing; covered by review_C13-QA.md)
 - [x] C13-07 qa-engineer: run npm run build + npm test full suite green (zero regressions incl. T-MATRIX-A5 block); record qa_review; PASS/FAIL gate. Per spec AC8. (note: npm run build zero errors, npm audit --audit-level=high clean, npm test 938/938 x2 runs, no flake; covered by review_C13-QA.md)
-- [ ] C13-08 pm/coordinator: post-release, mark docs/backlog.md C13 done with shipping version + commit ref. Per spec AC9.
+- [x] C13-08 pm/coordinator: post-release, mark docs/backlog.md C13 done with shipping version + commit ref. Per spec AC9. (note: tw_sync: mirrored from handoff.completed_tasks (R10))
 
 ## Completed
 
