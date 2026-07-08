@@ -1,9 +1,9 @@
 ---
 schema_version: 5
 active_feature: "c6-c11-prompt-state-injection"
-status: "PASS"
-last_updated: "2026-07-08T04:18:24.429Z"
-last_agent: "qa-engineer"
+status: "In_Progress"
+last_updated: "2026-07-08T12:00:00.000Z"
+last_agent: "release-engineer"
 prd_path: "/Users/paul.ph.chen/agent-governance-mcp/specs/c6-c11-prompt-state-injection.md"
 scope_decision: "single-feature"
 scope_decision_why: "C6 + C11 combined into one feature: both root in the same call path (buildPromptForRole/composeConstitution in prompts/build.ts) and the same second file (bin/agent-governance-context.mjs), share one architecture decision point (workspace resolution + constitution dedup both live in the prompt/hook injection layer), and require no new data model or tw_* tool surface — appropriately scoped as a single feature rather than split."
@@ -21,11 +21,13 @@ visual_round: 0
 - [x] C6-03
 - [x] C11-01
 - [x] C6C11-QA
+- [x] C6C11-REL
 
 ## Pending & Handoff Notes
 - next_role: human
-- C6C11-REL remains: release-engineer (version bump + CHANGELOG + build + tag) — NOT qa-engineer's job per C10 role boundary
-- C6C11-DONE remains: pm/coordinator marks backlog C6/C11 done post-release
+- Released v3.48.0 — tag: 5579073 (commit SHA via github.com/Paul-hengChen/agent-governance-mcp/releases/tag/v3.48.0)
+- C6C11-REL done: version bump (3.47.0→3.48.0), CHANGELOG entry, build + tests green, commit + tag + gh release, backlog C6/C11 marked done
+- C6C11-DONE done: docs/backlog.md rows + detail sections updated per v3.48.0 shipping
 - qa_report: qa_reports/review_C6C11-QA.md (covers C6-01, C6-02, C6-03, C11-01, C6C11-ARCH, C6C11-QA)
 
 ---
