@@ -124,8 +124,8 @@ _(No active tasks — ready for the next feature.)_
 - [x] C6-03 [P1] sr-engineer (fable pin): add/confirm the stale-prd_path regression guard (AC-6) — extend an existing test or add a minimal one asserting resolvePrdPath() degrades gracefully; no production code change expected unless the architect's diagnosis surfaces a second stale-path surface. | depends_on: C6C11-ARCH (note: QA PASS — see qa_reports/review_C6C11-QA.md)
 - [x] C11-01 [P1] sr-engineer (fable pin): implement the architect's chosen constitution-dedup mechanism across prompts/build.ts / bin/agent-governance-context.mjs (AC-7, AC-8). | depends_on: C6C11-ARCH (note: QA PASS — see qa_reports/review_C6C11-QA.md)
 - [x] C6C11-QA [P0] qa-engineer: write test/prompt-state-footer.test.mjs (AC-1, AC-2, AC-3, AC-5); extend/add stale-prd_path test (AC-6); extend test/context-budget.test.mjs with a measurable token-reduction assertion (AC-9); reconcile test/compose-equivalence.test.mjs + any test/fixtures/compose-golden/ fixtures — update only what must change, record why (AC-10); run npm test full-suite green (AC-11). | depends_on: C6-01, C6-02, C6-03, C11-01 (note: QA PASS — see qa_reports/review_C6C11-QA.md)
-- [ ] C6C11-REL [P1] release-engineer (post-PASS): version bump, CHANGELOG entry, build, tag, release per skill-release-engineer. | depends_on: C6C11-QA
-- [ ] C6C11-DONE [P2] pm/coordinator (post-release): mark backlog C6 and C11 done in docs/backlog.md with mechanism summary and commit reference. | depends_on: C6C11-REL
+- [x] C6C11-REL [P1] release-engineer (post-PASS): version bump, CHANGELOG entry, build, tag, release per skill-release-engineer. | depends_on: C6C11-QA (note: tw_sync: mirrored from handoff.completed_tasks (R10))
+- [x] C6C11-DONE [P2] pm/coordinator (post-release): mark backlog C6 and C11 done in docs/backlog.md with mechanism summary and commit reference. | depends_on: C6C11-REL (note: tw_sync: mirrored from handoff.completed_tasks (R10))
 
 ## Completed
 
