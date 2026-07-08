@@ -16,6 +16,11 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.50.0] - 2026-07-08
+
+### Added
+- **`a13-section1-polish` — Constitution §1 unified output policy, watermark decision table, schema examples, context-budget cap bumps (v3.50.0).** Polishes Constitution §1 governance coverage by consolidating clause 1d output-format rules, adding a decision table for watermark role/tier selection, and including concrete schema examples for handoff/tasks formats. Nine content-only edits to constitution fragment + skill files; fixture/test-cap follow-up completed. No new data model, no schema_version bump, no new tw_* tool, no cross-cutting API surface change. Backwards-compatible; MINOR bump for polish. See `specs/a13-section1-polish.md`, `qa_reports/review_a13-section1-polish.md`, `review_reports/review_a13-review.md`.
+
 ## [3.49.0] - 2026-07-08
 
 ### Added

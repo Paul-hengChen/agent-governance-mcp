@@ -731,15 +731,15 @@ test("E5: AC-9 — full verbatim PIXEL_GATE_ATTESTATION_MISSING copy string in d
 // AC-9: Version bump assertions — package.json + index.ts Server() = "3.42.0"
 // ===========================================================================
 
-test("AC-9: package.json version field equals 3.49.0", () => {
+test("AC-9: package.json version field equals 3.50.0", () => {
   // Why: AC-9 requires the server version to be bumped with the new gate. Both
-  // package.json and the Server() literal must agree on 3.49.0.
+  // package.json and the Server() literal must agree on 3.50.0.
   const pkgPath = path.join(path.dirname(new URL(import.meta.url).pathname), "..", "package.json");
   const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
-  assert.equal(pkg.version, "3.49.0", `package.json version must be "3.49.0", got "${pkg.version}"`);
+  assert.equal(pkg.version, "3.50.0", `package.json version must be "3.50.0", got "${pkg.version}"`);
 });
 
-test("AC-9: index.ts Server() literal equals 3.49.0", () => {
+test("AC-9: index.ts Server() literal equals 3.50.0", () => {
   // Why: the Server() version literal is broadcast to MCP clients. It must match package.json.
   const srcIndex = fs.readFileSync(
     path.join(path.dirname(new URL(import.meta.url).pathname), "..", "index.ts"),
@@ -747,8 +747,8 @@ test("AC-9: index.ts Server() literal equals 3.49.0", () => {
   );
   assert.match(
     srcIndex,
-    /Server\(\s*\{[^}]*version:\s*["']3\.49\.0["']/s,
-    "Server() version literal in index.ts must equal 3.49.0",
+    /Server\(\s*\{[^}]*version:\s*["']3\.50\.0["']/s,
+    "Server() version literal in index.ts must equal 3.50.0",
   );
 });
 
