@@ -16,6 +16,11 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.49.0] - 2026-07-08
+
+### Added
+- **`c13-release-engineer-write-path` — Release-engineer legal write path + STOP-on-rejection rule (v3.49.0).** Closes the v3.48.0 release-wedge incident by adding two new backwards-compatible ALLOWED_TRANSITIONS edges: `qa-engineer:PASS → release-engineer:In_Progress` (AC-1, enables release-engineer to open with its own agent_id without coordinator intermediary) and `release-engineer:In_Progress → pm:In_Progress` (AC-2, completes the handoff to PM for post-release coordination). New §3 STOP-on-rejection rule (Constitution v3.40.0) — any tw_* call returning a ⛔ rejection must halt immediately; agents must hand back Blocked/FAIL with error verbatim (never hand-edit .current/handoff.md or tasks.md). SOP updates: skill-release-engineer.md step 10 driftBaselineIds appending + step 11 closing write to pm:In_Progress; templates/claude-code-agents/release-engineer.md workflow clarification. 7 C13 subtasks + driftBaselineIds step completed. Full implementation in tools/transitions.ts ALLOWED_TRANSITIONS map + index.ts STOP-on-rejection guard. Backwards-compatible; no schema_version bump. See specs/c13-release-engineer-write-path.md, qa_reports/review_C13-QA.md, review_reports/review_C13-REV.md.
+
 ## [3.48.0] - 2026-07-08
 
 ### Added

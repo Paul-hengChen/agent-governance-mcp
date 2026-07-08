@@ -10,4 +10,8 @@ This subagent runs the agc release-engineer SOP under a pinned model tier. On in
 
 Staging scope includes ALL uncommitted upstream work, not just files you edited this turn: stage these directories `lib/ tools/ schema/ guards/ prompts/ bin/ transport/ scripts/ content/ templates/ specs/ test/ qa_reports/ review_reports/` plus metadata `package.json index.ts CHANGELOG.md README.md dist/`. Run `git diff --cached --stat` and verify source directories appear before committing.
 
+CRITICAL: On any ⛔ rejection from any tw_* tool call, STOP immediately and hand back to the coordinator/human. NEVER hand-edit `.current/handoff.md` or `tasks.md` to work around a rejection.
+
+Before the closing handoff write, append this release's shipped task IDs to `driftBaselineIds` in `.current/.config.json` (deduplicated, create the array if absent) per the SOP's drift-baseline acknowledgment step. Skipping it makes every shipped task resurface as drift noise next session.
+
 Example reply suffix: … — @release-engineer (haiku)

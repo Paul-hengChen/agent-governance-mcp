@@ -210,6 +210,16 @@ const ALLOWED: ReadonlyMap<string, AllowedNext> = new Map<string, AllowedNext>([
   ["qa-engineer:PASS", [
     { agent: "pm", status: "In_Progress" },
     { agent: "researcher", status: "In_Progress" },
+    // v3.49.0 (C13) — release-engineer's legal opening write. Closes the
+    // wedge where post-PASS release work had no entry edge and subagents
+    // fell back to mis-stamping agent_id="pm" or hand-editing handoff.md.
+    { agent: "release-engineer", status: "In_Progress" },
+  ]],
+  // v3.49.0 (C13) — release-engineer's legal closing write. Hands back to pm
+  // ONLY (its SOP routes nowhere else); same-agent multi-step progress is
+  // covered by the generic self-loop fast path in validateTransition.
+  ["release-engineer:In_Progress", [
+    { agent: "pm", status: "In_Progress" },
   ]],
   ["release-engineer:PASS", [
     { agent: "pm", status: "In_Progress" },

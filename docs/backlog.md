@@ -42,7 +42,7 @@ future `/teamwork` feature; none blocks a release on its own.
 | C10 | qa-engineer / release-engineer bookkeeping boundary blur (QA did version bump + CHANGELOG in A10-10) | P2 | — | ~3 (skill-pm cut guidance, skill-qa-engineer, skill-release-engineer) | — |
 | C11 | Constitution double-injection: SessionStart hook + `/teamwork*` prompt both carry the full constitution in one session — **done (2026-07-08, v3.48.0)** | P2 | — | ~3 (`prompts/build.ts`, `bin/agent-governance-context.mjs`) | — |
 | C12 | Registry doc-facing fields (`triggerEdge`/`armCondition`/`clearingArtifact`) have zero consumers/tests — fourth unverified copy of gate semantics | P2 | A10 ✓ | ~4 (`gates/registry.ts`, `prompts/build.ts` or `test/error-code-contract.test.mjs`, content) | — |
-| C13 | release-engineer has no legal handoff write; on TRANSITION_REJECTED the subagent hand-edited handoff.md, wedging the state machine | P1 | — | ~4 (`tools/transitions.ts`, skill-release-engineer, templates, tests) | — |
+| C13 | release-engineer has no legal handoff write; on TRANSITION_REJECTED the subagent hand-edited handoff.md, wedging the state machine — **done (2026-07-08)** | P1 | — | ~4 (`tools/transitions.ts`, skill-release-engineer, templates, tests) | — |
 
 ---
 
@@ -535,7 +535,9 @@ future `/teamwork` feature; none blocks a release on its own.
   human reader) trusts stale trigger/arm/clear descriptions — an unverified
   fourth copy is worse than no copy.
 
-## C13 — release-engineer has no legal handoff write; rejected subagent hand-edited handoff.md (P1, observed 2026-07-08)
+## C13 — release-engineer has no legal handoff write; rejected subagent hand-edited handoff.md (P1, observed 2026-07-08) — DONE 2026-07-08
+
+**Mechanism:** two new legal edges (`qa-engineer:PASS → release-engineer:In_Progress`, `release-engineer:In_Progress → pm:In_Progress`) + STOP-on-rejection rule in constitution §3
 - **What:** During the v3.48.0 release, the release-engineer subagent's
   `tw_update_state(agent_id="release-engineer", status="In_Progress")` was
   rejected (`qa-engineer:PASS` allows only `pm`/`researcher` successors), so it

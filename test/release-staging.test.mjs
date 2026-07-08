@@ -379,3 +379,92 @@ test("AC-B5.5: every repo source directory appears in FEATURE_DIRS or metadata l
     );
   }
 });
+
+// ---------------------------------------------------------------------------
+// Phase 4 — C13: release-engineer legal handoff write path (v3.49.0)
+// ---------------------------------------------------------------------------
+// WHY: specs/c13-release-engineer-write-path.md AC5 replaced the old
+// "Side-channel constraint" workaround with a CRITICAL Hard rule telling
+// release-engineer to STOP on any tw_* ⛔ rejection rather than hand-edit
+// .current/handoff.md or tasks.md (the exact anti-pattern the v3.48.0
+// incident exhibited). AC6/AC7 require the same STOP reminder — plus a
+// driftBaselineIds reminder — to also land as dual-anchored, ≤2-sentence
+// reinforcement hints in the haiku-tier template shim, and require both to
+// survive as regression-testable literals. We pin load-bearing substrings
+// (not whole paragraphs) so future rewording that preserves intent doesn't
+// spuriously fail, but silent removal of the STOP instruction or the
+// driftBaselineIds reminder does.
+
+test("C13-AC5: skill-release-engineer.md contains the verbatim CRITICAL STOP-on-⛔ rule", () => {
+  // Contract: the Hard rules section must instruct STOP + hand-back on ANY
+  // tw_* ⛔ rejection, and must explicitly forbid hand-editing BOTH
+  // .current/handoff.md and tasks.md — the two files the incident's
+  // hand-edit workaround touched / could touch.
+  assert.match(
+    SKILL,
+    /On any ⛔ rejection from any tw_\* tool call \(including but not limited to TRANSITION_REJECTED\), STOP immediately and hand back to the coordinator\/human\./,
+    "skill-release-engineer.md must contain the verbatim CRITICAL STOP-on-⛔ rule opening (C13-AC5)",
+  );
+  assert.match(
+    SKILL,
+    /NEVER hand-edit \.current\/handoff\.md or tasks\.md directly to work around a rejection — this applies regardless of role and is a Constitution §3 violation\./,
+    "skill-release-engineer.md must contain the verbatim CRITICAL STOP-on-⛔ rule's hand-edit-ban clause (C13-AC5)",
+  );
+});
+
+test("C13-AC5: skill-release-engineer.md no longer contains the old stamp-as-upstream-caller workaround language", () => {
+  // Contract: AC5 requires the "Side-channel constraint" bullet to be
+  // REPLACED — release-engineer now stamps agent_id="release-engineer"
+  // directly, not "the upstream caller's identifier".
+  assert.ok(
+    !SKILL.includes("the upstream caller's identifier"),
+    "skill-release-engineer.md must NOT retain the old stamp-as-upstream-caller workaround phrasing (C13-AC5)",
+  );
+});
+
+test("C13-AC6/AC7: release-engineer.md shim contains the verbatim STOP-on-⛔ reinforcement hint", () => {
+  // Contract: AC6.1 — a STOP-on-⛔-rejection reminder mirroring AC5's Hard
+  // rule, ≤2 sentences, present in the template shim (not just the skill
+  // file) so haiku-tier context-budget pressure can't drop it.
+  assert.match(
+    SHIM,
+    /CRITICAL: On any ⛔ rejection from any tw_\* tool call, STOP immediately and hand back to the coordinator\/human\./,
+    "release-engineer.md shim must contain the verbatim STOP-on-⛔ reinforcement hint (C13-AC6/AC7)",
+  );
+  assert.match(
+    SHIM,
+    /NEVER hand-edit `\.current\/handoff\.md` or `tasks\.md` to work around a rejection\./,
+    "release-engineer.md shim must forbid hand-editing both handoff.md and tasks.md verbatim (C13-AC6/AC7)",
+  );
+});
+
+test("C13-AC6/AC7: release-engineer.md shim contains the verbatim driftBaselineIds reinforcement hint", () => {
+  // Contract: AC6.2 — a driftBaselineIds append reminder mirroring SOP step
+  // 10/9's text, addressing the incident's third defect (the step existed
+  // but was skipped under haiku-tier load with no shim-level anchor).
+  assert.match(
+    SHIM,
+    /append this release's shipped task IDs to `driftBaselineIds`/,
+    "release-engineer.md shim must remind to append shipped task IDs to driftBaselineIds (C13-AC6/AC7)",
+  );
+  assert.match(
+    SHIM,
+    /Skipping it makes every shipped task resurface as drift noise next session\./,
+    "release-engineer.md shim must state the consequence of skipping the driftBaselineIds append verbatim (C13-AC6/AC7)",
+  );
+});
+
+test("C13-AC6: shim watermark and tw_get_state/tw_switch_role invocation lines are unaltered by the new hints", () => {
+  // Contract: AC6 explicitly forbids altering the watermark line or the
+  // tw_get_state / tw_switch_role instruction while adding the two hints.
+  assert.match(
+    SHIM,
+    /CRITICAL: End every reply with `— @release-engineer \(haiku\)` per Constitution §1 \(watermark\)\./,
+    "shim watermark line must be preserved verbatim (C13-AC6)",
+  );
+  assert.match(
+    SHIM,
+    /call `tw_get_state` then `tw_switch_role\("release-engineer"\)`/,
+    "shim tw_get_state/tw_switch_role invocation line must be preserved verbatim (C13-AC6)",
+  );
+});

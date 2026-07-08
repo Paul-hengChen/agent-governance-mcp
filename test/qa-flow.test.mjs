@@ -1416,3 +1416,199 @@ test("C1-07: resume_of marker is single-use — pending_notes are replaced (not 
     "marker must NOT survive into the next write — pending_notes are replaced, not merged",
   );
 });
+
+// ============================================================================
+// T-MATRIX-C13 — release-engineer legal handoff write path (v3.49.0)
+// ============================================================================
+// WHY: the v3.48.0 release incident (specs/c13-release-engineer-write-path.md)
+// found release-engineer had NO legal entry edge out of (qa-engineer, PASS) —
+// only {pm, researcher} were granted — and NO row at all for
+// (release-engineer, In_Progress), which would have wedged the chain with an
+// empty allowed set the instant anything tried to land there (the same wedge
+// class T-MATRIX-A5 fixed for release-engineer:PASS). Faced with the
+// rejection, a haiku-tier subagent hand-edited handoff.md directly instead of
+// stopping. C13 adds two additive edges — qa-engineer:PASS →
+// release-engineer:In_Progress (open) and release-engineer:In_Progress →
+// pm:In_Progress (close) — so release-engineer becomes a first-class,
+// wedge-free citizen of the state machine. These tests pin the two new
+// edges, the wedge-regression guard (non-empty allowed set), non-regression
+// of the pre-existing qa-engineer:PASS successors, and round-counter
+// steadiness across the new hop.
+
+// ---------- T-MATRIX-C13(a): opening edge — qa-engineer:PASS → release-engineer:In_Progress ----------
+
+test("T-MATRIX-C13: qa-engineer:PASS → release-engineer:In_Progress accepted", () => {
+  // WHY: this is the legal opening write the incident lacked — release-engineer
+  // stamping its own agent_id straight out of PASS, no more mis-stamping as
+  // "pm" and no more hand-editing handoff.md to route around a rejection.
+  assert.equal(
+    validateTransition({
+      prev: { agent: "qa-engineer", status: "PASS" },
+      next: { agent: "release-engineer", status: "In_Progress" },
+      prev_qa_round: 0,
+      prev_review_round: 0,
+    }),
+    null,
+  );
+});
+
+// ---------- T-MATRIX-C13(b): closing edge — release-engineer:In_Progress → pm:In_Progress ----------
+
+test("T-MATRIX-C13: release-engineer:In_Progress → pm:In_Progress accepted", () => {
+  // WHY: the legal closing write — release-engineer hands the chain back to
+  // pm with a true last_agent="release-engineer" audit trail during the
+  // release window, rather than the old stamp-as-pm convention that recorded
+  // a false last_agent for work pm never did.
+  assert.equal(
+    validateTransition({
+      prev: { agent: "release-engineer", status: "In_Progress" },
+      next: { agent: "pm", status: "In_Progress" },
+      prev_qa_round: 0,
+      prev_review_round: 0,
+    }),
+    null,
+  );
+});
+
+// ---------- T-MATRIX-C13(c): rejected edge + wedge-regression guard ----------
+
+test("T-MATRIX-C13: release-engineer:In_Progress → sr-engineer:In_Progress REJECTED with non-empty allowed set", () => {
+  // WHY: release-engineer's SOP hands back to pm ONLY (AC2) — it does not
+  // route to sr-engineer, researcher, architect, or qa-engineer directly.
+  // Critically, the allowed set must be NON-EMPTY: an empty allowed set from
+  // a reachable (release-engineer, In_Progress) tuple is exactly the wedge
+  // this ticket fixes (mirrors T-MATRIX-A5(d)'s prior-wedge regression for
+  // release-engineer:PASS). A regression that dropped the new row entirely
+  // would make ALLOWED.get(...) return undefined -> allowed=[] here.
+  const r = validateTransition({
+    prev: { agent: "release-engineer", status: "In_Progress" },
+    next: { agent: "sr-engineer", status: "In_Progress" },
+    prev_qa_round: 0,
+    prev_review_round: 0,
+  });
+  assert.ok(r, "transition must be rejected");
+  assert.equal(r.error, "TRANSITION_REJECTED");
+  assert.ok(r.allowed.length > 0, "allowed set must be NON-EMPTY — empty is the wedge regression");
+  assert.ok(
+    !r.allowed.some((a) => a.new_agent === "sr-engineer"),
+    `allowed list must NOT contain sr-engineer; got ${JSON.stringify(r.allowed)}`,
+  );
+  assert.deepEqual(
+    r.allowed,
+    [{ new_agent: "pm", new_status: "In_Progress" }],
+    "allowed set must be exactly {pm, In_Progress} per AC2 — no other successor",
+  );
+});
+
+test("T-MATRIX-C13: release-engineer:In_Progress → qa-engineer:In_Progress REJECTED with non-empty allowed set", () => {
+  // WHY: same wedge-regression guard as the sr-engineer case above, exercised
+  // against a second unrelated target to rule out a narrower bug (e.g. a
+  // fix that special-cased sr-engineer only).
+  const r = validateTransition({
+    prev: { agent: "release-engineer", status: "In_Progress" },
+    next: { agent: "qa-engineer", status: "In_Progress" },
+    prev_qa_round: 0,
+    prev_review_round: 0,
+  });
+  assert.ok(r, "transition must be rejected");
+  assert.equal(r.error, "TRANSITION_REJECTED");
+  assert.ok(r.allowed.length > 0, "allowed set must be NON-EMPTY — empty is the wedge regression");
+  assert.ok(
+    r.allowed.some((a) => a.new_agent === "pm" && a.new_status === "In_Progress"),
+    "allowed list must contain (pm, In_Progress)",
+  );
+});
+
+test("T-MATRIX-C13: release-engineer:In_Progress row is present in ALLOWED_TRANSITIONS and non-empty (wedge regression)", () => {
+  // WHY: static-map counterpart of the two rejection tests above. Before C13
+  // there was NO "release-engineer:In_Progress" key at all; ALLOWED.get(...)
+  // returned undefined, which validateTransition treats as allowed=[] for
+  // EVERY next tuple — a tuple with zero outbound edges is exactly what
+  // wedged the chain in the incident. This test encodes that the key must
+  // exist AND carry at least one target.
+  assert.ok(
+    ALLOWED_TRANSITIONS.has("release-engineer:In_Progress"),
+    "ALLOWED_TRANSITIONS must have a 'release-engineer:In_Progress' key (absent before C13 — the wedge)",
+  );
+  const row = ALLOWED_TRANSITIONS.get("release-engineer:In_Progress");
+  assert.ok(row && row.length > 0, "release-engineer:In_Progress row must have at least one allowed target");
+  assert.deepEqual(
+    row,
+    [{ agent: "pm", status: "In_Progress" }],
+    "row must be exactly [{pm, In_Progress}] per AC2 — no researcher/architect/self successor",
+  );
+});
+
+// ---------- T-MATRIX-C13(d): qa-engineer:PASS retains pm/researcher successors (no regression) ----------
+
+test("T-MATRIX-C13: qa-engineer:PASS → pm:In_Progress still accepted (no regression from AC1 edit)", () => {
+  // WHY: AC1 is additive — adding release-engineer as a third successor of
+  // qa-engineer:PASS must not disturb the two pre-existing edges.
+  assert.equal(
+    validateTransition({
+      prev: { agent: "qa-engineer", status: "PASS" },
+      next: { agent: "pm", status: "In_Progress" },
+      prev_qa_round: 0,
+      prev_review_round: 0,
+    }),
+    null,
+  );
+});
+
+test("T-MATRIX-C13: qa-engineer:PASS → researcher:In_Progress still accepted (no regression from AC1 edit)", () => {
+  assert.equal(
+    validateTransition({
+      prev: { agent: "qa-engineer", status: "PASS" },
+      next: { agent: "researcher", status: "In_Progress" },
+      prev_qa_round: 0,
+      prev_review_round: 0,
+    }),
+    null,
+  );
+});
+
+test("T-MATRIX-C13: qa-engineer:PASS allowed-next contains all three successors {pm, researcher, release-engineer}", () => {
+  // WHY: a direct spot-check of the static row itself, complementing the
+  // three behavioral accept tests above.
+  const row = ALLOWED_TRANSITIONS.get("qa-engineer:PASS");
+  assert.ok(row, "qa-engineer:PASS row must exist");
+  assert.ok(row.some((c) => c.agent === "pm" && c.status === "In_Progress"), "row must retain (pm, In_Progress)");
+  assert.ok(
+    row.some((c) => c.agent === "researcher" && c.status === "In_Progress"),
+    "row must retain (researcher, In_Progress)",
+  );
+  assert.ok(
+    row.some((c) => c.agent === "release-engineer" && c.status === "In_Progress"),
+    "row must gain (release-engineer, In_Progress)",
+  );
+  assert.equal(row.length, 3, "row must have exactly 3 successors — additive, not a fourth accidental entry");
+});
+
+// ---------- T-MATRIX-C13(e): round-counter pin ----------
+
+test("T-MATRIX-C13: computeNewRound holds qa_round/review_round/visual_round steady across qa-engineer:PASS → release-engineer:In_Progress", () => {
+  // WHY: spec AC4's round-counter pin. next=(release-engineer, In_Progress)
+  // matches none of computeNewRound's reset-or-increment branches (all keyed
+  // on qa-engineer or pm as next.agent), so all three counters must hold
+  // from a nonzero prior value — correct, since PASS already zeroed them and
+  // nothing should regress on the hop into release-engineer.
+  assert.deepEqual(
+    computeNewRound(2, 3, 4, { agent: "release-engineer", status: "In_Progress" }, { agent: "qa-engineer", status: "PASS" }),
+    { qa_round: 2, review_round: 3, visual_round: 4 },
+  );
+  // Also pin the zero-prior case (the realistic post-PASS state).
+  assert.deepEqual(
+    computeNewRound(0, 0, 0, { agent: "release-engineer", status: "In_Progress" }, { agent: "qa-engineer", status: "PASS" }),
+    { qa_round: 0, review_round: 0, visual_round: 0 },
+  );
+});
+
+test("T-MATRIX-C13: computeNewRound re-zeros all three counters on release-engineer:In_Progress → pm:In_Progress", () => {
+  // WHY: the closing write hits the existing (pm, In_Progress) reset branch —
+  // already covered generically elsewhere, but this pins it specifically
+  // following a (release-engineer, In_Progress) prev, per spec AC4.
+  assert.deepEqual(
+    computeNewRound(2, 3, 4, { agent: "pm", status: "In_Progress" }, { agent: "release-engineer", status: "In_Progress" }),
+    { qa_round: 0, review_round: 0, visual_round: 0 },
+  );
+});

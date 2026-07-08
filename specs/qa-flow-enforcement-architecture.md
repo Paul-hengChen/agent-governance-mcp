@@ -160,7 +160,8 @@ Authoritative source. Key: `(prev_agent, prev_status)` → set of allowed `(new_
 | qa-engineer | In_Progress | (qa-engineer, PASS), (qa-engineer, FAIL), (qa-engineer, Blocked) |
 | qa-engineer | Blocked | (sr-engineer, In_Progress), (qa-engineer, In_Progress) |
 | qa-engineer | FAIL | (sr-engineer, In_Progress), (pm, In_Progress) |
-| qa-engineer | PASS | (pm, In_Progress), (researcher, In_Progress) |
+| qa-engineer | PASS | (pm, In_Progress), (researcher, In_Progress), (release-engineer, In_Progress) |
+| release-engineer | In_Progress | (pm, In_Progress) |
 | release-engineer | PASS | (pm, In_Progress), (researcher, In_Progress) |
 
 **Self-loops on `In_Progress`** for the *same* agent (e.g. sr-engineer doing a multi-step task) are allowed implicitly: if `prev.agent === next.agent && prev.status === "In_Progress" && next.status === "In_Progress"`, skip the table lookup and accept. This avoids forcing agents to ping-pong through other roles for internal progress writes.
