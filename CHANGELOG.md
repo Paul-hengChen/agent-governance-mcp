@@ -16,6 +16,11 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.47.0] - 2026-07-08
+
+### Added
+- **`c3-covering-evidence` — Covering-report evidence mechanism for evidence checks (v3.47.0).** Evidence checks in `gates/qa-review.ts` (`hasEvidenceInFile`) and `gates/code-review.ts` (`hasCodeReviewEvidenceInFile`) now accept a covering report — a `covers: <id1>, <id2>, ...` line in one report file satisfies N task ids. Lazy directory scan triggered only on per-id miss; per-id files remain valid as the default. Closes backlog C3 (stub-pointer-file litter from batched review rounds). Parser/index helpers (`parseCoversIds`, `buildCoverageIndex`, `COVERS_LINE_RE`) live in `tools/evidence-file.ts`. File-mode only; no schema version bump; backwards-compatible with existing per-id evidence files.
+
 ## [3.46.1] - 2026-07-08
 
 ### Changed

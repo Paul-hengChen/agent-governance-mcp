@@ -32,7 +32,7 @@ future `/teamwork` feature; none blocks a release on its own.
 | B9 | Per-feature token budget + coordinator STOP at ceiling (carried forward) | P2 | — | ~3 (coordinator SOP, handoff/config field) | — |
 | C1 | Transitions matrix lacks amend/repair semantics (pm re-entry strands downstream roles) — **done (2026-07-07)** | P1 | — | ~4 (`tools/transitions.ts`, constitution §3.1, skill-coordinator, tests) | — |
 | C2 | Cut-approval cannot cross the subagent boundary — formalize coordinator-attested approval — **done (2026-07-07)** | P1 | — | ~5 (`handoff` field, `transitions.ts`/orchestrator, skill-pm, skill-coordinator, tests) | — |
-| C3 | Per-task-id evidence check forces stub pointer files — accept covering review + id manifest | P2 | — | ~3 (evidence check in orchestrator/evidence-file, skills, tests) | — |
+| C3 | Per-task-id evidence check forces stub pointer files — accept covering review + id manifest — **done (2026-07-08)** | P2 | — | ~3 (evidence check in orchestrator/evidence-file, skills, tests) | — |
 | C4 | Drift detector drowned by historical noise — acknowledged-baseline / archive mechanism — **done (2026-07-07)** | P2 | — | ~4 (`tools/drift.ts`, maybe `tw_sync`/config, tests) | — |
 | C5 | Watermark toolchain: template hardcodes tier; validateWatermark appends instead of replacing on mismatch | P2 | — | ~4 (`lib/watermark-check.ts`, `templates/claude-code-agents/*`, tests) | — |
 | C6 | Prompt-injection state footer reports "No handoff state found" while handoff exists; stale `prd_path` suspect | P1 | — | ~3 (`prompts/build.ts` state loader, `bin/agent-governance-context.mjs`, test) | — |
@@ -332,7 +332,7 @@ future `/teamwork` feature; none blocks a release on its own.
 - **Risk if skipped:** strict PM subagents deadlock the chain on every cut;
   lenient ones accept relayed approval inconsistently — both are wrong.
 
-## C3 — Per-task-id evidence check forces stub pointer files (P2, observed 2026-07-07)
+## C3 — Per-task-id evidence check forces stub pointer files (P2, observed 2026-07-07) — DONE 2026-07-08
 - **What:** `review: APPROVED` handoff and QA PASS verify
   `review_reports/review_<id>.md` / `qa_reports/review_<id>.md` exist for EACH
   id in `completed_tasks`. A single review round covering 7 tasks (T-REG-01..07)

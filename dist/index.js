@@ -28,7 +28,7 @@ function formatZodError(err) {
 // 1. Initialize Server (Tools + Prompts)
 // ==========================================
 // Storage adapter defaults to FileHandoffStorage; HTTP-mode boot switches it via setActiveStorage().
-const server = new Server({ name: "agent-governance-mcp", version: "3.46.1" }, { capabilities: { tools: {}, prompts: {} } });
+const server = new Server({ name: "agent-governance-mcp", version: "3.47.0" }, { capabilities: { tools: {}, prompts: {} } });
 // ==========================================
 // 2. Register Prompts (Layer 1: Auto-inject constitution)
 // ==========================================
