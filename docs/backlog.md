@@ -35,12 +35,12 @@ future `/teamwork` feature; none blocks a release on its own.
 | C3 | Per-task-id evidence check forces stub pointer files — accept covering review + id manifest — **done (2026-07-08)** | P2 | — | ~3 (evidence check in orchestrator/evidence-file, skills, tests) | — |
 | C4 | Drift detector drowned by historical noise — acknowledged-baseline / archive mechanism — **done (2026-07-07)** | P2 | — | ~4 (`tools/drift.ts`, maybe `tw_sync`/config, tests) | — |
 | C5 | Watermark toolchain: template hardcodes tier; validateWatermark appends instead of replacing on mismatch | P2 | — | ~4 (`lib/watermark-check.ts`, `templates/claude-code-agents/*`, tests) | — |
-| C6 | Prompt-injection state footer reports "No handoff state found" while handoff exists; stale `prd_path` suspect | P1 | — | ~3 (`prompts/build.ts` state loader, `bin/agent-governance-context.mjs`, test) | — |
+| C6 | Prompt-injection state footer reports "No handoff state found" while handoff exists; stale `prd_path` suspect — **done (2026-07-08, v3.48.0)** | P1 | — | ~3 (`prompts/build.ts` state loader, `bin/agent-governance-context.mjs`, test) | — |
 | C7 | §2 test-ownership absolutism collides with mechanical version-literal edits at release | P2 | — | ~3 (constitution §2, skill-release-engineer, version-assertion tests) | — |
 | C8 | Crash-resume protocol: mid-role kill leaves no §3 failure write; resume drops dispatch-time model pin | P2 | — | ~2 (skill-coordinator SOP, maybe handoff field) | — |
 | C9 | pending_notes free-text protocol tokens (`next_role:`/`resume_of:`/`review: APPROVED`) → structured handoff fields | P2 | A10 ✓ | ~6 (`tools/handoff.ts` schema, `transitions.ts`, orchestrator, skills, tests) | — |
 | C10 | qa-engineer / release-engineer bookkeeping boundary blur (QA did version bump + CHANGELOG in A10-10) | P2 | — | ~3 (skill-pm cut guidance, skill-qa-engineer, skill-release-engineer) | — |
-| C11 | Constitution double-injection: SessionStart hook + `/teamwork*` prompt both carry the full constitution in one session | P2 | — | ~3 (`prompts/build.ts`, `bin/agent-governance-context.mjs`) | — |
+| C11 | Constitution double-injection: SessionStart hook + `/teamwork*` prompt both carry the full constitution in one session — **done (2026-07-08, v3.48.0)** | P2 | — | ~3 (`prompts/build.ts`, `bin/agent-governance-context.mjs`) | — |
 | C12 | Registry doc-facing fields (`triggerEdge`/`armCondition`/`clearingArtifact`) have zero consumers/tests — fourth unverified copy of gate semantics | P2 | A10 ✓ | ~4 (`gates/registry.ts`, `prompts/build.ts` or `test/error-code-contract.test.mjs`, content) | — |
 
 ---
@@ -387,7 +387,19 @@ future `/teamwork` feature; none blocks a release on its own.
 - **Risk if skipped:** cosmetic but user-facing on every relay; tier attribution
   in the audit trail is wrong for overridden dispatches.
 
-## C6 — Prompt-injection state footer blind to existing handoff (P1, observed 2026-07-08)
+## C6 — Prompt-injection state footer blind to existing handoff (P1, observed 2026-07-08) — DONE 2026-07-08
+- **Done:** shipped as feature `c6-c11-prompt-state-injection` (spec
+  `specs/c6-c11-prompt-state-injection.md`, architecture
+  `specs/c6-c11-prompt-state-injection-architecture.md`; v3.48.0).
+  Mechanism: unified workspace-resolution at `resolveWorkspacePath()` in
+  `index.ts` (called from GetPrompt handler; arg → CLAUDE_PROJECT_DIR → cwd,
+  never redirects); three fail-loud footer variants in `prompts/build.ts`
+  (S01a resolved path not a managed workspace, S01b managed + genuinely fresh,
+  S02 handoff present but parse/migration error — never rendered as fresh),
+  each naming the resolved path + resolution source; stale `prd_path` covered
+  by the existing `resolvePrdPath` existsSync guard (test-only per DR-7).
+  Closed by implemented AC-1..AC-6 in spec and verified in
+  qa_reports/review_C6C11-QA.md.
 - **What:** During the A10 run, BOTH `/teamwork` and `/teamwork-lite` prompt
   injections ended with "📍 Current Project State — No handoff state found.
   Fresh project" while `tw_get_state` returned a full, current handoff for the
@@ -471,7 +483,20 @@ future `/teamwork` feature; none blocks a release on its own.
 - **Risk if skipped:** duplicated build/test cost each release and recurring
   C7-style boundary violations.
 
-## C11 — Constitution double-injection in one session (P2, observed 2026-07-08)
+## C11 — Constitution double-injection in one session (P2, observed 2026-07-08) — DONE 2026-07-08
+- **Done:** shipped as feature `c6-c11-prompt-state-injection` (spec
+  `specs/c6-c11-prompt-state-injection.md`, architecture
+  `specs/c6-c11-prompt-state-injection-architecture.md`; v3.48.0).
+  Mechanism: two-level dedup at the GetPrompt handler in `index.ts` (NOT inside
+  `buildPromptForRole`, which stays pure per DR-6) — L1 in-memory per-workspace
+  delivered flag (prompt→prompt within one server process); L2 120s freshness
+  marker `.current/.agc-hook-marker.json` written by the
+  `bin/agent-governance-context.mjs` SessionStart hook on successful full emit
+  (gitignored; absent/stale/malformed ⇒ fail-safe to full emission). Deduped
+  bundles carry the S03 sentinel + recovery instruction; measured
+  ~1500 token saving per deduped injection (AC-9 token assertion pins ≥1200).
+  Closed by implemented AC-7/AC-8 in spec and verified in
+  qa_reports/review_C6C11-QA.md.
 - **What:** A session that receives the SessionStart hook context AND invokes a
   `/teamwork*` prompt carries the full constitution twice (hook block + prompt
   bundle) — observed live when `/teamwork` then `/teamwork-lite` were invoked
