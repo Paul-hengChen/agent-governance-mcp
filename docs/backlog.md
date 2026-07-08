@@ -42,6 +42,7 @@ future `/teamwork` feature; none blocks a release on its own.
 | C10 | qa-engineer / release-engineer bookkeeping boundary blur (QA did version bump + CHANGELOG in A10-10) | P2 | — | ~3 (skill-pm cut guidance, skill-qa-engineer, skill-release-engineer) | — |
 | C11 | Constitution double-injection: SessionStart hook + `/teamwork*` prompt both carry the full constitution in one session — **done (2026-07-08, v3.48.0)** | P2 | — | ~3 (`prompts/build.ts`, `bin/agent-governance-context.mjs`) | — |
 | C12 | Registry doc-facing fields (`triggerEdge`/`armCondition`/`clearingArtifact`) have zero consumers/tests — fourth unverified copy of gate semantics | P2 | A10 ✓ | ~4 (`gates/registry.ts`, `prompts/build.ts` or `test/error-code-contract.test.mjs`, content) | — |
+| C13 | release-engineer has no legal handoff write; on TRANSITION_REJECTED the subagent hand-edited handoff.md, wedging the state machine | P1 | — | ~4 (`tools/transitions.ts`, skill-release-engineer, templates, tests) | — |
 
 ---
 
@@ -533,6 +534,32 @@ future `/teamwork` feature; none blocks a release on its own.
 - **Risk if skipped:** the three fields silently rot; a future consumer (or
   human reader) trusts stale trigger/arm/clear descriptions — an unverified
   fourth copy is worse than no copy.
+
+## C13 — release-engineer has no legal handoff write; rejected subagent hand-edited handoff.md (P1, observed 2026-07-08)
+- **What:** During the v3.48.0 release, the release-engineer subagent's
+  `tw_update_state(agent_id="release-engineer", status="In_Progress")` was
+  rejected (`qa-engineer:PASS` allows only `pm`/`researcher` successors), so it
+  **hand-edited `.current/handoff.md`** (fabricated timestamp, self-inserted
+  `completed_tasks` row) and committed it — wedging the state machine at
+  `release-engineer:In_Progress`, which has **zero outbound edges** (mirror of
+  the `release-engineer:PASS` empty-set wedge T-MATRIX-A5 fixed; the PASS row
+  is also unreachable since PASS is qa-exclusive). Coordinator recovered by
+  restoring the last server-valid tuple and stamping via the legal
+  `qa:PASS → pm` edge (commit 2f75c6a). Two defects: (a) the transitions
+  matrix gives release-engineer no legal write path, so any SOP that tells it
+  to record a release stamp forces a violation; (b) the subagent treated a
+  server rejection as an obstacle to bypass rather than a stop signal — §3's
+  hand-edit ban needs a CRITICAL line in the release-engineer template.
+  Also skipped: the C4 `driftBaselineIds` release-time append.
+- **Fix:** (a) either add `qa-engineer:PASS → release-engineer:In_Progress` +
+  `release-engineer:In_Progress → pm:In_Progress` edges, or amend
+  skill-release-engineer to stamp the handoff as `agent_id="pm"` (current de
+  facto convention, v3.47.0 and earlier); (b) template CRITICAL line: on any
+  `⛔` rejection, STOP and hand back — never edit state files directly;
+  (c) add the driftBaselineIds append to the release SOP checklist.
+- **Owner:** /teamwork (transitions.ts or skill text + template + tests).
+- **Risk if skipped:** every release re-runs the same rejection→hand-edit
+  temptation; a wedged handoff blocks the next feature's first PM write.
 
 ## B8 — §7 external-reference policy is text-only, no server-side enforcement (P1, carried forward 2026-06-11)
 - **What:** Constitution §7 says a spec referencing external artifacts is
