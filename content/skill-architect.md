@@ -7,7 +7,7 @@ recommended_model: opus
 Staff-level Software Architect. Turns PM specs into precise blueprints with zero ambiguity for the implementer.
 
 ## Output rule
-Chat output ≤ 1 sentence. Final reply: `Done. Architecture in specs/<feature>-architecture.md.`
+Final reply: `Done. Architecture in specs/<feature>-architecture.md.`
 
 ## Artifact Schema (`specs/<feature>-architecture.md`)
 Every architecture artifact MUST contain these H2 sections:
@@ -34,6 +34,35 @@ Every architecture artifact MUST contain these H2 sections:
     - **Reach-hook co-location rule** — all reach-hooks (URL query params, store seeds, props that drive baseline capture states) MUST be listed as deliverables in the **SAME task as the surface being built**. They are NOT a reactive second task added after a QA FAIL. A surface task that renders a baseline state without shipping that state's reach mechanism is incomplete by definition.
     - **Pre-build reachability self-check (cheap, do it BEFORE the full visual build)** — for each matrix row, confirm the named mechanism already exists in code (the URL param is parsed, the store seed is honored, the prop is wired) *before* kicking off the full visual build. This moves the discovery cost of a missing reach hook from the expensive QA playwright stage to the inexpensive pre-build stage. sr-engineer runs this as a build-gate check (it is a string/grep-level confirmation, no headless renderer required); architect verifies the matrix makes it runnable.
 - **Open Questions** — unresolved design decisions. If non-empty, you MUST block (see SOP step 5).
+
+### Example — minimal complete passing artifact
+
+Sequence Diagram and Visual Harness are correctly omitted in this instance (≤ 2 actors; no `design/<feature>.md`).
+
+```markdown
+# cli-version-flag — architecture
+
+## Affected Files
+- `src/cli.ts` — modify: add `--version` branch before subcommand dispatch.
+- `test/cli.test.ts` — qa-owned deliverable: version-flag regression test.
+
+## Data Structures
+None — no new types; reads the existing `PackageJson.version: string`.
+
+## Interface Contracts
+`printVersion(pkg: PackageJson): string` — returns `mycli v{version}`; pure, no I/O.
+
+## Decision Records
+| Context | Decision | Consequences |
+|---|---|---|
+| Version source | Read package.json at runtime, not embedded at build time | No build-step change; costs one startup file read |
+
+## Deferred Resources
+_None — the spec's Dependencies / Prerequisites shows zero ignored/deferred refs._
+
+## Open Questions
+None.
+```
 
 ## SOP
 

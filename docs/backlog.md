@@ -27,7 +27,7 @@ future `/teamwork` feature; none blocks a release on its own.
 | A10 | Gate registry as structured data → code + rendered prose — **done (2026-07-08)** | P1 | A9 ✓ | ~10 (`gates` data file, `transitions.ts`, `handoff-orchestrator.ts`, `build.ts`, content, tests) | — |
 | A11 | Escalation-route tables + unified WHEN/DO/ELSE rule grammar across skills | P2 | A6, A7 | ~12 (all `content/skill-*.md`, constitution) | — |
 | A12 | Shared SOP partials + Limits number registry | P2 | A9 | ~14 (all content files, `build.ts`) | — |
-| A13 | §1 polish: unified output policy, watermark decision table, positive examples per schema | P2 | — | ~6 (constitution + several skills) | — |
+| A13 | §1 polish: unified output policy, watermark decision table, positive examples per schema — **done (2026-07-08)** | P2 | — | ~6 (constitution + several skills) | — |
 | B8 | §7 external-reference policy has no server-side enforcement gate (carried forward) | P1 | — | ~4 (`tools/transitions.ts`, evidence/ledger check, constitution §7) | — |
 | B9 | Per-feature token budget + coordinator STOP at ceiling (carried forward) | P2 | — | ~3 (coordinator SOP, handoff/config field) | — |
 | C1 | Transitions matrix lacks amend/repair semantics (pm re-entry strands downstream roles) — **done (2026-07-07)** | P1 | — | ~4 (`tools/transitions.ts`, constitution §3.1, skill-coordinator, tests) | — |
@@ -381,9 +381,8 @@ future `/teamwork` feature; none blocks a release on its own.
 - **Fix:** (a) templates phrase the reminder as "end with `— @<role> (<the
   model you are actually pinned to>)`" or the dispatching coordinator injects
   the tier into the brief; (b) validateWatermark strips a detected-but-wrong
-  trailing watermark line before appending. Also add `fable` to the §1 tier
-  enum (constitution mentions opus/sonnet/haiku only — fold into A13 if that
-  ships first).
+  trailing watermark line before appending. ~~Also add `fable` to the §1 tier
+  enum~~ — *shipped via A13 (2026-07-08)*; remaining scope is (a)+(b) only.
 - **Owner:** /teamwork (lib/watermark-check.ts + templates + tests; small).
 - **Risk if skipped:** cosmetic but user-facing on every relay; tier attribution
   in the audit trail is wrong for overridden dispatches.
