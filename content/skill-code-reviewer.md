@@ -35,7 +35,10 @@ Every review report MUST contain these seven H2 sections in order:
    - `specs/<feature>.md` — the contract.
    - `specs/<feature>-architecture.md` if present — the design constraint.
    - Do NOT read `qa_reports/`, prior PR comments, or sr-engineer's pending_notes commentary.
-4. **Review** — produce `review_reports/review_<task-id>.md` per the Schema above. One file per task id reviewed.
+4. **Review** — produce `review_reports/review_<task-id>.md` per the Schema above. Per-id files remain the default (and stay fully valid) for single-task rounds. For a **batched round** (N task ids, one review), write ONE real report at the primary id's path and add a `covers:` label line inside it naming every id in the round — the `MISSING_REVIEW_EVIDENCE` gate accepts any id named on a `covers:` line in a `review_reports/*.md` file; do NOT create one-line pointer stubs for the extra ids. Example — reviewing T-REG-01..T-REG-03 in one round, write only `review_reports/review_T-REG-01.md` containing:
+   ```
+   covers: T-REG-01, T-REG-02, T-REG-03
+   ```
 5. **Verdict**:
    - **APPROVED** → `tw_update_state(status=In_Progress, agent_id="qa-engineer", completed_tasks=[<task-ids>], pending_notes=["review: APPROVED", "review_report: review_reports/review_<task-id>.md", "next_role: qa-engineer"])`. The server verifies a `review_reports/review_<id>.md` exists for each id in `completed_tasks` before accepting the handoff to qa (else `MISSING_REVIEW_EVIDENCE`).
    - **CHANGES_REQUESTED** → `tw_update_state(status=FAIL, agent_id="code-reviewer", completed_tasks=[<task-ids>], blocking_reason="<one-line summary>", qa_review=<omit; reserved for qa>, pending_notes=["review: CHANGES_REQUESTED", "review_report: review_reports/review_<task-id>.md", "next_role: sr-engineer"])`. The server increments `review_round`. After 3 FAILs the next valid transition is `(pm, In_Progress)` (else `REVIEW_ROUND_EXCEEDED`) — escalate.

@@ -1,8 +1,11 @@
 // Coded by @sr-engineer
 // Code-review-evidence gate predicates (A2 split — verbatim relocation from
 // tools/evidence-file.ts, no behavior change). Parallel to gates/qa-review.ts
-// but over <workspace>/review_reports/review_<task_id>.md. Existence is
-// sufficient for hasCodeReviewEvidenceInFile() — content is not parsed.
+// but over <workspace>/review_reports/review_<task_id>.md. A per-id file's
+// existence is sufficient for hasCodeReviewEvidenceInFile(); when a per-id
+// file is absent, a lazy `covers:` label-line fallback (c3-covering-evidence)
+// lets one covering report satisfy additional ids — see parseCoversIds /
+// buildCoverageIndex in tools/evidence-file.ts (gate-agnostic plumbing).
 //
 // Registry linkage: the code-review-evidence gate (MISSING_REVIEW_EVIDENCE)
 // emits its hint at the orchestrator emit site via
@@ -11,6 +14,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
+import { buildCoverageIndex } from "../tools/evidence-file.js";
 
 function codeReviewDir(workspacePath: string): string {
   return path.join(workspacePath, "review_reports");
@@ -48,8 +52,16 @@ export function hasCodeReviewEvidenceInFile(
 ): { present: string[]; missing: string[] } {
   const present: string[] = [];
   const missing: string[] = [];
+  // c3-covering-evidence: identical lazy `covers:` fallback over
+  // review_reports/ — built at most once per call, only on first miss (AC-6).
+  let coverage: Map<string, string> | null = null;
   for (const id of taskIds) {
     if (fs.existsSync(codeReviewPath(workspacePath, id))) {
+      present.push(id);
+      continue;
+    }
+    if (coverage === null) coverage = buildCoverageIndex(codeReviewDir(workspacePath));
+    if (coverage.has(id)) {
       present.push(id);
     } else {
       missing.push(id);

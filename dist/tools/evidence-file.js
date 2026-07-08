@@ -6,10 +6,76 @@
 // gates/visual.ts, gates/scope-decision.ts, gates/cut-approval.ts). What
 // remains here is ONLY the low-level, gate-agnostic parsing plumbing shared by
 // the visual sub-gate parsers: H2 section slicing, table-cell splitting, and
-// the checkbox / assertion / region-diff / status cell parsers.
+// the checkbox / assertion / region-diff / status cell parsers — plus the
+// `covers:` label-line coverage plumbing (c3-covering-evidence) consumed by
+// gates/qa-review.ts and gates/code-review.ts.
 //
 // This module imports NOTHING from gates/ (the dependency points the other
 // way: gates/*.ts import these helpers), keeping the import DAG acyclic.
+import * as fs from "fs";
+import * as path from "path";
+// ---------- c3-covering-evidence — `covers:` label-line plumbing ----------
+// One real review file may declare `covers: <id1>, <id2>, ...` to satisfy the
+// evidence gates (MISSING_EVIDENCE / MISSING_REVIEW_EVIDENCE) for a batched
+// round, instead of N-1 one-line pointer stubs. File-mode only; the SQLite
+// hasEvidence / hasCodeReviewEvidence paths are untouched (they already record
+// one `reports` row per id). Gate-agnostic: the directory to scan is supplied
+// by the caller (gates/qa-review.ts → qa_reports/, gates/code-review.ts →
+// review_reports/); this module stays free of any gate knowledge.
+// Permissive label-line regex, mirroring the visual gate's BASELINE_LINE_RE /
+// DIFF_METRIC_LINE_RE style: optional leading bullet (`-`/`*`), optional
+// surrounding markdown bold (`**`), case-insensitive `covers` label, `:`/`—`/`-`
+// separator, capture the remainder of the line. A bare `covers:` with no value
+// does not match (capture requires >= 1 char), so an empty label yields no ids
+// (AC-5).
+export const COVERS_LINE_RE = /^[^\S\n]*(?:[-*][^\S\n]*)?(?:\*\*[^\S\n]*)?covers(?:[^\S\n]*\*\*)?[^\S\n]*[:—-][^\S\n]*([^\n]+?)[^\S\n]*$/im;
+// Pure parser (no I/O, never throws). Extracts the id list from the FIRST
+// `covers:` line in `content`. Splits on comma/whitespace, strips surrounding
+// backticks/brackets and residual emphasis per token, drops empties. Returns
+// [] when the label is absent or its value is empty/whitespace (AC-5).
+export function parseCoversIds(content) {
+    if (!content)
+        return [];
+    const m = COVERS_LINE_RE.exec(content);
+    if (!m)
+        return [];
+    return m[1]
+        .split(/[,\s]+/)
+        .map((t) => t.replace(/^[`[\]()<>*_]+|[`[\]()<>*_]+$/g, "").trim())
+        .filter((t) => t.length > 0);
+}
+// Scans every `*.md` file in `dir` for a `covers:` line and returns a
+// first-seen-wins `coveredId -> filename` map. Directory listing is sorted so
+// "first seen" is deterministic across platforms. Never throws: an unreadable
+// directory returns an empty map; unreadable files are skipped. Callers invoke
+// this LAZILY — only when a requested id's direct per-id file is missing — so
+// the common single-task path (every id has its own file) never pays the scan.
+export function buildCoverageIndex(dir) {
+    const index = new Map();
+    let entries;
+    try {
+        entries = fs.readdirSync(dir);
+    }
+    catch {
+        return index;
+    }
+    for (const name of [...entries].sort()) {
+        if (!name.toLowerCase().endsWith(".md"))
+            continue;
+        let content;
+        try {
+            content = fs.readFileSync(path.join(dir, name), "utf-8");
+        }
+        catch {
+            continue;
+        }
+        for (const id of parseCoversIds(content)) {
+            if (!index.has(id))
+                index.set(id, name);
+        }
+    }
+    return index;
+}
 // Escape a string for literal use inside a RegExp.
 function escapeRegex(s) {
     return s.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&");

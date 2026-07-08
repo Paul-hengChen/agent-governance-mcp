@@ -2,8 +2,11 @@
 // QA-evidence gate predicates (A2 split — verbatim relocation from
 // tools/evidence-file.ts, no behavior change). File-mode QA evidence I/O:
 // each QA round appends a timestamped section to
-// <workspace>/qa_reports/review_<task_id>.md. Existence (any review file) is
-// sufficient for hasEvidenceInFile() — content is not parsed.
+// <workspace>/qa_reports/review_<task_id>.md. A per-id file's existence is
+// sufficient for hasEvidenceInFile(); when a per-id file is absent, a lazy
+// `covers:` label-line fallback (c3-covering-evidence) lets one covering
+// report satisfy additional ids — see parseCoversIds / buildCoverageIndex in
+// tools/evidence-file.ts (gate-agnostic plumbing).
 //
 // Registry linkage: the QA-evidence gate (MISSING_EVIDENCE) emits its hint at
 // the orchestrator emit site, which sources gate("MISSING_EVIDENCE").hintStatic
@@ -11,6 +14,7 @@
 // only and do not consume hint text, so no registry import is added here.
 import * as fs from "fs";
 import * as path from "path";
+import { buildCoverageIndex } from "../tools/evidence-file.js";
 function evidenceDir(workspacePath) {
     return path.join(workspacePath, "qa_reports");
 }
@@ -36,8 +40,17 @@ export async function recordReviewInFile(workspacePath, taskIds, status, reviewe
 export function hasEvidenceInFile(workspacePath, taskIds) {
     const present = [];
     const missing = [];
+    // c3-covering-evidence: coverage index over qa_reports/ `covers:` lines,
+    // built at most once per call and ONLY on the first direct-file miss (AC-6).
+    let coverage = null;
     for (const id of taskIds) {
         if (fs.existsSync(evidencePath(workspacePath, id))) {
+            present.push(id);
+            continue;
+        }
+        if (coverage === null)
+            coverage = buildCoverageIndex(evidenceDir(workspacePath));
+        if (coverage.has(id)) {
             present.push(id);
         }
         else {
