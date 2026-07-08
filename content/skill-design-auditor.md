@@ -44,13 +44,13 @@ Every audit MUST contain these H2 sections:
    | "wireframe", "whiteboard photo", "paper sketch" | `paper` |
    | none of the above | `no-design` |
    If `no-design`, jump to step 5 with the minimal audit; do NOT block.
-2a. **Volume Gate (pre-fetch)** — fetch-based modes (`figma`/`sketch`/`xd`/`penpot`) only. BEFORE extracting, estimate the source's surface/frame count via cheap metadata (frame list / node count) — NOT a full-document fetch. If a single feature's source exceeds roughly one feature's worth — more surfaces than 5 passes × 250 lines could audit, OR a fetch that would dominate the context budget — STOP: `tw_update_state(status=Blocked, agent_id="design-auditor", pending_notes=["design-auditor: design source oversized — recommend splitting feature further (<N> frames > threshold)", "next_role: pm"])`. Do NOT ingest-then-defer — splitting the feature is preferred to overflowing context. `image`/`pdf`/`paper`/`no-design` skip this gate (human-confirmed values, no bulk fetch). This is the input-side mirror of the 250-line/5-pass output cap.
+2a. **Volume Gate (pre-fetch)** — fetch-based modes (`figma`/`sketch`/`xd`/`penpot`) only. BEFORE extracting, estimate the source's surface/frame count via cheap metadata (frame list / node count) — NOT a full-document fetch. WHEN a single feature's source exceeds roughly one feature's worth — more surfaces than 5 passes × 250 lines could audit, OR a fetch that would dominate the context budget — DO STOP per *Escalation Routes: design source oversized* (`status=Blocked` → `next_role: pm`). ELSE continue to extraction. Do NOT ingest-then-defer — splitting the feature is preferred to overflowing context. `image`/`pdf`/`paper`/`no-design` skip this gate (human-confirmed values, no bulk fetch). This is the input-side mirror of the 250-line/5-pass output cap.
 2b. **Source-Credibility Classification<!-- origin:start --> (v3.38.0)<!-- origin:end -->** — fetch-based modes only (`figma`/`sketch`/`xd`/`penpot`). BEFORE extracting any values, classify each target node into one of:
    (a) **full-page / screen composite frame** — the top-level frame representing the feature's actual surface as it renders for an end user;
    (b) **component variant / component-set child** — a sub-node inside a component definition, not a full composed screen;
    (c) **read-only review / overview page** — a documentation or handoff overview that shows a different mode, state, or context than the feature being built;
    (d) **other** — annotation, asset, or non-UI frame.
-   If the classification is (b), (c), or (d) — i.e. NOT a full-page/screen composite frame for the intended feature — you MUST STOP and call `tw_update_state(status=Blocked, agent_id="design-auditor", pending_notes=["design-auditor: node type mismatch — <node-id> is <actual classification>, expected full-page composite frame for <feature>; resolve source reference before extraction", "next_role: pm"])`. Do NOT transcribe values from the wrong node type; the guardrail fires BEFORE any values are written to the audit artifact. P2 was saved by this behaviour; P1 was reopened for lack of it (see `research/mode-feature-process-retrospective.md` §四#2). `image`/`pdf`/`paper`/`no-design` modes skip this gate (human-confirmed sources).
+   WHEN the classification is (b), (c), or (d) — i.e. NOT a full-page/screen composite frame for the intended feature — you MUST STOP per *Escalation Routes: node type mismatch*. ELSE proceed to extraction. Do NOT transcribe values from the wrong node type; the guardrail fires BEFORE any values are written to the audit artifact. P2 was saved by this behaviour; P1 was reopened for lack of it (see `research/mode-feature-process-retrospective.md` §四#2). `image`/`pdf`/`paper`/`no-design` modes skip this gate (human-confirmed sources).
 2c. **Mechanical baseline selection (v3.39.0)** — fetch-based modes only (`figma`/`sketch`/`xd`/`penpot`), and ONLY when the source is a multi-surface board (one URL/node expands to many surfaces, e.g. a full OOBE flow board) and the task needs a subset as baselines. Do NOT eyeball-scan the board and hand-pick frames — that is unreproducible, unaccountable, and varies per run (漏抓 / 誤收 / 把箭頭·標註當畫面). Instead select via a **deterministic structural filter** over the metadata you already pulled in 2a, written so a human can re-run it:
    1. **Frame-type + name pattern** — keep `type=FRAME` whose `name` matches the surface naming glob (e.g. `Slide 16:9 - *`); drop CONNECTOR / annotation TEXT / sub-components.
    2. **Semantic anchor** — keep only frames whose subtree contains the feature's anchor node. Prefer matching by `componentId` over layer name (name is unstable; component id is the more durable contract).
@@ -87,7 +87,17 @@ Every audit MUST contain these H2 sections:
 
    **Geometric-density flag (<!-- origin:start -->v3.31.0, <!-- origin:end -->awareness-only)** — while auditing a surface's `## Layout / Canvas` structure, count its **independently-constrained geometry layers** (stacked container constraints, asymmetric padding, nested components with independent fill/sizing rules) — distinct from canonical state-count. When a single surface has **≥ 3 independently-constrained geometry layers**, note it in the surface's *Source manifest* `reason` (or *Out of Scope* note) and flag it so PM can apply the authoritative **Geometric-Density Split Gate** (`skill-pm` step 2a-bis). Design-auditor only **flags**; PM owns the split decision and writes `.current/feature-split.md`. This does not change the 8–10 state-count threshold.
 5. **Write** `design/<feature>.md` per the Artifact Schema.
-6. `tw_update_state(active_feature=<name>, status=In_Progress, agent_id="design-auditor", pending_notes=["Audit: design/<feature>.md", "next_role: pm"])`. On failure, still call with the failure summary in `pending_notes`.
+6. Hand off per *Escalation Routes: audit complete* (include `active_feature=<name>` on the write). On failure, still call `tw_update_state` with the failure summary in `pending_notes`.
+
+## Escalation Routes
+
+Call shape: Constitution §3 *Escalation call format* (`agent_id="design-auditor"`).
+
+| situation | status | note token | next_role |
+|---|---|---|---|
+| design source oversized (Volume Gate 2a) | Blocked | `design-auditor: design source oversized — recommend splitting feature further (<N> frames > threshold)` | pm |
+| node type mismatch (Source-Credibility 2b) | Blocked | `design-auditor: node type mismatch — <node-id> is <actual classification>, expected full-page composite frame for <feature>; resolve source reference before extraction` | pm |
+| audit complete (step 6 closing handoff) | In_Progress | `Audit: design/<feature>.md` | pm |
 
 ## When skipped entirely
 

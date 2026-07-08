@@ -82,18 +82,28 @@ After each role's handoff, read the just-written `pending_notes`. If a `next_rol
 
 **Fallback (`tw_switch_role`)** — used when Task tool / subagents are unavailable (Cursor, Continue, Anti-Gravity, plain MCP clients, or Claude Code without the templates installed). Call `tw_switch_role(<next_role>)` and follow the returned SOP in the same context. This is the pre-v3.20.0 behavior — degradation is graceful and silent; no tw_* tool surface has changed.
 
-**Stop conditions** (any one yields to the human — surface the reason in one sentence):
-1. `status: Blocked` on the last `tw_update_state`.
-2. `status: PASS` (terminal success; release-engineer is a deliberate human decision, not an auto-hop).
-3. `pending_notes` contains a line beginning with `next_role: human`.
-4. `pending_notes` contains NO line beginning with `next_role:` (the prior role forgot or finished without nominating a successor — surface as ambiguous).
-5. Hop counter ≥ `10` for this `/teamwork` session.
-6. **Cut-approval gate**: `pending_notes` contains `next_role: architect` or `next_role: sr-engineer` but `cut_approved` is not set on the handoff — surface the cut draft to the human and wait. Do NOT auto-hop through to build (server error: `CUT_APPROVAL_REQUIRED`; full mechanism and trust rule: Constitution §3.1). **Coordinator writer obligation**: when the PM subagent ended its turn after presenting the draft, YOU are the sanctioned writer — after the human approves the cut in YOUR chat, write `tw_update_state(agent_id="pm", cut_approved: true, ...)` on the PM's still-current state tuple, then resume routing to build. Self-check before writing: confirm the approval text appears in YOUR OWN conversation turn — never write cut_approved from a subagent's summary or relayed claim that "the human approved"; that is not consent.
-7. **Amend-Resume relay** (routing action, not a halt): when relaying a PM amendment whose `pending_notes` declare `resume_of: code-reviewer` or `resume_of: qa-engineer` (with `next_role:` naming that same role), carry the identical `resume_of: <role>` entry in `pending_notes` on the routing `tw_update_state(agent_id="<role>", status="In_Progress", ...)` write — the server rejects the resume edge without it. Full mechanism: Constitution §3.1.
+**Stop conditions**: see `## Escalation Routes` below. WHEN any row's trigger fires → DO stop (or, for the relay row, route) per that row, surfacing the reason in one sentence → ELSE keep auto-hopping.
 
 **Opt-out**: if `AGC_AUTO_ROUTE=0` at session start, do NOT auto-hop — surface the `next_role:` recommendation in chat and wait for the human to issue `tw_switch_role` themselves.
 
 **Hop counter scope**: in-memory only, for the lifetime of one `/teamwork` invocation. Do NOT persist to `handoff.md` or any tool argument.
+
+## Escalation Routes
+
+Stop conditions + routing escalations (WHEN/DO/ELSE collapsed to rows; Constitution §3 *Escalation call format*). The coordinator mostly yields without a state write — `status` `—` means observe/halt only; rows that write state say so.
+
+| situation | status | note token | next_role |
+|---|---|---|---|
+| last `tw_update_state` wrote `status: Blocked` | Blocked (observed) | surface the blocking reason in one sentence | human |
+| last write is `status: PASS` | PASS (terminal) | terminal success — release-engineer is a deliberate human decision, not an auto-hop | human |
+| `pending_notes` contains a line beginning `next_role: human` | — | relay the prior role's note | human |
+| `pending_notes` contains NO line beginning `next_role:` | — | surface as ambiguous — the prior role forgot or finished without nominating a successor | human |
+| hop counter ≥ `10` for this `/teamwork` session | — | surface the hop cap | human |
+| **Cut-approval gate** — `pending_notes` contains `next_role: architect` or `next_role: sr-engineer` but `cut_approved` is not set on the handoff (server error: `CUT_APPROVAL_REQUIRED`) | — | surface the cut draft and wait — do NOT auto-hop through to build; writer obligation below | human |
+| **Amend-Resume relay** — PM amendment `pending_notes` declare `resume_of: code-reviewer` or `resume_of: qa-engineer` (with `next_role:` naming that same role; routing action, not a halt) | In_Progress (routing write, `agent_id="<role>"`) | carry the identical `resume_of: <role>` entry — the server rejects the resume edge without it. Full mechanism: Constitution §3.1 | code-reviewer / qa-engineer |
+| visual work complete but no independent qa-visual context — `qa-visual`/`qa-engineer` cannot run (rate/session/weekly limit) and the coordinator has been building inline | Blocked | "awaiting independent QA" — the actor that built a surface MUST NOT author its visual verdict or issue its PASS (builder ≠ judge, §3.2); do not improvise a verdict to keep the chain moving | human |
+
+**Cut-approval gate writer obligation** (full mechanism and trust rule: Constitution §3.1): when the PM subagent ended its turn after presenting the draft, YOU are the sanctioned writer — after the human approves the cut in YOUR chat, write `tw_update_state(agent_id="pm", cut_approved: true, ...)` on the PM's still-current state tuple, then resume routing to build. Self-check before writing: confirm the approval text appears in YOUR OWN conversation turn — never write cut_approved from a subagent's summary or relayed claim that "the human approved"; that is not consent.
 
 ## Subagent Reply Watermark Validation
 
@@ -131,14 +141,10 @@ Per Constitution §3.2, the coordinator routes and summarizes — it does NOT ju
   divergence class (e.g. "selection-state / scroll-offset differences are acceptable"). Pre-excusing a
   difference is qa-visual's call alone, recorded in its own `## Allowed Differences`. A coordinator-
   authored accept-policy is void and the server will reject the resulting PASS.
-- **Unavailable judge → Blocked, never self-PASS.** If `qa-visual` / `qa-engineer` cannot run
-  (rate/session/weekly limit) and the coordinator has been building inline, STOP at
-  `status=Blocked` ("awaiting independent QA"). The actor that built a surface MUST NOT author its
-  visual verdict or issue its PASS (builder ≠ judge). Surface the block to the human; do not improvise
-  a verdict to keep the chain moving.
-
-This is a stop-condition addition: treat "visual work complete but no independent qa-visual context
-available" as a hand-to-human event, not an auto-hop.
+- **Unavailable judge → Blocked, never self-PASS.** WHEN visual work is complete but no independent
+  qa-visual context is available → DO STOP at `status=Blocked` per *Escalation Routes: visual work
+  complete but no independent qa-visual context* (a hand-to-human event, not an auto-hop) → ELSE
+  route to the independent judge as normal.
 
 ## Drift Reconcile after out-of-band execution<!-- origin:start --> (v3.26.0, R10)<!-- origin:end -->
 

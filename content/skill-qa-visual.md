@@ -72,6 +72,8 @@ PASS requires ALL of: every Step A checkbox `[x]`; every Step A.5 row `[x]`; eve
 
 ### Error codes & STOP routes
 
+This table is the canonical exemplar of the Constitution §3 *Escalation call format* / `## Escalation Routes` convention the other skills follow.
+
 Implementation-defect FAILs carry a `visual_fail:` note — a `pending_notes` entry whose trimmed text starts with that exact prefix (colon included) increments `visual_round`; a pure test-logic FAIL without it increments only `qa_round` (Constitution §3.1). Design-defect FAILs route to design-auditor WITHOUT the prefix. Past the round cap (6), only a `(pm, In_Progress)` transition is accepted.
 
 | trigger | error code | STOP action |

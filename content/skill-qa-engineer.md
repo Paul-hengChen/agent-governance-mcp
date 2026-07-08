@@ -31,13 +31,13 @@ All review notes, questions, and bug reports → `qa_reports/review_<task-id>.md
 
    3a. **Copy Audit Gate**: open the spec's *Copy / Strings* H2 (required by skill-pm). For every entry, verify the implementation renders the documented text verbatim — grep the source tree for the string id AND for the documented text. Two failure modes:
    - **Drift**: implementation text ≠ spec text → FAIL back to sr-engineer with the diff (escalate to Phase 2 round 1, do NOT proceed to Phase 3).
-   - **Coverage gap**: implementation introduces a user-facing string not listed in the spec → FAIL back to PM (`["QA: copy gap — '<text>' in <file> missing from spec Copy/Strings", "next_role: pm"]`). Do NOT let the spec ratify post-hoc; force PM to source the string.
+   - **Coverage gap**: WHEN the implementation introduces a user-facing string not listed in the spec → DO FAIL back to PM per *Escalation Routes: copy coverage gap*. Do NOT let the spec ratify post-hoc; force PM to source the string.
 
    Rationale: stylistic ACs (font, color, position) pass without catching paraphrased prose. The Copy Audit Gate is the only step that compares rendered text to the design contract.
 
    3b. **Visual Audit Gate**: open the spec's *Visual Tokens* H2 (required by skill-pm). For every entry, verify the implementation declares the documented value verbatim — grep the source tree for the property's literal (e.g. `0xFF2A2A2A`, `32.sp`, `184.dp`, `FontWeight.Bold`). Three failure modes:
    - **Drift**: implementation literal ≠ spec literal → FAIL back to sr-engineer with the diff. Stylistic AC tests like `OobeThemeTokensTest` catch drift after the spec is right; the gate catches the inverse — when code is right but spec was stale, OR when code paraphrased the spec (e.g. `#3D5BAB` instead of `#3C5AAA`).
-   - **Coverage gap**: implementation hard-codes a literal property not listed in the spec → FAIL back to PM (`["QA: visual token gap — '<property>=<value>' in <file> missing from spec Visual Tokens", "next_role: pm"]`). Do NOT let the spec ratify post-hoc; force PM to source the token.
+   - **Coverage gap**: WHEN the implementation hard-codes a literal property not listed in the spec → DO FAIL back to PM per *Escalation Routes: visual token coverage gap*. Do NOT let the spec ratify post-hoc; force PM to source the token.
    - **Source rot** (when feasible): if the spec cites a Figma node id and the team has Figma MCP access, sample at least one cited token by fetching the node; flag drift to PM rather than blocking the build.
 
    Rationale: stylistic ACs only verify what the spec enumerates; without a "every concrete literal must be sourced" gate, unsourced theme literals go undetected. Layout proportions and platform defaults are out of scope by design.
@@ -48,9 +48,9 @@ All review notes, questions, and bug reports → `qa_reports/review_<task-id>.md
 
 5. **Phase 2 — Discussion (only if issues found)**:
    - Append questions/concerns to the review doc under `## Round 1`.
-   - `tw_update_state(status=Blocked, agent_id="qa-engineer", pending_notes=["Waiting for sr-engineer Round <N>", "next_role: sr-engineer"])`. STOP.
+   - Escalate per *Escalation Routes: awaiting sr-engineer round*. STOP.
    - Human switches sr-engineer in, who replies, then switches you back. Repeat for up to 3 rounds.
-   - **Unresolved after Round 3**: `tw_rollback_task(<task-id>, "QA: unresolved after 3 rounds")` → `tw_update_state(status=FAIL, agent_id="qa-engineer", qa_review="<reason>", pending_notes=["QA: <task-id> failed Round 3", "next_role: pm"])`. The server increments `qa_round`; the next valid transition is `(pm, In_Progress)`. STOP.
+   - **Unresolved after Round 3**: `tw_rollback_task(<task-id>, "QA: unresolved after 3 rounds")` → escalate per *Escalation Routes: unresolved after Round 3*. The server increments `qa_round`; the next valid transition is `(pm, In_Progress)`. STOP.
    - **Phase 2 PASS** (all rounds resolved, or no issues found in Phase 1): proceed to Phase 3.
 
 6. **Phase 3 — Tests**:
@@ -66,4 +66,16 @@ All review notes, questions, and bug reports → `qa_reports/review_<task-id>.md
    - Project build: ZERO errors.
    - **CI Runnability**: `npm test` / `pytest` / `cargo test` runs headlessly with zero human interaction. Flag if not.
    - **PASS** → `tw_update_state(status=PASS, agent_id="qa-engineer", completed_tasks=[<ids>], qa_review="<summary>", pending_notes=["QA: <task-id> PASS"])`. Server auto-records the review (file mode: `qa_reports/review_<id>.md`; SQLite: `reports` row) AND verifies evidence exists (else `MISSING_EVIDENCE`) before persisting PASS. Auto-record is unchanged; `covers:` is for pre-PASS manual batch files. Then call `tw_complete_task(<task-id>, agent_id="qa-engineer")` per completed id.
-   - **FAIL** → `tw_rollback_task(<task-id>, <reason>)` → `tw_update_state(status=FAIL, agent_id="qa-engineer", qa_review="<failure detail>", pending_notes=["QA: <task-id> FAIL — <reason>", "next_role: sr-engineer"])`. `qa_round` auto-increments. At Round 4 (after 3 prior FAILs), only `(pm, In_Progress)` is accepted next (else `QA_ROUND_EXCEEDED`) — escalate.
+   - **FAIL** → `tw_rollback_task(<task-id>, <reason>)` → escalate per *Escalation Routes: Phase 4 FAIL*. `qa_round` auto-increments. At Round 4 (after 3 prior FAILs), only `(pm, In_Progress)` is accepted next (else `QA_ROUND_EXCEEDED`) — escalate.
+
+## Escalation Routes
+
+Format: Constitution §3 *Escalation call format*. FAIL rows carry `qa_review` and follow the `tw_rollback_task` at their SOP site. Phase 1.5: see skill-qa-visual *Error codes & STOP routes*.
+
+| situation | status | note token | next_role |
+|---|---|---|---|
+| awaiting sr-engineer round | Blocked | `Waiting for sr-engineer Round <N>` | sr-engineer |
+| unresolved after Round 3 | FAIL | `QA: <task-id> failed Round 3` | pm |
+| copy coverage gap | FAIL | `QA: copy gap — '<text>' in <file> missing from spec Copy/Strings` | pm |
+| visual token coverage gap | FAIL | `QA: visual token gap — '<property>=<value>' in <file> missing from spec Visual Tokens` | pm |
+| Phase 4 FAIL | FAIL | `QA: <task-id> FAIL — <reason>` | sr-engineer |

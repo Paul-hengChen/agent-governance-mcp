@@ -57,9 +57,15 @@ Release-engineer MUST NOT touch source under `tools/` / `prompts/` / `schema/` /
 10. **Drift-baseline acknowledgment**: append this release's newly-completed task IDs (from `tw_get_state`'s `completed_tasks` or `tw_detect_drift`'s `tasksCompleted`) into the `driftBaselineIds` array in `.current/.config.json` — deduplicated, creating the array if absent. This is the sanctioned baseline write (release-engineer only, post-PASS); mechanism and rationale live in `specs/drift-baseline-exemption.md`. This step is part of release bookkeeping — do NOT skip it: without the append, every shipped task ID resurfaces as drift noise in the next session's `tw_detect_drift`.
 11. **Closing write**: `tw_update_state(status=In_Progress, agent_id="pm", pending_notes=["Released vX.Y.Z", "tag: <sha>", "next_role: coordinator"])`. Legal via the `release-engineer:In_Progress → pm:In_Progress` edge (v3.49.0, C13) — this hands the chain back to pm; it is a routing write, not an identity alias.
 
-## Failure modes (surface immediately, do not auto-recover)
+## Escalation Routes (failure modes — surface immediately, do not auto-recover)
 
-- **Expected vs unrelated uncommitted changes**: feature source files in `lib/`, `tools/`, `schema/`, `guards/`, `prompts/`, `bin/`, `transport/`, `scripts/`, `content/`, `templates/`, `specs/`, `test/`, `qa_reports/`, `review_reports/` are EXPECTED in a release commit and MUST be staged per SOP step 8 — these never trigger STOP. Only UNRELATED uncommitted changes (paths with no connection to the active feature, e.g. stray editor swap files `*.swp`, `.DS_Store`, IDE caches, `.env*`, secrets, scratch dirs, or unrelated source edits in directories outside the feature scope) trigger STOP with: `"Pre-existing uncommitted changes found in <path> — this path is unrelated to the active feature. Commit or stash it first."`
-- `npm test` regression → STOP, route to qa-engineer; do not tag a red suite.
-- A tag with the target name already exists locally OR on origin → STOP, ask user to choose a new bump or delete the old tag manually (never delete it yourself per Hard rules).
-- `gh` CLI missing or unauthenticated → STOP, ask user to authenticate; do not work around.
+Call shape: Constitution §3 *Escalation call format* (`agent_id="release-engineer"`). WHEN a row's trigger fires → DO STOP and surface per the row (on any ⛔ rejection, apply the CRITICAL Hard rule) → ELSE proceed with the SOP.
+
+| situation | status | note token | next_role |
+|---|---|---|---|
+| unrelated uncommitted changes (scope rule below) | Blocked | `Pre-existing uncommitted changes found in <path> — this path is unrelated to the active feature. Commit or stash it first.` | human |
+| `npm test` regression | Blocked | `release-engineer: npm test regression — do not tag a red suite` | qa-engineer |
+| tag with the target name already exists locally OR on origin | Blocked | `release-engineer: tag <vX.Y.Z> already exists — choose a new bump or delete the old tag manually (never delete it yourself per Hard rules)` | human |
+| `gh` CLI missing or unauthenticated | Blocked | `release-engineer: gh CLI missing/unauthenticated — authenticate; do not work around` | human |
+
+**Expected vs unrelated scope rule** (first row's trigger): feature source files in `lib/`, `tools/`, `schema/`, `guards/`, `prompts/`, `bin/`, `transport/`, `scripts/`, `content/`, `templates/`, `specs/`, `test/`, `qa_reports/`, `review_reports/` are EXPECTED in a release commit and MUST be staged per SOP step 8 — these never trigger STOP. Only UNRELATED uncommitted changes (paths with no connection to the active feature, e.g. stray editor swap files `*.swp`, `.DS_Store`, IDE caches, `.env*`, secrets, scratch dirs, or unrelated source edits in directories outside the feature scope) trigger the STOP row above.

@@ -133,12 +133,17 @@ test("AC2: lean always-on bundle is below the raw baseline and within target (<=
   // re-measured (not trusted from sr-engineer's handoff note) at 3087 ~tok (exact); cap
   // set to the exact measured value per the established Phase-2 convention (no additional
   // headroom).
+  // a11-escalation-grammar (qa-owned bump, A11-02): cap raised from 3087 → 3332 to absorb
+  // the const-05-chain-mid.md canonical Escalation call format + WHEN/DO/ELSE bullets added
+  // by this ticket (chain-tagged, loads on this lean path). Independently re-measured (not
+  // trusted from sr-engineer's handoff note) at 3332 ~tok (exact); cap set to the exact
+  // measured value per the established Phase-2 convention (no additional headroom).
   const liteSkill = fs.readFileSync(path.join(ROOT, "content", "skill-coordinator-lite.md"), "utf-8");
   const SEP = "\n\n---\n\n";
   const raw = approxTokens(CONSTITUTION + SEP + liteSkill);
   const lean = approxTokens(LEAN_CONSTITUTION + SEP + liteSkill);
   assert.ok(lean < raw, `lean (${lean}) must be < raw (${raw})`);
-  assert.ok(lean <= 3087, `lean always-on (${lean} ~tok) must meet the <= 3087 target`);
+  assert.ok(lean <= 3332, `lean always-on (${lean} ~tok) must meet the <= 3332 target`);
 });
 
 // --- AC3: enforcement preserved ------------------------------------------
@@ -479,6 +484,11 @@ test("AC1/AC2: skill-pm stripped token count meets ≤ 3196 cap", () => {
   // reduction that the schema example far outweighs). Independently re-measured
   // (not trusted from sr-engineer's handoff note) at 3196 ~tok exactly; cap set to
   // the exact measured value per the established Phase-2 convention (no headroom).
+  // a11-escalation-grammar (qa-owned bump, A11-02): cap raised from 3196 → 3225 to absorb
+  // skill-pm.md's Escalation Routes table conversion to the canonical const-05 call format
+  // (byte-identical | situation | status | note token | next_role | header). Independently
+  // re-measured (not trusted from sr-engineer's handoff note) at 3225 ~tok exactly; cap set
+  // to the exact measured value per the established Phase-2 convention (no headroom).
   const SKILL_PM = fs.readFileSync(path.join(ROOT, "content", "skill-pm.md"), "utf-8");
   // Strip frontmatter (--- block) before token-counting the body, matching buildPromptForRole.
   const body = SKILL_PM.startsWith("---")
@@ -486,7 +496,7 @@ test("AC1/AC2: skill-pm stripped token count meets ≤ 3196 cap", () => {
     : SKILL_PM;
   const stripped = stripRationale(stripOriginTags(body));
   const toks = approxTokens(stripped);
-  assert.ok(toks <= 3196, `skill-pm stripped body (${toks} ~tok) must be ≤ 3196 (AC1, a13-section1-polish re-baseline)`);
+  assert.ok(toks <= 3225, `skill-pm stripped body (${toks} ~tok) must be ≤ 3225 (AC1, a11-escalation-grammar re-baseline)`);
 });
 
 test("AC1/AC2: skill-sr-engineer stripped token count meets ≤ 2138 cap", () => {
@@ -506,13 +516,18 @@ test("AC1/AC2: skill-sr-engineer stripped token count meets ≤ 2138 cap", () =>
   // measured value (no headroom) per the Phase-2 convention — leaving raw-only would
   // have left this cap at 2210 despite the body actually shrinking, silently masking
   // the feature's real saving.
+  // a11-escalation-grammar (qa-owned bump, A11-02): cap raised from 2138 → 2258 to absorb
+  // skill-sr-engineer.md's Escalation Routes table conversion to the canonical const-05
+  // call format (byte-identical header). Independently re-measured (not trusted from
+  // sr-engineer's handoff note) at 2258 ~tok exactly; cap set to the exact measured value
+  // per the established Phase-2 convention (no headroom).
   const SKILL_SR = fs.readFileSync(path.join(ROOT, "content", "skill-sr-engineer.md"), "utf-8");
   const body = SKILL_SR.startsWith("---")
     ? SKILL_SR.slice(SKILL_SR.indexOf("---", 3) + 3).trimStart()
     : SKILL_SR;
   const stripped = stripRationale(stripOriginTags(body));
   const toks = approxTokens(stripped);
-  assert.ok(toks <= 2138, `skill-sr stripped body (${toks} ~tok) must be ≤ 2138 (AC2, governance-tag-strip re-baseline)`);
+  assert.ok(toks <= 2258, `skill-sr stripped body (${toks} ~tok) must be ≤ 2258 (AC2, a11-escalation-grammar re-baseline)`);
 });
 
 // --- governance-text-load Round-2: constitution rationale fencing (T-GTL-06/07) ---
@@ -568,7 +583,7 @@ test("AC7: exactly two balanced rationale fences, both outside §3.x", () => {
   assert.equal(ends, 2, "exactly two rationale:end markers");
 });
 
-test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the measured floor (≤ 5316 ~tok)", () => {
+test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the measured floor (≤ 5561 ~tok)", () => {
   // WHY: floor REBASELINED by constitution-conditional-load PHASE 2. Phase 2 extends the
   // design-only axis to two more spans (§4 visual prose S3–S5 + P-AUDITOR, and §1 L16/L17/L19),
   // adding 3 MORE design-only fence pairs (now 6 pairs / 12 marker lines total, up from
@@ -619,16 +634,23 @@ test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the 
   // stripped 5316 = 273 ~tok, still ≥ 240 (unchanged from the prior bump — the §1
   // rewrite added roughly the same token count to both the raw and rationale-stripped
   // sides).
+  // a11-escalation-grammar (qa-owned bump, A11-02): cap raised from 5316 → 5561 to absorb
+  // the const-05-chain-mid.md canonical Escalation call format + WHEN/DO/ELSE bullets
+  // (chain-tagged, loads on this design-arm path — not design-only-fenced). Independently
+  // re-measured (not trusted from sr-engineer's handoff note) — raw 5834, stripped 5561
+  // (exact); cap set to the exact measured value per the established Phase-2 convention
+  // (no additional headroom). Saving margin re-verified: raw 5834 − stripped 5561 = 273
+  // ~tok, still ≥ 240 (unchanged — the const-05 edit sits outside both rationale fences).
   const raw = approxTokens(CONSTITUTION);
   const stripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));
-  assert.ok(stripped <= 5316, `stripped constitution (${stripped} ~tok) must be ≤ 5316 (AC8 design-arm floor, a13-section1-polish re-baseline)`);
+  assert.ok(stripped <= 5561, `stripped constitution (${stripped} ~tok) must be ≤ 5561 (AC8 design-arm floor, a11-escalation-grammar re-baseline)`);
   assert.ok(
     raw - stripped >= 240,
-    `constitution rationale+origin-tag saving (${raw - stripped} ~tok) must be ≥ 240 (AC8 measured min, pm-repair-resume-routing re-baseline)`,
+    `constitution rationale+origin-tag saving (${raw - stripped} ~tok) must be ≥ 240 (AC8 measured min, a11-escalation-grammar re-baseline)`,
   );
 });
 
-test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 9106 ~tok)", () => {
+test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 9545 ~tok)", () => {
   // WHY: the constitution is injected on every dispatch; the full coordinator bundle is
   // the worst case. Compose the chain-role bundle the way buildPromptForRole does:
   // rationale-stripped constitution + SEP + rationale-stripped skill body. Floor
@@ -680,13 +702,19 @@ test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/b
   // Independently re-measured (not trusted from sr-engineer's handoff note) at 9106 ~tok
   // (exact); cap set to the exact measured value per the established Phase-2 convention
   // (no additional headroom).
+  // a11-escalation-grammar (qa-owned bump, A11-02): cap raised from 9106 → 9545 to absorb
+  // the const-05-chain-mid.md canonical Escalation call format + WHEN/DO/ELSE bullets
+  // (constitution side of this bundle) plus skill-coordinator.md's Escalation Routes table
+  // conversion (skill side). Independently re-measured (not trusted from sr-engineer's
+  // handoff note) at 9545 ~tok (exact); cap set to the exact measured value per the
+  // established Phase-2 convention (no additional headroom).
   const skillCoord = fs.readFileSync(path.join(ROOT, "content", "skill-coordinator.md"), "utf-8");
   const body = skillCoord.startsWith("---")
     ? skillCoord.slice(skillCoord.indexOf("---", 3) + 3).trimStart()
     : skillCoord;
   const SEP = "\n\n---\n\n";
   const bundle = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)) + SEP + stripRationale(stripOriginTags(body)));
-  assert.ok(bundle <= 9106, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 9106 (AC8 design-arm floor, a13-section1-polish re-baseline)`);
+  assert.ok(bundle <= 9545, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 9545 (AC8 design-arm floor, a11-escalation-grammar re-baseline)`);
 });
 
 test("AC9: every operative rule/gate/heading survives stripRationale on the constitution", () => {
@@ -1037,7 +1065,7 @@ test("AC7: lite + non-design strips §3.2 once (no reintroduction), consistent w
 
 // --- AC8: rebaseline + pin the new non-design figure ----------------------
 
-test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 3232 ~tok)", () => {
+test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 3477 ~tok)", () => {
   // WHY: this is the BUDGET WIN that justified the feature, and it must be regression-guarded.
   // On a non-design chain dispatch buildPromptForRole emits stripDesignOnly(stripRationale(source)).
   // REBASELINED by constitution-conditional-load PHASE 2: Phase 2 strips two MORE spans on the
@@ -1081,12 +1109,20 @@ test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is
   // ~tok (exact); cap set to the exact measured value per the established Phase-2
   // convention (no additional headroom). Saving margin re-verified: design-arm 5316 −
   // non-design 3232 = 2084 ~tok, still ≥ 2080.
-  const ratStripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));         // design-arm path: 5316
-  const nonDesign = approxTokens(stripRationale(stripOriginTags(composeConstitution({ chain: true, design: false })))); // non-design path: 3232
-  assert.ok(nonDesign <= 3232, `non-design constitution (${nonDesign} ~tok) must be ≤ 3232 (AC8 non-design floor, a13-section1-polish re-baseline)`);
+  // a11-escalation-grammar (qa-owned bump, A11-02): cap raised from 3232 → 3477. The
+  // const-05-chain-mid.md canonical Escalation call format + WHEN/DO/ELSE bullets are
+  // chain-tagged (not design-tagged), so they land on the non-design path too, same as
+  // the design-arm floor above. Independently re-measured (not trusted from
+  // sr-engineer's handoff note) at 3477 ~tok (exact); cap set to the exact measured
+  // value per the established Phase-2 convention (no additional headroom). Saving
+  // margin re-verified: design-arm 5561 − non-design 3477 = 2084 ~tok, still ≥ 2080
+  // (unchanged — the const-05 edit sits outside the design-only fences).
+  const ratStripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));         // design-arm path: 5561
+  const nonDesign = approxTokens(stripRationale(stripOriginTags(composeConstitution({ chain: true, design: false })))); // non-design path: 3477
+  assert.ok(nonDesign <= 3477, `non-design constitution (${nonDesign} ~tok) must be ≤ 3477 (AC8 non-design floor, a11-escalation-grammar re-baseline)`);
   assert.ok(
     ratStripped - nonDesign >= 2080,
-    `design-only strip saving (${ratStripped - nonDesign} ~tok) must be ≥ 2080 (a13-section1-polish re-baseline)`,
+    `design-only strip saving (${ratStripped - nonDesign} ~tok) must be ≥ 2080 (a11-escalation-grammar re-baseline)`,
   );
 });
 

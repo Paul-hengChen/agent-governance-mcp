@@ -67,10 +67,22 @@ None.
 ## SOP
 
 1. `tw_get_state` → `tw_detect_drift`.
-2. Read `specs/<feature>.md`. If missing → `tw_update_state(status=Blocked, pending_notes=["Architect blocked: PM spec missing for <feature>", "next_role: pm"])`. STOP.
-3. **Ambiguity Gate**: If spec acceptance criteria are missing or contradictory → `tw_update_state(status=Blocked, pending_notes=["Architect blocked: spec incomplete — <detail>", "next_role: pm"])`. STOP.
-4. **External-reference Sanity Gate**: cross-check `Deferred Resources` against the spec's *Dependencies / Prerequisites*. If you find a reference in the spec that is NOT in `Deferred Resources` AND was NOT fetched, → block with `["Architect blocked: external reference '<ref>' not classified by PM", "next_role: pm"]`.
-4a. **Visual Harness Gate**<!-- origin:start --> (v3.14.0)<!-- origin:end -->: if `design/<feature>.md` exists AND contains a `## Visual Baselines` H2, AND the spec's task list lacks a `[P0] Build visual-diff harness` task ordered before widget tasks → block with `["Architect blocked: visual harness task missing in spec tasks", "next_role: pm"]`. Reason: without an owned harness, R1's PASS gate cannot be satisfied even when QA tries.
+2. Read `specs/<feature>.md`. WHEN missing → DO escalate per *Escalation Routes: spec missing*. STOP. ELSE continue.
+3. **Ambiguity Gate**: WHEN spec acceptance criteria are missing or contradictory → DO escalate per *Escalation Routes: spec incomplete*. STOP. ELSE continue.
+4. **External-reference Sanity Gate**: cross-check `Deferred Resources` against the spec's *Dependencies / Prerequisites*. WHEN a reference in the spec is NOT in `Deferred Resources` AND was NOT fetched → DO escalate per *Escalation Routes: external reference unclassified*. ELSE continue.
+4a. **Visual Harness Gate**<!-- origin:start --> (v3.14.0)<!-- origin:end -->: WHEN `design/<feature>.md` exists AND contains a `## Visual Baselines` H2, AND the spec's task list lacks a `[P0] Build visual-diff harness` task ordered before widget tasks → DO escalate per *Escalation Routes: visual harness task missing* (`next_role: pm`). ELSE continue. Reason: without an owned harness, R1's PASS gate cannot be satisfied even when QA tries.
 5. Produce `specs/<feature>-architecture.md` per the Artifact Schema.
-6. **Open Questions Gate**: If `Open Questions` section is non-empty → `tw_update_state(status=Blocked, pending_notes=["Architect: <N> open questions need PM/human input", "next_role: pm"])`. STOP. Do NOT hand off to sr-engineer with unresolved design questions.
+6. **Open Questions Gate**: WHEN `Open Questions` section is non-empty → DO escalate per *Escalation Routes: open questions*. STOP. Do NOT hand off to sr-engineer with unresolved design questions. ELSE continue.
 7. Otherwise: `tw_update_state(status=In_Progress, pending_notes=["Architecture ready", "next_role: sr-engineer"])`.
+
+## Escalation Routes
+
+Call shape: Constitution §3 *Escalation call format* (`agent_id="architect"`). Every route below STOPs after the write; all architect escalations route back to PM.
+
+| situation | status | note token | next_role |
+|---|---|---|---|
+| spec missing | Blocked | `Architect blocked: PM spec missing for <feature>` | pm |
+| spec incomplete | Blocked | `Architect blocked: spec incomplete — <detail>` | pm |
+| external reference unclassified | Blocked | `Architect blocked: external reference '<ref>' not classified by PM` | pm |
+| visual harness task missing | Blocked | `Architect blocked: visual harness task missing in spec tasks` | pm |
+| open questions | Blocked | `Architect: <N> open questions need PM/human input` | pm |

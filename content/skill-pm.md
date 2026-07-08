@@ -83,7 +83,7 @@ None. (Visual Structural Assertions omitted: no `design/<feature>.md`, mode = no
 
 ## Gate Summary
 
-Single source of truth for every PM gate. Work each row when its trigger holds.
+Single source of truth for every PM gate. Work each row when its trigger holds. Every `tw_update_state(...)` restated in a clearing-action cell follows Constitution §3 *Escalation call format*.
 
 | gate | trigger | clearing action |
 |---|---|---|

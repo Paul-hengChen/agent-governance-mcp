@@ -25,7 +25,7 @@ future `/teamwork` feature; none blocks a release on its own.
 | A8 | Single-owner dedup of multi-told mechanisms (cut-approval ×3 — *resolved via C2, 2026-07-07*; self-converge ×2 still open) | P2 | — | ~5 (constitution + coordinator + pm + lite + sr skills) | — |
 | A9 | Compose-not-strip: overlay modules replace fence stripping in `build.ts` — **done (2026-07-07)** | P2 | — | ~8 (`prompts/build.ts`, split `content/constitution*.md`, tests) | — |
 | A10 | Gate registry as structured data → code + rendered prose — **done (2026-07-08)** | P1 | A9 ✓ | ~10 (`gates` data file, `transitions.ts`, `handoff-orchestrator.ts`, `build.ts`, content, tests) | — |
-| A11 | Escalation-route tables + unified WHEN/DO/ELSE rule grammar across skills | P2 | A6, A7 | ~12 (all `content/skill-*.md`, constitution) | — |
+| A11 | Escalation-route tables + unified WHEN/DO/ELSE rule grammar across skills — **done (2026-07-08)** | P2 | A6, A7 | ~12 (all `content/skill-*.md`, constitution) | — |
 | A12 | Shared SOP partials + Limits number registry | P2 | A9 | ~14 (all content files, `build.ts`) | — |
 | A13 | §1 polish: unified output policy, watermark decision table, positive examples per schema — **done (2026-07-08)** | P2 | — | ~6 (constitution + several skills) | — |
 | B8 | §7 external-reference policy has no server-side enforcement gate (carried forward) | P1 | — | ~4 (`tools/transitions.ts`, evidence/ledger check, constitution §7) | — |
@@ -228,7 +228,13 @@ future `/teamwork` feature; none blocks a release on its own.
 - **Risk if skipped:** every new gate re-pays the triple-authoring tax and
   reopens the drift window A5 can only detect after the fact.
 
-## A11 — Escalation-route tables + unified rule grammar (P2, depends A6/A7)
+## A11 — Escalation-route tables + unified rule grammar (P2, depends A6/A7) — DONE 2026-07-08
+- **Done:** shipped as feature `a11-escalation-grammar` (spec
+  `specs/a11-escalation-grammar.md`). const-05 §3 defines the escalation call
+  format + WHEN/DO/ELSE grammar once; 7 skills gained `## Escalation Routes`
+  tables (31 rows), 12 inline incantations removed. PM survey corrected the
+  stale estimate below: post-A6/A7/A13, `skill-architect.md` boilerplate was
+  ~9% (5 sites), not ~40%; qa-visual/pm were already table-form exemplars.
 - **What:** Every skill carries 5–8 scattered
   `tw_update_state(status=Blocked, pending_notes=["…", "next_role: …"])`
   incantations with slightly different phrasing (~40% of `skill-architect.md` is
