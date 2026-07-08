@@ -16,6 +16,11 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.48.0] - 2026-07-08
+
+### Added
+- **`c6-c11-prompt-state-injection` — Fail-loud handoff-state footer variants + constitution dedup (v3.48.0).** C6: Prompt state injection now fails loud when workspace path resolution is ambiguous (CLAUDE_PROJECT_DIR not set, cwd fallback, file not found, or parse error) — three footer variants (S01a/S01b/S02 per `specs/c6-c11-prompt-state-injection.md`) alert agents to call `resolveWorkspacePath()` or explicitly pass `workspace_path` to GetPrompt. Unified workspace-resolution logic at `resolveWorkspacePath()` in `index.ts` and reused across `prompts/build.ts`'s footer builder and handoff-state read paths (AC-4 consistency). C11: Constitution inject-dedup now uses two-level strategy — L1 in-memory per-workspace hook-marker flag (set post-SessionStart, cleared per-workspace on role switch) and L2 120s stale-sentinel file at `.current/.agc-hook-marker.json` (gitignored) — reduces duplicate injection from concurrent hook fires and session-boundary bleed, measured ~1500 token saving per deduped dispatch; token assertion pins ≥1200 (AC-9). Backwards-compatible; file-mode only for now; no schema version bump. Both fixes live in `prompts/build.ts` (S01a/S01b/S02 footer builder) and `bin/agent-governance-context.mjs` (SessionStart hook), with architecture decided in `specs/c6-c11-prompt-state-injection-architecture.md`. Closes backlog C6 (prompt state blindness) and C11 (constitution double-injection).
+
 ## [3.47.0] - 2026-07-08
 
 ### Added

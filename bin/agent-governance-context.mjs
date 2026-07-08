@@ -171,3 +171,20 @@ process.stdout.write(
     },
   })
 );
+
+// C11 L2 dedup marker: record that the FULL constitution was just emitted so
+// a /teamwork* prompt fetch within the next 120s can substitute the S03
+// sentinel instead of a second full copy (read by index.ts hookMarkerFresh).
+// Written ONLY on this successful full-body emit — never on the
+// misconfigured-hint branch above. Fail-safe by construction: if the write
+// fails (e.g. no .current/ dir in a tasks.md/TODO.md-only workspace, or a
+// permissions error), there is simply no marker and the server re-emits the
+// full constitution — a marker write failure must never break the hook.
+try {
+  fs.writeFileSync(
+    path.join(workspace, ".current", ".agc-hook-marker.json"),
+    JSON.stringify({ ts: Date.now(), pid: process.pid })
+  );
+} catch {
+  // Silent: dedup is best-effort; the fail-safe path is double emission.
+}

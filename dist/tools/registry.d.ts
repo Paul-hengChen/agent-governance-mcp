@@ -1,6 +1,5 @@
 import { z } from "zod";
 import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
-import type { PromptResult } from "../prompts/build.js";
 export type ToolResult = CallToolResult;
 export interface ToolRegistryEntry {
     name: string;
@@ -16,7 +15,7 @@ export interface PromptRegistryEntry {
         description: string;
         required: boolean;
     }>;
-    build: (workspacePath: string) => PromptResult;
+    skillFile: string;
 }
 export declare function defineTool<TSchema extends z.ZodTypeAny>(spec: {
     name: string;
@@ -32,10 +31,10 @@ declare const UpdateStateArgs: z.ZodObject<{
     workspace_path: z.ZodString;
     active_feature: z.ZodString;
     status: z.ZodEnum<{
-        PASS: "PASS";
         FAIL: "FAIL";
         Blocked: "Blocked";
         In_Progress: "In_Progress";
+        PASS: "PASS";
     }>;
     completed_tasks: z.ZodDefault<z.ZodOptional<z.ZodArray<z.ZodString>>>;
     pending_notes: z.ZodDefault<z.ZodOptional<z.ZodArray<z.ZodString>>>;

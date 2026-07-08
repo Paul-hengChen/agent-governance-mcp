@@ -167,12 +167,38 @@ test("AC3/AC4: full (chain-role) constitution RETAINS chain-only sections verbat
 
 // --- AC3: SessionStart hook integration ----------------------------------
 
+// Test-isolation fix (C6C11-QA, review_reports/review_C6C11-REV.md N2): this
+// used to run the hook with CLAUDE_PROJECT_DIR=ROOT, which writes a REAL C11
+// L2 dedup marker (bin/agent-governance-context.mjs's trailing
+// `.agc-hook-marker.json` write) into THIS repo's own `.current/`. That marker
+// is cross-process BY DESIGN (index.ts's hookMarkerFresh reads it from disk),
+// so a later, unrelated test *process* — test/teamwork-lite.test.mjs AC3b —
+// spawning the real server against `PROJECT_ROOT` (== this same ROOT) within
+// the 120s window correctly (per the C11 fail-safe contract) saw a fresh
+// marker and substituted the S03 sentinel for the constitution, failing
+// AC3b's `# Constitution v` assertion. That is the product working as
+// designed colliding with a shared on-disk side effect of THIS file's test
+// run — a test-infra defect, not a product bug (confirmed by code-reviewer,
+// APPROVED). Fix: give every runHook() call its own throwaway managed
+// workspace (a temp dir with a `.current/` marker so isManagedWorkspace is
+// true) so the L2 marker it writes never lands in the real repo, and delete
+// that workspace immediately after — no assertion is loosened (AC-10/AC-11:
+// AC3b keeps its unqualified S03-must-be-absent assertion). SERVER_ROOT
+// (content/constitution/skill source) is unaffected: the hook derives it from
+// `__dirname`, not from CLAUDE_PROJECT_DIR, so it still loads the real
+// content/ tree regardless of which workspace we point CLAUDE_PROJECT_DIR at.
 function runHook(env) {
-  const out = execFileSync("node", [path.join(ROOT, "bin", "agent-governance-context.mjs")], {
-    env: { ...process.env, CLAUDE_PROJECT_DIR: ROOT, ...env },
-    encoding: "utf-8",
-  });
-  return JSON.parse(out).hookSpecificOutput.additionalContext;
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "agc-hook-test-"));
+  fs.mkdirSync(path.join(ws, ".current"), { recursive: true });
+  try {
+    const out = execFileSync("node", [path.join(ROOT, "bin", "agent-governance-context.mjs")], {
+      env: { ...process.env, CLAUDE_PROJECT_DIR: ws, ...env },
+      encoding: "utf-8",
+    });
+    return JSON.parse(out).hookSpecificOutput.additionalContext;
+  } finally {
+    fs.rmSync(ws, { recursive: true, force: true });
+  }
 }
 
 test("AC3: SessionStart hook LITE output strips chain sections, keeps universal", () => {
@@ -186,6 +212,41 @@ test("AC3: SessionStart hook FULL output retains chain sections", () => {
   for (const m of [...CHAIN_MARKERS, ...UNIVERSAL_MARKERS]) {
     assert.ok(ctx.includes(m), `full hook must contain: ${m}`);
   }
+});
+
+// --- AC-9 (C6C11, C11 dedup outcome): measurable token reduction ----------
+// WHY: spec c6-c11-prompt-state-injection.md AC-9 requires a CONCRETE number,
+// not just "some savings", for the dual-injection scenario the C11 mechanism
+// exists to fix (hook full-emit + a same-session /teamwork* fetch, or
+// /teamwork then /teamwork-lite — see test/prompt-state-footer.test.mjs's
+// e2e dedup test for the end-to-end proof that this mechanism actually fires).
+// This test isolates the PURE size delta buildPromptForRole's omitConstitution
+// param produces (index.ts's L1/L2 decision, DR-6): the second fetch in a
+// dual-injection session pays only the S03 sentinel's cost instead of a full
+// second constitution copy.
+test("AC-9: omitConstitution=true bundle is measurably smaller than the full bundle by a concrete floor", async () => {
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "twac9-"));
+  setActiveStorage(new FileHandoffStorage());
+  const s = new FileHandoffStorage();
+  await s.writeState(ws, "ac9-fixture-feat", "In_Progress", [], []);
+  const full = buildPromptForRole("skill-coordinator-lite.md", "ac9", ws, false, "workspace_path arg", false).messages[0].content.text;
+  const omitted = buildPromptForRole("skill-coordinator-lite.md", "ac9", ws, false, "workspace_path arg", true).messages[0].content.text;
+  fs.rmSync(ws, { recursive: true, force: true });
+  const fullTok = approxTokens(full);
+  const omittedTok = approxTokens(omitted);
+  // c6-c11-prompt-state-injection (qa-owned, AC-9): measured full=2575 ~tok,
+  // omitted=1070 ~tok, saved=1505 ~tok on this working tree (coordinator-lite
+  // skill, non-design fixture — the leanest arm, so this is a conservative
+  // saving; the design-arm / chain-role saving is larger since the full
+  // constitution slice it replaces is bigger). Floor set to 1200 ~tok, ~300
+  // below the measured value, so routine content edits to the S03 sentinel
+  // or skill-coordinator-lite.md don't flap this test while still proving a
+  // real, non-trivial reduction (AC-9's own "concrete number" requirement).
+  assert.ok(omittedTok < fullTok, `omit=true bundle (${omittedTok} ~tok) must be smaller than omit=false (${fullTok} ~tok)`);
+  assert.ok(
+    fullTok - omittedTok >= 1200,
+    `dual-injection saving (${fullTok - omittedTok} ~tok) must be >= 1200 ~tok (AC-9 concrete measurement)`,
+  );
 });
 
 // --- AC1: measurement script ---------------------------------------------

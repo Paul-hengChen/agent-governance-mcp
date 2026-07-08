@@ -4,3 +4,6 @@ node_modules
 
 # Local backups (Notion exports, etc.)
 .backup/
+
+# Ephemeral SessionStart-hook dedup marker (C11 L2) — never committed
+.current/.agc-hook-marker.json

@@ -112,6 +112,24 @@ export function stripOriginTags(text: string): string {
 // The lite coordinator skill marks a server-read-only, no-chain context.
 const LITE_SKILL_FILE = "skill-coordinator-lite.md";
 
+// How the workspace path handed to buildPromptForRole was resolved by the
+// GetPrompt handler's fallback chain (C6 AC-2/DR-1). Named in the fail-loud
+// footer so a wrong-path resolution is diagnosable from the emitted text.
+export type WorkspaceSource =
+  | "workspace_path arg"
+  | "CLAUDE_PROJECT_DIR env"
+  | "cwd fallback";
+
+// S03 sentinel (C11 DR-5): substituted for the composed constitution when the
+// handler determines it was already delivered this session (hook marker or a
+// prior prompt fetch). Headline is verbatim from the spec; the recovery clause
+// makes a rare false-omission self-healable instead of silent.
+const CONSTITUTION_OMITTED_BLOCK =
+  "constitution already in context via hook — omitted\n" +
+  "(If you do NOT see the governance constitution earlier in this session, " +
+  "it was not actually delivered: call tw_switch_role to load the role SOP " +
+  "and treat the constitution as required — do not proceed ungoverned.)";
+
 export type PromptResult = {
   description: string;
   messages: Array<{ role: "user"; content: { type: "text"; text: string } }>;
@@ -287,6 +305,8 @@ export function buildPromptForRole(
   description: string,
   workspacePath: string,
   fullDetail = false,
+  resolutionSource: WorkspaceSource = "workspace_path arg",
+  omitConstitution = false,
 ): {
   description: string;
   messages: Array<{ role: "user"; content: { type: "text"; text: string } }>;
@@ -294,13 +314,16 @@ export function buildPromptForRole(
   // Read handoff state BEFORE constitution composition: the design axis is
   // state-dependent (the chain axis is static-arg-driven), so `active_feature`
   // must be known to probe the design arm below. Reused for the state block at
-  // the end of this function. Try/catch preserved — a parse failure degrades
-  // to "no state" (and, per AC3, to the non-design compose default).
+  // the end of this function. The error is CAPTURED (C6 AC-3/DR-3) — a parse
+  // failure still degrades to the non-design compose default, but the footer
+  // renders a distinct S02 "lookup failed" block instead of a false "fresh".
   let state: HandoffState | null = null;
+  let stateError: Error | null = null;
   try {
     state = getActiveStorage().parse(workspacePath);
-  } catch {
-    // fall through to "no state" block (and non-design compose default)
+  } catch (e) {
+    // fall through with state=null (non-design compose default); footer = S02
+    stateError = e instanceof Error ? e : new Error(String(e));
   }
 
   // Design-arm probe. Include the design-tagged fragments only when the feature
@@ -320,12 +343,22 @@ export function buildPromptForRole(
   // transitions a lite context cannot exercise); chain roles include them
   // because those rules become load-bearing.
   const isLite = skillFile === LITE_SKILL_FILE;
-  const assembled = composeConstitution(
-    { chain: !isLite, design: isDesignFeature },
-    workspacePath,
-  );
-  const originClean = stripOriginTags(assembled);
-  const constitution = fullDetail ? originClean : stripRationale(originClean);
+  // C11 dedup (DR-6): the omit decision lives at the HANDLER, never in here —
+  // this function stays pure so repeated calls (capture script, golden-fixture
+  // and compose-equivalence loops) are byte-identical. When the handler passes
+  // omitConstitution=true, the S03 sentinel replaces the constitution slice;
+  // skill, model hint, and state footer are untouched.
+  let constitution: string;
+  if (omitConstitution) {
+    constitution = CONSTITUTION_OMITTED_BLOCK;
+  } else {
+    const assembled = composeConstitution(
+      { chain: !isLite, design: isDesignFeature },
+      workspacePath,
+    );
+    const originClean = stripOriginTags(assembled);
+    constitution = fullDetail ? originClean : stripRationale(originClean);
+  }
   const rawSkill = loadContent(skillFile, workspacePath);
   const { frontmatter, body: taggedBody } = parseSkillFile(rawSkill);
   // Same unconditional origin-tag strip as the constitution above (frontmatter
@@ -338,9 +371,41 @@ export function buildPromptForRole(
   // ALSO rationale-stripped above (T-GTL-07), gated on the same fullDetail flag.
   const skill = fullDetail ? rawBody : stripRationale(rawBody);
 
-  const stateBlock = state
-    ? `## 📍 Current Project State (Auto-injected)\n\`\`\`json\n${JSON.stringify(state, null, 2)}\n\`\`\``
-    : `## 📍 Current Project State\nNo handoff state found. Fresh project — call \`tw_get_state\` to initialize.`;
+  // Fail-loud footer (C6 DR-3): the old single silent "Fresh project" line
+  // collapsed three distinct situations. Split them:
+  //   state parsed non-null -> JSON state block (unchanged)
+  //   parse threw           -> S02 (path + error text; NOT a fresh project)
+  //   no file, not managed  -> S01a (resolution suspect: path + source)
+  //   no file, managed      -> S01b (genuine fresh: path + source)
+  const handoffPath = path.join(workspacePath, ".current", "handoff.md");
+  let stateBlock: string;
+  if (state) {
+    stateBlock = `## 📍 Current Project State (Auto-injected)\n\`\`\`json\n${JSON.stringify(state, null, 2)}\n\`\`\``;
+  } else if (stateError) {
+    // S02 — read/parse error surfaces loudly, never as "no state".
+    stateBlock =
+      `## ⚠️ Current Project State — Lookup Failed\n` +
+      `state lookup failed at ${handoffPath}: ${stateError.message}. ` +
+      `This is NOT a fresh project — do not treat active_feature/pending_notes as absent. ` +
+      `Call \`tw_get_state\` directly to retrieve the real state.`;
+  } else {
+    const managed =
+      fs.existsSync(path.join(workspacePath, ".current")) ||
+      fs.existsSync(path.join(workspacePath, "tasks.md"));
+    stateBlock = managed
+      ? // S01b — genuinely fresh (managed workspace, no handoff.md yet).
+        `## 📍 Current Project State\n` +
+        `No handoff.md found at ${handoffPath} (resolved via ${resolutionSource}). ` +
+        `If this workspace should have state, verify workspace_path resolution — ` +
+        `otherwise this is genuinely a fresh project; call \`tw_get_state\` to initialize.`
+      : // S01a — resolved path is not a managed workspace: resolution suspect.
+        `## ⚠️ Current Project State — resolution suspect\n` +
+        `${workspacePath} is not an agent-governance-managed workspace ` +
+        `(no .current/ or tasks.md present); resolved via ${resolutionSource}. ` +
+        `No handoff.md found there. If you are working in a managed workspace ` +
+        `this is a workspace_path resolution mismatch — verify workspace_path resolution; ` +
+        `otherwise call \`tw_get_state\` to initialize.`;
+  }
 
   const modelHint = frontmatter.recommended_model
     ? `\n\nRecommended model for this role: ${frontmatter.recommended_model}.`

@@ -5,6 +5,7 @@ export declare function composeConstitution(opts: {
 }, workspacePath?: string): string;
 export declare function stripRationale(text: string): string;
 export declare function stripOriginTags(text: string): string;
+export type WorkspaceSource = "workspace_path arg" | "CLAUDE_PROJECT_DIR env" | "cwd fallback";
 export type PromptResult = {
     description: string;
     messages: Array<{
@@ -17,7 +18,7 @@ export type PromptResult = {
 };
 export declare function resolvePrdPath(workspacePath: string, state: HandoffState | null): string | null;
 export declare function appendSpecContext(result: PromptResult, workspacePath: string, role?: string): Promise<PromptResult>;
-export declare function buildPromptForRole(skillFile: string, description: string, workspacePath: string, fullDetail?: boolean): {
+export declare function buildPromptForRole(skillFile: string, description: string, workspacePath: string, fullDetail?: boolean, resolutionSource?: WorkspaceSource, omitConstitution?: boolean): {
     description: string;
     messages: Array<{
         role: "user";

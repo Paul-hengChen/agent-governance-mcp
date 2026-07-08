@@ -628,25 +628,25 @@ test("E6: AC — exact error strings match ERR-BMM-01 / ERR-BPI-01 verbatim (ful
 // AC-9: Version bump assertion — package.json + index.ts Server() = "3.40.1"
 // ===========================================================================
 
-test("AC-9: package.json version field equals 3.47.0", () => {
+test("AC-9: package.json version field equals 3.48.0", () => {
   // Why: AC-9 pins the version contract. Both package.json and the Server() literal
-  // must be "3.47.0" for the release to be self-consistent. Updated from 3.46.0
-  // to 3.47.0 when gate-registry (A10+A2) shipped.
+  // must be "3.48.0" for the release to be self-consistent. Updated from 3.47.0
+  // to 3.48.0 when c6-c11-prompt-state-injection shipped.
   const pkgPath = path.join(path.dirname(new URL(import.meta.url).pathname), "..", "package.json");
   const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
-  assert.equal(pkg.version, "3.47.0", `package.json version must be "3.47.0", got "${pkg.version}"`);
+  assert.equal(pkg.version, "3.48.0", `package.json version must be "3.48.0", got "${pkg.version}"`);
 });
 
-test("AC-9: index.ts Server() literal equals 3.47.0", () => {
+test("AC-9: index.ts Server() literal equals 3.48.0", () => {
   // Why: the Server() version literal in index.ts is the operational version broadcast
-  // to MCP clients. It must match package.json. Updated from 3.46.0 to 3.47.0 when
-  // gate-registry (A10+A2) shipped.
+  // to MCP clients. It must match package.json. Updated from 3.47.0 to 3.48.0 when
+  // c6-c11-prompt-state-injection shipped.
   const srcIndex = fs.readFileSync(
     path.join(path.dirname(new URL(import.meta.url).pathname), "..", "index.ts"),
     "utf-8",
   );
-  assert.match(srcIndex, /Server\(\s*\{[^}]*version:\s*["']3\.47\.0["']/s,
-    "Server() version literal in index.ts must equal 3.47.0");
+  assert.match(srcIndex, /Server\(\s*\{[^}]*version:\s*["']3\.48\.0["']/s,
+    "Server() version literal in index.ts must equal 3.48.0");
 });
 
 // ===========================================================================

@@ -12,7 +12,6 @@
 import * as path from "node:path";
 import { z } from "zod";
 import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
-import type { PromptResult } from "../prompts/build.js";
 import { handleGetState } from "./handoff.js";
 import { handleDetectDrift } from "./drift.js";
 import { handleSync } from "./sync.js";
@@ -25,17 +24,6 @@ import {
 } from "./tasks.js";
 import { handleUpdateState } from "./handoff-orchestrator.js";
 import { handleIndexPrd, handleClearPrdChunks, DEFAULT_EMBEDDING_MODEL } from "./rag.js";
-import { buildSrEngineerPrompt } from "../prompts/sr-engineer.js";
-import { buildResearcherPrompt } from "../prompts/researcher.js";
-import { buildPmPrompt } from "../prompts/pm.js";
-import { buildQaEngineerPrompt } from "../prompts/qa-engineer.js";
-import { buildCoordinatorPrompt } from "../prompts/coordinator.js";
-import { buildCoordinatorLitePrompt } from "../prompts/coordinator-lite.js";
-import { buildArchitectPrompt } from "../prompts/architect.js";
-import { buildDesignAuditorPrompt } from "../prompts/design-auditor.js";
-import { buildCodeReviewerPrompt } from "../prompts/code-reviewer.js";
-import { buildDocWriterPrompt } from "../prompts/doc-writer.js";
-import { buildReleaseEngineerPrompt } from "../prompts/release-engineer.js";
 
 // ==========================================
 // Registry entry types (T-REG-01)
@@ -59,7 +47,12 @@ export interface PromptRegistryEntry {
   name: string;
   description: string;
   arguments: Array<{ name: string; description: string; required: boolean }>;
-  build: (workspacePath: string) => PromptResult;
+  // Declarative skill-file reference (C6 DR-2): the GetPrompt handler in
+  // index.ts calls buildPromptForRole(entry.skillFile, …) directly so the
+  // resolution-source and omit-constitution params are passed at one call
+  // site. The prompts/<role>.ts wrapper functions stay exported for tests
+  // but are no longer referenced here.
+  skillFile: string; // e.g. "skill-architect.md"
 }
 
 export function defineTool<TSchema extends z.ZodTypeAny>(spec: {
@@ -538,7 +531,8 @@ export const TOOL_REGISTRY: ToolRegistryEntry[] = [
 // Order and descriptions are FROZEN to the pre-refactor
 // ListPromptsRequestSchema output (AC-4 byte-identical), including the
 // `teamwork` / `teamwork-lite` backwards-compat ids mapped to the
-// coordinator build functions.
+// coordinator skill files. Entries are declarative (C6 DR-2): `skillFile`
+// names the content/skill-*.md the handler feeds to buildPromptForRole.
 // ==========================================
 
 const PROMPT_WORKSPACE_ARG = {
@@ -552,66 +546,66 @@ export const PROMPT_REGISTRY: PromptRegistryEntry[] = [
     name: "sr-engineer",
     description: "Load constitution, skill, state. Run first.",
     arguments: [PROMPT_WORKSPACE_ARG],
-    build: buildSrEngineerPrompt,
+    skillFile: "skill-sr-engineer.md",
   },
   {
     name: "researcher",
     description: "Deep research. Load constitution, skill, state.",
     arguments: [PROMPT_WORKSPACE_ARG],
-    build: buildResearcherPrompt,
+    skillFile: "skill-researcher.md",
   },
   {
     name: "pm",
     description: "PM role. Write specs, break down tasks, sync state.",
     arguments: [PROMPT_WORKSPACE_ARG],
-    build: buildPmPrompt,
+    skillFile: "skill-pm.md",
   },
   {
     name: "qa-engineer",
     description: "QA role. Verify code, write tests, rollback bugs.",
     arguments: [PROMPT_WORKSPACE_ARG],
-    build: buildQaEngineerPrompt,
+    skillFile: "skill-qa-engineer.md",
   },
   {
     name: "teamwork",
     description: "Agent Governance Coordinator. Route tasks or execute them.",
     arguments: [PROMPT_WORKSPACE_ARG],
-    build: buildCoordinatorPrompt,
+    skillFile: "skill-coordinator.md",
   },
   {
     name: "teamwork-lite",
     description: "Coordinator (lite). Solo-dev mode: direct execution, no chain, no state writes.",
     arguments: [PROMPT_WORKSPACE_ARG],
-    build: buildCoordinatorLitePrompt,
+    skillFile: "skill-coordinator-lite.md",
   },
   {
     name: "architect",
     description: "Architect role. Write system design, interface contracts.",
     arguments: [PROMPT_WORKSPACE_ARG],
-    build: buildArchitectPrompt,
+    skillFile: "skill-architect.md",
   },
   {
     name: "design-auditor",
     description: "Design audit. Extract Copy / Visual tokens from any design source.",
     arguments: [PROMPT_WORKSPACE_ARG],
-    build: buildDesignAuditorPrompt,
+    skillFile: "skill-design-auditor.md",
   },
   {
     name: "code-reviewer",
     description: "Code review role — clean-context diff judge between sr-engineer and qa-engineer.",
     arguments: [PROMPT_WORKSPACE_ARG],
-    build: buildCodeReviewerPrompt,
+    skillFile: "skill-code-reviewer.md",
   },
   {
     name: "doc-writer",
     description: "Documentation maintainer — keeps README / CHANGELOG / docs in sync after PASS.",
     arguments: [PROMPT_WORKSPACE_ARG],
-    build: buildDocWriterPrompt,
+    skillFile: "skill-doc-writer.md",
   },
   {
     name: "release-engineer",
     description: "Release engineer — owns version bumps, CHANGELOG, git tag, and gh release after PASS.",
     arguments: [PROMPT_WORKSPACE_ARG],
-    build: buildReleaseEngineerPrompt,
+    skillFile: "skill-release-engineer.md",
   },
 ];

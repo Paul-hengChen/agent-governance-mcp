@@ -6,6 +6,7 @@
 // Methodology-agnostic: defaults to a generic markdown checkbox task format;
 // teams override task pattern / paths / constitution via <workspace>/.current/.
 
+import * as fs from "node:fs";
 import * as path from "node:path";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -21,7 +22,81 @@ import { z } from "zod";
 import { cleanupStaleSessions } from "./guards/session.js";
 import { setActiveStorage } from "./tools/storage.js";
 import { TOOL_REGISTRY, PROMPT_REGISTRY } from "./tools/registry.js";
-import { appendSpecContext } from "./prompts/build.js";
+import {
+  appendSpecContext,
+  buildPromptForRole,
+  type WorkspaceSource,
+} from "./prompts/build.js";
+
+// ==========================================
+// Workspace resolution (C6 DR-1) — one shared fallback chain for the prompt
+// path: explicit arg → CLAUDE_PROJECT_DIR env → server cwd. The resolved path
+// is NEVER silently redirected; the `managed` probe only ANNOTATES (the
+// fail-loud footer in prompts/build.ts renders S01a when it is false).
+// Exported for the AC-4 unit test.
+// ==========================================
+
+export interface WorkspaceResolution {
+  path: string;            // resolved absolute path (never silently altered)
+  source: WorkspaceSource; // which fallback step produced it
+  managed: boolean;        // does path have .current/ or tasks.md ?
+}
+
+export function resolveWorkspacePath(
+  args: Record<string, unknown> | undefined,
+): WorkspaceResolution {
+  let resolved: string;
+  let source: WorkspaceSource;
+  if (typeof args?.workspace_path === "string" && args.workspace_path) {
+    resolved = args.workspace_path;
+    source = "workspace_path arg";
+  } else if (process.env.CLAUDE_PROJECT_DIR) {
+    resolved = process.env.CLAUDE_PROJECT_DIR;
+    source = "CLAUDE_PROJECT_DIR env";
+  } else {
+    resolved = process.cwd();
+    source = "cwd fallback";
+  }
+  const managed =
+    fs.existsSync(path.join(resolved, ".current")) ||
+    fs.existsSync(path.join(resolved, "tasks.md"));
+  return { path: resolved, source, managed };
+}
+
+// ==========================================
+// Constitution dedup (C11, DR-4/DR-6) — decided AT THE HANDLER so
+// buildPromptForRole stays pure. Both layers fail SAFE: any doubt => emit the
+// full constitution (false-omission is catastrophic; double-injection is
+// benign token waste).
+//   L1: in-memory per-workspace "already delivered this process" flag —
+//       covers prompt→prompt (AC-8); resets when the stdio server exits
+//       (== session end). Keyed by resolved workspace path (HTTP mode note:
+//       the S03 recovery sentinel covers the rare same-workspace concurrent
+//       session).
+//   L2: windowed marker written by the SessionStart hook — covers hook→prompt
+//       (AC-7) for the boot-then-/teamwork repro.
+// ==========================================
+
+const constitutionDeliveredFor = new Set<string>();
+
+const HOOK_MARKER_WINDOW_MS = 120_000; // 2 min (DR-4)
+
+function hookMarkerFresh(ws: string): boolean {
+  // Fail-safe default = false (emit full) on absent / stale / unreadable /
+  // malformed marker.
+  try {
+    const raw = fs.readFileSync(
+      path.join(ws, ".current", ".agc-hook-marker.json"),
+      "utf-8",
+    );
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== "object" || parsed === null) return false;
+    const ts = (parsed as Record<string, unknown>).ts;
+    return typeof ts === "number" && Date.now() - ts <= HOOK_MARKER_WINDOW_MS;
+  } catch {
+    return false;
+  }
+}
 
 // Runtime validation schemas (zod) now live in tools/registry.ts, paired with
 // each tool's JSON Schema + handler via defineTool (registry-pattern, T-REG-06).
@@ -40,7 +115,7 @@ function formatZodError(err: z.ZodError): string {
 // ==========================================
 // Storage adapter defaults to FileHandoffStorage; HTTP-mode boot switches it via setActiveStorage().
 const server = new Server(
-  { name: "agent-governance-mcp", version: "3.47.0" },
+  { name: "agent-governance-mcp", version: "3.48.0" },
   { capabilities: { tools: {}, prompts: {} } }
 );
 
@@ -56,15 +131,25 @@ server.setRequestHandler(ListPromptsRequestSchema, async () => ({
 server.setRequestHandler(GetPromptRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
 
-  // Fallback: CLAUDE_PROJECT_DIR (set by Claude Code) or cwd
-  const resolvedPath =
-    (typeof args?.workspace_path === "string" && args.workspace_path) ||
-    process.env.CLAUDE_PROJECT_DIR ||
-    process.cwd();
+  const { path: ws, source } = resolveWorkspacePath(args);
 
   const entry = PROMPT_REGISTRY.find((e) => e.name === name);
   if (!entry) throw new Error(`Prompt not found: ${name}`);
-  return appendSpecContext(entry.build(resolvedPath), resolvedPath, name);
+
+  // C11 dedup — decide omit BEFORE recording delivery (fail-safe: any doubt
+  // => false => full constitution emitted).
+  const omit = constitutionDeliveredFor.has(ws) || hookMarkerFresh(ws);
+  constitutionDeliveredFor.add(ws); // this session now "has" the constitution
+
+  const result = buildPromptForRole(
+    entry.skillFile,
+    entry.description,
+    ws,
+    false,
+    source,
+    omit,
+  );
+  return appendSpecContext(result, ws, name);
 });
 
 // ==========================================
