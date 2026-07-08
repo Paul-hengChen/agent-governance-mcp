@@ -16,6 +16,11 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.51.0] - 2026-07-08
+
+### Added
+- **`a11-escalation-grammar` — Escalation-route tables + WHEN/DO/ELSE rule grammar (v3.51.0).** Consolidates scattered escalation-call incantations into a canonical format defined once in Constitution §3 and expressed as one `## Escalation Routes` table per skill file. Adds one canonical **Escalation call format** bullet to `content/const-05-core-standards.md` and one **Rule grammar (WHEN/DO/ELSE)** bullet. Restructures escalation sites in 7 skill files (`skill-architect.md`, `skill-sr-engineer.md`, `skill-qa-engineer.md`, `skill-design-auditor.md`, `skill-code-reviewer.md`, `skill-coordinator.md`, `skill-release-engineer.md`) from prose to tabular form; light-touch cross-reference edits to `skill-pm.md` and `skill-qa-visual.md`. 11 content-only edits (A11-01..A11-11); no new data model, no schema_version bump, no new tw_* tool, no cross-cutting API surface change. Backwards-compatible; PATCH bump for consistency polish. See `specs/a11-escalation-grammar.md`, `qa_reports/review_a11-escalation-grammar.md`, `review_reports/review_a11-escalation-grammar.md`.
+
 ## [3.50.0] - 2026-07-08
 
 ### Added
