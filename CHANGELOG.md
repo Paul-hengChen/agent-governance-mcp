@@ -16,6 +16,11 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.52.0] - 2026-07-09
+
+### Added
+- **`b8-external-ref-ledger` — External-reference ledger + build-entry gate (v3.52.0).** Adds server-enforced EXTERNAL_REFS_UNRESOLVED gate to Constitution §7, blocking the PM→architect/sr-engineer build-entry transition while any recorded external reference remains `unresolved`. New `external_refs` field in handoff YAML (file-mode only): array of `{ref, state}` entries with closed-enum states (`fetched`, `indexed`, `user-confirmed-ignorable`, `unresolved`). Ledger is feature-scoped (reset on `active_feature` change) and preserves across writes in same feature. Mirrored attestation pattern mirrors `scope_decision`/`cut_approved` (AC-2 absence = "zero refs found", not unresolved sentinel). Gate fires on both PM→architect and PM→sr-engineer edges (AC-4); gated edge reset on Amend-Resume re-entry (AC-3); SQL-mode skips (AC-5). Handoff schema v5→v6 migration (stamp-only, `external_refs` absent on migrate). SOP updates: skill-pm.md Resource Audit Gate + skill-coordinator.md Auto-Routing stop-condition surface unresolved refs. Constitution §7 wording reflects enforcement. 11 B8 subtasks + QA completed; 959/959 tests (938 baseline + 21 new). See `specs/b8-external-ref-ledger.md`, `qa_reports/review_b8.md`, `review_reports/review_b8.md`.
+
 ## [3.51.0] - 2026-07-08
 
 ### Added
