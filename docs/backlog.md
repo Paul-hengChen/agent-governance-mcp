@@ -37,7 +37,7 @@ future `/teamwork` feature; none blocks a release on its own.
 | C5 | Watermark toolchain: template hardcodes tier; validateWatermark appends instead of replacing on mismatch | P2 | — | ~4 (`lib/watermark-check.ts`, `templates/claude-code-agents/*`, tests) | — |
 | C6 | Prompt-injection state footer reports "No handoff state found" while handoff exists; stale `prd_path` suspect — **done (2026-07-08, v3.48.0)** | P1 | — | ~3 (`prompts/build.ts` state loader, `bin/agent-governance-context.mjs`, test) | — |
 | C7 | §2 test-ownership absolutism collides with mechanical version-literal edits at release | P2 | — | ~3 (constitution §2, skill-release-engineer, version-assertion tests) | — |
-| C8 | Crash-resume protocol: mid-role kill leaves no §3 failure write; resume drops dispatch-time model pin | P2 | — | ~2 (skill-coordinator SOP, maybe handoff field) | — |
+| C8 | Crash-resume protocol: mid-role kill leaves no §3 failure write; resume drops dispatch-time model pin — **done (2026-07-09)** | P2 | — | ~2 (skill-coordinator SOP, maybe handoff field) | — |
 | C9 | pending_notes free-text protocol tokens (`next_role:`/`resume_of:`/`review: APPROVED`) → structured handoff fields | P2 | A10 ✓ | ~6 (`tools/handoff.ts` schema, `transitions.ts`, orchestrator, skills, tests) | — |
 | C10 | qa-engineer / release-engineer bookkeeping boundary blur (QA did version bump + CHANGELOG in A10-10) | P2 | — | ~3 (skill-pm cut guidance, skill-qa-engineer, skill-release-engineer) | — |
 | C11 | Constitution double-injection: SessionStart hook + `/teamwork*` prompt both carry the full constitution in one session — **done (2026-07-08, v3.48.0)** | P2 | — | ~3 (`prompts/build.ts`, `bin/agent-governance-context.mjs`) | — |
@@ -441,7 +441,19 @@ future `/teamwork` feature; none blocks a release on its own.
 - **Risk if skipped:** §2's bright line blurs by precedent instead of by
   decision.
 
-## C8 — No crash-resume protocol; resume drops the dispatch-time model pin (P2, observed 2026-07-08)
+## C8 — No crash-resume protocol; resume drops the dispatch-time model pin (P2, observed 2026-07-08) — DONE 2026-07-09
+- **Done:** shipped as feature `c8-crash-resume-protocol` (spec
+  `specs/c8-crash-resume-protocol.md` + code-review `review_reports/review_T-C8-CR.md`
+  + QA `qa_reports/review_T-C8-QA.md`; single-feature commit + release flow).
+  Mechanism: three-step resume procedure in skill-coordinator.md Crash-Resume
+  Protocol section — (1) ground-truth working tree via git status, (2) restate
+  findings in the resume brief, (3) re-assert dispatch-time model pins from
+  `dispatch_pins` pending_notes convention, verifying resumed run honors them.
+  New dispatch_pins convention in Auto-Routing section (AC-1), new pinned-tier
+  expectation in Watermark Validation section (AC-2), new Crash-Resume Protocol
+  section (AC-3), new Crash detection row in Escalation Routes table (AC-4).
+  Content-only, no schema bump; test/context-budget.test.mjs AC8 cap rebaselined
+  9699 → 10774 per QA. 6 C8 subtasks (T-C8-01..04 + T-C8-CR + T-C8-QA) + PASS.
 - **What:** The sr-engineer subagent was killed mid-task by a session usage
   limit — it could not honor §3's "on crash, still call tw_update_state", so
   the chain had no failure record. The coordinator improvised: ground-truthed
@@ -455,10 +467,6 @@ future `/teamwork` feature; none blocks a release on its own.
   brief, (3) re-assert any dispatch-time overrides (model pin) and verify the
   resumed run honors them — pin recorded in `pending_notes` at dispatch so it
   survives context loss.
-- **Owner:** /teamwork (skill-coordinator SOP; optionally a `dispatch_pins`
-  note convention; content-only).
-- **Risk if skipped:** every externally-killed role becomes an improvised
-  recovery; model-pin directives silently degrade on resume.
 
 ## C9 — pending_notes is a free-text protocol channel (P2, observed 2026-07-08; natural A10 follow-on)
 - **What:** Load-bearing routing/gating signals — `next_role:`, `resume_of:`,

@@ -80,6 +80,20 @@ After each role's handoff, read the just-written `pending_notes`. If a `next_rol
 
 **Subagent Dispatch (Claude Code)** — preferred when available. If the host advertises a `Task` tool with `subagent_type=<role>` AND a subagent named `<role>` is registered (heuristic: attempt the call once; on tool-error or unknown-subagent-type, fall back), dispatch via `Task(subagent_type="<next_role>", prompt="<one-paragraph brief summarising the upstream pending_notes>")` INSTEAD of `tw_switch_role`. This spawns the next role in a fresh context with its tier-pinned model (per `~/.claude/agents/<role>.md` frontmatter — copy from `templates/claude-code-agents/`). The dispatched subagent's first action remains `tw_get_state` → `tw_detect_drift` (Constitution §3); the **server-enforced `ALLOWED_TRANSITIONS` matrix in `tools/transitions.ts` still gates every `tw_update_state` write** (invalid edges rejected with `TRANSITION_REJECTED`) — Task-tool dispatch changes WHICH MODEL runs the role, NOT the routing chain itself.
 
+**Dispatch-time overrides (`dispatch_pins`)** — when dispatching (or re-dispatching) a role with a
+non-default `model` override (e.g. a human directive to pin `sr-engineer` to `fable` for this
+feature, overriding its `~/.claude/agents/<role>.md` frontmatter default), you MUST persist the pin
+BEFORE calling `Task(subagent_type=<role>, model=<pin>, …)`: call `tw_update_state` on the CURRENT
+handoff tuple (same `agent_id`/`status` already on record — a same-tuple amendment, not a role
+transition; same pattern as the Cut-approval gate writer obligation below) with `pending_notes` set
+to every existing note PLUS one line `dispatch_pins: <role>=<model>` (one entry per pinned role;
+re-pinning a role replaces only that role's segment, other notes and other roles' pins survive).
+`pending_notes` is replaced wholesale on every write — carry every note you still want kept. This is
+a note-convention, not a schema field (backlog C9 covers promoting these tokens to first-class
+fields — out of scope here). The pin now survives context loss: any future coordinator instance
+reading `handoff.md` recovers the override from `pending_notes` alone, with no dependence on the
+dispatching session's own memory.
+
 **Fallback (`tw_switch_role`)** — used when Task tool / subagents are unavailable (Cursor, Continue, Anti-Gravity, plain MCP clients, or Claude Code without the templates installed). Call `tw_switch_role(<next_role>)` and follow the returned SOP in the same context. This is the pre-v3.20.0 behavior — degradation is graceful and silent; no tw_* tool surface has changed.
 
 **Stop conditions**: see `## Escalation Routes` below. WHEN any row's trigger fires → DO stop (or, for the relay row, route) per that row, surfacing the reason in one sentence → ELSE keep auto-hopping.
@@ -99,12 +113,39 @@ Stop conditions + routing escalations (WHEN/DO/ELSE collapsed to rows; Constitut
 | `pending_notes` contains a line beginning `next_role: human` | — | relay the prior role's note | human |
 | `pending_notes` contains NO line beginning `next_role:` | — | surface as ambiguous — the prior role forgot or finished without nominating a successor | human |
 | hop counter ≥ `10` for this `/teamwork` session | — | surface the hop cap | human |
+| **Crash detection** — a dispatched `Task(subagent_type=<role>, …)` call returns a tool-error or empty/truncated reply, or the host/user reports the subagent was killed (session or usage-limit kill), BEFORE that role's own `tw_update_state` landed (handoff `agent_id`/`status` unchanged since dispatch) | — | do not resume or re-dispatch directly — run the Crash-Resume Protocol first, then resume | (role being resumed) |
 | **Cut-approval gate** — `pending_notes` contains `next_role: architect` or `next_role: sr-engineer` but `cut_approved` is not set on the handoff (server error: `CUT_APPROVAL_REQUIRED`) | — | surface the cut draft and wait — do NOT auto-hop through to build; writer obligation below | human |
 | **External-refs gate** — `pending_notes` contains `next_role: architect` or `next_role: sr-engineer` but the handoff `external_refs` ledger has an entry with `state: "unresolved"` (server error: `EXTERNAL_REFS_UNRESOLVED`) | — | surface the unresolved refs and wait — do NOT auto-hop through to build; PM must resolve each ref (fetch/index/user-confirm-ignorable) and re-write the ledger | human |
 | **Amend-Resume relay** — PM amendment `pending_notes` declare `resume_of: code-reviewer` or `resume_of: qa-engineer` (with `next_role:` naming that same role; routing action, not a halt) | In_Progress (routing write, `agent_id="<role>"`) | carry the identical `resume_of: <role>` entry — the server rejects the resume edge without it. Full mechanism: Constitution §3.1 | code-reviewer / qa-engineer |
 | visual work complete but no independent qa-visual context — `qa-visual`/`qa-engineer` cannot run (rate/session/weekly limit) and the coordinator has been building inline | Blocked | "awaiting independent QA" — the actor that built a surface MUST NOT author its visual verdict or issue its PASS (builder ≠ judge, §3.2); do not improvise a verdict to keep the chain moving | human |
 
 **Cut-approval gate writer obligation** (full mechanism and trust rule: Constitution §3.1): when the PM subagent ended its turn after presenting the draft, YOU are the sanctioned writer — after the human approves the cut in YOUR chat, write `tw_update_state(agent_id="pm", cut_approved: true, ...)` on the PM's still-current state tuple, then resume routing to build. Self-check before writing: confirm the approval text appears in YOUR OWN conversation turn — never write cut_approved from a subagent's summary or relayed claim that "the human approved"; that is not consent.
+
+## Crash-Resume Protocol<!-- origin:start --> (v3.53.0)<!-- origin:end -->
+
+Constitution §3 requires "on crash/failure, still call `tw_update_state` with the failure summary" —
+but an externally-killed subagent (session/usage-limit kill, host crash) cannot honor that; it dies
+mid-task with NO failure record. The **Crash detection** row in Escalation Routes above routes here.
+Run this protocol BEFORE any re-dispatch or resume — do NOT improvise a resume from transcript alone;
+that is how a dispatch-time `model` pin silently degrades back to frontmatter default.
+
+1. **Ground-truth the working tree.** Before trusting anything the dead role claimed (its last
+   `pending_notes`, transcript text, or `tasks.md` checkbox state), verify independently: `git
+   status`, `git diff`, `git log -1`, and re-read the specific target files against the claims — did
+   the files it said it touched actually change? Did the tests it said it added exist? Treat any
+   claim you cannot verify from the tree as **not done**, regardless of transcript confidence.
+2. **Restate findings in the resume brief.** The prompt handed to the resumed/re-dispatched role (via
+   `Task(subagent_type=<role>, …)` or the `tw_switch_role` fallback) MUST explicitly state what step 1
+   found: which claimed changes are verified present, which are verified absent, and which task(s)
+   therefore remain open. Do not let the resumed role re-derive this from a stale transcript — hand
+   it the ground-truth summary directly so it resumes from reality, not from the dead role's last
+   (possibly false) claim.
+3. **Re-assert dispatch-time overrides and verify they're honored.** Read `pending_notes` for a
+   `dispatch_pins: <role>=<model>` entry covering the role being resumed. If present, pass that SAME
+   `model` override on the resume `Task(...)` call — do not fall back to frontmatter default just
+   because the crash lost session memory; the pin lives in `pending_notes`, not in your context.
+   After the resumed role replies, run Subagent Reply Watermark Validation as usual, but check the
+   tier against the pin per the Pinned-tier expectation below, not the frontmatter default.
 
 ## Subagent Reply Watermark Validation
 
@@ -119,6 +160,13 @@ When the parent (this coordinator) dispatches a role via `Task(subagent_type="<r
 ```
 
 The leading character MUST be U+2014 (EM DASH, `—`), not a hyphen-minus or en-dash. The `<name>` and `<tier>` captured tokens MUST also match the dispatched subagent's `name` frontmatter and `model` frontmatter (case-insensitive). A mismatched name (e.g. reply ends `— @wrong-name (haiku)` while dispatched as `@lite`) is treated as absent.
+
+**Pinned-tier expectation** — if `pending_notes` carries a `dispatch_pins: <role>=<model>` entry for
+the dispatched role, the expected `<tier>` for this match is the PIN, not the role's frontmatter
+default. A reply stamped with the frontmatter-default tier while a pin is active is a MISMATCH (the
+pin silently failed to take effect), not a pass — apply the Correction strategy below to fix the
+stamped string, but also surface in your relay that the pin did not take effect; a corrected
+watermark string does not mean the pinned model actually executed.
 
 **Correction strategy** — when the watermark is absent or mismatched, append the canonical suffix `\n— @<name> (<tier>)` to the relayed text. Do NOT re-dispatch (doubles cost, risks loops) and do NOT add a visible warning (operator wants the suffix, not a debugging trace). Cost is one string concatenation per miss.
 

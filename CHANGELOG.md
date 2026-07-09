@@ -16,6 +16,11 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.53.0] - 2026-07-09
+
+### Added
+- **`c8-crash-resume-protocol` — Mid-role crash recovery: ground-truth working tree, restate findings, re-assert dispatch-time model pins (v3.53.0).** Adds skill-coordinator.md crash-resume protocol (three-step procedure: ground-truth the working tree vs role's last claims via git status; restate findings in the resume brief; re-assert dispatch-time overrides like model pins from dispatch notes, verifying resumed run honors them). New dispatch_pins convention in pending_notes (records dispatch-time model pins surviving context loss). New pinned-tier expectation in Watermark Validation section. New Crash detection row in Escalation Routes table (routes to Crash-Resume Protocol). Content-only, no schema bump, no new tw_* tool. 6 C8 subtasks (T-C8-01..04 implementation + T-C8-CR code review + T-C8-QA verification); build 959/959 tests green; test/context-budget.test.mjs AC8 cap rebaselined 9699 → 10774 per QA. See `specs/c8-crash-resume-protocol.md`, `qa_reports/review_T-C8-QA.md`, `review_reports/review_T-C8-CR.md`.
+
 ## [3.52.0] - 2026-07-09
 
 ### Added
