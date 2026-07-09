@@ -39,7 +39,8 @@ export type GateErrorCode =
   | "VISUAL_PROVENANCE_MISSING"
   | "BASELINE_MANIFEST_MISSING"
   | "BASELINE_PROVENANCE_INCOMPLETE"
-  | "PIXEL_GATE_ATTESTATION_MISSING";
+  | "PIXEL_GATE_ATTESTATION_MISSING"
+  | "REVIEW_VERDICT_STATUS_MISMATCH";
 
 export type GateProducer = "validateTransition" | "orchestrator";
 export type GateEnvelope = "transition-json" | "orchestrator-json" | "plain-text";
@@ -59,12 +60,12 @@ export interface GateDefinition {
   // (DR-3, qa-engineer's rewritten error-code-contract test) compares against.
   readonly hintStatic: string;
   // True iff the code is (and must stay) backtick-quoted in >=1 content/*.md.
-  // All 19 are true today. The field exists so a future code-internal gate can
+  // All 20 are true today. The field exists so a future code-internal gate can
   // opt out without weakening the parity test.
   readonly documentedInProse: boolean;
 }
 
-// The 19-gate catalog, in documentation order. Array order is DOC order only —
+// The 20-gate catalog, in documentation order. Array order is DOC order only —
 // it MUST NOT be relied on for evaluation order (DR-5; that lives in
 // handoff-orchestrator.ts as the physical if-block sequence).
 export const GATE_REGISTRY: readonly GateDefinition[] = [
@@ -161,7 +162,7 @@ export const GATE_REGISTRY: readonly GateDefinition[] = [
       "specs/b8-external-ref-ledger.md.",
     documentedInProse: true,
   },
-  // ---- plain-text (codes 9-19, producer: orchestrator) ----
+  // ---- plain-text (codes 9-20, producer: orchestrator) ----
   {
     errorCode: "MISSING_EVIDENCE",
     producer: "orchestrator",
@@ -300,6 +301,19 @@ export const GATE_REGISTRY: readonly GateDefinition[] = [
       "surface in qa_reports/visual_<id>.md must carry '- pixel_gate_complete: true' " +
       "in its ### <surface id> prose sub-section under ## Region Diff. Carry-forward " +
       "surfaces are exempt. See specs/qa-visual-pixel-gate-attestation.md.",
+    documentedInProse: true,
+  },
+  {
+    errorCode: "REVIEW_VERDICT_STATUS_MISMATCH",
+    producer: "orchestrator",
+    envelope: "plain-text",
+    triggerEdge: "code-reviewer write with review_verdict disagreeing with status",
+    armCondition: "agent_id=code-reviewer && review_verdict present",
+    clearingArtifact: "APPROVED↔In_Progress or CHANGES_REQUESTED↔FAIL",
+    hintStatic:
+      "A code-reviewer APPROVED verdict requires status=In_Progress; " +
+      "CHANGES_REQUESTED requires status=FAIL. Align review_verdict with status, " +
+      "or omit review_verdict. See specs/c9-protocol-fields.md AC-5.",
     documentedInProse: true,
   },
 ];

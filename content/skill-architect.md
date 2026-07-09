@@ -70,16 +70,16 @@ None.
 2. Read `specs/<feature>.md`. WHEN missing → DO escalate per *Escalation Routes: spec missing*. STOP. ELSE continue.
 3. **Ambiguity Gate**: WHEN spec acceptance criteria are missing or contradictory → DO escalate per *Escalation Routes: spec incomplete*. STOP. ELSE continue.
 4. **External-reference Sanity Gate**: cross-check `Deferred Resources` against the spec's *Dependencies / Prerequisites*. WHEN a reference in the spec is NOT in `Deferred Resources` AND was NOT fetched → DO escalate per *Escalation Routes: external reference unclassified*. ELSE continue.
-4a. **Visual Harness Gate**<!-- origin:start --> (v3.14.0)<!-- origin:end -->: WHEN `design/<feature>.md` exists AND contains a `## Visual Baselines` H2, AND the spec's task list lacks a `[P0] Build visual-diff harness` task ordered before widget tasks → DO escalate per *Escalation Routes: visual harness task missing* (`next_role: pm`). ELSE continue. Reason: without an owned harness, R1's PASS gate cannot be satisfied even when QA tries.
+4a. **Visual Harness Gate**<!-- origin:start --> (v3.14.0)<!-- origin:end -->: WHEN `design/<feature>.md` exists AND contains a `## Visual Baselines` H2, AND the spec's task list lacks a `[P0] Build visual-diff harness` task ordered before widget tasks → DO escalate per *Escalation Routes: visual harness task missing* (`next_role=pm`). ELSE continue. Reason: without an owned harness, R1's PASS gate cannot be satisfied even when QA tries.
 5. Produce `specs/<feature>-architecture.md` per the Artifact Schema.
 6. **Open Questions Gate**: WHEN `Open Questions` section is non-empty → DO escalate per *Escalation Routes: open questions*. STOP. Do NOT hand off to sr-engineer with unresolved design questions. ELSE continue.
-7. Otherwise: `tw_update_state(status=In_Progress, pending_notes=["Architecture ready", "next_role: sr-engineer"])`.
+7. Otherwise: `tw_update_state(status=In_Progress, next_role="sr-engineer", pending_notes=["Architecture ready"])`.
 
 ## Escalation Routes
 
-Call shape: Constitution §3 *Escalation call format* (`agent_id="architect"`). Every route below STOPs after the write; all architect escalations route back to PM.
+Call shape: Constitution §3 *Escalation call format* (`agent_id="architect"`; `next_role` is the first-class field). Every route below STOPs after the write; all architect escalations route back to PM.
 
-| situation | status | note token | next_role |
+| situation | status | pending note | next_role |
 |---|---|---|---|
 | spec missing | Blocked | `Architect blocked: PM spec missing for <feature>` | pm |
 | spec incomplete | Blocked | `Architect blocked: spec incomplete — <detail>` | pm |

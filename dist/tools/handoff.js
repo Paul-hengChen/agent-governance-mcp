@@ -62,6 +62,27 @@ function parseExternalRefs(raw) {
     }
     return refs.length > 0 ? refs : undefined;
 }
+// v7 — legal value sets for the three protocol fields, for defensive
+// parse-time filtering (c9-protocol-fields).
+const NEXT_ROLE_VALUES = [
+    "pm",
+    "researcher",
+    "design-auditor",
+    "architect",
+    "sr-engineer",
+    "code-reviewer",
+    "qa-engineer",
+    "release-engineer",
+];
+const RESUME_OF_VALUES = ["code-reviewer", "qa-engineer"];
+const REVIEW_VERDICT_VALUES = ["APPROVED", "CHANGES_REQUESTED"];
+// v7 — defensive enum parser for the three protocol frontmatter fields.
+// Returns undefined on absent / non-string / out-of-enum raw values (matching
+// parseExternalRefs' defensive posture); never throws. Absence stays the
+// single "no routing signal recorded" sentinel.
+function parseEnumField(raw, allowed) {
+    return typeof raw === "string" && allowed.includes(raw) ? raw : undefined;
+}
 // Internal helper. Reads + parses + runs schema migrations. Returns the
 // migrated state plus a flag that lets readHandoffState fire a write-back
 // to heal the on-disk file. Callers that don't need the flag use parseHandoff.
@@ -119,6 +140,11 @@ function readAndMigrate(workspacePath) {
     // absent/malformed, so absence flows to hasUnresolvedRefs as the
     // non-blocking "zero refs found" sentinel (spec AC-2).
     const externalRefs = parseExternalRefs(frontmatter.external_refs);
+    // v7 — protocol fields (c9-protocol-fields). undefined when absent /
+    // out-of-enum, so absence stays the "no routing signal recorded" sentinel.
+    const nextRole = parseEnumField(frontmatter.next_role, NEXT_ROLE_VALUES);
+    const resumeOf = parseEnumField(frontmatter.resume_of, RESUME_OF_VALUES);
+    const reviewVerdict = parseEnumField(frontmatter.review_verdict, REVIEW_VERDICT_VALUES);
     const qaRoundRaw = Number(frontmatter.qa_round);
     const qa_round = Number.isFinite(qaRoundRaw) && qaRoundRaw >= 0 ? Math.floor(qaRoundRaw) : 0;
     const reviewRoundRaw = Number(frontmatter.review_round);
@@ -136,6 +162,9 @@ function readAndMigrate(workspacePath) {
         ...(scopeDecisionWhy && { scope_decision_why: scopeDecisionWhy }),
         ...(cutApproved && { cut_approved: cutApproved }),
         ...(externalRefs && { external_refs: externalRefs }),
+        ...(nextRole && { next_role: nextRole }),
+        ...(resumeOf && { resume_of: resumeOf }),
+        ...(reviewVerdict && { review_verdict: reviewVerdict }),
         completed_tasks,
         pending_notes,
         qa_round,
@@ -189,8 +218,9 @@ export function readHandoffState(workspacePath) {
     }
     const truncated = state.completed_tasks.length > COMPLETED_TASKS_RETURN_LIMIT;
     // Truncate pending_notes by total character count. Keep notes from the
-    // front (routing directives like "next_role: ..." appear first and are
-    // most important). Drop trailing notes that push past the limit.
+    // front (writers put the most load-bearing prose first; routing itself now
+    // travels in the structured next_role field, v7). Drop trailing notes that
+    // push past the limit.
     let pendingNotes = state.pending_notes;
     let pendingTruncated = false;
     const totalChars = pendingNotes.reduce((sum, n) => sum + n.length, 0);
@@ -246,6 +276,12 @@ export async function writeHandoffState(workspacePathOrOpts, activeFeature, stat
     // the same-feature preserve clause below carries any existing ledger
     // forward, DR-8).
     let externalRefs;
+    // v7 — protocol fields. Positional overload leaves all three undefined
+    // (transient AC-3 semantics: an omitting write — including the
+    // migration-heal write in readHandoffState — simply drops them).
+    let nextRole;
+    let resumeOf;
+    let reviewVerdict;
     if (typeof workspacePathOrOpts === "object" &&
         !Array.isArray(workspacePathOrOpts)) {
         const o = workspacePathOrOpts;
@@ -264,6 +300,9 @@ export async function writeHandoffState(workspacePathOrOpts, activeFeature, stat
         scopeDecisionWhy = o.scopeDecisionWhy;
         cutApproved = o.cutApproved;
         externalRefs = o.externalRefs;
+        nextRole = o.nextRole;
+        resumeOf = o.resumeOf;
+        reviewVerdict = o.reviewVerdict;
     }
     else {
         workspacePath = workspacePathOrOpts;
@@ -393,6 +432,17 @@ export async function writeHandoffState(workspacePathOrOpts, activeFeature, stat
         if (effectiveExternalRefs && effectiveExternalRefs.length > 0) {
             frontmatterData.external_refs = effectiveExternalRefs;
         }
+        // v7 — protocol fields: emit ONLY when set on THIS write (AC-3 transient
+        // semantics). Deliberately NOT joined to the existing-state preserve read
+        // above — carrying a stale single-hop directive forward would be a
+        // behavioral regression versus the wholesale-replaced pending_notes lines
+        // these fields replace (c9-protocol-fields DR on AC-3).
+        if (nextRole)
+            frontmatterData.next_role = nextRole;
+        if (resumeOf)
+            frontmatterData.resume_of = resumeOf;
+        if (reviewVerdict)
+            frontmatterData.review_verdict = reviewVerdict;
         // Always emit qa_round (even 0) so the field is discoverable; falsy
         // input (undefined/NaN) normalises to 0.
         const normalisedRound = Number.isFinite(qaRound) && qaRound >= 0 ? Math.floor(qaRound) : 0;

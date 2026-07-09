@@ -16,6 +16,11 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.55.0] - 2026-07-09
+
+### Added
+- **`c9-protocol-fields` — Structured routing/review fields in handoff state (v3.55.0).** Migrates three load-bearing protocol signals from free-text `pending_notes` conventions into dedicated handoff fields: `next_role` (which role should act next), `resume_of` (which stranded role a PM amendment resumes), and `review_verdict` (code-reviewer's verdict: APPROVED or CHANGES_REQUESTED). New zod schema validation at the `tw_update_state` boundary: `next_role` must be one of 8 AgentName values; `resume_of` must be one of {code-reviewer, qa-engineer}; `review_verdict` must be one of {APPROVED, CHANGES_REQUESTED}. New consistency gate: when `agent_id==="code-reviewer"` and `review_verdict` is present, an `APPROVED` verdict MUST pair with `status !== FAIL` (and vice versa for CHANGES_REQUESTED). All three fields are transient, write-scoped directives (absent on each write unless explicitly set — they are NOT blindly preserved or feature-scoped-preserved). Updates `tools/transitions.ts` Amend-Resume Edge to read structured `resume_of` field instead of pending_notes substring grep. Handoff schema v6→v7 migration (stamp-only, mirrors v3→v4 and v4→v5 precedent: absence of new fields on migrated files means "no signal recorded", not synthesized default). Skill updates: skill-pm.md, skill-coordinator.md, skill-code-reviewer.md, skill-sr-engineer.md, and skill-qa-engineer.md updated to emit/consume the structured fields instead of convention tokens. Five-layer defense: zod schema validation (tool boundary), consistency gate (review_verdict↔status), transient-semantic enforcement (write-scoped not feature-scoped), decision-record contrast (explicit vs. external_refs/cut_approved), and skill-text documentation. 16 T-C9-* tasks completed; build 973/973 tests green. See `specs/c9-protocol-fields.md`, `specs/c9-protocol-fields-architecture.md`, `qa_reports/review_c9-protocol-fields.md`, `review_reports/review_T-C9-01.md`.
+
 ## [3.54.0] - 2026-07-09
 
 ### Added

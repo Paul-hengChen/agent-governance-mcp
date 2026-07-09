@@ -35,10 +35,13 @@ export interface TransitionRequest {
   // v3.14.0 — pixel-fidelity sub-loop counter. Caller defaults to 0 if absent
   // for backwards-compat with pre-v3.14 callers (handoff schema v2).
   prev_visual_round?: number;
-  // v3.14.0 — pending_notes from the incoming write. Inspected to decide
-  // whether to bump visual_round (only ticks when notes contain
-  // `visual_fail:`, distinguishing pixel/widget drift from test-logic FAIL).
-  next_pending_notes?: ReadonlyArray<string>;
+  // v7 (c9-protocol-fields, AC-4) — structured Amend-Resume declaration from
+  // the incoming write (parsed.resume_of at the orchestrator). Replaces the
+  // former next_pending_notes substring grep (`resume_of: <target>` line),
+  // which was removed with no fallback — legacy pending_notes tokens are
+  // inert (DR-2/DR-6). computeNewRound still takes pending_notes as its own
+  // separate parameter for the visual_fail: check; that path is unrelated.
+  next_resume_of?: "code-reviewer" | "qa-engineer";
 }
 
 export interface TransitionRejection {
@@ -262,18 +265,6 @@ function isAgent(a: string | null): a is AgentName {
   );
 }
 
-// Amend-Resume Edge (C1). Pure, fs-free. Returns true iff `notes` contains a
-// single trimmed entry exactly equal to `resume_of: <target>`. Trust class of
-// scope_decision_why: client-attested, not server-verified.
-function resumeMarkerNames(
-  notes: ReadonlyArray<string> | undefined,
-  target: "code-reviewer" | "qa-engineer",
-): boolean {
-  if (!notes) return false;
-  const want = `resume_of: ${target}`;
-  return notes.some((n) => typeof n === "string" && n.trim() === want);
-}
-
 function rejection(
   req: TransitionRequest,
   error: TransitionRejection["error"],
@@ -305,7 +296,7 @@ function rejection(
  *   2. round-cap override (qa_round >= 4 → only (pm, In_Progress))
  *   3. self-loop fast path on same-agent In_Progress→In_Progress
  *   3.5 Amend-Resume Edge (C1): pm:In_Progress → {code-reviewer,qa-engineer}:In_Progress
- *       iff next_pending_notes self-attests `resume_of: <that exact role>`
+ *       iff the structured next_resume_of field names that exact role (v7)
  *   4. table lookup
  */
 export function validateTransition(req: TransitionRequest): TransitionRejection | null {
@@ -369,19 +360,22 @@ export function validateTransition(req: TransitionRequest): TransitionRejection 
     return null;
   }
 
-  // 3.5 Amend-Resume Edge (C1). Additive: opens pm:In_Progress →
-  // {code-reviewer,qa-engineer}:In_Progress ONLY when the incoming write
-  // self-attests `resume_of: <that exact role>` in pending_notes. The static
-  // table has no such entry, so absent/mismatched markers fall through to the
-  // unchanged TRANSITION_REJECTED. "Was actually stranded" is PM-attested (SOP);
-  // the server checks only marker⟺target consistency. Pure (reads only
-  // prev/next/pending_notes) — no fs, no schema field, works in every storage mode.
+  // 3.5 Amend-Resume Edge (C1, rewired by c9-protocol-fields AC-4). Additive:
+  // opens pm:In_Progress → {code-reviewer,qa-engineer}:In_Progress ONLY when
+  // the incoming write's structured resume_of field (threaded here as
+  // next_resume_of by the orchestrator) names that exact role. The static
+  // table has no such entry, so absent/mismatched fields fall through to the
+  // unchanged TRANSITION_REJECTED. Legacy `resume_of: <role>` pending_notes
+  // lines are INERT (DR-2 — not honored, not rejected). "Was actually
+  // stranded" is PM-attested (SOP, trust class of scope_decision_why); the
+  // server checks only field⟺target consistency. Pure (reads only
+  // prev/next/next_resume_of) — no fs, storage-agnostic.
   if (
     req.prev.agent === "pm" &&
     req.prev.status === "In_Progress" &&
     req.next.status === "In_Progress" &&
     (req.next.agent === "code-reviewer" || req.next.agent === "qa-engineer") &&
-    resumeMarkerNames(req.next_pending_notes, req.next.agent)
+    req.next_resume_of === req.next.agent
   ) {
     return null; // accept
   }

@@ -76,7 +76,7 @@ If ≥ 1 hit → route to `design-auditor` *before* PM. The auditor produces `de
 
 Default-ON in `/teamwork`. Disabled in `/teamwork-lite` (different skill).
 
-After each role's handoff, read the just-written `pending_notes`. If a `next_role: <name>` line is present and none of the stop conditions below fire, dispatch to the next role per the preference order below and follow its SOP. Increment your in-memory hop counter by 1 per successful dispatch.
+After each role's handoff, read the just-written state (`tw_get_state`). If the first-class `next_role` field is set (handoff schema v7 — a structured field, not a `pending_notes` line) and none of the stop conditions below fire, dispatch to the role it names per the preference order below and follow its SOP. `pending_notes` is free-text context for the next reader, not a routing channel. Increment your in-memory hop counter by 1 per successful dispatch.
 
 **Subagent Dispatch (Claude Code)** — preferred when available. If the host advertises a `Task` tool with `subagent_type=<role>` AND a subagent named `<role>` is registered (heuristic: attempt the call once; on tool-error or unknown-subagent-type, fall back), dispatch via `Task(subagent_type="<next_role>", prompt="<one-paragraph brief summarising the upstream pending_notes>")` INSTEAD of `tw_switch_role`. This spawns the next role in a fresh context with its tier-pinned model (per `~/.claude/agents/<role>.md` frontmatter — copy from `templates/claude-code-agents/`). The dispatched subagent's first action remains `tw_get_state` → `tw_detect_drift` (Constitution §3); the **server-enforced `ALLOWED_TRANSITIONS` matrix in `tools/transitions.ts` still gates every `tw_update_state` write** (invalid edges rejected with `TRANSITION_REJECTED`) — Task-tool dispatch changes WHICH MODEL runs the role, NOT the routing chain itself.
 
@@ -89,8 +89,9 @@ transition; same pattern as the Cut-approval gate writer obligation below) with 
 to every existing note PLUS one line `dispatch_pins: <role>=<model>` (one entry per pinned role;
 re-pinning a role replaces only that role's segment, other notes and other roles' pins survive).
 `pending_notes` is replaced wholesale on every write — carry every note you still want kept. This is
-a note-convention, not a schema field (backlog C9 covers promoting these tokens to first-class
-fields — out of scope here). The pin now survives context loss: any future coordinator instance
+a note-convention, not a schema field (c9-protocol-fields promoted `next_role`/`resume_of`/
+`review_verdict` to first-class fields but explicitly re-deferred `dispatch_pins` — spec AC-8; it
+stays a `pending_notes` convention until its own future ticket). The pin now survives context loss: any future coordinator instance
 reading `handoff.md` recovers the override from `pending_notes` alone, with no dependence on the
 dispatching session's own memory.
 
@@ -98,7 +99,7 @@ dispatching session's own memory.
 
 **Stop conditions**: see `## Escalation Routes` below. WHEN any row's trigger fires → DO stop (or, for the relay row, route) per that row, surfacing the reason in one sentence → ELSE keep auto-hopping.
 
-**Opt-out**: if `AGC_AUTO_ROUTE=0` at session start, do NOT auto-hop — surface the `next_role:` recommendation in chat and wait for the human to issue `tw_switch_role` themselves.
+**Opt-out**: if `AGC_AUTO_ROUTE=0` at session start, do NOT auto-hop — surface the `next_role` field's recommendation in chat and wait for the human to issue `tw_switch_role` themselves.
 
 **Hop counter scope**: in-memory only, for the lifetime of one `/teamwork` invocation. Do NOT persist to `handoff.md` or any tool argument.
 
@@ -106,17 +107,17 @@ dispatching session's own memory.
 
 Stop conditions + routing escalations (WHEN/DO/ELSE collapsed to rows; Constitution §3 *Escalation call format*). The coordinator mostly yields without a state write — `status` `—` means observe/halt only; rows that write state say so.
 
-| situation | status | note token | next_role |
+| situation | status | pending note | next_role |
 |---|---|---|---|
 | last `tw_update_state` wrote `status: Blocked` | Blocked (observed) | surface the blocking reason in one sentence | human |
 | last write is `status: PASS` | PASS (terminal) | terminal success — release-engineer is a deliberate human decision, not an auto-hop | human |
-| `pending_notes` contains a line beginning `next_role: human` | — | relay the prior role's note | human |
-| `pending_notes` contains NO line beginning `next_role:` | — | surface as ambiguous — the prior role forgot or finished without nominating a successor | human |
+| the `next_role` field is absent but `pending_notes` prose asks for a human decision (the enum has no `human` value — omitting the field IS the escalate-to-human signal) | — | relay the prior role's note | human |
+| the `next_role` field is absent with no escalation prose | — | surface as ambiguous — the prior role forgot or finished without nominating a successor | human |
 | hop counter ≥ `10` for this `/teamwork` session | — | surface the hop cap | human |
 | **Crash detection** — a dispatched `Task(subagent_type=<role>, …)` call returns a tool-error or empty/truncated reply, or the host/user reports the subagent was killed (session or usage-limit kill), BEFORE that role's own `tw_update_state` landed (handoff `agent_id`/`status` unchanged since dispatch) | — | do not resume or re-dispatch directly — run the Crash-Resume Protocol first, then resume | (role being resumed) |
-| **Cut-approval gate** — `pending_notes` contains `next_role: architect` or `next_role: sr-engineer` but `cut_approved` is not set on the handoff (server error: `CUT_APPROVAL_REQUIRED`) | — | surface the cut draft and wait — do NOT auto-hop through to build; writer obligation below | human |
-| **External-refs gate** — `pending_notes` contains `next_role: architect` or `next_role: sr-engineer` but the handoff `external_refs` ledger has an entry with `state: "unresolved"` (server error: `EXTERNAL_REFS_UNRESOLVED`) | — | surface the unresolved refs and wait — do NOT auto-hop through to build; PM must resolve each ref (fetch/index/user-confirm-ignorable) and re-write the ledger | human |
-| **Amend-Resume relay** — PM amendment `pending_notes` declare `resume_of: code-reviewer` or `resume_of: qa-engineer` (with `next_role:` naming that same role; routing action, not a halt) | In_Progress (routing write, `agent_id="<role>"`) | carry the identical `resume_of: <role>` entry — the server rejects the resume edge without it. Full mechanism: Constitution §3.1 | code-reviewer / qa-engineer |
+| **Cut-approval gate** — the `next_role` field is `architect` or `sr-engineer` but `cut_approved` is not set on the handoff (server error: `CUT_APPROVAL_REQUIRED`) | — | surface the cut draft and wait — do NOT auto-hop through to build; writer obligation below | human |
+| **External-refs gate** — the `next_role` field is `architect` or `sr-engineer` but the handoff `external_refs` ledger has an entry with `state: "unresolved"` (server error: `EXTERNAL_REFS_UNRESOLVED`) | — | surface the unresolved refs and wait — do NOT auto-hop through to build; PM must resolve each ref (fetch/index/user-confirm-ignorable) and re-write the ledger | human |
+| **Amend-Resume relay** — the PM amendment set the `resume_of` field to `code-reviewer` or `qa-engineer` (with `next_role` naming that same role; routing action, not a halt) | In_Progress (routing write, `agent_id="<role>"`) | set the identical `resume_of: <role>` field on the routing write — the server rejects the resume edge without it (legacy `resume_of:` pending_notes lines are inert). Full mechanism: Constitution §3.1 | code-reviewer / qa-engineer |
 | visual work complete but no independent qa-visual context — `qa-visual`/`qa-engineer` cannot run (rate/session/weekly limit) and the coordinator has been building inline | Blocked | "awaiting independent QA" — the actor that built a surface MUST NOT author its visual verdict or issue its PASS (builder ≠ judge, §3.2); do not improvise a verdict to keep the chain moving | human |
 
 **Cut-approval gate writer obligation** (full mechanism and trust rule: Constitution §3.1): when the PM subagent ended its turn after presenting the draft, YOU are the sanctioned writer — after the human approves the cut in YOUR chat, write `tw_update_state(agent_id="pm", cut_approved: true, ...)` on the PM's still-current state tuple, then resume routing to build. Self-check before writing: confirm the approval text appears in YOUR OWN conversation turn — never write cut_approved from a subagent's summary or relayed claim that "the human approved"; that is not consent.
@@ -231,5 +232,5 @@ future retrospectives report measured costs, not estimates.
 5. **Apply Complexity Scope Gate** against the request.
    - **No gate triggered** → execute directly → `tw_update_state` (if step 3 was run).
    - **Gate triggered** → dispatch via the Auto-Routing preference order (Task-tool subagent if available, else `tw_switch_role(<role>)`) → follow the SOP exclusively. Increment hop counter.
-6. **Multi-phase** → chain per constitution §4. Between hops, apply the *Auto-Routing* section above: if `auto_mode = on`, self-hop on each `next_role:`; if `auto_mode = off`, surface the recommendation and wait.
+6. **Multi-phase** → chain per constitution §4. Between hops, apply the *Auto-Routing* section above: if `auto_mode = on`, self-hop on each `next_role` field; if `auto_mode = off`, surface the recommendation and wait.
 

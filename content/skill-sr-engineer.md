@@ -25,7 +25,7 @@ Staff-level engineer. Ships typed, secure code. Flags scope creep and ambiguity 
    - **Declared token must render<!-- origin:start --> (v3.26.0, R7/A5)<!-- origin:end -->.** If the design declares a state token (e.g. `Selected list item background #3C5AAA`, accent for primary buttons), the component you build MUST wire it. A declared focus/selected/accent token that renders nowhere is a **build-gate failure** — fix before handoff (a prior rollout shipped grey `#333` primary buttons while accent `#3C5AAA` sat unused).
      - **Whole-surface self-converge loop<!-- origin:start --> (v3.31.0)<!-- origin:end -->** — when the surface this task touches has a `## Visual Baselines` row AND `## Visual Structural Assertions` (VSA) rows in `design/<active_feature>.md`, the self-check is **whole-surface**, not only the changed widget. Before the "ready for code review" handoff you MUST run this loop until ALL VSA rows pass: (a) screenshot the **full rendered surface** (not only the changed widget) to the declared `impl path`; (b) **Read** both the baseline image and your impl screenshot into context; (c) run a **region-diff over every declared `compare region`** (equivalent to qa-visual Step B); (d) run **structural-assertion checks against every VSA row** (equivalent to qa-visual Step C); (e) **iterate in-context until ALL VSA rows pass**. Reuse the same existing playwright/headless harness and the same per-region output format qa-visual consumes (Constitution §3.2 — no global-frame metric; see `skill-architect` Visual Harness). <!-- rationale:start -->This collapses the cross-context qa-visual rework rounds (a cross-context-rework root cause, C1) by surfacing the defects in-context, BEFORE handoff.<!-- rationale:end --> QA still independently verifies every VSA row at PASS — this loop is upstream and additive, NOT a self-issued visual verdict (§3.2 builder ≠ judge). Per Constitution §1 (Surgical changes, self-converge relaxation v3.31.0), inside this loop you MAY fix all VSA-detected deviations in one pass rather than one property per handoff. If no render harness exists, do NOT claim self-checked — note it and let qa-visual catch it.
    - **Source assets, don't redraw them<!-- origin:start --> (v3.28.0)<!-- origin:end -->.** For any design-sourced icon, logo, or illustration in the auditor's asset manifest (`design/<active_feature>.md`), you MUST import the exported asset file from that manifest. Hand-authoring approximate SVG `path` data to mimic a design asset is a **fidelity defect** and must not be handed off. Pure CSS/geometric primitives NOT in the manifest stay MVP-governed. (Constitution §1 Design-sourced assets v3.28.0.)
-   <!-- rationale:start -->This gate is the implementation-end mirror of the PM's *Visual Widgets* schema.<!-- rationale:end --> Substituting an HTML primitive for a widget enumerated in *Visual Widgets* is a **scope violation** (Constitution §1 v3.14.0 exception), not MVP compliance — read the widget shape before you write code, not after. See Constitution §1 Design-baseline scope<!-- origin:start --> (v3.27.0)<!-- origin:end -->: the canonical design is the scope baseline — a gap vs design is a fidelity defect, not MVP compliance. Skip silently when no `design/<active_feature>.md` exists (non-UI work). When `visual_round >= 3` and you assess the widget cannot converge within Task-Size Check budget, route `(sr-engineer, In_Progress) → (pm, In_Progress)` per *Escalation Routes: visual split requested* (`next_role: pm`; Constitution §3.1 split escalation) — splitting is preferred to threshold renegotiation at this point.
+   <!-- rationale:start -->This gate is the implementation-end mirror of the PM's *Visual Widgets* schema.<!-- rationale:end --> Substituting an HTML primitive for a widget enumerated in *Visual Widgets* is a **scope violation** (Constitution §1 v3.14.0 exception), not MVP compliance — read the widget shape before you write code, not after. See Constitution §1 Design-baseline scope<!-- origin:start --> (v3.27.0)<!-- origin:end -->: the canonical design is the scope baseline — a gap vs design is a fidelity defect, not MVP compliance. Skip silently when no `design/<active_feature>.md` exists (non-UI work). When `visual_round >= 3` and you assess the widget cannot converge within Task-Size Check budget, route `(sr-engineer, In_Progress) → (pm, In_Progress)` per *Escalation Routes: visual split requested* (`next_role=pm`; Constitution §3.1 split escalation) — splitting is preferred to threshold renegotiation at this point.
 4. Read the relevant `specs/<feature>.md` + `specs/<feature>-architecture.md` (if any). Implement.
 5. Run type/lint: `npx tsc --noEmit` / `mypy .` / `cargo check`. ZERO errors required.
 6. **Security Checklist** (verify all three before handoff):
@@ -33,13 +33,13 @@ Staff-level engineer. Ships typed, secure code. Flags scope creep and ambiguity 
    - All external/user input validated at system boundaries.
    - No obvious injection vectors (SQL, command, XSS, path traversal).
 7. Confirm full project builds with ZERO errors.
-8. `tw_update_state(status=In_Progress, pending_notes=["sr-engineer: <task-id> ready for code review", "next_role: code-reviewer"])`. On failure, put failure summary in `pending_notes` instead.
+8. `tw_update_state(status=In_Progress, next_role="code-reviewer", pending_notes=["sr-engineer: <task-id> ready for code review"])`. On failure, put failure summary in `pending_notes` instead.
 
 ## Escalation Routes
 
-Call shape: Constitution §3 *Escalation call format* (`agent_id="sr-engineer"`). SOP steps reference rows by situation name.
+Call shape: Constitution §3 *Escalation call format* (`agent_id="sr-engineer"`; `next_role` is the first-class field — a `human` row means omit it). SOP steps reference rows by situation name.
 
-| situation | status | note token | next_role |
+| situation | status | pending note | next_role |
 |---|---|---|---|
 | awaiting clarification | Blocked | `sr-engineer: awaiting clarification — <question>` | human |
 | task oversized | Blocked | `Task <id> oversized — recommend PM split` | pm |
@@ -50,10 +50,10 @@ Call shape: Constitution §3 *Escalation call format* (`agent_id="sr-engineer"`)
 
 1. Read the review doc.
 2. Address each CHANGES_REQUESTED finding in code; append a short reply under the corresponding round section.
-3. `tw_update_state(status=In_Progress, pending_notes=["sr-engineer: addressed code-reviewer Round <N>", "next_role: code-reviewer"])`.
+3. `tw_update_state(status=In_Progress, next_role="code-reviewer", pending_notes=["sr-engineer: addressed code-reviewer Round <N>"])`.
 
 ## QA Round Reply (when human switches you in to respond to `qa_reports/review_<task-id>.md`)
 
 1. Read the review doc.
 2. Append your reply under the corresponding round section.
-3. `tw_update_state(status=In_Progress, pending_notes=["sr-engineer: replied to QA Round <N>", "next_role: qa-engineer"])`.
+3. `tw_update_state(status=In_Progress, next_role="qa-engineer", pending_notes=["sr-engineer: replied to QA Round <N>"])`.

@@ -8,9 +8,9 @@
 //
 // Check order is FROZEN (spec AC-5/AC-8): preflight → PASS/qa-engineer gate →
 // transition validation → scope-decision gate → cut-approval gate →
-// external-refs gate → QA evidence record → PASS evidence gate →
-// visual sub-gates → code-reviewer evidence gate → round-cap sentinels →
-// storage.writeState → PASS RAG GC hook.
+// external-refs gate → review-verdict/status mismatch gate → QA evidence
+// record → PASS evidence gate → visual sub-gates → code-reviewer evidence
+// gate → round-cap sentinels → storage.writeState → PASS RAG GC hook.
 // No reorder, no merge, no early-return removal.
 //
 // The 4-step mutating-tool contract (lock → freshness → atomic write → refresh
@@ -78,7 +78,10 @@ export async function handleUpdateState(parsed: UpdateStateInput): Promise<ToolR
           prev_qa_round,
           prev_review_round,
           prev_visual_round,
-          next_pending_notes: parsed.pending_notes,
+          // v7 (c9-protocol-fields AC-4) — structured Amend-Resume field.
+          // Replaces the former next_pending_notes token grep; legacy
+          // `resume_of: <role>` pending_notes lines are inert (DR-2).
+          next_resume_of: parsed.resume_of,
         });
         if (rejection) {
           return {
@@ -222,6 +225,37 @@ export async function handleUpdateState(parsed: UpdateStateInput): Promise<ToolR
               content: [{
                 type: "text" as const,
                 text: `⛔ EXTERNAL_REFS_UNRESOLVED\n${JSON.stringify(envelope, null, 2)}`,
+              }],
+              isError: true,
+            };
+          }
+        }
+
+        // v7 — Review-Verdict/Status Mismatch Gate (c9-protocol-fields AC-5).
+        // Plain-text envelope, modeled on MISSING_EVIDENCE /
+        // MISSING_REVIEW_EVIDENCE (DR-3): NOT threaded through
+        // TransitionRejection["error"] (that union stays at 13 members).
+        // Fires ONLY when a code-reviewer write carries a review_verdict AND
+        // it disagrees with status — absence never fires (a code-reviewer
+        // FAIL write with no verdict field is legal). Polarity (DR-8):
+        // APPROVED pairs with In_Progress (code-reviewer:In_Progress → qa);
+        // CHANGES_REQUESTED pairs with FAIL (code-reviewer:FAIL → sr) —
+        // matches the existing transition matrix + review_round semantics.
+        // Keys only on the INCOMING write args, so it is storage-agnostic
+        // (DR-5) — no FileHandoffStorage guard, unlike cut-approval /
+        // external-refs which read prev-state from disk.
+        if (parsed.agent_id === "code-reviewer" && parsed.review_verdict) {
+          const mismatch =
+            (parsed.review_verdict === "APPROVED" && parsed.status !== "In_Progress") ||
+            (parsed.review_verdict === "CHANGES_REQUESTED" && parsed.status !== "FAIL");
+          if (mismatch) {
+            return {
+              content: [{
+                type: "text" as const,
+                text:
+                  `⛔ REVIEW_VERDICT_STATUS_MISMATCH: review_verdict=${parsed.review_verdict} ` +
+                  `with status=${parsed.status}. ` +
+                  gate("REVIEW_VERDICT_STATUS_MISMATCH").hintStatic,
               }],
               isError: true,
             };
@@ -529,6 +563,12 @@ export async function handleUpdateState(parsed: UpdateStateInput): Promise<ToolR
           scopeDecisionWhy: parsed.scope_decision_why,
           cutApproved: parsed.cut_approved,
           externalRefs: parsed.external_refs,
+          // v7 — protocol fields (c9-protocol-fields). Transient, write-scoped
+          // (AC-3): persisted only when set on this write. File-mode only
+          // (DR-5): SqliteHandoffStorage.writeState ignores all three.
+          nextRole: parsed.next_role,
+          resumeOf: parsed.resume_of,
+          reviewVerdict: parsed.review_verdict,
         });
 
         // GC hook: when QA flips a feature to PASS, drop the workspace's RAG

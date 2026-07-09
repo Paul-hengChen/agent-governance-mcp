@@ -73,6 +73,21 @@ registerMigration<Record<string, unknown>, Record<string, unknown>>({
   up: (input) => ({ ...input, schema_version: 6 }),
 });
 
+// v6 → v7: add optional next_role / resume_of / review_verdict protocol fields
+// (c9-protocol-fields). Additive STAMP-ONLY: bumps the version, seeds NO
+// default for any of the three (DR-1) — absence means "no routing signal
+// recorded", and a synthesized default would fabricate a directive. Legacy
+// pending_notes token lines (`next_role: x` / `resume_of: y` / `review:
+// APPROVED`) are left byte-verbatim and NOT extracted into the new fields
+// (AC-9, DR-2 — they become inert prose). Mirrors the v3→v4 / v4→v5 / v5→v6
+// stamp-only pattern.
+registerMigration<Record<string, unknown>, Record<string, unknown>>({
+  kind: "handoff",
+  from: 6,
+  to: 7,
+  up: (input) => ({ ...input, schema_version: 7 }),
+});
+
 // Compile-time guard: if CURRENT_VERSIONS.handoff is ever bumped without a
 // matching registration added above, the runner's missing-step error fires
 // at read time. This reference makes the dependency explicit for grep.

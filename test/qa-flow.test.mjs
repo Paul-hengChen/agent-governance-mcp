@@ -26,6 +26,7 @@ import { parseHandoff, writeHandoffState } from "../dist/tools/handoff.js";
 import { markStateRead, resetSession } from "../dist/guards/session.js";
 import { setActiveStorage, FileHandoffStorage } from "../dist/tools/storage.js";
 import { handleUpdateState } from "../dist/tools/handoff-orchestrator.js";
+import { TOOL_REGISTRY } from "../dist/tools/registry.js";
 
 function mkWorkspace(prefix = "twqa-") {
   const ws = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -969,22 +970,27 @@ test("T-MATRIX-A5: release-engineer:PASS row is present in ALLOWED_TRANSITIONS (
 
 // ============================================================================
 // C1-07 — Amend-Resume Edge regression tests (backlog C1, spec AC-8)
+// Re-baselined by c9-protocol-fields (T-C9-09, AC-4/DR-2/DR-6): the edge is
+// now gated by the structured `next_resume_of` field on TransitionRequest,
+// NOT by grepping `next_pending_notes` for a `resume_of: <target>` line
+// (`resumeMarkerNames` and the `next_pending_notes` field are both deleted —
+// no dual-read fallback). These tests pin: (a) exact-field accept, (b)
+// missing-field reject, (c) wrong-role-field reject, (d) legacy pending_notes
+// token is now INERT (does not open the edge on its own), (e) round-cap
+// precedence over a valid field, (f) pre-existing pm:In_Progress edges are
+// field-independent, and (g) gate isolation — the Scope Decision and
+// Cut-Approval gates neither fire on the new edges nor are weakened on their
+// own (positive control).
 // ============================================================================
 // WHY: specs/pm-repair-resume-routing.md adds a narrowly-scoped routing edge so
 // PM can hand back directly to a downstream role (code-reviewer/qa-engineer) it
 // interrupted mid-chain, instead of a manufactured detour through sr-engineer.
-// The edge is additive and marker-gated (tools/transitions.ts step 3.5,
-// `resumeMarkerNames`) — these tests pin: (a) exact-marker accept, (b) missing-
-// marker reject, (c) wrong-role-marker reject, (d) malformed-marker reject
-// (no-space / trailing junk / out-of-set role), (e) round-cap precedence over a
-// valid marker, (f) pre-existing pm:In_Progress edges are marker-independent,
-// and (g) gate isolation — the Scope Decision and Cut-Approval gates neither
-// fire on the new edges nor are weakened on their own (positive control).
 // Spec-to-test map: AC-2 -> t-c1-accept-*; AC-3 -> t-c1-reject-*;
-// AC-1/AC-8(e) -> t-c1-gate-isolation-*; AC-8(d) -> t-c1-preexisting-*;
-// architecture Test Surface item 7 -> t-c1-roundcap-precedence.
+// c9 AC-4/AC-9 -> t-c1-inert-*; AC-1/AC-8(e) -> t-c1-gate-isolation-*;
+// AC-8(d) -> t-c1-preexisting-*; architecture Test Surface item 7 ->
+// t-c1-roundcap-precedence.
 
-// ---------- AC-2: accept — exact marker, exact role ----------
+// ---------- AC-2: accept — exact field, exact role ----------
 
 test("C1-07/AC-2: pm:In_Progress -> code-reviewer:In_Progress accepted with resume_of: code-reviewer", () => {
   assert.equal(
@@ -993,7 +999,7 @@ test("C1-07/AC-2: pm:In_Progress -> code-reviewer:In_Progress accepted with resu
       next: { agent: "code-reviewer", status: "In_Progress" },
       prev_qa_round: 0,
       prev_review_round: 0,
-      next_pending_notes: ["resume_of: code-reviewer"],
+      next_resume_of: "code-reviewer",
     }),
     null,
   );
@@ -1006,58 +1012,62 @@ test("C1-07/AC-2: pm:In_Progress -> qa-engineer:In_Progress accepted with resume
       next: { agent: "qa-engineer", status: "In_Progress" },
       prev_qa_round: 0,
       prev_review_round: 0,
-      next_pending_notes: ["resume_of: qa-engineer"],
+      next_resume_of: "qa-engineer",
     }),
     null,
   );
 });
 
-test("C1-07/AC-2: marker may co-exist with other pending_notes entries (not required to be the sole entry)", () => {
+test("C1-07/AC-2/c9: next_resume_of alone is sufficient — the field is independent of pending_notes content", () => {
+  // Why: pre-c9, the marker HAD to live inside pending_notes. Post-c9 the
+  // structured field is the only thing validateTransition reads at step 3.5;
+  // TransitionRequest no longer even has a next_pending_notes property
+  // (DR-6). This accepts purely on the field, with no pending_notes-shaped
+  // input at all.
   assert.equal(
     validateTransition({
       prev: { agent: "pm", status: "In_Progress" },
       next: { agent: "code-reviewer", status: "In_Progress" },
       prev_qa_round: 0,
       prev_review_round: 0,
-      next_pending_notes: ["next_role: code-reviewer", "resume_of: code-reviewer", "spec amended: §7 gap"],
+      next_resume_of: "code-reviewer",
     }),
     null,
   );
 });
 
-// ---------- AC-3: reject — no marker ----------
+// ---------- AC-3: reject — no field ----------
 
-test("C1-07/AC-3: pm:In_Progress -> code-reviewer:In_Progress REJECTED with empty pending_notes", () => {
+test("C1-07/AC-3: pm:In_Progress -> code-reviewer:In_Progress REJECTED with next_resume_of absent", () => {
   const r = validateTransition({
     prev: { agent: "pm", status: "In_Progress" },
     next: { agent: "code-reviewer", status: "In_Progress" },
     prev_qa_round: 0,
     prev_review_round: 0,
-    next_pending_notes: [],
+    // next_resume_of omitted entirely (undefined !== "code-reviewer").
   });
   assert.ok(r);
   assert.equal(r.error, "TRANSITION_REJECTED");
   // Byte-identical fall-through: allowed is the unchanged static pm:In_Progress
-  // set — code-reviewer/qa-engineer must NOT appear absent a marker.
+  // set — code-reviewer/qa-engineer must NOT appear absent the field.
   assert.ok(
     !r.allowed.some((a) => a.new_agent === "code-reviewer" || a.new_agent === "qa-engineer"),
-    `allowed list must NOT contain code-reviewer/qa-engineer without a marker; got ${JSON.stringify(r.allowed)}`,
+    `allowed list must NOT contain code-reviewer/qa-engineer without next_resume_of; got ${JSON.stringify(r.allowed)}`,
   );
 });
 
-test("C1-07/AC-3: pm:In_Progress -> qa-engineer:In_Progress REJECTED with undefined pending_notes", () => {
+test("C1-07/AC-3: pm:In_Progress -> qa-engineer:In_Progress REJECTED with next_resume_of undefined", () => {
   const r = validateTransition({
     prev: { agent: "pm", status: "In_Progress" },
     next: { agent: "qa-engineer", status: "In_Progress" },
     prev_qa_round: 0,
     prev_review_round: 0,
-    // next_pending_notes omitted entirely (undefined) — resumeMarkerNames must treat as false.
   });
   assert.ok(r);
   assert.equal(r.error, "TRANSITION_REJECTED");
 });
 
-// ---------- AC-3: reject — marker names the wrong role ----------
+// ---------- AC-3: reject — field names the wrong role ----------
 
 test("C1-07/AC-3: pm:In_Progress -> qa-engineer:In_Progress REJECTED with resume_of: code-reviewer (wrong role)", () => {
   const r = validateTransition({
@@ -1065,7 +1075,7 @@ test("C1-07/AC-3: pm:In_Progress -> qa-engineer:In_Progress REJECTED with resume
     next: { agent: "qa-engineer", status: "In_Progress" },
     prev_qa_round: 0,
     prev_review_round: 0,
-    next_pending_notes: ["resume_of: code-reviewer"],
+    next_resume_of: "code-reviewer",
   });
   assert.ok(r);
   assert.equal(r.error, "TRANSITION_REJECTED");
@@ -1077,117 +1087,96 @@ test("C1-07/AC-3: pm:In_Progress -> code-reviewer:In_Progress REJECTED with resu
     next: { agent: "code-reviewer", status: "In_Progress" },
     prev_qa_round: 0,
     prev_review_round: 0,
+    next_resume_of: "qa-engineer",
+  });
+  assert.ok(r);
+  assert.equal(r.error, "TRANSITION_REJECTED");
+});
+
+// ---------- AC-4/AC-9/DR-2: legacy pending_notes token is now INERT ----------
+// Byte-identical fall-through in every case: TRANSITION_REJECTED, no new error
+// code. TransitionRequest no longer has a next_pending_notes property at all
+// (DR-6) — these tests pin that passing pending_notes-shaped data (even a
+// well-formed legacy token) has ZERO effect without the structured field.
+
+test("C1-07/c9: well-formed legacy 'resume_of: code-reviewer' pending_notes token, with NO next_resume_of field, does NOT open the edge (inert)", () => {
+  const r = validateTransition({
+    prev: { agent: "pm", status: "In_Progress" },
+    next: { agent: "code-reviewer", status: "In_Progress" },
+    prev_qa_round: 0,
+    prev_review_round: 0,
+    // Legacy shape, no longer a field on TransitionRequest — passed here only
+    // to prove the extra/unknown property is silently ignored, not honored.
+    next_pending_notes: ["resume_of: code-reviewer"],
+  });
+  assert.ok(r, "a legacy pending_notes-shaped token must NOT open the edge post-c9");
+  assert.equal(r.error, "TRANSITION_REJECTED");
+});
+
+test("C1-07/c9: well-formed legacy 'resume_of: qa-engineer' pending_notes token, with NO next_resume_of field, does NOT open the edge (inert)", () => {
+  const r = validateTransition({
+    prev: { agent: "pm", status: "In_Progress" },
+    next: { agent: "qa-engineer", status: "In_Progress" },
+    prev_qa_round: 0,
+    prev_review_round: 0,
     next_pending_notes: ["resume_of: qa-engineer"],
   });
-  assert.ok(r);
+  assert.ok(r, "a legacy pending_notes-shaped token must NOT open the edge post-c9");
   assert.equal(r.error, "TRANSITION_REJECTED");
 });
 
-// ---------- AC-3/architecture Data Structures: reject — malformed marker ----------
-// Byte-identical fall-through in every case: TRANSITION_REJECTED, no new error code.
-
-test("C1-07: malformed marker (no space after colon) does NOT open the edge", () => {
+test("C1-07/c9: legacy pending_notes token PLUS an unrelated next_resume_of value still rejects (field, not prose, is authoritative)", () => {
   const r = validateTransition({
     prev: { agent: "pm", status: "In_Progress" },
     next: { agent: "code-reviewer", status: "In_Progress" },
     prev_qa_round: 0,
     prev_review_round: 0,
-    next_pending_notes: ["resume_of:code-reviewer"],
+    next_pending_notes: ["resume_of: code-reviewer"], // legacy text names the RIGHT role...
+    next_resume_of: "qa-engineer", // ...but the structured field names the WRONG one — field wins.
   });
-  assert.ok(r);
-  assert.equal(r.error, "TRANSITION_REJECTED");
-});
-
-test("C1-07: malformed marker (trailing junk) does NOT open the edge", () => {
-  const r = validateTransition({
-    prev: { agent: "pm", status: "In_Progress" },
-    next: { agent: "code-reviewer", status: "In_Progress" },
-    prev_qa_round: 0,
-    prev_review_round: 0,
-    next_pending_notes: ["resume_of: code-reviewer please resume now"],
-  });
-  assert.ok(r);
-  assert.equal(r.error, "TRANSITION_REJECTED");
-});
-
-test("C1-07: marker naming an out-of-set role (architect) does NOT open the edge", () => {
-  const r = validateTransition({
-    prev: { agent: "pm", status: "In_Progress" },
-    next: { agent: "code-reviewer", status: "In_Progress" },
-    prev_qa_round: 0,
-    prev_review_round: 0,
-    next_pending_notes: ["resume_of: architect"],
-  });
-  assert.ok(r);
-  assert.equal(r.error, "TRANSITION_REJECTED");
-});
-
-test("C1-07: marker naming an out-of-set role (sr-engineer) does NOT open the edge", () => {
-  const r = validateTransition({
-    prev: { agent: "pm", status: "In_Progress" },
-    next: { agent: "code-reviewer", status: "In_Progress" },
-    prev_qa_round: 0,
-    prev_review_round: 0,
-    next_pending_notes: ["resume_of: sr-engineer"],
-  });
-  assert.ok(r);
-  assert.equal(r.error, "TRANSITION_REJECTED");
-});
-
-test("C1-07: non-string / falsy entries in pending_notes are ignored, not thrown on", () => {
-  // Defense-in-depth: resumeMarkerNames guards `typeof n === "string"` per entry.
-  // A malformed pending_notes array (e.g. hand-crafted JSON payload) must reject
-  // safely rather than throw.
-  const r = validateTransition({
-    prev: { agent: "pm", status: "In_Progress" },
-    next: { agent: "code-reviewer", status: "In_Progress" },
-    prev_qa_round: 0,
-    prev_review_round: 0,
-    next_pending_notes: [null, undefined, 42, "resume_of: qa-engineer"],
-  });
-  assert.ok(r);
+  assert.ok(r, "the structured field is authoritative — legacy prose naming the correct role must not override a mismatched field");
   assert.equal(r.error, "TRANSITION_REJECTED");
 });
 
 // ---------- Status must be In_Progress on BOTH sides (architecture step-3.5 guard) ----------
 
-test("C1-07: prev status Blocked (not In_Progress) does NOT open the edge even with a valid marker", () => {
+test("C1-07: prev status Blocked (not In_Progress) does NOT open the edge even with a valid resume_of field", () => {
   const r = validateTransition({
     prev: { agent: "pm", status: "Blocked" },
     next: { agent: "code-reviewer", status: "In_Progress" },
     prev_qa_round: 0,
     prev_review_round: 0,
-    next_pending_notes: ["resume_of: code-reviewer"],
+    next_resume_of: "code-reviewer",
   });
   assert.ok(r, "prev.status must be pinned to In_Progress — Blocked must not qualify");
   assert.equal(r.error, "TRANSITION_REJECTED");
 });
 
-test("C1-07: next status FAIL (not In_Progress) does NOT open the edge even with a valid marker", () => {
+test("C1-07: next status FAIL (not In_Progress) does NOT open the edge even with a valid resume_of field", () => {
   const r = validateTransition({
     prev: { agent: "pm", status: "In_Progress" },
     next: { agent: "code-reviewer", status: "FAIL" },
     prev_qa_round: 0,
     prev_review_round: 0,
-    next_pending_notes: ["resume_of: code-reviewer"],
+    next_resume_of: "code-reviewer",
   });
   assert.ok(r, "next.status must be In_Progress — FAIL must not qualify for the resume edge");
   assert.equal(r.error, "TRANSITION_REJECTED");
 });
 
-test("C1-07: next status Blocked (not In_Progress) does NOT open the edge even with a valid marker", () => {
+test("C1-07: next status Blocked (not In_Progress) does NOT open the edge even with a valid resume_of field", () => {
   const r = validateTransition({
     prev: { agent: "pm", status: "In_Progress" },
     next: { agent: "qa-engineer", status: "Blocked" },
     prev_qa_round: 0,
     prev_review_round: 0,
-    next_pending_notes: ["resume_of: qa-engineer"],
+    next_resume_of: "qa-engineer",
   });
   assert.ok(r, "next.status must be In_Progress — Blocked must not qualify for the resume edge");
   assert.equal(r.error, "TRANSITION_REJECTED");
 });
 
-// ---------- AC-8(d): pre-existing pm:In_Progress edges unaffected, marker-independent ----------
+// ---------- AC-8(d): pre-existing pm:In_Progress edges unaffected, field-independent ----------
 
 const PRE_EXISTING_PM_TARGETS = [
   { agent: "architect", status: "In_Progress" },
@@ -1199,21 +1188,20 @@ const PRE_EXISTING_PM_TARGETS = [
 ];
 
 for (const target of PRE_EXISTING_PM_TARGETS) {
-  test(`C1-07/AC-8(d): pm:In_Progress -> ${target.agent}:${target.status} still accepted WITHOUT a resume marker`, () => {
+  test(`C1-07/AC-8(d): pm:In_Progress -> ${target.agent}:${target.status} still accepted WITHOUT a resume_of field`, () => {
     assert.equal(
       validateTransition({
         prev: { agent: "pm", status: "In_Progress" },
         next: { agent: target.agent, status: target.status },
         prev_qa_round: 0,
         prev_review_round: 0,
-        next_pending_notes: [],
       }),
       null,
     );
   });
 
-  test(`C1-07/AC-8(d): pm:In_Progress -> ${target.agent}:${target.status} still accepted WITH an (irrelevant) resume marker present`, () => {
-    // A resume_of marker naming a role that isn't the target must not change
+  test(`C1-07/AC-8(d): pm:In_Progress -> ${target.agent}:${target.status} still accepted WITH an (irrelevant) resume_of field present`, () => {
+    // A resume_of field naming a role that isn't the target must not change
     // the outcome of an already-allowed edge — step 3.5 only ever ADDS an
     // acceptance path; it never removes one from the static table.
     assert.equal(
@@ -1222,7 +1210,7 @@ for (const target of PRE_EXISTING_PM_TARGETS) {
         next: { agent: target.agent, status: target.status },
         prev_qa_round: 0,
         prev_review_round: 0,
-        next_pending_notes: ["resume_of: code-reviewer"],
+        next_resume_of: "code-reviewer",
       }),
       null,
     );
@@ -1231,27 +1219,27 @@ for (const target of PRE_EXISTING_PM_TARGETS) {
 
 // ---------- Round-cap precedence (architecture Test Surface item 7) ----------
 
-test("C1-07: review_round at cap (4) rejects the resume edge even with a valid marker (round cap outranks step 3.5)", () => {
+test("C1-07: review_round at cap (4) rejects the resume edge even with a valid resume_of field (round cap outranks step 3.5)", () => {
   const r = validateTransition({
     prev: { agent: "pm", status: "In_Progress" },
     next: { agent: "code-reviewer", status: "In_Progress" },
     prev_qa_round: 0,
     prev_review_round: 4,
-    next_pending_notes: ["resume_of: code-reviewer"],
+    next_resume_of: "code-reviewer",
   });
-  assert.ok(r, "must be rejected despite the valid marker");
+  assert.ok(r, "must be rejected despite the valid field");
   assert.equal(r.error, "REVIEW_ROUND_EXCEEDED");
 });
 
-test("C1-07: qa_round at cap (4) rejects the resume edge even with a valid marker (round cap outranks step 3.5)", () => {
+test("C1-07: qa_round at cap (4) rejects the resume edge even with a valid resume_of field (round cap outranks step 3.5)", () => {
   const r = validateTransition({
     prev: { agent: "pm", status: "In_Progress" },
     next: { agent: "qa-engineer", status: "In_Progress" },
     prev_qa_round: 4,
     prev_review_round: 0,
-    next_pending_notes: ["resume_of: qa-engineer"],
+    next_resume_of: "qa-engineer",
   });
-  assert.ok(r, "must be rejected despite the valid marker");
+  assert.ok(r, "must be rejected despite the valid field");
   assert.equal(r.error, "QA_ROUND_EXCEEDED");
 });
 
@@ -1287,7 +1275,9 @@ async function seedPmInProgress(ws, feature, extra = {}) {
   });
 }
 
-test("C1-07/AC-1/AC-8(e): armed+unattested pm->code-reviewer with resume_of marker trips NEITHER gate", async () => {
+test("C1-07/AC-1/AC-8(e)/c9: armed+unattested pm->code-reviewer with resume_of field trips NEITHER gate", async () => {
+  // Re-baselined by c9 AC-4: the tool-boundary arg is now the structured
+  // `resume_of` field, not a `pending_notes` token.
   setActiveStorage(new FileHandoffStorage());
   const { ws, feature } = mkGateWorkspace("c1-gate-cr");
   await seedPmInProgress(ws, feature); // no scope_decision, no cut_approved
@@ -1300,7 +1290,8 @@ test("C1-07/AC-1/AC-8(e): armed+unattested pm->code-reviewer with resume_of mark
     status: "In_Progress",
     agent_id: "code-reviewer",
     completed_tasks: [],
-    pending_notes: ["resume_of: code-reviewer"],
+    pending_notes: ["resuming after PM amendment"],
+    resume_of: "code-reviewer",
   });
   const text = result.content[0].text;
   assert.ok(!result.isError, `resume edge must not be rejected; got: ${text}`);
@@ -1308,7 +1299,7 @@ test("C1-07/AC-1/AC-8(e): armed+unattested pm->code-reviewer with resume_of mark
   assert.ok(!text.includes("CUT_APPROVAL_REQUIRED"), "Cut-Approval Gate must NOT fire on the resume edge");
 });
 
-test("C1-07/AC-1/AC-8(e): armed+unattested pm->qa-engineer with resume_of marker trips NEITHER gate", async () => {
+test("C1-07/AC-1/AC-8(e)/c9: armed+unattested pm->qa-engineer with resume_of field trips NEITHER gate", async () => {
   setActiveStorage(new FileHandoffStorage());
   const { ws, feature } = mkGateWorkspace("c1-gate-qa");
   await seedPmInProgress(ws, feature); // no scope_decision, no cut_approved
@@ -1321,12 +1312,39 @@ test("C1-07/AC-1/AC-8(e): armed+unattested pm->qa-engineer with resume_of marker
     status: "In_Progress",
     agent_id: "qa-engineer",
     completed_tasks: [],
-    pending_notes: ["resume_of: qa-engineer"],
+    pending_notes: ["resuming after PM amendment"],
+    resume_of: "qa-engineer",
   });
   const text = result.content[0].text;
   assert.ok(!result.isError, `resume edge must not be rejected; got: ${text}`);
   assert.ok(!text.includes("SCOPE_DECISION_REQUIRED"), "Scope Decision Gate must NOT fire on the resume edge");
   assert.ok(!text.includes("CUT_APPROVAL_REQUIRED"), "Cut-Approval Gate must NOT fire on the resume edge");
+});
+
+test("C1-07/c9: armed+unattested pm->code-reviewer with ONLY a legacy pending_notes token (no resume_of field) IS rejected — TRANSITION_REJECTED, not a gate", async () => {
+  // Why: proves the inert-token contract end-to-end through the real tool
+  // boundary, not just validateTransition in isolation. A legacy-shaped note
+  // with no structured resume_of field must fall through to the ordinary
+  // TRANSITION_REJECTED path (the edge simply never opens) — it must NOT be
+  // silently accepted, and must NOT be misreported as a gate failure.
+  setActiveStorage(new FileHandoffStorage());
+  const { ws, feature } = mkGateWorkspace("c1-gate-inert");
+  await seedPmInProgress(ws, feature);
+
+  resetSession(ws);
+  markStateRead(ws);
+  const result = await handleUpdateState({
+    workspace_path: ws,
+    active_feature: feature,
+    status: "In_Progress",
+    agent_id: "code-reviewer",
+    completed_tasks: [],
+    pending_notes: ["resume_of: code-reviewer"],
+    // resume_of field intentionally omitted.
+  });
+  const text = result.content[0].text;
+  assert.ok(result.isError, "the edge must NOT open on a legacy pending_notes token alone");
+  assert.ok(text.includes("TRANSITION_REJECTED"), `expected TRANSITION_REJECTED; got: ${text}`);
 });
 
 test("C1-07/AC-1 positive control: armed+unattested pm->sr-engineer (SAME state) STILL trips SCOPE_DECISION_REQUIRED", async () => {
@@ -1415,6 +1433,249 @@ test("C1-07: resume_of marker is single-use — pending_notes are replaced (not 
     !state.pending_notes.some((n) => n.trim() === "resume_of: code-reviewer"),
     "marker must NOT survive into the next write — pending_notes are replaced, not merged",
   );
+});
+
+// ============================================================================
+// T-C9-10 — enum rejection + REVIEW_VERDICT_STATUS_MISMATCH gate matrix
+// (c9-protocol-fields, spec AC-2/AC-5, architecture §Test Thresholds T-C9-10)
+// ============================================================================
+// WHY: c9-protocol-fields promotes next_role/resume_of/review_verdict to
+// closed-enum handoff v7 fields. Two distinct server layers must be pinned:
+// (1) the zod boundary (tools/registry.ts) rejects an out-of-enum value
+// BEFORE any gate runs — tested here directly against the real TOOL_REGISTRY
+// entry (spec.zodSchema.parse), not a hand-rolled schema copy; (2) the new
+// REVIEW_VERDICT_STATUS_MISMATCH plain-text orchestrator gate
+// (tools/handoff-orchestrator.ts) enforces verdict<->status consistency on
+// code-reviewer writes ONLY, firing only when review_verdict is PRESENT and
+// disagrees with status (AC-5, DR-8 polarity).
+
+// ---------- AC-2: zod enum rejection at the tool boundary ----------
+
+const UPDATE_STATE_ENTRY = TOOL_REGISTRY.find((e) => e.name === "tw_update_state");
+
+test("T-C9-10/AC-2: tw_update_state rejects an out-of-enum next_role at the zod boundary", async () => {
+  assert.ok(UPDATE_STATE_ENTRY, "tw_update_state must be registered in TOOL_REGISTRY");
+  // NOTE: ToolRegistryEntry.run is `(rawArgs) => spec.handler(spec.zodSchema.parse(rawArgs))`
+  // — a non-async arrow. When .parse() throws, run() throws SYNCHRONOUSLY (it never
+  // gets far enough to return a promise). assert.rejects only converts a synchronous
+  // throw into a proper rejection to await/inspect when the function IT calls is
+  // itself `async` — hence the `async () => { ... }` wrapper below (a plain
+  // `() => UPDATE_STATE_ENTRY.run(...)` throws past assert.rejects uncaught).
+  await assert.rejects(
+    async () => {
+      UPDATE_STATE_ENTRY.run({
+        workspace_path: "/tmp/does-not-matter",
+        active_feature: "x",
+        status: "In_Progress",
+        agent_id: "pm",
+        next_role: "reviewer", // not one of the 8 AgentName values
+      });
+    },
+    /ZodError|invalid_value|invalid_enum_value/i,
+    "an out-of-enum next_role must be rejected by zod before any gate/handler logic runs",
+  );
+});
+
+test("T-C9-10/AC-2: tw_update_state rejects an out-of-enum resume_of at the zod boundary", async () => {
+  await assert.rejects(
+    async () => {
+      UPDATE_STATE_ENTRY.run({
+        workspace_path: "/tmp/does-not-matter",
+        active_feature: "x",
+        status: "In_Progress",
+        agent_id: "pm",
+        resume_of: "pm", // restricted to code-reviewer | qa-engineer only
+      });
+    },
+    /ZodError|invalid_value|invalid_enum_value/i,
+    "an out-of-enum resume_of (e.g. 'pm', 'architect', 'sr-engineer') must be rejected by zod",
+  );
+});
+
+test("T-C9-10/AC-2: tw_update_state rejects a lowercase (out-of-enum) review_verdict at the zod boundary", async () => {
+  await assert.rejects(
+    async () => {
+      UPDATE_STATE_ENTRY.run({
+        workspace_path: "/tmp/does-not-matter",
+        active_feature: "x",
+        status: "In_Progress",
+        agent_id: "code-reviewer",
+        review_verdict: "approved", // must be exactly "APPROVED" | "CHANGES_REQUESTED"
+      });
+    },
+    /ZodError|invalid_value|invalid_enum_value/i,
+    "a lowercase/garbage review_verdict must be rejected by zod",
+  );
+});
+
+test("T-C9-10/AC-2: tw_update_state ACCEPTS valid enum values for all three fields (zod parse succeeds — real write goes through)", async () => {
+  // Positive control for the three rejection tests above — proves the schema
+  // isn't accidentally rejecting everything. Exercises a real self-loop write
+  // (pm:In_Progress -> pm:In_Progress, untouched by the scope/cut/external-refs
+  // build-entry gates) carrying all three fields at once; a ZodError here would
+  // mean the enum definitions themselves are broken, not just the negative cases.
+  setActiveStorage(new FileHandoffStorage());
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "twc9enum-"));
+  fs.mkdirSync(path.join(ws, ".current"), { recursive: true });
+  await seedState(ws, "c9-enum-ok", "pm", "In_Progress");
+  resetSession(ws);
+  markStateRead(ws);
+  const result = await UPDATE_STATE_ENTRY.run({
+    workspace_path: ws,
+    active_feature: "c9-enum-ok",
+    status: "In_Progress",
+    agent_id: "pm",
+    completed_tasks: [],
+    pending_notes: ["pm: re-evaluating"],
+    next_role: "sr-engineer",
+    resume_of: "qa-engineer",
+    review_verdict: "APPROVED",
+  });
+  assert.ok(!result.isError, `valid enum values on all three fields must not be rejected; got: ${result.content?.[0]?.text}`);
+});
+
+// ---------- AC-5/DR-8: REVIEW_VERDICT_STATUS_MISMATCH gate matrix (integration, real orchestrator) ----------
+
+function mkMismatchWorkspace() {
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "twc9mm-"));
+  fs.mkdirSync(path.join(ws, ".current"), { recursive: true });
+  return ws;
+}
+
+async function seedState(ws, feature, agent, status, extra = {}) {
+  resetSession(ws);
+  markStateRead(ws);
+  await writeHandoffState({
+    workspacePath: ws,
+    activeFeature: feature,
+    status,
+    completedTasks: [],
+    pendingNotes: ["seed"],
+    lastAgent: agent,
+    ...extra,
+  });
+}
+
+// | agent_id       | review_verdict     | status      | expect            |
+// |----------------|---------------------|-------------|--------------------|
+// | code-reviewer  | APPROVED            | FAIL        | reject             |
+// | code-reviewer  | CHANGES_REQUESTED   | In_Progress | reject             |
+// | code-reviewer  | APPROVED            | In_Progress | accept             |
+// | code-reviewer  | CHANGES_REQUESTED   | FAIL        | accept             |
+// | code-reviewer  | (absent)            | FAIL        | accept (never fires) |
+// | sr-engineer    | APPROVED            | In_Progress | accept (non-reviewer never fires) |
+
+test("T-C9-10/AC-5: code-reviewer APPROVED + status=FAIL is REJECTED (polarity mismatch)", async () => {
+  setActiveStorage(new FileHandoffStorage());
+  const ws = mkMismatchWorkspace("c9-mm-1");
+  await seedState(ws, "c9-mm-1", "code-reviewer", "In_Progress"); // prev: code-reviewer:In_Progress (valid edge to code-reviewer:FAIL)
+  resetSession(ws);
+  markStateRead(ws);
+  const result = await handleUpdateState({
+    workspace_path: ws,
+    active_feature: "c9-mm-1",
+    status: "FAIL",
+    agent_id: "code-reviewer",
+    completed_tasks: [],
+    pending_notes: ["code-reviewer: found a correctness issue"],
+    review_verdict: "APPROVED",
+  });
+  assert.ok(result.isError, "APPROVED with status=FAIL must be rejected");
+  assert.ok(result.content[0].text.includes("REVIEW_VERDICT_STATUS_MISMATCH"), `expected REVIEW_VERDICT_STATUS_MISMATCH; got: ${result.content[0].text}`);
+});
+
+test("T-C9-10/AC-5: code-reviewer CHANGES_REQUESTED + status=In_Progress is REJECTED (polarity mismatch)", async () => {
+  setActiveStorage(new FileHandoffStorage());
+  const ws = mkMismatchWorkspace("c9-mm-2");
+  await seedState(ws, "c9-mm-2", "sr-engineer", "In_Progress"); // prev: sr-engineer:In_Progress (valid edge to code-reviewer:In_Progress)
+  resetSession(ws);
+  markStateRead(ws);
+  const result = await handleUpdateState({
+    workspace_path: ws,
+    active_feature: "c9-mm-2",
+    status: "In_Progress",
+    agent_id: "code-reviewer",
+    completed_tasks: [],
+    pending_notes: ["code-reviewer: starting review"],
+    review_verdict: "CHANGES_REQUESTED",
+  });
+  assert.ok(result.isError, "CHANGES_REQUESTED with status=In_Progress must be rejected");
+  assert.ok(result.content[0].text.includes("REVIEW_VERDICT_STATUS_MISMATCH"), `expected REVIEW_VERDICT_STATUS_MISMATCH; got: ${result.content[0].text}`);
+});
+
+test("T-C9-10/AC-5: code-reviewer APPROVED + status=In_Progress is ACCEPTED", async () => {
+  setActiveStorage(new FileHandoffStorage());
+  const ws = mkMismatchWorkspace("c9-mm-3");
+  await seedState(ws, "c9-mm-3", "sr-engineer", "In_Progress");
+  resetSession(ws);
+  markStateRead(ws);
+  const result = await handleUpdateState({
+    workspace_path: ws,
+    active_feature: "c9-mm-3",
+    status: "In_Progress",
+    agent_id: "code-reviewer",
+    completed_tasks: [],
+    pending_notes: ["code-reviewer: approved"],
+    review_verdict: "APPROVED",
+  });
+  assert.ok(!result.isError, `APPROVED with status=In_Progress must be accepted; got: ${result.content?.[0]?.text}`);
+});
+
+test("T-C9-10/AC-5: code-reviewer CHANGES_REQUESTED + status=FAIL is ACCEPTED", async () => {
+  setActiveStorage(new FileHandoffStorage());
+  const ws = mkMismatchWorkspace("c9-mm-4");
+  await seedState(ws, "c9-mm-4", "code-reviewer", "In_Progress");
+  resetSession(ws);
+  markStateRead(ws);
+  const result = await handleUpdateState({
+    workspace_path: ws,
+    active_feature: "c9-mm-4",
+    status: "FAIL",
+    agent_id: "code-reviewer",
+    completed_tasks: [],
+    pending_notes: ["code-reviewer: changes requested"],
+    review_verdict: "CHANGES_REQUESTED",
+  });
+  assert.ok(!result.isError, `CHANGES_REQUESTED with status=FAIL must be accepted; got: ${result.content?.[0]?.text}`);
+});
+
+test("T-C9-10/AC-5: code-reviewer FAIL with review_verdict ABSENT is ACCEPTED (gate never fires on absence)", async () => {
+  setActiveStorage(new FileHandoffStorage());
+  const ws = mkMismatchWorkspace("c9-mm-5");
+  await seedState(ws, "c9-mm-5", "code-reviewer", "In_Progress");
+  resetSession(ws);
+  markStateRead(ws);
+  const result = await handleUpdateState({
+    workspace_path: ws,
+    active_feature: "c9-mm-5",
+    status: "FAIL",
+    agent_id: "code-reviewer",
+    completed_tasks: [],
+    pending_notes: ["code-reviewer: changes requested, no verdict field set"],
+    // review_verdict intentionally omitted.
+  });
+  assert.ok(!result.isError, `a code-reviewer FAIL with no review_verdict must be legal; got: ${result.content?.[0]?.text}`);
+});
+
+test("T-C9-10/AC-5: sr-engineer write carrying review_verdict=APPROVED is ACCEPTED (gate is code-reviewer-only, never fires for other agents)", async () => {
+  // Uses the sr-engineer:Blocked -> sr-engineer:In_Progress self-resume edge
+  // (not a pm->build-entry edge) so SCOPE_DECISION_REQUIRED/CUT_APPROVAL_REQUIRED
+  // — unrelated build-entry gates — cannot confound this assertion.
+  setActiveStorage(new FileHandoffStorage());
+  const ws = mkMismatchWorkspace("c9-mm-6");
+  await seedState(ws, "c9-mm-6", "sr-engineer", "Blocked");
+  resetSession(ws);
+  markStateRead(ws);
+  const result = await handleUpdateState({
+    workspace_path: ws,
+    active_feature: "c9-mm-6",
+    status: "In_Progress",
+    agent_id: "sr-engineer",
+    completed_tasks: [],
+    pending_notes: ["sr-engineer: implementing"],
+    review_verdict: "APPROVED", // nonsensical for this role, but the gate only keys on agent_id === "code-reviewer"
+  });
+  assert.ok(!result.isError, `a non-code-reviewer write must never trip REVIEW_VERDICT_STATUS_MISMATCH; got: ${result.content?.[0]?.text}`);
 });
 
 // ============================================================================

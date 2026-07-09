@@ -19,7 +19,7 @@
 // Evaluation order is NOT encoded here (no evalOrder field): it stays the
 // physical top-to-bottom if-block sequence in tools/handoff-orchestrator.ts
 // (spec AC-7, DR-5). This registry is a keyed lookup, never a dispatch loop.
-// The 19-gate catalog, in documentation order. Array order is DOC order only —
+// The 20-gate catalog, in documentation order. Array order is DOC order only —
 // it MUST NOT be relied on for evaluation order (DR-5; that lives in
 // handoff-orchestrator.ts as the physical if-block sequence).
 export const GATE_REGISTRY = [
@@ -113,7 +113,7 @@ export const GATE_REGISTRY = [
             "specs/b8-external-ref-ledger.md.",
         documentedInProse: true,
     },
-    // ---- plain-text (codes 9-19, producer: orchestrator) ----
+    // ---- plain-text (codes 9-20, producer: orchestrator) ----
     {
         errorCode: "MISSING_EVIDENCE",
         producer: "orchestrator",
@@ -242,6 +242,18 @@ export const GATE_REGISTRY = [
             "surface in qa_reports/visual_<id>.md must carry '- pixel_gate_complete: true' " +
             "in its ### <surface id> prose sub-section under ## Region Diff. Carry-forward " +
             "surfaces are exempt. See specs/qa-visual-pixel-gate-attestation.md.",
+        documentedInProse: true,
+    },
+    {
+        errorCode: "REVIEW_VERDICT_STATUS_MISMATCH",
+        producer: "orchestrator",
+        envelope: "plain-text",
+        triggerEdge: "code-reviewer write with review_verdict disagreeing with status",
+        armCondition: "agent_id=code-reviewer && review_verdict present",
+        clearingArtifact: "APPROVED↔In_Progress or CHANGES_REQUESTED↔FAIL",
+        hintStatic: "A code-reviewer APPROVED verdict requires status=In_Progress; " +
+            "CHANGES_REQUESTED requires status=FAIL. Align review_verdict with status, " +
+            "or omit review_verdict. See specs/c9-protocol-fields.md AC-5.",
         documentedInProse: true,
     },
 ];

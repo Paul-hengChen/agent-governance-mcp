@@ -29,9 +29,13 @@ itself when shipping a new version.
 | v3 | adds `visual_round` counter | v2→v3 stamps version + seeds `visual_round: 0` |
 | v4 | adds optional `scope_decision` attestation | v3→v4 stamp-only, seeds nothing (absence === no attestation) |
 | v5 | adds optional `cut_approved?: boolean` (pm-cut-approval-gate) | v4→v5 stamp-only, seeds nothing — **absence === unapproved**; a defaulted `false` would redundantly materialize absence and a defaulted `true` would be a false attestation, so nothing is seeded. Mirrors v3→v4 exactly. |
+| v6 | adds optional `external_refs?: ExternalRef[]` ledger (b8-external-ref-ledger) | v5→v6 stamp-only, seeds nothing — **absence === zero external refs found === non-blocking** (inverse polarity to `cut_approved`); seeding `[]` would redundantly materialize absence. |
+| v7 | adds optional `next_role` / `resume_of` / `review_verdict` protocol fields (c9-protocol-fields) | v6→v7 stamp-only, seeds nothing — **absence === no routing signal recorded**; a synthesized default would fabricate a directive. Legacy `next_role:` / `resume_of:` / `review:` pending_notes token lines are left byte-verbatim and NOT extracted (they become inert prose). |
 
-`sqlite` stays at v2 — `cut_approved` lives in the handoff YAML frontmatter only
-and is not mirrored to the SQLite schema (the cut-approval gate is file-mode only).
+`sqlite` stays at v2 — `cut_approved`, `external_refs`, and the v7 protocol
+fields live in the handoff YAML frontmatter only and are not mirrored to the
+SQLite schema (the gates that consume them either read the incoming write args
+or are file-mode only).
 
 ## Authoring a v(N) → v(N+1) migration
 

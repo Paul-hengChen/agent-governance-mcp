@@ -341,10 +341,10 @@ scope_decision_why: "one screen, no sub-flows"
   assert.equal(state.scope_decision_why, "one screen, no sub-flows");
 });
 
-test("AC-7: scope_decision round-trips through writeHandoffState → readback (v6 stamp)", async () => {
+test("AC-7: scope_decision round-trips through writeHandoffState → readback (v7 stamp)", async () => {
   // Why: the modern options-object write must emit scope_decision into YAML and
-  // parse it back identically, stamped at v6 (b8-external-ref-ledger re-baseline;
-  // was v5/pm-cut-approval-gate). This is the PM attestation write path.
+  // parse it back identically, stamped at v7 (c9-protocol-fields re-baseline;
+  // was v6/b8-external-ref-ledger). This is the PM attestation write path.
   const ws = mkWorkspace();
   resetSession();
   parseHandoff(ws);
@@ -360,7 +360,7 @@ test("AC-7: scope_decision round-trips through writeHandoffState → readback (v
   });
 
   const raw = readRaw(ws);
-  assert.match(raw, /schema_version:\s*6/, "write stamps current handoff schema v6");
+  assert.match(raw, /schema_version:\s*7/, "write stamps current handoff schema v7");
   assert.match(raw, /scope_decision:\s*["']?single-feature["']?/, "scope_decision emitted into YAML");
 
   const state = parseHandoff(ws);
@@ -409,19 +409,69 @@ test("field preservation: a downstream write omitting scope_decision does NOT dr
   assert.equal(state.last_agent, "sr-engineer", "the new write's own fields still apply");
 });
 
-test("AC-10(g): future v7 handoff refuses-loud against a v6 server (no silent downgrade)", () => {
-  // Why: forward-compat safety. A handoff written by a newer server (v7) must
-  // NOT be silently parsed by this v6 server — runMigrations throws because
+test("AC-3/c9: a downstream write omitting next_role/resume_of/review_verdict DOES drop them — transient, write-scoped, NOT blindly preserved (contrast with scope_decision/prd_path above)", async () => {
+  // Why: c9-protocol-fields AC-3 is the deliberate INVERSE of the test above.
+  // next_role/resume_of/review_verdict are single-hop directives to the
+  // IMMEDIATE next reader — identical lifetime to the pending_notes lines
+  // they replace (wholesale-replaced every write, never carried forward).
+  // Blindly preserving them (like scope_decision/prd_path) would be a
+  // behavioral regression: a stale next_role="architect" from three writes
+  // ago would linger silently. This pins the round-trip: present
+  // immediately after the write that sets them, ABSENT on the very next
+  // write that omits them — even though that write is otherwise a plain
+  // same-feature continuation, not an active_feature change (which is what
+  // drops external_refs/cut_approved's feature-scoped preservation).
+  const ws = mkWorkspace();
+  resetSession();
+  parseHandoff(ws);
+  // First write: sets all three new fields.
+  await writeHandoffState({
+    workspacePath: ws,
+    activeFeature: "transient-feat",
+    status: "In_Progress",
+    completedTasks: [],
+    pendingNotes: ["code-reviewer: approved"],
+    lastAgent: "code-reviewer",
+    nextRole: "qa-engineer",
+    resumeOf: "qa-engineer",
+    reviewVerdict: "APPROVED",
+  });
+  let state = parseHandoff(ws);
+  assert.equal(state.next_role, "qa-engineer", "next_role must be present immediately after the write that sets it");
+  assert.equal(state.resume_of, "qa-engineer", "resume_of must be present immediately after the write that sets it");
+  assert.equal(state.review_verdict, "APPROVED", "review_verdict must be present immediately after the write that sets it");
+
+  // Second write: same feature, no active_feature change, omits all three.
+  resetSession();
+  parseHandoff(ws);
+  await writeHandoffState({
+    workspacePath: ws,
+    activeFeature: "transient-feat",
+    status: "In_Progress",
+    completedTasks: [],
+    pendingNotes: ["qa-engineer: reviewing"],
+    lastAgent: "qa-engineer",
+  });
+  state = parseHandoff(ws);
+  assert.equal(state.next_role, undefined, "next_role must NOT survive an omitting write — transient, not blindly preserved");
+  assert.equal(state.resume_of, undefined, "resume_of must NOT survive an omitting write — transient, not blindly preserved");
+  assert.equal(state.review_verdict, undefined, "review_verdict must NOT survive an omitting write — transient, not blindly preserved");
+  assert.equal(state.last_agent, "qa-engineer", "the new write's own fields still apply");
+});
+
+test("AC-10(g): future v8 handoff refuses-loud against a v7 server (no silent downgrade)", () => {
+  // Why: forward-compat safety. A handoff written by a newer server (v8) must
+  // NOT be silently parsed by this v7 server — runMigrations throws because
   // on-disk version > server max. No new code; this pins the behavior for the
-  // b8-external-ref-ledger version bump specifically (v5→v6; was v4→v5 under
-  // pm-cut-approval-gate). A hypothetical v7 file must still refuse-loud
-  // against the current v6 server.
+  // c9-protocol-fields version bump specifically (v6→v7; was v5→v6 under
+  // b8-external-ref-ledger). A hypothetical v8 file must still refuse-loud
+  // against the current v7 server.
   const ws = mkWorkspace();
   resetSession();
   writeRaw(
     ws,
     `---
-schema_version: 7
+schema_version: 8
 active_feature: "from-the-future"
 status: "In_Progress"
 last_updated: "2099-01-01T00:00:00.000Z"
@@ -438,8 +488,8 @@ qa_round: 0
 
   assert.throws(
     () => parseHandoff(ws),
-    /on-disk version 7 > server max 6/,
-    "v7 file must refuse-loud against a v6 server",
+    /on-disk version 8 > server max 7/,
+    "v8 file must refuse-loud against a v7 server",
   );
 });
 
@@ -492,12 +542,12 @@ prd_path: "/abs/specs/legacy-v5-feat.md"
   assert.equal(state.prd_path, "/abs/specs/legacy-v5-feat.md", "prd_path preserved across v5→v6");
 });
 
-test("AC-8/B8: v5→v6 migration step is pure and idempotent — re-running runMigrations on an already-v6 payload is a no-op", async () => {
-  // Why: AC-8 losslessness plus the runner's own no-op contract (schema/versions.ts
-  // `current === target` short-circuit) — running the migration pipeline twice
-  // against the same payload (e.g. two concurrent reads racing the healing
-  // write-back) must never double-apply the v5→v6 step or mutate an already-
-  // current payload.
+test("AC-1/C9: v6→v7 migration step stamps version only — external_refs survives, new protocol fields stay absent", async () => {
+  // Why: AC-8/B8's old no-op assertion pinned CURRENT === 6; c9-protocol-fields
+  // bumps CURRENT to 7, so a v6 payload is now one stamp-only step BEHIND
+  // current, not already-current. This re-baseline exercises the v6→v7 step
+  // itself: losslessness of the sibling v6 attestation field (external_refs)
+  // plus DR-1's no-seed contract for the three new fields.
   const { runMigrations } = await import("../dist/schema/versions.js");
   const v6Payload = {
     schema_version: 6,
@@ -507,9 +557,86 @@ test("AC-8/B8: v5→v6 migration step is pure and idempotent — re-running runM
     external_refs: [{ ref: "JIRA-1", state: "unresolved" }],
   };
   const result = runMigrations("handoff", v6Payload);
-  assert.deepEqual(result.applied, [], "no migration step should run when on-disk version === CURRENT");
-  assert.equal(result.payload, v6Payload, "no-op path returns the input payload untouched (same reference)");
-  assert.deepEqual(result.payload.external_refs, [{ ref: "JIRA-1", state: "unresolved" }], "external_refs survives the no-op path verbatim");
+  assert.deepEqual(result.applied, [7], "the v6→v7 stamp-only step must run when on-disk version is one behind CURRENT");
+  assert.equal(result.payload.schema_version, 7, "schema_version bumped to CURRENT (7)");
+  assert.deepEqual(result.payload.external_refs, [{ ref: "JIRA-1", state: "unresolved" }], "external_refs survives the v6→v7 stamp-only step verbatim");
+  assert.equal(result.payload.next_role, undefined, "v6→v7 seeds no next_role default (DR-1)");
+  assert.equal(result.payload.resume_of, undefined, "v6→v7 seeds no resume_of default (DR-1)");
+  assert.equal(result.payload.review_verdict, undefined, "v6→v7 seeds no review_verdict default (DR-1)");
+});
+
+test("AC-1/C9: round-trip — re-running runMigrations on the now-v7 payload is a no-op (applied === [])", async () => {
+  // Why: T-C9-07 fixture #3 — the runner's own no-op contract (schema/versions.ts
+  // `current === target` short-circuit). A stale v6 handoff healed once must not
+  // be re-migrated on a second pass (e.g. two concurrent reads racing the healing
+  // write-back, or a plain re-read of an already-current file).
+  const { runMigrations } = await import("../dist/schema/versions.js");
+  const v6Payload = {
+    schema_version: 6,
+    active_feature: "round-trip-v6",
+    status: "In_Progress",
+    last_agent: "pm",
+  };
+  const healed = runMigrations("handoff", v6Payload);
+  assert.deepEqual(healed.applied, [7], "first pass heals v6 to CURRENT (v7)");
+  const reread = runMigrations("handoff", healed.payload);
+  assert.deepEqual(reread.applied, [], "second pass against the now-current payload applies nothing");
+  assert.equal(reread.payload, healed.payload, "no-op path returns the same reference");
+});
+
+test("AC-9/C9: v6 handoff (legacy next_role/resume_of/review tokens in pending_notes) migrates to v7 on read — fields stay undefined, pending_notes byte-verbatim, other fields preserved", () => {
+  // Why: T-C9-07 fixture #1 — DR-2's "inert" contract. A pre-ship v6 file whose
+  // pending_notes still carries the OLD string-convention tokens must climb to
+  // v7 WITHOUT any semantic extraction into the new structured fields — absence
+  // stays absence, and pending_notes is left byte-verbatim (AC-9).
+  const ws = mkWorkspace();
+  resetSession();
+  writeRaw(
+    ws,
+    `---
+schema_version: 6
+active_feature: "legacy-v6-feat"
+status: "In_Progress"
+last_updated: "2026-07-05T00:00:00.000Z"
+last_agent: "pm"
+qa_round: 1
+review_round: 2
+visual_round: 0
+external_refs:
+  - ref: "JIRA-9"
+    state: "user-confirmed-ignorable"
+---
+## ✅ Completed
+- 無
+
+## ⚠️ Pending & Handoff Notes
+- next_role: sr-engineer
+- resume_of: qa-engineer
+- review: APPROVED
+`,
+  );
+
+  const state = parseHandoff(ws);
+  // No-seed / inert (AC-9, DR-2): the v6→v7 migration adds NO structured field
+  // defaults, even though pending_notes contains the OLD string tokens it replaces.
+  assert.equal(state.next_role, undefined, "v6→v7 must NOT extract next_role out of legacy pending_notes prose");
+  assert.equal(state.resume_of, undefined, "v6→v7 must NOT extract resume_of out of legacy pending_notes prose");
+  assert.equal(state.review_verdict, undefined, "v6→v7 must NOT extract review_verdict out of legacy pending_notes prose");
+  // pending_notes left byte-verbatim — no semantic extraction (AC-9).
+  assert.deepEqual(
+    state.pending_notes,
+    ["next_role: sr-engineer", "resume_of: qa-engineer", "review: APPROVED"],
+    "legacy pending_notes tokens survive the migration verbatim",
+  );
+  // Pre-existing fields (including the sibling v6 external_refs ledger) preserved.
+  assert.equal(state.active_feature, "legacy-v6-feat");
+  assert.equal(state.qa_round, 1, "qa_round preserved across v6→v7");
+  assert.equal(state.review_round, 2, "review_round preserved across v6→v7");
+  assert.deepEqual(
+    state.external_refs,
+    [{ ref: "JIRA-9", state: "user-confirmed-ignorable" }],
+    "external_refs (sibling v6 field) preserved across v6→v7",
+  );
 });
 
 test("AC-7/B8: v4 file (pre-dates BOTH cut_approved and external_refs) climbs v4→v5→v6 with neither attestation seeded", () => {

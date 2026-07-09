@@ -140,15 +140,6 @@ function isAgent(a) {
         a === "qa-engineer" ||
         a === "release-engineer");
 }
-// Amend-Resume Edge (C1). Pure, fs-free. Returns true iff `notes` contains a
-// single trimmed entry exactly equal to `resume_of: <target>`. Trust class of
-// scope_decision_why: client-attested, not server-verified.
-function resumeMarkerNames(notes, target) {
-    if (!notes)
-        return false;
-    const want = `resume_of: ${target}`;
-    return notes.some((n) => typeof n === "string" && n.trim() === want);
-}
 function rejection(req, error, allowed, hint) {
     return {
         error,
@@ -174,7 +165,7 @@ function rejection(req, error, allowed, hint) {
  *   2. round-cap override (qa_round >= 4 → only (pm, In_Progress))
  *   3. self-loop fast path on same-agent In_Progress→In_Progress
  *   3.5 Amend-Resume Edge (C1): pm:In_Progress → {code-reviewer,qa-engineer}:In_Progress
- *       iff next_pending_notes self-attests `resume_of: <that exact role>`
+ *       iff the structured next_resume_of field names that exact role (v7)
  *   4. table lookup
  */
 export function validateTransition(req) {
@@ -221,18 +212,21 @@ export function validateTransition(req) {
         req.next.status === "In_Progress") {
         return null;
     }
-    // 3.5 Amend-Resume Edge (C1). Additive: opens pm:In_Progress →
-    // {code-reviewer,qa-engineer}:In_Progress ONLY when the incoming write
-    // self-attests `resume_of: <that exact role>` in pending_notes. The static
-    // table has no such entry, so absent/mismatched markers fall through to the
-    // unchanged TRANSITION_REJECTED. "Was actually stranded" is PM-attested (SOP);
-    // the server checks only marker⟺target consistency. Pure (reads only
-    // prev/next/pending_notes) — no fs, no schema field, works in every storage mode.
+    // 3.5 Amend-Resume Edge (C1, rewired by c9-protocol-fields AC-4). Additive:
+    // opens pm:In_Progress → {code-reviewer,qa-engineer}:In_Progress ONLY when
+    // the incoming write's structured resume_of field (threaded here as
+    // next_resume_of by the orchestrator) names that exact role. The static
+    // table has no such entry, so absent/mismatched fields fall through to the
+    // unchanged TRANSITION_REJECTED. Legacy `resume_of: <role>` pending_notes
+    // lines are INERT (DR-2 — not honored, not rejected). "Was actually
+    // stranded" is PM-attested (SOP, trust class of scope_decision_why); the
+    // server checks only field⟺target consistency. Pure (reads only
+    // prev/next/next_resume_of) — no fs, storage-agnostic.
     if (req.prev.agent === "pm" &&
         req.prev.status === "In_Progress" &&
         req.next.status === "In_Progress" &&
         (req.next.agent === "code-reviewer" || req.next.agent === "qa-engineer") &&
-        resumeMarkerNames(req.next_pending_notes, req.next.agent)) {
+        req.next_resume_of === req.next.agent) {
         return null; // accept
     }
     // 4. table lookup

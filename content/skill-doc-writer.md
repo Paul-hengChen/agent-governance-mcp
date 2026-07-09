@@ -33,4 +33,4 @@ Doc-writer MUST NOT create new top-level `*.md` files unless explicitly requeste
    - `README.md`: bump install pins if the version changed; refresh release-notes subsection; correct any prose that drifted from code.
    - `docs/**`: update reference material that names code symbols or paths.
 5. Re-build is NOT required (doc-writer touches only Markdown). If `dist/` has stale doc strings embedded, surface it — do not rebuild.
-6. `tw_update_state(status=In_Progress, agent_id="<upstream-caller>", pending_notes=["doc-writer: updated <file-list>", "next_role: <caller>"])`.
+6. `tw_update_state(status=In_Progress, agent_id="<upstream-caller>", next_role="<caller>", pending_notes=["doc-writer: updated <file-list>"])`.

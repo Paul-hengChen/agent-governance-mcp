@@ -131,6 +131,32 @@ const UpdateStateArgs = z
       )
       .max(200)
       .optional(),
+    // v7 — protocol fields (c9-protocol-fields). Closed enums (AC-2): an
+    // out-of-enum value is rejected here, at the tool boundary, before any
+    // gate runs (mirrors external_refs.state). All three are TRANSIENT,
+    // write-scoped (AC-3): storage emits them only when set on THIS write —
+    // never preserved across omitting writes.
+    // next_role: advisory single-hop routing directive; enum-shape validation
+    // ONLY — deliberately NOT cross-checked against ALLOWED_TRANSITIONS (AC-6).
+    next_role: z
+      .enum([
+        "pm",
+        "researcher",
+        "design-auditor",
+        "architect",
+        "sr-engineer",
+        "code-reviewer",
+        "qa-engineer",
+        "release-engineer",
+      ])
+      .optional(),
+    // resume_of: Amend-Resume target; consumed by validateTransition via
+    // TransitionRequest.next_resume_of (AC-4). Restricted to the exact two
+    // roles the Amend-Resume Edge allows.
+    resume_of: z.enum(["code-reviewer", "qa-engineer"]).optional(),
+    // review_verdict: code-reviewer verdict; checked against status by the
+    // REVIEW_VERDICT_STATUS_MISMATCH orchestrator gate (AC-5).
+    review_verdict: z.enum(["APPROVED", "CHANGES_REQUESTED"]).optional(),
   })
   .refine((d) => d.status !== "PASS" || d.agent_id === "qa-engineer", {
     message: 'status="PASS" requires agent_id="qa-engineer"',
@@ -358,6 +384,33 @@ export const TOOL_REGISTRY: ToolRegistryEntry[] = [
           },
           description:
             "External-reference ledger (file-mode only). Array of {ref, state} entries; state ∈ {fetched, indexed, user-confirmed-ignorable, unresolved}. PM populates this during the Resource Audit Gate — one entry per external artifact the spec references. Passing it REPLACES the array wholesale (not merged). Any entry left unresolved blocks the pm:In_Progress → {architect,sr-engineer}:In_Progress build-entry hop (EXTERNAL_REFS_UNRESOLVED). Absence/empty = zero external refs found = non-blocking. Feature-scoped: preserved across same-feature writes, dropped on active_feature change.",
+        },
+        next_role: {
+          type: "string",
+          enum: [
+            "pm",
+            "researcher",
+            "design-auditor",
+            "architect",
+            "sr-engineer",
+            "code-reviewer",
+            "qa-engineer",
+            "release-engineer",
+          ],
+          description:
+            "Single-hop routing directive: which role should act next. Advisory metadata only — enum-validated but NOT cross-checked against ALLOWED_TRANSITIONS. Transient: applies to THIS write only, never carried forward across writes that omit it. Replaces the legacy 'next_role: <role>' pending_notes line (handoff schema v7).",
+        },
+        resume_of: {
+          type: "string",
+          enum: ["code-reviewer", "qa-engineer"],
+          description:
+            "Amend-Resume declaration: which stranded role a PM mid-chain amendment resumes. The pm:In_Progress → {code-reviewer,qa-engineer}:In_Progress resume edge is accepted ONLY when this field names the exact target role. Transient: applies to THIS write only. Replaces the legacy 'resume_of: <role>' pending_notes line (handoff schema v7).",
+        },
+        review_verdict: {
+          type: "string",
+          enum: ["APPROVED", "CHANGES_REQUESTED"],
+          description:
+            "Code-reviewer verdict. Server-checked for consistency against status (REVIEW_VERDICT_STATUS_MISMATCH): APPROVED requires status=In_Progress; CHANGES_REQUESTED requires status=FAIL. Optional even on code-reviewer writes — absence never fires the gate. Transient: applies to THIS write only. Replaces the legacy 'review: APPROVED|CHANGES_REQUESTED' pending_notes line (handoff schema v7).",
         },
       },
       required: ["workspace_path", "active_feature", "status"],

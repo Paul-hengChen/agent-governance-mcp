@@ -12,6 +12,12 @@ future `/teamwork` feature; none blocks a release on its own.
 > the A1 orchestrator extraction both landed, cost dropped); A2 recommended
 > to fold into A10 (split gates/ while data-fying them, one QA round); A12
 > deprioritized (A9 shrank its marginal benefit).
+>
+> **2026-07-09 revision** (during the C9 /teamwork run): C14–C17 added from
+> live process friction observed in that run (pin carry-forward fragility,
+> expected-red opacity, code-reviewer ledger write, brief boilerplate). An
+> explicit execution order for everything still open is recorded in
+> *Recommended execution order* below the table.
 
 | id | desc | priority | depends_on | est. files | design-link |
 |----|------|----------|------------|------------|-------------|
@@ -38,11 +44,32 @@ future `/teamwork` feature; none blocks a release on its own.
 | C6 | Prompt-injection state footer reports "No handoff state found" while handoff exists; stale `prd_path` suspect — **done (2026-07-08, v3.48.0)** | P1 | — | ~3 (`prompts/build.ts` state loader, `bin/agent-governance-context.mjs`, test) | — |
 | C7 | §2 test-ownership absolutism collides with mechanical version-literal edits at release — **done (2026-07-09)** | P2 | — | ~3 (constitution §2, skill-release-engineer, version-assertion tests) | — |
 | C8 | Crash-resume protocol: mid-role kill leaves no §3 failure write; resume drops dispatch-time model pin — **done (2026-07-09)** | P2 | — | ~2 (skill-coordinator SOP, maybe handoff field) | — |
-| C9 | pending_notes free-text protocol tokens (`next_role:`/`resume_of:`/`review: APPROVED`) → structured handoff fields | P2 | A10 ✓ | ~6 (`tools/handoff.ts` schema, `transitions.ts`, orchestrator, skills, tests) | — |
+| C9 | pending_notes free-text protocol tokens (`next_role:`/`resume_of:`/`review: APPROVED`) → structured handoff fields — **done (2026-07-09, v3.55.0)** | P2 | A10 ✓ | ~6 (`tools/handoff.ts` schema, `transitions.ts`, orchestrator, skills, tests) | — |
 | C10 | qa-engineer / release-engineer bookkeeping boundary blur (QA did version bump + CHANGELOG in A10-10) | P2 | — | ~3 (skill-pm cut guidance, skill-qa-engineer, skill-release-engineer) | — |
 | C11 | Constitution double-injection: SessionStart hook + `/teamwork*` prompt both carry the full constitution in one session — **done (2026-07-08, v3.48.0)** | P2 | — | ~3 (`prompts/build.ts`, `bin/agent-governance-context.mjs`) | — |
 | C12 | Registry doc-facing fields (`triggerEdge`/`armCondition`/`clearingArtifact`) have zero consumers/tests — fourth unverified copy of gate semantics | P2 | A10 ✓ | ~4 (`gates/registry.ts`, `prompts/build.ts` or `test/error-code-contract.test.mjs`, content) | — |
 | C13 | release-engineer has no legal handoff write; on TRANSITION_REJECTED the subagent hand-edited handoff.md, wedging the state machine — **done (2026-07-08)** | P1 | — | ~4 (`tools/transitions.ts`, skill-release-engineer, templates, tests) | — |
+| C14 | `dispatch_pins` survives only by coordinator-reminded verbatim carry-forward — promote to first-class handoff field + skill carry rule | P1 | C9 | ~5 (`tools/handoff.ts` schema, `tools/registry.ts`, orchestrator, skill-coordinator + role skills, tests) | — |
+| C15 | Expected-red test handoff is prose — machine-checkable red-list manifest, QA diffs actual vs expected | P1 | — | ~4 (skill-sr-engineer, skill-qa-engineer, skill-code-reviewer, maybe evidence check) | — |
+| C16 | code-reviewer wrote `completed_tasks` ledger entries + evidence filename drifted from its own stated path | P2 | — | ~3 (skill-code-reviewer, maybe orchestrator guard, tests) | — |
+| C17 | Coordinator dispatch briefs restate protocol by hand each hop — per-role brief template partial | P3 | — | ~2 (skill-coordinator, maybe templates/) | — |
+
+### Recommended execution order (2026-07-09, everything still open)
+
+C9 is in flight (QA phase) and excluded. Order optimizes: risks actually hit
+in live runs first, cheap content-only batches next, design-heavy last.
+
+| order | ticket | why here |
+|---|---|---|
+| 1 | C14 | pin-loss risk was hit live in the C9 run (survived only via per-brief reminders); natural C9 follow-on — reuses the v7 field pattern while it's fresh |
+| 2 | C15 | only defense against a real regression hiding among mass re-baselines (52 reds in the C9 run, reviewer spot-checked 2); mostly content |
+| 3 | C16 + C10 | one content-only batch: both are role-boundary bookkeeping rules (reviewer ledger write; QA vs release-engineer split) — single QA round |
+| 4 | C5 | small code fix (watermark replace-not-append + template tier); long-open, cheap |
+| 5 | A8 | self-converge ×2 dedup remainder; content-only |
+| 6 | C12 | needs an option decision (render / assert / delete) before work — schedule the decision, then it's small |
+| 7 | C17 | pure ergonomics; no correctness exposure |
+| 8 | B9 | needs design (budget source, measurement point); round caps already bound worst case |
+| 9 | A12 | biggest surface (~14 files), lowest marginal benefit post-A9 — last |
 
 ---
 
@@ -572,6 +599,79 @@ future `/teamwork` feature; none blocks a release on its own.
 - **Owner:** /teamwork (transitions.ts or skill text + template + tests).
 - **Risk if skipped:** every release re-runs the same rejection→hand-edit
   temptation; a wedged handoff blocks the next feature's first PM write.
+
+## C14 — dispatch_pins survives only by hand-carried pending_notes (P1, observed 2026-07-09; C9 follow-on)
+- **What:** In the live C9 run, the human's `sr-engineer=fable` pin survived
+  four role hops and two crash-resumes ONLY because the coordinator wrote
+  "carry `dispatch_pins: sr-engineer=fable` VERBATIM" into every dispatch
+  brief. `pending_notes` is replaced wholesale on every write — one role
+  forgetting the line silently drops the pin, and the resumed/next dispatch
+  degrades to the frontmatter-default model with no error. C9 promoted
+  `next_role`/`resume_of`/`review_verdict` but explicitly re-deferred
+  `dispatch_pins` (shape differs: multi-entry `<role>=<model>` map vs single
+  scalar — see specs/c9-protocol-fields.md Out of Scope).
+- **Fix:** promote `dispatch_pins` to a first-class handoff field (record/map
+  shape, schema bump per docs/schema-versions.md) that PERSISTS across writes
+  until the feature closes (unlike C9's transient per-write fields —
+  pins are durable directives, not routing signals); plus a one-line skill
+  rule in each role: never re-derive model tier from frontmatter when a pin
+  covers the role. Coordinator Crash-Resume step 3 then reads the field, not
+  a grep.
+- **Owner:** /teamwork (schema bump + orchestrator + skill text; small-medium).
+- **Risk if skipped:** exactly the C8 failure class, still live — a dropped
+  note line silently downgrades the model mid-feature; nobody notices until
+  the watermark mismatches.
+
+## C15 — Expected-red test handoff is unverifiable prose (P1, observed 2026-07-09)
+- **What:** C9's sr-engineer (correctly) edited no tests and handed QA a
+  prose catalogue of 52 expected-red tests. Code-reviewer spot-checked 2 of
+  52. A genuine regression hiding among the reds would be invisible: nothing
+  machine-checks "actual red set == expected red set" before QA starts
+  re-baselining — QA could re-baseline a regression into the suite.
+- **Fix:** skill-sr-engineer: when leaving expected-reds, emit a
+  machine-comparable manifest (file + test name, one per line, e.g.
+  `qa_reports/expected-red_<feature>.txt`). skill-qa-engineer Phase 0: run
+  the suite, diff actual reds vs manifest — the difference set must be empty
+  or each extra/missing entry explicitly dispositioned in the evidence file
+  before any re-baseline edit. skill-code-reviewer: verify the manifest
+  exists and sample from it, not from prose.
+- **Owner:** /teamwork (3 skill files + maybe an evidence-check hook;
+  content-mostly).
+- **Risk if skipped:** mass re-baselines (schema bumps do this every time)
+  can launder a real regression into a "cap update"; post-hoc detection cost
+  is a full release audit.
+
+## C16 — code-reviewer overstepped bookkeeping: ledger write + evidence-path drift (P2, observed 2026-07-09)
+- **What:** In the C9 run the code-reviewer's APPROVED handoff wrote
+  `completed_tasks: T-C9-01..06, T-C9-12..16` onto the handoff ledger —
+  task-completion bookkeeping that belongs to qa-engineer's PASS (§3
+  ownership; the reviewer judges the diff, it does not record completions).
+  Separately its reply promised evidence at
+  `review_reports/review_c9-protocol-fields.md` but wrote
+  `review_reports/review_T-C9-01.md` — harmless here (the server found it),
+  but path drift breaks any downstream consumer that trusts the stated path.
+- **Fix:** skill-code-reviewer: explicit "never pass `completed_tasks`" rule;
+  standardize evidence naming to one convention (per-feature
+  `review_<feature>.md` OR per-task with a `covers:` manifest — pick one,
+  align with the C3 covering-review precedent). Optionally an orchestrator
+  guard rejecting `completed_tasks` from `agent_id=code-reviewer`.
+- **Owner:** /teamwork (1–2 skill files, optional orchestrator guard + test).
+- **Risk if skipped:** double-entry bookkeeping between reviewer and QA
+  drifts the ledger; stated-vs-actual evidence paths rot into dead links.
+
+## C17 — Coordinator dispatch briefs restate protocol by hand (P3, observed 2026-07-09)
+- **What:** Every C9-run dispatch brief hand-restated the same protocol
+  boilerplate (first action tw_get_state → tw_detect_drift, known-drift
+  ignore list, carry pins verbatim, don't set cut_approved, watermark
+  format). Each restatement is a chance to omit or contradict a rule — the
+  pin-carry line only existed because the coordinator remembered it.
+- **Fix:** skill-coordinator gains a canonical per-role brief template
+  partial (the invariant protocol block), so briefs are template + per-hop
+  delta only. Overlaps C14 (pin block drops out of the template once pins
+  are a field) — sequence after it.
+- **Owner:** /teamwork (skill-coordinator, maybe templates/; content-only).
+- **Risk if skipped:** low — ergonomics; but every omission class C14/C16
+  document started life as a forgotten brief line.
 
 ## B8 — §7 external-reference policy is text-only, no server-side enforcement (P1, carried forward 2026-06-11)
 - **What:** Constitution §7 says a spec referencing external artifacts is

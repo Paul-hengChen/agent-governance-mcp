@@ -14,7 +14,7 @@ export interface TransitionRequest {
     prev_qa_round: number;
     prev_review_round: number;
     prev_visual_round?: number;
-    next_pending_notes?: ReadonlyArray<string>;
+    next_resume_of?: "code-reviewer" | "qa-engineer";
 }
 export interface TransitionRejection {
     error: "TRANSITION_REJECTED" | "QA_ROUND_EXCEEDED" | "REVIEW_ROUND_EXCEEDED" | "VISUAL_ROUND_EXCEEDED" | "VISUAL_WIDGETS_UNVERIFIED" | "VISUAL_BASELINES_REQUIRED" | "VISUAL_REPORT_INCOMPLETE" | "VISUAL_ASSERTIONS_REQUIRED" | "SCOPE_DECISION_REQUIRED" | "PIXEL_GATE_ATTESTATION_MISSING" | "CUT_APPROVAL_REQUIRED" | "EXTERNAL_REFS_UNRESOLVED" | "AGENT_ID_REQUIRED";
@@ -48,7 +48,7 @@ export declare const ALLOWED_TRANSITIONS: ReadonlyMap<string, AllowedNext>;
  *   2. round-cap override (qa_round >= 4 → only (pm, In_Progress))
  *   3. self-loop fast path on same-agent In_Progress→In_Progress
  *   3.5 Amend-Resume Edge (C1): pm:In_Progress → {code-reviewer,qa-engineer}:In_Progress
- *       iff next_pending_notes self-attests `resume_of: <that exact role>`
+ *       iff the structured next_resume_of field names that exact role (v7)
  *   4. table lookup
  */
 export declare function validateTransition(req: TransitionRequest): TransitionRejection | null;

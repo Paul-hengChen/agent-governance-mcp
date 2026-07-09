@@ -150,12 +150,20 @@ test("AC2: lean always-on bundle is below the raw baseline and within target (<=
   // path too. Independently re-measured (not trusted from sr-engineer's or
   // code-reviewer's notes) at 3491 ~tok (exact); cap set to the exact measured value per
   // the established Phase-2 convention (no additional headroom).
+  // c9-protocol-fields (qa-owned bump, T-C9-11): cap raised from 3491 → 3685 to absorb
+  // the const-05-core-standards.md Escalation-call-format rewrite (T-C9-12: next_role/
+  // resume_of/review_verdict promoted to first-class fields, with the new
+  // REVIEW_VERDICT_STATUS_MISMATCH gate prose) plus the const-12-chain-r10-s4.md S6
+  // sentence rewording — both core/chain-tagged, load on this lean path. Independently
+  // re-measured (not trusted from sr-engineer's or code-reviewer's notes) at 3685 ~tok
+  // (exact); cap set to the exact measured value per the established Phase-2 convention
+  // (no additional headroom).
   const liteSkill = fs.readFileSync(path.join(ROOT, "content", "skill-coordinator-lite.md"), "utf-8");
   const SEP = "\n\n---\n\n";
   const raw = approxTokens(CONSTITUTION + SEP + liteSkill);
   const lean = approxTokens(LEAN_CONSTITUTION + SEP + liteSkill);
   assert.ok(lean < raw, `lean (${lean}) must be < raw (${raw})`);
-  assert.ok(lean <= 3491, `lean always-on (${lean} ~tok) must meet the <= 3491 target`);
+  assert.ok(lean <= 3685, `lean always-on (${lean} ~tok) must meet the <= 3685 target`);
 });
 
 // --- AC3: enforcement preserved ------------------------------------------
@@ -506,6 +514,11 @@ test("AC1/AC2: skill-pm stripped token count meets ≤ 3196 cap", () => {
   // tw_update_state, AC-11). Independently re-measured (not trusted from sr-engineer's
   // handoff note) at 3327 ~tok exactly; cap set to the exact measured value per the
   // established Phase-2 convention (no headroom).
+  // c9-protocol-fields (qa-owned bump, T-C9-13): cap raised from 3327 → 3377 to absorb
+  // skill-pm.md's Auto-Routing / Escalation Routes / Gate Summary prose rewrite (records
+  // `next_role`/`resume_of` as first-class fields instead of `pending_notes` tokens).
+  // Independently re-measured at 3377 ~tok exactly; cap set to the exact measured value
+  // per the established Phase-2 convention (no headroom).
   const SKILL_PM = fs.readFileSync(path.join(ROOT, "content", "skill-pm.md"), "utf-8");
   // Strip frontmatter (--- block) before token-counting the body, matching buildPromptForRole.
   const body = SKILL_PM.startsWith("---")
@@ -513,7 +526,7 @@ test("AC1/AC2: skill-pm stripped token count meets ≤ 3196 cap", () => {
     : SKILL_PM;
   const stripped = stripRationale(stripOriginTags(body));
   const toks = approxTokens(stripped);
-  assert.ok(toks <= 3327, `skill-pm stripped body (${toks} ~tok) must be ≤ 3327 (AC1, b8-external-ref-ledger re-baseline)`);
+  assert.ok(toks <= 3377, `skill-pm stripped body (${toks} ~tok) must be ≤ 3377 (AC1, c9-protocol-fields re-baseline)`);
 });
 
 test("AC1/AC2: skill-sr-engineer stripped token count meets ≤ 2138 cap", () => {
@@ -538,13 +551,18 @@ test("AC1/AC2: skill-sr-engineer stripped token count meets ≤ 2138 cap", () =>
   // call format (byte-identical header). Independently re-measured (not trusted from
   // sr-engineer's handoff note) at 2258 ~tok exactly; cap set to the exact measured value
   // per the established Phase-2 convention (no headroom).
+  // c9-protocol-fields (qa-owned bump, T-C9-14): cap raised from 2258 → 2275 to absorb
+  // skill-sr-engineer.md's Escalation Routes table column rewrite (note-token column →
+  // structured-field column, per T-C9-14). Independently re-measured at 2275 ~tok
+  // exactly; cap set to the exact measured value per the established Phase-2 convention
+  // (no headroom).
   const SKILL_SR = fs.readFileSync(path.join(ROOT, "content", "skill-sr-engineer.md"), "utf-8");
   const body = SKILL_SR.startsWith("---")
     ? SKILL_SR.slice(SKILL_SR.indexOf("---", 3) + 3).trimStart()
     : SKILL_SR;
   const stripped = stripRationale(stripOriginTags(body));
   const toks = approxTokens(stripped);
-  assert.ok(toks <= 2258, `skill-sr stripped body (${toks} ~tok) must be ≤ 2258 (AC2, a11-escalation-grammar re-baseline)`);
+  assert.ok(toks <= 2275, `skill-sr stripped body (${toks} ~tok) must be ≤ 2275 (AC2, c9-protocol-fields re-baseline)`);
 });
 
 // --- governance-text-load Round-2: constitution rationale fencing (T-GTL-06/07) ---
@@ -674,12 +692,21 @@ test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the 
   // established Phase-2 convention (no additional headroom). Saving margin re-verified:
   // raw 5994 − stripped 5721 = 273 ~tok, still ≥ 240 (unchanged — the const-05 edit sits
   // outside both rationale fences).
+  // c9-protocol-fields (qa-owned bump, T-C9-11/T-C9-12): cap raised from 5721 → 6024 to
+  // absorb the const-05-core-standards.md Escalation-call-format rewrite, the
+  // const-08-chain-31-mid.md Amend-Resume/code-reviewer-verdict rewrite (§3.1,
+  // chain-tagged — loads on this design-arm path), and the const-12-chain-r10-s4.md S6
+  // sentence rewording — all not design-only-fenced. Independently re-measured — raw
+  // 6297, stripped 6024 (exact); cap set to the exact measured value per the established
+  // Phase-2 convention (no additional headroom). Saving margin re-verified: raw 6297 −
+  // stripped 6024 = 273 ~tok, still ≥ 240 (unchanged — the edits sit outside both
+  // rationale fences).
   const raw = approxTokens(CONSTITUTION);
   const stripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));
-  assert.ok(stripped <= 5721, `stripped constitution (${stripped} ~tok) must be ≤ 5721 (AC8 design-arm floor, c7-version-assertion-ownership re-baseline)`);
+  assert.ok(stripped <= 6024, `stripped constitution (${stripped} ~tok) must be ≤ 6024 (AC8 design-arm floor, c9-protocol-fields re-baseline)`);
   assert.ok(
     raw - stripped >= 240,
-    `constitution rationale+origin-tag saving (${raw - stripped} ~tok) must be ≥ 240 (AC8 measured min, c7-version-assertion-ownership re-baseline)`,
+    `constitution rationale+origin-tag saving (${raw - stripped} ~tok) must be ≥ 240 (AC8 measured min, c9-protocol-fields re-baseline)`,
   );
 });
 
@@ -763,13 +790,20 @@ test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/b
   // re-measured (not trusted from sr-engineer's or code-reviewer's notes) at 10879 ~tok
   // (exact); cap set to the exact measured value per the established Phase-2 convention
   // (no additional headroom).
+  // c9-protocol-fields (qa-owned bump, T-C9-11/T-C9-12/T-C9-13): cap raised from 10879 →
+  // 11290 to absorb the constitution-side growth measured in the design-arm floor test
+  // above (+303 ~tok: const-05/const-08/const-12 rewrites) plus the skill-coordinator.md
+  // Auto-Routing / Escalation Routes / Gate Summary prose rewrite (skill side, T-C9-13:
+  // `next_role`/`resume_of` as first-class fields). Independently re-measured at 11290
+  // ~tok (exact); cap set to the exact measured value per the established Phase-2
+  // convention (no additional headroom).
   const skillCoord = fs.readFileSync(path.join(ROOT, "content", "skill-coordinator.md"), "utf-8");
   const body = skillCoord.startsWith("---")
     ? skillCoord.slice(skillCoord.indexOf("---", 3) + 3).trimStart()
     : skillCoord;
   const SEP = "\n\n---\n\n";
   const bundle = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)) + SEP + stripRationale(stripOriginTags(body)));
-  assert.ok(bundle <= 10879, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 10879 (AC8 design-arm floor, c7-version-assertion-ownership re-baseline)`);
+  assert.ok(bundle <= 11290, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 11290 (AC8 design-arm floor, c9-protocol-fields re-baseline)`);
 });
 
 test("AC9: every operative rule/gate/heading survives stripRationale on the constitution", () => {
@@ -1187,12 +1221,21 @@ test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is
   // the established Phase-2 convention (no additional headroom). Saving margin
   // re-verified: design-arm 5721 − non-design 3636 = 2085 ~tok, still ≥ 2080 (unchanged —
   // the const-05 edit sits outside the design-only fences).
-  const ratStripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));         // design-arm path: 5721
-  const nonDesign = approxTokens(stripRationale(stripOriginTags(composeConstitution({ chain: true, design: false })))); // non-design path: 3636
-  assert.ok(nonDesign <= 3636, `non-design constitution (${nonDesign} ~tok) must be ≤ 3636 (AC8 non-design floor, c7-version-assertion-ownership re-baseline)`);
+  // c9-protocol-fields (qa-owned bump, T-C9-11/T-C9-12): cap raised from 3636 → 3939. The
+  // const-05-core-standards.md Escalation-call-format rewrite, the const-08-chain-31-mid.md
+  // Amend-Resume/code-reviewer-verdict rewrite, and the const-12-chain-r10-s4.md S6
+  // sentence rewording are all chain-tagged (not design-tagged), so they land on the
+  // non-design path too, same as the design-arm floor above. Independently re-measured at
+  // 3939 ~tok (exact); cap set to the exact measured value per the established Phase-2
+  // convention (no additional headroom). Saving margin re-verified: design-arm 6024 −
+  // non-design 3939 = 2085 ~tok, still ≥ 2080 (unchanged — the edits sit outside the
+  // design-only fences).
+  const ratStripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));         // design-arm path: 6024
+  const nonDesign = approxTokens(stripRationale(stripOriginTags(composeConstitution({ chain: true, design: false })))); // non-design path: 3939
+  assert.ok(nonDesign <= 3939, `non-design constitution (${nonDesign} ~tok) must be ≤ 3939 (AC8 non-design floor, c9-protocol-fields re-baseline)`);
   assert.ok(
     ratStripped - nonDesign >= 2080,
-    `design-only strip saving (${ratStripped - nonDesign} ~tok) must be ≥ 2080 (c7-version-assertion-ownership re-baseline)`,
+    `design-only strip saving (${ratStripped - nonDesign} ~tok) must be ≥ 2080 (c9-protocol-fields re-baseline)`,
   );
 });
 
@@ -1328,8 +1371,14 @@ test("AC-P2-5: §4 reflow is REORDER-ONLY — every §4 rule sentence is byte-pr
     "sr-engineer ↔ code-reviewer loops on `(code-reviewer, FAIL)` for up to 3",
     // S2 (non-visual) — qa_round
     "The qa-engineer loop back to sr-engineer",
-    // S6 (non-visual) — universal handoff convention
-    "Each role finishes with `tw_update_state` whose `pending_notes` start with `next_role: <name>`",
+    // S6 (non-visual) — universal handoff convention. c9-protocol-fields
+    // (T-C9-11 qa-owned re-baseline): the sentence was legitimately REWORDED
+    // (not just reordered) by const-12-chain-r10-s4.md's T-C9-12 edit — the
+    // routing signal moved from a `pending_notes` token to the first-class
+    // `next_role` field. This anchor is updated to the new verbatim sentence;
+    // the REORDER-ONLY contract this test enforces applies to the reflow
+    // that split §4 across fragments, not to a later feature's content edit.
+    "Each role finishes with `tw_update_state` whose first-class `next_role` field names the successor role",
     // S3 (visual) — visual_round description + self-arming signal
     // governance-tag-strip (T-GTS-04): the raw anchor shifted — "v3.14.0" is now wrapped
     // in an inline origin fence inside the same parenthetical as the "§3.1" cross-ref

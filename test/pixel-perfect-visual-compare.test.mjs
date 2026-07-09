@@ -101,16 +101,20 @@ test("AC-4: v3.14.0 — four distinct failure routes (widget shape + pixel drift
   // v3.14.0: routes expanded from 3 to 4. Widget shape miss is new; pixel
   // drift retains the prior drift slot. Missing baseline → design-auditor;
   // implementation routes carry visual_fail: token for visual_round bump.
+  // c9-protocol-fields (T-C9-15 re-baseline): `next_role` is now a first-class
+  // field passed as `next_role="<role>"` (quoted tw_update_state arg), not a
+  // `next_role: <role>` pending_notes token — the colon-form regex no longer
+  // matches.
   const body = fs.readFileSync(QA_VISUAL_PATH, "utf-8");
 
   // Widget shape miss (new in v3.14.0) → sr-engineer with visual_fail token
-  assert.match(body, /Widget shape miss.*visual_fail:.*next_role:\s*sr-engineer/is, "widget shape route must target sr-engineer with visual_fail token");
+  assert.match(body, /Widget shape miss.*next_role="sr-engineer".*visual_fail:/is, "widget shape route must target sr-engineer with visual_fail token");
   // Pixel drift (renamed from "visual drift") → sr-engineer with visual_fail: pixel
-  assert.match(body, /Pixel drift.*visual_fail:\s*pixel.*next_role:\s*sr-engineer/is, "pixel drift must carry visual_fail: pixel token");
+  assert.match(body, /Pixel drift.*next_role="sr-engineer".*visual_fail:\s*pixel/is, "pixel drift must carry visual_fail: pixel token");
   // Missing baseline → design-auditor (no visual_fail; auditor defect, not implementation)
-  assert.match(body, /Missing baseline.*next_role:\s*design-auditor/is, "missing baseline must route to design-auditor");
+  assert.match(body, /Missing baseline.*next_role="design-auditor"/is, "missing baseline must route to design-auditor");
   // Missing impl → sr-engineer with visual_fail: missing_impl
-  assert.match(body, /Missing impl.*visual_fail:\s*missing_impl.*next_role:\s*sr-engineer/is, "missing impl must carry visual_fail: missing_impl token");
+  assert.match(body, /Missing impl.*next_role="sr-engineer".*visual_fail:\s*missing_impl/is, "missing impl must carry visual_fail: missing_impl token");
   // PASS sub-verdict heading exists (v3.14.0 promotes it to its own H3 section)
   assert.match(body, /PASS sub-verdict/is, "PASS sub-verdict must exist");
 });

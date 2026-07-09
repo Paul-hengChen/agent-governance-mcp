@@ -56,6 +56,24 @@ declare const UpdateStateArgs: z.ZodObject<{
             "user-confirmed-ignorable": "user-confirmed-ignorable";
         }>;
     }, z.core.$strip>>>;
+    next_role: z.ZodOptional<z.ZodEnum<{
+        pm: "pm";
+        researcher: "researcher";
+        "design-auditor": "design-auditor";
+        "sr-engineer": "sr-engineer";
+        "code-reviewer": "code-reviewer";
+        "qa-engineer": "qa-engineer";
+        architect: "architect";
+        "release-engineer": "release-engineer";
+    }>>;
+    resume_of: z.ZodOptional<z.ZodEnum<{
+        "code-reviewer": "code-reviewer";
+        "qa-engineer": "qa-engineer";
+    }>>;
+    review_verdict: z.ZodOptional<z.ZodEnum<{
+        APPROVED: "APPROVED";
+        CHANGES_REQUESTED: "CHANGES_REQUESTED";
+    }>>;
 }, z.core.$strip>;
 declare const CompleteTaskArgs: z.ZodObject<{
     workspace_path: z.ZodString;

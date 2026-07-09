@@ -53,7 +53,12 @@ const TOKEN_RE = /\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*\b/g;
 // BOTH extractCodeCodes and extractDocCodes (isGateErrorCode filters it out
 // of both harvests identically), which would silently mask a missing-registry
 // or missing-doc regression for this gate.
-const SUFFIX_RE = /_(REQUIRED|MISSING|INCOMPLETE|EXCEEDED|UNVERIFIED|REJECTED|UNRESOLVED)$/;
+// c9-protocol-fields (DR-7, qa-owned re-baseline): added MISMATCH. The new
+// REVIEW_VERDICT_STATUS_MISMATCH gate code introduces another novel suffix
+// outside the prior vocabulary — exactly the b8 UNRESOLVED precedent. Without
+// this, REVIEW_VERDICT_STATUS_MISMATCH is invisible to BOTH extraction sides
+// identically, masking a missing-registry or missing-doc regression.
+const SUFFIX_RE = /_(REQUIRED|MISSING|INCOMPLETE|EXCEEDED|UNVERIFIED|REJECTED|UNRESOLVED|MISMATCH)$/;
 const PREFIX_RE = /^MISSING_/;
 
 function isGateErrorCode(token) {
@@ -137,20 +142,21 @@ function fmt(codeMap, codes) {
 }
 
 // ---------------------------------------------------------------------------
-// AC-1 / AC-5: GATE_REGISTRY is the single source of truth, exactly 19
-// entries (b8-external-ref-ledger added the 19th, EXTERNAL_REFS_UNRESOLVED;
-// 18 in, 19 out — one gate added, none dropped).
+// AC-1 / AC-5: GATE_REGISTRY is the single source of truth, exactly 20
+// entries (c9-protocol-fields added the 20th, REVIEW_VERDICT_STATUS_MISMATCH;
+// 19 in, 20 out — one gate added, none dropped). b8-external-ref-ledger had
+// added the 19th, EXTERNAL_REFS_UNRESOLVED.
 // ---------------------------------------------------------------------------
 
-test("AC-1/AC-5: GATE_REGISTRY has exactly 19 entries (18 in, 19 out — b8-external-ref-ledger added EXTERNAL_REFS_UNRESOLVED)", () => {
+test("AC-1/AC-5: GATE_REGISTRY has exactly 20 entries (19 in, 20 out — c9-protocol-fields added REVIEW_VERDICT_STATUS_MISMATCH)", () => {
   assert.equal(
     GATE_REGISTRY.length,
-    19,
-    `expected exactly 19 GateDefinition entries, got ${GATE_REGISTRY.length}: ${GATE_REGISTRY.map((g) => g.errorCode).join(", ")}`,
+    20,
+    `expected exactly 20 GateDefinition entries, got ${GATE_REGISTRY.length}: ${GATE_REGISTRY.map((g) => g.errorCode).join(", ")}`,
   );
   assert.equal(
     ALL_GATE_CODES.length,
-    19,
+    20,
     "ALL_GATE_CODES must be GATE_REGISTRY.map(g => g.errorCode) — same length",
   );
   assert.deepEqual(
@@ -328,6 +334,24 @@ test("AC-6: AGC_AUTO_ROUTE is not classified as a gate error code (routing-conve
 
 test("AC-6: CHANGES_REQUESTED is not classified as a gate error code (code-reviewer verdict label, not a rejection code)", () => {
   assert.equal(isGateErrorCode("CHANGES_REQUESTED"), false);
+});
+
+// ---------------------------------------------------------------------------
+// T-C9-11 / DR-7: explicit pin for the new gate, on top of the generic
+// generative parity checks above — REVIEW_VERDICT_STATUS_MISMATCH must be a
+// real registry entry AND backtick-quoted in at least one content/*.md file.
+// ---------------------------------------------------------------------------
+
+test("c9-protocol-fields: REVIEW_VERDICT_STATUS_MISMATCH is a GATE_REGISTRY entry, backtick-quoted in >=1 content/*.md", () => {
+  assert.ok(
+    ALL_GATE_CODES.includes("REVIEW_VERDICT_STATUS_MISMATCH"),
+    "REVIEW_VERDICT_STATUS_MISMATCH must be registered in GATE_REGISTRY (AC-5)",
+  );
+  const docCodes = extractDocCodes();
+  assert.ok(
+    docCodes.has("REVIEW_VERDICT_STATUS_MISMATCH"),
+    "REVIEW_VERDICT_STATUS_MISMATCH must be backtick-quoted in >=1 content/*.md (documentedInProse contract)",
+  );
 });
 
 // ---------------------------------------------------------------------------

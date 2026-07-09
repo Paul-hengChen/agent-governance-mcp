@@ -60,13 +60,14 @@ test("AC-10: transitions.ts AgentName union constraint (side-channel)", () => {
   assert.match(transitionsTs, /release-engineer/, "release-engineer MUST be in transitions.ts (v3.28.0 A5 matrix promotion — terminal PASS role)");
 });
 
-test("AC-10: schema/versions.ts schema versions track b8-external-ref-ledger bump", () => {
-  // b8-external-ref-ledger bumped handoff to 6 (external_refs for the EXTERNAL_REFS_UNRESOLVED
-  // gate). pm-cut-approval-gate had bumped it to 5 (cut_approved). sqlite stays at 2 —
-  // external_refs, like cut_approved, is handoff-YAML frontmatter only; no SQLite column
-  // or migration needed.
+test("AC-10: schema/versions.ts schema versions track c9-protocol-fields bump", () => {
+  // c9-protocol-fields bumped handoff to 7 (next_role/resume_of/review_verdict,
+  // stamp-only migration, DR-1). b8-external-ref-ledger had bumped it to 6
+  // (external_refs for EXTERNAL_REFS_UNRESOLVED). sqlite stays at 2 — the three
+  // new fields, like external_refs, are handoff-YAML frontmatter only; no SQLite
+  // column or migration needed (DR-5).
   const versionsTs = fs.readFileSync(path.join(PROJECT_ROOT, "schema", "versions.ts"), "utf-8");
-  assert.match(versionsTs, /handoff:\s*6,/, "CURRENT_VERSIONS.handoff must be 6 (b8-external-ref-ledger)");
+  assert.match(versionsTs, /handoff:\s*7,/, "CURRENT_VERSIONS.handoff must be 7 (c9-protocol-fields)");
   assert.match(versionsTs, /sqlite:\s*2,/, "CURRENT_VERSIONS.sqlite must remain 2");
 });
 
@@ -95,6 +96,50 @@ test("AC-10: skill-file schema sanity checks (grep assertions)", () => {
 
   const codeReviewerContent = fs.readFileSync(path.join(PROJECT_ROOT, "content", "skill-code-reviewer.md"), "utf-8");
   assert.match(codeReviewerContent, /\*\*Performance\*\*/, "code-reviewer requires Performance section");
+});
+
+test("c9-protocol-fields (T-C9-12..16, AC-7): all 13 in-scope content files have retired the next_role:/resume_of:/review: pending_notes token convention", () => {
+  // Why: AC-7 requires that every content file previously instructing roles to
+  // embed `next_role: <role>`, `resume_of: <role>`, or `review: APPROVED|
+  // CHANGES_REQUESTED` INSIDE pending_notes be updated to reference the
+  // corresponding first-class handoff field instead. This is a repo-wide
+  // regression sweep across the exact 13-file list the spec enumerates
+  // (Dependencies / Resource Audit Gate) — most individual files already have
+  // narrower assertions elsewhere (compose-equivalence goldens, context-budget
+  // token caps, phase-0-5-sop, qa-visual-skill-split, pixel-perfect-visual-
+  // compare); this test is the belt-and-braces sweep proving NONE of the 13
+  // still carries the retired pending_notes token shape, including the 5
+  // files (skill-code-reviewer, skill-release-engineer, skill-design-auditor,
+  // skill-doc-writer, skill-researcher) with no other test touching this
+  // specific convention.
+  const AC7_FILES = [
+    "const-05-core-standards.md",
+    "const-08-chain-31-mid.md",
+    "const-12-chain-r10-s4.md",
+    "skill-coordinator.md",
+    "skill-pm.md",
+    "skill-sr-engineer.md",
+    "skill-architect.md",
+    "skill-code-reviewer.md",
+    "skill-qa-visual.md",
+    "skill-release-engineer.md",
+    "skill-design-auditor.md",
+    "skill-doc-writer.md",
+    "skill-researcher.md",
+  ];
+  // Retired shapes: a colon-form pending_notes token, e.g. `next_role: pm` or
+  // `"next_role: sr-engineer"` inside a note string. The new convention uses
+  // `next_role="<role>"` / `next_role=<role>` (a tw_update_state kwarg) or a
+  // bare table cell — neither of which this pattern matches.
+  const RETIRED_NEXT_ROLE = /next_role:\s*[a-z-]/;
+  const RETIRED_RESUME_OF = /resume_of:\s*[a-z-]/;
+  const RETIRED_REVIEW_VERDICT = /review:\s*(APPROVED|CHANGES_REQUESTED)/;
+  for (const file of AC7_FILES) {
+    const body = fs.readFileSync(path.join(PROJECT_ROOT, "content", file), "utf-8");
+    assert.doesNotMatch(body, RETIRED_NEXT_ROLE, `${file} must not retain the retired 'next_role: <role>' pending_notes token`);
+    assert.doesNotMatch(body, RETIRED_RESUME_OF, `${file} must not retain the retired 'resume_of: <role>' pending_notes token`);
+    assert.doesNotMatch(body, RETIRED_REVIEW_VERDICT, `${file} must not retain the retired 'review: APPROVED|CHANGES_REQUESTED' pending_notes token`);
+  }
 });
 
 test("AC-10: Constitution §6 contains the dependency-audit bullet", async () => {

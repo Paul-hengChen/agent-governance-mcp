@@ -72,15 +72,15 @@ APPROVED — implementation matches AC1 with zero findings in any category.
 
 ## Escalation Routes
 
-Call shape: Constitution §3 *Escalation call format*. Both rows carry `completed_tasks=[<task-ids>]` (review-scope manifest, see Notes) and a second note `review_report: review_reports/review_<task-id>.md`.
+Call shape: Constitution §3 *Escalation call format*. Both rows carry `completed_tasks=[<task-ids>]` (review-scope manifest, see Notes), the first-class `review_verdict` field, and a note `review_report: review_reports/review_<task-id>.md`. The verdict is recorded via the `review_verdict` field (schema v7) — NOT a `pending_notes` token; the server enforces verdict⟺status consistency (`REVIEW_VERDICT_STATUS_MISMATCH`: `APPROVED` requires `status=In_Progress`, `CHANGES_REQUESTED` requires `status=FAIL`).
 
-| situation | status | note token | next_role |
+| situation | status | review_verdict | next_role |
 |---|---|---|---|
-| APPROVED (verdict) | In_Progress | `review: APPROVED` | qa-engineer |
-| CHANGES_REQUESTED (verdict) | FAIL | `review: CHANGES_REQUESTED` | sr-engineer |
+| APPROVED (verdict) | In_Progress | `APPROVED` | qa-engineer |
+| CHANGES_REQUESTED (verdict) | FAIL | `CHANGES_REQUESTED` | sr-engineer |
 
-- **APPROVED row**: write with `agent_id="qa-engineer"`. The server verifies a `review_reports/review_<id>.md` exists for each id in `completed_tasks` before accepting the handoff to qa (else `MISSING_REVIEW_EVIDENCE`).
-- **CHANGES_REQUESTED row**: write with `agent_id="code-reviewer"`, `blocking_reason="<one-line summary>"`, and omit `qa_review` (reserved for qa). The server increments `review_round`. After 3 FAILs the next valid transition is `(pm, In_Progress)` (else `REVIEW_ROUND_EXCEEDED`) — escalate.
+- **APPROVED row**: write with `agent_id="qa-engineer"`, `review_verdict="APPROVED"`. The server verifies a `review_reports/review_<id>.md` exists for each id in `completed_tasks` before accepting the handoff to qa (else `MISSING_REVIEW_EVIDENCE`).
+- **CHANGES_REQUESTED row**: write with `agent_id="code-reviewer"`, `review_verdict="CHANGES_REQUESTED"`, `blocking_reason="<one-line summary>"`, and omit `qa_review` (reserved for qa). The server increments `review_round`. After 3 FAILs the next valid transition is `(pm, In_Progress)` (else `REVIEW_ROUND_EXCEEDED`) — escalate.
 
 ## Notes
 - `completed_tasks` on the handoff to qa is a **review-scope manifest** (which task ids were reviewed this round), NOT a completion signal. `tw_complete_task` remains qa-engineer-exclusive.

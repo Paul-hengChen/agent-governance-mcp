@@ -44,10 +44,13 @@ test("AC-1: skill-qa-visual.md exists and carries the v3.14.0 contract (widget s
 
   // v3.14.0 failure routes — 4 modes now (widget shape miss is new); all
   // implementation-side ones carry the `visual_fail:` token.
-  assert.match(body, /Widget shape miss.*visual_fail:.*next_role:\s*sr-engineer/is, "widget shape miss must target sr-engineer with visual_fail token");
-  assert.match(body, /Pixel drift.*visual_fail:\s*pixel.*next_role:\s*sr-engineer/is, "pixel drift route must carry visual_fail: pixel token");
-  assert.match(body, /Missing baseline.*next_role:\s*design-auditor/is, "missing baseline must route to design-auditor");
-  assert.match(body, /Missing impl.*visual_fail:\s*missing_impl.*next_role:\s*sr-engineer/is, "missing impl must carry visual_fail: missing_impl token");
+  // c9-protocol-fields (T-C9-15 re-baseline): `next_role` is now a first-class
+  // field passed as `next_role="<role>"`, not a `next_role: <role>`
+  // pending_notes token — the colon-form regex no longer matches.
+  assert.match(body, /Widget shape miss.*next_role="sr-engineer".*visual_fail:/is, "widget shape miss must target sr-engineer with visual_fail token");
+  assert.match(body, /Pixel drift.*next_role="sr-engineer".*visual_fail:\s*pixel/is, "pixel drift route must carry visual_fail: pixel token");
+  assert.match(body, /Missing baseline.*next_role="design-auditor"/is, "missing baseline must route to design-auditor");
+  assert.match(body, /Missing impl.*next_role="sr-engineer".*visual_fail:\s*missing_impl/is, "missing impl must carry visual_fail: missing_impl token");
 
   // PASS sub-verdict — now writes the visual_<task-id>.md PASS marker
   assert.match(body, /PASS sub-verdict/is, "PASS sub-verdict heading must exist");
@@ -178,8 +181,10 @@ test("AC-6: Phase 1.5 v3.8.2 contract is preserved AND extended in v3.14.0 (comb
     assert.match(combined, category, `combined surface must enumerate ${category}`);
   }
   // Routes — v3.8.2 had 3; v3.14.0 has 4 (added widget shape miss).
-  assert.match(combined, /next_role:\s*sr-engineer/, "sr-engineer route must exist");
-  assert.match(combined, /next_role:\s*design-auditor/, "design-auditor route must exist");
+  // c9-protocol-fields (T-C9-15 re-baseline): `next_role` is now a first-class
+  // field passed as `next_role="<role>"`, not a `next_role: <role>` token.
+  assert.match(combined, /next_role="sr-engineer"/, "sr-engineer route must exist");
+  assert.match(combined, /next_role="design-auditor"/, "design-auditor route must exist");
   // v3.14.0 additions
   assert.match(combined, /visual_fail:/, "v3.14.0: visual_fail token must be reachable for visual_round trigger");
   assert.match(combined, /Widget Shape Verification/, "v3.14.0: widget-shape checklist H2 must exist");

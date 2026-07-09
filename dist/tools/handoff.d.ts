@@ -1,10 +1,13 @@
 import type { ToolResult, WorkspaceOnlyInput } from "./registry.js";
+import type { AgentName } from "./transitions.js";
 import "../schema/migrations-handoff.js";
 export type ExternalRefState = "fetched" | "indexed" | "user-confirmed-ignorable" | "unresolved";
 export interface ExternalRef {
     ref: string;
     state: ExternalRefState;
 }
+export type ResumeOfTarget = "code-reviewer" | "qa-engineer";
+export type ReviewVerdict = "APPROVED" | "CHANGES_REQUESTED";
 export interface HandoffState {
     active_feature: string;
     status: string;
@@ -21,6 +24,9 @@ export interface HandoffState {
     scope_decision_why?: string;
     cut_approved?: boolean;
     external_refs?: ExternalRef[];
+    next_role?: AgentName;
+    resume_of?: ResumeOfTarget;
+    review_verdict?: ReviewVerdict;
 }
 /**
  * Parse handoff.md YAML frontmatter + section content into structured JSON.
@@ -55,6 +61,9 @@ export interface WriteHandoffStateOptions {
     scopeDecisionWhy?: string;
     cutApproved?: boolean;
     externalRefs?: ExternalRef[];
+    nextRole?: AgentName;
+    resumeOf?: ResumeOfTarget;
+    reviewVerdict?: ReviewVerdict;
 }
 /**
  * Write handoff state. v3.15.0 dual API:

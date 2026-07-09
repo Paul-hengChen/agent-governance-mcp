@@ -44,7 +44,7 @@ Every audit MUST contain these H2 sections:
    | "wireframe", "whiteboard photo", "paper sketch" | `paper` |
    | none of the above | `no-design` |
    If `no-design`, jump to step 5 with the minimal audit; do NOT block.
-2a. **Volume Gate (pre-fetch)** — fetch-based modes (`figma`/`sketch`/`xd`/`penpot`) only. BEFORE extracting, estimate the source's surface/frame count via cheap metadata (frame list / node count) — NOT a full-document fetch. WHEN a single feature's source exceeds roughly one feature's worth — more surfaces than 5 passes × 250 lines could audit, OR a fetch that would dominate the context budget — DO STOP per *Escalation Routes: design source oversized* (`status=Blocked` → `next_role: pm`). ELSE continue to extraction. Do NOT ingest-then-defer — splitting the feature is preferred to overflowing context. `image`/`pdf`/`paper`/`no-design` skip this gate (human-confirmed values, no bulk fetch). This is the input-side mirror of the 250-line/5-pass output cap.
+2a. **Volume Gate (pre-fetch)** — fetch-based modes (`figma`/`sketch`/`xd`/`penpot`) only. BEFORE extracting, estimate the source's surface/frame count via cheap metadata (frame list / node count) — NOT a full-document fetch. WHEN a single feature's source exceeds roughly one feature's worth — more surfaces than 5 passes × 250 lines could audit, OR a fetch that would dominate the context budget — DO STOP per *Escalation Routes: design source oversized* (`status=Blocked` → `next_role=pm`). ELSE continue to extraction. Do NOT ingest-then-defer — splitting the feature is preferred to overflowing context. `image`/`pdf`/`paper`/`no-design` skip this gate (human-confirmed values, no bulk fetch). This is the input-side mirror of the 250-line/5-pass output cap.
 2b. **Source-Credibility Classification<!-- origin:start --> (v3.38.0)<!-- origin:end -->** — fetch-based modes only (`figma`/`sketch`/`xd`/`penpot`). BEFORE extracting any values, classify each target node into one of:
    (a) **full-page / screen composite frame** — the top-level frame representing the feature's actual surface as it renders for an end user;
    (b) **component variant / component-set child** — a sub-node inside a component definition, not a full composed screen;
@@ -93,7 +93,7 @@ Every audit MUST contain these H2 sections:
 
 Call shape: Constitution §3 *Escalation call format* (`agent_id="design-auditor"`).
 
-| situation | status | note token | next_role |
+| situation | status | pending note | next_role |
 |---|---|---|---|
 | design source oversized (Volume Gate 2a) | Blocked | `design-auditor: design source oversized — recommend splitting feature further (<N> frames > threshold)` | pm |
 | node type mismatch (Source-Credibility 2b) | Blocked | `design-auditor: node type mismatch — <node-id> is <actual classification>, expected full-page composite frame for <feature>; resolve source reference before extraction` | pm |
