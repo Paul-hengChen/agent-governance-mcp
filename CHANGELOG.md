@@ -16,6 +16,11 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.57.0] - 2026-07-10
+
+### Added
+- **`c15-expected-red-manifest` — Expected-Red SOP surface + manifest-diff gate (v3.57.0).** Introduces expected-red manifest convention and integration: qa-engineer Phase 0.5 authors `qa_reports/expected-red_<feature>.txt` documenting "expected red" test outcome (known failures, flakes, or intentionally deferred). Skill-sr-engineer.md step 7a updates to emit manifest on release. Code-reviewer performs manifest sampling (4a) during review. New gate `EXPECTED_RED_DIFF_MISSING` (21st in gate sequence) wired at qa PASS transition; gate fires in file-mode only (dormant when no manifest authored, consistent with manifest-optional design). Gate enforces that expected-red manifest must exist and be committed when feature is marked PASS in file-mode (mirrors visual-baseline convention). No schema bump: new gate does not alter handoff/tasks YAML structure or zod boundaries. Feature shape mirrors VISUAL_EVIDENCE_MISSING gate — single gate module `gates/expected-red.ts`, registry entry, orchestrator wiring. 8 T-C15-* tasks completed; all test suites green. See `specs/c15-expected-red-manifest.md`, `qa_reports/expected-red_c15-expected-red-manifest.txt`, `review_reports/review_T-C15-*.md`.
+
 ## [3.56.0] - 2026-07-09
 
 ### Added
