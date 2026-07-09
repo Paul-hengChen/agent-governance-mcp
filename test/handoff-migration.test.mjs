@@ -341,9 +341,10 @@ scope_decision_why: "one screen, no sub-flows"
   assert.equal(state.scope_decision_why, "one screen, no sub-flows");
 });
 
-test("AC-7: scope_decision round-trips through writeHandoffState → readback (v5 stamp)", async () => {
+test("AC-7: scope_decision round-trips through writeHandoffState → readback (v6 stamp)", async () => {
   // Why: the modern options-object write must emit scope_decision into YAML and
-  // parse it back identically, stamped at v5 (pm-cut-approval-gate). This is the PM attestation write path.
+  // parse it back identically, stamped at v6 (b8-external-ref-ledger re-baseline;
+  // was v5/pm-cut-approval-gate). This is the PM attestation write path.
   const ws = mkWorkspace();
   resetSession();
   parseHandoff(ws);
@@ -359,7 +360,7 @@ test("AC-7: scope_decision round-trips through writeHandoffState → readback (v
   });
 
   const raw = readRaw(ws);
-  assert.match(raw, /schema_version:\s*5/, "write stamps current handoff schema v5");
+  assert.match(raw, /schema_version:\s*6/, "write stamps current handoff schema v6");
   assert.match(raw, /scope_decision:\s*["']?single-feature["']?/, "scope_decision emitted into YAML");
 
   const state = parseHandoff(ws);
@@ -408,18 +409,19 @@ test("field preservation: a downstream write omitting scope_decision does NOT dr
   assert.equal(state.last_agent, "sr-engineer", "the new write's own fields still apply");
 });
 
-test("AC-10(g): future v6 handoff refuses-loud against a v5 server (no silent downgrade)", () => {
-  // Why: forward-compat safety. A handoff written by a newer server (v6) must
-  // NOT be silently parsed by this v5 server — runMigrations throws because
+test("AC-10(g): future v7 handoff refuses-loud against a v6 server (no silent downgrade)", () => {
+  // Why: forward-compat safety. A handoff written by a newer server (v7) must
+  // NOT be silently parsed by this v6 server — runMigrations throws because
   // on-disk version > server max. No new code; this pins the behavior for the
-  // pm-cut-approval-gate version bump specifically (v4→v5). A hypothetical v6
-  // file must still refuse-loud against the current v5 server.
+  // b8-external-ref-ledger version bump specifically (v5→v6; was v4→v5 under
+  // pm-cut-approval-gate). A hypothetical v7 file must still refuse-loud
+  // against the current v6 server.
   const ws = mkWorkspace();
   resetSession();
   writeRaw(
     ws,
     `---
-schema_version: 6
+schema_version: 7
 active_feature: "from-the-future"
 status: "In_Progress"
 last_updated: "2099-01-01T00:00:00.000Z"
@@ -436,7 +438,110 @@ qa_round: 0
 
   assert.throws(
     () => parseHandoff(ws),
-    /on-disk version 6 > server max 5/,
-    "v6 file must refuse-loud against a v5 server",
+    /on-disk version 7 > server max 6/,
+    "v7 file must refuse-loud against a v6 server",
   );
+});
+
+// ============================================================================
+// v3.51.0 (B8-QA) — handoff schema v5 → v6 migration + external_refs ledger
+// Tests for specs/b8-external-ref-ledger.md AC-7, AC-8 and the idempotent
+// stamp-only step contract (schema/migrations-handoff.ts v5→v6). Mirrors the
+// v4→v5 cut_approved section above exactly, same stamp-only shape.
+// ============================================================================
+
+test("AC-7/B8: v5 handoff (no external_refs) migrates to v6 on read — field stays undefined, other fields preserved", () => {
+  // Why: the no-seed contract (DR-3/AC-7). A legacy v5 file (pre-dates the ledger)
+  // must climb to v6 WITHOUT gaining a synthetic external_refs value — absence
+  // stays absence so the gate is free to clear (inverse polarity vs cut_approved,
+  // where a no-seed migration still leaves the gate ARMED).
+  const ws = mkWorkspace();
+  resetSession();
+  writeRaw(
+    ws,
+    `---
+schema_version: 5
+active_feature: "legacy-v5-feat"
+status: "In_Progress"
+last_updated: "2026-07-01T00:00:00.000Z"
+last_agent: "pm"
+qa_round: 1
+review_round: 2
+visual_round: 0
+cut_approved: true
+prd_path: "/abs/specs/legacy-v5-feat.md"
+---
+## ✅ Completed
+- 無
+
+## ⚠️ Pending & Handoff Notes
+- next_role: architect
+`,
+  );
+
+  const state = parseHandoff(ws);
+  // No-seed: the v5→v6 migration adds NO external_refs default.
+  assert.equal(state.external_refs, undefined, "v5→v6 must NOT seed external_refs (absence is meaningful, AC-2/AC-7)");
+  // Pre-existing fields — including the OTHER attestation field, cut_approved —
+  // must survive untouched (lossless, AC-8).
+  assert.equal(state.active_feature, "legacy-v5-feat");
+  assert.equal(state.last_agent, "pm");
+  assert.equal(state.qa_round, 1, "qa_round preserved across v5→v6");
+  assert.equal(state.review_round, 2, "review_round preserved across v5→v6");
+  assert.equal(state.cut_approved, true, "cut_approved (a sibling v5 attestation field) preserved across v5→v6");
+  assert.equal(state.prd_path, "/abs/specs/legacy-v5-feat.md", "prd_path preserved across v5→v6");
+});
+
+test("AC-8/B8: v5→v6 migration step is pure and idempotent — re-running runMigrations on an already-v6 payload is a no-op", async () => {
+  // Why: AC-8 losslessness plus the runner's own no-op contract (schema/versions.ts
+  // `current === target` short-circuit) — running the migration pipeline twice
+  // against the same payload (e.g. two concurrent reads racing the healing
+  // write-back) must never double-apply the v5→v6 step or mutate an already-
+  // current payload.
+  const { runMigrations } = await import("../dist/schema/versions.js");
+  const v6Payload = {
+    schema_version: 6,
+    active_feature: "already-v6",
+    status: "In_Progress",
+    last_agent: "pm",
+    external_refs: [{ ref: "JIRA-1", state: "unresolved" }],
+  };
+  const result = runMigrations("handoff", v6Payload);
+  assert.deepEqual(result.applied, [], "no migration step should run when on-disk version === CURRENT");
+  assert.equal(result.payload, v6Payload, "no-op path returns the input payload untouched (same reference)");
+  assert.deepEqual(result.payload.external_refs, [{ ref: "JIRA-1", state: "unresolved" }], "external_refs survives the no-op path verbatim");
+});
+
+test("AC-7/B8: v4 file (pre-dates BOTH cut_approved and external_refs) climbs v4→v5→v6 with neither attestation seeded", () => {
+  // Why: the full-chain regression — a v4 file (server-scope-decision-gate era)
+  // must climb two additive stamp-only steps and land with BOTH newer attestation
+  // fields absent, not just the most recent one. Guards against a future step
+  // accidentally seeding a default for either field.
+  const ws = mkWorkspace();
+  resetSession();
+  writeRaw(
+    ws,
+    `---
+schema_version: 4
+active_feature: "double-legacy"
+status: "In_Progress"
+last_updated: "2026-06-01T00:00:00.000Z"
+last_agent: "pm"
+qa_round: 0
+review_round: 0
+visual_round: 0
+scope_decision: "single-feature"
+---
+## ✅ Completed
+- 無
+
+## ⚠️ Pending & Handoff Notes
+- next_role: architect
+`,
+  );
+
+  const state = parseHandoff(ws);
+  assert.equal(state.scope_decision, "single-feature", "v4-era scope_decision survives the double climb");
+  assert.equal(state.cut_approved, undefined, "v4→v5 step still seeds nothing for cut_approved");
+  assert.equal(state.external_refs, undefined, "v5→v6 step still seeds nothing for external_refs");
 });

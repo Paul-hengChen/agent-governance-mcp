@@ -87,6 +87,14 @@ export interface TransitionRejection {
                                     // validateTransition (it reads handoff state + storage kind);
                                     // union extension is for handler-side narrowing + envelope
                                     // consistency (mirrors SCOPE_DECISION_REQUIRED).
+    | "EXTERNAL_REFS_UNRESOLVED"    // v6 — emitted by the handoff-orchestrator gate at the
+                                    // pm → {architect,sr-engineer}:In_Progress edge when the prev
+                                    // handoff state carries >=1 external_refs entry with
+                                    // state === "unresolved". Unconditional (not arm-gated);
+                                    // file-storage mode only. NOT produced by validateTransition
+                                    // (it reads handoff state + storage kind); union extension is
+                                    // for handler-side narrowing + envelope consistency (mirrors
+                                    // CUT_APPROVAL_REQUIRED).
     | "AGENT_ID_REQUIRED";
   attempted: {
     prev_agent: string | null;

@@ -7,9 +7,10 @@
 // does not) — and to scope the future A2 gates/ extraction cleanly.
 //
 // Check order is FROZEN (spec AC-5/AC-8): preflight → PASS/qa-engineer gate →
-// transition validation → scope-decision gate → cut-approval gate → QA evidence
-// record → PASS evidence gate → visual sub-gates → code-reviewer evidence gate →
-// round-cap sentinels → storage.writeState → PASS RAG GC hook.
+// transition validation → scope-decision gate → cut-approval gate →
+// external-refs gate → QA evidence record → PASS evidence gate →
+// visual sub-gates → code-reviewer evidence gate → round-cap sentinels →
+// storage.writeState → PASS RAG GC hook.
 // No reorder, no merge, no early-return removal.
 //
 // The 4-step mutating-tool contract (lock → freshness → atomic write → refresh
@@ -20,6 +21,7 @@ import { requireQaEngineer, validateTransition, computeNewRound, ALLOWED_TRANSIT
 import { hasVisualBaselinesInDesign, hasVisualEvidenceInFile, hasUncheckedWidgets, hasDesignModeRequiringVisual, designDeclaresStructuralAssertions, validateVisualReports, checkVisualProvenance, checkBaselineManifest, checkPixelGateAttestation, } from "../gates/visual.js";
 import { hasScopeDecision } from "../gates/scope-decision.js";
 import { hasCutApproval } from "../gates/cut-approval.js";
+import { hasUnresolvedRefs, listUnresolvedRefs } from "../gates/external-refs.js";
 import { gate } from "../gates/registry.js";
 import { awaitAllInflightFor } from "./rag-coalesce.js";
 // --- GUARDED: must call tw_get_state first ---
@@ -139,6 +141,53 @@ export async function handleUpdateState(parsed) {
                 content: [{
                         type: "text",
                         text: `⛔ CUT_APPROVAL_REQUIRED\n${JSON.stringify(envelope, null, 2)}`,
+                    }],
+                isError: true,
+            };
+        }
+    }
+    // v6 — External-Refs Gate (b8-external-ref-ledger). THIRD build-entry
+    // attestation gate, back-to-back after scope-decision and cut-approval
+    // on the same pm:In_Progress → {architect,sr-engineer}:In_Progress edge.
+    // Unconditional (not arm-gated on design mode); the gate only FIRES when
+    // the prev state's external_refs ledger carries >=1 entry with
+    // state === "unresolved". INVERSE polarity to cut_approved (DR-3):
+    // absence / empty / all-resolved falls straight through (AC-2) —
+    // absence means "PM's Resource Audit Gate found zero external refs".
+    // Pinning prev=pm keeps resume/re-entry safe (AC-3): architect→sr and
+    // the sr self-loop have a non-pm predecessor and are never re-blocked
+    // by a ledger populated on an earlier PM write. FILE-MODE ONLY (AC-5):
+    // external_refs lives in the handoff YAML frontmatter only; in
+    // SQLite/HTTP mode prevState never carries it, so skip explicitly
+    // rather than gate on an always-empty read. NOT in transitions.ts
+    // (that stays pure / fs-free; mirrors CUT_APPROVAL_REQUIRED).
+    if (getActiveStorage() instanceof FileHandoffStorage &&
+        (nextTuple.agent === "architect" || nextTuple.agent === "sr-engineer") &&
+        nextTuple.status === "In_Progress" &&
+        prevTuple.agent === "pm" &&
+        prevTuple.status === "In_Progress") {
+        if (hasUnresolvedRefs(prevState)) {
+            const refs = listUnresolvedRefs(prevState).join(", ");
+            const hint = `External reference(s) unresolved: ${refs}.` +
+                gate("EXTERNAL_REFS_UNRESOLVED").hintStatic;
+            const envelope = {
+                error: "EXTERNAL_REFS_UNRESOLVED",
+                attempted: {
+                    prev_agent: prevTuple.agent,
+                    prev_status: prevTuple.status,
+                    new_agent: nextTuple.agent,
+                    new_status: nextTuple.status,
+                },
+                allowed: (ALLOWED_TRANSITIONS.get("pm:In_Progress") ?? []).map((c) => ({
+                    new_agent: c.agent,
+                    new_status: c.status,
+                })),
+                hint,
+            };
+            return {
+                content: [{
+                        type: "text",
+                        text: `⛔ EXTERNAL_REFS_UNRESOLVED\n${JSON.stringify(envelope, null, 2)}`,
                     }],
                 isError: true,
             };
@@ -415,6 +464,7 @@ export async function handleUpdateState(parsed) {
         scopeDecision: parsed.scope_decision,
         scopeDecisionWhy: parsed.scope_decision_why,
         cutApproved: parsed.cut_approved,
+        externalRefs: parsed.external_refs,
     });
     // GC hook: when QA flips a feature to PASS, drop the workspace's RAG
     // chunks so the next feature starts clean. Await any concurrent lazy

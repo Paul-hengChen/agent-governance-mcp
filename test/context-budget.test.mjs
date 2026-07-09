@@ -138,12 +138,17 @@ test("AC2: lean always-on bundle is below the raw baseline and within target (<=
   // by this ticket (chain-tagged, loads on this lean path). Independently re-measured (not
   // trusted from sr-engineer's handoff note) at 3332 ~tok (exact); cap set to the exact
   // measured value per the established Phase-2 convention (no additional headroom).
+  // b8-external-ref-ledger (qa-owned bump, B8-09/B8-10): cap raised from 3332 → 3386 to
+  // absorb the skill-coordinator-lite.md Auto-Routing stop-condition addition for the
+  // EXTERNAL_REFS_UNRESOLVED gate (AC-12). Independently re-measured (not trusted from
+  // sr-engineer's handoff note) at 3386 ~tok (exact); cap set to the exact measured value
+  // per the established Phase-2 convention (no additional headroom).
   const liteSkill = fs.readFileSync(path.join(ROOT, "content", "skill-coordinator-lite.md"), "utf-8");
   const SEP = "\n\n---\n\n";
   const raw = approxTokens(CONSTITUTION + SEP + liteSkill);
   const lean = approxTokens(LEAN_CONSTITUTION + SEP + liteSkill);
   assert.ok(lean < raw, `lean (${lean}) must be < raw (${raw})`);
-  assert.ok(lean <= 3332, `lean always-on (${lean} ~tok) must meet the <= 3332 target`);
+  assert.ok(lean <= 3386, `lean always-on (${lean} ~tok) must meet the <= 3386 target`);
 });
 
 // --- AC3: enforcement preserved ------------------------------------------
@@ -489,6 +494,11 @@ test("AC1/AC2: skill-pm stripped token count meets ≤ 3196 cap", () => {
   // (byte-identical | situation | status | note token | next_role | header). Independently
   // re-measured (not trusted from sr-engineer's handoff note) at 3225 ~tok exactly; cap set
   // to the exact measured value per the established Phase-2 convention (no headroom).
+  // b8-external-ref-ledger (qa-owned bump, B8-10): cap raised from 3225 → 3327 to absorb
+  // the skill-pm.md Resource Audit Gate row rewrite (records external_refs entries via
+  // tw_update_state, AC-11). Independently re-measured (not trusted from sr-engineer's
+  // handoff note) at 3327 ~tok exactly; cap set to the exact measured value per the
+  // established Phase-2 convention (no headroom).
   const SKILL_PM = fs.readFileSync(path.join(ROOT, "content", "skill-pm.md"), "utf-8");
   // Strip frontmatter (--- block) before token-counting the body, matching buildPromptForRole.
   const body = SKILL_PM.startsWith("---")
@@ -496,7 +506,7 @@ test("AC1/AC2: skill-pm stripped token count meets ≤ 3196 cap", () => {
     : SKILL_PM;
   const stripped = stripRationale(stripOriginTags(body));
   const toks = approxTokens(stripped);
-  assert.ok(toks <= 3225, `skill-pm stripped body (${toks} ~tok) must be ≤ 3225 (AC1, a11-escalation-grammar re-baseline)`);
+  assert.ok(toks <= 3327, `skill-pm stripped body (${toks} ~tok) must be ≤ 3327 (AC1, b8-external-ref-ledger re-baseline)`);
 });
 
 test("AC1/AC2: skill-sr-engineer stripped token count meets ≤ 2138 cap", () => {
@@ -641,12 +651,20 @@ test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the 
   // (exact); cap set to the exact measured value per the established Phase-2 convention
   // (no additional headroom). Saving margin re-verified: raw 5834 − stripped 5561 = 273
   // ~tok, still ≥ 240 (unchanged — the const-05 edit sits outside both rationale fences).
+  // b8-external-ref-ledger (qa-owned bump, B8-09): cap raised from 5561 → 5616 to absorb
+  // the const-15-core-tail.md §7 External-reference policy rewrite (server-enforced ledger
+  // mechanism reference, AC-10; not design-only-fenced, so it loads on this design-arm
+  // path). Independently re-measured (not trusted from sr-engineer's handoff note) — raw
+  // 5889, stripped 5616 (exact); cap set to the exact measured value per the established
+  // Phase-2 convention (no additional headroom). Saving margin re-verified: raw 5889 −
+  // stripped 5616 = 273 ~tok, still ≥ 240 (unchanged — the §7 edit sits outside both
+  // rationale fences).
   const raw = approxTokens(CONSTITUTION);
   const stripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));
-  assert.ok(stripped <= 5561, `stripped constitution (${stripped} ~tok) must be ≤ 5561 (AC8 design-arm floor, a11-escalation-grammar re-baseline)`);
+  assert.ok(stripped <= 5616, `stripped constitution (${stripped} ~tok) must be ≤ 5616 (AC8 design-arm floor, b8-external-ref-ledger re-baseline)`);
   assert.ok(
     raw - stripped >= 240,
-    `constitution rationale+origin-tag saving (${raw - stripped} ~tok) must be ≥ 240 (AC8 measured min, a11-escalation-grammar re-baseline)`,
+    `constitution rationale+origin-tag saving (${raw - stripped} ~tok) must be ≥ 240 (AC8 measured min, b8-external-ref-ledger re-baseline)`,
   );
 });
 
@@ -708,13 +726,19 @@ test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/b
   // conversion (skill side). Independently re-measured (not trusted from sr-engineer's
   // handoff note) at 9545 ~tok (exact); cap set to the exact measured value per the
   // established Phase-2 convention (no additional headroom).
+  // b8-external-ref-ledger (qa-owned bump, B8-09/B8-10): cap raised from 9545 → 9699 to
+  // absorb the const-15-core-tail.md §7 rewrite (constitution side) plus the
+  // skill-coordinator.md Auto-Routing stop-condition addition for EXTERNAL_REFS_UNRESOLVED
+  // (skill side, AC-12). Independently re-measured (not trusted from sr-engineer's handoff
+  // note) at 9699 ~tok (exact); cap set to the exact measured value per the established
+  // Phase-2 convention (no additional headroom).
   const skillCoord = fs.readFileSync(path.join(ROOT, "content", "skill-coordinator.md"), "utf-8");
   const body = skillCoord.startsWith("---")
     ? skillCoord.slice(skillCoord.indexOf("---", 3) + 3).trimStart()
     : skillCoord;
   const SEP = "\n\n---\n\n";
   const bundle = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)) + SEP + stripRationale(stripOriginTags(body)));
-  assert.ok(bundle <= 9545, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 9545 (AC8 design-arm floor, a11-escalation-grammar re-baseline)`);
+  assert.ok(bundle <= 9699, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 9699 (AC8 design-arm floor, b8-external-ref-ledger re-baseline)`);
 });
 
 test("AC9: every operative rule/gate/heading survives stripRationale on the constitution", () => {
@@ -1117,12 +1141,19 @@ test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is
   // value per the established Phase-2 convention (no additional headroom). Saving
   // margin re-verified: design-arm 5561 − non-design 3477 = 2084 ~tok, still ≥ 2080
   // (unchanged — the const-05 edit sits outside the design-only fences).
-  const ratStripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));         // design-arm path: 5561
-  const nonDesign = approxTokens(stripRationale(stripOriginTags(composeConstitution({ chain: true, design: false })))); // non-design path: 3477
-  assert.ok(nonDesign <= 3477, `non-design constitution (${nonDesign} ~tok) must be ≤ 3477 (AC8 non-design floor, a11-escalation-grammar re-baseline)`);
+  // b8-external-ref-ledger (qa-owned bump, B8-09): cap raised from 3477 → 3531. The
+  // const-15-core-tail.md §7 rewrite is chain-tagged core-tail content (not
+  // design-only-fenced), so it lands on the non-design path too, same as the design-arm
+  // floor above. Independently re-measured (not trusted from sr-engineer's handoff note)
+  // at 3531 ~tok (exact); cap set to the exact measured value per the established
+  // Phase-2 convention (no additional headroom). Saving margin re-verified: design-arm
+  // 5616 − non-design 3531 = 2085 ~tok, still ≥ 2080.
+  const ratStripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));         // design-arm path: 5616
+  const nonDesign = approxTokens(stripRationale(stripOriginTags(composeConstitution({ chain: true, design: false })))); // non-design path: 3531
+  assert.ok(nonDesign <= 3531, `non-design constitution (${nonDesign} ~tok) must be ≤ 3531 (AC8 non-design floor, b8-external-ref-ledger re-baseline)`);
   assert.ok(
     ratStripped - nonDesign >= 2080,
-    `design-only strip saving (${ratStripped - nonDesign} ~tok) must be ≥ 2080 (a11-escalation-grammar re-baseline)`,
+    `design-only strip saving (${ratStripped - nonDesign} ~tok) must be ≥ 2080 (b8-external-ref-ledger re-baseline)`,
   );
 });
 

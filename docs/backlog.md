@@ -28,7 +28,7 @@ future `/teamwork` feature; none blocks a release on its own.
 | A11 | Escalation-route tables + unified WHEN/DO/ELSE rule grammar across skills — **done (2026-07-08)** | P2 | A6, A7 | ~12 (all `content/skill-*.md`, constitution) | — |
 | A12 | Shared SOP partials + Limits number registry | P2 | A9 | ~14 (all content files, `build.ts`) | — |
 | A13 | §1 polish: unified output policy, watermark decision table, positive examples per schema — **done (2026-07-08)** | P2 | — | ~6 (constitution + several skills) | — |
-| B8 | §7 external-reference policy has no server-side enforcement gate (carried forward) | P1 | — | ~4 (`tools/transitions.ts`, evidence/ledger check, constitution §7) | — |
+| B8 | §7 external-reference policy has no server-side enforcement gate (carried forward) — **done (2026-07-09)** | P1 | — | ~4 (`tools/transitions.ts`, evidence/ledger check, constitution §7) | — |
 | B9 | Per-feature token budget + coordinator STOP at ceiling (carried forward) | P2 | — | ~3 (coordinator SOP, handoff/config field) | — |
 | C1 | Transitions matrix lacks amend/repair semantics (pm re-entry strands downstream roles) — **done (2026-07-07)** | P1 | — | ~4 (`tools/transitions.ts`, constitution §3.1, skill-coordinator, tests) | — |
 | C2 | Cut-approval cannot cross the subagent boundary — formalize coordinator-attested approval — **done (2026-07-07)** | P1 | — | ~5 (`handoff` field, `transitions.ts`/orchestrator, skill-pm, skill-coordinator, tests) | — |

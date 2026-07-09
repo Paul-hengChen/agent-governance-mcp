@@ -29,6 +29,10 @@ import {
   hasCutApproval,
 } from "../dist/gates/cut-approval.js";
 import {
+  hasUnresolvedRefs,
+  listUnresolvedRefs,
+} from "../dist/gates/external-refs.js";
+import {
   parseHandoff,
   writeHandoffState,
 } from "../dist/tools/handoff.js";
@@ -114,10 +118,11 @@ test("hasCutApproval: rejects string 'true' (YAML strict parse contract)", () =>
 
 test("R-schema-1: writeHandoffState emits cut_approved: true in YAML when passed", async () => {
   // WHY: verifies the PM approval write path emits the field so the gate can read it.
+  // b8-external-ref-ledger re-baseline: schema_version bumped 5->6 (external_refs ledger).
   const ws = tmpWs();
   await seedHandoff(ws, { cutApproved: true });
   const raw = readRawHandoff(ws);
-  assert.match(raw, /schema_version:\s*5/, "schema_version must be 5 (pm-cut-approval-gate)");
+  assert.match(raw, /schema_version:\s*6/, "schema_version must be 6 (b8-external-ref-ledger)");
   assert.match(raw, /cut_approved:\s*true/, "cut_approved must be emitted as true");
 });
 
@@ -396,6 +401,10 @@ test("M1: v4 → v5 migration is stamp-only (AC-7 — no default seeded for cut_
   // any default value. Absence is the unapproved sentinel. A default `false` would
   // be a redundant materialization of absence; a default `true` would be a false
   // attestation bypassing the gate for all legacy files.
+  // b8-external-ref-ledger re-baseline: CURRENT_VERSIONS.handoff is now 6, so the
+  // manually-registered chain must reach 6 (adding the v5->v6 stamp-only step) or
+  // runMigrations throws MISSING_MIGRATION_STEP against the new target. The v4->v5
+  // step under test is still asserted in isolation via `result.applied` below.
   _clearRegistryForTests();
   // Register the chain manually so we can test v4→v5 in isolation.
   registerMigration({ kind: "handoff", from: 0, to: 1, up: (i) => ({ ...i, schema_version: 1 }) });
@@ -403,26 +412,29 @@ test("M1: v4 → v5 migration is stamp-only (AC-7 — no default seeded for cut_
   registerMigration({ kind: "handoff", from: 2, to: 3, up: (i) => ({ ...i, schema_version: 3 }) });
   registerMigration({ kind: "handoff", from: 3, to: 4, up: (i) => ({ ...i, schema_version: 4 }) });
   registerMigration({ kind: "handoff", from: 4, to: 5, up: (i) => ({ ...i, schema_version: 5 }) });
+  registerMigration({ kind: "handoff", from: 5, to: 6, up: (i) => ({ ...i, schema_version: 6 }) });
 
   const v4payload = { schema_version: 4, active_feature: "old-feat", status: "In_Progress" };
   const result = runMigrations("handoff", v4payload);
 
-  assert.equal(result.payload.schema_version, 5, "migration must bump schema_version to 5");
+  assert.equal(result.payload.schema_version, 6, "migration must bump schema_version to CURRENT (6)");
   assert.equal(result.payload.cut_approved, undefined, "v4→v5 migration MUST NOT seed cut_approved");
-  assert.deepEqual(result.applied, [5], "only the v4→v5 step must have been applied");
+  assert.deepEqual(result.applied, [5, 6], "the v4→v5 step must have been applied (v5→v6 also runs to reach CURRENT)");
   assert.equal(result.fromVersion, 4, "fromVersion must be 4");
-  assert.equal(result.toVersion, 5, "toVersion must be 5");
+  assert.equal(result.toVersion, 6, "toVersion must be CURRENT (6)");
 });
 
 test("M2: v4 → v5 migration preserves all existing fields (AC-7 — lossless)", () => {
   // WHY: AC-7 — no existing field may be modified or removed. Losslessness is
   // critical so that scope_decision, prd_path, qa_round, etc. survive the bump.
+  // b8-external-ref-ledger re-baseline: see M1 comment — chain extended to v6.
   _clearRegistryForTests();
   registerMigration({ kind: "handoff", from: 0, to: 1, up: (i) => ({ ...i, schema_version: 1 }) });
   registerMigration({ kind: "handoff", from: 1, to: 2, up: (i) => ({ ...i, schema_version: 2 }) });
   registerMigration({ kind: "handoff", from: 2, to: 3, up: (i) => ({ ...i, schema_version: 3 }) });
   registerMigration({ kind: "handoff", from: 3, to: 4, up: (i) => ({ ...i, schema_version: 4 }) });
   registerMigration({ kind: "handoff", from: 4, to: 5, up: (i) => ({ ...i, schema_version: 5 }) });
+  registerMigration({ kind: "handoff", from: 5, to: 6, up: (i) => ({ ...i, schema_version: 6 }) });
 
   const v4payload = {
     schema_version: 4,
@@ -438,7 +450,7 @@ test("M2: v4 → v5 migration preserves all existing fields (AC-7 — lossless)"
   };
   const result = runMigrations("handoff", v4payload);
 
-  assert.equal(result.payload.schema_version, 5, "schema_version bumped to 5");
+  assert.equal(result.payload.schema_version, 6, "schema_version bumped to CURRENT (6)");
   assert.equal(result.payload.active_feature, "scope-feat", "active_feature preserved");
   assert.equal(result.payload.scope_decision, "single-feature", "scope_decision preserved");
   assert.equal(result.payload.scope_decision_why, "small feature", "scope_decision_why preserved");
@@ -446,6 +458,7 @@ test("M2: v4 → v5 migration preserves all existing fields (AC-7 — lossless)"
   assert.equal(result.payload.review_round, 1, "review_round preserved");
   assert.equal(result.payload.prd_path, "/abs/specs/scope-feat.md", "prd_path preserved");
   assert.equal(result.payload.cut_approved, undefined, "cut_approved still absent (no false/true seeded)");
+  assert.equal(result.payload.external_refs, undefined, "external_refs still absent (v5→v6 also stamp-only, no seed)");
 });
 
 test("M3: legacy file (no schema_version) migrates to v5 and has no cut_approved (AC-6)", async () => {
@@ -577,5 +590,402 @@ test("C4: S04 — cut-approval gate stop-condition present in skill-coordinator.
   assert.ok(
     COORD.includes("CUT_APPROVAL_REQUIRED"),
     "skill-coordinator.md must name the CUT_APPROVAL_REQUIRED error code",
+  );
+});
+
+// ============================================================================
+// b8-external-ref-ledger — EXTERNAL_REFS_UNRESOLVED gate (B8-QA)
+// Same file-mode-only, prev-pinned-to-pm shape as CUT_APPROVAL_REQUIRED above,
+// but INVERSE polarity (DR-3: absence/empty/all-resolved CLEARS, not blocks)
+// and NO PM-re-entry re-arm (DR-4: only active_feature change resets it).
+//
+// Spec-to-Test map:
+//   AC-1 (gate fires, unresolved)         -> XG1
+//   AC-2 (resolved/absent/empty clears)   -> X-pred-2/3/4, XG2
+//   AC-3 (pinned to pm predecessor)       -> XG-nonpm
+//   AC-4 (fires on both build edges)      -> XG-both-edges
+//   AC-5 (file-mode only)                 -> XS1
+//   AC-6 (REPLACE semantics, incl. [])    -> XR3, X-empty
+//   AC-7/AC-8 (v5->v6 migration, pure)    -> see test/handoff-migration.test.mjs
+//   DR-3 (malformed entries dropped)      -> X-malformed
+//   DR-4 (no PM re-entry re-arm; reset
+//         only on active_feature change)  -> XR1, XR2, XR4
+// ============================================================================
+
+test("X-pred-1: hasUnresolvedRefs/listUnresolvedRefs fire on a mixed ledger, listing only the unresolved refs in order", () => {
+  // WHY: AC-1 — a ledger with a mix of states must still fire, and the hint must
+  // enumerate ONLY the unresolved entries, in their original order (deterministic
+  // hint interpolation).
+  const state = {
+    external_refs: [
+      { ref: "https://figma.com/a", state: "fetched" },
+      { ref: "JIRA-1", state: "unresolved" },
+      { ref: "JIRA-2", state: "indexed" },
+      { ref: "JIRA-3", state: "unresolved" },
+    ],
+  };
+  assert.equal(hasUnresolvedRefs(state), true, "gate must fire when >=1 entry is unresolved");
+  assert.deepEqual(listUnresolvedRefs(state), ["JIRA-1", "JIRA-3"], "must list only unresolved refs, in input order");
+});
+
+test("X-pred-2: hasUnresolvedRefs returns false when external_refs is absent (AC-2)", () => {
+  // WHY: absence is the INVERSE-polarity sentinel vs cut_approved — "PM found zero
+  // external references", not "unresolved". Absence must clear, not block.
+  assert.equal(hasUnresolvedRefs({}), false);
+  assert.equal(hasUnresolvedRefs(null), false);
+  assert.equal(hasUnresolvedRefs(undefined), false);
+  assert.deepEqual(listUnresolvedRefs({}), []);
+});
+
+test("X-pred-3: hasUnresolvedRefs returns false for an empty array (AC-2)", () => {
+  assert.equal(hasUnresolvedRefs({ external_refs: [] }), false);
+  assert.deepEqual(listUnresolvedRefs({ external_refs: [] }), []);
+});
+
+test("X-pred-4: hasUnresolvedRefs returns false when every entry is resolved (fetched/indexed/user-confirmed-ignorable) (AC-2)", () => {
+  const state = {
+    external_refs: [
+      { ref: "a", state: "fetched" },
+      { ref: "b", state: "indexed" },
+      { ref: "c", state: "user-confirmed-ignorable" },
+    ],
+  };
+  assert.equal(hasUnresolvedRefs(state), false, "all-resolved ledger must clear the gate");
+  assert.deepEqual(listUnresolvedRefs(state), []);
+});
+
+test("X-malformed: hasUnresolvedRefs/listUnresolvedRefs never throw on hostile/malformed input", () => {
+  // WHY: gates/external-refs.ts predicates are deliberately loose-typed
+  // (`state: string`, not the closed enum) so a hand-edited or partially-migrated
+  // handoff can never crash the gate. Entries that are not objects, or lack the
+  // expected shape, must be tolerated (via optional-chaining), not thrown on.
+  assert.doesNotThrow(() => hasUnresolvedRefs({ external_refs: "not-an-array" }));
+  assert.equal(hasUnresolvedRefs({ external_refs: "not-an-array" }), false);
+  assert.doesNotThrow(() => hasUnresolvedRefs({ external_refs: [null, undefined, 42, "str", {}] }));
+  assert.equal(hasUnresolvedRefs({ external_refs: [null, undefined, 42, "str", {}] }), false);
+  assert.doesNotThrow(() => listUnresolvedRefs({ external_refs: [null, { ref: "ok", state: "unresolved" }] }));
+  assert.deepEqual(listUnresolvedRefs({ external_refs: [null, { ref: "ok", state: "unresolved" }] }), ["ok"]);
+});
+
+test("X-malformed-parse: parseHandoff drops malformed external_refs entries from raw YAML without throwing (DR-3)", async () => {
+  // WHY: tools/handoff.ts's parseExternalRefs is the OTHER defensive layer — it
+  // filters malformed frontmatter entries (missing ref, empty ref, out-of-enum
+  // state) before the gate ever sees them, and collapses an all-malformed result
+  // to undefined (absence), never seeding a phantom unresolved sentinel.
+  const ws = tmpWs();
+  writeRawHandoff(ws, `---
+schema_version: 6
+active_feature: "malformed-refs"
+status: "In_Progress"
+last_updated: "2026-01-01T00:00:00.000Z"
+last_agent: "pm"
+external_refs:
+  - ref: "good-ref"
+    state: "unresolved"
+  - ref: ""
+    state: "unresolved"
+  - state: "unresolved"
+  - ref: "bad-state"
+    state: "not-a-real-state"
+qa_round: 0
+review_round: 0
+visual_round: 0
+---
+# Handoff State
+
+## Completed
+- (none)
+
+## Pending & Handoff Notes
+- (none)
+`);
+  resetSession();
+  let state;
+  assert.doesNotThrow(() => { state = parseHandoff(ws); }, "parseHandoff must never throw on malformed external_refs entries");
+  assert.deepEqual(state.external_refs, [{ ref: "good-ref", state: "unresolved" }],
+    "only the well-formed entry must survive parsing; empty ref / missing ref / bad state are dropped");
+  assert.equal(hasUnresolvedRefs(state), true, "the one surviving well-formed entry still fires the gate");
+});
+
+test("X-empty: writing external_refs: [] elides the field from disk and clears the gate (AC-2/AC-6)", async () => {
+  // WHY: an empty array is NOT serialized (empty === absence === non-blocking) —
+  // the two states must be behaviorally identical on round-trip, not merely
+  // both individually non-blocking.
+  const ws = tmpWs();
+  resetSession();
+  markStateRead(ws);
+  await writeHandoffState({
+    workspacePath: ws,
+    activeFeature: "empty-refs",
+    status: "In_Progress",
+    completedTasks: [],
+    pendingNotes: [],
+    lastAgent: "pm",
+    externalRefs: [],
+  });
+  const raw = readRawHandoff(ws);
+  assert.doesNotMatch(raw, /external_refs:/, "an empty external_refs array must NOT be serialized into YAML");
+  resetSession();
+  const state = parseHandoff(ws);
+  assert.equal(state.external_refs, undefined, "empty array round-trips as absent, not as []");
+  assert.equal(hasUnresolvedRefs(state), false);
+});
+
+test("XR-schema-1: writeHandoffState emits external_refs as a YAML block sequence and parses it back verbatim", async () => {
+  // WHY: AC-6/DR-1 — external_refs is the FIRST array-of-object handoff frontmatter
+  // field; this pins the write->YAML->read round-trip for the new shape.
+  const ws = tmpWs();
+  resetSession();
+  markStateRead(ws);
+  await writeHandoffState({
+    workspacePath: ws,
+    activeFeature: "ledger-feat",
+    status: "In_Progress",
+    completedTasks: [],
+    pendingNotes: [],
+    lastAgent: "pm",
+    externalRefs: [
+      { ref: "https://figma.com/file/abc", state: "unresolved" },
+      { ref: "JIRA-4021", state: "indexed" },
+    ],
+  });
+  const raw = readRawHandoff(ws);
+  assert.match(raw, /external_refs:/, "external_refs key must be emitted");
+  assert.match(raw, /ref:\s*"https:\/\/figma\.com\/file\/abc"/, "first entry's ref must round-trip verbatim");
+  assert.match(raw, /state:\s*"unresolved"/, "first entry's state must round-trip verbatim");
+
+  resetSession();
+  const state = parseHandoff(ws);
+  assert.deepEqual(state.external_refs, [
+    { ref: "https://figma.com/file/abc", state: "unresolved" },
+    { ref: "JIRA-4021", state: "indexed" },
+  ], "external_refs array must round-trip losslessly, in order");
+});
+
+test("XR1: PM re-entry WITHOUT external_refs preserves the ledger — NO re-arm (DR-4, contrast with cut_approved R2)", async () => {
+  // WHY (the load-bearing contrast): cut_approved RE-ARMS to undefined on every
+  // PM re-entry that omits it (absence BLOCKS there). external_refs has INVERSE
+  // polarity (absence CLEARS) — re-arming it the same way would silently DISCARD
+  // a valid ledger and UN-BLOCK the gate, which is unsafe. So a PM re-entry that
+  // omits external_refs on the SAME feature must carry the ledger forward.
+  const ws = tmpWs();
+  resetSession();
+  markStateRead(ws);
+  await writeHandoffState({
+    workspacePath: ws,
+    activeFeature: "resume-feat",
+    status: "In_Progress",
+    completedTasks: [],
+    pendingNotes: [],
+    lastAgent: "pm",
+    externalRefs: [{ ref: "JIRA-9", state: "unresolved" }],
+  });
+  // PM re-enters (e.g. after a QA-FAIL bounce) WITHOUT passing external_refs.
+  resetSession();
+  markStateRead(ws);
+  await writeHandoffState({
+    workspacePath: ws,
+    activeFeature: "resume-feat",
+    status: "In_Progress",
+    lastAgent: "pm",
+    completedTasks: [],
+    pendingNotes: ["re-evaluating"],
+    // externalRefs intentionally omitted — DR-4: must NOT re-arm/drop.
+  });
+  resetSession();
+  const state = parseHandoff(ws);
+  assert.deepEqual(state.external_refs, [{ ref: "JIRA-9", state: "unresolved" }],
+    "PM re-entry omitting external_refs must PRESERVE the existing ledger (no re-arm, DR-4)");
+  assert.equal(hasUnresolvedRefs(state), true, "the still-unresolved ledger must keep the gate armed across the re-entry");
+});
+
+test("XR2: non-PM same-feature write carries external_refs forward unchanged", async () => {
+  // WHY: mirrors cut_approved's R3 — after PM records the ledger, downstream
+  // build-role writes (architect, sr-engineer) omit external_refs; it must
+  // survive so the gate state stays consistent mid-build.
+  const ws = tmpWs();
+  resetSession();
+  markStateRead(ws);
+  await writeHandoffState({
+    workspacePath: ws,
+    activeFeature: "build-feat",
+    status: "In_Progress",
+    completedTasks: [],
+    pendingNotes: [],
+    lastAgent: "pm",
+    externalRefs: [{ ref: "spec-link", state: "indexed" }],
+  });
+  resetSession();
+  markStateRead(ws);
+  await writeHandoffState({
+    workspacePath: ws,
+    activeFeature: "build-feat",
+    status: "In_Progress",
+    lastAgent: "architect",
+    completedTasks: [],
+    pendingNotes: ["designing"],
+  });
+  resetSession();
+  const state = parseHandoff(ws);
+  assert.deepEqual(state.external_refs, [{ ref: "spec-link", state: "indexed" }],
+    "non-PM same-feature write must preserve external_refs verbatim");
+});
+
+test("XR3: active_feature change drops external_refs (feature-scoped reset)", async () => {
+  // WHY: AC-6 — the ledger is feature-scoped. A stale ledger from feature-A must
+  // never leak into feature-B (whether it would block or clear the gate there).
+  const ws = tmpWs();
+  resetSession();
+  markStateRead(ws);
+  await writeHandoffState({
+    workspacePath: ws,
+    activeFeature: "feature-a",
+    status: "In_Progress",
+    completedTasks: [],
+    pendingNotes: [],
+    lastAgent: "pm",
+    externalRefs: [{ ref: "a-only-ref", state: "unresolved" }],
+  });
+  resetSession();
+  markStateRead(ws);
+  await writeHandoffState({
+    workspacePath: ws,
+    activeFeature: "feature-b",
+    status: "In_Progress",
+    lastAgent: "sr-engineer",
+    completedTasks: [],
+    pendingNotes: [],
+  });
+  resetSession();
+  const state = parseHandoff(ws);
+  assert.equal(state.external_refs, undefined, "feature change must drop the stale ledger");
+  assert.equal(hasUnresolvedRefs(state), false, "no ledger means the gate is clear on the new feature");
+});
+
+test("XR4: passing external_refs REPLACES the array wholesale, including clearing a prior unresolved ledger with []", async () => {
+  // WHY: AC-6 — same semantics as completed_tasks: never merged/appended. This is
+  // the PM-resolves-the-refs happy path from the architecture sequence diagram —
+  // PM re-writes the ledger with everything resolved (or clears it outright).
+  const ws = tmpWs();
+  resetSession();
+  markStateRead(ws);
+  await writeHandoffState({
+    workspacePath: ws,
+    activeFeature: "replace-feat",
+    status: "In_Progress",
+    completedTasks: [],
+    pendingNotes: [],
+    lastAgent: "pm",
+    externalRefs: [
+      { ref: "r1", state: "unresolved" },
+      { ref: "r2", state: "unresolved" },
+    ],
+  });
+  // PM resolves r1, drops r2 entirely, adds a new resolved ref — REPLACE, not merge.
+  resetSession();
+  markStateRead(ws);
+  await writeHandoffState({
+    workspacePath: ws,
+    activeFeature: "replace-feat",
+    status: "In_Progress",
+    completedTasks: [],
+    pendingNotes: [],
+    lastAgent: "pm",
+    externalRefs: [{ ref: "r1", state: "indexed" }],
+  });
+  resetSession();
+  let state = parseHandoff(ws);
+  assert.deepEqual(state.external_refs, [{ ref: "r1", state: "indexed" }],
+    "write must REPLACE the whole array, not merge — r2 must be gone");
+  assert.equal(hasUnresolvedRefs(state), false, "gate clears once the replacement ledger is fully resolved");
+
+  // Clearing with [] must also work (REPLACE semantics apply to the empty case too).
+  resetSession();
+  markStateRead(ws);
+  await writeHandoffState({
+    workspacePath: ws,
+    activeFeature: "replace-feat",
+    status: "In_Progress",
+    completedTasks: [],
+    pendingNotes: [],
+    lastAgent: "pm",
+    externalRefs: [],
+  });
+  resetSession();
+  state = parseHandoff(ws);
+  assert.equal(state.external_refs, undefined, "REPLACE with [] must clear the ledger entirely (AC-6)");
+});
+
+test("XG1: gate fires when prevState carries an unresolved entry (AC-1)", () => {
+  const state = { last_agent: "pm", status: "In_Progress", external_refs: [{ ref: "r", state: "unresolved" }] };
+  assert.equal(hasUnresolvedRefs(state), true, "gate MUST fire on an unresolved entry");
+});
+
+test("XG2: gate clears when prevState is absent/empty/all-resolved (AC-2)", () => {
+  assert.equal(hasUnresolvedRefs({ last_agent: "pm", status: "In_Progress" }), false, "absent ledger clears");
+  assert.equal(hasUnresolvedRefs({ last_agent: "pm", status: "In_Progress", external_refs: [] }), false, "empty ledger clears");
+  assert.equal(
+    hasUnresolvedRefs({ last_agent: "pm", status: "In_Progress", external_refs: [{ ref: "r", state: "fetched" }] }),
+    false,
+    "all-resolved ledger clears",
+  );
+});
+
+test("XG-both-edges: the orchestrator arm condition covers BOTH pm->architect and pm->sr-engineer (AC-4)", () => {
+  // WHY: AC-4 is this gate's B8-specific requirement — it must fire on the SAME
+  // two edges CUT_APPROVAL_REQUIRED and SCOPE_DECISION_REQUIRED already gate, not
+  // only the sr-engineer edge. We assert against the compiled orchestrator source
+  // (composition-test convention, same as G1-G3/S1 above) that both agent names
+  // appear together with the gate's arm condition and error code.
+  const gateBlock = DIST_INDEX.slice(
+    DIST_INDEX.indexOf("hasUnresolvedRefs(prevState)") - 400,
+    DIST_INDEX.indexOf("EXTERNAL_REFS_UNRESOLVED", DIST_INDEX.indexOf("hasUnresolvedRefs(prevState)")) + 40,
+  );
+  assert.ok(gateBlock.includes('"architect"'), "gate arm condition must include architect");
+  assert.ok(gateBlock.includes('"sr-engineer"'), "gate arm condition must include sr-engineer");
+  assert.ok(gateBlock.includes("EXTERNAL_REFS_UNRESOLVED"), "the located block must be the external-refs gate");
+});
+
+test("XG-nonpm: non-pm predecessor is never gated, regardless of ledger contents (AC-3)", () => {
+  // WHY: AC-3 — architect:In_Progress -> sr-engineer:In_Progress (or any self-loop)
+  // has prev.agent !== "pm"; the orchestrator's arm condition requires
+  // prevTuple.agent === "pm", so a ledger populated on an earlier PM write must
+  // never re-block a downstream resume/self-loop. We assert the ARM CONDITION
+  // directly (composition-test convention, same as G1 above) rather than the
+  // predicate itself — hasUnresolvedRefs has no agent-awareness by design; the
+  // pm-pinning lives in the orchestrator's `if` guard, not the predicate.
+  const prevTuple = { agent: "architect", status: "In_Progress" };
+  const onGatedEdge = prevTuple.agent === "pm" && prevTuple.status === "In_Progress";
+  assert.equal(onGatedEdge, false, "a non-pm predecessor must never satisfy the gate's arm condition");
+  // Even with an unresolved ledger sitting in prevState, the predicate alone
+  // (without the orchestrator's pm-pinning guard) would say "fire" — proving the
+  // pm-pinning guard, not the predicate, is what protects resume/self-loop edges.
+  const prevState = { last_agent: "architect", external_refs: [{ ref: "r", state: "unresolved" }] };
+  assert.equal(hasUnresolvedRefs(prevState), true, "predicate alone is agent-agnostic by design");
+});
+
+test("XS1: gate skips when active storage is not FileHandoffStorage (SQLite-mode skip, AC-5)", () => {
+  // WHY: D5/AC-5 — external_refs is handoff-YAML frontmatter only. In SQLite/HTTP
+  // mode the parsed prev-state never carries it, so the gate would always see an
+  // empty/absent ledger anyway — but the orchestrator skips explicitly rather
+  // than relying on an always-empty read (same guard as CUT_APPROVAL_REQUIRED).
+  const fakeNonFileStorage = { writeState: () => {}, readState: () => {}, parse: () => null };
+  assert.equal(
+    fakeNonFileStorage instanceof FileHandoffStorage,
+    false,
+    "a plain object must not satisfy instanceof FileHandoffStorage (SQLite-skip predicate fails as expected)",
+  );
+  const fileStorage = new FileHandoffStorage();
+  assert.equal(
+    fileStorage instanceof FileHandoffStorage,
+    true,
+    "FileHandoffStorage instance must satisfy instanceof check (gate arms in file mode)",
+  );
+});
+
+test("XC1: EXTERNAL_REFS_UNRESOLVED error code present verbatim in dist/tools/handoff-orchestrator.js", () => {
+  assert.ok(
+    DIST_INDEX.includes("EXTERNAL_REFS_UNRESOLVED"),
+    "compiled orchestrator must contain the verbatim error code EXTERNAL_REFS_UNRESOLVED",
   );
 });

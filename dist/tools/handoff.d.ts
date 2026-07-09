@@ -1,5 +1,10 @@
 import type { ToolResult, WorkspaceOnlyInput } from "./registry.js";
 import "../schema/migrations-handoff.js";
+export type ExternalRefState = "fetched" | "indexed" | "user-confirmed-ignorable" | "unresolved";
+export interface ExternalRef {
+    ref: string;
+    state: ExternalRefState;
+}
 export interface HandoffState {
     active_feature: string;
     status: string;
@@ -15,6 +20,7 @@ export interface HandoffState {
     scope_decision?: string;
     scope_decision_why?: string;
     cut_approved?: boolean;
+    external_refs?: ExternalRef[];
 }
 /**
  * Parse handoff.md YAML frontmatter + section content into structured JSON.
@@ -48,6 +54,7 @@ export interface WriteHandoffStateOptions {
     scopeDecision?: string;
     scopeDecisionWhy?: string;
     cutApproved?: boolean;
+    externalRefs?: ExternalRef[];
 }
 /**
  * Write handoff state. v3.15.0 dual API:

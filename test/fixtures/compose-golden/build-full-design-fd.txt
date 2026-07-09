@@ -164,7 +164,7 @@ into the spec. Tasks with no design reference skip the auditor entirely.
 - **Surface conflicts**: When patterns contradict, pick one (more recent / more tested), explain why, flag the other. Don't blend.
 - **Read before write**: Before adding code, read exports, callers, shared utilities. "Looks orthogonal" is not safe.
 - **Fail loud**: "Completed" is wrong if anything was skipped. "Tests pass" is wrong if any were skipped. Default to surfacing uncertainty.
-- **External-reference policy**: A spec referencing external artifacts<!-- rationale:start --> (URLs, design files, ticket IDs, mockups, "see XYZ")<!-- rationale:end --> is presumed **incomplete** until each reference is (a) fetched, (b) indexed via `tw_index_prd` / equivalent, or (c) user-confirmed ignorable. No role may unilaterally treat them as out-of-scope. PM owns the initial audit (skill-pm §Resource Audit Gate); architect surfaces leftover refs in `Deferred Resources`.
+- **External-reference policy**: A spec referencing external artifacts<!-- rationale:start --> (URLs, design files, ticket IDs, mockups, "see XYZ")<!-- rationale:end --> is presumed **incomplete** until each reference is (a) fetched, (b) indexed via `tw_index_prd` / equivalent, or (c) user-confirmed ignorable. The audit is ledger-backed: PM records each reference as an `external_refs` handoff entry (state `fetched` / `indexed` / `user-confirmed-ignorable` / `unresolved`); `tw_update_state` rejects the PM→build hop (`EXTERNAL_REFS_UNRESOLVED`) while any entry is `unresolved`. PM owns the initial audit (skill-pm §Resource Audit Gate); architect surfaces leftover refs in `Deferred Resources`.
 
 ## Document Priority
 

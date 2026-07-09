@@ -47,6 +47,15 @@ declare const UpdateStateArgs: z.ZodObject<{
     }>>;
     scope_decision_why: z.ZodOptional<z.ZodString>;
     cut_approved: z.ZodOptional<z.ZodBoolean>;
+    external_refs: z.ZodOptional<z.ZodArray<z.ZodObject<{
+        ref: z.ZodString;
+        state: z.ZodEnum<{
+            unresolved: "unresolved";
+            fetched: "fetched";
+            indexed: "indexed";
+            "user-confirmed-ignorable": "user-confirmed-ignorable";
+        }>;
+    }, z.core.$strip>>>;
 }, z.core.$strip>;
 declare const CompleteTaskArgs: z.ZodObject<{
     workspace_path: z.ZodString;

@@ -28,6 +28,7 @@ export type GateErrorCode =
   | "VISUAL_ROUND_EXCEEDED"
   | "SCOPE_DECISION_REQUIRED"
   | "CUT_APPROVAL_REQUIRED"
+  | "EXTERNAL_REFS_UNRESOLVED"
   | "MISSING_EVIDENCE"
   | "MISSING_REVIEW_EVIDENCE"
   | "VISUAL_BASELINES_REQUIRED"
@@ -58,12 +59,12 @@ export interface GateDefinition {
   // (DR-3, qa-engineer's rewritten error-code-contract test) compares against.
   readonly hintStatic: string;
   // True iff the code is (and must stay) backtick-quoted in >=1 content/*.md.
-  // All 18 are true today. The field exists so a future code-internal gate can
+  // All 19 are true today. The field exists so a future code-internal gate can
   // opt out without weakening the parity test.
   readonly documentedInProse: boolean;
 }
 
-// The 18-gate catalog, in documentation order. Array order is DOC order only —
+// The 19-gate catalog, in documentation order. Array order is DOC order only —
 // it MUST NOT be relied on for evaluation order (DR-5; that lives in
 // handoff-orchestrator.ts as the physical if-block sequence).
 export const GATE_REGISTRY: readonly GateDefinition[] = [
@@ -118,7 +119,7 @@ export const GATE_REGISTRY: readonly GateDefinition[] = [
     hintStatic: " exceeds cap. Only (pm, In_Progress) allowed for pixel/widget rebudget.",
     documentedInProse: true,
   },
-  // ---- orchestrator-json (codes 6-7, producer: orchestrator) ----
+  // ---- orchestrator-json (codes 6-8, producer: orchestrator) ----
   {
     errorCode: "SCOPE_DECISION_REQUIRED",
     producer: "orchestrator",
@@ -147,7 +148,20 @@ export const GATE_REGISTRY: readonly GateDefinition[] = [
       "the pm:In_Progress write after approval. See content/skill-pm.md §SOP step 7a.",
     documentedInProse: true,
   },
-  // ---- plain-text (codes 8-18, producer: orchestrator) ----
+  {
+    errorCode: "EXTERNAL_REFS_UNRESOLVED",
+    producer: "orchestrator",
+    envelope: "orchestrator-json",
+    triggerEdge: "pm:In_Progress -> {architect,sr-engineer}:In_Progress (file-mode only)",
+    armCondition: "unconditional; FileHandoffStorage only; fires iff >=1 external_refs entry state==unresolved",
+    clearingArtifact: "every external_refs entry fetched/indexed/user-confirmed-ignorable, or field absent/empty",
+    hintStatic:
+      " Each entry in external_refs must be fetched, indexed, or user-confirmed-ignorable " +
+      "before routing to build. See content/skill-pm.md §Resource Audit Gate and " +
+      "specs/b8-external-ref-ledger.md.",
+    documentedInProse: true,
+  },
+  // ---- plain-text (codes 9-19, producer: orchestrator) ----
   {
     errorCode: "MISSING_EVIDENCE",
     producer: "orchestrator",
@@ -310,8 +324,8 @@ export function gate(code: GateErrorCode): GateDefinition {
 
 // The 5 codes validateTransition's rejection() may emit. For tests + optional
 // Extract<> typing of validateTransition's own return — NOT for re-typing the
-// 12-member TransitionRejection["error"] union in tools/transitions.ts (see DR-8:
-// that union carries 7 additional handler-side envelope-consistency codes and
+// 13-member TransitionRejection["error"] union in tools/transitions.ts (see DR-8:
+// that union carries 8 additional handler-side envelope-consistency codes and
 // must stay byte-identical; non-drift is enforced by a test assertion
 // union ⊆ ALL_GATE_CODES, not by re-sourcing from here).
 export const TRANSITION_GATE_CODES: readonly GateErrorCode[] = [

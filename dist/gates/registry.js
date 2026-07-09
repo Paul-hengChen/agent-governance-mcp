@@ -19,7 +19,7 @@
 // Evaluation order is NOT encoded here (no evalOrder field): it stays the
 // physical top-to-bottom if-block sequence in tools/handoff-orchestrator.ts
 // (spec AC-7, DR-5). This registry is a keyed lookup, never a dispatch loop.
-// The 18-gate catalog, in documentation order. Array order is DOC order only —
+// The 19-gate catalog, in documentation order. Array order is DOC order only —
 // it MUST NOT be relied on for evaluation order (DR-5; that lives in
 // handoff-orchestrator.ts as the physical if-block sequence).
 export const GATE_REGISTRY = [
@@ -74,7 +74,7 @@ export const GATE_REGISTRY = [
         hintStatic: " exceeds cap. Only (pm, In_Progress) allowed for pixel/widget rebudget.",
         documentedInProse: true,
     },
-    // ---- orchestrator-json (codes 6-7, producer: orchestrator) ----
+    // ---- orchestrator-json (codes 6-8, producer: orchestrator) ----
     {
         errorCode: "SCOPE_DECISION_REQUIRED",
         producer: "orchestrator",
@@ -101,7 +101,19 @@ export const GATE_REGISTRY = [
             "the pm:In_Progress write after approval. See content/skill-pm.md §SOP step 7a.",
         documentedInProse: true,
     },
-    // ---- plain-text (codes 8-18, producer: orchestrator) ----
+    {
+        errorCode: "EXTERNAL_REFS_UNRESOLVED",
+        producer: "orchestrator",
+        envelope: "orchestrator-json",
+        triggerEdge: "pm:In_Progress -> {architect,sr-engineer}:In_Progress (file-mode only)",
+        armCondition: "unconditional; FileHandoffStorage only; fires iff >=1 external_refs entry state==unresolved",
+        clearingArtifact: "every external_refs entry fetched/indexed/user-confirmed-ignorable, or field absent/empty",
+        hintStatic: " Each entry in external_refs must be fetched, indexed, or user-confirmed-ignorable " +
+            "before routing to build. See content/skill-pm.md §Resource Audit Gate and " +
+            "specs/b8-external-ref-ledger.md.",
+        documentedInProse: true,
+    },
+    // ---- plain-text (codes 9-19, producer: orchestrator) ----
     {
         errorCode: "MISSING_EVIDENCE",
         producer: "orchestrator",
@@ -251,8 +263,8 @@ export function gate(code) {
 }
 // The 5 codes validateTransition's rejection() may emit. For tests + optional
 // Extract<> typing of validateTransition's own return — NOT for re-typing the
-// 12-member TransitionRejection["error"] union in tools/transitions.ts (see DR-8:
-// that union carries 7 additional handler-side envelope-consistency codes and
+// 13-member TransitionRejection["error"] union in tools/transitions.ts (see DR-8:
+// that union carries 8 additional handler-side envelope-consistency codes and
 // must stay byte-identical; non-drift is enforced by a test assertion
 // union ⊆ ALL_GATE_CODES, not by re-sourcing from here).
 export const TRANSITION_GATE_CODES = [

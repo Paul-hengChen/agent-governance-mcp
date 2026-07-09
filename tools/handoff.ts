@@ -16,6 +16,23 @@ import { CURRENT_VERSIONS, runMigrations } from "../schema/versions.js";
 // Side-effect import: registers the handoff v0→v1 migration on module load.
 import "../schema/migrations-handoff.js";
 
+// External-reference ledger entry state (handoff schema v6,
+// b8-external-ref-ledger). Closed enum (spec AC-9/S03): `unresolved` is the
+// ONLY blocking state; the other three all clear the gate.
+export type ExternalRefState =
+  | "fetched"
+  | "indexed"
+  | "user-confirmed-ignorable"
+  | "unresolved";
+
+// One external-reference ledger entry. `ref` is free text (URL / design-file /
+// ticket id) — NOT validated for reachability (spec Out of Scope); only
+// `state` is validated (closed enum, enforced by zod at the tool boundary).
+export interface ExternalRef {
+  ref: string;
+  state: ExternalRefState;
+}
+
 export interface HandoffState {
   active_feature: string;
   status: string;
@@ -62,6 +79,19 @@ export interface HandoffState {
   // across an active_feature change, and reset to undefined on every PM
   // In_Progress re-entry that does not explicitly re-pass it.
   cut_approved?: boolean;
+  // External-reference ledger (handoff schema v6, b8-external-ref-ledger).
+  // Populated by the PM during the Resource Audit Gate: one entry per external
+  // artifact the spec references, each classified fetched/indexed/
+  // user-confirmed-ignorable/unresolved. Backs the EXTERNAL_REFS_UNRESOLVED
+  // build-entry gate. ABSENT by default — undefined === "PM found zero external
+  // references" === gate CLEARS (inverse polarity to cut_approved, where absence
+  // BLOCKS; see architecture DR-3). FEATURE-SCOPED preserve: carried forward
+  // across same-feature writes that omit it, dropped on any active_feature
+  // change. NOT re-armed on PM re-entry (DR-4). FILE-MODE ONLY: never
+  // round-trips in SQLite. Surfaced verbatim to tw_get_state readers via the
+  // `{ ...state }` view in readHandoffState (User Story 3 — the architect reads
+  // the ledger from there; do not "optimize away" as unused).
+  external_refs?: ExternalRef[];
 }
 
 // Cap the completed_tasks array returned by readState() so long projects
@@ -96,6 +126,32 @@ function extractSectionContent(body: string, headingPattern: RegExp): string {
 interface HandoffReadResult {
   state: HandoffState;
   migrationApplied: boolean;
+}
+
+// The four legal external_refs states, for defensive parse-time filtering.
+const EXTERNAL_REF_STATES: readonly string[] = [
+  "fetched",
+  "indexed",
+  "user-confirmed-ignorable",
+  "unresolved",
+];
+
+// v6 — defensive parser for the external_refs frontmatter field. Returns
+// undefined when raw is not a non-empty array of {ref: string, state: <known
+// enum>} objects; malformed entries are dropped (matching the parser's
+// defensive asString posture); never throws. An all-malformed / empty result
+// collapses to undefined so absence stays the single non-blocking sentinel.
+function parseExternalRefs(raw: unknown): ExternalRef[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const refs: ExternalRef[] = [];
+  for (const entry of raw) {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;
+    const { ref, state } = entry as { ref?: unknown; state?: unknown };
+    if (typeof ref !== "string" || ref === "") continue;
+    if (typeof state !== "string" || !EXTERNAL_REF_STATES.includes(state)) continue;
+    refs.push({ ref, state: state as ExternalRefState });
+  }
+  return refs.length > 0 ? refs : undefined;
 }
 
 // Internal helper. Reads + parses + runs schema migrations. Returns the
@@ -156,6 +212,10 @@ function readAndMigrate(workspacePath: string): HandoffReadResult | null {
   // a string) collapses to `undefined` so the field is omitted via the
   // spread-guard below and the gate is free to fire.
   const cutApproved = frontmatter.cut_approved === true ? true : undefined;
+  // v6 — external-reference ledger (b8-external-ref-ledger). undefined when
+  // absent/malformed, so absence flows to hasUnresolvedRefs as the
+  // non-blocking "zero refs found" sentinel (spec AC-2).
+  const externalRefs = parseExternalRefs(frontmatter.external_refs);
   const qaRoundRaw = Number(frontmatter.qa_round);
   const qa_round = Number.isFinite(qaRoundRaw) && qaRoundRaw >= 0 ? Math.floor(qaRoundRaw) : 0;
   const reviewRoundRaw = Number(frontmatter.review_round);
@@ -175,6 +235,7 @@ function readAndMigrate(workspacePath: string): HandoffReadResult | null {
     ...(scopeDecision && { scope_decision: scopeDecision }),
     ...(scopeDecisionWhy && { scope_decision_why: scopeDecisionWhy }),
     ...(cutApproved && { cut_approved: cutApproved }),
+    ...(externalRefs && { external_refs: externalRefs }),
     completed_tasks,
     pending_notes,
     qa_round,
@@ -323,6 +384,11 @@ export interface WriteHandoffStateOptions {
   // rule in writeHandoffState (it re-arms on every PM In_Progress re-entry and
   // on any active_feature change).
   cutApproved?: boolean;
+  // v6 — external-reference ledger (b8-external-ref-ledger). REPLACE semantics
+  // when provided (wholesale, like completedTasks — never merged); feature-
+  // scoped preserve-if-omitted, reset ONLY on active_feature change, NOT on PM
+  // re-entry (inverse polarity to cutApproved — see writeHandoffState).
+  externalRefs?: ExternalRef[];
 }
 
 /**
@@ -376,6 +442,11 @@ export async function writeHandoffState(
   let scopeDecision: string | undefined;
   let scopeDecisionWhy: string | undefined;
   let cutApproved: boolean | undefined;
+  // v6 — external_refs ledger. The positional overload leaves it undefined
+  // (positional callers — including the migration-heal write — never pass it;
+  // the same-feature preserve clause below carries any existing ledger
+  // forward, DR-8).
+  let externalRefs: ExternalRef[] | undefined;
   if (
     typeof workspacePathOrOpts === "object" &&
     !Array.isArray(workspacePathOrOpts)
@@ -395,6 +466,7 @@ export async function writeHandoffState(
     scopeDecision = o.scopeDecision;
     scopeDecisionWhy = o.scopeDecisionWhy;
     cutApproved = o.cutApproved;
+    externalRefs = o.externalRefs;
   } else {
     workspacePath = workspacePathOrOpts as string;
     // Positional defaults preserved for backwards-compat callers passing < 11 args.
@@ -424,7 +496,10 @@ export async function writeHandoffState(
       ? (pendingNotes as string[]).map((t) => `- ${t}`).join("\n")
       : "- (none)";
 
-    const frontmatterData: Record<string, string | number | boolean> = {
+    // Value type admits ExternalRef[] for the external_refs block sequence
+    // (DR-5 — the first array-of-object frontmatter field; js-yaml dump
+    // serializes it losslessly with the existing options, DR-1).
+    const frontmatterData: Record<string, string | number | boolean | ExternalRef[]> = {
       schema_version: CURRENT_VERSIONS.handoff,
       active_feature: _activeFeature,
       status: _status,
@@ -459,11 +534,26 @@ export async function writeHandoffState(
     let effectiveCutApproved: boolean | undefined;
     const isPmReentry = lastAgent === "pm" && _status === "In_Progress";
     const cutApprovalNeedsExisting = cutApproved !== true && !isPmReentry;
+    // v6 — external_refs is FEATURE-SCOPED with NO PM-re-entry re-arm (DR-4).
+    // It deliberately does NOT copy cut_approved's clause (2): cut_approved
+    // re-arms on PM re-entry because its ABSENCE BLOCKS (re-arming forces
+    // re-approval); external_refs has INVERSE polarity — absence CLEARS — so
+    // re-arming here would silently DISCARD a valid ledger and un-block the
+    // EXTERNAL_REFS_UNRESOLVED gate. The consolidated algorithm (AC-6):
+    //   1. option externalRefs !== undefined             → use it verbatim
+    //                                                      (REPLACE, incl. [])
+    //   2. omitted && existing.active_feature === this   → carry existing
+    //                                                      ledger forward
+    //   3. omitted && active_feature changed             → undefined (drop
+    //                                                      stale ledger)
+    let effectiveExternalRefs: ExternalRef[] | undefined = externalRefs;
+    const externalRefsNeedsExisting = externalRefs === undefined;
     if (
       effectivePrdPath === undefined ||
       effectiveScopeDecision === undefined ||
       effectiveScopeDecisionWhy === undefined ||
-      cutApprovalNeedsExisting
+      cutApprovalNeedsExisting ||
+      externalRefsNeedsExisting
     ) {
       const existing = parseHandoff(workspacePath);
       if (effectivePrdPath === undefined) effectivePrdPath = existing?.prd_path;
@@ -473,6 +563,11 @@ export async function writeHandoffState(
         // clauses (3)/(4): carry forward only within the same feature.
         effectiveCutApproved =
           existing?.active_feature === _activeFeature ? existing?.cut_approved : undefined;
+      }
+      if (externalRefsNeedsExisting) {
+        // clauses (2)/(3): carry the ledger forward only within the same feature.
+        effectiveExternalRefs =
+          existing?.active_feature === _activeFeature ? existing?.external_refs : undefined;
       }
     }
     // clauses (1)/(2): explicit PM approval, or PM re-entry re-arm. These do not
@@ -490,6 +585,12 @@ export async function writeHandoffState(
     // Boolean attestation: emit `true` only when effective === true. A falsy
     // value is indistinguishable from "not set", so never emit `false`.
     if (effectiveCutApproved === true) frontmatterData.cut_approved = true;
+    // v6 — external_refs: emit only a NON-EMPTY ledger. An empty array is NOT
+    // serialized (empty === absence === non-blocking, spec AC-2) — keeps the
+    // file clean and the two states behaviorally identical.
+    if (effectiveExternalRefs && effectiveExternalRefs.length > 0) {
+      frontmatterData.external_refs = effectiveExternalRefs;
+    }
     // Always emit qa_round (even 0) so the field is discoverable; falsy
     // input (undefined/NaN) normalises to 0.
     const normalisedRound = Number.isFinite(qaRound) && (qaRound as number) >= 0 ? Math.floor(qaRound as number) : 0;

@@ -21,13 +21,13 @@ function reset() {
 
 // ---------- CURRENT_VERSIONS / VERSION_WHEN_ABSENT ----------
 
-test("CURRENT_VERSIONS exposes the four kinds at their pm-cut-approval-gate levels", () => {
-  // pm-cut-approval-gate bumped handoff to 5 (added cut_approved for the
-  // CUT_APPROVAL_REQUIRED gate). v3.30.0 had bumped it to 4 (scope_decision).
-  // sqlite stays at 2 — cut_approved is handoff-YAML frontmatter only; no
-  // SQLite column or migration needed (cutApproved option is silently ignored).
-  // tasks + config remain at v1.
-  assert.equal(CURRENT_VERSIONS.handoff, 5);
+test("CURRENT_VERSIONS exposes the four kinds at their b8-external-ref-ledger levels", () => {
+  // b8-external-ref-ledger bumped handoff to 6 (added external_refs for the
+  // EXTERNAL_REFS_UNRESOLVED gate). pm-cut-approval-gate had bumped it to 5
+  // (cut_approved). sqlite stays at 2 — external_refs, like cut_approved, is
+  // handoff-YAML frontmatter only; no SQLite column or migration needed
+  // (externalRefs option is silently ignored, AC-5). tasks + config remain at v1.
+  assert.equal(CURRENT_VERSIONS.handoff, 6);
   assert.equal(CURRENT_VERSIONS.tasks, 1);
   assert.equal(CURRENT_VERSIONS.sqlite, 2);
   assert.equal(CURRENT_VERSIONS.config, 1);
@@ -96,18 +96,19 @@ test("registerMigration rejects negative from/to", () => {
 
 test("registerMigration idempotent overwrite — last write wins", () => {
   reset();
-  // Register v0→v1 twice (overwrite test); also register v1→v2, v2→v3, v3→v4 and
-  // v4→v5 since CURRENT_VERSIONS.handoff is now 5 (pm-cut-approval-gate) — the runner
-  // must climb the full chain.
+  // Register v0→v1 twice (overwrite test); also register v1→v2, v2→v3, v3→v4, v4→v5,
+  // and v5→v6 since CURRENT_VERSIONS.handoff is now 6 (b8-external-ref-ledger) — the
+  // runner must climb the full chain.
   registerMigration({ kind: "handoff", from: 0, to: 1, up: () => ({ schema_version: 1, who: "first" }) });
   registerMigration({ kind: "handoff", from: 0, to: 1, up: () => ({ schema_version: 1, who: "second" }) });
   registerMigration({ kind: "handoff", from: 1, to: 2, up: (input) => ({ ...input, schema_version: 2 }) });
   registerMigration({ kind: "handoff", from: 2, to: 3, up: (input) => ({ ...input, schema_version: 3 }) });
   registerMigration({ kind: "handoff", from: 3, to: 4, up: (input) => ({ ...input, schema_version: 4 }) });
   registerMigration({ kind: "handoff", from: 4, to: 5, up: (input) => ({ ...input, schema_version: 5 }) });
+  registerMigration({ kind: "handoff", from: 5, to: 6, up: (input) => ({ ...input, schema_version: 6 }) });
   const result = runMigrations("handoff", { /* no schema_version → v0 */ });
   // Overwrite semantics: the second v0→v1 registration is the one that runs;
-  // its `who: "second"` field threads through the v1→v2→v3→v4→v5 steps unchanged.
+  // its `who: "second"` field threads through the v1→v2→v3→v4→v5→v6 steps unchanged.
   assert.equal(result.payload.who, "second");
 });
 
@@ -167,17 +168,18 @@ test("peekVersion handles array as non-object payload", () => {
 
 test("runMigrations no-op when current === target", () => {
   reset();
-  // CURRENT_VERSIONS.handoff === 5 (pm-cut-approval-gate); payload already at v5.
-  // Must register all steps so the runner can reach v5 from v0 in other tests.
+  // CURRENT_VERSIONS.handoff === 6 (b8-external-ref-ledger); payload already at v6.
+  // Must register all steps so the runner can reach v6 from v0 in other tests.
   registerMigration({ kind: "handoff", from: 0, to: 1, up: (input) => ({ ...input, schema_version: 1 }) });
   registerMigration({ kind: "handoff", from: 1, to: 2, up: (input) => ({ ...input, schema_version: 2 }) });
   registerMigration({ kind: "handoff", from: 2, to: 3, up: (input) => ({ ...input, schema_version: 3 }) });
   registerMigration({ kind: "handoff", from: 3, to: 4, up: (input) => ({ ...input, schema_version: 4 }) });
   registerMigration({ kind: "handoff", from: 4, to: 5, up: (input) => ({ ...input, schema_version: 5 }) });
-  const result = runMigrations("handoff", { schema_version: 5, kept: true });
+  registerMigration({ kind: "handoff", from: 5, to: 6, up: (input) => ({ ...input, schema_version: 6 }) });
+  const result = runMigrations("handoff", { schema_version: 6, kept: true });
   assert.deepEqual(result.applied, []);
-  assert.equal(result.fromVersion, 5);
-  assert.equal(result.toVersion, 5);
+  assert.equal(result.fromVersion, 6);
+  assert.equal(result.toVersion, 6);
   assert.equal(result.payload.kept, true);
 });
 
@@ -204,11 +206,11 @@ test("runMigrations applies single v0→v1 step", () => {
 
 test("runMigrations refuses-loud when on-disk version > current (AC-4)", () => {
   reset();
-  // pm-cut-approval-gate: CURRENT_VERSIONS.handoff === 5, so the "server max" surfaced in
+  // b8-external-ref-ledger: CURRENT_VERSIONS.handoff === 6, so the "server max" surfaced in
   // the refuse-loud error tracks the bumped value.
   assert.throws(
     () => runMigrations("handoff", { schema_version: 99 }),
-    /on-disk version 99 > server max 5/
+    /on-disk version 99 > server max 6/
   );
 });
 

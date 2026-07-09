@@ -60,12 +60,13 @@ test("AC-10: transitions.ts AgentName union constraint (side-channel)", () => {
   assert.match(transitionsTs, /release-engineer/, "release-engineer MUST be in transitions.ts (v3.28.0 A5 matrix promotion — terminal PASS role)");
 });
 
-test("AC-10: schema/versions.ts schema versions track pm-cut-approval-gate bump", () => {
-  // pm-cut-approval-gate bumped handoff to 5 (cut_approved for the CUT_APPROVAL_REQUIRED gate).
-  // v3.30.0 had bumped it to 4 (scope_decision). sqlite stays at 2 — cut_approved is
-  // handoff-YAML frontmatter only; no SQLite column or migration needed.
+test("AC-10: schema/versions.ts schema versions track b8-external-ref-ledger bump", () => {
+  // b8-external-ref-ledger bumped handoff to 6 (external_refs for the EXTERNAL_REFS_UNRESOLVED
+  // gate). pm-cut-approval-gate had bumped it to 5 (cut_approved). sqlite stays at 2 —
+  // external_refs, like cut_approved, is handoff-YAML frontmatter only; no SQLite column
+  // or migration needed.
   const versionsTs = fs.readFileSync(path.join(PROJECT_ROOT, "schema", "versions.ts"), "utf-8");
-  assert.match(versionsTs, /handoff:\s*5,/, "CURRENT_VERSIONS.handoff must be 5 (pm-cut-approval-gate)");
+  assert.match(versionsTs, /handoff:\s*6,/, "CURRENT_VERSIONS.handoff must be 6 (b8-external-ref-ledger)");
   assert.match(versionsTs, /sqlite:\s*2,/, "CURRENT_VERSIONS.sqlite must remain 2");
 });
 

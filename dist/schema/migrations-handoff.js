@@ -54,6 +54,17 @@ registerMigration({
     to: 5,
     up: (input) => ({ ...input, schema_version: 5 }),
 });
+// v5 → v6: add optional external_refs ledger (b8-external-ref-ledger).
+// Additive STAMP-ONLY: bumps the version, seeds NO default for external_refs.
+// Absence is the "zero refs found" non-blocking sentinel (AC-2/AC-7) — seeding
+// [] would be a redundant materialization of absence, so we add nothing.
+// Mirrors the v3→v4 scope_decision and v4→v5 cut_approved stamp-only pattern.
+registerMigration({
+    kind: "handoff",
+    from: 5,
+    to: 6,
+    up: (input) => ({ ...input, schema_version: 6 }),
+});
 // Compile-time guard: if CURRENT_VERSIONS.handoff is ever bumped without a
 // matching registration added above, the runner's missing-step error fires
 // at read time. This reference makes the dependency explicit for grep.

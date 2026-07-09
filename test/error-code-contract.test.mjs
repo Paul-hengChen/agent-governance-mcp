@@ -45,7 +45,15 @@ const { GATE_REGISTRY, ALL_GATE_CODES } = await import(
 // ---------------------------------------------------------------------------
 
 const TOKEN_RE = /\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*\b/g;
-const SUFFIX_RE = /_(REQUIRED|MISSING|INCOMPLETE|EXCEEDED|UNVERIFIED|REJECTED)$/;
+// b8-external-ref-ledger (qa-owned re-baseline): added UNRESOLVED. The new
+// EXTERNAL_REFS_UNRESOLVED gate code introduces a novel suffix outside the
+// prior vocabulary (spec S01 mandates the string verbatim; sr-engineer had no
+// latitude to rename it) — code-reviewer flagged this as the QA-side fix,
+// not a code rename. Without this, EXTERNAL_REFS_UNRESOLVED is invisible to
+// BOTH extractCodeCodes and extractDocCodes (isGateErrorCode filters it out
+// of both harvests identically), which would silently mask a missing-registry
+// or missing-doc regression for this gate.
+const SUFFIX_RE = /_(REQUIRED|MISSING|INCOMPLETE|EXCEEDED|UNVERIFIED|REJECTED|UNRESOLVED)$/;
 const PREFIX_RE = /^MISSING_/;
 
 function isGateErrorCode(token) {
@@ -129,19 +137,20 @@ function fmt(codeMap, codes) {
 }
 
 // ---------------------------------------------------------------------------
-// AC-1 / AC-5: GATE_REGISTRY is the single source of truth, exactly 18
-// entries, no gate dropped or added by the refactor (18 in, 18 out).
+// AC-1 / AC-5: GATE_REGISTRY is the single source of truth, exactly 19
+// entries (b8-external-ref-ledger added the 19th, EXTERNAL_REFS_UNRESOLVED;
+// 18 in, 19 out — one gate added, none dropped).
 // ---------------------------------------------------------------------------
 
-test("AC-1/AC-5: GATE_REGISTRY has exactly 18 entries (18 in, 18 out — no gate dropped or added)", () => {
+test("AC-1/AC-5: GATE_REGISTRY has exactly 19 entries (18 in, 19 out — b8-external-ref-ledger added EXTERNAL_REFS_UNRESOLVED)", () => {
   assert.equal(
     GATE_REGISTRY.length,
-    18,
-    `expected exactly 18 GateDefinition entries, got ${GATE_REGISTRY.length}: ${GATE_REGISTRY.map((g) => g.errorCode).join(", ")}`,
+    19,
+    `expected exactly 19 GateDefinition entries, got ${GATE_REGISTRY.length}: ${GATE_REGISTRY.map((g) => g.errorCode).join(", ")}`,
   );
   assert.equal(
     ALL_GATE_CODES.length,
-    18,
+    19,
     "ALL_GATE_CODES must be GATE_REGISTRY.map(g => g.errorCode) — same length",
   );
   assert.deepEqual(
@@ -254,14 +263,20 @@ test("internal consistency: orchestrator-producer entries' errorCode literally a
 // ---------------------------------------------------------------------------
 // DR-8 (architecture Interface Contracts / Decision Records): the
 // TransitionRejection["error"] union in tools/transitions.ts is deliberately
-// NOT re-sourced from the registry (it carries 5 emitted + 7 handler-side
+// NOT re-sourced from the registry (it carries 5 emitted + 8 handler-side
 // envelope-consistency codes, not a clean by-producer subset — narrowing it
-// would silently delete 7 documented members). Guard against drift the cheap
-// way instead: pin the union at exactly 12 members and assert it is a subset
+// would silently delete 8 documented members). Guard against drift the cheap
+// way instead: pin the union at exactly 13 members and assert it is a subset
 // of ALL_GATE_CODES.
+// b8-external-ref-ledger (B8-08, DR-9): EXTERNAL_REFS_UNRESOLVED joins the
+// union as an 8th handler-side-only member (12 -> 13), for the same three
+// reasons CUT_APPROVAL_REQUIRED/SCOPE_DECISION_REQUIRED carry theirs: envelope
+// narrowing at the emit site, the union-subset-of-ALL_GATE_CODES invariant
+// below, and catalog completeness. It is NOT added to TRANSITION_GATE_CODES
+// (that set is the 5 validateTransition-emitted codes only).
 // ---------------------------------------------------------------------------
 
-test("DR-8: TransitionRejection[\"error\"] union stays byte-identical at 12 members, all ⊆ ALL_GATE_CODES", () => {
+test("DR-8: TransitionRejection[\"error\"] union stays byte-identical at 13 members, all ⊆ ALL_GATE_CODES", () => {
   const transitionsSrc = readSource(path.join("tools", "transitions.ts"));
   const unionMatch = transitionsSrc.match(
     /export interface TransitionRejection \{\s*error:\s*([\s\S]*?);\s*\n\s*attempted:/,
@@ -275,12 +290,12 @@ test("DR-8: TransitionRejection[\"error\"] union stays byte-identical at 12 memb
 
   assert.equal(
     members.length,
-    12,
-    `TransitionRejection["error"] must stay byte-identical at 12 members (DR-8) — found ${members.length}: ${members.join(", ")}`,
+    13,
+    `TransitionRejection["error"] must stay byte-identical at 13 members (DR-8, b8-external-ref-ledger re-baseline) — found ${members.length}: ${members.join(", ")}`,
   );
   assert.equal(
     new Set(members).size,
-    12,
+    13,
     "TransitionRejection[\"error\"] union members must be unique",
   );
 

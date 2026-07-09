@@ -117,6 +117,20 @@ const UpdateStateArgs = z
     // human approval, to clear the CUT_APPROVAL_REQUIRED gate on the
     // pm:In_Progress → {architect,sr-engineer}:In_Progress build-entry edge.
     cut_approved: z.boolean().optional(),
+    // v6 — external-reference ledger (b8-external-ref-ledger). PM records one
+    // entry per external artifact its spec references during the Resource Audit
+    // Gate. Passing the field REPLACES the whole array (wholesale, like
+    // completed_tasks — never merged). Closed state enum (AC-9): an out-of-enum
+    // state is rejected by zod before the gate runs, no server error code.
+    external_refs: z
+      .array(
+        z.object({
+          ref: z.string().min(1).max(1000),
+          state: z.enum(["fetched", "indexed", "user-confirmed-ignorable", "unresolved"]),
+        }),
+      )
+      .max(200)
+      .optional(),
   })
   .refine((d) => d.status !== "PASS" || d.agent_id === "qa-engineer", {
     message: 'status="PASS" requires agent_id="qa-engineer"',
@@ -328,6 +342,22 @@ export const TOOL_REGISTRY: ToolRegistryEntry[] = [
           type: "boolean",
           description:
             "Ticket-cut approval attestation. PM sets cut_approved: true on its pm:In_Progress write AFTER presenting the ticket cut inline in chat and obtaining human approval, to clear the CUT_APPROVAL_REQUIRED gate before routing to architect/sr-engineer. Feature-scoped: re-armed on every PM In_Progress re-entry and on any active_feature change.",
+        },
+        external_refs: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              ref: { type: "string" },
+              state: {
+                type: "string",
+                enum: ["fetched", "indexed", "user-confirmed-ignorable", "unresolved"],
+              },
+            },
+            required: ["ref", "state"],
+          },
+          description:
+            "External-reference ledger (file-mode only). Array of {ref, state} entries; state ∈ {fetched, indexed, user-confirmed-ignorable, unresolved}. PM populates this during the Resource Audit Gate — one entry per external artifact the spec references. Passing it REPLACES the array wholesale (not merged). Any entry left unresolved blocks the pm:In_Progress → {architect,sr-engineer}:In_Progress build-entry hop (EXTERNAL_REFS_UNRESOLVED). Absence/empty = zero external refs found = non-blocking. Feature-scoped: preserved across same-feature writes, dropped on active_feature change.",
         },
       },
       required: ["workspace_path", "active_feature", "status"],
