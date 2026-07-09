@@ -131,7 +131,12 @@ test("AC-5: byte counts stay within v3.14.0-relaxed budgets (savings invariant v
   // number alone, but that comparison was informational, not load-bearing —
   // no other test or gate depends on the literal 8660 value (confirmed by
   // repo-wide grep).
-  assert.ok(qaSize <= 8850, `qa-engineer.md must be <= 8850 bytes (got ${qaSize})`);
+  // c15-expected-red-manifest (qa-owned bump, T-C15-02): Phase 0.5 (Expected-
+  // Red Diff) SOP prose added to skill-qa-engineer.md, bringing the file to
+  // 11082 bytes — only ~2200 bytes of headroom would be consumed at the old
+  // 8850 cap (i.e. it blows the cap outright). Raised 8850 -> 11500 (~418-
+  // byte headroom) per the established ~300-550-byte convention.
+  assert.ok(qaSize <= 11500, `qa-engineer.md must be <= 11500 bytes (got ${qaSize})`);
   // qa-visual.md: v3.36.0 adds B10 (Step B0 carry-forward gate) and B11
   // (Step B1 deterministic pixel-diff pre-screen + Step B2 LLM-only path).
   // These are SOP-prose insertions totalling ~5400 bytes on top of the

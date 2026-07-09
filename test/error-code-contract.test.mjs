@@ -142,21 +142,21 @@ function fmt(codeMap, codes) {
 }
 
 // ---------------------------------------------------------------------------
-// AC-1 / AC-5: GATE_REGISTRY is the single source of truth, exactly 20
-// entries (c9-protocol-fields added the 20th, REVIEW_VERDICT_STATUS_MISMATCH;
-// 19 in, 20 out — one gate added, none dropped). b8-external-ref-ledger had
-// added the 19th, EXTERNAL_REFS_UNRESOLVED.
+// AC-1 / AC-5: GATE_REGISTRY is the single source of truth, exactly 21
+// entries (c15-expected-red-manifest added the 21st, EXPECTED_RED_DIFF_MISSING;
+// 20 in, 21 out — one gate added, none dropped). c9-protocol-fields had added
+// the 20th, REVIEW_VERDICT_STATUS_MISMATCH.
 // ---------------------------------------------------------------------------
 
-test("AC-1/AC-5: GATE_REGISTRY has exactly 20 entries (19 in, 20 out — c9-protocol-fields added REVIEW_VERDICT_STATUS_MISMATCH)", () => {
+test("AC-1/AC-5: GATE_REGISTRY has exactly 21 entries (20 in, 21 out — c15-expected-red-manifest added EXPECTED_RED_DIFF_MISSING)", () => {
   assert.equal(
     GATE_REGISTRY.length,
-    20,
-    `expected exactly 20 GateDefinition entries, got ${GATE_REGISTRY.length}: ${GATE_REGISTRY.map((g) => g.errorCode).join(", ")}`,
+    21,
+    `expected exactly 21 GateDefinition entries, got ${GATE_REGISTRY.length}: ${GATE_REGISTRY.map((g) => g.errorCode).join(", ")}`,
   );
   assert.equal(
     ALL_GATE_CODES.length,
-    20,
+    21,
     "ALL_GATE_CODES must be GATE_REGISTRY.map(g => g.errorCode) — same length",
   );
   assert.deepEqual(

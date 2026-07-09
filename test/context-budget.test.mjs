@@ -563,13 +563,18 @@ test("AC1/AC2: skill-sr-engineer stripped token count meets ≤ 2138 cap", () =>
   // structured-field column, per T-C9-14). Independently re-measured at 2275 ~tok
   // exactly; cap set to the exact measured value per the established Phase-2 convention
   // (no headroom).
+  // c15-expected-red-manifest (qa-owned bump, T-C15-01): cap raised from 2275 → 2469 to
+  // absorb the new SOP step 7a (Expected-Red Manifest emission convention) added to
+  // skill-sr-engineer.md. Independently re-measured (not trusted from sr-engineer's
+  // handoff note) at 2469 ~tok exactly; cap set to the exact measured value per the
+  // established Phase-2 convention (no headroom).
   const SKILL_SR = fs.readFileSync(path.join(ROOT, "content", "skill-sr-engineer.md"), "utf-8");
   const body = SKILL_SR.startsWith("---")
     ? SKILL_SR.slice(SKILL_SR.indexOf("---", 3) + 3).trimStart()
     : SKILL_SR;
   const stripped = stripRationale(stripOriginTags(body));
   const toks = approxTokens(stripped);
-  assert.ok(toks <= 2275, `skill-sr stripped body (${toks} ~tok) must be ≤ 2275 (AC2, c9-protocol-fields re-baseline)`);
+  assert.ok(toks <= 2469, `skill-sr stripped body (${toks} ~tok) must be ≤ 2469 (AC2, c15-expected-red-manifest re-baseline)`);
 });
 
 // --- governance-text-load Round-2: constitution rationale fencing (T-GTL-06/07) ---
