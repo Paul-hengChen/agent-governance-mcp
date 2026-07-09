@@ -19,7 +19,7 @@
 // Evaluation order is NOT encoded here (no evalOrder field): it stays the
 // physical top-to-bottom if-block sequence in tools/handoff-orchestrator.ts
 // (spec AC-7, DR-5). This registry is a keyed lookup, never a dispatch loop.
-// The 20-gate catalog, in documentation order. Array order is DOC order only —
+// The 21-gate catalog, in documentation order. Array order is DOC order only —
 // it MUST NOT be relied on for evaluation order (DR-5; that lives in
 // handoff-orchestrator.ts as the physical if-block sequence).
 export const GATE_REGISTRY = [
@@ -133,6 +133,19 @@ export const GATE_REGISTRY = [
         clearingArtifact: "review_reports/review_<id>.md",
         hintStatic: "Code-reviewer evidence missing: write review_reports/review_<task-id>.md " +
             "before handing off to qa-engineer.",
+        documentedInProse: true,
+    },
+    {
+        errorCode: "EXPECTED_RED_DIFF_MISSING",
+        producer: "orchestrator",
+        envelope: "plain-text",
+        triggerEdge: "status=PASS with completed_tasks, manifest present, ## Expected-Red Diff absent",
+        armCondition: "hasExpectedRedManifest().present (file-mode only)",
+        clearingArtifact: "## Expected-Red Diff H2 in qa_reports/review_<id>.md (covers: files count)",
+        hintStatic: "qa_reports/expected-red_<feature>.txt is declared but no ## Expected-Red Diff " +
+            "section was found in any qa_reports/review_<id>.md for the PASS'd ids " +
+            "(covers: files count). Run Phase 0.5 (skill-qa-engineer) — diff the actual " +
+            "suite reds against the manifest and record the disposition before PASS.",
         documentedInProse: true,
     },
     {

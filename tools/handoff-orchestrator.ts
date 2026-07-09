@@ -9,9 +9,9 @@
 // Check order is FROZEN (spec AC-5/AC-8): preflight → PASS/qa-engineer gate →
 // transition validation → scope-decision gate → cut-approval gate →
 // external-refs gate → review-verdict/status mismatch gate → QA evidence
-// record → PASS evidence gate → visual sub-gates → code-reviewer evidence
-// gate → round-cap sentinels → storage.writeState → PASS RAG GC hook.
-// No reorder, no merge, no early-return removal.
+// record → PASS evidence gate → visual sub-gates → expected-red diff gate →
+// code-reviewer evidence gate → round-cap sentinels → storage.writeState →
+// PASS RAG GC hook. No reorder, no merge, no early-return removal.
 //
 // The 4-step mutating-tool contract (lock → freshness → atomic write → refresh
 // snapshot) lives inside tools/handoff.ts writeState — NOT here (spec finding #5).
@@ -40,6 +40,7 @@ import {
   checkPixelGateAttestation,
 } from "../gates/visual.js";
 import { hasScopeDecision } from "../gates/scope-decision.js";
+import { hasExpectedRedManifest, hasExpectedRedDisposition } from "../gates/expected-red.js";
 import { hasCutApproval } from "../gates/cut-approval.js";
 import { hasUnresolvedRefs, listUnresolvedRefs } from "../gates/external-refs.js";
 import { gate } from "../gates/registry.js";
@@ -476,6 +477,39 @@ export async function handleUpdateState(parsed: UpdateStateInput): Promise<ToolR
                     text:
                       `⛔ PIXEL_GATE_ATTESTATION_MISSING: ${listing}. ` +
                       gate("PIXEL_GATE_ATTESTATION_MISSING").hintStatic,
+                  }],
+                  isError: true,
+                };
+              }
+            }
+          }
+
+          // v3.57.0 — Expected-Red Diff gate (c15-expected-red-manifest, AC-4).
+          // Mirrors VISUAL_EVIDENCE_MISSING's arming polarity: dormant unless
+          // sr-engineer declared qa_reports/expected-red_<feature>.txt (absence
+          // = "no expected reds", zero cost — the external_refs/dispatch_pins
+          // precedent). When armed, at least ONE qa_reports/review_<id>.md for
+          // the PASS'd ids (or a file covering one of them via the c3 covers:
+          // convention) must contain a ## Expected-Red Diff H2 recording QA's
+          // Phase 0.5 suite-vs-manifest diff disposition. Existence-of-section
+          // only — the server does NOT run the test suite or validate the diff
+          // content (same trust boundary as MISSING_EVIDENCE). FILE-MODE ONLY
+          // (AC-5): the manifest is a qa_reports/ file convention; SQLite/HTTP
+          // mode has no equivalent — skip explicitly, mirroring the
+          // cut-approval / external-refs guards.
+          if (storage instanceof FileHandoffStorage) {
+            const manifest = hasExpectedRedManifest(parsed.workspace_path, parsed.active_feature);
+            if (manifest.present) {
+              const disposition = hasExpectedRedDisposition(parsed.workspace_path, parsed.completed_tasks);
+              if (!disposition.present) {
+                return {
+                  content: [{
+                    type: "text" as const,
+                    text:
+                      `⛔ EXPECTED_RED_DIFF_MISSING: ${parsed.completed_tasks.join(", ")}. ` +
+                      `Expected-red manifest exists (at ${manifest.manifestPath}) but no ` +
+                      `## Expected-Red Diff section was found for the listed task(s). ` +
+                      gate("EXPECTED_RED_DIFF_MISSING").hintStatic,
                   }],
                   isError: true,
                 };

@@ -33,6 +33,7 @@ Staff-level engineer. Ships typed, secure code. Flags scope creep and ambiguity 
    - All external/user input validated at system boundaries.
    - No obvious injection vectors (SQL, command, XSS, path traversal).
 7. Confirm full project builds with ZERO errors.
+7a. **Expected-Red Manifest**<!-- origin:start --> (v3.57.0, C15)<!-- origin:end -->: WHEN this handoff intentionally leaves ≥ 1 test red (e.g. a schema-bump re-baseline, a deliberately deferred implementation) → DO append each such test to `qa_reports/expected-red_<active_feature>.txt`, one line per test: `<relative test file path> | <exact test name/description string>`. Blank lines and `#`-prefixed lines are comments — group entries with a one-line rationale above the block. Feature-scoped: ONE file per feature, appended to (never overwritten) by every task that adds expected reds. A prose catalogue in `pending_notes` does NOT substitute — QA's Phase 0.5 diffs this manifest against the actual suite run, and code-reviewer samples entries from it. ELSE (no intentional reds) emit nothing: absence means "no expected reds".
 8. `tw_update_state(status=In_Progress, next_role="code-reviewer", pending_notes=["sr-engineer: <task-id> ready for code review"])`. On failure, put failure summary in `pending_notes` instead.
 
 ## Escalation Routes

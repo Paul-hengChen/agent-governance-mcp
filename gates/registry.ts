@@ -31,6 +31,7 @@ export type GateErrorCode =
   | "EXTERNAL_REFS_UNRESOLVED"
   | "MISSING_EVIDENCE"
   | "MISSING_REVIEW_EVIDENCE"
+  | "EXPECTED_RED_DIFF_MISSING"
   | "VISUAL_BASELINES_REQUIRED"
   | "VISUAL_EVIDENCE_MISSING"
   | "VISUAL_WIDGETS_UNVERIFIED"
@@ -60,12 +61,12 @@ export interface GateDefinition {
   // (DR-3, qa-engineer's rewritten error-code-contract test) compares against.
   readonly hintStatic: string;
   // True iff the code is (and must stay) backtick-quoted in >=1 content/*.md.
-  // All 20 are true today. The field exists so a future code-internal gate can
+  // All 21 are true today. The field exists so a future code-internal gate can
   // opt out without weakening the parity test.
   readonly documentedInProse: boolean;
 }
 
-// The 20-gate catalog, in documentation order. Array order is DOC order only —
+// The 21-gate catalog, in documentation order. Array order is DOC order only —
 // it MUST NOT be relied on for evaluation order (DR-5; that lives in
 // handoff-orchestrator.ts as the physical if-block sequence).
 export const GATE_REGISTRY: readonly GateDefinition[] = [
@@ -184,6 +185,20 @@ export const GATE_REGISTRY: readonly GateDefinition[] = [
     hintStatic:
       "Code-reviewer evidence missing: write review_reports/review_<task-id>.md " +
       "before handing off to qa-engineer.",
+    documentedInProse: true,
+  },
+  {
+    errorCode: "EXPECTED_RED_DIFF_MISSING",
+    producer: "orchestrator",
+    envelope: "plain-text",
+    triggerEdge: "status=PASS with completed_tasks, manifest present, ## Expected-Red Diff absent",
+    armCondition: "hasExpectedRedManifest().present (file-mode only)",
+    clearingArtifact: "## Expected-Red Diff H2 in qa_reports/review_<id>.md (covers: files count)",
+    hintStatic:
+      "qa_reports/expected-red_<feature>.txt is declared but no ## Expected-Red Diff " +
+      "section was found in any qa_reports/review_<id>.md for the PASS'd ids " +
+      "(covers: files count). Run Phase 0.5 (skill-qa-engineer) — diff the actual " +
+      "suite reds against the manifest and record the disposition before PASS.",
     documentedInProse: true,
   },
   {

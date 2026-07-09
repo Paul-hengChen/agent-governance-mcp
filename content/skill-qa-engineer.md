@@ -27,6 +27,14 @@ All review notes, questions, and bug reports → `qa_reports/review_<task-id>.md
 
 2. **Phase 0 — Claim review**: `tw_update_state(status=In_Progress, agent_id="qa-engineer", pending_notes=["QA: claiming review of <task-ids>"])`. This advances the state machine from `(sr-engineer, In_Progress)` to `(qa-engineer, In_Progress)` — required before any later PASS/FAIL is accepted by the server (any state write lacking a valid `agent_id` is rejected with `AGENT_ID_REQUIRED`).
 
+2a. **Phase 0.5 — Expected-Red Diff**<!-- origin:start --> (v3.57.0, C15)<!-- origin:end -->: check for `qa_reports/expected-red_<active_feature>.txt` — sr-engineer's feature-scoped manifest of intentionally-red tests (`<relative test file path> | <exact test name>` per line; blank/`#` lines are comments, ignored by the diff).
+   - **Absent** (or no such file) → log `Phase 0.5: skipped (no expected-red manifest declared)` in the review doc and proceed to Phase 1. Non-red features pay zero overhead, mirroring the Phase 1.5 absent branch.
+   - **Present** → run the FULL suite, collect the actual set of red (failing/erroring) tests, and diff it against the manifest's entries BEFORE any re-baseline edit (test file change, `.snap` update, expected-value edit). Record the outcome under a `## Expected-Red Diff` H2 in `qa_reports/review_<task-id>.md`:
+     - **Diff empty** → log `Phase 0.5: clean (N/N manifest entries confirmed red, 0 unexplained reds)` under that H2 and proceed to Phase 1.
+     - **Diff non-empty** → EVERY extra or missing entry MUST be explicitly dispositioned under that H2 (one line per entry: entry + one-line disposition, e.g. "now green — fixed earlier in the same PR, safe to drop"; "pre-existing unrelated flake, confirmed via git log") before any re-baseline edit. <!-- rationale:start -->Unexplained reds hiding among expected reds are exactly the regression-laundering vector this phase closes — a real regression re-baselined as a "cap update" is indistinguishable after the fact.<!-- rationale:end -->
+     - **An actual red NOT on the manifest with no plausible innocent disposition is a genuine regression** → do NOT disposition it away; escalate per *Escalation Routes: expected-red diff regression* (same posture as a Phase 4 FAIL).
+   - **PASS GATE**: when the manifest exists, the server rejects PASS with `EXPECTED_RED_DIFF_MISSING` unless a `## Expected-Red Diff` section exists in a `qa_reports/review_<id>.md` for one of the PASS'd ids (`covers:` files count). The server checks section EXISTENCE only — the diff's correctness stays your job.
+
 3. **Phase 1 — Review**: Read the implementation. Check correctness, edge cases, security. Write findings to `qa_reports/review_<task-id>.md`. Batched: ONE file may carry `covers: <id1>, <id2>, ...` (e.g. `covers: T-01, T-02` in `review_T-01.md`); per-id files stay the default.
 
    3a. **Copy Audit Gate**: open the spec's *Copy / Strings* H2 (required by skill-pm). For every entry, verify the implementation renders the documented text verbatim — grep the source tree for the string id AND for the documented text. Two failure modes:
@@ -78,4 +86,5 @@ Format: Constitution §3 *Escalation call format*. FAIL rows carry `qa_review` a
 | unresolved after Round 3 | FAIL | `QA: <task-id> failed Round 3` | pm |
 | copy coverage gap | FAIL | `QA: copy gap — '<text>' in <file> missing from spec Copy/Strings` | pm |
 | visual token coverage gap | FAIL | `QA: visual token gap — '<property>=<value>' in <file> missing from spec Visual Tokens` | pm |
+| expected-red diff regression | FAIL | `QA: expected-red regression — <entry> red but not on manifest` | sr-engineer |
 | Phase 4 FAIL | FAIL | `QA: <task-id> FAIL — <reason>` | sr-engineer |

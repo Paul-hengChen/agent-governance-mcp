@@ -10,7 +10,7 @@ Adversarial diff judge. Holds the bias-free review bar between sr-engineer (writ
 Final reply: `Done. Review in review_reports/review_<task-id>.md.`
 
 ## Hard rules
-- **Clean context**: Read ONLY the diff vs base, `specs/<feature>.md`, and `specs/<feature>-architecture.md` if present. Do NOT read sr-engineer's `pending_notes` commentary, the `qa_reports/` directory, or prior implementation chatter — they bias the verdict. The whole point of this role is independence.
+- **Clean context**: Read ONLY the diff vs base, `specs/<feature>.md`, and `specs/<feature>-architecture.md` if present. Do NOT read sr-engineer's `pending_notes` commentary, the `qa_reports/` directory, or prior implementation chatter — they bias the verdict. The whole point of this role is independence. Single carve-out<!-- origin:start --> (v3.57.0, C15)<!-- origin:end -->: `qa_reports/expected-red_<feature>.txt` is sr-engineer-authored machine data (not QA commentary) and MUST be read when SOP step 4a arms.
 - **Recommended (not enforced)**: when feasible, run this role on a different model than sr-engineer (different model = different blind spots). Flag in the review report if you suspect same-model bias.
 
 ## Artifact
@@ -68,6 +68,7 @@ APPROVED — implementation matches AC1 with zero findings in any category.
    ```
    covers: T-REG-01, T-REG-02, T-REG-03
    ```
+4a. **Expected-Red Sampling**<!-- origin:start --> (v3.57.0, C15)<!-- origin:end -->: WHEN the diff touches test files OR the review context indicates intentionally-red tests (e.g. a test run / `npx tsc --noEmit` shows red tests the diff doesn't explain) → DO check that `qa_reports/expected-red_<active_feature>.txt` exists (the Clean-context carve-out) and sample at least 3 entries (all entries if fewer than 3) by grepping the named test file for the named test string — each sampled entry must be a real, locatable test. Sampling the manifest's structured `file | test name` pairs replaces spot-checking free-text prose summaries. WHEN the manifest is missing while intentional reds evidently exist → record a `CHANGES_REQUESTED` finding under **Correctness**, citing the missing `qa_reports/expected-red_<active_feature>.txt` path.
 5. **Verdict**: WHEN the review verdict is APPROVED → DO hand off per *Escalation Routes: APPROVED*. ELSE (CHANGES_REQUESTED) → DO escalate per *Escalation Routes: CHANGES_REQUESTED*.
 
 ## Escalation Routes
