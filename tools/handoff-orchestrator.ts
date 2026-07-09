@@ -569,6 +569,13 @@ export async function handleUpdateState(parsed: UpdateStateInput): Promise<ToolR
           nextRole: parsed.next_role,
           resumeOf: parsed.resume_of,
           reviewVerdict: parsed.review_verdict,
+          // v8 — dispatch_pins (c14-dispatch-pins). Pass-through only:
+          // advisory bookkeeping like next_role (AC-5) — NOT cross-checked
+          // against ALLOWED_TRANSITIONS, no gate, no GateErrorCode. REPLACE
+          // wholesale when provided; the feature-scoped carry-forward for
+          // omitting writes lives in writeHandoffState. File-mode only:
+          // SqliteHandoffStorage.writeState ignores it.
+          dispatchPins: parsed.dispatch_pins,
         });
 
         // GC hook: when QA flips a feature to PASS, drop the workspace's RAG

@@ -158,12 +158,19 @@ test("AC2: lean always-on bundle is below the raw baseline and within target (<=
   // re-measured (not trusted from sr-engineer's or code-reviewer's notes) at 3685 ~tok
   // (exact); cap set to the exact measured value per the established Phase-2 convention
   // (no additional headroom).
+  // c14-dispatch-pins (qa-owned bump, T-C14-11): cap raised from 3685 → 3761 to absorb
+  // the const-01-core-head.md AC-7 Pin-override bullet (a new line under the Watermark
+  // rule stating dispatch_pins takes precedence over frontmatter/recommended_model
+  // defaults) — const-01-core-head.md is core-head (untagged chain/design), so it loads
+  // on this lean path too. Independently re-measured (not trusted from sr-engineer's or
+  // code-reviewer's notes) at 3761 ~tok (exact); cap set to the exact measured value per
+  // the established Phase-2 convention (no additional headroom).
   const liteSkill = fs.readFileSync(path.join(ROOT, "content", "skill-coordinator-lite.md"), "utf-8");
   const SEP = "\n\n---\n\n";
   const raw = approxTokens(CONSTITUTION + SEP + liteSkill);
   const lean = approxTokens(LEAN_CONSTITUTION + SEP + liteSkill);
   assert.ok(lean < raw, `lean (${lean}) must be < raw (${raw})`);
-  assert.ok(lean <= 3685, `lean always-on (${lean} ~tok) must meet the <= 3685 target`);
+  assert.ok(lean <= 3761, `lean always-on (${lean} ~tok) must meet the <= 3761 target`);
 });
 
 // --- AC3: enforcement preserved ------------------------------------------
@@ -701,12 +708,19 @@ test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the 
   // Phase-2 convention (no additional headroom). Saving margin re-verified: raw 6297 −
   // stripped 6024 = 273 ~tok, still ≥ 240 (unchanged — the edits sit outside both
   // rationale fences).
+  // c14-dispatch-pins (qa-owned bump, T-C14-11): cap raised from 6024 → 6100 to absorb
+  // the const-01-core-head.md AC-7 Pin-override bullet (not design-only-fenced, so it
+  // loads on this design-arm path too). Independently re-measured — raw 6373, stripped
+  // 6100 (exact); cap set to the exact measured value per the established Phase-2
+  // convention (no additional headroom). Saving margin re-verified: raw 6373 − stripped
+  // 6100 = 273 ~tok, still ≥ 240 (unchanged — the const-01 edit sits outside both
+  // rationale fences).
   const raw = approxTokens(CONSTITUTION);
   const stripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));
-  assert.ok(stripped <= 6024, `stripped constitution (${stripped} ~tok) must be ≤ 6024 (AC8 design-arm floor, c9-protocol-fields re-baseline)`);
+  assert.ok(stripped <= 6100, `stripped constitution (${stripped} ~tok) must be ≤ 6100 (AC8 design-arm floor, c14-dispatch-pins re-baseline)`);
   assert.ok(
     raw - stripped >= 240,
-    `constitution rationale+origin-tag saving (${raw - stripped} ~tok) must be ≥ 240 (AC8 measured min, c9-protocol-fields re-baseline)`,
+    `constitution rationale+origin-tag saving (${raw - stripped} ~tok) must be ≥ 240 (AC8 measured min, c14-dispatch-pins re-baseline)`,
   );
 });
 
@@ -797,13 +811,21 @@ test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/b
   // `next_role`/`resume_of` as first-class fields). Independently re-measured at 11290
   // ~tok (exact); cap set to the exact measured value per the established Phase-2
   // convention (no additional headroom).
+  // c14-dispatch-pins (qa-owned bump, T-C14-11): cap raised from 11290 → 11415 to absorb
+  // the constitution-side const-01-core-head.md AC-7 Pin-override bullet (+76 ~tok,
+  // matching the design-arm floor test above) plus the skill-coordinator.md AC-6 rewrite
+  // of the three dispatch_pins-touching passages (Auto-Routing persist-before-dispatch
+  // paragraph, Crash-Resume Protocol step 3, Pinned-tier expectation paragraph — skill
+  // side). Independently re-measured (not trusted from sr-engineer's or code-reviewer's
+  // notes) at 11415 ~tok (exact); cap set to the exact measured value per the established
+  // Phase-2 convention (no additional headroom).
   const skillCoord = fs.readFileSync(path.join(ROOT, "content", "skill-coordinator.md"), "utf-8");
   const body = skillCoord.startsWith("---")
     ? skillCoord.slice(skillCoord.indexOf("---", 3) + 3).trimStart()
     : skillCoord;
   const SEP = "\n\n---\n\n";
   const bundle = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)) + SEP + stripRationale(stripOriginTags(body)));
-  assert.ok(bundle <= 11290, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 11290 (AC8 design-arm floor, c9-protocol-fields re-baseline)`);
+  assert.ok(bundle <= 11415, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 11415 (AC8 design-arm floor, c14-dispatch-pins re-baseline)`);
 });
 
 test("AC9: every operative rule/gate/heading survives stripRationale on the constitution", () => {
@@ -1230,12 +1252,20 @@ test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is
   // convention (no additional headroom). Saving margin re-verified: design-arm 6024 −
   // non-design 3939 = 2085 ~tok, still ≥ 2080 (unchanged — the edits sit outside the
   // design-only fences).
-  const ratStripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));         // design-arm path: 6024
-  const nonDesign = approxTokens(stripRationale(stripOriginTags(composeConstitution({ chain: true, design: false })))); // non-design path: 3939
-  assert.ok(nonDesign <= 3939, `non-design constitution (${nonDesign} ~tok) must be ≤ 3939 (AC8 non-design floor, c9-protocol-fields re-baseline)`);
+  // c14-dispatch-pins (qa-owned bump, T-C14-11): cap raised from 3939 → 4016. The
+  // const-01-core-head.md AC-7 Pin-override bullet is core-head (not design-only-fenced),
+  // so it lands on the non-design path too, same as the design-arm floor above.
+  // Independently re-measured (not trusted from sr-engineer's or code-reviewer's notes)
+  // at 4016 ~tok (exact); cap set to the exact measured value per the established
+  // Phase-2 convention (no additional headroom). Saving margin re-verified: design-arm
+  // 6100 − non-design 4016 = 2084 ~tok, still ≥ 2080 (unchanged — the const-01 edit sits
+  // outside the design-only fences).
+  const ratStripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));         // design-arm path: 6100
+  const nonDesign = approxTokens(stripRationale(stripOriginTags(composeConstitution({ chain: true, design: false })))); // non-design path: 4016
+  assert.ok(nonDesign <= 4016, `non-design constitution (${nonDesign} ~tok) must be ≤ 4016 (AC8 non-design floor, c14-dispatch-pins re-baseline)`);
   assert.ok(
     ratStripped - nonDesign >= 2080,
-    `design-only strip saving (${ratStripped - nonDesign} ~tok) must be ≥ 2080 (c9-protocol-fields re-baseline)`,
+    `design-only strip saving (${ratStripped - nonDesign} ~tok) must be ≥ 2080 (c14-dispatch-pins re-baseline)`,
   );
 });
 

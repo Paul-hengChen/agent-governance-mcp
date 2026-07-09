@@ -79,6 +79,19 @@ registerMigration({
     to: 7,
     up: (input) => ({ ...input, schema_version: 7 }),
 });
+// v7 → v8: add optional dispatch_pins map (c14-dispatch-pins). Additive
+// STAMP-ONLY: bumps the version, seeds NO default (AC-1) — absence means "no
+// pins recorded", and a synthesized default would fabricate a human directive.
+// Legacy `dispatch_pins: <role>=<model>` pending_notes lines (the C8-era
+// convention) are left byte-verbatim and NOT extracted into the new field
+// (AC-8 — they become inert prose; the next writer sets the field explicitly).
+// Mirrors the v3→v4 / v4→v5 / v5→v6 / v6→v7 stamp-only pattern.
+registerMigration({
+    kind: "handoff",
+    from: 7,
+    to: 8,
+    up: (input) => ({ ...input, schema_version: 8 }),
+});
 // Compile-time guard: if CURRENT_VERSIONS.handoff is ever bumped without a
 // matching registration added above, the runner's missing-step error fires
 // at read time. This reference makes the dependency explicit for grep.

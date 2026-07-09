@@ -85,15 +85,16 @@ non-default `model` override (e.g. a human directive to pin `sr-engineer` to `fa
 feature, overriding its `~/.claude/agents/<role>.md` frontmatter default), you MUST persist the pin
 BEFORE calling `Task(subagent_type=<role>, model=<pin>, …)`: call `tw_update_state` on the CURRENT
 handoff tuple (same `agent_id`/`status` already on record — a same-tuple amendment, not a role
-transition; same pattern as the Cut-approval gate writer obligation below) with `pending_notes` set
-to every existing note PLUS one line `dispatch_pins: <role>=<model>` (one entry per pinned role;
-re-pinning a role replaces only that role's segment, other notes and other roles' pins survive).
-`pending_notes` is replaced wholesale on every write — carry every note you still want kept. This is
-a note-convention, not a schema field (c9-protocol-fields promoted `next_role`/`resume_of`/
-`review_verdict` to first-class fields but explicitly re-deferred `dispatch_pins` — spec AC-8; it
-stays a `pending_notes` convention until its own future ticket). The pin now survives context loss: any future coordinator instance
-reading `handoff.md` recovers the override from `pending_notes` alone, with no dependence on the
-dispatching session's own memory.
+transition; same pattern as the Cut-approval gate writer obligation below) with the first-class
+`dispatch_pins` field (handoff schema v8) set to the pin map, e.g. `dispatch_pins: {"sr-engineer":
+"fable"}`. The field is REPLACED WHOLESALE on every write that provides it — never merged
+key-by-key — so first read the existing map (`tw_get_state`) and include every still-wanted entry
+in the write. A write that OMITS the field entirely does NOT drop it: the server carries the map
+forward unchanged across same-feature writes and drops it only when `active_feature` changes.
+Legacy `dispatch_pins: <role>=<model>` `pending_notes` lines are inert prose — the field is the
+only channel this SOP reads. The pin survives context loss AND every intermediate write that
+doesn't touch it: any future coordinator instance reading `handoff.md` recovers the override from
+the `dispatch_pins` field alone, with no dependence on the dispatching session's own memory.
 
 **Fallback (`tw_switch_role`)** — used when Task tool / subagents are unavailable (Cursor, Continue, Anti-Gravity, plain MCP clients, or Claude Code without the templates installed). Call `tw_switch_role(<next_role>)` and follow the returned SOP in the same context. This is the pre-v3.20.0 behavior — degradation is graceful and silent; no tw_* tool surface has changed.
 
@@ -141,10 +142,11 @@ that is how a dispatch-time `model` pin silently degrades back to frontmatter de
    therefore remain open. Do not let the resumed role re-derive this from a stale transcript — hand
    it the ground-truth summary directly so it resumes from reality, not from the dead role's last
    (possibly false) claim.
-3. **Re-assert dispatch-time overrides and verify they're honored.** Read `pending_notes` for a
-   `dispatch_pins: <role>=<model>` entry covering the role being resumed. If present, pass that SAME
-   `model` override on the resume `Task(...)` call — do not fall back to frontmatter default just
-   because the crash lost session memory; the pin lives in `pending_notes`, not in your context.
+3. **Re-assert dispatch-time overrides and verify they're honored.** Read the `dispatch_pins` field
+   (via `tw_get_state`, handoff schema v8) for an entry naming the role being resumed. If present,
+   pass that SAME `model` override on the resume `Task(...)` call — do not fall back to frontmatter
+   default just because the crash lost session memory; the pin lives in the validated handoff field,
+   not in your context (do NOT grep `pending_notes` — legacy `dispatch_pins:` note lines are inert).
    After the resumed role replies, run Subagent Reply Watermark Validation as usual, but check the
    tier against the pin per the Pinned-tier expectation below, not the frontmatter default.
 
@@ -162,8 +164,8 @@ When the parent (this coordinator) dispatches a role via `Task(subagent_type="<r
 
 The leading character MUST be U+2014 (EM DASH, `—`), not a hyphen-minus or en-dash. The `<name>` and `<tier>` captured tokens MUST also match the dispatched subagent's `name` frontmatter and `model` frontmatter (case-insensitive). A mismatched name (e.g. reply ends `— @wrong-name (haiku)` while dispatched as `@lite`) is treated as absent.
 
-**Pinned-tier expectation** — if `pending_notes` carries a `dispatch_pins: <role>=<model>` entry for
-the dispatched role, the expected `<tier>` for this match is the PIN, not the role's frontmatter
+**Pinned-tier expectation** — if the `dispatch_pins` field carries an entry for the dispatched
+role, the expected `<tier>` for this match is the PIN, not the role's frontmatter
 default. A reply stamped with the frontmatter-default tier while a pin is active is a MISMATCH (the
 pin silently failed to take effect), not a pass — apply the Correction strategy below to fix the
 stamped string, but also surface in your relay that the pin did not take effect; a corrected

@@ -16,4 +16,5 @@ restate these rules.
   |---|---|
   | Task-spawned with `model:` pinned by the parent (`Task(subagent_type=…)`) | `— @<role> (<tier>)` |
   | otherwise (initial session agent, coordinator, coordinator-lite, or in-context `tw_switch_role`) | `— @<role>` (no tier) |
+  - **Pin override**: when the handoff `dispatch_pins` field (read via `tw_get_state`) names YOUR current role, `<tier>` in the pinned row above MUST be that pin's value — never re-derived from `~/.claude/agents/<role>.md` frontmatter or a skill's `recommended_model:` default while a pin covers the role.
 - **MVP strict**: Fulfil ONLY what was asked. No predictive features. No speculative refactors. No abstractions for single-use code.

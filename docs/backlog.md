@@ -601,7 +601,8 @@ in live runs first, cheap content-only batches next, design-heavy last.
 - **Risk if skipped:** every release re-runs the same rejection→hand-edit
   temptation; a wedged handoff blocks the next feature's first PM write.
 
-## C14 — dispatch_pins survives only by hand-carried pending_notes (P1, observed 2026-07-09; C9 follow-on)
+## C14 — dispatch_pins survives only by hand-carried pending_notes (P1, observed 2026-07-09; C9 follow-on) — DONE 2026-07-09 (v3.56.0)
+- **Done:** shipped as feature `c14-dispatch-pins` (spec `specs/c14-dispatch-pins.md` + architecture `specs/c14-dispatch-pins-architecture.md` + code-review `review_reports/review_T-C14-*.md` + QA `qa_reports/review_c14-dispatch-pins.md`; single-feature commit + release flow). Mechanism: `dispatch_pins?: Record<AgentName, ModelTier>` field elevated to first-class handoff state (transient/write-scoped), zod-validated closed-enum, skill-coordinator.md reads and honors pin on dispatch, handoff schema v7→v8 migration (stamp-only). 12 T-C14-* tasks (design-and-spec through test-evidence + release); 997/997 tests green.
 - **What:** In the live C9 run, the human's `sr-engineer=fable` pin survived
   four role hops and two crash-resumes ONLY because the coordinator wrote
   "carry `dispatch_pins: sr-engineer=fable` VERBATIM" into every dispatch

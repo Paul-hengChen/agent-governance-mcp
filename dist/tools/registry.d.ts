@@ -74,6 +74,16 @@ declare const UpdateStateArgs: z.ZodObject<{
         APPROVED: "APPROVED";
         CHANGES_REQUESTED: "CHANGES_REQUESTED";
     }>>;
+    dispatch_pins: z.ZodOptional<z.ZodObject<{
+        pm: z.ZodOptional<z.ZodString>;
+        researcher: z.ZodOptional<z.ZodString>;
+        "design-auditor": z.ZodOptional<z.ZodString>;
+        architect: z.ZodOptional<z.ZodString>;
+        "sr-engineer": z.ZodOptional<z.ZodString>;
+        "code-reviewer": z.ZodOptional<z.ZodString>;
+        "qa-engineer": z.ZodOptional<z.ZodString>;
+        "release-engineer": z.ZodOptional<z.ZodString>;
+    }, z.core.$strict>>;
 }, z.core.$strip>;
 declare const CompleteTaskArgs: z.ZodObject<{
     workspace_path: z.ZodString;

@@ -27,6 +27,7 @@ export interface HandoffState {
     next_role?: AgentName;
     resume_of?: ResumeOfTarget;
     review_verdict?: ReviewVerdict;
+    dispatch_pins?: Partial<Record<AgentName, string>>;
 }
 /**
  * Parse handoff.md YAML frontmatter + section content into structured JSON.
@@ -64,6 +65,7 @@ export interface WriteHandoffStateOptions {
     nextRole?: AgentName;
     resumeOf?: ResumeOfTarget;
     reviewVerdict?: ReviewVerdict;
+    dispatchPins?: Partial<Record<AgentName, string>>;
 }
 /**
  * Write handoff state. v3.15.0 dual API:

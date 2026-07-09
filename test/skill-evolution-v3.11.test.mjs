@@ -60,14 +60,15 @@ test("AC-10: transitions.ts AgentName union constraint (side-channel)", () => {
   assert.match(transitionsTs, /release-engineer/, "release-engineer MUST be in transitions.ts (v3.28.0 A5 matrix promotion — terminal PASS role)");
 });
 
-test("AC-10: schema/versions.ts schema versions track c9-protocol-fields bump", () => {
+test("AC-10: schema/versions.ts schema versions track c14-dispatch-pins bump", () => {
   // c9-protocol-fields bumped handoff to 7 (next_role/resume_of/review_verdict,
   // stamp-only migration, DR-1). b8-external-ref-ledger had bumped it to 6
-  // (external_refs for EXTERNAL_REFS_UNRESOLVED). sqlite stays at 2 — the three
-  // new fields, like external_refs, are handoff-YAML frontmatter only; no SQLite
-  // column or migration needed (DR-5).
+  // (external_refs for EXTERNAL_REFS_UNRESOLVED). c14-dispatch-pins bumps it to
+  // 8 (dispatch_pins, stamp-only migration, AC-1). sqlite stays at 2 — all of
+  // these new fields, like external_refs, are handoff-YAML frontmatter only; no
+  // SQLite column or migration needed (DR-5).
   const versionsTs = fs.readFileSync(path.join(PROJECT_ROOT, "schema", "versions.ts"), "utf-8");
-  assert.match(versionsTs, /handoff:\s*7,/, "CURRENT_VERSIONS.handoff must be 7 (c9-protocol-fields)");
+  assert.match(versionsTs, /handoff:\s*8,/, "CURRENT_VERSIONS.handoff must be 8 (c14-dispatch-pins)");
   assert.match(versionsTs, /sqlite:\s*2,/, "CURRENT_VERSIONS.sqlite must remain 2");
 });
 

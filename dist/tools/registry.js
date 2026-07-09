@@ -108,6 +108,32 @@ const UpdateStateArgs = z
     // review_verdict: code-reviewer verdict; checked against status by the
     // REVIEW_VERDICT_STATUS_MISMATCH orchestrator gate (AC-5).
     review_verdict: z.enum(["APPROVED", "CHANGES_REQUESTED"]).optional(),
+    // v8 — dispatch_pins map (c14-dispatch-pins). CLOSED KEYS, OPEN VALUES
+    // (AC-2): keys are the same 8 AgentName literals next_role validates
+    // against — an unknown key is rejected here, at the tool boundary, before
+    // any gate runs (`.strict()`, mirrors the next_role closed-enum
+    // precedent). Values are bounded free text (non-empty, ≤ 100 chars)
+    // naming the pinned model tier — deliberately NOT closed-enum: the legal
+    // model-tier vocabulary is not owned by this server and evolves
+    // independently; a typo'd model name is a client-side error the server
+    // does not gate on (same trust class as scope_decision_why). DURABLE,
+    // feature-scoped (AC-3/AC-4): REPLACES the whole map when provided (never
+    // merged key-by-key); carried forward across same-feature writes that
+    // omit it; dropped on active_feature change. File-mode only, no gate
+    // (AC-5).
+    dispatch_pins: z
+        .object({
+        pm: z.string().min(1).max(100).optional(),
+        researcher: z.string().min(1).max(100).optional(),
+        "design-auditor": z.string().min(1).max(100).optional(),
+        architect: z.string().min(1).max(100).optional(),
+        "sr-engineer": z.string().min(1).max(100).optional(),
+        "code-reviewer": z.string().min(1).max(100).optional(),
+        "qa-engineer": z.string().min(1).max(100).optional(),
+        "release-engineer": z.string().min(1).max(100).optional(),
+    })
+        .strict()
+        .optional(),
 })
     .refine((d) => d.status !== "PASS" || d.agent_id === "qa-engineer", {
     message: 'status="PASS" requires agent_id="qa-engineer"',
@@ -320,6 +346,21 @@ export const TOOL_REGISTRY = [
                     type: "string",
                     enum: ["APPROVED", "CHANGES_REQUESTED"],
                     description: "Code-reviewer verdict. Server-checked for consistency against status (REVIEW_VERDICT_STATUS_MISMATCH): APPROVED requires status=In_Progress; CHANGES_REQUESTED requires status=FAIL. Optional even on code-reviewer writes — absence never fires the gate. Transient: applies to THIS write only. Replaces the legacy 'review: APPROVED|CHANGES_REQUESTED' pending_notes line (handoff schema v7).",
+                },
+                dispatch_pins: {
+                    type: "object",
+                    properties: {
+                        pm: { type: "string" },
+                        researcher: { type: "string" },
+                        "design-auditor": { type: "string" },
+                        architect: { type: "string" },
+                        "sr-engineer": { type: "string" },
+                        "code-reviewer": { type: "string" },
+                        "qa-engineer": { type: "string" },
+                        "release-engineer": { type: "string" },
+                    },
+                    additionalProperties: false,
+                    description: "Human model-tier pins per role (file-mode only). Object whose keys are the 8 role names (unknown keys rejected) and whose values are free-text model-tier strings (non-empty, ≤100 chars; e.g. \"fable\", \"opus\", or a fully-qualified model id — NOT validated against a model vocabulary). Passing it REPLACES the map wholesale (not merged) — read the existing pins first and include every still-wanted entry. Feature-scoped: preserved across same-feature writes that omit it, dropped on active_feature change, NOT re-armed on PM re-entry. Advisory bookkeeping — no gate. Replaces the legacy 'dispatch_pins: <role>=<model>' pending_notes convention (handoff schema v8).",
                 },
             },
             required: ["workspace_path", "active_feature", "status"],

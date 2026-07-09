@@ -16,6 +16,11 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.56.0] - 2026-07-09
+
+### Added
+- **`c14-dispatch-pins` — Model-tier dispatch pins as first-class persistent handoff field (v3.56.0).** Elevates dispatch-time model-pin convention (e.g., `dispatch_pins: sr-engineer=fable`) from ad-hoc `pending_notes` tokens into a dedicated, typed `dispatch_pins` field in handoff state. Adds zod-validated `dispatch_pins?: Record<AgentName, ModelTier>` field to handoff YAML schema; field is transient/write-scoped (not preserved across writes unless explicitly re-set), allowing agents to declare model overrides at dispatch time and have them survive context loss during a role's execution. New consistency gate: `dispatch_pins` values must match the closed set of AgentName and ModelTier enums. Handoff schema v7→v8 migration (stamp-only: `dispatch_pins` absent on migrated files means "no pins recorded"). SOP updates: skill-coordinator.md updated to read and honor `dispatch_pins` on role dispatch; skill-sr-engineer.md, skill-qa-engineer.md, and skill-release-engineer.md updated to respect dispatch-time pin contracts. Constitution const-01-core-head.md updated with pin-override rule (when `dispatch_pins` records a model tier for your role, you MUST use that tier; Constitution §1 watermark accordingly). 12 T-C14-* tasks completed; build 997/997 tests green (4 new tests in test/dispatch-pins.test.mjs, baseline regenerated). Reuses v3.55.0's c9-protocol-fields pattern (schema bump + zod closed-enum + skill-text migration). See `specs/c14-dispatch-pins.md`, `specs/c14-dispatch-pins-architecture.md`, `qa_reports/review_c14-dispatch-pins.md`, `review_reports/review_T-C14-*.md`.
+
 ## [3.55.0] - 2026-07-09
 
 ### Added

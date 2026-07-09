@@ -83,6 +83,30 @@ const REVIEW_VERDICT_VALUES = ["APPROVED", "CHANGES_REQUESTED"];
 function parseEnumField(raw, allowed) {
     return typeof raw === "string" && allowed.includes(raw) ? raw : undefined;
 }
+// v8 — bound mirrored from the zod boundary (tools/registry.ts, spec AC-2);
+// parse-time we only need it to drop grossly malformed hand-edited values.
+const DISPATCH_PIN_VALUE_MAX = 100;
+// v8 — defensive parser for the dispatch_pins frontmatter map
+// (c14-dispatch-pins). Returns undefined when raw is not a non-array object
+// with at least one well-formed entry; unknown role keys and empty /
+// non-string / oversize values are dropped (matching parseExternalRefs'
+// defensive posture); never throws. An all-malformed / empty result collapses
+// to undefined so absence stays the single "no pins recorded" sentinel.
+function parseDispatchPins(raw) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw))
+        return undefined;
+    const pins = {};
+    let count = 0;
+    for (const [key, value] of Object.entries(raw)) {
+        if (!NEXT_ROLE_VALUES.includes(key))
+            continue;
+        if (typeof value !== "string" || value === "" || value.length > DISPATCH_PIN_VALUE_MAX)
+            continue;
+        pins[key] = value;
+        count++;
+    }
+    return count > 0 ? pins : undefined;
+}
 // Internal helper. Reads + parses + runs schema migrations. Returns the
 // migrated state plus a flag that lets readHandoffState fire a write-back
 // to heal the on-disk file. Callers that don't need the flag use parseHandoff.
@@ -145,6 +169,9 @@ function readAndMigrate(workspacePath) {
     const nextRole = parseEnumField(frontmatter.next_role, NEXT_ROLE_VALUES);
     const resumeOf = parseEnumField(frontmatter.resume_of, RESUME_OF_VALUES);
     const reviewVerdict = parseEnumField(frontmatter.review_verdict, REVIEW_VERDICT_VALUES);
+    // v8 — dispatch_pins map (c14-dispatch-pins). undefined when absent /
+    // malformed, so absence stays the "no pins recorded" sentinel.
+    const dispatchPins = parseDispatchPins(frontmatter.dispatch_pins);
     const qaRoundRaw = Number(frontmatter.qa_round);
     const qa_round = Number.isFinite(qaRoundRaw) && qaRoundRaw >= 0 ? Math.floor(qaRoundRaw) : 0;
     const reviewRoundRaw = Number(frontmatter.review_round);
@@ -165,6 +192,7 @@ function readAndMigrate(workspacePath) {
         ...(nextRole && { next_role: nextRole }),
         ...(resumeOf && { resume_of: resumeOf }),
         ...(reviewVerdict && { review_verdict: reviewVerdict }),
+        ...(dispatchPins && { dispatch_pins: dispatchPins }),
         completed_tasks,
         pending_notes,
         qa_round,
@@ -282,6 +310,11 @@ export async function writeHandoffState(workspacePathOrOpts, activeFeature, stat
     let nextRole;
     let resumeOf;
     let reviewVerdict;
+    // v8 — dispatch_pins map. The positional overload leaves it undefined
+    // (positional callers — including the migration-heal write — never pass it;
+    // the same-feature preserve clause below carries any existing pins forward,
+    // mirroring external_refs' DR-8 posture).
+    let dispatchPins;
     if (typeof workspacePathOrOpts === "object" &&
         !Array.isArray(workspacePathOrOpts)) {
         const o = workspacePathOrOpts;
@@ -303,6 +336,7 @@ export async function writeHandoffState(workspacePathOrOpts, activeFeature, stat
         nextRole = o.nextRole;
         resumeOf = o.resumeOf;
         reviewVerdict = o.reviewVerdict;
+        dispatchPins = o.dispatchPins;
     }
     else {
         workspacePath = workspacePathOrOpts;
@@ -331,7 +365,9 @@ export async function writeHandoffState(workspacePathOrOpts, activeFeature, stat
             : "- (none)";
         // Value type admits ExternalRef[] for the external_refs block sequence
         // (DR-5 — the first array-of-object frontmatter field; js-yaml dump
-        // serializes it losslessly with the existing options, DR-1).
+        // serializes it losslessly with the existing options, DR-1) and the v8
+        // dispatch_pins map (first nested-map frontmatter field — js-yaml dumps a
+        // plain string→string object losslessly with the same options).
         const frontmatterData = {
             schema_version: CURRENT_VERSIONS.handoff,
             active_feature: _activeFeature,
@@ -383,11 +419,26 @@ export async function writeHandoffState(workspacePathOrOpts, activeFeature, stat
         //                                                      stale ledger)
         let effectiveExternalRefs = externalRefs;
         const externalRefsNeedsExisting = externalRefs === undefined;
+        // v8 — dispatch_pins is FEATURE-SCOPED with NO PM-re-entry re-arm, the
+        // exact external_refs algorithm (spec AC-3/AC-4). It is a durable human
+        // directive, not a single-hop routing signal — it must survive every write
+        // in the chain that doesn't concern it (the bug c14 fixes), and a PM
+        // bouncing a QA FAIL back to In_Progress must NOT silently un-pin a role
+        // mid-feature (so no cut_approved-style clause (2)). The algorithm:
+        //   1. option dispatchPins !== undefined             → use it verbatim
+        //                                                      (REPLACE, incl. {})
+        //   2. omitted && existing.active_feature === this   → carry existing
+        //                                                      pins forward
+        //   3. omitted && active_feature changed             → undefined (drop
+        //                                                      stale pins)
+        let effectiveDispatchPins = dispatchPins;
+        const dispatchPinsNeedsExisting = dispatchPins === undefined;
         if (effectivePrdPath === undefined ||
             effectiveScopeDecision === undefined ||
             effectiveScopeDecisionWhy === undefined ||
             cutApprovalNeedsExisting ||
-            externalRefsNeedsExisting) {
+            externalRefsNeedsExisting ||
+            dispatchPinsNeedsExisting) {
             const existing = parseHandoff(workspacePath);
             if (effectivePrdPath === undefined)
                 effectivePrdPath = existing?.prd_path;
@@ -404,6 +455,11 @@ export async function writeHandoffState(workspacePathOrOpts, activeFeature, stat
                 // clauses (2)/(3): carry the ledger forward only within the same feature.
                 effectiveExternalRefs =
                     existing?.active_feature === _activeFeature ? existing?.external_refs : undefined;
+            }
+            if (dispatchPinsNeedsExisting) {
+                // v8 clauses (2)/(3): carry the pins forward only within the same feature.
+                effectiveDispatchPins =
+                    existing?.active_feature === _activeFeature ? existing?.dispatch_pins : undefined;
             }
         }
         // clauses (1)/(2): explicit PM approval, or PM re-entry re-arm. These do not
@@ -431,6 +487,12 @@ export async function writeHandoffState(workspacePathOrOpts, activeFeature, stat
         // file clean and the two states behaviorally identical.
         if (effectiveExternalRefs && effectiveExternalRefs.length > 0) {
             frontmatterData.external_refs = effectiveExternalRefs;
+        }
+        // v8 — dispatch_pins: emit only a NON-EMPTY map. An empty object is NOT
+        // serialized (empty === absence === "no pins recorded", spec AC-4) — keeps
+        // the file clean and the two states behaviorally identical.
+        if (effectiveDispatchPins && Object.keys(effectiveDispatchPins).length > 0) {
+            frontmatterData.dispatch_pins = effectiveDispatchPins;
         }
         // v7 — protocol fields: emit ONLY when set on THIS write (AC-3 transient
         // semantics). Deliberately NOT joined to the existing-state preserve read

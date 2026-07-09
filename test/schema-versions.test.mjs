@@ -21,14 +21,15 @@ function reset() {
 
 // ---------- CURRENT_VERSIONS / VERSION_WHEN_ABSENT ----------
 
-test("CURRENT_VERSIONS exposes the four kinds at their c9-protocol-fields levels", () => {
+test("CURRENT_VERSIONS exposes the four kinds at their c14-dispatch-pins levels", () => {
   // c9-protocol-fields bumped handoff to 7 (added next_role/resume_of/
   // review_verdict — stamp-only migration, DR-1). b8-external-ref-ledger had
-  // bumped it to 6 (external_refs). sqlite stays at 2 — the three new fields,
-  // like external_refs, are handoff-YAML frontmatter only; no SQLite column
-  // or migration needed (DR-5 — SqliteHandoffStorage.writeState ignores them).
-  // tasks + config remain at v1.
-  assert.equal(CURRENT_VERSIONS.handoff, 7);
+  // bumped it to 6 (external_refs). c14-dispatch-pins bumps it to 8 (added
+  // dispatch_pins — stamp-only migration, AC-1). sqlite stays at 2 — all of
+  // these new fields, like external_refs, are handoff-YAML frontmatter only;
+  // no SQLite column or migration needed (DR-5 — SqliteHandoffStorage.writeState
+  // ignores them). tasks + config remain at v1.
+  assert.equal(CURRENT_VERSIONS.handoff, 8);
   assert.equal(CURRENT_VERSIONS.tasks, 1);
   assert.equal(CURRENT_VERSIONS.sqlite, 2);
   assert.equal(CURRENT_VERSIONS.config, 1);
@@ -98,8 +99,8 @@ test("registerMigration rejects negative from/to", () => {
 test("registerMigration idempotent overwrite — last write wins", () => {
   reset();
   // Register v0→v1 twice (overwrite test); also register v1→v2, v2→v3, v3→v4, v4→v5,
-  // v5→v6, and v6→v7 since CURRENT_VERSIONS.handoff is now 7 (c9-protocol-fields) —
-  // the runner must climb the full chain.
+  // v5→v6, v6→v7, and v7→v8 since CURRENT_VERSIONS.handoff is now 8
+  // (c14-dispatch-pins) — the runner must climb the full chain.
   registerMigration({ kind: "handoff", from: 0, to: 1, up: () => ({ schema_version: 1, who: "first" }) });
   registerMigration({ kind: "handoff", from: 0, to: 1, up: () => ({ schema_version: 1, who: "second" }) });
   registerMigration({ kind: "handoff", from: 1, to: 2, up: (input) => ({ ...input, schema_version: 2 }) });
@@ -108,9 +109,10 @@ test("registerMigration idempotent overwrite — last write wins", () => {
   registerMigration({ kind: "handoff", from: 4, to: 5, up: (input) => ({ ...input, schema_version: 5 }) });
   registerMigration({ kind: "handoff", from: 5, to: 6, up: (input) => ({ ...input, schema_version: 6 }) });
   registerMigration({ kind: "handoff", from: 6, to: 7, up: (input) => ({ ...input, schema_version: 7 }) });
+  registerMigration({ kind: "handoff", from: 7, to: 8, up: (input) => ({ ...input, schema_version: 8 }) });
   const result = runMigrations("handoff", { /* no schema_version → v0 */ });
   // Overwrite semantics: the second v0→v1 registration is the one that runs;
-  // its `who: "second"` field threads through the v1→v2→...→v7 steps unchanged.
+  // its `who: "second"` field threads through the v1→v2→...→v8 steps unchanged.
   assert.equal(result.payload.who, "second");
 });
 
@@ -170,8 +172,8 @@ test("peekVersion handles array as non-object payload", () => {
 
 test("runMigrations no-op when current === target", () => {
   reset();
-  // CURRENT_VERSIONS.handoff === 7 (c9-protocol-fields); payload already at v7.
-  // Must register all steps so the runner can reach v7 from v0 in other tests.
+  // CURRENT_VERSIONS.handoff === 8 (c14-dispatch-pins); payload already at v8.
+  // Must register all steps so the runner can reach v8 from v0 in other tests.
   registerMigration({ kind: "handoff", from: 0, to: 1, up: (input) => ({ ...input, schema_version: 1 }) });
   registerMigration({ kind: "handoff", from: 1, to: 2, up: (input) => ({ ...input, schema_version: 2 }) });
   registerMigration({ kind: "handoff", from: 2, to: 3, up: (input) => ({ ...input, schema_version: 3 }) });
@@ -179,10 +181,11 @@ test("runMigrations no-op when current === target", () => {
   registerMigration({ kind: "handoff", from: 4, to: 5, up: (input) => ({ ...input, schema_version: 5 }) });
   registerMigration({ kind: "handoff", from: 5, to: 6, up: (input) => ({ ...input, schema_version: 6 }) });
   registerMigration({ kind: "handoff", from: 6, to: 7, up: (input) => ({ ...input, schema_version: 7 }) });
-  const result = runMigrations("handoff", { schema_version: 7, kept: true });
+  registerMigration({ kind: "handoff", from: 7, to: 8, up: (input) => ({ ...input, schema_version: 8 }) });
+  const result = runMigrations("handoff", { schema_version: 8, kept: true });
   assert.deepEqual(result.applied, []);
-  assert.equal(result.fromVersion, 7);
-  assert.equal(result.toVersion, 7);
+  assert.equal(result.fromVersion, 8);
+  assert.equal(result.toVersion, 8);
   assert.equal(result.payload.kept, true);
 });
 
@@ -209,11 +212,11 @@ test("runMigrations applies single v0→v1 step", () => {
 
 test("runMigrations refuses-loud when on-disk version > current (AC-4)", () => {
   reset();
-  // c9-protocol-fields: CURRENT_VERSIONS.handoff === 7, so the "server max" surfaced in
+  // c14-dispatch-pins: CURRENT_VERSIONS.handoff === 8, so the "server max" surfaced in
   // the refuse-loud error tracks the bumped value.
   assert.throws(
     () => runMigrations("handoff", { schema_version: 99 }),
-    /on-disk version 99 > server max 7/
+    /on-disk version 99 > server max 8/
   );
 });
 

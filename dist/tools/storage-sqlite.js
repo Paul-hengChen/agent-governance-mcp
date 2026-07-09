@@ -266,6 +266,12 @@ export class SqliteHandoffStorage {
     }
     writeState(workspacePathOrOpts, activeFeature, status, completedTasks, pendingNotes, blockingReason, lastAgent, qaRound, prdPath, reviewRound, visualRound) {
         // v3.15.0 dual API: discriminate by first-arg shape.
+        // NOTE (DR-5 precedent): the file-mode-only frontmatter fields —
+        // cutApproved (handoff v5), externalRefs (v6), nextRole / resumeOf /
+        // reviewVerdict (v7), and dispatchPins (v8, c14-dispatch-pins AC-5) — are
+        // deliberately NOT destructured here and never round-trip in SQLite. The
+        // gates that consume them either read the incoming write args or are
+        // file-mode only; no DDL change, sqlite schema_version unchanged.
         let workspacePath;
         let scopeDecision;
         let scopeDecisionWhy;
