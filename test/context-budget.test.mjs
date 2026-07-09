@@ -143,12 +143,19 @@ test("AC2: lean always-on bundle is below the raw baseline and within target (<=
   // EXTERNAL_REFS_UNRESOLVED gate (AC-12). Independently re-measured (not trusted from
   // sr-engineer's handoff note) at 3386 ~tok (exact); cap set to the exact measured value
   // per the established Phase-2 convention (no additional headroom).
+  // c7-version-assertion-ownership (qa-owned bump, AC-8): cap raised from 3386 → 3491 to
+  // absorb the const-05-core-standards.md "Test ownership" bullet rewrite (S01: narrow
+  // import/require-path-retarget carve-out naming the A10 precedent, net +420 chars).
+  // const-05-core-standards.md is core (untagged chain/design), so it loads on this lean
+  // path too. Independently re-measured (not trusted from sr-engineer's or
+  // code-reviewer's notes) at 3491 ~tok (exact); cap set to the exact measured value per
+  // the established Phase-2 convention (no additional headroom).
   const liteSkill = fs.readFileSync(path.join(ROOT, "content", "skill-coordinator-lite.md"), "utf-8");
   const SEP = "\n\n---\n\n";
   const raw = approxTokens(CONSTITUTION + SEP + liteSkill);
   const lean = approxTokens(LEAN_CONSTITUTION + SEP + liteSkill);
   assert.ok(lean < raw, `lean (${lean}) must be < raw (${raw})`);
-  assert.ok(lean <= 3386, `lean always-on (${lean} ~tok) must meet the <= 3386 target`);
+  assert.ok(lean <= 3491, `lean always-on (${lean} ~tok) must meet the <= 3491 target`);
 });
 
 // --- AC3: enforcement preserved ------------------------------------------
@@ -659,12 +666,20 @@ test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the 
   // Phase-2 convention (no additional headroom). Saving margin re-verified: raw 5889 −
   // stripped 5616 = 273 ~tok, still ≥ 240 (unchanged — the §7 edit sits outside both
   // rationale fences).
+  // c7-version-assertion-ownership (qa-owned bump, AC-8): cap raised from 5616 → 5721 to
+  // absorb the const-05-core-standards.md "Test ownership" bullet rewrite (S01, +420
+  // chars net; not design-only-fenced, so it loads on this design-arm path).
+  // Independently re-measured (not trusted from sr-engineer's or code-reviewer's notes) —
+  // raw 5994, stripped 5721 (exact); cap set to the exact measured value per the
+  // established Phase-2 convention (no additional headroom). Saving margin re-verified:
+  // raw 5994 − stripped 5721 = 273 ~tok, still ≥ 240 (unchanged — the const-05 edit sits
+  // outside both rationale fences).
   const raw = approxTokens(CONSTITUTION);
   const stripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));
-  assert.ok(stripped <= 5616, `stripped constitution (${stripped} ~tok) must be ≤ 5616 (AC8 design-arm floor, b8-external-ref-ledger re-baseline)`);
+  assert.ok(stripped <= 5721, `stripped constitution (${stripped} ~tok) must be ≤ 5721 (AC8 design-arm floor, c7-version-assertion-ownership re-baseline)`);
   assert.ok(
     raw - stripped >= 240,
-    `constitution rationale+origin-tag saving (${raw - stripped} ~tok) must be ≥ 240 (AC8 measured min, b8-external-ref-ledger re-baseline)`,
+    `constitution rationale+origin-tag saving (${raw - stripped} ~tok) must be ≥ 240 (AC8 measured min, c7-version-assertion-ownership re-baseline)`,
   );
 });
 
@@ -732,13 +747,29 @@ test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/b
   // (skill side, AC-12). Independently re-measured (not trusted from sr-engineer's handoff
   // note) at 9699 ~tok (exact); cap set to the exact measured value per the established
   // Phase-2 convention (no additional headroom).
+  // c8-crash-resume-protocol (qa-owned bump, T-C8-01..04): cap raised from 9699 → 10774 to
+  // absorb the +48 additive lines in skill-coordinator.md: the dispatch_pins convention
+  // (Auto-Routing), the Pinned-tier expectation (Subagent Reply Watermark Validation), the
+  // new `## Crash-Resume Protocol` section (3 numbered steps), and the Crash detection row
+  // in Escalation Routes. 100% spec-mandated SOP text, purely additive (48/0 per
+  // `git diff --numstat`), no constitution-side change. Independently re-measured (not
+  // trusted from sr-engineer's or code-reviewer's notes) at 10774 ~tok (exact); cap set to
+  // the exact measured value per the established Phase-2 convention (no additional
+  // headroom).
+  // c7-version-assertion-ownership (qa-owned bump, AC-8): cap raised from 10774 → 10879 to
+  // absorb the const-05-core-standards.md "Test ownership" bullet rewrite (S01, +420
+  // chars net; constitution side of this bundle — skill-coordinator.md itself is
+  // untouched by this ticket, so the c8 growth above stacks unchanged). Independently
+  // re-measured (not trusted from sr-engineer's or code-reviewer's notes) at 10879 ~tok
+  // (exact); cap set to the exact measured value per the established Phase-2 convention
+  // (no additional headroom).
   const skillCoord = fs.readFileSync(path.join(ROOT, "content", "skill-coordinator.md"), "utf-8");
   const body = skillCoord.startsWith("---")
     ? skillCoord.slice(skillCoord.indexOf("---", 3) + 3).trimStart()
     : skillCoord;
   const SEP = "\n\n---\n\n";
   const bundle = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)) + SEP + stripRationale(stripOriginTags(body)));
-  assert.ok(bundle <= 9699, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 9699 (AC8 design-arm floor, b8-external-ref-ledger re-baseline)`);
+  assert.ok(bundle <= 10879, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 10879 (AC8 design-arm floor, c7-version-assertion-ownership re-baseline)`);
 });
 
 test("AC9: every operative rule/gate/heading survives stripRationale on the constitution", () => {
@@ -1148,12 +1179,20 @@ test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is
   // at 3531 ~tok (exact); cap set to the exact measured value per the established
   // Phase-2 convention (no additional headroom). Saving margin re-verified: design-arm
   // 5616 − non-design 3531 = 2085 ~tok, still ≥ 2080.
-  const ratStripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));         // design-arm path: 5616
-  const nonDesign = approxTokens(stripRationale(stripOriginTags(composeConstitution({ chain: true, design: false })))); // non-design path: 3531
-  assert.ok(nonDesign <= 3531, `non-design constitution (${nonDesign} ~tok) must be ≤ 3531 (AC8 non-design floor, b8-external-ref-ledger re-baseline)`);
+  // c7-version-assertion-ownership (qa-owned bump, AC-8): cap raised from 3531 → 3636. The
+  // const-05-core-standards.md "Test ownership" bullet rewrite (S01, +420 chars net) is
+  // core (not design-only-fenced), so it lands on the non-design path too, same as the
+  // design-arm floor above. Independently re-measured (not trusted from sr-engineer's or
+  // code-reviewer's notes) at 3636 ~tok (exact); cap set to the exact measured value per
+  // the established Phase-2 convention (no additional headroom). Saving margin
+  // re-verified: design-arm 5721 − non-design 3636 = 2085 ~tok, still ≥ 2080 (unchanged —
+  // the const-05 edit sits outside the design-only fences).
+  const ratStripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));         // design-arm path: 5721
+  const nonDesign = approxTokens(stripRationale(stripOriginTags(composeConstitution({ chain: true, design: false })))); // non-design path: 3636
+  assert.ok(nonDesign <= 3636, `non-design constitution (${nonDesign} ~tok) must be ≤ 3636 (AC8 non-design floor, c7-version-assertion-ownership re-baseline)`);
   assert.ok(
     ratStripped - nonDesign >= 2080,
-    `design-only strip saving (${ratStripped - nonDesign} ~tok) must be ≥ 2080 (b8-external-ref-ledger re-baseline)`,
+    `design-only strip saving (${ratStripped - nonDesign} ~tok) must be ≥ 2080 (c7-version-assertion-ownership re-baseline)`,
   );
 });
 
