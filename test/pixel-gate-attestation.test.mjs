@@ -728,27 +728,55 @@ test("E5: AC-9 — full verbatim PIXEL_GATE_ATTESTATION_MISSING copy string in d
 });
 
 // ===========================================================================
-// AC-9: Version bump assertions — package.json + index.ts Server() = "3.42.0"
+// AC-9: Version bump assertions — package.json + index.ts Server() coherence
+// Relaxed per specs/c7-version-assertion-ownership.md AC-3/AC-4 (v3.54.0+):
+// self-updating, no hardcoded target version — a routine version bump never
+// requires a qa-engineer edit here again.
 // ===========================================================================
 
-test("AC-9: package.json version field equals 3.53.0", () => {
-  // Why: AC-9 requires the server version to be bumped with the new gate. Both
-  // package.json and the Server() literal must agree on 3.53.0.
+test("AC-9: package.json version field is valid semver >= historical floor 3.42.0", () => {
+  // Why: AC-9 originally pinned "package.json version == <exact release>", which
+  // required a qa-engineer test edit on every single release (a quiet §2 exception
+  // by precedent — see specs/c7-version-assertion-ownership.md Problem Statement).
+  // Relaxed to what the AC actually needs: valid semver shape + a monotonic floor at
+  // the version this AC-9 originally shipped in (3.42.0, per this file's own section
+  // header). Numeric tuple comparison, not string comparison, so a value like "3.100.0"
+  // doesn't falsely fail against a "3.42.0" floor. Passes unmodified at every future
+  // version.
   const pkgPath = path.join(path.dirname(new URL(import.meta.url).pathname), "..", "package.json");
   const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
-  assert.equal(pkg.version, "3.53.0", `package.json version must be "3.53.0", got "${pkg.version}"`);
+  assert.match(pkg.version, /^\d+\.\d+\.\d+$/, `package.json version must be valid semver, got "${pkg.version}"`);
+
+  const FLOOR = [3, 42, 0];
+  const tuple = pkg.version.split(".").map(Number);
+  const meetsFloor =
+    tuple[0] > FLOOR[0] ||
+    (tuple[0] === FLOOR[0] && tuple[1] > FLOOR[1]) ||
+    (tuple[0] === FLOOR[0] && tuple[1] === FLOOR[1] && tuple[2] >= FLOOR[2]);
+  assert.ok(
+    meetsFloor,
+    `package.json version ${pkg.version} must be numerically >= historical floor 3.42.0`,
+  );
 });
 
-test("AC-9: index.ts Server() literal equals 3.53.0", () => {
-  // Why: the Server() version literal is broadcast to MCP clients. It must match package.json.
+test("AC-9: index.ts Server() literal matches package.json version (dynamic cross-file coherence)", () => {
+  // Why: the Server() version literal is broadcast to MCP clients — it must agree with
+  // package.json. Rather than hardcoding both sides to a release literal (requiring a
+  // qa-engineer edit every bump), this reads package.json at test time and checks it
+  // against the extracted index.ts literal — the same invariant scripts/check-version.mjs
+  // already enforces dynamically. Passes unmodified across future major/minor bumps.
+  const pkgPath = path.join(path.dirname(new URL(import.meta.url).pathname), "..", "package.json");
+  const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
   const srcIndex = fs.readFileSync(
     path.join(path.dirname(new URL(import.meta.url).pathname), "..", "index.ts"),
     "utf-8",
   );
-  assert.match(
-    srcIndex,
-    /Server\(\s*\{[^}]*version:\s*["']3\.53\.0["']/s,
-    "Server() version literal in index.ts must equal 3.53.0",
+  const match = srcIndex.match(/Server\(\s*\{[^}]*version:\s*["']([^"']+)["']/s);
+  assert.ok(match, "index.ts must contain a Server({ ..., version: \"...\" }) literal");
+  assert.equal(
+    match[1],
+    pkg.version,
+    `Server() version literal ("${match[1]}") must equal package.json version ("${pkg.version}")`,
   );
 });
 

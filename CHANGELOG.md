@@ -16,6 +16,11 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.54.0] - 2026-07-09
+
+### Added
+- **`c7-version-assertion-ownership` — Dynamic version assertions (v3.54.0).** Implements AC-9 version assertions in `test/baseline-manifest-gate.test.mjs` and `test/pixel-gate-attestation.test.mjs` to read target version dynamically from `package.json`/`index.ts` at test time (numeric-tuple floors); eliminates need for test edits on version bumps. Adds narrow import-path-retarget carve-out in Constitution §2 (`content/const-05-core-standards.md`) for version-comparison AST logic, gated to `@agent-governance-mcp/internal` marker. New STOP+route-to-qa rule in `skill-release-engineer.md` (S02): if hardcoded version literal found in test during release, release-engineer routes to qa-engineer (Constitution §2 violation). 11 compose-golden fixtures regenerated; 4 context-budget caps rebaselined. See `specs/c7-version-assertion-ownership.md`, `qa_reports/review_T-C7-QA.md`, `review_reports/review_T-C7-CR.md`.
+
 ## [3.53.0] - 2026-07-09
 
 ### Added

@@ -1,0 +1,8 @@
+# QA review — T-C7-04
+
+<!-- Auto-appended by tw_update_state(qa_review=...). -->
+
+## 2026-07-09T03:19:07.646Z — PASS — by qa-engineer
+
+PASS. Independently re-verified AC-1..AC-7 against shipped files: S01/S02 byte-verbatim (extract-unescape-bytecompare, both true); AC-1..AC-4 tests re-run in isolation (43/43, 52/52) confirming numeric-tuple floor + dynamic index.ts<->package.json coherence, no hardcoded literal; AC-7 grep zero '3.53.0' hits. Fixed reviewer's non-blocking comment nit in both files (3.9.0 -> 3.100.0, comment-only, the false-fail illustration). AC-8 rebaseline: regenerated 10 compose-golden dispatch fixtures via scripts/capture-constitution-golden.mjs; manually re-synced the 11th (constitution-monolith.txt, script-skipped since content/constitution.md is deleted post-AC8) per the established house convention of prior const-05 edits (a11/a13/b8) that did the same; test/compose-equivalence.test.mjs now 14/14 (11 byte-identity tests green). Re-measured and bumped the 4 tripped context-budget caps to independently-measured new values with old->new WHY comments citing c7 const-05/S01 growth: AC2 lean 3386->3491, AC8 design-arm 5616->5721, teamwork bundle 10774->10879 (stacked AFTER the existing uncommitted c8 9699->10774 block, not clobbered), non-design 3531->3636; test/context-budget.test.mjs now 44/44. Full gate: npm run build (0 errors), npm audit --audit-level=high (0 high/critical, 1 pre-existing unrelated low), npm test (959/959). Evidence: qa_reports/review_T-C7-QA.md (covers T-C7-01..04, T-C7-CR, T-C7-QA). Disclosed the stacked-c8 co-mingling for release-engineer to split commits.
+
