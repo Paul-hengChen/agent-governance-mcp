@@ -53,6 +53,7 @@ future `/teamwork` feature; none blocks a release on its own.
 | C15 | Expected-red test handoff is prose — machine-checkable red-list manifest, QA diffs actual vs expected | P1 | — | ~4 (skill-sr-engineer, skill-qa-engineer, skill-code-reviewer, maybe evidence check) | — |
 | C16 | code-reviewer wrote `completed_tasks` ledger entries + evidence filename drifted from its own stated path | P2 | — | ~3 (skill-code-reviewer, maybe orchestrator guard, tests) | — |
 | C17 | Coordinator dispatch briefs restate protocol by hand each hop — per-role brief template partial | P3 | — | ~2 (skill-coordinator, maybe templates/) | — |
+| C18 | `configCache` never invalidates — post-release driftBaselineIds appends invisible until server restart (C4 follow-on) | P3 | — | ~3 (`tools/config.ts` mtime check, skill-release-engineer note, test) | — |
 
 ### Recommended execution order (2026-07-09, everything still open)
 
@@ -64,7 +65,7 @@ in live runs first, cheap content-only batches next, design-heavy last.
 | 1 | C14 | pin-loss risk was hit live in the C9 run (survived only via per-brief reminders); natural C9 follow-on — reuses the v7 field pattern while it's fresh |
 | 2 | C15 | only defense against a real regression hiding among mass re-baselines (52 reds in the C9 run, reviewer spot-checked 2); mostly content |
 | 3 | C16 + C10 | one content-only batch: both are role-boundary bookkeeping rules (reviewer ledger write; QA vs release-engineer split) — single QA round |
-| 4 | C5 | small code fix (watermark replace-not-append + template tier); long-open, cheap |
+| 4 | C5 + C18 | one small-code-fix batch: watermark replace-not-append + template tier; config-cache mtime invalidation — both ~1-file fixes, single QA round |
 | 5 | A8 | self-converge ×2 dedup remainder; content-only |
 | 6 | C12 | needs an option decision (render / assert / delete) before work — schedule the decision, then it's small |
 | 7 | C17 | pure ergonomics; no correctness exposure |
@@ -672,6 +673,28 @@ in live runs first, cheap content-only batches next, design-heavy last.
 - **Owner:** /teamwork (skill-coordinator, maybe templates/; content-only).
 - **Risk if skipped:** low — ergonomics; but every omission class C14/C16
   document started life as a forgotten brief line.
+
+## C18 — configCache never invalidates; post-release baseline appends are invisible until restart (P3, observed 2026-07-09; C4 follow-on)
+- **What:** `tools/config.ts` caches `.current/.config.json` per workspace in
+  a process-lifetime `configCache` Map with no invalidation. The release SOP
+  appends the feature's task ids to `driftBaselineIds` AFTER the session's
+  server process started, so every release the just-appended ids leak through
+  `tw_detect_drift` as false vibe-drift until the next server restart.
+  Observed live post-v3.55.0: T-C9-01..16 reported as 16-task drift while
+  already present in the on-disk baseline; a fresh process read the same
+  config and reported clean. Self-healing (next session is clean) but every
+  release pays one round of false alarms — the exact noise class C4 was cut
+  to eliminate, recreated one layer down.
+- **Fix:** cheapest that works: stat the config file and drop the cache entry
+  when mtime changed (read is already lazy per call site); plus one line in
+  skill-release-engineer noting the append takes effect immediately once the
+  cache honors mtime. Alternative (zero-code): drift.ts bypasses the cache —
+  but that forks config-read behavior; prefer the mtime check.
+- **Owner:** /teamwork (`tools/config.ts` + test; batched with C5 per the
+  execution order — two ~1-file fixes, one QA round).
+- **Risk if skipped:** low — self-healing, but recurring: every release's
+  post-stamp drift check cries wolf, training operators to ignore drift
+  output right when it matters most.
 
 ## B8 — §7 external-reference policy is text-only, no server-side enforcement (P1, carried forward 2026-06-11)
 - **What:** Constitution §7 says a spec referencing external artifacts is
