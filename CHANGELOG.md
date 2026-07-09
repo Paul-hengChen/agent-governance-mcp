@@ -16,6 +16,18 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.60.0] - 2026-07-10
+
+### Added
+- **`a8-single-owner-dedup` — Self-converge relaxation dedup + pointer consolidation (v3.60.0).** Eliminates duplicate restatement of the self-converge relaxation mechanism across Constitution §1 and skill-sr-engineer.md; consolidates into a single-owner pattern where the constitution owns the full normative text and skill text shrinks to a pointer line ("see Constitution §1"). Two content-only edits to `content/skill-sr-engineer.md`. Precedent set by C2 (cut-approval consolidation, v3.47.0) and C1 (amend-resume routing, v3.42.0). No schema_version bump, no new tw_* tool, no code changes. Backwards-compatible; MINOR bump. QA verified via Phase 0.5 dogfood: all 5 acceptance criteria (AC1–AC5) independently verified; single flaky test (prompt-state-footer.test.mjs e2e subprocess timing) confirmed pre-existing, not a regression. See `specs/a8-single-owner-dedup.md`, `qa_reports/review_T-A8-05.md`.
+
+### Changed
+- `content/skill-sr-engineer.md` step 7 now references Constitution §1 for self-converge relaxation details instead of restating.
+
+### Notes
+- driftBaselineIds appended with T-A8-01..05
+- `docs/backlog.md` A8 row marked DONE with v3.60.0 tag reference
+
 ## [3.59.0] - 2026-07-10
 
 ### Added
