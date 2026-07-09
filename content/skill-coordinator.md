@@ -171,7 +171,7 @@ pin silently failed to take effect), not a pass — apply the Correction strateg
 stamped string, but also surface in your relay that the pin did not take effect; a corrected
 watermark string does not mean the pinned model actually executed.
 
-**Correction strategy** — when the watermark is absent or mismatched, append the canonical suffix `\n— @<name> (<tier>)` to the relayed text. Do NOT re-dispatch (doubles cost, risks loops) and do NOT add a visible warning (operator wants the suffix, not a debugging trace). Cost is one string concatenation per miss.
+**Correction strategy** (v3.58.0, C5b) — absent: append the canonical suffix `\n— @<name> (<tier>)`. Mismatched (present but wrong name/tier): replace — strip the wrong trailing watermark line, then append the canonical suffix (exactly one watermark line, never two). Do NOT re-dispatch (doubles cost, risks loops) and do NOT add a visible warning (operator wants the suffix, not a debugging trace). Cost is one string operation per miss.
 
 **Implementation** — call the pure util `validateWatermark(reply, name, tier)` exported from `lib/watermark-check.ts` (compiled to `dist/lib/watermark-check.js`). It returns `{ present: boolean, corrected: string }`; relay the `corrected` value, not the raw reply.
 

@@ -16,6 +16,19 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.59.0] - 2026-07-10
+
+### Added
+- **`c5-c18-watermark-configcache` — Watermark replace logic fix + configCache mtime invalidation (v3.59.0).** C5(a) de-hardcodes the CRITICAL watermark reminder tier across all `templates/claude-code-agents/*.md` files to read the actual model tier invoked with; C5(b) fixes `lib/watermark-check.ts` validateWatermark's mismatched-watermark branch to replace (not double-append) the wrong trailing line. C18 adds mtime-based invalidation to `tools/config.ts`'s `configCache` to ensure config changes are reflected immediately in-process (documented trade-off: identical mtime serves cached value). Authored `test/watermark-check.test.mjs` additions (no-double-stamp + mismatch-branch idempotency + CRLF + watermark-only edges) and new `test/config-cache.test.mjs` (in-process mtime-driven reload + existence-transition cases). Phase 0.5 Expected-Red Diff run confirmed 5/5 manifest entries genuinely red, all re-baselined. Full suite 1035/1035 pass. See `specs/c5-c18-watermark-configcache.md`, `qa_reports/review_T-C5C18-06.md`, `review_reports/review_T-C5C18-01.md`.
+
+### Changed
+- Template watermarks now read `(<the model tier you were actually invoked with>)` instead of hardcoded `(haiku)` in 12 template files.
+- `tools/config.ts` configCache now checks file mtime on each `loadConfig` call; identical mtime returns cached value; changed mtime triggers reload.
+
+### Notes
+- driftBaselineIds appended with T-C5C18-01..08
+- `docs/backlog.md` C5 and C18 rows marked DONE with v3.59.0 tag reference
+
 ## [3.58.0] - 2026-07-10
 
 ### Added

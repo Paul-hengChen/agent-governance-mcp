@@ -38,15 +38,42 @@ const DEFAULT_TASK_PATHS = [
 //   - [ ] auth-refactor write migration
 export const DEFAULT_TASK_REGEX = /^- \[([ x])\] (\S+)\s+(.+)$/;
 
-const configCache = new Map<string, WorkspaceConfig>();
+// Cache entry records the config file's mtime at cache time (null = file did
+// not exist) so loadConfig can invalidate on any on-disk change within the
+// same long-lived server process (v3.58.0, C18). Without this, post-release
+// driftBaselineIds appends were invisible to tw_detect_drift until restart.
+interface ConfigCacheEntry {
+  config: WorkspaceConfig;
+  mtimeMs: number | null;
+}
+
+const configCache = new Map<string, ConfigCacheEntry>();
+
+// Current mtimeMs of the config file, or null when it does not exist.
+// Non-ENOENT stat errors propagate (refuse-loud, same spirit as read errors).
+function statConfigMtime(configPath: string): number | null {
+  try {
+    return fs.statSync(configPath).mtimeMs;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw new Error(`Failed to stat ${configPath}: ${(err as Error).message}`);
+  }
+}
 
 export function loadConfig(workspacePath: string): WorkspaceConfig {
-  const cached = configCache.get(workspacePath);
-  if (cached !== undefined) return cached;
-
   const configPath = path.join(workspacePath, ".current", ".config.json");
-  if (!fs.existsSync(configPath)) {
-    configCache.set(workspacePath, {});
+
+  // Re-stat on every call (C18): a cache hit is only served when the on-disk
+  // state (existence + mtimeMs) still matches what was recorded at cache
+  // time. Existence flips and mtime bumps both fall through to a re-read.
+  const currentMtime = statConfigMtime(configPath);
+  const cached = configCache.get(workspacePath);
+  if (cached !== undefined && cached.mtimeMs === currentMtime) {
+    return cached.config;
+  }
+
+  if (currentMtime === null) {
+    configCache.set(workspacePath, { config: {}, mtimeMs: null });
     return {};
   }
   let raw: string;
@@ -99,7 +126,12 @@ export function loadConfig(workspacePath: string): WorkspaceConfig {
     const filtered = driftBaselineIds.filter((p): p is string => typeof p === "string");
     if (filtered.length > 0) result.driftBaselineIds = filtered;
   }
-  configCache.set(workspacePath, result);
+  // Cache under the pre-read mtime. If the migration heal-on-read above
+  // rewrote the file, the recorded mtime is already stale — the NEXT call's
+  // stat will mismatch and trigger one redundant (but correct) re-read,
+  // which is preferable to racing a post-write re-stat against concurrent
+  // writers/deleters.
+  configCache.set(workspacePath, { config: result, mtimeMs: currentMtime });
   return result;
 }
 

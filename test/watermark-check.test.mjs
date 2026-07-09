@@ -166,6 +166,95 @@ test("t-whitespace-only-reply: whitespace-only reply → present:false, correcte
 });
 
 // ---------------------------------------------------------------------------
+// T-C5C18-06 (AC-2, v3.58.0 C5b) — mismatched watermark is REPLACED, not
+// double-stamped. Prior to C5b, the mismatched branch fell through to the
+// same append-only path as "absent", producing TWO trailing watermark lines
+// (the wrong one left in place + the correct one appended). These are the
+// regression-guard tests: any reversion to append-only-on-mismatch fails here.
+// ---------------------------------------------------------------------------
+
+test("t-mismatch-no-double-stamp: wrong-name watermark is replaced, not appended alongside", () => {
+  const reply = "Body text.\n— @wrong-name (haiku)";
+  const result = validateWatermark(reply, "lite", "haiku");
+  assert.equal(result.present, false, "mismatched watermark must be reported as absent");
+  assert.equal(
+    result.corrected,
+    "Body text.\n— @lite (haiku)",
+    "the wrong trailing watermark line must be replaced by the canonical one, not left in place",
+  );
+  const occurrences = (result.corrected.match(/—\s@[\w-]+\s\([\w-]+\)/g) || []).length;
+  assert.equal(occurrences, 1, "corrected must contain exactly one watermark line, never two");
+});
+
+test("t-mismatch-wrong-tier-no-double-stamp: wrong-tier watermark is replaced, not appended alongside", () => {
+  const reply = "Body text.\n— @lite (sonnet)";
+  const result = validateWatermark(reply, "lite", "haiku");
+  assert.equal(result.present, false);
+  assert.equal(result.corrected, "Body text.\n— @lite (haiku)");
+  const occurrences = (result.corrected.match(/—\s@[\w-]+\s\([\w-]+\)/g) || []).length;
+  assert.equal(occurrences, 1, "corrected must contain exactly one watermark line, never two");
+});
+
+test("t-mismatch-watermark-only-body: reply that IS only a wrong watermark line replaces cleanly", () => {
+  // lastBreak === -1 edge case: no preceding body — the entire reply is the
+  // (wrong) watermark line itself.
+  const reply = "— @wrong-name (haiku)";
+  const result = validateWatermark(reply, "lite", "haiku");
+  assert.equal(result.present, false);
+  assert.equal(
+    result.corrected,
+    "— @lite (haiku)",
+    "corrected must be just the canonical watermark — no leading newline, no leftover body",
+  );
+});
+
+test("t-mismatch-crlf: CRLF body before a wrong watermark is preserved and normalized, no stray \\r", () => {
+  const reply = "Body text.\r\n— @wrong-name (haiku)";
+  const result = validateWatermark(reply, "lite", "haiku");
+  assert.equal(result.present, false);
+  assert.equal(
+    result.corrected,
+    "Body text.\n— @lite (haiku)",
+    "CRLF body must be preserved (normalized to a trailing \\n) and the wrong watermark replaced",
+  );
+  assert.ok(!result.corrected.includes("\r"), "corrected must not retain a stray carriage return");
+});
+
+// ---------------------------------------------------------------------------
+// T-C5C18-06 (AC-2) — idempotency of the mismatched (replace) branch
+// specifically, as distinct from the existing t-idempotent test (which only
+// exercises the absent branch). A correct→re-validate cycle on a
+// mismatch-corrected reply must converge to present:true with exactly one
+// watermark line, proving the parent cannot accumulate watermarks across
+// retries when the subagent's own reply already carried a wrong one.
+// ---------------------------------------------------------------------------
+
+test("t-mismatch-idempotent: correcting a mismatched watermark twice converges, no double-append", () => {
+  const original = "Body text.\n— @wrong-name (opus)";
+  const pass1 = validateWatermark(original, "lite", "haiku");
+  assert.equal(pass1.present, false, "first call: mismatched watermark reported as absent");
+  assert.equal(pass1.corrected, "Body text.\n— @lite (haiku)");
+
+  const pass2 = validateWatermark(pass1.corrected, "lite", "haiku");
+  assert.equal(
+    pass2.present,
+    true,
+    "second call on the corrected reply must see the canonical watermark as present",
+  );
+  assert.equal(
+    pass2.corrected,
+    pass1.corrected,
+    "second pass must not further mutate the already-corrected reply",
+  );
+  const occurrences = (pass2.corrected.match(/—\s@[\w-]+\s\([\w-]+\)/g) || []).length;
+  assert.equal(
+    occurrences,
+    1,
+    "watermark must appear exactly once — never accumulate across repeated corrections",
+  );
+});
+
+// ---------------------------------------------------------------------------
 // Idempotency — validate → correct → validate again → present:true.
 // WHY: the parent may call validateWatermark on a reply it has already
 //      corrected (e.g. in a retry or logging path). A non-idempotent util

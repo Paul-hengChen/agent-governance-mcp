@@ -3,9 +3,11 @@
 // Pure utility used by the coordinator and coordinator-lite SOPs to detect
 // whether a subagent reply (relayed from a `Task` / Agent tool result) ends
 // with the canonical `— @<name> (<tier>)` watermark mandated by
-// `content/constitution.md` §1 (watermark). If the watermark is absent or
-// mismatched, the parent appends the correct one to the relayed text before
-// surfacing it to the user.
+// `content/constitution.md` §1 (watermark). If the watermark is absent, the
+// parent appends the correct one to the relayed text; if it is present but
+// mismatched (wrong name/tier), the parent replaces the wrong trailing
+// watermark line with the canonical one (v3.58.0, C5b) before surfacing it
+// to the user.
 //
 // This file has NO I/O and NO external imports — it is safe to import from
 // any layer. See `specs/subagent-watermark-parent-validation.md` for the full
@@ -57,7 +59,13 @@ export interface WatermarkCheckResult {
  *   line) matches `WATERMARK_REGEX` AND the matched `<name>` and `<tier>`
  *   equal the expected `name` / `tier` arguments (case-insensitive).
  * - Returns `{ present: false, corrected: reply + "\n" + buildWatermark(...) }`
- *   otherwise. The U+2014 EM DASH suffix uses the canonical form.
+ *   when NO watermark line is present (absent case — plain append). The
+ *   U+2014 EM DASH suffix uses the canonical form.
+ * - Returns `{ present: false, corrected: <reply minus the wrong trailing
+ *   watermark line> + "\n" + buildWatermark(...) }` when a watermark IS
+ *   present but its name/tier don't match (mismatched case — replace, not
+ *   double-stamp; v3.58.0, C5b). `corrected` always carries exactly ONE
+ *   trailing watermark line.
  * - For an empty / whitespace-only reply, `corrected` is just the watermark
  *   string (no leading newline) so the relay is not visually broken.
  *
@@ -112,7 +120,23 @@ export function validateWatermark(
     actualName.toLowerCase() !== name.toLowerCase() ||
     actualTier.toLowerCase() !== tier.toLowerCase()
   ) {
-    return { present: false, corrected: reply + "\n" + watermark };
+    // Mismatched watermark (present but wrong name/tier): REPLACE, don't
+    // double-stamp (v3.58.0, C5b). Strip the wrong trailing watermark line
+    // from the reply, then append the canonical one — so `corrected` carries
+    // exactly one trailing watermark line.
+    const trimmedEnd = reply.replace(/\s+$/, "");
+    const lastBreak = Math.max(
+      trimmedEnd.lastIndexOf("\n"),
+      trimmedEnd.lastIndexOf("\r"),
+    );
+    const body =
+      lastBreak === -1
+        ? ""
+        : trimmedEnd.slice(0, lastBreak).replace(/\s+$/, "");
+    return {
+      present: false,
+      corrected: body.length > 0 ? body + "\n" + watermark : watermark,
+    };
   }
 
   return { present: true, corrected: reply };

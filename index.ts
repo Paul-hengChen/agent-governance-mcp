@@ -115,7 +115,7 @@ function formatZodError(err: z.ZodError): string {
 // ==========================================
 // Storage adapter defaults to FileHandoffStorage; HTTP-mode boot switches it via setActiveStorage().
 const server = new Server(
-  { name: "agent-governance-mcp", version: "3.58.0" },
+  { name: "agent-governance-mcp", version: "3.59.0" },
   { capabilities: { tools: {}, prompts: {} } }
 );
 

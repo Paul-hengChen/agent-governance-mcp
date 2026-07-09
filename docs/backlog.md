@@ -40,7 +40,7 @@ future `/teamwork` feature; none blocks a release on its own.
 | C2 | Cut-approval cannot cross the subagent boundary — formalize coordinator-attested approval — **done (2026-07-07)** | P1 | — | ~5 (`handoff` field, `transitions.ts`/orchestrator, skill-pm, skill-coordinator, tests) | — |
 | C3 | Per-task-id evidence check forces stub pointer files — accept covering review + id manifest — **done (2026-07-08)** | P2 | — | ~3 (evidence check in orchestrator/evidence-file, skills, tests) | — |
 | C4 | Drift detector drowned by historical noise — acknowledged-baseline / archive mechanism — **done (2026-07-07)** | P2 | — | ~4 (`tools/drift.ts`, maybe `tw_sync`/config, tests) | — |
-| C5 | Watermark toolchain: template hardcodes tier; validateWatermark appends instead of replacing on mismatch | P2 | — | ~4 (`lib/watermark-check.ts`, `templates/claude-code-agents/*`, tests) | — |
+| C5 | Watermark toolchain: template hardcodes tier; validateWatermark appends instead of replacing on mismatch — **done (2026-07-10, v3.59.0)** | P2 | — | ~4 (`lib/watermark-check.ts`, `templates/claude-code-agents/*`, tests) | — |
 | C6 | Prompt-injection state footer reports "No handoff state found" while handoff exists; stale `prd_path` suspect — **done (2026-07-08, v3.48.0)** | P1 | — | ~3 (`prompts/build.ts` state loader, `bin/agent-governance-context.mjs`, test) | — |
 | C7 | §2 test-ownership absolutism collides with mechanical version-literal edits at release — **done (2026-07-09)** | P2 | — | ~3 (constitution §2, skill-release-engineer, version-assertion tests) | — |
 | C8 | Crash-resume protocol: mid-role kill leaves no §3 failure write; resume drops dispatch-time model pin — **done (2026-07-09)** | P2 | — | ~2 (skill-coordinator SOP, maybe handoff field) | — |
@@ -53,7 +53,7 @@ future `/teamwork` feature; none blocks a release on its own.
 | C15 | Expected-red test handoff is prose — machine-checkable red-list manifest, QA diffs actual vs expected — **done (2026-07-10)** | P1 | — | ~4 (skill-sr-engineer, skill-qa-engineer, skill-code-reviewer, maybe evidence check) | — |
 | C16 | code-reviewer wrote `completed_tasks` ledger entries + evidence filename drifted from its own stated path — **done (2026-07-10, v3.58.0)** | P2 | — | ~3 (skill-code-reviewer, maybe orchestrator guard, tests) | — |
 | C17 | Coordinator dispatch briefs restate protocol by hand each hop — per-role brief template partial | P3 | — | ~2 (skill-coordinator, maybe templates/) | — |
-| C18 | `configCache` never invalidates — post-release driftBaselineIds appends invisible until server restart (C4 follow-on) | P3 | — | ~3 (`tools/config.ts` mtime check, skill-release-engineer note, test) | — |
+| C18 | `configCache` never invalidates — post-release driftBaselineIds appends invisible until server restart (C4 follow-on) — **done (2026-07-10, v3.59.0)** | P3 | — | ~3 (`tools/config.ts` mtime check, skill-release-engineer note, test) | — |
 
 ### Recommended execution order (2026-07-09, everything still open)
 

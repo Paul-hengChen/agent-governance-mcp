@@ -185,6 +185,8 @@ test("AC5: release-engineer.md shim contains a reinforcement hint (<=2 sentences
   // Contract: the shim must remind haiku-tier that staging scope = all upstream work,
   // not just files edited in the current turn. The hint is <=2 sentences and must
   // NOT alter the watermark line or the tw_get_state/tw_switch_role invocation.
+  // Watermark line is now tier-agnostic (v3.58.0, C5a re-baseline) — see
+  // test/subagent-templates.test.mjs v3.21.1/v3.21.2 for the rationale.
   assert.match(
     SHIM,
     /ALL uncommitted upstream work/,
@@ -198,7 +200,7 @@ test("AC5: release-engineer.md shim contains a reinforcement hint (<=2 sentences
   // Watermark line must be preserved verbatim
   assert.match(
     SHIM,
-    /CRITICAL: End every reply with `— @release-engineer \(haiku\)` per Constitution §1 \(watermark\)\./,
+    /CRITICAL: End every reply with `— @release-engineer \(<the model tier you were actually invoked with>\)` per Constitution §1 \(watermark\)\./,
     "shim watermark line must be preserved verbatim (AC5)",
   );
   // tw_get_state / tw_switch_role invocations must be preserved
@@ -457,9 +459,10 @@ test("C13-AC6/AC7: release-engineer.md shim contains the verbatim driftBaselineI
 test("C13-AC6: shim watermark and tw_get_state/tw_switch_role invocation lines are unaltered by the new hints", () => {
   // Contract: AC6 explicitly forbids altering the watermark line or the
   // tw_get_state / tw_switch_role instruction while adding the two hints.
+  // Watermark line is now tier-agnostic (v3.58.0, C5a re-baseline).
   assert.match(
     SHIM,
-    /CRITICAL: End every reply with `— @release-engineer \(haiku\)` per Constitution §1 \(watermark\)\./,
+    /CRITICAL: End every reply with `— @release-engineer \(<the model tier you were actually invoked with>\)` per Constitution §1 \(watermark\)\./,
     "shim watermark line must be preserved verbatim (C13-AC6)",
   );
   assert.match(

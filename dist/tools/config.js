@@ -29,13 +29,30 @@ const DEFAULT_TASK_PATHS = [
 //   - [ ] auth-refactor write migration
 export const DEFAULT_TASK_REGEX = /^- \[([ x])\] (\S+)\s+(.+)$/;
 const configCache = new Map();
+// Current mtimeMs of the config file, or null when it does not exist.
+// Non-ENOENT stat errors propagate (refuse-loud, same spirit as read errors).
+function statConfigMtime(configPath) {
+    try {
+        return fs.statSync(configPath).mtimeMs;
+    }
+    catch (err) {
+        if (err.code === "ENOENT")
+            return null;
+        throw new Error(`Failed to stat ${configPath}: ${err.message}`);
+    }
+}
 export function loadConfig(workspacePath) {
-    const cached = configCache.get(workspacePath);
-    if (cached !== undefined)
-        return cached;
     const configPath = path.join(workspacePath, ".current", ".config.json");
-    if (!fs.existsSync(configPath)) {
-        configCache.set(workspacePath, {});
+    // Re-stat on every call (C18): a cache hit is only served when the on-disk
+    // state (existence + mtimeMs) still matches what was recorded at cache
+    // time. Existence flips and mtime bumps both fall through to a re-read.
+    const currentMtime = statConfigMtime(configPath);
+    const cached = configCache.get(workspacePath);
+    if (cached !== undefined && cached.mtimeMs === currentMtime) {
+        return cached.config;
+    }
+    if (currentMtime === null) {
+        configCache.set(workspacePath, { config: {}, mtimeMs: null });
         return {};
     }
     let raw;
@@ -92,7 +109,12 @@ export function loadConfig(workspacePath) {
         if (filtered.length > 0)
             result.driftBaselineIds = filtered;
     }
-    configCache.set(workspacePath, result);
+    // Cache under the pre-read mtime. If the migration heal-on-read above
+    // rewrote the file, the recorded mtime is already stale — the NEXT call's
+    // stat will mismatch and trigger one redundant (but correct) re-read,
+    // which is preferable to racing a post-write re-stat against concurrent
+    // writers/deleters.
+    configCache.set(workspacePath, { config: result, mtimeMs: currentMtime });
     return result;
 }
 function atomicWriteConfig(configPath, payload) {

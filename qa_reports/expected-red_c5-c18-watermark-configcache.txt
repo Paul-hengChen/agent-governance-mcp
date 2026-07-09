@@ -1,0 +1,18 @@
+# Expected-red manifest — c5-c18-watermark-configcache (C15 convention)
+# Format: <relative test file path> | <exact test name/description string>
+
+# C5(a) intended change: templates/claude-code-agents/*.md CRITICAL reminder is now
+# tier-agnostic ("<the model tier you were actually invoked with>"); these tests
+# assert the OLD hardcoded-tier line verbatim and need qa-owned re-baselining
+# (frontmatter model: fields are unchanged, per AC-1).
+test/subagent-templates.test.mjs | v3.21.1 AC1: every template body contains the watermark reminder with correct name+tier
+test/subagent-templates.test.mjs | v3.21.2 AC1: every template body's FIRST non-blank line is the CRITICAL: watermark reminder
+test/release-staging.test.mjs | AC5: release-engineer.md shim contains a reinforcement hint (<=2 sentences)
+test/release-staging.test.mjs | C13-AC6: shim watermark and tw_get_state/tw_switch_role invocation lines are unaltered by the new hints
+
+# C5(b) doc-sync side effect: content/skill-coordinator.md Correction-strategy prose
+# grew ~30 ~tok (absent->append vs mismatched->replace distinction, AC-3), pushing the
+# teamwork design-arm bundle over its exact-measured floor (11445 vs 11415). Cap
+# re-baselines are qa-owned bumps per test/context-budget.test.mjs's own convention
+# (A11-02, B8-09/B8-10 precedents).
+test/context-budget.test.mjs | AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 9545 ~tok)

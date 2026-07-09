@@ -39,7 +39,13 @@ export interface WatermarkCheckResult {
  *   line) matches `WATERMARK_REGEX` AND the matched `<name>` and `<tier>`
  *   equal the expected `name` / `tier` arguments (case-insensitive).
  * - Returns `{ present: false, corrected: reply + "\n" + buildWatermark(...) }`
- *   otherwise. The U+2014 EM DASH suffix uses the canonical form.
+ *   when NO watermark line is present (absent case — plain append). The
+ *   U+2014 EM DASH suffix uses the canonical form.
+ * - Returns `{ present: false, corrected: <reply minus the wrong trailing
+ *   watermark line> + "\n" + buildWatermark(...) }` when a watermark IS
+ *   present but its name/tier don't match (mismatched case — replace, not
+ *   double-stamp; v3.58.0, C5b). `corrected` always carries exactly ONE
+ *   trailing watermark line.
  * - For an empty / whitespace-only reply, `corrected` is just the watermark
  *   string (no leading newline) so the relay is not visually broken.
  *

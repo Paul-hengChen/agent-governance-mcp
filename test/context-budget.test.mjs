@@ -830,13 +830,21 @@ test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/b
   // side). Independently re-measured (not trusted from sr-engineer's or code-reviewer's
   // notes) at 11415 ~tok (exact); cap set to the exact measured value per the established
   // Phase-2 convention (no additional headroom).
+  // c5-c18-watermark-configcache (qa-owned bump, T-C5C18-03/AC-3): cap raised from 11415 →
+  // 11445 to absorb the skill-coordinator.md "Correction strategy" prose rewrite (~30 ~tok
+  // net growth) distinguishing "absent → append" from "mismatched → replace, strip the
+  // wrong trailing watermark line then append the canonical one" (C5b doc-sync side
+  // effect; no constitution-side change this feature). Independently re-measured (not
+  // trusted from sr-engineer's or code-reviewer's notes) at 11445 ~tok (exact); cap set to
+  // the exact measured value per the established Phase-2 convention (no additional
+  // headroom).
   const skillCoord = fs.readFileSync(path.join(ROOT, "content", "skill-coordinator.md"), "utf-8");
   const body = skillCoord.startsWith("---")
     ? skillCoord.slice(skillCoord.indexOf("---", 3) + 3).trimStart()
     : skillCoord;
   const SEP = "\n\n---\n\n";
   const bundle = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)) + SEP + stripRationale(stripOriginTags(body)));
-  assert.ok(bundle <= 11415, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 11415 (AC8 design-arm floor, c14-dispatch-pins re-baseline)`);
+  assert.ok(bundle <= 11445, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 11445 (AC8 design-arm floor, c5-c18-watermark-configcache re-baseline)`);
 });
 
 test("AC9: every operative rule/gate/heading survives stripRationale on the constitution", () => {

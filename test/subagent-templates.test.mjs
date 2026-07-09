@@ -241,7 +241,13 @@ test("v3.21.0 AC4: README surfaces @teamwork and @lite primaries", () => {
 // v3.21.1 AC1 / AC2: watermark reminder in every template
 // ---------------------------------------------------------------------------
 
-test("v3.21.1 AC1: every template body contains the watermark reminder with correct name+tier", () => {
+test("v3.21.1 AC1: every template body contains the watermark reminder, tier-agnostic (v3.58.0, C5a)", () => {
+  // C5a: the CRITICAL reminder no longer hardcodes the frontmatter model:
+  // tier — a dispatch_pins override (e.g. sr-engineer pinned to "fable")
+  // would otherwise tell the subagent to stamp the WRONG tier. The
+  // reminder now instructs the subagent to stamp whichever tier it was
+  // actually invoked with; frontmatter model: remains the default (checked
+  // separately below).
   for (const role of EXPECTED_ROLES) {
     const raw = readTemplateRaw(role);
     const nameMatch = raw.match(/^name:\s*(\S+)/m);
@@ -249,12 +255,14 @@ test("v3.21.1 AC1: every template body contains the watermark reminder with corr
     assert.ok(nameMatch, `${role}.md: name: not found`);
     assert.ok(modelMatch, `${role}.md: model: not found`);
     const name = nameMatch[1];
-    const tier = modelMatch[1];
-    const expected = `End every reply with \`— @${name} (${tier})\` per Constitution §1 (watermark).`;
+    const expected = `End every reply with \`— @${name} (<the model tier you were actually invoked with>)\` per Constitution §1 (watermark).`;
     assert.ok(
       raw.includes(expected),
       `${role}.md: missing watermark reminder line. Expected: ${expected}`,
     );
+    // Frontmatter model: field must still name a real default tier — AC-1
+    // requires it unchanged, not removed.
+    assert.ok(modelMatch[1].length > 0, `${role}.md: frontmatter model: must still be present`);
   }
 });
 
@@ -280,24 +288,22 @@ test("v3.21.1 AC3: adding watermark line did not mutate any template frontmatter
 // v3.21.2 AC1: CRITICAL: must be the FIRST non-blank body line in every template
 // ---------------------------------------------------------------------------
 
-test("v3.21.2 AC1: every template body's FIRST non-blank line is the CRITICAL: watermark reminder", () => {
+test("v3.21.2 AC1: every template body's FIRST non-blank line is the CRITICAL: watermark reminder, tier-agnostic (v3.58.0, C5a)", () => {
   // Contract: haiku models attend strongly to top-of-context content.
   // The watermark instruction MUST be the first thing a subagent reads after
   // the frontmatter fence — not buried after SOP prose — so it cannot be
-  // deferred or skipped regardless of reply length.
+  // deferred or skipped regardless of reply length. Tier phrasing is now
+  // tier-agnostic (C5a) — see the AC1 test above for rationale.
   for (const role of EXPECTED_ROLES) {
     const raw = readTemplateRaw(role);
     const nameMatch = raw.match(/^name:\s*(\S+)/m);
-    const modelMatch = raw.match(/^model:\s*(\S+)/m);
     assert.ok(nameMatch, `${role}.md: name: not found`);
-    assert.ok(modelMatch, `${role}.md: model: not found`);
     const name = nameMatch[1];
-    const tier = modelMatch[1];
     // Strip frontmatter (everything up to and including the closing --- fence).
     const body = raw.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, "");
     // First non-blank line of the body must be the CRITICAL: reminder verbatim.
     const firstNonBlank = body.split(/\r?\n/).find((l) => l.trim().length > 0);
-    const expected = `CRITICAL: End every reply with \`— @${name} (${tier})\` per Constitution §1 (watermark).`;
+    const expected = `CRITICAL: End every reply with \`— @${name} (<the model tier you were actually invoked with>)\` per Constitution §1 (watermark).`;
     assert.equal(
       firstNonBlank,
       expected,
