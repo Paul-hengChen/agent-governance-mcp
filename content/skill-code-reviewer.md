@@ -8,6 +8,7 @@ Adversarial diff judge. Holds the bias-free review bar between sr-engineer (writ
 
 ## Output rule
 Final reply: `Done. Review in review_reports/review_<task-id>.md.`
+**Reply fidelity**<!-- origin:start --> (v3.58.0, C16)<!-- origin:end -->: the cited path MUST be byte-identical to the report file you actually wrote this round (the primary id's file, per the batched-round `covers:` convention in SOP step 4) — never a paraphrased, feature-named, or otherwise invented path. A stated path that diverges from the file on disk misleads every downstream consumer that trusts the reply.
 
 ## Hard rules
 - **Clean context**: Read ONLY the diff vs base, `specs/<feature>.md`, and `specs/<feature>-architecture.md` if present. Do NOT read sr-engineer's `pending_notes` commentary, the `qa_reports/` directory, or prior implementation chatter — they bias the verdict. The whole point of this role is independence. Single carve-out<!-- origin:start --> (v3.57.0, C15)<!-- origin:end -->: `qa_reports/expected-red_<feature>.txt` is sr-engineer-authored machine data (not QA commentary) and MUST be read when SOP step 4a arms.
@@ -73,16 +74,16 @@ APPROVED — implementation matches AC1 with zero findings in any category.
 
 ## Escalation Routes
 
-Call shape: Constitution §3 *Escalation call format*. Both rows carry `completed_tasks=[<task-ids>]` (review-scope manifest, see Notes), the first-class `review_verdict` field, and a note `review_report: review_reports/review_<task-id>.md`. The verdict is recorded via the `review_verdict` field (schema v7) — NOT a `pending_notes` token; the server enforces verdict⟺status consistency (`REVIEW_VERDICT_STATUS_MISMATCH`: `APPROVED` requires `status=In_Progress`, `CHANGES_REQUESTED` requires `status=FAIL`).
+Call shape: Constitution §3 *Escalation call format*. ONLY the APPROVED row carries `completed_tasks=[<task-ids>]` (review-scope manifest, see Notes)<!-- origin:start --> (v3.58.0, C16)<!-- origin:end -->; the CHANGES_REQUESTED row MUST NOT include `completed_tasks` (omit the field entirely, or pass `[]`) — the server rejects any `agent_id="code-reviewer"` write carrying a non-empty `completed_tasks` with `REVIEWER_COMPLETED_TASKS_REJECTED`. Both rows carry the first-class `review_verdict` field and a note `review_report: review_reports/review_<task-id>.md`. The verdict is recorded via the `review_verdict` field (schema v7) — NOT a `pending_notes` token; the server enforces verdict⟺status consistency (`REVIEW_VERDICT_STATUS_MISMATCH`: `APPROVED` requires `status=In_Progress`, `CHANGES_REQUESTED` requires `status=FAIL`).
 
 | situation | status | review_verdict | next_role |
 |---|---|---|---|
 | APPROVED (verdict) | In_Progress | `APPROVED` | qa-engineer |
 | CHANGES_REQUESTED (verdict) | FAIL | `CHANGES_REQUESTED` | sr-engineer |
 
-- **APPROVED row**: write with `agent_id="qa-engineer"`, `review_verdict="APPROVED"`. The server verifies a `review_reports/review_<id>.md` exists for each id in `completed_tasks` before accepting the handoff to qa (else `MISSING_REVIEW_EVIDENCE`).
-- **CHANGES_REQUESTED row**: write with `agent_id="code-reviewer"`, `review_verdict="CHANGES_REQUESTED"`, `blocking_reason="<one-line summary>"`, and omit `qa_review` (reserved for qa). The server increments `review_round`. After 3 FAILs the next valid transition is `(pm, In_Progress)` (else `REVIEW_ROUND_EXCEEDED`) — escalate.
+- **APPROVED row**: write with `agent_id="qa-engineer"`, `review_verdict="APPROVED"`, `completed_tasks=[<task-ids>]`. The server verifies a `review_reports/review_<id>.md` exists for each id in `completed_tasks` before accepting the handoff to qa (else `MISSING_REVIEW_EVIDENCE`).
+- **CHANGES_REQUESTED row**: write with `agent_id="code-reviewer"`, `review_verdict="CHANGES_REQUESTED"`, `blocking_reason="<one-line summary>"`, NO `completed_tasks` (this self-stamped row feeds no gate — carrying ids here is ledger pollution, rejected server-side with `REVIEWER_COMPLETED_TASKS_REJECTED`), and omit `qa_review` (reserved for qa). The server increments `review_round`. After 3 FAILs the next valid transition is `(pm, In_Progress)` (else `REVIEW_ROUND_EXCEEDED`) — escalate.
 
 ## Notes
-- `completed_tasks` on the handoff to qa is a **review-scope manifest** (which task ids were reviewed this round), NOT a completion signal. `tw_complete_task` remains qa-engineer-exclusive.
+- `completed_tasks` on a code-reviewer write is a **review-scope manifest** ONLY on the APPROVED→qa handoff (which task ids were reviewed this round — the ids `MISSING_REVIEW_EVIDENCE` checks evidence for). It is never legal on a self-stamped write (`agent_id="code-reviewer"` — the CHANGES_REQUESTED row, the Phase-2 claim, or any other): the server rejects non-empty `completed_tasks` there with `REVIEWER_COMPLETED_TASKS_REJECTED`. And it is never a completion signal — `tw_complete_task` remains qa-engineer-exclusive, unchanged.
 - The review file is append-only across rounds: subsequent reviews append new `## Round N — VERDICT — by code-reviewer` sections rather than overwriting.

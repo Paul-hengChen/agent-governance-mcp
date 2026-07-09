@@ -8,8 +8,9 @@
 //
 // Check order is FROZEN (spec AC-5/AC-8): preflight → PASS/qa-engineer gate →
 // transition validation → scope-decision gate → cut-approval gate →
-// external-refs gate → review-verdict/status mismatch gate → QA evidence
-// record → PASS evidence gate → visual sub-gates → expected-red diff gate →
+// external-refs gate → review-verdict/status mismatch gate → reviewer
+// completed_tasks gate (v3.58.0, C16) → QA evidence record → PASS evidence
+// gate → visual sub-gates → expected-red diff gate →
 // code-reviewer evidence gate → round-cap sentinels → storage.writeState →
 // PASS RAG GC hook. No reorder, no merge, no early-return removal.
 //
@@ -224,6 +225,29 @@ export async function handleUpdateState(parsed) {
                 isError: true,
             };
         }
+    }
+    // v3.58.0 — Reviewer completed_tasks Gate (c16-c10-role-boundary AC-3).
+    // Sibling of REVIEW_VERDICT_STATUS_MISMATCH above — same family:
+    // plain-text envelope, keys ONLY on the incoming parsed args (no
+    // FileHandoffStorage guard, so it applies uniformly in file mode AND
+    // SQLite/HTTP mode). Fires on ANY code-reviewer-stamped write carrying
+    // a non-empty completed_tasks (the C16 ledger-pollution class: the
+    // CHANGES_REQUESTED row feeds no gate — MISSING_REVIEW_EVIDENCE only
+    // reads the manifest when nextTuple.agent === "qa-engineer"). The
+    // legitimate uses are untouched: the APPROVED row stamps
+    // agent_id="qa-engineer" (this gate keys on agent_id, not on which
+    // role authored the call), and the Phase-2 claim write carries
+    // completed_tasks=[] (zod default) so it never fires.
+    if (parsed.agent_id === "code-reviewer" && parsed.completed_tasks.length > 0) {
+        return {
+            content: [{
+                    type: "text",
+                    text: `⛔ REVIEWER_COMPLETED_TASKS_REJECTED: completed_tasks=` +
+                        `[${parsed.completed_tasks.join(", ")}] on an agent_id=code-reviewer write. ` +
+                        gate("REVIEWER_COMPLETED_TASKS_REJECTED").hintStatic,
+                }],
+            isError: true,
+        };
     }
     // Evidence record FIRST so the PASS gate below can observe the row /
     // file just written. Only fires when QA attaches qa_review on a

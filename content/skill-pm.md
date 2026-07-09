@@ -68,6 +68,8 @@ None. (Visual Structural Assertions omitted: no `design/<feature>.md`, mode = no
 ```
 `P0` = critical/blocking · `P1` = high · `P2` = normal. One task = one sr-engineer session (≤ 5 files / 300 lines).
 
+**Release-bookkeeping ownership rule**<!-- origin:start --> (v3.58.0, C10)<!-- origin:end -->: any ticket-cut line item describing release bookkeeping — version bump, CHANGELOG entry, `docs/backlog.md` done-marking — MUST be assigned to release-engineer (post-PASS), never cut onto a qa-engineer or sr-engineer task by default. Cutting release chores onto the role that happens to hold the PASS context recreates the A10 boundary blur.
+
 ## SOP
 
 1. `tw_get_state` → `tw_detect_drift`.

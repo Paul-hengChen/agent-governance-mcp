@@ -41,7 +41,8 @@ export type GateErrorCode =
   | "BASELINE_MANIFEST_MISSING"
   | "BASELINE_PROVENANCE_INCOMPLETE"
   | "PIXEL_GATE_ATTESTATION_MISSING"
-  | "REVIEW_VERDICT_STATUS_MISMATCH";
+  | "REVIEW_VERDICT_STATUS_MISMATCH"
+  | "REVIEWER_COMPLETED_TASKS_REJECTED";
 
 export type GateProducer = "validateTransition" | "orchestrator";
 export type GateEnvelope = "transition-json" | "orchestrator-json" | "plain-text";
@@ -61,12 +62,12 @@ export interface GateDefinition {
   // (DR-3, qa-engineer's rewritten error-code-contract test) compares against.
   readonly hintStatic: string;
   // True iff the code is (and must stay) backtick-quoted in >=1 content/*.md.
-  // All 21 are true today. The field exists so a future code-internal gate can
+  // All 22 are true today. The field exists so a future code-internal gate can
   // opt out without weakening the parity test.
   readonly documentedInProse: boolean;
 }
 
-// The 21-gate catalog, in documentation order. Array order is DOC order only —
+// The 22-gate catalog, in documentation order. Array order is DOC order only —
 // it MUST NOT be relied on for evaluation order (DR-5; that lives in
 // handoff-orchestrator.ts as the physical if-block sequence).
 export const GATE_REGISTRY: readonly GateDefinition[] = [
@@ -163,7 +164,7 @@ export const GATE_REGISTRY: readonly GateDefinition[] = [
       "specs/b8-external-ref-ledger.md.",
     documentedInProse: true,
   },
-  // ---- plain-text (codes 9-20, producer: orchestrator) ----
+  // ---- plain-text (codes 9-22, producer: orchestrator) ----
   {
     errorCode: "MISSING_EVIDENCE",
     producer: "orchestrator",
@@ -329,6 +330,21 @@ export const GATE_REGISTRY: readonly GateDefinition[] = [
       "A code-reviewer APPROVED verdict requires status=In_Progress; " +
       "CHANGES_REQUESTED requires status=FAIL. Align review_verdict with status, " +
       "or omit review_verdict. See specs/c9-protocol-fields.md AC-5.",
+    documentedInProse: true,
+  },
+  {
+    errorCode: "REVIEWER_COMPLETED_TASKS_REJECTED",
+    producer: "orchestrator",
+    envelope: "plain-text",
+    triggerEdge: "any code-reviewer-stamped write carrying non-empty completed_tasks",
+    armCondition: "agent_id=code-reviewer && completed_tasks.length > 0",
+    clearingArtifact:
+      "omit completed_tasks (or pass []) on self-stamped code-reviewer writes; the APPROVED row stamps agent_id=qa-engineer and is untouched",
+    hintStatic:
+      "completed_tasks on a code-reviewer-stamped write is ledger pollution: " +
+      "the review-scope manifest is legal only on the APPROVED handoff " +
+      "(agent_id=qa-engineer). Omit completed_tasks (or pass []) on this write. " +
+      "See specs/c16-c10-role-boundary.md AC-3.",
     documentedInProse: true,
   },
 ];

@@ -16,6 +16,11 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.58.0] - 2026-07-10
+
+### Added
+- **`c16-c10-role-boundary` — Code-reviewer gate + release-engineer SOP step 11 for backlog done-marking (v3.58.0).** Introduces REVIEWER_COMPLETED_TASKS_REJECTED gate (C16) to enforce code-reviewer attestation boundary: when a code-reviewer completes any task while in the review pass, they bypass the normal peer-review process. Gate applies post-PASS (if any tasks remain INCOMPLETE after code-reviewer exit) to prevent self-approval of code changes. Wired in `gates/registry.ts` + `tools/handoff-orchestrator.ts`. Also elevates backlog done-marking into release-engineer's SOP (C10, step 11): WHEN `docs/backlog.md` exists AND the active feature traces to one or more backlog rows, release-engineer marks the active feature's row(s) DONE with a one-line mechanism summary and release commit reference (tag or sha). This folds ad hoc post-PASS backlog-marking (previously a PM/coordinator task) into release-engineer's own SOP, alongside version bump and CHANGELOG. Content updates to `skill-release-engineer.md`, `skill-qa-engineer.md`, `skill-pm.md`, and `skill-code-reviewer.md`. 7 C16-C10 subtasks completed; QA baseline regenerated. See `specs/c16-c10-role-boundary.md`, `qa_reports/review_T-C16-04.md`, `review_reports/review_*.md`.
+
 ## [3.57.0] - 2026-07-10
 
 ### Added

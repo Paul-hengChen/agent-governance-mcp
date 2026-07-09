@@ -526,6 +526,12 @@ test("AC1/AC2: skill-pm stripped token count meets ≤ 3196 cap", () => {
   // `next_role`/`resume_of` as first-class fields instead of `pending_notes` tokens).
   // Independently re-measured at 3377 ~tok exactly; cap set to the exact measured value
   // per the established Phase-2 convention (no headroom).
+  // c16-c10-role-boundary (qa-owned bump, T-C16C10-06): cap raised from 3377 → 3473 to
+  // absorb T-C10-03's new cut-template rule (Task Format section: release bookkeeping —
+  // version bump, CHANGELOG, backlog done-marking — MUST be assigned to release-engineer,
+  // never cut onto a qa-engineer or sr-engineer task by default). Independently re-measured
+  // at 3473 ~tok exactly; cap set to the exact measured value per the established Phase-2
+  // convention (no headroom).
   const SKILL_PM = fs.readFileSync(path.join(ROOT, "content", "skill-pm.md"), "utf-8");
   // Strip frontmatter (--- block) before token-counting the body, matching buildPromptForRole.
   const body = SKILL_PM.startsWith("---")
@@ -533,7 +539,7 @@ test("AC1/AC2: skill-pm stripped token count meets ≤ 3196 cap", () => {
     : SKILL_PM;
   const stripped = stripRationale(stripOriginTags(body));
   const toks = approxTokens(stripped);
-  assert.ok(toks <= 3377, `skill-pm stripped body (${toks} ~tok) must be ≤ 3377 (AC1, c9-protocol-fields re-baseline)`);
+  assert.ok(toks <= 3473, `skill-pm stripped body (${toks} ~tok) must be ≤ 3473 (AC1, c16-c10-role-boundary re-baseline)`);
 });
 
 test("AC1/AC2: skill-sr-engineer stripped token count meets ≤ 2138 cap", () => {
