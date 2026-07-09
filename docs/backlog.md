@@ -36,7 +36,7 @@ future `/teamwork` feature; none blocks a release on its own.
 | C4 | Drift detector drowned by historical noise — acknowledged-baseline / archive mechanism — **done (2026-07-07)** | P2 | — | ~4 (`tools/drift.ts`, maybe `tw_sync`/config, tests) | — |
 | C5 | Watermark toolchain: template hardcodes tier; validateWatermark appends instead of replacing on mismatch | P2 | — | ~4 (`lib/watermark-check.ts`, `templates/claude-code-agents/*`, tests) | — |
 | C6 | Prompt-injection state footer reports "No handoff state found" while handoff exists; stale `prd_path` suspect — **done (2026-07-08, v3.48.0)** | P1 | — | ~3 (`prompts/build.ts` state loader, `bin/agent-governance-context.mjs`, test) | — |
-| C7 | §2 test-ownership absolutism collides with mechanical version-literal edits at release | P2 | — | ~3 (constitution §2, skill-release-engineer, version-assertion tests) | — |
+| C7 | §2 test-ownership absolutism collides with mechanical version-literal edits at release — **done (2026-07-09)** | P2 | — | ~3 (constitution §2, skill-release-engineer, version-assertion tests) | — |
 | C8 | Crash-resume protocol: mid-role kill leaves no §3 failure write; resume drops dispatch-time model pin — **done (2026-07-09)** | P2 | — | ~2 (skill-coordinator SOP, maybe handoff field) | — |
 | C9 | pending_notes free-text protocol tokens (`next_role:`/`resume_of:`/`review: APPROVED`) → structured handoff fields | P2 | A10 ✓ | ~6 (`tools/handoff.ts` schema, `transitions.ts`, orchestrator, skills, tests) | — |
 | C10 | qa-engineer / release-engineer bookkeeping boundary blur (QA did version bump + CHANGELOG in A10-10) | P2 | — | ~3 (skill-pm cut guidance, skill-qa-engineer, skill-release-engineer) | — |
@@ -425,21 +425,18 @@ future `/teamwork` feature; none blocks a release on its own.
   is fresh; pre-flight still catches writes, but read-side context (active
   feature, pending_notes routing) is lost exactly where it's cheapest to have.
 
-## C7 — §2 test-ownership absolutism vs mechanical release edits (P2, observed 2026-07-08)
-- **What:** Constitution §2 says "ONLY qa-engineer writes test files. No
-  exceptions." At the v3.46.1 release, release-engineer had to update 4
-  version-assertion tests (3.46.0 → 3.46.1 literals) to keep the suite green —
-  a quiet, sanctioned-in-practice violation. Rules that are routinely violated
-  erode; the next violation won't be mechanical.
-- **Fix:** either (a) explicit carve-out in §2: mechanical literal retargets
-  (version strings, moved import paths) are refactor plumbing, not test
-  authorship — mirroring the A10 precedent where sr-engineer's import
-  retargeting was ruled acceptable; or (b) remove the need: version assertions
-  read `package.json` at test time instead of hardcoding.  (b) is stronger.
-- **Owner:** /teamwork (constitution §2 wording + skill-release-engineer +
-  the version-assertion tests; content-heavy, small).
-- **Risk if skipped:** §2's bright line blurs by precedent instead of by
-  decision.
+## C7 — §2 test-ownership absolutism vs mechanical release edits (P2, observed 2026-07-08) — DONE 2026-07-09
+- **Done:** shipped as feature `c7-version-assertion-ownership` (spec
+  `specs/c7-version-assertion-ownership.md` + code-review `review_reports/review_T-C7-CR.md`
+  + QA `qa_reports/review_T-C7-QA.md`; single-feature commit + release flow).
+  Implemented via option (b): version assertions in `test/baseline-manifest-gate.test.mjs`
+  and `test/pixel-gate-attestation.test.mjs` now read target version dynamically from
+  `package.json`/`index.ts` at test time (numeric-tuple floors); eliminates need for
+  test-file edits on version bumps. Adds narrow import-path-retarget carve-out
+  in Constitution §2 (`content/const-05-core-standards.md`) for version-comparison AST
+  logic, gated to `@agent-governance-mcp/internal` marker. New STOP+route-to-qa rule in
+  `skill-release-engineer.md` (S02): if hardcoded version literal found in test during
+  release, release-engineer routes to qa-engineer (Constitution §2 violation).
 
 ## C8 — No crash-resume protocol; resume drops the dispatch-time model pin (P2, observed 2026-07-08) — DONE 2026-07-09
 - **Done:** shipped as feature `c8-crash-resume-protocol` (spec
