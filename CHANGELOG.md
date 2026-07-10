@@ -25,7 +25,6 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ### Notes
 - driftBaselineIds appended with T-A12F-03
-- `docs/backlog.md` a12-followup-qa-round-name row marked DONE with v3.64.1 tag reference
 
 ## [3.64.0] - 2026-07-10
 
