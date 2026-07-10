@@ -883,9 +883,17 @@ test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the 
   // the established Phase-2 convention (no additional headroom). Saving margin
   // re-verified: raw 6664 − stripped 6391 = 273 ~tok, still ≥ 240 (unchanged — the Limits
   // table and reference-by-name rewrites sit outside both rationale/origin fences).
+  // a12-followup-qa-round-name (qa-owned bump, T-A12F-02): cap raised from 6391 → 6399
+  // to absorb const-06-chain-31-head.md L8's qa_round name-reference rewrite (chain-tagged,
+  // not design-only-fenced, so it loads on this design-arm path — mirrors const-08's
+  // already-shipped review_round line). Independently re-measured (not trusted from
+  // code-reviewer's review note) — raw 6672, stripped 6399 (exact); cap set to the exact
+  // measured value per the established Phase-2 convention (no additional headroom). Saving
+  // margin re-verified: raw 6672 − stripped 6399 = 273 ~tok, still ≥ 240 (unchanged — the
+  // const-06 edit sits outside both rationale/origin fences).
   const raw = approxTokens(CONSTITUTION);
   const stripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));
-  assert.ok(stripped <= 6391, `stripped constitution (${stripped} ~tok) must be ≤ 6391 (AC8 design-arm floor, a12-partials-limits-registry re-baseline)`);
+  assert.ok(stripped <= 6399, `stripped constitution (${stripped} ~tok) must be ≤ 6399 (AC8 design-arm floor, a12-followup-qa-round-name re-baseline)`);
   assert.ok(
     raw - stripped >= 240,
     `constitution rationale+origin-tag saving (${raw - stripped} ~tok) must be ≥ 240 (AC8 measured min, c14-dispatch-pins re-baseline)`,
@@ -1018,13 +1026,20 @@ test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/b
   // adopt the {{PARTIAL:...}} mechanism, spec DR-5) — this bundle's growth is 100%
   // constitution-side. Independently re-measured at 12538 ~tok (exact); cap set to the
   // exact measured value per the established Phase-2 convention (no additional headroom).
+  // a12-followup-qa-round-name (qa-owned bump, T-A12F-02): cap raised from 12538 → 12547
+  // to absorb the same const-06-chain-31-head.md L8 qa_round name-reference growth
+  // measured in the design-arm floor test above (+8 ~tok); skill-coordinator.md itself is
+  // untouched by this ticket (spec Out of Scope), so this bundle's growth is 100%
+  // constitution-side. Independently re-measured (not trusted from code-reviewer's review
+  // note) at 12547 ~tok (exact); cap set to the exact measured value per the established
+  // Phase-2 convention (no additional headroom).
   const skillCoord = fs.readFileSync(path.join(ROOT, "content", "skill-coordinator.md"), "utf-8");
   const body = skillCoord.startsWith("---")
     ? skillCoord.slice(skillCoord.indexOf("---", 3) + 3).trimStart()
     : skillCoord;
   const SEP = "\n\n---\n\n";
   const bundle = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)) + SEP + stripRationale(stripOriginTags(body)));
-  assert.ok(bundle <= 12538, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 12538 (AC8 design-arm floor, a12-partials-limits-registry re-baseline)`);
+  assert.ok(bundle <= 12547, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 12547 (AC8 design-arm floor, a12-followup-qa-round-name re-baseline)`);
 });
 
 test("AC9: every operative rule/gate/heading survives stripRationale on the constitution", () => {
@@ -1469,12 +1484,20 @@ test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is
   // 6391 − non-design 4293 = 2098 ~tok, still ≥ 2080 (grows slightly — const-09's
   // visual_round reference-by-name rewrite is design-only-tagged and lands ONLY on the
   // design-arm side, widening the saving by a few tokens).
-  const ratStripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));         // design-arm path: 6391
-  const nonDesign = approxTokens(stripRationale(stripOriginTags(composeConstitution({ chain: true, design: false })))); // non-design path: 4293
-  assert.ok(nonDesign <= 4293, `non-design constitution (${nonDesign} ~tok) must be ≤ 4293 (AC8 non-design floor, a12-partials-limits-registry re-baseline)`);
+  // a12-followup-qa-round-name (qa-owned bump, T-A12F-02): cap raised from 4293 → 4302.
+  // The const-06-chain-31-head.md L8 qa_round name-reference rewrite is chain-tagged (not
+  // design-tagged), so it lands on the non-design path too, same as the design-arm floor
+  // above. Independently re-measured (not trusted from code-reviewer's review note) at
+  // 4302 ~tok (exact); cap set to the exact measured value per the established Phase-2
+  // convention (no additional headroom). Saving margin re-verified: design-arm 6399 −
+  // non-design 4302 = 2097 ~tok, still ≥ 2080 (unchanged — the const-06 edit sits outside
+  // the design-only fences).
+  const ratStripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));         // design-arm path: 6399
+  const nonDesign = approxTokens(stripRationale(stripOriginTags(composeConstitution({ chain: true, design: false })))); // non-design path: 4302
+  assert.ok(nonDesign <= 4302, `non-design constitution (${nonDesign} ~tok) must be ≤ 4302 (AC8 non-design floor, a12-followup-qa-round-name re-baseline)`);
   assert.ok(
     ratStripped - nonDesign >= 2080,
-    `design-only strip saving (${ratStripped - nonDesign} ~tok) must be ≥ 2080 (a12-partials-limits-registry re-baseline)`,
+    `design-only strip saving (${ratStripped - nonDesign} ~tok) must be ≥ 2080 (a12-followup-qa-round-name re-baseline)`,
   );
 });
 

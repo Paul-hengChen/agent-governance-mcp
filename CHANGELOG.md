@@ -16,6 +16,17 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.64.1] - 2026-07-10
+
+### Changed
+- `content/const-06-chain-31-head.md` L8: phrasing fix — "After 3 QA FAILs (Round 4)" → "After the `qa_round` cap of QA FAILs (Round 4 of `qa_round`)" for consistency with A12 naming convention.
+- `test/compose-equivalence.test.mjs` golden fixtures regenerated (6 updates).
+- `test/context-budget.test.mjs` AC8 design-arm floor rebaselined: 6391 → 6399 ~tok; teamwork bundle 12538 → 12547 ~tok; non-design floor 4293 → 4302 ~tok.
+
+### Notes
+- driftBaselineIds appended with T-A12F-03
+- `docs/backlog.md` a12-followup-qa-round-name row marked DONE with v3.64.1 tag reference
+
 ## [3.64.0] - 2026-07-10
 
 ### Added

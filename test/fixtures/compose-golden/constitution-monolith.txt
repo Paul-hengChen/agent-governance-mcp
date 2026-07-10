@@ -69,7 +69,7 @@ The routing chain is **server-enforced**, not advisory. Invalid
 `tw_update_state` writes are rejected before reaching storage. Key rules:
 
 - `status=PASS` and `tw_complete_task` require `agent_id="qa-engineer"`.
-- After 3 QA FAILs (Round 4), only `(pm, In_Progress)` is accepted.
+- After the `qa_round` cap of QA FAILs (Round 4 of `qa_round`), only `(pm, In_Progress)` is accepted.
 - PASS requires evidence: attach `qa_review`, or pre-write `qa_reports/review_<task-id>.md`.
 <!-- design-only:start -->
 - **Visual evidence gate<!-- origin:start --> (v3.16.0)<!-- origin:end -->**: the gate arms whenever `design/<active_feature>.md` exists with a `## Mode` ≠ `no-design` (not on `## Visual Baselines` H2 presence). When armed: if the design file lacks a `## Visual Baselines` H2, PASS is blocked with `VISUAL_BASELINES_REQUIRED` (the design-auditor must add the section — it is NOT a silent pass-through). When the `## Visual Baselines` H2 IS present, PASS additionally requires `qa_reports/visual_<task-id>.md` for every task id in the round; missing → `VISUAL_EVIDENCE_MISSING`. The two checks are mutually exclusive: the missing-baselines block fires first and short-circuits the evidence-file lookup. No design file, or `## Mode` = `no-design` (or unparseable mode), → gate is silent and pass-through. Backwards-compatible for non-UI workspaces.

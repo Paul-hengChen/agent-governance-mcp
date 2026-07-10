@@ -27,11 +27,11 @@ Existing tools in the same category (GitHub Spec Kit, OpenSpec) ship **templates
 
 ```bash
 # 1. Register the MCP server
-claude mcp add -s user agent-governance-mcp -- npx -y github:Paul-hengChen/agent-governance-mcp#v3.59.0
+claude mcp add -s user agent-governance-mcp -- npx -y github:Paul-hengChen/agent-governance-mcp#v3.64.1
 
 # 2. Mark the current workspace as managed (REQUIRED — hook is a silent no-op without this)
 # Recommended: use agc init (writes .current/ + tasks.md)
-npx -y github:Paul-hengChen/agent-governance-mcp#v3.59.0 agc init
+npx -y github:Paul-hengChen/agent-governance-mcp#v3.64.1 agc init
 # Alternative (bare scaffold):
 mkdir -p .current
 
@@ -176,7 +176,7 @@ Add to `~/.claude/settings.json`:
       "matcher": "",
       "hooks": [{
         "type": "command",
-        "command": "npx -y -p github:Paul-hengChen/agent-governance-mcp#v3.44.0 agent-governance-context",
+        "command": "npx -y -p github:Paul-hengChen/agent-governance-mcp#v3.64.1 agent-governance-context",
         "timeout": 60
       }]
     }]
