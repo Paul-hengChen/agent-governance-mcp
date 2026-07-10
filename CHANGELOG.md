@@ -16,6 +16,23 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.63.0] - 2026-07-10
+
+### Added
+- **`b9-token-budget-brake` — Optional cost-side circuit breaker for per-feature token budgets (v3.63.0).** Introduces opt-in, off-by-default token-budget brake that complements count-side caps. Enabled ONLY when `.current/.config.json` sets `tokenBudgetPerFeature` to a positive finite number; invalid values filter to absent (no schema_version bump). When enabled, running token total (input + output + cache read + cache creation) across all subagent dispatches within a `/teamwork` invocation is tracked in-memory (session-scoped, not persisted). When running total reaches or exceeds 80% of `tokenBudgetPerFeature`, stop routing and surface the running total, ceiling, and percentage. Halt semantics mirror hop-cap: observe/halt only, no state write, no new persisted field, no schema bump — advisory-only. Adds "Token Budget Brake" subsection to `content/skill-coordinator.md` Auto-Routing section with detailed enablement and escalation semantics. Updates Escalation Routes table with 80%-ceiling row. New test file `test/token-budget-config.test.mjs` (13 tests) covering config loading, invalid-value filtering, and brake-disabled state. Context-budget cap rebaselined (11815 → 12247 ~tok). One Copy/Strings regression in `test/subagent-templates.test.mjs` fixed. Backwards-compatible; MINOR bump. QA verified: all 5 acceptance criteria (AC1–AC5) passed; all 1043/1043 tests pass. See `specs/b9-token-budget-brake.md`, `qa_reports/review_T-B9-03.md`, `review_reports/review_T-B9-01.md`.
+
+### Changed
+- `tools/config.ts` `ConfigType` now includes optional `tokenBudgetPerFeature?: number`.
+- `tools/config.ts` `loadConfig()` filters invalid token budget values to absent.
+- `content/skill-coordinator.md` "Token Budget Brake" subsection added to Auto-Routing section.
+- `content/skill-coordinator.md` Escalation Routes table updated with 80%-ceiling token-budget-brake row.
+- `test/context-budget.test.mjs` AC8 design-arm floor bumped to 12247 ~tok.
+- `test/subagent-templates.test.mjs` Copy/Strings assertion fixed.
+
+### Notes
+- driftBaselineIds appended with T-B9-01..05
+- `docs/backlog.md` B9 row marked DONE with v3.63.0 tag reference
+
 ## [3.62.0] - 2026-07-10
 
 ### Added

@@ -5,7 +5,8 @@
 //   {
 //     "taskPattern": "<JS regex source string>",   // matched against trimmed line; group 1 = " "|"x" checkmark, group 2 = task ID, group 3 = description
 //     "taskPaths": ["tasks.md", "TODO.md"],         // workspace-relative candidate paths, tried in order
-//     "driftBaselineIds": ["T470", "T471"]          // task IDs acknowledged as shipped+reconciled; excluded from vibe-coding drift (tw_detect_drift)
+//     "driftBaselineIds": ["T470", "T471"],         // task IDs acknowledged as shipped+reconciled; excluded from vibe-coding drift (tw_detect_drift)
+//     "tokenBudgetPerFeature": 500000               // opt-in coordinator token-spend ceiling (raw summed usage.* tokens); non-positive/non-finite values treated as absent
 //   }
 import * as fs from "fs";
 import * as path from "path";
@@ -108,6 +109,16 @@ export function loadConfig(workspacePath) {
         const filtered = driftBaselineIds.filter((p) => typeof p === "string");
         if (filtered.length > 0)
             result.driftBaselineIds = filtered;
+    }
+    // Additive-optional field (no schema_version bump — same precedent as
+    // driftBaselineIds). Non-fatal filter: only a positive finite number is
+    // surfaced; strings, negatives, zero, NaN, Infinity are treated as absent
+    // (brake disabled) rather than throwing.
+    const tokenBudgetPerFeature = migration.payload.tokenBudgetPerFeature;
+    if (typeof tokenBudgetPerFeature === "number" &&
+        Number.isFinite(tokenBudgetPerFeature) &&
+        tokenBudgetPerFeature > 0) {
+        result.tokenBudgetPerFeature = tokenBudgetPerFeature;
     }
     // Cache under the pre-read mtime. If the migration heal-on-read above
     // rewrote the file, the recorded mtime is already stale — the NEXT call's

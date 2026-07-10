@@ -3,6 +3,7 @@ export interface WorkspaceConfig {
     taskPattern?: string;
     taskPaths?: string[];
     driftBaselineIds?: string[];
+    tokenBudgetPerFeature?: number;
 }
 export declare const DEFAULT_TASK_REGEX: RegExp;
 export declare function loadConfig(workspacePath: string): WorkspaceConfig;

@@ -129,6 +129,7 @@ Stop conditions + routing escalations (WHEN/DO/ELSE collapsed to rows; Constitut
 | the `next_role` field is absent but `pending_notes` prose asks for a human decision (the enum has no `human` value — omitting the field IS the escalate-to-human signal) | — | relay the prior role's note | human |
 | the `next_role` field is absent with no escalation prose | — | surface as ambiguous — the prior role forgot or finished without nominating a successor | human |
 | hop counter ≥ `10` for this `/teamwork` session | — | surface the hop cap | human |
+| **Token budget brake** — `.current/.config.json` sets `tokenBudgetPerFeature` AND the in-memory running token total for this `/teamwork` invocation ≥ 80% of it (see §Token Budget Brake) | — | `token budget: {running_total} / {tokenBudgetPerFeature} ({pct}%) — handing to human` | human |
 | **Crash detection** — a dispatched `Task(subagent_type=<role>, …)` call returns a tool-error or empty/truncated reply, or the host/user reports the subagent was killed (session or usage-limit kill), BEFORE that role's own `tw_update_state` landed (handoff `agent_id`/`status` unchanged since dispatch) | — | do not resume or re-dispatch directly — run the Crash-Resume Protocol first, then resume | (role being resumed) |
 | **Cut-approval gate** — the `next_role` field is `architect` or `sr-engineer` but `cut_approved` is not set on the handoff (server error: `CUT_APPROVAL_REQUIRED`) | — | surface the cut draft and wait — do NOT auto-hop through to build; writer obligation below | human |
 | **External-refs gate** — the `next_role` field is `architect` or `sr-engineer` but the handoff `external_refs` ledger has an entry with `state: "unresolved"` (server error: `EXTERNAL_REFS_UNRESOLVED`) | — | surface the unresolved refs and wait — do NOT auto-hop through to build; PM must resolve each ref (fetch/index/user-confirm-ignorable) and re-write the ledger | human |
@@ -238,6 +239,26 @@ unknown denominator (it conflates cached vs fresh input), whereas the `usage.*` 
 `agent-*.jsonl` gives a precise denominator per dispatch. Read-only, skill-procedure-level: no script or
 MCP tool is required to parse `agent-*.jsonl` (automated tooling is deferred). Use these fields so
 future retrospectives report measured costs, not estimates.
+
+## Token Budget Brake<!-- origin:start --> (v3.63.0, B9)<!-- origin:end -->
+
+Opt-in, off-by-default cost-side circuit breaker that complements (not replaces) the count-side caps
+(hop cap ≥ 10, per-skill round caps). Enabled ONLY when `.current/.config.json` sets
+`tokenBudgetPerFeature` to a positive finite number — an absent key, absent file, or invalid value
+(filtered to absent by `loadConfig`) means the brake is disabled and NO budget check occurs.
+
+When enabled, after each completed dispatch (`Task(subagent_type=<role>, …)`), read that dispatch's
+`agent-*.jsonl` entry and add the four canonical `usage.*` fields (§Subagent Token Observability
+above): `usage.input_tokens + usage.output_tokens + usage.cache_read_input_tokens +
+usage.cache_creation_input_tokens` to a running total. **Running-total scope**: identical to the hop
+counter's scope discipline — in-memory only, for the lifetime of one `/teamwork` invocation. Do NOT
+persist to `handoff.md` or any tool argument. The total resets when a new `/teamwork` invocation
+starts; cross-session accumulation is explicitly out of scope.
+
+WHEN the running total reaches or exceeds 80% of `tokenBudgetPerFeature` → DO stop instead of
+auto-hopping, surfacing the running total, the ceiling, and the percentage in one sentence per the
+*Token budget brake* Escalation Routes row (same halt semantics as the hop-cap row: observe/halt
+only, no state write, no new persisted field, no schema bump — advisory-only) → ELSE keep routing.
 
 ## SOP
 

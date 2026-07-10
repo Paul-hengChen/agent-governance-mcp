@@ -846,13 +846,21 @@ test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/b
   // sr-engineer's handoff note, which said ~11815 — confirmed exact) at 11815 ~tok
   // (exact); cap set to the exact measured value per the established Phase-2 convention
   // (no additional headroom).
+  // b9-token-budget-brake (qa-owned bump, T-B9-04/T-B9-05): cap raised from 11815 →
+  // 12247 to absorb the new skill-coordinator.md "Token Budget Brake" subsection
+  // (§Auto-Routing, after Subagent Token Observability) plus the new "Token budget
+  // brake" Escalation Routes row (skill side only; no constitution-side change this
+  // feature — spec Out of Scope confirms no schema bump / no server-side gate).
+  // Independently re-measured (not trusted from sr-engineer's or code-reviewer's notes,
+  // both of which said 12247) at 12247 ~tok (exact); cap set to the exact measured
+  // value per the established Phase-2 convention (no additional headroom).
   const skillCoord = fs.readFileSync(path.join(ROOT, "content", "skill-coordinator.md"), "utf-8");
   const body = skillCoord.startsWith("---")
     ? skillCoord.slice(skillCoord.indexOf("---", 3) + 3).trimStart()
     : skillCoord;
   const SEP = "\n\n---\n\n";
   const bundle = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)) + SEP + stripRationale(stripOriginTags(body)));
-  assert.ok(bundle <= 11815, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 11815 (AC8 design-arm floor, c17-dispatch-brief-template re-baseline)`);
+  assert.ok(bundle <= 12247, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 12247 (AC8 design-arm floor, b9-token-budget-brake re-baseline)`);
 });
 
 test("AC9: every operative rule/gate/heading survives stripRationale on the constitution", () => {

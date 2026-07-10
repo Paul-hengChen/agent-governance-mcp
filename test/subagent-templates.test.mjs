@@ -233,6 +233,34 @@ test("c17 AC1/AC2: skill-coordinator.md has a Dispatch Brief Template section re
 });
 
 // ---------------------------------------------------------------------------
+// b9-token-budget-brake (spec AC3/Copy-Strings budget.stop-note): the new
+// "Token Budget Brake" section must exist and the Escalation Routes row must
+// quote the budget.stop-note string verbatim — this is the sole Copy/Strings
+// entry this feature ships, and it is easy for a future prose rewrite of the
+// Escalation Routes table to silently paraphrase it.
+// ---------------------------------------------------------------------------
+
+test("b9 AC3/Copy-Strings: skill-coordinator.md has a Token Budget Brake section with the budget.stop-note string verbatim", () => {
+  const raw = fs.readFileSync(path.join(SKILL_DIR, "skill-coordinator.md"), "utf-8");
+  assert.match(
+    raw,
+    /^## Token Budget Brake/m,
+    "skill-coordinator.md must surface a ## Token Budget Brake section",
+  );
+  assert.match(
+    raw,
+    /\*\*Token budget brake\*\*/,
+    "Escalation Routes table must carry a **Token budget brake** row",
+  );
+  assert.ok(
+    raw.includes(
+      "`token budget: {running_total} / {tokenBudgetPerFeature} ({pct}%) — handing to human`",
+    ),
+    "Escalation Routes row must quote the budget.stop-note Copy/Strings entry verbatim",
+  );
+});
+
+// ---------------------------------------------------------------------------
 // AC5 (v3.20.0): README sub-section heading
 // ---------------------------------------------------------------------------
 
