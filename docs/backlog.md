@@ -52,7 +52,7 @@ future `/teamwork` feature; none blocks a release on its own.
 | C14 | `dispatch_pins` survives only by coordinator-reminded verbatim carry-forward — promote to first-class handoff field + skill carry rule — **done (2026-07-09, v3.56.0)** | P1 | C9 | ~5 (`tools/handoff.ts` schema, `tools/registry.ts`, orchestrator, skill-coordinator + role skills, tests) | — |
 | C15 | Expected-red test handoff is prose — machine-checkable red-list manifest, QA diffs actual vs expected — **done (2026-07-10)** | P1 | — | ~4 (skill-sr-engineer, skill-qa-engineer, skill-code-reviewer, maybe evidence check) | — |
 | C16 | code-reviewer wrote `completed_tasks` ledger entries + evidence filename drifted from its own stated path — **done (2026-07-10, v3.58.0)** | P2 | — | ~3 (skill-code-reviewer, maybe orchestrator guard, tests) | — |
-| C17 | Coordinator dispatch briefs restate protocol by hand each hop — per-role brief template partial | P3 | — | ~2 (skill-coordinator, maybe templates/) | — |
+| C17 | Coordinator dispatch briefs restate protocol by hand each hop — per-role brief template partial — **done (2026-07-10, v3.62.0)** | P3 | — | ~2 (skill-coordinator, maybe templates/) | — |
 | C18 | `configCache` never invalidates — post-release driftBaselineIds appends invisible until server restart (C4 follow-on) — **done (2026-07-10, v3.59.0)** | P3 | — | ~3 (`tools/config.ts` mtime check, skill-release-engineer note, test) | — |
 
 ### Recommended execution order (2026-07-09, everything still open)

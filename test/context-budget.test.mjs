@@ -838,13 +838,21 @@ test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/b
   // trusted from sr-engineer's or code-reviewer's notes) at 11445 ~tok (exact); cap set to
   // the exact measured value per the established Phase-2 convention (no additional
   // headroom).
+  // c17-dispatch-brief-template (qa-owned bump, T-C17-03/AC5): cap raised from 11445 →
+  // 11815 to absorb the new skill-coordinator.md "Dispatch Brief Template" subsection
+  // (§Auto-Routing) — the fenced template (6 invariant lines + heading + framing prose)
+  // plus the repointed `prompt=` phrasing (T-C17-01/T-C17-02, skill side only; no
+  // constitution-side change this feature). Independently re-measured (not trusted from
+  // sr-engineer's handoff note, which said ~11815 — confirmed exact) at 11815 ~tok
+  // (exact); cap set to the exact measured value per the established Phase-2 convention
+  // (no additional headroom).
   const skillCoord = fs.readFileSync(path.join(ROOT, "content", "skill-coordinator.md"), "utf-8");
   const body = skillCoord.startsWith("---")
     ? skillCoord.slice(skillCoord.indexOf("---", 3) + 3).trimStart()
     : skillCoord;
   const SEP = "\n\n---\n\n";
   const bundle = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)) + SEP + stripRationale(stripOriginTags(body)));
-  assert.ok(bundle <= 11445, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 11445 (AC8 design-arm floor, c5-c18-watermark-configcache re-baseline)`);
+  assert.ok(bundle <= 11815, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 11815 (AC8 design-arm floor, c17-dispatch-brief-template re-baseline)`);
 });
 
 test("AC9: every operative rule/gate/heading survives stripRationale on the constitution", () => {

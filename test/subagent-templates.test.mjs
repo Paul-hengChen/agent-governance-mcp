@@ -200,6 +200,39 @@ test("AC4: skill-coordinator.md §Auto-Routing documents tw_switch_role fallback
 });
 
 // ---------------------------------------------------------------------------
+// c17-dispatch-brief-template (spec AC1/AC2): canonical Dispatch Brief Template
+// section — the Subagent Dispatch paragraph must point at it (not a hand-paraphrased
+// prompt= restatement), and the fenced template must carry the six invariant lines
+// verbatim so every Task-dispatch brief opens identically.
+// ---------------------------------------------------------------------------
+
+test("c17 AC1/AC2: skill-coordinator.md has a Dispatch Brief Template section referenced by prompt=", () => {
+  const raw = fs.readFileSync(path.join(SKILL_DIR, "skill-coordinator.md"), "utf-8");
+  assert.match(
+    raw,
+    /prompt="<brief composed per the \*\*Dispatch Brief Template\*\* below>"/,
+    "Subagent Dispatch paragraph's prompt= must repoint to the Dispatch Brief Template (not a hand-paraphrased brief)",
+  );
+  assert.match(
+    raw,
+    /\*\*Dispatch Brief Template\*\*/,
+    "skill-coordinator.md must surface a **Dispatch Brief Template** heading under §Auto-Routing",
+  );
+  for (const invariantLine of [
+    "First action: `tw_get_state(workspace_path=<workspace_path>)` → `tw_detect_drift`.",
+    'Known drift, ignore (do not reconcile): <ids from this session\'s `tw_detect_drift` vibe-drift list, or "none — drift clean">.',
+    "Dispatch pins in effect: <current `dispatch_pins` map per `tw_get_state`, or \"none\">.",
+    "Do NOT set `cut_approved` — you are Task-dispatched; the coordinator attests approval after the human approves in the coordinator's chat.",
+    "Watermark your reply per Constitution §1 (Task-spawned: `— @<role> (<tier>)`; `<tier>` = the `dispatch_pins` entry above if it names your role, else your frontmatter default).",
+  ]) {
+    assert.ok(
+      raw.includes(invariantLine),
+      `Dispatch Brief Template must quote invariant line verbatim: "${invariantLine}"`,
+    );
+  }
+});
+
+// ---------------------------------------------------------------------------
 // AC5 (v3.20.0): README sub-section heading
 // ---------------------------------------------------------------------------
 

@@ -16,6 +16,21 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.62.0] - 2026-07-10
+
+### Added
+- **`c17-dispatch-brief-template` — Dispatch Brief Template subsection (v3.62.0).** Adds a new "Dispatch Brief Template" subsection to `content/skill-coordinator.md` under the Auto-Routing section, providing agents with a standardized template structure for subagent dispatch briefs (6 invariant lines: upstream pending_notes summary, subagent type, task list, branching strategy, assumptions, success criteria). Updates the "Subagent Dispatch (Claude Code)" paragraph to point dispatch brief authoring at the template rather than ad-hoc phrasing. Context-budget rebaselined (test/context-budget.test.mjs AC8 design-arm floor: 11445 → 11815 ~tok). Backwards-compatible; MINOR bump. QA verified: all acceptance criteria met; 1043/1043 tests pass. See `specs/c17-dispatch-brief-template.md`, `qa_reports/review_T-C17-03.md`.
+
+### Changed
+- `content/skill-coordinator.md` "Dispatch Brief Template" subsection added to Auto-Routing section.
+- `content/skill-coordinator.md` "Subagent Dispatch (Claude Code)" paragraph updated to point at template.
+- `test/context-budget.test.mjs` AC8 design-arm floor bumped to 11815 ~tok.
+- `test/subagent-templates.test.mjs` assertion added verifying Dispatch Brief Template section presence.
+
+### Notes
+- driftBaselineIds appended with T-C17-01..05
+- `docs/backlog.md` C17 row marked DONE with v3.62.0 tag reference
+
 ## [3.61.0] - 2026-07-10
 
 ### Added
