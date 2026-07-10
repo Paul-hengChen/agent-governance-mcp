@@ -40,6 +40,14 @@ const { GATE_REGISTRY, ALL_GATE_CODES } = await import(
   path.join(PROJECT_ROOT, "dist", "gates", "registry.js")
 );
 
+// c12-registry-field-consumers (T-C12-02/03): the three round-cap constants,
+// imported so the QA_ROUND_EXCEEDED/REVIEW_ROUND_EXCEEDED/VISUAL_ROUND_EXCEEDED
+// triggerEdge cap literals (">= 4", ">= 4", ">= 6") can be asserted against the
+// LIVE transitions.ts constants rather than trusted as hand-copied prose.
+const { ROUND_CAP_EXPORTED, REVIEW_ROUND_CAP_EXPORTED, VISUAL_ROUND_CAP_EXPORTED } = await import(
+  path.join(PROJECT_ROOT, "dist", "tools", "transitions.js")
+);
+
 // ---------------------------------------------------------------------------
 // Shape rule (spec: "Shape rule (used identically by both extraction sides)")
 // ---------------------------------------------------------------------------
@@ -373,5 +381,286 @@ test("AC-7 (relaxed): this test file intentionally imports dist/gates/registry.j
     selfText,
     /from\s+["'].*dist\/gates\/registry\.js["']|import\(\s*path\.join\([\s\S]*?"dist",\s*"gates",\s*"registry\.js"/,
     "error-code-contract.test.mjs must import the built gates/registry.js — AC-5 requires the generative check to consume the real registry",
+  );
+});
+
+// ===========================================================================
+// c12-registry-field-consumers (T-C12-02/03): triggerEdge/armCondition/
+// clearingArtifact — the three doc-facing GateDefinition fields A10 left
+// unchecked — now get the same generative-parity treatment hintStatic
+// already has (option (b) "assert" per specs/c12-registry-field-consumers.md;
+// (a) render and (c) delete were rejected, see spec Rejected Alternatives).
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// AC1: non-empty bar on all three fields, all 22 entries — same shape as the
+// existing "every GATE_REGISTRY entry has a non-empty hintStatic" test above.
+// ---------------------------------------------------------------------------
+
+test("AC1 (c12): every GATE_REGISTRY entry has non-empty triggerEdge/armCondition/clearingArtifact", () => {
+  for (const field of ["triggerEdge", "armCondition", "clearingArtifact"]) {
+    const empty = GATE_REGISTRY.filter((g) => !g[field] || g[field].length === 0).map((g) => g.errorCode);
+    assert.deepEqual(empty, [], `entries with empty ${field}: ${empty.join(", ")}`);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// AC2 checkable-literal extraction helpers. Three mechanically checkable
+// literal shapes, per spec AC2 + the task breakdown: (1) a numeric round-cap
+// ("prev_x_round >= N"), (2) a named predicate/function-call identifier
+// (camelCase, e.g. hasDesignModeRequiringVisual), (3) an agent:status
+// transition-edge pair (e.g. pm:In_Progress). A fourth, SCREAMING_SNAKE
+// constant-name literal (ALLOWED_TRANSITIONS), is handled as its own pinned
+// case below — it is a single occurrence, not a repeating shape worth a
+// generic extractor.
+// ---------------------------------------------------------------------------
+
+const CAMEL_RE = /\b[a-z][a-z0-9]*(?:[A-Z][a-z0-9]*)+\b/g;
+function extractPredicateNames(text) {
+  return [...new Set(text.match(CAMEL_RE) || [])];
+}
+
+const EDGE_RE =
+  /\b(pm|architect|sr-engineer|qa-engineer|code-reviewer|release-engineer|doc-writer|researcher):(In_Progress|PASS|FAIL|Blocked)\b/g;
+function extractEdgePairs(text) {
+  return [...new Set([...text.matchAll(EDGE_RE)].map((m) => `${m[1]}:${m[2]}`))];
+}
+
+// ---------------------------------------------------------------------------
+// AC2 (cap literals): QA_ROUND_EXCEEDED/REVIEW_ROUND_EXCEEDED/
+// VISUAL_ROUND_EXCEEDED triggerEdge encodes the round cap as ">= N" — assert
+// N matches the LIVE ROUND_CAP/REVIEW_ROUND_CAP/VISUAL_ROUND_CAP constants in
+// tools/transitions.ts (4/4/6), not a hand-copied number that can drift
+// silently if the cap is ever re-tuned.
+// ---------------------------------------------------------------------------
+
+const CAP_BY_CODE = {
+  QA_ROUND_EXCEEDED: ROUND_CAP_EXPORTED,
+  REVIEW_ROUND_EXCEEDED: REVIEW_ROUND_CAP_EXPORTED,
+  VISUAL_ROUND_EXCEEDED: VISUAL_ROUND_CAP_EXPORTED,
+};
+
+test("AC2 (c12): round-cap entries' triggerEdge numeric literal matches the live transitions.ts cap constant", () => {
+  for (const [code, cap] of Object.entries(CAP_BY_CODE)) {
+    const entry = GATE_REGISTRY.find((g) => g.errorCode === code);
+    assert.ok(entry, `${code} missing from GATE_REGISTRY`);
+    const m = entry.triggerEdge.match(/>=\s*(\d+)/);
+    assert.ok(m, `${code} triggerEdge does not encode a ">= N" cap literal: "${entry.triggerEdge}"`);
+    assert.equal(
+      Number(m[1]),
+      cap,
+      `${code} triggerEdge cap literal (${m[1]}) does not match the live transitions.ts cap (${cap})`,
+    );
+  }
+});
+
+// ---------------------------------------------------------------------------
+// AC2 (predicate names vs orchestrator emit sites): for every
+// producer:"orchestrator" entry whose armCondition contains a camelCase
+// predicate/function-call identifier, assert that identifier appears
+// literally in tools/handoff-orchestrator.ts — the file that actually calls
+// it. Catches a typo'd/renamed predicate in the registry copy that no longer
+// matches the real emit-site call.
+// ---------------------------------------------------------------------------
+
+test("AC2 (c12): orchestrator-producer armCondition predicate names are literally present in tools/handoff-orchestrator.ts", () => {
+  const orchestratorSrc = readSource(path.join("tools", "handoff-orchestrator.ts"));
+  let checked = 0;
+  for (const g of GATE_REGISTRY) {
+    if (g.producer !== "orchestrator") continue;
+    for (const predicate of extractPredicateNames(g.armCondition)) {
+      checked++;
+      assert.ok(
+        orchestratorSrc.includes(predicate),
+        `${g.errorCode} armCondition references "${predicate}" but it does not appear literally in tools/handoff-orchestrator.ts`,
+      );
+    }
+  }
+  assert.ok(
+    checked >= 12,
+    `expected >=12 predicate-name checks across orchestrator-producer entries, got ${checked}`,
+  );
+});
+
+// ---------------------------------------------------------------------------
+// AC2 (transition-edge pairs vs doc-file mapping): for the three entries
+// whose triggerEdge names a bare "pm:In_Progress" edge (SCOPE_DECISION_
+// REQUIRED, CUT_APPROVAL_REQUIRED, EXTERNAL_REFS_UNRESOLVED — the pm→build
+// entry gates), assert the edge literal appears verbatim in >=1 of the
+// content/*.md file(s) that already backtick-quote that entry's errorCode
+// (per the documentedInProse doc-file mapping, spec AC2). The compound
+// "{architect,sr-engineer}:In_Progress" half of the same triggerEdge is not
+// a single role:Status literal (a brace-set precedes the colon) and is
+// intentionally not extracted — EDGE_RE only matches a bare role name
+// immediately before ":Status".
+// ---------------------------------------------------------------------------
+
+test("AC2 (c12): transition-edge-pair literals in triggerEdge appear verbatim in the mapped content/*.md doc file(s)", () => {
+  const docCodes = extractDocCodes();
+  const EDGE_CHECKED_CODES = ["SCOPE_DECISION_REQUIRED", "CUT_APPROVAL_REQUIRED", "EXTERNAL_REFS_UNRESOLVED"];
+  let checked = 0;
+  for (const code of EDGE_CHECKED_CODES) {
+    const entry = GATE_REGISTRY.find((g) => g.errorCode === code);
+    assert.ok(entry, `${code} missing from GATE_REGISTRY`);
+    const edges = extractEdgePairs(entry.triggerEdge);
+    assert.ok(edges.length > 0, `${code} triggerEdge has no role:Status literal to check: "${entry.triggerEdge}"`);
+    const files = docCodes.get(code);
+    assert.ok(files && files.size > 0, `${code} is not backtick-quoted in any content/*.md (documentedInProse contract)`);
+    for (const edge of edges) {
+      const foundIn = [...files].filter((f) => readSource(f).includes(edge));
+      assert.ok(
+        foundIn.length > 0,
+        `${code} triggerEdge literal "${edge}" not found verbatim in any of its mapped doc files: ${[...files].join(", ")}`,
+      );
+      checked++;
+    }
+  }
+  assert.ok(checked >= 3, `expected >=3 edge-literal doc checks, got ${checked}`);
+});
+
+// ---------------------------------------------------------------------------
+// AC2 (constant-name literal, pinned case): TRANSITION_REJECTED's triggerEdge
+// names the ALLOWED_TRANSITIONS export — assert it really is a live
+// tools/transitions.ts export AND appears verbatim in TRANSITION_REJECTED's
+// mapped doc file (skill-coordinator.md).
+// ---------------------------------------------------------------------------
+
+test("AC2 (c12): TRANSITION_REJECTED's ALLOWED_TRANSITIONS literal is a real transitions.ts export, verbatim in its mapped doc", () => {
+  const entry = GATE_REGISTRY.find((g) => g.errorCode === "TRANSITION_REJECTED");
+  assert.ok(entry, "TRANSITION_REJECTED missing from GATE_REGISTRY");
+  assert.ok(
+    entry.triggerEdge.includes("ALLOWED_TRANSITIONS"),
+    "TRANSITION_REJECTED triggerEdge must reference ALLOWED_TRANSITIONS verbatim",
+  );
+  const transitionsSrc = readSource(path.join("tools", "transitions.ts"));
+  assert.ok(
+    transitionsSrc.includes("export const ALLOWED_TRANSITIONS"),
+    "ALLOWED_TRANSITIONS must be a real export in tools/transitions.ts",
+  );
+  const docCodes = extractDocCodes();
+  const files = docCodes.get("TRANSITION_REJECTED");
+  assert.ok(files && files.size > 0, "TRANSITION_REJECTED must be backtick-quoted in >=1 content/*.md");
+  const foundIn = [...files].filter((f) => readSource(f).includes("ALLOWED_TRANSITIONS"));
+  assert.ok(
+    foundIn.length > 0,
+    `ALLOWED_TRANSITIONS literal not found verbatim in TRANSITION_REJECTED's mapped doc file(s): ${[...files].join(", ")}`,
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Doc-file mapping vs actual backtick-quote sites: gates/registry.ts carries
+// a hand-authored comment (T-C12-01) mapping each errorCode to the
+// content/*.md file(s) that backtick-quote it — the input the checks above
+// rely on. Parse that comment (it is prose, not an exported const — TS
+// comments do not survive into dist/) and assert it is byte-for-byte the
+// same file set extractDocCodes() finds by actually scanning content/*.md.
+// A stale mapping comment (a doc file renamed/removed, a code re-documented
+// elsewhere) would silently make the AC2 checks above trust the wrong files
+// without this.
+// ---------------------------------------------------------------------------
+
+function parseDocFileMappingComment() {
+  const src = readSource(path.join("gates", "registry.ts"));
+  const map = new Map();
+  const LINE_RE = /^\/\/\s{2,}([A-Z][A-Z0-9_]*)\s{2,}(.+)$/gm;
+  let m;
+  while ((m = LINE_RE.exec(src))) {
+    map.set(
+      m[1],
+      new Set(m[2].split(",").map((f) => f.trim()).filter(Boolean)),
+    );
+  }
+  return map;
+}
+
+test("doc-file mapping (c12): gates/registry.ts's errorCode→doc-file mapping comment matches the actual backtick-quote sites", () => {
+  const mapping = parseDocFileMappingComment();
+  assert.equal(
+    mapping.size,
+    22,
+    `expected the mapping comment to list all 22 codes, found ${mapping.size}: ${[...mapping.keys()].join(", ")}`,
+  );
+  const docCodes = extractDocCodes();
+  for (const g of GATE_REGISTRY) {
+    const declared = mapping.get(g.errorCode);
+    assert.ok(declared, `${g.errorCode} missing from the doc-file mapping comment above GATE_REGISTRY`);
+    const actual = new Set([...(docCodes.get(g.errorCode) || [])].map((f) => path.basename(f)));
+    assert.deepEqual(
+      [...declared].sort(),
+      [...actual].sort(),
+      `${g.errorCode}: mapping comment declares [${[...declared].join(", ")}] but actual backtick-quote sites are [${[...actual].join(", ")}]`,
+    );
+  }
+});
+
+// ---------------------------------------------------------------------------
+// AC3: explicit allowlist for every (errorCode, field) pair whose value is
+// free-form English with no mechanically checkable literal — "never silently
+// exempted without acknowledgment in the diff." Each entry below carries a
+// one-line reason. The closure test that follows asserts every one of the
+// 22*2 (triggerEdge, armCondition) pairs is EITHER covered by a checkable-
+// literal test above OR listed here — never neither, never both. clearingArtifact
+// is intentionally out of this classification (AC1's non-empty bar is its only
+// bar per spec AC2's wording, which names only triggerEdge/armCondition as the
+// checkable-literal fields).
+// ---------------------------------------------------------------------------
+
+const FREE_TEXT_ALLOWLIST = [
+  { code: "AGENT_ID_REQUIRED", field: "triggerEdge", reason: "free English description of the null/unknown agent condition; no named predicate or edge-pair literal to check" },
+  { code: "AGENT_ID_REQUIRED", field: "armCondition", reason: "\"always (validateTransition step 1)\" — generic pointer to the enclosing function, reused verbatim (differing only by step N) across all 5 validateTransition-producer entries; not independently checkable per-entry" },
+  { code: "TRANSITION_REJECTED", field: "armCondition", reason: "same generic validateTransition-step pointer as AGENT_ID_REQUIRED" },
+  { code: "QA_ROUND_EXCEEDED", field: "armCondition", reason: "same generic validateTransition-step pointer" },
+  { code: "REVIEW_ROUND_EXCEEDED", field: "armCondition", reason: "same generic validateTransition-step pointer" },
+  { code: "VISUAL_ROUND_EXCEEDED", field: "armCondition", reason: "\"opt-in (counter present)\" — free English; the visual_round counter is a handoff field, not a named predicate/function call" },
+  { code: "CUT_APPROVAL_REQUIRED", field: "armCondition", reason: "\"unconditional; FileHandoffStorage only\" — names a class, not a predicate/function-call literal; this entry's checkable content is its triggerEdge edge-pair, checked separately" },
+  { code: "EXTERNAL_REFS_UNRESOLVED", field: "armCondition", reason: "compound free-English condition over the external_refs ledger; no single named predicate/function-call literal" },
+  { code: "MISSING_EVIDENCE", field: "triggerEdge", reason: "\"status=PASS with completed_tasks\" — free English, no role:Status edge pair or named constant" },
+  { code: "MISSING_REVIEW_EVIDENCE", field: "triggerEdge", reason: "a role:Status-shaped substring exists (code-reviewer:In_Progress -> qa-engineer:In_Progress), but skill-code-reviewer.md (its sole mapped doc) documents this hop only as comma-tuple prose ('(sr-engineer, In_Progress)' -> '(code-reviewer, In_Progress)'), never restating the colon form verbatim — asserting doc-verbatim presence here would be a guaranteed false failure, not a real check" },
+  { code: "EXPECTED_RED_DIFF_MISSING", field: "triggerEdge", reason: "free English precondition list, no role:Status edge pair or named constant" },
+  { code: "VISUAL_BASELINES_REQUIRED", field: "triggerEdge", reason: "free English (\"PASS, armed, ... absent\"), no checkable literal" },
+  { code: "VISUAL_EVIDENCE_MISSING", field: "triggerEdge", reason: "free English, no checkable literal" },
+  { code: "VISUAL_WIDGETS_UNVERIFIED", field: "triggerEdge", reason: "free English, no checkable literal" },
+  { code: "VISUAL_ASSERTIONS_REQUIRED", field: "triggerEdge", reason: "free English, no checkable literal" },
+  { code: "VISUAL_REPORT_INCOMPLETE", field: "triggerEdge", reason: "free English, no checkable literal" },
+  { code: "VISUAL_PROVENANCE_MISSING", field: "triggerEdge", reason: "references baseline:/diff-metric: prose field names, not a role:Status edge or named constant" },
+  { code: "BASELINE_MANIFEST_MISSING", field: "triggerEdge", reason: "free English, no checkable literal" },
+  { code: "BASELINE_PROVENANCE_INCOMPLETE", field: "triggerEdge", reason: "free English — the \">=2\" is a hardcoded threshold, not sourced from an exported constant the way the 4/4/6 round caps are" },
+  { code: "PIXEL_GATE_ATTESTATION_MISSING", field: "triggerEdge", reason: "references the pixel_gate_complete:true prose field name, not a role:Status edge or named constant" },
+  { code: "REVIEW_VERDICT_STATUS_MISMATCH", field: "triggerEdge", reason: "free English, no checkable literal" },
+  { code: "REVIEW_VERDICT_STATUS_MISMATCH", field: "armCondition", reason: "\"agent_id=code-reviewer && review_verdict present\" — snake_case field-name shorthand, not a camelCase predicate/function-call literal" },
+  { code: "REVIEWER_COMPLETED_TASKS_REJECTED", field: "triggerEdge", reason: "free English, no checkable literal" },
+  { code: "REVIEWER_COMPLETED_TASKS_REJECTED", field: "armCondition", reason: "snake_case field-name shorthand, not a camelCase predicate/function-call literal" },
+];
+
+test("AC3 (c12): every (errorCode, field) pair for triggerEdge/armCondition is either mechanically checked above or explicitly allowlisted as free-text — no silent exemptions", () => {
+  const triggerEdgeCheckable = new Set([
+    ...Object.keys(CAP_BY_CODE),
+    "TRANSITION_REJECTED",
+    "SCOPE_DECISION_REQUIRED",
+    "CUT_APPROVAL_REQUIRED",
+    "EXTERNAL_REFS_UNRESOLVED",
+  ]);
+  const armConditionCheckable = new Set(
+    GATE_REGISTRY.filter(
+      (g) => g.producer === "orchestrator" && extractPredicateNames(g.armCondition).length > 0,
+    ).map((g) => g.errorCode),
+  );
+  const allowlistKeys = FREE_TEXT_ALLOWLIST.map((e) => `${e.code}:${e.field}`);
+
+  const problems = [];
+  for (const g of GATE_REGISTRY) {
+    for (const field of ["triggerEdge", "armCondition"]) {
+      const key = `${g.errorCode}:${field}`;
+      const checkable = field === "triggerEdge" ? triggerEdgeCheckable.has(g.errorCode) : armConditionCheckable.has(g.errorCode);
+      const allowlisted = allowlistKeys.includes(key);
+      if (checkable && allowlisted) problems.push(`${key}: BOTH mechanically checked and allowlisted (remove from FREE_TEXT_ALLOWLIST)`);
+      if (!checkable && !allowlisted) problems.push(`${key}: NEITHER mechanically checked NOR allowlisted — silent exemption`);
+    }
+  }
+  assert.deepEqual(problems, [], problems.join("; "));
+  assert.equal(
+    new Set(allowlistKeys).size,
+    allowlistKeys.length,
+    "FREE_TEXT_ALLOWLIST must not contain duplicate (code, field) entries",
   );
 });

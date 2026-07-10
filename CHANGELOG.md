@@ -16,6 +16,19 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.61.0] - 2026-07-10
+
+### Added
+- **`c12-registry-field-consumers` — Registry field parity tests (v3.61.0).** Implements option (b) assert: extends A10/DR-3's existing generative-parity test pattern to `triggerEdge` and `armCondition` doc-facing fields in `gates/registry.ts`, adding 7 new parity test cases to `test/error-code-contract.test.mjs`. Eliminates the fourth unverified copy of gate semantics and ensures registry comments remain synchronized with code. No schema_version bump, no new tw_* tool, no code changes beyond test assertions (one comment-only edit to `gates/registry.ts`). Backwards-compatible; MINOR bump. QA verified via Phase 0.5 dogfood: all acceptance criteria independently verified; 1042/1042 tests pass. See `specs/c12-registry-field-consumers.md`, `qa_reports/review_T-C12-02.md`.
+
+### Changed
+- `gates/registry.ts` assertion comment expanded to document field parity contract.
+- `test/error-code-contract.test.mjs` 7 new test cases for `triggerEdge` and `armCondition` field validation.
+
+### Notes
+- driftBaselineIds appended with T-C12-01..05
+- `docs/backlog.md` C12 row marked DONE with v3.61.0 tag reference
+
 ## [3.60.0] - 2026-07-10
 
 ### Added

@@ -67,6 +67,38 @@ export interface GateDefinition {
   readonly documentedInProse: boolean;
 }
 
+// errorCode → doc-file mapping (T-C12-01, c12-registry-field-consumers).
+// For each errorCode, the content/*.md file(s) that backtick-quote it — the
+// documentedInProse anchor set. Consumed by the AC2 literal-parity assertions
+// in test/error-code-contract.test.mjs (T-C12-02/03): when an entry's
+// armCondition/triggerEdge carries a mechanically checkable literal, the
+// files listed here are where that entry's gate prose lives. Audited
+// 2026-07-10 against the live prose; regenerate with:
+//   grep -l '`<CODE>`' content/*.md
+//
+//   AGENT_ID_REQUIRED               skill-qa-engineer.md
+//   TRANSITION_REJECTED             skill-coordinator.md
+//   QA_ROUND_EXCEEDED               skill-qa-engineer.md
+//   REVIEW_ROUND_EXCEEDED           skill-code-reviewer.md
+//   VISUAL_ROUND_EXCEEDED           skill-qa-visual.md
+//   SCOPE_DECISION_REQUIRED         const-08-chain-31-mid.md, constitution-rationale.md, skill-pm.md
+//   CUT_APPROVAL_REQUIRED           const-08-chain-31-mid.md, skill-coordinator.md, skill-coordinator-lite.md
+//   EXTERNAL_REFS_UNRESOLVED        const-15-core-tail.md, skill-coordinator.md, skill-pm.md
+//   MISSING_EVIDENCE                skill-qa-engineer.md
+//   MISSING_REVIEW_EVIDENCE         skill-code-reviewer.md
+//   EXPECTED_RED_DIFF_MISSING       skill-qa-engineer.md
+//   VISUAL_BASELINES_REQUIRED       const-07-design-chain-gates.md, const-13-design-chain-s4.md, constitution-rationale.md, skill-design-auditor.md
+//   VISUAL_EVIDENCE_MISSING         const-07-design-chain-gates.md, skill-qa-engineer.md, skill-qa-visual.md
+//   VISUAL_WIDGETS_UNVERIFIED       skill-qa-visual.md
+//   VISUAL_ASSERTIONS_REQUIRED      const-07-design-chain-gates.md, const-13-design-chain-s4.md, constitution-rationale.md
+//   VISUAL_REPORT_INCOMPLETE        const-07-design-chain-gates.md, const-13-design-chain-s4.md, constitution-rationale.md, skill-qa-visual.md
+//   VISUAL_PROVENANCE_MISSING       skill-qa-visual.md
+//   BASELINE_MANIFEST_MISSING       const-07-design-chain-gates.md, skill-design-auditor.md, skill-qa-visual.md
+//   BASELINE_PROVENANCE_INCOMPLETE  const-07-design-chain-gates.md, skill-design-auditor.md, skill-qa-visual.md
+//   PIXEL_GATE_ATTESTATION_MISSING  skill-qa-visual.md
+//   REVIEW_VERDICT_STATUS_MISMATCH  const-05-core-standards.md, const-08-chain-31-mid.md, skill-code-reviewer.md
+//   REVIEWER_COMPLETED_TASKS_REJECTED  skill-code-reviewer.md
+
 // The 22-gate catalog, in documentation order. Array order is DOC order only —
 // it MUST NOT be relied on for evaluation order (DR-5; that lives in
 // handoff-orchestrator.ts as the physical if-block sequence).
