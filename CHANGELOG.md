@@ -16,6 +16,14 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.65.0] - 2026-07-10
+
+### Added
+- **`d1-prompt-arg-workspace-fallback` — Shape-gating for `workspace_path` arg (v3.65.0).** Adds `looksLikePath()` heuristic to `resolveWorkspacePath()` in `index.ts` to prevent free-text prompt arguments (e.g. natural-language questions in any script) from being misinterpreted as broken workspace paths. When the arg does not look path-shaped (`/`, `\`, `.`, `~`), it falls through to the `CLAUDE_PROJECT_DIR` env / `cwd` fallback chain, matching pre-D1 behavior for absent args. Path-shaped-but-missing args remain byte-identical to pre-D1 (C6's "resolution suspect" diagnostic still fires). Fixes live repro 2026-07-10: `/teamwork-lite <free text>` now resolves the real workspace state instead of rendering the S01a "not managed" footer. QA verified; all 1071/1071 tests pass. See `specs/d1-prompt-arg-workspace-fallback.md`, `qa_reports/review_D1-03.md`, `review_reports/review_D1-02.md`.
+
+### Notes
+- driftBaselineIds appended with D1-01, D1-02, D1-03, D1-REL, D1-DONE
+
 ## [3.64.1] - 2026-07-10
 
 ### Changed

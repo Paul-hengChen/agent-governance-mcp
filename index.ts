@@ -42,12 +42,29 @@ export interface WorkspaceResolution {
   managed: boolean;        // does path have .current/ or tasks.md ?
 }
 
+// Shape-only heuristic (D1): does the string look like a PATH ATTEMPT at all?
+// Claude Code's slash-command convention stuffs free text typed after the
+// command into the single `workspace_path` argument slot, so prose (in any
+// script) arrives here masquerading as a path. True for absolute Unix paths,
+// Windows paths, relative dot-prefixed paths, and ~/ home-shorthand; false for
+// prose, which essentially never contains a separator or a leading dot/tilde.
+// Deliberately shape-only — no existence check (spec: shape-gating takes
+// precedence; a non-path-shaped arg is discarded unconditionally). Exported
+// for unit tests.
+export function looksLikePath(s: string): boolean {
+  return /[/\\]/.test(s) || s.startsWith(".") || s.startsWith("~");
+}
+
 export function resolveWorkspacePath(
   args: Record<string, unknown> | undefined,
 ): WorkspaceResolution {
   let resolved: string;
   let source: WorkspaceSource;
-  if (typeof args?.workspace_path === "string" && args.workspace_path) {
+  if (
+    typeof args?.workspace_path === "string" &&
+    args.workspace_path &&
+    looksLikePath(args.workspace_path)
+  ) {
     resolved = args.workspace_path;
     source = "workspace_path arg";
   } else if (process.env.CLAUDE_PROJECT_DIR) {
@@ -115,7 +132,7 @@ function formatZodError(err: z.ZodError): string {
 // ==========================================
 // Storage adapter defaults to FileHandoffStorage; HTTP-mode boot switches it via setActiveStorage().
 const server = new Server(
-  { name: "agent-governance-mcp", version: "3.64.1" },
+  { name: "agent-governance-mcp", version: "3.65.0" },
   { capabilities: { tools: {}, prompts: {} } }
 );
 

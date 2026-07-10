@@ -18,6 +18,13 @@ future `/teamwork` feature; none blocks a release on its own.
 > expected-red opacity, code-reviewer ledger write, brief boilerplate). An
 > explicit execution order for everything still open is recorded in
 > *Recommended execution order* below the table.
+>
+> **2026-07-10 revision** (architecture review, lite session): with A/B/C
+> series fully shipped, D1–D8 added from a fresh review of the shipped system.
+> One observed live bug (D1); the rest are structural: the review's thesis is
+> that rule-corpus growth is superlinear and D3 (gate telemetry → rule
+> retirement) is the only counter-pressure — it should outrank adding any new
+> gate. Suggested order: D1 → D3 → D2 → D5 → D4 → D6 → D7+D8.
 
 | id | desc | priority | depends_on | est. files | design-link |
 |----|------|----------|------------|------------|-------------|
@@ -54,6 +61,14 @@ future `/teamwork` feature; none blocks a release on its own.
 | C16 | code-reviewer wrote `completed_tasks` ledger entries + evidence filename drifted from its own stated path — **done (2026-07-10, v3.58.0)** | P2 | — | ~3 (skill-code-reviewer, maybe orchestrator guard, tests) | — |
 | C17 | Coordinator dispatch briefs restate protocol by hand each hop — per-role brief template partial — **done (2026-07-10, v3.62.0)** | P3 | — | ~2 (skill-coordinator, maybe templates/) | — |
 | C18 | `configCache` never invalidates — post-release driftBaselineIds appends invisible until server restart (C4 follow-on) — **done (2026-07-10, v3.59.0)** | P3 | — | ~3 (`tools/config.ts` mtime check, skill-release-engineer note, test) | — |
+| D1 | Prompt args mis-resolved as `workspace_path` — non-path arg should fall back to cwd detection, not just "resolution suspect" — **done (2026-07-10, v3.65.0)** | P1 | — | ~3 (`prompts/build.ts`, `tools/registry.ts` prompt arg handling, test) | — |
+| D2 | Hop counter + token budget brake are model-executed in-memory arithmetic — move to server-side accounting (orchestrator counter field or PostToolUse hook) | P2 | D3 | ~4 (`tools/handoff-orchestrator.ts` or hook script, skill-coordinator, config, tests) | — |
+| D3 | Gate-fire telemetry: log every gate rejection (`TRANSITION_REJECTED`, `CUT_APPROVAL_REQUIRED`, …) to `.current/telemetry.jsonl` → data-driven rule retirement in retros | P1 | — | ~3 (`tools/handoff-orchestrator.ts` or `gates/registry.ts` emit point, docs, test) | — |
+| D4 | Behavioral compliance eval harness — scripted dispatch scenarios asserting model output format (§1 watermark etc.), guarding token-saving skill rewrites against behavior regressions | P2 | — | ~3 (new `test/eval/` harness, fixtures, npm script) | — |
+| D5 | Server-side crash detection: stamp `dispatched_at` + target role on dispatch; `tw_get_state` surfaces stale in-flight dispatch (>N min, no state write) — removes coordinator-memory dependence (C8 follow-on) | P2 | — | ~4 (`tools/handoff.ts` schema, orchestrator, skill-coordinator, tests) | — |
+| D6 | Host-capability as third compose axis: tag Claude-Code-only skill sections (Task tool, `agent-*.jsonl`, `~/.claude/agents`) `host:claude-code`; non-CC hosts skip dead text | P3 | — | ~5 (`prompts/constitution-manifest.ts` pattern extended to skills, `prompts/build.ts`, content splits, tests) | — |
+| D7 | `qa_reports/` unbounded growth (232 files) — per-feature archive / retention policy mirroring the tasks-archive convention | P3 | — | ~2 (skill-release-engineer or skill-qa-engineer archive step, docs) | — |
+| D8 | Lite recommended model is haiku but haiku §1 compliance is known-poor (watermark omissions) — trim lite bundle further or bump recommendation to sonnet | P3 | — | ~2 (`content/skill-coordinator-lite.md` frontmatter, measure-context-cost) | — |
 
 ### Recommended execution order (2026-07-09, everything still open)
 
@@ -729,3 +744,129 @@ in live runs first, cheap content-only batches next, design-heavy last.
 - **Owner:** /teamwork (coordinator SOP + handoff/config field).
 - **Risk if skipped:** low — round caps bound worst-case cost; this is a finer
   cost-side brake, not a correctness gate.
+
+## D1 — Prompt args mis-resolved as `workspace_path` (P1)
+- **What:** Invoking `/teamwork-lite <free text>` (e.g. a question in Chinese)
+  passes the text as the prompt's `workspace_path` argument;
+  `prompts/build.ts` resolves it literally and emits the S01a "resolution
+  suspect" state footer (`build.ts:410`) — the session starts with a wrong
+  "not a managed workspace" claim instead of the real workspace state.
+  Observed live 2026-07-10 in this repo.
+- **Fix:** when the `workspace_path` arg is not an existing directory, fall
+  back to cwd-based workspace detection (same probe the SessionStart hook
+  uses) and treat the arg as user text, not a path. Keep the suspect footer
+  only for path-shaped args that genuinely don't resolve.
+- **Owner:** /teamwork (small code fix + test; sr→qa).
+- **Risk if skipped:** every lite invocation with inline args loses state
+  injection; agents act on "no handoff found" while a handoff exists — the
+  exact failure class C6 fixed for the stale-`prd_path` variant.
+
+## D2 — Server-side accounting for hop counter + token brake (P2, depends D3)
+- **What:** Both cost-side circuit breakers are "in-memory, model-maintained
+  arithmetic" (`skill-coordinator.md` §Auto-Routing, §Token Budget Brake):
+  the coordinator increments its own hop counter and sums four `usage.*`
+  fields per dispatch by hand. Context compaction or a coordinator crash
+  silently resets both; model arithmetic is inherently unreliable. C9/C14
+  already proved the pattern: prose-token bookkeeping → validated first-class
+  mechanism.
+- **Fix (sketch):** either (a) orchestrator-side dispatch counter — a
+  per-feature counter field stamped on each role-transition write, checked
+  server-side against the `hop` cap; or (b) a PostToolUse hook on `Task` that
+  appends usage to a `.current/` side file the coordinator reads instead of
+  summing. Decide (a)/(b) at architecture time; telemetry from D3 shares the
+  emit point.
+- **Owner:** /teamwork (needs an architecture decision first).
+- **Risk if skipped:** the brakes exist but fail exactly in the long/expensive
+  sessions they were built for (compaction is correlated with high spend).
+
+## D3 — Gate-fire telemetry → data-driven rule retirement (P1)
+- **What:** Every C-series ticket came from a human noticing friction in a
+  live run. The server already sees each gate rejection
+  (`TRANSITION_REJECTED`, `CUT_APPROVAL_REQUIRED`, `EXTERNAL_REFS_UNRESOLVED`,
+  `REVIEW_VERDICT_STATUS_MISMATCH`, visual gates…) but records nothing.
+  There is no data on which rules ever fire — a prose rule or gate that never
+  fires is pure token cost on every dispatch.
+- **Fix:** one emit point (orchestrator or `gates/registry.ts`) appending
+  `{ts, gate, error_code, agent_id, feature}` to `.current/telemetry.jsonl`
+  on every rejection (and optionally every pass-through). Retro procedure:
+  rank rules by fire count; zero-fire rules over N features become retirement
+  candidates. Same "measured costs, not estimates" standard the coordinator
+  skill already applies to token telemetry (§Subagent Token Observability).
+- **Owner:** /teamwork (small code + retro SOP line).
+- **Risk if skipped:** rule-corpus growth is superlinear (every friction adds
+  a rule; nothing removes one) — compliance load keeps crowding out task
+  tokens with no counter-pressure. This is the review's highest-leverage
+  ticket.
+
+## D4 — Behavioral compliance eval harness (P2)
+- **What:** All 1067 tests are structural (marker greps, error-code contract,
+  compose golden baseline, parser round-trips). Nothing verifies that a model
+  given the assembled bundle actually follows it — known haiku watermark
+  omissions (patched downstream by coordinator `validateWatermark`) prove
+  behavioral drift is real and currently invisible to CI.
+- **Fix:** a small eval harness (5–10 scripted scenarios): feed a role bundle
+  + canned task to a model, assert output invariants (watermark format, terse
+  cap, escalation-call shape, no banned phrases). Run on demand / pre-release,
+  not per-commit (costs API calls). Primary purpose: catch behavior
+  regressions when skills are rewritten for token savings (A6/A7-class
+  rewrites).
+- **Owner:** /teamwork (qa-engineer owns the harness).
+- **Risk if skipped:** every token-saving rewrite is a blind bet that
+  compressed prose still steers the model; failures surface as downstream
+  agent misbehavior — the hardest class to trace (same rationale as A3).
+
+## D5 — Server-side stale-dispatch detection (P2, C8 follow-on)
+- **What:** The Crash-Resume Protocol (skill-coordinator, v3.53.0) depends on
+  the coordinator *remembering* it dispatched a role that never wrote state.
+  If the coordinator itself is compacted/killed, the wedge is invisible: the
+  handoff shows a stale tuple and nothing marks a dispatch as in-flight.
+- **Fix:** orchestrator stamps `dispatched_at` + target role on (or alongside)
+  the state write preceding a dispatch; `tw_get_state` surfaces "stale
+  in-flight dispatch: <role>, no state write for >N min" so ANY context —
+  including a fresh session — can detect the dead role and run Crash-Resume
+  without dispatch-side memory.
+- **Owner:** /teamwork (handoff schema field + orchestrator + skill note).
+- **Risk if skipped:** double-crash (subagent + coordinator) leaves a wedged
+  chain that only a human forensic pass can diagnose.
+
+## D6 — Host-capability as a third compose axis (P3)
+- **What:** `skill-coordinator.md` carries large Claude-Code-only sections
+  (Task-tool dispatch, `agent-*.jsonl` token telemetry, `~/.claude/agents`
+  templates, watermark validation via `dist/lib/watermark-check.js`). On
+  Cursor/Continue/plain-MCP hosts this is dead text loaded on every dispatch;
+  the graceful-fallback prose documents its own irrelevance.
+- **Fix:** extend the A9 compose pattern (`prompts/constitution-manifest.ts`
+  tags core/design/chain) with a host axis — e.g. `host:claude-code` tagged
+  skill fragments included only when the client advertises Task-tool
+  capability (or via config). Skills gain the same manifest treatment the
+  constitution already has.
+- **Owner:** /teamwork (manifest + build.ts + skill splits; design first —
+  how the server learns the host).
+- **Risk if skipped:** low — token waste on non-CC hosts only; grows as more
+  CC-specific machinery (hooks, pins, telemetry) accretes in coordinator prose.
+
+## D7 — `qa_reports/` retention / archive policy (P3)
+- **What:** `qa_reports/` holds 232 files and grows monotonically — every QA
+  round, review, and visual report lands there forever. tasks.md got an
+  archive convention (C4 / drift baseline); evidence files have none.
+- **Fix:** per-feature archive step at release time (release-engineer SOP):
+  move the shipped feature's reports to `qa_reports/archive/<feature>/` (or
+  a dated subdir). Server evidence checks only ever read the active feature's
+  reports, so the move is safe post-release; verify the drift/evidence paths
+  ignore the archive.
+- **Owner:** /teamwork (content + one SOP step; small).
+- **Risk if skipped:** low — directory noise, slower human navigation; no
+  correctness exposure found.
+
+## D8 — Lite recommended model vs haiku §1 compliance (P3)
+- **What:** `skill-coordinator-lite.md` recommends haiku, but haiku's §1
+  compliance is documented-poor (watermark omissions are the stated reason
+  the coordinator runs `validateWatermark` at all). Lite has NO validating
+  parent — its replies go to the human unchecked, so lite is exactly where a
+  low-compliance tier hurts most.
+- **Fix:** either trim the lite bundle further until haiku reliably complies
+  (measure via D4 harness), or bump the lite `recommended_model` to sonnet
+  and accept the cost. Decide with D4 data if available.
+- **Owner:** solo/lite-scale decision once D4 exists; content-only change.
+- **Risk if skipped:** low — cosmetic non-compliance (missing watermark,
+  verbosity) in solo sessions.

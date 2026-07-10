@@ -476,3 +476,124 @@ test("C11/AC-7 L2 fail-safe: stale (>120s), malformed, and absent markers all de
     rm(wsAbsent);
   }
 });
+
+// ---------------------------------------------------------------------------
+// D1 — prompt-arg-workspace-fallback (specs/d1-prompt-arg-workspace-fallback.md)
+// looksLikePath() gates resolveWorkspacePath()'s arg-acceptance branch so a
+// free-text workspace_path arg (Claude Code's slash-command convention stuffs
+// any text typed after "/teamwork ..." into this single argument slot) falls
+// through to the CLAUDE_PROJECT_DIR/cwd chain instead of being treated as a
+// literal (bogus) path. resolveWorkspacePath/looksLikePath live in index.ts,
+// which — like the AC-4 block above — cannot be imported in-process (its
+// top-level IIFE connects a stdio transport unconditionally at import time,
+// with no guard; verified by reading index.ts directly), so every case below
+// spawns the real compiled server via sendPromptRequests, exactly like the
+// existing AC-4/AC-7/AC-8 e2e tests.
+//
+// D1 Spec-to-Test map:
+//   AC-1 (non-path-shaped arg falls back)        -> t-d1-ac1
+//   AC-2 (existing-dir arg unchanged)             -> already covered above (the
+//                                                     AC-4/e2e dedup test's 3rd
+//                                                     fetch uses a real, existing
+//                                                     wsArg via workspace_path arg)
+//   AC-3 (path-shaped-but-missing arg unchanged)  -> t-d1-ac3
+//   AC-4 (end-to-end repro fixed)                 -> t-d1-ac4
+//   AC-5 (absent-arg behavior unchanged)          -> t-d1-ac5 (plus every
+//                                                     pre-existing arguments:{}
+//                                                     case above, unmodified)
+//   AC-6 (existing C6 footer tests still pass)    -> this whole file, unmodified
+//                                                     above this section
+//   AC-7 (full suite green)                       -> enforced at the npm test
+//                                                     level, not a single test
+// ---------------------------------------------------------------------------
+
+test("D1/AC-1: non-path-shaped (free-text) arg falls through to the CLAUDE_PROJECT_DIR env chain, never treated as a path", async () => {
+  const ws = managedEmptyWorkspace();
+  const freeText = "你好，這是一段沒有路徑分隔符號的自由文字，請問現在狀態如何？";
+  try {
+    const byId = await sendPromptRequests(
+      { env: { CLAUDE_PROJECT_DIR: ws } },
+      [{ id: 2, name: "teamwork", arguments: { workspace_path: freeText } }],
+    );
+    const text = textOf(byId, 2);
+    assert.ok(
+      text.includes("resolved via CLAUDE_PROJECT_DIR env"),
+      "a free-text arg must be rejected by looksLikePath() and fall through to the env source, never 'workspace_path arg'",
+    );
+    assert.ok(
+      !text.includes("resolved via workspace_path arg"),
+      "source must never be attributed to the rejected free-text arg",
+    );
+    assert.ok(
+      !text.includes(freeText),
+      "the rejected free-text arg must not be written or surfaced anywhere in the footer (AC-1)",
+    );
+    assert.ok(
+      !text.includes("resolution suspect"),
+      "a real managed workspace reached via the env fallback must render normally, not S01a",
+    );
+  } finally {
+    rm(ws);
+  }
+});
+
+test("D1/AC-3: path-shaped-but-nonexistent arg stays literal and still renders S01a — regression-locked, byte-identical to pre-D1", async () => {
+  const bogusPath = path.join(os.tmpdir(), `twpsf-d1-ac3-nonexistent-${Date.now()}`);
+  assert.ok(!fs.existsSync(bogusPath), "fixture precondition: this path must not exist on disk");
+  const byId = await sendPromptRequests({}, [{ id: 2, name: "teamwork", arguments: { workspace_path: bogusPath } }]);
+  const text = textOf(byId, 2);
+  assert.ok(
+    text.includes("resolution suspect"),
+    "a path-shaped-but-missing arg must still trip the S01a 'resolution suspect' footer (AC-3: no existence check gates this branch)",
+  );
+  assert.ok(text.includes(bogusPath), "S01a must still name the resolved (bogus) path verbatim, unchanged from pre-D1");
+  assert.ok(
+    text.includes("resolved via workspace_path arg"),
+    "source must stay attributed to the arg itself — path-shaped input gets no env/cwd fallback (AC-3)",
+  );
+});
+
+test("D1/AC-4: end-to-end repro — a real /teamwork* free-text arg in a real managed workspace renders live state, not S01a", async () => {
+  const ws = await realHandoffWorkspace("d1-ac4-repro-feat");
+  const freeText = "開始實作 D1，目前狀態是什麼？";
+  try {
+    const byId = await sendPromptRequests(
+      { env: { CLAUDE_PROJECT_DIR: ws } },
+      [{ id: 2, name: "teamwork", arguments: { workspace_path: freeText } }],
+    );
+    const text = textOf(byId, 2);
+    assert.ok(
+      text.includes("## 📍 Current Project State (Auto-injected)"),
+      "AC-4: must render the normal state JSON block for the real workspace",
+    );
+    assert.ok(
+      text.includes('"active_feature": "d1-ac4-repro-feat"'),
+      "AC-4: must reflect the REAL workspace's state, not the misrouted free text",
+    );
+    assert.ok(
+      !text.includes("resolution suspect"),
+      "AC-4: must NOT render the S01a 'not an agent-governance-managed workspace' claim — this was the exact 2026-07-10 live repro bug this feature fixes",
+    );
+    assert.ok(!text.includes(freeText), "the discarded free-text arg must not leak anywhere into the footer");
+  } finally {
+    rm(ws);
+  }
+});
+
+test("D1/AC-5: absent workspace_path arg is byte-identical to pre-D1 — still resolves via CLAUDE_PROJECT_DIR env untouched", async () => {
+  const ws = managedEmptyWorkspace();
+  try {
+    const byId = await sendPromptRequests(
+      { env: { CLAUDE_PROJECT_DIR: ws } },
+      [{ id: 2, name: "teamwork", arguments: {} }],
+    );
+    const text = textOf(byId, 2);
+    assert.ok(
+      text.includes("resolved via CLAUDE_PROJECT_DIR env"),
+      "AC-5: an absent arg must resolve via env exactly as before D1 — the leading typeof-string guard in resolveWorkspacePath is untouched by the looksLikePath gate",
+    );
+    assert.ok(!text.includes("resolution suspect"), "AC-5: absent arg into a real managed workspace must render normally, not S01a");
+  } finally {
+    rm(ws);
+  }
+});
