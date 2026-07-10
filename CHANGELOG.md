@@ -16,6 +16,14 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.67.0] - 2026-07-10
+
+### Added
+- **`d4-behavioral-eval-harness` — Behavioral compliance eval harness (v3.67.0).** Adds `test/eval/` bundle loader infrastructure with assertion helpers and 7 compliance scenarios covering role routing, state machine transitions, gate enforcement, and drift detection. Provides on-demand `npm run eval` runner for live evaluation of core constraints. Live smoke tests (AC-10) deferred due to missing `ANTHROPIC_API_KEY` — fail-fast path (AC-11) independently verified as substitute evidence. Full feature scope documented in `specs/d4-behavioral-eval-harness.md`; QA verified with human-waived scope (degraded). All 1089/1089 tests pass. See `qa_reports/review_T-D4-09.md`, `review_reports/review_T-D4-08.md`.
+
+### Notes
+- driftBaselineIds appended with T-D4-01, T-D4-02, T-D4-03, T-D4-05, T-D4-06, T-D4-07, T-D4-08, T-D4-09, T-D4-REL, T-D4-DONE
+
 ## [3.66.0] - 2026-07-10
 
 ### Added
