@@ -16,6 +16,14 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.66.0] - 2026-07-10
+
+### Added
+- **`d3-gate-fire-telemetry` — Gate-fire telemetry and retro procedure (v3.66.0).** Adds `tools/telemetry.ts` (65 lines) with `emitGateTelemetry()` function to record all gate rejections in `.current/telemetry.jsonl` (append-only, no locks). Splits `tools/handoff-orchestrator.ts` `handleUpdateState` into `handleUpdateStateCore` (unchanged frozen check-order body) + wrapper that emits telemetry on rejection. Adds `docs/gate-retro-procedure.md` — five-step periodic retro to parse telemetry, rank gate fires by frequency, flag zero-fire gates at N=5 releases (configurable), and surface findings for human review. No authoritatively-gated state change, no new API surface; pure observability sidecar. Enables load-bearing vs dead-weight distinction on gate rules — foundational for counter-pressure on superlinear rule-corpus growth (C-series tickets). QA verified; all 1089/1089 tests pass. See `specs/d3-gate-fire-telemetry.md`, `qa_reports/review_T-D3-05.md`.
+
+### Notes
+- driftBaselineIds appended with T-D3-01, T-D3-02, T-D3-03, T-D3-04, T-D3-05, T-D3-REL, T-D3-DONE
+
 ## [3.65.0] - 2026-07-10
 
 ### Added

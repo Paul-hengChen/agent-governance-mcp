@@ -46,9 +46,30 @@ import { hasCutApproval } from "../gates/cut-approval.js";
 import { hasUnresolvedRefs, listUnresolvedRefs } from "../gates/external-refs.js";
 import { gate } from "../gates/registry.js";
 import { awaitAllInflightFor } from "./rag-coalesce.js";
+import { emitGateTelemetry, extractGateCodeFromText } from "./telemetry.js";
+
+// D3 (d3-gate-fire-telemetry) — thin telemetry wrapper, the ONE emit point
+// for all 22 GATE_REGISTRY rejections. Zero changes to the frozen check-order
+// body below (handleUpdateStateCore is the pre-D3 handleUpdateState,
+// byte-identical). emitGateTelemetry swallows internally (AC-4): the returned
+// ToolResult is never masked or altered by a telemetry failure.
+// enforcePreFlight's thrown session-guard exceptions propagate through
+// unmodified — not a GateErrorCode, out of scope.
+export async function handleUpdateState(parsed: UpdateStateInput): Promise<ToolResult> {
+  const result = await handleUpdateStateCore(parsed);
+  if (result.isError) {
+    const first = result.content[0];
+    const text = first && first.type === "text" ? first.text : "";
+    const errorCode = extractGateCodeFromText(text);
+    if (errorCode) {
+      emitGateTelemetry(parsed.workspace_path, errorCode, parsed.agent_id, parsed.active_feature);
+    }
+  }
+  return result;
+}
 
 // --- GUARDED: must call tw_get_state first ---
-export async function handleUpdateState(parsed: UpdateStateInput): Promise<ToolResult> {
+async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResult> {
         enforcePreFlight(parsed.workspace_path, "tw_update_state");
 
         // Defense-in-depth: zod refine already enforces this on PASS, but a
