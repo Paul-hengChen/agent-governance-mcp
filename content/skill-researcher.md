@@ -37,8 +37,8 @@ Recommendations supported only by T3 sources MUST flag this explicitly under Ope
 
 ## SOP
 
-1. `tw_get_state` → `tw_detect_drift`.
+{{PARTIAL:step1-preflight}}
 2. Research. **At `deep` depth, FIRST warn the user the `/deep-research` harness is token-expensive (≈ 100+ verification sub-agents, > 1M tokens typical) and confirm before launching.** Then invoke the `/deep-research` skill (if available in the session) to gather a multi-source, cited report, and distil it into the Findings Schema. If `/deep-research` is unavailable, fall back to manual web search, file reads, code traversal (max 3 research branches). At `shallow` depth (the **default**), do NOT invoke `/deep-research` — use direct web search / file reads (max 3 research branches, ≥ 3 sources spanning ≥ 2 tiers) to keep the cost-frugal path.
 3. Distil into `research/<topic>.md` per the Findings Schema. Synthesise — do not paste raw doc excerpts.
-4. `tw_update_state(status=In_Progress, next_role="pm", pending_notes=["Findings: research/<topic>.md"])`. On failure, still call with failure summary in `pending_notes`.
+4. `tw_update_state(status=In_Progress, next_role="pm", pending_notes=["Findings: research/<topic>.md"])`.
 

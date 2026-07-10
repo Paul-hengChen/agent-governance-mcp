@@ -5,6 +5,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { parseSkillFile, type ModelTier } from "./skill-frontmatter.js";
+import { expandPartials } from "../prompts/partials-manifest.js";
 import type { ToolResult, SwitchRoleInput } from "./registry.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -57,7 +58,19 @@ export function switchRole(role: RoleName, workspacePath: string): string {
   }
 
   const raw = fs.readFileSync(filePath, "utf-8");
-  const { frontmatter, body } = parseSkillFile(raw);
+  // Partial expansion (ticket A12, DR-4): switchRole is the SECOND skill
+  // render path — it does NOT flow through buildPromptForRole, so without
+  // this call tw_switch_role would leak raw {{PARTIAL:…}} tokens for every
+  // partial-adopting role. The loader mirrors the skill override resolution
+  // above (workspace .current/ override > server content/ default).
+  const loadPartial = (f: string): string => {
+    const partialOverride = path.join(workspacePath, ".current", f);
+    return fs.readFileSync(
+      fs.existsSync(partialOverride) ? partialOverride : path.join(CONTENT_DIR, f),
+      "utf-8",
+    );
+  };
+  const { frontmatter, body } = parseSkillFile(expandPartials(raw, loadPartial));
 
   let instruction =
     `Context-loading only: the server is returning the "${role}" SOP for you to follow. ` +

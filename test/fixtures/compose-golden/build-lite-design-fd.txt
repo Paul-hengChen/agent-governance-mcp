@@ -4,6 +4,21 @@ Standing orders for any AI agent working in an agent-governance-managed workspac
 Methodology-agnostic. Skills inherit everything below — they MUST NOT
 restate these rules.
 
+## Limits
+
+Sole authoritative definition of every named numeric limit. Body text (constitution and skills) references these by **name** (e.g. "the `visual_round` cap") — never by restating the bare number.
+
+| name | value | meaning |
+|---|---|---|
+| `qa_round` cap | 3 | Max qa-engineer FAIL rounds on one task before routing locks to pm. |
+| `review_round` cap | 3 | Max code-reviewer CHANGES_REQUESTED rounds before routing locks to pm. |
+| `visual_round` cap | 5 | Max visual-regression rounds before mandatory split/pm route (design-armed only). |
+| `hop` cap | 10 | Max auto-routing role transitions per `/teamwork` session (lite mode exempt). |
+| `fix_try` cap | 2 | Max consecutive auto-fix tries on the same failure (§5 anti-loop). |
+| `read` cap | 3 | Max file reads per target (§5 anti-loop). |
+| `pass_budget` | 250 lines × 5 passes | design-auditor per-feature output ceiling (§5 anti-loop). |
+| `task_size` budget | ≤ 5 files / 300 lines | One sr-engineer task = one session ceiling. |
+
 ## 1. Output Directives (Zero Tolerance)
 
 - **NO YAPPING**: No filler. Output ONLY technical content, decisions, or tool calls.
@@ -49,10 +64,10 @@ restate these rules.
 
 ## 5. Anti-Loop Circuit Breaker
 
-- **Fix attempts**: Max 2 consecutive auto-fix tries on the same failure. Then STOP.
-- **File reads per target**: Max 3. Then STOP.
+- **Fix attempts**: Max consecutive auto-fix tries on the same failure is the `fix_try` cap. Then STOP.
+- **File reads per target**: Max is the `read` cap. Then STOP.
 - **Escalation**: On limit, stop tool use immediately. Report what's missing and wait for human instruction.
-- **Auto-routing hop cap**: per `/teamwork` session, max 10 role transitions. See `skill-coordinator` §Auto-Routing for the full stop-condition list. Lite mode is exempt (no auto-routing).
+- **Auto-routing hop cap**: per `/teamwork` session, role transitions are capped at the `hop` cap. See `skill-coordinator` §Auto-Routing for the full stop-condition list. Lite mode is exempt (no auto-routing).
 
 ## 6. Security & Privacy
 
@@ -75,4 +90,4 @@ Higher-priority document wins on conflict.
 
 On any intra-constitution conflict, safety/correctness rules (§2, §3, §6, §7) override efficiency/style rules (§1).
 
-When §5 anti-loop trips (2 fix tries / 3 reads exhausted), hand back Blocked/FAIL to the human. Never issue an error-laden PASS; never extend the loop.
+When §5 anti-loop trips (`fix_try` cap / `read` cap exhausted), hand back Blocked/FAIL to the human. Never issue an error-laden PASS; never extend the loop.

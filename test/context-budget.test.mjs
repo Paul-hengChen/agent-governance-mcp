@@ -43,6 +43,22 @@ const approxTokens = (t) => Math.ceil(t.length / 4);
 
 const { stripRationale, stripOriginTags, buildPromptForRole, composeConstitution } = await import(path.join(ROOT, "dist", "prompts", "build.js"));
 const { setActiveStorage, FileHandoffStorage } = await import(path.join(ROOT, "dist", "tools", "storage.js"));
+// a12-partials-limits-registry (T-A12-04, AC5): 5 skill files (architect, pm,
+// design-auditor, researcher, sr-engineer) now source their step-1 preflight
+// line from content/partial-step1-preflight.md via {{PARTIAL:step1-preflight}}
+// (buildPromptForRole/switchRole both expand it before frontmatter parsing —
+// see prompts/build.ts L363-371). Any test here that fs.readFileSync's one of
+// those 5 files directly no longer sees the composed text an agent actually
+// receives; it sees the bare, un-expanded token. Import the same expander the
+// real pipeline uses so raw-file-read tests measure/assert against the
+// partial-composed body, not the raw disk bytes.
+const { expandPartials } = await import(path.join(ROOT, "dist", "prompts", "partials-manifest.js"));
+function loadPartial(f) {
+  return fs.readFileSync(path.join(ROOT, "content", f), "utf-8");
+}
+function expandSkill(rawBody) {
+  return expandPartials(rawBody, loadPartial);
+}
 
 // compose-not-strip (ticket A9, T-CNSO-07): CONSTITUTION was `fs.readFileSync(content/
 // constitution.md)`; it is now the composed-all bundle, which Option R (architecture
@@ -93,6 +109,98 @@ const SR_RULE_MARKERS = [
   "Code-Review Round Reply",
   "QA Round Reply",
 ];
+
+// --- AC2 (a12-partials-limits-registry, T-A12-04): partial-substitution byte-identity ---
+// WHY: specs/a12-partials-limits-registry-architecture.md's Byte-Identity Contract (AC2)
+// requires buildPromptForRole's composed output for the 5 partial-adopting roles
+// (architect, pm, design-auditor, researcher, sr-engineer) to be byte-identical, on the
+// SKILL portion, to the pre-refactor hand-authored step-1 line. The direct expandPartials
+// unit test below is architecture's "Recommended primary AC2 assertion"; the per-role
+// buildPromptForRole assertions are the end-to-end proof that both render paths (build.ts
+// AND tools/role.ts, DR-4) actually wire it in — a regression in either wiring site would
+// either leak a raw {{PARTIAL:...}} token or drop the line entirely.
+const STEP1_LINE = "1. `tw_get_state` → `tw_detect_drift`.";
+const PARTIAL_ADOPTING_SKILLS = [
+  "skill-architect.md",
+  "skill-pm.md",
+  "skill-design-auditor.md",
+  "skill-researcher.md",
+  "skill-sr-engineer.md",
+];
+
+test("AC2: expandPartials(step1-preflight token) equals the exact pre-refactor step-1 line (byte-identical)", () => {
+  // WHY: this is the whole byte-identity contract distilled to one call — the loaded
+  // partial file, minus its one conventional trailing newline (DR-3), must equal the
+  // literal bytes every one of the 5 skills used to hand-author on their own step-1 line.
+  const actual = expandPartials("{{PARTIAL:step1-preflight}}", loadPartial);
+  assert.equal(actual, STEP1_LINE, "expandPartials must reproduce the exact pre-refactor step-1 line, byte-for-byte");
+});
+
+test("AC2: unknown partial token fails loud (DR-6) instead of silently passing through", () => {
+  const actual = expandPartials("{{PARTIAL:no-such-token}}", loadPartial);
+  assert.equal(actual, "[ERROR: unknown partial token 'no-such-token']", "unknown token must substitute the visible fail-loud marker");
+});
+
+test("AC2: text with zero {{PARTIAL:...}} matches passes through expandPartials unchanged", () => {
+  const text = "no partial tokens in this constitution fragment";
+  assert.equal(expandPartials(text, loadPartial), text, "no-token text must be returned unchanged");
+});
+
+for (const skillFile of PARTIAL_ADOPTING_SKILLS) {
+  test(`AC2: buildPromptForRole(${skillFile}) composed output carries the expanded step-1 line, no leaked token`, async () => {
+    const ws = fs.mkdtempSync(path.join(os.tmpdir(), "twa12-"));
+    setActiveStorage(new FileHandoffStorage());
+    const s = new FileHandoffStorage();
+    await s.writeState(ws, "a12-fixture-feat", "In_Progress", [], []);
+    const text = buildPromptForRole(skillFile, "a12-check", ws, false).messages[0].content.text;
+    fs.rmSync(ws, { recursive: true, force: true });
+    assert.ok(text.includes(STEP1_LINE), `${skillFile} composed dispatch must contain the expanded step-1 line verbatim`);
+    assert.ok(!text.includes("{{PARTIAL:"), `${skillFile} composed dispatch must not leak a raw {{PARTIAL:...}} token`);
+  });
+}
+
+test("AC2/DR-4: tools/role.ts switchRole (the second render path) also expands the step-1 partial for all 5 roles", async () => {
+  // WHY: switchRole does NOT flow through buildPromptForRole (architecture DR-4) — a
+  // separate wiring site that, if missed, would leak the raw token specifically on the
+  // tw_switch_role tool path while buildPromptForRole looked fine. Exercise both to close
+  // the full DR-4 contract.
+  const { switchRole } = await import(path.join(ROOT, "dist", "tools", "role.js"));
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "twa12-role-"));
+  try {
+    const roleFor = {
+      "skill-architect.md": "architect",
+      "skill-pm.md": "pm",
+      "skill-design-auditor.md": "design-auditor",
+      "skill-researcher.md": "researcher",
+      "skill-sr-engineer.md": "sr-engineer",
+    };
+    for (const [skillFile, role] of Object.entries(roleFor)) {
+      const response = JSON.parse(switchRole(role, ws));
+      assert.ok(response.sop.includes(STEP1_LINE), `switchRole("${role}") sop must contain the expanded step-1 line verbatim`);
+      assert.ok(!response.sop.includes("{{PARTIAL:"), `switchRole("${role}") sop must not leak a raw {{PARTIAL:...}} token`);
+    }
+  } finally {
+    fs.rmSync(ws, { recursive: true, force: true });
+  }
+});
+
+test("DR-5 guard (T-A12-09): no literal {{PARTIAL:...}} token may appear in any const-*.md, skill-coordinator.md, or skill-coordinator-lite.md source file", () => {
+  // WHY: architecture DR-5 — the SessionStart hook renders ONLY skill-coordinator.md /
+  // skill-coordinator-lite.md, and neither adopts the partial mechanism; const-*.md
+  // fragments never carried the step-1 line at all. None of these render through
+  // expandPartials (build.ts only calls it on the DISPATCHED skill file, never on the
+  // constitution fragments; the hook doesn't call it either). If a future edit ever
+  // placed a {{PARTIAL:...}} token into any of these files, it would leak to the agent
+  // completely un-expanded — this static source-grep guard catches that at the source,
+  // cheaper than waiting for a composed-output test to notice.
+  const CONTENT_DIR = path.join(ROOT, "content");
+  const files = fs.readdirSync(CONTENT_DIR).filter((f) => /^const-\d\d-/.test(f));
+  files.push("skill-coordinator.md", "skill-coordinator-lite.md");
+  for (const f of files) {
+    const body = fs.readFileSync(path.join(CONTENT_DIR, f), "utf-8");
+    assert.ok(!/\{\{PARTIAL:/.test(body), `${f} must not contain a literal {{PARTIAL:...}} token (DR-5: rendered outside expandPartials)`);
+  }
+});
 
 // --- AC2: reduction -------------------------------------------------------
 
@@ -165,12 +273,20 @@ test("AC2: lean always-on bundle is below the raw baseline and within target (<=
   // on this lean path too. Independently re-measured (not trusted from sr-engineer's or
   // code-reviewer's notes) at 3761 ~tok (exact); cap set to the exact measured value per
   // the established Phase-2 convention (no additional headroom).
+  // a12-partials-limits-registry (qa-owned bump, T-A12-05/AC3): cap raised from 3761 →
+  // 4027 to absorb the new `## Limits` table inserted at the top of
+  // const-01-core-head.md (before §1) — const-01 is core-head (untagged chain/design),
+  // so it loads on this lean path too. skill-coordinator-lite.md does not adopt the
+  // {{PARTIAL:...}} mechanism (spec DR-5), so no skill-side change here. Independently
+  // re-measured (not trusted from sr-engineer's or code-reviewer's notes) at 4027 ~tok
+  // (exact); cap set to the exact measured value per the established Phase-2 convention
+  // (no additional headroom).
   const liteSkill = fs.readFileSync(path.join(ROOT, "content", "skill-coordinator-lite.md"), "utf-8");
   const SEP = "\n\n---\n\n";
   const raw = approxTokens(CONSTITUTION + SEP + liteSkill);
   const lean = approxTokens(LEAN_CONSTITUTION + SEP + liteSkill);
   assert.ok(lean < raw, `lean (${lean}) must be < raw (${raw})`);
-  assert.ok(lean <= 3761, `lean always-on (${lean} ~tok) must meet the <= 3761 target`);
+  assert.ok(lean <= 4027, `lean always-on (${lean} ~tok) must meet the <= 4027 target`);
 });
 
 // --- AC3: enforcement preserved ------------------------------------------
@@ -446,8 +562,15 @@ test("AC9: every operative rule/gate/SOP marker survives stripRationale in skill
   // WHY: these are the imperative rule headings and gate names the pm role acts on.
   // None may be inside a rationale fence — if they were, stripping would silently
   // drop a governance gate from every pm dispatch.
+  // a12-partials-limits-registry (T-A12-04, AC5): skill-pm.md's step-1 line
+  // (the "1. `tw_get_state`" marker below) is now the bare token
+  // {{PARTIAL:step1-preflight}} on disk (T-A12-03) — a raw fs.readFileSync no
+  // longer contains that marker at all. expandSkill() runs the same
+  // expandPartials() pass buildPromptForRole/switchRole run before
+  // stripOriginTags/stripRationale, so this test measures what a pm dispatch
+  // actually contains, not the un-expanded source file.
   const SKILL_PM = fs.readFileSync(path.join(ROOT, "content", "skill-pm.md"), "utf-8");
-  const stripped = stripRationale(SKILL_PM);
+  const stripped = stripRationale(expandSkill(SKILL_PM));
   for (const m of PM_RULE_MARKERS) {
     assert.ok(stripped.includes(m), `skill-pm stripped must still contain rule marker: ${JSON.stringify(m)}`);
   }
@@ -476,9 +599,16 @@ test("AC8 (skill-pm-consolidation): Ambiguity Gate STOP payload is byte-exact (e
 test("AC9: every operative rule/gate/SOP marker survives stripRationale in skill-sr-engineer.md", () => {
   // WHY: same contract for sr-engineer — stripped dispatch must carry the full
   // operative SOP even after rationale-only prose is removed.
+  // a12-partials-limits-registry (T-A12-04, AC5): skill-sr-engineer.md is also one
+  // of the 5 partial-adopting files (T-A12-03); route through expandSkill() so this
+  // measures the composed dispatch text, matching the PM marker test above. None of
+  // SR_RULE_MARKERS names the step-1 line, so this is a consistency fix, not a
+  // regression fix — but the un-expanded raw file is no longer what sr-engineer
+  // dispatch actually contains, so asserting against it would be testing the wrong text.
   const SKILL_SR = fs.readFileSync(path.join(ROOT, "content", "skill-sr-engineer.md"), "utf-8");
-  const stripped = stripRationale(SKILL_SR);
-  assert.ok(stripped.length < SKILL_SR.length, "stripped skill-sr must be shorter than raw");
+  const expanded = expandSkill(SKILL_SR);
+  const stripped = stripRationale(expanded);
+  assert.ok(stripped.length < expanded.length, "stripped skill-sr must be shorter than the partial-expanded body");
   for (const m of SR_RULE_MARKERS) {
     assert.ok(stripped.includes(m), `skill-sr stripped must still contain rule marker: ${JSON.stringify(m)}`);
   }
@@ -532,14 +662,24 @@ test("AC1/AC2: skill-pm stripped token count meets ≤ 3196 cap", () => {
   // never cut onto a qa-engineer or sr-engineer task by default). Independently re-measured
   // at 3473 ~tok exactly; cap set to the exact measured value per the established Phase-2
   // convention (no headroom).
+  // a12-partials-limits-registry (T-A12-04/AC5, qa-owned re-baseline): this test previously
+  // measured the RAW body, which as of T-A12-03 contains the short literal
+  // "{{PARTIAL:step1-preflight}}" instead of the real step-1 line the composed dispatch
+  // ships (buildPromptForRole expands it before stripOriginTags/stripRationale run — see
+  // build.ts L363-371). Folding expandSkill() into this test's composition (matching
+  // production) measures stripRationale(stripOriginTags(expandSkill(body))) at 3473 ~tok
+  // exactly — coincidentally the SAME value as the prior raw-only measurement (the token
+  // placeholder and the expanded line differ by only ~1 ~tok), so the cap itself is
+  // unchanged, but the computation now reflects what pm dispatch actually contains instead
+  // of silently under-measuring it.
   const SKILL_PM = fs.readFileSync(path.join(ROOT, "content", "skill-pm.md"), "utf-8");
   // Strip frontmatter (--- block) before token-counting the body, matching buildPromptForRole.
   const body = SKILL_PM.startsWith("---")
     ? SKILL_PM.slice(SKILL_PM.indexOf("---", 3) + 3).trimStart()
     : SKILL_PM;
-  const stripped = stripRationale(stripOriginTags(body));
+  const stripped = stripRationale(stripOriginTags(expandSkill(body)));
   const toks = approxTokens(stripped);
-  assert.ok(toks <= 3473, `skill-pm stripped body (${toks} ~tok) must be ≤ 3473 (AC1, c16-c10-role-boundary re-baseline)`);
+  assert.ok(toks <= 3473, `skill-pm stripped body (${toks} ~tok) must be ≤ 3473 (AC1, a12-partials-limits-registry re-baseline)`);
 });
 
 test("AC1/AC2: skill-sr-engineer stripped token count meets ≤ 2138 cap", () => {
@@ -574,13 +714,22 @@ test("AC1/AC2: skill-sr-engineer stripped token count meets ≤ 2138 cap", () =>
   // skill-sr-engineer.md. Independently re-measured (not trusted from sr-engineer's
   // handoff note) at 2469 ~tok exactly; cap set to the exact measured value per the
   // established Phase-2 convention (no headroom).
+  // a12-partials-limits-registry (T-A12-04/AC5, qa-owned re-baseline): folded expandSkill()
+  // into this test's composition, matching production (skill-sr-engineer.md is one of the
+  // 5 T-A12-03 partial-adopting files — its raw disk body now carries the bare
+  // "{{PARTIAL:step1-preflight}}" token, not the expanded step-1 line). Re-measured
+  // stripRationale(stripOriginTags(expandSkill(body))) at 2407 ~tok exactly (down slightly
+  // from the prior raw-only 2404 measurement plus the +3 ~tok the fuller expanded line
+  // costs over the token placeholder); still comfortably under the existing 2469 cap, so
+  // the cap itself is unchanged — only the computation is corrected to reflect what
+  // sr-engineer dispatch actually contains.
   const SKILL_SR = fs.readFileSync(path.join(ROOT, "content", "skill-sr-engineer.md"), "utf-8");
   const body = SKILL_SR.startsWith("---")
     ? SKILL_SR.slice(SKILL_SR.indexOf("---", 3) + 3).trimStart()
     : SKILL_SR;
-  const stripped = stripRationale(stripOriginTags(body));
+  const stripped = stripRationale(stripOriginTags(expandSkill(body)));
   const toks = approxTokens(stripped);
-  assert.ok(toks <= 2469, `skill-sr stripped body (${toks} ~tok) must be ≤ 2469 (AC2, c15-expected-red-manifest re-baseline)`);
+  assert.ok(toks <= 2469, `skill-sr stripped body (${toks} ~tok) must be ≤ 2469 (AC2, a12-partials-limits-registry re-baseline)`);
 });
 
 // --- governance-text-load Round-2: constitution rationale fencing (T-GTL-06/07) ---
@@ -726,9 +875,17 @@ test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the 
   // convention (no additional headroom). Saving margin re-verified: raw 6373 − stripped
   // 6100 = 273 ~tok, still ≥ 240 (unchanged — the const-01 edit sits outside both
   // rationale fences).
+  // a12-partials-limits-registry (qa-owned bump, T-A12-05/06/AC3/AC4): cap raised from
+  // 6100 → 6391 to absorb the new `## Limits` table in const-01-core-head.md plus the
+  // const-08/const-09/const-12/const-15 reference-by-name rewrites (all chain/core-tagged,
+  // not design-only-fenced, so they all load on this design-arm path). Independently
+  // re-measured — raw 6664, stripped 6391 (exact); cap set to the exact measured value per
+  // the established Phase-2 convention (no additional headroom). Saving margin
+  // re-verified: raw 6664 − stripped 6391 = 273 ~tok, still ≥ 240 (unchanged — the Limits
+  // table and reference-by-name rewrites sit outside both rationale/origin fences).
   const raw = approxTokens(CONSTITUTION);
   const stripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));
-  assert.ok(stripped <= 6100, `stripped constitution (${stripped} ~tok) must be ≤ 6100 (AC8 design-arm floor, c14-dispatch-pins re-baseline)`);
+  assert.ok(stripped <= 6391, `stripped constitution (${stripped} ~tok) must be ≤ 6391 (AC8 design-arm floor, a12-partials-limits-registry re-baseline)`);
   assert.ok(
     raw - stripped >= 240,
     `constitution rationale+origin-tag saving (${raw - stripped} ~tok) must be ≥ 240 (AC8 measured min, c14-dispatch-pins re-baseline)`,
@@ -854,13 +1011,20 @@ test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/b
   // Independently re-measured (not trusted from sr-engineer's or code-reviewer's notes,
   // both of which said 12247) at 12247 ~tok (exact); cap set to the exact measured
   // value per the established Phase-2 convention (no additional headroom).
+  // a12-partials-limits-registry (qa-owned bump, T-A12-05/06/AC3/AC4): cap raised from
+  // 12247 → 12538 to absorb the constitution-side growth measured in the design-arm
+  // floor test above (+291 ~tok: Limits table + const-08/09/12/15 reference-by-name
+  // rewrites). skill-coordinator.md itself is untouched by this ticket (it does not
+  // adopt the {{PARTIAL:...}} mechanism, spec DR-5) — this bundle's growth is 100%
+  // constitution-side. Independently re-measured at 12538 ~tok (exact); cap set to the
+  // exact measured value per the established Phase-2 convention (no additional headroom).
   const skillCoord = fs.readFileSync(path.join(ROOT, "content", "skill-coordinator.md"), "utf-8");
   const body = skillCoord.startsWith("---")
     ? skillCoord.slice(skillCoord.indexOf("---", 3) + 3).trimStart()
     : skillCoord;
   const SEP = "\n\n---\n\n";
   const bundle = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)) + SEP + stripRationale(stripOriginTags(body)));
-  assert.ok(bundle <= 12247, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 12247 (AC8 design-arm floor, b9-token-budget-brake re-baseline)`);
+  assert.ok(bundle <= 12538, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 12538 (AC8 design-arm floor, a12-partials-limits-registry re-baseline)`);
 });
 
 test("AC9: every operative rule/gate/heading survives stripRationale on the constitution", () => {
@@ -1295,12 +1459,22 @@ test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is
   // Phase-2 convention (no additional headroom). Saving margin re-verified: design-arm
   // 6100 − non-design 4016 = 2084 ~tok, still ≥ 2080 (unchanged — the const-01 edit sits
   // outside the design-only fences).
-  const ratStripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));         // design-arm path: 6100
-  const nonDesign = approxTokens(stripRationale(stripOriginTags(composeConstitution({ chain: true, design: false })))); // non-design path: 4016
-  assert.ok(nonDesign <= 4016, `non-design constitution (${nonDesign} ~tok) must be ≤ 4016 (AC8 non-design floor, c14-dispatch-pins re-baseline)`);
+  // a12-partials-limits-registry (qa-owned bump, T-A12-05/06/AC3/AC4): cap raised from
+  // 4016 → 4293. The new `## Limits` table (const-01-core-head.md, core-head) and the
+  // const-08/const-12/const-15 reference-by-name rewrites (all chain-tagged, not
+  // design-tagged) all land on the non-design path too, same as the design-arm floor
+  // above (const-09 is design-tagged and does NOT land here). Independently re-measured
+  // at 4293 ~tok (exact); cap set to the exact measured value per the established
+  // Phase-2 convention (no additional headroom). Saving margin re-verified: design-arm
+  // 6391 − non-design 4293 = 2098 ~tok, still ≥ 2080 (grows slightly — const-09's
+  // visual_round reference-by-name rewrite is design-only-tagged and lands ONLY on the
+  // design-arm side, widening the saving by a few tokens).
+  const ratStripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));         // design-arm path: 6391
+  const nonDesign = approxTokens(stripRationale(stripOriginTags(composeConstitution({ chain: true, design: false })))); // non-design path: 4293
+  assert.ok(nonDesign <= 4293, `non-design constitution (${nonDesign} ~tok) must be ≤ 4293 (AC8 non-design floor, a12-partials-limits-registry re-baseline)`);
   assert.ok(
     ratStripped - nonDesign >= 2080,
-    `design-only strip saving (${ratStripped - nonDesign} ~tok) must be ≥ 2080 (c14-dispatch-pins re-baseline)`,
+    `design-only strip saving (${ratStripped - nonDesign} ~tok) must be ≥ 2080 (a12-partials-limits-registry re-baseline)`,
   );
 });
 

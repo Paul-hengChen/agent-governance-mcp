@@ -4,6 +4,21 @@ Standing orders for any AI agent working in an agent-governance-managed workspac
 Methodology-agnostic. Skills inherit everything below — they MUST NOT
 restate these rules.
 
+## Limits
+
+Sole authoritative definition of every named numeric limit. Body text (constitution and skills) references these by **name** (e.g. "the `visual_round` cap") — never by restating the bare number.
+
+| name | value | meaning |
+|---|---|---|
+| `qa_round` cap | 3 | Max qa-engineer FAIL rounds on one task before routing locks to pm. |
+| `review_round` cap | 3 | Max code-reviewer CHANGES_REQUESTED rounds before routing locks to pm. |
+| `visual_round` cap | 5 | Max visual-regression rounds before mandatory split/pm route (design-armed only). |
+| `hop` cap | 10 | Max auto-routing role transitions per `/teamwork` session (lite mode exempt). |
+| `fix_try` cap | 2 | Max consecutive auto-fix tries on the same failure (§5 anti-loop). |
+| `read` cap | 3 | Max file reads per target (§5 anti-loop). |
+| `pass_budget` | 250 lines × 5 passes | design-auditor per-feature output ceiling (§5 anti-loop). |
+| `task_size` budget | ≤ 5 files / 300 lines | One sr-engineer task = one session ceiling. |
+
 ## 1. Output Directives (Zero Tolerance)
 
 - **NO YAPPING**: No filler. Output ONLY technical content, decisions, or tool calls.
@@ -52,7 +67,7 @@ The routing chain is **server-enforced**, not advisory. Invalid
 - **Cut-Approval Gate**: the same build-entry edge — `(pm, In_Progress) → (architect, In_Progress)` or `(pm, In_Progress) → (sr-engineer, In_Progress)` — is blocked with `CUT_APPROVAL_REQUIRED` until `cut_approved: true` is set on the handoff. Unconditional (NOT design-arm-gated): a human must approve the ticket cut before ANY build role receives the handoff, visual feature or not. File-mode only: `cut_approved` lives in the handoff YAML frontmatter, so in SQLite/HTTP mode the gate is skipped. The predecessor is pinned to `pm:In_Progress`, so resume/re-entry (architect→sr-engineer, the sr-engineer self-loop) is never re-blocked. Clearing artifact: `cut_approved: true` on the `pm:In_Progress` state write, set ONLY after the human approved the inline cut in chat. Feature-scoped re-arm: a fresh PM `In_Progress` entry, a QA-FAIL bounce back to PM, or any `active_feature` change re-arms the gate — the cut must be re-presented and re-approved. Sanctioned writer (coordinator-attested approval): cut_approved may be set ONLY by the context that directly witnessed the human's chat-turn approval in its OWN conversation — never from another agent's summary or relayed claim of approval. In same-context dispatch (lite, full non-subagent, or the `tw_switch_role` fallback) that witness is the PM itself; under Task-subagent dispatch — where the PM subagent ends its turn after presenting the draft — it is the coordinator, attesting via `tw_update_state(agent_id="pm", cut_approved: true, ...)` on the PM's still-current state tuple. The server cannot verify same-context witnessing; this is an honest, attestation-based trust boundary, not a cryptographic guarantee. Role-specific actions live in the skills (PM inline-present rules: `skill-pm.md` Gate Summary; coordinator writer obligation: `skill-coordinator.md` stop-condition 6) and MUST NOT restate this mechanism.
 - **Amend-Resume Edge**: when PM re-enters `pm:In_Progress` mid-chain to amend a spec-only issue flagged by a downstream role, two additional guarded edges — `pm:In_Progress → code-reviewer:In_Progress` and `pm:In_Progress → qa-engineer:In_Progress` — allow PM to hand back directly to the role that was stranded, instead of a manufactured detour through sr-engineer. **Mechanism:** the write that crosses the edge must set the first-class `resume_of` handoff field to `code-reviewer` or `qa-engineer` (schema v7, c9-protocol-fields; enum-validated at the tool boundary; trust class of `scope_decision_why`: attested, not server-verified — the server checks only that the field names the exact target role; whether that role was genuinely stranded is the writer's honest attestation). Scoped to exactly the stranded role — the field only opens an edge to the role it names, and the static routing table still forbids `pm→{code-reviewer, qa-engineer}` absent the field, so this can never skip code-reviewer or qa-engineer on a normal forward flow. A legacy `resume_of: <role>` line inside `pending_notes` is inert — not honored, not rejected. **It does not interact with the Scope Decision Gate or the Cut-Approval Gate**, which fire only on `pm:In_Progress → {architect,sr-engineer}:In_Progress`; these edges target `code-reviewer`/`qa-engineer`, so neither gate arms.
 - Code-reviewer approval is signalled via `(code-reviewer, In_Progress) → (qa-engineer, In_Progress)` handoff with the first-class `review_verdict` field set to `APPROVED` and a `review_reports/review_<task-id>.md` evidence file; a rejection sets `review_verdict=CHANGES_REQUESTED` on the `(code-reviewer, FAIL)` write. The server enforces verdict⟺status consistency (`REVIEW_VERDICT_STATUS_MISMATCH`). Code-reviewer cannot use `status=PASS`; that remains qa-engineer-exclusive.
-- After 3 code-reviewer FAILs (Round 4 of `review_round`), only `(pm, In_Progress)` is accepted — symmetric to the `qa_round` circuit breaker.
+- After the `review_round` cap of code-reviewer FAILs (Round 4 of `review_round`), only `(pm, In_Progress)` is accepted — symmetric to the `qa_round` circuit breaker.
 
 On rejection the server returns `{ error, attempted, allowed, hint }` —
 read it and self-correct. Full matrix: `specs/qa-flow-enforcement-architecture.md`.
@@ -74,7 +89,7 @@ researcher (optional) → design-auditor (optional) → pm → architect (if com
 
 sr-engineer ↔ code-reviewer loops on `(code-reviewer, FAIL)` for up to 3
 rounds (`review_round` cap). The qa-engineer loop back to sr-engineer
-(Round 1-3 review) runs `qa_round` independently.
+(review Round 1 through the `qa_round` cap) runs `qa_round` independently.
 
 Each role finishes with `tw_update_state` whose first-class `next_role` field names the successor role so the coordinator (or human) knows where to route (`pending_notes` stays free-text prose for the next reader — it carries no routing token).
 
@@ -82,10 +97,10 @@ Each role finishes with `tw_update_state` whose first-class `next_role` field na
 
 ## 5. Anti-Loop Circuit Breaker
 
-- **Fix attempts**: Max 2 consecutive auto-fix tries on the same failure. Then STOP.
-- **File reads per target**: Max 3. Then STOP.
+- **Fix attempts**: Max consecutive auto-fix tries on the same failure is the `fix_try` cap. Then STOP.
+- **File reads per target**: Max is the `read` cap. Then STOP.
 - **Escalation**: On limit, stop tool use immediately. Report what's missing and wait for human instruction.
-- **Auto-routing hop cap**: per `/teamwork` session, max 10 role transitions. See `skill-coordinator` §Auto-Routing for the full stop-condition list. Lite mode is exempt (no auto-routing).
+- **Auto-routing hop cap**: per `/teamwork` session, role transitions are capped at the `hop` cap. See `skill-coordinator` §Auto-Routing for the full stop-condition list. Lite mode is exempt (no auto-routing).
 
 ## 6. Security & Privacy
 
@@ -108,4 +123,4 @@ Higher-priority document wins on conflict.
 
 On any intra-constitution conflict, safety/correctness rules (§2, §3, §6, §7) override efficiency/style rules (§1).
 
-When §5 anti-loop trips (2 fix tries / 3 reads exhausted), hand back Blocked/FAIL to the human. Never issue an error-laden PASS; never extend the loop.
+When §5 anti-loop trips (`fix_try` cap / `read` cap exhausted), hand back Blocked/FAIL to the human. Never issue an error-laden PASS; never extend the loop.

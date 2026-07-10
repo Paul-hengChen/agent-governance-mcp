@@ -23,6 +23,7 @@ import {
 import { parseSkillFile } from "../tools/skill-frontmatter.js";
 import { hasDesignModeRequiringVisual } from "../gates/visual.js";
 import { CONSTITUTION_SEGMENTS, includeSegment } from "./constitution-manifest.js";
+import { expandPartials } from "./partials-manifest.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -360,7 +361,14 @@ export function buildPromptForRole(
     constitution = fullDetail ? originClean : stripRationale(originClean);
   }
   const rawSkill = loadContent(skillFile, workspacePath);
-  const { frontmatter, body: taggedBody } = parseSkillFile(rawSkill);
+  // Partial expansion (ticket A12, DR-3/DR-4): resolve {{PARTIAL:<token>}}
+  // registry tokens BEFORE frontmatter parsing so downstream passes see the
+  // canonical text. The partial bodies carry no origin/rationale fences, so
+  // stripOriginTags/stripRationale below are no-ops over the expanded text —
+  // composed output stays byte-identical to the pre-refactor hand-authored
+  // lines (AC2). tools/role.ts switchRole() is the mirror call site.
+  const expandedSkill = expandPartials(rawSkill, (f) => loadContent(f, workspacePath));
+  const { frontmatter, body: taggedBody } = parseSkillFile(expandedSkill);
   // Same unconditional origin-tag strip as the constitution above (frontmatter
   // is parsed off first — origin fences live in body prose, never in YAML).
   const rawBody = stripOriginTags(taggedBody);

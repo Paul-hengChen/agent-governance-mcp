@@ -66,7 +66,7 @@ None.
 
 ## SOP
 
-1. `tw_get_state` → `tw_detect_drift`.
+{{PARTIAL:step1-preflight}}
 2. Read `specs/<feature>.md`. WHEN missing → DO escalate per *Escalation Routes: spec missing*. STOP. ELSE continue.
 3. **Ambiguity Gate**: WHEN spec acceptance criteria are missing or contradictory → DO escalate per *Escalation Routes: spec incomplete*. STOP. ELSE continue.
 4. **External-reference Sanity Gate**: cross-check `Deferred Resources` against the spec's *Dependencies / Prerequisites*. WHEN a reference in the spec is NOT in `Deferred Resources` AND was NOT fetched → DO escalate per *Escalation Routes: external reference unclassified*. ELSE continue.

@@ -41,7 +41,7 @@ On an incoming PRD/ticket of non-trivial size, AFTER state-sync, BEFORE Design-s
 
 **No existing `.current/feature-split.md`** → judge split-need from PRD text: self-enumerated steps/sections; **count** of design-source refs (grep URLs, don't fetch); a cross-cutting shared layer; size.
 - **single-feature** → continue to Design-source detection + routing.
-- **multi-feature** (separable units, or coverage would blow the design-auditor 5-pass×250-line cap) → STOP, write `.current/feature-split.md` (below, every row `status: pending`), surface a one-line rec + hint, wait.
+- **multi-feature** (separable units, or coverage would blow the design-auditor `pass_budget`) → STOP, write `.current/feature-split.md` (below, every row `status: pending`), surface a one-line rec + hint, wait.
 
 **Existing `.current/feature-split.md`** (resume) → do NOT re-assess or regenerate. First **reconcile**: if the handoff `active_feature` matches a row and its status is PASS, flip that row to `status: done`. Then take the next `pending` row — or, if the human named one (e.g. "do F0" / a feature id), that row — and **hydrate** it (scope + figma link + widgets + notes) as the feature input before routing. Never re-run a `done` row.
 
@@ -128,7 +128,7 @@ Stop conditions + routing escalations (WHEN/DO/ELSE collapsed to rows; Constitut
 | last write is `status: PASS` | PASS (terminal) | terminal success — release-engineer is a deliberate human decision, not an auto-hop | human |
 | the `next_role` field is absent but `pending_notes` prose asks for a human decision (the enum has no `human` value — omitting the field IS the escalate-to-human signal) | — | relay the prior role's note | human |
 | the `next_role` field is absent with no escalation prose | — | surface as ambiguous — the prior role forgot or finished without nominating a successor | human |
-| hop counter ≥ `10` for this `/teamwork` session | — | surface the hop cap | human |
+| hop counter ≥ the `hop` cap for this `/teamwork` session | — | surface the hop cap | human |
 | **Token budget brake** — `.current/.config.json` sets `tokenBudgetPerFeature` AND the in-memory running token total for this `/teamwork` invocation ≥ 80% of it (see §Token Budget Brake) | — | `token budget: {running_total} / {tokenBudgetPerFeature} ({pct}%) — handing to human` | human |
 | **Crash detection** — a dispatched `Task(subagent_type=<role>, …)` call returns a tool-error or empty/truncated reply, or the host/user reports the subagent was killed (session or usage-limit kill), BEFORE that role's own `tw_update_state` landed (handoff `agent_id`/`status` unchanged since dispatch) | — | do not resume or re-dispatch directly — run the Crash-Resume Protocol first, then resume | (role being resumed) |
 | **Cut-approval gate** — the `next_role` field is `architect` or `sr-engineer` but `cut_approved` is not set on the handoff (server error: `CUT_APPROVAL_REQUIRED`) | — | surface the cut draft and wait — do NOT auto-hop through to build; writer obligation below | human |
@@ -243,7 +243,7 @@ future retrospectives report measured costs, not estimates.
 ## Token Budget Brake<!-- origin:start --> (v3.63.0, B9)<!-- origin:end -->
 
 Opt-in, off-by-default cost-side circuit breaker that complements (not replaces) the count-side caps
-(hop cap ≥ 10, per-skill round caps). Enabled ONLY when `.current/.config.json` sets
+(the `hop` cap, per-skill round caps). Enabled ONLY when `.current/.config.json` sets
 `tokenBudgetPerFeature` to a positive finite number — an absent key, absent file, or invalid value
 (filtered to absent by `loadConfig`) means the brake is disabled and NO budget check occurs.
 

@@ -8,9 +8,9 @@ Staff-level engineer. Ships typed, secure code. Flags scope creep and ambiguity 
 
 ## SOP
 
-1. `tw_get_state` → `tw_detect_drift`.
+{{PARTIAL:step1-preflight}}
 2. **Clarification Gate**: WHEN the task is ambiguous or requirements conflict → DO reply with ONE clarifying question, then escalate per *Escalation Routes: awaiting clarification*. Do not code. ELSE continue.
-3. **Task-Size Check**: WHEN the task needs > 5 files or > 300 lines → DO STOP and escalate per *Escalation Routes: task oversized*. ELSE continue.
+3. **Task-Size Check**: WHEN the task exceeds the `task_size` budget → DO STOP and escalate per *Escalation Routes: task oversized*. ELSE continue.
 3a. **Design-Aware Pre-Flight**<!-- origin:start --> (v3.14.0)<!-- origin:end -->: if `design/<active_feature>.md` exists, BEFORE any file edit you MUST:
    1. Read `design/<active_feature>.md` end-to-end.
    2. Read the relevant `## Visual Widgets` row(s) for the widget(s) this task implements.
@@ -34,7 +34,7 @@ Staff-level engineer. Ships typed, secure code. Flags scope creep and ambiguity 
    - No obvious injection vectors (SQL, command, XSS, path traversal).
 7. Confirm full project builds with ZERO errors.
 7a. **Expected-Red Manifest**<!-- origin:start --> (v3.57.0, C15)<!-- origin:end -->: WHEN this handoff intentionally leaves ≥ 1 test red (e.g. a schema-bump re-baseline, a deliberately deferred implementation) → DO append each such test to `qa_reports/expected-red_<active_feature>.txt`, one line per test: `<relative test file path> | <exact test name/description string>`. Blank lines and `#`-prefixed lines are comments — group entries with a one-line rationale above the block. Feature-scoped: ONE file per feature, appended to (never overwritten) by every task that adds expected reds. A prose catalogue in `pending_notes` does NOT substitute — QA's Phase 0.5 diffs this manifest against the actual suite run, and code-reviewer samples entries from it. ELSE (no intentional reds) emit nothing: absence means "no expected reds".
-8. `tw_update_state(status=In_Progress, next_role="code-reviewer", pending_notes=["sr-engineer: <task-id> ready for code review"])`. On failure, put failure summary in `pending_notes` instead.
+8. `tw_update_state(status=In_Progress, next_role="code-reviewer", pending_notes=["sr-engineer: <task-id> ready for code review"])`.
 
 ## Escalation Routes
 

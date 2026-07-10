@@ -1,0 +1,33 @@
+# a12-partials-limits-registry — intentional reds left by sr-engineer (T-A12-01/02/03/05/06/07).
+# All are stale-baseline / raw-file-read collisions the spec pre-assigned to qa:
+# T-A12-08 regenerates compose-golden fixtures (AC6); T-A12-04 repoints raw-file marker
+# tests to partial-composed output and re-baselines token caps (AC5); T-A12-09 sweeps
+# literal-text assertions (AC7). No product-logic regression is hidden here.
+
+# Golden fixtures pin pre-A12 constitution bytes; const-01/08/12/15 changed under AC3/AC4
+# (Limits table + reference-by-name). Regenerate via scripts/capture-constitution-golden.mjs (T-A12-08).
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-coordinator-lite.md, design=false, fullDetail=false) is byte-identical to pre-refactor golden build-lite-nondesign.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-coordinator-lite.md, design=true, fullDetail=false) is byte-identical to pre-refactor golden build-lite-design.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-coordinator-lite.md, design=false, fullDetail=true) is byte-identical to pre-refactor golden build-lite-nondesign-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-coordinator-lite.md, design=true, fullDetail=true) is byte-identical to pre-refactor golden build-lite-design-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=false, fullDetail=false) is byte-identical to pre-refactor golden build-full-nondesign.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=true, fullDetail=false) is byte-identical to pre-refactor golden build-full-design.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=false, fullDetail=true) is byte-identical to pre-refactor golden build-full-nondesign-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=true, fullDetail=true) is byte-identical to pre-refactor golden build-full-design-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: SessionStart hook (lite/default env) is byte-identical to pre-refactor golden hook-lite.txt
+test/compose-equivalence.test.mjs | compose-equivalence: SessionStart hook (AGC_DEFAULT_SKILL=full) is byte-identical to pre-refactor golden hook-full.txt
+test/compose-equivalence.test.mjs | compose-equivalence: cat(15 manifest fragments in order) === the pre-refactor constitution.md monolith (DR-1 Option R invariant)
+
+# Token caps measured pre-A12 (Limits table adds core-fragment bytes) + raw-file marker
+# reads that no longer see the composed step-1 line ({{PARTIAL}} token substitution, AC2/AC5). T-A12-04.
+test/context-budget.test.mjs | AC2: lean always-on bundle is below the raw baseline and within target (<= 3087 ~tok)
+test/context-budget.test.mjs | AC9: every operative rule/gate/SOP marker survives stripRationale in skill-pm.md
+test/context-budget.test.mjs | AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the measured floor (≤ 5561 ~tok)
+test/context-budget.test.mjs | AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 9545 ~tok)
+test/context-budget.test.mjs | AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 3477 ~tok)
+
+# Literal-text assertions on the pre-A12 "250 lines / 5 passes" wording in skill-design-auditor.md,
+# rewritten to the named `pass_budget` reference under AC4 (T-A12-07). AC7 sweep scope (T-A12-09):
+# these two suites are collisions BEYOND the two suites AC7 named — flag for qa.
+test/design-auditor-volume-guard.test.mjs | AC5: existing 250-line / 5-pass output cap is unchanged (gate is additive)
+test/pixel-perfect-design-coverage.test.mjs | AC-2: multi-pass Hard rule has line cap, pass ceiling, and forced manifest progress

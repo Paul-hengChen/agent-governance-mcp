@@ -16,6 +16,28 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.64.0] - 2026-07-10
+
+### Added
+- **`a12-partials-limits-registry` — Skill-partials registry and Limits-table refactor (v3.64.0).** Introduces `prompts/partials-manifest.ts` canonical partial-file registry, wired into `buildPromptForRole()` render paths for const/ and skill/ composition. Adds `## Limits` table to `content/const-01-core-head.md` (8 named limits: `qa_round` cap 3, `review_round` cap 3, `visual_round` cap 5, hop cap 10, fix-try cap 2, file-read cap 3, design-auditor pass budget 250×5, sr-engineer task-size budget ≤5 files/300 lines) with name-references rewritten across all const-*.md and skill-*.md files, replacing bare-number restatements. Refactors byte-identical step-1 preflight line across 5 skills (architect, pm, design-auditor, researcher, sr-engineer) into one canonical partial, eliminating silent-drift hazard on SOP edits. Fixes qa-visual visual_round framing (const-09: "cap is 5 rounds" → `visual_round` name-reference; skill-qa-visual.md: "round cap (6)" corrected to 5). Context-budget rebaselined: teamwork bundle ≤12247 tok, design-arm floor 12247 tok, skill-pm ≤3196 tok, skill-sr-engineer ≤2469 tok. Golden compose-equivalence fixtures regenerated. Backwards-compatible; MINOR bump. QA verified: all 9 acceptance criteria (AC1–AC9) passed; all 1051/1051 tests pass. See `specs/a12-partials-limits-registry.md`, `qa_reports/review_T-A12-04.md`, `review_reports/review_T-A12-01.md`.
+
+### Changed
+- `prompts/partials-manifest.ts` new file — canonical registry of shared partials and their file paths.
+- `prompts/build.ts` `buildPromptForRole()` refactored to wire partial-composition into const-order and skill-order render paths.
+- `content/const-01-core-head.md` `## Limits` table added (pre-§1 position).
+- `content/const-08`, `const-09`, `const-12`, `const-15` — bare-number limits rewritten as name-references.
+- `content/skill-architect.md`, `skill-pm.md`, `skill-design-auditor.md`, `skill-researcher.md`, `skill-sr-engineer.md` — step-1 preflight line sourced from partial; state-update rule restated → removed (inherit from const-05 per const-01 mandate).
+- `content/skill-qa-engineer.md`, `skill-code-reviewer.md`, `skill-qa-visual.md`, `skill-coordinator.md` — bare-number limits rewritten as name-references.
+- `test/context-budget.test.mjs` AC8 design-arm floor rebaselined to 12247 ~tok; skill-pm ≤3196 tok; skill-sr-engineer ≤2469 tok.
+- `test/compose-equivalence.test.mjs` golden fixtures regenerated (`test/fixtures/compose-golden/*.txt`).
+- `test/subagent-templates.test.mjs` assertions updated to reflect partial-composition changes.
+- `test/skill-evolution-v3.11.test.mjs` assertions swept and updated.
+
+### Notes
+- Non-blocking follow-up for PM/release: const-06-chain-31-head.md L8 restates qa_round value outside A12 scope (noted for future const-06 landing or follow-up ticket per sr-engineer + code-reviewer concurrence).
+- driftBaselineIds appended with T-A12-01..09
+- `docs/backlog.md` A12 row marked DONE with v3.64.0 tag reference
+
 ## [3.63.0] - 2026-07-10
 
 ### Added

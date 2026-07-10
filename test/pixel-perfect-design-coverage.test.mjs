@@ -43,11 +43,21 @@ test("AC-2: multi-pass Hard rule has line cap, pass ceiling, and forced manifest
   // a single audit can token-explode; without the 5-pass ceiling we lose the
   // constitution §5 anti-loop guarantee; without "MUST flip ≥ 1 deferred→audited"
   // an agent could loop forever producing no-op passes. All three are load-bearing.
+  //
+  // a12-partials-limits-registry (T-A12-07/T-A12-09, AC4 sweep): skill-design-auditor.md
+  // no longer bare-restates "≤ 250 lines per pass" / "5 passes per feature" — those are
+  // now sourced from the `pass_budget` Limits-table entry (content/const-01-core-head.md)
+  // and referenced by name (AC4: "reference the name... never restate the number"). The
+  // anti-abuse property this test guards (a real per-pass line cap + a real pass ceiling
+  // exist and are enforced) still holds — it's verified in two parts: (a) the skill text
+  // names `pass_budget`, and (b) the Limits table resolves that name to the same 250/5
+  // values this test used to pin directly.
   const body = fs.readFileSync(AUDITOR_PATH, "utf-8");
+  const limits = fs.readFileSync(path.join(PROJECT_ROOT, "content", "const-01-core-head.md"), "utf-8");
 
   assert.match(body, /Token-frugal multi-pass/, "Hard rule must be renamed to multi-pass");
-  assert.match(body, /≤\s*250\s*lines\s*per\s*pass/i, "per-pass line cap must be present");
-  assert.match(body, /5\s*passes\s*per\s*feature/i, "5-pass ceiling must be present");
+  assert.match(body, /`pass_budget`/, "per-pass line cap / pass ceiling must be sourced from the named `pass_budget` limit");
+  assert.match(limits, /\|\s*`pass_budget`\s*\|\s*250 lines × 5 passes\s*\|/, "Limits table must define pass_budget as the exact 250-line / 5-pass value");
   assert.match(body, /flip.*≥\s*1.*manifest.*row.*from.*deferred.*→.*audited/is, "follow-up pass must require manifest progress");
   assert.match(body, /constitution\s*§5/i, "anti-loop cite must point at constitution §5");
 });

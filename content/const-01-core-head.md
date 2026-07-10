@@ -4,6 +4,21 @@ Standing orders for any AI agent working in an agent-governance-managed workspac
 Methodology-agnostic. Skills inherit everything below — they MUST NOT
 restate these rules.
 
+## Limits
+
+Sole authoritative definition of every named numeric limit. Body text (constitution and skills) references these by **name** (e.g. "the `visual_round` cap") — never by restating the bare number.
+
+| name | value | meaning |
+|---|---|---|
+| `qa_round` cap | 3 | Max qa-engineer FAIL rounds on one task before routing locks to pm. |
+| `review_round` cap | 3 | Max code-reviewer CHANGES_REQUESTED rounds before routing locks to pm. |
+| `visual_round` cap | 5 | Max visual-regression rounds before mandatory split/pm route (design-armed only). |
+| `hop` cap | 10 | Max auto-routing role transitions per `/teamwork` session (lite mode exempt). |
+| `fix_try` cap | 2 | Max consecutive auto-fix tries on the same failure (§5 anti-loop). |
+| `read` cap | 3 | Max file reads per target (§5 anti-loop). |
+| `pass_budget` | 250 lines × 5 passes | design-auditor per-feature output ceiling (§5 anti-loop). |
+| `task_size` budget | ≤ 5 files / 300 lines | One sr-engineer task = one session ceiling. |
+
 ## 1. Output Directives (Zero Tolerance)
 
 - **NO YAPPING**: No filler. Output ONLY technical content, decisions, or tool calls.

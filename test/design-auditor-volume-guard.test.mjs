@@ -53,7 +53,13 @@ test("AC5: gate is fetch-modes only — image/pdf/paper/no-design skip", () => {
 });
 
 test("AC5: existing 250-line / 5-pass output cap is unchanged (gate is additive)", () => {
-  assert.match(AUDITOR, /250-line cap/, "output cap must remain");
+  // a12-partials-limits-registry (T-A12-07/T-A12-09, AC4 sweep): skill-design-auditor.md's
+  // bare "250-line cap" literal was rewritten to reference the Limits-table `pass_budget`
+  // name (const-01-core-head.md's canonical 250 lines × 5 passes definition) instead of
+  // independently restating the number — this test now pins the NAMED reference. The
+  // underlying cap (250 lines × 5 passes) is unchanged; only the wording moved to the
+  // single-source-of-truth name per AC4.
+  assert.match(AUDITOR, /`pass_budget`.*per-pass line cap/, "output cap must remain, now referenced by the `pass_budget` Limits-table name");
   assert.match(AUDITOR, /deferred/, "Source-manifest deferral must remain");
 });
 

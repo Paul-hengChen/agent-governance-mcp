@@ -1,9 +1,9 @@
 ## 5. Anti-Loop Circuit Breaker
 
-- **Fix attempts**: Max 2 consecutive auto-fix tries on the same failure. Then STOP.
-- **File reads per target**: Max 3. Then STOP.
+- **Fix attempts**: Max consecutive auto-fix tries on the same failure is the `fix_try` cap. Then STOP.
+- **File reads per target**: Max is the `read` cap. Then STOP.
 - **Escalation**: On limit, stop tool use immediately. Report what's missing and wait for human instruction.
-- **Auto-routing hop cap**: per `/teamwork` session, max 10 role transitions. See `skill-coordinator` §Auto-Routing for the full stop-condition list. Lite mode is exempt (no auto-routing).
+- **Auto-routing hop cap**: per `/teamwork` session, role transitions are capped at the `hop` cap. See `skill-coordinator` §Auto-Routing for the full stop-condition list. Lite mode is exempt (no auto-routing).
 
 ## 6. Security & Privacy
 
@@ -26,4 +26,4 @@ Higher-priority document wins on conflict.
 
 On any intra-constitution conflict, safety/correctness rules (§2, §3, §6, §7) override efficiency/style rules (§1).
 
-When §5 anti-loop trips (2 fix tries / 3 reads exhausted), hand back Blocked/FAIL to the human. Never issue an error-laden PASS; never extend the loop.
+When §5 anti-loop trips (`fix_try` cap / `read` cap exhausted), hand back Blocked/FAIL to the human. Never issue an error-laden PASS; never extend the loop.
