@@ -16,6 +16,13 @@ const COMPLETED_TASKS_RETURN_LIMIT = 50;
 // Long deliverable descriptions (common in sr-engineer handoffs) can bloat
 // the LLM context on every tw_get_state call. Full notes remain on disk.
 const PENDING_NOTES_CHAR_LIMIT = 3000;
+// v10 — staleness threshold for the tw_get_state stale-dispatch advisory.
+// Fixed constant, NOT config-driven (DR-4): the advisory never blocks a write,
+// so a false positive costs one cheap ground-truth check, and there is no
+// legitimate reason a workspace would DISABLE it (unlike tokenBudgetPerFeature,
+// whose absence is a meaningful opt-out). Mirrors HOP_CAP's fixed-constant
+// posture. Tunable in one line if 15 proves too tight.
+const STALE_DISPATCH_THRESHOLD_MIN = 15;
 function getHandoffPath(workspacePath) {
     return path.join(workspacePath, ".current", "handoff.md");
 }
@@ -167,6 +174,12 @@ function readAndMigrate(workspacePath) {
     // v7 — protocol fields (c9-protocol-fields). undefined when absent /
     // out-of-enum, so absence stays the "no routing signal recorded" sentinel.
     const nextRole = parseEnumField(frontmatter.next_role, NEXT_ROLE_VALUES);
+    // v10 — dispatched_at stamp (d5-server-side-stale-dispatch-detection).
+    // Permissive string passthrough (asString posture): validity of the ISO
+    // timestamp is checked at compute time (read-path advisory, T-D5-02), not
+    // parse time. undefined when absent, so absence stays the "no dispatch
+    // currently in flight" sentinel.
+    const dispatchedAt = asString(frontmatter.dispatched_at) || undefined;
     const resumeOf = parseEnumField(frontmatter.resume_of, RESUME_OF_VALUES);
     const reviewVerdict = parseEnumField(frontmatter.review_verdict, REVIEW_VERDICT_VALUES);
     // v8 — dispatch_pins map (c14-dispatch-pins). undefined when absent /
@@ -195,6 +208,7 @@ function readAndMigrate(workspacePath) {
         ...(cutApproved && { cut_approved: cutApproved }),
         ...(externalRefs && { external_refs: externalRefs }),
         ...(nextRole && { next_role: nextRole }),
+        ...(dispatchedAt && { dispatched_at: dispatchedAt }),
         ...(resumeOf && { resume_of: resumeOf }),
         ...(reviewVerdict && { review_verdict: reviewVerdict }),
         ...(dispatchPins && { dispatch_pins: dispatchPins }),
@@ -301,7 +315,32 @@ export function readHandoffState(workspacePath) {
             },
         }),
     };
-    return JSON.stringify({ exists: true, ...view });
+    // v10 — stale-dispatch advisory (d5-server-side-stale-dispatch-detection,
+    // DR-1). Pure read-time computation over persisted next_role + dispatched_at
+    // + wall clock: a fresh/post-compaction session with NO memory of dispatching
+    // gets the identical signal (AC-4). Informational only — never blocks a
+    // write, no GateErrorCode (DR-6). Defensive by construction: absence of
+    // either field, an unparsable stamp, or an in-window stamp all yield no key
+    // (AC-5); nothing here can throw or fail the read.
+    let staleDispatch;
+    if (state.next_role && state.dispatched_at) {
+        const stampedMs = Date.parse(state.dispatched_at);
+        if (Number.isFinite(stampedMs)) {
+            // malformed stamp ⇒ no signal, never throw
+            const elapsedMin = (Date.now() - stampedMs) / 60000;
+            if (elapsedMin > STALE_DISPATCH_THRESHOLD_MIN) {
+                staleDispatch = {
+                    role: state.next_role,
+                    dispatched_at: state.dispatched_at,
+                    elapsed_minutes: Math.floor(elapsedMin),
+                    threshold_minutes: STALE_DISPATCH_THRESHOLD_MIN,
+                    message: `stale in-flight dispatch: ${state.next_role}, ` +
+                        `no state write for >${STALE_DISPATCH_THRESHOLD_MIN} min`,
+                };
+            }
+        }
+    }
+    return JSON.stringify({ exists: true, ...view, ...(staleDispatch && { stale_dispatch: staleDispatch }) });
 }
 export async function writeHandoffState(workspacePathOrOpts, activeFeature, status, completedTasks, pendingNotes, blockingReason, lastAgent, qaRound, prdPath, reviewRound, visualRound, hopCount) {
     // Discriminate by first-arg shape. Options-object branch when the first
@@ -514,6 +553,18 @@ export async function writeHandoffState(workspacePathOrOpts, activeFeature, stat
         // these fields replace (c9-protocol-fields DR on AC-3).
         if (nextRole)
             frontmatterData.next_role = nextRole;
+        // v10 — dispatch-liveness stamp (d5-server-side-stale-dispatch-detection,
+        // DR-2): stamp iff dispatching, on the SAME transient predicate and the
+        // SAME now() as last_updated, so dispatched_at === last_updated exactly
+        // whenever a dispatch is stamped. Single-sourced HERE (not the
+        // orchestrator) so every write path — orchestrator, migration heal-write,
+        // positional callers — gets it for free. Server-derived, never
+        // client-supplied. Bare sync assignment (D3 best-effort discipline): can
+        // never throw, never fails a tw_update_state write. An omitting write
+        // drops it; a re-dispatching write re-stamps it (AC-3/AC-6 fall out of
+        // the nextRole transient lifecycle — do NOT join to the preserve read).
+        if (nextRole)
+            frontmatterData.dispatched_at = now;
         if (resumeOf)
             frontmatterData.resume_of = resumeOf;
         if (reviewVerdict)

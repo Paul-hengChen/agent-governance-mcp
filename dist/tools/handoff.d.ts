@@ -26,6 +26,7 @@ export interface HandoffState {
     cut_approved?: boolean;
     external_refs?: ExternalRef[];
     next_role?: AgentName;
+    dispatched_at?: string;
     resume_of?: ResumeOfTarget;
     review_verdict?: ReviewVerdict;
     dispatch_pins?: Partial<Record<AgentName, string>>;

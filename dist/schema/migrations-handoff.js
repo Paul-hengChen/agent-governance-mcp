@@ -105,6 +105,17 @@ registerMigration({
     to: 9,
     up: (input) => ({ ...input, schema_version: 9, hop_count: 0 }),
 });
+// v9 → v10: add optional dispatched_at stamp (d5-server-side-stale-dispatch-
+// detection). Additive STAMP-ONLY: bumps the version, seeds NO default —
+// absence === "no dispatch currently in flight" (the next_role / scope_decision
+// absence-is-signal precedent, NOT hop_count's seed-0: there is no true
+// pre-feature value to seed). Mirrors the v3→v4 … v6→v7 stamp-only pattern.
+registerMigration({
+    kind: "handoff",
+    from: 9,
+    to: 10,
+    up: (input) => ({ ...input, schema_version: 10 }),
+});
 // Compile-time guard: if CURRENT_VERSIONS.handoff is ever bumped without a
 // matching registration added above, the runner's missing-step error fires
 // at read time. This reference makes the dependency explicit for grep.

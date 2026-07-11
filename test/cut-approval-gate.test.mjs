@@ -118,13 +118,15 @@ test("hasCutApproval: rejects string 'true' (YAML strict parse contract)", () =>
 
 test("R-schema-1: writeHandoffState emits cut_approved: true in YAML when passed", async () => {
   // WHY: verifies the PM approval write path emits the field so the gate can read it.
-  // d2-server-brake-accounting re-baseline: schema_version bumped 8->9 (hop_count,
-  // seeded 0); was 7->8 under c14-dispatch-pins (dispatch_pins, stamp-only); was
-  // 6->7 under c9-protocol-fields (next_role/resume_of/review_verdict, stamp-only).
+  // d5-server-side-stale-dispatch-detection re-baseline: schema_version bumped
+  // 9->10 (dispatched_at, stamp-only, seeds nothing); was 8->9 under
+  // d2-server-brake-accounting (hop_count, seeded 0); was 7->8 under
+  // c14-dispatch-pins (dispatch_pins, stamp-only); was 6->7 under
+  // c9-protocol-fields (next_role/resume_of/review_verdict, stamp-only).
   const ws = tmpWs();
   await seedHandoff(ws, { cutApproved: true });
   const raw = readRawHandoff(ws);
-  assert.match(raw, /schema_version:\s*9/, "schema_version must be 9 (d2-server-brake-accounting)");
+  assert.match(raw, /schema_version:\s*10/, "schema_version must be 10 (d5-server-side-stale-dispatch-detection)");
   assert.match(raw, /cut_approved:\s*true/, "cut_approved must be emitted as true");
 });
 
@@ -403,12 +405,12 @@ test("M1: v4 → v5 migration is stamp-only (AC-7 — no default seeded for cut_
   // any default value. Absence is the unapproved sentinel. A default `false` would
   // be a redundant materialization of absence; a default `true` would be a false
   // attestation bypassing the gate for all legacy files.
-  // d2-server-brake-accounting re-baseline: CURRENT_VERSIONS.handoff is now 9,
-  // so the manually-registered chain must reach 9 (adding the v5->v6, v6->v7,
-  // v7->v8, AND v8->v9 stamp-only/seed-only steps) or runMigrations throws
-  // MISSING_MIGRATION_STEP against the new target. Was 8 under c14-dispatch-pins.
-  // The v4->v5 step under test is still asserted in isolation via
-  // `result.applied` below.
+  // d5-server-side-stale-dispatch-detection re-baseline: CURRENT_VERSIONS.handoff
+  // is now 10, so the manually-registered chain must reach 10 (adding the
+  // v5->v6, v6->v7, v7->v8, v8->v9, AND v9->v10 stamp-only/seed-only steps) or
+  // runMigrations throws MISSING_MIGRATION_STEP against the new target. Was 9
+  // under d2-server-brake-accounting. The v4->v5 step under test is still
+  // asserted in isolation via `result.applied` below.
   _clearRegistryForTests();
   // Register the chain manually so we can test v4→v5 in isolation.
   registerMigration({ kind: "handoff", from: 0, to: 1, up: (i) => ({ ...i, schema_version: 1 }) });
@@ -420,21 +422,23 @@ test("M1: v4 → v5 migration is stamp-only (AC-7 — no default seeded for cut_
   registerMigration({ kind: "handoff", from: 6, to: 7, up: (i) => ({ ...i, schema_version: 7 }) });
   registerMigration({ kind: "handoff", from: 7, to: 8, up: (i) => ({ ...i, schema_version: 8 }) });
   registerMigration({ kind: "handoff", from: 8, to: 9, up: (i) => ({ ...i, schema_version: 9, hop_count: 0 }) });
+  registerMigration({ kind: "handoff", from: 9, to: 10, up: (i) => ({ ...i, schema_version: 10 }) });
 
   const v4payload = { schema_version: 4, active_feature: "old-feat", status: "In_Progress" };
   const result = runMigrations("handoff", v4payload);
 
-  assert.equal(result.payload.schema_version, 9, "migration must bump schema_version to CURRENT (9)");
+  assert.equal(result.payload.schema_version, 10, "migration must bump schema_version to CURRENT (10)");
   assert.equal(result.payload.cut_approved, undefined, "v4→v5 migration MUST NOT seed cut_approved");
-  assert.deepEqual(result.applied, [5, 6, 7, 8, 9], "the v4→v5 step must have been applied (v5→v6, v6→v7, v7→v8, and v8→v9 also run to reach CURRENT)");
+  assert.deepEqual(result.applied, [5, 6, 7, 8, 9, 10], "the v4→v5 step must have been applied (v5→v6, v6→v7, v7→v8, v8→v9, and v9→v10 also run to reach CURRENT)");
   assert.equal(result.fromVersion, 4, "fromVersion must be 4");
-  assert.equal(result.toVersion, 9, "toVersion must be CURRENT (9)");
+  assert.equal(result.toVersion, 10, "toVersion must be CURRENT (10)");
 });
 
 test("M2: v4 → v5 migration preserves all existing fields (AC-7 — lossless)", () => {
   // WHY: AC-7 — no existing field may be modified or removed. Losslessness is
   // critical so that scope_decision, prd_path, qa_round, etc. survive the bump.
-  // d2-server-brake-accounting re-baseline: see M1 comment — chain extended to v9.
+  // d5-server-side-stale-dispatch-detection re-baseline: see M1 comment — chain
+  // extended to v10.
   _clearRegistryForTests();
   registerMigration({ kind: "handoff", from: 0, to: 1, up: (i) => ({ ...i, schema_version: 1 }) });
   registerMigration({ kind: "handoff", from: 1, to: 2, up: (i) => ({ ...i, schema_version: 2 }) });
@@ -445,6 +449,7 @@ test("M2: v4 → v5 migration preserves all existing fields (AC-7 — lossless)"
   registerMigration({ kind: "handoff", from: 6, to: 7, up: (i) => ({ ...i, schema_version: 7 }) });
   registerMigration({ kind: "handoff", from: 7, to: 8, up: (i) => ({ ...i, schema_version: 8 }) });
   registerMigration({ kind: "handoff", from: 8, to: 9, up: (i) => ({ ...i, schema_version: 9, hop_count: 0 }) });
+  registerMigration({ kind: "handoff", from: 9, to: 10, up: (i) => ({ ...i, schema_version: 10 }) });
 
   const v4payload = {
     schema_version: 4,
@@ -460,7 +465,7 @@ test("M2: v4 → v5 migration preserves all existing fields (AC-7 — lossless)"
   };
   const result = runMigrations("handoff", v4payload);
 
-  assert.equal(result.payload.schema_version, 9, "schema_version bumped to CURRENT (9)");
+  assert.equal(result.payload.schema_version, 10, "schema_version bumped to CURRENT (10)");
   assert.equal(result.payload.active_feature, "scope-feat", "active_feature preserved");
   assert.equal(result.payload.scope_decision, "single-feature", "scope_decision preserved");
   assert.equal(result.payload.scope_decision_why, "small feature", "scope_decision_why preserved");
@@ -474,6 +479,7 @@ test("M2: v4 → v5 migration preserves all existing fields (AC-7 — lossless)"
   assert.equal(result.payload.review_verdict, undefined, "review_verdict still absent (v6→v7 also stamp-only, no seed)");
   assert.equal(result.payload.dispatch_pins, undefined, "dispatch_pins still absent (v7→v8 also stamp-only, no seed, c14-dispatch-pins)");
   assert.equal(result.payload.hop_count, 0, "hop_count seeded to 0 (v8→v9, d2-server-brake-accounting DR-3 — the counter precedent, not the stamp-only-attestation precedent)");
+  assert.equal(result.payload.dispatched_at, undefined, "dispatched_at still absent (v9→v10 also stamp-only, no seed, d5-server-side-stale-dispatch-detection DR-7)");
 });
 
 test("M3: legacy file (no schema_version) migrates to v5 and has no cut_approved (AC-6)", async () => {

@@ -130,7 +130,8 @@ Stop conditions + routing escalations (WHEN/DO/ELSE collapsed to rows; Constitut
 | the `next_role` field is absent with no escalation prose | — | surface as ambiguous — the prior role forgot or finished without nominating a successor | human |
 | `hop_count` from `tw_get_state` ≥ the `hop` cap for the active feature — or a `tw_update_state` write was rejected with `HOP_CAP_EXCEEDED` (server-enforced) | — | surface the hop cap (`hop_count={n}`) — autonomous dispatch is frozen at PM until a human re-scopes into a new feature or overrides | human |
 | **Token budget brake** — `.current/.config.json` sets `tokenBudgetPerFeature` AND the feature-scoped running total summed from `.current/usage.jsonl` (fallback: the `agent-*.jsonl` hand-sum when the sidecar is absent; see §Token Budget Brake) ≥ 80% of it | — | `token budget: {running_total} / {tokenBudgetPerFeature} ({pct}%) — handing to human` | human |
-| **Crash detection** — a dispatched `Task(subagent_type=<role>, …)` call returns a tool-error or empty/truncated reply, or the host/user reports the subagent was killed (session or usage-limit kill), BEFORE that role's own `tw_update_state` landed (handoff `agent_id`/`status` unchanged since dispatch) | — | do not resume or re-dispatch directly — run the Crash-Resume Protocol first, then resume | (role being resumed) |
+| **Crash detection** — a dispatched `Task(subagent_type=<role>, …)` call returns a tool-error or empty/truncated reply, or the host/user reports the subagent was killed (session or usage-limit kill), BEFORE that role's own `tw_update_state` landed (handoff `agent_id`/`status` unchanged since dispatch) | — | do not resume or re-dispatch directly — run the Crash-Resume Protocol first, then resume (fresh-session counterpart: the Stale-dispatch detection row below) | (role being resumed) |
+| **Stale-dispatch detection** — `tw_get_state` returns a `stale_dispatch` advisory (a `next_role` was stamped `dispatched_at` more than 15 min ago with no subsequent write; surfaced from persisted state alone, so a fresh/post-compaction session with NO memory of dispatching still sees it) | — | do not resume or re-dispatch directly — run the Crash-Resume Protocol first, then resume | (role named by `stale_dispatch.role`) |
 | **Cut-approval gate** — the `next_role` field is `architect` or `sr-engineer` but `cut_approved` is not set on the handoff (server error: `CUT_APPROVAL_REQUIRED`) | — | surface the cut draft and wait — do NOT auto-hop through to build; writer obligation below | human |
 | **External-refs gate** — the `next_role` field is `architect` or `sr-engineer` but the handoff `external_refs` ledger has an entry with `state: "unresolved"` (server error: `EXTERNAL_REFS_UNRESOLVED`) | — | surface the unresolved refs and wait — do NOT auto-hop through to build; PM must resolve each ref (fetch/index/user-confirm-ignorable) and re-write the ledger | human |
 | **Amend-Resume relay** — the PM amendment set the `resume_of` field to `code-reviewer` or `qa-engineer` (with `next_role` naming that same role; routing action, not a halt) | In_Progress (routing write, `agent_id="<role>"`) | set the identical `resume_of: <role>` field on the routing write — the server rejects the resume edge without it (legacy `resume_of:` pending_notes lines are inert). Full mechanism: Constitution §3.1 | code-reviewer / qa-engineer |
@@ -142,10 +143,17 @@ Stop conditions + routing escalations (WHEN/DO/ELSE collapsed to rows; Constitut
 
 Constitution §3 requires "on crash/failure, still call `tw_update_state` with the failure summary" —
 but an externally-killed subagent (session/usage-limit kill, host crash) cannot honor that; it dies
-mid-task with NO failure record. The **Crash detection** row in Escalation Routes above routes here.
+mid-task with NO failure record. BOTH the **Crash detection** row (same-session trigger) and the
+**Stale-dispatch detection** row (fresh-session trigger) in Escalation Routes above route here.
 Run this protocol BEFORE any re-dispatch or resume — do NOT improvise a resume from transcript alone;
 that is how a dispatch-time `model` pin silently degrades back to frontmatter default.
 
+0. **Identify the in-flight role without relying on your own memory.** If you saw
+   the `Task(...)` fail this session, that reply names the role directly. If you
+   are fresh / post-compaction and have NO memory of dispatching, read the
+   `stale_dispatch` field from `tw_get_state`: `stale_dispatch.role` IS the role
+   in flight and the signal is your trigger. Either path, resume THAT role and
+   proceed to step 1.
 1. **Ground-truth the working tree.** Before trusting anything the dead role claimed (its last
    `pending_notes`, transcript text, or `tasks.md` checkbox state), verify independently: `git
    status`, `git diff`, `git log -1`, and re-read the specific target files against the claims — did

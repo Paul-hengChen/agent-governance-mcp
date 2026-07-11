@@ -1049,13 +1049,24 @@ test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/b
   // paragraph, and the Escalation Routes hop-cap row. Independently re-measured (not
   // trusted from sr-engineer's handoff note) at 13046 ~tok (exact); cap set to the exact
   // measured value per the established Phase-2 convention (no additional headroom).
+  // d5-server-side-stale-dispatch-detection (qa-owned bump, T-D5-05): cap raised
+  // from 13046 → 13298 to absorb the skill-coordinator.md prose additions —
+  // the new "Stale-dispatch detection" Escalation Routes row, the "Crash
+  // detection" row's fresh-session pointer clause, the intro rewrite noting
+  // both triggers route to Crash-Resume, and the new step 0 prepended to the
+  // Crash-Resume Protocol (T-D5-03). No constitution-side change in this
+  // ticket (DR-6 — no new gate/GateErrorCode), so this bundle's growth is
+  // 100% skill-coordinator-side. Independently re-measured (not trusted from
+  // code-reviewer's review note) at 13298 ~tok (exact); cap set to the exact
+  // measured value per the established Phase-2 convention (no additional
+  // headroom).
   const skillCoord = fs.readFileSync(path.join(ROOT, "content", "skill-coordinator.md"), "utf-8");
   const body = skillCoord.startsWith("---")
     ? skillCoord.slice(skillCoord.indexOf("---", 3) + 3).trimStart()
     : skillCoord;
   const SEP = "\n\n---\n\n";
   const bundle = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)) + SEP + stripRationale(stripOriginTags(body)));
-  assert.ok(bundle <= 13046, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 13046 (AC8 design-arm floor, d2-server-brake-accounting re-baseline)`);
+  assert.ok(bundle <= 13298, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 13298 (AC8 design-arm floor, d5-server-side-stale-dispatch-detection re-baseline)`);
 });
 
 test("AC9: every operative rule/gate/heading survives stripRationale on the constitution", () => {

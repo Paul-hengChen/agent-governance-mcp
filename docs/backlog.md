@@ -65,7 +65,7 @@ future `/teamwork` feature; none blocks a release on its own.
 | D2 | Hop counter + token budget brake are model-executed in-memory arithmetic — move to server-side accounting (orchestrator counter field or PostToolUse hook) | P2 | D3 | ~4 (`tools/handoff-orchestrator.ts` or hook script, skill-coordinator, config, tests) | — |
 | D3 | Gate-fire telemetry: log every gate rejection (`TRANSITION_REJECTED`, `CUT_APPROVAL_REQUIRED`, …) to `.current/telemetry.jsonl` → data-driven rule retirement in retros — **done (2026-07-10, v3.66.0)** | P1 | — | ~3 (`tools/telemetry.ts`, `tools/handoff-orchestrator.ts` wrapper, `docs/gate-retro-procedure.md`) | — |
 | D4 | Behavioral compliance eval harness — scripted dispatch scenarios asserting model output format (§1 watermark etc.), guarding token-saving skill rewrites against behavior regressions — **done (2026-07-10, v3.67.0)** | P2 | — | ~3 (new `test/eval/` harness, fixtures, npm script) | — |
-| D5 | Server-side crash detection: stamp `dispatched_at` + target role on dispatch; `tw_get_state` surfaces stale in-flight dispatch (>N min, no state write) — removes coordinator-memory dependence (C8 follow-on) | P2 | — | ~4 (`tools/handoff.ts` schema, orchestrator, skill-coordinator, tests) | — |
+| D5 | Server-side crash detection: stamp `dispatched_at` + target role on dispatch; `tw_get_state` surfaces stale in-flight dispatch (>N min, no state write) — removes coordinator-memory dependence (C8 follow-on) — **done (2026-07-11, v3.70.0)** | P2 | — | ~4 (`tools/handoff.ts` schema, orchestrator, skill-coordinator, tests) | — |
 | D6 | Host-capability as third compose axis: tag Claude-Code-only skill sections (Task tool, `agent-*.jsonl`, `~/.claude/agents`) `host:claude-code`; non-CC hosts skip dead text | P3 | — | ~5 (`prompts/constitution-manifest.ts` pattern extended to skills, `prompts/build.ts`, content splits, tests) | — |
 | D7 | `qa_reports/` unbounded growth (232 files) — per-feature archive / retention policy mirroring the tasks-archive convention — **done (2026-07-11, v3.67.1)** | P3 | — | ~2 (skill-release-engineer or skill-qa-engineer archive step, docs) | — |
 | D8 | Lite recommended model is haiku but haiku §1 compliance is known-poor (watermark omissions) — trim lite bundle further or bump recommendation to sonnet — **done (2026-07-11, v3.68.1)** | P3 | — | ~2 (`content/skill-coordinator-lite.md` frontmatter, measure-context-cost) | — |
@@ -818,7 +818,8 @@ in live runs first, cheap content-only batches next, design-heavy last.
   compressed prose still steers the model; failures surface as downstream
   agent misbehavior — the hardest class to trace (same rationale as A3).
 
-## D5 — Server-side stale-dispatch detection (P2, C8 follow-on)
+## D5 — Server-side stale-dispatch detection (P2, C8 follow-on) ✓ DONE
+- **Done (v3.70.0):** Handoff schema v9→v10 adds transient `dispatched_at` (ISO-8601) auto-stamped in writeHandoffState whenever a write sets `next_role` (single-sourced, orchestrator untouched); `tw_get_state` surfaces a `stale_dispatch` advisory ({role, dispatched_at, elapsed_minutes, threshold_minutes, message}) when an in-flight dispatch has no state write for >15 min (fixed STALE_DISPATCH_THRESHOLD_MIN, read-path advisory, no new gate). skill-coordinator.md: Stale-dispatch Escalation Routes row + Crash-Resume step 0. Mechanism: specs/d5-server-side-stale-dispatch-detection.md + -architecture.md.
 - **What:** The Crash-Resume Protocol (skill-coordinator, v3.53.0) depends on
   the coordinator *remembering* it dispatched a role that never wrote state.
   If the coordinator itself is compacted/killed, the wedge is invisible: the

@@ -4,7 +4,7 @@
 
 Lost updates, rule drift across `.cursorrules` / `CLAUDE.md` / `.windsurfrules`, and silent overwrites when two IDEs write at once — solved at the protocol layer, not by hoping the AI behaves.
 
-> **Status**: production-used, v3.69.0. Suite **1173/1173**. Stdio mode is solo/single-machine; HTTP+SQLite mode is for multi-machine teams.
+> **Status**: production-used, v3.70.0. Suite **1186/1186**. Stdio mode is solo/single-machine; HTTP+SQLite mode is for multi-machine teams.
 
 *Solo-built and self-hosting: this repo dogfoods its own server — development of agent-governance-mcp itself runs through the constitution and `tw_*` gates it ships.*
 

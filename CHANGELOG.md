@@ -16,6 +16,15 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.70.0] - 2026-07-11
+
+### Added
+- **`d5-server-side-stale-dispatch-detection` — Server-side stale-dispatch liveness detection (v3.70.0).** Implements read-time staleness advisory for in-flight handoff dispatches. Handoff schema v9→v10 adds transient `dispatched_at` (ISO-8601) auto-stamped in `writeHandoffState` whenever a write sets `next_role`. `tw_get_state` surfaces a `stale_dispatch` advisory (`{role, dispatched_at, elapsed_minutes, threshold_minutes, message}`) when an in-flight dispatch has no state write for >15 min (fixed `STALE_DISPATCH_THRESHOLD_MIN`, read-path only, no new gates). Enables coordinator + agents to detect and handle dispatch liveness anomalies (hung agents, network partitions, race conditions). Zero new client args; orchestrator untouched; backwards-compatible MINOR bump. `content/skill-coordinator.md` gains Stale-dispatch Escalation Routes row + Crash-Resume step 0 instructions. Comprehensive architecture in `specs/d5-server-side-stale-dispatch-detection.md` and `specs/d5-server-side-stale-dispatch-detection-architecture.md`. Code-review approved; QA verified with 1179/1179 green. See `review_reports/review_T-D5-04.md`, `qa_reports/review_T-D5-05.md`.
+
+### Notes
+- driftBaselineIds appended with T-D5-ARCH, T-D5-01, T-D5-02, T-D5-03, T-D5-04, T-D5-05, T-D5-REL, T-D5-DONE
+- Handoff schema v10: `dispatched_at` field added to track dispatch-write timestamps (migration from v9 auto-runs on read)
+
 ## [3.69.0] - 2026-07-11
 
 ### Added

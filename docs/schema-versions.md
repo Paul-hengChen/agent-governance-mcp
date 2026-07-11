@@ -33,9 +33,13 @@ itself when shipping a new version.
 | v7 | adds optional `next_role` / `resume_of` / `review_verdict` protocol fields (c9-protocol-fields) | v6→v7 stamp-only, seeds nothing — **absence === no routing signal recorded**; a synthesized default would fabricate a directive. Legacy `next_role:` / `resume_of:` / `review:` pending_notes token lines are left byte-verbatim and NOT extracted (they become inert prose). |
 | v8 | adds optional `dispatch_pins?: Partial<Record<AgentName, string>>` map (c14-dispatch-pins) | v7→v8 stamp-only, seeds nothing — **absence === no pins recorded**; a synthesized default would fabricate a human directive. Legacy `dispatch_pins: <role>=<model>` pending_notes lines (C8-era convention) are left byte-verbatim and NOT extracted (they become inert prose). REPLACE-wholesale when provided; feature-scoped carry-forward when omitted, NO PM-re-entry re-arm (the `external_refs` algorithm). |
 | v9 | adds `hop_count` counter (d2-server-brake-accounting) — feature-scoped role-transition counter, computed server-side by `computeNewRound`, enforced by the `HOP_CAP_EXCEEDED` override in `validateTransition` (HOP_CAP = 10); resets ONLY on `active_feature` change, NOT on PM re-entry (DR-6) | v8→v9 stamps version + **seeds `hop_count: 0`** — the `review_round`/`visual_round` counter precedent, NOT the stamp-only attestation precedent (DR-3: a 0 count is the true pre-feature value, not a fabricated attestation). |
+| v10 | adds optional `dispatched_at?: string` stamp (d5-server-side-stale-dispatch-detection) — server-stamped companion to `next_role`, transient/write-scoped, file-mode-only | v9→v10 stamp-only, seeds nothing — **absence === no dispatch in flight** (the `next_role` absence-is-signal precedent, NOT `hop_count`'s seed-0). |
 
 `sqlite` stays at v2 — `cut_approved`, `external_refs`, the v7 protocol
-fields, and the v8 `dispatch_pins` map live in the handoff YAML frontmatter
+fields, the v8 `dispatch_pins` map, and the v10 `dispatched_at` stamp
+(`next_role`'s direct companion — stamped only when `next_role` is emitted,
+and `SqliteHandoffStorage.writeState` never persists `next_role`, so it never
+stamps `dispatched_at` either, D5 DR-5) live in the handoff YAML frontmatter
 only and are not mirrored to the SQLite schema (the gates that consume them
 either read the incoming write args or are file-mode only). The v9
 `hop_count` IS mirrored to SQLite, but via the idempotent
