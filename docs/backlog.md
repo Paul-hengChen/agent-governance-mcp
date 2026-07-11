@@ -68,7 +68,7 @@ future `/teamwork` feature; none blocks a release on its own.
 | D5 | Server-side crash detection: stamp `dispatched_at` + target role on dispatch; `tw_get_state` surfaces stale in-flight dispatch (>N min, no state write) — removes coordinator-memory dependence (C8 follow-on) | P2 | — | ~4 (`tools/handoff.ts` schema, orchestrator, skill-coordinator, tests) | — |
 | D6 | Host-capability as third compose axis: tag Claude-Code-only skill sections (Task tool, `agent-*.jsonl`, `~/.claude/agents`) `host:claude-code`; non-CC hosts skip dead text | P3 | — | ~5 (`prompts/constitution-manifest.ts` pattern extended to skills, `prompts/build.ts`, content splits, tests) | — |
 | D7 | `qa_reports/` unbounded growth (232 files) — per-feature archive / retention policy mirroring the tasks-archive convention — **done (2026-07-11, v3.67.1)** | P3 | — | ~2 (skill-release-engineer or skill-qa-engineer archive step, docs) | — |
-| D8 | Lite recommended model is haiku but haiku §1 compliance is known-poor (watermark omissions) — trim lite bundle further or bump recommendation to sonnet | P3 | — | ~2 (`content/skill-coordinator-lite.md` frontmatter, measure-context-cost) | — |
+| D8 | Lite recommended model is haiku but haiku §1 compliance is known-poor (watermark omissions) — trim lite bundle further or bump recommendation to sonnet — **done (2026-07-11, v3.68.1)** | P3 | — | ~2 (`content/skill-coordinator-lite.md` frontmatter, measure-context-cost) | — |
 
 ### Recommended execution order (2026-07-09, everything still open)
 
@@ -860,6 +860,11 @@ in live runs first, cheap content-only batches next, design-heavy last.
   correctness exposure found.
 
 ## D8 — Lite recommended model vs haiku §1 compliance (P3)
+
+> **DONE (2026-07-11, v3.68.1, commit f531a8c).** Option (b): bumped `recommended_model` haiku → sonnet
+> (skill frontmatter + doc mirror); `@lite` Task-subagent template stays haiku (has validating parent) —
+> sanctioned divergence encoded as dated `MIRROR_EXEMPT_ROLES` exemption in test/subagent-templates.test.mjs.
+> Decision on documented evidence (D4 live eval unavailable, per T-D4-09). See specs/d8-lite-recommended-model.md.
 - **What:** `skill-coordinator-lite.md` recommends haiku, but haiku's §1
   compliance is documented-poor (watermark omissions are the stated reason
   the coordinator runs `validateWatermark` at all). Lite has NO validating
