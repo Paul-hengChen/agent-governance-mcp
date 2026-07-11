@@ -452,3 +452,204 @@ test("S6: content/coord-03-core-fallback.md carries the FEATURE_LEASE_HELD Escal
     "the Escalation Routes row must route to human",
   );
 });
+
+// ============================================================================
+// E1A amendment (post-release lease terminal-marker + negative-age guard)
+// -- specs/e1-feature-scoped-state-design.md, "## Amendment (2026-07-12)"
+// AC-E1A-1..7. gates/feature-lease.ts:70-94.
+//
+// Spec-to-Test map (E1A):
+//   AC-E1A-1 (closing write releases the lease)         -> E1A-1
+//   AC-E1A-2 (opening write still holds)                 -> E1A-2
+//   AC-E1A-3 (Blocked / escalation next_role still holds) -> E1A-3a, E1A-3b, E1A-3c, E1A-3d
+//   AC-E1A-4 (future-dated last_updated -> not held)      -> E1A-4a, E1A-4b
+//   AC-E1A-5 (NaN/empty-string regression guard)          -> E1A-5a, E1A-5b
+//   AC-E1A-6 (SQLite-mode no-op safety)                   -> E1A-6
+//   AC-E1A-7 (skill-text pin, step 12)                    -> S7
+// ============================================================================
+
+test("E1A-1: release-engineer's CLOSING-write signal (last_agent=release-engineer, status=In_Progress, next_role=pm) releases the lease for a DIFFERENT feature (AC-E1A-1)", () => {
+  // WHY: this is the root fix — pre-amendment, this exact post-release state
+  // stayed lease-held for up to LEASE_TTL_MIN minutes even though the feature
+  // had genuinely shipped (v3.72.0 incident). The closing write is the ONLY
+  // state that carries this triple, so recognizing it lets the NEXT feature
+  // start immediately instead of waiting out a TTL cooldown after every release.
+  const prev = {
+    active_feature: "feat-x",
+    status: "In_Progress",
+    last_updated: new Date().toISOString(),
+    last_agent: "release-engineer",
+    next_role: "pm",
+  };
+  assert.equal(isFeatureLeaseHeld(prev, "feat-y", Date.now(), LEASE_TTL_MIN), false);
+});
+
+test("E1A-2: release-engineer's OPENING write (no next_role set) still HOLDS the lease (AC-E1A-2)", () => {
+  // WHY: the opening write (SOP step 2) never sets next_role. If the terminal
+  // clause fired here too, the lease would release WHILE release mechanics
+  // (git commit/tag/push) are still in flight — reopening exactly the
+  // D5/D9/D10 race the lease exists to prevent.
+  const prev = {
+    active_feature: "feat-x",
+    status: "In_Progress",
+    last_updated: new Date().toISOString(),
+    last_agent: "release-engineer",
+    // next_role intentionally absent (key not present at all).
+  };
+  assert.equal(isFeatureLeaseHeld(prev, "feat-y", Date.now(), LEASE_TTL_MIN), true);
+});
+
+test("E1A-3a: a pm-authored write with next_role=pm but last_agent!=release-engineer still HOLDS (AC-E1A-3 / last_agent conjunct)", () => {
+  // WHY: other roles legitimately hand back to pm with next_role="pm" (e.g.
+  // code-reviewer's CHANGES_REQUESTED routing, or an ordinary pm self-loop).
+  // Only release-engineer's OWN closing write may be mistaken for "shipped" —
+  // the last_agent conjunct is what excludes every other role's pm-handback.
+  const prev = {
+    active_feature: "feat-x",
+    status: "In_Progress",
+    last_updated: new Date().toISOString(),
+    last_agent: "pm",
+    next_role: "pm",
+  };
+  assert.equal(isFeatureLeaseHeld(prev, "feat-y", Date.now(), LEASE_TTL_MIN), true);
+});
+
+test("E1A-3b: release-engineer at status=Blocked (even with next_role=pm) still HOLDS — Blocked-counts-as-held is not overridden by the terminal marker (AC-E1A-3)", () => {
+  // WHY: the terminal clause requires status==="In_Progress" explicitly, so a
+  // Blocked release-engineer state (interrupted/failed release awaiting human
+  // recovery) can never satisfy it, regardless of next_role. This keeps the
+  // already-ratified "Blocked counts as held" decision intact.
+  const prev = {
+    active_feature: "feat-x",
+    status: "Blocked",
+    last_updated: new Date().toISOString(),
+    last_agent: "release-engineer",
+    next_role: "pm",
+  };
+  assert.equal(isFeatureLeaseHeld(prev, "feat-y", Date.now(), LEASE_TTL_MIN), true);
+});
+
+test("E1A-3c: release-engineer escalation with next_role=qa-engineer still HOLDS (AC-E1A-3)", () => {
+  // WHY: release-engineer's escalation writes (Escalation Routes table, e.g.
+  // npm test regression) route next_role="qa-engineer", never "pm" — an
+  // interrupted release must not release the lease early.
+  const prev = {
+    active_feature: "feat-x",
+    status: "In_Progress",
+    last_updated: new Date().toISOString(),
+    last_agent: "release-engineer",
+    next_role: "qa-engineer",
+  };
+  assert.equal(isFeatureLeaseHeld(prev, "feat-y", Date.now(), LEASE_TTL_MIN), true);
+});
+
+test("E1A-3d: release-engineer with next_role explicitly undefined still HOLDS (AC-E1A-3 / no-next_role variant)", () => {
+  // WHY: distinct from E1A-2's "key never set" shape — this pins that an
+  // explicit `next_role: undefined` (as opposed to the key being entirely
+  // absent from the object) is likewise never `=== "pm"` and therefore never
+  // satisfies the terminal clause. Both shapes must behave identically.
+  const prev = {
+    active_feature: "feat-x",
+    status: "In_Progress",
+    last_updated: new Date().toISOString(),
+    last_agent: "release-engineer",
+    next_role: undefined,
+  };
+  assert.equal(isFeatureLeaseHeld(prev, "feat-y", Date.now(), LEASE_TTL_MIN), true);
+});
+
+test("E1A-4a: future-dated last_updated (negative age) is NOT lease-held, regardless of ttlMin (AC-E1A-4)", () => {
+  // WHY: the incident this item fixes — a last_updated ~6.2h in the future
+  // (clock skew / hand-edited state) made `ageMs < ttlMin*60000` trivially
+  // true forever (any negative number is less than any positive threshold),
+  // turning the ratified 30-min TTL into a de-facto multi-hour cooldown. A
+  // future-dated stamp cannot prove a trustworthy elapsed time, so it must
+  // fail open (not held) — mirrors the NaN posture, no skew-grace window.
+  const now = Date.now();
+  const last_updated = new Date(now + 6.2 * 60 * 60 * 1000).toISOString(); // ~6.2h in the future
+  const prev = { active_feature: "feat-x", status: "In_Progress", last_updated };
+  assert.equal(isFeatureLeaseHeld(prev, "feat-y", now, LEASE_TTL_MIN), false);
+  // Regardless of ttlMin (even an enormous TTL cannot rescue a negative age).
+  assert.equal(isFeatureLeaseHeld(prev, "feat-y", now, 10_000), false);
+});
+
+test("E1A-4b: ageMs === 0 boundary (last_updated exactly \"now\") still HOLDS — zero is non-negative and fresh (AC-E1A-4 boundary)", () => {
+  // WHY: pins that the negative-age fix is a STRICT `ageMs >= 0` guard, not an
+  // accidental `> 0` that would also reject a legitimately-fresh same-instant
+  // write. Zero age is the freshest possible state and must remain held.
+  const now = Date.now();
+  const prev = { active_feature: "feat-x", status: "In_Progress", last_updated: new Date(now).toISOString() };
+  assert.equal(isFeatureLeaseHeld(prev, "feat-y", now, LEASE_TTL_MIN), true);
+});
+
+test("E1A-5a: unparseable last_updated (NaN) posture is UNCHANGED by the negative-age fix — still not held (AC-E1A-5 regression guard)", () => {
+  // WHY: the negative-age fix (`ageMs >= 0 && ageMs < ttl`) must not
+  // accidentally flip the pre-existing NaN behavior. `NaN >= 0` is `false`,
+  // identical in effect to the pre-amendment `NaN < ttl` also being `false` —
+  // same outcome, different (now more explicit) code path.
+  const prev = { active_feature: "feat-x", status: "In_Progress", last_updated: "not-a-real-date" };
+  assert.equal(isFeatureLeaseHeld(prev, "feat-y", Date.now(), LEASE_TTL_MIN), false);
+});
+
+test("E1A-5b: empty-string last_updated posture is UNCHANGED by the negative-age fix — still not held (AC-E1A-5 regression guard)", () => {
+  const prev = { active_feature: "feat-x", status: "In_Progress", last_updated: "" };
+  assert.equal(isFeatureLeaseHeld(prev, "feat-y", Date.now(), LEASE_TTL_MIN), false);
+});
+
+test("E1A-6: a SQLite-shaped prevState (no next_role field at all) can NEVER satisfy the terminal clause, even with last_agent=release-engineer + status=In_Progress (AC-E1A-6)", () => {
+  // WHY: SqliteHandoffStorage never persists next_role, so any prevState read
+  // back from the SQLite row structurally lacks the field — `undefined`,
+  // never `"pm"`. This proves the SQLite no-op is a structural guarantee (the
+  // field literally cannot be present with the right value), not merely an
+  // untested coincidence. SQLite-mode behavior for this state is therefore
+  // byte-for-byte unchanged from pre-amendment: still TTL-bounded post-release.
+  const prevSqliteShaped = {
+    active_feature: "feat-x",
+    status: "In_Progress",
+    last_updated: new Date().toISOString(),
+    last_agent: "release-engineer",
+    // no `next_role` key present -- mirrors the actual SQLite row shape.
+  };
+  assert.ok(!("next_role" in prevSqliteShaped), "sanity: fixture must not carry a next_role key");
+  assert.equal(isFeatureLeaseHeld(prevSqliteShaped, "feat-y", Date.now(), LEASE_TTL_MIN), true);
+
+  // And it remains TTL-bounded exactly like pre-amendment behavior: stale ->
+  // released; fresh -> held.
+  const staleSqliteShaped = {
+    ...prevSqliteShaped,
+    last_updated: new Date(Date.now() - (LEASE_TTL_MIN + 1) * 60_000).toISOString(),
+  };
+  assert.equal(isFeatureLeaseHeld(staleSqliteShaped, "feat-y", Date.now(), LEASE_TTL_MIN), false);
+});
+
+test("S7: content/skill-release-engineer.md SOP step 12 pins agent_id=\"release-engineer\" on the closing write and no longer instructs agent_id=\"pm\" there (AC-E1A-7)", () => {
+  const skill = readContentFile("skill-release-engineer.md");
+  const step12Match = skill.match(/^12\.\s+\*\*Closing write\*\*.*$/m);
+  assert.ok(step12Match, "must locate the numbered step-12 Closing write line");
+  const step12Line = step12Match[0];
+
+  // The corrected closing-write call must open with agent_id="release-engineer".
+  assert.ok(
+    step12Line.includes('tw_update_state(agent_id="release-engineer"'),
+    "step 12's tw_update_state call must open with agent_id=\"release-engineer\" (self-loop)",
+  );
+  assert.ok(
+    step12Line.includes('next_role="pm"'),
+    "step 12's tw_update_state call must still carry next_role=\"pm\" as the routing/terminal signal",
+  );
+
+  // The OLD, incorrect instruction (agent_id="pm" as part of the actual call)
+  // must be gone. The corrected prose still discusses the forbidden case in
+  // running text (e.g. "an agent_id=\"pm\" write would..."), so this assertion
+  // targets the specific old CALL shape, not every occurrence of the substring.
+  assert.ok(
+    !skill.includes('tw_update_state(status=In_Progress, agent_id="pm", next_role="pm"'),
+    "the old closing-write call instructing agent_id=\"pm\" must no longer be present verbatim",
+  );
+
+  // Explicit "NEVER agent_id=\"pm\"" guard language should accompany the fix.
+  assert.ok(
+    /NEVER\s+`?"pm"`?/.test(step12Line) || step12Line.includes('— NEVER `"pm"`'),
+    "step 12 must explicitly call out that agent_id must NEVER be \"pm\" on the closing write",
+  );
+});

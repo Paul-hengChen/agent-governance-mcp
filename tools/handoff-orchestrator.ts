@@ -152,9 +152,13 @@ async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResu
         // accepts, before the build-entry attestation gates — so the "can this
         // feature take the slot at all?" question is answered before any
         // per-edge attestation is evaluated. BOTH storage modes (unlike
-        // cut-approval / external-refs): the predicate reads only the three
+        // cut-approval / external-refs): the core clauses read the three
         // universal fields (active_feature/status/last_updated), which exist
-        // identically in the SQLite row. NOT in transitions.ts (that stays
+        // identically in the SQLite row; the E1A release-engineer closing-write
+        // terminal marker additionally reads last_agent/next_role, which are
+        // optional and file-mode-only (SQLite never persists next_role) — the
+        // clause simply never matches there (accepted asymmetry, spec
+        // §Amendment 2026-07-12). NOT in transitions.ts (that stays
         // pure / fs-free; mirrors SCOPE_DECISION_REQUIRED).
         if (prevState && isFeatureLeaseHeld(prevState, parsed.active_feature, Date.now(), LEASE_TTL_MIN)) {
           const hint =

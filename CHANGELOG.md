@@ -16,6 +16,18 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.73.1] - 2026-07-12
+
+### Fixed
+- **`e1a-feature-lease-amendment` — Post-release lease terminal marker + negative-age hardening (v3.73.1).** Fixes feature-lease hold duration post-release by introducing the terminal-marker signature in `gates/feature-lease.ts` (release-engineer closing write status=In_Progress + next_role="pm" now signals feature-lease release; prior versions leaked ~30 min post-release because the closing write clobbered the QA PASS tuple). Adds negative-age guard: `last_updated` in future (clock skew) no longer blocks lease release; only fresh updates reset the lease TTL, preventing indefinite hold on time-jumped handoff files. Amendment architecture in `specs/e1-feature-scoped-state-design.md ## Amendment (2026-07-12)` section. Feature-lease regression tests extended (`test/feature-lease.test.mjs`, +18 tests); full suite 1263/1263 green. QA verified (`qa_reports/review_T-E1A-03.md`).
+
+### Changed
+- **SOP clarification**: release-engineer closing write (step 12) SOP text corrected — `agent_id` must be "release-engineer" (self-loop), never "pm" (stamps false audit trail). This ensures the feature-lease terminal-marker contract (last_agent="release-engineer" ∧ status="In_Progress" ∧ next_role="pm") is satisfied, releasing the lease post-PASS.
+
+### Notes
+- driftBaselineIds appended with T-E1A-01, T-E1A-02, T-E1A-03, T-E1A-04
+- Feature-lease amendment is backwards-compatible (no schema bump, test-only validation)
+
 ## [3.73.0] - 2026-07-12
 
 ### Added

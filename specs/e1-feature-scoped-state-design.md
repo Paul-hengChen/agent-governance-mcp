@@ -381,3 +381,221 @@ done-mark) is release-engineer's standing post-PASS SOP step (T-C10-01
 convention) — not cut as a separate ticket line, mirroring D10 practice.
 E1b (per-feature handoff files) is a separate future cut, not part of this
 chain.
+
+---
+
+## Amendment (2026-07-12) — post-release lease terminal-marker (E1A)
+
+> Root-fix follow-on to the v3.72.0 release-engineer closing write.
+> Human-approved to proceed with the root fix (not just a diagram correction).
+> Ticket cut: `T-E1A-01…T-E1A-04` (below). Continues on the same
+> `active_feature` (`e1-feature-scoped-state-design`) — same-feature writes
+> never gate on the lease (`gates/feature-lease.ts:51`), so this amendment does
+> not itself trip the gate it is fixing.
+
+### Problem (grounded)
+
+The Decision above (`§Decision`) and its sequence diagram (L255-256) and prose
+(L220-221) assert that the lease releases once release-engineer hands back
+post-release: *"ships, and hands back `release-engineer:In_Progress →
+pm:In_Progress` (`:246-248`), landing at **terminal state**."* This is
+inaccurate. `isFeatureLeaseHeld` (`gates/feature-lease.ts:44-56`) has exactly
+ONE terminal condition — `prevState.status === "PASS"` — and `PASS` is
+reserved to `qa-engineer` (`requireQaEngineer` gate,
+`tools/handoff-orchestrator.ts:88-93`; zod `status` field description in
+`index.ts`). Release-engineer's closing write is `status: "In_Progress"`
+(SOP step 12, `content/skill-release-engineer.md:73`) — non-terminal — so a
+`<=30`-min `LEASE_TTL_MIN` cooldown applies after **every** release, silently
+contradicting the diagram's claim of immediate release. Confirmed live: the
+v3.72.0 closing write left the workspace at
+`active_feature=e1-feature-scoped-state-design, status=In_Progress,
+last_agent=release-engineer, next_role=pm` — exactly the non-terminal shape
+the lease still holds.
+
+Two implementation constraints rule out the two most obvious "just make it
+terminal" fixes:
+
+- **Cannot reuse `status=PASS`.** `requireQaEngineer` rejects any non-
+  `qa-engineer` writer from setting `status=PASS`; the PASS evidence-recording
+  path (`qa_review` stamping) is also `qa-engineer`-specific. Repurposing PASS
+  for "released" would conflate two distinct meanings (QA-verified vs.
+  shipped) and is out of scope for a wart-fix.
+- **Cannot key on `last_agent="release-engineer"` alone.** Both the OPENING
+  write (SOP step 2, `qa-engineer:PASS → release-engineer:In_Progress`) and
+  the CLOSING write stamp `last_agent="release-engineer"` — release-engineer
+  self-loops across its whole SOP via `validateTransition`'s same-agent
+  In_Progress→In_Progress fast path (`tools/transitions.ts:412-420`), not the
+  static `release-engineer:In_Progress → {agent:"pm"}` table entry. Releasing
+  the lease on ANY `last_agent="release-engineer"` state would also release it
+  during the OPENING window — i.e., while release mechanics (git commit/tag/
+  push) are still running — reopening exactly the D5/D9/D10 race the lease
+  exists to prevent (a second feature's build/release work interleaving with
+  the first's in-flight git operations in the same checkout).
+
+### Decision — terminal-marker (item 1, the root fix)
+
+Extend `isFeatureLeaseHeld`'s terminal check with a second, narrowly-scoped
+clause, evaluated after the existing `status === "PASS"` check:
+
+```
+prevState.last_agent === "release-engineer"
+  && prevState.status === "In_Progress"
+  && prevState.next_role === "pm"
+  ⇒ lease released (terminal)
+```
+
+This reuses `next_role`, an existing field already stamped unconditionally by
+release-engineer's closing write (SOP step 12) on every successful release —
+**zero SOP behavior change**, zero schema bump, zero new field. It fires only
+on the closing write because:
+
+- the OPENING write (SOP step 2) never sets `next_role` — the in-flight
+  release window stays lease-held, exactly as today;
+- release-engineer's escalation writes route `next_role="qa-engineer"` or
+  `"human"` (Escalation Routes table, `content/skill-release-engineer.md:79-85`),
+  or set `status="Blocked"` — neither matches, so an interrupted/failed
+  release still holds the lease pending human recovery, consistent with the
+  already-ratified "Blocked counts as held" decision;
+- the `last_agent === "release-engineer"` conjunction excludes every OTHER
+  role's `next_role="pm"` handback (e.g. code-reviewer's `CHANGES_REQUESTED`
+  routing pm to review rejected changes) from being mistaken for a shipped
+  feature.
+
+**Known scoping limit (explicit, not a defect):** `SqliteHandoffStorage`
+never persists `next_role` (`tools/handoff.ts:131`), so in SQLite/HTTP storage
+mode this clause is always false — the terminal-marker refinement is a
+**file-mode-only** improvement; SQLite-mode behavior is byte-for-byte
+unchanged (still TTL-bounded post-release). This mirrors the existing
+file-mode-only asymmetry already accepted for `cut_approved` / `external_refs`
+/ `dispatch_pins` (`tools/handoff-orchestrator.ts:189-190,238`). Extending
+`next_role` persistence to SQLite mode is a separate, larger change (touches
+`tools/storage-sqlite.ts` schema) and is explicitly deferred — not needed to
+fix the incident that triggered this amendment (a single-checkout, file-mode
+workspace).
+
+**Companion fix — skill-text correction.** `content/skill-release-engineer.md`
+SOP step 12's literal text instructs `agent_id="pm"` on the closing write. The
+v3.72.0 release did not do this — it self-looped as `agent_id="release-engineer"`
+(legal via the fast path above) with `next_role="pm"` as the routing signal,
+which is also the convention every OTHER role in this codebase follows
+(`agent_id` = the writer's own identity; `next_role` = who's dispatched next —
+e.g. `qa-engineer`'s `PASS` write keeps `agent_id="qa-engineer"`, never flips
+to the next role). Since the new terminal-marker clause keys on
+`last_agent === "release-engineer"`, a future release-engineer session that
+followed the CURRENT literal SOP text (`agent_id="pm"`) would stamp
+`last_agent="pm"` and silently defeat the fix. Step 12 is corrected to pin the
+actually-required, actually-observed contract: `agent_id` stays
+`"release-engineer"` (self-loop), `next_role="pm"` is the terminal/routing
+signal. No transition-table change — the self-loop fast path already permits
+this; only the SOP's prose (and its inline rationale comment) changes.
+
+### Decision — negative-age hardening (item 2)
+
+`isFeatureLeaseHeld` (`gates/feature-lease.ts:53-55`) computes
+`ageMs = nowMs - Date.parse(prevState.last_updated)` and returns
+`ageMs < ttlMin * 60_000`. A future-dated `last_updated` (clock skew, wrong
+timezone, hand-edited state) yields a **negative** `ageMs`, which is
+unconditionally less than any positive TTL threshold — the lease is held
+until the wall clock catches up to the bad stamp. Observed live in this
+session's own `tw_get_state` read, before this write's fresh, correct
+`last_updated` self-healed it: `last_updated: "2026-07-12T01:35:00.000Z"`
+against a real UTC of `~2026-07-11T19:24Z` — roughly 6.2h in the future,
+turning the ratified 30-min TTL into an effective ~6.5h cooldown.
+
+**Fix:** treat negative age as not-fresh (lease NOT held), mirroring the
+existing `NaN` posture at L54 (an unparseable stamp already fails open) —
+both are "cannot establish a trustworthy, non-negative elapsed time, so do not
+let it block the workspace." Zero tolerance / no skew-grace window: a
+non-negative check (`ageMs >= 0 && ageMs < ttlMin * 60_000`) is the whole fix,
+kept binary to match the existing `NaN` precedent rather than introducing a
+second tunable.
+
+### Decision — `LEASE_TTL_MIN` configurability (item 3): DEFERRED
+
+The question that prompted this ("was 30 min our own choice, and should it be
+configurable?") is real, but the incident that surfaced it was actually the
+negative-age bug (item 2) miscomputing the cooldown as ~6.5h, not evidence
+that the fixed 30-min value itself is wrong. Once item 2 ships, the effective
+cooldown is bounded at exactly the ratified 30 min. No workspace has yet
+needed a different value. Making `LEASE_TTL_MIN`
+(`tools/handoff-orchestrator.ts:60`) configurable via
+`.current/.config.json` now — new config key, default-fallback plumbing,
+docs, tests — would be speculative surface against a need that has not
+materialized. **`LEASE_TTL_MIN` stays a fixed constant, unchanged at `30`.**
+Revisit only if a concrete cross-workspace need for a different TTL emerges;
+tracked as a candidate for a future amendment, not cut here (keeps this
+wart-fix small, per the original Open Questions' own "any change requires a
+PM spec amendment, not a unilateral sr-engineer choice" rule — this amendment
+IS that PM ratification, and it ratifies "no change").
+
+### Acceptance Criteria (append)
+
+- **AC-E1A-1**: Given release-engineer's closing-write state (`last_agent="release-engineer"`,
+  `status="In_Progress"`, `next_role="pm"`) is the current state (file mode),
+  when a DIFFERENT feature's write is attempted, then `isFeatureLeaseHeld`
+  returns `false` (lease released).
+- **AC-E1A-2**: Given release-engineer's OPENING-write state (`last_agent="release-engineer"`,
+  `status="In_Progress"`, no `next_role`), when a different feature's write is
+  attempted, then the lease is still held (unchanged from pre-amendment
+  behavior).
+- **AC-E1A-3**: Given release-engineer writes `status="Blocked"` (any
+  `next_role`), or `next_role` ∈ `{"qa-engineer","human"}` with
+  `status="In_Progress"`, when a different feature's write is attempted, then
+  the lease is still held.
+- **AC-E1A-4**: Given `prevState.last_updated` parses to a timestamp in the
+  future (`nowMs - Date.parse(last_updated) < 0`), when `isFeatureLeaseHeld`
+  is evaluated with any `ttlMin`, then it returns `false`.
+- **AC-E1A-5**: Given the existing NaN / empty-string `last_updated` cases
+  (P5a/P5b in `test/feature-lease.test.mjs`), when `isFeatureLeaseHeld` is
+  evaluated, then behavior is unchanged (regression guard).
+- **AC-E1A-6**: Given the same release-engineer closing-write state in SQLite
+  storage mode (where `next_role` is not persisted on that row), when a
+  different feature's write is attempted, then behavior is unchanged from
+  pre-amendment (still TTL-bounded, no SQLite-mode regression).
+- **AC-E1A-7**: Given `content/skill-release-engineer.md`, its SOP step 12
+  text no longer instructs `agent_id="pm"` on the closing write; it pins
+  `agent_id` staying `"release-engineer"` with `next_role="pm"` as the
+  terminal/routing signal (skill-text pinning test, mirrors the existing
+  S1–S6 convention in `test/feature-lease.test.mjs`).
+
+No Copy / Strings, Visual Tokens, or Visual Widgets — this amendment is pure
+backend gate-logic plus one SOP-prose correction; no user-facing surface.
+
+### Decision Records (append)
+
+| Context | Decision | Consequences |
+|---|---|---|
+| Post-release lease terminal signal | `last_agent="release-engineer" ∧ status="In_Progress" ∧ next_role="pm"` treated as terminal, additive to `status===PASS` | Reuses an existing, already-unconditionally-stamped field; zero schema bump; file-mode-only (SQLite doesn't persist `next_role`) — explicit, accepted asymmetry, not a defect |
+| Why not key on `last_agent="release-engineer"` alone | Would also release the lease during release-engineer's OPENING write (mid release-mechanics) | Rejected — reopens the D5/D9/D10 in-flight-release race the lease exists to prevent |
+| Why not reuse `status="PASS"` for "released" | `PASS` is reserved to `qa-engineer` (`requireQaEngineer`); conflates QA-verified with shipped | Rejected — out of scope for a wart-fix, would need its own evidence-recording rework |
+| `content/skill-release-engineer.md` step 12 correction | `agent_id` stays `"release-engineer"` (self-loop) on the closing write, not `"pm"` | Matches actual v3.72.0 practice and the system-wide `agent_id`-is-identity / `next_role`-is-routing convention; prevents a literal-SOP-following future release from stamping `last_agent="pm"` and silently defeating the terminal-marker clause |
+| Negative-age handling | Treat `ageMs < 0` as not-held, mirroring the existing `NaN`-fails-open posture | One-line, zero-tolerance fix; no new skew-grace constant introduced |
+| `LEASE_TTL_MIN` configurability | Deferred — stays a fixed constant at `30` | The triggering incident was the negative-age bug, not the TTL value itself; no configurability need has been demonstrated yet |
+
+### Ticket cut — E1A (final, PM ratification 2026-07-12 — see `tasks.md` T-E1A-01…T-E1A-04)
+
+Sized to `task_size` (≤5 files / ≤300 lines each). Same mechanism → review →
+test → verify shape as the original E1 cut, tightened to one sr-engineer
+ticket since the whole mechanism fix lands in two small files.
+
+- **T-E1A-01 [sr-engineer]** — Feature-lease predicate hardening: terminal
+  marker (item 1) + negative-age guard (item 2) in `gates/feature-lease.ts`;
+  skill-text correction (item 1 companion) in
+  `content/skill-release-engineer.md` SOP step 12. ~2 files, ~45 LoC.
+  **No dependency — build first.**
+- **T-E1A-02 [code-reviewer]** — Batched review of T-E1A-01: scoping
+  correctness (opening-write / Blocked / escalation / other-roles'-`pm`-handback
+  all still gate), SQLite-mode no-op safety, NaN-posture regression check,
+  zero schema/version-file changes, skill-text match. **Depends on
+  T-E1A-01.** ~0 files (review only).
+- **T-E1A-03 [qa-engineer]** — Tests: extend `test/feature-lease.test.mjs`
+  per AC-E1A-1…7 (file mode + SQLite mode where applicable) + skill-text
+  pinning test for the corrected step 12 line. **Depends on T-E1A-02.**
+  ~1 file, ~100-150 LoC.
+- **T-E1A-04 [qa-engineer]** — Full verification + PASS: `npm run build &&
+  npm audit --audit-level=high && npm test`, 0 fail; re-baseline any tripped
+  context-budget cap. **Depends on T-E1A-03.**
+
+Build order: **T-E1A-01 → T-E1A-02 → T-E1A-03 → T-E1A-04**. Release/backlog
+bookkeeping is release-engineer's standing post-PASS SOP step, not a separate
+ticket line here either.
