@@ -318,33 +318,66 @@ interface, or schema addition. (a-explicit, if ever promoted, would add
 _None — this design references only in-repo source; the E1 backlog row cites no
 external URLs, design files, or tickets._
 
-## Open Questions
+## Open Questions — resolved (PM ratification, 2026-07-12)
 
-None blocking. Two calibration values for PM to fix in the spec (both have safe
-defaults, neither gates the design): `LEASE_TTL_MIN` (propose 30 — longer than
-D5's 15-min dispatch staleness, since a whole feature legitimately spans longer
-gaps than a single dispatch) and whether the gate should treat `Blocked` as
-lease-holding (recommend **yes** — a Blocked feature is still the workspace's
-owner awaiting human recovery, not free to be clobbered).
+None blocking. Both calibration values below are now fixed for implementation
+(sr-engineer MUST use these exact values; any change requires a PM spec
+amendment, not a unilateral sr-engineer choice):
 
-## Ticket cut estimate (PM input for when E1 enters the chain)
+- **`LEASE_TTL_MIN = 30`** — longer than D5's 15-min dispatch staleness, since
+  a whole feature legitimately spans longer gaps than a single dispatch.
+- **`Blocked` counts as lease-held: YES** — a `Blocked` feature is still the
+  workspace's owner awaiting human recovery, not free to be clobbered. The
+  predicate's `prevState.status ∉ { "PASS" }` clause (already written this way
+  in the Decision above) already encodes this — `Blocked` is not `PASS`, so no
+  code change is needed beyond implementing the clause exactly as specified;
+  this entry exists to make the choice an explicit, citable decision rather
+  than an implicit fallthrough.
 
-Sized to `task_size` (≤5 files / ≤300 lines each), dependency-ordered:
+## Ticket cut (final, PM ratification 2026-07-12 — see tasks.md T-E1-01…T-E1-06)
 
-- **T-E1-01 — Lease gate + error code (the mechanism).** `gates/registry.ts`
-  (union + hint), new `isFeatureLeaseHeld` predicate in `gates/`,
-  `tools/handoff-orchestrator.ts` gate block + `LEASE_TTL_MIN`,
-  `tools/transitions.ts` union extension, unit tests (file + SQLite mode).
-  ~5 files. **No dependency — build first.**
-- **T-E1-02 — Release re-baseline SOP hardening (D10-class killer).**
-  `content/skill-release-engineer.md` SOP 3/4 re-baseline step +
-  `templates/claude-code-agents/release-engineer.md` mirror + skill-text pin
-  test. ~3 files. **Depends on T-E1-01** (references the lease as the primary
-  serialization; SOP is the worktree-case tourniquet).
-- **T-E1-03 — Coordinator escalation + feature-scope note.**
-  `content/skill-coordinator.md` Escalation-Routes row + Feature-Scope-Gate note
-  + skill-text pin test. ~2 files. **Depends on T-E1-01** (surfaces the new gate
-  code). Parallelizable with T-E1-02.
+Sized to `task_size` (≤5 files / ≤300 lines each), dependency-ordered. Split
+into implementation / review / test tasks per repo convention (mirrors the
+T-D5/T-D9/T-D10 tickets) rather than bundling sr + qa work into one task, since
+"one task = one sr-engineer session" (`content/skill-pm.md` Task Format):
 
-Build order: **T-E1-01 → { T-E1-02, T-E1-03 }**. E1b (per-feature files) is a
-separate future cut, not part of this chain.
+- **T-E1-01 [sr-engineer] — Lease gate + error code (the mechanism).**
+  `gates/registry.ts` (`FEATURE_LEASE_HELD` union + hint), new
+  `isFeatureLeaseHeld()` predicate in a new `gates/feature-lease.ts`,
+  `tools/handoff-orchestrator.ts` gate block + `LEASE_TTL_MIN = 30` const,
+  `tools/transitions.ts` `TransitionRejection["error"]` union extension.
+  ~4 files. **No dependency — build first.**
+- **T-E1-02 [sr-engineer] — Release re-baseline SOP hardening (D10-class
+  killer).** `content/skill-release-engineer.md` SOP 3/4 re-baseline-off-HEAD
+  step + `templates/claude-code-agents/release-engineer.md` mirror hint.
+  ~2 files. **Depends on T-E1-01** (references the lease as the primary
+  serialization; the SOP hardening is the worktree-case tourniquet the lease
+  itself cannot reach).
+- **T-E1-03 [sr-engineer] — Coordinator escalation + feature-scope note.**
+  `content/skill-coordinator.md` Escalation-Routes row (`FEATURE_LEASE_HELD`)
+  + Feature-Scope-Gate note. ~1 file. **Depends on T-E1-01** (surfaces the new
+  gate code). Parallelizable with T-E1-02.
+- **T-E1-04 [code-reviewer] — Batched review of T-E1-01/02/03.** Confirm
+  `isFeatureLeaseHeld` is pure/fs-free/storage-agnostic (reads only
+  `active_feature`/`status`/`last_updated`); confirm the gate lives in the
+  orchestrator, not `transitions.ts` (which stays pure); confirm `Blocked`
+  counts as lease-held per the ratified Open Questions above; confirm zero
+  changes to `tools/handoff.ts` / `tools/storage*.ts` / `schema/*` (the entire
+  point of choosing a-min); confirm the two skill-text edits match this spec's
+  prose. **Depends on T-E1-01, T-E1-02, T-E1-03.**
+- **T-E1-05 [qa-engineer] — Tests.** Unit tests for `isFeatureLeaseHeld`
+  (TTL-boundary, `Blocked`-counts-as-held, terminal `PASS` releases the lease,
+  `feature_changed=false` never gates) + orchestrator gate integration in
+  **both** file and SQLite storage modes; skill-text pinning tests for the
+  T-E1-02/T-E1-03 prose (mirrors the T-D10-03/C13-06 pinning convention).
+  **Depends on T-E1-04.**
+- **T-E1-06 [qa-engineer] — Full verification + PASS.** `npm run build && npm
+  audit --audit-level=high && npm test`, 0 fail; re-baseline any tripped
+  context-budget cap. **Depends on T-E1-05.**
+
+Build order: **T-E1-01 → { T-E1-02, T-E1-03 } → T-E1-04 → T-E1-05 → T-E1-06**.
+Release/backlog bookkeeping (version bump, CHANGELOG, `docs/backlog.md` E1
+done-mark) is release-engineer's standing post-PASS SOP step (T-C10-01
+convention) — not cut as a separate ticket line, mirroring D10 practice.
+E1b (per-feature handoff files) is a separate future cut, not part of this
+chain.

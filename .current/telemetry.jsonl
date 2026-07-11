@@ -1,3 +1,4 @@
 {"ts":"2026-07-10T13:36:47.881Z","gate":"validateTransition","error_code":"TRANSITION_REJECTED","agent_id":"sr-engineer","feature":"d4-behavioral-eval-harness"}
 {"ts":"2026-07-10T13:53:55.203Z","gate":"validateTransition","error_code":"TRANSITION_REJECTED","agent_id":"qa-engineer","feature":"d4-behavioral-eval-harness"}
 {"ts":"2026-07-11T09:30:09.002Z","gate":"validateTransition","error_code":"TRANSITION_REJECTED","agent_id":"release-engineer","feature":"d5-server-side-stale-dispatch-detection"}
+{"ts":"2026-07-11T17:12:32.205Z","gate":"orchestrator","error_code":"EXPECTED_RED_DIFF_MISSING","agent_id":"qa-engineer","feature":"e1-feature-scoped-state-design"}

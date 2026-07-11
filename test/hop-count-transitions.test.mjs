@@ -56,6 +56,24 @@ function mkWs(prefix = "hopcap-") {
   return ws;
 }
 
+// e1-feature-scoped-state-design (qa-owned re-baseline, T-E1-05): the E1
+// feature-lease gate now rejects ANY write whose active_feature differs from
+// the incumbent's while the incumbent is non-terminal (status != PASS) AND
+// fresh (last_updated within LEASE_TTL_MIN=30 min) — see
+// specs/e1-feature-scoped-state-design.md. t-e2e-feature-reset below writes a
+// NEW active_feature over a still-In_Progress incumbent, which is now exactly
+// the clobber FEATURE_LEASE_HELD exists to reject. This helper backdates the
+// incumbent's persisted last_updated past the TTL so the lease has gone stale
+// BEFORE the feature-change write — letting the fixture reach the hop_count
+// reset assertion it was written to test, without altering that assertion.
+function backdateLastUpdated(ws, minutesAgo) {
+  const p = path.join(ws, ".current", "handoff.md");
+  const raw = fs.readFileSync(p, "utf-8");
+  const stamp = new Date(Date.now() - minutesAgo * 60_000).toISOString();
+  const patched = raw.replace(/^last_updated:\s*"[^"]*"$/m, `last_updated: "${stamp}"`);
+  fs.writeFileSync(p, patched, "utf-8");
+}
+
 const UPDATE_STATE_ENTRY = TOOL_REGISTRY.find((e) => e.name === "tw_update_state");
 
 async function dispatch(ws, args) {
@@ -398,6 +416,13 @@ test("t-e2e-feature-reset: an active_feature change resets hop_count to a fresh 
 
   const atCap = await climbToHopCap(ws, "hop-reset-feat-a");
   assert.equal(atCap.hop_count, HOP_CAP_EXPORTED, "precondition: hop_count is at cap for feature-a");
+
+  // E1 feature-lease: age the incumbent (feature-a, still In_Progress) past
+  // LEASE_TTL_MIN=30 so the upcoming cross-feature write isn't rejected with
+  // FEATURE_LEASE_HELD before it ever reaches the hop-cap/reset logic under
+  // test — this fixture predates the lease gate and modeled an in-flight
+  // clobber the gate now correctly blocks (see helper comment above).
+  backdateLastUpdated(ws, 31);
 
   // A NEW active_feature write on a legal edge from sr-engineer:In_Progress
   // (pm:In_Progress) must reset the counter — feature_changed bypasses the

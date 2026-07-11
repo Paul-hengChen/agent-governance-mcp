@@ -1077,13 +1077,22 @@ test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/b
   // retired — this cap measures the historical "everything ships" bundle, which
   // is now the full-capability composition (taskTool:true reproduces the
   // monolith byte-for-byte, AC5), not the lean in-server default.
+  // e1-feature-scoped-state-design (qa-owned bump, T-E1-06): cap raised from
+  // 13298 → 13537 to absorb the new content/coord-03-core-fallback.md prose
+  // (Feature-Scope Gate note in the Fallback Playbook + a FEATURE_LEASE_HELD
+  // Escalation Routes row, T-E1-03) folded into the composed skill-coordinator
+  // monolith; no other constitution/skill-side change this feature.
+  // Independently re-measured (not trusted from sr-engineer's or
+  // code-reviewer's notes) at 13537 ~tok (exact); cap set to the exact
+  // measured value per the established Phase-2 convention (no additional
+  // headroom).
   const skillCoord = readSkillFile("skill-coordinator.md");
   const body = skillCoord.startsWith("---")
     ? skillCoord.slice(skillCoord.indexOf("---", 3) + 3).trimStart()
     : skillCoord;
   const SEP = "\n\n---\n\n";
   const bundle = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)) + SEP + stripRationale(stripOriginTags(body)));
-  assert.ok(bundle <= 13298, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 13298 (AC8 design-arm floor, d5-server-side-stale-dispatch-detection re-baseline)`);
+  assert.ok(bundle <= 13537, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 13537 (AC8 design-arm floor, e1-feature-scoped-state-design re-baseline)`);
 });
 
 test("AC9: every operative rule/gate/heading survives stripRationale on the constitution", () => {

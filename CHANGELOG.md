@@ -16,6 +16,18 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.72.0] - 2026-07-12
+
+### Added
+- **`e1-feature-scoped-state-design` — Feature-scoped state isolation and release re-baseline (v3.72.0).** Introduces the feature-lease mechanism (`gates/feature-lease.ts` + `gates/registry.ts`) for serializing concurrent E-series features and coordinating release timing. Adds `FEATURE_LEASE_HELD` gate code blocking competing features during active release; re-baselines release-engineer SOP step 3a (mandatory pre-release HEAD re-fetch before version bump) to prevent concurrent-release collisions. Implements feature-lease acquire/release orchestration in `tools/handoff-orchestrator.ts` and transition rules in `tools/transitions.ts`. Enables future per-feature handoff-file scoping (E1b) and coordinator escalation routes (E1c). Comprehensive architecture in `specs/e1-feature-scoped-state-design.md`. Feature-lease tests added (`test/feature-lease.test.mjs`, 24 new tests); full suite 1235/1235 green. QA verified (`qa_reports/review_T-E1-05.md`). See specs for mechanism, rationale, and downstream enablement roadmap.
+
+### Changed
+- **SOP hardening**: release-engineer SOP now includes mandatory step 3a (re-baseline off `origin/HEAD` before bumping) to prevent version-collision race conditions when features are released concurrently in separate git worktrees.
+
+### Notes
+- driftBaselineIds appended with T-E1-01, T-E1-02, T-E1-03, T-E1-04, T-E1-05, T-E1-06
+- Feature-lease mechanism is backwards-compatible (no handoff schema bump, gate is internal only)
+
 ## [3.71.1] - 2026-07-12
 
 ### Changed

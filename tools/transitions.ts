@@ -112,6 +112,16 @@ export interface TransitionRejection {
                                     // (it reads handoff state + storage kind); union extension is
                                     // for handler-side narrowing + envelope consistency (mirrors
                                     // CUT_APPROVAL_REQUIRED).
+    | "FEATURE_LEASE_HELD"          // E1 (e1-feature-scoped-state-design) — emitted by the
+                                    // handoff-orchestrator lease gate when a write carries a
+                                    // DIFFERENT active_feature while the incumbent feature is
+                                    // non-terminal (status != PASS; Blocked counts as held) and
+                                    // fresh (last_updated within LEASE_TTL_MIN). Both storage
+                                    // modes (reads only the three universal fields). NOT produced
+                                    // by validateTransition (the lease is derived from prevState,
+                                    // which this pure module never reads); union extension is for
+                                    // handler-side narrowing + envelope consistency (mirrors
+                                    // SCOPE_DECISION_REQUIRED).
     | "AGENT_ID_REQUIRED";
   attempted: {
     prev_agent: string | null;

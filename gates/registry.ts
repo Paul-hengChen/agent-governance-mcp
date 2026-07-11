@@ -30,6 +30,7 @@ export type GateErrorCode =
   | "SCOPE_DECISION_REQUIRED"
   | "CUT_APPROVAL_REQUIRED"
   | "EXTERNAL_REFS_UNRESOLVED"
+  | "FEATURE_LEASE_HELD"
   | "MISSING_EVIDENCE"
   | "MISSING_REVIEW_EVIDENCE"
   | "EXPECTED_RED_DIFF_MISSING"
@@ -64,7 +65,7 @@ export interface GateDefinition {
   // (DR-3, qa-engineer's rewritten error-code-contract test) compares against.
   readonly hintStatic: string;
   // True iff the code is (and must stay) backtick-quoted in >=1 content/*.md.
-  // All 24 are true today. The field exists so a future code-internal gate can
+  // All 25 are true today. The field exists so a future code-internal gate can
   // opt out without weakening the parity test.
   readonly documentedInProse: boolean;
 }
@@ -87,6 +88,7 @@ export interface GateDefinition {
 //   SCOPE_DECISION_REQUIRED         const-08-chain-31-mid.md, constitution-rationale.md, skill-pm.md
 //   CUT_APPROVAL_REQUIRED           const-08-chain-31-mid.md, coord-03-core-fallback.md, skill-coordinator-lite.md
 //   EXTERNAL_REFS_UNRESOLVED        const-15-core-tail.md, coord-03-core-fallback.md, skill-pm.md
+//   FEATURE_LEASE_HELD              coord-03-core-fallback.md, skill-release-engineer.md
 //   MISSING_EVIDENCE                skill-qa-engineer.md
 //   MISSING_REVIEW_EVIDENCE         skill-code-reviewer.md
 //   EXPECTED_RED_DIFF_MISSING       skill-qa-engineer.md
@@ -103,7 +105,7 @@ export interface GateDefinition {
 //   REVIEWER_COMPLETED_TASKS_REJECTED  skill-code-reviewer.md
 //   QA_REVIEW_TARGET_REQUIRED       skill-qa-engineer.md
 
-// The 24-gate catalog, in documentation order. Array order is DOC order only —
+// The 25-gate catalog, in documentation order. Array order is DOC order only —
 // it MUST NOT be relied on for evaluation order (DR-5; that lives in
 // handoff-orchestrator.ts as the physical if-block sequence).
 export const GATE_REGISTRY: readonly GateDefinition[] = [
@@ -175,7 +177,7 @@ export const GATE_REGISTRY: readonly GateDefinition[] = [
     // parity test runs (T-D2-05).
     documentedInProse: true,
   },
-  // ---- orchestrator-json (codes 7-9, producer: orchestrator) ----
+  // ---- orchestrator-json (codes 7-10, producer: orchestrator) ----
   {
     errorCode: "SCOPE_DECISION_REQUIRED",
     producer: "orchestrator",
@@ -217,7 +219,24 @@ export const GATE_REGISTRY: readonly GateDefinition[] = [
       "specs/b8-external-ref-ledger.md.",
     documentedInProse: true,
   },
-  // ---- plain-text (codes 10-23, producer: orchestrator) ----
+  {
+    errorCode: "FEATURE_LEASE_HELD",
+    producer: "orchestrator",
+    envelope: "orchestrator-json",
+    triggerEdge:
+      "any write whose active_feature differs from the prev state's (feature_changed) while the incumbent feature is non-terminal (status != PASS; Blocked counts as held) and fresh (last_updated within LEASE_TTL_MIN = 30 min)",
+    armCondition: "isFeatureLeaseHeld(prevState, incoming active_feature, now, LEASE_TTL_MIN)",
+    clearingArtifact:
+      "incumbent feature reaches terminal PASS, or its lease goes stale (last_updated older than LEASE_TTL_MIN), or the new feature runs in a separate git worktree (distinct workspace_path)",
+    hintStatic:
+      "A second feature cannot take the workspace slot while the incumbent feature's lease is live " +
+      "(per-workspace mutual exclusion: at most one non-terminal feature per workspace_path). " +
+      "Wait for the incumbent to reach PASS or for its lease to expire, or run the new feature " +
+      "in a separate git worktree (distinct workspace_path). " +
+      "See specs/e1-feature-scoped-state-design.md.",
+    documentedInProse: true,
+  },
+  // ---- plain-text (codes 11-24, producer: orchestrator) ----
   {
     errorCode: "MISSING_EVIDENCE",
     producer: "orchestrator",
@@ -439,8 +458,8 @@ export function gate(code: GateErrorCode): GateDefinition {
 
 // The 6 codes validateTransition's rejection() may emit. For tests + optional
 // Extract<> typing of validateTransition's own return — NOT for re-typing the
-// 14-member TransitionRejection["error"] union in tools/transitions.ts (see DR-8:
-// that union carries 8 additional handler-side envelope-consistency codes and
+// 15-member TransitionRejection["error"] union in tools/transitions.ts (see DR-8:
+// that union carries 9 additional handler-side envelope-consistency codes and
 // must stay byte-identical; non-drift is enforced by a test assertion
 // union ⊆ ALL_GATE_CODES, not by re-sourcing from here).
 export const TRANSITION_GATE_CODES: readonly GateErrorCode[] = [

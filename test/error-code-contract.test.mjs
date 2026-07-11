@@ -70,7 +70,13 @@ const TOKEN_RE = /\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*\b/g;
 // outside the prior vocabulary — exactly the b8 UNRESOLVED precedent. Without
 // this, REVIEW_VERDICT_STATUS_MISMATCH is invisible to BOTH extraction sides
 // identically, masking a missing-registry or missing-doc regression.
-const SUFFIX_RE = /_(REQUIRED|MISSING|INCOMPLETE|EXCEEDED|UNVERIFIED|REJECTED|UNRESOLVED|MISMATCH)$/;
+// e1-feature-scoped-state-design (qa-owned re-baseline, T-E1-05): added HELD.
+// The new FEATURE_LEASE_HELD gate code introduces yet another novel suffix
+// outside the prior vocabulary — the exact same b8/c9 precedent. Per
+// code-reviewer's adjudication (review_reports/review_T-E1-04.md), this is
+// the QA-side fix (widen the shape-rule vocabulary), NOT a rename of the
+// spec-mandated code.
+const SUFFIX_RE = /_(REQUIRED|MISSING|INCOMPLETE|EXCEEDED|UNVERIFIED|REJECTED|UNRESOLVED|MISMATCH|HELD)$/;
 const PREFIX_RE = /^MISSING_/;
 
 function isGateErrorCode(token) {
@@ -154,25 +160,26 @@ function fmt(codeMap, codes) {
 }
 
 // ---------------------------------------------------------------------------
-// AC-1 / AC-5: GATE_REGISTRY is the single source of truth, exactly 24
-// entries (d9-qa-review-scoped-append, qa-owned re-baseline, 2026-07-11:
-// added the 24th, QA_REVIEW_TARGET_REQUIRED — the scoped-append-target gate;
-// 23 in, 24 out — one gate added, none dropped). d2-server-brake-accounting
+// AC-1 / AC-5: GATE_REGISTRY is the single source of truth, exactly 25
+// entries (e1-feature-scoped-state-design, qa-owned re-baseline, 2026-07-12:
+// added the 25th, FEATURE_LEASE_HELD — the derive-only feature-lease gate;
+// 24 in, 25 out — one gate added, none dropped). d9-qa-review-scoped-append
+// had added the 24th, QA_REVIEW_TARGET_REQUIRED. d2-server-brake-accounting
 // had added the 23rd, HOP_CAP_EXCEEDED. c16-c10-role-boundary had added the
 // 22nd, REVIEWER_COMPLETED_TASKS_REJECTED. c15-expected-red-manifest had
 // added the 21st, EXPECTED_RED_DIFF_MISSING. c9-protocol-fields had added the
 // 20th, REVIEW_VERDICT_STATUS_MISMATCH.
 // ---------------------------------------------------------------------------
 
-test("AC-1/AC-5: GATE_REGISTRY has exactly 24 entries (23 in, 24 out — d9-qa-review-scoped-append added QA_REVIEW_TARGET_REQUIRED)", () => {
+test("AC-1/AC-5: GATE_REGISTRY has exactly 25 entries (24 in, 25 out — e1-feature-scoped-state-design added FEATURE_LEASE_HELD)", () => {
   assert.equal(
     GATE_REGISTRY.length,
-    24,
-    `expected exactly 24 GateDefinition entries, got ${GATE_REGISTRY.length}: ${GATE_REGISTRY.map((g) => g.errorCode).join(", ")}`,
+    25,
+    `expected exactly 25 GateDefinition entries, got ${GATE_REGISTRY.length}: ${GATE_REGISTRY.map((g) => g.errorCode).join(", ")}`,
   );
   assert.equal(
     ALL_GATE_CODES.length,
-    24,
+    25,
     "ALL_GATE_CODES must be GATE_REGISTRY.map(g => g.errorCode) — same length",
   );
   assert.deepEqual(
@@ -302,9 +309,13 @@ test("internal consistency: orchestrator-producer entries' errorCode literally a
 // reasons CUT_APPROVAL_REQUIRED/SCOPE_DECISION_REQUIRED carry theirs: envelope
 // narrowing at the emit site, the union-subset-of-ALL_GATE_CODES invariant
 // below, and catalog completeness.
+// e1-feature-scoped-state-design (T-E1-01, qa-owned re-baseline): FEATURE_
+// LEASE_HELD joins the union as a 9th handler-side-only member (14 -> 15),
+// same three reasons as EXTERNAL_REFS_UNRESOLVED immediately above (it too is
+// an orchestrator-producer-only code, never emitted by validateTransition).
 // ---------------------------------------------------------------------------
 
-test("DR-8: TransitionRejection[\"error\"] union stays byte-identical at 14 members, all ⊆ ALL_GATE_CODES", () => {
+test("DR-8: TransitionRejection[\"error\"] union stays byte-identical at 15 members, all ⊆ ALL_GATE_CODES", () => {
   const transitionsSrc = readSource(path.join("tools", "transitions.ts"));
   const unionMatch = transitionsSrc.match(
     /export interface TransitionRejection \{\s*error:\s*([\s\S]*?);\s*\n\s*attempted:/,
@@ -318,12 +329,12 @@ test("DR-8: TransitionRejection[\"error\"] union stays byte-identical at 14 memb
 
   assert.equal(
     members.length,
-    14,
-    `TransitionRejection["error"] must stay byte-identical at 14 members (DR-8, d2-server-brake-accounting re-baseline) — found ${members.length}: ${members.join(", ")}`,
+    15,
+    `TransitionRejection["error"] must stay byte-identical at 15 members (DR-8, e1-feature-scoped-state-design re-baseline) — found ${members.length}: ${members.join(", ")}`,
   );
   assert.equal(
     new Set(members).size,
-    14,
+    15,
     "TransitionRejection[\"error\"] union members must be unique",
   );
 
@@ -594,8 +605,8 @@ test("doc-file mapping (c12): gates/registry.ts's errorCode→doc-file mapping c
   const mapping = parseDocFileMappingComment();
   assert.equal(
     mapping.size,
-    24,
-    `expected the mapping comment to list all 24 codes, found ${mapping.size}: ${[...mapping.keys()].join(", ")}`,
+    25,
+    `expected the mapping comment to list all 25 codes, found ${mapping.size}: ${[...mapping.keys()].join(", ")}`,
   );
   const docCodes = extractDocCodes();
   for (const g of GATE_REGISTRY) {
@@ -653,6 +664,14 @@ const FREE_TEXT_ALLOWLIST = [
   // reasons, same shape.
   { code: "QA_REVIEW_TARGET_REQUIRED", field: "triggerEdge", reason: "free English, no checkable literal" },
   { code: "QA_REVIEW_TARGET_REQUIRED", field: "armCondition", reason: "snake_case field-name shorthand, not a camelCase predicate/function-call literal" },
+  // e1-feature-scoped-state-design (qa-owned, 2026-07-12): FEATURE_LEASE_HELD
+  // fires on ANY write whose active_feature differs from prevState's, not a
+  // single fixed role:Status edge pair or a CAP_BY_CODE-style numeric literal
+  // — free English describing a cross-feature condition. armCondition is NOT
+  // allowlisted: it names the real isFeatureLeaseHeld(...) predicate call, so
+  // it is mechanically checked (armConditionCheckable) like every other
+  // orchestrator-producer entry with a camelCase predicate literal.
+  { code: "FEATURE_LEASE_HELD", field: "triggerEdge", reason: "free English describing a cross-feature condition (\"any write whose active_feature differs ... while the incumbent is non-terminal and fresh\"), no single role:Status edge pair or CAP_BY_CODE-style numeric literal" },
 ];
 
 test("AC3 (c12): every (errorCode, field) pair for triggerEdge/armCondition is either mechanically checked above or explicitly allowlisted as free-text — no silent exemptions", () => {

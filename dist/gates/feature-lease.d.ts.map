@@ -1,0 +1,1 @@
+{"version":3,"file":"feature-lease.d.ts","sourceRoot":"","sources":["../../gates/feature-lease.ts"],"names":[],"mappings":"AAqCA,MAAM,WAAW,kBAAkB;IACjC,cAAc,EAAE,MAAM,CAAC;IACvB,MAAM,EAAE,MAAM,CAAC;IACf,YAAY,EAAE,MAAM,CAAC;CACtB;AAED,wBAAgB,kBAAkB,CAChC,SAAS,EAAE,kBAAkB,GAAG,IAAI,GAAG,SAAS,EAChD,eAAe,EAAE,MAAM,EACvB,KAAK,EAAE,MAAM,EACb,MAAM,EAAE,MAAM,GACb,OAAO,CAOT"}

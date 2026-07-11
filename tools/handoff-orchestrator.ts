@@ -7,7 +7,7 @@
 // does not) — and to scope the future A2 gates/ extraction cleanly.
 //
 // Check order is FROZEN (spec AC-5/AC-8): preflight → PASS/qa-engineer gate →
-// transition validation → scope-decision gate → cut-approval gate →
+// transition validation → feature-lease gate (E1) → scope-decision gate → cut-approval gate →
 // external-refs gate → review-verdict/status mismatch gate → reviewer
 // completed_tasks gate (v3.58.0, C16) → QA evidence record → PASS evidence
 // gate → visual sub-gates → expected-red diff gate →
@@ -42,12 +42,22 @@ import {
   checkPixelGateAttestation,
 } from "../gates/visual.js";
 import { hasScopeDecision } from "../gates/scope-decision.js";
+import { isFeatureLeaseHeld } from "../gates/feature-lease.js";
 import { hasExpectedRedManifest, hasExpectedRedDisposition } from "../gates/expected-red.js";
 import { hasCutApproval } from "../gates/cut-approval.js";
 import { hasUnresolvedRefs, listUnresolvedRefs } from "../gates/external-refs.js";
 import { gate } from "../gates/registry.js";
 import { awaitAllInflightFor } from "./rag-coalesce.js";
 import { emitGateTelemetry, extractGateCodeFromText } from "./telemetry.js";
+
+// E1 (e1-feature-scoped-state-design) — feature-lease TTL. Fixed constant,
+// NOT config-driven (mirrors STALE_DISPATCH_THRESHOLD_MIN in tools/handoff.ts
+// and HOP_CAP's fixed-constant posture): stale-lease auto-expiry is a safety
+// self-heal, not a tunable policy knob. 30 min — deliberately LONGER than the
+// 15-min dispatch-staleness threshold, since a whole feature legitimately
+// spans longer gaps than a single dispatch (PM-ratified calibration,
+// 2026-07-12; any change requires a PM spec amendment).
+const LEASE_TTL_MIN = 30;
 
 // D3 (d3-gate-fire-telemetry) — thin telemetry wrapper, the ONE emit point
 // for all 22 GATE_REGISTRY rejections. Zero changes to the frozen check-order
@@ -125,6 +135,55 @@ async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResu
         if (rejection) {
           return {
             content: [{ type: "text" as const, text: `⛔ ${rejection.error}\n${JSON.stringify(rejection, null, 2)}` }],
+            isError: true,
+          };
+        }
+
+        // E1 — Feature-Lease Gate (e1-feature-scoped-state-design, option a-min).
+        // Converts the silent second-feature clobber (D5/D9/D10 incident class)
+        // into a loud, governed rejection: a write carrying a DIFFERENT
+        // active_feature is rejected while the incumbent feature is non-terminal
+        // (status != PASS — Blocked counts as held, PM-ratified) and fresh
+        // (last_updated within LEASE_TTL_MIN). Per-workspace mutual exclusion:
+        // at most one non-terminal feature per workspace_path; the release path
+        // is serial by construction. Same-feature writes NEVER gate
+        // (feature_changed false short-circuits inside the predicate). Runs
+        // FIRST among the state-reading gates — after validateTransition
+        // accepts, before the build-entry attestation gates — so the "can this
+        // feature take the slot at all?" question is answered before any
+        // per-edge attestation is evaluated. BOTH storage modes (unlike
+        // cut-approval / external-refs): the predicate reads only the three
+        // universal fields (active_feature/status/last_updated), which exist
+        // identically in the SQLite row. NOT in transitions.ts (that stays
+        // pure / fs-free; mirrors SCOPE_DECISION_REQUIRED).
+        if (prevState && isFeatureLeaseHeld(prevState, parsed.active_feature, Date.now(), LEASE_TTL_MIN)) {
+          const hint =
+            `Feature lease held by "${prevState.active_feature}" ` +
+            `(status=${prevState.status}, last_updated=${prevState.last_updated}, ` +
+            `TTL=${LEASE_TTL_MIN}min). ` +
+            gate("FEATURE_LEASE_HELD").hintStatic;
+          const envelope = {
+            error: "FEATURE_LEASE_HELD",
+            attempted: {
+              prev_agent: prevTuple.agent,
+              prev_status: prevTuple.status,
+              new_agent: nextTuple.agent,
+              new_status: nextTuple.status,
+            },
+            incumbent: {
+              active_feature: prevState.active_feature,
+              status: prevState.status,
+              last_updated: prevState.last_updated,
+              lease_ttl_min: LEASE_TTL_MIN,
+            },
+            attempted_feature: parsed.active_feature,
+            hint,
+          };
+          return {
+            content: [{
+              type: "text" as const,
+              text: `⛔ FEATURE_LEASE_HELD\n${JSON.stringify(envelope, null, 2)}`,
+            }],
             isError: true,
           };
         }
