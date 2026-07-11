@@ -16,6 +16,16 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.68.0] - 2026-07-11
+
+### Added
+- **`d2-server-brake-accounting` — Server-side hop-cap brake + durable token-usage accounting (v3.68.0).** Implements server-enforced cost-side circuit breakers, replacing in-memory coordinator arithmetic with durable, persisted field tracking. (1) Hop Counter Brake: adds `hop_count` field to `handoff.md` (schema v9, seed 0), incremented deterministically by `tools/transitions.ts`, with `HOP_CAP_EXCEEDED` gate enforcing 10-hop limit per feature. Feature-scoped reset on (pm, In_Progress) landing edge with exemption for the same-feature re-entry edge. (2) Token Budget Brake (opt-in): adds `bin/agent-governance-usage-hook.mjs` PostToolUse hook (best-effort, never-throw) appending `{ts, feature, dispatch, usage}` records to `.current/usage.jsonl` sidecar; coordinator reads sidecar (with hand-sum fallback to `agent-*.jsonl` for backward-compat) instead of model-maintained arithmetic. Handoff schema v8→v9 migration adds `hop_count` field to all extant task records (seed 0 for backward-compat, no replay required). Updated `content/skill-coordinator.md` (Token Budget Brake section) and `content/skill-coordinator-lite.md` to document feature-scoped reset mechanics. Comprehensive architecture documented in `specs/d2-server-brake-accounting.md` and `specs/d2-server-brake-accounting-architecture.md`. Code-review approved; QA verified with 1165/1165 green. See `review_reports/review_T-D2-04.md`, `qa_reports/review_T-D2-05.md`.
+
+### Notes
+- driftBaselineIds appended with T-D2-ARCH, T-D2-01, T-D2-01A, T-D2-01B, T-D2-02, T-D2-03, T-D2-04, T-D2-05, T-D2-REL, T-D2-DONE
+- `hop_count` field added to handoff schema v9 (migration from v8 auto-runs on read)
+- `.current/usage.jsonl` is new append-only sidecar for token accounting (created on-demand by hook)
+
 ## [3.67.0] - 2026-07-10
 
 ### Added

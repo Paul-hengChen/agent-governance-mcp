@@ -32,11 +32,17 @@ itself when shipping a new version.
 | v6 | adds optional `external_refs?: ExternalRef[]` ledger (b8-external-ref-ledger) | v5→v6 stamp-only, seeds nothing — **absence === zero external refs found === non-blocking** (inverse polarity to `cut_approved`); seeding `[]` would redundantly materialize absence. |
 | v7 | adds optional `next_role` / `resume_of` / `review_verdict` protocol fields (c9-protocol-fields) | v6→v7 stamp-only, seeds nothing — **absence === no routing signal recorded**; a synthesized default would fabricate a directive. Legacy `next_role:` / `resume_of:` / `review:` pending_notes token lines are left byte-verbatim and NOT extracted (they become inert prose). |
 | v8 | adds optional `dispatch_pins?: Partial<Record<AgentName, string>>` map (c14-dispatch-pins) | v7→v8 stamp-only, seeds nothing — **absence === no pins recorded**; a synthesized default would fabricate a human directive. Legacy `dispatch_pins: <role>=<model>` pending_notes lines (C8-era convention) are left byte-verbatim and NOT extracted (they become inert prose). REPLACE-wholesale when provided; feature-scoped carry-forward when omitted, NO PM-re-entry re-arm (the `external_refs` algorithm). |
+| v9 | adds `hop_count` counter (d2-server-brake-accounting) — feature-scoped role-transition counter, computed server-side by `computeNewRound`, enforced by the `HOP_CAP_EXCEEDED` override in `validateTransition` (HOP_CAP = 10); resets ONLY on `active_feature` change, NOT on PM re-entry (DR-6) | v8→v9 stamps version + **seeds `hop_count: 0`** — the `review_round`/`visual_round` counter precedent, NOT the stamp-only attestation precedent (DR-3: a 0 count is the true pre-feature value, not a fabricated attestation). |
 
 `sqlite` stays at v2 — `cut_approved`, `external_refs`, the v7 protocol
 fields, and the v8 `dispatch_pins` map live in the handoff YAML frontmatter
 only and are not mirrored to the SQLite schema (the gates that consume them
-either read the incoming write args or are file-mode only).
+either read the incoming write args or are file-mode only). The v9
+`hop_count` IS mirrored to SQLite, but via the idempotent
+`addColumnIfMissing` ALTER in the storage-sqlite constructor with **NO
+version bump** (DR-2) — the exact mechanism that added `visual_round`; an
+additive `DEFAULT 0` column is backward/forward-compatible, so no
+`schema_meta` step is registered.
 
 ## Authoring a v(N) → v(N+1) migration
 

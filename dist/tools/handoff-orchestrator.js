@@ -18,7 +18,7 @@
 // snapshot) lives inside tools/handoff.ts writeState — NOT here (spec finding #5).
 import { enforcePreFlight } from "../guards/session.js";
 import { getActiveStorage, FileHandoffStorage } from "./storage.js";
-import { requireQaEngineer, validateTransition, computeNewRound, ALLOWED_TRANSITIONS, } from "./transitions.js";
+import { requireQaEngineer, validateTransition, computeNewRound, ALLOWED_TRANSITIONS, HOP_CAP_EXPORTED, } from "./transitions.js";
 import { hasVisualBaselinesInDesign, hasVisualEvidenceInFile, hasUncheckedWidgets, hasDesignModeRequiringVisual, designDeclaresStructuralAssertions, validateVisualReports, checkVisualProvenance, checkBaselineManifest, checkPixelGateAttestation, } from "../gates/visual.js";
 import { hasScopeDecision } from "../gates/scope-decision.js";
 import { hasExpectedRedManifest, hasExpectedRedDisposition } from "../gates/expected-red.js";
@@ -62,6 +62,15 @@ async function handleUpdateStateCore(parsed) {
     const prev_qa_round = prevState?.qa_round ?? 0;
     const prev_review_round = prevState?.review_round ?? 0;
     const prev_visual_round = prevState?.visual_round ?? 0;
+    // v9 (d2-server-brake-accounting) — hop-cap inputs, derived HERE so
+    // transitions.ts stays pure / fs-free (it never reads active_feature
+    // itself, only the boolean computed from prevState + the incoming
+    // write). No prevState (fresh workspace) counts as a feature change:
+    // the counter starts from a 0 base either way.
+    const prev_hop_count = prevState?.hop_count ?? 0;
+    const feature_changed = prevState
+        ? prevState.active_feature !== parsed.active_feature
+        : true;
     const prevTuple = {
         agent: prevState?.last_agent ?? null,
         status: prevState?.status ?? null,
@@ -80,6 +89,12 @@ async function handleUpdateStateCore(parsed) {
         // Replaces the former next_pending_notes token grep; legacy
         // `resume_of: <role>` pending_notes lines are inert (DR-2).
         next_resume_of: parsed.resume_of,
+        // v9 — hop-cap inputs (d2-server-brake-accounting). Arms the
+        // HOP_CAP_EXCEEDED override: fires when the feature's persisted
+        // hop_count is at/over cap on a counted role transition that is not
+        // the (pm, In_Progress) landing; feature_changed=true bypasses.
+        prev_hop_count,
+        feature_changed,
     });
     if (rejection) {
         return {
@@ -529,7 +544,11 @@ async function handleUpdateStateCore(parsed) {
             };
         }
     }
-    const { qa_round: new_qa_round, review_round: new_review_round, visual_round: new_visual_round, } = computeNewRound(prev_qa_round, prev_review_round, prev_visual_round, nextTuple, prevTuple, parsed.pending_notes);
+    const { qa_round: new_qa_round, review_round: new_review_round, visual_round: new_visual_round, 
+    // v9 — server-computed hop counter (DR-9: +1 on role transitions
+    // only; DR-6: reset only on feature change, pm landing does NOT
+    // reset). Persisted via storage.writeState below.
+    hop_count: new_hop_count, } = computeNewRound(prev_qa_round, prev_review_round, prev_visual_round, nextTuple, prevTuple, parsed.pending_notes, prev_hop_count, feature_changed);
     const pending = [...parsed.pending_notes];
     // v3.15.0 — symmetric cap-cross predicate fix.
     // v3.14.0 used `=== 4 && === 3` which would skip the sentinel when
@@ -552,6 +571,19 @@ async function handleUpdateStateCore(parsed) {
     if (new_visual_round >= 6 && prev_visual_round < 6) {
         pending.unshift("⛔ Visual Round 6: forced rollback to pm — no further pixel iteration allowed until PM rebudgets scope or threshold.");
     }
+    // v9 (d2-server-brake-accounting) — hop-cap-cross sentinel. Same
+    // `new >= cap && prev < cap` predicate as the three round sentinels
+    // above: fires exactly once per cap-cross from any prior value. This
+    // write itself is still accepted (the counter only REACHED cap here);
+    // the NEXT counted role transition trips HOP_CAP_EXCEEDED in
+    // validateTransition, which admits only the (pm, In_Progress) landing
+    // — and that landing does NOT reset hop_count (DR-6): only an
+    // active_feature change does.
+    if (new_hop_count >= HOP_CAP_EXPORTED && prev_hop_count < HOP_CAP_EXPORTED) {
+        pending.unshift(`⛔ Hop cap reached (hop_count=${new_hop_count}/${HOP_CAP_EXPORTED}): ` +
+            "next role transition will be rejected (HOP_CAP_EXCEEDED) — only (pm, In_Progress) may land. " +
+            "Halt autonomous dispatch and surface to human; only an active_feature change resets the counter.");
+    }
     // v3.15.0 — call site uses the new options-object overload of
     // storage.writeState. Each field is named, eliminating the
     // 11-positional risk that motivated the refactor. The positional
@@ -568,6 +600,10 @@ async function handleUpdateStateCore(parsed) {
         prdPath: parsed.prd_path,
         reviewRound: new_review_round,
         visualRound: new_visual_round,
+        // v9 — server-computed hop counter; persisted in BOTH storage modes
+        // (file frontmatter + sqlite hop_count column, DR-2) unlike the
+        // file-mode-only attestation fields below.
+        hopCount: new_hop_count,
         scopeDecision: parsed.scope_decision,
         scopeDecisionWhy: parsed.scope_decision_why,
         cutApproved: parsed.cut_approved,

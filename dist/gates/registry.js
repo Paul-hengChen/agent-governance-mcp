@@ -33,6 +33,7 @@
 //   QA_ROUND_EXCEEDED               skill-qa-engineer.md
 //   REVIEW_ROUND_EXCEEDED           skill-code-reviewer.md
 //   VISUAL_ROUND_EXCEEDED           skill-qa-visual.md
+//   HOP_CAP_EXCEEDED                skill-coordinator.md
 //   SCOPE_DECISION_REQUIRED         const-08-chain-31-mid.md, constitution-rationale.md, skill-pm.md
 //   CUT_APPROVAL_REQUIRED           const-08-chain-31-mid.md, skill-coordinator.md, skill-coordinator-lite.md
 //   EXTERNAL_REFS_UNRESOLVED        const-15-core-tail.md, skill-coordinator.md, skill-pm.md
@@ -50,11 +51,11 @@
 //   PIXEL_GATE_ATTESTATION_MISSING  skill-qa-visual.md
 //   REVIEW_VERDICT_STATUS_MISMATCH  const-05-core-standards.md, const-08-chain-31-mid.md, skill-code-reviewer.md
 //   REVIEWER_COMPLETED_TASKS_REJECTED  skill-code-reviewer.md
-// The 22-gate catalog, in documentation order. Array order is DOC order only —
+// The 23-gate catalog, in documentation order. Array order is DOC order only —
 // it MUST NOT be relied on for evaluation order (DR-5; that lives in
 // handoff-orchestrator.ts as the physical if-block sequence).
 export const GATE_REGISTRY = [
-    // ---- transition-json (codes 1-5, producer: validateTransition) ----
+    // ---- transition-json (codes 1-6, producer: validateTransition) ----
     {
         errorCode: "AGENT_ID_REQUIRED",
         producer: "validateTransition",
@@ -105,7 +106,21 @@ export const GATE_REGISTRY = [
         hintStatic: " exceeds cap. Only (pm, In_Progress) allowed for pixel/widget rebudget.",
         documentedInProse: true,
     },
-    // ---- orchestrator-json (codes 6-8, producer: orchestrator) ----
+    {
+        errorCode: "HOP_CAP_EXCEEDED",
+        producer: "validateTransition",
+        envelope: "transition-json",
+        triggerEdge: "prev_hop_count >= 10 on a role transition (next.agent != prev.agent) and next != (pm,In_Progress); feature_changed bypasses",
+        armCondition: "opt-in (counter present)",
+        clearingArtifact: "(pm, In_Progress) landing (does NOT reset hop_count) or active_feature change (resets to 0)",
+        hintStatic: " reaches hop cap (10). Only the (pm, In_Progress) landing is allowed; " +
+            "hop_count resets only on active_feature change — human must re-scope or override.",
+        // DR-7 (d2-server-brake-accounting): the backtick-quoted literal in
+        // skill-coordinator.md lands with T-D2-03; both must ship before the C12
+        // parity test runs (T-D2-05).
+        documentedInProse: true,
+    },
+    // ---- orchestrator-json (codes 7-9, producer: orchestrator) ----
     {
         errorCode: "SCOPE_DECISION_REQUIRED",
         producer: "orchestrator",
@@ -144,7 +159,7 @@ export const GATE_REGISTRY = [
             "specs/b8-external-ref-ledger.md.",
         documentedInProse: true,
     },
-    // ---- plain-text (codes 9-22, producer: orchestrator) ----
+    // ---- plain-text (codes 10-23, producer: orchestrator) ----
     {
         errorCode: "MISSING_EVIDENCE",
         producer: "orchestrator",
@@ -330,9 +345,9 @@ export function gate(code) {
     }
     return def;
 }
-// The 5 codes validateTransition's rejection() may emit. For tests + optional
+// The 6 codes validateTransition's rejection() may emit. For tests + optional
 // Extract<> typing of validateTransition's own return — NOT for re-typing the
-// 13-member TransitionRejection["error"] union in tools/transitions.ts (see DR-8:
+// 14-member TransitionRejection["error"] union in tools/transitions.ts (see DR-8:
 // that union carries 8 additional handler-side envelope-consistency codes and
 // must stay byte-identical; non-drift is enforced by a test assertion
 // union ⊆ ALL_GATE_CODES, not by re-sourcing from here).
@@ -342,6 +357,7 @@ export const TRANSITION_GATE_CODES = [
     "QA_ROUND_EXCEEDED",
     "REVIEW_ROUND_EXCEEDED",
     "VISUAL_ROUND_EXCEEDED",
+    "HOP_CAP_EXCEEDED",
 ];
 // Every gate error code, in catalog order. === GATE_REGISTRY.map(g => g.errorCode).
 export const ALL_GATE_CODES = GATE_REGISTRY.map((g) => g.errorCode);

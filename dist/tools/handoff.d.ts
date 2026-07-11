@@ -19,6 +19,7 @@ export interface HandoffState {
     qa_round: number;
     review_round: number;
     visual_round: number;
+    hop_count: number;
     prd_path?: string;
     scope_decision?: string;
     scope_decision_why?: string;
@@ -58,6 +59,7 @@ export interface WriteHandoffStateOptions {
     prdPath?: string;
     reviewRound?: number;
     visualRound?: number;
+    hopCount?: number;
     scopeDecision?: string;
     scopeDecisionWhy?: string;
     cutApproved?: boolean;
@@ -85,6 +87,6 @@ export declare function writeHandoffState(opts: WriteHandoffStateOptions): Promi
  * `writeHandoffState({ workspacePath, activeFeature, status, ... })`.
  * Positional signature retained for backwards-compat; planned removal in v4.0.0.
  */
-export declare function writeHandoffState(workspacePath: string, activeFeature: string, status: string, completedTasks: string[], pendingNotes: string[], blockingReason?: string, lastAgent?: string, qaRound?: number, prdPath?: string, reviewRound?: number, visualRound?: number): Promise<string>;
+export declare function writeHandoffState(workspacePath: string, activeFeature: string, status: string, completedTasks: string[], pendingNotes: string[], blockingReason?: string, lastAgent?: string, qaRound?: number, prdPath?: string, reviewRound?: number, visualRound?: number, hopCount?: number): Promise<string>;
 export declare function handleGetState(args: WorkspaceOnlyInput): Promise<ToolResult>;
 //# sourceMappingURL=handoff.d.ts.map

@@ -281,12 +281,20 @@ test("AC2: lean always-on bundle is below the raw baseline and within target (<=
   // re-measured (not trusted from sr-engineer's or code-reviewer's notes) at 4027 ~tok
   // (exact); cap set to the exact measured value per the established Phase-2 convention
   // (no additional headroom).
+  // d2-server-brake-accounting (qa-owned bump, T-D2-03): cap raised from 4027 → 4085 to
+  // absorb the hop-counter server-tracked rewiring in skill-coordinator-lite.md (the
+  // hop-cap-exempt note for lite mode, const-01 Limits reference) plus the
+  // const-01-core-head.md `## Limits` table's `hop` cap row and the HOP_CAP_EXCEEDED
+  // server-enforcement bullet (core-head, untagged chain/design, loads on this lean path
+  // too). Independently re-measured (not trusted from sr-engineer's handoff note) at 4085
+  // ~tok (exact); cap set to the exact measured value per the established Phase-2
+  // convention (no additional headroom).
   const liteSkill = fs.readFileSync(path.join(ROOT, "content", "skill-coordinator-lite.md"), "utf-8");
   const SEP = "\n\n---\n\n";
   const raw = approxTokens(CONSTITUTION + SEP + liteSkill);
   const lean = approxTokens(LEAN_CONSTITUTION + SEP + liteSkill);
   assert.ok(lean < raw, `lean (${lean}) must be < raw (${raw})`);
-  assert.ok(lean <= 4027, `lean always-on (${lean} ~tok) must meet the <= 4027 target`);
+  assert.ok(lean <= 4085, `lean always-on (${lean} ~tok) must meet the <= 4085 target`);
 });
 
 // --- AC3: enforcement preserved ------------------------------------------
@@ -1033,13 +1041,21 @@ test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/b
   // constitution-side. Independently re-measured (not trusted from code-reviewer's review
   // note) at 12547 ~tok (exact); cap set to the exact measured value per the established
   // Phase-2 convention (no additional headroom).
+  // d2-server-brake-accounting (qa-owned bump, T-D2-03): cap raised from 12547 → 13046 to
+  // absorb the constitution-side `## Limits` `hop` cap row / HOP_CAP_EXCEEDED bullet
+  // (const-01-core-head.md, matching the design-arm floor test above) plus the
+  // skill-coordinator.md §Auto-Routing hop-counter rewrite (server-tracked `hop_count`
+  // read path, replacing the retired in-memory counter), the new "Hop counter scope"
+  // paragraph, and the Escalation Routes hop-cap row. Independently re-measured (not
+  // trusted from sr-engineer's handoff note) at 13046 ~tok (exact); cap set to the exact
+  // measured value per the established Phase-2 convention (no additional headroom).
   const skillCoord = fs.readFileSync(path.join(ROOT, "content", "skill-coordinator.md"), "utf-8");
   const body = skillCoord.startsWith("---")
     ? skillCoord.slice(skillCoord.indexOf("---", 3) + 3).trimStart()
     : skillCoord;
   const SEP = "\n\n---\n\n";
   const bundle = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)) + SEP + stripRationale(stripOriginTags(body)));
-  assert.ok(bundle <= 12547, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 12547 (AC8 design-arm floor, a12-followup-qa-round-name re-baseline)`);
+  assert.ok(bundle <= 13046, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 13046 (AC8 design-arm floor, d2-server-brake-accounting re-baseline)`);
 });
 
 test("AC9: every operative rule/gate/heading survives stripRationale on the constitution", () => {

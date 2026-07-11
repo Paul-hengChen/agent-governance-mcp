@@ -15,9 +15,11 @@ export interface TransitionRequest {
     prev_review_round: number;
     prev_visual_round?: number;
     next_resume_of?: "code-reviewer" | "qa-engineer";
+    prev_hop_count?: number;
+    feature_changed?: boolean;
 }
 export interface TransitionRejection {
-    error: "TRANSITION_REJECTED" | "QA_ROUND_EXCEEDED" | "REVIEW_ROUND_EXCEEDED" | "VISUAL_ROUND_EXCEEDED" | "VISUAL_WIDGETS_UNVERIFIED" | "VISUAL_BASELINES_REQUIRED" | "VISUAL_REPORT_INCOMPLETE" | "VISUAL_ASSERTIONS_REQUIRED" | "SCOPE_DECISION_REQUIRED" | "PIXEL_GATE_ATTESTATION_MISSING" | "CUT_APPROVAL_REQUIRED" | "EXTERNAL_REFS_UNRESOLVED" | "AGENT_ID_REQUIRED";
+    error: "TRANSITION_REJECTED" | "QA_ROUND_EXCEEDED" | "REVIEW_ROUND_EXCEEDED" | "VISUAL_ROUND_EXCEEDED" | "HOP_CAP_EXCEEDED" | "VISUAL_WIDGETS_UNVERIFIED" | "VISUAL_BASELINES_REQUIRED" | "VISUAL_REPORT_INCOMPLETE" | "VISUAL_ASSERTIONS_REQUIRED" | "SCOPE_DECISION_REQUIRED" | "PIXEL_GATE_ATTESTATION_MISSING" | "CUT_APPROVAL_REQUIRED" | "EXTERNAL_REFS_UNRESOLVED" | "AGENT_ID_REQUIRED";
     attempted: {
         prev_agent: string | null;
         prev_status: string | null;
@@ -46,6 +48,8 @@ export declare const ALLOWED_TRANSITIONS: ReadonlyMap<string, AllowedNext>;
  * Precedence (highest → lowest):
  *   1. agent_id required when next.status is non-null
  *   2. round-cap override (qa_round >= 4 → only (pm, In_Progress))
+ *   2.5 hop-cap override (v9: hop_count >= 10 on a counted role transition →
+ *       only the (pm, In_Progress) landing; landing does NOT reset the count)
  *   3. self-loop fast path on same-agent In_Progress→In_Progress
  *   3.5 Amend-Resume Edge (C1): pm:In_Progress → {code-reviewer,qa-engineer}:In_Progress
  *       iff the structured next_resume_of field names that exact role (v7)
@@ -76,14 +80,22 @@ export declare function validateTransition(req: TransitionRequest): TransitionRe
  *   - (qa-engineer, PASS)         → 0
  *   - (pm, In_Progress)           → 0
  *   - everything else             → prev_visual_round
+ *
+ * hop_count (v9, d2-server-brake-accounting):
+ *   - feature_changed             → base resets to 0 (AC-3; the ONLY reset —
+ *     (pm, In_Progress) does NOT reset it, unlike the three rounds — DR-6)
+ *   - role transition (next.agent !== prev.agent) → base + 1 (DR-9)
+ *   - everything else (self-loops, same-agent status changes) → base
  */
-export declare function computeNewRound(prev_qa_round: number, prev_review_round: number, prev_visual_round: number, next: TransitionTuple, prev?: TransitionTuple, next_pending_notes?: ReadonlyArray<string>): {
+export declare function computeNewRound(prev_qa_round: number, prev_review_round: number, prev_visual_round: number, next: TransitionTuple, prev?: TransitionTuple, next_pending_notes?: ReadonlyArray<string>, prev_hop_count?: number, feature_changed?: boolean): {
     qa_round: number;
     review_round: number;
     visual_round: number;
+    hop_count: number;
 };
 export declare const ROUND_CAP_EXPORTED = 4;
 export declare const REVIEW_ROUND_CAP_EXPORTED = 4;
 export declare const VISUAL_ROUND_CAP_EXPORTED = 6;
+export declare const HOP_CAP_EXPORTED = 10;
 export {};
 //# sourceMappingURL=transitions.d.ts.map

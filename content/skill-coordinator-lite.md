@@ -17,6 +17,7 @@ Doer. Read request, do it, reply. No triage, no delegation.
 - `tw_get_state` allowed (read-only) if you need context. `tw_detect_drift` only on user request.
 - **No code-reviewer step.** Lite excludes the code-reviewer gate — solo-dev same-context work; the reviewer gate is a multi-context tool.
 - **No auto-routing.** Lite is single-shot; the auto-hop loop lives in `/teamwork` only.
+- **Hop cap-exempt.** Lite is exempt from the `hop` cap (const-01 Limits) and server-read-only — no `hop_count` enforcement applies (the server-tracked counter gates role-transition `tw_update_state` writes, which lite never issues).
 - **Cut-approval halt (SOP-ceiling).** Full mechanism and trust rule: Constitution §3.1. Lite is server-read-only, so the server's `CUT_APPROVAL_REQUIRED` transition gate cannot fire here — this SOP rule is the enforcement ceiling for the lite path; lite is also always single-context by construction (no coordinator/subagent boundary), so the sanctioned-writer question never arises here. If a lite task ever crosses into PM-style ticket-splitting and then build work, you MUST present the ticket cut inline in chat (`id | desc | depends_on | est. files | design-link`) and HALT for human approval before executing/nominating build — do NOT use `AskUserQuestion`, present inline and wait. In practice this is also a `/teamwork` escalation signal (multi-ticket cut → not a one-shot lite edit → **full** per step 3), so prefer escalating.
 
 ## SOP

@@ -186,6 +186,36 @@ Add to `~/.claude/settings.json`:
 
 The hook is a silent no-op outside managed workspaces (no `.current/`, `tasks.md`, or `TODO.md`) — by design.
 
+### PostToolUse usage hook (Claude Code only, opt-in)
+
+Durable token-usage accounting for the coordinator's Token Budget Brake: after each `Task`
+subagent dispatch, the hook appends one usage record to the workspace's `.current/usage.jsonl`
+sidecar, which the coordinator sums per feature instead of relying on in-memory model arithmetic.
+**Opt-in twice over**: the hook only writes when (a) it is wired in `settings.json` as below, AND
+(b) the workspace's `.current/.config.json` sets `tokenBudgetPerFeature` to a positive finite
+number — otherwise it is a silent no-op (no file, no accounting). Not wiring it is fully
+supported: the coordinator falls back to the pre-D2 `agent-*.jsonl` hand-sum.
+
+Add to `~/.claude/settings.json` (the hook is not a package bin — point `command` at your local
+checkout, or set `AGC_SERVER_ROOT` and reuse it in the path):
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [{
+      "matcher": "Task",
+      "hooks": [{
+        "type": "command",
+        "command": "node /path/to/agent-governance-mcp/bin/agent-governance-usage-hook.mjs",
+        "timeout": 10
+      }]
+    }]
+  }
+}
+```
+
+Best-effort by contract: the hook always exits 0 and never blocks or alters the `Task` result.
+
 ---
 
 ## Links

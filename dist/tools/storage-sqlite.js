@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS handoff_state (
   prd_path        TEXT,
   review_round    INTEGER NOT NULL DEFAULT 0,
   visual_round    INTEGER NOT NULL DEFAULT 0,
+  hop_count       INTEGER NOT NULL DEFAULT 0,
   scope_decision      TEXT,
   scope_decision_why  TEXT
 );
@@ -128,6 +129,11 @@ export class SqliteHandoffStorage {
         addColumnIfMissing("ALTER TABLE handoff_state ADD COLUMN prd_path TEXT");
         addColumnIfMissing("ALTER TABLE handoff_state ADD COLUMN review_round INTEGER NOT NULL DEFAULT 0");
         addColumnIfMissing("ALTER TABLE handoff_state ADD COLUMN visual_round INTEGER NOT NULL DEFAULT 0");
+        // v9 (d2-server-brake-accounting) — hop_count counter. Idempotent ALTER,
+        // NO sqlite schema_meta bump (DR-2): the exact mechanism that added
+        // visual_round at v3.14.0. Additive DEFAULT 0 is backward/forward-
+        // compatible, and 0 is the counter's true pre-feature value (DR-3).
+        addColumnIfMissing("ALTER TABLE handoff_state ADD COLUMN hop_count INTEGER NOT NULL DEFAULT 0");
         // v4 — scope-decision attestation (server-scope-decision-gate). Nullable,
         // no default — absence is meaningful (no attestation → gate may fire).
         addColumnIfMissing("ALTER TABLE handoff_state ADD COLUMN scope_decision TEXT");
@@ -141,16 +147,16 @@ export class SqliteHandoffStorage {
         this.selectStmt = this.db.prepare("SELECT * FROM handoff_state WHERE workspace_path = ?");
         this.selectLastUpdatedStmt = this.db.prepare("SELECT last_updated FROM handoff_state WHERE workspace_path = ?");
         this.upsertStmt = this.db.prepare(`INSERT OR REPLACE INTO handoff_state
-        (workspace_path, active_feature, status, last_updated, blocking_reason, last_agent, completed, pending, qa_round, prd_path, review_round, visual_round, scope_decision, scope_decision_why)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-        this.txUpsert = this.db.transaction((workspacePath, activeFeature, status, now, blockingReason, lastAgent, completed, pending, qaRound, prdPath, reviewRound, visualRound, scopeDecision, scopeDecisionWhy, expectedLastUpdated) => {
+        (workspace_path, active_feature, status, last_updated, blocking_reason, last_agent, completed, pending, qa_round, prd_path, review_round, visual_round, hop_count, scope_decision, scope_decision_why)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+        this.txUpsert = this.db.transaction((workspacePath, activeFeature, status, now, blockingReason, lastAgent, completed, pending, qaRound, prdPath, reviewRound, visualRound, hopCount, scopeDecision, scopeDecisionWhy, expectedLastUpdated) => {
             const row = this.selectLastUpdatedStmt.get(workspacePath);
             const actual = row?.last_updated ?? null;
             if (actual !== expectedLastUpdated) {
                 throw new Error(`⛔ STATE DRIFT: handoff row changed between freshness check and write ` +
                     `(expected last_updated=${expectedLastUpdated}, actual=${actual}). Retry after tw_get_state.`);
             }
-            this.upsertStmt.run(workspacePath, activeFeature, status, now, blockingReason, lastAgent, completed, pending, qaRound, prdPath, reviewRound, visualRound, scopeDecision, scopeDecisionWhy);
+            this.upsertStmt.run(workspacePath, activeFeature, status, now, blockingReason, lastAgent, completed, pending, qaRound, prdPath, reviewRound, visualRound, hopCount, scopeDecision, scopeDecisionWhy);
         });
         this.listTasksStmt = this.db.prepare(`SELECT task_id, description, section, completed, note, reverted_reason, sort_order
        FROM tasks WHERE workspace_path = ? ORDER BY sort_order ASC`);
@@ -227,6 +233,13 @@ export class SqliteHandoffStorage {
         const visual_round = typeof visualRoundRaw === "number" && Number.isFinite(visualRoundRaw) && visualRoundRaw >= 0
             ? Math.floor(visualRoundRaw)
             : 0;
+        // v9 — hop_count counter. Null (pre-ALTER row read before the column
+        // backfilled) and malformed values default to 0, matching the file-mode
+        // parser and the three round counters above.
+        const hopCountRaw = row.hop_count;
+        const hop_count = typeof hopCountRaw === "number" && Number.isFinite(hopCountRaw) && hopCountRaw >= 0
+            ? Math.floor(hopCountRaw)
+            : 0;
         return {
             active_feature: row.active_feature,
             status: row.status,
@@ -241,6 +254,7 @@ export class SqliteHandoffStorage {
             qa_round,
             review_round,
             visual_round,
+            hop_count,
         };
     }
     readState(workspacePath) {
@@ -275,6 +289,13 @@ export class SqliteHandoffStorage {
         let workspacePath;
         let scopeDecision;
         let scopeDecisionWhy;
+        // v9 — hop_count IS persisted in SQLite (unlike the DR-5 file-mode-only
+        // fields above): it is a server-computed counter the HOP_CAP_EXCEEDED
+        // gate reads back from prevState, so skipping it here would leave the
+        // gate silently inert in HTTP mode (DR-2). Options-object callers only —
+        // the deprecated positional overload predates the field and normalises
+        // to 0 below.
+        let hopCount;
         if (typeof workspacePathOrOpts === "object" && !Array.isArray(workspacePathOrOpts)) {
             const o = workspacePathOrOpts;
             workspacePath = o.workspacePath;
@@ -288,6 +309,7 @@ export class SqliteHandoffStorage {
             prdPath = o.prdPath;
             reviewRound = o.reviewRound;
             visualRound = o.visualRound;
+            hopCount = o.hopCount;
             scopeDecision = o.scopeDecision;
             scopeDecisionWhy = o.scopeDecisionWhy;
         }
@@ -309,6 +331,11 @@ export class SqliteHandoffStorage {
         const normalisedVisualRound = Number.isFinite(visualRound) && visualRound >= 0
             ? Math.floor(visualRound)
             : 0;
+        // v9 — hop_count normalisation, identical to the three round counters:
+        // falsy/absent input (incl. the positional overload) normalises to 0.
+        const normalisedHopCount = Number.isFinite(hopCount) && hopCount >= 0
+            ? Math.floor(hopCount)
+            : 0;
         // Preserve prd_path AND the scope_decision attestation across writes that
         // don't explicitly set them (PM sets each once; downstream roles call
         // writeState without re-passing the fields). One existing read services all.
@@ -327,7 +354,7 @@ export class SqliteHandoffStorage {
                 effectiveScopeDecisionWhy = existing?.scope_decision_why ?? null;
         }
         const now = new Date().toISOString();
-        this.txUpsert(workspacePath, _activeFeature, _status, now, blockingReason ?? null, lastAgent ?? null, JSON.stringify(_completedTasks), JSON.stringify(_pendingNotes), normalisedRound, effectivePrdPath, normalisedReviewRound, normalisedVisualRound, effectiveScopeDecision, effectiveScopeDecisionWhy, currentLastUpdated);
+        this.txUpsert(workspacePath, _activeFeature, _status, now, blockingReason ?? null, lastAgent ?? null, JSON.stringify(_completedTasks), JSON.stringify(_pendingNotes), normalisedRound, effectivePrdPath, normalisedReviewRound, normalisedVisualRound, normalisedHopCount, effectiveScopeDecision, effectiveScopeDecisionWhy, currentLastUpdated);
         snapshotExtra(workspacePath, SNAPSHOT_KEY, now);
         return Promise.resolve(JSON.stringify({ success: true, storage: "sqlite", updated_at: now }));
     }

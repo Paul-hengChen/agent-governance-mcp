@@ -127,6 +127,13 @@ const REVIEW_ROUND_CAP = 4;
 // §3.1 documents the user-visible "5 rounds" framing; cap=6 reflects the
 // off-by-one between "rounds completed" and "next write index".
 const VISUAL_ROUND_CAP = 6;
+// v9 (d2-server-brake-accounting) — const-01 Limits: `hop` cap — max
+// auto-routing role transitions per feature. Unlike the three round caps
+// above, hop_count is feature-scoped: it resets ONLY on active_feature
+// change, never on PM re-entry (DR-6), so after the gate fires autonomous
+// dispatch stays frozen at the (pm, In_Progress) landing until a human
+// re-scopes into a new feature.
+const HOP_CAP = 10;
 function isStatus(s) {
     return s === "In_Progress" || s === "PASS" || s === "FAIL" || s === "Blocked";
 }
@@ -163,6 +170,8 @@ function rejection(req, error, allowed, hint) {
  * Precedence (highest → lowest):
  *   1. agent_id required when next.status is non-null
  *   2. round-cap override (qa_round >= 4 → only (pm, In_Progress))
+ *   2.5 hop-cap override (v9: hop_count >= 10 on a counted role transition →
+ *       only the (pm, In_Progress) landing; landing does NOT reset the count)
  *   3. self-loop fast path on same-agent In_Progress→In_Progress
  *   3.5 Amend-Resume Edge (C1): pm:In_Progress → {code-reviewer,qa-engineer}:In_Progress
  *       iff the structured next_resume_of field names that exact role (v7)
@@ -204,6 +213,24 @@ export function validateTransition(req) {
         if (ok)
             return null;
         return rejection(req, "VISUAL_ROUND_EXCEEDED", onlyAllowed, `visual_round=${prev_visual_round}${gate("VISUAL_ROUND_EXCEEDED").hintStatic}`);
+    }
+    // 2.5 hop-cap override (v9, d2-server-brake-accounting). Fourth round-style
+    // override — AFTER the qa/review/visual overrides (so their outputs stay
+    // byte-identical, AC-8) and BEFORE the self-loop fast path. Fires only when
+    // the feature's persisted hop_count is already at/over HOP_CAP AND the
+    // incoming write is a counted role transition (next.agent !== prev.agent,
+    // DR-9 — self-loops and same-agent status changes are NOT role transitions,
+    // so they fall through and are never hop-blocked) AND it is not the
+    // (pm, In_Progress) landing edge. A feature change resets the count (AC-3),
+    // so feature_changed=true bypasses the gate. The landing write does NOT
+    // reset hop_count (DR-6) — only an active_feature change does.
+    const prev_hop_count = req.prev_hop_count ?? 0;
+    if (!req.feature_changed &&
+        prev_hop_count >= HOP_CAP &&
+        req.next.agent !== req.prev.agent &&
+        !(req.next.agent === "pm" && req.next.status === "In_Progress")) {
+        const onlyAllowed = [{ agent: "pm", status: "In_Progress" }];
+        return rejection(req, "HOP_CAP_EXCEEDED", onlyAllowed, `hop_count=${prev_hop_count}${gate("HOP_CAP_EXCEEDED").hintStatic}`);
     }
     // 3. self-loop fast path
     if (req.prev.agent !== null &&
@@ -261,8 +288,14 @@ export function validateTransition(req) {
  *   - (qa-engineer, PASS)         → 0
  *   - (pm, In_Progress)           → 0
  *   - everything else             → prev_visual_round
+ *
+ * hop_count (v9, d2-server-brake-accounting):
+ *   - feature_changed             → base resets to 0 (AC-3; the ONLY reset —
+ *     (pm, In_Progress) does NOT reset it, unlike the three rounds — DR-6)
+ *   - role transition (next.agent !== prev.agent) → base + 1 (DR-9)
+ *   - everything else (self-loops, same-agent status changes) → base
  */
-export function computeNewRound(prev_qa_round, prev_review_round, prev_visual_round, next, prev, next_pending_notes) {
+export function computeNewRound(prev_qa_round, prev_review_round, prev_visual_round, next, prev, next_pending_notes, prev_hop_count = 0, feature_changed = false) {
     let qa_round = prev_qa_round;
     let review_round = prev_review_round;
     let visual_round = prev_visual_round;
@@ -297,9 +330,21 @@ export function computeNewRound(prev_qa_round, prev_review_round, prev_visual_ro
     else if (next.agent === "pm" && next.status === "In_Progress") {
         visual_round = 0;
     }
-    return { qa_round, review_round, visual_round };
+    // v9 hop_count logic (DR-6/DR-9). Feature change resets the base; a counted
+    // role transition (next.agent !== prev.agent, including the very first write
+    // where prev.agent is null) increments it; self-loops and same-agent status
+    // changes carry it forward unchanged. The (pm, In_Progress) landing after a
+    // HOP_CAP_EXCEEDED fire is itself a role transition and increments — it does
+    // NOT reset (only active_feature change resets).
+    const isRoleTransition = !!next.agent && next.agent !== (prev?.agent ?? null);
+    const hopBase = feature_changed ? 0 : prev_hop_count;
+    const hop_count = isRoleTransition ? hopBase + 1 : hopBase;
+    return { qa_round, review_round, visual_round, hop_count };
 }
 export const ROUND_CAP_EXPORTED = ROUND_CAP;
 export const REVIEW_ROUND_CAP_EXPORTED = REVIEW_ROUND_CAP;
 export const VISUAL_ROUND_CAP_EXPORTED = VISUAL_ROUND_CAP;
+// v9 (d2-server-brake-accounting) — consumed by the T-D2-01B orchestrator
+// sentinel (hop-cap-cross pending note) and by tests.
+export const HOP_CAP_EXPORTED = HOP_CAP;
 //# sourceMappingURL=transitions.js.map

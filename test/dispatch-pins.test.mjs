@@ -107,7 +107,10 @@ next_role: "sr-engineer"
   assert.equal(state.next_role, "sr-engineer", "sibling v7 field preserved across v7→v8");
 });
 
-test("M1b: readHandoffState's fire-and-forget write-back heals the v7 file to v8 on disk", async () => {
+test("M1b: readHandoffState's fire-and-forget write-back heals the v7 file to v9 on disk", async () => {
+  // d2-server-brake-accounting (qa-owned re-baseline): CURRENT_VERSIONS.handoff
+  // is now 9 (v8→v9 added hop_count). A v7 file heals all the way to v9 in one
+  // fire-and-forget write-back, seeding hop_count: 0 (DR-3) along the way.
   const ws = mkWs();
   resetSession();
   writeRaw(
@@ -128,19 +131,23 @@ qa_round: 0
   );
   readHandoffState(ws);
   await new Promise((resolve) => setTimeout(resolve, 30));
-  assert.match(readRaw(ws), /schema_version:\s*8/, "fire-and-forget heal lands the file at CURRENT (v8)");
+  const healed = readRaw(ws);
+  assert.match(healed, /schema_version:\s*9/, "fire-and-forget heal lands the file at CURRENT (v9)");
+  assert.match(healed, /hop_count:\s*0/, "the v8→v9 step's seeded hop_count: 0 survives the heal write");
 });
 
-test("M2: future v9 handoff refuses-loud against a v8 server (no silent downgrade)", () => {
+test("M2: future v10 handoff refuses-loud against a v9 server (no silent downgrade)", () => {
   // WHY: forward-compat safety, mirroring the AC-10(g) c9-protocol-fields
-  // precedent (v7 file against a v6 server; here v9 against v8). A handoff
-  // written by a newer server must never be silently parsed.
+  // precedent (v7 file against a v6 server; here v10 against v9 — re-baselined
+  // by d2-server-brake-accounting, qa-owned, since v9 is now CURRENT and no
+  // longer "the future"). A handoff written by a newer server must never be
+  // silently parsed.
   const ws = mkWs();
   resetSession();
   writeRaw(
     ws,
     `---
-schema_version: 9
+schema_version: 10
 active_feature: "from-the-future"
 status: "In_Progress"
 last_updated: "2099-01-01T00:00:00.000Z"
@@ -155,19 +162,24 @@ qa_round: 0
   );
   assert.throws(
     () => readHandoffState(ws),
-    /handoff on-disk version 9 > server max 8/,
-    "v9 file must refuse-loud against a v8 server",
+    /handoff on-disk version 10 > server max 9/,
+    "v10 file must refuse-loud against a v9 server",
   );
   assert.throws(
     () => parseHandoff(ws),
-    /on-disk version 9 > server max 8/,
+    /on-disk version 10 > server max 9/,
   );
 });
 
-test("M3: registry-level v7→v8 step is pure, stamp-only, and seeds nothing (isolated from the full chain)", () => {
-  // WHY: pins the migration step itself (schema/migrations-handoff.ts), not
-  // just its effect through parseHandoff — a direct unit test of the runner
-  // registration, matching the M1/M2 cut-approval-gate.test.mjs convention.
+test("M3: registry-level v7→v8→v9 steps are pure, stamp-only/seed-only, and seed nothing extra (isolated from the full chain)", () => {
+  // WHY: pins the migration steps themselves (schema/migrations-handoff.ts),
+  // not just their effect through parseHandoff — a direct unit test of the
+  // runner registration, matching the M1/M2 cut-approval-gate.test.mjs
+  // convention. d2-server-brake-accounting (qa-owned re-baseline): CURRENT is
+  // now 9, so the isolated chain re-registered here must extend one step
+  // further (v8→v9, seeding hop_count: 0 — DR-3) or every read in this file
+  // hits "missing migration step handoff v8→v9" (the registry is a shared
+  // module-level singleton across tests in this file/process).
   _clearRegistryForTests();
   registerMigration({ kind: "handoff", from: 0, to: 1, up: (i) => ({ ...i, schema_version: 1 }) });
   registerMigration({ kind: "handoff", from: 1, to: 2, up: (i) => ({ ...i, schema_version: 2 }) });
@@ -177,6 +189,7 @@ test("M3: registry-level v7→v8 step is pure, stamp-only, and seeds nothing (is
   registerMigration({ kind: "handoff", from: 5, to: 6, up: (i) => ({ ...i, schema_version: 6 }) });
   registerMigration({ kind: "handoff", from: 6, to: 7, up: (i) => ({ ...i, schema_version: 7 }) });
   registerMigration({ kind: "handoff", from: 7, to: 8, up: (i) => ({ ...i, schema_version: 8 }) });
+  registerMigration({ kind: "handoff", from: 8, to: 9, up: (i) => ({ ...i, schema_version: 9, hop_count: 0 }) });
 
   const v7Payload = {
     schema_version: 7,
@@ -185,10 +198,11 @@ test("M3: registry-level v7→v8 step is pure, stamp-only, and seeds nothing (is
     next_role: "qa-engineer",
   };
   const result = runMigrations("handoff", v7Payload);
-  assert.deepEqual(result.applied, [8], "only the v7→v8 step runs when on-disk version is one behind CURRENT");
-  assert.equal(result.payload.schema_version, 8, "schema_version bumped to CURRENT (8)");
+  assert.deepEqual(result.applied, [8, 9], "the v7→v8 AND v8→v9 steps both run when on-disk version is two behind CURRENT");
+  assert.equal(result.payload.schema_version, 9, "schema_version bumped to CURRENT (9)");
   assert.equal(result.payload.dispatch_pins, undefined, "v7→v8 seeds no dispatch_pins default (AC-1)");
-  assert.equal(result.payload.next_role, "qa-engineer", "sibling v7 field survives the v7→v8 stamp-only step verbatim");
+  assert.equal(result.payload.hop_count, 0, "v8→v9 seeds hop_count: 0 (DR-3)");
+  assert.equal(result.payload.next_role, "qa-engineer", "sibling v7 field survives both stamp-only/seed-only steps verbatim");
 
   // Re-running against the already-current payload is a no-op.
   const reread = runMigrations("handoff", result.payload);
@@ -783,8 +797,9 @@ test("Z7: tw_update_state ACCEPTS an empty dispatch_pins object ({} clears, per 
   assert.ok(!result.isError, `an empty {} dispatch_pins must not be rejected by zod; got: ${result.content?.[0]?.text}`);
 });
 
-// Sanity: CURRENT_VERSIONS.handoff really is 8 in this build (guards every
+// Sanity: CURRENT_VERSIONS.handoff really is 9 in this build (guards every
 // test above against silently testing the wrong target version).
-test("sanity: CURRENT_VERSIONS.handoff is 8 (c14-dispatch-pins)", () => {
-  assert.equal(CURRENT_VERSIONS.handoff, 8);
+// d2-server-brake-accounting (qa-owned re-baseline): bumped 8 -> 9 (hop_count).
+test("sanity: CURRENT_VERSIONS.handoff is 9 (d2-server-brake-accounting)", () => {
+  assert.equal(CURRENT_VERSIONS.handoff, 9);
 });

@@ -35,6 +35,10 @@ interface HandoffRow {
   prd_path: string | null;
   review_round: number | null;
   visual_round: number | null;
+  // v9 (d2-server-brake-accounting) — feature-scoped role-transition counter.
+  // Added via idempotent ALTER, NO sqlite schema_meta bump (DR-2: the exact
+  // visual_round precedent — additive DEFAULT 0 column).
+  hop_count: number | null;
   scope_decision: string | null;
   scope_decision_why: string | null;
 }
@@ -63,6 +67,7 @@ CREATE TABLE IF NOT EXISTS handoff_state (
   prd_path        TEXT,
   review_round    INTEGER NOT NULL DEFAULT 0,
   visual_round    INTEGER NOT NULL DEFAULT 0,
+  hop_count       INTEGER NOT NULL DEFAULT 0,
   scope_decision      TEXT,
   scope_decision_why  TEXT
 );
@@ -128,7 +133,7 @@ export class SqliteHandoffStorage implements HandoffStorage {
   private db: Database.Database;
   private selectStmt: Database.Statement<[string]>;
   private selectLastUpdatedStmt: Database.Statement<[string]>;
-  private upsertStmt: Database.Statement<[string, string, string, string, string | null, string | null, string, string, number, string | null, number, number, string | null, string | null]>;
+  private upsertStmt: Database.Statement<[string, string, string, string, string | null, string | null, string, string, number, string | null, number, number, number, string | null, string | null]>;
   private txUpsert: (
     workspacePath: string,
     activeFeature: string,
@@ -142,6 +147,7 @@ export class SqliteHandoffStorage implements HandoffStorage {
     prdPath: string | null,
     reviewRound: number,
     visualRound: number,
+    hopCount: number,
     scopeDecision: string | null,
     scopeDecisionWhy: string | null,
     expectedLastUpdated: string | null,
@@ -189,6 +195,11 @@ export class SqliteHandoffStorage implements HandoffStorage {
     addColumnIfMissing("ALTER TABLE handoff_state ADD COLUMN prd_path TEXT");
     addColumnIfMissing("ALTER TABLE handoff_state ADD COLUMN review_round INTEGER NOT NULL DEFAULT 0");
     addColumnIfMissing("ALTER TABLE handoff_state ADD COLUMN visual_round INTEGER NOT NULL DEFAULT 0");
+    // v9 (d2-server-brake-accounting) — hop_count counter. Idempotent ALTER,
+    // NO sqlite schema_meta bump (DR-2): the exact mechanism that added
+    // visual_round at v3.14.0. Additive DEFAULT 0 is backward/forward-
+    // compatible, and 0 is the counter's true pre-feature value (DR-3).
+    addColumnIfMissing("ALTER TABLE handoff_state ADD COLUMN hop_count INTEGER NOT NULL DEFAULT 0");
     // v4 — scope-decision attestation (server-scope-decision-gate). Nullable,
     // no default — absence is meaningful (no attestation → gate may fire).
     addColumnIfMissing("ALTER TABLE handoff_state ADD COLUMN scope_decision TEXT");
@@ -207,10 +218,10 @@ export class SqliteHandoffStorage implements HandoffStorage {
     this.selectLastUpdatedStmt = this.db.prepare<[string]>(
       "SELECT last_updated FROM handoff_state WHERE workspace_path = ?",
     );
-    this.upsertStmt = this.db.prepare<[string, string, string, string, string | null, string | null, string, string, number, string | null, number, number, string | null, string | null]>(
+    this.upsertStmt = this.db.prepare<[string, string, string, string, string | null, string | null, string, string, number, string | null, number, number, number, string | null, string | null]>(
       `INSERT OR REPLACE INTO handoff_state
-        (workspace_path, active_feature, status, last_updated, blocking_reason, last_agent, completed, pending, qa_round, prd_path, review_round, visual_round, scope_decision, scope_decision_why)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (workspace_path, active_feature, status, last_updated, blocking_reason, last_agent, completed, pending, qa_round, prd_path, review_round, visual_round, hop_count, scope_decision, scope_decision_why)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
 
     this.txUpsert = this.db.transaction(
@@ -227,6 +238,7 @@ export class SqliteHandoffStorage implements HandoffStorage {
         prdPath: string | null,
         reviewRound: number,
         visualRound: number,
+        hopCount: number,
         scopeDecision: string | null,
         scopeDecisionWhy: string | null,
         expectedLastUpdated: string | null,
@@ -252,6 +264,7 @@ export class SqliteHandoffStorage implements HandoffStorage {
           prdPath,
           reviewRound,
           visualRound,
+          hopCount,
           scopeDecision,
           scopeDecisionWhy,
         );
@@ -371,6 +384,14 @@ export class SqliteHandoffStorage implements HandoffStorage {
       typeof visualRoundRaw === "number" && Number.isFinite(visualRoundRaw) && visualRoundRaw >= 0
         ? Math.floor(visualRoundRaw)
         : 0;
+    // v9 — hop_count counter. Null (pre-ALTER row read before the column
+    // backfilled) and malformed values default to 0, matching the file-mode
+    // parser and the three round counters above.
+    const hopCountRaw = row.hop_count;
+    const hop_count =
+      typeof hopCountRaw === "number" && Number.isFinite(hopCountRaw) && hopCountRaw >= 0
+        ? Math.floor(hopCountRaw)
+        : 0;
     return {
       active_feature: row.active_feature,
       status: row.status,
@@ -385,6 +406,7 @@ export class SqliteHandoffStorage implements HandoffStorage {
       qa_round,
       review_round,
       visual_round,
+      hop_count,
     };
   }
 
@@ -448,6 +470,13 @@ export class SqliteHandoffStorage implements HandoffStorage {
     let workspacePath: string;
     let scopeDecision: string | undefined;
     let scopeDecisionWhy: string | undefined;
+    // v9 — hop_count IS persisted in SQLite (unlike the DR-5 file-mode-only
+    // fields above): it is a server-computed counter the HOP_CAP_EXCEEDED
+    // gate reads back from prevState, so skipping it here would leave the
+    // gate silently inert in HTTP mode (DR-2). Options-object callers only —
+    // the deprecated positional overload predates the field and normalises
+    // to 0 below.
+    let hopCount: number | undefined;
     if (typeof workspacePathOrOpts === "object" && !Array.isArray(workspacePathOrOpts)) {
       const o = workspacePathOrOpts;
       workspacePath = o.workspacePath;
@@ -461,6 +490,7 @@ export class SqliteHandoffStorage implements HandoffStorage {
       prdPath = o.prdPath;
       reviewRound = o.reviewRound;
       visualRound = o.visualRound;
+      hopCount = o.hopCount;
       scopeDecision = o.scopeDecision;
       scopeDecisionWhy = o.scopeDecisionWhy;
     } else {
@@ -484,6 +514,12 @@ export class SqliteHandoffStorage implements HandoffStorage {
     const normalisedVisualRound =
       Number.isFinite(visualRound) && (visualRound as number) >= 0
         ? Math.floor(visualRound as number)
+        : 0;
+    // v9 — hop_count normalisation, identical to the three round counters:
+    // falsy/absent input (incl. the positional overload) normalises to 0.
+    const normalisedHopCount =
+      Number.isFinite(hopCount) && (hopCount as number) >= 0
+        ? Math.floor(hopCount as number)
         : 0;
 
     // Preserve prd_path AND the scope_decision attestation across writes that
@@ -517,6 +553,7 @@ export class SqliteHandoffStorage implements HandoffStorage {
       effectivePrdPath,
       normalisedReviewRound,
       normalisedVisualRound,
+      normalisedHopCount,
       effectiveScopeDecision,
       effectiveScopeDecisionWhy,
       currentLastUpdated,

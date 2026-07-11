@@ -161,11 +161,15 @@ test("AC-11: pre-v3.14 callers (no prev_visual_round) work unchanged (backwards 
   // Why: the prev_visual_round parameter is required positionally now,
   // but downstream Storage/handoff parsers default missing fields to 0.
   // Passing 0 explicitly should match historical behaviour.
+  // d2-server-brake-accounting (qa-owned re-baseline): computeNewRound's
+  // return shape gained hop_count (v9, additive). No prev arg here (defaults
+  // to null agent), so next.agent="sr-engineer" is a role transition and
+  // prev_hop_count/feature_changed both default → hop_count = 0 + 1 = 1.
   const result = computeNewRound(
     2, 1, 0,
     { agent: "sr-engineer", status: "In_Progress" },
   );
-  assert.deepEqual(result, { qa_round: 2, review_round: 1, visual_round: 0 });
+  assert.deepEqual(result, { qa_round: 2, review_round: 1, visual_round: 0, hop_count: 1 });
 });
 
 test("AC-11: visual_fail token detection is whitespace-robust", () => {

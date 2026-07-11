@@ -8,6 +8,13 @@
 //     "driftBaselineIds": ["T470", "T471"],         // task IDs acknowledged as shipped+reconciled; excluded from vibe-coding drift (tw_detect_drift)
 //     "tokenBudgetPerFeature": 500000               // opt-in coordinator token-spend ceiling (raw summed usage.* tokens); non-positive/non-finite values treated as absent
 //   }
+//
+// tokenBudgetPerFeature accounting (d2-server-brake-accounting): the ceiling
+// is now backed by the durable .current/usage.jsonl sidecar — appended per
+// dispatch by the opt-in PostToolUse hook (bin/agent-governance-usage-hook.mjs)
+// and summed feature-scoped via tools/usage-accounting.ts — rather than the
+// coordinator's in-memory model arithmetic. The coordinator falls back to the
+// B9 agent-*.jsonl hand-sum only when the sidecar is absent (hook not wired).
 
 import * as fs from "fs";
 import * as path from "path";
