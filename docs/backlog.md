@@ -69,6 +69,8 @@ future `/teamwork` feature; none blocks a release on its own.
 | D6 | Host-capability as third compose axis: tag Claude-Code-only skill sections (Task tool, `agent-*.jsonl`, `~/.claude/agents`) `host:claude-code`; non-CC hosts skip dead text | P3 | — | ~5 (`prompts/constitution-manifest.ts` pattern extended to skills, `prompts/build.ts`, content splits, tests) | — |
 | D7 | `qa_reports/` unbounded growth (232 files) — per-feature archive / retention policy mirroring the tasks-archive convention — **done (2026-07-11, v3.67.1)** | P3 | — | ~2 (skill-release-engineer or skill-qa-engineer archive step, docs) | — |
 | D8 | Lite recommended model is haiku but haiku §1 compliance is known-poor (watermark omissions) — trim lite bundle further or bump recommendation to sonnet — **done (2026-07-11, v3.68.1)** | P3 | — | ~2 (`content/skill-coordinator-lite.md` frontmatter, measure-context-cost) | — |
+| D9 | `qa_review` auto-append fan-out: on a qa FAIL/PASS state write the evidence stamp was appended to every OPEN task's `qa_reports/review_<id>.md` (11 unrelated stale files modified + `review_T-D8-REL.md`/`review_T-D8-DONE.md` spuriously created, 2026-07-11 D8 run) instead of only the current task's — evidence pollution risks corrupting the `covers:` coverage index | P2 | — | ~3 (auto-append target resolution in tools/, regression test, cleanup note) | — |
+| D10 | release-engineer (haiku) resolved a concurrent-release push conflict with destructive `git reset`, discarding its own committed release (recovered via reflog cherry-pick, D8 v3.68.1) — add STOP-on-non-ff rule: never reset/rebase/clean; hand back Blocked with the local commit SHA for coordinator recovery | P2 | — | ~2 (skill-release-engineer Hard rule + Escalation Routes row, template hint, test pin) | — |
 
 ### Recommended execution order (2026-07-09, everything still open)
 
@@ -876,3 +878,39 @@ in live runs first, cheap content-only batches next, design-heavy last.
 - **Owner:** solo/lite-scale decision once D4 exists; content-only change.
 - **Risk if skipped:** low — cosmetic non-compliance (missing watermark,
   verbosity) in solo sessions.
+
+## D9 — `qa_review` auto-append fan-out to unrelated review files (P2)
+- **What:** During the D8 run (2026-07-11), a qa-engineer FAIL `tw_update_state`
+  auto-appended its `qa_review` stamp not only to the current task's report but
+  to `qa_reports/review_<id>.md` for **every open task**: 11 pre-existing,
+  unrelated files (T-ORM-02/03, T-PGAT-01..04, T-PCAG-ARCH/SCHEMA/GATE/SOP,
+  A11-12) were modified, and `review_T-D8-REL.md` / `review_T-D8-DONE.md` were
+  spuriously created (the FAIL stamp also duplicated into `review_A11-12.md`
+  etc.). Polluted diffs are parked in git `stash@{0}` (never popped) and the two
+  stray files in the session scratchpad — inspect before fixing.
+- **Why it matters:** evidence files are load-bearing (PASS gate, `covers:`
+  coverage index via `buildCoverageIndex`). Cross-task stamps forge apparent
+  evidence for tasks that were never reviewed and dirty release staging.
+- **Fix:** find the auto-append target resolution (recordReview path) and scope
+  it to the task id(s) actually being reviewed — never "all open tasks"; add a
+  regression test (FAIL write with N open tasks → exactly the intended file(s)
+  touched).
+- **Risk if skipped:** medium — silent evidence forgery; next `covers:` sweep or
+  archive step may relocate/attribute wrong evidence.
+
+## D10 — release-engineer destructive conflict recovery (P2)
+- **What:** Shipping D8, the release-engineer (haiku tier) hit a non-fast-forward
+  push (concurrent D2 session had advanced main to v3.68.0) and "resolved" it by
+  aborting a rebase and running `git reset HEAD~1`, discarding its own committed
+  release (v3.67.2) and the working tree. Only the reflog (`2115a2b`) made
+  recovery possible; the coordinator re-versioned and re-released as v3.68.1.
+- **Fix:** add to `content/skill-release-engineer.md`: a Hard rule — on any
+  non-fast-forward / push-rejection / concurrent-release collision, STOP: no
+  `git reset`, `git rebase`, `git checkout --force`, or `git clean`; write
+  `status=Blocked` with the local release-commit SHA in `pending_notes` and hand
+  back for coordinator recovery — plus a matching Escalation Routes row, a
+  ≤2-sentence reinforcement hint in `templates/claude-code-agents/release-engineer.md`
+  (C13 pattern), and a test pinning the rule text (release-staging.test.mjs
+  convention).
+- **Risk if skipped:** high on busy repos — concurrent sessions are now routine
+  (D2/D7/D8 overlapped); next collision may not leave a reflog-reachable commit.
