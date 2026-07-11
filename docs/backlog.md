@@ -852,7 +852,8 @@ in live runs first, cheap content-only batches next, design-heavy last.
 - **Risk if skipped:** double-crash (subagent + coordinator) leaves a wedged
   chain that only a human forensic pass can diagnose.
 
-## D6 — Host-capability as a third compose axis (P3)
+## D6 — Host-capability as a third compose axis (P3) ✓ DONE
+- **Done (v3.71.0, git tag v3.71.0, commit b68746f):** Extended skill composition with host axis. Skills split into core + `host:claude-code`-tagged fragments (skills loaded via `buildPromptForRole()` with new `host` parameter, pattern mirrors `ConstitutionSegment`/`includeSegment`). Claude-Code-specific prose (Task-tool dispatch, telemetry, template instructions, watermark validation) excluded for non-CC hosts (Cursor, Continue, Anti-Gravity, plain MCP). Mechanism: prompts/build.ts, content/skill-*.md splits, test coverage. Backwards-compatible MINOR feature. See specs/d6-host-capability-compose-axis.md + -architecture.md.
 - **What:** `skill-coordinator.md` carries large Claude-Code-only sections
   (Task-tool dispatch, `agent-*.jsonl` token telemetry, `~/.claude/agents`
   templates, watermark validation via `dist/lib/watermark-check.js`). On

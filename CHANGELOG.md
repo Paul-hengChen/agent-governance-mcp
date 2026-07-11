@@ -16,6 +16,15 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.71.0] - 2026-07-11
+
+### Added
+- **`d6-host-capability-compose-axis` — Host-capability as a third compose axis for skills (v3.71.0).** Extends the skill-composition system with a host axis, mirroring the existing design/chain axes in `prompts/constitution-manifest.ts`. Skills are now split into core + `host:claude-code`-tagged fragments, allowing Claude-Code-specific prose (Task-tool dispatch, telemetry parsing, `~/.claude/agents` template instructions, watermark validation) to be excluded for non-Claude-Code hosts (Cursor, Continue, Anti-Gravity, plain MCP). Adds `host` parameter to `buildPromptForRole()`, reusing `ConstitutionSegment`/`includeSegment` fragment patterns. Mechanism documented in `specs/d6-host-capability-compose-axis.md` and `specs/d6-host-capability-compose-axis-architecture.md`. Backwards-compatible feature addition (MINOR bump). Code-review approved; QA verified with 1179+ tests green. See `qa_reports/review_T-D6-04.md`.
+
+### Notes
+- driftBaselineIds appended with T-D6-ARCH, T-D6-01, T-D6-02, T-D6-03, T-D6-04, T-D6-05, T-D6-06, T-D6-REL, T-D6-DONE
+- Skill files now support host-targeted fragment tagging via `host:claude-code` in `<!-- origin:* -->` markers
+
 ## [3.70.0] - 2026-07-11
 
 ### Added
