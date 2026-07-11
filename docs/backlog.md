@@ -67,7 +67,7 @@ future `/teamwork` feature; none blocks a release on its own.
 | D4 | Behavioral compliance eval harness — scripted dispatch scenarios asserting model output format (§1 watermark etc.), guarding token-saving skill rewrites against behavior regressions — **done (2026-07-10, v3.67.0)** | P2 | — | ~3 (new `test/eval/` harness, fixtures, npm script) | — |
 | D5 | Server-side crash detection: stamp `dispatched_at` + target role on dispatch; `tw_get_state` surfaces stale in-flight dispatch (>N min, no state write) — removes coordinator-memory dependence (C8 follow-on) | P2 | — | ~4 (`tools/handoff.ts` schema, orchestrator, skill-coordinator, tests) | — |
 | D6 | Host-capability as third compose axis: tag Claude-Code-only skill sections (Task tool, `agent-*.jsonl`, `~/.claude/agents`) `host:claude-code`; non-CC hosts skip dead text | P3 | — | ~5 (`prompts/constitution-manifest.ts` pattern extended to skills, `prompts/build.ts`, content splits, tests) | — |
-| D7 | `qa_reports/` unbounded growth (232 files) — per-feature archive / retention policy mirroring the tasks-archive convention | P3 | — | ~2 (skill-release-engineer or skill-qa-engineer archive step, docs) | — |
+| D7 | `qa_reports/` unbounded growth (232 files) — per-feature archive / retention policy mirroring the tasks-archive convention — **done (2026-07-11, v3.67.1)** | P3 | — | ~2 (skill-release-engineer or skill-qa-engineer archive step, docs) | — |
 | D8 | Lite recommended model is haiku but haiku §1 compliance is known-poor (watermark omissions) — trim lite bundle further or bump recommendation to sonnet | P3 | — | ~2 (`content/skill-coordinator-lite.md` frontmatter, measure-context-cost) | — |
 
 ### Recommended execution order (2026-07-09, everything still open)
