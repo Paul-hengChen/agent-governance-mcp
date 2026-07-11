@@ -761,7 +761,8 @@ in live runs first, cheap content-only batches next, design-heavy last.
   injection; agents act on "no handoff found" while a handoff exists — the
   exact failure class C6 fixed for the stale-`prd_path` variant.
 
-## D2 — Server-side accounting for hop counter + token brake (P2, depends D3)
+## D2 — Server-side accounting for hop counter + token brake (P2, depends D3) ✓ DONE
+- **Done (v3.68.0):** Hybrid implementation — (a) hop counter: schema v8→v9 with persisted hop_count field, HOP_CAP_EXCEEDED gate enforcing 10-hop limit; (b) token budget brake: opt-in PostToolUse hook appends usage.jsonl sidecar. Mechanism: specs/d2-server-brake-accounting.md + specs/d2-server-brake-accounting-architecture.md. Commit: af8537b (v3.68.0 tag).
 - **What:** Both cost-side circuit breakers are "in-memory, model-maintained
   arithmetic" (`skill-coordinator.md` §Auto-Routing, §Token Budget Brake):
   the coordinator increments its own hop counter and sums four `usage.*`
