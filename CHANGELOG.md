@@ -16,6 +16,15 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.69.0] - 2026-07-11
+
+### Added
+- **`d9-qa-review-scoped-append` — Scoped QA review auto-append targeting (v3.69.0).** Implements `review_task_ids` field in `tools/registry.ts` and handoff-orchestrator resolution logic to scope the auto-append of QA evidence files to a specific subset of completed task IDs (rather than all tasks in a feature). Adds `QA_REVIEW_TARGET_REQUIRED` gate code to `gates/registry.ts` enforcing that releases with QA evidence must declare explicit target scope via this field. Updates `content/skill-qa-engineer.md` with new auto-append scoping semantics and gate documentation. Adds regression test suite `test/qa-review-scoped-append.test.mjs` (1173/1173 tests pass). Re-baselines `test/error-code-contract.test.mjs` and `test/qa-visual-skill-split.test.mjs` for new gate code. Observable behavior addition (new field + gate code = MINOR bump). Comprehensive spec in `specs/d9-qa-review-scoped-append.md`; code review approved (`review_reports/review_T-D9-01.md`); QA verified (`qa_reports/review_T-D9-05.md`).
+
+### Notes
+- driftBaselineIds appended with T-D9-01, T-D9-02, T-D9-03, T-D9-04, T-D9-05, T-D9-REL, T-D9-DONE
+- `review_task_ids` field added to handoff schema (schema version unchanged; new optional field)
+
 ## [3.68.1] - 2026-07-11
 
 ### Changed

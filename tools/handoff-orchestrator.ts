@@ -329,19 +329,39 @@ async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResu
         // Evidence record FIRST so the PASS gate below can observe the row /
         // file just written. Only fires when QA attaches qa_review on a
         // PASS or FAIL write.
+        // d9-qa-review-scoped-append — scoped target resolution: the review
+        // stamp lands on review_task_ids (if non-empty), else completed_tasks
+        // (the unchanged PASS back-compat path, AC2). The former "every
+        // incomplete task in the workspace" fallback is DELETED (AC1): it
+        // fired on every FAIL write (completed_tasks is legitimately empty
+        // there per the Escalation call format) and fanned the stamp into
+        // every open task's evidence file — the D8 incident polluted 11
+        // unrelated review files. Both empty now rejects loud with
+        // QA_REVIEW_TARGET_REQUIRED before anything is recorded (AC3) —
+        // never forge evidence, never silently drop it. Keys ONLY on the
+        // incoming parsed args, so it is storage-agnostic (file + SQLite).
         if (
           parsed.qa_review &&
           parsed.agent_id === "qa-engineer" &&
           (parsed.status === "PASS" || parsed.status === "FAIL")
         ) {
-          let ids = parsed.completed_tasks;
+          const ids =
+            parsed.review_task_ids && parsed.review_task_ids.length > 0
+              ? parsed.review_task_ids
+              : parsed.completed_tasks;
           if (ids.length === 0) {
-            const all = storage.listTasks(parsed.workspace_path);
-            ids = all ? all.filter((t) => !t.completed).map((t) => t.id) : [];
+            return {
+              content: [{
+                type: "text" as const,
+                text:
+                  `⛔ QA_REVIEW_TARGET_REQUIRED: qa_review on a ${parsed.status} write with ` +
+                  `review_task_ids and completed_tasks both empty. ` +
+                  gate("QA_REVIEW_TARGET_REQUIRED").hintStatic,
+              }],
+              isError: true,
+            };
           }
-          if (ids.length > 0) {
-            await storage.recordReview(parsed.workspace_path, ids, parsed.status, "qa-engineer", parsed.qa_review);
-          }
+          await storage.recordReview(parsed.workspace_path, ids, parsed.status, "qa-engineer", parsed.qa_review);
         }
 
         // Evidence gate for PASS path

@@ -43,7 +43,8 @@ export type GateErrorCode =
   | "BASELINE_PROVENANCE_INCOMPLETE"
   | "PIXEL_GATE_ATTESTATION_MISSING"
   | "REVIEW_VERDICT_STATUS_MISMATCH"
-  | "REVIEWER_COMPLETED_TASKS_REJECTED";
+  | "REVIEWER_COMPLETED_TASKS_REJECTED"
+  | "QA_REVIEW_TARGET_REQUIRED";
 
 export type GateProducer = "validateTransition" | "orchestrator";
 export type GateEnvelope = "transition-json" | "orchestrator-json" | "plain-text";
@@ -63,7 +64,7 @@ export interface GateDefinition {
   // (DR-3, qa-engineer's rewritten error-code-contract test) compares against.
   readonly hintStatic: string;
   // True iff the code is (and must stay) backtick-quoted in >=1 content/*.md.
-  // All 23 are true today. The field exists so a future code-internal gate can
+  // All 24 are true today. The field exists so a future code-internal gate can
   // opt out without weakening the parity test.
   readonly documentedInProse: boolean;
 }
@@ -100,8 +101,9 @@ export interface GateDefinition {
 //   PIXEL_GATE_ATTESTATION_MISSING  skill-qa-visual.md
 //   REVIEW_VERDICT_STATUS_MISMATCH  const-05-core-standards.md, const-08-chain-31-mid.md, skill-code-reviewer.md
 //   REVIEWER_COMPLETED_TASKS_REJECTED  skill-code-reviewer.md
+//   QA_REVIEW_TARGET_REQUIRED       skill-qa-engineer.md
 
-// The 23-gate catalog, in documentation order. Array order is DOC order only —
+// The 24-gate catalog, in documentation order. Array order is DOC order only —
 // it MUST NOT be relied on for evaluation order (DR-5; that lives in
 // handoff-orchestrator.ts as the physical if-block sequence).
 export const GATE_REGISTRY: readonly GateDefinition[] = [
@@ -396,6 +398,23 @@ export const GATE_REGISTRY: readonly GateDefinition[] = [
       "the review-scope manifest is legal only on the APPROVED handoff " +
       "(agent_id=qa-engineer). Omit completed_tasks (or pass []) on this write. " +
       "See specs/c16-c10-role-boundary.md AC-3.",
+    documentedInProse: true,
+  },
+  {
+    errorCode: "QA_REVIEW_TARGET_REQUIRED",
+    producer: "orchestrator",
+    envelope: "plain-text",
+    triggerEdge:
+      "qa-engineer PASS/FAIL write carrying qa_review with review_task_ids and completed_tasks both empty",
+    armCondition: "qa_review present && agent_id=qa-engineer && status in {PASS, FAIL}",
+    clearingArtifact:
+      "review_task_ids=[<task-id>, ...] naming the reviewed task(s) on the write (or completed_tasks on PASS)",
+    // Spec Copy/Strings row (d9-qa-review-scoped-append) — byte-exact.
+    hintStatic:
+      "A qa_review write must name the reviewed task(s) via review_task_ids " +
+      "(or completed_tasks on PASS) — it can no longer fall back to \"every " +
+      "open task.\" Set review_task_ids=[<task-id>, ...] on the " +
+      "tw_update_state call.",
     documentedInProse: true,
   },
 ];

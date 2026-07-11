@@ -134,6 +134,16 @@ const UpdateStateArgs = z
     })
         .strict()
         .optional(),
+    // v9 — d9-qa-review-scoped-append. Task id(s) the qa_review evidence
+    // auto-record targets (agent_id=qa-engineer, status PASS/FAIL). Same
+    // shape/limits as completed_tasks. TRANSIENT, write-scoped (c9-protocol-
+    // fields convention, like next_role/resume_of/review_verdict): consumed
+    // ONLY by the id-resolution in handoff-orchestrator.ts — never persisted,
+    // never carried across writes. Resolution: review_task_ids if non-empty,
+    // else completed_tasks; both empty on a qa_review-bearing write is
+    // rejected with QA_REVIEW_TARGET_REQUIRED (the old "every open task"
+    // fan-out fallback is deleted — D8 incident).
+    review_task_ids: z.array(z.string().max(500)).max(200).optional(),
 })
     .refine((d) => d.status !== "PASS" || d.agent_id === "qa-engineer", {
     message: 'status="PASS" requires agent_id="qa-engineer"',
@@ -290,6 +300,11 @@ export const TOOL_REGISTRY = [
                 qa_review: {
                     type: "string",
                     description: "Review notes. Recorded as evidence when agent_id=qa-engineer and status in {PASS, FAIL}.",
+                },
+                review_task_ids: {
+                    type: "array",
+                    items: { type: "string" },
+                    description: "Task id(s) under review — the target(s) the qa_review evidence auto-record stamps (file mode: qa_reports/review_<id>.md; SQLite: reports rows). Resolution: review_task_ids if non-empty, else completed_tasks; a qa_review-bearing PASS/FAIL write with both empty is rejected with QA_REVIEW_TARGET_REQUIRED — the server never falls back to \"every open task\". Transient: applies to THIS write only, never persisted (c9-protocol-fields convention). Required in practice on FAIL writes, where completed_tasks is legitimately empty.",
                 },
                 prd_path: {
                     type: "string",

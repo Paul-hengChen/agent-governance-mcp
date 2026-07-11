@@ -136,7 +136,14 @@ test("AC-5: byte counts stay within v3.14.0-relaxed budgets (savings invariant v
   // 11082 bytes — only ~2200 bytes of headroom would be consumed at the old
   // 8850 cap (i.e. it blows the cap outright). Raised 8850 -> 11500 (~418-
   // byte headroom) per the established ~300-550-byte convention.
-  assert.ok(qaSize <= 11500, `qa-engineer.md must be <= 11500 bytes (got ${qaSize})`);
+  // d9-qa-review-scoped-append (qa-owned bump, 2026-07-11): Phase 4 FAIL step
+  // and the Escalation Routes format line both gained a `review_task_ids`
+  // clause (sr-engineer's fix for the qa_review auto-append fan-out bug),
+  // bringing the file to 11826 bytes — independently re-measured with
+  // `wc -c content/skill-qa-engineer.md`, matching sr-engineer's reported
+  // figure exactly. Raised 11500 -> 12200 (~374-byte headroom) per the
+  // established ~300-550-byte convention.
+  assert.ok(qaSize <= 12200, `qa-engineer.md must be <= 12200 bytes (got ${qaSize})`);
   // qa-visual.md: v3.36.0 adds B10 (Step B0 carry-forward gate) and B11
   // (Step B1 deterministic pixel-diff pre-screen + Step B2 LLM-only path).
   // These are SOP-prose insertions totalling ~5400 bytes on top of the

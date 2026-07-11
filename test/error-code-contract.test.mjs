@@ -154,25 +154,25 @@ function fmt(codeMap, codes) {
 }
 
 // ---------------------------------------------------------------------------
-// AC-1 / AC-5: GATE_REGISTRY is the single source of truth, exactly 23
-// entries (d2-server-brake-accounting, qa-owned re-baseline: added the 23rd,
-// HOP_CAP_EXCEEDED — the hop-cap gate, sibling of QA_ROUND_EXCEEDED/
-// REVIEW_ROUND_EXCEEDED/VISUAL_ROUND_EXCEEDED; 22 in, 23 out — one gate
-// added, none dropped). c16-c10-role-boundary had added the 22nd,
-// REVIEWER_COMPLETED_TASKS_REJECTED. c15-expected-red-manifest had added the
-// 21st, EXPECTED_RED_DIFF_MISSING. c9-protocol-fields had added the 20th,
-// REVIEW_VERDICT_STATUS_MISMATCH.
+// AC-1 / AC-5: GATE_REGISTRY is the single source of truth, exactly 24
+// entries (d9-qa-review-scoped-append, qa-owned re-baseline, 2026-07-11:
+// added the 24th, QA_REVIEW_TARGET_REQUIRED — the scoped-append-target gate;
+// 23 in, 24 out — one gate added, none dropped). d2-server-brake-accounting
+// had added the 23rd, HOP_CAP_EXCEEDED. c16-c10-role-boundary had added the
+// 22nd, REVIEWER_COMPLETED_TASKS_REJECTED. c15-expected-red-manifest had
+// added the 21st, EXPECTED_RED_DIFF_MISSING. c9-protocol-fields had added the
+// 20th, REVIEW_VERDICT_STATUS_MISMATCH.
 // ---------------------------------------------------------------------------
 
-test("AC-1/AC-5: GATE_REGISTRY has exactly 23 entries (22 in, 23 out — d2-server-brake-accounting added HOP_CAP_EXCEEDED)", () => {
+test("AC-1/AC-5: GATE_REGISTRY has exactly 24 entries (23 in, 24 out — d9-qa-review-scoped-append added QA_REVIEW_TARGET_REQUIRED)", () => {
   assert.equal(
     GATE_REGISTRY.length,
-    23,
-    `expected exactly 23 GateDefinition entries, got ${GATE_REGISTRY.length}: ${GATE_REGISTRY.map((g) => g.errorCode).join(", ")}`,
+    24,
+    `expected exactly 24 GateDefinition entries, got ${GATE_REGISTRY.length}: ${GATE_REGISTRY.map((g) => g.errorCode).join(", ")}`,
   );
   assert.equal(
     ALL_GATE_CODES.length,
-    23,
+    24,
     "ALL_GATE_CODES must be GATE_REGISTRY.map(g => g.errorCode) — same length",
   );
   assert.deepEqual(
@@ -594,8 +594,8 @@ test("doc-file mapping (c12): gates/registry.ts's errorCode→doc-file mapping c
   const mapping = parseDocFileMappingComment();
   assert.equal(
     mapping.size,
-    23,
-    `expected the mapping comment to list all 23 codes, found ${mapping.size}: ${[...mapping.keys()].join(", ")}`,
+    24,
+    `expected the mapping comment to list all 24 codes, found ${mapping.size}: ${[...mapping.keys()].join(", ")}`,
   );
   const docCodes = extractDocCodes();
   for (const g of GATE_REGISTRY) {
@@ -648,6 +648,11 @@ const FREE_TEXT_ALLOWLIST = [
   { code: "REVIEW_VERDICT_STATUS_MISMATCH", field: "armCondition", reason: "\"agent_id=code-reviewer && review_verdict present\" — snake_case field-name shorthand, not a camelCase predicate/function-call literal" },
   { code: "REVIEWER_COMPLETED_TASKS_REJECTED", field: "triggerEdge", reason: "free English, no checkable literal" },
   { code: "REVIEWER_COMPLETED_TASKS_REJECTED", field: "armCondition", reason: "snake_case field-name shorthand, not a camelCase predicate/function-call literal" },
+  // d9-qa-review-scoped-append (qa-owned, 2026-07-11): follows the
+  // REVIEWER_COMPLETED_TASKS_REJECTED precedent immediately above — same two
+  // reasons, same shape.
+  { code: "QA_REVIEW_TARGET_REQUIRED", field: "triggerEdge", reason: "free English, no checkable literal" },
+  { code: "QA_REVIEW_TARGET_REQUIRED", field: "armCondition", reason: "snake_case field-name shorthand, not a camelCase predicate/function-call literal" },
 ];
 
 test("AC3 (c12): every (errorCode, field) pair for triggerEdge/armCondition is either mechanically checked above or explicitly allowlisted as free-text — no silent exemptions", () => {

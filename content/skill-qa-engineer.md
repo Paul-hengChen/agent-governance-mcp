@@ -75,11 +75,11 @@ All review notes, questions, and bug reports → `qa_reports/review_<task-id>.md
    - Project build: ZERO errors.
    - **CI Runnability**: `npm test` / `pytest` / `cargo test` runs headlessly with zero human interaction. Flag if not.
    - **PASS** → `tw_update_state(status=PASS, agent_id="qa-engineer", completed_tasks=[<ids>], qa_review="<summary>", pending_notes=["QA: <task-id> PASS"])`. Server auto-records the review (file mode: `qa_reports/review_<id>.md`; SQLite: `reports` row) AND verifies evidence exists (else `MISSING_EVIDENCE`) before persisting PASS. Auto-record is unchanged; `covers:` is for pre-PASS manual batch files. Then call `tw_complete_task(<task-id>, agent_id="qa-engineer")` per completed id.
-   - **FAIL** → `tw_rollback_task(<task-id>, <reason>)` → escalate per *Escalation Routes: Phase 4 FAIL*. `qa_round` auto-increments. At Round 4 (the `qa_round` cap of prior FAILs exhausted), only `(pm, In_Progress)` is accepted next (else `QA_ROUND_EXCEEDED`) — escalate.
+   - **FAIL** → `tw_rollback_task(<task-id>, <reason>)` → escalate per *Escalation Routes: Phase 4 FAIL* with `review_task_ids=[<task-id(s)>]` on the `qa_review`-bearing write — the FAIL stamp lands only on the named task(s); both it and `completed_tasks` empty → rejected `QA_REVIEW_TARGET_REQUIRED` (no fall-back to every open task). `qa_round` auto-increments. At Round 4 (the `qa_round` cap of prior FAILs exhausted), only `(pm, In_Progress)` is accepted next (else `QA_ROUND_EXCEEDED`) — escalate.
 
 ## Escalation Routes
 
-Format: Constitution §3 *Escalation call format*. FAIL rows carry `qa_review` and follow the `tw_rollback_task` at their SOP site. Phase 1.5: see skill-qa-visual *Error codes & STOP routes*.
+Format: Constitution §3 *Escalation call format*. FAIL rows carry `qa_review` plus `review_task_ids=[<task-id(s)>]` naming the reviewed task(s) (QA-evidence-specific addendum, like `covers:` — not a general-format change) and follow the `tw_rollback_task` at their SOP site. Phase 1.5: see skill-qa-visual *Error codes & STOP routes*.
 
 | situation | status | note token | next_role |
 |---|---|---|---|
