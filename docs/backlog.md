@@ -25,6 +25,17 @@ future `/teamwork` feature; none blocks a release on its own.
 > that rule-corpus growth is superlinear and D3 (gate telemetry → rule
 > retirement) is the only counter-pressure — it should outrank adding any new
 > gate. Suggested order: D1 → D3 → D2 → D5 → D4 → D6 → D7+D8.
+>
+> **2026-07-11 revision** (lite session, post-D5/D9 architecture Q&A): E1–E8
+> added from a "what's left for near-autonomous feature/bug-fix delivery"
+> review grounded in the `research/` retrospectives (Language 1.05M-token
+> run, Mode four-phase integration, F2 false-green postmortem,
+> ticket-splitting report). Thesis: the A–D series eliminated the
+> process-failure class (crash, pin loss, hand-edited state, collisions);
+> the remaining success-rate ceiling is set by contract-correctness-before-
+> work, outcome-shaped verification, and concurrency isolation — none of
+> which is another prose rule. Suggested order:
+> E8 → E4 → E2 → E1 → E3 → E7 (after D10) → E6 → E5.
 
 | id | desc | priority | depends_on | est. files | design-link |
 |----|------|----------|------------|------------|-------------|
@@ -71,6 +82,14 @@ future `/teamwork` feature; none blocks a release on its own.
 | D8 | Lite recommended model is haiku but haiku §1 compliance is known-poor (watermark omissions) — trim lite bundle further or bump recommendation to sonnet — **done (2026-07-11, v3.68.1)** | P3 | — | ~2 (`content/skill-coordinator-lite.md` frontmatter, measure-context-cost) | — |
 | D9 | `qa_review` auto-append fan-out: on a qa FAIL/PASS state write the evidence stamp was appended to every OPEN task's `qa_reports/review_<id>.md` (11 unrelated stale files modified + `review_T-D8-REL.md`/`review_T-D8-DONE.md` spuriously created, 2026-07-11 D8 run) instead of only the current task's — evidence pollution risks corrupting the `covers:` coverage index | P2 | — | ~3 (auto-append target resolution in tools/, regression test, cleanup note) | **done (2026-07-11, v3.69.0)** — Implements review_task_ids field + QA_REVIEW_TARGET_REQUIRED gate; 1173/1173 tests pass; tag v3.69.0 (1481717) |
 | D10 | release-engineer (haiku) resolved a concurrent-release push conflict with destructive `git reset`, discarding its own committed release (recovered via reflog cherry-pick, D8 v3.68.1) — add STOP-on-non-ff rule: never reset/rebase/clean; hand back Blocked with the local commit SHA for coordinator recovery | P2 | — | ~2 (skill-release-engineer Hard rule + Escalation Routes row, template hint, test pin) | — |
+| E1 | Single `active_feature` cannot model concurrent sessions — feature-scoped state (lease field or per-feature branch/worktree) + serialized release queue; structural root cause of the D9/D10 collision class | P1 | — | ~6 (design first: handoff schema, orchestrator, storage, skills) | — |
+| E2 | Bug-fix as a first-class chain: `bugfix` dispatch mode (lighter than feature chain) + server-enforced repro-first gate — failing expected-red repro manifest required BEFORE fix work (reuses C15 machinery) | P1 | — | ~4 (transitions/dispatch mode, gate, skill-pm/sr/qa, tests) | — |
+| E3 | Outcome-shaped acceptance: machine-executable ACs in specs + mandatory QA runtime-evidence step — gates currently verify evidence exists, never that the change does what the AC says | P1 | — | ~4 (skill-pm AC schema, skill-qa, evidence gate, tests) | — |
+| E4 | design-auditor source-credibility check as a hard STOP gate — classify source node (full-frame / variant / read-only page) with server-checked attestation before the build hop; retros' single highest-leverage lever | P1 | — | ~3 (skill-design-auditor, gate check, test) | — |
+| E5 | Backlog intake loop + tiered cut-approval: coordinator auto-starts next open backlog ticket; small cuts (≤2 files, P3, no schema) auto-approve, large/design-armed still HALT | P2 | E8 | ~3 (skill-coordinator, const §3.1 tier rule, config threshold) | — |
+| E6 | Rule-retirement retro cadence: actually run the D3 data every N features; zero-fire gates/prose become retirement PRs — the counter-pressure D3 was built for, still unexecuted | P2 | D3 ✓, E8 | ~2 (retro procedure doc, summarizer script) | — |
+| E7 | Git/CI as a governed surface: sanctioned-git-ops whitelist for ALL roles (generalizes D10 beyond release-engineer) + optional CI-status check at release instead of self-reported test-green | P2 | D10 | ~3 (constitution/skill content, optional gh check step, test) | — |
+| E8 | Success-side telemetry: per-feature one-pass rate / qa-review-visual rounds / hops / token totals appended at release — D3 records only rejections; success claims are currently hand-assembled anecdotes | P2 | D3 ✓ | ~3 (telemetry emit, release SOP line, summarizer) | — |
 
 ### Recommended execution order (2026-07-09, everything still open)
 
@@ -915,3 +934,131 @@ in live runs first, cheap content-only batches next, design-heavy last.
   convention).
 - **Risk if skipped:** high on busy repos — concurrent sessions are now routine
   (D2/D7/D8 overlapped); next collision may not leave a reflog-reachable commit.
+
+## E1 — Feature-scoped state: concurrency isolation for parallel sessions (P1, from 2026-07-11 review)
+- **What:** `handoff.md` models exactly ONE `active_feature`, but concurrent
+  sessions are now routine and every overlap produced an incident: D2/D7/D8
+  overlapped in one day; D5/D9 collided on v3.69.0 (D5's release re-versioned
+  to v3.70.0 via a coordinator-executed rebase); D9's evidence fan-out dirtied
+  11 unrelated files; D10's destructive `git reset` discarded a committed
+  release. D10's STOP-on-non-ff rule is a tourniquet — the structural cause is
+  that all in-flight features share one state file, one ledger, and one
+  release path.
+- **Fix (design first):** per-feature state scoping. Candidates: (a) a feature
+  lease field — a second feature's PM write is rejected/queued while a lease
+  is live; (b) branch/worktree-per-feature with feature-scoped handoff files
+  and a serialized release queue. Weigh against local-fs file-lock semantics
+  and schema-migration cost; decide at architecture time.
+- **Owner:** /teamwork (architecture decision first; handoff schema +
+  orchestrator + storage + skill-coordinator/release).
+- **Risk if skipped:** every future overlap re-rolls the D9/D10 dice; the next
+  collision may not leave a reflog-reachable commit.
+
+## E2 — Bug-fix as a first-class chain: repro-first gate (P1, from 2026-07-11 review)
+- **What:** the entire chain is feature-shaped (pm spec → architect → sr →
+  reviewer → qa). A bug fix today pays either full-chain overhead or goes lite
+  with no independent QA. Nothing enforces the one discipline that makes
+  automated bug fixing trustworthy: a failing reproduction test that exists
+  BEFORE the fix.
+- **Fix:** a `bugfix` dispatch mode with a lighter chain (pm ticket → sr → qa;
+  architect/design skipped by default), plus a server gate: fix-phase work is
+  blocked until an expected-red repro manifest exists (reuse C15 machinery,
+  e.g. `qa_reports/expected-red_<bug>.txt`); QA PASS requires exactly that red
+  set turned green with no new reds.
+- **Owner:** /teamwork (transitions/dispatch mode + gate + skill-pm/sr/qa + tests).
+- **Risk if skipped:** bug fixes keep paying feature-chain cost or skip QA —
+  either depresses autonomous success exactly where it should be cheapest.
+
+## E3 — Outcome-shaped acceptance: executable ACs + runtime evidence (P1, from 2026-07-11 review)
+- **What:** every gate is process-shaped — it checks that evidence files
+  exist, parse, and that transitions are legal; nothing verifies the change
+  does what the spec's AC says. QA writes its own tests and grades its own
+  homework. The F2 false-green postmortem and the Mode retrospective's
+  chronic "PASS ≠ 畫面對" theme both show the evidence layer passing while
+  the output was wrong.
+- **Fix:** PM specs gain machine-executable ACs where feasible (each AC
+  provable by one command / test / pixel-diff — per the ticket-splitting
+  report's field contract); skill-qa gains a mandatory "drive the change
+  end-to-end and record runtime evidence" step; the evidence check requires
+  the AC execution log, not just the report file's existence.
+- **Owner:** /teamwork (skill-pm AC schema + skill-qa + evidence gate + tests).
+- **Risk if skipped:** gate-green-but-wrong ships keep recurring — the most
+  expensive failure class (human retraction → full-round redo).
+
+## E4 — design-auditor source-credibility check as a hard STOP gate (P1, from 2026-07-11 review)
+- **What:** the retrospectives' single strongest cross-feature conclusion:
+  pin the correct, frozen design contract before work and the chain converges
+  in one pass. Mode P2 caught a wrong Figma node pre-build → zero rework;
+  Mode P1 mis-sourced per-card crops → full-round redo; Language's lossy
+  geometry → 4 rework rounds (55.6% of 1.05M tokens). Today source
+  verification is SOP prose, not a gate.
+- **Fix:** formalize design-auditor step 0 as machine-checkable: classify the
+  source node (full-frame composite / component variant / read-only review
+  page / wrong mode), record the verdict as an attestation field in the
+  design artifact; a mismatched or unverified source is Blocked — the server
+  checks the attestation before the pm→build hop on design-armed features
+  (B8 external-refs ledger pattern).
+- **Owner:** /teamwork (skill-design-auditor + gate check + test; content-mostly).
+- **Risk if skipped:** the highest-leverage lever stays unpulled; every
+  mis-sourced design costs a full round.
+
+## E5 — Backlog intake loop + tiered cut-approval (P2, depends E8, from 2026-07-11 review)
+- **What:** every feature ends with "next feature is a human decision", and
+  cut-approval halts every cut regardless of size. These two human touchpoints
+  are the availability bottleneck for autonomous operation.
+- **Fix:** (a) coordinator intake loop — read backlog order, auto-propose or
+  auto-start the next open ticket at feature close; (b) cut-approval tiering —
+  cuts under a threshold (e.g. ≤2 files, P3, no schema change, non-design)
+  auto-approve with `cut_approved` recorded as auto-tier; larger or
+  design-armed cuts HALT as today. Per the ticket-splitting report, cut review
+  is the highest-leverage human checkpoint — remove it LAST, and only after E8
+  data shows the auto-tier is safe.
+- **Owner:** /teamwork (skill-coordinator + const §3.1 tier rule + config threshold).
+- **Risk if skipped:** low-risk small tickets queue behind human availability;
+  mis-tiering risk if done before E8 exists — start conservative.
+
+## E6 — Rule-retirement retro: actually run it (P2, depends D3 ✓ + E8, from 2026-07-11 review)
+- **What:** D3 landed the telemetry emit, but the review thesis it was built
+  for (rule-corpus growth is superlinear; retirement is the only
+  counter-pressure) remains unexecuted — zero retros run, zero rules retired.
+  The context tax compounds on every dispatch and directly crowds out task
+  tokens.
+- **Fix:** institute a cadence — every N features (suggest 5), run
+  `docs/gate-retro-procedure.md` over `telemetry.jsonl` + E8 summaries;
+  zero-fire gates/prose over the window become retirement-candidate PRs;
+  keep a retired-rule list so removals are auditable.
+- **Owner:** recurring lite/coordinator procedure, not a one-off feature;
+  first run is the deliverable.
+- **Risk if skipped:** compliance load keeps growing with no counter-pressure;
+  autonomous success degrades invisibly as bundles grow.
+
+## E7 — Git/CI as a governed surface (P2, sequence after D10, from 2026-07-11 review)
+- **What:** "does NOT touch git" is the stated design boundary, yet
+  release-engineer touches git every release and the two worst recent
+  incidents were git incidents (C13 hand-edit wedge, D10 destructive reset).
+  Test-green is self-reported by agents; nothing external verifies it.
+- **Fix (minimal):** a sanctioned-git-ops whitelist in constitution §6 or a
+  shared skill fragment, applying to ALL roles (add/commit/tag/fast-forward
+  push only; reset/rebase/clean/force-push → Blocked-and-hand-back —
+  generalizing D10 beyond release-engineer). Optional second step: where CI
+  exists, the release gate reads CI status (`gh` checks) instead of trusting
+  the agent's own test claim.
+- **Owner:** /teamwork (content + optional gh check step; small).
+- **Risk if skipped:** the next git incident comes from a role other than
+  release-engineer, with no rule to point to.
+
+## E8 — Success-side telemetry: per-feature outcome metrics (P2, D3 follow-on, from 2026-07-11 review)
+- **What:** telemetry records only gate rejections. Success-rate claims
+  ("fine-grained logic tickets ≈ near-100% one-pass; visual features far
+  lower") are hand-assembled from retrospectives after the fact; nothing
+  accumulates per-feature one-pass rate, qa/review/visual rounds, hops, or
+  token totals.
+- **Fix:** extend the D3 emit point (or add a feature-close/release hook) to
+  append one per-feature summary record
+  `{feature, tickets, qa_rounds, review_rounds, visual_rounds, hops, one_pass, released_version}`
+  to `.current/telemetry.jsonl` (or a sibling `metrics.jsonl`) at release;
+  small summarizer script for retros. Feeds E6 retirement decisions and E5
+  auto-tier safety evidence.
+- **Owner:** /teamwork (small code + release SOP line + summarizer).
+- **Risk if skipped:** process tuning stays anecdotal — no way to verify
+  whether E1–E5 actually move the success rate they were cut to move.
