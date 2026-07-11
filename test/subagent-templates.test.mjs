@@ -144,8 +144,31 @@ test("AC1: every template body delegates to tw_get_state + tw_switch_role (S04 c
 // Tier-consistency regression guard
 // ---------------------------------------------------------------------------
 
+// MIRROR_EXEMPT_ROLES (added 2026-07-11, specs/d8-lite-recommended-model.md
+// Amendment / AC8): narrow, dated exemption from the tier-mirror assertion
+// below, for `lite` ONLY. d8 bumped content/skill-coordinator-lite.md's
+// `recommended_model` to `sonnet` for the direct/session-invoked surface
+// (no validating parent — a §1 watermark compliance failure ships straight
+// to the human), while deliberately leaving
+// templates/claude-code-agents/lite.md's `model: haiku` pin unchanged for the
+// Task-subagent dispatch surface (which DOES have a validating parent — the
+// full coordinator's `validateWatermark` step watches `@lite` replies and
+// corrects a dropped suffix before it reaches the human). The two surfaces'
+// risk profiles genuinely diverge for `lite`; this is the first legitimate
+// case of that, so the exemption narrows the assertion by exactly this one
+// row rather than weakening it for anyone else. Do NOT add further roles to
+// this map without the same kind of documented, spec-backed divergence.
+const MIRROR_EXEMPT_ROLES = {
+  "lite": "2026-07-11: specs/d8-lite-recommended-model.md Amendment — skill recommended_model bumped to sonnet (no validating parent on direct/session surface); template model stays haiku (Task-subagent surface has a validating parent, coordinator validateWatermark). See spec's Decision Amendment subsection and AC8.",
+};
+
 test("AC1 contract: each template tier mirrors content/skill-*.md recommended_model", () => {
   for (const [role, skillFile] of Object.entries(ROLE_TO_SKILL)) {
+    if (role in MIRROR_EXEMPT_ROLES) {
+      // Exempted — see MIRROR_EXEMPT_ROLES above for the dated rationale.
+      // The assertion still runs (below, un-exempted) for the other 11 roles.
+      continue;
+    }
     const tplRaw = readTemplateRaw(role);
     const skillRaw = fs.readFileSync(path.join(SKILL_DIR, skillFile), "utf-8");
 

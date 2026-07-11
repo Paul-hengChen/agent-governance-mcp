@@ -16,6 +16,14 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.68.1] - 2026-07-11
+
+### Changed
+- **`d8-lite-recommended-model` — Lite skill recommended model bump (v3.68.1).** Bumps `content/skill-coordinator-lite.md` frontmatter `recommended_model: haiku → sonnet`. Rationale: the lite skill's direct-invocation surface (e.g., `/teamwork-lite`, SessionStart hook default) has no corrective watermark-validation layer, unlike the Task-subagent dispatch path, so recommending the tier with documented §1 (watermark) compliance weaknesses creates unguarded risk. Decision made post-QA-FAIL per backlog D8's "decide directly" instruction given unavailable live D4 eval evidence and near-zero remaining bundle trim margin. Mirror doc updated (`docs/skills/coordinator-lite.md`); test amended to encode the deliberate `@lite` Task-subagent template divergence as a dated exemption (post-QA-FAIL reconciliation, T-D8-03). All 1107/1107 tests pass; 0 unrelated regressions. PATCH bump. See `specs/d8-lite-recommended-model.md`, `qa_reports/review_T-D8-03.md`.
+
+### Notes
+- driftBaselineIds appended with T-D8-01, T-D8-02, T-D8-03, T-D8-REL, T-D8-DONE
+
 ## [3.68.0] - 2026-07-11
 
 ### Added
@@ -25,6 +33,14 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 - driftBaselineIds appended with T-D2-ARCH, T-D2-01, T-D2-01A, T-D2-01B, T-D2-02, T-D2-03, T-D2-04, T-D2-05, T-D2-REL, T-D2-DONE
 - `hop_count` field added to handoff schema v9 (migration from v8 auto-runs on read)
 - `.current/usage.jsonl` is new append-only sidecar for token accounting (created on-demand by hook)
+
+## [3.67.1] - 2026-07-11
+
+### Added
+- **`d7-qa-reports-archive` — QA Reports Archive SOP (v3.67.1).** Introduces release-engineer SOP step 7a to archive shipped feature qa_reports into `qa_reports/archive/<active_feature>/` subdirectory, preventing stale evidence from cluttering the root during multi-feature releases. Updates `content/skill-release-engineer.md` with new SOP step 7a, allowlist annotation (archive path excluded from `evidence-file.ts` coverage scans via `.md`-suffix + non-recursive readdirSync), and no-clobber move semantics per Constitution §2 safety rules. Adds regression test to `test/covering-evidence.test.mjs` (1107/1107 tests pass) pinning AC8-b invariant: `buildCoverageIndex` tolerates archive/ subdirectories and never surfaces archived ids. QA verified empirically via temp-fixture probe against compiled production code (dist/tools/evidence-file.js, dist/gates/qa-review.js) demonstrating bit-for-bit identical behavior with/without archive present. Backwards-compatible; PATCH bump. All acceptance criteria met; see `specs/d7-qa-reports-archive.md`, `qa_reports/review_T-D7-02.md`, `review_reports/review_T-D7-01.md`.
+
+### Notes
+- driftBaselineIds appended with T-D7-01, T-D7-02, T-D7-REL, T-D7-DONE
 
 ## [3.67.0] - 2026-07-10
 
