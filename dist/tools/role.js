@@ -5,6 +5,8 @@ import * as path from "path";
 import { fileURLToPath } from "url";
 import { parseSkillFile } from "./skill-frontmatter.js";
 import { expandPartials } from "../prompts/partials-manifest.js";
+import { composeSkill, hostCapabilitiesFor, SKILL_SEGMENTS, } from "../prompts/skill-manifest.js";
+import { loadConfig } from "./config.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.resolve(__dirname, "..");
@@ -31,25 +33,34 @@ const ROLE_SKILL_MAP = {
 };
 export function switchRole(role, workspacePath) {
     const skillFile = ROLE_SKILL_MAP[role];
-    // Workspace override > server default
-    const override = path.join(workspacePath, ".current", skillFile);
-    const filePath = fs.existsSync(override)
-        ? override
-        : path.join(CONTENT_DIR, skillFile);
-    if (!fs.existsSync(filePath)) {
-        return JSON.stringify({ error: `Skill file not found for role "${role}": ${filePath}` });
+    // Workspace-override-aware loader (workspace .current/ override > server
+    // content/ default) — shared by skill/fragment composition below AND the
+    // partial expansion further down.
+    const hasOverride = (f) => fs.existsSync(path.join(workspacePath, ".current", f));
+    const loadFile = (f) => {
+        const overridePath = path.join(workspacePath, ".current", f);
+        return fs.readFileSync(fs.existsSync(overridePath) ? overridePath : path.join(CONTENT_DIR, f), "utf-8");
+    };
+    // Existence pre-check preserved for UNSPLIT skills (split skills load their
+    // fragments through composeSkill; a missing fragment throws below).
+    const isSplit = Object.prototype.hasOwnProperty.call(SKILL_SEGMENTS, skillFile);
+    if (!isSplit && !hasOverride(skillFile) && !fs.existsSync(path.join(CONTENT_DIR, skillFile))) {
+        return JSON.stringify({ error: `Skill file not found for role "${role}": ${path.join(CONTENT_DIR, skillFile)}` });
     }
-    const raw = fs.readFileSync(filePath, "utf-8");
+    // Host-capability axis (ticket D6): compose the skill from its fragment
+    // registry filtered by the workspace's declared host capabilities. The
+    // tw_switch_role path IS the non-Task fallback, so its no-config default
+    // profile { taskTool: false } is semantically correct — role SOPs delivered
+    // here omit Task-dispatch prose unless .current/.config.json declares
+    // host: "claude-code" (architecture Q2). A whole-file .current/ override
+    // is returned verbatim (no host filtering); unsplit skills pass through.
+    const raw = composeSkill(skillFile, hostCapabilitiesFor(loadConfig(workspacePath).host), loadFile, hasOverride);
     // Partial expansion (ticket A12, DR-4): switchRole is the SECOND skill
     // render path — it does NOT flow through buildPromptForRole, so without
     // this call tw_switch_role would leak raw {{PARTIAL:…}} tokens for every
     // partial-adopting role. The loader mirrors the skill override resolution
     // above (workspace .current/ override > server content/ default).
-    const loadPartial = (f) => {
-        const partialOverride = path.join(workspacePath, ".current", f);
-        return fs.readFileSync(fs.existsSync(partialOverride) ? partialOverride : path.join(CONTENT_DIR, f), "utf-8");
-    };
-    const { frontmatter, body } = parseSkillFile(expandPartials(raw, loadPartial));
+    const { frontmatter, body } = parseSkillFile(expandPartials(raw, loadFile));
     let instruction = `Context-loading only: the server is returning the "${role}" SOP for you to follow. ` +
         `No server-side role enforcement exists — other tw_* tools remain callable regardless. ` +
         `Follow the SOP below exclusively until the task is complete or you switch roles again.`;

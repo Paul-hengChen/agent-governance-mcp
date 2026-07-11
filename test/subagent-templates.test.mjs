@@ -23,6 +23,18 @@ const REPO_ROOT = path.resolve(__dirname, "..");
 const TEMPLATE_DIR = path.join(REPO_ROOT, "templates", "claude-code-agents");
 const SKILL_DIR = path.join(REPO_ROOT, "content");
 
+// d6-host-capability-compose-axis (T-D6-04): content/skill-coordinator.md is
+// retired — it is no longer a compose source (all 3 render paths route through
+// composeSkill/SKILL_SEGMENTS). readSkillFile composes the full-capability
+// (taskTool:true) reconstruction, which reproduces the retired monolith
+// byte-for-byte (AC5) — a drop-in replacement for the raw reads below.
+// composeSkill falls through to a plain read for any UNSPLIT skill (every
+// file but skill-coordinator.md today), so this is safe to use uniformly.
+const { composeSkill, hostCapabilitiesFor } = await import(path.join(REPO_ROOT, "dist", "prompts", "skill-manifest.js"));
+function readSkillFile(f) {
+  return composeSkill(f, hostCapabilitiesFor("claude-code"), (g) => fs.readFileSync(path.join(SKILL_DIR, g), "utf-8"));
+}
+
 // Source of truth: which roles ship as Claude Code subagents (AC1).
 // v3.21.0: 12 templates — `coordinator-lite` renamed to `lite`, NEW `teamwork`.
 const EXPECTED_ROLES = [
@@ -170,7 +182,7 @@ test("AC1 contract: each template tier mirrors content/skill-*.md recommended_mo
       continue;
     }
     const tplRaw = readTemplateRaw(role);
-    const skillRaw = fs.readFileSync(path.join(SKILL_DIR, skillFile), "utf-8");
+    const skillRaw = readSkillFile(skillFile);
 
     const tplModelMatch = tplRaw.match(/^model:\s*(opus|sonnet|haiku)\s*$/m);
     assert.ok(tplModelMatch, `${role}.md: model: line not parseable`);
@@ -190,7 +202,7 @@ test("AC1 contract: each template tier mirrors content/skill-*.md recommended_mo
 // ---------------------------------------------------------------------------
 
 test("AC3: skill-coordinator.md §Auto-Routing has Subagent Dispatch sub-bullet (S06)", () => {
-  const raw = fs.readFileSync(path.join(SKILL_DIR, "skill-coordinator.md"), "utf-8");
+  const raw = readSkillFile("skill-coordinator.md");
   assert.match(
     raw,
     /\*\*Subagent Dispatch \(Claude Code\)\*\*/,
@@ -209,7 +221,7 @@ test("AC3: skill-coordinator.md §Auto-Routing has Subagent Dispatch sub-bullet 
 });
 
 test("AC4: skill-coordinator.md §Auto-Routing documents tw_switch_role fallback", () => {
-  const raw = fs.readFileSync(path.join(SKILL_DIR, "skill-coordinator.md"), "utf-8");
+  const raw = readSkillFile("skill-coordinator.md");
   assert.match(
     raw,
     /\*\*Fallback \(`tw_switch_role`\)\*\*/,
@@ -230,7 +242,7 @@ test("AC4: skill-coordinator.md §Auto-Routing documents tw_switch_role fallback
 // ---------------------------------------------------------------------------
 
 test("c17 AC1/AC2: skill-coordinator.md has a Dispatch Brief Template section referenced by prompt=", () => {
-  const raw = fs.readFileSync(path.join(SKILL_DIR, "skill-coordinator.md"), "utf-8");
+  const raw = readSkillFile("skill-coordinator.md");
   assert.match(
     raw,
     /prompt="<brief composed per the \*\*Dispatch Brief Template\*\* below>"/,
@@ -264,7 +276,7 @@ test("c17 AC1/AC2: skill-coordinator.md has a Dispatch Brief Template section re
 // ---------------------------------------------------------------------------
 
 test("b9 AC3/Copy-Strings: skill-coordinator.md has a Token Budget Brake section with the budget.stop-note string verbatim", () => {
-  const raw = fs.readFileSync(path.join(SKILL_DIR, "skill-coordinator.md"), "utf-8");
+  const raw = readSkillFile("skill-coordinator.md");
   assert.match(
     raw,
     /^## Token Budget Brake/m,

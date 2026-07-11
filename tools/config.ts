@@ -27,6 +27,11 @@ export interface WorkspaceConfig {
   taskPaths?: string[];
   driftBaselineIds?: string[];
   tokenBudgetPerFeature?: number;
+  // Workspace host declaration (d6 host-capability compose axis), e.g.
+  // "claude-code". Drives prompts/skill-manifest.ts hostCapabilitiesFor():
+  // absent/empty/unrecognized ⇒ the lean no-capability profile
+  // ({ taskTool: false }) — host-tagged skill fragments are excluded.
+  host?: string;
 }
 
 // Methodology-agnostic defaults. Common task-list filenames in workspace root
@@ -146,6 +151,14 @@ export function loadConfig(workspacePath: string): WorkspaceConfig {
     tokenBudgetPerFeature > 0
   ) {
     result.tokenBudgetPerFeature = tokenBudgetPerFeature;
+  }
+  // Additive-optional field (no schema_version bump — same precedent as
+  // driftBaselineIds/tokenBudgetPerFeature). Non-fatal filter: only a
+  // non-empty string is surfaced; anything else is treated as absent, which
+  // downstream maps to the lean { taskTool: false } capability profile.
+  const host = migration.payload.host;
+  if (typeof host === "string" && host.length > 0) {
+    result.host = host;
   }
   // Cache under the pre-read mtime. If the migration heal-on-read above
   // rewrote the file, the recorded mtime is already stale — the NEXT call's

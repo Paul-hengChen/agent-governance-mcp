@@ -79,14 +79,14 @@ export interface GateDefinition {
 //   grep -l '`<CODE>`' content/*.md
 //
 //   AGENT_ID_REQUIRED               skill-qa-engineer.md
-//   TRANSITION_REJECTED             skill-coordinator.md
+//   TRANSITION_REJECTED             coord-02-host-dispatch.md
 //   QA_ROUND_EXCEEDED               skill-qa-engineer.md
 //   REVIEW_ROUND_EXCEEDED           skill-code-reviewer.md
 //   VISUAL_ROUND_EXCEEDED           skill-qa-visual.md
-//   HOP_CAP_EXCEEDED                skill-coordinator.md
+//   HOP_CAP_EXCEEDED                coord-01-core-head.md, coord-03-core-fallback.md
 //   SCOPE_DECISION_REQUIRED         const-08-chain-31-mid.md, constitution-rationale.md, skill-pm.md
-//   CUT_APPROVAL_REQUIRED           const-08-chain-31-mid.md, skill-coordinator.md, skill-coordinator-lite.md
-//   EXTERNAL_REFS_UNRESOLVED        const-15-core-tail.md, skill-coordinator.md, skill-pm.md
+//   CUT_APPROVAL_REQUIRED           const-08-chain-31-mid.md, coord-03-core-fallback.md, skill-coordinator-lite.md
+//   EXTERNAL_REFS_UNRESOLVED        const-15-core-tail.md, coord-03-core-fallback.md, skill-pm.md
 //   MISSING_EVIDENCE                skill-qa-engineer.md
 //   MISSING_REVIEW_EVIDENCE         skill-code-reviewer.md
 //   EXPECTED_RED_DIFF_MISSING       skill-qa-engineer.md

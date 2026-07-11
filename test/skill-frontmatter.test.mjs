@@ -97,9 +97,13 @@ test("every content/skill-*.md carries a valid recommended_model frontmatter", (
   const files = fs.readdirSync(CONTENT_DIR).filter(
     (f) => f.startsWith("skill-") && f.endsWith(".md"),
   );
-  // We ship 12 skill files (see specs/model-routing.md AC1). Guard the count
+  // We ship 11 skill files (see specs/model-routing.md AC1). Guard the count
   // so a deleted file is caught here too.
-  assert.equal(files.length, 12, "expected 12 skill files in content/");
+  // d6-host-capability-compose-axis (T-D6-04): content/skill-coordinator.md
+  // was retired — it is split into content/coord-NN-*.md fragments (headerless
+  // byte-slices, deliberately NOT the skill-*.md prefix so they don't land in
+  // this glob) composed via composeSkill/SKILL_SEGMENTS. Count drops 12 -> 11.
+  assert.equal(files.length, 11, "expected 11 skill files in content/ (skill-coordinator.md retired — see coord-NN-*.md fragments)");
 
   const tiers = new Set(MODEL_TIERS);
   for (const f of files) {

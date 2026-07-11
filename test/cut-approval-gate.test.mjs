@@ -590,13 +590,19 @@ test("C3: S03 — inline cut draft table header present verbatim in skill-pm.md"
   );
 });
 
-test("C4: S04 — cut-approval gate stop-condition present in skill-coordinator.md Auto-Routing section", () => {
+test("C4: S04 — cut-approval gate stop-condition present in skill-coordinator.md Auto-Routing section", async () => {
   // WHY: S04 is the coordinator stop-condition that prevents auto-routing from
   // hopping through the cut-approval gate. Without it, the auto-routing loop
   // would route to build before human approval.
-  const COORD = fs.readFileSync(
-    path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "content", "skill-coordinator.md"),
-    "utf-8",
+  // d6-host-capability-compose-axis (T-D6-04): content/skill-coordinator.md is
+  // retired — reconstruct the full monolith via the real composer (taskTool:true
+  // reproduces it byte-for-byte, AC5) instead of raw-reading the deleted file.
+  const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
+  const { composeSkill, hostCapabilitiesFor } = await import(path.join(root, "dist", "prompts", "skill-manifest.js"));
+  const COORD = composeSkill(
+    "skill-coordinator.md",
+    hostCapabilitiesFor("claude-code"),
+    (f) => fs.readFileSync(path.join(root, "content", f), "utf-8"),
   );
   // Check that the key S04 semantics are present: cut-approval gate reference +
   // the condition (next_role: architect/sr-engineer with no cut_approved) + the action.

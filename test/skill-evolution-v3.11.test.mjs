@@ -11,6 +11,16 @@ import { fileURLToPath } from "node:url";
 const __filename = fileURLToPath(import.meta.url);
 const PROJECT_ROOT = path.resolve(path.dirname(__filename), "..");
 
+// d6-host-capability-compose-axis (T-D6-04): content/skill-coordinator.md is
+// retired — it is no longer a compose source. readContentFile composes the
+// full-capability (taskTool:true) reconstruction for that one filename
+// (byte-identical to the retired monolith, AC5) and falls through to a plain
+// read for every other (unsplit) content file.
+const { composeSkill, hostCapabilitiesFor } = await import(path.join(PROJECT_ROOT, "dist", "prompts", "skill-manifest.js"));
+function readContentFile(f) {
+  return composeSkill(f, hostCapabilitiesFor("claude-code"), (g) => fs.readFileSync(path.join(PROJECT_ROOT, "content", g), "utf-8"));
+}
+
 test("AC-10: ROLE_SKILL_MAP contains doc-writer and release-engineer, and their files exist", () => {
   const roleTs = fs.readFileSync(path.join(PROJECT_ROOT, "tools", "role.ts"), "utf-8");
   assert.match(roleTs, /"doc-writer":\s*"skill-doc-writer\.md"/, "doc-writer must be in ROLE_SKILL_MAP");
@@ -141,7 +151,7 @@ test("c9-protocol-fields (T-C9-12..16, AC-7): all 13 in-scope content files have
   const RETIRED_RESUME_OF = /resume_of:\s*[a-z-]/;
   const RETIRED_REVIEW_VERDICT = /review:\s*(APPROVED|CHANGES_REQUESTED)/;
   for (const file of AC7_FILES) {
-    const body = fs.readFileSync(path.join(PROJECT_ROOT, "content", file), "utf-8");
+    const body = readContentFile(file);
     assert.doesNotMatch(body, RETIRED_NEXT_ROLE, `${file} must not retain the retired 'next_role: <role>' pending_notes token`);
     assert.doesNotMatch(body, RETIRED_RESUME_OF, `${file} must not retain the retired 'resume_of: <role>' pending_notes token`);
     assert.doesNotMatch(body, RETIRED_REVIEW_VERDICT, `${file} must not retain the retired 'review: APPROVED|CHANGES_REQUESTED' pending_notes token`);

@@ -22,7 +22,17 @@ import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const COORD = fs.readFileSync(path.join(ROOT, "content", "skill-coordinator.md"), "utf-8");
+// d6-host-capability-compose-axis (T-D6-04): content/skill-coordinator.md is
+// retired — it is no longer a compose source (all 3 render paths route
+// through composeSkill/SKILL_SEGMENTS). Reconstruct the full monolith text via
+// the real composer (taskTool:true reproduces it byte-for-byte, AC5) instead
+// of raw-reading a file that no longer exists.
+const { composeSkill, hostCapabilitiesFor } = await import(path.join(ROOT, "dist", "prompts", "skill-manifest.js"));
+const COORD = composeSkill(
+  "skill-coordinator.md",
+  hostCapabilitiesFor("claude-code"),
+  (f) => fs.readFileSync(path.join(ROOT, "content", f), "utf-8"),
+);
 
 function gateSection() {
   const a = COORD.indexOf("## Feature-Scope Gate");

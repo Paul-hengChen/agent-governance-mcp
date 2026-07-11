@@ -43,9 +43,23 @@ const { CONSTITUTION_SEGMENTS, includeSegment } = await import(
 const { stripRationale } = await import(
   pathToFileURL(path.join(ROOT, "dist", "prompts", "build.js")).href
 );
+// d6-host-capability-compose-axis (T-D6-04): content/skill-coordinator.md is
+// retired — it is split into content/coord-NN-*.md fragments composed via
+// composeSkill (same treatment as CONSTITUTION_SEGMENTS above, instead of a
+// monolith read). readSkill() reproduces today's full-capability figure
+// (byte-identical to the retired monolith, AC5) so this script's reported
+// numbers are unchanged for the "full" variant; composeSkill passes every
+// other (unsplit) skill file through as-is.
+const { composeSkill, hostCapabilitiesFor } = await import(
+  pathToFileURL(path.join(ROOT, "dist", "prompts", "skill-manifest.js")).href
+);
 
 function read(rel) {
   return fs.readFileSync(path.join(CONTENT, rel), "utf-8");
+}
+
+function readSkill(rel) {
+  return composeSkill(rel, hostCapabilitiesFor("claude-code"), read);
 }
 
 // Compose the constitution for a given dispatch mode. `collapse` mirrors the
@@ -105,13 +119,17 @@ console.log("(chars/4 token approximation — deterministic baseline for spec co
 // 1. Raw artifacts
 printTable(
   "Raw artifacts",
-  [row("constitution (composed, all fragments)", constitution), ...skillFiles.map((f) => row(f, read(f)))],
+  [
+    row("constitution (composed, all fragments)", constitution),
+    row("skill-coordinator.md (composed, full capability)", readSkill("skill-coordinator.md")),
+    ...skillFiles.map((f) => row(f, read(f))),
+  ],
 );
 
 // 2. SessionStart hook output (constitution + default skill). Header/state are
 //    small/volatile; the constitution + skill pair is the dominant fixed cost.
 const liteSkill = read("skill-coordinator-lite.md");
-const fullSkill = read("skill-coordinator.md");
+const fullSkill = readSkill("skill-coordinator.md");
 printTable("SessionStart hook (constitution + skill)", [
   row("hook lite  (default)", constitution + SEP + liteSkill),
   row("hook full  (AGC_DEFAULT_SKILL=full)", constitution + SEP + fullSkill),
@@ -119,7 +137,7 @@ printTable("SessionStart hook (constitution + skill)", [
 
 // 3. Role-prompt bundles (constitution + role skill; volatile state excluded).
 printTable("Role-prompt bundles (constitution + skill, state excluded)", [
-  ...ROLE_PROMPTS.map(([id, file]) => row(`${id}  [${file}]`, constitution + SEP + read(file))),
+  ...ROLE_PROMPTS.map(([id, file]) => row(`${id}  [${file}]`, constitution + SEP + readSkill(file))),
 ]);
 
 // 3b. Role-prompt bundles AFTER stripRationale() on BOTH the constitution AND the
@@ -137,7 +155,7 @@ const constitutionNonDesign = stripRationale(composeConstitution({ chain: true, 
 const designOnlySaved = approxTokens(constitutionStripped) - approxTokens(constitutionNonDesign);
 printTable("Role-prompt bundles (rationale-stripped: constitution + skill)", [
   ...ROLE_PROMPTS.map(([id, file]) => {
-    const skill = read(file);
+    const skill = readSkill(file);
     const stripped = stripRationale(skill);
     const bundle = constitutionStripped + SEP + stripped;
     const skillSaved = approxTokens(skill) - approxTokens(stripped);

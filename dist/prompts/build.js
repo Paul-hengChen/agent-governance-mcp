@@ -10,6 +10,8 @@ import { getInflightKey, getInflight, setInflight, deleteInflight, } from "../to
 import { parseSkillFile } from "../tools/skill-frontmatter.js";
 import { hasDesignModeRequiringVisual } from "../gates/visual.js";
 import { CONSTITUTION_SEGMENTS, includeSegment } from "./constitution-manifest.js";
+import { composeSkill, hostCapabilitiesFor } from "./skill-manifest.js";
+import { loadConfig } from "../tools/config.js";
 import { expandPartials } from "./partials-manifest.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -279,7 +281,17 @@ export function buildPromptForRole(skillFile, description, workspacePath, fullDe
         const originClean = stripOriginTags(assembled);
         constitution = fullDetail ? originClean : stripRationale(originClean);
     }
-    const rawSkill = loadContent(skillFile, workspacePath);
+    // Host-capability axis (ticket D6): the skill text is composed from its
+    // fragment registry (prompts/skill-manifest.ts) filtered by the workspace's
+    // declared host capabilities — a drop-in swap for the old unconditional
+    // loadContent(skillFile). Unsplit skills pass through whole-file; a
+    // whole-file .current/ override bypasses composition verbatim. In-server
+    // GetPrompt default (no config `host`) is the LEAN profile
+    // { taskTool: false } (architecture Q2); the SessionStart hook is the
+    // CC-structural full path. Everything downstream (expandPartials →
+    // parseSkillFile → strip passes) operates on the composed string unchanged.
+    const hostCaps = hostCapabilitiesFor(loadConfig(workspacePath).host);
+    const rawSkill = composeSkill(skillFile, hostCaps, (f) => loadContent(f, workspacePath), (f) => fs.existsSync(path.join(workspacePath, ".current", f)));
     // Partial expansion (ticket A12, DR-3/DR-4): resolve {{PARTIAL:<token>}}
     // registry tokens BEFORE frontmatter parsing so downstream passes see the
     // canonical text. The partial bodies carry no origin/rationale fences, so

@@ -83,6 +83,40 @@ async function composeConstitution(wantChain) {
   }
 }
 
+// Host-capability skill composition (ticket D6): the skill text is composed
+// from the per-skill fragment registry via the compiled
+// dist/prompts/skill-manifest.js (same single-source-of-truth pattern as the
+// constitution manifest above). The hook is Claude-Code-only BY CONSTRUCTION,
+// so its STRUCTURAL default when no `.current/.config.json` "host" is set is
+// the full profile { taskTool: true } — an explicit config host still
+// overrides even here (a workspace can force-lean). Unsplit skills (e.g. the
+// lite coordinator) pass through whole-file; a whole-file .current/ override
+// is returned verbatim. Fail-loud: if the manifest import fails (dist/
+// missing during a partial install), return "" so the existing "hook
+// misconfigured" hint fires below — same contract as composeConstitution.
+async function composeSkillText(skillFile) {
+  try {
+    const mod = await import(
+      pathToFileURL(path.join(SERVER_ROOT, "dist", "prompts", "skill-manifest.js")).href
+    );
+    let host;
+    try {
+      const cfg = JSON.parse(
+        readSafe(path.join(workspace, ".current", ".config.json")) || "{}"
+      );
+      if (cfg && typeof cfg.host === "string" && cfg.host) host = cfg.host;
+    } catch {
+      // Malformed/absent config: fall through to the structural CC default.
+    }
+    const caps = host ? mod.hostCapabilitiesFor(host) : { taskTool: true };
+    return mod.composeSkill(skillFile, caps, loadContent, (f) =>
+      fs.existsSync(path.join(workspace, ".current", f))
+    );
+  } catch {
+    return "";
+  }
+}
+
 // Tier mapping for the SessionStart banner. Mirrors specs/model-routing.md.
 const MODEL_TIER_LABEL = { opus: "high", sonnet: "medium", haiku: "low" };
 
@@ -111,7 +145,7 @@ const skillVariant = process.env.AGC_DEFAULT_SKILL === "full"
 // Lite bootstrap (the default) is server-read-only with no chain → the chain
 // fragments are excluded. Full coordinator composes the complete constitution.
 const constitution = await composeConstitution(skillVariant === "skill-coordinator.md");
-const rawSkill = loadContent(skillVariant);
+const rawSkill = await composeSkillText(skillVariant);
 
 if (!constitution || !rawSkill) {
   // Server repo missing or moved — surface a hint instead of injecting nothing.

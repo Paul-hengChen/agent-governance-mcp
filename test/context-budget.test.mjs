@@ -43,6 +43,14 @@ const approxTokens = (t) => Math.ceil(t.length / 4);
 
 const { stripRationale, stripOriginTags, buildPromptForRole, composeConstitution } = await import(path.join(ROOT, "dist", "prompts", "build.js"));
 const { setActiveStorage, FileHandoffStorage } = await import(path.join(ROOT, "dist", "tools", "storage.js"));
+// d6-host-capability-compose-axis (T-D6-04): content/skill-coordinator.md is
+// retired — reads of it below go through the real composer (taskTool:true
+// reproduces the monolith byte-for-byte, AC5) instead of a raw fs.readFileSync
+// against a file that no longer exists on disk.
+const { composeSkill, hostCapabilitiesFor } = await import(path.join(ROOT, "dist", "prompts", "skill-manifest.js"));
+function readSkillFile(f) {
+  return composeSkill(f, hostCapabilitiesFor("claude-code"), (g) => fs.readFileSync(path.join(ROOT, "content", g), "utf-8"));
+}
 // a12-partials-limits-registry (T-A12-04, AC5): 5 skill files (architect, pm,
 // design-auditor, researcher, sr-engineer) now source their step-1 preflight
 // line from content/partial-step1-preflight.md via {{PARTIAL:step1-preflight}}
@@ -195,7 +203,12 @@ test("DR-5 guard (T-A12-09): no literal {{PARTIAL:...}} token may appear in any 
   // cheaper than waiting for a composed-output test to notice.
   const CONTENT_DIR = path.join(ROOT, "content");
   const files = fs.readdirSync(CONTENT_DIR).filter((f) => /^const-\d\d-/.test(f));
-  files.push("skill-coordinator.md", "skill-coordinator-lite.md");
+  // d6-host-capability-compose-axis (T-D6-04): content/skill-coordinator.md is
+  // retired — its source is now the coord-NN-*.md fragment set (composeSkill
+  // concatenates them; neither the fragments nor the composed result flow
+  // through expandPartials at the fragment-file level), so scan those instead
+  // of a monolith file that no longer exists on disk.
+  files.push(...fs.readdirSync(CONTENT_DIR).filter((f) => /^coord-\d\d-/.test(f)), "skill-coordinator-lite.md");
   for (const f of files) {
     const body = fs.readFileSync(path.join(CONTENT_DIR, f), "utf-8");
     assert.ok(!/\{\{PARTIAL:/.test(body), `${f} must not contain a literal {{PARTIAL:...}} token (DR-5: rendered outside expandPartials)`);
@@ -1060,7 +1073,11 @@ test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/b
   // code-reviewer's review note) at 13298 ~tok (exact); cap set to the exact
   // measured value per the established Phase-2 convention (no additional
   // headroom).
-  const skillCoord = fs.readFileSync(path.join(ROOT, "content", "skill-coordinator.md"), "utf-8");
+  // d6-host-capability-compose-axis (T-D6-04): content/skill-coordinator.md is
+  // retired — this cap measures the historical "everything ships" bundle, which
+  // is now the full-capability composition (taskTool:true reproduces the
+  // monolith byte-for-byte, AC5), not the lean in-server default.
+  const skillCoord = readSkillFile("skill-coordinator.md");
   const body = skillCoord.startsWith("---")
     ? skillCoord.slice(skillCoord.indexOf("---", 3) + 3).trimStart()
     : skillCoord;
