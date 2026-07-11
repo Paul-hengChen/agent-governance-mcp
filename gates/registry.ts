@@ -34,6 +34,7 @@ export type GateErrorCode =
   | "MISSING_EVIDENCE"
   | "MISSING_REVIEW_EVIDENCE"
   | "EXPECTED_RED_DIFF_MISSING"
+  | "REPRO_MANIFEST_MISSING"
   | "VISUAL_BASELINES_REQUIRED"
   | "VISUAL_EVIDENCE_MISSING"
   | "VISUAL_WIDGETS_UNVERIFIED"
@@ -65,7 +66,7 @@ export interface GateDefinition {
   // (DR-3, qa-engineer's rewritten error-code-contract test) compares against.
   readonly hintStatic: string;
   // True iff the code is (and must stay) backtick-quoted in >=1 content/*.md.
-  // All 25 are true today. The field exists so a future code-internal gate can
+  // All 26 are true today. The field exists so a future code-internal gate can
   // opt out without weakening the parity test.
   readonly documentedInProse: boolean;
 }
@@ -92,6 +93,7 @@ export interface GateDefinition {
 //   MISSING_EVIDENCE                skill-qa-engineer.md
 //   MISSING_REVIEW_EVIDENCE         skill-code-reviewer.md
 //   EXPECTED_RED_DIFF_MISSING       skill-qa-engineer.md
+//   REPRO_MANIFEST_MISSING          skill-sr-engineer.md
 //   VISUAL_BASELINES_REQUIRED       const-07-design-chain-gates.md, const-13-design-chain-s4.md, constitution-rationale.md, skill-design-auditor.md
 //   VISUAL_EVIDENCE_MISSING         const-07-design-chain-gates.md, skill-qa-engineer.md, skill-qa-visual.md
 //   VISUAL_WIDGETS_UNVERIFIED       skill-qa-visual.md
@@ -105,7 +107,7 @@ export interface GateDefinition {
 //   REVIEWER_COMPLETED_TASKS_REJECTED  skill-code-reviewer.md
 //   QA_REVIEW_TARGET_REQUIRED       skill-qa-engineer.md
 
-// The 25-gate catalog, in documentation order. Array order is DOC order only —
+// The 26-gate catalog, in documentation order. Array order is DOC order only —
 // it MUST NOT be relied on for evaluation order (DR-5; that lives in
 // handoff-orchestrator.ts as the physical if-block sequence).
 export const GATE_REGISTRY: readonly GateDefinition[] = [
@@ -236,7 +238,7 @@ export const GATE_REGISTRY: readonly GateDefinition[] = [
       "See specs/e1-feature-scoped-state-design.md.",
     documentedInProse: true,
   },
-  // ---- plain-text (codes 11-24, producer: orchestrator) ----
+  // ---- plain-text (codes 11-25, producer: orchestrator) ----
   {
     errorCode: "MISSING_EVIDENCE",
     producer: "orchestrator",
@@ -272,6 +274,30 @@ export const GATE_REGISTRY: readonly GateDefinition[] = [
       "section was found in any qa_reports/review_<id>.md for the PASS'd ids " +
       "(covers: files count). Run Phase 0.5 (skill-qa-engineer) — diff the actual " +
       "suite reds against the manifest and record the disposition before PASS.",
+    documentedInProse: true,
+  },
+  {
+    // E2 (e2-bugfix-repro-gate, AC2/AC6) — repro-first gate for bugfix-mode
+    // tickets. Sibling of EXPECTED_RED_DIFF_MISSING: same plain-text
+    // orchestrator envelope, same qa_reports/expected-red_<feature>.txt
+    // manifest reused verbatim via hasExpectedRedManifest(). Fires on the
+    // fix-phase handoff (sr-engineer:In_Progress → code-reviewer:In_Progress)
+    // when prevState.dispatch_mode === "bugfix" but no repro manifest exists.
+    // Blocks the write — never a silent skip, never a throw (AC6). NOT in
+    // transitions.ts: this plain-text gate family is not in the
+    // TransitionRejection["error"] union (DR-5).
+    errorCode: "REPRO_MANIFEST_MISSING",
+    producer: "orchestrator",
+    envelope: "plain-text",
+    triggerEdge: "sr-engineer:In_Progress -> code-reviewer:In_Progress (file-mode only)",
+    armCondition: "prevState.dispatch_mode === bugfix; FileHandoffStorage only",
+    clearingArtifact: "qa_reports/expected-red_<feature>.txt present (hasExpectedRedManifest)",
+    hintStatic:
+      "Bugfix-mode fix cannot hand off to code-reviewer until " +
+      "qa_reports/expected-red_<feature>.txt records the failing reproduction " +
+      "test(s) proven red before the fix (skill-sr-engineer). If repro is " +
+      "infeasible, escalate status=Blocked to pm instead. " +
+      "See specs/e2-bugfix-repro-gate.md AC2/AC6.",
     documentedInProse: true,
   },
   {
