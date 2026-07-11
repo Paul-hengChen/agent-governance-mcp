@@ -316,18 +316,48 @@ test("I5: gate is wrapped in instanceof FileHandoffStorage — a non-file storag
   );
 });
 
-test("I5b: source pins the guard — hasExpectedRedManifest call site is wrapped in `if (storage instanceof FileHandoffStorage)`", () => {
-  // Why: I5 proves the predicate itself; this pins that the ACTUAL call site
-  // in tools/handoff-orchestrator.ts uses it (a refactor that hoists the
-  // expected-red gate out of the guard would regress AC-5 silently otherwise).
+test("I5b: source pins the guard — both hasExpectedRedManifest call sites are FileHandoffStorage-guarded (e2-bugfix-repro-gate re-baseline)", () => {
+  // Why: I5 proves the predicate itself; this pins that the ACTUAL call
+  // site(s) in tools/handoff-orchestrator.ts use it (a refactor that hoists
+  // the expected-red gate out of the guard would regress AC-5 silently
+  // otherwise). e2-bugfix-repro-gate (T-E2-02) added a SECOND
+  // hasExpectedRedManifest(parsed.workspace_path...) call site — the
+  // repro-first gate, placed earlier in the file than this original PASS-path
+  // gate — guarded by a compound multi-line
+  // `if (storage instanceof FileHandoffStorage && ...)`, not the single-line
+  // literal this test used to `lastIndexOf` unconditionally. A bare
+  // `src.indexOf(...)` now lands on THAT new call site first, so this test
+  // disambiguates the two sites explicitly instead of assuming there is only
+  // one.
   const root = path.resolve(import.meta.dirname, "..");
   const src = fs.readFileSync(path.join(root, "tools", "handoff-orchestrator.ts"), "utf-8");
-  const gateIdx = src.indexOf("hasExpectedRedManifest(parsed.workspace_path");
-  assert.ok(gateIdx !== -1, "hasExpectedRedManifest call site must exist");
-  const guardIdx = src.lastIndexOf("if (storage instanceof FileHandoffStorage)", gateIdx);
-  assert.ok(guardIdx !== -1, "a FileHandoffStorage guard must precede the call site");
-  const between = src.slice(guardIdx, gateIdx);
-  // No closing brace between the guard and the call site means the call is
-  // still lexically inside that specific if-block (not a later unrelated one).
-  assert.ok(!between.includes("\n        }\n"), "the guard must directly wrap the expected-red gate call (no intervening block close)");
+
+  const firstIdx = src.indexOf("hasExpectedRedManifest(parsed.workspace_path");
+  assert.ok(firstIdx !== -1, "hasExpectedRedManifest call site must exist");
+  const secondIdx = src.indexOf("hasExpectedRedManifest(parsed.workspace_path", firstIdx + 1);
+  assert.ok(secondIdx !== -1, "a second hasExpectedRedManifest call site must exist (e2 repro-first gate)");
+  assert.equal(
+    src.indexOf("hasExpectedRedManifest(parsed.workspace_path", secondIdx + 1),
+    -1,
+    "exactly two hasExpectedRedManifest(parsed.workspace_path...) call sites are expected",
+  );
+
+  // Site 1 (repro-first gate, T-E2-02): guarded by the compound multi-line
+  // `if (storage instanceof FileHandoffStorage && ...)`. Assert the
+  // substring immediately precedes the call site with no intervening block
+  // close, and that it contains the compound `&&` continuation (not the
+  // bare single-line literal).
+  const compoundGuardIdx = src.lastIndexOf("if (\n          storage instanceof FileHandoffStorage &&", firstIdx);
+  assert.ok(compoundGuardIdx !== -1, "site 1 (repro-first gate) must be wrapped in the compound FileHandoffStorage guard");
+  const between1 = src.slice(compoundGuardIdx, firstIdx);
+  assert.ok(!between1.includes("\n        }\n"), "site 1's compound guard must directly wrap the call (no intervening block close)");
+
+  // Site 2 (original EXPECTED_RED_DIFF_MISSING PASS-path gate): still the
+  // single-line literal `if (storage instanceof FileHandoffStorage)`,
+  // byte-unchanged (AC-5 feature-mode parity).
+  const singleLineGuardIdx = src.lastIndexOf("if (storage instanceof FileHandoffStorage)", secondIdx);
+  assert.ok(singleLineGuardIdx !== -1, "site 2 (PASS-path gate) must be wrapped in the single-line FileHandoffStorage guard");
+  assert.ok(singleLineGuardIdx > firstIdx, "site 2's guard must be its own (post-site-1) guard, not site 1's compound guard");
+  const between2 = src.slice(singleLineGuardIdx, secondIdx);
+  assert.ok(!between2.includes("\n        }\n"), "site 2's guard must directly wrap the expected-red gate call (no intervening block close)");
 });

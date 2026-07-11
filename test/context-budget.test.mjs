@@ -635,7 +635,7 @@ test("AC9: every operative rule/gate/SOP marker survives stripRationale in skill
   }
 });
 
-test("AC1/AC2: skill-pm stripped token count meets ≤ 3196 cap", () => {
+test("AC1/AC2: skill-pm stripped token count meets ≤ 3775 cap", () => {
   // WHY: the spec's re-grounded AC1 target (measured lossless, current file size
   // including F-A growth) must hold so each pm role dispatch is within budget.
   // pm-cut-approval-gate (qa-owned bump): cap raised from 2322 → 2850 to absorb
@@ -693,6 +693,11 @@ test("AC1/AC2: skill-pm stripped token count meets ≤ 3196 cap", () => {
   // placeholder and the expanded line differ by only ~1 ~tok), so the cap itself is
   // unchanged, but the computation now reflects what pm dispatch actually contains instead
   // of silently under-measuring it.
+  // e2-bugfix-repro-gate (qa-owned bump): cap raised from 3473 → 3775 to absorb the new
+  // "Bugfix mode" paragraph added to skill-pm.md (step 8 area: dispatch_mode="bugfix"
+  // guidance, AC4 opt-back-in note, one Task-Format example). Independently re-measured
+  // at 3775 ~tok exactly; cap set to the exact measured value per the established Phase-2
+  // convention (no headroom).
   const SKILL_PM = fs.readFileSync(path.join(ROOT, "content", "skill-pm.md"), "utf-8");
   // Strip frontmatter (--- block) before token-counting the body, matching buildPromptForRole.
   const body = SKILL_PM.startsWith("---")
@@ -700,10 +705,10 @@ test("AC1/AC2: skill-pm stripped token count meets ≤ 3196 cap", () => {
     : SKILL_PM;
   const stripped = stripRationale(stripOriginTags(expandSkill(body)));
   const toks = approxTokens(stripped);
-  assert.ok(toks <= 3473, `skill-pm stripped body (${toks} ~tok) must be ≤ 3473 (AC1, a12-partials-limits-registry re-baseline)`);
+  assert.ok(toks <= 3775, `skill-pm stripped body (${toks} ~tok) must be ≤ 3775 (AC1, e2-bugfix-repro-gate re-baseline)`);
 });
 
-test("AC1/AC2: skill-sr-engineer stripped token count meets ≤ 2138 cap", () => {
+test("AC1/AC2: skill-sr-engineer stripped token count meets ≤ 2642 cap", () => {
   // WHY: the spec's re-grounded AC2 target must hold for sr-engineer dispatch budget.
   // v3.28.0 (qa-owned bump): cap raised from 2048 → 2210 to absorb the
   // design-asset-source-rule feature's "Source assets, don't redraw them (v3.28.0)"
@@ -744,13 +749,18 @@ test("AC1/AC2: skill-sr-engineer stripped token count meets ≤ 2138 cap", () =>
   // costs over the token placeholder); still comfortably under the existing 2469 cap, so
   // the cap itself is unchanged — only the computation is corrected to reflect what
   // sr-engineer dispatch actually contains.
+  // e2-bugfix-repro-gate (qa-owned bump): cap raised from 2469 → 2642 to absorb the new
+  // step 3b "Repro-First (bugfix mode)" SOP addition to skill-sr-engineer.md (write the
+  // repro test, confirm RED, record the manifest, THEN fix; AC6 escape to pm). Independently
+  // re-measured at 2642 ~tok exactly; cap set to the exact measured value per the
+  // established Phase-2 convention (no headroom).
   const SKILL_SR = fs.readFileSync(path.join(ROOT, "content", "skill-sr-engineer.md"), "utf-8");
   const body = SKILL_SR.startsWith("---")
     ? SKILL_SR.slice(SKILL_SR.indexOf("---", 3) + 3).trimStart()
     : SKILL_SR;
   const stripped = stripRationale(stripOriginTags(expandSkill(body)));
   const toks = approxTokens(stripped);
-  assert.ok(toks <= 2469, `skill-sr stripped body (${toks} ~tok) must be ≤ 2469 (AC2, a12-partials-limits-registry re-baseline)`);
+  assert.ok(toks <= 2642, `skill-sr stripped body (${toks} ~tok) must be ≤ 2642 (AC2, e2-bugfix-repro-gate re-baseline)`);
 });
 
 // --- governance-text-load Round-2: constitution rationale fencing (T-GTL-06/07) ---

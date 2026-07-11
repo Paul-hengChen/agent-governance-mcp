@@ -8,6 +8,7 @@ export interface ExternalRef {
 }
 export type ResumeOfTarget = "code-reviewer" | "qa-engineer";
 export type ReviewVerdict = "APPROVED" | "CHANGES_REQUESTED";
+export type DispatchMode = "feature" | "bugfix";
 export interface HandoffState {
     active_feature: string;
     status: string;
@@ -30,6 +31,7 @@ export interface HandoffState {
     resume_of?: ResumeOfTarget;
     review_verdict?: ReviewVerdict;
     dispatch_pins?: Partial<Record<AgentName, string>>;
+    dispatch_mode?: DispatchMode;
 }
 /**
  * Parse handoff.md YAML frontmatter + section content into structured JSON.
@@ -69,6 +71,7 @@ export interface WriteHandoffStateOptions {
     resumeOf?: ResumeOfTarget;
     reviewVerdict?: ReviewVerdict;
     dispatchPins?: Partial<Record<AgentName, string>>;
+    dispatchMode?: DispatchMode;
 }
 /**
  * Write handoff state. v3.15.0 dual API:

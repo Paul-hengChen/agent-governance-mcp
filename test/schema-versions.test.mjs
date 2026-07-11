@@ -21,21 +21,24 @@ function reset() {
 
 // ---------- CURRENT_VERSIONS / VERSION_WHEN_ABSENT ----------
 
-test("CURRENT_VERSIONS exposes the four kinds at their d5-server-side-stale-dispatch-detection levels", () => {
+test("CURRENT_VERSIONS exposes the four kinds at their e2-bugfix-repro-gate levels", () => {
   // c9-protocol-fields bumped handoff to 7 (added next_role/resume_of/
   // review_verdict — stamp-only migration, DR-1). b8-external-ref-ledger had
   // bumped it to 6 (external_refs). c14-dispatch-pins bumped it to 8 (added
   // dispatch_pins — stamp-only migration, AC-1). d2-server-brake-accounting
   // bumped it to 9 (added hop_count — seeded 0, DR-3; sibling of
   // qa_round/review_round/visual_round, not a stamp-only attestation).
-  // d5-server-side-stale-dispatch-detection now bumps it to 10 (added
+  // d5-server-side-stale-dispatch-detection bumped it to 10 (added
   // dispatched_at — stamp-only, seeds nothing, DR-7; next_role's direct
-  // companion). sqlite stays at 2 — hop_count IS persisted there too, via the
-  // idempotent addColumnIfMissing ALTER (DR-2), the exact mechanism that added
-  // visual_round without a versioned bump; unlike external_refs/dispatch_pins/
-  // dispatched_at, which are handoff-YAML frontmatter only (DR-5 —
+  // companion). e2-bugfix-repro-gate now bumps it to 11 (added dispatch_mode
+  // — stamp-only, seeds nothing; the dispatch_pins/external_refs feature-
+  // scoped carry-forward algorithm, but scalar). sqlite stays at 2 —
+  // hop_count IS persisted there too, via the idempotent addColumnIfMissing
+  // ALTER (DR-2), the exact mechanism that added visual_round without a
+  // versioned bump; unlike external_refs/dispatch_pins/dispatched_at/
+  // dispatch_mode, which are handoff-YAML frontmatter only (DR-5 —
   // SqliteHandoffStorage.writeState ignores those). tasks + config remain at v1.
-  assert.equal(CURRENT_VERSIONS.handoff, 10);
+  assert.equal(CURRENT_VERSIONS.handoff, 11);
   assert.equal(CURRENT_VERSIONS.tasks, 1);
   assert.equal(CURRENT_VERSIONS.sqlite, 2);
   assert.equal(CURRENT_VERSIONS.config, 1);
@@ -105,8 +108,8 @@ test("registerMigration rejects negative from/to", () => {
 test("registerMigration idempotent overwrite — last write wins", () => {
   reset();
   // Register v0→v1 twice (overwrite test); also register v1→v2, v2→v3, v3→v4, v4→v5,
-  // v5→v6, v6→v7, v7→v8, v8→v9, and v9→v10 since CURRENT_VERSIONS.handoff is now 10
-  // (d5-server-side-stale-dispatch-detection) — the runner must climb the full chain.
+  // v5→v6, v6→v7, v7→v8, v8→v9, v9→v10, and v10→v11 since CURRENT_VERSIONS.handoff
+  // is now 11 (e2-bugfix-repro-gate) — the runner must climb the full chain.
   registerMigration({ kind: "handoff", from: 0, to: 1, up: () => ({ schema_version: 1, who: "first" }) });
   registerMigration({ kind: "handoff", from: 0, to: 1, up: () => ({ schema_version: 1, who: "second" }) });
   registerMigration({ kind: "handoff", from: 1, to: 2, up: (input) => ({ ...input, schema_version: 2 }) });
@@ -118,9 +121,10 @@ test("registerMigration idempotent overwrite — last write wins", () => {
   registerMigration({ kind: "handoff", from: 7, to: 8, up: (input) => ({ ...input, schema_version: 8 }) });
   registerMigration({ kind: "handoff", from: 8, to: 9, up: (input) => ({ ...input, schema_version: 9, hop_count: 0 }) });
   registerMigration({ kind: "handoff", from: 9, to: 10, up: (input) => ({ ...input, schema_version: 10 }) });
+  registerMigration({ kind: "handoff", from: 10, to: 11, up: (input) => ({ ...input, schema_version: 11 }) });
   const result = runMigrations("handoff", { /* no schema_version → v0 */ });
   // Overwrite semantics: the second v0→v1 registration is the one that runs;
-  // its `who: "second"` field threads through the v1→v2→...→v10 steps unchanged.
+  // its `who: "second"` field threads through the v1→v2→...→v11 steps unchanged.
   assert.equal(result.payload.who, "second");
 });
 
@@ -180,9 +184,9 @@ test("peekVersion handles array as non-object payload", () => {
 
 test("runMigrations no-op when current === target", () => {
   reset();
-  // CURRENT_VERSIONS.handoff === 10 (d5-server-side-stale-dispatch-detection);
-  // payload already at v10. Must register all steps so the runner can reach
-  // v10 from v0 in other tests.
+  // CURRENT_VERSIONS.handoff === 11 (e2-bugfix-repro-gate); payload already at
+  // v11. Must register all steps so the runner can reach v11 from v0 in
+  // other tests.
   registerMigration({ kind: "handoff", from: 0, to: 1, up: (input) => ({ ...input, schema_version: 1 }) });
   registerMigration({ kind: "handoff", from: 1, to: 2, up: (input) => ({ ...input, schema_version: 2 }) });
   registerMigration({ kind: "handoff", from: 2, to: 3, up: (input) => ({ ...input, schema_version: 3 }) });
@@ -193,10 +197,11 @@ test("runMigrations no-op when current === target", () => {
   registerMigration({ kind: "handoff", from: 7, to: 8, up: (input) => ({ ...input, schema_version: 8 }) });
   registerMigration({ kind: "handoff", from: 8, to: 9, up: (input) => ({ ...input, schema_version: 9, hop_count: 0 }) });
   registerMigration({ kind: "handoff", from: 9, to: 10, up: (input) => ({ ...input, schema_version: 10 }) });
-  const result = runMigrations("handoff", { schema_version: 10, kept: true });
+  registerMigration({ kind: "handoff", from: 10, to: 11, up: (input) => ({ ...input, schema_version: 11 }) });
+  const result = runMigrations("handoff", { schema_version: 11, kept: true });
   assert.deepEqual(result.applied, []);
-  assert.equal(result.fromVersion, 10);
-  assert.equal(result.toVersion, 10);
+  assert.equal(result.fromVersion, 11);
+  assert.equal(result.toVersion, 11);
   assert.equal(result.payload.kept, true);
 });
 
@@ -223,11 +228,11 @@ test("runMigrations applies single v0→v1 step", () => {
 
 test("runMigrations refuses-loud when on-disk version > current (AC-4)", () => {
   reset();
-  // d5-server-side-stale-dispatch-detection: CURRENT_VERSIONS.handoff === 10, so
-  // the "server max" surfaced in the refuse-loud error tracks the bumped value.
+  // e2-bugfix-repro-gate: CURRENT_VERSIONS.handoff === 11, so the "server max"
+  // surfaced in the refuse-loud error tracks the bumped value.
   assert.throws(
     () => runMigrations("handoff", { schema_version: 99 }),
-    /on-disk version 99 > server max 10/
+    /on-disk version 99 > server max 11/
   );
 });
 

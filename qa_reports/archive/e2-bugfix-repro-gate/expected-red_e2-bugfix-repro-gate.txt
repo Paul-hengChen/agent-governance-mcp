@@ -1,0 +1,76 @@
+# Expected-red manifest — e2-bugfix-repro-gate (sr-engineer, T-E2-01/02/03)
+# Format: <relative test file path> | <exact test name>
+# All entries below are INTENTIONAL reds at the T-E2-01/02/03 handoff. They are
+# baseline re-pins owned by qa-engineer (T-E2-05/06), NOT logic regressions:
+# the production migration module DOES register the v10->v11 step (schema/
+# migrations-handoff.ts) and the new gate IS wired + guarded correctly. Each
+# group below states why the test is red and what qa re-baselines.
+
+# --- Group A: handoff schema v10 -> v11 bump (e2 T-E2-01) ---
+# CURRENT_VERSIONS.handoff is now 11. These tests either (a) pin the literal 10,
+# (b) assert a "future v11 refuses-loud against a v10 server" (v11 is now
+# CURRENT, so it no longer refuses), or (c) clear the migration registry and
+# re-register steps only up to v9->v10, so a read now hits "missing migration
+# step v10->v11". qa re-pins the version literals and registers the v10->v11
+# step in the affected fixtures.
+test/cut-approval-gate.test.mjs | R-schema-1: writeHandoffState emits cut_approved: true in YAML when passed
+test/cut-approval-gate.test.mjs | M1: v4 → v5 migration is stamp-only (AC-7 — no default seeded for cut_approved)
+test/cut-approval-gate.test.mjs | M2: v4 → v5 migration preserves all existing fields (AC-7 — lossless)
+test/cut-approval-gate.test.mjs | M3: legacy file (no schema_version) migrates to v5 and has no cut_approved (AC-6)
+test/cut-approval-gate.test.mjs | M4: v4 file with scope_decision migrates to v5 with no cut_approved seeded (AC-6/AC-7)
+test/cut-approval-gate.test.mjs | X-malformed-parse: parseHandoff drops malformed external_refs entries from raw YAML without throwing (DR-3)
+test/dispatch-pins.test.mjs | M1b: readHandoffState's fire-and-forget write-back heals the v7 file to v10 on disk
+test/dispatch-pins.test.mjs | M2: future v11 handoff refuses-loud against a v10 server (no silent downgrade)
+test/dispatch-pins.test.mjs | M3: registry-level v7→v8→v9→v10 steps are pure, stamp-only/seed-only, and seed nothing extra (isolated from the full chain)
+test/dispatch-pins.test.mjs | M4/AC-8: v7 handoff with a legacy 'dispatch_pins: sr-engineer=fable' pending_notes line migrates to v8 with the line byte-verbatim and the new field absent
+test/dispatch-pins.test.mjs | P1: parseHandoff drops an unknown dispatch_pins role key from hand-edited YAML, keeps well-formed siblings
+test/dispatch-pins.test.mjs | P2: parseHandoff drops an empty-string dispatch_pins value
+test/dispatch-pins.test.mjs | P3: parseHandoff drops an oversize (>100 char) dispatch_pins value
+test/dispatch-pins.test.mjs | P4: parseHandoff collapses dispatch_pins to undefined when raw is an array or a scalar (non-object shapes)
+test/dispatch-pins.test.mjs | P5: parseHandoff collapses an all-malformed dispatch_pins map to undefined (never a phantom empty object)
+test/dispatch-pins.test.mjs | sanity: CURRENT_VERSIONS.handoff is 10 (d5-server-side-stale-dispatch-detection)
+test/drift-skew.test.mjs | T32 AC-6: future handoff schema_version surfaces as a drift reason (not a thrown error)
+test/handoff-migration.test.mjs | AC-7: scope_decision round-trips through writeHandoffState → readback (v10 stamp)
+test/handoff-migration.test.mjs | AC-10(g): future v11 handoff refuses-loud against a v10 server (no silent downgrade)
+test/handoff-migration.test.mjs | AC-1/C9: v6→v10 migration chain stamps version only — external_refs survives, new protocol fields (incl. dispatch_pins, dispatched_at) stay absent, hop_count seeds 0
+test/handoff-migration.test.mjs | AC-1/C9: round-trip — re-running runMigrations on the now-v10 payload is a no-op (applied === [])
+test/handoff-versioning.test.mjs | AC-1: writeHandoffState stamps schema_version: 10 in YAML (d5-server-side-stale-dispatch-detection)
+test/handoff-versioning.test.mjs | AC-2: readHandoffState heals v0 handoff to CURRENT (v10) on disk (fire-and-forget)
+test/handoff-versioning.test.mjs | AC-2 regression: existing handoff missing schema_version round-trips to CURRENT (v10)
+test/handoff-versioning.test.mjs | AC-4: readHandoffState refuses-loud when on-disk schema_version > CURRENT
+test/handoff-versioning.test.mjs | AC-4: parseHandoff refuses-loud on future schema_version
+test/handoff-versioning.test.mjs | AC-5: sequential second-write swallows freshness error after a healing write
+test/schema-versions.test.mjs | CURRENT_VERSIONS exposes the four kinds at their d5-server-side-stale-dispatch-detection levels
+test/schema-versions.test.mjs | registerMigration idempotent overwrite — last write wins
+test/schema-versions.test.mjs | runMigrations no-op when current === target
+test/schema-versions.test.mjs | runMigrations refuses-loud when on-disk version > current (AC-4)
+test/skill-evolution-v3.11.test.mjs | AC-10: schema/versions.ts schema versions track d5-server-side-stale-dispatch-detection bump
+test/stale-dispatch-detection.test.mjs | T8: a v9 handoff (no dispatched_at) migrates to v10 on read — field stays undefined, hop_count/sibling fields preserved (DR-7)
+test/stale-dispatch-detection.test.mjs | T8b: a future v11 handoff refuses-loud against this v10 server (no silent downgrade)
+test/stale-dispatch-detection.test.mjs | T10: sanity — CURRENT_VERSIONS.handoff is 10 (d5-server-side-stale-dispatch-detection)
+
+# --- Group B: gate registry 25 -> 26 (e2 T-E2-02, REPRO_MANIFEST_MISSING) ---
+# The registry now has 26 entries. The count pin, the doc-file mapping size
+# pin, and the AC3 free-text-closure check (REPRO_MANIFEST_MISSING's triggerEdge
+# is a sr->code-reviewer edge, not in triggerEdgeCheckable and not yet in
+# FREE_TEXT_ALLOWLIST) all need the qa re-baseline for the 26th gate.
+test/error-code-contract.test.mjs | AC-1/AC-5: GATE_REGISTRY has exactly 25 entries (24 in, 25 out — e1-feature-scoped-state-design added FEATURE_LEASE_HELD)
+test/error-code-contract.test.mjs | doc-file mapping (c12): gates/registry.ts's errorCode→doc-file mapping comment matches the actual backtick-quote sites
+test/error-code-contract.test.mjs | AC3 (c12): every (errorCode, field) pair for triggerEdge/armCondition is either mechanically checked above or explicitly allowlisted as free-text — no silent exemptions
+
+# --- Group C: second FileHandoffStorage-guarded expected-red call site (T-E2-02) ---
+# The repro-first gate adds a SECOND hasExpectedRedManifest(parsed.workspace_path
+# ...) call site, placed before the PASS-path one. It IS FileHandoffStorage-
+# guarded, but as a compound multi-line `if (storage instanceof
+# FileHandoffStorage && ...)`, so the test's indexOf now lands on the new call
+# site and its lastIndexOf for the single-line literal `if (storage instanceof
+# FileHandoffStorage)` misses. qa disambiguates the two guarded call sites.
+test/gates-expected-red.test.mjs | I5b: source pins the guard — hasExpectedRedManifest call site is wrapped in `if (storage instanceof FileHandoffStorage)`
+
+# --- Group D: skill-text growth token/byte caps (e2 T-E2-03) ---
+# The bugfix-mode guidance added to skill-pm / skill-sr-engineer / skill-qa-
+# engineer pushes stripped-token and byte-count caps over their pins. qa
+# re-baselines each cap to the re-measured value (C2-06 / T-E1-06 precedent).
+test/context-budget.test.mjs | AC1/AC2: skill-pm stripped token count meets ≤ 3196 cap
+test/context-budget.test.mjs | AC1/AC2: skill-sr-engineer stripped token count meets ≤ 2138 cap
+test/qa-visual-skill-split.test.mjs | AC-5: byte counts stay within v3.14.0-relaxed budgets (savings invariant vs v3.8.2 baseline)

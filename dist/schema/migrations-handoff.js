@@ -116,6 +116,18 @@ registerMigration({
     to: 10,
     up: (input) => ({ ...input, schema_version: 10 }),
 });
+// v10 → v11: add optional dispatch_mode field (e2-bugfix-repro-gate). Additive
+// STAMP-ONLY: bumps the version, seeds NO default — absence === "feature"
+// (the default dispatch mode; the next_role / scope_decision absence-is-signal
+// precedent, NOT hop_count's seed-0). Seeding "feature" would be a redundant
+// materialization of absence (DR-1/DR-8). Mirrors the v9→v10 dispatched_at
+// stamp-only template.
+registerMigration({
+    kind: "handoff",
+    from: 10,
+    to: 11,
+    up: (input) => ({ ...input, schema_version: 11 }),
+});
 // Compile-time guard: if CURRENT_VERSIONS.handoff is ever bumped without a
 // matching registration added above, the runner's missing-step error fires
 // at read time. This reference makes the dependency explicit for grep.

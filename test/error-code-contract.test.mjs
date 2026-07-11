@@ -160,26 +160,27 @@ function fmt(codeMap, codes) {
 }
 
 // ---------------------------------------------------------------------------
-// AC-1 / AC-5: GATE_REGISTRY is the single source of truth, exactly 25
-// entries (e1-feature-scoped-state-design, qa-owned re-baseline, 2026-07-12:
-// added the 25th, FEATURE_LEASE_HELD — the derive-only feature-lease gate;
-// 24 in, 25 out — one gate added, none dropped). d9-qa-review-scoped-append
-// had added the 24th, QA_REVIEW_TARGET_REQUIRED. d2-server-brake-accounting
-// had added the 23rd, HOP_CAP_EXCEEDED. c16-c10-role-boundary had added the
-// 22nd, REVIEWER_COMPLETED_TASKS_REJECTED. c15-expected-red-manifest had
-// added the 21st, EXPECTED_RED_DIFF_MISSING. c9-protocol-fields had added the
-// 20th, REVIEW_VERDICT_STATUS_MISMATCH.
+// AC-1 / AC-5: GATE_REGISTRY is the single source of truth, exactly 26
+// entries (e2-bugfix-repro-gate, qa-owned re-baseline: added the 26th,
+// REPRO_MANIFEST_MISSING — the bugfix-mode repro-first gate; 25 in, 26 out —
+// one gate added, none dropped). e1-feature-scoped-state-design had added the
+// 25th, FEATURE_LEASE_HELD. d9-qa-review-scoped-append had added the 24th,
+// QA_REVIEW_TARGET_REQUIRED. d2-server-brake-accounting had added the 23rd,
+// HOP_CAP_EXCEEDED. c16-c10-role-boundary had added the 22nd,
+// REVIEWER_COMPLETED_TASKS_REJECTED. c15-expected-red-manifest had added the
+// 21st, EXPECTED_RED_DIFF_MISSING. c9-protocol-fields had added the 20th,
+// REVIEW_VERDICT_STATUS_MISMATCH.
 // ---------------------------------------------------------------------------
 
-test("AC-1/AC-5: GATE_REGISTRY has exactly 25 entries (24 in, 25 out — e1-feature-scoped-state-design added FEATURE_LEASE_HELD)", () => {
+test("AC-1/AC-5: GATE_REGISTRY has exactly 26 entries (25 in, 26 out — e2-bugfix-repro-gate added REPRO_MANIFEST_MISSING)", () => {
   assert.equal(
     GATE_REGISTRY.length,
-    25,
-    `expected exactly 25 GateDefinition entries, got ${GATE_REGISTRY.length}: ${GATE_REGISTRY.map((g) => g.errorCode).join(", ")}`,
+    26,
+    `expected exactly 26 GateDefinition entries, got ${GATE_REGISTRY.length}: ${GATE_REGISTRY.map((g) => g.errorCode).join(", ")}`,
   );
   assert.equal(
     ALL_GATE_CODES.length,
-    25,
+    26,
     "ALL_GATE_CODES must be GATE_REGISTRY.map(g => g.errorCode) — same length",
   );
   assert.deepEqual(
@@ -605,8 +606,8 @@ test("doc-file mapping (c12): gates/registry.ts's errorCode→doc-file mapping c
   const mapping = parseDocFileMappingComment();
   assert.equal(
     mapping.size,
-    25,
-    `expected the mapping comment to list all 25 codes, found ${mapping.size}: ${[...mapping.keys()].join(", ")}`,
+    26,
+    `expected the mapping comment to list all 26 codes, found ${mapping.size}: ${[...mapping.keys()].join(", ")}`,
   );
   const docCodes = extractDocCodes();
   for (const g of GATE_REGISTRY) {
@@ -672,6 +673,17 @@ const FREE_TEXT_ALLOWLIST = [
   // it is mechanically checked (armConditionCheckable) like every other
   // orchestrator-producer entry with a camelCase predicate literal.
   { code: "FEATURE_LEASE_HELD", field: "triggerEdge", reason: "free English describing a cross-feature condition (\"any write whose active_feature differs ... while the incumbent is non-terminal and fresh\"), no single role:Status edge pair or CAP_BY_CODE-style numeric literal" },
+  // e2-bugfix-repro-gate (qa-owned): REPRO_MANIFEST_MISSING's triggerEdge is
+  // "sr-engineer:In_Progress -> code-reviewer:In_Progress (file-mode only)" —
+  // a real role:Status edge pair IS present, but it is not in
+  // triggerEdgeCheckable (that set is CAP_BY_CODE keys plus the three
+  // pm->build-entry gates only); the trailing "(file-mode only)" qualifier and
+  // the lack of a CAP_BY_CODE numeric literal keep this pair out of the
+  // mechanical check. armCondition is NOT allowlisted: it contains the
+  // camelCase identifier "prevState", which literally appears in
+  // tools/handoff-orchestrator.ts, so it is mechanically checked like every
+  // other orchestrator-producer entry.
+  { code: "REPRO_MANIFEST_MISSING", field: "triggerEdge", reason: "role:Status edge pair present but not in triggerEdgeCheckable (no CAP_BY_CODE numeric literal, not one of the three pm->build-entry gates); the \"(file-mode only)\" qualifier is free English" },
 ];
 
 test("AC3 (c12): every (errorCode, field) pair for triggerEdge/armCondition is either mechanically checked above or explicitly allowlisted as free-text — no silent exemptions", () => {

@@ -2,7 +2,7 @@
 // Schema-versioning runner. Pure functions; callers own all I/O.
 // Per architecture: specs/schema-versioning-architecture.md (Phase 4).
 export const CURRENT_VERSIONS = {
-    handoff: 10,
+    handoff: 11,
     tasks: 1,
     sqlite: 2,
     config: 1,

@@ -134,6 +134,17 @@ const UpdateStateArgs = z
     })
         .strict()
         .optional(),
+    // v11 — dispatch_mode (e2-bugfix-repro-gate). Closed two-value enum:
+    // an out-of-enum value is rejected here, at the tool boundary, before any
+    // gate runs (the next_role closed-enum precedent). Absence === "feature"
+    // (the default) — the field is OPTIONAL and never seeded. DURABLE,
+    // feature-scoped (the dispatch_pins/external_refs lifetime, but scalar):
+    // carried forward across same-feature writes that omit it; dropped on
+    // active_feature change; NOT re-armed on PM re-entry. "bugfix" arms the
+    // file-mode repro-first gate (REPRO_MANIFEST_MISSING) on the
+    // sr-engineer:In_Progress → code-reviewer:In_Progress fix-phase edge; it
+    // never gates a transition edge itself. File-mode only.
+    dispatch_mode: z.enum(["feature", "bugfix"]).optional(),
     // v9 — d9-qa-review-scoped-append. Task id(s) the qa_review evidence
     // auto-record targets (agent_id=qa-engineer, status PASS/FAIL). Same
     // shape/limits as completed_tasks. TRANSIENT, write-scoped (c9-protocol-
@@ -376,6 +387,11 @@ export const TOOL_REGISTRY = [
                     },
                     additionalProperties: false,
                     description: "Human model-tier pins per role (file-mode only). Object whose keys are the 8 role names (unknown keys rejected) and whose values are free-text model-tier strings (non-empty, ≤100 chars; e.g. \"fable\", \"opus\", or a fully-qualified model id — NOT validated against a model vocabulary). Passing it REPLACES the map wholesale (not merged) — read the existing pins first and include every still-wanted entry. Feature-scoped: preserved across same-feature writes that omit it, dropped on active_feature change, NOT re-armed on PM re-entry. Advisory bookkeeping — no gate. Replaces the legacy 'dispatch_pins: <role>=<model>' pending_notes convention (handoff schema v8).",
+                },
+                dispatch_mode: {
+                    type: "string",
+                    enum: ["feature", "bugfix"],
+                    description: "Ticket dispatch-mode classification (file-mode only). PM sets \"bugfix\" at cut time to mark a repro-first bug-fix ticket: the server then BLOCKS the sr-engineer:In_Progress → code-reviewer:In_Progress fix-phase handoff with REPRO_MANIFEST_MISSING until qa_reports/expected-red_<feature>.txt records the failing reproduction test(s), and QA's Phase 0.5 expected-red disposition becomes load-bearing for PASS. Absence === \"feature\" (the default) — feature-mode chains are unaffected. Feature-scoped: preserved across same-feature writes that omit it, dropped on active_feature change, NOT re-armed on PM re-entry; opt back into the full chain by explicitly setting \"feature\". Never gates a transition edge itself (handoff schema v11).",
                 },
             },
             required: ["workspace_path", "active_feature", "status"],

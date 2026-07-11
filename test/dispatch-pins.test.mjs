@@ -108,11 +108,11 @@ next_role: "sr-engineer"
 });
 
 test("M1b: readHandoffState's fire-and-forget write-back heals the v7 file to v10 on disk", async () => {
-  // d5-server-side-stale-dispatch-detection (qa-owned re-baseline):
-  // CURRENT_VERSIONS.handoff is now 10 (v9→v10 added dispatched_at, stamp-only,
-  // seeds nothing). A v7 file heals all the way to v10 in one fire-and-forget
-  // write-back, seeding hop_count: 0 (DR-3, from the earlier v8→v9 step) along
-  // the way; the new v9→v10 step adds no field default of its own.
+  // e2-bugfix-repro-gate (qa-owned re-baseline): CURRENT_VERSIONS.handoff is
+  // now 11 (v10→v11 added dispatch_mode, stamp-only, seeds nothing). A v7
+  // file heals all the way to v11 in one fire-and-forget write-back, seeding
+  // hop_count: 0 (DR-3, from the earlier v8→v9 step) along the way; the new
+  // v10→v11 step adds no field default of its own (nor did v9→v10).
   const ws = mkWs();
   resetSession();
   writeRaw(
@@ -134,22 +134,22 @@ qa_round: 0
   readHandoffState(ws);
   await new Promise((resolve) => setTimeout(resolve, 30));
   const healed = readRaw(ws);
-  assert.match(healed, /schema_version:\s*10/, "fire-and-forget heal lands the file at CURRENT (v10)");
+  assert.match(healed, /schema_version:\s*11/, "fire-and-forget heal lands the file at CURRENT (v11)");
   assert.match(healed, /hop_count:\s*0/, "the v8→v9 step's seeded hop_count: 0 survives the heal write");
 });
 
-test("M2: future v11 handoff refuses-loud against a v10 server (no silent downgrade)", () => {
+test("M2: future v12 handoff refuses-loud against a v11 server (no silent downgrade)", () => {
   // WHY: forward-compat safety, mirroring the AC-10(g) c9-protocol-fields
-  // precedent (v7 file against a v6 server; here v11 against v10 — re-baselined
-  // by d5-server-side-stale-dispatch-detection, qa-owned, since v10 is now
-  // CURRENT and no longer "the future"). A handoff written by a newer server
-  // must never be silently parsed.
+  // precedent (v7 file against a v6 server; here v12 against v11 — re-baselined
+  // by e2-bugfix-repro-gate, qa-owned, since v11 is now CURRENT and no longer
+  // "the future"; was v11-vs-v10 under d5-server-side-stale-dispatch-detection).
+  // A handoff written by a newer server must never be silently parsed.
   const ws = mkWs();
   resetSession();
   writeRaw(
     ws,
     `---
-schema_version: 11
+schema_version: 12
 active_feature: "from-the-future"
 status: "In_Progress"
 last_updated: "2099-01-01T00:00:00.000Z"
@@ -164,12 +164,12 @@ qa_round: 0
   );
   assert.throws(
     () => readHandoffState(ws),
-    /handoff on-disk version 11 > server max 10/,
-    "v11 file must refuse-loud against a v10 server",
+    /handoff on-disk version 12 > server max 11/,
+    "v12 file must refuse-loud against a v11 server",
   );
   assert.throws(
     () => parseHandoff(ws),
-    /on-disk version 11 > server max 10/,
+    /on-disk version 12 > server max 11/,
   );
 });
 
@@ -177,10 +177,10 @@ test("M3: registry-level v7→v8→v9→v10 steps are pure, stamp-only/seed-only
   // WHY: pins the migration steps themselves (schema/migrations-handoff.ts),
   // not just their effect through parseHandoff — a direct unit test of the
   // runner registration, matching the M1/M2 cut-approval-gate.test.mjs
-  // convention. d5-server-side-stale-dispatch-detection (qa-owned re-baseline):
-  // CURRENT is now 10, so the isolated chain re-registered here must extend one
-  // step further (v9→v10, stamp-only — dispatched_at seeds nothing) or every
-  // read in this file hits "missing migration step handoff v9→v10" (the
+  // convention. e2-bugfix-repro-gate (qa-owned re-baseline): CURRENT is now
+  // 11, so the isolated chain re-registered here must extend one step further
+  // (v10→v11, stamp-only — dispatch_mode seeds nothing) or every subsequent
+  // read in this file hits "missing migration step handoff v10→v11" (the
   // registry is a shared module-level singleton across tests in this
   // file/process).
   _clearRegistryForTests();
@@ -194,6 +194,7 @@ test("M3: registry-level v7→v8→v9→v10 steps are pure, stamp-only/seed-only
   registerMigration({ kind: "handoff", from: 7, to: 8, up: (i) => ({ ...i, schema_version: 8 }) });
   registerMigration({ kind: "handoff", from: 8, to: 9, up: (i) => ({ ...i, schema_version: 9, hop_count: 0 }) });
   registerMigration({ kind: "handoff", from: 9, to: 10, up: (i) => ({ ...i, schema_version: 10 }) });
+  registerMigration({ kind: "handoff", from: 10, to: 11, up: (i) => ({ ...i, schema_version: 11 }) });
 
   const v7Payload = {
     schema_version: 7,
@@ -202,12 +203,13 @@ test("M3: registry-level v7→v8→v9→v10 steps are pure, stamp-only/seed-only
     next_role: "qa-engineer",
   };
   const result = runMigrations("handoff", v7Payload);
-  assert.deepEqual(result.applied, [8, 9, 10], "the v7→v8, v8→v9, AND v9→v10 steps all run when on-disk version is three behind CURRENT");
-  assert.equal(result.payload.schema_version, 10, "schema_version bumped to CURRENT (10)");
+  assert.deepEqual(result.applied, [8, 9, 10, 11], "the v7→v8, v8→v9, v9→v10, AND v10→v11 steps all run when on-disk version is four behind CURRENT");
+  assert.equal(result.payload.schema_version, 11, "schema_version bumped to CURRENT (11)");
   assert.equal(result.payload.dispatch_pins, undefined, "v7→v8 seeds no dispatch_pins default (AC-1)");
   assert.equal(result.payload.hop_count, 0, "v8→v9 seeds hop_count: 0 (DR-3)");
   assert.equal(result.payload.dispatched_at, undefined, "v9→v10 seeds no dispatched_at default (d5 DR-7 — absence-is-signal, not hop_count's seed-0)");
-  assert.equal(result.payload.next_role, "qa-engineer", "sibling v7 field survives all three stamp-only/seed-only steps verbatim");
+  assert.equal(result.payload.dispatch_mode, undefined, "v10→v11 seeds no dispatch_mode default (e2-bugfix-repro-gate — absence-is-signal, same posture as dispatched_at)");
+  assert.equal(result.payload.next_role, "qa-engineer", "sibling v7 field survives all four stamp-only/seed-only steps verbatim");
 
   // Re-running against the already-current payload is a no-op.
   const reread = runMigrations("handoff", result.payload);
@@ -802,10 +804,12 @@ test("Z7: tw_update_state ACCEPTS an empty dispatch_pins object ({} clears, per 
   assert.ok(!result.isError, `an empty {} dispatch_pins must not be rejected by zod; got: ${result.content?.[0]?.text}`);
 });
 
-// Sanity: CURRENT_VERSIONS.handoff really is 10 in this build (guards every
+// Sanity: CURRENT_VERSIONS.handoff really is 11 in this build (guards every
 // test above against silently testing the wrong target version).
-// d5-server-side-stale-dispatch-detection (qa-owned re-baseline): bumped
-// 9 -> 10 (dispatched_at, stamp-only, seeds nothing).
-test("sanity: CURRENT_VERSIONS.handoff is 10 (d5-server-side-stale-dispatch-detection)", () => {
-  assert.equal(CURRENT_VERSIONS.handoff, 10);
+// e2-bugfix-repro-gate (qa-owned re-baseline): bumped 10 -> 11 (dispatch_mode,
+// stamp-only, seeds nothing); was 9 -> 10 under
+// d5-server-side-stale-dispatch-detection (dispatched_at, stamp-only, seeds
+// nothing).
+test("sanity: CURRENT_VERSIONS.handoff is 11 (e2-bugfix-repro-gate)", () => {
+  assert.equal(CURRENT_VERSIONS.handoff, 11);
 });

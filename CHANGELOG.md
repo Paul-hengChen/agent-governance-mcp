@@ -16,6 +16,15 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.73.0] - 2026-07-12
+
+### Added
+- **`e2-bugfix-repro-gate` — Bugfix-mode dispatch and repro-first gate enforcement (v3.73.0).** Introduces bugfix-mode signal mechanism for feature-scoped state isolation (handoff schema v10→v11 adds `dispatch_mode?: "feature"|"bugfix"` field; absence-is-signal precedent = feature-mode default). Implements repro-first gate (`REPRO_FIRST_REQUIRED`) in `gates/registry.ts` and `gates/expected-red.ts` blocking sr-engineer fix-phase writes until a qa_reports manifest documents the failing test(s). Integrates manifest parsing and gate enforcement in `tools/handoff-orchestrator.ts`. Extends `content/skill-pm.md`, `content/skill-sr-engineer.md`, `content/skill-qa-engineer.md` with bugfix-mode ticket-cut guidance, repro-first manifest step, and strict bugfix-mode PASS criterion (exact repro red-set green + zero new reds, load-bearing not advisory). Comprehensive architecture in `specs/e2-bugfix-repro-gate.md` and `specs/e2-bugfix-repro-gate-architecture.md`. Regression test suite added; full suite 1251/1251 green. QA verified (`qa_reports/review_T-E2-05.md`). Feature-mode chains remain byte-behavior-unchanged per AC5.
+
+### Notes
+- driftBaselineIds appended with T-E2-ARCH, T-E2-01, T-E2-02, T-E2-03, T-E2-04, T-E2-05, T-E2-06
+- Handoff schema v11: `dispatch_mode` field added to track bugfix vs feature mode (migration from v10 auto-runs on read)
+
 ## [3.72.0] - 2026-07-12
 
 ### Added

@@ -84,6 +84,10 @@ declare const UpdateStateArgs: z.ZodObject<{
         "qa-engineer": z.ZodOptional<z.ZodString>;
         "release-engineer": z.ZodOptional<z.ZodString>;
     }, z.core.$strict>>;
+    dispatch_mode: z.ZodOptional<z.ZodEnum<{
+        feature: "feature";
+        bugfix: "bugfix";
+    }>>;
     review_task_ids: z.ZodOptional<z.ZodArray<z.ZodString>>;
 }, z.core.$strip>;
 declare const CompleteTaskArgs: z.ZodObject<{

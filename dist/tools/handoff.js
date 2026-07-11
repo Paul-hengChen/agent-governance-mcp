@@ -83,6 +83,9 @@ const NEXT_ROLE_VALUES = [
 ];
 const RESUME_OF_VALUES = ["code-reviewer", "qa-engineer"];
 const REVIEW_VERDICT_VALUES = ["APPROVED", "CHANGES_REQUESTED"];
+// v11 — legal dispatch_mode values (e2-bugfix-repro-gate), for the same
+// defensive parse-time filtering as the three v7 protocol fields.
+const DISPATCH_MODE_VALUES = ["feature", "bugfix"];
 // v7 — defensive enum parser for the three protocol frontmatter fields.
 // Returns undefined on absent / non-string / out-of-enum raw values (matching
 // parseExternalRefs' defensive posture); never throws. Absence stays the
@@ -185,6 +188,9 @@ function readAndMigrate(workspacePath) {
     // v8 — dispatch_pins map (c14-dispatch-pins). undefined when absent /
     // malformed, so absence stays the "no pins recorded" sentinel.
     const dispatchPins = parseDispatchPins(frontmatter.dispatch_pins);
+    // v11 — dispatch_mode (e2-bugfix-repro-gate). undefined when absent /
+    // out-of-enum, so absence stays the "feature-mode default" sentinel.
+    const dispatchMode = parseEnumField(frontmatter.dispatch_mode, DISPATCH_MODE_VALUES);
     const qaRoundRaw = Number(frontmatter.qa_round);
     const qa_round = Number.isFinite(qaRoundRaw) && qaRoundRaw >= 0 ? Math.floor(qaRoundRaw) : 0;
     const reviewRoundRaw = Number(frontmatter.review_round);
@@ -212,6 +218,7 @@ function readAndMigrate(workspacePath) {
         ...(resumeOf && { resume_of: resumeOf }),
         ...(reviewVerdict && { review_verdict: reviewVerdict }),
         ...(dispatchPins && { dispatch_pins: dispatchPins }),
+        ...(dispatchMode && { dispatch_mode: dispatchMode }),
         completed_tasks,
         pending_notes,
         qa_round,
@@ -366,6 +373,11 @@ export async function writeHandoffState(workspacePathOrOpts, activeFeature, stat
     // the same-feature preserve clause below carries any existing pins forward,
     // mirroring external_refs' DR-8 posture).
     let dispatchPins;
+    // v11 — dispatch_mode scalar. The positional overload leaves it undefined
+    // (positional callers — including the migration-heal write — never pass it;
+    // the same-feature preserve clause below carries any existing value forward,
+    // mirroring dispatch_pins' DR-8 posture).
+    let dispatchMode;
     if (typeof workspacePathOrOpts === "object" &&
         !Array.isArray(workspacePathOrOpts)) {
         const o = workspacePathOrOpts;
@@ -389,6 +401,7 @@ export async function writeHandoffState(workspacePathOrOpts, activeFeature, stat
         resumeOf = o.resumeOf;
         reviewVerdict = o.reviewVerdict;
         dispatchPins = o.dispatchPins;
+        dispatchMode = o.dispatchMode;
     }
     else {
         workspacePath = workspacePathOrOpts;
@@ -485,12 +498,27 @@ export async function writeHandoffState(workspacePathOrOpts, activeFeature, stat
         //                                                      stale pins)
         let effectiveDispatchPins = dispatchPins;
         const dispatchPinsNeedsExisting = dispatchPins === undefined;
+        // v11 — dispatch_mode is FEATURE-SCOPED with NO PM-re-entry re-arm, the
+        // exact dispatch_pins/external_refs algorithm but SCALAR (e2 DR): a bug-
+        // vs-feature classification is stable for the life of the ticket — a PM
+        // bouncing a QA FAIL back to In_Progress must NOT silently flip the mode
+        // (so no cut_approved-style clause (2)); AC4 opt-out is an EXPLICIT PM
+        // write of "feature". The algorithm:
+        //   1. option dispatchMode !== undefined              → use it verbatim
+        //   2. omitted && existing.active_feature === this    → carry existing
+        //                                                       mode forward
+        //   3. omitted && active_feature changed              → undefined (drop
+        //                                                       stale mode —
+        //                                                       absence = feature)
+        let effectiveDispatchMode = dispatchMode;
+        const dispatchModeNeedsExisting = dispatchMode === undefined;
         if (effectivePrdPath === undefined ||
             effectiveScopeDecision === undefined ||
             effectiveScopeDecisionWhy === undefined ||
             cutApprovalNeedsExisting ||
             externalRefsNeedsExisting ||
-            dispatchPinsNeedsExisting) {
+            dispatchPinsNeedsExisting ||
+            dispatchModeNeedsExisting) {
             const existing = parseHandoff(workspacePath);
             if (effectivePrdPath === undefined)
                 effectivePrdPath = existing?.prd_path;
@@ -512,6 +540,11 @@ export async function writeHandoffState(workspacePathOrOpts, activeFeature, stat
                 // v8 clauses (2)/(3): carry the pins forward only within the same feature.
                 effectiveDispatchPins =
                     existing?.active_feature === _activeFeature ? existing?.dispatch_pins : undefined;
+            }
+            if (dispatchModeNeedsExisting) {
+                // v11 clauses (2)/(3): carry the mode forward only within the same feature.
+                effectiveDispatchMode =
+                    existing?.active_feature === _activeFeature ? existing?.dispatch_mode : undefined;
             }
         }
         // clauses (1)/(2): explicit PM approval, or PM re-entry re-arm. These do not
@@ -546,6 +579,11 @@ export async function writeHandoffState(workspacePathOrOpts, activeFeature, stat
         if (effectiveDispatchPins && Object.keys(effectiveDispatchPins).length > 0) {
             frontmatterData.dispatch_pins = effectiveDispatchPins;
         }
+        // v11 — dispatch_mode: emit only when set. Absence === "feature" (the
+        // default) — never materialize the default (the scope_decision /
+        // dispatched_at absence-is-signal emit posture).
+        if (effectiveDispatchMode)
+            frontmatterData.dispatch_mode = effectiveDispatchMode;
         // v7 — protocol fields: emit ONLY when set on THIS write (AC-3 transient
         // semantics). Deliberately NOT joined to the existing-state preserve read
         // above — carrying a stale single-hop directive forward would be a

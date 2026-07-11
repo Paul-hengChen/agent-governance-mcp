@@ -43,6 +43,9 @@ export type ResumeOfTarget = "code-reviewer" | "qa-engineer";
 // Code-reviewer verdict values (handoff schema v7, c9-protocol-fields).
 export type ReviewVerdict = "APPROVED" | "CHANGES_REQUESTED";
 
+// Dispatch-mode classification (handoff schema v11, e2-bugfix-repro-gate).
+export type DispatchMode = "feature" | "bugfix";
+
 export interface HandoffState {
   active_feature: string;
   status: string;
@@ -159,6 +162,21 @@ export interface HandoffState {
   // to tw_get_state readers via the `{ ...state }` view (User Story 2 — the
   // dispatched role reads its OWN pin to stamp its watermark at the source).
   dispatch_pins?: Partial<Record<AgentName, string>>;
+  // Dispatch-mode ticket classification (handoff schema v11,
+  // e2-bugfix-repro-gate). Absence === "feature" (the default) — a bugfix-mode
+  // ticket is marked by the PM at cut time with dispatch_mode: "bugfix", which
+  // arms the file-mode repro-first gate (REPRO_MANIFEST_MISSING) on the
+  // sr-engineer:In_Progress → code-reviewer:In_Progress fix-phase edge and
+  // makes QA's Phase 0.5 expected-red disposition load-bearing. FEATURE-SCOPED
+  // (the exact dispatch_pins/external_refs algorithm, but SCALAR): carried
+  // across same-active_feature writes that omit it, dropped on active_feature
+  // change, NOT re-armed on PM re-entry (a stable ticket classification,
+  // unlike cut_approved which re-arms per cut). Changeable by an explicit PM
+  // write (AC4 opt-back-in: set "feature" or route to architect). FILE-MODE
+  // ONLY: SqliteHandoffStorage.writeState ignores it (mirrors dispatch_pins
+  // DR-5) — the gates it arms are file-mode only anyway. dispatch_mode never
+  // gates a transition edge; transitions.ts stays pure (DR on AC1/AC5).
+  dispatch_mode?: DispatchMode;
 }
 
 // Cap the completed_tasks array returned by readState() so long projects
@@ -243,6 +261,9 @@ const NEXT_ROLE_VALUES: readonly string[] = [
 ];
 const RESUME_OF_VALUES: readonly string[] = ["code-reviewer", "qa-engineer"];
 const REVIEW_VERDICT_VALUES: readonly string[] = ["APPROVED", "CHANGES_REQUESTED"];
+// v11 — legal dispatch_mode values (e2-bugfix-repro-gate), for the same
+// defensive parse-time filtering as the three v7 protocol fields.
+const DISPATCH_MODE_VALUES: readonly string[] = ["feature", "bugfix"];
 
 // v7 — defensive enum parser for the three protocol frontmatter fields.
 // Returns undefined on absent / non-string / out-of-enum raw values (matching
@@ -357,6 +378,12 @@ function readAndMigrate(workspacePath: string): HandoffReadResult | null {
   // v8 — dispatch_pins map (c14-dispatch-pins). undefined when absent /
   // malformed, so absence stays the "no pins recorded" sentinel.
   const dispatchPins = parseDispatchPins(frontmatter.dispatch_pins);
+  // v11 — dispatch_mode (e2-bugfix-repro-gate). undefined when absent /
+  // out-of-enum, so absence stays the "feature-mode default" sentinel.
+  const dispatchMode = parseEnumField<DispatchMode>(
+    frontmatter.dispatch_mode,
+    DISPATCH_MODE_VALUES,
+  );
   const qaRoundRaw = Number(frontmatter.qa_round);
   const qa_round = Number.isFinite(qaRoundRaw) && qaRoundRaw >= 0 ? Math.floor(qaRoundRaw) : 0;
   const reviewRoundRaw = Number(frontmatter.review_round);
@@ -388,6 +415,7 @@ function readAndMigrate(workspacePath: string): HandoffReadResult | null {
     ...(resumeOf && { resume_of: resumeOf }),
     ...(reviewVerdict && { review_verdict: reviewVerdict }),
     ...(dispatchPins && { dispatch_pins: dispatchPins }),
+    ...(dispatchMode && { dispatch_mode: dispatchMode }),
     completed_tasks,
     pending_notes,
     qa_round,
@@ -600,6 +628,14 @@ export interface WriteHandoffStateOptions {
   // to frontmatter only when non-empty. FILE-MODE only (AC-5):
   // SqliteHandoffStorage.writeState ignores it.
   dispatchPins?: Partial<Record<AgentName, string>>;
+  // v11 — dispatch_mode (e2-bugfix-repro-gate). Scalar sibling of
+  // dispatchPins: feature-scoped preserve-if-omitted, reset ONLY on
+  // active_feature change, NOT on PM re-entry (NOT the transient nextRole
+  // lifetime, NOT the cutApproved re-arm — bug-vs-feature is a stable ticket
+  // classification for the life of the feature). Emitted to frontmatter only
+  // when set; absence === "feature" (the default). FILE-MODE only:
+  // SqliteHandoffStorage.writeState ignores it.
+  dispatchMode?: DispatchMode;
 }
 
 /**
@@ -671,6 +707,11 @@ export async function writeHandoffState(
   // the same-feature preserve clause below carries any existing pins forward,
   // mirroring external_refs' DR-8 posture).
   let dispatchPins: Partial<Record<AgentName, string>> | undefined;
+  // v11 — dispatch_mode scalar. The positional overload leaves it undefined
+  // (positional callers — including the migration-heal write — never pass it;
+  // the same-feature preserve clause below carries any existing value forward,
+  // mirroring dispatch_pins' DR-8 posture).
+  let dispatchMode: DispatchMode | undefined;
   if (
     typeof workspacePathOrOpts === "object" &&
     !Array.isArray(workspacePathOrOpts)
@@ -696,6 +737,7 @@ export async function writeHandoffState(
     resumeOf = o.resumeOf;
     reviewVerdict = o.reviewVerdict;
     dispatchPins = o.dispatchPins;
+    dispatchMode = o.dispatchMode;
   } else {
     workspacePath = workspacePathOrOpts as string;
     // Positional defaults preserved for backwards-compat callers passing < 11 args.
@@ -796,13 +838,28 @@ export async function writeHandoffState(
     //                                                      stale pins)
     let effectiveDispatchPins: Partial<Record<AgentName, string>> | undefined = dispatchPins;
     const dispatchPinsNeedsExisting = dispatchPins === undefined;
+    // v11 — dispatch_mode is FEATURE-SCOPED with NO PM-re-entry re-arm, the
+    // exact dispatch_pins/external_refs algorithm but SCALAR (e2 DR): a bug-
+    // vs-feature classification is stable for the life of the ticket — a PM
+    // bouncing a QA FAIL back to In_Progress must NOT silently flip the mode
+    // (so no cut_approved-style clause (2)); AC4 opt-out is an EXPLICIT PM
+    // write of "feature". The algorithm:
+    //   1. option dispatchMode !== undefined              → use it verbatim
+    //   2. omitted && existing.active_feature === this    → carry existing
+    //                                                       mode forward
+    //   3. omitted && active_feature changed              → undefined (drop
+    //                                                       stale mode —
+    //                                                       absence = feature)
+    let effectiveDispatchMode: DispatchMode | undefined = dispatchMode;
+    const dispatchModeNeedsExisting = dispatchMode === undefined;
     if (
       effectivePrdPath === undefined ||
       effectiveScopeDecision === undefined ||
       effectiveScopeDecisionWhy === undefined ||
       cutApprovalNeedsExisting ||
       externalRefsNeedsExisting ||
-      dispatchPinsNeedsExisting
+      dispatchPinsNeedsExisting ||
+      dispatchModeNeedsExisting
     ) {
       const existing = parseHandoff(workspacePath);
       if (effectivePrdPath === undefined) effectivePrdPath = existing?.prd_path;
@@ -822,6 +879,11 @@ export async function writeHandoffState(
         // v8 clauses (2)/(3): carry the pins forward only within the same feature.
         effectiveDispatchPins =
           existing?.active_feature === _activeFeature ? existing?.dispatch_pins : undefined;
+      }
+      if (dispatchModeNeedsExisting) {
+        // v11 clauses (2)/(3): carry the mode forward only within the same feature.
+        effectiveDispatchMode =
+          existing?.active_feature === _activeFeature ? existing?.dispatch_mode : undefined;
       }
     }
     // clauses (1)/(2): explicit PM approval, or PM re-entry re-arm. These do not
@@ -851,6 +913,10 @@ export async function writeHandoffState(
     if (effectiveDispatchPins && Object.keys(effectiveDispatchPins).length > 0) {
       frontmatterData.dispatch_pins = effectiveDispatchPins;
     }
+    // v11 — dispatch_mode: emit only when set. Absence === "feature" (the
+    // default) — never materialize the default (the scope_decision /
+    // dispatched_at absence-is-signal emit posture).
+    if (effectiveDispatchMode) frontmatterData.dispatch_mode = effectiveDispatchMode;
     // v7 — protocol fields: emit ONLY when set on THIS write (AC-3 transient
     // semantics). Deliberately NOT joined to the existing-state preserve read
     // above — carrying a stale single-hop directive forward would be a

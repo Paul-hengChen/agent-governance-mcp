@@ -8,7 +8,7 @@
 //
 // Check order is FROZEN (spec AC-5/AC-8): preflight → PASS/qa-engineer gate →
 // transition validation → feature-lease gate (E1) → scope-decision gate → cut-approval gate →
-// external-refs gate → review-verdict/status mismatch gate → reviewer
+// external-refs gate → repro-first gate (E2, bugfix-mode) → review-verdict/status mismatch gate → reviewer
 // completed_tasks gate (v3.58.0, C16) → QA evidence record → PASS evidence
 // gate → visual sub-gates → expected-red diff gate →
 // code-reviewer evidence gate → round-cap sentinels → storage.writeState →
@@ -284,6 +284,44 @@ async function handleUpdateStateCore(parsed) {
                 content: [{
                         type: "text",
                         text: `⛔ EXTERNAL_REFS_UNRESOLVED\n${JSON.stringify(envelope, null, 2)}`,
+                    }],
+                isError: true,
+            };
+        }
+    }
+    // E2 — Repro-First Gate (e2-bugfix-repro-gate, AC2/AC6). Bugfix-mode
+    // only. Fires on the fix-phase handoff sr-engineer:In_Progress →
+    // code-reviewer:In_Progress when the incumbent feature is
+    // dispatch_mode="bugfix" but no repro manifest
+    // (qa_reports/expected-red_<feature>.txt) exists. Blocks the write —
+    // never a silent skip, never a throw (AC6). The Blocked escape edge
+    // (sr-engineer → pm) is NOT keyed here, so escalation is always
+    // available. Reuses the existing hasExpectedRedManifest() predicate —
+    // a repro test is a "declared red" recorded in the same C15 manifest
+    // (DR-2), no new file, no new predicate. FILE-MODE ONLY: the manifest
+    // is a qa_reports/ file convention and dispatch_mode lives in the
+    // handoff YAML frontmatter only (SQLite never carries it) — so gate
+    // only under FileHandoffStorage, mirroring the cut-approval /
+    // external-refs / expected-red guards. Placed AFTER the external-refs
+    // gate and BEFORE the review-verdict/status-mismatch gate: a disjoint
+    // edge (sr→code-reviewer, not pm→build), so it reorders no existing
+    // gate; check order stays frozen-additive. NOT in transitions.ts (this
+    // plain-text gate family is not in the TransitionRejection union —
+    // DR-5).
+    if (storage instanceof FileHandoffStorage &&
+        prevState?.dispatch_mode === "bugfix" &&
+        prevTuple.agent === "sr-engineer" &&
+        prevTuple.status === "In_Progress" &&
+        nextTuple.agent === "code-reviewer" &&
+        nextTuple.status === "In_Progress") {
+        const manifest = hasExpectedRedManifest(parsed.workspace_path, parsed.active_feature);
+        if (!manifest.present) {
+            return {
+                content: [{
+                        type: "text",
+                        text: `⛔ REPRO_MANIFEST_MISSING: ${parsed.active_feature}. ` +
+                            `Expected repro manifest at ${manifest.manifestPath}. ` +
+                            gate("REPRO_MANIFEST_MISSING").hintStatic,
                     }],
                 isError: true,
             };
@@ -695,6 +733,11 @@ async function handleUpdateStateCore(parsed) {
         // omitting writes lives in writeHandoffState. File-mode only:
         // SqliteHandoffStorage.writeState ignores it.
         dispatchPins: parsed.dispatch_pins,
+        // v11 — dispatch_mode (e2-bugfix-repro-gate). Pass-through only:
+        // feature-scoped scalar sibling of dispatchPins (carry-forward for
+        // omitting writes lives in writeHandoffState). File-mode only:
+        // SqliteHandoffStorage.writeState ignores it.
+        dispatchMode: parsed.dispatch_mode,
     });
     // GC hook: when QA flips a feature to PASS, drop the workspace's RAG
     // chunks so the next feature starts clean. Await any concurrent lazy
