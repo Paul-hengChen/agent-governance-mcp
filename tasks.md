@@ -249,8 +249,8 @@ _(No active tasks — ready for the next feature.)_
 - [x] T-D6-04 sr-engineer: add/extend unit tests covering host-axis compose for every skill file actually split (host=claude-code included vs. default/unknown excluded), analogous to existing constitution compose tests; update scripts/measure-context-cost.mjs if it enumerates skill files (AC7). | depends_on: T-D6-02, T-D6-03
 - [x] T-D6-05 code-reviewer: review the diff - confirm the default/unknown-host path is safe (excludes CC-only text, no functional regression for non-CC hosts, AC3), confirm golden-byte-parity for the full-capability case (AC5), confirm the implemented mechanism matches the architect's pinned design (AC4), confirm no gate/transition regressions elsewhere in prompts/build.ts. | depends_on: T-D6-04
 - [x] T-D6-06 qa-engineer: QA pass - verify composed skill output for both host states end-to-end, run full suite green, confirm no CC-only text leaks into a non-CC dispatch and the existing Claude Code dispatch path is unchanged in substance (AC1, AC2, AC7). | depends_on: T-D6-05
-- [ ] T-D6-REL release-engineer (post-PASS): version bump, CHANGELOG entry, build, git tag, gh release per skill-release-engineer SOP. | depends_on: T-D6-06
-- [ ] T-D6-DONE release-engineer (post-release): mark backlog D6 done in docs/backlog.md with mechanism summary and commit reference; append driftBaselineIds T-D6-*; archive qa_reports/ for this feature per D7 SOP. | depends_on: T-D6-REL
+- [x] T-D6-REL release-engineer (post-PASS): version bump, CHANGELOG entry, build, git tag, gh release per skill-release-engineer SOP. | depends_on: T-D6-06 (note: tw_sync: mirrored from handoff.completed_tasks (R10))
+- [x] T-D6-DONE release-engineer (post-release): mark backlog D6 done in docs/backlog.md with mechanism summary and commit reference; append driftBaselineIds T-D6-*; archive qa_reports/ for this feature per D7 SOP. | depends_on: T-D6-REL (note: tw_sync: mirrored from handoff.completed_tasks (R10))
 
 ## Completed
 
