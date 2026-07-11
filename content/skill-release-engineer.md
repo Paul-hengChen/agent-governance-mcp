@@ -27,6 +27,7 @@ Release-engineer is allowed to write to:
 - `README.md` (install-pin replacements `#vX.Y.Z` and the latest release-notes subsection only — do not refactor unrelated prose)
 - `.current/.config.json` (the `driftBaselineIds` field only — drift-baseline acknowledgment, see SOP step 10 and `specs/drift-baseline-exemption.md`)
 - `docs/backlog.md` (done-marking of the active feature's row(s) only — do not edit unrelated rows; see SOP step 11)
+- `qa_reports/archive/**` (move-only — relocating the released feature's existing evidence files per SOP step 7a; never authoring or editing evidence content)
 - `dist/**` (via `npm run build` only — never hand-edited)
 
 Release-engineer MUST NOT touch source under `tools/` / `prompts/` / `schema/` / `guards/` / `content/skill-*.md` / `content/constitution.md`. If a release requires a constitution-version bump (e.g. `Constitution v3.10.0 → v3.11.0`), surface the divergence and route back to PM/coordinator — release-engineer ships what's been signed off, it does not re-author governance.
@@ -44,6 +45,14 @@ Release-engineer MUST NOT touch source under `tools/` / `prompts/` / `schema/` /
 5. `npm run build`. ZERO compile errors required. The build refreshes `dist/`.
 6. `npm test`. All tests MUST pass (including the version-coherence test in `test/qa-visual-skill-split.test.mjs` which gates package.json / index.ts / dist / CHANGELOG agreement).
 7. `node scripts/check-version.mjs`. MUST return OK at the new version.
+7a. **Archive shipped feature's qa_reports** (D7): move the just-released feature's evidence files out of the `qa_reports/` root into `qa_reports/archive/<active_feature>/`, so the moves land in the SAME release commit (step 8's `qa_reports/` glob already stages the new subdirectory — no staging change needed):
+   - Derive the ticket-code prefix `<CODE>`: the leading alnum token of `<active_feature>` before its first `-`, uppercased (e.g. `d7-qa-reports-archive` → `D7`, matching the project-wide `T-D7-*` task-id convention).
+   - `mkdir -p qa_reports/archive/<active_feature>/` (idempotent).
+   - Move every `qa_reports/review_<id>.md` and `qa_reports/visual_<id>.md` whose `<id>` matches `^T-<CODE>-` into it, preserving filenames.
+   - Move `qa_reports/expected-red_<active_feature>.txt` into it, if that file exists.
+   - **`covers:` sweep**: grep the remaining root-level `qa_reports/*.md` for `covers:` label lines; any file whose covered ids intersect the released feature's `T-<CODE>-*` id set is also moved, even when its OWN filename's id does not match the prefix (same membership semantics as `parseCoversIds`/`buildCoverageIndex` in `tools/evidence-file.ts`, expressed as shell — this step is SOP prose, not new source code).
+   - **No-clobber**: skip any move whose destination already exists (`mv -n`) — a retried invocation MUST NOT overwrite or duplicate.
+   - **Zero matches = silent no-op**: if nothing matches the prefix/`covers:` rules, do nothing — never guess-move unrelated files, never fail the release over it. Files whose ids do NOT match `^T-<CODE>-` belong to concurrent in-flight features and MUST NOT be touched.
 8. **Commit + tag + push**, using HEREDOC for the message:
    - **Stage explicitly** — run `git status --short` first to see ALL uncommitted upstream work (not just files you edited this turn). Then stage by explicit directories and metadata files:
      ```
@@ -72,4 +81,4 @@ Call shape: Constitution §3 *Escalation call format* (`agent_id="release-engine
 | tag with the target name already exists locally OR on origin | Blocked | `release-engineer: tag <vX.Y.Z> already exists — choose a new bump or delete the old tag manually (never delete it yourself per Hard rules)` | human |
 | `gh` CLI missing or unauthenticated | Blocked | `release-engineer: gh CLI missing/unauthenticated — authenticate; do not work around` | human |
 
-**Expected vs unrelated scope rule** (first row's trigger): feature source files in `lib/`, `tools/`, `schema/`, `guards/`, `prompts/`, `bin/`, `transport/`, `scripts/`, `content/`, `templates/`, `specs/`, `test/`, `qa_reports/`, `review_reports/` are EXPECTED in a release commit and MUST be staged per SOP step 8 — these never trigger STOP. Only UNRELATED uncommitted changes (paths with no connection to the active feature, e.g. stray editor swap files `*.swp`, `.DS_Store`, IDE caches, `.env*`, secrets, scratch dirs, or unrelated source edits in directories outside the feature scope) trigger the STOP row above.
+**Expected vs unrelated scope rule** (first row's trigger): feature source files in `lib/`, `tools/`, `schema/`, `guards/`, `prompts/`, `bin/`, `transport/`, `scripts/`, `content/`, `templates/`, `specs/`, `test/`, `qa_reports/`, `review_reports/` are EXPECTED in a release commit and MUST be staged per SOP step 8 — these never trigger STOP. Only UNRELATED uncommitted changes (paths with no connection to the active feature, e.g. stray editor swap files `*.swp`, `.DS_Store`, IDE caches, `.env*`, secrets, scratch dirs, or unrelated source edits in directories outside the feature scope) trigger the STOP row above. The `qa_reports/archive/<feature>/**` moves produced by SOP step 7a (deleted root-level paths plus their new archive paths, for the released feature's evidence files only) are likewise EXPECTED move-only release-engineer output, not a role-boundary violation — never a STOP trigger.

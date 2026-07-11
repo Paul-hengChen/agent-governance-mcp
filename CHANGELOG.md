@@ -16,6 +16,14 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.67.1] - 2026-07-11
+
+### Added
+- **`d7-qa-reports-archive` — QA Reports Archive SOP (v3.67.1).** Introduces release-engineer SOP step 7a to archive shipped feature qa_reports into `qa_reports/archive/<active_feature>/` subdirectory, preventing stale evidence from cluttering the root during multi-feature releases. Updates `content/skill-release-engineer.md` with new SOP step 7a, allowlist annotation (archive path excluded from `evidence-file.ts` coverage scans via `.md`-suffix + non-recursive readdirSync), and no-clobber move semantics per Constitution §2 safety rules. Adds regression test to `test/covering-evidence.test.mjs` (1107/1107 tests pass) pinning AC8-b invariant: `buildCoverageIndex` tolerates archive/ subdirectories and never surfaces archived ids. QA verified empirically via temp-fixture probe against compiled production code (dist/tools/evidence-file.js, dist/gates/qa-review.js) demonstrating bit-for-bit identical behavior with/without archive present. Backwards-compatible; PATCH bump. All acceptance criteria met; see `specs/d7-qa-reports-archive.md`, `qa_reports/review_T-D7-02.md`, `review_reports/review_T-D7-01.md`.
+
+### Notes
+- driftBaselineIds appended with T-D7-01, T-D7-02, T-D7-REL, T-D7-DONE
+
 ## [3.67.0] - 2026-07-10
 
 ### Added

@@ -214,6 +214,43 @@ test("buildCoverageIndex: files with no covers: line contribute nothing", () => 
   assert.equal(index.size, 0);
 });
 
+// Regression guard for specs/d7-qa-reports-archive.md AC8-b: a released
+// feature's evidence files get moved under qa_reports/archive/<feature>/.
+// buildCoverageIndex's readdirSync-then-filter must tolerate that
+// subdirectory sitting alongside root-level .md files — a bare directory
+// name has no ".md" suffix, so it is filtered out before any readFileSync,
+// never descended into. This pins the exact invariant AC8-b describes
+// (rather than re-deriving it from the "non-.md files are ignored" test
+// above, since a directory and a non-.md *file* exercise the same filter
+// line but are worth distinguishing for a reader auditing archive-safety).
+test("buildCoverageIndex: tolerates an archive/ subdirectory alongside real .md files (AC8-b)", () => {
+  const ws = tmpWs();
+  const dir = path.join(ws, "qa_reports");
+  writeQaReport(ws, "review_T-LIVE.md", "covers: T-LIVE\n");
+  // A past feature's archived evidence, moved under archive/<feature>/ by the
+  // release-engineer SOP step — same shape a real release produces.
+  const archiveDir = path.join(dir, "archive", "d3-gate-fire-telemetry");
+  fs.mkdirSync(archiveDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(archiveDir, "review_T-D3-01.md"),
+    "covers: T-D3-01\n",
+    "utf-8",
+  );
+  let threw = false;
+  let index;
+  try {
+    index = buildCoverageIndex(dir);
+  } catch {
+    threw = true;
+  }
+  assert.equal(threw, false, "must never throw when an archive/ subdirectory is present");
+  // Only the root-level file's id is indexed; the archived id is invisible —
+  // proves the subdirectory is filtered, never descended into.
+  assert.equal(index.get("T-LIVE"), "review_T-LIVE.md");
+  assert.equal(index.has("T-D3-01"), false);
+  assert.equal(index.size, 1);
+});
+
 // ===========================================================================
 // hasEvidenceInFile — QA PASS gate (qa_reports/), C3-03
 // ===========================================================================
