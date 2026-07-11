@@ -471,3 +471,130 @@ test("C13-AC6: shim watermark and tw_get_state/tw_switch_role invocation lines a
     "shim tw_get_state/tw_switch_role invocation line must be preserved verbatim (C13-AC6)",
   );
 });
+
+// ---------------------------------------------------------------------------
+// Phase 5 — D10: release-engineer git-stop-rule (non-fast-forward push /
+// concurrent-release collision)
+// ---------------------------------------------------------------------------
+// WHY: specs/d10-release-engineer-git-stop-rule.md documents an incident where
+// a haiku-tier release-engineer hit a non-fast-forward push (a concurrent D2
+// session had advanced main) and "resolved" it by aborting a rebase and
+// running `git reset HEAD~1`, discarding its own committed release — only the
+// reflog made recovery possible. AC1-AC3 require a Hard rule + matching
+// Escalation Routes row in content/skill-release-engineer.md that forbids
+// destructive git recovery and instead routes to a Blocked handoff with the
+// local release-commit SHA. AC4 requires a mirroring ≤2-sentence
+// reinforcement hint in the haiku-tier shim, without touching the watermark
+// or tw_get_state/tw_switch_role lines. AC5 requires this test file to pin
+// the verbatim Copy/Strings substrings from both files, following the same
+// load-bearing-substring convention as the AC1-AC5/C13 tests above — we pin
+// substrings (not whole paragraphs) so future rewording that preserves
+// intent doesn't spuriously fail, but silent removal of the STOP rule,
+// the forbidden-command list, or the Blocked/SHA/hand-back contract does.
+
+test("D10-AC1: skill-release-engineer.md Hard rule STOPs on non-fast-forward push / collision and forbids destructive git recovery", () => {
+  // Contract: the Hard rule must instruct immediate STOP and explicitly
+  // forbid git reset / rebase / checkout --force / clean as workarounds —
+  // the exact anti-pattern the D10 incident exhibited.
+  assert.ok(
+    SKILL.includes(
+      "STOP immediately — NEVER run `git reset`, `git rebase`, `git checkout --force`, or `git clean` to work around it.",
+    ),
+    "skill-release-engineer.md must contain the verbatim D10 stop-clause forbidding destructive git recovery (D10-AC1)",
+  );
+});
+
+test("D10-AC2: skill-release-engineer.md Hard rule routes to status=Blocked with the local release-commit SHA, handing back for coordinator recovery", () => {
+  // Contract: instead of self-recovering, the rule must instruct writing
+  // status=Blocked with the local release-commit SHA in pending_notes and
+  // handing back — never attempting recovery itself. Pinned as two
+  // substrings (spec's own Copy/Strings table elides the middle with "..."),
+  // both of which must survive intact.
+  assert.ok(
+    SKILL.includes(
+      "write `status=Blocked` with the local release-commit SHA in `pending_notes`",
+    ),
+    "skill-release-engineer.md must instruct writing status=Blocked with the local release-commit SHA in pending_notes (D10-AC2)",
+  );
+  assert.ok(
+    SKILL.includes("and hand back for coordinator recovery."),
+    "skill-release-engineer.md must instruct handing back for coordinator recovery, not self-recovery (D10-AC2)",
+  );
+});
+
+test("D10-AC1/AC2: skill-release-engineer.md Hard rule includes the worked pending_notes example and the incident-reason clause", () => {
+  // Contract: the Hard rule gives a literal pending_notes=[...] example
+  // (this file's existing convention for other Blocked examples) plus the
+  // D10 incident rationale, so the rule reads as self-justifying under
+  // context pressure rather than a bare directive.
+  assert.ok(
+    SKILL.includes(
+      'pending_notes=["release-engineer: push rejected (non-fast-forward) — local release commit <sha> not on remote, needs coordinator recovery"]',
+    ),
+    "skill-release-engineer.md must contain the verbatim D10 worked pending_notes example (D10-AC1/AC2)",
+  );
+  assert.ok(
+    SKILL.includes(
+      "Reason (D10): a haiku-tier release-engineer hit exactly this collision, aborted a rebase, and ran `git reset HEAD~1`, discarding its own committed release — only the reflog made recovery possible.",
+    ),
+    "skill-release-engineer.md must contain the verbatim D10 incident-reason clause (D10-AC1/AC2)",
+  );
+});
+
+test("D10-AC3: skill-release-engineer.md Escalation Routes table has a matching non-fast-forward/collision row (Blocked, SHA pending-note, human)", () => {
+  // Contract: the Escalation Routes table row must name the trigger, carry
+  // status=Blocked, the canonical SHA pending-note (deliberately identical
+  // to the Hard rule's worked example per spec's paired-wording intent),
+  // and next_role=human.
+  assert.match(
+    SKILL,
+    /\| non-fast-forward push rejection \/ concurrent-release collision \(D10\) \| Blocked \|/,
+    "skill-release-engineer.md Escalation Routes table must have a D10 row with status=Blocked (D10-AC3)",
+  );
+  assert.ok(
+    SKILL.includes(
+      "`release-engineer: push rejected (non-fast-forward) — local release commit <sha> not on remote, needs coordinator recovery`",
+    ),
+    "skill-release-engineer.md Escalation Routes row must carry the verbatim backtick-wrapped D10 pending-note (D10-AC3)",
+  );
+  assert.match(
+    SKILL,
+    /non-fast-forward push rejection \/ concurrent-release collision \(D10\) \| Blocked \| `release-engineer: push rejected \(non-fast-forward\) — local release commit <sha> not on remote, needs coordinator recovery` \| human \|/,
+    "skill-release-engineer.md Escalation Routes D10 row must route to next_role=human (D10-AC3)",
+  );
+});
+
+test("D10-AC4: release-engineer.md shim contains the verbatim D10 reinforcement hint (<=2 sentences)", () => {
+  // Contract: the shim must mirror the Hard rule's STOP instruction and
+  // forbidden-command list as a compact, C13-pattern reinforcement hint —
+  // the anchor that survives even under haiku-tier context pressure.
+  const hint =
+    "CRITICAL: On any non-fast-forward push rejection or concurrent-release collision, STOP — NEVER `git reset`, `git rebase`, `git checkout --force`, or `git clean`. Write `status=Blocked` with the local release commit SHA in `pending_notes` and hand back to the coordinator/human for recovery.";
+  assert.ok(
+    SHIM.includes(hint),
+    "release-engineer.md shim must contain the verbatim D10 reinforcement hint (D10-AC4)",
+  );
+  const sentences = hint.split(/\.\s+|\.$/).filter(Boolean);
+  assert.ok(
+    sentences.length <= 2,
+    `D10 shim hint must be <=2 sentences; found ${sentences.length} (D10-AC4)`,
+  );
+});
+
+test("D10-AC4: shim watermark and tw_get_state/tw_switch_role invocation lines are unaltered by the D10 hint", () => {
+  // Contract: AC4 explicitly forbids altering the watermark line or the
+  // tw_get_state/tw_switch_role instruction while adding the D10 hint —
+  // same non-regression guard as the C13 hints above, re-asserted here so a
+  // future edit specifically to the D10 hint region can't silently clobber
+  // either anchor line.
+  assert.match(
+    SHIM,
+    /CRITICAL: End every reply with `— @release-engineer \(<the model tier you were actually invoked with>\)` per Constitution §1 \(watermark\)\./,
+    "shim watermark line must be preserved verbatim (D10-AC4)",
+  );
+  assert.match(
+    SHIM,
+    /call `tw_get_state` then `tw_switch_role\("release-engineer"\)`/,
+    "shim tw_get_state/tw_switch_role invocation line must be preserved verbatim (D10-AC4)",
+  );
+});

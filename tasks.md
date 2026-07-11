@@ -251,6 +251,9 @@ _(No active tasks — ready for the next feature.)_
 - [x] T-D6-06 qa-engineer: QA pass - verify composed skill output for both host states end-to-end, run full suite green, confirm no CC-only text leaks into a non-CC dispatch and the existing Claude Code dispatch path is unchanged in substance (AC1, AC2, AC7). | depends_on: T-D6-05
 - [x] T-D6-REL release-engineer (post-PASS): version bump, CHANGELOG entry, build, git tag, gh release per skill-release-engineer SOP. | depends_on: T-D6-06 (note: tw_sync: mirrored from handoff.completed_tasks (R10))
 - [x] T-D6-DONE release-engineer (post-release): mark backlog D6 done in docs/backlog.md with mechanism summary and commit reference; append driftBaselineIds T-D6-*; archive qa_reports/ for this feature per D7 SOP. | depends_on: T-D6-REL (note: tw_sync: mirrored from handoff.completed_tasks (R10))
+- [x] T-D10-01 [P0] Add Hard rule (d10.hard-rule.stop-clause/blocked-clause/example-note/reason) + Escalation Routes row (d10.escalation-row.pending-note) to content/skill-release-engineer.md per specs/d10-release-engineer-git-stop-rule.md Copy/Strings table | depends_on: none (note: QA PASS — Hard rule + Escalation row byte-exact verified against spec Copy/Strings)
+- [x] T-D10-02 [P0] Add ≤2-sentence reinforcement hint (d10.template-hint) to templates/claude-code-agents/release-engineer.md without altering the watermark line or tw_get_state/tw_switch_role invocation line | depends_on: T-D10-01 (note: QA PASS — template hint verified byte-exact, watermark/invocation lines unaltered)
+- [x] T-D10-03 [P0] Add regression tests to test/release-staging.test.mjs pinning the verbatim D10 strings (Hard rule substrings, Escalation Routes pending-note, template hint substrings) per the file's existing AC/C13 pinning convention; confirm npm test green | depends_on: T-D10-01, T-D10-02 (note: QA PASS — 6 new pinning tests added to test/release-staging.test.mjs, full suite 1211/1211 green)
 
 ## Completed
 

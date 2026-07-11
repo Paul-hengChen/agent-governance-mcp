@@ -16,6 +16,14 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.71.1] - 2026-07-12
+
+### Changed
+- **`d10-release-engineer-git-stop-rule` — Release-engineer hard-stop rules and escalation routes (v3.71.1).** Adds critical Hard rule (STOP on push rejection / concurrent-release collision via D10 escalation case), reinforces no-force-push prohibition, and deepens `driftBaselineIds` baseline acknowledgment instructions in `content/skill-release-engineer.md`. Adds escalation-routes table row (non-fast-forward push rejection collision) and CRITICAL condition for task-cleanup misconfigurations triggering premature version-literal assertions. SOP scope clarified for major-version opt-in (explicit user confirmation required). Reinforcement hint added to `templates/claude-code-agents/release-engineer.md`. Regression test suite extended with 6 new pinning tests in `test/release-staging.test.mjs` covering git-state-collision scenarios and hard-rule enforcement. QA verified with 1211/1211 tests green. See `specs/d10-release-engineer-git-stop-rule.md`.
+
+### Notes
+- driftBaselineIds appended with T-D10-01, T-D10-02, T-D10-03, T-D10-REL
+
 ## [3.71.0] - 2026-07-11
 
 ### Added
