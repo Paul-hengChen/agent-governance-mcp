@@ -5,9 +5,13 @@
 // snapshot). Mirrors the existing best-effort, lock-free append precedent
 // in gates/qa-review.ts's recordReviewInFile (spec AC-7).
 //
-// D2 non-preclusion (spec AC-9): the exported TelemetryEvent type + this
-// module boundary are the extension point for D2's future hop/token fields.
-// D3 itself emits ONLY the 5 fields below.
+// D2 consumer (this module's spec AC-9, resolved by D2 AC-7/DR-4): per-dispatch
+// token-usage cost records live in the SIBLING module tools/usage-accounting.ts
+// and its SEPARATE sidecar file .current/usage.jsonl — two files, two modules,
+// disjoint key sets ({ts, feature, dispatch, usage{…}} vs this module's
+// {ts, gate, error_code, agent_id, feature}). This module remains gate-fire
+// telemetry ONLY and emits ONLY the 5 fields below; D2's hop-cap gate fires
+// (HOP_CAP_EXCEEDED) flow through here unchanged.
 
 import * as fs from "fs";
 import * as path from "path";

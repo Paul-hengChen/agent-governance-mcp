@@ -65,6 +65,14 @@ export interface HandoffState {
   // Backward-compat: parser defaults missing field to 0 (v2→v3 migration
   // also stamps the field).
   visual_round: number;
+  // v9 (d2-server-brake-accounting) — feature-scoped role-transition counter.
+  // Computed server-side by computeNewRound; enforced by the HOP_CAP_EXCEEDED
+  // override in validateTransition. Always emitted (even 0), parser defaults
+  // missing to 0 — identical treatment to qa_round/review_round/visual_round.
+  // Feature-scoped: resets ONLY on active_feature change (NOT on PM re-entry,
+  // DR-6 — the hop cap is a session-length circuit breaker, harder to clear
+  // than the per-task round caps by design).
+  hop_count: number;
   // Optional absolute path to the workspace's PRD file. Consumed by the RAG
   // lazy-reindex hook in prompts/build.ts:appendSpecContext. When absent, the
   // hook falls back to discovering PRD.md/docs/PRD.md/specs/PRD.md.
@@ -333,6 +341,12 @@ function readAndMigrate(workspacePath: string): HandoffReadResult | null {
   const visualRoundRaw = Number(frontmatter.visual_round);
   const visual_round =
     Number.isFinite(visualRoundRaw) && visualRoundRaw >= 0 ? Math.floor(visualRoundRaw) : 0;
+  // v9 — hop_count counter (d2-server-brake-accounting). Defaults missing /
+  // malformed to 0, the true pre-feature value (DR-3) — identical defensive
+  // posture to the three round counters above.
+  const hopCountRaw = Number(frontmatter.hop_count);
+  const hop_count =
+    Number.isFinite(hopCountRaw) && hopCountRaw >= 0 ? Math.floor(hopCountRaw) : 0;
 
   const state: HandoffState = {
     active_feature: asString(frontmatter.active_feature),
@@ -354,6 +368,7 @@ function readAndMigrate(workspacePath: string): HandoffReadResult | null {
     qa_round,
     review_round,
     visual_round,
+    hop_count,
   };
 
   // One-shot stderr warning on v1→v2 migration when an in-flight ticket sits at
@@ -418,6 +433,12 @@ export function readHandoffState(workspacePath: string): string {
       state.prd_path,
       state.review_round,
       state.visual_round,
+      // v9 — carry the (possibly migration-seeded) hop_count through the heal
+      // write. Without this 12th arg the v8→v9 heal stamped schema_version: 9
+      // but DROPPED the seeded counter, and the always-emit block below would
+      // re-default it to 0 — harmless for the seed value (0) but lossy for any
+      // real accumulated count on a hand-migrated file.
+      state.hop_count,
     ).catch(() => {
       /* swallowed — read still returns migrated state */
     });
@@ -488,6 +509,12 @@ export interface WriteHandoffStateOptions {
   prdPath?: string;
   reviewRound?: number;
   visualRound?: number;
+  // v9 — hop_count counter (d2-server-brake-accounting). Server-computed by
+  // computeNewRound and threaded through the orchestrator; always emitted to
+  // frontmatter (even 0), normalised like the three round counters. NOT
+  // preserved-if-omitted: an omitting write normalises to 0, matching
+  // qaRound/reviewRound/visualRound semantics exactly.
+  hopCount?: number;
   // v4 — scope-decision attestation (server-scope-decision-gate). Emitted into
   // frontmatter only when truthy; preserved across writes that omit it.
   scopeDecision?: string;
@@ -552,6 +579,7 @@ export function writeHandoffState(
   prdPath?: string,
   reviewRound?: number,
   visualRound?: number,
+  hopCount?: number,
 ): Promise<string>;
 export async function writeHandoffState(
   workspacePathOrOpts: string | WriteHandoffStateOptions,
@@ -565,6 +593,7 @@ export async function writeHandoffState(
   prdPath?: string,
   reviewRound?: number,
   visualRound?: number,
+  hopCount?: number,
 ): Promise<string> {
   // Discriminate by first-arg shape. Options-object branch when the first
   // argument is a non-null, non-array object. After this block, all locals
@@ -605,6 +634,7 @@ export async function writeHandoffState(
     prdPath = o.prdPath;
     reviewRound = o.reviewRound;
     visualRound = o.visualRound;
+    hopCount = o.hopCount;
     scopeDecision = o.scopeDecision;
     scopeDecisionWhy = o.scopeDecisionWhy;
     cutApproved = o.cutApproved;
@@ -790,6 +820,14 @@ export async function writeHandoffState(
         ? Math.floor(visualRound as number)
         : 0;
     frontmatterData.visual_round = normalisedVisualRound;
+    // v9 — always emit hop_count (even 0) so the field is discoverable and the
+    // v8→v9 migration-heal write persists the seeded counter (closing the 01A
+    // stamp-v9-but-drop-hop_count gap). Falsy input normalises to 0.
+    const normalisedHopCount =
+      Number.isFinite(hopCount) && (hopCount as number) >= 0
+        ? Math.floor(hopCount as number)
+        : 0;
+    frontmatterData.hop_count = normalisedHopCount;
 
     const frontmatter = yaml
       .dump(frontmatterData, { lineWidth: -1, forceQuotes: true, quotingType: '"' })

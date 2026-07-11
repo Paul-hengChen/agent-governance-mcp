@@ -359,26 +359,34 @@ test("ALLOWED_TRANSITIONS map has known keys", () => {
 // semantics in this section; review_round semantics live in the T67 tests
 // below; visual_round semantics live in test/visual-round-transitions.test.mjs.
 
+// d2-server-brake-accounting (qa-owned re-baseline): computeNewRound's return
+// shape gained a fourth field, hop_count (v9). Additive-only — the three
+// round fields are computed identically; every deepEqual fixture below now
+// pins hop_count too. None of these calls pass prev_hop_count/feature_changed
+// (both default), and every one is a role-transition (next.agent differs from
+// the (possibly-omitted, i.e. null) prev.agent) — DR-9: hop_count = 0 + 1 = 1
+// in every case here, never a reset (no feature_changed=true call in this file).
+
 test("computeNewRound: (qa-engineer, FAIL) increments qa_round, holds review_round", () => {
-  assert.deepEqual(computeNewRound(0, 0, 0, { agent: "qa-engineer", status: "FAIL" }), { qa_round: 1, review_round: 0, visual_round: 0 });
-  assert.deepEqual(computeNewRound(2, 1, 0, { agent: "qa-engineer", status: "FAIL" }), { qa_round: 3, review_round: 1, visual_round: 0 });
-  assert.deepEqual(computeNewRound(3, 0, 0, { agent: "qa-engineer", status: "FAIL" }), { qa_round: 4, review_round: 0, visual_round: 0 }); // enter Round 4
+  assert.deepEqual(computeNewRound(0, 0, 0, { agent: "qa-engineer", status: "FAIL" }), { qa_round: 1, review_round: 0, visual_round: 0, hop_count: 1 });
+  assert.deepEqual(computeNewRound(2, 1, 0, { agent: "qa-engineer", status: "FAIL" }), { qa_round: 3, review_round: 1, visual_round: 0, hop_count: 1 });
+  assert.deepEqual(computeNewRound(3, 0, 0, { agent: "qa-engineer", status: "FAIL" }), { qa_round: 4, review_round: 0, visual_round: 0, hop_count: 1 }); // enter Round 4
 });
 
 test("computeNewRound: (qa-engineer, PASS) resets qa_round, holds review_round", () => {
-  assert.deepEqual(computeNewRound(3, 0, 0, { agent: "qa-engineer", status: "PASS" }), { qa_round: 0, review_round: 0, visual_round: 0 });
-  assert.deepEqual(computeNewRound(0, 2, 0, { agent: "qa-engineer", status: "PASS" }), { qa_round: 0, review_round: 2, visual_round: 0 });
+  assert.deepEqual(computeNewRound(3, 0, 0, { agent: "qa-engineer", status: "PASS" }), { qa_round: 0, review_round: 0, visual_round: 0, hop_count: 1 });
+  assert.deepEqual(computeNewRound(0, 2, 0, { agent: "qa-engineer", status: "PASS" }), { qa_round: 0, review_round: 2, visual_round: 0, hop_count: 1 });
 });
 
 test("computeNewRound: (pm, In_Progress) resets both counters (re-entry)", () => {
-  assert.deepEqual(computeNewRound(4, 3, 0, { agent: "pm", status: "In_Progress" }), { qa_round: 0, review_round: 0, visual_round: 0 });
+  assert.deepEqual(computeNewRound(4, 3, 0, { agent: "pm", status: "In_Progress" }), { qa_round: 0, review_round: 0, visual_round: 0, hop_count: 1 });
 });
 
 test("computeNewRound: other writes hold both counters unchanged", () => {
-  assert.deepEqual(computeNewRound(2, 1, 0, { agent: "sr-engineer", status: "In_Progress" }), { qa_round: 2, review_round: 1, visual_round: 0 });
+  assert.deepEqual(computeNewRound(2, 1, 0, { agent: "sr-engineer", status: "In_Progress" }), { qa_round: 2, review_round: 1, visual_round: 0, hop_count: 1 });
   // (qa-engineer, In_Progress) without prev=(code-reviewer, In_Progress) does NOT reset review_round.
-  assert.deepEqual(computeNewRound(2, 1, 0, { agent: "qa-engineer", status: "In_Progress" }), { qa_round: 2, review_round: 1, visual_round: 0 });
-  assert.deepEqual(computeNewRound(2, 1, 0, { agent: "pm", status: "Blocked" }), { qa_round: 2, review_round: 1, visual_round: 0 });
+  assert.deepEqual(computeNewRound(2, 1, 0, { agent: "qa-engineer", status: "In_Progress" }), { qa_round: 2, review_round: 1, visual_round: 0, hop_count: 1 });
+  assert.deepEqual(computeNewRound(2, 1, 0, { agent: "pm", status: "Blocked" }), { qa_round: 2, review_round: 1, visual_round: 0, hop_count: 1 });
 });
 
 // ---------- v3.15.0 AC-11/AC-12/AC-13 — Round 4 sentinel symmetric `>=` predicate ----------
@@ -728,13 +736,15 @@ test("AC-12: review_round cap independent from qa_round cap", () => {
 test("AC-12: computeNewRound — (code-reviewer, FAIL) increments review_round, holds qa_round", () => {
   // Why: AC-3 mandates FAIL increments. qa_round must hold steady — the two
   // counters are independent. v3.14.0: visual_round also independent.
+  // d2-server-brake-accounting (qa-owned re-baseline): hop_count pinned per
+  // the file-header note above (role transition, no feature_changed → 1).
   assert.deepEqual(
     computeNewRound(2, 0, 0, { agent: "code-reviewer", status: "FAIL" }),
-    { qa_round: 2, review_round: 1, visual_round: 0 },
+    { qa_round: 2, review_round: 1, visual_round: 0, hop_count: 1 },
   );
   assert.deepEqual(
     computeNewRound(0, 2, 0, { agent: "code-reviewer", status: "FAIL" }),
-    { qa_round: 0, review_round: 3, visual_round: 0 },
+    { qa_round: 0, review_round: 3, visual_round: 0, hop_count: 1 },
   );
 });
 
@@ -749,7 +759,7 @@ test("AC-12: computeNewRound — handoff (code-reviewer→qa-engineer, In_Progre
       { agent: "qa-engineer", status: "In_Progress" },
       { agent: "code-reviewer", status: "In_Progress" },
     ),
-    { qa_round: 1, review_round: 0, visual_round: 0 },
+    { qa_round: 1, review_round: 0, visual_round: 0, hop_count: 1 },
   );
 });
 
@@ -765,7 +775,7 @@ test("AC-12: computeNewRound — (qa-engineer, In_Progress) without code-reviewe
       { agent: "qa-engineer", status: "In_Progress" },
       { agent: "sr-engineer", status: "In_Progress" },
     ),
-    { qa_round: 0, review_round: 2, visual_round: 0 },
+    { qa_round: 0, review_round: 2, visual_round: 0, hop_count: 1 },
   );
 });
 
@@ -774,7 +784,7 @@ test("AC-12: computeNewRound — (pm, In_Progress) resets BOTH counters (re-entr
   // v3.14.0: also resets visual_round.
   assert.deepEqual(
     computeNewRound(3, 2, 4, { agent: "pm", status: "In_Progress" }),
-    { qa_round: 0, review_round: 0, visual_round: 0 },
+    { qa_round: 0, review_round: 0, visual_round: 0, hop_count: 1 },
   );
 });
 
@@ -1853,14 +1863,17 @@ test("T-MATRIX-C13: computeNewRound holds qa_round/review_round/visual_round ste
   // on qa-engineer or pm as next.agent), so all three counters must hold
   // from a nonzero prior value — correct, since PASS already zeroed them and
   // nothing should regress on the hop into release-engineer.
+  // d2-server-brake-accounting (qa-owned re-baseline): both calls here are a
+  // role transition (qa-engineer -> release-engineer), no feature_changed →
+  // hop_count = 1 in both cases (per the file-header note above).
   assert.deepEqual(
     computeNewRound(2, 3, 4, { agent: "release-engineer", status: "In_Progress" }, { agent: "qa-engineer", status: "PASS" }),
-    { qa_round: 2, review_round: 3, visual_round: 4 },
+    { qa_round: 2, review_round: 3, visual_round: 4, hop_count: 1 },
   );
   // Also pin the zero-prior case (the realistic post-PASS state).
   assert.deepEqual(
     computeNewRound(0, 0, 0, { agent: "release-engineer", status: "In_Progress" }, { agent: "qa-engineer", status: "PASS" }),
-    { qa_round: 0, review_round: 0, visual_round: 0 },
+    { qa_round: 0, review_round: 0, visual_round: 0, hop_count: 1 },
   );
 });
 
@@ -1868,8 +1881,10 @@ test("T-MATRIX-C13: computeNewRound re-zeros all three counters on release-engin
   // WHY: the closing write hits the existing (pm, In_Progress) reset branch —
   // already covered generically elsewhere, but this pins it specifically
   // following a (release-engineer, In_Progress) prev, per spec AC4.
+  // d2-server-brake-accounting (qa-owned re-baseline): role transition
+  // (release-engineer -> pm), no feature_changed → hop_count = 1.
   assert.deepEqual(
     computeNewRound(2, 3, 4, { agent: "pm", status: "In_Progress" }, { agent: "release-engineer", status: "In_Progress" }),
-    { qa_round: 0, review_round: 0, visual_round: 0 },
+    { qa_round: 0, review_round: 0, visual_round: 0, hop_count: 1 },
   );
 });

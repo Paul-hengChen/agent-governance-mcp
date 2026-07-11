@@ -44,7 +44,11 @@ const { GATE_REGISTRY, ALL_GATE_CODES } = await import(
 // imported so the QA_ROUND_EXCEEDED/REVIEW_ROUND_EXCEEDED/VISUAL_ROUND_EXCEEDED
 // triggerEdge cap literals (">= 4", ">= 4", ">= 6") can be asserted against the
 // LIVE transitions.ts constants rather than trusted as hand-copied prose.
-const { ROUND_CAP_EXPORTED, REVIEW_ROUND_CAP_EXPORTED, VISUAL_ROUND_CAP_EXPORTED } = await import(
+// d2-server-brake-accounting (qa-owned re-baseline): HOP_CAP_EXPORTED joins the
+// three round-cap constants above — HOP_CAP_EXCEEDED's triggerEdge carries the
+// same ">= N" checkable cap literal, sourced from the live constant rather than
+// hand-copied.
+const { ROUND_CAP_EXPORTED, REVIEW_ROUND_CAP_EXPORTED, VISUAL_ROUND_CAP_EXPORTED, HOP_CAP_EXPORTED } = await import(
   path.join(PROJECT_ROOT, "dist", "tools", "transitions.js")
 );
 
@@ -150,23 +154,25 @@ function fmt(codeMap, codes) {
 }
 
 // ---------------------------------------------------------------------------
-// AC-1 / AC-5: GATE_REGISTRY is the single source of truth, exactly 22
-// entries (T-C16-04, qa-owned re-baseline: c16-c10-role-boundary added the
-// 22nd, REVIEWER_COMPLETED_TASKS_REJECTED; 21 in, 22 out — one gate added,
-// none dropped). c15-expected-red-manifest had added the 21st,
-// EXPECTED_RED_DIFF_MISSING. c9-protocol-fields had added the 20th,
+// AC-1 / AC-5: GATE_REGISTRY is the single source of truth, exactly 23
+// entries (d2-server-brake-accounting, qa-owned re-baseline: added the 23rd,
+// HOP_CAP_EXCEEDED — the hop-cap gate, sibling of QA_ROUND_EXCEEDED/
+// REVIEW_ROUND_EXCEEDED/VISUAL_ROUND_EXCEEDED; 22 in, 23 out — one gate
+// added, none dropped). c16-c10-role-boundary had added the 22nd,
+// REVIEWER_COMPLETED_TASKS_REJECTED. c15-expected-red-manifest had added the
+// 21st, EXPECTED_RED_DIFF_MISSING. c9-protocol-fields had added the 20th,
 // REVIEW_VERDICT_STATUS_MISMATCH.
 // ---------------------------------------------------------------------------
 
-test("AC-1/AC-5: GATE_REGISTRY has exactly 22 entries (21 in, 22 out — c16-c10-role-boundary added REVIEWER_COMPLETED_TASKS_REJECTED)", () => {
+test("AC-1/AC-5: GATE_REGISTRY has exactly 23 entries (22 in, 23 out — d2-server-brake-accounting added HOP_CAP_EXCEEDED)", () => {
   assert.equal(
     GATE_REGISTRY.length,
-    22,
-    `expected exactly 22 GateDefinition entries, got ${GATE_REGISTRY.length}: ${GATE_REGISTRY.map((g) => g.errorCode).join(", ")}`,
+    23,
+    `expected exactly 23 GateDefinition entries, got ${GATE_REGISTRY.length}: ${GATE_REGISTRY.map((g) => g.errorCode).join(", ")}`,
   );
   assert.equal(
     ALL_GATE_CODES.length,
-    22,
+    23,
     "ALL_GATE_CODES must be GATE_REGISTRY.map(g => g.errorCode) — same length",
   );
   assert.deepEqual(
@@ -279,20 +285,26 @@ test("internal consistency: orchestrator-producer entries' errorCode literally a
 // ---------------------------------------------------------------------------
 // DR-8 (architecture Interface Contracts / Decision Records): the
 // TransitionRejection["error"] union in tools/transitions.ts is deliberately
-// NOT re-sourced from the registry (it carries 5 emitted + 8 handler-side
+// NOT re-sourced from the registry (it carries 6 emitted + 8 handler-side
 // envelope-consistency codes, not a clean by-producer subset — narrowing it
 // would silently delete 8 documented members). Guard against drift the cheap
-// way instead: pin the union at exactly 13 members and assert it is a subset
+// way instead: pin the union at exactly 14 members and assert it is a subset
 // of ALL_GATE_CODES.
+// d2-server-brake-accounting (qa-owned re-baseline): HOP_CAP_EXCEEDED joins
+// the union as a 6th validateTransition-EMITTED member (13 -> 14) — unlike
+// EXTERNAL_REFS_UNRESOLVED (a handler-side-only addition), HOP_CAP_EXCEEDED
+// is actually produced by validateTransition's hop-cap override (tools/
+// transitions.ts precedence step 2.5), the same emit-site class as
+// QA_ROUND_EXCEEDED/REVIEW_ROUND_EXCEEDED/VISUAL_ROUND_EXCEEDED. It IS added
+// to TRANSITION_GATE_CODES (gates/registry.ts) for that reason.
 // b8-external-ref-ledger (B8-08, DR-9): EXTERNAL_REFS_UNRESOLVED joins the
 // union as an 8th handler-side-only member (12 -> 13), for the same three
 // reasons CUT_APPROVAL_REQUIRED/SCOPE_DECISION_REQUIRED carry theirs: envelope
 // narrowing at the emit site, the union-subset-of-ALL_GATE_CODES invariant
-// below, and catalog completeness. It is NOT added to TRANSITION_GATE_CODES
-// (that set is the 5 validateTransition-emitted codes only).
+// below, and catalog completeness.
 // ---------------------------------------------------------------------------
 
-test("DR-8: TransitionRejection[\"error\"] union stays byte-identical at 13 members, all ⊆ ALL_GATE_CODES", () => {
+test("DR-8: TransitionRejection[\"error\"] union stays byte-identical at 14 members, all ⊆ ALL_GATE_CODES", () => {
   const transitionsSrc = readSource(path.join("tools", "transitions.ts"));
   const unionMatch = transitionsSrc.match(
     /export interface TransitionRejection \{\s*error:\s*([\s\S]*?);\s*\n\s*attempted:/,
@@ -306,12 +318,12 @@ test("DR-8: TransitionRejection[\"error\"] union stays byte-identical at 13 memb
 
   assert.equal(
     members.length,
-    13,
-    `TransitionRejection["error"] must stay byte-identical at 13 members (DR-8, b8-external-ref-ledger re-baseline) — found ${members.length}: ${members.join(", ")}`,
+    14,
+    `TransitionRejection["error"] must stay byte-identical at 14 members (DR-8, d2-server-brake-accounting re-baseline) — found ${members.length}: ${members.join(", ")}`,
   );
   assert.equal(
     new Set(members).size,
-    13,
+    14,
     "TransitionRejection[\"error\"] union members must be unique",
   );
 
@@ -438,6 +450,11 @@ const CAP_BY_CODE = {
   QA_ROUND_EXCEEDED: ROUND_CAP_EXPORTED,
   REVIEW_ROUND_EXCEEDED: REVIEW_ROUND_CAP_EXPORTED,
   VISUAL_ROUND_EXCEEDED: VISUAL_ROUND_CAP_EXPORTED,
+  // d2-server-brake-accounting (qa-owned re-baseline): HOP_CAP_EXCEEDED's
+  // triggerEdge carries the identical ">= N" cap-literal shape as the three
+  // round caps above ("prev_hop_count >= 10 on a role transition ..."); check
+  // it against the live HOP_CAP_EXPORTED constant the same way.
+  HOP_CAP_EXCEEDED: HOP_CAP_EXPORTED,
 };
 
 test("AC2 (c12): round-cap entries' triggerEdge numeric literal matches the live transitions.ts cap constant", () => {
@@ -577,8 +594,8 @@ test("doc-file mapping (c12): gates/registry.ts's errorCode→doc-file mapping c
   const mapping = parseDocFileMappingComment();
   assert.equal(
     mapping.size,
-    22,
-    `expected the mapping comment to list all 22 codes, found ${mapping.size}: ${[...mapping.keys()].join(", ")}`,
+    23,
+    `expected the mapping comment to list all 23 codes, found ${mapping.size}: ${[...mapping.keys()].join(", ")}`,
   );
   const docCodes = extractDocCodes();
   for (const g of GATE_REGISTRY) {
@@ -612,6 +629,7 @@ const FREE_TEXT_ALLOWLIST = [
   { code: "QA_ROUND_EXCEEDED", field: "armCondition", reason: "same generic validateTransition-step pointer" },
   { code: "REVIEW_ROUND_EXCEEDED", field: "armCondition", reason: "same generic validateTransition-step pointer" },
   { code: "VISUAL_ROUND_EXCEEDED", field: "armCondition", reason: "\"opt-in (counter present)\" — free English; the visual_round counter is a handoff field, not a named predicate/function call" },
+  { code: "HOP_CAP_EXCEEDED", field: "armCondition", reason: "\"opt-in (counter present)\" — free English, identical reasoning to VISUAL_ROUND_EXCEEDED; the hop_count counter is a handoff field, not a named predicate/function call. triggerEdge is NOT allowlisted — it is mechanically checked via CAP_BY_CODE (d2-server-brake-accounting re-baseline)." },
   { code: "CUT_APPROVAL_REQUIRED", field: "armCondition", reason: "\"unconditional; FileHandoffStorage only\" — names a class, not a predicate/function-call literal; this entry's checkable content is its triggerEdge edge-pair, checked separately" },
   { code: "EXTERNAL_REFS_UNRESOLVED", field: "armCondition", reason: "compound free-English condition over the external_refs ledger; no single named predicate/function-call literal" },
   { code: "MISSING_EVIDENCE", field: "triggerEdge", reason: "\"status=PASS with completed_tasks\" — free English, no role:Status edge pair or named constant" },

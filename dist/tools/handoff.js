@@ -178,6 +178,11 @@ function readAndMigrate(workspacePath) {
     const review_round = Number.isFinite(reviewRoundRaw) && reviewRoundRaw >= 0 ? Math.floor(reviewRoundRaw) : 0;
     const visualRoundRaw = Number(frontmatter.visual_round);
     const visual_round = Number.isFinite(visualRoundRaw) && visualRoundRaw >= 0 ? Math.floor(visualRoundRaw) : 0;
+    // v9 — hop_count counter (d2-server-brake-accounting). Defaults missing /
+    // malformed to 0, the true pre-feature value (DR-3) — identical defensive
+    // posture to the three round counters above.
+    const hopCountRaw = Number(frontmatter.hop_count);
+    const hop_count = Number.isFinite(hopCountRaw) && hopCountRaw >= 0 ? Math.floor(hopCountRaw) : 0;
     const state = {
         active_feature: asString(frontmatter.active_feature),
         status: asString(frontmatter.status),
@@ -198,6 +203,7 @@ function readAndMigrate(workspacePath) {
         qa_round,
         review_round,
         visual_round,
+        hop_count,
     };
     // One-shot stderr warning on v1→v2 migration when an in-flight ticket sits at
     // sr-engineer:In_Progress. After v2, that tuple can no longer transition
@@ -240,7 +246,13 @@ export function readHandoffState(workspacePath) {
         // error here just means another writer already healed the file (AC-5), so
         // swallow it. Any other failure also non-fatal — the in-memory state we
         // return is already at CURRENT.
-        void writeHandoffState(workspacePath, state.active_feature, state.status, state.completed_tasks, state.pending_notes, state.blocking_reason, state.last_agent, state.qa_round, state.prd_path, state.review_round, state.visual_round).catch(() => {
+        void writeHandoffState(workspacePath, state.active_feature, state.status, state.completed_tasks, state.pending_notes, state.blocking_reason, state.last_agent, state.qa_round, state.prd_path, state.review_round, state.visual_round, 
+        // v9 — carry the (possibly migration-seeded) hop_count through the heal
+        // write. Without this 12th arg the v8→v9 heal stamped schema_version: 9
+        // but DROPPED the seeded counter, and the always-emit block below would
+        // re-default it to 0 — harmless for the seed value (0) but lossy for any
+        // real accumulated count on a hand-migrated file.
+        state.hop_count).catch(() => {
             /* swallowed — read still returns migrated state */
         });
     }
@@ -291,7 +303,7 @@ export function readHandoffState(workspacePath) {
     };
     return JSON.stringify({ exists: true, ...view });
 }
-export async function writeHandoffState(workspacePathOrOpts, activeFeature, status, completedTasks, pendingNotes, blockingReason, lastAgent, qaRound, prdPath, reviewRound, visualRound) {
+export async function writeHandoffState(workspacePathOrOpts, activeFeature, status, completedTasks, pendingNotes, blockingReason, lastAgent, qaRound, prdPath, reviewRound, visualRound, hopCount) {
     // Discriminate by first-arg shape. Options-object branch when the first
     // argument is a non-null, non-array object. After this block, all locals
     // below are guaranteed non-undefined for the required fields.
@@ -329,6 +341,7 @@ export async function writeHandoffState(workspacePathOrOpts, activeFeature, stat
         prdPath = o.prdPath;
         reviewRound = o.reviewRound;
         visualRound = o.visualRound;
+        hopCount = o.hopCount;
         scopeDecision = o.scopeDecision;
         scopeDecisionWhy = o.scopeDecisionWhy;
         cutApproved = o.cutApproved;
@@ -517,6 +530,13 @@ export async function writeHandoffState(workspacePathOrOpts, activeFeature, stat
             ? Math.floor(visualRound)
             : 0;
         frontmatterData.visual_round = normalisedVisualRound;
+        // v9 — always emit hop_count (even 0) so the field is discoverable and the
+        // v8→v9 migration-heal write persists the seeded counter (closing the 01A
+        // stamp-v9-but-drop-hop_count gap). Falsy input normalises to 0.
+        const normalisedHopCount = Number.isFinite(hopCount) && hopCount >= 0
+            ? Math.floor(hopCount)
+            : 0;
+        frontmatterData.hop_count = normalisedHopCount;
         const frontmatter = yaml
             .dump(frontmatterData, { lineWidth: -1, forceQuotes: true, quotingType: '"' })
             .trimEnd();

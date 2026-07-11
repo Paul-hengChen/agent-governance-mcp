@@ -76,7 +76,7 @@ If ≥ 1 hit → route to `design-auditor` *before* PM. The auditor produces `de
 
 Default-ON in `/teamwork`. Disabled in `/teamwork-lite` (different skill).
 
-After each role's handoff, read the just-written state (`tw_get_state`). If the first-class `next_role` field is set (handoff schema v7 — a structured field, not a `pending_notes` line) and none of the stop conditions below fire, dispatch to the role it names per the preference order below and follow its SOP. `pending_notes` is free-text context for the next reader, not a routing channel. Increment your in-memory hop counter by 1 per successful dispatch.
+After each role's handoff, read the just-written state (`tw_get_state`). If the first-class `next_role` field is set (handoff schema v7 — a structured field, not a `pending_notes` line) and none of the stop conditions below fire, dispatch to the role it names per the preference order below and follow its SOP. `pending_notes` is free-text context for the next reader, not a routing channel. The hop counter is server-tracked<!-- origin:start --> (v3.67.0, D2, handoff schema v9)<!-- origin:end -->: every accepted role-transition write increments the persisted `hop_count` field — read it from `tw_get_state` after each handoff instead of maintaining an in-memory counter, and the server enforces the cap by rejecting the over-cap transition write with `HOP_CAP_EXCEEDED`.
 
 **Subagent Dispatch (Claude Code)** — preferred when available. If the host advertises a `Task` tool with `subagent_type=<role>` AND a subagent named `<role>` is registered (heuristic: attempt the call once; on tool-error or unknown-subagent-type, fall back), dispatch via `Task(subagent_type="<next_role>", prompt="<brief composed per the **Dispatch Brief Template** below>")` INSTEAD of `tw_switch_role`. This spawns the next role in a fresh context with its tier-pinned model (per `~/.claude/agents/<role>.md` frontmatter — copy from `templates/claude-code-agents/`). The dispatched subagent's first action remains `tw_get_state` → `tw_detect_drift` (Constitution §3); the **server-enforced `ALLOWED_TRANSITIONS` matrix in `tools/transitions.ts` still gates every `tw_update_state` write** (invalid edges rejected with `TRANSITION_REJECTED`) — Task-tool dispatch changes WHICH MODEL runs the role, NOT the routing chain itself.
 
@@ -116,7 +116,7 @@ the `dispatch_pins` field alone, with no dependence on the dispatching session's
 
 **Opt-out**: if `AGC_AUTO_ROUTE=0` at session start, do NOT auto-hop — surface the `next_role` field's recommendation in chat and wait for the human to issue `tw_switch_role` themselves.
 
-**Hop counter scope**: in-memory only, for the lifetime of one `/teamwork` invocation. Do NOT persist to `handoff.md` or any tool argument.
+**Hop counter scope**<!-- origin:start --> (v3.67.0, D2)<!-- origin:end -->: server-tracked and feature-scoped — `hop_count` is a persisted `handoff.md` field computed by the orchestrator (a sibling of `qa_round`/`review_round`/`visual_round`); it resets ONLY on `active_feature` change (NOT on PM re-entry) and therefore persists across `/teamwork` invocations of the same feature. Read it from `tw_get_state`; do NOT compute, cache, or write it yourself — the pre-D2 in-memory counter is retired. WHEN a feature's `hop_count` is already at/over the `hop` cap (const-01 Limits) → the server rejects the next counted role-transition write with `HOP_CAP_EXCEEDED`, allowing only the `(pm, In_Progress)` landing edge (which records the halt WITHOUT resetting the counter — only a feature change clears it) → surface the halt per the *hop cap* Escalation Routes row. Self-loops and same-agent status changes are not role transitions and are never hop-counted or hop-blocked.
 
 ## Escalation Routes
 
@@ -128,8 +128,8 @@ Stop conditions + routing escalations (WHEN/DO/ELSE collapsed to rows; Constitut
 | last write is `status: PASS` | PASS (terminal) | terminal success — release-engineer is a deliberate human decision, not an auto-hop | human |
 | the `next_role` field is absent but `pending_notes` prose asks for a human decision (the enum has no `human` value — omitting the field IS the escalate-to-human signal) | — | relay the prior role's note | human |
 | the `next_role` field is absent with no escalation prose | — | surface as ambiguous — the prior role forgot or finished without nominating a successor | human |
-| hop counter ≥ the `hop` cap for this `/teamwork` session | — | surface the hop cap | human |
-| **Token budget brake** — `.current/.config.json` sets `tokenBudgetPerFeature` AND the in-memory running token total for this `/teamwork` invocation ≥ 80% of it (see §Token Budget Brake) | — | `token budget: {running_total} / {tokenBudgetPerFeature} ({pct}%) — handing to human` | human |
+| `hop_count` from `tw_get_state` ≥ the `hop` cap for the active feature — or a `tw_update_state` write was rejected with `HOP_CAP_EXCEEDED` (server-enforced) | — | surface the hop cap (`hop_count={n}`) — autonomous dispatch is frozen at PM until a human re-scopes into a new feature or overrides | human |
+| **Token budget brake** — `.current/.config.json` sets `tokenBudgetPerFeature` AND the feature-scoped running total summed from `.current/usage.jsonl` (fallback: the `agent-*.jsonl` hand-sum when the sidecar is absent; see §Token Budget Brake) ≥ 80% of it | — | `token budget: {running_total} / {tokenBudgetPerFeature} ({pct}%) — handing to human` | human |
 | **Crash detection** — a dispatched `Task(subagent_type=<role>, …)` call returns a tool-error or empty/truncated reply, or the host/user reports the subagent was killed (session or usage-limit kill), BEFORE that role's own `tw_update_state` landed (handoff `agent_id`/`status` unchanged since dispatch) | — | do not resume or re-dispatch directly — run the Crash-Resume Protocol first, then resume | (role being resumed) |
 | **Cut-approval gate** — the `next_role` field is `architect` or `sr-engineer` but `cut_approved` is not set on the handoff (server error: `CUT_APPROVAL_REQUIRED`) | — | surface the cut draft and wait — do NOT auto-hop through to build; writer obligation below | human |
 | **External-refs gate** — the `next_role` field is `architect` or `sr-engineer` but the handoff `external_refs` ledger has an entry with `state: "unresolved"` (server error: `EXTERNAL_REFS_UNRESOLVED`) | — | surface the unresolved refs and wait — do NOT auto-hop through to build; PM must resolve each ref (fetch/index/user-confirm-ignorable) and re-write the ledger | human |
@@ -240,25 +240,32 @@ unknown denominator (it conflates cached vs fresh input), whereas the `usage.*` 
 MCP tool is required to parse `agent-*.jsonl` (automated tooling is deferred). Use these fields so
 future retrospectives report measured costs, not estimates.
 
-## Token Budget Brake<!-- origin:start --> (v3.63.0, B9)<!-- origin:end -->
+## Token Budget Brake<!-- origin:start --> (v3.63.0, B9; durable sidecar v3.67.0, D2)<!-- origin:end -->
 
 Opt-in, off-by-default cost-side circuit breaker that complements (not replaces) the count-side caps
 (the `hop` cap, per-skill round caps). Enabled ONLY when `.current/.config.json` sets
 `tokenBudgetPerFeature` to a positive finite number — an absent key, absent file, or invalid value
 (filtered to absent by `loadConfig`) means the brake is disabled and NO budget check occurs.
 
-When enabled, after each completed dispatch (`Task(subagent_type=<role>, …)`), read that dispatch's
-`agent-*.jsonl` entry and add the four canonical `usage.*` fields (§Subagent Token Observability
-above): `usage.input_tokens + usage.output_tokens + usage.cache_read_input_tokens +
-usage.cache_creation_input_tokens` to a running total. **Running-total scope**: identical to the hop
-counter's scope discipline — in-memory only, for the lifetime of one `/teamwork` invocation. Do NOT
-persist to `handoff.md` or any tool argument. The total resets when a new `/teamwork` invocation
-starts; cross-session accumulation is explicitly out of scope.
+When enabled, after each completed dispatch (`Task(subagent_type=<role>, …)`), read the durable
+sidecar `.current/usage.jsonl` — populated per dispatch by the opt-in PostToolUse hook
+(`bin/agent-governance-usage-hook.mjs`; wiring: README) — and compute the running total
+feature-scoped: over every line whose `feature` equals the active feature, sum the four canonical
+`usage.*` fields (§Subagent Token Observability above): `usage.input_tokens + usage.output_tokens +
+usage.cache_read_input_tokens + usage.cache_creation_input_tokens`. **Running-total scope**:
+feature-scoped and durable — the sidecar survives context loss, session kills, and new `/teamwork`
+invocations of the same feature; any future coordinator instance recomputes the same total by
+re-reading the file. Do NOT keep a parallel in-memory total as the source of truth, and do NOT
+persist totals to `handoff.md` or any tool argument — the sidecar is the ledger. WHEN
+`.current/usage.jsonl` is absent (hook not wired) → DO fall back to the pre-D2 B9 hand-sum: read
+each completed dispatch's `agent-*.jsonl` entry and accumulate the same four `usage.*` fields
+in-memory for the lifetime of this `/teamwork` invocation (B9 behavior preserved for un-wired
+users) → ELSE the sidecar sum is authoritative.
 
 WHEN the running total reaches or exceeds 80% of `tokenBudgetPerFeature` → DO stop instead of
 auto-hopping, surfacing the running total, the ceiling, and the percentage in one sentence per the
 *Token budget brake* Escalation Routes row (same halt semantics as the hop-cap row: observe/halt
-only, no state write, no new persisted field, no schema bump — advisory-only) → ELSE keep routing.
+only, no state write, no schema bump — advisory-only) → ELSE keep routing.
 
 ## SOP
 
@@ -268,6 +275,6 @@ only, no state write, no new persisted field, no schema bump — advisory-only) 
 4. **Feature-Scope Gate** (incoming PRD/ticket only; text-only): judge single vs multi-feature. **Multi** → STOP, write `.current/feature-split.md`, surface the recommendation + hint, wait for the human (do NOT route until they confirm + re-invoke per unit). **Single / not a PRD** → continue.
 5. **Apply Complexity Scope Gate** against the request.
    - **No gate triggered** → execute directly → `tw_update_state` (if step 3 was run).
-   - **Gate triggered** → dispatch via the Auto-Routing preference order (Task-tool subagent if available, else `tw_switch_role(<role>)`) → follow the SOP exclusively. Increment hop counter.
+   - **Gate triggered** → dispatch via the Auto-Routing preference order (Task-tool subagent if available, else `tw_switch_role(<role>)`) → follow the SOP exclusively. The server increments the persisted `hop_count` on each accepted role-transition write — do not count hops yourself.
 6. **Multi-phase** → chain per constitution §4. Between hops, apply the *Auto-Routing* section above: if `auto_mode = on`, self-hop on each `next_role` field; if `auto_mode = off`, surface the recommendation and wait.
 

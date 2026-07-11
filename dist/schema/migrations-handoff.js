@@ -92,6 +92,19 @@ registerMigration({
     to: 8,
     up: (input) => ({ ...input, schema_version: 8 }),
 });
+// v8 → v9: add hop_count counter (d2-server-brake-accounting). SEEDS
+// `hop_count: 0` — the review_round (v1→v2) / visual_round (v2→v3) counter
+// precedent, NOT the stamp-only attestation precedent (DR-3): hop_count is a
+// counter whose true pre-feature value is 0, not an attestation whose absence
+// is meaningful. Feature-scoped role-transition counter, computed server-side
+// by computeNewRound and enforced by the HOP_CAP_EXCEEDED override in
+// validateTransition (HOP_CAP = 10).
+registerMigration({
+    kind: "handoff",
+    from: 8,
+    to: 9,
+    up: (input) => ({ ...input, schema_version: 9, hop_count: 0 }),
+});
 // Compile-time guard: if CURRENT_VERSIONS.handoff is ever bumped without a
 // matching registration added above, the runner's missing-step error fires
 // at read time. This reference makes the dependency explicit for grep.

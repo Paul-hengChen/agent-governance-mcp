@@ -16,13 +16,15 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
-## [3.67.1] - 2026-07-11
+## [3.68.0] - 2026-07-11
 
 ### Added
-- **`d7-qa-reports-archive` — QA Reports Archive SOP (v3.67.1).** Introduces release-engineer SOP step 7a to archive shipped feature qa_reports into `qa_reports/archive/<active_feature>/` subdirectory, preventing stale evidence from cluttering the root during multi-feature releases. Updates `content/skill-release-engineer.md` with new SOP step 7a, allowlist annotation (archive path excluded from `evidence-file.ts` coverage scans via `.md`-suffix + non-recursive readdirSync), and no-clobber move semantics per Constitution §2 safety rules. Adds regression test to `test/covering-evidence.test.mjs` (1107/1107 tests pass) pinning AC8-b invariant: `buildCoverageIndex` tolerates archive/ subdirectories and never surfaces archived ids. QA verified empirically via temp-fixture probe against compiled production code (dist/tools/evidence-file.js, dist/gates/qa-review.js) demonstrating bit-for-bit identical behavior with/without archive present. Backwards-compatible; PATCH bump. All acceptance criteria met; see `specs/d7-qa-reports-archive.md`, `qa_reports/review_T-D7-02.md`, `review_reports/review_T-D7-01.md`.
+- **`d2-server-brake-accounting` — Server-side hop-cap brake + durable token-usage accounting (v3.68.0).** Implements server-enforced cost-side circuit breakers, replacing in-memory coordinator arithmetic with durable, persisted field tracking. (1) Hop Counter Brake: adds `hop_count` field to `handoff.md` (schema v9, seed 0), incremented deterministically by `tools/transitions.ts`, with `HOP_CAP_EXCEEDED` gate enforcing 10-hop limit per feature. Feature-scoped reset on (pm, In_Progress) landing edge with exemption for the same-feature re-entry edge. (2) Token Budget Brake (opt-in): adds `bin/agent-governance-usage-hook.mjs` PostToolUse hook (best-effort, never-throw) appending `{ts, feature, dispatch, usage}` records to `.current/usage.jsonl` sidecar; coordinator reads sidecar (with hand-sum fallback to `agent-*.jsonl` for backward-compat) instead of model-maintained arithmetic. Handoff schema v8→v9 migration adds `hop_count` field to all extant task records (seed 0 for backward-compat, no replay required). Updated `content/skill-coordinator.md` (Token Budget Brake section) and `content/skill-coordinator-lite.md` to document feature-scoped reset mechanics. Comprehensive architecture documented in `specs/d2-server-brake-accounting.md` and `specs/d2-server-brake-accounting-architecture.md`. Code-review approved; QA verified with 1165/1165 green. See `review_reports/review_T-D2-04.md`, `qa_reports/review_T-D2-05.md`.
 
 ### Notes
-- driftBaselineIds appended with T-D7-01, T-D7-02, T-D7-REL, T-D7-DONE
+- driftBaselineIds appended with T-D2-ARCH, T-D2-01, T-D2-01A, T-D2-01B, T-D2-02, T-D2-03, T-D2-04, T-D2-05, T-D2-REL, T-D2-DONE
+- `hop_count` field added to handoff schema v9 (migration from v8 auto-runs on read)
+- `.current/usage.jsonl` is new append-only sidecar for token accounting (created on-demand by hook)
 
 ## [3.67.0] - 2026-07-10
 
