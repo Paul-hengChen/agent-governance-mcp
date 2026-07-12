@@ -85,7 +85,7 @@ future `/teamwork` feature; none blocks a release on its own.
 | E1 | Single `active_feature` cannot model concurrent sessions — feature-scoped state (lease field or per-feature branch/worktree) + serialized release queue; structural root cause of the D9/D10 collision class | P1 | — | ~6 (design first: handoff schema, orchestrator, storage, skills) | **done (2026-07-12, v3.72.0)** — Feature-lease mechanism (gates/feature-lease.ts + gates/registry.ts) + FEATURE_LEASE_HELD gate + SOP step 3a (re-baseline off origin/HEAD); 1235/1235 tests green; tag v3.72.0 (269c42b) + E1A amendment (v3.73.1, terminal-marker gate + negative-age guard, tag cb38d06) |
 | E2 | Bug-fix as a first-class chain: `bugfix` dispatch mode (lighter than feature chain) + server-enforced repro-first gate — failing expected-red repro manifest required BEFORE fix work (reuses C15 machinery) | P1 | — | ~4 (transitions/dispatch mode, gate, skill-pm/sr/qa, tests) | **done (2026-07-12, v3.73.0)** — Bugfix-mode signal (handoff schema v11, dispatch_mode field) + REPRO_FIRST_REQUIRED gate + skill guidance; 1251/1251 tests pass; tag c279d70 |
 | E3 | Outcome-shaped acceptance: machine-executable ACs in specs + mandatory QA runtime-evidence step — gates currently verify evidence exists, never that the change does what the AC says | P1 | — | ~4 (skill-pm AC schema, skill-qa, evidence gate, tests) | — |
-| E4 | design-auditor source-credibility check as a hard STOP gate — classify source node (full-frame / variant / read-only page) with server-checked attestation before the build hop; retros' single highest-leverage lever | P1 | — | ~3 (skill-design-auditor, gate check, test) | — |
+| E4 | design-auditor source-credibility check as a hard STOP gate — classify source node (full-frame / variant / read-only page) with server-checked attestation before the build hop; retros' single highest-leverage lever | P1 | — | ~3 (skill-design-auditor, gate check, test) | **done (2026-07-12, v3.75.0)** — SOURCE_CREDIBILITY_UNVERIFIED gate on pm→{architect,sr-engineer} edge + credibility cell parser in gates/visual.ts + design-auditor SOP update; 1313/1313 tests green; tag v3.75.0 (0932338) |
 | E5 | Backlog intake loop + tiered cut-approval: coordinator auto-starts next open backlog ticket; small cuts (≤2 files, P3, no schema) auto-approve, large/design-armed still HALT | P2 | E8 | ~3 (skill-coordinator, const §3.1 tier rule, config threshold) | — |
 | E6 | Rule-retirement retro cadence: actually run the D3 data every N features; zero-fire gates/prose become retirement PRs — the counter-pressure D3 was built for, still unexecuted | P2 | D3 ✓, E8 | ~2 (retro procedure doc, summarizer script) | — |
 | E7 | Git/CI as a governed surface: sanctioned-git-ops whitelist for ALL roles (generalizes D10 beyond release-engineer) + optional CI-status check at release instead of self-reported test-green | P2 | D10 | ~3 (constitution/skill content, optional gh check step, test) | — |
@@ -990,8 +990,11 @@ in live runs first, cheap content-only batches next, design-heavy last.
 - **Risk if skipped:** gate-green-but-wrong ships keep recurring — the most
   expensive failure class (human retraction → full-round redo).
 
-## E4 — design-auditor source-credibility check as a hard STOP gate (P1, from 2026-07-11 review)
-- **What:** the retrospectives' single strongest cross-feature conclusion:
+## E4 — design-auditor source-credibility check as a hard STOP gate (P1, from 2026-07-11 review) — DONE v3.75.0
+
+**Release:** v3.75.0 (0932338, 2026-07-12) — shipped SOURCE_CREDIBILITY_UNVERIFIED gate on pm→{architect,sr-engineer} edge. Extends gates/visual.ts with credibility cell parser reading design baseline manifests; gate fires when fetch-based modes (Figma/Sketch/XD/Penpot) have audited rows missing credibility attestation (credibility: full-page-composite required). Dormant on image/PDF/paper modes. Complements E8 metrics: ensures source quality (E4) + measures outcome quality (E8) cross-feature. Full suite 1313/1313 green (1281 baseline + 32 new E4 tests). Evidence: qa_reports/review_T-E4-05.md. Specs: specs/e4-design-source-credibility-gate.md + specs/e4-design-source-credibility-gate-architecture.md.
+
+**What:** the retrospectives' single strongest cross-feature conclusion:
   pin the correct, frozen design contract before work and the chain converges
   in one pass. Mode P2 caught a wrong Figma node pre-build → zero rework;
   Mode P1 mis-sourced per-card crops → full-round redo; Language's lossy
