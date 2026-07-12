@@ -92,8 +92,9 @@ future `/teamwork` feature; none blocks a release on its own.
 | E8 | Success-side telemetry: per-feature one-pass rate / qa-review-visual rounds / hops / token totals appended at release — D3 records only rejections; success claims are currently hand-assembled anecdotes | P2 | D3 ✓ | ~3 (telemetry emit, release SOP line, summarizer) | **done (2026-07-12, v3.74.0)** — schema v12 cumulative round counters + release-time metrics emit to .current/metrics.jsonl + scripts/summarize-metrics.mjs; 1295/1295 green; tag v3.74.0 |
 | E9 | Suspected hand-authored `.current/handoff.md` release-closing writes: v3.72.0 and v3.73.1 closing stamps are round-to-the-minute AND local-time-mislabeled-as-Z, unlike server `tw_update_state` stamps (ms entropy) — suspect release-engineer subagents hand-editing during release staging, forbidden by skill-release-engineer.md L20 | P2 | — | ~3 (reproduce + find writer; optional server-side integrity check: reject client-shaped stamps / drift-detect out-of-band writes) | — |
 | E10 | Feature-lease human override + non-work write exemptions: failure-record writes and lazy-migration heals refresh a dead lease with no sanctioned human attestation path (2026-07-12 E8-start incident — ~34 min of timeout-waiting in an idle workspace) | P2 | E1 ✓ | ~4 (lease_override field + §3.1 trust mechanics, exempt admin/heal writes from stamp refresh, tests) | — |
-| E11 | `check-version.mjs` ships-vs-source blind spot: the guard asserts only `index.ts` Server() literal vs `package.json`, NOT the compiled `dist/index.js` that npx consumers actually run — v3.74.0 shipped `dist/index.js` at 3.73.1 while the check passed (caught in coordinator post-release verify, fixed in 9b91db9) | P2 | — | ~2 (extend check-version.mjs to parse+assert dist Server() literal + test) | — |
-| E12 | E8 metrics emit not idempotent per release: two terminal-signature writes during v3.74.0 release staging appended two identical `e8-success-telemetry` records to `.current/metrics.jsonl` — emit should fire once per (feature, released_version) | P3 | E8 ✓ | ~2 (dedupe guard in tools/metrics.ts + test) | — |
+| E11 | `check-version.mjs` ships-vs-source blind spot: the guard asserts only `index.ts` Server() literal vs `package.json`, NOT the compiled `dist/index.js` that npx consumers actually run — v3.74.0 shipped `dist/index.js` at 3.73.1 while the check passed (caught in coordinator post-release verify, fixed in 9b91db9) | P2 | — | ~2 (extend check-version.mjs to parse+assert dist Server() literal + test) | **done (2026-07-12, v3.76.0)** — dist-parity check via scripts/check-version.mjs + gate in release-engineer SOP step 7; 1323/1323 green; tag v3.76.0 commit 4d38a8a |
+| E12 | E8 metrics emit not idempotent per release: two terminal-signature writes during v3.74.0 release staging appended two identical `e8-success-telemetry` records to `.current/metrics.jsonl` — emit should fire once per (feature, released_version) | P3 | E8 ✓ | ~2 (dedupe guard in tools/metrics.ts + test) | **done (2026-07-12, v3.76.0)** — idempotent metrics emit in tools/metrics.ts via last-line check; dedupe regression tests; 1323/1323 green; tag v3.76.0 commit 4d38a8a |
+| E13 | E1A terminal-marker fragility: v3.75.0 closing write omitted `next_role=pm` (coordinator brief error), so the exact-triple terminal clause failed silently and the lease stayed held ~30 min — release-engineer got no warning the closing write was non-terminal; server should warn/reject a release-engineer closing-signature write missing the triple, or relax the marker | P2 | E1 ✓, E10 | ~3 (gates/feature-lease.ts or orchestrator advisory, skill-release-engineer note, test) | — |
 
 ### Recommended execution order (2026-07-09, everything still open)
 
@@ -1172,6 +1173,7 @@ in live runs first, cheap content-only batches next, design-heavy last.
 - **Risk if skipped:** the same stale-dist mis-versioned release can recur
   every release; the guard that exists to prevent exactly this class silently
   doesn't cover the shipped artifact.
+- **Status:** ✅ DONE (2026-07-12, v3.76.0 — commit 4d38a8a) — dist-parity check now parses dist/index.js Server() literal and compares against package.json; gate mandatory in release-engineer SOP step 7; 1323/1323 tests green.
 
 ## E12 — E8 metrics emit not idempotent per release (P3, data-quality, from 2026-07-12 v3.74.0 first live emit)
 
@@ -1192,3 +1194,26 @@ in live runs first, cheap content-only batches next, design-heavy last.
 - **Risk if skipped:** cross-feature success-rate math (the E6/E5 consumers)
   double-counts any release that double-fired, skewing the exact numbers E8
   was built to make trustworthy.
+- **Status:** ✅ DONE (2026-07-12, v3.76.0 — commit 4d38a8a) — metrics emit now idempotent via last-line read-back check in tools/metrics.ts; silent skip on duplicate (feature, released_version) pairs; dedupe regression tests in test/success-metrics.test.mjs; 1323/1323 tests green.
+
+## E13 — E1A terminal-marker fragility: non-terminal closing write fails silently (P2, release-integrity, from 2026-07-12 E11+E12 intake incident)
+
+- **What:** the E1A feature-lease terminal marker requires the exact triple
+  `last_agent="release-engineer" && status="In_Progress" && next_role="pm"`
+  (gates/feature-lease.ts:70-95). During the v3.75.0 close-out the coordinator
+  briefed the release-engineer to omit `next_role` ("parked, awaiting human"),
+  the write landed without complaint, the terminal clause's third conjunct
+  failed silently, and the next feature's PM write was rejected with
+  FEATURE_LEASE_HELD until a corrective reissue. Nothing warned either agent
+  that the closing write was non-terminal.
+- **Fix (pick one at design time):** (a) server-side advisory/rejection when a
+  write matches the release-engineer closing signature except for a missing
+  `next_role` — "closing write is non-terminal, lease stays held"; or (b)
+  relax the marker to `last_agent="release-engineer" && status="In_Progress"`
+  post-PASS; or (c) both-belt: advisory + skill-release-engineer checklist
+  line. Sequence with E10 (lease human-override) — same trust surface.
+- **Owner:** TBD — small (~3: gates/feature-lease.ts or orchestrator advisory,
+  skill-release-engineer note, test).
+- **Risk if skipped:** every future close-out that omits the triple re-creates
+  a silent ~30-min lease stall at the next feature start; the marker's
+  correctness depends on prose SOP compliance the server never checks.
