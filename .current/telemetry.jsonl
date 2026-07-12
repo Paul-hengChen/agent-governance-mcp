@@ -3,3 +3,7 @@
 {"ts":"2026-07-11T09:30:09.002Z","gate":"validateTransition","error_code":"TRANSITION_REJECTED","agent_id":"release-engineer","feature":"d5-server-side-stale-dispatch-detection"}
 {"ts":"2026-07-11T17:12:32.205Z","gate":"orchestrator","error_code":"EXPECTED_RED_DIFF_MISSING","agent_id":"qa-engineer","feature":"e1-feature-scoped-state-design"}
 {"ts":"2026-07-11T20:17:46.958Z","gate":"orchestrator","error_code":"MISSING_EVIDENCE","agent_id":"qa-engineer","feature":"e1-feature-scoped-state-design"}
+{"ts":"2026-07-11T20:44:17.276Z","gate":"orchestrator","error_code":"FEATURE_LEASE_HELD","agent_id":"pm","feature":"e8-success-telemetry"}
+{"ts":"2026-07-11T20:45:59.250Z","gate":"orchestrator","error_code":"FEATURE_LEASE_HELD","agent_id":"pm","feature":"e8-success-telemetry"}
+{"ts":"2026-07-11T20:46:31.306Z","gate":"validateTransition","error_code":"TRANSITION_REJECTED","agent_id":"pm","feature":"e1-feature-scoped-state-design"}
+{"ts":"2026-07-11T21:17:44.618Z","gate":"orchestrator","error_code":"FEATURE_LEASE_HELD","agent_id":"pm","feature":"e8-success-telemetry"}

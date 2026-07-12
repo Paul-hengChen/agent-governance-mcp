@@ -90,6 +90,8 @@ future `/teamwork` feature; none blocks a release on its own.
 | E6 | Rule-retirement retro cadence: actually run the D3 data every N features; zero-fire gates/prose become retirement PRs — the counter-pressure D3 was built for, still unexecuted | P2 | D3 ✓, E8 | ~2 (retro procedure doc, summarizer script) | — |
 | E7 | Git/CI as a governed surface: sanctioned-git-ops whitelist for ALL roles (generalizes D10 beyond release-engineer) + optional CI-status check at release instead of self-reported test-green | P2 | D10 | ~3 (constitution/skill content, optional gh check step, test) | — |
 | E8 | Success-side telemetry: per-feature one-pass rate / qa-review-visual rounds / hops / token totals appended at release — D3 records only rejections; success claims are currently hand-assembled anecdotes | P2 | D3 ✓ | ~3 (telemetry emit, release SOP line, summarizer) | — |
+| E9 | Suspected hand-authored `.current/handoff.md` release-closing writes: v3.72.0 and v3.73.1 closing stamps are round-to-the-minute AND local-time-mislabeled-as-Z, unlike server `tw_update_state` stamps (ms entropy) — suspect release-engineer subagents hand-editing during release staging, forbidden by skill-release-engineer.md L20 | P2 | — | ~3 (reproduce + find writer; optional server-side integrity check: reject client-shaped stamps / drift-detect out-of-band writes) | — |
+| E10 | Feature-lease human override + non-work write exemptions: failure-record writes and lazy-migration heals refresh a dead lease with no sanctioned human attestation path (2026-07-12 E8-start incident — ~34 min of timeout-waiting in an idle workspace) | P2 | E1 ✓ | ~4 (lease_override field + §3.1 trust mechanics, exempt admin/heal writes from stamp refresh, tests) | — |
 
 ### Recommended execution order (2026-07-09, everything still open)
 
@@ -1063,3 +1065,66 @@ in live runs first, cheap content-only batches next, design-heavy last.
 - **Owner:** /teamwork (small code + release SOP line + summarizer).
 - **Risk if skipped:** process tuning stays anecdotal — no way to verify
   whether E1–E5 actually move the success rate they were cut to move.
+
+## E9 — Suspected hand-authored release-closing handoff writes (P2, governance-integrity, from 2026-07-12 coordinator finding)
+- **What:** the last two release-closing writes to `.current/handoff.md`
+  (v3.72.0 and v3.73.1) carry `last_updated` stamps that are round-to-the-
+  minute AND local-time-mislabeled-as-Z (e.g. `2026-07-12T04:35:00.000Z`
+  written at real UTC ~20:35). Every server-side `tw_update_state` stamp
+  carries millisecond entropy (`new Date().toISOString()`), so a
+  minute-round, wrong-offset stamp is not something the write path
+  produces — these two look hand-authored. `content/skill-release-engineer.md`
+  L20 already forbids hand-editing `.current/handoff.md`/`tasks.md` under
+  any circumstance (STOP-on-rejection rule); the suspected mechanism is a
+  release-engineer subagent hand-editing the handoff file directly during
+  release staging instead of calling `tw_update_state`, rather than an
+  explicit rule violation choice.
+- **Blast radius today:** contained — the v3.73.1 negative-age guard
+  (E1A, `gates/feature-lease.ts`) already treats a stamp that cannot
+  establish a trustworthy non-negative elapsed time as lease-NOT-held
+  (fail-open), so a mislabeled-offset stamp cannot itself wedge the
+  feature-lease mechanism. The concern is integrity/audit-trail, not an
+  active outage.
+- **Fix (scope suggestion, not yet chosen):** (1) reproduce — find the
+  exact writer (audit recent release-engineer transcripts/tool-call logs
+  for a direct file write vs. a `tw_update_state` call around those two
+  releases); (2) consider a server-side integrity check — e.g. reject
+  client-shaped timestamp patterns (round-minute, non-UTC-tagged) on
+  `tw_update_state`-adjacent reads, or extend `tw_detect_drift` to flag a
+  handoff `last_updated` that could not plausibly have come from
+  `new Date().toISOString()`.
+- **Owner:** TBD — not started; do not fix opportunistically inside an
+  unrelated feature's ticket.
+- **Risk if skipped:** the false audit trail persists silently; if the
+  same mechanism produces a stamp that DOES pass the negative-age guard
+  (e.g. correctly-offset but still hand-authored), a future incident loses
+  the one signal (`tw_update_state`'s ms-entropy timestamp) that currently
+  distinguishes a real write from a hand-edit.
+
+## E10 — Feature-lease human override + non-work write exemptions (P2, from 2026-07-12 E8-start incident)
+
+- **What:** two lease false-positive classes surfaced while starting E8 with
+  a human present and the incumbent feature (E1) verifiably shipped:
+  (1) a PM *failure-record* write — required by Constitution §3 crash/failure
+  rules and forced onto the only legal edge `(pm, In_Progress)` — re-held the
+  lease for a feature everyone knew was terminal; (2) the server's lazy
+  schema-migration rewrite on first read refreshed `last_updated`, extending
+  the same dead lease by another TTL window. Net effect: the human waited out
+  ~34 minutes of timeouts to start approved work in an idle workspace, with
+  no sanctioned way to attest "this lease is dead".
+- **Fix (scope suggestion):** (1) a human-override write path — e.g. a
+  `lease_override: true` field writable only on a coordinator-authored
+  `tw_update_state` carrying an inline human-approval attestation (mirror the
+  `cut_approved` §3.1 trust mechanics + audit-trail note); (2) exempt
+  bookkeeping writes from lease refresh — failure-record/admin writes and
+  migration heals should preserve the incumbent `last_updated` instead of
+  stamping fresh (a heal is not evidence the feature is alive);
+  (3) optionally: a distinct `status` or flag for administrative notes so the
+  state machine stops conflating "record of being blocked" with "work in
+  progress".
+- **Owner:** TBD — needs PM cut; touches gates/feature-lease.ts,
+  handoff-orchestrator, migrations, constitution §3.1 text.
+- **Risk if skipped:** every future crash-record or migration in a busy
+  workspace re-arms a dead lease; humans learn to work around the gate
+  (worktrees, waiting, or — worse — hand-edits), eroding exactly the
+  discipline the lease was built to protect.

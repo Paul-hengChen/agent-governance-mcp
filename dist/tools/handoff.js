@@ -202,6 +202,19 @@ function readAndMigrate(workspacePath) {
     // posture to the three round counters above.
     const hopCountRaw = Number(frontmatter.hop_count);
     const hop_count = Number.isFinite(hopCountRaw) && hopCountRaw >= 0 ? Math.floor(hopCountRaw) : 0;
+    // v12 — cumulative round totals (e8-success-telemetry). Defaults missing /
+    // malformed to 0, the true pre-feature value (v11→v12 seed-0 migration
+    // precedent) — the exact hop_count defensive posture, per field.
+    const qaRoundsTotalRaw = Number(frontmatter.qa_rounds_total);
+    const qa_rounds_total = Number.isFinite(qaRoundsTotalRaw) && qaRoundsTotalRaw >= 0 ? Math.floor(qaRoundsTotalRaw) : 0;
+    const reviewRoundsTotalRaw = Number(frontmatter.review_rounds_total);
+    const review_rounds_total = Number.isFinite(reviewRoundsTotalRaw) && reviewRoundsTotalRaw >= 0
+        ? Math.floor(reviewRoundsTotalRaw)
+        : 0;
+    const visualRoundsTotalRaw = Number(frontmatter.visual_rounds_total);
+    const visual_rounds_total = Number.isFinite(visualRoundsTotalRaw) && visualRoundsTotalRaw >= 0
+        ? Math.floor(visualRoundsTotalRaw)
+        : 0;
     const state = {
         active_feature: asString(frontmatter.active_feature),
         status: asString(frontmatter.status),
@@ -225,6 +238,9 @@ function readAndMigrate(workspacePath) {
         review_round,
         visual_round,
         hop_count,
+        qa_rounds_total,
+        review_rounds_total,
+        visual_rounds_total,
     };
     // One-shot stderr warning on v1→v2 migration when an in-flight ticket sits at
     // sr-engineer:In_Progress. After v2, that tuple can no longer transition
@@ -267,13 +283,38 @@ export function readHandoffState(workspacePath) {
         // error here just means another writer already healed the file (AC-5), so
         // swallow it. Any other failure also non-fatal — the in-memory state we
         // return is already at CURRENT.
-        void writeHandoffState(workspacePath, state.active_feature, state.status, state.completed_tasks, state.pending_notes, state.blocking_reason, state.last_agent, state.qa_round, state.prd_path, state.review_round, state.visual_round, 
-        // v9 — carry the (possibly migration-seeded) hop_count through the heal
-        // write. Without this 12th arg the v8→v9 heal stamped schema_version: 9
-        // but DROPPED the seeded counter, and the always-emit block below would
-        // re-default it to 0 — harmless for the seed value (0) but lossy for any
-        // real accumulated count on a hand-migrated file.
-        state.hop_count).catch(() => {
+        // v12 — heal write converted from the legacy positional overload to the
+        // options object (architecture DR: prefer the modern form over growing the
+        // positional list to 15 params). Behaviorally identical for the pre-v12
+        // fields: transient v7 protocol fields stay omitted (dropped, AC-3) and
+        // the feature-scoped fields (external_refs / dispatch_pins / dispatch_mode
+        // / cut_approved) carry forward via the same-feature preserve clause in
+        // writeHandoffState — exactly as the positional call behaved.
+        void writeHandoffState({
+            workspacePath,
+            activeFeature: state.active_feature,
+            status: state.status,
+            completedTasks: state.completed_tasks,
+            pendingNotes: state.pending_notes,
+            blockingReason: state.blocking_reason,
+            lastAgent: state.last_agent,
+            qaRound: state.qa_round,
+            prdPath: state.prd_path,
+            reviewRound: state.review_round,
+            visualRound: state.visual_round,
+            // v9 — carry the (possibly migration-seeded) hop_count through the heal
+            // write. Without this the v8→v9 heal stamped schema_version: 9 but
+            // DROPPED the seeded counter, and the always-emit block below would
+            // re-default it to 0 — harmless for the seed value (0) but lossy for any
+            // real accumulated count on a hand-migrated file.
+            hopCount: state.hop_count,
+            // v12 — same forward-safety for the three cumulative totals: a future
+            // v12→v13 heal must not stamp the new version while dropping real
+            // accumulated totals (the v9 hop_count 12th-arg gap, closed at birth).
+            qaRoundsTotal: state.qa_rounds_total,
+            reviewRoundsTotal: state.review_rounds_total,
+            visualRoundsTotal: state.visual_rounds_total,
+        }).catch(() => {
             /* swallowed — read still returns migrated state */
         });
     }
@@ -378,6 +419,12 @@ export async function writeHandoffState(workspacePathOrOpts, activeFeature, stat
     // the same-feature preserve clause below carries any existing value forward,
     // mirroring dispatch_pins' DR-8 posture).
     let dispatchMode;
+    // v12 — cumulative round totals. Options-object only (the positional
+    // overload deliberately does NOT grow — architecture DR); a positional call
+    // leaves them undefined and the always-emit blocks below normalise to 0.
+    let qaRoundsTotal;
+    let reviewRoundsTotal;
+    let visualRoundsTotal;
     if (typeof workspacePathOrOpts === "object" &&
         !Array.isArray(workspacePathOrOpts)) {
         const o = workspacePathOrOpts;
@@ -402,6 +449,9 @@ export async function writeHandoffState(workspacePathOrOpts, activeFeature, stat
         reviewVerdict = o.reviewVerdict;
         dispatchPins = o.dispatchPins;
         dispatchMode = o.dispatchMode;
+        qaRoundsTotal = o.qaRoundsTotal;
+        reviewRoundsTotal = o.reviewRoundsTotal;
+        visualRoundsTotal = o.visualRoundsTotal;
     }
     else {
         workspacePath = workspacePathOrOpts;
@@ -626,6 +676,22 @@ export async function writeHandoffState(workspacePathOrOpts, activeFeature, stat
             ? Math.floor(hopCount)
             : 0;
         frontmatterData.hop_count = normalisedHopCount;
+        // v12 — always emit the three cumulative totals (even 0) so the fields are
+        // discoverable and the v11→v12 migration-heal write persists the seeded
+        // counters (the hop_count v9 emit posture, per field). Falsy input
+        // normalises to 0.
+        const normalisedQaRoundsTotal = Number.isFinite(qaRoundsTotal) && qaRoundsTotal >= 0
+            ? Math.floor(qaRoundsTotal)
+            : 0;
+        frontmatterData.qa_rounds_total = normalisedQaRoundsTotal;
+        const normalisedReviewRoundsTotal = Number.isFinite(reviewRoundsTotal) && reviewRoundsTotal >= 0
+            ? Math.floor(reviewRoundsTotal)
+            : 0;
+        frontmatterData.review_rounds_total = normalisedReviewRoundsTotal;
+        const normalisedVisualRoundsTotal = Number.isFinite(visualRoundsTotal) && visualRoundsTotal >= 0
+            ? Math.floor(visualRoundsTotal)
+            : 0;
+        frontmatterData.visual_rounds_total = normalisedVisualRoundsTotal;
         const frontmatter = yaml
             .dump(frontmatterData, { lineWidth: -1, forceQuotes: true, quotingType: '"' })
             .trimEnd();

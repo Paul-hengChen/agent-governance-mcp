@@ -169,7 +169,12 @@ test("AC-11: pre-v3.14 callers (no prev_visual_round) work unchanged (backwards 
     2, 1, 0,
     { agent: "sr-engineer", status: "In_Progress" },
   );
-  assert.deepEqual(result, { qa_round: 2, review_round: 1, visual_round: 0, hop_count: 1 });
+  // e8-success-telemetry (qa-owned re-baseline): computeNewRound's return
+  // shape gained qa_rounds_total/review_rounds_total/visual_rounds_total (v12,
+  // additive). No prev_*_total args here (all default to 0), and next.agent
+  // is neither qa-engineer nor code-reviewer, so none of the three FAIL
+  // predicates match — all three totals hold at their 0 base.
+  assert.deepEqual(result, { qa_round: 2, review_round: 1, visual_round: 0, hop_count: 1, qa_rounds_total: 0, review_rounds_total: 0, visual_rounds_total: 0 });
 });
 
 test("AC-11: visual_fail token detection is whitespace-robust", () => {

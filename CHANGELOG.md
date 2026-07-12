@@ -16,6 +16,19 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.74.0] - 2026-07-12
+
+### Added
+- **`e8-success-telemetry` — Per-feature success-side metrics emission (v3.74.0).** Introduces cumulative per-feature round counters (qa_round, review_round, visual_round) and hop_count to handoff schema (v11→v12 migration). Adds release-time metrics emission: release-engineer closing write emits feature metadata `{feature, tickets, rounds, hops, one_pass, released_version}` as JSON lines to `.current/metrics.jsonl` for cross-feature analytics on QA intensity, review cycles, and release velocity. Implements metrics collection in `tools/metrics.ts` + automatic best-effort emit on closing-write success in `tools/handoff-orchestrator.ts`. Includes `scripts/summarize-metrics.mjs` summarizer and `test/success-metrics.test.mjs` regression tests; full suite 1295/1295 green. QA verified (`qa_reports/review_T-E8-07.md`). See `specs/e8-success-telemetry.md` and `specs/e8-success-telemetry-architecture.md` for mechanism and analytics use cases.
+
+### Changed
+- **SOP enhancement**: release-engineer SOP step 11b (metrics emit) is automatic, best-effort; no manual action required on closing write.
+
+### Notes
+- driftBaselineIds appended with T-E8-ARCH, T-E8-01, T-E8-02, T-E8-03, T-E8-04, T-E8-05, T-E8-06, T-E8-07, T-E8-REL, T-E8-DONE
+- Handoff schema v12: added `qa_round`, `review_round`, `visual_round`, `hop_count` fields (auto-migration from v11 on first read)
+- Metrics emit is best-effort; absence does not fail the release
+
 ## [3.73.1] - 2026-07-12
 
 ### Fixed

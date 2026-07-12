@@ -49,6 +49,7 @@ import { hasUnresolvedRefs, listUnresolvedRefs } from "../gates/external-refs.js
 import { gate } from "../gates/registry.js";
 import { awaitAllInflightFor } from "./rag-coalesce.js";
 import { emitGateTelemetry, extractGateCodeFromText } from "./telemetry.js";
+import { emitFeatureMetrics } from "./metrics.js";
 
 // E1 (e1-feature-scoped-state-design) — feature-lease TTL. Fixed constant,
 // NOT config-driven (mirrors STALE_DISPATCH_THRESHOLD_MIN in tools/handoff.ts
@@ -103,6 +104,14 @@ async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResu
         // write). No prevState (fresh workspace) counts as a feature change:
         // the counter starts from a 0 base either way.
         const prev_hop_count = prevState?.hop_count ?? 0;
+        // v12 (e8-success-telemetry) — cumulative-total inputs, same derivation
+        // posture as prev_hop_count: transitions.ts stays pure / fs-free; the
+        // orchestrator reads the persisted totals and threads them through.
+        // File-mode-only fields (DR-1): SqliteHandoffStorage.parse never
+        // constructs them, so `?? 0` keeps SQLite mode at a harmless 0 base.
+        const prev_qa_rounds_total = prevState?.qa_rounds_total ?? 0;
+        const prev_review_rounds_total = prevState?.review_rounds_total ?? 0;
+        const prev_visual_rounds_total = prevState?.visual_rounds_total ?? 0;
         const feature_changed = prevState
           ? prevState.active_feature !== parsed.active_feature
           : true;
@@ -738,6 +747,13 @@ async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResu
           // only; DR-6: reset only on feature change, pm landing does NOT
           // reset). Persisted via storage.writeState below.
           hop_count: new_hop_count,
+          // v12 — cumulative per-feature totals (e8-success-telemetry). Tick in
+          // lock-step with the per-cycle FAIL branches inside computeNewRound;
+          // reset ONLY on feature change (hop_count's rule). Persisted via
+          // storage.writeState below (file-mode frontmatter only, DR-1).
+          qa_rounds_total: new_qa_rounds_total,
+          review_rounds_total: new_review_rounds_total,
+          visual_rounds_total: new_visual_rounds_total,
         } = computeNewRound(
           prev_qa_round,
           prev_review_round,
@@ -747,6 +763,9 @@ async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResu
           parsed.pending_notes,
           prev_hop_count,
           feature_changed,
+          prev_qa_rounds_total,
+          prev_review_rounds_total,
+          prev_visual_rounds_total,
         );
         const pending = [...parsed.pending_notes];
         // v3.15.0 — symmetric cap-cross predicate fix.
@@ -806,6 +825,14 @@ async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResu
           // (file frontmatter + sqlite hop_count column, DR-2) unlike the
           // file-mode-only attestation fields below.
           hopCount: new_hop_count,
+          // v12 — cumulative totals (e8-success-telemetry). Server-computed by
+          // computeNewRound alongside hop_count; persisted in file-mode
+          // frontmatter ONLY (DR-1: SqliteHandoffStorage.writeState ignores
+          // all three — their sole consumer, the release-close metrics emit,
+          // fires only under FileHandoffStorage).
+          qaRoundsTotal: new_qa_rounds_total,
+          reviewRoundsTotal: new_review_rounds_total,
+          visualRoundsTotal: new_visual_rounds_total,
           scopeDecision: parsed.scope_decision,
           scopeDecisionWhy: parsed.scope_decision_why,
           cutApproved: parsed.cut_approved,
@@ -848,6 +875,32 @@ async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResu
           } catch {
             // swallow — state write is the source of truth; cleanup is opportunistic
           }
+        }
+
+        // E8 (e8-success-telemetry, T-E8-03) — release-close metrics emit.
+        // Fires on the E1A terminal-marker signature (the same "feature has
+        // shipped" predicate gates/feature-lease.ts trusts): release-engineer
+        // closing self-loop routing back to pm. File-mode only (DR-1) — the
+        // marker keys on next_role, which SqliteHandoffStorage never persists.
+        // Totals are read from prevState (DR: the closing write is a
+        // release-engineer self-loop, so computeNewRound carries them
+        // unchanged — prevState is authoritative and already in scope).
+        // emitFeatureMetrics never throws (AC2): the ToolResult below is
+        // byte-identical with or without this hook.
+        if (
+          storage instanceof FileHandoffStorage &&
+          parsed.agent_id === "release-engineer" &&
+          parsed.status === "In_Progress" &&
+          parsed.next_role === "pm"
+        ) {
+          emitFeatureMetrics({
+            workspacePath: parsed.workspace_path,
+            feature: parsed.active_feature,
+            qaRoundsTotal: prevState?.qa_rounds_total ?? 0,
+            reviewRoundsTotal: prevState?.review_rounds_total ?? 0,
+            visualRoundsTotal: prevState?.visual_rounds_total ?? 0,
+            hops: prevState?.hop_count ?? 0,
+          });
         }
 
         return { content: [{ type: "text" as const, text: result }] };

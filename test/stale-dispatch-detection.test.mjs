@@ -458,30 +458,35 @@ next_role: "sr-engineer"
   assert.equal(state.dispatch_mode, undefined, "v10→v11 must NOT seed dispatch_mode (absence-is-signal, e2-bugfix-repro-gate)");
   // Sibling fields survive the migration untouched (lossless).
   assert.equal(state.active_feature, "legacy-v9-feat");
-  assert.equal(state.hop_count, 3, "hop_count preserved across v9→v10→v11");
-  assert.equal(state.next_role, "sr-engineer", "sibling v7 field preserved across v9→v10→v11");
+  assert.equal(state.hop_count, 3, "hop_count preserved across v9→v10→v11→v12");
+  assert.equal(state.next_role, "sr-engineer", "sibling v7 field preserved across v9→v10→v11→v12");
+  // e8-success-telemetry re-baseline: the file also climbs v11→v12, seeding
+  // the three new cumulative totals to 0 (the hop_count counter precedent).
+  assert.equal(state.qa_rounds_total, 0, "v11→v12 seeds qa_rounds_total: 0 (e8-success-telemetry)");
+  assert.equal(state.review_rounds_total, 0, "v11→v12 seeds review_rounds_total: 0 (e8-success-telemetry)");
+  assert.equal(state.visual_rounds_total, 0, "v11→v12 seeds visual_rounds_total: 0 (e8-success-telemetry)");
 
-  // On-disk heal: readHandoffState's fire-and-forget write-back lands at v11.
+  // On-disk heal: readHandoffState's fire-and-forget write-back lands at v12.
   resetSession();
   readHandoffState(ws);
   await new Promise((resolve) => setTimeout(resolve, 30));
   const healed = readRaw(ws);
-  assert.match(healed, /schema_version:\s*11/, "fire-and-forget heal lands the file at CURRENT (v11)");
+  assert.match(healed, /schema_version:\s*12/, "fire-and-forget heal lands the file at CURRENT (v12)");
 
   // Re-running the migration on the now-current payload is a no-op — the file
   // stays at CURRENT and no further heal-write fires.
   resetSession();
   parseHandoff(ws);
-  assert.match(readRaw(ws), /schema_version:\s*11/, "second read stays at CURRENT, no further migration applied");
+  assert.match(readRaw(ws), /schema_version:\s*12/, "second read stays at CURRENT, no further migration applied");
 });
 
-test("T8b: a future v12 handoff refuses-loud against this v11 server (no silent downgrade)", () => {
+test("T8b: a future v13 handoff refuses-loud against this v12 server (no silent downgrade)", () => {
   const ws = mkWs();
   resetSession();
   writeRaw(
     ws,
     `---
-schema_version: 12
+schema_version: 13
 active_feature: "from-the-future"
 status: "In_Progress"
 last_updated: "2099-01-01T00:00:00.000Z"
@@ -496,8 +501,8 @@ qa_round: 0
   );
   assert.throws(
     () => readHandoffState(ws),
-    /handoff on-disk version 12 > server max 11/,
-    "a v12 file must refuse-loud rather than silently downgrade",
+    /handoff on-disk version 13 > server max 12/,
+    "a v13 file must refuse-loud rather than silently downgrade",
   );
 });
 
@@ -551,6 +556,6 @@ sqliteDescribe("T9: SQLite storage never persists or surfaces dispatched_at/stal
 // the version-number/token-floor bump, never for a behavior change).
 // ============================================================================
 
-test("T10: sanity — CURRENT_VERSIONS.handoff is 11 (e2-bugfix-repro-gate)", () => {
-  assert.equal(CURRENT_VERSIONS.handoff, 11);
+test("T10: sanity — CURRENT_VERSIONS.handoff is 12 (e8-success-telemetry)", () => {
+  assert.equal(CURRENT_VERSIONS.handoff, 12);
 });

@@ -65,3 +65,19 @@ Each line has exactly 5 keys:
   `gate(code).producer` in `gates/registry.ts`; `"unknown"` means the emitted
   code was not in the registry at emit time (e.g. a gate added/removed
   mid-window) — investigate rather than count.
+
+## Success-metrics summary
+
+`telemetry.jsonl` is rejection-only; the success side of the retro lives in a
+separate sidecar, `.current/metrics.jsonl` — one JSON line per SHIPPED feature
+(`tickets`, cumulative qa/review/visual rework rounds, hops, `one_pass`,
+`released_version`), appended automatically at the release-engineer closing
+write (see `specs/e8-success-telemetry.md` / `tools/metrics.ts`). Summarize it
+for the retro with:
+
+```bash
+node scripts/summarize-metrics.mjs   # default: .current/metrics.jsonl
+```
+
+which prints a per-feature table plus the aggregate one-pass rate and mean
+rounds/hops.

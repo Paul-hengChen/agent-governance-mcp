@@ -653,3 +653,54 @@ test("S7: content/skill-release-engineer.md SOP step 12 pins agent_id=\"release-
     "step 12 must explicitly call out that agent_id must NEVER be \"pm\" on the closing write",
   );
 });
+
+// ============================================================================
+// S8 (e8-success-telemetry, T-E8-05/T-E8-07): step 11b's informational
+// success-metrics note pins alongside the still-byte-intact E1A step-12
+// contract — the two must coexist, not clobber one another. Extends the S7
+// pinning convention above rather than duplicating a new test file.
+// ============================================================================
+
+test("S8: content/skill-release-engineer.md carries step 11b — the success-metrics emit note is automatic/best-effort and names .current/metrics.jsonl", () => {
+  const skill = readContentFile("skill-release-engineer.md");
+  const step11bMatch = skill.match(/^11b\.\s+\*\*Success-metrics emit is automatic\*\*.*$/m);
+  assert.ok(step11bMatch, "must locate the numbered step-11b success-metrics line");
+  const step11bLine = step11bMatch[0];
+
+  assert.ok(
+    /automatic/i.test(step11bLine),
+    "step 11b must describe the emit as automatic (no manual action required)",
+  );
+  assert.ok(
+    /best-effort/i.test(step11bLine),
+    "step 11b must describe the emit as best-effort (never a release blocker)",
+  );
+  assert.ok(
+    step11bLine.includes(".current/metrics.jsonl"),
+    "step 11b must name the exact sidecar path .current/metrics.jsonl",
+  );
+  assert.ok(
+    /do not.*(hand-author|edit)/i.test(step11bLine),
+    "step 11b must instruct release-engineer NOT to hand-author or edit metrics records",
+  );
+  assert.ok(
+    /never.*(block|alter)/i.test(step11bLine) || /does not.*(block|alter)/i.test(step11bLine),
+    "step 11b must state the emit never blocks or alters the closing write's result",
+  );
+});
+
+test("S8b: step 11b sits between step 11 and step 12 (ordering) and the E1A step-12 contract text remains byte-intact alongside it (regression guard vs S7)", () => {
+  const skill = readContentFile("skill-release-engineer.md");
+  const step11bIdx = skill.search(/^11b\.\s+\*\*Success-metrics emit is automatic\*\*/m);
+  const step12Idx = skill.search(/^12\.\s+\*\*Closing write\*\*/m);
+  assert.ok(step11bIdx >= 0, "step 11b must be present");
+  assert.ok(step12Idx >= 0, "step 12 must still be present");
+  assert.ok(step11bIdx < step12Idx, "step 11b must be ordered before step 12 (numbered-list convention: 11, 11a, 11b, 12)");
+
+  // The exact S7-pinned step-12 substrings must still be present verbatim —
+  // step 11b's insertion must not have perturbed step 12's text at all.
+  const step12Match = skill.match(/^12\.\s+\*\*Closing write\*\*.*$/m);
+  assert.ok(step12Match, "step 12 line must still be locatable");
+  assert.ok(step12Match[0].includes('tw_update_state(agent_id="release-engineer"'), "step 12's corrected call shape must remain byte-intact");
+  assert.ok(step12Match[0].includes('next_role="pm"'), "step 12's next_role=\"pm\" routing signal must remain byte-intact");
+});

@@ -128,6 +128,25 @@ registerMigration({
     to: 11,
     up: (input) => ({ ...input, schema_version: 11 }),
 });
+// v11 → v12: add qa_rounds_total / review_rounds_total / visual_rounds_total
+// cumulative counters (e8-success-telemetry). SEEDS all three to 0 — the
+// hop_count v8→v9 counter precedent, NOT the stamp-only attestation precedent
+// (DR: a 0 count is the true pre-feature value, not a fabricated attestation;
+// AC8 — stale rows migrate in with all three = 0). Feature-scoped exactly like
+// hop_count: persist across QA PASS/FAIL cycles and PM re-entries, reset ONLY
+// on active_feature change. File-mode-only (DR-1) — sqlite schema stays v2.
+registerMigration({
+    kind: "handoff",
+    from: 11,
+    to: 12,
+    up: (input) => ({
+        ...input,
+        schema_version: 12,
+        qa_rounds_total: 0,
+        review_rounds_total: 0,
+        visual_rounds_total: 0,
+    }),
+});
 // Compile-time guard: if CURRENT_VERSIONS.handoff is ever bumped without a
 // matching registration added above, the runner's missing-step error fires
 // at read time. This reference makes the dependency explicit for grep.

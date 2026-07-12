@@ -294,8 +294,15 @@ export function validateTransition(req) {
  *     (pm, In_Progress) does NOT reset it, unlike the three rounds — DR-6)
  *   - role transition (next.agent !== prev.agent) → base + 1 (DR-9)
  *   - everything else (self-loops, same-agent status changes) → base
+ *
+ * qa_rounds_total / review_rounds_total / visual_rounds_total (v12,
+ * e8-success-telemetry): cumulative mirrors of the per-cycle counters. Each
+ * total ticks in lock-step with its per-cycle counter's FAIL branch (the FAIL
+ * predicates are copied verbatim so total and cycle counters can never diverge
+ * on which event counts), but NEVER resets except on feature change — NOT on
+ * QA PASS, NOT on (pm, In_Progress) re-entry (hop_count's reset rule, AC8).
  */
-export function computeNewRound(prev_qa_round, prev_review_round, prev_visual_round, next, prev, next_pending_notes, prev_hop_count = 0, feature_changed = false) {
+export function computeNewRound(prev_qa_round, prev_review_round, prev_visual_round, next, prev, next_pending_notes, prev_hop_count = 0, feature_changed = false, prev_qa_rounds_total = 0, prev_review_rounds_total = 0, prev_visual_rounds_total = 0) {
     let qa_round = prev_qa_round;
     let review_round = prev_review_round;
     let visual_round = prev_visual_round;
@@ -339,7 +346,28 @@ export function computeNewRound(prev_qa_round, prev_review_round, prev_visual_ro
     const isRoleTransition = !!next.agent && next.agent !== (prev?.agent ?? null);
     const hopBase = feature_changed ? 0 : prev_hop_count;
     const hop_count = isRoleTransition ? hopBase + 1 : hopBase;
-    return { qa_round, review_round, visual_round, hop_count };
+    // v12 cumulative totals (e8-success-telemetry). Base is
+    // `feature_changed ? 0 : prev_total` (hop_count's reset rule); each FAIL
+    // predicate is copied verbatim from the per-cycle branches above
+    // (qa_round / review_round / visual_round) so the two families can never
+    // diverge on which event counts.
+    const qaTotBase = feature_changed ? 0 : prev_qa_rounds_total;
+    const qa_rounds_total = next.agent === "qa-engineer" && next.status === "FAIL" ? qaTotBase + 1 : qaTotBase;
+    const revTotBase = feature_changed ? 0 : prev_review_rounds_total;
+    const review_rounds_total = next.agent === "code-reviewer" && next.status === "FAIL" ? revTotBase + 1 : revTotBase;
+    const visTotBase = feature_changed ? 0 : prev_visual_rounds_total;
+    const visual_rounds_total = next.agent === "qa-engineer" && next.status === "FAIL" && hasVisualFailToken
+        ? visTotBase + 1
+        : visTotBase;
+    return {
+        qa_round,
+        review_round,
+        visual_round,
+        hop_count,
+        qa_rounds_total,
+        review_rounds_total,
+        visual_rounds_total,
+    };
 }
 export const ROUND_CAP_EXPORTED = ROUND_CAP;
 export const REVIEW_ROUND_CAP_EXPORTED = REVIEW_ROUND_CAP;

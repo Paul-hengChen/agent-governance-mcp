@@ -70,23 +70,26 @@ test("AC-10: transitions.ts AgentName union constraint (side-channel)", () => {
   assert.match(transitionsTs, /release-engineer/, "release-engineer MUST be in transitions.ts (v3.28.0 A5 matrix promotion — terminal PASS role)");
 });
 
-test("AC-10: schema/versions.ts schema versions track e2-bugfix-repro-gate bump", () => {
+test("AC-10: schema/versions.ts schema versions track e8-success-telemetry bump", () => {
   // c9-protocol-fields bumped handoff to 7 (next_role/resume_of/review_verdict,
   // stamp-only migration, DR-1). b8-external-ref-ledger had bumped it to 6
   // (external_refs for EXTERNAL_REFS_UNRESOLVED). c14-dispatch-pins bumped it to
   // 8 (dispatch_pins, stamp-only migration, AC-1). d2-server-brake-accounting
   // bumped it to 9 (hop_count, seeded 0, DR-3). d5-server-side-stale-dispatch-
   // detection bumped it to 10 (dispatched_at, stamp-only, seeds nothing,
-  // DR-7 — next_role's direct companion). e2-bugfix-repro-gate now bumps it to
+  // DR-7 — next_role's direct companion). e2-bugfix-repro-gate bumped it to
   // 11 (dispatch_mode, stamp-only, seeds nothing — the dispatch_pins/
-  // external_refs feature-scoped carry-forward algorithm, but scalar). sqlite
-  // stays at 2 — hop_count IS added there too, but via an idempotent
-  // addColumnIfMissing ALTER (DR-2), no schema_meta bump, the exact mechanism
-  // visual_round used; unlike dispatch_pins/external_refs/dispatched_at/
-  // dispatch_mode, which are handoff-YAML frontmatter only, no SQLite column
-  // at all (DR-5).
+  // external_refs feature-scoped carry-forward algorithm, but scalar).
+  // e8-success-telemetry now bumps it to 12 (qa_rounds_total/
+  // review_rounds_total/visual_rounds_total, seeded 0 — the hop_count counter
+  // precedent, DR-1 file-mode-only). sqlite stays at 2 — hop_count IS added
+  // there too, but via an idempotent addColumnIfMissing ALTER (DR-2), no
+  // schema_meta bump, the exact mechanism visual_round used; unlike
+  // dispatch_pins/external_refs/dispatched_at/dispatch_mode/the three new e8
+  // totals, which are handoff-YAML frontmatter only, no SQLite column at all
+  // (DR-5/DR-1).
   const versionsTs = fs.readFileSync(path.join(PROJECT_ROOT, "schema", "versions.ts"), "utf-8");
-  assert.match(versionsTs, /handoff:\s*11,/, "CURRENT_VERSIONS.handoff must be 11 (e2-bugfix-repro-gate)");
+  assert.match(versionsTs, /handoff:\s*12,/, "CURRENT_VERSIONS.handoff must be 12 (e8-success-telemetry)");
   assert.match(versionsTs, /sqlite:\s*2,/, "CURRENT_VERSIONS.sqlite must remain 2");
 });
 

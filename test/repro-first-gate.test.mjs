@@ -287,9 +287,14 @@ next_role: "sr-engineer"
   assert.equal(state.dispatch_mode, undefined, "v10->v11 must NOT seed dispatch_mode (absence-is-signal, e2-bugfix-repro-gate)");
   // Sibling fields survive losslessly.
   assert.equal(state.active_feature, "legacy-v10-feat");
-  assert.equal(state.hop_count, 2, "hop_count preserved across v10->v11");
-  assert.equal(state.next_role, "sr-engineer", "sibling v7 field preserved across v10->v11");
-  assert.equal(CURRENT_VERSIONS.handoff, 11, "sanity: this server's CURRENT handoff version is 11");
+  assert.equal(state.hop_count, 2, "hop_count preserved across v10->v11->v12");
+  assert.equal(state.next_role, "sr-engineer", "sibling v7 field preserved across v10->v11->v12");
+  // e8-success-telemetry re-baseline: the file also climbs v11->v12, seeding
+  // the three new cumulative totals to 0 (the hop_count counter precedent).
+  assert.equal(state.qa_rounds_total, 0, "v11->v12 seeds qa_rounds_total: 0 (e8-success-telemetry)");
+  assert.equal(state.review_rounds_total, 0, "v11->v12 seeds review_rounds_total: 0 (e8-success-telemetry)");
+  assert.equal(state.visual_rounds_total, 0, "v11->v12 seeds visual_rounds_total: 0 (e8-success-telemetry)");
+  assert.equal(CURRENT_VERSIONS.handoff, 12, "sanity: this server's CURRENT handoff version is 12");
 });
 
 // ============================================================================

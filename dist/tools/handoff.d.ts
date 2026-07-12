@@ -21,6 +21,9 @@ export interface HandoffState {
     review_round: number;
     visual_round: number;
     hop_count: number;
+    qa_rounds_total?: number;
+    review_rounds_total?: number;
+    visual_rounds_total?: number;
     prd_path?: string;
     scope_decision?: string;
     scope_decision_why?: string;
@@ -63,6 +66,9 @@ export interface WriteHandoffStateOptions {
     reviewRound?: number;
     visualRound?: number;
     hopCount?: number;
+    qaRoundsTotal?: number;
+    reviewRoundsTotal?: number;
+    visualRoundsTotal?: number;
     scopeDecision?: string;
     scopeDecisionWhy?: string;
     cutApproved?: boolean;

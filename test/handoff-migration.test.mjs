@@ -343,9 +343,9 @@ scope_decision_why: "one screen, no sub-flows"
 
 test("AC-7: scope_decision round-trips through writeHandoffState → readback (v10 stamp)", async () => {
   // Why: the modern options-object write must emit scope_decision into YAML and
-  // parse it back identically, stamped at v11 (e2-bugfix-repro-gate re-baseline;
-  // was v10/d5-server-side-stale-dispatch-detection, v9/d2-server-brake-
-  // accounting, v8/c14-dispatch-pins, v7/c9-protocol-fields,
+  // parse it back identically, stamped at v12 (e8-success-telemetry re-baseline;
+  // was v11/e2-bugfix-repro-gate, v10/d5-server-side-stale-dispatch-detection,
+  // v9/d2-server-brake-accounting, v8/c14-dispatch-pins, v7/c9-protocol-fields,
   // v6/b8-external-ref-ledger). This is the PM attestation write path.
   const ws = mkWorkspace();
   resetSession();
@@ -362,7 +362,7 @@ test("AC-7: scope_decision round-trips through writeHandoffState → readback (v
   });
 
   const raw = readRaw(ws);
-  assert.match(raw, /schema_version:\s*11/, "write stamps current handoff schema v11");
+  assert.match(raw, /schema_version:\s*12/, "write stamps current handoff schema v12");
   assert.match(raw, /scope_decision:\s*["']?single-feature["']?/, "scope_decision emitted into YAML");
 
   const state = parseHandoff(ws);
@@ -461,19 +461,19 @@ test("AC-3/c9: a downstream write omitting next_role/resume_of/review_verdict DO
   assert.equal(state.last_agent, "qa-engineer", "the new write's own fields still apply");
 });
 
-test("AC-10(g): future v12 handoff refuses-loud against a v11 server (no silent downgrade)", () => {
-  // Why: forward-compat safety. A handoff written by a newer server (v12) must
-  // NOT be silently parsed by this v11 server — runMigrations throws because
+test("AC-10(g): future v13 handoff refuses-loud against a v12 server (no silent downgrade)", () => {
+  // Why: forward-compat safety. A handoff written by a newer server (v13) must
+  // NOT be silently parsed by this v12 server — runMigrations throws because
   // on-disk version > server max. No new code; this pins the behavior for the
-  // e2-bugfix-repro-gate version bump specifically (v10→v11; was v9→v10 under
-  // d5-server-side-stale-dispatch-detection). A hypothetical v12 file must
-  // still refuse-loud against the current v11 server.
+  // e8-success-telemetry version bump specifically (v11→v12; was v10→v11 under
+  // e2-bugfix-repro-gate). A hypothetical v13 file must still refuse-loud
+  // against the current v12 server.
   const ws = mkWorkspace();
   resetSession();
   writeRaw(
     ws,
     `---
-schema_version: 12
+schema_version: 13
 active_feature: "from-the-future"
 status: "In_Progress"
 last_updated: "2099-01-01T00:00:00.000Z"
@@ -490,8 +490,8 @@ qa_round: 0
 
   assert.throws(
     () => parseHandoff(ws),
-    /on-disk version 12 > server max 11/,
-    "v12 file must refuse-loud against a v11 server",
+    /on-disk version 13 > server max 12/,
+    "v13 file must refuse-loud against a v12 server",
   );
 });
 
@@ -549,15 +549,17 @@ test("AC-1/C9: v6→v10 migration chain stamps version only — external_refs su
   // bumped CURRENT to 7 (this test originally isolated the v6→v7 step),
   // c14-dispatch-pins bumped CURRENT to 8, d2-server-brake-accounting bumped
   // CURRENT to 9, d5-server-side-stale-dispatch-detection bumped CURRENT to
-  // 10, and e2-bugfix-repro-gate now bumps CURRENT to 11 — a v6 payload is
-  // five steps BEHIND current, so runMigrations climbs the full
-  // v6→v7→v8→v9→v10→v11 chain in one call (the runner walks current→target
-  // stepwise; there is no way to isolate a single intermediate step from the
-  // public API). This re-baseline exercises that chain: losslessness of the
-  // sibling v6 attestation field (external_refs) plus DR-1's no-seed contract
-  // for the three c9 fields, the c14 dispatch_pins field, the d5 dispatched_at
-  // field (DR-7), the e2 dispatch_mode field, AND DR-3's hop_count: 0 seed
-  // (the counter precedent, not a stamp-only no-seed field).
+  // 10, e2-bugfix-repro-gate bumped CURRENT to 11, and e8-success-telemetry
+  // now bumps CURRENT to 12 — a v6 payload is six steps BEHIND current, so
+  // runMigrations climbs the full v6→v7→v8→v9→v10→v11→v12 chain in one call
+  // (the runner walks current→target stepwise; there is no way to isolate a
+  // single intermediate step from the public API). This re-baseline exercises
+  // that chain: losslessness of the sibling v6 attestation field
+  // (external_refs) plus DR-1's no-seed contract for the three c9 fields, the
+  // c14 dispatch_pins field, the d5 dispatched_at field (DR-7), the e2
+  // dispatch_mode field, DR-3's hop_count: 0 seed (the counter precedent, not
+  // a stamp-only no-seed field), AND the e8 qa_rounds_total/
+  // review_rounds_total/visual_rounds_total: 0 seed (same counter precedent).
   const { runMigrations } = await import("../dist/schema/versions.js");
   const v6Payload = {
     schema_version: 6,
@@ -567,9 +569,9 @@ test("AC-1/C9: v6→v10 migration chain stamps version only — external_refs su
     external_refs: [{ ref: "JIRA-1", state: "unresolved" }],
   };
   const result = runMigrations("handoff", v6Payload);
-  assert.deepEqual(result.applied, [7, 8, 9, 10, 11], "the v6→v7→v8→v9→v10→v11 stamp-only/seed-only chain must run when on-disk version is five behind CURRENT");
-  assert.equal(result.payload.schema_version, 11, "schema_version bumped to CURRENT (11)");
-  assert.deepEqual(result.payload.external_refs, [{ ref: "JIRA-1", state: "unresolved" }], "external_refs survives the v6→v7→v8→v9→v10→v11 chain verbatim");
+  assert.deepEqual(result.applied, [7, 8, 9, 10, 11, 12], "the v6→v7→v8→v9→v10→v11→v12 stamp-only/seed-only chain must run when on-disk version is six behind CURRENT");
+  assert.equal(result.payload.schema_version, 12, "schema_version bumped to CURRENT (12)");
+  assert.deepEqual(result.payload.external_refs, [{ ref: "JIRA-1", state: "unresolved" }], "external_refs survives the v6→v7→v8→v9→v10→v11→v12 chain verbatim");
   assert.equal(result.payload.next_role, undefined, "v6→v7 seeds no next_role default (DR-1)");
   assert.equal(result.payload.resume_of, undefined, "v6→v7 seeds no resume_of default (DR-1)");
   assert.equal(result.payload.review_verdict, undefined, "v6→v7 seeds no review_verdict default (DR-1)");
@@ -577,6 +579,9 @@ test("AC-1/C9: v6→v10 migration chain stamps version only — external_refs su
   assert.equal(result.payload.hop_count, 0, "v8→v9 seeds hop_count: 0 (d2-server-brake-accounting DR-3)");
   assert.equal(result.payload.dispatched_at, undefined, "v9→v10 seeds no dispatched_at default (d5-server-side-stale-dispatch-detection DR-7)");
   assert.equal(result.payload.dispatch_mode, undefined, "v10→v11 seeds no dispatch_mode default (e2-bugfix-repro-gate — absence-is-signal)");
+  assert.equal(result.payload.qa_rounds_total, 0, "v11→v12 seeds qa_rounds_total: 0 (e8-success-telemetry — the counter precedent)");
+  assert.equal(result.payload.review_rounds_total, 0, "v11→v12 seeds review_rounds_total: 0 (e8-success-telemetry)");
+  assert.equal(result.payload.visual_rounds_total, 0, "v11→v12 seeds visual_rounds_total: 0 (e8-success-telemetry)");
 });
 
 test("AC-1/C9: round-trip — re-running runMigrations on the now-v10 payload is a no-op (applied === [])", async () => {
@@ -584,8 +589,8 @@ test("AC-1/C9: round-trip — re-running runMigrations on the now-v10 payload is
   // `current === target` short-circuit). A stale v6 handoff healed once must not
   // be re-migrated on a second pass (e.g. two concurrent reads racing the healing
   // write-back, or a plain re-read of an already-current file).
-  // e2-bugfix-repro-gate re-baseline: CURRENT is now 11, so the first pass
-  // climbs v6→v7→v8→v9→v10→v11.
+  // e8-success-telemetry re-baseline: CURRENT is now 12, so the first pass
+  // climbs v6→v7→v8→v9→v10→v11→v12.
   const { runMigrations } = await import("../dist/schema/versions.js");
   const v6Payload = {
     schema_version: 6,
@@ -594,7 +599,7 @@ test("AC-1/C9: round-trip — re-running runMigrations on the now-v10 payload is
     last_agent: "pm",
   };
   const healed = runMigrations("handoff", v6Payload);
-  assert.deepEqual(healed.applied, [7, 8, 9, 10, 11], "first pass heals v6 to CURRENT (v11)");
+  assert.deepEqual(healed.applied, [7, 8, 9, 10, 11, 12], "first pass heals v6 to CURRENT (v12)");
   const reread = runMigrations("handoff", healed.payload);
   assert.deepEqual(reread.applied, [], "second pass against the now-current payload applies nothing");
   assert.equal(reread.payload, healed.payload, "no-op path returns the same reference");
