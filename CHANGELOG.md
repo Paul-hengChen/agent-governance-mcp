@@ -16,6 +16,21 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.75.0] - 2026-07-12
+
+### Added
+- **`e4-design-source-credibility-gate` — Design source credibility verification (v3.75.0).** Introduces SOURCE_CREDIBILITY_UNVERIFIED gate for design-armed features to ensure requirement sources are verified before work begins. Extends `gates/visual.ts` with credibility cell parser reading from design baseline manifests; new gate fires on pm→architect/sr-engineer edge when fetch-based modes (Figma/Sketch/XD/Penpot) have audited rows missing credibility attestation (`credibility: full-page-composite` required). Implements source verification in `gates/registry.ts` + `gates/visual.ts` + `tools/handoff-orchestrator.ts` check-order block. Complements E8 metrics: gates ensure source credibility + E8 measures outcome quality cross-feature. Full suite 1313/1313 green (1281 QA baseline + 32 E4 tests). QA verified (`qa_reports/review_T-E4-05.md`). See `specs/e4-design-source-credibility-gate.md` and `specs/e4-design-source-credibility-gate-architecture.md` for gate mechanism and design-auditor integration.
+
+### Changed
+- **SOP enhancement**: design-auditor step 2b requires credibility attestation (`credibility: full-page-composite`) on all audited rows for fetch-based design modes.
+- **Gate check-order**: pm→{architect,sr-engineer} edge now checks source-credibility alongside existing cut-approval, scope-decision, external-refs gates (storage-mode agnostic, v11 schema — zero schema bump).
+
+### Notes
+- driftBaselineIds appended with T-E4-ARCH, T-E4-01, T-E4-02, T-E4-03, T-E4-04, T-E4-05, T-E4-REL, T-E4-DONE
+- E4 integrates E8 v3.74.0 (v11→v12 schema: cumulative round counters + metrics emit). E4 adds SOURCE_CREDIBILITY_UNVERIFIED gate on v11 schema (zero schema bump, no E1A-style lease additions).
+- Gate is dormant on image/PDF/paper design modes and when `## Source` section absent
+- Handoff schema remains v11 (no migration needed — gate operates on existing visual evidence format)
+
 ## [3.74.0] - 2026-07-12
 
 ### Added

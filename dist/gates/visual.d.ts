@@ -63,6 +63,7 @@ export interface BaselineManifestRow {
     pointer: string;
     status: string;
     isAudited: boolean;
+    credibility: string;
     rawLine: string;
 }
 export interface BaselineManifestCheck {
@@ -75,4 +76,11 @@ export interface BaselineManifestCheck {
 export declare function parseBaselineManifestRows(content: string): BaselineManifestRow[];
 export declare function hasBaselineProvenance(content: string): boolean;
 export declare function checkBaselineManifest(workspacePath: string, activeFeature: string): BaselineManifestCheck;
+export interface SourceCredibilityCheck {
+    ok: boolean;
+    offendingRows: string[];
+    designPath: string;
+    mode: string | null;
+}
+export declare function checkSourceCredibility(workspacePath: string, activeFeature: string): SourceCredibilityCheck;
 //# sourceMappingURL=visual.d.ts.map

@@ -534,6 +534,7 @@ export function parseBaselineManifestRows(content) {
     let statusIdx = -1;
     let pointerIdx = -1;
     let mediumIdx = -1;
+    let credibilityIdx = -1; // E4: located by the `credibility` header; -1 => column absent
     let headerLine = null;
     for (const line of tableLines) {
         if (/^\|[\s:|-]+\|?$/.test(line))
@@ -544,6 +545,7 @@ export function parseBaselineManifestRows(content) {
             statusIdx = si;
             pointerIdx = cells.findIndex((c) => /^(pointer|node-?id)$/.test(c));
             mediumIdx = cells.findIndex((c) => /^medium$/.test(c));
+            credibilityIdx = cells.findIndex((c) => /^credibility$/.test(c));
             headerLine = line;
             break;
         }
@@ -574,7 +576,13 @@ export function parseBaselineManifestRows(content) {
             ? "audited"
             : normalizeStatus(effStatusIdx < cells.length ? cells[effStatusIdx] : "");
         const isAudited = status === "audited" && pointer.trim().length > 0;
-        rows.push({ medium, pointer, status, isAudited, rawLine: line });
+        // E4: credibility located by header only (no positional fallback) — absent
+        // header / short row → "". Normalized trim().toLowerCase() so the gate can
+        // compare directly to the literal "full-page-composite".
+        const credibility = credibilityIdx >= 0 && credibilityIdx < cells.length
+            ? cells[credibilityIdx].trim().toLowerCase()
+            : "";
+        rows.push({ medium, pointer, status, isAudited, credibility, rawLine: line });
     }
     return rows;
 }
@@ -639,5 +647,59 @@ export function checkBaselineManifest(workspacePath, activeFeature) {
         };
     }
     return { ok: true, code: null, detail: "", designPath, auditedCount };
+}
+// ---------- E4 — Source-credibility gate (e4-design-source-credibility-gate) ----------
+// Build-entry attestation gate on the pm:In_Progress -> {architect,sr-engineer}:In_Progress
+// edge. Confirms the design-auditor's step-2b Source-Credibility Classification actually
+// ran and recorded its verdict: every `audited` `## Source` row of a fetch-based design
+// carries `credibility: full-page-composite`. Reuses the module's existing
+// designFilePath / parseDesignMode / sliceH2Section + the extended
+// parseBaselineManifestRows — one read of the identical `## Source` table (DR-1). The
+// composition helper touches fs; it never throws (fs errors -> dormant ok:true).
+// Explicit INCLUSION list (spec Dependencies point 4 / DR-2) — deliberately NARROWER
+// than hasDesignModeRequiringVisual's "any mode != no-design" EXCLUSION. Matches step 2b's
+// own scope so the gate never false-fires on image/pdf/paper/no-design.
+const FETCH_BASED_MODES = ["figma", "sketch", "xd", "penpot"];
+// Composition helper (fs). Mirrors checkBaselineManifest's dormant/fail shape. Reads
+// design/<feature>.md once via designFilePath(). Never throws (fs errors → dormant).
+// Decision tree:
+//   1. no activeFeature OR file absent               → { ok:true }  (AC-4)
+//   2. parseDesignMode(content) not in FETCH_BASED_MODES → { ok:true }  (AC-4)
+//   3. sliceH2Section(content,"Source") === null      → { ok:true }  (AC-4)
+//   4. audited rows whose normalized credibility !== "full-page-composite"
+//        → { ok:false, offendingRows:["<medium>/<pointer>", …] }  (AC-1, AC-3)
+//   5. zero audited rows, or all audited rows compliant → { ok:true }
+// The fetch-based INCLUSION list in step 2 is the whole arm — `mode != no-design`
+// is NOT re-checked broadly (DR-2). Independent of the PASS-time baseline-manifest
+// gates (AC-5): different edge, different check.
+export function checkSourceCredibility(workspacePath, activeFeature) {
+    const designPath = designFilePath(workspacePath, activeFeature);
+    const dormant = { ok: true, offendingRows: [], designPath, mode: null };
+    if (!activeFeature || !fs.existsSync(designPath))
+        return dormant; // AC-4 (no design file)
+    let content;
+    try {
+        content = fs.readFileSync(designPath, "utf-8");
+    }
+    catch {
+        return dormant;
+    }
+    const mode = parseDesignMode(content); // null if no Mode line found
+    if (mode === null || !FETCH_BASED_MODES.includes(mode)) {
+        return { ok: true, offendingRows: [], designPath, mode }; // AC-4 (non-fetch mode)
+    }
+    // AC-4: no `## Source` section at all → dormant (pre-E4 / pre-manifest designs).
+    if (sliceH2Section(content, "Source") === null) {
+        return { ok: true, offendingRows: [], designPath, mode };
+    }
+    const offendingRows = [];
+    for (const row of parseBaselineManifestRows(content)) {
+        if (!row.isAudited)
+            continue; // deferred/out-of-scope/zero-audited never gated (AC-5)
+        if (row.credibility !== "full-page-composite") {
+            offendingRows.push(`${row.medium}/${row.pointer}`);
+        }
+    }
+    return { ok: offendingRows.length === 0, offendingRows, designPath, mode };
 }
 //# sourceMappingURL=visual.js.map

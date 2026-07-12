@@ -8,7 +8,7 @@
 //
 // Check order is FROZEN (spec AC-5/AC-8): preflight → PASS/qa-engineer gate →
 // transition validation → feature-lease gate (E1) → scope-decision gate → cut-approval gate →
-// external-refs gate → repro-first gate (E2, bugfix-mode) → review-verdict/status mismatch gate → reviewer
+// external-refs gate → source-credibility gate (E4) → repro-first gate (E2, bugfix-mode) → review-verdict/status mismatch gate → reviewer
 // completed_tasks gate (v3.58.0, C16) → QA evidence record → PASS evidence
 // gate → visual sub-gates → expected-red diff gate →
 // code-reviewer evidence gate → round-cap sentinels → storage.writeState →
@@ -19,7 +19,7 @@
 import { enforcePreFlight } from "../guards/session.js";
 import { getActiveStorage, FileHandoffStorage } from "./storage.js";
 import { requireQaEngineer, validateTransition, computeNewRound, ALLOWED_TRANSITIONS, HOP_CAP_EXPORTED, } from "./transitions.js";
-import { hasVisualBaselinesInDesign, hasVisualEvidenceInFile, hasUncheckedWidgets, hasDesignModeRequiringVisual, designDeclaresStructuralAssertions, validateVisualReports, checkVisualProvenance, checkBaselineManifest, checkPixelGateAttestation, } from "../gates/visual.js";
+import { hasVisualBaselinesInDesign, hasVisualEvidenceInFile, hasUncheckedWidgets, hasDesignModeRequiringVisual, designDeclaresStructuralAssertions, validateVisualReports, checkVisualProvenance, checkBaselineManifest, checkPixelGateAttestation, checkSourceCredibility, } from "../gates/visual.js";
 import { hasScopeDecision } from "../gates/scope-decision.js";
 import { isFeatureLeaseHeld } from "../gates/feature-lease.js";
 import { hasExpectedRedManifest, hasExpectedRedDisposition } from "../gates/expected-red.js";
@@ -297,6 +297,50 @@ async function handleUpdateStateCore(parsed) {
                 content: [{
                         type: "text",
                         text: `⛔ EXTERNAL_REFS_UNRESOLVED\n${JSON.stringify(envelope, null, 2)}`,
+                    }],
+                isError: true,
+            };
+        }
+    }
+    // E4 — Source-Credibility Gate (e4-design-source-credibility-gate). FOURTH
+    // build-entry attestation gate on the pm:In_Progress -> {architect,sr-engineer}
+    // :In_Progress edge, after scope-decision / cut-approval / external-refs.
+    // UNLIKE those three (file-mode only, read handoff YAML), this gate reads
+    // design/<feature>.md directly via fs, so it is STORAGE-MODE-AGNOSTIC (AC-7) —
+    // NO `getActiveStorage() instanceof FileHandoffStorage` guard. Arm is the
+    // fetch-based-mode INCLUSION list inside checkSourceCredibility, NOT the broad
+    // hasDesignModeRequiringVisual exclusion. Pinned to prev=pm keeps resume/re-entry
+    // safe (AC-6): architect->sr-engineer and the sr self-loop have a non-pm
+    // predecessor and are never gated. NOT in transitions.ts (that stays pure /
+    // fs-free; mirrors SCOPE_DECISION_REQUIRED). Independent of the PASS-time
+    // baseline-manifest gates (AC-5): different edge, different check.
+    if ((nextTuple.agent === "architect" || nextTuple.agent === "sr-engineer") &&
+        nextTuple.status === "In_Progress" &&
+        prevTuple.agent === "pm" &&
+        prevTuple.status === "In_Progress") {
+        const cred = checkSourceCredibility(parsed.workspace_path, parsed.active_feature);
+        if (!cred.ok) {
+            const rows = cred.offendingRows.join(", ");
+            const hint = `Source-credibility attestation missing or unverified for: ${rows}.` +
+                gate("SOURCE_CREDIBILITY_UNVERIFIED").hintStatic;
+            const envelope = {
+                error: "SOURCE_CREDIBILITY_UNVERIFIED",
+                attempted: {
+                    prev_agent: prevTuple.agent,
+                    prev_status: prevTuple.status,
+                    new_agent: nextTuple.agent,
+                    new_status: nextTuple.status,
+                },
+                allowed: (ALLOWED_TRANSITIONS.get("pm:In_Progress") ?? []).map((c) => ({
+                    new_agent: c.agent,
+                    new_status: c.status,
+                })),
+                hint,
+            };
+            return {
+                content: [{
+                        type: "text",
+                        text: `⛔ SOURCE_CREDIBILITY_UNVERIFIED\n${JSON.stringify(envelope, null, 2)}`,
                     }],
                 isError: true,
             };

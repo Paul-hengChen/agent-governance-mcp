@@ -37,6 +37,7 @@
 //   SCOPE_DECISION_REQUIRED         const-08-chain-31-mid.md, constitution-rationale.md, skill-pm.md
 //   CUT_APPROVAL_REQUIRED           const-08-chain-31-mid.md, coord-03-core-fallback.md, skill-coordinator-lite.md
 //   EXTERNAL_REFS_UNRESOLVED        const-15-core-tail.md, coord-03-core-fallback.md, skill-pm.md
+//   SOURCE_CREDIBILITY_UNVERIFIED   coord-03-core-fallback.md, skill-design-auditor.md, skill-pm.md
 //   FEATURE_LEASE_HELD              coord-03-core-fallback.md, skill-release-engineer.md
 //   MISSING_EVIDENCE                skill-qa-engineer.md
 //   MISSING_REVIEW_EVIDENCE         skill-code-reviewer.md
@@ -54,7 +55,7 @@
 //   REVIEW_VERDICT_STATUS_MISMATCH  const-05-core-standards.md, const-08-chain-31-mid.md, skill-code-reviewer.md
 //   REVIEWER_COMPLETED_TASKS_REJECTED  skill-code-reviewer.md
 //   QA_REVIEW_TARGET_REQUIRED       skill-qa-engineer.md
-// The 26-gate catalog, in documentation order. Array order is DOC order only —
+// The 27-gate catalog, in documentation order. Array order is DOC order only —
 // it MUST NOT be relied on for evaluation order (DR-5; that lives in
 // handoff-orchestrator.ts as the physical if-block sequence).
 export const GATE_REGISTRY = [
@@ -160,6 +161,26 @@ export const GATE_REGISTRY = [
         hintStatic: " Each entry in external_refs must be fetched, indexed, or user-confirmed-ignorable " +
             "before routing to build. See content/skill-pm.md §Resource Audit Gate and " +
             "specs/b8-external-ref-ledger.md.",
+        documentedInProse: true,
+    },
+    {
+        // E4 (e4-design-source-credibility-gate) — FOURTH build-entry attestation gate on the
+        // pm:In_Progress -> {architect,sr-engineer}:In_Progress edge, after scope-decision /
+        // cut-approval / external-refs. UNLIKE those three (file-mode only, read handoff YAML),
+        // this gate reads design/<feature>.md directly via fs, so it is STORAGE-MODE-AGNOSTIC
+        // (AC-7). Arm is the fetch-based-mode INCLUSION list inside checkSourceCredibility, NOT
+        // hasDesignModeRequiringVisual's broad exclusion (DR-2). hintStatic has a LEADING SPACE:
+        // the emit site concatenates a dynamic prefix ending in `.` then this string, reproducing
+        // spec S02 byte-for-byte (AC-8, DR-9).
+        errorCode: "SOURCE_CREDIBILITY_UNVERIFIED",
+        producer: "orchestrator",
+        envelope: "orchestrator-json",
+        triggerEdge: "pm:In_Progress -> {architect,sr-engineer}:In_Progress",
+        armCondition: "checkSourceCredibility (fetch-based modes figma/sketch/xd/penpot only)",
+        clearingArtifact: "every audited ## Source row carries credibility: full-page-composite, or design is non-fetch-mode / has no ## Source section / no design file",
+        hintStatic: " Every audited row in a fetch-based design (figma/sketch/xd/penpot) must carry " +
+            "credibility: full-page-composite in the ## Source manifest before routing to build. " +
+            "See content/skill-design-auditor.md step 2b and specs/e4-design-source-credibility-gate.md.",
         documentedInProse: true,
     },
     {
