@@ -160,10 +160,12 @@ function fmt(codeMap, codes) {
 }
 
 // ---------------------------------------------------------------------------
-// AC-1 / AC-5: GATE_REGISTRY is the single source of truth, exactly 26
-// entries (e2-bugfix-repro-gate, qa-owned re-baseline: added the 26th,
-// REPRO_MANIFEST_MISSING — the bugfix-mode repro-first gate; 25 in, 26 out —
-// one gate added, none dropped). e1-feature-scoped-state-design had added the
+// AC-1 / AC-5: GATE_REGISTRY is the single source of truth, exactly 27
+// entries (e4-design-source-credibility-gate, qa-owned re-baseline: added the
+// 27th, SOURCE_CREDIBILITY_UNVERIFIED — the build-entry source-credibility
+// attestation gate; 26 in, 27 out — one gate added, none dropped).
+// e2-bugfix-repro-gate had added the 26th, REPRO_MANIFEST_MISSING — the
+// bugfix-mode repro-first gate. e1-feature-scoped-state-design had added the
 // 25th, FEATURE_LEASE_HELD. d9-qa-review-scoped-append had added the 24th,
 // QA_REVIEW_TARGET_REQUIRED. d2-server-brake-accounting had added the 23rd,
 // HOP_CAP_EXCEEDED. c16-c10-role-boundary had added the 22nd,
@@ -172,15 +174,15 @@ function fmt(codeMap, codes) {
 // REVIEW_VERDICT_STATUS_MISMATCH.
 // ---------------------------------------------------------------------------
 
-test("AC-1/AC-5: GATE_REGISTRY has exactly 26 entries (25 in, 26 out — e2-bugfix-repro-gate added REPRO_MANIFEST_MISSING)", () => {
+test("AC-1/AC-5: GATE_REGISTRY has exactly 27 entries (26 in, 27 out — e4-design-source-credibility-gate added SOURCE_CREDIBILITY_UNVERIFIED)", () => {
   assert.equal(
     GATE_REGISTRY.length,
-    26,
-    `expected exactly 26 GateDefinition entries, got ${GATE_REGISTRY.length}: ${GATE_REGISTRY.map((g) => g.errorCode).join(", ")}`,
+    27,
+    `expected exactly 27 GateDefinition entries, got ${GATE_REGISTRY.length}: ${GATE_REGISTRY.map((g) => g.errorCode).join(", ")}`,
   );
   assert.equal(
     ALL_GATE_CODES.length,
-    26,
+    27,
     "ALL_GATE_CODES must be GATE_REGISTRY.map(g => g.errorCode) — same length",
   );
   assert.deepEqual(
@@ -314,9 +316,14 @@ test("internal consistency: orchestrator-producer entries' errorCode literally a
 // LEASE_HELD joins the union as a 9th handler-side-only member (14 -> 15),
 // same three reasons as EXTERNAL_REFS_UNRESOLVED immediately above (it too is
 // an orchestrator-producer-only code, never emitted by validateTransition).
+// e4-design-source-credibility-gate (DR-3, qa-owned re-baseline): SOURCE_
+// CREDIBILITY_UNVERIFIED joins the union as a 10th handler-side-only member
+// (15 -> 16), same three reasons as EXTERNAL_REFS_UNRESOLVED/FEATURE_LEASE_HELD
+// above — an orchestrator-producer-only code (reads design/<feature>.md via
+// fs), never emitted by validateTransition (which stays pure/fs-free).
 // ---------------------------------------------------------------------------
 
-test("DR-8: TransitionRejection[\"error\"] union stays byte-identical at 15 members, all ⊆ ALL_GATE_CODES", () => {
+test("DR-8: TransitionRejection[\"error\"] union stays byte-identical at 16 members, all ⊆ ALL_GATE_CODES", () => {
   const transitionsSrc = readSource(path.join("tools", "transitions.ts"));
   const unionMatch = transitionsSrc.match(
     /export interface TransitionRejection \{\s*error:\s*([\s\S]*?);\s*\n\s*attempted:/,
@@ -330,12 +337,12 @@ test("DR-8: TransitionRejection[\"error\"] union stays byte-identical at 15 memb
 
   assert.equal(
     members.length,
-    15,
-    `TransitionRejection["error"] must stay byte-identical at 15 members (DR-8, e1-feature-scoped-state-design re-baseline) — found ${members.length}: ${members.join(", ")}`,
+    16,
+    `TransitionRejection["error"] must stay byte-identical at 16 members (DR-8, e4-design-source-credibility-gate re-baseline) — found ${members.length}: ${members.join(", ")}`,
   );
   assert.equal(
     new Set(members).size,
-    15,
+    16,
     "TransitionRejection[\"error\"] union members must be unique",
   );
 
@@ -606,8 +613,8 @@ test("doc-file mapping (c12): gates/registry.ts's errorCode→doc-file mapping c
   const mapping = parseDocFileMappingComment();
   assert.equal(
     mapping.size,
-    26,
-    `expected the mapping comment to list all 26 codes, found ${mapping.size}: ${[...mapping.keys()].join(", ")}`,
+    27,
+    `expected the mapping comment to list all 27 codes, found ${mapping.size}: ${[...mapping.keys()].join(", ")}`,
   );
   const docCodes = extractDocCodes();
   for (const g of GATE_REGISTRY) {
@@ -684,6 +691,16 @@ const FREE_TEXT_ALLOWLIST = [
   // tools/handoff-orchestrator.ts, so it is mechanically checked like every
   // other orchestrator-producer entry.
   { code: "REPRO_MANIFEST_MISSING", field: "triggerEdge", reason: "role:Status edge pair present but not in triggerEdgeCheckable (no CAP_BY_CODE numeric literal, not one of the three pm->build-entry gates); the \"(file-mode only)\" qualifier is free English" },
+  // e4-design-source-credibility-gate (qa-owned, 2026-07-12): SOURCE_
+  // CREDIBILITY_UNVERIFIED's triggerEdge is a real "pm:In_Progress ->
+  // {architect,sr-engineer}:In_Progress" role:Status edge pair, but it is not
+  // in triggerEdgeCheckable (not a CAP_BY_CODE numeric literal, not one of the
+  // three pm->build-entry gates named in EDGE_CHECKED_CODES). armCondition is
+  // NOT allowlisted: it names the real camelCase checkSourceCredibility(...)
+  // predicate call, which appears literally in tools/handoff-orchestrator.ts,
+  // so it is mechanically checked (armConditionCheckable) like every other
+  // orchestrator-producer entry.
+  { code: "SOURCE_CREDIBILITY_UNVERIFIED", field: "triggerEdge", reason: "role:Status edge pair present but not in triggerEdgeCheckable (not a CAP_BY_CODE numeric literal, not one of the three pm->build-entry gates in EDGE_CHECKED_CODES)" },
 ];
 
 test("AC3 (c12): every (errorCode, field) pair for triggerEdge/armCondition is either mechanically checked above or explicitly allowlisted as free-text — no silent exemptions", () => {

@@ -651,6 +651,11 @@ export interface BaselineManifestRow {
   pointer: string;         // node-id / pointer cell; "" if blank
   status: string;          // normalized lowercase: "audited" | "deferred" | "out-of-scope" | "unknown" | <raw>
   isAudited: boolean;      // status === "audited" AND pointer non-empty (frozen-row predicate)
+  credibility: string;     // E4: the `credibility` cell, normalized trim().toLowerCase();
+                           //     "" when the column is absent/blank. Only the literal
+                           //     "full-page-composite" clears SOURCE_CREDIBILITY_UNVERIFIED
+                           //     on an audited row. Additive field — checkBaselineManifest
+                           //     logic (isAudited/auditedCount) is untouched.
   rawLine: string;         // the source table line, for debugging
 }
 
@@ -683,6 +688,7 @@ export function parseBaselineManifestRows(content: string): BaselineManifestRow[
   let statusIdx = -1;
   let pointerIdx = -1;
   let mediumIdx = -1;
+  let credibilityIdx = -1;   // E4: located by the `credibility` header; -1 => column absent
   let headerLine: string | null = null;
   for (const line of tableLines) {
     if (/^\|[\s:|-]+\|?$/.test(line)) continue; // separator row never a header
@@ -692,6 +698,7 @@ export function parseBaselineManifestRows(content: string): BaselineManifestRow[
       statusIdx = si;
       pointerIdx = cells.findIndex((c) => /^(pointer|node-?id)$/.test(c));
       mediumIdx = cells.findIndex((c) => /^medium$/.test(c));
+      credibilityIdx = cells.findIndex((c) => /^credibility$/.test(c));
       headerLine = line;
       break;
     }
@@ -719,7 +726,14 @@ export function parseBaselineManifestRows(content: string): BaselineManifestRow[
       ? "audited"
       : normalizeStatus(effStatusIdx < cells.length ? cells[effStatusIdx] : "");
     const isAudited = status === "audited" && pointer.trim().length > 0;
-    rows.push({ medium, pointer, status, isAudited, rawLine: line });
+    // E4: credibility located by header only (no positional fallback) — absent
+    // header / short row → "". Normalized trim().toLowerCase() so the gate can
+    // compare directly to the literal "full-page-composite".
+    const credibility =
+      credibilityIdx >= 0 && credibilityIdx < cells.length
+        ? cells[credibilityIdx].trim().toLowerCase()
+        : "";
+    rows.push({ medium, pointer, status, isAudited, credibility, rawLine: line });
   }
   return rows;
 }
@@ -789,4 +803,71 @@ export function checkBaselineManifest(
     };
   }
   return { ok: true, code: null, detail: "", designPath, auditedCount };
+}
+
+// ---------- E4 — Source-credibility gate (e4-design-source-credibility-gate) ----------
+// Build-entry attestation gate on the pm:In_Progress -> {architect,sr-engineer}:In_Progress
+// edge. Confirms the design-auditor's step-2b Source-Credibility Classification actually
+// ran and recorded its verdict: every `audited` `## Source` row of a fetch-based design
+// carries `credibility: full-page-composite`. Reuses the module's existing
+// designFilePath / parseDesignMode / sliceH2Section + the extended
+// parseBaselineManifestRows — one read of the identical `## Source` table (DR-1). The
+// composition helper touches fs; it never throws (fs errors -> dormant ok:true).
+
+// Explicit INCLUSION list (spec Dependencies point 4 / DR-2) — deliberately NARROWER
+// than hasDesignModeRequiringVisual's "any mode != no-design" EXCLUSION. Matches step 2b's
+// own scope so the gate never false-fires on image/pdf/paper/no-design.
+const FETCH_BASED_MODES = ["figma", "sketch", "xd", "penpot"] as const;
+
+export interface SourceCredibilityCheck {
+  ok: boolean;
+  offendingRows: string[];   // "medium/pointer" pairs for audited rows missing/wrong credibility
+  designPath: string;        // resolved design/<feature>.md, for the hint
+  mode: string | null;       // parsed mode, for error context / debugging
+}
+
+// Composition helper (fs). Mirrors checkBaselineManifest's dormant/fail shape. Reads
+// design/<feature>.md once via designFilePath(). Never throws (fs errors → dormant).
+// Decision tree:
+//   1. no activeFeature OR file absent               → { ok:true }  (AC-4)
+//   2. parseDesignMode(content) not in FETCH_BASED_MODES → { ok:true }  (AC-4)
+//   3. sliceH2Section(content,"Source") === null      → { ok:true }  (AC-4)
+//   4. audited rows whose normalized credibility !== "full-page-composite"
+//        → { ok:false, offendingRows:["<medium>/<pointer>", …] }  (AC-1, AC-3)
+//   5. zero audited rows, or all audited rows compliant → { ok:true }
+// The fetch-based INCLUSION list in step 2 is the whole arm — `mode != no-design`
+// is NOT re-checked broadly (DR-2). Independent of the PASS-time baseline-manifest
+// gates (AC-5): different edge, different check.
+export function checkSourceCredibility(
+  workspacePath: string,
+  activeFeature: string,
+): SourceCredibilityCheck {
+  const designPath = designFilePath(workspacePath, activeFeature);
+  const dormant: SourceCredibilityCheck = { ok: true, offendingRows: [], designPath, mode: null };
+
+  if (!activeFeature || !fs.existsSync(designPath)) return dormant; // AC-4 (no design file)
+  let content: string;
+  try {
+    content = fs.readFileSync(designPath, "utf-8");
+  } catch {
+    return dormant;
+  }
+
+  const mode = parseDesignMode(content); // null if no Mode line found
+  if (mode === null || !(FETCH_BASED_MODES as readonly string[]).includes(mode)) {
+    return { ok: true, offendingRows: [], designPath, mode }; // AC-4 (non-fetch mode)
+  }
+  // AC-4: no `## Source` section at all → dormant (pre-E4 / pre-manifest designs).
+  if (sliceH2Section(content, "Source") === null) {
+    return { ok: true, offendingRows: [], designPath, mode };
+  }
+
+  const offendingRows: string[] = [];
+  for (const row of parseBaselineManifestRows(content)) {
+    if (!row.isAudited) continue; // deferred/out-of-scope/zero-audited never gated (AC-5)
+    if (row.credibility !== "full-page-composite") {
+      offendingRows.push(`${row.medium}/${row.pointer}`);
+    }
+  }
+  return { ok: offendingRows.length === 0, offendingRows, designPath, mode };
 }

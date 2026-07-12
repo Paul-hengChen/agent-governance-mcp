@@ -112,6 +112,15 @@ export interface TransitionRejection {
                                     // (it reads handoff state + storage kind); union extension is
                                     // for handler-side narrowing + envelope consistency (mirrors
                                     // CUT_APPROVAL_REQUIRED).
+    | "SOURCE_CREDIBILITY_UNVERIFIED" // E4 (e4-design-source-credibility-gate) — emitted by the
+                                    // handoff-orchestrator gate at the pm → {architect,sr-engineer}
+                                    // :In_Progress edge when a fetch-based design/<feature>.md has an
+                                    // audited ## Source row lacking credibility: full-page-composite.
+                                    // STORAGE-MODE-AGNOSTIC (reads design/<feature>.md via fs, not
+                                    // handoff YAML) — DIFFERENT from EXTERNAL_REFS_UNRESOLVED /
+                                    // CUT_APPROVAL_REQUIRED. NOT produced by validateTransition (this
+                                    // module stays pure / fs-free); union extension is for handler-side
+                                    // narrowing + envelope consistency (mirrors EXTERNAL_REFS_UNRESOLVED).
     | "FEATURE_LEASE_HELD"          // E1 (e1-feature-scoped-state-design) — emitted by the
                                     // handoff-orchestrator lease gate when a write carries a
                                     // DIFFERENT active_feature while the incumbent feature is

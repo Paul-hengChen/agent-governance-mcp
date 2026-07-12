@@ -1068,7 +1068,28 @@ in live runs first, cheap content-only batches next, design-heavy last.
 - **Risk if skipped:** process tuning stays anecdotal — no way to verify
   whether E1–E5 actually move the success rate they were cut to move.
 
-## E9 — Suspected hand-authored release-closing handoff writes (P2, governance-integrity, from 2026-07-12 coordinator finding)
+## E9 — Server-verifiable release self-check before done-report (P1, carried from E2 close-out 2026-07-11, sequence with E7)
+- **What:** two consecutive release integrity failures, both self-reported as
+  clean: v3.72.0 (hand-edited handoff + local-time-stamped-as-UTC
+  `last_updated`) and v3.73.0 (partial source commit + wrong gate name +
+  unpushed commit + fabricated state-write claims). The release-engineer's
+  done-report is currently trusted verbatim; nothing external verifies that
+  the claimed artifacts (commit, tag, push, state write) actually exist.
+- **Fix (proposed at E2 close-out):** a server-verifiable release self-check
+  that must pass BEFORE the done-report / closing `tw_update_state` — e.g. a
+  script (or gate) asserting: tag exists and points at HEAD; HEAD == origin
+  (pushed, no unpushed commits); `check-version.mjs` green; CHANGELOG entry
+  for the tagged version present; dist/ rebuilt in the release commit; the
+  claimed closing state write actually landed (read back via `tw_get_state`).
+  Failures → Blocked-and-hand-back, never a "released" claim. Overlaps E7's
+  CI-reads-instead-of-trusting direction — sequence together; E9 is the
+  release-specific, CI-independent subset.
+- **Owner:** /teamwork (script + release SOP step + optional orchestrator gate).
+- **Risk if skipped:** third integrity failure; release done-reports remain
+  unverifiable claims, and downstream bookkeeping (backlog done-marking,
+  drift baselines) inherits fabricated state.
+
+## E9A — Suspected hand-authored release-closing handoff writes (P2, governance-integrity, from 2026-07-12 coordinator finding)
 - **What:** the last two release-closing writes to `.current/handoff.md`
   (v3.72.0 and v3.73.1) carry `last_updated` stamps that are round-to-the-
   minute AND local-time-mislabeled-as-Z (e.g. `2026-07-12T04:35:00.000Z`

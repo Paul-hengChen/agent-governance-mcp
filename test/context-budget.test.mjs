@@ -698,6 +698,12 @@ test("AC1/AC2: skill-pm stripped token count meets ≤ 3775 cap", () => {
   // guidance, AC4 opt-back-in note, one Task-Format example). Independently re-measured
   // at 3775 ~tok exactly; cap set to the exact measured value per the established Phase-2
   // convention (no headroom).
+  // e4-design-source-credibility-gate (qa-owned bump, T-E4-03): cap raised from 3775 →
+  // 3922 to absorb the new "Source-Credibility Gate" row added to skill-pm.md's Gate
+  // Summary table (awareness-only pointer to the design-auditor-authored attestation,
+  // per spec Dependencies point — PM does not author the attestation, just needs the
+  // pointer). Independently re-measured at 3922 ~tok exactly; cap set to the exact
+  // measured value per the established Phase-2 convention (no headroom).
   const SKILL_PM = fs.readFileSync(path.join(ROOT, "content", "skill-pm.md"), "utf-8");
   // Strip frontmatter (--- block) before token-counting the body, matching buildPromptForRole.
   const body = SKILL_PM.startsWith("---")
@@ -705,7 +711,7 @@ test("AC1/AC2: skill-pm stripped token count meets ≤ 3775 cap", () => {
     : SKILL_PM;
   const stripped = stripRationale(stripOriginTags(expandSkill(body)));
   const toks = approxTokens(stripped);
-  assert.ok(toks <= 3775, `skill-pm stripped body (${toks} ~tok) must be ≤ 3775 (AC1, e2-bugfix-repro-gate re-baseline)`);
+  assert.ok(toks <= 3922, `skill-pm stripped body (${toks} ~tok) must be ≤ 3922 (AC1, e4-design-source-credibility-gate re-baseline)`);
 });
 
 test("AC1/AC2: skill-sr-engineer stripped token count meets ≤ 2642 cap", () => {
@@ -1096,13 +1102,20 @@ test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/b
   // code-reviewer's notes) at 13537 ~tok (exact); cap set to the exact
   // measured value per the established Phase-2 convention (no additional
   // headroom).
+  // e4-design-source-credibility-gate (qa-owned bump, T-E4-03): cap raised
+  // from 13537 → 13669 to absorb the new "Source-credibility gate" stop-
+  // condition row added to content/coord-03-core-fallback.md (Auto-Routing /
+  // Escalation-Routes table, folded into the composed skill-coordinator
+  // monolith); no constitution-side change this feature. Independently
+  // re-measured at 13669 ~tok (exact); cap set to the exact measured value
+  // per the established Phase-2 convention (no additional headroom).
   const skillCoord = readSkillFile("skill-coordinator.md");
   const body = skillCoord.startsWith("---")
     ? skillCoord.slice(skillCoord.indexOf("---", 3) + 3).trimStart()
     : skillCoord;
   const SEP = "\n\n---\n\n";
   const bundle = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)) + SEP + stripRationale(stripOriginTags(body)));
-  assert.ok(bundle <= 13537, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 13537 (AC8 design-arm floor, e1-feature-scoped-state-design re-baseline)`);
+  assert.ok(bundle <= 13669, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 13669 (AC8 design-arm floor, e4-design-source-credibility-gate re-baseline)`);
 });
 
 test("AC9: every operative rule/gate/heading survives stripRationale on the constitution", () => {
