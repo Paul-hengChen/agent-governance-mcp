@@ -689,6 +689,295 @@ test("S8: content/skill-release-engineer.md carries step 11b — the success-met
   );
 });
 
+// ============================================================================
+// E13 (e13-terminal-marker-advisory) — terminal-marker resilience to the
+// heal-drop class. Repro-first (bugfix mode, spec AC7): E13-R1 below was
+// authored BEFORE the gates/feature-lease.ts predicate change and verified RED
+// against the unmodified predicate (recorded in
+// qa_reports/expected-red_e13-terminal-marker-advisory.txt); it turns green
+// with the T-E13-02 fix.
+//
+// Spec-to-Test map (E13, sr-engineer repro slice — qa-engineer extends per
+// T-E13-06):
+//   AC2 (second occurrence: heal drops next_role,
+//        pending_notes preserved -> lease released)   -> E13-R1
+//   AC1 (first occurrence: next_role never set at write
+//        time, closing pending_notes present -> released) -> E13-AC1
+//   AC3 (opening write explicit regression assertion)   -> E13-AC3
+//   AC4 (SQLite-mode orchestrator path: closing-signature
+//        pending_notes never passed in -> TTL-bounded
+//        only, unchanged)                                -> E13-AC4a, E13-AC4b
+//   AC5 (Blocked status + closing-signature pending_notes:
+//        the disjunct cannot bypass the status conjunct)  -> E13-AC5
+//   AC6 (skill-text pin — resilience note, steps 12-13)    -> E13-AC6
+// ============================================================================
+
+test("E13-R1: heal-drop class — closing write carried the full terminal triple, then a heal-style re-persist preserved pending_notes verbatim but dropped the transient next_role; the lease must be RELEASED (spec AC2, second occurrence)", async () => {
+  // WHY: the v3.77.0 close-out incident. The closing write was CORRECT when
+  // written (full E1A triple, confirmed by read-back). Later, an unrelated
+  // read triggered readHandoffState's fire-and-forget migration heal-write
+  // (tools/handoff.ts ~506-544), which re-passes pendingNotes verbatim
+  // (~line 523) but — per next_role's documented TRANSIENT semantics (AC-3) —
+  // never carries next_role forward. The pre-E13 terminal marker keyed on
+  // next_role === "pm" surviving indefinitely, so the post-heal state wrongly
+  // re-armed a dead lease and stalled the next feature's PM start for the
+  // ~30-min TTL. The durable closing signature (pending_notes[0] =~
+  // /^Released v/) survives the heal; the marker must accept it.
+  setActiveStorage(new FileHandoffStorage());
+  const ws = mkWs("flease-e13r1-");
+  resetSession(ws);
+  markStateRead(ws);
+
+  // Step 1 — release-engineer's closing write, full E1A terminal triple +
+  // closing-signature pending_notes (skill-release-engineer SOP step 12).
+  await writeHandoffState({
+    workspacePath: ws,
+    activeFeature: "feat-x",
+    status: "In_Progress",
+    completedTasks: [],
+    pendingNotes: ["Released v3.77.0", "tag: 2f759c3"],
+    lastAgent: "release-engineer",
+    nextRole: "pm",
+  });
+  const atWrite = parseHandoff(ws);
+  assert.equal(atWrite.next_role, "pm", "sanity: the closing write carried the full terminal triple");
+  assert.equal(
+    isFeatureLeaseHeld(atWrite, "feat-y", Date.now(), LEASE_TTL_MIN),
+    false,
+    "sanity: the pre-heal closing state is already terminal under the existing marker",
+  );
+
+  // Step 2 — heal-style re-persist, mirroring readHandoffState's migration
+  // heal-write field-for-field (tools/handoff.ts ~518-544): pendingNotes
+  // re-passed verbatim, nextRole OMITTED — dropped by design (transient, AC-3;
+  // positional-overload comment ~757-759: "an omitting write — including the
+  // migration-heal write in readHandoffState — simply drops them").
+  await writeHandoffState({
+    workspacePath: ws,
+    activeFeature: atWrite.active_feature,
+    status: atWrite.status,
+    completedTasks: atWrite.completed_tasks,
+    pendingNotes: atWrite.pending_notes,
+    lastAgent: atWrite.last_agent,
+    // nextRole intentionally omitted — the heal write never carries it forward.
+  });
+  const postHeal = parseHandoff(ws);
+  assert.equal(postHeal.next_role, undefined, "sanity: the heal-style re-persist dropped the transient next_role");
+  assert.equal(postHeal.last_agent, "release-engineer", "sanity: last_agent preserved by the heal-style re-persist");
+  assert.equal(postHeal.pending_notes[0], "Released v3.77.0", "sanity: pending_notes preserved verbatim by the heal-style re-persist");
+
+  // THE BUG (red pre-fix): the feature genuinely shipped, but the post-heal
+  // state no longer matches the exact triple, so the pre-E13 predicate
+  // reports the lease HELD and the next feature stalls out the TTL window.
+  assert.equal(
+    isFeatureLeaseHeld(postHeal, "feat-y", Date.now(), LEASE_TTL_MIN),
+    false,
+    "post-heal closing state must release the lease — the durable pending_notes closing signature must satisfy the terminal marker (E13)",
+  );
+});
+
+test("E13-AC1: first-occurrence class — next_role never set on the closing write ITSELF (no heal involved), closing-signature pending_notes present — lease released (spec AC1)", () => {
+  // WHY: distinct from E13-R1 (AC2), which needs a two-step heal-drop to
+  // reach the shape. AC1 is the v3.75.0 incident: release-engineer's closing
+  // write omitted next_role from the start (coordinator briefed it to, per
+  // the spec Problem Statement) — there is no prior "full triple" write and
+  // no heal step. The durable pending_notes signature alone must be enough.
+  const prev = {
+    active_feature: "feat-x",
+    status: "In_Progress",
+    last_updated: new Date().toISOString(),
+    last_agent: "release-engineer",
+    pending_notes: ["Released v3.75.0", "tag: abc1234"],
+    // next_role intentionally never set — key absent, mirroring the actual
+    // v3.75.0 closing write shape (not a derived/healed state).
+  };
+  assert.ok(!("next_role" in prev), "sanity: fixture must not carry a next_role key at all");
+  assert.equal(
+    isFeatureLeaseHeld(prev, "feat-y", Date.now(), LEASE_TTL_MIN),
+    false,
+    "a closing write that never set next_role must still release the lease via the durable pending_notes signature (AC1)",
+  );
+});
+
+test("E13-AC3: opening write regression assertion — pending_notes carries the OPENING signature (not /^Released v/), so the new disjunct never fires and the lease stays held (spec AC3)", () => {
+  // WHY: E1A-2 already pins "opening write holds" pre-E13. This test targets
+  // the E13 addition specifically: prove the new pending_notes disjunct does
+  // NOT accidentally widen to match the opening write's own notes ("release-
+  // engineer: starting release for <feature>"), which never begins with
+  // "Released v". Without this explicit case, a future edit to the regex
+  // (e.g. loosening the anchor) could silently reopen the D9/D10 race and no
+  // AC3 test would catch it directly at the pending_notes level.
+  const prev = {
+    active_feature: "feat-x",
+    status: "In_Progress",
+    last_updated: new Date().toISOString(),
+    last_agent: "release-engineer",
+    pending_notes: ["release-engineer: starting release for feat-x"],
+    // next_role intentionally absent, exactly as the opening write leaves it.
+  };
+  assert.equal(
+    isFeatureLeaseHeld(prev, "feat-y", Date.now(), LEASE_TTL_MIN),
+    true,
+    "the opening write's pending_notes must never satisfy the closing-signature disjunct — in-flight release stays lease-held (AC3)",
+  );
+});
+
+test("E13-AC5: Blocked status WITH closing-signature pending_notes still HOLDS — the pending_notes disjunct cannot bypass the status==='In_Progress' conjunct (spec AC5)", () => {
+  // WHY: E1A-3b already pins Blocked+next_role="pm" still holds. This test
+  // targets the E13 addition specifically: even in the (contrived, but
+  // worth pinning) case where pending_notes ALSO carries the closing
+  // signature, an interrupted/failed release sitting Blocked must not be
+  // mistaken for "shipped" — the status conjunct is evaluated with AND, not
+  // overridden by either disjunct branch. This is the defense-in-depth case
+  // the spec's AC5 escalation clause is meant to cover for the new disjunct.
+  const prev = {
+    active_feature: "feat-x",
+    status: "Blocked",
+    last_updated: new Date().toISOString(),
+    last_agent: "release-engineer",
+    pending_notes: ["Released v3.77.0", "tag: 2f759c3"],
+  };
+  assert.equal(
+    isFeatureLeaseHeld(prev, "feat-y", Date.now(), LEASE_TTL_MIN),
+    true,
+    "Blocked status must still gate the lease held regardless of pending_notes content — the disjunct is inside the status==='In_Progress' AND, not a bypass (AC5)",
+  );
+});
+
+test("E13-AC6: content/skill-release-engineer.md carries the E13 terminal-marker resilience note near steps 12-13 (spec AC6)", () => {
+  const skill = readContentFile("skill-release-engineer.md");
+  const noteMatch = skill.match(/^\*\*Terminal-marker resilience note \(E13.*$/m);
+  assert.ok(noteMatch, "must locate the E13 terminal-marker resilience note heading");
+  // Find the note's paragraph (from the heading line to the next blank line
+  // or next H2, whichever comes first) so assertions aren't order-sensitive
+  // to unrelated surrounding prose.
+  const noteStart = skill.indexOf(noteMatch[0]);
+  const noteEnd = skill.indexOf("\n\n", noteStart);
+  const noteBlock = noteEnd === -1 ? skill.slice(noteStart) : skill.slice(noteStart, noteEnd);
+
+  // (a) the exact triple remains PRIMARY, still verified by step 13's read-back.
+  assert.ok(
+    /exact triple.*remains the PRIMARY closing-write contract/.test(noteBlock),
+    "note must state the exact triple remains the PRIMARY closing-write contract",
+  );
+  assert.ok(
+    /step 13.*read-back still verifies it verbatim/.test(noteBlock),
+    "note must state step 13's read-back still verifies the exact triple verbatim",
+  );
+  // (b) the relaxed marker is a documented safety net, not license to omit next_role.
+  assert.ok(
+    noteBlock.includes("gates/feature-lease.ts"),
+    "note must name the file where the relaxed marker lives",
+  );
+  assert.ok(
+    /safety net/.test(noteBlock),
+    "note must characterize the relaxed marker as a safety net",
+  );
+  assert.ok(
+    /NOT license to omit `?next_role`?/.test(noteBlock),
+    "note must explicitly state this is NOT license to omit next_role",
+  );
+});
+
+// ============================================================================
+// E13-AC4: SQLite-mode orchestrator path — the call site passes
+// `pending_notes: undefined` for non-FileHandoffStorage, so the closing-
+// signature disjunct can never fire in SQLite mode even when the persisted
+// row's pending_notes would otherwise match it. Lease behavior stays
+// byte-for-byte TTL-bounded, unchanged from pre-E13 (spec AC4).
+// ============================================================================
+
+sqliteDescribe("SQLite mode: E13 closing-signature pending_notes are inert (AC4)", () => {
+  test("E13-AC4a: SQLite mode — a FRESH release-engineer closing-signature state (no next_role, pending_notes matching /^Released v/) still HOLDS the lease for a different feature (AC4)", async () => {
+    const { dir, dbPath } = mkSqliteWorkspace("flease-e13ac4a-");
+    try {
+      const storage = new SqliteHandoffStorage(dbPath);
+      setActiveStorage(storage);
+      await storage.writeState({
+        workspacePath: dir,
+        activeFeature: "flease-sql-a",
+        status: "In_Progress",
+        completedTasks: [],
+        pendingNotes: ["Released v3.77.0", "tag: 2f759c3"],
+        lastAgent: "release-engineer",
+        // nextRole intentionally omitted — SqliteHandoffStorage never
+        // persists next_role regardless, but omitting it here matches the
+        // AC1/AC2 incident shape faithfully.
+      });
+      resetSession(dir);
+      storage.readState(dir);
+
+      const result = await handleUpdateState({
+        workspace_path: dir,
+        active_feature: "flease-sql-b",
+        status: "In_Progress",
+        agent_id: "pm",
+        completed_tasks: [],
+        pending_notes: ["PM starting a new feature"],
+        cut_approved: true,
+      });
+      assert.ok(
+        result.isError,
+        "a fresh SQLite-mode closing-signature state must still hold the lease — the orchestrator call site passes pending_notes: undefined for non-file storage, so the disjunct can never fire (AC4)",
+      );
+      assert.match(result.content[0].text, /FEATURE_LEASE_HELD/);
+      assert.equal(storage.parse(dir).active_feature, "flease-sql-a", "incumbent must remain active_feature after rejection");
+    } finally {
+      setActiveStorage(new FileHandoffStorage());
+      try { fs.rmSync(dir, { recursive: true, force: true }); } catch {}
+    }
+  });
+
+  test("E13-AC4b: SQLite mode — the SAME closing-signature state, once STALE (past LEASE_TTL_MIN), releases the lease via ordinary TTL auto-expiry (not the E13 disjunct) — unchanged from pre-E13 behavior (AC4)", async () => {
+    const { dir, dbPath } = mkSqliteWorkspace("flease-e13ac4b-");
+    try {
+      const storage = new SqliteHandoffStorage(dbPath);
+      setActiveStorage(storage);
+      await storage.writeState({
+        workspacePath: dir,
+        activeFeature: "flease-sql-a",
+        status: "In_Progress",
+        completedTasks: [],
+        pendingNotes: ["Released v3.77.0", "tag: 2f759c3"],
+        lastAgent: "release-engineer",
+      });
+      // Backdate the SQLite-persisted last_updated column directly (test
+      // setup only — bypasses writeState, which always stamps `now`). Mirrors
+      // the file-mode backdateLastUpdated() helper's intent for the SQLite
+      // row shape; `storage.db` is a plain runtime property (TS `private` is
+      // compile-time only), so this is a same-process direct-row poke, not a
+      // new public API.
+      const backdated = new Date(Date.now() - (LEASE_TTL_MIN + 1) * 60_000).toISOString();
+      storage.db
+        .prepare("UPDATE handoff_state SET last_updated = ? WHERE workspace_path = ?")
+        .run(backdated, dir);
+      resetSession(dir);
+      storage.readState(dir);
+
+      const preState = storage.parse(dir);
+      assert.equal(preState.last_updated, backdated, "sanity: direct row poke backdated last_updated as intended");
+
+      const result = await handleUpdateState({
+        workspace_path: dir,
+        active_feature: "flease-sql-b",
+        status: "In_Progress",
+        agent_id: "pm",
+        completed_tasks: [],
+        pending_notes: ["PM starting a new feature after incumbent went stale"],
+        cut_approved: true,
+      });
+      assert.ok(
+        !result.isError,
+        `a stale SQLite-mode incumbent must release the lease via ordinary TTL expiry, unchanged from pre-E13: ${result.content?.[0]?.text}`,
+      );
+      assert.equal(storage.parse(dir).active_feature, "flease-sql-b");
+    } finally {
+      setActiveStorage(new FileHandoffStorage());
+      try { fs.rmSync(dir, { recursive: true, force: true }); } catch {}
+    }
+  });
+});
+
 test("S8b: step 11b sits between step 11 and step 12 (ordering) and the E1A step-12 contract text remains byte-intact alongside it (regression guard vs S7)", () => {
   const skill = readContentFile("skill-release-engineer.md");
   const step11bIdx = skill.search(/^11b\.\s+\*\*Success-metrics emit is automatic\*\*/m);

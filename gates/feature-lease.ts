@@ -19,20 +19,47 @@
 //   feature is still the workspace's owner awaiting human recovery, not free
 //   to be clobbered. The `status !== "PASS"` clause encodes this — Blocked,
 //   In_Progress, and FAIL are all non-terminal.
-// - Release-engineer closing-write terminal marker (E1A item 1): the exact
-//   signature `last_agent === "release-engineer" ∧ status === "In_Progress"
-//   ∧ next_role === "pm"` is terminal — the feature has shipped and the
-//   chain is handed back to pm, so the lease is released immediately instead
-//   of waiting out the TTL. Narrowly scoped by design:
-//   * the OPENING write (SOP step 2) never sets `next_role`, so the in-flight
-//     release window (git commit/tag/push mechanics) stays lease-held —
-//     keying on `last_agent` alone would reopen the D9/D10 race;
+// - Release-engineer closing-write terminal marker (E1A item 1; third
+//   conjunct broadened by E13, e13-terminal-marker-advisory): the signature
+//   `last_agent === "release-engineer" ∧ status === "In_Progress" ∧
+//   (next_role === "pm" ∨ pending_notes[0] =~ /^Released v/)` is terminal —
+//   the feature has shipped and the chain is handed back to pm, so the lease
+//   is released immediately instead of waiting out the TTL.
+//   E13 rationale — the exact triple's `next_role === "pm"` conjunct failed
+//   silently twice, each time re-arming a dead lease for the TTL window:
+//   * first occurrence (v3.75.0 close-out): the closing write simply omitted
+//     `next_role` (transient field, omission never rejected);
+//   * second occurrence (v3.77.0 close-out): the closing write DID carry the
+//     full triple, but a later unrelated read triggered readHandoffState's
+//     migration heal-write (tools/handoff.ts), which re-passes
+//     `pendingNotes` verbatim but — per `next_role`'s documented TRANSIENT
+//     (AC-3) semantics — drops `next_role` by design.
+//   The durable substitute signal is the closing write's pending_notes
+//   signature: SOP step 12 (content/skill-release-engineer.md) always stamps
+//   `pending_notes=["Released vX.Y.Z", "tag: <sha>"]`, and unlike `next_role`
+//   pending_notes IS preserved by the heal-write. Strict superset: every
+//   previously-terminal case (next_role === "pm") stays terminal; the
+//   disjunct additionally covers both incident classes (spec AC1/AC2).
+//   Still narrowly scoped by design (non-regression, spec AC3/AC5):
+//   * the OPENING write (SOP step 2) never sets `next_role` AND stamps
+//     `pending_notes=["release-engineer: starting release for <feature>"]` —
+//     neither disjunct matches, so the in-flight release window (git
+//     commit/tag/push mechanics) stays lease-held — keying on `last_agent`
+//     alone would reopen the D9/D10 race (which is exactly why the literal
+//     backlog option-(b) text — dropping the third conjunct entirely — was
+//     corrected to this narrower relaxation instead);
 //   * escalation writes route `next_role="qa-engineer"` / omit it / set
-//     `status="Blocked"` — none match, consistent with Blocked-counts-as-held;
+//     `status="Blocked"`, and their pending_notes never match /^Released v/
+//     — none match, consistent with Blocked-counts-as-held;
 //   * other roles' `next_role="pm"` handbacks fail the `last_agent` conjunct.
-//   FILE-MODE-ONLY by accepted asymmetry: SqliteHandoffStorage never persists
-//   `next_role`, so the fields are absent there and the clause simply never
-//   matches (SQLite behavior byte-for-byte unchanged — still TTL-bounded).
+//   FILE-MODE-ONLY by accepted asymmetry, enforced at the ORCHESTRATOR CALL
+//   SITE for the E13 disjunct: SqliteHandoffStorage never persists
+//   `next_role` (absent → never matches), and although SQLite DOES persist
+//   pending_notes, tools/handoff-orchestrator.ts passes `pending_notes` into
+//   this predicate ONLY under FileHandoffStorage (undefined otherwise), so
+//   SQLite behavior stays byte-for-byte unchanged — still TTL-bounded, no
+//   terminal-marker relief (spec AC4; extending relief to SQLite mode is a
+//   deliberately deferred, separate decision).
 // - TTL auto-expiry (advisory, not auto-steal): a dead session cannot
 //   deadlock the workspace forever; a live-but-slow one is protected within
 //   the TTL. Mirrors LOCK_STALE_MS (guards/file-lock.ts) and the D5
@@ -65,6 +92,13 @@ export interface FeatureLeaseFields {
   // that predate them; absence simply never matches the terminal clause.
   last_agent?: string;
   next_role?: string;
+  // E13 terminal-marker input — OPTIONAL: the durable closing-signature
+  // disjunct reads pending_notes[0]. FILE-MODE ONLY by call-site contract:
+  // the orchestrator passes this ONLY under FileHandoffStorage (undefined in
+  // SQLite mode, even though SQLite persists pending_notes) so SQLite lease
+  // behavior stays byte-for-byte unchanged (spec AC4). Absence simply never
+  // matches the disjunct.
+  pending_notes?: string[];
 }
 
 export function isFeatureLeaseHeld(
@@ -78,12 +112,19 @@ export function isFeatureLeaseHeld(
   if (prevState.status === "PASS") return false; // incumbent terminal — lease released
   if (
     // E1A terminal marker: release-engineer's CLOSING write — shipped, handed
-    // back to pm. Exact-signature match only: the opening write has no
-    // next_role (in-flight release stays held), escalations route elsewhere
-    // or set Blocked, and other roles' pm-handbacks fail the last_agent test.
+    // back to pm. The opening write matches neither third-conjunct disjunct
+    // (no next_role, "starting release..." notes — in-flight release stays
+    // held, D9/D10), escalations route elsewhere or set Blocked, and other
+    // roles' pm-handbacks fail the last_agent test.
     prevState.last_agent === "release-engineer" &&
     prevState.status === "In_Progress" &&
-    prevState.next_role === "pm"
+    // E13: next_role is TRANSIENT (AC-3) — it can be omitted at write time
+    // (first incident class) or dropped later by the migration heal-write
+    // (second class). The closing write's pending_notes signature ("Released
+    // vX.Y.Z" first, per SOP step 12) survives both, so accept EITHER. Strict
+    // superset of the pre-E13 exact triple.
+    (prevState.next_role === "pm" ||
+      /^Released v/.test(prevState.pending_notes?.[0] ?? ""))
   ) {
     return false; // incumbent shipped — lease released
   }

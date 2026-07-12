@@ -140,11 +140,32 @@ async function handleUpdateStateCore(parsed) {
     // terminal marker additionally reads last_agent/next_role, which are
     // optional and file-mode-only (SQLite never persists next_role) — the
     // clause simply never matches there (accepted asymmetry, spec
-    // §Amendment 2026-07-12). NOT in transitions.ts (that stays
-    // pure / fs-free; mirrors SCOPE_DECISION_REQUIRED).
-    if (prevState && isFeatureLeaseHeld(prevState, parsed.active_feature, Date.now(), LEASE_TTL_MIN)) {
-        const hint = `Feature lease held by "${prevState.active_feature}" ` +
-            `(status=${prevState.status}, last_updated=${prevState.last_updated}, ` +
+    // §Amendment 2026-07-12). E13 (e13-terminal-marker-advisory): the
+    // marker's durable pending_notes disjunct is scoped file-mode-only
+    // HERE, at the call site, not inside the pure predicate — SQLite DOES
+    // persist pending_notes (unlike next_role), so passing prevState
+    // wholesale would silently extend terminal-marker relief to SQLite
+    // mode as an unreviewed side effect. The explicit lease-fields object
+    // below passes pending_notes ONLY under FileHandoffStorage; SQLite
+    // inputs stay byte-for-byte what they were pre-E13 (TTL-bounded only,
+    // spec AC4). NOT in transitions.ts (that stays pure / fs-free;
+    // mirrors SCOPE_DECISION_REQUIRED).
+    const leaseFields = prevState
+        ? {
+            active_feature: prevState.active_feature,
+            status: prevState.status,
+            last_updated: prevState.last_updated,
+            last_agent: prevState.last_agent,
+            next_role: prevState.next_role,
+            // E13: file-mode only — undefined for SQLite/HTTP storage.
+            pending_notes: storage instanceof FileHandoffStorage
+                ? prevState.pending_notes
+                : undefined,
+        }
+        : null;
+    if (leaseFields && isFeatureLeaseHeld(leaseFields, parsed.active_feature, Date.now(), LEASE_TTL_MIN)) {
+        const hint = `Feature lease held by "${leaseFields.active_feature}" ` +
+            `(status=${leaseFields.status}, last_updated=${leaseFields.last_updated}, ` +
             `TTL=${LEASE_TTL_MIN}min). ` +
             gate("FEATURE_LEASE_HELD").hintStatic;
         const envelope = {
@@ -156,9 +177,9 @@ async function handleUpdateStateCore(parsed) {
                 new_status: nextTuple.status,
             },
             incumbent: {
-                active_feature: prevState.active_feature,
-                status: prevState.status,
-                last_updated: prevState.last_updated,
+                active_feature: leaseFields.active_feature,
+                status: leaseFields.status,
+                last_updated: leaseFields.last_updated,
                 lease_ttl_min: LEASE_TTL_MIN,
             },
             attempted_feature: parsed.active_feature,

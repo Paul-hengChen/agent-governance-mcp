@@ -4,6 +4,7 @@ export interface FeatureLeaseFields {
     last_updated: string;
     last_agent?: string;
     next_role?: string;
+    pending_notes?: string[];
 }
 export declare function isFeatureLeaseHeld(prevState: FeatureLeaseFields | null | undefined, incomingFeature: string, nowMs: number, ttlMin: number): boolean;
 //# sourceMappingURL=feature-lease.d.ts.map

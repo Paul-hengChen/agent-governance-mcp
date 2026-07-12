@@ -16,6 +16,23 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.79.0] - 2026-07-13
+
+### Added
+- **`e13-terminal-marker-advisory` — Terminal-marker resilience fix (v3.79.0).** Broadens the feature-lease terminal marker (`gates/feature-lease.ts`) to accept closing writes via durable signature: exact triple `last_agent="release-engineer" && status="In_Progress" && next_role="pm"` (primary contract, still required) OR a fallback pattern matching `pending_notes[0]` against `/^Released v/` (file-mode only, resilience fallback). Covers two known incident classes where `next_role` was absent/dropped despite correct intent: (1) closing write omitting `next_role` (v3.75.0), and (2) correct closing write whose transient `next_role` was later dropped by an unrelated migration heal-write while `pending_notes` survived (v3.77.0). Scoped to file-mode only via orchestrator call-site enforcement (`tools/handoff-orchestrator.ts`); SQLite behavior unchanged. Implements gate-broadening predicate (`gates/feature-lease.ts` third conjunct), orchestrator scoping (`tools/handoff-orchestrator.ts` leaseFields param), release-engineer SOP resilience note (`content/skill-release-engineer.md` step 12-13 terminal-marker section), and test coverage (`test/feature-lease.test.mjs`, E13-R1 + 6 ACs). Full suite 1370/1370 pass. QA verified (`qa_reports/review_T-E13-06.md`). Closes E13 ticket.
+
+### Changed
+- **gates/feature-lease.ts**: Terminal marker third conjunct broadened to accept closing writes via `pending_notes[0]` signature (file-mode only, guarded at call site).
+- **tools/handoff-orchestrator.ts**: leaseFields scoped to `FileHandoffStorage` only for resilience fallback.
+- **content/skill-release-engineer.md**: Terminal-marker resilience note appended after step 13 (documents the fallback safety net and reiterates that steps 12-13 remain the primary contract).
+- **test/feature-lease.test.mjs**: E13-R1 regression test + 6 ACs (pending_notes signature matching, file-mode enforcement, SQLite isolation).
+
+### Notes
+- driftBaselineIds appended with T-E13-01, T-E13-02, T-E13-03, T-E13-04, T-E13-05, T-E13-06, T-E13-07
+- E13 is a resilience/governance ticket addressing silent lease-stalls from v3.75.0 and v3.77.0 closing-write incidents
+- Terminal-marker relaxation is file-mode only (SQLite behavior preserved byte-for-byte per AC-4)
+- No breaking changes to MCP tool surface, handoff schema, or prompt system
+
 ## [3.78.0] - 2026-07-12
 
 ### Added
