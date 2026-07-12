@@ -1219,3 +1219,15 @@ in live runs first, cheap content-only batches next, design-heavy last.
 - **Risk if skipped:** every future close-out that omits the triple re-creates
   a silent ~30-min lease stall at the next feature start; the marker's
   correctness depends on prose SOP compliance the server never checks.
+- **Second occurrence (2026-07-12, E9 intake):** a new failure path for the same
+  marker — the v3.77.0 closing write DID carry the full triple (`next_role=pm`
+  observed in a 11:08Z read), but a subsequent server-side rewrite at
+  11:14:49.627Z (suspected read-path heal during a PM subagent session; not an
+  agent write — `last_agent` stayed `release-engineer`, `pending_notes`
+  unchanged) dropped the transient `next_role`, breaking the triple's third
+  conjunct after the fact. Next feature's PM write rejected with
+  FEATURE_LEASE_HELD; ~30-min stall waiting out the re-armed lease. Implication
+  for the fix: relaxing the marker to drop the `next_role` conjunct (option b)
+  also covers this class, whereas a write-time advisory (option a) alone does
+  not — the closing write here was correct when written. Overlaps E10 class 2
+  (heal refreshes `last_updated` / mutates persisted state of a dead lease).

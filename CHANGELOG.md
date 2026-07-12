@@ -16,6 +16,21 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.78.0] - 2026-07-12
+
+### Added
+- **`e9-release-self-check` — Release self-check gate (v3.78.0).** Introduces `scripts/verify-release.mjs` for independent post-push verification of release artifacts before closing the release (5 checks: tag-at-HEAD, pushed-to-origin, check-version green, CHANGELOG entry present, dist committed+parity at HEAD). Mandatory SOP step 9a; prevents incomplete/broken releases from being claimed PASS. Addresses v3.72.0 and v3.73.0 regression where releases were self-reported clean while actually broken. Implemented in `scripts/verify-release.mjs` with full test coverage (`test/verify-release.test.mjs`, 20 tests) and release-engineer SOP wiring (`content/skill-release-engineer.md` step 9a + Escalation Routes). Full suite 1370/1370 green. QA verified (`qa_reports/review_T-E9-04.md`). Closes E9 ticket.
+
+### Changed
+- **release-engineer SOP step 9a (new, mandatory)**: Run `node scripts/verify-release.mjs vX.Y.Z` post-push/gh-release, pre-closing-write. ALL checks MUST pass (exit 0) before proceeding to closing write. Any non-zero exit triggers Escalation Routes blockage and stops the release.
+- **release-engineer Escalation Routes**: Added release-self-check failure mode row (`release self-check reports any FAIL`).
+
+### Notes
+- driftBaselineIds appended with T-E9-01, T-E9-02, T-E9-03, T-E9-04
+- E9 is a release-integrity follow-up ticket addressing v3.72.0 + v3.73.0 false-clean self-reports
+- Release-engineer SOP step 13 (closing-write read-back, AC10 mandatory) validates the closing write landed on server before emitting final `Done. Released` claim
+- No breaking changes to MCP tool surface, handoff schema, or prompt system
+
 ## [3.77.0] - 2026-07-12
 
 ### Added

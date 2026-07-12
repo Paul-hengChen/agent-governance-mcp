@@ -4,7 +4,7 @@
 
 Lost updates, rule drift across `.cursorrules` / `CLAUDE.md` / `.windsurfrules`, and silent overwrites when two IDEs write at once — solved at the protocol layer, not by hoping the AI behaves.
 
-> **Status**: production-used, v3.73.1. Suite **1251/1251**. Stdio mode is solo/single-machine; HTTP+SQLite mode is for multi-machine teams.
+> **Status**: production-used, v3.78.0. Suite **1370/1370**. Stdio mode is solo/single-machine; HTTP+SQLite mode is for multi-machine teams.
 
 *Solo-built and self-hosting: this repo dogfoods its own server — development of agent-governance-mcp itself runs through the constitution and `tw_*` gates it ships.*
 
@@ -27,11 +27,11 @@ Existing tools in the same category (GitHub Spec Kit, OpenSpec) ship **templates
 
 ```bash
 # 1. Register the MCP server
-claude mcp add -s user agent-governance-mcp -- npx -y github:Paul-hengChen/agent-governance-mcp#v3.77.0
+claude mcp add -s user agent-governance-mcp -- npx -y github:Paul-hengChen/agent-governance-mcp#v3.78.0
 
 # 2. Mark the current workspace as managed (REQUIRED — hook is a silent no-op without this)
 # Recommended: use agc init (writes .current/ + tasks.md)
-npx -y github:Paul-hengChen/agent-governance-mcp#v3.77.0 agc init
+npx -y github:Paul-hengChen/agent-governance-mcp#v3.78.0 agc init
 # Alternative (bare scaffold):
 mkdir -p .current
 
