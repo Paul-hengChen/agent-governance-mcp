@@ -16,6 +16,22 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.76.0] - 2026-07-12
+
+### Added
+- **`e11-check-version-dist-parity` — dist/ build parity guard (v3.76.0).** Introduces `scripts/check-version.mjs` dist-parity verification to catch stale or mismatched `dist/index.js` at release time. Detects v3.74.0 regression (stale dist shipped to users). Adds `--strict` mode for CI gate, prints `dist/index.js parity OK (version)` on success. Implemented in `scripts/check-version.mjs` and `test/check-version.test.mjs`; gates release-engineer SOP step 7 pre-tag. Closes E11 ticket following post-v3.74.0 stale-dist incident review.
+- **`e12-metrics-emit-dedupe` — Metrics emit de-duplication (v3.76.0).** Fixes v3.74.0 double-emit regression where `tools/metrics.ts` appendMetrics() could emit duplicate lines on concurrent release attempts (same feature, same closing write, multiple handoff refreshes). Adds idempotent emit via `metrics.jsonl` last-line read-back check; only unique features are appended. Implemented in `tools/metrics.ts` with `test/success-metrics.test.mjs` dedupe regression tests. Full suite 1323/1323 green. QA verified (`qa_reports/review_T-E11E12-03.md`). Closes E12 ticket following post-v3.74.0 metrics incident review.
+
+### Changed
+- **release-engineer SOP step 7**: `npm run build` followed by `node scripts/check-version.mjs` now mandatory pre-tag; gate returns exit code 0 on success, prints version parity line.
+- **metrics emit**: `tools/metrics.ts` appendMetrics() now idempotent — duplicate features are silently skipped, preventing metric-line duplication on retried releases.
+
+### Notes
+- driftBaselineIds appended with T-E11-01, T-E12-01, T-E11E12-02, T-E11E12-03, T-E11E12-REL, T-E11E12-DONE
+- E11+E12 are joint-release follow-up tickets addressing v3.74.0 (E8) release-integrity incidents: stale dist and double-emit
+- No schema changes; fixes are additive to release-engineer SOP + metrics pipeline
+- `npm run build` prebuild now includes `check:version` for every `tsc` run (v3.70.0+ chain standard)
+
 ## [3.75.0] - 2026-07-12
 
 ### Added

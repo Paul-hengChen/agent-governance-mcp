@@ -675,6 +675,170 @@ test("E8-E9: emitFeatureMetrics never throws directly, regardless of inputs (def
   }));
 });
 
+// ============================================================================
+// E12 (specs/e11-e12-release-integrity-batch.md AC6-AC12) — dedupe guard:
+// same (feature, released_version) pair skipped, new version appends, null
+// treated as a real key, cross-feature no collision, malformed line skipped,
+// missing/unreadable file fails open. Authored per T-E11E12-03 (AC13,
+// qa-owned). D1-D3 drive the guard through the REAL release-engineer
+// closing-write signature (the exact double-fire reproduced at v3.74.0); U1-U3
+// drive emitFeatureMetrics directly for the cases the dispatch chain can't
+// cheaply isolate (null-key dedupe, cross-feature independence, fail-open on
+// an unreadable metrics.jsonl).
+//
+// Spec-to-Test map:
+//   AC7 (same feature+version dispatched twice -> 1 line)       -> E12-D1
+//   AC8 (version changes between dispatches -> 2 lines)         -> E12-D2
+//   AC10 (pre-existing malformed line doesn't crash the guard)  -> E12-D3
+//   AC9 (null released_version dedupes against null only)       -> E12-U1
+//   AC6/AC8 (cross-feature, same version -> no collision)       -> E12-U2
+//   AC10/AC11 (unreadable metrics.jsonl fails open -> appends)  -> E12-U3
+// ============================================================================
+
+test("E12-D1 (AC7): dispatching the release-engineer closing-write signature TWICE for the same feature+package.json version appends exactly ONE metrics line — the v3.74.0 double-fire scenario, closed", async () => {
+  setActiveStorage(new FileHandoffStorage());
+  const ws = mkWs("e12-dedupe-samever-");
+  const feature = "e12-dedupe-samever-feat";
+  seedTasksAndPackage(ws, { code: "E12SAMEVER", checked: 1, version: "5.0.0" });
+  const storage = new FileHandoffStorage();
+  setActiveStorage(storage);
+  await storage.writeState({
+    workspacePath: ws, activeFeature: feature, status: "PASS",
+    completedTasks: [], pendingNotes: [], lastAgent: "qa-engineer",
+    hopCount: 1, qaRoundsTotal: 0, reviewRoundsTotal: 0, visualRoundsTotal: 0,
+  });
+
+  // First full open+close cycle — record #1.
+  await dispatch(ws, { active_feature: feature, status: "In_Progress", agent_id: "release-engineer" });
+  let res = await dispatch(ws, { active_feature: feature, status: "In_Progress", agent_id: "release-engineer", next_role: "pm" });
+  assert.ok(!res.isError, `first closing write must be accepted: ${res.content?.[0]?.text}`);
+  assert.equal(readMetricsLines(ws).length, 1, "first closing write appends exactly one record");
+
+  // Second closing-write dispatch for the SAME feature, package.json unchanged
+  // (still 5.0.0) — this is the exact double-fire signature from staging.
+  res = await dispatch(ws, { active_feature: feature, status: "In_Progress", agent_id: "release-engineer", next_role: "pm" });
+  assert.ok(!res.isError, `repeat closing write must still be ACCEPTED as a state write: ${res.content?.[0]?.text}`);
+  const lines = readMetricsLines(ws);
+  assert.equal(lines.length, 1, "AC7 — the repeat dispatch must NOT append a second line for the same (feature, released_version) pair");
+  assert.equal(lines[0].released_version, "5.0.0");
+});
+
+test("E12-D2 (AC8): changing package.json's version between two closing-write dispatches for the same feature yields TWO lines — a genuinely new release is never deduped away", async () => {
+  setActiveStorage(new FileHandoffStorage());
+  const ws = mkWs("e12-dedupe-newver-");
+  const feature = "e12-dedupe-newver-feat";
+  seedTasksAndPackage(ws, { code: "E12NEWVER", checked: 1, version: "1.0.0" });
+  const storage = new FileHandoffStorage();
+  setActiveStorage(storage);
+  await storage.writeState({
+    workspacePath: ws, activeFeature: feature, status: "PASS",
+    completedTasks: [], pendingNotes: [], lastAgent: "qa-engineer",
+    hopCount: 1, qaRoundsTotal: 0, reviewRoundsTotal: 0, visualRoundsTotal: 0,
+  });
+
+  await dispatch(ws, { active_feature: feature, status: "In_Progress", agent_id: "release-engineer" });
+  await dispatch(ws, { active_feature: feature, status: "In_Progress", agent_id: "release-engineer", next_role: "pm" });
+  assert.equal(readMetricsLines(ws).length, 1, "first release recorded");
+
+  // Bump package.json's version to simulate a genuinely new release of the
+  // same feature (e.g. a re-cut after an amendment), then dispatch again.
+  fs.writeFileSync(path.join(ws, "package.json"), JSON.stringify({ name: "x", version: "1.0.1" }));
+  await dispatch(ws, { active_feature: feature, status: "In_Progress", agent_id: "release-engineer" });
+  const res = await dispatch(ws, { active_feature: feature, status: "In_Progress", agent_id: "release-engineer", next_role: "pm" });
+  assert.ok(!res.isError, `second closing write must be accepted: ${res.content?.[0]?.text}`);
+  const lines = readMetricsLines(ws);
+  assert.equal(lines.length, 2, "AC8 — a new released_version for the same feature is NOT deduped, both lines survive");
+  assert.deepEqual(lines.map((l) => l.released_version).sort(), ["1.0.0", "1.0.1"], "both distinct versions are present");
+});
+
+test("E12-D3 (AC10): a pre-existing malformed line in .current/metrics.jsonl does not crash the dedupe read — the closing write still succeeds and appends correctly", async () => {
+  setActiveStorage(new FileHandoffStorage());
+  const ws = mkWs("e12-malformed-");
+  const feature = "e12-malformed-feat";
+  seedTasksAndPackage(ws, { code: "E12MALFORMED", checked: 1, version: "2.0.0" });
+  // Pre-seed a malformed (non-JSON) line ahead of any real record.
+  fs.mkdirSync(path.join(ws, ".current"), { recursive: true });
+  fs.writeFileSync(metricsPath(ws), "{not valid json at all\n");
+  const storage = new FileHandoffStorage();
+  setActiveStorage(storage);
+  await storage.writeState({
+    workspacePath: ws, activeFeature: feature, status: "PASS",
+    completedTasks: [], pendingNotes: [], lastAgent: "qa-engineer",
+    hopCount: 1, qaRoundsTotal: 0, reviewRoundsTotal: 0, visualRoundsTotal: 0,
+  });
+  await dispatch(ws, { active_feature: feature, status: "In_Progress", agent_id: "release-engineer" });
+  const res = await dispatch(ws, { active_feature: feature, status: "In_Progress", agent_id: "release-engineer", next_role: "pm" });
+  assert.ok(!res.isError, `closing write must succeed despite the pre-existing malformed line: ${res.content?.[0]?.text}`);
+  const raw = fs.readFileSync(metricsPath(ws), "utf-8");
+  assert.match(raw, /^\{not valid json at all$/m, "the malformed line is left untouched — append-only, no rewrite/truncate");
+  const validLines = raw.split("\n").filter((l) => l.trim() !== "").filter((l) => {
+    try { JSON.parse(l); return true; } catch { return false; }
+  });
+  assert.equal(validLines.length, 1, "AC10 — the malformed line is skipped (not counted as a dedupe match) and exactly one new well-formed record is appended");
+  assert.equal(JSON.parse(validLines[0]).feature, feature);
+});
+
+test("E12-U1 (AC9): released_version resolving to null is a REAL dedupe key, not a wildcard — a second null-version emit for the same feature is skipped", () => {
+  const ws = mkWs("e12-nullkey-");
+  const feature = "e12-nullkey-feat";
+  fs.writeFileSync(path.join(ws, "tasks.md"), "- [x] T-E12NULLKEY-01 done\n");
+  // Deliberately no package.json -> released_version resolves to null both times.
+  emitFeatureMetrics({ workspacePath: ws, feature, qaRoundsTotal: 0, reviewRoundsTotal: 0, visualRoundsTotal: 0, hops: 0 });
+  let lines = readMetricsLines(ws);
+  assert.equal(lines.length, 1, "first null-version emit appends");
+  assert.equal(lines[0].released_version, null);
+
+  emitFeatureMetrics({ workspacePath: ws, feature, qaRoundsTotal: 0, reviewRoundsTotal: 0, visualRoundsTotal: 0, hops: 0 });
+  lines = readMetricsLines(ws);
+  assert.equal(lines.length, 1, "AC9 — a second (feature, null) emit is deduped against the first, NOT treated as always-append");
+});
+
+test("E12-U2: two DIFFERENT features emitted with the SAME released_version never collide — dedupe key is the (feature, released_version) pair, not released_version alone", () => {
+  const ws = mkWs("e12-crossfeat-");
+  fs.writeFileSync(path.join(ws, "package.json"), JSON.stringify({ version: "7.7.7" }));
+  fs.writeFileSync(
+    path.join(ws, "tasks.md"),
+    "- [x] T-E12CROSSA-01 done\n- [x] T-E12CROSSB-01 done\n",
+  );
+  emitFeatureMetrics({ workspacePath: ws, feature: "e12-crossa-feat", qaRoundsTotal: 0, reviewRoundsTotal: 0, visualRoundsTotal: 0, hops: 0 });
+  emitFeatureMetrics({ workspacePath: ws, feature: "e12-crossb-feat", qaRoundsTotal: 0, reviewRoundsTotal: 0, visualRoundsTotal: 0, hops: 0 });
+  const lines = readMetricsLines(ws);
+  assert.equal(lines.length, 2, "both features' records are present — same released_version does not cause cross-feature deduping");
+  assert.deepEqual(lines.map((l) => l.feature).sort(), ["e12-crossa-feat", "e12-crossb-feat"]);
+  assert.ok(lines.every((l) => l.released_version === "7.7.7"));
+});
+
+test("E12-U3 (AC10/AC11): metrics.jsonl unreadable mid-read (permissions error) fails OPEN — the dedupe falls back to appending rather than silently dropping a legitimate record", () => {
+  const ws = mkWs("e12-failopen-");
+  const feature = "e12-failopen-feat";
+  fs.writeFileSync(path.join(ws, "package.json"), JSON.stringify({ version: "1.0.0" }));
+  fs.writeFileSync(path.join(ws, "tasks.md"), "- [x] T-E12FAILOPEN-01 done\n");
+  fs.mkdirSync(path.join(ws, ".current"), { recursive: true });
+  // Seed one existing (different) record, then drop read permission while
+  // KEEPING write permission (0o200 — write-only) so readFileSync fails
+  // EACCES (exercising the fail-open catch) while appendFileSync (opened
+  // O_APPEND, needs only write) still succeeds — isolating "read fails" from
+  // "file is entirely unwritable" (the latter is the already-covered,
+  // record-dropped environment-failure path noted in review_T-E11E12-02.md).
+  fs.writeFileSync(
+    metricsPath(ws),
+    JSON.stringify({ feature: "some-other-feature", released_version: "1.0.0" }) + "\n",
+  );
+  fs.chmodSync(metricsPath(ws), 0o200);
+  try {
+    emitFeatureMetrics({ workspacePath: ws, feature, qaRoundsTotal: 0, reviewRoundsTotal: 0, visualRoundsTotal: 0, hops: 0 });
+  } finally {
+    fs.chmodSync(metricsPath(ws), 0o644); // restore so readMetricsLines below can read it back
+  }
+  const lines = readMetricsLines(ws);
+  // Whether or not this sandbox actually enforces 0o000 for the current user
+  // (e.g. root bypasses permission bits), the guard must never throw AND the
+  // legitimate new record for `feature` must end up present exactly once —
+  // that's the AC11 contract, independent of which code path was exercised.
+  const own = lines.filter((l) => l.feature === feature);
+  assert.equal(own.length, 1, "AC11 — the new record for this feature is appended, never silently dropped, whether the read failed open or succeeded normally");
+});
+
 // ---------- deriveTicketCode (AC4) ----------
 
 test("E8-D1: deriveTicketCode derives the leading alnum token before the first hyphen, uppercased", () => {

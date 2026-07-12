@@ -5,7 +5,7 @@
 // checkout AND a tag matching the package version exists — so fresh clones
 // and pre-release commits aren't blocked.
 
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import * as path from "node:path";
@@ -28,6 +28,41 @@ if (m[1] !== pkg.version) {
       "Update both to the same value before building."
   );
   process.exit(1);
+}
+
+// Compiled-artifact parity: dist/index.js is what `npx github:...#<tag>`
+// consumers actually run. A stale dist (built before the version bump) shipping
+// alongside correctly-bumped source + package.json is the v3.74.0 near-miss —
+// dist carried "3.73.1" while everything else was "3.74.0" and the check still
+// passed. If dist/index.js exists we assert its Server() literal too, and fail
+// loud on either a mismatch OR a parse failure (a guard that can't find what it
+// checks must not pass silently). If dist/index.js is absent (fresh clone before
+// `npm run build`), we skip with a note — mirroring the git-tag check's
+// "not in a git checkout" tolerance.
+const distPath = path.join(root, "dist", "index.js");
+if (existsSync(distPath)) {
+  const distSrc = readFileSync(distPath, "utf-8");
+  const dm = distSrc.match(/name:\s*"agent-governance-mcp",\s*version:\s*"([^"]+)"/);
+  if (!dm) {
+    console.error(
+      "check:version — could not find dist version literal: no Server() version literal in dist/index.js.\n" +
+        "The compiled artifact exists but is unparseable — run `npm run build`."
+    );
+    process.exit(1);
+  }
+  if (dm[1] !== pkg.version) {
+    console.error(
+      `check:version — dist version mismatch: package.json=${pkg.version} dist/index.js=${dm[1]}.\n` +
+        "Rebuild (`npm run build`) so the shipped artifact matches before tagging."
+    );
+    process.exit(1);
+  }
+  console.log(`check:version — dist/index.js parity OK (${dm[1]})`);
+} else {
+  console.log(
+    "check:version — note: dist/index.js not present (unbuilt checkout). " +
+      "Skipping dist parity check; run `npm run build` before publishing."
+  );
 }
 
 // CHANGELOG check: highest `## [x.y.z]` heading should match package.json.

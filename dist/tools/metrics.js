@@ -43,6 +43,42 @@ export function emitFeatureMetrics(args) {
         catch {
             // unreadable package.json — record ships with released_version: null.
         }
+        // Idempotency guard (E12): skip the append when a record with the same
+        // (feature, released_version) pair already exists. The PAIR is the key —
+        // released_version === null is a valid key value, NOT a wildcard, so a
+        // second null-version emit for the same feature is also deduped (AC9). An
+        // existing record with an absent/non-string released_version normalizes to
+        // null so it compares equal to a computed null. Defensive read: a missing
+        // file means "no existing records" so the append proceeds (AC10); a
+        // malformed line is skipped without crashing (AC10); and any failure of the
+        // read itself fails OPEN — fall through to append rather than drop a
+        // legitimate record (AC11) — never throwing, per this module's contract.
+        let alreadyEmitted = false;
+        try {
+            const existing = fs.readFileSync(metricsPath(args.workspacePath), "utf-8");
+            for (const line of existing.split("\n")) {
+                if (line.trim() === "")
+                    continue;
+                let parsed;
+                try {
+                    parsed = JSON.parse(line);
+                }
+                catch {
+                    continue; // malformed line — skip, do not crash the read (AC10)
+                }
+                const parsedVersion = typeof parsed.released_version === "string" ? parsed.released_version : null;
+                if (parsed.feature === args.feature && parsedVersion === released_version) {
+                    alreadyEmitted = true;
+                    break;
+                }
+            }
+        }
+        catch {
+            // File missing (AC10) or unreadable mid-read (AC11): fail open — leave
+            // alreadyEmitted false and fall through to append.
+        }
+        if (alreadyEmitted)
+            return;
         const record = {
             ts: new Date().toISOString(),
             feature: args.feature,
