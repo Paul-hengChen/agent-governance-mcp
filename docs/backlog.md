@@ -89,9 +89,11 @@ future `/teamwork` feature; none blocks a release on its own.
 | E5 | Backlog intake loop + tiered cut-approval: coordinator auto-starts next open backlog ticket; small cuts (≤2 files, P3, no schema) auto-approve, large/design-armed still HALT | P2 | E8 | ~3 (skill-coordinator, const §3.1 tier rule, config threshold) | — |
 | E6 | Rule-retirement retro cadence: actually run the D3 data every N features; zero-fire gates/prose become retirement PRs — the counter-pressure D3 was built for, still unexecuted | P2 | D3 ✓, E8 | ~2 (retro procedure doc, summarizer script) | — |
 | E7 | Git/CI as a governed surface: sanctioned-git-ops whitelist for ALL roles (generalizes D10 beyond release-engineer) + optional CI-status check at release instead of self-reported test-green | P2 | D10 | ~3 (constitution/skill content, optional gh check step, test) | — |
-| E8 | Success-side telemetry: per-feature one-pass rate / qa-review-visual rounds / hops / token totals appended at release — D3 records only rejections; success claims are currently hand-assembled anecdotes | P2 | D3 ✓ | ~3 (telemetry emit, release SOP line, summarizer) | — |
+| E8 | Success-side telemetry: per-feature one-pass rate / qa-review-visual rounds / hops / token totals appended at release — D3 records only rejections; success claims are currently hand-assembled anecdotes | P2 | D3 ✓ | ~3 (telemetry emit, release SOP line, summarizer) | **done (2026-07-12, v3.74.0)** — schema v12 cumulative round counters + release-time metrics emit to .current/metrics.jsonl + scripts/summarize-metrics.mjs; 1295/1295 green; tag v3.74.0 |
 | E9 | Suspected hand-authored `.current/handoff.md` release-closing writes: v3.72.0 and v3.73.1 closing stamps are round-to-the-minute AND local-time-mislabeled-as-Z, unlike server `tw_update_state` stamps (ms entropy) — suspect release-engineer subagents hand-editing during release staging, forbidden by skill-release-engineer.md L20 | P2 | — | ~3 (reproduce + find writer; optional server-side integrity check: reject client-shaped stamps / drift-detect out-of-band writes) | — |
 | E10 | Feature-lease human override + non-work write exemptions: failure-record writes and lazy-migration heals refresh a dead lease with no sanctioned human attestation path (2026-07-12 E8-start incident — ~34 min of timeout-waiting in an idle workspace) | P2 | E1 ✓ | ~4 (lease_override field + §3.1 trust mechanics, exempt admin/heal writes from stamp refresh, tests) | — |
+| E11 | `check-version.mjs` ships-vs-source blind spot: the guard asserts only `index.ts` Server() literal vs `package.json`, NOT the compiled `dist/index.js` that npx consumers actually run — v3.74.0 shipped `dist/index.js` at 3.73.1 while the check passed (caught in coordinator post-release verify, fixed in 9b91db9) | P2 | — | ~2 (extend check-version.mjs to parse+assert dist Server() literal + test) | — |
+| E12 | E8 metrics emit not idempotent per release: two terminal-signature writes during v3.74.0 release staging appended two identical `e8-success-telemetry` records to `.current/metrics.jsonl` — emit should fire once per (feature, released_version) | P3 | E8 ✓ | ~2 (dedupe guard in tools/metrics.ts + test) | — |
 
 ### Recommended execution order (2026-07-09, everything still open)
 
@@ -1128,3 +1130,41 @@ in live runs first, cheap content-only batches next, design-heavy last.
   workspace re-arms a dead lease; humans learn to work around the gate
   (worktrees, waiting, or — worse — hand-edits), eroding exactly the
   discipline the lease was built to protect.
+
+## E11 — check-version.mjs ships-vs-source blind spot (P2, release-integrity, from 2026-07-12 v3.74.0 post-release verify)
+
+- **What:** `scripts/check-version.mjs` asserts the `index.ts` `Server()`
+  version literal equals `package.json` version — but never checks the
+  compiled `dist/index.js`, which is the artifact `npx github:...#<tag>`
+  actually runs. At v3.74.0 the release commit shipped `dist/index.js` still
+  carrying `"3.73.1"` while source + package.json were correctly `3.74.0`;
+  `check-version.mjs` passed, so a wrong-version tag would have gone out. The
+  coordinator caught it in post-release verify and corrected it (fixup commit
+  9b91db9, tag moved), but nothing automated would have.
+- **Fix:** extend `check-version.mjs` to also parse the `Server({... version})`
+  literal out of `dist/index.js` and assert it equals `package.json`; fail
+  loud on mismatch. Add a test that a stale dist trips it.
+- **Owner:** TBD — small (1 script + 1 test); qa owns the test per §2.
+- **Risk if skipped:** the same stale-dist mis-versioned release can recur
+  every release; the guard that exists to prevent exactly this class silently
+  doesn't cover the shipped artifact.
+
+## E12 — E8 metrics emit not idempotent per release (P3, data-quality, from 2026-07-12 v3.74.0 first live emit)
+
+- **What:** the release-time metrics emit (E8, `tools/metrics.ts` wired at the
+  E1A terminal-marker in `handoff-orchestrator.ts`) fires on every write
+  matching the release-engineer closing signature. During v3.74.0 staging two
+  such writes occurred, so `.current/metrics.jsonl` now holds two identical
+  `e8-success-telemetry` records (differing only in `ts`). The metric values
+  are correct; the duplication is a data-quality wart for the very telemetry
+  E8 exists to produce.
+- **Fix:** dedupe per `(feature, released_version)` — either skip the append
+  when a record for that pair already exists in `metrics.jsonl`, or fire the
+  emit exactly once per release close. Keep best-effort/never-block posture.
+- **Owner:** TBD — small (dedupe guard in tools/metrics.ts + test). Do NOT
+  hand-edit the existing duplicate out of `metrics.jsonl` (append-only
+  telemetry; hand-edits are the E9 anti-pattern) — let the summarizer or a
+  migration handle historical dedupe if needed.
+- **Risk if skipped:** cross-feature success-rate math (the E6/E5 consumers)
+  double-counts any release that double-fired, skewing the exact numbers E8
+  was built to make trustworthy.
