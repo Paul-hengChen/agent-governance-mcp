@@ -16,6 +16,21 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.77.0] - 2026-07-12
+
+### Added
+- **`e3-outcome-shaped-acceptance` — QA Phase 3.5 runtime-evidence gate (v3.77.0).** Introduces AC_EXECUTION_LOG_MISSING (28th gate) to enforce proof annotations in feature specs as a precondition for release. Three legs: PM AC schema specification (`content/skill-pm.md` proof guidance), QA Phase 3.5 runtime-evidence execution phase (`content/skill-qa-engineer.md`), and the AC_EXECUTION_LOG_MISSING evidence gate (`gates/ac-execution.ts` NEW, `gates/registry.ts`, `tools/handoff-orchestrator.ts`). Implements AC execution log verification for 8 required proof annotations per active feature spec; gate fires on qa-engineer:PASS → release-engineer:In_Progress edge when evidence-of-execution is missing or incomplete (inspired by F2 false-green motivation, ensuring release-time rigor). Covers 8 ACs: AC schema, phase guidance, gate armcheck, missing-log detection, test coverage, escalation routes, scope alignment, and visual/copy audit baselines. Full suite 1350/1350 pass. QA verified (`qa_reports/review_T-E3-QA.md`). Closes E3 ticket.
+
+### Changed
+- **skill-pm and skill-qa-engineer**: Added proof-annotation guidance and QA Phase 3.5 description per AC schema.
+- **test suite**: New `test/ac-execution.test.mjs` (28 assertions covering arm-check, disposition, integration, and file-mode guard); re-baselined `test/error-code-contract.test.mjs` (27→28 gate entries), `test/context-budget.test.mjs` (skill-pm cap 3922→4128), `test/qa-visual-skill-split.test.mjs` (skill-qa-engineer cap 12950→14729).
+
+### Notes
+- driftBaselineIds appended with T-E3-ARCH, T-E3-01, T-E3-02, T-E3-03, T-E3-CR, T-E3-QA
+- E3 is a governance-feature ticket closing a v3.76.0+ follow-up workstream: proof annotations + runtime-evidence phase + gate 28
+- AC Execution Log manifest in `qa_reports/review_T-E3-QA.md` (Phase 3.5); test-infra path correction applied (gates-expected-red.test.mjs pattern → flat test/ac-execution.test.mjs)
+- No breaking changes to MCP tool surface, handoff schema, or prompt system
+
 ## [3.76.0] - 2026-07-12
 
 ### Added

@@ -149,7 +149,14 @@ test("AC-5: byte counts stay within v3.14.0-relaxed budgets (savings invariant v
   // 12549 bytes — independently re-measured with `wc -c
   // content/skill-qa-engineer.md`. Raised 12200 -> 12950 (~400-byte headroom)
   // per the established ~300-550-byte convention.
-  assert.ok(qaSize <= 12950, `qa-engineer.md must be <= 12950 bytes (got ${qaSize})`);
+  // e3-outcome-shaped-acceptance (qa-owned bump, T-E3-QA): new Phase 3.5 — AC
+  // Execution inserted between Phase 3 (Tests) and Phase 4 (Run) — scan/none/
+  // present/fail/PASS-GATE sub-bullets, bringing the file to 14329 bytes —
+  // independently re-measured with `wc -c content/skill-qa-engineer.md`
+  // (matches code-reviewer's reported figure exactly, review_reports/
+  // review_T-E3-CR.md). Raised 12950 -> 14729 (~400-byte headroom) per the
+  // established ~300-550-byte convention.
+  assert.ok(qaSize <= 14729, `qa-engineer.md must be <= 14729 bytes (got ${qaSize})`);
   // qa-visual.md: v3.36.0 adds B10 (Step B0 carry-forward gate) and B11
   // (Step B1 deterministic pixel-diff pre-screen + Step B2 LLM-only path).
   // These are SOP-prose insertions totalling ~5400 bytes on top of the

@@ -160,29 +160,30 @@ function fmt(codeMap, codes) {
 }
 
 // ---------------------------------------------------------------------------
-// AC-1 / AC-5: GATE_REGISTRY is the single source of truth, exactly 27
-// entries (e4-design-source-credibility-gate, qa-owned re-baseline: added the
-// 27th, SOURCE_CREDIBILITY_UNVERIFIED — the build-entry source-credibility
-// attestation gate; 26 in, 27 out — one gate added, none dropped).
-// e2-bugfix-repro-gate had added the 26th, REPRO_MANIFEST_MISSING — the
-// bugfix-mode repro-first gate. e1-feature-scoped-state-design had added the
-// 25th, FEATURE_LEASE_HELD. d9-qa-review-scoped-append had added the 24th,
-// QA_REVIEW_TARGET_REQUIRED. d2-server-brake-accounting had added the 23rd,
-// HOP_CAP_EXCEEDED. c16-c10-role-boundary had added the 22nd,
-// REVIEWER_COMPLETED_TASKS_REJECTED. c15-expected-red-manifest had added the
-// 21st, EXPECTED_RED_DIFF_MISSING. c9-protocol-fields had added the 20th,
-// REVIEW_VERDICT_STATUS_MISMATCH.
+// AC-1 / AC-5: GATE_REGISTRY is the single source of truth, exactly 28
+// entries (e3-outcome-shaped-acceptance, qa-owned re-baseline: added the
+// 28th, AC_EXECUTION_LOG_MISSING — the AC-execution evidence gate; 27 in, 28
+// out — one gate added, none dropped). e4-design-source-credibility-gate had
+// added the 27th, SOURCE_CREDIBILITY_UNVERIFIED — the build-entry
+// source-credibility attestation gate. e2-bugfix-repro-gate had added the
+// 26th, REPRO_MANIFEST_MISSING — the bugfix-mode repro-first gate.
+// e1-feature-scoped-state-design had added the 25th, FEATURE_LEASE_HELD.
+// d9-qa-review-scoped-append had added the 24th, QA_REVIEW_TARGET_REQUIRED.
+// d2-server-brake-accounting had added the 23rd, HOP_CAP_EXCEEDED.
+// c16-c10-role-boundary had added the 22nd, REVIEWER_COMPLETED_TASKS_REJECTED.
+// c15-expected-red-manifest had added the 21st, EXPECTED_RED_DIFF_MISSING.
+// c9-protocol-fields had added the 20th, REVIEW_VERDICT_STATUS_MISMATCH.
 // ---------------------------------------------------------------------------
 
-test("AC-1/AC-5: GATE_REGISTRY has exactly 27 entries (26 in, 27 out — e4-design-source-credibility-gate added SOURCE_CREDIBILITY_UNVERIFIED)", () => {
+test("AC-1/AC-5: GATE_REGISTRY has exactly 28 entries (27 in, 28 out — e3-outcome-shaped-acceptance added AC_EXECUTION_LOG_MISSING)", () => {
   assert.equal(
     GATE_REGISTRY.length,
-    27,
-    `expected exactly 27 GateDefinition entries, got ${GATE_REGISTRY.length}: ${GATE_REGISTRY.map((g) => g.errorCode).join(", ")}`,
+    28,
+    `expected exactly 28 GateDefinition entries, got ${GATE_REGISTRY.length}: ${GATE_REGISTRY.map((g) => g.errorCode).join(", ")}`,
   );
   assert.equal(
     ALL_GATE_CODES.length,
-    27,
+    28,
     "ALL_GATE_CODES must be GATE_REGISTRY.map(g => g.errorCode) — same length",
   );
   assert.deepEqual(
@@ -321,6 +322,13 @@ test("internal consistency: orchestrator-producer entries' errorCode literally a
 // (15 -> 16), same three reasons as EXTERNAL_REFS_UNRESOLVED/FEATURE_LEASE_HELD
 // above — an orchestrator-producer-only code (reads design/<feature>.md via
 // fs), never emitted by validateTransition (which stays pure/fs-free).
+// e3-outcome-shaped-acceptance (qa-owned, T-E3-QA): AC_EXECUTION_LOG_MISSING
+// is NOT added here — per architecture Decision Records ("Registry
+// classification"), it is a plain-text orchestrator gate in the same family
+// as EXPECTED_RED_DIFF_MISSING/REPRO_MANIFEST_MISSING, deliberately excluded
+// from TransitionRejection["error"] and TRANSITION_GATE_CODES. This union
+// stays byte-identical at 16 members; only GATE_REGISTRY.length and the
+// doc-file-mapping counts move (27 -> 28) below.
 // ---------------------------------------------------------------------------
 
 test("DR-8: TransitionRejection[\"error\"] union stays byte-identical at 16 members, all ⊆ ALL_GATE_CODES", () => {
@@ -613,8 +621,8 @@ test("doc-file mapping (c12): gates/registry.ts's errorCode→doc-file mapping c
   const mapping = parseDocFileMappingComment();
   assert.equal(
     mapping.size,
-    27,
-    `expected the mapping comment to list all 27 codes, found ${mapping.size}: ${[...mapping.keys()].join(", ")}`,
+    28,
+    `expected the mapping comment to list all 28 codes, found ${mapping.size}: ${[...mapping.keys()].join(", ")}`,
   );
   const docCodes = extractDocCodes();
   for (const g of GATE_REGISTRY) {
@@ -701,6 +709,15 @@ const FREE_TEXT_ALLOWLIST = [
   // so it is mechanically checked (armConditionCheckable) like every other
   // orchestrator-producer entry.
   { code: "SOURCE_CREDIBILITY_UNVERIFIED", field: "triggerEdge", reason: "role:Status edge pair present but not in triggerEdgeCheckable (not a CAP_BY_CODE numeric literal, not one of the three pm->build-entry gates in EDGE_CHECKED_CODES)" },
+  // e3-outcome-shaped-acceptance (qa-owned, T-E3-QA): AC_EXECUTION_LOG_MISSING's
+  // triggerEdge ("status=PASS with completed_tasks, spec has >=1 proof: AC,
+  // ## AC Execution Log absent") is free English — no CAP_BY_CODE numeric
+  // literal, no role:Status edge pair, not one of the three pm->build-entry
+  // gates in EDGE_CHECKED_CODES. armCondition is NOT allowlisted: it names the
+  // real camelCase hasProofAnnotatedAC(...) predicate call, which appears
+  // literally in tools/handoff-orchestrator.ts, so it is mechanically checked
+  // (armConditionCheckable) like every other orchestrator-producer entry.
+  { code: "AC_EXECUTION_LOG_MISSING", field: "triggerEdge", reason: "free English precondition list (\"status=PASS with completed_tasks, spec has >=1 proof: AC, ## AC Execution Log absent\"), no CAP_BY_CODE numeric literal or role:Status edge pair" },
 ];
 
 test("AC3 (c12): every (errorCode, field) pair for triggerEdge/armCondition is either mechanically checked above or explicitly allowlisted as free-text — no silent exemptions", () => {

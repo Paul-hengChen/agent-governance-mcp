@@ -72,6 +72,12 @@ All review notes, questions, and bug reports → `qa_reports/review_<task-id>.md
       - Auth/permission tests if the feature has access control.
    e. Write the automated tests.
 
+6a. **Phase 3.5 — AC Execution**<!-- origin:start --> (v3.77.0, E3)<!-- origin:end -->: scan `specs/<active_feature>.md`'s Acceptance Criteria for `proof:` annotations (a line whose first non-whitespace token is `proof:`).
+   - **None** (or no spec file) → log `Phase 3.5: skipped (no proof:-annotated ACs)` in the review doc and proceed to Phase 4. Pre-E3 specs pay zero overhead, mirroring the Phase 0.5 / Phase 1.5 absent branches.
+   - **Present** → execute each declared proof (command / named test / pixel-diff region — a pixel-diff proof is satisfied by the existing Phase 1.5 Read+vision-diff workflow, no new tooling) and record, per AC: the command, the raw output/exit code, and a pass/fail verdict, under a `## AC Execution Log` H2 in `qa_reports/review_<task-id>.md`, BEFORE attempting PASS. A proof that cannot be run (e.g. missing fixture) is never silently skipped — log it under the same H2 with an explicit one-line reason in place of the output. The proofs describe the SPEC, not one task: ONE log per round covers every id in the round (`covers:` files count) — do not duplicate it per id.
+   - **A proof's command fails, or its observed outcome contradicts the AC text** → that is a Phase 4 FAIL: `tw_rollback_task` + escalate per *Escalation Routes: Phase 4 FAIL*. The AC Execution Log is evidence feeding the existing FAIL path — NOT a new outcome type and NOT a new escalation row.
+   - **PASS GATE**: when the spec declares at least one `proof:`-annotated AC, the server rejects PASS with `AC_EXECUTION_LOG_MISSING` unless a `## AC Execution Log` section exists in a `qa_reports/review_<id>.md` for one of the PASS'd ids (`covers:` files count). The server checks the section's EXISTENCE only — the proofs' truthfulness stays your job.
+
 7. **Phase 4 — Run**:
    - Project build: ZERO errors.
    - **CI Runnability**: `npm test` / `pytest` / `cargo test` runs headlessly with zero human interaction. Flag if not.

@@ -635,7 +635,7 @@ test("AC9: every operative rule/gate/SOP marker survives stripRationale in skill
   }
 });
 
-test("AC1/AC2: skill-pm stripped token count meets ≤ 3775 cap", () => {
+test("AC1/AC2: skill-pm stripped token count meets ≤ 4128 cap", () => {
   // WHY: the spec's re-grounded AC1 target (measured lossless, current file size
   // including F-A growth) must hold so each pm role dispatch is within budget.
   // pm-cut-approval-gate (qa-owned bump): cap raised from 2322 → 2850 to absorb
@@ -704,6 +704,16 @@ test("AC1/AC2: skill-pm stripped token count meets ≤ 3775 cap", () => {
   // per spec Dependencies point — PM does not author the attestation, just needs the
   // pointer). Independently re-measured at 3922 ~tok exactly; cap set to the exact
   // measured value per the established Phase-2 convention (no headroom).
+  // e3-outcome-shaped-acceptance (qa-owned bump, T-E3-QA): cap raised from 3922 → 4128
+  // to absorb the new conditional `proof:` annotation convention + worked example added
+  // to the Acceptance Criteria bullet in skill-pm.md's Spec Schema (AC1/AC2). Independently
+  // re-measured (not trusted from code-reviewer's handoff note, which cited the same 4128
+  // figure) at 4128 ~tok exactly; cap set to the exact measured value per the established
+  // Phase-2 convention (no headroom). This bump also fixes a pre-existing title/assert
+  // drift the code-reviewer flagged as a cosmetic nitpick (review_reports/review_T-E3-CR.md):
+  // the test's title string had stalled at "≤ 3775 cap" ever since the e4 bump raised the
+  // live assert to 3922 without updating the title text — the title below now matches the
+  // actual asserted cap again.
   const SKILL_PM = fs.readFileSync(path.join(ROOT, "content", "skill-pm.md"), "utf-8");
   // Strip frontmatter (--- block) before token-counting the body, matching buildPromptForRole.
   const body = SKILL_PM.startsWith("---")
@@ -711,7 +721,7 @@ test("AC1/AC2: skill-pm stripped token count meets ≤ 3775 cap", () => {
     : SKILL_PM;
   const stripped = stripRationale(stripOriginTags(expandSkill(body)));
   const toks = approxTokens(stripped);
-  assert.ok(toks <= 3922, `skill-pm stripped body (${toks} ~tok) must be ≤ 3922 (AC1, e4-design-source-credibility-gate re-baseline)`);
+  assert.ok(toks <= 4128, `skill-pm stripped body (${toks} ~tok) must be ≤ 4128 (AC1, e3-outcome-shaped-acceptance re-baseline)`);
 });
 
 test("AC1/AC2: skill-sr-engineer stripped token count meets ≤ 2642 cap", () => {

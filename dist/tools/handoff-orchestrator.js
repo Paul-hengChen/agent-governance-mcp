@@ -23,6 +23,7 @@ import { hasVisualBaselinesInDesign, hasVisualEvidenceInFile, hasUncheckedWidget
 import { hasScopeDecision } from "../gates/scope-decision.js";
 import { isFeatureLeaseHeld } from "../gates/feature-lease.js";
 import { hasExpectedRedManifest, hasExpectedRedDisposition } from "../gates/expected-red.js";
+import { hasProofAnnotatedAC, hasAcExecutionLogDisposition } from "../gates/ac-execution.js";
 import { hasCutApproval } from "../gates/cut-approval.js";
 import { hasUnresolvedRefs, listUnresolvedRefs } from "../gates/external-refs.js";
 import { gate } from "../gates/registry.js";
@@ -687,6 +688,26 @@ async function handleUpdateStateCore(parsed) {
                                     `## Expected-Red Diff section was found for the listed task(s). ` +
                                     gate("EXPECTED_RED_DIFF_MISSING").hintStatic,
                             }],
+                        isError: true,
+                    };
+                }
+            }
+        }
+        // E3 — AC-Execution-Log gate (e3-outcome-shaped-acceptance, AC4/AC5). Sibling
+        // of EXPECTED_RED_DIFF_MISSING: arms on spec content (≥1 proof: AC), clears on a
+        // `## AC Execution Log` H2 in a PASS'd review file (or a covers: file).
+        // Existence-only trust boundary. FILE-MODE ONLY.
+        if (storage instanceof FileHandoffStorage) {
+            const arm = hasProofAnnotatedAC(parsed.workspace_path, parsed.active_feature);
+            if (arm.armed) {
+                const disposition = hasAcExecutionLogDisposition(parsed.workspace_path, parsed.completed_tasks);
+                if (!disposition.present) {
+                    return {
+                        content: [{ type: "text",
+                                text: `⛔ AC_EXECUTION_LOG_MISSING: ${parsed.completed_tasks.join(", ")}. ` +
+                                    `Spec ${arm.specPath} declares ≥1 proof:-annotated AC but no ` +
+                                    `## AC Execution Log section was found for the listed task(s). ` +
+                                    gate("AC_EXECUTION_LOG_MISSING").hintStatic, }],
                         isError: true,
                     };
                 }

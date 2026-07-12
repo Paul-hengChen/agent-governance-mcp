@@ -55,7 +55,8 @@
 //   REVIEW_VERDICT_STATUS_MISMATCH  const-05-core-standards.md, const-08-chain-31-mid.md, skill-code-reviewer.md
 //   REVIEWER_COMPLETED_TASKS_REJECTED  skill-code-reviewer.md
 //   QA_REVIEW_TARGET_REQUIRED       skill-qa-engineer.md
-// The 27-gate catalog, in documentation order. Array order is DOC order only —
+//   AC_EXECUTION_LOG_MISSING        skill-qa-engineer.md
+// The 28-gate catalog, in documentation order. Array order is DOC order only —
 // it MUST NOT be relied on for evaluation order (DR-5; that lives in
 // handoff-orchestrator.ts as the physical if-block sequence).
 export const GATE_REGISTRY = [
@@ -401,6 +402,32 @@ export const GATE_REGISTRY = [
             "(or completed_tasks on PASS) — it can no longer fall back to \"every " +
             "open task.\" Set review_task_ids=[<task-id>, ...] on the " +
             "tw_update_state call.",
+        documentedInProse: true,
+    },
+    {
+        // E3 (e3-outcome-shaped-acceptance, AC4/AC5) — AC-Execution-Log gate.
+        // Sibling of EXPECTED_RED_DIFF_MISSING: same plain-text orchestrator
+        // envelope, same existence-only trust boundary, same file-mode-only
+        // posture. Arms by parsing specs/<feature>.md for >= 1 line-leading
+        // `proof:` annotation (gates/ac-execution.ts, NO handoff schema field —
+        // Decision b); clears on a `## AC Execution Log` H2 in a PASS'd id's
+        // qa_reports/review_<id>.md (covers: files count — Decision c,
+        // per-feature at-least-one-across-ids). Pre-E3 specs carry zero `proof:`
+        // lines → dormant (AC5). NOT in TransitionRejection["error"] nor
+        // TRANSITION_GATE_CODES (plain-text family, DR-5/DR-8 posture).
+        errorCode: "AC_EXECUTION_LOG_MISSING",
+        producer: "orchestrator",
+        envelope: "plain-text",
+        triggerEdge: "status=PASS with completed_tasks, spec has >=1 proof: AC, ## AC Execution Log absent",
+        armCondition: "hasProofAnnotatedAC().armed (file-mode only)",
+        clearingArtifact: "## AC Execution Log H2 in qa_reports/review_<id>.md (covers: files count)",
+        hintStatic: "Run Phase 3.5 (skill-qa-engineer) — execute each proof:-annotated AC in " +
+            "specs/<feature>.md and record command, raw output/exit code, and a per-AC " +
+            "pass/fail verdict under a ## AC Execution Log section in a " +
+            "qa_reports/review_<id>.md for one of the PASS'd ids (covers: files count) " +
+            "before PASS. The server checks the section's presence only — the proofs' " +
+            "truthfulness stays with qa-engineer / code-reviewer. " +
+            "See specs/e3-outcome-shaped-acceptance.md AC3/AC4.",
         documentedInProse: true,
     },
 ];
