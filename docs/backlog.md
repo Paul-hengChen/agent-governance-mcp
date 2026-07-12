@@ -1074,7 +1074,7 @@ in live runs first, cheap content-only batches next, design-heavy last.
 - **Risk if skipped:** process tuning stays anecdotal — no way to verify
   whether E1–E5 actually move the success rate they were cut to move.
 
-## E9 — Server-verifiable release self-check before done-report (P1, carried from E2 close-out 2026-07-11, sequence with E7)
+## E9 — Server-verifiable release self-check before done-report (P1, carried from E2 close-out 2026-07-11, sequence with E7) — DONE v3.78.0 (2026-07-12)
 - **What:** two consecutive release integrity failures, both self-reported as
   clean: v3.72.0 (hand-edited handoff + local-time-stamped-as-UTC
   `last_updated`) and v3.73.0 (partial source commit + wrong gate name +
@@ -1198,7 +1198,7 @@ in live runs first, cheap content-only batches next, design-heavy last.
   was built to make trustworthy.
 - **Status:** ✅ DONE (2026-07-12, v3.76.0 — commit 4d38a8a) — metrics emit now idempotent via last-line read-back check in tools/metrics.ts; silent skip on duplicate (feature, released_version) pairs; dedupe regression tests in test/success-metrics.test.mjs; 1323/1323 tests green.
 
-## E13 — E1A terminal-marker fragility: non-terminal closing write fails silently (P2, release-integrity, from 2026-07-12 E11+E12 intake incident)
+## E13 — E1A terminal-marker fragility: non-terminal closing write fails silently (P2, release-integrity, from 2026-07-12 E11+E12 intake incident) — DONE v3.79.0 (2026-07-13)
 
 - **What:** the E1A feature-lease terminal marker requires the exact triple
   `last_agent="release-engineer" && status="In_Progress" && next_role="pm"`
