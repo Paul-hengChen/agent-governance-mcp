@@ -971,9 +971,18 @@ test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the 
   // its version stamp — no rationale fence — so its full text counts here). Measured at
   // 7435 ~tok (exact); cap set to the exact measured value per the established Phase-2
   // convention (no additional headroom).
+  // e5-intake-tiering (qa-owned bump, T-E5-02): cap raised from 7435 → 7863 to absorb
+  // the new §3.1 Cut-Approval Auto-Tier bullet appended to const-08-chain-31-mid.md
+  // (chain-tagged, not design-only-fenced — loads on this design-arm path; the bullet
+  // carries only an origin fence around its version stamp, no rationale fence, so its
+  // full text counts here). Independently re-measured (not trusted from sr-engineer's
+  // or code-reviewer's handoff notes, both of which said 7859/7863 respectively) at
+  // 7863 ~tok (exact); cap set to the exact measured value per the established Phase-2
+  // convention (no additional headroom). Growth (+428 ~tok) is proportionate to the
+  // ~1780-char single bullet added — not a blowout.
   const raw = approxTokens(CONSTITUTION);
   const stripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));
-  assert.ok(stripped <= 7435, `stripped constitution (${stripped} ~tok) must be ≤ 7435 (AC8 design-arm floor, e14-e16-release-hardening re-baseline)`);
+  assert.ok(stripped <= 7863, `stripped constitution (${stripped} ~tok) must be ≤ 7863 (AC8 design-arm floor, e5-intake-tiering re-baseline)`);
   assert.ok(
     raw - stripped >= 240,
     `constitution rationale+origin-tag saving (${raw - stripped} ~tok) must be ≥ 240 (AC8 measured min, c14-dispatch-pins re-baseline)`,
@@ -1175,13 +1184,24 @@ test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/b
   // coord-03-core-fallback.md Amend-Resume relay row (coordinator-side, ~36 ~tok).
   // Measured at 14740 ~tok (exact); cap set to the exact measured value per the
   // established Phase-2 convention (no additional headroom).
+  // e5-intake-tiering (qa-owned bump, T-E5-01/02/03): cap raised from 14740 → 15958 to
+  // absorb the new §3.1 Cut-Approval Auto-Tier bullet in const-08-chain-31-mid.md
+  // (constitution side, +428 ~tok stripped, same measurement as the design-arm floor
+  // test above) PLUS the skill-coordinator.md Backlog Intake Loop section + auto-tier
+  // writer action + cut-approval-gate row amendment (coord-03) and the Cheapest-
+  // Compliant-Path Intake step 4a (coord-07). Independently re-measured (not trusted
+  // from sr-engineer's or code-reviewer's handoff notes, both of which said 15953/15958
+  // respectively) at 15958 ~tok (exact); cap set to the exact measured value per the
+  // established Phase-2 convention (no additional headroom). Growth (+1218 ~tok) is
+  // proportionate to the three edited fragments (~1780 chars const-08 + ~3800 chars
+  // coord-03/coord-07 combined, before stripping) — not a blowout.
   const skillCoord = readSkillFile("skill-coordinator.md");
   const body = skillCoord.startsWith("---")
     ? skillCoord.slice(skillCoord.indexOf("---", 3) + 3).trimStart()
     : skillCoord;
   const SEP = "\n\n---\n\n";
   const bundle = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)) + SEP + stripRationale(stripOriginTags(body)));
-  assert.ok(bundle <= 14740, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 14740 (AC8 design-arm floor, e14-e16-release-hardening re-baseline)`);
+  assert.ok(bundle <= 15958, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 15958 (AC8 design-arm floor, e5-intake-tiering re-baseline)`);
 });
 
 test("AC9: every operative rule/gate/heading survives stripRationale on the constitution", () => {
@@ -1657,9 +1677,19 @@ test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is
   // (no additional headroom). Saving margin re-verified: design-arm 7435 − non-design
   // 5337 = 2098 ~tok, still ≥ 2080 (unchanged — the addition sits outside the
   // design-only fences).
-  const ratStripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));         // design-arm path: 7435
-  const nonDesign = approxTokens(stripRationale(stripOriginTags(composeConstitution({ chain: true, design: false })))); // non-design path: 5337
-  assert.ok(nonDesign <= 5337, `non-design constitution (${nonDesign} ~tok) must be ≤ 5337 (AC8 non-design floor, e14-e16-release-hardening re-baseline)`);
+  // e5-intake-tiering (qa-owned bump, T-E5-02): cap raised from 5337 → 5766. The new
+  // §3.1 Cut-Approval Auto-Tier bullet in const-08-chain-31-mid.md is chain-tagged
+  // (not design-tagged), so it lands on the non-design path too, same as the
+  // design-arm floor above (+429 ~tok, matching the design-arm's +428 within
+  // measurement rounding). Independently re-measured (not trusted from sr-engineer's
+  // or code-reviewer's handoff notes, both of which said 5766) at 5766 ~tok (exact);
+  // cap set to the exact measured value per the established Phase-2 convention (no
+  // additional headroom). Saving margin re-verified: design-arm 7863 − non-design
+  // 5766 = 2097 ~tok, still ≥ 2080 (unchanged — the addition sits outside the
+  // design-only fences).
+  const ratStripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));         // design-arm path: 7863
+  const nonDesign = approxTokens(stripRationale(stripOriginTags(composeConstitution({ chain: true, design: false })))); // non-design path: 5766
+  assert.ok(nonDesign <= 5766, `non-design constitution (${nonDesign} ~tok) must be ≤ 5766 (AC8 non-design floor, e5-intake-tiering re-baseline)`);
   assert.ok(
     ratStripped - nonDesign >= 2080,
     `design-only strip saving (${ratStripped - nonDesign} ~tok) must be ≥ 2080 (a12-followup-qa-round-name re-baseline)`,

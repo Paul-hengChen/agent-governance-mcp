@@ -1,10 +1,18 @@
 import "../schema/migrations-config.js";
+export interface CutApprovalAutoTier {
+    maxFiles: number;
+    maxPriority: string;
+    allowSchemaChange: boolean;
+    allowDesignArmed: boolean;
+}
+export declare const CUT_APPROVAL_AUTO_TIER_DEFAULTS: Readonly<CutApprovalAutoTier>;
 export interface WorkspaceConfig {
     taskPattern?: string;
     taskPaths?: string[];
     driftBaselineIds?: string[];
     tokenBudgetPerFeature?: number;
     host?: string;
+    cutApprovalAutoTier?: CutApprovalAutoTier;
 }
 export declare const DEFAULT_TASK_REGEX: RegExp;
 export declare function loadConfig(workspacePath: string): WorkspaceConfig;

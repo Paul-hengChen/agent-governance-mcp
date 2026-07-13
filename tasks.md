@@ -282,6 +282,9 @@ _(No active tasks — ready for the next feature.)_
 - [x] T-E3-QA [P0] qa-engineer: PASS round — verify all ACs including AC1/AC8 self-check proofs (grep counts) still hold against the final spec text, full suite green | depends_on: T-E3-CR
 - [x] T-E3-REL [P1] release-engineer: version bump + CHANGELOG entry + docs/backlog.md E3 done-marking | depends_on: T-E3-QA (note: Released v3.77.0, tag 5dbfc57)
 - [x] T-E3-DONE [P2] release-engineer: git tag + github release + terminal closing write (next_role=pm triple, per E13 fragility note) | depends_on: T-E3-REL (note: Released v3.77.0, tag 5dbfc57, closing write 2f759c3)
+- [x] T-E5-01 skill-coordinator backlog intake loop — at feature close, read docs/backlog.md order and auto-propose/auto-start the next open ticket (fix a) (note: PASS — Backlog Intake Loop (coord-03) verified against docs/backlog.md:1016-1047 fix (a); content pins authored in test/e5-intake-tiering.test.mjs.)
+- [x] T-E5-02 tiered cut-approval — const §3.1 auto-tier rule (const-08-chain-31-mid.md) + config threshold key (tools/config.ts, docs/config.md): ≤2 files, P3, no schema change, non-design → auto-approve with cut_approved recorded as auto-tier; larger/design-armed HALT as today (fix b) (note: PASS — const-08 §3.1 Cut-Approval Auto-Tier + tools/config.ts cutApprovalAutoTier verified against fix (b); 20 config-parse tests + content pins authored; context-budget ratchets independently re-measured (7863/15958/5766).)
+- [x] T-E5-03 cheapest-compliant-path intake step in skill-coordinator — decompose ticket into phases, classify coordinator-direct / mini-chain / full-chain, propose cheapest compliant path in one line; §2 test ownership and §3.2 builder≠judge hard floor never bypassed (fix c) (note: PASS — coord-07 step 4a Cheapest-Compliant-Path Intake verified against fix (c); §2/§3.2 hard-floor content pin authored in test/e5-intake-tiering.test.mjs.)
 
 ## Completed
 

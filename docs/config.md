@@ -22,6 +22,34 @@ Both fields are optional. Omit `taskPattern` to use the default `- [ ] T\d+ …`
 
 **Schema-versioned**: `.config.json` carries `schema_version` and is lazily migrated on first read. See [docs/schema-versions.md](schema-versions.md).
 
+### `cutApprovalAutoTier` — cut-approval auto-tier threshold (opt-in)
+
+Arms the Constitution §3.1 **Cut-Approval Auto-Tier**: a ticket cut meeting ALL threshold conditions may be auto-approved — the sanctioned writer sets `cut_approved: true` without halting for the human, recording `cut-approved: auto-tier` + the threshold facts in `pending_notes` of the same write.
+
+```json
+{
+  "cutApprovalAutoTier": {
+    "maxFiles": 2,
+    "maxPriority": "P3",
+    "allowSchemaChange": false,
+    "allowDesignArmed": false
+  }
+}
+```
+
+| Field | Default | Meaning |
+|---|---|---|
+| `maxFiles` | `2` | Cut may touch at most this many files. |
+| `maxPriority` | `"P3"` | Least-urgent bound: the ticket's priority must be this or lower-urgency (numerically ≥). At the default, P2/P1/P0 tickets never auto-approve. |
+| `allowSchemaChange` | `false` | `true` lets cuts containing a schema change auto-approve. Never by default. |
+| `allowDesignArmed` | `false` | `true` lets design-armed cuts (design source detected) auto-approve. Never by default. |
+
+Semantics:
+
+- **Absent key = tier disabled.** Every cut halts for human approval, exactly the pre-v3.85.0 behavior. Cut review is the highest-leverage human checkpoint (E5 risk note: remove it last, only once retro data shows the tier is safe) — so removing it is an explicit per-workspace opt-in, never a default.
+- **Present key (even `{}`) = tier armed.** Omitted or invalid fields fall back to the conservative defaults above; a non-object value is treated as absent (tier disabled).
+- **Advisory, not enforced.** The server parses and surfaces the key (`loadConfig`) but never checks the threshold or gates a write on it. The coordinator/PM reads the config and applies the tier — the same attestation trust model as `cut_approved` itself.
+
 ---
 
 ## `.current/constitution.md` — constitution override

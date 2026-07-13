@@ -6,7 +6,13 @@
 //     "taskPattern": "<JS regex source string>",   // matched against trimmed line; group 1 = " "|"x" checkmark, group 2 = task ID, group 3 = description
 //     "taskPaths": ["tasks.md", "TODO.md"],         // workspace-relative candidate paths, tried in order
 //     "driftBaselineIds": ["T470", "T471"],         // task IDs acknowledged as shipped+reconciled; excluded from vibe-coding drift (tw_detect_drift)
-//     "tokenBudgetPerFeature": 500000               // opt-in coordinator token-spend ceiling (raw summed usage.* tokens); non-positive/non-finite values treated as absent
+//     "tokenBudgetPerFeature": 500000,              // opt-in coordinator token-spend ceiling (raw summed usage.* tokens); non-positive/non-finite values treated as absent
+//     "cutApprovalAutoTier": {                      // opt-in §3.1 cut-approval auto-tier threshold; key PRESENT (even {}) = tier armed, absent = disabled
+//       "maxFiles": 2,                              //   omitted fields take these conservative defaults
+//       "maxPriority": "P3",
+//       "allowSchemaChange": false,
+//       "allowDesignArmed": false
+//     }
 //   }
 //
 // tokenBudgetPerFeature accounting (d2-server-brake-accounting): the ceiling
@@ -20,6 +26,15 @@ import * as path from "path";
 import { CURRENT_VERSIONS, runMigrations } from "../schema/versions.js";
 // Side-effect import: registers the config v0→v1 migration on module load.
 import "../schema/migrations-config.js";
+// Conservative defaults per the E5 backlog risk note ("start conservative").
+// Applied per-field when the arming key is present but a field is omitted
+// or invalid. The tier itself is opt-in: these defaults never arm it.
+export const CUT_APPROVAL_AUTO_TIER_DEFAULTS = {
+    maxFiles: 2,
+    maxPriority: "P3",
+    allowSchemaChange: false,
+    allowDesignArmed: false,
+};
 // Methodology-agnostic defaults. Common task-list filenames in workspace root
 // or under .current/. No project-management-tool-specific paths.
 const DEFAULT_TASK_PATHS = [
@@ -134,6 +149,30 @@ export function loadConfig(workspacePath) {
     const host = migration.payload.host;
     if (typeof host === "string" && host.length > 0) {
         result.host = host;
+    }
+    // Additive-optional field (no schema_version bump — same precedent as
+    // driftBaselineIds/tokenBudgetPerFeature). Opt-in arming key for the §3.1
+    // cut-approval auto-tier: the key's PRESENCE as a JSON object (even {})
+    // arms the tier; absence disables it. Non-fatal per-field filter: an
+    // omitted or invalid field falls back to the conservative default; a
+    // non-object value is treated as absent (tier disabled), not an error.
+    const autoTier = migration.payload.cutApprovalAutoTier;
+    if (autoTier && typeof autoTier === "object" && !Array.isArray(autoTier)) {
+        const tier = autoTier;
+        result.cutApprovalAutoTier = {
+            maxFiles: typeof tier.maxFiles === "number" &&
+                Number.isFinite(tier.maxFiles) &&
+                tier.maxFiles > 0
+                ? Math.floor(tier.maxFiles)
+                : CUT_APPROVAL_AUTO_TIER_DEFAULTS.maxFiles,
+            maxPriority: typeof tier.maxPriority === "string" && /^P\d+$/.test(tier.maxPriority)
+                ? tier.maxPriority
+                : CUT_APPROVAL_AUTO_TIER_DEFAULTS.maxPriority,
+            // Strict === true: anything else (absent, truthy junk) stays false —
+            // schema-change / design-armed cuts never auto-approve by accident.
+            allowSchemaChange: tier.allowSchemaChange === true,
+            allowDesignArmed: tier.allowDesignArmed === true,
+        };
     }
     // Cache under the pre-read mtime. If the migration heal-on-read above
     // rewrote the file, the recorded mtime is already stale — the NEXT call's

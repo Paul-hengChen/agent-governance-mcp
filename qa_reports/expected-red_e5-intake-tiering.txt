@@ -1,0 +1,28 @@
+# T-E5-01/02/03 (sr-engineer) — expected reds from the intentional content-fragment
+# growth: coord-03 (Backlog Intake Loop + auto-tier writer action + PASS/cut-approval
+# row amendments), coord-07 (Cheapest-Compliant-Path Intake step 4a), and const-08
+# (Cut-Approval Auto-Tier sibling bullet). All are golden-fixture / size-floor
+# re-baseline reds, not product defects — qa-engineer owns the fixture regen
+# (scripts/capture-constitution-golden.mjs for the compose goldens + the
+# skill-manifest coordinator golden) and the qa-owned ratchet bumps in
+# test/context-budget.test.mjs (re-measure independently; do not trust these
+# sr-measured advisories: design-arm constitution 7859 vs 7435 floor; teamwork
+# design-arm bundle 15953 vs 14740 floor; non-design constitution vs 5337 floor).
+
+# -- compose-equivalence goldens: const-08 fragment changed, so every composed
+#    constitution output and the fragment-concatenation monolith moved
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=false, fullDetail=false) is byte-identical to pre-refactor golden build-full-nondesign.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=true, fullDetail=false) is byte-identical to pre-refactor golden build-full-design.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=false, fullDetail=true) is byte-identical to pre-refactor golden build-full-nondesign-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=true, fullDetail=true) is byte-identical to pre-refactor golden build-full-design-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: SessionStart hook (AGC_DEFAULT_SKILL=full) is byte-identical to pre-refactor golden hook-full.txt
+test/compose-equivalence.test.mjs | compose-equivalence: cat(15 manifest fragments in order) === the pre-refactor constitution.md monolith (DR-1 Option R invariant)
+
+# -- coordinator-skill golden: coord-03 + coord-07 fragments changed
+test/skill-manifest.test.mjs | t-golden-byte-identity (AC1/AC5): composeSkill("skill-coordinator.md", {taskTool:true}) === frozen golden monolith, byte-for-byte
+
+# -- context-budget ratchets outgrown by the new prose (qa-owned bump per the
+#    test file's own convention, independently re-measured)
+test/context-budget.test.mjs | AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the measured floor (≤ 7435 ~tok)
+test/context-budget.test.mjs | AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 14740 ~tok)
+test/context-budget.test.mjs | AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 5337 ~tok)
