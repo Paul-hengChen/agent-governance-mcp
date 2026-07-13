@@ -81,3 +81,18 @@ node scripts/summarize-metrics.mjs   # default: .current/metrics.jsonl
 
 which prints a per-feature table plus the aggregate one-pass rate and mean
 rounds/hops.
+
+## Cadence & retired-rule ledger (E6, instituted 2026-07-13)
+
+- **Cadence:** re-run this retro after every **5 shipped features** or at the
+  **first design-armed feature** since the last retro, whichever comes first.
+  The release-engineer's DONE ticket for the 5th feature since the last retro
+  should carry a "retro due" pending note; the coordinator may run the retro
+  directly (analysis-only, no chain — 2026-07-13 precedent).
+- **Retro log:** one file per run, `docs/retro-<date>-gate-fire.md`.
+  - 2026-07-13 — first run (`docs/retro-2026-07-13-gate-fire.md`): no
+    retirements; EXTERNAL_REFS_UNRESOLVED placed on WATCH. Next retro due:
+    5 features after v3.82.0 (~v3.87) or first design-armed feature.
+- **Retired-rule ledger** (auditable removals; empty so far):
+  | date | code/prose retired | evidence | removal commit |
+  |---|---|---|---|
