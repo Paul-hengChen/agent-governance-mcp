@@ -8,3 +8,4 @@
 {"ts":"2026-07-11T20:46:31.306Z","gate":"validateTransition","error_code":"TRANSITION_REJECTED","agent_id":"pm","feature":"e1-feature-scoped-state-design"}
 {"ts":"2026-07-11T21:05:39.342Z","gate":"orchestrator","error_code":"FEATURE_LEASE_HELD","agent_id":"pm","feature":"e4-design-source-credibility-gate"}
 {"ts":"2026-07-11T21:17:44.618Z","gate":"orchestrator","error_code":"FEATURE_LEASE_HELD","agent_id":"pm","feature":"e8-success-telemetry"}
+{"ts":"2026-07-13T06:18:54.922Z","gate":"validateTransition","error_code":"TRANSITION_REJECTED","agent_id":"qa-engineer","feature":"e15-test-flake-fix"}

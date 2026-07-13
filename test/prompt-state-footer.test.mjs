@@ -338,7 +338,14 @@ test("C6-03/AC-6: a LIVE (existing) state.prd_path is still trusted verbatim (co
 // AC3b already does.
 // ---------------------------------------------------------------------------
 
-function sendPromptRequests(spawnOpts, requests, waitMs = 3000) {
+// Response-driven: resolves as soon as every id-bearing request sent (the
+// initialize handshake plus each entry in `requests`) has a matching
+// response on stdout, parsed incrementally as data arrives. `waitMs` is a
+// generous ceiling — a failure backstop, not the expected runtime — so the
+// test resolves fast under normal load and only pays the full wait when the
+// server genuinely never replies (cold-start-under-full-suite-concurrency
+// was flaking the old fixed-sleep-then-kill version: see docs/backlog.md E15).
+function sendPromptRequests(spawnOpts, requests, waitMs = 20000) {
   return new Promise((resolve) => {
     const dist = path.join(ROOT, "dist", "index.js");
     const p = spawn("node", [dist], {
@@ -347,8 +354,34 @@ function sendPromptRequests(spawnOpts, requests, waitMs = 3000) {
       cwd: spawnOpts.cwd,
     });
     let stdout = "";
-    p.stdout.on("data", (d) => { stdout += d.toString(); });
+    let settled = false;
+    const expectedIds = new Set([1, ...requests.map((r) => r.id)]);
+    const byId = new Map();
+
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(ceiling);
+      p.kill();
+      resolve(byId);
+    };
+
+    p.stdout.on("data", (d) => {
+      stdout += d.toString();
+      for (const line of stdout.split("\n")) {
+        if (!line.trim()) continue;
+        try {
+          const msg = JSON.parse(line);
+          if (msg && msg.id != null) byId.set(msg.id, msg);
+        } catch {
+          // Partial line mid-chunk — full stdout is reprocessed on the next
+          // data event, so this line will parse successfully once complete.
+        }
+      }
+      if ([...expectedIds].every((id) => byId.has(id))) finish();
+    });
     p.stderr.on("data", () => {}); // suppress server startup banner noise
+    p.on("close", finish);
 
     const send = (msg) => p.stdin.write(JSON.stringify(msg) + "\n");
     send({
@@ -360,20 +393,7 @@ function sendPromptRequests(spawnOpts, requests, waitMs = 3000) {
       send({ jsonrpc: "2.0", id: req.id, method: "prompts/get", params: { name: req.name, arguments: req.arguments ?? {} } });
     }
 
-    setTimeout(() => {
-      p.kill();
-      const byId = new Map();
-      for (const line of stdout.split("\n")) {
-        if (!line.trim()) continue;
-        try {
-          const msg = JSON.parse(line);
-          if (msg && msg.id != null) byId.set(msg.id, msg);
-        } catch {
-          // ignore non-JSON stdout noise
-        }
-      }
-      resolve(byId);
-    }, waitMs);
+    const ceiling = setTimeout(finish, waitMs);
   });
 }
 

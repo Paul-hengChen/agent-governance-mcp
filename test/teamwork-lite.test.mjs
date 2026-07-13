@@ -7,10 +7,57 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
 const PROJECT_ROOT = path.resolve(path.dirname(__filename), "..");
+
+/**
+ * Spawn the compiled MCP server, send `messages` (raw JSON-RPC objects), and
+ * resolve with the response matching `targetId` as soon as it appears on
+ * stdout (parsed incrementally as data arrives). `waitMs` is a generous
+ * failure-backstop ceiling, not the expected runtime — response-driven
+ * replacement for the old fixed-sleep-then-kill pattern, which flaked under
+ * full-suite concurrency when the server's cold start + reply exceeded the
+ * fixed wait (docs/backlog.md E15).
+ */
+function spawnAndAwait(messages, targetId, waitMs = 20000) {
+  return new Promise((resolve) => {
+    const dist = path.join(PROJECT_ROOT, "dist", "index.js");
+    const p = spawn("node", [dist], { stdio: ["pipe", "pipe", "pipe"] });
+    let stdout = "";
+    let settled = false;
+
+    const finish = (msg) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(ceiling);
+      p.kill();
+      resolve(msg ?? null);
+    };
+
+    p.stdout.on("data", (d) => {
+      stdout += d.toString();
+      for (const line of stdout.split("\n")) {
+        if (!line.trim()) continue;
+        try {
+          const msg = JSON.parse(line);
+          if (msg && msg.id === targetId) { finish(msg); return; }
+        } catch {
+          // Partial line mid-chunk — full stdout is reprocessed on the next
+          // data event, so this line parses successfully once complete.
+        }
+      }
+    });
+    p.stderr.on("data", () => {}); // suppress server startup banner noise
+    p.on("close", () => finish(null));
+
+    for (const msg of messages) p.stdin.write(JSON.stringify(msg) + "\n");
+
+    const ceiling = setTimeout(() => finish(null), waitMs);
+  });
+}
 
 test("AC1: content/skill-coordinator-lite.md exists with required sections + hard rules", () => {
   const skillPath = path.join(PROJECT_ROOT, "content", "skill-coordinator-lite.md");
@@ -53,25 +100,14 @@ test("AC2: prompts/coordinator-lite.ts exports buildCoordinatorLitePrompt", asyn
 });
 
 test("AC3: ListPromptsRequestSchema response includes 'teamwork-lite'", async () => {
-  const { spawn } = await import("node:child_process");
-  const dist = path.join(PROJECT_ROOT, "dist", "index.js");
-  const p = spawn("node", [dist], { stdio: ["pipe", "pipe", "pipe"] });
-
-  let stdout = "";
-  p.stdout.on("data", (d) => { stdout += d.toString(); });
-  p.stderr.on("data", () => {}); // suppress
-
-  const send = (msg) => p.stdin.write(JSON.stringify(msg) + "\n");
-  send({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "qa-test", version: "0" } } });
-  send({ jsonrpc: "2.0", method: "notifications/initialized" });
-  send({ jsonrpc: "2.0", id: 2, method: "prompts/list" });
-
-  await new Promise((r) => setTimeout(r, 2500));
-  p.kill();
-
-  const promptList = stdout.split("\n").filter(Boolean).map((l) => {
-    try { return JSON.parse(l); } catch { return null; }
-  }).find((m) => m && m.id === 2);
+  const promptList = await spawnAndAwait(
+    [
+      { jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "qa-test", version: "0" } } },
+      { jsonrpc: "2.0", method: "notifications/initialized" },
+      { jsonrpc: "2.0", id: 2, method: "prompts/list" },
+    ],
+    2,
+  );
 
   assert.ok(promptList, "received prompts/list response");
   const names = promptList.result.prompts.map((x) => x.name);
@@ -90,25 +126,14 @@ test("AC4: 'teamwork-lite' is in RAG_SKIP_ROLES (no PRD chunk injection)", async
 });
 
 test("AC3b: GetPromptRequestSchema dispatches 'teamwork-lite' correctly", async () => {
-  const { spawn } = await import("node:child_process");
-  const dist = path.join(PROJECT_ROOT, "dist", "index.js");
-  const p = spawn("node", [dist], { stdio: ["pipe", "pipe", "pipe"] });
-
-  let stdout = "";
-  p.stdout.on("data", (d) => { stdout += d.toString(); });
-  p.stderr.on("data", () => {});
-
-  const send = (msg) => p.stdin.write(JSON.stringify(msg) + "\n");
-  send({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "qa-test", version: "0" } } });
-  send({ jsonrpc: "2.0", method: "notifications/initialized" });
-  send({ jsonrpc: "2.0", id: 2, method: "prompts/get", params: { name: "teamwork-lite", arguments: { workspace_path: PROJECT_ROOT } } });
-
-  await new Promise((r) => setTimeout(r, 2500));
-  p.kill();
-
-  const getRes = stdout.split("\n").filter(Boolean).map((l) => {
-    try { return JSON.parse(l); } catch { return null; }
-  }).find((m) => m && m.id === 2);
+  const getRes = await spawnAndAwait(
+    [
+      { jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "qa-test", version: "0" } } },
+      { jsonrpc: "2.0", method: "notifications/initialized" },
+      { jsonrpc: "2.0", id: 2, method: "prompts/get", params: { name: "teamwork-lite", arguments: { workspace_path: PROJECT_ROOT } } },
+    ],
+    2,
+  );
 
   assert.ok(getRes, "received prompts/get response");
   assert.ok(getRes.result, `expected result, got: ${JSON.stringify(getRes).slice(0, 200)}`);

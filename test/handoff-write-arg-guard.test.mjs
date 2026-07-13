@@ -47,31 +47,57 @@ const DIST_INDEX = path.join(PROJECT_ROOT, "dist", "index.js");
 
 /**
  * Spin up a fresh MCP stdio server, send a sequence of JSON-RPC messages,
- * collect all line-delimited responses, kill the process, and return the
- * parsed response objects.
+ * and resolve as soon as a response for every id-bearing message in
+ * `messages` has appeared on stdout (parsed incrementally as data arrives).
+ * `waitMs` is a generous ceiling — a failure backstop, not the expected
+ * runtime — so the test resolves fast under normal load and only pays the
+ * full wait when the server genuinely never replies (cold-start-under-full-
+ * suite-concurrency was flaking the old fixed-sleep-then-kill version: see
+ * docs/backlog.md E15).
  *
  * @param {object[]} messages - JSON-RPC message objects to send in order.
- * @param {number}   [waitMs=2000] - ms to wait for responses before killing.
- * @returns {Promise<object[]>} All parseable JSON-RPC lines received on stdout.
+ * @param {number}   [waitMs=20000] - ceiling ms before giving up and killing.
+ * @returns {Promise<object[]>} The parsed id-bearing JSON-RPC responses received on stdout.
  */
-async function callServer(messages, waitMs = 2000) {
-  const p = spawn(process.execPath, [DIST_INDEX], { stdio: ["pipe", "pipe", "pipe"] });
-  let stdout = "";
-  p.stdout.on("data", (d) => { stdout += d.toString(); });
-  p.stderr.on("data", () => {}); // suppress server noise
+function callServer(messages, waitMs = 20000) {
+  return new Promise((resolve) => {
+    const p = spawn(process.execPath, [DIST_INDEX], { stdio: ["pipe", "pipe", "pipe"] });
+    let stdout = "";
+    let settled = false;
+    const expectedIds = new Set(messages.filter((m) => m.id != null).map((m) => m.id));
+    const byId = new Map();
 
-  for (const msg of messages) {
-    p.stdin.write(JSON.stringify(msg) + "\n");
-  }
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(ceiling);
+      p.kill();
+      resolve(Array.from(byId.values()));
+    };
 
-  await new Promise((r) => setTimeout(r, waitMs));
-  p.kill();
+    p.stdout.on("data", (d) => {
+      stdout += d.toString();
+      for (const line of stdout.split("\n")) {
+        if (!line.trim()) continue;
+        try {
+          const parsed = JSON.parse(line);
+          if (parsed && parsed.id != null) byId.set(parsed.id, parsed);
+        } catch {
+          // Partial line mid-chunk — full stdout is reprocessed on the next
+          // data event, so this line will parse successfully once complete.
+        }
+      }
+      if (expectedIds.size > 0 && [...expectedIds].every((id) => byId.has(id))) finish();
+    });
+    p.stderr.on("data", () => {}); // suppress server noise
+    p.on("close", finish);
 
-  return stdout
-    .split("\n")
-    .filter(Boolean)
-    .map((line) => { try { return JSON.parse(line); } catch { return null; } })
-    .filter(Boolean);
+    for (const msg of messages) {
+      p.stdin.write(JSON.stringify(msg) + "\n");
+    }
+
+    const ceiling = setTimeout(finish, waitMs);
+  });
 }
 
 /** Standard MCP initialise handshake messages. */
