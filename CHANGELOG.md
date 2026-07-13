@@ -16,6 +16,27 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.83.0] - 2026-07-13
+
+### Added
+- **`e14-ci-ground-truth` — Verify-release CI ground-truth check (v3.83.0).** Adds Check 6 to `scripts/verify-release.mjs`: reads the latest completed CI run on main via `gh` and FAILs on non-success conclusion. Degrades gracefully (`gh` missing/unauthenticated or zero completed runs is WARN-and-continue, never a release blocker). Implements script check routine and release-engineer SOP step 9a integration. Spec: `specs/e14-ci-ground-truth.md`. Code-review APPROVED (`qa_reports/review_T-EB-03.md`). QA verified (`qa_reports/review_T-EB-04.md`). Closes E14 ticket.
+- **`e15-spawned-server-de-flake` — Spawned-server test de-flake (v3.83.0).** Addresses test flakiness in spawned-server integration tests via response-driven waits instead of fixed delays. Refactors wait patterns to detect server readiness from response content rather than time-based heuristics. Shipped in commit 3267a69. Code-review APPROVED. QA verified. Closes E15 ticket.
+- **`e16-judge-dispatch-charter` — Single-role judge-dispatch charter broadening (v3.83.0).** Amends Constitution §3.1 to broaden the single-role judge-dispatch charter: splits `resume_of` gate enforcement into two edges — code-reviewer:In_Progress direct entry (unchanged, requires `resume_of`) and qa-engineer:In_Progress Amend-Resume entry (NEW, requires `resume_of`). Implements new gate predicate in `tools/handoff-orchestrator.ts` (charter broadening logic) and content-only Constitution amendments in `content/const-08-chain-31-mid.md` and `content/coord-03-core-fallback.md` (two new §3.1 bullets). Adds coordinator pointer to the resumed-role's SOP via amended `coord-03-core-fallback.md`. File-mode only; no handoff schema changes. Test coverage in `test/e16-judge-dispatch-charter.test.mjs` and composed golden fixtures. Full suite: 1420/1420 pass. Spec: `specs/e16-judge-dispatch-charter.md`. Code-review APPROVED (`qa_reports/review_T-EB-03.md`). QA verified (`qa_reports/review_T-EB-04.md`). Closes E16 ticket.
+
+### Changed
+- **scripts/verify-release.mjs**: Added Check 6 (CI ground-truth read via `gh`; FAIL on non-success, WARN-and-continue on missing).
+- **tools/handoff-orchestrator.ts**: Broadened `resume_of` gate to accept qa-engineer:In_Progress Amend-Resume entry in addition to code-reviewer:In_Progress direct entry.
+- **content/const-08-chain-31-mid.md**: Two new §3.1 bullets governing qa-engineer Amend-Resume `resume_of` requirement.
+- **content/coord-03-core-fallback.md**: Added coordinator pointer explaining the qa-engineer Amend-Resume path and `resume_of` semantics.
+- **test/**: New test suite `test/e16-judge-dispatch-charter.test.mjs` with golden fixture composition coverage; all existing fixtures regenerated for E16 coverage.
+
+### Notes
+- driftBaselineIds appended with T-EB-01, T-EB-02, T-EB-03, T-EB-04
+- E14, E15, E16 are a 3-item batch shipped as single feature (`e14-e16-release-hardening`) per small-batch precedent (C16+C10 scope rule)
+- E15 was previously shipped in commit 3267a69; this release marks its formal completion alongside E14 and E16
+- No breaking changes to MCP tool surface or handoff schema; all changes content-only (E16) or additive (E14, E15)
+- Release-engineer self-check (step 9a) now exercises Check 6 live via `gh`
+
 ## [3.82.0] - 2026-07-13
 
 ### Added

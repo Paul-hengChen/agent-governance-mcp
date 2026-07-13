@@ -841,7 +841,7 @@ test("AC7: exactly two balanced rationale fences, both outside §3.x", () => {
   assert.equal(ends, 2, "exactly two rationale:end markers");
 });
 
-test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the measured floor (≤ 7275 ~tok)", () => {
+test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the measured floor (≤ 7435 ~tok)", () => {
   // WHY: floor REBASELINED by constitution-conditional-load PHASE 2. Phase 2 extends the
   // design-only axis to two more spans (§4 visual prose S3–S5 + P-AUDITOR, and §1 L16/L17/L19),
   // adding 3 MORE design-only fence pairs (now 6 pairs / 12 marker lines total, up from
@@ -964,16 +964,23 @@ test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the 
   // established Phase-2 convention (no additional headroom). Saving margin re-verified:
   // raw 7573 − stripped 7275 = 298 ~tok, still ≥ 240 (unchanged — the new bullet is
   // unfenced, so raw and stripped grew by the same amount).
+  // e14-e16-release-hardening (sr-owned bump per T-EB-02, E7 precedent): cap raised from
+  // 7275 → 7435 to absorb the new §3.1 "Single-role judge dispatch" charter sentences
+  // appended to the Amend-Resume Edge bullet in const-08-chain-31-mid.md (chain-tagged,
+  // loads on this design-arm full path; the addition carries only an origin fence around
+  // its version stamp — no rationale fence — so its full text counts here). Measured at
+  // 7435 ~tok (exact); cap set to the exact measured value per the established Phase-2
+  // convention (no additional headroom).
   const raw = approxTokens(CONSTITUTION);
   const stripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));
-  assert.ok(stripped <= 7275, `stripped constitution (${stripped} ~tok) must be ≤ 7275 (AC8 design-arm floor, e7-governed-git-surface re-baseline)`);
+  assert.ok(stripped <= 7435, `stripped constitution (${stripped} ~tok) must be ≤ 7435 (AC8 design-arm floor, e14-e16-release-hardening re-baseline)`);
   assert.ok(
     raw - stripped >= 240,
     `constitution rationale+origin-tag saving (${raw - stripped} ~tok) must be ≥ 240 (AC8 measured min, c14-dispatch-pins re-baseline)`,
   );
 });
 
-test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 14544 ~tok)", () => {
+test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 14740 ~tok)", () => {
   // WHY: the constitution is injected on every dispatch; the full coordinator bundle is
   // the worst case. Compose the chain-role bundle the way buildPromptForRole does:
   // rationale-stripped constitution + SEP + rationale-stripped skill body. Floor
@@ -1161,13 +1168,20 @@ test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/b
   // the AC2 pointer, and that file is not part of this bundle), so this bundle's growth
   // is 100% constitution-side. Measured at 14544 ~tok (exact); cap set to the exact
   // measured value per the established Phase-2 convention (no additional headroom).
+  // e14-e16-release-hardening (sr-owned bump per T-EB-02, E7 precedent): cap raised from
+  // 14544 → 14740 to absorb the same new §3.1 Single-role judge dispatch charter
+  // sentences in const-08-chain-31-mid.md (+160 ~tok stripped, measured in the
+  // design-arm floor test above) PLUS the pointer-only sentence added to the
+  // coord-03-core-fallback.md Amend-Resume relay row (coordinator-side, ~36 ~tok).
+  // Measured at 14740 ~tok (exact); cap set to the exact measured value per the
+  // established Phase-2 convention (no additional headroom).
   const skillCoord = readSkillFile("skill-coordinator.md");
   const body = skillCoord.startsWith("---")
     ? skillCoord.slice(skillCoord.indexOf("---", 3) + 3).trimStart()
     : skillCoord;
   const SEP = "\n\n---\n\n";
   const bundle = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)) + SEP + stripRationale(stripOriginTags(body)));
-  assert.ok(bundle <= 14544, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 14544 (AC8 design-arm floor, e7-governed-git-surface re-baseline)`);
+  assert.ok(bundle <= 14740, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 14740 (AC8 design-arm floor, e14-e16-release-hardening re-baseline)`);
 });
 
 test("AC9: every operative rule/gate/heading survives stripRationale on the constitution", () => {
@@ -1518,7 +1532,7 @@ test("AC7: lite + non-design strips §3.2 once (no reintroduction), consistent w
 
 // --- AC8: rebaseline + pin the new non-design figure ----------------------
 
-test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 5177 ~tok)", () => {
+test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 5337 ~tok)", () => {
   // WHY: this is the BUDGET WIN that justified the feature, and it must be regression-guarded.
   // On a non-design chain dispatch buildPromptForRole emits stripDesignOnly(stripRationale(source)).
   // REBASELINED by constitution-conditional-load PHASE 2: Phase 2 strips two MORE spans on the
@@ -1635,9 +1649,17 @@ test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is
   // exact measured value per the established Phase-2 convention (no additional headroom).
   // Saving margin re-verified: design-arm 7275 − non-design 5177 = 2098 ~tok, still
   // ≥ 2080 (unchanged — the new bullet is core-tagged, landing equally on both sides).
-  const ratStripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));         // design-arm path: 7275
-  const nonDesign = approxTokens(stripRationale(stripOriginTags(composeConstitution({ chain: true, design: false })))); // non-design path: 5177
-  assert.ok(nonDesign <= 5177, `non-design constitution (${nonDesign} ~tok) must be ≤ 5177 (AC8 non-design floor, e7-governed-git-surface re-baseline)`);
+  // e14-e16-release-hardening (sr-owned bump per T-EB-02, E7 precedent): cap raised from
+  // 5177 → 5337. The new §3.1 Single-role judge dispatch charter sentences in
+  // const-08-chain-31-mid.md are chain-tagged (not design-tagged), so they land on the
+  // non-design path too, same as the design-arm floor above. Measured at 5337 ~tok
+  // (exact); cap set to the exact measured value per the established Phase-2 convention
+  // (no additional headroom). Saving margin re-verified: design-arm 7435 − non-design
+  // 5337 = 2098 ~tok, still ≥ 2080 (unchanged — the addition sits outside the
+  // design-only fences).
+  const ratStripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));         // design-arm path: 7435
+  const nonDesign = approxTokens(stripRationale(stripOriginTags(composeConstitution({ chain: true, design: false })))); // non-design path: 5337
+  assert.ok(nonDesign <= 5337, `non-design constitution (${nonDesign} ~tok) must be ≤ 5337 (AC8 non-design floor, e14-e16-release-hardening re-baseline)`);
   assert.ok(
     ratStripped - nonDesign >= 2080,
     `design-only strip saving (${ratStripped - nonDesign} ~tok) must be ≥ 2080 (a12-followup-qa-round-name re-baseline)`,

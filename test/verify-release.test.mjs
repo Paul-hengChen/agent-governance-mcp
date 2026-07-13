@@ -25,10 +25,22 @@
 //   AC5 (CHANGELOG missing entry)                      -> VR-5
 //   AC6 (dist uncommitted changes)                     -> VR-6
 //   AC7 (committed dist parity mismatch)                -> VR-7
-//   AC8 (all 5 checks pass -> OK lines + ALL PASSED)     -> VR-8
+//   AC8 (all 6 checks report OK -> OK lines + ALL PASSED) -> VR-8
 //   AC9 (SOP step 9a + Escalation Routes row)            -> VR-9
 //   AC10 (post-closing-write tw_get_state read-back)     -> VR-10
 //   Security smoke (boundary inputs)                     -> VR-SEC-1..4
+//
+// T-EB-04 (E14, backlog row + T-EB-01) additions — Check 6 "CI ground-truth":
+//   Check 6 red (definitively failed completed run)      -> VR-11
+//   Check 6 green (shimmed success, no WARN emitted)      -> VR-12
+//   Check 6 degradation: gh binary missing (ENOENT)       -> VR-13
+//   Check 6 degradation: gh exits non-zero (auth/API err)  -> VR-14
+//   Check 6 degradation: zero completed runs               -> VR-15
+//   Check 6 degradation: unparseable gh output (bonus)    -> VR-16
+// These use a `gh` shim on PATH (a tiny executable script placed in a temp
+// dir prepended to PATH) rather than the real `gh` binary — the fixture-repo
+// convention above still drives every git-facing check exactly as before;
+// only Check 6's external `gh` dependency is substituted.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -185,6 +197,42 @@ function runVerify(root, args = []) {
     [path.join(root, "scripts", "verify-release.mjs"), ...args],
     { cwd: root, encoding: "utf-8" },
   );
+}
+
+/**
+ * Check 6 (E14) shims `gh` via a real executable on PATH rather than mocking
+ * spawnSync — this exercises the actual `spawnSync("gh", ...)` resolution
+ * path in scripts/verify-release.mjs, mirroring the "drive the real script
+ * against a real environment" convention the rest of this file uses for git.
+ *
+ * `runVerifyWithPath` overrides the CHILD PROCESS's PATH so verify-release.mjs
+ * finds the shim (or, for the gh-missing case, finds no `gh` at all) while
+ * `git` still resolves from a real system path — isolating Check 6 without
+ * disturbing Checks 1-5.
+ */
+function mkGhShim(scriptBody) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "gh-shim-"));
+  const ghPath = path.join(dir, "gh");
+  fs.writeFileSync(ghPath, scriptBody);
+  fs.chmodSync(ghPath, 0o755);
+  return dir;
+}
+
+// A minimal PATH that still resolves `git` (needed by Checks 1/2/5 and by
+// check-version.mjs, Check 3) but excludes wherever the real `gh` binary
+// happens to live on the host running this suite.
+const GH_LESS_SYSTEM_PATH = "/usr/bin:/bin";
+
+function runVerifyWithPath(root, pathValue, args = []) {
+  return spawnSync(
+    process.execPath,
+    [path.join(root, "scripts", "verify-release.mjs"), ...args],
+    { cwd: root, encoding: "utf-8", env: { ...process.env, PATH: pathValue } },
+  );
+}
+
+function ghJsonShim(json) {
+  return `#!/bin/sh\ncat <<'EOF'\n${json}\nEOF\n`;
 }
 
 // ---------------------------------------------------------------------------
@@ -357,17 +405,45 @@ test("VR-7 (AC7): dist/index.js absent at HEAD (never committed) -> exit non-zer
 });
 
 // ---------------------------------------------------------------------------
-// VR-8 (AC8): all five checks pass
+// VR-8 (AC8): all six checks report OK (title corrected T-EB-04 — Check 6/E14
+// landed after this test was first authored against 5 checks; the loop
+// below was asserting OK lines by name, never a count, so it stayed green
+// through E14 by accident rather than by design — see review_T-EB-03.md).
+// Check 6 is included in the OK-line loop below: the fixture's origin is a
+// local bare repo, not a real GitHub remote, so `gh run list` cannot resolve
+// a host and Check 6 degrades via WARN — but a WARN is not a fail, so it
+// still reports OK and the run still exits 0 with empty stderr. This is
+// intentionally NOT gh-shimmed (unlike VR-11..VR-16 below): it pins the
+// real, unmodified environment behavior a bare `npm test` run hits.
 // ---------------------------------------------------------------------------
-test("VR-8 (AC8): all 5 checks pass -> one OK line per check, final ALL CHECKS PASSED line, exit 0", () => {
+test("VR-8 (AC8): all 6 checks report OK -> one OK line per check, final ALL CHECKS PASSED line, exit 0", () => {
   const { root } = mkFixtureRepo({ version: "8.0.0", tag: "at-head", origin: "pushed" });
   const result = runVerify(root, ["v8.0.0"]);
   assert.equal(result.status, 0, `expected exit 0; stderr: ${result.stderr}`);
-  for (const name of ["tag-at-HEAD", "pushed-to-origin", "check-version", "CHANGELOG entry", "dist committed+parity"]) {
+  for (const name of [
+    "tag-at-HEAD",
+    "pushed-to-origin",
+    "check-version",
+    "CHANGELOG entry",
+    "dist committed+parity",
+    "CI ground-truth",
+  ]) {
     assert.match(result.stdout, new RegExp(`OK: ${name.replace(/[+]/g, "\\+")}`), `expected an OK line for '${name}'`);
   }
   assert.match(result.stdout, /check:release — ALL CHECKS PASSED \(v8\.0\.0\)/);
-  assert.equal(result.stderr, "", "a fully passing run must not print anything to stderr");
+  assert.equal(
+    result.stderr,
+    "",
+    "a fully passing run must not print anything to stderr — Check 6's graceful degradation warns on stdout only (VR-8 pin)",
+  );
+  // Check 6 cannot resolve a GitHub host from the fixture's local-bare-repo
+  // origin, so it degrades — document that this test's "all OK" run still
+  // legitimately includes a WARN (not a masked failure).
+  assert.match(
+    result.stdout,
+    /WARN: CI ground-truth —/,
+    "sanity: this fixture has no real GitHub remote, so Check 6 is expected to WARN-degrade even on an all-OK run",
+  );
 });
 
 test("VR-8 (AC8): multi-cause failure surfaces every FAIL in one run (no short-circuit)", () => {
@@ -392,6 +468,146 @@ test("VR-8 (AC8): multi-cause failure surfaces every FAIL in one run (no short-c
   assert.match(result.stderr, /FAIL: dist\/ has uncommitted changes — rebuild and commit before releasing/);
   assert.match(result.stdout, /OK: check-version/, "an unrelated passing check must still report OK in the same run");
   assert.match(result.stderr, /check:release — FAILED \(4 check\(s\) failed\)/);
+});
+
+// ---------------------------------------------------------------------------
+// VR-11 (E14, T-EB-01): Check 6 — a definitively red completed CI run on main
+// STOPs the release; every other check still runs and reports OK (no
+// short-circuit), matching the Checks-run-independently invariant already
+// pinned for VR-8's multi-cause-failure test.
+// ---------------------------------------------------------------------------
+test("VR-11 (E14): shimmed gh reports a red completed run -> exit non-zero, FAIL names conclusion+headSha+url, other 5 checks still OK", () => {
+  const { root } = mkFixtureRepo({ version: "10.0.0", tag: "at-head", origin: "pushed" });
+  const shimDir = mkGhShim(
+    ghJsonShim(
+      JSON.stringify([
+        {
+          conclusion: "failure",
+          headSha: "2222222222222222222222222222222222222222",
+          url: "https://example.com/actions/runs/2",
+          updatedAt: "2026-01-01T00:00:00Z",
+        },
+      ]),
+    ),
+  );
+  const result = runVerifyWithPath(root, `${shimDir}:${GH_LESS_SYSTEM_PATH}`, ["v10.0.0"]);
+  assert.notEqual(result.status, 0, "a red completed CI run must FAIL the release self-check");
+  assert.match(
+    result.stderr,
+    /FAIL: latest completed CI run on main concluded "failure" \(head 222222222222\) — https:\/\/example\.com\/actions\/runs\/2/,
+    "FAIL line must name the conclusion, the (truncated) head SHA, and the run URL",
+  );
+  for (const name of ["tag-at-HEAD", "pushed-to-origin", "check-version", "CHANGELOG entry", "dist committed+parity"]) {
+    assert.match(
+      result.stdout,
+      new RegExp(`OK: ${name.replace(/[+]/g, "\\+")}`),
+      `Check 6 failing must not prevent '${name}' from running and reporting OK`,
+    );
+  }
+  assert.match(result.stderr, /check:release — FAILED \(1 check\(s\) failed\)/);
+});
+
+// ---------------------------------------------------------------------------
+// VR-12 (E14): Check 6 — a green completed CI run reports OK with no WARN.
+// ---------------------------------------------------------------------------
+test("VR-12 (E14): shimmed gh reports a successful completed run -> OK line, exit 0, no WARN emitted, empty stderr", () => {
+  const { root } = mkFixtureRepo({ version: "10.0.1", tag: "at-head", origin: "pushed" });
+  const shimDir = mkGhShim(
+    ghJsonShim(
+      JSON.stringify([
+        {
+          conclusion: "success",
+          headSha: "1111111111111111111111111111111111111111",
+          url: "https://example.com/actions/runs/1",
+          updatedAt: "2026-01-01T00:00:00Z",
+        },
+      ]),
+    ),
+  );
+  const result = runVerifyWithPath(root, `${shimDir}:${GH_LESS_SYSTEM_PATH}`, ["v10.0.1"]);
+  assert.equal(result.status, 0, `expected exit 0; stderr: ${result.stderr}`);
+  assert.match(result.stdout, /OK: CI ground-truth/);
+  assert.ok(
+    !result.stdout.includes("WARN: CI ground-truth"),
+    "a genuinely green completed run must not also degrade — WARN is reserved for cannot-obtain-ground-truth paths",
+  );
+  assert.match(result.stdout, /check:release — ALL CHECKS PASSED \(v10\.0\.1\)/);
+  assert.equal(result.stderr, "", "a fully passing run (including a real green Check 6) must not print to stderr");
+});
+
+// ---------------------------------------------------------------------------
+// VR-13 (E14): Check 6 degradation — gh binary missing (ENOENT) -> WARN on
+// stdout, check still reports OK, release still exits 0. The ONLY failure
+// mode is a definitively red completed run (VR-11); every "cannot obtain
+// ground truth" path must degrade gracefully, never block a release on
+// missing/unconfigured tooling.
+// ---------------------------------------------------------------------------
+test("VR-13 (E14 degradation): gh binary not on PATH -> WARN on stdout naming gh unavailability, check still OK, exit 0", () => {
+  const { root } = mkFixtureRepo({ version: "10.0.2", tag: "at-head", origin: "pushed" });
+  const result = runVerifyWithPath(root, GH_LESS_SYSTEM_PATH, ["v10.0.2"]);
+  assert.equal(result.status, 0, `a missing gh binary must never fail the release; stderr: ${result.stderr}`);
+  assert.match(
+    result.stdout,
+    /WARN: CI ground-truth — gh CLI unavailable \(ENOENT\); continuing without CI verification \(graceful degradation, E14\)/,
+  );
+  assert.match(result.stdout, /OK: CI ground-truth/);
+  assert.equal(result.stderr, "", "a WARN-only degradation must not print to stderr");
+});
+
+// ---------------------------------------------------------------------------
+// VR-14 (E14 degradation): Check 6 — gh exits non-zero (auth/network/API
+// error) -> WARN on stdout carrying gh's own error detail, never a FAIL.
+// ---------------------------------------------------------------------------
+test("VR-14 (E14 degradation): gh exits non-zero (API/auth error) -> WARN on stdout with gh's error surfaced, exit 0", () => {
+  const { root } = mkFixtureRepo({ version: "10.0.3", tag: "at-head", origin: "pushed" });
+  const shimDir = mkGhShim(
+    "#!/bin/sh\necho 'gh: authentication required, run `gh auth login`' 1>&2\nexit 1\n",
+  );
+  const result = runVerifyWithPath(root, `${shimDir}:${GH_LESS_SYSTEM_PATH}`, ["v10.0.3"]);
+  assert.equal(result.status, 0, `a gh API/auth error must never fail the release; stderr: ${result.stderr}`);
+  assert.match(
+    result.stdout,
+    /WARN: CI ground-truth — gh run list failed: gh: authentication required, run `gh auth login`; continuing without CI verification \(graceful degradation, E14\)/,
+  );
+  assert.match(result.stdout, /OK: CI ground-truth/);
+  assert.equal(result.stderr, "");
+});
+
+// ---------------------------------------------------------------------------
+// VR-15 (E14 degradation): Check 6 — zero completed CI runs found (e.g. a
+// brand-new repo, or CI renamed/disabled) -> WARN on stdout, never a FAIL.
+// ---------------------------------------------------------------------------
+test("VR-15 (E14 degradation): zero completed CI runs on main -> WARN on stdout, never a FAIL, exit 0", () => {
+  const { root } = mkFixtureRepo({ version: "10.0.4", tag: "at-head", origin: "pushed" });
+  const shimDir = mkGhShim(ghJsonShim("[]"));
+  const result = runVerifyWithPath(root, `${shimDir}:${GH_LESS_SYSTEM_PATH}`, ["v10.0.4"]);
+  assert.equal(result.status, 0, `zero completed CI runs must never fail the release; stderr: ${result.stderr}`);
+  assert.match(
+    result.stdout,
+    /WARN: CI ground-truth — no completed CI runs found on origin\/main; continuing without CI verification \(graceful degradation, E14\)/,
+  );
+  assert.match(result.stdout, /OK: CI ground-truth/);
+  assert.equal(result.stderr, "");
+});
+
+// ---------------------------------------------------------------------------
+// VR-16 (E14 degradation, bonus coverage): unparseable gh stdout (malformed
+// JSON) -> WARN on stdout, never a FAIL. Beyond the task's named three
+// degradation paths (gh missing / API error / zero runs), but exercises the
+// JSON.parse try/catch branch the code-reviewer called out by name in
+// review_T-EB-03.md as verified-but-not-yet-test-pinned.
+// ---------------------------------------------------------------------------
+test("VR-16 (E14 degradation, bonus): unparseable gh output -> WARN on stdout, never a FAIL, exit 0", () => {
+  const { root } = mkFixtureRepo({ version: "10.0.5", tag: "at-head", origin: "pushed" });
+  const shimDir = mkGhShim("#!/bin/sh\necho 'not json at all'\n");
+  const result = runVerifyWithPath(root, `${shimDir}:${GH_LESS_SYSTEM_PATH}`, ["v10.0.5"]);
+  assert.equal(result.status, 0, `unparseable gh output must never fail the release; stderr: ${result.stderr}`);
+  assert.match(
+    result.stdout,
+    /WARN: CI ground-truth — could not parse gh run list output; continuing without CI verification \(graceful degradation, E14\)/,
+  );
+  assert.match(result.stdout, /OK: CI ground-truth/);
+  assert.equal(result.stderr, "");
 });
 
 // ---------------------------------------------------------------------------

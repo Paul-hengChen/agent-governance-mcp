@@ -5,7 +5,12 @@
 // scripts/check-version.mjs is green (invoked as a subprocess, never
 // re-implemented), (4) CHANGELOG.md has an entry for the target version,
 // (5) dist/ is committed and the committed dist/index.js Server() literal
-// matches the target version.
+// matches the target version, (6) CI ground truth (E14): the latest COMPLETED
+// CI run on origin/main concluded success — self-reported "npm test green" is
+// not a substitute for what CI actually said. Check 6 degrades gracefully by
+// design: when `gh` is missing, unauthenticated, or there are no completed CI
+// runs to read, it WARNs and continues (never blocks a release on missing
+// tooling); it FAILs ONLY on a definitively non-success conclusion.
 //
 // Checks run independently — a failure in one never prevents the others from
 // running and reporting — so a multi-cause failure surfaces every cause in a
@@ -165,6 +170,72 @@ runCheck("dist committed+parity", (fails) => {
     fails.push("FAIL: could not find Server() version literal in committed dist/index.js");
   } else if (dm[1] !== version) {
     fails.push(`FAIL: committed dist/index.js version (${dm[1]}) != target v${version}`);
+  }
+});
+
+// --- Check 6: CI ground truth on origin/main (E14) ----------------------------
+// Reads the latest COMPLETED run of the CI workflow on the main branch via the
+// gh CLI. Graceful degradation is load-bearing (backlog E14 / T-EB-01): any
+// inability to OBTAIN ground truth — gh not installed, gh unauthenticated,
+// network/API error, unparseable output, zero completed runs — emits a WARN
+// and leaves the check green, preserving the pre-E14 exit-0 path exactly.
+// The ONLY failure mode is a definitively red answer: a completed run whose
+// conclusion is not "success".
+runCheck("CI ground-truth", (fails) => {
+  // WARNs go to stdout, not stderr: the script's contract (pinned by VR-8)
+  // reserves stderr for FAIL lines — a fully passing run prints nothing there.
+  const warn = (reason) =>
+    console.log(`WARN: CI ground-truth — ${reason}; continuing without CI verification (graceful degradation, E14)`);
+
+  const res = spawnSync(
+    "gh",
+    [
+      "run",
+      "list",
+      "--branch",
+      "main",
+      "--workflow",
+      "CI",
+      "--status",
+      "completed",
+      "--limit",
+      "1",
+      "--json",
+      "conclusion,headSha,url,updatedAt",
+    ],
+    { cwd: root, encoding: "utf-8" }
+  );
+
+  if (res.error) {
+    // Spawn-level failure — gh binary missing (ENOENT) or not executable.
+    warn(`gh CLI unavailable (${res.error.code ?? res.error.message})`);
+    return;
+  }
+  if (res.status !== 0) {
+    // gh ran but errored — unauthenticated, network failure, workflow not
+    // found, etc. All are "cannot obtain ground truth", never a release FAIL.
+    const detail = (res.stderr || "").trim().split("\n")[0] || `gh exited ${res.status}`;
+    warn(`gh run list failed: ${detail}`);
+    return;
+  }
+
+  let runs;
+  try {
+    runs = JSON.parse(res.stdout);
+  } catch {
+    warn("could not parse gh run list output");
+    return;
+  }
+  if (!Array.isArray(runs) || runs.length === 0) {
+    warn("no completed CI runs found on origin/main");
+    return;
+  }
+
+  const { conclusion, headSha, url } = runs[0];
+  if (conclusion !== "success") {
+    fails.push(
+      `FAIL: latest completed CI run on main concluded "${conclusion}" (head ${String(headSha).slice(0, 12)}) — ${url ?? "no url"}`
+    );
   }
 });
 
