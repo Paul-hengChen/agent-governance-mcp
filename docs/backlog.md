@@ -1037,6 +1037,13 @@ before automation, optional-external last.
   keep a retired-rule list so removals are auditable.
 - **Owner:** recurring lite/coordinator procedure, not a one-off feature;
   first run is the deliverable.
+- **First run executed 2026-07-13** (coordinator-direct, no chain):
+  `docs/retro-2026-07-13-gate-fire.md`. Verdict: 4 gates fired (all
+  load-bearing), 26 zero-fire but only 8 genuinely armed-and-silent — all
+  KEEP except EXTERNAL_REFS_UNRESOLVED placed on WATCH. No retirement PR
+  this cycle; re-run after 5 more features or the first design-armed
+  feature. The remaining E6 deliverable is the *cadence* (making the re-run
+  happen), not the mechanics — those are proven now.
 - **Risk if skipped:** compliance load keeps growing with no counter-pressure;
   autonomous success degrades invisibly as bundles grow.
 
@@ -1128,6 +1135,15 @@ before automation, optional-external last.
   Edit on `.current/handoff.md` directly — which would produce exactly the
   hand-authored stamp shape v3.72.0/v3.73.1 exhibit. Investigation should
   start from subagent tool-surface configuration, not rule-compliance.
+- **Forensics complete (2026-07-13):** `research/e9a-stamp-forensics.md` —
+  full-history stamp audit found 5 hand-authored stamps (v3.48.0, v3.49.0,
+  v3.72.0, v3.73.1 release stamps + one pre-era seed), ALL in the
+  release-close class, none elsewhere; every other stamp has ms entropy.
+  Root cause confirmed as tool-surface (no MCP path in the release-engineer
+  subagent; pre-C13 no legal write existed at all). The reproduce step of
+  this ticket is DONE — remaining scope is the fix: codify the
+  coordinator-relay for closing writes (skill + template) + optional
+  `tw_detect_drift` stamp-shape advisory.
 - **Owner:** TBD — not started; do not fix opportunistically inside an
   unrelated feature's ticket.
 - **Risk if skipped:** the false audit trail persists silently; if the
