@@ -16,6 +16,22 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.80.0] - 2026-07-13
+
+### Added
+- **`e10-lease-override` — Feature-lease human override + non-work write exemptions (v3.80.0).** Introduces two new transient `tw_update_state` args: `lease_override` (coordinator-attested FEATURE_LEASE_HELD bypass for any edge; requires `lease-override:` audit note in `pending_notes`, else LEASE_OVERRIDE_AUDIT_MISSING gate fires) and `bookkeeping_write` (preserves `last_updated` timestamp on same-feature bookkeeping writes; rejects different-feature combinations with BOOKKEEPING_WRITE_INVALID_CHANGE-class error). Migration heal-write hard-wired to preserve `last_updated`. Adds two new Constitution §3.1 bullets (const-08-chain-31-mid.md) governing lease-override attestation and bookkeeping-mode semantics. File-mode only; SQLite behavior unchanged. No handoff schema version bump (both fields transient, never persisted — handoff remains v12). Implemented in `tools/handoff-orchestrator.ts` (gate logic + field validation), `content/const-08-chain-31-mid.md` (new governance bullets), and `test/lease-override.test.mjs` (suite: 1390/1390 pass). Spec: `specs/e10-lease-override.md`; architecture: `specs/e10-lease-override-architecture.md`. Code-review APPROVED (`qa_reports/review_T-E10-07.md`). QA verified (`qa_reports/review_T-E10-08.md`). Closes E10 ticket.
+
+### Changed
+- **tw_update_state tool args**: Added `lease_override` (string, optional) and `bookkeeping_write` (boolean, optional) parameters with strict validation and gate enforcement.
+- **tools/handoff-orchestrator.ts**: LEASE_OVERRIDE_AUDIT_MISSING and BOOKKEEPING_WRITE_INVALID_CHANGE gate logic; `last_updated` preservation in migration heal-write path.
+- **content/const-08-chain-31-mid.md**: Two new Constitution §3.1 bullets governing lease-override attestation semantics and bookkeeping-mode exclusive-feature requirement.
+
+### Notes
+- driftBaselineIds appended with T-E10-ARCH, T-E10-01, T-E10-02, T-E10-03, T-E10-04, T-E10-05, T-E10-06, T-E10-07, T-E10-08
+- E10 is a governance-tooling feature enabling human intervention on blocked releases while maintaining audit trail + accounting for maintenance writes
+- File-mode only (SQLite inert per AC-4); no breaking changes to MCP tool surface or handoff schema
+- No new gates beyond LEASE_OVERRIDE_AUDIT_MISSING and BOOKKEEPING_WRITE_INVALID_CHANGE (both transient validations, no persistent state impact)
+
 ## [3.79.0] - 2026-07-13
 
 ### Added

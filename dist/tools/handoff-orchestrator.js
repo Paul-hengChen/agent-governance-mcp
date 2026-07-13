@@ -7,7 +7,8 @@
 // does not) — and to scope the future A2 gates/ extraction cleanly.
 //
 // Check order is FROZEN (spec AC-5/AC-8): preflight → PASS/qa-engineer gate →
-// transition validation → feature-lease gate (E1) → scope-decision gate → cut-approval gate →
+// transition validation → feature-lease gate (E1) → lease-override bypass/audit (E10) →
+// bookkeeping-write feature-change gate (E10) → scope-decision gate → cut-approval gate →
 // external-refs gate → source-credibility gate (E4) → repro-first gate (E2, bugfix-mode) → review-verdict/status mismatch gate → reviewer
 // completed_tasks gate (v3.58.0, C16) → QA evidence record → PASS evidence
 // gate → visual sub-gates → expected-red diff gate →
@@ -25,6 +26,7 @@ import { isFeatureLeaseHeld } from "../gates/feature-lease.js";
 import { hasExpectedRedManifest, hasExpectedRedDisposition } from "../gates/expected-red.js";
 import { hasProofAnnotatedAC, hasAcExecutionLogDisposition } from "../gates/ac-execution.js";
 import { hasCutApproval } from "../gates/cut-approval.js";
+import { classifyLeaseOverride } from "../gates/lease-override.js";
 import { hasUnresolvedRefs, listUnresolvedRefs } from "../gates/external-refs.js";
 import { gate } from "../gates/registry.js";
 import { awaitAllInflightFor } from "./rag-coalesce.js";
@@ -164,31 +166,103 @@ async function handleUpdateStateCore(parsed) {
         }
         : null;
     if (leaseFields && isFeatureLeaseHeld(leaseFields, parsed.active_feature, Date.now(), LEASE_TTL_MIN)) {
-        const hint = `Feature lease held by "${leaseFields.active_feature}" ` +
-            `(status=${leaseFields.status}, last_updated=${leaseFields.last_updated}, ` +
-            `TTL=${LEASE_TTL_MIN}min). ` +
-            gate("FEATURE_LEASE_HELD").hintStatic;
+        // E10 (e10-lease-override, AC1/AC2) — human-attested override,
+        // file-mode only (AC9: SQLite ignores lease_override and falls
+        // through to the unchanged FEATURE_LEASE_HELD reject). Classified
+        // from the INCOMING tool args (transient, write-scoped — AC3); the
+        // audit gate lives INSIDE this lease-held branch by design (DR-3:
+        // an override with nothing to bypass is inert, so an unaudited
+        // lease_override on an unheld lease is never rejected).
+        const leaseFileMode = storage instanceof FileHandoffStorage;
+        const overrideClass = classifyLeaseOverride(parsed);
+        if (leaseFileMode && overrideClass === "audited") {
+            // BYPASS — fall through to the remaining gates; the lease-held
+            // rejection is suppressed for THIS write only.
+        }
+        else if (leaseFileMode && overrideClass === "unaudited") {
+            // AC2 — an unaudited bypass is rejected loud with its own code,
+            // never silently accepted and never silently downgraded to the
+            // plain FEATURE_LEASE_HELD envelope.
+            const hint = gate("LEASE_OVERRIDE_AUDIT_MISSING").hintStatic;
+            const envelope = {
+                error: "LEASE_OVERRIDE_AUDIT_MISSING",
+                attempted_feature: parsed.active_feature,
+                incumbent: {
+                    active_feature: leaseFields.active_feature,
+                    status: leaseFields.status,
+                    last_updated: leaseFields.last_updated,
+                    lease_ttl_min: LEASE_TTL_MIN,
+                },
+                hint,
+            };
+            return {
+                content: [{
+                        type: "text",
+                        text: `⛔ LEASE_OVERRIDE_AUDIT_MISSING\n${JSON.stringify(envelope, null, 2)}`,
+                    }],
+                isError: true,
+            };
+        }
+        else {
+            const hint = `Feature lease held by "${leaseFields.active_feature}" ` +
+                `(status=${leaseFields.status}, last_updated=${leaseFields.last_updated}, ` +
+                `TTL=${LEASE_TTL_MIN}min). ` +
+                gate("FEATURE_LEASE_HELD").hintStatic;
+            const envelope = {
+                error: "FEATURE_LEASE_HELD",
+                attempted: {
+                    prev_agent: prevTuple.agent,
+                    prev_status: prevTuple.status,
+                    new_agent: nextTuple.agent,
+                    new_status: nextTuple.status,
+                },
+                incumbent: {
+                    active_feature: leaseFields.active_feature,
+                    status: leaseFields.status,
+                    last_updated: leaseFields.last_updated,
+                    lease_ttl_min: LEASE_TTL_MIN,
+                },
+                attempted_feature: parsed.active_feature,
+                hint,
+            };
+            return {
+                content: [{
+                        type: "text",
+                        text: `⛔ FEATURE_LEASE_HELD\n${JSON.stringify(envelope, null, 2)}`,
+                    }],
+                isError: true,
+            };
+        }
+    }
+    // E10 (e10-lease-override, AC6) — bookkeeping-write same-feature
+    // restriction, immediately after the lease block. Inline (DR-4): a
+    // one-line comparison the orchestrator already computed
+    // (feature_changed, line ~117) needs no predicate module. Guarded by
+    // prevState so a fresh workspace is INERT, not rejected
+    // (writeHandoffState's same-feature guard falls through to now()
+    // there). File-mode only (AC9). Rejecting — rather than silently
+    // downgrading to a normal refreshed write — closes the footgun where
+    // marking a brand-new feature's own claim as "bookkeeping" would make
+    // its lease look artificially pre-aged (the E1/E1A clobber race).
+    if (storage instanceof FileHandoffStorage &&
+        parsed.bookkeeping_write === true &&
+        prevState &&
+        feature_changed) {
+        const hint = gate("BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE").hintStatic;
         const envelope = {
-            error: "FEATURE_LEASE_HELD",
-            attempted: {
-                prev_agent: prevTuple.agent,
-                prev_status: prevTuple.status,
-                new_agent: nextTuple.agent,
-                new_status: nextTuple.status,
-            },
-            incumbent: {
-                active_feature: leaseFields.active_feature,
-                status: leaseFields.status,
-                last_updated: leaseFields.last_updated,
-                lease_ttl_min: LEASE_TTL_MIN,
-            },
+            error: "BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE",
             attempted_feature: parsed.active_feature,
+            incumbent: {
+                active_feature: prevState.active_feature,
+                status: prevState.status,
+                last_updated: prevState.last_updated,
+            },
             hint,
         };
         return {
             content: [{
                     type: "text",
-                    text: `⛔ FEATURE_LEASE_HELD\n${JSON.stringify(envelope, null, 2)}`,
+                    text: `⛔ BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE\n${JSON.stringify(envelope, null, 2)}`,
                 }],
             isError: true,
         };
@@ -850,6 +924,13 @@ async function handleUpdateStateCore(parsed) {
         // omitting writes lives in writeHandoffState). File-mode only:
         // SqliteHandoffStorage.writeState ignores it.
         dispatchMode: parsed.dispatch_mode,
+        // E10 — bookkeeping-write attestation (e10-lease-override AC5).
+        // Pass-through only: writeHandoffState's same-feature-guarded
+        // preserve branch selects last_updated (DR-5 defense-in-depth);
+        // the AC6 different-feature reject already fired above. TRANSIENT:
+        // never persisted to frontmatter, no schema bump (DR-1). File-mode
+        // only (AC9): SqliteHandoffStorage.writeState ignores it.
+        bookkeepingWrite: parsed.bookkeeping_write,
     });
     // GC hook: when QA flips a feature to PASS, drop the workspace's RAG
     // chunks so the next feature starts clean. Await any concurrent lazy

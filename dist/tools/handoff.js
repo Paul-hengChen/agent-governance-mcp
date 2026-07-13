@@ -314,6 +314,15 @@ export function readHandoffState(workspacePath) {
             qaRoundsTotal: state.qa_rounds_total,
             reviewRoundsTotal: state.review_rounds_total,
             visualRoundsTotal: state.visual_rounds_total,
+            // E10 (e10-lease-override AC4) — the heal-write is hard-wired to the
+            // bookkeeping behavior UNCONDITIONALLY: a schema heal is mechanically
+            // non-substantive (never a real state transition), so it must preserve
+            // the pre-heal last_updated verbatim instead of extending a possibly-
+            // dead lease. Server-internal, no attestation needed (the same trust
+            // posture as the pendingNotes passthrough above). Always same-feature
+            // by construction, so writeHandoffState's same-feature guard always
+            // takes the preserve branch.
+            bookkeepingWrite: true,
         }).catch(() => {
             /* swallowed — read still returns migrated state */
         });
@@ -425,6 +434,10 @@ export async function writeHandoffState(workspacePathOrOpts, activeFeature, stat
     let qaRoundsTotal;
     let reviewRoundsTotal;
     let visualRoundsTotal;
+    // E10 — bookkeeping-write attestation. Options-object only: the positional
+    // overload leaves it undefined (the heal-write call site uses the options
+    // object; a positional caller always gets the fresh-stamp default).
+    let bookkeepingWrite;
     if (typeof workspacePathOrOpts === "object" &&
         !Array.isArray(workspacePathOrOpts)) {
         const o = workspacePathOrOpts;
@@ -452,6 +465,7 @@ export async function writeHandoffState(workspacePathOrOpts, activeFeature, stat
         qaRoundsTotal = o.qaRoundsTotal;
         reviewRoundsTotal = o.reviewRoundsTotal;
         visualRoundsTotal = o.visualRoundsTotal;
+        bookkeepingWrite = o.bookkeepingWrite;
     }
     else {
         workspacePath = workspacePathOrOpts;
@@ -562,14 +576,21 @@ export async function writeHandoffState(workspacePathOrOpts, activeFeature, stat
         //                                                       absence = feature)
         let effectiveDispatchMode = dispatchMode;
         const dispatchModeNeedsExisting = dispatchMode === undefined;
+        // E10 — `existing` is hoisted out of the preserve block so the timestamp
+        // resolution below can read it; a bookkeeping write joins the trigger
+        // condition (it needs existing.last_updated). All other paths are
+        // unchanged: `existing` stays null unless some preserve clause needed the
+        // read, exactly as before.
+        let existing = null;
         if (effectivePrdPath === undefined ||
             effectiveScopeDecision === undefined ||
             effectiveScopeDecisionWhy === undefined ||
             cutApprovalNeedsExisting ||
             externalRefsNeedsExisting ||
             dispatchPinsNeedsExisting ||
-            dispatchModeNeedsExisting) {
-            const existing = parseHandoff(workspacePath);
+            dispatchModeNeedsExisting ||
+            bookkeepingWrite === true) {
+            existing = parseHandoff(workspacePath);
             if (effectivePrdPath === undefined)
                 effectivePrdPath = existing?.prd_path;
             if (effectiveScopeDecision === undefined)
@@ -597,6 +618,25 @@ export async function writeHandoffState(workspacePathOrOpts, activeFeature, stat
                     existing?.active_feature === _activeFeature ? existing?.dispatch_mode : undefined;
             }
         }
+        // E10 — timestamp resolution (e10-lease-override AC4/AC5, DR-5). Default:
+        // fresh stamp (unchanged). A bookkeeping write PRESERVES the existing
+        // on-disk last_updated verbatim so the incumbent lease's measured age
+        // keeps reflecting the last REAL write — guarded same-active_feature even
+        // though the orchestrator's AC6 gate already rejects the differing-feature
+        // combination: the migration heal-write in readHandoffState calls this
+        // writer DIRECTLY (no orchestrator), so the writer itself must never
+        // suppress a differing-feature freshness stamp (the pre-aged-clobber
+        // footgun). dispatched_at deliberately keeps its own now() (DR-6): the
+        // lease clock is last_updated; dispatched_at feeds the D5 stale-dispatch
+        // advisory, a separate concern.
+        let effectiveLastUpdated = now;
+        if (bookkeepingWrite === true &&
+            existing &&
+            existing.active_feature === _activeFeature &&
+            existing.last_updated) {
+            effectiveLastUpdated = existing.last_updated;
+        }
+        frontmatterData.last_updated = effectiveLastUpdated;
         // clauses (1)/(2): explicit PM approval, or PM re-entry re-arm. These do not
         // depend on `existing`, so they resolve regardless of the read above.
         if (cutApproved === true) {
@@ -644,7 +684,9 @@ export async function writeHandoffState(workspacePathOrOpts, activeFeature, stat
         // v10 — dispatch-liveness stamp (d5-server-side-stale-dispatch-detection,
         // DR-2): stamp iff dispatching, on the SAME transient predicate and the
         // SAME now() as last_updated, so dispatched_at === last_updated exactly
-        // whenever a dispatch is stamped. Single-sourced HERE (not the
+        // whenever a dispatch is stamped (E10 exception, DR-6: a bookkeeping
+        // write that also dispatches preserves last_updated but stamps
+        // dispatched_at = now — acceptable, advisory only, not gated). Single-sourced HERE (not the
         // orchestrator) so every write path — orchestrator, migration heal-write,
         // positional callers — gets it for free. Server-derived, never
         // client-supplied. Bare sync assignment (D3 best-effort discipline): can
@@ -714,7 +756,9 @@ ${pendingList}
         fs.writeFileSync(tmpPath, content, "utf-8");
         fs.renameSync(tmpPath, handoffPath);
         refreshSnapshotFor(workspacePath, handoffPath, "handoff");
-        return JSON.stringify({ success: true, path: handoffPath, updated_at: now });
+        // E10 — report the timestamp actually persisted (preserved on a
+        // bookkeeping write, fresh otherwise), not unconditionally now().
+        return JSON.stringify({ success: true, path: handoffPath, updated_at: effectiveLastUpdated });
     });
 }
 // ==========================================

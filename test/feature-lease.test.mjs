@@ -33,7 +33,7 @@ const __filename = fileURLToPath(import.meta.url);
 const ROOT = path.resolve(path.dirname(__filename), "..");
 
 import { isFeatureLeaseHeld } from "../dist/gates/feature-lease.js";
-import { writeHandoffState, parseHandoff } from "../dist/tools/handoff.js";
+import { writeHandoffState, parseHandoff, readHandoffState } from "../dist/tools/handoff.js";
 import { resetSession, markStateRead } from "../dist/guards/session.js";
 import { setActiveStorage, FileHandoffStorage } from "../dist/tools/storage.js";
 import { handleUpdateState } from "../dist/tools/handoff-orchestrator.js";
@@ -992,4 +992,445 @@ test("S8b: step 11b sits between step 11 and step 12 (ordering) and the E1A step
   assert.ok(step12Match, "step 12 line must still be locatable");
   assert.ok(step12Match[0].includes('tw_update_state(agent_id="release-engineer"'), "step 12's corrected call shape must remain byte-intact");
   assert.ok(step12Match[0].includes('next_role="pm"'), "step 12's next_role=\"pm\" routing signal must remain byte-intact");
+});
+
+// ============================================================================
+// E10 (e10-lease-override) — two additive, orthogonal mechanisms on top of the
+// E1/E1A/E13 lease predicate above: `lease_override` (human-attested bypass of
+// FEATURE_LEASE_HELD, any edge) and `bookkeeping_write` (non-substantive-write
+// timestamp preservation, same-feature only). Both file-mode only, both
+// transient/write-scoped (never persisted, never carried forward — spec AC3).
+// specs/e10-lease-override.md AC1-AC9; architecture DR-1: NO schema bump,
+// neither field is ever emitted to or read back from frontmatter.
+// §2 test-ownership: qa-engineer-owned (T-E10-08) — sr-engineer authored no
+// tests here (gates/lease-override.ts, tools/handoff-orchestrator.ts,
+// tools/handoff.ts changes only).
+//
+// Spec-to-Test map (E10):
+//   AC1 (audited lease_override bypasses FEATURE_LEASE_HELD)   -> E10-AC1
+//   AC2 (unaudited override rejected, no silent fallthrough)    -> E10-AC2a, E10-AC2b
+//   AC3 (lease_override transient, never carried forward)       -> E10-AC3
+//   AC4 (migration heal-write preserves pre-heal last_updated)  -> "AC4 (e10): ..."
+//        (exact name from qa_reports/expected-red_e10-lease-override.txt —
+//        the authored red->green repro test, T-E10-01 reassigned to qa per §2)
+//   AC5 (bookkeeping_write preserves last_updated same-feature;
+//        sibling write without the flag still stamps fresh now())  -> E10-AC5a, E10-AC5b
+//   AC6 (bookkeeping_write + different active_feature hard-rejected;
+//        fresh-workspace inert, not rejected)                   -> E10-AC6a, E10-AC6b
+//   AC8 (const-08 two new §3.1 bullets pinned)                  -> E10-AC8a, E10-AC8b
+//   AC9 (SQLite mode: both fields inert)                        -> E10-AC9a, E10-AC9b
+// ============================================================================
+
+test("E10-AC1: an audited lease_override (pending_notes[0] matching /^lease-override:/) bypasses FEATURE_LEASE_HELD for THIS write only (file mode, spec AC1)", async () => {
+  setActiveStorage(new FileHandoffStorage());
+  const ws = mkWs("flease-e10ac1-");
+  await seedFileState(ws, "flease-a", "sr-engineer", "In_Progress");
+  resetSession(ws);
+  markStateRead(ws);
+
+  const result = await handleUpdateState({
+    workspace_path: ws,
+    active_feature: "flease-b",
+    status: "In_Progress",
+    agent_id: "pm",
+    completed_tasks: [],
+    pending_notes: ["lease-override: incumbent shipped in a prior session, human confirmed dead"],
+    cut_approved: true,
+    lease_override: true,
+  });
+  assert.ok(!result.isError, `an audited lease_override must bypass FEATURE_LEASE_HELD: ${result.content?.[0]?.text}`);
+  assert.equal(parseHandoff(ws).active_feature, "flease-b", "the bypassed write must actually claim the new feature's slot");
+});
+
+test("E10-AC2a: lease_override:true with EMPTY pending_notes is rejected LEASE_OVERRIDE_AUDIT_MISSING — never silently accepted, never silently downgraded to the plain FEATURE_LEASE_HELD envelope (spec AC2)", async () => {
+  setActiveStorage(new FileHandoffStorage());
+  const ws = mkWs("flease-e10ac2a-");
+  await seedFileState(ws, "flease-a", "sr-engineer", "In_Progress");
+  resetSession(ws);
+  markStateRead(ws);
+
+  const result = await handleUpdateState({
+    workspace_path: ws,
+    active_feature: "flease-b",
+    status: "In_Progress",
+    agent_id: "pm",
+    completed_tasks: [],
+    pending_notes: [],
+    cut_approved: true,
+    lease_override: true,
+  });
+  assert.ok(result.isError, "an unaudited lease_override must be rejected");
+  assert.match(result.content[0].text, /LEASE_OVERRIDE_AUDIT_MISSING/, "must reject with its own distinct error code");
+  assert.doesNotMatch(
+    result.content[0].text,
+    /⛔ FEATURE_LEASE_HELD/,
+    "must NOT silently fall through to the plain FEATURE_LEASE_HELD envelope — LEASE_OVERRIDE_AUDIT_MISSING is a distinct code, not a relabeling",
+  );
+  assert.equal(parseHandoff(ws).active_feature, "flease-a", "the incumbent must remain untouched after the rejected write");
+});
+
+test("E10-AC2b: lease_override:true with a MISMATCHED pending_notes[0] (does not match /^lease-override:/) is likewise rejected LEASE_OVERRIDE_AUDIT_MISSING (spec AC2)", async () => {
+  setActiveStorage(new FileHandoffStorage());
+  const ws = mkWs("flease-e10ac2b-");
+  await seedFileState(ws, "flease-a", "sr-engineer", "In_Progress");
+  resetSession(ws);
+  markStateRead(ws);
+
+  const result = await handleUpdateState({
+    workspace_path: ws,
+    active_feature: "flease-b",
+    status: "In_Progress",
+    agent_id: "pm",
+    completed_tasks: [],
+    pending_notes: ["PM starting a new feature, no audit line"],
+    cut_approved: true,
+    lease_override: true,
+  });
+  assert.ok(result.isError, "a mismatched-note lease_override must be rejected");
+  assert.match(result.content[0].text, /LEASE_OVERRIDE_AUDIT_MISSING/);
+  assert.equal(parseHandoff(ws).active_feature, "flease-a");
+});
+
+test("E10-AC3: lease_override is transient — write N's bypass does NOT leak forward to write N+1, which is evaluated by the normal FEATURE_LEASE_HELD predicate against the freshly-stamped new incumbent (spec AC3)", async () => {
+  setActiveStorage(new FileHandoffStorage());
+  const ws = mkWs("flease-e10ac3-");
+  await seedFileState(ws, "flease-a", "sr-engineer", "In_Progress");
+  resetSession(ws);
+  markStateRead(ws);
+
+  // Write N: audited override claims flease-b, bypassing the flease-a lease.
+  const writeN = await handleUpdateState({
+    workspace_path: ws,
+    active_feature: "flease-b",
+    status: "In_Progress",
+    agent_id: "pm",
+    completed_tasks: [],
+    pending_notes: ["lease-override: flease-a abandoned, human confirmed"],
+    cut_approved: true,
+    lease_override: true,
+  });
+  assert.ok(!writeN.isError, `write N (audited override) must succeed: ${writeN.content?.[0]?.text}`);
+  assert.equal(parseHandoff(ws).active_feature, "flease-b");
+
+  // Write N+1: a DIFFERENT feature, omitting lease_override entirely. flease-b
+  // is now the incumbent, freshly stamped by write N (In_Progress, seconds
+  // old) — the normal FEATURE_LEASE_HELD predicate must hold it; there is no
+  // residual bypass carried forward from write N's attestation.
+  resetSession(ws);
+  markStateRead(ws);
+  const writeNPlus1 = await handleUpdateState({
+    workspace_path: ws,
+    active_feature: "flease-c",
+    status: "In_Progress",
+    agent_id: "pm",
+    completed_tasks: [],
+    pending_notes: ["PM starting yet another feature, no override"],
+    cut_approved: true,
+  });
+  assert.ok(writeNPlus1.isError, "write N+1 must be evaluated normally — no residual lease_override bypass");
+  assert.match(writeNPlus1.content[0].text, /FEATURE_LEASE_HELD/);
+  assert.equal(parseHandoff(ws).active_feature, "flease-b", "flease-b must remain the incumbent after the correctly-rejected write");
+});
+
+// --- AC4 repro (T-E10-01, red->green; see qa_reports/expected-red_e10-lease-override.txt) ---
+//
+// Exact test name specified by sr-engineer's manifest (§2 reassignment: qa-
+// engineer authors this, since only qa may write test files). Red-proof
+// method (recorded in Phase 0.5 disposition below): the assertion fails
+// against pre-E10 code, verified by temporarily removing `bookkeepingWrite:
+// true` from the heal call site in tools/handoff.ts's readHandoffState (or
+// `git stash` the E10 diff) and observing last_updated stamped to now();
+// green against the landed fix.
+test("AC4 (e10): migration heal-write preserves pre-heal last_updated verbatim", async () => {
+  setActiveStorage(new FileHandoffStorage());
+  const ws = mkWs("flease-e10ac4-");
+  const ORIGINAL_LAST_UPDATED = "2026-05-01T00:00:00.000Z";
+  // v0-shaped handoff.md — no schema_version key at all (peekVersion collapses
+  // absence to VERSION_WHEN_ABSENT=0), so the read below trips the full
+  // v0->CURRENT migration chain and fires readHandoffState's fire-and-forget
+  // heal-write.
+  const v0Content = `---
+active_feature: "flease-e10ac4-legacy"
+status: "In_Progress"
+last_updated: "${ORIGINAL_LAST_UPDATED}"
+last_agent: "pm"
+---
+# Handoff State
+
+## Completed
+- (none)
+
+## Pending & Handoff Notes
+- (none)
+
+---
+> System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.
+`;
+  fs.writeFileSync(path.join(ws, ".current", "handoff.md"), v0Content, "utf-8");
+  assert.ok(!/schema_version/.test(v0Content), "sanity: fixture must be v0-shaped (no schema_version key)");
+  resetSession(ws);
+
+  // The read triggers runMigrations (v0 -> CURRENT), which fires the
+  // fire-and-forget heal-write in readHandoffState. Await one macrotask so
+  // the (internally-async, fire-and-forget) heal write settles on disk
+  // before we assert.
+  readHandoffState(ws);
+  await new Promise((resolve) => setImmediate(resolve));
+
+  const healed = parseHandoff(ws);
+  assert.equal(
+    healed.last_updated,
+    ORIGINAL_LAST_UPDATED,
+    "the migration heal-write must preserve the pre-heal last_updated verbatim, not stamp now() (AC4)",
+  );
+
+  // Practical consequence: a SUBSEQUENT different-feature write must be
+  // evaluated against the ORIGINAL (~2 months stale) age, not a
+  // heal-refreshed fresh one — TTL auto-expiry releases the lease immediately.
+  const result = await handleUpdateState({
+    workspace_path: ws,
+    active_feature: "flease-e10ac4-next",
+    status: "In_Progress",
+    agent_id: "pm",
+    completed_tasks: [],
+    pending_notes: ["PM starting a new feature after the legacy incumbent's lease healed stale"],
+    cut_approved: true,
+  });
+  assert.ok(
+    !result.isError,
+    `a different-feature write must be accepted against the ORIGINAL stale age, not a heal-refreshed fresh one: ${result.content?.[0]?.text}`,
+  );
+  assert.equal(parseHandoff(ws).active_feature, "flease-e10ac4-next");
+});
+
+test("E10-AC5a: bookkeeping_write:true on a SAME-feature write preserves the existing on-disk last_updated verbatim (spec AC5)", async () => {
+  setActiveStorage(new FileHandoffStorage());
+  const ws = mkWs("flease-e10ac5a-");
+  await seedFileState(ws, "flease-a", "pm", "In_Progress");
+  const preWrite = parseHandoff(ws);
+  const originalLastUpdated = preWrite.last_updated;
+  resetSession(ws);
+  markStateRead(ws);
+
+  // A tiny real-clock delay so a fresh stamp would be measurably different
+  // from the preserved one if the preserve branch failed to take effect.
+  await new Promise((resolve) => setTimeout(resolve, 5));
+
+  const result = await handleUpdateState({
+    workspace_path: ws,
+    active_feature: "flease-a",
+    status: "In_Progress",
+    agent_id: "pm",
+    completed_tasks: [],
+    pending_notes: ["PM crash/failure-record write — no forward progress"],
+    bookkeeping_write: true,
+  });
+  assert.ok(!result.isError, `a same-feature bookkeeping_write must be accepted: ${result.content?.[0]?.text}`);
+  assert.equal(
+    parseHandoff(ws).last_updated,
+    originalLastUpdated,
+    "bookkeeping_write:true must preserve last_updated verbatim, not stamp now() (AC5)",
+  );
+});
+
+test("E10-AC5b: an IDENTICAL same-feature write WITHOUT bookkeeping_write stamps a fresh now() as today (regression guard on the unflagged default, spec AC5)", async () => {
+  setActiveStorage(new FileHandoffStorage());
+  const ws = mkWs("flease-e10ac5b-");
+  await seedFileState(ws, "flease-a", "pm", "In_Progress");
+  const preWrite = parseHandoff(ws);
+  const originalLastUpdated = preWrite.last_updated;
+  resetSession(ws);
+  markStateRead(ws);
+
+  await new Promise((resolve) => setTimeout(resolve, 5));
+
+  const result = await handleUpdateState({
+    workspace_path: ws,
+    active_feature: "flease-a",
+    status: "In_Progress",
+    agent_id: "pm",
+    completed_tasks: [],
+    pending_notes: ["PM ordinary same-feature progress, no bookkeeping flag"],
+  });
+  assert.ok(!result.isError, `an ordinary same-feature write must be accepted: ${result.content?.[0]?.text}`);
+  assert.notEqual(
+    parseHandoff(ws).last_updated,
+    originalLastUpdated,
+    "an unflagged write must still refresh last_updated to now() — the default behavior is unchanged (AC5 regression guard)",
+  );
+});
+
+test("E10-AC6a: bookkeeping_write:true whose active_feature DIFFERS from the incumbent's is rejected BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE, never silently accepted or downgraded (spec AC6)", async () => {
+  setActiveStorage(new FileHandoffStorage());
+  const ws = mkWs("flease-e10ac6a-");
+  await seedFileState(ws, "flease-a", "pm", "In_Progress");
+  // Backdate past the TTL so FEATURE_LEASE_HELD (which runs FIRST in the
+  // frozen check order) releases the lease and does not intercept this write
+  // — isolating the AC6 gate, which fires immediately after the lease block
+  // regardless of whether the lease itself was held.
+  backdateLastUpdated(ws, LEASE_TTL_MIN + 1);
+  resetSession(ws);
+  markStateRead(ws);
+
+  const result = await handleUpdateState({
+    workspace_path: ws,
+    active_feature: "flease-b",
+    status: "In_Progress",
+    agent_id: "pm",
+    completed_tasks: [],
+    pending_notes: ["mislabeled bookkeeping write on a feature change — must be rejected"],
+    cut_approved: true,
+    bookkeeping_write: true,
+  });
+  assert.ok(result.isError, "a different-feature bookkeeping_write must be rejected");
+  assert.match(result.content[0].text, /BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE/);
+  assert.equal(parseHandoff(ws).active_feature, "flease-a", "the incumbent must remain untouched after the rejected write");
+});
+
+test("E10-AC6b: bookkeeping_write:true on a FRESH workspace (no prevState) is INERT, not rejected — the AC6 gate is guarded by prevState (spec AC6 / architecture DR-4)", async () => {
+  setActiveStorage(new FileHandoffStorage());
+  const ws = mkWs("flease-e10ac6b-");
+  resetSession(ws);
+  markStateRead(ws);
+
+  const result = await handleUpdateState({
+    workspace_path: ws,
+    active_feature: "flease-fresh",
+    status: "In_Progress",
+    agent_id: "pm",
+    completed_tasks: [],
+    pending_notes: ["first write in a brand-new workspace, mislabeled bookkeeping"],
+    cut_approved: true,
+    bookkeeping_write: true,
+  });
+  assert.ok(!result.isError, `a fresh workspace must never reject on bookkeeping_write (no prevState to feature-change against): ${result.content?.[0]?.text}`);
+  assert.equal(parseHandoff(ws).active_feature, "flease-fresh");
+});
+
+// --- AC9 (SQLite mode: both fields inert) ---
+
+sqliteDescribe("SQLite mode: E10 lease_override / bookkeeping_write are both inert (AC9)", () => {
+  test("E10-AC9a: SQLite mode — lease_override:true (even correctly audited) has NO effect; the plain FEATURE_LEASE_HELD rejection stands unchanged (spec AC9)", async () => {
+    const { dir, dbPath } = mkSqliteWorkspace("flease-e10ac9a-");
+    try {
+      const storage = new SqliteHandoffStorage(dbPath);
+      setActiveStorage(storage);
+      await storage.writeState({
+        workspacePath: dir,
+        activeFeature: "flease-sql-a",
+        status: "In_Progress",
+        completedTasks: [],
+        pendingNotes: ["seed"],
+        lastAgent: "sr-engineer",
+      });
+      resetSession(dir);
+      storage.readState(dir);
+
+      const result = await handleUpdateState({
+        workspace_path: dir,
+        active_feature: "flease-sql-b",
+        status: "In_Progress",
+        agent_id: "pm",
+        completed_tasks: [],
+        pending_notes: ["lease-override: SQLite mode, should still be rejected"],
+        cut_approved: true,
+        lease_override: true,
+      });
+      assert.ok(
+        result.isError,
+        "SQLite mode must ignore lease_override entirely — the plain FEATURE_LEASE_HELD rejection stands unchanged (AC9)",
+      );
+      assert.match(result.content[0].text, /FEATURE_LEASE_HELD/);
+      assert.doesNotMatch(result.content[0].text, /LEASE_OVERRIDE_AUDIT_MISSING/);
+      assert.equal(storage.parse(dir).active_feature, "flease-sql-a");
+    } finally {
+      setActiveStorage(new FileHandoffStorage());
+      try { fs.rmSync(dir, { recursive: true, force: true }); } catch {}
+    }
+  });
+
+  test("E10-AC9b: SQLite mode — bookkeeping_write:true on a same-feature write has NO timestamp effect; last_updated still stamps fresh now() unchanged (spec AC9)", async () => {
+    const { dir, dbPath } = mkSqliteWorkspace("flease-e10ac9b-");
+    try {
+      const storage = new SqliteHandoffStorage(dbPath);
+      setActiveStorage(storage);
+      await storage.writeState({
+        workspacePath: dir,
+        activeFeature: "flease-sql-a",
+        status: "In_Progress",
+        completedTasks: [],
+        pendingNotes: ["seed"],
+        lastAgent: "pm",
+      });
+      const originalLastUpdated = storage.parse(dir).last_updated;
+      resetSession(dir);
+      storage.readState(dir);
+
+      await new Promise((resolve) => setTimeout(resolve, 5));
+
+      const result = await handleUpdateState({
+        workspace_path: dir,
+        active_feature: "flease-sql-a",
+        status: "In_Progress",
+        agent_id: "pm",
+        completed_tasks: [],
+        pending_notes: ["bookkeeping write attempt, SQLite mode"],
+        bookkeeping_write: true,
+      });
+      assert.ok(!result.isError, `SQLite same-feature write must be accepted: ${result.content?.[0]?.text}`);
+      assert.notEqual(
+        storage.parse(dir).last_updated,
+        originalLastUpdated,
+        "SQLite mode must ignore bookkeeping_write — last_updated still stamps fresh now() (AC9, byte-for-byte unchanged behavior)",
+      );
+    } finally {
+      setActiveStorage(new FileHandoffStorage());
+      try { fs.rmSync(dir, { recursive: true, force: true }); } catch {}
+    }
+  });
+});
+
+// --- AC8 (const-08 §3.1 bullets pinning) ---
+//
+// Convention: mirrors E13's AC6 skill-text pinning test (S/AC-numbered tests
+// above, e.g. E13-AC6) and E1/E1A's S1-S8 series — grep-based, targets the
+// exact heading/bold-label + load-bearing substrings rather than the full
+// prose (prose wording is free-text, not pinned verbatim beyond the load-
+// bearing clauses spec AC8 calls out).
+
+test("E10-AC8a: content/const-08-chain-31-mid.md carries the Lease-Override bullet — sanctioned-writer rule, any-edge scope, stricter audit requirement, transient/write-scoped, file-mode only (spec AC8a)", () => {
+  const const08 = readContentFile("const-08-chain-31-mid.md");
+  assert.ok(const08.includes("**Lease-Override"), "must carry the Lease-Override bullet heading");
+  assert.ok(const08.includes("`FEATURE_LEASE_HELD`"), "must backtick-quote the gate it bypasses");
+  assert.ok(const08.includes("`lease_override: true`"), "must backtick-quote the field");
+  assert.ok(
+    const08.includes("Sanctioned writer") && const08.includes("coordinator-attested"),
+    "must document the sanctioned-writer / coordinator-attested trust rule (Cut-Approval Gate structural template, spec AC8a)",
+  );
+  assert.ok(const08.includes("any edge"), "must state the any-edge scope (differs from cut-approval's build-entry pin)");
+  assert.ok(
+    const08.includes("`pending_notes[0]`") && const08.includes("/^lease-override:/"),
+    "must document the stricter audit-note-format requirement",
+  );
+  assert.ok(const08.includes("`LEASE_OVERRIDE_AUDIT_MISSING`"), "must backtick-quote the audit-gate error code");
+  assert.ok(const08.includes("transient"), "must state the transient/write-scoped lifetime");
+  assert.ok(const08.includes("gates/feature-lease.ts"), "must cross-reference the predicate's E1/E1A/E13 header lineage rather than restating it");
+});
+
+test("E10-AC8b: content/const-08-chain-31-mid.md carries the Bookkeeping-Write bullet — timestamp-preservation semantics, same-active_feature restriction, migration heal-write hard-wired equivalent (spec AC8b)", () => {
+  const const08 = readContentFile("const-08-chain-31-mid.md");
+  assert.ok(const08.includes("**Bookkeeping-Write"), "must carry the Bookkeeping-Write bullet heading");
+  assert.ok(const08.includes("`bookkeeping_write: true`"), "must backtick-quote the field");
+  assert.ok(
+    const08.includes("last_updated") && const08.includes("now()"),
+    "must document the timestamp-preservation semantics (preserve existing last_updated instead of stamping now())",
+  );
+  assert.ok(
+    const08.includes("active_feature") && const08.includes("`BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE`"),
+    "must document the same-active_feature restriction and its rejection code",
+  );
+  assert.ok(
+    const08.includes("readHandoffState") && /hard-wired/.test(const08),
+    "must document the readHandoffState migration heal-write as this mechanism's hard-wired unconditional equivalent",
+  );
 });

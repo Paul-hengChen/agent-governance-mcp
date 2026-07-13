@@ -78,6 +78,7 @@ export interface WriteHandoffStateOptions {
     reviewVerdict?: ReviewVerdict;
     dispatchPins?: Partial<Record<AgentName, string>>;
     dispatchMode?: DispatchMode;
+    bookkeepingWrite?: boolean;
 }
 /**
  * Write handoff state. v3.15.0 dual API:

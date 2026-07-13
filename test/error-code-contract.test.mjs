@@ -76,7 +76,12 @@ const TOKEN_RE = /\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*\b/g;
 // code-reviewer's adjudication (review_reports/review_T-E1-04.md), this is
 // the QA-side fix (widen the shape-rule vocabulary), NOT a rename of the
 // spec-mandated code.
-const SUFFIX_RE = /_(REQUIRED|MISSING|INCOMPLETE|EXCEEDED|UNVERIFIED|REJECTED|UNRESOLVED|MISMATCH|HELD)$/;
+// e10-lease-override (qa-owned re-baseline, T-E10-08): added CHANGE.
+// BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE's novel suffix is otherwise
+// invisible to BOTH extraction sides identically (the b8/c9/e1 precedent) —
+// its sibling LEASE_OVERRIDE_AUDIT_MISSING already matches the existing
+// _MISSING alternative and needs no vocabulary change.
+const SUFFIX_RE = /_(REQUIRED|MISSING|INCOMPLETE|EXCEEDED|UNVERIFIED|REJECTED|UNRESOLVED|MISMATCH|HELD|CHANGE)$/;
 const PREFIX_RE = /^MISSING_/;
 
 function isGateErrorCode(token) {
@@ -160,10 +165,13 @@ function fmt(codeMap, codes) {
 }
 
 // ---------------------------------------------------------------------------
-// AC-1 / AC-5: GATE_REGISTRY is the single source of truth, exactly 28
-// entries (e3-outcome-shaped-acceptance, qa-owned re-baseline: added the
-// 28th, AC_EXECUTION_LOG_MISSING — the AC-execution evidence gate; 27 in, 28
-// out — one gate added, none dropped). e4-design-source-credibility-gate had
+// AC-1 / AC-5: GATE_REGISTRY is the single source of truth, exactly 30
+// entries (e10-lease-override, qa-owned re-baseline: added the 29th and
+// 30th, LEASE_OVERRIDE_AUDIT_MISSING + BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE
+// — the lease-override bypass/audit gate and the bookkeeping-write
+// same-feature gate; 28 in, 30 out — two gates added, none dropped).
+// e3-outcome-shaped-acceptance had added the 28th, AC_EXECUTION_LOG_MISSING —
+// the AC-execution evidence gate. e4-design-source-credibility-gate had
 // added the 27th, SOURCE_CREDIBILITY_UNVERIFIED — the build-entry
 // source-credibility attestation gate. e2-bugfix-repro-gate had added the
 // 26th, REPRO_MANIFEST_MISSING — the bugfix-mode repro-first gate.
@@ -175,15 +183,15 @@ function fmt(codeMap, codes) {
 // c9-protocol-fields had added the 20th, REVIEW_VERDICT_STATUS_MISMATCH.
 // ---------------------------------------------------------------------------
 
-test("AC-1/AC-5: GATE_REGISTRY has exactly 28 entries (27 in, 28 out — e3-outcome-shaped-acceptance added AC_EXECUTION_LOG_MISSING)", () => {
+test("AC-1/AC-5: GATE_REGISTRY has exactly 30 entries (28 in, 30 out — e10-lease-override added LEASE_OVERRIDE_AUDIT_MISSING + BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE)", () => {
   assert.equal(
     GATE_REGISTRY.length,
-    28,
-    `expected exactly 28 GateDefinition entries, got ${GATE_REGISTRY.length}: ${GATE_REGISTRY.map((g) => g.errorCode).join(", ")}`,
+    30,
+    `expected exactly 30 GateDefinition entries, got ${GATE_REGISTRY.length}: ${GATE_REGISTRY.map((g) => g.errorCode).join(", ")}`,
   );
   assert.equal(
     ALL_GATE_CODES.length,
-    28,
+    30,
     "ALL_GATE_CODES must be GATE_REGISTRY.map(g => g.errorCode) — same length",
   );
   assert.deepEqual(
@@ -621,8 +629,8 @@ test("doc-file mapping (c12): gates/registry.ts's errorCode→doc-file mapping c
   const mapping = parseDocFileMappingComment();
   assert.equal(
     mapping.size,
-    28,
-    `expected the mapping comment to list all 28 codes, found ${mapping.size}: ${[...mapping.keys()].join(", ")}`,
+    30,
+    `expected the mapping comment to list all 30 codes, found ${mapping.size}: ${[...mapping.keys()].join(", ")}`,
   );
   const docCodes = extractDocCodes();
   for (const g of GATE_REGISTRY) {
@@ -718,6 +726,25 @@ const FREE_TEXT_ALLOWLIST = [
   // literally in tools/handoff-orchestrator.ts, so it is mechanically checked
   // (armConditionCheckable) like every other orchestrator-producer entry.
   { code: "AC_EXECUTION_LOG_MISSING", field: "triggerEdge", reason: "free English precondition list (\"status=PASS with completed_tasks, spec has >=1 proof: AC, ## AC Execution Log absent\"), no CAP_BY_CODE numeric literal or role:Status edge pair" },
+  // e10-lease-override (qa-owned, T-E10-08): LEASE_OVERRIDE_AUDIT_MISSING's
+  // triggerEdge ("any write while FEATURE_LEASE_HELD would fire, carrying
+  // lease_override:true (file-mode only)") is free English — no CAP_BY_CODE
+  // numeric literal, no role:Status edge pair, not one of the three
+  // pm->build-entry gates in EDGE_CHECKED_CODES. armCondition is NOT
+  // allowlisted: it names the real camelCase classifyLeaseOverride(...)
+  // predicate call, which appears literally in tools/handoff-orchestrator.ts,
+  // so it is mechanically checked (armConditionCheckable) like every other
+  // orchestrator-producer entry.
+  { code: "LEASE_OVERRIDE_AUDIT_MISSING", field: "triggerEdge", reason: "free English precondition (\"any write while FEATURE_LEASE_HELD would fire, carrying lease_override:true (file-mode only)\"), no CAP_BY_CODE numeric literal or role:Status edge pair" },
+  // e10-lease-override (qa-owned, T-E10-08): BOOKKEEPING_WRITE_INVALID_
+  // FEATURE_CHANGE's triggerEdge ("bookkeeping_write:true whose active_feature
+  // differs from the incumbent's (file-mode only)") is free English — no
+  // CAP_BY_CODE numeric literal, no role:Status edge pair. armCondition is
+  // NOT allowlisted: it contains the real camelCase "prevState" identifier,
+  // which appears literally in tools/handoff-orchestrator.ts, so it is
+  // mechanically checked (armConditionCheckable) like every other
+  // orchestrator-producer entry.
+  { code: "BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE", field: "triggerEdge", reason: "free English precondition (\"bookkeeping_write:true whose active_feature differs from the incumbent's (file-mode only)\"), no CAP_BY_CODE numeric literal or role:Status edge pair" },
 ];
 
 test("AC3 (c12): every (errorCode, field) pair for triggerEdge/armCondition is either mechanically checked above or explicitly allowlisted as free-text — no silent exemptions", () => {

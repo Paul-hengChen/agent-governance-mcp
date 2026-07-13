@@ -88,6 +88,8 @@ declare const UpdateStateArgs: z.ZodObject<{
         feature: "feature";
         bugfix: "bugfix";
     }>>;
+    lease_override: z.ZodOptional<z.ZodBoolean>;
+    bookkeeping_write: z.ZodOptional<z.ZodBoolean>;
     review_task_ids: z.ZodOptional<z.ZodArray<z.ZodString>>;
 }, z.core.$strip>;
 declare const CompleteTaskArgs: z.ZodObject<{

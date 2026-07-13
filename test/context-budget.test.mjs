@@ -832,7 +832,7 @@ test("AC7: exactly two balanced rationale fences, both outside §3.x", () => {
   assert.equal(ends, 2, "exactly two rationale:end markers");
 });
 
-test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the measured floor (≤ 5561 ~tok)", () => {
+test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the measured floor (≤ 7064 ~tok)", () => {
   // WHY: floor REBASELINED by constitution-conditional-load PHASE 2. Phase 2 extends the
   // design-only axis to two more spans (§4 visual prose S3–S5 + P-AUDITOR, and §1 L16/L17/L19),
   // adding 3 MORE design-only fence pairs (now 6 pairs / 12 marker lines total, up from
@@ -938,16 +938,24 @@ test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the 
   // measured value per the established Phase-2 convention (no additional headroom). Saving
   // margin re-verified: raw 6672 − stripped 6399 = 273 ~tok, still ≥ 240 (unchanged — the
   // const-06 edit sits outside both rationale/origin fences).
+  // e10-lease-override (qa-owned bump, T-E10-08): cap raised from 6399 → 7064 to absorb
+  // the two new const-08-chain-31-mid.md §3.1 bullets (Lease-Override, Bookkeeping-Write —
+  // AC8, chain-tagged, not design-only-fenced, so both load on this design-arm path).
+  // Independently re-measured (not trusted from sr-engineer's ~340 ~tok estimate) — raw
+  // 7362, stripped 7064 (exact); cap set to the exact measured value per the established
+  // Phase-2 convention (no additional headroom). Saving margin re-verified: raw 7362 −
+  // stripped 7064 = 298 ~tok, still ≥ 240 (the two new bullets sit outside both
+  // rationale/origin fences, so raw and stripped grew by the same amount).
   const raw = approxTokens(CONSTITUTION);
   const stripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));
-  assert.ok(stripped <= 6399, `stripped constitution (${stripped} ~tok) must be ≤ 6399 (AC8 design-arm floor, a12-followup-qa-round-name re-baseline)`);
+  assert.ok(stripped <= 7064, `stripped constitution (${stripped} ~tok) must be ≤ 7064 (AC8 design-arm floor, e10-lease-override re-baseline)`);
   assert.ok(
     raw - stripped >= 240,
     `constitution rationale+origin-tag saving (${raw - stripped} ~tok) must be ≥ 240 (AC8 measured min, c14-dispatch-pins re-baseline)`,
   );
 });
 
-test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 9545 ~tok)", () => {
+test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 14333 ~tok)", () => {
   // WHY: the constitution is injected on every dispatch; the full coordinator bundle is
   // the worst case. Compose the chain-role bundle the way buildPromptForRole does:
   // rationale-stripped constitution + SEP + rationale-stripped skill body. Floor
@@ -1119,13 +1127,22 @@ test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/b
   // monolith); no constitution-side change this feature. Independently
   // re-measured at 13669 ~tok (exact); cap set to the exact measured value
   // per the established Phase-2 convention (no additional headroom).
+  // e10-lease-override (qa-owned bump, T-E10-08): cap raised from 13669 →
+  // 14333 to absorb the same two new const-08-chain-31-mid.md §3.1 bullets
+  // (Lease-Override, Bookkeeping-Write) measured in the design-arm floor test
+  // above (+665 ~tok); skill-coordinator.md itself is untouched by this
+  // feature (spec Out of Scope: no skill pointer restatement), so this
+  // bundle's growth is 100% constitution-side. Independently re-measured (not
+  // trusted from sr-engineer's ~340 ~tok estimate) at 14333 ~tok (exact); cap
+  // set to the exact measured value per the established Phase-2 convention
+  // (no additional headroom).
   const skillCoord = readSkillFile("skill-coordinator.md");
   const body = skillCoord.startsWith("---")
     ? skillCoord.slice(skillCoord.indexOf("---", 3) + 3).trimStart()
     : skillCoord;
   const SEP = "\n\n---\n\n";
   const bundle = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)) + SEP + stripRationale(stripOriginTags(body)));
-  assert.ok(bundle <= 13669, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 13669 (AC8 design-arm floor, e4-design-source-credibility-gate re-baseline)`);
+  assert.ok(bundle <= 14333, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 14333 (AC8 design-arm floor, e10-lease-override re-baseline)`);
 });
 
 test("AC9: every operative rule/gate/heading survives stripRationale on the constitution", () => {
@@ -1476,7 +1493,7 @@ test("AC7: lite + non-design strips §3.2 once (no reintroduction), consistent w
 
 // --- AC8: rebaseline + pin the new non-design figure ----------------------
 
-test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 3477 ~tok)", () => {
+test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 4966 ~tok)", () => {
   // WHY: this is the BUDGET WIN that justified the feature, and it must be regression-guarded.
   // On a non-design chain dispatch buildPromptForRole emits stripDesignOnly(stripRationale(source)).
   // REBASELINED by constitution-conditional-load PHASE 2: Phase 2 strips two MORE spans on the
@@ -1578,9 +1595,17 @@ test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is
   // convention (no additional headroom). Saving margin re-verified: design-arm 6399 −
   // non-design 4302 = 2097 ~tok, still ≥ 2080 (unchanged — the const-06 edit sits outside
   // the design-only fences).
-  const ratStripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));         // design-arm path: 6399
-  const nonDesign = approxTokens(stripRationale(stripOriginTags(composeConstitution({ chain: true, design: false })))); // non-design path: 4302
-  assert.ok(nonDesign <= 4302, `non-design constitution (${nonDesign} ~tok) must be ≤ 4302 (AC8 non-design floor, a12-followup-qa-round-name re-baseline)`);
+  // e10-lease-override (qa-owned bump, T-E10-08): cap raised from 4302 → 4966. The two new
+  // const-08-chain-31-mid.md §3.1 bullets (Lease-Override, Bookkeeping-Write) are
+  // chain-tagged (not design-tagged), so they land on the non-design path too, same as
+  // the design-arm floor above. Independently re-measured (not trusted from
+  // sr-engineer's ~340 ~tok estimate) at 4966 ~tok (exact); cap set to the exact measured
+  // value per the established Phase-2 convention (no additional headroom). Saving margin
+  // re-verified: design-arm 7064 − non-design 4966 = 2098 ~tok, still ≥ 2080 (unchanged —
+  // the two new bullets sit outside the design-only fences).
+  const ratStripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));         // design-arm path: 7064
+  const nonDesign = approxTokens(stripRationale(stripOriginTags(composeConstitution({ chain: true, design: false })))); // non-design path: 4966
+  assert.ok(nonDesign <= 4966, `non-design constitution (${nonDesign} ~tok) must be ≤ 4966 (AC8 non-design floor, e10-lease-override re-baseline)`);
   assert.ok(
     ratStripped - nonDesign >= 2080,
     `design-only strip saving (${ratStripped - nonDesign} ~tok) must be ≥ 2080 (a12-followup-qa-round-name re-baseline)`,

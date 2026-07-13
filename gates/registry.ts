@@ -32,6 +32,8 @@ export type GateErrorCode =
   | "EXTERNAL_REFS_UNRESOLVED"
   | "SOURCE_CREDIBILITY_UNVERIFIED"
   | "FEATURE_LEASE_HELD"
+  | "LEASE_OVERRIDE_AUDIT_MISSING"
+  | "BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE"
   | "MISSING_EVIDENCE"
   | "MISSING_REVIEW_EVIDENCE"
   | "EXPECTED_RED_DIFF_MISSING"
@@ -68,7 +70,7 @@ export interface GateDefinition {
   // (DR-3, qa-engineer's rewritten error-code-contract test) compares against.
   readonly hintStatic: string;
   // True iff the code is (and must stay) backtick-quoted in >=1 content/*.md.
-  // All 28 are true today. The field exists so a future code-internal gate can
+  // All 30 are true today. The field exists so a future code-internal gate can
   // opt out without weakening the parity test.
   readonly documentedInProse: boolean;
 }
@@ -92,7 +94,9 @@ export interface GateDefinition {
 //   CUT_APPROVAL_REQUIRED           const-08-chain-31-mid.md, coord-03-core-fallback.md, skill-coordinator-lite.md
 //   EXTERNAL_REFS_UNRESOLVED        const-15-core-tail.md, coord-03-core-fallback.md, skill-pm.md
 //   SOURCE_CREDIBILITY_UNVERIFIED   coord-03-core-fallback.md, skill-design-auditor.md, skill-pm.md
-//   FEATURE_LEASE_HELD              coord-03-core-fallback.md, skill-release-engineer.md
+//   FEATURE_LEASE_HELD              const-08-chain-31-mid.md, coord-03-core-fallback.md, skill-release-engineer.md
+//   LEASE_OVERRIDE_AUDIT_MISSING    const-08-chain-31-mid.md
+//   BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE  const-08-chain-31-mid.md
 //   MISSING_EVIDENCE                skill-qa-engineer.md
 //   MISSING_REVIEW_EVIDENCE         skill-code-reviewer.md
 //   EXPECTED_RED_DIFF_MISSING       skill-qa-engineer.md
@@ -111,7 +115,7 @@ export interface GateDefinition {
 //   QA_REVIEW_TARGET_REQUIRED       skill-qa-engineer.md
 //   AC_EXECUTION_LOG_MISSING        skill-qa-engineer.md
 
-// The 28-gate catalog, in documentation order. Array order is DOC order only —
+// The 30-gate catalog, in documentation order. Array order is DOC order only —
 // it MUST NOT be relied on for evaluation order (DR-5; that lives in
 // handoff-orchestrator.ts as the physical if-block sequence).
 export const GATE_REGISTRY: readonly GateDefinition[] = [
@@ -262,6 +266,53 @@ export const GATE_REGISTRY: readonly GateDefinition[] = [
       "Wait for the incumbent to reach PASS or for its lease to expire, or run the new feature " +
       "in a separate git worktree (distinct workspace_path). " +
       "See specs/e1-feature-scoped-state-design.md.",
+    documentedInProse: true,
+  },
+  {
+    // E10 (e10-lease-override, AC1/AC2) — human-attested lease-override audit
+    // gate. Fires INSIDE the FEATURE_LEASE_HELD branch (DR-3: an override with
+    // nothing to bypass is inert), file-mode only, iff the write carries
+    // lease_override: true but its pending_notes[0] audit line is absent or
+    // mismatched. An audited override (pending_notes[0] matching
+    // /^lease-override:/) BYPASSES the lease-held rejection for this write
+    // only; an unaudited one is rejected loud here — never silently accepted,
+    // never silently downgraded to the plain FEATURE_LEASE_HELD envelope.
+    errorCode: "LEASE_OVERRIDE_AUDIT_MISSING",
+    producer: "orchestrator",
+    envelope: "orchestrator-json",
+    triggerEdge:
+      "any write while FEATURE_LEASE_HELD would fire, carrying lease_override:true (file-mode only)",
+    armCondition: "classifyLeaseOverride === unaudited; FileHandoffStorage only",
+    clearingArtifact: "pending_notes[0] matching /^lease-override:/",
+    hintStatic:
+      "A lease_override write must carry its human-attested audit line: prepend " +
+      "a \"lease-override: <reason>\" note as pending_notes[0] (gates/lease-override.ts). " +
+      "See specs/e10-lease-override.md AC2.",
+    documentedInProse: true,
+  },
+  {
+    // E10 (e10-lease-override, AC6) — bookkeeping-write same-feature
+    // restriction. A bookkeeping_write: true attestation is valid ONLY on a
+    // same-active_feature write (it preserves the incumbent's last_updated,
+    // spec AC5); a differently-featured write is itself a fresh claim, and
+    // suppressing ITS freshness stamp would let a brand-new feature's lease
+    // look artificially pre-aged — the exact premature-clobber race E1/E1A
+    // closed. Rejected loud, never silently accepted or downgraded. Inline in
+    // the orchestrator reusing the already-computed feature_changed boolean,
+    // guarded by prevState so a fresh workspace never trips it (DR-4).
+    errorCode: "BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE",
+    producer: "orchestrator",
+    envelope: "orchestrator-json",
+    triggerEdge:
+      "bookkeeping_write:true whose active_feature differs from the incumbent's (file-mode only)",
+    armCondition: "bookkeeping_write===true && prevState && feature_changed; FileHandoffStorage only",
+    clearingArtifact: "same-active_feature write, or drop bookkeeping_write",
+    hintStatic:
+      "bookkeeping_write is valid only on a same-active_feature write: it preserves " +
+      "the incumbent lease's last_updated, and suppressing a NEW feature's own " +
+      "freshness stamp would make its lease look pre-aged (premature-clobber " +
+      "footgun). Drop bookkeeping_write on feature-changing writes. " +
+      "See specs/e10-lease-override.md AC6.",
     documentedInProse: true,
   },
   // ---- plain-text (codes 11-25, producer: orchestrator) ----

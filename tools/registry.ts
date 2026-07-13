@@ -194,6 +194,21 @@ const UpdateStateArgs = z
     // sr-engineer:In_Progress → code-reviewer:In_Progress fix-phase edge; it
     // never gates a transition edge itself. File-mode only.
     dispatch_mode: z.enum(["feature", "bugfix"]).optional(),
+    // E10 (e10-lease-override) — two attested booleans, NO schema bump
+    // (architecture DR-1): neither is ever emitted to or read back from
+    // frontmatter. Both are TRANSIENT, write-scoped (the next_role/resume_of/
+    // review_verdict precedent, NOT the durable cut_approved/dispatch_mode
+    // precedent) and FILE-MODE only (spec AC9: SQLite mode ignores both).
+    // lease_override: human-attested FEATURE_LEASE_HELD bypass, any edge.
+    // Consumed ONLY at the orchestrator lease gate from the incoming args;
+    // requires a pending_notes[0] audit line matching /^lease-override:/
+    // (LEASE_OVERRIDE_AUDIT_MISSING otherwise — gates/lease-override.ts).
+    lease_override: z.boolean().optional(),
+    // bookkeeping_write: non-substantive-write attestation. Consumed ONLY as
+    // a writeHandoffState option selecting last_updated (preserve the
+    // incumbent's stamp instead of now()); valid on same-active_feature
+    // writes only (BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE otherwise, AC6).
+    bookkeeping_write: z.boolean().optional(),
     // v9 — d9-qa-review-scoped-append. Task id(s) the qa_review evidence
     // auto-record targets (agent_id=qa-engineer, status PASS/FAIL). Same
     // shape/limits as completed_tasks. TRANSIENT, write-scoped (c9-protocol-
@@ -486,6 +501,16 @@ export const TOOL_REGISTRY: ToolRegistryEntry[] = [
           enum: ["feature", "bugfix"],
           description:
             "Ticket dispatch-mode classification (file-mode only). PM sets \"bugfix\" at cut time to mark a repro-first bug-fix ticket: the server then BLOCKS the sr-engineer:In_Progress → code-reviewer:In_Progress fix-phase handoff with REPRO_MANIFEST_MISSING until qa_reports/expected-red_<feature>.txt records the failing reproduction test(s), and QA's Phase 0.5 expected-red disposition becomes load-bearing for PASS. Absence === \"feature\" (the default) — feature-mode chains are unaffected. Feature-scoped: preserved across same-feature writes that omit it, dropped on active_feature change, NOT re-armed on PM re-entry; opt back into the full chain by explicitly setting \"feature\". Never gates a transition edge itself (handoff schema v11).",
+        },
+        lease_override: {
+          type: "boolean",
+          description:
+            "Human-attested FEATURE_LEASE_HELD bypass (file-mode only, e10-lease-override). Set true ONLY by the context that directly witnessed the human's chat-turn attestation that the incumbent lease is dead (same-context dispatch: the acting role; Task-subagent dispatch: the coordinator — the cut_approved §3.1 trust mechanics, but usable on ANY edge, not build-entry-pinned). The write MUST also carry pending_notes[0] matching /^lease-override:/ with a human-readable reason, or it is rejected with LEASE_OVERRIDE_AUDIT_MISSING. Transient: applies to THIS write only, never persisted, never carried forward — a later write omitting it is evaluated by the normal lease predicate. Ignored in SQLite/HTTP mode.",
+        },
+        bookkeeping_write: {
+          type: "boolean",
+          description:
+            "Non-substantive-write attestation (file-mode only, e10-lease-override). Set true on a failure-record / administrative-note touch that records no forward progress: the server PRESERVES the existing on-disk last_updated verbatim instead of stamping now(), so the incumbent feature's lease age keeps reflecting the last REAL write. Valid ONLY when this write's active_feature equals the existing on-disk active_feature — a differing-feature combination is rejected with BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE. Transient: applies to THIS write only, never persisted. Ignored in SQLite/HTTP mode.",
         },
       },
       required: ["workspace_path", "active_feature", "status"],
