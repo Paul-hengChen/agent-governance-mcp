@@ -218,10 +218,56 @@ function mkGhShim(scriptBody) {
   return dir;
 }
 
-// A minimal PATH that still resolves `git` (needed by Checks 1/2/5 and by
-// check-version.mjs, Check 3) but excludes wherever the real `gh` binary
-// happens to live on the host running this suite.
-const GH_LESS_SYSTEM_PATH = "/usr/bin:/bin";
+/**
+ * Resolve an executable via a manual PATH walk (no shelling out to
+ * `which`/`where`, which would itself be a PATH-resolution dependency).
+ */
+function resolveOnPath(bin) {
+  const exts = process.platform === "win32" ? [".exe", ".cmd", ""] : [""];
+  const dirs = (process.env.PATH || "").split(path.delimiter);
+  for (const dir of dirs) {
+    for (const ext of exts) {
+      const candidate = path.join(dir, bin + ext);
+      try {
+        fs.accessSync(candidate, fs.constants.X_OK);
+        return candidate;
+      } catch {
+        // not here — keep walking
+      }
+    }
+  }
+  throw new Error(`resolveOnPath: could not find '${bin}' on PATH=${process.env.PATH}`);
+}
+
+// A PATH containing ONLY the external binaries this test file legitimately
+// needs and NOTHING ELSE (crucially, never `gh`): `git` (Checks 1/2/5's
+// `execFileSync("git", ...)` and check-version.mjs's git calls — `node`
+// itself is invoked via the absolute `process.execPath`, and
+// check-version.mjs's `execSync` shells out to the literal `/bin/sh`, not a
+// PATH-resolved `sh`) plus `cat` (the `ghJsonShim` fixtures' `#!/bin/sh`
+// bodies pipe their canned JSON through `cat <<'EOF' ... EOF`, an external
+// command the shell resolves via PATH — `echo`-only shim bodies need
+// nothing extra, since `echo` is a shell builtin).
+//
+// A fixed "/usr/bin:/bin" (the prior approach) is NOT a safe "no gh" PATH on
+// every host: GitHub's ubuntu-latest hosted runner image installs the `gh`
+// CLI via apt at /usr/bin/gh, so that static path silently stops being
+// gh-less in CI (VR-13 root cause — it degraded to the real `gh`, which then
+// hit the gh-run-list-failed branch instead of ENOENT, and only the ENOENT
+// wording was pinned). Building the shim from whatever this test runner's
+// OWN environment actually resolves makes the "no gh anywhere on PATH"
+// guarantee hold on any machine, not just ones shaped like a macOS/Homebrew
+// checkout.
+let _noGhSystemPathDir;
+function noGhSystemPath() {
+  if (_noGhSystemPathDir) return _noGhSystemPathDir;
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "no-gh-path-"));
+  for (const bin of ["git", "cat"]) {
+    fs.symlinkSync(resolveOnPath(bin), path.join(dir, bin));
+  }
+  _noGhSystemPathDir = dir;
+  return dir;
+}
 
 function runVerifyWithPath(root, pathValue, args = []) {
   return spawnSync(
@@ -490,7 +536,7 @@ test("VR-11 (E14): shimmed gh reports a red completed run -> exit non-zero, FAIL
       ]),
     ),
   );
-  const result = runVerifyWithPath(root, `${shimDir}:${GH_LESS_SYSTEM_PATH}`, ["v10.0.0"]);
+  const result = runVerifyWithPath(root, `${shimDir}:${noGhSystemPath()}`, ["v10.0.0"]);
   assert.notEqual(result.status, 0, "a red completed CI run must FAIL the release self-check");
   assert.match(
     result.stderr,
@@ -524,7 +570,7 @@ test("VR-12 (E14): shimmed gh reports a successful completed run -> OK line, exi
       ]),
     ),
   );
-  const result = runVerifyWithPath(root, `${shimDir}:${GH_LESS_SYSTEM_PATH}`, ["v10.0.1"]);
+  const result = runVerifyWithPath(root, `${shimDir}:${noGhSystemPath()}`, ["v10.0.1"]);
   assert.equal(result.status, 0, `expected exit 0; stderr: ${result.stderr}`);
   assert.match(result.stdout, /OK: CI ground-truth/);
   assert.ok(
@@ -541,10 +587,22 @@ test("VR-12 (E14): shimmed gh reports a successful completed run -> OK line, exi
 // mode is a definitively red completed run (VR-11); every "cannot obtain
 // ground truth" path must degrade gracefully, never block a release on
 // missing/unconfigured tooling.
+//
+// CI-flake fix (post-v3.83.0, VR-13 CI Fix): this test previously ran with a
+// hardcoded `PATH="/usr/bin:/bin"`, reasoning "git lives there but gh
+// doesn't" — true on a macOS/Homebrew checkout, false on GitHub's
+// ubuntu-latest hosted runner, which installs the `gh` CLI via apt at
+// /usr/bin/gh. There, this PATH resolved the REAL gh, which (unauthenticated,
+// no GH_TOKEN) exited non-zero with an auth error — the WARN text for that
+// path is pinned by VR-14, not this test's ENOENT wording — turning this test
+// red on every CI run since v3.83.0. `noGhSystemPath()` builds the "no gh
+// anywhere" PATH from whatever `git` THIS test process's own PATH resolves
+// to, so the guarantee holds on any host, not just ones shaped like this
+// author's machine.
 // ---------------------------------------------------------------------------
 test("VR-13 (E14 degradation): gh binary not on PATH -> WARN on stdout naming gh unavailability, check still OK, exit 0", () => {
   const { root } = mkFixtureRepo({ version: "10.0.2", tag: "at-head", origin: "pushed" });
-  const result = runVerifyWithPath(root, GH_LESS_SYSTEM_PATH, ["v10.0.2"]);
+  const result = runVerifyWithPath(root, noGhSystemPath(), ["v10.0.2"]);
   assert.equal(result.status, 0, `a missing gh binary must never fail the release; stderr: ${result.stderr}`);
   assert.match(
     result.stdout,
@@ -563,7 +621,7 @@ test("VR-14 (E14 degradation): gh exits non-zero (API/auth error) -> WARN on std
   const shimDir = mkGhShim(
     "#!/bin/sh\necho 'gh: authentication required, run `gh auth login`' 1>&2\nexit 1\n",
   );
-  const result = runVerifyWithPath(root, `${shimDir}:${GH_LESS_SYSTEM_PATH}`, ["v10.0.3"]);
+  const result = runVerifyWithPath(root, `${shimDir}:${noGhSystemPath()}`, ["v10.0.3"]);
   assert.equal(result.status, 0, `a gh API/auth error must never fail the release; stderr: ${result.stderr}`);
   assert.match(
     result.stdout,
@@ -580,7 +638,7 @@ test("VR-14 (E14 degradation): gh exits non-zero (API/auth error) -> WARN on std
 test("VR-15 (E14 degradation): zero completed CI runs on main -> WARN on stdout, never a FAIL, exit 0", () => {
   const { root } = mkFixtureRepo({ version: "10.0.4", tag: "at-head", origin: "pushed" });
   const shimDir = mkGhShim(ghJsonShim("[]"));
-  const result = runVerifyWithPath(root, `${shimDir}:${GH_LESS_SYSTEM_PATH}`, ["v10.0.4"]);
+  const result = runVerifyWithPath(root, `${shimDir}:${noGhSystemPath()}`, ["v10.0.4"]);
   assert.equal(result.status, 0, `zero completed CI runs must never fail the release; stderr: ${result.stderr}`);
   assert.match(
     result.stdout,
@@ -600,7 +658,7 @@ test("VR-15 (E14 degradation): zero completed CI runs on main -> WARN on stdout,
 test("VR-16 (E14 degradation, bonus): unparseable gh output -> WARN on stdout, never a FAIL, exit 0", () => {
   const { root } = mkFixtureRepo({ version: "10.0.5", tag: "at-head", origin: "pushed" });
   const shimDir = mkGhShim("#!/bin/sh\necho 'not json at all'\n");
-  const result = runVerifyWithPath(root, `${shimDir}:${GH_LESS_SYSTEM_PATH}`, ["v10.0.5"]);
+  const result = runVerifyWithPath(root, `${shimDir}:${noGhSystemPath()}`, ["v10.0.5"]);
   assert.equal(result.status, 0, `unparseable gh output must never fail the release; stderr: ${result.stderr}`);
   assert.match(
     result.stdout,
