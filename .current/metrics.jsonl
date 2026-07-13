@@ -2,3 +2,4 @@
 {"ts":"2026-07-12T06:28:25.876Z","feature":"e8-success-telemetry","tickets":8,"qa_rounds":0,"review_rounds":0,"visual_rounds":0,"hops":0,"one_pass":true,"released_version":"3.74.0"}
 {"ts":"2026-07-13T03:22:38.184Z","feature":"e7-governed-git-surface","tickets":7,"qa_rounds":0,"review_rounds":0,"visual_rounds":0,"hops":4,"one_pass":true,"released_version":"3.81.0"}
 {"ts":"2026-07-13T06:05:52.272Z","feature":"e9a-stamp-integrity","tickets":5,"qa_rounds":0,"review_rounds":0,"visual_rounds":0,"hops":5,"one_pass":true,"released_version":"3.82.0"}
+{"ts":"2026-07-13T07:11:28.542Z","feature":"e14-e16-release-hardening","tickets":0,"qa_rounds":0,"review_rounds":0,"visual_rounds":0,"hops":5,"one_pass":true,"released_version":"3.83.0"}
