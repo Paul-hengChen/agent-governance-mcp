@@ -1572,3 +1572,163 @@ test("E9A-S5 (regression guard): the pre-existing pinned template blocks survive
   assert.ok(exampleIdx > 0, "example line must not be the first line");
   assert.equal(lines[exampleIdx - 1].trim(), "", "line before the example suffix must be blank");
 });
+
+// ============================================================================
+// E17 (e17-release-record-integrity, T-E17-04): record-integrity Hard rule
+// pinning. Mirrors the E9A-S1..S5 convention immediately above (same two
+// target files: content/skill-release-engineer.md's Hard rules block +
+// templates/claude-code-agents/release-engineer.md) — grep-based, targets
+// the four load-bearing phrases the backlog E17 row named rather than the
+// full prose: (i) git-diff-stat-derived file lists, (ii)
+// exists-on-disk-at-write-time, (iii) never-from-memory-of-the-dispatch-brief,
+// (iv) no-fabricated-review/QA rounds.
+// ============================================================================
+
+test("E17-S1: content/skill-release-engineer.md carries the CRITICAL record-integrity Hard rule bullet", () => {
+  const skill = readContentFile("skill-release-engineer.md");
+  const ruleMatch = skill.match(
+    /^-\s+\*\*CRITICAL — Record integrity: describe the diff, not the brief\*\*.*$/m,
+  );
+  assert.ok(ruleMatch, "must locate the CRITICAL record-integrity Hard rule bullet, byte-identifiable heading");
+  const ruleLine = ruleMatch[0];
+
+  assert.ok(
+    ruleLine.includes("MUST appear in the `git diff --stat` of the commit being described"),
+    "(i) must pin the git-diff-stat-derived file lists requirement",
+  );
+  assert.ok(
+    ruleLine.includes("every referenced report/spec path MUST exist on disk at write time"),
+    "(ii) must pin the exists-on-disk-at-write-time requirement",
+  );
+  assert.ok(
+    ruleLine.includes("NEVER from memory of the dispatch brief"),
+    "(iii) must pin the never-from-memory-of-the-dispatch-brief prohibition",
+  );
+  assert.ok(
+    ruleLine.includes("NEVER claim a code-review or QA round that has no on-disk report"),
+    "(iv) must pin the no-fabricated-review/QA-rounds prohibition",
+  );
+  assert.ok(
+    ruleLine.includes("(E17)"),
+    "rule must carry the (E17) tag matching the surrounding Hard-rules block convention",
+  );
+});
+
+test("E17-S2: the record-integrity Hard rule's incident-reason tail names the v3.83.0 fabrication and its a484a4d correction", () => {
+  const skill = readContentFile("skill-release-engineer.md");
+  const ruleMatch = skill.match(
+    /^-\s+\*\*CRITICAL — Record integrity: describe the diff, not the brief\*\*.*$/m,
+  );
+  assert.ok(ruleMatch, "must locate the CRITICAL record-integrity Hard rule bullet");
+  const ruleLine = ruleMatch[0];
+
+  assert.ok(
+    ruleLine.includes("Reason (E17 forensics)"),
+    "must carry a Reason tail tagged E17 forensics, matching the D10/E9A precedent structure",
+  );
+  assert.ok(
+    /v3\.83\.0 release commit message, CHANGELOG entry, and release notes all described a `tools\/handoff-orchestrator\.ts` change that does not exist/.test(ruleLine),
+    "reason tail must name the v3.83.0 fabricated file-path incident",
+  );
+  assert.ok(
+    ruleLine.includes("cited nonexistent spec/report paths"),
+    "reason tail must name the nonexistent-path incident",
+  );
+  assert.ok(
+    ruleLine.includes("claimed a fabricated code-review round for E15"),
+    "reason tail must name the fabricated-round incident",
+  );
+  assert.ok(
+    ruleLine.includes("corrected post-release in commit a484a4d"),
+    "reason tail must name the a484a4d correction commit",
+  );
+});
+
+test("E17-S3: templates/claude-code-agents/release-engineer.md carries the matching record-integrity CRITICAL paragraph", () => {
+  const tpl = fs.readFileSync(
+    path.join(ROOT, "templates", "claude-code-agents", "release-engineer.md"),
+    "utf-8",
+  );
+  assert.ok(
+    /CRITICAL: Record integrity — describe the diff, not the brief\./.test(tpl),
+    "template must carry the CRITICAL record-integrity paragraph, byte-identifiable opening",
+  );
+  assert.ok(
+    tpl.includes("MUST appear in the `git diff --stat` of the commit being described"),
+    "(i) template paragraph must carry the git-diff-stat-derived file lists requirement",
+  );
+  assert.ok(
+    tpl.includes("every referenced report/spec path MUST exist on disk at write time"),
+    "(ii) template paragraph must carry the exists-on-disk-at-write-time requirement",
+  );
+  assert.ok(
+    /never from memory of the dispatch brief/.test(tpl),
+    "(iii) template paragraph must carry the never-from-memory-of-the-dispatch-brief prohibition",
+  );
+  assert.ok(
+    /Never claim a code-review or QA round that has no on-disk report/.test(tpl),
+    "(iv) template paragraph must carry the no-fabricated-review/QA-rounds prohibition",
+  );
+});
+
+test("E17-S4 (regression guard): the pre-existing pinned template blocks and skill Hard rules survive alongside the new E17 paragraph", () => {
+  const tpl = fs.readFileSync(
+    path.join(ROOT, "templates", "claude-code-agents", "release-engineer.md"),
+    "utf-8",
+  );
+  // v3.21.2 AC1: CRITICAL watermark reminder is still the first non-blank body line.
+  const body = tpl.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, "");
+  const firstNonBlank = body.split(/\r?\n/).find((l) => l.trim().length > 0);
+  assert.equal(
+    firstNonBlank,
+    "CRITICAL: End every reply with `— @release-engineer (<the model tier you were actually invoked with>)` per Constitution §1 (watermark).",
+    "watermark reminder must remain the first non-blank body line, unshifted by the new E17 paragraph",
+  );
+  // Pre-existing D10 push-rejection CRITICAL paragraph, still present verbatim.
+  assert.ok(
+    tpl.includes(
+      "CRITICAL: On any non-fast-forward push rejection or concurrent-release collision, STOP",
+    ),
+    "pre-existing D10 push-rejection CRITICAL paragraph must still be present",
+  );
+  // Pre-existing E9A no-MCP-path relay paragraph, still present verbatim.
+  assert.ok(
+    /CRITICAL: If this session has no MCP tool-invocation path at all/.test(tpl),
+    "pre-existing E9A no-MCP-path relay CRITICAL paragraph must still be present",
+  );
+  // Pre-existing driftBaselineIds paragraph, still present — the new E17
+  // paragraph sits between the RELAY-REQUIRED (E9A) and driftBaselineIds
+  // paragraphs per the backlog E17 row, and must not have displaced either.
+  assert.ok(
+    tpl.includes("append this release's shipped task IDs to `driftBaselineIds`"),
+    "pre-existing driftBaselineIds paragraph must still be present",
+  );
+  // v3.21.2 AC2: haiku example-reply-suffix block still present and still
+  // preceded by a blank line.
+  const exampleLine = "Example reply suffix: … — @release-engineer (haiku)";
+  assert.ok(tpl.includes(exampleLine), "haiku example reply suffix block must still be present");
+  const lines = tpl.split(/\r?\n/);
+  const exampleIdx = lines.findIndex((l) => l === exampleLine);
+  assert.ok(exampleIdx > 0, "example line must not be the first line");
+  assert.equal(lines[exampleIdx - 1].trim(), "", "line before the example suffix must be blank");
+
+  // Skill-side regression: pre-existing D10 + E9A Hard rules and SOP step 8
+  // HEREDOC commit-message prose are byte-unchanged by the new E17 bullet.
+  const skill = readContentFile("skill-release-engineer.md");
+  assert.ok(
+    skill.includes(
+      "**CRITICAL — STOP on push rejection / concurrent-release collision** (D10)",
+    ),
+    "pre-existing D10 Hard rule bullet must still be present, unmodified",
+  );
+  assert.ok(
+    skill.includes(
+      "**CRITICAL — No-MCP-path sessions MUST relay, never hand-edit** (E9A)",
+    ),
+    "pre-existing E9A Hard rule bullet must still be present, unmodified",
+  );
+  assert.ok(
+    skill.includes('ALWAYS pass commit messages via `git commit -m "$(cat <<\'EOF\' ... EOF)"`'),
+    "pre-existing HEREDOC commit-message Hard rule must still be present, unmodified",
+  );
+});

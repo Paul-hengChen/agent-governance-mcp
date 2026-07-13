@@ -16,6 +16,22 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.84.0] - 2026-07-13
+
+### Added
+- **`e17-release-record-integrity` — Record-integrity Hard rule for release mechanics (v3.84.0).** Codifies Hard rule in release-engineer SOP: every file path named in commit messages, CHANGELOG entries, or release-notes bodies MUST appear in the `git diff --stat` of the commit being described, and every referenced report/spec path MUST exist on disk at write time. Prevents narrative fabrication from dispatch-brief memory (v3.83.0 incident: release message and CHANGELOG entry claimed nonexistent `tools/handoff-orchestrator.ts` change and nonexistent report paths, corrected post-release in commit a484a4d). Pinning suite `test/feature-lease.test.mjs` expanded with E17-S1..S4 dispatch pins (haiku-pinned feature-lease test assertions). Spec backfill: `specs/e17-release-record-integrity.md` (summarizing backlog incident). Test pinning: 1424/1424 suite green. Code-review APPROVED (review_reports/review_T-E17-03.md). QA verified (qa_reports/review_T-E17-04.md). Closes E17 ticket.
+
+### Changed
+- **content/skill-release-engineer.md**: Hard rule added (record-integrity rule #6 in rule sequence) — prescriptive verification: derive file lists from `git diff --stat` before writing records, verify report/spec paths exist on disk, claim only rounds whose reports exist.
+- **templates/claude-code-agents/release-engineer.md**: Dispatch template updated with Hard rule instruction block.
+- **test/feature-lease.test.mjs**: Test-pinning suite expanded with E17-S1..S4 pins (4 new haiku-pinned assertions verifying release-engineer record-integrity discipline).
+
+### Notes
+- driftBaselineIds appended with T-E17-01, T-E17-02, T-E17-03, T-E17-04
+- Content-only release: no server-code changes to `tools/`, `guards/`, `index.ts` logic; updates to SOP skill text only
+- E17 tracks forensic incident from v3.83.0 post-release correction (commit a484a4d)
+- Full test suite including new E17 pins: 1424/1424 pass
+
 ## [3.83.0] - 2026-07-13
 
 ### Added

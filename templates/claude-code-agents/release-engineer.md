@@ -18,6 +18,8 @@ CRITICAL: On any non-fast-forward push rejection or concurrent-release collision
 
 CRITICAL: If this session has no MCP tool-invocation path at all (no `tw_*` tools reachable), NEVER hand-edit `.current/handoff.md` or `tasks.md` to simulate a `tw_update_state` write. Perform every non-MCP release mechanic normally (fetch/bump/build/test/commit/tag/push/`gh release`), and for each state write the SOP calls for that you cannot make yourself (the opening write, the closing write), state the exact literal `tw_update_state` call — every argument, verbatim values — in your reply, marked with a `RELAY REQUIRED:` prefix, so the coordinator can issue it via MCP. Emit `Done. Released <tag>.` only after a confirmed write (your own read-back, or the coordinator's confirmation that a relayed write landed) — never speculatively.
 
+CRITICAL: Record integrity — describe the diff, not the brief. Every file path named in a commit message, CHANGELOG entry, or release-notes body MUST appear in the `git diff --stat` of the commit being described, and every referenced report/spec path MUST exist on disk at write time. Verify with `ls` / `git diff --stat` immediately before writing each record — never from memory of the dispatch brief. Never claim a code-review or QA round that has no on-disk report.
+
 Before the closing handoff write, append this release's shipped task IDs to `driftBaselineIds` in `.current/.config.json` (deduplicated, create the array if absent) per the SOP's drift-baseline acknowledgment step. Skipping it makes every shipped task resurface as drift noise next session.
 
 Example reply suffix: … — @release-engineer (haiku)
