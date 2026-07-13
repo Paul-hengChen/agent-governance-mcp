@@ -16,6 +16,22 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.81.0] - 2026-07-13
+
+### Added
+- **`e7-governed-git-surface` — All-roles sanctioned-git-ops whitelist (v3.81.0).** Generalizes D10's release-engineer git-ops safety rules to all roles via a new core-tagged Constitution §6 bullet (Security & Privacy) listing sanctioned operations (add/commit/tag/fast-forward push only; reset/rebase/clean/force-push/checkout --force blocked with status=Blocked + pending_notes explanation + handoff to coordinator). Release-engineer's D10 bullet rewritten as pointer-only cross-reference preserving recovery mechanics (Blocked + SHA example + step 3a re-baseline). Byte-budget bumped to account for §6 bullet in core-tagged dispatch arms (lite + chain). Implemented in `content/const-15-core-tail.md` (new §6 bullet), `content/skill-release-engineer.md` (pointer rewrite), and `test/context-budget.test.mjs` (budget recomputed). Spec: `specs/e7-governed-git-surface.md`. Code-review APPROVED (`qa_reports/review_T-E7-04.md`). QA verified (`qa_reports/review_T-E7-05.md`, 1394/1394 tests). Closes E7 ticket.
+
+### Changed
+- **content/const-15-core-tail.md**: New §6 bullet for sanctioned-git-ops whitelist (core-tagged, all roles).
+- **content/skill-release-engineer.md**: D10 bullet rewritten as pointer-only cross-reference to §6, preserving recovery mechanics.
+- **test/context-budget.test.mjs**: Byte-budget caps re-baselined to accommodate new const-15 bullet in every dispatch arm.
+
+### Notes
+- driftBaselineIds appended with T-E7-01, T-E7-02, T-E7-03, T-E7-04, T-E7-05
+- E7 is a security-hardening feature generalizing release-engineer git safety to all roles via Constitution §6
+- Core-tagged bullet ships in lite + chain dispatch arms, increasing byte budgets across all roles
+- No breaking changes to MCP tool surface, handoff schema, or prompt system
+
 ## [3.80.0] - 2026-07-13
 
 ### Added

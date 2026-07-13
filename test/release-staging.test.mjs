@@ -28,6 +28,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { getTsConfigSourceDirs } from "../dist/lib/tsconfig-source-dirs.js";
+import { composeConstitution } from "../dist/prompts/build.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SKILL = fs.readFileSync(
@@ -36,6 +37,10 @@ const SKILL = fs.readFileSync(
 );
 const SHIM = fs.readFileSync(
   path.join(ROOT, "templates", "claude-code-agents", "release-engineer.md"),
+  "utf-8",
+);
+const CONST15 = fs.readFileSync(
+  path.join(ROOT, "content", "const-15-core-tail.md"),
   "utf-8",
 );
 
@@ -596,5 +601,102 @@ test("D10-AC4: shim watermark and tw_get_state/tw_switch_role invocation lines a
     SHIM,
     /call `tw_get_state` then `tw_switch_role\("release-engineer"\)`/,
     "shim tw_get_state/tw_switch_role invocation line must be preserved verbatim (D10-AC4)",
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Phase 6 — E7: governed git surface (generalized sanctioned-git-ops
+// whitelist, ALL roles)
+// ---------------------------------------------------------------------------
+// WHY: specs/e7-governed-git-surface.md generalizes D10's release-engineer-only
+// STOP rule into one core-tagged constitution bullet (content/const-15-core-tail.md
+// §6) binding every role, and turns release-engineer's own D10 bullet into a
+// pointer rather than a restatement. AC1 pins the new §6 bullet's load-bearing
+// verbs (sanctioned + forbidden) and the STOP/Blocked/hand-back phrase, all in
+// the SAME bullet (so the pointer-vs-restatement split can't silently drift the
+// two halves apart). AC2 pins the cross-reference sentence appended to the
+// existing D10 bullet. AC5 (non-regression) is already covered by the D10-AC1
+// through D10-AC4 tests above, unmodified — those substrings still had to
+// survive byte-identical for this section's tests to be meaningful at all;
+// re-asserting that overlap here would be redundant, not additional coverage.
+
+test("E7-AC1: content/const-15-core-tail.md §6 carries the sanctioned-git-ops whitelist bullet — sanctioned verbs, forbidden verbs, and the STOP/Blocked/hand-back phrase, all in the same bullet (spec AC1)", () => {
+  const bulletMatch = CONST15.match(/- \*\*Sanctioned git operations \(ALL roles\)\*\*:.*$/m);
+  assert.ok(bulletMatch, "must carry the 'Sanctioned git operations (ALL roles)' bullet in const-15-core-tail.md §6");
+  const bullet = bulletMatch[0];
+
+  // Sanctioned verbs (load-bearing — AC1)
+  for (const verb of ["`git add`", "`git commit`", "`git tag`", "fast-forward `git push`"]) {
+    assert.ok(bullet.includes(verb), `sanctioned-git-ops bullet must whitelist ${verb} (E7-AC1)`);
+  }
+
+  // Forbidden verbs (load-bearing — AC1)
+  for (const verb of ["`git reset`", "`git rebase`", "`git clean`", "force-push (`git push --force`)", "`git checkout --force`"]) {
+    assert.ok(bullet.includes(verb), `sanctioned-git-ops bullet must forbid ${verb} (E7-AC1)`);
+  }
+  assert.ok(bullet.includes("FORBIDDEN"), "forbidden verbs must be flagged FORBIDDEN (E7-AC1)");
+
+  // STOP -> Blocked -> hand-back phrase, same bullet (load-bearing — AC1)
+  assert.ok(bullet.includes("STOP immediately"), "must instruct immediate STOP on a wall (E7-AC1)");
+  assert.ok(bullet.includes("`status: Blocked`"), "must instruct writing status: Blocked (E7-AC1)");
+  assert.ok(
+    bullet.includes("git state (branch, local commit SHA, what triggered the STOP)") && bullet.includes("`pending_notes`"),
+    "must instruct capturing branch/local SHA/trigger in pending_notes (E7-AC1)",
+  );
+  assert.ok(bullet.includes("hand back to the coordinator/human"), "must instruct handing back to the coordinator/human (E7-AC1)");
+  assert.ok(bullet.includes("never run a destructive fix unsupervised"), "must forbid unsupervised destructive fixes (E7-AC1)");
+
+  // Read-only git stays permitted, generalizing D10 (not itself a forbidden op)
+  assert.ok(
+    bullet.includes("Read-only git (`diff`, `log`, `status`, `show`) is always permitted"),
+    "must explicitly permit read-only git ops (E7-AC1)",
+  );
+});
+
+test("E7-AC3: content/const-15-core-tail.md is tagged 'core' in prompts/constitution-manifest.ts, so the new bullet ships on every dispatch arm (spec AC3)", () => {
+  const manifestSrc = fs.readFileSync(path.join(ROOT, "prompts", "constitution-manifest.ts"), "utf-8");
+  const fragmentEntry = manifestSrc.match(/\{[^{}]*file:\s*"const-15-core-tail\.md"[^{}]*\}/s);
+  assert.ok(fragmentEntry, "const-15-core-tail.md must have a fragment entry in prompts/constitution-manifest.ts (E7-AC3)");
+  assert.match(
+    fragmentEntry[0],
+    /tag:\s*"core"/,
+    "const-15-core-tail.md's manifest entry must be tag: \"core\" so includeSegment(\"core\", ...) ships it on every dispatch arm (E7-AC3)",
+  );
+});
+
+test("E7-AC1/AC3: the sanctioned-git-ops bullet reaches the COMPOSED (not raw) constitution text on both the tightest (lite, non-design) and broadest (full-chain, design-armed) dispatch arms (spec AC1's composed-text requirement, AC3)", () => {
+  // AC3's own proof text calls out "the new AC1 pinning test itself running
+  // against the composed (not raw) constitution text" — the raw-fragment
+  // assertions above (E7-AC1) pin the bullet's content; this test pins its
+  // REACHABILITY through composeConstitution() on the narrowest arm (lite,
+  // no chain, no design — the arm most likely to accidentally drop a
+  // core-tagged fragment) and the broadest arm, closing the gap between
+  // "the fragment file has the bullet" and "every dispatch arm ships it".
+  const lite = composeConstitution({ chain: false, design: false });
+  const full = composeConstitution({ chain: true, design: true });
+  assert.ok(
+    lite.includes("**Sanctioned git operations (ALL roles)**"),
+    "composeConstitution({chain:false, design:false}) (lite, tightest arm) must carry the sanctioned-git-ops bullet (E7-AC1/AC3)",
+  );
+  assert.ok(
+    full.includes("**Sanctioned git operations (ALL roles)**"),
+    "composeConstitution({chain:true, design:true}) (full-chain, design-armed, broadest arm) must carry the sanctioned-git-ops bullet (E7-AC1/AC3)",
+  );
+});
+
+test("E7-AC2: content/skill-release-engineer.md's D10 bullet cross-references the new general §6 sanctioned-git-ops whitelist by name/section, pointer-only (spec AC2)", () => {
+  assert.ok(
+    /§6/.test(SKILL) || /general git-ops whitelist/i.test(SKILL),
+    "skill-release-engineer.md must reference the general §6 git-ops rule by section number or name (E7-AC2)",
+  );
+  assert.ok(
+    SKILL.includes(
+      "one source of truth is the general git-ops whitelist in Constitution §6 (Security & Privacy), binding ALL roles",
+    ),
+    "skill-release-engineer.md's D10 bullet must carry the verbatim §6 cross-reference sentence (E7-AC2)",
+  );
+  assert.ok(
+    SKILL.includes("this bullet retains only the release-engineer recovery mechanics"),
+    "the cross-reference must explicitly scope the D10 bullet down to recovery mechanics only, pointer not restatement (E7-AC2)",
   );
 });
