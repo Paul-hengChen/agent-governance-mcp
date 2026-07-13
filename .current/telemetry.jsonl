@@ -9,3 +9,5 @@
 {"ts":"2026-07-11T21:05:39.342Z","gate":"orchestrator","error_code":"FEATURE_LEASE_HELD","agent_id":"pm","feature":"e4-design-source-credibility-gate"}
 {"ts":"2026-07-11T21:17:44.618Z","gate":"orchestrator","error_code":"FEATURE_LEASE_HELD","agent_id":"pm","feature":"e8-success-telemetry"}
 {"ts":"2026-07-13T06:18:54.922Z","gate":"validateTransition","error_code":"TRANSITION_REJECTED","agent_id":"qa-engineer","feature":"e15-test-flake-fix"}
+{"ts":"2026-07-13T07:38:13.992Z","gate":"validateTransition","error_code":"TRANSITION_REJECTED","agent_id":"release-engineer","feature":"e17-release-record-integrity"}
+{"ts":"2026-07-13T10:49:52.841Z","gate":"validateTransition","error_code":"TRANSITION_REJECTED","agent_id":"release-engineer","feature":"e17-release-record-integrity"}
