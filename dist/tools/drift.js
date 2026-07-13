@@ -8,6 +8,23 @@ import * as yaml from "js-yaml";
 import { getActiveStorage } from "./storage.js";
 import { findTasksFile, loadConfig } from "./config.js";
 import { CURRENT_VERSIONS, peekVersion } from "../schema/versions.js";
+// e9a-stamp-integrity: every stamp produced by tw_update_state itself comes
+// from `new Date().toISOString()` and therefore carries millisecond entropy.
+// A stamp with seconds `00` AND milliseconds `.000` matches all 5 confirmed
+// hand-authored stamps in handoff history (round-hour / round-half-hour hits
+// satisfy this as a subset) and is overwhelmingly unlikely from the server
+// write path. Advisory-only by design: E1A's negative-age guard already
+// fail-opens on an untrustworthy stamp, so this is audit-trail signal, not a
+// new rejection path.
+const HAND_AUTHORED_STAMP_RE = /T\d{2}:\d{2}:00\.000Z$/;
+function computeStampAdvisory(lastUpdated) {
+    if (!HAND_AUTHORED_STAMP_RE.test(lastUpdated))
+        return null;
+    return (`Handoff last_updated "${lastUpdated}" has a round-second, zero-millisecond shape ` +
+        `(seconds 00, ms .000) — consistent with a hand-authored, out-of-band edit rather than ` +
+        `the server's millisecond-entropy tw_update_state write path (new Date().toISOString()). ` +
+        `Advisory only: verify how this stamp was produced.`);
+}
 // A task is "archived" when it lives under a `## Completed` H2 section. The
 // match mirrors tasks-file.ts (sectionMatch[1].trim()) plus a lower-case fold,
 // so `## completed`, `##  Completed  `, and `## COMPLETED` all qualify (AC-6).
@@ -158,6 +175,7 @@ export function detectDrift(workspacePath) {
             handoffLastTask: "",
             tasksCompleted: [],
             tasksIncomplete: [],
+            stampAdvisory: null,
         });
     }
     const storage = getActiveStorage();
@@ -170,6 +188,7 @@ export function detectDrift(workspacePath) {
             handoffLastTask: "",
             tasksCompleted: [],
             tasksIncomplete: [],
+            stampAdvisory: null,
         });
     }
     if (!handoff) {
@@ -179,8 +198,14 @@ export function detectDrift(workspacePath) {
             handoffLastTask: "",
             tasksCompleted: [],
             tasksIncomplete: [],
+            stampAdvisory: null,
         });
     }
+    // e9a-stamp-integrity: computed once, right after handoff is confirmed
+    // non-null, then threaded into every return path from this point forward.
+    // No storage-mode scoping: last_updated is populated by both HandoffStorage
+    // implementations via the same server-side new Date().toISOString() path.
+    const stampAdvisory = computeStampAdvisory(handoff.last_updated);
     if (!tasks) {
         return JSON.stringify({
             driftDetected: false,
@@ -188,6 +213,7 @@ export function detectDrift(workspacePath) {
             handoffLastTask: handoff.active_feature,
             tasksCompleted: handoff.completed_tasks,
             tasksIncomplete: [],
+            stampAdvisory,
         });
     }
     // Exclude archived (`## Completed`) tasks from drift comparison so that
@@ -254,6 +280,7 @@ export function detectDrift(workspacePath) {
         // a baselined id recorded in handoff never misreports as incomplete.
         tasksCompleted: completedTasks.filter((id) => !baselineIds.has(id)),
         tasksIncomplete: incompleteTasks,
+        stampAdvisory,
     };
     return JSON.stringify(report);
 }

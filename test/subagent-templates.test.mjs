@@ -480,6 +480,40 @@ test("AC8: package.json + index.ts versions match", () => {
   );
 });
 
+// ---------------------------------------------------------------------------
+// e9a-stamp-integrity AC2: release-engineer.md dispatch template carries the
+// no-MCP-path relay paragraph forward into the dispatch context itself
+// (not only the skill SOP loaded later via tw_switch_role).
+// ---------------------------------------------------------------------------
+
+test("e9a AC2: templates/claude-code-agents/release-engineer.md carries the no-MCP-path relay paragraph", () => {
+  const raw = readTemplateRaw("release-engineer");
+  assert.match(
+    raw,
+    /CRITICAL: If this session has no MCP tool-invocation path at all \(no `tw_\*` tools reachable\)/,
+    "release-engineer.md must carry the CRITICAL no-MCP-path paragraph opening verbatim",
+  );
+  assert.match(
+    raw,
+    /NEVER hand-edit `\.current\/handoff\.md` or `tasks\.md` to simulate a `tw_update_state` write/,
+    "paragraph must forbid hand-editing to simulate a tw_update_state write",
+  );
+  assert.match(
+    raw,
+    /marked with a `RELAY REQUIRED:` prefix/,
+    "paragraph must instruct marking the relay payload with the RELAY REQUIRED: prefix",
+  );
+  assert.ok(
+    raw.includes("exact literal `tw_update_state` call — every argument, verbatim values"),
+    "paragraph must require the exact literal call with every argument / verbatim values",
+  );
+  assert.match(
+    raw,
+    /Emit `Done\. Released <tag>\.` only after a confirmed write/,
+    "paragraph must carry the amended Output-rule gate on a confirmed write",
+  );
+});
+
 test("AC6: no persisted-state schema_version bumped (content-only feature)", () => {
   const versionsSrc = fs.readFileSync(
     path.join(REPO_ROOT, "schema", "versions.ts"),

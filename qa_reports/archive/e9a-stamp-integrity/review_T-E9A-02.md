@@ -1,0 +1,8 @@
+# QA review — T-E9A-02
+
+<!-- Auto-appended by tw_update_state(qa_review=...). -->
+
+## 2026-07-13T05:56:16.223Z — PASS — by qa-engineer
+
+PASS. T-E9A-01/02/03 (skill-release-engineer.md CRITICAL no-MCP-path relay Hard rule + amended Output rule; matching templates/claude-code-agents/release-engineer.md paragraph; tools/drift.ts purely-additive stampAdvisory field) reviewed and code-reviewer APPROVED (review_reports/review_T-E9A-04.md). QA authored: E9A-S1/S2/S3 pinning tests in test/feature-lease.test.mjs (AC1: Hard rule + never-hand-edit + RELAY REQUIRED: prefix + exact-literal-payload requirement; amended Output rule gate); new e9a AC2 case in test/subagent-templates.test.mjs plus cross-pinned E9A-S4/S5 in test/feature-lease.test.mjs (AC2, incl. regression guard that pre-existing pinned template blocks survive); new test/drift-stamp-advisory.test.mjs (8 tests, AC3/AC4: fires on hand-authored + round-hour stamps, null on ms-entropy stamp, null on all 3 pre-handoff early returns, driftDetected/details/tasksCompleted/tasksIncomplete byte-identical across stamp shapes). Full existing drift-baseline/drift-archived-tasks/drift-skew suites green unmodified (AC5: 27/27). AC Execution Log for AC1-AC6 recorded in qa_reports/review_T-E9A-05.md. Full verification: npm run build clean; npm audit --audit-level=high = 1 low (esbuild, transitive, non-blocking); npm test run 3x = 1408/1408, 1408/1408, 1407/1407 (1 flake). Flake = test/handoff-write-arg-guard.test.mjs AC-1 t-ac1-valid-root-path-accepted, reproduced as pre-existing full-suite-only concurrency flake, confirmed 3/3 pass in isolation, zero relation to E9A surfaces — disposed per reviewer's advance note, not an E9A regression. Evidence: qa_reports/review_T-E9A-05.md.
+

@@ -16,6 +16,23 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.82.0] - 2026-07-13
+
+### Added
+- **`e9a-stamp-integrity` — No-MCP-path relay codification + stampAdvisory hand-authored forensics (v3.82.0).** Elevates the no-MCP-path emergency fallback from a per-incident workaround (D10, E1A, E13) to a sanctioned, formalized pattern in release-engineer SOP (Hard rule: "No-MCP-path sessions MUST relay, never hand-edit"). Adds `RELAY REQUIRED:` relay convention: when a release session has no MCP `tw_*` tool invocation path at all, it states the exact literal `tw_update_state` call as output to the coordinator instead of hand-editing `.current/handoff.md` directly. Implements new `stampAdvisory` field in `tw_detect_drift` output (read-only advisory reporting) that flags any drift entries with hand-authored `last_updated` timestamps outside the session's own durable `tw_update_state` writes (forensics: v3.75.0, v3.77.0, v3.80.0 all had hand-edited drift recoveries). Codified in `content/skill-release-engineer.md` (Hard rule #5: no-MCP-path relay + exact RELAY REQUIRED format), `tools/drift.ts` (stampAdvisory read-only advisory field), release-engineer SOP steps 2/12 (relay directive), and `test/drift-stamp-advisory.test.mjs` (suite validation). Full suite 1408/1408 pass. Spec: `specs/e9a-stamp-integrity.md`. Code-review APPROVED (`qa_reports/review_T-E9A-04.md`). QA verified (`qa_reports/review_T-E9A-05.md`). Closes E9A ticket.
+
+### Changed
+- **content/skill-release-engineer.md**: Hard rule #5 codified (no-MCP-path relay pattern with `RELAY REQUIRED:` format; exact literal `tw_update_state` calls relayed when session has no MCP path).
+- **tools/drift.ts**: New `stampAdvisory` field added to `tw_detect_drift` output (read-only advisory reporting hand-authored-stamp detection).
+- **test/drift-stamp-advisory.test.mjs**: New test suite validating stampAdvisory forensics.
+
+### Notes
+- driftBaselineIds appended with T-E9A-01, T-E9A-02, T-E9A-03, T-E9A-04, T-E9A-05
+- E9A is a governance-resilience feature addressing the no-MCP-path emergency fallback used in v3.75.0, v3.77.0, and v3.80.0 incident recovery
+- `stampAdvisory` is read-only advisory, never blocks any gate — purely informational forensics reporting
+- No breaking changes to MCP tool surface, handoff schema, or transitions; no new gates
+- Release-engineer SOP steps 2 and 12 now include relay directive for no-MCP-path sessions (coordinator confirms receipt before release is claimed complete)
+
 ## [3.81.0] - 2026-07-13
 
 ### Added

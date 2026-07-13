@@ -1434,3 +1434,141 @@ test("E10-AC8b: content/const-08-chain-31-mid.md carries the Bookkeeping-Write b
     "must document the readHandoffState migration heal-write as this mechanism's hard-wired unconditional equivalent",
   );
 });
+
+// ============================================================================
+// E9A (e9a-stamp-integrity, T-E9A-05): no-MCP-path relay Hard rule + amended
+// Output rule pinning. Mirrors the S1-S7 / T-E7-05 skill-text pinning
+// convention above — grep-based, targets the load-bearing phrases the
+// forensics converged on (never hand-edit / RELAY REQUIRED: prefix /
+// exact-literal-payload requirement) rather than the full prose.
+// ============================================================================
+
+test("E9A-S1: content/skill-release-engineer.md carries the CRITICAL no-MCP-path relay Hard rule, never hand-edit", () => {
+  const skill = readContentFile("skill-release-engineer.md");
+  const ruleMatch = skill.match(/^-\s+\*\*CRITICAL — No-MCP-path sessions MUST relay, never hand-edit\*\*.*$/m);
+  assert.ok(ruleMatch, "must locate the CRITICAL no-MCP-path relay Hard rule bullet, byte-identifiable heading");
+  const ruleLine = ruleMatch[0];
+
+  assert.ok(
+    ruleLine.includes("no MCP tool-invocation path at all"),
+    "must state the triggering condition: no MCP tool-invocation path at all",
+  );
+  assert.ok(
+    /NEVER hand-edit/.test(ruleLine),
+    "must state the load-bearing NEVER hand-edit prohibition",
+  );
+  assert.ok(
+    ruleLine.includes(".current/handoff.md") && ruleLine.includes("tasks.md"),
+    "must name both files the rule forbids hand-editing",
+  );
+});
+
+test("E9A-S2: the CRITICAL relay Hard rule requires the exact literal tw_update_state call, verbatim values, RELAY REQUIRED: prefix", () => {
+  const skill = readContentFile("skill-release-engineer.md");
+  const ruleMatch = skill.match(/^-\s+\*\*CRITICAL — No-MCP-path sessions MUST relay, never hand-edit\*\*.*$/m);
+  assert.ok(ruleMatch, "must locate the CRITICAL no-MCP-path relay Hard rule bullet");
+  const ruleLine = ruleMatch[0];
+
+  assert.ok(
+    ruleLine.includes("**exact literal `tw_update_state` call**"),
+    "must require the exact literal tw_update_state call (bold, load-bearing exact-literal-payload requirement)",
+  );
+  assert.ok(
+    ruleLine.includes("every argument, verbatim values"),
+    "must require every argument / verbatim values — not a paraphrase",
+  );
+  assert.ok(
+    ruleLine.includes("`RELAY REQUIRED:` prefix"),
+    "must mark the payload with the exact RELAY REQUIRED: prefix",
+  );
+  assert.ok(
+    ruleLine.includes("step 2's opening write") && ruleLine.includes("step 12's closing write"),
+    "must name both writes (opening/closing) a no-MCP-path session cannot make directly",
+  );
+});
+
+test("E9A-S3: the amended Output rule gates 'Done. Released <tag>.' on a confirmed write, never speculative from an unverified relay", () => {
+  const skill = readContentFile("skill-release-engineer.md");
+  const outputSection = skill.match(/^## Output rule\n(.+)$/m);
+  assert.ok(outputSection, "must locate the ## Output rule section");
+  const outputLine = outputSection[1];
+
+  assert.ok(
+    outputLine.includes("emitted ONLY after a confirmed state write"),
+    "must gate the Done. Released <tag>. line on a confirmed state write",
+  );
+  assert.ok(
+    outputLine.includes("own SOP step-13 read-back confirms the closing write it made directly") ||
+      /step-13 read-back confirms/.test(outputLine),
+    "must name the own-read-back confirmation path (a)",
+  );
+  assert.ok(
+    /coordinator confirms back that a relayed .RELAY REQUIRED:. closing write landed/.test(outputLine),
+    "must name the coordinator-relay-confirmation path (b), tied to the RELAY REQUIRED: payload",
+  );
+  assert.ok(
+    /NEVER assert `Done\. Released <tag>\.` speculatively/.test(outputLine),
+    "must explicitly forbid speculative assertion from a session that could not verify the write",
+  );
+  assert.ok(
+    outputLine.includes("does NOT claim Released"),
+    "must state that a no-MCP-path session ending on a RELAY REQUIRED: payload does not claim Released",
+  );
+});
+
+test("E9A-S4: templates/claude-code-agents/release-engineer.md carries the matching no-MCP-path relay paragraph (dispatch-context copy)", () => {
+  const tpl = fs.readFileSync(
+    path.join(ROOT, "templates", "claude-code-agents", "release-engineer.md"),
+    "utf-8",
+  );
+  assert.ok(
+    /CRITICAL: If this session has no MCP tool-invocation path at all/.test(tpl),
+    "template must carry the CRITICAL no-MCP-path paragraph, byte-identifiable opening",
+  );
+  assert.ok(
+    /NEVER hand-edit `\.current\/handoff\.md` or `tasks\.md` to simulate a `tw_update_state` write/.test(tpl),
+    "template paragraph must carry the never-hand-edit-to-simulate clause verbatim",
+  );
+  assert.ok(
+    tpl.includes("marked with a `RELAY REQUIRED:` prefix"),
+    "template paragraph must carry the RELAY REQUIRED: prefix instruction",
+  );
+  assert.ok(
+    tpl.includes("exact literal `tw_update_state` call — every argument, verbatim values"),
+    "template paragraph must carry the exact-literal-payload requirement verbatim",
+  );
+  assert.ok(
+    /Emit `Done\. Released <tag>\.` only after a confirmed write/.test(tpl),
+    "template paragraph must carry the amended Output-rule gate on a confirmed write",
+  );
+});
+
+test("E9A-S5 (regression guard): the pre-existing pinned template blocks survive alongside the new E9A paragraph", () => {
+  const tpl = fs.readFileSync(
+    path.join(ROOT, "templates", "claude-code-agents", "release-engineer.md"),
+    "utf-8",
+  );
+  // v3.21.2 AC1: CRITICAL watermark reminder is still the first non-blank body line.
+  const body = tpl.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, "");
+  const firstNonBlank = body.split(/\r?\n/).find((l) => l.trim().length > 0);
+  assert.equal(
+    firstNonBlank,
+    "CRITICAL: End every reply with `— @release-engineer (<the model tier you were actually invoked with>)` per Constitution §1 (watermark).",
+    "watermark reminder must remain the first non-blank body line, unshifted by the new E9A paragraph",
+  );
+  // Pre-existing D10 push-rejection CRITICAL paragraph, still present verbatim.
+  assert.ok(
+    tpl.includes(
+      "CRITICAL: On any non-fast-forward push rejection or concurrent-release collision, STOP",
+    ),
+    "pre-existing D10 push-rejection CRITICAL paragraph must still be present",
+  );
+  // v3.21.2 AC2: haiku example-reply-suffix block still present and still
+  // preceded by a blank line.
+  const exampleLine = "Example reply suffix: … — @release-engineer (haiku)";
+  assert.ok(tpl.includes(exampleLine), "haiku example reply suffix block must still be present");
+  const lines = tpl.split(/\r?\n/);
+  const exampleIdx = lines.findIndex((l) => l === exampleLine);
+  assert.ok(exampleIdx > 0, "example line must not be the first line");
+  assert.equal(lines[exampleIdx - 1].trim(), "", "line before the example suffix must be blank");
+});

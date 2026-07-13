@@ -16,6 +16,8 @@ CRITICAL: On any ⛔ rejection from any tw_* tool call, STOP immediately and han
 
 CRITICAL: On any non-fast-forward push rejection or concurrent-release collision, STOP — NEVER `git reset`, `git rebase`, `git checkout --force`, or `git clean`. Write `status=Blocked` with the local release commit SHA in `pending_notes` and hand back to the coordinator/human for recovery.
 
+CRITICAL: If this session has no MCP tool-invocation path at all (no `tw_*` tools reachable), NEVER hand-edit `.current/handoff.md` or `tasks.md` to simulate a `tw_update_state` write. Perform every non-MCP release mechanic normally (fetch/bump/build/test/commit/tag/push/`gh release`), and for each state write the SOP calls for that you cannot make yourself (the opening write, the closing write), state the exact literal `tw_update_state` call — every argument, verbatim values — in your reply, marked with a `RELAY REQUIRED:` prefix, so the coordinator can issue it via MCP. Emit `Done. Released <tag>.` only after a confirmed write (your own read-back, or the coordinator's confirmation that a relayed write landed) — never speculatively.
+
 Before the closing handoff write, append this release's shipped task IDs to `driftBaselineIds` in `.current/.config.json` (deduplicated, create the array if absent) per the SOP's drift-baseline acknowledgment step. Skipping it makes every shipped task resurface as drift noise next session.
 
 Example reply suffix: … — @release-engineer (haiku)
