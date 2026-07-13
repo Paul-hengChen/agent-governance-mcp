@@ -97,22 +97,18 @@ future `/teamwork` feature; none blocks a release on its own.
 | E13 | E1A terminal-marker fragility: v3.75.0 closing write omitted `next_role=pm` (coordinator brief error), so the exact-triple terminal clause failed silently and the lease stayed held ~30 min — release-engineer got no warning the closing write was non-terminal; server should warn/reject a release-engineer closing-signature write missing the triple, or relax the marker | P2 | E1 ✓, E10 ✓ | ~3 (gates/feature-lease.ts or orchestrator advisory, skill-release-engineer note, test) | **done (2026-07-13, v3.79.0)** — closing-signature advisory broadening (pending_notes[0] `/^Released v/` disjunct in gates/feature-lease.ts terminal marker) + skill-release-engineer note; tag v3.79.0 (see §E13 detail) |
 | E14 | CI-status self-report vs. ground-truth: release-engineer currently asserts "npm test green" by self-check; optional follow-on reads `gh` API to verify CI status before release — deferred from E7 per spec Out of Scope, enables automated release gates on CI health | P3 | E7 ✓ | ~2 (release SOP optional step, gh API call, test) | — |
 
-### Recommended execution order (2026-07-09, everything still open)
+### Recommended execution order (2026-07-13, post-E7 — supersedes the 2026-07-09 order, which shipped in full)
 
-C9 is in flight (QA phase) and excluded. Order optimizes: risks actually hit
-in live runs first, cheap content-only batches next, design-heavy last.
+Remaining open tickets: E5, E6, E9A (all P2) and E14 (P3). All dependencies
+are satisfied. Order optimizes: cheapest-highest-leverage first, integrity
+before automation, optional-external last.
 
 | order | ticket | why here |
 |---|---|---|
-| 1 | C14 | pin-loss risk was hit live in the C9 run (survived only via per-brief reminders); natural C9 follow-on — reuses the v7 field pattern while it's fresh |
-| 2 | C15 | only defense against a real regression hiding among mass re-baselines (52 reds in the C9 run, reviewer spot-checked 2); mostly content |
-| 3 | C16 + C10 | one content-only batch: both are role-boundary bookkeeping rules (reviewer ledger write; QA vs release-engineer split) — single QA round |
-| 4 | C5 + C18 | one small-code-fix batch: watermark replace-not-append + template tier; config-cache mtime invalidation — both ~1-file fixes, single QA round |
-| 5 | A8 | self-converge ×2 dedup remainder; content-only |
-| 6 | C12 | needs an option decision (render / assert / delete) before work — schedule the decision, then it's small |
-| 7 | C17 | pure ergonomics; no correctness exposure |
-| 8 | B9 | needs design (budget source, measurement point); round caps already bound worst case |
-| 9 | A12 | biggest surface (~14 files), lowest marginal benefit post-A9 — last |
+| 1 | E6 | the counter-pressure loop D3/E8 were built to feed is still unexecuted; the data finally exists (gate-rejection telemetry + `.current/metrics.jsonl` per-feature records, E7 emitted `one_pass: true`); cheapest (~2 files) and its output — retirement PRs — shrinks constitution bytes, compounding every later feature |
+| 2 | E9A | governance-integrity; fresh 2026-07-13 evidence narrows the investigation (see §E9A Evidence bullet: haiku release-engineer subagents have no MCP tool-invocation path, making direct-file-edit the path of least resistance) — reproduce is now cheap, and the minimal fix (stamp-shape advisory in `tw_detect_drift`) is small |
+| 3 | E5 | intake automation should follow the retro, not precede it: E6's evidence is what justifies (or vetoes) the auto-approve tier thresholds E5 introduces; medium content ticket once that data is in hand |
+| 4 | E14 | P3, optional, and externally gated — requires CI actually configured on the repo before a `gh` checks read means anything; zero risk if it waits |
 
 ---
 
@@ -1123,6 +1119,15 @@ in live runs first, cheap content-only batches next, design-heavy last.
   `tw_update_state`-adjacent reads, or extend `tw_detect_drift` to flag a
   handoff `last_updated` that could not plausibly have come from
   `new Date().toISOString()`.
+- **Evidence (2026-07-13, v3.81.0 release):** the suspected mechanism got a
+  live confirmation datapoint — the release-engineer subagent (haiku)
+  reported it had NO MCP tool-invocation capability (Read/Edit/Write/Bash
+  only) and could not call `tw_update_state` for the terminal closing
+  write; it correctly escalated and the coordinator relayed the write via
+  MCP instead. A less-careful run of the same setup plausibly reaches for
+  Edit on `.current/handoff.md` directly — which would produce exactly the
+  hand-authored stamp shape v3.72.0/v3.73.1 exhibit. Investigation should
+  start from subagent tool-surface configuration, not rule-compliance.
 - **Owner:** TBD — not started; do not fix opportunistically inside an
   unrelated feature's ticket.
 - **Risk if skipped:** the false audit trail persists silently; if the
