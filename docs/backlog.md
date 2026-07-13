@@ -86,7 +86,7 @@ future `/teamwork` feature; none blocks a release on its own.
 | E2 | Bug-fix as a first-class chain: `bugfix` dispatch mode (lighter than feature chain) + server-enforced repro-first gate — failing expected-red repro manifest required BEFORE fix work (reuses C15 machinery) | P1 | — | ~4 (transitions/dispatch mode, gate, skill-pm/sr/qa, tests) | **done (2026-07-12, v3.73.0)** — Bugfix-mode signal (handoff schema v11, dispatch_mode field) + REPRO_FIRST_REQUIRED gate + skill guidance; 1251/1251 tests pass; tag c279d70 |
 | E3 | Outcome-shaped acceptance: machine-executable ACs in specs + mandatory QA runtime-evidence step — gates currently verify evidence exists, never that the change does what the AC says | P1 | — | ~4 (skill-pm AC schema, skill-qa, evidence gate, tests) | **done (2026-07-12, v3.77.0)** — AC_EXECUTION_LOG_MISSING gate (28th gate) + PM/QA Phase 3.5 runtime-evidence integration; 1350/1350 tests pass; tag v3.77.0 (5dbfc57) |
 | E4 | design-auditor source-credibility check as a hard STOP gate — classify source node (full-frame / variant / read-only page) with server-checked attestation before the build hop; retros' single highest-leverage lever | P1 | — | ~3 (skill-design-auditor, gate check, test) | **done (2026-07-12, v3.75.0)** — SOURCE_CREDIBILITY_UNVERIFIED gate on pm→{architect,sr-engineer} edge + credibility cell parser in gates/visual.ts + design-auditor SOP update; 1313/1313 tests green; tag v3.75.0 (0932338) |
-| E5 | Backlog intake loop + tiered cut-approval: coordinator auto-starts next open backlog ticket; small cuts (≤2 files, P3, no schema) auto-approve, large/design-armed still HALT | P2 | E8 | ~3 (skill-coordinator, const §3.1 tier rule, config threshold) | — |
+| E5 | Backlog intake loop + tiered cut-approval + cheapest-compliant-path intake: coordinator auto-starts next open backlog ticket; small cuts (≤2 files, P3, no schema) auto-approve, large/design-armed still HALT; intake SOP gains a phase-decomposition step — classify each ticket's phases as coordinator-direct / mini-chain / full-chain and propose the cheapest compliant path by default (2026-07-13 evidence: direct analysis phases saved 50–90% tokens across E6/E9A/E15) | P2 | E8 ✓ | ~3 (skill-coordinator, const §3.1 tier rule, config threshold) | — |
 | E6 | Rule-retirement retro cadence: actually run the D3 data every N features; zero-fire gates/prose become retirement PRs — the counter-pressure D3 was built for, still unexecuted | P2 | D3 ✓, E8 ✓ | ~2 (retro procedure doc, summarizer script) | **done (2026-07-13, no release — procedure institution)** — first retro executed (docs/retro-2026-07-13-gate-fire.md: 4 fired gates KEEP, EXTERNAL_REFS_UNRESOLVED on WATCH, no retirements) + cadence & retired-rule ledger instituted in docs/gate-retro-procedure.md (every 5 features / first design-armed; next due ~v3.87); commits de6352b + 96b9324; human-approved done-mark |
 | E7 | Git/CI as a governed surface: sanctioned-git-ops whitelist for ALL roles (generalizes D10 beyond release-engineer) + optional CI-status check at release instead of self-reported test-green | P2 | D10 | ~3 (constitution/skill content, optional gh check step, test) | **done (2026-07-13, v3.81.0)** — Constitution §6 all-roles sanctioned-git-ops whitelist (core-tagged, lite+chain dispatch arms); release-engineer D10 pointer rewrite; byte-budget re-baseline (tag v3.81.0, commit d4f1520) |
 | E8 | Success-side telemetry: per-feature one-pass rate / qa-review-visual rounds / hops / token totals appended at release — D3 records only rejections; success claims are currently hand-assembled anecdotes | P2 | D3 ✓ | ~3 (telemetry emit, release SOP line, summarizer) | **done (2026-07-12, v3.74.0)** — schema v12 cumulative round counters + release-time metrics emit to .current/metrics.jsonl + scripts/summarize-metrics.mjs; 1295/1295 green; tag v3.74.0 |
@@ -1024,6 +1024,24 @@ before automation, optional-external last.
   design-armed cuts HALT as today. Per the ticket-splitting report, cut review
   is the highest-leverage human checkpoint — remove it LAST, and only after E8
   data shows the auto-tier is safe.
+- **Fix (c) — cheapest-compliant-path intake step (added 2026-07-13, human-directed):**
+  the Complexity Scope Gate classifies a ticket by its END deliverable, so
+  feature-shaped tickets always route to the chain even when most of the work
+  is analysis. Add an explicit intake step to skill-coordinator BEFORE routing:
+  decompose the ticket into phases and classify each as (i) coordinator-direct
+  (investigation, forensics, diagnosis, doc/bookkeeping, design-decision
+  studies — read-only or no-test-no-verdict work), (ii) mini-chain (sr→CR→qa
+  with the spec being the backlog row itself, skipping PM/ARCH; or qa-only via
+  the E16 single-role judge-dispatch charter for test-only work), or (iii)
+  full chain. Propose the cheapest compliant path by default and surface the
+  classification to the human in one line. Hard floor stays: §2 test ownership
+  and §3.2 builder ≠ judge are never bypassed. Evidence (2026-07-13): the
+  human had to ask three times before the coordinator offered direct paths;
+  direct analysis phases for E6 (retro run), E9A (stamp forensics), and E15
+  (flake diagnosis) cost 50–90% less than chain execution AND made the
+  subsequent build chains shorter because the spec arrived pre-researched.
+  Small-batch precedent (C16+C10, E14+E16) composes with this: batch small
+  same-class rows into one feature with a single review + QA round.
 - **Owner:** /teamwork (skill-coordinator + const §3.1 tier rule + config threshold).
 - **Risk if skipped:** low-risk small tickets queue behind human availability;
   mis-tiering risk if done before E8 exists — start conservative.
