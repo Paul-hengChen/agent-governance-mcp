@@ -1,5 +1,6 @@
 {
   "schema_version": 1,
+  "cutApprovalAutoTier": {},
   "driftBaselineIds": [
     "T470",
     "T471",

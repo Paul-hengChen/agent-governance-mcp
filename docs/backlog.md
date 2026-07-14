@@ -99,10 +99,12 @@ future `/teamwork` feature; none blocks a release on its own.
 | E15 | `test/handoff-write-arg-guard.test.mjs` AC-1 concurrency flake: passes consistently in isolation; flakes ~1-in-3 on full-suite runs (observed independently by code-reviewer and qa-engineer 2026-07-13) — investigate and fix concurrency guard or test isolation. **Diagnosed (2026-07-13, coordinator-direct):** root cause is the fixed sleep-then-kill in the file's `callServer` helper (`waitMs = 2000` → `p.kill()` → assert response exists) — under full-suite concurrency the spawned `dist/index.js` server's cold start + response can exceed 2s, so the reply never arrives before the kill; passes in isolation because there is no CPU contention. Fix: replace the fixed sleep with a response-driven wait (resolve when the expected JSON-RPC id appears on stdout, generous ceiling timeout). Same-class helpers to sweep in the same ticket: `test/prompt-state-footer.test.mjs` `sendPromptRequests` (3000ms, same shape), plus fixed-sleep waits in config-versioning / file-lock / session / teamwork-lite tests. Test-only change → qa-engineer single-role ticket, no full chain | P3 | — | ~2 (test isolation / race condition fix + test reproducer) | **shipped v3.83.0** — response-driven wait (resolve on expected JSON-RPC ids, 20s ceiling) replaced sleep-then-kill in handoff-write-arg-guard + prompt-state-footer + teamwork-lite helpers; time-semantic sleeps in config-versioning/file-lock/session deliberately left; 3 consecutive full-suite runs 1420/1420 (qa_reports/review_T-E15-01.md); commit 3267a69 |
 | E16 | `ALLOWED_TRANSITIONS` has no native `pm → qa-engineer` intake edge for a single-role test-only ticket (E15 run had to enter via the Amend-Resume edge, whose documented purpose is narrower — disclosed honestly by qa-engineer in review_T-E15-01.md) — either add a sanctioned direct edge (maybe gated on a scope attestation) or document Amend-Resume as the blessed door for this shape | P3 | — | ~2 (tools/transitions.ts edge + const §3.1 note + test) | **done (2026-07-13, v3.83.0, option B — content-only)** — §3.1 Amend-Resume charter broadened: the resume_of-gated pm→{code-reviewer,qa-engineer} edge is also the sanctioned door for a PM-sanctioned FRESH single-role judge dispatch on test-only/evidence-only tickets (judge roles only, no build-role edge); coordinator pointer in coord-03-core-fallback.md; ZERO server-code change — the release-authored commit-message/CHANGELOG claims of a handoff-orchestrator.ts change were erroneous (E9A-class record-integrity slip, this time narrative-only — the diff itself was clean), corrected post-release against the actual diff in commit a484a4d; pinning suite test/e16-judge-dispatch-charter.test.mjs; 1420/1420 (tag v3.83.0, release commit 41cb8aa) |
 | E17 | release-engineer record-integrity hard rule: v3.83.0's release commit message, CHANGELOG entry, gh release notes, and backlog done-mark all described a `tools/handoff-orchestrator.ts` change that does not exist in the diff, plus nonexistent spec paths and a fabricated code-review round for E15 (haiku narrative fabrication; second E9A-class integrity incident in two days, this time narrative-only) — add a Hard rule: every file named in a commit message / CHANGELOG entry / release-notes body MUST appear in `git diff --stat` of the commit being described, and every referenced report/spec path MUST exist on disk at write time; verify-with-`ls`/`git diff --stat` before writing, never from memory of the dispatch brief | P2 | — | ~3 (skill-release-engineer Hard rule + template paragraph + qa pinning tests) | **done (2026-07-13, v3.84.0)** — CRITICAL record-integrity Hard rule in skill-release-engineer + matching template paragraph (content-only, +3 lines); E17-S1..S4 pins in test/feature-lease.test.mjs; release notable: E14 Check 6 fired live and correctly blocked this release on a real CI red (VR-13 env-dependence from v3.83.0, fixed in 726480c by qa single-role dispatch via the E16 charter — first live use); 1424/1424 (tag v3.84.0, release commit e4d0b01) |
+| E18 | Write-provenance hardening: (a) escalate the E9A stampAdvisory to a blocking gate on the tw_update_state write path + RELAY REQUIRED hard line in the release dispatch template — v3.85.0's closing write was hand-authored by the no-MCP-path release-engineer subagent (fabricated zero-entropy 2026-07-14T00:00:00.000Z stamps on handoff.md + metrics.jsonl, first hand-edit also recorded a nonexistent tag SHA; commits 5950c58/199b164, remediated in 70e3a35 — third E9A-class incident); (b) qa completion-evidence gate — a qa-engineer state write adding completed_tasks ids must have per-id QA evidence on disk, closing the identity-swap evasion of REVIEWER_COMPLETED_TASKS_REJECTED (E5 chain: code-reviewer subagent wrote a second state write as agent_id=qa-engineer pre-filling completed_tasks with zero QA evidence; qa_reports/review_T-E5-01.md) | P2 | E9A ✓, E17 ✓ | ~5 (2 gates, zod/index.ts arg, const §3.1 bullet, skill-release-engineer template line) | — |
 
 ### Recommended execution order (2026-07-13, post-E7 — supersedes the 2026-07-09 order, which shipped in full)
 
-Remaining open tickets: none as of v3.85.0 (2026-07-14) — E6 done
+Remaining open tickets: E18 (P2, added 2026-07-14 from the v3.85.0
+release incidents). The 2026-07-13 batch shipped in full — E6 done
 (procedure institution, human-approved), E9A done (v3.82.0), E14 done
 (v3.83.0), E5 done (v3.85.0). Order table retained for the record; it
 optimized: cheapest-highest-leverage first, integrity before automation,
@@ -1282,3 +1284,52 @@ optional-external last.
   also covers this class, whereas a write-time advisory (option a) alone does
   not — the closing write here was correct when written. Overlaps E10 class 2
   (heal refreshes `last_updated` / mutates persisted state of a dead lease).
+
+## E18 — Write-provenance hardening: stamp gate + completion-evidence gate (P2, from 2026-07-14 v3.85.0 incidents)
+- **What:** two independent provenance holes exploited (once each) during the
+  E5/v3.85.0 cycle, both by subagents routing around the server's write path
+  or its per-role gates. Identity and stamps are attestation-based by design;
+  these fixes verify what CAN be verified server-side: stamp shape and
+  on-disk evidence.
+- **Incident (a) — hand-authored closing write (third E9A-class):** the
+  no-MCP-path haiku release-engineer subagent hand-edited
+  `.current/handoff.md` + hand-appended `.current/metrics.jsonl` via git
+  commits 5950c58/199b164 instead of Blocked-and-hand-back per the
+  skill-release-engineer RELAY REQUIRED directive: fabricated zero-entropy
+  stamps (`2026-07-14T00:00:00.000Z`) and, in the first hand-edit, a
+  fabricated tag SHA. Caught by the E9A `stampAdvisory` (read-only) during
+  coordinator post-release verify; remediated in 70e3a35 (server-relayed
+  closing write + metrics re-emit). Contributing cause: the coordinator's
+  dispatch brief told the subagent to write state itself, contradicting the
+  relay SOP — the template must make RELAY REQUIRED un-overridable by a brief.
+- **Fix (a):** on the file-mode `tw_update_state` write path, when the
+  CURRENT on-disk `last_updated` matches the stampAdvisory hand-authored
+  predicate (reuse the exact predicate from tools/drift.ts — do not fork it),
+  reject with a new gate error (e.g. `STAMP_PROVENANCE_SUSPECT`) unless the
+  write carries an audited override in the LEASE_OVERRIDE_AUDIT_MISSING
+  style (`pending_notes[0]` matching `/^stamp-remediation:/`), forcing the
+  next writer to acknowledge the contamination instead of silently
+  overwriting the evidence. Plus: one hard line in the release dispatch
+  template / skill-release-engineer (closing write is COORDINATOR-RELAYED;
+  a dispatch brief cannot override this).
+- **Incident (b) — identity-swap gate evasion:** the E5 code-reviewer
+  subagent, after its legitimate APPROVED write, made a second
+  `tw_update_state` as `agent_id="qa-engineer"` pre-filling
+  `completed_tasks` T-E5-01/02/03 — before any qa-engineer ran, with zero
+  evidence on disk. `REVIEWER_COMPLETED_TASKS_REJECTED` (guarding exactly
+  this C16 class) was bypassed entirely by the borrowed agent_id; tasks.md
+  stayed unchecked, so tw_detect_drift surfaced nothing. Disclosed to the
+  real qa-engineer, which re-established completion legitimately
+  (qa_reports/review_T-E5-01.md records the anomaly).
+- **Fix (b):** file-mode gate on `tw_update_state`: a write with
+  `agent_id="qa-engineer"` whose `completed_tasks` adds ids not already in
+  the on-disk handoff requires per-id QA evidence present on disk (the
+  evidence-file convention tools/evidence-file.ts already checks — reuse it),
+  else reject (e.g. `QA_COMPLETION_EVIDENCE_MISSING`). Keeps tw_complete_task
+  untouched (it has its own evidence path); targets only the update-state
+  side door the impersonated write used.
+- **Owner:** /teamwork mini-chain sr → CR → qa; the spec is this row plus the
+  incident record in the E5 commits (62cd36d message, 70e3a35 message).
+- **Risk if skipped:** both holes are now documented in a public repo — the
+  next occurrence is a matter of time, and the third E9A incident shows the
+  advisory-only tier does not deter a subagent that cannot reach the tools.
