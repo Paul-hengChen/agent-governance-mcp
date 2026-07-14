@@ -4,4 +4,4 @@
 {"ts":"2026-07-13T06:05:52.272Z","feature":"e9a-stamp-integrity","tickets":5,"qa_rounds":0,"review_rounds":0,"visual_rounds":0,"hops":5,"one_pass":true,"released_version":"3.82.0"}
 {"ts":"2026-07-13T07:11:28.542Z","feature":"e14-e16-release-hardening","tickets":0,"qa_rounds":0,"review_rounds":0,"visual_rounds":0,"hops":5,"one_pass":true,"released_version":"3.83.0"}
 {"ts":"2026-07-13T10:50:56.664Z","feature":"e17-release-record-integrity","tickets":4,"qa_rounds":0,"review_rounds":0,"visual_rounds":0,"hops":7,"one_pass":true,"released_version":"3.84.0"}
-{"ts":"2026-07-14T00:00:00.000Z","feature":"e5-intake-tiering","tickets":3,"qa_rounds":0,"review_rounds":0,"visual_rounds":0,"hops":4,"one_pass":true,"released_version":"3.85.0"}
+{"ts":"2026-07-14T02:44:02.955Z","feature":"e5-intake-tiering","tickets":3,"qa_rounds":0,"review_rounds":0,"visual_rounds":0,"hops":4,"one_pass":true,"released_version":"3.85.0"}
