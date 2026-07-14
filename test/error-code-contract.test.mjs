@@ -81,7 +81,12 @@ const TOKEN_RE = /\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*\b/g;
 // invisible to BOTH extraction sides identically (the b8/c9/e1 precedent) —
 // its sibling LEASE_OVERRIDE_AUDIT_MISSING already matches the existing
 // _MISSING alternative and needs no vocabulary change.
-const SUFFIX_RE = /_(REQUIRED|MISSING|INCOMPLETE|EXCEEDED|UNVERIFIED|REJECTED|UNRESOLVED|MISMATCH|HELD|CHANGE)$/;
+// e18-write-provenance (qa-owned re-baseline, T-E18-01): added SUSPECT. The new
+// STAMP_PROVENANCE_SUSPECT gate code introduces yet another novel suffix outside
+// the prior vocabulary — the exact same b8/c9/e1/e10 precedent. Its sibling
+// QA_COMPLETION_EVIDENCE_MISSING already matches the existing _MISSING
+// alternative and needs no vocabulary change.
+const SUFFIX_RE = /_(REQUIRED|MISSING|INCOMPLETE|EXCEEDED|UNVERIFIED|REJECTED|UNRESOLVED|MISMATCH|HELD|CHANGE|SUSPECT)$/;
 const PREFIX_RE = /^MISSING_/;
 
 function isGateErrorCode(token) {
@@ -165,11 +170,15 @@ function fmt(codeMap, codes) {
 }
 
 // ---------------------------------------------------------------------------
-// AC-1 / AC-5: GATE_REGISTRY is the single source of truth, exactly 30
-// entries (e10-lease-override, qa-owned re-baseline: added the 29th and
-// 30th, LEASE_OVERRIDE_AUDIT_MISSING + BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE
+// AC-1 / AC-5: GATE_REGISTRY is the single source of truth, exactly 32
+// entries (e18-write-provenance, qa-owned re-baseline: added the 31st and
+// 32nd, STAMP_PROVENANCE_SUSPECT + QA_COMPLETION_EVIDENCE_MISSING — the
+// write-path stamp-provenance gate and the qa completion-evidence gate;
+// 30 in, 32 out — two gates added, none dropped).
+// e10-lease-override had added the 29th and 30th,
+// LEASE_OVERRIDE_AUDIT_MISSING + BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE
 // — the lease-override bypass/audit gate and the bookkeeping-write
-// same-feature gate; 28 in, 30 out — two gates added, none dropped).
+// same-feature gate; 28 in, 30 out — two gates added, none dropped.
 // e3-outcome-shaped-acceptance had added the 28th, AC_EXECUTION_LOG_MISSING —
 // the AC-execution evidence gate. e4-design-source-credibility-gate had
 // added the 27th, SOURCE_CREDIBILITY_UNVERIFIED — the build-entry
@@ -183,15 +192,15 @@ function fmt(codeMap, codes) {
 // c9-protocol-fields had added the 20th, REVIEW_VERDICT_STATUS_MISMATCH.
 // ---------------------------------------------------------------------------
 
-test("AC-1/AC-5: GATE_REGISTRY has exactly 30 entries (28 in, 30 out — e10-lease-override added LEASE_OVERRIDE_AUDIT_MISSING + BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE)", () => {
+test("AC-1/AC-5: GATE_REGISTRY has exactly 32 entries (30 in, 32 out — e18-write-provenance added STAMP_PROVENANCE_SUSPECT + QA_COMPLETION_EVIDENCE_MISSING)", () => {
   assert.equal(
     GATE_REGISTRY.length,
-    30,
-    `expected exactly 30 GateDefinition entries, got ${GATE_REGISTRY.length}: ${GATE_REGISTRY.map((g) => g.errorCode).join(", ")}`,
+    32,
+    `expected exactly 32 GateDefinition entries, got ${GATE_REGISTRY.length}: ${GATE_REGISTRY.map((g) => g.errorCode).join(", ")}`,
   );
   assert.equal(
     ALL_GATE_CODES.length,
-    30,
+    32,
     "ALL_GATE_CODES must be GATE_REGISTRY.map(g => g.errorCode) — same length",
   );
   assert.deepEqual(
@@ -629,8 +638,8 @@ test("doc-file mapping (c12): gates/registry.ts's errorCode→doc-file mapping c
   const mapping = parseDocFileMappingComment();
   assert.equal(
     mapping.size,
-    30,
-    `expected the mapping comment to list all 30 codes, found ${mapping.size}: ${[...mapping.keys()].join(", ")}`,
+    32,
+    `expected the mapping comment to list all 32 codes, found ${mapping.size}: ${[...mapping.keys()].join(", ")}`,
   );
   const docCodes = extractDocCodes();
   for (const g of GATE_REGISTRY) {
@@ -745,6 +754,25 @@ const FREE_TEXT_ALLOWLIST = [
   // mechanically checked (armConditionCheckable) like every other
   // orchestrator-producer entry.
   { code: "BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE", field: "triggerEdge", reason: "free English precondition (\"bookkeeping_write:true whose active_feature differs from the incumbent's (file-mode only)\"), no CAP_BY_CODE numeric literal or role:Status edge pair" },
+  // e18-write-provenance (qa-owned, T-E18-01): STAMP_PROVENANCE_SUSPECT's triggerEdge
+  // ("any write while the on-disk handoff last_updated matches the hand-authored stamp
+  // shape (file-mode only)") is free English — no CAP_BY_CODE numeric literal, no
+  // role:Status edge pair, not one of the three pm->build-entry gates in
+  // EDGE_CHECKED_CODES. armCondition is NOT allowlisted: it names the real camelCase
+  // isHandAuthoredStamp(...)/hasStampRemediationAudit(...)/prevState identifiers, which
+  // appear literally in tools/handoff-orchestrator.ts, so it is mechanically checked
+  // (armConditionCheckable) like every other orchestrator-producer entry.
+  { code: "STAMP_PROVENANCE_SUSPECT", field: "triggerEdge", reason: "free English precondition (\"any write while the on-disk handoff last_updated matches the hand-authored stamp shape (file-mode only)\"), no CAP_BY_CODE numeric literal or role:Status edge pair" },
+  // e18-write-provenance (qa-owned, T-E18-02): QA_COMPLETION_EVIDENCE_MISSING's
+  // triggerEdge contains a real role:Status edge pair ("code-reviewer:In_Progress ->
+  // qa-engineer:In_Progress"), but it is not in triggerEdgeCheckable (no CAP_BY_CODE
+  // numeric literal, not one of the three pm->build-entry gates in EDGE_CHECKED_CODES)
+  // — the exact REPRO_MANIFEST_MISSING/SOURCE_CREDIBILITY_UNVERIFIED precedent.
+  // armCondition is NOT allowlisted: it names the real camelCase hasEvidenceInFile(...)
+  // predicate call, which appears literally in tools/handoff-orchestrator.ts, so it is
+  // mechanically checked (armConditionCheckable) like every other orchestrator-producer
+  // entry.
+  { code: "QA_COMPLETION_EVIDENCE_MISSING", field: "triggerEdge", reason: "role:Status edge pair present (code-reviewer:In_Progress -> qa-engineer:In_Progress) but not in triggerEdgeCheckable (no CAP_BY_CODE numeric literal, not one of the three pm->build-entry gates); the \"(file-mode only)\" qualifier and set-difference precondition are free English" },
 ];
 
 test("AC3 (c12): every (errorCode, field) pair for triggerEdge/armCondition is either mechanically checked above or explicitly allowlisted as free-text — no silent exemptions", () => {

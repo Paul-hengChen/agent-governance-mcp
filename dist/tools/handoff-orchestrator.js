@@ -7,10 +7,14 @@
 // does not) — and to scope the future A2 gates/ extraction cleanly.
 //
 // Check order is FROZEN (spec AC-5/AC-8): preflight → PASS/qa-engineer gate →
-// transition validation → feature-lease gate (E1) → lease-override bypass/audit (E10) →
+// transition validation → stamp-provenance gate (E18, before the lease gate:
+// the lease predicate consumes last_updated, so provenance resolves first) →
+// feature-lease gate (E1) → lease-override bypass/audit (E10) →
 // bookkeeping-write feature-change gate (E10) → scope-decision gate → cut-approval gate →
 // external-refs gate → source-credibility gate (E4) → repro-first gate (E2, bugfix-mode) → review-verdict/status mismatch gate → reviewer
-// completed_tasks gate (v3.58.0, C16) → QA evidence record → PASS evidence
+// completed_tasks gate (v3.58.0, C16) → QA evidence record → qa
+// completion-evidence gate (E18, after the record so a qa_review-bearing
+// write's own evidence counts) → PASS evidence
 // gate → visual sub-gates → expected-red diff gate →
 // code-reviewer evidence gate → round-cap sentinels → storage.writeState →
 // PASS RAG GC hook. No reorder, no merge, no early-return removal.
@@ -27,6 +31,8 @@ import { hasExpectedRedManifest, hasExpectedRedDisposition } from "../gates/expe
 import { hasProofAnnotatedAC, hasAcExecutionLogDisposition } from "../gates/ac-execution.js";
 import { hasCutApproval } from "../gates/cut-approval.js";
 import { classifyLeaseOverride } from "../gates/lease-override.js";
+import { isHandAuthoredStamp, hasStampRemediationAudit } from "../gates/stamp-provenance.js";
+import { hasEvidenceInFile } from "../gates/qa-review.js";
 import { hasUnresolvedRefs, listUnresolvedRefs } from "../gates/external-refs.js";
 import { gate } from "../gates/registry.js";
 import { awaitAllInflightFor } from "./rag-coalesce.js";
@@ -120,6 +126,53 @@ async function handleUpdateStateCore(parsed) {
     if (rejection) {
         return {
             content: [{ type: "text", text: `⛔ ${rejection.error}\n${JSON.stringify(rejection, null, 2)}` }],
+            isError: true,
+        };
+    }
+    // E18 — Stamp-Provenance Gate (e18-write-provenance, fix a). Escalates
+    // the E9A read-only stampAdvisory (tools/drift.ts) to a blocking gate:
+    // when the CURRENT on-disk last_updated matches the hand-authored
+    // stamp shape (gates/stamp-provenance.ts — the exact predicate the
+    // advisory uses, extracted, not forked), reject any write that does
+    // not acknowledge the contamination via pending_notes[0] matching
+    // /^stamp-remediation:/ (the LEASE_OVERRIDE_AUDIT_MISSING audit-note
+    // style; note-only — no companion boolean, see the module header).
+    // Placement: AFTER validateTransition (all transition-shaped rejects
+    // still read first — the standing convention) and BEFORE the E1
+    // feature-lease gate, an intentional additive insertion: the lease
+    // predicate CONSUMES last_updated, so on a suspect stamp its
+    // freshness answer is untrustworthy — provenance must be resolved
+    // before any gate that trusts the stamp runs. The 4-step freshness
+    // guard (writeState: lock → verifyFreshness → atomic write → refresh)
+    // is orthogonal: it compares session-snapshot mtimes, never the stamp
+    // content, and runs after all gates. Guarded by prevState so the very
+    // first write to a brand-new workspace is never gated (no existing
+    // handoff = nothing to distrust). Self-disarming: any accepted write
+    // stamps a fresh millisecond-entropy now(), so the remediation write
+    // itself clears the condition (it must be a NORMAL write — a
+    // bookkeeping_write would preserve the suspect stamp verbatim).
+    // FILE-MODE ONLY: SQLite/HTTP stamps come from the DB write path,
+    // mirroring the sibling attestation gates.
+    if (storage instanceof FileHandoffStorage &&
+        prevState &&
+        isHandAuthoredStamp(prevState.last_updated) &&
+        !hasStampRemediationAudit(parsed)) {
+        const hint = gate("STAMP_PROVENANCE_SUSPECT").hintStatic;
+        const envelope = {
+            error: "STAMP_PROVENANCE_SUSPECT",
+            attempted_feature: parsed.active_feature,
+            incumbent: {
+                active_feature: prevState.active_feature,
+                status: prevState.status,
+                last_updated: prevState.last_updated,
+            },
+            hint,
+        };
+        return {
+            content: [{
+                    type: "text",
+                    text: `⛔ STAMP_PROVENANCE_SUSPECT\n${JSON.stringify(envelope, null, 2)}`,
+                }],
             isError: true,
         };
     }
@@ -563,6 +616,62 @@ async function handleUpdateStateCore(parsed) {
             };
         }
         await storage.recordReview(parsed.workspace_path, ids, parsed.status, "qa-engineer", parsed.qa_review);
+    }
+    // E18 — QA Completion-Evidence Gate (e18-write-provenance, fix b).
+    // Closes the identity-swap side door REVIEWER_COMPLETED_TASKS_REJECTED
+    // cannot see (E5 incident: a code-reviewer subagent made a SECOND
+    // write stamped agent_id="qa-engineer", pre-filling completed_tasks
+    // before any qa-engineer ran, with zero evidence on disk — the
+    // borrowed agent_id bypassed the reviewer gate entirely). Any
+    // qa-engineer-stamped write whose completed_tasks adds ids NOT
+    // already in the on-disk handoff's completed set must have per-id QA
+    // evidence on disk via the existing gates/qa-review.ts convention
+    // (hasEvidenceInFile — reused, not forked; per-id file OR covers:
+    // coverage). Set-difference scoping keeps the legitimate cumulative
+    // flow intact: ids already on disk need no re-evidence when qa passes
+    // the full list back. Placed AFTER the qa_review auto-record above —
+    // deliberately, mirroring how the PASS MISSING_EVIDENCE gate observes
+    // the row just written — so a legitimate PASS/FAIL write carrying
+    // qa_review satisfies this gate with its own just-recorded evidence;
+    // an evidence-less pre-fill (the incident shape: In_Progress, no
+    // qa_review) has nothing on disk and is rejected naming the ids.
+    // APPROVED-row exemption: the sanctioned code-reviewer:In_Progress →
+    // qa-engineer:In_Progress handoff stamps agent_id="qa-engineer" and
+    // carries completed_tasks as the review-scope manifest BEFORE any
+    // qa-engineer runs (c16 AC-3 bullet 3) — no QA evidence can exist
+    // yet, and that edge is already evidence-gated per-id by
+    // MISSING_REVIEW_EVIDENCE (review_reports/) below, so it is excluded
+    // here. The incident write is NOT on that edge: it self-looped from
+    // (qa-engineer, In_Progress) after the real APPROVED handoff.
+    // tw_complete_task is untouched (its own evidence path). No prevState
+    // guard: on a brand-new workspace EVERY claimed id is new, and a
+    // first-write completion claim with no evidence is exactly the class
+    // this gate exists to reject. FILE-MODE ONLY, matching the sibling
+    // attestation gates (SQLite's hasEvidence path is reports-row-based
+    // and out of scope).
+    const isApprovedRowHandoff = prevTuple.agent === "code-reviewer" &&
+        prevTuple.status === "In_Progress" &&
+        nextTuple.agent === "qa-engineer" &&
+        nextTuple.status === "In_Progress";
+    if (storage instanceof FileHandoffStorage &&
+        parsed.agent_id === "qa-engineer" &&
+        parsed.completed_tasks.length > 0 &&
+        !isApprovedRowHandoff) {
+        const onDiskCompleted = new Set(prevState?.completed_tasks ?? []);
+        const newIds = parsed.completed_tasks.filter((id) => !onDiskCompleted.has(id));
+        if (newIds.length > 0) {
+            const ev = hasEvidenceInFile(parsed.workspace_path, newIds);
+            if (ev.missing.length > 0) {
+                return {
+                    content: [{
+                            type: "text",
+                            text: `⛔ QA_COMPLETION_EVIDENCE_MISSING: ${ev.missing.join(", ")}. ` +
+                                gate("QA_COMPLETION_EVIDENCE_MISSING").hintStatic,
+                        }],
+                    isError: true,
+                };
+            }
+        }
     }
     // Evidence gate for PASS path
     if (parsed.status === "PASS" && parsed.completed_tasks.length > 0) {

@@ -1184,10 +1184,15 @@ last_agent: "pm"
     "the migration heal-write must preserve the pre-heal last_updated verbatim, not stamp now() (AC4)",
   );
 
-  // Practical consequence: a SUBSEQUENT different-feature write must be
-  // evaluated against the ORIGINAL (~2 months stale) age, not a
-  // heal-refreshed fresh one — TTL auto-expiry releases the lease immediately.
-  const result = await handleUpdateState({
+  // e18-write-provenance (qa-owned re-baseline, T-E18-01): the preserved
+  // ORIGINAL_LAST_UPDATED ("2026-05-01T00:00:00.000Z") happens to match the new
+  // STAMP_PROVENANCE_SUSPECT gate's hand-authored stamp shape (seconds 00, ms
+  // .000) — an intended behavior change, not a regression (this is exactly the
+  // v0 fixture's own hand-authored shape, not a heal artifact). Prove the gate
+  // genuinely fires on this real lease scenario BEFORE proving the audited
+  // remediation note clears it — a vacuous "it fires" claim would mask a
+  // mis-wired gate just as easily as a missing one.
+  const suspectResult = await handleUpdateState({
     workspace_path: ws,
     active_feature: "flease-e10ac4-next",
     status: "In_Progress",
@@ -1197,10 +1202,44 @@ last_agent: "pm"
     cut_approved: true,
   });
   assert.ok(
+    suspectResult.isError,
+    `an unremediated write against a hand-authored-shaped on-disk stamp must be rejected STAMP_PROVENANCE_SUSPECT (E18): ${suspectResult.content?.[0]?.text}`,
+  );
+  assert.match(suspectResult.content[0].text, /STAMP_PROVENANCE_SUSPECT/, "must reject with the new stamp-provenance code");
+  assert.equal(
+    parseHandoff(ws).active_feature,
+    "flease-e10ac4-legacy",
+    "the incumbent must remain untouched after the STAMP_PROVENANCE_SUSPECT rejection",
+  );
+
+  // Practical consequence (the ORIGINAL AC4 pin, preserved): once the write
+  // acknowledges the contamination via an audited stamp-remediation note (which
+  // only clears the NEW E18 gate — it does not touch the feature-lease
+  // predicate itself), the SUBSEQUENT different-feature write must still be
+  // evaluated against the ORIGINAL (~2 months stale) age, not a heal-refreshed
+  // fresh one — TTL auto-expiry releases the lease immediately.
+  const result = await handleUpdateState({
+    workspace_path: ws,
+    active_feature: "flease-e10ac4-next",
+    status: "In_Progress",
+    agent_id: "pm",
+    completed_tasks: [],
+    pending_notes: [
+      "stamp-remediation: pre-heal v0 fixture stamp is hand-authored by test construction (not a real out-of-band edit) — verified via this test's own setup, safe to overwrite",
+      "PM starting a new feature after the legacy incumbent's lease healed stale",
+    ],
+    cut_approved: true,
+  });
+  assert.ok(
     !result.isError,
-    `a different-feature write must be accepted against the ORIGINAL stale age, not a heal-refreshed fresh one: ${result.content?.[0]?.text}`,
+    `a different-feature write carrying an audited stamp-remediation note must be accepted against the ORIGINAL stale age, not a heal-refreshed fresh one: ${result.content?.[0]?.text}`,
   );
   assert.equal(parseHandoff(ws).active_feature, "flease-e10ac4-next");
+  assert.equal(
+    parseHandoff(ws).pending_notes[0],
+    "stamp-remediation: pre-heal v0 fixture stamp is hand-authored by test construction (not a real out-of-band edit) — verified via this test's own setup, safe to overwrite",
+    "the stamp-remediation audit note must persist verbatim in the written handoff (forensic trail)",
+  );
 });
 
 test("E10-AC5a: bookkeeping_write:true on a SAME-feature write preserves the existing on-disk last_updated verbatim (spec AC5)", async () => {

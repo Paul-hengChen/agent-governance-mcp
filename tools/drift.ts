@@ -10,6 +10,7 @@ import { getActiveStorage, type TaskRecord } from "./storage.js";
 import type { ToolResult, WorkspaceOnlyInput } from "./registry.js";
 import { findTasksFile, loadConfig } from "./config.js";
 import { CURRENT_VERSIONS, peekVersion, type SchemaKind } from "../schema/versions.js";
+import { isHandAuthoredStamp } from "../gates/stamp-provenance.js";
 
 interface DriftReport {
   driftDetected: boolean;
@@ -25,18 +26,16 @@ interface DriftReport {
   stampAdvisory: string | null;
 }
 
-// e9a-stamp-integrity: every stamp produced by tw_update_state itself comes
-// from `new Date().toISOString()` and therefore carries millisecond entropy.
-// A stamp with seconds `00` AND milliseconds `.000` matches all 5 confirmed
-// hand-authored stamps in handoff history (round-hour / round-half-hour hits
-// satisfy this as a subset) and is overwhelmingly unlikely from the server
-// write path. Advisory-only by design: E1A's negative-age guard already
-// fail-opens on an untrustworthy stamp, so this is audit-trail signal, not a
-// new rejection path.
-const HAND_AUTHORED_STAMP_RE = /T\d{2}:\d{2}:00\.000Z$/;
-
+// e9a-stamp-integrity: the hand-authored-stamp predicate now lives in
+// gates/stamp-provenance.ts (E18 extracted it — single source of truth,
+// shared with the write-path STAMP_PROVENANCE_SUSPECT gate so the read-side
+// advisory and the write-side gate can never drift apart; see that module's
+// header for the shape rationale). THIS advisory stays advisory-only by
+// design: E1A's negative-age guard already fail-opens on an untrustworthy
+// stamp, so this is audit-trail signal, not a rejection path — the rejection
+// path is the E18 gate in tools/handoff-orchestrator.ts.
 function computeStampAdvisory(lastUpdated: string): string | null {
-  if (!HAND_AUTHORED_STAMP_RE.test(lastUpdated)) return null;
+  if (!isHandAuthoredStamp(lastUpdated)) return null;
   return (
     `Handoff last_updated "${lastUpdated}" has a round-second, zero-millisecond shape ` +
     `(seconds 00, ms .000) — consistent with a hand-authored, out-of-band edit rather than ` +

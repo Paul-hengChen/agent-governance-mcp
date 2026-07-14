@@ -41,8 +41,10 @@
 //   FEATURE_LEASE_HELD              const-08-chain-31-mid.md, coord-03-core-fallback.md, skill-release-engineer.md
 //   LEASE_OVERRIDE_AUDIT_MISSING    const-08-chain-31-mid.md
 //   BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE  const-08-chain-31-mid.md
+//   STAMP_PROVENANCE_SUSPECT        const-08-chain-31-mid.md, skill-release-engineer.md
 //   MISSING_EVIDENCE                skill-qa-engineer.md
-//   MISSING_REVIEW_EVIDENCE         skill-code-reviewer.md
+//   QA_COMPLETION_EVIDENCE_MISSING  const-08-chain-31-mid.md
+//   MISSING_REVIEW_EVIDENCE         skill-code-reviewer.md, const-08-chain-31-mid.md
 //   EXPECTED_RED_DIFF_MISSING       skill-qa-engineer.md
 //   REPRO_MANIFEST_MISSING          skill-sr-engineer.md
 //   VISUAL_BASELINES_REQUIRED       const-07-design-chain-gates.md, const-13-design-chain-s4.md, constitution-rationale.md, skill-design-auditor.md
@@ -58,7 +60,7 @@
 //   REVIEWER_COMPLETED_TASKS_REJECTED  skill-code-reviewer.md
 //   QA_REVIEW_TARGET_REQUIRED       skill-qa-engineer.md
 //   AC_EXECUTION_LOG_MISSING        skill-qa-engineer.md
-// The 30-gate catalog, in documentation order. Array order is DOC order only —
+// The 32-gate catalog, in documentation order. Array order is DOC order only —
 // it MUST NOT be relied on for evaluation order (DR-5; that lives in
 // handoff-orchestrator.ts as the physical if-block sequence).
 export const GATE_REGISTRY = [
@@ -243,6 +245,33 @@ export const GATE_REGISTRY = [
             "See specs/e10-lease-override.md AC6.",
         documentedInProse: true,
     },
+    {
+        // E18 (e18-write-provenance, fix a) — stamp-provenance gate. Escalates
+        // the E9A read-only stampAdvisory (tools/drift.ts) to a blocking write-
+        // path gate: when the CURRENT on-disk handoff last_updated matches the
+        // hand-authored stamp shape (gates/stamp-provenance.ts — the SAME
+        // predicate the advisory uses, extracted, not forked), the next write is
+        // rejected unless it acknowledges the contamination via an audited
+        // pending_notes[0] remediation note (the LEASE_OVERRIDE_AUDIT_MISSING
+        // note style; note-only, no companion boolean — see the gate module
+        // header). Fires on ANY edge, BEFORE the feature-lease gate: the lease
+        // predicate consumes last_updated, so its freshness answer on a suspect
+        // stamp is untrustworthy and provenance must be resolved first. A
+        // brand-new workspace (no prevState) is never gated. File-mode only.
+        errorCode: "STAMP_PROVENANCE_SUSPECT",
+        producer: "orchestrator",
+        envelope: "orchestrator-json",
+        triggerEdge: "any write while the on-disk handoff last_updated matches the hand-authored stamp shape (file-mode only)",
+        armCondition: "isHandAuthoredStamp(prevState.last_updated) && !hasStampRemediationAudit; FileHandoffStorage only; prevState present",
+        clearingArtifact: "pending_notes[0] matching /^stamp-remediation:/ on this write (self-disarms after any accepted write, which stamps a fresh server now())",
+        hintStatic: "The on-disk handoff last_updated has the hand-authored, out-of-band stamp shape " +
+            "(seconds 00, ms .000) — the server write path always stamps millisecond entropy. " +
+            "Acknowledge the contamination before overwriting the evidence: prepend a " +
+            "\"stamp-remediation: <how the suspect stamp was produced / verified>\" note as " +
+            "pending_notes[0] (gates/stamp-provenance.ts). " +
+            "See docs/backlog.md E18 incident (a).",
+        documentedInProse: true,
+    },
     // ---- plain-text (codes 11-25, producer: orchestrator) ----
     {
         errorCode: "MISSING_EVIDENCE",
@@ -252,6 +281,38 @@ export const GATE_REGISTRY = [
         armCondition: "hasEvidence().missing non-empty",
         clearingArtifact: "qa_review / qa_reports/review_<id>.md",
         hintStatic: "Provide qa_review or write qa_reports/review_<id>.md (file mode) / insert reports row (SQLite) before PASS.",
+        documentedInProse: true,
+    },
+    {
+        // E18 (e18-write-provenance, fix b) — qa completion-evidence gate. Closes
+        // the identity-swap side door REVIEWER_COMPLETED_TASKS_REJECTED cannot
+        // see (E5 incident: a code-reviewer subagent made a second write stamped
+        // agent_id="qa-engineer", pre-filling completed_tasks with zero evidence
+        // on disk). Any qa-engineer-stamped write whose completed_tasks adds ids
+        // NOT already in the on-disk handoff's completed set must have per-id QA
+        // evidence on disk via the existing hasEvidenceInFile convention
+        // (gates/qa-review.ts — reused, not forked; covers: coverage honored).
+        // Ids already in the on-disk set are exempt (a qa write legitimately
+        // passes the full cumulative list back), and so is the sanctioned
+        // APPROVED-row handoff (code-reviewer:In_Progress →
+        // qa-engineer:In_Progress), whose completed_tasks is the review-scope
+        // manifest written BEFORE qa runs and already evidence-gated per-id by
+        // MISSING_REVIEW_EVIDENCE. Evaluated AFTER the qa_review
+        // auto-record so a legitimate PASS/FAIL write's just-recorded evidence
+        // satisfies it. tw_complete_task is untouched (own evidence path).
+        // File-mode only, matching the sibling attestation gates.
+        errorCode: "QA_COMPLETION_EVIDENCE_MISSING",
+        producer: "orchestrator",
+        envelope: "plain-text",
+        triggerEdge: "any qa-engineer-stamped write whose completed_tasks adds ids not in the on-disk completed set, except the code-reviewer:In_Progress -> qa-engineer:In_Progress APPROVED row (file-mode only)",
+        armCondition: "agent_id=qa-engineer && newly-added completed ids non-empty && not the APPROVED-row handoff && hasEvidenceInFile(newIds).missing non-empty; FileHandoffStorage only",
+        clearingArtifact: "qa_reports/review_<id>.md (or a covers: file) on disk for every newly-added id — including via the qa_review auto-record on this same write",
+        hintStatic: "A qa-engineer write adding completed_tasks ids requires per-id QA evidence " +
+            "on disk (qa_reports/review_<id>.md or a covers: file) for each NEWLY added " +
+            "id. Run the QA review and record evidence first (attach qa_review with " +
+            "review_task_ids on a PASS/FAIL write, or write the report file), or drop " +
+            "the unevidenced ids from completed_tasks. " +
+            "See docs/backlog.md E18 incident (b).",
         documentedInProse: true,
     },
     {
