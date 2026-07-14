@@ -1045,6 +1045,7 @@ before automation, optional-external last.
 - **Owner:** /teamwork (skill-coordinator + const §3.1 tier rule + config threshold).
 - **Risk if skipped:** low-risk small tickets queue behind human availability;
   mis-tiering risk if done before E8 exists — start conservative.
+- **STATUS:** ✓ released in v3.85.0 (2026-07-14): E5 tickets T-E5-01/02/03 PASS; 1455/1455 tests green; driftBaselineIds: T-E5-01, T-E5-02, T-E5-03.
 
 ## E6 — Rule-retirement retro: actually run it (P2, depends D3 ✓ + E8, from 2026-07-11 review)
 - **What:** D3 landed the telemetry emit, but the review thesis it was built

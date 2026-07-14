@@ -16,6 +16,26 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.85.0] - 2026-07-14
+
+### Added
+- **`e5-intake-tiering` — Backlog intake loop + tiered cut-approval + cheapest-compliant-path intake (v3.85.0).** Delivers three integrated fixes to intake flow: (a) Backlog Intake Loop — coordinator auto-proposes or auto-starts the next open backlog ticket at feature close; auto-start gated by §3.1 cut-approval auto-tier qualification, else auto-propose; never auto-hops to release-engineer (PASS terminal per backlog risk note); (b) Cut-Approval Auto-Tier — §3.1 bullet + opt-in `cutApprovalAutoTier` config key in `tools/config.ts` (absent = disabled; empty `{}` = conservative defaults ≤2 files / P3 / no schema change / non-design-armed); thresholds and opt-in-only design honor backlog's risk notes verbatim; documented in `docs/config.md`; (c) Cheapest-Compliant-Path Intake — coordinator SOP step 4a adds phase decomposition: coordinator-direct (full within-SOP), mini-chain (2–3 roles), full-chain (4+ roles); § 2 test ownership + §3.2 builder ≠ judge hard floors preserved. Implementation: `content/coord-03-core-fallback.md` (Backlog Intake Loop h2), `content/const-08-chain-31-mid.md` (§3.1 auto-tier bullet), `content/coord-07-core-sop.md` (step 4a + phase classifications), `tools/config.ts` + `docs/config.md` (config key + docs). Test suite: `test/e5-intake-tiering.test.mjs` (31 pins covering tools/config.ts parse, content pins for const-08/coord-03/coord-07); context-budget ratchets independently re-measured (design-arm 7863, teamwork bundle 15958, non-design 5766). Full suite 1455/1455 green. Spec: `docs/backlog.md:1016–1047` (backlog row). Code-review APPROVED (`review_reports/review_T-E5-01.md`). QA verified (`qa_reports/review_T-E5-01.md` covers T-E5-01/02/03, spec fidelity confirmed, golden fixtures regenerated, ratchets independently measured). Closes E5 ticket.
+
+### Changed
+- **content/coord-03-core-fallback.md**: Backlog Intake Loop h2 added to PASS stop-condition row.
+- **content/const-08-chain-31-mid.md**: §3.1 Cut-Approval Auto-Tier bullet added (threshold-gated auto-approval, opt-in arming, advisory/non-server-enforced).
+- **content/coord-07-core-sop.md**: SOP step 4a Cheapest-Compliant-Path Intake added (phase decomposition: coordinator-direct / mini-chain / full-chain; §2/§3.2 hard-floor sentence).
+- **tools/config.ts**: New `cutApprovalAutoTier` optional field + parser (absent/empty/malformed/defaults logic); `CUT_APPROVAL_AUTO_TIER_DEFAULTS` export with conservative thresholds.
+- **docs/config.md**: `cutApprovalAutoTier` key documented (opt-in, defaults, example thresholds).
+- **test/**: New `test/e5-intake-tiering.test.mjs` (31 tests); compose-equivalence and context-budget golden fixtures regenerated (6 + 1 compose goldens; 3 budget ratchets).
+
+### Notes
+- driftBaselineIds appended with T-E5-01, T-E5-02, T-E5-03
+- Chain: mini-chain sr(fable) → code-reviewer(APPROVED) → qa-engineer(PASS)
+- QA anomaly disclosed in `qa_reports/review_T-E5-01.md`: prior out-of-band impersonated completion write detected and superseded by real QA completion path; disclosure documented per governance-audit transparency
+- No breaking changes to MCP tool surface or handoff schema; all changes additive (config key opt-in)
+- Content-dominant release (skill & const amendments); small server-code addition (config parse logic in tools/config.ts)
+
 ## [3.84.0] - 2026-07-13
 
 ### Added
