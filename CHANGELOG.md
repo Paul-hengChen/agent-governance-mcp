@@ -16,6 +16,27 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.86.0] - 2026-07-14
+
+### Added
+- **`e18-write-provenance` — Write-provenance hardening: stamp gate + qa completion-evidence gate (v3.86.0).** Delivers two integrated gates to prevent out-of-band state writes: (a) STAMP_PROVENANCE_SUSPECT — file-mode tw_update_state rejects over a hand-authored-shaped on-disk last_updated (predicate extracted verbatim to gates/stamp-provenance.ts, shared with the E9A stampAdvisory) unless the write carries a pending_notes[0] `stamp-remediation:` audit note; ordered after validateTransition, before the feature-lease gate; new-workspace inert, self-disarms; (b) QA_COMPLETION_EVIDENCE_MISSING — qa-engineer writes adding new completed_tasks ids require per-id QA evidence on disk (reuses hasEvidenceInFile); APPROVED-row edge exempt (backstopped per-id by MISSING_REVIEW_EVIDENCE); tw_complete_task untouched. Implementation: `gates/stamp-provenance.ts` (new module with stampLooksHandAuthored predicate), `tools/handoff-orchestrator.ts` (orchestrator integration + qa-evidence check), `tools/drift.ts` (stampAdvisory reuse), `const-08-chain-31-mid.md` (two §3.1 mechanism bullets, v3.86.0), `content/skill-release-engineer.md` (COORDINATOR-RELAYED hard line). Test suite: `test/e18-write-provenance.test.mjs` (17 tests incl. exact replays of both E5-cycle incidents — hand-authored stamp and qa-impersonated completed_tasks pre-fill, both now rejected); goldens regenerated; ratchets re-measured +574 tok (8437/16532/6340); error-code contract 30→32; suite 1472/1472 green. Spec: `docs/backlog.md:1048–1077` (backlog row). Code-review APPROVED (`review_reports/review_T-E18-03.md`). QA verified (`qa_reports/review_T-E18-01.md` and `qa_reports/review_T-E18-02.md` cover incident replays, spec fidelity confirmed, golden fixtures regenerated, ratchets independently measured). Closes E18 ticket.
+
+### Changed
+- **gates/stamp-provenance.ts**: New module exported `stampLooksHandAuthored(state)` predicate and `STAMP_PROVENANCE_SUSPECT` error.
+- **tools/handoff-orchestrator.ts**: Integrated STAMP_PROVENANCE_SUSPECT gate (after validateTransition, before feature-lease) + QA_COMPLETION_EVIDENCE_MISSING check (qa-engineer path, APPROVED-row exempt).
+- **tools/drift.ts**: Import and reuse `stampLooksHandAuthored` predicate verbatim for stampAdvisory consistency.
+- **gates/registry.ts**: Catalog expanded 30→32 errors; new STAMP_PROVENANCE_SUSPECT and QA_COMPLETION_EVIDENCE_MISSING registered.
+- **content/const-08-chain-31-mid.md**: Two §3.1 mechanism bullets added (v3.86.0, E18).
+- **content/skill-release-engineer.md**: COORDINATOR-RELAYED hard line added (dispatch brief cannot override relay rule).
+- **test/**: New `test/e18-write-provenance.test.mjs` (17 tests); compose-equivalence and context-budget golden fixtures regenerated (6 + 1 compose goldens; 3 budget ratchets); error-code contract test updated 30→32.
+
+### Notes
+- driftBaselineIds appended with T-E18-01, T-E18-02
+- Chain: mini-chain sr(fable) → code-reviewer(APPROVED) → qa-engineer(PASS), one pass, 4 hops
+- Responds to two out-of-band state-write incidents: v3.85.0 hand-authored closing write (E9A class); E5-cycle qa-impersonated completed_tasks pre-fill (incident disclosed in `qa_reports/review_T-E5-01.md`)
+- No breaking changes to MCP tool surface or handoff schema; all changes additive (new gates, predicate-driven rejection)
+- Gates-and-skill-dominant release (gates/stamp-provenance.ts + orchestrator integration + SOP amendment); test-heavy (17 new tests + 6 goldens ratcheted)
+
 ## [3.85.0] - 2026-07-14
 
 ### Added
