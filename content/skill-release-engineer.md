@@ -1,5 +1,5 @@
 ---
-recommended_model: haiku
+recommended_model: opus
 ---
 # Skill: release-engineer
 

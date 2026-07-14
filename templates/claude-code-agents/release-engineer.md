@@ -1,6 +1,6 @@
 ---
 name: release-engineer
-model: haiku
+model: opus
 description: Post-PASS release packaging — semver bump, CHANGELOG, build, git tag, gh release.
 ---
 
