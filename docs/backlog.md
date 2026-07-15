@@ -89,7 +89,7 @@ future `/teamwork` feature; none blocks a release on its own.
 | D3 | Gate-fire telemetry: log every gate rejection (`TRANSITION_REJECTED`, `CUT_APPROVAL_REQUIRED`, …) to `.current/telemetry.jsonl` → data-driven rule retirement in retros — **done (2026-07-10, v3.66.0)** | P1 | — | ~3 (`tools/telemetry.ts`, `tools/handoff-orchestrator.ts` wrapper, `docs/gate-retro-procedure.md`) | — |
 | D4 | Behavioral compliance eval harness — scripted dispatch scenarios asserting model output format (§1 watermark etc.), guarding token-saving skill rewrites against behavior regressions — **done (2026-07-10, v3.67.0)** | P2 | — | ~3 (new `test/eval/` harness, fixtures, npm script) | — |
 | D5 | Server-side crash detection: stamp `dispatched_at` + target role on dispatch; `tw_get_state` surfaces stale in-flight dispatch (>N min, no state write) — removes coordinator-memory dependence (C8 follow-on) — **done (2026-07-11, v3.70.0)** | P2 | — | ~4 (`tools/handoff.ts` schema, orchestrator, skill-coordinator, tests) | — |
-| D6 | Host-capability as third compose axis: tag Claude-Code-only skill sections (Task tool, `agent-*.jsonl`, `~/.claude/agents`) `host:claude-code`; non-CC hosts skip dead text | P3 | — | ~5 (`prompts/constitution-manifest.ts` pattern extended to skills, `prompts/build.ts`, content splits, tests) | — |
+| D6 | Host-capability as third compose axis: tag Claude-Code-only skill sections (Task tool, `agent-*.jsonl`, `~/.claude/agents`) `host:claude-code`; non-CC hosts skip dead text — **done (2026-07-11, v3.71.0)** — host axis in prompts/build.ts + skill fragment splits (tag v3.71.0, commit b68746f; see §D6) | P3 | — | ~5 (`prompts/constitution-manifest.ts` pattern extended to skills, `prompts/build.ts`, content splits, tests) | — |
 | D7 | `qa_reports/` unbounded growth (232 files) — per-feature archive / retention policy mirroring the tasks-archive convention — **done (2026-07-11, v3.67.1)** | P3 | — | ~2 (skill-release-engineer or skill-qa-engineer archive step, docs) | — |
 | D8 | Lite recommended model is haiku but haiku §1 compliance is known-poor (watermark omissions) — trim lite bundle further or bump recommendation to sonnet — **done (2026-07-11, v3.68.1)** | P3 | — | ~2 (`content/skill-coordinator-lite.md` frontmatter, measure-context-cost) | — |
 | D9 | `qa_review` auto-append fan-out: on a qa FAIL/PASS state write the evidence stamp was appended to every OPEN task's `qa_reports/review_<id>.md` (11 unrelated stale files modified + `review_T-D8-REL.md`/`review_T-D8-DONE.md` spuriously created, 2026-07-11 D8 run) instead of only the current task's — evidence pollution risks corrupting the `covers:` coverage index | P2 | — | ~3 (auto-append target resolution in tools/, regression test, cleanup note) | **done (2026-07-11, v3.69.0)** — Implements review_task_ids field + QA_REVIEW_TARGET_REQUIRED gate; 1173/1173 tests pass; tag v3.69.0 (1481717) |
@@ -127,7 +127,7 @@ future `/teamwork` feature; none blocks a release on its own.
 
 ### Recommended execution order (2026-07-13, post-E7 — supersedes the 2026-07-09 order, which shipped in full)
 
-Remaining open tickets: none. The 2026-07-14 batch shipped in full — E18 done
+Remaining open tickets as of 2026-07-14: none (superseded 2026-07-15 by the E19–E30 batch — see the next order table). The 2026-07-14 batch shipped in full — E18 done
 (v3.86.0). The 2026-07-13 batch shipped in full — E6 done
 (procedure institution, human-approved), E9A done (v3.82.0), E14 done
 (v3.83.0), E5 done (v3.85.0). Order table retained for the record; it
@@ -155,7 +155,7 @@ optional-external last.
 
 ---
 
-## A1 — Registry pattern for tool & prompt registration (P1)
+## A1 — Registry pattern for tool & prompt registration (P1) — DONE 2026-07-07
 - **What:** `index.ts` is 1436 lines; adding a tool requires touching three
   places (`ListToolsRequestSchema` list, zod schema, `CallToolRequestSchema`
   dispatcher case — per CLAUDE.md), and prompt registration is an 11-branch
@@ -210,7 +210,7 @@ optional-external last.
   as agent misbehavior in downstream workspaces — the hardest failure class to
   trace back.
 
-## A4 — Strip version/origin tags from governance text at build time (P1)
+## A4 — Strip version/origin tags from governance text at build time (P1) — DONE 2026-07-06
 - **What:** Nearly every rule in `content/constitution.md` and `content/skill-*.md`
   carries inline provenance tags — `(v3.26.0, R5)`, `(B10)`, `root cause C1`,
   `§四#7`, references to retrospectives the executing agent cannot read. For the
@@ -225,7 +225,7 @@ optional-external last.
 - **Risk if skipped:** every dispatch pays the tag tax; rules read as archaeology
   instead of instructions.
 
-## A5 — Error-code contract test: content ↔ code (P1)
+## A5 — Error-code contract test: content ↔ code (P1) — DONE (commit 3360c68)
 - **What:** Governance prose asserts server behavior by name —
   `VISUAL_PROVENANCE_MISSING`, `CUT_APPROVAL_REQUIRED`, `BASELINE_MANIFEST_MISSING`,
   etc. Nothing prevents those claims drifting from what `tools/transitions.ts` /
@@ -238,7 +238,7 @@ optional-external last.
 - **Risk if skipped:** doc rot — agents follow prose describing gates that no
   longer exist or miss ones that do; the failure surfaces as confusing `⛔` rejections.
 
-## A6 — Consolidation rewrite of `skill-qa-visual.md` (P1)
+## A6 — Consolidation rewrite of `skill-qa-visual.md` (P1) — DONE (commit 77a6373)
 - **What:** 265 lines accreted from successive postmortems: B0/B1/B2 staged gates,
   three attestation fields (`baseline:` / `diff-metric:` / `pixel_gate_complete:`),
   carry-forward exemption prose spread across four sections ("fallback token
@@ -254,7 +254,7 @@ optional-external last.
 - **Risk if skipped:** each new visual gate compounds the prose debt; agent
   compliance degrades as exemption logic gets harder to hold in context.
 
-## A7 — Consolidation rewrite of `skill-pm.md` (P1)
+## A7 — Consolidation rewrite of `skill-pm.md` (P1) — DONE 2026-07-06
 - **What:** SOP numbering 2 → 2a → 2a-bis → 2b → … → 7a is patch-layering
   sediment; gates (state-count split, geometric-density split, scope decision,
   resource audit, question batch, ambiguity, cut-approval) each live in their own
@@ -266,7 +266,7 @@ optional-external last.
 - **Risk if skipped:** same as A6 — PM is the chain's entry role; its SOP being
   hard to follow costs every feature.
 
-## A8 — Single-owner dedup of multi-told mechanisms (P2)
+## A8 — Single-owner dedup of multi-told mechanisms (P2) — DONE v3.60.0 (2026-07-10)
 - **What:** The constitution's own header says skills "MUST NOT restate" it, yet:
   cut-approval is told 3× (skill-coordinator stop-condition 6, skill-pm 7a,
   skill-coordinator-lite) with divergent wording — *(correction 2026-07-07:
@@ -285,7 +285,7 @@ optional-external last.
   instructions; Document Priority resolves conflicts but agents burn context
   reconciling them.
 
-## A9 — Compose-not-strip: overlay modules replace fence stripping (P2, supersedes A3)
+## A9 — Compose-not-strip: overlay modules replace fence stripping (P2, supersedes A3) — DONE 2026-07-07
 - **What:** `prompts/build.ts` assembles role prompts **subtractively**: one large
   constitution file minus `<!-- chain-only -->` / `<!-- rationale -->` /
   `<!-- design-only -->` fenced spans. A single malformed fence silently changes
@@ -356,7 +356,7 @@ optional-external last.
 - **Risk if skipped:** boilerplate divergence — near-identical escalations with
   different note formats confuse downstream parsers and readers.
 
-## A12 — Shared SOP partials + Limits number registry (P2, depends A9)
+## A12 — Shared SOP partials + Limits number registry (P2, depends A9) — DONE v3.64.0 (2026-07-10)
 - **What:** (a) Verbatim-repeated blocks across all skills: step 1
   (`tw_get_state` → `tw_detect_drift`), output-rule lines, "on failure still
   call `tw_update_state` with the failure summary". (b) Magic numbers scattered
@@ -370,7 +370,7 @@ optional-external last.
 - **Risk if skipped:** cap changes silently miss copies; repeated blocks drift
   in wording.
 
-## A13 — §1 polish: output policy, watermark table, positive examples (P2)
+## A13 — §1 polish: output policy, watermark table, positive examples (P2) — DONE 2026-07-08
 - **What:** three small text-quality issues: (a) output directives conflict —
   PM's "≤ 1 sentence" vs step 7a's mandatory inline cut table; exceptions are
   implicit and growing. (b) §1 watermark self-detection is the constitution's
@@ -487,7 +487,7 @@ optional-external last.
 - **Risk if skipped:** alert fatigue — the one drift report that matters gets
   ignored like the 98 that don't.
 
-## C5 — Watermark toolchain defects (P2, observed 2026-07-06)
+## C5 — Watermark toolchain defects (P2, observed 2026-07-06) — DONE v3.59.0 (2026-07-10)
 - **What:** two related defects seen live: (a) agent templates hardcode the tier
   in the CRITICAL reminder line (`— @sr-engineer (opus)`), so a dispatch-time
   model override (fable) produced a mis-signed watermark; (b)
@@ -574,7 +574,7 @@ optional-external last.
   resumed run honors them — pin recorded in `pending_notes` at dispatch so it
   survives context loss.
 
-## C9 — pending_notes is a free-text protocol channel (P2, observed 2026-07-08; natural A10 follow-on)
+## C9 — pending_notes is a free-text protocol channel (P2, observed 2026-07-08; natural A10 follow-on) — DONE v3.55.0 (2026-07-09)
 - **What:** Load-bearing routing/gating signals — `next_role:`, `resume_of:`,
   `review: APPROVED`, cut-attestation notes — all live as string conventions
   inside `pending_notes`. The server greps for exact tokens; coordinators parse
@@ -589,7 +589,7 @@ optional-external last.
 - **Risk if skipped:** token-format drift between skills and server grep
   (exactly the drift class A10 just eliminated for gate definitions).
 
-## C10 — qa-engineer / release-engineer bookkeeping boundary blur (P2, observed 2026-07-08)
+## C10 — qa-engineer / release-engineer bookkeeping boundary blur (P2, observed 2026-07-08) — DONE v3.58.0 (2026-07-10)
 - **What:** The A10 cut assigned version bump + CHANGELOG + backlog-marking to
   qa-engineer (A10-10); release-engineer then re-ran build/tests and did the
   commit/tag/release. Result: release bookkeeping split across two roles, QA's
@@ -630,7 +630,7 @@ optional-external last.
 - **Risk if skipped:** every dual-path session pays double governance tokens —
   directly against the context-frugality design goal (cf. B9).
 
-## C12 — Registry doc-facing fields are dead data — the drift class A10 killed, recreated inside the registry (P2, observed 2026-07-08, depends A10 ✓)
+## C12 — Registry doc-facing fields are dead data — the drift class A10 killed, recreated inside the registry (P2, observed 2026-07-08, depends A10 ✓) — DONE v3.61.0 (2026-07-10)
 - **What:** `gates/registry.ts` carries three doc-facing prose fields per gate —
   `triggerEdge`, `armCondition`, `clearingArtifact` — with **zero consumers and
   zero test assertions** (the generative parity test verifies only `errorCode`
@@ -705,7 +705,7 @@ optional-external last.
   note line silently downgrades the model mid-feature; nobody notices until
   the watermark mismatches.
 
-## C15 — Expected-red test handoff is unverifiable prose (P1, observed 2026-07-09)
+## C15 — Expected-red test handoff is unverifiable prose (P1, observed 2026-07-09) — DONE 2026-07-10
 - **What:** C9's sr-engineer (correctly) edited no tests and handed QA a
   prose catalogue of 52 expected-red tests. Code-reviewer spot-checked 2 of
   52. A genuine regression hiding among the reds would be invisible: nothing
@@ -724,7 +724,7 @@ optional-external last.
   can launder a real regression into a "cap update"; post-hoc detection cost
   is a full release audit.
 
-## C16 — code-reviewer overstepped bookkeeping: ledger write + evidence-path drift (P2, observed 2026-07-09)
+## C16 — code-reviewer overstepped bookkeeping: ledger write + evidence-path drift (P2, observed 2026-07-09) — DONE v3.58.0 (2026-07-10)
 - **What:** In the C9 run the code-reviewer's APPROVED handoff wrote
   `completed_tasks: T-C9-01..06, T-C9-12..16` onto the handoff ledger —
   task-completion bookkeeping that belongs to qa-engineer's PASS (§3
@@ -742,7 +742,7 @@ optional-external last.
 - **Risk if skipped:** double-entry bookkeeping between reviewer and QA
   drifts the ledger; stated-vs-actual evidence paths rot into dead links.
 
-## C17 — Coordinator dispatch briefs restate protocol by hand (P3, observed 2026-07-09)
+## C17 — Coordinator dispatch briefs restate protocol by hand (P3, observed 2026-07-09) — DONE v3.62.0 (2026-07-10)
 - **What:** Every C9-run dispatch brief hand-restated the same protocol
   boilerplate (first action tw_get_state → tw_detect_drift, known-drift
   ignore list, carry pins verbatim, don't set cut_approved, watermark
@@ -756,7 +756,7 @@ optional-external last.
 - **Risk if skipped:** low — ergonomics; but every omission class C14/C16
   document started life as a forgotten brief line.
 
-## C18 — configCache never invalidates; post-release baseline appends are invisible until restart (P3, observed 2026-07-09; C4 follow-on)
+## C18 — configCache never invalidates; post-release baseline appends are invisible until restart (P3, observed 2026-07-09; C4 follow-on) — DONE v3.59.0 (2026-07-10)
 - **What:** `tools/config.ts` caches `.current/.config.json` per workspace in
   a process-lifetime `configCache` Map with no invalidation. The release SOP
   appends the feature's task ids to `driftBaselineIds` AFTER the session's
@@ -778,7 +778,7 @@ optional-external last.
   post-stamp drift check cries wolf, training operators to ignore drift
   output right when it matters most.
 
-## B8 — §7 external-reference policy is text-only, no server-side enforcement (P1, carried forward 2026-06-11)
+## B8 — §7 external-reference policy is text-only, no server-side enforcement (P1, carried forward 2026-06-11) — DONE 2026-07-09
 - **What:** Constitution §7 says a spec referencing external artifacts is
   presumed incomplete until each ref is fetched / indexed via `tw_index_prd` /
   user-confirmed ignorable — but this is prose only; `tw_update_state` never
@@ -797,7 +797,7 @@ optional-external last.
   reference; downstream builds proceed against an incomplete spec with all
   gates green.
 
-## B9 — Per-feature token budget + coordinator STOP at ceiling (P2, carried forward)
+## B9 — Per-feature token budget + coordinator STOP at ceiling (P2, carried forward) — DONE v3.63.0 (2026-07-10)
 - **What:** The routing chain bounds cost only implicitly (round caps ≤ 3-4,
   §5 hop cap ≤ 10). No explicit per-feature token budget, no coordinator
   stop-condition on spend. Language process-retrospective measured ~1.05M
@@ -811,7 +811,7 @@ optional-external last.
 - **Risk if skipped:** low — round caps bound worst-case cost; this is a finer
   cost-side brake, not a correctness gate.
 
-## D1 — Prompt args mis-resolved as `workspace_path` (P1)
+## D1 — Prompt args mis-resolved as `workspace_path` (P1) — DONE v3.65.0 (2026-07-10)
 - **What:** Invoking `/teamwork-lite <free text>` (e.g. a question in Chinese)
   passes the text as the prompt's `workspace_path` argument;
   `prompts/build.ts` resolves it literally and emits the S01a "resolution
@@ -846,7 +846,7 @@ optional-external last.
 - **Risk if skipped:** the brakes exist but fail exactly in the long/expensive
   sessions they were built for (compaction is correlated with high spend).
 
-## D3 — Gate-fire telemetry → data-driven rule retirement (P1)
+## D3 — Gate-fire telemetry → data-driven rule retirement (P1) — DONE v3.66.0 (2026-07-10)
 - **What:** Every C-series ticket came from a human noticing friction in a
   live run. The server already sees each gate rejection
   (`TRANSITION_REJECTED`, `CUT_APPROVAL_REQUIRED`, `EXTERNAL_REFS_UNRESOLVED`,
@@ -865,7 +865,7 @@ optional-external last.
   tokens with no counter-pressure. This is the review's highest-leverage
   ticket.
 
-## D4 — Behavioral compliance eval harness (P2)
+## D4 — Behavioral compliance eval harness (P2) — DONE v3.67.0 (2026-07-10)
 - **What:** All 1067 tests are structural (marker greps, error-code contract,
   compose golden baseline, parser round-trips). Nothing verifies that a model
   given the assembled bundle actually follows it — known haiku watermark
@@ -914,7 +914,7 @@ optional-external last.
 - **Risk if skipped:** low — token waste on non-CC hosts only; grows as more
   CC-specific machinery (hooks, pins, telemetry) accretes in coordinator prose.
 
-## D7 — `qa_reports/` retention / archive policy (P3)
+## D7 — `qa_reports/` retention / archive policy (P3) — DONE v3.67.1 (2026-07-11)
 - **What:** `qa_reports/` holds 232 files and grows monotonically — every QA
   round, review, and visual report lands there forever. tasks.md got an
   archive convention (C4 / drift baseline); evidence files have none.
@@ -927,7 +927,7 @@ optional-external last.
 - **Risk if skipped:** low — directory noise, slower human navigation; no
   correctness exposure found.
 
-## D8 — Lite recommended model vs haiku §1 compliance (P3)
+## D8 — Lite recommended model vs haiku §1 compliance (P3) — DONE v3.68.1 (2026-07-11)
 
 > **DONE (2026-07-11, v3.68.1, commit f531a8c).** Option (b): bumped `recommended_model` haiku → sonnet
 > (skill frontmatter + doc mirror); `@lite` Task-subagent template stays haiku (has validating parent) —
@@ -945,7 +945,7 @@ optional-external last.
 - **Risk if skipped:** low — cosmetic non-compliance (missing watermark,
   verbosity) in solo sessions.
 
-## D9 — `qa_review` auto-append fan-out to unrelated review files (P2)
+## D9 — `qa_review` auto-append fan-out to unrelated review files (P2) — DONE v3.69.0 (2026-07-11)
 - **What:** During the D8 run (2026-07-11), a qa-engineer FAIL `tw_update_state`
   auto-appended its `qa_review` stamp not only to the current task's report but
   to `qa_reports/review_<id>.md` for **every open task**: 11 pre-existing,
@@ -964,7 +964,7 @@ optional-external last.
 - **Risk if skipped:** medium — silent evidence forgery; next `covers:` sweep or
   archive step may relocate/attribute wrong evidence.
 
-## D10 — release-engineer destructive conflict recovery (P2)
+## D10 — release-engineer destructive conflict recovery (P2) — DONE v3.71.1 (2026-07-12)
 - **What:** Shipping D8, the release-engineer (haiku tier) hit a non-fast-forward
   push (concurrent D2 session had advanced main to v3.68.0) and "resolved" it by
   aborting a rebase and running `git reset HEAD~1`, discarding its own committed
@@ -981,7 +981,7 @@ optional-external last.
 - **Risk if skipped:** high on busy repos — concurrent sessions are now routine
   (D2/D7/D8 overlapped); next collision may not leave a reflog-reachable commit.
 
-## E1 — Feature-scoped state: concurrency isolation for parallel sessions (P1, from 2026-07-11 review)
+## E1 — Feature-scoped state: concurrency isolation for parallel sessions (P1, from 2026-07-11 review) — DONE v3.72.0 (2026-07-12)
 - **What:** `handoff.md` models exactly ONE `active_feature`, but concurrent
   sessions are now routine and every overlap produced an incident: D2/D7/D8
   overlapped in one day; D5/D9 collided on v3.69.0 (D5's release re-versioned
@@ -1000,7 +1000,7 @@ optional-external last.
 - **Risk if skipped:** every future overlap re-rolls the D9/D10 dice; the next
   collision may not leave a reflog-reachable commit.
 
-## E2 — Bug-fix as a first-class chain: repro-first gate (P1, from 2026-07-11 review)
+## E2 — Bug-fix as a first-class chain: repro-first gate (P1, from 2026-07-11 review) — DONE v3.73.0 (2026-07-12)
 - **What:** the entire chain is feature-shaped (pm spec → architect → sr →
   reviewer → qa). A bug fix today pays either full-chain overhead or goes lite
   with no independent QA. Nothing enforces the one discipline that makes
@@ -1015,7 +1015,7 @@ optional-external last.
 - **Risk if skipped:** bug fixes keep paying feature-chain cost or skip QA —
   either depresses autonomous success exactly where it should be cheapest.
 
-## E3 — Outcome-shaped acceptance: executable ACs + runtime evidence (P1, from 2026-07-11 review)
+## E3 — Outcome-shaped acceptance: executable ACs + runtime evidence (P1, from 2026-07-11 review) — DONE v3.77.0 (2026-07-12)
 - **What:** every gate is process-shaped — it checks that evidence files
   exist, parse, and that transitions are legal; nothing verifies the change
   does what the spec's AC says. QA writes its own tests and grades its own
@@ -1053,7 +1053,7 @@ optional-external last.
 - **Risk if skipped:** the highest-leverage lever stays unpulled; every
   mis-sourced design costs a full round.
 
-## E5 — Backlog intake loop + tiered cut-approval (P2, depends E8, from 2026-07-11 review)
+## E5 — Backlog intake loop + tiered cut-approval (P2, depends E8, from 2026-07-11 review) — DONE v3.85.0 (2026-07-14)
 - **What:** every feature ends with "next feature is a human decision", and
   cut-approval halts every cut regardless of size. These two human touchpoints
   are the availability bottleneck for autonomous operation.
@@ -1087,7 +1087,7 @@ optional-external last.
   mis-tiering risk if done before E8 exists — start conservative.
 - **STATUS:** ✓ released in v3.85.0 (2026-07-14): E5 tickets T-E5-01/02/03 PASS; 1455/1455 tests green; driftBaselineIds: T-E5-01, T-E5-02, T-E5-03.
 
-## E6 — Rule-retirement retro: actually run it (P2, depends D3 ✓ + E8, from 2026-07-11 review)
+## E6 — Rule-retirement retro: actually run it (P2, depends D3 ✓ + E8, from 2026-07-11 review) — DONE 2026-07-13 (procedure institution, no release)
 - **What:** D3 landed the telemetry emit, but the review thesis it was built
   for (rule-corpus growth is superlinear; retirement is the only
   counter-pressure) remains unexecuted — zero retros run, zero rules retired.
@@ -1114,7 +1114,7 @@ optional-external last.
 - **Risk if skipped:** compliance load keeps growing with no counter-pressure;
   autonomous success degrades invisibly as bundles grow.
 
-## E7 — Git/CI as a governed surface (P2, sequence after D10, from 2026-07-11 review)
+## E7 — Git/CI as a governed surface (P2, sequence after D10, from 2026-07-11 review) — DONE v3.81.0 (2026-07-13)
 - **What:** "does NOT touch git" is the stated design boundary, yet
   release-engineer touches git every release and the two worst recent
   incidents were git incidents (C13 hand-edit wedge, D10 destructive reset).
@@ -1129,7 +1129,7 @@ optional-external last.
 - **Risk if skipped:** the next git incident comes from a role other than
   release-engineer, with no rule to point to.
 
-## E8 — Success-side telemetry: per-feature outcome metrics (P2, D3 follow-on, from 2026-07-11 review)
+## E8 — Success-side telemetry: per-feature outcome metrics (P2, D3 follow-on, from 2026-07-11 review) — DONE v3.74.0 (2026-07-12)
 - **What:** telemetry records only gate rejections. Success-rate claims
   ("fine-grained logic tickets ≈ near-100% one-pass; visual features far
   lower") are hand-assembled from retrospectives after the fact; nothing
@@ -1219,7 +1219,7 @@ optional-external last.
   the one signal (`tw_update_state`'s ms-entropy timestamp) that currently
   distinguishes a real write from a hand-edit.
 
-## E10 — Feature-lease human override + non-work write exemptions (P2, from 2026-07-12 E8-start incident)
+## E10 — Feature-lease human override + non-work write exemptions (P2, from 2026-07-12 E8-start incident) — DONE v3.80.0 (2026-07-13)
 
 - **What:** two lease false-positive classes surfaced while starting E8 with
   a human present and the incumbent feature (E1) verifiably shipped:
@@ -1247,7 +1247,7 @@ optional-external last.
   (worktrees, waiting, or — worse — hand-edits), eroding exactly the
   discipline the lease was built to protect.
 
-## E11 — check-version.mjs ships-vs-source blind spot (P2, release-integrity, from 2026-07-12 v3.74.0 post-release verify)
+## E11 — check-version.mjs ships-vs-source blind spot (P2, release-integrity, from 2026-07-12 v3.74.0 post-release verify) — DONE v3.76.0 (2026-07-12)
 
 - **What:** `scripts/check-version.mjs` asserts the `index.ts` `Server()`
   version literal equals `package.json` version — but never checks the
@@ -1266,7 +1266,7 @@ optional-external last.
   doesn't cover the shipped artifact.
 - **Status:** ✅ DONE (2026-07-12, v3.76.0 — commit 4d38a8a) — dist-parity check now parses dist/index.js Server() literal and compares against package.json; gate mandatory in release-engineer SOP step 7; 1323/1323 tests green.
 
-## E12 — E8 metrics emit not idempotent per release (P3, data-quality, from 2026-07-12 v3.74.0 first live emit)
+## E12 — E8 metrics emit not idempotent per release (P3, data-quality, from 2026-07-12 v3.74.0 first live emit) — DONE v3.76.0 (2026-07-12)
 
 - **What:** the release-time metrics emit (E8, `tools/metrics.ts` wired at the
   E1A terminal-marker in `handoff-orchestrator.ts`) fires on every write
@@ -1321,7 +1321,7 @@ optional-external last.
   not — the closing write here was correct when written. Overlaps E10 class 2
   (heal refreshes `last_updated` / mutates persisted state of a dead lease).
 
-## E18 — Write-provenance hardening: stamp gate + completion-evidence gate (P2, from 2026-07-14 v3.85.0 incidents)
+## E18 — Write-provenance hardening: stamp gate + completion-evidence gate (P2, from 2026-07-14 v3.85.0 incidents) — DONE v3.86.0 (2026-07-14)
 - **What:** two independent provenance holes exploited (once each) during the
   E5/v3.85.0 cycle, both by subagents routing around the server's write path
   or its per-role gates. Identity and stamps are attestation-based by design;
@@ -1371,7 +1371,7 @@ optional-external last.
   advisory-only tier does not deter a subagent that cannot reach the tools.
 - **STATUS:** ✓ released in v3.86.0 — STAMP_PROVENANCE_SUSPECT gate (gates/stamp-provenance.ts) + QA_COMPLETION_EVIDENCE_MISSING gate (tools/handoff-orchestrator.ts) + RELAY REQUIRED hard line (skill-release-engineer.md); mini-chain sr(fable) → CR(APPROVED) → qa(PASS); 1472/1472 tests green.
 
-## E19 — SessionStart hook auto-injection retired (P1, human decision 2026-07-15)
+## E19 — SessionStart hook auto-injection retired (P1, human decision 2026-07-15) — DONE 2026-07-15 (docs+settings, no release)
 - **What:** the SessionStart hook (`bin/agent-governance-context.mjs`)
   auto-injects the full constitution + coordinator-lite skill (~18.7KB) into
   every session in any workspace with `.current/` or `tasks.md` — including
