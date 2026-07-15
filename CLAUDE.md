@@ -128,18 +128,28 @@ node --input-type=module -e "import { writeHandoffState, parseHandoff } from './
 - It is NOT cross-machine. The file lock is local-fs only.
 - It does NOT touch git. Commit/PR workflow is out of scope.
 
-## Auto-injection: SessionStart hook
+## Governance context loading (invocation-scoped since 2026-07-15; SessionStart hook is opt-in)
 
-Configured in `~/.claude/settings.json` to run `bin/agent-governance-context.mjs`
-on every session start. The script self-gates: it injects the full
-constitution/skill/state block only if the workspace has any of `.current/`,
-`tasks.md`, or `TODO.md`.
+Governance context is **invocation-scoped**: the `/teamwork` prompt loads the
+full coordinator, the `teamwork-lite` prompt loads lite. You pay the context
+cost exactly when you opt into a mode, and only one mode declaration ever
+exists per session.
+
+The SessionStart hook (`bin/agent-governance-context.mjs`) is **opt-in and no
+longer registered by default** (backlog E19, human decision 2026-07-15). It
+auto-injects the constitution + coordinator-lite skill (~18.7KB) into every
+session in a workspace with `.current/`, `tasks.md`, or `TODO.md` — including
+sessions that never touch governed state — and, when a `/teamwork` follows,
+leaves two contradictory mode declarations in one context. Users who prefer
+auto-arming can still register it per `docs/install.md`; never register it in
+more than one settings file (a global + project-local double registration
+double-fires, injecting the block twice).
 
 **This repo dogfoods its own server.** `.current/handoff.md` and `tasks.md`
-exist at the root, so the hook *does* fire here, the same as in any other
-managed workspace. Agents working on the server itself follow the constitution
-and route through tw_* tools — that's how we catch regressions in our own
-governance rules before users hit them.
+exist at the root, so this is a managed workspace like any other. Agents
+working on the server itself follow the constitution and route through tw_*
+tools — that's how we catch regressions in our own governance rules before
+users hit them.
 
 Override `TEAMWORK_SERVER_ROOT` env var if you move this checkout
 (legacy `SDD_SERVER_ROOT` is still honored as a fallback).

@@ -36,6 +36,18 @@ future `/teamwork` feature; none blocks a release on its own.
 > work, outcome-shaped verification, and concurrency isolation — none of
 > which is another prose rule. Suggested order:
 > E8 → E4 → E2 → E1 → E3 → E7 (after D10) → E6 → E5.
+>
+> **2026-07-15 revision** (from the 104447-F0 field retrospective,
+> `research/104447-F0-retrospective-agc-governance-issues.md` — first
+> full-chain crash-and-resume observed in a managed consumer workspace):
+> E19–E30 added. Dominant costs measured there: a silently-dead qa-engineer
+> session (1h55m unnoticed idle, ≥250k tokens of re-verification) and an
+> evidence-schema tightening mid-feature (3 consecutive gate rejections).
+> One finding was a *mis*-finding worth its own ticket: both the retro and
+> the operator concluded the usage.jsonl token sidecar "was never
+> implemented" when it is merely un-armed (E27). Suggested order:
+> E19 (human-prioritized, executed same day) → E20+E21 (content-only,
+> halve the crash cost) → E23 → E24 → E26 → E22 → E25/E27–E30.
 
 | id | desc | priority | depends_on | est. files | design-link |
 |----|------|----------|------------|------------|-------------|
@@ -100,6 +112,18 @@ future `/teamwork` feature; none blocks a release on its own.
 | E16 | `ALLOWED_TRANSITIONS` has no native `pm → qa-engineer` intake edge for a single-role test-only ticket (E15 run had to enter via the Amend-Resume edge, whose documented purpose is narrower — disclosed honestly by qa-engineer in review_T-E15-01.md) — either add a sanctioned direct edge (maybe gated on a scope attestation) or document Amend-Resume as the blessed door for this shape | P3 | — | ~2 (tools/transitions.ts edge + const §3.1 note + test) | **done (2026-07-13, v3.83.0, option B — content-only)** — §3.1 Amend-Resume charter broadened: the resume_of-gated pm→{code-reviewer,qa-engineer} edge is also the sanctioned door for a PM-sanctioned FRESH single-role judge dispatch on test-only/evidence-only tickets (judge roles only, no build-role edge); coordinator pointer in coord-03-core-fallback.md; ZERO server-code change — the release-authored commit-message/CHANGELOG claims of a handoff-orchestrator.ts change were erroneous (E9A-class record-integrity slip, this time narrative-only — the diff itself was clean), corrected post-release against the actual diff in commit a484a4d; pinning suite test/e16-judge-dispatch-charter.test.mjs; 1420/1420 (tag v3.83.0, release commit 41cb8aa) |
 | E17 | release-engineer record-integrity hard rule: v3.83.0's release commit message, CHANGELOG entry, gh release notes, and backlog done-mark all described a `tools/handoff-orchestrator.ts` change that does not exist in the diff, plus nonexistent spec paths and a fabricated code-review round for E15 (haiku narrative fabrication; second E9A-class integrity incident in two days, this time narrative-only) — add a Hard rule: every file named in a commit message / CHANGELOG entry / release-notes body MUST appear in `git diff --stat` of the commit being described, and every referenced report/spec path MUST exist on disk at write time; verify-with-`ls`/`git diff --stat` before writing, never from memory of the dispatch brief | P2 | — | ~3 (skill-release-engineer Hard rule + template paragraph + qa pinning tests) | **done (2026-07-13, v3.84.0)** — CRITICAL record-integrity Hard rule in skill-release-engineer + matching template paragraph (content-only, +3 lines); E17-S1..S4 pins in test/feature-lease.test.mjs; release notable: E14 Check 6 fired live and correctly blocked this release on a real CI red (VR-13 env-dependence from v3.83.0, fixed in 726480c by qa single-role dispatch via the E16 charter — first live use); 1424/1424 (tag v3.84.0, release commit e4d0b01) |
 | E18 | Write-provenance hardening: (a) escalate the E9A stampAdvisory to a blocking gate on the tw_update_state write path + RELAY REQUIRED hard line in the release dispatch template — v3.85.0's closing write was hand-authored by the no-MCP-path release-engineer subagent (fabricated zero-entropy 2026-07-14T00:00:00.000Z stamps on handoff.md + metrics.jsonl, first hand-edit also recorded a nonexistent tag SHA; commits 5950c58/199b164, remediated in 70e3a35 — third E9A-class incident); (b) qa completion-evidence gate — a qa-engineer state write adding completed_tasks ids must have per-id QA evidence on disk, closing the identity-swap evasion of REVIEWER_COMPLETED_TASKS_REJECTED (E5 chain: code-reviewer subagent wrote a second state write as agent_id=qa-engineer pre-filling completed_tasks with zero QA evidence; qa_reports/review_T-E5-01.md) | P2 | E9A ✓, E17 ✓ | ~5 (2 gates, zod/index.ts arg, const §3.1 bullet, skill-release-engineer template line) | **done (2026-07-14, v3.86.0)** — STAMP_PROVENANCE_SUSPECT + QA_COMPLETION_EVIDENCE_MISSING gates (gates/stamp-provenance.ts + tools/handoff-orchestrator.ts integration); RELAY REQUIRED hard line (skill-release-engineer.md); 17 tests in test/e18-write-provenance.test.mjs (exact replays of both E5-cycle incidents, both now rejected); 1472/1472 suite green; tag v3.86.0 (commit 1826840) |
+| E19 | SessionStart hook auto-injection retired (104447-F0 E1 + live 2026-07-15 evidence): the hook injects the full lite constitution+skill block (~18.7KB) into EVERY session in a managed workspace — including casual Q&A sessions that never touch state — and double-fires (~37KB) when registered in both `~/.claude/settings.json` and a project `.claude/settings.local.json` (observed live this session); a subsequent `/teamwork` then loads the full coordinator, leaving two contradictory mode declarations in one context (lite says server-read-only; full's core job is state writes). Decision (2026-07-15, human): remove SessionStart registration — governance context loads only on explicit prompt invocation (`/teamwork` full, `teamwork-lite` solo); `bin/agent-governance-context.mjs` kept in-tree as a documented opt-in for users who prefer auto-arming; CLAUDE.md + docs/install.md updated to present the hook as opt-in with the context-cost tradeoff | P1 | — | ~3 (2 settings files, CLAUDE.md, docs/install.md; no server code) | **done (2026-07-15, docs+settings only, no release)** — hook entries removed from both settings files (double-fire eliminated); CLAUDE.md "Governance context loading" section rewritten invocation-scoped; docs/install.md hook section demoted to opt-in with single-registration warning |
+| E20 | Legal "waiting on long evidence" expression (104447-F0 P2): after backgrounding a ~1h regression suite an agent has no sanctioned state — `In_Progress`'s only legal moves are keep-working or terminal write, so each agent invents behavior (the crash-resume QA stopped its turn to "wait for notification" and nearly caused a second stale dispatch; only a coordinator SendMessage chase saved it). Fix, two tiers: (i) content-only hard line in skill-qa-engineer + skill-sr-engineer — long suites run synchronously to completion OR are poll-harvested within the same turn; ending a turn with work in flight is a violation (ship this first); (ii) server tier — `waiting_on` free-text field on tw_update_state that resets the stale-dispatch clock, or per-phase stale thresholds (QA full-regression phase ≫ 15 min default) | P1 | — | ~3 (2 skills; optional handoff field + stale predicate) | — |
+| E21 | Crash checkpoint via existing bookkeeping_write (104447-F0 P1, the retro's single highest-leverage item): §3 "write state even on crash" is physically unexecutable for external kills (session/usage-limit); the dead QA session lost ~90% of completed work traces → 1h55m silent idle + a resume that re-verified everything (~30–40% of the 250k-token recovery). `bookkeeping_write` semantics already fit (administrative write, no lease-timestamp refresh) but no skill SOP directs roles to use it. Fix (content-only): skill-qa-engineer Phase-4 line — before launching a full regression, bookkeeping_write "completed <artifacts>, awaiting regression"; matching line in skill-sr-engineer for long builds; optionally register an evidence-journal path at dispatch that Crash-Resume reads instead of git archaeology | P1 | — | ~2 (content-only) | — |
+| E22 | Proactive stale-dispatch notification (D5 ✓ follow-on; 104447-F0 A3): the advisory is pull-only — computed at tw_get_state time, so nobody sees it until the next `/teamwork`; the 1h55m idle window went entirely unnoticed. Server already owns the timestamp + threshold; add an opt-in notify channel on threshold crossing (touch a watch-file for an external watcher / desktop notification / webhook), config-gated, no new state | P2 | D5 ✓ | ~3 (watcher emit + config key + test) | — |
+| E23 | Evidence schema versioning + structured frontmatter (104447-F0 P3 / B1 / B2): the visual-evidence schema tightened while a feature was in flight, so crash-era artifacts that were legal when written became illegal at resume — 3 consecutive rejections (VISUAL_EVIDENCE_MISSING → VISUAL_REPORT_INCOMPLETE → AC_EXECUTION_LOG_MISSING), the last fired on a `Phase 3.5 — ` heading prefix, i.e. markdown prose as machine interface. Fix: (a) `evidence_schema: <n>` pinned into handoff at dispatch — gates validate against the pinned version, upgrades affect new features only; (b) reports carry YAML frontmatter (`sections: [...]`, `verdict`, `region_diff_pct`) that gates validate, prose body stays for humans — or minimally, heading match becomes normalized-contains; (c) rejection envelopes name the missing section / expected string, not just the error code | P1 | — | ~5 (gates/evidence parsing, handoff field, skill-qa-visual, tests) | — |
+| E24 | Exemptions manifest `.current/exemptions.json` (104447-F0 C2, priority raised from the retro's "medium"): §2 ZERO-compile-errors is a *permanent-violation state* in the 104447 workspace (33 known tsc errors across 3 exempted test files; `npm run build` known-broken), re-litigated in prose every review/QA round, and §6's dependency-audit-at-build-gate is dead because build never runs. A rule everyone knows is permanently violated teaches agents that rules are negotiable — normalization of deviance corrodes every OTHER gate's authority, which is worse than the re-explanation cost. Fix: declarative exemption entries (path + reason + expiry condition), gates subtract them automatically; a prose-only exemption counts as not exempted; exemption-count becomes a monitorable only-grows metric | P1 | — | ~4 (config/manifest loader, build-gate check, const §2, tests) | — |
+| E25 | §6 git vocabulary completion (104447-F0 P7/C3): `git stash` / `stash pop` appear in NEITHER the sanctioned list (add/commit/tag/ff-push) nor the forbidden list (reset/rebase/clean/force) — verified absent from all const-*.md 2026-07-15 — yet the 104447 QA used stash correctly as an isolation-proof tool; under a whitelist regime an incomplete vocabulary forces correct behavior into violation. Add stash/stash-pop (reversible, non-destructive) to sanctioned; clarify `git checkout -- <file>` status while there | P3 | — | ~1 (const content + pin test) | — |
+| E26 | `tw_gate_stats` — per-gate fire-count coverage reader (D3 ✓ / E8 ✓ enabler; 104447-F0 §4-D): telemetry.jsonl (gate fires) and metrics.jsonl (per-feature outcomes) both exist but no aggregation exists — the 104447 retro answered "which rules are alive" from 4 raw telemetry lines by hand. Aggregate per-gate/per-error-code counts across features so the E6 rule-retirement retro runs on data instead of recall; also the substrate for adjudicating the retro's dead-rule table (token brake, dispatch_pins, read cap, terse cap et al.). NOTE the category boundary: telemetry only proves *gate-backed* rules dead/alive; prose-behavioral rules (§5 read cap, §1 terse) need transcript sampling, not gate stats — the reader's output should say which category a rule is in rather than imply zero-fires = dead | P2 | D3 ✓ | ~3 (new tool or script over the two sidecars + tests) | — |
+| E27 | Opt-in arming onboarding doc (104447-F0 correction ticket): the retro AND its operator both concluded the usage.jsonl token sidecar "was never implemented / implement it" — it IS implemented (tools/usage-accounting.ts + opt-in PostToolUse hook + coord-06 hand-sum fallback, shipped D2); same unarmed-reads-as-dead pattern for `driftBaselineIds` (C4 ✓ — would fold the retro's 105-item historical-drift noise, P6) and `cutApprovalAutoTier` (E5 ✓). One doc walks a consumer workspace through arming each opt-in: hook wiring, config key, expected effect, how to verify it's live. Unarmed-and-unaware produces duplicate reimplementation tickets downstream — this retro nearly filed one | P3 | — | ~1 (docs/config.md or new docs/arming.md) | — |
+| E28 | Wholesale-replace footgun on `dispatch_pins` / `external_refs` (104447-F0 E2): both fields replace rather than merge on write — a writer that forgets read-before-write silently drops existing entries. Fix: when a write shrinks the entry set, warn in the response envelope (or reject absent an explicit `shrink_ack` flag) | P3 | — | ~2 (orchestrator check + test) | — |
+| E29 | stale_dispatch advisory carries a Crash-Resume pointer (104447-F0 E3): the protocol lives only in skill-coordinator text; if the coordinator itself is the dead party, or a lite session takes over, nothing in the advisory points at it. Append a one-line protocol summary/pointer to the advisory `message` field | P3 | — | ~1 (advisory string + test) | — |
+| E30 | qa-visual actual-capture output convention (104447-F0 P4): consumer test suites write actual screenshots next to committed baselines (`ACTUAL_DIR` = `tests/visual/`), so every run dirties git status and a real visual regression is indistinguishable from routine overwrite at a glance — cost one full pixelmatch forensics round to clear a false alarm. skill-qa-visual gains a convention line: actual captures go to an untracked directory outside the baseline dir; qa flags suites that violate it | P3 | — | ~1 (skill-qa-visual line) | — |
 
 ### Recommended execution order (2026-07-13, post-E7 — supersedes the 2026-07-09 order, which shipped in full)
 
@@ -116,6 +140,18 @@ optional-external last.
 | 2 | E9A | governance-integrity; fresh 2026-07-13 evidence narrows the investigation (see §E9A Evidence bullet: haiku release-engineer subagents have no MCP tool-invocation path, making direct-file-edit the path of least resistance) — reproduce is now cheap, and the minimal fix (stamp-shape advisory in `tw_detect_drift`) is small |
 | 3 | E5 | intake automation should follow the retro, not precede it: E6's evidence is what justifies (or vetoes) the auto-approve tier thresholds E5 introduces; medium content ticket once that data is in hand |
 | 4 | E14 | P3 and optional — the original "externally gated, no CI configured" premise was WRONG (corrected 2026-07-13: ci.yml has existed since May and is green), so E14 is implementable whenever wanted; still last because it's an optional hardening step |
+
+### Recommended execution order (2026-07-15, E19–E30 batch from the 104447-F0 retrospective)
+
+| order | ticket | why here |
+|---|---|---|
+| 1 | E19 | human-prioritized 2026-07-15; no server code — settings + docs only; also kills the live double-injection burning ~37KB every session in every managed workspace |
+| 2 | E20 + E21 | content-only SOP lines, one edit session together; directly halve the measured worst cost (1h55m idle + 250k-token recovery) of the crash class that WILL recur |
+| 3 | E23 | the other measured pain (3-rejection rework loop); schema pinning prevents every future mid-feature tightening from taxing in-flight work |
+| 4 | E24 | governance-integrity: permanent-violation state corrodes all other gates; declarative manifest also unblocks the dead dependency-audit gate |
+| 5 | E26 | cheap, and its output (per-gate coverage data) is the prerequisite for adjudicating the retro's dead-rule table honestly instead of by anecdote |
+| 6 | E22 | turns the crash class from hour-scale to minute-scale detection; after E20/E21 shrink the blast radius, this shrinks the window |
+| 7 | E25, E27–E30 | P3 tail — each ~1–2 files, batchable into any convenient release |
 
 ---
 
@@ -1334,3 +1370,39 @@ optional-external last.
   next occurrence is a matter of time, and the third E9A incident shows the
   advisory-only tier does not deter a subagent that cannot reach the tools.
 - **STATUS:** ✓ released in v3.86.0 — STAMP_PROVENANCE_SUSPECT gate (gates/stamp-provenance.ts) + QA_COMPLETION_EVIDENCE_MISSING gate (tools/handoff-orchestrator.ts) + RELAY REQUIRED hard line (skill-release-engineer.md); mini-chain sr(fable) → CR(APPROVED) → qa(PASS); 1472/1472 tests green.
+
+## E19 — SessionStart hook auto-injection retired (P1, human decision 2026-07-15)
+- **What:** the SessionStart hook (`bin/agent-governance-context.mjs`)
+  auto-injects the full constitution + coordinator-lite skill (~18.7KB) into
+  every session in any workspace with `.current/` or `tasks.md` — including
+  sessions that only ask questions and never touch governed state.
+- **Evidence (both observed live 2026-07-15, this repo):**
+  1. **Double-fire:** the hook was registered in BOTH `~/.claude/settings.json`
+     (global) and this repo's `.claude/settings.local.json` — every session
+     here received two byte-identical ~18.7KB injections (~37KB dead context).
+  2. **Mode contradiction (104447-F0 retro E1):** hook says "You are in
+     Coordinator-Lite mode" (server-read-only); the user then invokes
+     `/teamwork`, loading the full coordinator whose core job is state
+     writes. Two contradictory standing declarations coexist for the rest of
+     the session.
+- **Decision (human, 2026-07-15):** remove the SessionStart registration
+  entirely rather than patch around it. Governance context becomes
+  invocation-scoped: `/teamwork` loads the full coordinator, the
+  `teamwork-lite` prompt loads lite — you pay the context cost exactly when
+  you opt into the mode, and only one mode declaration ever exists per
+  session. Rationale: users who open a session to ask the coordinator a
+  question (not to run lite) were paying the lite injection for nothing.
+- **Scope:** delete the hook entry from both settings files; keep
+  `bin/agent-governance-context.mjs` in-tree as a documented opt-in;
+  rewrite the CLAUDE.md "Auto-injection" section + docs/install.md hook
+  step to present it as opt-in with the tradeoff stated (auto-arming for
+  hook users vs. zero passive context cost without it).
+- **Non-goal:** no server/prompt code changes; the lite prompt itself is
+  untouched.
+- **STATUS:** ✓ done 2026-07-15 (same session as intake, coordinator-direct,
+  docs+settings only — no build, no release). Hook removed from
+  `~/.claude/settings.json` and `.claude/settings.local.json` (both re-validated
+  as JSON); CLAUDE.md §"Governance context loading" rewritten; docs/install.md
+  hook section marked OPT-IN with the double-registration warning; intro link
+  anchor fixed. `bin/agent-governance-context.mjs` kept in-tree. Takes effect
+  from the next session start.

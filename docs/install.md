@@ -38,7 +38,7 @@ claude mcp list
 
 > ⚠️ Do **NOT** put `mcpServers` in `~/.claude/settings.json`. Claude Code CLI ignores that key (it's Claude Desktop's format).
 
-Then add the [SessionStart hook](#sessionstart-hook-claude-code-only) and [mark the workspace](#mark-the-workspace).
+Then [mark the workspace](#mark-the-workspace). (The [SessionStart hook](#sessionstart-hook-claude-code-only--opt-in-not-recommended-as-default) is optional — see its section before adding it.)
 
 ---
 
@@ -132,7 +132,9 @@ npx -y --package=github:Paul-hengChen/agent-governance-mcp#v3.30.0 agc init
 
 ---
 
-## SessionStart hook (Claude Code only)
+## SessionStart hook (Claude Code only — OPT-IN, not recommended as default)
+
+> **Default since 2026-07-15: skip this section.** Governance context loads when you invoke a role prompt (`/teamwork` for the full coordinator, `teamwork-lite` for solo mode) — you pay the context cost only when you opt into a mode. The hook instead injects the full constitution + lite SOP (~19KB) into *every* session in a managed workspace, including sessions that never touch governed state, and a later `/teamwork` then adds a second, contradictory mode declaration. Register it only if you want auto-arming and accept that cost — and register it in exactly ONE settings file (a global + project-local double registration injects the block twice per session).
 
 Auto-injects the constitution + Coordinator SOP + handoff state every session. Edit `~/.claude/settings.json`:
 
