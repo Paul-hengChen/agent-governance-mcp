@@ -15,7 +15,7 @@ Lost updates, rule drift across `.cursorrules` / `CLAUDE.md` / `.windsurfrules`,
 | Problem | What this fixes |
 |---|---|
 | **Lost updates** — two IDEs write `handoff.md` simultaneously, later one silently overwrites | `O_EXCL` file lock + mtime freshness check; concurrent writer gets `⛔ STATE DRIFT` |
-| **Rule drift** — same rules duplicated across `.cursorrules`, `CLAUDE.md`, `AGENTS.md`, … | Constitution (composed from fragments) injected into every session via SessionStart hook + MCP prompts |
+| **Rule drift** — same rules duplicated across `.cursorrules`, `CLAUDE.md`, `AGENTS.md`, … | Constitution (composed from fragments) loaded via MCP role prompts (`/teamwork`, `teamwork-lite`, …); opt-in SessionStart hook for auto-injection |
 | **Format drift** — AI hand-edits `handoff.md` and breaks YAML / checkboxes | Free-text edits revoked; AI MUST go through 11 `tw_*` tools with zod-validated args |
 | **No iteration discipline** — AI declares PASS without testing, or loops forever on the same fail | Server-enforced state machine: `qa_round` / `review_round` / `visual_round` caps; PASS requires evidence files |
 
@@ -29,16 +29,17 @@ Existing tools in the same category (GitHub Spec Kit, OpenSpec) ship **templates
 # 1. Register the MCP server
 claude mcp add -s user agent-governance-mcp -- npx -y github:Paul-hengChen/agent-governance-mcp#v3.84.0
 
-# 2. Mark the current workspace as managed (REQUIRED — hook is a silent no-op without this)
+# 2. Mark the current workspace as managed (REQUIRED — the server treats a workspace as managed only with these)
 # Recommended: use agc init (writes .current/ + tasks.md)
 npx -y github:Paul-hengChen/agent-governance-mcp#v3.84.0 agc init
 # Alternative (bare scaffold):
 mkdir -p .current
 
-# 3. Add the SessionStart hook to ~/.claude/settings.json (see Setup → Hook below)
+# 3. In Claude Code, invoke /teamwork (full coordinator) or the teamwork-lite prompt (solo mode)
+#    — that loads the constitution + role SOP + live state. No hook required.
 ```
 
-Then `claude mcp list` should show `✓ Connected`, and opening Claude Code in that workspace injects the constitution banner. First `npx` pull is ~30–60s; subsequent runs are instant.
+Then `claude mcp list` should show `✓ Connected`. Governance context is invocation-scoped: it loads when you invoke a role prompt, so you pay the context cost only when you opt into a mode. (An optional SessionStart hook can auto-inject it every session instead — see Setup → Hook below before choosing that.) First `npx` pull is ~30–60s; subsequent runs are instant.
 
 **Other clients** (Cursor, Windsurf, Cline, Continue, Zed, Anti-Gravity) — same `npx` command, different config file path. See [docs/install.md](docs/install.md).
 
@@ -165,7 +166,9 @@ See [specs/subagent-dispatch.md](specs/subagent-dispatch.md) + [specs/subagent-s
 - **HTTP / Docker / remote mode**: [docs/http-mode.md](docs/http-mode.md)
 - **Workspace customisation** (task format, constitution override): [docs/config.md](docs/config.md)
 
-### SessionStart hook (Claude Code only)
+### SessionStart hook (Claude Code only — OPT-IN)
+
+> **Optional, off by default.** Role prompts already load the full governance context on invocation; the hook instead auto-injects the constitution + lite SOP (~19KB) into *every* session in a managed workspace, and a later `/teamwork` adds a second, contradictory mode declaration. Register it only if you want auto-arming — and in exactly ONE settings file (a global + project-local double registration injects the block twice). Details: [docs/install.md](docs/install.md).
 
 Add to `~/.claude/settings.json`:
 

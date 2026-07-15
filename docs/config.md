@@ -107,7 +107,9 @@ Useful when:
 
 ---
 
-## SessionStart hook gating
+## SessionStart hook gating (the hook itself is opt-in)
+
+The SessionStart hook is **not registered by default** (since 2026-07-15, backlog E19) — governance context loads on prompt invocation instead. This section applies only if you registered the hook per [docs/install.md](install.md).
 
 The bundled `bin/agent-governance-context.mjs` is a **silent no-op** unless the workspace contains **any of** `.current/`, `tasks.md`, or `TODO.md`. By design — keeps unrelated projects clean.
 

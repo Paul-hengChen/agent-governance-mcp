@@ -29,8 +29,8 @@ Lite is one of two coordinator surfaces; the other is the full coordinator (`/te
   - anything needing independent QA
 
 **How lite is selected / activated:**
-- It is the default solo-dev mode. The SessionStart hook (`bin/agent-governance-context.mjs`) auto-injects constitution + skill context when a managed workspace is detected (presence of `.current/`, `tasks.md`, or `TODO.md`).
-- The active skill is governed by the configured default skill (the `AGC_DEFAULT_SKILL` mechanism). When the default is coordinator-lite, the doer persona is in effect until the user explicitly invokes `/teamwork` to enter full chain mode.
+- It is the solo-dev mode, loaded by invoking the `teamwork-lite` prompt. (The opt-in SessionStart hook — `bin/agent-governance-context.mjs`, not registered by default since E19 — auto-injects it instead when a managed workspace is detected: presence of `.current/`, `tasks.md`, or `TODO.md`.)
+- Under the hook, the active skill is governed by the configured default skill (the `AGC_DEFAULT_SKILL` mechanism). When the default is coordinator-lite, the doer persona is in effect until the user explicitly invokes `/teamwork` to enter full chain mode.
 - Lite mode is exempt from the §5 auto-routing hop cap because it has no auto-routing at all.
 
 ## Full SOP
