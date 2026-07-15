@@ -93,6 +93,13 @@ rounds/hops.
   - 2026-07-13 — first run (`docs/retro-2026-07-13-gate-fire.md`): no
     retirements; EXTERNAL_REFS_UNRESOLVED placed on WATCH. Next retro due:
     5 features after v3.82.0 (~v3.87) or first design-armed feature.
+  - 2026-07-15 — second run (`docs/retro-2026-07-15-gate-fire.md`): no
+    retirements; EXTERNAL_REFS_UNRESOLVED escalated WATCH → formal
+    retirement candidate (second consecutive zero-fire, zero lifetime —
+    human decision pending); visual-gate family (12 codes) categorized
+    unexercised (no design-armed feature in window), not candidates.
+    Next retro due: 5 features after v3.87.0 (~v3.92) or first
+    design-armed feature.
 - **Retired-rule ledger** (auditable removals; empty so far):
   | date | code/prose retired | evidence | removal commit |
   |---|---|---|---|
