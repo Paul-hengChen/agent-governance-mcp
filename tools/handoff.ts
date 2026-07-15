@@ -192,6 +192,24 @@ export interface HandoffState {
   // DR-5) — the gates it arms are file-mode only anyway. dispatch_mode never
   // gates a transition edge; transitions.ts stays pure (DR on AC1/AC5).
   dispatch_mode?: DispatchMode;
+  // Evidence-schema pin (handoff schema v13, e23-evidence-schema-versioning
+  // D1). SERVER-STAMPED, NEVER CLIENT-SUPPLIED: the orchestrator stamps
+  // EVIDENCE_SCHEMA_CURRENT (gates/evidence-schema.ts) on the first accepted
+  // write of a new active_feature — there is deliberately NO zod arg on
+  // tw_update_state for it. Pins which evidence-heading-match convention the
+  // qa_reports/*.md gate predicates run under for the LIFE of the feature
+  // (v1 = exact-anchored H2 match, v2 = normalized-contains), so a
+  // mid-flight tightening of the conventions can never retroactively
+  // invalidate crash-era artifacts (the 104447-F0 incident class).
+  // FEATURE-SCOPED (the exact dispatch_mode scalar algorithm): carried
+  // across same-active_feature writes that omit it, dropped on
+  // active_feature change (then re-stamped by the orchestrator at the new
+  // feature's first write), NOT re-armed on PM re-entry. ABSENT for pre-E23
+  // in-flight features — absence gets the v2 normalized-contains default at
+  // the gates (D2 fallback: v2 is a strict superset of v1, it can only
+  // newly ACCEPT; the v12→v13 migration invents NO pin). FILE-MODE ONLY:
+  // SqliteHandoffStorage ignores it (both evidence gates are file-mode-only).
+  evidence_schema?: number;
 }
 
 // Cap the completed_tasks array returned by readState() so long projects
@@ -399,6 +417,15 @@ function readAndMigrate(workspacePath: string): HandoffReadResult | null {
     frontmatter.dispatch_mode,
     DISPATCH_MODE_VALUES,
   );
+  // v13 — evidence_schema pin (e23-evidence-schema-versioning). Defensive
+  // positive-integer parse; absent/malformed stays undefined — absence is the
+  // "pre-E23 feature, v2 normalized-contains default" sentinel (D2), NEVER
+  // defaulted to 0 (unlike the counters: 0 is not a legal schema version).
+  const evidenceSchemaRaw = Number(frontmatter.evidence_schema);
+  const evidenceSchema =
+    Number.isFinite(evidenceSchemaRaw) && evidenceSchemaRaw >= 1
+      ? Math.floor(evidenceSchemaRaw)
+      : undefined;
   const qaRoundRaw = Number(frontmatter.qa_round);
   const qa_round = Number.isFinite(qaRoundRaw) && qaRoundRaw >= 0 ? Math.floor(qaRoundRaw) : 0;
   const reviewRoundRaw = Number(frontmatter.review_round);
@@ -447,6 +474,7 @@ function readAndMigrate(workspacePath: string): HandoffReadResult | null {
     ...(reviewVerdict && { review_verdict: reviewVerdict }),
     ...(dispatchPins && { dispatch_pins: dispatchPins }),
     ...(dispatchMode && { dispatch_mode: dispatchMode }),
+    ...(evidenceSchema !== undefined && { evidence_schema: evidenceSchema }),
     completed_tasks,
     pending_notes,
     qa_round,
@@ -703,6 +731,17 @@ export interface WriteHandoffStateOptions {
   // when set; absence === "feature" (the default). FILE-MODE only:
   // SqliteHandoffStorage.writeState ignores it.
   dispatchMode?: DispatchMode;
+  // v13 — evidence_schema pin (e23-evidence-schema-versioning D1). Scalar
+  // sibling of dispatchMode with the identical feature-scoped algorithm:
+  // preserve-if-omitted within the same active_feature, drop on
+  // active_feature change, NO PM-re-entry re-arm. SET ONLY BY THE
+  // ORCHESTRATOR (feature_changed → EVIDENCE_SCHEMA_CURRENT) — never from a
+  // client arg; positional callers and the migration heal-write leave it
+  // undefined and the same-feature carry preserves any existing pin. Emitted
+  // to frontmatter only when set; absence === "pre-E23 feature, v2
+  // normalized-contains default at the gates" (D2). FILE-MODE only:
+  // SqliteHandoffStorage.writeState ignores it.
+  evidenceSchema?: number;
   // E10 — bookkeeping-write attestation (e10-lease-override AC4/AC5). When
   // true, PRESERVE the existing on-disk last_updated verbatim (same-
   // active_feature only — defense-in-depth, DR-5) instead of stamping now(),
@@ -788,6 +827,10 @@ export async function writeHandoffState(
   // the same-feature preserve clause below carries any existing value forward,
   // mirroring dispatch_pins' DR-8 posture).
   let dispatchMode: DispatchMode | undefined;
+  // v13 — evidence_schema pin. Same positional-overload posture as
+  // dispatchMode: undefined unless the orchestrator stamps it, with the
+  // same-feature preserve clause carrying any existing pin forward.
+  let evidenceSchema: number | undefined;
   // v12 — cumulative round totals. Options-object only (the positional
   // overload deliberately does NOT grow — architecture DR); a positional call
   // leaves them undefined and the always-emit blocks below normalise to 0.
@@ -824,6 +867,7 @@ export async function writeHandoffState(
     reviewVerdict = o.reviewVerdict;
     dispatchPins = o.dispatchPins;
     dispatchMode = o.dispatchMode;
+    evidenceSchema = o.evidenceSchema;
     qaRoundsTotal = o.qaRoundsTotal;
     reviewRoundsTotal = o.reviewRoundsTotal;
     visualRoundsTotal = o.visualRoundsTotal;
@@ -942,6 +986,23 @@ export async function writeHandoffState(
     //                                                       absence = feature)
     let effectiveDispatchMode: DispatchMode | undefined = dispatchMode;
     const dispatchModeNeedsExisting = dispatchMode === undefined;
+    // v13 — evidence_schema is FEATURE-SCOPED with NO PM-re-entry re-arm, the
+    // exact dispatch_mode scalar algorithm (e23 D1): the pin records which
+    // evidence conventions were CURRENT when the feature was dispatched — a
+    // stable dispatch-time fact for the life of the ticket, so no write in
+    // the chain (PM bounce included) may silently re-pin it. The algorithm:
+    //   1. option evidenceSchema !== undefined            → use it verbatim
+    //                                                       (orchestrator
+    //                                                       stamp on feature
+    //                                                       change)
+    //   2. omitted && existing.active_feature === this    → carry existing
+    //                                                       pin forward
+    //   3. omitted && active_feature changed              → undefined (drop
+    //                                                       stale pin —
+    //                                                       absence = v2
+    //                                                       default)
+    let effectiveEvidenceSchema: number | undefined = evidenceSchema;
+    const evidenceSchemaNeedsExisting = evidenceSchema === undefined;
     // E10 — `existing` is hoisted out of the preserve block so the timestamp
     // resolution below can read it; a bookkeeping write joins the trigger
     // condition (it needs existing.last_updated). All other paths are
@@ -956,6 +1017,7 @@ export async function writeHandoffState(
       externalRefsNeedsExisting ||
       dispatchPinsNeedsExisting ||
       dispatchModeNeedsExisting ||
+      evidenceSchemaNeedsExisting ||
       bookkeepingWrite === true
     ) {
       existing = parseHandoff(workspacePath);
@@ -981,6 +1043,11 @@ export async function writeHandoffState(
         // v11 clauses (2)/(3): carry the mode forward only within the same feature.
         effectiveDispatchMode =
           existing?.active_feature === _activeFeature ? existing?.dispatch_mode : undefined;
+      }
+      if (evidenceSchemaNeedsExisting) {
+        // v13 clauses (2)/(3): carry the pin forward only within the same feature.
+        effectiveEvidenceSchema =
+          existing?.active_feature === _activeFeature ? existing?.evidence_schema : undefined;
       }
     }
     // E10 — timestamp resolution (e10-lease-override AC4/AC5, DR-5). Default:
@@ -1035,6 +1102,14 @@ export async function writeHandoffState(
     // default) — never materialize the default (the scope_decision /
     // dispatched_at absence-is-signal emit posture).
     if (effectiveDispatchMode) frontmatterData.dispatch_mode = effectiveDispatchMode;
+    // v13 — evidence_schema: emit only when set. Absence === "pre-E23
+    // feature, v2 normalized-contains default at the gates" (e23 D2) — never
+    // materialize a pin the feature was not dispatched with. Explicit
+    // !== undefined guard (not truthiness): a schema version can never
+    // legally be 0, but the guard style keeps the numeric intent obvious.
+    if (effectiveEvidenceSchema !== undefined) {
+      frontmatterData.evidence_schema = effectiveEvidenceSchema;
+    }
     // v7 — protocol fields: emit ONLY when set on THIS write (AC-3 transient
     // semantics). Deliberately NOT joined to the existing-state preserve read
     // above — carrying a stale single-hop directive forward would be a

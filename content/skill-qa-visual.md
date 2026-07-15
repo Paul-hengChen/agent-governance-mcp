@@ -68,7 +68,7 @@ For every custom widget (non-`N/A` `## Visual Widgets` row), verify the widget *
 
 ### PASS sub-verdict
 
-PASS requires ALL of: every Step A checkbox `[x]`; every Step A.5 row `[x]`; every Step C assertion `pass`; every Step B surface `pass`/`accepted` with no material difference outside `## Allowed Differences`. Then write `## Verdict — PASS` as the final H2. The verdict value's first alphabetic token must uppercase to exactly `PASS`, and the value must not contain `not`/`fail`/`failed`/`blocked`/`blocking`/`changes requested`/`incomplete`/`pending` anywhere. The report MUST contain all six H2 sections — `## Widget Shape Verification`, `## Canonical State Verification`, `## Structural Assertions`, `## Region Diff`, `## Allowed Differences`, `## Verdict`.
+PASS requires ALL of: every Step A checkbox `[x]`; every Step A.5 row `[x]`; every Step C assertion `pass`; every Step B surface `pass`/`accepted` with no material difference outside `## Allowed Differences`. Then write `## Verdict — PASS` as the final H2. The verdict value's first alphabetic token must uppercase to exactly `PASS`, and the value must not contain `not`/`fail`/`failed`/`blocked`/`blocking`/`changes requested`/`incomplete`/`pending` anywhere. The report MUST contain all six H2 sections — `## Widget Shape Verification`, `## Canonical State Verification`, `## Structural Assertions`, `## Region Diff`, `## Allowed Differences`, `## Verdict`. Section headings may carry prefixes/suffixes (e.g. `## Phase 2 — Region Diff`) but MUST contain the canonical section names (evidence schema v2, normalized-contains match).
 
 ### Error codes & STOP routes
 

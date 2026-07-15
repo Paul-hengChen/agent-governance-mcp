@@ -128,9 +128,11 @@ test("R-schema-1: writeHandoffState emits cut_approved: true in YAML when passed
   const ws = tmpWs();
   await seedHandoff(ws, { cutApproved: true });
   const raw = readRawHandoff(ws);
-  // e8-success-telemetry re-baseline: CURRENT_VERSIONS.handoff bumped 11->12
-  // (qa_rounds_total/review_rounds_total/visual_rounds_total, seed-0).
-  assert.match(raw, /schema_version:\s*12/, "schema_version must be 12 (e8-success-telemetry)");
+  // e23-evidence-schema-versioning re-baseline: CURRENT_VERSIONS.handoff bumped
+  // 12->13 (evidence_schema pin, stamp-only, seeds nothing). Was 11->12 under
+  // e8-success-telemetry (qa_rounds_total/review_rounds_total/visual_rounds_total,
+  // seed-0).
+  assert.match(raw, /schema_version:\s*13/, "schema_version must be 13 (e23-evidence-schema-versioning)");
   assert.match(raw, /cut_approved:\s*true/, "cut_approved must be emitted as true");
 });
 
@@ -409,17 +411,18 @@ test("M1: v4 → v5 migration is stamp-only (AC-7 — no default seeded for cut_
   // any default value. Absence is the unapproved sentinel. A default `false` would
   // be a redundant materialization of absence; a default `true` would be a false
   // attestation bypassing the gate for all legacy files.
-  // e8-success-telemetry re-baseline: CURRENT_VERSIONS.handoff is now 12, so
-  // the manually-registered chain must reach 12 (adding the v5->v6, v6->v7,
-  // v7->v8, v8->v9, v9->v10, v10->v11, AND v11->v12 stamp-only/seed-only
-  // steps) or runMigrations throws MISSING_MIGRATION_STEP against the new
-  // target. Was 11 under e2-bugfix-repro-gate. IMPORTANT: this manual chain
-  // MUST reach the real CURRENT — leaving it short doesn't just fail this
-  // test, it permanently clobbers the shared module-level migration registry
-  // (via _clearRegistryForTests) for every later test in this file that reads
-  // through the REAL registry (M3/M4/X-malformed-parse below all regressed
-  // to MISSING_MIGRATION_STEP when this chain was one short). The v4->v5 step
-  // under test is still asserted in isolation via `result.applied` below.
+  // e23-evidence-schema-versioning re-baseline: CURRENT_VERSIONS.handoff is
+  // now 13, so the manually-registered chain must reach 13 (adding the
+  // v5->v6, v6->v7, v7->v8, v8->v9, v9->v10, v10->v11, v11->v12, AND v12->v13
+  // stamp-only/seed-only steps) or runMigrations throws MISSING_MIGRATION_STEP
+  // against the new target. Was 12 under e8-success-telemetry. IMPORTANT: this
+  // manual chain MUST reach the real CURRENT — leaving it short doesn't just
+  // fail this test, it permanently clobbers the shared module-level migration
+  // registry (via _clearRegistryForTests) for every later test in this file
+  // that reads through the REAL registry (M3/M4/X-malformed-parse below all
+  // regressed to MISSING_MIGRATION_STEP when this chain was one short). The
+  // v4->v5 step under test is still asserted in isolation via `result.applied`
+  // below.
   _clearRegistryForTests();
   // Register the chain manually so we can test v4→v5 in isolation.
   registerMigration({ kind: "handoff", from: 0, to: 1, up: (i) => ({ ...i, schema_version: 1 }) });
@@ -434,21 +437,23 @@ test("M1: v4 → v5 migration is stamp-only (AC-7 — no default seeded for cut_
   registerMigration({ kind: "handoff", from: 9, to: 10, up: (i) => ({ ...i, schema_version: 10 }) });
   registerMigration({ kind: "handoff", from: 10, to: 11, up: (i) => ({ ...i, schema_version: 11 }) });
   registerMigration({ kind: "handoff", from: 11, to: 12, up: (i) => ({ ...i, schema_version: 12, qa_rounds_total: 0, review_rounds_total: 0, visual_rounds_total: 0 }) });
+  registerMigration({ kind: "handoff", from: 12, to: 13, up: (i) => ({ ...i, schema_version: 13 }) });
 
   const v4payload = { schema_version: 4, active_feature: "old-feat", status: "In_Progress" };
   const result = runMigrations("handoff", v4payload);
 
-  assert.equal(result.payload.schema_version, 12, "migration must bump schema_version to CURRENT (12)");
+  assert.equal(result.payload.schema_version, 13, "migration must bump schema_version to CURRENT (13)");
   assert.equal(result.payload.cut_approved, undefined, "v4→v5 migration MUST NOT seed cut_approved");
-  assert.deepEqual(result.applied, [5, 6, 7, 8, 9, 10, 11, 12], "the v4→v5 step must have been applied (v5→v6, v6→v7, v7→v8, v8→v9, v9→v10, v10→v11, and v11→v12 also run to reach CURRENT)");
+  assert.deepEqual(result.applied, [5, 6, 7, 8, 9, 10, 11, 12, 13], "the v4→v5 step must have been applied (v5→v6, v6→v7, v7→v8, v8→v9, v9→v10, v10→v11, v11→v12, and v12→v13 also run to reach CURRENT)");
   assert.equal(result.fromVersion, 4, "fromVersion must be 4");
-  assert.equal(result.toVersion, 12, "toVersion must be CURRENT (12)");
+  assert.equal(result.toVersion, 13, "toVersion must be CURRENT (13)");
 });
 
 test("M2: v4 → v5 migration preserves all existing fields (AC-7 — lossless)", () => {
   // WHY: AC-7 — no existing field may be modified or removed. Losslessness is
   // critical so that scope_decision, prd_path, qa_round, etc. survive the bump.
-  // e8-success-telemetry re-baseline: see M1 comment — chain extended to v12.
+  // e23-evidence-schema-versioning re-baseline: see M1 comment — chain
+  // extended to v13.
   _clearRegistryForTests();
   registerMigration({ kind: "handoff", from: 0, to: 1, up: (i) => ({ ...i, schema_version: 1 }) });
   registerMigration({ kind: "handoff", from: 1, to: 2, up: (i) => ({ ...i, schema_version: 2 }) });
@@ -462,6 +467,7 @@ test("M2: v4 → v5 migration preserves all existing fields (AC-7 — lossless)"
   registerMigration({ kind: "handoff", from: 9, to: 10, up: (i) => ({ ...i, schema_version: 10 }) });
   registerMigration({ kind: "handoff", from: 10, to: 11, up: (i) => ({ ...i, schema_version: 11 }) });
   registerMigration({ kind: "handoff", from: 11, to: 12, up: (i) => ({ ...i, schema_version: 12, qa_rounds_total: 0, review_rounds_total: 0, visual_rounds_total: 0 }) });
+  registerMigration({ kind: "handoff", from: 12, to: 13, up: (i) => ({ ...i, schema_version: 13 }) });
 
   const v4payload = {
     schema_version: 4,
@@ -477,7 +483,7 @@ test("M2: v4 → v5 migration preserves all existing fields (AC-7 — lossless)"
   };
   const result = runMigrations("handoff", v4payload);
 
-  assert.equal(result.payload.schema_version, 12, "schema_version bumped to CURRENT (12)");
+  assert.equal(result.payload.schema_version, 13, "schema_version bumped to CURRENT (13)");
   assert.equal(result.payload.active_feature, "scope-feat", "active_feature preserved");
   assert.equal(result.payload.scope_decision, "single-feature", "scope_decision preserved");
   assert.equal(result.payload.scope_decision_why, "small feature", "scope_decision_why preserved");
@@ -496,6 +502,7 @@ test("M2: v4 → v5 migration preserves all existing fields (AC-7 — lossless)"
   assert.equal(result.payload.qa_rounds_total, 0, "qa_rounds_total seeded to 0 (v11→v12, e8-success-telemetry — the counter precedent, same as hop_count)");
   assert.equal(result.payload.review_rounds_total, 0, "review_rounds_total seeded to 0 (v11→v12, e8-success-telemetry)");
   assert.equal(result.payload.visual_rounds_total, 0, "visual_rounds_total seeded to 0 (v11→v12, e8-success-telemetry)");
+  assert.equal(result.payload.evidence_schema, undefined, "evidence_schema still absent (v12→v13 also stamp-only, no seed, e23-evidence-schema-versioning D1 — migration invents no pin)");
 });
 
 test("M3: legacy file (no schema_version) migrates to v5 and has no cut_approved (AC-6)", async () => {

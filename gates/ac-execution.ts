@@ -28,7 +28,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import { sliceH2Section, buildCoverageIndex } from "../tools/evidence-file.js";
+import { sliceH2SectionAt, buildCoverageIndex } from "../tools/evidence-file.js";
 
 // The H2 heading qa-engineer's Phase 3.5 writes (skill-qa-engineer SOP 6a).
 const DISPOSITION_HEADING = "AC Execution Log";
@@ -40,8 +40,14 @@ export interface AcArmResult {
 }
 
 // Disposition: >= 1 PASS'd review file carries the `## AC Execution Log` H2.
+// E23 (D3): checkedPaths records every candidate review file the traversal
+// examined — the direct qa_reports/review_<id>.md when it exists, else the
+// covers:-resolved file, else the direct EXPECTED path (named so the
+// AC_EXECUTION_LOG_MISSING envelope can cite where the server looked even
+// when nothing was on disk). Deduplicated, traversal order.
 export interface AcDispositionResult {
   present: boolean;
+  checkedPaths: string[];
 }
 
 // Arm regex (architecture Interface Contracts, verified against the live E3
@@ -102,13 +108,17 @@ export function hasProofAnnotatedAC(
 // recorded log covers every id in the round — a per-id requirement would
 // force QA to duplicate the same log N times. Verbatim clone of
 // hasExpectedRedDisposition's traversal. Never throws (fs errors → file
-// skipped).
+// skipped). E23 (D2): heading match is evidence-schema-keyed — pin 1 replays
+// the legacy exact anchor; pin >=2 or absent uses normalized-contains, so
+// `## Phase 3.5 — AC Execution Log` (the 104447-F0 incident heading) clears.
 export function hasAcExecutionLogDisposition(
   workspacePath: string,
   taskIds: string[],
+  evidenceSchema?: number,
 ): AcDispositionResult {
   let coverage: Map<string, string> | null = null;
   const checked = new Set<string>();
+  const checkedPaths: string[] = [];
   for (const id of taskIds) {
     const direct = reviewPath(workspacePath, id);
     let candidate: string | null = null;
@@ -121,17 +131,27 @@ export function hasAcExecutionLogDisposition(
         candidate = path.join(qaReportsDir(workspacePath), covering);
       }
     }
-    if (candidate === null || checked.has(candidate)) continue;
+    if (candidate === null) {
+      // E23 D3: nothing on disk for this id — record the direct EXPECTED
+      // path so the rejection envelope can name where the server looked.
+      if (!checked.has(direct)) {
+        checked.add(direct);
+        checkedPaths.push(direct);
+      }
+      continue;
+    }
+    if (checked.has(candidate)) continue;
     checked.add(candidate);
+    checkedPaths.push(candidate);
     let content: string;
     try {
       content = fs.readFileSync(candidate, "utf-8");
     } catch {
       continue;
     }
-    if (sliceH2Section(content, DISPOSITION_HEADING) !== null) {
-      return { present: true };
+    if (sliceH2SectionAt(content, DISPOSITION_HEADING, evidenceSchema) !== null) {
+      return { present: true, checkedPaths };
     }
   }
-  return { present: false };
+  return { present: false, checkedPaths };
 }

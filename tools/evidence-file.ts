@@ -92,6 +92,83 @@ export function sliceH2Section(content: string, heading: string): string | null 
   return nextIdx === -1 ? rest : rest.slice(0, nextIdx);
 }
 
+// ---------- E23 (e23-evidence-schema-versioning, D2) — schema-keyed slicing ----------
+// The exact-anchored sliceH2Section above (`^##\s+<heading>\b` — prefix text
+// never matches) was the 104447-F0 incident root cause: `## Phase 3.5 — AC
+// Execution Log` failed the gate solely on its heading prefix. The siblings
+// below key matching behavior off the feature's pinned evidence_schema:
+//   evidenceSchema === 1        → today's exact-anchored behavior, unchanged.
+//   evidenceSchema >= 2 OR absent → normalized-contains: an H2 line matches
+//     the target when normalize(h2Text).includes(normalize(target)).
+// Absent-pin features get v2 because v2 is a strict superset of v1 (it can
+// only newly ACCEPT, never newly reject) — see gates/evidence-schema.ts.
+// sliceH2Section itself and its other callers are deliberately untouched.
+
+// D2 normalize: lowercase, collapse every non-alphanumeric run to one space,
+// trim. Pure, never throws.
+export function normalizeHeadingText(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+// H2 line matcher for the normalized-contains scan. `[ \t]` (not `\s`) so the
+// separator can never consume a newline; `(.+)` captures the heading text.
+// Deeper headings (`###`) don't match: their third char is `#`, not space/tab.
+const H2_LINE_RE = /^##[ \t]+(.+)$/gm;
+
+// Locate the FIRST H2 heading matching `heading` under the given evidence
+// schema. Returns the full heading line plus the index just past it (where
+// the section body starts), or null. First-match-wins when several H2s
+// contain the target (D2).
+function findH2At(
+  content: string,
+  heading: string,
+  evidenceSchema?: number,
+): { line: string; bodyStart: number } | null {
+  if (evidenceSchema === 1) {
+    const headRe = new RegExp(`^##\\s+${escapeRegex(heading)}\\b[^\\n]*`, "im");
+    const m = headRe.exec(content);
+    if (!m || m.index === undefined) return null;
+    return { line: m[0], bodyStart: m.index + m[0].length };
+  }
+  const target = normalizeHeadingText(heading);
+  const re = new RegExp(H2_LINE_RE.source, "gm"); // fresh lastIndex per call
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(content)) !== null) {
+    if (normalizeHeadingText(m[1]).includes(target)) {
+      return { line: m[0], bodyStart: m.index + m[0].length };
+    }
+  }
+  return null;
+}
+
+// Schema-keyed sibling of sliceH2Section (D2). Same body-slicing contract
+// (heading exclusive, up to the next `## ` or EOF); only heading LOCATION is
+// schema-keyed. Normalization applies to locating headings, never to section
+// body content, verdict values, or pass/fail cell parsing.
+export function sliceH2SectionAt(
+  content: string,
+  heading: string,
+  evidenceSchema?: number,
+): string | null {
+  const found = findH2At(content, heading, evidenceSchema);
+  if (!found) return null;
+  const rest = content.slice(found.bodyStart);
+  const nextIdx = rest.search(/\n##\s/);
+  return nextIdx === -1 ? rest : rest.slice(0, nextIdx);
+}
+
+// Schema-keyed heading-LINE lookup (D2). Consumed by gates/visual.ts
+// verdictIsPass, which reads the trailing value off the `## Verdict — <value>`
+// heading line itself and therefore needs the line, not the body.
+export function findH2LineAt(
+  content: string,
+  heading: string,
+  evidenceSchema?: number,
+): string | null {
+  const found = findH2At(content, heading, evidenceSchema);
+  return found ? found.line : null;
+}
+
 // `- [mark] label` rows → labels whose mark is not x/X (unchecked/unverified).
 export function parseUncheckedLabels(section: string): string[] {
   const lineRe = /^-\s+\[(.)\]\s+(.+)$/gm;

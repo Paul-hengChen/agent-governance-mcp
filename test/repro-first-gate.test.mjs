@@ -294,7 +294,11 @@ next_role: "sr-engineer"
   assert.equal(state.qa_rounds_total, 0, "v11->v12 seeds qa_rounds_total: 0 (e8-success-telemetry)");
   assert.equal(state.review_rounds_total, 0, "v11->v12 seeds review_rounds_total: 0 (e8-success-telemetry)");
   assert.equal(state.visual_rounds_total, 0, "v11->v12 seeds visual_rounds_total: 0 (e8-success-telemetry)");
-  assert.equal(CURRENT_VERSIONS.handoff, 12, "sanity: this server's CURRENT handoff version is 12");
+  // e23-evidence-schema-versioning re-baseline: the file also climbs v12->v13,
+  // seeding NO evidence_schema default (D1 — migration invents no pin,
+  // absence-is-signal, same posture as dispatch_mode above).
+  assert.equal(state.evidence_schema, undefined, "v12->v13 must NOT seed evidence_schema (absence-is-signal, e23-evidence-schema-versioning D1)");
+  assert.equal(CURRENT_VERSIONS.handoff, 13, "sanity: this server's CURRENT handoff version is 13");
 });
 
 // ============================================================================

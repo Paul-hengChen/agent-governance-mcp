@@ -1,3 +1,4 @@
+export declare function visualEvidencePath(workspacePath: string, taskId: string): string;
 export declare function hasVisualBaselinesInDesign(workspacePath: string, activeFeature: string): {
     present: boolean;
     designPath: string;
@@ -30,13 +31,13 @@ export interface VisualReportValidation {
     failedRegionDiffs: string[];
     verdictPass: boolean;
 }
-export declare function validateVisualReport(content: string): VisualReportValidation;
+export declare function validateVisualReport(content: string, evidenceSchema?: number): VisualReportValidation;
 export declare function designDeclaresStructuralAssertions(workspacePath: string, activeFeature: string): boolean;
 export interface VisualReportsCheck {
     ok: boolean;
     byTaskId: Record<string, VisualReportValidation>;
 }
-export declare function validateVisualReports(workspacePath: string, taskIds: string[]): VisualReportsCheck;
+export declare function validateVisualReports(workspacePath: string, taskIds: string[], evidenceSchema?: number): VisualReportsCheck;
 export interface VisualProvenanceRow {
     surfaceId: string;
     fingerprint: string | null;

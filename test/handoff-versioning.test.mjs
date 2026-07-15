@@ -38,7 +38,7 @@ function yieldMacrotask() {
 
 // ---------- AC-1: schema_version stamped on writes ----------
 
-test("AC-1: writeHandoffState stamps schema_version: 12 in YAML (e8-success-telemetry)", async () => {
+test("AC-1: writeHandoffState stamps schema_version: 13 in YAML (e23-evidence-schema-versioning)", async () => {
   const ws = mkWorkspace();
   resetSession();
   // Initial parse to mark state read so writeHandoffState's freshness check
@@ -55,7 +55,9 @@ test("AC-1: writeHandoffState stamps schema_version: 12 in YAML (e8-success-tele
   // bumped it to 11 (added dispatch_mode, stamp-only, seeds nothing).
   // e8-success-telemetry (qa-owned re-baseline) bumps it to 12 (added
   // qa_rounds_total/review_rounds_total/visual_rounds_total, seeded to 0).
-  assert.match(content, /schema_version:\s*12/);
+  // e23-evidence-schema-versioning (qa-owned re-baseline) bumps it to 13
+  // (added evidence_schema pin, stamp-only, seeds nothing).
+  assert.match(content, /schema_version:\s*13/);
 });
 
 test("AC-1: schema_version appears as the first frontmatter key (grep-stable)", async () => {
@@ -72,7 +74,7 @@ test("AC-1: schema_version appears as the first frontmatter key (grep-stable)", 
 
 // ---------- AC-2: lazy migrate-on-read ----------
 
-test("AC-2: readHandoffState heals v0 handoff to CURRENT (v12) on disk (fire-and-forget)", async () => {
+test("AC-2: readHandoffState heals v0 handoff to CURRENT (v13) on disk (fire-and-forget)", async () => {
   const ws = mkWorkspace();
   resetSession();
   // Pre-versioning shape: no schema_version key.
@@ -103,9 +105,9 @@ qa_round: 0
   await yieldMacrotask();
 
   const healed = read(ws);
-  // e8-success-telemetry (qa-owned re-baseline): chain climbs
-  // v0→v1→v2→v3→v4→v5→v6→v7→v8→v9→v10→v11→v12; healed file lands at CURRENT (=12).
-  assert.match(healed, /schema_version:\s*12/);
+  // e23-evidence-schema-versioning (qa-owned re-baseline): chain climbs
+  // v0→v1→v2→v3→v4→v5→v6→v7→v8→v9→v10→v11→v12→v13; healed file lands at CURRENT (=13).
+  assert.match(healed, /schema_version:\s*13/);
 });
 
 test("AC-2 fast path: v1 file triggers no write-back", async () => {
@@ -158,7 +160,7 @@ qa_round: 0
   assert.equal(after, before, "parseHandoff is read-only on disk");
 });
 
-test("AC-2 regression: existing handoff missing schema_version round-trips to CURRENT (v12)", async () => {
+test("AC-2 regression: existing handoff missing schema_version round-trips to CURRENT (v13)", async () => {
   const ws = mkWorkspace();
   resetSession();
   writeRaw(
@@ -184,9 +186,9 @@ qa_round: 0
   assert.equal(parsed.active_feature, "round-trip");
   assert.deepEqual(parsed.completed_tasks, ["T01"]);
   assert.deepEqual(parsed.pending_notes, ["next_role: pm"]);
-  // e8-success-telemetry (qa-owned re-baseline): v0 → v1 →
-  // ... → v11 → v12 chain lands at CURRENT.
-  assert.match(read(ws), /schema_version:\s*12/);
+  // e23-evidence-schema-versioning (qa-owned re-baseline): v0 → v1 →
+  // ... → v12 → v13 chain lands at CURRENT.
+  assert.match(read(ws), /schema_version:\s*13/);
 });
 
 // ---------- AC-4: refuse-loud on future versions ----------
@@ -213,7 +215,7 @@ qa_round: 0
 
   assert.throws(
     () => readHandoffState(ws),
-    /handoff on-disk version 99 > server max 12/,
+    /handoff on-disk version 99 > server max 13/,
   );
 });
 
@@ -238,7 +240,7 @@ qa_round: 0
   );
   assert.throws(
     () => parseHandoff(ws),
-    /on-disk version 42 > server max 12/,
+    /on-disk version 42 > server max 13/,
   );
 });
 
@@ -275,8 +277,8 @@ qa_round: 0
   assert.equal(JSON.parse(json1).active_feature, "concurrent");
   assert.equal(JSON.parse(json2).active_feature, "concurrent");
   // File ended up healed (one of the writes won; the other swallowed quietly).
-  // e8-success-telemetry (qa-owned re-baseline): chain lands at CURRENT (=12).
-  assert.match(read(ws), /schema_version:\s*12/);
+  // e23-evidence-schema-versioning (qa-owned re-baseline): chain lands at CURRENT (=13).
+  assert.match(read(ws), /schema_version:\s*13/);
 });
 
 // ---------- regression: missing / malformed files ----------

@@ -35,6 +35,7 @@ export interface HandoffState {
     review_verdict?: ReviewVerdict;
     dispatch_pins?: Partial<Record<AgentName, string>>;
     dispatch_mode?: DispatchMode;
+    evidence_schema?: number;
 }
 /**
  * Parse handoff.md YAML frontmatter + section content into structured JSON.
@@ -78,6 +79,7 @@ export interface WriteHandoffStateOptions {
     reviewVerdict?: ReviewVerdict;
     dispatchPins?: Partial<Record<AgentName, string>>;
     dispatchMode?: DispatchMode;
+    evidenceSchema?: number;
     bookkeepingWrite?: boolean;
 }
 /**

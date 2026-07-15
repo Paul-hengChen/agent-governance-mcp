@@ -108,12 +108,11 @@ next_role: "sr-engineer"
 });
 
 test("M1b: readHandoffState's fire-and-forget write-back heals the v7 file to v10 on disk", async () => {
-  // e8-success-telemetry (qa-owned re-baseline): CURRENT_VERSIONS.handoff is
-  // now 12 (v11→v12 added qa_rounds_total/review_rounds_total/
-  // visual_rounds_total, seed-0). A v7 file heals all the way to v12 in one
-  // fire-and-forget write-back, seeding hop_count: 0 (DR-3, from the earlier
-  // v8→v9 step) AND the three v12 totals: 0 along the way; v9→v10 and
-  // v10→v11 add no field default of their own.
+  // e23-evidence-schema-versioning (qa-owned re-baseline): CURRENT_VERSIONS.handoff
+  // is now 13 (v12→v13 added evidence_schema, stamp-only, seeds nothing). A v7
+  // file heals all the way to v13 in one fire-and-forget write-back, seeding
+  // hop_count: 0 (DR-3, from the earlier v8→v9 step) AND the three v12 totals: 0
+  // along the way; v9→v10, v10→v11, and v12→v13 add no field default of their own.
   const ws = mkWs();
   resetSession();
   writeRaw(
@@ -135,25 +134,25 @@ qa_round: 0
   readHandoffState(ws);
   await new Promise((resolve) => setTimeout(resolve, 30));
   const healed = readRaw(ws);
-  assert.match(healed, /schema_version:\s*12/, "fire-and-forget heal lands the file at CURRENT (v12)");
+  assert.match(healed, /schema_version:\s*13/, "fire-and-forget heal lands the file at CURRENT (v13)");
   assert.match(healed, /hop_count:\s*0/, "the v8→v9 step's seeded hop_count: 0 survives the heal write");
   assert.match(healed, /qa_rounds_total:\s*0/, "the v11→v12 step's seeded qa_rounds_total: 0 survives the heal write");
   assert.match(healed, /review_rounds_total:\s*0/, "the v11→v12 step's seeded review_rounds_total: 0 survives the heal write");
   assert.match(healed, /visual_rounds_total:\s*0/, "the v11→v12 step's seeded visual_rounds_total: 0 survives the heal write");
 });
 
-test("M2: future v13 handoff refuses-loud against a v12 server (no silent downgrade)", () => {
+test("M2: future v14 handoff refuses-loud against a v13 server (no silent downgrade)", () => {
   // WHY: forward-compat safety, mirroring the AC-10(g) c9-protocol-fields
-  // precedent (v7 file against a v6 server; here v13 against v12 — re-baselined
-  // by e8-success-telemetry, qa-owned, since v12 is now CURRENT and no longer
-  // "the future"; was v12-vs-v11 under e2-bugfix-repro-gate).
+  // precedent (v7 file against a v6 server; here v14 against v13 — re-baselined
+  // by e23-evidence-schema-versioning, qa-owned, since v13 is now CURRENT and no
+  // longer "the future"; was v13-vs-v12 under e8-success-telemetry).
   // A handoff written by a newer server must never be silently parsed.
   const ws = mkWs();
   resetSession();
   writeRaw(
     ws,
     `---
-schema_version: 13
+schema_version: 14
 active_feature: "from-the-future"
 status: "In_Progress"
 last_updated: "2099-01-01T00:00:00.000Z"
@@ -168,12 +167,12 @@ qa_round: 0
   );
   assert.throws(
     () => readHandoffState(ws),
-    /handoff on-disk version 13 > server max 12/,
-    "v13 file must refuse-loud against a v12 server",
+    /handoff on-disk version 14 > server max 13/,
+    "v14 file must refuse-loud against a v13 server",
   );
   assert.throws(
     () => parseHandoff(ws),
-    /on-disk version 13 > server max 12/,
+    /on-disk version 14 > server max 13/,
   );
 });
 
@@ -181,11 +180,12 @@ test("M3: registry-level v7→v8→v9→v10 steps are pure, stamp-only/seed-only
   // WHY: pins the migration steps themselves (schema/migrations-handoff.ts),
   // not just their effect through parseHandoff — a direct unit test of the
   // runner registration, matching the M1/M2 cut-approval-gate.test.mjs
-  // convention. e8-success-telemetry (qa-owned re-baseline): CURRENT is now
-  // 12, so the isolated chain re-registered here must extend one step further
-  // (v11→v12, seeds the 3 cumulative totals to 0) or every subsequent read in
-  // this file hits "missing migration step handoff v11→v12" (the registry is
-  // a shared module-level singleton across tests in this file/process).
+  // convention. e23-evidence-schema-versioning (qa-owned re-baseline): CURRENT
+  // is now 13, so the isolated chain re-registered here must extend one step
+  // further (v12→v13, evidence_schema pin, stamp-only, seeds nothing) or every
+  // subsequent read in this file hits "missing migration step handoff v12→v13"
+  // (the registry is a shared module-level singleton across tests in this
+  // file/process).
   _clearRegistryForTests();
   registerMigration({ kind: "handoff", from: 0, to: 1, up: (i) => ({ ...i, schema_version: 1 }) });
   registerMigration({ kind: "handoff", from: 1, to: 2, up: (i) => ({ ...i, schema_version: 2 }) });
@@ -199,6 +199,7 @@ test("M3: registry-level v7→v8→v9→v10 steps are pure, stamp-only/seed-only
   registerMigration({ kind: "handoff", from: 9, to: 10, up: (i) => ({ ...i, schema_version: 10 }) });
   registerMigration({ kind: "handoff", from: 10, to: 11, up: (i) => ({ ...i, schema_version: 11 }) });
   registerMigration({ kind: "handoff", from: 11, to: 12, up: (i) => ({ ...i, schema_version: 12, qa_rounds_total: 0, review_rounds_total: 0, visual_rounds_total: 0 }) });
+  registerMigration({ kind: "handoff", from: 12, to: 13, up: (i) => ({ ...i, schema_version: 13 }) });
 
   const v7Payload = {
     schema_version: 7,
@@ -207,8 +208,8 @@ test("M3: registry-level v7→v8→v9→v10 steps are pure, stamp-only/seed-only
     next_role: "qa-engineer",
   };
   const result = runMigrations("handoff", v7Payload);
-  assert.deepEqual(result.applied, [8, 9, 10, 11, 12], "the v7→v8, v8→v9, v9→v10, v10→v11, AND v11→v12 steps all run when on-disk version is five behind CURRENT");
-  assert.equal(result.payload.schema_version, 12, "schema_version bumped to CURRENT (12)");
+  assert.deepEqual(result.applied, [8, 9, 10, 11, 12, 13], "the v7→v8, v8→v9, v9→v10, v10→v11, v11→v12, AND v12→v13 steps all run when on-disk version is six behind CURRENT");
+  assert.equal(result.payload.schema_version, 13, "schema_version bumped to CURRENT (13)");
   assert.equal(result.payload.dispatch_pins, undefined, "v7→v8 seeds no dispatch_pins default (AC-1)");
   assert.equal(result.payload.hop_count, 0, "v8→v9 seeds hop_count: 0 (DR-3)");
   assert.equal(result.payload.dispatched_at, undefined, "v9→v10 seeds no dispatched_at default (d5 DR-7 — absence-is-signal, not hop_count's seed-0)");
@@ -216,7 +217,8 @@ test("M3: registry-level v7→v8→v9→v10 steps are pure, stamp-only/seed-only
   assert.equal(result.payload.qa_rounds_total, 0, "v11→v12 seeds qa_rounds_total: 0 (e8-success-telemetry — the counter precedent, same as hop_count)");
   assert.equal(result.payload.review_rounds_total, 0, "v11→v12 seeds review_rounds_total: 0 (e8-success-telemetry)");
   assert.equal(result.payload.visual_rounds_total, 0, "v11→v12 seeds visual_rounds_total: 0 (e8-success-telemetry)");
-  assert.equal(result.payload.next_role, "qa-engineer", "sibling v7 field survives all five stamp-only/seed-only steps verbatim");
+  assert.equal(result.payload.evidence_schema, undefined, "v12→v13 seeds no evidence_schema default (e23-evidence-schema-versioning D1 — absence-is-signal, same posture as dispatched_at/dispatch_mode)");
+  assert.equal(result.payload.next_role, "qa-engineer", "sibling v7 field survives all six stamp-only/seed-only steps verbatim");
 
   // Re-running against the already-current payload is a no-op.
   const reread = runMigrations("handoff", result.payload);
@@ -813,10 +815,10 @@ test("Z7: tw_update_state ACCEPTS an empty dispatch_pins object ({} clears, per 
 
 // Sanity: CURRENT_VERSIONS.handoff really is 12 in this build (guards every
 // test above against silently testing the wrong target version).
-// e8-success-telemetry (qa-owned re-baseline): bumped 11 -> 12
-// (qa_rounds_total/review_rounds_total/visual_rounds_total, seed-0); was
-// 10 -> 11 under e2-bugfix-repro-gate (dispatch_mode, stamp-only, seeds
-// nothing).
-test("sanity: CURRENT_VERSIONS.handoff is 12 (e8-success-telemetry)", () => {
-  assert.equal(CURRENT_VERSIONS.handoff, 12);
+// e23-evidence-schema-versioning (qa-owned re-baseline): bumped 12 -> 13
+// (evidence_schema, stamp-only, seeds nothing); was 11 -> 12 under
+// e8-success-telemetry (qa_rounds_total/review_rounds_total/visual_rounds_total,
+// seed-0).
+test("sanity: CURRENT_VERSIONS.handoff is 13 (e23-evidence-schema-versioning)", () => {
+  assert.equal(CURRENT_VERSIONS.handoff, 13);
 });

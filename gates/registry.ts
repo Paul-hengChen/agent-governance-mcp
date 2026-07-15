@@ -505,7 +505,9 @@ export const GATE_REGISTRY: readonly GateDefinition[] = [
       "qa_reports/visual_<id>.md must contain Canonical State Verification, " +
       "Structural Assertions, Region Diff (per-surface pass/accepted), Allowed " +
       "Differences, and a Verdict that normalizes to exactly PASS — every row " +
-      "cleared (skill-qa-visual §Report schema). Resolve the failed/unverified " +
+      "cleared (skill-qa-visual §Report schema; headings may carry " +
+      "prefixes/suffixes but must contain the canonical names, evidence " +
+      "schema v2). Resolve the failed/unverified " +
       "rows — do NOT pre-accept them (visual verdict is qa-visual-owned, " +
       "Constitution §3.2).",
     documentedInProse: true,
@@ -631,7 +633,9 @@ export const GATE_REGISTRY: readonly GateDefinition[] = [
       "Run Phase 3.5 (skill-qa-engineer) — execute each proof:-annotated AC in " +
       "specs/<feature>.md and record command, raw output/exit code, and a per-AC " +
       "pass/fail verdict under a ## AC Execution Log section in a " +
-      "qa_reports/review_<id>.md for one of the PASS'd ids (covers: files count) " +
+      "qa_reports/review_<id>.md for one of the PASS'd ids (covers: files count; " +
+      "the heading may carry a prefix/suffix but must contain the canonical " +
+      "name, evidence schema v2) " +
       "before PASS. The server checks the section's presence only — the proofs' " +
       "truthfulness stays with qa-engineer / code-reviewer. " +
       "See specs/e3-outcome-shaped-acceptance.md AC3/AC4.",

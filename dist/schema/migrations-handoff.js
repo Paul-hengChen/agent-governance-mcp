@@ -147,6 +147,23 @@ registerMigration({
         visual_rounds_total: 0,
     }),
 });
+// v12 → v13: add optional evidence_schema pin (e23-evidence-schema-versioning,
+// D1). Additive STAMP-ONLY: bumps the version, seeds NO default — the
+// migration invents NO pin for historical payloads (spec D1): an absent field
+// stays absent post-migration, and the gates treat absence as the v2
+// normalized-contains default (D2 fallback — v2 is a strict superset of v1,
+// so an absent pin can only newly ACCEPT, never newly reject). Seeding
+// EVIDENCE_SCHEMA_CURRENT would fabricate a dispatch-time attestation the
+// feature never received; seeding 1 would newly REJECT crash-era artifacts —
+// the exact incident class E23 exists to close. Mirrors the v9→v10 /
+// v10→v11 stamp-only template. The orchestrator stamps the real pin on the
+// first accepted write of the NEXT new active_feature.
+registerMigration({
+    kind: "handoff",
+    from: 12,
+    to: 13,
+    up: (input) => ({ ...input, schema_version: 13 }),
+});
 // Compile-time guard: if CURRENT_VERSIONS.handoff is ever bumped without a
 // matching registration added above, the runner's missing-step error fires
 // at read time. This reference makes the dependency explicit for grep.

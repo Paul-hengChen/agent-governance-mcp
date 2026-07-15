@@ -38,6 +38,7 @@ import {
 import {
   hasVisualBaselinesInDesign,
   hasVisualEvidenceInFile,
+  visualEvidencePath,
   hasUncheckedWidgets,
   hasDesignModeRequiringVisual,
   designDeclaresStructuralAssertions,
@@ -52,6 +53,7 @@ import { isFeatureLeaseHeld } from "../gates/feature-lease.js";
 import { hasExpectedRedManifest, hasExpectedRedDisposition } from "../gates/expected-red.js";
 import { hasProofAnnotatedAC, hasAcExecutionLogDisposition } from "../gates/ac-execution.js";
 import { hasCutApproval } from "../gates/cut-approval.js";
+import { EVIDENCE_SCHEMA_CURRENT } from "../gates/evidence-schema.js";
 import { classifyLeaseOverride } from "../gates/lease-override.js";
 import { isHandAuthoredStamp, hasStampRemediationAudit } from "../gates/stamp-provenance.js";
 import { hasEvidenceInFile } from "../gates/qa-review.js";
@@ -125,6 +127,24 @@ async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResu
         const feature_changed = prevState
           ? prevState.active_feature !== parsed.active_feature
           : true;
+        // E23 (e23-evidence-schema-versioning, D1/D2) — evidence-schema pin
+        // resolution. Same-feature writes run the evidence gates under the
+        // feature's persisted pin (absent for pre-E23 in-flight features →
+        // the v2 normalized-contains default, D2 fallback). A feature-change
+        // write IS the stamping write: its checks run under
+        // EVIDENCE_SCHEMA_CURRENT, the exact value stamped below. NEVER
+        // client-supplied — resolved purely from prevState + feature_changed
+        // (AC6: no new zod arg on tw_update_state).
+        const evidenceSchemaPin = feature_changed
+          ? EVIDENCE_SCHEMA_CURRENT
+          : prevState?.evidence_schema;
+        // D3 — the version string the rejection envelopes cite. An absent pin
+        // is named as such (not silently rendered as v2) so the reader knows
+        // the feature predates pinning and got the default.
+        const evidenceSchemaLabel =
+          evidenceSchemaPin !== undefined
+            ? `v${evidenceSchemaPin}`
+            : "absent pin (v2 normalized-contains default)";
         const prevTuple: TransitionTuple = {
           agent: (prevState?.last_agent as AgentName | undefined) ?? null,
           status: (prevState?.status as StatusName | undefined) ?? null,
@@ -784,6 +804,12 @@ async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResu
           if (visualGate.present) {
             const visEv = hasVisualEvidenceInFile(parsed.workspace_path, parsed.completed_tasks);
             if (visEv.missing.length > 0) {
+              // E23 (D3): name the exact expected file path per missing id and
+              // the evidence-schema version the check ran under (existence
+              // check — the version is context, not a matcher input here).
+              const expectedPaths = visEv.missing
+                .map((id) => visualEvidencePath(parsed.workspace_path, id))
+                .join(", ");
               return {
                 content: [{
                   type: "text" as const,
@@ -791,6 +817,8 @@ async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResu
                     `⛔ VISUAL_EVIDENCE_MISSING: ${visEv.missing.join(", ")}. ` +
                     `design/<feature>.md declares ## Visual Baselines (at ${visualGate.designPath}) ` +
                     `but qa_reports/visual_<task-id>.md is absent for the listed task(s). ` +
+                    `Expected file(s): ${expectedPaths}. ` +
+                    `Evidence schema: ${evidenceSchemaLabel}. ` +
                     gate("VISUAL_EVIDENCE_MISSING").hintStatic,
                 }],
                 isError: true,
@@ -842,17 +870,27 @@ async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResu
                   isError: true,
                 };
               }
-              const schema = validateVisualReports(parsed.workspace_path, parsed.completed_tasks);
+              // E23 (D2): the report validator runs under the feature's pinned
+              // evidence schema — pin 1 replays the exact-anchored heading
+              // match; pin >=2 / absent uses normalized-contains.
+              const schema = validateVisualReports(
+                parsed.workspace_path,
+                parsed.completed_tasks,
+                evidenceSchemaPin,
+              );
               if (!schema.ok) {
+                // E23 (D3): each failing task names the exact missing section
+                // heading(s) / failed row(s), the report file path checked,
+                // and (below) the evidence-schema version the check ran under.
                 const listing = Object.entries(schema.byTaskId)
                   .map(([taskId, v]) => {
                     const reasons: string[] = [];
-                    if (v.missingSections.length) reasons.push(`missing: ${v.missingSections.join("/")}`);
+                    if (v.missingSections.length) reasons.push(`missing section(s): ${v.missingSections.map((s) => `## ${s}`).join(", ")}`);
                     if (v.failedCanonicalStates.length) reasons.push(`canonical-state fail: ${v.failedCanonicalStates.join("/")}`);
                     if (v.failedStructuralAssertions.length) reasons.push(`structural fail: ${v.failedStructuralAssertions.join("/")}`);
                     if (v.failedRegionDiffs.length) reasons.push(`region-diff fail: ${v.failedRegionDiffs.join("/")}`);
                     if (!v.verdictPass) reasons.push("verdict != PASS");
-                    return `${taskId} {${reasons.join("; ")}}`;
+                    return `${taskId} (at ${visualEvidencePath(parsed.workspace_path, taskId)}) {${reasons.join("; ")}}`;
                   })
                   .join(" | ");
                 return {
@@ -860,6 +898,7 @@ async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResu
                     type: "text" as const,
                     text:
                       `⛔ VISUAL_REPORT_INCOMPLETE: ${listing}. ` +
+                      `Evidence schema: ${evidenceSchemaLabel}. ` +
                       gate("VISUAL_REPORT_INCOMPLETE").hintStatic,
                   }],
                   isError: true,
@@ -985,16 +1024,30 @@ async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResu
           if (storage instanceof FileHandoffStorage) {
             const arm = hasProofAnnotatedAC(parsed.workspace_path, parsed.active_feature);
             if (arm.armed) {
+              // E23 (D2): the disposition heading match runs under the
+              // feature's pinned evidence schema — under pin >=2 / absent,
+              // `## Phase 3.5 — AC Execution Log` (the 104447-F0 incident
+              // heading) clears; pin 1 keeps the exact anchor.
               const disposition = hasAcExecutionLogDisposition(
-                parsed.workspace_path, parsed.completed_tasks,
+                parsed.workspace_path, parsed.completed_tasks, evidenceSchemaPin,
               );
               if (!disposition.present) {
+                // E23 (D3): name the expected heading, every review file path
+                // inspected, and the evidence-schema version the check ran
+                // under (pre-E23 this envelope listed task ids only).
+                const inspected =
+                  disposition.checkedPaths.length > 0
+                    ? disposition.checkedPaths.join(", ")
+                    : "(none — no review file resolved for the listed task(s))";
                 return {
                   content: [{ type: "text" as const,
                     text:
                       `⛔ AC_EXECUTION_LOG_MISSING: ${parsed.completed_tasks.join(", ")}. ` +
                       `Spec ${arm.specPath} declares ≥1 proof:-annotated AC but no ` +
                       `## AC Execution Log section was found for the listed task(s). ` +
+                      `Expected heading: "## AC Execution Log". ` +
+                      `Inspected: ${inspected}. ` +
+                      `Evidence schema: ${evidenceSchemaLabel}. ` +
                       gate("AC_EXECUTION_LOG_MISSING").hintStatic,
                   }],
                   isError: true,
@@ -1144,6 +1197,16 @@ async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResu
           // omitting writes lives in writeHandoffState). File-mode only:
           // SqliteHandoffStorage.writeState ignores it.
           dispatchMode: parsed.dispatch_mode,
+          // v13 — evidence_schema server-stamp (e23-evidence-schema-versioning
+          // D1). SET here on the first accepted write of a new active_feature
+          // (feature_changed includes the fresh-workspace case); OMITTED on
+          // same-feature writes so writeHandoffState's feature-scoped carry
+          // preserves the existing pin verbatim — including its ABSENCE for
+          // pre-E23 in-flight features (the migration invents no pin). Never
+          // client-supplied: `parsed` has no such field (AC6 — the
+          // tw_update_state zod surface is unchanged). File-mode only:
+          // SqliteHandoffStorage.writeState ignores it.
+          evidenceSchema: feature_changed ? EVIDENCE_SCHEMA_CURRENT : undefined,
           // E10 — bookkeeping-write attestation (e10-lease-override AC5).
           // Pass-through only: writeHandoffState's same-feature-guarded
           // preserve branch selects last_updated (DR-5 defense-in-depth);

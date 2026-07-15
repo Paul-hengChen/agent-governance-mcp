@@ -88,6 +88,11 @@ async function dispatch(ws, args) {
 // ============================================================================
 
 test("E8-M1: registered v11->v12 step seeds all three totals to 0, additive/lossless", () => {
+  // e23-evidence-schema-versioning re-baseline: CURRENT is now 13, so the
+  // manually-registered chain must extend one step further (v12→v13,
+  // evidence_schema pin, stamp-only, seeds nothing) or every subsequent read
+  // in this file hits "missing migration step handoff v12→v13" (the registry
+  // is a shared module-level singleton across tests in this file/process).
   _clearRegistryForTests();
   registerMigration({ kind: "handoff", from: 0, to: 1, up: (i) => ({ ...i, schema_version: 1 }) });
   registerMigration({ kind: "handoff", from: 1, to: 2, up: (i) => ({ ...i, schema_version: 2 }) });
@@ -106,19 +111,21 @@ test("E8-M1: registered v11->v12 step seeds all three totals to 0, additive/loss
     to: 12,
     up: (i) => ({ ...i, schema_version: 12, qa_rounds_total: 0, review_rounds_total: 0, visual_rounds_total: 0 }),
   });
+  registerMigration({ kind: "handoff", from: 12, to: 13, up: (i) => ({ ...i, schema_version: 13 }) });
 
   const result = runMigrations("handoff", { schema_version: 11, active_feature: "seed-feat", qa_round: 2, hop_count: 5 });
-  assert.deepEqual(result.applied, [12], "only the v11->v12 step runs when on-disk is one behind CURRENT");
-  assert.equal(result.payload.schema_version, 12);
+  assert.deepEqual(result.applied, [12, 13], "the v11->v12 AND v12->v13 steps run when on-disk is two behind CURRENT");
+  assert.equal(result.payload.schema_version, 13);
   assert.equal(result.payload.qa_rounds_total, 0, "AC8 — stale rows migrate in with qa_rounds_total = 0");
   assert.equal(result.payload.review_rounds_total, 0, "AC8 — stale rows migrate in with review_rounds_total = 0");
   assert.equal(result.payload.visual_rounds_total, 0, "AC8 — stale rows migrate in with visual_rounds_total = 0");
+  assert.equal(result.payload.evidence_schema, undefined, "v12->v13 seeds no evidence_schema default (e23-evidence-schema-versioning D1 — migration invents no pin)");
   assert.equal(result.payload.active_feature, "seed-feat", "sibling field survives losslessly");
   assert.equal(result.payload.qa_round, 2, "sibling cycle counter untouched (v11->v12 seeds only the 3 new fields)");
   assert.equal(result.payload.hop_count, 5, "hop_count untouched by this step (sibling, unrelated counter)");
 });
 
-test("E8-M2: a v0 legacy handoff (real registry) migrates all the way to CURRENT (v12) via readHandoffState/parseHandoff", async () => {
+test("E8-M2: a v0 legacy handoff (real registry) migrates all the way to CURRENT (v13) via readHandoffState/parseHandoff", async () => {
   const ws = mkWs("e8-legacy-");
   resetSession(ws);
   fs.writeFileSync(
@@ -137,21 +144,22 @@ test("E8-M2: a v0 legacy handoff (real registry) migrates all the way to CURRENT
   await new Promise((resolve) => setTimeout(resolve, 30));
   const state = parseHandoff(ws);
   assert.equal(state.schema_version ?? CURRENT_VERSIONS.handoff, CURRENT_VERSIONS.handoff, "sanity: server CURRENT is what we migrate to");
-  assert.equal(CURRENT_VERSIONS.handoff, 12, "sanity: CURRENT is 12 (e8-success-telemetry)");
+  assert.equal(CURRENT_VERSIONS.handoff, 13, "sanity: CURRENT is 13 (e23-evidence-schema-versioning)");
   assert.equal(state.qa_rounds_total, 0, "v0 legacy chain lands with qa_rounds_total seeded 0");
   assert.equal(state.review_rounds_total, 0, "v0 legacy chain lands with review_rounds_total seeded 0");
   assert.equal(state.visual_rounds_total, 0, "v0 legacy chain lands with visual_rounds_total seeded 0");
+  assert.equal(state.evidence_schema, undefined, "v0 legacy chain lands with evidence_schema NOT seeded (e23-evidence-schema-versioning D1 — absence-is-signal)");
   const raw = fs.readFileSync(path.join(ws, ".current", "handoff.md"), "utf-8");
-  assert.match(raw, /schema_version:\s*12/, "on-disk heal lands at v12");
+  assert.match(raw, /schema_version:\s*13/, "on-disk heal lands at v13");
 });
 
-test("E8-M3: a v13 handoff refuses-loud against this v12 server (no silent downgrade)", () => {
+test("E8-M3: a v14 handoff refuses-loud against this v13 server (no silent downgrade)", () => {
   const ws = mkWs("e8-future-");
   resetSession(ws);
   fs.writeFileSync(
     path.join(ws, ".current", "handoff.md"),
     `---
-schema_version: 13
+schema_version: 14
 active_feature: "from-the-future"
 status: "In_Progress"
 last_updated: "2099-01-01T00:00:00.000Z"
@@ -166,8 +174,8 @@ qa_round: 0
   );
   assert.throws(
     () => parseHandoff(ws),
-    /on-disk version 13 > server max 12/,
-    "a v13 file must refuse-loud, never silently downgrade",
+    /on-disk version 14 > server max 13/,
+    "a v14 file must refuse-loud, never silently downgrade",
   );
 });
 
@@ -202,13 +210,17 @@ hop_count: 4
   readHandoffState(ws);
   await new Promise((resolve) => setTimeout(resolve, 30));
   const healed = fs.readFileSync(path.join(ws, ".current", "handoff.md"), "utf-8");
-  assert.match(healed, /schema_version:\s*12/, "heal lands at CURRENT (v12)");
+  assert.match(healed, /schema_version:\s*13/, "heal lands at CURRENT (v13)");
   // v11 file had no totals at all (pre-e8 shape) -> migration seeds 0, and the
   // heal write must persist that seeded 0 (not silently drop the fields).
   assert.match(healed, /qa_rounds_total:\s*0/, "heal write persists the seeded qa_rounds_total");
   assert.match(healed, /review_rounds_total:\s*0/, "heal write persists the seeded review_rounds_total");
   assert.match(healed, /visual_rounds_total:\s*0/, "heal write persists the seeded visual_rounds_total");
   assert.match(healed, /hop_count:\s*4/, "sibling hop_count survives the heal write untouched");
+  // e23-evidence-schema-versioning re-baseline: the v11->v12->v13 heal also
+  // climbs the new v12->v13 step, which seeds NO evidence_schema default
+  // (D1 — absence-is-signal, migration invents no pin).
+  assert.doesNotMatch(healed, /evidence_schema:/, "heal write does NOT materialize an evidence_schema pin (e23-evidence-schema-versioning D1)");
 });
 
 // ============================================================================

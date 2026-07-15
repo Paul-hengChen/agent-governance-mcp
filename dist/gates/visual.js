@@ -16,12 +16,14 @@
 // added here (the verbatim move keeps behavior byte-identical).
 import * as fs from "fs";
 import * as path from "path";
-import { sliceH2Section, splitTableCells, parseUncheckedLabels, parseAssertionFailures, parseRegionDiffFailures, normalizeStatus, } from "../tools/evidence-file.js";
+import { sliceH2Section, sliceH2SectionAt, findH2LineAt, splitTableCells, parseUncheckedLabels, parseAssertionFailures, parseRegionDiffFailures, normalizeStatus, } from "../tools/evidence-file.js";
 // ---------- visual evidence (v3.14.0) ----------
 // Constitution §3.1 visual evidence gate: when `design/<active_feature>.md`
 // contains a `## Visual Baselines` H2, PASS additionally requires
 // `qa_reports/visual_<task-id>.md` for every task id in the round.
-function visualEvidencePath(workspacePath, taskId) {
+// Exported as of E23 (D3): the VISUAL_EVIDENCE_MISSING / VISUAL_REPORT_INCOMPLETE
+// emit sites in tools/handoff-orchestrator.ts name the exact file path checked.
+export function visualEvidencePath(workspacePath, taskId) {
     const safe = taskId.replace(/[^A-Za-z0-9._-]/g, "_");
     return path.join(workspacePath, "qa_reports", `visual_${safe}.md`);
 }
@@ -232,12 +234,23 @@ const REQUIRED_VISUAL_SECTIONS = [
 // Guards against `\bPASS\b`-anywhere false positives like "NOT PASS",
 // "PASS blocked", "not ready to PASS". Reads the trailing value of the
 // `## Verdict — <value>` heading, else the first non-empty body line.
-function verdictIsPass(content) {
-    const head = /^##\s+Verdict\b[^\n]*/im.exec(content);
-    const body = sliceH2Section(content, "Verdict");
+// E23 (D2): only heading LOCATION is evidence-schema-keyed (pin 1 = exact
+// anchor, pin >=2 / absent = normalized-contains, so `## Phase 4 — Verdict:
+// PASS` locates). The verdict VALUE parse keeps its exact-token semantics —
+// normalization never applies to the value.
+function verdictIsPass(content, evidenceSchema) {
+    const headLine = findH2LineAt(content, "Verdict", evidenceSchema);
+    const body = sliceH2SectionAt(content, "Verdict", evidenceSchema);
     let text = "";
-    if (head) {
-        text = head[0].replace(/^##\s+Verdict\b/i, "").replace(/^[\s—:–-]+/, "").trim();
+    if (headLine !== null) {
+        // Strip up to and including the FIRST "verdict" token in the heading
+        // line, then leading separators. Under pin 1 the line is exact-anchored
+        // (`^##\s+Verdict\b…`), so this is equivalent to the pre-E23
+        // `replace(/^##\s+Verdict\b/i, "")` prefix strip; under v2 it also
+        // handles prefixed headings like `## Phase 4 — Verdict: PASS`.
+        const m = /verdict/i.exec(headLine);
+        const after = m ? headLine.slice(m.index + m[0].length) : "";
+        text = after.replace(/^[\s—:–-]+/, "").trim();
     }
     if (!text && body !== null) {
         const firstLine = body.split("\n").map((s) => s.trim()).find((s) => s.length > 0) ?? "";
@@ -254,19 +267,25 @@ function verdictIsPass(content) {
     return firstToken === "PASS";
 }
 // Pure validator over a single visual report's content.
-export function validateVisualReport(content) {
+// E23 (D2): `evidenceSchema` keys HEADING LOCATION only — pin 1 replays the
+// legacy exact-anchored sliceH2Section behavior; pin >=2 or absent uses
+// normalized-contains, so `## Widget Shape Verification (v2 grid)` style
+// suffixed/prefixed headings satisfy section presence. Row parsing
+// (parseUncheckedLabels / parseAssertionFailures / parseRegionDiffFailures)
+// and the verdict VALUE parse keep their exact semantics unchanged.
+export function validateVisualReport(content, evidenceSchema) {
     const missingSections = [];
     for (const sec of REQUIRED_VISUAL_SECTIONS) {
-        if (sliceH2Section(content, sec) === null)
+        if (sliceH2SectionAt(content, sec, evidenceSchema) === null)
             missingSections.push(sec);
     }
-    const canonical = sliceH2Section(content, "Canonical State Verification");
+    const canonical = sliceH2SectionAt(content, "Canonical State Verification", evidenceSchema);
     const failedCanonicalStates = canonical ? parseUncheckedLabels(canonical) : [];
-    const structural = sliceH2Section(content, "Structural Assertions");
+    const structural = sliceH2SectionAt(content, "Structural Assertions", evidenceSchema);
     const failedStructuralAssertions = structural ? parseAssertionFailures(structural) : [];
-    const region = sliceH2Section(content, "Region Diff");
+    const region = sliceH2SectionAt(content, "Region Diff", evidenceSchema);
     const failedRegionDiffs = region ? parseRegionDiffFailures(region) : [];
-    const verdictPass = verdictIsPass(content);
+    const verdictPass = verdictIsPass(content, evidenceSchema);
     const ok = missingSections.length === 0 &&
         failedCanonicalStates.length === 0 &&
         failedStructuralAssertions.length === 0 &&
@@ -299,7 +318,9 @@ export function designDeclaresStructuralAssertions(workspacePath, activeFeature)
 // Composition helper. Validates each present visual_<id>.md against the v3.26
 // schema. Missing files are skipped (existence is enforced upstream by
 // hasVisualEvidenceInFile). Returns the failing task ids with their detail.
-export function validateVisualReports(workspacePath, taskIds) {
+// E23 (D2): threads the feature's pinned evidence_schema through to the pure
+// validator; the orchestrator resolves the pin from the handoff state.
+export function validateVisualReports(workspacePath, taskIds, evidenceSchema) {
     const byTaskId = {};
     for (const id of taskIds) {
         const filePath = visualEvidencePath(workspacePath, id);
@@ -312,7 +333,7 @@ export function validateVisualReports(workspacePath, taskIds) {
         catch {
             continue;
         }
-        const v = validateVisualReport(content);
+        const v = validateVisualReport(content, evidenceSchema);
         if (!v.ok)
             byTaskId[id] = v;
     }
