@@ -16,6 +16,27 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.87.0] - 2026-07-15
+
+### Added
+- **`e23-evidence-schema-versioning` — Evidence-schema versioning: pinned `evidence_schema` field + normalized-contains H2 matching + named rejection envelopes (v3.87.0, backlog E23).** Fixes the 104447-F0 class where a mid-flight evidence-schema tightening made crash-era artifacts that were legal when written illegal at resume. (D1) `evidence_schema` integer pin, server-stamped on the first write of a new `active_feature` (never client-supplied — zod surface unchanged); feature-scoped carry mirrors `dispatch_mode` (preserve same-feature, drop+restamp on change). Handoff schema **v12→v13** with a migration that invents no pin — absent stays absent and validates under the current (v2) rules, which are a strict superset (backwards-compatible; old files migrate lazily). (D2) `gates/evidence-schema.ts` (`EVIDENCE_SCHEMA_CURRENT=2`) + `sliceH2SectionAt`/`findH2LineAt` in `tools/evidence-file.ts`: pin 1 replays the legacy exact anchor byte-for-byte; pin ≥2/absent matches H2 headings by normalized-contains, so the incident heading `## Phase 3.5 — AC Execution Log` now clears. `verdictIsPass` value semantics and pass/fail cell parsers unchanged. (D3) `VISUAL_EVIDENCE_MISSING` / `VISUAL_REPORT_INCOMPLETE` / `AC_EXECUTION_LOG_MISSING` envelopes now name the missing section / expected string, the file path(s) inspected, and the evidence-schema version. Implementation: `gates/evidence-schema.ts` (new), `gates/{ac-execution,registry,visual}.ts`, `schema/{versions,migrations-handoff}.ts`, `tools/{evidence-file,handoff,handoff-orchestrator}.ts`, `content/skill-qa-visual.md`. Tests: `test/e23-evidence-schema.test.mjs` (18 AC1–AC6 proof tests) + 41 pre-existing fixtures re-baselined for the v13 bump (groups A/B/C per `qa_reports/expected-red_e23-evidence-schema-versioning.txt`); suite **1503/1503** green, coordinator re-verified independently. Spec: `specs/e23-evidence-schema-versioning.md`. Chain: coordinator design study → sr(fable, crash-resumed once after a session-limit kill per Crash-Resume Protocol) → code-reviewer APPROVED (41-failure classification adversarially spot-checked) → qa PASS (`qa_reports/review_T-E23-01.md`, `review_T-E23-02.md`, `review_T-E23-03.md`).
+- **`e20-e21` — Long-run in-turn hard line + crash-checkpoint-via-`bookkeeping_write` SOP lines (v3.87.0, backlog E20 tier (i) + E21).** Content-only. E20 tier (i): a HARD line in `skill-qa-engineer` + `skill-sr-engineer` — long suites/builds run synchronously to completion OR are poll-harvested within the same turn; ending a turn with a run in flight is a violation (tier (ii) `waiting_on` field / per-phase stale thresholds deferred). E21: crash-checkpoint SOP lines — before any long regression/build, roles `bookkeeping_write` completed artifacts (file-mode only; lease timestamp preserved) so Crash-Resume reads the checkpoint instead of git archaeology. Implementation: `content/skill-qa-engineer.md`, `content/skill-sr-engineer.md` (templates are thin pointers, no mirrors). Tests: 13 pins in `test/e20-e21-crash-resilience.test.mjs`; byte/token budget pins re-baselined (`test/context-budget.test.mjs`, `test/qa-visual-skill-split.test.mjs`); suite **1485/1485** green. Chain: mini-chain sr(fable) → code-reviewer(APPROVED) → qa(PASS) (`qa_reports/review_T-E20-01.md`, `review_T-E21-01.md`).
+
+### Changed
+- **gates/evidence-schema.ts**: New module exporting `EVIDENCE_SCHEMA_CURRENT=2` and the evidence-schema gate pieces.
+- **gates/ac-execution.ts, gates/visual.ts**: normalized-contains H2 matching keyed off the pinned `evidence_schema` (pin 1 exact legacy replay, ≥2/absent contains); rejection envelopes name section/expected-string/path/version.
+- **gates/registry.ts**: evidence-schema envelope registration.
+- **schema/versions.ts, schema/migrations-handoff.ts**: handoff schema v12→v13 + migration (invents no pin).
+- **tools/evidence-file.ts, tools/handoff.ts, tools/handoff-orchestrator.ts**: `sliceH2SectionAt`/`findH2LineAt`, `evidence_schema` server-stamp on first write of a new feature, feature-scoped carry.
+- **content/skill-qa-visual.md**: evidence-schema note.
+- **content/skill-qa-engineer.md, content/skill-sr-engineer.md**: E20 long-run-in-turn hard line + E21 crash-checkpoint-via-`bookkeeping_write` lines.
+- **dist/**: rebuilt for the E23 gate/schema/tool changes.
+
+### Notes
+- driftBaselineIds appended with T-E20-01, T-E21-01, T-E23-01, T-E23-02, T-E23-03
+- No breaking changes to the MCP tool surface or zod schema; the handoff schema v12→v13 bump is backwards-compatible (lazy migration invents no pin; absent validates under the current superset rules). A running MCP server process loads `dist/` at startup and must be restarted to serve the v13/D2 behavior.
+- Also rides on `main` (landed after the v3.86.0 tag): E19 onboarding/opt-in-hook docs housekeeping — SessionStart hook retired to opt-in and no longer presented as default (`f85b08c`, `b89701e`, `f643465`), backlog DONE-mark sync of 39 shipped tickets + D6 row (`bf42442`), release-engineer opus pin in skill + template (`a55f48a`); plus v3.86.0 post-release bookkeeping (`59fe327`, CHANGELOG record-integrity fixes + drift baseline + relayed closing write + metrics).
+
 ## [3.86.0] - 2026-07-14
 
 ### Added
