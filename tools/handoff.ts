@@ -13,6 +13,7 @@ import { withFileLock } from "../guards/file-lock.js";
 import { getActiveStorage } from "./storage.js";
 import type { ToolResult, WorkspaceOnlyInput } from "./registry.js";
 import { CURRENT_VERSIONS, runMigrations } from "../schema/versions.js";
+import { loadExemptions } from "./exemptions.js";
 // Type-only import (erased at compile): the runtime graph stays one-directional
 // (transitions.ts never imports handoff.ts).
 import type { AgentName } from "./transitions.js";
@@ -522,11 +523,27 @@ export function parseHandoff(workspacePath: string): HandoffState | null {
 export function readHandoffState(workspacePath: string): string {
   markStateRead(workspacePath);
 
+  // E24 (exemptions manifest) — read-time surface of .current/exemptions.json,
+  // the ONLY sanctioned §2 build-gate exemption channel. Same posture as the
+  // v10 stale_dispatch advisory below: pure read-time computation, no handoff
+  // schema field, informational, never blocks or throws (loadExemptions
+  // collapses every failure to zero-exemptions + loud errors[]). Surfaced on
+  // tw_get_state because it is the mandatory first action of every role —
+  // the cheapest single point where every agent already looks, so the
+  // exemption list (and its only-grows `count` metric) needs no second read
+  // and no drift-advisory plumbing. File-mode read path only, matching the
+  // sibling E10/E18 file-mode posture.
+  const exemptions = loadExemptions(workspacePath);
+
   const result = readAndMigrate(workspacePath);
   if (!result) {
+    // Surface the manifest even before the first handoff write: an adopted
+    // workspace may declare exemptions before governance state exists, and
+    // sanctioned exemptions must never be silently hidden.
     return JSON.stringify({
       exists: false,
       message: "No handoff state found. This is a fresh project — initialize by calling tw_update_state.",
+      ...(exemptions && { exemptions }),
     });
   }
   const { state, migrationApplied } = result;
@@ -654,7 +671,12 @@ export function readHandoffState(workspacePath: string): string {
     }
   }
 
-  return JSON.stringify({ exists: true, ...view, ...(staleDispatch && { stale_dispatch: staleDispatch }) });
+  return JSON.stringify({
+    exists: true,
+    ...view,
+    ...(staleDispatch && { stale_dispatch: staleDispatch }),
+    ...(exemptions && { exemptions }),
+  });
 }
 
 /**

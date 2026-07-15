@@ -292,6 +292,9 @@ _(No active tasks — ready for the next feature.)_
 - [x] T-E23-01 E23 D1: evidence_schema server-stamped feature-scoped handoff field, schema v12→v13 + migration, EVIDENCE_SCHEMA_CURRENT=2 (note: Re-baselined all 41 fixtures + authored AC1-AC6 proof tests; full suite 1503/1503 green.)
 - [x] T-E23-02 E23 D2: normalized-contains H2 heading match keyed off the evidence_schema pin (v1 exact legacy, ≥2/absent contains) in visual + ac-execution gates (note: D2 normalized-contains verified via AC3/AC4 proof tests (incident-heading replay + suffixed/prefixed headings); pin 1 legacy behavior confirmed unchanged.)
 - [x] T-E23-03 E23 D3: VISUAL_EVIDENCE_MISSING / VISUAL_REPORT_INCOMPLETE / AC_EXECUTION_LOG_MISSING envelopes name missing section + expected string + file path + evidence-schema version (note: D3 envelope detail (section/string, file path, evidence-schema version) verified via AC5 proof tests against all three emit sites.)
+- [ ] T-E24-01 Exemptions manifest loader — .current/exemptions.json schema (path + reason + expiry condition per entry) + loader with validation; prose-only exemptions count as not exempted
+- [ ] T-E24-02 Gate integration — build-gate/§2 checks subtract manifest-exempted paths automatically; const §2 content line documents the manifest as the only sanctioned exemption channel
+- [ ] T-E24-03 Exemption-count metric (monitorable, only-grows — surface count in state/metrics) + tests for loader, gate subtraction, and metric
 
 ## Completed
 
