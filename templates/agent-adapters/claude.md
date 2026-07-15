@@ -11,5 +11,5 @@ This project is managed by agent-governance-mcp. Before acting:
 
 - Subagent dispatch: available (`Task` tool). Use it for role switching when context budget permits.
 - Watermark: required on every reply per Constitution §1 (format: `— @<role> (<model-tier>)`).
-- SessionStart hook: auto-injects constitution context when `.current/` or `tasks.md` is present.
+- Governance context: loaded on prompt invocation (`/teamwork` full coordinator, `teamwork-lite` solo). The SessionStart hook is opt-in (see docs/install.md) — if registered, it auto-injects constitution context when `.current/` or `tasks.md` is present; register it in at most ONE settings file.
 <!-- END agc-adapter -->

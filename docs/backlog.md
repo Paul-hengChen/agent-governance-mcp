@@ -1405,4 +1405,9 @@ optional-external last.
   as JSON); CLAUDE.md §"Governance context loading" rewritten; docs/install.md
   hook section marked OPT-IN with the double-registration warning; intro link
   anchor fixed. `bin/agent-governance-context.mjs` kept in-tree. Takes effect
-  from the next session start.
+  from the next session start. Follow-up same day: the agc-init adapter
+  template (`templates/agent-adapters/claude.md`) still claimed the hook
+  auto-injects — rewritten to invocation-scoped + opt-in hook wording, and this
+  repo's own CLAUDE.md adapter block synced to match. Note for consumers:
+  workspaces agc-init'd before this date carry the stale line until they re-run
+  `agc init`.
