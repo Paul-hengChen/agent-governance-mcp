@@ -779,13 +779,22 @@ test("AC1/AC2: skill-sr-engineer stripped token count meets ≤ 2642 cap", () =>
   // repro test, confirm RED, record the manifest, THEN fix; AC6 escape to pm). Independently
   // re-measured at 2642 ~tok exactly; cap set to the exact measured value per the
   // established Phase-2 convention (no headroom).
+  // e20-e21-crash-resilience-sop (qa-owned bump, T-E20-01/T-E21-01): cap raised from
+  // 2642 → 2852 to absorb two new SOP steps added between step 4 and step 5: 4a "Crash
+  // checkpoint before long steps" (E21 — bookkeeping_write checkpoint ahead of any long
+  // build/suite, plus a QA-added "(file-mode only)" caveat per the code-reviewer's
+  // non-blocking advisory) and 4b "HARD — long runs end in-turn" (E20 — synchronous-to-
+  // completion or same-turn poll-harvest requirement). Independently re-measured (not
+  // trusted from the code-reviewer's handoff note, which cited 2848 pre-caveat) at 2852
+  // ~tok exactly; cap set to the exact measured value per the established Phase-2
+  // convention (no headroom).
   const SKILL_SR = fs.readFileSync(path.join(ROOT, "content", "skill-sr-engineer.md"), "utf-8");
   const body = SKILL_SR.startsWith("---")
     ? SKILL_SR.slice(SKILL_SR.indexOf("---", 3) + 3).trimStart()
     : SKILL_SR;
   const stripped = stripRationale(stripOriginTags(expandSkill(body)));
   const toks = approxTokens(stripped);
-  assert.ok(toks <= 2642, `skill-sr stripped body (${toks} ~tok) must be ≤ 2642 (AC2, e2-bugfix-repro-gate re-baseline)`);
+  assert.ok(toks <= 2852, `skill-sr stripped body (${toks} ~tok) must be ≤ 2852 (AC2, e20-e21-crash-resilience-sop re-baseline)`);
 });
 
 // --- governance-text-load Round-2: constitution rationale fencing (T-GTL-06/07) ---

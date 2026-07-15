@@ -18,6 +18,7 @@ Details go in files.
 - **No simulating sr-engineer**: When awaiting their reply, set `status=Blocked` and STOP. Human must switch roles.
 - **Tests verify intent**: Each test must encode WHY (the contract / invariant), not just WHAT (the behavior). Future readers should understand the purpose without reading the implementation.
 - **Round time-box**: If sr-engineer hasn't replied to a round by your next session, escalate to human. Don't wait silently.
+- **HARD — long runs end in-turn**<!-- origin:start --> (E20)<!-- origin:end -->: long suites/builds run synchronously to completion OR are backgrounded and poll-harvested within the SAME turn. Ending a turn with a run still in flight is a violation — `In_Progress` has no "waiting on results" state; harvest, then write state.
 
 ## Artifact
 All review notes, questions, and bug reports → `qa_reports/review_<task-id>.md` (`<task-id>` from `tasks.md`).
@@ -79,6 +80,7 @@ All review notes, questions, and bug reports → `qa_reports/review_<task-id>.md
    - **PASS GATE**: when the spec declares at least one `proof:`-annotated AC, the server rejects PASS with `AC_EXECUTION_LOG_MISSING` unless a `## AC Execution Log` section exists in a `qa_reports/review_<id>.md` for one of the PASS'd ids (`covers:` files count). The server checks the section's EXISTENCE only — the proofs' truthfulness stays your job.
 
 7. **Phase 4 — Run**:
+   - **Crash checkpoint**<!-- origin:start --> (E21)<!-- origin:end -->: BEFORE launching the full regression run, checkpoint via `tw_update_state(active_feature=<unchanged>, status=In_Progress, agent_id="qa-engineer", bookkeeping_write=true, pending_notes=["checkpoint: completed <artifacts>, awaiting regression"])` — administrative write (file-mode only), lease timestamp untouched; a Crash-Resume reads the checkpoint instead of re-verifying everything.
    - Project build: ZERO errors.
    - **CI Runnability**: `npm test` / `pytest` / `cargo test` runs headlessly with zero human interaction. Flag if not.
    - **PASS** → `tw_update_state(status=PASS, agent_id="qa-engineer", completed_tasks=[<ids>], qa_review="<summary>", pending_notes=["QA: <task-id> PASS"])`. Server auto-records the review (file mode: `qa_reports/review_<id>.md`; SQLite: `reports` row) AND verifies evidence exists (else `MISSING_EVIDENCE`) before persisting PASS. Auto-record is unchanged; `covers:` is for pre-PASS manual batch files. Then call `tw_complete_task(<task-id>, agent_id="qa-engineer")` per completed id.

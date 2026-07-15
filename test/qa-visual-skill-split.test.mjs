@@ -156,7 +156,15 @@ test("AC-5: byte counts stay within v3.14.0-relaxed budgets (savings invariant v
   // (matches code-reviewer's reported figure exactly, review_reports/
   // review_T-E3-CR.md). Raised 12950 -> 14729 (~400-byte headroom) per the
   // established ~300-550-byte convention.
-  assert.ok(qaSize <= 14729, `qa-engineer.md must be <= 14729 bytes (got ${qaSize})`);
+  // e20-e21-crash-resilience-sop (qa-owned bump, T-E20-01/T-E21-01): the E20 hard
+  // rule bullet ("HARD — long runs end in-turn") plus the E21 Phase-4 crash-
+  // checkpoint bullet (code-reviewer confirmed the bytes are justified), plus a
+  // QA-added "(file-mode only)" caveat on the crash-checkpoint bullet per the
+  // reviewer's non-blocking advisory, bringing the file to 15121 bytes —
+  // independently re-measured with `wc -c content/skill-qa-engineer.md`. Raised
+  // 14729 -> 15500 (~379-byte headroom) per the established ~300-550-byte
+  // convention.
+  assert.ok(qaSize <= 15500, `qa-engineer.md must be <= 15500 bytes (got ${qaSize})`);
   // qa-visual.md: v3.36.0 adds B10 (Step B0 carry-forward gate) and B11
   // (Step B1 deterministic pixel-diff pre-screen + Step B2 LLM-only path).
   // These are SOP-prose insertions totalling ~5400 bytes on top of the
