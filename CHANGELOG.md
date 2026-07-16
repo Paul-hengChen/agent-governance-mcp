@@ -16,6 +16,24 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.89.0] - 2026-07-16
+
+### Added
+- **`e26-gate-stats` — `tw_gate_stats` per-gate fire-count coverage reader (v3.89.0, backlog E26, 104447-F0 §4-D).** New read-only twelfth `tw_*` tool that aggregates the two observability sidecars the E6 rule-retirement retro (`docs/gate-retro-procedure.md`) consumes — `.current/telemetry.jsonl` (one line per `GATE_REGISTRY`-cataloged rejection, from D3) and `.current/metrics.jsonl` (one line per shipped feature, from E8) — into per-gate / per-error-code counts, so the retro runs on data instead of raw `jq` + hand-categorization (the 2026-07-13 and 2026-07-15 retros both hand-tallied). (D1) `tools/gate-stats.ts` — full `GATE_REGISTRY` coverage (fired codes ranked by count plus the complete zero-fire list), per-feature and per-agent breakdowns, first/last timestamps, unregistered-code detection (a gate added/removed mid-window: investigate, don't count), and a deduped metrics summary keyed on the E12 `(feature, released_version)` idempotency key (pre-E12 double-appends healed at read time). (D2) **Category boundary — the load-bearing E26 requirement**: telemetry can prove a *gate-backed* rule dead or alive because every enforcement path emits a `GATE_REGISTRY` error code, but *prose-behavioral* rules (§5 read cap, §1 terse cap, `dispatch_pins` honoring, the coordinator token-budget brake) have NO server gate and therefore NO telemetry. The output makes this structural: prose-behavioral rows live in a separate array whose `fires` is `null` (never `0`), so a reader can never conflate "not measured" with "never fired" — zero fires for a prose rule means transcript sampling is required, never auto-retirement. (D3) Never-throws posture (mirrors the `tools/exemptions.ts` loader): a missing sidecar is the normal young-workspace case (zero counts + a note), a malformed line is skipped and counted loudly, and no failure mode may block a retro. Registered in `tools/registry.ts` with the `WorkspaceOnly` zod schema. Spec: backlog row `docs/backlog.md` §E26 (backlog-row-as-spec mini-chain, no dedicated `specs/` file — same pattern as E24). Chain: mini-chain sr(fable) → code-reviewer(APPROVED, `review_reports/review_T-E26-01.md`) → qa-engineer(PASS). Evidence (archived per SOP step 7a into `qa_reports/archive/e26-gate-stats/`): `review_T-E26-01.md` (covers T-E26-01/02/03), `review_T-E26-02.md`, `review_T-E26-03.md`.
+
+### Changed
+- **tools/gate-stats.ts**: New read-only aggregation module implementing `handleGateStats` (413 lines).
+- **tools/registry.ts**: `tw_gate_stats` registry entry + `handleGateStats` import.
+- **docs/gate-retro-procedure.md**: retro procedure steps 2–4 now point at `tw_gate_stats` as the preferred aggregation (the `jq` one-liners retained as a no-server fallback); adds the gate-backed vs prose-behavioral category note; drops the stale hardcoded "22 entries" `GATE_REGISTRY` count.
+- **CLAUDE.md**: tool inventory updated from eleven to twelve `tw_*` tools; `tools/gate-stats.ts` added to the layout map.
+- **test/e26-gate-stats.test.mjs**: 26-test coverage / never-throws / dedupe matrix.
+- **dist/**: rebuilt for the new `tools/gate-stats.ts` module + `tools/registry.ts` entry.
+
+### Notes
+- driftBaselineIds appended with T-E26-01, T-E26-02, T-E26-03
+- Chain: mini-chain sr(fable) → code-reviewer(APPROVED) → qa-engineer(PASS), one pass, 4 hops; full suite **1547/1547** green, build zero errors, `npm audit` clean at high (one pre-existing low-severity esbuild advisory, below the high threshold).
+- No breaking changes to the MCP tool surface or handoff schema; `tw_gate_stats` is a purely additive read-only tool. A running MCP server process loads `dist/` at startup and must be restarted to expose the new tool.
+
 ## [3.88.0] - 2026-07-16
 
 ### Added
