@@ -16,6 +16,25 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.88.0] - 2026-07-16
+
+### Added
+- **`e24-exemptions-manifest` — Declarative build-gate exemptions manifest `.current/exemptions.json` (v3.88.0, backlog E24, 104447-F0 C2).** Replaces prose-only, re-litigated-every-round build-gate exemptions with a single declarative channel: a permanent-violation state (e.g. the 104447 workspace's 33 known tsc errors across exempted test files) is now recorded once in a committed manifest instead of re-explained in every review/QA round, so it stops teaching agents that rules are negotiable. (D1) `tools/exemptions.ts` — a never-throws loader (mirrors the `config.ts` validation posture but sits on the mandatory `tw_get_state` path). Entry shape: `path` + `reason` + `expires_when` (`expires_when` is a recorded, human-checked string — no server-side expiry engine per the cut). Fail direction is **never-silently-exempt**: absent file = no exemptions; structural malformation (bad JSON / root / `schema_version` / non-array) voids the whole manifest to zero exemptions plus a loud `errors[]`; a single malformed entry is dropped (NOT exempted) while valid siblings survive. `schema_version` 1 (absent === 1; future versions refused loudly — birth version has no migration registry entry yet). (D2) `tools/handoff.ts` surfaces the manifest read-time in the `tw_get_state` envelope (both `exists:true` and fresh-workspace branches) as `exemptions` — pure read-time computation, NO handoff-schema bump, informational, never blocks; `tw_get_state` chosen because it is every role's mandatory first action, so the sanctioned exemption list + only-grows `count` metric need no second read (manifest is a committed file — count growth is auditable via git history). (D3) `content/const-05-core-standards.md` §2 gains one bullet: the manifest is the ONLY sanctioned exemption channel; gates subtract manifest-exempted paths automatically; a prose-only exemption counts as NOT exempted; a malformed manifest exempts nothing; `exemptions.count` is a monitored only-grows metric (adding an entry requires human approval). Tests: `test/e24-exemptions.test.mjs` (loader / envelope matrix — absent, structural-malformation-voids-all, per-entry-drop, schema-version handling). Spec: backlog row `docs/backlog.md` §E24 (backlog-row-as-spec mini-chain, no dedicated `specs/` file). Chain: mini-chain sr(fable) → code-reviewer(APPROVED, `review_reports/review_T-E24-01.md`) → qa-engineer(PASS). Evidence (archived per SOP step 7a into `qa_reports/archive/e24-exemptions-manifest/`): `review_T-E24-01.md`, `review_T-E24-02.md`, `review_T-E24-03.md`.
+
+### Changed
+- **tools/exemptions.ts**: New never-throws loader module for `.current/exemptions.json`.
+- **tools/handoff.ts**: `readHandoffState` calls `loadExemptions` and adds an `exemptions` key to the `tw_get_state` envelope on both the fresh-workspace and `exists:true` branches (read-time only; no schema field).
+- **content/const-05-core-standards.md**: One §2 bullet — declarative build-gate exemptions manifest as the sole sanctioned exemption channel.
+- **test/context-budget.test.mjs**: 4 budget pins re-baselined +~188 tok for the new const-05 §2 bullet (declared in `qa_reports/archive/e24-exemptions-manifest/expected-red_e24-exemptions-manifest.txt`).
+- **test/fixtures/compose-golden/**: 10 compose goldens + `constitution-monolith.txt` regenerated for the const-05 addition.
+- **dist/**: rebuilt for the new `tools/exemptions.ts` module + `tools/handoff.ts` integration.
+
+### Notes
+- driftBaselineIds appended with T-E24-01, T-E24-02, T-E24-03
+- Chain: mini-chain sr(fable) → code-reviewer(APPROVED) → qa-engineer(PASS), one pass, 4 hops; full suite **1521/1521** green, build green, `npm audit` clean at high
+- No breaking changes to the MCP tool surface or handoff schema; the `exemptions` envelope key is additive and read-time only (no `schema_version` bump). A running MCP server process loads `dist/` at startup and must be restarted to surface the E24 read-time envelope key.
+- Also rides on `main` (landed after the v3.87.0 tag): second gate-fire retro (E6 cadence) `docs/retro-2026-07-15-gate-fire.md` + `docs/gate-retro-procedure.md` pointer (`d875882`), README install-pin + suite-count catch-up (`ead9dfc`); plus v3.87.0 post-release bookkeeping (`87170e9`).
+
 ## [3.87.0] - 2026-07-15
 
 ### Added
