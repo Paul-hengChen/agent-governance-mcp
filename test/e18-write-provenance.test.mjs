@@ -27,13 +27,27 @@
 //   QA-evidence gate accepts once per-id evidence exists        -> QAEV-2
 //   QA-evidence gate does not re-gate a cumulative list-back
 //     (no NEW ids)                                              -> QAEV-3
-//   QA-evidence gate exempts the APPROVED-row edge when
-//     review_reports evidence exists                            -> QAEV-4
+//   QA-evidence gate: the OLD sanctioned APPROVED-row shape
+//     (completed_tasks manifest + review_reports evidence, NO
+//     qa_reports) is now REJECTED — the exemption is removed         -> QAEV-4a
+//   QA-evidence gate: the AMENDED APPROVED-row shape (review_task_ids
+//     manifest, completed_tasks EMPTY) is ACCEPTED, ledger stays []  -> QAEV-4b
 //   Incident replay: the exact E5 identity-swap shape is now
 //     rejected                                                  -> QAEV-INCIDENT
 //   QA-evidence gate is file-mode only (SQLite inert)            -> QAEV-SQL
 //   Content pins: const-08 origin tags + skill-release-engineer
 //     COORDINATOR-RELAYED hard line                              -> CONTENT-1..3
+//
+// E32 amendment (2026-07-16, e32-e33-gate-hardening): the fourth
+// E9A/E18-class incident showed the APPROVED-row `completed_tasks`
+// exemption above was itself the hole — an unsanctioned pre-fill riding the
+// (code-reviewer,In_Progress)->(qa-engineer,In_Progress) edge was
+// byte-identical to the sanctioned write. QAEV-4a/b replace the old
+// single QAEV-4 exemption test with the amended contract (specs/
+// c16-c10-role-boundary.md Amendment section; review_reports/
+// review_T-E32-01.md rounds 1-2). See also test/e32-e33-gate-hardening.test.mjs
+// for the permanent R1-incident regression pin, the P6a/P6b/P6c
+// divergent-field matrix, and the rejection-envelope content assertions.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -369,20 +383,22 @@ test("QAEV-3: a cumulative list-back (only ids ALREADY on disk, no new ones) is 
   assert.ok(!result.isError, `passing back the same (already-on-disk) id list must never gate: ${result.content?.[0]?.text}`);
 });
 
-test("QAEV-4: the sanctioned APPROVED-row edge (code-reviewer:In_Progress -> qa-engineer:In_Progress) with review_reports evidence is EXEMPT from QA_COMPLETION_EVIDENCE_MISSING", async () => {
+test("QAEV-4a (E32 amendment): the OLD sanctioned APPROVED-row shape — completed_tasks manifest + review_reports evidence, NO qa_reports — is now REJECTED (exemption removed)", async () => {
   setActiveStorage(new FileHandoffStorage());
-  const ws = mkWs("e18-qaev4-");
-  await seedFileState(ws, "e18-qaev4-feat", "code-reviewer", "In_Progress");
-  // review_reports/ evidence satisfies the pre-existing MISSING_REVIEW_EVIDENCE
-  // gate on this edge — deliberately NO qa_reports/ evidence, proving the NEW
-  // gate does not ALSO demand it on this specific sanctioned edge.
+  const ws = mkWs("e18-qaev4a-");
+  await seedFileState(ws, "e18-qaev4a-feat", "code-reviewer", "In_Progress");
+  // review_reports/ evidence would have satisfied the pre-existing
+  // MISSING_REVIEW_EVIDENCE gate on this edge under the OLD contract —
+  // deliberately NO qa_reports/ evidence. Under the amended contract this
+  // shape (completed_tasks non-empty on a qa-engineer write, no per-id QA
+  // evidence) is rejected UNCONDITIONALLY: no edge/status/verdict exemption.
   writeCodeReviewEvidence(ws, "T-QAEV4-01");
   resetSession(ws);
   markStateRead(ws);
 
   const result = await handleUpdateState({
     workspace_path: ws,
-    active_feature: "e18-qaev4-feat",
+    active_feature: "e18-qaev4a-feat",
     status: "In_Progress",
     agent_id: "qa-engineer",
     completed_tasks: ["T-QAEV4-01"],
@@ -390,10 +406,41 @@ test("QAEV-4: the sanctioned APPROVED-row edge (code-reviewer:In_Progress -> qa-
     pending_notes: ["code-reviewer: APPROVED, handing to qa-engineer"],
   });
   assert.ok(
-    !result.isError,
-    `the APPROVED-row handoff must be exempt from QA_COMPLETION_EVIDENCE_MISSING (evidenced instead by MISSING_REVIEW_EVIDENCE): ${result.content?.[0]?.text}`,
+    result.isError,
+    `the E32 amendment removes the APPROVED-row exemption entirely — this OLD shape must now be REJECTED: ${result.content?.[0]?.text}`,
   );
-  assert.deepEqual(parseHandoff(ws).completed_tasks, ["T-QAEV4-01"]);
+  assert.match(result.content[0].text, /QA_COMPLETION_EVIDENCE_MISSING/);
+  assert.deepEqual(parseHandoff(ws).completed_tasks, [], "the ledger must stay unpolluted — the manifest write never lands");
+});
+
+test("QAEV-4b (E32 amendment): the AMENDED APPROVED-row shape — review_task_ids manifest, completed_tasks EMPTY — is ACCEPTED, ledger stays []", async () => {
+  setActiveStorage(new FileHandoffStorage());
+  const ws = mkWs("e18-qaev4b-");
+  await seedFileState(ws, "e18-qaev4b-feat", "code-reviewer", "In_Progress");
+  // Amended contract: review scope travels ONLY in the transient
+  // review_task_ids field; completed_tasks stays empty on the APPROVED row.
+  // review_reports/ evidence satisfies MISSING_REVIEW_EVIDENCE (which now
+  // reads review_task_ids); QA_COMPLETION_EVIDENCE_MISSING never arms
+  // because completed_tasks is empty (nothing grows).
+  writeCodeReviewEvidence(ws, "T-QAEV4-02");
+  resetSession(ws);
+  markStateRead(ws);
+
+  const result = await handleUpdateState({
+    workspace_path: ws,
+    active_feature: "e18-qaev4b-feat",
+    status: "In_Progress",
+    agent_id: "qa-engineer",
+    completed_tasks: [],
+    review_task_ids: ["T-QAEV4-02"],
+    review_verdict: "APPROVED",
+    pending_notes: ["code-reviewer: APPROVED, handing to qa-engineer"],
+  });
+  assert.ok(
+    !result.isError,
+    `the amended compliant shape (review_task_ids + empty completed_tasks) must be ACCEPTED: ${result.content?.[0]?.text}`,
+  );
+  assert.deepEqual(parseHandoff(ws).completed_tasks, [], "review scope must NOT persist into completed_tasks under the amended contract");
 });
 
 // ---------------------------------------------------------------------------

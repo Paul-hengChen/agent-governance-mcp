@@ -18,9 +18,14 @@
 //   omitting the field on write is silent (server carry-forward) -> S1, S2
 //   a feature-change write is silent even though the set shrinks -> F1, F2
 //   envelope stays valid, additive JSON (no keys dropped/altered)-> J1, J2
-//   reviewer probe 1: same-cardinality SWAP passes silently      -> P1a, P1b
-//     (current behavior, matches literal "shrink/fewer" spec wording;
-//      a fix is filed as backlog E33 — NOT implemented here, only pinned)
+//   reviewer probe 1: same-cardinality SWAP now WARNS naming the
+//     dropped entry (E33 entry-identity diff, e32-e33-gate-hardening) -> P1a, P1b
+//     (re-pinned post-E33: the old strict-cardinality `nextSize <
+//      prevLength` compare that let equal-count swaps drop entries
+//      silently is replaced by an entry-identity diff — dispatch_pins by
+//      key set, external_refs by ref string — so a same-count swap now
+//      warns too. See tools/handoff-orchestrator.ts:1297-1342 and
+//      review_reports/review_T-E32-01.md "T-E33-01 — CORRECT" section.)
 //   reviewer probe 2: no strict-envelope consumer breaks         -> J1, J2
 //     (additive key only; grep confirms no test/*.mjs asserts an exact key
 //      set on the tw_update_state response envelope)
@@ -255,18 +260,19 @@ test("J2: a non-shrink write's envelope carries NO warnings key at all (byte-ide
 });
 
 // ============================================================================
-// P1a/P1b: reviewer probe 1 — same-cardinality SWAP passes silently. This is
-// CURRENT, PIN-AS-IS behavior: shrink detection is `nextSize < prevLength`
-// (strict cardinality), so a same-count entry swap drops one entry with NO
-// warning. Matches the spec's literal "shrink"/"fewer entries" wording, so
-// this is in-scope-correct per code-reviewer's non-blocking observation
-// (review_T-E25-01.md §Correctness) — NOT a defect. A fix (entry-identity
-// diff, warn on ANY drop even at equal count) is filed as backlog E33; do
-// NOT implement it here. These tests PIN the current behavior so a future
-// accidental fix-without-a-ticket doesn't silently change this contract.
+// P1a/P1b: reviewer probe 1 — same-cardinality SWAP. RE-PINNED (E33,
+// e32-e33-gate-hardening): shrink detection is now an ENTRY-IDENTITY diff
+// (dispatch_pins by key set, external_refs by ref string), not cardinality,
+// so a same-count entry swap that drops a prior entry WARNS, naming the
+// dropped entry — the E28-as-shipped `nextSize < prevLength` compare that
+// let this through silently is fixed. code-reviewer verified this live
+// (review_reports/review_T-E32-01.md "T-E33-01 — CORRECT, no findings" /
+// round-2 "T-E33-01 regression ... CLEAN"). A value-only pin change (key
+// survives) or an external_refs state advance (ref survives) is still NOT a
+// drop and stays silent — see W1/W2/S1/S2/F1/F2 above, unchanged.
 // ============================================================================
 
-test("P1a (probe 1, pin-as-is): a same-count dispatch_pins SWAP drops an entry with NO warning (E33 not yet fixed)", async () => {
+test("P1a (probe 1, post-E33): a same-count dispatch_pins SWAP drops an entry and WARNS, naming it", async () => {
   const ws = await seedAndRead({
     seed: { dispatchPins: { "sr-engineer": "fable", "release-engineer": "opus" } },
   });
@@ -275,10 +281,13 @@ test("P1a (probe 1, pin-as-is): a same-count dispatch_pins SWAP drops an entry w
   });
   assert.ok(!result.isError);
   const envelope = JSON.parse(result.content[0].text);
-  assert.equal(envelope.warnings, undefined, "PIN: equal-cardinality swap is currently silent (backlog E33 tracks the fix, not implemented here)");
+  assert.ok(Array.isArray(envelope.warnings) && envelope.warnings.length === 1, "post-E33: an equal-cardinality swap must warn (entry-identity diff, not cardinality)");
+  assert.match(envelope.warnings[0], /dispatch_pins REPLACES wholesale/);
+  assert.match(envelope.warnings[0], /kept 1 of 2/);
+  assert.match(envelope.warnings[0], /dropped: release-engineer/);
 });
 
-test("P1b (probe 1, pin-as-is): a same-count external_refs SWAP drops an entry with NO warning (E33 not yet fixed)", async () => {
+test("P1b (probe 1, post-E33): a same-count external_refs SWAP drops an entry and WARNS, naming it", async () => {
   const ws = await seedAndRead({
     seed: { externalRefs: [{ ref: "JIRA-1", state: "indexed" }, { ref: "JIRA-2", state: "unresolved" }] },
   });
@@ -287,5 +296,8 @@ test("P1b (probe 1, pin-as-is): a same-count external_refs SWAP drops an entry w
   });
   assert.ok(!result.isError);
   const envelope = JSON.parse(result.content[0].text);
-  assert.equal(envelope.warnings, undefined, "PIN: equal-cardinality swap is currently silent (backlog E33 tracks the fix, not implemented here)");
+  assert.ok(Array.isArray(envelope.warnings) && envelope.warnings.length === 1, "post-E33: an equal-cardinality swap must warn (entry-identity diff, not cardinality)");
+  assert.match(envelope.warnings[0], /external_refs REPLACES wholesale/);
+  assert.match(envelope.warnings[0], /kept 1 of 2/);
+  assert.match(envelope.warnings[0], /dropped: JIRA-2/);
 });

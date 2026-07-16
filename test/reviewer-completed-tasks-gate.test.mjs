@@ -12,11 +12,18 @@
 //   AC-3 bullet 2 (zod-default completed_tasks omitted entirely, full
 //     TOOL_REGISTRY dispatch — crash-safety per review_T-C16-01.md finding)
 //                                                          -> FM3
-//   AC-3 bullet 3 (APPROVED row, agent_id=qa-engineer, non-empty
-//     completed_tasks: new gate does not fire; pre-existing
-//     MISSING_REVIEW_EVIDENCE still fires correctly — file mode)
+//   AC-3 bullet 3 (APPROVED row, agent_id=qa-engineer: new gate does not
+//     fire; pre-existing MISSING_REVIEW_EVIDENCE still fires correctly —
+//     file mode) — RE-PINNED (E32 amendment, e32-e33-gate-hardening):
+//     review scope now travels via review_task_ids, completed_tasks stays
+//     empty (a non-empty completed_tasks on this write would instead hit
+//     the amended QA_COMPLETION_EVIDENCE_MISSING gate first — see
+//     test/e18-write-provenance.test.mjs QAEV-4a/b and
+//     test/e32-e33-gate-hardening.test.mjs C2/P6a/P6b/P6c)
 //                                                          -> FM4, FM5
-//   AC-3 bullet 3 (same, SQLite mode)                       -> SQ3
+//   AC-3 bullet 3 (same, SQLite mode — unaffected by the E32 amendment:
+//     QA_COMPLETION_EVIDENCE_MISSING is file-mode only, so SQ3 keeps the
+//     pre-amendment completed_tasks shape)                 -> SQ3
 //
 // WHY: the C16 incident was a code-reviewer write's `completed_tasks` field
 // polluting the handoff ledger with ids qa-engineer never actually completed
@@ -34,7 +41,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
-import { writeHandoffState } from "../dist/tools/handoff.js";
+import { writeHandoffState, parseHandoff } from "../dist/tools/handoff.js";
 import { markStateRead, resetSession } from "../dist/guards/session.js";
 import { setActiveStorage, FileHandoffStorage } from "../dist/tools/storage.js";
 import { handleUpdateState } from "../dist/tools/handoff-orchestrator.js";
@@ -155,15 +162,21 @@ test("FM3: tw_update_state with completed_tasks omitted defaults to [] (zod) and
 });
 
 // ---------------------------------------------------------------------------
-// FM4 / FM5 — AC-3 bullet 3: the APPROVED row (agent_id=qa-engineer, non-empty
-// completed_tasks) is untouched by the new gate — it keys on agent_id, not on
-// which role authored the call. The pre-existing MISSING_REVIEW_EVIDENCE gate
-// downstream must still fire correctly (FM4: evidence absent -> rejected by
-// MISSING_REVIEW_EVIDENCE, NOT by the new gate) and clear when evidence exists
-// (FM5: positive control, proves the new gate is truly inert on this path).
+// FM4 / FM5 — AC-3 bullet 3: the APPROVED row is untouched by the new
+// REVIEWER_COMPLETED_TASKS_REJECTED gate — it keys on agent_id, not on which
+// role authored the call. RE-PINNED (E32 amendment, e32-e33-gate-hardening):
+// review scope now travels via the transient review_task_ids field, with
+// completed_tasks staying EMPTY on this row (a non-empty completed_tasks
+// here would instead be caught by the amended QA_COMPLETION_EVIDENCE_MISSING
+// gate FIRST — see test/e18-write-provenance.test.mjs QAEV-4a). The
+// pre-existing MISSING_REVIEW_EVIDENCE gate downstream must still fire
+// correctly off review_task_ids (FM4: evidence absent -> rejected by
+// MISSING_REVIEW_EVIDENCE, NOT by the new gate) and clear when evidence
+// exists (FM5: positive control, proves the new gate is truly inert on this
+// path and that completed_tasks stays unpolluted).
 // ---------------------------------------------------------------------------
 
-test("FM4: qa-engineer APPROVED-row write with non-empty completed_tasks and NO review evidence is rejected by MISSING_REVIEW_EVIDENCE, not the new gate (file mode)", async () => {
+test("FM4 (E32 amendment): qa-engineer APPROVED-row write with review_task_ids and NO review evidence is rejected by MISSING_REVIEW_EVIDENCE, not the new gate (file mode)", async () => {
   setActiveStorage(new FileHandoffStorage());
   const ws = mkWorkspace("rctg-fm4-");
   await seedFileState(ws, "rctg-fm4", "code-reviewer", "In_Progress");
@@ -174,7 +187,9 @@ test("FM4: qa-engineer APPROVED-row write with non-empty completed_tasks and NO 
     active_feature: "rctg-fm4",
     status: "In_Progress",
     agent_id: "qa-engineer",
-    completed_tasks: ["T-RCTG-EV"],
+    completed_tasks: [],
+    review_task_ids: ["T-RCTG-EV"],
+    review_verdict: "APPROVED",
     pending_notes: ["code-reviewer: APPROVED"],
   });
   assert.ok(result.isError, "no review evidence on disk must still be rejected");
@@ -184,11 +199,15 @@ test("FM4: qa-engineer APPROVED-row write with non-empty completed_tasks and NO 
   );
   assert.ok(
     !result.content[0].text.includes("REVIEWER_COMPLETED_TASKS_REJECTED"),
-    "the new gate must NOT fire for an agent_id=qa-engineer write, even with non-empty completed_tasks",
+    "the new gate must NOT fire for an agent_id=qa-engineer write",
+  );
+  assert.ok(
+    !result.content[0].text.includes("QA_COMPLETION_EVIDENCE_MISSING"),
+    "with completed_tasks empty the amended completion-evidence gate must not fire either — the two gates are orthogonal",
   );
 });
 
-test("FM5: qa-engineer APPROVED-row write with non-empty completed_tasks and review evidence PRESENT is ACCEPTED (file mode, positive control)", async () => {
+test("FM5 (E32 amendment): qa-engineer APPROVED-row write with review_task_ids and review evidence PRESENT is ACCEPTED, completed_tasks stays empty (file mode, positive control)", async () => {
   setActiveStorage(new FileHandoffStorage());
   const ws = mkWorkspace("rctg-fm5-");
   await seedFileState(ws, "rctg-fm5", "code-reviewer", "In_Progress");
@@ -202,10 +221,13 @@ test("FM5: qa-engineer APPROVED-row write with non-empty completed_tasks and rev
     active_feature: "rctg-fm5",
     status: "In_Progress",
     agent_id: "qa-engineer",
-    completed_tasks: ["T-RCTG-EV2"],
+    completed_tasks: [],
+    review_task_ids: ["T-RCTG-EV2"],
+    review_verdict: "APPROVED",
     pending_notes: ["code-reviewer: APPROVED"],
   });
   assert.ok(!result.isError, `review evidence present must clear MISSING_REVIEW_EVIDENCE; got: ${result.content?.[0]?.text}`);
+  assert.deepEqual(parseHandoff(ws).completed_tasks, [], "review scope must NOT persist into completed_tasks under the amended contract");
 });
 
 // ---------------------------------------------------------------------------
