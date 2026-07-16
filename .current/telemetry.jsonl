@@ -16,3 +16,5 @@
 {"ts":"2026-07-15T06:24:17.708Z","gate":"orchestrator","error_code":"EXPECTED_RED_DIFF_MISSING","agent_id":"qa-engineer","feature":"e23-evidence-schema-versioning"}
 {"ts":"2026-07-15T06:25:03.099Z","gate":"orchestrator","error_code":"AC_EXECUTION_LOG_MISSING","agent_id":"qa-engineer","feature":"e23-evidence-schema-versioning"}
 {"ts":"2026-07-15T07:20:19.844Z","gate":"orchestrator","error_code":"EXPECTED_RED_DIFF_MISSING","agent_id":"qa-engineer","feature":"e24-exemptions-manifest"}
+{"ts":"2026-07-16T07:53:55.097Z","gate":"validateTransition","error_code":"TRANSITION_REJECTED","agent_id":"qa-engineer","feature":"e31-config-nonfatal"}
+{"ts":"2026-07-16T07:54:13.826Z","gate":"orchestrator","error_code":"EXPECTED_RED_DIFF_MISSING","agent_id":"qa-engineer","feature":"e31-config-nonfatal"}
