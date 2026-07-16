@@ -17,10 +17,13 @@
 //   file-mode only, no new handoff state / no schema bump                 -> I1 (schema
 //                                                                             pin), S1
 //   code-reviewer's flagged vector: corrupt/future-schema config + stale  -> I7, I8,
-//     dispatch — INDEPENDENTLY VERIFIED to NOT behave as review_T-E22-01.md    I7b/I8b
-//     claims (see the I7-I9 block header comment below for the full
-//     writeup): the read throws before notify.error is ever reached. A
-//     non-blocking correctness finding, escalated, not a T-E22-01 FAIL.
+//     dispatch — RE-PINNED post-E31 (e31-config-nonfatal, qa-engineer):        I7b/I8b
+//     at E22 QA time the read threw before notify.error was ever reached
+//     (escalated as backlog E31, a non-blocking correctness finding, not a
+//     T-E22-01 FAIL). E31 made loadConfig non-fatal server-wide, so this
+//     vector now matches the review doc's ORIGINAL claim: tw_get_state
+//     returns an envelope carrying `config_error`, never throws (see the
+//     I7-I9 block header comment below for the full writeup).
 //     Common disarmed path (valid config, key absent) unperturbed          -> I2
 //
 // Fail-direction under test throughout: fail LOUD, never SILENT and never
@@ -409,68 +412,91 @@ test("I6: armed config but the dispatch is still WITHIN the threshold window -> 
 
 // ============================================================================
 // I7-I9 — code-reviewer's flagged vector: corrupt/future-schema config +
-// stale dispatch. review_reports/review_T-E22-01.md claims this "will newly
-// surface stale_dispatch.notify.error even when E22 was never armed" and
-// characterizes it as fail-loud-but-never-throws.
+// stale dispatch. review_reports/review_T-E22-01.md originally claimed this
+// "will newly surface stale_dispatch.notify.error even when E22 was never
+// armed" (fail-loud-but-never-throws). At E22 QA time that claim did NOT
+// hold: `readHandoffState` called `markStateRead` -> `findTasksFile` ->
+// `resolveTaskPaths` -> `loadConfig` for TASK-PATH resolution BEFORE the
+// stale_dispatch/notify computation was reached, and THAT EARLIER loadConfig
+// call threw uncaught on corrupt/future-schema config — the whole
+// tw_get_state pre-flight read threw, never reaching notify at all. Filed as
+// backlog E31 (qa_reports/review_T-E22-01.md Phase 1).
 //
-// INDEPENDENT VERIFICATION FINDING (see QA review doc for full writeup):
-// that claim does not hold. `readHandoffState` calls `markStateRead` ->
-// `findTasksFile` -> `resolveTaskPaths` -> `loadConfig` for TASK-PATH
-// resolution BEFORE the stale_dispatch/notify computation is ever reached
-// (tools/handoff.ts:283 via guards/session.ts). That EARLIER loadConfig call
-// throws uncaught on corrupt/future-schema config, so the whole read (and
-// the mandatory tw_get_state pre-flight action) throws — it never gets far
-// enough to produce a `stale_dispatch.notify.error`. I7/I8 pin the TRUE
-// observed behavior (a throw), not the review doc's claim.
-//
-// Confirmed via a companion diagnostic (not a formal test, verified
-// manually in the QA session) that this reproduces on a BARE workspace with
-// no handoff.md and no stale dispatch at all — i.e. this is a pre-existing
-// gap in the config/task-path subsystem, orthogonal to and unmodified by
-// the E22 diff (tools/config.ts's E22 hunk only ADDS the
-// staleDispatchNotifyFile field parser; the throwing statements below it
-// are untouched — see `git diff HEAD~1 HEAD -- tools/config.ts`). Escalated
-// as a non-blocking correctness finding, not a T-E22-01 regression.
+// RE-PINNED (E31, e31-config-nonfatal): loadConfig no longer throws on ANY
+// config-file fatality (unreadable/unparseable/non-object-root/future-schema)
+// — it degrades to defaults and the failure is cached + surfaced via
+// getConfigError(), which tools/handoff.ts spreads onto the tw_get_state
+// envelope as `config_error`. The ORIGINAL review_T-E22-01.md claim is now
+// the ACTUAL contract: corrupt/future-schema config + stale dispatch no
+// longer throws — tw_get_state returns a normal envelope carrying
+// `config_error`, and (because notifyStaleDispatch's own getConfigError()
+// check short-circuits before ever touching staleDispatchNotifyFile) the
+// stale_dispatch advisory's notify sub-object also surfaces a matching
+// per-emit error (tools/stale-notify.ts) rather than emitting or going silent.
+// I7b/I8b re-confirm the SAME non-throw holds even with zero stale-dispatch
+// involvement (bare workspace, no handoff.md at all) — proving the fix lives
+// in loadConfig itself, not in the stale-dispatch wiring.
 // ============================================================================
 
-test("I7: corrupt (unparsable) .config.json + stale dispatch -> tw_get_state THROWS (pre-existing gap in task-path config resolution, unrelated to and unmodified by the E22 diff — NOT the graceful notify.error the review doc claims)", () => {
+test("I7 (re-pinned E31): corrupt (unparsable) .config.json + stale dispatch -> tw_get_state returns an envelope carrying config_error, never throws", () => {
   const ws = mkWorkspace();
   resetSession();
   writeConfig(ws, "{ this is broken json");
   writeRawHandoff(ws, { staleStamp: isoMinutesAgo(16) });
 
-  assert.throws(
-    () => readHandoffState(ws),
-    /Failed to parse .*\.config\.json/,
-    "the actual behavior is an uncaught throw from the pre-existing task-path loadConfig call site, BEFORE stale_dispatch/notify is ever computed — contradicts review_T-E22-01.md's 'surfaces notify.error, never throws' characterization for this vector",
+  let parsed;
+  assert.doesNotThrow(() => {
+    parsed = JSON.parse(readHandoffState(ws));
+  }, "E31: a corrupt config must never make the mandatory tw_get_state pre-flight read throw");
+  assert.equal(parsed.exists, true);
+  assert.ok(
+    typeof parsed.config_error === "string" && /Failed to parse .*\.config\.json/.test(parsed.config_error),
+    "the degradation must be loud on the envelope, naming the config path and the parse problem",
   );
+  // notifyStaleDispatch's own getConfigError() short-circuit (tools/stale-notify.ts)
+  // means the stale_dispatch advisory still fires but its notify sub-object
+  // surfaces the same config failure rather than emitting or going silent.
+  assert.ok(parsed.stale_dispatch, "the underlying stale-dispatch advisory is unaffected by the config failure");
+  assert.equal(parsed.stale_dispatch.notify.emitted, false);
+  assert.match(parsed.stale_dispatch.notify.error, /\.config\.json/);
 });
 
-test("I8: future-schema .config.json + stale dispatch -> tw_get_state THROWS for the same pre-existing reason as I7 (not a graceful notify.error)", () => {
+test("I8 (re-pinned E31): future-schema .config.json + stale dispatch -> tw_get_state returns an envelope carrying config_error, never throws", () => {
   const ws = mkWorkspace();
   resetSession();
   writeConfig(ws, { schema_version: CURRENT_VERSIONS.config + 99 });
   writeRawHandoff(ws, { staleStamp: isoMinutesAgo(16) });
 
-  assert.throws(
-    () => readHandoffState(ws),
-    /config on-disk version \d+ > server max/,
-    "a from-the-future config must refuse-loud, but that refusal is an uncaught throw out of tw_get_state, not a contained stale_dispatch.notify.error",
+  let parsed;
+  assert.doesNotThrow(() => {
+    parsed = JSON.parse(readHandoffState(ws));
+  }, "E31: a from-the-future config must refuse-loud via config_error, not an uncaught throw");
+  assert.equal(parsed.exists, true);
+  assert.ok(
+    typeof parsed.config_error === "string" && /config on-disk version \d+ > server max/.test(parsed.config_error),
+    "the refusal must be captured on the envelope, not thrown",
   );
+  assert.ok(parsed.stale_dispatch);
+  assert.equal(parsed.stale_dispatch.notify.emitted, false);
 });
 
-test("I7b/I8b — pre-existing-scope pin: the SAME throw reproduces on a bare workspace with NO handoff.md and NO stale dispatch at all, proving this is unrelated to and predates the E22 diff", () => {
+test("I7b/I8b (re-pinned E31) — pre-existing-scope pin still holds: the SAME non-throw reproduces on a bare workspace with NO handoff.md and NO stale dispatch at all, proving the fix lives in loadConfig itself", () => {
   const ws = mkWorkspace();
   resetSession();
   writeConfig(ws, "{ this is broken json");
   // No handoff.md written at all — there is no next_role/dispatched_at, so
   // there is nothing for E22's stale-dispatch wiring to even react to. The
-  // throw is entirely a task-path config-resolution artifact.
-  assert.throws(
-    () => readHandoffState(ws),
-    /Failed to parse .*\.config\.json/,
-    "a corrupt config breaks tw_get_state even with zero stale-dispatch involvement — this gap predates and is orthogonal to T-E22-01",
+  // (non-)throw is entirely a task-path config-resolution behavior.
+  let parsed;
+  assert.doesNotThrow(() => {
+    parsed = JSON.parse(readHandoffState(ws));
+  }, "E31: a corrupt config must not break tw_get_state even with zero stale-dispatch involvement");
+  assert.equal(parsed.exists, false, "no handoff.md yet -> the fresh-project envelope shape");
+  assert.ok(
+    typeof parsed.config_error === "string" && /Failed to parse .*\.config\.json/.test(parsed.config_error),
+    "config_error must surface even on the exists:false envelope",
   );
+  assert.equal(parsed.stale_dispatch, undefined, "no handoff.md means no stale-dispatch advisory to compute at all");
 });
 
 test("I9: armed config but the watch-file's target path is an existing directory + stale dispatch -> tw_get_state never throws, notify.error surfaces", () => {

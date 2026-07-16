@@ -9,7 +9,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
-import { loadConfig } from "../dist/tools/config.js";
+import { loadConfig, getConfigError } from "../dist/tools/config.js";
 import { CURRENT_VERSIONS } from "../dist/schema/versions.js";
 
 function mkWorkspace() {
@@ -82,13 +82,17 @@ test("T31 AC-2: missing config returns empty WorkspaceConfig (no crash)", () => 
 
 // ---------- AC-4: refuse-loud on future versions ----------
 
-test("T31 AC-4: refuses-loud when on-disk schema_version > CURRENT", () => {
+test("T31 AC-4 (re-pinned E31): future schema_version degrades non-fatally — loadConfig returns {} and getConfigError() names the refuse-loud reason, no throw", () => {
   const ws = mkWorkspace();
   writeConfig(ws, { schema_version: 99, taskPaths: ["tasks.md"] });
-  assert.throws(
-    () => loadConfig(ws),
-    /config on-disk version 99 > server max 1/,
-  );
+  let cfg;
+  assert.doesNotThrow(() => {
+    cfg = loadConfig(ws);
+  }, "E31: a future-schema config must never throw out of loadConfig");
+  assert.deepEqual(cfg, {}, "defaults in effect when the on-disk schema can't be understood");
+  const err = getConfigError(ws);
+  assert.ok(typeof err === "string" && err.length > 0, "the refusal must surface via getConfigError, not silence");
+  assert.match(err, /config on-disk version 99 > server max 1/);
 });
 
 // ---------- Field round-trip ----------
@@ -119,16 +123,30 @@ test("T31 round-trip: unknown JSON keys preserved on disk but stripped from type
 
 // ---------- Boundary inputs ----------
 
-test("T31 boundary: malformed JSON throws descriptive error", () => {
+test("T31 boundary (re-pinned E31): malformed JSON degrades non-fatally — {} config + getConfigError() names the parse problem, no throw", () => {
   const ws = mkWorkspace();
   fs.writeFileSync(path.join(ws, ".current", ".config.json"), "{not valid json");
-  assert.throws(() => loadConfig(ws), /Failed to parse/);
+  let cfg;
+  assert.doesNotThrow(() => {
+    cfg = loadConfig(ws);
+  }, "E31: malformed JSON must never throw out of loadConfig");
+  assert.deepEqual(cfg, {});
+  const err = getConfigError(ws);
+  assert.ok(typeof err === "string" && err.length > 0);
+  assert.match(err, /Failed to parse/);
 });
 
-test("T31 boundary: JSON array (non-object) is rejected", () => {
+test("T31 boundary (re-pinned E31): JSON array (non-object) degrades non-fatally — {} config + getConfigError() names the root-shape problem, no throw", () => {
   const ws = mkWorkspace();
   fs.writeFileSync(path.join(ws, ".current", ".config.json"), "[1,2,3]");
-  assert.throws(() => loadConfig(ws), /must be a JSON object/);
+  let cfg;
+  assert.doesNotThrow(() => {
+    cfg = loadConfig(ws);
+  }, "E31: a non-object root must never throw out of loadConfig");
+  assert.deepEqual(cfg, {});
+  const err = getConfigError(ws);
+  assert.ok(typeof err === "string" && err.length > 0);
+  assert.match(err, /must be a JSON object/);
 });
 
 test("T31 boundary: empty taskPaths array is dropped from typed view", () => {
