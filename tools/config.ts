@@ -12,7 +12,8 @@
 //       "maxPriority": "P3",
 //       "allowSchemaChange": false,
 //       "allowDesignArmed": false
-//     }
+//     },
+//     "staleDispatchNotifyFile": ".current/stale-dispatch.notify"  // opt-in E22 stale-dispatch watch-file emit; absent = disarmed
 //   }
 //
 // tokenBudgetPerFeature accounting (d2-server-brake-accounting): the ceiling
@@ -71,6 +72,13 @@ export interface WorkspaceConfig {
   // here it is fully normalized: omitted/invalid fields are already filled
   // with CUT_APPROVAL_AUTO_TIER_DEFAULTS.
   cutApprovalAutoTier?: CutApprovalAutoTier;
+  // E22 stale-dispatch notify watch-file (opt-in). Workspace-relative (or
+  // absolute) path the server writes the stale_dispatch advisory payload to
+  // when the tw_get_state read-time threshold check fires — an external
+  // watcher turns the mtime bump into a desktop notification / webhook.
+  // Absent = fully disarmed (the pre-E22 pull-only behavior). Consumed by
+  // tools/stale-notify.ts; file-mode read path only.
+  staleDispatchNotifyFile?: string;
 }
 
 // Methodology-agnostic defaults. Common task-list filenames in workspace root
@@ -224,6 +232,14 @@ export function loadConfig(workspacePath: string): WorkspaceConfig {
       allowSchemaChange: tier.allowSchemaChange === true,
       allowDesignArmed: tier.allowDesignArmed === true,
     };
+  }
+  // Additive-optional field (no schema_version bump — same precedent as
+  // host/driftBaselineIds). Non-fatal filter: only a non-empty string is
+  // surfaced; anything else is treated as absent (notify channel disarmed),
+  // never an error.
+  const staleDispatchNotifyFile = migration.payload.staleDispatchNotifyFile;
+  if (typeof staleDispatchNotifyFile === "string" && staleDispatchNotifyFile.length > 0) {
+    result.staleDispatchNotifyFile = staleDispatchNotifyFile;
   }
   // Cache under the pre-read mtime. If the migration heal-on-read above
   // rewrote the file, the recorded mtime is already stale — the NEXT call's

@@ -14,6 +14,8 @@ import { getActiveStorage } from "./storage.js";
 import type { ToolResult, WorkspaceOnlyInput } from "./registry.js";
 import { CURRENT_VERSIONS, runMigrations } from "../schema/versions.js";
 import { loadExemptions } from "./exemptions.js";
+import { notifyStaleDispatch } from "./stale-notify.js";
+import type { StaleDispatchAdvisory } from "./stale-notify.js";
 // Type-only import (erased at compile): the runtime graph stays one-directional
 // (transitions.ts never imports handoff.ts).
 import type { AgentName } from "./transitions.js";
@@ -658,7 +660,7 @@ export function readHandoffState(workspacePath: string): string {
       // malformed stamp ⇒ no signal, never throw
       const elapsedMin = (Date.now() - stampedMs) / 60000;
       if (elapsedMin > STALE_DISPATCH_THRESHOLD_MIN) {
-        staleDispatch = {
+        const advisory: StaleDispatchAdvisory = {
           role: state.next_role,
           dispatched_at: state.dispatched_at,
           elapsed_minutes: Math.floor(elapsedMin),
@@ -667,6 +669,16 @@ export function readHandoffState(workspacePath: string): string {
             `stale in-flight dispatch: ${state.next_role}, ` +
             `no state write for >${STALE_DISPATCH_THRESHOLD_MIN} min`,
         };
+        // E22 — opt-in push channel on the same threshold crossing: when the
+        // workspace armed `staleDispatchNotifyFile` in .current/.config.json,
+        // write the advisory to that watch-file so an EXTERNAL watcher can
+        // surface it without waiting for the next pull. Same posture as the
+        // advisory itself: never throws, never blocks the read (all failure
+        // modes collapse to a loud `notify.error`), no-op when the key is
+        // absent (null → no `notify` key at all, byte-identical pre-E22
+        // payload). Dedupe lives in the watch-file, not in handoff state.
+        const notify = notifyStaleDispatch(workspacePath, advisory);
+        staleDispatch = { ...advisory, ...(notify && { notify }) };
       }
     }
   }

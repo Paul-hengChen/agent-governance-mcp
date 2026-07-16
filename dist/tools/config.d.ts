@@ -13,6 +13,7 @@ export interface WorkspaceConfig {
     tokenBudgetPerFeature?: number;
     host?: string;
     cutApprovalAutoTier?: CutApprovalAutoTier;
+    staleDispatchNotifyFile?: string;
 }
 export declare const DEFAULT_TASK_REGEX: RegExp;
 export declare function loadConfig(workspacePath: string): WorkspaceConfig;

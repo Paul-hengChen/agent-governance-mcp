@@ -12,7 +12,8 @@
 //       "maxPriority": "P3",
 //       "allowSchemaChange": false,
 //       "allowDesignArmed": false
-//     }
+//     },
+//     "staleDispatchNotifyFile": ".current/stale-dispatch.notify"  // opt-in E22 stale-dispatch watch-file emit; absent = disarmed
 //   }
 //
 // tokenBudgetPerFeature accounting (d2-server-brake-accounting): the ceiling
@@ -173,6 +174,14 @@ export function loadConfig(workspacePath) {
             allowSchemaChange: tier.allowSchemaChange === true,
             allowDesignArmed: tier.allowDesignArmed === true,
         };
+    }
+    // Additive-optional field (no schema_version bump — same precedent as
+    // host/driftBaselineIds). Non-fatal filter: only a non-empty string is
+    // surfaced; anything else is treated as absent (notify channel disarmed),
+    // never an error.
+    const staleDispatchNotifyFile = migration.payload.staleDispatchNotifyFile;
+    if (typeof staleDispatchNotifyFile === "string" && staleDispatchNotifyFile.length > 0) {
+        result.staleDispatchNotifyFile = staleDispatchNotifyFile;
     }
     // Cache under the pre-read mtime. If the migration heal-on-read above
     // rewrote the file, the recorded mtime is already stale — the NEXT call's

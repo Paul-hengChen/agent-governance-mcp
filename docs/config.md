@@ -50,6 +50,32 @@ Semantics:
 - **Present key (even `{}`) = tier armed.** Omitted or invalid fields fall back to the conservative defaults above; a non-object value is treated as absent (tier disabled).
 - **Advisory, not enforced.** The server parses and surfaces the key (`loadConfig`) but never checks the threshold or gates a write on it. The coordinator/PM reads the config and applies the tier — the same attestation trust model as `cut_approved` itself.
 
+### `staleDispatchNotifyFile` — stale-dispatch watch-file emit (opt-in)
+
+The `stale_dispatch` advisory is pull-only: it is computed at `tw_get_state` time, so nobody sees a stale in-flight dispatch until the next session reads state. This key arms the cheapest push channel (E22): when the read-time threshold check fires (>15 min since `dispatched_at` with a `next_role` in flight), the server writes the advisory payload to the configured watch-file. An **external** watcher — the server spawns no daemon or timer — turns the file change into whatever alert you want.
+
+```json
+{
+  "staleDispatchNotifyFile": ".current/stale-dispatch.notify"
+}
+```
+
+Semantics:
+
+- **Absent key = disarmed.** No file is ever written; `tw_get_state` output is byte-identical to the pre-E22 behavior.
+- **Present = emit on threshold crossing.** The watch-file receives the advisory JSON (`role`, `dispatched_at`, `elapsed_minutes`, `threshold_minutes`, `message`, plus `workspace` and `emitted_at`), written atomically (tmp + rename). The path is workspace-relative (absolute also honored); parent directories are created as needed.
+- **One emit per distinct dispatch.** Subsequent `tw_get_state` calls in the same stale window skip the write (`notify.skipped_duplicate: true` in the advisory payload) — a watcher fires once per crossing, not once per read. A new dispatch (fresh `dispatched_at`) re-arms the emit. The dedupe cursor is the watch-file content itself; no new handoff state.
+- **Never blocks the read.** A failed emit (unwritable path, corrupt config) surfaces as `notify.error` inside the `stale_dispatch` payload; `tw_get_state` itself always succeeds. File-mode only.
+- **Pull-triggered, not a timer.** The emit happens when something calls `tw_get_state` after the threshold passed. If no session reads state during the idle window, nothing fires — that trade-off is by design (E22 cut: no daemon).
+
+Verify it works:
+
+1. Arm the key in `.current/.config.json` as above.
+2. Ensure the handoff has an in-flight dispatch older than 15 min (`next_role` set, `dispatched_at` in the past — or just wait one out).
+3. Call `tw_get_state`; the response's `stale_dispatch.notify` shows `emitted: true` and the file exists at the configured path.
+4. Call `tw_get_state` again: `notify.skipped_duplicate: true`, file mtime unchanged.
+5. Example watcher (macOS): `fswatch .current/stale-dispatch.notify | while read -r _; do osascript -e 'display notification "stale agent dispatch" with title "agent-governance"'; done`
+
 ---
 
 ## `.current/constitution.md` — constitution override
