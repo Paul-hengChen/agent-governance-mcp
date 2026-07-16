@@ -524,3 +524,61 @@ test("S1: sanity — CURRENT_VERSIONS.handoff/config are unchanged by E22 (no sc
   assert.equal(CURRENT_VERSIONS.handoff, 13, "E22 must not have bumped the handoff schema version");
   assert.equal(CURRENT_VERSIONS.config, 1, "E22 must not have bumped the config schema version");
 });
+
+// ============================================================================
+// E29 (T-E29-01, e-p3-tail-batch, qa-owned new coverage) — reviewer probe 3:
+// the Crash-Resume pointer appended to `stale_dispatch.message` (tools/handoff.ts)
+// must (a) actually reach the E22 watch-file payload end-to-end through the
+// real tw_get_state -> notifyStaleDispatch wiring, and (b) not disturb the
+// (dispatched_at, role) dedupe contract — the dedupe key is a TUPLE, not the
+// message string, so a longer message must not re-arm or break a repeat read.
+// Distinct from the unit-level advisory() fixture helper above (which builds
+// its OWN fabricated pre-E29 message and never exercises tools/handoff.ts's
+// real message-construction code at all) — these two tests are the only ones
+// in this file that assert on the REAL end-to-end message content.
+// ============================================================================
+
+test("E29a: the watch-file payload's message carries the E29 Crash-Resume pointer end-to-end (not just the base Copy/Strings sentence)", () => {
+  const ws = mkWorkspace();
+  resetSession();
+  writeConfig(ws, { staleDispatchNotifyFile: ".current/stale-dispatch.notify" });
+  writeRawHandoff(ws, { staleStamp: isoMinutesAgo(16), nextRole: "sr-engineer" });
+
+  const parsed = JSON.parse(readHandoffState(ws));
+  assert.equal(parsed.stale_dispatch.notify.emitted, true);
+  assert.match(
+    parsed.stale_dispatch.message,
+    /Crash-Resume: ground-truth before re-dispatch/,
+    "the in-band advisory message must carry the E29 pointer",
+  );
+
+  const written = readWatch(ws);
+  assert.match(
+    written.message,
+    /Crash-Resume: ground-truth before re-dispatch/,
+    "the pointer must reach the EXTERNAL watch-file payload too, not just the pull-path advisory",
+  );
+  assert.match(written.message, /skill-coordinator Crash-Resume Protocol/, "the full-protocol pointer name must be verbatim in the watch-file payload");
+});
+
+test("E29b (probe 3): a longer E29 message does not break the (dispatched_at, role) dedupe — two consecutive reads still dedupe on the second", () => {
+  const ws = mkWorkspace();
+  resetSession();
+  writeConfig(ws, { staleDispatchNotifyFile: ".current/stale-dispatch.notify" });
+  writeRawHandoff(ws, { staleStamp: isoMinutesAgo(16), nextRole: "architect" });
+
+  const first = JSON.parse(readHandoffState(ws));
+  assert.equal(first.stale_dispatch.notify.emitted, true);
+  assert.match(first.stale_dispatch.message, /Crash-Resume/, "sanity: this IS the E29-shaped message, not the old short one");
+  const firstWritten = readWatch(ws);
+  assert.match(firstWritten.message, /Crash-Resume/);
+
+  const second = JSON.parse(readHandoffState(ws));
+  assert.equal(second.stale_dispatch.notify.emitted, false, "dedupe key is (dispatched_at, role), not message content — repeat read must still be a skip");
+  assert.equal(second.stale_dispatch.notify.skipped_duplicate, true);
+  // message content itself is irrelevant to the dedupe decision, but it
+  // should remain the same E29-shaped string on the advisory even on the
+  // deduped read (the advisory is recomputed fresh every read; only the
+  // WATCH-FILE emit is skipped).
+  assert.match(second.stale_dispatch.message, /Crash-Resume/);
+});

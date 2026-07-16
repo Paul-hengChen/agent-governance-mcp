@@ -231,8 +231,16 @@ dispatched_at: "${staleStamp}"
   assert.ok(parsed.stale_dispatch.elapsed_minutes >= 16, "elapsed_minutes must reflect the actual elapsed time (floored)");
   assert.equal(
     parsed.stale_dispatch.message,
-    "stale in-flight dispatch: sr-engineer, no state write for >15 min",
-    "message must be verbatim to the spec's Copy/Strings row (stale_dispatch.message)",
+    // e29-crash-resume-pointer (qa-owned re-pin, T-E29-01, e-p3-tail-batch): the
+    // base Copy/Strings row sentence is now followed by the Crash-Resume
+    // pointer sentence (tools/handoff.ts, appended to the SAME message field
+    // the E22 watch-file emit shares — no new advisory key).
+    "stale in-flight dispatch: sr-engineer, no state write for >15 min. " +
+      "Crash-Resume: ground-truth before re-dispatch — compare git status/diff " +
+      "against handoff claims, honor dispatch_pins, then resume the incumbent " +
+      "role (never blind re-dispatch); full protocol: skill-coordinator " +
+      "Crash-Resume Protocol.",
+    "message must be verbatim to the spec's Copy/Strings row (stale_dispatch.message) plus the E29 Crash-Resume pointer",
   );
 });
 
@@ -276,7 +284,15 @@ dispatched_at: "${staleStamp}"
   assert.equal(parsed.stale_dispatch.role, "architect");
   assert.equal(
     parsed.stale_dispatch.message,
-    "stale in-flight dispatch: architect, no state write for >15 min",
+    // e29-crash-resume-pointer (qa-owned re-pin, T-E29-01, e-p3-tail-batch): same
+    // verbatim message as T4 above (role name swapped) — proves the Crash-Resume
+    // pointer is a pure function of (next_role, dispatched_at, now), not
+    // process-local state.
+    "stale in-flight dispatch: architect, no state write for >15 min. " +
+      "Crash-Resume: ground-truth before re-dispatch — compare git status/diff " +
+      "against handoff claims, honor dispatch_pins, then resume the incumbent " +
+      "role (never blind re-dispatch); full protocol: skill-coordinator " +
+      "Crash-Resume Protocol.",
   );
 });
 
