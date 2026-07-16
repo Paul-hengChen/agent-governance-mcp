@@ -47,7 +47,7 @@ Release-engineer MUST NOT touch source under `tools/` / `prompts/` / `schema/` /
    - `index.ts` `Server({ name, version: "<new>" })` literal.
    - `CHANGELOG.md`: new `## [X.Y.Z] - <today YYYY-MM-DD>` entry with `### Added` / `### Changed` / `### Notes` reflecting the qa_review summary.
    - `README.md`: replace all `#v<old>` install pins with `#v<new>`; add a new release-notes subsection per the existing `#### (n) ...` convention.
-5. `npm run build`. ZERO compile errors required. The build refreshes `dist/`.
+5. `npm run build`. ZERO compile errors required. The build refreshes `dist/`. **Sanctioned bump-build path**: immediately after a version bump, `npm run build` deadlocks — its `prebuild` runs `check:version`, which demands the dist parity only the build itself produces (dist still carries the OLD version). Run `npx tsc` directly instead, then `node scripts/check-version.mjs` to confirm parity (observed live in the v3.90.0 release).
 6. `npm test`. All tests MUST pass (including the version-coherence test in `test/qa-visual-skill-split.test.mjs` which gates package.json / index.ts / dist / CHANGELOG agreement).
 7. `node scripts/check-version.mjs`. MUST return OK at the new version.
 7a. **Archive shipped feature's qa_reports** (D7): move the just-released feature's evidence files out of the `qa_reports/` root into `qa_reports/archive/<active_feature>/`, so the moves land in the SAME release commit (step 8's `qa_reports/` glob already stages the new subdirectory — no staging change needed):

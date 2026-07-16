@@ -2,6 +2,8 @@
 
 The server defaults to a generic markdown-checkbox task format and the bundled constitution. Override per-workspace via files under `.current/`.
 
+> **Opt-in features looking dead?** Several capabilities (usage.jsonl token sidecar, `driftBaselineIds`, `cutApprovalAutoTier`, `staleDispatchNotifyFile`) ship implemented but disarmed. See [docs/arming.md](arming.md) for how to arm each one and verify it's live before concluding it doesn't exist.
+
 ## `.current/.config.json` — task format override
 
 Customize where and how the server reads task lists:

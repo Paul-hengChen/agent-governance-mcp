@@ -679,7 +679,17 @@ export function readHandoffState(workspacePath: string): string {
           threshold_minutes: STALE_DISPATCH_THRESHOLD_MIN,
           message:
             `stale in-flight dispatch: ${state.next_role}, ` +
-            `no state write for >${STALE_DISPATCH_THRESHOLD_MIN} min`,
+            `no state write for >${STALE_DISPATCH_THRESHOLD_MIN} min. ` +
+            // E29 — Crash-Resume pointer. The recovery protocol lives in the
+            // coordinator skill text only; if the coordinator itself is the
+            // dead party (or a lite/fresh session takes over), this line is
+            // the only in-band copy. One sentence, appended to the SAME
+            // message field the stale-notify watch-file emit shares — no new
+            // advisory key, byte-shape unchanged for consumers.
+            `Crash-Resume: ground-truth before re-dispatch — compare git status/diff ` +
+            `against handoff claims, honor dispatch_pins, then resume the incumbent ` +
+            `role (never blind re-dispatch); full protocol: skill-coordinator ` +
+            `Crash-Resume Protocol.`,
         };
         // E22 — opt-in push channel on the same threshold crossing: when the
         // workspace armed `staleDispatchNotifyFile` in .current/.config.json,

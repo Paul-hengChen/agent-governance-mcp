@@ -1262,5 +1262,57 @@ async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResu
           });
         }
 
-        return { content: [{ type: "text" as const, text: result }] };
+        // E28 — wholesale-replace shrink warning (dispatch_pins / external_refs).
+        // Both fields REPLACE on write, so a writer that skips read-before-write
+        // silently drops entries. When THIS write supplied one of them and the
+        // supplied set is SMALLER than the on-disk prior set (same-feature
+        // writes only — a feature change legitimately drops both feature-scoped
+        // fields), append an advisory `warnings` array to the success envelope
+        // naming the dropped entries. Warn-only by design: never rejects, no
+        // new arg, no schema bump, and any failure here leaves the original
+        // envelope untouched (the state write already succeeded).
+        const shrinkWarnings: string[] = [];
+        if (prevState && !feature_changed) {
+          if (parsed.dispatch_pins) {
+            const prevPinKeys = Object.keys(prevState.dispatch_pins ?? {});
+            const nextPinKeys = new Set(Object.keys(parsed.dispatch_pins));
+            if (nextPinKeys.size < prevPinKeys.length) {
+              const dropped = prevPinKeys.filter((k) => !nextPinKeys.has(k));
+              shrinkWarnings.push(
+                `dispatch_pins REPLACES wholesale, not merges: this write kept ` +
+                  `${nextPinKeys.size} of ${prevPinKeys.length} prior entries — dropped: ` +
+                  `${dropped.join(", ")}. If unintended, read the previous state and ` +
+                  `re-write the FULL map including every still-wanted pin.`,
+              );
+            }
+          }
+          if (parsed.external_refs) {
+            const prevRefs = prevState.external_refs ?? [];
+            if (parsed.external_refs.length < prevRefs.length) {
+              const nextRefSet = new Set(parsed.external_refs.map((r) => r.ref));
+              const dropped = prevRefs.filter((r) => !nextRefSet.has(r.ref)).map((r) => r.ref);
+              shrinkWarnings.push(
+                `external_refs REPLACES wholesale, not merges: this write kept ` +
+                  `${parsed.external_refs.length} of ${prevRefs.length} prior entries — dropped: ` +
+                  `${dropped.join(", ")}. If unintended, read the previous state and ` +
+                  `re-write the FULL ledger including every still-wanted entry.`,
+              );
+            }
+          }
+        }
+        let responseText = result;
+        if (shrinkWarnings.length > 0) {
+          try {
+            const envelope = JSON.parse(result) as Record<string, unknown>;
+            envelope.warnings = [
+              ...(Array.isArray(envelope.warnings) ? (envelope.warnings as string[]) : []),
+              ...shrinkWarnings,
+            ];
+            responseText = JSON.stringify(envelope);
+          } catch {
+            // Advisory only — an unparseable success payload keeps its original text.
+          }
+        }
+
+        return { content: [{ type: "text" as const, text: responseText }] };
 }
