@@ -295,9 +295,9 @@ _(No active tasks — ready for the next feature.)_
 - [x] T-E24-01 Exemptions manifest loader — .current/exemptions.json schema (path + reason + expiry condition per entry) + loader with validation; prose-only exemptions count as not exempted
 - [x] T-E24-02 Gate integration — build-gate/§2 checks subtract manifest-exempted paths automatically; const §2 content line documents the manifest as the only sanctioned exemption channel
 - [x] T-E24-03 Exemption-count metric (monitorable, only-grows — surface count in state/metrics) + tests for loader, gate subtraction, and metric
-- [ ] T-E26-01 tools/gate-stats.ts — never-throws aggregator computeGateStats() over .current/telemetry.jsonl + .current/metrics.jsonl: per-error-code fire counts with full GATE_REGISTRY coverage (fired + zero-fire), unregistered-code bucket, deduped metrics summary, and a prose-behavioral catalog so output labels each rule's category (gate-backed vs prose-behavioral; zero-fires ≠ dead)
-- [ ] T-E26-02 Register tw_gate_stats in TOOL_REGISTRY (tools/registry.ts defineTool entry, WorkspaceOnly zod schema, read-only handler — A1 registry pattern, no index.ts edit needed)
-- [ ] T-E26-03 Doc alignment for tw_gate_stats: docs/gate-retro-procedure.md (retire the "no built analysis tool exists or is planned" claim, point steps 2/step-5 aggregation at the tool) + CLAUDE.md tool roster (eleven → twelve, add tools/gate-stats.ts to layout)
+- [x] T-E26-01 tools/gate-stats.ts — never-throws aggregator computeGateStats() over .current/telemetry.jsonl + .current/metrics.jsonl: per-error-code fire counts with full GATE_REGISTRY coverage (fired + zero-fire), unregistered-code bucket, deduped metrics summary, and a prose-behavioral catalog so output labels each rule's category (gate-backed vs prose-behavioral; zero-fires ≠ dead) (note: QA PASS — see qa_reports/review_T-E26-01.md (covers T-E26-01/02/03))
+- [x] T-E26-02 Register tw_gate_stats in TOOL_REGISTRY (tools/registry.ts defineTool entry, WorkspaceOnly zod schema, read-only handler — A1 registry pattern, no index.ts edit needed) (note: QA PASS — see qa_reports/review_T-E26-01.md (covers T-E26-01/02/03))
+- [x] T-E26-03 Doc alignment for tw_gate_stats: docs/gate-retro-procedure.md (retire the "no built analysis tool exists or is planned" claim, point steps 2/step-5 aggregation at the tool) + CLAUDE.md tool roster (eleven → twelve, add tools/gate-stats.ts to layout) (note: QA PASS — see qa_reports/review_T-E26-01.md (covers T-E26-01/02/03))
 
 ## Completed
 
