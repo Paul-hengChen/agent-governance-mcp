@@ -130,9 +130,10 @@ async function main() {
   if (!fs.existsSync(currentDir)) return;
 
   // Opt-in gate (AC-9): positive finite tokenBudgetPerFeature required.
-  // Raw read + parse (not tools/config.js): loadConfig throws refuse-loud on
-  // malformed JSON and heals schema_version on read — both wrong postures for
-  // a best-effort observer hook that must never write config or exit non-zero.
+  // Raw read + parse (not tools/config.js): loadConfig heals schema_version
+  // on read (a write) — the wrong posture for a best-effort observer hook
+  // that must never write config or exit non-zero. (Since E31 loadConfig no
+  // longer throws on malformed JSON, but the heal-on-read objection stands.)
   let budget;
   try {
     const config = JSON.parse(fs.readFileSync(path.join(currentDir, ".config.json"), "utf-8"));

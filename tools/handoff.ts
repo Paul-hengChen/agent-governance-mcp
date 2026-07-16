@@ -14,6 +14,7 @@ import { getActiveStorage } from "./storage.js";
 import type { ToolResult, WorkspaceOnlyInput } from "./registry.js";
 import { CURRENT_VERSIONS, runMigrations } from "../schema/versions.js";
 import { loadExemptions } from "./exemptions.js";
+import { getConfigError } from "./config.js";
 import { notifyStaleDispatch } from "./stale-notify.js";
 import type { StaleDispatchAdvisory } from "./stale-notify.js";
 // Type-only import (erased at compile): the runtime graph stays one-directional
@@ -537,6 +538,16 @@ export function readHandoffState(workspacePath: string): string {
   // sibling E10/E18 file-mode posture.
   const exemptions = loadExemptions(workspacePath);
 
+  // E31 (e31-config-nonfatal) — loud surface for a .current/.config.json that
+  // exists but cannot be used (unreadable / unparseable / non-object root /
+  // future schema_version). loadConfig degrades to defaults instead of
+  // throwing out of the markStateRead task-path resolution above (the
+  // pre-existing call site that made the mandatory pre-flight read throw —
+  // E22 QA Phase 1 finding); this field is what keeps that degradation
+  // readable rather than silent. null (clean or absent config) adds no key —
+  // valid/absent config envelopes stay byte-identical.
+  const configError = getConfigError(workspacePath);
+
   const result = readAndMigrate(workspacePath);
   if (!result) {
     // Surface the manifest even before the first handoff write: an adopted
@@ -545,6 +556,7 @@ export function readHandoffState(workspacePath: string): string {
     return JSON.stringify({
       exists: false,
       message: "No handoff state found. This is a fresh project — initialize by calling tw_update_state.",
+      ...(configError && { config_error: configError }),
       ...(exemptions && { exemptions }),
     });
   }
@@ -688,6 +700,7 @@ export function readHandoffState(workspacePath: string): string {
     ...view,
     ...(staleDispatch && { stale_dispatch: staleDispatch }),
     ...(exemptions && { exemptions }),
+    ...(configError && { config_error: configError }),
   });
 }
 

@@ -39,28 +39,27 @@
 // sibling E10/E18/E24 file-mode posture.
 import * as fs from "fs";
 import * as path from "path";
-import { loadConfig } from "./config.js";
+import { getConfigError, loadConfig } from "./config.js";
 /**
  * Emit the stale-dispatch advisory to the workspace's opt-in watch-file.
  * Returns null when the workspace has not armed `staleDispatchNotifyFile`
  * (the default — caller surfaces nothing). NEVER throws — see module header.
  */
 export function notifyStaleDispatch(workspacePath, advisory) {
-    // loadConfig throws on corrupt/unreadable config. tw_get_state never called
-    // it before E22, so a broken config must not start breaking the read path
-    // now — collapse to a loud error instead. (Task tools already refuse-loud
-    // on the same corruption, so this adds signal without adding blockage.)
-    let notifyRel;
-    try {
-        notifyRel = loadConfig(workspacePath).staleDispatchNotifyFile;
-    }
-    catch (err) {
+    // Corrupt/unreadable config: since E31 loadConfig degrades to defaults
+    // instead of throwing, with the failure exposed via getConfigError(). Keep
+    // the E22 contract here — a broken config collapses to a loud per-emit
+    // error (never disarmed-null silence, never a throw), on top of the
+    // envelope-level `config_error` the read path now surfaces.
+    const configError = getConfigError(workspacePath);
+    if (configError) {
         return {
             emitted: false,
             error: `stale-notify: cannot read .current/.config.json — ` +
-                `${err.message} — notify emit skipped.`,
+                `${configError} — notify emit skipped.`,
         };
     }
+    const notifyRel = loadConfig(workspacePath).staleDispatchNotifyFile;
     if (!notifyRel)
         return null; // key absent = disarmed, no signal
     // path.resolve (not join) so an absolute configured path is honored as-is

@@ -8,6 +8,7 @@ import { withFileLock } from "../guards/file-lock.js";
 import { getActiveStorage } from "./storage.js";
 import { CURRENT_VERSIONS, runMigrations } from "../schema/versions.js";
 import { loadExemptions } from "./exemptions.js";
+import { getConfigError } from "./config.js";
 import { notifyStaleDispatch } from "./stale-notify.js";
 // Side-effect import: registers the handoff v0→v1 migration on module load.
 import "../schema/migrations-handoff.js";
@@ -292,6 +293,15 @@ export function readHandoffState(workspacePath) {
     // and no drift-advisory plumbing. File-mode read path only, matching the
     // sibling E10/E18 file-mode posture.
     const exemptions = loadExemptions(workspacePath);
+    // E31 (e31-config-nonfatal) — loud surface for a .current/.config.json that
+    // exists but cannot be used (unreadable / unparseable / non-object root /
+    // future schema_version). loadConfig degrades to defaults instead of
+    // throwing out of the markStateRead task-path resolution above (the
+    // pre-existing call site that made the mandatory pre-flight read throw —
+    // E22 QA Phase 1 finding); this field is what keeps that degradation
+    // readable rather than silent. null (clean or absent config) adds no key —
+    // valid/absent config envelopes stay byte-identical.
+    const configError = getConfigError(workspacePath);
     const result = readAndMigrate(workspacePath);
     if (!result) {
         // Surface the manifest even before the first handoff write: an adopted
@@ -300,6 +310,7 @@ export function readHandoffState(workspacePath) {
         return JSON.stringify({
             exists: false,
             message: "No handoff state found. This is a fresh project — initialize by calling tw_update_state.",
+            ...(configError && { config_error: configError }),
             ...(exemptions && { exemptions }),
         });
     }
@@ -438,6 +449,7 @@ export function readHandoffState(workspacePath) {
         ...view,
         ...(staleDispatch && { stale_dispatch: staleDispatch }),
         ...(exemptions && { exemptions }),
+        ...(configError && { config_error: configError }),
     });
 }
 export async function writeHandoffState(workspacePathOrOpts, activeFeature, status, completedTasks, pendingNotes, blockingReason, lastAgent, qaRound, prdPath, reviewRound, visualRound, hopCount) {

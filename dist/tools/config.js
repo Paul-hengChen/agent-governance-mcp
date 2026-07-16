@@ -53,38 +53,53 @@ const DEFAULT_TASK_PATHS = [
 //   - [ ] auth-refactor write migration
 export const DEFAULT_TASK_REGEX = /^- \[([ x])\] (\S+)\s+(.+)$/;
 const configCache = new Map();
-// Current mtimeMs of the config file, or null when it does not exist.
-// Non-ENOENT stat errors propagate (refuse-loud, same spirit as read errors).
-function statConfigMtime(configPath) {
-    try {
-        return fs.statSync(configPath).mtimeMs;
-    }
-    catch (err) {
-        if (err.code === "ENOENT")
-            return null;
-        throw new Error(`Failed to stat ${configPath}: ${err.message}`);
-    }
-}
-export function loadConfig(workspacePath) {
+// Shared non-fatal load core (E31). Returns the typed config view plus the
+// loud load error, serving/refreshing the mtime cache. NEVER throws on
+// config-file fatality — every failure mode collapses to
+// { config: {}, error: <message naming the path + problem> }.
+function loadConfigEntry(workspacePath) {
     const configPath = path.join(workspacePath, ".current", ".config.json");
     // Re-stat on every call (C18): a cache hit is only served when the on-disk
     // state (existence + mtimeMs) still matches what was recorded at cache
     // time. Existence flips and mtime bumps both fall through to a re-read.
-    const currentMtime = statConfigMtime(configPath);
+    // Non-ENOENT stat errors (permission flap on .current/) are non-fatal but
+    // deliberately UNCACHED — mtime cannot witness a chmod, so re-stat every
+    // call until the flap clears.
+    let currentMtime;
+    try {
+        currentMtime = fs.statSync(configPath).mtimeMs;
+    }
+    catch (err) {
+        if (err.code !== "ENOENT") {
+            return {
+                config: {},
+                mtimeMs: null,
+                error: `Failed to stat ${configPath}: ${err.message} — config IGNORED, defaults in effect.`,
+            };
+        }
+        currentMtime = null;
+    }
     const cached = configCache.get(workspacePath);
     if (cached !== undefined && cached.mtimeMs === currentMtime) {
-        return cached.config;
+        return cached;
     }
     if (currentMtime === null) {
-        configCache.set(workspacePath, { config: {}, mtimeMs: null });
-        return {};
+        const entry = { config: {}, mtimeMs: null, error: null };
+        configCache.set(workspacePath, entry);
+        return entry;
     }
     let raw;
     try {
         raw = fs.readFileSync(configPath, "utf-8");
     }
     catch (err) {
-        throw new Error(`Failed to read ${configPath}: ${err.message}`);
+        // Exists but unreadable: loud, defaults in effect. UNCACHED for the same
+        // chmod-invisible-to-mtime reason as the stat branch above.
+        return {
+            config: {},
+            mtimeMs: null,
+            error: `Failed to read ${configPath}: ${err.message} — config IGNORED, defaults in effect.`,
+        };
     }
     let parsed;
     try {
@@ -95,12 +110,35 @@ export function loadConfig(workspacePath) {
         parsed = decoded;
     }
     catch (err) {
-        throw new Error(`Failed to parse ${configPath}: ${err.message}`);
+        // Content-derived failure: cache under the corrupt file's mtime (a fix
+        // necessarily bumps it, invalidating the cached error).
+        const entry = {
+            config: {},
+            mtimeMs: currentMtime,
+            error: `Failed to parse ${configPath}: ${err.message} — config IGNORED, defaults in effect.`,
+        };
+        configCache.set(workspacePath, entry);
+        return entry;
     }
     // Schema-versioning lazy migrate-on-read (Phase 4). Bumps an absent or
-    // older schema_version up to CURRENT_VERSIONS.config. Throws refuse-loud
-    // on future versions — propagates intentionally (AC-4).
-    const migration = runMigrations("config", parsed);
+    // older schema_version up to CURRENT_VERSIONS.config. A FUTURE on-disk
+    // version throws inside runMigrations (refuse-loud, AC-4) — since E31 that
+    // refusal is captured as a loud config_error instead of propagating into
+    // the pre-flight read: guessing at a shape this server does not understand
+    // is still refused, but the refusal no longer blocks tw_get_state.
+    let migration;
+    try {
+        migration = runMigrations("config", parsed);
+    }
+    catch (err) {
+        const entry = {
+            config: {},
+            mtimeMs: currentMtime,
+            error: `Failed to load ${configPath}: ${err.message} — config IGNORED, defaults in effect.`,
+        };
+        configCache.set(workspacePath, entry);
+        return entry;
+    }
     if (migration.applied.length > 0) {
         // Best-effort heal-on-read: persist the upgraded JSON. Failures here
         // (concurrent writer, permission flap) are non-fatal; the in-memory shape
@@ -188,8 +226,30 @@ export function loadConfig(workspacePath) {
     // stat will mismatch and trigger one redundant (but correct) re-read,
     // which is preferable to racing a post-write re-stat against concurrent
     // writers/deleters.
-    configCache.set(workspacePath, { config: result, mtimeMs: currentMtime });
-    return result;
+    const entry = { config: result, mtimeMs: currentMtime, error: null };
+    configCache.set(workspacePath, entry);
+    return entry;
+}
+/**
+ * Typed workspace config view. Absent file OR any config-file fatality
+ * (unreadable, unparseable, non-object root, future schema_version) returns
+ * the empty config — defaults in effect. NEVER throws (E31): the failure is
+ * surfaced via getConfigError(), not a pre-flight-blocking exception.
+ */
+export function loadConfig(workspacePath) {
+    return loadConfigEntry(workspacePath).config;
+}
+/**
+ * Loud config-load error for the workspace, or null when the config loaded
+ * clean or is simply absent (E31). Non-null means loadConfig() is currently
+ * serving defaults IN PLACE OF a config file that exists but cannot be used —
+ * the message names the config path and the parse/read problem. Surfaced as
+ * `config_error` on every tw_get_state envelope so the degradation is never
+ * silent. Same mtime-cached core as loadConfig — no extra I/O on the happy
+ * path.
+ */
+export function getConfigError(workspacePath) {
+    return loadConfigEntry(workspacePath).error;
 }
 function atomicWriteConfig(configPath, payload) {
     // Re-stamp at CURRENT regardless of what the input carried, so the file

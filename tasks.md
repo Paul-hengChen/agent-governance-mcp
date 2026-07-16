@@ -299,6 +299,7 @@ _(No active tasks — ready for the next feature.)_
 - [x] T-E26-02 Register tw_gate_stats in TOOL_REGISTRY (tools/registry.ts defineTool entry, WorkspaceOnly zod schema, read-only handler — A1 registry pattern, no index.ts edit needed) (note: QA PASS — see qa_reports/review_T-E26-01.md (covers T-E26-01/02/03))
 - [x] T-E26-03 Doc alignment for tw_gate_stats: docs/gate-retro-procedure.md (retire the "no built analysis tool exists or is planned" claim, point steps 2/step-5 aggregation at the tool) + CLAUDE.md tool roster (eleven → twelve, add tools/gate-stats.ts to layout) (note: QA PASS — see qa_reports/review_T-E26-01.md (covers T-E26-01/02/03))
 - [x] T-E22-01 E22 — proactive stale-dispatch notification: opt-in config-gated notify channel (watch-file emit) on stale-threshold crossing; no new handoff state (backlog E22, D5 follow-on) (note: QA PASS — see qa_reports/review_T-E22-01.md)
+- [x] T-E31-01 E31 — non-fatal loadConfig on corrupt .config.json: tw_get_state pre-flight must never throw; degrade loudly-but-readable via envelope error (backlog E31, E22 QA finding) (note: PASS. Re-pinned the 6 manifested expected-red tests to the non-fatal contract; authored 14 new E31-contract tests (envelope purity, error-message content, mtime-cache invalidation, custom-taskPattern probe). Full suite 1587/1587 green.)
 
 ## Completed
 
