@@ -24,6 +24,18 @@ function evidencePath(workspacePath, taskId) {
     const safe = taskId.replace(/[^A-Za-z0-9._-]/g, "_");
     return path.join(evidenceDir(workspacePath), `review_${safe}.md`);
 }
+// Exported alias (E32, e32-e33-gate-hardening): the QA completion-evidence
+// gate's rejection envelope names the exact expected per-id evidence file
+// path (mirrors the exported visualEvidencePath precedent in gates/visual.ts
+// — E23 named-path rejection posture). Thin delegate over the same sanitised
+// path the predicates below check, so the envelope can never name a path the
+// gate didn't test. Kept as a WRAPPER (not a rename) so the internal
+// `evidencePath` call sites stay literally intact — the covering-evidence
+// AC-6 code-path pin asserts the exact `fs.existsSync(evidencePath(...))`
+// source text inside hasEvidenceInFile.
+export function qaEvidencePath(workspacePath, taskId) {
+    return evidencePath(workspacePath, taskId);
+}
 export async function recordReviewInFile(workspacePath, taskIds, status, reviewer, notes) {
     const dir = evidenceDir(workspacePath);
     if (!fs.existsSync(dir))

@@ -249,3 +249,28 @@ skill-qa-engineer, skill-pm)**
   c9-protocol-fields verbatim (plain-text envelope, `parsed`-args-only,
   code-reviewer-keyed) — this ticket adds a sibling of that family, not a
   new mechanism class.
+
+## Amendment — E32 (2026-07-16, e32-e33-gate-hardening)
+
+AC-1 bullet 1 is SUPERSEDED. The fourth E9A/E18-class incident (2026-07-16,
+e-p3-tail-batch) showed the APPROVED-row manifest-in-`completed_tasks`
+contract is unenforceable: an unsanctioned pre-fill riding the
+`(code-reviewer, In_Progress) → (qa-engineer, In_Progress)` edge is
+byte-identical to the sanctioned write, so no server predicate can tell
+them apart, and the persisted ids poison the on-disk baseline (any later
+carry-forward of them is ungated — two-step evasion). Amended contract
+(PM re-scope option A, human-approved):
+
+- The APPROVED handoff carries the review-scope manifest ONLY in the
+  transient `review_task_ids` field (`agent_id="qa-engineer"`,
+  `review_verdict="APPROVED"`, NO `completed_tasks`).
+  `MISSING_REVIEW_EVIDENCE` reads `review_task_ids` (falling back to
+  `completed_tasks` only when `review_task_ids` is empty).
+- `completed_tasks` on ANY `agent_id=qa-engineer` write is reserved for
+  QA-evidence-backed completions: the `QA_COMPLETION_EVIDENCE_MISSING`
+  gate's APPROVED-row exemption is removed entirely — any growth vs the
+  on-disk completed set without per-id `qa_reports/` evidence is rejected,
+  unconditionally (regardless of status, verdict, or previous tuple).
+- Carry-forward (no growth) stays ungated by design; ledgers already
+  poisoned by pre-amendment manifest writes are documented (docs/backlog.md
+  E32), not chased.

@@ -43,7 +43,7 @@
 //   BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE  const-08-chain-31-mid.md
 //   STAMP_PROVENANCE_SUSPECT        const-08-chain-31-mid.md, skill-release-engineer.md
 //   MISSING_EVIDENCE                skill-qa-engineer.md
-//   QA_COMPLETION_EVIDENCE_MISSING  const-08-chain-31-mid.md
+//   QA_COMPLETION_EVIDENCE_MISSING  const-08-chain-31-mid.md, skill-code-reviewer.md
 //   MISSING_REVIEW_EVIDENCE         skill-code-reviewer.md, const-08-chain-31-mid.md
 //   EXPECTED_RED_DIFF_MISSING       skill-qa-engineer.md
 //   REPRO_MANIFEST_MISSING          skill-sr-engineer.md
@@ -293,34 +293,40 @@ export const GATE_REGISTRY = [
         // evidence on disk via the existing hasEvidenceInFile convention
         // (gates/qa-review.ts — reused, not forked; covers: coverage honored).
         // Ids already in the on-disk set are exempt (a qa write legitimately
-        // passes the full cumulative list back), and so is the sanctioned
-        // APPROVED-row handoff (code-reviewer:In_Progress →
-        // qa-engineer:In_Progress), whose completed_tasks is the review-scope
-        // manifest written BEFORE qa runs and already evidence-gated per-id by
-        // MISSING_REVIEW_EVIDENCE. Evaluated AFTER the qa_review
-        // auto-record so a legitimate PASS/FAIL write's just-recorded evidence
-        // satisfies it. tw_complete_task is untouched (own evidence path).
-        // File-mode only, matching the sibling attestation gates.
+        // passes the full cumulative list back). NO edge/verdict exemption —
+        // c16 contract amendment (E32, e32-e33-gate-hardening): the former
+        // APPROVED-row exemption was removed entirely because the incident write
+        // is byte-identical to the sanctioned manifest shape (fourth
+        // E9A/E18-class incident, 2026-07-16); review scope on the APPROVED
+        // handoff now travels ONLY in the transient review_task_ids field
+        // (evidence-gated by MISSING_REVIEW_EVIDENCE), and completed_tasks on
+        // ANY qa-engineer-stamped write is reserved for evidence-backed QA
+        // completions. Evaluated AFTER the qa_review auto-record so a legitimate
+        // PASS/FAIL write's just-recorded evidence satisfies it.
+        // tw_complete_task is untouched (own evidence path). File-mode only,
+        // matching the sibling attestation gates.
         errorCode: "QA_COMPLETION_EVIDENCE_MISSING",
         producer: "orchestrator",
         envelope: "plain-text",
-        triggerEdge: "any qa-engineer-stamped write whose completed_tasks adds ids not in the on-disk completed set, except the code-reviewer:In_Progress -> qa-engineer:In_Progress APPROVED row (file-mode only)",
-        armCondition: "agent_id=qa-engineer && newly-added completed ids non-empty && not the APPROVED-row handoff && hasEvidenceInFile(newIds).missing non-empty; FileHandoffStorage only",
+        triggerEdge: "any qa-engineer-stamped write whose completed_tasks adds ids not in the on-disk completed set — no edge/status/verdict exemption (file-mode only)",
+        armCondition: "agent_id=qa-engineer && newly-added completed ids non-empty && hasEvidenceInFile(newIds).missing non-empty; FileHandoffStorage only",
         clearingArtifact: "qa_reports/review_<id>.md (or a covers: file) on disk for every newly-added id — including via the qa_review auto-record on this same write",
         hintStatic: "A qa-engineer write adding completed_tasks ids requires per-id QA evidence " +
             "on disk (qa_reports/review_<id>.md or a covers: file) for each NEWLY added " +
-            "id. Run the QA review and record evidence first (attach qa_review with " +
-            "review_task_ids on a PASS/FAIL write, or write the report file), or drop " +
-            "the unevidenced ids from completed_tasks. " +
-            "See docs/backlog.md E18 incident (b).",
+            "id — no exemption for any edge, status, or review_verdict. Run the QA " +
+            "review and record evidence first (attach qa_review with review_task_ids " +
+            "on a PASS/FAIL write, or write the report file), or drop the unevidenced " +
+            "ids from completed_tasks. If this is the code-reviewer APPROVED handoff, " +
+            "carry the review scope in review_task_ids INSTEAD of completed_tasks " +
+            "(c16 amendment, E32). See docs/backlog.md E18 incident (b) + E32.",
         documentedInProse: true,
     },
     {
         errorCode: "MISSING_REVIEW_EVIDENCE",
         producer: "orchestrator",
         envelope: "plain-text",
-        triggerEdge: "code-reviewer:In_Progress -> qa-engineer:In_Progress with completed_tasks",
-        armCondition: "hasCodeReviewEvidence().missing non-empty",
+        triggerEdge: "code-reviewer:In_Progress -> qa-engineer:In_Progress with review scope (review_task_ids if non-empty, else completed_tasks — c16 amendment, E32)",
+        armCondition: "hasCodeReviewEvidence(reviewScopeIds).missing non-empty",
         clearingArtifact: "review_reports/review_<id>.md",
         hintStatic: "Code-reviewer evidence missing: write review_reports/review_<task-id>.md " +
             "before handing off to qa-engineer.",
@@ -491,11 +497,12 @@ export const GATE_REGISTRY = [
         envelope: "plain-text",
         triggerEdge: "any code-reviewer-stamped write carrying non-empty completed_tasks",
         armCondition: "agent_id=code-reviewer && completed_tasks.length > 0",
-        clearingArtifact: "omit completed_tasks (or pass []) on self-stamped code-reviewer writes; the APPROVED row stamps agent_id=qa-engineer and is untouched",
+        clearingArtifact: "omit completed_tasks (or pass []) on self-stamped code-reviewer writes; the APPROVED row stamps agent_id=qa-engineer with review scope in review_task_ids (c16 amendment, E32)",
         hintStatic: "completed_tasks on a code-reviewer-stamped write is ledger pollution: " +
-            "the review-scope manifest is legal only on the APPROVED handoff " +
-            "(agent_id=qa-engineer). Omit completed_tasks (or pass []) on this write. " +
-            "See specs/c16-c10-role-boundary.md AC-3.",
+            "the review-scope manifest travels in review_task_ids on the APPROVED " +
+            "handoff (agent_id=qa-engineer) — never in completed_tasks. Omit " +
+            "completed_tasks (or pass []) on this write. " +
+            "See specs/c16-c10-role-boundary.md AC-3 + the E32 amendment.",
         documentedInProse: true,
     },
     {

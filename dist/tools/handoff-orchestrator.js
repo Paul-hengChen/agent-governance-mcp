@@ -33,7 +33,7 @@ import { hasCutApproval } from "../gates/cut-approval.js";
 import { EVIDENCE_SCHEMA_CURRENT } from "../gates/evidence-schema.js";
 import { classifyLeaseOverride } from "../gates/lease-override.js";
 import { isHandAuthoredStamp, hasStampRemediationAudit } from "../gates/stamp-provenance.js";
-import { hasEvidenceInFile } from "../gates/qa-review.js";
+import { hasEvidenceInFile, qaEvidencePath } from "../gates/qa-review.js";
 import { hasUnresolvedRefs, listUnresolvedRefs } from "../gates/external-refs.js";
 import { gate } from "../gates/registry.js";
 import { awaitAllInflightFor } from "./rag-coalesce.js";
@@ -588,9 +588,11 @@ async function handleUpdateStateCore(parsed) {
     // CHANGES_REQUESTED row feeds no gate — MISSING_REVIEW_EVIDENCE only
     // reads the manifest when nextTuple.agent === "qa-engineer"). The
     // legitimate uses are untouched: the APPROVED row stamps
-    // agent_id="qa-engineer" (this gate keys on agent_id, not on which
-    // role authored the call), and the Phase-2 claim write carries
-    // completed_tasks=[] (zod default) so it never fires.
+    // agent_id="qa-engineer" with the review scope in the transient
+    // review_task_ids field (c16 amendment, E32 — completed_tasks stays
+    // empty there; growth is rejected by QA_COMPLETION_EVIDENCE_MISSING
+    // below), and the Phase-2 claim write carries completed_tasks=[]
+    // (zod default) so it never fires.
     if (parsed.agent_id === "code-reviewer" && parsed.completed_tasks.length > 0) {
         return {
             content: [{
@@ -653,37 +655,57 @@ async function handleUpdateStateCore(parsed) {
     // qa_review satisfies this gate with its own just-recorded evidence;
     // an evidence-less pre-fill (the incident shape: In_Progress, no
     // qa_review) has nothing on disk and is rejected naming the ids.
-    // APPROVED-row exemption: the sanctioned code-reviewer:In_Progress →
-    // qa-engineer:In_Progress handoff stamps agent_id="qa-engineer" and
-    // carries completed_tasks as the review-scope manifest BEFORE any
-    // qa-engineer runs (c16 AC-3 bullet 3) — no QA evidence can exist
-    // yet, and that edge is already evidence-gated per-id by
-    // MISSING_REVIEW_EVIDENCE (review_reports/) below, so it is excluded
-    // here. The incident write is NOT on that edge: it self-looped from
-    // (qa-engineer, In_Progress) after the real APPROVED handoff.
+    // NO EXEMPTIONS — c16 contract amendment (E32, e32-e33-gate-hardening,
+    // review round 1 finding C1/C2 + PM re-scope option A). The gate as
+    // shipped exempted the sanctioned APPROVED-row handoff
+    // (code-reviewer:In_Progress → qa-engineer:In_Progress), whose
+    // completed_tasks was the c16 review-scope manifest. That exemption
+    // WAS the hole: the fourth E9A/E18-class incident (2026-07-16,
+    // e-p3-tail-batch) rode it with a write byte-identical to the
+    // sanctioned shape — no predicate can distinguish a forged manifest
+    // write from a real one because they are the same write, and the
+    // persisted ids then poisoned the on-disk baseline so any later
+    // carry-forward of them was ungated (two-step evasion). The contract
+    // is amended instead of the predicate: review scope on an APPROVED
+    // handoff travels ONLY in the transient review_task_ids field (per
+    // skill-code-reviewer.md; MISSING_REVIEW_EVIDENCE below now reads it),
+    // and completed_tasks on ANY agent_id=qa-engineer write is reserved
+    // for evidence-backed QA completions. So: ANY qa-engineer-stamped
+    // write that GROWS completed_tasks vs the on-disk prior set without
+    // per-id QA evidence is rejected, unconditionally — regardless of
+    // status, review_verdict, or the previous tuple. Carry-forward (no
+    // new ids) never gates BY DESIGN — ledgers already poisoned by
+    // pre-amendment manifest writes are documented (docs/backlog.md E32),
+    // not chased. bookkeeping_write touches don't grow the ledger; non-qa
+    // identities are REVIEWER_COMPLETED_TASKS_REJECTED's jurisdiction.
     // tw_complete_task is untouched (its own evidence path). No prevState
     // guard: on a brand-new workspace EVERY claimed id is new, and a
     // first-write completion claim with no evidence is exactly the class
     // this gate exists to reject. FILE-MODE ONLY, matching the sibling
     // attestation gates (SQLite's hasEvidence path is reports-row-based
     // and out of scope).
-    const isApprovedRowHandoff = prevTuple.agent === "code-reviewer" &&
-        prevTuple.status === "In_Progress" &&
-        nextTuple.agent === "qa-engineer" &&
-        nextTuple.status === "In_Progress";
     if (storage instanceof FileHandoffStorage &&
         parsed.agent_id === "qa-engineer" &&
-        parsed.completed_tasks.length > 0 &&
-        !isApprovedRowHandoff) {
+        parsed.completed_tasks.length > 0) {
         const onDiskCompleted = new Set(prevState?.completed_tasks ?? []);
         const newIds = parsed.completed_tasks.filter((id) => !onDiskCompleted.has(id));
         if (newIds.length > 0) {
             const ev = hasEvidenceInFile(parsed.workspace_path, newIds);
             if (ev.missing.length > 0) {
+                // E32 (E23 named-path posture): name the exact expected
+                // evidence file per offending id — the same sanitised path
+                // hasEvidenceInFile checked — plus the covers: fallback, so
+                // the writer knows precisely which artifact clears the gate
+                // (mirrors VISUAL_EVIDENCE_MISSING's expectedPaths listing).
+                const expectedPaths = ev.missing
+                    .map((id) => qaEvidencePath(parsed.workspace_path, id))
+                    .join(", ");
                 return {
                     content: [{
                             type: "text",
                             text: `⛔ QA_COMPLETION_EVIDENCE_MISSING: ${ev.missing.join(", ")}. ` +
+                                `Expected evidence file(s): ${expectedPaths} ` +
+                                `(or an existing qa_reports/ report covering the id via a covers: line). ` +
                                 gate("QA_COMPLETION_EVIDENCE_MISSING").hintStatic,
                         }],
                     isError: true,
@@ -967,12 +989,22 @@ async function handleUpdateStateCore(parsed) {
     // Code-reviewer evidence gate. Mirrors the PASS gate above for the
     // sr ↔ code-reviewer → qa handoff. Only fires when the previous tuple
     // is (code-reviewer, In_Progress) AND the next tuple hands off to qa.
+    // c16 amendment (E32, e32-e33-gate-hardening): the review-scope
+    // manifest travels in the transient review_task_ids field —
+    // completed_tasks on the APPROVED handoff is retired (any growth
+    // there is rejected upstream by QA_COMPLETION_EVIDENCE_MISSING).
+    // Resolution mirrors the d9 qa_review rule: review_task_ids if
+    // non-empty, else completed_tasks (carry-forward ids on a legacy-
+    // shaped write still get review-evidence-checked here).
+    const reviewScopeIds = parsed.review_task_ids && parsed.review_task_ids.length > 0
+        ? parsed.review_task_ids
+        : parsed.completed_tasks;
     if (prevTuple.agent === "code-reviewer" &&
         prevTuple.status === "In_Progress" &&
         nextTuple.agent === "qa-engineer" &&
         nextTuple.status === "In_Progress" &&
-        parsed.completed_tasks.length > 0) {
-        const ev = await storage.hasCodeReviewEvidence(parsed.workspace_path, parsed.completed_tasks);
+        reviewScopeIds.length > 0) {
+        const ev = await storage.hasCodeReviewEvidence(parsed.workspace_path, reviewScopeIds);
         if (ev.missing.length > 0) {
             return {
                 content: [{
@@ -1139,32 +1171,40 @@ async function handleUpdateStateCore(parsed) {
     // E28 — wholesale-replace shrink warning (dispatch_pins / external_refs).
     // Both fields REPLACE on write, so a writer that skips read-before-write
     // silently drops entries. When THIS write supplied one of them and the
-    // supplied set is SMALLER than the on-disk prior set (same-feature
-    // writes only — a feature change legitimately drops both feature-scoped
-    // fields), append an advisory `warnings` array to the success envelope
-    // naming the dropped entries. Warn-only by design: never rejects, no
-    // new arg, no schema bump, and any failure here leaves the original
-    // envelope untouched (the state write already succeeded).
+    // supplied set DROPS any prior entry (same-feature writes only — a
+    // feature change legitimately drops both feature-scoped fields),
+    // append an advisory `warnings` array to the success envelope naming
+    // the dropped entries. E33 (e32-e33-gate-hardening): detection is
+    // ENTRY-IDENTITY diff — dispatch_pins by key set, external_refs by
+    // ref string — not cardinality, so a same-count (or even growing)
+    // entry SWAP that drops a prior entry warns too; the E28-as-shipped
+    // `nextSize < prevLength` compare let equal-count swaps drop entries
+    // silently. Warn-only by design: never rejects, no new arg, no schema
+    // bump, and any failure here leaves the original envelope untouched
+    // (the state write already succeeded). A pin whose VALUE changes but
+    // whose key survives is NOT a drop (values are free-text tiers, and
+    // re-pinning a role is the field's normal use); same for an
+    // external_refs entry whose state advances under an unchanged ref.
     const shrinkWarnings = [];
     if (prevState && !feature_changed) {
         if (parsed.dispatch_pins) {
             const prevPinKeys = Object.keys(prevState.dispatch_pins ?? {});
             const nextPinKeys = new Set(Object.keys(parsed.dispatch_pins));
-            if (nextPinKeys.size < prevPinKeys.length) {
-                const dropped = prevPinKeys.filter((k) => !nextPinKeys.has(k));
+            const dropped = prevPinKeys.filter((k) => !nextPinKeys.has(k));
+            if (dropped.length > 0) {
                 shrinkWarnings.push(`dispatch_pins REPLACES wholesale, not merges: this write kept ` +
-                    `${nextPinKeys.size} of ${prevPinKeys.length} prior entries — dropped: ` +
+                    `${prevPinKeys.length - dropped.length} of ${prevPinKeys.length} prior entries — dropped: ` +
                     `${dropped.join(", ")}. If unintended, read the previous state and ` +
                     `re-write the FULL map including every still-wanted pin.`);
             }
         }
         if (parsed.external_refs) {
             const prevRefs = prevState.external_refs ?? [];
-            if (parsed.external_refs.length < prevRefs.length) {
-                const nextRefSet = new Set(parsed.external_refs.map((r) => r.ref));
-                const dropped = prevRefs.filter((r) => !nextRefSet.has(r.ref)).map((r) => r.ref);
+            const nextRefSet = new Set(parsed.external_refs.map((r) => r.ref));
+            const dropped = prevRefs.filter((r) => !nextRefSet.has(r.ref)).map((r) => r.ref);
+            if (dropped.length > 0) {
                 shrinkWarnings.push(`external_refs REPLACES wholesale, not merges: this write kept ` +
-                    `${parsed.external_refs.length} of ${prevRefs.length} prior entries — dropped: ` +
+                    `${prevRefs.length - dropped.length} of ${prevRefs.length} prior entries — dropped: ` +
                     `${dropped.join(", ")}. If unintended, read the previous state and ` +
                     `re-write the FULL ledger including every still-wanted entry.`);
             }

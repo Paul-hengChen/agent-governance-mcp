@@ -2,6 +2,13 @@
 
 # Code-Reviewer Role Extraction — Architecture (v3.9.0)
 
+> **PARTIALLY SUPERSEDED (2026-07-16, E32 c16 amendment):** this document describes the
+> APPROVED handoff persisting review-scope ids into `completed_tasks` (the original manifest
+> shape). That contract was amended by backlog E32 — review scope now travels ONLY in the
+> transient `review_task_ids` field, and any `agent_id=qa-engineer` write growing
+> `completed_tasks` without per-id QA evidence is rejected. Authoritative text:
+> `specs/c16-c10-role-boundary.md` (Amendment section) + `content/skill-code-reviewer.md`.
+
 Blueprint for sr-engineer. Maps the 12 ACs in `specs/code-reviewer-role-extraction.md` onto exact files, function signatures, and migration semantics.
 
 ## Affected Files
