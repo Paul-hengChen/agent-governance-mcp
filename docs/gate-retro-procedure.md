@@ -4,8 +4,14 @@ Periodic human-review SOP for retiring dead-weight gates. The server appends
 one JSON line to `<workspace>/.current/telemetry.jsonl` for every
 `GATE_REGISTRY`-cataloged rejection `tw_update_state` returns (see
 `specs/d3-gate-fire-telemetry.md`); this procedure turns that sidecar into a
-retirement signal. It is a manual/scripted grep + group-by — no built
-analysis tool exists or is planned.
+retirement signal. The aggregation is built in since E26: the read-only
+`tw_gate_stats` tool (tools/gate-stats.ts) covers steps 2–4 below and the
+success-metrics summary in one call — the `jq` one-liners remain as a
+no-server fallback. Its output also labels each rule's **category**:
+gate-backed rules (countable here) vs prose-behavioral rules (`fires: null`
+— §5 read cap, §1 terse cap, dispatch_pins, token brake — which need
+transcript sampling, never gate stats; zero fires for those means
+"not measured", not "dead").
 
 Each line has exactly 5 keys:
 
@@ -19,8 +25,12 @@ Each line has exactly 5 keys:
    JSONL; a rare interleaved line under concurrent writes is an accepted
    cost — skip unparseable lines).
 
-2. **Group by `error_code` and count fires.** Per feature (`feature` field)
-   or across a window of features. One-liner:
+2. **Group by `error_code` and count fires.** Preferred: call `tw_gate_stats`
+   — it returns per-code fire counts ranked by count (`fired`), the complete
+   zero-fire registry list (`zero_fire`), per-feature/per-agent breakdowns,
+   and any unregistered codes, plus the deduped metrics summary. NOTE its
+   counts are lifetime (whole sidecar), so window externally for step 4.
+   Fallback one-liner, per feature (`feature` field) or across a window:
 
    ```bash
    jq -r .error_code .current/telemetry.jsonl | sort | uniq -c | sort -rn
@@ -37,7 +47,7 @@ Each line has exactly 5 keys:
    candidates for scrutiny.
 
 4. **Flag zero-fire gates as retirement candidates.** Any `error_code` in
-   `GATE_REGISTRY` (`gates/registry.ts`, 22 entries) with **zero fires across
+   `GATE_REGISTRY` (`gates/registry.ts`) with **zero fires across
    the last N shipped features** is a retirement candidate.
    **Default N = 5** — adjustable: raise N for gates guarding rare edges
    (e.g. round-cap sentinels fire only on pathological loops), lower it if
@@ -80,7 +90,9 @@ node scripts/summarize-metrics.mjs   # default: .current/metrics.jsonl
 ```
 
 which prints a per-feature table plus the aggregate one-pass rate and mean
-rounds/hops.
+rounds/hops. `tw_gate_stats` returns the same aggregate in its `metrics`
+block, deduped on the E12 `(feature, released_version)` idempotency key
+(pre-E12 double-appends, e.g. the e8 pair, are healed at read time).
 
 ## Cadence & retired-rule ledger (E6, instituted 2026-07-13)
 

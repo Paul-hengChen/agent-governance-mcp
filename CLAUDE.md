@@ -30,7 +30,7 @@ Three layers of defense, all in `index.ts`:
    design, no `agent_id` in the routing chain; the other five
    (`sr-engineer`, `pm`, `architect`, `researcher`, `qa-engineer`) use
    matching file names.
-2. **Tools** (`tools/{handoff,tasks,tasks-file,drift,role,storage,storage-sqlite,config,transitions,evidence-file,rag,rag-coalesce}.ts`) — eleven `tw_*` tools that
+2. **Tools** (`tools/{handoff,tasks,tasks-file,drift,role,storage,storage-sqlite,config,transitions,evidence-file,rag,rag-coalesce,gate-stats}.ts`) — twelve `tw_*` tools that
    read/write `.current/handoff.md`, `tasks.md`, and (in HTTP/SQLite mode)
    PRD-derived RAG chunks in target workspaces.
 3. **Guards** (`guards/{session,file-lock}.ts`) — pre-flight check, file
@@ -56,6 +56,7 @@ tools/transitions.ts      ALLOWED_TRANSITIONS state machine (v3.2.0)
 tools/evidence-file.ts    file-mode QA evidence write/check (v3.2.0)
 tools/rag.ts              PRD chunking + embeddings (SQLite mode, v3.3.0)
 tools/rag-coalesce.ts     shared _indexingInFlight registry (v3.3.0)
+tools/gate-stats.ts       tw_gate_stats — telemetry/metrics sidecar aggregation for the E6 retro (E26)
 schema/versions.ts        schema_version constants + migration registries (v3.4.0)
 schema/migrations-*.ts    handoff / tasks / sqlite / config migration runners (v3.4.0)
 guards/session.ts         per-(process,workspace) snapshot of "agent read state"

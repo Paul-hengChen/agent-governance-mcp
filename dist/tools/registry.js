@@ -17,6 +17,7 @@ import { handleSwitchRole } from "./role.js";
 import { handleGetNextTask, handleCompleteTask, handleRollbackTask, handleAddTask, } from "./tasks.js";
 import { handleUpdateState } from "./handoff-orchestrator.js";
 import { handleIndexPrd, handleClearPrdChunks, DEFAULT_EMBEDDING_MODEL } from "./rag.js";
+import { handleGateStats } from "./gate-stats.js";
 export function defineTool(spec) {
     return {
         name: spec.name,
@@ -603,6 +604,26 @@ export const TOOL_REGISTRY = [
         },
         zodSchema: WorkspaceOnly,
         handler: handleClearPrdChunks,
+    }),
+    defineTool({
+        name: "tw_gate_stats",
+        description: "Aggregate .current/telemetry.jsonl (gate fires) + .current/metrics.jsonl (per-feature outcomes) " +
+            "into per-gate/per-error-code counts for the E6 rule-retirement retro (docs/gate-retro-procedure.md). " +
+            "Read-only; full GATE_REGISTRY coverage (fired + zero-fire). Counts prove GATE-BACKED rules only — " +
+            "prose-behavioral rules (§5 read cap, §1 terse cap, dispatch_pins, token brake) are listed separately " +
+            "with fires=null: zero fires here NEVER means a prose rule is dead (transcript sampling required).",
+        inputSchema: {
+            type: "object",
+            properties: {
+                workspace_path: {
+                    type: "string",
+                    description: "Absolute workspace path",
+                },
+            },
+            required: ["workspace_path"],
+        },
+        zodSchema: WorkspaceOnly,
+        handler: handleGateStats,
     }),
 ];
 // ==========================================
