@@ -16,6 +16,24 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.92.0] - 2026-07-17
+
+### Fixed
+- **`e34-agc-init-dead-end-seed` — `agc init` no longer seeds a dead-end handoff state (backlog E34, live incident 2026-07-17 VS-NDI-Receiver consumer workspace).** `bin/agc-init.mjs` previously wrote a `.current/handoff.md` template with `status: "Not_Started"` + `last_agent: "pm"`. But `pm:Not_Started` has no `ALLOWED_TRANSITIONS` edge, so every init'd consumer workspace rejected ALL subsequent `tw_update_state` writes with `TRANSITION_REJECTED` — dead on arrival, unrecoverable without manually removing `handoff.md`. Fix (human-scoped 2026-07-17, minimal init-side option): `runInit()` stops writing `.current/handoff.md` entirely — a fresh workspace is now `null:null` (file absent, the matrix's sanctioned fresh tuple), and the first `pm:In_Progress` write creates the handoff via the normal `null:null` edge. `.config.json` / `tasks.md` / adapters are unchanged. Defensive prev-tuple coercion in the handoff orchestrator was explicitly DESCOPED (human decision). Chain: content-scoped mini-chain (backlog row as spec, PM/architect skipped) sr(fable) → code-reviewer (APPROVED round 1, zero findings, `review_reports/review_T-E34-01.md`) → qa-engineer (PASS, `qa_reports/review_T-E34-01.md` + `qa_reports/review_T-E34-02.md`). Expected-Red manifest `qa_reports/expected-red_e34-agc-init-dead-end-seed.txt`. Commit `23aee75`.
+- **Install-command doc fix (same incident):** `README.md` install command changed from `npx -y github:…#vX agc init` to `npx -y -p github:…#vX agc init`. The package ships 3 bin entries, so without `-p` npx runs the default bin (the MCP server, `dist/index.js`) and the `agc` bin never executes → no files created. `docs/install.md` was already correct via `--package=`.
+
+### Changed
+- **bin/agc-init.mjs**: `runInit()` no longer writes `.current/handoff.md`.
+- **README.md**: install command gains `-p`; install pins caught up 3.91.0 → 3.92.0; status line suite count 1611 → 1612.
+- **test/p0-onboarding-lite-default.test.mjs**: AC1/AC2/AC3 flipped to the no-handoff contract + permanent E34 regression pin (a seeded tuple must have an `ALLOWED_TRANSITIONS` edge).
+- **package.json / index.ts**: version bumped 3.91.0 → 3.92.0 (package manifest + Server() literal).
+- **dist/**: rebuilt for the 3.92.0 Server() literal.
+
+### Notes
+- **BREAKING-ish for existing consumers**: `agc init` output no longer includes `.current/handoff.md`. Consumers upgrading who already have a seeded dead-end `handoff.md` (from an older `agc init`) must delete or rename it manually — defensive coercion was explicitly descoped — and must NOT re-run an older `agc init` afterward.
+- Suite **1612/1612** green; build zero errors.
+- No MCP tool-surface or handoff-schema changes; no migration needed (handoff schema stays v13, evidence schema v2).
+
 ## [3.91.0] - 2026-07-16
 
 ### Added
