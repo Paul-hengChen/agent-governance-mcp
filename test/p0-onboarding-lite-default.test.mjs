@@ -3,6 +3,16 @@
 // Covers bin/agc-init.mjs scaffolding (T43), package.json bin wiring (T44),
 // and bin/agent-governance-context.mjs lite-default variant switching (T45).
 // Spec-to-Test map lives in qa_reports/review_p0-onboarding-lite-default.md.
+//
+// AC1/AC2/AC3 contract-flip (E34, 2026-07-17, qa-engineer): `agc init` used
+// to seed `.current/handoff.md` with a `pm:Not_Started` tuple that has NO
+// outgoing ALLOWED_TRANSITIONS edge — every consumer workspace was dead on
+// arrival (live incident, VS-NDI-Receiver). The fix (bin/agc-init.mjs) stops
+// writing handoff.md entirely: the transition matrix's only fresh-workspace
+// key is `null:null` (file absent), so the first `pm:In_Progress` write
+// creates it via the normal edge. AC1/AC2/AC3 below are re-pinned to this new
+// contract; see qa_reports/expected-red_e34-agc-init-dead-end-seed.txt and
+// qa_reports/review_T-E34-01.md for the full disposition.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -13,6 +23,7 @@ import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
 import { parseHandoff } from "../dist/tools/handoff.js";
+import { ALLOWED_TRANSITIONS } from "../dist/tools/transitions.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const PROJECT_ROOT = path.resolve(path.dirname(__filename), "..");
@@ -38,18 +49,18 @@ function runHook(cwd, env = {}) {
   });
 }
 
-test("AC1: agc init creates handoff/.config/tasks with expected templates", () => {
+test("AC1: agc init creates .config.json + tasks.md with expected templates, no handoff.md (re-pinned E34)", () => {
   const ws = mkTmp("agc-init-ac1-");
   const r = runInit(ws);
   assert.equal(r.status, 0, `exit code (stderr=${r.stderr})`);
-  assert.match(r.stdout, /Created: \.current\/handoff\.md, \.current\/\.config\.json, tasks\.md/);
+  assert.match(r.stdout, /Created: \.current\/\.config\.json, tasks\.md/);
+  assert.doesNotMatch(r.stdout, /handoff\.md/, "stdout must never mention handoff.md — init no longer scaffolds it (E34)");
 
-  const handoff = fs.readFileSync(path.join(ws, ".current", "handoff.md"), "utf-8");
-  assert.match(handoff, /^---\nschema_version: 1\n/, "handoff has schema_version: 1");
-  assert.match(handoff, /active_feature: ""/, "handoff has empty active_feature");
-  assert.match(handoff, /status: "Not_Started"/, "handoff status Not_Started");
-  assert.match(handoff, /last_agent: "pm"/, "handoff last_agent pm");
-  assert.match(handoff, /qa_round: 0/, "handoff qa_round 0");
+  assert.equal(
+    fs.existsSync(path.join(ws, ".current", "handoff.md")),
+    false,
+    "agc init must NOT create .current/handoff.md (E34 — a seeded prev tuple dead-ends ALLOWED_TRANSITIONS)",
+  );
 
   const cfg = JSON.parse(fs.readFileSync(path.join(ws, ".current", ".config.json"), "utf-8"));
   assert.deepEqual(cfg, { schema_version: 1 });
@@ -59,36 +70,65 @@ test("AC1: agc init creates handoff/.config/tasks with expected templates", () =
   assert.match(tasks, /## Completed/);
 });
 
-test("AC2: agc init leaves existing files byte-for-byte unchanged on re-run", () => {
+test("AC2: agc init leaves .config.json and tasks.md byte-for-byte unchanged on re-run (re-pinned E34)", () => {
   const ws = mkTmp("agc-init-ac2-");
   assert.equal(runInit(ws).status, 0);
 
-  const handoffPath = path.join(ws, ".current", "handoff.md");
+  const cfgPath = path.join(ws, ".current", ".config.json");
   const tasksPath = path.join(ws, "tasks.md");
-  const handoffBefore = fs.readFileSync(handoffPath);
+  const cfgBefore = fs.readFileSync(cfgPath);
   const tasksBefore = fs.readFileSync(tasksPath);
 
   // Second run.
   const r = runInit(ws);
   assert.equal(r.status, 0);
-  assert.match(r.stdout, /Skipped \(already exists\): .*handoff\.md.*\.config\.json.*tasks\.md/);
+  assert.match(r.stdout, /Skipped \(already exists\): \.current\/\.config\.json, tasks\.md/);
+  assert.doesNotMatch(r.stdout, /handoff\.md/, "re-run stdout must never mention handoff.md (E34)");
 
-  assert.deepEqual(fs.readFileSync(handoffPath), handoffBefore, "handoff unchanged");
-  assert.deepEqual(fs.readFileSync(tasksPath), tasksBefore, "tasks unchanged");
+  assert.deepEqual(fs.readFileSync(cfgPath), cfgBefore, ".config.json unchanged");
+  assert.deepEqual(fs.readFileSync(tasksPath), tasksBefore, "tasks.md unchanged");
+  assert.equal(
+    fs.existsSync(path.join(ws, ".current", "handoff.md")),
+    false,
+    "re-run must still not create handoff.md",
+  );
 });
 
-test("AC3: agc init scaffold parses via parseHandoff with Not_Started + pm + empty arrays", () => {
+test("AC3: agc init leaves handoff.md absent — parseHandoff returns null post-init (re-pinned E34)", () => {
   const ws = mkTmp("agc-init-ac3-");
   assert.equal(runInit(ws).status, 0);
 
+  // The sanctioned fresh-workspace tuple is null:null — i.e. handoff.md being
+  // ABSENT, not a seeded Not_Started/pm template. parseHandoff must reflect
+  // that: no file to parse, no state.
   const state = parseHandoff(ws);
-  assert.ok(state, "parseHandoff returns state");
-  assert.equal(state.status, "Not_Started");
-  assert.equal(state.last_agent, "pm");
-  assert.equal(state.active_feature, "");
-  assert.equal(state.qa_round, 0);
-  assert.deepEqual(state.completed_tasks, []);
-  assert.deepEqual(state.pending_notes, []);
+  assert.equal(state, null, "parseHandoff must return null — no handoff.md is the sanctioned fresh-workspace tuple (E34)");
+});
+
+test("REGRESSION (E34): agc init never seeds a handoff.md whose (last_agent,status) tuple lacks an ALLOWED_TRANSITIONS edge", () => {
+  // Outlives the specific "no handoff.md at all" shape above: if some future
+  // refactor reintroduces a seeded template, this pins the invariant that
+  // actually matters — whatever gets seeded (if anything) MUST have a live
+  // outgoing edge, so no consumer workspace can be dead on arrival again.
+  const ws = mkTmp("agc-init-regression-e34-");
+  const r = runInit(ws);
+  assert.equal(r.status, 0);
+
+  const handoffPath = path.join(ws, ".current", "handoff.md");
+  if (fs.existsSync(handoffPath)) {
+    const state = parseHandoff(ws);
+    assert.ok(state, "a seeded handoff.md must parse cleanly");
+    const key = `${state.last_agent ?? "null"}:${state.status ?? "null"}`;
+    assert.ok(
+      ALLOWED_TRANSITIONS.has(key),
+      `seeded tuple "${key}" has no ALLOWED_TRANSITIONS edge — every consumer workspace would be dead on arrival (the exact E34 incident)`,
+    );
+  } else {
+    // Current contract: init creates NO handoff.md at all — the strongest
+    // form of the invariant (file absent = the sanctioned null:null tuple,
+    // which DOES have outgoing edges per ALLOWED_TRANSITIONS).
+    assert.ok(ALLOWED_TRANSITIONS.has("null:null"), "sanity: null:null must itself be a live edge");
+  }
 });
 
 test("AC4: package.json bin.agc maps to bin/agc-init.mjs and the file is executable", () => {

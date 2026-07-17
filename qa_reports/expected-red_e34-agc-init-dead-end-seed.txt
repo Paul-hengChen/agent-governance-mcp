@@ -1,0 +1,24 @@
+# e34-agc-init-dead-end-seed — sr-engineer expected-red manifest (T-E34-01, T-E34-02)
+#
+# REPRO (bugfix-mode gate, recorded RED pre-fix 2026-07-17):
+# script: scratchpad e34-repro.mjs — runs the real `node bin/agc-init.mjs init` into a
+# fresh temp workspace, feeds the seeded handoff.md through parseHandoff, then
+# validateTransition(prev=pm:Not_Started -> next=pm:In_Progress).
+# Pre-fix output (exit 1, RED):
+#   seeded last_agent: "pm", seeded status: "Not_Started"
+#   validateTransition rejection: {"error":"TRANSITION_REJECTED","attempted":
+#     {"prev_agent":"pm","prev_status":"Not_Started","new_agent":"pm",
+#      "new_status":"In_Progress","qa_round":0,"visual_round":0},"allowed":[],
+#     "hint":"No edge pm:Not_Started → pm:In_Progress in ALLOWED_TRANSITIONS. ..."}
+#   RESULT: RED — first pm write is rejected; init-seeded workspace is dead on arrival.
+# Post-fix expectation: agc init creates NO .current/handoff.md; the first pm write
+# evaluates against the null:null fresh-workspace tuple and is ACCEPTED.
+# (No committed repro test file — §2 test ownership; qa-engineer owns test authorship.)
+
+# Contract-flip: these tests pin the OLD runInit handoff.md template (Not_Started + pm
+# seed) that T-E34-01 removes. They go red by design; qa-engineer modernizes them
+# (human-scoped 2026-07-17: init must NOT write handoff.md — null:null = file absent
+# is the only sanctioned fresh tuple).
+test/p0-onboarding-lite-default.test.mjs | AC1: agc init creates handoff/.config/tasks with expected templates
+test/p0-onboarding-lite-default.test.mjs | AC2: agc init leaves existing files byte-for-byte unchanged on re-run
+test/p0-onboarding-lite-default.test.mjs | AC3: agc init scaffold parses via parseHandoff with Not_Started + pm + empty arrays

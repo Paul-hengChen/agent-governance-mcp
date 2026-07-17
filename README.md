@@ -31,7 +31,7 @@ claude mcp add -s user agent-governance-mcp -- npx -y github:Paul-hengChen/agent
 
 # 2. Mark the current workspace as managed (REQUIRED — the server treats a workspace as managed only with these)
 # Recommended: use agc init (writes .current/ + tasks.md)
-npx -y github:Paul-hengChen/agent-governance-mcp#v3.91.0 agc init
+npx -y -p github:Paul-hengChen/agent-governance-mcp#v3.91.0 agc init
 # Alternative (bare scaffold):
 mkdir -p .current
 
