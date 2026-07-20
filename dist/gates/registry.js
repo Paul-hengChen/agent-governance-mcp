@@ -16,9 +16,11 @@
 // fixed portion, so the emitted string stays byte-identical to pre-refactor
 // behavior. The EXISTING gate tests assert that byte-parity; see DR-2.
 //
-// Evaluation order is NOT encoded here (no evalOrder field): it stays the
-// physical top-to-bottom if-block sequence in tools/handoff-orchestrator.ts
-// (spec AC-7, DR-5). This registry is a keyed lookup, never a dispatch loop.
+// Evaluation order is NOT encoded here (no evalOrder field): since E35
+// (e35-gate-pipeline-extraction) it lives as data in the ordered
+// UPDATE_STATE_GATE_PIPELINE array in tools/handoff-orchestrator.ts
+// (previously the physical if-block sequence there — spec AC-7, DR-5).
+// This registry is a keyed lookup, never a dispatch loop.
 // errorCode → doc-file mapping (T-C12-01, c12-registry-field-consumers).
 // For each errorCode, the content/*.md file(s) that backtick-quote it — the
 // documentedInProse anchor set. Consumed by the AC2 literal-parity assertions
@@ -62,7 +64,7 @@
 //   AC_EXECUTION_LOG_MISSING        skill-qa-engineer.md
 // The 32-gate catalog, in documentation order. Array order is DOC order only —
 // it MUST NOT be relied on for evaluation order (DR-5; that lives in
-// handoff-orchestrator.ts as the physical if-block sequence).
+// handoff-orchestrator.ts as the ordered UPDATE_STATE_GATE_PIPELINE array, E35).
 export const GATE_REGISTRY = [
     // ---- transition-json (codes 1-6, producer: validateTransition) ----
     {

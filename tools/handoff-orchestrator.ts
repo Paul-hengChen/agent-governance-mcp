@@ -6,18 +6,26 @@
 // (this module imports tools/transitions.ts + tools/evidence-file.ts; handoff.ts
 // does not) — and to scope the future A2 gates/ extraction cleanly.
 //
-// Check order is FROZEN (spec AC-5/AC-8): preflight → PASS/qa-engineer gate →
-// transition validation → stamp-provenance gate (E18, before the lease gate:
-// the lease predicate consumes last_updated, so provenance resolves first) →
-// feature-lease gate (E1) → lease-override bypass/audit (E10) →
-// bookkeeping-write feature-change gate (E10) → scope-decision gate → cut-approval gate →
-// external-refs gate → source-credibility gate (E4) → repro-first gate (E2, bugfix-mode) → review-verdict/status mismatch gate → reviewer
-// completed_tasks gate (v3.58.0, C16) → QA evidence record → qa
-// completion-evidence gate (E18, after the record so a qa_review-bearing
-// write's own evidence counts) → PASS evidence
-// gate → visual sub-gates → expected-red diff gate →
-// code-reviewer evidence gate → round-cap sentinels → storage.writeState →
-// PASS RAG GC hook. No reorder, no merge, no early-return removal.
+// Check order is FROZEN-ADDITIVE and, since E35 (e35-gate-pipeline-extraction),
+// expressed as DATA: the ordered UPDATE_STATE_GATE_PIPELINE array below replaces
+// the pre-E35 hand-woven if-block sequence. Full order: preflight →
+// PASS/qa-engineer gate → ctx derivation → pipeline [transition validation →
+// stamp-provenance gate (E18, before the lease gate: the lease predicate
+// consumes last_updated, so provenance resolves first) → feature-lease gate (E1)
+// → lease-override bypass/audit (E10) → bookkeeping-write feature-change gate
+// (E10) → scope-decision gate → cut-approval gate → external-refs gate →
+// source-credibility gate (E4) → repro-first gate (E2, bugfix-mode) →
+// review-verdict/status mismatch gate → reviewer completed_tasks gate (v3.58.0,
+// C16) → QA evidence record → qa completion-evidence gate (E18, after the record
+// so a qa_review-bearing write's own evidence counts) → PASS evidence gate →
+// visual sub-gates → expected-red diff gate → AC-execution-log gate (E3) →
+// code-reviewer evidence gate] → round-cap sentinels → storage.writeState →
+// PASS RAG GC hook. No reorder, no merge, no early-return removal — the order
+// is asserted by the qa-owned order-pin test, not a comment. Gate bodies are
+// byte-verbatim relocations of the pre-E35 inline blocks (original indentation
+// deliberately preserved: the source-pin suites — error-code-contract,
+// ac-execution I5b, gates-expected-red — assert exact byte shapes; do not
+// re-indent).
 //
 // The 4-step mutating-tool contract (lock → freshness → atomic write → refresh
 // snapshot) lives inside tools/handoff.ts writeState — NOT here (spec finding #5).
@@ -58,10 +66,15 @@ import { classifyLeaseOverride } from "../gates/lease-override.js";
 import { isHandAuthoredStamp, hasStampRemediationAudit } from "../gates/stamp-provenance.js";
 import { hasEvidenceInFile, qaEvidencePath } from "../gates/qa-review.js";
 import { hasUnresolvedRefs, listUnresolvedRefs } from "../gates/external-refs.js";
-import { gate } from "../gates/registry.js";
+import { gate, TRANSITION_GATE_CODES } from "../gates/registry.js";
 import { awaitAllInflightFor } from "./rag-coalesce.js";
 import { emitGateTelemetry, extractGateCodeFromText } from "./telemetry.js";
 import { emitFeatureMetrics } from "./metrics.js";
+import {
+  runUpdateStatePipeline,
+  type UpdateStateGateContext,
+  type UpdateStateGateStep,
+} from "../gates/pipeline.js";
 
 // E1 (e1-feature-scoped-state-design) — feature-lease TTL. Fixed constant,
 // NOT config-driven (mirrors STALE_DISPATCH_THRESHOLD_MIN in tools/handoff.ts
@@ -74,8 +87,9 @@ const LEASE_TTL_MIN = 30;
 
 // D3 (d3-gate-fire-telemetry) — thin telemetry wrapper, the ONE emit point
 // for all 22 GATE_REGISTRY rejections. Zero changes to the frozen check-order
-// body below (handleUpdateStateCore is the pre-D3 handleUpdateState,
-// byte-identical). emitGateTelemetry swallows internally (AC-4): the returned
+// body below (handleUpdateStateCore was the pre-D3 handleUpdateState,
+// byte-identical; since E35 its gate blocks live in UPDATE_STATE_GATE_PIPELINE,
+// bodies still byte-verbatim). emitGateTelemetry swallows internally (AC-4): the returned
 // ToolResult is never masked or altered by a telemetry failure.
 // enforcePreFlight's thrown session-guard exceptions propagate through
 // unmodified — not a GateErrorCode, out of scope.
@@ -92,68 +106,22 @@ export async function handleUpdateState(parsed: UpdateStateInput): Promise<ToolR
   return result;
 }
 
-// --- GUARDED: must call tw_get_state first ---
-async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResult> {
-        enforcePreFlight(parsed.workspace_path, "tw_update_state");
-
-        // Defense-in-depth: zod refine already enforces this on PASS, but a
-        // client that bypasses zod still hits this guard.
-        if (parsed.status === "PASS") {
-          const gate = requireQaEngineer(parsed.agent_id, "tw_update_state(status=PASS)");
-          if (!gate.ok) {
-            return { content: [{ type: "text" as const, text: gate.message ?? "blocked" }] };
-          }
-        }
-
-        const storage = getActiveStorage();
-        const prevState = storage.parse(parsed.workspace_path);
-        const prev_qa_round = prevState?.qa_round ?? 0;
-        const prev_review_round = prevState?.review_round ?? 0;
-        const prev_visual_round = prevState?.visual_round ?? 0;
-        // v9 (d2-server-brake-accounting) — hop-cap inputs, derived HERE so
-        // transitions.ts stays pure / fs-free (it never reads active_feature
-        // itself, only the boolean computed from prevState + the incoming
-        // write). No prevState (fresh workspace) counts as a feature change:
-        // the counter starts from a 0 base either way.
-        const prev_hop_count = prevState?.hop_count ?? 0;
-        // v12 (e8-success-telemetry) — cumulative-total inputs, same derivation
-        // posture as prev_hop_count: transitions.ts stays pure / fs-free; the
-        // orchestrator reads the persisted totals and threads them through.
-        // File-mode-only fields (DR-1): SqliteHandoffStorage.parse never
-        // constructs them, so `?? 0` keeps SQLite mode at a harmless 0 base.
-        const prev_qa_rounds_total = prevState?.qa_rounds_total ?? 0;
-        const prev_review_rounds_total = prevState?.review_rounds_total ?? 0;
-        const prev_visual_rounds_total = prevState?.visual_rounds_total ?? 0;
-        const feature_changed = prevState
-          ? prevState.active_feature !== parsed.active_feature
-          : true;
-        // E23 (e23-evidence-schema-versioning, D1/D2) — evidence-schema pin
-        // resolution. Same-feature writes run the evidence gates under the
-        // feature's persisted pin (absent for pre-E23 in-flight features →
-        // the v2 normalized-contains default, D2 fallback). A feature-change
-        // write IS the stamping write: its checks run under
-        // EVIDENCE_SCHEMA_CURRENT, the exact value stamped below. NEVER
-        // client-supplied — resolved purely from prevState + feature_changed
-        // (AC6: no new zod arg on tw_update_state).
-        const evidenceSchemaPin = feature_changed
-          ? EVIDENCE_SCHEMA_CURRENT
-          : prevState?.evidence_schema;
-        // D3 — the version string the rejection envelopes cite. An absent pin
-        // is named as such (not silently rendered as v2) so the reader knows
-        // the feature predates pinning and got the default.
-        const evidenceSchemaLabel =
-          evidenceSchemaPin !== undefined
-            ? `v${evidenceSchemaPin}`
-            : "absent pin (v2 normalized-contains default)";
-        const prevTuple: TransitionTuple = {
-          agent: (prevState?.last_agent as AgentName | undefined) ?? null,
-          status: (prevState?.status as StatusName | undefined) ?? null,
-        };
-        const nextTuple: TransitionTuple = {
-          agent: (parsed.agent_id as AgentName | undefined) ?? null,
-          status: parsed.status,
-        };
-
+// E35 (e35-gate-pipeline-extraction) — the tw_update_state gate pipeline.
+// Check order as DATA: this array IS the frozen-additive check order the
+// pre-E35 orchestrator hand-wove as an if-block sequence (each step's body is
+// that block, moved byte-verbatim with its provenance comments attached). New
+// gates are added by inserting a step at the spec'd position — never by
+// editing a neighbor's body. Step granularity: one step per gate family; the
+// PASS-path visual sub-gates share derived arm state (armCheck/visualGate)
+// and remain one step, their internal order unchanged. Side effects: the
+// pre-E35 flow's only mid-sequence effect (the qa_review auto-record) stays
+// in its step at the same position (QA_REVIEW_RECORD).
+export const UPDATE_STATE_GATE_PIPELINE: readonly UpdateStateGateStep[] = [
+  {
+    name: "TRANSITION_VALIDATION",
+    codes: TRANSITION_GATE_CODES,
+    run: (ctx) => {
+      const { parsed, prevTuple, nextTuple, prev_qa_round, prev_review_round, prev_visual_round, prev_hop_count, feature_changed } = ctx;
         const rejection = validateTransition({
           prev: prevTuple,
           next: nextTuple,
@@ -177,7 +145,14 @@ async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResu
             isError: true,
           };
         }
-
+      return null;
+    },
+  },
+  {
+    name: "STAMP_PROVENANCE_SUSPECT",
+    codes: ["STAMP_PROVENANCE_SUSPECT"],
+    run: (ctx) => {
+      const { parsed, storage, prevState } = ctx;
         // E18 — Stamp-Provenance Gate (e18-write-provenance, fix a). Escalates
         // the E9A read-only stampAdvisory (tools/drift.ts) to a blocking gate:
         // when the CURRENT on-disk last_updated matches the hand-authored
@@ -227,7 +202,14 @@ async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResu
             isError: true,
           };
         }
-
+      return null;
+    },
+  },
+  {
+    name: "FEATURE_LEASE",
+    codes: ["FEATURE_LEASE_HELD", "LEASE_OVERRIDE_AUDIT_MISSING"],
+    run: (ctx) => {
+      const { parsed, storage, prevState, prevTuple, nextTuple } = ctx;
         // E1 — Feature-Lease Gate (e1-feature-scoped-state-design, option a-min).
         // Converts the silent second-feature clobber (D5/D9/D10 incident class)
         // into a loud, governed rejection: a write carrying a DIFFERENT
@@ -339,7 +321,14 @@ async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResu
             };
           }
         }
-
+      return null;
+    },
+  },
+  {
+    name: "BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE",
+    codes: ["BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE"],
+    run: (ctx) => {
+      const { parsed, storage, prevState, feature_changed } = ctx;
         // E10 (e10-lease-override, AC6) — bookkeeping-write same-feature
         // restriction, immediately after the lease block. Inline (DR-4): a
         // one-line comparison the orchestrator already computed
@@ -375,7 +364,14 @@ async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResu
             isError: true,
           };
         }
-
+      return null;
+    },
+  },
+  {
+    name: "SCOPE_DECISION_REQUIRED",
+    codes: ["SCOPE_DECISION_REQUIRED"],
+    run: (ctx) => {
+      const { parsed, prevState, prevTuple, nextTuple } = ctx;
         // v3.30.0 — Scope Decision Gate (server-scope-decision-gate). Fires on
         // the build-entry edge (pm:In_Progress → {architect,sr-engineer}:In_Progress)
         // when the design is armed (mode != no-design) but no scope decision is
@@ -418,7 +414,14 @@ async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResu
             };
           }
         }
-
+      return null;
+    },
+  },
+  {
+    name: "CUT_APPROVAL_REQUIRED",
+    codes: ["CUT_APPROVAL_REQUIRED"],
+    run: (ctx) => {
+      const { prevState, prevTuple, nextTuple } = ctx;
         // v5 — Cut-Approval Gate (pm-cut-approval-gate). Fires on the same
         // build-entry edge (pm:In_Progress → {architect,sr-engineer}:In_Progress)
         // as the scope-decision gate, but is UNCONDITIONAL (not arm-gated): a
@@ -465,7 +468,14 @@ async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResu
             };
           }
         }
-
+      return null;
+    },
+  },
+  {
+    name: "EXTERNAL_REFS_UNRESOLVED",
+    codes: ["EXTERNAL_REFS_UNRESOLVED"],
+    run: (ctx) => {
+      const { prevState, prevTuple, nextTuple } = ctx;
         // v6 — External-Refs Gate (b8-external-ref-ledger). THIRD build-entry
         // attestation gate, back-to-back after scope-decision and cut-approval
         // on the same pm:In_Progress → {architect,sr-engineer}:In_Progress edge.
@@ -516,7 +526,14 @@ async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResu
             };
           }
         }
-
+      return null;
+    },
+  },
+  {
+    name: "SOURCE_CREDIBILITY_UNVERIFIED",
+    codes: ["SOURCE_CREDIBILITY_UNVERIFIED"],
+    run: (ctx) => {
+      const { parsed, prevTuple, nextTuple } = ctx;
         // E4 — Source-Credibility Gate (e4-design-source-credibility-gate). FOURTH
         // build-entry attestation gate on the pm:In_Progress -> {architect,sr-engineer}
         // :In_Progress edge, after scope-decision / cut-approval / external-refs.
@@ -564,7 +581,14 @@ async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResu
             };
           }
         }
-
+      return null;
+    },
+  },
+  {
+    name: "REPRO_MANIFEST_MISSING",
+    codes: ["REPRO_MANIFEST_MISSING"],
+    run: (ctx) => {
+      const { parsed, storage, prevState, prevTuple, nextTuple } = ctx;
         // E2 — Repro-First Gate (e2-bugfix-repro-gate, AC2/AC6). Bugfix-mode
         // only. Fires on the fix-phase handoff sr-engineer:In_Progress →
         // code-reviewer:In_Progress when the incumbent feature is
@@ -606,7 +630,14 @@ async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResu
             };
           }
         }
-
+      return null;
+    },
+  },
+  {
+    name: "REVIEW_VERDICT_STATUS_MISMATCH",
+    codes: ["REVIEW_VERDICT_STATUS_MISMATCH"],
+    run: (ctx) => {
+      const { parsed } = ctx;
         // v7 — Review-Verdict/Status Mismatch Gate (c9-protocol-fields AC-5).
         // Plain-text envelope, modeled on MISSING_EVIDENCE /
         // MISSING_REVIEW_EVIDENCE (DR-3): NOT threaded through
@@ -637,7 +668,14 @@ async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResu
             };
           }
         }
-
+      return null;
+    },
+  },
+  {
+    name: "REVIEWER_COMPLETED_TASKS_REJECTED",
+    codes: ["REVIEWER_COMPLETED_TASKS_REJECTED"],
+    run: (ctx) => {
+      const { parsed } = ctx;
         // v3.58.0 — Reviewer completed_tasks Gate (c16-c10-role-boundary AC-3).
         // Sibling of REVIEW_VERDICT_STATUS_MISMATCH above — same family:
         // plain-text envelope, keys ONLY on the incoming parsed args (no
@@ -664,7 +702,14 @@ async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResu
             isError: true,
           };
         }
-
+      return null;
+    },
+  },
+  {
+    name: "QA_REVIEW_RECORD",
+    codes: ["QA_REVIEW_TARGET_REQUIRED"],
+    run: async (ctx) => {
+      const { parsed, storage } = ctx;
         // Evidence record FIRST so the PASS gate below can observe the row /
         // file just written. Only fires when QA attaches qa_review on a
         // PASS or FAIL write.
@@ -702,7 +747,14 @@ async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResu
           }
           await storage.recordReview(parsed.workspace_path, ids, parsed.status, "qa-engineer", parsed.qa_review);
         }
-
+      return null;
+    },
+  },
+  {
+    name: "QA_COMPLETION_EVIDENCE_MISSING",
+    codes: ["QA_COMPLETION_EVIDENCE_MISSING"],
+    run: (ctx) => {
+      const { parsed, storage, prevState } = ctx;
         // E18 — QA Completion-Evidence Gate (e18-write-provenance, fix b).
         // Closes the identity-swap side door REVIEWER_COMPLETED_TASKS_REJECTED
         // cannot see (E5 incident: a code-reviewer subagent made a SECOND
@@ -782,7 +834,14 @@ async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResu
             }
           }
         }
-
+      return null;
+    },
+  },
+  {
+    name: "PASS_MISSING_EVIDENCE",
+    codes: ["MISSING_EVIDENCE"],
+    run: async (ctx) => {
+      const { parsed, storage } = ctx;
         // Evidence gate for PASS path
         if (parsed.status === "PASS" && parsed.completed_tasks.length > 0) {
           const ev = await storage.hasEvidence(parsed.workspace_path, parsed.completed_tasks);
@@ -795,6 +854,16 @@ async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResu
               isError: true,
             };
           }
+        }
+      return null;
+    },
+  },
+  {
+    name: "PASS_VISUAL_SUBGATES",
+    codes: ["VISUAL_BASELINES_REQUIRED", "VISUAL_EVIDENCE_MISSING", "VISUAL_WIDGETS_UNVERIFIED", "VISUAL_ASSERTIONS_REQUIRED", "VISUAL_REPORT_INCOMPLETE", "VISUAL_PROVENANCE_MISSING", "BASELINE_MANIFEST_MISSING", "BASELINE_PROVENANCE_INCOMPLETE", "PIXEL_GATE_ATTESTATION_MISSING"],
+    run: (ctx) => {
+      const { parsed, evidenceSchemaPin, evidenceSchemaLabel } = ctx;
+        if (parsed.status === "PASS" && parsed.completed_tasks.length > 0) {
           // v3.16.0 — Visual gate self-arming (visual-fidelity-gate-hardening, AC-1).
           // Arming moved off "## Visual Baselines present" onto "design mode != no-design".
           // STEP 1 (arm-check) fires BEFORE the evidence-file lookup; the two paths are
@@ -1004,7 +1073,16 @@ async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResu
               }
             }
           }
-
+        }
+      return null;
+    },
+  },
+  {
+    name: "PASS_EXPECTED_RED_DIFF",
+    codes: ["EXPECTED_RED_DIFF_MISSING"],
+    run: (ctx) => {
+      const { parsed, storage } = ctx;
+        if (parsed.status === "PASS" && parsed.completed_tasks.length > 0) {
           // v3.57.0 — Expected-Red Diff gate (c15-expected-red-manifest, AC-4).
           // Mirrors VISUAL_EVIDENCE_MISSING's arming polarity: dormant unless
           // sr-engineer declared qa_reports/expected-red_<feature>.txt (absence
@@ -1037,7 +1115,16 @@ async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResu
               }
             }
           }
-
+        }
+      return null;
+    },
+  },
+  {
+    name: "PASS_AC_EXECUTION_LOG",
+    codes: ["AC_EXECUTION_LOG_MISSING"],
+    run: (ctx) => {
+      const { parsed, storage, evidenceSchemaPin, evidenceSchemaLabel } = ctx;
+        if (parsed.status === "PASS" && parsed.completed_tasks.length > 0) {
           // E3 — AC-Execution-Log gate (e3-outcome-shaped-acceptance, AC4/AC5). Sibling
           // of EXPECTED_RED_DIFF_MISSING: arms on spec content (≥1 proof: AC), clears on a
           // `## AC Execution Log` H2 in a PASS'd review file (or a covers: file).
@@ -1077,7 +1164,14 @@ async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResu
             }
           }
         }
-
+      return null;
+    },
+  },
+  {
+    name: "MISSING_REVIEW_EVIDENCE",
+    codes: ["MISSING_REVIEW_EVIDENCE"],
+    run: async (ctx) => {
+      const { parsed, storage, prevTuple, nextTuple } = ctx;
         // Code-reviewer evidence gate. Mirrors the PASS gate above for the
         // sr ↔ code-reviewer → qa handoff. Only fires when the previous tuple
         // is (code-reviewer, In_Progress) AND the next tuple hands off to qa.
@@ -1111,6 +1205,97 @@ async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResu
               isError: true,
             };
           }
+        }
+      return null;
+    },
+  },
+];
+
+// --- GUARDED: must call tw_get_state first ---
+async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResult> {
+        enforcePreFlight(parsed.workspace_path, "tw_update_state");
+
+        // Defense-in-depth: zod refine already enforces this on PASS, but a
+        // client that bypasses zod still hits this guard.
+        if (parsed.status === "PASS") {
+          const gate = requireQaEngineer(parsed.agent_id, "tw_update_state(status=PASS)");
+          if (!gate.ok) {
+            return { content: [{ type: "text" as const, text: gate.message ?? "blocked" }] };
+          }
+        }
+
+        const storage = getActiveStorage();
+        const prevState = storage.parse(parsed.workspace_path);
+        const prev_qa_round = prevState?.qa_round ?? 0;
+        const prev_review_round = prevState?.review_round ?? 0;
+        const prev_visual_round = prevState?.visual_round ?? 0;
+        // v9 (d2-server-brake-accounting) — hop-cap inputs, derived HERE so
+        // transitions.ts stays pure / fs-free (it never reads active_feature
+        // itself, only the boolean computed from prevState + the incoming
+        // write). No prevState (fresh workspace) counts as a feature change:
+        // the counter starts from a 0 base either way.
+        const prev_hop_count = prevState?.hop_count ?? 0;
+        // v12 (e8-success-telemetry) — cumulative-total inputs, same derivation
+        // posture as prev_hop_count: transitions.ts stays pure / fs-free; the
+        // orchestrator reads the persisted totals and threads them through.
+        // File-mode-only fields (DR-1): SqliteHandoffStorage.parse never
+        // constructs them, so `?? 0` keeps SQLite mode at a harmless 0 base.
+        const prev_qa_rounds_total = prevState?.qa_rounds_total ?? 0;
+        const prev_review_rounds_total = prevState?.review_rounds_total ?? 0;
+        const prev_visual_rounds_total = prevState?.visual_rounds_total ?? 0;
+        const feature_changed = prevState
+          ? prevState.active_feature !== parsed.active_feature
+          : true;
+        // E23 (e23-evidence-schema-versioning, D1/D2) — evidence-schema pin
+        // resolution. Same-feature writes run the evidence gates under the
+        // feature's persisted pin (absent for pre-E23 in-flight features →
+        // the v2 normalized-contains default, D2 fallback). A feature-change
+        // write IS the stamping write: its checks run under
+        // EVIDENCE_SCHEMA_CURRENT, the exact value stamped below. NEVER
+        // client-supplied — resolved purely from prevState + feature_changed
+        // (AC6: no new zod arg on tw_update_state).
+        const evidenceSchemaPin = feature_changed
+          ? EVIDENCE_SCHEMA_CURRENT
+          : prevState?.evidence_schema;
+        // D3 — the version string the rejection envelopes cite. An absent pin
+        // is named as such (not silently rendered as v2) so the reader knows
+        // the feature predates pinning and got the default.
+        const evidenceSchemaLabel =
+          evidenceSchemaPin !== undefined
+            ? `v${evidenceSchemaPin}`
+            : "absent pin (v2 normalized-contains default)";
+        const prevTuple: TransitionTuple = {
+          agent: (prevState?.last_agent as AgentName | undefined) ?? null,
+          status: (prevState?.status as StatusName | undefined) ?? null,
+        };
+        const nextTuple: TransitionTuple = {
+          agent: (parsed.agent_id as AgentName | undefined) ?? null,
+          status: parsed.status,
+        };
+
+        // E35 (e35-gate-pipeline-extraction) — everything above this line is
+        // the ctx-building phase: prev-state derivation, round/hop inputs,
+        // feature_changed, and the evidence-schema pin are resolved ONCE
+        // here, never inside a gate step. The pipeline then runs the frozen
+        // check order as data; the first rejection's envelope is returned
+        // unchanged (byte-identical to the pre-E35 inline emits).
+        const ctx: UpdateStateGateContext = {
+          parsed,
+          storage,
+          prevState,
+          prevTuple,
+          nextTuple,
+          prev_qa_round,
+          prev_review_round,
+          prev_visual_round,
+          prev_hop_count,
+          feature_changed,
+          evidenceSchemaPin,
+          evidenceSchemaLabel,
+        };
+        const pipelineRejection = await runUpdateStatePipeline(UPDATE_STATE_GATE_PIPELINE, ctx);
+        if (pipelineRejection) {
+          return pipelineRejection;
         }
 
         const {
