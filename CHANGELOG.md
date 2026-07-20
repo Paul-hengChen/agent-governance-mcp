@@ -16,6 +16,20 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.92.1] - 2026-07-20
+
+### Changed
+- **`e35-gate-pipeline-extraction` — gate-pipeline extraction: check order becomes data (backlog E35, 2026-07-20 refactor-survey revision).** `handleUpdateStateCore`'s ~1,260-line hand-woven gate sequence in `tools/handoff-orchestrator.ts` is now a declarative ordered `UPDATE_STATE_GATE_PIPELINE` array of 18 gate steps, executed by a first-rejection-wins runner — extending the A10 registry pattern (gate METADATA as data) with its E35 half (gate ORDER as data). New `gates/pipeline.ts` holds the shared contract: `UpdateStateGateContext` (per-write ctx derived once in the ctx-building phase — gate steps never derive values later steps depend on), `UpdateStateGateStep` (`name` + `codes[]` + `run`), and `runUpdateStatePipeline()`. The ordered array itself stays in `tools/handoff-orchestrator.ts` because the source-pin suites assert emit-body literals against that file; per-gate emit bodies are byte-verbatim relocations (mechanically verified — diff empty after scaffolding-strip, `review_reports/review_T-E35-01.md`). `gates/registry.ts` change is comment-only. ZERO observable behavior change: error codes, envelope shapes, telemetry emits, and the frozen 18-step check order are all unchanged — PATCH per the internal-refactor policy above.
+- **test/e35-pipeline-order.test.mjs** (new, qa-engineer-authored per §2): order-pin test asserting the pipeline's 18 step names in exact sequence and each step's `codes[]` array against `gates/registry.ts` `ALL_GATE_CODES` (31 codes, set-equal, no duplicates, no gaps) — replacing the frozen-additive comment as the order's enforcement mechanism.
+- **docs/backlog.md**: E35/E36 refactor-survey rows added (2026-07-20 revision); E35 row is this release's spec (mini-chain, backlog-row-as-spec).
+- **package.json / index.ts / dist/**: version 3.92.0 → 3.92.1 (manifest + Server() literal + rebuilt dist).
+- **README.md**: install pins caught up 3.92.0 → 3.92.1; status line suite count 1612 → 1618.
+
+### Notes
+- Suite **1618/1618** green (1612 pre-existing + 6 new order-pin tests); zero test-expectation edits.
+- Chain: mini-chain (backlog row as spec, PM/architect skipped, `scope_decision: single-feature`) sr(fable) → code-reviewer (APPROVED round 1, zero blocking findings, `review_reports/review_T-E35-01.md`) → qa-engineer (PASS, `qa_reports/review_T-E35-01.md`). Implementation commit `fffe3d9`; QA commit `c542a28`.
+- No MCP tool-surface, gate-semantics, or schema changes (handoff schema stays v13, evidence schema v2); no migration needed.
+
 ## [3.92.0] - 2026-07-17
 
 ### Fixed
