@@ -103,3 +103,7 @@ touched by QA — `tools/handoff-orchestrator.ts` / `gates/registry.ts` /
 `gates/pipeline.ts` were sr-engineer's diff, already code-reviewer
 APPROVED. Files touched: `test/e35-pipeline-order.test.mjs` (new). dist/
 unchanged (no src edits by QA).
+## 2026-07-20T03:42:24.330Z — PASS — by qa-engineer
+
+PASS — T-E35-01. Authored test/e35-pipeline-order.test.mjs (6 tests): pins UPDATE_STATE_GATE_PIPELINE's 18-step name sequence + each step's codes[] exactly, cross-checks the flattened codes union against gates/registry.ts ALL_GATE_CODES (exact set-equality, 31 codes, no dupes/gaps), and asserts TRANSITION_VALIDATION.codes is the same array reference as TRANSITION_GATE_CODES (no fork). Teeth-verified: a manual rename of one step in the built dist failed 2/6 tests as expected, then restored (dist/tools clean vs HEAD before and after). Full suite 1618/1618 pass (1612 pre-existing + 6 new), 0 fail; npx tsc --noEmit clean; boot smoke confirmed server online banner. No specs/e35-*.md proof:-annotated ACs exist so AC_EXECUTION_LOG_MISSING correctly stayed unarmed. Evidence: qa_reports/review_T-E35-01.md. Commit c542a28.
+
