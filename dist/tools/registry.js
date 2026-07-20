@@ -10,12 +10,11 @@
 // automatically. Do NOT move it to a top-level registry/ directory.
 import * as path from "node:path";
 import { z } from "zod";
-import { handleGetState } from "./handoff.js";
 import { handleDetectDrift } from "./drift.js";
 import { handleSync } from "./sync.js";
 import { handleSwitchRole } from "./role.js";
 import { handleGetNextTask, handleCompleteTask, handleRollbackTask, handleAddTask, } from "./tasks.js";
-import { handleUpdateState } from "./handoff-orchestrator.js";
+import { handleUpdateState, handleGetState } from "./handoff-orchestrator.js";
 import { handleIndexPrd, handleClearPrdChunks, DEFAULT_EMBEDDING_MODEL } from "./rag.js";
 import { handleGateStats } from "./gate-stats.js";
 export function defineTool(spec) {

@@ -32,6 +32,18 @@ export declare class SqliteHandoffStorage implements HandoffStorage {
     writeState(opts: WriteHandoffStateOptions): Promise<string>;
     /** @deprecated v3.15.0: prefer the options-object overload. */
     writeState(workspacePath: string, activeFeature: string, status: string, completedTasks: string[], pendingNotes: string[], blockingReason?: string, lastAgent?: string, qaRound?: number, prdPath?: string, reviewRound?: number, visualRound?: number): Promise<string>;
+    /**
+     * Real implementation (E36 Option-A convergence). Both writeState overloads
+     * bottom out here via the thin dispatcher above — options-object shape
+     * only, no more first-arg discrimination in the body.
+     * NOTE (DR-5 precedent): the file-mode-only frontmatter fields —
+     * cutApproved (handoff v5), externalRefs (v6), nextRole / resumeOf /
+     * reviewVerdict (v7), and dispatchPins (v8, c14-dispatch-pins AC-5) — are
+     * deliberately NOT destructured here and never round-trip in SQLite. The
+     * gates that consume them either read the incoming write args or are
+     * file-mode only; no DDL change, sqlite schema_version unchanged.
+     */
+    private writeStateCore;
     listTasks(workspacePath: string): TaskRecord[] | null;
     getNextTask(workspacePath: string): string;
     completeTask(workspacePath: string, taskId: string, note?: string): Promise<string>;

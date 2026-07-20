@@ -17,6 +17,7 @@ import {
   parseHandoff,
   writeHandoffState,
 } from "../dist/tools/handoff.js";
+import { FileHandoffStorage } from "../dist/tools/storage.js";
 import { resetSession } from "../dist/guards/session.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -26,6 +27,16 @@ function mkWorkspace() {
   const ws = fs.mkdtempSync(path.join(os.tmpdir(), "wsoo-"));
   fs.mkdirSync(path.join(ws, ".current"), { recursive: true });
   return ws;
+}
+
+// Reads handoff.md raw and blanks the last_updated timestamp (the ONE field
+// that legitimately differs call-to-call — everything else, including field
+// ORDER in the YAML frontmatter, must match byte-for-byte if the positional
+// adapter packs args in the exact same order as the options-object caller).
+function readNormalized(ws) {
+  const p = path.join(ws, ".current", "handoff.md");
+  const raw = fs.readFileSync(p, "utf-8");
+  return raw.replace(/last_updated: "[^"]*"/, 'last_updated: "<TS>"');
 }
 
 // ---------- AC-6 — options-object overload ----------
@@ -178,4 +189,140 @@ test("AC-10: options-object with omitted optional fields defaults to historical 
   assert.deepEqual(state.completed_tasks, []);
   // Empty pending_notes → file emits "- (none)" sentinel; parser drops it
   assert.deepEqual(state.pending_notes, []);
+});
+
+// ---------- E36 — thin-adapter delegation parity (handoff-write.ts) ----------
+//
+// E36 converged writeHandoffState's positional overload onto a thin arg-
+// packing adapter over writeHandoffStateCore(opts). These tests pin that
+// convergence at the byte level: a positional-form call covering the FULL
+// legacy 12-positional arg list (including all three round counters, which
+// occupy adjacent, easily-transposed slots — qaRound at index 8, reviewRound
+// at index 10, visualRound at index 11 — plus blockingReason and prdPath)
+// must produce output byte-identical to the equivalent options-object call.
+// A future edit that swaps, drops, or renames a field while re-packing the
+// adapter's positional args will fail this test even if every individual
+// field's VALUE still round-trips correctly in isolation (which the AC-6/
+// AC-10 tests above would not catch, since they compare parsed fields, not
+// argument-POSITION-to-field mapping).
+
+test("E36: positional writeHandoffState (full 12-arg form, all 3 round counters + blockingReason + prdPath) is byte-identical to the equivalent options-object call", async () => {
+  const wsPositional = mkWorkspace();
+  const wsOptions = mkWorkspace();
+
+  resetSession();
+  parseHandoff(wsPositional);
+  await writeHandoffState(
+    wsPositional,                    // workspacePath
+    "feat-e36-adapter",              // activeFeature
+    "In_Progress",                   // status
+    ["T01", "T02"],                  // completedTasks
+    ["note-one", "note-two"],        // pendingNotes
+    "blocked for review",            // blockingReason
+    "sr-engineer",                   // lastAgent
+    2,                                // qaRound
+    "/abs/path/to/prd.md",           // prdPath
+    3,                                // reviewRound
+    4,                                // visualRound
+    5,                                // hopCount
+  );
+
+  resetSession();
+  parseHandoff(wsOptions);
+  await writeHandoffState({
+    workspacePath: wsOptions,
+    activeFeature: "feat-e36-adapter",
+    status: "In_Progress",
+    completedTasks: ["T01", "T02"],
+    pendingNotes: ["note-one", "note-two"],
+    blockingReason: "blocked for review",
+    lastAgent: "sr-engineer",
+    qaRound: 2,
+    prdPath: "/abs/path/to/prd.md",
+    reviewRound: 3,
+    visualRound: 4,
+    hopCount: 5,
+  });
+
+  assert.equal(
+    readNormalized(wsPositional),
+    readNormalized(wsOptions),
+    "positional and options-object writeHandoffState calls must produce byte-identical handoff.md (modulo last_updated)",
+  );
+
+  // Belt-and-suspenders: confirm the three round counters landed in their
+  // OWN distinct slots (not silently swapped with each other in a way that
+  // happened to also match between both calls, e.g. if BOTH call sites were
+  // wrong identically — the whole-file byte-compare above only proves the
+  // two call shapes AGREE, not that either is correct against the historical
+  // positional signature order).
+  const state = parseHandoff(wsPositional);
+  assert.equal(state.qa_round, 2);
+  assert.equal(state.review_round, 3);
+  assert.equal(state.visual_round, 4);
+  assert.equal(state.blocking_reason, "blocked for review");
+  assert.equal(state.prd_path, "/abs/path/to/prd.md");
+});
+
+// ---------- E36 — thin-adapter delegation parity (storage.ts FileHandoffStorage) ----------
+//
+// storage.ts's FileHandoffStorage.writeState carries its OWN independent
+// positional→options packing (it does not simply forward raw positional args
+// to tools/handoff-write.ts's adapter — it packs its own options object and
+// always calls writeHandoffState's options-object overload directly). That
+// makes it a second, separate site where an arg-order regression could be
+// introduced without the handoff-write.ts test above catching it. Note:
+// unlike the 12-positional writeHandoffState signature, FileHandoffStorage's
+// positional overload stops at visualRound (11 args, no hopCount) — this
+// matches the pre-E36 forward-declared HandoffStorage interface.
+
+test("E36: FileHandoffStorage.writeState positional (full 11-arg form, all 3 round counters + blockingReason + prdPath) is byte-identical to the equivalent options-object call", async () => {
+  const wsPositional = mkWorkspace();
+  const wsOptions = mkWorkspace();
+  const storage = new FileHandoffStorage();
+
+  resetSession();
+  parseHandoff(wsPositional);
+  await storage.writeState(
+    wsPositional,                    // workspacePath
+    "feat-e36-storage-adapter",      // activeFeature
+    "FAIL",                          // status
+    ["T03"],                         // completedTasks
+    ["note-three"],                  // pendingNotes
+    "storage-level blocking reason", // blockingReason
+    "qa-engineer",                   // lastAgent
+    6,                                // qaRound
+    "/abs/path/to/other-prd.md",     // prdPath
+    7,                                // reviewRound
+    8,                                // visualRound
+  );
+
+  resetSession();
+  parseHandoff(wsOptions);
+  await storage.writeState({
+    workspacePath: wsOptions,
+    activeFeature: "feat-e36-storage-adapter",
+    status: "FAIL",
+    completedTasks: ["T03"],
+    pendingNotes: ["note-three"],
+    blockingReason: "storage-level blocking reason",
+    lastAgent: "qa-engineer",
+    qaRound: 6,
+    prdPath: "/abs/path/to/other-prd.md",
+    reviewRound: 7,
+    visualRound: 8,
+  });
+
+  assert.equal(
+    readNormalized(wsPositional),
+    readNormalized(wsOptions),
+    "FileHandoffStorage.writeState positional and options-object calls must produce byte-identical handoff.md (modulo last_updated)",
+  );
+
+  const state = parseHandoff(wsPositional);
+  assert.equal(state.qa_round, 6);
+  assert.equal(state.review_round, 7);
+  assert.equal(state.visual_round, 8);
+  assert.equal(state.blocking_reason, "storage-level blocking reason");
+  assert.equal(state.prd_path, "/abs/path/to/other-prd.md");
 });

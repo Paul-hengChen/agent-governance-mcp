@@ -12,7 +12,6 @@
 import * as path from "node:path";
 import { z } from "zod";
 import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
-import { handleGetState } from "./handoff.js";
 import { handleDetectDrift } from "./drift.js";
 import { handleSync } from "./sync.js";
 import { handleSwitchRole } from "./role.js";
@@ -22,7 +21,7 @@ import {
   handleRollbackTask,
   handleAddTask,
 } from "./tasks.js";
-import { handleUpdateState } from "./handoff-orchestrator.js";
+import { handleUpdateState, handleGetState } from "./handoff-orchestrator.js";
 import { handleIndexPrd, handleClearPrdChunks, DEFAULT_EMBEDDING_MODEL } from "./rag.js";
 import { handleGateStats } from "./gate-stats.js";
 

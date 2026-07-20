@@ -30,7 +30,7 @@
 // The 4-step mutating-tool contract (lock → freshness → atomic write → refresh
 // snapshot) lives inside tools/handoff.ts writeState — NOT here (spec finding #5).
 
-import type { ToolResult, UpdateStateInput } from "./registry.js";
+import type { ToolResult, UpdateStateInput, WorkspaceOnlyInput } from "./registry.js";
 import { enforcePreFlight } from "../guards/session.js";
 import { getActiveStorage, FileHandoffStorage } from "./storage.js";
 import {
@@ -76,13 +76,30 @@ import {
   type UpdateStateGateStep,
 } from "../gates/pipeline.js";
 
+// ==========================================
+// tw_get_state tool handler (E36 — e36-handoff-split-overload-adapter).
+// Relocated from tools/handoff.ts (verbatim body, pre-split ~line 1272) to
+// live alongside its sibling handleUpdateState — both are MCP tool handlers
+// for the same handoff.md surface (read vs. write), not part of the
+// parse/write library code tools/handoff.ts now barrels. registry.ts imports
+// both from this module.
+// ==========================================
+
+// --- No guard: reading state IS the pre-flight check ---
+export async function handleGetState(args: WorkspaceOnlyInput): Promise<ToolResult> {
+  const { workspace_path } = args;
+  const result = getActiveStorage().readState(workspace_path);
+  return { content: [{ type: "text" as const, text: result }] };
+}
+
 // E1 (e1-feature-scoped-state-design) — feature-lease TTL. Fixed constant,
-// NOT config-driven (mirrors STALE_DISPATCH_THRESHOLD_MIN in tools/handoff.ts
-// and HOP_CAP's fixed-constant posture): stale-lease auto-expiry is a safety
-// self-heal, not a tunable policy knob. 30 min — deliberately LONGER than the
-// 15-min dispatch-staleness threshold, since a whole feature legitimately
-// spans longer gaps than a single dispatch (PM-ratified calibration,
-// 2026-07-12; any change requires a PM spec amendment).
+// NOT config-driven (mirrors STALE_DISPATCH_THRESHOLD_MIN in
+// tools/handoff-parse.ts and HOP_CAP's fixed-constant posture): stale-lease
+// auto-expiry is a safety self-heal, not a tunable policy knob. 30 min —
+// deliberately LONGER than the 15-min dispatch-staleness threshold, since a
+// whole feature legitimately spans longer gaps than a single dispatch
+// (PM-ratified calibration, 2026-07-12; any change requires a PM spec
+// amendment).
 const LEASE_TTL_MIN = 30;
 
 // D3 (d3-gate-fire-telemetry) — thin telemetry wrapper, the ONE emit point

@@ -447,6 +447,10 @@ export class SqliteHandoffStorage implements HandoffStorage {
     reviewRound?: number,
     visualRound?: number,
   ): Promise<string>;
+  // E36 Option-A: thin ~10-line dispatcher — if the first arg is already the
+  // options shape, hand it straight to the real impl (writeStateCore); else
+  // pack the positional args into that same options shape first. No gate/
+  // persistence logic lives at this boundary any more — see writeStateCore.
   writeState(
     workspacePathOrOpts: string | WriteHandoffStateOptions,
     activeFeature?: string,
@@ -460,48 +464,59 @@ export class SqliteHandoffStorage implements HandoffStorage {
     reviewRound?: number,
     visualRound?: number,
   ): Promise<string> {
-    // v3.15.0 dual API: discriminate by first-arg shape.
-    // NOTE (DR-5 precedent): the file-mode-only frontmatter fields —
-    // cutApproved (handoff v5), externalRefs (v6), nextRole / resumeOf /
-    // reviewVerdict (v7), and dispatchPins (v8, c14-dispatch-pins AC-5) — are
-    // deliberately NOT destructured here and never round-trip in SQLite. The
-    // gates that consume them either read the incoming write args or are
-    // file-mode only; no DDL change, sqlite schema_version unchanged.
-    let workspacePath: string;
-    let scopeDecision: string | undefined;
-    let scopeDecisionWhy: string | undefined;
+    if (typeof workspacePathOrOpts === "object" && !Array.isArray(workspacePathOrOpts)) {
+      return this.writeStateCore(workspacePathOrOpts);
+    }
+    return this.writeStateCore({
+      workspacePath: workspacePathOrOpts as string,
+      activeFeature: activeFeature as string,
+      status: status as string,
+      completedTasks: completedTasks ?? [],
+      pendingNotes: pendingNotes ?? [],
+      blockingReason,
+      lastAgent,
+      qaRound,
+      prdPath,
+      reviewRound,
+      visualRound,
+      // hopCount / scopeDecision / scopeDecisionWhy are NOT part of the
+      // legacy positional overload — matches the pre-E36 behavior where the
+      // positional branch left them undefined (normalising to 0/null below).
+    });
+  }
+
+  /**
+   * Real implementation (E36 Option-A convergence). Both writeState overloads
+   * bottom out here via the thin dispatcher above — options-object shape
+   * only, no more first-arg discrimination in the body.
+   * NOTE (DR-5 precedent): the file-mode-only frontmatter fields —
+   * cutApproved (handoff v5), externalRefs (v6), nextRole / resumeOf /
+   * reviewVerdict (v7), and dispatchPins (v8, c14-dispatch-pins AC-5) — are
+   * deliberately NOT destructured here and never round-trip in SQLite. The
+   * gates that consume them either read the incoming write args or are
+   * file-mode only; no DDL change, sqlite schema_version unchanged.
+   */
+  private writeStateCore(opts: WriteHandoffStateOptions): Promise<string> {
+    const workspacePath = opts.workspacePath;
+    const scopeDecision = opts.scopeDecision;
+    const scopeDecisionWhy = opts.scopeDecisionWhy;
     // v9 — hop_count IS persisted in SQLite (unlike the DR-5 file-mode-only
     // fields above): it is a server-computed counter the HOP_CAP_EXCEEDED
     // gate reads back from prevState, so skipping it here would leave the
     // gate silently inert in HTTP mode (DR-2). Options-object callers only —
     // the deprecated positional overload predates the field and normalises
     // to 0 below.
-    let hopCount: number | undefined;
-    if (typeof workspacePathOrOpts === "object" && !Array.isArray(workspacePathOrOpts)) {
-      const o = workspacePathOrOpts;
-      workspacePath = o.workspacePath;
-      activeFeature = o.activeFeature;
-      status = o.status;
-      completedTasks = o.completedTasks ?? [];
-      pendingNotes = o.pendingNotes ?? [];
-      blockingReason = o.blockingReason;
-      lastAgent = o.lastAgent;
-      qaRound = o.qaRound;
-      prdPath = o.prdPath;
-      reviewRound = o.reviewRound;
-      visualRound = o.visualRound;
-      hopCount = o.hopCount;
-      scopeDecision = o.scopeDecision;
-      scopeDecisionWhy = o.scopeDecisionWhy;
-    } else {
-      workspacePath = workspacePathOrOpts as string;
-      completedTasks = completedTasks ?? [];
-      pendingNotes = pendingNotes ?? [];
-    }
-    const _activeFeature: string = activeFeature as string;
-    const _status: string = status as string;
-    const _completedTasks: string[] = completedTasks;
-    const _pendingNotes: string[] = pendingNotes;
+    const hopCount = opts.hopCount;
+    const blockingReason = opts.blockingReason;
+    const lastAgent = opts.lastAgent;
+    const qaRound = opts.qaRound;
+    const prdPath = opts.prdPath;
+    const reviewRound = opts.reviewRound;
+    const visualRound = opts.visualRound;
+    const _activeFeature: string = opts.activeFeature;
+    const _status: string = opts.status;
+    const _completedTasks: string[] = opts.completedTasks ?? [];
+    const _pendingNotes: string[] = opts.pendingNotes ?? [];
     const currentLastUpdated = this.fetchLastUpdated(workspacePath);
     verifyExtra(workspacePath, SNAPSHOT_KEY, currentLastUpdated);
 

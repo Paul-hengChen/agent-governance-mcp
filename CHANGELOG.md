@@ -16,6 +16,21 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.93.0] - 2026-07-20
+
+### Changed
+- **`e36-handoff-split-overload-adapter` — `tools/handoff.ts` module split + Option-A overload convergence (backlog E36, 2026-07-20 refactor-survey pair). ZERO observable behavior change.** Two coordinated moves:
+  - **(a) Module split.** The 1,276-line `tools/handoff.ts` (four responsibilities: types, frontmatter parse + migration glue, serialization + `writeHandoffState`, and the `handleGetState` tool handler) is split into `tools/handoff-types.ts` (types), `tools/handoff-parse.ts` (parse/migrate/read), and `tools/handoff-write.ts` (`WriteHandoffStateOptions` + `writeHandoffState`). `tools/handoff.ts` is now a 33-line barrel that re-exports the full prior public surface (every symbol old `handoff.ts` exported), so no importer changes. `handleGetState` moved verbatim into `tools/handoff-orchestrator.ts`; its sole importer `tools/registry.ts` was rewired. The `handoff-parse ↔ handoff-write` import cycle is call-time-only (no module-init call sites) and verified safe.
+  - **(b) Option-A overload convergence (NON-breaking, minor bump — NOT the v4.0.0 removal).** The positional `writeHandoffState` / `FileHandoffStorage.writeState` / `SqliteHandoffStorage.writeState` overloads now converge onto a single options-object implementation (`writeHandoffStateCore` in `handoff-write.ts`; private `writeStateCore` in the storage classes) via thin arg-packing adapters. Public signatures are unchanged and the deprecated positional overload is retained — its removal remains deferred to v4.0.0. MINOR per the versioning policy (the internal convergence is a backwards-compatible refactor; the positional API surface is preserved).
+- **test/writestate-options-object.test.mjs** (qa-engineer-authored per §2): +2 tests pinning adapter parity mechanically — (1) `writeHandoffState` positional (full 12-arg form incl. `qaRound`/`reviewRound`/`visualRound`/`blockingReason`/`prdPath`/`hopCount`) vs the equivalent options-object call, asserted byte-identical `handoff.md` (modulo `last_updated`); (2) `FileHandoffStorage.writeState` positional (11-arg, its own independent packing) vs options-object, same byte-identical assertion. A future arg-order regression (swap/drop/rename) now fails mechanically rather than relying on manual re-inspection.
+- **docs/backlog.md**: E36 row marked done with mechanism summary + release reference.
+- **package.json / index.ts / dist/**: version 3.92.1 → 3.93.0 (manifest + Server() literal + rebuilt dist, including the new `dist/tools/handoff-{types,parse,write}.js`).
+- **README.md**: install pins caught up 3.92.1 → 3.93.0; status-line suite count 1618 → 1620.
+
+### Notes
+- Suite **1620/1620** green (1618 pre-existing + 2 new adapter-parity tests); zero test-expectation edits.
+- Chain: mini-chain (backlog row as spec, PM/architect skipped, `scope_decision: single-feature`) sr(fable) → code-reviewer (APPROVED round 1, zero blocking findings, verified against pre-E36 source, `review_reports/review_T-E36-01.md`) → qa-engineer (PASS, `qa_reports/archive/e36-handoff-split-overload-adapter/review_T-E36-01.md`).
+
 ## [3.92.1] - 2026-07-20
 
 ### Changed

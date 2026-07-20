@@ -12,11 +12,26 @@ export class FileHandoffStorage {
         return readHandoffState(workspacePath);
     }
     writeState(workspacePathOrOpts, activeFeature, status, completedTasks, pendingNotes, blockingReason, lastAgent, qaRound, prdPath, reviewRound, visualRound) {
-        // Forward to writeHandoffState whichever overload matches the caller.
+        // E36 Option-A: dual-dispatch body collapses to "if object → options
+        // path; else pack positionals → options → call" — targeting the ONE real
+        // options-object writeHandoffState implementation directly (not its own
+        // positional overload, which is itself just this same packing).
         if (typeof workspacePathOrOpts === "object" && !Array.isArray(workspacePathOrOpts)) {
             return writeHandoffState(workspacePathOrOpts);
         }
-        return writeHandoffState(workspacePathOrOpts, activeFeature, status, completedTasks ?? [], pendingNotes ?? [], blockingReason, lastAgent, qaRound, prdPath, reviewRound, visualRound);
+        return writeHandoffState({
+            workspacePath: workspacePathOrOpts,
+            activeFeature: activeFeature,
+            status: status,
+            completedTasks: completedTasks ?? [],
+            pendingNotes: pendingNotes ?? [],
+            blockingReason,
+            lastAgent,
+            qaRound,
+            prdPath,
+            reviewRound,
+            visualRound,
+        });
     }
     parse(workspacePath) {
         return parseHandoff(workspacePath);

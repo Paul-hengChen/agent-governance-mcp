@@ -31,10 +31,10 @@ declare const UpdateStateArgs: z.ZodObject<{
     workspace_path: z.ZodString;
     active_feature: z.ZodString;
     status: z.ZodEnum<{
-        FAIL: "FAIL";
-        Blocked: "Blocked";
         In_Progress: "In_Progress";
         PASS: "PASS";
+        FAIL: "FAIL";
+        Blocked: "Blocked";
     }>;
     completed_tasks: z.ZodDefault<z.ZodOptional<z.ZodArray<z.ZodString>>>;
     pending_notes: z.ZodDefault<z.ZodOptional<z.ZodArray<z.ZodString>>>;
@@ -50,20 +50,20 @@ declare const UpdateStateArgs: z.ZodObject<{
     external_refs: z.ZodOptional<z.ZodArray<z.ZodObject<{
         ref: z.ZodString;
         state: z.ZodEnum<{
-            unresolved: "unresolved";
             fetched: "fetched";
             indexed: "indexed";
             "user-confirmed-ignorable": "user-confirmed-ignorable";
+            unresolved: "unresolved";
         }>;
     }, z.core.$strip>>>;
     next_role: z.ZodOptional<z.ZodEnum<{
         pm: "pm";
         researcher: "researcher";
         "design-auditor": "design-auditor";
+        architect: "architect";
         "sr-engineer": "sr-engineer";
         "code-reviewer": "code-reviewer";
         "qa-engineer": "qa-engineer";
-        architect: "architect";
         "release-engineer": "release-engineer";
     }>>;
     resume_of: z.ZodOptional<z.ZodEnum<{
@@ -115,12 +115,12 @@ declare const SwitchRoleArgs: z.ZodObject<{
         pm: "pm";
         researcher: "researcher";
         "design-auditor": "design-auditor";
+        architect: "architect";
         "sr-engineer": "sr-engineer";
         "code-reviewer": "code-reviewer";
         "qa-engineer": "qa-engineer";
-        architect: "architect";
-        "doc-writer": "doc-writer";
         "release-engineer": "release-engineer";
+        "doc-writer": "doc-writer";
     }>;
 }, z.core.$strip>;
 declare const IndexPrdArgs: z.ZodObject<{
