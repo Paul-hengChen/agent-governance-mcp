@@ -14,3 +14,4 @@
 {"ts":"2026-07-17T03:44:20.532Z","feature":"e34-agc-init-dead-end-seed","tickets":2,"qa_rounds":0,"review_rounds":0,"visual_rounds":0,"hops":5,"one_pass":true,"released_version":"3.92.0"}
 {"ts":"2026-07-20T03:55:29.092Z","feature":"e35-gate-pipeline-extraction","tickets":1,"qa_rounds":0,"review_rounds":0,"visual_rounds":0,"hops":5,"one_pass":true,"released_version":"3.92.1"}
 {"ts":"2026-07-20T11:30:50.768Z","feature":"e36-handoff-split-overload-adapter","tickets":1,"qa_rounds":0,"review_rounds":0,"visual_rounds":0,"hops":4,"one_pass":true,"released_version":"3.93.0"}
+{"ts":"2026-07-27T05:40:57.554Z","feature":"e38-next-role-lookahead-advisory","tickets":1,"qa_rounds":0,"review_rounds":2,"visual_rounds":0,"hops":9,"one_pass":false,"released_version":"3.94.0"}
