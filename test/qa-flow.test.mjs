@@ -1838,9 +1838,15 @@ test("T-MATRIX-C13: qa-engineer:PASS → researcher:In_Progress still accepted (
   );
 });
 
-test("T-MATRIX-C13: qa-engineer:PASS allowed-next contains all three successors {pm, researcher, release-engineer}", () => {
+test("T-MATRIX-C13/E37: qa-engineer:PASS allowed-next contains all four successors {pm, researcher, release-engineer, design-auditor}", () => {
   // WHY: a direct spot-check of the static row itself, complementing the
-  // three behavioral accept tests above.
+  // behavioral accept tests above. v3.94.0 (E37) widened this row a second
+  // time (C13 added release-engineer; E37 restores design-auditor's
+  // post-PASS opening edge, parity with the null:null opener's
+  // design-auditor:In_Progress entry) — this test is pinned by identity
+  // (row.some per entry) AND cardinality (row.length), so a future edit
+  // that swaps one successor for another without changing the count would
+  // still be caught.
   const row = ALLOWED_TRANSITIONS.get("qa-engineer:PASS");
   assert.ok(row, "qa-engineer:PASS row must exist");
   assert.ok(row.some((c) => c.agent === "pm" && c.status === "In_Progress"), "row must retain (pm, In_Progress)");
@@ -1850,9 +1856,13 @@ test("T-MATRIX-C13: qa-engineer:PASS allowed-next contains all three successors 
   );
   assert.ok(
     row.some((c) => c.agent === "release-engineer" && c.status === "In_Progress"),
-    "row must gain (release-engineer, In_Progress)",
+    "row must retain (release-engineer, In_Progress)",
   );
-  assert.equal(row.length, 3, "row must have exactly 3 successors — additive, not a fourth accidental entry");
+  assert.ok(
+    row.some((c) => c.agent === "design-auditor" && c.status === "In_Progress"),
+    "row must gain (design-auditor, In_Progress) — E37",
+  );
+  assert.equal(row.length, 4, "row must have exactly 4 successors — additive, not a fifth accidental entry");
 });
 
 // ---------- T-MATRIX-C13(e): round-counter pin ----------
@@ -1885,6 +1895,98 @@ test("T-MATRIX-C13: computeNewRound re-zeros all three counters on release-engin
   // (release-engineer -> pm), no feature_changed → hop_count = 1.
   assert.deepEqual(
     computeNewRound(2, 3, 4, { agent: "pm", status: "In_Progress" }, { agent: "release-engineer", status: "In_Progress" }),
+    { qa_round: 0, review_round: 0, visual_round: 0, hop_count: 1, qa_rounds_total: 0, review_rounds_total: 0, visual_rounds_total: 0 },
+  );
+});
+
+// ============================================================================
+// T-E37-01 — design-auditor's post-PASS opening edge (v3.94.0)
+// ============================================================================
+// WHY: the qa-engineer:PASS row ("previous feature closed, next may open")
+// admitted only {pm, researcher, release-engineer} — design-auditor was
+// never restored here when C13 added release-engineer, even though the
+// null:null fresh-workspace opener has always admitted
+// design-auditor:In_Progress (:177). Consequence: the design-armed chain's
+// canonical opening move (coordinator dispatches design-auditor BEFORE pm so
+// the auditor's token tables feed the spec) worked on a workspace's first
+// feature and was TRANSITION_REJECTED on every feature thereafter — 6 of 7
+// observed TRANSITION_REJECTED fires across 2 workspaces / 5 features,
+// 07-21..07-23 (VS-NDI-Receiver telemetry). E37 adds
+// { agent: "design-auditor", status: "In_Progress" } to the qa-engineer:PASS
+// row. qa-engineer:FAIL is deliberately NOT widened (a QA failure is a fix
+// loop — sr-engineer/pm — not a re-audit trigger); E38 revisits that shape
+// deliberately, so the reject test below pins the deferral as a conscious
+// boundary rather than an oversight.
+
+// ---------- T-E37-01(a): opening edge — qa-engineer:PASS → design-auditor:In_Progress ----------
+
+test("T-E37-01: qa-engineer:PASS → design-auditor:In_Progress accepted", () => {
+  // WHY: the legal post-PASS opening write E37 restores — design-auditor
+  // stamping its own agent_id straight out of a prior feature's PASS to
+  // open the next one, exactly as it already could from null:null.
+  // Mirrors T-MATRIX-C13(a) at :1711 for the release-engineer opening edge.
+  assert.equal(
+    validateTransition({
+      prev: { agent: "qa-engineer", status: "PASS" },
+      next: { agent: "design-auditor", status: "In_Progress" },
+      prev_qa_round: 0,
+      prev_review_round: 0,
+    }),
+    null,
+  );
+});
+
+// ---------- T-E37-01(b): scope-guard reject — qa-engineer:FAIL → design-auditor:In_Progress ----------
+
+test("T-E37-01: qa-engineer:FAIL → design-auditor:In_Progress still REJECTED (E38 deferral pin)", () => {
+  // WHY: E37's scope guard — a QA failure is a fix loop (sr-engineer/pm),
+  // not a re-audit trigger, so qa-engineer:FAIL is deliberately NOT widened
+  // alongside qa-engineer:PASS. This pin locks that deferral so a future
+  // widening of the FAIL row (E38's subject) is a conscious, reviewed edit
+  // rather than an accidental copy-paste of the PASS row's new entry.
+  const r = validateTransition({
+    prev: { agent: "qa-engineer", status: "FAIL" },
+    next: { agent: "design-auditor", status: "In_Progress" },
+    prev_qa_round: 0,
+    prev_review_round: 0,
+  });
+  assert.ok(r, "transition must be rejected");
+  assert.equal(r.error, "TRANSITION_REJECTED");
+  assert.ok(
+    !r.allowed.some((a) => a.new_agent === "design-auditor"),
+    `allowed list must NOT contain design-auditor; got ${JSON.stringify(r.allowed)}`,
+  );
+  assert.deepEqual(
+    r.allowed,
+    [
+      { new_agent: "sr-engineer", new_status: "In_Progress" },
+      { new_agent: "pm", new_status: "In_Progress" },
+    ],
+    "qa-engineer:FAIL allowed set must be unchanged — exactly {sr-engineer, pm}",
+  );
+});
+
+// ---------- T-E37-01(c): round-counter pin ----------
+
+test("T-E37-01: computeNewRound holds qa_round/review_round/visual_round steady across qa-engineer:PASS → design-auditor:In_Progress", () => {
+  // WHY: spec AC's round-counter expectation, mirroring T-MATRIX-C13(e).
+  // next=(design-auditor, In_Progress) matches none of computeNewRound's
+  // reset-or-increment branches (all keyed on qa-engineer or pm as
+  // next.agent), so all three counters must hold from a nonzero prior
+  // value. This is provably safe at any REACHABLE qa-engineer:PASS state —
+  // PASS already zeroes qa_round and visual_round, and review_round was
+  // zeroed by the code-reviewer:In_Progress → qa-engineer:In_Progress hop
+  // that necessarily precedes PASS — but the pin is worth taking because it
+  // is the same one-line insurance C13 took: a future edit that adds
+  // design-auditor to a reset branch would silently launder a hot counter,
+  // and this test would be the only thing to catch it.
+  assert.deepEqual(
+    computeNewRound(2, 3, 4, { agent: "design-auditor", status: "In_Progress" }, { agent: "qa-engineer", status: "PASS" }),
+    { qa_round: 2, review_round: 3, visual_round: 4, hop_count: 1, qa_rounds_total: 0, review_rounds_total: 0, visual_rounds_total: 0 },
+  );
+  // Also pin the zero-prior case (the realistic post-PASS state).
+  assert.deepEqual(
+    computeNewRound(0, 0, 0, { agent: "design-auditor", status: "In_Progress" }, { agent: "qa-engineer", status: "PASS" }),
     { qa_round: 0, review_round: 0, visual_round: 0, hop_count: 1, qa_rounds_total: 0, review_rounds_total: 0, visual_rounds_total: 0 },
   );
 });

@@ -107,6 +107,17 @@ const ALLOWED = new Map([
             // wedge where post-PASS release work had no entry edge and subagents
             // fell back to mis-stamping agent_id="pm" or hand-editing handoff.md.
             { agent: "release-engineer", status: "In_Progress" },
+            // v3.94.0 (E37) — design-auditor's post-PASS opening edge, restoring
+            // parity with the null:null opener's design-auditor:In_Progress entry
+            // (:177). "Previous feature closed, next may open" is the same position
+            // whether the workspace is fresh or between features; C13 added
+            // release-engineer here but never restored this edge, so the
+            // design-armed chain's canonical opening move (coordinator dispatches
+            // design-auditor before PM) worked only on a workspace's first feature
+            // and was TRANSITION_REJECTED on every feature thereafter (6 of 7
+            // observed fires / 2 workspaces / 5 features, 07-21..07-23, VS-NDI-Receiver
+            // telemetry; the 7th is the qa-engineer:FAIL shape, deferred to E38).
+            { agent: "design-auditor", status: "In_Progress" },
         ]],
     // v3.49.0 (C13) — release-engineer's legal closing write. Hands back to pm
     // ONLY (its SOP routes nowhere else); same-agent multi-step progress is

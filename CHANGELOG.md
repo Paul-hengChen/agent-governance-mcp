@@ -16,6 +16,28 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.94.0] - 2026-07-27
+
+### Added
+- **`e38-next-role-lookahead-advisory` — `next_role` write-time lookahead advisory (backlog E38).** `tools/handoff-orchestrator.ts` gains `effectiveAllowedSuccessors()`, a pure, fs-free helper that derives a state's ACTUAL allowed-successor set by calling `validateTransition` itself across all 8×4 (agent, status) pairs, rather than re-deriving a second notion of "allowed" from the static `ALLOWED` table. After an accepted write, when `parsed.next_role` names an agent absent from that set for the state the write just landed on — evaluated under the POST-write round/hop counters, the same ones the next real transition will face — a non-rejecting advisory is appended to the existing E28 `warnings` envelope array. The message names the actual allowed `agent:status` pair(s), annotating any that are `only legal with resume_of="<role>"` or `only legal if the next write opens a new feature`.
+  - **Advisory-only by design, and it stays that way**: no `GATE_REGISTRY` entry, no new error code, no pipeline step that can reject. `next_role` remains documented as advisory metadata; this release makes a disagreement with `ALLOWED_TRANSITIONS` *visible* at write time, it does not enforce it. Nothing new can reject a write.
+  - **Silence when uncertain** is the deliberate bias: the helper whitelists the three shapes that sit outside the static table — the Amend-Resume `resume_of` edge, the round-cap collapse to `pm` alone, and the same-agent `In_Progress → In_Progress` self-loop — and unions both `feature_changed` branches at hop cap, trading a missed warning for never firing falsely on legal routing.
+
+### Changed
+- **`e37-design-auditor-post-pass-edge` — restore design-auditor's post-PASS opening edge (backlog E37).** `tools/transitions.ts` adds `{ agent: "design-auditor", status: "In_Progress" }` to the `qa-engineer:PASS` row of `ALLOWED`, restoring parity with the fresh-workspace `null:null` opener, which has always admitted `design-auditor:In_Progress`. "Previous feature closed, next may open" is the same position whether the workspace is fresh or between features; C13 added `release-engineer` to that row but never restored this edge, so the design-armed chain's canonical opening move (coordinator dispatches design-auditor before PM) worked only on a workspace's *first* feature and was `TRANSITION_REJECTED` on every feature thereafter — 6 of 7 observed fires across 2 consumer workspaces and 5 features (2026-07-21..07-23, VS-NDI-Receiver telemetry). The 7th fire is the `qa-engineer:FAIL` shape, deliberately left rejecting and pinned as such.
+- **specs/qa-flow-enforcement-architecture.md**: the mirrored `qa-engineer | PASS` matrix cell gains `(design-auditor, In_Progress)`, per that file's standing MUST-update-mirror obligation.
+- **test/qa-flow.test.mjs**: E37 contract flip on the `qa-engineer:PASS` allowed-next assertion (now four successors) plus 3 new tests — positive accept on the new edge, a reject pin holding `qa-engineer:FAIL → design-auditor` illegal (locking E38's deferral), and a `computeNewRound` pin holding all three round counters steady across the new hop.
+- **test/e38-next-role-lookahead.test.mjs** (new, qa-engineer-authored per §2): 10 tests — 1 positive advisory case, 5 silence cases across the whitelisted shapes (including hop-cap and round-cap regression pins), 2 round-2 remedy-list regression pins, a never-rejects pin, and an E28 shrink-warning coexistence pin.
+- **docs/backlog.md**: E37 and E38 rows marked done with mechanism summaries + release reference.
+- **package.json / index.ts / dist/**: version 3.93.0 → 3.94.0 (manifest + `Server()` literal + rebuilt dist).
+- **README.md**: install pins caught up 3.93.0 → 3.94.0; status-line suite count 1620 → 1633.
+
+### Notes
+- Suite **1633/1633** green (1620 pre-existing + 13 new: 3 E37 + 10 E38); one E37 contract flip, no other test-expectation edits.
+- MINOR per the versioning policy: both changes are additive and non-breaking — E37 widens an allowed-transition row (nothing previously legal becomes illegal), E38 adds an envelope warning on a path that already carries `warnings`.
+- Chain: two mini-chains (backlog rows as spec, PM/architect skipped, `scope_decision: single-feature`). E37: sr(fable) → code-reviewer (APPROVED round 1, `review_reports/review_T-E37-01.md`) → qa-engineer (PASS, `qa_reports/archive/e37-design-auditor-post-pass-edge/review_T-E37-01.md`). E38: sr(fable) → code-reviewer (APPROVED at round 3 of the `review_round` cap, `review_reports/review_T-E38-01.md`) → qa-engineer (PASS, `qa_reports/archive/e38-next-role-lookahead-advisory/review_T-E38-01.md`). E37 reached PASS first and was held unreleased to ship together with E38, which depends on it.
+- No MCP tool-surface, schema, or gate-semantics changes (handoff schema stays v13, evidence schema v2); no migration needed. Rows E39–E43, filed during these two tickets' review rounds, remain open.
+
 ## [3.93.0] - 2026-07-20
 
 ### Changed

@@ -1228,6 +1228,99 @@ export const UPDATE_STATE_GATE_PIPELINE: readonly UpdateStateGateStep[] = [
   },
 ];
 
+// E38 (e38-next-role-lookahead-advisory) — full agent/status enumeration for
+// effectiveAllowedSuccessors below. Advisory-only helper: never touches the
+// gate pipeline above, never rejects, no GATE_REGISTRY entry.
+const ALL_AGENT_NAMES: readonly AgentName[] = [
+  "pm",
+  "researcher",
+  "design-auditor",
+  "architect",
+  "sr-engineer",
+  "code-reviewer",
+  "qa-engineer",
+  "release-engineer",
+];
+const ALL_STATUS_NAMES: readonly StatusName[] = ["In_Progress", "PASS", "FAIL", "Blocked"];
+
+// E38 — computes the ACTUAL effective allowed-successor set for a state
+// (typically the state a write just landed on), by calling validateTransition
+// itself for every (agent, status) pair rather than re-deriving a second,
+// divergent notion of "allowed" from the static ALLOWED table. This is the
+// only way to correctly honor the three edges that sit OUTSIDE that table:
+//   (a) the Amend-Resume `resume_of` edge (C1): pm:In_Progress →
+//       {code-reviewer, qa-engineer}:In_Progress, legal only when a write
+//       sets resume_of to that exact role. A future write's resume_of value
+//       is unknowable from here, so by default this function ASSUMES it
+//       would be set to match — treating the edge as reachable, never as
+//       illegal. That is the "stay silent when uncertain" side of the
+//       ticket's hard constraint: a false warning on a legal routing
+//       directive is worse than a missed one. Pass `assumeResumeOf: false`
+//       to get the strict (resume_of-independent) set instead — used by the
+//       caller to tell conditional edges apart from unconditional ones in
+//       the printed message (Q2).
+//   (b) the round/hop-cap overrides, which collapse the allowed set to
+//       {pm: In_Progress} alone once a round counter is at cap. The three
+//       round caps have no feature_changed term (transitions.ts:371/382/397
+//       `return null` for (pm,In_Progress) unconditionally), so passing the
+//       post-write round counters here reproduces the exact collapse the
+//       next real transition attempt will see. HOP_CAP (transitions.ts:
+//       417-422) is DIFFERENT: it reads feature_changed and a future write
+//       that opens a new feature (`true`) bypasses the gate entirely, so
+//       whether a next-feature write is legal at hop cap is unknowable from
+//       here — the same "unknowable input" shape as (a). This function
+//       therefore unions BOTH feature_changed branches per candidate: a
+//       candidate counts as reachable if EITHER accepts it. Below HOP_CAP
+//       the branches are identical, so this changes nothing there; at/above
+//       it, it trades a false warning on an illegal same-feature next_role
+//       (the ticket-sanctioned under-warn direction — the hop-cap-cross
+//       sentinel at :1441-1444 already covers that writer) for never
+//       warning on a legal next-feature one.
+//   (c) the self-loop fast path (same agent, In_Progress → In_Progress),
+//       which bypasses the static table entirely.
+// Pure / fs-free (mirrors transitions.ts itself): 64 in-memory calls, no I/O.
+function effectiveAllowedSuccessors(
+  prev: TransitionTuple,
+  counters: {
+    qa_round: number;
+    review_round: number;
+    visual_round: number;
+    hop_count: number;
+  },
+  options: { assumeResumeOf?: boolean; featureChanged?: boolean } = {},
+): Array<{ agent: AgentName; status: StatusName }> {
+  const { assumeResumeOf = true, featureChanged } = options;
+  // E38 round 3 (N1) — `featureChanged` lets a caller pin the union to a
+  // single branch instead of trying both. Used to compute the same-feature
+  // -only subset (featureChanged: false) so the hop-cap union-only entries
+  // can be told apart from the unconditional ones. Default (undefined) keeps
+  // the round-2 union-both-branches behavior unchanged.
+  const featureChangedBranches = featureChanged === undefined ? [false, true] : [featureChanged];
+  const out: Array<{ agent: AgentName; status: StatusName }> = [];
+  for (const agent of ALL_AGENT_NAMES) {
+    for (const status of ALL_STATUS_NAMES) {
+      const accepted = featureChangedBranches.some(
+        (feature_changed) =>
+          validateTransition({
+            prev,
+            next: { agent, status },
+            prev_qa_round: counters.qa_round,
+            prev_review_round: counters.review_round,
+            prev_visual_round: counters.visual_round,
+            prev_hop_count: counters.hop_count,
+            feature_changed,
+            next_resume_of:
+              assumeResumeOf && (agent === "code-reviewer" || agent === "qa-engineer")
+                ? agent
+                : undefined,
+          }) === null,
+      );
+      if (accepted) out.push({ agent, status });
+    }
+  }
+  return out;
+}
+
 // --- GUARDED: must call tw_get_state first ---
 async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResult> {
         enforcePreFlight(parsed.workspace_path, "tw_update_state");
@@ -1542,13 +1635,105 @@ async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResu
             }
           }
         }
+        // E38 (e38-next-role-lookahead-advisory) — next_role write-time
+        // lookahead. next_role is documented at the tool boundary as
+        // "advisory metadata only — enum-validated but NOT cross-checked
+        // against ALLOWED_TRANSITIONS", so a legal write can carry a
+        // next_role the very next hop is guaranteed to TRANSITION_REJECT
+        // (observed live, VS-NDI-Receiver app/web settings-item
+        // 2026-07-23T02:37:17Z: qa-engineer:FAIL written with
+        // next_role="design-auditor", whose allowed set is
+        // {sr-engineer, pm}). This fires ONLY when parsed.next_role is set
+        // AND names an agent absent from the effective allowed-successor set
+        // of nextTuple (the state THIS write just landed on) under the
+        // POST-write round/hop counters — the exact counters the next real
+        // transition attempt will be checked against. The advisory-only
+        // design is deliberate and stays: this is a post-write envelope
+        // decoration, never a gate — no GATE_REGISTRY entry, no new error
+        // code, no pipeline step that can reject this write.
+        const nextRoleWarnings: string[] = [];
+        if (parsed.next_role) {
+          const counters = {
+            qa_round: new_qa_round,
+            review_round: new_review_round,
+            visual_round: new_visual_round,
+            hop_count: new_hop_count,
+          };
+          const effective = effectiveAllowedSuccessors(nextTuple, counters);
+          const isLegalSuccessor = effective.some((e) => e.agent === parsed.next_role);
+          if (!isLegalSuccessor) {
+            // Q2 fix (round 3, C2) — the printed remedy list must not
+            // (1) advertise a resume_of-conditional edge as unconditional
+            // routing advice, (2) advertise a hop-cap union-only edge (legal
+            // only if the next write opens a NEW feature, N1) as legal
+            // same-feature, or (3) exclude a same-agent STATUS CHANGE
+            // (qa:In_Progress -> qa:PASS/FAIL/Blocked, sr:In_Progress ->
+            // sr:Blocked) merely because it shares an agent with the state
+            // just written. Round 2's `e.agent === nextTuple.agent` filter
+            // conflated (3) with the genuine In_Progress->In_Progress
+            // self-loop fast path (transitions.ts:432-440) and emptied the
+            // remedy list on qa-engineer:In_Progress and pm:Blocked, whose
+            // successors are ALL same-agent — resurrecting the categorically
+            // false "(none - ...)" fallback as live output. Excluding only
+            // the exact (agent, status) PAIR that was just written keeps
+            // that fallback dead (round-1 proof: no reachable state has an
+            // empty ALLOWED row) while still surfacing same-agent status
+            // changes as the genuinely actionable answer. Printing
+            // `agent:status` pairs (rather than deduped bare agent names)
+            // is what makes the narrowed filter informative instead of
+            // ambiguous.
+            const strict = effectiveAllowedSuccessors(nextTuple, counters, {
+              assumeResumeOf: false,
+            });
+            const strictKeys = new Set(strict.map((e) => `${e.agent}:${e.status}`));
+            // N1 (round 3, non-blocking) — the C1 union's mirror cost: at
+            // hop cap, `effective` includes edges legal ONLY because
+            // feature_changed=true bypasses the hop-cap gate
+            // (transitions.ts:417-422). Recomputing with featureChanged
+            // pinned to false isolates the same-feature-legal subset; below
+            // HOP_CAP the two sets are identical (feature_changed is inert
+            // there, per the C1 fix's own comment), so this never annotates
+            // off-cap.
+            const sameFeatureOnly = effectiveAllowedSuccessors(nextTuple, counters, {
+              featureChanged: false,
+            });
+            const sameFeatureKeys = new Set(sameFeatureOnly.map((e) => `${e.agent}:${e.status}`));
+            const allowedPairs = effective
+              .filter((e) => !(e.agent === nextTuple.agent && e.status === nextTuple.status))
+              .map((e) => {
+                const pairKey = `${e.agent}:${e.status}`;
+                const clauses: string[] = [];
+                if (!strictKeys.has(pairKey)) {
+                  clauses.push(`only legal with resume_of="${e.agent}"`);
+                }
+                if (!sameFeatureKeys.has(pairKey)) {
+                  clauses.push("only legal if the next write opens a new feature");
+                }
+                return clauses.length > 0 ? `${pairKey} (${clauses.join("; ")})` : pairKey;
+              });
+            nextRoleWarnings.push(
+              `next_role="${parsed.next_role}" does not match any allowed successor of the state ` +
+                `just written (${nextTuple.agent}:${nextTuple.status}). Actual allowed next ` +
+                `(agent:status) pair(s): ${
+                  allowedPairs.length > 0
+                    ? allowedPairs.join(", ")
+                    : "(none — no successor is currently reachable from this state)"
+                }. ` +
+                `next_role is advisory-only and this write was NOT rejected, but a next hop that follows ` +
+                `next_role as given will be rejected — re-route to one of the allowed pair(s) ` +
+                `above, or omit next_role and let the acting role decide.`,
+            );
+          }
+        }
+
         let responseText = result;
-        if (shrinkWarnings.length > 0) {
+        if (shrinkWarnings.length > 0 || nextRoleWarnings.length > 0) {
           try {
             const envelope = JSON.parse(result) as Record<string, unknown>;
             envelope.warnings = [
               ...(Array.isArray(envelope.warnings) ? (envelope.warnings as string[]) : []),
               ...shrinkWarnings,
+              ...nextRoleWarnings,
             ];
             responseText = JSON.stringify(envelope);
           } catch {
