@@ -133,9 +133,12 @@ to upgrade the server or migrate manually.
 
 QA fixtures live under `test/`:
 
-- `test/schema-versioning.test.mjs` — runner unit tests.
-- `test/handoff.test.mjs`, `test/tasks-file.test.mjs`, `test/sqlite.test.mjs`,
-  `test/config.test.mjs` — per-kind integration tests with `_clearRegistryForTests`.
+- `test/schema-versions.test.mjs` — runner unit tests; this is the file that uses
+  `_clearRegistryForTests`.
+- `test/handoff-versioning.test.mjs` (T28), `test/tasks-versioning.test.mjs` (T29),
+  `test/sqlite-versioning.test.mjs` (T30), `test/config-versioning.test.mjs` (T31)
+  — per-kind integration tests. All four import the compiled output from `dist/`,
+  so run `npm run build` (or plain `npm test`, which prebuilds) before them.
 
 When you add a v(N+1) migration, add at least:
 

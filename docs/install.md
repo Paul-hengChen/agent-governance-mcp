@@ -2,7 +2,7 @@
 
 > 90% of users only need [Claude Code (CLI)](#claude-code-cli). Skip to your client; ignore the rest.
 
-**Requirements**: Node.js 18+ (`node --version`). Stdio mode has zero native deps. HTTP mode optionally pulls in `better-sqlite3` (needs Python + C++ toolchain on first install).
+**Requirements**: Node.js 20+ (`node --version`) — enforced by `package.json` `engines`. Stdio mode has zero native deps. HTTP mode optionally pulls in `better-sqlite3` (needs Python + C++ toolchain on first install).
 
 > ⏱️ First `npx` pull is **~30–60s**. Not a hang — subsequent runs are instant from the npx cache. If your hook `timeout` is < 60s, it appears broken on first install. This is the #1 install pitfall.
 
@@ -22,7 +22,7 @@
 | Gemini CLI / Code Assist | [↓ here](#gemini-cli--code-assist) |
 | Google Anti-Gravity | [↓ here](#google-anti-gravity) |
 
-All clients point at the same command: `npx -y github:Paul-hengChen/agent-governance-mcp#v3.30.0`.
+All clients point at the same command: `npx -y github:Paul-hengChen/agent-governance-mcp#v3.94.0`.
 
 ---
 
@@ -31,7 +31,7 @@ All clients point at the same command: `npx -y github:Paul-hengChen/agent-govern
 Writes to `~/.claude.json`. Uses the CLI's own command:
 
 ```bash
-claude mcp add -s user agent-governance-mcp -- npx -y github:Paul-hengChen/agent-governance-mcp#v3.30.0
+claude mcp add -s user agent-governance-mcp -- npx -y github:Paul-hengChen/agent-governance-mcp#v3.94.0
 claude mcp list
 # agent-governance-mcp: ... - ✓ Connected
 ```
@@ -53,7 +53,7 @@ Edit `claude_desktop_config.json`:
   "mcpServers": {
     "agent-governance-mcp": {
       "command": "npx",
-      "args": ["-y", "github:Paul-hengChen/agent-governance-mcp#v3.30.0"]
+      "args": ["-y", "github:Paul-hengChen/agent-governance-mcp#v3.94.0"]
     }
   }
 }
@@ -85,7 +85,7 @@ mcpServers:
     command: npx
     args:
       - "-y"
-      - "github:Paul-hengChen/agent-governance-mcp#v3.30.0"
+      - "github:Paul-hengChen/agent-governance-mcp#v3.94.0"
 ```
 
 ## Zed
@@ -98,7 +98,7 @@ Edit `~/.config/zed/settings.json` (uses `context_servers`, not `mcpServers`):
     "agent-governance-mcp": {
       "command": {
         "path": "npx",
-        "args": ["-y", "github:Paul-hengChen/agent-governance-mcp#v3.30.0"]
+        "args": ["-y", "github:Paul-hengChen/agent-governance-mcp#v3.94.0"]
       }
     }
   }
@@ -111,7 +111,7 @@ Edit `~/.gemini/settings.json`. Same JSON block as Claude Desktop.
 
 ## Google Anti-Gravity
 
-Open the in-app MCP Server settings UI → add entry: command `npx`, args `-y github:Paul-hengChen/agent-governance-mcp#v3.30.0`.
+Open the in-app MCP Server settings UI → add entry: command `npx`, args `-y github:Paul-hengChen/agent-governance-mcp#v3.94.0`.
 
 ---
 
@@ -127,7 +127,7 @@ mkdir -p .current
 
 Or use the bundled scaffolder:
 ```bash
-npx -y --package=github:Paul-hengChen/agent-governance-mcp#v3.30.0 agc init
+npx -y --package=github:Paul-hengChen/agent-governance-mcp#v3.94.0 agc init
 ```
 
 ---
@@ -145,7 +145,7 @@ Auto-injects the constitution + Coordinator SOP + handoff state every session. E
       "matcher": "",
       "hooks": [{
         "type": "command",
-        "command": "npx -y -p github:Paul-hengChen/agent-governance-mcp#v3.30.0 agent-governance-context",
+        "command": "npx -y -p github:Paul-hengChen/agent-governance-mcp#v3.94.0 agent-governance-context",
         "timeout": 60
       }]
     }]
@@ -168,7 +168,7 @@ claude mcp list
 
 # 2. SessionStart hook helper works (cd into a managed workspace first)
 cd <your-project-with-.current>
-npx -y -p github:Paul-hengChen/agent-governance-mcp#v3.30.0 agent-governance-context
+npx -y -p github:Paul-hengChen/agent-governance-mcp#v3.94.0 agent-governance-context
 # → JSON blob containing "additionalContext" with the constitution
 ```
 
@@ -177,7 +177,7 @@ If (2) produces no output:
 2. `timeout` in `settings.json` is ≥ 60?
 3. Restarted Claude Code after editing `settings.json`?
 4. `claude mcp list` shows ✓ Connected?
-5. `node --version` ≥ 18, network reachable, `npx clear-npx-cache` then retry.
+5. `node --version` ≥ 20, network reachable, `npx clear-npx-cache` then retry.
 
 ---
 
@@ -185,13 +185,19 @@ If (2) produces no output:
 
 In Claude Code, MCP prompts are namespaced slash commands:
 
+All 11 registered prompts (`tools/registry.ts` → `PROMPT_REGISTRY`):
+
 - `/mcp__agent-governance-mcp__teamwork` — Coordinator (auto-routes to specialists)
 - `/mcp__agent-governance-mcp__teamwork-lite` — Coordinator (lite): solo-dev direct execution
 - `/mcp__agent-governance-mcp__pm`
 - `/mcp__agent-governance-mcp__architect`
 - `/mcp__agent-governance-mcp__researcher`
+- `/mcp__agent-governance-mcp__design-auditor`
 - `/mcp__agent-governance-mcp__sr-engineer`
+- `/mcp__agent-governance-mcp__code-reviewer`
 - `/mcp__agent-governance-mcp__qa-engineer`
+- `/mcp__agent-governance-mcp__doc-writer`
+- `/mcp__agent-governance-mcp__release-engineer`
 
 Want shorter aliases like `/teamwork`? Create `~/.claude/commands/teamwork.md` (or per-project `.claude/commands/teamwork.md`) with one line invoking the namespaced command.
 
@@ -201,7 +207,7 @@ In other clients: in-app prompt picker (Claude Desktop), `@`-mention (Cursor's M
 
 ## Upgrade / pin a version
 
-Replace `#v3.30.0` in the install command with another tag (or `#main` for bleeding edge). Then clear the npx cache:
+Replace `#v3.94.0` in the install command with another tag (or `#main` for bleeding edge). Then clear the npx cache:
 
 ```bash
 npx clear-npx-cache

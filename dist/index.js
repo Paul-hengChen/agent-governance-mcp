@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // Agent Governance MCP — 3-Layer Defense Architecture
-// Layer 1: MCP Prompts (auto-inject constitution + skill + state)
-// Layer 2: Structured Tools (8 tw_* tools for state/task/drift/role)
-// Layer 3: Server-side Guards (pre-flight check enforcement)
+// Layer 1: MCP Prompts (11, PROMPT_REGISTRY — constitution + skill + state)
+// Layer 2: Structured Tools (12 tw_* tools, TOOL_REGISTRY — state/task/drift/role)
+// Layer 3: Server-side Guards (pre-flight, lock, freshness) + the 18-step
+//          UPDATE_STATE_GATE_PIPELINE in tools/handoff-orchestrator.ts
 // Methodology-agnostic: defaults to a generic markdown checkbox task format;
 // teams override task pattern / paths / constitution via <workspace>/.current/.
 import * as fs from "node:fs";

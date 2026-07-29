@@ -80,16 +80,38 @@ Verify it works:
 
 ---
 
-## `.current/constitution.md` — constitution override
+## `.current/const-*.md` — constitution override
 
-Drop a `constitution.md` next to `handoff.md` to **fully replace** the bundled constitution for this workspace. The server reads the workspace copy first, falls back to `content/constitution.md` (the bundled one) if absent.
+> ⚠️ **Changed in v3.44.0.** There is no longer a single `content/constitution.md`, so **`.current/constitution.md` is not read by anything** — dropping that file has no effect and produces no error. If you set one up before v3.44.0, migrate it to per-fragment overrides as below.
+
+The constitution is composed additively from **15 ordered fragments** in `content/` (`prompts/constitution-manifest.ts` picks which ones ship per dispatch mode). Override is therefore **per fragment**: drop a same-named file in `.current/` and it replaces that fragment for this workspace.
+
+```
+.current/const-01-core-head.md        # §1 watermark, dispatch pins
+.current/const-02-design-mvp.md
+.current/const-03-core-surgical.md
+.current/const-04-design-surgical.md
+.current/const-05-core-standards.md   # escalation-call format, rule grammar
+.current/const-06-chain-31-head.md
+.current/const-07-design-chain-gates.md
+.current/const-08-chain-31-mid.md
+.current/const-09-design-chain-vround.md
+.current/const-10-chain-31-tail.md
+.current/const-11-design-chain-32.md
+.current/const-12-chain-r10-s4.md
+.current/const-13-design-chain-s4.md
+.current/const-14-chain-end.md
+.current/const-15-core-tail.md
+```
+
+Same `loadContent()` fallback as the skill overrides below: `<workspace>/.current/<fragment>` first, else the bundled `content/<fragment>`. To replace the whole document, override every fragment your dispatch mode loads — overriding one leaves the other 14 on the shipped default. Fragment order and tags are listed in `prompts/constitution-manifest.ts`; run the composition through `composeConstitution()` if you need to see the assembled result.
 
 Use cases:
 - Stricter rules for a regulated codebase (e.g. additional security gates).
 - Looser rules for a sandbox / experiment workspace.
 - Custom roles or alternate routing chains (advanced).
 
-**Caveat**: a hand-written constitution must keep the server-enforced contracts (`§3.1 server-enforced chain`, `§4 routing chain`). The state machine in `tools/transitions.ts` is code, not text — drift between your custom constitution and the code yields confusing rejections.
+**Caveat**: hand-written fragments must keep the server-enforced contracts (`§3.1 server-enforced chain`, `§4 routing chain`). The state machine in `tools/transitions.ts` and the 18 gates in `gates/` are code, not text — drift between your custom constitution and the code yields confusing rejections.
 
 ---
 
@@ -121,7 +143,9 @@ Use cases:
 
 **Caveat (same as constitution override)**: skill files cannot soften server-enforced behaviours. e.g. removing the qa-engineer's evidence-of-PASS requirement from `skill-qa-engineer.md` does NOT lift the gate — the server still rejects PASS without `qa_reports/review_<id>.md`. Text-layer overrides are guidance to the agent; the gates are code.
 
-> Since **v3.1.0** (commit `ef65eb2`, 2026-05-12). Same mechanism that introduced `.current/constitution.md` override and `.config.json`.
+> Since **v3.1.0** (commit `ef65eb2`, 2026-05-12). Same `loadContent()` mechanism as the constitution-fragment override above and `.config.json`.
+>
+> `skill-coordinator.md` is a valid override key even though no such file ships in `content/` — the coordinator SOP is composed from `content/coord-01..07-*.md`, and a whole-file `.current/skill-coordinator.md` override short-circuits that composition and is returned verbatim (no host-capability filtering). See `composeSkill()` in `prompts/skill-manifest.ts`.
 
 ---
 

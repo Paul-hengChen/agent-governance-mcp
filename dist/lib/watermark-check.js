@@ -3,7 +3,7 @@
 // Pure utility used by the coordinator and coordinator-lite SOPs to detect
 // whether a subagent reply (relayed from a `Task` / Agent tool result) ends
 // with the canonical `— @<name> (<tier>)` watermark mandated by
-// `content/constitution.md` §1 (watermark). If the watermark is absent, the
+// Constitution §1 (watermark; `content/const-01-core-head.md`). If absent, the
 // parent appends the correct one to the relayed text; if it is present but
 // mismatched (wrong name/tier), the parent replaces the wrong trailing
 // watermark line with the canonical one (v3.58.0, C5b) before surfacing it

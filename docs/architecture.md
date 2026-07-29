@@ -7,86 +7,109 @@ How the three layers fit together, what gates a state write, and how the routing
 ## Three layers, one server
 
 ```
-┌── Layer 1: Prompts ───────────────────────────────────────┐
-│  prompts/build.ts assembles per-session via composition:  │
-│    content/const-*.md (15 ordered fragments)              │
-│  + content/skill-<role>.md                                │
-│  + .current/handoff.md state                              │
-│  (Fragment selection per dispatch mode via manifest)      │
+┌── Layer 1: Prompts ────────────────────────────────────────┐
+│  prompts/build.ts assembles per-session via composition:   │
+│    content/const-*.md (15 ordered fragments)               │
+│  + content/skill-<role>.md                                 │
+│    (coordinator: content/coord-01..07-*.md fragments)      │
+│  + .current/handoff.md state                               │
+│  (Fragment selection per dispatch mode via manifest)       │
 │                                                            │
-│  Registered prompts: teamwork, teamwork-lite, pm,         │
-│    architect, researcher, sr-engineer, qa-engineer        │
-├── Layer 2: Tools (11 tw_* MCP tools) ─────────────────────┤
-│  tw_get_state           tw_update_state                   │
-│  tw_get_next_task       tw_add_task                       │
-│  tw_complete_task       tw_rollback_task                  │
-│  tw_detect_drift        tw_switch_role                    │
-│  tw_index_prd           tw_clear_prd_chunks               │
-│  tw_sync (R10 reconcile)                                  │
+│  11 registered prompts (tools/registry.ts):                │
+│    teamwork, teamwork-lite, pm, architect, researcher,     │
+│    design-auditor, sr-engineer, code-reviewer,             │
+│    qa-engineer, doc-writer, release-engineer               │
+├── Layer 2: Tools (12 tw_* MCP tools) ──────────────────────┤
+│  tw_get_state           tw_update_state                    │
+│  tw_get_next_task       tw_add_task                        │
+│  tw_complete_task       tw_rollback_task                   │
+│  tw_detect_drift        tw_switch_role                     │
+│  tw_index_prd           tw_clear_prd_chunks                │
+│  tw_sync (R10)          tw_gate_stats (E26 telemetry)      │
 │                                                            │
-│  AI cannot edit handoff/tasks directly — MUST go through  │
-│  these tools (zod-validated args).                        │
-├── Layer 3: Guards ────────────────────────────────────────┤
-│  guards/session.ts    — pre-flight read snapshot          │
-│  guards/file-lock.ts  — O_EXCL cross-process lock         │
-│                       + mtime freshness check             │
-│                       + atomic tmp+rename publish         │
+│  AI cannot edit handoff/tasks directly — MUST go through   │
+│  these tools (zod-validated args).                         │
+├── Layer 3: Guards ─────────────────────────────────────────┤
+│  guards/session.ts    — pre-flight read snapshot           │
+│  guards/file-lock.ts  — O_EXCL cross-process lock          │
+│                       + mtime freshness check              │
+│                       + atomic tmp+rename publish          │
+│  gates/ (14 modules)  — the 18-step gate pipeline below    │
 └────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Per-write 9-step pipeline (v3.2.0+)
+## Per-write pipeline
 
 Every `tw_update_state` call runs this **before** `.current/handoff.md` (or the SQLite row) is touched. A rejection at any step returns `{ error, attempted, allowed, hint }` — the AI can self-correct or escalate.
 
+Three guard steps run first, then the **18-step gate pipeline** (`UPDATE_STATE_GATE_PIPELINE`, `tools/handoff-orchestrator.ts`; step bodies in `gates/`), then round accounting and the atomic publish. Each gate is one entry in the array — the order below is the execution order, and it is load-bearing (see `test/e35-pipeline-order.test.mjs`).
+
 ```
-caller: tw_update_state({ agent_id, status, completed_tasks, qa_review?, pending_notes })
+caller: tw_update_state({ agent_id, status, completed_tasks, qa_review?, ... })
                                           │
                                           ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│ ① Pre-Flight Check (guards/session.ts)                          │
+│ GUARDS (pre-pipeline)                                           │
+├─────────────────────────────────────────────────────────────────┤
+│ G1 Pre-Flight Check (guards/session.ts)                         │
 │    hasReadState(workspace)? ─ no → ⛔ BLOCKED                    │
 ├─────────────────────────────────────────────────────────────────┤
-│ ② File Lock (guards/file-lock.ts)                               │
-│    O_EXCL on .current/handoff.md.lock + stale-PID detection      │
+│ G2 File Lock (guards/file-lock.ts)                              │
+│    O_EXCL on .current/handoff.md.lock + stale-PID detection     │
 ├─────────────────────────────────────────────────────────────────┤
-│ ③ Freshness Check                                                │
-│    file mode: current mtime == snapshot mtime?                   │
-│    SQLite mode: SNAPSHOT_KEY token unchanged?                    │
+│ G3 Freshness Check                                              │
+│    file mode: current mtime == snapshot mtime?                  │
+│    SQLite mode: SNAPSHOT_KEY token unchanged?                   │
 │    drift → ⛔ STATE DRIFT (caller must re-read)                  │
+╞═════════════════════════════════════════════════════════════════╡
+│ UPDATE_STATE_GATE_PIPELINE — 18 steps, in order                 │
 ├─────────────────────────────────────────────────────────────────┤
-│ ④ validateTransition() (tools/transitions.ts)                   │
-│    (prev_agent, prev_status) → (next_agent, next_status)         │
-│    must appear in ALLOWED_TRANSITIONS, OR qualify for the        │
-│    same-agent In_Progress→In_Progress self-loop fast path.       │
-│    reject → { error, attempted, allowed, hint }                  │
+│  1 TRANSITION_VALIDATION          (tools/transitions.ts)        │
+│      (prev_agent, prev_status) → (next_agent, next_status) must │
+│      be in ALLOWED_TRANSITIONS, or qualify for the same-agent   │
+│      In_Progress→In_Progress self-loop fast path. Also applies  │
+│      the round-cap overrides:                                   │
+│        qa_round     ≥ 4 (ROUND_CAP)        ┐ matrix collapses   │
+│        review_round ≥ 4 (REVIEW_ROUND_CAP) ├ to {(pm,           │
+│        visual_round ≥ 6 (VISUAL_ROUND_CAP) ┘ In_Progress)}      │
+│  2 STAMP_PROVENANCE_SUSPECT       (gates/stamp-provenance.ts)   │
+│  3 FEATURE_LEASE                  (gates/feature-lease.ts)      │
+│  4 BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE                     │
+│  5 SCOPE_DECISION_REQUIRED        (gates/scope-decision.ts)     │
+│  6 CUT_APPROVAL_REQUIRED          (gates/cut-approval.ts)       │
+│  7 EXTERNAL_REFS_UNRESOLVED       (gates/external-refs.ts)      │
+│  8 SOURCE_CREDIBILITY_UNVERIFIED                                │
+│  9 REPRO_MANIFEST_MISSING                                       │
+│ 10 REVIEW_VERDICT_STATUS_MISMATCH (gates/code-review.ts)        │
+│ 11 REVIEWER_COMPLETED_TASKS_REJECTED                            │
+│ 12 QA_REVIEW_RECORD               (gates/qa-review.ts)          │
+│ 13 QA_COMPLETION_EVIDENCE_MISSING (gates/evidence-schema.ts)    │
+│ 14 PASS_MISSING_EVIDENCE          — qa_reports/review_<id>.md   │
+│      must exist per completed task (file mode) or `reports` row │
+│ 15 PASS_VISUAL_SUBGATES           (gates/visual.ts)             │
+│ 16 PASS_EXPECTED_RED_DIFF         (gates/expected-red.ts)       │
+│ 17 PASS_AC_EXECUTION_LOG          (gates/ac-execution.ts)       │
+│ 18 MISSING_REVIEW_EVIDENCE                                      │
+╞═════════════════════════════════════════════════════════════════╡
+│ POST-PIPELINE                                                   │
 ├─────────────────────────────────────────────────────────────────┤
-│ ⑤ Round-Cap Override                                             │
-│    if prev_qa_round ≥ 4 → matrix collapses to {(pm, In_Progress)}│
-│    forces PM re-entry; everything else rejected                  │
+│ P1 Round accounting (computeNewRound)                           │
+│      (qa-engineer, FAIL) → prev + 1                             │
+│      (qa-engineer, PASS) | (pm, In_Progress) → 0                │
+│      else → unchanged;  hop_count incremented per transition    │
 ├─────────────────────────────────────────────────────────────────┤
-│ ⑥ Agent-ID Gate (PASS path + tw_complete_task)                  │
-│    agent_id == "qa-engineer"? ─ no → ⛔ BLOCKED                  │
-├─────────────────────────────────────────────────────────────────┤
-│ ⑦ Evidence-of-QA (PASS path)                                     │
-│    every id in completed_tasks must have                         │
-│    qa_reports/review_<id>.md (file mode) or `reports` row        │
-│    qa_review attachment recorded atomically                      │
-├─────────────────────────────────────────────────────────────────┤
-│ ⑧ computeNewRound()                                              │
-│    (qa-engineer, FAIL) → prev + 1                                │
-│    (qa-engineer, PASS) | (pm, In_Progress) → 0                   │
-│    else → unchanged                                              │
-├─────────────────────────────────────────────────────────────────┤
-│ ⑨ Atomic Write                                                   │
-│    tmp file + fs.renameSync → refreshSnapshotFor                 │
-│    next same-session write won't self-trip freshness check       │
+│ P2 Atomic Write                                                 │
+│      tmp file + fs.renameSync → refreshSnapshotFor              │
+│      next same-session write won't self-trip freshness check    │
 └─────────────────────────────────────────────────────────────────┘
                                           │
                                           ▼
                                   handoff state updated
 ```
+
+Gate metadata (error code, owning role, exemptions) is declared once per gate in `gates/registry.ts` — 32 entries covering the pipeline gates plus the read-path and task-tool gates. `tw_gate_stats` aggregates fire counts per gate from the telemetry sidecar.
 
 ---
 

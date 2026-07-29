@@ -5,7 +5,7 @@ Stdio mode (the default) is recommended for solo / single-machine use. **Pick HT
 ## Quick start (local)
 
 ```bash
-npx -y github:Paul-hengChen/agent-governance-mcp#v3.18.0 --port 3000 --db ./agc.db
+npx -y github:Paul-hengChen/agent-governance-mcp#v3.94.0 --port 3000 --db ./agc.db
 
 # liveness probe
 curl http://localhost:3000/healthz
@@ -22,7 +22,7 @@ Endpoint: Streamable HTTP at `POST /mcp`. Liveness: `GET /healthz`.
 
 ```bash
 TW_AUTH_TOKEN=hunter2 TW_ALLOWED_ORIGINS=https://app.example.com \
-  npx -y github:Paul-hengChen/agent-governance-mcp#v3.18.0 --port 3000 --db ./agc.db
+  npx -y github:Paul-hengChen/agent-governance-mcp#v3.94.0 --port 3000 --db ./agc.db
 ```
 
 Clients connect with `Authorization: Bearer hunter2` and an allowlisted `Origin` header.

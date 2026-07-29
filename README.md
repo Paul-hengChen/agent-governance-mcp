@@ -16,7 +16,7 @@ Lost updates, rule drift across `.cursorrules` / `CLAUDE.md` / `.windsurfrules`,
 |---|---|
 | **Lost updates** — two IDEs write `handoff.md` simultaneously, later one silently overwrites | `O_EXCL` file lock + mtime freshness check; concurrent writer gets `⛔ STATE DRIFT` |
 | **Rule drift** — same rules duplicated across `.cursorrules`, `CLAUDE.md`, `AGENTS.md`, … | Constitution (composed from fragments) loaded via MCP role prompts (`/teamwork`, `teamwork-lite`, …); opt-in SessionStart hook for auto-injection |
-| **Format drift** — AI hand-edits `handoff.md` and breaks YAML / checkboxes | Free-text edits revoked; AI MUST go through 11 `tw_*` tools with zod-validated args |
+| **Format drift** — AI hand-edits `handoff.md` and breaks YAML / checkboxes | Free-text edits revoked; AI MUST go through 12 `tw_*` tools with zod-validated args |
 | **No iteration discipline** — AI declares PASS without testing, or loops forever on the same fail | Server-enforced state machine: `qa_round` / `review_round` / `visual_round` caps; PASS requires evidence files |
 
 Existing tools in the same category (GitHub Spec Kit, OpenSpec) ship **templates + slash commands** — enforcement is advisory. This ships **server-side gates** — AI gets `⛔ BLOCKED` envelopes on rule violations. See [vs. alternatives](#vs-alternatives) below.
@@ -52,7 +52,7 @@ Then `claude mcp list` should show `✓ Connected`. Governance context is invoca
 │  /teamwork, /pm, /architect, /sr-engineer, /qa-engineer,  │
 │  …  →  inject constitution + role SOP + handoff state     │
 ├── Layer 2: Tools ─────────────────────────────────────────┤
-│  11 tw_* MCP tools — the ONLY way to mutate handoff/tasks │
+│  12 tw_* MCP tools — the ONLY way to mutate handoff/tasks │
 │  (zod-validated args; free-text edits revoked)            │
 ├── Layer 3: Guards ────────────────────────────────────────┤
 │  Pre-flight read ▸ file lock ▸ mtime freshness ▸          │
@@ -64,7 +64,7 @@ Then `claude mcp list` should show `✓ Connected`. Governance context is invoca
 └────────────────────────────────────────────────────────────┘
 ```
 
-Every `tw_update_state` runs the full 9-step pipeline before touching disk. A rejected write returns `{ error, attempted, allowed, hint }` so the AI can self-correct or escalate. Full pipeline diagram: [docs/architecture.md](docs/architecture.md).
+Every `tw_update_state` runs pre-flight → file lock → freshness check → an **18-step gate pipeline** (`UPDATE_STATE_GATE_PIPELINE` in `tools/handoff-orchestrator.ts`) → round accounting → atomic write, all before disk is touched. A rejected write returns `{ error, attempted, allowed, hint }` so the AI can self-correct or escalate. Full pipeline diagram: [docs/architecture.md](docs/architecture.md).
 
 **Routing chain** (full mode): `researcher? → design-auditor? → pm → architect? → sr-engineer ↔ code-reviewer → qa-engineer → PASS`. Lite mode (`/teamwork-lite`) bypasses the chain for solo 1-file edits — server-read-only, no state writes.
 
@@ -77,7 +77,7 @@ Every `tw_update_state` runs the full 9-step pipeline before touching disk. A re
 | Category | MCP server + hard gates | Slash-command + templates | Slash-command + templates |
 | Enforcement | **Server-side** (`⛔ BLOCKED`) | Prompt-level (advisory) | Prompt-level (advisory) |
 | Concurrent-write safety | **O_EXCL lock + mtime check** | None | None |
-| Role separation | **12 roles + ALLOWED_TRANSITIONS** | Single agent per session | Human-AI pair |
+| Role separation | **12 roles; 8 in ALLOWED_TRANSITIONS** | Single agent per session | Human-AI pair |
 | Retry / feedback loops | **3 round counters w/ caps** | Undefined | Undefined |
 | Multi-IDE shared state | **Yes** (stdio fs, or HTTP+SQLite) | Filesystem only | Filesystem only |
 | Install weight | Heavier (MCP server) | Lighter (CLI scaffold) | Lighter (CLI scaffold) |
@@ -88,7 +88,7 @@ Every `tw_update_state` runs the full 9-step pipeline before touching disk. A re
 
 ## Per-Role Model Routing
 
-Every `content/skill-*.md` declares a `recommended_model` in its YAML frontmatter. The recommendation is **advisory** — the MCP server does not control client-side inference. Honor it via Claude Code's `~/.claude/agents/*.md` (per-subagent model pinning) or manual `/model` switches; old clients that ignore the field keep working.
+Every role SOP declares a `recommended_model` in its YAML frontmatter — in `content/skill-<role>.md` for the eleven single-file roles, and in `content/coord-01-core-head.md` for the coordinator (whose SOP is composed from `content/coord-01..07-*.md` per `prompts/skill-manifest.ts`). The recommendation is **advisory** — the MCP server does not control client-side inference. Honor it via Claude Code's `~/.claude/agents/*.md` (per-subagent model pinning) or manual `/model` switches; old clients that ignore the field keep working.
 
 | Role             | Tier   | Recommended model | Rationale                                                            |
 | ---------------- | ------ | ----------------- | -------------------------------------------------------------------- |
@@ -225,7 +225,7 @@ Best-effort by contract: the hook always exits 0 and never blocks or alters the 
 
 - **Changelog**: [CHANGELOG.md](CHANGELOG.md) — every version with rationale
 - **Contributing**: [CONTRIBUTING.md](CONTRIBUTING.md) — dev workflow, project layout, schema-version checklist
-- **Architecture**: [docs/architecture.md](docs/architecture.md) — 9-step write pipeline, state machine, RAG lifecycle
+- **Architecture**: [docs/architecture.md](docs/architecture.md) — 18-step gate pipeline, state machine, RAG lifecycle
 - **Research**: [research/](research/) — token-frugality audits, industry comparisons, retrospectives
 - **Repo**: <https://github.com/Paul-hengChen/agent-governance-mcp>
 
