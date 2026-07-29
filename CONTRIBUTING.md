@@ -118,6 +118,82 @@ The pre-flight check (`enforcePreFlight`) is in-memory per-process. The freshnes
 
 ---
 
+## Reading the constitution
+
+There is **no single `content/constitution.md`** — see [why](#why-there-is-no-single-constitution-file) below. Pick by what you're doing:
+
+**Read the whole thing.** A composed full-text copy is committed:
+
+```
+test/fixtures/compose-golden/constitution-monolith.txt      # all 15 fragments
+test/fixtures/compose-golden/skill-coordinator-monolith.txt # all 7 coord-*.md
+```
+
+These are **golden test fixtures, not the source of truth**. `test/compose-equivalence.test.mjs` (AC8) and `test/skill-manifest.test.mjs` (AC5) assert they stay byte-identical to the live composition, so they cannot silently go stale — but that also means **editing any fragment turns those tests red until you re-baseline the golden**. That is expected, and it is a deliberate step: it forces every constitution wording change to be an explicit, reviewable diff.
+
+Re-baseline by regenerating (never hand-edit the fixture). `scripts/capture-constitution-golden.mjs` does **not** do this — its monolith branch needs the retired `content/constitution.md` and no-ops with a note; it still owns the 10 dispatch/hook fixtures:
+
+```bash
+npm run build
+node --input-type=module -e '
+import fs from "node:fs";
+import { CONSTITUTION_SEGMENTS } from "./dist/prompts/constitution-manifest.js";
+import { composeSkill, hostCapabilitiesFor } from "./dist/prompts/skill-manifest.js";
+const read = (f) => fs.readFileSync("content/" + f, "utf8");
+fs.writeFileSync("test/fixtures/compose-golden/constitution-monolith.txt",
+  CONSTITUTION_SEGMENTS.map((s) => read(s.file)).join(""));
+fs.writeFileSync("test/fixtures/compose-golden/skill-coordinator-monolith.txt",
+  composeSkill("skill-coordinator.md", hostCapabilitiesFor("claude-code"), read));
+'
+git diff --stat test/fixtures/compose-golden/   # review the wording diff before committing
+```
+
+Both writes mirror exactly what the two tests compute, so running this with no fragment edits pending is a no-op. Expect to re-baseline context-budget caps too (`test/context-budget.test.mjs`) when a fragment grows.
+
+**Edit it.** The 15 `content/const-*.md` fragments are the source. Document order = the order in `CONSTITUTION_SEGMENTS` (`prompts/constitution-manifest.ts`), which the filename number prefixes mirror, so `cat content/const-*.md` reads correctly. Each fragment carries one tag:
+
+| tag | fragments | ships when |
+|---|---|---|
+| `core` | 01, 03, 05, 15 | always |
+| `design` | 02, 04 | design-armed feature |
+| `chain` | 06, 08, 10, 12, 14 | non-lite dispatch |
+| `chain-design` | 07, 09, 11, 13 | both |
+
+**See what one role actually receives.** Composition varies per dispatch — this is the point of the split:
+
+| mode | fragments | bytes |
+|---|---|---|
+| chain + design (full, design-armed) | 15/15 | 36,189 |
+| chain, no design | 9/15 | 27,050 |
+| lite + design | 6/15 | 14,220 |
+| lite, no design (leanest) | 4/15 | 12,206 |
+
+```bash
+npm run build
+node --input-type=module -e '
+import { composeConstitution } from "./dist/prompts/build.js";
+process.stdout.write(composeConstitution({ chain: false, design: false }));
+' | less
+```
+
+That prints the composed text **before** the transform passes. What an agent really gets has also been through `stripOriginTags` (always) and `stripRationale` (unless `fullDetail`) — to see the true final bundle, invoke the role prompt itself.
+
+`content/constitution-rationale.md` holds the non-normative "why" behind §1/§3.1/§3.2/§5/§7. Read it when a rule's intent isn't obvious from its text.
+
+### Why there is no single constitution file
+
+Backlog ticket **A9** (v3.44.0–v3.45.0); design in [specs/compose-not-strip-overlays.md](specs/compose-not-strip-overlays.md).
+
+Assembly used to be **subtractive**: one 1,951-line `content/constitution.md` with `<!-- chain-only -->`, `<!-- design-only -->`, and `<!-- rationale -->` fenced spans, which `build.ts` stripped by regex per dispatch mode. One malformed or unbalanced marker silently changed the governance text an agent received — no build error, no test bound to marker validity, no signal to the human that the bundle was corrupt. The fences also nested three deep (`design-only` inside `chain-only` in §3.1/§3.2/§4; `rationale` inside `design-only` at §1; `origin` inside both), so hand-editing them was error-prone in exactly the way that matters: a rule could vanish from one dispatch mode and nothing would look wrong.
+
+Composition is now **additive** — a fragment ships iff its tag's predicate holds, and excluded fragments simply never load. With nothing left to strip, the unbalanced-fence failure class is gone *structurally* rather than guarded against, which is why ticket A3 (a build-time fence validator) was superseded instead of implemented. It also makes "what does role X receive?" answerable as "which files got concatenated" instead of "which regex matched a fence in a 1,951-line document."
+
+The refactor was required to change assembly only, never wording: golden fixtures were captured **before** any edit landed, and equivalence is enforced as byte-identical output per dispatch mode — not asserted by inspection.
+
+The cost is this section's existence: no file is "the constitution" any more, so reading it end-to-end needs the pointers above.
+
+---
+
 ## Schema versions
 
 All four persisted artifacts (`handoff.md`, `tasks.md`, the SQLite DB, `.config.json`) carry a `schema_version`. Older files are lazily migrated on first read.
