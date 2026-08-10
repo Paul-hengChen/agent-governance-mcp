@@ -158,7 +158,7 @@ Authoritative source. Key: `(prev_agent, prev_status)` → set of allowed `(new_
 | sr-engineer | In_Progress | (qa-engineer, In_Progress), (sr-engineer, Blocked), (pm, In_Progress) |
 | sr-engineer | Blocked | (sr-engineer, In_Progress), (pm, In_Progress) |
 | qa-engineer | In_Progress | (qa-engineer, PASS), (qa-engineer, FAIL), (qa-engineer, Blocked) |
-| qa-engineer | Blocked | (sr-engineer, In_Progress), (qa-engineer, In_Progress) |
+| qa-engineer | Blocked | (sr-engineer, In_Progress), (qa-engineer, In_Progress), (pm, In_Progress) |
 | qa-engineer | FAIL | (sr-engineer, In_Progress), (pm, In_Progress) |
 | qa-engineer | PASS | (pm, In_Progress), (researcher, In_Progress), (release-engineer, In_Progress), (design-auditor, In_Progress) |
 | release-engineer | In_Progress | (pm, In_Progress) |

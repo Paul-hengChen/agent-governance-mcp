@@ -1990,3 +1990,206 @@ test("T-E37-01: computeNewRound holds qa_round/review_round/visual_round steady 
     { qa_round: 0, review_round: 0, visual_round: 0, hop_count: 1, qa_rounds_total: 0, review_rounds_total: 0, visual_rounds_total: 0 },
   );
 });
+
+// ============================================================================
+// T-E45-01 — qa-engineer:Blocked → pm:In_Progress escape edge (v3.95.0, E45)
+// ============================================================================
+// WHY: tools/transitions.ts:246-287 (E45) adds { agent: "pm", status:
+// "In_Progress" } to the qa-engineer:Blocked row of ALLOWED, restoring
+// symmetry with the other six <role>:Blocked rows (all of which already
+// carry a Blocked -> pm:In_Progress escape) and closing the dead end
+// documented in research/vs-ndi-button-realign-qa-blocked-dead-end.md: QA
+// halted at Blocked on a contract defect that was honestly markable neither
+// PASS nor FAIL, and from there PM was unreachable. Human chose option A,
+// LOOSE variant — no resume_of requirement on this outbound edge, matching
+// the qa-engineer:FAIL -> pm precedent and all six peer Blocked rows (none
+// of which require resume_of to reach pm; that field gates only the PM
+// RETURN-leg, step 3.5 of validateTransition).
+//
+// Per code-reviewer's review (review_reports/review_T-E45-01.md), the row
+// edit shipped correct but UNPINNED — the suite stayed green on a purely
+// additive change because nothing asserted this row's exact membership.
+// These tests close that gap: the positive accept the ticket exists for, a
+// row-equality pin (T-MATRIX-C13/E37 shape) so the next additive edit to
+// this row cannot land silently the same way, regression pins on the
+// sibling qa-engineer:In_Progress row and the three round-cap override
+// envelopes (measured byte-identical by the reviewer, but never pinned from
+// this row's own direction), and the E38 next_role lookahead advisory's
+// predicate on a Blocked state, both silent (pm now legal) and still firing
+// (a genuinely unreachable next_role).
+
+// ---------- positive accept: the edge the ticket exists for ----------
+
+test("T-E45-01: qa-engineer:Blocked → pm:In_Progress accepted, no resume_of required", () => {
+  // WHY: this is the edge E45 ships, and it shipped with zero coverage of
+  // itself. next_resume_of is omitted entirely below — resume_of gates ONLY
+  // the PM RETURN-leg (pm:In_Progress -> {code-reviewer,qa-engineer}) and
+  // plays no role in this OUTBOUND edge — so this must accept without it,
+  // per the human's explicit loose-variant choice.
+  assert.equal(
+    validateTransition({
+      prev: { agent: "qa-engineer", status: "Blocked" },
+      next: { agent: "pm", status: "In_Progress" },
+      prev_qa_round: 0,
+      prev_review_round: 0,
+    }),
+    null,
+  );
+});
+
+// ---------- row-equality pin (T-MATRIX-C13/E37 shape, :1841) ----------
+
+test("T-E45-01: qa-engineer:Blocked row equals exactly {sr-engineer:In_Progress, qa-engineer:In_Progress, pm:In_Progress}", () => {
+  // WHY: mirrors the T-MATRIX-C13/E37 row-identity-and-cardinality pin at
+  // :1841. deepEqual pins membership AND order (the new pm entry is
+  // appended last, matching the C13/E37 append convention) — a future
+  // additive edit to this row (the exact way E45 itself shipped unpinned)
+  // can no longer land silently.
+  const row = ALLOWED_TRANSITIONS.get("qa-engineer:Blocked");
+  assert.ok(row, "qa-engineer:Blocked row must exist");
+  assert.deepEqual(
+    row,
+    [
+      { agent: "sr-engineer", status: "In_Progress" },
+      { agent: "qa-engineer", status: "In_Progress" },
+      { agent: "pm", status: "In_Progress" },
+    ],
+    "qa-engineer:Blocked row must be exactly these three successors, in this order",
+  );
+});
+
+// ---------- regression pin: qa-engineer:In_Progress unaffected (no direct pm leak) ----------
+
+test("T-E45-01 (regression pin): qa-engineer:In_Progress row still admits only its three own-agent statuses — no direct pm entry", () => {
+  // WHY: E45's edit is scoped to the qa-engineer:Blocked row only. This pins
+  // that the sibling qa-engineer:In_Progress row (the state QA occupies
+  // WHILE reviewing, before it reaches PASS/FAIL/Blocked) did not acquire
+  // the same shortcut to pm — that would let QA hand off to PM mid-review,
+  // bypassing the PASS/FAIL/Blocked decision entirely.
+  assert.deepEqual(
+    ALLOWED_TRANSITIONS.get("qa-engineer:In_Progress"),
+    [
+      { agent: "qa-engineer", status: "PASS" },
+      { agent: "qa-engineer", status: "FAIL" },
+      { agent: "qa-engineer", status: "Blocked" },
+    ],
+    "qa-engineer:In_Progress must still admit only PASS/FAIL/Blocked — no pm leak",
+  );
+});
+
+// ---------- regression pin: round-cap override envelopes unaffected, pinned from this row's direction ----------
+
+test("T-E45-01 (regression pin): qa_round at cap still rejects qa-engineer:Blocked → sr-engineer:In_Progress (QA_ROUND_EXCEEDED, pm-only)", () => {
+  // WHY: round-cap overrides (transitions.ts step 2) outrank the table
+  // lookup (step 4) unconditionally — a target legal at the table level
+  // must still be rejected once qa_round is at cap, exactly as before this
+  // row grew a third entry. The reviewer measured the three cap envelopes
+  // byte-identical across both review rounds; nothing previously pinned
+  // that from THIS row's own direction.
+  const r = validateTransition({
+    prev: { agent: "qa-engineer", status: "Blocked" },
+    next: { agent: "sr-engineer", status: "In_Progress" },
+    prev_qa_round: 4,
+    prev_review_round: 0,
+  });
+  assert.ok(r, "transition must be rejected");
+  assert.equal(r.error, "QA_ROUND_EXCEEDED");
+  assert.deepEqual(r.allowed, [{ new_agent: "pm", new_status: "In_Progress" }]);
+});
+
+test("T-E45-01 (regression pin): review_round at cap still rejects qa-engineer:Blocked → qa-engineer:In_Progress (REVIEW_ROUND_EXCEEDED, pm-only)", () => {
+  const r = validateTransition({
+    prev: { agent: "qa-engineer", status: "Blocked" },
+    next: { agent: "qa-engineer", status: "In_Progress" },
+    prev_qa_round: 0,
+    prev_review_round: 4,
+  });
+  assert.ok(r, "transition must be rejected");
+  assert.equal(r.error, "REVIEW_ROUND_EXCEEDED");
+  assert.deepEqual(r.allowed, [{ new_agent: "pm", new_status: "In_Progress" }]);
+});
+
+test("T-E45-01 (regression pin): visual_round at cap still accepts qa-engineer:Blocked → pm:In_Progress (the cap's own escape, unweakened)", () => {
+  // WHY: at visual_round cap, (pm, In_Progress) was already the sole legal
+  // landing regardless of the table row. This confirms the new table entry
+  // didn't change the cap's own behavior — no duplicate/shadowing effect —
+  // by exercising the cap from qa-engineer:Blocked specifically.
+  assert.equal(
+    validateTransition({
+      prev: { agent: "qa-engineer", status: "Blocked" },
+      next: { agent: "pm", status: "In_Progress" },
+      prev_qa_round: 0,
+      prev_review_round: 0,
+      prev_visual_round: 6,
+    }),
+    null,
+  );
+});
+
+// ---------- E38 next_role lookahead advisory, pinned on a Blocked state ----------
+// WHY: docs/backlog.md's E45 row flags an open question about how the E38
+// next_role lookahead advisory (tools/handoff-orchestrator.ts) behaves on
+// Blocked states. The two tests below pin the CURRENT predicate directly,
+// in both directions: silent now that pm is a legal successor of
+// qa-engineer:Blocked (this ticket's edge), and still firing for a
+// genuinely unreachable next_role from that same state — so together they
+// pin the predicate itself, not merely its silence on this one edge.
+
+test("T-E45-01/E38: qa-engineer:Blocked write with next_role=pm produces NO advisory (pm now a legal successor)", async () => {
+  setActiveStorage(new FileHandoffStorage());
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "twe45-"));
+  fs.mkdirSync(path.join(ws, ".current"), { recursive: true });
+  await seedState(ws, "e45-lookahead-silent", "qa-engineer", "In_Progress");
+  resetSession(ws);
+  markStateRead(ws);
+  const result = await handleUpdateState({
+    workspace_path: ws,
+    active_feature: "e45-lookahead-silent",
+    status: "Blocked",
+    agent_id: "qa-engineer",
+    completed_tasks: [],
+    pending_notes: [],
+    blocking_reason: "e45 probe — Blocked with next_role=pm",
+    next_role: "pm",
+  });
+  const text = result.content[0].text;
+  assert.ok(!result.isError, `write must succeed; got: ${text}`);
+  const envelope = JSON.parse(text);
+  assert.equal(
+    envelope.warnings,
+    undefined,
+    "next_role=pm from qa-engineer:Blocked must stay silent now that pm is a legal successor of this row",
+  );
+});
+
+test("T-E45-01/E38: qa-engineer:Blocked write with an unreachable next_role STILL warns (predicate pinned, not just its silence)", async () => {
+  // WHY: "architect" is not, and never was, in the qa-engineer:Blocked row
+  // ({sr-engineer, qa-engineer, pm}) — proving E45 widened the row's legal-
+  // successor SET, not the advisory's willingness to fire at all.
+  setActiveStorage(new FileHandoffStorage());
+  const ws = fs.mkdtempSync(path.join(os.tmpdir(), "twe45-"));
+  fs.mkdirSync(path.join(ws, ".current"), { recursive: true });
+  await seedState(ws, "e45-lookahead-fires", "qa-engineer", "In_Progress");
+  resetSession(ws);
+  markStateRead(ws);
+  const result = await handleUpdateState({
+    workspace_path: ws,
+    active_feature: "e45-lookahead-fires",
+    status: "Blocked",
+    agent_id: "qa-engineer",
+    completed_tasks: [],
+    pending_notes: [],
+    blocking_reason: "e45 probe — Blocked with unreachable next_role",
+    next_role: "architect",
+  });
+  const text = result.content[0].text;
+  assert.ok(!result.isError, `write must succeed (advisory never rejects); got: ${text}`);
+  const envelope = JSON.parse(text);
+  assert.ok(Array.isArray(envelope.warnings) && envelope.warnings.length === 1, "exactly one warning expected");
+  const warning = envelope.warnings[0];
+  assert.match(warning, /next_role="architect"/);
+  assert.match(warning, /qa-engineer:Blocked/, "warning must name the state just written");
+  assert.match(warning, /sr-engineer:In_Progress/, "remedy must name sr-engineer:In_Progress");
+  assert.match(warning, /qa-engineer:In_Progress/, "remedy must name qa-engineer:In_Progress");
+  assert.match(warning, /pm:In_Progress/, "remedy must name pm:In_Progress (the E45 edge)");
+});

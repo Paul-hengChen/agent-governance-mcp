@@ -246,6 +246,45 @@ const ALLOWED: ReadonlyMap<string, AllowedNext> = new Map<string, AllowedNext>([
   ["qa-engineer:Blocked", [
     { agent: "sr-engineer", status: "In_Progress" },
     { agent: "qa-engineer", status: "In_Progress" },
+    // v3.95.0 (E45) — pm's escape edge, restoring symmetry with the other
+    // six <role>:Blocked rows (researcher/design-auditor/pm/architect/
+    // sr-engineer/code-reviewer all have Blocked -> pm:In_Progress; this was
+    // the only one missing it). The control case proves the gap was an
+    // omission, not a design decision: the "qa-engineer:FAIL" row below
+    // already has a pm:In_Progress escape for the same "hand back to PM"
+    // shape.
+    //
+    // To be precise about what content/skill-qa-engineer.md's Escalation
+    // Routes actually say (its ONLY Blocked row routes to sr-engineer, not
+    // pm; the two spec-defect rows — copy coverage gap, visual token
+    // coverage gap — both prescribe FAIL -> pm, an edge that already
+    // existed): this change does not restore a broken SOP-prescribed route.
+    // It covers a *Blocked* reading of a spec-defect situation that the SOP
+    // itself routes via FAIL. That reading is defensible on its own terms —
+    // observed live 2026-08-07, VS-NDI-Receiver workspace, feature
+    // button-figma-realign (full account in
+    // research/vs-ndi-button-realign-qa-blocked-dead-end.md): QA hit
+    // "## Visual Structural Assertions" rows asserting a superseded Figma
+    // source after a human-approved sanctioned divergence. Marking `pass`
+    // would have written a falsehood into the evidence trail; marking `fail`
+    // would have blamed an implementation doing exactly what was approved.
+    // QA wrote Blocked instead — reasonable, since a contract defect is not
+    // an implementation failure and FAIL charges the qa_round budget for it —
+    // and from that Blocked state PM was unreachable, forcing the PM
+    // amendment to be recorded on a qa-engineer write with an in-band
+    // ATTRIBUTION NOTE, dirtying provenance on a spec file the SOP assigns
+    // to PM. This edge closes that dead end and restores row symmetry; it
+    // does not claim the SOP's FAIL -> pm route was ever broken.
+    //
+    // No `resume_of` requirement on this edge (human decision, loose
+    // variant): resume_of is the PM RETURN-leg field gating (pm, In_Progress)
+    // -> {code-reviewer, qa-engineer} (§ALLOWED_TRANSITIONS Amend-Resume
+    // Edge, step 3.5 of validateTransition); requiring it on this OUTBOUND
+    // edge would make qa-engineer:Blocked asymmetric with both the six peer
+    // Blocked rows above (none require resume_of to reach pm) and the
+    // qa-engineer:FAIL -> pm edge it mirrors. Mirrored in
+    // specs/qa-flow-enforcement-architecture.md:161.
+    { agent: "pm", status: "In_Progress" },
   ]],
   ["qa-engineer:FAIL", [
     { agent: "sr-engineer", status: "In_Progress" },
