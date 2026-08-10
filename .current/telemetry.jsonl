@@ -22,3 +22,4 @@
 {"ts":"2026-07-20T11:10:30.711Z","gate":"orchestrator","error_code":"CUT_APPROVAL_REQUIRED","agent_id":"sr-engineer","feature":"e36-handoff-split-overload-adapter"}
 {"ts":"2026-07-20T11:11:52.383Z","gate":"orchestrator","error_code":"CUT_APPROVAL_REQUIRED","agent_id":"sr-engineer","feature":"e36-handoff-split-overload-adapter"}
 {"ts":"2026-08-10T05:48:59.481Z","gate":"validateTransition","error_code":"TRANSITION_REJECTED","agent_id":"qa-engineer","feature":"e45-qa-blocked-pm-escape"}
+{"ts":"2026-08-10T06:25:20.921Z","gate":"validateTransition","error_code":"TRANSITION_REJECTED","agent_id":"code-reviewer","feature":"e46-qa-spec-defect-status-rule"}

@@ -41,13 +41,13 @@ All review notes, questions, and bug reports → `qa_reports/review_<task-id>.md
 3. **Phase 1 — Review**: Read the implementation. Check correctness, edge cases, security. Write findings to `qa_reports/review_<task-id>.md`. Batched: ONE file may carry `covers: <id1>, <id2>, ...` (e.g. `covers: T-01, T-02` in `review_T-01.md`); per-id files stay the default.
 
    3a. **Copy Audit Gate**: open the spec's *Copy / Strings* H2 (required by skill-pm). For every entry, verify the implementation renders the documented text verbatim — grep the source tree for the string id AND for the documented text. Two failure modes:
-   - **Drift**: implementation text ≠ spec text → FAIL back to sr-engineer with the diff (escalate to Phase 2 round 1, do NOT proceed to Phase 3).
+   - **Drift**: implementation text ≠ spec text → FAIL back to sr-engineer with the diff (escalate to Phase 2 round 1, do NOT proceed to Phase 3). First check § *Contract Defect vs Implementation Failure* — if a sanctioned divergence supersedes the spec's text, this is `Blocked`, not `FAIL`.
    - **Coverage gap**: WHEN the implementation introduces a user-facing string not listed in the spec → DO FAIL back to PM per *Escalation Routes: copy coverage gap*. Do NOT let the spec ratify post-hoc; force PM to source the string.
 
    Rationale: stylistic ACs (font, color, position) pass without catching paraphrased prose. The Copy Audit Gate is the only step that compares rendered text to the design contract.
 
    3b. **Visual Audit Gate**: open the spec's *Visual Tokens* H2 (required by skill-pm). For every entry, verify the implementation declares the documented value verbatim — grep the source tree for the property's literal (e.g. `0xFF2A2A2A`, `32.sp`, `184.dp`, `FontWeight.Bold`). Three failure modes:
-   - **Drift**: implementation literal ≠ spec literal → FAIL back to sr-engineer with the diff. Stylistic AC tests like `OobeThemeTokensTest` catch drift after the spec is right; the gate catches the inverse — when code is right but spec was stale, OR when code paraphrased the spec (e.g. `#3D5BAB` instead of `#3C5AAA`).
+   - **Drift**: implementation literal ≠ spec literal → FAIL back to sr-engineer with the diff. Stylistic AC tests like `OobeThemeTokensTest` catch drift after the spec is right; the gate catches the inverse — when code is right but spec was stale, OR when code paraphrased the spec (e.g. `#3D5BAB` instead of `#3C5AAA`). First check § *Contract Defect vs Implementation Failure* — if a sanctioned divergence supersedes the spec's literal, this is `Blocked`, not `FAIL`.
    - **Coverage gap**: WHEN the implementation hard-codes a literal property not listed in the spec → DO FAIL back to PM per *Escalation Routes: visual token coverage gap*. Do NOT let the spec ratify post-hoc; force PM to source the token.
    - **Source rot** (when feasible): if the spec cites a Figma node id and the team has Figma MCP access, sample at least one cited token by fetching the node; flag drift to PM rather than blocking the build.
 
@@ -86,6 +86,18 @@ All review notes, questions, and bug reports → `qa_reports/review_<task-id>.md
    - **PASS** → `tw_update_state(status=PASS, agent_id="qa-engineer", completed_tasks=[<ids>], qa_review="<summary>", pending_notes=["QA: <task-id> PASS"])`. Server auto-records the review (file mode: `qa_reports/review_<id>.md`; SQLite: `reports` row) AND verifies evidence exists (else `MISSING_EVIDENCE`) before persisting PASS. Auto-record is unchanged; `covers:` is for pre-PASS manual batch files. Then call `tw_complete_task(<task-id>, agent_id="qa-engineer")` per completed id.
    - **FAIL** → `tw_rollback_task(<task-id>, <reason>)` → escalate per *Escalation Routes: Phase 4 FAIL* with `review_task_ids=[<task-id(s)>]` on the `qa_review`-bearing write — the FAIL stamp lands only on the named task(s); both it and `completed_tasks` empty → rejected `QA_REVIEW_TARGET_REQUIRED` (no fall-back to every open task). `qa_round` auto-increments. At Round 4 (the `qa_round` cap of prior FAILs exhausted), only `(pm, In_Progress)` is accepted next (else `QA_ROUND_EXCEEDED`) — escalate.
 
+## Contract Defect vs Implementation Failure
+
+A Phase 3a/3b **Drift** call (implementation literal ≠ spec literal) or a Phase 1.5 Structural Assertion row (`content/skill-qa-visual.md` Step C) needs one of two labels: `FAIL` charges `qa_round` toward its cap; `Blocked` does not.
+
+**Decision test** — write out both verdicts and check each honestly:
+- **Contract defect**: `pass` would be a falsehood (the assertion's literal claim doesn't hold) AND `fail` would blame an implementation doing exactly what a human already approved — the assertion describes a source (Figma, an original design) that a sanctioned divergence has since superseded. Both dishonest, same reason → the assertion is the defect, not the code.
+- **Implementation failure**: only one verdict is honest — the spec/design is still the approved truth. Grade normally.
+
+WHEN both verdicts are dishonest → DO `status=Blocked` per *Escalation Routes: contract defect*, `blocking_reason` naming the assertion and the divergence that supersedes it, cited from an artifact that (a) is NOT authored by qa-engineer and (b) predates this QA round — the PM/coordinator attestation on the cut-approving `pm:In_Progress` write, or a PM-authored divergence table in `specs/<feature>.md`. A `qa_reports/visual_<id>.md` `## Allowed Differences` entry does NOT satisfy this: that section is QA's own, written at verification time (`content/skill-qa-visual.md` *Allowed Differences*), and citing it lets QA self-certify the very escape this guard exists to gate. No qualifying artifact on record → the claim is an implementation failure wearing a cheaper label; FAIL it. ELSE → FAIL per the existing rows below; the implementation is what's wrong, so it is charged.
+
+The coverage-gap rows below stay `FAIL`, unaffected: their literal is unsourced, so the spec asserts nothing about it — the contract-defect test's first conjunct is unsatisfiable, closing the branch by construction, not by exception.
+
 ## Escalation Routes
 
 Format: Constitution §3 *Escalation call format*. FAIL rows carry `qa_review` plus `review_task_ids=[<task-id(s)>]` naming the reviewed task(s) (QA-evidence-specific addendum, like `covers:` — not a general-format change) and follow the `tw_rollback_task` at their SOP site. Phase 1.5: see skill-qa-visual *Error codes & STOP routes*.
@@ -93,6 +105,7 @@ Format: Constitution §3 *Escalation call format*. FAIL rows carry `qa_review` p
 | situation | status | note token | next_role |
 |---|---|---|---|
 | awaiting sr-engineer round | Blocked | `Waiting for sr-engineer Round <N>` | sr-engineer |
+| contract defect | Blocked | `QA: contract defect — <assertion> superseded by <approved-divergence ref>` | pm |
 | unresolved after Round 3 | FAIL | `QA: <task-id> failed Round 3` | pm |
 | copy coverage gap | FAIL | `QA: copy gap — '<text>' in <file> missing from spec Copy/Strings` | pm |
 | visual token coverage gap | FAIL | `QA: visual token gap — '<property>=<value>' in <file> missing from spec Visual Tokens` | pm |

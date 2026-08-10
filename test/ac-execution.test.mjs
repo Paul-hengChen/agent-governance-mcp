@@ -440,17 +440,25 @@ test("AC6: new Phase 3.5 references the existing Phase 4 FAIL escalation route a
     /Phase 3\.5[\s\S]*?Phase 4 FAIL/,
     "Phase 3.5 text must cross-reference the existing 'Phase 4 FAIL' escalation route",
   );
-  // Escalation Routes table row count unchanged: exactly one row per situation
+  // Escalation Routes table row count: exactly one row per situation
   // documented today (pipe-delimited markdown table rows under "## Escalation
-  // Routes"), no new row added for AC-execution failures.
+  // Routes"). AC6 itself still adds NO row for AC-execution failures (Phase
+  // 3.5 reuses the pre-existing "Phase 4 FAIL" route, asserted above) — the
+  // table grew from 6 to 7 rows for an unrelated reason: E46 (T-E46-01,
+  // 2026-08-10) added the `contract defect | Blocked | ... | pm` row so a QA
+  // agent has a status other than FAIL for a spec/design defect a human has
+  // already approved diverging from. Pinning stays at the current count (now
+  // 7) so a future accidental row add/removal still fails this test; it must
+  // be bumped again, with a comment naming the ticket, on the next genuine
+  // addition — never silently re-numbered to make an unrelated diff pass.
   const tableStart = body.indexOf("## Escalation Routes");
   assert.ok(tableStart > 0, "## Escalation Routes section must exist");
   const tableBody = body.slice(tableStart);
   const rows = tableBody.split("\n").filter((l) => l.startsWith("|") && !l.includes("---") && !l.includes("situation"));
   assert.equal(
     rows.length,
-    6,
-    `Escalation Routes table must stay at 6 data rows (AC6: no new row added for AC-execution failures), got ${rows.length}:\n${rows.join("\n")}`,
+    7,
+    `Escalation Routes table must stay at 7 data rows (AC6: no new row added for AC-execution failures; the 7th row is E46's unrelated contract-defect route), got ${rows.length}:\n${rows.join("\n")}`,
   );
 });
 

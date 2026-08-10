@@ -164,7 +164,21 @@ test("AC-5: byte counts stay within v3.14.0-relaxed budgets (savings invariant v
   // independently re-measured with `wc -c content/skill-qa-engineer.md`. Raised
   // 14729 -> 15500 (~379-byte headroom) per the established ~300-550-byte
   // convention.
-  assert.ok(qaSize <= 15500, `qa-engineer.md must be <= 15500 bytes (got ${qaSize})`);
+  // e46-qa-spec-defect-status-rule (qa-owned bump, T-E46-01, 2026-08-10): new
+  // "## Contract Defect vs Implementation Failure" H2 (two-verdict decision
+  // test + WHEN/DO/ELSE route + anti-abuse citation guard) plus a `contract
+  // defect | Blocked | ... | pm` Escalation Routes row, plus the two Phase
+  // 3a/3b Drift-bullet cross-references added in code review round 2/3,
+  // bringing the file to 17512 bytes — independently re-measured with `wc -c
+  // content/skill-qa-engineer.md` (matches code-reviewer's round-3 figure
+  // exactly, review_reports/review_T-E46-01.md). Raised 15500 -> 17900
+  // (~388-byte headroom) — the tighter end of the established ~350-550-byte
+  // convention, deliberately: this cap is a context-budget guard, so headroom
+  // is exactly the unreviewed growth the next edit can take without anyone
+  // deciding to allow it (round 3 rejected 18000/~488 bytes for the same
+  // reason). `skill-qa-visual.md` needs no bump (unchanged at 17007, under
+  // its 20700 cap).
+  assert.ok(qaSize <= 17900, `qa-engineer.md must be <= 17900 bytes (got ${qaSize})`);
   // qa-visual.md: v3.36.0 adds B10 (Step B0 carry-forward gate) and B11
   // (Step B1 deterministic pixel-diff pre-screen + Step B2 LLM-only path).
   // These are SOP-prose insertions totalling ~5400 bytes on top of the
