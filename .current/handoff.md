@@ -3,21 +3,20 @@ schema_version: 13
 active_feature: "e44-e49-release-sop-conditional-checks"
 status: "In_Progress"
 last_updated: "2026-08-10T11:14:44.785Z"
-last_agent: "release-engineer"
+last_agent: "pm"
 prd_path: "/Users/paul.ph.chen/agent-governance-mcp/docs/backlog.md"
 scope_decision: "single-feature"
 scope_decision_why: "E44 + E49 batched (backlog execution order 2026-08-10 order 1: \"Ship with E44 — same file, same class, one edit session\"). Backlog rows ARE the spec -> mini-chain sr-engineer -> code-reviewer -> qa-engineer, PM/ARCH skipped (E35-E38/E45/E46 pattern). Content-only, no source-code change: (T-E44-01) content/skill-release-engineer.md step 8 AC4 becomes conditional — require specs/<active_feature>.md in the release commit WHEN that file exists in the tree (PM/architect chain authored one; absence from the commit stays a hard STOP with the existing wording), SKIP when no such file exists anywhere AND handoff scope_decision_why records a backlog-row-as-spec mini-chain (log one line naming which branch fired), STOP as unclassifiable when neither condition holds; (T-E49-01) step 7a derives the ticket-code SET from git log <prev-tag>..HEAD (the range the SOP already reads for the CHANGELOG) instead of active_feature alone, keeps destination qa_reports/archive/<active_feature>/, retains the MUST NOT for codes outside that range, and records that the original \"concurrent in-flight features\" premise is false by construction under the E1 feature lease; (T-E44-02, qa-engineer per §2 test ownership) retarget the three AC4 assertion sites in test/release-staging.test.mjs (:80, :169-183, :320) and cover the mini-chain skip branch; (T-E49-02, coordinator-direct bookkeeping) one-off sweep of the orphaned qa_reports/review_T-E45-01.md into qa_reports/archive/e46-qa-spec-defect-status-rule/ — the E49 fix is NOT retroactive because the E45 commit predates the v3.95.0 tag. Constitution must NOT be edited (skills own role-specific SOP actions). Human approved the cut inline in coordinator chat 2026-08-10 (\"ok, do it\") after the coordinator presented the full task table, pinned ACs, and the auto-tier non-qualification (P2 > maxPriority P3, 3 files > maxFiles 2)."
-cut_approved: true
 dispatch_pins:
   sr-engineer: "fable"
   release-engineer: "opus"
 evidence_schema: 2
 next_role: "pm"
-dispatched_at: "2026-08-10T11:14:44.785Z"
+dispatched_at: "2026-08-10T11:22:58.509Z"
 qa_round: 0
 review_round: 0
 visual_round: 0
-hop_count: 9
+hop_count: 10
 qa_rounds_total: 0
 review_rounds_total: 2
 visual_rounds_total: 0
@@ -28,10 +27,13 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- Released v3.96.0
-- tag: 27f59e252e713ecc1ced2b1cda56d87079f132aa
-- release-engineer: step 7a derived <CODES> = {E44, E49, E4X} from 4 untracked root-level qa_reports/ files (non-empty — F7 regression did NOT reappear); AC4 fired the SKIP branch (no specs/e44-e49-release-sop-conditional-checks.md anywhere in tree; scope_decision_why records backlog-row-as-spec mini-chain).
-- PM: file as new OPEN backlog rows (release-engineer's Artifact allowlist permits done-marking only, not new rows) — N3: step 7a scans only qa_reports/, so review_reports/ evidence is never archived. N4: grep -vxFf with an empty pattern file passes everything through; reachable on a first release or a mid-life agc adopter whose PREV_TAG predates qa_reports/; unreachable here, non-destructive via mv -n, pinned in the suite as current behavior. N5: <(...) process substitution is bash/zsh-only, fails loudly under sh -c. N6: the origin:/rationale: strip passes run on the prompts/build.ts path but NOT on tools/role.ts, so tw_switch_role returns unstripped SOP text — pre-existing, repo-wide, observed again this session. Zero-match logging: step 7a should log the derived <CODES> even when empty, so empty-by-design is distinguishable from empty-by-breakage — the exact ambiguity that hid F7 through two review rounds.
+- ⛔ Hop cap reached (hop_count=10/10): next role transition will be rejected (HOP_CAP_EXCEEDED) — only (pm, In_Progress) may land. Halt autonomous dispatch and surface to human; only an active_feature change resets the counter.
+- PM intake complete: filed 3 new OPEN backlog rows for the 6 findings release-engineer surfaced but could not self-file (Artifact allowlist scopes it to done-marking only) — docs/backlog.md.
+- E50 (P2, depends_on E49) bundles N4 (grep -vxFf empty-baseline mass sweep), zero-match logging, N3 (step 7a scans qa_reports/ only, not review_reports/), and N5 (bash-only <(...)) — all four are edits to content/skill-release-engineer.md:56-64, same file/review-round, bundled per PM's cheapest-compliant-path judgment (disagreeing with treating them as 4 separate cuts).
+- E51 (P2) files N6 (origin/rationale strip tags apply on prompts/build.ts but NOT on tools/role.ts's switchRole -- tw_switch_role returns unstripped SOP text; live evidence from 3 subagents this session). Flagged for an architect look before cutting since it crosses two independently-evolved render paths.
+- E52 (P2, new finding, mine -- not in release-engineer's pending_notes) files the review-round undercount: metrics.jsonl recorded review_rounds:2 for this feature but review_reports/review_T-E4X-03.md shows 3 rounds, because review_round only increments on FAIL-shaped writes -- systematically undercounts every feature that ever converges, worst on the most-reviewed ones, exactly the population the E6 retro reads. Recommended fix (ii): correct the metrics-emit value in tools/metrics.ts rather than the live round-cap-gating counter in transitions.ts; leaning against backfilling prior records. Flagged as a genuine judgment call, not a settled recommendation.
+- Execution order table updated at docs/backlog.md (new 2026-08-10 post-v3.96.0 table): order 1 E44+E49 done; 2 E50; 3 E51 (architect look recommended); 4 E39+E48(b); 5 E43; 6 E40; 7 E52; 8 E47 (measure first); 9 E41+E42. Old post-v3.95.0 table retained below for the record per file convention.
+- No cut approved, no tasks.md rows added, no active_feature opened -- awaiting human review/approval of the E50/E51/E52 rows and the reordered execution table before any of them is cut.
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.
