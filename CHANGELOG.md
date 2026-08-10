@@ -16,6 +16,39 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.95.0] - 2026-08-10
+
+Both tickets in this release are corrections to governance this server enforces on
+*other* workspaces, found by a consumer workspace hitting them in production
+(`VS-NDI-Receiver`, feature `button-figma-realign`, 2026-08-07; full account in
+`research/vs-ndi-button-realign-qa-blocked-dead-end.md`). QA hit `## Visual Structural
+Assertions` rows that asserted a Figma source a human-approved sanctioned divergence had
+since superseded: marking `pass` would have written a falsehood into the evidence trail,
+marking `fail` would have blamed an implementation doing exactly what was approved. QA
+wrote `Blocked` — and from `Blocked`, PM was unreachable.
+
+### Changed
+- **`e45-qa-blocked-pm-escape` — give `qa-engineer:Blocked` its `pm:In_Progress` escape (backlog E45).** `tools/transitions.ts` adds `{ agent: "pm", status: "In_Progress" }` to the `qa-engineer:Blocked` row of `ALLOWED`. That row was the only `<role>:Blocked` row in the table without it — researcher / design-auditor / pm / architect / sr-engineer / code-reviewer all had `Blocked → pm:In_Progress` — which made Constitution §3.1 Amend-Resume unreachable from the one state most likely to need it. The control case shows the gap was an omission rather than a design decision: the adjacent `qa-engineer:FAIL` row already carried a `pm:In_Progress` escape for the same "hand back to PM" shape.
+  - **Loose variant, no `resume_of` requirement** (human's choice): `resume_of` gates the PM *return* leg (`pm:In_Progress → {code-reviewer, qa-engineer}`), so requiring it on this *outbound* edge would have made `qa-engineer:Blocked` asymmetric with both the six peer `Blocked` rows and the `qa-engineer:FAIL → pm` edge it mirrors.
+  - **This is a behavioural change to the state machine** — it admits a transition the server previously rejected. No existing edge was removed or narrowed, so nothing that worked before breaks; hence minor, not major.
+  - `specs/qa-flow-enforcement-architecture.md:161` mirror cell synced per that file's standing MUST-update-mirror obligation. E39's full-table re-derive was deliberately not folded in.
+  - `test/qa-flow.test.mjs`: +203 lines — positive accept without `resume_of`, a row-equality pin, sibling-row and all three round-cap-override regression pins, and two E38-advisory pins on `Blocked` states.
+  - **Correction shipped alongside the fix**: E45's own code review caught that the originating research doc (§4), this repo's backlog E45 row, *and* the first draft of the `tools/transitions.ts` provenance comment all asserted a rule that does not exist — `content/skill-qa-engineer.md` prescribes `FAIL` → pm for spec defects, never `Blocked`. All three were corrected by annotation rather than deletion. The real gap was narrower and still real: two defensible status expressions for "the spec is wrong", only one of which could reach PM.
+
+### Added
+- **`e46-qa-spec-defect-status-rule` — write down the rule three careful readers got wrong (backlog E46).** E45 made the `Blocked` framing *reachable*; nothing in any SOP told a QA agent when to use it. `content/skill-qa-engineer.md` gains a `## Contract Defect vs Implementation Failure` H2 stating the decision test directly: if marking `pass` writes a falsehood into the evidence trail **and** marking `fail` blames an implementation doing exactly what a human already approved, the assertion is the defect, not the code → `Blocked`. If only one verdict is dishonest, the spec is still the approved truth → grade normally.
+  - **Cost is stated, so the choice is made on cost rather than instinct**: `FAIL` increments `qa_round` toward its cap; `Blocked` does not. Charging a contract defect to the implementation's round budget can push a chain toward the round-cap lock for a problem the implementation did not cause.
+  - **Anti-abuse guard**: the `Blocked` route requires citing a divergence artifact that is (a) not authored by qa-engineer and (b) predates this QA round. A `qa_reports/visual_<id>.md` `## Allowed Differences` entry is explicitly disqualified — that section is QA's own, written at verification time, so citing it would let QA self-certify the very escape the guard exists to gate.
+  - `contract defect | Blocked | … | pm` added to the Escalation Routes table; pointers added at both Phase 3a/3b Drift bullets so the rule is met at the decision point, not only in the section. The two coverage-gap rows stay `FAIL`, unaffected: their literal is unsourced, so the spec asserts nothing about it and the test's first conjunct is unsatisfiable — closed by construction, not by exception.
+  - `content/skill-qa-visual.md:24`: the pre-existing "contract defect" wording renamed to **"specification ambiguity"**, ending a term collision that routed the same label to `FAIL`; `:64` gains a one-line pointer from Structural Assertions to the new rule. No duplication of the rule text — it lives in one place.
+  - `test/qa-visual-skill-split.test.mjs`: byte cap `15500 → 17900` (file measured at 17512; ~388 bytes headroom, the tighter end of the convention, deliberately — the cap is a context-budget guard, so headroom is exactly the unreviewed growth the next edit can take unnoticed). `test/ac-execution.test.mjs`: AC6's Escalation Routes row-count pin re-scoped `6 → 7` with a comment naming the ticket — re-scoped, not silently renumbered.
+
+### Notes
+- Suite: **1641/1641** green (`node --test test/*.test.mjs`), up 8 from 1633 at v3.94.0.
+- E46's review took 3 rounds (R1 four findings, R2 one half-closed, R3 approved); E45's took 2, with both findings landing in the provenance comment rather than the code. Evidence on disk: `review_reports/review_T-E45-01.md`, `review_reports/review_T-E46-01.md`, `qa_reports/review_T-E45-01.md`, `qa_reports/review_T-E46-01.md`.
+- `npm audit --audit-level=high` reports 11 pre-existing advisories (js-yaml, sharp/libvips via `@xenova/transformers`, protobufjs, fast-uri, ip-address, hono, esbuild). Neither ticket touches `package.json` dependencies or the lockfile, so these are unrelated to this release and waived as pre-existing per Constitution §6; remediating them is dependency work for its own ticket, not something to attempt inside a release.
+- Residue handed on, not silently absorbed: the old "contract defect" meaning still survives in the doc-writer-owned mirrors (`docs/skills/qa-visual.md`, `docs/skills/qa-engineer.md`, `specs/retro-sop-hardening.md`), and the round-accounting asymmetry E46 creates — `Blocked` has no dedicated counter, so the sanctioned `qa → Blocked → pm → qa` cycle is braked only by the coarse feature-scoped `hop` cap — is filed as **E47**.
+
 ## [3.94.0] - 2026-07-27
 
 ### Added
