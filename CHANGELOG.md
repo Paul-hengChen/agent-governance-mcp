@@ -16,6 +16,34 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.96.0] - 2026-08-10
+
+Both tickets fix release-engineer SOP steps that were **unexecutable as written** against the
+shapes this repo actually ships. Neither is a source-code change: `content/skill-release-engineer.md`
+is the only content file in the diff, and `test/release-staging.test.mjs` is its pin. This release
+is also the first run of the changed SOP by a release-engineer following it — the two branches
+below were exercised live during the cut (`<CODES> = {E44, E49, E4X}`, AC4 SKIP branch).
+
+### Changed
+- **`e44-e49-release-sop-conditional-checks` — step 8 AC4 becomes a three-way branch on dispatch shape (backlog E44).** The post-commit sanity check previously required `specs/<active_feature>.md` in the release commit unconditionally, which is unsatisfiable on a mini-chain: when PM/architect are skipped and the backlog row IS the spec, no such file is ever authored, so the check STOPped every mini-chain release on a file that could not exist. It is now exactly one of three named branches, and the release-engineer logs which one fired:
+  - **REQUIRE** — `specs/<active_feature>.md` exists somewhere in the working tree → it MUST appear in `git diff HEAD~1 --name-only`, else hard STOP. Wording is byte-unchanged from the pre-E44 check; this branch is not weakened, and spec-in-tree wins over SKIP even when `scope_decision_why` also records a mini-chain.
+  - **SKIP** — no such file anywhere in the tree AND `scope_decision_why` records a backlog-row-as-spec mini-chain → skip, no STOP, log one line naming the branch. The log line is the point: a skipped check that leaves no trace is indistinguishable from a forgotten one.
+  - **UNCLASSIFIABLE** — neither holds → STOP and route to human rather than guess. The absent third branch is what made the old check silently wrong instead of loudly wrong.
+- **`e44-e49-release-sop-conditional-checks` — step 7a derives `<CODES>` from the working tree, not from committed history (backlog E49).** The archiving step derived a single ticket code from `active_feature` alone, so a release shipping more than one ticket archived only one ticket's evidence. E49's first fix generalized it to a SET read from the commit range — which was itself wrong for the dominant case (F7, caught in code-review round 3): `qa_reports/` evidence is normally still UNTRACKED at step-7a time (step 8's `git add qa_reports/` is what first commits it), so any derivation reading committed adds returns ∅ on exactly the releases that need it. The shipped rule enumerates root-level `qa_reports/` files as they sit in the working tree and uses the previous tag only as a membership predicate:
+  ```
+  find qa_reports -maxdepth 1 -type f | sort \
+    | grep -vxFf <(git ls-tree -r --name-only "$PREV_TAG" -- qa_reports/)
+  ```
+  One predicate now covers both shapes that previously diverged — a file committed at root within the range is absent from `$PREV_TAG`'s tree, and an untracked file is *also* absent from it, since untracked files were never in any historical tree. `find -maxdepth 1` never descends into `archive/`, so the old explicit archive exclusion falls out for free and a retried release cannot re-derive codes from what it already archived. Re-run at each of the last six releases' own step-7a point, the rule reproduces exactly what each actually archived (`{E25,E27,E28,E29,E30,E32,E33,RELSOP}`, `{E34}`, `{E35}`, `{E36}`, `{E37,E38}`, `{E45,E46}`).
+  - The MUST NOT is rescoped from "outside the single `active_feature` prefix" to "not new since `$PREV_TAG`", and the "concurrent in-flight features" premise it used to cite is recorded as **false by construction**: the E1 feature lease admits one non-terminal feature per workspace, so same-release tickets closed sequentially. The MUST NOT still has a real job — bounding *scope*, not guarding against concurrency it was mislabelled for.
+- **`test/release-staging.test.mjs`** (qa-engineer-authored per §2): +461/−34 lines, 41 tests in the file. The three pre-existing AC4 assertion sites are retargeted to the branch structure; new fixtures C–H cover REQUIRE-fires, REQUIRE-passes, SKIP, UNCLASSIFIABLE (empty and non-mini-chain `scope_decision_why`), and REQUIRE-beats-SKIP non-weakening, plus a branch-exhaustiveness pin over every (spec-in-tree × records-mini-chain) combination. For E49: an F7 regression pin reproducing the v3.93.0 untracked-at-root shape, the v3.94.0 two-file shape, the committed-in-range shape, non-retroactivity, the F4 bare-code-prose negative, already-archived re-entry in both rename and untracked-add shapes, and a substring pin that FAILS if the discarded committed-history-only command ever returns to the executable fence.
+
+### Notes
+- Suite **1657/1657** green, up 16 from 1641 at v3.95.0. `npm run build` 0 errors. `npm audit --audit-level=high`: 11 pre-existing advisories, 0 new — no dependency or lockfile change in this release.
+- Chain: mini-chain (backlog rows as spec, PM/architect skipped, `scope_decision: single-feature`) sr-engineer(fable) → code-reviewer **3 rounds** → qa-engineer PASS. Evidence on disk: `review_reports/review_T-E4X-03.md`, `qa_reports/review_T-E44-01.md`, `qa_reports/review_T-E44-02.md`, `qa_reports/review_T-E49-01.md`, `qa_reports/review_T-E4X-03.md`. Round 3 is where F7 was caught — the ∅-returning derivation had survived two rounds because step 7a's zero-match case is a legitimate silent no-op, so ∅-by-design and ∅-by-breakage look identical.
+- **`qa_reports/review_T-E45-01.md` swept into `qa_reports/archive/e46-qa-spec-defect-status-rule/`** (T-E49-02, deliberate one-off): the E45 evidence commit predates the `v3.95.0` tag, so it is inside `$PREV_TAG`'s tree and the E49 rule correctly does NOT pick it up. E49 is not retroactive by design; this orphan was moved by hand instead.
+- Backlog rows filed OPEN, not fixed here: **N3** (step 7a scans only `qa_reports/`, so `review_reports/` evidence is never archived), **N4** (`grep -vxFf` with an empty pattern file passes everything through — reachable on a first release or a mid-life adopter whose `PREV_TAG` predates `qa_reports/`; unreachable on this repo's dense tag history, non-destructive via `mv -n`, and pinned in the suite as current behavior), **N5** (`<(...)` process substitution is bash/zsh-only and fails loudly under `sh -c`), **N6** (the `origin:`/`rationale:` strip passes run on the `prompts/build.ts` path but not on `tools/role.ts`, so `tw_switch_role` returns unstripped SOP text — pre-existing and repo-wide; visible in this release's own diff, which carries raw `<!-- origin:* -->` markers), and **zero-match logging** (step 7a should log the derived `<CODES>` even when empty, so ∅-by-design is distinguishable from ∅-by-breakage — the exact ambiguity that hid F7).
+
 ## [3.95.0] - 2026-08-10
 
 Both tickets in this release are corrections to governance this server enforces on
