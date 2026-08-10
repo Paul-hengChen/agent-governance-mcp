@@ -16,3 +16,4 @@
 {"ts":"2026-07-20T11:30:50.768Z","feature":"e36-handoff-split-overload-adapter","tickets":1,"qa_rounds":0,"review_rounds":0,"visual_rounds":0,"hops":4,"one_pass":true,"released_version":"3.93.0"}
 {"ts":"2026-07-27T05:40:57.554Z","feature":"e38-next-role-lookahead-advisory","tickets":1,"qa_rounds":0,"review_rounds":2,"visual_rounds":0,"hops":9,"one_pass":false,"released_version":"3.94.0"}
 {"ts":"2026-08-10T06:47:46.991Z","feature":"e46-qa-spec-defect-status-rule","tickets":1,"qa_rounds":0,"review_rounds":2,"visual_rounds":0,"hops":9,"one_pass":false,"released_version":"3.95.0"}
+{"ts":"2026-08-10T11:14:44.790Z","feature":"e44-e49-release-sop-conditional-checks","tickets":2,"qa_rounds":0,"review_rounds":2,"visual_rounds":0,"hops":9,"one_pass":false,"released_version":"3.96.0"}

@@ -1,19 +1,19 @@
 ---
 schema_version: 13
-active_feature: "e46-qa-spec-defect-status-rule"
+active_feature: "e44-e49-release-sop-conditional-checks"
 status: "In_Progress"
-last_updated: "2026-08-10T06:47:46.984Z"
+last_updated: "2026-08-10T11:14:44.785Z"
 last_agent: "release-engineer"
 prd_path: "/Users/paul.ph.chen/agent-governance-mcp/docs/backlog.md"
 scope_decision: "single-feature"
-scope_decision_why: "E46, backlog row = spec (mini-chain sr-engineer -> code-reviewer -> qa-engineer, PM/ARCH skipped; E35-E38/E45 pattern). Content-only: give content/skill-qa-engineer.md an explicit WHEN/DO/ELSE rule separating a CONTRACT defect (spec asserts something the human has since approved diverging from -> Blocked, next_role pm, does NOT charge qa_round) from an IMPLEMENTATION failure (-> FAIL, next_role pm, charges qa_round), and add the Blocked + next_role: pm row to its Escalation Routes table alongside the two existing FAIL rows. Human approved in coordinator chat 2026-08-10 (\"做 E46\") after the coordinator described the ticket in full the preceding turn. Coordinator scope call on the ticket's open \"consider whether skill-qa-visual needs the same rule\": the rule lives in ONE place (skill-qa-engineer); skill-qa-visual gets at most a one-line pointer if its sanctioned-divergence flow needs it — no duplication of the rule text, per the no-restatement principle that governs constitution/skill layering. Constitution must NOT be edited: the state machine already supports both statuses (E45 shipped the qa-engineer:Blocked -> pm:In_Progress edge) and skills own role-specific actions. NOTE: this write also clears the stale scope_decision_why from e45-qa-blocked-pm-escape (review note N-2) — that field asserted skill-qa-engineer prescribes Blocked for spec defects, which is exactly the false claim E46 exists to make true."
+scope_decision_why: "E44 + E49 batched (backlog execution order 2026-08-10 order 1: \"Ship with E44 — same file, same class, one edit session\"). Backlog rows ARE the spec -> mini-chain sr-engineer -> code-reviewer -> qa-engineer, PM/ARCH skipped (E35-E38/E45/E46 pattern). Content-only, no source-code change: (T-E44-01) content/skill-release-engineer.md step 8 AC4 becomes conditional — require specs/<active_feature>.md in the release commit WHEN that file exists in the tree (PM/architect chain authored one; absence from the commit stays a hard STOP with the existing wording), SKIP when no such file exists anywhere AND handoff scope_decision_why records a backlog-row-as-spec mini-chain (log one line naming which branch fired), STOP as unclassifiable when neither condition holds; (T-E49-01) step 7a derives the ticket-code SET from git log <prev-tag>..HEAD (the range the SOP already reads for the CHANGELOG) instead of active_feature alone, keeps destination qa_reports/archive/<active_feature>/, retains the MUST NOT for codes outside that range, and records that the original \"concurrent in-flight features\" premise is false by construction under the E1 feature lease; (T-E44-02, qa-engineer per §2 test ownership) retarget the three AC4 assertion sites in test/release-staging.test.mjs (:80, :169-183, :320) and cover the mini-chain skip branch; (T-E49-02, coordinator-direct bookkeeping) one-off sweep of the orphaned qa_reports/review_T-E45-01.md into qa_reports/archive/e46-qa-spec-defect-status-rule/ — the E49 fix is NOT retroactive because the E45 commit predates the v3.95.0 tag. Constitution must NOT be edited (skills own role-specific SOP actions). Human approved the cut inline in coordinator chat 2026-08-10 (\"ok, do it\") after the coordinator presented the full task table, pinned ACs, and the auto-tier non-qualification (P2 > maxPriority P3, 3 files > maxFiles 2)."
 cut_approved: true
 dispatch_pins:
   sr-engineer: "fable"
   release-engineer: "opus"
 evidence_schema: 2
 next_role: "pm"
-dispatched_at: "2026-08-10T06:47:46.984Z"
+dispatched_at: "2026-08-10T11:14:44.785Z"
 qa_round: 0
 review_round: 0
 visual_round: 0
@@ -28,8 +28,10 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- Released v3.95.0
-- tag: 7b49d81
+- Released v3.96.0
+- tag: 27f59e252e713ecc1ced2b1cda56d87079f132aa
+- release-engineer: step 7a derived <CODES> = {E44, E49, E4X} from 4 untracked root-level qa_reports/ files (non-empty — F7 regression did NOT reappear); AC4 fired the SKIP branch (no specs/e44-e49-release-sop-conditional-checks.md anywhere in tree; scope_decision_why records backlog-row-as-spec mini-chain).
+- PM: file as new OPEN backlog rows (release-engineer's Artifact allowlist permits done-marking only, not new rows) — N3: step 7a scans only qa_reports/, so review_reports/ evidence is never archived. N4: grep -vxFf with an empty pattern file passes everything through; reachable on a first release or a mid-life agc adopter whose PREV_TAG predates qa_reports/; unreachable here, non-destructive via mv -n, pinned in the suite as current behavior. N5: <(...) process substitution is bash/zsh-only, fails loudly under sh -c. N6: the origin:/rationale: strip passes run on the prompts/build.ts path but NOT on tools/role.ts, so tw_switch_role returns unstripped SOP text — pre-existing, repo-wide, observed again this session. Zero-match logging: step 7a should log the derived <CODES> even when empty, so empty-by-design is distinguishable from empty-by-breakage — the exact ambiguity that hid F7 through two review rounds.
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.
