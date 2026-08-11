@@ -3,21 +3,18 @@ schema_version: 13
 active_feature: "e50-release-sop-step7a-hardening"
 status: "In_Progress"
 last_updated: "2026-08-11T03:30:51.883Z"
-last_agent: "release-engineer"
+last_agent: "pm"
 prd_path: "/Users/paul.ph.chen/agent-governance-mcp/docs/backlog.md"
 scope_decision: "single-feature"
 scope_decision_why: "E50 (backlog execution order 2026-08-10 post-v3.96.0, order 2). Backlog row IS the spec -> mini-chain sr-engineer -> code-reviewer -> qa-engineer, PM/ARCH skipped (E35-E38/E44-E49 pattern). Four step-7a fixes in content/skill-release-engineer.md:56-64, all from E49's own code review (review_reports/review_T-E4X-03.md rounds 2-3): (a) empty-baseline guard — when PREV_TAG is unset or `git ls-tree -r --name-only \"$PREV_TAG\" -- qa_reports/` returns empty, grep -vxFf passes its whole input through and mass-sweeps every root evidence file into one feature's archive dir; there is no baseline to diff against, so surface and route to human instead of sweeping; (b) zero-match logging — log the derived <CODES> even when empty, so empty-by-design is distinguishable from empty-by-breakage (that ambiguity hid F7 through two review rounds); (c) scan scope — extend to review_reports/ under the same membership predicate; (d) N5 shell portability. Two questions the row left open are PINNED by coordinator decision, do not re-litigate: (c) destination is a parallel review_reports/archive/<active_feature>/, NOT folded into qa_reports/archive/<active_feature>/ — the streams share basenames (review_T-E4X-03.md is in BOTH qa_reports/archive/e44-e49-.../ and review_reports/ in v3.96.0 commit 27f59e2), so one shared dir makes mv -n silently skip the second file, the exact silent-orphan class this ticket kills; (d) state the bash/zsh dependency in one parenthetical rather than rewriting without <(...) — the shell is bash/zsh (verified 6x in E49 review), failure is loud not silent, and reshaping the predicate reopens a derivation that took three rounds to converge. Constitution must NOT be edited. Human approved inline 2026-08-11 (\"ok, do it\"); auto-tier does not apply (P2 > maxPriority P3)."
-cut_approved: true
 dispatch_pins:
   sr-engineer: "fable"
   release-engineer: "opus"
 evidence_schema: 2
-next_role: "pm"
-dispatched_at: "2026-08-11T03:30:51.883Z"
 qa_round: 0
 review_round: 0
 visual_round: 0
-hop_count: 6
+hop_count: 7
 qa_rounds_total: 0
 review_rounds_total: 1
 visual_rounds_total: 0
@@ -28,10 +25,11 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- Released v3.97.0
-- tag: d79e2d9
-- step 7a ran live on its own cut: PREV_TAG=v3.96.0, all four guard flags unset, <CODES> = {E50}, AC4 SKIP branch. Both trees participated; shared basename review_T-E50-02.md landed in BOTH qa_reports/archive/e50-release-sop-step7a-hardening/ and review_reports/archive/e50-release-sop-step7a-hardening/ with nothing dropped.
-- Backlog candidates for PM (NOT filed by release-engineer): (1) release-engineer:Blocked unreachable — tools/transitions.ts:315-321 declares no :Blocked key for this role, so four Blocked rows in the release SOP point at a rejected edge; source fix. (2) N14 fence duplication in step 7a — two copies of the derivation, only the executable one kept honest (E39/E48/E51 shape). (3) N15 — code-extraction regex [a-z_]* prefix wider than the review_/visual_ prefixes that exist. (4) E40 second dated instance (2026-08-11): sr-engineer round-1 write carried completed_tasks on an sr-engineer:In_Progress write; server rejects this for code-reviewer (REVIEWER_COMPLETED_TASKS_REJECTED) but not for the writer role upstream, so E40's fix belongs at the write, not at the PASS.
+- PM intake pass complete (2026-08-11), docs/backlog.md only, nothing implemented, no cut approved, no active_feature change, tasks.md untouched at zero open tasks.
+- Filed E53 (P2, standalone: release-engineer:Blocked unreachable, tools/transitions.ts fix + recommend auditing all roles' :Blocked reachability, not just this one). Filed E54 (P3, bundles N14 fence-dup + N15 regex-width, both content/skill-release-engineer.md step 7a, both cosmetic/non-blocking).
+- Filed E55 (P2): release-engineer structurally cannot self-file findings (2/2 releases now needed a separate PM pass). Recommend option (ii) - explicit post-release PM-intake-pass step in coordinator/release SOP. Rejected (i) allowlist-widen (role-boundary blur) and (iii) gate-on-unfiled-findings (infra ahead of evidence). Cost so far: a round trip, not a lost finding - both instances were caught.
+- Folded second dated instances into existing rows: E40 (sr-engineer completed_tasks prefill during E50; fix sharpened to close at the write, not the PASS) and E52 (v3.97.0 review_rounds:1 for a 2-round feature; now a confirmed pattern, not a single instance).
+- Amended the post-v3.96.0 execution-order table in place (not a new dated table): marked order 2 (E50) shipped v3.97.0; inserted E53 at order 4, E55 at order 7 (batched with E43, same fix-shape precedent), E54 at order 10 (lowest urgency, after T-E50-03's in-flight fence-identity test). E51 (order 3) is next up and needs an architect look before cutting per its own row. No content/tools/gates/tests touched.
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.
