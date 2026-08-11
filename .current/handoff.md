@@ -1,24 +1,25 @@
 ---
 schema_version: 13
-active_feature: "e44-e49-release-sop-conditional-checks"
+active_feature: "e50-release-sop-step7a-hardening"
 status: "In_Progress"
-last_updated: "2026-08-10T11:14:44.785Z"
-last_agent: "pm"
+last_updated: "2026-08-11T03:30:51.883Z"
+last_agent: "release-engineer"
 prd_path: "/Users/paul.ph.chen/agent-governance-mcp/docs/backlog.md"
 scope_decision: "single-feature"
-scope_decision_why: "E44 + E49 batched (backlog execution order 2026-08-10 order 1: \"Ship with E44 — same file, same class, one edit session\"). Backlog rows ARE the spec -> mini-chain sr-engineer -> code-reviewer -> qa-engineer, PM/ARCH skipped (E35-E38/E45/E46 pattern). Content-only, no source-code change: (T-E44-01) content/skill-release-engineer.md step 8 AC4 becomes conditional — require specs/<active_feature>.md in the release commit WHEN that file exists in the tree (PM/architect chain authored one; absence from the commit stays a hard STOP with the existing wording), SKIP when no such file exists anywhere AND handoff scope_decision_why records a backlog-row-as-spec mini-chain (log one line naming which branch fired), STOP as unclassifiable when neither condition holds; (T-E49-01) step 7a derives the ticket-code SET from git log <prev-tag>..HEAD (the range the SOP already reads for the CHANGELOG) instead of active_feature alone, keeps destination qa_reports/archive/<active_feature>/, retains the MUST NOT for codes outside that range, and records that the original \"concurrent in-flight features\" premise is false by construction under the E1 feature lease; (T-E44-02, qa-engineer per §2 test ownership) retarget the three AC4 assertion sites in test/release-staging.test.mjs (:80, :169-183, :320) and cover the mini-chain skip branch; (T-E49-02, coordinator-direct bookkeeping) one-off sweep of the orphaned qa_reports/review_T-E45-01.md into qa_reports/archive/e46-qa-spec-defect-status-rule/ — the E49 fix is NOT retroactive because the E45 commit predates the v3.95.0 tag. Constitution must NOT be edited (skills own role-specific SOP actions). Human approved the cut inline in coordinator chat 2026-08-10 (\"ok, do it\") after the coordinator presented the full task table, pinned ACs, and the auto-tier non-qualification (P2 > maxPriority P3, 3 files > maxFiles 2)."
+scope_decision_why: "E50 (backlog execution order 2026-08-10 post-v3.96.0, order 2). Backlog row IS the spec -> mini-chain sr-engineer -> code-reviewer -> qa-engineer, PM/ARCH skipped (E35-E38/E44-E49 pattern). Four step-7a fixes in content/skill-release-engineer.md:56-64, all from E49's own code review (review_reports/review_T-E4X-03.md rounds 2-3): (a) empty-baseline guard — when PREV_TAG is unset or `git ls-tree -r --name-only \"$PREV_TAG\" -- qa_reports/` returns empty, grep -vxFf passes its whole input through and mass-sweeps every root evidence file into one feature's archive dir; there is no baseline to diff against, so surface and route to human instead of sweeping; (b) zero-match logging — log the derived <CODES> even when empty, so empty-by-design is distinguishable from empty-by-breakage (that ambiguity hid F7 through two review rounds); (c) scan scope — extend to review_reports/ under the same membership predicate; (d) N5 shell portability. Two questions the row left open are PINNED by coordinator decision, do not re-litigate: (c) destination is a parallel review_reports/archive/<active_feature>/, NOT folded into qa_reports/archive/<active_feature>/ — the streams share basenames (review_T-E4X-03.md is in BOTH qa_reports/archive/e44-e49-.../ and review_reports/ in v3.96.0 commit 27f59e2), so one shared dir makes mv -n silently skip the second file, the exact silent-orphan class this ticket kills; (d) state the bash/zsh dependency in one parenthetical rather than rewriting without <(...) — the shell is bash/zsh (verified 6x in E49 review), failure is loud not silent, and reshaping the predicate reopens a derivation that took three rounds to converge. Constitution must NOT be edited. Human approved inline 2026-08-11 (\"ok, do it\"); auto-tier does not apply (P2 > maxPriority P3)."
+cut_approved: true
 dispatch_pins:
   sr-engineer: "fable"
   release-engineer: "opus"
 evidence_schema: 2
 next_role: "pm"
-dispatched_at: "2026-08-10T11:22:58.509Z"
+dispatched_at: "2026-08-11T03:30:51.883Z"
 qa_round: 0
 review_round: 0
 visual_round: 0
-hop_count: 10
+hop_count: 6
 qa_rounds_total: 0
-review_rounds_total: 2
+review_rounds_total: 1
 visual_rounds_total: 0
 ---
 # Handoff State
@@ -27,13 +28,10 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- ⛔ Hop cap reached (hop_count=10/10): next role transition will be rejected (HOP_CAP_EXCEEDED) — only (pm, In_Progress) may land. Halt autonomous dispatch and surface to human; only an active_feature change resets the counter.
-- PM intake complete: filed 3 new OPEN backlog rows for the 6 findings release-engineer surfaced but could not self-file (Artifact allowlist scopes it to done-marking only) — docs/backlog.md.
-- E50 (P2, depends_on E49) bundles N4 (grep -vxFf empty-baseline mass sweep), zero-match logging, N3 (step 7a scans qa_reports/ only, not review_reports/), and N5 (bash-only <(...)) — all four are edits to content/skill-release-engineer.md:56-64, same file/review-round, bundled per PM's cheapest-compliant-path judgment (disagreeing with treating them as 4 separate cuts).
-- E51 (P2) files N6 (origin/rationale strip tags apply on prompts/build.ts but NOT on tools/role.ts's switchRole -- tw_switch_role returns unstripped SOP text; live evidence from 3 subagents this session). Flagged for an architect look before cutting since it crosses two independently-evolved render paths.
-- E52 (P2, new finding, mine -- not in release-engineer's pending_notes) files the review-round undercount: metrics.jsonl recorded review_rounds:2 for this feature but review_reports/review_T-E4X-03.md shows 3 rounds, because review_round only increments on FAIL-shaped writes -- systematically undercounts every feature that ever converges, worst on the most-reviewed ones, exactly the population the E6 retro reads. Recommended fix (ii): correct the metrics-emit value in tools/metrics.ts rather than the live round-cap-gating counter in transitions.ts; leaning against backfilling prior records. Flagged as a genuine judgment call, not a settled recommendation.
-- Execution order table updated at docs/backlog.md (new 2026-08-10 post-v3.96.0 table): order 1 E44+E49 done; 2 E50; 3 E51 (architect look recommended); 4 E39+E48(b); 5 E43; 6 E40; 7 E52; 8 E47 (measure first); 9 E41+E42. Old post-v3.95.0 table retained below for the record per file convention.
-- No cut approved, no tasks.md rows added, no active_feature opened -- awaiting human review/approval of the E50/E51/E52 rows and the reordered execution table before any of them is cut.
+- Released v3.97.0
+- tag: d79e2d9
+- step 7a ran live on its own cut: PREV_TAG=v3.96.0, all four guard flags unset, <CODES> = {E50}, AC4 SKIP branch. Both trees participated; shared basename review_T-E50-02.md landed in BOTH qa_reports/archive/e50-release-sop-step7a-hardening/ and review_reports/archive/e50-release-sop-step7a-hardening/ with nothing dropped.
+- Backlog candidates for PM (NOT filed by release-engineer): (1) release-engineer:Blocked unreachable — tools/transitions.ts:315-321 declares no :Blocked key for this role, so four Blocked rows in the release SOP point at a rejected edge; source fix. (2) N14 fence duplication in step 7a — two copies of the derivation, only the executable one kept honest (E39/E48/E51 shape). (3) N15 — code-extraction regex [a-z_]* prefix wider than the review_/visual_ prefixes that exist. (4) E40 second dated instance (2026-08-11): sr-engineer round-1 write carried completed_tasks on an sr-engineer:In_Progress write; server rejects this for code-reviewer (REVIEWER_COMPLETED_TASKS_REJECTED) but not for the writer role upstream, so E40's fix belongs at the write, not at the PASS.
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.
