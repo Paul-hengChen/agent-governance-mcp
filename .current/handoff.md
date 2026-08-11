@@ -1,12 +1,13 @@
 ---
 schema_version: 13
-active_feature: "e51-skill-render-strip-parity"
-status: "In_Progress"
-last_updated: "2026-08-11T09:36:06.067Z"
-last_agent: "pm"
+active_feature: "e53-blocked-reachability"
+status: "PASS"
+last_updated: "2026-08-11T11:08:12.508Z"
+last_agent: "qa-engineer"
 prd_path: "/Users/paul.ph.chen/agent-governance-mcp/docs/backlog.md"
 scope_decision: "single-feature"
-scope_decision_why: "E51 (backlog order 3, post-v3.96.0 table amended 2026-08-11). Backlog row IS the spec -> mini-chain sr-engineer -> code-reviewer -> qa-engineer, PM/ARCH skipped (E35-E38/E44-E49/E50 pattern). Defect verified in source: prompts/build.ts:391 stripOriginTags(taggedBody) + :397 fullDetail ? rawBody : stripRationale(rawBody); tools/role.ts:94 parseSkillFile(expandPartials(raw,loadFile)) returns body raw at :109, no strip. Both paths already share composeSkill -> expandPartials -> parseSkillFile. FOUR DECISIONS PINNED by coordinator boundary read; do not re-litigate: (1) shared helper in NEW prompts/text-transforms.ts, called by both AFTER parseSkillFile - NOT relocated into composeSkill/expandPartials, which sees frontmatter (build.ts:389: origin fences live in body prose, never YAML) and must not know fullDetail; (2) build.ts must RE-EXPORT stripRationale/stripOriginTags - ~40 call sites in test/context-budget.test.mjs + scripts/measure-context-cost.mjs import them from dist/prompts/build.js and Constitution section 2 bars sr from test logic, so re-export = zero test churn; (3) tools/role.ts gets non-fullDetail semantics (strip both) - tw_switch_role is the dispatch path and the acting agent is exactly who the markers are hidden from; (4) bin/agent-governance-context.mjs is a THIRD unstripped path, OUT OF SCOPE: non-stripping there is deliberate DR-2/DR-3 single-copy design (build.ts:80-82, :105-107), so revisiting it is a separate row. Comments falsified by this change, in scope for T-E51-01: build.ts:81, build.ts:106, tools/role.ts:89-92. AC: (1) no origin/rationale marker in tw_switch_role output for any ROLE_SKILL_MAP role; (2) all 8 test/fixtures/compose-golden/* byte-identical (pure refactor on the build path); (3) both strippers still importable from dist/prompts/build.js; (4) 1633/1633 green + new strip-parity tests; (5) hook untouched. Human approved inline 2026-08-11; auto-tier N/A (P2 over maxPriority P3, 3 files over maxFiles 2)."
+scope_decision_why: "E53 (backlog order 4, P2). Backlog row IS the spec -> mini-chain sr-engineer -> code-reviewer -> qa-engineer, PM/ARCH skipped (E35-E51 pattern). CUT, 4 files: (1) tools/transitions.ts - release-engineer:In_Progress += {release-engineer, Blocked}; NEW key release-engineer:Blocked -> [release-engineer:In_Progress, pm:In_Progress, qa-engineer:In_Progress]; sr-engineer:Blocked += {design-auditor, In_Progress} (gap B, see notes). (2) specs/qa-flow-enforcement-architecture.md - mirror ONLY those three rows; the file's broader drift is E39, explicitly not this cut. (3) content/skill-release-engineer.md - :84 and :159 both assert the edge is unreachable and are falsified by (1); human chose option (b): convert step 7a's empty-baseline STOP into a real Escalation Routes row on the now-reachable edge and delete both workaround notes. Rows :152-157 are byte-pinned by test/release-staging.test.mjs:757 and test/verify-release.test.mjs:701 - do NOT touch them. (4) tests - qa-engineer only (const section 2). AC: (1) release-engineer:In_Progress -> release-engineer:Blocked accepted; (2) release-engineer:Blocked -> each of pm / qa-engineer / release-engineer In_Progress accepted, no longer allowed=[]; (3) sr-engineer:Blocked -> design-auditor:In_Progress accepted; (4) no other previously-rejected edge opened; (5) the three mirror rows match source, remaining drift left to E39; (6) zero remaining \"unreachable\" claims in skill-release-engineer.md, step 7a is a table row, :152-157 unchanged; (7) 1633/1633 green + new edge tests. Human approved inline 2026-08-11 in the coordinator's own chat turn; auto-tier N/A (P2 over maxPriority P3, 4 files over maxFiles 2)."
+cut_approved: true
 dispatch_pins:
   sr-engineer: "fable"
   release-engineer: "opus"
@@ -14,7 +15,7 @@ evidence_schema: 2
 qa_round: 0
 review_round: 0
 visual_round: 0
-hop_count: 5
+hop_count: 3
 qa_rounds_total: 0
 review_rounds_total: 0
 visual_rounds_total: 0
@@ -22,15 +23,13 @@ visual_rounds_total: 0
 # Handoff State
 
 ## Completed
-- (none)
+- [x] T-E53-01
+- [x] T-E53-02
+- [x] T-E53-03
 
 ## Pending & Handoff Notes
-- PM intake pass complete (2026-08-11, post-v3.97.1), docs/backlog.md only: nothing implemented, no cut approved, no active_feature change, tasks.md untouched at zero open tasks. This is the E55-recommended post-release intake step, dispatched deliberately rather than remembered.
-- Filed E56 (P3): governance-text-load-architecture DR-2 misdescribes production after E51 - satisfies its decision (one implementation) but falsifies its premise (one production call-site). Batched into execution order 6 with E39+E48(b) for CONTEXT only, with an explicit warning NOT to point the mirror sync check at it: DR-2 is a dated design record that is supposed to describe the past, so the fix is one amendment paragraph written once, not ongoing machinery.
-- Filed E57 (P2, inserted at execution order 5 - ahead of the doc/mirror tail): five standing HIGH npm advisories (sharp<-libvips CVE-2026-33327/33328/35590, @xenova/transformers<-sharp, fast-uri, ip-address, js-yaml). Every per-release waiver was individually correct (no cut introduced them) but that has been the standing answer for several consecutive releases - the accretion pattern exemptions.count exists to make visible. Deliverable is a decision record per advisory, not necessarily code. js-yaml parses every handoff.md and is still flagged at 4.2.0, so no routine bump clears it; the sharp/@xenova chain is worth a stdio-mode reachability check first, since dropping it would close three of five.
-- Folded the third dated instance into E52 rather than filing new: v3.97.1 emitted review_rounds:0 for a feature with one review round. Three instances now pin the actual mechanism, beyond the earlier off-by-one framing - the counter increments ONLY on a code-reviewer FAIL, so an APPROVED round is never counted at all. A clean one-pass feature always reports zero, making 'needed least review' and 'got none' indistinguishable. Strengthens option (ii) and narrows the open architect question to one thing: does anything read the emitted value as the live gate counter?
-- NOT filed, deliberately: the mid-session node_modules prune (js-yaml missing, npm ls empty, package.json/lock unchanged in git, repaired with npm ci). One unexplained environment event with no reproduction does not warrant a ticket - the same 'infra ahead of evidence' reasoning E55 used to reject its own option (iii). Recorded inside E57's row so a second occurrence has a first data point to join.
-- Next up: E53 (order 4, P2) - release-engineer:Blocked unreachable in ALLOWED_TRANSITIONS, plus the recommended audit of every other role's :Blocked reachability in the same pass. Does not clear auto-tier (P2), so its cut needs a human nod.
+- QA: T-E53-01/02/03 PASS. Full review: qa_reports/review_T-E53-01.md (covers: T-E53-01, T-E53-02, T-E53-03). All 7 ACs verified independently; suite 1690/1690; build clean; audit unchanged (E57 pre-existing). Ready for release-engineer.
+- FOR COORDINATOR: file finding C1 as its own backlog ticket (not fixed here, out of E53's pinned scope) - content/skill-pm.md:28 stamps next_role="design-auditor" on a pm Blocked write but pm:Blocked lacks that edge (allowed=[pm:In_Progress, pm:Blocked] only). Identical defect shape to gap B (sr-engineer), which this cut fixed; pm was left inconsistent. 2-hop workaround exists (pm:Blocked -> pm:In_Progress -> design-auditor:In_Progress) so not urgent, but a coordinator honoring next_role literally hits TRANSITION_REJECTED.
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.
