@@ -3,8 +3,7 @@ export declare function composeConstitution(opts: {
     chain: boolean;
     design: boolean;
 }, workspacePath?: string): string;
-export declare function stripRationale(text: string): string;
-export declare function stripOriginTags(text: string): string;
+export { stripRationale, stripOriginTags } from "./text-transforms.js";
 export type WorkspaceSource = "workspace_path arg" | "CLAUDE_PROJECT_DIR env" | "cwd fallback";
 export type PromptResult = {
     description: string;

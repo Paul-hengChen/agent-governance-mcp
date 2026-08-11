@@ -16,6 +16,33 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.97.1] - 2026-08-11
+
+The first of the three governance-text render paths to be fixed rather than documented. `stripOriginTags`
+/ `stripRationale` ran on exactly one of the two paths that deliver a role SOP to an agent — and not the
+one most dispatch actually uses. Source diff is three files (`prompts/text-transforms.ts` new,
+`prompts/build.ts` +18/−57, `tools/role.ts` +12/−1) plus its pin (`test/skill-manifest.test.mjs`
++181/−1, 8 new tests). `<CODES> = {E51}`, AC4 SKIP branch (backlog-row-as-spec mini-chain).
+
+Bump kind is PATCH under this file's own policy read as written — a bug fix — though note E51 does
+change observable output on the `tw_switch_role` path (that is the fix), so the policy's PATCH clause
+is being read with "no observable behavior change" qualifying *internal refactors* rather than *bug
+fixes*. Recorded here rather than settled silently.
+
+### Fixed
+- **`e51-skill-render-strip-parity` — the strip passes now run on BOTH skill-render paths (backlog E51).** `prompts/build.ts` applied `stripOriginTags` (always) and `stripRationale` (unless `fullDetail`); `tools/role.ts`'s `switchRole` — the handler behind `tw_switch_role`, and the path every role dispatch in this repo and every agc-managed workspace is routed through when the Task tool is unavailable — applied neither. Every role SOP delivered that way carried raw `<!-- origin:… -->` / `<!-- rationale:… -->` markers verbatim to the acting agent: the one reader the fence convention exists to keep them away from. Pre-existing and repo-wide, not introduced by v3.96.0/v3.97.0, but with a live cost — E49's backlog row and E50's sr-engineer both used the rationale convention on the assumption the tags are invisible to the acting agent, which was true on one path and false on the other.
+- The fix is a shared pass, not a second copy: both strippers moved **verbatim** (verified byte-identical to their prior definitions by extract-and-compare, not by diff reading) into a new zero-dependency leaf module `prompts/text-transforms.ts`, alongside `applyTextTransforms(text, { fullDetail })` that holds the canonical order — origin always, rationale unless `fullDetail` — in one place. `prompts/build.ts` re-exports both names unchanged, so the ~40 call sites in `test/context-budget.test.mjs` and `scripts/measure-context-cost.mjs` that import them from `dist/prompts/build.js` needed zero edits, and `dist/prompts/build.d.ts` keeps its declaration surface.
+- `switchRole` passes `fullDetail: false` (it is a dispatch path; no authoring mode exists there) and strips the **body only** — the pass runs downstream of `parseSkillFile`, so YAML frontmatter and the `recommended_model` hint are never in scope. A whole-file `.current/` override is now stripped too, which is deliberate parity with the `buildPromptForRole` path rather than a new behavior.
+
+### Changed
+- Corrected three source comments the fix falsified: `prompts/build.ts`'s two "only `buildPromptForRole` calls it" claims (governance-text-load-architecture DR-2) and `tools/role.ts`'s "does NOT flow through `buildPromptForRole`" note, which now explains the strip parity as well as the partial expansion.
+
+### Notes
+- **Restart the MCP server to observe the fix.** A running server holds `dist/tools/role.js` from process start, so `tw_switch_role` replies in an already-open session keep showing the old unstripped text after the rebuild. Verified against the rebuilt `dist/`; a manual in-session spot-check against a stale server reports a false negative.
+- Suite 1677/1677 (1669 + 8). All 8 `test/fixtures/compose-golden/*` fixtures are byte-identical on disk — **nothing was rebaselined**, which is the evidence that the `buildPromptForRole` path is a genuine no-op refactor. Two of the new tests earn their place beyond the obvious: `t-e51-witness-fences-exist-in-source` fails if the fences are ever deleted from `content/` instead of stripped at render time (which would make the marker-free assertion pass on empty input), and `t-e51-build-reexport-surface` asserts `===` identity between the two modules' exports, so a re-introduced copy fails rather than silently drifting.
+- **A third render path remains unstripped, deliberately.** `bin/agent-governance-context.mjs` composes constitution + coordinator-lite skill and applies neither pass. That is a standing decision (governance-text-load-architecture DR-2/DR-4), not an oversight, and it was left out of E51's scope rather than re-litigated inside a 3-file cut — now pinned by `t-e51-hook-remains-non-caller`, which names the DR and tells whoever changes it to retire the test on purpose. DR-2's prose is itself now stale (it still says the single copy lives in `prompts/build.ts` and that stripping is needed at one production call-site); left unamended because these `specs/*-architecture.md` files are dated design records, not header-sync mirrors — same drift class as backlog E39/E48.
+- `npm audit` reports 5 HIGH / 0 CRITICAL (`sharp` ← libvips CVE-2026-33327/33328/35590, `@xenova/transformers` ← `sharp`, `fast-uri`, `ip-address`, `js-yaml`), all pre-existing and orthogonal: no dependency file changed in this release. Waived per Constitution §6 with that rationale. `js-yaml` 4.2.0 is still flagged, so a routine bump will not clear it.
+
 ## [3.97.0] - 2026-08-11
 
 Third consecutive release-SOP hardening cut, and the third rewrite of step 7a in three days. Like

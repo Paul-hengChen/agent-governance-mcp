@@ -5,6 +5,7 @@ import * as path from "path";
 import { fileURLToPath } from "url";
 import { parseSkillFile } from "./skill-frontmatter.js";
 import { expandPartials } from "../prompts/partials-manifest.js";
+import { applyTextTransforms } from "../prompts/text-transforms.js";
 import { composeSkill, hostCapabilitiesFor, SKILL_SEGMENTS, } from "../prompts/skill-manifest.js";
 import { loadConfig } from "./config.js";
 const __filename = fileURLToPath(import.meta.url);
@@ -60,7 +61,17 @@ export function switchRole(role, workspacePath) {
     // this call tw_switch_role would leak raw {{PARTIAL:…}} tokens for every
     // partial-adopting role. The loader mirrors the skill override resolution
     // above (workspace .current/ override > server content/ default).
-    const { frontmatter, body } = parseSkillFile(expandPartials(raw, loadFile));
+    const { frontmatter, body: taggedBody } = parseSkillFile(expandPartials(raw, loadFile));
+    // Same second-path reasoning as the partial expansion above, for the strip
+    // passes (ticket E51): buildPromptForRole applied stripOriginTags/stripRationale
+    // and switchRole applied neither, so every SOP delivered through tw_switch_role
+    // leaked raw <!-- origin:… --> / <!-- rationale:… --> markers to the acting
+    // agent — the reader those fences exist to keep them away from. Shared pass,
+    // one implementation: prompts/text-transforms.ts. fullDetail: false because
+    // tw_switch_role IS a dispatch (no full-detail/authoring mode exists here), and
+    // the BODY only — frontmatter is parsed off above, and recommended_model is read
+    // from it below.
+    const body = applyTextTransforms(taggedBody, { fullDetail: false });
     let instruction = `Context-loading only: the server is returning the "${role}" SOP for you to follow. ` +
         `No server-side role enforcement exists — other tw_* tools remain callable regardless. ` +
         `Follow the SOP below exclusively until the task is complete or you switch roles again.`;

@@ -50,6 +50,26 @@ const {
 const { buildPromptForRole } = await import(path.join(ROOT, "dist", "prompts", "build.js"));
 const { switchRole } = await import(path.join(ROOT, "dist", "tools", "role.js"));
 const { setActiveStorage, FileHandoffStorage } = await import(path.join(ROOT, "dist", "tools", "storage.js"));
+// E51 (T-E51-03): the shared strip pass, plus the two stages switchRole runs it
+// after — needed to prove parity rather than re-implement the pipeline here.
+const { applyTextTransforms } = await import(path.join(ROOT, "dist", "prompts", "text-transforms.js"));
+const { parseSkillFile } = await import(path.join(ROOT, "dist", "tools", "skill-frontmatter.js"));
+const { expandPartials } = await import(path.join(ROOT, "dist", "prompts", "partials-manifest.js"));
+
+// The 9 keys of ROLE_SKILL_MAP (tools/role.ts) — every role tw_switch_role can
+// reach. NOT 10: `teamwork` / `teamwork-lite` are prompt ids served by
+// prompts/build.ts, not switchRole roles.
+const ALL_SWITCHROLE_ROLES = [
+  "pm",
+  "researcher",
+  "design-auditor",
+  "sr-engineer",
+  "code-reviewer",
+  "qa-engineer",
+  "architect",
+  "doc-writer",
+  "release-engineer",
+];
 
 function readContent(f) {
   return fs.readFileSync(path.join(CONTENT_DIR, f), "utf-8");
@@ -266,10 +286,170 @@ test("t-switchRole-unsplit-host-independent: switchRole(\"sr-engineer\", ws) ret
 
 test("t-switchRole-does-not-throw: switchRole succeeds for every ROLE_SKILL_MAP role on a workspace with no config at all (AC3 default path, no crash)", () => {
   const ws = mkWorkspace();
-  for (const role of ["pm", "researcher", "design-auditor", "sr-engineer", "code-reviewer", "qa-engineer", "architect", "doc-writer", "release-engineer"]) {
+  for (const role of ALL_SWITCHROLE_ROLES) {
     const resp = JSON.parse(switchRole(role, ws));
     assert.ok(!resp.error, `switchRole("${role}") must not error on a config-less workspace: ${resp.error}`);
     assert.ok(resp.sop && resp.sop.length > 0, `switchRole("${role}") must return non-empty sop text`);
   }
   fs.rmSync(ws, { recursive: true, force: true });
+});
+
+// ---------------------------------------------------------------------------
+// E51 — strip parity across BOTH skill-render paths (T-E51-03).
+//
+// The defect: stripOriginTags/stripRationale ran on the prompts/build.ts path
+// only. tools/role.ts switchRole — the path tw_switch_role dispatch actually
+// uses, and the busier of the two — applied neither, so every role SOP handed to
+// an acting agent carried raw <!-- origin:… --> / <!-- rationale:… --> markers
+// that the fence convention exists to keep away from that exact reader.
+//
+// Spec-to-Test map (ACs from the E51 cut, docs/backlog.md row E51):
+//   AC1 (no marker in switchRole output, every role)  -> t-e51-switchRole-marker-free,
+//                                                        t-e51-witness-fences-exist-in-source
+//   AC2 (compose-golden fixtures byte-identical)      -> t-golden-byte-identity above +
+//                                                        test/compose-equivalence.test.mjs
+//                                                        (assert-not-rebaseline: a differing
+//                                                        fixture is a FAIL, never regenerated)
+//   AC3 (strippers still importable from build.js)    -> t-e51-build-reexport-surface
+//   AC5 (hook path deliberately untouched)            -> t-e51-hook-remains-non-caller
+//   shared-pass contract (fullDetail semantics)       -> t-e51-applyTextTransforms-contract
+//   body-only, frontmatter intact                     -> t-e51-frontmatter-survives-strip
+//   whole-file override also stripped                 -> t-e51-override-is-stripped
+// ---------------------------------------------------------------------------
+
+const ORIGIN_MARKER = "<!-- origin:";
+const RATIONALE_MARKER = "<!-- rationale:";
+
+// WHY a witness test guards AC1: "output contains no marker" passes trivially if
+// the markers were deleted from content/ instead of stripped at render time.
+// This pins that the fences still EXIST in source, so t-e51-switchRole-marker-free
+// is measuring the strip pass rather than an empty input.
+test("t-e51-witness-fences-exist-in-source: at least one switchRole-reachable skill file still carries raw origin/rationale fences on disk", () => {
+  const withFences = ALL_SWITCHROLE_ROLES
+    .map((role) => `skill-${role}.md`)
+    .filter((f) => {
+      const raw = readContent(f);
+      return raw.includes(ORIGIN_MARKER) || raw.includes(RATIONALE_MARKER);
+    });
+  assert.ok(
+    withFences.length > 0,
+    "no skill file carries origin/rationale fences any more — t-e51-switchRole-marker-free would be vacuous; re-derive that test against real fenced input",
+  );
+});
+
+test("t-e51-switchRole-marker-free: switchRole sop carries zero origin/rationale markers for every ROLE_SKILL_MAP role", () => {
+  const ws = mkWorkspace();
+  for (const role of ALL_SWITCHROLE_ROLES) {
+    const { sop } = JSON.parse(switchRole(role, ws));
+    assert.ok(
+      !sop.includes(ORIGIN_MARKER),
+      `switchRole("${role}") leaked an origin marker — the acting agent must never see maintainer provenance fences`,
+    );
+    assert.ok(
+      !sop.includes(RATIONALE_MARKER),
+      `switchRole("${role}") leaked a rationale marker — tw_switch_role is a dispatch path and strips rationale like buildPromptForRole does`,
+    );
+  }
+  fs.rmSync(ws, { recursive: true, force: true });
+});
+
+// WHY: parity means the SAME implementation, not two functions that happen to
+// agree today. Recomputing the expected text through the strippers imported from
+// dist/prompts/build.js and asserting byte-equality would pass even if role.ts
+// held a private copy — so this asserts equality against the SHARED pass, and
+// t-e51-build-reexport-surface pins that build.js's names resolve to that same
+// module.
+test("t-e51-switchRole-uses-the-shared-pass: sop is byte-identical to applyTextTransforms(body, {fullDetail:false}) over the same composed input", () => {
+  const ws = mkWorkspace();
+  for (const role of ALL_SWITCHROLE_ROLES) {
+    const skillFile = `skill-${role}.md`;
+    const loadFile = (f) => readContent(f);
+    const composed = composeSkill(skillFile, hostCapabilitiesFor(undefined), loadFile, () => false);
+    const { body } = parseSkillFile(expandPartials(composed, loadFile));
+    const expected = applyTextTransforms(body, { fullDetail: false });
+    const { sop } = JSON.parse(switchRole(role, ws));
+    assert.equal(sop, expected, `switchRole("${role}") must render through the shared text-transform pass, byte-for-byte`);
+  }
+  fs.rmSync(ws, { recursive: true, force: true });
+});
+
+// WHY: the E51 cut mandated a re-export rather than a moved export, because ~40
+// call sites in test/context-budget.test.mjs and scripts/measure-context-cost.mjs
+// import both names from dist/prompts/build.js. This pins that public surface so a
+// future tidy-up cannot quietly break every token-budget test at once.
+test("t-e51-build-reexport-surface: stripRationale/stripOriginTags remain importable from build.js and are the same functions text-transforms.js exports", async () => {
+  const fromBuild = await import(path.join(ROOT, "dist", "prompts", "build.js"));
+  const fromModule = await import(path.join(ROOT, "dist", "prompts", "text-transforms.js"));
+  assert.equal(typeof fromBuild.stripRationale, "function", "build.js must still export stripRationale");
+  assert.equal(typeof fromBuild.stripOriginTags, "function", "build.js must still export stripOriginTags");
+  assert.equal(fromBuild.stripRationale, fromModule.stripRationale, "build.js's stripRationale must BE text-transforms.js's — a copy would reintroduce the drift E51 closed");
+  assert.equal(fromBuild.stripOriginTags, fromModule.stripOriginTags, "build.js's stripOriginTags must BE text-transforms.js's — a copy would reintroduce the drift E51 closed");
+});
+
+// WHY: fullDetail is the one knob that must survive relocation — buildPromptForRole
+// still needs a full-detail mode that keeps rationale prose, while origin fences
+// are stripped unconditionally at every detail level.
+test("t-e51-applyTextTransforms-contract: origin stripped always, rationale only when fullDetail is false; idempotent; no-marker passthrough", () => {
+  const text = [
+    "Rule text<!-- origin:start --> (v9.9.9)<!-- origin:end --> continues.",
+    "<!-- rationale:start -->Reason: war story.<!-- rationale:end -->",
+    "Trailing rule.",
+  ].join("\n");
+
+  const dispatch = applyTextTransforms(text, { fullDetail: false });
+  assert.ok(!dispatch.includes(ORIGIN_MARKER) && !dispatch.includes("(v9.9.9)"), "dispatch mode strips origin spans and their content");
+  assert.ok(!dispatch.includes(RATIONALE_MARKER) && !dispatch.includes("war story"), "dispatch mode strips rationale blocks");
+  assert.ok(dispatch.includes("Rule text") && dispatch.includes("Trailing rule."), "no operative rule text may be lost");
+
+  const full = applyTextTransforms(text, { fullDetail: true });
+  assert.ok(!full.includes(ORIGIN_MARKER) && !full.includes("(v9.9.9)"), "origin spans are stripped at EVERY detail level");
+  assert.ok(full.includes("war story"), "fullDetail must retain rationale prose");
+
+  assert.equal(applyTextTransforms(dispatch, { fullDetail: false }), dispatch, "must be idempotent");
+  const plain = "No markers here.\nJust text.\n";
+  assert.equal(applyTextTransforms(plain, { fullDetail: false }), plain, "no-marker input must pass through unchanged (safety default)");
+});
+
+// WHY: the pass runs AFTER parseSkillFile, on the body only. If it ever ran over
+// the whole file, YAML frontmatter would be in scope and recommended_model — the
+// model hint the coordinator honours — could be corrupted by a fence in prose.
+test("t-e51-frontmatter-survives-strip: switchRole still surfaces recommended_model on a marker-stripped role", () => {
+  const ws = mkWorkspace();
+  const resp = JSON.parse(switchRole("sr-engineer", ws));
+  assert.ok(resp.recommended_model, "recommended_model must survive the strip pass — frontmatter is parsed off before it runs");
+  assert.ok(!resp.sop.includes("---\n"), "frontmatter must not reappear in the sop body");
+  assert.ok(!resp.sop.includes(ORIGIN_MARKER), "and the body must still be marker-free");
+  fs.rmSync(ws, { recursive: true, force: true });
+});
+
+// WHY: composeSkill returns a whole-file `.current/` override verbatim, and the
+// strip pass now runs downstream of it — so overrides are stripped too. That is
+// deliberate parity with buildPromptForRole (which has always stripped
+// overrides), documented here so the behaviour is not mistaken for a leak later.
+test("t-e51-override-is-stripped: a workspace whole-file override carrying fences is delivered marker-free via switchRole", () => {
+  const ws = mkWorkspace();
+  fs.writeFileSync(
+    path.join(ws, ".current", "skill-pm.md"),
+    "# Skill: pm\n\nOverride rule<!-- origin:start --> (vX)<!-- origin:end -->.\n<!-- rationale:start -->Reason: because.<!-- rationale:end -->\nTail.\n",
+  );
+  const { sop } = JSON.parse(switchRole("pm", ws));
+  assert.match(sop, /Override rule/, "override text must still be used");
+  assert.ok(!sop.includes(ORIGIN_MARKER) && !sop.includes("(vX)"), "override origin fences are stripped, same as on the buildPromptForRole path");
+  assert.ok(!sop.includes(RATIONALE_MARKER) && !sop.includes("because"), "override rationale fences are stripped too");
+  fs.rmSync(ws, { recursive: true, force: true });
+});
+
+// WHY: the E51 cut deliberately left bin/agent-governance-context.mjs as a
+// non-caller (governance-text-load-architecture DR-2/DR-4). This pins that
+// boundary so a future "obvious" tidy-up has to read the DR and decide on
+// purpose, rather than widening E51's scope by accident. Delete this test as part
+// of whichever ticket decides the hook SHOULD strip.
+test("t-e51-hook-remains-non-caller: the SessionStart hook does not import or call the strip passes", () => {
+  const hook = fs.readFileSync(path.join(ROOT, "bin", "agent-governance-context.mjs"), "utf-8");
+  for (const name of ["applyTextTransforms", "stripOriginTags", "stripRationale"]) {
+    assert.ok(
+      !hook.includes(name),
+      `bin/agent-governance-context.mjs references ${name} — that is a deliberate non-caller per DR-2/DR-4; if this changed on purpose, retire this test in that ticket`,
+    );
+  }
 });

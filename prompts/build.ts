@@ -26,6 +26,7 @@ import { CONSTITUTION_SEGMENTS, includeSegment } from "./constitution-manifest.j
 import { composeSkill, hostCapabilitiesFor } from "./skill-manifest.js";
 import { loadConfig } from "../tools/config.js";
 import { expandPartials } from "./partials-manifest.js";
+import { applyTextTransforms } from "./text-transforms.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -71,46 +72,20 @@ export function composeConstitution(
     .join("");
 }
 
-// Remove every <!-- rationale:start --> … <!-- rationale:end --> block (markers
-// inclusive) and collapse blank lines left behind. Idempotent; text with no
-// markers is returned unchanged (full-detail safety default). Rationale blocks
-// carry only "why" prose (war-story / Reason: paragraphs) that onboards humans
-// and forms audit trail — never a rule a role acts on — so stripping them for
-// chain-role dispatch trims per-dispatch budget without dropping enforcement.
-// Single-copy by design (see governance-text-load-architecture DR-2, v3.31.0):
-// only buildPromptForRole calls it; NOT duplicated in the hook or measure script
-// as a load-bearing copy, so DR-3's 3-copy parity rule does not apply here.
-export function stripRationale(text: string): string {
-  return text
-    .replace(/<!-- rationale:start -->[\s\S]*?<!-- rationale:end -->\n?/g, "")
-    .replace(/[ \t]+\n/g, "\n") // trim trailing spaces left by an inline strip
-    .replace(/\n{3,}/g, "\n\n");
-}
-
-// Remove every <!-- origin:start --> … <!-- origin:end --> span (markers
-// inclusive) and clean up whitespace left behind. Idempotent; text with no
-// markers is returned unchanged (safety default). Origin spans carry only
-// maintainer provenance — version stamps ("(v3.26.0)"), backlog/finding codes
-// ("(R10)", "A1"), retrospective pointers — never a rule any role acts on, so
-// stripping them trims per-dispatch budget at EVERY detail level: applied
-// unconditionally in buildPromptForRole over the composed constitution, FIRST,
-// before the fullDetail-gated stripRationale pass (compose-not-strip pipeline:
-// compose → stripOriginTags → stripRationale unless fullDetail). Unlike
-// rationale fences, origin fences are INLINE (mid-sentence / end-of-heading),
-// so the regex deliberately does NOT consume a trailing newline — doing so
-// would join a fenced heading with the line below it. Origin fences never
-// straddle a rationale boundary or a fragment seam (they may nest inside a
-// rationale span), so the two strippers compose order-independently, and its
-// \n{3,} collapse also normalizes any blank-run left at a fragment seam.
-// Single-copy by design (governance-text-load-architecture DR-2, same as
-// stripRationale): only buildPromptForRole calls it; NOT duplicated into
-// bin/agent-governance-context.mjs.
-export function stripOriginTags(text: string): string {
-  return text
-    .replace(/<!-- origin:start -->[\s\S]*?<!-- origin:end -->/g, "")
-    .replace(/[ \t]+\n/g, "\n") // trim trailing spaces left by an inline strip
-    .replace(/\n{3,}/g, "\n\n");
-}
+// Both strip passes and their canonical order now live in ./text-transforms.ts
+// (ticket E51) because buildPromptForRole is not the only skill-render path —
+// tools/role.ts `switchRole` renders the SAME skill text for tw_switch_role and
+// applies the same passes through applyTextTransforms. The pre-E51
+// "single-copy by design: only buildPromptForRole calls it"
+// (governance-text-load-architecture DR-2, v3.31.0) still holds in the sense
+// that matters — there is exactly ONE implementation, now shared rather than
+// private — and DR-3's 3-copy parity rule still does not apply, since
+// bin/agent-governance-context.mjs remains a deliberate non-caller.
+//
+// Re-exported verbatim: tests (test/context-budget.test.mjs) and
+// scripts/measure-context-cost.mjs import both names from dist/prompts/build.js,
+// and that public surface is preserved unchanged.
+export { stripRationale, stripOriginTags } from "./text-transforms.js";
 
 // The lite coordinator skill marks a server-read-only, no-chain context.
 const LITE_SKILL_FILE = "skill-coordinator-lite.md";
@@ -359,8 +334,7 @@ export function buildPromptForRole(
       { chain: !isLite, design: isDesignFeature },
       workspacePath,
     );
-    const originClean = stripOriginTags(assembled);
-    constitution = fullDetail ? originClean : stripRationale(originClean);
+    constitution = applyTextTransforms(assembled, { fullDetail });
   }
   // Host-capability axis (ticket D6): the skill text is composed from its
   // fragment registry (prompts/skill-manifest.ts) filtered by the workspace's
@@ -386,15 +360,14 @@ export function buildPromptForRole(
   // lines (AC2). tools/role.ts switchRole() is the mirror call site.
   const expandedSkill = expandPartials(rawSkill, (f) => loadContent(f, workspacePath));
   const { frontmatter, body: taggedBody } = parseSkillFile(expandedSkill);
-  // Same unconditional origin-tag strip as the constitution above (frontmatter
-  // is parsed off first — origin fences live in body prose, never in YAML).
-  const rawBody = stripOriginTags(taggedBody);
-  // Chain-role skill dispatch strips verbose rationale unless fullDetail is set
-  // (DR-5, v3.31.0). Default false = strip on every buildPromptForRole dispatch,
-  // including the full teamwork coordinator — lossless because the fences hold no
-  // rule text (no-marker passthrough on un-fenced files). The constitution is
-  // ALSO rationale-stripped above (T-GTL-07), gated on the same fullDetail flag.
-  const skill = fullDetail ? rawBody : stripRationale(rawBody);
+  // Same transform pass as the constitution above: unconditional origin strip,
+  // then rationale strip unless fullDetail (DR-5, v3.31.0). Frontmatter is parsed
+  // off first — origin fences live in body prose, never in YAML. Default
+  // fullDetail=false = strip on every buildPromptForRole dispatch, including the
+  // full teamwork coordinator — lossless because the fences hold no rule text
+  // (no-marker passthrough on un-fenced files). tools/role.ts switchRole() is the
+  // mirror call site (E51), passing fullDetail: false.
+  const skill = applyTextTransforms(taggedBody, { fullDetail });
 
   // Fail-loud footer (C6 DR-3): the old single silent "Fresh project" line
   // collapsed three distinct situations. Split them:
