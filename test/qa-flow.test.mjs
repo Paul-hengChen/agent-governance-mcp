@@ -1744,13 +1744,21 @@ test("T-MATRIX-C13: release-engineer:In_Progress → pm:In_Progress accepted", (
 // ---------- T-MATRIX-C13(c): rejected edge + wedge-regression guard ----------
 
 test("T-MATRIX-C13: release-engineer:In_Progress → sr-engineer:In_Progress REJECTED with non-empty allowed set", () => {
-  // WHY: release-engineer's SOP hands back to pm ONLY (AC2) — it does not
-  // route to sr-engineer, researcher, architect, or qa-engineer directly.
-  // Critically, the allowed set must be NON-EMPTY: an empty allowed set from
-  // a reachable (release-engineer, In_Progress) tuple is exactly the wedge
-  // this ticket fixes (mirrors T-MATRIX-A5(d)'s prior-wedge regression for
-  // release-engineer:PASS). A regression that dropped the new row entirely
-  // would make ALLOWED.get(...) return undefined -> allowed=[] here.
+  // WHY: release-engineer's SOP hands back to pm ONLY as its role-changing
+  // successor (AC2) — it does not route to sr-engineer, researcher,
+  // architect, or qa-engineer directly. Critically, the allowed set must be
+  // NON-EMPTY: an empty allowed set from a reachable (release-engineer,
+  // In_Progress) tuple is exactly the wedge this ticket fixes (mirrors
+  // T-MATRIX-A5(d)'s prior-wedge regression for release-engineer:PASS). A
+  // regression that dropped the new row entirely would make ALLOWED.get(...)
+  // return undefined -> allowed=[] here.
+  //
+  // v3.98.0 (E53) retarget: the exact shape below is STALE, not the guard —
+  // E53 opened release-engineer:In_Progress -> release-engineer:Blocked (the
+  // entry edge into the newly-reachable Blocked state), so this row now has
+  // TWO successors, not one. The wedge-regression assertions above (non-empty,
+  // no sr-engineer leak) are untouched and still catch a real wedge; only the
+  // frozen exact-shape pin below needed updating to the new intended shape.
   const r = validateTransition({
     prev: { agent: "release-engineer", status: "In_Progress" },
     next: { agent: "sr-engineer", status: "In_Progress" },
@@ -1766,8 +1774,11 @@ test("T-MATRIX-C13: release-engineer:In_Progress → sr-engineer:In_Progress REJ
   );
   assert.deepEqual(
     r.allowed,
-    [{ new_agent: "pm", new_status: "In_Progress" }],
-    "allowed set must be exactly {pm, In_Progress} per AC2 — no other successor",
+    [
+      { new_agent: "pm", new_status: "In_Progress" },
+      { new_agent: "release-engineer", new_status: "Blocked" },
+    ],
+    "allowed set must be exactly {pm:In_Progress, release-engineer:Blocked} per E53 AC1 — no other successor",
   );
 });
 
@@ -1797,6 +1808,11 @@ test("T-MATRIX-C13: release-engineer:In_Progress row is present in ALLOWED_TRANS
   // EVERY next tuple — a tuple with zero outbound edges is exactly what
   // wedged the chain in the incident. This test encodes that the key must
   // exist AND carry at least one target.
+  //
+  // v3.98.0 (E53) retarget: the frozen exact shape below is stale, not the
+  // guard — see the sibling test above at the same line-shape. E53 appended
+  // release-engineer:Blocked as this row's second successor (the entry edge
+  // AC1 opens); researcher/architect/self are still correctly absent.
   assert.ok(
     ALLOWED_TRANSITIONS.has("release-engineer:In_Progress"),
     "ALLOWED_TRANSITIONS must have a 'release-engineer:In_Progress' key (absent before C13 — the wedge)",
@@ -1805,8 +1821,11 @@ test("T-MATRIX-C13: release-engineer:In_Progress row is present in ALLOWED_TRANS
   assert.ok(row && row.length > 0, "release-engineer:In_Progress row must have at least one allowed target");
   assert.deepEqual(
     row,
-    [{ agent: "pm", status: "In_Progress" }],
-    "row must be exactly [{pm, In_Progress}] per AC2 — no researcher/architect/self successor",
+    [
+      { agent: "pm", status: "In_Progress" },
+      { agent: "release-engineer", status: "Blocked" },
+    ],
+    "row must be exactly [{pm, In_Progress}, {release-engineer, Blocked}] per E53 AC1 — no researcher/architect/self-loop successor beyond the new Blocked edge",
   );
 });
 
@@ -2192,4 +2211,282 @@ test("T-E45-01/E38: qa-engineer:Blocked write with an unreachable next_role STIL
   assert.match(warning, /sr-engineer:In_Progress/, "remedy must name sr-engineer:In_Progress");
   assert.match(warning, /qa-engineer:In_Progress/, "remedy must name qa-engineer:In_Progress");
   assert.match(warning, /pm:In_Progress/, "remedy must name pm:In_Progress (the E45 edge)");
+});
+
+// ============================================================================
+// T-E53-03 — release-engineer:Blocked reachability + sr-engineer gap B (v3.98.0, E53)
+// ============================================================================
+// WHY: before this cut, release-engineer:Blocked was UNREACHABLE — no edge
+// into it existed at all (release-engineer:In_Progress admitted only
+// pm:In_Progress), even though content/skill-release-engineer.md's step 7a
+// empty-baseline guard and six Escalation Routes rows all instruct the role
+// to halt via exactly that write. E53 opens the missing entry edge plus a
+// new release-engineer:Blocked key with three destinations (self-resume,
+// pm-recovery, qa-engineer for the npm-test-regression row), and separately
+// fixes the same defect SHAPE for sr-engineer (content/skill-sr-engineer.md:50
+// routes Blocked -> design-auditor on "visual structure unspecified", an
+// edge sr-engineer:Blocked previously lacked). Five edges total, proven
+// exhaustively by code-reviewer's 1056-tuple differential
+// (review_reports/review_T-E53-01.md AC4): accepted edges 63 -> 68, zero
+// closed. The two positive-accept groups below pin each edge individually;
+// the row-equality pins pin each row's full membership+order; the exhaustive
+// sweep at the end is the durable, in-suite form of that differential — it
+// re-derives the reviewer's proof from source rather than trusting a
+// point-in-time review artifact, so a later edit that opens or closes ANY
+// edge anywhere in the matrix (not just these five) fails loudly here.
+
+// ---------- positive accepts: the five edges this ticket opens ----------
+
+test("T-E53-03(a): release-engineer:In_Progress → release-engineer:Blocked accepted (the entry edge)", () => {
+  // WHY: the edge that made release-engineer:Blocked reachable at all. Before
+  // E53, ALLOWED.get("release-engineer:In_Progress") had exactly one
+  // successor (pm:In_Progress); the state release-engineer:Blocked existed
+  // as a *destination* (self.SOP instructs writing it) but no source edge
+  // led there — writing it would have hit TRANSITION_REJECTED.
+  assert.equal(
+    validateTransition({
+      prev: { agent: "release-engineer", status: "In_Progress" },
+      next: { agent: "release-engineer", status: "Blocked" },
+      prev_qa_round: 0,
+      prev_review_round: 0,
+    }),
+    null,
+  );
+});
+
+test("T-E53-03(b): release-engineer:Blocked → release-engineer:In_Progress accepted (self-resume)", () => {
+  // WHY: NOT covered by the generic self-loop fast path in validateTransition
+  // (step 3) — that path only fires on same-agent In_Progress→In_Progress;
+  // Blocked→In_Progress for the same agent must come from the table. This is
+  // the resume-after-halt edge every peer <role>:Blocked row already has.
+  assert.equal(
+    validateTransition({
+      prev: { agent: "release-engineer", status: "Blocked" },
+      next: { agent: "release-engineer", status: "In_Progress" },
+      prev_qa_round: 0,
+      prev_review_round: 0,
+    }),
+    null,
+  );
+});
+
+test("T-E53-03(c): release-engineer:Blocked → pm:In_Progress accepted (recovery escape)", () => {
+  // WHY: mirrors the pm-escape shape all six other <role>:Blocked rows carry
+  // (researcher/design-auditor/pm/architect/sr-engineer/code-reviewer) —
+  // five of the six D10-style Escalation Routes rows in
+  // content/skill-release-engineer.md:152-157 route to next_role=human, which
+  // resolves via this edge (coordinator recovery) or the self-resume edge
+  // above.
+  assert.equal(
+    validateTransition({
+      prev: { agent: "release-engineer", status: "Blocked" },
+      next: { agent: "pm", status: "In_Progress" },
+      prev_qa_round: 0,
+      prev_review_round: 0,
+    }),
+    null,
+  );
+});
+
+test("T-E53-03(d): release-engineer:Blocked → qa-engineer:In_Progress accepted (npm-test-regression row)", () => {
+  // WHY: the one Escalation Routes row (content/skill-release-engineer.md:153,
+  // "`npm test` regression") that names next_role=qa-engineer rather than
+  // human — pm alone would have been the wrong destination set for this key.
+  // Precedent: qa-engineer:Blocked -> sr-engineer:In_Progress (route to the
+  // role that must fix, not just to pm).
+  assert.equal(
+    validateTransition({
+      prev: { agent: "release-engineer", status: "Blocked" },
+      next: { agent: "qa-engineer", status: "In_Progress" },
+      prev_qa_round: 0,
+      prev_review_round: 0,
+    }),
+    null,
+  );
+});
+
+test("T-E53-03(e): sr-engineer:Blocked → design-auditor:In_Progress accepted (gap B)", () => {
+  // WHY: content/skill-sr-engineer.md:50's "visual structure unspecified"
+  // escalation row instructs exactly this write; sr-engineer:Blocked
+  // previously admitted only {sr-engineer:In_Progress, pm:In_Progress} — the
+  // SOP-prescribed route was TRANSITION_REJECTED. Same defect shape as
+  // T-E45-01's qa-engineer:Blocked gap, found by E53's own instruction to
+  // audit every role's :Blocked reachability in the same pass.
+  assert.equal(
+    validateTransition({
+      prev: { agent: "sr-engineer", status: "Blocked" },
+      next: { agent: "design-auditor", status: "In_Progress" },
+      prev_qa_round: 0,
+      prev_review_round: 0,
+    }),
+    null,
+  );
+});
+
+// ---------- row-equality pins (T-MATRIX-C13/E37/T-E45-01 shape) ----------
+
+test("T-E53-03(f): release-engineer:Blocked row equals exactly {release-engineer:In_Progress, pm:In_Progress, qa-engineer:In_Progress}, in this order", () => {
+  // WHY: this key did not exist at all before E53 (ALLOWED.get(...) returned
+  // undefined). Pinning membership AND order now, at the moment the key is
+  // introduced, means a future additive edit to this brand-new row is caught
+  // from its very first review rather than shipping unpinned the way E45's
+  // qa-engineer:Blocked row once did (review_reports/review_T-E45-01.md).
+  const row = ALLOWED_TRANSITIONS.get("release-engineer:Blocked");
+  assert.ok(row, "release-engineer:Blocked row must exist");
+  assert.deepEqual(
+    row,
+    [
+      { agent: "release-engineer", status: "In_Progress" },
+      { agent: "pm", status: "In_Progress" },
+      { agent: "qa-engineer", status: "In_Progress" },
+    ],
+    "release-engineer:Blocked row must be exactly these three successors, in this order",
+  );
+});
+
+test("T-E53-03(g): sr-engineer:Blocked row equals exactly {sr-engineer:In_Progress, pm:In_Progress, design-auditor:In_Progress}, in this order", () => {
+  // WHY: same rationale as T-MATRIX-C13/E37's :1841 pin — an additive edit to
+  // an existing row is invisible to a same-set-membership assert.ok chain;
+  // only deepEqual on the full row catches a stray sixth successor or a
+  // silently dropped existing one.
+  const row = ALLOWED_TRANSITIONS.get("sr-engineer:Blocked");
+  assert.ok(row, "sr-engineer:Blocked row must exist");
+  assert.deepEqual(
+    row,
+    [
+      { agent: "sr-engineer", status: "In_Progress" },
+      { agent: "pm", status: "In_Progress" },
+      { agent: "design-auditor", status: "In_Progress" },
+    ],
+    "sr-engineer:Blocked row must be exactly these three successors, in this order",
+  );
+});
+
+// ---------- exhaustive negative pin: nothing else opened (durable differential) ----------
+
+test("T-E53-03(h): exhaustive matrix sweep — accepted edge set is EXACTLY the 68 tuples E53 leaves standing (durable form of the reviewer's 1056-tuple differential)", () => {
+  // WHY: code-reviewer's AC4 proof (review_reports/review_T-E53-01.md) ran a
+  // one-off 1056-tuple differential (33 prev tuples x 32 next tuples) against
+  // two compiled snapshots to show accepted edges went 63 -> 68 with zero
+  // closed. That proof is real but point-in-time — it lives in a review
+  // artifact, not the suite, so it cannot catch a LATER regression. This test
+  // re-derives the same universe from source and pins the resulting accepted
+  // set as a literal snapshot, so any future edit that opens or closes ANY
+  // edge anywhere in ALLOWED_TRANSITIONS — not just the five this ticket
+  // touches — fails here with an actionable diff, the same way the row-
+  // equality pins above do for a single row. Deliberately a positive pin
+  // (the accepted set), not a hand-listed set of rejected tuples: a rejected-
+  // tuple list only proves the tuples someone thought to write down were
+  // still rejected, and silently says nothing about tuples nobody enumerated;
+  // pinning the accepted set is exhaustive by construction, since anything
+  // not in the expected set is implicitly asserted rejected.
+  const AGENTS = [
+    "pm",
+    "researcher",
+    "design-auditor",
+    "architect",
+    "sr-engineer",
+    "code-reviewer",
+    "qa-engineer",
+    "release-engineer",
+  ];
+  const STATUSES = ["In_Progress", "PASS", "FAIL", "Blocked"];
+
+  // Universe: prev in {null:null} ∪ (agent x status) = 1 + 8*4 = 33 tuples;
+  // next in (agent x status) = 8*4 = 32 tuples (agent_id is always required on
+  // a real write, so next.agent is never null here). 33 x 32 = 1056 combos —
+  // matches the reviewer's own enumeration exactly.
+  const prevTuples = [{ agent: null, status: null }];
+  for (const a of AGENTS) for (const s of STATUSES) prevTuples.push({ agent: a, status: s });
+  const nextTuples = [];
+  for (const a of AGENTS) for (const s of STATUSES) nextTuples.push({ agent: a, status: s });
+  assert.equal(prevTuples.length, 33, "prev universe must be 33 tuples");
+  assert.equal(nextTuples.length, 32, "next universe must be 32 tuples");
+
+  const accepted = [];
+  for (const prev of prevTuples) {
+    for (const next of nextTuples) {
+      const r = validateTransition({ prev, next, prev_qa_round: 0, prev_review_round: 0 });
+      if (r === null) accepted.push(`${prev.agent ?? "null"}:${prev.status ?? "null"} -> ${next.agent}:${next.status}`);
+    }
+  }
+
+  const EXPECTED = [
+    "null:null -> pm:In_Progress",
+    "null:null -> pm:Blocked",
+    "null:null -> researcher:In_Progress",
+    "null:null -> researcher:Blocked",
+    "null:null -> design-auditor:In_Progress",
+    "null:null -> design-auditor:Blocked",
+    "pm:In_Progress -> pm:In_Progress",
+    "pm:In_Progress -> pm:Blocked",
+    "pm:In_Progress -> researcher:In_Progress",
+    "pm:In_Progress -> design-auditor:In_Progress",
+    "pm:In_Progress -> architect:In_Progress",
+    "pm:In_Progress -> sr-engineer:In_Progress",
+    "pm:Blocked -> pm:In_Progress",
+    "pm:Blocked -> pm:Blocked",
+    "researcher:In_Progress -> pm:In_Progress",
+    "researcher:In_Progress -> pm:Blocked",
+    "researcher:In_Progress -> researcher:In_Progress",
+    "researcher:In_Progress -> researcher:Blocked",
+    "researcher:In_Progress -> design-auditor:In_Progress",
+    "researcher:Blocked -> pm:In_Progress",
+    "researcher:Blocked -> researcher:In_Progress",
+    "design-auditor:In_Progress -> pm:In_Progress",
+    "design-auditor:In_Progress -> design-auditor:In_Progress",
+    "design-auditor:In_Progress -> design-auditor:Blocked",
+    "design-auditor:Blocked -> pm:In_Progress",
+    "design-auditor:Blocked -> design-auditor:In_Progress",
+    "architect:In_Progress -> pm:In_Progress",
+    "architect:In_Progress -> architect:In_Progress",
+    "architect:In_Progress -> architect:Blocked",
+    "architect:In_Progress -> sr-engineer:In_Progress",
+    "architect:Blocked -> pm:In_Progress",
+    "architect:Blocked -> architect:In_Progress",
+    "sr-engineer:In_Progress -> pm:In_Progress",
+    "sr-engineer:In_Progress -> sr-engineer:In_Progress",
+    "sr-engineer:In_Progress -> sr-engineer:Blocked",
+    "sr-engineer:In_Progress -> code-reviewer:In_Progress",
+    "sr-engineer:Blocked -> pm:In_Progress",
+    "sr-engineer:Blocked -> design-auditor:In_Progress",
+    "sr-engineer:Blocked -> sr-engineer:In_Progress",
+    "code-reviewer:In_Progress -> code-reviewer:In_Progress",
+    "code-reviewer:In_Progress -> code-reviewer:FAIL",
+    "code-reviewer:In_Progress -> code-reviewer:Blocked",
+    "code-reviewer:In_Progress -> qa-engineer:In_Progress",
+    "code-reviewer:FAIL -> pm:In_Progress",
+    "code-reviewer:FAIL -> sr-engineer:In_Progress",
+    "code-reviewer:Blocked -> pm:In_Progress",
+    "code-reviewer:Blocked -> code-reviewer:In_Progress",
+    "qa-engineer:In_Progress -> qa-engineer:In_Progress",
+    "qa-engineer:In_Progress -> qa-engineer:PASS",
+    "qa-engineer:In_Progress -> qa-engineer:FAIL",
+    "qa-engineer:In_Progress -> qa-engineer:Blocked",
+    "qa-engineer:PASS -> pm:In_Progress",
+    "qa-engineer:PASS -> researcher:In_Progress",
+    "qa-engineer:PASS -> design-auditor:In_Progress",
+    "qa-engineer:PASS -> release-engineer:In_Progress",
+    "qa-engineer:FAIL -> pm:In_Progress",
+    "qa-engineer:FAIL -> sr-engineer:In_Progress",
+    "qa-engineer:Blocked -> pm:In_Progress",
+    "qa-engineer:Blocked -> sr-engineer:In_Progress",
+    "qa-engineer:Blocked -> qa-engineer:In_Progress",
+    "release-engineer:In_Progress -> pm:In_Progress",
+    "release-engineer:In_Progress -> release-engineer:In_Progress",
+    "release-engineer:In_Progress -> release-engineer:Blocked",
+    "release-engineer:PASS -> pm:In_Progress",
+    "release-engineer:PASS -> researcher:In_Progress",
+    "release-engineer:Blocked -> pm:In_Progress",
+    "release-engineer:Blocked -> qa-engineer:In_Progress",
+    "release-engineer:Blocked -> release-engineer:In_Progress",
+  ].sort();
+
+  const sortedAccepted = accepted.slice().sort();
+  assert.equal(sortedAccepted.length, 68, `expected exactly 68 accepted edges, got ${sortedAccepted.length}`);
+  assert.deepEqual(
+    sortedAccepted,
+    EXPECTED,
+    "accepted edge set must match the E53 baseline exactly — any diff here is either an unintended edge opened or an unintended edge closed",
+  );
 });

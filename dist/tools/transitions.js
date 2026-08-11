@@ -73,6 +73,15 @@ const ALLOWED = new Map([
     ["sr-engineer:Blocked", [
             { agent: "sr-engineer", status: "In_Progress" },
             { agent: "pm", status: "In_Progress" },
+            // v3.98.0 (E53, gap B) — content/skill-sr-engineer.md:50's "visual
+            // structure unspecified" escalation row routes Blocked -> design-auditor,
+            // an edge this key lacked (only the self-loop and the pm escape existed).
+            // Found by the audit E53 itself required ("audit every other role's
+            // :Blocked reachability in the same pass" — not just the filed
+            // release-engineer gap); same defect shape as E45's qa-engineer fix, an
+            // omission rather than a design decision. Mirrored in
+            // specs/qa-flow-enforcement-architecture.md:159.
+            { agent: "design-auditor", status: "In_Progress" },
         ]],
     ["code-reviewer:In_Progress", [
             { agent: "code-reviewer", status: "FAIL" },
@@ -163,6 +172,36 @@ const ALLOWED = new Map([
     // covered by the generic self-loop fast path in validateTransition.
     ["release-engineer:In_Progress", [
             { agent: "pm", status: "In_Progress" },
+            // v3.98.0 (E53) — the missing entry edge into release-engineer:Blocked.
+            // content/skill-release-engineer.md carries six Blocked escalation rows
+            // (:152-157, plus step 7a's empty-baseline guard, now converted to a
+            // table row) that instruct the role to halt via exactly this write, but
+            // no :Blocked key existed for this agent at all — unlike every other
+            // role, which all carry a :Blocked entry edge. Found by code-reviewer
+            // during E50 round 1
+            // (review_reports/archive/e50-release-sop-step7a-hardening/review_T-E50-02.md,
+            // F10); same family as E45's qa-engineer:Blocked gap but a different
+            // shape (E45's role HAD a :Blocked key, missing one outbound edge; this
+            // role had no key at all). Mirrored in
+            // specs/qa-flow-enforcement-architecture.md:164.
+            { agent: "release-engineer", status: "Blocked" },
+        ]],
+    // v3.98.0 (E53) — release-engineer's new :Blocked key, opened by the entry
+    // edge above. Destinations derived from skill-release-engineer.md's own
+    // six Blocked rows (:152-157) plus the converted step 7a guard: five
+    // resolve to human — a halt, resumed here via the self-loop back to
+    // In_Progress or handed to pm for recovery (e.g. D10's push-rejection row)
+    // — and the `npm test` regression row (:153) names qa-engineer, not pm, so
+    // pm alone would have been the wrong destination set. Self -> In_Progress
+    // and -> pm:In_Progress mirror the six peer :Blocked keys' shape; ->
+    // qa-engineer:In_Progress has precedent in qa-engineer:Blocked ->
+    // sr-engineer:In_Progress (route to the role that must fix) — neither is a
+    // new pattern. Mirrored in specs/qa-flow-enforcement-architecture.md
+    // (new row after :164).
+    ["release-engineer:Blocked", [
+            { agent: "release-engineer", status: "In_Progress" },
+            { agent: "pm", status: "In_Progress" },
+            { agent: "qa-engineer", status: "In_Progress" },
         ]],
     ["release-engineer:PASS", [
             { agent: "pm", status: "In_Progress" },

@@ -795,6 +795,166 @@ test("D10-AC4: shim watermark and tw_get_state/tw_switch_role invocation lines a
 });
 
 // ---------------------------------------------------------------------------
+// Phase 5.5 — E53: release-engineer:Blocked reachability (v3.98.0)
+// ---------------------------------------------------------------------------
+// WHY: docs/backlog.md's E53 row + review_reports/review_T-E53-01.md. Before
+// this cut, step 7a's own empty-baseline guard (:84 area) and every row in
+// the Escalation Routes table above (:152-157) instructed release-engineer to
+// halt via `status=Blocked`, but `tools/transitions.ts` had NO
+// `release-engineer:Blocked` key and no entry edge into it at all — the SOP
+// prescribed a write the server would TRANSITION_REJECTED. content/
+// skill-release-engineer.md carried two explicit claims that this was by
+// design ("...`release-engineer:Blocked` is not a reachable transition into
+// this role on any edge...", ":84"; "**Step 7a's empty-baseline hazard is NOT
+// a row in this table**...", former :159) and step 7a's guard was an
+// in-SOP-only halt-and-surface rather than a real state transition. E53 opens
+// the edge in tools/transitions.ts (test/qa-flow.test.mjs T-E53-03 pins the
+// state-machine side) and, on the content side, deletes both now-false
+// claims and converts step 7a's guard into a genuine Escalation Routes table
+// row. These tests cover the content assertions T-E53-03 owns: zero
+// remaining unreachable claims, the new row's presence and shape, and the
+// four Escalation Routes rows (:152-154, :156) that
+// test/release-staging.test.mjs:757 (D10, :155) and
+// test/verify-release.test.mjs:701 (release self-check, :157) do NOT already
+// byte-pin — so this block covers what those two don't, rather than
+// duplicating them.
+
+test("E53: zero remaining claims that release-engineer:Blocked is unreachable", () => {
+  // Contract: both pre-E53 falsehoods must be gone. Pinned as exact substrings
+  // (not a generic /unreachable/i sweep) so a legitimate FUTURE use of the
+  // word "unreachable" elsewhere in the file (e.g. describing an unrelated
+  // dead code path) can't make this test an accidental trip-wire.
+  assert.ok(
+    !SKILL.includes("is not a reachable transition into this role on any edge"),
+    "skill-release-engineer.md must NOT retain the :84-area claim that release-engineer:Blocked is unreachable (E53)",
+  );
+  assert.ok(
+    !SKILL.includes("Step 7a's empty-baseline hazard is NOT a row in this table"),
+    "skill-release-engineer.md must NOT retain the former :159 claim that the guard cannot be a table row (E53)",
+  );
+  assert.ok(
+    !/release-engineer:Blocked.{0,40}unreachable|unreachable.{0,40}release-engineer:Blocked/is.test(SKILL),
+    "skill-release-engineer.md must not pair 'release-engineer:Blocked' with 'unreachable' anywhere, even under reworded phrasing (E53)",
+  );
+});
+
+test("E53: step 7a's empty-baseline STOP is now a genuine Escalation Routes table row, not an in-SOP-only halt", () => {
+  // Contract: the guard bullet at step 7a must instruct the actual
+  // tw_update_state(status="Blocked") write and point at the table row, and
+  // that row must exist with status=Blocked and next_role=human — the
+  // opposite of the deleted "in-SOP-only halt" / "never an Escalation-Routes-
+  // table row" framing.
+  assert.match(
+    SKILL,
+    /DO `tw_update_state\(agent_id="release-engineer", status="Blocked", pending_notes=\["<the message above>"\]\)` per \*Escalation Routes: empty-baseline hazard \(step 7a\)\*/,
+    "step 7a's guard must instruct the real tw_update_state Blocked write and cite the Escalation Routes row by name (E53)",
+  );
+  assert.match(
+    SKILL,
+    /This is now a real Escalation-Routes-table row and a genuine state transition \(E53 opened the `release-engineer:Blocked` edge in `tools\/transitions\.ts`\)/,
+    "step 7a's guard prose must state the halt is now a real table row / state transition, superseding the old in-SOP-only framing (E53)",
+  );
+  assert.match(
+    SKILL,
+    /\| empty-baseline hazard \(step 7a: no membership baseline for `qa_reports`\/`review_reports`, and that tree currently holds root-level evidence files it would sweep in full — `STOP_QA`\/`STOP_RR` set\) \| Blocked \| `step 7a has no membership baseline for <qa_reports\\\|review_reports> \(PREV_TAG='\$PREV_TAG'\)/,
+    "Escalation Routes table must carry the new empty-baseline-hazard row with status=Blocked (E53)",
+  );
+  assert.match(
+    SKILL,
+    /step 7a has no membership baseline for <qa_reports\\\|review_reports> \(PREV_TAG='\$PREV_TAG'\) — that tree has root-level evidence files and no baseline to diff them against; refusing to derive <CODES> for it rather than risk an unbounded sweep\.` \| human \|/,
+    "the new row must route to next_role=human, matching every other Blocked row in this table (E53)",
+  );
+});
+
+test("E53: pending-note escaping caveat — the :84 guard clause and the new table row are semantically verbatim but NOT byte-equal, and normalise identically", () => {
+  // Contract (flagged by code-reviewer, review_T-E53-01.md, for T-E53-03
+  // specifically): a markdown table cell MUST escape a literal `|` as `\|`
+  // or the row splits — so the new row's message reads
+  // `<qa_reports\|review_reports>` while the step 7a prose at :84 (not inside
+  // a table cell) keeps the bare `<qa_reports|review_reports>`. A naive
+  // byte-equality assertion across both occurrences would fail spuriously;
+  // this test locks in that they are equal AFTER normalising `\|` -> `|`,
+  // and that the raw forms really do differ (proving the normalisation step
+  // is load-bearing, not vacuous).
+  const proseMatch = SKILL.match(
+    /WHEN either is set → \*\*STOP\*\*: `"(step 7a has no membership baseline for <qa_reports\|review_reports>[^"]*)"`/,
+  );
+  const rowMatch = SKILL.match(
+    /\| Blocked \| `(step 7a has no membership baseline for <qa_reports\\\|review_reports>[^`]*)` \| human \|/,
+  );
+  assert.ok(proseMatch, "must find the step 7a prose STOP message (:84 area)");
+  assert.ok(rowMatch, "must find the new Escalation Routes row's pending-note message");
+
+  const proseMsg = proseMatch[1];
+  const rowMsgRaw = rowMatch[1];
+  assert.notEqual(
+    proseMsg,
+    rowMsgRaw,
+    "the two occurrences must NOT be byte-equal as written — the row's pipe is escaped, the prose's is not (this is what makes normalisation load-bearing)",
+  );
+
+  const normalise = (s) => s.replace(/\\\|/g, "|");
+  assert.equal(
+    normalise(proseMsg),
+    normalise(rowMsgRaw),
+    "the step 7a prose message and the new table row's message must be semantically identical once `\\|` is normalised to `|`",
+  );
+});
+
+test("E53: Escalation Routes rows :152-154 and :156 (not already byte-pinned by D10-AC3 or the release-self-check test) are unchanged", () => {
+  // Contract: this cut's pinned scope is 4 files, none of which include the
+  // six pre-existing Escalation Routes rows — only a new seventh row was
+  // appended. D10-AC3 (:757 above) pins the non-fast-forward row (:155) and
+  // test/verify-release.test.mjs:701 pins the release-self-check row (:157).
+  // This test covers the remaining four rows those two do not.
+  assert.ok(
+    SKILL.includes(
+      "| unrelated uncommitted changes (scope rule below) | Blocked | `Pre-existing uncommitted changes found in <path> — this path is unrelated to the active feature. Commit or stash it first.` | human |",
+    ),
+    "the 'unrelated uncommitted changes' row (:152) must be unchanged (E53 scope)",
+  );
+  assert.ok(
+    SKILL.includes(
+      "| `npm test` regression | Blocked | `release-engineer: npm test regression — do not tag a red suite` | qa-engineer |",
+    ),
+    "the 'npm test regression' row (:153) must be unchanged (E53 scope)",
+  );
+  assert.ok(
+    SKILL.includes(
+      "| tag with the target name already exists locally OR on origin | Blocked | `release-engineer: tag <vX.Y.Z> already exists — choose a new bump or delete the old tag manually (never delete it yourself per Hard rules)` | human |",
+    ),
+    "the 'tag already exists' row (:154) must be unchanged (E53 scope)",
+  );
+  assert.ok(
+    SKILL.includes(
+      "| `gh` CLI missing or unauthenticated | Blocked | `release-engineer: gh CLI missing/unauthenticated — authenticate; do not work around` | human |",
+    ),
+    "the 'gh CLI missing' row (:156) must be unchanged (E53 scope)",
+  );
+});
+
+test("E53: the Escalation Routes table gains exactly one new row (six pre-existing + the empty-baseline-hazard row = seven), placed last", () => {
+  // Contract: additive-only. Counting table data rows (excluding the header
+  // and separator) between the table's start and the "Expected vs unrelated
+  // scope rule" paragraph that follows it confirms no row was duplicated,
+  // dropped, or reordered, and that the new row is appended at the end
+  // rather than inserted in the middle of the pre-existing six.
+  const tableStart = SKILL.indexOf("| situation | status | pending note | next_role |");
+  const scopeRuleStart = SKILL.indexOf("**Expected vs unrelated scope rule**");
+  assert.ok(tableStart > -1 && scopeRuleStart > -1, "must locate both the table header and the scope-rule paragraph");
+  const tableBlock = SKILL.slice(tableStart, scopeRuleStart);
+  const dataRows = tableBlock
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l.startsWith("|") && !l.startsWith("|---") && !l.startsWith("| situation"));
+  assert.equal(dataRows.length, 7, "Escalation Routes table must have exactly 7 data rows (6 pre-existing + E53's new one)");
+  assert.ok(
+    dataRows[6].startsWith("| empty-baseline hazard (step 7a:"),
+    "the new empty-baseline-hazard row must be the LAST row in the table, not inserted among the pre-existing six",
+  );
+});
+
+// ---------------------------------------------------------------------------
 // Phase 6 — E7: governed git surface (generalized sanctioned-git-ops
 // whitelist, ALL roles)
 // ---------------------------------------------------------------------------
