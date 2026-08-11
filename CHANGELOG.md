@@ -16,6 +16,31 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.97.0] - 2026-08-11
+
+Third consecutive release-SOP hardening cut, and the third rewrite of step 7a in three days. Like
+v3.96.0 this is content-only: `content/skill-release-engineer.md` (+57/−11) is the sole content file
+in the diff and `test/release-staging.test.mjs` (+509/−56, 53 tests) is its pin. Every fix in it
+came out of E49's own code review — the reviewer kept finding defects in the step *after* it shipped,
+so E50 exists to close the ones round 3 surfaced too late to fold in. This release is again the first
+run of the changed step by a release-engineer following it (`<CODES> = {E50}`, both guard flags
+unset, AC4 SKIP branch).
+
+### Changed
+- **`e50-release-sop-step7a-hardening` — step 7a gains a per-tree empty-baseline guard (backlog E50, N4/F9).** `grep -vxFf` with an EMPTY pattern file passes its ENTIRE input through, not nothing — so an empty membership baseline is not "nothing to exclude", it is "no baseline to diff against", and using it anyway would sweep every root-level evidence file into one feature's archive dir. The outcome is now evaluated **per tree**, not folded into one flag, because one tree can be seeded while the other is absent:
+  - `STOP_QA` / `STOP_RR` — `PREV_TAG` unset, or that tree's baseline is empty *while* the tree holds root-level files an unbounded sweep would take → hard STOP with a named message, surfaced to the human.
+  - `EXCLUDE_QA` / `EXCLUDE_RR` — that tree never existed on disk, or its baseline is empty *and* it holds zero root-level files → contributes nothing and proceeds silently. This is the self-healing shape for a `teamwork-lite` workspace that never dispatches code-reviewer (`review_reports/` never exists); unlike a single global flag it is re-evaluated fresh each run and never blocks the other tree.
+  - The guard is an **in-SOP halt-and-surface, not an Escalation-Routes row** — `release-engineer:Blocked` is not a reachable transition into this role on any edge, so a table row here would resolve to a write the server rejects. It matches the precedent step 8's AC4 branches already set for this role.
+- **`e50-release-sop-step7a-hardening` — `<CODES>` is now actually bound, and logged even when empty (backlog E50, F8).** The v3.96.0 logging bullet expanded an unbound variable and therefore printed `{∅}` on every release regardless of what the derivation found. The derivation fence now assigns `CODES=$(…)` and the logging bullet expands that binding (`echo "step 7a: <CODES> = {${CODES:-∅}}"`) rather than re-running a fresh, uncaptured pipeline. `∅` remains a legitimate, non-fatal outcome — the point is that empty-by-design and empty-by-breakage are no longer indistinguishable in the transcript, which is exactly the ambiguity that hid the prior derivation's defect through two full review rounds.
+- **`e50-release-sop-step7a-hardening` — scope extends from `qa_reports/` alone to `qa_reports/` + `review_reports/` (backlog E50).** Both trees are enumerated under the same membership predicate and their codes are unioned into one `<CODES>`. Destinations stay **parallel** — `qa_reports/archive/<active_feature>/` and `review_reports/archive/<active_feature>/` — and review evidence is NEVER folded into the qa archive: the two streams share basenames (`review_T-E4X-03.md` existed simultaneously in both trees within the v3.96.0 commit `27f59e2`), so one shared destination makes `mv -n` silently skip whichever file arrives second. That silent-orphan class is the whole reason the step exists. The `covers:` sweep is likewise per-tree, never cross-filed.
+- **`e50-release-sop-step7a-hardening` — shell-portability dependency stated, not engineered around (backlog E50, N5).** The pipeline's `<(…)` process substitution is bash/zsh, not POSIX `sh`; that dependency is now recorded in one parenthetical. Reshaping the predicate to avoid it was explicitly rejected at cut time — the failure mode is loud, not silent, and rewriting reopens a derivation that took three review rounds to converge.
+- **The Artifact allowlist gains `review_reports/archive/**`** (move-only, parallel to `qa_reports/archive/**`), and the *Expected vs unrelated scope rule* now names `review_reports/archive/<feature>/**` moves as expected release-engineer output rather than a role-boundary violation.
+
+### Notes
+- **Known-unreachable edge, filed not fixed**: `release-engineer:Blocked` has no `:Blocked` key in `tools/transitions.ts` for this role, so the four Blocked rows in the release SOP's Escalation Routes table point at an edge the server rejects (`allowed=[pm:In_Progress]` from `release-engineer:In_Progress`, `allowed=[]` from `release-engineer:Blocked`). Verified against the compiled validator during code review. A source fix, deliberately out of scope for a content-only cut.
+- **Deferred follow-ups** carried into the backlog rather than fixed here: the step now carries two copies of the derivation (an illustrative fence plus the executable `CODES=` fence, because a test pinned the illustrative one's leading text) — the same "two copies, only one kept honest" shape as E39/E48/E51; and the code-extraction regex's `[a-z_]*` prefix is wider than the `review_`/`visual_` prefixes that actually exist, so `notes_about_T-E99-01_backup.md` would yield `{E99}`.
+- Suite: **1669 pass / 0 fail** (up from 1657 — 12 tests added to `test/release-staging.test.mjs`). Build 0 errors. `npm audit`: 11 pre-existing, 0 new.
+
 ## [3.96.0] - 2026-08-10
 
 Both tickets fix release-engineer SOP steps that were **unexecutable as written** against the

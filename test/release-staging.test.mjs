@@ -892,39 +892,70 @@ test("E7-AC2: content/skill-release-engineer.md's D10 bullet cross-references th
 });
 
 // ---------------------------------------------------------------------------
-// Phase 7 — E49: step 7a ticket-code SET derivation (working-tree enumeration +
-// PREV_TAG membership predicate)
+// Phase 7 — E49/E50: step 7a ticket-code SET derivation (working-tree
+// enumeration + PREV_TAG membership predicate, unioned across qa_reports/ and
+// review_reports/)
 // ---------------------------------------------------------------------------
-// WHY: review_reports/review_T-E4X-03.md documents that this derivation's
-// literal text changed twice during review:
-//   round 1 — hunt ticket/feature SLUGS in commit subjects/bodies. Wrong on the
-//     exact release it was written for: v3.95.0 yielded {E37,E38} (disjoint
-//     from the right answer {E45,E46}), because shipped tickets appear in the
-//     range only as bare codes, never as slugs (F1/F2/F3).
-//   round 2 — committed history only (`git log --diff-filter=A`). Fixed F1-F3,
-//     but silently returns EMPTY on v3.93.0 and v3.94.0 — 2 of the last 6
-//     releases — because qa_reports/ evidence is routinely UNTRACKED at
+// WHY: review_reports/review_T-E4X-03.md and review_reports/review_T-E50-02.md
+// document that this derivation's literal text changed FOUR times across two
+// tickets:
+//   round 1 (E49) — hunt ticket/feature SLUGS in commit subjects/bodies. Wrong
+//     on the exact release it was written for: v3.95.0 yielded {E37,E38}
+//     (disjoint from the right answer {E45,E46}), because shipped tickets
+//     appear in the range only as bare codes, never as slugs (F1/F2/F3).
+//   round 2 (E49) — committed history only (`git log --diff-filter=A`). Fixed
+//     F1-F3, but silently returns EMPTY on v3.93.0 and v3.94.0 — 2 of the last
+//     6 releases — because qa_reports/ evidence is routinely UNTRACKED at
 //     step-7a time (step 8's `git add qa_reports/` is what first commits it).
 //     Combined with "zero matches = silent no-op", this is a regression versus
 //     the pre-E49 rule, which archived those releases correctly by
 //     working-tree existence (F7 — the round-2 BLOCKING finding).
-//   round 3 (APPROVED, shipped) — enumerate root-level qa_reports/ files as
-//     they sit in the WORKING TREE right now, and use the git range only as a
-//     MEMBERSHIP TEST against PREV_TAG's tree. Backtested by the reviewer
-//     against all six of this repo's last releases in six detached worktrees,
-//     reproducing every "actually archived" outcome including the two that
-//     round 2 returned empty for.
-// These tests pin the ACTUALLY SHIPPED (round 3) text and behavior — not
-// either discarded draft — per the review's own instruction that a substring
-// pin recognizing the round-2 command as still being the ACTIVE derivation
-// must fail.
+//   round 3 (E49, APPROVED) — enumerate root-level qa_reports/ files as they
+//     sit in the WORKING TREE right now, and use the git range only as a
+//     MEMBERSHIP TEST against PREV_TAG's tree. Backtested against all six of
+//     this repo's last releases in six detached worktrees, reproducing every
+//     "actually archived" outcome including the two that round 2 returned
+//     empty for. Round 3 also recorded N4 (non-blocking then): an
+//     empty/unresolvable PREV_TAG baseline makes `grep -vxFf` pass its WHOLE
+//     input through — a mass-sweep hazard, explicitly left unfixed.
+//   E50 round 1 — (a) closed N4 with a guard, but shipped it as a single
+//     global flag (F9: permanently wedges any workspace that has never
+//     produced a review_reports/ tree) and (b) added zero-match logging that
+//     expanded an UNBOUND `$CODES` variable, printing `{∅}` on every release,
+//     including non-empty ones (F8) — CHANGES_REQUESTED.
+//   E50 round 2 (APPROVED, shipped) — F8 closed by binding `CODES=$( { ... } |
+//     ... )`; F9 closed by splitting the single flag into per-tree
+//     STOP_QA/STOP_RR/EXCLUDE_QA/EXCLUDE_RR, so an absent or never-seeded
+//     review_reports/ tree no longer blocks qa_reports/'s half and does not
+//     recur release after release. (c) extends the whole predicate to
+//     review_reports/ under a PARALLEL archive dir (never folded into
+//     qa_reports/archive/ — the two streams share basenames, verified against
+//     the real v3.96.0 review_T-E4X-03.md collision).
+// These tests pin the ACTUALLY SHIPPED (E50 round 2) text and behavior — not
+// any earlier draft — per review_T-E50-02.md's "Test-coverage note for
+// T-E50-03" (12 items, sequenced by consequence).
+
+// Model of the shipped filename -> code extraction (E50 round 2, F8/attack 1):
+//   sed -E 's#.*<slash>##' | grep -oE '^[a-z_]*T-[A-Za-z0-9]+-' \
+//     | sed -E 's/^[a-z_]*T-//; s/-$//' | tr 'a-z' 'A-Z'
+// (literal shell text elided above to avoid a stray "*<slash>" closing this
+// block comment early — the shell strips the leading directory with a basic
+// sed substitution). Operates on a BASENAME (callers strip the directory
+// themselves via path.posix.basename, matching the shipped pipeline's own
+// ordering). Returns the uppercased code, or null when the filename carries
+// no `T-<CODE>-` segment reachable from an anchored `[a-z_]*` prefix run.
+function codeFromFilename(basename) {
+  const m = basename.match(/^[a-z_]*T-([A-Za-z0-9]+)-/);
+  return m ? m[1].toUpperCase() : null;
+}
 
 /**
- * Model of the shipped step-7a derivation:
+ * Model of the shipped step-7a derivation for a SINGLE tree (qa_reports/):
  *   find qa_reports -maxdepth 1 -type f | sort \
  *     | grep -vxFf <(git ls-tree -r --name-only "$PREV_TAG" -- qa_reports/)
- * followed by: take the `T-<CODE>-` substring off each resulting filename,
- * uppercased, ignoring filenames with no such substring (N2).
+ * followed by codeFromFilename per resulting basename (N2: a filename with no
+ * `T-<CODE>-` segment is still admitted as a candidate FILE, contributing no
+ * code).
  *
  * @param {string[]} workingTreeFiles - every qa_reports/-rooted path that
  *   exists in the working tree right now, at any depth (models what a naive
@@ -947,15 +978,106 @@ function deriveCodesFromWorkingTree(workingTreeFiles, prevTagTreeFiles) {
   const admitted = rootFiles.filter((f) => !prevTagSet.has(f)).sort();
   const codes = new Set();
   for (const f of admitted) {
-    const base = path.posix.basename(f);
-    // "Take the T-<CODE>- prefix off each resulting filename, uppercased ...
-    // ignore any filename with no T-<CODE>- prefix" — filenames carry a
-    // review_/visual_ prefix before the T-<CODE>- token, so search rather
-    // than anchor.
-    const m = base.match(/T-([A-Za-z0-9]+)-/);
-    if (m) codes.add(m[1].toUpperCase());
+    const code = codeFromFilename(path.posix.basename(f));
+    if (code) codes.add(code);
   }
   return { admitted, codes: [...codes].sort() };
+}
+
+/**
+ * Model of the shipped per-tree empty-baseline guard (E50 round 2 — F9),
+ * content/skill-release-engineer.md step 7a "Empty-baseline guard" bullet.
+ * STOP is reserved for "no baseline for this tree AND something at its root
+ * an unbounded sweep would take"; EXCLUDE covers "tree absent" or "baseline
+ * empty AND nothing at root to protect" — the self-healing, non-recurring
+ * case round 1 conflated with STOP.
+ */
+function deriveGuardFlags({
+  prevTag,
+  qaDirExists = true,
+  qaBaselineNonEmpty = false,
+  qaRootFilesPresent = false,
+  rrDirExists = true,
+  rrBaselineNonEmpty = false,
+  rrRootFilesPresent = false,
+} = {}) {
+  const flags = { STOP_QA: false, STOP_RR: false, EXCLUDE_QA: false, EXCLUDE_RR: false };
+  if (!prevTag) {
+    // Genuinely global: an unset PREV_TAG means there is no baseline for ANY
+    // tree, a property of the repository, not of a tree.
+    flags.STOP_QA = true;
+    flags.STOP_RR = true;
+    return flags;
+  }
+  if (!qaDirExists) flags.EXCLUDE_QA = true;
+  else if (qaBaselineNonEmpty) {
+    /* baseline present -- qa_reports/ included in the derivation below */
+  } else if (qaRootFilesPresent) flags.STOP_QA = true;
+  else flags.EXCLUDE_QA = true;
+
+  if (!rrDirExists) flags.EXCLUDE_RR = true;
+  else if (rrBaselineNonEmpty) {
+    /* baseline present -- review_reports/ included in the derivation below */
+  } else if (rrRootFilesPresent) flags.STOP_RR = true;
+  else flags.EXCLUDE_RR = true;
+
+  return flags;
+}
+
+/**
+ * Model of the shipped union derivation across BOTH trees (E50): each
+ * non-excluded tree contributes its own admitted set, and `<CODES>` is the
+ * union of codes derived from either. An excluded tree contributes nothing
+ * (models the shell's `[ -z "$EXCLUDE_QA" ] && find ... | ...` short-circuit
+ * — the excluded tree's pipeline never runs at all).
+ */
+function deriveCodesUnion({
+  qaWorkingTree = [],
+  qaPrevTagTree = [],
+  rrWorkingTree = [],
+  rrPrevTagTree = [],
+  excludeQa = false,
+  excludeRr = false,
+} = {}) {
+  const admitted = [];
+  if (!excludeQa) {
+    const { admitted: qaAdmitted } = deriveCodesFromWorkingTree(qaWorkingTree, qaPrevTagTree);
+    admitted.push(...qaAdmitted);
+  }
+  if (!excludeRr) {
+    const rootFiles = rrWorkingTree.filter((f) => path.posix.dirname(f) === "review_reports");
+    const prevSet = new Set(rrPrevTagTree);
+    admitted.push(...rootFiles.filter((f) => !prevSet.has(f)));
+  }
+  const codes = new Set();
+  for (const f of admitted) {
+    const code = codeFromFilename(path.posix.basename(f));
+    if (code) codes.add(code);
+  }
+  return { admitted: [...admitted].sort(), codes: [...codes].sort() };
+}
+
+/**
+ * Model of the shipped PARALLEL destination resolution (E50, item (c)): each
+ * source tree gets its OWN archive dir, never folded together — the pin that
+ * matters against a real basename collision (review_T-E4X-03.md existed
+ * simultaneously at qa_reports/archive/.../ and review_reports/ root within
+ * the same v3.96.0 commit).
+ */
+function resolveDestination(sourceTree, activeFeature) {
+  return `${sourceTree}/archive/${activeFeature}/`;
+}
+
+/** Resolve the per-file moves a set of admitted candidates would produce. */
+function resolveMoves({ qaAdmitted = [], rrAdmitted = [], activeFeature }) {
+  const moves = [];
+  for (const f of qaAdmitted) {
+    moves.push({ from: f, to: `${resolveDestination("qa_reports", activeFeature)}${path.posix.basename(f)}` });
+  }
+  for (const f of rrAdmitted) {
+    moves.push({ from: f, to: `${resolveDestination("review_reports", activeFeature)}${path.posix.basename(f)}` });
+  }
+  return moves;
 }
 
 test("E49 step 7a: skill text pins the ACTUALLY SHIPPED derivation literally, both lines, plus PREV_TAG's resolution", () => {
@@ -974,27 +1096,70 @@ test("E49 step 7a: skill text pins the ACTUALLY SHIPPED derivation literally, bo
   );
 });
 
-test("E49 step 7a: the EXECUTABLE derivation fence does not resurrect the round-2 committed-history-only rule (a substring pin on the round-2 command must fail)", () => {
-  // The round-2 rule (`git log ... --diff-filter=A ...`) is legitimately
-  // *mentioned in prose* now, as part of the rationale for why it was
-  // replaced (content/skill-release-engineer.md:55) — so a whole-file
-  // substring check for "--diff-filter=A" would give a false pass/fail
-  // reading. Scope the check to the EXECUTABLE fenced derivation itself.
-  const fenceMatch = SKILL.match(/```\n(\s*find qa_reports -maxdepth 1[\s\S]*?)```/);
-  assert.ok(fenceMatch, "must find step 7a's fenced derivation code block");
+test("E50 step 7a (N14 CLOSED — pin repointed at the EXECUTABLE CODES= fence): does not resurrect the round-2 committed-history-only rule (a substring pin on the round-2 command must fail)", () => {
+  // N14 (review_T-E50-02.md round 2): the PRE-EXISTING version of this test
+  // anchored on `/```\n(\s*find qa_reports -maxdepth 1[\s\S]*?)```/`, which
+  // matches the FIRST fence beginning "find qa_reports -maxdepth 1" — after
+  // E50, that is the ILLUSTRATIVE fence (content/skill-release-engineer.md's
+  // "Derive the ticket-code SET" prose block), not the CODES= fence the role
+  // actually executes. Reintroducing `git log`/`--diff-filter=A` into the
+  // CODES= fence would have left that stale pin green. Repointed here at the
+  // fence that opens with the `CODES=$( {` binding (E50 round 2, F8).
+  const fenceMatch = SKILL.match(/```\n(\s*CODES=\$\( \{[\s\S]*?)```/);
+  assert.ok(fenceMatch, "must find step 7a's EXECUTABLE CODES= fenced derivation code block");
   const fence = fenceMatch[1];
+  assert.ok(fence.includes("CODES="), "sanity: the matched fence must actually contain the CODES= binding, not the illustrative fence");
   assert.ok(
     !/git log/.test(fence),
-    "the EXECUTABLE derivation fence must not invoke `git log` — that is the round-2 committed-history rule (F7 regression class)",
+    "the EXECUTABLE CODES= fence must not invoke `git log` — that is the round-2 committed-history rule (F7 regression class)",
   );
   assert.ok(
     !/diff-filter/.test(fence),
-    "the EXECUTABLE derivation fence must not contain --diff-filter=A — that is the round-2 rule that returned EMPTY on 2 of the last 6 releases (F7)",
+    "the EXECUTABLE CODES= fence must not contain --diff-filter=A — that is the round-2 rule that returned EMPTY on 2 of the last 6 releases (F7)",
   );
   assert.ok(
     fence.includes('git ls-tree -r --name-only "$PREV_TAG" -- qa_reports/'),
-    "the EXECUTABLE derivation fence must use git ls-tree as its membership predicate",
+    "the CODES= fence must use git ls-tree as qa_reports/'s membership predicate",
   );
+  assert.ok(
+    fence.includes('git ls-tree -r --name-only "$PREV_TAG" -- review_reports/'),
+    "the CODES= fence must use git ls-tree as review_reports/'s membership predicate too (E50)",
+  );
+});
+
+test("E50 step 7a (N14 follow-up): the illustrative fence and the executable CODES= fence carry an identical find/grep -vxFf predicate pair per tree", () => {
+  // N14's remedy is sequenced: this ticket repoints the pin (test above); a
+  // follow-up ticket collapses the two fences into one, since every future
+  // edit to the membership predicate currently has to be made twice and only
+  // one copy is under test. Until that lands, pin that the duplicate cannot
+  // silently diverge.
+  const illustrativeMatch = SKILL.match(/```\n(\s*find qa_reports -maxdepth 1[\s\S]*?)```/);
+  const executableMatch = SKILL.match(/```\n(\s*CODES=\$\( \{[\s\S]*?)```/);
+  assert.ok(illustrativeMatch && executableMatch, "both fences must be present in the shipped text");
+
+  const normalize = (s) =>
+    s
+      .replace(/\[ -z "\$EXCLUDE_(QA|RR)" \] && /g, "") // only the executable fence gates each pipeline on EXCLUDE_*
+      .replace(/\\\n/g, " ") // shell line-continuation, not a semantic difference
+      .replace(/\s+/g, " ")
+      .trim();
+
+  const illustrative = normalize(illustrativeMatch[1]);
+  const executable = normalize(executableMatch[1]);
+  for (const tree of ["qa_reports", "review_reports"]) {
+    const pairRe = new RegExp(
+      `find ${tree} -maxdepth 1 -type f \\| sort \\| grep -vxFf <\\(git ls-tree -r --name-only "\\$PREV_TAG" -- ${tree}/\\)`,
+    );
+    const fromIllustrative = illustrative.match(pairRe);
+    const fromExecutable = executable.match(pairRe);
+    assert.ok(fromIllustrative, `illustrative fence must contain the ${tree}/ find/grep -vxFf pair`);
+    assert.ok(fromExecutable, `executable fence must contain the ${tree}/ find/grep -vxFf pair`);
+    assert.equal(
+      fromIllustrative[0],
+      fromExecutable[0],
+      `${tree}/'s find/grep -vxFf pair must stay byte-identical (modulo the EXCLUDE_* guard clause and whitespace) between the two fences until they are collapsed into one`,
+    );
+  }
 });
 
 test("E49 step 7a (F7 regression — the single most important assertion in this suite): v3.93.0 shape — evidence untracked at root, absent from PREV_TAG's tree, still yields a non-empty code", () => {
@@ -1084,24 +1249,42 @@ test("E49 step 7a (N2): filenames with no T-<CODE>- substring (expected-red_*) a
   );
 });
 
-test("E49 step 7a (N4, non-blocking hazard — recorded per review round 3, NOT fixed in this ticket): an empty PREV_TAG baseline currently admits every root-level file", () => {
-  // Round 3's N4 (non-blocking): `grep -vxFf` with an empty pattern file
-  // passes its whole input through. No guard clause exists in the shipped
-  // text for an empty/unresolvable PREV_TAG baseline (first-ever release, or
-  // a repo that adopted agc mid-life) — confirmed absent from
-  // content/skill-release-engineer.md by this test file's author. Per the
-  // review's own instruction ("if the guard is not added, assert the current
-  // permissive behavior explicitly so the hazard is recorded in the suite
-  // rather than discovered in a consumer workspace"), this test pins the
-  // CURRENT behavior. This is a record of a known hazard, not a passing
-  // grade — N4 is explicitly out of T-E44-02's scope to fix.
+test("E50 step 7a (Item 0 — F9 CLOSED, N4 hazard closed): an empty PREV_TAG baseline WITH root files present now STOPs instead of admitting every root-level file", () => {
+  // This test REPLACES, in place, the prior pin at this exact location that
+  // asserted deriveCodesFromWorkingTree(["...E45...","...OLD..."], []) ->
+  // ["E45","OLD"] as "current (unguarded) behavior ... NOT this ticket's to
+  // fix" (round 3's N4). review_T-E50-02.md's Item 0 is explicit: E50 exists
+  // to close exactly this hazard, so leaving that pin standing beside a new
+  // guard test would assert the mass-sweep this ticket was written to kill —
+  // two tests pinning opposite behaviors is a contradiction, and the stale
+  // one reads as sanction for the permissive path. Rewritten in place; the
+  // ["E45","OLD"] fixture is carried forward as the set that must NOT be
+  // produced.
   const workingTree = ["qa_reports/review_T-E45-01.md", "qa_reports/review_T-OLD-01.md"];
   const prevTagTree = []; // empty baseline: no tags yet, or PREV_TAG predates qa_reports/
-  const { codes } = deriveCodesFromWorkingTree(workingTree, prevTagTree);
+
+  const flags = deriveGuardFlags({
+    prevTag: "v1.0.0",
+    qaDirExists: true,
+    qaBaselineNonEmpty: prevTagTree.length > 0,
+    qaRootFilesPresent: workingTree.some((f) => path.posix.dirname(f) === "qa_reports"),
+  });
+  assert.equal(
+    flags.STOP_QA,
+    true,
+    "an empty qa_reports/ baseline WHILE qa_reports/ root holds files an unbounded sweep would take must STOP (F9) — the exact shape the pre-E50 pin called permissive-by-design",
+  );
+  assert.equal(flags.EXCLUDE_QA, false, "STOP and EXCLUDE are mutually exclusive outcomes for the same tree in the same run");
+
+  // Sanity: the underlying per-file derivation logic is UNCHANGED by E50 (it
+  // is the guard that gates whether it may run, not the derivation itself)
+  // — so this remains the exact dangerous set F9's guard exists to keep the
+  // SOP from ever deriving on this input.
+  const { codes: wouldHaveBeenDerived } = deriveCodesFromWorkingTree(workingTree, prevTagTree);
   assert.deepEqual(
-    codes,
+    wouldHaveBeenDerived,
     ["E45", "OLD"],
-    "current (unguarded) behavior: an empty baseline admits every root file, including one unrelated to this release (N4) — a backlog candidate, not a regression introduced by this ticket, and NOT this ticket's to fix",
+    "carried-forward fixture: this is the mass-sweep set that must never be produced when the guard is honored (per-tree STOP fires before this derivation is reached)",
   );
 });
 
@@ -1126,4 +1309,274 @@ test("E49/E44 step-order pin: step 7a precedes step 8 in the file, and 7a's deri
     !/git show HEAD\b/.test(section7a),
     "step 7a must not reference the release commit's own content via `git show HEAD` (F2 regression class)",
   );
+});
+
+// ---------------------------------------------------------------------------
+// Phase 8 — E50: step 7a per-tree empty-baseline guard, review_reports/
+// extension, and the extraction-chain filename-shape matrix.
+// review_reports/review_T-E50-02.md, "Test-coverage note for T-E50-03 —
+// FINAL, supersedes Round 1" (12 items, ordered by consequence). Items 0
+// (guard flip) and 1 (N14 fence repoint) are addressed in place above; the
+// remainder follow here.
+// ---------------------------------------------------------------------------
+
+test("E50 step 7a (Item 3 — 14-row filename-shape matrix, attack 1): the shipped extraction chain produces exactly these codes, or none", () => {
+  const cases = [
+    ["review_T-RELSOP-01.md", "RELSOP"], // v3.91.0 depends on this shape
+    ["review_T-E4X-03.md", "E4X"], // alphanumeric code preserved
+    ["visual_T-E36-01.md", "E36"], // visual_ prefix handled
+    ["review_T-E11E12-02.md", "E11E12"], // matches a real multi-ticket task id
+    ["review_T-C7-CR.md", "C7"], // trailing non-numeric segment
+    ["T-E51-01.md", "E51"], // no review_/visual_ prefix at all -- [a-z_]* matches empty
+    ["expected-red_e50-release-sop-step7a-hardening.txt", null], // moved by its own bullet, never enters <CODES>
+    ["expected-red_T-E51-01.txt", null], // adversarial: a real code embedded in an expected-red_ name still must not enter <CODES>
+    ["review_C1-02.md", null], // legacy pre-convention name (no T-<CODE>- token)
+    ["review_b8.md", null], // legacy pre-convention name
+    ["README.md", null], // no prefix, no T-<CODE>- token
+    ["REVIEW_T-E51-01.md", null], // uppercase prefix breaks the lowercase [a-z_]* class
+    ["review_t-e51-01.md", null], // lowercase "t-" breaks the literal uppercase "T-" match
+    ["review_T-PGAT.md", null], // N16: no trailing "-<segment>" after the code, invisible end-to-end
+  ];
+  for (const [filename, expected] of cases) {
+    assert.equal(
+      codeFromFilename(filename),
+      expected,
+      `${filename} must derive ${expected === null ? "no code" : `"${expected}"`}`,
+    );
+  }
+});
+
+test("E50 step 7a (N15, recorded not fixed): the [a-z_]* prefix class is wider than review_/visual_ and over-accepts a stray non-convention filename", () => {
+  // Non-blocking per review_T-E50-02.md — not fixed in this ticket, pinned so
+  // the over-accept is visible in the suite rather than rediscovered.
+  assert.equal(codeFromFilename("notes_about_T-E99-01_backup.md"), "E99");
+  assert.equal(codeFromFilename("archive_T-E51-01.md"), "E51");
+});
+
+test("E50 step 7a (F9 — per-tree guard, all shapes): tree absent, baseline empty with/without root files, and the globally-unset PREV_TAG case", () => {
+  // Tree absent -> EXCLUDE; the other tree is unaffected.
+  assert.deepEqual(
+    deriveGuardFlags({ prevTag: "v1.0.0", rrDirExists: false, qaBaselineNonEmpty: true }),
+    { STOP_QA: false, STOP_RR: false, EXCLUDE_QA: false, EXCLUDE_RR: true },
+  );
+
+  // Baseline empty + zero root files -> EXCLUDE (nothing to protect, nothing to sweep).
+  let flags = deriveGuardFlags({ prevTag: "v1.0.0", qaBaselineNonEmpty: false, qaRootFilesPresent: false });
+  assert.equal(flags.EXCLUDE_QA, true, "empty baseline with nothing at root must EXCLUDE, not STOP");
+  assert.equal(flags.STOP_QA, false);
+
+  // Baseline empty + root files present -> STOP (the real N4 hazard).
+  flags = deriveGuardFlags({ prevTag: "v1.0.0", qaBaselineNonEmpty: false, qaRootFilesPresent: true });
+  assert.equal(flags.STOP_QA, true, "empty baseline with root files present must STOP");
+  assert.equal(flags.EXCLUDE_QA, false);
+
+  // PREV_TAG unset -> both trees STOP, unconditionally (genuinely global: no
+  // baseline exists for ANY tree, a property of the repo, not of a tree).
+  assert.deepEqual(
+    deriveGuardFlags({ prevTag: "", qaBaselineNonEmpty: true, rrDirExists: false }),
+    { STOP_QA: true, STOP_RR: true, EXCLUDE_QA: false, EXCLUDE_RR: false },
+  );
+
+  // Baseline non-empty -> neither STOP nor EXCLUDE; the tree participates normally.
+  assert.deepEqual(
+    deriveGuardFlags({ prevTag: "v1.0.0", qaBaselineNonEmpty: true, rrBaselineNonEmpty: true }),
+    { STOP_QA: false, STOP_RR: false, EXCLUDE_QA: false, EXCLUDE_RR: false },
+  );
+});
+
+test("E50 step 7a (Item 4 — F9 CLOSED, the permanent-wedge shape from round 1): a workspace whose review_reports/ tree never exists proceeds across THREE CONSECUTIVE releases, not just once", () => {
+  // Round 1's F9 finding: a global-OR guard STOPped this shape at release 2
+  // and recurred at release 3, forever -- self-inflicted, since nothing in
+  // the loop ever creates review_reports/. A fix that merely DEFERS the STOP
+  // (e.g. only clears at release 2) would still fail this test, because it
+  // asserts the SAME workspace shape at three consecutive tags. Mature
+  // workspace: qa_reports/ already has a non-empty baseline BEFORE this
+  // fixture's window (a "review_T-PRIOR-01.md" from an earlier release) so
+  // qa_reports/'s own guard outcome is "included" throughout, isolating
+  // review_reports/'s permanent absence as the only variable under test.
+  const releases = [
+    {
+      prevTag: "v1.0.0",
+      qaWorkingTree: ["qa_reports/review_T-PRIOR-01.md", "qa_reports/review_T-NEW-01.md"],
+      qaPrevTagTree: ["qa_reports/review_T-PRIOR-01.md"],
+    },
+    {
+      prevTag: "v1.1.0",
+      qaWorkingTree: ["qa_reports/review_T-PRIOR-01.md", "qa_reports/review_T-NEW-01.md", "qa_reports/review_T-NEXT-01.md"],
+      qaPrevTagTree: ["qa_reports/review_T-PRIOR-01.md", "qa_reports/review_T-NEW-01.md"],
+    },
+    {
+      prevTag: "v1.2.0",
+      qaWorkingTree: [
+        "qa_reports/review_T-PRIOR-01.md",
+        "qa_reports/review_T-NEW-01.md",
+        "qa_reports/review_T-NEXT-01.md",
+        "qa_reports/review_T-FOUR-01.md",
+      ],
+      qaPrevTagTree: ["qa_reports/review_T-PRIOR-01.md", "qa_reports/review_T-NEW-01.md", "qa_reports/review_T-NEXT-01.md"],
+    },
+  ];
+  const expectedNewCode = ["NEW", "NEXT", "FOUR"];
+  releases.forEach((release, i) => {
+    const flags = deriveGuardFlags({
+      prevTag: release.prevTag,
+      qaDirExists: true,
+      qaBaselineNonEmpty: release.qaPrevTagTree.length > 0,
+      qaRootFilesPresent: true,
+      rrDirExists: false, // review_reports/ has NEVER been created in this workspace
+    });
+    assert.equal(flags.EXCLUDE_RR, true, `release ${i + 1}: an absent review_reports/ tree must EXCLUDE, not STOP`);
+    assert.equal(flags.STOP_QA, false, `release ${i + 1}: the qa_reports/ half must be unaffected by review_reports/'s permanent absence`);
+    const { codes } = deriveCodesUnion({
+      qaWorkingTree: release.qaWorkingTree,
+      qaPrevTagTree: release.qaPrevTagTree,
+      excludeRr: true,
+    });
+    assert.ok(
+      codes.includes(expectedNewCode[i]),
+      `release ${i + 1} must still derive its own new code (${expectedNewCode[i]}) -- the wedge from round 1 must not recur or merely defer`,
+    );
+  });
+});
+
+test("E50 step 7a (Item 5/7 — seven-release backtest, union adds zero extra codes on real history): union(qa_reports, review_reports) equals the qa_reports column on all seven releases", () => {
+  // Ported from review_reports/review_T-E50-02.md's round-2 seven-release
+  // table (re-run against the shipped guard + CODES= blocks in seven detached
+  // worktrees). review_reports/'s <CODES> is always a SUBSET of the same
+  // release's qa_reports/ set in this repo's actual history -- the union
+  // therefore adds nothing extra, on every row.
+  const releases = [
+    { tag: "v3.91.0", qa: ["E25", "E27", "E28", "E29", "E30", "E32", "E33", "RELSOP"], rr: ["E25", "E32"] },
+    { tag: "v3.92.0", qa: ["E34"], rr: ["E34"] },
+    { tag: "v3.92.1", qa: ["E35"], rr: ["E35"] },
+    { tag: "v3.93.0", qa: ["E36"], rr: ["E36"] },
+    { tag: "v3.94.0", qa: ["E37", "E38"], rr: ["E37", "E38"] },
+    { tag: "v3.95.0", qa: ["E45", "E46"], rr: ["E45", "E46"] },
+    { tag: "v3.96.0", qa: ["E44", "E49", "E4X"], rr: ["E4X"] }, // the highest-value row: review_reports/ contributes at all
+  ];
+  for (const { tag, qa, rr } of releases) {
+    const qaWorkingTree = qa.map((c) => `qa_reports/review_T-${c}-01.md`);
+    const rrWorkingTree = rr.map((c) => `review_reports/review_T-${c}-01.md`);
+    const { codes } = deriveCodesUnion({ qaWorkingTree, qaPrevTagTree: [], rrWorkingTree, rrPrevTagTree: [] });
+    assert.deepEqual(
+      codes,
+      [...qa].sort(),
+      `${tag}: union must equal the qa_reports column exactly -- review_reports/ contributes nothing beyond it in this repo's real history`,
+    );
+  }
+});
+
+test("E50 step 7a (Item 6 — the real v3.96.0 collision): identical basenames in both trees resolve to distinct, non-clobbering destinations", () => {
+  const activeFeature = "e44-e49-release-sop-conditional-checks";
+  const moves = resolveMoves({
+    qaAdmitted: ["qa_reports/review_T-E4X-03.md"],
+    rrAdmitted: ["review_reports/review_T-E4X-03.md"],
+    activeFeature,
+  });
+  assert.equal(moves.length, 2, "both files must be scheduled to move -- neither may be dropped because of the shared basename");
+  const destinations = moves.map((m) => m.to);
+  assert.equal(
+    new Set(destinations).size,
+    2,
+    "the two destinations must differ -- a single shared destination would make `mv -n` silently skip whichever file arrives second (the real v3.96.0 collision)",
+  );
+  assert.ok(destinations.includes("qa_reports/archive/e44-e49-release-sop-conditional-checks/review_T-E4X-03.md"));
+  assert.ok(destinations.includes("review_reports/archive/e44-e49-release-sop-conditional-checks/review_T-E4X-03.md"));
+});
+
+test("E50 step 7a (Item 7 — real v3.96.0 shape): E44/E49 enter <CODES> from qa_reports/ alone; the review_reports/ move matches nothing for them and no-ops", () => {
+  const qaWorkingTree = ["qa_reports/review_T-E44-01.md", "qa_reports/review_T-E49-01.md", "qa_reports/review_T-E4X-03.md"];
+  const rrWorkingTree = ["review_reports/review_T-E4X-03.md"];
+  const { codes } = deriveCodesUnion({ qaWorkingTree, qaPrevTagTree: [], rrWorkingTree, rrPrevTagTree: [] });
+  assert.deepEqual(codes, ["E44", "E49", "E4X"], "union must include E44/E49 from qa_reports/ alone plus E4X from both trees");
+
+  // The review_reports/ move bullet matches root files whose id is in
+  // <CODES> -- with no E44/E49 file present in review_reports/, it moves
+  // nothing for those two codes; only E4X's file (genuinely present in both
+  // trees) moves, from each tree to its OWN archive dir (Item 6).
+  const rrMoved = rrWorkingTree.filter((f) => codes.some((c) => path.posix.basename(f).includes(`T-${c}-`)));
+  assert.deepEqual(
+    rrMoved,
+    ["review_reports/review_T-E4X-03.md"],
+    "review_reports/ must not fabricate moves for codes that exist only in qa_reports/, and a retried mv -n over the same match stays idempotent",
+  );
+});
+
+test("E50 step 7a (Item 8 — covers: sweep stays in its own tree): a review_reports/*.md file whose covers: line matches <CODES> resolves to review_reports/archive/, never qa_reports/archive/", () => {
+  const activeFeature = "e44-e49-release-sop-conditional-checks";
+  const coversLine = "covers: T-E4X-03, T-E44-01, T-E49-01";
+  const codes = ["E44", "E49", "E4X"];
+  const coveredIds = coversLine.replace(/^covers:\s*/, "").split(",").map((s) => s.trim());
+  const intersects = coveredIds.some((id) => codes.some((c) => id === `T-${c}` || id.startsWith(`T-${c}-`)));
+  assert.ok(intersects, "sanity: this covers: line does intersect <CODES>");
+
+  // Destination is resolved per SOURCE TREE, never by which codes matched --
+  // a review_reports/*.md file's covers: sweep can never land in
+  // qa_reports/archive/, and symmetrically.
+  assert.equal(resolveDestination("review_reports", activeFeature), `review_reports/archive/${activeFeature}/`);
+  assert.notEqual(resolveDestination("review_reports", activeFeature), resolveDestination("qa_reports", activeFeature));
+});
+
+test("E50 step 7a (Item 9 — non-retroactivity, highest-consequence regression pin): a baseline containing a review_reports/ root file excludes that id, even across the 103 legacy files", () => {
+  // Real v3.96.0 shape (review_T-E50-02.md round 2): E45 sits in v3.95.0's
+  // review_reports/ baseline because the coordinator's manual R100 cleanup
+  // committed it there. The NEXT release must not re-derive E45 from
+  // review_reports/ even though the rule correctly does NOT know or care WHY
+  // it is already in the baseline -- a bug here mass-relocates the project's
+  // entire code-review history.
+  const rrWorkingTree = ["review_reports/review_T-E45-01.md", "review_reports/review_T-E51-01.md"];
+  const rrPrevTagTree = ["review_reports/review_T-E45-01.md"]; // already recorded in the previous release's tree
+  const { codes } = deriveCodesUnion({ rrWorkingTree, rrPrevTagTree });
+  assert.deepEqual(codes, ["E51"], "E45 must be excluded -- it is already in PREV_TAG's review_reports/ tree, non-retroactive by construction");
+
+  // Scaled check: a legacy review_reports/ root file already in every recent
+  // baseline (the 103 pre-E50 files at that root are all in this shape) must
+  // never be swept into a new feature's <CODES>, no matter how old.
+  const legacyFile = "review_reports/review_T-RELSOP-01.md"; // v3.91.0-era, in every baseline since
+  const { codes: legacyCodes } = deriveCodesUnion({
+    rrWorkingTree: [legacyFile, ...rrWorkingTree],
+    rrPrevTagTree: [legacyFile, ...rrPrevTagTree],
+  });
+  assert.ok(
+    !legacyCodes.includes("RELSOP"),
+    "a legacy review_reports/ file already in every recent baseline must never be swept into a new feature's <CODES>",
+  );
+});
+
+test("E50 step 7a (Item 4 continued — directory absence on disk): review_reports/ not present at all is EXCLUDE, not an error, and contributes nothing", () => {
+  // `find review_reports -maxdepth 1` exits 1 with "No such file or
+  // directory" when the tree is absent -- a real path a teamwork-lite
+  // consumer workspace takes (code-reviewer never dispatched, so
+  // review_reports/ never comes into existence). The guard must route this
+  // to EXCLUDE before any find/grep runs against the missing directory.
+  const flags = deriveGuardFlags({ prevTag: "v3.96.0", rrDirExists: false });
+  assert.equal(flags.EXCLUDE_RR, true);
+  assert.equal(flags.STOP_RR, false);
+  const { codes, admitted } = deriveCodesUnion({
+    qaWorkingTree: ["qa_reports/review_T-E50-01.md"],
+    qaPrevTagTree: [],
+    rrWorkingTree: ["review_reports/review_T-SHOULD-NOT-APPEAR-01.md"], // must never be consulted when excluded
+    rrPrevTagTree: [],
+    excludeRr: true,
+  });
+  assert.deepEqual(codes, ["E50"], "an excluded review_reports/ tree must contribute nothing, even if a caller mistakenly passes it working-tree data");
+  assert.ok(!admitted.some((f) => f.startsWith("review_reports/")), "no review_reports/ path may enter the admitted set when EXCLUDE_RR is set");
+});
+
+test("E50 step 7a: the guard block precedes the CODES= derivation, mkdir, and move bullets, and performs no writes itself", () => {
+  const idx7a = SKILL.indexOf("7a. **Archive shipped feature's qa_reports**");
+  const guardIdx = SKILL.indexOf("STOP_QA= STOP_RR= EXCLUDE_QA= EXCLUDE_RR=");
+  const codesIdx = SKILL.indexOf("CODES=$( {");
+  const mkdirIdx = SKILL.indexOf("`mkdir -p` the archive dir for each tree that is NOT");
+  assert.ok(idx7a > -1 && guardIdx > -1 && codesIdx > -1 && mkdirIdx > -1, "must locate step 7a, the guard block, the CODES= derivation, and the mkdir bullet");
+  assert.ok(idx7a < guardIdx, "the guard must live inside step 7a");
+  assert.ok(guardIdx < codesIdx, "the guard must precede the CODES= derivation -- a guard evaluated after the sweep is worthless");
+  assert.ok(codesIdx < mkdirIdx, "the CODES= derivation must precede the mkdir bullet");
+
+  const guardFence = SKILL.match(/```\n(\s*STOP_QA= STOP_RR=[\s\S]*?)```/);
+  assert.ok(guardFence, "must find the guard's fenced code block");
+  const guard = guardFence[1];
+  assert.ok(!/\bmv\b/.test(guard), "the guard block must contain no `mv` -- it must not itself be capable of sweeping");
+  assert.ok(!/mkdir/.test(guard), "the guard block must contain no `mkdir`");
+  assert.ok(!/git add/.test(guard), "the guard block must contain no `git add`");
 });
