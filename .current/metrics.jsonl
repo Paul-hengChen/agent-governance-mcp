@@ -18,3 +18,4 @@
 {"ts":"2026-08-10T06:47:46.991Z","feature":"e46-qa-spec-defect-status-rule","tickets":1,"qa_rounds":0,"review_rounds":2,"visual_rounds":0,"hops":9,"one_pass":false,"released_version":"3.95.0"}
 {"ts":"2026-08-10T11:14:44.790Z","feature":"e44-e49-release-sop-conditional-checks","tickets":2,"qa_rounds":0,"review_rounds":2,"visual_rounds":0,"hops":9,"one_pass":false,"released_version":"3.96.0"}
 {"ts":"2026-08-11T03:30:51.889Z","feature":"e50-release-sop-step7a-hardening","tickets":3,"qa_rounds":0,"review_rounds":1,"visual_rounds":0,"hops":6,"one_pass":false,"released_version":"3.97.0"}
+{"ts":"2026-08-11T09:36:06.073Z","feature":"e51-skill-render-strip-parity","tickets":3,"qa_rounds":0,"review_rounds":0,"visual_rounds":0,"hops":4,"one_pass":true,"released_version":"3.97.1"}

@@ -1,22 +1,25 @@
 ---
 schema_version: 13
-active_feature: "e50-release-sop-step7a-hardening"
+active_feature: "e51-skill-render-strip-parity"
 status: "In_Progress"
-last_updated: "2026-08-11T03:30:51.883Z"
-last_agent: "pm"
+last_updated: "2026-08-11T09:36:06.067Z"
+last_agent: "release-engineer"
 prd_path: "/Users/paul.ph.chen/agent-governance-mcp/docs/backlog.md"
 scope_decision: "single-feature"
-scope_decision_why: "E50 (backlog execution order 2026-08-10 post-v3.96.0, order 2). Backlog row IS the spec -> mini-chain sr-engineer -> code-reviewer -> qa-engineer, PM/ARCH skipped (E35-E38/E44-E49 pattern). Four step-7a fixes in content/skill-release-engineer.md:56-64, all from E49's own code review (review_reports/review_T-E4X-03.md rounds 2-3): (a) empty-baseline guard — when PREV_TAG is unset or `git ls-tree -r --name-only \"$PREV_TAG\" -- qa_reports/` returns empty, grep -vxFf passes its whole input through and mass-sweeps every root evidence file into one feature's archive dir; there is no baseline to diff against, so surface and route to human instead of sweeping; (b) zero-match logging — log the derived <CODES> even when empty, so empty-by-design is distinguishable from empty-by-breakage (that ambiguity hid F7 through two review rounds); (c) scan scope — extend to review_reports/ under the same membership predicate; (d) N5 shell portability. Two questions the row left open are PINNED by coordinator decision, do not re-litigate: (c) destination is a parallel review_reports/archive/<active_feature>/, NOT folded into qa_reports/archive/<active_feature>/ — the streams share basenames (review_T-E4X-03.md is in BOTH qa_reports/archive/e44-e49-.../ and review_reports/ in v3.96.0 commit 27f59e2), so one shared dir makes mv -n silently skip the second file, the exact silent-orphan class this ticket kills; (d) state the bash/zsh dependency in one parenthetical rather than rewriting without <(...) — the shell is bash/zsh (verified 6x in E49 review), failure is loud not silent, and reshaping the predicate reopens a derivation that took three rounds to converge. Constitution must NOT be edited. Human approved inline 2026-08-11 (\"ok, do it\"); auto-tier does not apply (P2 > maxPriority P3)."
+scope_decision_why: "E51 (backlog order 3, post-v3.96.0 table amended 2026-08-11). Backlog row IS the spec -> mini-chain sr-engineer -> code-reviewer -> qa-engineer, PM/ARCH skipped (E35-E38/E44-E49/E50 pattern). Defect verified in source: prompts/build.ts:391 stripOriginTags(taggedBody) + :397 fullDetail ? rawBody : stripRationale(rawBody); tools/role.ts:94 parseSkillFile(expandPartials(raw,loadFile)) returns body raw at :109, no strip. Both paths already share composeSkill -> expandPartials -> parseSkillFile. FOUR DECISIONS PINNED by coordinator boundary read; do not re-litigate: (1) shared helper in NEW prompts/text-transforms.ts, called by both AFTER parseSkillFile - NOT relocated into composeSkill/expandPartials, which sees frontmatter (build.ts:389: origin fences live in body prose, never YAML) and must not know fullDetail; (2) build.ts must RE-EXPORT stripRationale/stripOriginTags - ~40 call sites in test/context-budget.test.mjs + scripts/measure-context-cost.mjs import them from dist/prompts/build.js and Constitution section 2 bars sr from test logic, so re-export = zero test churn; (3) tools/role.ts gets non-fullDetail semantics (strip both) - tw_switch_role is the dispatch path and the acting agent is exactly who the markers are hidden from; (4) bin/agent-governance-context.mjs is a THIRD unstripped path, OUT OF SCOPE: non-stripping there is deliberate DR-2/DR-3 single-copy design (build.ts:80-82, :105-107), so revisiting it is a separate row. Comments falsified by this change, in scope for T-E51-01: build.ts:81, build.ts:106, tools/role.ts:89-92. AC: (1) no origin/rationale marker in tw_switch_role output for any ROLE_SKILL_MAP role; (2) all 8 test/fixtures/compose-golden/* byte-identical (pure refactor on the build path); (3) both strippers still importable from dist/prompts/build.js; (4) 1633/1633 green + new strip-parity tests; (5) hook untouched. Human approved inline 2026-08-11; auto-tier N/A (P2 over maxPriority P3, 3 files over maxFiles 2)."
+cut_approved: true
 dispatch_pins:
   sr-engineer: "fable"
   release-engineer: "opus"
 evidence_schema: 2
+next_role: "pm"
+dispatched_at: "2026-08-11T09:36:06.067Z"
 qa_round: 0
 review_round: 0
 visual_round: 0
-hop_count: 7
+hop_count: 4
 qa_rounds_total: 0
-review_rounds_total: 1
+review_rounds_total: 0
 visual_rounds_total: 0
 ---
 # Handoff State
@@ -25,11 +28,8 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- PM intake pass complete (2026-08-11), docs/backlog.md only, nothing implemented, no cut approved, no active_feature change, tasks.md untouched at zero open tasks.
-- Filed E53 (P2, standalone: release-engineer:Blocked unreachable, tools/transitions.ts fix + recommend auditing all roles' :Blocked reachability, not just this one). Filed E54 (P3, bundles N14 fence-dup + N15 regex-width, both content/skill-release-engineer.md step 7a, both cosmetic/non-blocking).
-- Filed E55 (P2): release-engineer structurally cannot self-file findings (2/2 releases now needed a separate PM pass). Recommend option (ii) - explicit post-release PM-intake-pass step in coordinator/release SOP. Rejected (i) allowlist-widen (role-boundary blur) and (iii) gate-on-unfiled-findings (infra ahead of evidence). Cost so far: a round trip, not a lost finding - both instances were caught.
-- Folded second dated instances into existing rows: E40 (sr-engineer completed_tasks prefill during E50; fix sharpened to close at the write, not the PASS) and E52 (v3.97.0 review_rounds:1 for a 2-round feature; now a confirmed pattern, not a single instance).
-- Amended the post-v3.96.0 execution-order table in place (not a new dated table): marked order 2 (E50) shipped v3.97.0; inserted E53 at order 4, E55 at order 7 (batched with E43, same fix-shape precedent), E54 at order 10 (lowest urgency, after T-E50-03's in-flight fence-identity test). E51 (order 3) is next up and needs an architect look before cutting per its own row. No content/tools/gates/tests touched.
+- Released v3.97.1
+- tag: 5f31c81
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.
