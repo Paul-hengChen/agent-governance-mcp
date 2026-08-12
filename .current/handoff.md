@@ -1,35 +1,49 @@
 ---
 schema_version: 13
-active_feature: "e53-blocked-reachability"
+active_feature: "e57-dependency-advisory-decisions"
 status: "PASS"
-last_updated: "2026-08-11T11:08:12.508Z"
+last_updated: "2026-08-12T02:39:25.967Z"
 last_agent: "qa-engineer"
 prd_path: "/Users/paul.ph.chen/agent-governance-mcp/docs/backlog.md"
 scope_decision: "single-feature"
-scope_decision_why: "E53 (backlog order 4, P2). Backlog row IS the spec -> mini-chain sr-engineer -> code-reviewer -> qa-engineer, PM/ARCH skipped (E35-E51 pattern). CUT, 4 files: (1) tools/transitions.ts - release-engineer:In_Progress += {release-engineer, Blocked}; NEW key release-engineer:Blocked -> [release-engineer:In_Progress, pm:In_Progress, qa-engineer:In_Progress]; sr-engineer:Blocked += {design-auditor, In_Progress} (gap B, see notes). (2) specs/qa-flow-enforcement-architecture.md - mirror ONLY those three rows; the file's broader drift is E39, explicitly not this cut. (3) content/skill-release-engineer.md - :84 and :159 both assert the edge is unreachable and are falsified by (1); human chose option (b): convert step 7a's empty-baseline STOP into a real Escalation Routes row on the now-reachable edge and delete both workaround notes. Rows :152-157 are byte-pinned by test/release-staging.test.mjs:757 and test/verify-release.test.mjs:701 - do NOT touch them. (4) tests - qa-engineer only (const section 2). AC: (1) release-engineer:In_Progress -> release-engineer:Blocked accepted; (2) release-engineer:Blocked -> each of pm / qa-engineer / release-engineer In_Progress accepted, no longer allowed=[]; (3) sr-engineer:Blocked -> design-auditor:In_Progress accepted; (4) no other previously-rejected edge opened; (5) the three mirror rows match source, remaining drift left to E39; (6) zero remaining \"unreachable\" claims in skill-release-engineer.md, step 7a is a table row, :152-157 unchanged; (7) 1633/1633 green + new edge tests. Human approved inline 2026-08-11 in the coordinator's own chat turn; auto-tier N/A (P2 over maxPriority P3, 4 files over maxFiles 2)."
+scope_decision_why: "E57 (backlog order 5, P2). Backlog row IS the spec -> mini-chain sr-engineer -> code-reviewer -> qa-engineer, PM/ARCH skipped. Auto-tier N/A (P2 > maxPriority P3; 4 files > maxFiles 2). Human approved inline 2026-08-11 in the coordinator's OWN chat turn (\"ok, do it\") after the triage table + verified recipe were presented.\n\nPHASE 1 coordinator-direct triage COMPLETE. js-yaml (direct ^4.1.1 @ 4.2.0, load-bearing at tools/handoff-parse.ts:175) UPGRADE — 4.3.1 clears both advisories in-range; the backlog row's \"4.2.0 still flagged so not a routine bump\" is FALSIFIED (4.3.1 shipped after filing). fast-uri (SDK->ajv@8.20.0->^3.0.1 @ 3.1.2) UPGRADE — 3.1.5 in-range, lockfile-only. ip-address (SDK->express-rate-limit@8.5.1->^10.2.0 @ 10.2.0) UPGRADE — 10.5.0 in-range, lockfile-only. sharp (under @xenova/transformers ^0.32.0 @ 0.32.6) UPGRADE via package.json overrides. @xenova/transformers closes with sharp; do NOT swap packages (@huggingface/transformers@4.2.0 still pins sharp ^0.34.5, also vulnerable), reject npm audit fix's semver-major DOWNGRADE to 1.4.2.\n\nsharp-pair reachability: UNREACHABLE in stdio mode entirely (tools/rag.ts:190 and :255 refuse without --port; embedText's only other caller is tools/storage-sqlite.ts:820). Under SQLite mode sharp enters require.cache at transformers import but the native binding never loads, and the path is text-only feature-extraction — the libvips decode CVEs have no input channel.\n\nVERIFIED RECIPE (isolated lockfile copy, audit exit=0): js-yaml ^4.1.1->^4.3.1 + overrides {\"sharp\":\"^0.35.3\"}, then npm install --package-lock-only; npm update fast-uri ip-address --package-lock-only. Exactly 4 packages move; SDK STAYS 1.29.0, transformers STAYS 2.17.2. Do NOT run plain npm audit fix (drags SDK->1.30.0 + hono). Residual 2 low + 4 moderate out of scope.\n\nCUT, 4 files: package.json; package-lock.json; docs/dependency-advisories.md (NEW); content/skill-release-engineer.md. Tests: qa-engineer ONLY. AC 1-7 in the dispatch prompt."
 cut_approved: true
+external_refs:
+  - ref: "GHSA-52cp-r559-cp3m + GHSA-5p4m-2wfm-xmqj (js-yaml quadratic CPU)"
+    state: "fetched"
+  - ref: "GHSA-v2hh-gcrm-f6hx + GHSA-7p8r-x3mc-p8w7 + GHSA-4c8g-83qw-93j6 (fast-uri host confusion)"
+    state: "fetched"
+  - ref: "GHSA-mwp4-54f8-5fhr (ip-address leading-zero octet SSRF)"
+    state: "fetched"
+  - ref: "GHSA-f88m-g3jw-g9cj (sharp/libvips CVE-2026-33327/33328/35590/35591)"
+    state: "fetched"
+  - ref: "research/xenova-reachability.md (prior in-repo reachability trace)"
+    state: "fetched"
 dispatch_pins:
   sr-engineer: "fable"
   release-engineer: "opus"
 evidence_schema: 2
+next_role: "release-engineer"
+dispatched_at: "2026-08-12T02:39:25.967Z"
 qa_round: 0
 review_round: 0
 visual_round: 0
-hop_count: 3
+hop_count: 6
 qa_rounds_total: 0
-review_rounds_total: 0
+review_rounds_total: 1
 visual_rounds_total: 0
 ---
 # Handoff State
 
 ## Completed
-- [x] T-E53-01
-- [x] T-E53-02
-- [x] T-E53-03
+- [x] T-E57-01
+- [x] T-E57-02
+- [x] T-E57-03
 
 ## Pending & Handoff Notes
-- QA: T-E53-01/02/03 PASS. Full review: qa_reports/review_T-E53-01.md (covers: T-E53-01, T-E53-02, T-E53-03). All 7 ACs verified independently; suite 1690/1690; build clean; audit unchanged (E57 pre-existing). Ready for release-engineer.
-- FOR COORDINATOR: file finding C1 as its own backlog ticket (not fixed here, out of E53's pinned scope) - content/skill-pm.md:28 stamps next_role="design-auditor" on a pm Blocked write but pm:Blocked lacks that edge (allowed=[pm:In_Progress, pm:Blocked] only). Identical defect shape to gap B (sr-engineer), which this cut fixed; pm was left inconsistent. 2-hop workaround exists (pm:Blocked -> pm:In_Progress -> design-auditor:In_Progress) so not urgent, but a coordinator honoring next_role literally hits TRANSITION_REJECTED.
+- QA: T-E57-01/02/03 PASS -- see qa_reports/review_T-E57-01.md
+- qa-engineer: known drift on T-E53-01/02/03 (tasks.md complete, handoff completed_tasks silent) is pre-existing E53 residue -- already QA-PASSed and committed (7b33f90, bb6bb2e), completed_tasks reset when active_feature changed. Do not tw_sync or tw_rollback_task against it; coordinator handles at feature close.
+- qa-engineer: fixed N1 (content/skill-release-engineer.md step 6a, :20 -> phrase-anchored 'the version-assertion-tests Hard rule') and N2 (docs/dependency-advisories.md:68 circular clause deleted) in this round -- both non-blocking, verified suite still 1692/1692 and byte-pinned Escalation Routes rows untouched after the edits.
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.
