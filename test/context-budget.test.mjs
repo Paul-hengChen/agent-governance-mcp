@@ -217,7 +217,7 @@ test("DR-5 guard (T-A12-09): no literal {{PARTIAL:...}} token may appear in any 
 
 // --- AC2: reduction -------------------------------------------------------
 
-test("AC2: lean always-on bundle is below the raw baseline and within target (<= 4544 ~tok)", () => {
+test("AC2: lean always-on bundle is below the raw baseline and within target (<= 4667 ~tok)", () => {
   // v3.24.0 (B2 backlog fix): cap raised from 2100 → 2300 to provide ~200-token
   // editing headroom. The v3.22.0 raise (2000 → 2100) left only a 2-token margin
   // (2098/2100), meaning any minor constitution/skill edit broke CI unexpectedly.
@@ -328,12 +328,23 @@ test("AC2: lean always-on bundle is below the raw baseline and within target (<=
   // ~tok (exact); cap set to the exact measured value per the established Phase-2
   // convention (no additional headroom). Growth (+59 ~tok) is proportionate to the one
   // bullet edit — not a blowout.
+  // e59-const6-waiver-clause (qa-owned bump, T-E59-03): cap raised from 4544 → 4667 to
+  // absorb the const-15-core-tail.md §6 "Dependency audit at build gate" bullet rewrite —
+  // the "unless waived in the PR description with rationale" escape was replaced with a
+  // pre-dated dependency-advisory-record disposition requirement (advisory id, decision,
+  // re-review trigger) that binds every build-running role, not just release-engineer
+  // (docs/backlog.md E59, origin review_T-E57-01 F7) — same core-tagged bullet as the
+  // e25 bump above, so it ships on this lean/lite path too. Independently re-measured
+  // (not trusted from sr-engineer's or code-reviewer's handoff notes, both of whom
+  // reported this exact figure) at 4667 ~tok (exact); cap set to the exact measured
+  // value per the established Phase-2 convention (no additional headroom). Growth
+  // (+123 ~tok) is proportionate to the one bullet rewrite — not a blowout.
   const liteSkill = fs.readFileSync(path.join(ROOT, "content", "skill-coordinator-lite.md"), "utf-8");
   const SEP = "\n\n---\n\n";
   const raw = approxTokens(CONSTITUTION + SEP + liteSkill);
   const lean = approxTokens(LEAN_CONSTITUTION + SEP + liteSkill);
   assert.ok(lean < raw, `lean (${lean}) must be < raw (${raw})`);
-  assert.ok(lean <= 4544, `lean always-on (${lean} ~tok) must meet the <= 4544 target (e25-git-vocabulary re-baseline)`);
+  assert.ok(lean <= 4667, `lean always-on (${lean} ~tok) must meet the <= 4667 target (e59-const6-waiver-clause re-baseline)`);
 });
 
 // --- AC3: enforcement preserved ------------------------------------------
@@ -867,7 +878,7 @@ test("AC7: exactly two balanced rationale fences, both outside §3.x", () => {
   assert.equal(ends, 2, "exactly two rationale:end markers");
 });
 
-test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the measured floor (≤ 8685 ~tok)", () => {
+test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the measured floor (≤ 8804 ~tok)", () => {
   // WHY: floor REBASELINED by constitution-conditional-load PHASE 2. Phase 2 extends the
   // design-only axis to two more spans (§4 visual prose S3–S5 + P-AUDITOR, and §1 L16/L17/L19),
   // adding 3 MORE design-only fence pairs (now 6 pairs / 12 marker lines total, up from
@@ -1032,16 +1043,28 @@ test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the 
   // convention (no additional headroom). Growth (+60 ~tok) matches the lean-path bump
   // exactly (same unfenced bullet). Saving margin re-verified: raw 9038 − stripped 8685 =
   // 353 ~tok — unchanged, still ≥ 240.
+  // e59-const6-waiver-clause (qa-owned bump, T-E59-03): cap raised from 8685 → 8804 to
+  // absorb the const-15-core-tail.md §6 "Dependency audit at build gate" bullet rewrite
+  // (the "unless waived in the PR description with rationale" escape replaced with a
+  // pre-dated dependency-advisory-record disposition requirement binding every
+  // build-running role; docs/backlog.md E59, origin review_T-E57-01 F7) — same
+  // core-tagged, unfenced bullet as the e25 bump above, so full text counts on this
+  // design-arm path. Independently re-measured (not trusted from sr-engineer's or
+  // code-reviewer's handoff notes, both of whom reported this exact figure) at 8804
+  // ~tok (exact); cap set to the exact measured value per the established Phase-2
+  // convention (no additional headroom). Growth (+119 ~tok) is proportionate to the
+  // one bullet rewrite — not a blowout. Saving margin re-verified: raw 9170 − stripped
+  // 8804 = 366 ~tok, still ≥ 240.
   const raw = approxTokens(CONSTITUTION);
   const stripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));
-  assert.ok(stripped <= 8685, `stripped constitution (${stripped} ~tok) must be ≤ 8685 (AC8 design-arm floor, e25-git-vocabulary re-baseline)`);
+  assert.ok(stripped <= 8804, `stripped constitution (${stripped} ~tok) must be ≤ 8804 (AC8 design-arm floor, e59-const6-waiver-clause re-baseline)`);
   assert.ok(
     raw - stripped >= 240,
     `constitution rationale+origin-tag saving (${raw - stripped} ~tok) must be ≥ 240 (AC8 measured min, c14-dispatch-pins re-baseline)`,
   );
 });
 
-test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 16779 ~tok)", () => {
+test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 16898 ~tok)", () => {
   // WHY: the constitution is injected on every dispatch; the full coordinator bundle is
   // the worst case. Compose the chain-role bundle the way buildPromptForRole does:
   // rationale-stripped constitution + SEP + rationale-stripped skill body. Floor
@@ -1269,13 +1292,21 @@ test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/b
   // constitution-side. Independently re-measured (not trusted from sr-engineer's or
   // code-reviewer's handoff notes) at 16779 ~tok (exact); cap set to the exact measured
   // value per the established Phase-2 convention (no additional headroom).
+  // e59-const6-waiver-clause (qa-owned bump, T-E59-03): cap raised from 16779 → 16898 to
+  // absorb the same const-15-core-tail.md §6 "Dependency audit at build gate" bullet
+  // rewrite measured in the design-arm floor test above (+119 ~tok); skill-coordinator.md
+  // itself is untouched by this feature, so this bundle's growth is 100%
+  // constitution-side. Independently re-measured (not trusted from sr-engineer's or
+  // code-reviewer's handoff notes, both of whom reported this exact figure) at 16898
+  // ~tok (exact); cap set to the exact measured value per the established Phase-2
+  // convention (no additional headroom).
   const skillCoord = readSkillFile("skill-coordinator.md");
   const body = skillCoord.startsWith("---")
     ? skillCoord.slice(skillCoord.indexOf("---", 3) + 3).trimStart()
     : skillCoord;
   const SEP = "\n\n---\n\n";
   const bundle = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)) + SEP + stripRationale(stripOriginTags(body)));
-  assert.ok(bundle <= 16779, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 16779 (AC8 design-arm floor, e25-git-vocabulary re-baseline)`);
+  assert.ok(bundle <= 16898, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 16898 (AC8 design-arm floor, e59-const6-waiver-clause re-baseline)`);
 });
 
 test("AC9: every operative rule/gate/heading survives stripRationale on the constitution", () => {
@@ -1626,7 +1657,7 @@ test("AC7: lite + non-design strips §3.2 once (no reintroduction), consistent w
 
 // --- AC8: rebaseline + pin the new non-design figure ----------------------
 
-test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 6587 ~tok)", () => {
+test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 6706 ~tok)", () => {
   // WHY: this is the BUDGET WIN that justified the feature, and it must be regression-guarded.
   // On a non-design chain dispatch buildPromptForRole emits stripDesignOnly(stripRationale(source)).
   // REBASELINED by constitution-conditional-load PHASE 2: Phase 2 strips two MORE spans on the
@@ -1789,9 +1820,18 @@ test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is
   // Phase-2 convention (no additional headroom). Saving margin re-verified: design-arm
   // 8685 − non-design 6587 = 2098 ~tok, still ≥ 2080 (unchanged — the bullet sits outside
   // the design-only fences).
-  const ratStripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));         // design-arm path: 8685
-  const nonDesign = approxTokens(stripRationale(stripOriginTags(composeConstitution({ chain: true, design: false })))); // non-design path: 6587
-  assert.ok(nonDesign <= 6587, `non-design constitution (${nonDesign} ~tok) must be ≤ 6587 (AC8 non-design floor, e25-git-vocabulary re-baseline)`);
+  // e59-const6-waiver-clause (qa-owned bump, T-E59-03): cap raised from 6587 → 6706. The
+  // const-15-core-tail.md §6 "Dependency audit at build gate" bullet rewrite is
+  // core-tagged (not design-tagged), so it lands on the non-design path too, same as the
+  // design-arm floor above (+119 ~tok, matching the design-arm's +119 exactly).
+  // Independently re-measured (not trusted from sr-engineer's or code-reviewer's handoff
+  // notes, both of whom reported this exact figure) at 6706 ~tok (exact); cap set to the
+  // exact measured value per the established Phase-2 convention (no additional
+  // headroom). Saving margin re-verified: design-arm 8804 − non-design 6706 = 2098 ~tok,
+  // unchanged, still ≥ 2080 (the bullet sits outside the design-only fences).
+  const ratStripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));         // design-arm path: 8804
+  const nonDesign = approxTokens(stripRationale(stripOriginTags(composeConstitution({ chain: true, design: false })))); // non-design path: 6706
+  assert.ok(nonDesign <= 6706, `non-design constitution (${nonDesign} ~tok) must be ≤ 6706 (AC8 non-design floor, e59-const6-waiver-clause re-baseline)`);
   assert.ok(
     ratStripped - nonDesign >= 2080,
     `design-only strip saving (${ratStripped - nonDesign} ~tok) must be ≥ 2080 (a12-followup-qa-round-name re-baseline)`,

@@ -79,7 +79,7 @@ Verify **all three** before handoff (Constitution §6):
 - No obvious injection vectors (SQL, command, XSS, path traversal).
 
 ### Step 7 — Full build
-- Confirm full project builds with **ZERO errors** (Constitution §2 build gate). Per Constitution §6 dependency audit, any role calling `npm run build` / `cargo build` / `pip install` MUST also run the language audit (`npm audit --audit-level=high`, `cargo audit`, `pip-audit`) **after build, before `tw_update_state`**, and treat any HIGH/CRITICAL finding as a build failure unless waived in the PR description with rationale. Toolchains lacking an audit command waive the rule.
+- Confirm full project builds with **ZERO errors** (Constitution §2 build gate). Per Constitution §6 dependency audit, any role calling `npm run build` / `cargo build` / `pip install` MUST also run the language audit (`npm audit --audit-level=high`, `cargo audit`, `pip-audit`) **after build, before `tw_update_state`**, and treat any HIGH/CRITICAL finding as a build failure — UNLESS the workspace's dependency-advisory record (the agent-governance-mcp repo's own instance: `docs/dependency-advisories.md`) carries a disposition for it, recorded BEFORE the finding was passed: advisory id, decision, and re-review trigger. A fired re-review trigger re-arms the failure. An inline rationale in a PR/commit description is NOT a waiver, at any role. No matching disposition means STOP: `status: Blocked`, hand back for a fresh advisory decision — writing the record is part of that decision, never a build-time fallback. Toolchains lacking an audit command waive the rule.
 
 ### Step 8 — Hand off to code-reviewer
 - `tw_update_state(status=In_Progress, pending_notes=["sr-engineer: <task-id> ready for code review", "next_role: code-reviewer"])`.
@@ -109,7 +109,7 @@ Verify **all three** before handoff (Constitution §6):
 | 6 | **No render harness** but surface is custom-widget/state work (Step 3a, R5/v3.31.0) | Do NOT skip silently and do NOT claim self-checked — note it; let qa-visual catch it. |
 | 7 | **`visual_round >= 3`** and widget cannot converge within Task-Size budget (Step 3a, §3.1) | Route `(sr-engineer, In_Progress) → (pm, In_Progress)`. `pending_notes: ["visual_split_requested: <reason>", "next_role: pm"]`. Available R3/4/5, mandatory R6. |
 | 8 | **Type/lint or build errors** (Steps 5, 7) | Not ZERO errors → cannot hand off. Fix, bounded by §5 (max 2 fix tries / 3 reads), then STOP if exhausted. |
-| 9 | **HIGH/CRITICAL dependency audit finding** (Step 7, §6) | Treat as build failure unless waived in PR description with rationale. |
+| 9 | **HIGH/CRITICAL dependency audit finding** (Step 7, §6) | Treat as build failure unless the workspace's dependency-advisory record already carries a pre-dated disposition (advisory id, decision, re-review trigger) with the trigger unfired; an inline PR/commit rationale is NOT a waiver. |
 | 10 | **Security checklist fails** (Step 6) | Fix the secret/unvalidated boundary/injection vector before handoff. |
 | 11 | **§5 anti-loop tripped** — 2 consecutive fix tries OR 3 reads of one target exhausted | STOP tool use immediately. Hand back Blocked/FAIL to the human. Never issue an error-laden PASS; never extend the loop. |
 | 12 | **Implementation clean** (Steps 5/6/7 all green) | `tw_update_state(status=In_Progress, pending_notes=["sr-engineer: <task-id> ready for code review", "next_role: code-reviewer"])`. |
@@ -129,7 +129,7 @@ These are enforced server-side on sr-engineer's `tw_update_state` writes (the cl
 - **Circuit-breaker landing pad** (Constitution §3.1 / §5) — after any of the three caps trip (3 QA FAILs, 3 code-reviewer FAILs, or `visual_round` Round 6), the team lands back on PM. PM is the designated recovery owner; sr-engineer's role is to escalate, not to extend the loop.
 - **Scope decision gate (`SCOPE_DECISION_REQUIRED`, v3.30.0)** — gates the transition INTO build `(pm, In_Progress) → (sr-engineer, In_Progress)` when `design/<active_feature>.md` is armed and no scope decision is recorded. The predecessor is pinned to `pm:In_Progress`, so sr-engineer **re-entry/self-loop is never re-blocked** by this gate (resume is safe).
 - **Build gate** (Constitution §2) — sr-engineer hands off with ZERO compile/type errors (enforced procedurally via Steps 5/7; the chain assumes a clean build at handoff).
-- **Dependency audit at build gate** (Constitution §6) — `npm audit --audit-level=high` / `cargo audit` / `pip-audit` after build, before `tw_update_state`; HIGH/CRITICAL = build failure unless waived in the PR description.
+- **Dependency audit at build gate** (Constitution §6) — `npm audit --audit-level=high` / `cargo audit` / `pip-audit` after build, before `tw_update_state`; HIGH/CRITICAL = build failure unless the workspace's dependency-advisory record already carries a pre-dated disposition (advisory id, decision, re-review trigger) with the trigger unfired — an inline PR/commit rationale is NOT a waiver.
 - **§5 anti-loop** (Constitution §5) — max 2 consecutive auto-fix tries on the same failure; max 3 reads per target. On limit, stop tool use immediately and hand back Blocked/FAIL to the human; never extend the loop, never issue an error-laden PASS.
 
 ## Downstream consumers
@@ -201,9 +201,11 @@ flowchart TD
     SECOK -- no --> LOOP
     SECOK -- yes --> S7[Step 7: Full build ZERO errors<br/>+ dependency audit §6]
 
-    S7 --> BUILDOK{Build + audit clean?}
+    S7 --> BUILDOK{Build clean?}
     BUILDOK -- no --> LOOP
-    BUILDOK -- yes --> S8[Step 8: tw_update_state In_Progress<br/>'ready for code review'; next_role: code-reviewer]
+    BUILDOK -- yes --> AUDITOK{§6 audit: HIGH/CRITICAL with<br/>no current disposition?}
+    AUDITOK -- yes --> BLK_AUDIT[STOP: Blocked - no matching disposition<br/>hand back for fresh advisory decision; next_role: pm]
+    AUDITOK -- no --> S8[Step 8: tw_update_state In_Progress<br/>'ready for code review'; next_role: code-reviewer]
 
     S8 --> CR[code-reviewer: clean-context diff review]
     CR --> CRV{Verdict?}
@@ -228,6 +230,7 @@ flowchart TD
     BLK_SIZE --> HUMAN
     FLAG --> HUMAN
     BLK_LOOP --> HUMAN
+    BLK_AUDIT --> HUMAN
     SPLIT --> HUMAN
     PM_LAND --> HUMAN
 ```

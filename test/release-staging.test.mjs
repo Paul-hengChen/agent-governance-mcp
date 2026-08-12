@@ -1052,6 +1052,134 @@ test("E7-AC2: content/skill-release-engineer.md's D10 bullet cross-references th
 });
 
 // ---------------------------------------------------------------------------
+// Phase 6.5 — E59: §6 dependency-audit waiver-escape closure (structural,
+// all-sites regression pin)
+// ---------------------------------------------------------------------------
+// WHY: docs/backlog.md E59 (origin: review_T-E57-01 F7) closed the "unless
+// waived in the PR description with rationale" escape that let five HIGH
+// advisories ride release-to-release untouched (E57). The escape was
+// restated, in slightly different words each time, at 9 live normative sites
+// spread across 3 files (const-15's source bullet + 8 mirrors/table-rows/
+// diagram edges in docs/skills/release-engineer.md and
+// docs/skills/sr-engineer.md) — three independent review passes (coordinator,
+// sr-engineer, code-reviewer) each re-derived a DIFFERENT site count (5, then
+// 6, then 7) before a full-tree enumeration by site (not by grep-hit) settled
+// on 9 (review_T-E59-01.md Round 2). That history — every prior single-pattern
+// sweep missed at least one live site — is exactly why this pin is structural
+// rather than a single string match:
+//   (a) a repo-tree sweep for the literal word "waived" across content/ and
+//       docs/skills/. Every historical escape phrasing used this exact verb
+//       form ("waived in the PR description[, with rationale]", "unwaived",
+//       "no / waived" — confirmed against git history, commit 95d6376..HEAD).
+//       The RETAINED "Toolchains lacking an audit command waive the rule"
+//       sentence and the NEW "...is NOT a waiver..." clause both use
+//       different words ("waive" / "waiver"), so this sweep has zero
+//       legitimate positives to exclude — the escape reappearing ANYWHERE in
+//       either tree, not just at one of the 9 known sites (including a future
+//       10th mirror nobody has enumerated yet), reds this test.
+//   (b) presence, at each of the 9 enumerated sites, of the disposition-
+//       channel language the escape was replaced with — so silently deleting
+//       or truncating a mirror's fixed text (which would not reintroduce the
+//       word "waived") is caught too.
+// Together (a) and (b) fail on: the escape word reappearing anywhere, OR any
+// of the 9 known sites losing its replacement text — the two ways this
+// defect could recur.
+
+function listMarkdownFilesRecursive(dir) {
+  return fs
+    .readdirSync(dir, { recursive: true })
+    .filter((entry) => typeof entry === "string" && entry.endsWith(".md"))
+    .map((entry) => path.join(dir, entry));
+}
+
+test("E59: the abolished 'waived' dependency-audit escape does not reappear anywhere in content/ or docs/skills/ (structural, tree-wide sweep)", () => {
+  const trees = [path.join(ROOT, "content"), path.join(ROOT, "docs", "skills")];
+  const offenders = [];
+  for (const tree of trees) {
+    for (const file of listMarkdownFilesRecursive(tree)) {
+      const body = fs.readFileSync(file, "utf-8");
+      if (/\bwaived\b/i.test(body)) {
+        offenders.push(path.relative(ROOT, file));
+      }
+    }
+  }
+  assert.deepEqual(
+    offenders,
+    [],
+    `no file under content/ or docs/skills/ may contain the word "waived" — that exact verb was the only form the abolished §6 escape ever took ("waived in the PR description[, with rationale]", "unwaived", "no / waived"); the retained "waive the rule" sentence and the new "NOT a waiver" clause both use different words (E59). Found it reintroduced in: ${offenders.join(", ")}`,
+  );
+});
+
+test("E59: all 9 live §6 dependency-audit normative sites carry the disposition-channel replacement text (structural, per-site enumeration per review_T-E59-01.md Round 2)", () => {
+  const RELEASE_MIRROR = fs.readFileSync(path.join(ROOT, "docs", "skills", "release-engineer.md"), "utf-8");
+  const SR_MIRROR = fs.readFileSync(path.join(ROOT, "docs", "skills", "sr-engineer.md"), "utf-8");
+
+  const sites = [
+    {
+      body: CONST15,
+      anchor: /- \*\*Dependency audit at build gate\*\*:.*$/m,
+      label: "content/const-15-core-tail.md:11 (source bullet)",
+    },
+    {
+      body: RELEASE_MIRROR,
+      anchor: /- \*\*Constitution §6 — Dependency audit at build gate\*\*:.*$/m,
+      label: "docs/skills/release-engineer.md:51 (step 4 verbatim mirror)",
+    },
+    {
+      body: RELEASE_MIRROR,
+      anchor: /\| 5 \| \*\*`npm audit` HIGH\/CRITICAL finding\*\*.*$/m,
+      label: "docs/skills/release-engineer.md:92 (STOP-exit table row 5)",
+    },
+    {
+      body: RELEASE_MIRROR,
+      anchor: /- \*\*Build gate \+ §6 dependency audit\*\* —.*$/m,
+      label: "docs/skills/release-engineer.md:121 (server-enforced-gates bullet)",
+    },
+    {
+      body: RELEASE_MIRROR,
+      anchor: /AUDITOK -- yes,.*\n.*AUDITOK -- no \/.*$/m,
+      label: "docs/skills/release-engineer.md:165-167 (mermaid decision diagram)",
+    },
+    {
+      body: SR_MIRROR,
+      anchor: /- Confirm full project builds with \*\*ZERO errors\*\*.*$/m,
+      label: "docs/skills/sr-engineer.md:82 (Step 7 verbatim mirror)",
+    },
+    {
+      body: SR_MIRROR,
+      anchor: /\| 9 \| \*\*HIGH\/CRITICAL dependency audit finding\*\*.*$/m,
+      label: "docs/skills/sr-engineer.md:112 (Branch/STOP-exit table row 9)",
+    },
+    {
+      body: SR_MIRROR,
+      anchor: /- \*\*Dependency audit at build gate\*\* \(Constitution §6\) —.*$/m,
+      label: "docs/skills/sr-engineer.md:132 (Server-enforced-gates bullet)",
+    },
+    {
+      body: SR_MIRROR,
+      anchor: /AUDITOK\{§6 audit:.*\n.*AUDITOK -- yes.*\n.*AUDITOK -- no.*$/m,
+      label: "docs/skills/sr-engineer.md:206-208 (mermaid decision diagram)",
+    },
+  ];
+
+  assert.equal(sites.length, 9, "this enumeration must itself stay at 9 sites (review_T-E59-01.md Round 2 count) — update it deliberately, not by accident, if the mirror set changes");
+
+  for (const { body, anchor, label } of sites) {
+    const match = body.match(anchor);
+    assert.ok(match, `could not locate the §6 dependency-audit site for ${label} — the site moved or was deleted (E59)`);
+    const excerpt = match[0];
+    assert.ok(
+      /dependency-advisory record/.test(excerpt) || /disposition/.test(excerpt),
+      `${label} must still name the dependency-advisory-record disposition channel that replaced the waiver escape (E59): ${excerpt}`,
+    );
+    assert.ok(
+      !/\bwaived\b/i.test(excerpt),
+      `${label} must not reintroduce the abolished "waived" escape (E59): ${excerpt}`,
+    );
+  }
+});
+
+// ---------------------------------------------------------------------------
 // Phase 7 — E49/E50: step 7a ticket-code SET derivation (working-tree
 // enumeration + PREV_TAG membership predicate, unioned across qa_reports/ and
 // review_reports/)

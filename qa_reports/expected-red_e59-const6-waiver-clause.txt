@@ -1,0 +1,43 @@
+# e59-const6-waiver-clause — expected-red manifest (emitted by sr-engineer per skill-sr-engineer SOP 7a)
+# Format: <relative test file path> | <exact test name/description string>
+
+# qa-owned golden re-baseline: T-E59-01 rewrote the §6 "Dependency audit at build gate"
+# bullet in content/const-15-core-tail.md (core-tagged, composed into every dispatch mode)
+# to close the "waived in the PR description with rationale" escape for all roles. const-15
+# is byte-pinned into all 11 compose-golden fixtures, so every fixture that embeds it reds.
+# Per precedent commit 6ef1a6e, qa re-baselines the goldens with
+# scripts/capture-constitution-golden.mjs conventions — sr does not touch test/.
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-coordinator-lite.md, design=false, fullDetail=false) is byte-identical to pre-refactor golden build-lite-nondesign.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-coordinator-lite.md, design=true, fullDetail=false) is byte-identical to pre-refactor golden build-lite-design.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-coordinator-lite.md, design=false, fullDetail=true) is byte-identical to pre-refactor golden build-lite-nondesign-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-coordinator-lite.md, design=true, fullDetail=true) is byte-identical to pre-refactor golden build-lite-design-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=false, fullDetail=false) is byte-identical to pre-refactor golden build-full-nondesign.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=true, fullDetail=false) is byte-identical to pre-refactor golden build-full-design.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=false, fullDetail=true) is byte-identical to pre-refactor golden build-full-nondesign-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=true, fullDetail=true) is byte-identical to pre-refactor golden build-full-design-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: SessionStart hook (lite/default env) is byte-identical to pre-refactor golden hook-lite.txt
+test/compose-equivalence.test.mjs | compose-equivalence: SessionStart hook (AGC_DEFAULT_SKILL=full) is byte-identical to pre-refactor golden hook-full.txt
+test/compose-equivalence.test.mjs | compose-equivalence: cat(15 manifest fragments in order) === the pre-refactor constitution.md monolith (DR-1 Option R invariant)
+
+# qa-owned token-cap re-baseline: the new §6 bullet is longer than the escape clause it
+# replaced (it names the disposition fields, the pre-dating requirement, and the re-review
+# re-arm explicitly, per AC2) — measured deltas below are for qa to re-baseline, not to
+# blanket-raise. content/const-15-core-tail.md is core-tagged, so every bundle that includes
+# it (always-on lean bundle; design-arm rationale-stripped constitution; teamwork coordinator
+# bundle; non-design floor) absorbs the delta.
+#
+# Round-2 (T-E59-01 code-review rework) re-measurement: the N1 quality fix — replacing the
+# "this repo's instance" deictic with "the agent-governance-mcp repo's own instance" in the
+# same const-15 bullet — added a further +6 ~tok to every ceiling below (const-15 is
+# core-tagged, so the bump lands on all four). Fresh measured values, this working tree,
+# `node --test test/*.test.mjs`:
+#   AC2 lean always-on bundle:                    4667 ~tok vs cap 4544  (+123, was +117 pre-N1)
+#   AC8 rationale-stripped (design-arm) floor:     8804 ~tok vs cap 8685  (+119, was +113 pre-N1)
+#   AC8 teamwork coordinator bundle (design-arm): 16898 ~tok vs cap 16779 (+119, was +113 pre-N1)
+#   AC8 non-design floor:                          6706 ~tok vs cap 6587  (+119, was +113 pre-N1)
+# The adjacent "chain-role non-design bundle is ~1830 ~tok lighter" delta assertion stayed
+# green in both rounds — move these 4 caps individually, not blanket-raised.
+test/context-budget.test.mjs | AC2: lean always-on bundle is below the raw baseline and within target (<= 4544 ~tok)
+test/context-budget.test.mjs | AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the measured floor (≤ 8685 ~tok)
+test/context-budget.test.mjs | AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 16779 ~tok)
+test/context-budget.test.mjs | AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 6587 ~tok)

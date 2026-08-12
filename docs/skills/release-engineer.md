@@ -48,7 +48,7 @@ These four files (plus `dist/**` via build, step 4) are the **only** files relea
 
 ### Step 4 — Build (+ §6 dependency audit)
 - `npm run build`. **ZERO compile errors required.** The build refreshes `dist/`.
-- **Constitution §6 — Dependency audit at build gate**: every role that calls `npm run build` (this is one) MUST also run the language's audit command — here `npm audit --audit-level=high` — **after build, before `tw_update_state`**, and treat any **HIGH/CRITICAL** finding as a build failure unless waived in the PR description with rationale. **(Source note:** §6 mandates the audit; the release-engineer SOP text does not separately re-list `npm audit`, but §6 binds it because release-engineer runs `npm run build`. The audit therefore sits between step 4 and the step 9 `tw_update_state`.**)**
+- **Constitution §6 — Dependency audit at build gate**: every role that calls `npm run build` (this is one) MUST also run the language's audit command — here `npm audit --audit-level=high` — **after build, before `tw_update_state`**, and treat any **HIGH/CRITICAL** finding as a build failure — UNLESS the workspace's dependency-advisory record (the agent-governance-mcp repo's own instance: `docs/dependency-advisories.md`) carries a disposition for it, recorded BEFORE the finding was passed: advisory id, decision, and re-review trigger. A fired re-review trigger re-arms the failure. An inline rationale in a PR/commit description is NOT a waiver, at any role. No matching disposition means STOP: `status: Blocked`, hand back for a fresh advisory decision — writing the record is part of that decision, never a build-time fallback. **(Source note:** §6 mandates the audit; the release-engineer SOP text does not separately re-list `npm audit`, but §6 binds it because release-engineer runs `npm run build`. The audit therefore sits between step 4 and the step 9 `tw_update_state`.**)**
 
 ### Step 5 — Test
 - `npm test`. **All tests MUST pass**, including the version-coherence test in `test/qa-visual-skill-split.test.mjs`, which gates `package.json` / `index.ts` / `dist` / `CHANGELOG` agreement.
@@ -89,7 +89,7 @@ These four files (plus `dist/**` via build, step 4) are the **only** files relea
 | 2 | **Bump kind unclear** (step 2) | Ask the user a **single** question. Default proposal `patch`. |
 | 3 | **Major / `X.0.0` bump** (step 2) | Requires **explicit user confirmation** before applying. |
 | 4 | **`npm run build` compile error** (step 4) | STOP — ZERO errors required before proceeding. |
-| 5 | **`npm audit` HIGH/CRITICAL finding** (§6, after step 4) | Treat as a **build failure** — STOP unless waived in the PR description with rationale. |
+| 5 | **`npm audit` HIGH/CRITICAL finding** (§6, after step 4) | Treat as a **build failure** — STOP unless the workspace's dependency-advisory record already carries a pre-dated disposition (advisory id, decision, re-review trigger) with the trigger unfired; an inline PR/commit rationale is NOT a waiver. |
 | 6 | **`npm test` regression** (step 5) | STOP, **route to qa-engineer**; do not tag a red suite. |
 | 7 | **`check-version.mjs` fails** (step 6) | STOP — bump is incoherent across package.json / index.ts / dist / CHANGELOG; fix incoherence before tagging. |
 | 8 | **Pre-commit verify (AC2)** — a feature-relevant source dir has changes in `git status` but is absent from `git diff --cached --stat`; or metadata-only staging while source dirs are dirty | STOP, surface the missing paths, stage them before proceeding (metadata-only is a FAIL signal). |
@@ -118,7 +118,7 @@ release-engineer MUST NOT touch source under `tools/` / `prompts/` / `schema/` /
 These bind release-engineer regardless of how it was dispatched (`Task` subagent or `tw_switch_role`); the client cannot bypass them.
 
 - **Pre-Flight** (Constitution §3) — `tw_get_state` must precede the state-modifying `tw_update_state` (step 9). Skipping returns `⛔ BLOCKED`. SOP step 1 satisfies this.
-- **Build gate + §6 dependency audit** — `npm run build` must produce ZERO compile errors (step 4), and per Constitution §6 the `npm audit --audit-level=high` must run after build / before `tw_update_state`, with any HIGH/CRITICAL treated as a build failure unless waived in the PR description with rationale. (Procedural gate from §6; enforced by the role, not by the MCP server's transition matrix.)
+- **Build gate + §6 dependency audit** — `npm run build` must produce ZERO compile errors (step 4), and per Constitution §6 the `npm audit --audit-level=high` must run after build / before `tw_update_state`, with any HIGH/CRITICAL treated as a build failure — UNLESS the workspace's dependency-advisory record (the agent-governance-mcp repo's own instance: `docs/dependency-advisories.md`) carries a pre-dated disposition (advisory id, decision, re-review trigger) with the trigger unfired; an inline PR/commit rationale is NOT a waiver, at any role. (Procedural gate from §6; enforced by the role, not by the MCP server's transition matrix.)
 - **Version-coherence test** — `npm test` includes `test/qa-visual-skill-split.test.mjs`, which gates `package.json` / `index.ts` / `dist` / `CHANGELOG` agreement (step 5). Plus `node scripts/check-version.mjs` (step 6) re-checks the same coherence. (Procedural gates — failing either is a STOP.)
 - **`ALLOWED_TRANSITIONS` matrix** (`tools/transitions.ts`) — every `tw_update_state` write is gated. Key facts for release-engineer:
   - `release-engineer` IS a defined `AgentName` and there IS a matrix key `"release-engineer:PASS"` whose allowed successors are `{(pm, In_Progress), (researcher, In_Progress)}` — i.e. edges FROM a release-engineer-signed PASS exist.
@@ -163,8 +163,8 @@ flowchart TD
     BUILDOK -- no --> STOPBUILD[STOP: compile error]
     BUILDOK -- yes --> AUDIT[§6: npm audit --audit-level=high]
     AUDIT --> AUDITOK{HIGH/CRITICAL found?}
-    AUDITOK -- yes, unwaived --> STOPAUDIT[STOP: treat as build failure]
-    AUDITOK -- no / waived --> S5[Step 5: npm test incl. version-coherence test]
+    AUDITOK -- yes, no current disposition --> STOPAUDIT[STOP: build failure — Blocked;<br/>route for a fresh advisory decision]
+    AUDITOK -- no / disposition recorded, trigger unfired --> S5[Step 5: npm test incl. version-coherence test]
     S5 --> TESTOK{All tests pass?}
     TESTOK -- no --> STOPTEST[STOP: route to qa-engineer; do not tag red suite]
     TESTOK -- yes --> S6[Step 6: node scripts/check-version.mjs]
