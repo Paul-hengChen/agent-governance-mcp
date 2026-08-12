@@ -16,6 +16,49 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.98.0] - 2026-08-12
+
+A combined cut of two independently QA-PASSed mini-chains, both of which fix something this very
+release step depends on. E53 makes `release-engineer:Blocked` reachable — the escalation path this
+SOP has instructed the role to take for six failure modes while the server rejected the write. E57
+closes the five standing HIGH npm advisories and replaces the ad hoc "not introduced by this cut"
+waiver with a per-advisory decision record that release step 6a now consults. Source diff is
+`tools/transitions.ts` (+39) and `package.json`/`package-lock.json`; `<CODES> = {E53, E57}`, AC4 SKIP
+branch (backlog-row-as-spec mini-chain, both features).
+
+Bump kind is MINOR, not PATCH: E53 adds five newly-accepted edges to `ALLOWED_TRANSITIONS`, which is
+a behavior change to the routing validator (writes the server used to reject now land), and E57
+raises the dependency floor (`js-yaml` `^4.1.1 → ^4.3.1`, new `overrides.sharp`). Neither breaks a
+documented contract — no edge was closed, no tool surface or state-file format changed — so this is
+the "backwards-compatible feature" clause of the policy above, not MAJOR.
+
+### Added
+- **`e53-transition-gap-closure` — `release-engineer:Blocked` is now reachable, and `sr-engineer:Blocked → design-auditor` exists (backlog E53).** Three gaps in `tools/transitions.ts`, five new accepted edges:
+  - `release-engineer:In_Progress` gains `{release-engineer, Blocked}` — the missing *entry* edge. Every other role carries a `:Blocked` entry; release-engineer had none.
+  - New key `release-engineer:Blocked` → `[release-engineer, pm, qa-engineer]:In_Progress`. It previously resolved to `allowed=[]`, so even a Blocked state reached by some other means was a dead end. The destination set is derived from the SOP's own six Blocked rows rather than assumed: five hand back to human/pm, but the `npm test` regression row names **qa-engineer**, so `pm` alone would have been wrong.
+  - `sr-engineer:Blocked` gains `{design-auditor, In_Progress}` — gap B, found by the same-pass audit E53 itself commissioned, not by the filed ticket. `content/skill-sr-engineer.md:50` routes a "visual structure unspecified" halt there against an edge that did not exist.
+- Mirrored in `specs/qa-flow-enforcement-architecture.md` — those three rows only. The file's broader drift stays open under E39; this cut deliberately did not widen into it.
+- `content/skill-release-engineer.md` step 7a's empty-baseline STOP was converted from an in-SOP halt into a real Escalation Routes row. With the edge live there was no honest distinction left between it and the six rows already in that table — this is the human's option (b), chosen at intake.
+
+### Changed
+- **`e57-dependency-advisory-decisions` — all five standing HIGH advisories closed by upgrade, and a decision record now owns the disposition (backlog E57).** No accept-with-rationale was needed for any of the five:
+  - `js-yaml` `^4.1.1 → ^4.3.1` (direct dependency; parses every `handoff.md` at `tools/handoff-parse.ts:175`) — clears GHSA-52cp-r559-cp3m and GHSA-5p4m-2wfm-xmqj.
+  - New `overrides.sharp: ^0.35.3`, which closes the `sharp` and `@xenova/transformers` pair together (GHSA-f88m-g3jw-g9cj / CVE-2026-33327, -33328, -35590, -35591) with zero code change.
+  - `fast-uri` `3.1.2 → 3.1.5` and `ip-address` `10.2.0 → 10.5.0` — both lockfile-only, both already inside their parents' declared ranges.
+  - `@modelcontextprotocol/sdk` stays **1.29.0** and `@xenova/transformers` stays **2.17.2**: plain `npm audit fix` drags the SDK to 1.30.0 plus `hono`, and proposes a semver-**major downgrade** of sharp to 1.4.2. Both were rejected on the facts and the rejection is recorded so it is not re-litigated.
+- New `docs/dependency-advisories.md` is the actual deliverable — GHSA id, dependency path, reachability, decision, and re-review trigger per advisory, plus a rejected-options section and the residual 2 low / 4 moderate findings that are explicitly out of scope.
+- `content/skill-release-engineer.md` gains **step 6a (Dependency-audit disposition)**: `npm audit --audit-level=high` after `npm test`; on a non-zero exit, cross-check each flagged package against the record and STOP (`status=Blocked`, `next_role="pm"`) if it is unrecorded or its re-review trigger has fired. Release-engineer is explicitly forbidden from authoring the record itself or improvising an inline waiver — the record is outside its Artifact allowlist by design.
+
+### Notes
+- **E57 falsified two of its own backlog premises**, both recorded in the decision record rather than quietly dropped: (a) "4.2.0 is still flagged so no routine bump clears it" — `js-yaml` **4.3.1** shipped *after* the row was written and clears both advisories in-range, so it was a routine in-range bump after all; (b) "dropping the RAG dependency would close three of the five outright" — dropping was never needed, and the swap-to-`@huggingface/transformers` alternative was rejected because 4.2.0 still pins `sharp ^0.34.5`, also vulnerable.
+- **The sharp reachability finding was corrected during review; the retracted version is not the record.** A round-1 draft claimed sharp's native binding never loads, resting on a `process.moduleLoadList` probe — that API cannot observe `dlopen`'d addons at all, so it had no discriminating power, and code-reviewer caught it with a positive control. The correct finding: libvips **is** resident in-process under SQLite mode, and that is *favorable*, because the resident binding is now the fixed sharp 0.35.3 / libvips 8.18.3. Safety rests on the text-only feature-extraction pipeline never issuing a decode call, not on the binding being absent. Stdio mode remains unreachable outright (`tools/rag.ts:190`/`:255` hard-refuse without `--port`).
+- Lockfile delta is 5 version moves and +29/−21 entries (214 → 222 `node_modules/` nodes). 27 of the additions are `@img/*` prebuilt binaries replacing sharp 0.32's `tar-fs` / `bare-*` download-at-install stack — a net **reduction** in install-time supply-chain surface, not just a churn of names.
+- `npm audit --audit-level=high` now exits **0**. This is the first release since the record shipped, so step 6a took its happy path and cited nothing — the point of the record is that the next release which does *not* exit 0 has somewhere to look other than a fresh paragraph of prose.
+- E53's AC4 ("no other edge opened") was proven exhaustively rather than sampled: a 1056-tuple differential sweep (33 prev × 32 next) against the base build, accepted edges 63 → 68 — exactly the 5 intended, 0 closed. qa-engineer then rebuilt that sweep as a durable in-suite negative pin, so a future edge added without a matching AC fails the suite.
+- Suite **1692/1692** (1690 after E53's +13, plus 2 new override pins from E57).
+- Spawned from these two cuts and deliberately **not** folded in: E58 (`pm:Blocked → design-auditor`, the fourth instance of this defect family — folding a fourth edge would have breached E53's own AC4), E59 (Constitution §6's *"unless waived in the PR description"* escape is still open to sr-engineer and qa-engineer — E57 closed the door for one role and left open the two that run `npm audit` most often), and E60 (`package-lock.json`'s root `version` is maintained by nothing; E57's `npm install` refreshed it 3.66.0 → 3.97.1 as a side effect, which is exactly why it needs a real check). This release leaves the lockfile root version at 3.97.1 — outside release-engineer's Artifact allowlist, and E60 is the ticket that decides how it gets maintained.
+- The `agc-version` adapter stamps in `CLAUDE.md`, `AGENTS.md`, and `.antigravityrules` were stale at 3.97.0 (v3.97.1 shipped without bumping them, so `agc check` exited 1). All three are re-stamped to 3.98.0 here and `agc check` exits 0.
+
 ## [3.97.1] - 2026-08-11
 
 The first of the three governance-text render paths to be fixed rather than documented. `stripOriginTags`
