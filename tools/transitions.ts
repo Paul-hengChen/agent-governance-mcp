@@ -206,6 +206,16 @@ const ALLOWED: ReadonlyMap<string, AllowedNext> = new Map<string, AllowedNext>([
   ["pm:Blocked", [
     { agent: "pm", status: "In_Progress" },
     { agent: "pm", status: "Blocked" },
+    // (E58, F0 cut) — content/skill-pm.md:28 stamps next_role="design-auditor"
+    // on a pm Blocked write, but this key lacked the edge, so a coordinator
+    // honoring that next_role literally hit TRANSITION_REJECTED. Fourth
+    // instance of the E45/E53 :Blocked-reachability defect family, and the
+    // first found by a deliberate audit (E53's own "audit every role" pass)
+    // rather than by accident. Same shape as E53's sr-engineer:Blocked gap
+    // (a :Blocked key existed but was missing one outbound edge), deliberately
+    // left out of E53 to avoid breaching that ticket's own exhaustively-proven
+    // AC4. Mirrored in specs/qa-flow-enforcement-architecture.md.
+    { agent: "design-auditor", status: "In_Progress" },
   ]],
   ["architect:In_Progress", [
     { agent: "sr-engineer", status: "In_Progress" },

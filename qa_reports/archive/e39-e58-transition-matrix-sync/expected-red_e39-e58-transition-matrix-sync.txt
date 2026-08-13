@@ -1,0 +1,18 @@
+# e39-e58-transition-matrix-sync — intentional red left by sr-engineer (T-E39-01).
+# T-E39-01 adds `{ agent: "design-auditor", status: "In_Progress" }` to the
+# `pm:Blocked` key in tools/transitions.ts (E58: content/skill-pm.md:28 routes
+# a pm Blocked write to design-auditor, an edge ALLOWED_TRANSITIONS lacked).
+# That is a genuinely new accepted edge, so the E53-baseline exhaustive sweep
+# below — a literal snapshot of "exactly these 68 accepted tuples, nothing
+# more" — now sees 69 accepted edges and fails its length + deepEqual
+# assertions against the old 68-tuple list. This is expected, not a
+# regression: T-E39-03 (qa-engineer, this same cut) owns extending the
+# sweep's EXPECTED array by the one new tuple
+# ("pm:Blocked -> design-auditor:In_Progress"), per the E53 precedent this
+# same test's own header comment describes ("re-derives the same universe
+# from source and pins the resulting accepted set... any future edit that
+# opens or closes ANY edge... fails here"). No other edge changed — the new
+# sync check (scripts/check-transitions-sync.mjs) independently confirms the
+# corrected specs/qa-flow-enforcement-architecture.md table has exactly the
+# same 21 keys, same entry sets, as the compiled tools/transitions.ts.
+test/qa-flow.test.mjs | T-E53-03(h): exhaustive matrix sweep — accepted edge set is EXACTLY the 68 tuples E53 leaves standing (durable form of the reviewer's 1056-tuple differential)

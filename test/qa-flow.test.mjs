@@ -2364,7 +2364,7 @@ test("T-E53-03(g): sr-engineer:Blocked row equals exactly {sr-engineer:In_Progre
 
 // ---------- exhaustive negative pin: nothing else opened (durable differential) ----------
 
-test("T-E53-03(h): exhaustive matrix sweep — accepted edge set is EXACTLY the 68 tuples E53 leaves standing (durable form of the reviewer's 1056-tuple differential)", () => {
+test("T-E53-03(h): exhaustive matrix sweep — accepted edge set is EXACTLY the 69 tuples E53+E58 leave standing (durable form of the reviewer's 1056-tuple differential; extended by T-E39-03 for E58's pm:Blocked -> design-auditor:In_Progress edge)", () => {
   // WHY: code-reviewer's AC4 proof (review_reports/review_T-E53-01.md) ran a
   // one-off 1056-tuple differential (33 prev tuples x 32 next tuples) against
   // two compiled snapshots to show accepted edges went 63 -> 68 with zero
@@ -2426,6 +2426,7 @@ test("T-E53-03(h): exhaustive matrix sweep — accepted edge set is EXACTLY the 
     "pm:In_Progress -> sr-engineer:In_Progress",
     "pm:Blocked -> pm:In_Progress",
     "pm:Blocked -> pm:Blocked",
+    "pm:Blocked -> design-auditor:In_Progress",
     "researcher:In_Progress -> pm:In_Progress",
     "researcher:In_Progress -> pm:Blocked",
     "researcher:In_Progress -> researcher:In_Progress",
@@ -2483,7 +2484,7 @@ test("T-E53-03(h): exhaustive matrix sweep — accepted edge set is EXACTLY the 
   ].sort();
 
   const sortedAccepted = accepted.slice().sort();
-  assert.equal(sortedAccepted.length, 68, `expected exactly 68 accepted edges, got ${sortedAccepted.length}`);
+  assert.equal(sortedAccepted.length, 69, `expected exactly 69 accepted edges, got ${sortedAccepted.length}`);
   assert.deepEqual(
     sortedAccepted,
     EXPECTED,

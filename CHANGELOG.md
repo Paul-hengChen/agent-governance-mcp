@@ -16,6 +16,53 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.99.0] - 2026-08-13
+
+Three units, one release. E39 re-derives the `ALLOWED_TRANSITIONS` mirror table in
+`specs/qa-flow-enforcement-architecture.md` from the compiled source and then **pins** it with a new
+`postbuild` check, so the drift class that produced nine wrong or missing rows cannot re-form
+silently. E58 (folded into E39's cut per its own backlog instruction) adds the one edge that closes
+the fourth and last known `:Blocked`-reachability gap. E59 generalizes Constitution §6's
+dependency-audit waiver clause from one role to every role — it was committed as `25d231e` after
+v3.98.0 was tagged and ships here.
+
+Bump kind is MINOR, not PATCH, on two independent grounds. E58 adds a newly-accepted edge to
+`ALLOWED_TRANSITIONS` — a write the server used to reject with `TRANSITION_REJECTED` now lands, which
+is observable behavior, the same reasoning that made v3.98.0's E53 a minor. And E39's
+`scripts/check-transitions-sync.mjs` runs on every `npm run build` (and therefore every `npm test`
+via `pretest`), so a checkout that built clean before can now fail the build. No edge was closed, no
+tool surface, prompt schema, or handoff/state-file format changed, so nothing documented breaks —
+this is the "backwards-compatible feature" clause of the versioning policy above, not MAJOR.
+
+### Added
+- **`scripts/check-transitions-sync.mjs` — the `ALLOWED_TRANSITIONS` mirror table is now machine-pinned (backlog E39).** Set-equality between the compiled `ALLOWED_TRANSITIONS` Map in `dist/tools/transitions.js` and the markdown mirror in `specs/qa-flow-enforcement-architecture.md`, reported in both directions (keys missing from the mirror, keys the mirror invents, and keys present on both sides with a different entry set).
+  - Wired at **`postbuild`**, deliberately not `prebuild` where `check:version` sits. The check imports from `dist/`, so at `prebuild` it would run before `tsc` and validate the *previous* build's output — reintroducing the exact stale-compiled-output failure the ticket exists to prevent. `postbuild` still fires on every `npm run build` and every `npm test`.
+  - **No vacuous passes**, an explicit ticket condition: a missing `dist/tools/transitions.js`, an unimportable module, a non-Map or empty `ALLOWED_TRANSITIONS`, a missing heading, or a section that parses to zero data rows are each a hard failure, never a silent skip.
+  - The section heading is matched with a line-exact `/^## ALLOWED_TRANSITIONS Matrix\s*$/m` anchor rather than a substring `indexOf` — this repo has an inline prose mention of that exact heading in `tasks.md`, which a substring search would bind to first and then report a confident, wrong-cause "parsed ZERO data rows".
+  - A duplicate-row guard fails when one key appears twice in the mirror. Without it `Map.set` is last-write-wins, so a re-drift shaped like *appending* a new row instead of editing the existing one — the exact shape of the E58 edit — would pass with only the last occurrence checked.
+- **`pm:Blocked → design-auditor:In_Progress` is now an accepted edge (backlog E58).** `content/skill-pm.md:28` stamps `next_role="design-auditor"` on a pm Blocked write, but `ALLOWED_TRANSITIONS` gave `pm:Blocked` only `[pm:In_Progress, pm:Blocked]`, so a coordinator honoring that `next_role` literally hit `TRANSITION_REJECTED`. Fourth instance of the E45/E53 `:Blocked`-reachability family and the first found by a deliberate audit rather than by accident; folded into this cut per its own backlog row, which asked not to ship a one-edge release.
+- **`test/check-version.test.mjs` gains CTS-1..CTS-7 (+203 lines)** — the sync check shipped with zero coverage, its whole contract verified only by hand across three review rounds. The new fixtures copy the real script byte-for-byte into a temp root and cover: green on a corrected tree, RED on a seeded doc-side omission, RED on a seeded doc-side extra row, RED on an absent heading, the line-exact anchor in both directions (heading rename fails / inline prose mention still passes), and the duplicate-row guard on the wrong-then-correct ordering that produced a false green in round 1.
+
+### Changed
+- **The mirror table itself: 16 rows → 21, re-derived mechanically from source (backlog E39).** Nine drift sites, not the "roughly 5" the ticket estimated — 4 wrong rows and 5 missing keys:
+  - Missing entirely: `design-auditor:{In_Progress, Blocked}` and `code-reviewer:{In_Progress, FAIL, Blocked}`.
+  - Wrong: `null:null`, `researcher:In_Progress`, and `pm:In_Progress` each dropped a `design-auditor` entry; `sr-engineer:In_Progress` named `(qa-engineer, In_Progress)` where source says `(code-reviewer, In_Progress)` — correct when written, silently invalidated at v3.9.0 (`7e81cf7`) when the code-reviewer role was extracted without updating the mirror.
+  - A footnote now records the derivation, the row count, and that history, so the next reader does not re-derive it cold.
+- **The Amend-Resume paragraph now describes the mechanism that actually runs.** It still documented the original v3.47.0 `pending_notes` string-grep (`resume_of: <role>`), which v3.55.0 (C9) replaced with the structured top-level `resume_of` field threaded to `validateTransition` as `next_resume_of`. A `pending_notes` line reading `resume_of: qa-engineer` opens no edge today; only the field does. The rewrite also records the field's write-scoped lifetime, that SQLite mode never persists it, and that the hop cap outranks the resume edge alongside the round caps.
+- **Constitution §6's dependency-audit waiver escape is closed for every role, not just release-engineer (backlog E59, committed `25d231e`).** `content/const-15-core-tail.md` previously let any HIGH/CRITICAL finding through "unless waived in the PR description with rationale", while binding *"every role that calls `npm run build` / `cargo build` / `pip install` / equivalent"*. E57 had closed that door at skill level for release-engineer only — leaving it open to sr-engineer and qa-engineer, the two roles that run `npm audit` far more often. A finding now needs a disposition already recorded in the workspace's dependency-advisory record (advisory id, decision, re-review trigger) with its trigger unfired; an inline PR/commit rationale is not a waiver at any role, and no matching disposition means `status: Blocked`. No per-role skill patch was needed — `skill-sr-engineer.md` and `skill-qa-engineer.md` correctly do not restate §6, so fixing the fragment binds both automatically; adding per-role text would have rebuilt the prose channel the change abolishes.
+- E59 also corrected 8 mirrors of the rule in `docs/skills/{release-engineer,sr-engineer}.md`, including two mermaid branches that routed toward proceeding on a "waived" state that no longer exists, and split `sr-engineer.md`'s flow so an undispositioned advisory no longer falls into the §5 auto-fix loop alongside compile errors (a latent path that predated E59).
+- `test/qa-flow.test.mjs`'s E53 exhaustive sweep goes 68 → 69 accepted tuples, extended by exactly the one E58 edge — the durable negative pin still asserts an exact set, so it remains the thing that catches an unintended edge.
+
+### Notes
+- **The declared expected-red closed cleanly.** `qa_reports/expected-red_e39-e58-transition-matrix-sync.txt` declared one intentional failure: E58's new edge breaks `T-E53-03(h)`'s literal 68-tuple snapshot. QA's sweep extension closed it, and the file is archived with this release's evidence.
+- **E39's own review filed E62** (`docs/backlog.md`, execution order `6a`): stale `tools/transitions.ts:NNN` line-number citations, which is E39's defect class in the one form E39's check is structurally blind to. The reviewer noted two sites; the follow-up grep found five. Not folded in — no citation gates a transition, and the failure mode is wasted reading, not wrong behavior. Its `N8` note records the genuine tension the row has to resolve: E39's own rewritten paragraph *adds* seven precise line-number citations because the reviewer demanded them, so the fix is a policy on where line numbers are load-bearing versus decorative, not a blanket rewrite.
+- **Not in this cut, and deliberately so.** Order 6 batched `E39 + E48(b) + E56`; only E39 shipped. Measurement during the cut falsified E48's premise — `docs/skills/*` are 2-4x hand-written expansions with no generator and no structured source (`docs/skills/coordinator.md` has no source file at all), so "generate from `content/`" and "share E39's check" are both non-viable and the row needs a human design decision. E56 is an independent one-paragraph amendment. Both remain open in `.current/feature-split.md` as F1/F2. E60 (`package-lock.json` root version maintained by nothing) and E61 (two pre-E59 prose surfaces) also remain open.
+- The round-cap paragraph (`prev_qa_round >= 4`) was checked and deliberately **not** touched: it is correct as written. An earlier scoping draft called it a contradiction against the Limits section's "3 counts"; it is not — the Limits text counts failures, the code counts the counter, and `ROUND_CAP = 4` agrees with the paragraph.
+- `specs/qa-flow-enforcement-architecture.md:147` still opens the section with *"Authoritative source."* three lines above a table both `tools/transitions.ts` and E39's new footnote call a mirror. Pre-existing, unchanged diff context, recorded as the cheapest item in E62 — and materially less dangerous now, since a contributor who trusts it and edits the table gets a hard `postbuild` failure instead of silent drift.
+- Suite **1704/1704**, 0 fail. 1692 at v3.98.0 → 1694 after E59's 9-site regression pin (`25d231e`) → 1704 with E39's CTS fixtures.
+- `npm audit --audit-level=high` exits **0**; step 6a took its happy path and cited nothing. Residual findings are 2 low / 3 moderate, all below the gate.
+- The lockfile root `version` stays as npm last left it — outside release-engineer's Artifact allowlist, and E60 is the ticket that decides how it gets maintained.
+
 ## [3.98.0] - 2026-08-12
 
 A combined cut of two independently QA-PASSed mini-chains, both of which fix something this very

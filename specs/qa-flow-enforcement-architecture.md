@@ -148,15 +148,20 @@ Authoritative source. Key: `(prev_agent, prev_status)` → set of allowed `(new_
 
 | prev_agent | prev_status | allowed new (agent, status) |
 |---|---|---|
-| null | null | (pm, In_Progress), (pm, Blocked), (researcher, In_Progress), (researcher, Blocked) |
-| researcher | In_Progress | (pm, In_Progress), (pm, Blocked), (researcher, Blocked) |
+| null | null | (pm, In_Progress), (pm, Blocked), (researcher, In_Progress), (researcher, Blocked), (design-auditor, In_Progress), (design-auditor, Blocked) |
+| researcher | In_Progress | (pm, In_Progress), (pm, Blocked), (researcher, Blocked), (design-auditor, In_Progress) |
 | researcher | Blocked | (researcher, In_Progress), (pm, In_Progress) |
-| pm | In_Progress | (architect, In_Progress), (sr-engineer, In_Progress), (researcher, In_Progress), (pm, Blocked), (pm, In_Progress) |
-| pm | Blocked | (pm, In_Progress), (pm, Blocked) |
+| design-auditor | In_Progress | (pm, In_Progress), (design-auditor, Blocked) |
+| design-auditor | Blocked | (design-auditor, In_Progress), (pm, In_Progress) |
+| pm | In_Progress | (architect, In_Progress), (sr-engineer, In_Progress), (researcher, In_Progress), (design-auditor, In_Progress), (pm, Blocked), (pm, In_Progress) |
+| pm | Blocked | (pm, In_Progress), (pm, Blocked), (design-auditor, In_Progress) |
 | architect | In_Progress | (sr-engineer, In_Progress), (architect, Blocked), (pm, In_Progress) |
 | architect | Blocked | (pm, In_Progress), (architect, In_Progress) |
-| sr-engineer | In_Progress | (qa-engineer, In_Progress), (sr-engineer, Blocked), (pm, In_Progress) |
+| sr-engineer | In_Progress | (code-reviewer, In_Progress), (sr-engineer, Blocked), (pm, In_Progress) |
 | sr-engineer | Blocked | (sr-engineer, In_Progress), (pm, In_Progress), (design-auditor, In_Progress) |
+| code-reviewer | In_Progress | (code-reviewer, FAIL), (code-reviewer, Blocked), (qa-engineer, In_Progress) |
+| code-reviewer | FAIL | (sr-engineer, In_Progress), (pm, In_Progress) |
+| code-reviewer | Blocked | (code-reviewer, In_Progress), (pm, In_Progress) |
 | qa-engineer | In_Progress | (qa-engineer, PASS), (qa-engineer, FAIL), (qa-engineer, Blocked) |
 | qa-engineer | Blocked | (sr-engineer, In_Progress), (qa-engineer, In_Progress), (pm, In_Progress) |
 | qa-engineer | FAIL | (sr-engineer, In_Progress), (pm, In_Progress) |
@@ -165,11 +170,17 @@ Authoritative source. Key: `(prev_agent, prev_status)` → set of allowed `(new_
 | release-engineer | Blocked | (release-engineer, In_Progress), (pm, In_Progress), (qa-engineer, In_Progress) |
 | release-engineer | PASS | (pm, In_Progress), (researcher, In_Progress) |
 
+*(21 keys — mechanically re-derived from `ALLOWED_TRANSITIONS` in `tools/transitions.ts`/`dist/tools/transitions.js`, E39+E58. Previously this table carried 16 rows — 12 correct, 4 wrong (`null:null` missing both `design-auditor` entries; `researcher:In_Progress` and `pm:In_Progress` each missing exactly `(design-auditor, In_Progress)`; `sr-engineer:In_Progress` naming `(qa-engineer, In_Progress)` — correct when the table was authored, but silently invalidated at v3.9.0 (`7e81cf7`), which extracted the code-reviewer role and changed the source to `(code-reviewer, In_Progress)` without updating this mirror), and 5 missing entirely (`design-auditor:{In_Progress,Blocked}`, `code-reviewer:{In_Progress,FAIL,Blocked}`) — found by code-reviewer during E37 round 1, 2026-07-27. `scripts/check-transitions-sync.mjs` now pins this table against the compiled source so it cannot silently re-drift.)*
+
 **Self-loops on `In_Progress`** for the *same* agent (e.g. sr-engineer doing a multi-step task) are allowed implicitly: if `prev.agent === next.agent && prev.status === "In_Progress" && next.status === "In_Progress"`, skip the table lookup and accept. This avoids forcing agents to ping-pong through other roles for internal progress writes.
 
 **Round-cap override** (highest precedence): if `prev_qa_round >= 4`, the only allowed transition is `(pm, In_Progress)`. All other entries (including the self-loop fast path) are denied with `error: "QA_ROUND_EXCEEDED"`. PM's `(pm, In_Progress)` write must reset `qa_round` to 0 (handled by `computeNewRound`).
 
-**Amend-Resume Edge** (conditional precedence rule, v3.47.0 — backlog C1, `specs/pm-repair-resume-routing-architecture.md`): `(pm, In_Progress) → (code-reviewer, In_Progress)` and `(pm, In_Progress) → (qa-engineer, In_Progress)` are accepted ONLY when the incoming write's `pending_notes` contains an entry that, trimmed, exactly equals `resume_of: <that exact target role>` (literal single space after the colon). These are NOT rows in the static table above — they are evaluated as step 3.5 in `validateTransition`, after the round-cap overrides and the self-loop fast path, before the static-table lookup; the round caps therefore outrank the resume edge. An absent, malformed, or wrong-role marker opens no edge and falls through to the unchanged `TRANSITION_REJECTED` (the `allowed` list remains the static `pm:In_Progress` set — no new error code). The marker is self-attested (trust class `scope_decision_why`): the server checks only marker⟺target consistency; "the role was genuinely stranded" is a PM SOP attestation. Single-use by construction — `pending_notes` are replaced on every write, so no stored flag and no re-arm logic. Mode-agnostic (pure in-memory inputs; identical in file and SQLite/HTTP mode). The Scope Decision Gate and Cut-Approval Gate do not fire on these edges (their predicates require `next.agent ∈ {architect, sr-engineer}`).
+**Amend-Resume Edge** (conditional precedence rule, originated v3.47.0 — backlog C1, `specs/pm-repair-resume-routing-architecture.md`; mechanism superseded v3.55.0 — backlog C9, `specs/c9-protocol-fields.md`/`specs/c9-protocol-fields-architecture.md`, AC-4): `(pm, In_Progress) → (code-reviewer, In_Progress)` and `(pm, In_Progress) → (qa-engineer, In_Progress)` are accepted ONLY when the incoming `tw_update_state` write carries the **structured** top-level `resume_of` field (`z.enum(["code-reviewer", "qa-engineer"]).optional()`, `tools/registry.ts:156`) naming that exact target role. The orchestrator threads it into `validateTransition` as `TransitionRequest.next_resume_of` (`tools/handoff-orchestrator.ts:151`; `tools/transitions.ts:44`). This field is write-scoped: it is emitted to `handoff.md` only on the write that sets it and is never carried forward — `writeHandoffState` deliberately does not join it to the existing-state preserve read, so a later write that omits it drops it (`tools/handoff-write.ts:440-459`). SQLite mode never persists it at all (DR-5). Nothing reads it back off state; `validateTransition` sees only the incoming write's value. There is therefore nothing to re-arm or clear between writes.
+
+This **replaces** the original v3.47.0 mechanism, which gated the same two edges on a `pending_notes` entry that, trimmed, exactly equalled `resume_of: <role>` (a literal string-grep convention). `tools/transitions.ts:39-44`'s own comment records the change: "Replaces the former next_pending_notes substring grep... which was removed with no fallback — legacy pending_notes tokens are inert (DR-2/DR-6)." A `pending_notes` line reading `resume_of: qa-engineer` today opens no edge; only the structured field does.
+
+These are NOT rows in the static table above — they are evaluated as step 3.5 in `validateTransition`, after the round-cap overrides, the hop-cap override (`HOP_CAP_EXCEEDED`, `tools/transitions.ts:494-518`, `HOP_CAP = 10` at `:388`), and the self-loop fast path, before the static-table lookup; the round caps and the hop cap therefore both outrank the resume edge. An absent or wrong-role field value opens no edge and falls through to the unchanged `TRANSITION_REJECTED` (the `allowed` list remains the static `pm:In_Progress` set — no new error code). The field is self-attested (trust class `scope_decision_why`): the server checks only field⟺target consistency; "the role was genuinely stranded" is a PM SOP attestation. Mode-agnostic (pure in-memory inputs; identical in file and SQLite/HTTP mode). The Scope Decision Gate and Cut-Approval Gate do not fire on these edges (their predicates require `next.agent ∈ {architect, sr-engineer}`).
 
 ## Round Counter Semantics
 
