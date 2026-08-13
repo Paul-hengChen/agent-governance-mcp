@@ -1,40 +1,40 @@
 ---
 schema_version: 13
-active_feature: "e39-e58-transition-matrix-sync"
+active_feature: "e40-nonqa-completed-tasks-write-gate"
 status: "In_Progress"
-last_updated: "2026-08-13T03:49:27.335Z"
+last_updated: "2026-08-13T07:45:52.688Z"
 last_agent: "release-engineer"
 prd_path: "/Users/paul.ph.chen/agent-governance-mcp/docs/backlog.md"
 scope_decision: "single-feature"
-scope_decision_why: "F0 of .current/feature-split.md (order 6; E39 P2 + E58 P3 folded). Backlog rows ARE the spec -> mini-chain sr -> code-reviewer -> qa; PM/ARCH skipped. Auto-tier N/A (P2 > maxPriority P3; 4-5 files > maxFiles 2). Human chose order 6, then \"do F0\", in the coordinator's OWN chat turn 2026-08-12, after the measurement + 3-unit split were presented.\n\nSPLIT: feature-split.md holds 3 rows. F1 (e48-docs-skills-policy) NOT started — needs a human design decision; measurement falsified E48's premise (docs/skills/* are 2-4x hand-written expansions, 12/12 mermaid, no generator, docs/skills/coordinator.md has no source file), so \"generate from content/\" and \"share E39's check\" are both non-viable. F2 (e56) is a 1-paragraph amendment, independent.\n\nE58 FOLDED per its own row: \"If E39 is picked up first, fold E58 into that cut rather than shipping a one-edge release.\"\n\nMEASURED GROUND TRUTH (from dist/tools/transitions.js): source 21 keys; mirror 16 rows -> 12 correct, 4 WRONG, 5 MISSING = 9 drift sites, not \"roughly 5\". Missing: design-auditor:{In_Progress,Blocked}, code-reviewer:{In_Progress,FAIL,Blocked}. Wrong: null:null, researcher:In_Progress, pm:In_Progress (each missing a design-auditor entry), and sr-engineer:In_Progress which names (qa-engineer,In_Progress) where source says (code-reviewer,In_Progress).\n\nALSO STALE: the Amend-Resume paragraph describes the legacy pending_notes resume_of: string grep; source uses the structured next_resume_of field (transitions.ts:39-44,522-535).\n\nDO NOT TOUCH: the round-cap paragraph (prev_qa_round >= 4) is CORRECT — ROUND_CAP=4 at transitions.ts:365; the Limits cap of 3 counts fails, the code counts the counter. An earlier feature-split.md draft wrongly called this a contradiction; corrected there.\n\nCUT: specs/qa-flow-enforcement-architecture.md (re-derive + Amend-Resume para); tools/transitions.ts (E58 edge only); scripts/ sync check (NEW). test/qa-flow.test.mjs sweep + sync-check test = qa ONLY."
+scope_decision_why: "E40 (backlog order 9, P2). Backlog row IS the spec -> mini-chain sr -> code-reviewer -> qa; PM/ARCH skipped. NOT in feature-split.md (that file is scoped to order 6; F0 done, F1/F2 stay pending by human choice). Auto-tier N/A (P2 > maxPriority P3; 6 files > maxFiles 2) -> cut approved by the human in the coordinator's OWN chat turn 2026-08-13 (\"ok, do it\").\n\nMEASURED (coordinator-direct, read-only, source not dist): handoff-orchestrator.ts:710 c16 arms on agent_id===\"code-reviewer\" ONLY. :822-828 E18/E32 arms on agent_id===\"qa-engineer\" ONLY and diffs completed_tasks against the ON-DISK set. Ids prefilled by any OTHER non-qa role sit on disk before QA's PASS -> zero set-difference -> per-id evidence never required. Bypass confirmed as the row states.\n\nNOTHING LEGITIMATE FORBIDDEN: no SOP tells a non-qa role to WRITE completed_tasks — skill-release-engineer.md:140 / skill-doc-writer.md:29 only READ it; skill-code-reviewer.md forbids it. Writes replace the ledger wholesale (handoff-write.ts:166) and the live handoff held completed_tasks: [] right after a PASS+release.\n\nDECISION (approved): ONE gate, TWO codes. REVIEWER_COMPLETED_TASKS_REJECTED stays byte-identical for code-reviewer (published code, in envelopes + SOP); NEW NON_QA_COMPLETED_TASKS_REJECTED for every other non-qa agent_id. STRICT predicate (any non-empty completed_tasks), not set-difference, NO exemptions (E32 precedent). Rejected: widening c16 in place (name would lie on an sr write); renaming c16 (retires a published code across 4 files + 3 tests, no gain).\n\nCUT: (1) handoff-orchestrator.ts widen the c16 step; (2) gates/registry.ts new code in union + 33rd entry; (3) content/const-08-chain-31-mid.md one row (contract test demands documentedInProse). QA ONLY: (4) error-code-contract.test.mjs 32->33; (5) e35-pipeline-order.test.mjs codes -> 2; (6) reviewer-completed-tasks-gate.test.mjs extend to other non-qa roles + qa-PASS-after-prefill bypass. Golden/prompt-budget may need refresh from (3)."
 cut_approved: true
 external_refs:
-  - ref: "docs/backlog.md E39 row — the spec"
+  - ref: "docs/backlog.md:166 E40 row — the spec"
     state: "fetched"
-  - ref: "docs/backlog.md E58 row — folded in per its own 'if E39 is picked up first' instruction"
+  - ref: "docs/backlog.md:206 execution order 9 — intake classification (mini-chain)"
     state: "fetched"
-  - ref: ".current/feature-split.md F0 — coordinator measurement + hydrated scope"
+  - ref: "tools/handoff-orchestrator.ts:691-724 — the c16 gate step being widened"
     state: "fetched"
-  - ref: "dist/tools/transitions.js ALLOWED_TRANSITIONS — 21 keys, authoritative table extracted"
+  - ref: "tools/handoff-orchestrator.ts:770-856 — E18/E32 set-difference gate (the bypassed check)"
     state: "fetched"
-  - ref: "specs/qa-flow-enforcement-architecture.md:145 — the 16-row mirror under repair"
+  - ref: "gates/registry.ts:55,120,593 — c16 code declaration + doc map + entry"
     state: "fetched"
-  - ref: "tools/transitions.ts:3-4 — the MUST-mirror obligation header"
+  - ref: "test/error-code-contract.test.mjs:180-200 — 32-entry count + documentedInProse requirement for any new code"
     state: "fetched"
-  - ref: "scripts/check-version.mjs — the sync-check pattern to follow"
+  - ref: "content/skill-code-reviewer.md:77,84,85,88 — existing completed_tasks prohibition wording to mirror"
     state: "fetched"
 dispatch_pins:
   sr-engineer: "fable"
   release-engineer: "opus"
 evidence_schema: 2
 next_role: "pm"
-dispatched_at: "2026-08-13T03:49:27.335Z"
+dispatched_at: "2026-08-13T07:45:52.688Z"
 qa_round: 0
 review_round: 0
 visual_round: 0
-hop_count: 9
+hop_count: 7
 qa_rounds_total: 0
-review_rounds_total: 2
+review_rounds_total: 1
 visual_rounds_total: 0
 ---
 # Handoff State
@@ -43,8 +43,8 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- Released v3.99.0
-- tag: 11cc08250c4ac2b5b411395f6886c04c61a6c788
+- Released v3.100.0
+- tag: 3c4b39e12c02cb62441112accb5a83d2c84585ac
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.
