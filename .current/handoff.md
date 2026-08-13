@@ -1,36 +1,40 @@
 ---
 schema_version: 13
-active_feature: "e57-dependency-advisory-decisions"
+active_feature: "e39-e58-transition-matrix-sync"
 status: "In_Progress"
-last_updated: "2026-08-12T02:52:53.991Z"
+last_updated: "2026-08-13T03:49:27.335Z"
 last_agent: "release-engineer"
 prd_path: "/Users/paul.ph.chen/agent-governance-mcp/docs/backlog.md"
 scope_decision: "single-feature"
-scope_decision_why: "E57 (backlog order 5, P2). Backlog row IS the spec -> mini-chain sr-engineer -> code-reviewer -> qa-engineer, PM/ARCH skipped. Auto-tier N/A (P2 > maxPriority P3; 4 files > maxFiles 2). Human approved inline 2026-08-11 in the coordinator's OWN chat turn (\"ok, do it\") after the triage table + verified recipe were presented.\n\nPHASE 1 coordinator-direct triage COMPLETE. js-yaml (direct ^4.1.1 @ 4.2.0, load-bearing at tools/handoff-parse.ts:175) UPGRADE — 4.3.1 clears both advisories in-range; the backlog row's \"4.2.0 still flagged so not a routine bump\" is FALSIFIED (4.3.1 shipped after filing). fast-uri (SDK->ajv@8.20.0->^3.0.1 @ 3.1.2) UPGRADE — 3.1.5 in-range, lockfile-only. ip-address (SDK->express-rate-limit@8.5.1->^10.2.0 @ 10.2.0) UPGRADE — 10.5.0 in-range, lockfile-only. sharp (under @xenova/transformers ^0.32.0 @ 0.32.6) UPGRADE via package.json overrides. @xenova/transformers closes with sharp; do NOT swap packages (@huggingface/transformers@4.2.0 still pins sharp ^0.34.5, also vulnerable), reject npm audit fix's semver-major DOWNGRADE to 1.4.2.\n\nsharp-pair reachability: UNREACHABLE in stdio mode entirely (tools/rag.ts:190 and :255 refuse without --port; embedText's only other caller is tools/storage-sqlite.ts:820). Under SQLite mode sharp enters require.cache at transformers import but the native binding never loads, and the path is text-only feature-extraction — the libvips decode CVEs have no input channel.\n\nVERIFIED RECIPE (isolated lockfile copy, audit exit=0): js-yaml ^4.1.1->^4.3.1 + overrides {\"sharp\":\"^0.35.3\"}, then npm install --package-lock-only; npm update fast-uri ip-address --package-lock-only. Exactly 4 packages move; SDK STAYS 1.29.0, transformers STAYS 2.17.2. Do NOT run plain npm audit fix (drags SDK->1.30.0 + hono). Residual 2 low + 4 moderate out of scope.\n\nCUT, 4 files: package.json; package-lock.json; docs/dependency-advisories.md (NEW); content/skill-release-engineer.md. Tests: qa-engineer ONLY. AC 1-7 in the dispatch prompt."
+scope_decision_why: "F0 of .current/feature-split.md (order 6; E39 P2 + E58 P3 folded). Backlog rows ARE the spec -> mini-chain sr -> code-reviewer -> qa; PM/ARCH skipped. Auto-tier N/A (P2 > maxPriority P3; 4-5 files > maxFiles 2). Human chose order 6, then \"do F0\", in the coordinator's OWN chat turn 2026-08-12, after the measurement + 3-unit split were presented.\n\nSPLIT: feature-split.md holds 3 rows. F1 (e48-docs-skills-policy) NOT started — needs a human design decision; measurement falsified E48's premise (docs/skills/* are 2-4x hand-written expansions, 12/12 mermaid, no generator, docs/skills/coordinator.md has no source file), so \"generate from content/\" and \"share E39's check\" are both non-viable. F2 (e56) is a 1-paragraph amendment, independent.\n\nE58 FOLDED per its own row: \"If E39 is picked up first, fold E58 into that cut rather than shipping a one-edge release.\"\n\nMEASURED GROUND TRUTH (from dist/tools/transitions.js): source 21 keys; mirror 16 rows -> 12 correct, 4 WRONG, 5 MISSING = 9 drift sites, not \"roughly 5\". Missing: design-auditor:{In_Progress,Blocked}, code-reviewer:{In_Progress,FAIL,Blocked}. Wrong: null:null, researcher:In_Progress, pm:In_Progress (each missing a design-auditor entry), and sr-engineer:In_Progress which names (qa-engineer,In_Progress) where source says (code-reviewer,In_Progress).\n\nALSO STALE: the Amend-Resume paragraph describes the legacy pending_notes resume_of: string grep; source uses the structured next_resume_of field (transitions.ts:39-44,522-535).\n\nDO NOT TOUCH: the round-cap paragraph (prev_qa_round >= 4) is CORRECT — ROUND_CAP=4 at transitions.ts:365; the Limits cap of 3 counts fails, the code counts the counter. An earlier feature-split.md draft wrongly called this a contradiction; corrected there.\n\nCUT: specs/qa-flow-enforcement-architecture.md (re-derive + Amend-Resume para); tools/transitions.ts (E58 edge only); scripts/ sync check (NEW). test/qa-flow.test.mjs sweep + sync-check test = qa ONLY."
 cut_approved: true
 external_refs:
-  - ref: "GHSA-52cp-r559-cp3m + GHSA-5p4m-2wfm-xmqj (js-yaml quadratic CPU)"
+  - ref: "docs/backlog.md E39 row — the spec"
     state: "fetched"
-  - ref: "GHSA-v2hh-gcrm-f6hx + GHSA-7p8r-x3mc-p8w7 + GHSA-4c8g-83qw-93j6 (fast-uri host confusion)"
+  - ref: "docs/backlog.md E58 row — folded in per its own 'if E39 is picked up first' instruction"
     state: "fetched"
-  - ref: "GHSA-mwp4-54f8-5fhr (ip-address leading-zero octet SSRF)"
+  - ref: ".current/feature-split.md F0 — coordinator measurement + hydrated scope"
     state: "fetched"
-  - ref: "GHSA-f88m-g3jw-g9cj (sharp/libvips CVE-2026-33327/33328/35590/35591)"
+  - ref: "dist/tools/transitions.js ALLOWED_TRANSITIONS — 21 keys, authoritative table extracted"
     state: "fetched"
-  - ref: "research/xenova-reachability.md (prior in-repo reachability trace)"
+  - ref: "specs/qa-flow-enforcement-architecture.md:145 — the 16-row mirror under repair"
+    state: "fetched"
+  - ref: "tools/transitions.ts:3-4 — the MUST-mirror obligation header"
+    state: "fetched"
+  - ref: "scripts/check-version.mjs — the sync-check pattern to follow"
     state: "fetched"
 dispatch_pins:
   sr-engineer: "fable"
   release-engineer: "opus"
 evidence_schema: 2
 next_role: "pm"
-dispatched_at: "2026-08-12T02:52:53.991Z"
+dispatched_at: "2026-08-13T03:49:27.335Z"
 qa_round: 0
 review_round: 0
 visual_round: 0
-hop_count: 7
+hop_count: 9
 qa_rounds_total: 0
-review_rounds_total: 1
+review_rounds_total: 2
 visual_rounds_total: 0
 ---
 # Handoff State
@@ -39,8 +43,8 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- Released v3.98.0
-- tag: fdbdbb9
+- Released v3.99.0
+- tag: 11cc08250c4ac2b5b411395f6886c04c61a6c788
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.
