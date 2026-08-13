@@ -1,0 +1,8 @@
+# QA review — T-E40-02
+
+<!-- Auto-appended by tw_update_state(qa_review=...). -->
+
+## 2026-08-13T07:16:18.496Z — PASS — by qa-engineer
+
+PASS. E40 non-qa completed_tasks write gate. Test surface: (1) 6 new non-qa identity tests (FM6-FM11: sr-engineer/pm/architect/researcher/design-auditor/release-engineer) + SQ4 SQLite parity, each seeded on a LEGAL self-loop prev-tuple per the reviewer's flagged hazard (avoids CUT_APPROVAL_REQUIRED/AGENT_ID_REQUIRED shadowing) and asserting the specific NON_QA_COMPLETED_TASKS_REJECTED code. (2) BYPASS-FM/BYPASS-SQL regression pin: non-qa prefill rejected AT THE FIRST WRITE (not merely somewhere in the sequence), ledger stays unpoisoned, downstream QA_COMPLETION_EVIDENCE_MISSING still armed on the genuinely-new id (proves E18/E32 not loosened). (3) error-code-contract.test.mjs + e35-pipeline-order.test.mjs re-baselined 32->33 with in-file E40 comments (test 563's mapping-comment count re-baseline separated from F1's genuine source-side fix, already closed by sr-engineer/code-reviewer); e26-gate-stats.test.mjs also re-baselined (6 tests, load-bearing for full green, not in task's literal item list but flagged as such). (4) Exactly 5 goldens re-captured (4 build-full-*, hook-full) + constitution-monolith.txt re-derived from its actual current source (CONSTITUTION_SEGMENTS concat, since the pre-refactor monolith file no longer exists); 7 other goldens confirmed byte-unchanged. 3 ceilings re-baselined to measured +383 each (9187/17281/7089), matching manifest exactly (its +23 parenthetical typo noted, non-load-bearing). Full build clean, npm audit --audit-level=high clean of HIGH/CRITICAL, full suite 1713/1713 (0 fail). Evidence qa_reports/review_T-E40-03.md covering T-E40-01, T-E40-02.
+

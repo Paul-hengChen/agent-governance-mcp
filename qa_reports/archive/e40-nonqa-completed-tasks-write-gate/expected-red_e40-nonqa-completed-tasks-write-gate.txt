@@ -1,0 +1,73 @@
+# e40-nonqa-completed-tasks-write-gate — expected-red manifest (emitted by
+# sr-engineer per skill-sr-engineer SOP 7a, closing the gap the code-reviewer
+# flagged in review_reports/review_T-E40-01.md: this manifest previously
+# arrived only as pending_notes prose).
+# Format: <relative test file path> | <exact test name/description string>
+
+# All 19 reds below are the 32->33 GATE_REGISTRY re-baseline class (the new
+# NON_QA_COMPLETED_TASKS_REJECTED code raises the registry from 32 to 33
+# entries), owned by qa-engineer. Confirmed by the code-reviewer
+# (review_reports/review_T-E40-01.md) and independently re-verified here
+# after the F1 source fix below: every one of these still fails ONLY on a
+# hardcoded `32` / frozen `codes[]` sanity assert, not on any substantive
+# invariant — replicated at 33 with the count asserts removed (all
+# substantive checks pass: full-registry coverage, catalog-order
+# enumeration, fired/zero_fire disjointness + union equality, unregistered-
+# code isolation, prose_behavioral fires:null boundary, bare-workspace
+# degradation, and the frozen per-step codes[] sequence with 33 in place of 32).
+
+# doc-file mapping comment + count contract (test/error-code-contract.test.mjs)
+test/error-code-contract.test.mjs | doc-file mapping (c12): gates/registry.ts's errorCode→doc-file mapping comment matches the actual backtick-quote sites
+test/error-code-contract.test.mjs | AC3 (c12): every (errorCode, field) pair for triggerEdge/armCondition is either mechanically checked above or explicitly allowlisted as free-text — no silent exemptions
+test/error-code-contract.test.mjs | AC-1/AC-5: GATE_REGISTRY has exactly 32 entries (30 in, 32 out — e18-write-provenance added STAMP_PROVENANCE_SUSPECT + QA_COMPLETION_EVIDENCE_MISSING)
+
+# NOTE on the first row above (test 563): this is NOT a bare re-baseline.
+# Round 1 shipped with a stale gates/registry.ts doc-map comment for the
+# PRE-EXISTING code REVIEWER_COMPLETED_TASKS_REJECTED (declared only
+# `skill-code-reviewer.md`, but the new const-08 row backtick-quotes it too,
+# so the actual site set became [const-08-chain-31-mid.md,
+# skill-code-reviewer.md]) — a genuine source-side defect masked by this
+# test aborting on the `mapping.size === 32` assert before reaching the
+# per-code comparison. Fixed in gates/registry.ts:121 this round (one line):
+#   //   REVIEWER_COMPLETED_TASKS_REJECTED  const-08-chain-31-mid.md, skill-code-reviewer.md
+# Re-verified post-fix by replicating the test's exact per-code deepEqual
+# (BACKTICK_TOKEN_RE) against the rebuilt dist/ with the count assert
+# removed: mapping comment entries: 33; GATE_REGISTRY: 33; 0 mismatch(es).
+# Test 563 now fails ONLY on `33 !== 32` — it has changed character from a
+# masked source defect to a pure count re-baseline, same class as the rest
+# of this manifest. qa-engineer's re-baseline of the `32` literal (and the
+# `codes[]` count assert) is the only remaining action on it.
+
+# pipeline codes[] frozen-sequence count (test/e35-pipeline-order.test.mjs)
+test/e35-pipeline-order.test.mjs | t-order-exact: each step's codes[] matches the frozen sequence exactly, in order
+
+# gate-stats sidecar aggregation, 32-coverage sanity asserts (test/e26-gate-stats.test.mjs)
+test/e26-gate-stats.test.mjs | R1: with zero telemetry, EVERY GATE_REGISTRY code lands in zero_fire, fired is empty, count is 32
+test/e26-gate-stats.test.mjs | R2: fired.length + zero_fire.length === 32 always, and the two sets are disjoint (no code counted twice)
+test/e26-gate-stats.test.mjs | U1: an error_code absent from today's GATE_REGISTRY lands in `unregistered`, never in fired/zero_fire, and never breaks 32/32 coverage
+test/e26-gate-stats.test.mjs | D1: both sidecars absent -> never throws, full 32-code zero_fire coverage, zero counts, honest exists:false + caveats naming both paths
+test/e26-gate-stats.test.mjs | D2: only metrics.jsonl present (telemetry absent) -> telemetry side degrades independently, metrics side still fully populated
+test/e26-gate-stats.test.mjs | T3b: handleGateStats never throws even against a workspace with no .current directory at all
+
+# compose-golden byte-identity fixtures (chain-tagged fragment changed;
+# const-08-chain-31-mid.md is composed into every chain/full-detail bundle
+# but never into lite mode, so the 4 build-lite-* and hook-lite goldens
+# stayed green while these 6 moved)
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=false, fullDetail=false) is byte-identical to pre-refactor golden build-full-nondesign.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=true, fullDetail=false) is byte-identical to pre-refactor golden build-full-design.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=false, fullDetail=true) is byte-identical to pre-refactor golden build-full-nondesign-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=true, fullDetail=true) is byte-identical to pre-refactor golden build-full-design-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: SessionStart hook (AGC_DEFAULT_SKILL=full) is byte-identical to pre-refactor golden hook-full.txt
+test/compose-equivalence.test.mjs | compose-equivalence: cat(15 manifest fragments in order) === the pre-refactor constitution.md monolith (DR-1 Option R invariant)
+
+# token-budget ceilings. The code-reviewer measured +359 ~tok in each before
+# F2 (review_reports/review_T-E40-01.md); this round's F2 fix (one added
+# storage-scope clause on the new const-08 row, per the reviewer's
+# non-blocking finding) adds a further +24/+24/+23 ~tok respectively.
+# Actual measured totals this working tree, `npm test`:
+#   design-arm rationale-stripped floor:      8804 -> 9187 ~tok (+383)
+#   teamwork coordinator bundle (design-arm): 16898 -> 17281 ~tok (+383)
+#   non-design floor:                          6706 -> 7089 ~tok (+383)
+test/context-budget.test.mjs | AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the measured floor (≤ 8804 ~tok)
+test/context-budget.test.mjs | AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 16898 ~tok)
+test/context-budget.test.mjs | AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 6706 ~tok)

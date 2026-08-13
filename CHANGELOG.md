@@ -16,6 +16,55 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.100.0] - 2026-08-13
+
+One unit. E40 closes the non-qa `completed_tasks` prefill door **at the write**, generalizing the
+reviewer-only c16 check to every non-qa `agent_id`. The bypass it closes is structural, not a coding
+slip: the E18/E32 QA Completion-Evidence gate diffs an incoming `qa-engineer` write's
+`completed_tasks` against the **on-disk** set, so ids any other non-qa role already persisted before
+that write contribute zero set-difference and never trigger per-id evidence — the on-disk set was
+already poisoned upstream of the check. Only `code-reviewer` was blocked from prefilling; the other
+six non-qa identities were not. Source diff is `tools/handoff-orchestrator.ts` (+42),
+`gates/registry.ts` (+20/−2), and one `content/const-08-chain-31-mid.md` row; `<CODES> = {E40}`,
+AC4 SKIP branch (backlog-row-as-spec mini-chain).
+
+Bump kind is MINOR, not PATCH: a write the server used to accept — any non-qa-stamped
+`tw_update_state` carrying non-empty `completed_tasks` — is now rejected, and the rejection surfaces
+a **new error code** (`NON_QA_COMPLETED_TASKS_REJECTED`) that no client has seen before. That is
+observable behavior plus an added surface, the same reasoning that made v3.98.0's E53 and v3.99.0's
+E58 minors. It is not MAJOR: no documented workflow relied on the closed write (no role SOP tells a
+non-qa role to write `completed_tasks` — `skill-release-engineer.md` and `skill-doc-writer.md` only
+read the field, `skill-code-reviewer.md` already forbids writing it), no tool surface, prompt schema,
+or handoff/state-file format changed, and `tw_complete_task` is untouched.
+
+Nor is it 4.0.0. `3.99.0 → 3.100.0` is the correct semver successor — version components are
+integers, not decimal digits, so 100 follows 99 in the MINOR slot and a MAJOR bump would falsely
+signal breaking changes to the tool surface per this file's own versioning policy.
+
+### Added
+- **New gate `NON_QA_COMPLETED_TASKS_REJECTED` — the reviewer-only `completed_tasks` boundary now binds every non-qa identity (backlog E40).** `GATE_REGISTRY` goes 32 → 33 entries. Arm condition: `agent_id` present && `agent_id !== "qa-engineer"` && `agent_id !== "code-reviewer"` && `completed_tasks.length > 0`. Clearing artifact: omit `completed_tasks` (or pass `[]`) — only `agent_id=qa-engineer` may grow the ledger, backed by the existing `QA_COMPLETION_EVIDENCE_MISSING` evidence gate.
+  - **ONE gate step, TWO codes.** The existing `REVIEWER_COMPLETED_TASKS_REJECTED` envelope stays **byte-identical** for `agent_id="code-reviewer"` — it is published, cited in `content/skill-code-reviewer.md`, and pinned by `test/reviewer-completed-tasks-gate.test.mjs`. Two alternatives were considered and rejected at cut time: widening c16 in place (the name would lie on an `sr-engineer` write) and renaming c16 (retires a published code across four files and three tests for no behavioral gain).
+  - **STRICT predicate, deliberately not a set-difference.** Any non-empty `completed_tasks` is rejected regardless of which ids or how many. The E18/E32 set-difference against the on-disk ledger is not a pattern to copy here — that set-difference *is* the bypass being closed.
+  - **No exemptions**, per the E32 precedent: an exemption on this same class of check is the hole that reopened once already. `parsed.agent_id &&` guards an absent id from matching at all; `AGENT_ID_REQUIRED` (pipeline step 1) already rejects those upstream, so that clause is defense-in-depth rather than the primary guard.
+  - Applies in **file and SQLite/HTTP mode alike** — the predicate reads only the incoming write's arguments, with no storage-backend guard. Pinned in both modes by the new tests below.
+- **`content/const-08-chain-31-mid.md` gains a "Non-QA Completed-Tasks Gate" row** documenting the mechanism, the dual-envelope split, the strict-predicate rationale, and the clearing artifact. Required by `test/error-code-contract.test.mjs`'s `documentedInProse` contract, which admits no gate that prose does not describe.
+- **`test/reviewer-completed-tasks-gate.test.mjs` grows +283 lines.** `FM6`–`FM11` parameterize the new rejection across all six previously-open identities (`sr-engineer`, `pm`, `architect`, `researcher`, `design-auditor`, `release-engineer`), each asserting the write is stopped by *this* gate and not an earlier one. `BYPASS-FM` pins the bypass itself end-to-end: the non-qa prefill is rejected at the first write, and a downstream `qa-engineer` write carrying the same id is still caught by `QA_COMPLETION_EVIDENCE_MISSING`. `SQ4` and `BYPASS-SQL` replicate both under `SqliteHandoffStorage`.
+
+### Changed
+- **The `REVIEWER_COMPLETED_TASKS_REJECTED` pipeline step's `codes[]` widens 1 → 2 entries.** The step name is unchanged and its order is unchanged — still directly after `REVIEW_VERDICT_STATUS_MISMATCH`, before `QA_REVIEW_RECORD`. The `UPDATE_STATE_GATE_PIPELINE` remains **18 steps**; E40 added a code to an existing step, not a step.
+- **A genuine source-side defect surfaced by round-1 code review, in the pre-existing code's doc-map (`gates/registry.ts`).** `REVIEWER_COMPLETED_TASKS_REJECTED`'s `errorCode→doc-file` mapping comment declared only `skill-code-reviewer.md`, but this feature's new `const-08` row backtick-quotes that code too, so its actual site set became `[const-08-chain-31-mid.md, skill-code-reviewer.md]`. The mismatch was **masked** by `test/error-code-contract.test.mjs` aborting on its `mapping.size === 32` count assert before ever reaching the per-code comparison. Fixed at source (one line), not by relaxing the test; re-verified independently by code-reviewer round 2.
+- **Token-budget ceilings re-baselined +383 ~tok on all three axes** to absorb the new core-tagged `const-08` row: design-arm rationale-stripped floor `8804 → 9187`, teamwork coordinator bundle `16898 → 17281`, non-design floor `6706 → 7089`. Caps are set to the exact independently re-measured values per the established Phase-2 convention (no added headroom); the rationale+origin-tag saving margin was re-verified at `9567 − 9187 = 380 ~tok`, still ≥ 240. No `coord-*.md` fragment is touched, so the coordinator bundle's growth is 100% constitution-side.
+- **Registry-count re-baselines, 32 → 33**, in `test/error-code-contract.test.mjs` (entry count, `ALL_GATE_CODES` length, doc-map comment size), `test/e26-gate-stats.test.mjs` (coverage/disjointness/degradation asserts — the reader sums to `GATE_REGISTRY.length` by construction, so these are pure size re-baselines), and `test/e35-pipeline-order.test.mjs` (the frozen per-step `codes[]` sequence). Six `test/fixtures/compose-golden/*.txt` byte-identity goldens absorb the one added constitution line.
+
+### Notes
+- **The declared expected-red closed cleanly.** `qa_reports/expected-red_e40-nonqa-completed-tasks-write-gate.txt` declared 19 intentional failures, every one of the `32 → 33` re-baseline class. Each was independently confirmed to fail *only* on a hardcoded `32` or a frozen `codes[]` sanity assert, never on a substantive invariant — replicated at 33 with the count asserts removed, with full-registry coverage, catalog-order enumeration, fired/zero_fire disjointness and union equality, unregistered-code isolation, and bare-workspace degradation all green. The four `build-lite-*` and `hook-lite` goldens stayed green throughout, correctly: `const-08-chain-31-mid.md` is chain-tagged and never composed into lite mode. The manifest is archived with this release's evidence.
+- **The `expected-red` manifest itself arrived late and was backfilled on review.** Round 1 emitted it only as `pending_notes` prose; the code-reviewer flagged the missing file, and sr-engineer wrote it to disk per its own SOP 7a before round 2.
+- **Suite 1713/1713**, 0 fail. 1704 at v3.99.0 → 1713 with E40's `FM6`–`FM11`, `BYPASS-FM`, `SQ4`, and `BYPASS-SQL`.
+- **Dispatch shape: mini-chain, no per-feature spec.** No `specs/e40-*.md` exists anywhere in the tree — the backlog row served as the spec, PM and architect were skipped, and `scope_decision_why` records that classification. Release step 8's AC4 check therefore took its **SKIP** branch (the conditional added by E44), not the REQUIRE branch and not the UNCLASSIFIABLE stop.
+- `npm audit --audit-level=high` exits **0**; step 6a took its happy path and cited nothing from `docs/dependency-advisories.md`.
+- **A follow-up item exists and is deliberately not filed here.** No new backlog row was added by this release; filing is the coordinator's.
+- `.current/feature-split.md` carries unrelated in-flight E48/E56 measurement notes that predate this feature and are **not** part of this commit — `.current/` is governance state, outside the release commit's staged path set, and `scope_decision_why` records that E40 was never in that file's scope.
+
 ## [3.99.0] - 2026-08-13
 
 Three units, one release. E39 re-derives the `ALLOWED_TRANSITIONS` mirror table in

@@ -59,10 +59,13 @@
 //   BASELINE_PROVENANCE_INCOMPLETE  const-07-design-chain-gates.md, skill-design-auditor.md, skill-qa-visual.md
 //   PIXEL_GATE_ATTESTATION_MISSING  skill-qa-visual.md
 //   REVIEW_VERDICT_STATUS_MISMATCH  const-05-core-standards.md, const-08-chain-31-mid.md, skill-code-reviewer.md
-//   REVIEWER_COMPLETED_TASKS_REJECTED  skill-code-reviewer.md
+//   REVIEWER_COMPLETED_TASKS_REJECTED  const-08-chain-31-mid.md, skill-code-reviewer.md
+//   NON_QA_COMPLETED_TASKS_REJECTED  const-08-chain-31-mid.md
 //   QA_REVIEW_TARGET_REQUIRED       skill-qa-engineer.md
 //   AC_EXECUTION_LOG_MISSING        skill-qa-engineer.md
-// The 32-gate catalog, in documentation order. Array order is DOC order only —
+// The 33-gate catalog, in documentation order (e40-nonqa-completed-tasks-write-gate
+// added the 33rd, NON_QA_COMPLETED_TASKS_REJECTED — the reviewer-only
+// completed_tasks gate generalized to every non-qa identity). Array order is DOC order only —
 // it MUST NOT be relied on for evaluation order (DR-5; that lives in
 // handoff-orchestrator.ts as the ordered UPDATE_STATE_GATE_PIPELINE array, E35).
 export const GATE_REGISTRY = [
@@ -505,6 +508,19 @@ export const GATE_REGISTRY = [
             "handoff (agent_id=qa-engineer) — never in completed_tasks. Omit " +
             "completed_tasks (or pass []) on this write. " +
             "See specs/c16-c10-role-boundary.md AC-3 + the E32 amendment.",
+        documentedInProse: true,
+    },
+    {
+        errorCode: "NON_QA_COMPLETED_TASKS_REJECTED",
+        producer: "orchestrator",
+        envelope: "plain-text",
+        triggerEdge: "any write whose agent_id is present, is NOT qa-engineer, and is NOT code-reviewer, carrying non-empty completed_tasks",
+        armCondition: "agent_id present && agent_id !== \"qa-engineer\" && agent_id !== \"code-reviewer\" && completed_tasks.length > 0",
+        clearingArtifact: "omit completed_tasks (or pass []) on any non-qa-stamped write; only agent_id=qa-engineer may grow the ledger",
+        hintStatic: "completed_tasks on a non-qa-stamped write is ledger pollution: " +
+            "only agent_id=qa-engineer may grow completed_tasks, backed by the " +
+            "QA_COMPLETION_EVIDENCE_MISSING evidence gate. Omit completed_tasks " +
+            "(or pass []) on this write. See docs/backlog.md E40.",
         documentedInProse: true,
     },
     {

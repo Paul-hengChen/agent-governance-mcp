@@ -170,11 +170,17 @@ function fmt(codeMap, codes) {
 }
 
 // ---------------------------------------------------------------------------
-// AC-1 / AC-5: GATE_REGISTRY is the single source of truth, exactly 32
-// entries (e18-write-provenance, qa-owned re-baseline: added the 31st and
-// 32nd, STAMP_PROVENANCE_SUSPECT + QA_COMPLETION_EVIDENCE_MISSING — the
+// AC-1 / AC-5: GATE_REGISTRY is the single source of truth, exactly 33
+// entries (e40-nonqa-completed-tasks-write-gate, qa-owned re-baseline: added
+// the 33rd, NON_QA_COMPLETED_TASKS_REJECTED — generalizes the reviewer-only
+// completed_tasks gate (c16) to every non-qa identity, closing the
+// prefill-then-QA-write bypass the QA Completion-Evidence set-difference
+// gate could not see on its own; 32 in, 33 out — one gate added, none
+// dropped, docs/backlog.md E40).
+// e18-write-provenance had added the 31st and 32nd,
+// STAMP_PROVENANCE_SUSPECT + QA_COMPLETION_EVIDENCE_MISSING — the
 // write-path stamp-provenance gate and the qa completion-evidence gate;
-// 30 in, 32 out — two gates added, none dropped).
+// 30 in, 32 out — two gates added, none dropped.
 // e10-lease-override had added the 29th and 30th,
 // LEASE_OVERRIDE_AUDIT_MISSING + BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE
 // — the lease-override bypass/audit gate and the bookkeeping-write
@@ -192,15 +198,15 @@ function fmt(codeMap, codes) {
 // c9-protocol-fields had added the 20th, REVIEW_VERDICT_STATUS_MISMATCH.
 // ---------------------------------------------------------------------------
 
-test("AC-1/AC-5: GATE_REGISTRY has exactly 32 entries (30 in, 32 out — e18-write-provenance added STAMP_PROVENANCE_SUSPECT + QA_COMPLETION_EVIDENCE_MISSING)", () => {
+test("AC-1/AC-5: GATE_REGISTRY has exactly 33 entries (32 in, 33 out — e40-nonqa-completed-tasks-write-gate added NON_QA_COMPLETED_TASKS_REJECTED)", () => {
   assert.equal(
     GATE_REGISTRY.length,
-    32,
-    `expected exactly 32 GateDefinition entries, got ${GATE_REGISTRY.length}: ${GATE_REGISTRY.map((g) => g.errorCode).join(", ")}`,
+    33,
+    `expected exactly 33 GateDefinition entries, got ${GATE_REGISTRY.length}: ${GATE_REGISTRY.map((g) => g.errorCode).join(", ")}`,
   );
   assert.equal(
     ALL_GATE_CODES.length,
-    32,
+    33,
     "ALL_GATE_CODES must be GATE_REGISTRY.map(g => g.errorCode) — same length",
   );
   assert.deepEqual(
@@ -618,6 +624,21 @@ test("AC2 (c12): TRANSITION_REJECTED's ALLOWED_TRANSITIONS literal is a real tra
 // A stale mapping comment (a doc file renamed/removed, a code re-documented
 // elsewhere) would silently make the AC2 checks above trust the wrong files
 // without this.
+//
+// e40-nonqa-completed-tasks-write-gate (qa-owned re-baseline, T-E40-03):
+// 32 -> 33 for the new NON_QA_COMPLETED_TASKS_REJECTED mapping-comment line.
+// Round-1 code review (review_reports/review_T-E40-01.md, F1) caught that
+// this same feature's const-08-chain-31-mid.md row backtick-quotes the
+// PRE-EXISTING REVIEWER_COMPLETED_TASKS_REJECTED code too, which staled that
+// code's mapping-comment line (it declared only skill-code-reviewer.md) —
+// a genuine source-side defect this test was masking by aborting on the
+// `mapping.size === 32` count assert before ever reaching the per-code
+// comparison below. That is a source defect, not a test defect: sr-engineer
+// fixed the mapping-comment line itself (gates/registry.ts, one line,
+// closed and independently re-verified by code-reviewer round 2). QA's
+// re-baseline here is ONLY the count (32 -> 33); the per-code comparison
+// below was already correct and needed no test-side change once the source
+// line was fixed.
 // ---------------------------------------------------------------------------
 
 function parseDocFileMappingComment() {
@@ -638,8 +659,8 @@ test("doc-file mapping (c12): gates/registry.ts's errorCode→doc-file mapping c
   const mapping = parseDocFileMappingComment();
   assert.equal(
     mapping.size,
-    32,
-    `expected the mapping comment to list all 32 codes, found ${mapping.size}: ${[...mapping.keys()].join(", ")}`,
+    33,
+    `expected the mapping comment to list all 33 codes, found ${mapping.size}: ${[...mapping.keys()].join(", ")}`,
   );
   const docCodes = extractDocCodes();
   for (const g of GATE_REGISTRY) {
@@ -773,6 +794,19 @@ const FREE_TEXT_ALLOWLIST = [
   // mechanically checked (armConditionCheckable) like every other orchestrator-producer
   // entry.
   { code: "QA_COMPLETION_EVIDENCE_MISSING", field: "triggerEdge", reason: "role:Status edge pair present (code-reviewer:In_Progress -> qa-engineer:In_Progress) but not in triggerEdgeCheckable (no CAP_BY_CODE numeric literal, not one of the three pm->build-entry gates); the \"(file-mode only)\" qualifier and set-difference precondition are free English" },
+  // e40-nonqa-completed-tasks-write-gate (qa-owned, T-E40-03): follows the
+  // REVIEWER_COMPLETED_TASKS_REJECTED precedent immediately above verbatim —
+  // same two reasons, same shape, because NON_QA_COMPLETED_TASKS_REJECTED is
+  // that exact gate's sibling branch (one step, two codes; docs/backlog.md
+  // E40). triggerEdge is free English ("any write whose agent_id is present,
+  // is NOT qa-engineer, and is NOT code-reviewer, carrying non-empty
+  // completed_tasks") — no role:Status edge pair or CAP_BY_CODE numeric
+  // literal. armCondition ("agent_id present && agent_id !== \"qa-engineer\"
+  // && agent_id !== \"code-reviewer\" && completed_tasks.length > 0") is
+  // snake_case field-name shorthand, not a camelCase predicate/function-call
+  // literal, so extractPredicateNames() (CAMEL_RE) finds nothing to check.
+  { code: "NON_QA_COMPLETED_TASKS_REJECTED", field: "triggerEdge", reason: "free English, no checkable literal — same shape as REVIEWER_COMPLETED_TASKS_REJECTED, its sibling branch" },
+  { code: "NON_QA_COMPLETED_TASKS_REJECTED", field: "armCondition", reason: "snake_case field-name shorthand, not a camelCase predicate/function-call literal — same shape as REVIEWER_COMPLETED_TASKS_REJECTED, its sibling branch" },
 ];
 
 test("AC3 (c12): every (errorCode, field) pair for triggerEdge/armCondition is either mechanically checked above or explicitly allowlisted as free-text — no silent exemptions", () => {

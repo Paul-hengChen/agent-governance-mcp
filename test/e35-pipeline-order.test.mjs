@@ -55,7 +55,16 @@ const EXPECTED_PIPELINE = [
   { name: "SOURCE_CREDIBILITY_UNVERIFIED", codes: ["SOURCE_CREDIBILITY_UNVERIFIED"] },
   { name: "REPRO_MANIFEST_MISSING", codes: ["REPRO_MANIFEST_MISSING"] },
   { name: "REVIEW_VERDICT_STATUS_MISMATCH", codes: ["REVIEW_VERDICT_STATUS_MISMATCH"] },
-  { name: "REVIEWER_COMPLETED_TASKS_REJECTED", codes: ["REVIEWER_COMPLETED_TASKS_REJECTED"] },
+  // e40-nonqa-completed-tasks-write-gate (qa-owned re-baseline, T-E40-03):
+  // this step's codes[] widened from 1 -> 2 entries. The step itself
+  // generalizes the reviewer-only completed_tasks gate (c16) to every
+  // non-qa identity (docs/backlog.md E40) — same step NAME (no rename: the
+  // c16 envelope for agent_id="code-reviewer" stays byte-identical, so
+  // retiring the published step name would lie about that continuity), but
+  // it now emits a second code, NON_QA_COMPLETED_TASKS_REJECTED, for every
+  // other non-qa agent_id. Order is unchanged — still directly after
+  // REVIEW_VERDICT_STATUS_MISMATCH and before QA_REVIEW_RECORD.
+  { name: "REVIEWER_COMPLETED_TASKS_REJECTED", codes: ["REVIEWER_COMPLETED_TASKS_REJECTED", "NON_QA_COMPLETED_TASKS_REJECTED"] },
   { name: "QA_REVIEW_RECORD", codes: ["QA_REVIEW_TARGET_REQUIRED"] },
   { name: "QA_COMPLETION_EVIDENCE_MISSING", codes: ["QA_COMPLETION_EVIDENCE_MISSING"] },
   { name: "PASS_MISSING_EVIDENCE", codes: ["MISSING_EVIDENCE"] },

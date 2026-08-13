@@ -639,7 +639,7 @@ export const UPDATE_STATE_GATE_PIPELINE = [
     },
     {
         name: "REVIEWER_COMPLETED_TASKS_REJECTED",
-        codes: ["REVIEWER_COMPLETED_TASKS_REJECTED"],
+        codes: ["REVIEWER_COMPLETED_TASKS_REJECTED", "NON_QA_COMPLETED_TASKS_REJECTED"],
         run: (ctx) => {
             const { parsed } = ctx;
             // v3.58.0 — Reviewer completed_tasks Gate (c16-c10-role-boundary AC-3).
@@ -655,7 +655,9 @@ export const UPDATE_STATE_GATE_PIPELINE = [
             // review_task_ids field (c16 amendment, E32 — completed_tasks stays
             // empty there; growth is rejected by QA_COMPLETION_EVIDENCE_MISSING
             // below), and the Phase-2 claim write carries completed_tasks=[]
-            // (zod default) so it never fires.
+            // (zod default) so it never fires. Envelope kept byte-identical for
+            // agent_id="code-reviewer" (published, cited in skill-code-reviewer.md
+            // and pinned by test/reviewer-completed-tasks-gate.test.mjs).
             if (parsed.agent_id === "code-reviewer" && parsed.completed_tasks.length > 0) {
                 return {
                     content: [{
@@ -663,6 +665,41 @@ export const UPDATE_STATE_GATE_PIPELINE = [
                             text: `⛔ REVIEWER_COMPLETED_TASKS_REJECTED: completed_tasks=` +
                                 `[${parsed.completed_tasks.join(", ")}] on an agent_id=code-reviewer write. ` +
                                 gate("REVIEWER_COMPLETED_TASKS_REJECTED").hintStatic,
+                        }],
+                    isError: true,
+                };
+            }
+            // v3.100.0 — E40 (e40-nonqa-completed-tasks-write-gate) generalizes
+            // the reviewer-only check above to EVERY non-qa identity, closing the
+            // prefill door the QA_COMPLETION_EVIDENCE_MISSING set-difference gate
+            // below cannot see: that gate diffs an incoming qa-engineer write's
+            // completed_tasks against the ON-DISK set, so ids a non-qa role
+            // already persisted BEFORE any qa-engineer write contribute zero
+            // difference and escape per-id evidence entirely — the on-disk set
+            // was already poisoned upstream of the check. STRICT predicate
+            // (deliberately NOT that set-difference — the set-difference IS the
+            // bypass, not a pattern to copy): any non-empty completed_tasks on a
+            // write whose agent_id is present and is neither "qa-engineer" (the
+            // evidence-backed completion path) nor "code-reviewer" (handled by
+            // the byte-identical branch above) is rejected outright, regardless
+            // of which ids or how many. `parsed.agent_id &&` guards an
+            // absent/undefined agent_id from ever matching here — validateTransition
+            // (AGENT_ID_REQUIRED, step 1 of this pipeline) already rejects any
+            // write with no agent_id before this step runs, so this is
+            // defense-in-depth, not the primary guard. NO exemptions (E32
+            // precedent: an exemption on this exact class of check is the hole
+            // that reopened once already). tw_complete_task is untouched — its
+            // own evidence path, never routed through tw_update_state.
+            if (parsed.agent_id &&
+                parsed.agent_id !== "qa-engineer" &&
+                parsed.agent_id !== "code-reviewer" &&
+                parsed.completed_tasks.length > 0) {
+                return {
+                    content: [{
+                            type: "text",
+                            text: `⛔ NON_QA_COMPLETED_TASKS_REJECTED: completed_tasks=` +
+                                `[${parsed.completed_tasks.join(", ")}] on an agent_id=${parsed.agent_id} write. ` +
+                                gate("NON_QA_COMPLETED_TASKS_REJECTED").hintStatic,
                         }],
                     isError: true,
                 };
