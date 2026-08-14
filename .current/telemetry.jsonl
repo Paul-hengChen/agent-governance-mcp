@@ -26,3 +26,4 @@
 {"ts":"2026-08-10T10:37:18.095Z","gate":"validateTransition","error_code":"TRANSITION_REJECTED","agent_id":"code-reviewer","feature":"e44-e49-release-sop-conditional-checks"}
 {"ts":"2026-08-11T03:05:30.946Z","gate":"validateTransition","error_code":"TRANSITION_REJECTED","agent_id":"qa-engineer","feature":"e50-release-sop-step7a-hardening"}
 {"ts":"2026-08-12T08:29:32.322Z","gate":"validateTransition","error_code":"TRANSITION_REJECTED","agent_id":"qa-engineer","feature":"e39-e58-transition-matrix-sync"}
+{"ts":"2026-08-13T12:41:00.827Z","gate":"orchestrator","error_code":"EXPECTED_RED_DIFF_MISSING","agent_id":"qa-engineer","feature":"e64-e65-e55-release-sop-staging"}

@@ -22,3 +22,4 @@
 {"ts":"2026-08-12T02:52:53.998Z","feature":"e57-dependency-advisory-decisions","tickets":3,"qa_rounds":0,"review_rounds":1,"visual_rounds":0,"hops":7,"one_pass":false,"released_version":"3.98.0"}
 {"ts":"2026-08-13T03:49:27.342Z","feature":"e39-e58-transition-matrix-sync","tickets":3,"qa_rounds":0,"review_rounds":2,"visual_rounds":0,"hops":9,"one_pass":false,"released_version":"3.99.0"}
 {"ts":"2026-08-13T07:45:52.693Z","feature":"e40-nonqa-completed-tasks-write-gate","tickets":3,"qa_rounds":0,"review_rounds":1,"visual_rounds":0,"hops":7,"one_pass":false,"released_version":"3.100.0"}
+{"ts":"2026-08-14T02:23:49.310Z","feature":"e64-e65-e55-release-sop-staging","tickets":0,"qa_rounds":0,"review_rounds":1,"visual_rounds":0,"hops":7,"one_pass":false,"released_version":"3.101.0"}

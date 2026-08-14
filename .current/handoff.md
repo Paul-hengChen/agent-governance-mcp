@@ -1,34 +1,34 @@
 ---
 schema_version: 13
-active_feature: "e40-nonqa-completed-tasks-write-gate"
+active_feature: "e64-e65-e55-release-sop-staging"
 status: "In_Progress"
-last_updated: "2026-08-13T07:45:52.688Z"
+last_updated: "2026-08-14T02:23:49.306Z"
 last_agent: "release-engineer"
 prd_path: "/Users/paul.ph.chen/agent-governance-mcp/docs/backlog.md"
 scope_decision: "single-feature"
-scope_decision_why: "E40 (backlog order 9, P2). Backlog row IS the spec -> mini-chain sr -> code-reviewer -> qa; PM/ARCH skipped. NOT in feature-split.md (that file is scoped to order 6; F0 done, F1/F2 stay pending by human choice). Auto-tier N/A (P2 > maxPriority P3; 6 files > maxFiles 2) -> cut approved by the human in the coordinator's OWN chat turn 2026-08-13 (\"ok, do it\").\n\nMEASURED (coordinator-direct, read-only, source not dist): handoff-orchestrator.ts:710 c16 arms on agent_id===\"code-reviewer\" ONLY. :822-828 E18/E32 arms on agent_id===\"qa-engineer\" ONLY and diffs completed_tasks against the ON-DISK set. Ids prefilled by any OTHER non-qa role sit on disk before QA's PASS -> zero set-difference -> per-id evidence never required. Bypass confirmed as the row states.\n\nNOTHING LEGITIMATE FORBIDDEN: no SOP tells a non-qa role to WRITE completed_tasks — skill-release-engineer.md:140 / skill-doc-writer.md:29 only READ it; skill-code-reviewer.md forbids it. Writes replace the ledger wholesale (handoff-write.ts:166) and the live handoff held completed_tasks: [] right after a PASS+release.\n\nDECISION (approved): ONE gate, TWO codes. REVIEWER_COMPLETED_TASKS_REJECTED stays byte-identical for code-reviewer (published code, in envelopes + SOP); NEW NON_QA_COMPLETED_TASKS_REJECTED for every other non-qa agent_id. STRICT predicate (any non-empty completed_tasks), not set-difference, NO exemptions (E32 precedent). Rejected: widening c16 in place (name would lie on an sr write); renaming c16 (retires a published code across 4 files + 3 tests, no gain).\n\nCUT: (1) handoff-orchestrator.ts widen the c16 step; (2) gates/registry.ts new code in union + 33rd entry; (3) content/const-08-chain-31-mid.md one row (contract test demands documentedInProse). QA ONLY: (4) error-code-contract.test.mjs 32->33; (5) e35-pipeline-order.test.mjs codes -> 2; (6) reviewer-completed-tasks-gate.test.mjs extend to other non-qa roles + qa-PASS-after-prefill bypass. Golden/prompt-budget may need refresh from (3)."
+scope_decision_why: "E64 + E65 + E55 batched (backlog order 8a + 8). Content-only, ONE file (content/skill-release-engineer.md), same class: release-time obligations the SOP omits or orders so they cannot be honored. Human approved the batch in the coordinator's OWN chat turn 2026-08-13 (\"開始 E64+E65，把 E55 併進去\").\n\nINTAKE UPGRADED from the rows' \"coordinator-direct\" to mini-chain (sr -> code-reviewer -> qa; PM/ARCH skipped, backlog rows ARE the spec): this file's text is pinned by test/release-staging.test.mjs (1870 lines of SOP-text assertions incl. FEATURE_DIRS :82, git-add contract :176-194), so the edit has a qa-owned test surface. Precedent: E44+E49 — same file, content-only, ran mini-chain for this reason. Auto-tier N/A (P2 > maxPriority P3).\n\nMEASURED (read-only): three lists omit `gates/` -> :127 the literal git add line; :130 AC2's cross-reference set; :163 the \"Expected vs unrelated scope rule\" list. `guards/` is in all three; one letter apart, different things (guards/ = 2 files; gates/ = 33 gate defs + registry). FEATURE_DIRS at test/release-staging.test.mjs:82 needs the same check — if it also lacks gates/, AC2's fixture logic is blind too (qa's half).\n\nE65 = row option (i): move step-10/11 writes + the agc adapter-stamp bump AHEAD of step 8, add all five paths (.current/.config.json, docs/backlog.md, CLAUDE.md, AGENTS.md, .antigravityrules) to its list. Precedent: 11cc082 (v3.99.0) and 3c4b39e (v3.100.0) both did this by hand.\n\nE55 = name the post-release PM/backlog-intake dispatch an explicit terminal step of the release handback. This batch is itself the third instance of that mechanism firing.\n\nOUT OF SCOPE pending a human fold-or-file call: the \"npx tsc skips postbuild (check-transitions-sync.mjs)\" gap, and the retired content/constitution.md path at :38. Same file, both cheap — but exactly three rows were approved and E59's discipline applies."
 cut_approved: true
 external_refs:
-  - ref: "docs/backlog.md:166 E40 row — the spec"
+  - ref: "docs/backlog.md E64 row — spec for the gates/ omission"
     state: "fetched"
-  - ref: "docs/backlog.md:206 execution order 9 — intake classification (mini-chain)"
+  - ref: "docs/backlog.md E65 row — spec for the step-8/10/11 ordering gap, incl. option (i) preference"
     state: "fetched"
-  - ref: "tools/handoff-orchestrator.ts:691-724 — the c16 gate step being widened"
+  - ref: "docs/backlog.md E55 row — spec for the release-handback intake step"
     state: "fetched"
-  - ref: "tools/handoff-orchestrator.ts:770-856 — E18/E32 set-difference gate (the bypassed check)"
+  - ref: "content/skill-release-engineer.md:127,130,163 — the three lists omitting gates/"
     state: "fetched"
-  - ref: "gates/registry.ts:55,120,593 — c16 code declaration + doc map + entry"
+  - ref: "content/skill-release-engineer.md:38 — MUST-NOT-touch list (gates/ consistency check; also carries a retired content/constitution.md path, out of scope)"
     state: "fetched"
-  - ref: "test/error-code-contract.test.mjs:180-200 — 32-entry count + documentedInProse requirement for any new code"
+  - ref: "test/release-staging.test.mjs:82,176-194 — FEATURE_DIRS + git-add contract pins (qa-owned)"
     state: "fetched"
-  - ref: "content/skill-code-reviewer.md:77,84,85,88 — existing completed_tasks prohibition wording to mirror"
+  - ref: "git 11cc082 (v3.99.0) + 3c4b39e (v3.100.0) — both commits show E65's option (i) already done by hand"
     state: "fetched"
 dispatch_pins:
   sr-engineer: "fable"
   release-engineer: "opus"
 evidence_schema: 2
 next_role: "pm"
-dispatched_at: "2026-08-13T07:45:52.688Z"
+dispatched_at: "2026-08-14T02:23:49.306Z"
 qa_round: 0
 review_round: 0
 visual_round: 0
@@ -43,8 +43,8 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- Released v3.100.0
-- tag: 3c4b39e12c02cb62441112accb5a83d2c84585ac
+- Released v3.101.0
+- tag: bd9aee38a47c88ec3acc19ed7b87fa46479147e1
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.
