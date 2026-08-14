@@ -63,7 +63,19 @@ const CONST15 = fs.readFileSync(
 // ---------------------------------------------------------------------------
 
 // The directories the SOP declares as feature source dirs (AC1, AC2, AC3).
-const FEATURE_DIRS = ["lib/", "tools/", "schema/", "guards/", "prompts/", "bin/", "scripts/", "content/", "templates/", "specs/", "test/", "qa_reports/", "review_reports/", "transport/"];
+// "gates/" added (E64): tsconfig.json's `include` gained `gates/**/*.ts` (the
+// AC-B5.5 root-cause fix, review_reports/review_T-E645-02.md round 2 R2-1),
+// which makes AC-B5.5 correctly derive gates/ as an expected source dir — this
+// list must carry it too, or AC-B5.5 reds (it is a pure set difference between
+// tsconfig's `include` and this array; see AC-B5.5 below).
+const FEATURE_DIRS = ["lib/", "tools/", "schema/", "guards/", "gates/", "prompts/", "bin/", "scripts/", "content/", "templates/", "specs/", "test/", "qa_reports/", "review_reports/", "transport/"];
+
+// The non-directory metadata paths staged by the same git-add line (AC1,
+// rescoped). Six pre-E65 (tsconfig.json joined this round alongside gates/
+// above) plus the five E65 paths written by SOP steps 7b-7d ahead of the
+// release commit.
+const METADATA_PATHS = ["tsconfig.json", "package.json", "index.ts", "CHANGELOG.md", "README.md", "dist/"];
+const E65_METADATA_PATHS = [".current/.config.json", "docs/backlog.md", "CLAUDE.md", "AGENTS.md", ".antigravityrules"];
 
 /**
  * Simulate the pre-commit verification logic described in AC2:
@@ -172,20 +184,34 @@ function simulatePostCommitCheck(gitDiffHeadNameOnly, activeFeature, specExistsI
 // Phase 1 — Content assertion tests (AC1–AC5)
 // ---------------------------------------------------------------------------
 
-test("AC1: skill-release-engineer.md enumerates required staging directories explicitly", () => {
-  // Contract: the git add instruction must name each required directory by path.
-  // Abstract language ("touched files", "all relevant files") is prohibited.
+test("AC1: skill-release-engineer.md's git-add line enumerates every required staging directory and metadata path IN ITS CAPTURE GROUP (rescoped, E64/T-E645-03 point 2)", () => {
+  // Contract: the git add instruction must name each required directory by
+  // path. Abstract language ("touched files", "all relevant files") is
+  // prohibited.
+  //
+  // Rescoped from a whole-document `SKILL.includes(dir)` check
+  // (review_reports/review_T-E645-02.md round 1 F1 layer 3): that form is
+  // vacuous — every one of the 15 dirs is satisfied by prose elsewhere in the
+  // file, so deleting the entire `git add lib/ tools/ …` line outright still
+  // left the old assertion at 60/60 green. A pin that survives deletion of
+  // the thing it pins protects nothing. This form extracts the git-add line
+  // itself and asserts against ONLY its capture group, so removing or
+  // truncating the line is now a genuine, detectable red.
+  const gitAddMatch = SKILL.match(/^\s+git add (.+)$/m);
+  assert.ok(gitAddMatch, "must find the git-add line in the staging instruction (AC1)");
+  const stagedTokens = gitAddMatch[1].split(/\s+/).filter(Boolean);
+
   for (const dir of FEATURE_DIRS) {
     assert.ok(
-      SKILL.includes(dir),
-      `skill-release-engineer.md must mention '${dir}' in the staging instruction (AC1)`,
+      stagedTokens.includes(dir),
+      `the git-add line's capture group must include '${dir}' (AC1, rescoped)`,
     );
   }
-  // The metadata files must also be present in the staging instruction
-  for (const meta of ["package.json", "index.ts", "CHANGELOG.md", "README.md", "dist/"]) {
+  // The metadata files must also be present in the git-add line's capture group.
+  for (const meta of [...METADATA_PATHS, ...E65_METADATA_PATHS]) {
     assert.ok(
-      SKILL.includes(meta),
-      `skill-release-engineer.md must mention '${meta}' in the staging instruction (AC1)`,
+      stagedTokens.includes(meta),
+      `the git-add line's capture group must include '${meta}' (AC1, rescoped)`,
     );
   }
   // Must NOT use the old abstract phrasing
@@ -399,6 +425,21 @@ test("Fixture B (AC1, AC3, AC6): complete staging passes pre-commit verify", () 
   const result = simulatePreCommitVerify(gitStatusShort, gitDiffCachedStat);
   assert.equal(result.pass, true, "Fixture B: complete staging must produce PASS");
   assert.equal(result.missing.length, 0, "Fixture B: no feature dirs should be flagged as missing");
+});
+
+test("Fixture I (AC2, E64): an unstaged gates/ change is now CAUGHT — the exact scenario that nearly shipped during v3.100.0 and was only caught by AC2's manual step", () => {
+  // Simulate: git status shows gates/registry.ts changed, but git diff
+  // --cached --stat shows only package.json staged (gates/ forgotten).
+  // Before E64 (gates/ absent from FEATURE_DIRS), this fixture would have
+  // produced a false PASS — the test-side blindness mirroring the SOP-side
+  // defect E64 fixes. With gates/ in FEATURE_DIRS, it must FAIL.
+  const gitStatusShort = [" M gates/registry.ts", " M package.json"].join("\n");
+  const gitDiffCachedStat = [" package.json | 2 +-", " 1 file changed, 1 insertion(+), 1 deletion(-)"].join("\n");
+
+  const result = simulatePreCommitVerify(gitStatusShort, gitDiffCachedStat);
+  assert.equal(result.pass, false, "Fixture I: an unstaged gates/ change must produce FAIL");
+  assert.ok(result.missing.includes("gates/"), "Fixture I: gates/ must be in the missing list");
+  assert.equal(result.missing.length, 1, "Fixture I: exactly one dir (gates/) must be flagged as missing");
 });
 
 test("Fixture C (AC4/REQUIRE, AC6): REQUIRE branch fires with verbatim AC4 error when spec exists in tree but is absent from the commit", () => {
@@ -952,6 +993,26 @@ test("E53: the Escalation Routes table gains exactly one new row (six pre-existi
     dataRows[6].startsWith("| empty-baseline hazard (step 7a:"),
     "the new empty-baseline-hazard row must be the LAST row in the table, not inserted among the pre-existing six",
   );
+});
+
+test("Expected vs unrelated scope rule (E64, T-E645-03 point 3): the scope-rule paragraph's OWN enumeration — not the whole document — names every FEATURE_DIR including gates/", () => {
+  // Retargets the AC1 rescope's lesson to the second list this file carries.
+  // A whole-document `SKILL.includes(dir)` check is vacuous (round-1 F1 layer
+  // 3): every dir is satisfied by prose elsewhere, so a check like that
+  // cannot tell whether THIS paragraph's own list is complete. Bound the
+  // check to the paragraph's enumeration sentence only.
+  const scopeRuleStart = SKILL.indexOf("**Expected vs unrelated scope rule**");
+  assert.ok(scopeRuleStart > -1, "must find the scope-rule paragraph");
+  const enumSentenceEnd = SKILL.indexOf("MUST be staged per SOP step 8", scopeRuleStart);
+  assert.ok(enumSentenceEnd > -1, "must find the enumeration sentence's end anchor");
+  const enumeratedList = SKILL.slice(scopeRuleStart, enumSentenceEnd);
+
+  for (const dir of FEATURE_DIRS) {
+    assert.ok(
+      enumeratedList.includes(`\`${dir}\``),
+      `the scope-rule paragraph's own enumeration must name '${dir}' (E64) — checked within the paragraph only, not the whole document`,
+    );
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -1867,4 +1928,66 @@ test("E50 step 7a: the guard block precedes the CODES= derivation, mkdir, and mo
   assert.ok(!/\bmv\b/.test(guard), "the guard block must contain no `mv` -- it must not itself be capable of sweeping");
   assert.ok(!/mkdir/.test(guard), "the guard block must contain no `mkdir`");
   assert.ok(!/git add/.test(guard), "the guard block must contain no `git add`");
+});
+
+// ---------------------------------------------------------------------------
+// Phase 9 — E65 (step-8/10/11 ordering + adapter-stamp bump) and E55
+// (terminal handback naming), T-E645-03 points 4-5.
+// review_reports/review_T-E645-02.md rounds 1-2 APPROVED sr's step-order
+// change (F-OK-4) and the E55 terminal step (F-OK-6); these pins hold the
+// order itself, since order is the entire defect E65 documents — a review
+// that reads the moved steps without checking their sequence would miss it.
+// ---------------------------------------------------------------------------
+
+test("E65: the five newly-staged metadata paths appear in step 8's git-add line", () => {
+  const gitAddMatch = SKILL.match(/^\s+git add (.+)$/m);
+  assert.ok(gitAddMatch, "must find the git-add line");
+  const stagedTokens = gitAddMatch[1].split(/\s+/).filter(Boolean);
+  for (const p of E65_METADATA_PATHS) {
+    assert.ok(stagedTokens.includes(p), `step 8's git-add line must stage '${p}' (E65)`);
+  }
+});
+
+test("E65: the adapter-stamp step exists, names all three deployed adapter files, and requires agc check to exit 0", () => {
+  assert.match(SKILL, /\*\*Adapter-stamp bump\*\*/, "SOP must name the adapter-stamp bump step (E65)");
+  const idx7d = SKILL.indexOf("**Adapter-stamp bump**");
+  const idx8 = SKILL.indexOf("8. **Commit + tag + push**");
+  assert.ok(idx7d > -1 && idx8 > -1, "must locate the adapter-stamp step and step 8");
+  const section7d = SKILL.slice(idx7d, idx8);
+  for (const f of ["CLAUDE.md", "AGENTS.md", ".antigravityrules"]) {
+    assert.ok(section7d.includes(f), `adapter-stamp step must name ${f} (E65)`);
+  }
+  assert.match(section7d, /agc check/, "adapter-stamp step must invoke agc check (E65)");
+  assert.match(section7d, /exits 0/, "adapter-stamp step must require agc check to exit 0 (E65)");
+});
+
+test("E65: step 7b (driftBaselineIds), 7c (backlog done-marking), and 7d (adapter-stamp bump) are ALL ordered before step 8's commit, in that relative order — order is the whole defect", () => {
+  const idx7b = SKILL.indexOf("7b. **Drift-baseline acknowledgment**");
+  const idx7c = SKILL.indexOf("7c. **Backlog done-marking**");
+  const idx7d = SKILL.indexOf("7d. **Adapter-stamp bump**");
+  const idx8 = SKILL.indexOf("8. **Commit + tag + push**");
+  assert.ok(
+    idx7b > -1 && idx7c > -1 && idx7d > -1 && idx8 > -1,
+    "must locate steps 7b, 7c, 7d, and 8",
+  );
+  assert.ok(idx7b < idx8, "step 7b (driftBaselineIds append) must precede step 8's commit (E65)");
+  assert.ok(idx7c < idx8, "step 7c (backlog done-marking) must precede step 8's commit (E65)");
+  assert.ok(idx7d < idx8, "step 7d (adapter-stamp bump) must precede step 8's commit (E65)");
+  assert.ok(idx7b < idx7c && idx7c < idx7d, "7b, 7c, and 7d must appear in that relative order, matching their own numbering");
+});
+
+test("E55: the terminal handback step names the post-release PM/backlog-intake dispatch as an explicit terminal step of the release handback, not a bare routing formality", () => {
+  assert.match(
+    SKILL,
+    /\*\*Terminal handback: backlog intake\*\*/,
+    "SOP must name the terminal-handback step (E55)",
+  );
+  const idx12 = SKILL.indexOf("12. **Closing write**");
+  const idx14 = SKILL.indexOf("**Terminal handback: backlog intake**");
+  assert.ok(idx12 > -1 && idx14 > -1, "must find both step 12 (closing write) and the terminal-handback step");
+  assert.ok(idx12 < idx14, "the terminal-handback step must be described AFTER step 12's closing write, since it explains what the write's next_role hands off to");
+  assert.ok(
+    SKILL.includes("pm's normal intake"),
+    "the terminal-handback step must describe pm's post-release backlog intake as the expected next action, not an optional follow-up (E55)",
+  );
 });

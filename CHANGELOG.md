@@ -16,6 +16,45 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.101.0] - 2026-08-14
+
+Three release-SOP tickets, one file of substance (`content/skill-release-engineer.md`, +26/−11) and
+its pin (`test/release-staging.test.mjs`, +143/−9). All three were found **by running the previous
+version of this same SOP** — E64 by a near-miss during the v3.100.0 cut, E65 by two consecutive
+releases silently doing the right thing in the wrong order, E55 by the pm backlog-intake dispatch
+that cut this very batch. `<CODES> = {E645}`, AC4 SKIP branch (backlog-row-as-spec mini-chain).
+
+Bump kind is MINOR, not PATCH, and the basis is this file's own versioning policy plus direct
+precedent rather than taste: MINOR covers "backwards-compatible tools, **role skills**, or storage
+features", and a role skill is exactly what changed — the SOP the server hands a release-engineer
+gains a step that did not exist before (7d) and a terminal step that did not exist before (14). That
+is observable change in what the server delivers, the same reasoning that made the two prior
+content-only release-SOP cuts minors (v3.96.0 for E44+E49, v3.97.0 for E50). It is not PATCH
+because "no observable behavior change" is false at the SOP surface even though it is true at the
+code surface. It is not MAJOR: no tool surface, prompt schema, or handoff/state-file format changed,
+and there is **zero runtime code change** — no `tools/`, no `gates/` logic. The one-line
+`tsconfig.json` addition is declaration-only and provably so: `gates/**/*.ts` was already being
+compiled transitively via `tools/handoff-orchestrator.ts`, and the post-bump build's entire `dist/`
+delta is `dist/index.js`'s version literal.
+
+### Added
+- **SOP step 7d — the adapter-stamp bump, an obligation that previously appeared in NO step (backlog E65).** `CLAUDE.md` has required the `agc-version:` stamps in `CLAUDE.md` / `AGENTS.md` / `.antigravityrules` to be bumped in the release commit, and `agc check` must exit 0 before release — but no numbered SOP step ever said so, leaving it to whoever remembered. Step 7d now names all three files and their distinct comment syntaxes, and requires `agc check` (or `node bin/agc-init.mjs check`) to exit 0 **before** the commit, where a stale stamp is a one-line fix rather than a second commit. The three paths join the role's Artifact allowlist, each scoped to the stamp line only.
+- **SOP step 14 — the terminal handback names pm's backlog intake (backlog E55).** Step 12's `next_role="pm"` is documented as an explicit dispatch rather than a bare routing value: on resume, pm's normal intake — reviewing `docs/backlog.md` for the next open row(s) — is the expected next action, not an optional follow-up a human must separately request. No write mechanics change; the step only names in-file what the handback is for. The batch shipping this step is itself the third instance of the mechanism firing.
+- **`test/release-staging.test.mjs` Phase 9 and Fixture I (+143/−9).** Fixture I pins the exact scenario that nearly shipped during v3.100.0: `git status` shows a changed `gates/registry.ts` while `git diff --cached --stat` shows only `package.json`. Before E64 this fixture produced a false PASS — the test-side blindness mirroring the SOP-side defect. Phase 9 pins the step **order** itself for E65, since order is the entire defect that ticket documents; a review that reads the moved steps without checking their sequence would miss it.
+
+### Changed
+- **`gates/` added to five enumeration sites that all omitted it (backlog E64).** The SOP's step-8 `git add` line, AC2's cross-reference set, the "Expected vs unrelated scope rule" list, the Artifact MUST-NOT-touch list, and `FEATURE_DIRS` in `test/release-staging.test.mjs`. `guards/` was present in every one of them; `gates/` — one letter apart, and 12 predicate modules plus `registry.ts` (33 gate definitions) plus `pipeline.ts` against `guards/`'s 2 files — was in none. The scope-rule paragraph now spells out the distinction explicitly so the two are not read as interchangeable.
+- **Root cause fixed at source: `tsconfig.json`'s `include` gained `gates/**/*.ts`.** This is why AC-B5.5 — the meta-guard added after `transport/` slipped out of staging in v3.24.0, which derives expected source dirs from tsconfig — could not see `gates/` and therefore could not flag its absence. The guard was working; its input was incomplete. As noted above, the build effect is nil; the effect is that AC-B5.5 now derives `gates/` correctly, which is what makes the `FEATURE_DIRS` update load-bearing rather than decorative.
+- **Steps 10 and 11 moved ahead of the commit as 7b (drift-baseline acknowledgment) and 7c (backlog done-marking) (backlog E65).** Both writes belong *inside* the release commit, not after it; `11cc082` (v3.99.0) and `3c4b39e` (v3.100.0) each did exactly this by hand, so the renumbering ratifies observed practice rather than inventing it. The old slots 10 and 11 are **retained as retired pointers** so the numbering has no gap and nothing between 9a and 11a reads as accidentally deleted. Step 7c's summary cites the version (`vX.Y.Z`) and not a sha or tag, because step 8 has created neither at that point — matching what both reference commits actually wrote.
+- **Step 8's stage list and AC2 cross-reference gain the five metadata paths written by 7b–7d** (`.current/.config.json`, `docs/backlog.md`, `CLAUDE.md`, `AGENTS.md`, `.antigravityrules`) plus `tsconfig.json`, and the scope rule marks all of them EXPECTED release-engineer output at that point in the sequence rather than a role-boundary violation.
+- **The Artifact section states the author-vs-stage distinction rather than leaving it inferred.** `gates/` joins the MUST-NOT-touch list for the same reason `guards/` already sat there — both are gate/guard source authored by other roles — while step 8 simultaneously *requires* staging upstream `gates/` changes. Staging someone else's reviewed change is not authoring it; the two rules bind different verbs and the file now says so.
+- **`test/config-cache.test.mjs`'s WHY comment retargeted** from "SOP step 10" to note the E65 renumbering to 7b, so the pin's rationale does not silently point at a retired slot.
+
+### Notes
+- **QA rescoped AC1, which was vacuous.** The prior form asserted `SKILL.includes(dir)` against the whole document, and every one of the 15 directories is satisfied by prose elsewhere in the file — so deleting the entire `git add lib/ tools/ …` line outright still left the assertion 60/60 green. A pin that survives deletion of the thing it pins protects nothing. The rescoped form extracts the git-add line and asserts against **only its capture group**; deletion is now a genuine red. The same lesson was retargeted to the scope-rule paragraph, whose check is now bounded to its own enumeration sentence. This defect was in the pre-existing test, not in this cut's new code.
+- **Suite 1719/1719.** `npm audit --audit-level=high` exits 0 (moderate/low only), so step 6a's `docs/dependency-advisories.md` cross-check did not arm this release.
+- **This release is the first run of the changed SOP by a release-engineer following it**, matching the pattern v3.96.0 and v3.97.0 set. Steps 7b, 7c, 7d, 8 and 14 were all exercised live during this cut; observations from that run are reported back to the coordinator for backlog intake per the new step 14.
+
 ## [3.100.0] - 2026-08-13
 
 One unit. E40 closes the non-qa `completed_tasks` prefill door **at the write**, generalizing the

@@ -18,7 +18,7 @@ file-by-file ticket boundaries are in "Ticket Boundaries" below.
 - `tools/metrics.ts` — NEW module: `emitFeatureMetrics()` + `deriveTicketCode()` (T-E8-03).
 - `scripts/summarize-metrics.mjs` — NEW zero-dep CLI summarizer (T-E8-04).
 - `docs/gate-retro-procedure.md` — append a `## Success-metrics summary` pointer (T-E8-04).
-- `content/skill-release-engineer.md` — one informational SOP note near step 11/12 (T-E8-05).
+- `content/skill-release-engineer.md` — one informational SOP note near step 11/12 (now step 11b, between the E65-retired step 11 pointer and step 12) (T-E8-05).
 - `tools/storage-sqlite.ts` — **NOT touched** (see DR-1: totals are file-mode-only).
 
 ## Data Structures

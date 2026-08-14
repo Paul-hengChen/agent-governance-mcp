@@ -45,7 +45,7 @@ to confirm the defects are still present and scoped as described.
   `Map<string, WorkspaceConfig>`, line 41) is set-once, read-many with no
   invalidation path — `loadConfig()` returns the cached entry on any hit
   regardless of on-disk changes. `content/skill-release-engineer.md:59`
-  (SOP step 10, "Drift-baseline acknowledgment") already documents the
+  (SOP step 10 as of this spec; renumbered to step 7b under E65, "Drift-baseline acknowledgment") already documents the
   *symptom* mitigation (append `driftBaselineIds` post-PASS) but not the
   fact that within a single long-lived server process the append is
   invisible to `tw_detect_drift` until the process restarts, because
@@ -114,7 +114,7 @@ change. One extra `stat` call per `loadConfig()` invocation is the
 accepted cost (read is already lazy per call site, per the backlog note).
 
 Then add one line to `content/skill-release-engineer.md` SOP step 10
-(near line 59) noting that once the cache honors mtime, the
+(near line 59; renumbered to step 7b under E65) noting that once the cache honors mtime, the
 `driftBaselineIds` append (this same step) takes effect immediately for
 any `tw_detect_drift` call in the same process — no restart needed.
 
@@ -142,7 +142,8 @@ any `tw_detect_drift` call in the same process — no restart needed.
 - AC-5: `loadConfig` behavior when the config file does not exist, then is
   created, then is deleted again, is still correct (no crash, no stale
   positive/negative caching across existence transitions).
-- AC-6: `content/skill-release-engineer.md` SOP step 10 gains a one-line
+- AC-6: `content/skill-release-engineer.md` SOP step 10 (renumbered to
+  step 7b under E65) gains a one-line
   note that the `driftBaselineIds` append is now immediately visible to
   `tw_detect_drift` in the same process (no restart needed).
 - AC-7: `npm run build && npm test` green.

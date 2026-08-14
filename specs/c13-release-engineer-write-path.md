@@ -181,7 +181,7 @@ entry; not actioned here.
     `tw_update_state(agent_id="release-engineer", status="In_Progress", active_feature=<from tw_get_state>, pending_notes=["release-engineer: starting release for <active_feature>"])`
     — legal now via AC1's new edge. Subsequent SOP steps renumber
     accordingly.
-  - The closing write (current step 10) is unchanged in content
+  - The closing write (current step 10 as of this spec; now step 12 in the current SOP) is unchanged in content
     (`agent_id="pm"`, `pending_notes=["Released vX.Y.Z", ...]`) but is now
     legal via AC2's new edge rather than via the old "aliasing" convention.
   - A new CRITICAL rule MUST be added to the Hard rules section, verbatim

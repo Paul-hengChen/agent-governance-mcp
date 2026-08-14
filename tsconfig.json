@@ -19,6 +19,7 @@
     "index.ts",
     "tools/**/*.ts",
     "guards/**/*.ts",
+    "gates/**/*.ts",
     "prompts/**/*.ts",
     "schema/**/*.ts",
     "transport/**/*.ts",

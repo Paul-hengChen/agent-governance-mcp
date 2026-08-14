@@ -12,8 +12,9 @@
 //
 // WHY: prior to C18, configCache was set-once/read-many with no invalidation
 // path — a post-release driftBaselineIds append (content/skill-release-
-// engineer.md SOP step 10) was invisible to tw_detect_drift until the server
-// process restarted. These tests pin the "re-stat every call, compare
+// engineer.md SOP step 10 as of this comment's authoring; renumbered to step
+// 7b under E65) was invisible to tw_detect_drift until the server process
+// restarted. These tests pin the "re-stat every call, compare
 // existence+mtime" contract so a future "optimize away the stat call"
 // refactor cannot silently reintroduce the stale-forever cache.
 //
