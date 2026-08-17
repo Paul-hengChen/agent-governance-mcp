@@ -1,26 +1,26 @@
 ---
 schema_version: 13
-active_feature: "e64-e65-e55-release-sop-staging"
+active_feature: "e66-e67-release-sop-docs-staging"
 status: "In_Progress"
-last_updated: "2026-08-14T02:28:25.199Z"
+last_updated: "2026-08-17T04:35:58.252Z"
 last_agent: "pm"
 prd_path: "/Users/paul.ph.chen/agent-governance-mcp/docs/backlog.md"
 scope_decision: "single-feature"
-scope_decision_why: "E64 + E65 + E55 batched (backlog order 8a + 8). Content-only, ONE file (content/skill-release-engineer.md), same class: release-time obligations the SOP omits or orders so they cannot be honored. Human approved the batch in the coordinator's OWN chat turn 2026-08-13 (\"開始 E64+E65，把 E55 併進去\").\n\nINTAKE UPGRADED from the rows' \"coordinator-direct\" to mini-chain (sr -> code-reviewer -> qa; PM/ARCH skipped, backlog rows ARE the spec): this file's text is pinned by test/release-staging.test.mjs (1870 lines of SOP-text assertions incl. FEATURE_DIRS :82, git-add contract :176-194), so the edit has a qa-owned test surface. Precedent: E44+E49 — same file, content-only, ran mini-chain for this reason. Auto-tier N/A (P2 > maxPriority P3).\n\nMEASURED (read-only): three lists omit `gates/` -> :127 the literal git add line; :130 AC2's cross-reference set; :163 the \"Expected vs unrelated scope rule\" list. `guards/` is in all three; one letter apart, different things (guards/ = 2 files; gates/ = 33 gate defs + registry). FEATURE_DIRS at test/release-staging.test.mjs:82 needs the same check — if it also lacks gates/, AC2's fixture logic is blind too (qa's half).\n\nE65 = row option (i): move step-10/11 writes + the agc adapter-stamp bump AHEAD of step 8, add all five paths (.current/.config.json, docs/backlog.md, CLAUDE.md, AGENTS.md, .antigravityrules) to its list. Precedent: 11cc082 (v3.99.0) and 3c4b39e (v3.100.0) both did this by hand.\n\nE55 = name the post-release PM/backlog-intake dispatch an explicit terminal step of the release handback. This batch is itself the third instance of that mechanism firing.\n\nOUT OF SCOPE pending a human fold-or-file call: the \"npx tsc skips postbuild (check-transitions-sync.mjs)\" gap, and the retired content/constitution.md path at :38. Same file, both cheap — but exactly three rows were approved and E59's discipline applies."
+scope_decision_why: "E66+E67 batched (backlog order 8b): content/skill-release-engineer.md + CLAUDE.md; same class as the 8a batch shipped v3.101.0. Human approved in the coordinator's own chat turn 2026-08-17, with E66 option (ii) named in the proposal.\n\nINTAKE = mini-chain (sr -> code-reviewer -> qa; PM/ARCH skipped, backlog rows ARE the spec). Auto-tier N/A: P2 and 3 files, both over threshold. Precedent E44+E49, E64+E65.\n\nMEASURED: FEATURE_DIRS (test :71) has 15 and omits docs/, research/, multi-agent-scripts/; the same three are missing from SOP :133 git-add, :136 AC2 set, :171 Expected-scope rule. AC1 (test :186) pins FEATURE_DIRS against the git-add capture group, so the sr and qa halves cannot ship apart. research/ is feature-touched (ad617da), multi-agent-scripts/ is 5 tracked files: both into FEATURE_DIRS; NON_SOURCE_DIRS = dist/ (in METADATA_PATHS) + node_modules/ (gitignored).\n\nE67 verified live: (a) README has ZERO #### headings; (b) npx tsc at :54 bypasses postbuild=check:transitions-sync; (c) real output has no v — \"agc check — OK (3.101.0) — all adapters current\"; (d) :137 says Opus 4.7; (f) :41 cites the absent content/constitution.md; (g) CLAUDE.md:87 says 32 gates, registry has 33.\n\nOUT OF SCOPE: E68 — blocked on E48 per order 8c."
 external_refs:
-  - ref: "docs/backlog.md E64 row — spec for the gates/ omission"
+  - ref: "docs/backlog.md:189 E66 row — spec, incl. the option (i) vs (ii) call (human picked (ii))"
     state: "fetched"
-  - ref: "docs/backlog.md E65 row — spec for the step-8/10/11 ordering gap, incl. option (i) preference"
+  - ref: "docs/backlog.md:190 E67 row — spec for defects (a)-(f) plus the CLAUDE.md:87 site"
     state: "fetched"
-  - ref: "docs/backlog.md E55 row — spec for the release-handback intake step"
+  - ref: "content/skill-release-engineer.md:133,136,171 — the three lists omitting docs/ (E66)"
     state: "fetched"
-  - ref: "content/skill-release-engineer.md:127,130,163 — the three lists omitting gates/"
+  - ref: "content/skill-release-engineer.md:41,53,54,129,137 — the E67 text-accuracy sites"
     state: "fetched"
-  - ref: "content/skill-release-engineer.md:38 — MUST-NOT-touch list (gates/ consistency check; also carries a retired content/constitution.md path, out of scope)"
+  - ref: "test/release-staging.test.mjs:71 FEATURE_DIRS + :77 METADATA_PATHS + :186 AC1 capture-group assertion (qa-owned)"
     state: "fetched"
-  - ref: "test/release-staging.test.mjs:82,176-194 — FEATURE_DIRS + git-add contract pins (qa-owned)"
+  - ref: "CLAUDE.md:87 — stale 32-gate enumeration; gates/registry.ts GATE_REGISTRY = 33"
     state: "fetched"
-  - ref: "git 11cc082 (v3.99.0) + 3c4b39e (v3.100.0) — both commits show E65's option (i) already done by hand"
+  - ref: "agc check live output at v3.101.0 — agc check — OK (3.101.0) — all adapters current"
     state: "fetched"
 dispatch_pins:
   sr-engineer: "fable"
@@ -29,9 +29,9 @@ evidence_schema: 2
 qa_round: 0
 review_round: 0
 visual_round: 0
-hop_count: 8
+hop_count: 9
 qa_rounds_total: 0
-review_rounds_total: 1
+review_rounds_total: 2
 visual_rounds_total: 0
 ---
 # Handoff State
@@ -40,12 +40,12 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- INTAKE COMPLETE — nothing is in flight. This write closes the step-14 (E55) handback dispatch so a fresh session does not see a false stale_dispatch advisory. No next_role by design: the human is picking the next ticket in a separate session.
-- SHIPPED THIS SESSION: v3.100.0 (E40, commit 3c4b39e) and v3.101.0 (E64+E65+E55, commit bd9aee3). Both tagged and on origin. Bookkeeping commits cc3e0df and 53a6392.
-- FILED THIS SESSION, all committed in docs/backlog.md: E63 (order 9a, qa-owned), E66+E67 (order 8b), E68 (order 8c, BLOCKED on E48's design decision).
-- RECOMMENDED NEXT: order 8b (E66 + E67) — mini-chain, content is the deliverable but test/release-staging.test.mjs owns the pins. E66 is the only open P2. Prefer E66 option (ii) (NON_SOURCE_DIRS + a test asserting every top-level dir appears in exactly one list) so the class closes, not the instance: docs/ is not a TypeScript source dir, so unlike E64's gates/ no tsconfig repair can ever make a meta-guard see it.
-- AWAITING HUMAN DESIGN DECISION, unchanged: .current/feature-split.md F1 (E48, docs/skills policy — its own three options were falsified by measurement) and F2 (E56, one amendment paragraph). F1 now also blocks E68. feature-split.md is intentionally left uncommitted — it is E48/E56 material, not this feature's.
-- TREE: clean at 53a6392 except .current/feature-split.md (see above). Suite 1719/1719 at v3.101.0.
+- INTAKE COMPLETE — nothing in flight. This write closes the v3.102.0 step-14 (E55) handback dispatch so a fresh session does not see a false stale_dispatch advisory. No next_role by design: the human picks the next ticket.
+- SHIPPED: v3.102.0 (E66+E67), commit feba27d, tagged and pushed to origin/main. GitHub release published; verify-release.mjs all six checks passed. Suite 1720/1720; npm audit exit 0.
+- FILED THIS SESSION in docs/backlog.md: E69 (order 8d, P2 — the stripRationale \n-swallow at :119 and :126-128 plus the render-structure regression test, one cut), E70 (order 8e, P3 — stale 32-gate count in CONTRIBUTING.md/docs/architecture.md + the fictitious README release-notes instruction in skill-doc-writer.md), E71 (order 8d with E69, P2 — three execute-only defects from the v3.102.0 run). E52 amended with its fourth instance; order 8d rewritten to carry both rows.
+- RECOMMENDED NEXT: order 8d (E69 + E71) — mini-chain, both in content/skill-release-engineer.md with qa-owned test pins. E71(a) is the sharpest: E66's own fix made step 8's git add line 19 directories, and git aborts the whole line on a nonexistent pathspec, so the literal SOP now breaks in any adopter workspace missing one of them while passing every test here. E69 is confirmed live in the real dispatch path, not just in a test render.
+- AWAITING HUMAN DESIGN DECISION, unchanged: .current/feature-split.md F1 (E48, docs/skills policy) and F2 (E56). F1 still blocks E68. feature-split.md stays intentionally uncommitted.
+- METRICS CAVEAT: the auto-written v3.102.0 record says review_rounds: 2; the real count was 3 (round 3 was the APPROVED one). That is E52's off-by-one, now at its fourth consecutive instance — recorded in the row rather than hand-corrected in the sidecar.
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.
