@@ -16,6 +16,84 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.102.0] - 2026-08-17
+
+Two release-SOP tickets in the same two files the v3.101.0 cut touched, and found the same way — by
+running the SOP rather than reading it. E66 closes the staging-omission *class* that E64 closed one
+instance of; E67 fixes six text-accuracy defects that a live executor would have been misled by.
+Diff of substance: `content/skill-release-engineer.md` (+11/−9), `test/release-staging.test.mjs`
+(+128/−1), `CLAUDE.md` (+2/−2), `docs/backlog.md` (+4/−0). Zero runtime code change — no `tools/`,
+no `gates/`, no `prompts/`; the entire `dist/` delta is `dist/index.js`'s version literal.
+
+Bump kind is MINOR, not PATCH, on this file's own versioning policy plus direct precedent: MINOR
+covers "backwards-compatible tools, **role skills**, or storage features", and a role skill is what
+changed — the SOP the server hands a release-engineer now stages four directories it previously did
+not, so the delivered artifact behaves differently. Same reasoning as v3.96.0 (E44+E49), v3.97.0
+(E50), and v3.101.0 (E64+E65+E55). Not PATCH because "no observable behavior change" is false at the
+SOP surface. Not MAJOR: no tool surface, prompt schema, or handoff/state-file format changed.
+
+### Added
+
+- **`NON_SOURCE_DIRS` + a partition test in `test/release-staging.test.mjs`** (E66, T-E66-02) — the
+  hand-classified complement of `FEATURE_DIRS`: `dist/` (shipped build output, already in
+  `METADATA_PATHS`), `node_modules/` (gitignored), `.current/` (only `.current/.config.json` ships,
+  as a metadata path). The new `Partition` test enumerates top-level directories via `git ls-files`
+  — deterministic across clones and in CI, and unlike `ls -d */` it *does* surface dot-directories
+  — adds `node_modules/` explicitly when present on disk, then asserts the two lists are disjoint
+  and jointly cover every enumerated directory. This converts the silent-staleness failure mode
+  that produced E64 and E66 into a red test: the next top-level directory added to the repo reds
+  here instead of going quietly unstaged in some future release commit.
+- **Directory-set pins inside the existing AC2 and AC3 tests** (E66, T-E66-02, from
+  `review_reports/review_T-E66-01.md` round 1) — both tests previously asserted only that framing
+  *strings* were present in the SOP, so the AC2 `{...}` cross-reference set and the AC3 "Expected vs
+  unrelated scope rule" list could have been emptied entirely with the suite still green. Each set
+  is now extracted from the SOP text and `deepEqual`-pinned to `FEATURE_DIRS`, so all three
+  enumeration sites are held identical by test rather than by hand.
+
+### Changed
+
+- **`docs/`, `research/`, `multi-agent-scripts/`, `.github/` added to all three staging enumeration
+  sites in `content/skill-release-engineer.md`** (E66, T-E66-01) — the step-8 `git add` line (now 19
+  directories), the step-8 AC2 pre-commit cross-reference set, and the Escalation-Routes "Expected
+  vs unrelated scope rule" paragraph. `FEATURE_DIRS` in `test/release-staging.test.mjs` gains the
+  same four. AC-B5.5's tsconfig-`include` derivation — E64's fix pattern — cannot reach any of them
+  (none is a TypeScript source root), which is why hand-enumeration plus the new partition test is
+  the mechanism here. `.github/` came from review round 1: it is the only tracked top-level
+  directory the original `ls -d */` measurement could not see.
+- **Six text-accuracy fixes in `content/skill-release-engineer.md`** (E67, T-E67-01) — (a) the
+  fictitious README "release-notes subsection per the existing `#### (n) ...` convention", removed
+  from both the Artifact allowlist and step 4 (`README.md` carries zero `####` headings; the
+  CHANGELOG entry *is* the release-notes record, and the 3 install-pin replacements are the whole of
+  what the file needs); (b) step 5 now says to run `npm run check:transitions-sync` explicitly on
+  the sanctioned `npx tsc` bump-build path, because `npx tsc` silently skips the `postbuild` hook
+  that normally fires it; (c) step 7d's expected `agc check` output string corrected to the real
+  `agc check — OK (X.Y.Z) — all adapters current` (no `v` prefix); (d) the step-8 commit trailer no
+  longer hardcodes a model name/version and defers to the session harness's own git-commit
+  instruction; (e) a caveat on step 7a's `<CODES>` derivation noting that a batch dispatch's
+  `T-<BATCHNAME>-NN` task ids yield a synthetic code (v3.101.0 derived `{E645}`), documented rather
+  than special-cased; (f) the dead `content/constitution.md` cite replaced with
+  `content/const-*.md`.
+- **`CLAUDE.md` gate count 32 → 33 at both sites** (E67, T-E67-02, lines 49 and 87) — stale since
+  E40 shipped the 33rd gate in v3.100.0.
+- **`docs/backlog.md`** — E66 and E67 rows done-marked; new rows E69 (a `stripRationale` newline
+  defect that makes two SOP sites mis-render in the dispatched text, found during review rounds 2-3)
+  and E70 (the same stale-count class in `CONTRIBUTING.md` / `docs/architecture.md`, plus a
+  fictitious README release-notes instruction still live in `content/skill-doc-writer.md`), with
+  intake rows 8d and 8e.
+
+### Notes
+
+- Chain: mini-chain (sr-engineer → code-reviewer → qa-engineer), PM/architect skipped — the backlog
+  rows served as the spec, so step 8's AC4 SKIP branch applies. 3 review rounds
+  (`review_reports/review_T-E66-01.md`), QA PASS covering T-E66-01, T-E66-02, T-E67-01, T-E67-02
+  (`qa_reports/review_T-E66-02.md`). `<CODES> = {E66, E67}`.
+- This release was cut by the first release-engineer to execute the rewritten SOP end to end. The
+  four new staging directories, step 5's explicit `check:transitions-sync`, and step 7d's corrected
+  `agc check` string were all exercised live and behaved as written.
+- E69's two mis-rendering sites are still live in the SOP text this release ships — the fix was
+  deliberately withheld from this cut because the regression test that proves it reds until the
+  fences move, and QA declined to split them. It is the highest-priority open row (intake 8d).
+
 ## [3.101.0] - 2026-08-14
 
 Three release-SOP tickets, one file of substance (`content/skill-release-engineer.md`, +26/−11) and

@@ -39,6 +39,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { getTsConfigSourceDirs } from "../dist/lib/tsconfig-source-dirs.js";
 import { composeConstitution } from "../dist/prompts/build.js";
@@ -68,7 +69,33 @@ const CONST15 = fs.readFileSync(
 // which makes AC-B5.5 correctly derive gates/ as an expected source dir — this
 // list must carry it too, or AC-B5.5 reds (it is a pure set difference between
 // tsconfig's `include` and this array; see AC-B5.5 below).
-const FEATURE_DIRS = ["lib/", "tools/", "schema/", "guards/", "gates/", "prompts/", "bin/", "scripts/", "content/", "templates/", "specs/", "test/", "qa_reports/", "review_reports/", "transport/"];
+// "docs/", "research/", "multi-agent-scripts/", ".github/" added (E66, T-E66-02):
+// the same three (docs/, research/, multi-agent-scripts/) that were missing
+// from the git-add line, the AC2 cross-reference set, and the Expected-scope
+// list at cut time, plus .github/ (review_T-E66-01.md round-1 N1 — the only
+// tracked top-level dir the coordinator's `ls -d */`-based measurement never
+// saw, since that glob hides dot-directories). None of the four are
+// TypeScript source roots (AC-B5.5 derives its expected set purely from
+// tsconfig.json's `include`, so it can never wake for any of them — that's
+// why E64's fix pattern, repairing `include`, doesn't generalize here and
+// hand-enumeration is the only option), and none belong in NON_SOURCE_DIRS
+// below (all four are tracked and feature-touchable, per skill-release-
+// engineer.md:173).
+const FEATURE_DIRS = ["lib/", "tools/", "schema/", "guards/", "gates/", "prompts/", "bin/", "scripts/", "content/", "templates/", "specs/", "test/", "qa_reports/", "review_reports/", "docs/", "research/", "multi-agent-scripts/", ".github/", "transport/"];
+
+// Top-level repo directories deliberately OUTSIDE FEATURE_DIRS — hand-
+// classified, not derived (E66, T-E66-02): unlike AC-B5.5's tsconfig-`include`
+// derivation, there is no meta-guard that can tell "shipped metadata",
+// "gitignored dependency tree", or "session bookkeeping" apart from "feature
+// source" automatically, so this partition is maintained by hand and the
+// Partition test below exists precisely to make its staleness loud instead of
+// silent (the failure mode that let docs/, research/, multi-agent-scripts/,
+// and .github/ go missing from FEATURE_DIRS in the first place).
+const NON_SOURCE_DIRS = [
+  "dist/", // build output; already enumerated in METADATA_PATHS below (staged via `npm run build` only per the release-engineer Artifact allowlist, never hand-edited or staged as feature source)
+  "node_modules/", // gitignored dependency tree (repo .gitignore); never tracked, never staged, never appears in a release diff
+  ".current/", // only .current/.config.json ships — one of the five E65_METADATA_PATHS below, staged separately as a metadata path, not as this directory; the rest of the tree (handoff.md, telemetry.jsonl, metrics.jsonl, ...) is session bookkeeping committed outside the release commit (skill-release-engineer.md:173, citing commits cc3e0df/53a6392)
+];
 
 // The non-directory metadata paths staged by the same git-add line (AC1,
 // rescoped). Six pre-E65 (tsconfig.json joined this round alongside gates/
@@ -240,6 +267,26 @@ test("AC2: skill-release-engineer.md includes pre-commit 'git diff --cached --st
     /Metadata-only staging[\s\S]*?FAIL signal/,
     "SOP must declare metadata-only staging as a FAIL signal when source dirs have pending edits (AC2)",
   );
+
+  // Directory-set pin (T-E66-02, review_T-E66-01.md round-1 Architecture
+  // finding): the three assertions above only check that framing STRINGS are
+  // present — none of them inspect the `{...}` cross-reference set itself, so
+  // that set could be emptied entirely (or drift from FEATURE_DIRS/AC1's set)
+  // with this test still green. Extract it and pin it exactly.
+  const ac2SetMatch = SKILL.match(/every directory in `\{([^}]*)\}`/);
+  assert.ok(
+    ac2SetMatch,
+    "must find AC2's pre-commit cross-reference set ('every directory in `{...}`') in the SOP",
+  );
+  const ac2Dirs = ac2SetMatch[1]
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  assert.deepEqual(
+    [...ac2Dirs].sort(),
+    [...FEATURE_DIRS].sort(),
+    `AC2's cross-reference set must be exactly FEATURE_DIRS (got ${JSON.stringify(ac2Dirs)})`,
+  );
 });
 
 test("AC3: failure-mode wording is inverted — source dirs are EXPECTED, not blocked", () => {
@@ -264,6 +311,25 @@ test("AC3: failure-mode wording is inverted — source dirs are EXPECTED, not bl
     SKILL,
     /Pre-existing uncommitted changes found in <path> — this path is unrelated to the active feature\. Commit or stash it first\./,
     "failure-mode must include the verbatim AC3 stop-condition string (AC3)",
+  );
+
+  // Directory-set pin (T-E66-02, review_T-E66-01.md round-1 Architecture
+  // finding): the assertions above only check framing STRINGS — none inspect
+  // the "Expected vs unrelated scope rule" paragraph's own directory list, so
+  // that list could be emptied entirely (or drift from FEATURE_DIRS/AC1's
+  // set) with this test still green. Extract it and pin it exactly.
+  const ac3Match = SKILL.match(
+    /feature source files in ([\s\S]*?) are EXPECTED in a release commit/,
+  );
+  assert.ok(
+    ac3Match,
+    "must find the 'Expected vs unrelated scope rule' paragraph's directory list in the SOP",
+  );
+  const ac3Dirs = [...ac3Match[1].matchAll(/`([^`]+)`/g)].map((m) => m[1]);
+  assert.deepEqual(
+    [...ac3Dirs].sort(),
+    [...FEATURE_DIRS].sort(),
+    `AC3's Expected-scope directory list must be exactly FEATURE_DIRS (got ${JSON.stringify(ac3Dirs)})`,
   );
 });
 
@@ -616,6 +682,67 @@ test("AC-B5.5: every repo source directory appears in FEATURE_DIRS or metadata l
       `getTsConfigSourceDirs must return '${d}' (present in tsconfig.json include at B6 authoring time)`,
     );
   }
+});
+
+test("Partition (E66, T-E66-02): every top-level repo directory is classified in exactly one of FEATURE_DIRS / NON_SOURCE_DIRS", () => {
+  // WHY: FEATURE_DIRS/NON_SOURCE_DIRS is a hand-maintained partition, not a
+  // derived one — AC-B5.5 above already proves the tsconfig-`include`
+  // derivation route doesn't generalize here (docs/, research/,
+  // multi-agent-scripts/ are not TypeScript source roots, so that guard can
+  // never wake for them). A hand-maintained list's failure mode is silent
+  // staleness: a new top-level directory lands on disk and nobody remembers
+  // to add it anywhere — exactly what happened to docs/, research/,
+  // multi-agent-scripts/, and .github/ before this ticket. This test makes
+  // that failure mode loud: enumerate real top-level directories and assert
+  // the partition still covers every one of them, so the next directory
+  // created reds a test instead of going silently unstaged.
+  //
+  // Enumeration source: `git ls-files` (tracked paths), NOT `fs.readdirSync`
+  // or `ls -d */`. `ls -d */` is exactly the tool whose blind spot produced
+  // this ticket (review_T-E66-01.md round-1 N1): it hides dot-directories, so
+  // .github/ and .current/ were never in the coordinator's original
+  // NON_SOURCE_DIRS candidate set. A raw filesystem readdir has the opposite
+  // problem — it would also surface contributor-local, untracked scratch
+  // directories (editor/IDE state, ad hoc local backup dirs, etc.) that have
+  // nothing to do with this repo's structure and would make the test fail
+  // non-deterministically machine-to-machine. `git ls-files` is deterministic
+  // and reproducible on every clone and in CI, and DOES enumerate dot-dirs.
+  const trackedTopDirs = execSync("git ls-files", { cwd: ROOT, encoding: "utf-8" })
+    .split("\n")
+    .filter(Boolean)
+    .filter((p) => p.includes("/"))
+    .map((p) => `${p.split("/")[0]}/`);
+  const diskDirs = new Set(trackedTopDirs);
+
+  // node_modules/ is real, load-bearing infrastructure — this very test run
+  // depends on it — but is deliberately untracked (repo .gitignore), so
+  // `git ls-files` alone can never surface it. Add it explicitly, gated on
+  // its actually existing on disk rather than assumed unconditionally.
+  if (fs.existsSync(path.join(ROOT, "node_modules"))) {
+    diskDirs.add("node_modules/");
+  }
+
+  // Disjointness: a directory hand-classified into BOTH lists is a defect in
+  // the lists themselves, independent of what's on disk right now.
+  const overlap = FEATURE_DIRS.filter((d) => NON_SOURCE_DIRS.includes(d));
+  assert.deepEqual(
+    overlap,
+    [],
+    `FEATURE_DIRS and NON_SOURCE_DIRS must be disjoint; found in both: ${JSON.stringify(overlap)}`,
+  );
+
+  // Full coverage: every on-disk top-level directory lands in exactly one of
+  // the two lists (disjointness above + this membership check together give
+  // "exactly one").
+  const partition = new Set([...FEATURE_DIRS, ...NON_SOURCE_DIRS]);
+  const uncovered = [...diskDirs].filter((d) => !partition.has(d));
+  assert.deepEqual(
+    uncovered,
+    [],
+    `every top-level tracked repo directory must be classified in FEATURE_DIRS or NON_SOURCE_DIRS; ` +
+    `uncovered: ${JSON.stringify(uncovered)} — classify it in test/release-staging.test.mjs and, if it is ` +
+    `feature source, add it to the three SOP enumeration sites in content/skill-release-engineer.md`,
+  );
 });
 
 // ---------------------------------------------------------------------------
