@@ -1254,23 +1254,40 @@ test("E7-AC2: content/skill-release-engineer.md's D10 bullet cross-references th
 // 6, then 7) before a full-tree enumeration by site (not by grep-hit) settled
 // on 9 (review_T-E59-01.md Round 2). That history — every prior single-pattern
 // sweep missed at least one live site — is exactly why this pin is structural
-// rather than a single string match:
-//   (a) a repo-tree sweep for the literal word "waived" across content/ and
-//       docs/skills/. Every historical escape phrasing used this exact verb
-//       form ("waived in the PR description[, with rationale]", "unwaived",
-//       "no / waived" — confirmed against git history, commit 95d6376..HEAD).
-//       The RETAINED "Toolchains lacking an audit command waive the rule"
-//       sentence and the NEW "...is NOT a waiver..." clause both use
-//       different words ("waive" / "waiver"), so this sweep has zero
-//       legitimate positives to exclude — the escape reappearing ANYWHERE in
-//       either tree, not just at one of the 9 known sites (including a future
-//       10th mirror nobody has enumerated yet), reds this test.
-//   (b) presence, at each of the 9 enumerated sites, of the disposition-
+// rather than a single string match.
+//
+// RE-BASELINED 2026-08-17 (E48, human decision, no salvage): docs/skills/ was
+// deleted entirely — it was never on the prompt path (prompts/build.ts and
+// tools/role.ts compose from content/ only) and 9 of its 12 files had never
+// been touched since their creation commit. That removes 8 of the 9 sites
+// above (only 1 of the 8 was a verbatim mirror; the rest — STOP-exit table
+// rows, server-enforced-gates bullets, mermaid decision branches — were
+// structures the live SOPs never contained at all). Re-deriving from the tree
+// rather than from the deletion count (review_T-E48-02.md round 1/2, finding
+// C2) surfaced 3 previously-unpinned LIVE sites that were never in the
+// original 9: content/skill-release-engineer.md:56-58, the §6a
+// dependency-audit-disposition mechanism itself — the exact "cite the
+// advisory record's row, don't improvise a rationale" behavior E57/E59 exist
+// to enforce. The re-baselined enumeration is therefore 9 -> 4, NOT 9 -> 1:
+// const-15's source bullet plus those 3 sites.
+//   (a) a repo-tree sweep for the literal word "waived" across content/ (the
+//       only tree left — docs/skills/ no longer exists). Every historical
+//       escape phrasing used this exact verb form ("waived in the PR
+//       description[, with rationale]", "unwaived", "no / waived" —
+//       confirmed against git history, commit 95d6376..HEAD). The RETAINED
+//       "Toolchains lacking an audit command waive the rule" sentence and the
+//       "...is NOT a waiver..."/"...waiver..." clauses (const-15:11,
+//       skill-release-engineer.md:57) all use different words ("waive" /
+//       "waiver"), so this sweep has zero legitimate positives to exclude —
+//       the escape reappearing ANYWHERE in content/, not just at one of the 4
+//       known sites (including a future 5th site nobody has enumerated yet),
+//       reds this test.
+//   (b) presence, at each of the 4 enumerated sites, of the disposition-
 //       channel language the escape was replaced with — so silently deleting
-//       or truncating a mirror's fixed text (which would not reintroduce the
+//       or truncating a site's fixed text (which would not reintroduce the
 //       word "waived") is caught too.
 // Together (a) and (b) fail on: the escape word reappearing anywhere, OR any
-// of the 9 known sites losing its replacement text — the two ways this
+// of the 4 known sites losing its replacement text — the two ways this
 // defect could recur.
 
 function listMarkdownFilesRecursive(dir) {
@@ -1280,8 +1297,8 @@ function listMarkdownFilesRecursive(dir) {
     .map((entry) => path.join(dir, entry));
 }
 
-test("E59: the abolished 'waived' dependency-audit escape does not reappear anywhere in content/ or docs/skills/ (structural, tree-wide sweep)", () => {
-  const trees = [path.join(ROOT, "content"), path.join(ROOT, "docs", "skills")];
+test("E59: the abolished 'waived' dependency-audit escape does not reappear anywhere in content/ (structural, tree-wide sweep)", () => {
+  const trees = [path.join(ROOT, "content")];
   const offenders = [];
   for (const tree of trees) {
     for (const file of listMarkdownFilesRecursive(tree)) {
@@ -1294,14 +1311,11 @@ test("E59: the abolished 'waived' dependency-audit escape does not reappear anyw
   assert.deepEqual(
     offenders,
     [],
-    `no file under content/ or docs/skills/ may contain the word "waived" — that exact verb was the only form the abolished §6 escape ever took ("waived in the PR description[, with rationale]", "unwaived", "no / waived"); the retained "waive the rule" sentence and the new "NOT a waiver" clause both use different words (E59). Found it reintroduced in: ${offenders.join(", ")}`,
+    `no file under content/ may contain the word "waived" — that exact verb was the only form the abolished §6 escape ever took ("waived in the PR description[, with rationale]", "unwaived", "no / waived"); the retained "waive the rule" sentence and the new "NOT a waiver" clause both use different words (E59). Found it reintroduced in: ${offenders.join(", ")}`,
   );
 });
 
-test("E59: all 9 live §6 dependency-audit normative sites carry the disposition-channel replacement text (structural, per-site enumeration per review_T-E59-01.md Round 2)", () => {
-  const RELEASE_MIRROR = fs.readFileSync(path.join(ROOT, "docs", "skills", "release-engineer.md"), "utf-8");
-  const SR_MIRROR = fs.readFileSync(path.join(ROOT, "docs", "skills", "sr-engineer.md"), "utf-8");
-
+test("E59: all 4 live §6 dependency-audit normative sites carry the disposition-channel replacement text (structural, per-site enumeration, re-baselined 2026-08-17 per review_T-E48-02.md round 1/2 C2)", () => {
   const sites = [
     {
       body: CONST15,
@@ -1309,48 +1323,41 @@ test("E59: all 9 live §6 dependency-audit normative sites carry the disposition
       label: "content/const-15-core-tail.md:11 (source bullet)",
     },
     {
-      body: RELEASE_MIRROR,
-      anchor: /- \*\*Constitution §6 — Dependency audit at build gate\*\*:.*$/m,
-      label: "docs/skills/release-engineer.md:51 (step 4 verbatim mirror)",
+      body: SKILL,
+      anchor: /6a\. \*\*Dependency-audit disposition\*\*.*$/m,
+      label: "content/skill-release-engineer.md:56 (§6a disposition heading)",
     },
     {
-      body: RELEASE_MIRROR,
-      anchor: /\| 5 \| \*\*`npm audit` HIGH\/CRITICAL finding\*\*.*$/m,
-      label: "docs/skills/release-engineer.md:92 (STOP-exit table row 5)",
+      body: SKILL,
+      // Widened to include the :56 heading: the bullet's own text names
+      // neither "disposition" nor "dependency-advisory record" verbatim
+      // (verified directly — a single-line anchor at the bullet lead alone
+      // would false-fail the presence assertion below), but the bullet is
+      // meaningless detached from the "6a. Dependency-audit disposition"
+      // heading that introduces it, so the excerpt legitimately includes it.
+      anchor: /6a\. \*\*Dependency-audit disposition\*\*[\s\S]*?- \*\*Already recorded\*\*.*$/m,
+      label: "content/skill-release-engineer.md:57 (Already-recorded disposition bullet)",
     },
     {
-      body: RELEASE_MIRROR,
-      anchor: /- \*\*Build gate \+ §6 dependency audit\*\* —.*$/m,
-      label: "docs/skills/release-engineer.md:121 (server-enforced-gates bullet)",
-    },
-    {
-      body: RELEASE_MIRROR,
-      anchor: /AUDITOK -- yes,.*\n.*AUDITOK -- no \/.*$/m,
-      label: "docs/skills/release-engineer.md:165-167 (mermaid decision diagram)",
-    },
-    {
-      body: SR_MIRROR,
-      anchor: /- Confirm full project builds with \*\*ZERO errors\*\*.*$/m,
-      label: "docs/skills/sr-engineer.md:82 (Step 7 verbatim mirror)",
-    },
-    {
-      body: SR_MIRROR,
-      anchor: /\| 9 \| \*\*HIGH\/CRITICAL dependency audit finding\*\*.*$/m,
-      label: "docs/skills/sr-engineer.md:112 (Branch/STOP-exit table row 9)",
-    },
-    {
-      body: SR_MIRROR,
-      anchor: /- \*\*Dependency audit at build gate\*\* \(Constitution §6\) —.*$/m,
-      label: "docs/skills/sr-engineer.md:132 (Server-enforced-gates bullet)",
-    },
-    {
-      body: SR_MIRROR,
-      anchor: /AUDITOK\{§6 audit:.*\n.*AUDITOK -- yes.*\n.*AUDITOK -- no.*$/m,
-      label: "docs/skills/sr-engineer.md:206-208 (mermaid decision diagram)",
+      body: SKILL,
+      // Same widening as :57, for the same reason.
+      anchor: /6a\. \*\*Dependency-audit disposition\*\*[\s\S]*?- \*\*Not recorded, or recorded but its re-review trigger has since fired\*\*.*$/m,
+      label: "content/skill-release-engineer.md:58 (Not-recorded disposition bullet)",
     },
   ];
 
-  assert.equal(sites.length, 9, "this enumeration must itself stay at 9 sites (review_T-E59-01.md Round 2 count) — update it deliberately, not by accident, if the mirror set changes");
+  // Re-baselined 9 -> 4, NOT 9 -> 1 (E48, 2026-08-17): E48 deleted docs/skills/
+  // entirely, which removes 8 of the original 9 sites (7 of those 8 were
+  // structures — STOP-exit table rows, server-enforced-gates bullets, mermaid
+  // decision branches — the live SOPs never contained at all; only 1 was a
+  // verbatim mirror). That deletion alone would leave only const-15's source
+  // bullet pinned. But re-deriving from the tree instead of from the deletion
+  // count surfaced 3 previously-unpinned LIVE sites that were never in the
+  // original 9-site enumeration: content/skill-release-engineer.md:56-58, the
+  // §6a dependency-audit-disposition mechanism itself (the "cite the advisory
+  // record's row, don't improvise a rationale" behavior E57/E59 exist to
+  // enforce). Net: -8 mirror sites, +3 previously-uncounted live sites = 4.
+  assert.equal(sites.length, 4, "this enumeration must itself stay at 4 sites (re-baselined 2026-08-17, E48 + review_T-E48-02.md round 1/2 C2: -8 docs/skills/ mirror sites deleted by E48, +3 previously-unpinned live content/skill-release-engineer.md:56-58 sites added) — update it deliberately, not by accident, if the site set changes");
 
   for (const { body, anchor, label } of sites) {
     const match = body.match(anchor);

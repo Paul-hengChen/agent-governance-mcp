@@ -16,6 +16,97 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.102.1] - 2026-08-17
+
+E48 ends a ticket that had been open since 2026-08-10 and parked in `.current/feature-split.md` (F1)
+since 2026-08-12, awaiting a human design decision on what `docs/skills/*` is for. The decision, made
+in the coordinator's chat turn on 2026-08-17: **delete the tree entirely, no salvage.** Diff of
+substance: 12 files removed under `docs/skills/` (−2,786 lines), `scripts/check-transitions-sync.mjs`
+(+3/−2), `test/release-staging.test.mjs` (+63/−56), `docs/backlog.md` (+6/−4). Zero runtime code
+change — no `tools/`, no `gates/`, no `prompts/`, and `content/` is byte-identical to the previous
+release throughout, so no constitution or role-SOP text moved and no composition golden or context
+budget shifts. The entire `dist/` delta is `dist/index.js`'s version literal.
+
+Bump kind is **PATCH**, deliberately not the MINOR that the four preceding ticket releases took, on
+this file's own versioning policy: MINOR covers *adding* backwards-compatible tools, role skills, or
+storage features, and nothing was added — what shipped is a documentation removal plus a test
+re-baseline. The discriminator v3.102.0 used to justify its own MINOR ("a role skill changed, so the
+delivered artifact behaves differently") is precisely what does **not** hold here: `content/` did not
+move, and the deleted tree was never on the prompt path (`prompts/build.ts` and `tools/role.ts`
+compose from `content/` only), had zero inbound links from `README.md`, `docs/install.md`,
+`CONTRIBUTING.md`, `docs/architecture.md` or `CLAUDE.md`, and therefore never reached an agent's
+context. "Doc clarifications and internal refactors with no observable behavior change" is the PATCH
+row, and it describes this cut exactly. Not MAJOR: no tool surface, prompt schema, or handoff/state
+file format changed.
+
+### Removed
+
+- **The entire `docs/skills/` tree — 12 files, 2,786 lines** (E48, T-E48-01): `architect.md`,
+  `code-reviewer.md`, `coordinator-lite.md`, `coordinator.md`, `design-auditor.md`, `doc-writer.md`,
+  `pm.md`, `qa-engineer.md`, `qa-visual.md`, `release-engineer.md`, `researcher.md`,
+  `sr-engineer.md`. These were 2–4x hand-written prose expansions of the `content/` role SOPs, with
+  no generator and no mechanizable diff against their sources — so they drifted silently and
+  accumulated superseded rule text (the defect E48 was filed for). Four measurements drove the
+  deletion over the two alternatives: 9 of the 12 files carried only their creation commit
+  (`4c310fb`, 2026-06-24) and were never updated across ~50 releases; the tree had zero inbound
+  links from any entry point; it was absent from every prompt path, making removal provably inert on
+  agent behavior; and both repair options had already been falsified — generate-from-source by the
+  order-6 measurement (no generator exists and `docs/skills/coordinator.md` had no `content/` source
+  at all), and a stale-quote guard by the 2026-08-13 correction (it caught neither headline
+  instance). Salvage of the one orphan artifact, `docs/skills/coordinator.md`'s flow diagram, was
+  considered and declined: it was substantially wrong rather than merely old (routing on
+  `pending_notes`, which C9 replaced with the `next_role` field at v3.55.0; drawing `hop>=10` as
+  coordinator-counted, server-tracked since D2; omitting cut-approval, auto-tier, feature-lease,
+  external-refs, source-credibility, amend-resume, Backlog Intake Loop and Crash-Resume), so moving
+  it to `specs/` would have laundered a falsehood.
+
+### Changed
+
+- **`test/release-staging.test.mjs` — E59's two pins re-baselined for the deleted tree** (E48,
+  T-E48-03, qa-owned): the tree-wide `waived` sweep narrows from `content/` + `docs/skills/` to
+  `content/` alone, and the per-site normative-text enumeration re-bases **9 → 4 sites — not 9 → 1,
+  which is what the ticket prescribed.** The correction came from the code-reviewer re-deriving the
+  site set from the tree rather than from the deletion count (round 1, finding C2): deleting
+  `docs/skills/` removes 8 of the original 9 sites, but three **live** sites at
+  `content/skill-release-engineer.md:56,:57,:58` — the §6a dependency-audit disposition mechanism
+  itself, the *cite the advisory record's row rather than improvising a rationale* behavior E57 and
+  E59 exist to enforce — had never been in E59's enumeration at all. Shrinking to
+  `content/const-15-core-tail.md:11` alone would have satisfied the letter of "drop the deleted
+  sites" while leaving that mechanism deletable with the suite green. Two further findings are
+  recorded in the same round: only **1 of the 8** deleted pins was a verbatim mirror (six were
+  structures — STOP-exit table rows, server-enforced-gates bullets, mermaid decision branches — that
+  the live SOPs never contained, and `content/skill-sr-engineer.md` carries no §6 audit text at
+  all), so half the deleted pins had been guarding text no agent ever received, which strengthens
+  the deletion rather than weakening it; and QA widened the `:57`/`:58` anchors to span from the
+  `:56` heading, because a naive single-line anchor at `:57` matches neither `disposition` nor
+  `dependency-advisory record` literally and would have false-failed the presence assertion.
+- **`scripts/check-transitions-sync.mjs:17-19` — the dangling `docs/skills/*` citation reworded**
+  (E48, T-E48-02): the comment justified this script's set-equality check by contrasting it with
+  `docs/skills/*`, a live-path pointer that the deletion would have left dangling. The contrast now
+  attaches to the generic class ("a hand-written prose expansion of a prose source") and cites the
+  removed tree in the past tense as an instance of it. Round 1 rejected the first attempt, which had
+  substituted `content/skill-*.md` into the contrast slot — an assertion that the composition
+  sources have no structured source to diff against, which v3.102.0's own E67 fixes had just
+  disproved, and a fresh instance of the exact defect class E48 exists to close.
+
+### Notes
+
+- `npm test` — 1720/1720 green. `npm audit --audit-level=high` — exit 0. Five moderate/low transitive
+  advisories remain unchanged and below the gate threshold (`@hono/node-server`, `body-parser`,
+  `esbuild`, `hono`, `protobufjs`), each with a disposition already recorded in
+  `docs/dependency-advisories.md`.
+- **E68 is VOID, not done** (`docs/backlog.md` order row 8c): it was filed to sync
+  `docs/skills/release-engineer.md`, which no longer exists. The row's own reasoning is why — it
+  insisted the sync must not run before the `docs/skills/*` policy call was made, and that call
+  removed the file. Order row 6 (F1) closes with it; only E56 (F2) remains open in that slot.
+- **E72 filed** (`docs/backlog.md`, order 8f, coordinator-direct investigation first): during this
+  cut, a code-reviewer subagent's round-2 APPROVED `tw_update_state` landed materially different from
+  what its own reply claimed — `agent_id: "qa-engineer"` instead of `"code-reviewer"`, and an empty
+  `pending_notes` — which reset `review_round` 1 → 0 and briefly recorded a `last_agent` that had not
+  run. The authoritative round-by-round record for this feature is therefore
+  `review_reports/review_T-E48-02.md`, not the handoff. First open row about the ledger's own
+  trustworthiness rather than a document's accuracy.
+
 ## [3.102.0] - 2026-08-17
 
 Two release-SOP tickets in the same two files the v3.101.0 cut touched, and found the same way — by

@@ -14,8 +14,9 @@
 // sites across 16 mirrored rows) with nothing to catch it. Both sides are
 // structured data — a Map in compiled JS, a markdown table with a fixed
 // three-column shape — so a set-equality check is genuinely mechanizable
-// here, unlike docs/skills/* (E48), which are hand-written prose expansions
-// with no structured source to diff against.
+// here, unlike a hand-written prose expansion of a prose source, which has
+// no structured source to diff against — the docs/skills/* mirror tree was
+// exactly that case, and E48 deleted it rather than trying to check it.
 //
 // Hard requirement (explicit ticket condition, same defect class as E50's
 // `grep -vxFf` empty-baseline bug): if this script cannot find or parse the
