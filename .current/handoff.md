@@ -1,37 +1,39 @@
 ---
 schema_version: 13
-active_feature: "e66-e67-release-sop-docs-staging"
+active_feature: "e48-docs-skills-delete"
 status: "In_Progress"
-last_updated: "2026-08-17T04:35:58.252Z"
-last_agent: "pm"
+last_updated: "2026-08-17T07:08:56.026Z"
+last_agent: "release-engineer"
 prd_path: "/Users/paul.ph.chen/agent-governance-mcp/docs/backlog.md"
 scope_decision: "single-feature"
-scope_decision_why: "E66+E67 batched (backlog order 8b): content/skill-release-engineer.md + CLAUDE.md; same class as the 8a batch shipped v3.101.0. Human approved in the coordinator's own chat turn 2026-08-17, with E66 option (ii) named in the proposal.\n\nINTAKE = mini-chain (sr -> code-reviewer -> qa; PM/ARCH skipped, backlog rows ARE the spec). Auto-tier N/A: P2 and 3 files, both over threshold. Precedent E44+E49, E64+E65.\n\nMEASURED: FEATURE_DIRS (test :71) has 15 and omits docs/, research/, multi-agent-scripts/; the same three are missing from SOP :133 git-add, :136 AC2 set, :171 Expected-scope rule. AC1 (test :186) pins FEATURE_DIRS against the git-add capture group, so the sr and qa halves cannot ship apart. research/ is feature-touched (ad617da), multi-agent-scripts/ is 5 tracked files: both into FEATURE_DIRS; NON_SOURCE_DIRS = dist/ (in METADATA_PATHS) + node_modules/ (gitignored).\n\nE67 verified live: (a) README has ZERO #### headings; (b) npx tsc at :54 bypasses postbuild=check:transitions-sync; (c) real output has no v — \"agc check — OK (3.101.0) — all adapters current\"; (d) :137 says Opus 4.7; (f) :41 cites the absent content/constitution.md; (g) CLAUDE.md:87 says 32 gates, registry has 33.\n\nOUT OF SCOPE: E68 — blocked on E48 per order 8c."
+scope_decision_why: "E48 — HUMAN DECISION 2026-08-17 (coordinator's own chat turn): DELETE docs/skills/ entirely, no salvage (option c). Resolves .current/feature-split.md F1, parked awaiting exactly this call since 2026-08-12.\n\nEVIDENCE (coordinator-direct, measured this session): (1) 9 of the 12 files have exactly ONE commit — the creation commit 4c310fb (2026-06-24) — and were never updated across ~50 releases; the 3 that moved were dragged along by unrelated sweeps (E59, E64/E65, E19). Dead on arrival, not a mirror that drifts. (2) ZERO inbound links — README.md, docs/install.md, CONTRIBUTING.md, docs/architecture.md and CLAUDE.md all carry no reference; the tree has no entry point. (3) Not on any prompt path: prompts/build.ts and tools/role.ts compose from content/ only, so deletion has zero agent-behavior impact. (4) The other two options were already falsified — the order-6 measurement killed generate-from-source (no generator, none buildable; docs/skills/coordinator.md has no content/ source at all) and the 2026-08-13 correction killed the stale-quote guard (catches NEITHER headline instance).\n\nSALVAGE CONSIDERED, DECLINED: docs/skills/coordinator.md:240-286, the only orphan mermaid diagram, was read this session and is substantially WRONG rather than merely old — it routes on pending_notes (C9 replaced that with the next_role field at v3.55.0), draws hop>=10 as coordinator-counted (server-tracked hop_count since D2), and omits cut-approval, auto-tier, feature-lease, external-refs, source-credibility, amend-resume, Backlog Intake Loop and Crash-Resume. Moving it to specs/ would launder a falsehood; redrawing it is new work that belongs in content/.\n\nINTAKE = mini-chain (sr -> code-reviewer -> qa; PM/ARCH skipped, the E48 backlog row plus this decision ARE the spec). Auto-tier N/A: cutApprovalAutoTier is {} so conservative defaults apply (maxFiles 2, maxPriority P3) and this cut is 14 files at P2 — over both, halted for approval as designed. Precedent: E44+E49, E64+E65, E66+E67."
+cut_approved: true
 external_refs:
-  - ref: "docs/backlog.md:189 E66 row — spec, incl. the option (i) vs (ii) call (human picked (ii))"
+  - ref: "docs/backlog.md:171 E48 row — the ticket, incl. part (a) named stale sites and the part (b) three options"
     state: "fetched"
-  - ref: "docs/backlog.md:190 E67 row — spec for defects (a)-(f) plus the CLAUDE.md:87 site"
+  - ref: ".current/feature-split.md:41-107 — the order-6 measurement that falsified generate-from-source, plus the 2026-08-13 correction that falsified the stale-quote guard"
     state: "fetched"
-  - ref: "content/skill-release-engineer.md:133,136,171 — the three lists omitting docs/ (E66)"
+  - ref: "docs/skills/ — all 12 files enumerated via git ls-files; per-file git log confirming 9 carry only commit 4c310fb (2026-06-24)"
     state: "fetched"
-  - ref: "content/skill-release-engineer.md:41,53,54,129,137 — the E67 text-accuracy sites"
+  - ref: "test/release-staging.test.mjs:1283-1299 (E59 tree sweep) + :1301-1354 (9-site enumeration incl. the sites.length counter-guard) — qa-owned"
     state: "fetched"
-  - ref: "test/release-staging.test.mjs:71 FEATURE_DIRS + :77 METADATA_PATHS + :186 AC1 capture-group assertion (qa-owned)"
+  - ref: "scripts/check-transitions-sync.mjs:17 — the docs/skills/* contrast citation in a comment, dangling after deletion"
     state: "fetched"
-  - ref: "CLAUDE.md:87 — stale 32-gate enumeration; gates/registry.ts GATE_REGISTRY = 33"
+  - ref: "docs/skills/coordinator.md:240-286 — the salvage-candidate flow diagram, read and declined as substantially wrong"
     state: "fetched"
-  - ref: "agc check live output at v3.101.0 — agc check — OK (3.101.0) — all adapters current"
+  - ref: "tree-wide grep for docs/skills across *.md/*.ts/*.mjs/*.js/*.json — confirms README/install/CONTRIBUTING/architecture/CLAUDE carry zero references and that every other hit is inert history"
     state: "fetched"
 dispatch_pins:
   sr-engineer: "fable"
-  release-engineer: "opus"
 evidence_schema: 2
+next_role: "pm"
+dispatched_at: "2026-08-17T07:08:56.026Z"
 qa_round: 0
 review_round: 0
 visual_round: 0
-hop_count: 9
+hop_count: 6
 qa_rounds_total: 0
-review_rounds_total: 2
+review_rounds_total: 1
 visual_rounds_total: 0
 ---
 # Handoff State
@@ -40,12 +42,11 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- INTAKE COMPLETE — nothing in flight. This write closes the v3.102.0 step-14 (E55) handback dispatch so a fresh session does not see a false stale_dispatch advisory. No next_role by design: the human picks the next ticket.
-- SHIPPED: v3.102.0 (E66+E67), commit feba27d, tagged and pushed to origin/main. GitHub release published; verify-release.mjs all six checks passed. Suite 1720/1720; npm audit exit 0.
-- FILED THIS SESSION in docs/backlog.md: E69 (order 8d, P2 — the stripRationale \n-swallow at :119 and :126-128 plus the render-structure regression test, one cut), E70 (order 8e, P3 — stale 32-gate count in CONTRIBUTING.md/docs/architecture.md + the fictitious README release-notes instruction in skill-doc-writer.md), E71 (order 8d with E69, P2 — three execute-only defects from the v3.102.0 run). E52 amended with its fourth instance; order 8d rewritten to carry both rows.
-- RECOMMENDED NEXT: order 8d (E69 + E71) — mini-chain, both in content/skill-release-engineer.md with qa-owned test pins. E71(a) is the sharpest: E66's own fix made step 8's git add line 19 directories, and git aborts the whole line on a nonexistent pathspec, so the literal SOP now breaks in any adopter workspace missing one of them while passing every test here. E69 is confirmed live in the real dispatch path, not just in a test render.
-- AWAITING HUMAN DESIGN DECISION, unchanged: .current/feature-split.md F1 (E48, docs/skills policy) and F2 (E56). F1 still blocks E68. feature-split.md stays intentionally uncommitted.
-- METRICS CAVEAT: the auto-written v3.102.0 record says review_rounds: 2; the real count was 3 (round 3 was the APPROVED one). That is E52's off-by-one, now at its fourth consecutive instance — recorded in the row rather than hand-corrected in the sidecar.
+- Released v3.102.1
+- tag: f02ea1e36d2248c36c8d74e53ac296baf17948c8
+- E52 instance FIVE (recorded, not fixed per standing disposition — sidecar NOT hand-edited): real review count this feature was 2 rounds (round 1 CHANGES_REQUESTED, round 2 APPROVED, both on disk in review_reports/review_T-E48-02.md); handoff carried review_rounds_total=1 and review_round=0.
+- E72 touched this feature's own ledger: the code-reviewer's round-2 APPROVED write landed as agent_id=qa-engineer with empty pending_notes, resetting review_round 1 -> 0. Authoritative round record is review_reports/review_T-E48-02.md (now archived at review_reports/archive/e48-docs-skills-delete/), NOT the handoff. Release-time round counts were read off the evidence file per the brief.
+- Bump was PATCH (3.102.0 -> 3.102.1), deliberately not the MINOR of the four preceding ticket releases: CHANGELOG.md's versioning policy reserves MINOR for ADDING tools/role skills/storage features, and content/ is byte-identical this cut, so v3.102.0's own MINOR discriminator ('a role skill changed') does not hold. Rationale recorded in the CHANGELOG entry.
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.

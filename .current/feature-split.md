@@ -73,8 +73,38 @@ Consequences for the row's three stated options:
 
 A fourth option the row does not list, and the one that actually fits the measured shape:
 a **stale-quote guard** — assert that no `docs/skills/*.md` file quotes a string that no
-longer exists in its `content/` source. Implementable, keeps the diagrams, and would have
-caught both E48's named instances and all 8 of E59's mirror sites.
+longer exists in its `content/` source. Implementable, keeps the diagrams.
+
+**CORRECTION (2026-08-13, coordinator, before any build).** The claim above that this guard
+"would have caught both E48's named instances and all 8 of E59's mirror sites" was asserted,
+not measured. Tested against the actual sites, **it catches neither headline instance**:
+
+- *"contract defect"* (`docs/skills/qa-visual.md:69,:168,:189`, `qa-engineer.md:73`) — the term
+  is **still present** in `content/skill-qa-engineer.md:89,94,97,108`. Nothing vanished. The
+  staleness is the *pairing*: the docs pair the term with the pre-E46 verdict (`FAIL`), the
+  source now pairs it with `Blocked`. A string-existence guard sees nothing.
+- *"there is NO edge routing INTO `release-engineer`"* (`release-engineer.md:125`) — a prose
+  assertion about `ALLOWED_TRANSITIONS`; its only backticked token (`release-engineer`) plainly
+  exists. Falsifiable only against the transition table, i.e. E39's class but in prose.
+
+Both real defects are **semantic**, not lexical. The E59 half of the claim is likewise
+unverified — `review_reports/review_T-E59-01.md` does not mention `docs/skills` — and is
+withdrawn rather than repeated.
+
+**What IS mechanically checkable, and it is worth more than the row suggests: dead path
+references.** Measured over all 12 files — 213 backticked path refs, 39 unique resolvable,
+of which **2 are dead across 33 sites**:
+
+| dead path | sites | why |
+|---|---|---|
+| `content/skill-coordinator.md` | 18 | **never existed** — the coordinator SOP is 7 `coord-*.md` fragments composed per `prompts/skill-manifest.ts` (`CLAUDE.md` says so explicitly) |
+| `content/constitution.md` | 15 | retired — split into 15 `const-*.md` fragments |
+
+Zero ambiguity (a path either resolves or it does not) and larger than E48's row documents,
+which names only the `qa-visual.md:2` cite. One design decision the implementation must make:
+a naive resolver also flags **bare basenames** used in prose (`handoff.md`, `check-version.mjs`,
+`TODO.md`) which resolve fine at `.current/` and `scripts/` — 4 false positives in this
+measurement. Require a directory separator, or resolve against known roots.
 
 **E58 folds in free.** Its own row says *"If E39 is picked up first, fold E58 into that cut
 rather than shipping a one-edge release."* We are picking up E39, so that condition is met:
@@ -89,7 +119,7 @@ to describe the past.
 | order | feature id | scope | figma link | depends_on | key visual widgets | notes / 注意事項 | status |
 |---|---|---|---|---|---|---|---|
 | 0 | e39-e58-transition-matrix-sync | Re-derive all 21 rows of the `specs/qa-flow-enforcement-architecture.md` matrix from `ALLOWED_TRANSITIONS`; correct the two stale mechanism paragraphs (round cap, Amend-Resume); fold in E58's `pm:Blocked → design-auditor:In_Progress` edge in `tools/transitions.ts` + mirror row + `test/qa-flow.test.mjs` sweep line; add a `scripts/` sync check pinning table⟷source so the next edit cannot silently desync | | none | — | **PASS 2026-08-12** — 3 review rounds (C1/C2 → C4), QA 1704/1704. Not yet released. Crash-resumed mid-chain: an sr context died after applying C1/C2/C3/Q1 without a state write. Spawned E62 (stale `transitions.ts:NNN` citations, 5 sites + N7/N8) | done |
-| 1 | e48-docs-skills-policy | Decide what `docs/skills/*` **is** (delete / stale-quote guard / accept-unchecked), then execute that decision incl. E48 part (a): reconcile the named stale sites (`qa-visual.md:69,:168,:189`, `qa-engineer.md:73`, `release-engineer.md:125`, `qa-visual.md:2`'s retired `content/constitution.md` cite) | | F0 (share the check pattern if a guard is chosen) | — | **needs a human design decision before any chain starts — the row's own three options are invalidated or reshaped by the measurement above** | pending |
+| 1 | e48-docs-skills-policy | Decide what `docs/skills/*` **is** (delete / stale-quote guard / accept-unchecked), then execute that decision incl. E48 part (a): reconcile the named stale sites (`qa-visual.md:69,:168,:189`, `qa-engineer.md:73`, `release-engineer.md:125`, `qa-visual.md:2`'s retired `content/constitution.md` cite) | | F0 (share the check pattern if a guard is chosen) | — | **PASS 2026-08-17** — human chose **DELETE, no salvage**; ran as `e48-docs-skills-delete`. Part (a) rendered moot (the stale sites were deleted, not reconciled). Decided on two measurements this table did not have: 9 of the 12 files sat at exactly ONE commit (`4c310fb`, 2026-06-24) across ~50 releases, and ZERO docs linked in — so the tree was never maintained, not merely drifting. Salvage of `coordinator.md`'s orphan mermaid diagram considered and declined: read and found substantially wrong (routes on `pending_notes`, pre-C9; coordinator-counted `hop`, pre-D2; missing 8 later mechanisms), so `specs/` would have laundered a falsehood. 2 review rounds, suite 1720/1720, not yet released. Reviewer's C2 was the real yield — E59's pin had to re-baseline 9 → **4** sites, not 9 → 1, because `content/skill-release-engineer.md:56-58` carries live §6 disposition text E59 never enumerated. Spawned E72 (a code-reviewer write landed with the wrong `agent_id` and empty `pending_notes` while its reply claimed otherwise). Voided E68 by deletion | done |
 | 2 | e56-drtwo-amendment | One dated amendment paragraph in `specs/governance-text-load-architecture.md` recording that DR-2's *premise* was falsified by E51 (two production call-sites; `tools/role.ts` `switchRole` is the busier one) while its *decision* still holds (one implementation, relocated to `prompts/text-transforms.ts`). Do NOT edit the historical record in place | | none | — | coordinator-direct, ~1 file, can run at any time incl. alongside F0 | pending |
 
 ## How to proceed
