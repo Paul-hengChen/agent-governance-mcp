@@ -31,12 +31,22 @@
 //   Security smoke (boundary inputs)                     -> VR-SEC-1..4
 //
 // T-EB-04 (E14, backlog row + T-EB-01) additions — Check 6 "CI ground-truth":
-//   Check 6 red (definitively failed completed run)      -> VR-11
-//   Check 6 green (shimmed success, no WARN emitted)      -> VR-12
+//   Check 6 red at the release commit (FAIL)              -> VR-11
+//   Check 6 green at the release commit (OK, no WARN)      -> VR-12
 //   Check 6 degradation: gh binary missing (ENOENT)       -> VR-13
 //   Check 6 degradation: gh exits non-zero (auth/API err)  -> VR-14
 //   Check 6 degradation: zero completed runs               -> VR-15
 //   Check 6 degradation: unparseable gh output (bonus)    -> VR-16
+//
+// T-E78-01/T-E78-02 (E78) additions — sha-matched ground truth, closing the
+// v3.102.2 stale-green regression (a green run from an EARLIER commit was
+// accepted as ground truth for a release whose own CI was still in flight):
+//   green run at a DIFFERENT commit -> WARN (stale-green, the core fix)  -> VR-17
+//   red run at a DIFFERENT commit -> WARN, does not block                -> VR-18
+//   matching red buried at position 8/10 in the run window -> still FAIL -> VR-19
+// VR-11/VR-12 above are retargeted (not new) for this same change: both
+// previously shimmed a dummy headSha that could never match a real fixture
+// HEAD, which degrades to WARN under sha-matched code.
 // These use a `gh` shim on PATH (a tiny executable script placed in a temp
 // dir prepended to PATH) rather than the real `gh` binary — the fixture-repo
 // convention above still drives every git-facing check exactly as before;
@@ -517,19 +527,34 @@ test("VR-8 (AC8): multi-cause failure surfaces every FAIL in one run (no short-c
 });
 
 // ---------------------------------------------------------------------------
-// VR-11 (E14, T-EB-01): Check 6 — a definitively red completed CI run on main
-// STOPs the release; every other check still runs and reports OK (no
-// short-circuit), matching the Checks-run-independently invariant already
-// pinned for VR-8's multi-cause-failure test.
+// VR-11 (E14, T-EB-01; retargeted E78/T-E78-02): Check 6 — a definitively red
+// completed CI run AT THE RELEASE COMMIT STOPs the release; every other check
+// still runs and reports OK (no short-circuit), matching the
+// Checks-run-independently invariant already pinned for VR-8's
+// multi-cause-failure test.
+//
+// RETARGET NOTE (T-E78-02): this test previously shimmed a dummy
+// `headSha: "2222...2"` that could never equal a real fixture repo's actual
+// HEAD. Under pre-E78 code (ground truth = runs[0], sha unchecked) that
+// dummy sha was irrelevant and the test passed for the wrong reason; under
+// E78's sha-matched code it now WARNs ("this commit's CI has not completed
+// yet") instead of FAILing, because the shimmed run's headSha never matches
+// this fixture's real HEAD. Retargeted, not retired — the FAIL path is the
+// single most consequential assertion in this cut, so it is resolved via the
+// same `git(["rev-parse", "HEAD"], root)` the real script itself uses, not a
+// placeholder. Independently confirmed (outside this file, via a standalone
+// probe fixture) that setting the shimmed headSha to the fixture's real HEAD
+// makes the red-run FAIL path arm correctly before this retarget was written.
 // ---------------------------------------------------------------------------
-test("VR-11 (E14): shimmed gh reports a red completed run -> exit non-zero, FAIL names conclusion+headSha+url, other 5 checks still OK", () => {
+test("VR-11 (E14): shimmed gh reports a red completed run AT the release commit -> exit non-zero, FAIL names conclusion+headSha+url, other 5 checks still OK", () => {
   const { root } = mkFixtureRepo({ version: "10.0.0", tag: "at-head", origin: "pushed" });
+  const releaseSha = git(["rev-parse", "HEAD"], root);
   const shimDir = mkGhShim(
     ghJsonShim(
       JSON.stringify([
         {
           conclusion: "failure",
-          headSha: "2222222222222222222222222222222222222222",
+          headSha: releaseSha,
           url: "https://example.com/actions/runs/2",
           updatedAt: "2026-01-01T00:00:00Z",
         },
@@ -537,11 +562,12 @@ test("VR-11 (E14): shimmed gh reports a red completed run -> exit non-zero, FAIL
     ),
   );
   const result = runVerifyWithPath(root, `${shimDir}:${noGhSystemPath()}`, ["v10.0.0"]);
-  assert.notEqual(result.status, 0, "a red completed CI run must FAIL the release self-check");
+  assert.notEqual(result.status, 0, "a red completed CI run at the release commit must FAIL the release self-check");
+  const escapedHeadPrefix = releaseSha.slice(0, 12);
   assert.match(
     result.stderr,
-    /FAIL: latest completed CI run on main concluded "failure" \(head 222222222222\) — https:\/\/example\.com\/actions\/runs\/2/,
-    "FAIL line must name the conclusion, the (truncated) head SHA, and the run URL",
+    new RegExp(`FAIL: latest completed CI run on main concluded "failure" \\(head ${escapedHeadPrefix}\\) — https://example\\.com/actions/runs/2`),
+    "FAIL line must name the conclusion, the (truncated) head SHA of the release commit, and the run URL",
   );
   for (const name of ["tag-at-HEAD", "pushed-to-origin", "check-version", "CHANGELOG entry", "dist committed+parity"]) {
     assert.match(
@@ -554,16 +580,20 @@ test("VR-11 (E14): shimmed gh reports a red completed run -> exit non-zero, FAIL
 });
 
 // ---------------------------------------------------------------------------
-// VR-12 (E14): Check 6 — a green completed CI run reports OK with no WARN.
+// VR-12 (E14; retargeted E78/T-E78-02): Check 6 — a green completed CI run AT
+// THE RELEASE COMMIT reports OK with no WARN. Same retarget rationale as
+// VR-11 above: the dummy `headSha: "1111...1"` never matched a real fixture
+// HEAD, so under E78's sha-matched code this degraded to WARN instead of OK.
 // ---------------------------------------------------------------------------
-test("VR-12 (E14): shimmed gh reports a successful completed run -> OK line, exit 0, no WARN emitted, empty stderr", () => {
+test("VR-12 (E14): shimmed gh reports a successful completed run AT the release commit -> OK line, exit 0, no WARN emitted, empty stderr", () => {
   const { root } = mkFixtureRepo({ version: "10.0.1", tag: "at-head", origin: "pushed" });
+  const releaseSha = git(["rev-parse", "HEAD"], root);
   const shimDir = mkGhShim(
     ghJsonShim(
       JSON.stringify([
         {
           conclusion: "success",
-          headSha: "1111111111111111111111111111111111111111",
+          headSha: releaseSha,
           url: "https://example.com/actions/runs/1",
           updatedAt: "2026-01-01T00:00:00Z",
         },
@@ -575,10 +605,112 @@ test("VR-12 (E14): shimmed gh reports a successful completed run -> OK line, exi
   assert.match(result.stdout, /OK: CI ground-truth/);
   assert.ok(
     !result.stdout.includes("WARN: CI ground-truth"),
-    "a genuinely green completed run must not also degrade — WARN is reserved for cannot-obtain-ground-truth paths",
+    "a genuinely green completed run at the release commit must not also degrade — WARN is reserved for cannot-obtain-ground-truth paths",
   );
   assert.match(result.stdout, /check:release — ALL CHECKS PASSED \(v10\.0\.1\)/);
   assert.equal(result.stderr, "", "a fully passing run (including a real green Check 6) must not print to stderr");
+});
+
+// ---------------------------------------------------------------------------
+// VR-17 (E78, T-E78-02 behavior 1 — THE regression this ticket fixes): a
+// completed GREEN run whose headSha is a DIFFERENT commit than the one being
+// released must NOT satisfy the check — it must WARN, exactly like the
+// v3.102.2 incident (a stale green run from an earlier commit was accepted
+// as ground truth for a release whose own CI was still in flight). This is
+// the core "stale-green" case T-E78-01 exists to close; VR-12 above only
+// proves the matching-sha green path, which is necessary but not sufficient.
+// ---------------------------------------------------------------------------
+test("VR-17 (E78): shimmed gh reports a green completed run at a DIFFERENT commit -> WARN (stale-green, v3.102.2 regression), never OK, exit 0, empty stderr", () => {
+  const { root } = mkFixtureRepo({ version: "10.0.6", tag: "at-head", origin: "pushed" });
+  const releaseSha = git(["rev-parse", "HEAD"], root);
+  const otherSha = "3333333333333333333333333333333333333333";
+  assert.notEqual(otherSha, releaseSha, "sanity: the shimmed run's headSha must differ from the release commit");
+  const shimDir = mkGhShim(
+    ghJsonShim(
+      JSON.stringify([
+        {
+          conclusion: "success",
+          headSha: otherSha,
+          url: "https://example.com/actions/runs/3",
+          updatedAt: "2026-01-01T00:00:00Z",
+        },
+      ]),
+    ),
+  );
+  const result = runVerifyWithPath(root, `${shimDir}:${noGhSystemPath()}`, ["v10.0.6"]);
+  assert.equal(result.status, 0, `a stale green run from a different commit must never fail the release; stderr: ${result.stderr}`);
+  assert.match(
+    result.stdout,
+    new RegExp(`WARN: CI ground-truth — this commit's CI has not completed yet \\(head ${releaseSha.slice(0, 12)} not found among the last 1 completed run\\(s\\) on main\\); continuing without CI verification \\(graceful degradation, E14\\)`),
+    "a green run at an unrelated commit must degrade via WARN, naming THIS commit's head, not be accepted as ground truth",
+  );
+  assert.match(result.stdout, /OK: CI ground-truth/, "the check itself still reports OK — WARN is a degradation, not a failure");
+  assert.equal(result.stderr, "", "a WARN-only degradation must not print to stderr");
+});
+
+// ---------------------------------------------------------------------------
+// VR-18 (E78, T-E78-02 behavior — non-blocking on an unrelated red): a
+// completed RED run at a DIFFERENT commit must not block the release either
+// — it is just as much "the wrong answer" as a stale green, not a fatal
+// mismatch. Only a red run AT the release commit (VR-11) is a FAIL.
+// ---------------------------------------------------------------------------
+test("VR-18 (E78): shimmed gh reports a red completed run at a DIFFERENT commit -> WARN, does not block, exit 0, empty stderr", () => {
+  const { root } = mkFixtureRepo({ version: "10.0.7", tag: "at-head", origin: "pushed" });
+  const releaseSha = git(["rev-parse", "HEAD"], root);
+  const otherSha = "4444444444444444444444444444444444444444";
+  assert.notEqual(otherSha, releaseSha, "sanity: the shimmed run's headSha must differ from the release commit");
+  const shimDir = mkGhShim(
+    ghJsonShim(
+      JSON.stringify([
+        {
+          conclusion: "failure",
+          headSha: otherSha,
+          url: "https://example.com/actions/runs/4",
+          updatedAt: "2026-01-01T00:00:00Z",
+        },
+      ]),
+    ),
+  );
+  const result = runVerifyWithPath(root, `${shimDir}:${noGhSystemPath()}`, ["v10.0.7"]);
+  assert.equal(result.status, 0, `a red run belonging to an unrelated commit must never fail THIS release; stderr: ${result.stderr}`);
+  assert.match(result.stdout, /WARN: CI ground-truth — this commit's CI has not completed yet/, "an unrelated commit's red run degrades exactly like any other cannot-obtain-ground-truth path");
+  assert.match(result.stdout, /OK: CI ground-truth/);
+  assert.equal(result.stderr, "");
+});
+
+// ---------------------------------------------------------------------------
+// VR-19 (E78, window coverage): the release commit's run is not runs[0] — it
+// is buried at position 8 of a 10-run `--limit 10` window, behind several
+// unrelated completed runs. Proves the window is genuinely searched with
+// `.find`, not just `runs[0]` (which pre-E78 code effectively assumed).
+// ---------------------------------------------------------------------------
+test("VR-19 (E78): a matching red run found deep in the 10-run window (position 8 of 10) still FAILs", () => {
+  const { root } = mkFixtureRepo({ version: "10.0.8", tag: "at-head", origin: "pushed" });
+  const releaseSha = git(["rev-parse", "HEAD"], root);
+  const decoys = Array.from({ length: 7 }, (_, i) => ({
+    conclusion: "success",
+    headSha: `${i}`.repeat(40),
+    url: `https://example.com/actions/runs/decoy-${i}`,
+    updatedAt: "2026-01-01T00:00:00Z",
+  }));
+  const runs = [
+    ...decoys,
+    {
+      conclusion: "failure",
+      headSha: releaseSha,
+      url: "https://example.com/actions/runs/deep",
+      updatedAt: "2026-01-01T00:00:00Z",
+    },
+    { conclusion: "success", headSha: "8".repeat(40), url: "https://example.com/actions/runs/decoy-8", updatedAt: "2026-01-01T00:00:00Z" },
+    { conclusion: "success", headSha: "9".repeat(40), url: "https://example.com/actions/runs/decoy-9", updatedAt: "2026-01-01T00:00:00Z" },
+  ];
+  assert.equal(runs.length, 10, "sanity: exactly 10 runs, matching --limit 10");
+  assert.equal(runs.indexOf(runs.find((r) => r.headSha === releaseSha)), 7, "sanity: the matching run sits at index 7 (position 8 of 10), not runs[0]");
+  const shimDir = mkGhShim(ghJsonShim(JSON.stringify(runs)));
+  const result = runVerifyWithPath(root, `${shimDir}:${noGhSystemPath()}`, ["v10.0.8"]);
+  assert.notEqual(result.status, 0, "a matching red run buried in the window must still FAIL, proving runs[0] alone is not what's checked");
+  assert.match(result.stderr, /FAIL: latest completed CI run on main concluded "failure"/);
+  assert.match(result.stderr, /check:release — FAILED \(1 check\(s\) failed\)/);
 });
 
 // ---------------------------------------------------------------------------

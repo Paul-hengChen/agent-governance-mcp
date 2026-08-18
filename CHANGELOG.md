@@ -16,6 +16,69 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.102.3] - 2026-08-18
+
+### Fixed
+
+- **E77 - CI-red: a test read repository history as a fixture**
+  (`test/render-structure.test.mjs`): the detector-soundness test built its baseline
+  with `execFileSync("git", ["show", "ffa4082:content/skill-release-engineer.md"])`,
+  which requires that commit object to exist in the clone. CI clones shallow, so the
+  test failed `fatal: invalid object name 'ffa4082'` on CI (run 32093068950) while
+  passing locally - the red suite on `main` at v3.102.2. The two known-broken
+  rationale spans are now literal constants copied verbatim from that blob, so the
+  test reads no history at all. Adds a meta-test asserting no file under `test/`
+  reads repository history as a fixture (pinned sha / `git show <rev>:<path>` /
+  `git log`), plus a guard-the-guard case proving the detector reds against the
+  pre-fix line.
+- **E76 - step 7a's archive sweep silently moved nothing**
+  (`content/skill-release-engineer.md`): the outer `for c in $CODES` loop was left
+  unwrapped while `CODES` was bound in a different shell from the one consuming it,
+  so the sweep reported success at exit 0 having moved zero files (observed live at
+  v3.102.2). Step 7a is now FIVE fragments of ONE script fed to `bash` over a quoted
+  heredoc (`bash <<'STEP7A'` ... `STEP7A`) - `PREV_TAG`, the empty-baseline guard,
+  the executable `CODES=` derivation, the `<CODES>` logging line, and the
+  `mkdir`/move/`expected-red`/`covers:` block - so `$PREV_TAG` and `$CODES` are bound
+  and consumed in the same process and there is no export to forget. A quoted
+  heredoc, not `bash -c '...'`: the derivation carries a dozen literal single quotes
+  that a single-quoted wrapper would terminate on. The empty-baseline guard now
+  genuinely `echo`s `STEP7A_STOP: <msg>` and `exit 9`s rather than describing a halt
+  in prose the agent could not observe from outside the subshell, and the `covers:`
+  sweep matches an anchored `COVERS_RE` label-line pattern instead of an unanchored
+  bare-word `grep -i covers` that a report's own prose ("This round covers ...")
+  could win.
+- **E78 - `verify-release.mjs` Check 6 accepted a green run from a different commit**
+  (`scripts/verify-release.mjs`): the CI ground-truth check fetched each run's
+  `headSha` but used it only to decorate the FAIL message, so it answered "is the
+  most recently completed run on main green" rather than "is THIS release's run
+  green". At v3.102.2 that accepted the previous day's green run while the release's
+  own CI was still in flight, 56s in. The check now requests the last 10 completed
+  runs and selects the one whose `headSha` equals the commit being released. No
+  matching run yet degrades to a WARN and continues, exactly like every other
+  cannot-obtain-ground-truth path (E14) - never a blocking wait or poll, and never a
+  release blocker.
+
+### Added
+
+- `test/render-structure.test.mjs`: history-fixture detector, the T-E77-02 meta-test
+  over all of `test/`, and its guard-the-guard negative control.
+- `test/verify-release.test.mjs`: Check 6 sha-matching coverage - matched-green,
+  matched-red, no-run-for-this-sha WARN, and the pre-fix negative control showing the
+  old `runs[0]` read accepted a foreign sha.
+- `test/release-staging.test.mjs`: content pins for step 7a's single-invocation
+  heredoc form, the guard's `STEP7A_STOP:`/`exit 9` pair, and the anchored
+  `COVERS_RE`, including extraction of the SOP's shell verbatim for execution.
+
+### Notes
+
+- Suite 1734 -> 1742 tests, all passing. Additionally verified under a genuine
+  depth-1 shallow clone (`npm ci && npm test`) - the exact condition E77's fixture
+  failed under, and the reason `main` was red at v3.102.2.
+- Two code-review rounds on E76 (round 1 CHANGES_REQUESTED, round 2 APPROVED),
+  E78 approved in round 1 - `review_reports/archive/e76-e78-release-integrity/review_T-E76-01.md`.
+- No runtime source changed: `dist/` differs from v3.102.2 only by the version
+  literal. SOP text, one release script, and tests.
+
 ## [3.102.2] - 2026-08-18
 
 ### Fixed

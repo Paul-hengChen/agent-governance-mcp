@@ -69,7 +69,6 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -78,7 +77,6 @@ const ROOT = path.resolve(path.dirname(__filename), "..");
 const { switchRole } = await import(path.join(ROOT, "dist", "tools", "role.js"));
 const { buildPromptForRole, composeConstitution } = await import(path.join(ROOT, "dist", "prompts", "build.js"));
 const { applyTextTransforms, stripOriginTags, stripRationale } = await import(path.join(ROOT, "dist", "prompts", "text-transforms.js"));
-const { parseSkillFile } = await import(path.join(ROOT, "dist", "tools", "skill-frontmatter.js"));
 
 // ---------------------------------------------------------------------------
 // Detector 1 (source-level, structural — see WHY above).
@@ -143,15 +141,48 @@ function findLineGlueFindings(text) {
 // sites (docs/backlog.md:192) against the pre-fix baseline, and nothing else.
 // A detector that matches nothing on a known-broken input is worse than no
 // detector (dispatch brief instruction) — this is the guard-the-guard check.
+//
+// HERMETIC FIXTURE (E77, docs/backlog.md:200, fixed 2026-08-18): this used to
+// build the baseline by reading repository history —
+// `execFileSync("git", ["show", "ffa4082:content/skill-release-engineer.md"])`
+// — which requires the `ffa4082` commit object to exist in the clone. CI
+// (.github/workflows/ci.yml:17, actions/checkout@v4, no fetch-depth ⇒ action
+// default of 1) does not fetch it, so the call died
+// `fatal: invalid object name 'ffa4082'` on CI (run 32093068950) while passing
+// on every developer machine with a deep clone — the fixture was repository
+// history, so the test passed or failed on clone depth, not on the code under
+// test. Fixed by embedding the two known-broken spans as literals below,
+// copied verbatim from `git show ffa4082:content/skill-release-engineer.md`
+// lines 119-120 (BASELINE_EXCERPT_MKDIR_P) and lines 126-129
+// (BASELINE_EXCERPT_DRIFT_BASELINE) on 2026-08-18 — `ffa4082` is cited here
+// as PROVENANCE only, never read at test time. Verified byte-for-byte against
+// a full deep-clone `git show` of the same commit before this swap (both
+// detectors' finding counts and content unchanged) — this is a fixture swap,
+// not a weakened guard: the two excerpts below still exercise the identical
+// detector code paths (RATIONALE_SPAN_RE / findAsymmetricRationaleSpans over
+// raw text, applyTextTransforms + findLineGlueFindings over the rendered
+// text) against the identical bytes the historical file contained at those
+// two sites; only the surrounding, uninvolved prose (the rest of the ~170-line
+// file) is omitted, and omitting it cannot change either detector's output
+// since both operate on fixed-width local context (a rationale span, or a
+// single rendered line) that never crosses outside these excerpts.
 // ---------------------------------------------------------------------------
 
+// content/skill-release-engineer.md @ ffa4082, lines 119-120 verbatim — the
+// "already makes" / `mkdir -p` asymmetric rationale span (fence end followed
+// by `\n`, fence start not alone on its own line).
+const BASELINE_EXCERPT_MKDIR_P =
+  "   - **Log `<CODES>` even when empty (E50)**: print the derived set to the release transcript before acting on it — `echo \"step 7a: <CODES> = {${CODES:-∅}}\"`, expanding the `CODES` variable bound by the derivation above (never a fresh, uncaptured pipeline) — the same self-documenting move step 8's AC4 SKIP branch already makes. <!-- rationale:start -->`<CODES> = ∅` is a legitimate, non-fatal outcome (e.g. a purely docs-only release) and MUST stay non-fatal — but with nothing logged, a correct empty-by-design no-op and a broken empty-by-breakage run are indistinguishable in the transcript. That exact ambiguity is what let a prior derivation's empty-set defect survive two full code-review rounds before a reviewer caught it by hand-backtesting six releases in detached worktrees — the step ran, swept nothing, and told nobody.<!-- rationale:end -->\n   - `mkdir -p` the archive dir for each tree that is NOT `EXCLUDE_*` above: `[ -z \"$EXCLUDE_QA\" ] && mkdir -p qa_reports/archive/<active_feature>/` ; `[ -z \"$EXCLUDE_RR\" ] && mkdir -p review_reports/archive/<active_feature>/` (idempotent). Two PARALLEL per-release directories, one per PARTICIPATING source tree, both named after `active_feature` — regardless of how many codes are in `<CODES>` — one release, one archive dir per participating tree (a participating tree that happens to match zero codes this release can still leave an empty dir behind; harmless and git-invisible, same residual as before — N11). NEVER fold `review_reports/` evidence into `qa_reports/archive/<active_feature>/` (E50, pinned at cut time): the two streams can share basenames (e.g. `review_T-E4X-03.md` existed simultaneously at `qa_reports/archive/e44-e49-.../` and at `review_reports/` root within the same v3.96.0 commit `27f59e2`), so a single shared destination would make `mv -n` silently skip whichever of the two arrives second — exactly the silent-orphan class this step exists to kill.\n";
+
+// content/skill-release-engineer.md @ ffa4082, lines 126-129 verbatim — the
+// "MUST NOT be touched." / "7b. **Drift-baseline" asymmetric rationale span
+// (an origin:end/rationale:start pair glued inline, fence end followed by
+// `\n` directly into the next numbered step header).
+const BASELINE_EXCERPT_DRIFT_BASELINE =
+  "   - **Zero matches = silent no-op**: if nothing matches any code in `<CODES>`/the `covers:` rules, do nothing — never guess-move unrelated files, never fail the release over it (now visible in the transcript via the logging bullet above, rather than genuinely silent). **MUST NOT**: files whose ids do NOT match `^T-<CODE>-` for any `<CODE>` in `<CODES>` — i.e. not new since `$PREV_TAG` — MUST NOT be touched.<!-- origin:start --> (rescoped across three revisions: originally \"outside the single `active_feature` prefix\"; E49 rescoped to \"outside the commit range\"; E49 round 3 rescoped again to \"not new since `$PREV_TAG`\"; E50 extends scope from `qa_reports/` alone to both `qa_reports/` and `review_reports/`, each confined to its own parallel archive dir)<!-- origin:end --><!-- rationale:start -->\n   - **On the premise this replaces**: the pre-E49 wording justified that MUST NOT as protecting \"concurrent in-flight features\". That premise is false by construction for same-release tickets — the E1 feature lease permits only one non-terminal feature per workspace at a time, so every ticket that ships in the same release closed sequentially, one before the next opened; there is no concurrency to protect against within a single release's commit range. The MUST NOT still has a real job (a different, not-yet-released feature's evidence sitting at the root must not be swept in), it was just mis-labeled as guarding against concurrency instead of scope.\n<!-- rationale:end -->\n7b. **Drift-baseline acknowledgment** (moved ahead of the release commit — E65; was step 10 through v3.100.0. Both `11cc082` (v3.99.0) and `3c4b39e` (v3.100.0) made this write before tagging, landing it inside the release commit rather than after it — this step now describes what those two releases actually did, not a new invention): append this release's newly-completed task IDs (from `tw_get_state`'s `completed_tasks` or `tw_detect_drift`'s `tasksCompleted`) into the `driftBaselineIds` array in `.current/.config.json` — deduplicated, creating the array if absent. This is the sanctioned baseline write (release-engineer only, post-PASS); mechanism and rationale live in `specs/drift-baseline-exemption.md`. This step is part of release bookkeeping — do NOT skip it: without the append, every shipped task ID resurfaces as drift noise in the next session's `tw_detect_drift`. The append takes effect immediately — `loadConfig` re-stats `.config.json`'s mtime on every call (v3.58.0, C18), so any `tw_detect_drift` in the same server process sees the new baseline with no restart needed. `.current/.config.json` is one of the paths step 8's `git add` now stages explicitly.\n";
+
 test("detector soundness: both detectors reproduce exactly the 2 known ffa4082 glue sites, byte-identical", () => {
-  const baselineRaw = execFileSync(
-    "git",
-    ["show", "ffa4082:content/skill-release-engineer.md"],
-    { cwd: ROOT, encoding: "utf-8" },
-  );
-  const { body } = parseSkillFile(baselineRaw);
+  const body = BASELINE_EXCERPT_MKDIR_P + BASELINE_EXCERPT_DRIFT_BASELINE;
 
   // Detector 1, source-level (pre-strip).
   const structural = findAsymmetricRationaleSpans(body);
@@ -327,4 +358,328 @@ test("constitution fragments: all 4 chain x design compose combinations are glue
       assert.deepEqual(findings, [], `composeConstitution({chain:${chain}, design:${design}}) must have zero glue findings`);
     }
   }
+});
+
+// ---------------------------------------------------------------------------
+// T-E77-02 (docs/backlog.md:200, 2026-08-18 amendment, folded into the same
+// cut/dispatch as T-E77-01 above by human decision — same file, same qa
+// review surface): class-wide meta-test asserting that NO file under test/
+// reads repository HISTORY as a fixture — a pinned sha, `git show
+// <rev>:<path>`, or `git log` used to source expected test data. This is
+// exactly the class T-E77-01 fixed one instance of (the `git show
+// ffa4082:content/skill-release-engineer.md` call two sections above, before
+// this ticket).
+//
+// SCOPE TRAP (recorded in the row, restated here per the row's own
+// instruction): do NOT ban `git` outright. test/feature-lease.test.mjs,
+// test/context-budget.test.mjs, test/e16-judge-dispatch-charter.test.mjs,
+// test/release-staging.test.mjs, and test/verify-release.test.mjs all invoke
+// git legitimately — reading WORKING-TREE state (status, diff --cached,
+// ls-files, rev-parse HEAD/@{u}, init/add/commit/tag/push/config/checkout/
+// remote/reset against a throwaway fixture repo the test itself created) —
+// or merely regex-match SOP prose that *mentions* a git command as a string
+// under test (e.g. release-staging.test.mjs:1571 asserting the SOP defines
+// PREV_TAG via `` `git describe --tags --abbrev=0` ``: that is a string
+// literal being checked with .includes(), never an actual git invocation).
+// The predicate below is "reads history as a fixture", not "calls git" — a
+// coarser guard false-positives on all five files, which per E74's own
+// lesson is worse than no guard: it trains readers to ignore it.
+//
+// The detector purposely does NOT do a flat textual grep of the whole file
+// for the word "git" (E74-shaped trap) — it looks for actual subprocess
+// invocations whose git subcommand is `show`/`log`, or whose argument is a
+// bare pinned commit sha, using a small tokenizer that strips comments and
+// string/regex literal contents first so:
+//   (a) a COMMENT that merely quotes or describes such a call (e.g. this
+//       very file's own T-E77-01 provenance note two sections above, which
+//       literally spells out the old `execFileSync("git", ["show", ...])`
+//       call for provenance) is never mistaken for a live call site, and
+//   (b) a regex literal containing a bare backtick or quote character (e.g.
+//       `BULLET_RE` above, `` /-\s(?:\*\*|`|\[[ xX]\])/g ``) never desyncs
+//       the scanner into treating the rest of the file as "inside a string"
+//       (hit and fixed during authorship: a naive quote-only tokenizer
+//       swallowed real `//` comments for the next ~30 lines because of
+//       exactly this backtick).
+// ---------------------------------------------------------------------------
+
+function isRegexLiteralContext(lastSignificant) {
+  if (lastSignificant === "") return true;
+  return "([{,;:=!&|?+-*%^~<>".includes(lastSignificant);
+}
+
+// Strip //, /* */ comments and treat string/template/regex literal contents
+// as opaque (their bytes are preserved verbatim in the output, just never
+// re-interpreted as comment/regex syntax) -- see the block comment above for
+// why a plain quote-tracking pass is not sufficient on this codebase.
+function stripJsCommentsForHistoryScan(source) {
+  let out = "";
+  let i = 0;
+  const n = source.length;
+  let lastSignificant = "";
+  while (i < n) {
+    const c = source[i];
+    const c2 = i + 1 < n ? source[i + 1] : "";
+    if (c === "/" && c2 === "/") {
+      while (i < n && source[i] !== "\n") i++;
+      continue;
+    }
+    if (c === "/" && c2 === "*") {
+      i += 2;
+      while (i < n && !(source[i] === "*" && source[i + 1] === "/")) {
+        if (source[i] === "\n") out += "\n";
+        i++;
+      }
+      i += 2;
+      continue;
+    }
+    if (c === '"' || c === "'" || c === "`") {
+      const quote = c;
+      out += c;
+      i++;
+      while (i < n && source[i] !== quote) {
+        if (source[i] === "\\") {
+          out += source[i];
+          i++;
+          if (i < n) {
+            out += source[i];
+            i++;
+          }
+          continue;
+        }
+        if (source[i] === "\n") out += "\n";
+        out += source[i];
+        i++;
+      }
+      if (i < n) {
+        out += source[i];
+        i++;
+      }
+      lastSignificant = quote;
+      continue;
+    }
+    if (c === "/" && isRegexLiteralContext(lastSignificant)) {
+      let j = i + 1;
+      let inClass = false;
+      let sawClose = false;
+      while (j < n) {
+        if (source[j] === "\\") {
+          j += 2;
+          continue;
+        }
+        if (source[j] === "[") {
+          inClass = true;
+          j++;
+          continue;
+        }
+        if (source[j] === "]") {
+          inClass = false;
+          j++;
+          continue;
+        }
+        if (source[j] === "/" && !inClass) {
+          sawClose = true;
+          break;
+        }
+        if (source[j] === "\n") break; // a JS regex literal never spans a line
+        j++;
+      }
+      if (sawClose) {
+        let k = j + 1;
+        while (k < n && /[a-z]/i.test(source[k])) k++; // flags
+        out += source.slice(i, k);
+        i = k;
+        lastSignificant = "/";
+        continue;
+      }
+      // no closing "/" on this line -> this was division, not a regex.
+    }
+    if (!/\s/.test(c)) lastSignificant = c;
+    out += c;
+    i++;
+  }
+  return out;
+}
+
+function matchBracket(text, openIdx, openCh, closeCh) {
+  let depth = 0;
+  for (let i = openIdx; i < text.length; i++) {
+    if (text[i] === openCh) depth++;
+    else if (text[i] === closeCh) {
+      depth--;
+      if (depth === 0) return i;
+    }
+  }
+  return -1;
+}
+
+function findUnescapedQuote(text, fromIdx, quote) {
+  for (let i = fromIdx; i < text.length; i++) {
+    if (text[i] === "\\") {
+      i++;
+      continue;
+    }
+    if (text[i] === quote) return i;
+  }
+  return -1;
+}
+
+// Locate exec-family calls whose command is the literal "git": array form
+// (execFileSync/spawnSync/spawn/execFile) or shell-string form (execSync/
+// exec), plus calls to a local `git(args, cwd)` wrapper (the
+// test/verify-release.test.mjs convention: `function git(args, cwd) { return
+// execFileSync("git", args, ...); }`, called elsewhere as `git([...], root)`)
+// -- only activated when the file actually defines such a wrapper, so an
+// unrelated `git(...)` identifier is never matched.
+function findGitInvocations(source) {
+  const invocations = [];
+
+  const arrayCallRe = /\b(?:execFileSync|spawnSync|spawn|execFile)\s*\(\s*["'`]git["'`]\s*,\s*\[/g;
+  for (const m of source.matchAll(arrayCallRe)) {
+    const arrStart = m.index + m[0].length - 1;
+    const close = matchBracket(source, arrStart, "[", "]");
+    if (close !== -1) invocations.push({ index: m.index, argsText: source.slice(arrStart, close + 1) });
+  }
+
+  const stringCallRe = /\b(?:execSync|exec)\s*\(\s*(["'`])git\s+/g;
+  for (const m of source.matchAll(stringCallRe)) {
+    const quote = m[1];
+    const contentStart = m.index + m[0].length;
+    const closeIdx = findUnescapedQuote(source, contentStart, quote);
+    if (closeIdx !== -1) invocations.push({ index: m.index, argsText: source.slice(contentStart, closeIdx) });
+  }
+
+  if (/\bfunction\s+git\s*\(|const\s+git\s*=\s*\(/.test(source)) {
+    const wrapperCallRe = /(?<![.\w])git\s*\(\s*\[/g;
+    for (const m of source.matchAll(wrapperCallRe)) {
+      const arrStart = m.index + m[0].length - 1;
+      const close = matchBracket(source, arrStart, "[", "]");
+      if (close !== -1) invocations.push({ index: m.index, argsText: source.slice(arrStart, close + 1) });
+    }
+  }
+
+  return invocations;
+}
+
+// Extract quoted string-literal tokens (the git argv) from an argsText blob,
+// whether a JS array literal (`["show", "sha:path"]`) or a raw shell-command
+// tail (`show sha:path`).
+function extractGitArgTokens(argsText) {
+  const tokens = [];
+  const quotedRe = /["'`]((?:[^"'`\\]|\\.)*)["'`]/g;
+  let any = false;
+  for (const m of argsText.matchAll(quotedRe)) {
+    tokens.push(m[1]);
+    any = true;
+  }
+  if (!any) tokens.push(...argsText.trim().split(/\s+/).filter(Boolean));
+  return tokens;
+}
+
+const PINNED_SHA_RE = /^[0-9a-f]{7,40}$/i;
+
+// The T-E77-02 predicate: a git invocation reads HISTORY as a fixture when
+// its subcommand is `show` or `log`, or when any of its arguments is a bare
+// pinned commit sha used as a ref.
+function findHistoryFixtureReads(rawSource) {
+  const source = stripJsCommentsForHistoryScan(rawSource);
+  const findings = [];
+  for (const { index, argsText } of findGitInvocations(source)) {
+    const tokens = extractGitArgTokens(argsText).filter((t) => t.length > 0 && !t.startsWith("-"));
+    const subcommand = tokens[0];
+    const lineNo = source.slice(0, index).split("\n").length;
+
+    if (subcommand === "show") {
+      findings.push({ lineNo, reason: "git show <rev>:<path> reads a historical blob as a fixture", snippet: argsText.slice(0, 160) });
+      continue;
+    }
+    if (subcommand === "log") {
+      findings.push({ lineNo, reason: "git log reads commit history as a fixture", snippet: argsText.slice(0, 160) });
+      continue;
+    }
+    for (const t of tokens) {
+      const shaCandidate = t.split(":")[0];
+      if (PINNED_SHA_RE.test(shaCandidate)) {
+        findings.push({ lineNo, reason: `pinned sha '${shaCandidate}' used as a git ref argument (history-as-fixture)`, snippet: argsText.slice(0, 160) });
+        break;
+      }
+    }
+  }
+  return findings;
+}
+
+function listMjsFilesUnder(dir) {
+  const out = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) out.push(...listMjsFilesUnder(full));
+    else if (entry.isFile() && entry.name.endsWith(".mjs")) out.push(full);
+  }
+  return out;
+}
+
+test("T-E77-02 meta-test: no file under test/ reads repository history as a fixture (pinned sha / git show <rev>:<path> / git log)", () => {
+  const testDir = path.join(ROOT, "test");
+  const files = listMjsFilesUnder(testDir);
+  assert.ok(files.length >= 80, "sanity: must see roughly the full test/ tree, not an empty/partial glob");
+
+  const allFindings = [];
+  for (const f of files) {
+    const src = fs.readFileSync(f, "utf-8");
+    for (const finding of findHistoryFixtureReads(src)) {
+      allFindings.push({ file: path.relative(ROOT, f), ...finding });
+    }
+  }
+
+  assert.deepEqual(
+    allFindings,
+    [],
+    "no test/ file may read repository history as a fixture (pinned sha / `git show <rev>:<path>` / `git log`) — " +
+      `found: ${JSON.stringify(allFindings)}`,
+  );
+});
+
+// Assembles the reconstructed pre-fix invocation text from parts at runtime
+// (never as one static contiguous `execFileSync("git", [...` literal in THIS
+// file's own source) so the T-E77-02 sweep test above -- which scans this
+// same file among test/*.mjs -- does not mistake this guard-the-guard demo
+// DATA for a live call site in render-structure.test.mjs itself. The
+// assembled STRING VALUE handed to findHistoryFixtureReads below is
+// byte-identical to the real pre-fix line either way; only how it is
+// spelled out in THIS file's source changes.
+function assembleReconstructedCall(execFn, bin, subArgs, opts) {
+  return `const baselineRaw = ${execFn}(\n  ${JSON.stringify(bin)},\n  ${JSON.stringify(subArgs)},\n  ${JSON.stringify(opts)},\n);\n`;
+}
+
+test("T-E77-02 guard-the-guard: the history-fixture detector reds against the pre-fix `git show ffa4082:...` line", () => {
+  // Reconstructed verbatim from the pre-E77-01 render-structure.test.mjs
+  // (see git blame / the E77 backlog row for the original commit) -- NOT
+  // read via `git show` here, since this guard-the-guard check must itself
+  // never read repository history. Demonstrates the detector would have
+  // caught the actual historical defect, per the row's instruction to
+  // demonstrate rather than merely assert this.
+  const preFixSnippet = assembleReconstructedCall(
+    "execFileSync",
+    "git",
+    ["show", "ffa4082:content/skill-release-engineer.md"],
+    { cwd: "ROOT", encoding: "utf-8" },
+  );
+  const findings = findHistoryFixtureReads(preFixSnippet);
+  assert.ok(findings.length >= 1, "detector must RED against the known pre-fix git-show-ffa4082 line");
+  assert.ok(
+    findings.some((f) => f.reason.includes("git show") && f.snippet.includes("ffa4082")),
+    "the finding must specifically identify the git-show-history call, not an unrelated one",
+  );
+
+  // Negative control in the same test: a legitimate working-tree git call
+  // (verify-release.test.mjs's own `rev-parse HEAD` via its `git(...)`
+  // wrapper) and a SOP-prose string assertion (release-staging.test.mjs's
+  // `.includes("git describe --tags ...")` style check) must NOT be flagged
+  // -- guards against solving the false-negative at the cost of a new
+  // false-positive on the very shapes T-E77-02's scope trap calls out.
+  const legitimateSnippet = `
+    function git(args, cwd) { return execFileSync("git", args, { cwd, encoding: "utf-8" }).trim(); }
+    const headSha = git(["rev-parse", "HEAD"], root);
+    assert.ok(sop.includes("git describe --tags --abbrev=0"), "SOP must define PREV_TAG");
+  `;
+  assert.deepEqual(findHistoryFixtureReads(legitimateSnippet), [], "must not false-positive on working-tree git calls or SOP-prose string assertions");
 });

@@ -2284,30 +2284,316 @@ test("E71(d): step 7c names the DONE-but-unreleased pre-marked-row shape and sta
   assert.match(section7c, /do NOT append a duplicate row/, "step 7c must forbid appending a duplicate row for the same feature (E71d)");
 });
 
-// Residual from review_reports/review_T-E69-01.md round 2 ("Minor 2"): the
-// code-reviewer found :126 (review_reports move example) correctly guarded
-// with `[ -z "$EXCLUDE_RR" ] &&`, but :125 (the qa_reports move example) is
-// NOT -- an asymmetry against :91's stated rule ("Run only the pair belonging
-// to a tree that is NOT EXCLUDE_* above") and :122 (which guards both trees).
-// Consequence if executed with EXCLUDE_QA set: one stderr line, nothing
-// moved, exit 0 -- noise, not damage (no fatal error, no wrong file moved).
-// QA DECISION (this ticket, not a new sr round): PASS, not FAIL. The
-// reviewer explicitly did not block on it (cosmetic asymmetry, zero
-// behavioral difference on any path), and QA's own scope is failing
-// tests/missing coverage/test-infra defects -- a readability asymmetry with
-// no behavioral consequence is neither. Pinned here as an EXACT ratchet
-// instead of silence: this test reds the moment either guard's presence
-// changes, so a future fix to :125 (the reviewer's named one-token remedy,
-// `[ -z "$EXCLUDE_QA" ] && ` prefixed onto the qa_reports move example) forces
-// this pin to be updated rather than drifting unnoticed either direction.
-test("residual (review round 2, Minor 2): review_reports move example is EXCLUDE_RR-guarded; qa_reports move example is NOT YET EXCLUDE_QA-guarded (known asymmetry, non-blocking, PASSed by qa-engineer -- see qa_reports/review_T-E69-02.md)", () => {
-  const rrLine = SKILL.split("\n").find((l) => l.includes("find review_reports -maxdepth 1 -name \"review_T-<CODE>-*.md\""));
-  const qaLine = SKILL.split("\n").find((l) => l.includes("find qa_reports -maxdepth 1 -name \"review_T-<CODE>-*.md\""));
-  assert.ok(rrLine, "must find the review_reports move example line");
-  assert.ok(qaLine, "must find the qa_reports move example line");
-  assert.match(rrLine, /\[ -z "\$EXCLUDE_RR" \] &&/, "the review_reports move example MUST carry its EXCLUDE_RR guard");
-  assert.ok(
-    !/\[ -z "\$EXCLUDE_QA" \] &&/.test(qaLine),
-    "the qa_reports move example does NOT yet carry an EXCLUDE_QA guard (tracked residual, not a regression) -- if this now fails, someone added the guard: update this test to assert its presence instead, and this comment/test name is safe to delete",
+// Residual from review_reports/review_T-E69-01.md round 2 ("Minor 2"),
+// RETARGETED by E76 round 2 (review_reports/review_T-E76-01.md, code-reviewer
+// Quality item): the underlying asymmetry is UNCHANGED -- code-reviewer
+// confirmed it is "still exactly present" -- but E76 rewrote step 7a's move
+// loop from one-bullet-per-tree (each an inline `[ -z "$EXCLUDE_*" ] &&`
+// prefix on its own line) into a single heredoc block where the two move
+// loops share one `for c in $CODES; do ... done` and the review_reports side
+// is now guarded by an ENCLOSING `if [ -z "$EXCLUDE_RR" ]; then ... fi`
+// rather than an inline prefix on the same line as the `find`. The old
+// predicates searched for a literal `<CODE>` placeholder and an inline
+// `&&` guard on the match line itself -- both stale against the rewritten
+// text (`<CODE>` is now the shell variable `${c}`, and the guard moved to
+// the line above) -- so the test died at `assert.ok(rrLine)` before ever
+// reaching the guard assertions, silently stopping being a ratchet on the
+// asymmetry it exists to pin. Retargeted, not retired: the qa_reports move
+// example is STILL not EXCLUDE_QA-guarded (:143), while the review_reports
+// move example IS EXCLUDE_RR-guarded, now via the enclosing `if` at :146
+// rather than an inline `&&` at :147. Consequence if executed with
+// EXCLUDE_QA set is unchanged: one stderr line from `find`, nothing moved,
+// exit 0 -- noise, not damage.
+// QA DECISION (this ticket, not a new sr round): PASS, not FAIL, same as
+// before -- code-reviewer did not block on this in either round (cosmetic
+// asymmetry, zero behavioral difference on any path), and QA's own scope is
+// failing tests/missing coverage/test-infra defects, not this kind of
+// readability asymmetry. Pinned here as an EXACT ratchet on BOTH the guard's
+// shape and its presence/absence: this test reds the moment either guard's
+// presence changes, OR the review_reports guard's shape reverts from an
+// enclosing `if` back to an inline `&&` prefix -- so a future fix to :143
+// (adding an `EXCLUDE_QA` guard to the qa_reports loop) forces this pin to be
+// updated rather than drifting unnoticed either direction.
+test("residual (review round 2, Minor 2; retargeted E76 round 2): review_reports move example is EXCLUDE_RR-guarded via an enclosing if; qa_reports move example is NOT YET EXCLUDE_QA-guarded (known asymmetry, non-blocking, PASSed by qa-engineer -- see qa_reports/review_T-E76-02.md)", () => {
+  const lines = SKILL.split("\n");
+  const rrIdx = lines.findIndex((l) => l.includes("find review_reports -maxdepth 1 -name \"review_T-${c}-*.md\""));
+  const qaIdx = lines.findIndex((l) => l.includes("find qa_reports -maxdepth 1 -name \"review_T-${c}-*.md\""));
+  assert.ok(rrIdx > -1, "must find the review_reports move example line");
+  assert.ok(qaIdx > -1, "must find the qa_reports move example line");
+  const rrLine = lines[rrIdx];
+  const qaLine = lines[qaIdx];
+
+  // The review_reports move loop MUST be nested inside an enclosing
+  // `if [ -z "$EXCLUDE_RR" ]; then` guard -- scan a small window of lines
+  // immediately above it (the loop is not itself prefixed inline anymore).
+  const rrPrecedingWindow = lines.slice(Math.max(0, rrIdx - 3), rrIdx).join("\n");
+  assert.match(
+    rrPrecedingWindow,
+    /if \[ -z "\$EXCLUDE_RR" \]; then/,
+    "the review_reports move example MUST be nested inside an enclosing EXCLUDE_RR guard",
   );
+  assert.ok(!/\[ -z "\$EXCLUDE_RR" \] &&/.test(rrLine), "the guard now lives on an enclosing if line, not an inline && prefix on the find line itself");
+
+  // The qa_reports move loop must NOT be similarly guarded -- neither
+  // inline nor via an enclosing if in the lines immediately above it.
+  const qaPrecedingWindow = lines.slice(Math.max(0, qaIdx - 3), qaIdx).join("\n");
+  assert.ok(
+    !/\[ -z "\$EXCLUDE_QA" \] &&/.test(qaLine) && !/if \[ -z "\$EXCLUDE_QA" \]; then/.test(qaPrecedingWindow),
+    "the qa_reports move example does NOT yet carry an EXCLUDE_QA guard, inline or enclosing (tracked residual, not a regression) -- if this now fails, someone added the guard: update this test to assert its presence instead, and this comment/test name is safe to delete",
+  );
+});
+
+// ---------------------------------------------------------------------------
+// T-E76-02 pins (E76 round 2, code-reviewer's explicit recommendation): a
+// CLASS assertion over an instance pin, per the E66/E69 precedent both cited
+// by name in review_reports/review_T-E76-01.md's Round 2 Architecture
+// section as the durable control code-reviewer chose INSTEAD OF a third
+// sr-engineer round. These extract step 7a's five fragments mechanically
+// (the same extraction shape N14/E50's fence-repointing tests above already
+// use) and assemble them exactly as the SOP instructs, so the assertions
+// below run against the ACTUAL shipped script text, not a hand-copied
+// restatement of it that could silently drift from the source.
+// ---------------------------------------------------------------------------
+
+/**
+ * Strip 5-space markdown-fence indentation from every line of an extracted
+ * fenced code block, without disturbing any DEEPER indentation used for
+ * shell line-continuations inside the fence (e.g. the CODES= derivation's
+ * wrapped `| sed -E ...` continuation lines, which sit at 8 spaces).
+ */
+function dedentFence(fenceText) {
+  return fenceText
+    .split("\n")
+    .map((l) => l.replace(/^ {5}/, ""))
+    .join("\n");
+}
+
+/**
+ * Mask the INTERIOR of quoted strings (replacing bytes with 'x', preserving
+ * the quote characters themselves and all other structure) for the quote
+ * types named in `quotes`. Used to tell a real shell-level `VAR=` assignment
+ * or `$VAR` reference apart from a variable name that merely appears as
+ * human-readable STRING DATA -- e.g. step 7a's own STOP message embeds the
+ * literal text `(PREV_TAG='$PREV_TAG')` inside MSG's double-quoted value,
+ * purely to show the operator what the printed message will look like. That
+ * substring reads exactly like a `PREV_TAG=` assignment to a naive scanner,
+ * which would silently defeat the very class check this pin exists to be.
+ */
+function maskQuoted(text, quotes) {
+  let out = "";
+  let inQuote = null;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inQuote) {
+      if (ch === inQuote) {
+        inQuote = null;
+        out += ch;
+      } else {
+        out += quotes.includes(inQuote) ? "x" : ch;
+      }
+    } else if (ch === "'" || ch === '"') {
+      inQuote = ch;
+      out += ch;
+    } else {
+      out += ch;
+    }
+  }
+  return out;
+}
+
+/**
+ * Compute the set of shell variable names ASSIGNED within a script and the
+ * set REFERENCED (via `$VAR` / `${VAR}`) anywhere within it.
+ *
+ * Assigned: scanned on a copy with BOTH quote types' interiors masked -- a
+ * real assignment's LHS name is always outside any quoting (`VAR=value`,
+ * never `"VAR"=value`), so masking removes false hits from string DATA that
+ * merely looks like `VAR=`. `for VAR in ...; do` loop headers count too --
+ * they bind VAR exactly as an assignment would.
+ *
+ * Referenced: scanned on a copy with only SINGLE-quote interiors masked --
+ * bash does not interpolate inside single-quoted strings (step 7a's own
+ * `COVERS_RE='...'` and `tr 'a-z' 'A-Z'` are single-quoted and contain no
+ * `$`, so this never bites here, but the distinction is correct in general),
+ * while a double-quoted `$VAR` (e.g. `"$PREV_TAG"`) is a genuine reference
+ * and must stay visible to the scan.
+ */
+function extractAssignedAndReferenced(script) {
+  const forAssignment = maskQuoted(script, ["'", '"']);
+  const assigned = new Set();
+  for (const m of forAssignment.matchAll(/(?<![\w-])([A-Za-z_][A-Za-z0-9_]*)=(?!=)/g)) assigned.add(m[1]);
+  for (const m of forAssignment.matchAll(/\bfor\s+([A-Za-z_][A-Za-z0-9_]*)\s+in\b/g)) assigned.add(m[1]);
+
+  const forReference = maskQuoted(script, ["'"]);
+  const referenced = new Set();
+  for (const m of forReference.matchAll(/\$\{?([A-Za-z_][A-Za-z0-9_]*)/g)) referenced.add(m[1]);
+
+  return { assigned, referenced };
+}
+
+/**
+ * Extract step 7a's five fragments straight out of the shipped SOP text and
+ * assemble them in the SOP's own mandated order (PREV_TAG -> guard -> the
+ * EXECUTABLE CODES= derivation, never the illustrative find/grep example ->
+ * the <CODES> logging line -> the mkdir/move/expected-red/covers: fence).
+ * Returns null for any fragment not found, so callers can assert presence
+ * before assembling (a missing fragment must fail loudly, not assemble a
+ * silently-incomplete script that could pass the invariant by accident).
+ */
+function extractStep7aFragments(skillText) {
+  const frag1 = "PREV_TAG=$(git describe --tags --abbrev=0)";
+  if (!skillText.includes(frag1)) return null;
+
+  const guardMatch = skillText.match(/```\n(\s*STOP_QA= STOP_RR= EXCLUDE_QA= EXCLUDE_RR=[\s\S]*?\n\s*```)/);
+  if (!guardMatch) return null;
+  const frag2 = dedentFence(guardMatch[1].replace(/\n\s*```$/, ""));
+
+  // The EXECUTABLE derivation fence is the one that opens `CODES=$( {` --
+  // NOT the illustrative find/grep fence immediately above it in the SOP
+  // text, which exists only to explain the predicate (see the "exactly one
+  // fence opens CODES=$(" test below, which pins this distinction directly).
+  const codesMatch = skillText.match(/```\n(\s*CODES=\$\( \{[\s\S]*?)```/);
+  if (!codesMatch) return null;
+  const frag3 = dedentFence(codesMatch[1].replace(/\n\s*$/, ""));
+
+  const frag4 = 'echo "step 7a: <CODES> = {${CODES:-∅}}"';
+  if (!skillText.includes(frag4)) return null;
+
+  const moveMatch = skillText.match(/```\n(\s*\[ -z "\$EXCLUDE_QA" \] && mkdir -p[\s\S]*?)```/);
+  if (!moveMatch) return null;
+  const frag5 = dedentFence(moveMatch[1].replace(/\n\s*$/, "")).replace(/\nSTEP7A\s*$/, "");
+
+  return { frag1, frag2, frag3, frag4, frag5 };
+}
+
+test("T-E76-02 (class assertion, closes F1): every variable REFERENCED anywhere in the assembled step-7a script is ASSIGNED somewhere within it -- no fragment reaches for an outer-shell variable", () => {
+  const frags = extractStep7aFragments(SKILL);
+  assert.ok(frags, "must be able to extract all five step-7a fragments from the shipped SOP text");
+  const assembled = [frags.frag1, frags.frag2, frags.frag3, frags.frag4, frags.frag5].join("\n");
+
+  const { assigned, referenced } = extractAssignedAndReferenced(assembled);
+  const referencedNotAssigned = [...referenced].filter((v) => !assigned.has(v));
+  const assignedNotReferenced = [...assigned].filter((v) => !referenced.has(v));
+
+  assert.deepEqual(
+    referencedNotAssigned,
+    [],
+    `every variable step 7a reads must be bound somewhere in the SAME assembled script -- found referenced-but-never-assigned: ${referencedNotAssigned.join(", ")} (this is exactly F1's shape: a variable left in the outer shell, unreachable from inside the single heredoc invocation)`,
+  );
+  // Not the load-bearing half of the invariant (an assigned-but-unused var is
+  // dead code, not a correctness hazard), but code-reviewer's round-2
+  // verification found the two sets EXACTLY equal on the real shipped text,
+  // and pinning that observation too catches an accidental unused-variable
+  // regression for free.
+  assert.deepEqual(
+    assignedNotReferenced,
+    [],
+    `sanity (non-load-bearing): assigned-but-never-referenced variables found: ${assignedNotReferenced.join(", ")} -- the shipped text has none; if this now fails, someone added a dead assignment (harmless, but update this pin's comment if intentional)`,
+  );
+
+  // GUARD-THE-GUARD (this pin must red against the round-1 text, demonstrated
+  // rather than asserted): round 1's enumeration named only fragments 2-7
+  // ("everything below") and never listed the PREV_TAG bullet above it -- so
+  // the script round 1 actually told the executor to assemble omitted
+  // fragment 1 entirely. Reconstruct that exact omission against the CURRENT
+  // (round-2, otherwise-correct) fragments 2-5 and confirm the invariant
+  // above would have caught it: PREV_TAG is read by the guard but bound
+  // nowhere in a script that omits fragment 1.
+  const round1Reconstruction = [frags.frag2, frags.frag3, frags.frag4, frags.frag5].join("\n");
+  const round1 = extractAssignedAndReferenced(round1Reconstruction);
+  const round1ReferencedNotAssigned = [...round1.referenced].filter((v) => !round1.assigned.has(v));
+  assert.deepEqual(
+    round1ReferencedNotAssigned,
+    ["PREV_TAG"],
+    "guard-the-guard: reconstructing round 1's fragment omission (PREV_TAG assignment left out of the assembled script) MUST make this exact invariant fail on PREV_TAG -- if it does not, the class assertion above is not actually testing what it claims to",
+  );
+});
+
+test("T-E76-02 (class assertion, pins fragment 3's identity): exactly ONE fence in step 7a opens with the executable `CODES=$(` binding", () => {
+  // Distinguishes the one EXECUTABLE derivation fence from the illustrative
+  // find/grep example fence immediately above it (":107-111", never bound to
+  // CODES, shown only to explain the per-tree predicate) -- an executor (or
+  // a future edit) that assembled the illustrative fence instead would bind
+  // nothing, silently reproducing the E76 empty-derivation hazard (round 2's
+  // Quality section: "the wrong fence prints the files it failed to derive
+  // from, directly above {∅}"). Scoped to step 7a only, not the whole file --
+  // step 8's unrelated `bash -c` existence-pre-filter fence is out of scope.
+  const start = SKILL.indexOf("7a. **Archive shipped");
+  const end = SKILL.indexOf("7b. **Drift-baseline");
+  assert.ok(start > -1 && end > start, "must find step 7a's section boundaries");
+  const section = SKILL.slice(start, end);
+
+  const codesOpeningFences = [...section.matchAll(/```\n(\s*CODES=\$\()/g)];
+  assert.equal(
+    codesOpeningFences.length,
+    1,
+    `expected exactly one fence in step 7a opening with CODES=$( -- found ${codesOpeningFences.length}. Two or more means the illustrative example and the executable derivation have become ambiguous (or ambiguously duplicated), reopening the empty-derivation hazard`,
+  );
+
+  // GUARD-THE-GUARD: prove the count-based assertion actually discriminates,
+  // by mutating a copy of the section so the illustrative fence ALSO opens
+  // with CODES=$( (a synthetic stand-in for "someone pasted the derivation
+  // into the illustrative slot too") and confirming the count goes to 2.
+  const mutated = section.replace(
+    /```\n(\s*find qa_reports -maxdepth 1 -type f)/,
+    "```\n     CODES=$( fake_duplicate_of_the_derivation",
+  );
+  const mutatedCount = [...mutated.matchAll(/```\n(\s*CODES=\$\()/g)].length;
+  assert.equal(
+    mutatedCount,
+    2,
+    "guard-the-guard: injecting a second CODES=$( fence opener must be detected as count=2, proving this assertion is not vacuously true",
+  );
+});
+
+test("T-E76-02 (single-invocation property, F2 regression guard): step 7a assembles into exactly one quoted-heredoc-fed bash invocation -- no `bash -c` reintroduced, delimiter quoted, exactly one closing STEP7A line", () => {
+  const start = SKILL.indexOf("7a. **Archive shipped");
+  const end = SKILL.indexOf("7b. **Drift-baseline");
+  const section = SKILL.slice(start, end);
+
+  // The literal heredoc opener must be present, and quoted (`'STEP7A'`, not
+  // a bare `STEP7A`) -- an unquoted delimiter would let the outer shell
+  // expand the body, defeating F2's fix.
+  assert.ok(section.includes("bash <<'STEP7A'"), "step 7a must open the single invocation with a QUOTED heredoc delimiter: bash <<'STEP7A'");
+
+  // No fenced (executable) code block within step 7a may contain `bash -c` --
+  // scoped to FENCES specifically, not the surrounding prose, which
+  // legitimately discusses the retired `bash -c` shape by name while
+  // explaining why it was replaced (a bare substring match over the whole
+  // section would false-positive on that prose).
+  const fences = [...section.matchAll(/```\n([\s\S]*?)```/g)].map((m) => m[1]);
+  assert.ok(fences.length > 0, "sanity: step 7a must contain at least one fenced code block");
+  const fencesWithBashC = fences.filter((f) => /bash -c/.test(f));
+  assert.deepEqual(
+    fencesWithBashC,
+    [],
+    "no executable fence in step 7a may reintroduce `bash -c` -- that is exactly F2's hazard (a single-quoted bash -c '...' cannot hold the derivation's own literal single quotes)",
+  );
+
+  // Exactly one closing terminator line, reading exactly `STEP7A` alone --
+  // more than one would mean the heredoc body was split across multiple
+  // invocations (the exact hazard the single-invocation bullet exists to
+  // close), and zero would mean the heredoc never closes.
+  const terminatorLines = [...section.matchAll(/^\s*STEP7A\s*$/gm)];
+  assert.equal(terminatorLines.length, 1, `expected exactly one bare STEP7A terminator line in step 7a; found ${terminatorLines.length}`);
+
+  // GUARD-THE-GUARD: reconstruct round 1's shape (moves wrapped in their own
+  // bash -c, matching E71b's per-bullet wrapping that E76's bullet itself
+  // names as "no longer a separate wrapping step here" -- see :137) and
+  // confirm the no-bash-c-in-fence assertion would have caught it.
+  const round1MoveFenceReconstruction = `\`\`\`\nbash -c '\n  for c in $CODES; do\n    : archive moves here\n  done\n'\n\`\`\``;
+  const round1Fences = [...round1MoveFenceReconstruction.matchAll(/```\n([\s\S]*?)```/g)].map((m) => m[1]);
+  const round1FencesWithBashC = round1Fences.filter((f) => /bash -c/.test(f));
+  assert.ok(
+    round1FencesWithBashC.length > 0,
+    "guard-the-guard: a reconstructed bash -c-wrapped move fence must be caught by the same predicate used above, proving it is not vacuously true",
+  );
+
+  // NOT covered by this pin, deliberately: the five-fragment assembly
+  // ergonomics residual (spreading the script across ~110 lines of prose)
+  // that code-reviewer named as a non-blocking follow-up in review round 2 --
+  // see qa_reports/review_T-E76-02.md Part 4 for the explicit accept/file/pin
+  // decision on that separate concern. This pin only guards the INVOCATION
+  // shape (single quoted-heredoc, no bash -c, one close), not the assembly
+  // burden itself.
 });

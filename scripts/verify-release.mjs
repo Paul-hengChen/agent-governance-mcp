@@ -173,19 +173,32 @@ runCheck("dist committed+parity", (fails) => {
   }
 });
 
-// --- Check 6: CI ground truth on origin/main (E14) ----------------------------
-// Reads the latest COMPLETED run of the CI workflow on the main branch via the
-// gh CLI. Graceful degradation is load-bearing (backlog E14 / T-EB-01): any
-// inability to OBTAIN ground truth — gh not installed, gh unauthenticated,
-// network/API error, unparseable output, zero completed runs — emits a WARN
+// --- Check 6: CI ground truth on origin/main (E14; sha-matched per E78) ------
+// Reads recent COMPLETED runs of the CI workflow on the main branch via the
+// gh CLI and finds the one whose headSha matches the commit actually being
+// released — NOT just "whatever completed run happens to be listed first".
+// A fast release push can complete `git push` + `gh release` before its own
+// CI run finishes; when that happens, the previously-first completed run
+// belongs to an EARLIER commit, and treating its conclusion as ground truth
+// for THIS release answers a different question (E78: v3.102.2 shipped this
+// way — the release's own run was still in flight, 56s in, and the check
+// reported PASS off the prior day's green run on a different sha).
+//
+// Graceful degradation is load-bearing (backlog E14 / T-EB-01, extended by
+// E78): any inability to OBTAIN ground truth for THIS commit — gh not
+// installed, gh unauthenticated, network/API error, unparseable output, zero
+// completed runs, or no completed run found for this sha yet — emits a WARN
 // and leaves the check green, preserving the pre-E14 exit-0 path exactly.
-// The ONLY failure mode is a definitively red answer: a completed run whose
-// conclusion is not "success".
+// The ONLY failure mode is a definitively red answer: a completed run for
+// THIS commit whose conclusion is not "success". Never a blocking wait/poll
+// for the run to finish — a WARN is the full extent of the response.
 runCheck("CI ground-truth", (fails) => {
   // WARNs go to stdout, not stderr: the script's contract (pinned by VR-8)
   // reserves stderr for FAIL lines — a fully passing run prints nothing there.
   const warn = (reason) =>
     console.log(`WARN: CI ground-truth — ${reason}; continuing without CI verification (graceful degradation, E14)`);
+
+  const releaseSha = git(["rev-parse", "HEAD"]);
 
   const res = spawnSync(
     "gh",
@@ -199,7 +212,7 @@ runCheck("CI ground-truth", (fails) => {
       "--status",
       "completed",
       "--limit",
-      "1",
+      "10",
       "--json",
       "conclusion,headSha,url,updatedAt",
     ],
@@ -231,7 +244,23 @@ runCheck("CI ground-truth", (fails) => {
     return;
   }
 
-  const { conclusion, headSha, url } = runs[0];
+  // Ground truth for THIS release is the completed run whose headSha IS the
+  // commit being released — not runs[0], which is merely the most recently
+  // completed run on main and may belong to an earlier, unrelated commit
+  // (E78). A completed run for an earlier commit is not "nothing to go on"
+  // (that's the zero-runs branch above) and it is not "this commit is red"
+  // either — it is simply the wrong answer, so it degrades exactly like any
+  // other cannot-obtain-ground-truth path rather than being accepted or
+  // treated as a fatal mismatch.
+  const matched = runs.find((r) => r.headSha === releaseSha);
+  if (!matched) {
+    warn(
+      `this commit's CI has not completed yet (head ${releaseSha.slice(0, 12)} not found among the last ${runs.length} completed run(s) on main)`
+    );
+    return;
+  }
+
+  const { conclusion, headSha, url } = matched;
   if (conclusion !== "success") {
     fails.push(
       `FAIL: latest completed CI run on main concluded "${conclusion}" (head ${String(headSha).slice(0, 12)}) — ${url ?? "no url"}`
