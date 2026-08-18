@@ -16,6 +16,63 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.102.2] - 2026-08-18
+
+### Fixed
+
+- **E69 — release-engineer SOP render fences** (`content/skill-release-engineer.md`):
+  the two asymmetric `<!-- rationale:start -->` fences that sat inline at the end of
+  their preceding bullet are relocated onto their own lines, so `stripRationale`
+  (in `prompts/text-transforms.ts` — unchanged by this cut) can no longer consume the bullet's trailing newline
+  and glue the next line onto it. Newline placement only — zero prose bytes changed.
+  Both sites rendered glued in every dispatched release-engineer SOP up to `ffa4082`:
+  the step-7a "Log `<CODES>` even when empty" bullet and the "Zero matches = silent
+  no-op" MUST NOT bullet.
+
+### Changed
+
+- **E71 (a)-(d) — release-engineer SOP correctness fixes** (same file):
+  - **(a)** step 8's `git add` gains a mandatory existence pre-filter. The prior text
+    claimed a missing pathspec would "no-op silently"; it does not — `git add` fails
+    `fatal: pathspec '<x>' did not match any files` and stages nothing at all. The
+    path list is stated as 30 paths (19 directories + 11 metadata), and the pre-filter
+    loop is wrapped in explicit `bash -c` because its unquoted `$PATHS` expansion
+    relies on word-splitting that zsh does not perform. `git add` also gains `--`.
+  - **(b)** step 7a's glob safety under zsh's default `NOMATCH`, covering **two** site
+    classes the original filing collapsed into one: the archive move bullets *and* the
+    `covers:` sweep's own `qa_reports/*.md` / `review_reports/*.md` targets. Raw globs
+    are replaced by `find -maxdepth 1 -name "..."` predicates run under `bash -c`, with
+    the quoting requirement (double quotes inside the `bash -c '...'` wrapper) stated.
+  - **(c)** the Expected-vs-unrelated scope rule now names `.current/**` (minus
+    `.config.json`) and `tasks.md` as explicit non-STOP exclusions — both are modified
+    at every release by construction, and neither may fire the Blocked row on its own.
+  - **(d)** step 7c gains the DONE-but-unreleased third shape: a backlog row already
+    pre-marked `**DONE** (<date>, not yet released)` does **not** satisfy the
+    done-marking obligation — the version stamp is still owed, amended in place rather
+    than appended as a duplicate row.
+
+### Added
+
+- `test/render-structure.test.mjs` (new, 330 lines): cross-SOP render-structure
+  regression over the 9 `tw_switch_role` roles, `teamwork` / `teamwork-lite`, and all
+  4 constitution chain x design compose combinations, via both the `tools/role.ts` and
+  `prompts/build.ts` render paths (both unchanged by this cut) — plus a detector-soundness test that reproduces the
+  2 known `ffa4082` glue sites byte-identically, and an exact ratchet of the known
+  remaining glue sites elsewhere in `content/`.
+- 6 new E71 (a)-(d) content pins in `test/release-staging.test.mjs`, including two that
+  extract shell from the SOP verbatim and execute it under both bash and zsh with
+  negative controls proving the `bash -c` wrapper is necessary.
+
+### Notes
+
+- Suite 1720 -> 1734 tests. Two code-review rounds
+  (`review_reports/archive/e69-e71-sop-render-fences/review_T-E69-01.md`).
+- SOP text only; `dist/` output is unchanged by this cut, hence a PATCH bump.
+- Follow-up E75 is filed and remains OPEN: 4 further live instances of the same E69
+  glue class in `content/skill-pm.md` (x2), `content/skill-qa-engineer.md`, and
+  `content/skill-architect.md` — all three untouched by this cut, E75 fixes them — held as the exact ratchet in
+  `test/render-structure.test.mjs` that E75 will decrement.
+
 ## [3.102.1] - 2026-08-17
 
 E48 ends a ticket that had been open since 2026-08-10 and parked in `.current/feature-split.md` (F1)
