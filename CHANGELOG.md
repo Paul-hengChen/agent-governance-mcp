@@ -16,6 +16,63 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.103.0] - 2026-08-19
+
+### Added
+
+- **E72 - coordinator claim-vs-state mismatch detection** (`content/coord-03-core-fallback.md`).
+  A new **Claim-vs-state mismatch** row in the coordinator's Escalation Routes table:
+  after EVERY handoff, `tw_get_state` and diff the finished role's claims
+  (`completed_tasks`, `pending_notes`, the evidence file it names) against what
+  actually landed. A reply asserting content the write did not persist is a
+  Crash-Resume-class event — ground-truth first, then re-dispatch with the
+  mismatch stated in the brief; never route on the reply. No gate catches this
+  class by construction: the server validates a write against *rules*, never
+  against *what its author said it was doing* — `pending_notes` is passed
+  through verbatim and zod-defaults to `[]` when omitted, so no predicate can
+  compare a write to a reply the server never sees.
+- **E72 - Known non-mismatches note** (`content/coord-03-core-fallback.md`),
+  shipped in the same edit and load-bearing for the row above: the
+  code-reviewer's APPROVED handoff legitimately stamps `agent_id="qa-engineer"`
+  (Constitution §3.1's canonical `(code-reviewer, In_Progress) → (qa-engineer,
+  In_Progress)` edge, spelled out in `skill-code-reviewer.md`'s APPROVED row)
+  and that edge legitimately resets `review_round` to 0. Without this note the
+  new row misfires on every approval handoff — as it did to the coordinator on
+  2026-08-19, before the investigation below.
+
+### Changed
+
+- `test/context-budget.test.mjs`: AC8 coordinator context floor re-baselined
+  17281 → 17498 approx. tokens for the two added fragment blocks.
+- `test/fixtures/compose-golden/skill-coordinator-monolith.txt`: golden
+  composition refreshed to match the new `coord-03` content.
+- `docs/backlog.md`: E72 (row 195) and order-8f (row 231) amended with the
+  investigation result and marked shipped.
+
+### Notes
+
+- **E72's investigation falsified half its own ticket, before any code was
+  written.** The filed defect (a) — the APPROVED write's `agent_id:
+  "qa-engineer"` read as an identity misstamp — is a MIS-FINDING: that value is
+  SOP-mandated, it is the only non-FAIL/Blocked edge out of
+  `code-reviewer:In_Progress` (`tools/transitions.ts:247`), and the observed
+  `review_round` 1 → 0 reset is that edge's documented behavior
+  (`tools/transitions.ts:576`). The ticket's proposed direction (i) — reject
+  `review_verdict` when `agent_id` is not `code-reviewer` — would therefore
+  reject the SOP-mandated APPROVED row and break every approval handoff in the
+  chain, and is recorded **DO-NOT-BUILD**. Defect (b), the silent
+  `pending_notes` loss, survives as the only real one, leaving direction (ii)
+  (the coordinator-side diff shipped above) as the only available defense.
+- Suite green at 1745/1745.
+- Files cited above as *evidence* and NOT modified by this release:
+  `tools/transitions.ts`, `tools/handoff-orchestrator.ts`,
+  `content/skill-code-reviewer.md`. This release's diff is the two
+  `content/coord-03-core-fallback.md` blocks, the two test files, the
+  backlog rows, and the release metadata.
+- No code-review round ran for E72: the cut was coordinator-direct content
+  plus a single-role QA dispatch for the test-only residue (Constitution
+  §3.1 judge-dispatch charter), so `review_reports/` has no E72 entry.
+
 ## [3.102.5] - 2026-08-19
 
 ### Fixed

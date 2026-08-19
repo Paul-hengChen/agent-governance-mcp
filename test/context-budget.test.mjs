@@ -1076,7 +1076,7 @@ test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the 
   );
 });
 
-test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 17281 ~tok)", () => {
+test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 17498 ~tok)", () => {
   // WHY: the constitution is injected on every dispatch; the full coordinator bundle is
   // the worst case. Compose the chain-role bundle the way buildPromptForRole does:
   // rationale-stripped constitution + SEP + rationale-stripped skill body. Floor
@@ -1320,13 +1320,20 @@ test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/b
   // code-reviewer's handoff notes, though both independently reported this exact figure
   // across two review rounds) at 17281 ~tok (exact); cap set to the exact measured value
   // per the established Phase-2 convention (no additional headroom).
+  // e72-claim-vs-state-diff (qa-owned bump, T-E72-02): cap raised from 17281 → 17498 to
+  // absorb the new content/coord-03-core-fallback.md "Claim-vs-state mismatch" Escalation
+  // Routes row plus its "Known non-mismatches" note (coordinator-side; no constitution-side
+  // change this feature — the AC8 stripped-constitution-only floor above is untouched).
+  // Independently re-measured (not trusted from the coordinator's own 17498 figure) at
+  // 17498 ~tok (exact); cap set to the exact measured value per the established Phase-2
+  // convention (no additional headroom).
   const skillCoord = readSkillFile("skill-coordinator.md");
   const body = skillCoord.startsWith("---")
     ? skillCoord.slice(skillCoord.indexOf("---", 3) + 3).trimStart()
     : skillCoord;
   const SEP = "\n\n---\n\n";
   const bundle = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)) + SEP + stripRationale(stripOriginTags(body)));
-  assert.ok(bundle <= 17281, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 17281 (AC8 design-arm floor, e40-nonqa-completed-tasks-write-gate re-baseline)`);
+  assert.ok(bundle <= 17498, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 17498 (AC8 design-arm floor, e72-claim-vs-state-diff re-baseline)`);
 });
 
 test("AC9: every operative rule/gate/heading survives stripRationale on the constitution", () => {
