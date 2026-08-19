@@ -47,6 +47,21 @@
 // VR-11/VR-12 above are retargeted (not new) for this same change: both
 // previously shimmed a dummy headSha that could never match a real fixture
 // HEAD, which degrades to WARN under sha-matched code.
+//
+// T-E80-02 (E80) additions — the sha-not-found branch now bounded-polls
+// `gh run list` instead of giving up on the first miss (a healthy release's
+// own CI run is almost always still in flight the moment step 9a runs):
+//   sha absent, then present+success on a later gh call -> OK, no WARN -> VR-20
+//   poll budget expires, sha still absent -> byte-identical pre-E80 WARN -> VR-21
+//   AGC_VERIFY_CI_WAIT_SECONDS=0 -> exactly one gh call, no wall-clock wait -> VR-22
+// VR-17/VR-18 above are amended (not retargeted) for this same change: both
+// drive the sha-not-found branch, so each now pins AGC_VERIFY_CI_WAIT_SECONDS=0
+// explicitly — otherwise, with runVerifyWithPath's child inheriting an unset
+// process.env var, each would silently block for the full 600s default
+// (~20 minutes of suite slowdown, not a red; heads-up from code-reviewer's
+// T-E80-01 review). VR-9 is retargeted to assert step 9a's new wording, which
+// distinguishes "the poll is running, let it finish" from "genuinely
+// degraded environment" instead of one catch-all WARN sentence.
 // These use a `gh` shim on PATH (a tiny executable script placed in a temp
 // dir prepended to PATH) rather than the real `gh` binary — the fixture-repo
 // convention above still drives every git-facing check exactly as before;
@@ -279,16 +294,60 @@ function noGhSystemPath() {
   return dir;
 }
 
-function runVerifyWithPath(root, pathValue, args = []) {
+// `extraEnv` merges OVER `process.env` (after `PATH`) — every E80 poll test
+// uses this to pin AGC_VERIFY_CI_WAIT_SECONDS explicitly rather than relying
+// on this test process's own (unset) shell inheritance, so a developer's
+// exported value can never silently change test behavior (T-E80-01 review
+// heads-up).
+function runVerifyWithPath(root, pathValue, args = [], extraEnv = {}) {
   return spawnSync(
     process.execPath,
     [path.join(root, "scripts", "verify-release.mjs"), ...args],
-    { cwd: root, encoding: "utf-8", env: { ...process.env, PATH: pathValue } },
+    { cwd: root, encoding: "utf-8", env: { ...process.env, PATH: pathValue, ...extraEnv } },
   );
 }
 
 function ghJsonShim(json) {
   return `#!/bin/sh\ncat <<'EOF'\n${json}\nEOF\n`;
+}
+
+// A `gh` shim that returns a DIFFERENT canned response on each successive
+// invocation (last response repeats for any calls beyond the list) — used to
+// prove the E80 poll loop actually re-queries `gh` rather than caching its
+// first answer. Each response is written to its own file so a multi-line
+// JSON payload never has to survive re-quoting inside the shell script body.
+function mkGhSequenceShim(jsons) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "gh-shim-seq-"));
+  const counterPath = path.join(dir, "counter");
+  fs.writeFileSync(counterPath, "0");
+  jsons.forEach((json, i) => {
+    fs.writeFileSync(path.join(dir, `resp-${i}`), json);
+  });
+  const lastIndex = jsons.length - 1;
+  fs.writeFileSync(
+    path.join(dir, "gh"),
+    `#!/bin/sh\nN=$(cat "${counterPath}")\ncat "${dir}/resp-$N"\nif [ "$N" -lt ${lastIndex} ]; then\n  echo $((N + 1)) > "${counterPath}"\nfi\n`,
+  );
+  fs.chmodSync(path.join(dir, "gh"), 0o755);
+  return dir;
+}
+
+// A `gh` shim that always returns the same canned response but records how
+// many times it was invoked, via a counter file the test reads back
+// afterward — used to prove `AGC_VERIFY_CI_WAIT_SECONDS=0` calls `gh` exactly
+// once rather than merely completing quickly (a slow-but-single call and a
+// fast-multi-call loop could otherwise both look "instant" to a wall-clock
+// assertion alone).
+function mkGhCallCounterShim(json) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "gh-shim-count-"));
+  const counterPath = path.join(dir, "calls");
+  fs.writeFileSync(counterPath, "0");
+  fs.writeFileSync(
+    path.join(dir, "gh"),
+    `#!/bin/sh\nN=$(cat "${counterPath}")\necho $((N + 1)) > "${counterPath}"\ncat <<'EOF'\n${json}\nEOF\n`,
+  );
+  fs.chmodSync(path.join(dir, "gh"), 0o755);
+  return { dir, counterPath };
 }
 
 // ---------------------------------------------------------------------------
@@ -637,7 +696,12 @@ test("VR-17 (E78): shimmed gh reports a green completed run at a DIFFERENT commi
       ]),
     ),
   );
-  const result = runVerifyWithPath(root, `${shimDir}:${noGhSystemPath()}`, ["v10.0.6"]);
+  // wait=0 (T-E80-02): this test drives the sha-not-found branch, which now
+  // bounded-polls by default — pin the budget explicitly rather than let this
+  // process's own (unset) env silently give the child a 600s budget.
+  const result = runVerifyWithPath(root, `${shimDir}:${noGhSystemPath()}`, ["v10.0.6"], {
+    AGC_VERIFY_CI_WAIT_SECONDS: "0",
+  });
   assert.equal(result.status, 0, `a stale green run from a different commit must never fail the release; stderr: ${result.stderr}`);
   assert.match(
     result.stdout,
@@ -671,7 +735,11 @@ test("VR-18 (E78): shimmed gh reports a red completed run at a DIFFERENT commit 
       ]),
     ),
   );
-  const result = runVerifyWithPath(root, `${shimDir}:${noGhSystemPath()}`, ["v10.0.7"]);
+  // wait=0 (T-E80-02): same reasoning as VR-17 above — this drives the
+  // sha-not-found branch, so pin the budget rather than inherit it.
+  const result = runVerifyWithPath(root, `${shimDir}:${noGhSystemPath()}`, ["v10.0.7"], {
+    AGC_VERIFY_CI_WAIT_SECONDS: "0",
+  });
   assert.equal(result.status, 0, `a red run belonging to an unrelated commit must never fail THIS release; stderr: ${result.stderr}`);
   assert.match(result.stdout, /WARN: CI ground-truth — this commit's CI has not completed yet/, "an unrelated commit's red run degrades exactly like any other cannot-obtain-ground-truth path");
   assert.match(result.stdout, /OK: CI ground-truth/);
@@ -711,6 +779,124 @@ test("VR-19 (E78): a matching red run found deep in the 10-run window (position 
   assert.notEqual(result.status, 0, "a matching red run buried in the window must still FAIL, proving runs[0] alone is not what's checked");
   assert.match(result.stderr, /FAIL: latest completed CI run on main concluded "failure"/);
   assert.match(result.stderr, /check:release — FAILED \(1 check\(s\) failed\)/);
+});
+
+// ---------------------------------------------------------------------------
+// VR-20 (E80, T-E80-02(a)): the sha-not-found branch now bounded-polls
+// instead of giving up on the first miss — a completed run for THIS commit
+// that shows up mid-poll (not on the first `gh` call) must resolve to a
+// genuine OK, never a WARN, exactly as if it had matched on the first call.
+// Proves the poll loop actually re-queries `gh` rather than caching its
+// first (miss) answer.
+// ---------------------------------------------------------------------------
+test("VR-20 (E80): sha absent on the first gh call, present+success on a later call -> OK, no WARN, exit 0", () => {
+  const { root } = mkFixtureRepo({ version: "10.0.9", tag: "at-head", origin: "pushed" });
+  const releaseSha = git(["rev-parse", "HEAD"], root);
+  const notFoundJson = JSON.stringify([
+    {
+      conclusion: "success",
+      headSha: "5".repeat(40),
+      url: "https://example.com/actions/runs/decoy-first-call",
+      updatedAt: "2026-01-01T00:00:00Z",
+    },
+  ]);
+  const foundJson = JSON.stringify([
+    {
+      conclusion: "success",
+      headSha: releaseSha,
+      url: "https://example.com/actions/runs/found-second-call",
+      updatedAt: "2026-01-01T00:00:05Z",
+    },
+  ]);
+  const shimDir = mkGhSequenceShim([notFoundJson, foundJson]);
+  const start = Date.now();
+  // budget=5s: POLL_INTERVAL_SECONDS is 20s, so a 5s budget forces exactly
+  // one sleep of min(20s, remaining) = 5s between the miss and the match,
+  // keeping this test fast while still genuinely exercising the poll-then-
+  // resolve path (not just wait=0's single-call shortcut, covered by VR-22).
+  const result = runVerifyWithPath(root, `${shimDir}:${noGhSystemPath()}`, ["v10.0.9"], {
+    AGC_VERIFY_CI_WAIT_SECONDS: "5",
+  });
+  const elapsedMs = Date.now() - start;
+  assert.equal(result.status, 0, `expected exit 0; stderr: ${result.stderr}`);
+  assert.match(result.stdout, /OK: CI ground-truth/);
+  assert.ok(
+    !result.stdout.includes("WARN: CI ground-truth"),
+    "a sha that resolves before the budget expires must report a genuine OK, never a WARN",
+  );
+  assert.match(result.stdout, /check:release — ALL CHECKS PASSED \(v10\.0\.9\)/);
+  assert.equal(result.stderr, "", "a run that resolves mid-poll must not print to stderr");
+  assert.ok(elapsedMs < 15000, `poll-then-resolve must complete well within the 5s budget + overhead; took ${elapsedMs}ms`);
+});
+
+// ---------------------------------------------------------------------------
+// VR-21 (E80, T-E80-02(b)): the poll's own budget can expire with the sha
+// STILL absent — E78's contract must stay intact on this path: the SAME
+// WARN text as the pre-E80 immediate-miss branch (VR-17/VR-18), the check
+// still green, exit 0. No new FAIL mode is introduced by adding the poll.
+// ---------------------------------------------------------------------------
+test("VR-21 (E80): poll budget expires with the sha still absent -> byte-identical pre-E80 WARN text, check green, exit 0", () => {
+  const { root } = mkFixtureRepo({ version: "10.0.10", tag: "at-head", origin: "pushed" });
+  const releaseSha = git(["rev-parse", "HEAD"], root);
+  const shimDir = mkGhShim(
+    ghJsonShim(
+      JSON.stringify([
+        {
+          conclusion: "success",
+          headSha: "6".repeat(40),
+          url: "https://example.com/actions/runs/decoy-never-matches",
+          updatedAt: "2026-01-01T00:00:00Z",
+        },
+      ]),
+    ),
+  );
+  const start = Date.now();
+  const result = runVerifyWithPath(root, `${shimDir}:${noGhSystemPath()}`, ["v10.0.10"], {
+    AGC_VERIFY_CI_WAIT_SECONDS: "2",
+  });
+  const elapsedMs = Date.now() - start;
+  assert.equal(result.status, 0, `budget expiry must never fail the release; stderr: ${result.stderr}`);
+  assert.match(
+    result.stdout,
+    new RegExp(`WARN: CI ground-truth — this commit's CI has not completed yet \\(head ${releaseSha.slice(0, 12)} not found among the last 1 completed run\\(s\\) on main\\); continuing without CI verification \\(graceful degradation, E14\\)`),
+    "budget expiry must emit the SAME WARN text as the pre-E80 immediate-miss branch — E78's contract preserved, not inverted, and no new FAIL mode",
+  );
+  assert.match(result.stdout, /OK: CI ground-truth/, "the check itself still reports OK — budget expiry is a degradation, not a failure");
+  assert.equal(result.stderr, "", "a WARN-only degradation must not print to stderr");
+  assert.ok(elapsedMs >= 2000, "the poll must actually have waited out the 2s budget, not returned on the first miss");
+  assert.ok(elapsedMs < 15000, `budget expiry must not run long past the configured 2s budget; took ${elapsedMs}ms`);
+});
+
+// ---------------------------------------------------------------------------
+// VR-22 (E80, T-E80-02(c)): AGC_VERIFY_CI_WAIT_SECONDS=0 is the documented
+// opt-out — it must perform EXACTLY one `gh` call (not "return fast", which
+// a slow single call could also satisfy) and incur no wall-clock wait at
+// all, preserving the pre-E80 single-call behavior byte-for-byte.
+// ---------------------------------------------------------------------------
+test("VR-22 (E80): AGC_VERIFY_CI_WAIT_SECONDS=0 performs exactly one gh call and no wall-clock wait", () => {
+  const { root } = mkFixtureRepo({ version: "10.0.11", tag: "at-head", origin: "pushed" });
+  const notFoundJson = JSON.stringify([
+    {
+      conclusion: "success",
+      headSha: "7".repeat(40),
+      url: "https://example.com/actions/runs/decoy-wait-zero",
+      updatedAt: "2026-01-01T00:00:00Z",
+    },
+  ]);
+  const { dir: shimDir, counterPath } = mkGhCallCounterShim(notFoundJson);
+  const start = Date.now();
+  const result = runVerifyWithPath(root, `${shimDir}:${noGhSystemPath()}`, ["v10.0.11"], {
+    AGC_VERIFY_CI_WAIT_SECONDS: "0",
+  });
+  const elapsedMs = Date.now() - start;
+  assert.equal(result.status, 0, `expected exit 0; stderr: ${result.stderr}`);
+  assert.match(result.stdout, /WARN: CI ground-truth — this commit's CI has not completed yet/);
+  assert.equal(
+    fs.readFileSync(counterPath, "utf-8").trim(),
+    "1",
+    "wait=0 must call gh exactly once, never enter the poll loop",
+  );
+  assert.ok(elapsedMs < 5000, `wait=0 must not incur any wall-clock poll sleep; took ${elapsedMs}ms`);
 });
 
 // ---------------------------------------------------------------------------
@@ -837,6 +1023,27 @@ test("VR-9 (AC9): skill-release-engineer.md requires verify-release.mjs after pu
     SKILL,
     /do NOT proceed to the closing write and do NOT emit `Done\. Released <tag>\.` on a FAIL/,
     "SOP step 9a must explicitly forbid the closing write and the done-report on FAIL",
+  );
+
+  // E80 retarget (T-E80-02): step 9a used to describe ONE catch-all WARN
+  // sentence for "gh missing/unauthenticated or zero completed runs". It now
+  // must distinguish "the script itself is bounded-polling — let it run"
+  // from "WARN-and-continue is reserved for a genuinely degraded
+  // environment" — the wait-vs-degraded split this cut introduced.
+  assert.match(
+    SKILL,
+    /the script itself bounded-polls `gh run list` for it \(E80; default ~10 minutes via `AGC_VERIFY_CI_WAIT_SECONDS`, `0` to opt out\) before giving up/,
+    "step 9a must describe the E80 bounded poll, its default budget, and the AGC_VERIFY_CI_WAIT_SECONDS opt-out",
+  );
+  assert.match(
+    SKILL,
+    /just let this step run to completion, do not treat a poll-in-progress as a WARN to manually re-run around/,
+    "step 9a must instruct the operator not to treat an in-progress poll as a WARN needing manual intervention",
+  );
+  assert.match(
+    SKILL,
+    /WARN-and-continue \(the check stays green either way, never a release blocker\) is what you get in two cases: the poll's own budget runs out with this sha still not found, or the environment is genuinely degraded/,
+    "step 9a must scope WARN-and-continue to exactly two cases — poll-budget expiry or a genuinely degraded environment — not a single undifferentiated catch-all",
   );
 });
 

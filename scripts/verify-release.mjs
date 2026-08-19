@@ -5,12 +5,17 @@
 // scripts/check-version.mjs is green (invoked as a subprocess, never
 // re-implemented), (4) CHANGELOG.md has an entry for the target version,
 // (5) dist/ is committed and the committed dist/index.js Server() literal
-// matches the target version, (6) CI ground truth (E14): the latest COMPLETED
-// CI run on origin/main concluded success — self-reported "npm test green" is
-// not a substitute for what CI actually said. Check 6 degrades gracefully by
-// design: when `gh` is missing, unauthenticated, or there are no completed CI
-// runs to read, it WARNs and continues (never blocks a release on missing
-// tooling); it FAILs ONLY on a definitively non-success conclusion.
+// matches the target version, (6) CI ground truth (E14/E78/E80): the
+// COMPLETED CI run for THIS release's sha on origin/main concluded success —
+// self-reported "npm test green" is not a substitute for what CI actually
+// said. When that run hasn't completed yet, Check 6 bounded-polls `gh run
+// list` for it (default ~600s via AGC_VERIFY_CI_WAIT_SECONDS, `0` = no wait,
+// exactly one `gh` call) before giving up. Check 6 degrades gracefully by
+// design: when `gh` is missing, unauthenticated, there are no completed CI
+// runs to read, or the poll budget expires with this sha still not found, it
+// WARNs and continues (never blocks a release on missing tooling or a
+// slow-finishing run); it FAILs ONLY on a definitively non-success conclusion
+// for this sha.
 //
 // Checks run independently — a failure in one never prevents the others from
 // running and reporting — so a multi-cause failure surfaces every cause in a
@@ -173,7 +178,8 @@ runCheck("dist committed+parity", (fails) => {
   }
 });
 
-// --- Check 6: CI ground truth on origin/main (E14; sha-matched per E78) ------
+// --- Check 6: CI ground truth on origin/main (E14; sha-matched per E78; -----
+// --- bounded-poll per E80) ---------------------------------------------------
 // Reads recent COMPLETED runs of the CI workflow on the main branch via the
 // gh CLI and finds the one whose headSha matches the commit actually being
 // released — NOT just "whatever completed run happens to be listed first".
@@ -184,87 +190,136 @@ runCheck("dist committed+parity", (fails) => {
 // way — the release's own run was still in flight, 56s in, and the check
 // reported PASS off the prior day's green run on a different sha).
 //
-// Graceful degradation is load-bearing (backlog E14 / T-EB-01, extended by
-// E78): any inability to OBTAIN ground truth for THIS commit — gh not
-// installed, gh unauthenticated, network/API error, unparseable output, zero
-// completed runs, or no completed run found for this sha yet — emits a WARN
-// and leaves the check green, preserving the pre-E14 exit-0 path exactly.
-// The ONLY failure mode is a definitively red answer: a completed run for
-// THIS commit whose conclusion is not "success". Never a blocking wait/poll
-// for the run to finish — a WARN is the full extent of the response.
+// E80: on a healthy release, THIS commit's CI run is almost always STILL IN
+// FLIGHT the moment this check runs (step 9a fires seconds after the
+// triggering push) — so the sha-not-found branch below is the DEFAULT path
+// on a healthy release, not a degraded one, and giving up on the first miss
+// let releases ship with CI silently unverified. That branch now
+// bounded-polls `gh run list` for the released sha instead of giving up
+// immediately: budget from AGC_VERIFY_CI_WAIT_SECONDS (default 600s; `0` =
+// no wait, exactly one `gh` call — the pre-E80 behavior), polling every
+// ~20s and printing progress to stdout (never stderr — see below). A
+// completed run for this sha appearing mid-poll is evaluated exactly as
+// before: success -> OK, non-success -> the existing FAIL.
+//
+// Graceful degradation is still load-bearing (backlog E14 / T-EB-01,
+// extended by E78 and E80): any inability to OBTAIN ground truth for THIS
+// commit — gh not installed, gh unauthenticated, network/API error,
+// unparseable output, zero completed runs, or the poll budget expiring with
+// no completed run found for this sha — emits the SAME WARN and leaves the
+// check green, preserving the pre-E14 exit-0 path exactly (E78's contract
+// preserved, not inverted: the poll only improves the odds of finding
+// ground truth, it never turns a miss into a FAIL). The ONLY failure mode is
+// a definitively red answer: a completed run for THIS commit whose
+// conclusion is not "success".
 runCheck("CI ground-truth", (fails) => {
-  // WARNs go to stdout, not stderr: the script's contract (pinned by VR-8)
-  // reserves stderr for FAIL lines — a fully passing run prints nothing there.
+  // WARNs (and poll-progress lines) go to stdout, not stderr: the script's
+  // contract (pinned by VR-8) reserves stderr for FAIL lines — a fully
+  // passing run prints nothing there.
   const warn = (reason) =>
     console.log(`WARN: CI ground-truth — ${reason}; continuing without CI verification (graceful degradation, E14)`);
 
   const releaseSha = git(["rev-parse", "HEAD"]);
 
-  const res = spawnSync(
-    "gh",
-    [
-      "run",
-      "list",
-      "--branch",
-      "main",
-      "--workflow",
-      "CI",
-      "--status",
-      "completed",
-      "--limit",
-      "10",
-      "--json",
-      "conclusion,headSha,url,updatedAt",
-    ],
-    { cwd: root, encoding: "utf-8" }
-  );
+  const POLL_INTERVAL_SECONDS = 20;
+  const DEFAULT_WAIT_SECONDS = 600;
+  const rawBudget = process.env.AGC_VERIFY_CI_WAIT_SECONDS;
+  const parsedBudget = rawBudget === undefined || rawBudget === "" ? NaN : Number(rawBudget);
+  const waitBudgetSeconds =
+    Number.isFinite(parsedBudget) && parsedBudget >= 0 ? parsedBudget : DEFAULT_WAIT_SECONDS;
 
-  if (res.error) {
-    // Spawn-level failure — gh binary missing (ENOENT) or not executable.
-    warn(`gh CLI unavailable (${res.error.code ?? res.error.message})`);
-    return;
-  }
-  if (res.status !== 0) {
-    // gh ran but errored — unauthenticated, network failure, workflow not
-    // found, etc. All are "cannot obtain ground truth", never a release FAIL.
-    const detail = (res.stderr || "").trim().split("\n")[0] || `gh exited ${res.status}`;
-    warn(`gh run list failed: ${detail}`);
-    return;
-  }
-
-  let runs;
-  try {
-    runs = JSON.parse(res.stdout);
-  } catch {
-    warn("could not parse gh run list output");
-    return;
-  }
-  if (!Array.isArray(runs) || runs.length === 0) {
-    warn("no completed CI runs found on origin/main");
-    return;
-  }
-
-  // Ground truth for THIS release is the completed run whose headSha IS the
-  // commit being released — not runs[0], which is merely the most recently
-  // completed run on main and may belong to an earlier, unrelated commit
-  // (E78). A completed run for an earlier commit is not "nothing to go on"
-  // (that's the zero-runs branch above) and it is not "this commit is red"
-  // either — it is simply the wrong answer, so it degrades exactly like any
-  // other cannot-obtain-ground-truth path rather than being accepted or
-  // treated as a fatal mismatch.
-  const matched = runs.find((r) => r.headSha === releaseSha);
-  if (!matched) {
-    warn(
-      `this commit's CI has not completed yet (head ${releaseSha.slice(0, 12)} not found among the last ${runs.length} completed run(s) on main)`
+  function listCompletedRuns() {
+    return spawnSync(
+      "gh",
+      [
+        "run",
+        "list",
+        "--branch",
+        "main",
+        "--workflow",
+        "CI",
+        "--status",
+        "completed",
+        "--limit",
+        "10",
+        "--json",
+        "conclusion,headSha,url,updatedAt",
+      ],
+      { cwd: root, encoding: "utf-8" }
     );
-    return;
   }
 
-  const { conclusion, headSha, url } = matched;
-  if (conclusion !== "success") {
-    fails.push(
-      `FAIL: latest completed CI run on main concluded "${conclusion}" (head ${String(headSha).slice(0, 12)}) — ${url ?? "no url"}`
+  // Synchronous sleep — this script runs as a plain top-to-bottom sequence of
+  // subprocess calls (execFileSync/spawnSync throughout), so the poll loop
+  // below blocks the same way rather than introducing async control flow.
+  function sleepSync(ms) {
+    if (ms <= 0) return;
+    const view = new Int32Array(new SharedArrayBuffer(4));
+    Atomics.wait(view, 0, 0, ms);
+  }
+
+  const deadline = Date.now() + waitBudgetSeconds * 1000;
+
+  for (;;) {
+    const res = listCompletedRuns();
+
+    if (res.error) {
+      // Spawn-level failure — gh binary missing (ENOENT) or not executable.
+      warn(`gh CLI unavailable (${res.error.code ?? res.error.message})`);
+      return;
+    }
+    if (res.status !== 0) {
+      // gh ran but errored — unauthenticated, network failure, workflow not
+      // found, etc. All are "cannot obtain ground truth", never a release FAIL.
+      const detail = (res.stderr || "").trim().split("\n")[0] || `gh exited ${res.status}`;
+      warn(`gh run list failed: ${detail}`);
+      return;
+    }
+
+    let runs;
+    try {
+      runs = JSON.parse(res.stdout);
+    } catch {
+      warn("could not parse gh run list output");
+      return;
+    }
+    if (!Array.isArray(runs) || runs.length === 0) {
+      warn("no completed CI runs found on origin/main");
+      return;
+    }
+
+    // Ground truth for THIS release is the completed run whose headSha IS the
+    // commit being released — not runs[0], which is merely the most recently
+    // completed run on main and may belong to an earlier, unrelated commit
+    // (E78). A completed run for an earlier commit is not "nothing to go on"
+    // (that's the zero-runs branch above) and it is not "this commit is red"
+    // either — it is simply the wrong answer, so it degrades exactly like any
+    // other cannot-obtain-ground-truth path rather than being accepted or
+    // treated as a fatal mismatch.
+    const matched = runs.find((r) => r.headSha === releaseSha);
+    if (matched) {
+      const { conclusion, headSha, url } = matched;
+      if (conclusion !== "success") {
+        fails.push(
+          `FAIL: latest completed CI run on main concluded "${conclusion}" (head ${String(headSha).slice(0, 12)}) — ${url ?? "no url"}`
+        );
+      }
+      return;
+    }
+
+    const remainingMs = deadline - Date.now();
+    if (remainingMs <= 0) {
+      warn(
+        `this commit's CI has not completed yet (head ${releaseSha.slice(0, 12)} not found among the last ${runs.length} completed run(s) on main)`
+      );
+      return;
+    }
+
+    const sleepMs = Math.min(POLL_INTERVAL_SECONDS * 1000, remainingMs);
+    console.log(
+      `check:release — CI ground-truth: head ${releaseSha.slice(0, 12)} not found among the last ${runs.length} completed run(s) yet; polling again in ${Math.round(sleepMs / 1000)}s (~${Math.round(remainingMs / 1000)}s left in budget)`
     );
+    sleepSync(sleepMs);
   }
 });
 

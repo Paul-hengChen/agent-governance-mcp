@@ -16,6 +16,69 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.102.5] - 2026-08-19
+
+### Fixed
+
+- **E80 - post-E78 `verify-release.mjs` Check 6 WARNed on the healthy path, so
+  step 9a's CI gate was effectively off** (`scripts/verify-release.mjs`).
+  E78 (v3.102.3) made Check 6 sha-matched: it looks for the completed CI run
+  whose `headSha` is the commit being released, and any other answer degrades
+  to WARN. But step 9a runs *seconds* after the push that triggers that run, so
+  on a healthy release the sha is legitimately not found yet — the default,
+  non-degraded path hit the "cannot obtain ground truth" WARN, then printed
+  `ALL CHECKS PASSED` and exited 0. It fired for real at v3.102.4, where the
+  release only stayed honest because the dispatch brief told the
+  release-engineer to re-run the script by hand — an instruction the SOP never
+  stated. Check 6's sha-not-found branch now **bounded-polls** `gh run list`
+  for the released sha (every ~20s, progress to stdout) instead of giving up on
+  the first miss. A completed run appearing mid-poll is evaluated exactly as
+  before: `success` -> OK, anything else -> the existing FAIL.
+
+### Added
+
+- **`AGC_VERIFY_CI_WAIT_SECONDS`** (`scripts/verify-release.mjs`) - the poll
+  budget for the Check 6 wait above. Default `600` (~10 min); `0` restores the
+  pre-E80 behavior exactly (one `gh` call, no wall-clock wait); a malformed or
+  negative value falls back to the default. This is a release-tooling knob for
+  this repo's own release chain, not part of the MCP server's runtime
+  configuration surface.
+
+### Changed
+
+- **`content/skill-release-engineer.md` step 9a** re-split to match: CI for this
+  sha simply not having finished yet is no longer something the release-engineer
+  handles by hand ("just let this step run to completion, do not treat a
+  poll-in-progress as a WARN to manually re-run around"), and WARN-and-continue
+  is now described as what you get in exactly two cases - the poll's own budget
+  expiring, or a genuinely degraded environment (`gh` missing, unauthenticated,
+  no CI workflow configured).
+- **`test/verify-release.test.mjs`** - new pins VR-20 (sha absent on the first
+  `gh` call, present+success on a later one -> OK, no WARN, exit 0), VR-21
+  (budget expires with the sha still absent -> byte-identical pre-E80 WARN text,
+  check green, exit 0) and VR-22 (`AGC_VERIFY_CI_WAIT_SECONDS=0` -> exactly one
+  `gh` call). VR-17/VR-18 now pass `AGC_VERIFY_CI_WAIT_SECONDS=0` explicitly so
+  the suite never blocks on the new wait, and VR-9 is retargeted to step 9a's
+  new wait-vs-degraded wording.
+
+### Notes
+
+- **E78's contract is preserved, not inverted**: when the poll budget expires the
+  branch still falls through to the *same* WARN and leaves the check green, so
+  E80 adds no new FAIL mode and cannot turn a slow CI run into a release
+  blocker. The poll only improves the odds of obtaining ground truth. Every
+  other degraded branch (`gh` ENOENT, non-zero exit, unparseable output, zero
+  completed runs) is unchanged and still immediate.
+- **PATCH per this file's own versioning policy**: a bug fix to internal release
+  tooling. No `tw_*` tool surface change, no prompt-registry change, no schema
+  bump, no `bin/` or wire-protocol change; `AGC_VERIFY_CI_WAIT_SECONDS` is read
+  only by `scripts/verify-release.mjs`, never by the server at runtime (contrast
+  `AGC_AUTO_ROUTE` / `AGC_DEFAULT_SKILL`). Direct precedent: E78 made a larger
+  semantic change to this same check and shipped as v3.102.3, a patch.
+- Full `npm test` green at 1745/1745 before the cut (QA, ~58.3s; independently
+  re-run by the coordinator). Evidence: `qa_reports/review_T-E80-01.md`,
+  `qa_reports/review_T-E80-02.md`, `review_reports/review_T-E80-01.md`.
+
 ## [3.102.4] - 2026-08-19
 
 ### Fixed
