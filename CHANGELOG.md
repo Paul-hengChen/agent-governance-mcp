@@ -16,6 +16,63 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.102.4] - 2026-08-19
+
+### Fixed
+
+- **E75 - four asymmetric `rationale:` fences rendered glued text into three role
+  SOPs** (`content/skill-pm.md`, `content/skill-architect.md`,
+  `content/skill-qa-engineer.md`): `stripRationale`'s trailing-newline match
+  (`prompts/text-transforms.ts:28`) consumes the newline after a
+  `<!-- rationale:end -->` marker. When the matching `<!-- rationale:start -->`
+  opened mid-line, the strip therefore removed a newline the span never owned,
+  glueing the following line onto the preceding one in the *rendered* dispatch
+  text pm, architect, and qa-engineer receive. Four such asymmetric spans
+  existed (`skill-pm.md:25` and `:26`, `skill-architect.md:30`,
+  `skill-qa-engineer.md:36`); each `rationale:start` marker is now on its own
+  line, making every span symmetric. **Newline/whitespace only** - prose is
+  byte-identical, verified three independent ways (sr-engineer's `--word-diff`,
+  code-reviewer's positional whitespace signature, and a whitespace-stripped
+  digest comparison). No tool surface, schema, gate, or transition edge changes;
+  `prompts/text-transforms.ts` itself is untouched. Same change class as E69,
+  which shipped as a patch in v3.102.2.
+
+### Changed
+
+- **E75 - the E69 asymmetric-span ratchet is paid off**
+  (`test/render-structure.test.mjs`, qa-owned per Constitution §2):
+  `KNOWN_ASYMMETRIC_SPAN_COUNTS` decremented to `{}` and
+  `EXPECTED_RENDER_GLUE_COUNTS` decremented to zero for pm, architect, and
+  qa-engineer, since the debt those maps pinned no longer exists. The
+  "KNOWN, TRACKED debt" comment block is rewritten to read as closed rather
+  than left stale, and the two cross-SOP render sweeps (`tw_switch_role` and
+  `buildPromptForRole`) are converted from assert-in-loop to collect-then-assert
+  so a failure reports every offending role at once instead of only the first.
+  Expected-red manifest: `qa_reports/expected-red_e75-rationale-fence-relocation.txt`
+  (3 entries, all confirmed red before the re-baseline, no fourth red).
+
+- **Backlog bookkeeping, not part of the E75 cut** (`docs/backlog.md`): the
+  ticket-table `status` cells for **E58** and **E59** had read `-` since both
+  shipped in v3.99.0, while the order table and the CHANGELOG both recorded them
+  DONE. Both cells now record DONE with the shipped version - the same
+  in-file accuracy class as E70/E74.
+
+### Notes
+
+- Bump kind: **PATCH**. What changes is the rendered whitespace of the dispatch
+  text three roles receive; no prose byte, tool surface, schema, gate, or
+  transition edge moves. This matches both the project's own versioning policy
+  ("bug fixes ... with no observable behavior change") and the direct precedent
+  of E69, an identical fence-relocation cut that shipped as v3.102.2.
+- Review chain: mini-chain (sr-engineer -> code-reviewer -> qa-engineer);
+  PM/architect skipped, the backlog row (`docs/backlog.md` order row `8i`) is the
+  spec, matching E69/E71/E76/E78. Code review APPROVED round 1, zero findings
+  (`review_reports/review_T-E75-01.md`); QA PASS round 1
+  (`qa_reports/review_T-E75-02.md`, covers T-E75-01 and T-E75-02).
+- First live execution of E76's step 7a single-invocation fix and of E78's
+  sha-matched CI check in `scripts/verify-release.mjs`; both shipped in v3.102.3
+  and had not been exercised by a release until this one.
+
 ## [3.102.3] - 2026-08-18
 
 ### Fixed

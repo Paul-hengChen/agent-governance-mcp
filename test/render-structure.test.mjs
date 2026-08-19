@@ -57,13 +57,16 @@
 // engineer.md, and — newly discovered by this test, never audited before because
 // nothing rendered any OTHER role SOP through the strip pass — 3 more live sites
 // in content/skill-pm.md (x2) and content/skill-qa-engineer.md (x1) and
-// content/skill-architect.md (x1). Those 4 are OUT OF SCOPE for this ticket
-// (T-E69-01/T-E71-01 touch only content/skill-release-engineer.md) — see the
-// "KNOWN, TRACKED debt" block below and qa_reports/review_T-E69-02.md for the
-// escalation. Recorded here as an exact ratchet (not silently excluded): any
-// NEW instance beyond this list, in any file, reds the suite immediately; a fix
-// to any of the 4 listed sites also reds the suite, forcing this list to be
-// updated rather than silently going stale.
+// content/skill-architect.md (x1). Those 4 were OUT OF SCOPE for this ticket
+// (T-E69-01/T-E71-01 touched only content/skill-release-engineer.md) — see the
+// "KNOWN, TRACKED debt" escalation in qa_reports/review_T-E69-02.md. They were
+// tracked as an exact ratchet (not silently excluded) until E75 (T-E75-01)
+// relocated all 4 fences — newline/whitespace only, prose byte-identical,
+// verified by both code-reviewer and qa-engineer (review_reports/review_T-E75-01.md,
+// qa_reports/review_T-E75-02.md) — paying the debt to zero. The ratchet below
+// (KNOWN_ASYMMETRIC_SPAN_COUNTS) is now the empty allowlist `{}`: any asymmetric
+// span found anywhere in content/, now or in the future, reds the suite
+// immediately — a strictly stronger guard than the 4-site exemption it replaces.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -239,23 +242,24 @@ test("T-E69-02 AC: content/skill-release-engineer.md renders glue-free via build
 // `teamwork-lite`) plus the 15 const-*.md constitution fragments, in one pass,
 // independent of any render-path wiring.
 //
-// KNOWN, TRACKED debt (escalated to pm in qa_reports/review_T-E69-02.md —
-// NOT this ticket's scope, which touches only content/skill-release-engineer.md):
-// content/skill-pm.md carries 2 live asymmetric spans and content/skill-
-// qa-engineer.md and content/skill-architect.md carry 1 each — same defect
-// class as E69, never audited before this test existed. Recorded here as an
-// EXACT allowlist, not a blanket exclusion: the count is asserted per file, so
-// a NEW asymmetric span anywhere (including growth in these 3 files) reds the
-// suite, and fixing any of the 4 listed spans ALSO reds the suite (the count
-// drops below the pinned expectation) until this list is updated — a silent
-// fix can't quietly widen the exemption either.
+// CLOSED DEBT (was escalated to pm in qa_reports/review_T-E69-02.md — OUT OF
+// SCOPE for the original E69 ticket, which touched only content/skill-release-
+// engineer.md): content/skill-pm.md carried 2 live asymmetric spans and
+// content/skill-qa-engineer.md and content/skill-architect.md carried 1 each —
+// same defect class as E69, discovered by this test but tracked rather than
+// fixed at the time. E75 (T-E75-01) relocated all 4 fences (newline/whitespace
+// only, prose byte-identical — independently verified by code-reviewer and
+// qa-engineer, review_reports/review_T-E75-01.md and
+// qa_reports/review_T-E75-02.md), paying the debt to zero. The allowlist below
+// is now empty (`{}`) rather than removed: it stays a live, zero-tolerance
+// assertion — any asymmetric span appearing anywhere in content/ going
+// forward, in these files or any other, reds the suite immediately. This is a
+// STRONGER guard than the 4-site exemption it replaces, not a weaker one: the
+// prior version tolerated exactly these 4 sites and would only catch a 5th; the
+// empty map tolerates none.
 // ---------------------------------------------------------------------------
 
-const KNOWN_ASYMMETRIC_SPAN_COUNTS = {
-  "skill-pm.md": 2,
-  "skill-qa-engineer.md": 1,
-  "skill-architect.md": 1,
-};
+const KNOWN_ASYMMETRIC_SPAN_COUNTS = {};
 
 test("structural sweep: every content/{skill-,const-,coord-}*.md fragment has zero UNTRACKED asymmetric rationale spans", () => {
   const contentDir = path.join(ROOT, "content");
@@ -301,39 +305,51 @@ const ROLE_TO_SKILLFILE = {
 // text, keyed by role name — must track KNOWN_ASYMMETRIC_SPAN_COUNTS above
 // 1:1 (same root cause, same files), plus 0 for every clean role.
 const EXPECTED_RENDER_GLUE_COUNTS = {
-  "pm": 2,
+  "pm": 0,
   "researcher": 0,
   "design-auditor": 0,
   "sr-engineer": 0,
   "code-reviewer": 0,
-  "qa-engineer": 1,
-  "architect": 1,
+  "qa-engineer": 0,
+  "architect": 0,
   "doc-writer": 0,
   "release-engineer": 0,
 };
 
 test("cross-SOP render sweep (tw_switch_role): glue-finding counts match the tracked debt list exactly, for every role", () => {
+  // Collect-then-assert (E75/T-E75-02): iterate every role fully BEFORE any
+  // assertion, then compare the whole map in one assert.deepEqual. A
+  // per-iteration assert.equal would fail-fast on the first mismatching role
+  // (alphabetically/insertion-order first is "pm") and never exercise the
+  // rest of the roles in that run — exactly what happened while this ratchet
+  // was red for E75 (code-reviewer verified architect/qa-engineer separately
+  // by hand because the loop never reached them). Collecting first means a
+  // single run always reports every role's actual count, not just the first
+  // one to differ.
+  const actual = {};
   for (const role of Object.keys(ROLE_TO_SKILLFILE)) {
     const resp = JSON.parse(switchRole(role, ROOT));
-    const findings = findLineGlueFindings(resp.sop);
-    assert.equal(
-      findings.length,
-      EXPECTED_RENDER_GLUE_COUNTS[role],
-      `switchRole("${role}") glue-finding count must match the tracked expectation (found: ${JSON.stringify(findings.map((f) => f.marker))})`,
-    );
+    actual[role] = findLineGlueFindings(resp.sop).length;
   }
+  assert.deepEqual(
+    actual,
+    EXPECTED_RENDER_GLUE_COUNTS,
+    "glue-finding counts (per role, tw_switch_role) must match the tracked expectation for EVERY role, not just the first mismatch",
+  );
 });
 
 test("cross-SOP render sweep (buildPromptForRole): glue-finding counts match the tracked debt list exactly, for every role", () => {
+  // Collect-then-assert — see the tw_switch_role sweep above for why.
+  const actual = {};
   for (const [role, skillFile] of Object.entries(ROLE_TO_SKILLFILE)) {
     const text = buildPromptForRole(skillFile, "probe", ROOT, false).messages[0].content.text;
-    const findings = findLineGlueFindings(text);
-    assert.equal(
-      findings.length,
-      EXPECTED_RENDER_GLUE_COUNTS[role],
-      `buildPromptForRole("${skillFile}") glue-finding count must match the tracked expectation (found: ${JSON.stringify(findings.map((f) => f.marker))})`,
-    );
+    actual[role] = findLineGlueFindings(text).length;
   }
+  assert.deepEqual(
+    actual,
+    EXPECTED_RENDER_GLUE_COUNTS,
+    "glue-finding counts (per role, buildPromptForRole) must match the tracked expectation for EVERY role, not just the first mismatch",
+  );
 });
 
 test("cross-SOP render sweep: teamwork (skill-coordinator.md, coord-*.md fragments) and teamwork-lite (skill-coordinator-lite.md) are glue-free", () => {
