@@ -28,3 +28,6 @@
 {"ts":"2026-08-12T08:29:32.322Z","gate":"validateTransition","error_code":"TRANSITION_REJECTED","agent_id":"qa-engineer","feature":"e39-e58-transition-matrix-sync"}
 {"ts":"2026-08-13T12:41:00.827Z","gate":"orchestrator","error_code":"EXPECTED_RED_DIFF_MISSING","agent_id":"qa-engineer","feature":"e64-e65-e55-release-sop-staging"}
 {"ts":"2026-08-17T06:52:56.704Z","gate":"orchestrator","error_code":"EXPECTED_RED_DIFF_MISSING","agent_id":"qa-engineer","feature":"e48-docs-skills-delete"}
+{"ts":"2026-08-17T11:55:20.166Z","gate":"validateTransition","error_code":"TRANSITION_REJECTED","agent_id":"qa-engineer","feature":"e69-e71-sop-render-fences"}
+{"ts":"2026-08-18T05:13:03.978Z","gate":"validateTransition","error_code":"TRANSITION_REJECTED","agent_id":"qa-engineer","feature":"e76-e78-release-integrity"}
+{"ts":"2026-08-18T11:28:50.925Z","gate":"orchestrator","error_code":"EXPECTED_RED_DIFF_MISSING","agent_id":"qa-engineer","feature":"e75-rationale-fence-relocation"}

@@ -25,3 +25,6 @@
 {"ts":"2026-08-14T02:23:49.310Z","feature":"e64-e65-e55-release-sop-staging","tickets":0,"qa_rounds":0,"review_rounds":1,"visual_rounds":0,"hops":7,"one_pass":false,"released_version":"3.101.0"}
 {"ts":"2026-08-17T04:35:58.261Z","feature":"e66-e67-release-sop-docs-staging","tickets":2,"qa_rounds":0,"review_rounds":2,"visual_rounds":0,"hops":8,"one_pass":false,"released_version":"3.102.0"}
 {"ts":"2026-08-17T07:08:56.034Z","feature":"e48-docs-skills-delete","tickets":3,"qa_rounds":0,"review_rounds":1,"visual_rounds":0,"hops":6,"one_pass":false,"released_version":"3.102.1"}
+{"ts":"2026-08-18T02:48:32.348Z","feature":"e69-e71-sop-render-fences","tickets":2,"qa_rounds":0,"review_rounds":1,"visual_rounds":0,"hops":6,"one_pass":false,"released_version":"3.102.2"}
+{"ts":"2026-08-18T05:53:47.861Z","feature":"e76-e78-release-integrity","tickets":2,"qa_rounds":0,"review_rounds":1,"visual_rounds":0,"hops":7,"one_pass":false,"released_version":"3.102.3"}
+{"ts":"2026-08-19T03:12:27.058Z","feature":"e75-rationale-fence-relocation","tickets":2,"qa_rounds":0,"review_rounds":0,"visual_rounds":0,"hops":5,"one_pass":true,"released_version":"3.102.4"}
