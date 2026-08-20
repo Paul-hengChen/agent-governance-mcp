@@ -11,15 +11,30 @@
 import * as fs from "fs";
 import * as path from "path";
 
+// ROUND SEMANTICS — read before interpreting any *_rounds value (E52). The
+// three round fields count REWORK ONLY: a QA FAIL, a code-reviewer
+// CHANGES_REQUESTED, a visual-round FAIL. That is the definition
+// specs/e8-success-telemetry.md AC3 specifies, and the counters this module
+// reads (transitions.ts computeNewRound) implement it exactly — a round that
+// ends APPROVED or PASS increments nothing. So a feature reviewed once and
+// approved on the first pass records `review_rounds: 0`, the same value as a
+// feature that was never reviewed at all: BY DESIGN, not an off-by-one. Read
+// these as "how much rework did it take", never as "how many rounds ran".
+// Two reasons the terminal round must NOT be folded in here: `one_pass` is
+// defined as all three being 0, so counting it would make one_pass
+// permanently false and destroy this record's headline metric; and this emit
+// site never sees a verdict (emitFeatureMetrics receives only the three
+// totals), so it cannot tell an APPROVED close from any other. A rounds-RUN
+// signal, if ever wanted, is NEW fields alongside these — backlog E85.
 export interface FeatureMetricRecord {
   ts: string; // ISO-8601 emit time == the release-close moment (DR-4)
   feature: string;
   tickets: number;
-  qa_rounds: number; // from prevState.qa_rounds_total
-  review_rounds: number; // from prevState.review_rounds_total
-  visual_rounds: number; // from prevState.visual_rounds_total
+  qa_rounds: number; // rework only — cumulative QA FAILs (prevState.qa_rounds_total)
+  review_rounds: number; // rework only — cumulative CHANGES_REQUESTED (prevState.review_rounds_total)
+  visual_rounds: number; // rework only — cumulative visual FAILs (prevState.visual_rounds_total)
   hops: number; // from prevState.hop_count (AC5 — no new field)
-  one_pass: boolean; // qa_rounds===0 && review_rounds===0 && visual_rounds===0 (AC3)
+  one_pass: boolean; // zero rework in all three families (AC3) — NOT "exactly one round ran"
   released_version: string | null; // package.json version at emit time, null if unreadable (AC7)
 }
 
@@ -111,6 +126,8 @@ export function emitFeatureMetrics(args: {
       review_rounds: args.reviewRoundsTotal,
       visual_rounds: args.visualRoundsTotal,
       hops: args.hops,
+      // Zero rework of any kind (AC3) — see ROUND SEMANTICS above for why a
+      // first-pass-APPROVED round is not counted into these totals.
       one_pass:
         args.qaRoundsTotal === 0 && args.reviewRoundsTotal === 0 && args.visualRoundsTotal === 0,
       released_version,

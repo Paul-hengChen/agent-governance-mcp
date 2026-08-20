@@ -90,7 +90,15 @@ node scripts/summarize-metrics.mjs   # default: .current/metrics.jsonl
 ```
 
 which prints a per-feature table plus the aggregate one-pass rate and mean
-rounds/hops. `tw_gate_stats` returns the same aggregate in its `metrics`
+rounds/hops.
+
+The round columns are **rework counts, not rounds-run** (`specs/e8-success-telemetry.md`
+AC3): only a QA FAIL, a code-reviewer `CHANGES_REQUESTED`, or a visual FAIL
+increments them. A feature reviewed once and approved on the first pass reads
+`review_rounds: 0` — the same as a feature never reviewed at all — and that is
+correct, not an off-by-one. Do NOT "correct" such a record: reading these
+columns as review effort is what E52 was mis-filed on, five times in a row.
+`one_pass: true` means zero rework in all three families. `tw_gate_stats` returns the same aggregate in its `metrics`
 block, deduped on the E12 `(feature, released_version)` idempotency key
 (pre-E12 double-appends, e.g. the e8 pair, are healed at read time).
 

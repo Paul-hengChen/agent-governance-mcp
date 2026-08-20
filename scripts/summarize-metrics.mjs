@@ -68,6 +68,15 @@ console.table(
   })),
 );
 
+// Legend (E52): the round columns are REWORK counts, not rounds-run — only a
+// QA FAIL / CHANGES_REQUESTED / visual FAIL increments them, per
+// specs/e8-success-telemetry.md AC3. Printed with the table because five
+// consecutive readers misread these columns as review effort.
+console.log(
+  "legend — qa/review/visual_rounds count REWORK only (FAIL / CHANGES_REQUESTED); " +
+    "a first-pass-approved round reads 0 by design. one_pass = zero rework.",
+);
+
 const total = records.length;
 const onePassCount = records.filter((r) => r.one_pass === true).length;
 const mean = (field) => (records.reduce((sum, r) => sum + num(r[field]), 0) / total).toFixed(2);
