@@ -16,6 +16,50 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.103.1] - 2026-08-20
+
+### Changed
+
+- **E52 - rework-vs-rounds-run semantics recorded in prose** (`tools/metrics.ts`,
+  `docs/gate-retro-procedure.md`, `scripts/summarize-metrics.mjs`). The three
+  `*_rounds` fields in `.current/metrics.jsonl` count **rework only** — a QA
+  FAIL, a code-reviewer `CHANGES_REQUESTED`, a visual-round FAIL — exactly as
+  `specs/e8-success-telemetry.md` AC3 defines them. A feature reviewed once and
+  approved on the first pass therefore records `review_rounds: 0`, the same
+  value as a feature never reviewed at all, and that is by design rather than an
+  off-by-one. `tools/metrics.ts` gains a `ROUND SEMANTICS` block above
+  `FeatureMetricRecord`, per-field notes, and a note at the `one_pass`
+  computation; `docs/gate-retro-procedure.md` states the rework reading
+  explicitly and instructs readers NOT to "correct" such a record;
+  `scripts/summarize-metrics.mjs` prints a legend line alongside the table
+  (`console.table` keys untouched, so `test/success-metrics.test.mjs` E8-S1..S4
+  stay green). **Zero logic change** — comment and prose only, no test
+  authoring, and no `.current/metrics.jsonl` backfill: the existing records are
+  correct under the rework definition, so backfilling would manufacture false
+  data.
+
+### Notes
+
+- **E52's premise was falsified before any code was written**, and the row is
+  resolved that way in `docs/backlog.md`: options (i) and (ii) are recorded
+  DO-NOT-BUILD. `one_pass` is defined as all three round totals being `0`, so
+  folding the terminal round into the counters would make `one_pass`
+  permanently false and destroy the headline metric E8 exists to produce; (ii)
+  is additionally unimplementable as filed, because the emit site receives only
+  the three totals and sees no verdict. The real defect was naming — five
+  consecutive readers misread `review_rounds` as review effort.
+- **Two follow-ups filed** in `docs/backlog.md`: **E85** (P3) for the genuine
+  residue — nothing records rounds-*run*, so "reviewed once, approved" and
+  "never reviewed" emit the same `0` — and **E86** (P3) for handoff free-text
+  field contamination observed this session.
+- QA round 1 FAILed this cut over three wrong/stale code citations in the E52
+  row itself; the fix symbol-anchored every live reference instead of re-citing
+  fresh line numbers, which would have re-armed the E39/E62 stale-citation class
+  inside the one row whose subject is misleading prose. QA round 2 PASS —
+  evidence `qa_reports/archive/e52-metrics-rework-semantics/review_T-E52-01.md`.
+- Dependency audit: `npm audit --audit-level=high` reports 5 findings, all
+  low/moderate severity, zero HIGH/CRITICAL.
+
 ## [3.103.0] - 2026-08-19
 
 ### Added
