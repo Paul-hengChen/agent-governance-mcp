@@ -31,3 +31,5 @@
 {"ts":"2026-08-19T05:23:54.447Z","feature":"e80-ci-groundtruth-wait","tickets":2,"qa_rounds":0,"review_rounds":0,"visual_rounds":0,"hops":5,"one_pass":true,"released_version":"3.102.5"}
 {"ts":"2026-08-19T05:55:57.214Z","feature":"e72-claim-vs-state-diff","tickets":2,"qa_rounds":0,"review_rounds":0,"visual_rounds":0,"hops":3,"one_pass":true,"released_version":"3.103.0"}
 {"ts":"2026-08-20T10:43:31.980Z","feature":"e52-metrics-rework-semantics","tickets":1,"qa_rounds":1,"review_rounds":0,"visual_rounds":0,"hops":5,"one_pass":false,"released_version":"3.103.1"}
+{"ts":"2026-08-21T02:15:17.046Z","feature":"e43-test-file-ask-at-dispatch","tickets":2,"qa_rounds":0,"review_rounds":1,"visual_rounds":0,"hops":7,"one_pass":false,"released_version":"3.104.0"}
+{"ts":"2026-08-21T07:02:54.291Z","feature":"e90-golden-capture-completeness","tickets":2,"qa_rounds":0,"review_rounds":0,"visual_rounds":0,"hops":4,"one_pass":true,"released_version":"3.104.1"}

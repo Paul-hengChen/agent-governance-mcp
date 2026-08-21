@@ -31,3 +31,4 @@
 {"ts":"2026-08-17T11:55:20.166Z","gate":"validateTransition","error_code":"TRANSITION_REJECTED","agent_id":"qa-engineer","feature":"e69-e71-sop-render-fences"}
 {"ts":"2026-08-18T05:13:03.978Z","gate":"validateTransition","error_code":"TRANSITION_REJECTED","agent_id":"qa-engineer","feature":"e76-e78-release-integrity"}
 {"ts":"2026-08-18T11:28:50.925Z","gate":"orchestrator","error_code":"EXPECTED_RED_DIFF_MISSING","agent_id":"qa-engineer","feature":"e75-rationale-fence-relocation"}
+{"ts":"2026-08-20T11:17:47.142Z","gate":"validateTransition","error_code":"TRANSITION_REJECTED","agent_id":"qa-engineer","feature":"e43-test-file-ask-at-dispatch"}
