@@ -16,6 +16,68 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.104.1] - 2026-08-21
+
+### Changed
+
+- **`scripts/capture-constitution-golden.mjs` is now the standing regeneration tool for all 12
+  `test/fixtures/compose-golden/` fixtures, and fails loud instead of reporting a false success**
+  (backlog E90, order 13e). It previously captured 10 of the 12. The two it could not produce were
+  the ones a `content/` composition ticket is most likely to invalidate: `constitution-monolith.txt`
+  was read from `content/constitution.md`, deleted at A9/AC8, so the script printed
+  `note: content/constitution.md absent (post-AC8 delete)` and exited 0 while
+  `test/compose-equivalence.test.mjs`'s `cat(manifest fragments) === monolith` assertion stayed red;
+  `skill-coordinator-monolith.txt` was never in scope at all, though
+  `test/skill-manifest.test.mjs`'s `t-golden-byte-identity` pins it. Both had to be rebuilt by hand
+  during E43 from one-off code that re-derived the operation out of the assertions themselves. Four
+  changes, one file (+107/-33): (a) the constitution monolith now derives from
+  `CONSTITUTION_SEGMENTS` mapped over `content/` and joined — the same expression
+  `test/compose-equivalence.test.mjs` performs, importing the manifest from the same
+  `dist/prompts/constitution-manifest.js`; (b) a 12th capture,
+  `composeSkill("skill-coordinator.md", hostCapabilitiesFor("claude-code"), readContent)`, matching
+  `test/skill-manifest.test.mjs` call-for-call; (c) every capture routes through a `writeFixture()`
+  that throws on an empty or non-string derivation, and a closing `onDisk - captured` guard exits 1
+  on any fixture the run did not produce — the silent-success half is gone; (d) the header comment
+  block, which documented 11 captures and a one-shot pre-refactor framing that was no longer true,
+  now matches the script. Both derivations deliberately read `content/` with no `.current/` override
+  probe: a committed golden is the oracle for a `content/`-derived composition, so a probe would
+  encode the capturing checkout's local state into the fixture and fail the very assertion it
+  exists to serve. Rationale is recorded at the code.
+
+### Added
+
+- **`test/e90-golden-capture-completeness.test.mjs`** — a 3-test class guard (qa-authored) that ties
+  the script's capture set to both consuming suites and to the fixture directory on every `npm test`
+  run, so a 13th fixture cannot become silently un-regenerable. It compares three independently
+  derived sets: what the script captures (extracted from its literal `writeFixture(...)` calls),
+  what `test/compose-equivalence.test.mjs` and `test/skill-manifest.test.mjs` actually assert
+  against, and what is on disk in `test/fixtures/compose-golden/`. Static source-text extraction,
+  not script execution — executing the real tool from inside the suite would make every test run
+  rewrite the committed oracle. This closes the one residual the code review left open: the
+  script's internal `onDisk - captured` guard cannot see a fixture that is absent from BOTH sets,
+  so a suite assertion depending on a fixture nobody ever captured exited 0. The guard was verified
+  by execution to red against the real pre-E90 script (`git show HEAD:` blob):
+  `capturedSet.size` 10 vs 12, the exact defect count E90 was filed over.
+
+### Notes
+
+- Chain: sr-engineer (`fable`) -> code-reviewer (`opus`) APPROVED round 1 -> qa-engineer (`sonnet`)
+  PASS round 1. No FAIL bounce in either loop. Evidence: `review_reports/review_T-E90-01.md`,
+  `qa_reports/review_T-E90-02.md` (covers T-E90-01, T-E90-02).
+- Suite **1759/1759** (1756 + the 3 new tests), build clean, and
+  `git diff --exit-code test/fixtures/compose-golden/` clean after a full regeneration run --
+  independently re-verified by the coordinator, not only self-reported by the chain.
+- Acceptance was checked by execution rather than inspection: all 12 fixtures regenerated
+  byte-identically from a clean tree; both previously-uncapturable fixtures deleted, then
+  overwritten with junk, and restored byte-identically each time (proving the script overwrites
+  rather than skip-if-exists); and a forced-empty derivation confirmed to throw and exit 1.
+- Two non-blocking cosmetic nits from round 1 (`const written = []` declared after the closure that
+  references it; the success banner printing ahead of the completeness guard's stderr) were reviewed
+  and deliberately left open -- sr-owned file, demonstrated safe, zero behavior change.
+- Semver: PATCH. The MCP tool surface, prompt schema, and handoff/state file format are untouched;
+  the cut is one `scripts/` developer tool plus one new test file, with zero `content/`, schema, or
+  gate change.
+
 ## [3.104.0] - 2026-08-21
 
 ### Changed

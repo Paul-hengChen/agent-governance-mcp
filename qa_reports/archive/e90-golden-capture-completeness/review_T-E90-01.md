@@ -1,0 +1,8 @@
+# QA review — T-E90-01
+
+<!-- Auto-appended by tw_update_state(qa_review=...). -->
+
+## 2026-08-21T06:48:28.851Z — PASS — by qa-engineer
+
+PASS. Re-derived both prior roles' claims by execution, not replay: build clean; regenerated all 12 fixtures fresh, git diff --exit-code clean; deleted then perturbed both previously-uncapturable fixtures (constitution-monolith.txt, skill-coordinator-monolith.txt), re-ran, confirmed byte-identical restoration both times; forced an empty derivation and confirmed uncaught throw + exit 1 (fail-loud, not a benign note). Reproduced the residual code-reviewer flagged (fixture absent from disk + no capture -> internal guard exits 0) independently, then closed it with a new suite-side class guard, test/e90-golden-capture-completeness.test.mjs (3 tests, static source-text extraction, no script execution/side effects): ties the script's own capture set, the two consuming suites' (compose-equivalence.test.mjs, skill-manifest.test.mjs) asserted set, and the on-disk fixture directory together on every npm test run. Verified by execution that this guard reds against a reconstruction of the real pre-E90 script (git show HEAD, prior to this ticket's uncommitted edit): capturedSet.size=10 vs 12 expected, matching the exact defect count E90 was filed over. Two non-blocking nits from round 1 (TDZ-safe declaration order, banner-before-guard print order) reviewed and deliberately left open -- cosmetic, sr-owned, zero behavior risk, not worth another round. Full suite 1759/1759 pass (1756 + 3 new), build clean, fixture diff clean after full run. Evidence: qa_reports/review_T-E90-02.md (covers T-E90-01, T-E90-02).
+
