@@ -7,12 +7,13 @@ First action: `tw_get_state(workspace_path=<workspace_path>)` → `tw_detect_dri
 Known drift, ignore (do not reconcile): <ids from this session's `tw_detect_drift` vibe-drift list, or "none — drift clean">.
 Dispatch pins in effect: <current `dispatch_pins` map per `tw_get_state`, or "none">.
 Do NOT set `cut_approved` — you are Task-dispatched; the coordinator attests approval after the human approves in the coordinator's chat.
+Test-file placement: <named target test file(s) for this round, or "create as needed — creation pre-authorized">.
 Watermark your reply per Constitution §1 (Task-spawned: `— @<role> (<tier>)`; `<tier>` = the `dispatch_pins` entry above if it names your role, else your frontmatter default).
 
 Assignment: <per-hop delta — feature, task id(s), scope, upstream `pending_notes` summary>.
 ````
 
-Fill the drift and pins lines from this session's `tw_detect_drift` / `tw_get_state`, quoting the first-class `dispatch_pins` field directly (the `pending_notes` pin convention is retired, C14). The known-drift line is ALWAYS present — render the literal `"none — drift clean"` on a clean check rather than omitting the line; its presence is what makes a forgotten drift check visible in the transcript. The `cut_approved` line is included ONLY when the dispatch target's `next_role` is `pm`; omit it for every other role.
+Fill the drift and pins lines from this session's `tw_detect_drift` / `tw_get_state`, quoting the first-class `dispatch_pins` field directly (the `pending_notes` pin convention is retired, C14). The known-drift line is ALWAYS present — render the literal `"none — drift clean"` on a clean check rather than omitting the line; its presence is what makes a forgotten drift check visible in the transcript. The `cut_approved` line is included ONLY when the dispatch target's `next_role` is `pm`; omit it for every other role. The `Test-file placement` line is likewise target-conditional — included ONLY when the dispatch target is `qa-engineer`, and there it is REQUIRED<!-- origin:start --> (v3.104.0, E43)<!-- origin:end -->: resolving placement is the dispatcher's obligation, because a Task-dispatched qa-engineer has neither an ask channel nor a resumption path for Constitution §2's *Conditional test writing* ask. Name the file(s) when you know them; otherwise pre-authorize creation explicitly and leave placement to qa. Omitting the line pushes an unexecutable ask downstream and is not an option.
 
 **Dispatch-time overrides (`dispatch_pins`)** — when dispatching (or re-dispatching) a role with a
 non-default `model` override (e.g. a human directive to pin `sr-engineer` to `fable` for this

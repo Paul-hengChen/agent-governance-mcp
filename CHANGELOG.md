@@ -16,6 +16,52 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.104.0] - 2026-08-21
+
+### Changed
+
+- **Constitution §2 *Conditional test writing* is now executable under Task dispatch** (backlog E43).
+  The rule previously read "qa-engineer MUST ask the user before creating any [test file]", which a
+  Task-dispatched subagent cannot do — it has no channel to ask mid-round and no resumption path if
+  it stops to try. Its only available compliances were to halt the round and lose the context, or to
+  decide and disclose; E38's QA round took the latter and recorded the deviation. The bullet now
+  resolves placement by the channel actually available to the acting role: (a) the dispatch brief
+  names the target test file(s) or pre-authorizes creation → proceed, no ask; (b) no such line but a
+  human is reachable in the acting context → ask, as before; (c) otherwise — Task-dispatched with a
+  silent brief, or any context with no reachable human → decide it yourself, create the file or judge
+  that no new test is warranted, and disclose the decision in both `pending_notes` and `qa_review`.
+  Halting the round to ask is explicitly non-compliant under (c), and neither unaccountable outcome
+  is permitted: "never create, and never skip, silently".
+- **The ask moved upstream to the dispatcher, where a human is reachable** — `content/coord-02-host-dispatch.md`'s
+  Dispatch Brief Template gains a `Test-file placement:` line plus a target-conditional inclusion
+  rule shaped on the existing `cut_approved` rule: included ONLY when the dispatch target is
+  `qa-engineer`, and REQUIRED there. This writes down what the coordinator already did informally
+  (E45/E46 and T-E52-01 all pre-named the target test file in the brief, so the old rule never armed).
+- **`content/skill-qa-engineer.md` Phase 3a** no longer restates the bare "ask the user" — it reads
+  the brief's placement line first and defers to §2 by reference, removing a "Skills MUST NOT restate
+  these rules" violation alongside the E43 defect.
+
+### Notes
+
+- **Content-only: zero code, logic, schema, or gate changes.** No new server enforcement — §2's other
+  bullets are attested rather than enforced, and this one stays that way.
+- Two correctness findings were caught and fixed in code review round 1 before this shipped: branch
+  (c)'s original imperative "create" foreclosed the "no new test needed" outcome the same bullet's
+  first sentence asserts (and that T-E52-01's round actually required), and the three branches did not
+  partition — an unattended inline context matched none of them, reintroducing the E43 defect class one
+  level down. See `review_reports/archive/e43-test-file-ask-at-dispatch/review_T-E43-01.md`.
+- QA re-baselined all 12 `test/fixtures/compose-golden/*.txt` byte-equality fixtures (minimality
+  diff-verified: one changed line in each of the 11 constitution fixtures, +2/-1 in the coordinator
+  monolith) and re-measured 4 `test/context-budget.test.mjs` caps: lean always-on 4667 → 4868,
+  design-arm constitution 9187 → 9374, non-design constitution 7089 → 7276, teamwork coordinator
+  bundle 17498 → 17844. The design-arm-minus-non-design saving holds at 2098 ~tok, the expected
+  invariant for an edit to a core (untagged) fragment.
+- `test/e43-test-file-ask-at-dispatch.test.mjs` adds 11 pins, class assertions preferred over instance
+  pins, two of them guard-the-guard: the branch-partition and two-sided-outcome pins are replayed
+  against a hermetic pre-E43 literal AND against the round-1 draft code review rejected, and each must
+  throw. Full suite 1756/1756.
+- Dependency audit: `npm audit --audit-level=high` exit 0 (5 advisories, none HIGH/CRITICAL).
+
 ## [3.103.1] - 2026-08-20
 
 ### Changed

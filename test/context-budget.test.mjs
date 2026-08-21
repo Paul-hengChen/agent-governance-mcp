@@ -217,7 +217,7 @@ test("DR-5 guard (T-A12-09): no literal {{PARTIAL:...}} token may appear in any 
 
 // --- AC2: reduction -------------------------------------------------------
 
-test("AC2: lean always-on bundle is below the raw baseline and within target (<= 4667 ~tok)", () => {
+test("AC2: lean always-on bundle is below the raw baseline and within target (<= 4868 ~tok)", () => {
   // v3.24.0 (B2 backlog fix): cap raised from 2100 → 2300 to provide ~200-token
   // editing headroom. The v3.22.0 raise (2000 → 2100) left only a 2-token margin
   // (2098/2100), meaning any minor constitution/skill edit broke CI unexpectedly.
@@ -344,7 +344,18 @@ test("AC2: lean always-on bundle is below the raw baseline and within target (<=
   const raw = approxTokens(CONSTITUTION + SEP + liteSkill);
   const lean = approxTokens(LEAN_CONSTITUTION + SEP + liteSkill);
   assert.ok(lean < raw, `lean (${lean}) must be < raw (${raw})`);
-  assert.ok(lean <= 4667, `lean always-on (${lean} ~tok) must meet the <= 4667 target (e59-const6-waiver-clause re-baseline)`);
+  // e43-test-file-ask-at-dispatch (qa-owned bump, T-E43-02): cap raised from 4667 → 4868
+  // (+201) to absorb the three-branch rewrite of const-05's §2 *Conditional test writing*
+  // bullet (230 → 1032 chars). This is the always-on lean bundle, so this is the widest
+  // blast radius any const-05 edit has — the bullet ships in every dispatch mode. Bought
+  // deliberately: the pre-E43 one-sentence form was unexecutable for a Task-dispatched
+  // qa-engineer (docs/backlog.md E43) and had already forced a documented deviation in
+  // E38's QA round, so the growth buys a rule that no longer requires violating it.
+  // Independently re-measured by qa (NOT trusted from sr-engineer's handoff or the
+  // reviewer's report) at 4868 ~tok (exact); cap set to the exact measured value per the
+  // established Phase-2 convention. Rationale-fencing the bullet's causal clause was
+  // considered and REJECTED with the numbers in hand — see qa_reports/review_T-E43-02.md.
+  assert.ok(lean <= 4868, `lean always-on (${lean} ~tok) must meet the <= 4868 target (e43-test-file-ask-at-dispatch re-baseline)`);
 });
 
 // --- AC3: enforcement preserved ------------------------------------------
@@ -878,7 +889,7 @@ test("AC7: exactly two balanced rationale fences, both outside §3.x", () => {
   assert.equal(ends, 2, "exactly two rationale:end markers");
 });
 
-test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the measured floor (≤ 9187 ~tok)", () => {
+test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the measured floor (≤ 9374 ~tok)", () => {
   // WHY: floor REBASELINED by constitution-conditional-load PHASE 2. Phase 2 extends the
   // design-only axis to two more spans (§4 visual prose S3–S5 + P-AUDITOR, and §1 L16/L17/L19),
   // adding 3 MORE design-only fence pairs (now 6 pairs / 12 marker lines total, up from
@@ -1069,14 +1080,20 @@ test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the 
   // 380 ~tok, still ≥ 240.
   const raw = approxTokens(CONSTITUTION);
   const stripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));
-  assert.ok(stripped <= 9187, `stripped constitution (${stripped} ~tok) must be ≤ 9187 (AC8 design-arm floor, e40-nonqa-completed-tasks-write-gate re-baseline)`);
+  // e43-test-file-ask-at-dispatch (qa-owned bump, T-E43-02): floor raised from 9187 → 9374
+  // (+187) for the same const-05 §2 three-branch rewrite. Independently re-measured at
+  // 9374 ~tok (exact). Saving margin re-verified against the non-design floor below:
+  // 9374 − 7276 = 2098 ~tok, UNCHANGED from the pre-E43 pair (9187 − 7089), which is the
+  // expected signature of an edit to a core (untagged) fragment — it lands in both paths
+  // identically, so the design-only savings are provably untouched by this cut.
+  assert.ok(stripped <= 9374, `stripped constitution (${stripped} ~tok) must be ≤ 9374 (AC8 design-arm floor, e43-test-file-ask-at-dispatch re-baseline)`);
   assert.ok(
     raw - stripped >= 240,
     `constitution rationale+origin-tag saving (${raw - stripped} ~tok) must be ≥ 240 (AC8 measured min, c14-dispatch-pins re-baseline)`,
   );
 });
 
-test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 17498 ~tok)", () => {
+test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 17844 ~tok)", () => {
   // WHY: the constitution is injected on every dispatch; the full coordinator bundle is
   // the worst case. Compose the chain-role bundle the way buildPromptForRole does:
   // rationale-stripped constitution + SEP + rationale-stripped skill body. Floor
@@ -1333,7 +1350,14 @@ test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/b
     : skillCoord;
   const SEP = "\n\n---\n\n";
   const bundle = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)) + SEP + stripRationale(stripOriginTags(body)));
-  assert.ok(bundle <= 17498, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 17498 (AC8 design-arm floor, e72-claim-vs-state-diff re-baseline)`);
+  // e43-test-file-ask-at-dispatch (qa-owned bump, T-E43-02): floor raised from 17498 →
+  // 17844 (+346) — the ONLY one of the four E43 bumps that is not purely the const-05
+  // delta: +187 from the constitution fragment plus ~159 from coord-02-host-dispatch.md's
+  // new `Test-file placement` template line and its target-conditional inclusion rule.
+  // The coordinator bundle is the only measured bundle carrying coord-02 (it is
+  // host-tagged `host:claude-code`), which is why the other three bumps are +187/+201 and
+  // this one is larger. Independently re-measured at 17844 ~tok (exact).
+  assert.ok(bundle <= 17844, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 17844 (AC8 design-arm floor, e43-test-file-ask-at-dispatch re-baseline)`);
 });
 
 test("AC9: every operative rule/gate/heading survives stripRationale on the constitution", () => {
@@ -1684,7 +1708,7 @@ test("AC7: lite + non-design strips §3.2 once (no reintroduction), consistent w
 
 // --- AC8: rebaseline + pin the new non-design figure ----------------------
 
-test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 7089 ~tok)", () => {
+test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 7276 ~tok)", () => {
   // WHY: this is the BUDGET WIN that justified the feature, and it must be regression-guarded.
   // On a non-design chain dispatch buildPromptForRole emits stripDesignOnly(stripRationale(source)).
   // REBASELINED by constitution-conditional-load PHASE 2: Phase 2 strips two MORE spans on the
@@ -1868,9 +1892,13 @@ test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is
   // measured value per the established Phase-2 convention (no additional headroom).
   // Saving margin re-verified: design-arm 9187 − non-design 7089 = 2098 ~tok, unchanged,
   // still ≥ 2080 (the row sits outside the design-only fences).
-  const ratStripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));         // design-arm path: 9187
-  const nonDesign = approxTokens(stripRationale(stripOriginTags(composeConstitution({ chain: true, design: false })))); // non-design path: 7089
-  assert.ok(nonDesign <= 7089, `non-design constitution (${nonDesign} ~tok) must be ≤ 7089 (AC8 non-design floor, e40-nonqa-completed-tasks-write-gate re-baseline)`);
+  const ratStripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));         // design-arm path: 9374 (e43 re-baseline)
+  const nonDesign = approxTokens(stripRationale(stripOriginTags(composeConstitution({ chain: true, design: false })))); // non-design path: 7276 (e43 re-baseline)
+  // e43-test-file-ask-at-dispatch (qa-owned bump, T-E43-02): floor raised from 7089 →
+  // 7276 (+187), identical to the design-arm delta above because const-05 is a core
+  // (untagged) fragment present in both paths. Independently re-measured at 7276 ~tok
+  // (exact); the 2098 ~tok design-only saving is unchanged (see the note above).
+  assert.ok(nonDesign <= 7276, `non-design constitution (${nonDesign} ~tok) must be ≤ 7276 (AC8 non-design floor, e43-test-file-ask-at-dispatch re-baseline)`);
   assert.ok(
     ratStripped - nonDesign >= 2080,
     `design-only strip saving (${ratStripped - nonDesign} ~tok) must be ≥ 2080 (a12-followup-qa-round-name re-baseline)`,

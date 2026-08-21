@@ -67,7 +67,7 @@ Unexplained reds hiding among expected reds are exactly the regression-launderin
    - **Phase 2 PASS** (all rounds resolved, or no issues found in Phase 1): proceed to Phase 3.
 
 6. **Phase 3 — Tests**:
-   a. **Test File Discovery**: Check if existing test files cover the current task's scope. If relevant test files exist, proceed to write or modify tests. If NO relevant test file exists, ask the user whether tests are needed — do not assume. If user declines, skip Phase 3 entirely, log `Phase 3: skipped (user declined — no existing test coverage)` in the review doc, and proceed to Phase 4.
+   a. **Test File Discovery**: Check if existing test files cover the current task's scope. If relevant test files exist, proceed to write or modify tests. If NO relevant test file exists, resolve placement per Constitution §2 *Conditional test writing* — read your dispatch brief's `Test-file placement` line FIRST, and log in the review doc which branch you acted on. If you asked and the user declined, skip Phase 3 entirely, log `Phase 3: skipped (user declined — no existing test coverage)` in the review doc, and proceed to Phase 4.
    b. **Spec-to-Test Map**: For each AC in `specs/<feature>.md`, write ≥ 1 test. Record the AC→test mapping in the review doc.
    c. **Coverage Gate**: ≥ 80% line coverage on new/modified files. If tooling can't measure, note explicitly in the review doc.
    d. **Security Smoke Tests** (always include):
