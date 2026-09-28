@@ -1,5 +1,7 @@
 # Pending tickets — lane e250
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E250-NEW-1
 title: shared git-root helpers echo cwd / worktree paths raw in their refusal and error messages (reached by agc eject and agc feature)
@@ -36,5 +38,3 @@ body: |
   paste-me command lines handled the way E250 handles `git rm -r` (omit and print a note when a
   listed path holds a control character).
 ```
-
-## Applied
