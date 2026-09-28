@@ -66,3 +66,38 @@ CHANGES_REQUESTED: the implementation meets AC1-AC17, but the `design-file-key` 
 - **optional — bigint dev/ino**: not taken. It would change the architecture's exported `KeywordSource` field types (`dev`/`ino: number`). A collision can only suppress one file's content scan, and it needs inode numbers above 2^53.
 - **optional — keyword glued to an ASCII word character in a file name**: on hold, pending an integrator spec decision (coordinator instruction).
 - Also: the BOM literal in `parseKeywordList` is now written as a `﻿` escape instead of an invisible character. Behaviour is unchanged.
+
+## Round 2 — CHANGES_REQUESTED — by code-reviewer
+
+Scope: `git diff a5b49a7..HEAD`, which is e8f5552 (the round-1 fixes) and ab39e62 (the D5/AC18 masking amendment). Judged against the amended spec, AC1–AC18.
+
+## Summary
+- All three round-1 fixes are correct and verified at runtime. A 160k-char dotted line now takes 2 ms. An env var that names a FIFO prints `hyg.kw.unreadable` straight away. A newline or bidi control in a printed path is escaped after masking. I accept declining the bigint dev/ino change.
+- AC18 is implemented. `maskSpans` masks keyword occurrences that are glued to other characters (`aaaa_ZORBLAX_notes.md` prints as `***_***_notes.md`), and detection still uses the D1 word boundaries.
+- One new required finding: `maskSpans` loops forever when a keyword starts with a non-BMP character, and `agc check` then crashes out of memory.
+- Clean: `tsc --noEmit`, rebuilding `dist/` (no diff after the rebuild), `test/error-code-contract.test.mjs` (21/21), and AC16 on a hermetic `git archive HEAD` copy (only `hyg.kw.none` and `skipped 16`).
+
+## AC Completeness
+AC1–AC17 — implemented. They are unchanged from round 1 except for the fixes below.
+AC1 — partial — exit-code invariance breaks when a keyword starts with a non-BMP character (see Correctness).
+AC18 — implemented — tools/hygiene-scan.ts, `maskSpans` inside `compileKeywordMatcher` and the `maskText` call site. The one exception is the Correctness finding below.
+
+## Correctness
+- **required** — tools/hygiene-scan.ts `maskSpans` (in `compileKeywordMatcher`, around the `scan.lastIndex = m.index + 1` line): this loops forever on a match whose first character is a non-BMP code point, meaning a surrogate pair such as an emoji or a CJK Extension-B ideograph. D1 names CJK names explicitly. The regex has the `u` flag, and in `u` mode a `lastIndex` that points at the trailing half of a pair is moved back to the pair's start. So `exec` returns the same match at the same `m.index` again, `lastIndex` is reset to `m.index + 1`, and the loop never advances. Each pass pushes another span, so memory grows until V8 aborts. Reproduced in isolation: with `/(?:<two astral chars>)/giu`, `lastIndex = 1` on text that starts with that pair, `exec` returns index 0. Reproduced end to end: a keyword file holding one two-emoji keyword, plus a tracked file whose name contains that keyword and whose content has one home-path hit, made `agc check` exit **134** (heap OOM, with the native stack trace on stderr). That breaks exit-code invariance (D5/AC1), and `runHygieneScan`'s catch-all cannot recover from an OOM abort. **Fix**: advance by one full code point, for example `scan.lastIndex = m.index + (m[0].codePointAt(0)! > 0xffff ? 2 : 1)` (or use the length of `String.fromCodePoint(m[0].codePointAt(0)!)`). Also add a progress guard that stops the loop when `scan.lastIndex <= m.index`. qa should add a unit case: `maskText` over a path that contains a keyword starting with a non-BMP character must return, with `***` in place of the keyword.
+- No other findings. `loadKeywordFile` now takes `dev`/`ino` from `fstat` on the open descriptor, which is the same inode as the realpath, so self-exclusion is unchanged. `O_NONBLOCK ?? 0` is safe where the constant does not exist.
+
+## Quality
+- **recommended** — specs/e234-hygiene-scan.md D5 amendment: the bullet still says "pending human ratification in the coordinator's chat". The coordinator reports the change is ratified, so update the wording, citing the ratification and mailbox to-lane#5, so the spec does not contradict the record.
+- The `﻿` escape in place of the invisible literal is an improvement.
+
+## Architecture
+`maskSpans` is an additive member of the exported `KeywordMatcher` interface, and it is consistent with the amended D5. Putting `escapeForDisplay` after `maskText` is correct, because spans are computed on the raw text. No layering change.
+
+## Security
+- The no-echo property now also covers keywords glued to other characters in printed paths (AC18), and control and bidi characters can no longer forge lines or reorder output. The crash above has a side effect on output: the OOM abort prints V8's native stack, which includes the node install's absolute path. That is one more reason to fix it.
+
+## Performance
+- The design-file-key regression is fixed: 160k chars took 2 ms. `maskSpans` on a 700k-char path-like string took 23 ms. It is linear apart from the non-BMP infinite loop above.
+
+## Verdict
+CHANGES_REQUESTED: the round-1 fixes and AC18 are correct, but `maskSpans` never advances past a non-BMP first character, so `agc check` crashes with exit 134 when a keyword starts with an emoji or an Extension-B ideograph. The fix is to advance `lastIndex` by a whole code point.
