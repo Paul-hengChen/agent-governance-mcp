@@ -39,3 +39,9 @@
 {"ts":"2026-09-28T10:07:49.428Z","feature":"release-v4.1.0","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
 {"ts":"2026-09-28T10:08:51.946Z","feature":"release-v4.1.0","agent_id":"release-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-09-28T10:17:08.947Z","feature":"release-v4.1.0","agent_id":"release-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-28T16:09:55.695Z","feature":"release-v4.2.0","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-28T16:12:30.151Z","feature":"release-v4.2.0","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-28T16:13:51.384Z","feature":"release-v4.2.0","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-28T16:18:04.258Z","feature":"release-v4.2.0","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-28T16:19:10.274Z","feature":"release-v4.2.0","agent_id":"release-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-28T16:27:28.707Z","feature":"release-v4.2.0","agent_id":"release-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}

@@ -65,3 +65,4 @@
 {"ts":"2026-09-27T11:40:50.664Z","gate":"validateTransition","error_code":"TRANSITION_REJECTED","agent_id":"qa-engineer","feature":"release-v4.0.0"}
 {"ts":"2026-09-27T13:43:38.610Z","gate":"orchestrator","error_code":"QA_COMPLETION_EVIDENCE_MISSING","agent_id":"qa-engineer","feature":"release-v4.0.0"}
 {"ts":"2026-09-28T10:00:34.567Z","gate":"validateTransition","error_code":"TRANSITION_REJECTED","agent_id":"qa-engineer","feature":"release-v4.1.0"}
+{"ts":"2026-09-28T16:12:57.074Z","gate":"validateTransition","error_code":"TRANSITION_REJECTED","agent_id":"qa-engineer","feature":"release-v4.2.0"}
