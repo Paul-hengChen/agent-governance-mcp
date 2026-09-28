@@ -1,0 +1,16 @@
+# c15-expected-red-manifest — expected-red manifest (emitted by sr-engineer per skill-sr-engineer SOP 7a)
+# Format: <relative test file path> | <exact test name/description string>
+
+# qa-owned token-cap re-baseline: T-C15-01 added SOP step 7a (Expected-Red Manifest)
+# to skill-sr-engineer.md; the 2275-~tok cap is exact-measured with no headroom, so any
+# addition reddens it. QA re-measures and bumps per the established Phase-2 convention.
+test/context-budget.test.mjs | AC1/AC2: skill-sr-engineer stripped token count meets ≤ 2138 cap
+
+# qa-owned registry-count re-baseline: T-C15-05 registered the 21st gate
+# (EXPECTED_RED_DIFF_MISSING); the exactly-20 pin must be re-baselined 20 -> 21.
+test/error-code-contract.test.mjs | AC-1/AC-5: GATE_REGISTRY has exactly 20 entries (19 in, 20 out — c9-protocol-fields added REVIEW_VERDICT_STATUS_MISMATCH)
+
+# qa-owned byte-budget re-baseline: T-C15-02 added Phase 0.5 (Expected-Red Diff) to
+# skill-qa-engineer.md (8486 -> 11082 bytes); the 8850-byte cap had ~360B headroom by
+# design and needs a qa-owned bump, same as the c3-covering-evidence precedent.
+test/qa-visual-skill-split.test.mjs | AC-5: byte counts stay within v3.14.0-relaxed budgets (savings invariant vs v3.8.2 baseline)

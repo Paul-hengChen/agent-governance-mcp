@@ -1,0 +1,15 @@
+# e94-e97-release-staging-and-terminal-marker — expected-red manifest
+# (emitted by sr-engineer per skill-sr-engineer SOP 7a)
+# Format: <relative test file path> | <exact test name/description string>
+
+# qa-owned re-baseline (T-E94-01, per tasks.md: "Tests are qa-owned (S2) — do
+# NOT author them. qa updates METADATA_PATHS and the AC2 pin in
+# test/release-staging.test.mjs"): T-E94-01 added CONTRIBUTING.md and
+# tasks.md to both the step-8 git-add line and the PATHS= existence
+# pre-filter in content/skill-release-engineer.md, moving the staged-path
+# count from 31 (19 directories + 12 metadata) to 33 (19 directories + 14
+# metadata) — independently counted against the edited line, matches the
+# task row's own arithmetic. This test's METADATA_PATHS fixture (and its
+# hardcoded 31/12 pin) predates that change and must be re-baselined to the
+# new set and count.
+test/release-staging.test.mjs | E71(a): the git-add line stages exactly 31 paths (19 directories + 12 metadata), set-equal to FEATURE_DIRS/METADATA_PATHS/E65_METADATA_PATHS

@@ -1,0 +1,14 @@
+{"ts":"2026-09-27T07:10:20.726Z","feature":"e178b-lane-watch-tooling","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-27T07:10:57.155Z","feature":"e178b-lane-watch-tooling","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-27T07:14:06.003Z","feature":"e178b-lane-watch-tooling","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-27T07:24:54.314Z","feature":"e178b-lane-watch-tooling","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-27T07:31:55.557Z","feature":"e178b-lane-watch-tooling","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-27T07:32:57.676Z","feature":"e178b-lane-watch-tooling","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-27T07:40:58.725Z","feature":"e178b-lane-watch-tooling","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-27T07:41:51.839Z","feature":"e178b-lane-watch-tooling","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-27T07:42:42.150Z","feature":"e178b-lane-watch-tooling","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-27T07:43:27.273Z","feature":"e178b-lane-watch-tooling","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-27T07:47:02.412Z","feature":"e178b-lane-watch-tooling","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-27T07:48:02.934Z","feature":"e178b-lane-watch-tooling","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-27T07:59:15.783Z","feature":"e178b-lane-watch-tooling","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-27T08:03:35.452Z","feature":"e178b-lane-watch-tooling","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}

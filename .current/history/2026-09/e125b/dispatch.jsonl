@@ -1,0 +1,16 @@
+{"ts":"2026-09-25T14:36:23.680Z","feature":"e125b-lane-close-writeback","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-25T14:43:11.075Z","feature":"e125b-lane-close-writeback","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-25T14:53:46.586Z","feature":"e125b-lane-close-writeback","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-25T14:58:15.982Z","feature":"e125b-lane-close-writeback","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-25T15:04:43.844Z","feature":"e125b-lane-close-writeback","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-25T15:24:30.348Z","feature":"e125b-lane-close-writeback","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-25T15:31:55.600Z","feature":"e125b-lane-close-writeback","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-25T15:35:19.834Z","feature":"e125b-lane-close-writeback","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-25T15:36:14.756Z","feature":"e125b-lane-close-writeback","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-25T15:41:26.802Z","feature":"e125b-lane-close-writeback","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-25T15:46:54.589Z","feature":"e125b-lane-close-writeback","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-25T15:49:34.736Z","feature":"e125b-lane-close-writeback","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-25T15:50:18.634Z","feature":"e125b-lane-close-writeback","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-25T15:54:04.045Z","feature":"e125b-lane-close-writeback","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-25T16:09:36.353Z","feature":"e125b-lane-close-writeback","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-25T16:12:51.294Z","feature":"e125b-lane-close-writeback","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}

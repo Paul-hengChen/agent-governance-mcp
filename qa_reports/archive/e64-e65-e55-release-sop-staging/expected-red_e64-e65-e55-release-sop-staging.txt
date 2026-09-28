@@ -1,0 +1,19 @@
+# e64-e65-e55-release-sop-staging — expected-red manifest (emitted by
+# sr-engineer per skill-sr-engineer SOP 7a)
+# Format: <relative test file path> | <exact test name/description string>
+
+# Round 2 (T-E645-02 code-review remediation): the coordinator's round-2 brief
+# folded the tsconfig.json fix into this ticket — `gates/**/*.ts` was missing
+# from `include`, which is why AC-B5.5 (built specifically so a newly added
+# source dir is auto-detected) never caught gates/ omissions in the first
+# place (review_reports/review_T-E645-02.md, F1 layer 2). Adding it makes
+# AC-B5.5 correctly derive gates/ as an expected source dir from tsconfig.json
+# — but FEATURE_DIRS in test/release-staging.test.mjs:66 still lacks "gates/",
+# so the assertion now (correctly) reds. Fixing FEATURE_DIRS, and rescoping
+# AC1 first per the review's ordering note (F1: "3 before 1, or AC-B5.5 goes
+# red"), is qa's half — T-E645-03 point 1. sr does not touch test/** this
+# round per the coordinator's explicit instruction.
+# Verified emit-neutral: dist/ is byte-identical before/after the tsconfig.json
+# change (diff -rq, 0 differences) — this red is test-detection-only, not a
+# build regression.
+test/release-staging.test.mjs | AC-B5.5: every repo source directory appears in FEATURE_DIRS or metadata list

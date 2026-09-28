@@ -1,0 +1,21 @@
+# e163-ci-gate-ordering — expected-red manifest (emitted by sr-engineer per skill-sr-engineer SOP 7a)
+# Format: <relative test file path> | <exact test name/description string>
+
+# qa-owned pinned-string re-baseline: T-E163-01 renamed the former single step 8
+# ("8. **Commit + tag + push**") to 8a/8b/8c per the cut's D1 decision (content/skill-release-engineer.md).
+# The literal header string these four tests search for no longer exists — each needs
+# retargeting to "8a. **Commit + push branch**" (or an 8a/8c-aware boundary where the
+# assertion spans the tag-push half specifically). Not a defect: the rename is exactly
+# what E163 D1 asked for (sub-lettering, not renumbering, so step 9 stays put).
+test/release-staging.test.mjs | E49/E44 step-order pin: step 7a precedes step 8 in the file, and 7a's derivation does not depend on the release commit's own content (guards F2's class from returning)
+test/release-staging.test.mjs | E65: the adapter-stamp step exists, names all three deployed adapter files, and requires agc check to exit 0
+test/release-staging.test.mjs | E65: step 7b (driftBaselineIds), 7c (backlog done-marking), and 7d (adapter-stamp bump) are ALL ordered before step 8's commit, in that relative order — order is the whole defect
+
+# qa-owned row-count re-baseline: T-E163-01 added two new Escalation Routes rows
+# (pre-flight CI gate red — step 2a; CI gate failure — step 8b), both required by the
+# cut (E163 part 2/3: main must refuse to start a release when already red, and the
+# 8a/8c gate must have a documented STOP path). The 7-data-row / "last row is
+# empty-baseline-hazard" pin needs to become 9 rows, with the two new E163 rows placed
+# wherever qa decides reads best (this SOP put them first, ahead of the six
+# pre-existing rows, since they fire earliest in the SOP's step order).
+test/release-staging.test.mjs | E53: the Escalation Routes table gains exactly one new row (six pre-existing + the empty-baseline-hazard row = seven), placed last

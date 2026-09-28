@@ -1,0 +1,5 @@
+{"ts":"2026-09-24T06:44:57.353Z","feature":"e174a-release-lane-paths","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-24T06:45:48.238Z","feature":"e174a-release-lane-paths","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-24T06:48:26.265Z","feature":"e174a-release-lane-paths","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-24T06:49:12.750Z","feature":"e174a-release-lane-paths","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-24T07:06:25.725Z","feature":"e174a-release-lane-paths","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}

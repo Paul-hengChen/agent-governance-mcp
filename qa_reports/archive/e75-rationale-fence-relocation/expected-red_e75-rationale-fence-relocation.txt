@@ -1,0 +1,29 @@
+# e75-rationale-fence-relocation — expected-red manifest (emitted by sr-engineer per skill-sr-engineer SOP 7a)
+# Format: <relative test file path> | <exact test name/description string>
+
+# T-E75-01 relocated the 4 asymmetric rationale fences the E69 ratchet in
+# test/render-structure.test.mjs pins as KNOWN, TRACKED debt:
+#   content/skill-pm.md:25, :26 ; content/skill-architect.md:30 ; content/skill-qa-engineer.md:36
+# Each `<!-- rationale:start -->` marker was moved onto its own line (newline/
+# whitespace only — git diff --word-diff and a whitespace-stripped byte
+# comparison both confirm zero prose bytes changed). This is exactly what the
+# ratchet exists to catch: KNOWN_ASYMMETRIC_SPAN_COUNTS (line ~254) and
+# EXPECTED_RENDER_GLUE_COUNTS (line ~303) both still pin the OLD counts
+# (skill-pm.md: 2, skill-qa-engineer.md: 1, skill-architect.md: 1), so every
+# assertion that diffs live output against those pinned maps now reds, live
+# output having dropped to 0/0/0 for all three files/roles. Verified directly
+# (scratch script against dist/tools/role.js + dist/prompts/build.js,
+# reproducing both detectors verbatim from this test file, including the
+# backtick-code-span exclusion in findLineGlueFindings): 0 asymmetric spans
+# and 0 line-glue findings for pm/architect/qa-engineer through BOTH
+# switchRole and buildPromptForRole.
+#
+# qa-engineer (T-E75-02) closes this red by decrementing the ratchet:
+# KNOWN_ASYMMETRIC_SPAN_COUNTS -> {} and EXPECTED_RENDER_GLUE_COUNTS
+# pm/qa-engineer/architect -> 0, and rewriting the "KNOWN, TRACKED debt"
+# comment block so it reads as closed, not stale. sr-engineer did not touch
+# test/render-structure.test.mjs (qa-owned, Constitution §2).
+
+test/render-structure.test.mjs | structural sweep: every content/{skill-,const-,coord-}*.md fragment has zero UNTRACKED asymmetric rationale spans
+test/render-structure.test.mjs | cross-SOP render sweep (tw_switch_role): glue-finding counts match the tracked debt list exactly, for every role
+test/render-structure.test.mjs | cross-SOP render sweep (buildPromptForRole): glue-finding counts match the tracked debt list exactly, for every role

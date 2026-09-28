@@ -1,0 +1,10 @@
+# E24 const §2 Build-gate-exemptions bullet (+188 ~tok in every composed mode)
+# pushes the four context-budget pins past their e7/e18-era baselines. Content
+# is the approved cut (one §2 bullet, human-approved); the pins are the
+# artifact to move, not the content. qa-engineer: re-baseline per the
+# e18-write-provenance precedent (measured values — lean always-on 4485,
+# design-arm constitution 8625, teamwork bundle 16720, non-design 6528 ~tok).
+test/context-budget.test.mjs | AC2: lean always-on bundle is below the raw baseline and within target (<= 4297 ~tok)
+test/context-budget.test.mjs | AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the measured floor (≤ 8437 ~tok)
+test/context-budget.test.mjs | AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 16532 ~tok)
+test/context-budget.test.mjs | AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 6340 ~tok)

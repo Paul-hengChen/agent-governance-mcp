@@ -1,0 +1,12 @@
+# QA review — T-E75-01
+
+<!-- Auto-appended by tw_update_state(qa_review=...). -->
+
+## 2026-08-18T11:28:50.923Z — PASS — by qa-engineer
+
+PASS. Expected-red manifest clean (3/3 confirmed red, exact match, 0 unexplained). Ratchet decremented: KNOWN_ASYMMETRIC_SPAN_COUNTS -> {} (empty allowlist, now a zero-tolerance class assertion, strictly stronger than the 4-site exemption it replaces); EXPECTED_RENDER_GLUE_COUNTS pm/qa-engineer/architect -> 0 (every role 0). Header note and KNOWN,TRACKED debt comment block rewritten as closed history, no stale live-debt claims left. Fail-fast gap (carried from code-reviewer) fixed: converted both cross-SOP render sweep tests from per-iteration assert.equal to collect-then-assert (mirrors the existing structural-sweep pattern in the same file) so all 9 roles are asserted together, not short-circuited on the first mismatch. Build clean (tsc + check:version 3.102.3 + check:transitions-sync 21 keys). npm audit --audit-level=high: 5 findings, all moderate/low, zero HIGH/CRITICAL. Full npm test: 1742/1742 pass, 0 fail (pre-edit baseline was 1739/3 matching manifest exactly). Only test/render-structure.test.mjs touched under test/; content/ and prompts/text-transforms.ts untouched. review: qa_reports/review_T-E75-02.md (covers T-E75-01, T-E75-02).
+
+## 2026-08-18T11:29:12.524Z — PASS — by qa-engineer
+
+PASS. Expected-red manifest clean (3/3 confirmed red, exact match, 0 unexplained). Ratchet decremented: KNOWN_ASYMMETRIC_SPAN_COUNTS -> {} (empty allowlist, now a zero-tolerance class assertion, strictly stronger than the 4-site exemption it replaces); EXPECTED_RENDER_GLUE_COUNTS pm/qa-engineer/architect -> 0 (every role 0). Header note and KNOWN,TRACKED debt comment block rewritten as closed history, no stale live-debt claims left. Fail-fast gap (carried from code-reviewer) fixed: converted both cross-SOP render sweep tests from per-iteration assert.equal to collect-then-assert (mirrors the existing structural-sweep pattern in the same file) so all 9 roles are asserted together, not short-circuited on the first mismatch. Build clean (tsc + check:version 3.102.3 + check:transitions-sync 21 keys). npm audit --audit-level=high: 5 findings, all moderate/low, zero HIGH/CRITICAL. Full npm test: 1742/1742 pass, 0 fail (pre-edit baseline was 1739/3 matching manifest exactly). Only test/render-structure.test.mjs touched under test/; content/ and prompts/text-transforms.ts untouched. review: qa_reports/review_T-E75-02.md (covers T-E75-01, T-E75-02).
+

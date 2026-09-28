@@ -1,0 +1,4 @@
+{"ts":"2026-09-24T05:37:22.080Z","feature":"e123c-cross-lane-aggregation","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-24T05:40:29.343Z","feature":"e123c-cross-lane-aggregation","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-24T05:41:20.203Z","feature":"e123c-cross-lane-aggregation","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-24T05:46:25.921Z","feature":"e123c-cross-lane-aggregation","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}

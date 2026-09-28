@@ -1,0 +1,14 @@
+{"ts":"2026-09-26T18:51:42.717Z","feature":"e177b-lane-status-tooling","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-26T18:56:35.468Z","feature":"e177b-lane-status-tooling","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-26T18:59:41.984Z","feature":"e177b-lane-status-tooling","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-26T19:09:51.710Z","feature":"e177b-lane-status-tooling","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-26T19:17:07.286Z","feature":"e177b-lane-status-tooling","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-26T19:17:55.670Z","feature":"e177b-lane-status-tooling","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-26T19:21:59.071Z","feature":"e177b-lane-status-tooling","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-26T19:26:59.542Z","feature":"e177b-lane-status-tooling","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-26T19:41:13.831Z","feature":"e177b-lane-status-tooling","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-26T19:49:12.914Z","feature":"e177b-lane-status-tooling","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-26T19:55:07.737Z","feature":"e177b-lane-status-tooling","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-26T19:55:51.338Z","feature":"e177b-lane-status-tooling","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-26T20:01:49.727Z","feature":"e177b-lane-status-tooling","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-26T21:02:46.749Z","feature":"e177b-lane-status-tooling","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}

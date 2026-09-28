@@ -1,0 +1,8 @@
+# QA review — T-E39-02
+
+<!-- Auto-appended by tw_update_state(qa_review=...). -->
+
+## 2026-08-12T08:41:34.663Z — PASS — by qa-engineer
+
+PASS. T-E39-03 test surface closed: (1) T-E53-03(h) sweep extended 68->69 with pm:Blocked->design-auditor:In_Progress; count-move and negative property (fails if any OTHER edge opens/closes) verified by direct perturbation of dist/tools/transitions.js, restored clean (git diff shows only the sanctioned E58 hunk). (2) scripts/check-transitions-sync.mjs — zero prior coverage — now has 10 tests (CTS-1..CTS-10) in test/check-version.test.mjs (the pre-cleared sanctioned home) pinning: green on corrected tree; RED on doc-side omission/extra row; RED (not vacuous) when heading absent or table truncates to zero rows; line-exact anchor both directions (rename fails, prose-mention passes); duplicate-row guard both shapes (wrong-then-correct pins the round-1 false-green; correct-then-wrong fires both messages); missing-dist fails loud. (3) Verified check green against shipped tree via npm run build. Full build green (postbuild OK 21 keys exact match); npm audit --audit-level=high clean of HIGH/CRITICAL (6 pre-existing moderate/low advisories, no lockfile change); npm test 1704/1704 pass (1694 baseline + 10 new), the declared expected-red (T-E53-03(h)) now closed. No out-of-cut file touched. Evidence: qa_reports/review_T-E39-03.md covering T-E39-01, T-E39-02, T-E39-03. Note for coordinator: hop_count was 8/10 pre-write; this PASS is a same-agent status change and is not hop-counted, so the cap is unaffected by this write, but is close enough to flag if any further round is needed on this feature.
+

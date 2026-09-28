@@ -1,0 +1,23 @@
+# Superseded (fixed this round, T-E179-09/10/12/17 — qa-engineer):
+#   test/lane-paths.test.mjs REG1, test/lane-migrate.test.mjs FL1/REV1/
+#   AC5-DEBRIS1-4/RT1 (T-E179-02's 6th LANE_FILES entry — fixed by seeding
+#   pending-tickets.md in the shared lane-migrate fixture helper and updating
+#   REG1's expected count), test/context-budget.test.mjs AC8/AC-P2-7 teamwork
+#   bundle + test/skill-manifest.test.mjs t-golden-byte-identity (T-E179-15's
+#   AC8 prose edit — fixed by re-baselining test/fixtures/compose-golden/
+#   skill-coordinator-monolith.txt via `node scripts/capture-constitution-
+#   golden.mjs` and raising the context-budget floor 19284 -> 19408, the one
+#   floor actually pushed). Full suite reconfirmed clean of all 10 — see
+#   qa_reports/review_T-E179-09.md.
+
+# T-E179-11 (AC5, E179-NEW-2 option (a), human ruling 2026-09-25): the human
+# ruled that AC5's <lane> in `git show <branch>:.current/<lane>/pending-
+# tickets.md` binds to the branch's OWN lane (resolveCurrentLane(branch)),
+# never every `.current/<lane>/` a branch's tree happens to carry. sr's
+# current checkOrphanLanes (bin/agc-init.mjs) still ORs every lane dir found
+# under `.current/` on the branch — code-reviewer APPROVED it as spec-
+# conformant under the PRE-ruling reading (review_reports/review_T-E179-02.md).
+# This proof is qa-authored per the NEW ruling and is genuinely red against
+# the current implementation; the next sr round (own-lane-only scan +
+# updated detectOrphanLanes docstring) plus the reviewer's R1 fix land in the
+# same round, after which qa re-verifies and this line is dropped.

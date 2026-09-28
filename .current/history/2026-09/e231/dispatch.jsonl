@@ -1,0 +1,10 @@
+{"ts":"2026-09-27T16:23:00.388Z","feature":"e231-info-hygiene-rule","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-27T16:31:27.840Z","feature":"e231-info-hygiene-rule","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-27T16:35:38.690Z","feature":"e231-info-hygiene-rule","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-27T16:39:47.290Z","feature":"e231-info-hygiene-rule","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-27T16:41:23.204Z","feature":"e231-info-hygiene-rule","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-27T16:44:33.385Z","feature":"e231-info-hygiene-rule","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-27T16:45:15.437Z","feature":"e231-info-hygiene-rule","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-27T16:50:53.342Z","feature":"e231-info-hygiene-rule","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-27T16:52:00.308Z","feature":"e231-info-hygiene-rule","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-27T17:09:46.096Z","feature":"e231-info-hygiene-rule","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}

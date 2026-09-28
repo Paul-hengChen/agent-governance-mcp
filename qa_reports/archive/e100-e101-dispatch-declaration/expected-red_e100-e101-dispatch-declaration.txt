@@ -1,0 +1,17 @@
+# e100-e101-dispatch-declaration — expected-red manifest (emitted by
+# sr-engineer per skill-sr-engineer SOP 7a)
+# Format: <relative test file path> | <exact test name/description string>
+
+# qa-owned re-pin: T-E100-01 adds "host": "claude-code" to bin/agc-init.mjs's
+# configTemplate (E100 fix — a brand-new .current/.config.json now declares
+# its host so prompts/skill-manifest.ts's host-tagged coordinator fragments
+# actually render; see docs/backlog.md E100). AC1 in
+# test/p0-onboarding-lite-default.test.mjs asserts the OLD, pre-E100 shape
+# (`{ schema_version: 1 }` with no host key) — that assertion is now the
+# thing E100 exists to change, not a regression. The task brief
+# pre-authorized leaving this red for qa: re-pinning AC1 (and auditing AC2,
+# which currently passes only because run 1 seeds the host key — see
+# review_reports/review_T-E100-01.md QA-gap #7) is T-E100-02's job, not
+# sr-engineer's (test/ is qa-owned, Constitution §2). Confirmed via a full
+# `npm test` run, not a scoped subset — 1780/1781, exactly this one red.
+test/p0-onboarding-lite-default.test.mjs | AC1: agc init creates .config.json + tasks.md with expected templates, no handoff.md (re-pinned E34)

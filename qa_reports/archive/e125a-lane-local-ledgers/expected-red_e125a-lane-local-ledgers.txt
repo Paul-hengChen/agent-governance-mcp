@@ -1,0 +1,104 @@
+# e125a-lane-local-ledgers expected-red manifest (C15 format: <test file> | <exact test name>)
+# T-E125A-01 (sr-engineer): LANE_FILES gains a 7th entry `tasks` (noFlatCounterpart, never moved by the E123 runners)
+# and CURRENT_VERSIONS.tasks 1->2. These pre-existing tests hard-code the 6-entry registry / tasks max v1 and need
+# qa-engineer re-baselining (spec AC1/AC2/AC3/AC13); no behaviour regression intended.
+test/drift-skew.test.mjs | T32 AC-6: future tasks sentinel surfaces as drift reason
+test/lane-migrate.test.mjs | FL1: full-fixture move — all 5 present files move from flat .current/ into .current/<lane>/, none touched by non-LANE_FILES paths
+test/lane-migrate.test.mjs | FL2: handoff-only fixture — the 4 optional sidecars are skipped silently, no error, moved contains only handoff.md
+test/lane-migrate.test.mjs | REV1: full-fixture reverse — all 5 lane files move back to flat, then the now-empty lane dir is removed
+test/lane-migrate.test.mjs | REV2: reverse of a handoff-only lane skips the 4 optional entries and still removes the lane dir
+test/lane-migrate.test.mjs | AC5-DEBRIS1 (e123b9 J2, spec AC5 — the lock's OWN path is now this same filename): a leftover STALE HANDOFF_LOCK_FILENAME in the lane dir is cleared by withFileLock's own stale-lock detection and the move succeeds, removing the (now-empty) lane dir
+test/lane-migrate.test.mjs | AC5-DEBRIS2: a stale atomic-write temp file (`<lane filename>.<pid>.<ms>.tmp`) in the lane dir is tolerated — the move succeeds and the temp file is removed with the lane dir
+test/lane-migrate.test.mjs | AC5-DEBRIS3: any OTHER non-LANE_FILES entry (not the lock, not an atomic-tmp shape) still refuses before any move — debris tolerance is narrow, not a general amnesty
+test/lane-migrate.test.mjs | AC5-DEBRIS4 (e123b9 J2, spec AC5 — the debris-tolerance pre-flight now runs INSIDE the per-lane lock, so a directory squatting on the lock's own path fails at lock ACQUISITION, not the later foreign-content check): a DIRECTORY named exactly HANDOFF_LOCK_FILENAME refuses (via the lock-acquisition timeout) and touches nothing
+test/lane-migrate.test.mjs | RT1: migrateFlatToLane then migrateLaneToFlat leaves all 5 files byte-identical to their pre-migration content
+test/lane-migrate.test.mjs | COUNT1: migrateFlatToLane's moved+skipped count equals LANE_FILES.length on the full 5-file fixture
+test/lane-migrate.test.mjs | COUNT2: migrateLaneToFlat's moved+skipped count equals LANE_FILES.length on the full 5-file fixture
+test/lane-paths.test.mjs | REG1: LANE_FILES has exactly 6 entries — 1 required (handoff) + 5 optional (telemetry/metrics/usage/dispatch/pendingTickets)
+test/schema-versions.test.mjs | CURRENT_VERSIONS exposes the four kinds at their e123a-lane-layout-migration levels
+test/schema-versions.test.mjs | runMigrations applies single v0→v1 step
+test/schema-versions.test.mjs | runMigrations threads payload through steps (output of N = input of N+1)
+test/tasks-versioning.test.mjs | AC-1: addTaskInFile creates new tasks.md with sentinel on line 1
+test/tasks-versioning.test.mjs | AC-1: completeTaskInFile preserves sentinel after mutation
+test/tasks-versioning.test.mjs | AC-1: rollbackTaskInFile preserves sentinel after mutation
+test/tasks-versioning.test.mjs | AC-2: getNextTaskFromFile heals sentinel-less tasks.md on first read
+test/tasks-versioning.test.mjs | AC-2 fast-path: getNextTaskFromFile no-op when file already at v1
+test/tasks-versioning.test.mjs | AC-4: parseTasksFromFile refuses-loud when sentinel version > CURRENT
+test/tasks-versioning.test.mjs | AC-4: getNextTaskFromFile refuses-loud on future sentinel
+test/tasks-versioning.test.mjs | AC-4: completeTaskInFile refuses-loud on future sentinel (mutation path)
+test/tasks-versioning.test.mjs | boundary: malformed sentinel value falls into v0 and heals
+test/tasks-versioning.test.mjs | boundary: sentinel with extra whitespace still matches as v1
+
+# T-E125A-02 (sr-engineer): new module tools/tasks-lane-migrate.ts (architecture-mandated) imports lane-paths and calls
+# resolveCurrentLanePaths — a genuine new sanctioned caller; the two allow-lists need 'tools/tasks-lane-migrate.ts' added.
+# CALLERS1 (resolveLanePaths zero-callers) is deliberately kept GREEN: the module routes through resolveCurrentLanePaths (AC1).
+test/lane-paths.test.mjs | CALLERS2 (allow-list): grep -rln "lane-paths" tools/ gates/ guards/ prompts/ bin/ index.ts names exactly the sanctioned F0 + L1-L3 importer set — a NEW unlisted importer still fails this
+test/lane-paths.test.mjs | CALLERS3 (allow-list): grep -rn resolveCurrentLane tools/ gates/ guards/ prompts/ bin/ index.ts names exactly the sanctioned L1-L3 caller set — a NEW unlisted caller still fails this
+
+# T-E125A-04 (sr-engineer): tw_* now read/write ONLY .current/<lane>/tasks.md (spec D-F/AC9). These fixtures write a ROOT tasks.md
+# stamped schema_version CURRENT_VERSIONS.tasks (now 2 = an index, D-D/D13, never a forward source) or a v1 root that the read
+# path now migrates (architecture Migration Trigger Site), then assert on the root file. QA re-baselines them to the lane path /
+# a v1 root fixture (spec AC13, 'Test impact'). CALLERS2/CALLERS3 above also gain tools/config.ts + tools/tasks-file.ts.
+test/e117-void-task.test.mjs | void marks an incomplete row as voided and returns success
+test/e117-void-task.test.mjs | void on an unknown task id returns a plain not-found error
+test/e117-void-task.test.mjs | void on an already-completed [x] row is refused
+test/e117-void-task.test.mjs | void is not complete: completeTask on a voided id reports not-found, not success
+test/e117-void-task.test.mjs | void is not rollback: rollbackTask on a voided id reports not-found, not success
+test/e117-void-task.test.mjs | E120: a re-cut of a voided id is REFUSED via addTask — reverses the old id-reuse contract this test used to assert
+test/e117-void-task.test.mjs | E112 (file mode): getNextTask skips a voided row and progress.total drops
+test/e117-void-task.test.mjs | C1 (file mode): a task the ledger considers complete cannot be voided, even while its tasks.md checkbox still reads [ ]
+test/e117-void-task.test.mjs | C1 (file mode) positive control: a task NOT in the ledger and unchecked can still be voided
+test/e117-void-task.test.mjs | C2: a custom taskPattern under which the voided marker still parses as a task is refused, file untouched
+test/e117-void-task.test.mjs | C5: a reason containing a newline that would plant a live task line is refused, file untouched
+test/e117-void-task.test.mjs | void with a benign reason (no newline, no $-expansion) succeeds normally under the default pattern
+test/e117-void-task.test.mjs | Q1 (file mode): re-voiding an already-voided id is refused with alreadyVoided:true
+test/e117-void-task.test.mjs | Q1 (file mode): a never-existed id is refused WITHOUT alreadyVoided
+test/e117-void-task.test.mjs | a voided row (not in the ledger) never surfaces as drift and is excluded from tasksIncomplete
+test/e117-void-task.test.mjs | REGRESSION (the original C1 bug): a REFUSED void of a ledger-complete task must not erase the pre-existing drift signal
+test/e117-void-task.test.mjs | tw_sync (reconcileTasks) never attempts to sync or flag a voided row
+test/e117-void-task.test.mjs | handleVoidTask dispatches through to the real void once pre-flight is satisfied
+test/e120-void-recut-refusal.test.mjs | E120 nine-indent matrix (flat (no indent)): void succeeds, re-void reports alreadyVoided, re-add is refused, no live re-cut ever coexists with the marker
+test/e120-void-recut-refusal.test.mjs | E120 nine-indent matrix (2-space): void succeeds, re-void reports alreadyVoided, re-add is refused, no live re-cut ever coexists with the marker
+test/e120-void-recut-refusal.test.mjs | E120 nine-indent matrix (tab): void succeeds, re-void reports alreadyVoided, re-add is refused, no live re-cut ever coexists with the marker
+test/e120-void-recut-refusal.test.mjs | E120 nine-indent matrix (U+00A0 NBSP): void succeeds, re-void reports alreadyVoided, re-add is refused, no live re-cut ever coexists with the marker
+test/e120-void-recut-refusal.test.mjs | E120 nine-indent matrix (U+000B VT): void succeeds, re-void reports alreadyVoided, re-add is refused, no live re-cut ever coexists with the marker
+test/e120-void-recut-refusal.test.mjs | E120 nine-indent matrix (U+000C FF): void succeeds, re-void reports alreadyVoided, re-add is refused, no live re-cut ever coexists with the marker
+test/e120-void-recut-refusal.test.mjs | E120 nine-indent matrix (U+2000 EN QUAD): void succeeds, re-void reports alreadyVoided, re-add is refused, no live re-cut ever coexists with the marker
+test/e120-void-recut-refusal.test.mjs | E120 nine-indent matrix (U+3000 IDEOGRAPHIC SPACE): void succeeds, re-void reports alreadyVoided, re-add is refused, no live re-cut ever coexists with the marker
+test/e120-void-recut-refusal.test.mjs | E120 nine-indent matrix (U+FEFF BOM): void succeeds, re-void reports alreadyVoided, re-add is refused, no live re-cut ever coexists with the marker
+test/e120-void-recut-refusal.test.mjs | id boundary: voiding T-12 does not block adding the unrelated shorter id T-1
+test/e120-void-recut-refusal.test.mjs | id boundary: voiding T-1.5 does not block adding the unrelated id T-1 (the false positive the old \\b boundary produced)
+test/e120-void-recut-refusal.test.mjs | id boundary: a punctuation-terminated id (T-1.) voids, re-voids with alreadyVoided, and refuses its own re-cut
+test/e120-void-recut-refusal.test.mjs | id boundary: a regex-metacharacter id (T-A+B) is escaped correctly and does not leak into T-AB
+test/e121-tasks-file-injection.test.mjs | THE TRAP: a forged-row payload in addTask's taskId returns {error}, not success:true — and every weaker assertion would have passed pre-fix
+test/e121-tasks-file-injection.test.mjs | must-refuse 1/8: completeTask(taskId) with a forged-row payload is refused, not looked up
+test/e121-tasks-file-injection.test.mjs | must-refuse 2/8: completeTask(note) with a forged-row payload is refused
+test/e121-tasks-file-injection.test.mjs | must-refuse 3/8: rollbackTask(taskId) with a forged-row payload is refused, not looked up
+test/e121-tasks-file-injection.test.mjs | must-refuse 4/8: rollbackTask(reason) with a forged-row payload is refused
+test/e121-tasks-file-injection.test.mjs | must-refuse 5/8: voidTask(taskId) with a forged-row payload is refused, not looked up
+test/e121-tasks-file-injection.test.mjs | must-refuse 6/8: voidTask(reason) with a forged-row payload is refused
+test/e121-tasks-file-injection.test.mjs | must-refuse 7/8: addTask(taskId) with a forged-row payload is refused — E121's headline defect, the one live forging site pre-round-3
+test/e121-tasks-file-injection.test.mjs | must-refuse 8/8: addTask(description) with a forged-row payload is refused
+test/e121-tasks-file-injection.test.mjs | round-1 non-regression round trip: $-expansion payloads store literally through complete then rollback, and the id occurs exactly once
+test/e121-tasks-file-injection.test.mjs | must-succeed: voidTask on a backtick id with a benign reason succeeds normally (no over-refusal)
+test/e121-tasks-file-injection.test.mjs | E131 parser: a LIVE checkbox row carrying a raw U+2028 LINE SEPARATOR throws instead of silently vanishing
+test/e121-tasks-file-injection.test.mjs | E131 parser: a VOIDED row carrying a raw U+2028 LINE SEPARATOR in its reason parses clean — its invisibility is the contract, not a bug
+test/e121-tasks-file-injection.test.mjs | E131 parser: a LIVE checkbox row carrying a raw U+2029 PARAGRAPH SEPARATOR throws instead of silently vanishing
+test/e121-tasks-file-injection.test.mjs | E131 parser: a VOIDED row carrying a raw U+2029 PARAGRAPH SEPARATOR in its reason parses clean — its invisibility is the contract, not a bug
+test/e121-tasks-file-injection.test.mjs | E131 parser: getNextTask returns normally (no throw) when a voided row carries a raw U+2028 in its reason
+test/e31-config-nonfatal.test.mjs | E31 QA probe 1: corrupting the SAME workspace's config makes the custom task file silently undiscoverable (falls back to DEFAULT_TASK_PATHS, never a crash)
+test/e31-config-nonfatal.test.mjs | E31 QA probe 1: addTaskInFile against a config-degraded workspace silently targets DEFAULT_TASK_PATHS[0] instead of the workspace's custom taskPaths (documented fallback, not fixed)
+test/tasks-versioning.test.mjs | AC-2 boundary: parseTasksFromFile does NOT trigger heal-on-read (drift path)
+test/tasks.test.mjs | completeTask flips the checkbox and appends the note
+test/tasks.test.mjs | completeTask escapes regex metacharacters in the task id
+test/tasks.test.mjs | rollbackTask flips [x] back to [ ] and appends the reason
+test/tasks.test.mjs | rollbackTask strips a prior note annotation but keeps the description
+test/tasks.test.mjs | rollbackTask preserves parentheses inside the description (e.g. fix(auth))
+
+# Review round 2 (sr-engineer, C1/AC6b): same v2-root fixture class as the T-04 block above — the root stamped
+# CURRENT_VERSIONS.tasks (=2) is a _primary index with no ledger, which now throws TASKS_LEDGER_ABSENT (AC6b(a)) instead of
+# returning an empty list. QA re-baselines to a v1 root or a lane ledger.
+test/e120-void-recut-refusal.test.mjs | no false refusal: a void marker embedded in another row's plain text does not block adding that id
+test/e120-void-recut-refusal.test.mjs | no false refusal: a void marker embedded after an embedded CR on the same physical line does not block adding that id
+test/e120-void-recut-refusal.test.mjs | no false refusal: a void marker embedded after an embedded U+2028 on the same physical line does not block adding that id
+test/e121-tasks-file-injection.test.mjs | must-succeed: addTask accepts a spread of benign id shapes with no line break

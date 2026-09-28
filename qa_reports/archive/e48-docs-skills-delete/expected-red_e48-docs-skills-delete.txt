@@ -1,0 +1,13 @@
+# e48-docs-skills-delete — expected-red manifest (emitted by sr-engineer per skill-sr-engineer SOP 7a)
+# Format: <relative test file path> | <exact test name/description string>
+
+# qa-owned staging-tree re-baseline: T-E48-01 (git rm) deleted docs/skills/ entirely
+# (human decision 2026-08-17, no salvage). Both pins below assumed the directory exists
+# and hard-crash (ENOENT) rather than assert-fail now that it is gone. T-E48-03 re-baselines
+# both: drop docs/skills from the :1284 trees array, and re-baseline the 9-site enumeration
+# to 4 sites, NOT to the 1 remaining live site alone — content/const-15-core-tail.md:11 plus
+# 3 previously-unpinned live sites at content/skill-release-engineer.md:56-58 (the §6a
+# dependency-audit-disposition mechanism), never in E59's original enumeration
+# (review_T-E48-02.md round 1/2, finding C2).
+test/release-staging.test.mjs | E59: the abolished 'waived' dependency-audit escape does not reappear anywhere in content/ or docs/skills/ (structural, tree-wide sweep)
+test/release-staging.test.mjs | E59: all 9 live §6 dependency-audit normative sites carry the disposition-channel replacement text (structural, per-site enumeration per review_T-E59-01.md Round 2)

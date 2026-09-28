@@ -1,0 +1,11 @@
+# c16-c10-role-boundary — sr-engineer expected-red manifest (T-C16-01..03, T-C10-01..03)
+
+# Gate-count re-baseline: T-C16-02 registered REVIEWER_COMPLETED_TASKS_REJECTED as the
+# 22nd GATE_REGISTRY entry; the hardcoded 21-count assertion is qa-owned (T-C16-04,
+# Constitution §2 test-ownership — sr-engineer must not edit it).
+test/error-code-contract.test.mjs | AC-1/AC-5: GATE_REGISTRY has exactly 21 entries (20 in, 21 out — c15-expected-red-manifest added EXPECTED_RED_DIFF_MISSING)
+
+# Context-budget cap tripped by T-C10-03's skill-pm Release-bookkeeping ownership rule
+# (stripped body now 3473 ~tok vs 3377 cap); qa-owned re-baseline per T-C16C10-06
+# (C2-06 precedent: documented old→new comment).
+test/context-budget.test.mjs | AC1/AC2: skill-pm stripped token count meets ≤ 3196 cap

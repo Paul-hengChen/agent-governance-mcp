@@ -1,0 +1,3 @@
+{"ts":"2026-09-28T07:34:22.149Z","gate":"orchestrator","error_code":"EXPECTED_RED_DIFF_MISSING","agent_id":"qa-engineer","feature":"e235b-relative-manifest-worktree"}
+{"ts":"2026-09-28T07:43:45.536Z","gate":"validateTransition","error_code":"TRANSITION_REJECTED","agent_id":"qa-engineer","feature":"e235b-relative-manifest-worktree"}
+{"ts":"2026-09-28T07:45:53.775Z","gate":"orchestrator","error_code":"EXPECTED_RED_DIFF_MISSING","agent_id":"qa-engineer","feature":"e235b-relative-manifest-worktree"}

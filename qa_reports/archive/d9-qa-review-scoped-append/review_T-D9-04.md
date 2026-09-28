@@ -1,0 +1,8 @@
+# QA review — T-D9-04
+
+<!-- Auto-appended by tw_update_state(qa_review=...). -->
+
+## 2026-07-11T09:22:52.459Z — PASS — by qa-engineer
+
+PASS — T-D9-01..05. Authored test/qa-review-scoped-append.test.mjs (7 tests: FM1-FM4 file mode, SQ1-SQ3 SQLite mode) covering spec AC1-AC4: FAIL+review_task_ids touches ONLY the named task among N open tasks (byte-identical unrelated files, exact SQLite row count); PASS+completed_tasks back-compat unchanged (review_task_ids omitted); both-empty rejected with QA_REVIEW_TARGET_REQUIRED, records nothing (verified qa_reports/ dir never created, 0 SQLite rows). Proved the tests are load-bearing: git-stashed the fix, rebuilt, re-ran — 5/7 failed against pre-fix code, confirming genuine regression coverage; restored fix, all 7 green. Re-baselined the 4 known pre-existing failures caused by the in-scope diff: GATE_REGISTRY entries 23->24 (2 sites) + 2 FREE_TEXT_ALLOWLIST rows for QA_REVIEW_TARGET_REQUIRED (mirrors REVIEWER_COMPLETED_TASKS_REJECTED precedent, verified via CAMEL_RE that armCondition genuinely has no predicate token); skill-qa-engineer.md byte budget independently re-measured at 11826 (confirms sr's reported figure, not blindly trusted) and cap raised 11500->12200. Full gates: npm run build clean, npm test 1173/1173 green, npm audit --audit-level=high exit 0 (1 pre-existing unrelated low, esbuild dev-server). Copy Audit Gate PASS: QA_REVIEW_TARGET_REQUIRED hintStatic byte-exact to spec. Phase 0.5/1.5 both skipped (no expected-red manifest, no design file — server-side fix, no UI). Evidence: qa_reports/review_T-D9-05.md (covers T-D9-01..05).
+

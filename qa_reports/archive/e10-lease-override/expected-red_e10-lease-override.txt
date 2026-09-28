@@ -1,0 +1,66 @@
+# e10-lease-override — expected-red manifest (C15 format: <file> | <exact test name>)
+# Written by @sr-engineer (fable). All entries are qa-owned re-baselines of contract/golden
+# tests that pin counts or bytes which E10 legitimately moved. Suite state at handoff:
+# 1363 pass / 14 fail, all 14 listed below. Zero unexplained reds.
+
+# --- Group 1: gate-count / parity contract (test/error-code-contract.test.mjs) ---
+# E10 adds 2 GATE_REGISTRY entries (28 -> 30): LEASE_OVERRIDE_AUDIT_MISSING +
+# BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE. QA re-baseline recipe (the exact
+# b8/c9/e1 precedent documented in that file):
+#   (a) bump the two `28` count assertions (GATE_REGISTRY.length, ALL_GATE_CODES.length)
+#       and the mapping-comment size assertion to 30;
+#   (b) widen SUFFIX_RE with |CHANGE (BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE's novel
+#       suffix is otherwise invisible to BOTH harvests — the documented E1 _HELD precedent);
+#   (c) add FREE_TEXT_ALLOWLIST triggerEdge entries for both new codes (free English,
+#       no CAP_BY_CODE literal / not a pm->build-entry gate). armCondition needs NO
+#       allowlisting for either: classifyLeaseOverride / prevState are camelCase
+#       predicates literally present in tools/handoff-orchestrator.ts.
+# NOTE: the doc-file mapping row for FEATURE_LEASE_HELD now also lists
+# const-08-chain-31-mid.md (the new Lease-Override bullet backtick-quotes it) — already
+# updated in gates/registry.ts; the mapping test needs BOTH (a) and (b) to go green
+# (until SUFFIX_RE recognizes _CHANGE, the BOOKKEEPING row's actual-sites set reads empty).
+test/error-code-contract.test.mjs | AC-1/AC-5: GATE_REGISTRY has exactly 28 entries (27 in, 28 out — e3-outcome-shaped-acceptance added AC_EXECUTION_LOG_MISSING)
+test/error-code-contract.test.mjs | AC-5: ALL_GATE_CODES === code-side shape-rule harvest (registry <-> code source parity)
+test/error-code-contract.test.mjs | registry ⊆ doc: every documentedInProse:true entry is backtick-quoted in >=1 content/*.md
+test/error-code-contract.test.mjs | doc-file mapping (c12): gates/registry.ts's errorCode→doc-file mapping comment matches the actual backtick-quote sites
+test/error-code-contract.test.mjs | AC3 (c12): every (errorCode, field) pair for triggerEdge/armCondition is either mechanically checked above or explicitly allowlisted as free-text — no silent exemptions
+
+# --- Group 2: compose-equivalence goldens (test/fixtures/compose-golden/) ---
+# const-08-chain-31-mid.md gained the two AC8 bullets (Lease-Override, Bookkeeping-Write),
+# so every golden containing the chain-tagged constitution moved. QA re-baseline recipe:
+# re-run scripts/capture-constitution-golden.mjs to regenerate the committed goldens
+# (the sanctioned capture path named in the test header), then confirm byte-equality.
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=false, fullDetail=false) is byte-identical to pre-refactor golden build-full-nondesign.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=true, fullDetail=false) is byte-identical to pre-refactor golden build-full-design.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=false, fullDetail=true) is byte-identical to pre-refactor golden build-full-nondesign-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=true, fullDetail=true) is byte-identical to pre-refactor golden build-full-design-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: SessionStart hook (AGC_DEFAULT_SKILL=full) is byte-identical to pre-refactor golden hook-full.txt
+test/compose-equivalence.test.mjs | compose-equivalence: cat(15 manifest fragments in order) === the pre-refactor constitution.md monolith (DR-1 Option R invariant)
+
+# --- Group 3: context-budget floors (test/context-budget.test.mjs) ---
+# The two const-08 bullets add ~340 ~tok to chain-tagged constitution paths. QA re-baseline
+# recipe: bump the three floor caps to the newly measured values (the documented qa-owned
+# cap-bump precedent in that file — "absorb the new Cut-Approval Gate bullet" etc.), citing
+# e10-lease-override AC8 as the absorbed growth.
+test/context-budget.test.mjs | AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the measured floor (≤ 5561 ~tok)
+test/context-budget.test.mjs | AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 9545 ~tok)
+test/context-budget.test.mjs | AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 3477 ~tok)
+
+# --- AC7 repro recipe (T-E10-01) — heal-refresh bug, for qa-engineer to AUTHOR ---
+# No existing test demonstrates the pre-fix bug (test/handoff-versioning.test.mjs "AC-2:
+# readHandoffState heals v0 handoff to CURRENT (v12) on disk (fire-and-forget)" asserts
+# schema_version only, never last_updated). §2 test-ownership: sr-engineer may not author
+# test files, so the red test is specified here for qa-engineer:
+#   file:      test/feature-lease.test.mjs
+#   test name: "AC4 (e10): migration heal-write preserves pre-heal last_updated verbatim"
+#   recipe:    write a v0-shaped .current/handoff.md (no schema_version) with
+#              last_updated: "2026-05-01T00:00:00.000Z"; call readHandoffState(ws); await
+#              one macrotask for the fire-and-forget heal; then
+#              assert.equal(parseHandoff(ws).last_updated, "2026-05-01T00:00:00.000Z")
+#              and additionally assert a subsequent different-feature write is evaluated
+#              against the ORIGINAL age (stale -> accepted), not a refreshed one.
+#   red proof: the assertion fails against pre-E10 code — verify by temporarily removing
+#              `bookkeepingWrite: true` from the heal call site in tools/handoff.ts
+#              readHandoffState (or `git stash` the E10 diff) and observing last_updated
+#              stamped to now(); green against the landed fix. Record the red->green
+#              turnover in the Phase 0.5 disposition.

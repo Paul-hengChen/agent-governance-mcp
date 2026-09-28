@@ -1,0 +1,1 @@
+- **Surgical changes**: Touch only what the task requires. Don't "improve" adjacent code, comments, or formatting. Clean up only your own mess.

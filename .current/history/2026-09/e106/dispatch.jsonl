@@ -1,0 +1,8 @@
+{"ts":"2026-09-27T16:37:06.615Z","feature":"e106-init-artifacts-flag","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-27T16:42:42.055Z","feature":"e106-init-artifacts-flag","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-27T16:49:11.855Z","feature":"e106-init-artifacts-flag","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-27T16:53:54.732Z","feature":"e106-init-artifacts-flag","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-27T16:55:43.091Z","feature":"e106-init-artifacts-flag","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-27T16:58:56.468Z","feature":"e106-init-artifacts-flag","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-27T16:59:48.877Z","feature":"e106-init-artifacts-flag","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-27T17:31:56.044Z","feature":"e106-init-artifacts-flag","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}

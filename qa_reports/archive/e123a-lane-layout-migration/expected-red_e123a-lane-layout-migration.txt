@@ -1,0 +1,62 @@
+# expected-red manifest — e123a-lane-layout-migration (C15 format: <test file> | <exact test name>)
+
+# T-E123A3-01 (batch 1): CURRENT_VERSIONS.handoff bumped 14 -> 15. Every test below either pins
+# "current handoff version is 14" literally, uses a v15 fixture as the "future" refuse-loud case,
+# or clears the migration registry and re-registers the chain only up to v14 (so any read now hits
+# 'missing migration step handoff v14->v15'). All are AC12 qa-owned re-baselines (Constitution §2 —
+# sr-engineer does not touch test/); bumping the pins/fixtures to 15 (and adding the 14->15 re-register
+# line after each 13->14 one) turns them green. No production behaviour change is behind any of them.
+test/cut-approval-gate.test.mjs | R-schema-1: writeHandoffState emits cut_approved: true in YAML when passed
+test/cut-approval-gate.test.mjs | M1: v4 → v5 migration is stamp-only (AC-7 — no default seeded for cut_approved)
+test/cut-approval-gate.test.mjs | M2: v4 → v5 migration preserves all existing fields (AC-7 — lossless)
+test/cut-approval-gate.test.mjs | M3: legacy file (no schema_version) migrates to v5 and has no cut_approved (AC-6)
+test/cut-approval-gate.test.mjs | M4: v4 file with scope_decision migrates to v5 with no cut_approved seeded (AC-6/AC-7)
+test/cut-approval-gate.test.mjs | X-malformed-parse: parseHandoff drops malformed external_refs entries from raw YAML without throwing (DR-3)
+test/dispatch-pins.test.mjs | M1b: readHandoffState's fire-and-forget write-back heals the v7 file to v10 on disk
+test/dispatch-pins.test.mjs | M2: future v15 handoff refuses-loud against a v14 server (no silent downgrade)
+test/dispatch-pins.test.mjs | M3: registry-level v7→v8→v9→v10 steps are pure, stamp-only/seed-only, and seed nothing extra (isolated from the full chain)
+test/dispatch-pins.test.mjs | M4/AC-8: v7 handoff with a legacy 'dispatch_pins: sr-engineer=fable' pending_notes line migrates to v8 with the line byte-verbatim and the new field absent
+test/dispatch-pins.test.mjs | P1: parseHandoff drops an unknown dispatch_pins role key from hand-edited YAML, keeps well-formed siblings
+test/dispatch-pins.test.mjs | P2: parseHandoff drops an empty-string dispatch_pins value
+test/dispatch-pins.test.mjs | P3: parseHandoff drops an oversize (>100 char) dispatch_pins value
+test/dispatch-pins.test.mjs | P4: parseHandoff collapses dispatch_pins to undefined when raw is an array or a scalar (non-object shapes)
+test/dispatch-pins.test.mjs | P5: parseHandoff collapses an all-malformed dispatch_pins map to undefined (never a phantom empty object)
+test/dispatch-pins.test.mjs | sanity: CURRENT_VERSIONS.handoff is 14 (e114-cut-approval-inheritance)
+test/drift-skew.test.mjs | T32 AC-6: future handoff schema_version surfaces as a drift reason (not a thrown error)
+test/e114-cut-approval-inheritance.test.mjs | AC1: v13->v14 migration is stamp-only — bumps schema_version only, seeds no cut_approved_source
+test/e114-cut-approval-inheritance.test.mjs | AC1: a real v13 handoff file migrates to v14 on disk via readHandoffState's fire-and-forget heal (real registry), stamp-only
+test/e114-cut-approval-inheritance.test.mjs | AC2: a handoff with no cut_approved_source reads back undefined — absence is the non-inherited default, never a false negative/positive
+test/e22-stale-notify.test.mjs | S1: sanity — CURRENT_VERSIONS.handoff/config are unchanged by E22 (no schema bump; the dedupe cursor lives entirely in the watch-file, not in handoff state)
+test/e23-evidence-schema.test.mjs | AC2-1: a v12 fixture migrates to v13 with schema_version becoming 14 and NO evidence_schema seeded
+test/e23-evidence-schema.test.mjs | AC2-2: a real v12 handoff file (via parseHandoff, real registry) migrates to v13 on disk with the pin absent — an absent field stays absent post-migration
+test/handoff-migration.test.mjs | AC-7: scope_decision round-trips through writeHandoffState → readback (v10 stamp)
+test/handoff-migration.test.mjs | AC-10(g): future v15 handoff refuses-loud against a v14 server (no silent downgrade)
+test/handoff-migration.test.mjs | AC-1/C9: v6→v10 migration chain stamps version only — external_refs survives, new protocol fields (incl. dispatch_pins, dispatched_at) stay absent, hop_count seeds 0
+test/handoff-migration.test.mjs | AC-1/C9: round-trip — re-running runMigrations on the now-v10 payload is a no-op (applied === [])
+test/handoff-versioning.test.mjs | AC-1: writeHandoffState stamps schema_version: 14 in YAML (e114-cut-approval-inheritance)
+test/handoff-versioning.test.mjs | AC-2: readHandoffState heals v0 handoff to CURRENT (v14) on disk (fire-and-forget)
+test/handoff-versioning.test.mjs | AC-2 regression: existing handoff missing schema_version round-trips to CURRENT (v14)
+test/handoff-versioning.test.mjs | AC-4: readHandoffState refuses-loud when on-disk schema_version > CURRENT
+test/handoff-versioning.test.mjs | AC-4: parseHandoff refuses-loud on future schema_version
+test/handoff-versioning.test.mjs | AC-5: sequential second-write swallows freshness error after a healing write
+test/repro-first-gate.test.mjs | M1: a hand-written v10 handoff file migrates to v11 on read — dispatch_mode stays absent (no seed), sibling fields preserved
+test/schema-versions.test.mjs | CURRENT_VERSIONS exposes the four kinds at their e114-cut-approval-inheritance levels
+test/schema-versions.test.mjs | registerMigration idempotent overwrite — last write wins
+test/schema-versions.test.mjs | runMigrations no-op when current === target
+test/schema-versions.test.mjs | runMigrations refuses-loud when on-disk version > current (AC-4)
+test/skill-evolution-v3.11.test.mjs | AC-10: schema/versions.ts schema versions track e114-cut-approval-inheritance bump
+test/stale-dispatch-detection.test.mjs | T8: a v9 handoff (no dispatched_at) migrates to v10 on read — field stays undefined, hop_count/sibling fields preserved (DR-7)
+test/stale-dispatch-detection.test.mjs | T8b: a future v15 handoff refuses-loud against this v14 server (no silent downgrade)
+test/stale-dispatch-detection.test.mjs | T10: sanity — CURRENT_VERSIONS.handoff is 14 (e114-cut-approval-inheritance)
+test/success-metrics.test.mjs | E8-M1: registered v11->v12 step seeds all three totals to 0, additive/lossless
+test/success-metrics.test.mjs | E8-M2: a v0 legacy handoff (real registry) migrates all the way to CURRENT (v14) via readHandoffState/parseHandoff
+test/success-metrics.test.mjs | E8-M3: a v15 handoff refuses-loud against this v14 server (no silent downgrade)
+test/success-metrics.test.mjs | E8-M4: totals are preserved (not reset) across a same-feature migration-heal write
+test/success-metrics.test.mjs | E8-H3: parseHandoff sanitises negative/NaN hand-edited totals to 0
+
+# NOT caused by this diff — pre-existing on the branch base (dea8544): the PM-authored spec
+# specs/e123a-lane-layout-migration.md:280 has a 3-cell row under a 4-column Visual Tokens header, which
+# the real-corpus md-tables check rejects. Listed so Phase 0.5 sees it; filed as NEW-TICKETS.md
+# L-SCHEMA-NEW-5 (spec fix is PM-owned, out of sr-engineer scope).
+test/check-md-tables.test.mjs | AC7 (real corpus, informational count NOT pinned here): `node scripts/check-md-tables.mjs` against this actual repository's docs/backlog.md still exits 0 — the E88 advisory must never turn a pre-existing row fatal
+test/check-md-tables.test.mjs | CQ-9 (real corpus, non-regression, T-E145-02 required case 9): the real docs/backlog.md still exits 0, still advises on the E39/E40/E58/E59 rows, and does NOT advise on the E145 row — identified by TICKET ID via a live line-number lookup, never a hardcoded line number or a fixed advisory count (docs/backlog.md is edited by concurrent lanes)

@@ -1,0 +1,18 @@
+# e177b-lane-status-tooling — expected reds (sr-engineer round 2, T-E177B-05)
+# The amended spec (specs/e177b-lane-status-tooling.md, "tools/lane-paths.ts
+# reuse (R1 amendment...)" under Dependencies/Prerequisites) mandates that
+# tools/lane-status.ts import resolveLaneName / LEGACY_LANE / PRIMARY_LANE /
+# isSafeLaneName / laneFile from ./lane-paths.js instead of restating the
+# ticket-id regex (code-review round 1 R1 finding: a byte-copied regex is a
+# guard dodge, not a legitimate way to avoid CALLERS2). That import makes
+# tools/lane-status.ts a new, sanctioned lane-paths importer, which CALLERS2
+# flags by design ("verify it against the feature split before adding it
+# here, never allow-list it blind"). test/lane-paths.test.mjs is shared,
+# qa-owned test code outside this lane's ownership list; the human-approved
+# ownership extension (spec, 2026-09-27) authorizes qa-engineer — not
+# sr-engineer — to add the one-line allow-list entry plus this manifest.
+# tools/lane-status.ts does not call resolveCurrentLane/resolveLanePaths (it
+# deliberately reuses only resolveLaneName's ticket-token parsing, per the
+# spec's Dependencies note), so CALLERS3 and CALLERS1 are unaffected and stay
+# green — only CALLERS2 goes red until the allow-list entry below is added.
+test/lane-paths.test.mjs | CALLERS2 (allow-list): grep -rln "lane-paths" tools/ gates/ guards/ prompts/ bin/ index.ts names exactly the sanctioned F0 + L1-L3 importer set — a NEW unlisted importer still fails this

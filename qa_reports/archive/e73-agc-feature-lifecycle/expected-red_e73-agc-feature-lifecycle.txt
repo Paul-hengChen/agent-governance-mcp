@@ -1,0 +1,10 @@
+# e73-agc-feature-lifecycle — expected reds (sr-engineer, T-E73-01B..03B)
+# The spec (specs/e73-agc-feature-lifecycle.md, T-E73-01B row) mandates that
+# bin/agc-init.mjs import resolveCurrentLane / resolveLaneName from
+# dist/tools/lane-paths.js instead of copying the ticket-id regex. That makes
+# bin/agc-init.mjs a new, sanctioned lane-paths importer and resolveCurrentLane
+# caller, which these two allow-list guards flag by design ("verify it against
+# the feature split before adding it here"). test/** is qa-owned (§2): QA adds
+# bin/agc-init.mjs to both allow-lists under T-E73-04B.
+test/lane-paths.test.mjs | CALLERS2 (allow-list): grep -rln "lane-paths" tools/ gates/ guards/ prompts/ bin/ index.ts names exactly the sanctioned F0 + L1-L3 importer set — a NEW unlisted importer still fails this
+test/lane-paths.test.mjs | CALLERS3 (allow-list): grep -rn resolveCurrentLane tools/ gates/ guards/ prompts/ bin/ index.ts names exactly the sanctioned L1-L3 caller set — a NEW unlisted caller still fails this

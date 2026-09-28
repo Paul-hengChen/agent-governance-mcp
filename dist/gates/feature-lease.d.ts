@@ -1,0 +1,11 @@
+export interface FeatureLeaseFields {
+    active_feature: string;
+    status: string;
+    last_updated: string;
+    last_agent?: string;
+    next_role?: string;
+    pending_notes?: string[];
+}
+export declare function isReleaseClosingWrite(state: Pick<FeatureLeaseFields, "last_agent" | "status" | "next_role" | "pending_notes">): boolean;
+export declare function isFeatureLeaseHeld(prevState: FeatureLeaseFields | null | undefined, incomingFeature: string, nowMs: number, ttlMin: number): boolean;
+//# sourceMappingURL=feature-lease.d.ts.map

@@ -1,0 +1,6 @@
+# e235b T-E235B-02: runValidate now appends one non-fatal WARN line per dispatchable
+# row whose worktree cell is absolute. These two exact-stdout assertions read the
+# e177a fixture manifest, which still carries absolute worktree cells until qa's
+# T-E235B-06 fixture rewrite; they go green once the fixture cells are primary-relative.
+test/e177a-check-cli.test.mjs | AC15 CLI contract
+test/e177a-manifest.test.mjs | AC2 validate wave7 exit 0

@@ -1,0 +1,8 @@
+# QA review — T-E117-01
+
+<!-- Auto-appended by tw_update_state(qa_review=...). -->
+
+## 2026-09-15T05:30:45.180Z — PASS — by qa-engineer
+
+PASS. T-E117-01 (tw_void_task impl): code-reviewer APPROVED at round 3 (review_reports/review_T-E117-01.md); QA independently re-verified the option-(a) scope boundary, the four mutating-tool obligations, and the C5 post-write guard by execution. T-E117-02 (qa tests): added 25 tests in test/e117-void-task.test.mjs covering the E112 acceptance point (both storage modes), C1 (ledger-authoritative completion guard, both modes, incl. the divergent handoff-ahead-of-tasks state), C2/C5 (post-write invariant refusals under a custom taskPattern and a newline/newline+$& reason, file left byte-untouched), Q1 (file mode distinguishes already-voided from never-existed; SQLite is uniform not-found for both), invisibility to parseTasksFromFile/tw_detect_drift/tw_sync plus a regression pin for the original C1 bug (a refused void must not erase a real drift signal), and registry/pre-flight dispatch wiring. Also fixed the single expected red: test/e26-gate-stats.test.mjs T2 (TOOL_REGISTRY count 12->13 for tw_void_task), updated count + descriptive text. Verified independently: npx tsc --noEmit exit 0; npm run build clean; full suite npm test 1840/1840 pass, 0 fail; test/e117-void-task.test.mjs run 3x isolated, 25/25 every run. Not fixed (per dispatch brief, filed as separate non-blocking backlog rows, code paths untouched): C3 (SQLite DELETE discards reason), C4 (re-cut id inherits stale review/QA evidence), C6 ($-backtick/$-quote String.replace splicing, shared with rollbackTaskInFile/completeTaskInFile/addTaskInFile). Evidence: qa_reports/review_T-E117-02.md (covers T-E117-01, T-E117-02).
+

@@ -1,0 +1,9 @@
+{"ts":"2026-09-27T09:17:58.458Z","feature":"e223-watch-rearm-gone","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-27T09:20:40.168Z","feature":"e223-watch-rearm-gone","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-27T09:21:37.127Z","feature":"e223-watch-rearm-gone","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-27T09:22:39.147Z","feature":"e223-watch-rearm-gone","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-27T09:23:21.652Z","feature":"e223-watch-rearm-gone","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-27T09:25:25.600Z","feature":"e223-watch-rearm-gone","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-27T09:26:02.133Z","feature":"e223-watch-rearm-gone","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-27T09:27:48.809Z","feature":"e223-watch-rearm-gone","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-27T09:30:58.235Z","feature":"e223-watch-rearm-gone","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}

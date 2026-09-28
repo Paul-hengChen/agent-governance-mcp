@@ -1,0 +1,3 @@
+# T-E164-01 (sr-engineer): L-CONTENT-NEW-3 adds the governance-bookkeeping exclusion to skill-pm's `touches`
+# definition (+100 chars, measured 4401 ~tok vs 4376 cap). qa re-baselines this floor (the only floor allowed to move).
+test/context-budget.test.mjs | AC1/AC2: skill-pm stripped token count meets ≤ 4376 cap

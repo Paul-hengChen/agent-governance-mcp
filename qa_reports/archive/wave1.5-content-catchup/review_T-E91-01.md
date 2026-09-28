@@ -1,0 +1,8 @@
+# QA review — T-E91-01
+
+<!-- Auto-appended by tw_update_state(qa_review=...). -->
+
+## 2026-09-17T03:54:21.226Z — PASS — by qa-engineer
+
+PASS. Both expected reds cleared by qa-owned re-baseline: (1) test/fixtures/compose-golden/skill-coordinator-monolith.txt regenerated via scripts/capture-constitution-golden.mjs — only that one of 12 fixtures moved, diff confined to the three coord-0{2,3,4} spans, independently confirmed. (2) test/context-budget.test.mjs:1405 floor bumped 18369->18570, independently re-measured at 74280 chars via the exact composeConstitution+composeSkill+strip pipeline the test uses — matches all three prior independent measurements. Also reconciled the pre-existing title/assertion label mismatch at :1096 (now both say 18570). Added a new behavioural-pin test (test/skill-manifest.test.mjs: t-e91-e103-behavioural-pin) asserting the composed, stripped coordinator bundle contains the new REQUIRED-model dispatch obligation and the self-report framing, and does NOT contain the three retired enforcement strings. Proved non-vacuous by executing the exact regression the reviewer described: reverted content/coord-02/03/04 to base, re-baselined the golden fixture against the reverted source (byte-identity test passed vacuously as predicted), and confirmed the new behavioural test still failed -- then restored the fix. Verified independently against the tree (not trusted from handoff): tasks.md:361/362 describe the shipped mechanism accurately; diff confined to content/coord-0{2,3,4}+tasks.md, docs/bin/prompts/tools/gates untouched. Full npm test 1865/1865, check:md-tables OK, check:version OK. See qa_reports/review_T-E103-01.md.
+

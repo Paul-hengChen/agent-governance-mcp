@@ -1,0 +1,4594 @@
+# Changelog
+
+All notable changes to `agent-governance-mcp` are documented here.
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
+and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## Versioning policy
+
+- **Install via tagged ref**: `npx -y github:Paul-hengChen/agent-governance-mcp#v<version>`.
+- `main` is the development branch; pinning to a tag is the supported way to use this server.
+- **MAJOR** bumps signal breaking changes to the MCP tool surface, prompt schema, or
+  handoff/state file format. Re-read this changelog before upgrading across a MAJOR.
+- **MINOR** bumps add backwards-compatible tools, role skills, or storage features.
+- **PATCH** bumps are bug fixes, doc clarifications, and internal refactors with no
+  observable behavior change.
+
+## [Unreleased]
+
+## [4.0.0] - 2026-09-27
+
+v4.0.0 execution plan Wave 8 (`docs/v4.0.0-execution-plan.md`). This is the MAJOR release that
+closes the v4 plan. It ships ten lane features merged to `main` since v3.119.0 (Wave 7: E204,
+E180, E177a, E177b, E212, E213, E130, E178b with the E222 test fix, E223, E178a) plus this
+release's own CI fix. The state-layout changes it declares as breaking were delivered in
+v3.117.0 (lane layout) and v3.119.0 (lane-local task ledgers) as MINOR releases, by human
+decision; this entry is the MAJOR upgrade record for all of them.
+
+### Upgrade notes — read before upgrading from 3.x
+
+What is breaking, compared with the last 3.x behaviour a pre-v3.117.0 user knows:
+
+- **`.current/` is lane-scoped.** Per-workspace governance files (`handoff.md` and the
+  `*.jsonl` sidecars) live in `.current/<lane>/`, where the lane is `_primary` on `main` (or any
+  non-`feat/<id>-…` branch) and `<id>` on `feat/<id>-…`. `.current/.config.json` stays at the
+  `.current/` root.
+- **`tw_*` tools read and write lane-local ledgers.** The live task ledger is
+  `.current/<lane>/tasks.md`. Root `tasks.md` is a tasks-schema v2 history index that no `tw_*`
+  tool writes; a hand-edit to it is read by nothing and makes the `_primary` reverse migration
+  refuse.
+- **A lane is where a complex ticket starts (E130).** The coordinator's Complexity Scope Gate
+  now opens a lane with `agc feature start` by default instead of offering a worktree only when a
+  feature lease is already held.
+- **The integrator is a formal role (E178a).** A new `integrator` prompt is registered and
+  Constitution §6 grants the integrator, and only the integrator, a fixed set of merge / branch /
+  worktree git operations. `git commit --amend` is now forbidden for every role.
+
+Upgrade path and migration behaviour:
+
+- **No manual step.** Upgrade by moving the install pin to `#v4.0.0`. Migration is
+  migrate-on-read: the first `tw_*` read of a 3.x workspace moves the flat `.current/` files into
+  `.current/<lane>/`, and the first task access moves the task ledger into the lane (on
+  `_primary` the root body is copied into `.current/_primary/tasks.md` and the root is re-stamped
+  as the v2 index).
+- **There is no downgrade path.** A pre-lane server (≤ 3.116.0) pointed at a migrated
+  workspace reports a fresh project instead of an error. To go back, restore `.current/` and
+  `tasks.md` from git or from a backup taken before upgrading.
+- **Git-ignored `.current/` (option A).** When a lane's `.current/<lane>/` path is git-ignored in
+  that workspace, the task-ledger migration is skipped and the legacy root `tasks.md` stays the
+  ledger.
+- Details, including the v2 index shape, the receipt check that guards the `_primary` reverse
+  migration, and the `HANDOFF_LAYOUT_CONFLICT` refusal when both layouts exist:
+  `docs/schema-versions.md` → *Lane layout*, *Tasks version history*, *Tasks v2 index shape and
+  `_primary` forward migration*, *Option A: git-ignored lane path exception*, and *Lazy
+  migrate-on-read*. The v3.117.0 and v3.119.0 entries below carry the per-release notes.
+
+### Added
+
+- **E178a: `integrator` role**: `content/skill-integrator.md` (new) replaces the interim
+  repo-local `.claude/commands/integrator.md` (removed). `prompts/integrator.ts` (new) and one
+  `PROMPT_REGISTRY` entry in `tools/registry.ts` register it as the twelfth prompt. It is
+  prompt-only: it is not a `tw_switch_role` role, not a transition agent, and writes no handoff
+  state. `content/const-15-core-tail.md` §6 adds the integrator-only git grant (`git merge
+  --no-ff` / `--ff-only`, `git switch`, `git worktree remove`, `git branch -d`,
+  compare-and-delete `git update-ref -d`), sanctions the internal git ops of `agc feature
+  start` / `finish` when invoked in the role `docs/lane-protocol.md` assigns, and forbids `git
+  commit --amend` for all roles. `docs/lane-protocol.md` §5 records the lane side of the mailbox
+  and cut pre-review rules. The prompt count moves 11 → 12 in `CLAUDE.md`, `README.md`,
+  `docs/install.md` and `docs/architecture.md`. Spec: `specs/e178a-integrator-role.md`. Tests:
+  `test/e178a-integrator-role.test.mjs`.
+- **E177a: fan-out manifest tooling (`tools/fanout-manifest.ts`, `scripts/fanout.mjs`, both
+  new)**: `node scripts/fanout.mjs validate|render|check` parses a wave's `specs/fanout-<wave>.md`,
+  renders a lane's dispatch prompt from its row, and lists every file a lane branch changed
+  outside its owned paths. A manifest section the parser cannot read is reported by name, never
+  inferred. Spec: `specs/e177a-fanout-manifest.md`. Tests: `test/e177a-manifest.test.mjs`,
+  `test/e177a-check-cli.test.mjs`.
+- **E177b: lane observability tooling (`tools/lane-status.ts`, `scripts/lane-status.mjs`,
+  `scripts/mailbox-watch.mjs`, `scripts/test-lock.mjs`, all new)**: per-lane status and
+  same-/cross-feature roll-up with an evidence-count check, a machine-level lock so concurrent
+  lanes' full-suite runs do not starve each other (macOS has no `flock`), and a mailbox watcher
+  that replaces the hand-written shell loop. Spec: `specs/e177b-lane-status-tooling.md`. Tests:
+  `test/e177b-lane-status.test.mjs`, `test/e177b-mailbox-watch.test.mjs`,
+  `test/e177b-test-lock.test.mjs`.
+- **E178b: `lane-status --watch`, cut pre-review fan-in check, E208 warning**: `--watch` polls
+  each lane's handoff, prints one line per state change and a re-arm command with baseline
+  fingerprints at its deadline. A fan-in check flags a lane with a written cut that never sent it
+  for pre-review. `fanout check` warns on a path-shaped owned token that matches no file (E208).
+  Changes in `tools/lane-status.ts`, `scripts/lane-status.mjs`, `tools/fanout-manifest.ts`.
+  Spec: `specs/e178b-lane-watch-tooling.md`. Tests: `test/e178b-lane-watch.test.mjs`,
+  `test/e178b-cut-prereview.test.mjs`, `test/e178b-fanout-unmatched.test.mjs`.
+
+### Changed
+
+- **E130 + E199 + E198(b): a lane is the default start for a complex ticket**:
+  `content/coord-03-core-fallback.md`'s Feature-Scope Gate now routes a ticket the Complexity
+  Scope Gate judges complex into `agc feature start`, states the cwd-reset rule for lane Bash
+  calls, and states the refusal path when `agc feature start` refuses. `content/coord-01-core-head.md`
+  says rows with equal `order` in the Split Table run in parallel. `content/const-15-core-tail.md`
+  ranks auto-injected data blocks below Templates. `content/const-05-core-standards.md` drops the
+  PM bootstrap exemption from the task-list hand-edit rule (E199). `content/skill-release-engineer.md`
+  step 8a stages `.current/_primary/tasks.md` with root `tasks.md` (E198(b)). Spec:
+  `specs/e130-lane-default.md`. Tests: `test/e130-lane-default.test.mjs`,
+  `test/release-staging.test.mjs`, `test/context-budget.test.mjs`.
+- **E180 + E194 + E197: `agc feature finish --abandoned` keeps git-ignored lane content
+  (`bin/agc-init.mjs`)**: git-ignored, unlinked evidence and an untracked `.current/<lane>/` are
+  copied to primary before the worktree is removed, instead of being deleted with it. The
+  closed-lane pointer's fallback now says `git log -i --grep`. Spec:
+  `specs/e180-abandoned-harvest.md`. Tests: `test/e180-abandoned-harvest.test.mjs`.
+- **E213 + E214 + E216: `agc feature finish --shipped` works when `tasks.md` and evidence are
+  git-ignored (`bin/agc-init.mjs`)**: with an ignored root `tasks.md`, the Closed Lanes pointer is
+  written to disk with an advisory instead of failing the close. Git-ignored, unlinked
+  `qa_reports/`, `review_reports/` and `specs/` files are harvested to primary before worktree
+  removal. The `--abandoned` `moved` line is qualified for files also harvested to primary. Spec:
+  `specs/e213-shipped-ignored-shape.md` (acceptance runs: `specs/e73-adopter-acceptance-2026-09-27.md`,
+  `specs/e73-adopter-acceptance-rerun-2026-09-27.md`). Tests: `test/e213-shipped-ignored-shape.test.mjs`.
+- **E223: `lane-status --watch` re-arm reports a closed lane as gone (`tools/lane-status.ts`)**:
+  in the default watch set, a `--baseline` key naming a lane whose worktree was removed now
+  prints `[<lane>] gone` instead of exiting 64. Spec: `specs/e223-watch-rearm-gone.md`. Tests:
+  `test/e223-watch-rearm-gone.test.mjs`.
+- **CI checks out full history (`.github/workflows/ci.yml`, T-REL4-03)**: the checkout step
+  sets `fetch-depth: 0`, so tests that diff against historical lane-base shas can resolve them
+  on the runner. `main` had been red on those tests with `fatal: bad revision`.
+- `docs/schema-versions.md` describes the tasks v2 index, the `_primary` forward migration and
+  option A (T-REL4-02).
+
+### Fixed
+
+- **E204**: `test/e125c-index-compaction.test.mjs` AC10/AC11 read a frozen snapshot
+  (`test/fixtures/e125c-frozen/`) instead of the live `_primary` ledger.
+- **E212**: `test/e177b-test-lock.test.mjs` AC13b no longer flakes under full-suite load; its
+  child process exits only after the test writes a release file.
+- **E222**: `test/e130-lane-default.test.mjs` AC4/AC14 diff a pinned lane range instead of live
+  HEAD.
+
+### Notes
+
+- Evidence: this release archives the ticket-prefixed QA and code-review reports of the lanes
+  above into `qa_reports/archive/release-v4.0.0/` and `review_reports/archive/release-v4.0.0/`,
+  and each `expected-red_<feature>.txt` into `qa_reports/archive/<feature>/`. Lane e213 used
+  bare task ids (`T01`…`T10`), so its reports stay at `qa_reports/review_T10.md` and
+  `review_reports/review_T01.md` (context, not changed). Each lane's closed handoff is under
+  `.current/history/2026-09/<lane>/` (context, not changed). Release-gate spec:
+  `specs/release-v4.0.0.md`.
+- No tool input schema changed. The `integrator` prompt is additive.
+
+## [3.119.0] - 2026-09-27
+
+v4.0.0 execution plan Wave 6 (`docs/v4.0.0-execution-plan.md`). Four features, each built in
+its own lane and merged to `main`: E125a, E125b, E125c (with E195 folded in), and E126 (with
+E198(a) folded in). This is Wave 6 of the v4.0.0 plan, not v4.0.0 itself.
+
+### Upgrade notes — read before upgrading (tasks schema v1 → v2)
+
+- **The task ledger moves into the lane directory on first task access.** The tasks schema
+  goes from v1 to v2 (`schema/versions.ts`, `schema/migrations-tasks.ts`). On `main` (lane
+  `_primary`) the existing `tasks.md` body is copied to `.current/_primary/tasks.md`, and the
+  root `tasks.md` is re-stamped as a v2 history index with a one-line notice. On a
+  `feat/<id>-…` lane, that lane's own `## ` sections move to `.current/<id>/tasks.md` and leave
+  a `tasks_moved` marker in the root. No manual step is needed.
+- **After the upgrade, `tw_*` tools read and write only `.current/<lane>/tasks.md`.** The root
+  `tasks.md` is an index that no tool writes. A hand-edit to it is read by nothing, and it makes
+  the `_primary` reverse migration refuse.
+- **The `_primary` migration is reversible**: `migratePrimaryReverse` in
+  `tools/tasks-lane-migrate.ts` restores the v1 root, checked against a receipt sha taken at
+  forward time.
+
+### Added
+
+- **E125a: lane-local task ledgers (`tools/tasks-lane-migrate.ts`, new)**: the forward and
+  reverse migrations described above, run lazily under a sync lock (`ensureTasksMigratedLocked`).
+  A lane born after the `_primary` migration starts with an empty ledger. Before writing a lane
+  path, the forward migration runs a read-only `git check-ignore`, so a gitignored `.current/`
+  is handled. `tools/tasks-file.ts` and `tools/config.ts` (`findTasksFile`) resolve the lane
+  ledger first. `tools/drift.ts` still reports future-schema skew on a root index.
+  `guards/file-lock.ts` exports its stale-lock predicate as `isLockPayloadStale` so the new
+  lock shares it. `tools/metrics.ts` counts distinct completed ids across the root file and every
+  live and history lane ledger. Specs: `specs/e125a-lane-local-ledgers.md`,
+  `specs/e125a-lane-local-ledgers-architecture.md`. Tests: `test/e125a-lane-local-ledgers.test.mjs`.
+- **E125b: `agc feature finish --shipped` writes the lane back (`bin/agc-init.mjs`)**: it moves
+  `.current/<lane>/` into `.current/history/<YYYY-MM>/<lane>/` and appends one
+  `<!-- lane_closed: … -->` pointer (primary key `ticket=` + `branch=`, optional `pr=` from the
+  new `--pr <n>` flag, auxiliary `base_sha=`) under root `tasks.md`'s `## Closed Lanes`. It
+  commits both on `--base` before removing the worktree. `tools/lane-paths.ts` gains
+  `resolveHistoryBucket`, `resolveHistoryLaneDir` and `hasHistoryLedger`.
+  `tools/lane-registry.ts`'s feature history now includes features that a long-lived lane such
+  as `_primary` shipped and replaced in place. `agc check`'s orphan-lane scan still does not read
+  `.current/history/`; that is now a recorded decision (S1). Spec:
+  `specs/e125b-lane-close-writeback.md`. Tests: `test/agc-feature-finish-history.test.mjs`,
+  `test/lane-paths-history.test.mjs`.
+- **E126 + E198(a): post-merge invariant check (`tools/merge-invariants.ts`,
+  `scripts/merge-invariants.mjs`, both new)**: `node scripts/merge-invariants.mjs [<merge-ref>]`
+  checks that a merge commit kept every task row, every `[x]` mark and every append-only sidecar
+  record that either parent had, compared against the merge base. Rows are matched by task id
+  across the root file and all live and history lane ledgers. Exit codes: 0 PASS, 1 FAIL,
+  2 not a merge commit, 3 no merge base, 4 usage error. It fires no gate. The integrator SOP
+  (`.claude/commands/integrator.md`) runs it after each `--no-ff` merge. Spec:
+  `specs/e126-merge-invariants.md`. Tests: `test/e126-merge-invariants.test.mjs`.
+
+### Changed
+
+- **E125c + E195: `_primary` reverse migration accepts the index as `finish --shipped` leaves
+  it (`tools/tasks-lane-migrate.ts`)**: the receipt is now the sha256 of the normalized index
+  body (`primaryIndexReceiptSha`: `tasks_moved` markers and the `## Closed Lanes` section
+  removed). The reverse keeps the Closed Lanes pointers and still refuses any other change to the
+  body. Receipts stamped before this change as a raw-body sha are still accepted. The `_primary`
+  ledger and the root index were compacted to their live content (548KB → 14KB). Spec:
+  `specs/e125c-index-compaction.md`. Tests: `test/e125c-index-compaction.test.mjs`.
+- **E125c: SOP prose.** `content/skill-release-engineer.md` step 7a adds a lane-ledger
+  writeback bullet: `agc feature finish --shipped` is the only ledger archive path, and
+  `git log -i --grep <ticket-id>` finds a closed ticket's rows. `content/skill-pm.md` sends PM
+  tasks to `.current/<lane>/tasks.md` through `tw_add_task` and says PM never writes the root
+  `tasks.md`.
+- **E198(a): `scripts/verify-release.mjs` counts lane-local `tasks.md` as bookkeeping.**
+  `.current/_primary/tasks.md` and `.current/<lane>/tasks.md` join the bookkeeping allowlist, so
+  a commit that only touches a lane ledger no longer fails `tag-at-HEAD`. Tests:
+  `test/verify-release.test.mjs`.
+- `docs/lane-protocol.md` §3 describes the lane-local ledger and requires the ticket id in every
+  lane commit subject. `docs/v4.0.0-execution-plan.md`, `docs/v4.0.0-new-tickets.md` and
+  `docs/backlog.md` record the Wave 6 integration and new tickets E189–E203.
+
+### Notes
+
+- Release gate: `qa_reports/archive/release-v4-wave6/review_T-RELV4W6-01.md` (PASS). Each
+  feature's QA and code-review evidence is archived by step 7a under
+  `qa_reports/archive/release-v4-wave6/` and `review_reports/archive/release-v4-wave6/`.
+- Known test defect, to be ticketed after this release: `test/e125c-index-compaction.test.mjs`
+  AC10/AC11 read the live `_primary` ledger from disk, so they fail while that ledger has an
+  uncommitted row. They pass on the committed tree. E198(b) (8a staging of lane ledgers) is not
+  in this release; it is planned for Wave 7.
+
+## [3.118.0] - 2026-09-25
+
+v4.0.0 execution plan Wave 5 + Wave 5.1 (`docs/v4.0.0-execution-plan.md`). Five features, each
+built in its own lane and merged to `main`. None of them is a breaking change.
+
+### Added
+
+- **E73: `agc feature start` / `agc feature finish` (lane lifecycle, `bin/agc-init.mjs`)**:
+  - `agc feature start <ticket-slug> [--base] [--path]` runs from the primary checkout only. It adds a worktree on `feat/<slug>`, takes the lane id from `resolveCurrentLane`, symlinks `node_modules` to the primary (and warns never to run `npm ci` in the lane), byte-copies `.env`, and adds `.env` and `/node_modules` to the shared `info/exclude`.
+  - `agc feature finish <id> --shipped|--abandoned` checks the branch is merged, removes the worktree without `--force`, and deletes the branch with `branch -d`. On `--abandoned`, the lane's evidence is `git mv`-ed to `abandoned/<id>/` and committed on the kept branch.
+  - Documented in `docs/install.md`. Spec: `specs/e73-agc-feature-lifecycle.md`. Tests: `test/agc-feature-lifecycle.test.mjs`.
+- **E124: lane ticket-id allocation module (`tools/lane-ticket-allocation.ts`)**: pure functions `parsePendingTickets`, `allocateTicketIds`, `extractMaxBacklogId`, `detectOrphanLanes`, `markApplied`. A lane files its findings, without ids, in `.current/<lane>/pending-tickets.md` on its own branch. Spec: `specs/e124-lane-ticket-allocation.md`. Tests: `test/lane-ticket-allocation.test.mjs`.
+- **E179: ticket allocation wired into the lane lifecycle (Wave 5.1)**:
+  - `agc feature finish --shipped|--abandoned` now applies the lane's `pending-tickets.md` to `docs/backlog.md` on the primary's `--base`, in a path-limited commit. It checks the primary's preconditions and refuses on any error before changing anything. Re-running it is idempotent (tracked by provenance).
+  - `agc check` warns about orphan lanes belonging to this checkout. The warning is advisory.
+  - `LANE_FILES` in `tools/lane-paths.ts` gains an optional `pendingTickets` entry. `tools/lane-migrate.ts` merges only `.jsonl` append logs, so `pending-tickets.md` is never concatenated: identical bytes are dropped, and different bytes refuse.
+  - The scanner reports blocks after `## Applied` that have no provenance row, and openers that close an enclosing fence. E124's speculative surface is removed.
+  - Specs: `specs/e179-ticket-allocation-wiring.md`, `specs/e179-architecture.md`.
+- **E137: handoff state is rendered inside a data boundary**: one shared renderer, `lib/render-boundary.ts` (`renderDataBlock`), uses a fence one backtick longer than the longest backtick run in the content (minimum 3), so the content cannot close it. It is used at all three render sites: the state block in `prompts/build.ts`, the SessionStart hook (`bin/agent-governance-context.mjs`, which now reads through the read-only lane → flat parser instead of inlining raw `handoff.md`), and the SQLite Spec Context. Each block has an explicit "Data boundary" label in front of it. Known limit: a reader can still be persuaded by what a note says. The renderer only guarantees that the note appears as labelled data. Spec: `specs/e137-render-sanitise.md`. Tests: `test/e137-render-sanitise.test.mjs`, `test/e137-rag-render.test.mjs`.
+- **Interim `/integrator` role**: `.claude/commands/integrator.md` (repo-local slash command) and `docs/lane-protocol.md`. It plans parallel lanes, hands them out, collects them and merges them back. E178 will move it into `content/` (v4 Wave 7).
+
+### Changed
+
+- **E174: flat `.current/` paths retargeted to `.current/<lane>/`** in `content/coord-03-core-fallback.md`, `content/coord-06-host-token.md`, `docs/architecture.md`, `docs/gate-retro-procedure.md` (retro totals now point at `tw_gate_stats`, which de-duplicates merged-lane copies), `docs/http-mode.md` and `docs/arming.md`. Spec: `specs/e174-flat-path-sweep.md`.
+- **E174 / E99: coordinators must now fill in the dispatch-attestation fields**: `content/coord-02-host-dispatch.md`'s Dispatch Brief Template tells a Task-spawned hop to set `dispatch_mechanism: "task"` with the watermark tier. `content/coord-03-core-fallback.md` covers `switch_role` / `inline`, where the tier is the model actually running. The coordinator context-budget floor in `test/context-budget.test.mjs` moves 18990 → 19284, and `test/fixtures/compose-golden/skill-coordinator-monolith.txt` is regenerated.
+- **E179: lane findings are numbered when the lane finishes**: `content/coord-03-core-fallback.md` and `content/skill-release-engineer.md` say a lane never mints a backlog id, and retire `NEW-TICKETS.md` for lane findings.
+- `test/release-staging.test.mjs` classifies `.claude/` as non-source (E66 partition).
+- `docs/v4.0.0-execution-plan.md` and `docs/v4.0.0-new-tickets.md` record the Wave 5 and 5.1 integration. New tickets E176–E188 are filed there and in `docs/backlog.md`.
+
+### Notes
+
+- Evidence, archived in this release by step 7a (one directory per feature): `qa_reports/archive/e73-agc-feature-lifecycle/`, `qa_reports/archive/e124-lane-ticket-allocation/`, `qa_reports/archive/e137-render-sanitise/`, `qa_reports/archive/e174-flat-path-sweep/`, `qa_reports/archive/e179-ticket-allocation-wiring/`, and the matching `review_reports/archive/<feature>/` directories. Release gate: `qa_reports/review_release-v4-wave5-5.1.md` (PASS; `npm test` 2517/2517 on `750fd6c`).
+- This is Wave 5 + 5.1 of the v4.0.0 plan, not v4.0.0 itself.
+
+## [3.117.0] - 2026-09-24
+
+### Upgrade notes — read before upgrading (lane layout, one-way)
+
+- **`.current/` moves into lane directories on first read.** Per-workspace governance files
+  (`handoff.md`, `telemetry.jsonl`, `metrics.jsonl`, `usage.jsonl`, `dispatch.jsonl`) move from
+  `.current/` to `.current/<lane>/`. The lane is `_primary` on `main` or any non-`feat/<id>-…`
+  branch, and `<id>` on `feat/<id>-…`. No manual step is needed; the first read does it under
+  the per-lane lock. `.current/.config.json` stays where it is. Handoff schema goes 14 → 15.
+- **There is no downgrade path.** A pre-lane version (≤ 3.116.0) pointed at a migrated
+  workspace finds no `.current/handoff.md` and reports a fresh project. It does not error, and it
+  does not read the lane file. To go back, restore `.current/` from git or a backup taken before
+  upgrading.
+- **If both layouts exist**, reads refuse with `HANDOFF_LAYOUT_CONFLICT` instead of picking one.
+  Resolve by hand; do not delete either file blind.
+- Details: `docs/schema-versions.md` → *Lane layout*.
+
+### Added
+
+- **E123 lane layout for `.current/` (F0 `e123a-lane-layout-migration`, F1 `e123b0`..`e123b9`, F2 `e123c-cross-lane-aggregation`)**:
+  - `tools/lane-paths.ts` is the only place the five lane filenames are defined (`LANE_FILES`). It adds `resolveLaneName` (used at migration time), `resolveCurrentLane(ws)` (a pure-fs HEAD read: `feat/<id>-…` → `<id>`, otherwise `_primary`; it never throws), `resolveLanePaths` / `resolveCurrentLanePaths`, the `HANDOFF_LOCK_FILENAME` constant, a linear `TICKET_ID_RE`, and a shared `isBytePrefix` helper.
+  - `tools/lane-migrate.ts` adds `migrateFlatToLane` / `migrateLaneToFlat`. Both hold the handoff lock, move files with atomic `fs.renameSync`, and run every check before the first move, so the round trip is byte-identical.
+  - The J2 flip (`7dc9d0d`): `resolveLanePaths` now returns `.current/<lane>/<file>`. Own-workspace reads and writes migrate a flat layout lazily, and each lane has its own lock at `.current/<lane>/.handoff.lock`. If both a flat and a lane `handoff.md` exist, the call throws `HANDOFF_LAYOUT_CONFLICT`. Cross-workspace readers stay read-only and fall back from the lane path to the flat path.
+  - `ea5bb05` makes an interrupted migration resumable: sidecars move first and `handoff.md` last, and flat sidecars left behind are swept in on the next pass.
+- **Handoff schema v15 (E99)**: two optional per-hop fields, `dispatch_mechanism` (`task` | `switch_role` | `inline`) and `dispatch_mechanism_tier`, are added to `tools/handoff-types.ts` and `tools/handoff-parse.ts`, with a stamp-only v14 → v15 migration in `schema/migrations-handoff.ts` and `schema/versions.ts`. Both fields are transient and recorded only; no gate reads them. `tools/dispatch-log.ts` appends one line per hop to the lane's `dispatch.jsonl` after a successful `tw_update_state`, best-effort, and never throws.
+- **E123 F2 cross-lane aggregation**: `tw_gate_stats` (`tools/gate-stats.ts`) and `tools/usage-accounting.ts` now sum telemetry, metrics and usage across live lanes, closed lanes under `.current/history/<YYYY-MM>/<lane>/`, and flat sidecars that were never migrated. Duplicates are detected by content, never by lane name, and every skip is reported as a caveat.
+- **E110 — PM parallel-lane cut rule**: `content/skill-pm.md` adds the Parallel-Lane Cut rule and a `touches` column in the cut table, and `content/coord-01-core-head.md` adds a `touches` column to the Split Table.
+- **E118 — code-reviewer per-AC completeness**: `content/skill-code-reviewer.md` adds an eighth report section, AC Completeness (each AC marked implemented, partial or missing, with file:line; required whenever `specs/<feature>.md` exists), and defines required/recommended/optional finding tiers.
+
+### Changed
+
+- **Core write path, sidecars, prompts and hooks now resolve paths through the lane resolver (E123 F1 L1-L3, J1)**: `tools/handoff-write.ts`, `tools/handoff-parse.ts`, `guards/session.ts`, `tools/drift.ts`, `tools/telemetry.ts`, `tools/metrics.ts`, `tools/dispatch-log.ts`, `prompts/build.ts`, `bin/agent-governance-context.mjs` and `bin/agent-governance-usage-hook.mjs`. `index.ts` normalizes every workspace path (`~` expansion plus `path.resolve`). `tools/lane-registry.ts` history reads now cover live lanes plus `history/<YYYY-MM>/<lane>/`.
+- **E164 + E167 — release-engineer steps 8b/8c (`content/skill-release-engineer.md`)**: 8b re-runs after a host kill are now sequenced (the re-run lowers `AGC_VERIFY_CI_WAIT_SECONDS` below the host timeout) and capped by `fix_try`. 8c separates the local, reversible `git tag -a` from the irreversible tag push. Every 8b STOP deletes the unpushed local tag.
+- **E174a — release path retargeted to the lane layout**: step 13a derives the lane from the compiled `resolveCurrentLane()` and stages `.current/<lane>/handoff.md` plus that lane's `*.jsonl`. `BOOKKEEPING_PATH_RES` in `scripts/verify-release.mjs` accepts any single-segment lane directory and keeps the flat forms for workspaces that have not flipped.
+- **E166 — `templates/claude-code-agents/release-engineer.md`** no longer lists staging paths; it points at SOP step 8a instead.
+- **E157**: `.current/archive/` is gitignored (`.gitignore`), and the tracked e142 archive snapshot has been removed from the index.
+- `content/skill-coordinator-lite.md`: the cut-approval bullet points at skill-pm's Cut-Approval Gate header instead of an inline column list.
+- `docs/schema-versions.md` records handoff v15 and the lane layout.
+
+### Fixed
+
+- **E165 — `scripts/verify-release.mjs` no longer hardcodes `--branch main`** in the CI query. The branch is read from the checkout's upstream, falling back to the current branch. On a detached HEAD, `gh` is never called (a WARN normally, a FAIL under `--strict`).
+
+### Notes
+
+- **Shipped as MINOR by human decision (2026-09-24)**, even though the change is to the handoff/state file layout. That is why the one-way upgrade notes above are part of this entry.
+- Evidence is archived per feature under `qa_reports/archive/<feature>/` and `review_reports/archive/<feature>/`. The seven features that have specs are `specs/e110-pm-parallel-lane-template.md`, `specs/e123a-lane-layout-migration.md`, `specs/e123b0-lane-runtime-resolver.md`, `specs/e123b8-flip-prep.md`, `specs/e123b9-lane-flip.md`, `specs/e118-reviewer-ac-completeness.md` and `specs/e123c-cross-lane-aggregation.md`.
+- Rollout: restart every running MCP server after upgrading. A server started before the flip keeps writing the flat `handoff.md`.
+
+## [3.116.0] - 2026-09-22
+
+### Added
+
+- **E163 (second half) — pre-flight CI gate at release entry (`content/skill-release-engineer.md` step 2a)**: a new SOP step that queries CI for the current HEAD *before* any bump is applied and refuses to start a release on top of a `main` that is already red. Measured 2026-09-22: `main` had been red for six consecutive commits on the same defect before a release finally noticed, because step 9a was the only thing in the entire system that ever queried CI. Lenient by design (`gh` missing/unauthenticated, no completed runs, or poll-budget expiry all WARN-and-continue) — nothing irreversible exists at that point in the SOP, so an inconclusive read has nothing to protect; step 8b re-asks the same question under `--strict` where it does.
+- **`--ci-check [--strict] [--sha <sha>]` mode in `scripts/verify-release.mjs`**: runs only the CI ground-truth logic — same sha resolution, same bounded `gh run list` poll, same `AGC_VERIFY_CI_WAIT_SECONDS` budget — against a given sha, with no version resolved and no tag required. `--strict` converts every graceful-degradation WARN into a FAIL, because an unresolved CI status is not consent to publish an immutable tag. `--sha` with a missing or flag-like value exits non-zero rather than silently falling back to HEAD.
+
+### Changed
+
+- **E163 (first half) — step 8 split into 8a / 8b / 8c (`content/skill-release-engineer.md`)**: 8a commits and pushes the release BRANCH only (reversible — no tag, no GitHub release yet); 8b is a mandatory CI gate (`node scripts/verify-release.mjs --ci-check --strict`) between the branch push and the tag push; 8c pushes the tag (irreversible from there). Sub-lettered rather than renumbered so step 9 and every existing cross-reference stay intact. Before this, a red CI was only ever discovered by step 9a — after the tag and the GitHub release were already public and immutable, which burned a version number every time (v3.115.0). 8b's prose also distinguishes a host-level command-timeout kill (silence — re-run) from a printed verdict (the only thing that escalates), and two new Escalation Routes rows back both gates.
+- **`scripts/verify-release.mjs`**: Check 6's CI ground-truth logic factored into a shared `evaluateCIGroundTruth({ sha, strict, fails })` so the SOP's two new call sites reuse it rather than growing a second implementation. Check 6 itself is behaviourally unchanged (`strict: false`, and it still resolves the released sha from the tag per E147).
+- **`test/release-staging.test.mjs`**: four expected-red assertions retargeted for the split — three step-8 header-literal pins moved to 8a, and the Escalation Routes row-count pin raised from 7 to 9 (E163's two new rows). `test/render-structure.test.mjs`: a stale prose-fixture note updated (fixture input, not an assertion).
+- **`docs/backlog.md`**: E163 marked DONE with its second half recorded; **E164** (step 8b's budget-expiry FAIL is unreachable on a host whose command timeout is below `AGC_VERIFY_CI_WAIT_SECONDS`, so the retry guidance can livelock — non-blocking, it can never publish) and **E165** (`--branch main` is hardcoded in the CI query, now load-bearing rather than advisory) filed at queue orders 14t and 14u. Both are left open; neither is fixed here.
+
+### Notes
+
+- **This release is E163's first live exercise, on itself**: the session that shipped it ran the new step 2a and the new 8a/8b/8c ordering as written, against the very file it was changing.
+- `npm audit --audit-level=high` exits 0 for this release — 6 advisories reported, all moderate or low (hono, protobufjs, qs), none HIGH or CRITICAL — so no fresh disposition against `docs/dependency-advisories.md` (context, not changed) was required.
+
+## [3.115.1] - 2026-09-22
+
+Fix-forward for v3.115.0, whose CI was red on its own published tag commit `3313c40`
+(run `35699511268`). v3.115.0's local phase was green at 2234/2234 and its release
+self-check then found CI failing on the very commit it had just tagged. The tag, the
+`main` history and the GitHub release are immutable and stay exactly as published —
+this patch is the remedy, not a rewrite.
+
+### Fixed
+
+- **CI-hostile scratch-repo fixture in the E115 join-precondition suite** (backlog E162) —
+  `test/e115-join-precondition.test.mjs`. `mkGitRepo()` built its throwaway repo with
+  `git init -q`, which inherits the host's `init.defaultBranch`. Developer machines set
+  it to `main`, so the suite passed everywhere it was ever run by hand; CI runners set
+  nothing, git fell back to `master`, and the two AC1 subtests that reach for
+  `git checkout -q main` died on a branch that did not exist. The test could never have
+  passed on CI — it was not a flake and not a regression in the code under test. The
+  fixture now pins `git -c init.defaultBranch=main init -q` (a plain config override, so
+  no git version floor, unlike `git init -b main` which needs git >= 2.28) and adds
+  `git config commit.gpgsign false` from a same-class sweep, so a host with global
+  signing enabled and no usable key cannot hang or fail the scratch commit either.
+
+### Notes
+
+- **Test-only change; no shipped behavior moved.** The E115 feature module carries no
+  hardcoded branch name at all — `grep -c main` returns zero matches against both
+  `tools/join-precondition.ts` (context, not changed) and its compiled
+  `dist/tools/join-precondition.js` (context, not changed). The defect lived entirely in
+  the test's fixture, so
+  consumers of `agent-governance-mcp` see no functional difference between v3.115.0 and
+  v3.115.1.
+- **Verified against a CI-equivalent git config, not just the local default.** Re-run
+  under a `GIT_CONFIG_GLOBAL` setting `init.defaultBranch = master` — the configuration
+  that reproduced the failure at 21/23 — the suite now reports 23/23, and 23/23 again
+  under the ordinary local config.
+- E115's own spec, `specs/e115-join-precondition-check.md` (context, not changed), shipped
+  inside v3.115.0 and is unchanged here; this release adds no spec of its own, per the
+  backlog-row-as-spec convention for mini-chain tickets.
+- Evidence: `qa_reports/archive/e162-ci-default-branch-test-fix/review_T-E162-01.md`.
+- Backlog row E163 (release-SOP ordering: push the branch and confirm CI green before the
+  tag) is filed by this release but deliberately left open and unimplemented.
+
+## [3.115.0] - 2026-09-22
+
+Wave 3 of the v4 plan — the five E109 lane-fan-out tickets, shipped as one version from
+five parallel worktrees. E109 framed the problem (`workspace` is assumed to equal
+`feature`, and every agc mechanism keys on workspace); these five are its consequences,
+each measured on the same NDI fan-out: a detector that lied in both directions, a cost
+brake that divided by the number of lanes, a join precondition verified by nothing, a
+ledger silently overwritten on feature change, and no way for any session to see what
+another was doing.
+
+### Added
+
+- **Feature-level cost roll-up at feature close** (backlog E113) — `tools/feature-rollup.ts`,
+  `scripts/feature-rollup.mjs`, `content/coord-03-core-fallback.md`,
+  `test/feature-rollup.test.mjs`, `test/context-budget.test.mjs`,
+  `test/fixtures/compose-golden/skill-coordinator-monolith.txt`. Spec:
+  `specs/e113-feature-level-rollup.md`. Every feature-scoped cost brake divides by the
+  number of lanes, so a `hop` cap of 10 absorbed 8+4+6+4+6 = 28 in silence — no single
+  read can see more than one lane's share. The roll-up sums the feature's lanes at close
+  and writes the total to the close-out surface, which is the first place the real figure
+  has ever appeared. Pairs with E132: E113 needs the lanes enumerated, E132 produces the
+  facts, and neither is useful alone.
+
+- **A machine check for a join ticket's `depends_on` preconditions** (backlog E115) —
+  `tools/join-precondition.ts`, `scripts/join-precondition.mjs`,
+  `test/e115-join-precondition.test.mjs`. Spec:
+  `specs/e115-join-precondition-check.md`. A join's preconditions existed only as prose
+  ("J1a PASS at 0637e61, L3+L4 merged at 3245bb9") — nothing checked it, so a failed or
+  dead lane did not block the merge. `checkLaneAncestry` uses
+  `git merge-base --is-ancestor` and `checkDeclaredVsActualLaneIdentity` compares the
+  declared lane identity in `.current/feature-split.md` (context, not changed) against
+  this workspace's own
+  handoff. **Zero cross-workspace reads by construction** — local git objects and this
+  workspace's own files only, unlike E113's roll-up, which deliberately does read sibling
+  worktrees. AC3 is membership, not per-row equality: the actual `active_feature` present
+  in any declared row satisfies it.
+
+- **A cross-lane registry derived from git worktree metadata** (backlog E132) —
+  `tools/lane-registry.ts`, `tools/handoff-parse.ts`, `test/e132-lane-registry.test.mjs`.
+  Spec: `specs/e132-lane-registry.md`. No session could see what any other session was
+  working on, and the one place that knows — `git worktree list` — was never read. A
+  coordinator working in the `e111` worktree had no idea a third worktree existed. The
+  registry derives the lane set from worktree metadata rather than from an in-process Map
+  that cannot see another process, and surfaces it through the `tw_get_state` return.
+
+### Changed
+
+- **`tw_detect_drift` no longer lies in either direction** (backlog E112) —
+  `tools/drift.ts`, `tools/evidence-lookup.ts`,
+  `test/e112-drift-fanout-feature-scope.test.mjs`, `test/drift-archived-tasks.test.mjs`,
+  `test/drift-baseline.test.mjs`, `test/token-efficiency.test.mjs`. Two distortion cases,
+  one tool, one code path — folded into one row rather than filed separately. **(a)** The
+  fan-out case: a lane's ledger cannot see sibling lanes' completions, so the detector
+  reported them as drift; it now emits an advisory saying *this workspace may be one lane
+  of a larger feature* instead of implying a cross-workspace read it cannot make.
+  **(b)** The single-workspace multi-feature case, measured during Wave 1: after a lane's
+  second batch began, the report misattributed the first batch's state. No spec file —
+  backlog-row-as-spec, the mini-chain convention for a ticket riding in a wave.
+
+- **The outgoing ledger is archived before a feature change** (backlog E116) —
+  `tools/handoff-write.ts`, `test/e116-archive-on-feature-change.test.mjs`. Spec:
+  `specs/e116-archive-on-feature-change.md`. Running a second ticket in the same worktree
+  overwrote the first one's ledger permanently — J1a's handoff no longer exists, which is
+  why E113's roll-up figure above is a floor and not the true total. A feature change now
+  archives the outgoing ledger under `.current/archive/` first. Split from E115 because
+  this was silent data loss, not a missing check.
+
+### Notes
+
+- **Five features, one version.** The release's own AC4 multi-feature branch
+  (`content/skill-release-engineer.md` (context, not changed)) validated four specs —
+  `specs/e113-feature-level-rollup.md`, `specs/e115-join-precondition-check.md`,
+  `specs/e116-archive-on-feature-change.md`, `specs/e132-lane-registry.md` — and logged
+  one deliberate skip for E112, which ships on its backlog row. Without the
+  `Multi-feature release:` note in `pending_notes` the check would have validated only
+  the last feature's spec and passed while the other four went unverified.
+
+- **E114 is not in this release** — it shipped v3.114.0 and its backlog row was
+  done-marked there.
+
+- **Carried-forward drift, not a blocker**: `tw_detect_drift` reports T-E113-01,
+  T-E113-02 and T-E113-04 as completed with no handoff entry. Their code is merged; only
+  the `qa_reports/` evidence files are missing, lost when the E113 lane worktree was
+  removed (the E111/E150 class).
+  `review_reports/archive/e115-join-precondition-check/review_T-E113-04.md` exists (moved
+  there by this release's step-7a archive sweep); the other
+  two have no evidence file of any kind. Not reconciled, not re-QA'd by design.
+
+- **`.current/archive/` ownership is unresolved** (backlog E157, deferred to Wave 4
+  alongside E123). One file there is tracked from the E115 commit; E132's lane
+  deliberately excluded its own. This release changed nothing about that policy.
+
+- **One unreproduced suite failure** (backlog E156): `AC3b: GetPromptRequestSchema
+  dispatches 'teamwork-lite'` went red once in six full-suite runs and has not
+  reproduced. Recorded as an observation, not investigated as a defect.
+
+## [3.114.0] - 2026-09-18
+
+Wave 2.5 of the v4 plan — the release tooling that kept mis-serving multi-feature
+releases — plus E114, which gives an inherited cut approval somewhere honest to be
+recorded. Two features, one version: this is the first release whose own mechanics are
+exercised by the Wave 2.5 fixes it ships.
+
+### Added
+
+- **`cut_approved_source` records WHERE a cut approval came from** (backlog E114) —
+  `tools/handoff-types.ts`, `tools/handoff-parse.ts`, `tools/handoff-write.ts`,
+  `tools/handoff-orchestrator.ts`, `tools/registry.ts`,
+  `test/e114-cut-approval-inheritance.test.mjs`. Spec:
+  `specs/e114-cut-approval-inheritance.md`. One human approval fanning out across five
+  lanes produced five `cut_approved: true` self-attestations that no reader could tell
+  from fabrication. The new optional field is the client-settable companion to
+  `cut_approved`: a writer whose approval was carried forward from a parent feature
+  records `"inherited:<parent-feature>"` instead of silently re-claiming a turn that
+  never happened. Feature-scoped carry-forward on the `dispatch_mode` algorithm, with NO
+  PM-re-entry re-arm — inheritance is a stable fact about the lane, not a per-cut
+  approval. **Recording-only**: it satisfies `CUT_APPROVAL_REQUIRED` and every other gate
+  exactly as much as it did before, which is not at all.
+
+### Changed
+
+- **The release SOP no longer assumes one feature per release** (backlog E142) —
+  `content/skill-release-engineer.md`, `test/release-staging.test.mjs`,
+  `test/render-structure.test.mjs`. Spec: `specs/e142-release-tooling-wave25.md`. Three
+  checks misfired on every multi-feature release, all three measured on v3.111.0.
+  **(a)** The CHANGELOG citation check now measures against the union of
+  `<prev-tag>..HEAD` and the staged diff, not the release commit alone — a wave lands its
+  work across earlier commits, and the narrow denominator flagged 35 of 41 genuine paths.
+  **(b)** Step 8 AC4 gains a MULTI-FEATURE branch and drops its single-commit proxy for
+  the honest `<prev-tag>..HEAD` range; a release that ships more than one feature is now
+  classified and each named feature's spec checked, rather than falling through to a
+  backlog-row-as-spec SKIP that was never a real check. A named feature with no spec file
+  is logged and skipped by design — backlog-row-as-spec is this project's norm for
+  mini-chain tickets riding a wave. **(c)** Step 7a's expected-red sweep is generalized:
+  every root-level `expected-red_*.txt` is tested against the `<prev-tag>` membership
+  baseline and filed under its OWN feature's archive dir, so a sibling feature's file is
+  no longer orphaned at root.
+- **Step 8 owns `tasks.md`; step 13a never did** (backlog E143) —
+  `content/skill-release-engineer.md`, `scripts/verify-release.mjs`,
+  `test/verify-release.test.mjs`. 13a claimed the task ledger on the premise that E71c
+  excluded it from the release commit, but E94's root-file completeness check *forces*
+  step 8 to stage it, so 13a contributed zero files of it on the release where the claim
+  was first executed. The ownership is now stated once, in the Artifact list, and 13a's
+  `git add` no longer names it. `BOOKKEEPING_PATH_RES` keeps its `tasks.md` entry
+  deliberately, now documented as a harmless superset rather than a mirror of 13a's
+  staging.
+- **`--close-out`'s failure remedy distinguishes its two causes** (backlog E144) —
+  `content/skill-release-engineer.md`. The check already failed correctly on a branch
+  with no upstream; only the prose remedy was wrong, telling the reader to "push again"
+  when a never-pushed branch needs `git push -u` to create the upstream the check reads.
+  Step 13b now routes on which FAIL fired.
+- **Check 6 asks CI about the tagged release commit, not whatever HEAD happens to be**
+  (backlog E147) — `scripts/verify-release.mjs`, `test/verify-release.test.mjs`. The
+  check resolved `releaseSha` from `git rev-parse HEAD`. Before E141 that was unreachable
+  — a bookkeeping commit past the tag made Check 1 FAIL outright — but E141 made that
+  shape a first-class pass, so on the post-13a re-run Check 6 polled CI about the
+  bookkeeping commit and reported a GREEN verdict about the wrong sha (measured on
+  v3.112.0; reproduced on v3.113.0). It now resolves the sha from `refs/tags/v<version>`
+  via the same two-call pattern Check 1 uses, falling back to HEAD only pre-tag.
+- **The anchoring rule no longer reads as contradicting the worktree bootstrap
+  obligation** (backlog E149) — `content/coord-03-core-fallback.md`. E109 listed evidence
+  paths among the mechanisms "anchored to `workspace_path` ... never spans workspaces"
+  one paragraph above E111 requiring a worktree lane to symlink those very directories
+  back to primary. The rule now says anchoring is about *keying*, and points at the
+  bootstrap obligation for where the paths resolve.
+- `docs/schema-versions.md` gains the v14 row **and the v13 row that was never written**
+  — the registry had shipped v13 undocumented since v3.87.0.
+- `test/context-budget.test.mjs`,
+  `test/fixtures/compose-golden/skill-coordinator-monolith.txt` — coordinator bundle
+  floor 18722 → 18747 and the compose-golden fixture regenerated for E149's N1 clause.
+
+### Notes
+
+- **Handoff schema v13 → v14** — `schema/versions.ts`, `schema/migrations-handoff.ts`,
+  `test/handoff-migration.test.mjs`, `test/handoff-versioning.test.mjs`,
+  `test/schema-versions.test.mjs`. The migration is **stamp-only and seeds nothing**:
+  **absence === non-inherited**, the safe direction, so an old handoff with no
+  `cut_approved_source` can never be read as claiming inheritance. Old state files
+  migrate forward lazily on read with no operator action. This is a MINOR bump, not a
+  MAJOR: the versioning policy above reserves MAJOR for *breaking* changes to the
+  handoff/state format, and an additive optional field whose absence is the conservative
+  default breaks nothing — the closest precedents are v4→v5 (`cut_approved`) and,
+  mechanically, v10→v11 (`dispatch_mode`), both MINOR.
+- **This is a multi-feature release.** `active_feature` is
+  `e142-release-tooling-wave25`; the second feature is `e114-cut-approval-inheritance`.
+  Both carry a spec under `specs/`, and citations in this entry are derived from the
+  union of `v3.113.0..HEAD` and the release commit's staged diff — E142(a), shipping
+  here, is what makes that denominator automatic rather than a hand-chosen range.
+- **First live exercise of E142/E144/E147.** The fixes ship in the commit this release
+  tags, so this release is their first real run rather than a rehearsal.
+- **`npm audit --audit-level=high` exit 0.** No disposition in
+  `docs/dependency-advisories.md` *(context, not changed)* was required for this release.
+- Suite 2135/2135.
+
+
+## [3.113.0] - 2026-09-18
+
+Wave 2's content lane plus two backlog-row-as-spec mini-chains, released together as one
+version. E109 anchors the workspace/feature relationship in the coordinator's core
+fallback, E146 rides it to correct step 9a's prose about Check 1's tolerance path, E145
+stops `check-md-tables` from flagging a CITED done-mark, and E148 takes the wall clock
+out of a seed's stamp provenance. Three features, one version: E145 and E148 are
+`test/`- and `scripts/`-scoped mini-chains that were never going to justify a version of
+their own, and E146 documents behaviour v3.112.0 already shipped.
+
+### Added
+
+- **A seed's stamp provenance no longer depends on the wall clock** (backlog E148) —
+  `test/e148-seed-stamp.mjs`, `test/e148-stamp-provenance-seed.test.mjs`. Seeded handoff
+  writes took their stamp from `Date.now()` at seed time, so a suite that seeded and then
+  asserted within the same coarse clock tick could read a stamp it had not actually
+  caused, and one that straddled a tick boundary could not. The seed helper now supplies
+  the stamp explicitly; 16 suites were converted onto it — `test/ac-execution.test.mjs`,
+  `test/dispatch-pins.test.mjs`, `test/e128-orchestrator-blocked-repair.test.mjs`,
+  `test/e18-write-provenance.test.mjs`, `test/e23-evidence-schema.test.mjs`,
+  `test/e28-shrink-warning.test.mjs`, `test/e32-e33-gate-hardening.test.mjs`,
+  `test/e38-next-role-lookahead.test.mjs`, `test/feature-lease.test.mjs`,
+  `test/gates-expected-red.test.mjs`, `test/hop-count-transitions.test.mjs`,
+  `test/qa-flow.test.mjs`, `test/qa-review-scoped-append.test.mjs`,
+  `test/repro-first-gate.test.mjs`, `test/reviewer-completed-tasks-gate.test.mjs`,
+  `test/success-metrics.test.mjs`. The stamp-provenance gate itself is untouched: this
+  changes what the tests feed it, not what it accepts.
+
+### Changed
+
+- **The coordinator's core fallback now states the workspace/feature anchoring rule**
+  (backlog E109) — `content/coord-03-core-fallback.md`. Spec:
+  `specs/e109-workspace-feature-anchoring.md`. The declare-as-designed reading was
+  adopted over treat-as-defect, and the rule is stated as prose in the fallback body
+  rather than wrapped in a rationale fence — that route was considered, rejected, and
+  independently re-verified during QA, and should not be reopened in a later round.
+- **Release SOP step 9a now describes Check 1's tolerance path** (backlog E146, riding
+  E109's lane per the Wave 2 plan) — `content/skill-release-engineer.md`. v3.112.0
+  shipped the tolerance in `scripts/verify-release.mjs` *(context, not changed)* while
+  step 9a still described `tag-at-HEAD` as an unconditional assertion and never mentioned
+  the `NOTE:` line a tolerated pass prints. The prose now names both, and says plainly
+  that a tolerated pass is a genuine pass rather than a degraded one. This was filed at
+  v3.112.0 as the half `content/` could not reach from that cut's lane.
+- **The done-mark position advisory no longer fires on a CITED mark** (backlog E145) —
+  `scripts/check-md-tables.mjs`, `test/check-md-tables.test.mjs`. A done-mark carrying a
+  citation was counted as buried, so `docs/backlog.md` carried an advisory for a row that
+  was correctly marked. Advisories on that file drop 5 → 4 (E39/E40/E58/E59 remain).
+  `CQ-9` pins that E145's own row — whose mark deliberately sits in the last column —
+  stays clear of the advisory.
+- `test/context-budget.test.mjs`, `test/fixtures/compose-golden/skill-coordinator-monolith.txt`
+  — context-budget floor 18570 → 18722 and the compose-golden fixture re-baselined for
+  E109's added fallback prose (AC6).
+
+### Notes
+
+- **This is a multi-feature release.** `active_feature` is
+  `e109-workspace-feature-anchoring`; E145 and E148 are backlog-row-as-spec mini-chains
+  with no spec file of their own. Citations in this entry are derived from
+  `v3.112.0..HEAD`, not from the release commit's own diff — the feature work landed
+  across earlier commits and merges, so the release commit carries only the version
+  bump, the bookkeeping writes, and the evidence archive moves. Backlog **E142** covers
+  the tooling gap that makes that denominator a manual choice.
+- **Known and filed, not fixed here:** `scripts/verify-release.mjs` *(context, not
+  changed)* Check 6 resolves `releaseSha` from `git rev-parse HEAD`, so on the post-13a
+  re-run it queries CI about the bookkeeping commit rather than the tagged release
+  commit (**E147**, Wave 2.5). WARN-and-continue is that check's contract, so it is not
+  a release blocker.
+- **`npm audit --audit-level=high` exit 0.** No disposition in
+  `docs/dependency-advisories.md` *(context, not changed)* was required for this release.
+- Suite 2114/2114.
+
+## [3.112.0] - 2026-09-18
+
+E141 — the release self-check's `tag-at-HEAD` invariant, which Wave 1.5's own step 13a
+made unsatisfiable under this repo's actual workflow. Step 13a commits governance
+bookkeeping in the same session, after the tagged release commit, so HEAD advances past
+the tag; the last three releases (v3.109.0, v3.110.0, v3.111.0) all deferred the remote
+phase to a human, by which time that commit already exists locally. Since every
+remaining wave ends in a release and a `verify-release` FAIL routes to `Blocked`, this
+was a hard stop on Waves 2-7, not a warning.
+
+### Changed
+
+- **Check 1 (`tag-at-HEAD`) now tolerates a tag followed ONLY by governance-bookkeeping commits** (backlog E141) — `scripts/verify-release.mjs`. Two preconditions, both required: the tag must be an ancestor of HEAD, and every commit in `<tag>..HEAD` must touch only the bookkeeping allowlist (`.current/handoff.md`, `.current/*.jsonl`, `tasks.md`). Either failing keeps the FAIL. A tag that is not an ancestor — a rewritten or wrong-branch tag — keeps the **byte-identical** original FAIL message, so ancestry is a precondition of the tolerance and never a substitute for it. A non-bookkeeping path in range produces a FAIL naming the offending commit sha(s) and path(s), so the operator does not re-derive the range by hand. A merge commit in range is judged by the same path rule via `git diff-tree -m` rather than vacuously skipped, since a plain `diff-tree` reports no paths at all for a merge. A tolerated pass is never silent: it prints `NOTE: tag-at-HEAD — tolerated N governance-bookkeeping commit(s) ahead of tag vX.Y.Z (<tagsha>..<headsha>)` before `OK: tag-at-HEAD`. The tag-equals-HEAD path returns byte-identically to before — the equality path is not the tolerance path.
+- **`--close-out` is narrowed in role, not in behaviour** (backlog E141) — `scripts/verify-release.mjs`. Its code is untouched; the header comment now records that a normal run already tolerates the single bookkeeping-only commit automatically, leaving `--close-out` for what the tolerance deliberately does not cover: real source changes ahead of the tag, or a tag that is not an ancestor of HEAD.
+- `test/verify-release.test.mjs` — six new pins covering the tolerance's acceptance criteria: the equality path, the tolerated-pass NOTE, the non-bookkeeping-path FAIL and its sha/path detail, the non-ancestor byte-identical FAIL, and the merge-commit-in-range case. Suite file 44/44.
+
+### Notes
+
+- **Checks 2-6, `runCheck`, and `--close-out`'s logic are untouched.** The change is scoped to Check 1's inequality branch.
+- **The tolerance was NOT exercised by this release's own local phase.** The release commit is tagged at HEAD, so Check 1 would take the equality path. Step 9a runs in the remote phase, after the push; see that phase's record for the verbatim output.
+- **Known and filed, not fixed here:** Check 6 computes `releaseSha` as `git rev-parse HEAD`, so once the tolerance fires it queries CI about the bookkeeping commit rather than the tagged release commit (**L-RELTOOL-NEW-1**, scheduled for Wave 3). WARN-and-continue is that check's contract, so it is not a release blocker.
+- **`content/skill-release-engineer.md`** *(context, not changed)* step 9a still describes Check 1 as an unconditional assertion and does not mention the NOTE line. Filed as **E146**, riding Wave 2's `L-CONTENT` lane — `content/` is E109's lane under §2.1 and was not available to this cut at any price. The row and its execution-order entry were deliberately left unmarked.
+- **`npm audit --audit-level=high` exit 0.** No disposition in `docs/dependency-advisories.md` *(context, not changed)* was required for this release.
+- Suite 2100/2100.
+
+## [3.111.0] - 2026-09-17
+
+Wave 1 and Wave 1.5 of the v4.0.0 execution plan, released together. Wave 1 shipped
+13 tickets across 8 parallel lanes on 4 branches; Wave 1.5 is the single content lane
+that closes the three orphans Wave 1's lane/file rule barred from it. **They ship as one
+version deliberately**: Wave 1 landed E82 (i) — `scripts/verify-release.mjs`
+`DEFAULT_WAIT_SECONDS = 480` — while option (ii), the SOP prose describing that budget,
+belonged to `content/` and so was unavailable to that lane at any price. Releasing Wave 1
+alone would have published a version whose own documentation contradicted its code.
+
+### Added
+
+- **A re-cut of a voided task id is now refused outright** (backlog E120) — `tools/tasks-file.ts`, `tools/storage-sqlite.ts`. A re-cut id inherited the review and QA evidence of the incarnation that was voided, so a never-reviewed task satisfied both `MISSING_REVIEW_EVIDENCE` and the QA completion-evidence gate. Closed by refusing the re-cut rather than stamping evidence with a void generation — a re-cut is different work, and refusing removes the state in which the bug is expressible instead of adding a version field every future evidence reader would have to honour. Closed in both storage modes: SQLite void deletes the row, so a `voided_tasks` tombstone gives `addTask` something to refuse against, and the DELETE and INSERT now share one transaction.
+- **U+2028/U+2029 can no longer erase a `tasks.md` row** (backlog E131) — `tools/tasks-file.ts`. Those terminators made a row unparseable, so it survived on disk while `parseTasksFromFile`, `getNextTask`, `tw_detect_drift` and `tw_sync` all went blind to it at once. Scoped wider than filed: the input-boundary guard refuses both characters at all eight call sites, and the parser now fails loudly on a corrupted live row instead of silently erasing it, because a hand-edited `tasks.md` never passes a mutator at all.
+- **A write-boundary refusal for leaked tool-call markup** (backlog E86) — `tools/registry.ts`. A malformed multi-argument tool call could bleed a sibling argument's literal tag markup onto the tail of a free-text field, and nothing at the write boundary noticed. A zod `superRefine` now guards five free-text fields (`pending_notes` entries, `scope_decision_why`, `qa_review`, `blocking_reason`, and `tw_add_task`'s `description`). The predicate is deliberately narrow — the fragment must be tail-anchored AND carry a real tool-call signal (a close-tag slash or an attribute assignment) — because a predicate that reds on truthful prose is worse than no predicate.
+- **A synthetic omission marker for wholly-dropped notes** (backlog E92) — `tools/handoff-parse.ts`. A partially kept note already got an inline marker, but a note dropped whole left no trace in the returned array, visible only to a caller that thought to inspect the `pending_notes_truncated` advisory.
+- **A Blocked role can now correct its own Blocked record** (backlog E128) — `tools/transitions.ts`. `validateTransition`'s step-3 self-loop fast path accepts same-agent `Blocked → Blocked`, written as an explicit second NAMED status pair rather than a `prev.status === next.status` wildcard — the wildcard would also admit `PASS → PASS`, so naming the pairs makes PASS terminality structurally unreachable by this change rather than merely untested. 69 → 76 accepted edges, zero removals. The static `ALLOWED` map stays byte-identical, so the mirror table needs no coordinated edit and `check:transitions-sync` stays green at 21 keys.
+- **`verify-release.mjs --close-out`** (backlog E84) — `scripts/verify-release.mjs`. The governance bookkeeping commit is created AFTER `verify-release` runs (the E71c exclusion), and re-running the whole script afterwards cannot work because Check 1 (tag-at-HEAD) then fails by construction. `--close-out` asserts zero commits ahead of `@{u}` while deliberately skipping tag-at-HEAD and every version-dependent check, so it is runnable at the moment the gap opens. Verified against fixtures to FAIL on the live v3.102.5 shape.
+- **A done-mark position advisory** (backlog E88) — `scripts/check-md-tables.mjs`. ADVISORY-ONLY, never affecting the exit code, scoped to `docs/backlog.md` by exact header-cell match. `findGenuineDoneMark()` requires a candidate to sit outside any code span (CommonMark equal-length backtick-run pairing) and to self-close or carry a version/date stamp; measured over all 65 marker-bearing cells it returns exactly the 4 genuine rows, zero loss across the other 61.
+- **`sanitizeForRender`** (backlog E122) — `prompts/build.ts`. Live handoff state was rendered with `JSON.stringify` into a json fence, so every free-text field reached the dispatch prompt verbatim and structural markers quoted in that text were scanned by structural detectors as though they were authored SOP content. State is now deep-cloned and structural markers backtick-quoted on every string leaf, reusing the detector's own exclusion for quoted illustrations; the marker pattern is the byte-identical union of the detector's two regexes and a test pins that equivalence. The transform is strictly additive — it cannot delete, truncate or reorder text.
+- **Every Task dispatch now carries an explicit `model`** (backlog E103 option (iii)) — `content/coord-02-host-dispatch.md`. The coordinator resolves the tier from the `dispatch_pins` entry for the role, else that role's `~/.claude/agents/<role>.md` `model` frontmatter; no resolvable tier is a stop-and-report, not a silent omission.
+- `docs/v4.0.0-execution-plan.md`, `docs/v4.0.0-new-tickets.md`, `NEW-TICKETS.md` — the v4.0.0 wave plan, the post-v4 findings queue, and the four Wave 1 lanes' verbatim findings logs.
+- New suites: `test/e120-void-recut-refusal.test.mjs`, `test/e122-state-render-injection.test.mjs`, `test/e128-blocked-self-loop-repro.test.mjs`, `test/e128-orchestrator-blocked-repair.test.mjs`, `test/e92-e86-handoff-write-boundary.test.mjs`, `test/e92-e86-handoff-write-boundary-repro.test.mjs`, `test/check-md-tables.test.mjs`.
+
+### Changed
+
+- **`agc init` writes through a symlinked `CLAUDE.md` instead of replacing it** (backlog E102) — `bin/agc-init.mjs`. `atomicWriteFile`'s tmp + `renameSync` swapped the inode, so a symlinked `CLAUDE.md` was detached and replaced: the canonical file the user maintains never received the adapter block, and `agc check` then reported OK against the detached copy. The target is now resolved with `realpathSync` before deriving `tmpPath`. What settled it was an internal contradiction rather than a preference — E111 ships a rule in this same binary telling adopters to symlink evidence directories back to primary, and one binary cannot teach a convention and destroy it a few hundred lines apart. Also adds try/finally so a mid-write ENOSPC cannot strand a partial `.tmp`, and preserves the target's mode so a deliberate `0600` no longer widens to `0644`. Hardlinks remain unsupported by decision, now stated in the code.
+- **The `check-md-tables` cause discriminator no longer prescribes a corrupting remedy** (backlog E105) — `scripts/check-md-tables.mjs`. The (a)/(b)/(c) discriminator conflated "a blank line severed a table from its header" with "two adjacent tables, the second missing its delimiter"; for the second shape it prescribed "fix the blank line", and following that remedy turned 1 violation into 2 and demoted the second header to a data row — the tool's own instruction producing the corruption it exists to prevent. It now compares against the prior run's header cell count rather than the nearest non-blank row.
+- **The enforcement-implying model-pin wording is retired** (backlog E91 option (iii)) — `content/coord-03-core-fallback.md`, `content/coord-04-host-watermark.md`. Crash-Resume no longer promises to "verify they're honored"; passing the override is all the coordinator can do, because no channel reports which model actually served a turn. The pinned-tier expectation is kept but reframed as a self-report check — a mismatch means only that the reply did not claim the pinned tier, and a match never establishes which model executed.
+- **Release SOP: the CI-poll-budget sentence now cites `DEFAULT_WAIT_SECONDS` by name** (backlog E82 option (ii), reporting half) — `content/skill-release-engineer.md` step 9a. The sentence hardcoded "~10 minutes" and went stale the moment the constant became 480s. Step 9a also now requires the resolved wait budget actually used to be stated in the release notes, so the record says what ran rather than only that it ran.
+- **Release SOP: steps 13a and 13b** (backlog E84 SOP wiring) — `content/skill-release-engineer.md`. Round 1 of E84 placed the `--close-out` check with no step making the commit it checks for: `--close-out`'s only assertion is `git rev-list --count @{u}..HEAD`, and with no commit yet made in-session that count is 0 by construction, so the check passed vacuously — worse than no check, since it manufactured a clean signal for the exact escape E84 exists to catch. Split in two: **13a** now makes AND pushes the bookkeeping commit in the same session, enumerating `.current/*.jsonl` via `find` rather than a raw glob (zsh NOMATCH would abort the whole `git add`) and asserting the stage is non-empty before committing; **13b** runs `--close-out` immediately after, against a real freshly-pushed commit.
+- **Release SOP: the E17 record-integrity rule gains a `(context, not changed)` convention** (backlog E83) — `content/skill-release-engineer.md`. A path cited as evidence or background rather than claimed as modified this release is exempt from the diff-membership half of the check only; the on-disk-existence half is never exempt.
+- `test/verify-release.test.mjs` — VR-9b pins E82 (ii) behaviourally (the step-9a sentence carries no hardcoded duration literal and sources it from `DEFAULT_WAIT_SECONDS`); VR-9c pins that 13a's assertion is scoped to a fully-empty stage, not partial under-staging.
+- `test/feature-lease.test.mjs` — E17-S2 retargeted: the record-integrity reason tail moved into a `<!-- rationale:start/end -->` fence, which `prompts/build.ts` strips on every dispatch, so the test now asserts the fence exists rather than assuming inline placement — making the asymmetry a pinned, visible fact rather than something a future edit could silently drop.
+- `tools/handoff-parse.ts`, `test/qa-flow.test.mjs`, `test/context-budget.test.mjs`, `test/skill-manifest.test.mjs`, `test/e117-void-task.test.mjs`, `test/e121-tasks-file-injection.test.mjs`, `test/agc-adapters.test.mjs`, `test/fixtures/compose-golden/skill-coordinator-monolith.txt`, `specs/qa-flow-enforcement-architecture.md` — coverage and goldens re-baselined for the above.
+- `specs/e82-e84-release-verify-tooling.md`, `specs/e88-e105-md-table-checker.md`, `specs/e92-e86-handoff-write-boundary.md` — per-feature design records.
+
+### Notes
+
+- **E122 ships PARTIAL and its row says so.** The structural symptom is closed — a note can no longer render as prompt structure — but the injection surface is mitigated, not closed: a note reading "IGNORE ALL PREVIOUS INSTRUCTIONS" still renders byte-for-byte, and the framing sentence is the only defence. A second surface at `bin/agent-governance-context.mjs` *(context, not changed)* inlines the raw handoff file with no field boundaries at all and is untouched. Filed as **E137** rather than implied closed by a done-mark.
+- **E82 ships (i) plus (ii)'s reporting half.** Option (ii)'s first clause — set a budget below the tool's own ceiling — is satisfied only structurally, by (i)'s 480s default; the prose half that shipped here is the reporting requirement. The done-mark is scoped accordingly.
+- **Two Wave 0 decisions were amended in flight, deliberately visibly.** Decision C named `content/skill-<role>.md` frontmatter as the dispatch-pin source, but `agc init` never scaffolds `content/` into a managed workspace, so read literally it resolves to nothing for every adopter; the shipped mechanism reads `~/.claude/agents/<role>.md`. Decision E specified fail-closed where `realpathSync` throws, a branch the caller's own `existsSync` makes unreachable. Both had one root cause — validated against this repo's layout rather than against the state the code will actually meet — and `docs/v4.0.0-execution-plan.md` §8b now carries the standing pre-cut check. The remaining four Wave 0 decisions were re-checked against it: A, B, D and F pass.
+- **Findings filed from these waves' own execution, all unbuilt and deliberately not marked:** E134 (E128's fast path bypasses the static table, so the rejection hint never advertises the edge E128 just legalised), E135 (read-view markers are indistinguishable from author prose, so the next role writes them back as real state), E136 (both evidence-path gate sites derive the path by sanitising the task id, so on APFS or NTFS two ids differing only in case resolve to one file — E120 reproduces through another door), E137 (above), E138 (read-view truncation drops the tail, so a chain's handover notes are the ones lost), E139 (the verdict-integrity gate arms only on reviewer writes, so a fabricated `review_verdict` from any other role passes all 33 gates and auto-routing would act on it), E140 (a prose step cannot verify that it ran — filed observation-class, no cut).
+- **`npm audit --audit-level=high` exit 0.** Six advisories are outstanding (2 low, 4 moderate — `@hono/node-server`, `body-parser`, `esbuild`, `hono`, `protobufjs`, `qs`), all below the HIGH threshold the Constitution §6 build gate keys on, so no disposition in `docs/dependency-advisories.md` *(context, not changed)* was required for this release.
+- Suite 2094/2094.
+
+## [3.110.0] - 2026-09-15
+
+### Added
+
+- **`tasks.md` mutators now refuse caller text that could forge a ledger row** (backlog E121) — `tools/tasks-file.ts`. Two distinct holes are closed at all four mutators (`voidTaskInFile`, `rollbackTaskInFile`, `completeTaskInFile`, `addTaskInFile`). (1) *`$`-expansion*: each site passed caller-derived text as a `String.replace` **replacement string**, whose grammar interprets `$&`, `` $` ``, `$'`, `$1` and `$$`; `` $` `` and `$'` splice multi-line content and were reproduced planting genuine-looking task rows while the tool returned `success: true`. Every site now passes a replacer **function**, so no `$` sequence is ever interpreted. (2) *line injection*: a bare newline in a note, reason, description or task id ends the row and starts a new one regardless of `$` handling, so a `containsLineBreak()` input-boundary guard now refuses it at eight points — the `taskId` and the payload field of each of the four mutators — rather than storing text the single-line storage format cannot represent. Not an outside-party exposure: every caller is a governed role. The realistic trigger is a reason or note that quotes a task row verbatim, which is ordinary during a re-cut.
+- `test/e121-tasks-file-injection.test.mjs` — 13 tests covering the eight must-refuse field x mutator cells, the explicit-refusal negative assertion for the `taskId` column, a must-succeed over-refusal floor (16 benign id shapes plus a `$`-expansion round trip), and a CR-only hygiene case. Proven non-vacuous by execution against the pre-fix build, where 11 of the 13 fail.
+- **Coordinator SOP: an *Evidence-Citation Convention*** (backlog E87 option (i)) — `content/coord-03-core-fallback.md`. A `docs/backlog.md` row citing a `qa_reports/`/`review_reports/` evidence file MUST cite its eventual archive path (`<tree>/archive/<feature>/<file>`), never the pre-archive root: release-engineer step 7a moves the file at the next release regardless of which row cites it, and no role is authorized to repair the stale citation afterward.
+- **Release SOP: a CHANGELOG citation check** (backlog E95 option (i)) — `content/skill-release-engineer.md`, in **step 8**, before the commit. Every file path named in the new CHANGELOG entry must appear in `git diff --cached --name-only`; citations are derived from that diff, never from the backlog row or ticket summary. Step 8 is the earliest point at which the staged diff is populated, and there is no path by which a citation changes between it and the commit. **This entry is the check's first exercise**, applied to itself.
+- `test/render-structure.test.mjs` — 5 behavioural pins asserting both new convention texts survive composition and render at `fullDetail` true/false, and strip cleanly at `fullDetail=false`. A golden refresh alone would pass even if the text were dropped.
+
+### Changed
+
+- `specs/e1-feature-scoped-state-design.md` — the feature-clobber prose corrected (backlog E93). Counter-reset behaviour on an `active_feature` change is **not** uniform: `hop_count` and the three `*_rounds_total` mirrors reset via `computeNewRound`'s `feature_changed` base, but `qa_round` / `review_round` / `visual_round` carry no `feature_changed` term and are zeroed only by the `(pm, In_Progress)` branch — so a non-PM write that changes `active_feature` hands the incoming feature a stranger's round counts against caps already partly consumed.
+- `README.md` — the SessionStart hook install pin at line 182 was stale at `#v3.104.2` while the two install pins above it had moved (backlog E129); all three now agree, bumped here to `#v3.110.0`.
+- `test/context-budget.test.mjs` — the design-arm teamwork-coordinator bundle floor re-baselined 18303 → 18369 ~tok for the `coord-03` addition above, set to the exact independently re-measured value per that file's qa-owned bump convention.
+- `test/fixtures/compose-golden/skill-coordinator-monolith.txt` — compose golden regenerated for the same addition, diff-confirmed to contain only the intended span.
+- `docs/backlog.md` and `docs/agc-feedback-2026-09-08.md` — the **E73 / E130 scope boundary re-drawn as mechanism vs policy**: E73 owns the `agc feature start/finish` lane bootstrap, E130 owns only the default-switch policy and now declares `depends_on: E73` rather than building a bootstrap of its own. No code ships for either.
+- `docs/backlog.md` — **E91's premise corrected**: its option (i) was measured as already shipped in v3.53.0, months before the row was filed, so what remains is a decision between (ii) and (iii), not a cheap line. **E131 filed** (order `13s`) for the U+2028/U+2029 row-*erasure* vector that E121's round-2 review measured and deliberately declined to absorb under a round cap — `DEFAULT_TASK_REGEX`'s trailing `(.+)$` cannot cross those terminators, so such a row is not forged but rendered invisible to `parseTasksFromFile`.
+
+### Notes
+
+- **Three record corrections ship with the done-marks, because a done-mark on a false premise propagates it.**
+  - `docs/backlog.md` E121 and the `tasks.md` T-E121-01 row both stated that for the three non-void mutators "the injected row is inert garbage". Code-reviewer round 1 measured that **false**: under the newline vector the spliced row is live and parseable, `getNextTask` offers it, and `progress.total` moves 2 → 3 on a `success: true` receipt. Both rows are corrected here.
+  - `docs/backlog.md` E95 option (i) named "step 10", which has been a retired pointer slot since E65. The check shipped at **step 8**; the row now says so, so the next reader is not sent to a dead step.
+  - `docs/backlog.md` order row `13l` (**E104**) is done-marked for work that shipped in **v3.107.0**, not in this release — its prevention (c) landed in `d505878` and is absent at `v3.106.0`, verified independently here; the ticket row already recorded it while the order row never received the mark. (The two files that carry it — `bin/agc-init.mjs` and `test/agc-adapters.test.mjs` — are named here as **v3.107.0 context, NOT as changes in this release**; neither appears in this release's diff, and this entry makes no claim that it does.) E104 remains **PARTIAL**: the residual-history facet is still open and human-owned.
+- **Batch release, by explicit human decision.** Seven backlog items ship as one release off a single uncommitted branch: two reviewed-and-PASSed features (E121; E87+E95) plus five coordinator-direct or amendment-only items (E93, E129, E73/E130, E91, E131). Because two features are in the batch, SOP step 7a's per-feature archive subtree applies twice — `qa_reports/archive/` and `review_reports/archive/` each receive a separate `e121-tasks-file-replacer/` and `e87-e95-release-citation-accuracy/` subdirectory, not one folded tree.
+- **E113 is deliberately NOT in this batch.** It was classified as cheap-batch material and then measured not to be: it carries a real SOP design decision (feature-level roll-up at feature close) and would have pushed the coordinator context-budget cap a third time in three features. It gets its own cut presentation.
+- **First exercise of the E95 check, on itself — and it fired.** Run against this entry, `git diff --cached --name-only` flagged two cited paths absent from the staged diff: `bin/agc-init.mjs` and `test/agc-adapters.test.mjs`. Both are correct as written — they are *context* citations in the E104 note above, naming where v3.107.0's work lives, not claims about this release's diff — so the entry was clarified rather than the citations removed. The finding is the check's known path-granular limit meeting the changed-vs-cited distinction E83 exists to draw and E95's own option (ii) anticipates: as specified, the check cannot tell a change-citation from a context-citation, so a human disposition is still required at each fire. Recorded here rather than filed as new, since E95's row already names it.
+- Two non-blocking residuals recorded by code-reviewer and accepted rather than fixed: E87's `<feature>` archive-path template resolves to the *releasing* feature, not the citing row's own feature (E87 option (iii) territory), and E95's check is path-granular — it catches 3 of the 4 miscitations in its own worked example, hunk-level verification costing more than a P3 convention warrants.
+- Evidence ships in the commit, already at its archive path per the E87 convention this release introduces: `review_reports/archive/e121-tasks-file-replacer/review_T-E121-01.md`, `qa_reports/archive/e121-tasks-file-replacer/review_T-E121-01.md`, `qa_reports/archive/e121-tasks-file-replacer/review_T-E121-02.md`, `review_reports/archive/e87-e95-release-citation-accuracy/review_T-E8795-01.md`, `qa_reports/archive/e87-e95-release-citation-accuracy/review_T-E8795-01.md`, `qa_reports/archive/e87-e95-release-citation-accuracy/review_T-E8795-02.md`.
+
+## [3.109.0] - 2026-09-15
+
+### Added
+
+- **Coordinator SOP: a *Worktree bootstrap obligation* under the Feature-Scope Gate** (backlog E111) — `content/coord-03-core-fallback.md`. When the separate-git-worktree route out of a held feature lease is taken, the lane MUST, before any build, symlink back to a location outside the lane each of `qa_reports/`, `review_reports/`, `specs/` that is untracked in that repo. A fresh worktree has none of the three by default, so a lane's code-review and QA evidence otherwise lives in exactly one directory that `git worktree remove` deletes outright. Two constraints are stated rather than left to inference: `mkdir -p` the directory in primary FIRST when it is absent there too, because linking to a path that does not exist yet produces a dangling symlink whose first evidence write fails outright; and link the **TOP-LEVEL** directory only, never per-file, because release-engineer SOP step 7a archives released evidence into a per-feature subdirectory under `qa_reports/` and a parallel one under `review_reports/`, and only a top-level link carries that subtree with it. The *Escalation Routes* feature-lease row gains a clause pointing at the new paragraph.
+- **`agc check` now emits an advisory warning when a linked git worktree's evidence directories are not symlinked back out** (backlog E111) — `checkWorktreeEvidence()` in `bin/agc-init.mjs`, wired into `runCheck()` alongside the existing `checkResearchBinaries()`. Worktree detection uses git's own on-disk signal — a linked worktree has a `.git` *file* (the `gitdir:` gitfile), a primary checkout has a `.git` *directory* — so a primary checkout can never false-positive on its path name and the whole check is a silent no-op there. For each of `qa_reports/`, `review_reports/`, `specs/` it warns when either the entry is a real directory that is completely empty, or holds untracked content that is itself gitignored or sits in a directory with zero tracked files; or the entry IS a symlink that does not resolve outside the worktree (dangling and resolves-inside-the-lane produce distinct messages, since they are different diagnoses). The supporting predicates — `hasUntrackedContent()` (`git ls-files --others` deliberately WITHOUT `--exclude-standard`, so a gitignored evidence file is not filtered back out), `hasIgnoredUntrackedContent()` (file-by-file, because `git check-ignore` on a *directory* holding one force-added tracked file reports "not ignored" while every untracked file inside it still is), and `hasTrackedContent()` — each carry the same `-z`/NUL-split/`execFileSync`-argv and fail-closed-and-silent discipline as `checkResearchBinaries()`. **Advisory only: it never changes `agc check`'s exit code.**
+- `test/agc-adapters.test.mjs` — six tests pinning the above against synthetic fixture repos: E111(i) a plain untracked evidence dir warns and does not go silent when a force-added tracked `.gitkeep` sits beside untracked evidence; E111(ii) a symlink resolving outside the worktree stays silent; E111(iii) every tracked-evidence shape stays silent, including the untracked-straggler shape this repo itself exhibits; E111(iv) a primary checkout stays silent regardless of evidence-dir state; an R1 regression guard that a freshly bootstrapped, completely empty evidence dir still warns; and an exit-code test confirming `agc check` exits 0 with warnings present while the pre-existing stale-adapter exit-1 path still fires independently.
+
+### Changed
+
+- `docs/backlog.md` — E73 constraint (3) amended: the adopter-artifact-isolation constraint previously covered only `docs/backlog.md` and `.config.json` and missed the three evidence directories E111 is about.
+- `test/context-budget.test.mjs` — the AC8/AC-P2-7 design-arm teamwork-coordinator bundle floor re-baselined 17984 → 18303 ~tok (+319) for the two `content/coord-03-core-fallback.md` additions above, re-measured through the real render path and set to the exact measured value per the established Phase-2 convention. The other AC8 floors measure the constitution alone and are untouched — `coord-*.md` is never part of `CONSTITUTION`.
+- `test/fixtures/compose-golden/skill-coordinator-monolith.txt` — compose golden regenerated for the same two additions.
+
+### Notes
+
+- **Adopter-facing; a silent no-op in this repo.** All three evidence directories are tracked here, so `checkWorktreeEvidence()` has nothing to warn about locally — which is also why the detection logic is proven against synthetic fixture repos rather than against this checkout, the same validation shape E104 prevention (c) used.
+- **The advisory backs up the rule; it is not the enforcement.** The bootstrap symlink in `coord-03` is the mechanism. This check is the belt-and-suspenders detector for when that step was skipped, and it deliberately does not fail closed.
+- Two known, accepted false positives are recorded inline in `bin/agc-init.mjs` and in `review_reports/review_T-E111-01.md` round 2: a git submodule working tree with untracked evidence dirs still warns (C4), and a directory tracked under a different case on a case-insensitive filesystem is silent (C5, a side effect of the round-2 fix rather than a design choice).
+- **Independent of `[3.108.0]` below.** `v3.108.0` (`tw_void_task`, E117) shipped from a separate branch and was merged into this lane before `v3.109.0` was tagged, so `main` reads 3.107.0 → 3.108.0 → 3.109.0. The two releases share no code; nothing in E117's entry below was authored or restated here.
+- Evidence for this release ships in the commit: `review_reports/review_T-E111-01.md` (all three code-review rounds) and `qa_reports/review_T-E111-01.md` / `qa_reports/review_T-E111-02.md` (the QA PASS, with its `covers:` line). Committing lane evidence rather than leaving it untracked is the defect class E111 exists to close.
+
+## [3.108.0] - 2026-09-15
+
+### Added
+
+- **`tw_void_task` — void a task row so it stops being dispatched (E117).** A
+  thirteenth `tw_*` tool (`TOOL_REGISTRY` 12 → 13). Voiding retires a task id
+  that was cut in error or superseded, without marking it complete and without
+  leaving it in the dispatch queue.
+  - `voidTaskInFile` in `tools/tasks-file.ts` is the file-mode implementation;
+    `handleVoidTask` and the storage delegator are in `tools/tasks.ts`; the tool
+    definition is one `defineTool` entry in `tools/registry.ts`.
+  - `HandoffStorage` gains a `voidTask` member (`tools/storage.ts`), implemented
+    for both backends — file mode in `tools/tasks-file.ts`, SQLite mode in
+    `tools/storage-sqlite.ts`.
+
+### Changed
+
+- **File mode marks a voided row `- [-] <id> … (voided: <reason>)`.** The `-`
+  marker sits outside `DEFAULT_TASK_REGEX`'s checkbox character class, so a
+  voided row becomes invisible to `parseTasksFromFile`, `getNextTaskFromFile`,
+  `tw_detect_drift` and `tw_sync` — it is neither dispatched nor counted as
+  drift. SQLite mode deletes the row outright, producing the same observable
+  behaviour with no schema change (no `schema_version` bump in this release).
+- **The completion guard reads the authoritative ledger, not the mirror.**
+  `voidTask` refuses to void an already-completed task by consulting
+  `handoff.completed_tasks`, not the `tasks.md` checkbox mirror, so a
+  desynchronised mirror cannot let a completed task be voided.
+- **The file-mode write asserts a post-write invariant over real content.** The
+  replaced text is re-parsed line by line against the configured `taskPattern`
+  before the write is reported successful, rather than trusting the substitution.
+- Removes E112's documented side effect: a voided row is no longer offered by
+  `tw_get_next_task`. This does **not** close E112 itself.
+
+### Notes
+
+- Closes **E117**. Additive only — no schema bump, no breaking change to any
+  existing tool, prompt, or state file.
+- Tests: `test/e117-void-task.test.mjs` (25 cases); `test/e26-gate-stats.test.mjs`
+  updated for the registry count 12 → 13. Full suite green at 1840/1840.
+- Evidence: `qa_reports/archive/e117-void-task/review_T-E117-01.md` and
+  `review_T-E117-02.md`; code review at
+  `review_reports/archive/e117-void-task/review_T-E117-01.md`.
+- Dependency audit (Constitution §6): `npm audit --audit-level=high` exits 0 —
+  0 high, 0 critical (6 total: 2 low, 4 moderate). No advisory disposition was
+  needed for this cut.
+
+## [3.107.0] - 2026-09-14
+
+### Added
+
+- **`agc check` now emits an advisory warning for tracked binary assets under `research/`** (backlog E104, prevention (c)) — `checkResearchBinaries()` in `bin/agc-init.mjs`. It runs `git ls-files -z -- research` and matches each path against an extension allowlist (`png/jpe?g/gif/pdf/fig/sketch/xd/webp/mp4/zip`), writing one `agc check — warning: tracked binary under research/: <path>` line per hit to stderr. Three deliberate constraints: the check is **advisory and never changes `agc check`'s exit code**, because `research/` is this repo's own naming convention rather than a contract every adopter shares and a false positive would fail an unrelated adopter's release over a path-name collision; `-z` with a NUL split is load-bearing rather than cosmetic, since git's default `core.quotePath=true` C-quotes any non-ASCII path (a CJK filename) and wraps it in a trailing `"` that the `$`-anchored regex would never match — silently missing the localized-name client-asset case the check exists to catch; and classification is an extension allowlist over `execFileSync` with an argv array, not a content sniff, so a text fixture is never misclassified as binary (the accepted trade is a false negative on an extensionless binary).
+- `test/agc-adapters.test.mjs` — two tests pinning the above: a fixture-repo behavioural guard that includes a CJK filename (the negative control for the `-z` split), and a standing ratchet asserting this repo tracks zero binaries under `research/`.
+
+### Notes
+
+- **E104 ships PARTIAL, not complete.** This release closes E104's *prevention* facet only. Prevention (a) — `.gitignore` excluding `research/assets/` and the *Third-party assets are never committed* section in `CONTRIBUTING.md` — landed earlier the same day in `af33f3b` and is unchanged by this release (named here as already-landed context, not as files this release touches); prevention (c) is the `bin/agc-init.mjs` change above. The **residual-history facet remains OPEN and human-owned**: purging the 33 third-party assets already in git history requires `git-filter-repo` plus a force-push and a GitHub Support GC request, and Constitution §6 forbids an agent executing a force-push. The prepared rewrite has never been pushed, and the mirror holding it is stale. `docs/backlog.md`'s E104 row and order row 13l both carry the dated interim disposition.
+- The only code path changed in this release is `bin/agc-init.mjs`. `agc check`'s success output contract is unchanged: `agc check — OK (3.107.0) — all adapters current`, exit 0.
+
+## [3.106.0] - 2026-09-07
+
+### Added
+
+- **`scripts/check-md-tables.mjs` — a Markdown table-integrity linter, plus the `check:md-tables` npm script that runs it** (backlog E74). It walks git-tracked `.md` files and enforces two rules: every data row's cell count must equal its header's, and every table block must carry a delimiter row directly after its header and must not be severed from it by a blank line. Four discriminators keep it from producing false positives worse than no checker at all — an escaped `\|` is a literal pipe rather than a cell separator, fenced-code interiors are never table rows, a row must open with `|` at column 0 (an indented `|` is a list item's lazy continuation), and the delimiter row is itself exempt from the cell-count rule. Fence tracking records the opening character and run length rather than toggling a boolean: a bare toggle mis-closes a four-backtick block on an inner three-backtick fence, which this repo would hit today at `content/coord-01-core-head.md:50` and `content/coord-02-host-dispatch.md:5`. The no-delimiter diagnostic distinguishes three causes — a blank line severed the block from its header, the block genuinely has no delimiter row, or a delimiter row is present but mis-sized — because only the first is fixed by touching a blank line.
+- `test/check-md-tables.test.mjs` — 17 tests over the above, including a wiring test asserting `package.json`'s `check:md-tables` invokes the script.
+
+### Changed
+
+- **22 malformed table sites repaired across 17 content files** — `docs/backlog.md` and 16 files under `specs/`. Twenty are cell-count rows (four in `docs/backlog.md`: the `E37`, `E38`, `E39` and `E49` ticket rows; sixteen across 15 `specs/` files). The remaining two are structural: `specs/qa-visual-pixel-gate-attestation.md:182` gained the delimiter row it never had, and a stray blank line at `docs/backlog.md:169` was removed.
+- **That blank line was the largest defect in the cut and was not in E74's ticket.** Live since `b2c7e35` (2026-08-10, the E46 cut), it split the master ticket table so that the second block — every open ticket from `E47` through `E104` — carried no delimiter row of its own and rendered as a paragraph rather than a table for roughly four weeks.
+
+### Notes
+
+- **The checker is not enforced automatically.** It is reachable only as `npm run check:md-tables`. It is not wired into `prebuild`, `pretest`, `postbuild`, CI, or `scripts/verify-release.mjs`, and nothing in this release invokes it on a developer's behalf. That was decision D3 at cut time: the release-gate wiring belongs with E82/E83/E84/E95, which own that surface. Until someone runs it, this release does not prevent the defect class from recurring — it makes the class detectable on demand, which is a weaker and different claim.
+- **`qa_reports/` and `review_reports/` are excluded from the scan, deliberately.** Those trees record shell commands verbatim, and the fix the checker would otherwise demand — escaping a `|` inside a recorded command — changes what the command means, since POSIX BRE `\|` is alternation rather than an escaped literal. A misrendered cell in an evidence file is cheaper than a falsified command. Measured blast radius: the exclusion covers 565 of 806 tracked `.md` files but conceals exactly 2 cell-count sites and 0 no-delimiter sites, so narrowing it would not meaningfully expand coverage. Those 2 concealed sites are the difference between the 22 sites measured across 18 files at cut time and the 20 cell-count rows this release actually repairs.
+- **Three of E74's own filed premises were corrected during the cut**, and the corrections are recorded on the backlog row rather than silently absorbed. The ticket's summary said "20 sites / 19 files", undercounting its own enumeration — an escaped-pipe-aware, fence-skipping scan measures 22 rows across 18 files, matching the ticket's list site for site. The `docs/backlog.md:169` blank line was never in the ticket at all. And the ticket's hypothesis that sub-class (ii) originated in a wrong SOP template is falsified: `content/skill-pm.md:51-63` carries correct cell counts, so the 16 `specs/` instances are cross-contamination between three adjacent template blocks, not a propagated defect. No file under `content/` is touched by this release.
+- **`docs/backlog.md` bookkeeping in this release was written by the coordinator before the release commit, not by release-engineer.** E74's ticket row and execution-order row `8h` are done-marked, and E105 is filed (ticket row plus order row `13m`) for a residual defect that code-reviewer found in the checker's own (a)/(b) cause discriminator during E74 round 3. E105 ships OPEN.
+- Suite green at 1813/1813; `npm run check:md-tables` reports `OK (241 file(s) scanned, 0 malformed tables)`; `agc check` exits 0 at the new version.
+
+## [3.105.2] - 2026-08-31
+
+### Changed
+
+- **Corrected the v3.105.1 release record** (backlog E103, coordinator-direct corrective patch). ZERO executable change: no file under `tools/`, `prompts/`, `gates/`, `guards/`, `schema/`, `content/`, `bin/`, or `templates/` is touched by this release. Four defects in v3.105.1's own bookkeeping, three of them the E17 "describe the diff, not the brief" class that the release-engineer SOP (`content/skill-release-engineer.md`, itself unchanged by this release) marks CRITICAL:
+  - `CHANGELOG.md` — the v3.105.1 entry's **E101** paragraph described E101 as adapter-stamp version bookkeeping. That is not what E101 shipped: E101 rewrote the `## Execution Profile — Claude Code` subagent-dispatch bullet to state that invoking `/teamwork` IS the user's standing request for dispatch and that `code-reviewer` / `qa-engineer` MUST be dispatched via `Task`. The entry documented a non-deliverable and omitted the real one. Rewritten to the change that actually shipped, and the one-line `AGENTS.md` / `.antigravityrules` edits it had mistaken for E101 are now named for what they are — routine adapter version stamps.
+  - `CHANGELOG.md` — that same paragraph named an upper-case adapter template path that does not exist on disk. The v3.105.1 diff's file is lower-case; the entry now names it correctly.
+  - `CHANGELOG.md` — the v3.105.1 **Notes** section asserted that the constitution's §1 watermark and the roles' own SOPs "already name the cost of `host` declaration". Verified false at correction time: zero occurrences of `host` in `content/const-01-core-head.md`, and no host-declaration language in any `const-*.md` or `skill-*.md` (those files are unchanged by this release — the assertion was removed, not made true). Replaced with the accurate, checkable statement: migration is opt-in per workspace and self-applies to nothing.
+  - `docs/backlog.md` — execution-order rows `0d` and `0e` had been collapsed from 4 columns to 3 by a done-mark overwriting the `intake` cell (the E74 escaped-pipe/column-split trap, third recurrence). Both rows restored from the pre-defect revision with the done-mark placed in the correct column; all eight `0`-series rows now match the header's 4 columns with escaped `\|` discounted.
+- `docs/backlog.md` — **E103** filed (order `0g`) for the dispatch-tier defect that produced all four of the above, and **E99** amended with its second same-day instance. Both rows are OPEN and deliberately not done-marked by this release.
+- `README.md` — the two `#v` install pins, still on `v3.105.0`, advanced to `v3.105.2`.
+
+### Notes
+
+- **The dispatch brief for this patch was itself wrong about the release page, and the correction is recorded here because this release is about record integrity.** The brief stated that the published v3.105.1 GitHub release notes still carried defects 1-3 live and instructed that they be edited. Checked directly against the live release body: they did not. That body already named the lower-case `templates/agent-adapters/claude.md`, already described the dispatch obligation as the E101 deliverable, and contained neither the false constitution assertion nor the "server version declaring `host`" framing. All three defects were confined to `CHANGELOG.md`. One genuine but far smaller inaccuracy did exist in that release's Summary — it introduced the `claude.md` dispatch-clause rewrite as an "adapter-stamp update", the same category confusion in milder form — and that phrase alone was corrected in place on the v3.105.1 release, with an edit note appended there. Nothing else on that release was altered. The v3.105.2 commit message (`88a4adf`) and the initial form of this bullet both repeated the brief's claim before it was checked; the commit message is immutable and stands uncorrected, which is why the correction is recorded here.
+- **v3.105.1's commit message was already correct.** It named the lower-case adapter path and described the dispatch obligation accurately; only the `CHANGELOG.md` entry and the GitHub release notes derived from it diverged. The defect is narrower than "the release was misdescribed everywhere", and the divergence between the two records is itself the evidence that the narrative was rewritten from the brief rather than from the diff.
+- **No backlog row ships DONE in this release** — the corrective work maps to no shipping ticket, and E103, the row describing this very defect, is the proposed fix rather than a delivered one.
+- Suite green at 1796/1796 and `agc check` exits 0 at the new version.
+
+## [3.105.1] - 2026-08-31
+
+### Changed
+
+- **`agc init` config upsert path: mutate existing `.current/.config.json` atomically** (backlog E100, E101, mini-chain):
+  - **E100** — `bin/agc-init.mjs` now mutates an existing `.current/.config.json` in place via `atomicWriteFile()` (mirroring `tools/config.ts:atomicWriteConfig()`), fixing the class of defects where an existing workspace never received the `host` key because `agc init` only checked for create-if-absent. Three paths now all work: brand-new workspace (create), existing without `host` key (upsert), existing with `host` key (no-op). This repo and dependent workspaces re-run `agc init` to self-heal; new adopters on a re-run automatically gain the key post-adoption.
+  - **E101** — `templates/agent-adapters/claude.md`'s `## Execution Profile — Claude Code` subagent-dispatch bullet was rewritten. It previously said only that dispatch is *available* and to use it "when context budget permits". It now states that invoking `/teamwork` (or any agc role prompt) IS the user's standing request for subagent dispatch, so a host system prompt nudging the agent away from the Task/Agent tool does not override it; that `code-reviewer` and `qa-engineer` MUST be dispatched via `Task`, because judging in-context voids Constitution §3.2 builder != judge and the downgrade is invisible to every gate in `GATE_REGISTRY`; and that build roles may still run in-context under budget pressure. `claude.md` ONLY — `codex.md` and `antigravity.md` are deliberately untouched, because those hosts carry no equivalent nudge and some advertise no Task tool at all, so asserting the obligation there would promise a capability the host may not have. (The one-line `AGENTS.md` / `.antigravityrules` changes in this release are the routine adapter version stamps, not E101.)
+  - **Rendered prompt cost**: declaring `host: claude-code` in a workspace composes the LEAN coordinator → full coordinator (including `coord-02`, `coord-04`, `coord-06` segments), measured as +21% (+11,169 chars, 52,749 → 63,918). This cost is per-session invocation, only paid when an explicit `/teamwork` prompt or subagent dispatch addresses the coordinator. (Separate disclosure per SOP step 2.)
+
+### Notes
+
+- **Migration is opt-in per workspace and does not self-apply**: an existing workspace gains `host` only when someone re-runs `agc init` in it. Until then it keeps composing the lean coordinator and never receives the E101 dispatch bullet. Re-running `agc init` in an already-initialised workspace is now a supported, repeatable operation rather than a no-op.
+- **Dogfood migration applied**: this repo's own `.current/.config.json` gained `host: claude-code` and `CLAUDE.md` adapter bullet refreshed (both expected feature-diff files, recorded in handoff `scope_decision_why` as QA bookkeeping steps).
+- **Reparse guard effectiveness** (code-reviewer round 3, re-derivation in QA round 1): `bin/agc-init.mjs:228-236`'s guard against a wrong-occurrence splice of the host key is sufficient — a splice at a nested `"host"` key leaves the top-level value unchanged and the duplicate-key semantics (`last-wins` in `JSON.parse`) ensure the correct value survives. Confirmed independently via source-code walk-through and via live CLI execution of the proof case (`{"host": {"a":1}, "n": {"host": "x"}}`).
+
+## [3.105.0] - 2026-08-28
+
+### Changed
+
+- **Coordinator dispatch preference made explicit; silent fallback to `tw_switch_role` retired** (backlog E96, execution order `0b`, mini-chain, content-only):
+  - **`content/coord-02-host-dispatch.md`** — the **Subagent Dispatch (Claude Code)** paragraph now states that a host system prompt nudging the agent away from subagent calls unless the user requested one is not a reason to take the Fallback: an explicit `/teamwork` invocation (or equivalent explicit coordinator entry) IS that request. Adds a WHEN/DO clause requiring that taking the fallback while the host DOES advertise `Task` be surfaced in chat as a Constitution §3.2 builder ≠ judge downgrade, naming the reason.
+  - **`content/coord-03-core-fallback.md`** — the fallback line is re-conditioned on *genuine* tool unavailability (host advertises no `Task` tool, or the `Task` call returns a tool-error / unknown-subagent-type) and now names those conditions inline instead of pointing at "above". The unqualified "degradation is graceful and silent" framing is gone; degradation "stays graceful for those hosts" (Cursor, Continue, Anti-Gravity, plain MCP clients, Claude Code without the templates installed), and the silent-downgrade path is closed by coord-02's surfacing rule.
+  - **Deferred, not shipped**: E96 option (ii) — recording which mechanism carried each hop — needs a new first-class handoff field and a schema bump, and is filed separately as **E99** (order `13k`). No handoff field, schema, gate, or `tw_*` tool-surface change ships here.
+
+### Notes
+
+- **Rendered prompt cost** (measured through the real render path — `composeSkill` → `hostCapabilitiesFor` → `stripOriginTags` → `stripRationale`): coordinator bundle grows **+109 B** on the `lean` host and **+566 B** on `claude-code`. The asymmetry is by construction — `coord-02` is `host:claude-code`-tagged, so the lean bundle sees only the `coord-03` change.
+- **Test surfaces** (qa-owned, T-E96-02): `test/fixtures/compose-golden/skill-coordinator-monolith.txt` re-baselined via `scripts/capture-constitution-golden.mjs` — minimal regeneration, lines 81 and 114 only, the other 11 fixtures byte-untouched. `test/context-budget.test.mjs`'s AC8/AC-P2-7 coordinator-bundle floor raised 17844 → 17984 ~tok (+140), independently re-measured to the exact post-edit figure. New `test/e96-dispatch-preference.test.mjs` adds 7 class assertions pinning both new claims plus the lean/claude-code compose axis; suite 1774 → 1781.
+- **Filed from this feature's own review round**: **E100** (order `0d`) — `host` is never written by `agc init`, so a real workspace composes the LEAN coordinator and this remedy does not render there; **E99** (order `13k`) — the deferred option (ii) above.
+
+
+## [3.104.5] - 2026-08-27
+
+### Changed
+
+- **Release-engineer safety hardening: root-file completeness check + stale-dispatch advisory fix** (backlog E94, E97, mini-chain):
+  - **E94 (option i + refined iii)** — Release-engineer SOP step 8 now includes an inverse, enumeration-free completeness check after `git add`, using `git diff --name-only -- . ':!.current'` and `git ls-files --others --exclude-standard` to catch unstaged or untracked root-level files that would be silently omitted from the release commit. Prevents a repeat of v3.104.2's escape, where `CONTRIBUTING.md` was missing from the tagged release while claimed in the CHANGELOG. The step 8 `git add` pathspec now explicitly names `CONTRIBUTING.md` and `tasks.md`, matching the 33-path enumeration; all releases must pass this dual-gate (directory cross-reference + root-file inverse check) before tagging.
+  - **E97 (option i+ii)** — `tw_get_state` now recognizes and skips the `stale_dispatch` advisory on release-closing writes (`last_agent="release-engineer" ∧ next_role="pm"`), eliminating a false-positive 15-minute stale-dispatch warning that persisted forever after every successful release. Implementation: extracted `isReleaseClosingWrite()` predicate from `gates/feature-lease.ts` into a shared export (`gates/feature-lease.ts:isReleaseClosingWrite`), consumed by `tools/handoff-parse.ts` at advisory-emit time. Observable server-surface change: release-engineer's closing write no longer triggers any stale-dispatch notifications.
+
+## [3.104.4] - 2026-08-25
+
+### Changed
+
+- **Lockfile version parity enforcement at release time** (backlog E60, execution order 5c, option (i)) —
+  `package-lock.json`'s root `version` field was maintained by nothing and drifted 31 releases behind
+  before E57 refreshed it by accident, then 7 more after. Release-engineer SOP step 4 now requires
+  `npm install --package-lock-only` to keep lockfile parity with `package.json`, and `scripts/check-version.mjs`
+  gates the release on verifying both root `version` and `packages[""].version` fields match `package.json`.
+  This new check ensures future releases catch the drift at tag time, not in manual audits.
+
+## [3.104.3] - 2026-08-24
+
+### Changed
+
+- **Corrective patch: staging escape for v3.104.2** — ships the three prose deliverables from E61+E62+E70
+  that were omitted from the v3.104.2 tag due to a step-8 staging hazard (`CONTRIBUTING.md` was never
+  added to the explicit `git add` list). All three deliverables were verified complete in QA:
+  - **E61(b)** audit-gate rewording in `CONTRIBUTING.md:24` (§6's build-gate dependency-audit generalization to every build-running role)
+  - **E70(a)** gate-count site in `CONTRIBUTING.md:21` (GATE_REGISTRY incremented 32 → 33 in prose)
+  - **E62 option (ii)** citation-convention policy bullet in `CONTRIBUTING.md` (transitions.ts:NNN decorative citations converted to symbolic anchors)
+
+## [3.104.2] - 2026-08-24
+
+### Changed
+
+- **Prose and comment accuracy fixes across 10 files — zero executable change** (backlog E61, E62, E70).
+  §6's dependency-audit wording generalized to every build-running role: `docs/dependency-advisories.md`,
+  `CONTRIBUTING.md`. GATE_REGISTRY count incremented 32 → 33 and declared at three live prose sites
+  (`content/skill-qa-engineer.md`, `content/skill-code-reviewer.md`, `content/skill-release-engineer.md`).
+  Fictitious README release-notes convention removed from `content/skill-doc-writer.md`.
+  Decorative pin count and no-trailer fallback precision adjustments in `content/skill-release-engineer.md`.
+  Six `transitions.ts:NNN` decorative citations converted to symbolic anchors in `tools/handoff-orchestrator.ts`
+  and `specs/` (E62, E70). Citation-convention bullet added to `CONTRIBUTING.md` (E62 option (ii)).
+  Contradictory "Authoritative source." language in `specs/qa-flow-enforcement-architecture.md` unified (E70 R2-3).
+
+## [3.104.1] - 2026-08-21
+
+### Changed
+
+- **`scripts/capture-constitution-golden.mjs` is now the standing regeneration tool for all 12
+  `test/fixtures/compose-golden/` fixtures, and fails loud instead of reporting a false success**
+  (backlog E90, order 13e). It previously captured 10 of the 12. The two it could not produce were
+  the ones a `content/` composition ticket is most likely to invalidate: `constitution-monolith.txt`
+  was read from `content/constitution.md`, deleted at A9/AC8, so the script printed
+  `note: content/constitution.md absent (post-AC8 delete)` and exited 0 while
+  `test/compose-equivalence.test.mjs`'s `cat(manifest fragments) === monolith` assertion stayed red;
+  `skill-coordinator-monolith.txt` was never in scope at all, though
+  `test/skill-manifest.test.mjs`'s `t-golden-byte-identity` pins it. Both had to be rebuilt by hand
+  during E43 from one-off code that re-derived the operation out of the assertions themselves. Four
+  changes, one file (+107/-33): (a) the constitution monolith now derives from
+  `CONSTITUTION_SEGMENTS` mapped over `content/` and joined — the same expression
+  `test/compose-equivalence.test.mjs` performs, importing the manifest from the same
+  `dist/prompts/constitution-manifest.js`; (b) a 12th capture,
+  `composeSkill("skill-coordinator.md", hostCapabilitiesFor("claude-code"), readContent)`, matching
+  `test/skill-manifest.test.mjs` call-for-call; (c) every capture routes through a `writeFixture()`
+  that throws on an empty or non-string derivation, and a closing `onDisk - captured` guard exits 1
+  on any fixture the run did not produce — the silent-success half is gone; (d) the header comment
+  block, which documented 11 captures and a one-shot pre-refactor framing that was no longer true,
+  now matches the script. Both derivations deliberately read `content/` with no `.current/` override
+  probe: a committed golden is the oracle for a `content/`-derived composition, so a probe would
+  encode the capturing checkout's local state into the fixture and fail the very assertion it
+  exists to serve. Rationale is recorded at the code.
+
+### Added
+
+- **`test/e90-golden-capture-completeness.test.mjs`** — a 3-test class guard (qa-authored) that ties
+  the script's capture set to both consuming suites and to the fixture directory on every `npm test`
+  run, so a 13th fixture cannot become silently un-regenerable. It compares three independently
+  derived sets: what the script captures (extracted from its literal `writeFixture(...)` calls),
+  what `test/compose-equivalence.test.mjs` and `test/skill-manifest.test.mjs` actually assert
+  against, and what is on disk in `test/fixtures/compose-golden/`. Static source-text extraction,
+  not script execution — executing the real tool from inside the suite would make every test run
+  rewrite the committed oracle. This closes the one residual the code review left open: the
+  script's internal `onDisk - captured` guard cannot see a fixture that is absent from BOTH sets,
+  so a suite assertion depending on a fixture nobody ever captured exited 0. The guard was verified
+  by execution to red against the real pre-E90 script (`git show HEAD:` blob):
+  `capturedSet.size` 10 vs 12, the exact defect count E90 was filed over.
+
+### Notes
+
+- Chain: sr-engineer (`fable`) -> code-reviewer (`opus`) APPROVED round 1 -> qa-engineer (`sonnet`)
+  PASS round 1. No FAIL bounce in either loop. Evidence: `review_reports/review_T-E90-01.md`,
+  `qa_reports/review_T-E90-02.md` (covers T-E90-01, T-E90-02).
+- Suite **1759/1759** (1756 + the 3 new tests), build clean, and
+  `git diff --exit-code test/fixtures/compose-golden/` clean after a full regeneration run --
+  independently re-verified by the coordinator, not only self-reported by the chain.
+- Acceptance was checked by execution rather than inspection: all 12 fixtures regenerated
+  byte-identically from a clean tree; both previously-uncapturable fixtures deleted, then
+  overwritten with junk, and restored byte-identically each time (proving the script overwrites
+  rather than skip-if-exists); and a forced-empty derivation confirmed to throw and exit 1.
+- Two non-blocking cosmetic nits from round 1 (`const written = []` declared after the closure that
+  references it; the success banner printing ahead of the completeness guard's stderr) were reviewed
+  and deliberately left open -- sr-owned file, demonstrated safe, zero behavior change.
+- Semver: PATCH. The MCP tool surface, prompt schema, and handoff/state file format are untouched;
+  the cut is one `scripts/` developer tool plus one new test file, with zero `content/`, schema, or
+  gate change.
+
+## [3.104.0] - 2026-08-21
+
+### Changed
+
+- **Constitution §2 *Conditional test writing* is now executable under Task dispatch** (backlog E43).
+  The rule previously read "qa-engineer MUST ask the user before creating any [test file]", which a
+  Task-dispatched subagent cannot do — it has no channel to ask mid-round and no resumption path if
+  it stops to try. Its only available compliances were to halt the round and lose the context, or to
+  decide and disclose; E38's QA round took the latter and recorded the deviation. The bullet now
+  resolves placement by the channel actually available to the acting role: (a) the dispatch brief
+  names the target test file(s) or pre-authorizes creation → proceed, no ask; (b) no such line but a
+  human is reachable in the acting context → ask, as before; (c) otherwise — Task-dispatched with a
+  silent brief, or any context with no reachable human → decide it yourself, create the file or judge
+  that no new test is warranted, and disclose the decision in both `pending_notes` and `qa_review`.
+  Halting the round to ask is explicitly non-compliant under (c), and neither unaccountable outcome
+  is permitted: "never create, and never skip, silently".
+- **The ask moved upstream to the dispatcher, where a human is reachable** — `content/coord-02-host-dispatch.md`'s
+  Dispatch Brief Template gains a `Test-file placement:` line plus a target-conditional inclusion
+  rule shaped on the existing `cut_approved` rule: included ONLY when the dispatch target is
+  `qa-engineer`, and REQUIRED there. This writes down what the coordinator already did informally
+  (E45/E46 and T-E52-01 all pre-named the target test file in the brief, so the old rule never armed).
+- **`content/skill-qa-engineer.md` Phase 3a** no longer restates the bare "ask the user" — it reads
+  the brief's placement line first and defers to §2 by reference, removing a "Skills MUST NOT restate
+  these rules" violation alongside the E43 defect.
+
+### Notes
+
+- **Content-only: zero code, logic, schema, or gate changes.** No new server enforcement — §2's other
+  bullets are attested rather than enforced, and this one stays that way.
+- Two correctness findings were caught and fixed in code review round 1 before this shipped: branch
+  (c)'s original imperative "create" foreclosed the "no new test needed" outcome the same bullet's
+  first sentence asserts (and that T-E52-01's round actually required), and the three branches did not
+  partition — an unattended inline context matched none of them, reintroducing the E43 defect class one
+  level down. See `review_reports/archive/e43-test-file-ask-at-dispatch/review_T-E43-01.md`.
+- QA re-baselined all 12 `test/fixtures/compose-golden/*.txt` byte-equality fixtures (minimality
+  diff-verified: one changed line in each of the 11 constitution fixtures, +2/-1 in the coordinator
+  monolith) and re-measured 4 `test/context-budget.test.mjs` caps: lean always-on 4667 → 4868,
+  design-arm constitution 9187 → 9374, non-design constitution 7089 → 7276, teamwork coordinator
+  bundle 17498 → 17844. The design-arm-minus-non-design saving holds at 2098 ~tok, the expected
+  invariant for an edit to a core (untagged) fragment.
+- `test/e43-test-file-ask-at-dispatch.test.mjs` adds 11 pins, class assertions preferred over instance
+  pins, two of them guard-the-guard: the branch-partition and two-sided-outcome pins are replayed
+  against a hermetic pre-E43 literal AND against the round-1 draft code review rejected, and each must
+  throw. Full suite 1756/1756.
+- Dependency audit: `npm audit --audit-level=high` exit 0 (5 advisories, none HIGH/CRITICAL).
+
+## [3.103.1] - 2026-08-20
+
+### Changed
+
+- **E52 - rework-vs-rounds-run semantics recorded in prose** (`tools/metrics.ts`,
+  `docs/gate-retro-procedure.md`, `scripts/summarize-metrics.mjs`). The three
+  `*_rounds` fields in `.current/metrics.jsonl` count **rework only** — a QA
+  FAIL, a code-reviewer `CHANGES_REQUESTED`, a visual-round FAIL — exactly as
+  `specs/e8-success-telemetry.md` AC3 defines them. A feature reviewed once and
+  approved on the first pass therefore records `review_rounds: 0`, the same
+  value as a feature never reviewed at all, and that is by design rather than an
+  off-by-one. `tools/metrics.ts` gains a `ROUND SEMANTICS` block above
+  `FeatureMetricRecord`, per-field notes, and a note at the `one_pass`
+  computation; `docs/gate-retro-procedure.md` states the rework reading
+  explicitly and instructs readers NOT to "correct" such a record;
+  `scripts/summarize-metrics.mjs` prints a legend line alongside the table
+  (`console.table` keys untouched, so `test/success-metrics.test.mjs` E8-S1..S4
+  stay green). **Zero logic change** — comment and prose only, no test
+  authoring, and no `.current/metrics.jsonl` backfill: the existing records are
+  correct under the rework definition, so backfilling would manufacture false
+  data.
+
+### Notes
+
+- **E52's premise was falsified before any code was written**, and the row is
+  resolved that way in `docs/backlog.md`: options (i) and (ii) are recorded
+  DO-NOT-BUILD. `one_pass` is defined as all three round totals being `0`, so
+  folding the terminal round into the counters would make `one_pass`
+  permanently false and destroy the headline metric E8 exists to produce; (ii)
+  is additionally unimplementable as filed, because the emit site receives only
+  the three totals and sees no verdict. The real defect was naming — five
+  consecutive readers misread `review_rounds` as review effort.
+- **Two follow-ups filed** in `docs/backlog.md`: **E85** (P3) for the genuine
+  residue — nothing records rounds-*run*, so "reviewed once, approved" and
+  "never reviewed" emit the same `0` — and **E86** (P3) for handoff free-text
+  field contamination observed this session.
+- QA round 1 FAILed this cut over three wrong/stale code citations in the E52
+  row itself; the fix symbol-anchored every live reference instead of re-citing
+  fresh line numbers, which would have re-armed the E39/E62 stale-citation class
+  inside the one row whose subject is misleading prose. QA round 2 PASS —
+  evidence `qa_reports/archive/e52-metrics-rework-semantics/review_T-E52-01.md`.
+- Dependency audit: `npm audit --audit-level=high` reports 5 findings, all
+  low/moderate severity, zero HIGH/CRITICAL.
+
+## [3.103.0] - 2026-08-19
+
+### Added
+
+- **E72 - coordinator claim-vs-state mismatch detection** (`content/coord-03-core-fallback.md`).
+  A new **Claim-vs-state mismatch** row in the coordinator's Escalation Routes table:
+  after EVERY handoff, `tw_get_state` and diff the finished role's claims
+  (`completed_tasks`, `pending_notes`, the evidence file it names) against what
+  actually landed. A reply asserting content the write did not persist is a
+  Crash-Resume-class event — ground-truth first, then re-dispatch with the
+  mismatch stated in the brief; never route on the reply. No gate catches this
+  class by construction: the server validates a write against *rules*, never
+  against *what its author said it was doing* — `pending_notes` is passed
+  through verbatim and zod-defaults to `[]` when omitted, so no predicate can
+  compare a write to a reply the server never sees.
+- **E72 - Known non-mismatches note** (`content/coord-03-core-fallback.md`),
+  shipped in the same edit and load-bearing for the row above: the
+  code-reviewer's APPROVED handoff legitimately stamps `agent_id="qa-engineer"`
+  (Constitution §3.1's canonical `(code-reviewer, In_Progress) → (qa-engineer,
+  In_Progress)` edge, spelled out in `skill-code-reviewer.md`'s APPROVED row)
+  and that edge legitimately resets `review_round` to 0. Without this note the
+  new row misfires on every approval handoff — as it did to the coordinator on
+  2026-08-19, before the investigation below.
+
+### Changed
+
+- `test/context-budget.test.mjs`: AC8 coordinator context floor re-baselined
+  17281 → 17498 approx. tokens for the two added fragment blocks.
+- `test/fixtures/compose-golden/skill-coordinator-monolith.txt`: golden
+  composition refreshed to match the new `coord-03` content.
+- `docs/backlog.md`: E72 (row 195) and order-8f (row 231) amended with the
+  investigation result and marked shipped.
+
+### Notes
+
+- **E72's investigation falsified half its own ticket, before any code was
+  written.** The filed defect (a) — the APPROVED write's `agent_id:
+  "qa-engineer"` read as an identity misstamp — is a MIS-FINDING: that value is
+  SOP-mandated, it is the only non-FAIL/Blocked edge out of
+  `code-reviewer:In_Progress` (`tools/transitions.ts:247`), and the observed
+  `review_round` 1 → 0 reset is that edge's documented behavior
+  (`tools/transitions.ts:576`). The ticket's proposed direction (i) — reject
+  `review_verdict` when `agent_id` is not `code-reviewer` — would therefore
+  reject the SOP-mandated APPROVED row and break every approval handoff in the
+  chain, and is recorded **DO-NOT-BUILD**. Defect (b), the silent
+  `pending_notes` loss, survives as the only real one, leaving direction (ii)
+  (the coordinator-side diff shipped above) as the only available defense.
+- Suite green at 1745/1745.
+- Files cited above as *evidence* and NOT modified by this release:
+  `tools/transitions.ts`, `tools/handoff-orchestrator.ts`,
+  `content/skill-code-reviewer.md`. This release's diff is the two
+  `content/coord-03-core-fallback.md` blocks, the two test files, the
+  backlog rows, and the release metadata.
+- No code-review round ran for E72: the cut was coordinator-direct content
+  plus a single-role QA dispatch for the test-only residue (Constitution
+  §3.1 judge-dispatch charter), so `review_reports/` has no E72 entry.
+
+## [3.102.5] - 2026-08-19
+
+### Fixed
+
+- **E80 - post-E78 `verify-release.mjs` Check 6 WARNed on the healthy path, so
+  step 9a's CI gate was effectively off** (`scripts/verify-release.mjs`).
+  E78 (v3.102.3) made Check 6 sha-matched: it looks for the completed CI run
+  whose `headSha` is the commit being released, and any other answer degrades
+  to WARN. But step 9a runs *seconds* after the push that triggers that run, so
+  on a healthy release the sha is legitimately not found yet — the default,
+  non-degraded path hit the "cannot obtain ground truth" WARN, then printed
+  `ALL CHECKS PASSED` and exited 0. It fired for real at v3.102.4, where the
+  release only stayed honest because the dispatch brief told the
+  release-engineer to re-run the script by hand — an instruction the SOP never
+  stated. Check 6's sha-not-found branch now **bounded-polls** `gh run list`
+  for the released sha (every ~20s, progress to stdout) instead of giving up on
+  the first miss. A completed run appearing mid-poll is evaluated exactly as
+  before: `success` -> OK, anything else -> the existing FAIL.
+
+### Added
+
+- **`AGC_VERIFY_CI_WAIT_SECONDS`** (`scripts/verify-release.mjs`) - the poll
+  budget for the Check 6 wait above. Default `600` (~10 min); `0` restores the
+  pre-E80 behavior exactly (one `gh` call, no wall-clock wait); a malformed or
+  negative value falls back to the default. This is a release-tooling knob for
+  this repo's own release chain, not part of the MCP server's runtime
+  configuration surface.
+
+### Changed
+
+- **`content/skill-release-engineer.md` step 9a** re-split to match: CI for this
+  sha simply not having finished yet is no longer something the release-engineer
+  handles by hand ("just let this step run to completion, do not treat a
+  poll-in-progress as a WARN to manually re-run around"), and WARN-and-continue
+  is now described as what you get in exactly two cases - the poll's own budget
+  expiring, or a genuinely degraded environment (`gh` missing, unauthenticated,
+  no CI workflow configured).
+- **`test/verify-release.test.mjs`** - new pins VR-20 (sha absent on the first
+  `gh` call, present+success on a later one -> OK, no WARN, exit 0), VR-21
+  (budget expires with the sha still absent -> byte-identical pre-E80 WARN text,
+  check green, exit 0) and VR-22 (`AGC_VERIFY_CI_WAIT_SECONDS=0` -> exactly one
+  `gh` call). VR-17/VR-18 now pass `AGC_VERIFY_CI_WAIT_SECONDS=0` explicitly so
+  the suite never blocks on the new wait, and VR-9 is retargeted to step 9a's
+  new wait-vs-degraded wording.
+
+### Notes
+
+- **E78's contract is preserved, not inverted**: when the poll budget expires the
+  branch still falls through to the *same* WARN and leaves the check green, so
+  E80 adds no new FAIL mode and cannot turn a slow CI run into a release
+  blocker. The poll only improves the odds of obtaining ground truth. Every
+  other degraded branch (`gh` ENOENT, non-zero exit, unparseable output, zero
+  completed runs) is unchanged and still immediate.
+- **PATCH per this file's own versioning policy**: a bug fix to internal release
+  tooling. No `tw_*` tool surface change, no prompt-registry change, no schema
+  bump, no `bin/` or wire-protocol change; `AGC_VERIFY_CI_WAIT_SECONDS` is read
+  only by `scripts/verify-release.mjs`, never by the server at runtime (contrast
+  `AGC_AUTO_ROUTE` / `AGC_DEFAULT_SKILL`). Direct precedent: E78 made a larger
+  semantic change to this same check and shipped as v3.102.3, a patch.
+- Full `npm test` green at 1745/1745 before the cut (QA, ~58.3s; independently
+  re-run by the coordinator). Evidence: `qa_reports/review_T-E80-01.md`,
+  `qa_reports/review_T-E80-02.md`, `review_reports/review_T-E80-01.md`.
+
+## [3.102.4] - 2026-08-19
+
+### Fixed
+
+- **E75 - four asymmetric `rationale:` fences rendered glued text into three role
+  SOPs** (`content/skill-pm.md`, `content/skill-architect.md`,
+  `content/skill-qa-engineer.md`): `stripRationale`'s trailing-newline match
+  (`prompts/text-transforms.ts:28`) consumes the newline after a
+  `<!-- rationale:end -->` marker. When the matching `<!-- rationale:start -->`
+  opened mid-line, the strip therefore removed a newline the span never owned,
+  glueing the following line onto the preceding one in the *rendered* dispatch
+  text pm, architect, and qa-engineer receive. Four such asymmetric spans
+  existed (`skill-pm.md:25` and `:26`, `skill-architect.md:30`,
+  `skill-qa-engineer.md:36`); each `rationale:start` marker is now on its own
+  line, making every span symmetric. **Newline/whitespace only** - prose is
+  byte-identical, verified three independent ways (sr-engineer's `--word-diff`,
+  code-reviewer's positional whitespace signature, and a whitespace-stripped
+  digest comparison). No tool surface, schema, gate, or transition edge changes;
+  `prompts/text-transforms.ts` itself is untouched. Same change class as E69,
+  which shipped as a patch in v3.102.2.
+
+### Changed
+
+- **E75 - the E69 asymmetric-span ratchet is paid off**
+  (`test/render-structure.test.mjs`, qa-owned per Constitution §2):
+  `KNOWN_ASYMMETRIC_SPAN_COUNTS` decremented to `{}` and
+  `EXPECTED_RENDER_GLUE_COUNTS` decremented to zero for pm, architect, and
+  qa-engineer, since the debt those maps pinned no longer exists. The
+  "KNOWN, TRACKED debt" comment block is rewritten to read as closed rather
+  than left stale, and the two cross-SOP render sweeps (`tw_switch_role` and
+  `buildPromptForRole`) are converted from assert-in-loop to collect-then-assert
+  so a failure reports every offending role at once instead of only the first.
+  Expected-red manifest: `qa_reports/expected-red_e75-rationale-fence-relocation.txt`
+  (3 entries, all confirmed red before the re-baseline, no fourth red).
+
+- **Backlog bookkeeping, not part of the E75 cut** (`docs/backlog.md`): the
+  ticket-table `status` cells for **E58** and **E59** had read `-` since both
+  shipped in v3.99.0, while the order table and the CHANGELOG both recorded them
+  DONE. Both cells now record DONE with the shipped version - the same
+  in-file accuracy class as E70/E74.
+
+### Notes
+
+- Bump kind: **PATCH**. What changes is the rendered whitespace of the dispatch
+  text three roles receive; no prose byte, tool surface, schema, gate, or
+  transition edge moves. This matches both the project's own versioning policy
+  ("bug fixes ... with no observable behavior change") and the direct precedent
+  of E69, an identical fence-relocation cut that shipped as v3.102.2.
+- Review chain: mini-chain (sr-engineer -> code-reviewer -> qa-engineer);
+  PM/architect skipped, the backlog row (`docs/backlog.md` order row `8i`) is the
+  spec, matching E69/E71/E76/E78. Code review APPROVED round 1, zero findings
+  (`review_reports/review_T-E75-01.md`); QA PASS round 1
+  (`qa_reports/review_T-E75-02.md`, covers T-E75-01 and T-E75-02).
+- First live execution of E76's step 7a single-invocation fix and of E78's
+  sha-matched CI check in `scripts/verify-release.mjs`; both shipped in v3.102.3
+  and had not been exercised by a release until this one.
+
+## [3.102.3] - 2026-08-18
+
+### Fixed
+
+- **E77 - CI-red: a test read repository history as a fixture**
+  (`test/render-structure.test.mjs`): the detector-soundness test built its baseline
+  with `execFileSync("git", ["show", "ffa4082:content/skill-release-engineer.md"])`,
+  which requires that commit object to exist in the clone. CI clones shallow, so the
+  test failed `fatal: invalid object name 'ffa4082'` on CI (run 32093068950) while
+  passing locally - the red suite on `main` at v3.102.2. The two known-broken
+  rationale spans are now literal constants copied verbatim from that blob, so the
+  test reads no history at all. Adds a meta-test asserting no file under `test/`
+  reads repository history as a fixture (pinned sha / `git show <rev>:<path>` /
+  `git log`), plus a guard-the-guard case proving the detector reds against the
+  pre-fix line.
+- **E76 - step 7a's archive sweep silently moved nothing**
+  (`content/skill-release-engineer.md`): the outer `for c in $CODES` loop was left
+  unwrapped while `CODES` was bound in a different shell from the one consuming it,
+  so the sweep reported success at exit 0 having moved zero files (observed live at
+  v3.102.2). Step 7a is now FIVE fragments of ONE script fed to `bash` over a quoted
+  heredoc (`bash <<'STEP7A'` ... `STEP7A`) - `PREV_TAG`, the empty-baseline guard,
+  the executable `CODES=` derivation, the `<CODES>` logging line, and the
+  `mkdir`/move/`expected-red`/`covers:` block - so `$PREV_TAG` and `$CODES` are bound
+  and consumed in the same process and there is no export to forget. A quoted
+  heredoc, not `bash -c '...'`: the derivation carries a dozen literal single quotes
+  that a single-quoted wrapper would terminate on. The empty-baseline guard now
+  genuinely `echo`s `STEP7A_STOP: <msg>` and `exit 9`s rather than describing a halt
+  in prose the agent could not observe from outside the subshell, and the `covers:`
+  sweep matches an anchored `COVERS_RE` label-line pattern instead of an unanchored
+  bare-word `grep -i covers` that a report's own prose ("This round covers ...")
+  could win.
+- **E78 - `verify-release.mjs` Check 6 accepted a green run from a different commit**
+  (`scripts/verify-release.mjs`): the CI ground-truth check fetched each run's
+  `headSha` but used it only to decorate the FAIL message, so it answered "is the
+  most recently completed run on main green" rather than "is THIS release's run
+  green". At v3.102.2 that accepted the previous day's green run while the release's
+  own CI was still in flight, 56s in. The check now requests the last 10 completed
+  runs and selects the one whose `headSha` equals the commit being released. No
+  matching run yet degrades to a WARN and continues, exactly like every other
+  cannot-obtain-ground-truth path (E14) - never a blocking wait or poll, and never a
+  release blocker.
+
+### Added
+
+- `test/render-structure.test.mjs`: history-fixture detector, the T-E77-02 meta-test
+  over all of `test/`, and its guard-the-guard negative control.
+- `test/verify-release.test.mjs`: Check 6 sha-matching coverage - matched-green,
+  matched-red, no-run-for-this-sha WARN, and the pre-fix negative control showing the
+  old `runs[0]` read accepted a foreign sha.
+- `test/release-staging.test.mjs`: content pins for step 7a's single-invocation
+  heredoc form, the guard's `STEP7A_STOP:`/`exit 9` pair, and the anchored
+  `COVERS_RE`, including extraction of the SOP's shell verbatim for execution.
+
+### Notes
+
+- Suite 1734 -> 1742 tests, all passing. Additionally verified under a genuine
+  depth-1 shallow clone (`npm ci && npm test`) - the exact condition E77's fixture
+  failed under, and the reason `main` was red at v3.102.2.
+- Two code-review rounds on E76 (round 1 CHANGES_REQUESTED, round 2 APPROVED),
+  E78 approved in round 1 - `review_reports/archive/e76-e78-release-integrity/review_T-E76-01.md`.
+- No runtime source changed: `dist/` differs from v3.102.2 only by the version
+  literal. SOP text, one release script, and tests.
+
+## [3.102.2] - 2026-08-18
+
+### Fixed
+
+- **E69 — release-engineer SOP render fences** (`content/skill-release-engineer.md`):
+  the two asymmetric `<!-- rationale:start -->` fences that sat inline at the end of
+  their preceding bullet are relocated onto their own lines, so `stripRationale`
+  (in `prompts/text-transforms.ts` — unchanged by this cut) can no longer consume the bullet's trailing newline
+  and glue the next line onto it. Newline placement only — zero prose bytes changed.
+  Both sites rendered glued in every dispatched release-engineer SOP up to `ffa4082`:
+  the step-7a "Log `<CODES>` even when empty" bullet and the "Zero matches = silent
+  no-op" MUST NOT bullet.
+
+### Changed
+
+- **E71 (a)-(d) — release-engineer SOP correctness fixes** (same file):
+  - **(a)** step 8's `git add` gains a mandatory existence pre-filter. The prior text
+    claimed a missing pathspec would "no-op silently"; it does not — `git add` fails
+    `fatal: pathspec '<x>' did not match any files` and stages nothing at all. The
+    path list is stated as 30 paths (19 directories + 11 metadata), and the pre-filter
+    loop is wrapped in explicit `bash -c` because its unquoted `$PATHS` expansion
+    relies on word-splitting that zsh does not perform. `git add` also gains `--`.
+  - **(b)** step 7a's glob safety under zsh's default `NOMATCH`, covering **two** site
+    classes the original filing collapsed into one: the archive move bullets *and* the
+    `covers:` sweep's own `qa_reports/*.md` / `review_reports/*.md` targets. Raw globs
+    are replaced by `find -maxdepth 1 -name "..."` predicates run under `bash -c`, with
+    the quoting requirement (double quotes inside the `bash -c '...'` wrapper) stated.
+  - **(c)** the Expected-vs-unrelated scope rule now names `.current/**` (minus
+    `.config.json`) and `tasks.md` as explicit non-STOP exclusions — both are modified
+    at every release by construction, and neither may fire the Blocked row on its own.
+  - **(d)** step 7c gains the DONE-but-unreleased third shape: a backlog row already
+    pre-marked `**DONE** (<date>, not yet released)` does **not** satisfy the
+    done-marking obligation — the version stamp is still owed, amended in place rather
+    than appended as a duplicate row.
+
+### Added
+
+- `test/render-structure.test.mjs` (new, 330 lines): cross-SOP render-structure
+  regression over the 9 `tw_switch_role` roles, `teamwork` / `teamwork-lite`, and all
+  4 constitution chain x design compose combinations, via both the `tools/role.ts` and
+  `prompts/build.ts` render paths (both unchanged by this cut) — plus a detector-soundness test that reproduces the
+  2 known `ffa4082` glue sites byte-identically, and an exact ratchet of the known
+  remaining glue sites elsewhere in `content/`.
+- 6 new E71 (a)-(d) content pins in `test/release-staging.test.mjs`, including two that
+  extract shell from the SOP verbatim and execute it under both bash and zsh with
+  negative controls proving the `bash -c` wrapper is necessary.
+
+### Notes
+
+- Suite 1720 -> 1734 tests. Two code-review rounds
+  (`review_reports/archive/e69-e71-sop-render-fences/review_T-E69-01.md`).
+- SOP text only; `dist/` output is unchanged by this cut, hence a PATCH bump.
+- Follow-up E75 is filed and remains OPEN: 4 further live instances of the same E69
+  glue class in `content/skill-pm.md` (x2), `content/skill-qa-engineer.md`, and
+  `content/skill-architect.md` — all three untouched by this cut, E75 fixes them — held as the exact ratchet in
+  `test/render-structure.test.mjs` that E75 will decrement.
+
+## [3.102.1] - 2026-08-17
+
+E48 ends a ticket that had been open since 2026-08-10 and parked in `.current/feature-split.md` (F1)
+since 2026-08-12, awaiting a human design decision on what `docs/skills/*` is for. The decision, made
+in the coordinator's chat turn on 2026-08-17: **delete the tree entirely, no salvage.** Diff of
+substance: 12 files removed under `docs/skills/` (−2,786 lines), `scripts/check-transitions-sync.mjs`
+(+3/−2), `test/release-staging.test.mjs` (+63/−56), `docs/backlog.md` (+6/−4). Zero runtime code
+change — no `tools/`, no `gates/`, no `prompts/`, and `content/` is byte-identical to the previous
+release throughout, so no constitution or role-SOP text moved and no composition golden or context
+budget shifts. The entire `dist/` delta is `dist/index.js`'s version literal.
+
+Bump kind is **PATCH**, deliberately not the MINOR that the four preceding ticket releases took, on
+this file's own versioning policy: MINOR covers *adding* backwards-compatible tools, role skills, or
+storage features, and nothing was added — what shipped is a documentation removal plus a test
+re-baseline. The discriminator v3.102.0 used to justify its own MINOR ("a role skill changed, so the
+delivered artifact behaves differently") is precisely what does **not** hold here: `content/` did not
+move, and the deleted tree was never on the prompt path (`prompts/build.ts` and `tools/role.ts`
+compose from `content/` only), had zero inbound links from `README.md`, `docs/install.md`,
+`CONTRIBUTING.md`, `docs/architecture.md` or `CLAUDE.md`, and therefore never reached an agent's
+context. "Doc clarifications and internal refactors with no observable behavior change" is the PATCH
+row, and it describes this cut exactly. Not MAJOR: no tool surface, prompt schema, or handoff/state
+file format changed.
+
+### Removed
+
+- **The entire `docs/skills/` tree — 12 files, 2,786 lines** (E48, T-E48-01): `architect.md`,
+  `code-reviewer.md`, `coordinator-lite.md`, `coordinator.md`, `design-auditor.md`, `doc-writer.md`,
+  `pm.md`, `qa-engineer.md`, `qa-visual.md`, `release-engineer.md`, `researcher.md`,
+  `sr-engineer.md`. These were 2–4x hand-written prose expansions of the `content/` role SOPs, with
+  no generator and no mechanizable diff against their sources — so they drifted silently and
+  accumulated superseded rule text (the defect E48 was filed for). Four measurements drove the
+  deletion over the two alternatives: 9 of the 12 files carried only their creation commit
+  (`4c310fb`, 2026-06-24) and were never updated across ~50 releases; the tree had zero inbound
+  links from any entry point; it was absent from every prompt path, making removal provably inert on
+  agent behavior; and both repair options had already been falsified — generate-from-source by the
+  order-6 measurement (no generator exists and `docs/skills/coordinator.md` had no `content/` source
+  at all), and a stale-quote guard by the 2026-08-13 correction (it caught neither headline
+  instance). Salvage of the one orphan artifact, `docs/skills/coordinator.md`'s flow diagram, was
+  considered and declined: it was substantially wrong rather than merely old (routing on
+  `pending_notes`, which C9 replaced with the `next_role` field at v3.55.0; drawing `hop>=10` as
+  coordinator-counted, server-tracked since D2; omitting cut-approval, auto-tier, feature-lease,
+  external-refs, source-credibility, amend-resume, Backlog Intake Loop and Crash-Resume), so moving
+  it to `specs/` would have laundered a falsehood.
+
+### Changed
+
+- **`test/release-staging.test.mjs` — E59's two pins re-baselined for the deleted tree** (E48,
+  T-E48-03, qa-owned): the tree-wide `waived` sweep narrows from `content/` + `docs/skills/` to
+  `content/` alone, and the per-site normative-text enumeration re-bases **9 → 4 sites — not 9 → 1,
+  which is what the ticket prescribed.** The correction came from the code-reviewer re-deriving the
+  site set from the tree rather than from the deletion count (round 1, finding C2): deleting
+  `docs/skills/` removes 8 of the original 9 sites, but three **live** sites at
+  `content/skill-release-engineer.md:56,:57,:58` — the §6a dependency-audit disposition mechanism
+  itself, the *cite the advisory record's row rather than improvising a rationale* behavior E57 and
+  E59 exist to enforce — had never been in E59's enumeration at all. Shrinking to
+  `content/const-15-core-tail.md:11` alone would have satisfied the letter of "drop the deleted
+  sites" while leaving that mechanism deletable with the suite green. Two further findings are
+  recorded in the same round: only **1 of the 8** deleted pins was a verbatim mirror (six were
+  structures — STOP-exit table rows, server-enforced-gates bullets, mermaid decision branches — that
+  the live SOPs never contained, and `content/skill-sr-engineer.md` carries no §6 audit text at
+  all), so half the deleted pins had been guarding text no agent ever received, which strengthens
+  the deletion rather than weakening it; and QA widened the `:57`/`:58` anchors to span from the
+  `:56` heading, because a naive single-line anchor at `:57` matches neither `disposition` nor
+  `dependency-advisory record` literally and would have false-failed the presence assertion.
+- **`scripts/check-transitions-sync.mjs:17-19` — the dangling `docs/skills/*` citation reworded**
+  (E48, T-E48-02): the comment justified this script's set-equality check by contrasting it with
+  `docs/skills/*`, a live-path pointer that the deletion would have left dangling. The contrast now
+  attaches to the generic class ("a hand-written prose expansion of a prose source") and cites the
+  removed tree in the past tense as an instance of it. Round 1 rejected the first attempt, which had
+  substituted `content/skill-*.md` into the contrast slot — an assertion that the composition
+  sources have no structured source to diff against, which v3.102.0's own E67 fixes had just
+  disproved, and a fresh instance of the exact defect class E48 exists to close.
+
+### Notes
+
+- `npm test` — 1720/1720 green. `npm audit --audit-level=high` — exit 0. Five moderate/low transitive
+  advisories remain unchanged and below the gate threshold (`@hono/node-server`, `body-parser`,
+  `esbuild`, `hono`, `protobufjs`), each with a disposition already recorded in
+  `docs/dependency-advisories.md`.
+- **E68 is VOID, not done** (`docs/backlog.md` order row 8c): it was filed to sync
+  `docs/skills/release-engineer.md`, which no longer exists. The row's own reasoning is why — it
+  insisted the sync must not run before the `docs/skills/*` policy call was made, and that call
+  removed the file. Order row 6 (F1) closes with it; only E56 (F2) remains open in that slot.
+- **E72 filed** (`docs/backlog.md`, order 8f, coordinator-direct investigation first): during this
+  cut, a code-reviewer subagent's round-2 APPROVED `tw_update_state` landed materially different from
+  what its own reply claimed — `agent_id: "qa-engineer"` instead of `"code-reviewer"`, and an empty
+  `pending_notes` — which reset `review_round` 1 → 0 and briefly recorded a `last_agent` that had not
+  run. The authoritative round-by-round record for this feature is therefore
+  `review_reports/review_T-E48-02.md`, not the handoff. First open row about the ledger's own
+  trustworthiness rather than a document's accuracy.
+
+## [3.102.0] - 2026-08-17
+
+Two release-SOP tickets in the same two files the v3.101.0 cut touched, and found the same way — by
+running the SOP rather than reading it. E66 closes the staging-omission *class* that E64 closed one
+instance of; E67 fixes six text-accuracy defects that a live executor would have been misled by.
+Diff of substance: `content/skill-release-engineer.md` (+11/−9), `test/release-staging.test.mjs`
+(+128/−1), `CLAUDE.md` (+2/−2), `docs/backlog.md` (+4/−0). Zero runtime code change — no `tools/`,
+no `gates/`, no `prompts/`; the entire `dist/` delta is `dist/index.js`'s version literal.
+
+Bump kind is MINOR, not PATCH, on this file's own versioning policy plus direct precedent: MINOR
+covers "backwards-compatible tools, **role skills**, or storage features", and a role skill is what
+changed — the SOP the server hands a release-engineer now stages four directories it previously did
+not, so the delivered artifact behaves differently. Same reasoning as v3.96.0 (E44+E49), v3.97.0
+(E50), and v3.101.0 (E64+E65+E55). Not PATCH because "no observable behavior change" is false at the
+SOP surface. Not MAJOR: no tool surface, prompt schema, or handoff/state-file format changed.
+
+### Added
+
+- **`NON_SOURCE_DIRS` + a partition test in `test/release-staging.test.mjs`** (E66, T-E66-02) — the
+  hand-classified complement of `FEATURE_DIRS`: `dist/` (shipped build output, already in
+  `METADATA_PATHS`), `node_modules/` (gitignored), `.current/` (only `.current/.config.json` ships,
+  as a metadata path). The new `Partition` test enumerates top-level directories via `git ls-files`
+  — deterministic across clones and in CI, and unlike `ls -d */` it *does* surface dot-directories
+  — adds `node_modules/` explicitly when present on disk, then asserts the two lists are disjoint
+  and jointly cover every enumerated directory. This converts the silent-staleness failure mode
+  that produced E64 and E66 into a red test: the next top-level directory added to the repo reds
+  here instead of going quietly unstaged in some future release commit.
+- **Directory-set pins inside the existing AC2 and AC3 tests** (E66, T-E66-02, from
+  `review_reports/review_T-E66-01.md` round 1) — both tests previously asserted only that framing
+  *strings* were present in the SOP, so the AC2 `{...}` cross-reference set and the AC3 "Expected vs
+  unrelated scope rule" list could have been emptied entirely with the suite still green. Each set
+  is now extracted from the SOP text and `deepEqual`-pinned to `FEATURE_DIRS`, so all three
+  enumeration sites are held identical by test rather than by hand.
+
+### Changed
+
+- **`docs/`, `research/`, `multi-agent-scripts/`, `.github/` added to all three staging enumeration
+  sites in `content/skill-release-engineer.md`** (E66, T-E66-01) — the step-8 `git add` line (now 19
+  directories), the step-8 AC2 pre-commit cross-reference set, and the Escalation-Routes "Expected
+  vs unrelated scope rule" paragraph. `FEATURE_DIRS` in `test/release-staging.test.mjs` gains the
+  same four. AC-B5.5's tsconfig-`include` derivation — E64's fix pattern — cannot reach any of them
+  (none is a TypeScript source root), which is why hand-enumeration plus the new partition test is
+  the mechanism here. `.github/` came from review round 1: it is the only tracked top-level
+  directory the original `ls -d */` measurement could not see.
+- **Six text-accuracy fixes in `content/skill-release-engineer.md`** (E67, T-E67-01) — (a) the
+  fictitious README "release-notes subsection per the existing `#### (n) ...` convention", removed
+  from both the Artifact allowlist and step 4 (`README.md` carries zero `####` headings; the
+  CHANGELOG entry *is* the release-notes record, and the 3 install-pin replacements are the whole of
+  what the file needs); (b) step 5 now says to run `npm run check:transitions-sync` explicitly on
+  the sanctioned `npx tsc` bump-build path, because `npx tsc` silently skips the `postbuild` hook
+  that normally fires it; (c) step 7d's expected `agc check` output string corrected to the real
+  `agc check — OK (X.Y.Z) — all adapters current` (no `v` prefix); (d) the step-8 commit trailer no
+  longer hardcodes a model name/version and defers to the session harness's own git-commit
+  instruction; (e) a caveat on step 7a's `<CODES>` derivation noting that a batch dispatch's
+  `T-<BATCHNAME>-NN` task ids yield a synthetic code (v3.101.0 derived `{E645}`), documented rather
+  than special-cased; (f) the dead `content/constitution.md` cite replaced with
+  `content/const-*.md`.
+- **`CLAUDE.md` gate count 32 → 33 at both sites** (E67, T-E67-02, lines 49 and 87) — stale since
+  E40 shipped the 33rd gate in v3.100.0.
+- **`docs/backlog.md`** — E66 and E67 rows done-marked; new rows E69 (a `stripRationale` newline
+  defect that makes two SOP sites mis-render in the dispatched text, found during review rounds 2-3)
+  and E70 (the same stale-count class in `CONTRIBUTING.md` / `docs/architecture.md`, plus a
+  fictitious README release-notes instruction still live in `content/skill-doc-writer.md`), with
+  intake rows 8d and 8e.
+
+### Notes
+
+- Chain: mini-chain (sr-engineer → code-reviewer → qa-engineer), PM/architect skipped — the backlog
+  rows served as the spec, so step 8's AC4 SKIP branch applies. 3 review rounds
+  (`review_reports/review_T-E66-01.md`), QA PASS covering T-E66-01, T-E66-02, T-E67-01, T-E67-02
+  (`qa_reports/review_T-E66-02.md`). `<CODES> = {E66, E67}`.
+- This release was cut by the first release-engineer to execute the rewritten SOP end to end. The
+  four new staging directories, step 5's explicit `check:transitions-sync`, and step 7d's corrected
+  `agc check` string were all exercised live and behaved as written.
+- E69's two mis-rendering sites are still live in the SOP text this release ships — the fix was
+  deliberately withheld from this cut because the regression test that proves it reds until the
+  fences move, and QA declined to split them. It is the highest-priority open row (intake 8d).
+
+## [3.101.0] - 2026-08-14
+
+Three release-SOP tickets, one file of substance (`content/skill-release-engineer.md`, +26/−11) and
+its pin (`test/release-staging.test.mjs`, +143/−9). All three were found **by running the previous
+version of this same SOP** — E64 by a near-miss during the v3.100.0 cut, E65 by two consecutive
+releases silently doing the right thing in the wrong order, E55 by the pm backlog-intake dispatch
+that cut this very batch. `<CODES> = {E645}`, AC4 SKIP branch (backlog-row-as-spec mini-chain).
+
+Bump kind is MINOR, not PATCH, and the basis is this file's own versioning policy plus direct
+precedent rather than taste: MINOR covers "backwards-compatible tools, **role skills**, or storage
+features", and a role skill is exactly what changed — the SOP the server hands a release-engineer
+gains a step that did not exist before (7d) and a terminal step that did not exist before (14). That
+is observable change in what the server delivers, the same reasoning that made the two prior
+content-only release-SOP cuts minors (v3.96.0 for E44+E49, v3.97.0 for E50). It is not PATCH
+because "no observable behavior change" is false at the SOP surface even though it is true at the
+code surface. It is not MAJOR: no tool surface, prompt schema, or handoff/state-file format changed,
+and there is **zero runtime code change** — no `tools/`, no `gates/` logic. The one-line
+`tsconfig.json` addition is declaration-only and provably so: `gates/**/*.ts` was already being
+compiled transitively via `tools/handoff-orchestrator.ts`, and the post-bump build's entire `dist/`
+delta is `dist/index.js`'s version literal.
+
+### Added
+- **SOP step 7d — the adapter-stamp bump, an obligation that previously appeared in NO step (backlog E65).** `CLAUDE.md` has required the `agc-version:` stamps in `CLAUDE.md` / `AGENTS.md` / `.antigravityrules` to be bumped in the release commit, and `agc check` must exit 0 before release — but no numbered SOP step ever said so, leaving it to whoever remembered. Step 7d now names all three files and their distinct comment syntaxes, and requires `agc check` (or `node bin/agc-init.mjs check`) to exit 0 **before** the commit, where a stale stamp is a one-line fix rather than a second commit. The three paths join the role's Artifact allowlist, each scoped to the stamp line only.
+- **SOP step 14 — the terminal handback names pm's backlog intake (backlog E55).** Step 12's `next_role="pm"` is documented as an explicit dispatch rather than a bare routing value: on resume, pm's normal intake — reviewing `docs/backlog.md` for the next open row(s) — is the expected next action, not an optional follow-up a human must separately request. No write mechanics change; the step only names in-file what the handback is for. The batch shipping this step is itself the third instance of the mechanism firing.
+- **`test/release-staging.test.mjs` Phase 9 and Fixture I (+143/−9).** Fixture I pins the exact scenario that nearly shipped during v3.100.0: `git status` shows a changed `gates/registry.ts` while `git diff --cached --stat` shows only `package.json`. Before E64 this fixture produced a false PASS — the test-side blindness mirroring the SOP-side defect. Phase 9 pins the step **order** itself for E65, since order is the entire defect that ticket documents; a review that reads the moved steps without checking their sequence would miss it.
+
+### Changed
+- **`gates/` added to five enumeration sites that all omitted it (backlog E64).** The SOP's step-8 `git add` line, AC2's cross-reference set, the "Expected vs unrelated scope rule" list, the Artifact MUST-NOT-touch list, and `FEATURE_DIRS` in `test/release-staging.test.mjs`. `guards/` was present in every one of them; `gates/` — one letter apart, and 12 predicate modules plus `registry.ts` (33 gate definitions) plus `pipeline.ts` against `guards/`'s 2 files — was in none. The scope-rule paragraph now spells out the distinction explicitly so the two are not read as interchangeable.
+- **Root cause fixed at source: `tsconfig.json`'s `include` gained `gates/**/*.ts`.** This is why AC-B5.5 — the meta-guard added after `transport/` slipped out of staging in v3.24.0, which derives expected source dirs from tsconfig — could not see `gates/` and therefore could not flag its absence. The guard was working; its input was incomplete. As noted above, the build effect is nil; the effect is that AC-B5.5 now derives `gates/` correctly, which is what makes the `FEATURE_DIRS` update load-bearing rather than decorative.
+- **Steps 10 and 11 moved ahead of the commit as 7b (drift-baseline acknowledgment) and 7c (backlog done-marking) (backlog E65).** Both writes belong *inside* the release commit, not after it; `11cc082` (v3.99.0) and `3c4b39e` (v3.100.0) each did exactly this by hand, so the renumbering ratifies observed practice rather than inventing it. The old slots 10 and 11 are **retained as retired pointers** so the numbering has no gap and nothing between 9a and 11a reads as accidentally deleted. Step 7c's summary cites the version (`vX.Y.Z`) and not a sha or tag, because step 8 has created neither at that point — matching what both reference commits actually wrote.
+- **Step 8's stage list and AC2 cross-reference gain the five metadata paths written by 7b–7d** (`.current/.config.json`, `docs/backlog.md`, `CLAUDE.md`, `AGENTS.md`, `.antigravityrules`) plus `tsconfig.json`, and the scope rule marks all of them EXPECTED release-engineer output at that point in the sequence rather than a role-boundary violation.
+- **The Artifact section states the author-vs-stage distinction rather than leaving it inferred.** `gates/` joins the MUST-NOT-touch list for the same reason `guards/` already sat there — both are gate/guard source authored by other roles — while step 8 simultaneously *requires* staging upstream `gates/` changes. Staging someone else's reviewed change is not authoring it; the two rules bind different verbs and the file now says so.
+- **`test/config-cache.test.mjs`'s WHY comment retargeted** from "SOP step 10" to note the E65 renumbering to 7b, so the pin's rationale does not silently point at a retired slot.
+
+### Notes
+- **QA rescoped AC1, which was vacuous.** The prior form asserted `SKILL.includes(dir)` against the whole document, and every one of the 15 directories is satisfied by prose elsewhere in the file — so deleting the entire `git add lib/ tools/ …` line outright still left the assertion 60/60 green. A pin that survives deletion of the thing it pins protects nothing. The rescoped form extracts the git-add line and asserts against **only its capture group**; deletion is now a genuine red. The same lesson was retargeted to the scope-rule paragraph, whose check is now bounded to its own enumeration sentence. This defect was in the pre-existing test, not in this cut's new code.
+- **Suite 1719/1719.** `npm audit --audit-level=high` exits 0 (moderate/low only), so step 6a's `docs/dependency-advisories.md` cross-check did not arm this release.
+- **This release is the first run of the changed SOP by a release-engineer following it**, matching the pattern v3.96.0 and v3.97.0 set. Steps 7b, 7c, 7d, 8 and 14 were all exercised live during this cut; observations from that run are reported back to the coordinator for backlog intake per the new step 14.
+
+## [3.100.0] - 2026-08-13
+
+One unit. E40 closes the non-qa `completed_tasks` prefill door **at the write**, generalizing the
+reviewer-only c16 check to every non-qa `agent_id`. The bypass it closes is structural, not a coding
+slip: the E18/E32 QA Completion-Evidence gate diffs an incoming `qa-engineer` write's
+`completed_tasks` against the **on-disk** set, so ids any other non-qa role already persisted before
+that write contribute zero set-difference and never trigger per-id evidence — the on-disk set was
+already poisoned upstream of the check. Only `code-reviewer` was blocked from prefilling; the other
+six non-qa identities were not. Source diff is `tools/handoff-orchestrator.ts` (+42),
+`gates/registry.ts` (+20/−2), and one `content/const-08-chain-31-mid.md` row; `<CODES> = {E40}`,
+AC4 SKIP branch (backlog-row-as-spec mini-chain).
+
+Bump kind is MINOR, not PATCH: a write the server used to accept — any non-qa-stamped
+`tw_update_state` carrying non-empty `completed_tasks` — is now rejected, and the rejection surfaces
+a **new error code** (`NON_QA_COMPLETED_TASKS_REJECTED`) that no client has seen before. That is
+observable behavior plus an added surface, the same reasoning that made v3.98.0's E53 and v3.99.0's
+E58 minors. It is not MAJOR: no documented workflow relied on the closed write (no role SOP tells a
+non-qa role to write `completed_tasks` — `skill-release-engineer.md` and `skill-doc-writer.md` only
+read the field, `skill-code-reviewer.md` already forbids writing it), no tool surface, prompt schema,
+or handoff/state-file format changed, and `tw_complete_task` is untouched.
+
+Nor is it 4.0.0. `3.99.0 → 3.100.0` is the correct semver successor — version components are
+integers, not decimal digits, so 100 follows 99 in the MINOR slot and a MAJOR bump would falsely
+signal breaking changes to the tool surface per this file's own versioning policy.
+
+### Added
+- **New gate `NON_QA_COMPLETED_TASKS_REJECTED` — the reviewer-only `completed_tasks` boundary now binds every non-qa identity (backlog E40).** `GATE_REGISTRY` goes 32 → 33 entries. Arm condition: `agent_id` present && `agent_id !== "qa-engineer"` && `agent_id !== "code-reviewer"` && `completed_tasks.length > 0`. Clearing artifact: omit `completed_tasks` (or pass `[]`) — only `agent_id=qa-engineer` may grow the ledger, backed by the existing `QA_COMPLETION_EVIDENCE_MISSING` evidence gate.
+  - **ONE gate step, TWO codes.** The existing `REVIEWER_COMPLETED_TASKS_REJECTED` envelope stays **byte-identical** for `agent_id="code-reviewer"` — it is published, cited in `content/skill-code-reviewer.md`, and pinned by `test/reviewer-completed-tasks-gate.test.mjs`. Two alternatives were considered and rejected at cut time: widening c16 in place (the name would lie on an `sr-engineer` write) and renaming c16 (retires a published code across four files and three tests for no behavioral gain).
+  - **STRICT predicate, deliberately not a set-difference.** Any non-empty `completed_tasks` is rejected regardless of which ids or how many. The E18/E32 set-difference against the on-disk ledger is not a pattern to copy here — that set-difference *is* the bypass being closed.
+  - **No exemptions**, per the E32 precedent: an exemption on this same class of check is the hole that reopened once already. `parsed.agent_id &&` guards an absent id from matching at all; `AGENT_ID_REQUIRED` (pipeline step 1) already rejects those upstream, so that clause is defense-in-depth rather than the primary guard.
+  - Applies in **file and SQLite/HTTP mode alike** — the predicate reads only the incoming write's arguments, with no storage-backend guard. Pinned in both modes by the new tests below.
+- **`content/const-08-chain-31-mid.md` gains a "Non-QA Completed-Tasks Gate" row** documenting the mechanism, the dual-envelope split, the strict-predicate rationale, and the clearing artifact. Required by `test/error-code-contract.test.mjs`'s `documentedInProse` contract, which admits no gate that prose does not describe.
+- **`test/reviewer-completed-tasks-gate.test.mjs` grows +283 lines.** `FM6`–`FM11` parameterize the new rejection across all six previously-open identities (`sr-engineer`, `pm`, `architect`, `researcher`, `design-auditor`, `release-engineer`), each asserting the write is stopped by *this* gate and not an earlier one. `BYPASS-FM` pins the bypass itself end-to-end: the non-qa prefill is rejected at the first write, and a downstream `qa-engineer` write carrying the same id is still caught by `QA_COMPLETION_EVIDENCE_MISSING`. `SQ4` and `BYPASS-SQL` replicate both under `SqliteHandoffStorage`.
+
+### Changed
+- **The `REVIEWER_COMPLETED_TASKS_REJECTED` pipeline step's `codes[]` widens 1 → 2 entries.** The step name is unchanged and its order is unchanged — still directly after `REVIEW_VERDICT_STATUS_MISMATCH`, before `QA_REVIEW_RECORD`. The `UPDATE_STATE_GATE_PIPELINE` remains **18 steps**; E40 added a code to an existing step, not a step.
+- **A genuine source-side defect surfaced by round-1 code review, in the pre-existing code's doc-map (`gates/registry.ts`).** `REVIEWER_COMPLETED_TASKS_REJECTED`'s `errorCode→doc-file` mapping comment declared only `skill-code-reviewer.md`, but this feature's new `const-08` row backtick-quotes that code too, so its actual site set became `[const-08-chain-31-mid.md, skill-code-reviewer.md]`. The mismatch was **masked** by `test/error-code-contract.test.mjs` aborting on its `mapping.size === 32` count assert before ever reaching the per-code comparison. Fixed at source (one line), not by relaxing the test; re-verified independently by code-reviewer round 2.
+- **Token-budget ceilings re-baselined +383 ~tok on all three axes** to absorb the new core-tagged `const-08` row: design-arm rationale-stripped floor `8804 → 9187`, teamwork coordinator bundle `16898 → 17281`, non-design floor `6706 → 7089`. Caps are set to the exact independently re-measured values per the established Phase-2 convention (no added headroom); the rationale+origin-tag saving margin was re-verified at `9567 − 9187 = 380 ~tok`, still ≥ 240. No `coord-*.md` fragment is touched, so the coordinator bundle's growth is 100% constitution-side.
+- **Registry-count re-baselines, 32 → 33**, in `test/error-code-contract.test.mjs` (entry count, `ALL_GATE_CODES` length, doc-map comment size), `test/e26-gate-stats.test.mjs` (coverage/disjointness/degradation asserts — the reader sums to `GATE_REGISTRY.length` by construction, so these are pure size re-baselines), and `test/e35-pipeline-order.test.mjs` (the frozen per-step `codes[]` sequence). Six `test/fixtures/compose-golden/*.txt` byte-identity goldens absorb the one added constitution line.
+
+### Notes
+- **The declared expected-red closed cleanly.** `qa_reports/expected-red_e40-nonqa-completed-tasks-write-gate.txt` declared 19 intentional failures, every one of the `32 → 33` re-baseline class. Each was independently confirmed to fail *only* on a hardcoded `32` or a frozen `codes[]` sanity assert, never on a substantive invariant — replicated at 33 with the count asserts removed, with full-registry coverage, catalog-order enumeration, fired/zero_fire disjointness and union equality, unregistered-code isolation, and bare-workspace degradation all green. The four `build-lite-*` and `hook-lite` goldens stayed green throughout, correctly: `const-08-chain-31-mid.md` is chain-tagged and never composed into lite mode. The manifest is archived with this release's evidence.
+- **The `expected-red` manifest itself arrived late and was backfilled on review.** Round 1 emitted it only as `pending_notes` prose; the code-reviewer flagged the missing file, and sr-engineer wrote it to disk per its own SOP 7a before round 2.
+- **Suite 1713/1713**, 0 fail. 1704 at v3.99.0 → 1713 with E40's `FM6`–`FM11`, `BYPASS-FM`, `SQ4`, and `BYPASS-SQL`.
+- **Dispatch shape: mini-chain, no per-feature spec.** No `specs/e40-*.md` exists anywhere in the tree — the backlog row served as the spec, PM and architect were skipped, and `scope_decision_why` records that classification. Release step 8's AC4 check therefore took its **SKIP** branch (the conditional added by E44), not the REQUIRE branch and not the UNCLASSIFIABLE stop.
+- `npm audit --audit-level=high` exits **0**; step 6a took its happy path and cited nothing from `docs/dependency-advisories.md`.
+- **A follow-up item exists and is deliberately not filed here.** No new backlog row was added by this release; filing is the coordinator's.
+- `.current/feature-split.md` carries unrelated in-flight E48/E56 measurement notes that predate this feature and are **not** part of this commit — `.current/` is governance state, outside the release commit's staged path set, and `scope_decision_why` records that E40 was never in that file's scope.
+
+## [3.99.0] - 2026-08-13
+
+Three units, one release. E39 re-derives the `ALLOWED_TRANSITIONS` mirror table in
+`specs/qa-flow-enforcement-architecture.md` from the compiled source and then **pins** it with a new
+`postbuild` check, so the drift class that produced nine wrong or missing rows cannot re-form
+silently. E58 (folded into E39's cut per its own backlog instruction) adds the one edge that closes
+the fourth and last known `:Blocked`-reachability gap. E59 generalizes Constitution §6's
+dependency-audit waiver clause from one role to every role — it was committed as `25d231e` after
+v3.98.0 was tagged and ships here.
+
+Bump kind is MINOR, not PATCH, on two independent grounds. E58 adds a newly-accepted edge to
+`ALLOWED_TRANSITIONS` — a write the server used to reject with `TRANSITION_REJECTED` now lands, which
+is observable behavior, the same reasoning that made v3.98.0's E53 a minor. And E39's
+`scripts/check-transitions-sync.mjs` runs on every `npm run build` (and therefore every `npm test`
+via `pretest`), so a checkout that built clean before can now fail the build. No edge was closed, no
+tool surface, prompt schema, or handoff/state-file format changed, so nothing documented breaks —
+this is the "backwards-compatible feature" clause of the versioning policy above, not MAJOR.
+
+### Added
+- **`scripts/check-transitions-sync.mjs` — the `ALLOWED_TRANSITIONS` mirror table is now machine-pinned (backlog E39).** Set-equality between the compiled `ALLOWED_TRANSITIONS` Map in `dist/tools/transitions.js` and the markdown mirror in `specs/qa-flow-enforcement-architecture.md`, reported in both directions (keys missing from the mirror, keys the mirror invents, and keys present on both sides with a different entry set).
+  - Wired at **`postbuild`**, deliberately not `prebuild` where `check:version` sits. The check imports from `dist/`, so at `prebuild` it would run before `tsc` and validate the *previous* build's output — reintroducing the exact stale-compiled-output failure the ticket exists to prevent. `postbuild` still fires on every `npm run build` and every `npm test`.
+  - **No vacuous passes**, an explicit ticket condition: a missing `dist/tools/transitions.js`, an unimportable module, a non-Map or empty `ALLOWED_TRANSITIONS`, a missing heading, or a section that parses to zero data rows are each a hard failure, never a silent skip.
+  - The section heading is matched with a line-exact `/^## ALLOWED_TRANSITIONS Matrix\s*$/m` anchor rather than a substring `indexOf` — this repo has an inline prose mention of that exact heading in `tasks.md`, which a substring search would bind to first and then report a confident, wrong-cause "parsed ZERO data rows".
+  - A duplicate-row guard fails when one key appears twice in the mirror. Without it `Map.set` is last-write-wins, so a re-drift shaped like *appending* a new row instead of editing the existing one — the exact shape of the E58 edit — would pass with only the last occurrence checked.
+- **`pm:Blocked → design-auditor:In_Progress` is now an accepted edge (backlog E58).** `content/skill-pm.md:28` stamps `next_role="design-auditor"` on a pm Blocked write, but `ALLOWED_TRANSITIONS` gave `pm:Blocked` only `[pm:In_Progress, pm:Blocked]`, so a coordinator honoring that `next_role` literally hit `TRANSITION_REJECTED`. Fourth instance of the E45/E53 `:Blocked`-reachability family and the first found by a deliberate audit rather than by accident; folded into this cut per its own backlog row, which asked not to ship a one-edge release.
+- **`test/check-version.test.mjs` gains CTS-1..CTS-7 (+203 lines)** — the sync check shipped with zero coverage, its whole contract verified only by hand across three review rounds. The new fixtures copy the real script byte-for-byte into a temp root and cover: green on a corrected tree, RED on a seeded doc-side omission, RED on a seeded doc-side extra row, RED on an absent heading, the line-exact anchor in both directions (heading rename fails / inline prose mention still passes), and the duplicate-row guard on the wrong-then-correct ordering that produced a false green in round 1.
+
+### Changed
+- **The mirror table itself: 16 rows → 21, re-derived mechanically from source (backlog E39).** Nine drift sites, not the "roughly 5" the ticket estimated — 4 wrong rows and 5 missing keys:
+  - Missing entirely: `design-auditor:{In_Progress, Blocked}` and `code-reviewer:{In_Progress, FAIL, Blocked}`.
+  - Wrong: `null:null`, `researcher:In_Progress`, and `pm:In_Progress` each dropped a `design-auditor` entry; `sr-engineer:In_Progress` named `(qa-engineer, In_Progress)` where source says `(code-reviewer, In_Progress)` — correct when written, silently invalidated at v3.9.0 (`7e81cf7`) when the code-reviewer role was extracted without updating the mirror.
+  - A footnote now records the derivation, the row count, and that history, so the next reader does not re-derive it cold.
+- **The Amend-Resume paragraph now describes the mechanism that actually runs.** It still documented the original v3.47.0 `pending_notes` string-grep (`resume_of: <role>`), which v3.55.0 (C9) replaced with the structured top-level `resume_of` field threaded to `validateTransition` as `next_resume_of`. A `pending_notes` line reading `resume_of: qa-engineer` opens no edge today; only the field does. The rewrite also records the field's write-scoped lifetime, that SQLite mode never persists it, and that the hop cap outranks the resume edge alongside the round caps.
+- **Constitution §6's dependency-audit waiver escape is closed for every role, not just release-engineer (backlog E59, committed `25d231e`).** `content/const-15-core-tail.md` previously let any HIGH/CRITICAL finding through "unless waived in the PR description with rationale", while binding *"every role that calls `npm run build` / `cargo build` / `pip install` / equivalent"*. E57 had closed that door at skill level for release-engineer only — leaving it open to sr-engineer and qa-engineer, the two roles that run `npm audit` far more often. A finding now needs a disposition already recorded in the workspace's dependency-advisory record (advisory id, decision, re-review trigger) with its trigger unfired; an inline PR/commit rationale is not a waiver at any role, and no matching disposition means `status: Blocked`. No per-role skill patch was needed — `skill-sr-engineer.md` and `skill-qa-engineer.md` correctly do not restate §6, so fixing the fragment binds both automatically; adding per-role text would have rebuilt the prose channel the change abolishes.
+- E59 also corrected 8 mirrors of the rule in `docs/skills/{release-engineer,sr-engineer}.md`, including two mermaid branches that routed toward proceeding on a "waived" state that no longer exists, and split `sr-engineer.md`'s flow so an undispositioned advisory no longer falls into the §5 auto-fix loop alongside compile errors (a latent path that predated E59).
+- `test/qa-flow.test.mjs`'s E53 exhaustive sweep goes 68 → 69 accepted tuples, extended by exactly the one E58 edge — the durable negative pin still asserts an exact set, so it remains the thing that catches an unintended edge.
+
+### Notes
+- **The declared expected-red closed cleanly.** `qa_reports/expected-red_e39-e58-transition-matrix-sync.txt` declared one intentional failure: E58's new edge breaks `T-E53-03(h)`'s literal 68-tuple snapshot. QA's sweep extension closed it, and the file is archived with this release's evidence.
+- **E39's own review filed E62** (`docs/backlog.md`, execution order `6a`): stale `tools/transitions.ts:NNN` line-number citations, which is E39's defect class in the one form E39's check is structurally blind to. The reviewer noted two sites; the follow-up grep found five. Not folded in — no citation gates a transition, and the failure mode is wasted reading, not wrong behavior. Its `N8` note records the genuine tension the row has to resolve: E39's own rewritten paragraph *adds* seven precise line-number citations because the reviewer demanded them, so the fix is a policy on where line numbers are load-bearing versus decorative, not a blanket rewrite.
+- **Not in this cut, and deliberately so.** Order 6 batched `E39 + E48(b) + E56`; only E39 shipped. Measurement during the cut falsified E48's premise — `docs/skills/*` are 2-4x hand-written expansions with no generator and no structured source (`docs/skills/coordinator.md` has no source file at all), so "generate from `content/`" and "share E39's check" are both non-viable and the row needs a human design decision. E56 is an independent one-paragraph amendment. Both remain open in `.current/feature-split.md` as F1/F2. E60 (`package-lock.json` root version maintained by nothing) and E61 (two pre-E59 prose surfaces) also remain open.
+- The round-cap paragraph (`prev_qa_round >= 4`) was checked and deliberately **not** touched: it is correct as written. An earlier scoping draft called it a contradiction against the Limits section's "3 counts"; it is not — the Limits text counts failures, the code counts the counter, and `ROUND_CAP = 4` agrees with the paragraph.
+- `specs/qa-flow-enforcement-architecture.md:147` still opens the section with *"Authoritative source."* three lines above a table both `tools/transitions.ts` and E39's new footnote call a mirror. Pre-existing, unchanged diff context, recorded as the cheapest item in E62 — and materially less dangerous now, since a contributor who trusts it and edits the table gets a hard `postbuild` failure instead of silent drift.
+- Suite **1704/1704**, 0 fail. 1692 at v3.98.0 → 1694 after E59's 9-site regression pin (`25d231e`) → 1704 with E39's CTS fixtures.
+- `npm audit --audit-level=high` exits **0**; step 6a took its happy path and cited nothing. Residual findings are 2 low / 3 moderate, all below the gate.
+- The lockfile root `version` stays as npm last left it — outside release-engineer's Artifact allowlist, and E60 is the ticket that decides how it gets maintained.
+
+## [3.98.0] - 2026-08-12
+
+A combined cut of two independently QA-PASSed mini-chains, both of which fix something this very
+release step depends on. E53 makes `release-engineer:Blocked` reachable — the escalation path this
+SOP has instructed the role to take for six failure modes while the server rejected the write. E57
+closes the five standing HIGH npm advisories and replaces the ad hoc "not introduced by this cut"
+waiver with a per-advisory decision record that release step 6a now consults. Source diff is
+`tools/transitions.ts` (+39) and `package.json`/`package-lock.json`; `<CODES> = {E53, E57}`, AC4 SKIP
+branch (backlog-row-as-spec mini-chain, both features).
+
+Bump kind is MINOR, not PATCH: E53 adds five newly-accepted edges to `ALLOWED_TRANSITIONS`, which is
+a behavior change to the routing validator (writes the server used to reject now land), and E57
+raises the dependency floor (`js-yaml` `^4.1.1 → ^4.3.1`, new `overrides.sharp`). Neither breaks a
+documented contract — no edge was closed, no tool surface or state-file format changed — so this is
+the "backwards-compatible feature" clause of the policy above, not MAJOR.
+
+### Added
+- **`e53-transition-gap-closure` — `release-engineer:Blocked` is now reachable, and `sr-engineer:Blocked → design-auditor` exists (backlog E53).** Three gaps in `tools/transitions.ts`, five new accepted edges:
+  - `release-engineer:In_Progress` gains `{release-engineer, Blocked}` — the missing *entry* edge. Every other role carries a `:Blocked` entry; release-engineer had none.
+  - New key `release-engineer:Blocked` → `[release-engineer, pm, qa-engineer]:In_Progress`. It previously resolved to `allowed=[]`, so even a Blocked state reached by some other means was a dead end. The destination set is derived from the SOP's own six Blocked rows rather than assumed: five hand back to human/pm, but the `npm test` regression row names **qa-engineer**, so `pm` alone would have been wrong.
+  - `sr-engineer:Blocked` gains `{design-auditor, In_Progress}` — gap B, found by the same-pass audit E53 itself commissioned, not by the filed ticket. `content/skill-sr-engineer.md:50` routes a "visual structure unspecified" halt there against an edge that did not exist.
+- Mirrored in `specs/qa-flow-enforcement-architecture.md` — those three rows only. The file's broader drift stays open under E39; this cut deliberately did not widen into it.
+- `content/skill-release-engineer.md` step 7a's empty-baseline STOP was converted from an in-SOP halt into a real Escalation Routes row. With the edge live there was no honest distinction left between it and the six rows already in that table — this is the human's option (b), chosen at intake.
+
+### Changed
+- **`e57-dependency-advisory-decisions` — all five standing HIGH advisories closed by upgrade, and a decision record now owns the disposition (backlog E57).** No accept-with-rationale was needed for any of the five:
+  - `js-yaml` `^4.1.1 → ^4.3.1` (direct dependency; parses every `handoff.md` at `tools/handoff-parse.ts:175`) — clears GHSA-52cp-r559-cp3m and GHSA-5p4m-2wfm-xmqj.
+  - New `overrides.sharp: ^0.35.3`, which closes the `sharp` and `@xenova/transformers` pair together (GHSA-f88m-g3jw-g9cj / CVE-2026-33327, -33328, -35590, -35591) with zero code change.
+  - `fast-uri` `3.1.2 → 3.1.5` and `ip-address` `10.2.0 → 10.5.0` — both lockfile-only, both already inside their parents' declared ranges.
+  - `@modelcontextprotocol/sdk` stays **1.29.0** and `@xenova/transformers` stays **2.17.2**: plain `npm audit fix` drags the SDK to 1.30.0 plus `hono`, and proposes a semver-**major downgrade** of sharp to 1.4.2. Both were rejected on the facts and the rejection is recorded so it is not re-litigated.
+- New `docs/dependency-advisories.md` is the actual deliverable — GHSA id, dependency path, reachability, decision, and re-review trigger per advisory, plus a rejected-options section and the residual 2 low / 4 moderate findings that are explicitly out of scope.
+- `content/skill-release-engineer.md` gains **step 6a (Dependency-audit disposition)**: `npm audit --audit-level=high` after `npm test`; on a non-zero exit, cross-check each flagged package against the record and STOP (`status=Blocked`, `next_role="pm"`) if it is unrecorded or its re-review trigger has fired. Release-engineer is explicitly forbidden from authoring the record itself or improvising an inline waiver — the record is outside its Artifact allowlist by design.
+
+### Notes
+- **E57 falsified two of its own backlog premises**, both recorded in the decision record rather than quietly dropped: (a) "4.2.0 is still flagged so no routine bump clears it" — `js-yaml` **4.3.1** shipped *after* the row was written and clears both advisories in-range, so it was a routine in-range bump after all; (b) "dropping the RAG dependency would close three of the five outright" — dropping was never needed, and the swap-to-`@huggingface/transformers` alternative was rejected because 4.2.0 still pins `sharp ^0.34.5`, also vulnerable.
+- **The sharp reachability finding was corrected during review; the retracted version is not the record.** A round-1 draft claimed sharp's native binding never loads, resting on a `process.moduleLoadList` probe — that API cannot observe `dlopen`'d addons at all, so it had no discriminating power, and code-reviewer caught it with a positive control. The correct finding: libvips **is** resident in-process under SQLite mode, and that is *favorable*, because the resident binding is now the fixed sharp 0.35.3 / libvips 8.18.3. Safety rests on the text-only feature-extraction pipeline never issuing a decode call, not on the binding being absent. Stdio mode remains unreachable outright (`tools/rag.ts:190`/`:255` hard-refuse without `--port`).
+- Lockfile delta is 5 version moves and +29/−21 entries (214 → 222 `node_modules/` nodes). 27 of the additions are `@img/*` prebuilt binaries replacing sharp 0.32's `tar-fs` / `bare-*` download-at-install stack — a net **reduction** in install-time supply-chain surface, not just a churn of names.
+- `npm audit --audit-level=high` now exits **0**. This is the first release since the record shipped, so step 6a took its happy path and cited nothing — the point of the record is that the next release which does *not* exit 0 has somewhere to look other than a fresh paragraph of prose.
+- E53's AC4 ("no other edge opened") was proven exhaustively rather than sampled: a 1056-tuple differential sweep (33 prev × 32 next) against the base build, accepted edges 63 → 68 — exactly the 5 intended, 0 closed. qa-engineer then rebuilt that sweep as a durable in-suite negative pin, so a future edge added without a matching AC fails the suite.
+- Suite **1692/1692** (1690 after E53's +13, plus 2 new override pins from E57).
+- Spawned from these two cuts and deliberately **not** folded in: E58 (`pm:Blocked → design-auditor`, the fourth instance of this defect family — folding a fourth edge would have breached E53's own AC4), E59 (Constitution §6's *"unless waived in the PR description"* escape is still open to sr-engineer and qa-engineer — E57 closed the door for one role and left open the two that run `npm audit` most often), and E60 (`package-lock.json`'s root `version` is maintained by nothing; E57's `npm install` refreshed it 3.66.0 → 3.97.1 as a side effect, which is exactly why it needs a real check). This release leaves the lockfile root version at 3.97.1 — outside release-engineer's Artifact allowlist, and E60 is the ticket that decides how it gets maintained.
+- The `agc-version` adapter stamps in `CLAUDE.md`, `AGENTS.md`, and `.antigravityrules` were stale at 3.97.0 (v3.97.1 shipped without bumping them, so `agc check` exited 1). All three are re-stamped to 3.98.0 here and `agc check` exits 0.
+
+## [3.97.1] - 2026-08-11
+
+The first of the three governance-text render paths to be fixed rather than documented. `stripOriginTags`
+/ `stripRationale` ran on exactly one of the two paths that deliver a role SOP to an agent — and not the
+one most dispatch actually uses. Source diff is three files (`prompts/text-transforms.ts` new,
+`prompts/build.ts` +18/−57, `tools/role.ts` +12/−1) plus its pin (`test/skill-manifest.test.mjs`
++181/−1, 8 new tests). `<CODES> = {E51}`, AC4 SKIP branch (backlog-row-as-spec mini-chain).
+
+Bump kind is PATCH under this file's own policy read as written — a bug fix — though note E51 does
+change observable output on the `tw_switch_role` path (that is the fix), so the policy's PATCH clause
+is being read with "no observable behavior change" qualifying *internal refactors* rather than *bug
+fixes*. Recorded here rather than settled silently.
+
+### Fixed
+- **`e51-skill-render-strip-parity` — the strip passes now run on BOTH skill-render paths (backlog E51).** `prompts/build.ts` applied `stripOriginTags` (always) and `stripRationale` (unless `fullDetail`); `tools/role.ts`'s `switchRole` — the handler behind `tw_switch_role`, and the path every role dispatch in this repo and every agc-managed workspace is routed through when the Task tool is unavailable — applied neither. Every role SOP delivered that way carried raw `<!-- origin:… -->` / `<!-- rationale:… -->` markers verbatim to the acting agent: the one reader the fence convention exists to keep them away from. Pre-existing and repo-wide, not introduced by v3.96.0/v3.97.0, but with a live cost — E49's backlog row and E50's sr-engineer both used the rationale convention on the assumption the tags are invisible to the acting agent, which was true on one path and false on the other.
+- The fix is a shared pass, not a second copy: both strippers moved **verbatim** (verified byte-identical to their prior definitions by extract-and-compare, not by diff reading) into a new zero-dependency leaf module `prompts/text-transforms.ts`, alongside `applyTextTransforms(text, { fullDetail })` that holds the canonical order — origin always, rationale unless `fullDetail` — in one place. `prompts/build.ts` re-exports both names unchanged, so the ~40 call sites in `test/context-budget.test.mjs` and `scripts/measure-context-cost.mjs` that import them from `dist/prompts/build.js` needed zero edits, and `dist/prompts/build.d.ts` keeps its declaration surface.
+- `switchRole` passes `fullDetail: false` (it is a dispatch path; no authoring mode exists there) and strips the **body only** — the pass runs downstream of `parseSkillFile`, so YAML frontmatter and the `recommended_model` hint are never in scope. A whole-file `.current/` override is now stripped too, which is deliberate parity with the `buildPromptForRole` path rather than a new behavior.
+
+### Changed
+- Corrected three source comments the fix falsified: `prompts/build.ts`'s two "only `buildPromptForRole` calls it" claims (governance-text-load-architecture DR-2) and `tools/role.ts`'s "does NOT flow through `buildPromptForRole`" note, which now explains the strip parity as well as the partial expansion.
+
+### Notes
+- **Restart the MCP server to observe the fix.** A running server holds `dist/tools/role.js` from process start, so `tw_switch_role` replies in an already-open session keep showing the old unstripped text after the rebuild. Verified against the rebuilt `dist/`; a manual in-session spot-check against a stale server reports a false negative.
+- Suite 1677/1677 (1669 + 8). All 8 `test/fixtures/compose-golden/*` fixtures are byte-identical on disk — **nothing was rebaselined**, which is the evidence that the `buildPromptForRole` path is a genuine no-op refactor. Two of the new tests earn their place beyond the obvious: `t-e51-witness-fences-exist-in-source` fails if the fences are ever deleted from `content/` instead of stripped at render time (which would make the marker-free assertion pass on empty input), and `t-e51-build-reexport-surface` asserts `===` identity between the two modules' exports, so a re-introduced copy fails rather than silently drifting.
+- **A third render path remains unstripped, deliberately.** `bin/agent-governance-context.mjs` composes constitution + coordinator-lite skill and applies neither pass. That is a standing decision (governance-text-load-architecture DR-2/DR-4), not an oversight, and it was left out of E51's scope rather than re-litigated inside a 3-file cut — now pinned by `t-e51-hook-remains-non-caller`, which names the DR and tells whoever changes it to retire the test on purpose. DR-2's prose is itself now stale (it still says the single copy lives in `prompts/build.ts` and that stripping is needed at one production call-site); left unamended because these `specs/*-architecture.md` files are dated design records, not header-sync mirrors — same drift class as backlog E39/E48.
+- `npm audit` reports 5 HIGH / 0 CRITICAL (`sharp` ← libvips CVE-2026-33327/33328/35590, `@xenova/transformers` ← `sharp`, `fast-uri`, `ip-address`, `js-yaml`), all pre-existing and orthogonal: no dependency file changed in this release. Waived per Constitution §6 with that rationale. `js-yaml` 4.2.0 is still flagged, so a routine bump will not clear it.
+
+## [3.97.0] - 2026-08-11
+
+Third consecutive release-SOP hardening cut, and the third rewrite of step 7a in three days. Like
+v3.96.0 this is content-only: `content/skill-release-engineer.md` (+57/−11) is the sole content file
+in the diff and `test/release-staging.test.mjs` (+509/−56, 53 tests) is its pin. Every fix in it
+came out of E49's own code review — the reviewer kept finding defects in the step *after* it shipped,
+so E50 exists to close the ones round 3 surfaced too late to fold in. This release is again the first
+run of the changed step by a release-engineer following it (`<CODES> = {E50}`, both guard flags
+unset, AC4 SKIP branch).
+
+### Changed
+- **`e50-release-sop-step7a-hardening` — step 7a gains a per-tree empty-baseline guard (backlog E50, N4/F9).** `grep -vxFf` with an EMPTY pattern file passes its ENTIRE input through, not nothing — so an empty membership baseline is not "nothing to exclude", it is "no baseline to diff against", and using it anyway would sweep every root-level evidence file into one feature's archive dir. The outcome is now evaluated **per tree**, not folded into one flag, because one tree can be seeded while the other is absent:
+  - `STOP_QA` / `STOP_RR` — `PREV_TAG` unset, or that tree's baseline is empty *while* the tree holds root-level files an unbounded sweep would take → hard STOP with a named message, surfaced to the human.
+  - `EXCLUDE_QA` / `EXCLUDE_RR` — that tree never existed on disk, or its baseline is empty *and* it holds zero root-level files → contributes nothing and proceeds silently. This is the self-healing shape for a `teamwork-lite` workspace that never dispatches code-reviewer (`review_reports/` never exists); unlike a single global flag it is re-evaluated fresh each run and never blocks the other tree.
+  - The guard is an **in-SOP halt-and-surface, not an Escalation-Routes row** — `release-engineer:Blocked` is not a reachable transition into this role on any edge, so a table row here would resolve to a write the server rejects. It matches the precedent step 8's AC4 branches already set for this role.
+- **`e50-release-sop-step7a-hardening` — `<CODES>` is now actually bound, and logged even when empty (backlog E50, F8).** The v3.96.0 logging bullet expanded an unbound variable and therefore printed `{∅}` on every release regardless of what the derivation found. The derivation fence now assigns `CODES=$(…)` and the logging bullet expands that binding (`echo "step 7a: <CODES> = {${CODES:-∅}}"`) rather than re-running a fresh, uncaptured pipeline. `∅` remains a legitimate, non-fatal outcome — the point is that empty-by-design and empty-by-breakage are no longer indistinguishable in the transcript, which is exactly the ambiguity that hid the prior derivation's defect through two full review rounds.
+- **`e50-release-sop-step7a-hardening` — scope extends from `qa_reports/` alone to `qa_reports/` + `review_reports/` (backlog E50).** Both trees are enumerated under the same membership predicate and their codes are unioned into one `<CODES>`. Destinations stay **parallel** — `qa_reports/archive/<active_feature>/` and `review_reports/archive/<active_feature>/` — and review evidence is NEVER folded into the qa archive: the two streams share basenames (`review_T-E4X-03.md` existed simultaneously in both trees within the v3.96.0 commit `27f59e2`), so one shared destination makes `mv -n` silently skip whichever file arrives second. That silent-orphan class is the whole reason the step exists. The `covers:` sweep is likewise per-tree, never cross-filed.
+- **`e50-release-sop-step7a-hardening` — shell-portability dependency stated, not engineered around (backlog E50, N5).** The pipeline's `<(…)` process substitution is bash/zsh, not POSIX `sh`; that dependency is now recorded in one parenthetical. Reshaping the predicate to avoid it was explicitly rejected at cut time — the failure mode is loud, not silent, and rewriting reopens a derivation that took three review rounds to converge.
+- **The Artifact allowlist gains `review_reports/archive/**`** (move-only, parallel to `qa_reports/archive/**`), and the *Expected vs unrelated scope rule* now names `review_reports/archive/<feature>/**` moves as expected release-engineer output rather than a role-boundary violation.
+
+### Notes
+- **Known-unreachable edge, filed not fixed**: `release-engineer:Blocked` has no `:Blocked` key in `tools/transitions.ts` for this role, so the four Blocked rows in the release SOP's Escalation Routes table point at an edge the server rejects (`allowed=[pm:In_Progress]` from `release-engineer:In_Progress`, `allowed=[]` from `release-engineer:Blocked`). Verified against the compiled validator during code review. A source fix, deliberately out of scope for a content-only cut.
+- **Deferred follow-ups** carried into the backlog rather than fixed here: the step now carries two copies of the derivation (an illustrative fence plus the executable `CODES=` fence, because a test pinned the illustrative one's leading text) — the same "two copies, only one kept honest" shape as E39/E48/E51; and the code-extraction regex's `[a-z_]*` prefix is wider than the `review_`/`visual_` prefixes that actually exist, so `notes_about_T-E99-01_backup.md` would yield `{E99}`.
+- Suite: **1669 pass / 0 fail** (up from 1657 — 12 tests added to `test/release-staging.test.mjs`). Build 0 errors. `npm audit`: 11 pre-existing, 0 new.
+
+## [3.96.0] - 2026-08-10
+
+Both tickets fix release-engineer SOP steps that were **unexecutable as written** against the
+shapes this repo actually ships. Neither is a source-code change: `content/skill-release-engineer.md`
+is the only content file in the diff, and `test/release-staging.test.mjs` is its pin. This release
+is also the first run of the changed SOP by a release-engineer following it — the two branches
+below were exercised live during the cut (`<CODES> = {E44, E49, E4X}`, AC4 SKIP branch).
+
+### Changed
+- **`e44-e49-release-sop-conditional-checks` — step 8 AC4 becomes a three-way branch on dispatch shape (backlog E44).** The post-commit sanity check previously required `specs/<active_feature>.md` in the release commit unconditionally, which is unsatisfiable on a mini-chain: when PM/architect are skipped and the backlog row IS the spec, no such file is ever authored, so the check STOPped every mini-chain release on a file that could not exist. It is now exactly one of three named branches, and the release-engineer logs which one fired:
+  - **REQUIRE** — `specs/<active_feature>.md` exists somewhere in the working tree → it MUST appear in `git diff HEAD~1 --name-only`, else hard STOP. Wording is byte-unchanged from the pre-E44 check; this branch is not weakened, and spec-in-tree wins over SKIP even when `scope_decision_why` also records a mini-chain.
+  - **SKIP** — no such file anywhere in the tree AND `scope_decision_why` records a backlog-row-as-spec mini-chain → skip, no STOP, log one line naming the branch. The log line is the point: a skipped check that leaves no trace is indistinguishable from a forgotten one.
+  - **UNCLASSIFIABLE** — neither holds → STOP and route to human rather than guess. The absent third branch is what made the old check silently wrong instead of loudly wrong.
+- **`e44-e49-release-sop-conditional-checks` — step 7a derives `<CODES>` from the working tree, not from committed history (backlog E49).** The archiving step derived a single ticket code from `active_feature` alone, so a release shipping more than one ticket archived only one ticket's evidence. E49's first fix generalized it to a SET read from the commit range — which was itself wrong for the dominant case (F7, caught in code-review round 3): `qa_reports/` evidence is normally still UNTRACKED at step-7a time (step 8's `git add qa_reports/` is what first commits it), so any derivation reading committed adds returns ∅ on exactly the releases that need it. The shipped rule enumerates root-level `qa_reports/` files as they sit in the working tree and uses the previous tag only as a membership predicate:
+  ```
+  find qa_reports -maxdepth 1 -type f | sort \
+    | grep -vxFf <(git ls-tree -r --name-only "$PREV_TAG" -- qa_reports/)
+  ```
+  One predicate now covers both shapes that previously diverged — a file committed at root within the range is absent from `$PREV_TAG`'s tree, and an untracked file is *also* absent from it, since untracked files were never in any historical tree. `find -maxdepth 1` never descends into `archive/`, so the old explicit archive exclusion falls out for free and a retried release cannot re-derive codes from what it already archived. Re-run at each of the last six releases' own step-7a point, the rule reproduces exactly what each actually archived (`{E25,E27,E28,E29,E30,E32,E33,RELSOP}`, `{E34}`, `{E35}`, `{E36}`, `{E37,E38}`, `{E45,E46}`).
+  - The MUST NOT is rescoped from "outside the single `active_feature` prefix" to "not new since `$PREV_TAG`", and the "concurrent in-flight features" premise it used to cite is recorded as **false by construction**: the E1 feature lease admits one non-terminal feature per workspace, so same-release tickets closed sequentially. The MUST NOT still has a real job — bounding *scope*, not guarding against concurrency it was mislabelled for.
+- **`test/release-staging.test.mjs`** (qa-engineer-authored per §2): +461/−34 lines, 41 tests in the file. The three pre-existing AC4 assertion sites are retargeted to the branch structure; new fixtures C–H cover REQUIRE-fires, REQUIRE-passes, SKIP, UNCLASSIFIABLE (empty and non-mini-chain `scope_decision_why`), and REQUIRE-beats-SKIP non-weakening, plus a branch-exhaustiveness pin over every (spec-in-tree × records-mini-chain) combination. For E49: an F7 regression pin reproducing the v3.93.0 untracked-at-root shape, the v3.94.0 two-file shape, the committed-in-range shape, non-retroactivity, the F4 bare-code-prose negative, already-archived re-entry in both rename and untracked-add shapes, and a substring pin that FAILS if the discarded committed-history-only command ever returns to the executable fence.
+
+### Notes
+- Suite **1657/1657** green, up 16 from 1641 at v3.95.0. `npm run build` 0 errors. `npm audit --audit-level=high`: 11 pre-existing advisories, 0 new — no dependency or lockfile change in this release.
+- Chain: mini-chain (backlog rows as spec, PM/architect skipped, `scope_decision: single-feature`) sr-engineer(fable) → code-reviewer **3 rounds** → qa-engineer PASS. Evidence on disk: `review_reports/review_T-E4X-03.md`, `qa_reports/review_T-E44-01.md`, `qa_reports/review_T-E44-02.md`, `qa_reports/review_T-E49-01.md`, `qa_reports/review_T-E4X-03.md`. Round 3 is where F7 was caught — the ∅-returning derivation had survived two rounds because step 7a's zero-match case is a legitimate silent no-op, so ∅-by-design and ∅-by-breakage look identical.
+- **`qa_reports/review_T-E45-01.md` swept into `qa_reports/archive/e46-qa-spec-defect-status-rule/`** (T-E49-02, deliberate one-off): the E45 evidence commit predates the `v3.95.0` tag, so it is inside `$PREV_TAG`'s tree and the E49 rule correctly does NOT pick it up. E49 is not retroactive by design; this orphan was moved by hand instead.
+- Backlog rows filed OPEN, not fixed here: **N3** (step 7a scans only `qa_reports/`, so `review_reports/` evidence is never archived), **N4** (`grep -vxFf` with an empty pattern file passes everything through — reachable on a first release or a mid-life adopter whose `PREV_TAG` predates `qa_reports/`; unreachable on this repo's dense tag history, non-destructive via `mv -n`, and pinned in the suite as current behavior), **N5** (`<(...)` process substitution is bash/zsh-only and fails loudly under `sh -c`), **N6** (the `origin:`/`rationale:` strip passes run on the `prompts/build.ts` path but not on `tools/role.ts`, so `tw_switch_role` returns unstripped SOP text — pre-existing and repo-wide; visible in this release's own diff, which carries raw `<!-- origin:* -->` markers), and **zero-match logging** (step 7a should log the derived `<CODES>` even when empty, so ∅-by-design is distinguishable from ∅-by-breakage — the exact ambiguity that hid F7).
+
+## [3.95.0] - 2026-08-10
+
+Both tickets in this release are corrections to governance this server enforces on
+*other* workspaces, found by a consumer workspace hitting them in production
+(an adopter acceptance project, feature `button-figma-realign`, 2026-08-07; full account in
+`research/adopter-button-realign-qa-blocked-dead-end.md`). QA hit `## Visual Structural
+Assertions` rows that asserted a Figma source a human-approved sanctioned divergence had
+since superseded: marking `pass` would have written a falsehood into the evidence trail,
+marking `fail` would have blamed an implementation doing exactly what was approved. QA
+wrote `Blocked` — and from `Blocked`, PM was unreachable.
+
+### Changed
+- **`e45-qa-blocked-pm-escape` — give `qa-engineer:Blocked` its `pm:In_Progress` escape (backlog E45).** `tools/transitions.ts` adds `{ agent: "pm", status: "In_Progress" }` to the `qa-engineer:Blocked` row of `ALLOWED`. That row was the only `<role>:Blocked` row in the table without it — researcher / design-auditor / pm / architect / sr-engineer / code-reviewer all had `Blocked → pm:In_Progress` — which made Constitution §3.1 Amend-Resume unreachable from the one state most likely to need it. The control case shows the gap was an omission rather than a design decision: the adjacent `qa-engineer:FAIL` row already carried a `pm:In_Progress` escape for the same "hand back to PM" shape.
+  - **Loose variant, no `resume_of` requirement** (human's choice): `resume_of` gates the PM *return* leg (`pm:In_Progress → {code-reviewer, qa-engineer}`), so requiring it on this *outbound* edge would have made `qa-engineer:Blocked` asymmetric with both the six peer `Blocked` rows and the `qa-engineer:FAIL → pm` edge it mirrors.
+  - **This is a behavioural change to the state machine** — it admits a transition the server previously rejected. No existing edge was removed or narrowed, so nothing that worked before breaks; hence minor, not major.
+  - `specs/qa-flow-enforcement-architecture.md:161` mirror cell synced per that file's standing MUST-update-mirror obligation. E39's full-table re-derive was deliberately not folded in.
+  - `test/qa-flow.test.mjs`: +203 lines — positive accept without `resume_of`, a row-equality pin, sibling-row and all three round-cap-override regression pins, and two E38-advisory pins on `Blocked` states.
+  - **Correction shipped alongside the fix**: E45's own code review caught that the originating research doc (§4), this repo's backlog E45 row, *and* the first draft of the `tools/transitions.ts` provenance comment all asserted a rule that does not exist — `content/skill-qa-engineer.md` prescribes `FAIL` → pm for spec defects, never `Blocked`. All three were corrected by annotation rather than deletion. The real gap was narrower and still real: two defensible status expressions for "the spec is wrong", only one of which could reach PM.
+
+### Added
+- **`e46-qa-spec-defect-status-rule` — write down the rule three careful readers got wrong (backlog E46).** E45 made the `Blocked` framing *reachable*; nothing in any SOP told a QA agent when to use it. `content/skill-qa-engineer.md` gains a `## Contract Defect vs Implementation Failure` H2 stating the decision test directly: if marking `pass` writes a falsehood into the evidence trail **and** marking `fail` blames an implementation doing exactly what a human already approved, the assertion is the defect, not the code → `Blocked`. If only one verdict is dishonest, the spec is still the approved truth → grade normally.
+  - **Cost is stated, so the choice is made on cost rather than instinct**: `FAIL` increments `qa_round` toward its cap; `Blocked` does not. Charging a contract defect to the implementation's round budget can push a chain toward the round-cap lock for a problem the implementation did not cause.
+  - **Anti-abuse guard**: the `Blocked` route requires citing a divergence artifact that is (a) not authored by qa-engineer and (b) predates this QA round. A `qa_reports/visual_<id>.md` `## Allowed Differences` entry is explicitly disqualified — that section is QA's own, written at verification time, so citing it would let QA self-certify the very escape the guard exists to gate.
+  - `contract defect | Blocked | … | pm` added to the Escalation Routes table; pointers added at both Phase 3a/3b Drift bullets so the rule is met at the decision point, not only in the section. The two coverage-gap rows stay `FAIL`, unaffected: their literal is unsourced, so the spec asserts nothing about it and the test's first conjunct is unsatisfiable — closed by construction, not by exception.
+  - `content/skill-qa-visual.md:24`: the pre-existing "contract defect" wording renamed to **"specification ambiguity"**, ending a term collision that routed the same label to `FAIL`; `:64` gains a one-line pointer from Structural Assertions to the new rule. No duplication of the rule text — it lives in one place.
+  - `test/qa-visual-skill-split.test.mjs`: byte cap `15500 → 17900` (file measured at 17512; ~388 bytes headroom, the tighter end of the convention, deliberately — the cap is a context-budget guard, so headroom is exactly the unreviewed growth the next edit can take unnoticed). `test/ac-execution.test.mjs`: AC6's Escalation Routes row-count pin re-scoped `6 → 7` with a comment naming the ticket — re-scoped, not silently renumbered.
+
+### Notes
+- Suite: **1641/1641** green (`node --test test/*.test.mjs`), up 8 from 1633 at v3.94.0.
+- E46's review took 3 rounds (R1 four findings, R2 one half-closed, R3 approved); E45's took 2, with both findings landing in the provenance comment rather than the code. Evidence on disk: `review_reports/review_T-E45-01.md`, `review_reports/review_T-E46-01.md`, `qa_reports/review_T-E45-01.md`, `qa_reports/review_T-E46-01.md`.
+- `npm audit --audit-level=high` reports 11 pre-existing advisories (js-yaml, sharp/libvips via `@xenova/transformers`, protobufjs, fast-uri, ip-address, hono, esbuild). Neither ticket touches `package.json` dependencies or the lockfile, so these are unrelated to this release and waived as pre-existing per Constitution §6; remediating them is dependency work for its own ticket, not something to attempt inside a release.
+- Residue handed on, not silently absorbed: the old "contract defect" meaning still survives in the doc-writer-owned mirrors (`docs/skills/qa-visual.md`, `docs/skills/qa-engineer.md`, `specs/retro-sop-hardening.md`), and the round-accounting asymmetry E46 creates — `Blocked` has no dedicated counter, so the sanctioned `qa → Blocked → pm → qa` cycle is braked only by the coarse feature-scoped `hop` cap — is filed as **E47**.
+
+## [3.94.0] - 2026-07-27
+
+### Added
+- **`e38-next-role-lookahead-advisory` — `next_role` write-time lookahead advisory (backlog E38).** `tools/handoff-orchestrator.ts` gains `effectiveAllowedSuccessors()`, a pure, fs-free helper that derives a state's ACTUAL allowed-successor set by calling `validateTransition` itself across all 8×4 (agent, status) pairs, rather than re-deriving a second notion of "allowed" from the static `ALLOWED` table. After an accepted write, when `parsed.next_role` names an agent absent from that set for the state the write just landed on — evaluated under the POST-write round/hop counters, the same ones the next real transition will face — a non-rejecting advisory is appended to the existing E28 `warnings` envelope array. The message names the actual allowed `agent:status` pair(s), annotating any that are `only legal with resume_of="<role>"` or `only legal if the next write opens a new feature`.
+  - **Advisory-only by design, and it stays that way**: no `GATE_REGISTRY` entry, no new error code, no pipeline step that can reject. `next_role` remains documented as advisory metadata; this release makes a disagreement with `ALLOWED_TRANSITIONS` *visible* at write time, it does not enforce it. Nothing new can reject a write.
+  - **Silence when uncertain** is the deliberate bias: the helper whitelists the three shapes that sit outside the static table — the Amend-Resume `resume_of` edge, the round-cap collapse to `pm` alone, and the same-agent `In_Progress → In_Progress` self-loop — and unions both `feature_changed` branches at hop cap, trading a missed warning for never firing falsely on legal routing.
+
+### Changed
+- **`e37-design-auditor-post-pass-edge` — restore design-auditor's post-PASS opening edge (backlog E37).** `tools/transitions.ts` adds `{ agent: "design-auditor", status: "In_Progress" }` to the `qa-engineer:PASS` row of `ALLOWED`, restoring parity with the fresh-workspace `null:null` opener, which has always admitted `design-auditor:In_Progress`. "Previous feature closed, next may open" is the same position whether the workspace is fresh or between features; C13 added `release-engineer` to that row but never restored this edge, so the design-armed chain's canonical opening move (coordinator dispatches design-auditor before PM) worked only on a workspace's *first* feature and was `TRANSITION_REJECTED` on every feature thereafter — 6 of 7 observed fires across 2 consumer workspaces and 5 features (2026-07-21..07-23, adopter-project telemetry). The 7th fire is the `qa-engineer:FAIL` shape, deliberately left rejecting and pinned as such.
+- **specs/qa-flow-enforcement-architecture.md**: the mirrored `qa-engineer | PASS` matrix cell gains `(design-auditor, In_Progress)`, per that file's standing MUST-update-mirror obligation.
+- **test/qa-flow.test.mjs**: E37 contract flip on the `qa-engineer:PASS` allowed-next assertion (now four successors) plus 3 new tests — positive accept on the new edge, a reject pin holding `qa-engineer:FAIL → design-auditor` illegal (locking E38's deferral), and a `computeNewRound` pin holding all three round counters steady across the new hop.
+- **test/e38-next-role-lookahead.test.mjs** (new, qa-engineer-authored per §2): 10 tests — 1 positive advisory case, 5 silence cases across the whitelisted shapes (including hop-cap and round-cap regression pins), 2 round-2 remedy-list regression pins, a never-rejects pin, and an E28 shrink-warning coexistence pin.
+- **docs/backlog.md**: E37 and E38 rows marked done with mechanism summaries + release reference.
+- **package.json / index.ts / dist/**: version 3.93.0 → 3.94.0 (manifest + `Server()` literal + rebuilt dist).
+- **README.md**: install pins caught up 3.93.0 → 3.94.0; status-line suite count 1620 → 1633.
+
+### Notes
+- Suite **1633/1633** green (1620 pre-existing + 13 new: 3 E37 + 10 E38); one E37 contract flip, no other test-expectation edits.
+- MINOR per the versioning policy: both changes are additive and non-breaking — E37 widens an allowed-transition row (nothing previously legal becomes illegal), E38 adds an envelope warning on a path that already carries `warnings`.
+- Chain: two mini-chains (backlog rows as spec, PM/architect skipped, `scope_decision: single-feature`). E37: sr(fable) → code-reviewer (APPROVED round 1, `review_reports/review_T-E37-01.md`) → qa-engineer (PASS, `qa_reports/archive/e37-design-auditor-post-pass-edge/review_T-E37-01.md`). E38: sr(fable) → code-reviewer (APPROVED at round 3 of the `review_round` cap, `review_reports/review_T-E38-01.md`) → qa-engineer (PASS, `qa_reports/archive/e38-next-role-lookahead-advisory/review_T-E38-01.md`). E37 reached PASS first and was held unreleased to ship together with E38, which depends on it.
+- No MCP tool-surface, schema, or gate-semantics changes (handoff schema stays v13, evidence schema v2); no migration needed. Rows E39–E43, filed during these two tickets' review rounds, remain open.
+
+## [3.93.0] - 2026-07-20
+
+### Changed
+- **`e36-handoff-split-overload-adapter` — `tools/handoff.ts` module split + Option-A overload convergence (backlog E36, 2026-07-20 refactor-survey pair). ZERO observable behavior change.** Two coordinated moves:
+  - **(a) Module split.** The 1,276-line `tools/handoff.ts` (four responsibilities: types, frontmatter parse + migration glue, serialization + `writeHandoffState`, and the `handleGetState` tool handler) is split into `tools/handoff-types.ts` (types), `tools/handoff-parse.ts` (parse/migrate/read), and `tools/handoff-write.ts` (`WriteHandoffStateOptions` + `writeHandoffState`). `tools/handoff.ts` is now a 33-line barrel that re-exports the full prior public surface (every symbol old `handoff.ts` exported), so no importer changes. `handleGetState` moved verbatim into `tools/handoff-orchestrator.ts`; its sole importer `tools/registry.ts` was rewired. The `handoff-parse ↔ handoff-write` import cycle is call-time-only (no module-init call sites) and verified safe.
+  - **(b) Option-A overload convergence (NON-breaking, minor bump — NOT the v4.0.0 removal).** The positional `writeHandoffState` / `FileHandoffStorage.writeState` / `SqliteHandoffStorage.writeState` overloads now converge onto a single options-object implementation (`writeHandoffStateCore` in `handoff-write.ts`; private `writeStateCore` in the storage classes) via thin arg-packing adapters. Public signatures are unchanged and the deprecated positional overload is retained — its removal remains deferred to v4.0.0. MINOR per the versioning policy (the internal convergence is a backwards-compatible refactor; the positional API surface is preserved).
+- **test/writestate-options-object.test.mjs** (qa-engineer-authored per §2): +2 tests pinning adapter parity mechanically — (1) `writeHandoffState` positional (full 12-arg form incl. `qaRound`/`reviewRound`/`visualRound`/`blockingReason`/`prdPath`/`hopCount`) vs the equivalent options-object call, asserted byte-identical `handoff.md` (modulo `last_updated`); (2) `FileHandoffStorage.writeState` positional (11-arg, its own independent packing) vs options-object, same byte-identical assertion. A future arg-order regression (swap/drop/rename) now fails mechanically rather than relying on manual re-inspection.
+- **docs/backlog.md**: E36 row marked done with mechanism summary + release reference.
+- **package.json / index.ts / dist/**: version 3.92.1 → 3.93.0 (manifest + Server() literal + rebuilt dist, including the new `dist/tools/handoff-{types,parse,write}.js`).
+- **README.md**: install pins caught up 3.92.1 → 3.93.0; status-line suite count 1618 → 1620.
+
+### Notes
+- Suite **1620/1620** green (1618 pre-existing + 2 new adapter-parity tests); zero test-expectation edits.
+- Chain: mini-chain (backlog row as spec, PM/architect skipped, `scope_decision: single-feature`) sr(fable) → code-reviewer (APPROVED round 1, zero blocking findings, verified against pre-E36 source, `review_reports/review_T-E36-01.md`) → qa-engineer (PASS, `qa_reports/archive/e36-handoff-split-overload-adapter/review_T-E36-01.md`).
+
+## [3.92.1] - 2026-07-20
+
+### Changed
+- **`e35-gate-pipeline-extraction` — gate-pipeline extraction: check order becomes data (backlog E35, 2026-07-20 refactor-survey revision).** `handleUpdateStateCore`'s ~1,260-line hand-woven gate sequence in `tools/handoff-orchestrator.ts` is now a declarative ordered `UPDATE_STATE_GATE_PIPELINE` array of 18 gate steps, executed by a first-rejection-wins runner — extending the A10 registry pattern (gate METADATA as data) with its E35 half (gate ORDER as data). New `gates/pipeline.ts` holds the shared contract: `UpdateStateGateContext` (per-write ctx derived once in the ctx-building phase — gate steps never derive values later steps depend on), `UpdateStateGateStep` (`name` + `codes[]` + `run`), and `runUpdateStatePipeline()`. The ordered array itself stays in `tools/handoff-orchestrator.ts` because the source-pin suites assert emit-body literals against that file; per-gate emit bodies are byte-verbatim relocations (mechanically verified — diff empty after scaffolding-strip, `review_reports/review_T-E35-01.md`). `gates/registry.ts` change is comment-only. ZERO observable behavior change: error codes, envelope shapes, telemetry emits, and the frozen 18-step check order are all unchanged — PATCH per the internal-refactor policy above.
+- **test/e35-pipeline-order.test.mjs** (new, qa-engineer-authored per §2): order-pin test asserting the pipeline's 18 step names in exact sequence and each step's `codes[]` array against `gates/registry.ts` `ALL_GATE_CODES` (31 codes, set-equal, no duplicates, no gaps) — replacing the frozen-additive comment as the order's enforcement mechanism.
+- **docs/backlog.md**: E35/E36 refactor-survey rows added (2026-07-20 revision); E35 row is this release's spec (mini-chain, backlog-row-as-spec).
+- **package.json / index.ts / dist/**: version 3.92.0 → 3.92.1 (manifest + Server() literal + rebuilt dist).
+- **README.md**: install pins caught up 3.92.0 → 3.92.1; status line suite count 1612 → 1618.
+
+### Notes
+- Suite **1618/1618** green (1612 pre-existing + 6 new order-pin tests); zero test-expectation edits.
+- Chain: mini-chain (backlog row as spec, PM/architect skipped, `scope_decision: single-feature`) sr(fable) → code-reviewer (APPROVED round 1, zero blocking findings, `review_reports/review_T-E35-01.md`) → qa-engineer (PASS, `qa_reports/review_T-E35-01.md`). Implementation commit `fffe3d9`; QA commit `c542a28`.
+- No MCP tool-surface, gate-semantics, or schema changes (handoff schema stays v13, evidence schema v2); no migration needed.
+
+## [3.92.0] - 2026-07-17
+
+### Fixed
+- **`e34-agc-init-dead-end-seed` — `agc init` no longer seeds a dead-end handoff state (backlog E34, live incident 2026-07-17 in an adopter's consumer workspace).** `bin/agc-init.mjs` previously wrote a `.current/handoff.md` template with `status: "Not_Started"` + `last_agent: "pm"`. But `pm:Not_Started` has no `ALLOWED_TRANSITIONS` edge, so every init'd consumer workspace rejected ALL subsequent `tw_update_state` writes with `TRANSITION_REJECTED` — dead on arrival, unrecoverable without manually removing `handoff.md`. Fix (human-scoped 2026-07-17, minimal init-side option): `runInit()` stops writing `.current/handoff.md` entirely — a fresh workspace is now `null:null` (file absent, the matrix's sanctioned fresh tuple), and the first `pm:In_Progress` write creates the handoff via the normal `null:null` edge. `.config.json` / `tasks.md` / adapters are unchanged. Defensive prev-tuple coercion in the handoff orchestrator was explicitly DESCOPED (human decision). Chain: content-scoped mini-chain (backlog row as spec, PM/architect skipped) sr(fable) → code-reviewer (APPROVED round 1, zero findings, `review_reports/review_T-E34-01.md`) → qa-engineer (PASS, `qa_reports/review_T-E34-01.md` + `qa_reports/review_T-E34-02.md`). Expected-Red manifest `qa_reports/expected-red_e34-agc-init-dead-end-seed.txt`. Commit `23aee75`.
+- **Install-command doc fix (same incident):** `README.md` install command changed from `npx -y github:…#vX agc init` to `npx -y -p github:…#vX agc init`. The package ships 3 bin entries, so without `-p` npx runs the default bin (the MCP server, `dist/index.js`) and the `agc` bin never executes → no files created. `docs/install.md` was already correct via `--package=`.
+
+### Changed
+- **bin/agc-init.mjs**: `runInit()` no longer writes `.current/handoff.md`.
+- **README.md**: install command gains `-p`; install pins caught up 3.91.0 → 3.92.0; status line suite count 1611 → 1612.
+- **test/p0-onboarding-lite-default.test.mjs**: AC1/AC2/AC3 flipped to the no-handoff contract + permanent E34 regression pin (a seeded tuple must have an `ALLOWED_TRANSITIONS` edge).
+- **package.json / index.ts**: version bumped 3.91.0 → 3.92.0 (package manifest + Server() literal).
+- **dist/**: rebuilt for the 3.92.0 Server() literal.
+
+### Notes
+- **BREAKING-ish for existing consumers**: `agc init` output no longer includes `.current/handoff.md`. Consumers upgrading who already have a seeded dead-end `handoff.md` (from an older `agc init`) must delete or rename it manually — defensive coercion was explicitly descoped — and must NOT re-run an older `agc init` afterward.
+- Suite **1612/1612** green; build zero errors.
+- No MCP tool-surface or handoff-schema changes; no migration needed (handoff schema stays v13, evidence schema v2).
+
+## [3.91.0] - 2026-07-16
+
+### Added
+- **`e-p3-tail-batch` — P3 tail batch: E25 + E27 + E28 + E29 + E30 + release-SOP bump-build line (backlog rows E25/E27/E28/E29/E30, 104447-F0 retro).** Six ~1-file tickets shipped as one content-scoped batch (backlog-rows-as-spec mini-chain):
+  - **E25 — §6 git vocabulary completion** (`content/const-15-core-tail.md`): `git stash` / `git stash pop` (reversible, non-destructive) added to the sanctioned git-ops list; `git checkout -- <file>` clarified as forbidden (irreversibly discards uncommitted edits — stash instead). Under a whitelist regime an incomplete vocabulary forces correct behavior into violation — the 104447 QA used stash correctly as an isolation-proof tool. QA re-baselined 11 compose-equivalence goldens + 4 context-budget caps for the const-15 edit.
+  - **E27 — opt-in arming onboarding doc** (new `docs/arming.md` + `docs/config.md` cross-link): walks a consumer workspace through arming each of the 4 opt-ins (`tokenBudgetPerFeature` usage sidecar + PostToolUse hook, `driftBaselineIds`, `cutApprovalAutoTier`, `staleDispatchNotifyFile`) — how to arm, expected effect, how to verify it's live. Motivation: unarmed-reads-as-dead produced near-duplicate reimplementation tickets (the 104447 retro concluded the usage sidecar "was never implemented"; it shipped in D2). QA live-verified the `staleDispatchNotifyFile` walkthrough against real `tw_get_state` calls.
+  - **E28 — wholesale-replace shrink warning** (`tools/handoff-orchestrator.ts`): `dispatch_pins` / `external_refs` REPLACE on write, so a writer that skips read-before-write silently drops entries. Same-feature writes that shrink either set now get an advisory `warnings` array on the success envelope naming the dropped entries — warn-only, never rejects, no new arg, no schema bump, envelope additive-only. 11-test matrix `test/e28-shrink-warning.test.mjs`; the same-count-swap evasion was confirmed-and-pinned as backlog E33 (shipped below in this same release).
+  - **E29 — stale_dispatch Crash-Resume pointer** (`tools/handoff.ts`): the advisory `message` now appends a one-line ground-truth-then-resume protocol summary, so a dead coordinator or a lite takeover session sees the protocol without skill-coordinator text in context. Reaches the E22 watch-file end-to-end; the `(dispatched_at, role)` dedupe contract verified unbroken (+2 tests in `test/e22-stale-notify.test.mjs`).
+  - **E30 — qa-visual actual-capture output convention** (`content/skill-qa-visual.md`): actual screenshot captures go to an UNTRACKED directory outside the committed baseline dir (never `ACTUAL_DIR` = baseline dir); qa flags suites that violate it. Cost basis: one full pixelmatch forensics round spent clearing a false alarm that was routine overwrite noise.
+  - **Release-SOP bump-build line** (`content/skill-release-engineer.md` SOP step 5): sanctioned bump-build path — post-bump `npm run build` deadlocks (prebuild `check:version` demands the dist parity only the build produces); run `npx tsc` directly, then `node scripts/check-version.mjs` (observed live in the v3.90.0 release).
+  - Chain: mini-chain sr(fable) → code-reviewer (APPROVED, `review_reports/review_T-E25-01.md`) → qa-engineer (PASS, batched evidence `qa_reports/review_T-E25-01.md` covering all 6 ids + per-id disposition reports). Expected-Red manifest `qa_reports/expected-red_e-p3-tail-batch.txt` (11 goldens, 4 budget caps, 2 message pins — all explained, zero unexplained). Suite 1600/1600 at batch PASS. Evidence archived per SOP 7a into `qa_reports/archive/e-p3-tail-batch/`. Commits `95d6376` (feat) + `6ef1a6e` (test/qa) + `61db22b` (backlog done-marks).
+
+### Fixed
+- **`e32-e33-gate-hardening` — E32 c16-amendment: unconditional QA completion-evidence gate (P1) + E33 entry-identity shrink detection (P3).**
+  - **E32 (backlog row E32, fourth E9A/E18-class incident, live replay 2026-07-16):** a state write with `agent_id=qa-engineer`, `status=In_Progress`, `completed_tasks` pre-filled with all 6 e-p3-tail-batch ids and ZERO per-id QA evidence on disk was ACCEPTED. Root cause (corrected after review round 1 + PM re-scope, human option A): the E18 gate was already status-agnostic — the real door was the c16 APPROVED-manifest contract persisting review-scope ids into `completed_tasks` on the code-reviewer→qa edge, which made the incident write byte-identical to a sanctioned write and opened a two-step carry-forward evasion. Fix: (1) the APPROVED handoff now carries review scope via the transient `review_task_ids` channel ONLY — it never persists into `completed_tasks` (`tools/handoff-orchestrator.ts`); (2) the APPROVED-row exemption is removed — ANY qa-agent-id `completed_tasks` growth without per-id QA evidence is rejected unconditionally, regardless of status; (3) `MISSING_REVIEW_EVIDENCE` re-pointed at the amended channel (`gates/qa-review.ts`, `gates/registry.ts`); (4) `content/skill-code-reviewer.md` APPROVED-handoff template amended, `content/const-08-chain-31-mid.md` + `specs/c16-c10-role-boundary.md` aligned (historical v3.9.0 spec text supersession-marked). Rejection envelope names every offending id + its exact `qa_reports/review_<id>.md` path + the `covers:` fallback (E23 posture). The R1 incident shape is now REJECTED and permanently regression-pinned (`test/e32-e33-gate-hardening.test.mjs` R1), and the P6 divergent-field matrix proves the QA-evidence and review-evidence gates orthogonal — neither substitutes for the other.
+  - **E33 (backlog row E33, spun out of the E28 code review):** E28's shrink detection was cardinality-based, so a same-count entry SWAP (e.g. pins `{sr,release}→{sr,qa}`) dropped an entry silently. Detection now diffs entry identity — `dispatch_pins` by key set, `external_refs` by ref string — warning on ANY dropped entry at any count; value-only pin changes and ref-state advances stay silent. P1a/P1b re-pinned to warn-on-swap.
+  - Chain: pm re-scope (1 review round, CHANGES_REQUESTED → human option A) → sr(fable) → code-reviewer (APPROVED, `review_reports/review_T-E32-01.md`, live R1–R4 replay table) → qa-engineer (PASS, batched evidence `qa_reports/review_T-E32-01.md` covering T-E32-01 + T-E33-01). Expected-Red manifest `qa_reports/expected-red_e32-e33-gate-hardening.txt` (11 reds: 6 compose-goldens, QAEV-4 contract flip, FM4/FM5 re-pins, P1a/P1b — exact 1:1, zero unexplained). QAEV-4 split into 4a (OLD sanctioned shape now REJECTED) / 4b (amended `review_task_ids` shape ACCEPTED, ledger stays `[]`). Evidence archived per SOP 7a into `qa_reports/archive/e32-e33-gate-hardening/`. Commits `9fb6022` (feat) + `f1daf2b` (test/qa) + `3ac5582` (backlog done-marks).
+
+### Changed
+- **tools/handoff-orchestrator.ts**: E28 shrink `warnings` + E33 entry-identity diff + E32 c16-amendment (transient `review_task_ids` carry, exemption removal).
+- **tools/handoff.ts**: E29 Crash-Resume pointer on the `stale_dispatch` advisory message.
+- **gates/qa-review.ts / gates/registry.ts**: unconditional QA completion-evidence check; `MISSING_REVIEW_EVIDENCE` re-pointed.
+- **content/const-15-core-tail.md** (E25 git vocab), **content/const-08-chain-31-mid.md** (c16 amendment), **content/skill-code-reviewer.md** (APPROVED-handoff template), **content/skill-qa-visual.md** (E30 convention), **content/skill-release-engineer.md** (bump-build line).
+- **docs/arming.md** (new, E27), **docs/config.md** (cross-link), **specs/c16-c10-role-boundary.md** + **specs/code-reviewer-role-extraction-architecture.md** (c16 alignment).
+- **test/**: new `e28-shrink-warning.test.mjs` (11) + `e32-e33-gate-hardening.test.mjs` (10); QAEV-4 split, FM4/FM5 + P1a/P1b re-pins, stale-dispatch T4/T4b re-pins, E29a/E29b; 10 compose goldens + `constitution-monolith.txt` re-captured; 4 context-budget caps re-baselined.
+- **package.json / index.ts**: version bumped 3.90.0 → 3.91.0 (Server() literal + package manifest).
+- **README.md**: install pins caught up 3.89.0 → 3.91.0 (v3.90.0 release skipped the README step); status line suite count 1547 → 1611.
+- **dist/**: rebuilt for the tools/gates changes + 3.91.0 Server() literal.
+
+### Notes
+- **Gate behavior change (E32)**: the OLD sanctioned code-reviewer APPROVED-manifest shape — persisting review-scope ids into `completed_tasks` — is now REJECTED server-side. The amended contract carries review scope via transient `review_task_ids` only. `content/skill-code-reviewer.md` in this release matches the new contract; a running MCP server process loads `dist/` at startup and must be restarted to pick up the new gates (E23 precedent).
+- Suite **1611/1611** green (1600 at e-p3-tail-batch PASS + 1 net QAEV-4 split + 10 net new-file); build zero errors.
+- No MCP tool-surface or handoff-schema changes; no migration needed (handoff schema stays v13, evidence schema v2).
+
+## [3.90.0] - 2026-07-16
+
+### Added
+- **`e22-stale-notify` — opt-in stale-dispatch watch-file notify emit (v3.90.0, backlog E22, D5 follow-on / 104447-F0 A3).** The existing `stale_dispatch` advisory is pull-only — computed at `tw_get_state` read time — so a stalled dispatch goes unseen until the next `/teamwork`. E22 adds an opt-in push channel: when the `stale_dispatch` threshold is crossed, the server touches a configured watch-file that an external watcher (desktop notification / webhook) can observe. New `tools/stale-notify.ts` (`notifyStaleDispatch()`) rides the existing threshold check — it never adds a second trigger, and fires only when the underlying advisory fires. Armed by the new `staleDispatchNotifyFile` config key (`tools/config.ts`, additive-optional, empty-string filtered to absent); disarmed is byte-identical to pre-E22 (no `notify` key on the advisory, verified by exact key-set equality). The emit payload carries the advisory fields + `workspace` + an ISO `emitted_at`, published atomically via tmp-then-rename. Dedupe cursor is exactly `(dispatched_at, role)` stored in the watch-file: an identical pair is skipped, a fresh dispatch or a different role at the same timestamp re-arms, and a hand-deleted watch-file forces a fresh emit (fails toward notification, never toward silence). Never-throws: corrupt config, future-schema config, corrupt/non-object prior watch-file, unwritable directory, and directory-as-target all collapse to a loud `error` string with `emitted: false`. File-mode only — no new handoff state, no schema bump. Wired into the read-time computation in `tools/handoff.ts`; documented in `docs/config.md`. Chain: content-scoped mini-chain (backlog row as spec, no `specs/e22-*.md`) sr(fable) → code-reviewer (APPROVED, `review_reports/review_T-E22-01.md`) → qa-engineer (PASS, `qa_reports/review_T-E22-01.md`, 26-test matrix `test/e22-stale-notify.test.mjs`). Commits `34ef7d5` (feat) + `8650f1a` (test/qa).
+
+### Fixed
+- **`e31-config-nonfatal` — non-fatal `loadConfig` on corrupt `.current/.config.json` (v3.90.0, backlog E31, filed from the E22 QA Phase-1 finding).** A corrupt/unparseable `.config.json` made `loadConfig` throw uncaught through the pre-existing task-path resolution call site (`guards/session.ts` → `findTasksFile` → `resolveTaskPaths`), which runs during `tw_get_state` *before* any advisory/notify computation — so the mandatory pre-flight read failed entirely on a bare workspace, with zero stale-dispatch involvement (surfaced by E22 QA, `qa_reports/review_T-E22-01.md`). `tools/config.ts` now degrades loudly-but-readable through a shared non-fatal `loadConfigEntry()` core: `loadConfig` NEVER throws on any fatality mode (unreadable / unparseable / non-object root / future `schema_version`), returning `{}` and caching the loud error (stat/read failures left uncached since chmod is invisible to mtime; content-derived failures mtime-cached and self-healing once the file is fixed). New `getConfigError()` export; `readHandoffState` (`tools/handoff.ts`) spreads `config_error` onto both `tw_get_state` envelope shapes (`exists:true`/`exists:false`), absent and byte-identical on clean/absent config. `tools/stale-notify.ts` adopts `getConfigError()` so the E22 loud-per-emit contract is preserved instead of the old throw propagating. The best-effort observer hook `bin/agent-governance-usage-hook.mjs` keeps its raw-read path (comment updated: the heal-on-read objection stands even though the throw no longer does). The acknowledged C18 post-cache chmod-staleness limitation is out of scope and untouched. Chain: content-scoped mini-chain (backlog row as spec) sr(fable) → code-reviewer (APPROVED, recorded in handoff `pending_notes`) → qa-engineer (PASS, `qa_reports/review_T-E31-01.md`). Expected-Red manifest `qa_reports/expected-red_e31-config-nonfatal.txt` (6 pre-E31 throw-pins confirmed red pre-edit, 0 unexplained) re-pinned to the new contract in `test/config-versioning.test.mjs` + `test/e22-stale-notify.test.mjs`, plus 14 new tests in `test/e31-config-nonfatal.test.mjs`. Commits `f6df606` (feat) + `d3c8beb` (test/qa) + `5836c1c` (backlog done-marks).
+
+### Changed
+- **package.json / index.ts**: version bumped 3.89.0 → 3.90.0 (Server() literal + package manifest; `scripts/check-version.mjs` asserts source + dist parity).
+- **dist/**: rebuilt so the shipped compiled artifact carries the 3.90.0 Server() literal and the E22 + E31 `tools/` changes.
+
+## [3.89.0] - 2026-07-16
+
+### Added
+- **`e26-gate-stats` — `tw_gate_stats` per-gate fire-count coverage reader (v3.89.0, backlog E26, 104447-F0 §4-D).** New read-only twelfth `tw_*` tool that aggregates the two observability sidecars the E6 rule-retirement retro (`docs/gate-retro-procedure.md`) consumes — `.current/telemetry.jsonl` (one line per `GATE_REGISTRY`-cataloged rejection, from D3) and `.current/metrics.jsonl` (one line per shipped feature, from E8) — into per-gate / per-error-code counts, so the retro runs on data instead of raw `jq` + hand-categorization (the 2026-07-13 and 2026-07-15 retros both hand-tallied). (D1) `tools/gate-stats.ts` — full `GATE_REGISTRY` coverage (fired codes ranked by count plus the complete zero-fire list), per-feature and per-agent breakdowns, first/last timestamps, unregistered-code detection (a gate added/removed mid-window: investigate, don't count), and a deduped metrics summary keyed on the E12 `(feature, released_version)` idempotency key (pre-E12 double-appends healed at read time). (D2) **Category boundary — the load-bearing E26 requirement**: telemetry can prove a *gate-backed* rule dead or alive because every enforcement path emits a `GATE_REGISTRY` error code, but *prose-behavioral* rules (§5 read cap, §1 terse cap, `dispatch_pins` honoring, the coordinator token-budget brake) have NO server gate and therefore NO telemetry. The output makes this structural: prose-behavioral rows live in a separate array whose `fires` is `null` (never `0`), so a reader can never conflate "not measured" with "never fired" — zero fires for a prose rule means transcript sampling is required, never auto-retirement. (D3) Never-throws posture (mirrors the `tools/exemptions.ts` loader): a missing sidecar is the normal young-workspace case (zero counts + a note), a malformed line is skipped and counted loudly, and no failure mode may block a retro. Registered in `tools/registry.ts` with the `WorkspaceOnly` zod schema. Spec: backlog row `docs/backlog.md` §E26 (backlog-row-as-spec mini-chain, no dedicated `specs/` file — same pattern as E24). Chain: mini-chain sr(fable) → code-reviewer(APPROVED, `review_reports/review_T-E26-01.md`) → qa-engineer(PASS). Evidence (archived per SOP step 7a into `qa_reports/archive/e26-gate-stats/`): `review_T-E26-01.md` (covers T-E26-01/02/03), `review_T-E26-02.md`, `review_T-E26-03.md`.
+
+### Changed
+- **tools/gate-stats.ts**: New read-only aggregation module implementing `handleGateStats` (413 lines).
+- **tools/registry.ts**: `tw_gate_stats` registry entry + `handleGateStats` import.
+- **docs/gate-retro-procedure.md**: retro procedure steps 2–4 now point at `tw_gate_stats` as the preferred aggregation (the `jq` one-liners retained as a no-server fallback); adds the gate-backed vs prose-behavioral category note; drops the stale hardcoded "22 entries" `GATE_REGISTRY` count.
+- **CLAUDE.md**: tool inventory updated from eleven to twelve `tw_*` tools; `tools/gate-stats.ts` added to the layout map.
+- **test/e26-gate-stats.test.mjs**: 26-test coverage / never-throws / dedupe matrix.
+- **dist/**: rebuilt for the new `tools/gate-stats.ts` module + `tools/registry.ts` entry.
+
+### Notes
+- driftBaselineIds appended with T-E26-01, T-E26-02, T-E26-03
+- Chain: mini-chain sr(fable) → code-reviewer(APPROVED) → qa-engineer(PASS), one pass, 4 hops; full suite **1547/1547** green, build zero errors, `npm audit` clean at high (one pre-existing low-severity esbuild advisory, below the high threshold).
+- No breaking changes to the MCP tool surface or handoff schema; `tw_gate_stats` is a purely additive read-only tool. A running MCP server process loads `dist/` at startup and must be restarted to expose the new tool.
+
+## [3.88.0] - 2026-07-16
+
+### Added
+- **`e24-exemptions-manifest` — Declarative build-gate exemptions manifest `.current/exemptions.json` (v3.88.0, backlog E24, 104447-F0 C2).** Replaces prose-only, re-litigated-every-round build-gate exemptions with a single declarative channel: a permanent-violation state (e.g. the 104447 workspace's 33 known tsc errors across exempted test files) is now recorded once in a committed manifest instead of re-explained in every review/QA round, so it stops teaching agents that rules are negotiable. (D1) `tools/exemptions.ts` — a never-throws loader (mirrors the `config.ts` validation posture but sits on the mandatory `tw_get_state` path). Entry shape: `path` + `reason` + `expires_when` (`expires_when` is a recorded, human-checked string — no server-side expiry engine per the cut). Fail direction is **never-silently-exempt**: absent file = no exemptions; structural malformation (bad JSON / root / `schema_version` / non-array) voids the whole manifest to zero exemptions plus a loud `errors[]`; a single malformed entry is dropped (NOT exempted) while valid siblings survive. `schema_version` 1 (absent === 1; future versions refused loudly — birth version has no migration registry entry yet). (D2) `tools/handoff.ts` surfaces the manifest read-time in the `tw_get_state` envelope (both `exists:true` and fresh-workspace branches) as `exemptions` — pure read-time computation, NO handoff-schema bump, informational, never blocks; `tw_get_state` chosen because it is every role's mandatory first action, so the sanctioned exemption list + only-grows `count` metric need no second read (manifest is a committed file — count growth is auditable via git history). (D3) `content/const-05-core-standards.md` §2 gains one bullet: the manifest is the ONLY sanctioned exemption channel; gates subtract manifest-exempted paths automatically; a prose-only exemption counts as NOT exempted; a malformed manifest exempts nothing; `exemptions.count` is a monitored only-grows metric (adding an entry requires human approval). Tests: `test/e24-exemptions.test.mjs` (loader / envelope matrix — absent, structural-malformation-voids-all, per-entry-drop, schema-version handling). Spec: backlog row `docs/backlog.md` §E24 (backlog-row-as-spec mini-chain, no dedicated `specs/` file). Chain: mini-chain sr(fable) → code-reviewer(APPROVED, `review_reports/review_T-E24-01.md`) → qa-engineer(PASS). Evidence (archived per SOP step 7a into `qa_reports/archive/e24-exemptions-manifest/`): `review_T-E24-01.md`, `review_T-E24-02.md`, `review_T-E24-03.md`.
+
+### Changed
+- **tools/exemptions.ts**: New never-throws loader module for `.current/exemptions.json`.
+- **tools/handoff.ts**: `readHandoffState` calls `loadExemptions` and adds an `exemptions` key to the `tw_get_state` envelope on both the fresh-workspace and `exists:true` branches (read-time only; no schema field).
+- **content/const-05-core-standards.md**: One §2 bullet — declarative build-gate exemptions manifest as the sole sanctioned exemption channel.
+- **test/context-budget.test.mjs**: 4 budget pins re-baselined +~188 tok for the new const-05 §2 bullet (declared in `qa_reports/archive/e24-exemptions-manifest/expected-red_e24-exemptions-manifest.txt`).
+- **test/fixtures/compose-golden/**: 10 compose goldens + `constitution-monolith.txt` regenerated for the const-05 addition.
+- **dist/**: rebuilt for the new `tools/exemptions.ts` module + `tools/handoff.ts` integration.
+
+### Notes
+- driftBaselineIds appended with T-E24-01, T-E24-02, T-E24-03
+- Chain: mini-chain sr(fable) → code-reviewer(APPROVED) → qa-engineer(PASS), one pass, 4 hops; full suite **1521/1521** green, build green, `npm audit` clean at high
+- No breaking changes to the MCP tool surface or handoff schema; the `exemptions` envelope key is additive and read-time only (no `schema_version` bump). A running MCP server process loads `dist/` at startup and must be restarted to surface the E24 read-time envelope key.
+- Also rides on `main` (landed after the v3.87.0 tag): second gate-fire retro (E6 cadence) `docs/retro-2026-07-15-gate-fire.md` + `docs/gate-retro-procedure.md` pointer (`d875882`), README install-pin + suite-count catch-up (`ead9dfc`); plus v3.87.0 post-release bookkeeping (`87170e9`).
+
+## [3.87.0] - 2026-07-15
+
+### Added
+- **`e23-evidence-schema-versioning` — Evidence-schema versioning: pinned `evidence_schema` field + normalized-contains H2 matching + named rejection envelopes (v3.87.0, backlog E23).** Fixes the 104447-F0 class where a mid-flight evidence-schema tightening made crash-era artifacts that were legal when written illegal at resume. (D1) `evidence_schema` integer pin, server-stamped on the first write of a new `active_feature` (never client-supplied — zod surface unchanged); feature-scoped carry mirrors `dispatch_mode` (preserve same-feature, drop+restamp on change). Handoff schema **v12→v13** with a migration that invents no pin — absent stays absent and validates under the current (v2) rules, which are a strict superset (backwards-compatible; old files migrate lazily). (D2) `gates/evidence-schema.ts` (`EVIDENCE_SCHEMA_CURRENT=2`) + `sliceH2SectionAt`/`findH2LineAt` in `tools/evidence-file.ts`: pin 1 replays the legacy exact anchor byte-for-byte; pin ≥2/absent matches H2 headings by normalized-contains, so the incident heading `## Phase 3.5 — AC Execution Log` now clears. `verdictIsPass` value semantics and pass/fail cell parsers unchanged. (D3) `VISUAL_EVIDENCE_MISSING` / `VISUAL_REPORT_INCOMPLETE` / `AC_EXECUTION_LOG_MISSING` envelopes now name the missing section / expected string, the file path(s) inspected, and the evidence-schema version. Implementation: `gates/evidence-schema.ts` (new), `gates/{ac-execution,registry,visual}.ts`, `schema/{versions,migrations-handoff}.ts`, `tools/{evidence-file,handoff,handoff-orchestrator}.ts`, `content/skill-qa-visual.md`. Tests: `test/e23-evidence-schema.test.mjs` (18 AC1–AC6 proof tests) + 41 pre-existing fixtures re-baselined for the v13 bump (groups A/B/C per `qa_reports/expected-red_e23-evidence-schema-versioning.txt`); suite **1503/1503** green, coordinator re-verified independently. Spec: `specs/e23-evidence-schema-versioning.md`. Chain: coordinator design study → sr(fable, crash-resumed once after a session-limit kill per Crash-Resume Protocol) → code-reviewer APPROVED (41-failure classification adversarially spot-checked) → qa PASS (`qa_reports/review_T-E23-01.md`, `review_T-E23-02.md`, `review_T-E23-03.md`).
+- **`e20-e21` — Long-run in-turn hard line + crash-checkpoint-via-`bookkeeping_write` SOP lines (v3.87.0, backlog E20 tier (i) + E21).** Content-only. E20 tier (i): a HARD line in `skill-qa-engineer` + `skill-sr-engineer` — long suites/builds run synchronously to completion OR are poll-harvested within the same turn; ending a turn with a run in flight is a violation (tier (ii) `waiting_on` field / per-phase stale thresholds deferred). E21: crash-checkpoint SOP lines — before any long regression/build, roles `bookkeeping_write` completed artifacts (file-mode only; lease timestamp preserved) so Crash-Resume reads the checkpoint instead of git archaeology. Implementation: `content/skill-qa-engineer.md`, `content/skill-sr-engineer.md` (templates are thin pointers, no mirrors). Tests: 13 pins in `test/e20-e21-crash-resilience.test.mjs`; byte/token budget pins re-baselined (`test/context-budget.test.mjs`, `test/qa-visual-skill-split.test.mjs`); suite **1485/1485** green. Chain: mini-chain sr(fable) → code-reviewer(APPROVED) → qa(PASS) (`qa_reports/review_T-E20-01.md`, `review_T-E21-01.md`).
+
+### Changed
+- **gates/evidence-schema.ts**: New module exporting `EVIDENCE_SCHEMA_CURRENT=2` and the evidence-schema gate pieces.
+- **gates/ac-execution.ts, gates/visual.ts**: normalized-contains H2 matching keyed off the pinned `evidence_schema` (pin 1 exact legacy replay, ≥2/absent contains); rejection envelopes name section/expected-string/path/version.
+- **gates/registry.ts**: evidence-schema envelope registration.
+- **schema/versions.ts, schema/migrations-handoff.ts**: handoff schema v12→v13 + migration (invents no pin).
+- **tools/evidence-file.ts, tools/handoff.ts, tools/handoff-orchestrator.ts**: `sliceH2SectionAt`/`findH2LineAt`, `evidence_schema` server-stamp on first write of a new feature, feature-scoped carry.
+- **content/skill-qa-visual.md**: evidence-schema note.
+- **content/skill-qa-engineer.md, content/skill-sr-engineer.md**: E20 long-run-in-turn hard line + E21 crash-checkpoint-via-`bookkeeping_write` lines.
+- **dist/**: rebuilt for the E23 gate/schema/tool changes.
+
+### Notes
+- driftBaselineIds appended with T-E20-01, T-E21-01, T-E23-01, T-E23-02, T-E23-03
+- No breaking changes to the MCP tool surface or zod schema; the handoff schema v12→v13 bump is backwards-compatible (lazy migration invents no pin; absent validates under the current superset rules). A running MCP server process loads `dist/` at startup and must be restarted to serve the v13/D2 behavior.
+- Also rides on `main` (landed after the v3.86.0 tag): E19 onboarding/opt-in-hook docs housekeeping — SessionStart hook retired to opt-in and no longer presented as default (`f85b08c`, `b89701e`, `f643465`), backlog DONE-mark sync of 39 shipped tickets + D6 row (`bf42442`), release-engineer opus pin in skill + template (`a55f48a`); plus v3.86.0 post-release bookkeeping (`59fe327`, CHANGELOG record-integrity fixes + drift baseline + relayed closing write + metrics).
+
+## [3.86.0] - 2026-07-14
+
+### Added
+- **`e18-write-provenance` — Write-provenance hardening: stamp gate + qa completion-evidence gate (v3.86.0).** Delivers two integrated gates to prevent out-of-band state writes: (a) STAMP_PROVENANCE_SUSPECT — file-mode tw_update_state rejects over a hand-authored-shaped on-disk last_updated (predicate extracted verbatim to gates/stamp-provenance.ts, shared with the E9A stampAdvisory) unless the write carries a pending_notes[0] `stamp-remediation:` audit note; ordered after validateTransition, before the feature-lease gate; new-workspace inert, self-disarms; (b) QA_COMPLETION_EVIDENCE_MISSING — qa-engineer writes adding new completed_tasks ids require per-id QA evidence on disk (reuses hasEvidenceInFile); APPROVED-row edge exempt (backstopped per-id by MISSING_REVIEW_EVIDENCE); tw_complete_task untouched. Implementation: `gates/stamp-provenance.ts` (new module with isHandAuthoredStamp predicate), `tools/handoff-orchestrator.ts` (orchestrator integration + qa-evidence check), `tools/drift.ts` (stampAdvisory reuse), `const-08-chain-31-mid.md` (two §3.1 mechanism bullets, v3.86.0), `content/skill-release-engineer.md` (COORDINATOR-RELAYED hard line). Test suite: `test/e18-write-provenance.test.mjs` (17 tests incl. exact replays of both E5-cycle incidents — hand-authored stamp and qa-impersonated completed_tasks pre-fill, both now rejected); goldens regenerated; ratchets re-measured +574 tok (8437/16532/6340); error-code contract 30→32; suite 1472/1472 green. Spec: `docs/backlog.md` §E18 (backlog row, line 1288). Code-review APPROVED (verdict returned inline in the chain and recorded in handoff pending_notes; no review_reports file was written this round). QA verified (`qa_reports/review_T-E18-01.md` and `qa_reports/review_T-E18-02.md` cover incident replays, spec fidelity confirmed, golden fixtures regenerated, ratchets independently measured). Closes E18 ticket.
+
+### Changed
+- **gates/stamp-provenance.ts**: New module exporting the `isHandAuthoredStamp(lastUpdated)` predicate and the `STAMP_PROVENANCE_SUSPECT` gate pieces.
+- **tools/handoff-orchestrator.ts**: Integrated STAMP_PROVENANCE_SUSPECT gate (after validateTransition, before feature-lease) + QA_COMPLETION_EVIDENCE_MISSING check (qa-engineer path, APPROVED-row exempt).
+- **tools/drift.ts**: Imports and reuses the `isHandAuthoredStamp` predicate verbatim for stampAdvisory consistency.
+- **gates/registry.ts**: Catalog expanded 30→32 errors; new STAMP_PROVENANCE_SUSPECT and QA_COMPLETION_EVIDENCE_MISSING registered.
+- **content/const-08-chain-31-mid.md**: Two §3.1 mechanism bullets added (v3.86.0, E18).
+- **content/skill-release-engineer.md**: COORDINATOR-RELAYED hard line added (dispatch brief cannot override relay rule).
+- **test/**: New `test/e18-write-provenance.test.mjs` (17 tests); compose-equivalence and context-budget golden fixtures regenerated (6 + 1 compose goldens; 3 budget ratchets); error-code contract test updated 30→32.
+
+### Notes
+- driftBaselineIds appended with T-E18-01, T-E18-02
+- Chain: mini-chain sr(fable) → code-reviewer(APPROVED) → qa-engineer(PASS), one pass, 4 hops
+- Responds to two out-of-band state-write incidents: v3.85.0 hand-authored closing write (E9A class); E5-cycle qa-impersonated completed_tasks pre-fill (incident disclosed in `qa_reports/review_T-E5-01.md`)
+- No breaking changes to MCP tool surface or handoff schema; all changes additive (new gates, predicate-driven rejection)
+- Gates-and-skill-dominant release (gates/stamp-provenance.ts + orchestrator integration + SOP amendment); test-heavy (17 new tests + 6 goldens ratcheted)
+
+## [3.85.0] - 2026-07-14
+
+### Added
+- **`e5-intake-tiering` — Backlog intake loop + tiered cut-approval + cheapest-compliant-path intake (v3.85.0).** Delivers three integrated fixes to intake flow: (a) Backlog Intake Loop — coordinator auto-proposes or auto-starts the next open backlog ticket at feature close; auto-start gated by §3.1 cut-approval auto-tier qualification, else auto-propose; never auto-hops to release-engineer (PASS terminal per backlog risk note); (b) Cut-Approval Auto-Tier — §3.1 bullet + opt-in `cutApprovalAutoTier` config key in `tools/config.ts` (absent = disabled; empty `{}` = conservative defaults ≤2 files / P3 / no schema change / non-design-armed); thresholds and opt-in-only design honor backlog's risk notes verbatim; documented in `docs/config.md`; (c) Cheapest-Compliant-Path Intake — coordinator SOP step 4a adds phase decomposition: coordinator-direct (full within-SOP), mini-chain (2–3 roles), full-chain (4+ roles); § 2 test ownership + §3.2 builder ≠ judge hard floors preserved. Implementation: `content/coord-03-core-fallback.md` (Backlog Intake Loop h2), `content/const-08-chain-31-mid.md` (§3.1 auto-tier bullet), `content/coord-07-core-sop.md` (step 4a + phase classifications), `tools/config.ts` + `docs/config.md` (config key + docs). Test suite: `test/e5-intake-tiering.test.mjs` (31 pins covering tools/config.ts parse, content pins for const-08/coord-03/coord-07); context-budget ratchets independently re-measured (design-arm 7863, teamwork bundle 15958, non-design 5766). Full suite 1455/1455 green. Spec: `docs/backlog.md:1016–1047` (backlog row). Code-review APPROVED (`review_reports/review_T-E5-01.md`). QA verified (`qa_reports/review_T-E5-01.md` covers T-E5-01/02/03, spec fidelity confirmed, golden fixtures regenerated, ratchets independently measured). Closes E5 ticket.
+
+### Changed
+- **content/coord-03-core-fallback.md**: Backlog Intake Loop h2 added to PASS stop-condition row.
+- **content/const-08-chain-31-mid.md**: §3.1 Cut-Approval Auto-Tier bullet added (threshold-gated auto-approval, opt-in arming, advisory/non-server-enforced).
+- **content/coord-07-core-sop.md**: SOP step 4a Cheapest-Compliant-Path Intake added (phase decomposition: coordinator-direct / mini-chain / full-chain; §2/§3.2 hard-floor sentence).
+- **tools/config.ts**: New `cutApprovalAutoTier` optional field + parser (absent/empty/malformed/defaults logic); `CUT_APPROVAL_AUTO_TIER_DEFAULTS` export with conservative thresholds.
+- **docs/config.md**: `cutApprovalAutoTier` key documented (opt-in, defaults, example thresholds).
+- **test/**: New `test/e5-intake-tiering.test.mjs` (31 tests); compose-equivalence and context-budget golden fixtures regenerated (6 + 1 compose goldens; 3 budget ratchets).
+
+### Notes
+- driftBaselineIds appended with T-E5-01, T-E5-02, T-E5-03
+- Chain: mini-chain sr(fable) → code-reviewer(APPROVED) → qa-engineer(PASS)
+- QA anomaly disclosed in `qa_reports/review_T-E5-01.md`: prior out-of-band impersonated completion write detected and superseded by real QA completion path; disclosure documented per governance-audit transparency
+- No breaking changes to MCP tool surface or handoff schema; all changes additive (config key opt-in)
+- Content-dominant release (skill & const amendments); small server-code addition (config parse logic in tools/config.ts)
+
+## [3.84.0] - 2026-07-13
+
+### Added
+- **`e17-release-record-integrity` — Record-integrity Hard rule for release mechanics (v3.84.0).** Codifies Hard rule in release-engineer SOP: every file path named in commit messages, CHANGELOG entries, or release-notes bodies MUST appear in the `git diff --stat` of the commit being described, and every referenced report/spec path MUST exist on disk at write time. Prevents narrative fabrication from dispatch-brief memory (v3.83.0 incident: release message and CHANGELOG entry claimed nonexistent `tools/handoff-orchestrator.ts` change and nonexistent report paths, corrected post-release in commit a484a4d). Pinning suite `test/feature-lease.test.mjs` expanded with E17-S1..S4 dispatch pins (haiku-pinned feature-lease test assertions). Spec backfill: `specs/e17-release-record-integrity.md` (summarizing backlog incident). Test pinning: 1424/1424 suite green. Code-review APPROVED (review_reports/review_T-E17-03.md). QA verified (qa_reports/review_T-E17-04.md). Closes E17 ticket.
+
+### Changed
+- **content/skill-release-engineer.md**: Hard rule added (record-integrity rule #6 in rule sequence) — prescriptive verification: derive file lists from `git diff --stat` before writing records, verify report/spec paths exist on disk, claim only rounds whose reports exist.
+- **templates/claude-code-agents/release-engineer.md**: Dispatch template updated with Hard rule instruction block.
+- **test/feature-lease.test.mjs**: Test-pinning suite expanded with E17-S1..S4 pins (4 new haiku-pinned assertions verifying release-engineer record-integrity discipline).
+
+### Notes
+- driftBaselineIds appended with T-E17-01, T-E17-02, T-E17-03, T-E17-04
+- Content-only release: no server-code changes to `tools/`, `guards/`, `index.ts` logic; updates to SOP skill text only
+- E17 tracks forensic incident from v3.83.0 post-release correction (commit a484a4d)
+- Full test suite including new E17 pins: 1424/1424 pass
+
+## [3.83.0] - 2026-07-13
+
+### Added
+- **`e14-ci-ground-truth` — Verify-release CI ground-truth check (v3.83.0).** Adds Check 6 to `scripts/verify-release.mjs`: reads the latest completed CI run on main via `gh` and FAILs on non-success conclusion. Degrades gracefully (`gh` missing/unauthenticated or zero completed runs is WARN-and-continue, never a release blocker). Implements script check routine and release-engineer SOP step 9a integration; exercised live during this release's own self-check. Spec: `specs/e14-e16-release-hardening.md`. Code-review APPROVED (`qa_reports/archive/e14-e16-release-hardening/review_T-EB-03.md`). QA verified (`qa_reports/archive/e14-e16-release-hardening/review_T-EB-04.md`). Closes E14 ticket.
+- **`e15-spawned-server-de-flake` — Spawned-server test de-flake (v3.83.0).** Addresses test flakiness in spawned-server integration tests via response-driven waits instead of fixed delays. Refactors wait patterns to detect server readiness from response content rather than time-based heuristics. Shipped in commit 3267a69 as a single-role qa-engineer ticket (test-only; no code-review round by design — §2 test ownership). QA evidence: `qa_reports/review_T-E15-01.md`. Closes E15 ticket.
+- **`e16-judge-dispatch-charter` — Single-role judge-dispatch charter broadening (v3.83.0).** CONTENT-ONLY amendment — zero server-code change (`tools/`, `gates/`, `index.ts` untouched; `ALLOWED_TRANSITIONS` unchanged). Broadens the Amend-Resume Edge charter in Constitution §3.1 (`content/const-08-chain-31-mid.md`): the existing `resume_of`-gated pm→{code-reviewer,qa-engineer} edge is ALSO the sanctioned door for a PM-sanctioned FRESH single-role judge dispatch on a test-only/evidence-only ticket — not only a mid-chain resume. Same field, same trust mechanics, judge roles only (the field opens no edge to any build role). Adds a pointer sentence to the coordinator's Amend-Resume relay row (`content/coord-03-core-fallback.md`). Pinning suite `test/e16-judge-dispatch-charter.test.mjs`; golden fixtures regenerated. Full suite: 1420/1420 pass. Spec: `specs/e14-e16-release-hardening.md`. Code-review APPROVED (`qa_reports/archive/e14-e16-release-hardening/review_T-EB-03.md`). QA verified (`qa_reports/archive/e14-e16-release-hardening/review_T-EB-04.md`). Closes E16 ticket. *(Correction note: the v3.83.0 release commit message and the original version of this entry erroneously described a `tools/handoff-orchestrator.ts` gate-predicate change — no such change shipped; verified against the release diff.)*
+
+### Changed
+- **scripts/verify-release.mjs**: Added Check 6 (CI ground-truth read via `gh`; FAIL on non-success, WARN-and-continue on missing).
+- **content/const-08-chain-31-mid.md**: §3.1 Amend-Resume Edge charter broadened — single-role judge dispatch bullet (content-only; no server code changed in this release beyond verify-release.mjs).
+- **content/skill-release-engineer.md**: SOP step 9a line documenting the Check 6 CI ground-truth read.
+- **content/coord-03-core-fallback.md**: pointer sentence on the Amend-Resume relay row referencing the §3.1 charter.
+- **test/**: New pinning suite `test/e16-judge-dispatch-charter.test.mjs`; verify-release suite extended (VR-11..VR-16 incl. degradation paths); chain-arm golden fixtures regenerated; context-budget caps re-baselined (exact-measured).
+
+### Notes
+- driftBaselineIds appended with T-EB-01, T-EB-02, T-EB-03, T-EB-04
+- E14, E15, E16 are a 3-item batch shipped as single feature (`e14-e16-release-hardening`) per small-batch precedent (C16+C10 scope rule)
+- E15 was previously shipped in commit 3267a69; this release marks its formal completion alongside E14 and E16
+- No breaking changes to MCP tool surface or handoff schema; all changes content-only (E16) or additive (E14, E15)
+- Release-engineer self-check (step 9a) now exercises Check 6 live via `gh`
+
+## [3.82.0] - 2026-07-13
+
+### Added
+- **`e9a-stamp-integrity` — No-MCP-path relay codification + stampAdvisory hand-authored forensics (v3.82.0).** Elevates the no-MCP-path emergency fallback from a per-incident workaround (D10, E1A, E13) to a sanctioned, formalized pattern in release-engineer SOP (Hard rule: "No-MCP-path sessions MUST relay, never hand-edit"). Adds `RELAY REQUIRED:` relay convention: when a release session has no MCP `tw_*` tool invocation path at all, it states the exact literal `tw_update_state` call as output to the coordinator instead of hand-editing `.current/handoff.md` directly. Implements new `stampAdvisory` field in `tw_detect_drift` output (read-only advisory reporting) that flags any drift entries with hand-authored `last_updated` timestamps outside the session's own durable `tw_update_state` writes (forensics: v3.75.0, v3.77.0, v3.80.0 all had hand-edited drift recoveries). Codified in `content/skill-release-engineer.md` (Hard rule #5: no-MCP-path relay + exact RELAY REQUIRED format), `tools/drift.ts` (stampAdvisory read-only advisory field), release-engineer SOP steps 2/12 (relay directive), and `test/drift-stamp-advisory.test.mjs` (suite validation). Full suite 1408/1408 pass. Spec: `specs/e9a-stamp-integrity.md`. Code-review APPROVED (`qa_reports/review_T-E9A-04.md`). QA verified (`qa_reports/review_T-E9A-05.md`). Closes E9A ticket.
+
+### Changed
+- **content/skill-release-engineer.md**: Hard rule #5 codified (no-MCP-path relay pattern with `RELAY REQUIRED:` format; exact literal `tw_update_state` calls relayed when session has no MCP path).
+- **tools/drift.ts**: New `stampAdvisory` field added to `tw_detect_drift` output (read-only advisory reporting hand-authored-stamp detection).
+- **test/drift-stamp-advisory.test.mjs**: New test suite validating stampAdvisory forensics.
+
+### Notes
+- driftBaselineIds appended with T-E9A-01, T-E9A-02, T-E9A-03, T-E9A-04, T-E9A-05
+- E9A is a governance-resilience feature addressing the no-MCP-path emergency fallback used in v3.75.0, v3.77.0, and v3.80.0 incident recovery
+- `stampAdvisory` is read-only advisory, never blocks any gate — purely informational forensics reporting
+- No breaking changes to MCP tool surface, handoff schema, or transitions; no new gates
+- Release-engineer SOP steps 2 and 12 now include relay directive for no-MCP-path sessions (coordinator confirms receipt before release is claimed complete)
+
+## [3.81.0] - 2026-07-13
+
+### Added
+- **`e7-governed-git-surface` — All-roles sanctioned-git-ops whitelist (v3.81.0).** Generalizes D10's release-engineer git-ops safety rules to all roles via a new core-tagged Constitution §6 bullet (Security & Privacy) listing sanctioned operations (add/commit/tag/fast-forward push only; reset/rebase/clean/force-push/checkout --force blocked with status=Blocked + pending_notes explanation + handoff to coordinator). Release-engineer's D10 bullet rewritten as pointer-only cross-reference preserving recovery mechanics (Blocked + SHA example + step 3a re-baseline). Byte-budget bumped to account for §6 bullet in core-tagged dispatch arms (lite + chain). Implemented in `content/const-15-core-tail.md` (new §6 bullet), `content/skill-release-engineer.md` (pointer rewrite), and `test/context-budget.test.mjs` (budget recomputed). Spec: `specs/e7-governed-git-surface.md`. Code-review APPROVED (`qa_reports/review_T-E7-04.md`). QA verified (`qa_reports/review_T-E7-05.md`, 1394/1394 tests). Closes E7 ticket.
+
+### Changed
+- **content/const-15-core-tail.md**: New §6 bullet for sanctioned-git-ops whitelist (core-tagged, all roles).
+- **content/skill-release-engineer.md**: D10 bullet rewritten as pointer-only cross-reference to §6, preserving recovery mechanics.
+- **test/context-budget.test.mjs**: Byte-budget caps re-baselined to accommodate new const-15 bullet in every dispatch arm.
+
+### Notes
+- driftBaselineIds appended with T-E7-01, T-E7-02, T-E7-03, T-E7-04, T-E7-05
+- E7 is a security-hardening feature generalizing release-engineer git safety to all roles via Constitution §6
+- Core-tagged bullet ships in lite + chain dispatch arms, increasing byte budgets across all roles
+- No breaking changes to MCP tool surface, handoff schema, or prompt system
+
+## [3.80.0] - 2026-07-13
+
+### Added
+- **`e10-lease-override` — Feature-lease human override + non-work write exemptions (v3.80.0).** Introduces two new transient `tw_update_state` args: `lease_override` (coordinator-attested FEATURE_LEASE_HELD bypass for any edge; requires `lease-override:` audit note in `pending_notes`, else LEASE_OVERRIDE_AUDIT_MISSING gate fires) and `bookkeeping_write` (preserves `last_updated` timestamp on same-feature bookkeeping writes; rejects different-feature combinations with BOOKKEEPING_WRITE_INVALID_CHANGE-class error). Migration heal-write hard-wired to preserve `last_updated`. Adds two new Constitution §3.1 bullets (const-08-chain-31-mid.md) governing lease-override attestation and bookkeeping-mode semantics. File-mode only; SQLite behavior unchanged. No handoff schema version bump (both fields transient, never persisted — handoff remains v12). Implemented in `tools/handoff-orchestrator.ts` (gate logic + field validation), `content/const-08-chain-31-mid.md` (new governance bullets), and `test/lease-override.test.mjs` (suite: 1390/1390 pass). Spec: `specs/e10-lease-override.md`; architecture: `specs/e10-lease-override-architecture.md`. Code-review APPROVED (`qa_reports/review_T-E10-07.md`). QA verified (`qa_reports/review_T-E10-08.md`). Closes E10 ticket.
+
+### Changed
+- **tw_update_state tool args**: Added `lease_override` (string, optional) and `bookkeeping_write` (boolean, optional) parameters with strict validation and gate enforcement.
+- **tools/handoff-orchestrator.ts**: LEASE_OVERRIDE_AUDIT_MISSING and BOOKKEEPING_WRITE_INVALID_CHANGE gate logic; `last_updated` preservation in migration heal-write path.
+- **content/const-08-chain-31-mid.md**: Two new Constitution §3.1 bullets governing lease-override attestation semantics and bookkeeping-mode exclusive-feature requirement.
+
+### Notes
+- driftBaselineIds appended with T-E10-ARCH, T-E10-01, T-E10-02, T-E10-03, T-E10-04, T-E10-05, T-E10-06, T-E10-07, T-E10-08
+- E10 is a governance-tooling feature enabling human intervention on blocked releases while maintaining audit trail + accounting for maintenance writes
+- File-mode only (SQLite inert per AC-4); no breaking changes to MCP tool surface or handoff schema
+- No new gates beyond LEASE_OVERRIDE_AUDIT_MISSING and BOOKKEEPING_WRITE_INVALID_CHANGE (both transient validations, no persistent state impact)
+
+## [3.79.0] - 2026-07-13
+
+### Added
+- **`e13-terminal-marker-advisory` — Terminal-marker resilience fix (v3.79.0).** Broadens the feature-lease terminal marker (`gates/feature-lease.ts`) to accept closing writes via durable signature: exact triple `last_agent="release-engineer" && status="In_Progress" && next_role="pm"` (primary contract, still required) OR a fallback pattern matching `pending_notes[0]` against `/^Released v/` (file-mode only, resilience fallback). Covers two known incident classes where `next_role` was absent/dropped despite correct intent: (1) closing write omitting `next_role` (v3.75.0), and (2) correct closing write whose transient `next_role` was later dropped by an unrelated migration heal-write while `pending_notes` survived (v3.77.0). Scoped to file-mode only via orchestrator call-site enforcement (`tools/handoff-orchestrator.ts`); SQLite behavior unchanged. Implements gate-broadening predicate (`gates/feature-lease.ts` third conjunct), orchestrator scoping (`tools/handoff-orchestrator.ts` leaseFields param), release-engineer SOP resilience note (`content/skill-release-engineer.md` step 12-13 terminal-marker section), and test coverage (`test/feature-lease.test.mjs`, E13-R1 + 6 ACs). Full suite 1370/1370 pass. QA verified (`qa_reports/review_T-E13-06.md`). Closes E13 ticket.
+
+### Changed
+- **gates/feature-lease.ts**: Terminal marker third conjunct broadened to accept closing writes via `pending_notes[0]` signature (file-mode only, guarded at call site).
+- **tools/handoff-orchestrator.ts**: leaseFields scoped to `FileHandoffStorage` only for resilience fallback.
+- **content/skill-release-engineer.md**: Terminal-marker resilience note appended after step 13 (documents the fallback safety net and reiterates that steps 12-13 remain the primary contract).
+- **test/feature-lease.test.mjs**: E13-R1 regression test + 6 ACs (pending_notes signature matching, file-mode enforcement, SQLite isolation).
+
+### Notes
+- driftBaselineIds appended with T-E13-01, T-E13-02, T-E13-03, T-E13-04, T-E13-05, T-E13-06, T-E13-07
+- E13 is a resilience/governance ticket addressing silent lease-stalls from v3.75.0 and v3.77.0 closing-write incidents
+- Terminal-marker relaxation is file-mode only (SQLite behavior preserved byte-for-byte per AC-4)
+- No breaking changes to MCP tool surface, handoff schema, or prompt system
+
+## [3.78.0] - 2026-07-12
+
+### Added
+- **`e9-release-self-check` — Release self-check gate (v3.78.0).** Introduces `scripts/verify-release.mjs` for independent post-push verification of release artifacts before closing the release (5 checks: tag-at-HEAD, pushed-to-origin, check-version green, CHANGELOG entry present, dist committed+parity at HEAD). Mandatory SOP step 9a; prevents incomplete/broken releases from being claimed PASS. Addresses v3.72.0 and v3.73.0 regression where releases were self-reported clean while actually broken. Implemented in `scripts/verify-release.mjs` with full test coverage (`test/verify-release.test.mjs`, 20 tests) and release-engineer SOP wiring (`content/skill-release-engineer.md` step 9a + Escalation Routes). Full suite 1370/1370 green. QA verified (`qa_reports/review_T-E9-04.md`). Closes E9 ticket.
+
+### Changed
+- **release-engineer SOP step 9a (new, mandatory)**: Run `node scripts/verify-release.mjs vX.Y.Z` post-push/gh-release, pre-closing-write. ALL checks MUST pass (exit 0) before proceeding to closing write. Any non-zero exit triggers Escalation Routes blockage and stops the release.
+- **release-engineer Escalation Routes**: Added release-self-check failure mode row (`release self-check reports any FAIL`).
+
+### Notes
+- driftBaselineIds appended with T-E9-01, T-E9-02, T-E9-03, T-E9-04
+- E9 is a release-integrity follow-up ticket addressing v3.72.0 + v3.73.0 false-clean self-reports
+- Release-engineer SOP step 13 (closing-write read-back, AC10 mandatory) validates the closing write landed on server before emitting final `Done. Released` claim
+- No breaking changes to MCP tool surface, handoff schema, or prompt system
+
+## [3.77.0] - 2026-07-12
+
+### Added
+- **`e3-outcome-shaped-acceptance` — QA Phase 3.5 runtime-evidence gate (v3.77.0).** Introduces AC_EXECUTION_LOG_MISSING (28th gate) to enforce proof annotations in feature specs as a precondition for QA PASS. Three legs: PM AC schema specification (`content/skill-pm.md` proof guidance), QA Phase 3.5 runtime-evidence execution phase (`content/skill-qa-engineer.md`), and the AC_EXECUTION_LOG_MISSING evidence gate (`gates/ac-execution.ts` NEW, `gates/registry.ts`, `tools/handoff-orchestrator.ts`). Gate arms when the active feature spec has ≥1 line-leading `proof:` annotations and fires (file mode) on qa-engineer's PASS write if no `## AC Execution Log` H2 is present in the review file (motivated by F2 false-green to ensure outcome-shaped verification). Covers 8 ACs: AC schema, phase guidance, gate arm-detection, missing-log detection, test coverage, escalation routes, scope alignment, and visual/copy audit baselines. Full suite 1350/1350 pass. QA verified (`qa_reports/review_T-E3-QA.md`). Closes E3 ticket.
+
+### Changed
+- **skill-pm and skill-qa-engineer**: Added proof-annotation guidance and QA Phase 3.5 description per AC schema.
+- **test suite**: New `test/ac-execution.test.mjs` (28 assertions covering arm-check, disposition, integration, and file-mode guard); re-baselined `test/error-code-contract.test.mjs` (27→28 gate entries), `test/context-budget.test.mjs` (skill-pm cap 3922→4128), `test/qa-visual-skill-split.test.mjs` (skill-qa-engineer cap 12950→14729).
+
+### Notes
+- driftBaselineIds appended with T-E3-ARCH, T-E3-01, T-E3-02, T-E3-03, T-E3-CR, T-E3-QA, T-E3-04, T-E3-REL, T-E3-DONE
+- E3 is a governance-feature ticket closing a v3.76.0+ follow-up workstream: proof annotations + runtime-evidence phase + gate 28
+- AC Execution Log manifest in `qa_reports/review_T-E3-QA.md` (Phase 3.5); test-infra path correction applied (gates-expected-red.test.mjs pattern → flat test/ac-execution.test.mjs)
+- No breaking changes to MCP tool surface, handoff schema, or prompt system
+
+## [3.76.0] - 2026-07-12
+
+### Added
+- **`e11-check-version-dist-parity` — dist/ build parity guard (v3.76.0).** Introduces `scripts/check-version.mjs` dist-parity verification to catch stale or mismatched `dist/index.js` at release time. Detects v3.74.0 regression (stale dist shipped to users). Adds `--strict` mode for CI gate, prints `dist/index.js parity OK (version)` on success. Implemented in `scripts/check-version.mjs` and `test/check-version.test.mjs`; gates release-engineer SOP step 7 pre-tag. Closes E11 ticket following post-v3.74.0 stale-dist incident review.
+- **`e12-metrics-emit-dedupe` — Metrics emit de-duplication (v3.76.0).** Fixes v3.74.0 double-emit regression where `tools/metrics.ts` appendMetrics() could emit duplicate lines on concurrent release attempts (same feature, same closing write, multiple handoff refreshes). Adds idempotent emit via `metrics.jsonl` last-line read-back check; only unique features are appended. Implemented in `tools/metrics.ts` with `test/success-metrics.test.mjs` dedupe regression tests. Full suite 1323/1323 green. QA verified (`qa_reports/review_T-E11E12-03.md`). Closes E12 ticket following post-v3.74.0 metrics incident review.
+
+### Changed
+- **release-engineer SOP step 7**: `npm run build` followed by `node scripts/check-version.mjs` now mandatory pre-tag; gate returns exit code 0 on success, prints version parity line.
+- **metrics emit**: `tools/metrics.ts` appendMetrics() now idempotent — duplicate features are silently skipped, preventing metric-line duplication on retried releases.
+
+### Notes
+- driftBaselineIds appended with T-E11-01, T-E12-01, T-E11E12-02, T-E11E12-03, T-E11E12-REL, T-E11E12-DONE
+- E11+E12 are joint-release follow-up tickets addressing v3.74.0 (E8) release-integrity incidents: stale dist and double-emit
+- No schema changes; fixes are additive to release-engineer SOP + metrics pipeline
+- `npm run build` prebuild now includes `check:version` for every `tsc` run (v3.70.0+ chain standard)
+
+## [3.75.0] - 2026-07-12
+
+### Added
+- **`e4-design-source-credibility-gate` — Design source credibility verification (v3.75.0).** Introduces SOURCE_CREDIBILITY_UNVERIFIED gate for design-armed features to ensure requirement sources are verified before work begins. Extends `gates/visual.ts` with credibility cell parser reading from design baseline manifests; new gate fires on pm→architect/sr-engineer edge when fetch-based modes (Figma/Sketch/XD/Penpot) have audited rows missing credibility attestation (`credibility: full-page-composite` required). Implements source verification in `gates/registry.ts` + `gates/visual.ts` + `tools/handoff-orchestrator.ts` check-order block. Complements E8 metrics: gates ensure source credibility + E8 measures outcome quality cross-feature. Full suite 1313/1313 green (1281 QA baseline + 32 E4 tests). QA verified (`qa_reports/review_T-E4-05.md`). See `specs/e4-design-source-credibility-gate.md` and `specs/e4-design-source-credibility-gate-architecture.md` for gate mechanism and design-auditor integration.
+
+### Changed
+- **SOP enhancement**: design-auditor step 2b requires credibility attestation (`credibility: full-page-composite`) on all audited rows for fetch-based design modes.
+- **Gate check-order**: pm→{architect,sr-engineer} edge now checks source-credibility alongside existing cut-approval, scope-decision, external-refs gates (storage-mode agnostic, v11 schema — zero schema bump).
+
+### Notes
+- driftBaselineIds appended with T-E4-ARCH, T-E4-01, T-E4-02, T-E4-03, T-E4-04, T-E4-05, T-E4-REL, T-E4-DONE
+- E4 integrates E8 v3.74.0 (v11→v12 schema: cumulative round counters + metrics emit). E4 adds SOURCE_CREDIBILITY_UNVERIFIED gate on v11 schema (zero schema bump, no E1A-style lease additions).
+- Gate is dormant on image/PDF/paper design modes and when `## Source` section absent
+- Handoff schema remains v11 (no migration needed — gate operates on existing visual evidence format)
+
+## [3.74.0] - 2026-07-12
+
+### Added
+- **`e8-success-telemetry` — Per-feature success-side metrics emission (v3.74.0).** Introduces cumulative per-feature round counters (qa_round, review_round, visual_round) and hop_count to handoff schema (v11→v12 migration). Adds release-time metrics emission: release-engineer closing write emits feature metadata `{feature, tickets, rounds, hops, one_pass, released_version}` as JSON lines to `.current/metrics.jsonl` for cross-feature analytics on QA intensity, review cycles, and release velocity. Implements metrics collection in `tools/metrics.ts` + automatic best-effort emit on closing-write success in `tools/handoff-orchestrator.ts`. Includes `scripts/summarize-metrics.mjs` summarizer and `test/success-metrics.test.mjs` regression tests; full suite 1295/1295 green. QA verified (`qa_reports/review_T-E8-07.md`). See `specs/e8-success-telemetry.md` and `specs/e8-success-telemetry-architecture.md` for mechanism and analytics use cases.
+
+### Changed
+- **SOP enhancement**: release-engineer SOP step 11b (metrics emit) is automatic, best-effort; no manual action required on closing write.
+
+### Notes
+- driftBaselineIds appended with T-E8-ARCH, T-E8-01, T-E8-02, T-E8-03, T-E8-04, T-E8-05, T-E8-06, T-E8-07, T-E8-REL, T-E8-DONE
+- Handoff schema v12: added `qa_round`, `review_round`, `visual_round`, `hop_count` fields (auto-migration from v11 on first read)
+- Metrics emit is best-effort; absence does not fail the release
+
+## [3.73.1] - 2026-07-12
+
+### Fixed
+- **`e1a-feature-lease-amendment` — Post-release lease terminal marker + negative-age hardening (v3.73.1).** Fixes feature-lease hold duration post-release by introducing the terminal-marker signature in `gates/feature-lease.ts` (release-engineer closing write status=In_Progress + next_role="pm" now signals feature-lease release; prior versions leaked ~30 min post-release because the closing write clobbered the QA PASS tuple). Adds negative-age guard: `last_updated` in future (clock skew) no longer blocks lease release; only fresh updates reset the lease TTL, preventing indefinite hold on time-jumped handoff files. Amendment architecture in `specs/e1-feature-scoped-state-design.md ## Amendment (2026-07-12)` section. Feature-lease regression tests extended (`test/feature-lease.test.mjs`, +18 tests); full suite 1263/1263 green. QA verified (`qa_reports/review_T-E1A-03.md`).
+
+### Changed
+- **SOP clarification**: release-engineer closing write (step 12) SOP text corrected — `agent_id` must be "release-engineer" (self-loop), never "pm" (stamps false audit trail). This ensures the feature-lease terminal-marker contract (last_agent="release-engineer" ∧ status="In_Progress" ∧ next_role="pm") is satisfied, releasing the lease post-PASS.
+
+### Notes
+- driftBaselineIds appended with T-E1A-01, T-E1A-02, T-E1A-03, T-E1A-04
+- Feature-lease amendment is backwards-compatible (no schema bump, test-only validation)
+
+## [3.73.0] - 2026-07-12
+
+### Added
+- **`e2-bugfix-repro-gate` — Bugfix-mode dispatch and repro-first gate enforcement (v3.73.0).** Introduces bugfix-mode signal mechanism (handoff schema v10→v11 adds `dispatch_mode?: "feature"|"bugfix"` field; absence-is-signal precedent = feature-mode default). Implements repro-first gate (`REPRO_MANIFEST_MISSING`) in `gates/registry.ts` blocking sr-engineer fix-phase writes until a qa_reports manifest documents the failing test(s). Integrates manifest parsing and gate enforcement in `tools/handoff-orchestrator.ts`. Extends `content/skill-pm.md`, `content/skill-sr-engineer.md`, `content/skill-qa-engineer.md` with bugfix-mode ticket-cut guidance, repro-first manifest step, and strict bugfix-mode PASS criterion (exact repro red-set green + zero new reds, load-bearing not advisory). Comprehensive architecture in `specs/e2-bugfix-repro-gate.md` and `specs/e2-bugfix-repro-gate-architecture.md`. Regression test suite added; full suite 1251/1251 green. QA verified (`qa_reports/review_T-E2-05.md`). Feature-mode chains remain byte-behavior-unchanged per AC5.
+
+### Notes
+- driftBaselineIds appended with T-E2-ARCH, T-E2-01, T-E2-02, T-E2-03, T-E2-04, T-E2-05, T-E2-06
+- Handoff schema v11: `dispatch_mode` field added to track bugfix vs feature mode (migration from v10 auto-runs on read)
+
+## [3.72.0] - 2026-07-12
+
+### Added
+- **`e1-feature-scoped-state-design` — Feature-scoped state isolation and release re-baseline (v3.72.0).** Introduces the feature-lease mechanism (`gates/feature-lease.ts` + `gates/registry.ts`) for serializing concurrent E-series features and coordinating release timing. Adds `FEATURE_LEASE_HELD` gate code blocking competing features during active release; re-baselines release-engineer SOP step 3a (mandatory pre-release HEAD re-fetch before version bump) to prevent concurrent-release collisions. Implements feature-lease acquire/release orchestration in `tools/handoff-orchestrator.ts` and transition rules in `tools/transitions.ts`. Enables future per-feature handoff-file scoping (E1b) and coordinator escalation routes (E1c). Comprehensive architecture in `specs/e1-feature-scoped-state-design.md`. Feature-lease tests added (`test/feature-lease.test.mjs`, 24 new tests); full suite 1235/1235 green. QA verified (`qa_reports/review_T-E1-05.md`). See specs for mechanism, rationale, and downstream enablement roadmap.
+
+### Changed
+- **SOP hardening**: release-engineer SOP now includes mandatory step 3a (re-baseline off `origin/HEAD` before bumping) to prevent version-collision race conditions when features are released concurrently in separate git worktrees.
+
+### Notes
+- driftBaselineIds appended with T-E1-01, T-E1-02, T-E1-03, T-E1-04, T-E1-05, T-E1-06
+- Feature-lease mechanism is backwards-compatible (no handoff schema bump, gate is internal only)
+
+## [3.71.1] - 2026-07-12
+
+### Changed
+- **`d10-release-engineer-git-stop-rule` — Release-engineer hard-stop rules and escalation routes (v3.71.1).** Adds critical Hard rule (STOP on push rejection / concurrent-release collision via D10 escalation case), reinforces no-force-push prohibition, and deepens `driftBaselineIds` baseline acknowledgment instructions in `content/skill-release-engineer.md`. Adds escalation-routes table row (non-fast-forward push rejection collision) and CRITICAL condition for task-cleanup misconfigurations triggering premature version-literal assertions. SOP scope clarified for major-version opt-in (explicit user confirmation required). Reinforcement hint added to `templates/claude-code-agents/release-engineer.md`. Regression test suite extended with 6 new pinning tests in `test/release-staging.test.mjs` covering git-state-collision scenarios and hard-rule enforcement. QA verified with 1211/1211 tests green. See `specs/d10-release-engineer-git-stop-rule.md`.
+
+### Notes
+- driftBaselineIds appended with T-D10-01, T-D10-02, T-D10-03, T-D10-REL
+
+## [3.71.0] - 2026-07-11
+
+### Added
+- **`d6-host-capability-compose-axis` — Host-capability as a third compose axis for skills (v3.71.0).** Extends the skill-composition system with a host axis, mirroring the existing design/chain axes in `prompts/constitution-manifest.ts`. Skills are now split into core + `host:claude-code`-tagged fragments, allowing Claude-Code-specific prose (Task-tool dispatch, telemetry parsing, `~/.claude/agents` template instructions, watermark validation) to be excluded for non-Claude-Code hosts (Cursor, Continue, Anti-Gravity, plain MCP). Adds `host` parameter to `buildPromptForRole()`, reusing `ConstitutionSegment`/`includeSegment` fragment patterns. Mechanism documented in `specs/d6-host-capability-compose-axis.md` and `specs/d6-host-capability-compose-axis-architecture.md`. Backwards-compatible feature addition (MINOR bump). Code-review approved; QA verified with 1179+ tests green. See `qa_reports/review_T-D6-04.md`.
+
+### Notes
+- driftBaselineIds appended with T-D6-ARCH, T-D6-01, T-D6-02, T-D6-03, T-D6-04, T-D6-05, T-D6-06, T-D6-REL, T-D6-DONE
+- Skill files now support host-targeted fragment tagging via `host:claude-code` in `<!-- origin:* -->` markers
+
+## [3.70.0] - 2026-07-11
+
+### Added
+- **`d5-server-side-stale-dispatch-detection` — Server-side stale-dispatch liveness detection (v3.70.0).** Implements read-time staleness advisory for in-flight handoff dispatches. Handoff schema v9→v10 adds transient `dispatched_at` (ISO-8601) auto-stamped in `writeHandoffState` whenever a write sets `next_role`. `tw_get_state` surfaces a `stale_dispatch` advisory (`{role, dispatched_at, elapsed_minutes, threshold_minutes, message}`) when an in-flight dispatch has no state write for >15 min (fixed `STALE_DISPATCH_THRESHOLD_MIN`, read-path only, no new gates). Enables coordinator + agents to detect and handle dispatch liveness anomalies (hung agents, network partitions, race conditions). Zero new client args; orchestrator untouched; backwards-compatible MINOR bump. `content/skill-coordinator.md` gains Stale-dispatch Escalation Routes row + Crash-Resume step 0 instructions. Comprehensive architecture in `specs/d5-server-side-stale-dispatch-detection.md` and `specs/d5-server-side-stale-dispatch-detection-architecture.md`. Code-review approved; QA verified with 1179/1179 green. See `review_reports/review_T-D5-04.md`, `qa_reports/review_T-D5-05.md`.
+
+### Notes
+- driftBaselineIds appended with T-D5-ARCH, T-D5-01, T-D5-02, T-D5-03, T-D5-04, T-D5-05, T-D5-REL, T-D5-DONE
+- Handoff schema v10: `dispatched_at` field added to track dispatch-write timestamps (migration from v9 auto-runs on read)
+
+## [3.69.0] - 2026-07-11
+
+### Added
+- **`d9-qa-review-scoped-append` — Scoped QA review auto-append targeting (v3.69.0).** Implements `review_task_ids` field in `tools/registry.ts` and handoff-orchestrator resolution logic to scope the auto-append of QA evidence files to a specific subset of completed task IDs (rather than all tasks in a feature). Adds `QA_REVIEW_TARGET_REQUIRED` gate code to `gates/registry.ts` enforcing that releases with QA evidence must declare explicit target scope via this field. Updates `content/skill-qa-engineer.md` with new auto-append scoping semantics and gate documentation. Adds regression test suite `test/qa-review-scoped-append.test.mjs` (1173/1173 tests pass). Re-baselines `test/error-code-contract.test.mjs` and `test/qa-visual-skill-split.test.mjs` for new gate code. Observable behavior addition (new field + gate code = MINOR bump). Comprehensive spec in `specs/d9-qa-review-scoped-append.md`; code review approved (`review_reports/review_T-D9-01.md`); QA verified (`qa_reports/review_T-D9-05.md`).
+
+### Notes
+- driftBaselineIds appended with T-D9-01, T-D9-02, T-D9-03, T-D9-04, T-D9-05, T-D9-REL, T-D9-DONE
+- `review_task_ids` field added to handoff schema (schema version unchanged; new optional field)
+
+## [3.68.1] - 2026-07-11
+
+### Changed
+- **`d8-lite-recommended-model` — Lite skill recommended model bump (v3.68.1).** Bumps `content/skill-coordinator-lite.md` frontmatter `recommended_model: haiku → sonnet`. Rationale: the lite skill's direct-invocation surface (e.g., `/teamwork-lite`, SessionStart hook default) has no corrective watermark-validation layer, unlike the Task-subagent dispatch path, so recommending the tier with documented §1 (watermark) compliance weaknesses creates unguarded risk. Decision made post-QA-FAIL per backlog D8's "decide directly" instruction given unavailable live D4 eval evidence and near-zero remaining bundle trim margin. Mirror doc updated (`docs/skills/coordinator-lite.md`); test amended to encode the deliberate `@lite` Task-subagent template divergence as a dated exemption (post-QA-FAIL reconciliation, T-D8-03). All 1107/1107 tests pass; 0 unrelated regressions. PATCH bump. See `specs/d8-lite-recommended-model.md`, `qa_reports/review_T-D8-03.md`.
+
+### Notes
+- driftBaselineIds appended with T-D8-01, T-D8-02, T-D8-03, T-D8-REL, T-D8-DONE
+
+## [3.68.0] - 2026-07-11
+
+### Added
+- **`d2-server-brake-accounting` — Server-side hop-cap brake + durable token-usage accounting (v3.68.0).** Implements server-enforced cost-side circuit breakers, replacing in-memory coordinator arithmetic with durable, persisted field tracking. (1) Hop Counter Brake: adds `hop_count` field to `handoff.md` (schema v9, seed 0), incremented deterministically by `tools/transitions.ts`, with `HOP_CAP_EXCEEDED` gate enforcing 10-hop limit per feature. Feature-scoped reset on (pm, In_Progress) landing edge with exemption for the same-feature re-entry edge. (2) Token Budget Brake (opt-in): adds `bin/agent-governance-usage-hook.mjs` PostToolUse hook (best-effort, never-throw) appending `{ts, feature, dispatch, usage}` records to `.current/usage.jsonl` sidecar; coordinator reads sidecar (with hand-sum fallback to `agent-*.jsonl` for backward-compat) instead of model-maintained arithmetic. Handoff schema v8→v9 migration adds `hop_count` field to all extant task records (seed 0 for backward-compat, no replay required). Updated `content/skill-coordinator.md` (Token Budget Brake section) and `content/skill-coordinator-lite.md` to document feature-scoped reset mechanics. Comprehensive architecture documented in `specs/d2-server-brake-accounting.md` and `specs/d2-server-brake-accounting-architecture.md`. Code-review approved; QA verified with 1165/1165 green. See `review_reports/review_T-D2-04.md`, `qa_reports/review_T-D2-05.md`.
+
+### Notes
+- driftBaselineIds appended with T-D2-ARCH, T-D2-01, T-D2-01A, T-D2-01B, T-D2-02, T-D2-03, T-D2-04, T-D2-05, T-D2-REL, T-D2-DONE
+- `hop_count` field added to handoff schema v9 (migration from v8 auto-runs on read)
+- `.current/usage.jsonl` is new append-only sidecar for token accounting (created on-demand by hook)
+
+## [3.67.1] - 2026-07-11
+
+### Added
+- **`d7-qa-reports-archive` — QA Reports Archive SOP (v3.67.1).** Introduces release-engineer SOP step 7a to archive shipped feature qa_reports into `qa_reports/archive/<active_feature>/` subdirectory, preventing stale evidence from cluttering the root during multi-feature releases. Updates `content/skill-release-engineer.md` with new SOP step 7a, allowlist annotation (archive path excluded from `evidence-file.ts` coverage scans via `.md`-suffix + non-recursive readdirSync), and no-clobber move semantics per Constitution §2 safety rules. Adds regression test to `test/covering-evidence.test.mjs` (1107/1107 tests pass) pinning AC8-b invariant: `buildCoverageIndex` tolerates archive/ subdirectories and never surfaces archived ids. QA verified empirically via temp-fixture probe against compiled production code (dist/tools/evidence-file.js, dist/gates/qa-review.js) demonstrating bit-for-bit identical behavior with/without archive present. Backwards-compatible; PATCH bump. All acceptance criteria met; see `specs/d7-qa-reports-archive.md`, `qa_reports/review_T-D7-02.md`, `review_reports/review_T-D7-01.md`.
+
+### Notes
+- driftBaselineIds appended with T-D7-01, T-D7-02, T-D7-REL, T-D7-DONE
+
+## [3.67.0] - 2026-07-10
+
+### Added
+- **`d4-behavioral-eval-harness` — Behavioral compliance eval harness (v3.67.0).** Adds `test/eval/` bundle loader infrastructure with assertion helpers and 7 compliance scenarios covering role routing, state machine transitions, gate enforcement, and drift detection. Provides on-demand `npm run eval` runner for live evaluation of core constraints. Live smoke tests (AC-10) deferred due to missing `ANTHROPIC_API_KEY` — fail-fast path (AC-11) independently verified as substitute evidence. Full feature scope documented in `specs/d4-behavioral-eval-harness.md`; QA verified with human-waived scope (degraded). All 1089/1089 tests pass. See `qa_reports/review_T-D4-09.md`, `review_reports/review_T-D4-08.md`.
+
+### Notes
+- driftBaselineIds appended with T-D4-01, T-D4-02, T-D4-03, T-D4-05, T-D4-06, T-D4-07, T-D4-08, T-D4-09, T-D4-REL, T-D4-DONE
+
+## [3.66.0] - 2026-07-10
+
+### Added
+- **`d3-gate-fire-telemetry` — Gate-fire telemetry and retro procedure (v3.66.0).** Adds `tools/telemetry.ts` (65 lines) with `emitGateTelemetry()` function to record all gate rejections in `.current/telemetry.jsonl` (append-only, no locks). Splits `tools/handoff-orchestrator.ts` `handleUpdateState` into `handleUpdateStateCore` (unchanged frozen check-order body) + wrapper that emits telemetry on rejection. Adds `docs/gate-retro-procedure.md` — five-step periodic retro to parse telemetry, rank gate fires by frequency, flag zero-fire gates at N=5 releases (configurable), and surface findings for human review. No authoritatively-gated state change, no new API surface; pure observability sidecar. Enables load-bearing vs dead-weight distinction on gate rules — foundational for counter-pressure on superlinear rule-corpus growth (C-series tickets). QA verified; all 1089/1089 tests pass. See `specs/d3-gate-fire-telemetry.md`, `qa_reports/review_T-D3-05.md`.
+
+### Notes
+- driftBaselineIds appended with T-D3-01, T-D3-02, T-D3-03, T-D3-04, T-D3-05, T-D3-REL, T-D3-DONE
+
+## [3.65.0] - 2026-07-10
+
+### Added
+- **`d1-prompt-arg-workspace-fallback` — Shape-gating for `workspace_path` arg (v3.65.0).** Adds `looksLikePath()` heuristic to `resolveWorkspacePath()` in `index.ts` to prevent free-text prompt arguments (e.g. natural-language questions in any script) from being misinterpreted as broken workspace paths. When the arg does not look path-shaped (`/`, `\`, `.`, `~`), it falls through to the `CLAUDE_PROJECT_DIR` env / `cwd` fallback chain, matching pre-D1 behavior for absent args. Path-shaped-but-missing args remain byte-identical to pre-D1 (C6's "resolution suspect" diagnostic still fires). Fixes live repro 2026-07-10: `/teamwork-lite <free text>` now resolves the real workspace state instead of rendering the S01a "not managed" footer. QA verified; all 1071/1071 tests pass. See `specs/d1-prompt-arg-workspace-fallback.md`, `qa_reports/review_D1-03.md`, `review_reports/review_D1-02.md`.
+
+### Notes
+- driftBaselineIds appended with D1-01, D1-02, D1-03, D1-REL, D1-DONE
+
+## [3.64.1] - 2026-07-10
+
+### Changed
+- `content/const-06-chain-31-head.md` L8: phrasing fix — "After 3 QA FAILs (Round 4)" → "After the `qa_round` cap of QA FAILs (Round 4 of `qa_round`)" for consistency with A12 naming convention.
+- `test/compose-equivalence.test.mjs` golden fixtures regenerated (6 updates).
+- `test/context-budget.test.mjs` AC8 design-arm floor rebaselined: 6391 → 6399 ~tok; teamwork bundle 12538 → 12547 ~tok; non-design floor 4293 → 4302 ~tok.
+
+### Notes
+- driftBaselineIds appended with T-A12F-03
+
+## [3.64.0] - 2026-07-10
+
+### Added
+- **`a12-partials-limits-registry` — Skill-partials registry and Limits-table refactor (v3.64.0).** Introduces `prompts/partials-manifest.ts` canonical partial-file registry, wired into `buildPromptForRole()` render paths for const/ and skill/ composition. Adds `## Limits` table to `content/const-01-core-head.md` (8 named limits: `qa_round` cap 3, `review_round` cap 3, `visual_round` cap 5, hop cap 10, fix-try cap 2, file-read cap 3, design-auditor pass budget 250×5, sr-engineer task-size budget ≤5 files/300 lines) with name-references rewritten across all const-*.md and skill-*.md files, replacing bare-number restatements. Refactors byte-identical step-1 preflight line across 5 skills (architect, pm, design-auditor, researcher, sr-engineer) into one canonical partial, eliminating silent-drift hazard on SOP edits. Fixes qa-visual visual_round framing (const-09: "cap is 5 rounds" → `visual_round` name-reference; skill-qa-visual.md: "round cap (6)" corrected to 5). Context-budget rebaselined: lean bundle ≤4027 tok, design-arm floor ≤6391 tok, teamwork bundle ≤12538 tok, non-design floor ≤4293 tok (skill-pm ≤3196 / skill-sr-engineer ≤2469 caps unchanged, repointed to partial-composed text). Golden compose-equivalence fixtures regenerated. Backwards-compatible; MINOR bump. QA verified; all 1067/1067 tests pass. See `specs/a12-partials-limits-registry.md`, `qa_reports/review_T-A12-04.md`, `review_reports/review_T-A12-01.md`.
+
+### Changed
+- `prompts/partials-manifest.ts` new file — canonical registry of shared partials and their file paths.
+- `prompts/build.ts` `buildPromptForRole()` refactored to wire partial-composition into const-order and skill-order render paths.
+- `content/const-01-core-head.md` `## Limits` table added (pre-§1 position).
+- `content/const-08`, `const-09`, `const-12`, `const-15` — bare-number limits rewritten as name-references.
+- `content/skill-architect.md`, `skill-pm.md`, `skill-design-auditor.md`, `skill-researcher.md`, `skill-sr-engineer.md` — step-1 preflight line sourced from partial; state-update rule restated → removed (inherit from const-05 per const-01 mandate).
+- `content/skill-qa-engineer.md`, `skill-code-reviewer.md`, `skill-qa-visual.md`, `skill-coordinator.md` — bare-number limits rewritten as name-references.
+- `test/context-budget.test.mjs` AC8 design-arm floor rebaselined to 12247 ~tok; skill-pm ≤3196 tok; skill-sr-engineer ≤2469 tok.
+- `test/compose-equivalence.test.mjs` golden fixtures regenerated (`test/fixtures/compose-golden/*.txt`).
+- `test/subagent-templates.test.mjs` assertions updated to reflect partial-composition changes.
+- `test/skill-evolution-v3.11.test.mjs` assertions swept and updated.
+
+### Notes
+- Non-blocking follow-up for PM/release: const-06-chain-31-head.md L8 restates qa_round value outside A12 scope (noted for future const-06 landing or follow-up ticket per sr-engineer + code-reviewer concurrence).
+- driftBaselineIds appended with T-A12-01..09
+- `docs/backlog.md` A12 row marked DONE with v3.64.0 tag reference
+
+## [3.63.0] - 2026-07-10
+
+### Added
+- **`b9-token-budget-brake` — Optional cost-side circuit breaker for per-feature token budgets (v3.63.0).** Introduces opt-in, off-by-default token-budget brake that complements count-side caps. Enabled ONLY when `.current/.config.json` sets `tokenBudgetPerFeature` to a positive finite number; invalid values filter to absent (no schema_version bump). When enabled, running token total (input + output + cache read + cache creation) across all subagent dispatches within a `/teamwork` invocation is tracked in-memory (session-scoped, not persisted). When running total reaches or exceeds 80% of `tokenBudgetPerFeature`, stop routing and surface the running total, ceiling, and percentage. Halt semantics mirror hop-cap: observe/halt only, no state write, no new persisted field, no schema bump — advisory-only. Adds "Token Budget Brake" subsection to `content/skill-coordinator.md` Auto-Routing section with detailed enablement and escalation semantics. Updates Escalation Routes table with 80%-ceiling row. New test file `test/token-budget-config.test.mjs` (13 tests) covering config loading, invalid-value filtering, and brake-disabled state. Context-budget cap rebaselined (11815 → 12247 ~tok). One Copy/Strings regression in `test/subagent-templates.test.mjs` fixed. Backwards-compatible; MINOR bump. QA verified: all 5 acceptance criteria (AC1–AC5) passed; all 1043/1043 tests pass. See `specs/b9-token-budget-brake.md`, `qa_reports/review_T-B9-03.md`, `review_reports/review_T-B9-01.md`.
+
+### Changed
+- `tools/config.ts` `ConfigType` now includes optional `tokenBudgetPerFeature?: number`.
+- `tools/config.ts` `loadConfig()` filters invalid token budget values to absent.
+- `content/skill-coordinator.md` "Token Budget Brake" subsection added to Auto-Routing section.
+- `content/skill-coordinator.md` Escalation Routes table updated with 80%-ceiling token-budget-brake row.
+- `test/context-budget.test.mjs` AC8 design-arm floor bumped to 12247 ~tok.
+- `test/subagent-templates.test.mjs` Copy/Strings assertion fixed.
+
+### Notes
+- driftBaselineIds appended with T-B9-01..05
+- `docs/backlog.md` B9 row marked DONE with v3.63.0 tag reference
+
+## [3.62.0] - 2026-07-10
+
+### Added
+- **`c17-dispatch-brief-template` — Dispatch Brief Template subsection (v3.62.0).** Adds a new "Dispatch Brief Template" subsection to `content/skill-coordinator.md` under the Auto-Routing section, providing agents with a standardized template structure for subagent dispatch briefs (6 invariant lines: upstream pending_notes summary, subagent type, task list, branching strategy, assumptions, success criteria). Updates the "Subagent Dispatch (Claude Code)" paragraph to point dispatch brief authoring at the template rather than ad-hoc phrasing. Context-budget rebaselined (test/context-budget.test.mjs AC8 design-arm floor: 11445 → 11815 ~tok). Backwards-compatible; MINOR bump. QA verified: all acceptance criteria met; 1043/1043 tests pass. See `specs/c17-dispatch-brief-template.md`, `qa_reports/review_T-C17-03.md`.
+
+### Changed
+- `content/skill-coordinator.md` "Dispatch Brief Template" subsection added to Auto-Routing section.
+- `content/skill-coordinator.md` "Subagent Dispatch (Claude Code)" paragraph updated to point at template.
+- `test/context-budget.test.mjs` AC8 design-arm floor bumped to 11815 ~tok.
+- `test/subagent-templates.test.mjs` assertion added verifying Dispatch Brief Template section presence.
+
+### Notes
+- driftBaselineIds appended with T-C17-01..05
+- `docs/backlog.md` C17 row marked DONE with v3.62.0 tag reference
+
+## [3.61.0] - 2026-07-10
+
+### Added
+- **`c12-registry-field-consumers` — Registry field parity tests (v3.61.0).** Implements option (b) assert: extends A10/DR-3's existing generative-parity test pattern to `triggerEdge` and `armCondition` doc-facing fields in `gates/registry.ts`, adding 7 new parity test cases to `test/error-code-contract.test.mjs`. Eliminates the fourth unverified copy of gate semantics and ensures registry comments remain synchronized with code. No schema_version bump, no new tw_* tool, no code changes beyond test assertions (one comment-only edit to `gates/registry.ts`). Backwards-compatible; MINOR bump. QA verified via Phase 0.5 dogfood: all acceptance criteria independently verified; 1042/1042 tests pass. See `specs/c12-registry-field-consumers.md`, `qa_reports/review_T-C12-02.md`.
+
+### Changed
+- `gates/registry.ts` assertion comment expanded to document field parity contract.
+- `test/error-code-contract.test.mjs` 7 new test cases for `triggerEdge` and `armCondition` field validation.
+
+### Notes
+- driftBaselineIds appended with T-C12-01..05
+- `docs/backlog.md` C12 row marked DONE with v3.61.0 tag reference
+
+## [3.60.0] - 2026-07-10
+
+### Added
+- **`a8-single-owner-dedup` — Self-converge relaxation dedup + pointer consolidation (v3.60.0).** Eliminates duplicate restatement of the self-converge relaxation mechanism across Constitution §1 and skill-sr-engineer.md; consolidates into a single-owner pattern where the constitution owns the full normative text and skill text shrinks to a pointer line ("see Constitution §1"). Two content-only edits to `content/skill-sr-engineer.md`. Precedent set by C2 (cut-approval consolidation, v3.47.0) and C1 (amend-resume routing, v3.42.0). No schema_version bump, no new tw_* tool, no code changes. Backwards-compatible; MINOR bump. QA verified via Phase 0.5 dogfood: all 5 acceptance criteria (AC1–AC5) independently verified; single flaky test (prompt-state-footer.test.mjs e2e subprocess timing) confirmed pre-existing, not a regression. See `specs/a8-single-owner-dedup.md`, `qa_reports/review_T-A8-05.md`.
+
+### Changed
+- `content/skill-sr-engineer.md` step 7 now references Constitution §1 for self-converge relaxation details instead of restating.
+
+### Notes
+- driftBaselineIds appended with T-A8-01..05
+- `docs/backlog.md` A8 row marked DONE with v3.60.0 tag reference
+
+## [3.59.0] - 2026-07-10
+
+### Added
+- **`c5-c18-watermark-configcache` — Watermark replace logic fix + configCache mtime invalidation (v3.59.0).** C5(a) de-hardcodes the CRITICAL watermark reminder tier across all `templates/claude-code-agents/*.md` files to read the actual model tier invoked with; C5(b) fixes `lib/watermark-check.ts` validateWatermark's mismatched-watermark branch to replace (not double-append) the wrong trailing line. C18 adds mtime-based invalidation to `tools/config.ts`'s `configCache` to ensure config changes are reflected immediately in-process (documented trade-off: identical mtime serves cached value). Authored `test/watermark-check.test.mjs` additions (no-double-stamp + mismatch-branch idempotency + CRLF + watermark-only edges) and new `test/config-cache.test.mjs` (in-process mtime-driven reload + existence-transition cases). Phase 0.5 Expected-Red Diff run confirmed 5/5 manifest entries genuinely red, all re-baselined. Full suite 1035/1035 pass. See `specs/c5-c18-watermark-configcache.md`, `qa_reports/review_T-C5C18-06.md`, `review_reports/review_T-C5C18-01.md`.
+
+### Changed
+- Template watermarks now read `(<the model tier you were actually invoked with>)` instead of hardcoded `(haiku)` in 12 template files.
+- `tools/config.ts` configCache now checks file mtime on each `loadConfig` call; identical mtime returns cached value; changed mtime triggers reload.
+
+### Notes
+- driftBaselineIds appended with T-C5C18-01..08
+- `docs/backlog.md` C5 and C18 rows marked DONE with v3.59.0 tag reference
+
+## [3.58.0] - 2026-07-10
+
+### Added
+- **`c16-c10-role-boundary` — Code-reviewer gate + release-engineer SOP step 11 for backlog done-marking (v3.58.0).** Introduces REVIEWER_COMPLETED_TASKS_REJECTED gate (C16) to enforce code-reviewer attestation boundary: when a code-reviewer completes any task while in the review pass, they bypass the normal peer-review process. Gate applies post-PASS (if any tasks remain INCOMPLETE after code-reviewer exit) to prevent self-approval of code changes. Wired in `gates/registry.ts` + `tools/handoff-orchestrator.ts`. Also elevates backlog done-marking into release-engineer's SOP (C10, step 11): WHEN `docs/backlog.md` exists AND the active feature traces to one or more backlog rows, release-engineer marks the active feature's row(s) DONE with a one-line mechanism summary and release commit reference (tag or sha). This folds ad hoc post-PASS backlog-marking (previously a PM/coordinator task) into release-engineer's own SOP, alongside version bump and CHANGELOG. Content updates to `skill-release-engineer.md`, `skill-qa-engineer.md`, `skill-pm.md`, and `skill-code-reviewer.md`. 7 C16-C10 subtasks completed; QA baseline regenerated. See `specs/c16-c10-role-boundary.md`, `qa_reports/review_T-C16-04.md`, `review_reports/review_*.md`.
+
+## [3.57.0] - 2026-07-10
+
+### Added
+- **`c15-expected-red-manifest` — Expected-Red SOP surface + manifest-diff gate (v3.57.0).** Introduces expected-red manifest convention and integration: qa-engineer Phase 0.5 authors `qa_reports/expected-red_<feature>.txt` documenting "expected red" test outcome (known failures, flakes, or intentionally deferred). Skill-sr-engineer.md step 7a updates to emit manifest on release. Code-reviewer performs manifest sampling (4a) during review. New gate `EXPECTED_RED_DIFF_MISSING` (21st in gate sequence) wired at qa PASS transition; gate fires in file-mode only (dormant when no manifest authored, consistent with manifest-optional design). Gate enforces that expected-red manifest must exist and be committed when feature is marked PASS in file-mode (mirrors visual-baseline convention). No schema bump: new gate does not alter handoff/tasks YAML structure or zod boundaries. Feature shape mirrors VISUAL_EVIDENCE_MISSING gate — single gate module `gates/expected-red.ts`, registry entry, orchestrator wiring. 8 T-C15-* tasks completed; all test suites green. See `specs/c15-expected-red-manifest.md`, `qa_reports/expected-red_c15-expected-red-manifest.txt`, `review_reports/review_T-C15-*.md`.
+
+## [3.56.0] - 2026-07-09
+
+### Added
+- **`c14-dispatch-pins` — Model-tier dispatch pins as first-class persistent handoff field (v3.56.0).** Elevates dispatch-time model-pin convention (e.g., `dispatch_pins: sr-engineer=fable`) from ad-hoc `pending_notes` tokens into a dedicated, typed `dispatch_pins` field in handoff state. Adds zod-validated `dispatch_pins?: Record<AgentName, ModelTier>` field to handoff YAML schema; field is transient/write-scoped (not preserved across writes unless explicitly re-set), allowing agents to declare model overrides at dispatch time and have them survive context loss during a role's execution. New consistency gate: `dispatch_pins` values must match the closed set of AgentName and ModelTier enums. Handoff schema v7→v8 migration (stamp-only: `dispatch_pins` absent on migrated files means "no pins recorded"). SOP updates: skill-coordinator.md updated to read and honor `dispatch_pins` on role dispatch; skill-sr-engineer.md, skill-qa-engineer.md, and skill-release-engineer.md updated to respect dispatch-time pin contracts. Constitution const-01-core-head.md updated with pin-override rule (when `dispatch_pins` records a model tier for your role, you MUST use that tier; Constitution §1 watermark accordingly). 12 T-C14-* tasks completed; build 997/997 tests green (4 new tests in test/dispatch-pins.test.mjs, baseline regenerated). Reuses v3.55.0's c9-protocol-fields pattern (schema bump + zod closed-enum + skill-text migration). See `specs/c14-dispatch-pins.md`, `specs/c14-dispatch-pins-architecture.md`, `qa_reports/review_c14-dispatch-pins.md`, `review_reports/review_T-C14-*.md`.
+
+## [3.55.0] - 2026-07-09
+
+### Added
+- **`c9-protocol-fields` — Structured routing/review fields in handoff state (v3.55.0).** Migrates three load-bearing protocol signals from free-text `pending_notes` conventions into dedicated handoff fields: `next_role` (which role should act next), `resume_of` (which stranded role a PM amendment resumes), and `review_verdict` (code-reviewer's verdict: APPROVED or CHANGES_REQUESTED). New zod schema validation at the `tw_update_state` boundary: `next_role` must be one of 8 AgentName values; `resume_of` must be one of {code-reviewer, qa-engineer}; `review_verdict` must be one of {APPROVED, CHANGES_REQUESTED}. New consistency gate: when `agent_id==="code-reviewer"` and `review_verdict` is present, an `APPROVED` verdict MUST pair with `status !== FAIL` (and vice versa for CHANGES_REQUESTED). All three fields are transient, write-scoped directives (absent on each write unless explicitly set — they are NOT blindly preserved or feature-scoped-preserved). Updates `tools/transitions.ts` Amend-Resume Edge to read structured `resume_of` field instead of pending_notes substring grep. Handoff schema v6→v7 migration (stamp-only, mirrors v3→v4 and v4→v5 precedent: absence of new fields on migrated files means "no signal recorded", not synthesized default). Skill updates: skill-pm.md, skill-coordinator.md, skill-code-reviewer.md, skill-sr-engineer.md, and skill-qa-engineer.md updated to emit/consume the structured fields instead of convention tokens. Five-layer defense: zod schema validation (tool boundary), consistency gate (review_verdict↔status), transient-semantic enforcement (write-scoped not feature-scoped), decision-record contrast (explicit vs. external_refs/cut_approved), and skill-text documentation. 16 T-C9-* tasks completed; build 973/973 tests green. See `specs/c9-protocol-fields.md`, `specs/c9-protocol-fields-architecture.md`, `qa_reports/review_c9-protocol-fields.md`, `review_reports/review_T-C9-01.md`.
+
+## [3.54.0] - 2026-07-09
+
+### Added
+- **`c7-version-assertion-ownership` — Dynamic version assertions (v3.54.0).** Implements AC-9 version assertions in `test/baseline-manifest-gate.test.mjs` and `test/pixel-gate-attestation.test.mjs` to read target version dynamically from `package.json`/`index.ts` at test time (numeric-tuple floors); eliminates need for test edits on version bumps. Adds narrow import-path-retarget carve-out in Constitution §2 (`content/const-05-core-standards.md`) for version-comparison AST logic, gated to `@agent-governance-mcp/internal` marker. New STOP+route-to-qa rule in `skill-release-engineer.md` (S02): if hardcoded version literal found in test during release, release-engineer routes to qa-engineer (Constitution §2 violation). 11 compose-golden fixtures regenerated; 4 context-budget caps rebaselined. See `specs/c7-version-assertion-ownership.md`, `qa_reports/review_T-C7-QA.md`, `review_reports/review_T-C7-CR.md`.
+
+## [3.53.0] - 2026-07-09
+
+### Added
+- **`c8-crash-resume-protocol` — Mid-role crash recovery: ground-truth working tree, restate findings, re-assert dispatch-time model pins (v3.53.0).** Adds skill-coordinator.md crash-resume protocol (three-step procedure: ground-truth the working tree vs role's last claims via git status; restate findings in the resume brief; re-assert dispatch-time overrides like model pins from dispatch notes, verifying resumed run honors them). New dispatch_pins convention in pending_notes (records dispatch-time model pins surviving context loss). New pinned-tier expectation in Watermark Validation section. New Crash detection row in Escalation Routes table (routes to Crash-Resume Protocol). Content-only, no schema bump, no new tw_* tool. 6 C8 subtasks (T-C8-01..04 implementation + T-C8-CR code review + T-C8-QA verification); build 959/959 tests green; test/context-budget.test.mjs AC8 cap rebaselined 9699 → 10774 per QA. See `specs/c8-crash-resume-protocol.md`, `qa_reports/review_T-C8-QA.md`, `review_reports/review_T-C8-CR.md`.
+
+## [3.52.0] - 2026-07-09
+
+### Added
+- **`b8-external-ref-ledger` — External-reference ledger + build-entry gate (v3.52.0).** Adds server-enforced EXTERNAL_REFS_UNRESOLVED gate to Constitution §7, blocking the PM→architect/sr-engineer build-entry transition while any recorded external reference remains `unresolved`. New `external_refs` field in handoff YAML (file-mode only): array of `{ref, state}` entries with closed-enum states (`fetched`, `indexed`, `user-confirmed-ignorable`, `unresolved`). Ledger is feature-scoped (reset on `active_feature` change) and preserves across writes in same feature. Mirrored attestation pattern mirrors `scope_decision`/`cut_approved` (AC-2 absence = "zero refs found", not unresolved sentinel). Gate fires on both PM→architect and PM→sr-engineer edges (AC-4); gated edge reset on Amend-Resume re-entry (AC-3); SQL-mode skips (AC-5). Handoff schema v5→v6 migration (stamp-only, `external_refs` absent on migrate). SOP updates: skill-pm.md Resource Audit Gate + skill-coordinator.md Auto-Routing stop-condition surface unresolved refs. Constitution §7 wording reflects enforcement. 11 B8 subtasks + QA completed; 959/959 tests (938 baseline + 21 new). See `specs/b8-external-ref-ledger.md`, `qa_reports/review_b8.md`, `review_reports/review_b8.md`.
+
+## [3.51.0] - 2026-07-08
+
+### Added
+- **`a11-escalation-grammar` — Escalation-route tables + WHEN/DO/ELSE rule grammar (v3.51.0).** Consolidates scattered escalation-call incantations into a canonical format defined once in Constitution §3 and expressed as one `## Escalation Routes` table per skill file. Adds one canonical **Escalation call format** bullet to `content/const-05-core-standards.md` and one **Rule grammar (WHEN/DO/ELSE)** bullet. Restructures escalation sites in 7 skill files (`skill-architect.md`, `skill-sr-engineer.md`, `skill-qa-engineer.md`, `skill-design-auditor.md`, `skill-code-reviewer.md`, `skill-coordinator.md`, `skill-release-engineer.md`) from prose to tabular form; light-touch cross-reference edits to `skill-pm.md` and `skill-qa-visual.md`. 11 content-only edits (A11-01..A11-11); no new data model, no schema_version bump, no new tw_* tool, no cross-cutting API surface change. Backwards-compatible; PATCH bump for consistency polish. See `specs/a11-escalation-grammar.md`, `qa_reports/review_a11-escalation-grammar.md`, `review_reports/review_a11-escalation-grammar.md`.
+
+## [3.50.0] - 2026-07-08
+
+### Added
+- **`a13-section1-polish` — Constitution §1 unified output policy, watermark decision table, schema examples, context-budget cap bumps (v3.50.0).** Polishes Constitution §1 governance coverage by consolidating clause 1d output-format rules, adding a decision table for watermark role/tier selection, and including concrete schema examples for handoff/tasks formats. Nine content-only edits to constitution fragment + skill files; fixture/test-cap follow-up completed. No new data model, no schema_version bump, no new tw_* tool, no cross-cutting API surface change. Backwards-compatible; MINOR bump for polish. See `specs/a13-section1-polish.md`, `qa_reports/review_a13-section1-polish.md`, `review_reports/review_a13-review.md`.
+
+## [3.49.0] - 2026-07-08
+
+### Added
+- **`c13-release-engineer-write-path` — Release-engineer legal write path + STOP-on-rejection rule (v3.49.0).** Closes the v3.48.0 release-wedge incident by adding two new backwards-compatible ALLOWED_TRANSITIONS edges: `qa-engineer:PASS → release-engineer:In_Progress` (AC-1, enables release-engineer to open with its own agent_id without coordinator intermediary) and `release-engineer:In_Progress → pm:In_Progress` (AC-2, completes the handoff to PM for post-release coordination). New §3 STOP-on-rejection rule (Constitution v3.40.0) — any tw_* call returning a ⛔ rejection must halt immediately; agents must hand back Blocked/FAIL with error verbatim (never hand-edit .current/handoff.md or tasks.md). SOP updates: skill-release-engineer.md step 10 driftBaselineIds appending + step 11 closing write to pm:In_Progress; templates/claude-code-agents/release-engineer.md workflow clarification. 7 C13 subtasks + driftBaselineIds step completed. Full implementation in tools/transitions.ts ALLOWED_TRANSITIONS map + index.ts STOP-on-rejection guard. Backwards-compatible; no schema_version bump. See specs/c13-release-engineer-write-path.md, qa_reports/review_C13-QA.md, review_reports/review_C13-REV.md.
+
+## [3.48.0] - 2026-07-08
+
+### Added
+- **`c6-c11-prompt-state-injection` — Fail-loud handoff-state footer variants + constitution dedup (v3.48.0).** C6: Prompt state injection now fails loud when workspace path resolution is ambiguous (CLAUDE_PROJECT_DIR not set, cwd fallback, file not found, or parse error) — three footer variants (S01a/S01b/S02 per `specs/c6-c11-prompt-state-injection.md`) alert agents to call `resolveWorkspacePath()` or explicitly pass `workspace_path` to GetPrompt. Unified workspace-resolution logic at `resolveWorkspacePath()` in `index.ts` and reused across `prompts/build.ts`'s footer builder and handoff-state read paths (AC-4 consistency). C11: Constitution inject-dedup now uses two-level strategy — L1 in-memory per-workspace hook-marker flag (set post-SessionStart, cleared per-workspace on role switch) and L2 120s stale-sentinel file at `.current/.agc-hook-marker.json` (gitignored) — reduces duplicate injection from concurrent hook fires and session-boundary bleed, measured ~1500 token saving per deduped dispatch; token assertion pins ≥1200 (AC-9). Backwards-compatible; file-mode only for now; no schema version bump. Both fixes live in `prompts/build.ts` (S01a/S01b/S02 footer builder) and `bin/agent-governance-context.mjs` (SessionStart hook), with architecture decided in `specs/c6-c11-prompt-state-injection-architecture.md`. Closes backlog C6 (prompt state blindness) and C11 (constitution double-injection).
+
+## [3.47.0] - 2026-07-08
+
+### Added
+- **`c3-covering-evidence` — Covering-report evidence mechanism for evidence checks (v3.47.0).** Evidence checks in `gates/qa-review.ts` (`hasEvidenceInFile`) and `gates/code-review.ts` (`hasCodeReviewEvidenceInFile`) now accept a covering report — a `covers: <id1>, <id2>, ...` line in one report file satisfies N task ids. Lazy directory scan triggered only on per-id miss; per-id files remain valid as the default. Closes backlog C3 (stub-pointer-file litter from batched review rounds). Parser/index helpers (`parseCoversIds`, `buildCoverageIndex`, `COVERS_LINE_RE`) live in `tools/evidence-file.ts`. File-mode only; no schema version bump; backwards-compatible with existing per-id evidence files.
+
+## [3.46.1] - 2026-07-08
+
+### Changed
+- **`gate-registry` (backlog A10 + A2 folded in) — single structured source of truth for the 18-gate catalog (v3.46.1).** Introduces `gates/registry.ts` (`GATE_REGISTRY` — 18 typed `GateDefinition` entries: `errorCode`, `producer`, `envelope`, `triggerEdge`, `armCondition`, `clearingArtifact`, `hintStatic`, `documentedInProse`) as the single source `tools/transitions.ts` and the new `gates/*.ts` predicate modules source their error codes and hint text from, replacing three independently-drifting copies (code, constitution prose, skill prose) with one. `tools/evidence-file.ts` (994 lines) is split per backlog A2 into `gates/qa-review.ts`, `gates/code-review.ts`, `gates/visual.ts`, `gates/scope-decision.ts`, `gates/cut-approval.ts` — verbatim predicate moves, no behavior change — leaving `evidence-file.ts` as shared read/write plumbing only. Reconciled the gate catalog from the spec's stated 17 codes to the actual 18 (the spec omitted `MISSING_REVIEW_EVIDENCE`; see `specs/gate-registry-architecture.md`). `test/error-code-contract.test.mjs` rewritten as a generative parity test: imports the built registry and asserts registry↔code↔doc parity by construction (registry ⊆/⊇ doc-side backtick tokens, registry ⊆/⊇ code-side shape-rule harvest, `TransitionRejection["error"]` 12-member union ⊆ `ALL_GATE_CODES`) instead of a doc↔code regex-scrape. Pure re-plumbing: error codes, hint text, JSON/plain-text envelope shapes, frozen `tw_update_state` gate check order, and all `content/*.md` bytes are unchanged (zero `content/*.md` diff) — no schema_version bump, no new/removed gate, no observable behavior change. See `specs/gate-registry.md`, `specs/gate-registry-architecture.md`, `review_reports/review_A10-09.md`.
+
+## [3.46.0] - 2026-07-07
+
+### Added
+- **`cut-approval-coordinator-attestation` — Constitution §3.1 single-owner Cut-Approval Gate + coordinator-attested trust rule (v3.46.0).** Extends the pm:In_Progress → architect/sr-engineer build-entry edge with coordinator attestation semantics: `cut_approved` may be set ONLY by the context that witnessed the human's chat-turn approval — in subagent dispatch, that is the coordinator itself via `tw_update_state(agent_id="pm", cut_approved: true, ...)`. Adds `Sanctioned writer (coordinator-attested approval)` section to §3.1, wiring the trust boundary at the handoff read side. New SOP step in skill-coordinator.md stop-condition 6. File-mode only (SQLite/HTTP skip the gate); backwards-compatible with existing ALLOWED_TRANSITIONS. Constitution header unchanged (v3.40.0 supersedes the feature).
+- **`pm-repair-resume-routing` — Amend-Resume guarded edges pm→{code-reviewer,qa-engineer} via resume_of marker in tools/transitions.ts (v3.46.0).** Adds two new guarded edges to the ALLOWED_TRANSITIONS state machine: `pm:In_Progress → code-reviewer:In_Progress` and `pm:In_Progress → qa-engineer:In_Progress`, armed only when the write carries `resume_of: <role>` in pending_notes. Enables PM mid-chain spec amendments without manufacturing a detour through sr-engineer, addressing the "stranded downstream role" gap (see specs/pm-repair-resume-routing-architecture.md). Honest-attestation trust class (like `cut_approved`). Does NOT interact with Scope Decision or Cut-Approval gates. New §3.1 Amend-Resume Edge bullet. 34 new regression tests in test/qa-flow.test.mjs.
+- **`drift-baseline-exemption` — driftBaselineIds config exemption in tools/drift.ts + 144-id backfill (v3.46.0).** Closes the tw_detect_drift historical-noise flooding issue: new optional `driftBaselineIds: string[]` config array in `.current/.config.json` exempts specified task ids from drift-detector output. Allows teams to whitelist known-benign task reachability differences (archived ephemeral tasks, pre-migration historical runs, etc.). Backfilled with 144 historical ids; new tasks are explicitly appended at each release. No schema version bump (field is optional). Backwards-compatible; dormant if absent. Wired into drift.ts `shouldSkipDrift()` check before the baseline-manifest gate.
+
+### Changed
+- **`origin-marker-reconciliation` — Amend-Resume Edge marker corrected from v3.47.0 to v3.46.0.** The forward-looking origin tag on the new Amend-Resume Edge bullet (§3.1) was set speculatively to v3.47.0 during C1 implementation; reconciled to v3.46.0 for this release as this feature ships in v3.46.0, not v3.47.0.
+
+### Notes
+- Constitution header remains v3.40.0 (versioned independently per convention; tracks highest documented behavior). C1/C2 add new §3.1 bullets (subsumbed by v3.40.0 scope).
+- 144 historical task ids backfilled into driftBaselineIds per C4 scope. New released features (C1-01..C1-10, C2-01..C2-07, C4-01..C4-07) appended to baseline for next release drift filtering.
+
+## [3.45.0] - 2026-07-07
+
+### Added
+- **`registry-pattern` — Tools and prompts now use centralized registry for cleaner maintainability (v3.45.0).** Refactored `index.ts` from 1436 → 201 lines by extracting tool definitions and handlers into `tools/registry.ts`, prompt definitions into shared `PROMPT_REGISTRY`. Introduced `tools/handoff-orchestrator.ts` for unified handoff orchestration. Wire surface is byte-compatible with v3.44.0 — no MCP interface change, no schema bump, no migration. MINOR bump for architectural cleanup.
+- **`compose-not-strip-overlays` — Constitution overlay composition replaces fence stripping in build pipeline (v3.45.0).** Refactored `prompts/build.ts` to compose constitution overlays (rationale spans, design-only sections, chain-only gates) additively instead of stripping them post-render. Captured golden fixtures pre-refactor in test suite. Behavior is identical; token efficiency per-dispatch is preserved. MINOR bump for build-time refactor. Backwards-compatible; no prompt schema or content change.
+
+### Changed
+- **`prompts/build.ts` — Composition-based overlay architecture replaces conditional stripping (v3.45.0).** Overlays (rationale, design-only, chain-only) are now conditionally included during template render rather than stripped post-render, improving reasoning clarity during development and simplifying maintenance. No observable output change; token spend is identical to v3.44.0.
+
+## [3.44.0] - 2026-07-06
+
+### Added
+- **`governance-tag-strip` — Fourth context-budget stripper for provenance redaction (v3.44.0).** Implements `stripOriginTags()` in `prompts/build.ts`, the fourth stripper in the context-compression pipeline after stripChainOnly/stripRationale/stripDesignOnly. Redacts 42 fenced provenance metadata sites (Figma node-id pointers, git commit hashes, auth tokens, timestamps, internal tracking codes) from prompt injection vectors, reducing per-dispatch token spend by ~200 tokens. Context-budget re-baselined lower across all seven role prompts. Backwards-compatible: MINOR bump. No schema/migration/tool-surface change.
+
+### Changed
+- **`skill-qa-visual` — Consolidation rewrite, 265 → 124 lines (v3.44.0).** Removed redundant gate repetition; streamlined step numbering; clearer evidence schema and failure modes. No SOP behavior change.
+- **`skill-pm` — Consolidation rewrite, gates → Gate Summary table (v3.44.0).** Extracted gate enforcement bullets into a dedicated reference table for clarity; cleaner navigation. No PM flow change.
+
+### Fixed
+- **`error-code-contract` — Eight previously-undocumented error codes now documented (v3.44.0).** New test `test/error-code-contract.test.mjs` enforces strict 1:1 mapping between all error codes emitted by the server and their definitions in `content/constitution.md` or role SOPs. All currently-emitted codes brought into the contract.
+
+## [3.43.0] - 2026-06-26
+
+### Added
+- **`pm-cut-approval-gate` — PM ticket-cut approval gate, a server-enforced checkpoint before build entry (v3.43.0).** Closes the ticket-splitting accuracy gap (`research/ticket-splitting-for-ai-agents.md`): after PM splits tickets, a human checkpoint is required before the cut enters architect/sr-engineer context. New server gate on `pm:In_Progress → {architect,sr-engineer}:In_Progress` edge: transition blocked with `error: "CUT_APPROVAL_REQUIRED"` + hint unless `cut_approved === true` in handoff. Handoff schema v4→v5 migration (stamp-only; `cut_approved` absent = unapproved sentinel, no default seeding). PM SOP updated (skill-pm.md §7a): inline cut-draft table (id | desc | depends_on | est. files | design-link) with halt-for-approval pattern; per-ticket Figma node-id + URL in design-link column when `hasDesignModeRequiringVisual()` is armed. Coordinator skill (skill-coordinator.md) updated with cut-approval gate as documented Auto-Routing stop-condition. Coordinator-lite SOP ceiling enforcement (skill-coordinator-lite.md): lite mode is read-only; PM enforces cut-approval SOP text (AC-3), cannot server-gate. New gate wired into `tools/transitions.ts` `validateTransition()` call in `index.ts` (handles CUT_APPROVAL_REQUIRED error); new helper `isCutApprovalRequired()` in `tools/transitions.ts`. Lite enforcement at SOP-ceiling per Constitution §3.1. Full spec: `specs/pm-cut-approval-gate.md`.
+
+## [3.42.0] - 2026-06-25
+
+### Added
+- **`qa-visual-pixel-gate-attestation` — Pixel-gate attestation, the SEVENTH visual sub-gate (v3.42.0).** Closes the F2 false-pass (`research/104445-F2-qa-visual-false-pass-postmortem.md`): a qa-visual session that skipped the pixel diff could write `diff-metric: N/A` (or `dimensionsMatch=false`) and still PASS the v3.38.0 provenance gate, which only checked the line was non-empty. Two changes in `tools/evidence-file.ts`: (1) **AC-1 — placeholder rejection.** New pure `isPlaceholderDiffMetric()` + `DIFF_METRIC_PLACEHOLDERS` set (`n/a`, `skipped`, `skip`, `dimensionsmatch=false`, `dimensions mismatch`, `todo`, `tbd`, `none`, `-`, empty); `checkVisualProvenance` now treats a placeholder diff-metric as absent, emitting `VISUAL_PROVENANCE_MISSING` with the invalid value listed. The B1 LLM-fallback token is deliberately NOT a placeholder (AC-5). (2) **AC-2 — new gate.** New pure `parsePixelGateAttestation()` + fs composition `checkPixelGateAttestation()` require a positive `pixel_gate_complete: true` line in each non-carry-forward surface's `### <surface id>` prose sub-section under `## Region Diff`; missing → **`PIXEL_GATE_ATTESTATION_MISSING`**. Wired into `index.ts` inside the armed `if (armCheck.required)` block immediately after the baseline-manifest gate. Opt-in / backwards-compatible (AC-8): dormant for reports with no `baseline:` line. Carry-forward surfaces exempt (AC-4); the B1 LLM-fallback path still requires the attestation (AC-5). `diffMetric` is kept RAW in the parser so the error can name the offending value (AC-9). `PIXEL_GATE_ATTESTATION_MISSING` added to the `TransitionRejection["error"]` union (handler-side type only; not produced by `validateTransition`). `content/skill-qa-visual.md` updated (Step B1/B2, B1-fallback path, Report schema, Failure modes — AC-11). No schema/migration change.
+
+## [3.40.1] - 2026-06-18
+
+### Fixed
+- **`handoff-write-arg-guard` — Reject two malformed `tw_update_state` args (v3.40.1).** Two `.refine()` guards added to the `UpdateStateArgs` Zod schema in `index.ts`, hardening the input boundary so the server fails loud (Constitution §7) instead of writing corrupt handoff state. (1) **`workspace_path` basename `.current` guard** — when a caller passes the `.current/` state directory instead of the workspace root, the server appended `.current/handoff.md` to it, silently writing a doubly-nested `.current/.current/handoff.md`; the call is now rejected with `workspace_path must be the workspace root, not the .current state directory`. (2) **`active_feature` `"[object Object]"` sentinel guard** — when a caller passes `active_feature` as an object, the MCP transport stringifies it to the literal `"[object Object]"` before Zod sees it, and the prior `z.string()` check persisted the corrupt sentinel verbatim; the call is now rejected with `active_feature must be a plain string id, not a serialised object`. PATCH-only: no tool-surface, schema, or migration change — exact-string equality is the only check possible at this layer since the object is already stringified before Zod runs (deeper artifacts like `"[object Array]"` are out of scope). Valid args (absolute non-`.current` root + plain string id) still pass. No constitution header bump.
+
+## [3.40.0] - 2026-06-17
+
+### Added
+- **`figma-baseline-manifest-gate` — Server-enforced baseline manifest gate (v3.40.0).** Promotes the v3.39.0 prose-only baseline-selection SOP to a server-checked PASS gate, the SIXTH and last visual sub-gate (after the v3.38.0 provenance gate). New pure parsers `parseBaselineManifestRows()` / `hasBaselineProvenance()` plus the fs composition `checkBaselineManifest()` in `tools/evidence-file.ts`, wired into `index.ts` inside the armed `if (armCheck.required)` block. When `design/<feature>.md` is armed (`## Mode` ≠ `no-design`) and carries a `## Source` manifest, PASS now requires ≥1 audited baseline row (`status: audited` + non-empty node-id pointer): zero audited rows → **`BASELINE_MANIFEST_MISSING`**. Multi-surface manifests (≥2 audited rows) additionally require a `## Baseline Selection Provenance` section with both a `filter-conditions:` line and an `exclusion-reasons:` line → else **`BASELINE_PROVENANCE_INCOMPLETE`**. Opt-in / backwards-compatible: dormant when `## Source` is absent (pre-v3.40 designs never retro-blocked, AC-N3); single-surface (exactly 1 audited row) is exempt from the provenance section (AC-3). No `schema_version` bump (the gate reads `design/<feature>.md`, not a versioned artifact). SOP enforcement notes added to `content/skill-design-auditor.md` step 2c and `content/skill-qa-visual.md` Step A.0; Constitution §3.1 gate bullet added and header advanced to v3.40.0. Deferred: `## Visual Baselines`↔`## Source` cross-reference check (`figma-baseline-crossref-gate`), `tw_extract_figma_baseline` tooling, pointer-format validation.
+
+## [3.39.0] - 2026-06-17
+
+### Added
+- **`figma-baseline-mechanical-selection` — Mechanical baseline selection + qa-visual baseline-copy rule (v3.39.0).** Two SOP additions, no server/schema/build-logic change: (1) **Design-auditor Step 2c "Mechanical baseline selection"** in `content/skill-design-auditor.md` — when a single Figma URL expands to a multi-surface board, forbids eyeball-picking baseline frames and requires a deterministic structural filter (frame-type + name-glob + semantic-anchor descendant) with grouping by spatial proximity (`absoluteBoundingBox`) and/or `componentId` (explicitly NOT by fragile Figma `id` prefix), freezing the node-id list plus filter conditions and exclusion reasons into the Source manifest; (2) **QA-visual Step A.0 "Baseline Source-of-Truth"** in `content/skill-qa-visual.md` — requires qa-visual to copy the frozen baseline node-id list from the design-auditor Source manifest verbatim and forbids re-deriving the set from the Figma URL. Method docs: `research/figma-baseline-mechanical-filtering-method.md`, `research/figma-extraction-analysis.md`. Deferred (out of scope): `tw_extract_figma_baseline` tooling, pHash state-grouping.
+
+## [3.38.0] - 2026-06-17
+
+### Added
+- **`qa-visual-baseline-provenance-gate` — QA-visual provenance guard (F0, v3.38.0).** New `VISUAL_PROVENANCE_MISSING` gate in `checkVisualProvenance()` enforces that visual baseline evidence carries provenance metadata (creation timestamp, agent role, context hash) before release. Prevents stale or unattributed baseline data. Implementation in `tools/evidence-file.ts`; SOP in `content/skill-qa-visual.md` Step A.4 (Provenance Validation); test coverage in `test/evidence-provenance.test.mjs`.
+- **`retro-sop-hardening` — Design-auditor source-credibility classification and context-dependent guards (F2, v3.38.0).** Three SOP additions: (1) **Design-auditor Step 2b source-credibility classification** — new rule in `content/skill-design-auditor.md` requiring asset sources be marked as `credible: [✓—external-vendor, ✓—in-house-tool, ⚠️—preliminary, ✗—deprecated]` with rationale; (2) **Context-dependent design-auditor multi-value guard** — design-auditor checks source-credibility classification before asset import approval; (3) **QA-visual Step A.5 fidelity-baseline scope guard** — qa-visual validates fidelity baseline target against visual-complexity (pixel-budget vs. geometry) in scope; (4) **Coordinator-lite scope-creep visual-fidelity example** — lite-mode SOP extended with concrete scope-creep scenario (visual-fidelity creep in responsive layouts). All QA evidence in companion review files.
+
+### Changed
+- `content/skill-qa-visual.md` Step A.5 now includes fidelity-baseline scope validation (pixel-budget vs. visual-complexity).
+- `content/skill-coordinator-lite.md` Step 2b extended with visual-fidelity scope-creep example.
+- `content/skill-design-auditor.md` Step 2b now includes source-credibility classification requirement.
+
+### Notes
+- F0 (baseline-provenance gate) shipped in commit c02372a; F2 (retro-sop-hardening) shipped in commit 258435a. Both carry v3.38.0 markers and ship as a single minor release.
+- Pre-existing HIGH vulns in RAG embeddings stack (@xenova/transformers → onnxruntime-web → onnx-proto) waived per Constitution §6; not introduced by this release, fixable only via breaking --force override.
+- Full qa-engineer, code-reviewer, and release-engineer reviews green; all tests passing.
+
+## [3.37.1] - 2026-06-15
+
+### Changed
+- Removed redundant initialization steps (step 1 and step 2) from agent adapter templates.
+- Enabled watermark requirements by default for Codex and Antigravity execution profiles.
+
+## [3.37.0] - 2026-06-12
+
+### Added
+- **`qa-visual-token-reduction` — Token-optimized visual QA skill gates.** Backlog items B10 and B11 shipping together: (1) **B10 — Step B0 carry-forward gate.** When re-diffing a visual fixture (round N > 1), skip re-running Step B0 (deterministic pixel-diff) if no content-significant changes detected since the previous round; carry forward the baseline. Reduces token spend for iterative visual refinement. (2) **B11 — Deterministic-diff-first gate in Step B2.** Escalate to Step B2 LLM visual assessment only if deterministic pixel-diff (Step B1) exhausts its ~7k-token budget AND returns inconclusive. Closes token leakage from premature LLM escalation. Whole-frame-% PASS ban preserved. New skill prose in `content/skill-qa-visual.md` with clear AC-B10.1…3 and AC-B11.1…3 assertions; updated `test/qa-visual-skill-split.test.mjs` byte cap (9000→15000) for test doc growth.
+
+### Changed
+- `test/qa-visual-skill-split.test.mjs` byte-cap assertion updated to 15000 (from 9000) to accommodate new carry-forward and deterministic-diff-first gate prose in the skill definition.
+
+### Notes
+- Both B10 and B11 complete with full qa-engineer, design-auditor, and sr-engineer reviews. Full test suite passing; all release gates green.
+
+## [3.36.0] - 2026-06-12
+
+### Added
+- **`design-asset-source-rule` — Governance mandate for exported (not hand-drawn) design assets.** New governance rule requiring that all raster/vector assets sourced from design files be EXPORTED from Figma (via `download_figma_images`) and imported, never reconstructed as approximate hand-drawn SVG (fidelity defect). CSS/geometric primitives exempt. Three content edits: (1) `content/skill-design-auditor.md` — asset export workflow + manifest table in `design/<feature>.md`; (2) `content/skill-sr-engineer.md` — asset import mandate and fidelity-defect classification for hand-drawn approximation; (3) `content/constitution.md` §1 — one design-only-fenced governance line (constitution header already v3.28.0, independent of package version). Feature PASS with design-auditor, sr-engineer, and qa-engineer reviews completing v3.36.0.
+
+### Changed
+- `test/context-budget.test.mjs` re-baselined 4 context-budget caps to account for design-asset-source-rule governance additions: lean always-on 2600→2700; skill-sr-engineer stripped 2048→2210; design-arm constitution 4239→4304; teamwork bundle 7703→7768. Rationale: design-asset rule adds ~70 tok to constitution and skill-sr prose; all margins remain comfortable for tooling headroom and future governance growth.
+
+### Notes
+- Constitution header remains v3.28.0 (set independently during constitution-conditional-load v3.33.0 / Phase 2 v3.34.0; unrelated to package version bumps).
+- All context-budget, schema-versioning, and release-staging guards green; full test suite 634/634 passing.
+- Untracked `research/orientation-process-retrospective.md` from v3.35.0 omission included in this release.
+
+## [3.35.0] - 2026-06-12
+
+### Added
+- **`orientation-reach-matrix` — Baseline Reachability Matrix architect deliverable.** Architect role now produces a mandatory Baseline Reachability Matrix documenting which roles/steps/PRD zones are reachable under each dispatch mode (design-only, lite, standard). New `content/skill-architect.md` §5 guidance; reach-hook co-location rule (§4) ensuring reachability spec is committed alongside arc spec; pre-build `test/phase-0-5-sop.test.mjs` self-check validates matrix against handoff scopes. Closes backlog B7.
+- **`backlog-b6` — Derive tsconfig source dirs dynamically.** New `lib/tsconfig-source-dirs.ts` helper extracts include paths from `tsconfig.json` at build time, replacing the hand-maintained `EXCLUDED_DIRS` constant in `test/release-staging.test.mjs` (AC-B5.5). Reduces hardcoding and future-proofs staging verification as the project grows. Test suite verifies all staged directories are present in cached diff. Closes backlog B6.
+- **Backlog B9 documentation.** Deferred B9 scope-audit backlog entry documented in `docs/backlog.md` for future visibility.
+
+### Changed
+- `test/release-staging.test.mjs` now derives source directories from `tsconfig.json` `include` instead of a static list, improving maintainability.
+- `content/skill-architect.md` extended with mandatory reachability matrix section and reach-hook rules.
+
+### Notes
+- Both orientation-reach-matrix and backlog-b6 features shipped in this release (v3.35.0 bundles two completed PASS features).
+- Full test suite: 634/634 passing; all context-budget, schema-versioning, and release-staging guards green.
+
+## [3.34.0] - 2026-06-11
+
+### Added
+- **`constitution-conditional-load` — Phase 2 extension (§4 visual prose + §1 governance exceptions).** Extends the design-only fence axis from v3.33.0 to two additional spans: (1) §4 visual governance prose (the `visual_round` description, arming-signal, `VISUAL_*` error-code sentences, and design-auditor paragraph following a reflow-only reordering that preserves byte-identical rule sentences), and (2) §1 L16/L17/L19 governance exceptions (Visual-Widgets-exception, Design-baseline-scope, Self-converge-relaxation — two `<!-- design-only -->` fences with L16's existing rationale fence nested inside the outer design-fence). Non-design constitution now ~2409 ~tok (down from 4200 pre-v3.33.0 baseline; ~1790 tok lighter per non-design dispatch). Design-mode features load the full, unchanged constitution. No build.ts change (reuses v3.33.0 `stripDesignOnly()` mechanism); rule semantics unchanged (only §4 sentence reorder + marker insertion). AC-P2-1…8 assertions in `test/context-budget.test.mjs` verify Phase-2 strips and design loads; full test suite 629/629 passing.
+
+## [3.33.0] - 2026-06-11
+
+### Added
+- **`constitution-conditional-load` — Feature-conditional design-only constitution load axis.** New `stripDesignOnly()` in `prompts/build.ts` removes `<!-- design-only -->`-fenced visual-governance spans from the constitution when a feature has no design file (absent `design/<active_feature>.md` or its `## Mode` = `no-design`). On non-design features, this strips §3.2 (Visual Verdict Authority & Separation of Duties) and the four §3.1 visual bullets (L47, L48, L52, L53), which are inert when no visual verdict can exist. The arm probe reuses `hasDesignModeRequiringVisual()` (tools/evidence-file.ts:155) — the identical signal the server PASS gates use (index.ts:747/816) — guaranteeing the strip and the server gates cannot drift from each other (HC1 identity-by-construction). On design-armed features, the full constitution loads byte-identical to source (AC2/HC2). Design-only marker comments added to `content/constitution.md` (3 fenced regions: L47–48, L52–53, L58–85); R10 (tw_sync/reconcile) left unmodified in §3.2 per anti-sweep policy. Saves −1,187 ~tok/dispatch on non-design chain hops; +39 on the design path (marker-line cost). Composition verified safe with existing `stripChainOnly` and `stripRationale` axes (all permutations tested). AC1–AC8 assertions in `test/context-budget.test.mjs` confirm non-design strips, design loads unchanged, anti-sweep boundaries preserved, and measured token impact.
+
+## [3.32.0] - 2026-06-11
+
+### Added
+- **F-C1: `constitution-restructure` — Non-normative rationale companion document.** New `content/constitution-rationale.md` provides extended "why" commentary for §1 (Constitution preamble), §3.1/§3.2 (Pre-Flight Protocol), §5 (Evidence Taxonomy), and §7 (Watermark § 1 enforcement). Constitution.md itself byte-unchanged; rationale document is authoritative for design rationale only. CLAUDE.md layout updated to include rationale file. Backwards compatible.
+- **F-C2: `governance-text-load` — Rationale-stripping on chain-role dispatch.** `prompts/build.ts` now removes `<!-- rationale -->`-fenced prose from skill bodies when building role prompts (−72 tok/typical dispatch). Rationale fences added to `constitution.md` §1 and §7 (documentation only, no rule change). `scripts/measure-context-cost.mjs` mirror updated. AC7/AC8/AC9 assertions added to `test/context-budget.test.mjs` covering losslessness and token-cap enforcement. AC8 token floor raised 4153→4161 to account for new assertions; no rule bytes changed.
+- **F-C3: `decodename-cleanup` — Genericized private-codename provenance refs.** 18 private-codename mentions across `constitution.md`, `skill-pm.md`, `skill-sr-engineer.md`, `skill-qa-visual.md`, and `skill-design-auditor.md` genericized to reference patterns (e.g., "internal codename X"). Rules byte-unchanged; evidence taxonomy (§5) unaffected. Reduces coupling to legacy project names.
+
+### Fixed
+- **Ledger cleanup (QA maintenance).** 4 stale task rows (T-CR-01 descoped; T-CR-02/03/04 superseded by -REV variants) closed via `tw_complete_task`. T-CR-02-REV and T-CR-04-REV records confirm constitution-restructure feature (v3.32.0, constitution-rationale.md shipped). Test-label cosmetic fix: `test/context-budget.test.mjs` L80 name updated from '(<= 2400 ~tok)' → '(<= 2600 ~tok)' to match L96 assertion floor.
+
+## [3.31.0] - 2026-06-10
+
+### Added
+- **F-A: `visual-selfconverge` — Scoped Render Self-Check with in-context region-diff + VSA structural-assertion loop.** SR-engineer role extended to run per-widget→whole-surface visual validation before QA handoff, reducing visual-rework reject cycles. Coordinator subagent-token observability and PM geometric-density split gate (2a-bis) included; architect Visual Harness per-region numbers. Prompt-doc-only, no server-code changes. Constitution §1 bounded self-converge relaxation honored.
+- **F-B: `governance-text-load` — Rationale-stripping to reduce prompt context burden.** New `stripRationale()` in `prompts/build.ts` removes `<!-- rationale -->`-fenced prose from skill bodies on every dispatch (−261 tok/pm, −154 tok/sr-engineer). Rationale fences added to `skill-pm.md` and `skill-sr-engineer.md` without altering rules or SOP steps. 6 new losslessness + token-cap tests added. Constitution unchanged; AC-3 guard satisfied.
+
+## [3.30.0] - 2026-06-09
+
+### Added
+- **`SCOPE_DECISION_REQUIRED` server-side transition gate.** The MCP server now
+  enforces a new `SCOPE_DECISION_REQUIRED` status in the allowed-transitions state
+  machine. When a coordinator or sr-engineer attempts to transition out of a scoped
+  decision checkpoint without an explicit acceptance record, the server rejects the
+  transition and surfaces a structured error, preventing silent scope drift.
+- Handoff schema bumped to v4: new `scope_decision` field carries the gate payload
+  (decision text, timestamp, accepting agent).
+- +23 tests covering the new gate, schema migration v3→v4, and rejection paths.
+
+### Notes
+- This gate enforces scope decisions at the MCP-tool layer. It does NOT stop a
+  coordinator from bypassing the gate via direct in-context edits to `handoff.md`
+  or via constitution-only paths — those remain out-of-scope for server-side enforcement.
+
+## [3.29.1] - 2026-06-09
+
+### Fixed
+- `agc init` now reports a pre-existing `CLAUDE.md` that received the adapter block as
+  **Updated**, not **Created**. The `writeClaudeBlock` `"appended"` result (block added to an
+  existing file) was wrongly mapped to the `created` list; an appended block means the file
+  pre-existed, so it now joins `updated`. Behavior was already correct (prose preserved, block
+  appended once) — only the printed label was misleading.
+- `test/agc-adapters.test.mjs`: +2 regression tests covering the missing case (existing
+  CLAUDE.md without the block → Updated label) and the truly-fresh-dir → Created complement
+  (over-correction guard).
+
+## [3.29.0] - 2026-06-09
+
+### Added
+- **Cross-agent adapter scaffolding (`agc init` + `agc check`).** `agc init` now also
+  writes three per-project entry adapters — `AGENTS.md` (Codex), `.antigravityrules`
+  (Antigravity), and a marker-delimited block in `CLAUDE.md` (Claude Code) — from
+  `templates/agent-adapters/`. Each adapter is a **thin loader** (points at the
+  constitution served by the MCP server + the agent's execution profile: subagent
+  dispatch availability, watermark applicability, layering note) — it does **not**
+  duplicate constitution rules, preserving a single source of truth.
+- Adapters carry an `agc-version:` stamp (HTML comment in `CLAUDE.md`, `#` comment in the
+  others). New **`agc check`** subcommand compares each deployed stamp against the installed
+  agc package version (resolved via `import.meta.url`, cwd-poison-immune) and exits 1 on any
+  stale adapter — making drift detectable, not silent.
+- `agc init` adapter writes are idempotent: skip-existing for `AGENTS.md` / `.antigravityrules`;
+  marker-block upsert for `CLAUDE.md` (preserves surrounding user prose, refreshes the stamp).
+- `test/agc-adapters.test.mjs` (12 tests) covering init/check behavior, idempotency, the
+  zero-duplicated-clauses invariant, exit codes, and version-resolution immunity.
+
+### Notes
+- Research: `research/cross-agent-governance-single-source-strategy-2026-06-08.md` (the
+  architecture + the three-party Codex/Gemini/Claude convergence) underpins this feature.
+- Deferred follow-ups: `agc update`, live-reference (Mode A) delivery, Cursor adapter, agent
+  auto-detection, constitution pruning + §1 watermark-mechanic relocation.
+
+## [3.28.0] - 2026-06-08
+
+MINOR — adds the `release-engineer` role to the routing state machine and syncs the constitution
+(now self-versioned v3.27.0) with shipped server behavior. Closes the doc-vs-code drift (A1–A4) and
+internal-consistency (B1–B3) items from the two-AI review.
+
+### Fixed
+
+- **`release-engineer` was absent from `ALLOWED_TRANSITIONS` (matrix gap A5).** A `release-engineer:PASS`
+  write hit an empty allowed set, wedging the chain (no valid escape transition). Added
+  `release-engineer` to the `AgentName` union and `isAgent()` guard, plus an `ALLOWED` row
+  `release-engineer:PASS → (pm, In_Progress), (researcher, In_Progress)` mirroring `qa-engineer:PASS`
+  (`tools/transitions.ts`). Mirrored into `specs/qa-flow-enforcement-architecture.md`.
+
+### Changed (governance docs)
+
+- **`content/constitution.md` synced to shipped behavior and self-versioned v3.27.0** (independent of
+  `package.json`; `check-version.mjs` does not read the header). §3 pre-flight list and "Task list edits"
+  rule now name `tw_sync` (A1); §3.1 + §4 document `VISUAL_REPORT_INCOMPLETE` / `VISUAL_ASSERTIONS_REQUIRED`
+  with the six required report sections verbatim (A2); §3.2 authorship wording softened to "accepted and
+  owned by the qa chain at PASS time (server validates report schema, not file authorship)" (A4).
+- **§1 internal-consistency carve-outs.** Terse ≤15-word cap no longer applies when surfacing a blocker,
+  flagging an assumption gap (§7), or stating acceptance criteria (B1). Added a design-baseline rule:
+  for design-backed work the canonical design is the scope baseline; omitting a design-present element is
+  a fidelity defect, not MVP compliance (B2).
+- **`## Document Priority` intra-constitution tie-breaker (B3).** Safety/correctness rules (§2/§3/§6/§7)
+  override efficiency/style rules (§1); a §5 anti-loop trip hands back Blocked/FAIL — never an error-laden
+  PASS.
+- **Skill forward-references.** `content/skill-sr-engineer.md` and `content/skill-design-auditor.md` each
+  point to the §1 B2 design-baseline rule (forward-ref only, no restatement).
+
+## [3.27.1] - 2026-06-08
+
+PATCH — documentation/research only; no code or behavior change. Captures the prior visual rollout analysis
+and the cross-AI review trail that drove v3.26.0–v3.27.0.
+
+### Added (docs)
+
+- `docs/postmortem-visual-fidelity-gate.md` — postmortem of the visual-fidelity gate failure.
+- `research/oobe-visual-fidelity-governance-recommendations-2026-06-05.md` — Codex/GPT-5
+  governance recommendations.
+- `research/oobe-visual-fidelity-improvement-plan.md` — Antigravity/Gemini 3.1 Pro improvement plan.
+- `research/design-fidelity-workflow.md`, `research/multi-ai-agent-pipeline-report.md` — supporting
+  analysis.
+
+## [3.27.0] - 2026-06-05
+
+PATCH-plus follow-up hardening the v3.26.0 visual-verdict gate after an external code review
+(Codex/GPT-5) found the headline guarantee ("visual PASS can't be softened by prose") was not yet
+fully true. Closes five gaps. One behavior change (missing structural assertions becomes a hard
+error) makes this a MINOR.
+
+### Fixed / Hardened
+
+- **Verdict parser was too loose (Codex #1).** `validateVisualReport` matched `\bPASS\b` anywhere, so
+  "NOT PASS" / "PASS blocked" / "not ready to PASS" could set `verdictPass=true`. Now the verdict
+  value must normalize to exactly `PASS` (first alphabetic token) and is rejected on any negation token
+  (not/fail/blocked/changes requested/incomplete/pending).
+- **Strict validation no longer silently opt-out (Codex #3).** Report-schema validation now runs
+  whenever the visual gate is armed (`mode != no-design`). A design that omits `## Visual Structural
+  Assertions` is a **hard error `VISUAL_ASSERTIONS_REQUIRED`** (design-auditor must add it), not a
+  backwards-compatible bypass — mirrors how a missing `## Visual Baselines` blocks since v3.16.0.
+  **Behavior change:** pre-v3.26 design-backed workspaces (mode≠no-design, no assertions section) now
+  block at PASS until the section is added.
+- **Region Diff is now interpreted (Codex #4).** Previously a required-but-unparsed section. qa-visual
+  emits a per-surface result table `| surface | result |` (`pass`/`accepted`/`fail`); any non-pass/
+  accepted row blocks PASS via `failedRegionDiffs`.
+- **Constitution claim corrected to match the code (Codex #2).** §3.2 no longer claims the server
+  rejects non-qa-authored allowed-diffs (infeasible — the report is plain markdown with no agent_id).
+  Authorship is enforced *by construction* (PASS is qa-exclusive; the report is consulted only on a qa
+  PASS). The server now requires `## Allowed Differences` as a schema section but does not content-sniff
+  authorship.
+- **Docs refreshed (Codex #5).** README → v3.27.0 / 539 tests; architecture doc → 11 tools incl.
+  `tw_sync`.
+
+### Changed
+
+- `tools/evidence-file.ts` — `REQUIRED_VISUAL_SECTIONS` adds `Allowed Differences`;
+  `VisualReportValidation` adds `failedRegionDiffs`; new `verdictIsPass` + `parseRegionDiffFailures`.
+- `index.ts` PASS gate — mandatory-when-armed flow + `VISUAL_ASSERTIONS_REQUIRED`; region-diff failures
+  surfaced in `VISUAL_REPORT_INCOMPLETE`.
+- `tools/transitions.ts` — `VISUAL_ASSERTIONS_REQUIRED` added to the rejection union.
+- `content/skill-qa-visual.md` — Region Diff per-surface result-row format.
+
+### Tests
+
+- `test/visual-report-schema-validation.test.mjs` — +5 cases (verdict false-positive rejection,
+  body-form verdict, region-diff fail/accepted, mandatory Allowed Differences). Suite 539/539.
+
+## [3.26.0] - 2026-06-05
+
+MINOR release delivering **visual-verdict integrity** — the response to the prior visual rollout
+retrospective (`research/oobe-visual-fidelity-retrospective-2026-06-05.md`), where a run burned
+heavy tokens and shipped a UI far from Figma under a *nominal* PASS. v3.25.0 made visual evidence
+*exist*; v3.26.0 makes the visual verdict *hard to corrupt*: authority separation, canonical-state
+parity, structural assertions, server-validated report schema, and a ledger-reconcile op. All
+changes are backwards-compatible (new gates are opt-in via the design contract; chain-only additions
+stay off the always-on bundle).
+
+### Added
+
+- **`tw_sync` tool** (`tools/sync.ts`) — reconciles `tasks.md` checkboxes to the authoritative
+  `handoff.completed_tasks` (handoff → tasks direction only). Heals the drift that background/parallel
+  subagents + inline-coordinator execution produce. SAFETY: never writes `handoff`, never promotes a
+  `tasks.md`-only `[x]` into completed_tasks (still needs a qa-engineer PASS); vibe-drift is reported,
+  not reconciled. No `agent_id` gate (can only mirror already-qa-blessed completions). [R10]
+- **Server report-schema validation** (`tools/evidence-file.ts`) — `validateVisualReport` /
+  `validateVisualReports` parse `qa_reports/visual_<id>.md` and reject PASS on a missing required
+  section (Widget Shape / Canonical State / Structural Assertions / Region Diff / Verdict), any
+  unchecked canonical-state row, any structural assertion whose result ≠ `pass`, or a non-PASS
+  verdict. New error code `VISUAL_REPORT_INCOMPLETE`. Gated opt-in by
+  `designDeclaresStructuralAssertions()` so pre-v3.26 workspaces are unaffected. [R1 Tier 2]
+- **Constitution §3.2 — Visual Verdict Authority & Separation of Duties** (chain-only): the visual
+  verdict is qa-visual-owned; coordinator/non-qa roles pass context only and may not define / override
+  / relax / pre-accept any visual difference (a coordinator accept-policy is void). Builder ≠ judge:
+  an inline-run role under subagent limits cannot self-issue a visual PASS → `Blocked`. Whole-frame
+  pixel-% banned as a PASS metric. Plus the R10 sequential-context + reconcile rule. [R1/R9/R10]
+
+### Changed
+
+- **skill-qa-visual** — added Step A.5 Canonical-State Verification (state mismatch = capture defect,
+  not accepted drift); renamed Step B → Region Diff (whole-frame % banned, compare declared region);
+  added Step C Structural Assertions (focus bar / group box / primary accent / selected-card desc /
+  declared-token-rendered); qa-owned `## Allowed Differences`; per-widget kitchen-sink isolation;
+  declared the server-validated report schema. [R2/R3/R4]
+- **skill-design-auditor** — `## Layout / Canvas` now records auto-layout metadata (layoutMode/align/
+  itemSpacing/padding/sizing/fills + group containers), not prose; Visual Widgets must inventory
+  per-state deltas (default/focused/selected/disabled); new `## Visual Structural Assertions` section;
+  Visual Baselines schema extended (source node, viewport, route, canonical state, compare region);
+  content-verified node ids (name-match insufficient → fixes the wrong-baseline class). [R6/R8]
+- **skill-sr-engineer** — added a scoped render self-check for custom widgets / focus-selected / group
+  rows / drawers / modals / primary buttons (render in isolation, screenshot, compare to the Figma
+  node in-loop before handoff); flag-don't-assume for unspecified structure; declared state tokens
+  must render (build-gate failure otherwise). [R5/R7]
+- **skill-pm** — copies `## Visual Structural Assertions` verbatim into the spec; new visual
+  state-count split gate (>~8–10 canonical states → surface-state tasks, shared shell/widgets first).
+  [R4]
+- **skill-coordinator** — Visual Verdict Boundary (no accept-policy injection in qa-visual dispatch;
+  unavailable judge → `Blocked`, never self-PASS) + Drift Reconcile guidance (`tw_detect_drift` →
+  `tw_sync` after out-of-band/inline execution). [R1/R9/R10]
+- `tools/transitions.ts` — `VISUAL_REPORT_INCOMPLETE` added to the rejection error union.
+
+### Tests
+
+- `test/visual-report-schema-validation.test.mjs` (10 cases — all fail branches of the schema
+  validator + the opt-in gating signal).
+- `test/tw-sync-reconcile.test.mjs` (5 cases — safe sync / refused vibe-drift / in-sync / no-handoff /
+  idempotent).
+- Updated stale assertions in `test/pixel-perfect-visual-compare.test.mjs` (extended Baselines schema;
+  Region Diff rename) and raised the lazy-loaded `skill-qa-visual` byte cap (4700 → 9000) in
+  `test/qa-visual-skill-split.test.mjs`.
+
+## [3.25.0] - 2026-06-05
+
+MINOR release delivering visual-fidelity gate hardening: server-enforced baselines validation for design-backed features, mandatory canvas/layout auditing, and geometry assertions at sr-engineer screen-1 gate.
+
+### Added (Visual Fidelity Gate Hardening)
+
+- **Server enforcement** — new helper `hasDesignModeRequiringVisual()` in `tools/evidence-file.ts` reads `## Mode` from design files; when mode ≠ `no-design`, the PASS gate now requires `## Visual Baselines` section and emits a new error code `VISUAL_BASELINES_REQUIRED` if absent. Non-UI features with mode `no-design` or no design file continue to pass silently.
+- **Helper function** — `parseDesignMode()` in `tools/evidence-file.ts` extracts and validates `## Mode` from design files; used to arm the visual gate.
+- **Auditor template** — `content/skill-design-auditor.md` now mandates `## Layout / Canvas` section (captures root canvas type, dimensions, responsive behavior); clarified that `## Visual Baselines` absence only skips silently when `mode = no-design`, all other cases block at server PASS.
+- **PM spec schema** — `content/skill-pm.md` Dependencies / Prerequisites bullet now instructs copying `## Layout / Canvas` decision (fixed vs. responsive, dimensions) verbatim from design doc to spec.
+- **sr-engineer geometry assertion** — `content/skill-sr-engineer.md` step 3a adds Screen-1 Geometry Assertion (reads CSS/style literals, no headless renderer); verifies root canvas dimensions match design spec before multi-screen build.
+
+### Changed (Specs & Constitution Alignment)
+
+- **`content/constitution.md` §3.1 & §4** — updated visual-evidence gate description and `visual_round` semantics to reflect new arming logic (design-mode detection instead of `## Visual Baselines` H2 presence).
+- **`specs/qa-flow-enforcement-architecture.md`** — reconciled with new visual-fidelity behavior (v3.16.0 gate amendment); clarifies that design-backed features without baselines now block PASS instead of silently skipping.
+
+### Migration & Behavior Change
+
+Design-backed features (with `design/<feature>.md` where mode ≠ `no-design`) that previously PASSED without a `## Visual Baselines` section will now encounter the `VISUAL_BASELINES_REQUIRED` error at the server PASS gate. This is intentional: the feature closes a gap where design sources could bypass the visual-quality pipeline. Non-UI features and those with no design file are unaffected.
+
+## [3.24.0] - 2026-06-02
+
+MINOR release delivering a backlog batch (B1–B5): spec wording relaxation, context budget increase, dynamic version pinning test, release staging dir completeness, and code-review transport fixes.
+
+### Added (B2 — context budget increase)
+
+- Increased context budget cap from 2100 to 2300 tokens across all role prompts to accommodate larger PRD and multi-source workspace contexts without truncation warnings.
+
+### Changed (B1 — Constitution §4.1 watermark spec wording)
+
+- Relaxed watermark specification language to accommodate model-tier variations (`@sr-engineer (haiku)`, `@release-engineer (sonnet)`, etc.) while preserving SOP compliance.
+
+### Fixed (B3 — dynamic version-pin test)
+
+- Updated `test/release-staging.test.mjs` and `test/version-pin-dynamic.test.mjs` to read `package.json` version dynamically at test runtime instead of hardcoding semver strings, ensuring future PATCH/MINOR/MAJOR releases do not require updating test assertions.
+
+### Completeness (B5 — release staging directory inventory)
+
+- Updated `content/skill-release-engineer.md` SOP step 7 staging list to include `transport/` directory alongside existing `lib/`, `content/`, `templates/`, `specs/`, `test/`, `qa_reports/`, `review_reports/` — all code-review fixes to HTTP/stdio transport layer are now included in release commits.
+
+## [3.23.1] - 2026-06-02
+
+PATCH release combining two fixes: drift false-positive exclusion (B3) and
+Node version pinning for dev/CI environment consistency (B4).
+
+### Added (B4 — Node version pin)
+
+- `.nvmrc` pinned to `22` — `nvm use` / `fnm use` will switch to Node 22
+  automatically in dev, matching the CI matrix (`[20, 22]`).
+- `engines.node` set to `">=20"` in `package.json`. Lower bound enforced to
+  match the oldest CI target; no upper bound set (Option Y) because
+  `better-sqlite3` is rebuilt from source on `npx` install, so consumers on
+  Node 23+ do not hit ABI issues — adding `<23` would produce spurious engine
+  warnings for them with no safety benefit. Dev-environment consistency is
+  handled by `.nvmrc` + CI matrix, not by the engines upper bound.
+
+### Fixed (B3 — drift archived-task exclusion)
+
+PATCH release fixing a long-standing false-positive in `tw_detect_drift`.
+Previously the drift comparison fed every `[x]` task — including those
+already migrated to the `## Completed` archive section by `tw_complete_task`
+— into the "completed in task list but not in handoff" check, producing one
+spurious vibe-coding-drift line per archived task (161 in this repo) on every
+call.
+
+`tools/drift.ts` now excludes archived tasks at read time:
+
+- Adds an `isArchivedSection()` helper matching `## Completed`
+  case-insensitively with trimmed whitespace (consistent with
+  `tasks-file.ts` section parsing).
+- Detects the Active/Completed convention by checking whether any task carries
+  an `Active` or `Completed` section; filters `## Completed` tasks out of the
+  drift comparison only when the convention is present.
+- Backward-compatible: legacy `tasks.md` files with neither `## Active` nor
+  `## Completed` headings retain full-file drift behaviour unchanged. Tasks
+  under unknown sections (e.g. `## Sprint-3`) are treated as active so genuine
+  drift is never silently dropped.
+- Returned `tasksCompleted` / `tasksIncomplete` now reflect active-scope tasks
+  only.
+
+Read-time filter only — no on-disk format change, no migration, no
+`schema_version` bump.
+
+## [3.23.0] - 2026-06-02
+
+MINOR release introducing a two-format watermark regime. Previously every reply
+ended with `— @<role> (<tier>)`, which led users to read the visible `(<tier>)`
+as "the whole conversation ran on this model" — true only for Task-dispatched
+subagents whose model is pinned by agent frontmatter. Now the watermark format
+depends on execution context.
+
+### Changed
+
+- **`content/constitution.md` §1 Watermark** — replaced the single-format rule
+  with a two-format rule. **Subagent context** (running as a fresh
+  Task-dispatched subagent, model pinned by `~/.claude/agents/<role>.md`
+  frontmatter): end reply with `— @<role> (<tier>)`. **Non-subagent context**
+  (coordinator main loop, coordinator-lite, or a same-context `tw_switch_role`
+  switch): end reply with `— @<role>` (no model token). Added the load-bearing
+  self-detection rule for distinguishing the two contexts.
+- **`content/skill-coordinator.md`** — §Subagent Reply Watermark Validation now
+  states up front that validation applies only to Task-dispatched subagent
+  replies (which still emit the with-tier form), and that the coordinator's own
+  main-loop replies end with `— @coordinator` (no tier) and are excluded from
+  `validateWatermark` processing.
+- **`content/skill-coordinator-lite.md`** — clarified that coordinator-lite's
+  own replies end with `— @lite` (no tier); the subagent-relay cross-reference
+  is unchanged.
+
+### Unchanged (intentional)
+
+- **`lib/watermark-check.ts`** and **`test/watermark-check.test.mjs`** — the
+  `validateWatermark` signature, regex, and logic are untouched. It validates
+  subagent relays, which still emit `— @<role> (<tier>)`.
+- **`templates/claude-code-agents/*.md`** and **`test/subagent-templates.test.mjs`**
+  — subagent templates still emit the with-tier form; the `CRITICAL:` reminders
+  stay verbatim and the suite passes without modification.
+- **`schema/versions.ts`** — content/SOP-only change; no persisted-state schema
+  is touched.
+
+## [3.22.1] - 2026-06-02
+
+PATCH release fixing the release-engineer SOP that produced two consecutive
+incomplete release commits (v3.21.2 `a14b15f` and v3.22.0 `f5a0b4d`). Both
+staged only version-bump metadata and silently omitted feature source files,
+requiring backfill commit `6aaa042` to repair v3.22.0. Root cause: the SOP's
+ambiguous `git add <touched files including dist/>` instruction read at
+haiku-tier as "files I edited this turn" (just the metadata), and the
+"release-artifact whitelist" failure-mode wording implicitly taught that
+staging source dirs was abnormal — the exact opposite of correct behavior.
+
+### Changed
+
+- **`content/skill-release-engineer.md`** — SOP step 7 rewritten. The `git add`
+  instruction now enumerates explicit directories (`lib/ content/ templates/
+  specs/ test/ qa_reports/ review_reports/ tsconfig.json`) plus metadata
+  files (`package.json index.ts CHANGELOG.md README.md dist/`) instead of the
+  vague "touched files" phrase. Added pre-commit verification step
+  (`git diff --cached --stat`) that cross-references against
+  `git status --short` to catch metadata-only staging when source dirs have
+  pending edits. Added post-commit sanity check
+  (`git diff HEAD~1 --name-only`) requiring `specs/<active_feature>.md` to
+  appear in the commit — if absent, STOP with a specific recommend-backfill
+  error string.
+- **`content/skill-release-engineer.md`** — Failure modes section reworded.
+  The old "release-artifact whitelist" framing implied feature source dirs
+  were OUTSIDE the acceptable staging set. The new wording inverts the
+  framing: feature source dirs (`lib/`, `content/`, `templates/`, `specs/`,
+  `test/`, `qa_reports/`, `review_reports/`) are EXPECTED in every release
+  commit and never trigger STOP. Only UNRELATED uncommitted paths (editor
+  swap files, `.DS_Store`, `.env*`, secrets, scratch dirs, unrelated source
+  edits) trigger the stop condition.
+- **`templates/claude-code-agents/release-engineer.md`** — Added a 2-sentence
+  reinforcement hint to the subagent shim body, naming the explicit staging
+  directories and the pre-commit verify step. Reinforces dual-anchoring for
+  haiku-tier without altering the watermark line or the `tw_get_state` /
+  `tw_switch_role` invocation lines.
+
+### Notes
+
+- Pure prompt/SOP fix — no code, schema, transitions, or MCP tool changes.
+- `ALLOWED_TRANSITIONS` matrix unchanged.
+- Backwards compatible — existing release commits and tags untouched.
+- The v3.22.0 backfill commit `6aaa042` already repaired the prior incomplete
+  release; this v3.22.1 ships only the SOP fix that prevents recurrence.
+
+## [3.22.0] - 2026-06-02
+
+MINOR release adding parent-level watermark post-validation to the
+`/teamwork` and `/teamwork-lite` coordinator SOPs. Template-side hardening
+in v3.21.2 raised haiku compliance to 3/3 in controlled dispatch, but a
+subsequent live `@lite hi` invocation in a lite-mode main session still
+dropped the suffix — no instruction inside the subagent template can
+deterministically force a haiku model to append a trailing string on every
+reply. v3.22.0 closes the gap at the parent layer, which has guaranteed
+execution regardless of subagent attention drift.
+
+### Added
+
+- **`lib/watermark-check.ts`** — new pure util exporting
+  `validateWatermark(reply, name, tier)` and `buildWatermark(name, tier)`.
+  Detects the canonical `— @<name> (<tier>)` suffix on the last non-empty
+  line of a subagent reply using regex `/^—\s@[\w-]+\s\([\w-]+\)$/i` (U+2014
+  EM DASH required, case-insensitive). Returns `{ present, corrected }`;
+  callers relay the `corrected` value. Verifies the captured name and tier
+  match the expected dispatched subagent. Pure (no I/O), idempotent. Now
+  included in `tsconfig.json` `include` glob and compiled into
+  `dist/lib/watermark-check.js`.
+- **`## Subagent Reply Watermark Validation`** section in both
+  `content/skill-coordinator.md` and `content/skill-coordinator-lite.md`
+  (verbatim-equivalent). Documents the detection regex, append-on-miss
+  correction strategy, and the out-of-scope guard that limits validation to
+  replies relayed from a `Task` / Agent tool call (never the coordinator's
+  own non-Task tool turns).
+
+### Changed
+
+- **`package.json` + `index.ts`** — version bumped from `3.21.2` to `3.22.0`
+  (MINOR — new observable behavior in both coordinator SOP files, no
+  breaking changes).
+
+### Notes
+
+- No change to `tools/transitions.ts`, `content/constitution.md`, or any
+  `templates/claude-code-agents/*.md` file. No new `tw_*` MCP tool;
+  `validateWatermark` is internal SOP logic.
+- ALLOWED_TRANSITIONS matrix unchanged. Template format unchanged. Existing
+  `~/.claude/agents/` copies keep working unmodified.
+
+## [3.21.2] - 2026-06-01
+
+PATCH release tightening haiku-tier watermark compliance. Empirical testing
+on v3.21.1 showed haiku subagents (`@lite`, `@doc-writer`,
+`@release-engineer`) still omitted the `— @<name> (<tier>)` watermark on
+short replies because the reminder lived after the SOP paragraph at the
+bottom of the template, where haiku attention is weakest. This release
+repositions the reminder to the FIRST body line of every template, adds a
+`CRITICAL:` prefix to raise salience, and appends a one-shot example reply
+line to the three haiku templates for output-shape grounding.
+
+### Changed
+
+- **All 12 `templates/claude-code-agents/*.md`** — the watermark reminder
+  is now the first non-blank line after frontmatter and reads
+  `CRITICAL: End every reply with \`— @<name> (<tier>)\` per Constitution §1 (watermark).`
+  with `<name>` and `<tier>` filled from the file's own frontmatter
+  `name:` and `model:` values.
+- **`lite.md`, `doc-writer.md`, `release-engineer.md`** (haiku tier) —
+  body now ends with `Example reply suffix: … — @<name> (haiku)` as a
+  one-shot grounding for the watermark suffix shape.
+
+### Notes
+
+- Template-only change. No server-side tool, schema, or transition-matrix
+  modification. Existing `~/.claude/agents/` copies keep working; users
+  re-copy from this release to pick up the haiku-compliance fix.
+
+## [3.21.1] - 2026-06-01
+
+PATCH release adding an explicit watermark reminder line to all 12
+`templates/claude-code-agents/*.md` subagent shims. Closes the gap where
+short replies from dispatched subagents omitted the `— @<role> (<tier>)`
+watermark mandated by Constitution §1.
+
+### Changed
+
+- **All 12 `templates/claude-code-agents/*.md`** — each template body now
+  includes `End every reply with \`— @<name> (<tier>)\` per Constitution §1
+  (watermark).` with `<name>` and `<tier>` filled from the file's own
+  frontmatter `name:` and `model:` values.
+
+### Notes
+
+- Template-only change. No server-side tool, schema, or transition-matrix
+  modification. Existing `~/.claude/agents/` copies continue working;
+  users re-copy from this release to pick up the reminder.
+
+## [3.21.0] - 2026-06-01
+
+MINOR release shortening Claude Code subagent entry points + adding the
+coordinator subagent that v3.20.0 deliberately omitted. Template-layer-only
+change — all server-side identifiers (`content/skill-*.md`,
+`prompts/*.ts`, `/teamwork-lite` and `/teamwork` MCP prompt names,
+`tools/transitions.ts`) are unchanged; backwards-compatible at the wire
+contract.
+
+### Added
+
+- **`templates/claude-code-agents/teamwork.md`** — Sonnet-pinned
+  coordinator subagent. Entry via `@teamwork <task>` spawns a fresh
+  context running the full coordinator SOP at its recommended tier
+  (instead of inheriting the user's main session model). The
+  subagent's body delegates by file path (`content/skill-coordinator.md`)
+  rather than `tw_switch_role`, because the full coordinator is not in
+  the `RoleName` enum exposed by that tool (it's the dispatcher, not a
+  destination).
+
+### Changed
+
+- **`@coordinator-lite` → `@lite`** — `templates/claude-code-agents/coordinator-lite.md`
+  renamed to `lite.md`; frontmatter `name:` field updated. Model
+  (`haiku`), description, and body are unchanged. Shorter to type for
+  everyday solo-doer work.
+- README `### Claude Code subagent install (auto model-routing)`
+  sub-section now lists `@teamwork` + `@lite` as primary entry points
+  alongside the per-role subagents, plus a migration note for v3.20.0
+  users.
+- Test suite regression-guard updated: `test/subagent-templates.test.mjs`
+  now expects 12 templates (was 11); `LITE_EXEMPT` Set extended to
+  `{ lite, teamwork }` (both delegate by file path); the v3.20.0
+  "coordinator template absent" assertion is removed.
+
+### Reversed (from v3.20.0)
+
+- **v3.20.0 AC2** — "the full coordinator MUST NOT have a template
+  (recursive-spawn avoidance)" — is reversed. Claude Code's Dynamic
+  Workflows research preview (May 2026) confirms subagents support
+  nested spawn (up to 1,000 in parallel), invalidating the original
+  concern. See `research/multi-agent-auto-model-routing-directions.md`
+  §E1 and `specs/subagent-short-names.md` §AC3.
+
+### Notes
+
+- **No server-side identifier renamed** — `coordinator-lite` /
+  `coordinator` still live as their full names in
+  `content/skill-*.md`, `prompts/*.ts`, MCP prompt names, transition
+  tables. A server-side rename would be MAJOR (v4.0.0) and is
+  deliberately out of scope.
+- **v3.20.0 install survives** — users who already copied
+  `coordinator-lite.md` into `~/.claude/agents/` keep working
+  (Claude Code reads the frontmatter `name:` field). `@coordinator-lite`
+  continues to resolve until they re-copy from this release.
+- No persisted-state `schema_version` bump (template + docs only).
+  Suite tests passing; build zero-error.
+
+## [3.20.0] - 2026-06-01
+
+MINOR release shipping **Claude Code subagent dispatch** — turning v3.19.0's
+advisory `recommended_model` hint into actual per-role auto model-routing for
+Claude Code users. Other clients (Cursor, Continue, Anti-Gravity, plain MCP)
+keep the existing `tw_switch_role` text-load path with no behavior change.
+
+### Added
+
+- **`templates/claude-code-agents/*.md`** — 11 pre-pinned subagent template
+  files (pm, researcher, architect, design-auditor, sr-engineer,
+  code-reviewer, qa-engineer, qa-visual, doc-writer, release-engineer,
+  coordinator-lite). Each carries `name` / `model` / `description`
+  frontmatter; the `model:` tier mirrors the corresponding
+  `content/skill-<role>.md` `recommended_model`. Users copy into
+  `~/.claude/agents/` to enable per-role model pinning under Claude Code's
+  Task-tool dispatch (Dynamic Workflows / parallel subagents).
+- **`content/skill-coordinator.md` §Auto-Routing — Subagent Dispatch
+  (Claude Code)** sub-bullet: coordinator now prefers
+  `Task(subagent_type=<role>)` when available, falls back to
+  `tw_switch_role` otherwise. Server-enforced `ALLOWED_TRANSITIONS` is
+  unchanged — dispatch only chooses WHICH MODEL runs the role.
+- **README §Claude Code subagent install (auto model-routing)** — install
+  snippet + degradation callout + design link.
+- **`specs/subagent-dispatch.md`** — PRD (AC1–AC8).
+
+### Changed
+
+- Coordinator full skill SOP §5 reworded: gate-triggered routes now read
+  "dispatch via the Auto-Routing preference order" instead of hard-coding
+  `tw_switch_role`. Behavior preserved for non-Claude-Code hosts via the
+  fallback path.
+
+### Notes
+
+- **`tw_switch_role` tool surface is unchanged** — backwards-compatible.
+- No persisted-state `schema_version` bump (content + templates + skill
+  SOP only).
+- Coordinator full template is deliberately NOT shipped — it's the parent
+  dispatcher; spawning it as a subagent would be recursive.
+  `coordinator-lite` IS shipped for solo-dev Haiku-tier work.
+- Track 2 (`tw_dispatch_role` MCP tool for cross-IDE dispatch) and the
+  cost-telemetry `dispatch_ack` audit are deferred — see
+  `research/multi-agent-auto-model-routing-directions.md`.
+
+## [3.19.1] - 2026-06-01
+
+PATCH release — constitution v3.14.1 extends the watermark format from
+`— @<role>` to `— @<role> (<model>)` so the running model tier is visible
+alongside the role. Pairs with the per-role `recommended_model` shipped in
+v3.19.0: drift between recommended and actual tier is now visible at a
+glance in chat.
+
+### Changed
+
+- `content/constitution.md` §1 Output Directives — Watermark rule rewritten;
+  examples now show `— @coordinator (opus)`, `— @pm (sonnet)`. Constitution
+  header bumped v3.14.0 → v3.14.1.
+
+### Notes
+
+- Content-only patch. No tool surface or schema change.
+- Lean always-on bundle remains under the 2000-token budget enforced by
+  `test/context-budget.test.mjs` AC2.
+
+## [3.19.0] - 2026-06-01
+
+MINOR release adding per-role model-routing hints — an advisory tier (`opus` /
+`sonnet` / `haiku`) declared in each skill's YAML frontmatter so multi-IDE
+clients can stop running flagship-tier inference on Haiku-class work. The
+server cannot enforce client-side inference; the hint is surfaced via
+`tw_switch_role`, the prompt builder, and the SessionStart hook so client
+wrappers (Claude Code subagents, `/model` switches) can honor it.
+
+### Added
+
+- **`recommended_model` frontmatter** on all 12 `content/skill-*.md` files.
+  Tier table: researcher / architect / code-reviewer / design-auditor /
+  sr-engineer = `opus`; coordinator / pm / qa-engineer / qa-visual =
+  `sonnet`; coordinator-lite / doc-writer / release-engineer = `haiku`.
+- **`tools/skill-frontmatter.ts`** — shared YAML-frontmatter parser and
+  stripper consumed by `tools/role.ts`, `prompts/build.ts`, and
+  `bin/agent-governance-context.mjs`. Soft-degrades on missing/malformed
+  frontmatter (no throw); never leaks raw `---` blocks into context.
+- **`recommended_model` field in `tw_switch_role` response** — additive;
+  absent when the skill file has no frontmatter (backwards-compat).
+- **Recommended-model banner line** in SessionStart hook output
+  (`Recommended model: <model> (tier <tier>)`).
+- **README §Per-Role Model Routing** with the full tier table plus a
+  Claude Code `~/.claude/agents/<role>.md` example.
+- **`specs/model-routing.md` + `specs/model-routing-architecture.md`** —
+  PRD and architecture blueprint.
+
+### Changed
+
+- `tw_switch_role` `sop` field now returns the skill body with the
+  YAML frontmatter stripped (the frontmatter is parsed into the new
+  `recommended_model` field instead). Callers consuming `sop` as the
+  rendered SOP see no functional change.
+- `prompts/build.ts` appends `Recommended model for this role: <model>.`
+  between skill body and handoff state block when frontmatter declares it.
+
+### Notes
+
+- Advisory only — no server-side enforcement of client inference.
+- No persisted-state schema bump (content-only change). Suite tests
+  passing; new unit coverage added for the shared parser.
+
+## [3.18.0] - 2026-05-31
+
+MINOR release giving the Feature-Scope Gate's `.current/feature-split.md` a
+lifecycle, so a split plan can be resumed safely across `/teamwork` invocations
+without redoing completed units.
+
+### Added
+
+- **Split-plan `status` column** — the Feature-Split Plan Split Table gains a
+  `status` column (coordinator pre-fills `pending` on every row).
+- **Resume + done-marking (`content/skill-coordinator.md`)** — when an incoming
+  `/teamwork` finds an existing `.current/feature-split.md`, the Feature-Scope Gate
+  no longer re-assesses/regenerates: it **reconciles** (flips a row to `done` when its
+  `feature id` matches the handoff `active_feature` at PASS), then works the next
+  `pending` row — or a **human-named row** (`do F0` / a feature id) — by **hydrating**
+  it (scope + figma link + widgets + notes) as the feature input. A `done` row is
+  never re-run.
+
+### Changed
+
+- "How to proceed" documents `done`-on-PASS, resume-skips-`done`, and the `do F<n>`
+  by-id shortcut.
+- The Feature-Scope-Gate always-on footprint ceiling was raised ~425 → ~550 approx
+  tokens to accommodate the lifecycle logic (section ~496 tok; still guarded by test).
+
+### Notes
+
+- Prompt-layer + human-checkpoint only; no server transition-matrix change. The
+  coordinator edits `.current/feature-split.md` directly (not a `tw_*` write). Suite
+  439 tests passing.
+
+## [3.17.0] - 2026-05-31
+
+MINOR release adding two complementary front-door guardrails that keep large,
+design-heavy PRDs from overrunning the design-auditor — a feature-level split
+gate in the coordinator, and an input-volume guard in the design-auditor.
+
+### Added
+
+- **Feature-Scope Gate (`content/skill-coordinator.md`)** — a new coordinator SOP
+  step (after state-sync, before Design-source detection) that judges, **text-only**
+  (never fetching a design), whether an incoming PRD is one feature or many. Single
+  → continue automation uninterrupted; multi → STOP, write a `.current/feature-split.md`
+  **Feature-Split Plan** (coordinator pre-fills every column except `figma link` +
+  `notes / 注意事項`, which the human completes), surface a recommendation + hint, and
+  wait for the human to split + re-invoke per unit. Lite mode is unaffected.
+- **design-auditor Volume Gate + node-scoped fetch (`content/skill-design-auditor.md`)**
+  — a pre-fetch input-side gate (fetch-based modes only) that estimates a single
+  feature's surface/frame count from cheap metadata and STOPs (`Blocked → pm`,
+  fail-loud) when it exceeds ~one feature's worth, recommending a further split
+  instead of ingest-then-defer; plus a node-scoped-fetch rule so the auditor pulls
+  only the frames it audits this pass. The coordinator split-schema now asks for
+  **frame-scoped** Figma links (not whole-file) to bound the fetch at the source.
+
+### Changed
+
+- The Feature-Split Plan "How to proceed" line instructs the human to use a
+  frame-scoped Figma link per row.
+
+### Notes
+
+- Both additions are **prompt-layer + human-checkpoint** (advisory, like Design-source
+  detection); no server transition-matrix change. The coordinator gate's always-on
+  footprint is held to ~350 tok (guarded by test). Suite: 432 tests passing.
+
+## [3.16.3] - 2026-05-31
+
+PATCH release clearing the `npm audit` advisories waived in v3.16.2. Adds
+`package.json` `overrides` pinning the two vulnerable transitive dependencies to
+their first patched releases. `npm audit` goes from 5 advisories (1 critical, 3
+high, 1 moderate) to **0**.
+
+### Changed
+
+- **`package.json` `overrides`** — `protobufjs: ^7.5.8` (resolved 7.6.2) clears the
+  critical RCE (GHSA-xq3m-2v4x-88gg) + several high/moderate advisories reaching
+  the tree via the optional embedding dep `@xenova/transformers` → `onnxruntime-web`
+  → `onnx-proto`. `qs: ^6.15.2` clears the moderate DoS (GHSA-q8mj-m7cp-5q26) via
+  the MCP SDK's `express` → `qs` chain.
+
+### Added
+
+- **`test/dependency-overrides.test.mjs`** — pin-regression test asserting the
+  override floors (`protobufjs ≥ 7.5.8`, `qs ≥ 6.15.2`) stay in place so the
+  advisories cannot silently return on a future dependency edit.
+
+### Notes
+
+- The `protobufjs` override is a deliberate major bump (6 → 7) past `onnx-proto`'s
+  declared `^6.8.8` range. Verified at runtime, not just install: the RAG embedding
+  path (`@xenova/transformers`) still produces a correct 384-dim vector under the
+  forced version, and `tools/rag.ts` is unchanged. Full suite 417/417.
+
+## [3.16.2] - 2026-05-31
+
+PATCH release trimming the **always-on context budget**. The constitution's
+chain-only sections (§3.1 Server-enforced chain, §4 Routing Chain) are now fenced
+and stripped from **lite contexts only** (the SessionStart hook's default lite
+bootstrap and the `teamwork-lite` prompt), which never enter the role-to-role
+chain. Chain roles (`teamwork` full + `pm`/`architect`/`sr-engineer`/
+`code-reviewer`/`researcher`/`qa-engineer`) still receive the full, unmodified
+constitution — no normative rule is dropped from any path that enforces it.
+
+Measured effect: the default always-on bundle drops from ~2837 to ~1961 approx
+tokens per session (−31%). Single source of truth (one `constitution.md` with
+HTML-comment fences), so there is no dual-file drift risk.
+
+### Added
+
+- **`scripts/measure-context-cost.mjs`** — deterministic (chars/4) measurement of
+  the always-on bundle: per-artifact token table for `constitution.md`, every
+  `skill-*.md`, both SessionStart hook variants, and all 7 role-prompt bundles,
+  plus the pre/post-strip lite total. The baseline tool behind this change.
+- **`test/context-budget.test.mjs`** — asserts the reduction, that lite omits only
+  the chain-only sections while retaining every universal rule, that chain roles
+  keep the full constitution, and that the three `stripChainOnly` regex copies
+  stay identical.
+
+### Changed
+
+- **`content/constitution.md`** — §3.1 + §4 wrapped in a single
+  `<!-- chain-only:start -->` … `<!-- chain-only:end -->` fence (rule text
+  unchanged).
+- **`prompts/build.ts`** — new exported `stripChainOnly()`; `buildPromptForRole`
+  strips the fenced sections when the skill is `skill-coordinator-lite.md`.
+- **`bin/agent-governance-context.mjs`** — strips the fenced sections for the lite
+  SessionStart variant (duplicate stripper across the TS/.mjs module boundary,
+  kept in sync by a regex-equivalence test).
+- **`test/researcher-deep-research.test.mjs`** — updated AC-1/2/4/5 to the v3.16.1
+  shallow-default contract (they had been left asserting the superseded `deep`
+  standalone default).
+
+### Notes
+
+- Dependency audit: pre-existing HIGH/CRITICAL advisories in `protobufjs`
+  (transitive via `@xenova/transformers` → onnxruntime-web → onnx-proto, the RAG
+  embedding chain) remain. **Waived** for this release — unrelated to the change,
+  and the available fix is a breaking downgrade of `@xenova/transformers`. Tracked
+  separately for a dedicated dependency-bump pass.
+
+## [3.16.1] - 2026-05-31
+
+PATCH release flipping the **standalone** `researcher` default from `deep` back
+to `shallow`. A bare `researcher` invocation (no `researcher_depth:` in
+`pending_notes`) no longer auto-spawns the token-expensive `/deep-research`
+harness; `deep` is now opt-in only. This reverses the cost exposure introduced
+in v3.16.0 while keeping the `deep`→`/deep-research` wiring intact.
+
+### Changed
+
+- **Standalone default is `shallow`** — `content/skill-researcher.md` Hard rules
+  + SOP step 2: a standalone researcher call defaults to the cost-frugal
+  `shallow` path (direct web search / file reads, no `/deep-research` harness).
+  `deep` runs only when explicitly requested or when the question is genuinely
+  strategic.
+- **Token-cost warning before `deep`** — at `deep` depth the researcher MUST
+  first warn the user that `/deep-research` is token-expensive (≈ 100+
+  verification sub-agents, > 1M tokens typical) and confirm before launching.
+- **`shallow` corroboration floor** — `shallow` now requires ≥ 3 sources
+  spanning ≥ 2 credibility tiers (was ≥ 1 source); a single-source answer is no
+  longer acceptable.
+
+## [3.16.0] - 2026-05-30
+
+MINOR release wiring the `researcher` role to the Claude Code `/deep-research`
+skill. At `deep` depth the researcher now invokes `/deep-research` to gather a
+multi-source, cited report before distilling it into the Findings Schema, and a
+**standalone** invocation (one not routed through coordinator/PM, so no
+`researcher_depth:` is declared in `pending_notes`) now defaults to `deep` —
+making a bare `researcher` call auto-run the harness.
+
+Backwards-compatible: the routed `shallow` path is unchanged and explicitly does
+NOT invoke `/deep-research` (cost-frugal). The directive is prompt-layer
+guidance — the server still enforces only routing/state, not skill invocation —
+and degrades gracefully to manual web search when `/deep-research` is
+unavailable in the session.
+
+### Added
+
+- **`/deep-research` invocation at `deep` depth** — `content/skill-researcher.md`
+  SOP step 2 now directs the agent to invoke the `/deep-research` skill (when
+  available in the session) to gather a multi-source, cited report, then distil
+  it into the Findings Schema, with a manual-web-search fallback when the skill
+  is absent.
+- **Standalone default depth = `deep`** — the Depth Hard-rule gains a
+  `Standalone default` bullet: an invocation with no `researcher_depth:`
+  declared defaults to `deep`, so a bare `researcher` call auto-runs the
+  harness.
+- **`test/researcher-deep-research.test.mjs`** — 5 content-assertion tests
+  (AC-1..AC-5) pinning the standalone-default-deep rule, the `/deep-research`
+  invocation directive, the fallback wording, the unchanged shallow path, and
+  the end-to-end presence of all directives in the assembled prompt via
+  `buildResearcherPrompt`.
+
+### Changed
+
+- **`content/skill-researcher.md` SOP step 2** — reworded from "Research using
+  web search, file reads, code traversal" to the depth-aware
+  invoke-`/deep-research`-then-distil flow described above. `shallow` explicitly
+  skips the harness.
+
+### Notes
+
+- Prompt-layer only: no `tools/` / `prompts/` / `schema/` source changed, so
+  `dist/` is byte-identical. The constitution version is unchanged.
+
+## [3.15.0] - 2026-05-29
+
+MINOR release activating the R6 server-enforced widget verification gate
+that v3.14.0 architecture §A intentionally reserved for v3.15.0, refactoring
+`writeHandoffState` / `HandoffStorage.writeState` to a dual API (positional
+`@deprecated`, options-object new), and bringing the `qa_round` / `review_round`
+Round 4 sentinel predicates in line with v3.14.1's `visual_round` Round 6 fix.
+
+Backwards-compatible: workspaces without `design/<feature>.md` see no
+behaviour change; v3.14.x visual reports without a `## Widget Shape
+Verification` H2 still accept (the gate verifies CLAIMED checks, not
+mandates the claim shape); positional `writeState` callers still work.
+
+### Added
+
+- **R6 server-enforced Widget Shape Verification gate** —
+  `index.ts` runs `hasUncheckedWidgets(workspace, completed_tasks)` after
+  the v3.14.0 `VISUAL_EVIDENCE_MISSING` gate. The new helper in
+  `tools/evidence-file.ts` parses each `qa_reports/visual_<id>.md`,
+  locates the `## Widget Shape Verification` H2 section, and reports
+  rows whose bracket is not `[x]` / `[X]`. Any unchecked row → server
+  rejects PASS with the new error code `VISUAL_WIDGETS_UNVERIFIED`,
+  listing every offending task-id and widget-id inline so the operator
+  fixes everything in one round-trip. The error code was reserved in
+  v3.14.0 architecture §A — it is now active.
+- **`parseVisualWidgetsChecklist`** and **`hasUncheckedWidgets`** exports
+  in `tools/evidence-file.ts`. Pure parser + composition helper. Permissive
+  on whitespace, strict on bracket content (`[Y]` / `[ ]` / `[garbage]`
+  → unchecked, catching operator typos rather than silently accepting).
+- **`WriteHandoffStateOptions`** interface in `tools/handoff.ts`. The
+  options-object overload accepts every field that the 11-positional
+  signature used to require, with sensible defaults for the optional
+  ones.
+
+### Changed
+
+- **`writeHandoffState` dual API** — `tools/handoff.ts` now exposes
+  both the legacy positional signature (now `@deprecated v3.15.0` with
+  `removal in v4.0.0` migration hint) and a new options-object overload.
+  Discrimination is runtime-`typeof` on the first argument.
+- **`HandoffStorage.writeState` dual API** — `tools/storage.ts` interface
+  + `FileHandoffStorage` + `SqliteHandoffStorage` implementations all
+  support both call shapes. Implementations delegate to
+  `writeHandoffState` for both branches.
+- **`index.ts` handler call site** switched to the options-object form —
+  each field is named, eliminating the 11-positional risk that motivated
+  the refactor. Positional remains supported for backwards-compat callers.
+- **Round 4 sentinel predicates symmetric fix** — `index.ts:795-805`
+  predicates for `qa_round` and `review_round` Round 4 lock-injection
+  changed from `=== 4 && === 3` to `>= 4 && < 4`, matching v3.14.1's
+  `visual_round` Round 6 fix. All three counters now share the same
+  cap-cross detection semantics: fires exactly once per crossing from
+  any prior value (handles migration / hand-edit edge cases).
+
+### Tests
+
+- **+27 tests across 3 files**:
+  - `test/visual-widgets-unverified-gate.test.mjs` (new) — 14 tests
+    covering AC-1 through AC-5: unchecked-rejection, all-checked
+    acceptance, backwards-compat (missing section), error aggregation
+    across multiple task ids, permissive whitespace + strict bracket
+    content (`[x]` / `[X]` / `[Y]` / `[ ]` cases), case-insensitive
+    section heading, defensive edge cases (empty input, missing file,
+    section bounded by next `## `).
+  - `test/writestate-options-object.test.mjs` (new) — 8 tests covering
+    AC-6 through AC-10: options-object parity with positional,
+    all-fields persistence, compiled-handler call-site shape grep,
+    `@deprecated` JSDoc presence in both `handoff.ts` and `storage.ts`,
+    8-arg backwards-compat positional defaults, minimal options
+    defaults.
+  - `test/qa-flow.test.mjs` (extended) — 6 new tests covering
+    AC-11/AC-12/AC-13: qa_round + review_round Round 4 cap-cross
+    predicate from prev=3 (normal), from prev<3 (external-bump
+    handling), no-fire-past-cap, sentinel wording unchanged.
+- **Tally**: 371/371 (v3.14.1 baseline) → **398/398** passing.
+
+### Deferred to v3.16+
+
+- README "Why not spec-kit?" FAQ entry (positioning improvement; no
+  community pull yet).
+- spec-kit compatible command bridge.
+- tasks.md historical drift cleanup (105+ entries).
+- doc-writer / release-engineer routing-chain integration.
+
+### Notes
+
+- `npm audit` waiver unchanged from v3.14.1 (the `embedding_model`
+  allowlist closes the exploit path; transitive dep tree unchanged
+  because no patched upstream release exists).
+- Handoff schema NOT bumped — v3.15.0 changes API signatures and adds
+  one error code, but no new field is added to `HandoffState`.
+  `CURRENT_VERSIONS.handoff` stays at 3.
+
+## [3.14.1] - 2026-05-29
+
+PATCH release closing three findings + six missing tests from the post-v3.14.0
+audit. No public API change, no schema bump, no behavioural regression on
+default flow. Backwards-compatible with `#v3.14.0` consumers.
+
+### Security
+
+- **`embedding_model` allowlist** (`index.ts:139-180`) — the v3.13.0 / v3.14.0
+  waiver claim that `@xenova/transformers` → `onnxruntime-web` → `protobufjs`
+  CRITICAL chain (CVE-2026-41242 / GHSA-xq3m-2v4x-88gg) was "not reachable"
+  was **incorrect** in HTTP mode. The `tw_index_prd` MCP tool accepts a
+  client-controlled `embedding_model` parameter; the v3.14.0 regex
+  `/^[A-Za-z0-9._\-]+\/[A-Za-z0-9._\-]+$/` admitted any HF Hub repo, including
+  attacker-controlled ones. A malicious .onnx file's protobuf schema would
+  trigger the protobufjs RCE during model load.
+  v3.14.1 adds an explicit allowlist (`Xenova/all-MiniLM-L6-v2`,
+  `Xenova/bge-small-en-v1.5`, `Xenova/multilingual-e5-small`) gated by a zod
+  `refine`. Default-flow callers (no `embedding_model`) are unaffected. Full
+  reachability trace in `research/xenova-reachability.md`.
+  Audit waiver REFRAMED from "not reachable" to "reachable but path closed
+  by allowlist" — `npm audit` still shows the transitive vuln chain because
+  the dep tree is unchanged, but the exploit path through the MCP surface
+  is mitigated.
+
+### Fixed
+
+- **Path sanitiser collapse for `..` literal** (`tools/evidence-file.ts:115-123`)
+  — the v3.14.0 sanitiser `replace(/[^A-Za-z0-9._-]/g, "_")` collapsed `/` to
+  `_` (blocking traversal) but preserved the literal `..` in filenames. A
+  hostile `active_feature` like `..feat` produced `..feat.md` — not a
+  traversal exploit, but a cosmetic surprise that could mislead grep / audit
+  logs. v3.14.1 chains a second `replace(/\.\.+/g, "_")` after the first to
+  collapse any run of 2+ dots. Single `.` survives (legitimate filename
+  character — `feat.v2.md` is allowed).
+- **Round 6 sentinel cap-cross predicate** (`index.ts:775-784`) — v3.14.0
+  injected the `⛔ Visual Round 6: forced rollback to pm…` pending_notes
+  sentinel using `new_visual_round === 6 && prev_visual_round === 5`. If
+  `prev_visual_round` ever arrived at the handler at a value < 5 with the
+  new counter going to 6+ (migration / hand-edit), the sentinel would not
+  fire. Fixed to `new >= 6 && prev < 6` — correct cap-cross predicate that
+  fires exactly once per crossing. Symmetric fix for `qa_round` /
+  `review_round` sentinels at `index.ts:747-752` deferred to v3.14.2
+  (trigger path is migration-only; not blocking).
+
+### Tests
+
+- **+18 tests across 3 files**:
+  - `test/visual-gate-e2e.test.mjs` (new) — 11 tests covering AC-5 / AC-6
+    / AC-7 / AC-10: handler composition through `validateTransition` +
+    visual evidence gate + `computeNewRound` + `writeState` round-trip,
+    Round 6 sentinel cap-cross from `prev < 5`, visual_round persistence
+    through subsequent read+write cycles, `VISUAL_ROUND_EXCEEDED` PM-only
+    acceptance at cap.
+  - `test/visual-round-sqlite.test.mjs` (new) — 4 tests gated on
+    `better-sqlite3` availability: `visualRound` round-trip via
+    `SqliteHandoffStorage.writeState` + `parse`, default-to-0 when omitted,
+    update-not-append semantics, PASS-resets-to-0.
+  - `test/visual-evidence-gate.test.mjs` (extended) — 3 new v3.14.1 cases:
+    `..` literal collapse (leading / middle / triple-dot), single-dot
+    survival, read-error silent-swallow contract pin.
+
+- **Tally**: 353/353 (v3.14.0 baseline) → **371/371** passing.
+
+### Research
+
+- **`research/xenova-reachability.md`** (new) — deep dive into the
+  `@xenova/transformers` → `onnxruntime-web` → `protobufjs` call graph
+  from `tools/rag.ts`. Verdict: **REACHABLE in HTTP mode** via
+  `embedding_model` parameter; MODERATE in stdio mode (trust-equivalent
+  to existing local-process surface). Includes the CVE detail, the exact
+  exploit path, and three rejected alternatives (upgrade Xenova,
+  override-transitively, drop RAG).
+
+### Deferred to v3.15.0 (Question Batch decisions)
+
+- R6 server-enforced widget verification (`VISUAL_WIDGETS_UNVERIFIED`)
+- `writeHandoffState` / `storage.writeState` options-object refactor
+  (dual API: positional deprecated, options-object new)
+
+## [3.14.0] - 2026-05-29
+
+MINOR release closing the **pixel-perfect framework gap** uncovered by
+`research/why-pixel-perfect-missed.md`. Adds a third independent
+feedback loop (`visual_round`) to the routing chain, a server-side
+PASS-evidence gate for visual diff reports, and four new schema
+sections distributed across PM / design-auditor / architect /
+sr-engineer SOPs.
+
+**Backwards-compatible**: workspaces without `design/<feature>.md`
+(server logic, CLI, this MCP repo itself) pay zero overhead and see
+no behaviour change. The new gates fire only when a feature declares
+`## Visual Baselines` in its design file.
+
+### Added
+
+- **Constitution §1 Visual Widgets exception** — sub-bullet under
+  *MVP strict*. When a widget is listed in a spec's `## Visual Widgets`
+  section, substituting an HTML primitive (e.g. `<input type="date">`
+  for a column-scroller picker) is now **scope violation**, NOT MVP
+  compliance. Closes the gap where sr-engineer rationally chose
+  primitives because the spec didn't enumerate widget shapes.
+- **Constitution §3.1 visual evidence gate** — `(qa-engineer, PASS)`
+  requires `qa_reports/visual_<task-id>.md` when
+  `design/<active_feature>.md` declares `## Visual Baselines`. Server
+  rejects with `VISUAL_EVIDENCE_MISSING` on the missing file. No
+  baselines declared → gate is silent and pass-through.
+- **Constitution §3.1 `visual_round` sub-loop** — third feedback
+  counter, independent of `qa_round` and `review_round`. Ticks on
+  `(qa-engineer, FAIL)` when `pending_notes` contains `visual_fail:`
+  (pixel/widget drift, NOT test-logic FAIL). Cap is 5 rounds; Round 6
+  locks to `(pm, In_Progress)` only. Symmetric to the v3.2.0 qa_round
+  Round 4 circuit breaker.
+- **Constitution §3.1 split escalation** — at `visual_round >= 3`,
+  sr-engineer MAY route `(sr-engineer, In_Progress) → (pm, In_Progress)`
+  with `pending_notes` containing `visual_split_requested:`. Early
+  escape hatch: instead of grinding two more rounds toward threshold
+  renegotiation, the team splits an oversized widget into sub-tasks.
+- **`skill-pm.md` § Visual Widgets schema bullet** — new required H2
+  section between *Visual Tokens* and *Out of Scope*. 3-column table
+  `widget id | description | source-node`. Mandatory `N/A | — | …` row
+  for features without widgets (absence must be explicit).
+- **`skill-design-auditor.md` § Visual Widgets extraction** — schema
+  bullet + 8-row widget-shape heuristics table (Picker, Wheel,
+  Keyboard, Segmented, Scrollbar, Stepper, Accordion, Slider, Toggle)
+  + "verify with PM" uncertainty tag + out-of-scope clause for restyled
+  primitives.
+- **`skill-architect.md` § Visual Harness Artifact Schema bullet**
+  (MANDATORY when `design/<feature>.md` declares `## Visual Baselines`;
+  OMIT entirely otherwise) — specifies test runner, viewport list,
+  diff library + threshold, CI command, font/rendering pinning, task
+  ordering rule. New SOP gate 4a blocks back to PM when the spec's
+  task list lacks a `[P0] Build visual-diff harness` task.
+- **`skill-sr-engineer.md` § Phase 0.5 Design-Aware Pre-Flight** — new
+  SOP step 3a positioned BETWEEN Task-Size Check (3) and Implement (4).
+  Mandates reading `design/<active_feature>.md` end-to-end + relevant
+  `## Visual Widgets` row + baseline paths BEFORE any file edit. Skips
+  silently on non-UI workspaces. References split escalation at
+  `visual_round >= 3`.
+- **`skill-qa-engineer.md` § Phase 1.5 PASS-gated** — Phase 1.5 label
+  upgraded from "lazy-load, skip-if-absent" to "lazy-load + PASS-gated
+  when Visual Baselines present". Names the server error code
+  (`VISUAL_EVIDENCE_MISSING`) operators will see. The "Phase 1.5
+  deferred" escape clause is REMOVED.
+- **`skill-qa-visual.md` § Widget Shape Checklist** — new Step A
+  preceding the v3.8.2 Pixel Diff (now Step B). One markdown checkbox
+  per spec `## Visual Widgets` row. Unchecked `[ ]` → "widget shape
+  miss" failure mode (`visual_fail: <widgets>` token in pending_notes).
+  Shape FAIL gates Step B — pixel-perfect on the wrong widget is
+  meaningless. Output filename changed from `qa_reports/review_<id>.md`
+  to `qa_reports/visual_<id>.md` (Constitution §3.1 PASS gate target).
+- **`tools/evidence-file.ts` new exports** —
+  `hasVisualBaselinesInDesign(workspace, activeFeature)` and
+  `hasVisualEvidenceInFile(workspace, taskIds)`. Mirror existing
+  `hasEvidenceInFile` / `hasCodeReviewEvidenceInFile` patterns. Path
+  sanitisation reuses the `[^A-Za-z0-9._-]` filter.
+- **`tools/transitions.ts` new exports** — `VISUAL_ROUND_CAP_EXPORTED`
+  constant (=6). `TransitionRejection.error` union extends with
+  `VISUAL_ROUND_EXCEEDED`. `validateTransition` consults
+  `prev_visual_round` (optional; defaults to 0). `computeNewRound`
+  signature widens by two positional params and returns
+  `{ qa_round, review_round, visual_round }`.
+
+### Changed
+
+- **Handoff schema v2 → v3** — new `visual_round: number` field.
+  v2→v3 migration registered in `schema/migrations-handoff.ts` stamps
+  the field to 0 for in-flight tickets. SQLite mode adds a
+  `visual_round INTEGER NOT NULL DEFAULT 0` column via
+  `ALTER TABLE handoff_state` (no sqlite schema_version bump because
+  no new tables / no breaking column changes).
+- **`writeHandoffState` + `HandoffStorage.writeState`** — eleventh
+  positional parameter `visualRound?: number` added. All call sites
+  in `tools/handoff.ts`, `tools/storage.ts`, `tools/storage-sqlite.ts`,
+  and `index.ts` updated. Pre-v3.14 callers passing 10 params
+  continue to work (visualRound defaults to 0).
+- **Constitution §4 routing chain** — diagram annotation updated to
+  reflect "Round 1-3 QA review; Round 1-5 visual review" feedback
+  arrow scope. Textual paragraph documents `visual_round`'s gating
+  conditions.
+
+### Server enforcement summary
+
+| State | Server check (new in v3.14.0) | Trigger condition |
+|---|---|---|
+| PASS attempt | `hasVisualBaselinesInDesign` → if true, `hasVisualEvidenceInFile` for every completed_tasks id | `design/<active_feature>.md` declares `## Visual Baselines` |
+| Any transition | `visual_round >= 6` → only `(pm, In_Progress)` accepted | counter independent of `qa_round` / `review_round` |
+| `pending_notes` synthesis | `⛔ Visual Round 6: forced rollback to pm…` prepended | when `new_visual_round === 6 && prev_visual_round === 5` |
+
+### Backwards-compatibility
+
+- Workspaces without `design/<feature>.md`: no behaviour change.
+- Workspaces with `design/<feature>.md` but no `## Visual Baselines`
+  H2: no behaviour change (v3.8.2/v3.8.3 audit format still supported).
+- Existing specs (pre-v3.14) without `## Visual Widgets` section: no
+  retroactive enforcement; the section becomes mandatory only for
+  features authored after v3.14.0.
+- Handoff files at schema_version 0/1/2 lazy-migrate to v3 on first
+  read, identical to the v3.9.0 v1→v2 mechanism. v3.13.0 callers that
+  omit `visualRound` continue to work — the parameter defaults to 0.
+
+### Tests
+
+- 4 new test files (T109): `visual-evidence-gate.test.mjs`,
+  `visual-round-transitions.test.mjs`, `widget-shape-spec.test.mjs`,
+  `phase-0-5-sop.test.mjs`.
+- 8 existing test files migrated for the schema_version bump +
+  signature widening: `handoff-versioning.test.mjs`,
+  `handoff-migration.test.mjs`, `schema-versions.test.mjs`,
+  `drift-skew.test.mjs`, `qa-flow.test.mjs`,
+  `qa-visual-skill-split.test.mjs`,
+  `pixel-perfect-visual-compare.test.mjs`,
+  `skill-evolution-v3.11.test.mjs`.
+- Final tally: **353/353 passing**.
+
+### Notes
+
+- `npm audit` waiver from v3.13.0 carries forward unchanged: 3 HIGH +
+  1 CRITICAL transitive findings under `@xenova/transformers` (not
+  reachable). 1 moderate `qs` finding is new but below audit threshold.
+- Root-cause analysis lives in
+  `research/why-pixel-perfect-missed.md`. The R1-R6 recommendations
+  in that document map to ACs in `specs/pixel-perfect-fixes-v3.14.md`:
+  R1+R6 → AC-5/AC-6 (qa gate + widget checklist),
+  R2+R2a → AC-1/AC-2 (PM + design-auditor widgets),
+  R3 → AC-3 (architect harness),
+  R3a → AC-4 (sr Phase 0.5),
+  R4+R4a → AC-8/AC-9 (visual_round + split escalation),
+  R5 → AC-7 (Constitution §1 exception).
+
+## [3.13.0] - 2026-05-28
+
+Bundled MINOR release covering both the v3.12 polish pass and the v3.13
+auto-routing behaviour. No `tw_*` tool surface changes, no schema bump,
+no wire-protocol change — all behaviour lives in the prompt-injected
+constitution + skill files. Backwards-compatible with `#v3.11.0`
+consumers.
+
+### Added (auto-routing — v3.13 scope)
+- **`skill-coordinator.md` § Auto-Routing** — default-ON in `/teamwork`
+  (lite explicitly exempt). After each role's handoff the coordinator
+  self-calls `tw_switch_role(<next_role>)` based on `pending_notes`.
+  Five stop conditions yield to the human:
+  (1) `status: Blocked`,
+  (2) `status: PASS` (terminal — release-engineer remains a human decision),
+  (3) `pending_notes` contains `next_role: human`,
+  (4) `pending_notes` lacks any `next_role:` line (silent termination),
+  (5) Hop counter ≥ **10** per `/teamwork` session.
+- **`AGC_AUTO_ROUTE=0`** env-var opt-out — restores pre-v3.13 manual
+  routing. Read agent-side at coordinator SOP step 1; not validated
+  server-side.
+- **`skill-pm.md` § Question Batch Gate** — new SOP step 4 that batches
+  Resource Audit `fetch/index/ignore` decisions + Ambiguity Gate
+  clarifications into one upfront `AskUserQuestion` call (≤ 4 questions;
+  split into 2 batches if more). Empty-batch = no-op. Converts N
+  mid-chain `Blocked` round-trips into 1 upfront human interaction.
+- **`skill-coordinator-lite.md`** — new `No auto-routing` hard rule
+  preserves lite's single-shot zero-state-write contract.
+- **Constitution §5 Anti-Loop Circuit Breaker** — new bullet referencing
+  the 10-hop cap and naming lite as exempt.
+
+### Added (skill polish — v3.12 scope)
+- **`skill-architect.md` § Decision Records** — new H2 with a
+  `Context | Decision | Consequences` table; one row per non-trivial
+  trade-off. Empty section renders
+  `_No non-trivial trade-offs in this artifact._`.
+
+### Changed (token-frugality audit — v3.12 scope)
+- **Audit artifact** `research/token-frugality-audit-v3.12.md` —
+  per-file pass against the constitution §1 *Skills inherit everything
+  below — they MUST NOT restate these rules* contract.
+- **Subtractive trims** to 8 skill files:
+  - Removed restated `§3 drift-check` tails from
+    `skill-architect.md`, `skill-design-auditor.md`, `skill-pm.md`,
+    `skill-researcher.md`, `skill-sr-engineer.md`.
+  - Removed the restated `§4 routing chain` block from
+    `skill-coordinator.md` (5 lines).
+  - Compressed redundant prior-rollout incident narrative in
+    `skill-qa-engineer.md`.
+  - Compressed editorial parenthetical in
+    `skill-code-reviewer.md` L11.
+- **Net line reduction**: 580 → 576 (-0.7% at line level; character-level
+  reduction is materially larger due to in-line compressions). Audit's
+  *Aggregate* section documents that the spec's aspirational 5% floor
+  was unachievable without deleting load-bearing content; the OR-branch
+  of the spec AC was honoured by audit justification.
+
+### Notes
+- **Security coverage verified (v3.12 audit)** — constitution §6
+  already covers the v3.9 evaluation's two flagged Security gaps:
+  OWASP-level guidance lives at sr-engineer + code-reviewer role
+  checklists; the dependency-audit rule shipped in v3.10. No §6 edits
+  in this release.
+- **No `tw_*` tool surface, schema, or transition-matrix changes** —
+  this release is content-only. `prompts/build.ts` consumes
+  `content/*.md` as opaque blobs, so section additions/edits cannot
+  break the prompt-build path; build clean + 303/303 tests pass.
+- **Skipped tag `v3.12.0`** — v3.12 polish and v3.13 auto-routing were
+  bundled into one MINOR cut at user direction. No `#v3.12.0` install
+  pin is published; consumers go directly from `#v3.11.0` to `#v3.13.0`.
+
+## [3.11.0] - 2026-05-28
+
+### Added
+- **`doc-writer` side-channel role** — new `content/skill-doc-writer.md`,
+  `prompts/doc-writer.ts`, and MCP prompt registration. Keeps `README.md`,
+  `CHANGELOG.md`, and `docs/**` in sync after QA PASS. Staff-level technical
+  writer persona; fact-preservation hard rule; side-channel constraint
+  (not in `ALLOWED_TRANSITIONS`; uses upstream caller's `agent_id`).
+- **`release-engineer` side-channel role** — new
+  `content/skill-release-engineer.md`, `prompts/release-engineer.ts`, and MCP
+  prompt registration. Owns post-PASS version bumps, `CHANGELOG.md` entries,
+  `npm run build`, `git tag`, and `gh release create`. PASS-precondition
+  hard rule; major-bump opt-in gate; HEREDOC commit messages; immutable tags;
+  `scripts/check-version.mjs` gate; side-channel constraint.
+- **`tw_switch_role` enum widened** to include `doc-writer` and
+  `release-engineer` (zod schema + JSON inputSchema). Both roles loadable via
+  `tw_switch_role` and as standalone MCP prompts.
+- **`tools/role.ts` `ROLE_SKILL_MAP`** extended with both new role entries.
+
+### Changed
+- **`skill-researcher.md`** — new Hard rules `Depth` clause (`shallow` ≤ 15 min /
+  `deep` ≤ 60 min), `Source Credibility Tier` (T1/T2/T3 tags on Evidence
+  citations), and `Recency Gate` (sources > 18 months tagged `(stale)`;
+  deep research requires ≥ 1 source ≤ 12 months old per major claim).
+- **`skill-coordinator-lite.md`** — new `Scope-creep examples` H2 with 3
+  concrete escalate-to-`/teamwork` cases and 1 affirmative lite case.
+- **`skill-code-reviewer.md`** — new `Performance` section in Review Report
+  Schema (O(n²) loops, unbatched I/O, memory leaks, algorithmic regression).
+  Schema sections: 6 → 7.
+- **Constitution v3.11.0 §6** — new `Dependency audit at build gate` bullet:
+  `npm audit --audit-level=high` / `cargo audit` / `pip-audit` required after
+  build, before `tw_update_state`. HIGH/CRITICAL findings are build failures
+  unless explicitly waived.
+
+### Notes
+- **MINOR bump** — side-channel only. No `ALLOWED_TRANSITIONS` edges added;
+  no `AgentName` union widened; no schema version bumps (`handoff: 2`,
+  `sqlite: 2` unchanged). `#v3.10.0` consumers keep working unchanged.
+
+## [3.10.0] - 2026-05-28
+
+### Added
+- **Constitution §2: Conditional test writing** (qa-engineer). Not every
+  task requires new tests. If existing test files already cover the
+  task's scope, qa-engineer writes or modifies tests accordingly. If
+  NO relevant test file exists for the current task, qa-engineer MUST
+  ask the user whether tests are needed before creating any — do not
+  assume. Constitution bumps v3.9.0 → v3.10.0.
+
+### Changed
+- **`skill-qa-engineer.md` Phase 3 SOP** prepends a new step
+  `3a. Test File Discovery` that gates test creation on existence of
+  relevant test files. When the discovery step results in user-declined
+  test creation, Phase 3 is skipped, the review doc logs
+  `Phase 3: skipped (user declined — no existing test coverage)`, and
+  the flow proceeds to Phase 4. Prior steps 3a–3d renumber to 3b–3e.
+
+### Notes
+- MINOR bump (not PATCH) — qa-engineer behavior observably changes
+  (gated test creation, new user-prompt branch). Tooling, transition
+  matrix, schema versions, and wire protocol are unchanged.
+- Consumers pinned at `#v3.9.1` keep working unchanged. Upgrade to
+  `#v3.10.0` to get the new qa SOP rule.
+- Research basis: `research/architecture-and-skills-evaluation-v3.9.md`.
+
+## [3.9.1] - 2026-05-28
+
+### Added
+- QA test coverage for the v3.9.0 code-reviewer chain (T67 / AC-12).
+  33 new tests across `test/qa-flow.test.mjs` and the new
+  `test/handoff-migration.test.mjs`: every new `code-reviewer:*`
+  ALLOWED edge accepts; the removed `sr-engineer:In_Progress →
+  qa-engineer:In_Progress` edge rejects with allowed-list naming
+  code-reviewer; `REVIEW_ROUND_EXCEEDED` cap symmetric to qa_round;
+  `computeNewRound` review_round semantics (FAIL increments,
+  APPROVED-handoff reset gated on `prev=(code-reviewer, In_Progress)`,
+  PM resets both counters); evidence-file round-trip + sanitisation;
+  AC-8 verbatim hint reachability in compiled `dist/index.js`; AC-9
+  stderr migration warning fires on `sr-engineer:In_Progress` and is
+  silent otherwise (and on already-v2 files).
+
+### Changed
+- Revised 26 v3.8.3-era contract tests in-place across
+  `schema-versions.test.mjs`, `handoff-versioning.test.mjs`,
+  `sqlite-versioning.test.mjs`, `qa-flow.test.mjs`,
+  `qa-visual-skill-split.test.mjs`, `drift-skew.test.mjs`. The
+  pre-existing assertions encoded contracts removed by v3.9.0 AC-2
+  (direct sr→qa edge, single-return `computeNewRound`, schema v1
+  CURRENT). "Additive only" wording in AC-12(f) was structurally
+  impossible alongside AC-2; this release ships the resolution.
+- Sqlite-versioning tests now bootstrap `handoff_state` before calling
+  `runSqliteMigrations` standalone, mirroring the production ctor
+  flow where the schema is created before migration runs.
+
+### Notes
+- 297/297 tests pass; `tsc` clean; `scripts/check-version.mjs` OK.
+- No runtime / wire-protocol changes vs v3.9.0 — patch-only test
+  coverage + version bump. Consumers pinned at `#v3.9.0` keep working;
+  `#v3.9.1` is recommended for anyone running `npm test` against the
+  shipped checkout.
+
+## [3.9.0] - 2026-05-28
+
+### Added
+- **`code-reviewer` role** between `sr-engineer` and `qa-engineer` in the
+  routing chain. Owns code review (correctness / quality / architecture /
+  security) in a clean context — reads only the diff vs base, the PM spec,
+  and the architect handoff. Bias-free judgement is structural, not
+  optional, per 2025–2026 industry consensus
+  (`research/reviewer-role-extraction.md`).
+- **`review_round` counter** symmetric to `qa_round`. Incremented on
+  `(code-reviewer, FAIL)`, reset on handoff to qa or PM re-entry. Cap at
+  4 (3 FAILs allowed); Round 4 forces `(pm, In_Progress)` like the qa
+  circuit breaker.
+- **`review_reports/review_<task-id>.md` evidence gating.** The
+  `(code-reviewer, In_Progress) → (qa-engineer, In_Progress)` handoff
+  is rejected when any task id in `completed_tasks` lacks a review file
+  (file mode) or `code_review_reports` row (SQLite mode).
+- New skill `content/skill-code-reviewer.md`, new prompt
+  `prompts/code-reviewer.ts` (id `code-reviewer`), new SQLite table
+  `code_review_reports`. `tw_switch_role` accepts `"code-reviewer"`.
+
+### Changed
+- **Routing chain**: `sr-engineer → qa-engineer` direct edge replaced
+  with `sr-engineer ↔ code-reviewer → qa-engineer`. Constitution v3.9.0.
+- **`qa-engineer` scope narrowed**: rejects only for failing tests,
+  missing AC coverage, or test-infra defects. Style/architecture/
+  correctness review moved to code-reviewer; QA escalates rather than
+  FAILs on those grounds.
+- **`computeNewRound` signature**: now takes
+  `(prev_qa_round, prev_review_round, next, prev?)` and returns
+  `{ qa_round, review_round }`. Internal callers updated; external
+  callers must adopt the new shape.
+- **Schema bumps**: `CURRENT_VERSIONS.handoff: 1 → 2`,
+  `CURRENT_VERSIONS.sqlite: 1 → 2`. Migrations add `review_round=0` to
+  existing rows.
+
+### Breaking
+- **In-flight `sr-engineer:In_Progress` tickets** at upgrade time must
+  be manually re-routed to code-reviewer (or rolled back to pm). The
+  old `sr-engineer:In_Progress → qa-engineer:In_Progress` edge is
+  rejected by the new transition matrix. The v1→v2 handoff migration
+  emits a one-shot stderr warning on first parse when this state is
+  detected.
+- **`HandoffStorage.writeState`** gains a trailing optional
+  `reviewRound?: number` parameter. Trailing-optional is
+  backwards-compatible for positional callers; named-arg callers should
+  pass it for accurate persistence.
+
+### Notes
+- `teamwork-lite` (solo-dev mode) is **explicitly excluded** from the
+  code-reviewer step — lite is server-read-only same-context work
+  where the reviewer gate is structurally meaningless.
+- Spec: `specs/code-reviewer-role-extraction.md`.
+- Architecture: `specs/code-reviewer-role-extraction-architecture.md`.
+
+## [3.8.3] - 2026-05-26
+
+### Changed
+- **`skill-qa-visual.md` extracted from `skill-qa-engineer.md`** — the
+  v3.8.2 Phase 1.5 SOP block (skip-if-absent gate, six diff categories,
+  three failure routes, PASS sub-verdict, rationale) was moved verbatim
+  into a new `content/skill-qa-visual.md`. `skill-qa-engineer.md` step 4
+  shrinks to a 3-line lazy-load hook that instructs the agent to Read
+  the sub-skill *only* when `design/<feature>.md` declares a
+  `## Visual Baselines` H2.
+- **Token impact** — non-UI workspaces (server logic, CLI, this MCP
+  repo) save ~300 input tokens on every qa-engineer load. UI workspaces
+  pay roughly the v3.8.2 total: the Read brings the sub-skill into
+  context on demand. Motivated by
+  `research/skill-token-cost-and-pixel-perfect-success-rate.md`
+  § Recommendation watch-item (`skill-qa-engineer.md` was 2.17K tokens,
+  27% larger than the next-biggest skill).
+
+### Backwards-compatible
+- Phase 1.5 contract is unchanged: same skip-if-absent gating, same six
+  diff categories, same three failure routes (visual drift → sr-engineer,
+  missing baseline → design-auditor, missing impl → sr-engineer), same
+  PASS sub-verdict. v3.8.2 `design/<feature>.md` files with Visual
+  Baselines declarations execute the same protocol.
+- No server tool surface, prompt schema, ALLOWED_TRANSITIONS, or
+  handoff/state format change. No new role registered. Pure SOP-text
+  reorganisation.
+- SOP step numbering 1..7 in `skill-qa-engineer.md` is preserved; Phase
+  N labels remain stable so internal cross-refs keep working.
+
+### Notes
+- Spec: `specs/qa-visual-skill-split.md`.
+- Mechanism chosen: SOP-only lazy Read (rejected alternatives:
+  server-side conditional inject, separate role with `tw_switch_role`).
+
+## [3.8.2] - 2026-05-26
+
+### Changed
+- **`design-auditor` Artifact Schema** (`content/skill-design-auditor.md`): new
+  OPTIONAL `**Visual Baselines**` H2 section. 4-column table
+  `surface id | baseline path | impl path | notes`. `surface id` MUST match a
+  *Source manifest* row; `baseline path` is workspace-relative to whatever
+  image file the design source produced (Figma / Sketch / XD / Penpot export,
+  PDF page rendered to PNG, raw mockup file, photo); `impl path` is
+  workspace-relative to where the QA agent expects the implementation
+  screenshot at QA time. Absence of the section is the explicit no-op signal
+  to QA Phase 1.5.
+- **`skill-qa-engineer` SOP** — new step 4 `**Phase 1.5 — Visual Compare**`
+  inserted between Phase 1 (3a Copy Audit / 3b Visual Audit) and Phase 2.
+  Skip-if-absent gating against `design/<feature>.md` *Visual Baselines*.
+  For each row, QA Reads both PNGs (multimodal context) and emits a
+  structured diff covering layout / spacing / alignment / element presence
+  / color / text / image content into the review doc. Three failure routes:
+  visual drift → sr-engineer; missing baseline file → design-auditor;
+  missing impl file → sr-engineer. Prior steps 4–6 renumber to 5–7
+  (`Phase 2 — Discussion`, `Phase 3 — Tests`, `Phase 4 — Run`); the
+  *Phase N* labels are unchanged so internal cross-refs remain stable.
+
+### Backwards-compatible
+- `design/<feature>.md` files written under v3.8.1 (Source manifest present,
+  no Visual Baselines section) cause QA Phase 1.5 to skip silently — no
+  retroactive migration. Phase 1 behavior is unchanged.
+- Non-UI features (server logic, CLI tools, this MCP repo) pay zero
+  Phase 1.5 overhead because they declare no Visual Baselines.
+- Server tool surface unchanged. No new `tw_*` tool, no
+  ALLOWED_TRANSITIONS edits, no handoff/state format change. Pure
+  skill-text refinement.
+
+### Notes
+- Phase 2 of `research/pixel-perfect-and-design-coverage.md` — the
+  vision-LLM screenshot-compare arm. Phase 3 (Playwright VRT) remains
+  out of scope.
+- SOP-only delivery (no `tw_visual_compare` tool); vision capability is
+  provided by the QA agent's host LLM, not via the Figma REST API or any
+  pixel-diff library.
+- Spec: `specs/pixel-perfect-visual-compare.md`.
+
+## [3.8.1] - 2026-05-26
+
+### Changed
+- **`design-auditor` Source manifest is now exhaustive + status-tagged**
+  (`content/skill-design-auditor.md` Artifact Schema): every surface in
+  the design source (Figma frame, Sketch / XD artboard, Penpot board,
+  PDF page, image / photo file) MUST appear in the manifest, tagged
+  `status: audited | deferred | out-of-scope` with a one-line reason for
+  non-`audited` rows. Replaces the old behaviour of audit-only-task-
+  referenced-frames + cite-the-rest-in-Out-of-Scope, which silently
+  dropped frames the task description did not name.
+- **`design-auditor` multi-pass is now explicit** — Hard rules upgraded
+  from single-pass `Token-frugal` to `Token-frugal multi-pass`: ≤ 250
+  lines per pass, up to 5 passes per feature, each follow-up pass MUST
+  flip ≥ 1 `deferred` row to `audited`. No-op passes forbidden
+  (constitution §5 anti-loop).
+- **`skill-pm` Deferred-surface gate** (`content/skill-pm.md` SOP step 2):
+  PM MUST enumerate every `status: deferred` manifest row (pointer +
+  reason) under the spec's *Dependencies / Prerequisites* section, so
+  the team knows which surfaces ship without coverage.
+
+### Backwards-compatible
+- Older `design/<feature>.md` artifacts written before v3.8.1 lack the
+  status column and require no retroactive migration. Downstream roles
+  treat the listed surfaces as `audited` and any unknown surfaces as
+  `unknown`.
+- `no-design` mode is unchanged: empty manifest, single pass, no gate
+  activation.
+- Server tool surface unchanged. No prompt schema, ALLOWED_TRANSITIONS,
+  or handoff/state format change. Pure skill-text refinement.
+
+### Notes
+- Phase 1 of `research/pixel-perfect-and-design-coverage.md`. Phase 2
+  (vision-LLM screenshot compare) and Phase 3 (Playwright VRT) remain
+  out of scope.
+- Spec: `specs/pixel-perfect-design-coverage.md`.
+
+## [3.8.0] - 2026-05-21
+
+### Added
+- **`design-auditor` role** — new optional pre-PM role registered in
+  `tools/transitions.ts`, `tools/role.ts`, `prompts/design-auditor.ts`,
+  and `index.ts` prompt list. Reads any design source — Figma, Sketch,
+  Adobe XD, Penpot, PDF mockup, PNG screenshot, paper photo — and
+  produces `design/<feature>.md` with verbatim *Copy / Strings* and
+  *Visual Tokens* tables that PM copies into the spec.
+  Source-agnostic: detects mode from the supplied design surface and
+  picks the matching extraction strategy. Never assumes Figma. Tasks
+  with no design reference skip the auditor entirely (zero per-prompt
+  overhead — the skill is not loaded).
+- **`skill-coordinator` Design-source detection** — coordinator scans
+  every incoming PRD / ticket / user prompt for design-source patterns
+  (`figma.com`, `sketch.cloud`, `xd.adobe.com`, `penpot.app`, `marvelapp`,
+  `invisionapp`, `framer`, `.fig` / `.sketch` / `.xd` / `.penpot`, plus
+  mockup-context `.pdf` / `.png` / `.jpg`, plus EN / 中文 / 日本語
+  design keywords). On hit → routes to `design-auditor` before PM.
+- **ALLOWED_TRANSITIONS** — three new edges:
+  `null → design-auditor:In_Progress` (coordinator entrypoint),
+  `researcher:In_Progress → design-auditor:In_Progress` (chain after
+  researcher), `pm:In_Progress → design-auditor:In_Progress` (PM
+  re-route when refs surface late). Exit edges:
+  `design-auditor:In_Progress → pm:In_Progress` and
+  `design-auditor:Blocked → {design-auditor, pm}:In_Progress`.
+
+### Changed
+- **`skill-pm` SOP step 2** — PM must now copy `design/<feature>.md`'s
+  *Copy / Strings* and *Visual Tokens* tables verbatim into the spec
+  when a design audit exists. Additional entries authored by PM stay
+  flagged `authored-here` per the existing spec schema rule.
+- **Constitution §4 routing chain** — adds the optional design-auditor
+  hop with a one-paragraph explanation of when it fires.
+
+### Token economy
+
+The design-auditor's skill markdown is only loaded when (a) the
+coordinator detects a design source and (b) routes to it via
+`tw_switch_role` or the dedicated prompt. The routine 80% case
+(refactors, infra, bug fixes, server-side work) bypasses it entirely.
+The new skill file is intentionally ≤ 80 lines so even active runs
+stay token-frugal — comparable to `skill-researcher` (24 lines) +
+`skill-pm` (44 lines). No new MCP tools added; the role reuses
+existing `tw_*` surface.
+
+## [3.7.4] - 2026-05-21
+
+### Added
+- **`skill-pm` Visual Tokens H2** (Spec Schema, between Copy / Strings
+  and Out of Scope). Every concrete literal-valued visual property —
+  hex color, sp font size, dp dimension, weight, radius, stroke,
+  opacity — must be enumerated in a 4-column table `token id |
+  property | value | source` with the source quoted from a Figma node
+  id, fill / text-style name, design-system token name, or
+  `authored-here` with a one-line justification. Layout proportions
+  (`weight(1f)`), runtime values, and platform defaults are explicitly
+  excluded. PM blocks if any literal lacks a source.
+- **`skill-qa-engineer` Visual Audit Gate** (Phase 1 step 3b). QA
+  greps the source tree for each spec'd literal and FAILs on drift
+  (impl ≠ spec), coverage gap (impl literal missing from spec —
+  bounces to PM), or — when Figma MCP is available — source rot
+  (Figma value changed after spec was written).
+
+### Why
+v3.7.3's Copy Audit Gate fixed text drift. Visual properties (colors,
+spacing, typography literals) still relied on PM-authored stylistic
+ACs, which only catch what the spec already enumerates. An unsourced
+hex slipping into `OobeTheme.kt` — exactly what kicked off the
+prior-rollout Figma-alignment re-work — stayed invisible. v3.7.4 makes
+every literal a tracked, sourced contract, audited at QA time. This is
+the cheapest of the four design-fidelity options surveyed in
+`research/design-fidelity-enforcement.md`; pixel-baseline approaches
+(Paparazzi against Figma exports) remain out of scope.
+
+## [3.7.3] - 2026-05-21
+
+### Added
+- **`skill-pm` Copy / Strings H2** (Spec Schema). Every spec must now
+  enumerate every user-facing string the feature introduces or changes
+  in a 3-column table `string id | exact text | source`. *Source* must
+  be a PRD section number, a Figma node id, a CSV/ticket ref, or the
+  literal token `authored-here` with a one-line justification. PM
+  blocks if any string lacks a source.
+- **`skill-qa-engineer` Copy Audit Gate** (Phase 1 step 3a). QA now
+  greps the source tree for each spec'd string and FAILs on either
+  drift (impl ≠ spec) or coverage gap (impl introduces a string not in
+  the spec — bounces back to PM, not sr-engineer).
+
+### Why
+A prior rollout's implementation shipped titles like `"Select your language"`
+that the engineer (correctly) had no source for — the PRD only said
+"功能：選取系統主要語系". The Figma title was literally `"Language"`.
+Stylistic ACs (font/color/size) passed cleanly because they tested
+the *style*, not the *text*. v3.5.3 closed the "did anyone fetch the
+design?" gap; v3.7.3 closes the "did anyone audit the words?" gap.
+
+## [3.7.2] - 2026-05-21
+
+### Added
+- **Constitution v3.5.3 — External-reference policy** (`content/constitution.md` §7).
+  A spec referencing external artifacts (URLs, Figma/Sketch files, ticket IDs,
+  mockups, "see XYZ" prose) is presumed *incomplete* until each reference is
+  (a) fetched, (b) indexed via `tw_index_prd`, or (c) user-confirmed as
+  ignorable. No role may unilaterally treat a reference as out-of-scope.
+- **`skill-pm` Resource Audit Gate** (new SOP step 3). PM must grep every
+  supplied requirement doc for `http(s)://`, `figma`, `sketch`, `mockup`,
+  `設計圖`, `URL`, `link`, `Azure DevOps`, `JIRA` and ask the user
+  `fetch / index / ignore` per hit before writing the spec. Decisions are
+  recorded in the spec's *Dependencies / Prerequisites* section.
+- **`skill-architect` Deferred Resources section + Sanity Gate** (Artifact
+  Schema + new SOP step 4). Architect must cross-check every PM-deferred
+  reference against the spec and block if any spec reference is missing
+  from `Deferred Resources` — closes the loophole where architect
+  silently dropped a Figma URL during a prior visual rollout (2026-05-20).
+
+### Why
+First triggered when a prior OOBE wizard shipped without ever loading the
+Figma mockup linked seven times in the PRD. Architect's own design doc had
+unilaterally declared the link out-of-scope; nothing in the SOPs forced a
+user confirmation. These three changes turn "did anyone fetch the link?"
+into a server-enforced gate via the spec/architecture artifacts.
+
+## [3.7.1] - 2026-05-20
+
+### Changed
+- **`handoff.md` write path emits English headers.** `bin/agc-init.mjs`
+  scaffold and `tools/handoff.ts` `writeHandoffState` now produce
+  `# Handoff State / ## Completed / ## Pending & Handoff Notes` (and
+  `- (none)` empty-section sentinel) instead of the mixed Chinese +
+  English template. Parser keeps bilingual section regex and continues
+  to recognize the legacy `無` sentinel, so existing handoff.md files
+  parse unchanged. No tool surface or schema change.
+
+## [3.7.0] - 2026-05-20
+
+### Added
+- **`agc init` CLI** (`bin/agc-init.mjs`). Scaffolds an
+  agent-governance-managed workspace in one command:
+  `.current/handoff.md`, `.current/.config.json`, and `tasks.md` with
+  sane defaults. Idempotent — existing files are skipped, no `--force`
+  flag. Wired as the `agc` bin in `package.json`; invoke via
+  `npx -y --package=github:Paul-hengChen/agent-governance-mcp#v3.7.0 agc init`.
+  Closes P0 onboarding item from `research/agc-value-proposition-2026-05-20.md`.
+
+### Changed
+- **SessionStart hook defaults to `skill-coordinator-lite.md`**
+  (`bin/agent-governance-context.mjs`). Solo-dev direct-execute is now
+  the default boot mode; the intro prose names "Coordinator-Lite mode"
+  and points at `/teamwork` for cross-module work. Existing managed
+  workspaces see the lite skill on next session start with no config
+  change.
+- **Full coordinator opt-in via `AGC_DEFAULT_SKILL=full`**. Setting this
+  env var in the Claude Code session env restores the previous full
+  coordinator skill + intro prose verbatim. No breaking change to the
+  `/teamwork` or `/teamwork-lite` prompts themselves — both keep their
+  v3.6.x behavior; only the hook default flipped.
+
+### Tests
+- 8 new tests in `test/p0-onboarding-lite-default.test.mjs` covering
+  scaffold happy path, idempotency, parseHandoff round-trip, bin
+  wiring, both hook variants, and CLI usage/silent-no-op smoke tests.
+  Suite: 243/243 passing.
+
+## [3.6.1] - 2026-05-20
+
+### Fixed
+- **`skill-coordinator-lite.md` slimmed** (2502 → 1097 bytes, -56%). The
+  v3.6.0 lite skill was paradoxically *larger* than the full coordinator
+  skill, making the `teamwork-lite` prompt 120 tokens heavier than
+  `teamwork` at load time — contradicting the lite-mode value
+  proposition. Trimmed to essentials while preserving the section
+  contract (`Persona`, `When to use`, `Hard rules`, `SOP`, `Output rule`)
+  the integration tests rely on.
+- **Result**: `teamwork-lite` prompt is now ~228 tokens (-13%) smaller
+  than `teamwork` at load time. Per-task savings (chain skipping) are
+  unchanged from v3.6.0.
+
+## [3.6.0] - 2026-05-20
+
+### Added — Lite Mode Coordinator (`/teamwork-lite`)
+First architectural response to the post-fusion value audit
+(`research/value-assessment.md`), which identified the multi-role chain
+as net overhead for solo-dev daily work. Spec:
+`specs/lite-mode-coordinator.md`.
+
+- **New prompt `teamwork-lite`** — solo-dev minimal-overhead entry
+  point. Loads the full constitution (single source of truth preserved)
+  plus a new lighter skill `content/skill-coordinator-lite.md` that
+  documents direct-execute orientation: no `tw_switch_role`, no
+  `tw_detect_drift` by default, no chain routing.
+- **Lite is server-read-only by design.** `tools/transitions.ts`
+  `AgentName` is intentionally unchanged — lite has no valid `agent_id`
+  in the routing chain, so it cannot call `tw_update_state` /
+  `tw_complete_task` / `tw_add_task` / `tw_rollback_task`. This is
+  documented as a hard rule in the skill. Work that needs handoff
+  tracking should use `/teamwork` (full).
+- **`RAG_SKIP_ROLES`** now also skips `teamwork-lite` — triage doesn't
+  need PRD chunks.
+- **6 new integration tests** (`test/teamwork-lite.test.mjs`) exercise
+  the prompt registration, dispatch, RAG skip, and skill content.
+  Total suite: 235/235 pass.
+- **README Step 5** documents when to use lite vs full and what lite
+  skips.
+
+### Migration
+- Additive only — existing prompts and behavior unchanged. Users opt
+  into lite mode by invoking the new prompt; no config flag, no
+  workspace change.
+
+## [3.5.2] - 2026-05-20
+
+### Added — YAGNI Single-Use (Constitution v3.5.2)
+Closes the single remaining medium-high gap from the post-v3.5.1 audit
+(`research/post-v3.5.1-coverage-audit.md`). Spec:
+`specs/constitution-v3.5.2-yagni-single-use.md`.
+
+- **§1 MVP strict** extended (from R2): `No abstractions for single-use
+  code.` Concrete YAGNI rule — distinct from "no speculative refactors"
+  (which targets *edits*) by targeting *new code shape* (e.g. a base
+  class with one subclass, a helper hook with one caller).
+
+### Status
+- The 12-rule template fusion cycle is now considered **complete**. R5
+  and R6 remain deferred (need server-side enforcement); all other
+  rules either fully covered or correctly scoped to skill files.
+
+### Migration
+- Content-only. No code or schema changes.
+
+## [3.5.1] - 2026-05-20
+
+### Added — Rule Completeness (Constitution v3.5.1)
+Three gaps in the v3.5.0 fusion (vs the original 12-rule template) closed —
+spec: `specs/constitution-v3.5.1-rule-completeness.md`.
+
+- **§1 Surgical changes** (new bullet, from R3): "Touch only what the task
+  requires. Don't 'improve' adjacent code, comments, or formatting. Clean
+  up only your own mess." Complements `MVP strict` (which limits *what*
+  is added) by limiting *what is edited*.
+- **§2 Match conventions** extended (from R11): "Conformance > personal
+  taste; if a convention is genuinely harmful, surface it — don't fork
+  silently." Prevents agents from quietly drifting from house style.
+- **§7 Fail loud** extended (from R12): `"Tests pass" is wrong if any
+  were skipped.` Explicit qa-engineer guardrail against partial-test PASS.
+
+### Migration
+- Content-only — no code or schema changes. Pin to `#v3.5.1` to receive
+  the updated constitution; agents will see the new rules on next
+  session-start.
+
+## [3.5.0] - 2026-05-20
+
+### Added — Cognitive Discipline (Constitution v3.5.0)
+Cross-references: research `research/claude-md-12-rule-fusion.md`, spec
+`specs/constitution-v3.5-cognitive-discipline.md`. Five high-value rules
+extracted from the 12-rule CLAUDE.md template (R1, R4, R7, R8, R12) and
+fused into a new constitution §7 — ~100-token addition for the
+"thinking quality" dimension the prior process-compliance rules lacked.
+
+- **New §7 Cognitive Discipline** with 5 bullets: Think first,
+  Goal-driven, Surface conflicts, Read before write, Fail loud.
+- **§2 new bullet — Match conventions** (from R11): follow existing
+  codebase style before introducing new patterns; grep when in doubt.
+- **`skill-qa-engineer` new Hard rule — Tests verify intent** (from R9):
+  tests must encode WHY (contract/invariant), not just WHAT.
+
+### Deferred (intentional)
+- R5 (use model only for judgment) — implicitly satisfied by the
+  tool-driven MCP architecture.
+- R6 (token budgets 4k/task, 30k/session) — needs server-side tracking
+  to be enforceable; deferred per research open question #1.
+
+### Migration
+- Content-only — no code or schema changes. No action required.
+
+## [3.4.0] - 2026-05-20
+
+### Added — Schema Versioning (Phase 4)
+- **Lazy migrate-on-read** across all four persisted artifacts: handoff YAML
+  frontmatter, `tasks.md` sentinel, SQLite (`PRAGMA user_version`), and
+  `.current/.config.json`. Older files are detected by missing/lower
+  `schema_version` and upgraded transparently on the next read; no manual
+  migration step.
+- New module `schema/versions.ts` (current version constants, registries).
+- New migration runners — `schema/migrations-handoff.ts`,
+  `schema/migrations-tasks.ts`, `schema/migrations-sqlite.ts`,
+  `schema/migrations-config.ts` — each exporting an ordered `MIGRATIONS`
+  array keyed by `from → to`.
+- `tw_detect_drift` now also surfaces schema-version skew (e.g. handoff at
+  v2 but tasks.md still at v1) so cross-artifact drift is visible.
+- New doc `docs/schema-versions.md` explaining how to ship a new schema
+  version (when to bump, where migrations live, test expectations).
+
+### Added — Token-Efficiency Improvements
+- **Drift response compression** (`tools/drift.ts:compressDriftDetails`)
+  collapses repeated drift lines and caps the response payload so
+  `tw_detect_drift` stops bloating per-turn context.
+- **`pending_notes` truncation** (`tools/handoff.ts`) enforces a total
+  character budget on `pending_notes` returned by `readState()`. Older
+  notes are dropped first; truncation metadata is attached so callers can
+  see what was trimmed.
+
+### Migration
+- All format upgrades are read-side and idempotent — no maintenance step
+  required. Files written by older versions continue to load; files
+  written by 3.4.0 carry the new `schema_version` field.
+- SQLite databases gain a `schema_version` row via additive migration on
+  first boot.
+
+## [3.3.0] - 2026-05-19
+
+### Changed
+- Project renamed from `teamwork-mcp-server` to `agent-governance-mcp` — package name, GitHub repo, bin commands (`agent-governance-mcp`, `agent-governance-context`), and all internal references updated.
+
+## [3.2.0] - 2026-05-18
+
+### Added — QA-Flow Enforcement
+- **Routing-chain state machine**: `tw_update_state` now validates every write
+  against an `ALLOWED_TRANSITIONS` matrix keyed on `(prev_last_agent,
+  prev_status)`. Illegal edges (e.g. `sr-engineer → PASS`) reject with a
+  structured envelope listing the attempted tuple and allowed alternatives.
+  Self-loop on same-agent `In_Progress→In_Progress` is fast-pathed.
+- **QA round counter**: `qa_round` is now persisted in handoff frontmatter
+  (file mode) and the `handoff_state` table (SQLite). Increments on
+  `(qa-engineer, FAIL)`, resets on PASS or PM re-entry. Round 4 triggers
+  forced rollback to PM — only `(pm, In_Progress)` is accepted thereafter.
+- **Evidence-of-QA**: PASS path now requires `qa_reports/review_<id>.md`
+  (file mode) or a `reports` table row (SQLite) for every `completed_tasks`
+  id. `tw_update_state` gained an optional `qa_review` field; when set with
+  `agent_id="qa-engineer"` and status in {PASS, FAIL}, the server records
+  the review automatically.
+- **`tw_complete_task` agent gate**: `agent_id="qa-engineer"` now required.
+  Symmetric to the PASS gate; closes the bypass where any role could flip
+  `[x]` directly.
+- **`UpdateStateArgs` schema refinement**: `status="PASS"` requires
+  `agent_id="qa-engineer"` at the zod layer, so the constraint is visible
+  in the MCP client error envelope, not just a handler `if`.
+- New module `tools/transitions.ts` (pure: ALLOWED_TRANSITIONS,
+  validateTransition, computeNewRound, requireQaEngineer).
+- New module `tools/evidence-file.ts` (file-mode recordReview/hasEvidence).
+- `HandoffStorage` interface gained `recordReview` + `hasEvidence`;
+  `writeState` gained a trailing `qaRound` parameter.
+
+### Migration
+- SQLite databases upgrade automatically on first boot: the schema gets a
+  `qa_round` column (additive `ALTER`) and a new `reports` table.
+- File-mode `handoff.md` without `qa_round` frontmatter loads as `qa_round=0`.
+- No tool-name changes; client code keeps working.
+
+### Out of Scope (deferred)
+- Server-side session role snapshot (option C). Without MCP caller identity
+  binding it only relocates the self-declaration; revisit when MCP gains a
+  caller-id field.
+
+## [3.1.2] - 2026-05-16
+
+### Changed
+- Constitution heading bumped to `v3.1.2` (`content/constitution.md`) so the
+  in-prompt version label stays aligned with the server package version. Going
+  forward, each release bumps both together; no semantic change to the rules
+  themselves in this release.
+
+## [3.1.1] - 2026-05-16
+
+### Fixed
+- SessionStart hook hint now lists `/architect` alongside the other four roles
+  (`bin/agent-governance-context.mjs`). Previously, users were never told the architect
+  role existed via the auto-injected coordinator briefing, even though
+  constitution §4 and the coordinator routing table both include it.
+- `markStateRead()` (`guards/session.ts`) no longer scans the workspace
+  filesystem when the workspace path doesn't exist on the host. In SQLite/HTTP
+  mode the server may handle workspace paths it can't see locally; previously
+  every `tw_get_state` call there did wasted `stat()` syscalls (and risked
+  EACCES noise on hostile mounts). Freshness in that mode still rides on the
+  `extra` snapshot map.
+- `CLAUDE.md` no longer claims the SessionStart hook is a silent no-op in this
+  repo. The repo dogfoods its own server (`.current/`, `tasks.md` are present);
+  the hook fires here exactly as in any managed workspace.
+- `skill-sr-engineer.md` "Hard rules" no longer restates constitution §2 and §3
+  verbatim — both bullets now point at the relevant constitution section. This
+  honors constitution §1's "skills MUST NOT restate these rules".
+
+## [3.1.0] - 2026-05-15
+
+### Added
+- `tw_add_task` MCP tool — append tasks to the active list. Works in stdio (markdown)
+  and HTTP/SQLite modes. Required for seeding tasks remotely without filesystem access.
+- SQLite storage adapter for HTTP mode (`SqliteHandoffStorage`) implements the same
+  `HandoffStorage` interface as the markdown file storage — no workspace files needed
+  on the server host.
+
+### Changed
+- Constitution and skills slimmed (v3.1.0): removed redundancy, fixed role gaps,
+  consolidated repeated prompts. Net token budget per role ≈ 1.4k.
+- `tools/tasks.ts` is now a thin delegator through `getActiveStorage()`. File-system
+  task ops live in `tools/tasks-file.ts`; SQLite task ops live in `tools/storage-sqlite.ts`.
+- `tools/drift.ts` rewritten to use `storage.listTasks()` — no direct fs access, so
+  drift detection works identically in stdio and HTTP modes.
+- README clarifies first-time install timing, hook ordering, and the `Step 4: Verify`
+  pass.
+
+### Fixed
+- Architect role prompt registered in `index.ts` (previously missing from the
+  `ListPrompts` handler).
+- Stable hook bin path: `bin/agent-governance-context.mjs` exposed as a `bin` entry so users
+  no longer have to dig into `~/.npm/_npx/<hash>/…`.
+- `better-sqlite3` is loaded lazily — stdio users without a C++ toolchain are no
+  longer blocked at install time. HTTP mode still requires it.
+- Per-IDE install docs (Claude Code, Claude Desktop, Cursor, Continue, Zed, Windsurf,
+  Cline, Gemini, Antigravity) reconciled to a single canonical install command.
+- Token policy + tool schema synced across all role prompts.
+
+## [3.0.x and earlier]
+
+This is the first release under a version-pinned distribution policy. Prior history is
+preserved in `git log` and the GitHub commit graph; future entries will live in this file.

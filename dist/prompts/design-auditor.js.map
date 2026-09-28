@@ -1,0 +1,1 @@
+{"version":3,"file":"design-auditor.js","sourceRoot":"","sources":["../../prompts/design-auditor.ts"],"names":[],"mappings":"AAAA,wBAAwB;AACxB,4CAA4C;AAC5C,OAAO,EAAE,kBAAkB,EAAqB,MAAM,YAAY,CAAC;AAEnE,MAAM,UAAU,wBAAwB,CAAC,aAAqB;IAC5D,OAAO,kBAAkB,CACvB,yBAAyB,EACzB,gDAAgD,EAChD,aAAa,CACd,CAAC;AACJ,CAAC"}

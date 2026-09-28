@@ -1,0 +1,27 @@
+# e123c-cross-lane-aggregation — expected reds left by sr-engineer (T-E123C-01/02). qa-engineer owns test/ (§2).
+
+# AC8: the KNOWN GAP test asserts the OLD (throwing) behaviour; T-E123C-02 closes the gap. qa flips it to assert the graceful reason and renames it off "KNOWN GAP".
+test/drift-skew.test.mjs | KNOWN GAP (J2-NEW-9, non-blocking): an UNMIGRATED flat workspace with a from-the-future handoff schema_version is NOT caught by the skew precheck — parseHandoff throws instead of a graceful drift reason
+
+# AC11: tools/gate-stats.ts + tools/usage-accounting.ts are new, spec-sanctioned lane-paths importers (CALLERS2). Both also call
+# resolveCurrentLanePaths (the resolveCurrentLane grep substring, CALLERS3) — gate-stats for the report's current-lane path/caveat,
+# usage-accounting for AC7's write target. qa adds both files to both allow-lists.
+test/lane-paths.test.mjs | CALLERS2 (allow-list): grep -rln "lane-paths" tools/ gates/ guards/ prompts/ bin/ index.ts names exactly the sanctioned F0 + L1-L3 importer set — a NEW unlisted importer still fails this
+test/lane-paths.test.mjs | CALLERS3 (allow-list): grep -rn resolveCurrentLane tools/ gates/ guards/ prompts/ bin/ index.ts names exactly the sanctioned L1-L3 caller set — a NEW unlisted caller still fails this
+
+# AC7: appendUsageRecord now writes .current/<lane>/usage.jsonl (a no-.git tmp ws resolves lane _primary). These tests read the
+# FLAT usagePath(ws) via readUsageLines — qa retargets readUsageLines to resolveCurrentLanePaths(ws).usagePath.
+test/usage-accounting.test.mjs | t-append-creates-file: appendUsageRecord creates .current/usage.jsonl and writes one JSON line
+test/usage-accounting.test.mjs | t-append-creates-current-dir: appendUsageRecord creates .current/ if missing entirely
+test/usage-accounting.test.mjs | t-append-appends-not-truncates: multiple appendUsageRecord calls accumulate lines, never truncate
+test/usage-accounting.test.mjs | t-ac7-disjoint-keys: a usage.jsonl record's key set is disjoint from telemetry.jsonl's documented shape
+test/usage-accounting.test.mjs | t-ac7-separate-files: usage.jsonl and telemetry.jsonl are two distinct files, never conflated
+test/usage-accounting.test.mjs | t-hook-writes-record: a valid Task dispatch with tokenBudgetPerFeature set DOES append a usage.jsonl record (positive control)
+test/usage-accounting.test.mjs | t-hook-missing-usage-fields-default-zero: tool_response.usage with missing/non-numeric fields defaults them to 0
+test/usage-accounting.test.mjs | t-hook-no-usage-anywhere-all-zeros: no tool_response.usage and no agent-*.jsonl fallback source -> all-zeros record, still written (opt-in armed)
+test/usage-accounting.test.mjs | t-hook-feature-null-when-no-handoff: dispatch.feature is null when handoff.md is absent (best-effort, never throws)
+
+# PRE-EXISTING, not introduced by this diff (F2-NEW-1): these copy the PRIMARY checkout's live .current/, which has had no flat
+# handoff.md since b7a566f migrated it to .current/_primary/. Red on a clean HEAD too; environment-coupled, out of F2 scope.
+test/e123b9-lane-flip.test.mjs | AC8 Round 1: migrateFlatToLane then migrateLaneToFlat on a real copy of the primary checkout's .current/ leaves every file byte-identical (per-file SHA-256), modulo only a not-previously-absent lock/tmp artifact
+test/e123b9-lane-flip.test.mjs | AC8 Round 2: the WIRED trigger (readHandoffState, via a standalone node process against the built dist/) migrates a real copy of the primary's .current/, lands every LANE_FILES entry under .current/_primary/, deep-equals the pre-copy flat parse, then reverses byte-identically

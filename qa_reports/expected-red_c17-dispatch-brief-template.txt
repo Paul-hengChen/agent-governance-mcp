@@ -1,0 +1,9 @@
+# c17-dispatch-brief-template — expected-red manifest (emitted by sr-engineer per skill-sr-engineer SOP 7a)
+# Format: <relative test file path> | <exact test name/description string>
+
+# qa-owned token-cap re-baseline (spec AC5): T-C17-01 added the "Dispatch Brief Template"
+# subsection to content/skill-coordinator.md §Auto-Routing, growing the teamwork bundle
+# past the exact-measured ≤ 11445 cap (measured 11815 ~tok post-change). Per the established
+# Phase-2 convention the new cap must be the exact independently re-measured value (no
+# headroom) and only qa-engineer may write it (Constitution §2 Test ownership; T-C17-03/04/05).
+test/context-budget.test.mjs | AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 9545 ~tok)

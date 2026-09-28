@@ -1,0 +1,1 @@
+{"version":3,"file":"partials-manifest.d.ts","sourceRoot":"","sources":["../../prompts/partials-manifest.ts"],"names":[],"mappings":"AAoBA,MAAM,WAAW,cAAc;IAC7B,QAAQ,CAAC,KAAK,EAAE,MAAM,CAAC;IACvB,QAAQ,CAAC,IAAI,EAAE,MAAM,CAAC;CACvB;AAID,eAAO,MAAM,QAAQ,EAAE,SAAS,cAAc,EAE7C,CAAC;AASF,wBAAgB,cAAc,CAC5B,IAAI,EAAE,MAAM,EACZ,IAAI,EAAE,CAAC,WAAW,EAAE,MAAM,KAAK,MAAM,GACpC,MAAM,CAQR"}

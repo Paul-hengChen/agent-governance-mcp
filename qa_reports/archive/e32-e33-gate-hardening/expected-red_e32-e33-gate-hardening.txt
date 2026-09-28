@@ -1,0 +1,49 @@
+# e32-e33-gate-hardening — expected reds after the sr-engineer REWORK round
+# (T-E32-01 c16 contract amendment, per review round 1 CHANGES_REQUESTED +
+# PM re-scope option A). This round-2 manifest SUPERSEDES the round-1
+# justifications in this same file (round 1 narrowed the exemption to the
+# verdict-bearing shape; round 2 removes the exemption ENTIRELY and moves the
+# APPROVED-handoff review scope to transient review_task_ids — so the round-1
+# "add review_verdict to the fixture" fix guidance below is obsolete).
+# Suite state at handoff: 1589/1600 pass, 11 fail — every red listed below,
+# zero unexplained. qa-engineer owns all test/fixture edits (§2);
+# sr-engineer edited NO test file and NO fixture.
+
+# E33 as-is pins (unchanged from round 1, deliberate): P1a/P1b pin the
+# pre-E33 "same-count swap is silent" behavior and were written expecting
+# this ticket to flip them. Post-E33 the entry-identity diff warns on the
+# dropped entry, so envelope.warnings is now a 1-element array instead of
+# undefined. QA re-pins to assert the warning (naming the dropped entry).
+test/e28-shrink-warning.test.mjs | P1a (probe 1, pin-as-is): a same-count dispatch_pins SWAP drops an entry with NO warning (E33 not yet fixed)
+test/e28-shrink-warning.test.mjs | P1b (probe 1, pin-as-is): a same-count external_refs SWAP drops an entry with NO warning (E33 not yet fixed)
+
+# E32 c16-amendment flips — tests that PIN THE OLD SANCTIONED SHAPE
+# (manifest-in-completed_tasks on the APPROVED handoff). Under the amended
+# contract that shape is REJECTED BY DESIGN (QA_COMPLETION_EVIDENCE_MISSING:
+# completed_tasks growth on any qa-engineer-stamped write requires per-id
+# qa_reports/ evidence, no edge/status/verdict exemption; review scope
+# travels in review_task_ids). QA modernizes each to the amended contract:
+# QAEV-4 becomes "the amended APPROVED handoff (review_verdict +
+# review_task_ids, completed_tasks empty) is ACCEPTED and the old shape is
+# REJECTED"; FM4 asserts MISSING_REVIEW_EVIDENCE via review_task_ids (no
+# review_reports present); FM5's positive control moves the manifest to
+# review_task_ids (accepted, ledger stays empty).
+test/e18-write-provenance.test.mjs | QAEV-4: the sanctioned APPROVED-row edge (code-reviewer:In_Progress -> qa-engineer:In_Progress) with review_reports evidence is EXEMPT from QA_COMPLETION_EVIDENCE_MISSING
+test/reviewer-completed-tasks-gate.test.mjs | FM4: qa-engineer APPROVED-row write with non-empty completed_tasks and NO review evidence is rejected by MISSING_REVIEW_EVIDENCE, not the new gate (file mode)
+test/reviewer-completed-tasks-gate.test.mjs | FM5: qa-engineer APPROVED-row write with non-empty completed_tasks and review evidence PRESENT is ACCEPTED (file mode, positive control)
+
+# Compose-golden byte-equivalence — content/const-08-chain-31-mid.md's E18
+# bullet was amended (the APPROVED-row exemption sentence is replaced by the
+# no-exemption + review_task_ids contract), so every golden fixture whose
+# composition includes const-08 (chain-tagged: the four build-full-* modes,
+# the full hook, and the 15-fragment monolith concat) is now byte-stale.
+# Mechanical re-capture: qa re-runs scripts/capture-constitution-golden.mjs
+# and re-commits test/fixtures/compose-golden/. Lite goldens (const-08
+# excluded) and context-budget floors stay green (the amended sentence is
+# SHORTER than the original — budgets verified green this round).
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=false, fullDetail=false) is byte-identical to pre-refactor golden build-full-nondesign.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=true, fullDetail=false) is byte-identical to pre-refactor golden build-full-design.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=false, fullDetail=true) is byte-identical to pre-refactor golden build-full-nondesign-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=true, fullDetail=true) is byte-identical to pre-refactor golden build-full-design-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: SessionStart hook (AGC_DEFAULT_SKILL=full) is byte-identical to pre-refactor golden hook-full.txt
+test/compose-equivalence.test.mjs | compose-equivalence: cat(15 manifest fragments in order) === the pre-refactor constitution.md monolith (DR-1 Option R invariant)

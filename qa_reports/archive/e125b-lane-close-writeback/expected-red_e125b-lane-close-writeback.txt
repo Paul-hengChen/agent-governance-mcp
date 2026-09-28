@@ -1,0 +1,27 @@
+# e125b-lane-close-writeback — expected reds left for qa (T-E125B-04) to re-baseline. All are spec-mandated;
+# none is a production regression. sr-engineer 2026-09-25.
+
+# AC1: --shipped now moves .current/<lane>/ (incl. pending-tickets.md) into .current/history/<YYYY-MM>/<lane>/
+# and lands an ADJACENT close commit on --base, so git log -1 is the close commit and the
+# old .current/e179a/pending-tickets.md path is gone (read it from the history bucket instead).
+test/agc-feature-lifecycle.test.mjs | AC2 proof (1): finish --shipped applies a lane's 2-entry pending-tickets.md, commits on --base, and archives it
+
+# AC11: base-sha is a new MOVABLE LANE_FILES entry (8 entries). seedAllFiveFiles seeds only 6 movable
+# files, so every assertion derived from MOVABLE_FILENAMES now expects base-sha too (FL1/REV1/RT1/
+# DEBRIS*/AC2-e125a). Re-baseline the seed helper — the e125a REG1 precedent.
+test/lane-migrate.test.mjs | FL1: full-fixture move — all 5 present files move from flat .current/ into .current/<lane>/, none touched by non-LANE_FILES paths
+test/lane-migrate.test.mjs | REV1: full-fixture reverse — all 5 lane files move back to flat, then the now-empty lane dir is removed
+test/lane-migrate.test.mjs | AC5-DEBRIS1 (e123b9 J2, spec AC5 — the lock's OWN path is now this same filename): a leftover STALE HANDOFF_LOCK_FILENAME in the lane dir is cleared by withFileLock's own stale-lock detection and the move succeeds, removing the (now-empty) lane dir
+test/lane-migrate.test.mjs | AC5-DEBRIS2: a stale atomic-write temp file (`<lane filename>.<pid>.<ms>.tmp`) in the lane dir is tolerated — the move succeeds and the temp file is removed with the lane dir
+test/lane-migrate.test.mjs | AC5-DEBRIS3: any OTHER non-LANE_FILES entry (not the lock, not an atomic-tmp shape) still refuses before any move — debris tolerance is narrow, not a general amnesty
+test/lane-migrate.test.mjs | AC5-DEBRIS4 (e123b9 J2, spec AC5 — the debris-tolerance pre-flight now runs INSIDE the per-lane lock, so a directory squatting on the lock's own path fails at lock ACQUISITION, not the later foreign-content check): a DIRECTORY named exactly HANDOFF_LOCK_FILENAME refuses (via the lock-acquisition timeout) and touches nothing
+test/lane-migrate.test.mjs | RT1: migrateFlatToLane then migrateLaneToFlat leaves all 5 files byte-identical to their pre-migration content
+test/lane-migrate.test.mjs | AC2 (e125a): migrateLaneToFlat refuses outright while the lane dir still holds tasks.md — nothing moved, message names the tasks reverse runner
+test/lane-migrate.test.mjs | AC2 (e125a): a leftover tasks.md.lock in the lane dir, on its own, is tolerable debris — the reverse move still succeeds and removes it with the lane dir
+
+# AC11: registry count 7 -> 8 (baseSha).
+test/lane-paths.test.mjs | REG1: LANE_FILES has exactly 7 entries — 1 required (handoff) + 6 optional (telemetry/metrics/usage/dispatch/pendingTickets/tasks)
+
+# AC11: spec mandates consumers use resolveLanePaths(ws, lane).baseShaPath (no standalone composer);
+# bin/agc-init.mjs (start write + finish read) is now a sanctioned resolveLanePaths caller.
+test/lane-paths.test.mjs | CALLERS1: grep -rn resolveLanePaths tools/ gates/ guards/ prompts/ bin/ index.ts names only tools/lane-paths.ts (zero production callers)

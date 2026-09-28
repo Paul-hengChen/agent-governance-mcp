@@ -1,0 +1,17 @@
+# e102-agc-init-symlink-atomicwrite — expected-red manifest (emitted by
+# sr-engineer per skill-sr-engineer SOP 7a)
+# Format: <relative test file path> | <exact test name/description string>
+
+# T-E102-01 (R3-A, decided by the human 2026-09-16, backlog E102 row / plan
+# section 8 decision E: symlinks ARE a supported layout, hardlinks are NOT)
+# ships the fix that this documented-behaviour test was written to pin: it
+# resolves `target` through any symlink (fs.realpathSync) before deriving
+# `tmpPath` in atomicWriteFile, so a symlinked CLAUDE.md is now written
+# through the link instead of being replaced by a detached regular file.
+# That is precisely the opposite of what this test asserts (linkIsSymlink
+# === false, canonicalStillHasOldBlock === true), so it now fails BY DESIGN.
+# This is qa-owned surface (test/agc-adapters.test.mjs) — sr-engineer did not
+# edit it. Inverting the assertions to pin the NEW (fixed) behaviour is
+# qa-engineer's task, not sr-engineer's; flagging here so the red is not
+# mistaken for a regression.
+test/agc-adapters.test.mjs | KNOWN BEHAVIOUR (R3-A, non-blocking per code-reviewer round 3): a symlinked CLAUDE.md is replaced, not written through — pinned so a change here is deliberate, not silent

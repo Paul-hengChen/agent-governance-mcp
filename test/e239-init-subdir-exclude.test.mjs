@@ -1,0 +1,417 @@
+// Coded by @qa-engineer
+// Tests for specs/e239-init-subdir-exclude.md AC1-AC13 (AC14 is verified by
+// grep, not a test case here — see qa_reports/review_T-E239-02.md; AC3 is
+// the existing test/e106-init-artifacts-flag.test.mjs suite passing
+// unmodified, per the spec's own proof — this file never edits that suite's
+// existing assertions, only appends one additive regression case for AC3).
+//
+// Spec-to-test map:
+//   AC1  -> "AC1: subdir default-local writes subdir-prefixed exclude rules"
+//   AC2  -> "AC2: scaffold created under subdir is actually ignored by the written rules"
+//   AC3  -> test/e106-init-artifacts-flag.test.mjs's existing suite (unmodified) +
+//           its appended "AC3 regression (E239): ..." case
+//   AC4  -> "AC4: subdir already-tracked warning is subdir-prefixed and repo-root-qualified"
+//   AC5  -> "AC5: subdir omitted-flag tracked detection uses subdir-prefixed paths"
+//   AC6  -> "AC6: subdir re-run is idempotent, no duplicate exclude lines"
+//   AC7  -> "AC7: subdir repo mode still writes no exclude rules"
+//   AC8  -> "AC8: gitignore-metacharacter subdir name refuses local mode cleanly"
+//   AC9  -> "AC9: gitignore-metacharacter subdir name is fine under explicit repo mode"
+//   AC10 -> "AC10: agc check subdir declared-and-matching is silent"
+//   AC11 -> "AC11: agc check subdir drift detection mirrors the root case"
+//   AC12 -> "AC12: agc check does not cross-contaminate root and subdir artifact rule sets"
+//   AC13 -> "AC13: agc check advises rather than mis-tests on a gitignore-unsafe subdir path"
+//
+// Every scratch repo is a REAL git repository built under os.tmpdir() via
+// `git init` + a local identity (never this checkout or the lane worktree,
+// and never the ambient global git config) — same discipline as
+// test/e106-init-artifacts-flag.test.mjs, which this file is a sibling of.
+//
+// Repro-red (T-E239-02, per the spec's "Cut amendments" section): before
+// authoring this suite, the AC1/AC2 scenario below was run against the lane
+// base's bin/agc-init.mjs (d0c66f0, extracted via `git show
+// d0c66f0:bin/agc-init.mjs`) in a throwaway $TMPDIR fixture. It failed both
+// ways: .git/info/exclude gained the un-prefixed root-anchored rules
+// (/.current/, /tasks.md, /qa_reports/, /review_reports/) regardless of
+// cwd=sub, and neither `git check-ignore -v sub/.current/anything` nor
+// `git check-ignore -v sub/tasks.md` matched (exit 1, no match) — confirming
+// the bug this ticket fixes. That repro is not itself committed (it is not a
+// standing regression check, just the required red-before-fix evidence);
+// see qa_reports/review_T-E239-02.md for the transcript.
+
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+import { execFileSync, spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+
+const __filename = fileURLToPath(import.meta.url);
+const PROJECT_ROOT = path.resolve(path.dirname(__filename), "..");
+const AGC_INIT = path.join(PROJECT_ROOT, "bin", "agc-init.mjs");
+
+const ARTIFACT_EXCLUDE_RULES = ["/.current/", "/tasks.md", "/qa_reports/", "/review_reports/"];
+
+// Same four rules, re-anchored under a repo-relative prefix — exactly what
+// artifactExcludeRulesForPrefix(prefix) in bin/agc-init.mjs computes; this
+// test file re-derives it independently (black-box, CLI-level) rather than
+// importing the internal helper, mirroring how test/e106-init-artifacts-flag.test.mjs
+// asserts against the root-level ARTIFACT_EXCLUDE_RULES constant rather than
+// reaching into the module.
+function prefixedRules(prefix) {
+  return ARTIFACT_EXCLUDE_RULES.map((rule) => `/${prefix}${rule}`);
+}
+
+// ---------------------------------------------------------------------------
+// Cleanup registry — mirrors test/e106-init-artifacts-flag.test.mjs.
+// ---------------------------------------------------------------------------
+const TMP_DIRS = [];
+function mkTmp(prefix) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  TMP_DIRS.push(dir);
+  return dir;
+}
+test.after(() => {
+  for (const dir of TMP_DIRS) {
+    try {
+      fs.rmSync(dir, { recursive: true, force: true });
+    } catch {
+      // best effort
+    }
+  }
+});
+
+// ---------------------------------------------------------------------------
+// helpers
+// ---------------------------------------------------------------------------
+function git(cwd, args) {
+  return execFileSync("git", args, { cwd, encoding: "utf-8" });
+}
+
+function mkGitRepo(prefix) {
+  const repo = mkTmp(prefix);
+  git(repo, ["init", "-q", "-b", "main"]);
+  git(repo, ["config", "user.email", "qa@example.com"]);
+  git(repo, ["config", "user.name", "QA Sentinel"]);
+  git(repo, ["config", "commit.gpgsign", "false"]);
+  return repo;
+}
+
+function runAgc(cwd, args) {
+  return spawnSync(process.execPath, [AGC_INIT, ...args], { cwd, encoding: "utf-8" });
+}
+
+function readConfig(ws) {
+  return JSON.parse(fs.readFileSync(path.join(ws, ".current", ".config.json"), "utf-8"));
+}
+
+function readExclude(repo) {
+  return fs.readFileSync(path.join(repo, ".git", "info", "exclude"), "utf-8");
+}
+
+function excludeLineSet(repo) {
+  return new Set(
+    readExclude(repo)
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0 && !l.startsWith("#")),
+  );
+}
+
+function seedConfig(ws, obj) {
+  fs.mkdirSync(path.join(ws, ".current"), { recursive: true });
+  fs.writeFileSync(path.join(ws, ".current", ".config.json"), JSON.stringify(obj, null, 2) + "\n");
+}
+
+function mkSub(repo, rel = "sub") {
+  const sub = path.join(repo, rel);
+  fs.mkdirSync(sub, { recursive: true });
+  return sub;
+}
+
+function checkIgnore(repo, relPath) {
+  return spawnSync("git", ["check-ignore", "-v", relPath], { cwd: repo, encoding: "utf-8" });
+}
+
+// ---------------------------------------------------------------------------
+// AC1 — subdir default-local writes subdir-prefixed exclude rules
+// ---------------------------------------------------------------------------
+test("AC1: subdir default-local writes subdir-prefixed exclude rules", () => {
+  const repo = mkGitRepo("e239-ac1-");
+  const sub = mkSub(repo);
+  const r = runAgc(sub, ["init"]);
+  assert.equal(r.status, 0, `exit code (stderr=${r.stderr})`);
+  assert.deepEqual(readConfig(sub), { schema_version: 2, host: "claude-code", artifacts: "local" });
+
+  const lines = excludeLineSet(repo);
+  for (const rule of prefixedRules("sub")) {
+    assert.ok(lines.has(rule), `expected ${rule} in .git/info/exclude, got: ${[...lines].join(", ")}`);
+  }
+  // Never the un-prefixed root-anchored strings — this is the exact bug
+  // being fixed: writing them from a subdir would silently miss the scaffold.
+  for (const rule of ARTIFACT_EXCLUDE_RULES) {
+    assert.ok(!lines.has(rule), `un-prefixed rule ${rule} must NOT be written for a subdir workspace`);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// AC2 — scaffold created under subdir is actually ignored by the written rules
+// ---------------------------------------------------------------------------
+test("AC2: scaffold created under subdir is actually ignored by the written rules", () => {
+  const repo = mkGitRepo("e239-ac2-");
+  const sub = mkSub(repo);
+  const r = runAgc(sub, ["init", "--artifacts=local"]);
+  assert.equal(r.status, 0, `exit code (stderr=${r.stderr})`);
+
+  const ig1 = checkIgnore(repo, "sub/.current/anything");
+  const ig2 = checkIgnore(repo, "sub/tasks.md");
+  assert.equal(ig1.status, 0, `sub/.current/anything must be ignored (stdout=${ig1.stdout} stderr=${ig1.stderr})`);
+  assert.equal(ig2.status, 0, `sub/tasks.md must be ignored (stdout=${ig2.stdout} stderr=${ig2.stderr})`);
+});
+
+// ---------------------------------------------------------------------------
+// AC4 — subdir already-tracked warning is subdir-prefixed and repo-root-qualified
+// ---------------------------------------------------------------------------
+test("AC4: subdir already-tracked warning is subdir-prefixed and repo-root-qualified", () => {
+  const repo = mkGitRepo("e239-ac4-");
+  const sub = mkSub(repo);
+  fs.mkdirSync(path.join(sub, ".current"), { recursive: true });
+  fs.writeFileSync(path.join(sub, ".current", "handoff.md"), "seed\n");
+  fs.writeFileSync(path.join(sub, "tasks.md"), "# Tasks\n");
+  git(repo, ["add", "-A"]);
+  git(repo, ["commit", "-q", "-m", "pre-existing tracked artifacts under sub/"]);
+
+  const r = runAgc(sub, ["init", "--artifacts=local"]);
+  assert.equal(r.status, 0, `exit code (stderr=${r.stderr})`);
+
+  // Display list is subdir-prefixed.
+  assert.match(r.stderr, /^  sub\/\.current\/$/m, `stderr=${r.stderr}`);
+  assert.match(r.stderr, /^  sub\/tasks\.md$/m, `stderr=${r.stderr}`);
+  // Never the bare, un-prefixed display form.
+  assert.doesNotMatch(r.stderr, /^  \.current\/$/m);
+  assert.doesNotMatch(r.stderr, /^  tasks\.md$/m);
+
+  // Untrack command targets are subdir-prefixed, and the qualifier is present.
+  assert.match(r.stderr, /Untrack them with \(run from the repository root\):/);
+  assert.match(r.stderr, /git rm -r --cached sub\/\.current sub\/tasks\.md/);
+  assert.match(r.stderr, /Note: history still contains these files after that command\./);
+
+  // Still tracked — agc never runs git rm itself.
+  const tracked = git(repo, ["ls-files", "--", "sub/.current", "sub/tasks.md"]).trim().split("\n").filter(Boolean);
+  assert.ok(tracked.includes("sub/.current/handoff.md"));
+  assert.ok(tracked.includes("sub/tasks.md"));
+});
+
+// ---------------------------------------------------------------------------
+// AC5 — subdir omitted-flag tracked detection uses subdir-prefixed paths
+// ---------------------------------------------------------------------------
+test("AC5: subdir omitted-flag tracked detection uses subdir-prefixed paths", () => {
+  const repo = mkGitRepo("e239-ac5-");
+  const sub = mkSub(repo);
+  fs.writeFileSync(path.join(sub, "tasks.md"), "# Tasks\n");
+  git(repo, ["add", "-A"]);
+  git(repo, ["commit", "-q", "-m", "pre-existing tracked sub/tasks.md"]);
+
+  const before = readExclude(repo);
+  const r = runAgc(sub, ["init"]); // flag OMITTED
+  assert.equal(r.status, 0, `exit code (stderr=${r.stderr})`);
+
+  const cfg = readConfig(sub);
+  assert.equal(cfg.artifacts, undefined, "artifacts must stay undeclared, not silently default to local");
+  assert.ok(!Object.prototype.hasOwnProperty.call(cfg, "artifacts"));
+  assert.equal(readExclude(repo), before, "no exclude rules written when the flag is omitted on a tracked tree");
+
+  assert.match(r.stderr, /already tracked in this repo/);
+  assert.match(r.stderr, /^  sub\/tasks\.md$/m, `stderr=${r.stderr}`);
+  assert.doesNotMatch(r.stderr, /^  tasks\.md$/m, "must never print the un-prefixed root-anchored path");
+  assert.match(r.stderr, /re-run with --artifacts=local or --artifacts=repo to choose explicitly/);
+});
+
+// ---------------------------------------------------------------------------
+// AC6 — subdir re-run is idempotent, no duplicate exclude lines
+// ---------------------------------------------------------------------------
+test("AC6: subdir re-run is idempotent, no duplicate exclude lines", () => {
+  const repo = mkGitRepo("e239-ac6-");
+  const sub = mkSub(repo);
+  assert.equal(runAgc(sub, ["init", "--artifacts=local"]).status, 0);
+  const afterFirst = readExclude(repo);
+  const r2 = runAgc(sub, ["init", "--artifacts=local"]);
+  assert.equal(r2.status, 0, `exit code (stderr=${r2.stderr})`);
+  assert.equal(readExclude(repo), afterFirst, "second run must add zero new lines");
+
+  const nonCommentLines = readExclude(repo)
+    .split(/\r?\n/)
+    .filter((l) => l.trim().length > 0 && !l.trim().startsWith("#"));
+  assert.equal(nonCommentLines.length, 4, `expected exactly 4 non-comment lines, got: ${nonCommentLines.join(", ")}`);
+});
+
+// ---------------------------------------------------------------------------
+// AC7 — subdir repo mode still writes no exclude rules
+// ---------------------------------------------------------------------------
+test("AC7: subdir repo mode still writes no exclude rules", () => {
+  const repo = mkGitRepo("e239-ac7-");
+  const sub = mkSub(repo);
+  const before = readExclude(repo); // git init's default template
+  const r = runAgc(sub, ["init", "--artifacts=repo"]);
+  assert.equal(r.status, 0, `exit code (stderr=${r.stderr})`);
+  assert.equal(readExclude(repo), before, ".git/info/exclude must be byte-identical — repo mode writes nothing there");
+  assert.deepEqual(readConfig(sub), { schema_version: 2, host: "claude-code", artifacts: "repo" });
+});
+
+// ---------------------------------------------------------------------------
+// AC8 — gitignore-metacharacter subdir name refuses local mode cleanly
+// ---------------------------------------------------------------------------
+test("AC8: gitignore-metacharacter subdir name refuses local mode cleanly", () => {
+  // Sub-case (a): flag omitted, nothing tracked -> would default to local -> refuses.
+  {
+    const repo = mkGitRepo("e239-ac8a-");
+    const weird = mkSub(repo, "weird[dir]");
+    const r = runAgc(weird, ["init"]);
+    assert.equal(r.status, 2, `expected exit 2 (stderr=${r.stderr})`);
+    assert.match(
+      r.stderr,
+      /agc init: refusing --artifacts=local — workspace path segment "weird\[dir\]" contains a gitignore-wildcard character \(one of \* \? \[ \]\), so the exclude rule agc would write could match unintended files\. Rename the directory, or re-run with --artifacts=repo\./,
+    );
+    assert.ok(!fs.existsSync(path.join(weird, ".current")), "no partial scaffold left behind");
+    assert.ok(!fs.existsSync(path.join(weird, "tasks.md")), "no partial scaffold left behind");
+  }
+  // Sub-case (b): explicit --artifacts=local -> also refuses.
+  {
+    const repo = mkGitRepo("e239-ac8b-");
+    const weird = mkSub(repo, "weird[dir]");
+    const r = runAgc(weird, ["init", "--artifacts=local"]);
+    assert.equal(r.status, 2, `expected exit 2 (stderr=${r.stderr})`);
+    assert.match(r.stderr, /workspace path segment "weird\[dir\]"/);
+    assert.ok(!fs.existsSync(path.join(weird, ".current")), "no partial scaffold left behind");
+  }
+});
+
+// ---------------------------------------------------------------------------
+// AC9 — gitignore-metacharacter subdir name is fine under explicit repo mode
+// ---------------------------------------------------------------------------
+test("AC9: gitignore-metacharacter subdir name is fine under explicit repo mode", () => {
+  const repo = mkGitRepo("e239-ac9-");
+  const weird = mkSub(repo, "weird[dir]");
+  const before = readExclude(repo);
+  const r = runAgc(weird, ["init", "--artifacts=repo"]);
+  assert.equal(r.status, 0, `exit code (stderr=${r.stderr})`);
+  assert.deepEqual(readConfig(weird), { schema_version: 2, host: "claude-code", artifacts: "repo" });
+  assert.equal(readExclude(repo), before, "repo mode writes no exclude rules even under a wildcard-named dir");
+});
+
+// ---------------------------------------------------------------------------
+// AC10 — agc check subdir declared-and-matching is silent
+// ---------------------------------------------------------------------------
+test("AC10: agc check subdir declared-and-matching is silent", () => {
+  const repo = mkGitRepo("e239-ac10-");
+  const sub = mkSub(repo);
+  seedConfig(sub, { schema_version: 2, host: "claude-code", artifacts: "local" });
+  fs.mkdirSync(path.join(repo, ".git", "info"), { recursive: true });
+  fs.writeFileSync(path.join(repo, ".git", "info", "exclude"), prefixedRules("sub").join("\n") + "\n");
+
+  const r = runAgc(sub, ["check"]);
+  assert.equal(r.status, 0);
+  assert.doesNotMatch(r.stderr, /artifacts (drift|undeclared)/, `stderr=${r.stderr}`);
+});
+
+// ---------------------------------------------------------------------------
+// AC11 — agc check subdir drift detection mirrors the root case
+// ---------------------------------------------------------------------------
+test("AC11: agc check subdir drift detection mirrors the root case", () => {
+  // Sub-case (a): declared local, subdir-prefixed rules never written.
+  {
+    const repo = mkGitRepo("e239-ac11a-");
+    const sub = mkSub(repo);
+    seedConfig(sub, { schema_version: 2, host: "claude-code", artifacts: "local" });
+    const r = runAgc(sub, ["check"]);
+    assert.equal(r.status, 0);
+    assert.match(
+      r.stderr,
+      /artifacts drift: config declares "local" but exclude rules are missing from \.git\/info\/exclude/,
+    );
+  }
+  // Sub-case (b): declared local, rules present, but a subdir artifact path is tracked.
+  {
+    const repo = mkGitRepo("e239-ac11b-");
+    const sub = mkSub(repo);
+    seedConfig(sub, { schema_version: 2, host: "claude-code", artifacts: "local" });
+    git(repo, ["add", "-A"]);
+    git(repo, ["commit", "-q", "-m", "tracks sub/.current/.config.json"]);
+    fs.mkdirSync(path.join(repo, ".git", "info"), { recursive: true });
+    fs.writeFileSync(path.join(repo, ".git", "info", "exclude"), prefixedRules("sub").join("\n") + "\n");
+    const r = runAgc(sub, ["check"]);
+    assert.equal(r.status, 0);
+    assert.match(
+      r.stderr,
+      /artifacts drift: config declares "local" but sub\/\.current\/ is tracked despite local mode/,
+      `stderr=${r.stderr}`,
+    );
+  }
+});
+
+// ---------------------------------------------------------------------------
+// AC12 — agc check does not cross-contaminate root and subdir artifact rule sets
+// ---------------------------------------------------------------------------
+test("AC12: agc check does not cross-contaminate root and subdir artifact rule sets", () => {
+  const repo = mkGitRepo("e239-ac12-");
+  const sub = mkSub(repo);
+  seedConfig(sub, { schema_version: 2, host: "claude-code", artifacts: "repo" });
+  // Root's own, earlier `agc init --artifacts=local` run left root-anchored rules.
+  fs.mkdirSync(path.join(repo, ".git", "info"), { recursive: true });
+  fs.writeFileSync(path.join(repo, ".git", "info", "exclude"), ARTIFACT_EXCLUDE_RULES.join("\n") + "\n");
+
+  const r = runAgc(sub, ["check"]);
+  assert.equal(r.status, 0);
+  assert.doesNotMatch(
+    r.stderr,
+    /artifacts drift/,
+    "the root workspace's rules must never count as the subdir workspace's rules",
+  );
+});
+
+// ---------------------------------------------------------------------------
+// AC13 — agc check advises rather than mis-tests on a gitignore-unsafe subdir path
+// ---------------------------------------------------------------------------
+test("AC13: agc check advises rather than mis-tests on a gitignore-unsafe subdir path", () => {
+  const repo = mkGitRepo("e239-ac13-");
+  const weird = mkSub(repo, "weird[dir]");
+  // Hand-authored, since `agc init` itself would have refused per AC8.
+  seedConfig(weird, { schema_version: 2, host: "claude-code", artifacts: "local" });
+
+  const r = runAgc(weird, ["check"]);
+  assert.equal(r.status, 0);
+  assert.match(
+    r.stderr,
+    /agc check — cannot verify artifacts drift: workspace path segment "weird\[dir\]" contains a gitignore-wildcard character \(one of \* \? \[ \]\) — rename the directory, or declare artifacts explicitly via agc init --artifacts=repo/,
+  );
+  assert.doesNotMatch(
+    r.stderr,
+    /config declares/,
+    "must advise, not attempt (and get wrong) the normal drift() test, which is what config-declares would signal",
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Boundary / security smoke (SOP Phase 3d — always included)
+// ---------------------------------------------------------------------------
+test("boundary: a wildcard segment nested two levels deep is still refused, naming that inner segment", () => {
+  const repo = mkGitRepo("e239-boundary-nested-");
+  const nested = mkSub(repo, path.join("pkgs", "wei[rd]"));
+  const r = runAgc(nested, ["init"]);
+  assert.equal(r.status, 2, `expected exit 2 (stderr=${r.stderr})`);
+  assert.match(r.stderr, /workspace path segment "wei\[rd\]"/, `stderr=${r.stderr}`);
+  assert.ok(!fs.existsSync(path.join(nested, ".current")), "no partial scaffold left behind");
+});
+
+test("boundary: an empty subdirectory name segment (repo root itself) is unaffected by the subdir fix", () => {
+  // cwd === repo root: prefix is "", so none of the new subdir behavior
+  // applies — this is the root-cwd path AC3 protects, spot-checked here from
+  // this file's own fixtures rather than relying solely on the sibling suite.
+  const repo = mkGitRepo("e239-boundary-root-");
+  const r = runAgc(repo, ["init"]);
+  assert.equal(r.status, 0, `exit code (stderr=${r.stderr})`);
+  const lines = excludeLineSet(repo);
+  for (const rule of ARTIFACT_EXCLUDE_RULES) {
+    assert.ok(lines.has(rule));
+  }
+});

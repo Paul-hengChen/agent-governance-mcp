@@ -1,0 +1,11 @@
+# E31 re-baseline: these tests pin the PRE-E31 behavior — loadConfig throwing on
+# corrupt/unparseable/future-schema .current/.config.json, and that throw escaping
+# through the tw_get_state pre-flight read. E31's entire purpose is removing that
+# throw (non-fatal degrade + envelope config_error), so each goes red against the
+# fixed code. qa-engineer re-pins them to the new contract.
+test/config-versioning.test.mjs | T31 AC-4: refuses-loud when on-disk schema_version > CURRENT
+test/config-versioning.test.mjs | T31 boundary: malformed JSON throws descriptive error
+test/config-versioning.test.mjs | T31 boundary: JSON array (non-object) is rejected
+test/e22-stale-notify.test.mjs | I7: corrupt (unparsable) .config.json + stale dispatch -> tw_get_state THROWS (pre-existing gap in task-path config resolution, unrelated to and unmodified by the E22 diff — NOT the graceful notify.error the review doc claims)
+test/e22-stale-notify.test.mjs | I8: future-schema .config.json + stale dispatch -> tw_get_state THROWS for the same pre-existing reason as I7 (not a graceful notify.error)
+test/e22-stale-notify.test.mjs | I7b/I8b — pre-existing-scope pin: the SAME throw reproduces on a bare workspace with NO handoff.md and NO stale dispatch at all, proving this is unrelated to and predates the E22 diff

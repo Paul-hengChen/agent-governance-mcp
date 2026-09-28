@@ -1,0 +1,16 @@
+開始做 v4.0.0 Wave 7（翻開關），你只負責 e177a lane 的 E177a（S）。
+
+先完整讀 docs/lane-protocol.md（共同規則，包括信箱與回報格式），再讀 R1 + R2。
+你只負責這張票走到 qa PASS；波次層級的核取項屬於整合者。
+
+【你的欄位】
+- primary: /p    base: 3f648bd    ticket-slug: e177a-fanout-manifest
+- branch: feat/e177a-fanout-manifest    worktree: /agm-lanes/e177a    lane: e177a
+- 信箱: /m/e177a/（你寫 to-integrator.md，讀 to-lane.md）
+- dispatch pins: sr-engineer=fable
+
+【你擁有的檔案】新檔 `tools/fanout-manifest.ts`、新檔 `scripts/fanout.mjs`（薄殼，吃 `dist/tools/*.js`，同 `feature-rollup.mjs` 模式）、`dist/**`；qa：新檔 `test/e177a-*.test.mjs` 與 `test/fixtures/e177a/**`（建立已預先授權）；自己的 spec／證據／`.current/e177a/`，加上這張票新建的檔案與它自己的測試檔
+【不准碰】`bin/**`、`content/**`、goldens、budget、`package.json`、`docs/**`（含 `docs/lane-protocol.md`）、`.claude/commands/integrator.md`、既有的 `specs/fanout-*.md`（歷史產物；要當 fixture 就複製進 `test/fixtures/e177a/`）、e177b 的新檔
+【範圍切線（整合者已決定）】做：(1) manifest 格式 —— 以 `specs/fanout-wave7.md` 的 `## Lanes` 表為基準，寫出欄位定義；(2) `fanout render <manifest> <lane>` 由那一列 + 3b 模板輸出派工 prompt（共同規則仍指向 `docs/lane-protocol.md`，不複製進 prompt）；(3) `fanout check <manifest> <lane> [--base main]` 用 `git diff --name-only <base>...<branch>` 比對「擁有」glob，**逐一列出越界檔案、非零 exit**；(6) `## Decisions` 區的格式（每一筆：日期、誰裁決、內容、出處）。不做：lane 狀態／roll-up、信箱、`feature start` 接線、改整合者 SOP 或 lane-protocol（E178 會改成引用本工具）
+
+需要跟整合者討論的事一律走信箱，不要請我轉貼。需要我核准的事，等我在這裡親手打字。

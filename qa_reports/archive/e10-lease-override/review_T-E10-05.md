@@ -1,0 +1,12 @@
+# QA review — T-E10-05
+
+<!-- Auto-appended by tw_update_state(qa_review=...). -->
+
+## 2026-07-13T01:30:43.809Z — PASS — by qa-engineer
+
+PASS. AC1-AC9 traceable to passing tests in test/feature-lease.test.mjs (13 new tests, extended not new file per §2). AC7 red->green turnover independently verified: removed bookkeepingWrite:true from the heal call site, confirmed RED (last_updated stamped now() instead of preserved), restored, confirmed GREEN. Phase 0.5 Expected-Red Diff: clean, 14/14 manifest entries confirmed red, 0 unexplained reds, all re-baselined (error-code-contract.test.mjs counts/SUFFIX_RE/allowlist 28->30; context-budget.test.mjs 3 floor caps independently re-measured, not trusted from sr-engineer's ~340~tok estimate - actual delta ~665~tok/arm; 6 compose-golden fixtures regenerated + constitution-monolith.txt hand-regenerated from CONSTITUTION_SEGMENTS since content/constitution.md no longer exists for the script's normal path). AC Execution Log: all 9 proof:-annotated ACs executed and recorded. Full gates: npm run build clean; npm audit --audit-level=high = 1 low-severity (esbuild dev-server, transitive) zero HIGH/CRITICAL; npm test = 1390 pass / 0 fail / 0 skipped. T-E10-02 closed N/A per architect DR-1 (no schema bump). Evidence: qa_reports/review_T-E10-08.md.
+
+## 2026-07-13T01:31:16.547Z — PASS — by qa-engineer
+
+PASS. AC1-AC9 traceable to passing tests in test/feature-lease.test.mjs (13 new tests, extended not new file per §2). AC7 red->green turnover independently verified: removed bookkeepingWrite:true from the heal call site, confirmed RED (last_updated stamped now() instead of preserved), restored, confirmed GREEN. Phase 0.5 Expected-Red Diff: clean, 14/14 manifest entries confirmed red, 0 unexplained reds, all re-baselined (error-code-contract.test.mjs counts/SUFFIX_RE/allowlist 28->30; context-budget.test.mjs 3 floor caps independently re-measured, not trusted from sr-engineer's ~340~tok estimate - actual delta ~665~tok/arm; 6 compose-golden fixtures regenerated + constitution-monolith.txt hand-regenerated from CONSTITUTION_SEGMENTS since content/constitution.md no longer exists for the script's normal path). AC Execution Log: all 9 proof:-annotated ACs executed and recorded. Full gates: npm run build clean; npm audit --audit-level=high = 1 low-severity (esbuild dev-server, transitive) zero HIGH/CRITICAL; npm test = 1390 pass / 0 fail / 0 skipped. T-E10-02 closed N/A per architect DR-1 (no schema bump). Evidence: qa_reports/review_T-E10-08.md.
+

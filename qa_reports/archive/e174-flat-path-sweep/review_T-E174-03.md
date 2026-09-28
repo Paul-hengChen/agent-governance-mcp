@@ -1,0 +1,12 @@
+# QA review — T-E174-03
+
+<!-- Auto-appended by tw_update_state(qa_review=...). -->
+
+## 2026-09-24T08:49:13.903Z — PASS — by qa-engineer
+
+PASS. All non-dropped ACs (AC1-AC4, AC6-AC10) independently re-verified against the working tree via spec proof commands. Expected-red diff clean: both manifest entries (context-budget coordinator floor, skill-manifest golden byte-identity) were the manifest's own predicted qa-owned re-baselines, not unexplained regressions. Re-measured the coordinator bundle myself via the real render path (composeConstitution+stripOriginTags+stripRationale for constitution side, composeSkill+strips for skill side): 19284 ~tok exactly, matching the manifest figure; raised test/context-budget.test.mjs's floor from 18990 to 19284 (qa-owned bump, comment in established style). Regenerated all 12 goldens (node scripts/capture-constitution-golden.mjs, confirmed it writes into this worktree); only test/fixtures/compose-golden/skill-coordinator-monolith.txt changed, as expected for a coord-only change (constitution-only goldens untouched, AC5/const-01 dropped). No other floor moved. Full npm test: 2417/2417 pass, 0 fail. T-E174-04 remains voided (option B, no QA action). Details: qa_reports/review_T-E174-09.md.
+
+## 2026-09-24T08:49:36.065Z — PASS — by qa-engineer
+
+PASS. All non-dropped ACs (AC1-AC4, AC6-AC10) independently re-verified against the working tree via spec proof commands. Expected-red diff clean: both manifest entries (context-budget coordinator floor, skill-manifest golden byte-identity) were the manifest's own predicted qa-owned re-baselines, not unexplained regressions. Re-measured the coordinator bundle myself via the real render path (composeConstitution+stripOriginTags+stripRationale for constitution side, composeSkill+strips for skill side): 19284 ~tok exactly, matching the manifest figure; raised test/context-budget.test.mjs's floor from 18990 to 19284 (qa-owned bump, comment in established style). Regenerated all 12 goldens (node scripts/capture-constitution-golden.mjs, confirmed it writes into this worktree); only test/fixtures/compose-golden/skill-coordinator-monolith.txt changed, as expected for a coord-only change (constitution-only goldens untouched, AC5/const-01 dropped). No other floor moved. Full npm test: 2417/2417 pass, 0 fail. T-E174-04 remains voided (option B, no QA action). Details: qa_reports/review_T-E174-09.md.
+

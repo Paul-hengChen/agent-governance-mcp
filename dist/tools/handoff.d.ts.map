@@ -1,0 +1,1 @@
+{"version":3,"file":"handoff.d.ts","sourceRoot":"","sources":["../../tools/handoff.ts"],"names":[],"mappings":"AAiBA,YAAY,EACV,gBAAgB,EAChB,WAAW,EACX,cAAc,EACd,aAAa,EACb,YAAY,EACZ,YAAY,GACb,MAAM,oBAAoB,CAAC;AAC5B,OAAO,EAAE,YAAY,EAAE,gBAAgB,EAAE,MAAM,oBAAoB,CAAC;AAOpE,OAAO,EAAE,iBAAiB,EAAE,KAAK,wBAAwB,EAAE,MAAM,oBAAoB,CAAC"}

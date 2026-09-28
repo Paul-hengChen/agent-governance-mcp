@@ -1,0 +1,29 @@
+# e60-lockfile-version-parity — intentional red left by sr-engineer (T-E60-01).
+#
+# Item 3 of this cut requires adding `package-lock.json` to
+# content/skill-release-engineer.md step 8's git-add line (both the plain
+# listing and the bash -c pre-filter PATHS variable) and bumping the E71a
+# existence-pre-filter prose count from "30 paths (19 directories + 11
+# metadata paths)" to "31 paths (19 directories + 12 metadata paths)" —
+# per the coordinator's brief, to avoid the same class of stale-count defect
+# E70 already fixed.
+#
+# That edit is the SPEC. It makes the pre-existing E71(a) set-equality test
+# below go red, because the test hardcodes its own expectation independently
+# of the SOP prose: METADATA_PATHS (test/release-staging.test.mjs:105) does
+# not yet include "package-lock.json", and the test's own literal assertions
+# still say 30 / "19 directories + 11 metadata paths". Tests are qa-owned
+# (Constitution §2) — sr-engineer does not hand-edit test/release-staging.test.mjs.
+#
+# Fix (qa-owned, mechanical, same shape as this cut's other qa-owned pins to
+# test/check-version.test.mjs's CV-1..CV-4 harness):
+#   - add "package-lock.json" to METADATA_PATHS (test/release-staging.test.mjs:105)
+#   - update the two `assert.equal(..., 30, ...)` calls to 31
+#   - update the `assert.match(SKILL, /30 paths/, ...)` and
+#     `assert.match(SKILL, /19 directories \+ 11 metadata paths/, ...)` calls
+#     to match the new "31 paths" / "19 directories + 12 metadata paths" prose
+#
+# Confirmed: this is the ONLY suite failure introduced by this cut (full run:
+# 1758 pass / 1 fail / 1759 total, base was 1759/1759 green).
+
+test/release-staging.test.mjs | E71(a): the git-add line stages exactly 30 paths (19 directories + 11 metadata), set-equal to FEATURE_DIRS/METADATA_PATHS/E65_METADATA_PATHS

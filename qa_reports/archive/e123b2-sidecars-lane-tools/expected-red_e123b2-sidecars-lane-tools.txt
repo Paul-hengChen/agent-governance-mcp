@@ -1,0 +1,9 @@
+# Expected-red manifest — e123b2-sidecars-lane-tools (T-E123B2-01)
+# Human decision 2026-09-23, option A (coordinator chat), amending AC5.
+# These two tests are direct, intended consequences of AC1 (telemetry.ts and
+# metrics.ts now import and call resolveCurrentLanePaths/resolveCurrentLane
+# from tools/lane-paths.ts). They pin an importer/caller set that this
+# ticket deliberately widens. The integrator or J rewrites them once the
+# seam is flipped; see NEW-TICKETS.md L2-NEW-5.
+test/lane-paths.test.mjs | CALLERS2 (disclosed substitution): AC5's LITERAL proof (grep -rln "lane-paths") is a spec-proof defect, not an implementation defect — it always lists 3 files because AC15 mandates the imports
+test/lane-paths.test.mjs | CALLERS3: grep -rn resolveCurrentLane tools/ gates/ guards/ prompts/ bin/ index.ts names only tools/lane-paths.ts (zero production callers)

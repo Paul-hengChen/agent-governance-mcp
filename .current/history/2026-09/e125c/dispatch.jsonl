@@ -1,0 +1,7 @@
+{"ts":"2026-09-25T17:19:07.416Z","feature":"e125c-index-compaction","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-25T17:33:29.520Z","feature":"e125c-index-compaction","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-25T17:43:38.293Z","feature":"e125c-index-compaction","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-25T17:44:34.706Z","feature":"e125c-index-compaction","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-25T17:56:24.850Z","feature":"e125c-index-compaction","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-25T18:02:07.431Z","feature":"e125c-index-compaction","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-25T18:17:21.423Z","feature":"e125c-index-compaction","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}

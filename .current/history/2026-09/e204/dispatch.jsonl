@@ -1,0 +1,4 @@
+{"ts":"2026-09-26T18:48:57.737Z","feature":"e204-pin-e125c-fixture","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-26T18:51:04.442Z","feature":"e204-pin-e125c-fixture","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-26T18:51:08.882Z","feature":"e204-pin-e125c-fixture","agent_id":"qa-engineer","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-26T19:03:13.837Z","feature":"e204-pin-e125c-fixture","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}

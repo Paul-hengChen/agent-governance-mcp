@@ -1,0 +1,11 @@
+{"ts":"2026-09-24T07:49:01.532Z","feature":"e124-lane-ticket-allocation","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-24T08:11:29.197Z","feature":"e124-lane-ticket-allocation","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-24T08:13:48.048Z","feature":"e124-lane-ticket-allocation","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":null}
+{"ts":"2026-09-24T08:20:31.049Z","feature":"e124-lane-ticket-allocation","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-24T08:21:06.050Z","feature":"e124-lane-ticket-allocation","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-24T08:22:59.675Z","feature":"e124-lane-ticket-allocation","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-24T08:23:51.336Z","feature":"e124-lane-ticket-allocation","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-24T08:37:45.713Z","feature":"e124-lane-ticket-allocation","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-24T08:49:08.273Z","feature":"e124-lane-ticket-allocation","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-24T08:49:52.102Z","feature":"e124-lane-ticket-allocation","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-24T08:50:02.922Z","feature":"e124-lane-ticket-allocation","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}

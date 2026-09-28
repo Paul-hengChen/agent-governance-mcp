@@ -1,0 +1,24 @@
+# e128-blocked-self-loop — repro-first manifest (dispatch_mode: bugfix)
+# Format: <relative test file path> | <exact test name/description string>
+
+# sr-engineer-authored repro (skill-sr-engineer SOP step 3b carve-out): run
+# and confirmed RED against the un-fixed tools/transitions.ts (step-3
+# self-loop fast path accepted only In_Progress->In_Progress, and the static
+# ALLOWED_TRANSITIONS table has no release-engineer:Blocked ->
+# release-engineer:Blocked edge), then confirmed GREEN after the fast path
+# grew the named same-agent Blocked->Blocked pair. Minimal by design — full
+# coverage (including the PASS->PASS / FAIL->FAIL negative proofs) is
+# qa-engineer's job (T-QA-E128-01), not restated here.
+test/e128-blocked-self-loop-repro.test.mjs | E128 repro: release-engineer:Blocked -> release-engineer:Blocked is accepted (the incident case, fixed)
+
+# Pre-existing exhaustive positive-pin, now stale by design (not a repro of
+# ours — an EXPECTED side effect of the T-E128-02 fix, left red on purpose).
+# T-E53-03(h) enumerates the full accepted-edge universe and pins it to
+# exactly 69 tuples. The E128 fast-path change adds a same-agent
+# Blocked->Blocked edge for 7 of the 8 roles (pm already had its own
+# pm:Blocked -> pm:Blocked table row, so it contributes no new tuple) —
+# 69 + 7 = 76 is the expected new count, arithmetic anyone updating this
+# pin can check rather than just accept. Owned by qa-engineer under
+# T-QA-E128-01 to update the EXPECTED list/count in test/qa-flow.test.mjs;
+# sr-engineer does not touch that file per the L-TRANS lane boundary.
+test/qa-flow.test.mjs | T-E53-03(h): exhaustive matrix sweep — accepted edge set is EXACTLY the 69 tuples E53+E58 leave standing (durable form of the reviewer's 1056-tuple differential; extended by T-E39-03 for E58's pm:Blocked -> design-auditor:In_Progress edge)

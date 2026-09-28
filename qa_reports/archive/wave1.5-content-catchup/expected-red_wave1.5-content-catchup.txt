@@ -1,0 +1,13 @@
+# wave1.5-content-catchup — expected-red manifest (emitted by sr-engineer per skill-sr-engineer SOP 7a)
+# Format: <relative test file path> | <exact test name/description string>
+
+# qa-owned golden re-baseline: T-W15-01 rewrote content/skill-release-engineer.md
+# (E82 (ii) step-9a budget citation, E83 the (context, not changed) marker + CRITICAL
+# rule clause-order fix, E84 the step 13a/13b bookkeeping-commit-then-close-out split).
+# Both reds below are stale string/line pins into that file's prose, not behavioural
+# regressions — confirmed independently by code-reviewer round 1 (review_reports/review_T-W15-01.md,
+# N5): the content each pin is looking for still exists verbatim, it has moved. Per
+# precedent qa_reports/expected-red_e59-const6-waiver-clause.txt, sr does not touch test/ —
+# qa re-baselines these in T-W15-02.
+test/feature-lease.test.mjs | E17-S2: the record-integrity Hard rule's incident-reason tail names the v3.83.0 fabrication and its a484a4d correction
+test/verify-release.test.mjs | VR-9 (AC9): skill-release-engineer.md requires verify-release.mjs after push/gh-release and before the closing write, plus a matching Escalation Routes row

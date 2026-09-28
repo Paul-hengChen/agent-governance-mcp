@@ -1,0 +1,32 @@
+# e1-feature-scoped-state-design — expected reds from T-E1-01/02/03 (sr-engineer, 2026-07-12).
+# All are qa-owned re-baselines (T-E1-05/T-E1-06), per the established b8/c9/d2/d9 precedents.
+
+# Gate catalog grew 24 -> 25 (FEATURE_LEASE_HELD added). QA re-baselines the count.
+test/error-code-contract.test.mjs | AC-1/AC-5: GATE_REGISTRY has exactly 24 entries (23 in, 24 out — d9-qa-review-scoped-append added QA_REVIEW_TARGET_REQUIRED)
+
+# FEATURE_LEASE_HELD's _HELD suffix is outside the shape-rule vocabulary (SUFFIX_RE) —
+# the exact b8 UNRESOLVED / c9 MISMATCH precedent: the QA-side fix is adding HELD to
+# SUFFIX_RE, NOT renaming the spec-mandated code. Until then the code is invisible to
+# BOTH harvests, failing registry<->code parity, registry<->doc parity, the doc-file
+# mapping check (also pinned at 24), and the AC3 free-text-allowlist closure
+# (FEATURE_LEASE_HELD's triggerEdge needs an allowlist entry once visible).
+test/error-code-contract.test.mjs | AC-5: ALL_GATE_CODES === code-side shape-rule harvest (registry <-> code source parity)
+test/error-code-contract.test.mjs | registry ⊆ doc: every documentedInProse:true entry is backtick-quoted in >=1 content/*.md
+test/error-code-contract.test.mjs | doc-file mapping (c12): gates/registry.ts's errorCode→doc-file mapping comment matches the actual backtick-quote sites
+test/error-code-contract.test.mjs | AC3 (c12): every (errorCode, field) pair for triggerEdge/armCondition is either mechanically checked above or explicitly allowlisted as free-text — no silent exemptions
+
+# TransitionRejection["error"] union grew 14 -> 15 (spec-mandated handler-side
+# extension, T-E1-01 scope). QA re-pins the DR-8 member count.
+test/error-code-contract.test.mjs | DR-8: TransitionRejection["error"] union stays byte-identical at 14 members, all ⊆ ALL_GATE_CODES
+
+# Pre-E1 fixture writes a NEW active_feature over a fresh In_Progress incumbent —
+# exactly the clobber the lease gate now rejects (FEATURE_LEASE_HELD). QA re-baselines
+# the fixture (age the incumbent's last_updated beyond LEASE_TTL_MIN=30, or land the
+# incumbent at qa-engineer:PASS first) — the hop-reset assertion itself is unchanged.
+test/hop-count-transitions.test.mjs | t-e2e-feature-reset: an active_feature change resets hop_count to a fresh count, un-freezing dispatch (AC-3)
+
+# coord-03-core-fallback.md grew (Feature-Scope Gate note + FEATURE_LEASE_HELD
+# escalation row, T-E1-03). QA re-baselines the coordinator bundle token cap and the
+# frozen golden monolith fixture.
+test/context-budget.test.mjs | AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 9545 ~tok)
+test/skill-manifest.test.mjs | t-golden-byte-identity (AC1/AC5): composeSkill("skill-coordinator.md", {taskTool:true}) === frozen golden monolith, byte-for-byte

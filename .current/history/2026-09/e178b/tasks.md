@@ -1,0 +1,10 @@
+<!-- schema_version: 2 -->
+# Tasks
+
+## Active
+
+- [x] T-E178B-01 [P0] sr-engineer: lane-status --watch mode (spec AC1-AC9, decisions a-f, j) — pure snapshot/state-line/fingerprint/diff helpers + async runLaneWatch(argv, io) in tools/lane-status.ts; --watch/--interval/--deadline/--baseline parsing, re-arm command, exit 3/1/64; scripts/lane-status.mjs routes --watch; npm run build | depends_on: none | touches: tools/lane-status.ts, scripts/lane-status.mjs, dist/tools/lane-status.*
+- [x] T-E178B-02 [P0] sr-engineer: cut pre-review fan-in check (spec AC10-AC15, decisions g, h, j) — --mailbox-root flag, minimal mailbox header reader, checkCutPrereview (sent/missing/no-mailbox/n/a/not-checked), status-mode line + JSON cutPrereview, cut_prereview key in watch state; npm run build | depends_on: T-E178B-01 | touches: tools/lane-status.ts, dist/tools/lane-status.*
+- [x] T-E178B-03 [P1] sr-engineer: E208 fanout check warning (spec AC16-AC19, decisions h, i) — list base tree, classify owned tokens (glob / exists at base / added on branch / unmatched), append WARN lines after existing output, exit codes unchanged, no new FANOUT_CODES; npm run build | depends_on: none | touches: tools/fanout-manifest.ts, dist/tools/fanout-manifest.*
+- [x] T-E178B-04 [P0] qa-engineer: lane-status tests (spec AC1-AC15, AC20) — new test/e178b-lane-watch.test.mjs + test/e178b-cut-prereview.test.mjs, mailbox fixtures under test/fixtures/e178b/mailbox/; confirm test/e177b-* unchanged-green (edit only if usage text pinned) | depends_on: T-E178B-01, T-E178B-02 | touches: test/e178b-lane-watch.test.mjs, test/e178b-cut-prereview.test.mjs, test/fixtures/e178b/mailbox/**
+- [x] T-E178B-05 [P1] qa-engineer: fanout E208 tests + whole-ticket gate (spec AC16-AC21) — new test/e178b-fanout-unmatched.test.mjs + fixture test/fixtures/e178b/fanout-wave7-e177a.md (copy, not edit, of specs/fanout-wave7.md); confirm test/e177a-* green; post-commit clean-tree full npm test + fanout check e178b self-check | depends_on: T-E178B-03, T-E178B-04 | touches: test/e178b-fanout-unmatched.test.mjs, test/fixtures/e178b/fanout-wave7-e177a.md

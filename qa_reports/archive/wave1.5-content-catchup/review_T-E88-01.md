@@ -1,0 +1,8 @@
+# QA review — T-E88-01
+
+<!-- Auto-appended by tw_update_state(qa_review=...). -->
+
+## 2026-09-16T10:53:11.727Z — PASS — by qa-engineer
+
+PASS. AC1-AC7 verified by execution (fixture-based, not corpus-based — the E105 shape occurs 0 times in this repo). E105 tie-break and E88 advisory both pinned: 22 new tests appended to test/check-md-tables.test.mjs (17 pre-existing unmodified -> 39 total). Behavioural pin for AC2: prescribed remedy clears the violation; the OLD (pre-E105) remedy does NOT clear it and instead produces 2 fresh cell-count violations. Two residuals pinned as INTENDED per code-reviewer's round-2 request: equal-width adjacent tables still classify blank-split; a coincidentally-well-counted row with shifted content leaves the advisory silent. Non-regression invariant pinned: unescaped | inside a code span still goes FATAL under rule 1 with the advisory suppressed (the v3.105.0/E96 recurrence shape) - splitRow()/headerCellCount unchanged. 10 independently re-derived findCodeSpanRanges()/findGenuineDoneMark() adversarial fixtures, including the `` ``a ` b`` `` shape both outside (fires) and inside (silent) a marker. Non-fatal guarantee pinned both directions. npm run build clean. npm test 1890/1890 (1868 baseline + 22 new). npm run check:md-tables exits 0, exactly 4 advisories (docs/backlog.md:165/166/180/181, E39/E40/E58/E59) - independently re-verified, matches coordinator claim and code-reviewer round-2. NEW-TICKETS.md L-MDTOOL-N1 collapsed to the verified 4-row count with a correction note (was contradicting L-MDTOOL-N2); docs/backlog.md and scripts/check-md-tables.mjs untouched. Evidence: qa_reports/review_T-E88E105-02.md.
+

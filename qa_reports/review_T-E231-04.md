@@ -1,0 +1,12 @@
+# QA review — T-E231-04
+
+<!-- Auto-appended by tw_update_state(qa_review=...). -->
+
+## 2026-09-27T17:08:38.146Z — PASS — by qa-engineer
+
+PASS — T-E231-03/T-E231-04 (covers: qa_reports/review_T-E231-03.md). Expected-Red Diff clean (15/15 manifest entries confirmed red pre-baseline, 0 unexplained). Golden fixtures regenerated (11 of 12, matching the 11 golden reds; skill-coordinator-monolith.txt correctly untouched — this ticket never touches a coord-*.md fragment). Four ~tok ceilings bumped to exact re-measured values (lean 5157->5415, design-arm 9666->9924, teamwork bundle 20044->20310, non-design 7569->7826); each bump comment is plain language with the ticket id trailing only as a pointer (E231), per AC4. New test/e231-info-hygiene-rule.test.mjs pins AC1 (both bullets' key phrases, all five leak classes, full durable-output list, placement) and AC2 (both bullets survive composition on all four dispatch arms) on whitespace-normalized text per the dispatch brief's line-wrap note. AC3/AC5/AC6 independently re-confirmed via direct git diff/diff --stat reads, not trusted from the prior round. Full suite post-commit (1c16b6a, clean tree): 2819 pass / 2822 total / 0 fail / 3 pre-existing skips. See qa_reports/review_T-E231-03.md for the full AC Execution Log.
+
+## 2026-09-27T17:09:46.082Z — PASS — by qa-engineer
+
+PASS — T-E231-03/T-E231-04 (full report: qa_reports/review_T-E231-03.md, covers: T-E231-03, T-E231-04). Expected-Red Diff clean (15/15 manifest entries confirmed red pre-baseline, 0 unexplained). Golden fixtures regenerated (11 of 12, matching the 11 golden reds; skill-coordinator-monolith.txt correctly untouched, since this ticket never touches a coord-*.md fragment). Four ~tok ceilings bumped to exact re-measured values (lean 5157->5415, design-arm 9666->9924, teamwork bundle 20044->20310, non-design 7569->7826); each bump comment explains in plain language why the ceiling moved, with the ticket id trailing only as a pointer (E231), per AC4. New test/e231-info-hygiene-rule.test.mjs pins AC1 (both bullets' key phrases, all five leak classes, full durable-output list, placement) and AC2 (both bullets survive composition on all four dispatch arms) on whitespace-normalized text per the dispatch brief's line-wrap note. AC3/AC5/AC6 independently re-confirmed via direct git diff/diff --stat reads, not trusted from the prior round. Full suite post-commit (1c16b6a, clean tree): 2819 pass / 2822 total / 0 fail / 3 pre-existing skips.
+

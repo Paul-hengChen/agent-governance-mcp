@@ -1,0 +1,16 @@
+{"ts":"2026-09-26T16:05:27.364Z","feature":"e126-merge-invariants","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-26T16:11:04.667Z","feature":"e126-merge-invariants","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-26T16:11:20.718Z","feature":"e126-merge-invariants","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-26T16:14:44.976Z","feature":"e126-merge-invariants","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-26T16:18:33.873Z","feature":"e126-merge-invariants","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-26T16:36:23.742Z","feature":"e126-merge-invariants","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-26T16:42:10.836Z","feature":"e126-merge-invariants","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-26T16:45:34.156Z","feature":"e126-merge-invariants","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-26T16:46:21.131Z","feature":"e126-merge-invariants","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-26T16:50:38.342Z","feature":"e126-merge-invariants","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-26T16:56:33.867Z","feature":"e126-merge-invariants","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-26T17:12:31.121Z","feature":"e126-merge-invariants","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-26T17:17:10.159Z","feature":"e126-merge-invariants","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-26T17:17:47.771Z","feature":"e126-merge-invariants","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-26T17:20:19.342Z","feature":"e126-merge-invariants","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-26T17:30:01.108Z","feature":"e126-merge-invariants","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}

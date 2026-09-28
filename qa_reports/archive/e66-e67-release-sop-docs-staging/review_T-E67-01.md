@@ -1,0 +1,8 @@
+# QA review — T-E67-01
+
+<!-- Auto-appended by tw_update_state(qa_review=...). -->
+
+## 2026-08-17T04:09:59.643Z — PASS — by qa-engineer
+
+PASS. T-E66-02: FEATURE_DIRS extended 15->19 (docs/, research/, multi-agent-scripts/, .github/ appended after review_reports/); new NON_SOURCE_DIRS (dist/, node_modules/, .current/) with reasons recorded in-comment; new Partition test enumerates real top-level dirs via `git ls-files` (+node_modules/ if present) and asserts full coverage in exactly one list -- self-verified it reds by removing docs/ and restoring. AC2 and AC3 SOP directory lists now extracted from source text and pinned to exact FEATURE_DIRS set equality (previously unpinned per code-reviewer round-1 finding). Phase 4: re-verified all 6 E67 claims + CLAUDE.md 33-gate count directly against live artifacts (README grep, package.json scripts, real `agc check` output, git log trailers, filesystem, GATE_REGISTRY.length at runtime) -- all true. Re-ran the render check stripRationale(stripOriginTags(...)) against working-tree skill-release-engineer.md: steps 4/5/6/6a and the AC4 bullet each render on their own line (49/54/55/56/136), matching round-3's claim; fence inventory (4 rationale + 2 origin spans) unchanged from the APPROVED diff. Deliberately did NOT add the render-structure regression test code-reviewer suggested (N-R3-2) -- it would red against two pre-existing violations at HEAD (:119, :126-128), out of this cut; ships with the coordinator's planned follow-up ticket per round-3's own recommendation. npm run build clean; test/release-staging.test.mjs 67/67 (was 66/66); npm test 1720/1720 (was 1719/1719). Evidence: qa_reports/review_T-E66-02.md (covers T-E66-01, T-E66-02, T-E67-01, T-E67-02).
+

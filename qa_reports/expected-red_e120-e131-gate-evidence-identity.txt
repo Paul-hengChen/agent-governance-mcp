@@ -1,0 +1,28 @@
+# e120-e131-gate-evidence-identity — expected-red manifest (emitted by
+# sr-engineer per skill-sr-engineer SOP 7a)
+# Format: <relative test file path> | <exact test name/description string>
+#
+# Both reds below are the DIRECT, INTENTIONAL consequence of closing E120 (a
+# re-cut of a voided task id inherited the voided incarnation's review/QA
+# evidence). Each test asserts the PRE-FIX (buggy) contract as correct, so the
+# fix necessarily turns them red. Verified NOT pre-existing: `git stash` back
+# to the unmodified tree (base c35dcf8, before any change in this lane) and
+# running test/e117-void-task.test.mjs alone shows all 25 tests passing there;
+# these two fail ONLY once the E120 fix (tools/tasks-file.ts addTaskInFile
+# voidedPattern scan; tools/storage-sqlite.ts voided_tasks tombstone) is
+# applied. sr-engineer does not touch test/ (Constitution §2) — qa-engineer
+# owns updating or replacing these two to assert the new refusal contract.
+#
+# 1) "a voided id becomes reusable in a re-cut via addTask" asserted that
+#    re-adding a previously-voided id succeeds. That IS the E120 defect;
+#    addTaskInFile now refuses this re-cut outright (settled closure).
+# 2) "Q1 (SQLite mode): re-void ... neither carries alreadyVoided" asserted
+#    SQLite mode cannot distinguish already-voided from never-existed because
+#    "reason/state not persisted" across the void DELETE. The new
+#    voided_tasks tombstone table (tools/storage-sqlite.ts) persists exactly
+#    that state — by design, to give addTask something to refuse against —
+#    so voidTask's re-void branch now DOES report alreadyVoided, matching
+#    file-mode parity (Q1) rather than the old "uniform not-found" behavior.
+
+test/e117-void-task.test.mjs | a voided id becomes reusable in a re-cut via addTask
+test/e117-void-task.test.mjs | Q1 (SQLite mode): re-void and never-existed BOTH report a uniform not-found, neither carries alreadyVoided

@@ -1,0 +1,8 @@
+# QA review — T-E174A-02
+
+<!-- Auto-appended by tw_update_state(qa_review=...). -->
+
+## 2026-09-24T07:06:25.713Z — PASS — by qa-engineer
+
+PASS. Full detail in qa_reports/review_T-E174A-03.md (covers T-E174A-01..03). Retargeted the 4 pre-E174a flat-text reds (S8, E9A-S1 in feature-lease.test.mjs; C13-AC5 in release-staging.test.mjs; VR-9c in verify-release.test.mjs) to lane-scoped wording, intent unchanged. Added E141 lane-path tolerance cases (VR-39..VR-42: two-lane multi-sidecar incl. dispatch.jsonl/usage.jsonl tolerated, 'archived' lane tolerated, .current/archive|history/... rejected). Added the 4 A1 human-mandated negative cases (VR-43..VR-46: nested path, dot-lane, .config.json, feature-split.md all correctly NOT tolerated). Added VR-47, the A2 drift-guard test comparing verify-release.mjs's LANE_SEGMENT_RE_SRC + archive/history exclusion (extracted from the real committed script via new Function, never hand-retyped) against dist/tools/lane-paths.js's real isSafeLaneName/NON_LANE_DIRS exports over a 23-entry probe set plus NON_LANE_DIRS set-equality; empirically confirmed red under drift on either side. This makes verify-release.mjs:249-250's comment claim true (code-reviewer R1 closed). Context-budget floor: no existing test pins content/skill-release-engineer.md's own token count (unlike skill-pm/skill-sr-engineer) so none moved; raw measurement 20691->20854 ~tok (+163) reported for the record; zero impact confirmed on the 4 floors + 12 goldens that do exist (context-budget.test.mjs 54/54, golden-consumer suites 45/45). npm test 2417/2417, check-md-tables OK, build clean, npm audit --audit-level=high exit 0 (only pre-existing moderate/low). No defect found in sr-owned content/scripts/.
+

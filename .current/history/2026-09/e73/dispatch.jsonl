@@ -1,0 +1,6 @@
+{"ts":"2026-09-24T08:11:33.283Z","feature":"e73-agc-feature-lifecycle","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":null}
+{"ts":"2026-09-24T08:21:38.163Z","feature":"e73-agc-feature-lifecycle","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-24T08:22:31.802Z","feature":"e73-agc-feature-lifecycle","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-24T08:25:41.879Z","feature":"e73-agc-feature-lifecycle","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-24T08:27:05.003Z","feature":"e73-agc-feature-lifecycle","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-24T08:50:46.438Z","feature":"e73-agc-feature-lifecycle","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}

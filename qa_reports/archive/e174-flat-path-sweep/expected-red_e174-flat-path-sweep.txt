@@ -1,0 +1,4 @@
+# E174 T-E174-01/03 coord-02/coord-03 edits grow the coordinator bundle (19284 vs 18990 ~tok floor after T-E174-01 round 2; pre-edit baseline passes)
+# and change the frozen coordinator monolith golden. Both are qa-owned re-baselines (T-E174-09).
+test/context-budget.test.mjs | AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 18990 ~tok)
+test/skill-manifest.test.mjs | t-golden-byte-identity (AC1/AC5): composeSkill("skill-coordinator.md", {taskTool:true}) === frozen golden monolith, byte-for-byte

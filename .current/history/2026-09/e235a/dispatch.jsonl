@@ -1,0 +1,11 @@
+{"ts":"2026-09-28T06:45:44.153Z","feature":"e235a-relative-prd-path","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-28T06:48:37.489Z","feature":"e235a-relative-prd-path","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-28T06:53:52.763Z","feature":"e235a-relative-prd-path","agent_id":"architect","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-28T06:57:30.496Z","feature":"e235a-relative-prd-path","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-28T07:01:23.903Z","feature":"e235a-relative-prd-path","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-28T07:02:21.922Z","feature":"e235a-relative-prd-path","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-28T07:09:29.115Z","feature":"e235a-relative-prd-path","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-28T07:10:38.160Z","feature":"e235a-relative-prd-path","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-28T07:11:02.510Z","feature":"e235a-relative-prd-path","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-28T07:11:33.799Z","feature":"e235a-relative-prd-path","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-28T07:29:32.439Z","feature":"e235a-relative-prd-path","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}

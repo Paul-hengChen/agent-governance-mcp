@@ -1,0 +1,8 @@
+# QA review — T-E115-01
+
+<!-- Auto-appended by tw_update_state(qa_review=...). -->
+
+## 2026-09-22T03:52:02.729Z — PASS — by qa-engineer
+
+PASS. test/e115-join-precondition.test.mjs authored + EXECUTED (23/23 pass) against a real scratch git repo fixture (mkGitRepo: real git init/branch/commit/merge --no-ff) for AC1/AC2, and a real .current/-backed scratch workspace (mkWs + real writeHandoffState) for AC3/AC4/AC9, mirroring test/e116-archive-on-feature-change.test.mjs / test/feature-rollup.test.mjs style. AC3 membership semantics verified: matching-row (incl. status:done) -> mismatches:[]; absent-from-all-rows -> mismatches.length===1 asserted by count, naming the full declared set. AC9 verified: bold-decorated header recognized, backtick-decorated value normalizes, internal underscore round-trips unchanged (both matching and non-matching cases), decoration-only cell dropped (not an empty member), all-decoration table degrades honestly. AC5 pinned off dist/tools/join-precondition.d.ts (no second workspace-path arg on any export) plus a source-regex sweep (every read/exec anchored to repoRoot). AC6 grep-c=1 in the module, 0 in the script. AC7/AC8 inspection-confirmed (git status/diff clean on all forbidden paths). Full suite npm test 2179/2179 green; npm run build clean (tsc + check:version + check:transitions-sync). Code-reviewer verdict APPROVED at round 2 (review_reports/review_T-E115-01.md), independently re-confirmed by execution rather than trusted on the handoff's word. Full detail + AC Execution Log in qa_reports/review_T-E115-03.md. Completing T-E115-01/02/03. Known prior-session drift (T-E113-*, T-E116-01/03/04) left unreconciled per dispatch brief.
+

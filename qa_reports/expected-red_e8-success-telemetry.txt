@@ -1,0 +1,81 @@
+# T-E8-01 schema v11→v12 bump (qa_rounds_total / review_rounds_total /
+# visual_rounds_total, seed-0 migration). 47 pre-existing tests conflict with
+# the bump and await qa re-baseline (T-E8-07). Verified NOT logic regressions:
+# every failure is one of (a) _clearRegistryForTests fixtures that re-register
+# migration steps only up to v11 → "missing migration step handoff v11→v12",
+# (b) version-literal assertions (CURRENT_VERSIONS.handoff === 11, "v12 is
+# future refuses-loud", writeHandoffState stamps 11, heal-to-v11), or
+# (c) deepEqual on computeNewRound's return object, which now carries the 3
+# new *_rounds_total fields. Migration + counter semantics smoke-verified
+# green against dist (v11→v12 applied=[12] seeds three 0s; v13 refuses-loud;
+# totals tick on FAIL, survive PASS/pm-re-entry, reset on feature change;
+# legacy 4-arg computeNewRound calls still compile and default totals to 0).
+
+# (a/b) registry-fixture + version-literal — cut-approval-gate
+test/cut-approval-gate.test.mjs | R-schema-1: writeHandoffState emits cut_approved: true in YAML when passed
+test/cut-approval-gate.test.mjs | M1: v4 → v5 migration is stamp-only (AC-7 — no default seeded for cut_approved)
+test/cut-approval-gate.test.mjs | M2: v4 → v5 migration preserves all existing fields (AC-7 — lossless)
+test/cut-approval-gate.test.mjs | M3: legacy file (no schema_version) migrates to v5 and has no cut_approved (AC-6)
+test/cut-approval-gate.test.mjs | M4: v4 file with scope_decision migrates to v5 with no cut_approved seeded (AC-6/AC-7)
+test/cut-approval-gate.test.mjs | X-malformed-parse: parseHandoff drops malformed external_refs entries from raw YAML without throwing (DR-3)
+
+# (a/b) registry-fixture + version-literal — dispatch-pins
+test/dispatch-pins.test.mjs | M1b: readHandoffState's fire-and-forget write-back heals the v7 file to v10 on disk
+test/dispatch-pins.test.mjs | M2: future v12 handoff refuses-loud against a v11 server (no silent downgrade)
+test/dispatch-pins.test.mjs | M3: registry-level v7→v8→v9→v10 steps are pure, stamp-only/seed-only, and seed nothing extra (isolated from the full chain)
+test/dispatch-pins.test.mjs | M4/AC-8: v7 handoff with a legacy 'dispatch_pins: sr-engineer=fable' pending_notes line migrates to v8 with the line byte-verbatim and the new field absent
+test/dispatch-pins.test.mjs | P1: parseHandoff drops an unknown dispatch_pins role key from hand-edited YAML, keeps well-formed siblings
+test/dispatch-pins.test.mjs | P2: parseHandoff drops an empty-string dispatch_pins value
+test/dispatch-pins.test.mjs | P3: parseHandoff drops an oversize (>100 char) dispatch_pins value
+test/dispatch-pins.test.mjs | P4: parseHandoff collapses dispatch_pins to undefined when raw is an array or a scalar (non-object shapes)
+test/dispatch-pins.test.mjs | P5: parseHandoff collapses an all-malformed dispatch_pins map to undefined (never a phantom empty object)
+test/dispatch-pins.test.mjs | sanity: CURRENT_VERSIONS.handoff is 11 (e2-bugfix-repro-gate)
+
+# (b) future-version drift fixture — drift-skew
+test/drift-skew.test.mjs | T32 AC-6: future handoff schema_version surfaces as a drift reason (not a thrown error)
+
+# (a/b) registry-fixture + version-literal — handoff-migration
+test/handoff-migration.test.mjs | AC-7: scope_decision round-trips through writeHandoffState → readback (v10 stamp)
+test/handoff-migration.test.mjs | AC-10(g): future v12 handoff refuses-loud against a v11 server (no silent downgrade)
+test/handoff-migration.test.mjs | AC-1/C9: v6→v10 migration chain stamps version only — external_refs survives, new protocol fields (incl. dispatch_pins, dispatched_at) stay absent, hop_count seeds 0
+test/handoff-migration.test.mjs | AC-1/C9: round-trip — re-running runMigrations on the now-v10 payload is a no-op (applied === [])
+
+# (b) version-literal — handoff-versioning
+test/handoff-versioning.test.mjs | AC-1: writeHandoffState stamps schema_version: 11 in YAML (e2-bugfix-repro-gate)
+test/handoff-versioning.test.mjs | AC-2: readHandoffState heals v0 handoff to CURRENT (v11) on disk (fire-and-forget)
+test/handoff-versioning.test.mjs | AC-2 regression: existing handoff missing schema_version round-trips to CURRENT (v11)
+test/handoff-versioning.test.mjs | AC-4: readHandoffState refuses-loud when on-disk schema_version > CURRENT
+test/handoff-versioning.test.mjs | AC-4: parseHandoff refuses-loud on future schema_version
+test/handoff-versioning.test.mjs | AC-5: sequential second-write swallows freshness error after a healing write
+
+# (c) computeNewRound deepEqual return-shape — qa-flow
+test/qa-flow.test.mjs | computeNewRound: (qa-engineer, FAIL) increments qa_round, holds review_round
+test/qa-flow.test.mjs | computeNewRound: (qa-engineer, PASS) resets qa_round, holds review_round
+test/qa-flow.test.mjs | computeNewRound: (pm, In_Progress) resets both counters (re-entry)
+test/qa-flow.test.mjs | computeNewRound: other writes hold both counters unchanged
+test/qa-flow.test.mjs | AC-12: computeNewRound — (code-reviewer, FAIL) increments review_round, holds qa_round
+test/qa-flow.test.mjs | AC-12: computeNewRound — handoff (code-reviewer→qa-engineer, In_Progress) resets review_round only
+test/qa-flow.test.mjs | AC-12: computeNewRound — (qa-engineer, In_Progress) without code-reviewer prev does NOT reset review_round
+test/qa-flow.test.mjs | AC-12: computeNewRound — (pm, In_Progress) resets BOTH counters (re-entry)
+test/qa-flow.test.mjs | T-MATRIX-C13: computeNewRound holds qa_round/review_round/visual_round steady across qa-engineer:PASS → release-engineer:In_Progress
+test/qa-flow.test.mjs | T-MATRIX-C13: computeNewRound re-zeros all three counters on release-engineer:In_Progress → pm:In_Progress
+
+# (a) registry-fixture — repro-first-gate
+test/repro-first-gate.test.mjs | M1: a hand-written v10 handoff file migrates to v11 on read — dispatch_mode stays absent (no seed), sibling fields preserved
+
+# (a/b) registry-fixture + version-literal — schema-versions runner
+test/schema-versions.test.mjs | CURRENT_VERSIONS exposes the four kinds at their e2-bugfix-repro-gate levels
+test/schema-versions.test.mjs | registerMigration idempotent overwrite — last write wins
+test/schema-versions.test.mjs | runMigrations no-op when current === target
+test/schema-versions.test.mjs | runMigrations refuses-loud when on-disk version > current (AC-4)
+
+# (b) version-literal — skill-evolution
+test/skill-evolution-v3.11.test.mjs | AC-10: schema/versions.ts schema versions track e2-bugfix-repro-gate bump
+
+# (a/b) registry-fixture + version-literal — stale-dispatch-detection
+test/stale-dispatch-detection.test.mjs | T8: a v9 handoff (no dispatched_at) migrates to v10 on read — field stays undefined, hop_count/sibling fields preserved (DR-7)
+test/stale-dispatch-detection.test.mjs | T8b: a future v12 handoff refuses-loud against this v11 server (no silent downgrade)
+test/stale-dispatch-detection.test.mjs | T10: sanity — CURRENT_VERSIONS.handoff is 11 (e2-bugfix-repro-gate)
+
+# (c) computeNewRound deepEqual return-shape — visual-round-transitions
+test/visual-round-transitions.test.mjs | AC-11: pre-v3.14 callers (no prev_visual_round) work unchanged (backwards compat)

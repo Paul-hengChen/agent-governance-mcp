@@ -1,0 +1,41 @@
+# Expected-red manifest — e18-write-provenance (C15 format: <relative test file path> | <exact test name>)
+# Authored by sr-engineer at handoff (T-E18-01 / T-E18-02). All reds below are
+# intentional consequences of the E18 content growth + 2 new gate codes;
+# per Constitution §2 the test-side re-baselines are qa-engineer-owned.
+
+# const-08-chain-31-mid.md grew two §3.1 mechanism bullets (Stamp-Provenance,
+# QA Completion-Evidence) — byte-parity goldens need re-baselining (the E5
+# qa_reports/expected-red precedent flow).
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=false, fullDetail=false) is byte-identical to pre-refactor golden build-full-nondesign.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=true, fullDetail=false) is byte-identical to pre-refactor golden build-full-design.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=false, fullDetail=true) is byte-identical to pre-refactor golden build-full-nondesign-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=true, fullDetail=true) is byte-identical to pre-refactor golden build-full-design-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: SessionStart hook (AGC_DEFAULT_SKILL=full) is byte-identical to pre-refactor golden hook-full.txt
+test/compose-equivalence.test.mjs | compose-equivalence: cat(15 manifest fragments in order) === the pre-refactor constitution.md monolith (DR-1 Option R invariant)
+
+# Same content growth pushes the measured token-ratchet floors — qa re-ratchets
+# the three floor literals.
+test/context-budget.test.mjs | AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the measured floor (≤ 7435 ~tok)
+test/context-budget.test.mjs | AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 14740 ~tok)
+test/context-budget.test.mjs | AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 5337 ~tok)
+
+# GATE_REGISTRY grew 30 → 32 (STAMP_PROVENANCE_SUSPECT, QA_COMPLETION_EVIDENCE_MISSING).
+# Count/mapping-size literals retarget to 32; the shape-rule SUFFIX_RE vocabulary
+# needs SUSPECT added (the explicit b8 UNRESOLVED / c9 MISMATCH / e1 HELD /
+# e10 CHANGE qa-owned-re-baseline precedent — the code strings are backlog-
+# mandated, sr had no rename latitude); STAMP_PROVENANCE_SUSPECT's
+# triggerEdge/armCondition and QA_COMPLETION_EVIDENCE_MISSING's need either
+# checkable-literal coverage or FREE_TEXT_ALLOWLIST entries.
+test/error-code-contract.test.mjs | AC-1/AC-5: GATE_REGISTRY has exactly 30 entries (28 in, 30 out — e10-lease-override added LEASE_OVERRIDE_AUDIT_MISSING + BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE)
+test/error-code-contract.test.mjs | AC-5: ALL_GATE_CODES === code-side shape-rule harvest (registry <-> code source parity)
+test/error-code-contract.test.mjs | registry ⊆ doc: every documentedInProse:true entry is backtick-quoted in >=1 content/*.md
+test/error-code-contract.test.mjs | doc-file mapping (c12): gates/registry.ts's errorCode→doc-file mapping comment matches the actual backtick-quote sites
+test/error-code-contract.test.mjs | AC3 (c12): every (errorCode, field) pair for triggerEdge/armCondition is either mechanically checked above or explicitly allowlisted as free-text — no silent exemptions
+
+# Intended behavior change, not a regression: the test's v0 fixture stamp
+# ("2026-05-01T00:00:00.000Z") IS the hand-authored shape, so the follow-up
+# different-feature write now (correctly) rejects STAMP_PROVENANCE_SUSPECT.
+# The heal-write preservation assertion itself still passes; qa re-baselines
+# the follow-up write with a stamp-remediation: pending_notes[0] audit line
+# (which also asserts the new gate's bypass path on a real lease scenario).
+test/feature-lease.test.mjs | AC4 (e10): migration heal-write preserves pre-heal last_updated verbatim

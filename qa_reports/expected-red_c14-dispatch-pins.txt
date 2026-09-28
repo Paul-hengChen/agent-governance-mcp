@@ -1,0 +1,37 @@
+test/compose-equivalence.test.mjs :: compose-equivalence: buildPromptForRole(skill-coordinator-lite.md, design=false, fullDetail=false) is byte-identical to pre-refactor golden build-lite-nondesign.txt
+test/compose-equivalence.test.mjs :: compose-equivalence: buildPromptForRole(skill-coordinator-lite.md, design=true, fullDetail=false) is byte-identical to pre-refactor golden build-lite-design.txt
+test/compose-equivalence.test.mjs :: compose-equivalence: buildPromptForRole(skill-coordinator-lite.md, design=false, fullDetail=true) is byte-identical to pre-refactor golden build-lite-nondesign-fd.txt
+test/compose-equivalence.test.mjs :: compose-equivalence: buildPromptForRole(skill-coordinator-lite.md, design=true, fullDetail=true) is byte-identical to pre-refactor golden build-lite-design-fd.txt
+test/compose-equivalence.test.mjs :: compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=false, fullDetail=false) is byte-identical to pre-refactor golden build-full-nondesign.txt
+test/compose-equivalence.test.mjs :: compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=true, fullDetail=false) is byte-identical to pre-refactor golden build-full-design.txt
+test/compose-equivalence.test.mjs :: compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=false, fullDetail=true) is byte-identical to pre-refactor golden build-full-nondesign-fd.txt
+test/compose-equivalence.test.mjs :: compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=true, fullDetail=true) is byte-identical to pre-refactor golden build-full-design-fd.txt
+test/compose-equivalence.test.mjs :: compose-equivalence: SessionStart hook (lite/default env) is byte-identical to pre-refactor golden hook-lite.txt
+test/compose-equivalence.test.mjs :: compose-equivalence: SessionStart hook (AGC_DEFAULT_SKILL=full) is byte-identical to pre-refactor golden hook-full.txt
+test/compose-equivalence.test.mjs :: compose-equivalence: cat(15 manifest fragments in order) === the pre-refactor constitution.md monolith (DR-1 Option R invariant)
+test/context-budget.test.mjs :: AC2: lean always-on bundle is below the raw baseline and within target (<= 3087 ~tok)
+test/context-budget.test.mjs :: AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the measured floor (≤ 5561 ~tok)
+test/context-budget.test.mjs :: AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 9545 ~tok)
+test/context-budget.test.mjs :: AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 3477 ~tok)
+test/cut-approval-gate.test.mjs :: R-schema-1: writeHandoffState emits cut_approved: true in YAML when passed
+test/cut-approval-gate.test.mjs :: M1: v4 → v5 migration is stamp-only (AC-7 — no default seeded for cut_approved)
+test/cut-approval-gate.test.mjs :: M2: v4 → v5 migration preserves all existing fields (AC-7 — lossless)
+test/cut-approval-gate.test.mjs :: M3: legacy file (no schema_version) migrates to v5 and has no cut_approved (AC-6)
+test/cut-approval-gate.test.mjs :: M4: v4 file with scope_decision migrates to v5 with no cut_approved seeded (AC-6/AC-7)
+test/cut-approval-gate.test.mjs :: X-malformed-parse: parseHandoff drops malformed external_refs entries from raw YAML without throwing (DR-3)
+test/drift-skew.test.mjs :: T32 AC-6: future handoff schema_version surfaces as a drift reason (not a thrown error)
+test/handoff-migration.test.mjs :: AC-7: scope_decision round-trips through writeHandoffState → readback (v7 stamp)
+test/handoff-migration.test.mjs :: AC-10(g): future v8 handoff refuses-loud against a v7 server (no silent downgrade)
+test/handoff-migration.test.mjs :: AC-1/C9: v6→v7 migration step stamps version only — external_refs survives, new protocol fields stay absent
+test/handoff-migration.test.mjs :: AC-1/C9: round-trip — re-running runMigrations on the now-v7 payload is a no-op (applied === [])
+test/handoff-versioning.test.mjs :: AC-1: writeHandoffState stamps schema_version: 7 in YAML (c9-protocol-fields)
+test/handoff-versioning.test.mjs :: AC-2: readHandoffState heals v0 handoff to CURRENT (v7) on disk (fire-and-forget)
+test/handoff-versioning.test.mjs :: AC-2 regression: existing handoff missing schema_version round-trips to CURRENT (v7)
+test/handoff-versioning.test.mjs :: AC-4: readHandoffState refuses-loud when on-disk schema_version > CURRENT
+test/handoff-versioning.test.mjs :: AC-4: parseHandoff refuses-loud on future schema_version
+test/handoff-versioning.test.mjs :: AC-5: sequential second-write swallows freshness error after a healing write
+test/schema-versions.test.mjs :: CURRENT_VERSIONS exposes the four kinds at their c9-protocol-fields levels
+test/schema-versions.test.mjs :: registerMigration idempotent overwrite — last write wins
+test/schema-versions.test.mjs :: runMigrations no-op when current === target
+test/schema-versions.test.mjs :: runMigrations refuses-loud when on-disk version > current (AC-4)
+test/skill-evolution-v3.11.test.mjs :: AC-10: schema/versions.ts schema versions track c9-protocol-fields bump

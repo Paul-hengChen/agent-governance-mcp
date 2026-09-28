@@ -1,0 +1,12 @@
+{"ts":"2026-09-28T06:43:22.933Z","feature":"e235b-relative-manifest-worktree","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-28T06:55:12.440Z","feature":"e235b-relative-manifest-worktree","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-28T06:55:43.465Z","feature":"e235b-relative-manifest-worktree","agent_id":"architect","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-28T07:03:42.699Z","feature":"e235b-relative-manifest-worktree","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-28T07:08:21.879Z","feature":"e235b-relative-manifest-worktree","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-28T07:09:14.109Z","feature":"e235b-relative-manifest-worktree","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-28T07:15:38.099Z","feature":"e235b-relative-manifest-worktree","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-28T07:16:24.067Z","feature":"e235b-relative-manifest-worktree","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-28T07:35:27.797Z","feature":"e235b-relative-manifest-worktree","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-28T07:44:44.235Z","feature":"e235b-relative-manifest-worktree","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-28T07:44:51.662Z","feature":"e235b-relative-manifest-worktree","agent_id":"qa-engineer","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-28T07:46:07.292Z","feature":"e235b-relative-manifest-worktree","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}

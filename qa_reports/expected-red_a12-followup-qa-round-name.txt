@@ -1,0 +1,26 @@
+# a12-followup-qa-round-name — intentional reds left by sr-engineer (T-A12F-01).
+# T-A12F-01 rewrites content/const-06-chain-31-head.md L8 only (the qa_round
+# circuit-breaker line), replacing the bare "3" with the `qa_round` name-reference
+# per AC1-AC3 (mirrors const-08's shipped review_round phrasing). The line grows by
+# a few chars. const-06 carries the `chain` tag, so every chain-role bundle shifts.
+# qa-owned T-A12F-02 regenerates the golden fixtures and re-baselines the token
+# caps (AC4). No product-logic regression is hidden here — text-framing fix only,
+# ALLOWED_TRANSITIONS / qa_round cap value (3) unchanged (spec Out of Scope).
+
+# Golden fixtures pin the pre-change constitution bytes; const-06 (chain tag) changed
+# under AC1-AC3. Regenerate via scripts/capture-constitution-golden.mjs (T-A12F-02).
+# Only the chain-armed (full / hook-full / monolith) fixtures move — lite bundles strip
+# chain-only content and stay green, consistent with AC4's chain-tag-only scope.
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=false, fullDetail=false) is byte-identical to pre-refactor golden build-full-nondesign.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=true, fullDetail=false) is byte-identical to pre-refactor golden build-full-design.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=false, fullDetail=true) is byte-identical to pre-refactor golden build-full-nondesign-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=true, fullDetail=true) is byte-identical to pre-refactor golden build-full-design-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: SessionStart hook (AGC_DEFAULT_SKILL=full) is byte-identical to pre-refactor golden hook-full.txt
+test/compose-equivalence.test.mjs | compose-equivalence: cat(15 manifest fragments in order) === the pre-refactor constitution.md monolith (DR-1 Option R invariant)
+
+# Token-cap floors measured pre-change; the const-06 (chain tag) line growth pushes the
+# chain-armed bundles a few tokens over their no-headroom caps. Re-measure and bump to the
+# exact new value for every chain-tag bundle (AC4, T-A12-08 precedent) — T-A12F-02.
+test/context-budget.test.mjs | AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the measured floor (≤ 5561 ~tok)
+test/context-budget.test.mjs | AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 9545 ~tok)
+test/context-budget.test.mjs | AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 3477 ~tok)

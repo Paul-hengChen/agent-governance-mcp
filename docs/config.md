@@ -1,0 +1,202 @@
+# Workspace Configuration
+
+The server defaults to a generic markdown-checkbox task format and the bundled constitution. Override per-workspace via files under `.current/`.
+
+> **Opt-in features looking dead?** Several capabilities (usage.jsonl token sidecar, `driftBaselineIds`, `cutApprovalAutoTier`, `staleDispatchNotifyFile`) ship implemented but disarmed. See [docs/arming.md](arming.md) for how to arm each one and verify it's live before concluding it doesn't exist.
+
+## `.current/.config.json` — task format override
+
+Customize where and how the server reads task lists:
+
+```json
+{
+  "taskPattern": "^- \\[(?<state>[ x])\\] (?<id>T\\d+) (?<title>.+)$",
+  "taskPaths": ["tasks.md", "docs/backlog.md"]
+}
+```
+
+| Field | Purpose |
+|---|---|
+| `taskPattern` | Regex with named groups `state`, `id`, `title`. Matches one task per line. |
+| `taskPaths` | Ordered list of files the server scans for tasks. First-match wins for a given task id. |
+
+Both fields are optional. Omit `taskPattern` to use the default `- [ ] T\d+ …` shape; omit `taskPaths` to use the default `tasks.md` at the workspace root.
+
+**Schema-versioned**: `.config.json` carries `schema_version` and is lazily migrated on first read. See [docs/schema-versions.md](schema-versions.md).
+
+### `artifacts` — git posture for governance runtime artifacts
+
+Records whether the governance runtime artifacts (`.current/`, `tasks.md`, `qa_reports/`, `review_reports/`) stay out of git or are tracked. Written by `agc init --artifacts=local|repo` (see [docs/install.md](install.md#keeping-governance-artifacts-out-of-git-agc-init---artifactslocalrepo)); added in config `schema_version` 2.
+
+```json
+{
+  "artifacts": "local"
+}
+```
+
+| Value | Meaning |
+|---|---|
+| `"local"` | Artifacts are kept out of git by rules in the repo's shared `.git/info/exclude` (never `.gitignore`). |
+| `"repo"` | Artifacts are tracked like any other file. |
+| absent | Undeclared. `agc check` prints `agc check — artifacts undeclared — run agc init --artifacts=local\|repo`. |
+
+Semantics:
+
+- **Default `local` — at `agc init` time only.** `agc init` without the flag records `"local"` on a workspace where no artifact path is tracked yet. **Exception:** if any artifact path is already tracked, the flag-less run records nothing and asks you to choose explicitly — a silent `local` there would add exclude rules that have no effect on the tracked files.
+- **Absence is not `local`.** Neither the server nor the config v1→v2 migration seeds a value: `loadConfig` surfaces `WorkspaceConfig.artifacts` only for the exact strings `"local"` / `"repo"`; anything else (absent, misspelled, non-string) reads as undeclared and never errors.
+- **Advisory drift check.** `agc check` compares the declared value with the repo (`local`: exclude rules present and nothing tracked; `repo`: no artifact exclude rule present) and prints one line per mismatch. It never changes the exit code.
+
+### `cutApprovalAutoTier` — cut-approval auto-tier threshold (opt-in)
+
+Arms the Constitution §3.1 **Cut-Approval Auto-Tier**: a ticket cut meeting ALL threshold conditions may be auto-approved — the sanctioned writer sets `cut_approved: true` without halting for the human, recording `cut-approved: auto-tier` + the threshold facts in `pending_notes` of the same write.
+
+```json
+{
+  "cutApprovalAutoTier": {
+    "maxFiles": 2,
+    "maxPriority": "P3",
+    "allowSchemaChange": false,
+    "allowDesignArmed": false
+  }
+}
+```
+
+| Field | Default | Meaning |
+|---|---|---|
+| `maxFiles` | `2` | Cut may touch at most this many files. |
+| `maxPriority` | `"P3"` | Least-urgent bound: the ticket's priority must be this or lower-urgency (numerically ≥). At the default, P2/P1/P0 tickets never auto-approve. |
+| `allowSchemaChange` | `false` | `true` lets cuts containing a schema change auto-approve. Never by default. |
+| `allowDesignArmed` | `false` | `true` lets design-armed cuts (design source detected) auto-approve. Never by default. |
+
+Semantics:
+
+- **Absent key = tier disabled.** Every cut halts for human approval, exactly the pre-v3.85.0 behavior. Cut review is the highest-leverage human checkpoint (E5 risk note: remove it last, only once retro data shows the tier is safe) — so removing it is an explicit per-workspace opt-in, never a default.
+- **Present key (even `{}`) = tier armed.** Omitted or invalid fields fall back to the conservative defaults above; a non-object value is treated as absent (tier disabled).
+- **Advisory, not enforced.** The server parses and surfaces the key (`loadConfig`) but never checks the threshold or gates a write on it. The coordinator/PM reads the config and applies the tier — the same attestation trust model as `cut_approved` itself.
+
+### `staleDispatchNotifyFile` — stale-dispatch watch-file emit (opt-in)
+
+The `stale_dispatch` advisory is pull-only: it is computed at `tw_get_state` time, so nobody sees a stale in-flight dispatch until the next session reads state. This key arms the cheapest push channel (E22): when the read-time threshold check fires (>15 min since `dispatched_at` with a `next_role` in flight), the server writes the advisory payload to the configured watch-file. An **external** watcher — the server spawns no daemon or timer — turns the file change into whatever alert you want.
+
+```json
+{
+  "staleDispatchNotifyFile": ".current/stale-dispatch.notify"
+}
+```
+
+Semantics:
+
+- **Absent key = disarmed.** No file is ever written; `tw_get_state` output is byte-identical to the pre-E22 behavior.
+- **Present = emit on threshold crossing.** The watch-file receives the advisory JSON (`role`, `dispatched_at`, `elapsed_minutes`, `threshold_minutes`, `message`, plus `workspace` and `emitted_at`), written atomically (tmp + rename). The path is workspace-relative (absolute also honored); parent directories are created as needed.
+- **One emit per distinct dispatch.** Subsequent `tw_get_state` calls in the same stale window skip the write (`notify.skipped_duplicate: true` in the advisory payload) — a watcher fires once per crossing, not once per read. A new dispatch (fresh `dispatched_at`) re-arms the emit. The dedupe cursor is the watch-file content itself; no new handoff state.
+- **Never blocks the read.** A failed emit (unwritable path, corrupt config) surfaces as `notify.error` inside the `stale_dispatch` payload; `tw_get_state` itself always succeeds. File-mode only.
+- **Pull-triggered, not a timer.** The emit happens when something calls `tw_get_state` after the threshold passed. If no session reads state during the idle window, nothing fires — that trade-off is by design (E22 cut: no daemon).
+
+Verify it works:
+
+1. Arm the key in `.current/.config.json` as above.
+2. Ensure the handoff has an in-flight dispatch older than 15 min (`next_role` set, `dispatched_at` in the past — or just wait one out).
+3. Call `tw_get_state`; the response's `stale_dispatch.notify` shows `emitted: true` and the file exists at the configured path.
+4. Call `tw_get_state` again: `notify.skipped_duplicate: true`, file mtime unchanged.
+5. Example watcher (macOS): `fswatch .current/stale-dispatch.notify | while read -r _; do osascript -e 'display notification "stale agent dispatch" with title "agent-governance"'; done`
+
+---
+
+## `.current/const-*.md` — constitution override
+
+> ⚠️ **Changed in v3.44.0.** There is no longer a single `content/constitution.md`, so **`.current/constitution.md` is not read by anything** — dropping that file has no effect and produces no error. If you set one up before v3.44.0, migrate it to per-fragment overrides as below.
+
+The constitution is composed additively from **15 ordered fragments** in `content/` (`prompts/constitution-manifest.ts` picks which ones ship per dispatch mode). Override is therefore **per fragment**: drop a same-named file in `.current/` and it replaces that fragment for this workspace.
+
+```
+.current/const-01-core-head.md        # §1 watermark, dispatch pins
+.current/const-02-design-mvp.md
+.current/const-03-core-surgical.md
+.current/const-04-design-surgical.md
+.current/const-05-core-standards.md   # escalation-call format, rule grammar
+.current/const-06-chain-31-head.md
+.current/const-07-design-chain-gates.md
+.current/const-08-chain-31-mid.md
+.current/const-09-design-chain-vround.md
+.current/const-10-chain-31-tail.md
+.current/const-11-design-chain-32.md
+.current/const-12-chain-r10-s4.md
+.current/const-13-design-chain-s4.md
+.current/const-14-chain-end.md
+.current/const-15-core-tail.md
+```
+
+Same `loadContent()` fallback as the skill overrides below: `<workspace>/.current/<fragment>` first, else the bundled `content/<fragment>`. To replace the whole document, override every fragment your dispatch mode loads — overriding one leaves the other 14 on the shipped default. Fragment order and tags are listed in `prompts/constitution-manifest.ts`; run the composition through `composeConstitution()` if you need to see the assembled result.
+
+Use cases:
+- Stricter rules for a regulated codebase (e.g. additional security gates).
+- Looser rules for a sandbox / experiment workspace.
+- Custom roles or alternate routing chains (advanced).
+
+**Caveat**: hand-written fragments must keep the server-enforced contracts (`§3.1 server-enforced chain`, `§4 routing chain`). The state machine in `tools/transitions.ts` and the 18 gates in `gates/` are code, not text — drift between your custom constitution and the code yields confusing rejections.
+
+---
+
+## `.current/skill-<role>.md` — per-role skill override
+
+The same fallback applies to **every** role SOP. Drop any of these in `.current/` to replace just that role for this workspace:
+
+```
+.current/skill-coordinator.md
+.current/skill-coordinator-lite.md
+.current/skill-pm.md
+.current/skill-architect.md
+.current/skill-researcher.md
+.current/skill-design-auditor.md
+.current/skill-sr-engineer.md
+.current/skill-code-reviewer.md
+.current/skill-qa-engineer.md
+.current/skill-qa-visual.md
+.current/skill-doc-writer.md
+.current/skill-release-engineer.md
+```
+
+The server's `loadContent()` (`prompts/build.ts`) checks `<workspace>/.current/<filename>` first, falls back to the bundled `content/<filename>`. Per-file granularity — overriding `skill-pm.md` leaves every other role on the shipped default.
+
+Use cases:
+- Tighter PM gate for a regulated codebase (extra ambiguity checks).
+- Domain-specific QA checklist (e.g. accessibility-mandatory project).
+- Custom researcher heuristics (preferred T1 sources for your domain).
+
+**Caveat (same as constitution override)**: skill files cannot soften server-enforced behaviours. e.g. removing the qa-engineer's evidence-of-PASS requirement from `skill-qa-engineer.md` does NOT lift the gate — the server still rejects PASS without `qa_reports/review_<id>.md`. Text-layer overrides are guidance to the agent; the gates are code.
+
+> Since **v3.1.0** (commit `ef65eb2`, 2026-05-12). Same `loadContent()` mechanism as the constitution-fragment override above and `.config.json`.
+>
+> `skill-coordinator.md` is a valid override key even though no such file ships in `content/` — the coordinator SOP is composed from `content/coord-01..07-*.md`, and a whole-file `.current/skill-coordinator.md` override short-circuits that composition and is returned verbatim (no host-capability filtering). See `composeSkill()` in `prompts/skill-manifest.ts`.
+
+---
+
+## "Vibe coding" mode (no task list)
+
+If neither `tasks.md` nor `taskPaths` resolves to a real file, the task tools (`tw_add_task`, `tw_complete_task`, `tw_rollback_task`) fail gracefully — they return a structured error, not a crash. **Prompt injection and handoff state still function perfectly.**
+
+Useful when:
+- You want the constitution and `handoff.md` discipline, but no formal task tracking yet.
+- A workspace's "tasks" live in an external tool (Linear, Jira, GitHub Issues) and you're not ready to mirror them locally.
+
+---
+
+## SessionStart hook gating (the hook itself is opt-in)
+
+The SessionStart hook is **not registered by default** (since 2026-07-15, backlog E19) — governance context loads on prompt invocation instead. This section applies only if you registered the hook per [docs/install.md](install.md).
+
+The bundled `bin/agent-governance-context.mjs` is a **silent no-op** unless the workspace contains **any of** `.current/`, `tasks.md`, or `TODO.md`. By design — keeps unrelated projects clean.
+
+To opt-in: `mkdir -p .current` (the simplest path). To opt-out: rename `.current/` away.
+
+---
+
+## Env-var overrides
+
+| Var | Purpose |
+|---|---|
+| `TEAMWORK_SERVER_ROOT` | Override the checkout location used by the SessionStart hook helper. Legacy `SDD_SERVER_ROOT` still honored as fallback. |
+| `AGC_DEFAULT_SKILL` | Set to `full` to make `/teamwork` (full coordinator) the default skill in the SessionStart hook. Default: `lite`. |
+| `AGC_AUTO_ROUTE` | Set to `0` to disable auto-routing in `/teamwork` (restore the pre-v3.13 manual-routing behaviour where the coordinator surfaces the next role and waits). Default: on. |
+| `TW_AUTH_TOKEN` | HTTP mode only — see [docs/http-mode.md](http-mode.md). |
+| `TW_ALLOWED_ORIGINS` | HTTP mode only — see [docs/http-mode.md](http-mode.md). |

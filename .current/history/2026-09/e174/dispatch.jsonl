@@ -1,0 +1,16 @@
+{"ts":"2026-09-24T07:57:06.464Z","feature":"e174-flat-path-sweep","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-24T08:13:45.140Z","feature":"e174-flat-path-sweep","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-24T08:14:10.238Z","feature":"e174-flat-path-sweep","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-24T08:16:01.736Z","feature":"e174-flat-path-sweep","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-24T08:19:31.871Z","feature":"e174-flat-path-sweep","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-24T08:24:18.650Z","feature":"e174-flat-path-sweep","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-24T08:24:39.357Z","feature":"e174-flat-path-sweep","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-24T08:25:19.249Z","feature":"e174-flat-path-sweep","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-24T08:31:01.302Z","feature":"e174-flat-path-sweep","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-24T08:31:40.023Z","feature":"e174-flat-path-sweep","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-24T08:35:24.550Z","feature":"e174-flat-path-sweep","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-24T08:36:19.349Z","feature":"e174-flat-path-sweep","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-24T08:49:36.081Z","feature":"e174-flat-path-sweep","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-24T15:26:41.927Z","feature":"e174-flat-path-sweep","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-24T15:29:32.368Z","feature":"e174-flat-path-sweep","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-24T15:29:38.247Z","feature":"e174-flat-path-sweep","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}

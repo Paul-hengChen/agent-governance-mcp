@@ -1,0 +1,19 @@
+node_modules
+
+.DS_Store
+
+# Local backups (Notion exports, etc.)
+.backup/
+
+# Ephemeral SessionStart-hook dedup marker (C11 L2) — never committed
+.current/.agc-hook-marker.json
+
+# Third-party design sources and binary assets (E104) — workspace-local, NEVER
+# committed, whatever the repo's current visibility. See CONTRIBUTING.md
+# "Third-party assets are never committed".
+research/assets/
+
+# E157 (e123a-lane-layout-migration AC11) — snapshot archives are per-lane
+# working state, workspace-local and untracked (package A-prime, see
+# .current/feature-split.md Decisions). Content stays on disk.
+.current/archive/

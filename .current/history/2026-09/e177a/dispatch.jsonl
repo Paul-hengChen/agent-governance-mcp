@@ -1,0 +1,11 @@
+{"ts":"2026-09-26T18:52:38.336Z","feature":"e177a-fanout-manifest","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-26T18:59:20.455Z","feature":"e177a-fanout-manifest","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-26T19:09:16.563Z","feature":"e177a-fanout-manifest","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-26T19:14:49.608Z","feature":"e177a-fanout-manifest","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-26T19:15:43.000Z","feature":"e177a-fanout-manifest","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-26T19:19:04.644Z","feature":"e177a-fanout-manifest","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-26T19:21:54.064Z","feature":"e177a-fanout-manifest","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-26T19:22:39.185Z","feature":"e177a-fanout-manifest","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-26T19:23:41.603Z","feature":"e177a-fanout-manifest","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-26T19:39:15.159Z","feature":"e177a-fanout-manifest","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-26T19:40:08.054Z","feature":"e177a-fanout-manifest","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}

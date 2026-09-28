@@ -1,0 +1,48 @@
+# e106-init-artifacts-flag — expected-red manifest (emitted by
+# sr-engineer per skill-sr-engineer SOP 7a)
+# Format: <relative test file path> | <exact test name/description string>
+
+# T-E106-01: CURRENT_VERSIONS.config bumped 1 -> 2 with a registered v1->v2
+# stamp-only migration. These tests pin config schema 1 (the literal version,
+# a 'server max 1' refuse-loud message, a v1 file needing no write-back, a
+# v2 'future' fixture, or a registry-cleared chain that lacks the new step).
+# qa re-baselines them in T-E106-06.
+test/config-versioning.test.mjs | T31 AC-2 fast-path: v1 config triggers no write-back (mtime unchanged)
+test/config-versioning.test.mjs | T31 AC-4 (re-pinned E31): future schema_version degrades non-fatally — loadConfig returns {} and getConfigError() names the refuse-loud reason, no throw
+test/drift-baseline.test.mjs | AC-6: CURRENT_VERSIONS.config stays 1 and a pre-feature config loads unmigrated
+test/drift-skew.test.mjs | T32 AC-6: future config schema_version surfaces as drift reason
+test/e22-stale-notify.test.mjs | S1: sanity — CURRENT_VERSIONS.handoff/config are unchanged by E22 (no schema bump; the dedupe cursor lives entirely in the watch-file, not in handoff state)
+test/schema-versions.test.mjs | CURRENT_VERSIONS exposes the four kinds at their e123a-lane-layout-migration levels
+test/schema-versions.test.mjs | runMigrations applies single v0→v1 step
+test/schema-versions.test.mjs | runMigrations composes a multi-step chain v0→v2 (hypothetical)
+
+# T-E106-03 (AC1/AC3/AC5/AC14): a fresh `agc init` template now carries
+# "schema_version": 2 and "artifacts": "local", and an EXISTING config with
+# no artifacts key gains "artifacts": "local" in place (these fixtures run
+# outside a git repo, so the local default applies). The host-key assertions
+# themselves still hold (host rejected / preserved / repaired exactly as
+# before); what changes is the whole-file byte/line/deep-equal expectation.
+# qa updates them in T-E106-06.
+test/agc-adapters.test.mjs | E100 config class (1): fresh agc init writes host:"claude-code" into a brand-new .current/.config.json
+test/agc-adapters.test.mjs | E100 config class (2): an EXISTING host-less .config.json gains "host" on re-run, with schema_version and every other key preserved, and stays valid JSON
+test/agc-adapters.test.mjs | E100 config class (3): an existing "host": "cursor" is left byte-identical (over-correction guard) and reported on the Skipped line, not Updated
+test/agc-adapters.test.mjs | E100: falsy host values ("", null, false, 0) are all treated as absent and repaired to "claude-code", not silently left declared
+test/agc-adapters.test.mjs | E100 reparse-guard proof: truthy-but-unusable host shapes a plain !host check would miss are still repaired or safely rejected
+test/agc-adapters.test.mjs | E100 reparse-guard proof: a wrong-occurrence splice never proceeds — nested "host" sorting before a falsy top-level "host" leaves the file byte-identical
+test/agc-adapters.test.mjs | E100 formatting preservation: a large real-shaped driftBaselineIds array is left byte-identical apart from the inserted host line
+test/p0-onboarding-lite-default.test.mjs | AC1: agc init creates .config.json + tasks.md with expected templates, no handoff.md (re-pinned E34)
+test/p0-onboarding-lite-default.test.mjs | AC2-companion (E100): a pre-existing host-less .config.json (pre-E100 shape) is CHANGED on re-run — host added, schema_version + every other key preserved
+
+# T-E106-03/04: this test locates the runInit E34 comment by a fixed line
+# window (lines 341-365 of bin/agc-init.mjs). The header gained the
+# --artifacts description and new helpers precede runInit, so the unchanged
+# comment now sits further down. Content assertions are still satisfiable;
+# only the window needs widening (qa, T-E106-06).
+test/agc-feature-lifecycle.test.mjs | AC29: the two retargeted comments read the lane-scoped path; .config.json mentions untouched
+
+# PRE-EXISTING, not caused by this feature: `node scripts/check-md-tables.mjs`
+# exits 1 on the real docs/backlog.md, which this lane does not touch
+# (git diff d16fa6c -- docs/backlog.md scripts/ is empty). Listed so Phase 0.5
+# can disposition them; not in this feature's scope to fix.
+test/check-md-tables.test.mjs | AC7 (real corpus, informational count NOT pinned here): `node scripts/check-md-tables.mjs` against this actual repository's docs/backlog.md still exits 0 — the E88 advisory must never turn a pre-existing row fatal
+test/check-md-tables.test.mjs | CQ-9 (real corpus, non-regression, T-E145-02 required case 9): the real docs/backlog.md still exits 0, still advises on the E39/E40/E58/E59 rows, and does NOT advise on the E145 row — identified by TICKET ID via a live line-number lookup, never a hardcoded line number or a fixed advisory count (docs/backlog.md is edited by concurrent lanes)

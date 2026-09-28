@@ -1,0 +1,23 @@
+# e110-pm-parallel-lane-template: intentional reds left by sr-engineer (T-E110-01, T-E110-02).
+# The content edits (skill-pm.md +1217 B, coord-01-core-head.md +34 B) push two budget caps and
+# one golden. qa-owned T-E110-03 re-baselines them (spec AC6-AC7). No product logic is touched.
+
+# skill-pm stripped body: measured 4376 ~tok vs cap 4128 (+248, matches the spec's prototype).
+test/context-budget.test.mjs | AC1/AC2: skill-pm stripped token count meets ≤ 4128 cap
+
+# teamwork design-arm bundle: measured 18990 ~tok vs floor 18982 (+8; spec estimated ≈18991).
+test/context-budget.test.mjs | AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 18982 ~tok)
+
+# coord-01 composes into the monolith golden; regenerate via scripts/capture-constitution-golden.mjs.
+test/skill-manifest.test.mjs | t-golden-byte-identity (AC1/AC5): composeSkill("skill-coordinator.md", {taskTool:true}) === frozen golden monolith, byte-for-byte
+
+# NOT anticipated by the spec: C3 pins the OLD 5-column cut header verbatim. AC4 requires that
+# header gone, so both cannot hold. The fix is to update C3's literal to the new 6-column header,
+# which is a test/ edit (qa's) and widens AC8's allowed path set by test/cut-approval-gate.test.mjs.
+test/cut-approval-gate.test.mjs | C3: S03 — inline cut draft table header present verbatim in skill-pm.md
+
+# PRE-EXISTING on base dea8544, not caused by this lane: specs/e123a-lane-layout-migration.md:280
+# is a 3-cell row under a 4-column header, so `node scripts/check-md-tables.mjs` exits 1.
+# Filed as NEW-TICKETS.md L-CONTENT-NEW-2 (owner: the e123a lane). Listed so Phase 0.5 diffs clean.
+test/check-md-tables.test.mjs | AC7 (real corpus, informational count NOT pinned here): `node scripts/check-md-tables.mjs` against this actual repository's docs/backlog.md still exits 0 — the E88 advisory must never turn a pre-existing row fatal
+test/check-md-tables.test.mjs | CQ-9 (real corpus, non-regression, T-E145-02 required case 9): the real docs/backlog.md still exits 0, still advises on the E39/E40/E58/E59 rows, and does NOT advise on the E145 row — identified by TICKET ID via a live line-number lookup, never a hardcoded line number or a fixed advisory count (docs/backlog.md is edited by concurrent lanes)

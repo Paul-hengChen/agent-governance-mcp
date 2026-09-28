@@ -1,0 +1,17 @@
+# e123b1-core-write-path (E123 F1 L1) — expected reds.
+#
+# Block 1 — S0/F0 "zero production callers" pins. L1's whole job is to ADD
+# production callers of resolveCurrentLanePaths (spec AC2), so these two
+# e123b0/e123a-era assertions go red by design. test/ edits are forbidden in
+# this lane; retiring/rewriting the pins belongs to J (row 1.9, "update
+# flat-assuming tests"). Logged as L1-NEW-4. L2/L3 will extend the same reds.
+test/lane-paths.test.mjs | CALLERS2 (disclosed substitution): AC5's LITERAL proof (grep -rln "lane-paths") is a spec-proof defect, not an implementation defect — it always lists 3 files because AC15 mandates the imports
+test/lane-paths.test.mjs | CALLERS3: grep -rn resolveCurrentLane tools/ gates/ guards/ prompts/ bin/ index.ts names only tools/lane-paths.ts (zero production callers)
+
+# Block 2 — PRE-EXISTING at base commit 8f30aba, not caused by this lane.
+# `.current/feature-split.md:23` (row 1.9) contains the regex
+# `/^([a-z]+\d[a-z0-9]*)(?:-|$)/i` with an unescaped `|` inside a table cell
+# (9 cells vs 8 declared), so scripts/check-md-tables.mjs exits 1. That file
+# is out of this lane's touch set. Logged as L1-NEW-5.
+test/check-md-tables.test.mjs | AC7 (real corpus, informational count NOT pinned here): `node scripts/check-md-tables.mjs` against this actual repository's docs/backlog.md still exits 0 — the E88 advisory must never turn a pre-existing row fatal
+test/check-md-tables.test.mjs | CQ-9 (real corpus, non-regression, T-E145-02 required case 9): the real docs/backlog.md still exits 0, still advises on the E39/E40/E58/E59 rows, and does NOT advise on the E145 row — identified by TICKET ID via a live line-number lookup, never a hardcoded line number or a fixed advisory count (docs/backlog.md is edited by concurrent lanes)

@@ -1,0 +1,9 @@
+<!-- schema_version: 2 -->
+# Tasks
+
+## Active
+
+- [x] T-E231-01 sr-engineer: Add "Information hygiene" + "Generic citation" bullets to content/const-15-core-tail.md §6 (Security & Privacy), verbatim per specs/e231-info-hygiene-rule.md Decision §1. AC1, AC5. (note: code-reviewer APPROVED (review_reports/review_T-E231-01.md, covers T-E231-01/T-E231-02, commit 5855501); AC1/AC5 independently re-verified by qa this round (byte-diff on content/const-15-core-tail.md) — see qa_reports/review_T-E231-03.md AC Execution Log.)
+- [x] T-E231-02 sr-engineer: Add one-line pointer to CONTRIBUTING.md's "Third-party assets are never committed" section (Decision §2); optional short entry in content/constitution-rationale.md (never composed into any prompt — zero budget cost). AC3. (note: code-reviewer APPROVED (review_reports/review_T-E231-01.md, covers T-E231-01/T-E231-02, commit 5855501); AC3 independently re-verified by qa this round (git diff on CONTRIBUTING.md) — see qa_reports/review_T-E231-03.md AC Execution Log.)
+- [x] T-E231-03 qa-engineer: Regenerate test/fixtures/compose-golden/* via scripts/capture-constitution-golden.mjs; bump every affected ~tok ceiling constant in test/context-budget.test.mjs, with a plain-language comment explaining why the ceiling moved (ticket id trailing only, not standing alone). AC4. (note: Golden fixtures regenerated (11 fixtures) and four ~tok ceilings bumped to their exact re-measured values; see qa_reports/review_T-E231-03.md.)
+- [x] T-E231-04 qa-engineer: Add pinning test asserting both new bullets' key phrases survive composeConstitution() on all 4 dispatch arms (lite/chain x design/non-design), in new file test/e231-info-hygiene-rule.test.mjs. AC1 (pinning), AC2. (note: New test/e231-info-hygiene-rule.test.mjs pins AC1 (bullet key phrases) and AC2 (all four dispatch arms); see qa_reports/review_T-E231-03.md.)

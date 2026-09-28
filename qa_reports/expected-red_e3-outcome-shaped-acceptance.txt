@@ -1,0 +1,19 @@
+# e3-outcome-shaped-acceptance — expected reds left by T-E3-01..03 (sr-engineer, C15 manifest).
+# All five are the standard qa-owned re-baselines that accompany every gate addition /
+# content growth (T-E3-QA owns the fixes per the architecture Test Specification §3 and
+# the qa-owned-bump convention documented inside each test file). No behavior test is red.
+
+# Registry parity re-baseline 27→28 (arch Test Spec §3): GATE_REGISTRY gained the 28th
+# entry AC_EXECUTION_LOG_MISSING; count assertions + title, mapping.size, and the
+# FREE_TEXT_ALLOWLIST triggerEdge entry move with it.
+test/error-code-contract.test.mjs | AC-1/AC-5: GATE_REGISTRY has exactly 27 entries (26 in, 27 out — e4-design-source-credibility-gate added SOURCE_CREDIBILITY_UNVERIFIED)
+test/error-code-contract.test.mjs | doc-file mapping (c12): gates/registry.ts's errorCode→doc-file mapping comment matches the actual backtick-quote sites
+test/error-code-contract.test.mjs | AC3 (c12): every (errorCode, field) pair for triggerEdge/armCondition is either mechanically checked above or explicitly allowlisted as free-text — no silent exemptions
+
+# Content-budget caps are pinned to exact measured values with NO headroom (Phase-2
+# convention stated in the tests themselves), so ANY skill growth requires a qa-owned
+# bump. T-E3-01 grew skill-pm.md (proof: convention + worked example — measured 4128 ~tok
+# vs 3922 cap); T-E3-02 grew skill-qa-engineer.md (Phase 3.5 — 14329 bytes vs 12950 cap;
+# independently re-measure with wc -c).
+test/context-budget.test.mjs | AC1/AC2: skill-pm stripped token count meets ≤ 3775 cap
+test/qa-visual-skill-split.test.mjs | AC-5: byte counts stay within v3.14.0-relaxed budgets (savings invariant vs v3.8.2 baseline)

@@ -1,0 +1,9 @@
+# E13 repro-first record (bugfix mode, spec AC7 / skill-sr-engineer step 3b).
+# The test below was authored BEFORE the gates/feature-lease.ts predicate
+# change (T-E13-02) and VERIFIED RED against the unmodified predicate
+# (node --test test/feature-lease.test.mjs @ pre-fix HEAD 753bbc7: 38 pass,
+# 1 fail — this test, final assertion actual=true expected=false: the post-heal
+# closing state wrongly reports the lease HELD). It must turn green after the
+# T-E13-02/T-E13-03 fix with zero unexplained new reds elsewhere (QA Phase 0.5
+# diffs this manifest against the actual suite run).
+test/feature-lease.test.mjs | E13-R1: heal-drop class — closing write carried the full terminal triple, then a heal-style re-persist preserved pending_notes verbatim but dropped the transient next_role; the lease must be RELEASED (spec AC2, second occurrence)

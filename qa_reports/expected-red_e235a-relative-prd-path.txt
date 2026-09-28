@@ -1,0 +1,10 @@
+# e235a DR-5 / OQ-1 (integrator-accepted): these owned tests use synthetic
+# absolute prd_path fixtures that sit OUTSIDE their temp workspace. Under
+# AC4/DR-2 (read-time drop-to-absent) and DR-3 (write-side omit) they now read
+# as absent. qa (T-E235A-07) re-points the fixtures inside the temp workspace;
+# assertion intent is unchanged.
+test/handoff-migration.test.mjs | AC-7 / AC-10(f): v3 handoff migrates to v4 on read — scope_decision undefined, other fields preserved
+test/handoff-migration.test.mjs | field preservation: a downstream write omitting scope_decision does NOT drop it (nor prd_path)
+test/handoff-migration.test.mjs | AC-7/B8: v5 handoff (no external_refs) migrates to v6 on read — field stays undefined, other fields preserved
+test/writestate-options-object.test.mjs | E36: positional writeHandoffState (full 12-arg form, all 3 round counters + blockingReason + prdPath) is byte-identical to the equivalent options-object call
+test/writestate-options-object.test.mjs | E36: FileHandoffStorage.writeState positional (full 11-arg form, all 3 round counters + blockingReason + prdPath) is byte-identical to the equivalent options-object call

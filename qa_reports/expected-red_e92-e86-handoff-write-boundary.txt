@@ -1,0 +1,10 @@
+# e92-e86-handoff-write-boundary — repro-first manifest (dispatch_mode: bugfix)
+# Format: <relative test file path> | <exact test name/description string>
+
+# sr-engineer-authored repro (skill-sr-engineer SOP step 3b carve-out): both
+# tests below were run and confirmed RED against the un-fixed code before
+# tools/registry.ts (E86) and tools/handoff-parse.ts (E92) were touched, then
+# confirmed GREEN after the fix. Minimal by design — full AC1-AC5 coverage is
+# qa-engineer's job (T-QA-01), not restated here.
+test/e92-e86-handoff-write-boundary-repro.test.mjs | E86 repro: pending_notes entry ending in leftover tool-call tag markup is rejected with the new message, not a length-cap message
+test/e92-e86-handoff-write-boundary-repro.test.mjs | E92 repro: a wholly-dropped pending_notes entry leaves a synthetic omission marker as the array's last element

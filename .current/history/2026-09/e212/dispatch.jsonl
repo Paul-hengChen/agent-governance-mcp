@@ -1,0 +1,4 @@
+{"ts":"2026-09-26T22:25:37.425Z","feature":"e212-deflake-ac13b","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-26T22:25:42.719Z","feature":"e212-deflake-ac13b","agent_id":"qa-engineer","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-26T22:35:55.310Z","feature":"e212-deflake-ac13b","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-26T22:41:23.146Z","feature":"e212-deflake-ac13b","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
