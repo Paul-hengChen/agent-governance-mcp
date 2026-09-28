@@ -4,3 +4,5 @@
 {"ts":"2026-09-28T09:05:46.878Z","feature":"e248-relative-mailbox-header","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
 {"ts":"2026-09-28T09:06:32.418Z","feature":"e248-relative-mailbox-header","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-09-28T09:11:10.245Z","feature":"e248-relative-mailbox-header","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-28T09:16:37.383Z","feature":"e248-relative-mailbox-header","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-28T09:16:41.557Z","feature":"e248-relative-mailbox-header","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
