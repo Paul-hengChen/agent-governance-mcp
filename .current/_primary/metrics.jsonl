@@ -51,3 +51,4 @@
 {"ts":"2026-09-25T08:20:26.240Z","feature":"release-v4-wave5-5.1","tickets":0,"qa_rounds":0,"review_rounds":0,"visual_rounds":0,"hops":3,"one_pass":true,"released_version":"3.118.0"}
 {"ts":"2026-09-26T18:12:55.064Z","feature":"release-v4-wave6","tickets":0,"qa_rounds":0,"review_rounds":0,"visual_rounds":0,"hops":3,"one_pass":true,"released_version":"3.119.0"}
 {"ts":"2026-09-27T14:12:33.527Z","feature":"release-v4.0.0","tickets":0,"qa_rounds":1,"review_rounds":0,"visual_rounds":0,"hops":10,"one_pass":false,"released_version":"4.0.0"}
+{"ts":"2026-09-28T10:17:08.956Z","feature":"release-v4.1.0","tickets":0,"qa_rounds":0,"review_rounds":0,"visual_rounds":0,"hops":3,"one_pass":true,"released_version":"4.1.0"}
