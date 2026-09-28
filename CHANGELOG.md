@@ -16,6 +16,41 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [4.1.0] - 2026-09-28
+
+MINOR release. It ships two lane features merged to `main` since v4.0.0: E243 (lane `e243`) and
+E248 (lane `e248`). Both are backwards-compatible. No tool input schema changed.
+
+### Changed
+
+- **E243: `agc init --artifacts=local` refuses more unsafe workspace path segments
+  (`bin/agc-init.mjs`)**: besides the gitignore wildcards `* ? [ ]`, local mode now refuses a
+  workspace path segment that contains a backslash, a C0 control character or DEL. A backslash is
+  a gitignore escape character and a CR/LF splits one exclude rule into several, so before this
+  change such a path produced an exclude rule that silently missed the scaffold. `agc check` and
+  `agc eject` apply the same test through one shared predicate. The init refusal and the
+  `agc check` cannot-verify advisory now describe the character class instead of listing four
+  characters, and print the offending segment with control characters shown as visible escapes.
+  `--artifacts=repo` is unaffected, and Windows path handling is unchanged. `docs/install.md`
+  describes the wider class. Spec: `specs/e243-init-path-escape-refusal.md`. Tests:
+  `test/e239-init-subdir-exclude.test.mjs`, `test/e108-eject.test.mjs`.
+- **E248: a fan-out manifest's `mailbox:` header may be primary-relative
+  (`tools/fanout-manifest.ts`)**: `render` resolves a relative `mailbox:` value against primary,
+  the same way as the worktree column. An absolute value is still used as written, and
+  `validate` warns about it without echoing the path. A value starting with `~` fails with the
+  new error code `MAILBOX_TILDE`. `--mailbox-root` still takes precedence and is used as written.
+  `specs/e177a-fanout-manifest.md` records the new header semantics. Spec:
+  `specs/e248-relative-mailbox-header.md`. Tests: `test/e248-relative-mailbox-header.test.mjs`.
+
+### Notes
+
+- Evidence: this release archives the ticket-prefixed QA and code-review reports of both lanes
+  and of the release gate into `qa_reports/archive/release-v4.1.0/` and
+  `review_reports/archive/release-v4.1.0/`, and `expected-red_e243-init-path-escape-refusal.txt`
+  into `qa_reports/archive/e243-init-path-escape-refusal/`. Each lane's closed handoff is under
+  `.current/history/2026-09/<lane>/` (context, not changed). Fan-out manifest:
+  `specs/fanout-e243-e248.md`. Release-gate spec: `specs/release-v4.1.0.md`.
+
 ## [4.0.0] - 2026-09-27
 
 v4.0.0 execution plan Wave 8 (`docs/v4.0.0-execution-plan.md`). This is the MAJOR release that
