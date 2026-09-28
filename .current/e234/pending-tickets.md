@@ -1,5 +1,7 @@
 # Pending tickets — lane e234
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E234-NEW-1
 title: docs/config.md env-var overrides table does not list AGC_HYGIENE_KEYWORDS
@@ -14,5 +16,3 @@ body: |
   points at the keyword-list file for the advisory `agc check` hygiene scan, and links to the
   install.md paragraph.
 ```
-
-## Applied
