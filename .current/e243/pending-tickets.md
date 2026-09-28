@@ -1,5 +1,7 @@
 # e243 — pending tickets
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E243-NEW-1
 title: agc eject prints the workspace path raw — a CR/LF/ESC in a directory name splits or injects into its plan output
@@ -18,5 +20,3 @@ body: |
   of paths in runEject's output only. Other agc init / check messages that echo
   cwd or paths are likely in the same class and could be swept in the same pass.
 ```
-
-## Applied
