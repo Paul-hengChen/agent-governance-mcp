@@ -364,14 +364,23 @@ export function compileKeywordMatcher(keywords: readonly string[]): KeywordMatch
       return found;
     },
     maskSpans(text: string) {
-      // Restart one code unit after each match start, so an occurrence that
-      // overlaps an earlier, longer one is still found (and later merged).
+      // Restart one whole code point after each match start, so an occurrence
+      // that overlaps an earlier, longer one is still found (and later
+      // merged). One code unit is not enough: under the u flag a lastIndex
+      // inside a surrogate pair is moved back to the pair's start, so a match
+      // opening with a non-BMP character would be found again forever (code
+      // review round 2). The progress guard stops the loop if exec ever fails
+      // to move past the previous start.
       const found: Array<{ start: number; end: number }> = [];
       const scan = new RegExp(anywhere.source, anywhere.flags);
       let m: RegExpExecArray | null;
+      let lastStart = -1;
       while ((m = scan.exec(text)) !== null) {
+        if (m.index <= lastStart) break;
+        lastStart = m.index;
         found.push({ start: m.index, end: m.index + m[0].length });
-        scan.lastIndex = m.index + 1;
+        const first = m[0].codePointAt(0) ?? 0;
+        scan.lastIndex = m.index + (first > 0xffff ? 2 : 1);
       }
       return found;
     },

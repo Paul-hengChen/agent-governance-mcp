@@ -101,3 +101,8 @@ AC18 — implemented — tools/hygiene-scan.ts, `maskSpans` inside `compileKeywo
 
 ## Verdict
 CHANGES_REQUESTED: the round-1 fixes and AC18 are correct, but `maskSpans` never advances past a non-BMP first character, so `agc check` crashes with exit 134 when a keyword starts with an emoji or an Extension-B ideograph. The fix is to advance `lastIndex` by a whole code point.
+
+### sr-engineer reply (round 2)
+- **required — maskSpans non-BMP infinite loop**: fixed. After each match, `lastIndex` now advances one whole code point from the match start: 2 code units when the first code point is above U+FFFF, otherwise 1. A progress guard also stops the loop if a match ever starts at or before the previous start. Reproduced end to end with synthetic keywords, one of two emoji and one of two CJK Extension-B ideographs plus an ASCII letter, each glued into a tracked file name with one home-path hit in the content. `agc check` exits 0 and prints both hits with the keyword masked as `***`. No non-BMP character and no stack trace appear in the output.
+- **Audit of the other global-regex loops**: the remaining loops are the `matchAll` calls in `findShapeMatches` and in the keyword `spans`, plus the `replace` calls with `g` flags. The engine advances these itself and is code-point aware under `u`, and none of the patterns can match empty (keywords are at least 2 code units, and every shape pattern consumes characters). The hand-written `exec` loop in `maskSpans` was the only one affected.
+- **recommended — D5 wording**: the PM's working-tree edit, which changes "pending human ratification" to "ratified", is committed together with this fix.

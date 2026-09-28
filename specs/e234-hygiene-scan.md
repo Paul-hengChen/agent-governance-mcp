@@ -51,7 +51,7 @@ This skip applies only to the two home-path categories. There are no inline supp
 ### D5 — Output
 - Every line goes to **stderr** with the prefix `agc check — hygiene`, matching the other advisories.
 - There is one line per distinct (file, line, category). A file-name hit is its own line.
-- **The matched text is never echoed.** Any path that is printed is first masked: every span of it that matches either layer is replaced with `***`. Without this, printing a file name could reveal a keyword. **Masking is broader than detection** (amended after code review round 1, agreed with the integrator; pending human ratification in the coordinator's chat):
+- **The matched text is never echoed.** Any path that is printed is first masked: every span of it that matches either layer is replaced with `***`. Without this, printing a file name could reveal a keyword. **Masking is broader than detection** (amended after code review round 1, agreed with the integrator; ratified by the human in the coordinator's chat):
   - Every printed path is masked, whether it comes from a file-name hit or a content hit. The mask replaces every case-insensitive substring occurrence of every keyword with `***`, with **no** word-boundary requirement, as well as every shape-layer span.
   - Detection keeps D1's word boundaries unchanged, so hit counts and categories do not change.
   - Why: a keyword glued to an underscore in a file name (for example `<kw>_notes.md`) is not a hit under D1, so it would otherwise go unmasked and leak whenever that file has some other hit.
