@@ -221,6 +221,16 @@ test("AC-5: agc check exits 1 and prints stale message to stderr when adapter st
 // AC-6: agc check exits 0 when all adapters are current
 // ---------------------------------------------------------------------------
 
+// E234: agc check now always runs the advisory hygiene scan, which may add
+// its own `agc check — hygiene` lines (e.g. hyg.kw.none). These assertions are
+// about the other checks, so they drop those lines first.
+function withoutHygieneLines(stderr) {
+  return stderr
+    .split("\n")
+    .filter((l) => !l.startsWith("agc check — hygiene"))
+    .join("\n");
+}
+
 test("AC-6: agc check exits 0 with OK message when all adapters match installed version", () => {
   // Contract: after a successful `agc init`, every adapter file is stamped with
   // the current AGC_VERSION; `agc check` must exit 0 and print the OK message.
@@ -236,6 +246,7 @@ test("AC-6: agc check exits 0 with OK message when all adapters match installed 
     "OK message must include the installed version",
   );
   // No stale warnings expected.
+  r.stderr = withoutHygieneLines(r.stderr);
   assert.equal(r.stderr, "", "stderr must be empty when all adapters are current");
 });
 
@@ -252,6 +263,7 @@ test("AC-7: agc check exits 0 and produces no output when no adapters are presen
   const r = runAgc(ws, ["check"]);
   assert.equal(r.status, 0, `exit code must be 0 when no adapters present (stderr=${r.stderr})`);
   assert.equal(r.stdout, "", "stdout must be empty (no false alarms)");
+  r.stderr = withoutHygieneLines(r.stderr);
   assert.equal(r.stderr, "", "stderr must be empty");
 });
 
@@ -1187,6 +1199,7 @@ test("E111(iv): agc check stays silent from a PRIMARY checkout regardless of evi
 
   const r = runAgc(primary, ["check"]);
   assert.equal(r.status, 0, `advisory must never affect the exit code (stderr=${r.stderr})`);
+  r.stderr = withoutHygieneLines(r.stderr);
   assert.equal(r.stderr, "", "a primary checkout must produce zero worktree-evidence warnings regardless of directory state");
 });
 
