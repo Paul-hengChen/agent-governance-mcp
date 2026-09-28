@@ -513,15 +513,17 @@ function runInit(cwd, argv = []) {
   // without a flag is left byte-identical.
   const keyValue = requested !== undefined ? requested : declared === undefined ? mode : null;
 
-  // A workspace path segment with a gitignore wildcard character cannot be
-  // turned into an exclude rule that matches exactly the scaffold, so local
-  // mode refuses here — before any write. "repo" never writes the exclude
-  // file, and outside git there is no exclude file, so neither is affected.
+  // A workspace path segment with a character unsafe for a gitignore exclude
+  // rule (see GITIGNORE_UNSAFE_SEGMENT_RE) cannot be turned into an exclude
+  // rule that matches exactly the scaffold, so local mode refuses here —
+  // before any write. "repo" never writes the exclude file, and outside git
+  // there is no exclude file, so neither is affected.
   if (mode === "local" && workspace !== null && workspace.unsafeSegment !== null) {
     throw usageError(
-      `agc init: refusing --artifacts=local — workspace path segment "${workspace.unsafeSegment}" ` +
-        `contains a gitignore-wildcard character (one of * ? [ ]), so the exclude rule agc would ` +
-        `write could match unintended files. Rename the directory, or re-run with --artifacts=repo.`
+      `agc init: refusing --artifacts=local — workspace path segment "${escapeSegmentForDisplay(workspace.unsafeSegment)}" ` +
+        `contains a character unsafe for a gitignore exclude rule (a wildcard, a backslash, or a control character), ` +
+        `so the exclude rule agc would write could match unintended files or be split across lines. ` +
+        `Rename the directory, or re-run with --artifacts=repo.`
     );
   }
 
@@ -1163,9 +1165,9 @@ function checkArtifactsDrift(cwd) {
   if (declared === "local") {
     if (workspace.unsafeSegment !== null) {
       process.stderr.write(
-        `agc check — cannot verify artifacts drift: workspace path segment "${workspace.unsafeSegment}" ` +
-          `contains a gitignore-wildcard character (one of * ? [ ]) — rename the directory, ` +
-          `or declare artifacts explicitly via agc init --artifacts=repo\n`
+        `agc check — cannot verify artifacts drift: workspace path segment "${escapeSegmentForDisplay(workspace.unsafeSegment)}" ` +
+          `contains a character unsafe for a gitignore exclude rule (a wildcard, a backslash, or a control character) ` +
+          `— rename the directory, or declare artifacts explicitly via agc init --artifacts=repo\n`
       );
       return;
     }
@@ -1287,19 +1289,38 @@ const LANE_EXCLUDE_RULES = [".env", "/node_modules", "/.current/**/base-sha"];
 // through artifactExcludeRulesForPrefix() / artifactPathsForPrefix() below.
 const ARTIFACT_EXCLUDE_RULES = ["/.current/", "/tasks.md", "/qa_reports/", "/review_reports/"];
 
-// The gitignore wildcard metacharacters. A workspace path segment containing
-// one cannot be written into an exclude rule verbatim without it matching
-// something other than the literal directory, and escaping is not attempted.
-const GITIGNORE_WILDCARD_RE = /[*?[\]]/;
+// Characters unsafe inside a workspace path segment that agc writes verbatim
+// into a gitignore exclude rule: the wildcard metacharacters `* ? [ ]` (the
+// rule would match more than the literal directory), a backslash (git reads it
+// as an escape, so `/a\b/` means `/ab/`), and the C0 control range plus DEL
+// (a CR or LF would split one rule across lines of the shared exclude file;
+// no control byte has a legitimate use in a directory name). Escaping is not
+// attempted — callers refuse or skip instead. This is the ONE place the class
+// is defined; every caller reads repoRelativeWorkspacePrefix().unsafeSegment.
+const GITIGNORE_UNSAFE_SEGMENT_RE = /[*?[\]\\\x00-\x1f\x7f]/;
+
+// A copy of an unsafe `segment` fit to print inside a one-line message: LF,
+// CR and TAB become `\n` `\r` `\t`, every other C0 control byte and DEL
+// becomes `\xHH` (lowercase hex), and everything else — backslash and the
+// wildcard characters included — is left as-is. Display only: the raw
+// `unsafeSegment` value stays unescaped for every logic use.
+function escapeSegmentForDisplay(segment) {
+  return segment.replace(/[\x00-\x1f\x7f]/g, (ch) => {
+    if (ch === "\n") return "\\n";
+    if (ch === "\r") return "\\r";
+    if (ch === "\t") return "\\t";
+    return `\\x${ch.charCodeAt(0).toString(16).padStart(2, "0")}`;
+  });
+}
 
 // Where workspace `cwd` sits inside the work tree at `repoRoot`, as the
 // `/`-separated repo-relative path agc anchors its artifact rules and
 // pathspecs at: "" when `cwd` IS the repo root, "sub" or "pkgs/app" for a
 // subdirectory. Both sides are canonicalised first, because git reports the
 // toplevel with symlinks resolved while `cwd` may still contain them.
-// `unsafeSegment` names the first path segment carrying a gitignore wildcard
-// character (null when there is none); callers must not write or test an
-// exclude rule built from such a prefix. Pure apart from the realpath calls,
+// `unsafeSegment` names the first path segment carrying a character that is
+// unsafe for a gitignore exclude rule (null when there is none); callers must
+// not write or test an exclude rule built from such a prefix. Pure apart from the realpath calls,
 // so re-deriving it for the same workspace always yields the same prefix.
 function repoRelativeWorkspacePrefix(repoRoot, cwd) {
   const rel = path.relative(canonicalPath(repoRoot), canonicalPath(cwd));
@@ -1308,7 +1329,7 @@ function repoRelativeWorkspacePrefix(repoRoot, cwd) {
   }
   const prefix = rel === "" ? "" : rel.split(path.sep).join("/");
   const unsafeSegment =
-    prefix === "" ? null : (prefix.split("/").find((seg) => GITIGNORE_WILDCARD_RE.test(seg)) ?? null);
+    prefix === "" ? null : (prefix.split("/").find((seg) => GITIGNORE_UNSAFE_SEGMENT_RE.test(seg)) ?? null);
   return { prefix, unsafeSegment };
 }
 
@@ -3338,7 +3359,7 @@ function planAdapterFileEntry(ctx, rel, tpl) {
 // removed only when it equals one of those rules (a trailing CR aside); every
 // other line — lane rules, another workspace's rules, the adopter's own —
 // keeps its exact bytes and position. A workspace whose path holds a
-// gitignore wildcard never had rules written (init refuses local mode
+// character unsafe for an exclude rule never had rules written (init refuses local mode
 // there), so there is nothing to look for.
 function planExcludeEntry(ctx) {
   const label = "(iii) host traces — .git/info/exclude";

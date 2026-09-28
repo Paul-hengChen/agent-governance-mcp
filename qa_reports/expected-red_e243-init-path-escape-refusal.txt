@@ -1,0 +1,10 @@
+# e243-init-path-escape-refusal — expected-red manifest (emitted by
+# sr-engineer per skill-sr-engineer SOP 7a)
+# Format: <relative test file path> | <exact test name/description string>
+
+# T-E243-03 rewrites the init local-mode refusal (AC9) and the agc check
+# cannot-verify advisory (AC10) per the spec's Copy / Strings table, so the
+# two cases that pin E239's old "one of * ? [ ]" substring go red until
+# T-E243-04 (qa-engineer) updates them to the new copy per AC12.
+test/e239-init-subdir-exclude.test.mjs | AC8: gitignore-metacharacter subdir name refuses local mode cleanly
+test/e239-init-subdir-exclude.test.mjs | AC13: agc check advises rather than mis-tests on a gitignore-unsafe subdir path

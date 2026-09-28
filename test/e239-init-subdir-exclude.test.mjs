@@ -5,6 +5,13 @@
 // unmodified, per the spec's own proof — this file never edits that suite's
 // existing assertions, only appends one additive regression case for AC3).
 //
+// Also tests specs/e243-init-path-escape-refusal.md AC15-AC20 (T-E243-04):
+// AC8's and AC13's message-text regexes above were updated in place for the
+// widened refusal copy (AC12); AC15-AC20 are new cases appended after AC13,
+// below the "E243" banner comment. AC6/AC7/AC13(E243)/AC8(E243) are
+// code-level confirmations per the spec, not separate test cases here — see
+// that spec's own Acceptance Criteria for the exact proof each one cites.
+//
 // Spec-to-test map:
 //   AC1  -> "AC1: subdir default-local writes subdir-prefixed exclude rules"
 //   AC2  -> "AC2: scaffold created under subdir is actually ignored by the written rules"
@@ -270,7 +277,7 @@ test("AC8: gitignore-metacharacter subdir name refuses local mode cleanly", () =
     assert.equal(r.status, 2, `expected exit 2 (stderr=${r.stderr})`);
     assert.match(
       r.stderr,
-      /agc init: refusing --artifacts=local — workspace path segment "weird\[dir\]" contains a gitignore-wildcard character \(one of \* \? \[ \]\), so the exclude rule agc would write could match unintended files\. Rename the directory, or re-run with --artifacts=repo\./,
+      /agc init: refusing --artifacts=local — workspace path segment "weird\[dir\]" contains a character unsafe for a gitignore exclude rule \(a wildcard, a backslash, or a control character\), so the exclude rule agc would write could match unintended files or be split across lines\. Rename the directory, or re-run with --artifacts=repo\./,
     );
     assert.ok(!fs.existsSync(path.join(weird, ".current")), "no partial scaffold left behind");
     assert.ok(!fs.existsSync(path.join(weird, "tasks.md")), "no partial scaffold left behind");
@@ -382,13 +389,253 @@ test("AC13: agc check advises rather than mis-tests on a gitignore-unsafe subdir
   assert.equal(r.status, 0);
   assert.match(
     r.stderr,
-    /agc check — cannot verify artifacts drift: workspace path segment "weird\[dir\]" contains a gitignore-wildcard character \(one of \* \? \[ \]\) — rename the directory, or declare artifacts explicitly via agc init --artifacts=repo/,
+    /agc check — cannot verify artifacts drift: workspace path segment "weird\[dir\]" contains a character unsafe for a gitignore exclude rule \(a wildcard, a backslash, or a control character\) — rename the directory, or declare artifacts explicitly via agc init --artifacts=repo/,
   );
   assert.doesNotMatch(
     r.stderr,
     /config declares/,
     "must advise, not attempt (and get wrong) the normal drift() test, which is what config-declares would signal",
   );
+});
+
+// ---------------------------------------------------------------------------
+// E243 — widens the one shared predicate (repoRelativeWorkspacePrefix()'s
+// unsafeSegment, computed via GITIGNORE_UNSAFE_SEGMENT_RE) beyond the E239
+// gitignore-wildcard set to also cover a literal backslash and the C0
+// control range (0x01-0x1F) + DEL (0x7F). AC15-AC20 below are new; AC8/AC13
+// above had their pinned message-text assertions updated in place (AC12).
+//
+// Repro-first (specs/e243-init-path-escape-refusal.md Dependencies note):
+// before authoring AC15-AC20, the backslash/CR/LF/BEL scenarios below were
+// run against `bin/agc-init.mjs` as it existed at the lane's base commit
+// 3663b3a (`git show 3663b3a:bin/agc-init.mjs`, executed standalone in a
+// throwaway $TMPDIR fixture) — confirming the gap this ticket closes
+// actually existed before the fix. All were red: the base script's narrower
+// `GITIGNORE_WILDCARD_RE = /[*?[\]]/` does not match a backslash or any
+// control byte, so `init --artifacts=local` did NOT refuse for any of them —
+// it wrote a `.config.json` declaring "local" and wrote the (wrong) exclude
+// rule. Confirmed two ways: a backslash segment ("a\b") produced a written
+// rule git reads as `/ab/.current/` — `git check-ignore -v` on the real
+// `a\b/.current/foo` path returned exit 1 (no match), and `git status
+// --short` showed the real directory itself as untracked (`?? "a\\b/"`),
+// i.e. created-but-invisible-to-the-refusal, exactly the defect this ticket
+// names; a CR-bearing segment produced a raw 0x0D byte written straight into
+// `.git/info/exclude`, splitting the one intended rule across lines. Not
+// itself committed — this transcript lives in this round's review doc
+// (qa_reports/review_T-E243-04.md), same discipline as this file's own
+// AC1/AC2 repro-red note above.
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// AC15 (E243) — backslash subdir name refuses local mode cleanly
+// ---------------------------------------------------------------------------
+test("AC15: backslash subdir name refuses local mode cleanly", (t) => {
+  if (process.platform === "win32") {
+    t.skip(
+      'a literal backslash can never survive inside one path segment on win32 (path.sep is "\\\\", so it is always consumed as a separator before repoRelativeWorkspacePrefix() tests a segment) — AC13 covers this platform behavior directly',
+    );
+    return;
+  }
+  // Sub-case (a): flag omitted, nothing tracked -> would default to local -> refuses.
+  {
+    const repo = mkGitRepo("e243-ac15a-");
+    const weird = mkSub(repo, "a\\b");
+    const r = runAgc(weird, ["init"]);
+    assert.equal(r.status, 2, `expected exit 2 (stderr=${r.stderr})`);
+    assert.match(
+      r.stderr,
+      /agc init: refusing --artifacts=local — workspace path segment "a\\b" contains a character unsafe for a gitignore exclude rule \(a wildcard, a backslash, or a control character\), so the exclude rule agc would write could match unintended files or be split across lines\. Rename the directory, or re-run with --artifacts=repo\./,
+    );
+    assert.ok(!fs.existsSync(path.join(weird, ".current")), "no partial scaffold left behind");
+    assert.ok(!fs.existsSync(path.join(weird, "tasks.md")), "no partial scaffold left behind");
+  }
+  // Sub-case (b): explicit --artifacts=local -> also refuses.
+  {
+    const repo = mkGitRepo("e243-ac15b-");
+    const weird = mkSub(repo, "a\\b");
+    const r = runAgc(weird, ["init", "--artifacts=local"]);
+    assert.equal(r.status, 2, `expected exit 2 (stderr=${r.stderr})`);
+    assert.match(r.stderr, /workspace path segment "a\\b"/);
+    assert.ok(!fs.existsSync(path.join(weird, ".current")), "no partial scaffold left behind");
+  }
+});
+
+// ---------------------------------------------------------------------------
+// AC16 (E243) — CR/LF subdir name refuses local mode cleanly
+// ---------------------------------------------------------------------------
+test("AC16: CR/LF subdir name refuses local mode cleanly", (t) => {
+  if (process.platform === "win32") {
+    t.skip("NTFS forbids embedding 0x00-0x1F in a filename, so a CR- or LF-bearing directory name cannot even be constructed on win32");
+    return;
+  }
+  for (const [label, ch] of [
+    ["CR", "\r"],
+    ["LF", "\n"],
+  ]) {
+    const repo = mkGitRepo(`e243-ac16-${label.toLowerCase()}-`);
+    const weird = mkSub(repo, `x${ch}y`);
+    const r = runAgc(weird, ["init", "--artifacts=local"]);
+    assert.equal(r.status, 2, `${label}: expected exit 2 (stderr=${JSON.stringify(r.stderr)})`);
+    assert.match(
+      r.stderr,
+      /agc init: refusing --artifacts=local — workspace path segment/,
+      `${label}: refusal message present`,
+    );
+    assert.ok(!fs.existsSync(path.join(weird, ".current")), `${label}: no partial scaffold left behind`);
+    assert.ok(!fs.existsSync(path.join(weird, "tasks.md")), `${label}: no partial scaffold left behind`);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// AC17 (E243) — other C0/DEL subdir name refuses local mode cleanly
+// ---------------------------------------------------------------------------
+test("AC17: other C0/DEL subdir name refuses local mode cleanly", (t) => {
+  if (process.platform === "win32") {
+    t.skip("NTFS forbids embedding 0x00-0x1F or 0x7F in a filename, so these directory names cannot even be constructed on win32");
+    return;
+  }
+  // Sampled at minimum per the spec: BEL (0x07) and US (0x1F); DEL (0x7F)
+  // added since AC3 covers it explicitly alongside the C0 range.
+  for (const [label, ch] of [
+    ["BEL", "\x07"],
+    ["US", "\x1f"],
+    ["DEL", "\x7f"],
+  ]) {
+    const repo = mkGitRepo(`e243-ac17-${label.toLowerCase()}-`);
+    const weird = mkSub(repo, `x${ch}y`);
+    const r = runAgc(weird, ["init", "--artifacts=local"]);
+    assert.equal(r.status, 2, `${label}: expected exit 2 (stderr=${JSON.stringify(r.stderr)})`);
+    assert.match(
+      r.stderr,
+      /agc init: refusing --artifacts=local — workspace path segment/,
+      `${label}: refusal message present`,
+    );
+    assert.ok(!fs.existsSync(path.join(weird, ".current")), `${label}: no partial scaffold left behind`);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// AC18 (E243) — backslash/control-character subdir name is fine under explicit repo mode
+// ---------------------------------------------------------------------------
+test("AC18: backslash/control-character subdir name is fine under explicit repo mode", (t) => {
+  if (process.platform === "win32") {
+    t.skip("backslash and C0/DEL directory names cannot be constructed on win32 (see AC15/AC17)");
+    return;
+  }
+  for (const [label, name] of [
+    ["backslash", "a\\b"],
+    ["CR", "x\ry"],
+    ["ESC", "x\x1by"],
+  ]) {
+    const repo = mkGitRepo(`e243-ac18-${label.toLowerCase()}-`);
+    const weird = mkSub(repo, name);
+    const before = readExclude(repo);
+    const r = runAgc(weird, ["init", "--artifacts=repo"]);
+    assert.equal(r.status, 0, `${label}: exit code (stderr=${r.stderr})`);
+    assert.deepEqual(
+      readConfig(weird),
+      { schema_version: 2, host: "claude-code", artifacts: "repo" },
+      `${label}: config stamped`,
+    );
+    assert.equal(
+      readExclude(repo),
+      before,
+      `${label}: repo mode writes no exclude rules even under an unsafe-segment dir`,
+    );
+  }
+});
+
+// ---------------------------------------------------------------------------
+// AC19 (E243) — agc check advises rather than mis-tests on a backslash/control-character path
+// ---------------------------------------------------------------------------
+test("AC19: agc check advises rather than mis-tests on a backslash/control-character path", (t) => {
+  if (process.platform === "win32") {
+    t.skip("backslash and C0/DEL directory names cannot be constructed on win32 (see AC15/AC17)");
+    return;
+  }
+  for (const [label, name] of [
+    ["backslash", "a\\b"],
+    ["CR", "x\ry"],
+  ]) {
+    const repo = mkGitRepo(`e243-ac19-${label.toLowerCase()}-`);
+    const weird = mkSub(repo, name);
+    // Hand-authored, since `agc init` itself would have refused per AC15/AC16.
+    seedConfig(weird, { schema_version: 2, host: "claude-code", artifacts: "local" });
+
+    const r = runAgc(weird, ["check"]);
+    assert.equal(r.status, 0, `${label}: exit code`);
+    assert.match(
+      r.stderr,
+      /agc check — cannot verify artifacts drift: workspace path segment/,
+      `${label}: cannot-verify advisory present`,
+    );
+    assert.doesNotMatch(
+      r.stderr,
+      /config declares/,
+      `${label}: must advise, not attempt the normal drift\(\) test`,
+    );
+  }
+});
+
+// ---------------------------------------------------------------------------
+// AC20 (E243) — message printed for a CR/LF/ESC segment contains no raw control byte
+// ---------------------------------------------------------------------------
+test("AC20: message printed for a CR/LF/ESC segment contains no raw control byte", (t) => {
+  if (process.platform === "win32") {
+    t.skip("CR/LF/ESC directory names cannot be constructed on win32 (see AC16/AC17)");
+    return;
+  }
+  // init's refusal (AC9's message).
+  for (const [label, ch, escaped] of [
+    ["CR", "\r", "\\r"],
+    ["LF", "\n", "\\n"],
+    ["ESC", "\x1b", "\\x1b"],
+  ]) {
+    const repo = mkGitRepo(`e243-ac20-init-${label.toLowerCase()}-`);
+    const weird = mkSub(repo, `g${ch}h`);
+    const r = runAgc(weird, ["init", "--artifacts=local"]);
+    assert.equal(r.status, 2, `${label}: expected exit 2 (stderr=${JSON.stringify(r.stderr)})`);
+    // The message is everything up to the FIRST actual newline in stderr
+    // (the usage text that follows a refusal is itself multi-line, so this
+    // isolates the one-line message from that unrelated newline-bearing
+    // tail rather than asserting zero raw \n anywhere in all of stderr).
+    const firstLine = r.stderr.split("\n")[0];
+    assert.ok(
+      firstLine.includes(`"g${escaped}h"`),
+      `${label}: message must show the segment in its escaped display form (firstLine=${JSON.stringify(firstLine)})`,
+    );
+    assert.ok(
+      firstLine.endsWith("Rename the directory, or re-run with --artifacts=repo."),
+      `${label}: message must remain one whole line ending in the full sentence — a raw, un-escaped LF in the ` +
+        `segment would truncate this line early (firstLine=${JSON.stringify(firstLine)})`,
+    );
+    assert.ok(
+      !firstLine.includes(ch),
+      `${label}: message line must contain no raw occurrence of the control byte itself (firstLine=${JSON.stringify(firstLine)})`,
+    );
+  }
+
+  // agc check's cannot-verify advisory (AC10's message) echoes the same
+  // escaped <segment> per the spec — same proof, the other call site.
+  for (const [label, ch, escaped] of [
+    ["CR", "\r", "\\r"],
+    ["ESC", "\x1b", "\\x1b"],
+  ]) {
+    const repo = mkGitRepo(`e243-ac20-check-${label.toLowerCase()}-`);
+    const weird = mkSub(repo, `g${ch}h`);
+    seedConfig(weird, { schema_version: 2, host: "claude-code", artifacts: "local" });
+    const r = runAgc(weird, ["check"]);
+    assert.equal(r.status, 0, `${label}: exit code`);
+    const firstLine = r.stderr.split("\n")[0];
+    assert.ok(
+      firstLine.includes(`"g${escaped}h"`),
+      `${label}: agc check message must show the segment in its escaped display form (firstLine=${JSON.stringify(firstLine)})`,
+    );
+    assert.ok(
+      !firstLine.includes(ch),
+      `${label}: agc check message line must contain no raw occurrence of the control byte itself (firstLine=${JSON.stringify(firstLine)})`,
+    );
+  }
 });
 
 // ---------------------------------------------------------------------------
