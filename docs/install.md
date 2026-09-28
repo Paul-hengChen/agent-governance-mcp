@@ -151,6 +151,13 @@ agc init --artifacts=repo     # track them like any other file
 
 `agc check` reports (advisory, exit code unaffected) when the key is undeclared, or when the declared choice disagrees with the repo: `local` with exclude rules missing or an artifact path tracked, `repo` with an artifact exclude rule present.
 
+`agc check` also runs an **information-hygiene scan** (advisory, exit code unaffected) for the classes of detail the constitution's Information hygiene rule bans from durable output. It checks the contents and the file names of every tracked file and every untracked file that is not ignored (outside a git repo: a walk of the directory that skips `.git` and `node_modules`, capped at 10,000 files). Two layers run:
+
+- **Built-in shape patterns**, which name nothing concrete: `home-path` (an absolute home-directory path), `encoded-home-path` (a home path flattened into one hyphenated directory name), `temp-path` (a per-user or system temp directory with a segment below its root; the bare `/tmp/` root is not flagged), `design-file-key` (a design-tool file URL that carries a file key), `credential` (vendor-prefixed secret shapes such as a private-key header or a cloud, forge, chat or model-API token), `work-item-link` (a hosted tracker's work-item or org link) and `internal-host` (an http(s) URL on an internal-only domain suffix). A home path whose username segment is a generic placeholder or a template token is not listed; one line reports how many were skipped.
+- **Your keyword list** (people, company, client codenames, adopter names), category `keyword`. It is read from the file named by `AGC_HYGIENE_KEYWORDS`, or else from a file named `agc-hygiene-keywords` directly in the directory `git rev-parse --git-common-dir` prints (never tracked, and shared by every linked worktree). The format is UTF-8 text with one literal keyword per line; blank lines and `#` comment lines are ignored, and keywords shorter than 2 characters are dropped. Matching is case-insensitive and needs a word boundary on both sides. A list under the workspace's `.current/` is refused. With no list, only the shape layer runs and one line says so.
+
+Each hit is reported as file, line (or "file name") and category only. **The matched text is never echoed**: any part of a printed path that matches is shown as `***`. At most 50 hits are listed, followed by a count of the rest and a one-line summary.
+
 ---
 
 ## Feature lanes: `agc feature start` / `agc feature finish`

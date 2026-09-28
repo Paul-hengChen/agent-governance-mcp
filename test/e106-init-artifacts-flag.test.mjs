@@ -333,11 +333,22 @@ test("AC11: agc check does not confuse LANE_EXCLUDE_RULES entries for artifact d
 // ---------------------------------------------------------------------------
 // AC12 — agc check prints the undeclared-artifacts advisory, exit 0
 // ---------------------------------------------------------------------------
+// E234: agc check now always runs the advisory hygiene scan, which may add
+// its own `agc check — hygiene` lines (e.g. hyg.kw.none). AC12 is about the
+// artifacts advisory, so it drops those lines first.
+function withoutHygieneLines(stderr) {
+  return stderr
+    .split("\n")
+    .filter((l) => !l.startsWith("agc check — hygiene"))
+    .join("\n");
+}
+
 test("AC12: agc check prints the undeclared-artifacts advisory, exit 0", () => {
   const ws = mkTmp("e106-ac12-"); // deliberately NOT a git repo — AC12 needs no git state at all
   seedConfig(ws, { schema_version: 2, host: "claude-code" });
   const r = runAgc(ws, ["check"]);
   assert.equal(r.status, 0);
+  r.stderr = withoutHygieneLines(r.stderr);
   assert.equal(r.stderr, "agc check — artifacts undeclared — run agc init --artifacts=local|repo\n");
 });
 

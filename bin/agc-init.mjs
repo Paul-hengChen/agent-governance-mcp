@@ -1188,12 +1188,41 @@ function checkArtifactsDrift(cwd) {
   }
 }
 
+// Information-hygiene scan (e234-hygiene-scan). The scan logic lives in the
+// compiled dist/tools/hygiene-scan.js, loaded like loadLanePaths. Returns null
+// instead of throwing: agc check must never fail over an advisory.
+async function loadHygieneScan() {
+  try {
+    return await import(new URL("../dist/tools/hygiene-scan.js", import.meta.url).href);
+  } catch {
+    return null;
+  }
+}
+
+// Advisory only: every branch returns normally and nothing here touches the
+// exit code. A load failure prints fixed text, never the raw import error,
+// because that message carries the install's absolute file URL.
+async function checkHygiene(cwd) {
+  const skipped = (why) => process.stderr.write(`agc check — hygiene: scan skipped (${why})\n`);
+  const mod = await loadHygieneScan();
+  if (mod === null || typeof mod.runHygieneScan !== "function") {
+    skipped("cannot load dist/tools/hygiene-scan.js — run `npm run build`");
+    return;
+  }
+  try {
+    mod.runHygieneScan(cwd, { env: process.env, write: (l) => process.stderr.write(`${l}\n`) });
+  } catch {
+    skipped("unexpected error"); // runHygieneScan never throws by contract; belt and braces
+  }
+}
+
 // --- subcommand: check -----------------------------------------------------
 async function runCheck(cwd) {
   checkResearchBinaries(cwd); // advisory; never affects exit code
   checkWorktreeEvidence(cwd); // advisory; never affects exit code
   await checkOrphanLanes(cwd); // advisory; never affects exit code
   checkArtifactsDrift(cwd); // advisory; never affects exit code
+  await checkHygiene(cwd); // advisory; never affects exit code
 
   const ver = installedVersion();
   const stale = [];

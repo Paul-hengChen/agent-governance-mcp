@@ -1,0 +1,730 @@
+// Coded by @sr-engineer
+// Information-hygiene scan (e234-hygiene-scan, spec specs/e234-hygiene-scan.md,
+// architecture specs/e234-hygiene-scan-architecture.md). The fifth `agc check`
+// advisory: it warns about the classes of detail the constitution's
+// Information hygiene rule bans from durable output, and never changes the
+// exit code (bin/agc-init.mjs checkHygiene is the only caller).
+//
+// Two layers:
+//   - shape: built-in generic patterns that name nothing concrete;
+//   - keyword: a literal list read only from a local, untracked source
+//     (AGC_HYGIENE_KEYWORDS, else agc-hygiene-keywords in the git common dir).
+//
+// Two tiers inside this file: a PURE layer (strings in, spans / verdicts /
+// lines out; no I/O) and an I/O layer (listScanSet, resolveKeywordSource,
+// scanWorkspace, runHygieneScan) that is the only code touching git or fs.
+//
+// Authoring rule: no pattern literal in this file may match its own source
+// text. Separators are written as one-character classes, host dots are
+// escaped, and each vendor prefix is followed by a character class, so the
+// scan stays silent over this file (spec AC16). Comments describe shapes in
+// prose only. Constant names avoid UPPER_SNAKE gate-code suffixes
+// (test/error-code-contract.test.mjs harvests tools/*.ts).
+//
+// Imports are limited to fs, path and node:child_process (execFileSync with an
+// argv array, never a shell). No other tools/ module is imported.
+
+import * as fs from "fs";
+import * as path from "path";
+import { execFileSync } from "node:child_process";
+
+// ---------------------------------------------------------------------------
+// Data structures
+// ---------------------------------------------------------------------------
+
+export type HygieneCategory =
+  | "home-path"
+  | "encoded-home-path"
+  | "temp-path"
+  | "design-file-key"
+  | "credential"
+  | "work-item-link"
+  | "internal-host"
+  | "keyword";
+
+// D2 order; also the output order of categories within one line.
+export const hygieneCategories: readonly HygieneCategory[] = Object.freeze([
+  "home-path",
+  "encoded-home-path",
+  "temp-path",
+  "design-file-key",
+  "credential",
+  "work-item-link",
+  "internal-host",
+  "keyword",
+] as const);
+
+export const limits = Object.freeze({
+  maxListed: 50, // D5 cap
+  maxWalkFiles: 10000, // D4 no-git walk cap
+  maxContentBytes: 1048576, // 1 MiB, D4
+  binarySniffBytes: 8192, // D4 NUL sniff window
+} as const);
+
+// The D3 built-in placeholder list, lowercase, verbatim.
+export const placeholderUsernames: ReadonlySet<string> = new Set([
+  "me",
+  "user",
+  "username",
+  "you",
+  "yourname",
+  "your-name",
+  "your_name",
+  "name",
+  "someone",
+  "somebody",
+  "example",
+  "demo",
+  "test",
+  "foo",
+  "bar",
+  "alice",
+  "bob",
+  "jdoe",
+  "john",
+  "jane",
+  "johndoe",
+  "janedoe",
+  "dev",
+  "developer",
+  "admin",
+  "runner",
+  "ubuntu",
+  "root",
+  "node",
+  "vscode",
+  "shared",
+  "linuxbrew",
+  "x",
+  "xxx",
+]);
+
+export interface MatchSpan {
+  category: HygieneCategory;
+  start: number; // UTF-16 index into the tested text, inclusive
+  end: number; // exclusive
+  placeholder: boolean; // true only for a home-category span whose segment is a placeholder
+}
+
+export interface KeywordMatcher {
+  readonly size: number; // count of usable keywords
+  // Detection: occurrences with an ASCII word boundary on both sides (D1).
+  spans(text: string): Array<{ start: number; end: number }>;
+  // Masking: every case-insensitive substring occurrence, overlapping ones
+  // included, with no word-boundary check (D5 amendment, AC18).
+  maskSpans(text: string): Array<{ start: number; end: number }>;
+}
+
+export interface LineVerdict {
+  listed: HygieneCategory[]; // deduped, D2 order: categories with >= 1 non-placeholder span
+  skipped: HygieneCategory[]; // deduped, D2 order: home categories whose spans are ALL placeholders
+}
+
+export interface Hit {
+  path: string; // workspace-relative, forward slashes, UNMASKED (masked at format time)
+  line: number | null; // 1-based; null = file-name hit
+  category: HygieneCategory;
+}
+
+export type KeywordSource =
+  | { kind: "none" }
+  | { kind: "unreadable" }
+  | { kind: "refused" }
+  | { kind: "loaded"; keywords: string[]; dev: number; ino: number; tracked: boolean };
+
+export interface ScanSet {
+  paths: string[]; // workspace-relative, forward slashes, deduped, in enumeration order
+  mode: "git" | "walk";
+  capped: boolean; // walk mode only: more than maxWalkFiles files existed
+}
+
+export interface ScanOutcome {
+  source: KeywordSource["kind"];
+  keywordFileTracked: boolean;
+  walkCapped: boolean;
+  hits: Hit[]; // ALL hits in output order (formatReport applies the cap)
+  skipped: number; // D3 skip count: one per (file, line-or-name, home category) all-placeholder tuple
+}
+
+export interface HygieneScanOptions {
+  env?: Record<string, string | undefined>; // default: process.env
+  write?: (line: string) => void; // one call per output line, no trailing newline; default: stderr
+}
+
+// ---------------------------------------------------------------------------
+// Shape patterns (D2 coverage, architecture "Final shape patterns")
+// ---------------------------------------------------------------------------
+
+const backtick = "`";
+// One or two backslashes, or a slash.
+const sepFrag = String.raw`(?:\\{1,2}|/)`;
+// A path segment: runs until whitespace, a separator, a quote or a backtick.
+const segFrag = String.raw`[^\s/\\"'` + backtick + String.raw`]+`;
+// The root separator must not follow a word character, a dot, a tilde or a hyphen.
+const leftBound = String.raw`(?<![A-Za-z0-9_.~\-])`;
+
+interface ShapePattern {
+  readonly category: Exclude<HygieneCategory, "keyword">;
+  readonly re: RegExp;
+  // true: capture group 1 is the username segment, fed to isPlaceholderSegment.
+  readonly home: boolean;
+}
+
+const shapePatterns: readonly ShapePattern[] = Object.freeze([
+  // home-path: the macOS / Linux home roots (case-sensitive), then the Windows
+  // drive form (lowercase word and one or two backslashes accepted).
+  {
+    category: "home-path",
+    re: new RegExp(leftBound + String.raw`[/](?:Users|home)[/](` + segFrag + ")", "g"),
+    home: true,
+  },
+  {
+    category: "home-path",
+    re: new RegExp(
+      String.raw`(?<![A-Za-z0-9_])[A-Za-z]:` + sepFrag + "[Uu]sers" + sepFrag + "(" + segFrag + ")",
+      "g"
+    ),
+    home: true,
+  },
+  // encoded-home-path: a flattened path; the drive form is covered because its
+  // hyphen before the Users word follows another hyphen.
+  {
+    category: "encoded-home-path",
+    re: new RegExp(
+      String.raw`(?<![A-Za-z0-9])-(?:Users|home)-([^\-\s/\\"'` + backtick + "]+)-",
+      "g"
+    ),
+    home: true,
+  },
+  // temp-path: a further segment below the root is always required.
+  {
+    category: "temp-path",
+    re: new RegExp(leftBound + String.raw`(?:[/]private)?[/]var[/]folders[/]` + segFrag, "g"),
+    home: false,
+  },
+  {
+    category: "temp-path",
+    re: new RegExp(leftBound + String.raw`[/]private[/]tmp[/]` + segFrag, "g"),
+    home: false,
+  },
+  {
+    category: "temp-path",
+    re: new RegExp("AppData" + sepFrag + "Local" + sepFrag + "Temp" + sepFrag + segFrag, "gi"),
+    home: false,
+  },
+  // design-file-key: the scheme is optional (the key is the secret); a template
+  // token key is rejected by the alphanumeric key class. The lookbehind also
+  // excludes a dot, so a match can start only at the head of a dotted run:
+  // without it every position after a dot is a start and a long dotted line
+  // backtracks quadratically (code review round 1).
+  {
+    category: "design-file-key",
+    re: new RegExp(
+      String.raw`(?<![A-Za-z0-9.\-])(?:[A-Za-z0-9\-]+\.)*figma\.com[/](?:file|design|proto|board|slides|make)[/][A-Za-z0-9]{10,}`,
+      "gi"
+    ),
+    home: false,
+  },
+  // credential: vendor-prefixed secret shapes only.
+  {
+    category: "credential",
+    re: new RegExp(String.raw`-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY-----`, "g"),
+    home: false,
+  },
+  {
+    category: "credential",
+    re: new RegExp(String.raw`(?<![A-Z0-9])AKIA[A-Z0-9]{16}(?![A-Z0-9])`, "g"),
+    home: false,
+  },
+  {
+    category: "credential",
+    re: new RegExp(String.raw`(?<![A-Za-z0-9_])gh[pousr]_[A-Za-z0-9]{36,}`, "g"),
+    home: false,
+  },
+  {
+    category: "credential",
+    re: new RegExp(String.raw`(?<![A-Za-z0-9_])github_pat_[A-Za-z0-9_]{22,}`, "g"),
+    home: false,
+  },
+  {
+    category: "credential",
+    re: new RegExp(String.raw`(?<![A-Za-z0-9_])xox[a-z]-[A-Za-z0-9\-]{10,}`, "g"),
+    home: false,
+  },
+  {
+    category: "credential",
+    re: new RegExp(String.raw`(?<![A-Za-z0-9_])sk-ant-[A-Za-z0-9_\-]{20,}`, "g"),
+    home: false,
+  },
+  // work-item-link: a scheme is required.
+  {
+    category: "work-item-link",
+    re: new RegExp(
+      String.raw`https?:[/][/](?:[A-Za-z0-9\-]+\.)*dev\.azure\.com(?![A-Za-z0-9.\-])`,
+      "gi"
+    ),
+    home: false,
+  },
+  {
+    category: "work-item-link",
+    re: new RegExp(
+      String.raw`https?:[/][/][A-Za-z0-9\-]+\.visualstudio\.com(?![A-Za-z0-9.\-])`,
+      "gi"
+    ),
+    home: false,
+  },
+  {
+    category: "work-item-link",
+    re: new RegExp(
+      String.raw`https?:[/][/][A-Za-z0-9\-]+\.atlassian\.net[/]browse[/][A-Z][A-Z0-9_]+-[0-9]+`,
+      "g"
+    ),
+    home: false,
+  },
+  // internal-host: a scheme is required; the lookahead keeps longer TLD-like
+  // labels (for example one that merely starts with "lan") silent.
+  {
+    category: "internal-host",
+    re: new RegExp(
+      String.raw`https?:[/][/](?:[A-Za-z0-9\-]+\.)+(?:internal|corp|intranet|lan)(?![A-Za-z0-9.\-])`,
+      "gi"
+    ),
+    home: false,
+  },
+] satisfies ShapePattern[]);
+
+// ---------------------------------------------------------------------------
+// Pure layer
+// ---------------------------------------------------------------------------
+
+const trailingPunct = new Set([".", ",", ";", ":", "!", "?", ")", "]", "}", ">", "'", '"']);
+const templateLeads = new Set(["<", "{", "[", "$", "%"]);
+const fillerChars = new Set([".", "…", "*", "_", "x", "X"]);
+
+export function isPlaceholderSegment(seg: string): boolean {
+  let end = seg.length;
+  while (end > 0 && trailingPunct.has(seg[end - 1])) end--;
+  const base = end > 0 ? seg.slice(0, end) : seg;
+  const norm = base.toLowerCase();
+  if (norm.length === 0) return false;
+  if (placeholderUsernames.has(norm)) return true;
+  if (templateLeads.has(norm[0])) return true;
+  for (const ch of norm) {
+    if (!fillerChars.has(ch)) return false;
+  }
+  return true;
+}
+
+export function findShapeMatches(text: string): MatchSpan[] {
+  const out: MatchSpan[] = [];
+  for (const p of shapePatterns) {
+    for (const m of text.matchAll(p.re)) {
+      const start = m.index ?? 0;
+      const end = start + m[0].length;
+      const placeholder = p.home && typeof m[1] === "string" ? isPlaceholderSegment(m[1]) : false;
+      out.push({ category: p.category, start, end, placeholder });
+    }
+  }
+  out.sort((a, b) => a.start - b.start || a.end - b.end);
+  return out;
+}
+
+export function parseKeywordList(text: string): string[] {
+  const body = text.startsWith("\uFEFF") ? text.slice(1) : text;
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of body.split(/\r?\n/)) {
+    const kw = raw.trim();
+    if (kw.length === 0 || kw.startsWith("#")) continue;
+    if (kw.length < 2) continue;
+    const key = kw.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(kw);
+  }
+  return out;
+}
+
+const regexSyntaxChars = /[.*+?^${}()|[\]\\/]/g;
+
+export function compileKeywordMatcher(keywords: readonly string[]): KeywordMatcher | null {
+  if (keywords.length === 0) return null;
+  const ordered = [...keywords].sort((a, b) => b.length - a.length);
+  const alternation = ordered.map((k) => k.replace(regexSyntaxChars, "\\$&")).join("|");
+  const re = new RegExp("(?<![A-Za-z0-9_])(?:" + alternation + ")(?![A-Za-z0-9_])", "giu");
+  const anywhere = new RegExp("(?:" + alternation + ")", "giu");
+  return {
+    size: keywords.length,
+    spans(text: string) {
+      const found: Array<{ start: number; end: number }> = [];
+      for (const m of text.matchAll(re)) {
+        const start = m.index ?? 0;
+        found.push({ start, end: start + m[0].length });
+      }
+      return found;
+    },
+    maskSpans(text: string) {
+      // Restart one whole code point after each match start, so an occurrence
+      // that overlaps an earlier, longer one is still found (and later
+      // merged). One code unit is not enough: under the u flag a lastIndex
+      // inside a surrogate pair is moved back to the pair's start, so a match
+      // opening with a non-BMP character would be found again forever (code
+      // review round 2). The progress guard stops the loop if exec ever fails
+      // to move past the previous start.
+      const found: Array<{ start: number; end: number }> = [];
+      const scan = new RegExp(anywhere.source, anywhere.flags);
+      let m: RegExpExecArray | null;
+      let lastStart = -1;
+      while ((m = scan.exec(text)) !== null) {
+        if (m.index <= lastStart) break;
+        lastStart = m.index;
+        found.push({ start: m.index, end: m.index + m[0].length });
+        const first = m[0].codePointAt(0) ?? 0;
+        scan.lastIndex = m.index + (first > 0xffff ? 2 : 1);
+      }
+      return found;
+    },
+  };
+}
+
+function orderCategories(set: ReadonlySet<HygieneCategory>): HygieneCategory[] {
+  return hygieneCategories.filter((c) => set.has(c));
+}
+
+export function classifyLine(text: string, kw: KeywordMatcher | null): LineVerdict {
+  const real = new Set<HygieneCategory>();
+  const placeholderOnly = new Set<HygieneCategory>();
+  for (const s of findShapeMatches(text)) {
+    if (s.placeholder) placeholderOnly.add(s.category);
+    else real.add(s.category);
+  }
+  if (kw !== null && kw.spans(text).length > 0) real.add("keyword");
+  for (const c of real) placeholderOnly.delete(c);
+  return { listed: orderCategories(real), skipped: orderCategories(placeholderOnly) };
+}
+
+export function maskText(text: string, kw: KeywordMatcher | null): string {
+  const spans: Array<{ start: number; end: number }> = findShapeMatches(text).map((s) => ({
+    start: s.start,
+    end: s.end,
+  }));
+  // Masking is broader than detection (D5 amendment): keyword occurrences are
+  // masked even where D1's word boundary would not count them as a hit.
+  if (kw !== null) spans.push(...kw.maskSpans(text));
+  if (spans.length === 0) return text;
+  spans.sort((a, b) => a.start - b.start || a.end - b.end);
+  const merged: Array<{ start: number; end: number }> = [];
+  for (const s of spans) {
+    const last = merged[merged.length - 1];
+    if (last !== undefined && s.start <= last.end) {
+      if (s.end > last.end) last.end = s.end;
+    } else {
+      merged.push({ start: s.start, end: s.end });
+    }
+  }
+  let out = "";
+  let cursor = 0;
+  for (const s of merged) {
+    out += text.slice(cursor, s.start) + "***";
+    cursor = s.end;
+  }
+  return out + text.slice(cursor);
+}
+
+// C0/C1 controls, DEL, and the bidi mark/embedding/override/isolate controls.
+// A file name carrying one of these could otherwise forge extra advisory lines
+// or reorder the printed text on a terminal (code review round 1).
+const unsafeDisplayChars = /[\u0000-\u001f\u007f-\u009f\u200e\u200f\u202a-\u202e\u2066-\u2069]/g;
+
+// Applied after masking (spans are computed on the raw text), so escaping
+// never shifts a masked span. Each unsafe character is shown as a \u escape.
+export function escapeForDisplay(text: string): string {
+  return text.replace(unsafeDisplayChars, (ch) => "\\u" + ch.charCodeAt(0).toString(16).padStart(4, "0"));
+}
+
+const prefix = "agc check — hygiene: ";
+
+export const hygieneCopy = Object.freeze({
+  hit: (p: string, line: number, category: HygieneCategory) => `${prefix}${p}:${line} ${category}`,
+  hitName: (p: string, category: HygieneCategory) => `${prefix}${p} (file name) ${category}`,
+  more: (n: number) => `${prefix}… ${n} more hit(s) not listed`,
+  summary: (n: number, m: number) =>
+    `${prefix}${n} hit(s) in ${m} file(s) — advisory; describe each by class, never the literal text (constitution §6 Information hygiene)`,
+  skipped: (n: number) => `${prefix}skipped ${n} home-path hit(s) with a placeholder username`,
+  kwNone:
+    `${prefix}no keyword list found — only built-in shape patterns ran ` +
+    `(set AGC_HYGIENE_KEYWORDS or create agc-hygiene-keywords in the git common dir)`,
+  kwUnreadable:
+    `${prefix}keyword list named by AGC_HYGIENE_KEYWORDS cannot be read — only built-in shape patterns ran`,
+  kwRefused:
+    `${prefix}keyword list under .current/ refused (it may be tracked) — move it outside the repo; only built-in shape patterns ran`,
+  kwTracked: `${prefix}warning: the keyword list is a tracked file — move it outside the repo and untrack it`,
+  walkCapped: `${prefix}stopped after 10000 files (no git repo to list files) — results are partial`,
+  error: (message: string) => `${prefix}scan skipped (${message})`,
+});
+
+export function formatReport(o: ScanOutcome, kw: KeywordMatcher | null): string[] {
+  const lines: string[] = [];
+  if (o.source === "none") lines.push(hygieneCopy.kwNone);
+  else if (o.source === "unreadable") lines.push(hygieneCopy.kwUnreadable);
+  else if (o.source === "refused") lines.push(hygieneCopy.kwRefused);
+  else if (o.keywordFileTracked) lines.push(hygieneCopy.kwTracked);
+  if (o.walkCapped) lines.push(hygieneCopy.walkCapped);
+  for (const h of o.hits.slice(0, limits.maxListed)) {
+    const shown = escapeForDisplay(maskText(h.path, kw));
+    lines.push(h.line === null ? hygieneCopy.hitName(shown, h.category) : hygieneCopy.hit(shown, h.line, h.category));
+  }
+  const more = o.hits.length - limits.maxListed;
+  if (more > 0) lines.push(hygieneCopy.more(more));
+  if (o.hits.length > 0) {
+    lines.push(hygieneCopy.summary(o.hits.length, new Set(o.hits.map((h) => h.path)).size));
+  }
+  if (o.skipped > 0) lines.push(hygieneCopy.skipped(o.skipped));
+  return lines;
+}
+
+// ---------------------------------------------------------------------------
+// I/O layer
+// ---------------------------------------------------------------------------
+
+const gitMaxBuffer = 256 * 1024 * 1024;
+
+function toPosix(rel: string): string {
+  return path.sep === "/" ? rel : rel.split(path.sep).join("/");
+}
+
+function walkWorkspace(cwd: string): ScanSet {
+  const paths: string[] = [];
+  let capped = false;
+  const visit = (dirAbs: string): boolean => {
+    let names: string[];
+    try {
+      names = fs.readdirSync(dirAbs).sort();
+    } catch {
+      return true;
+    }
+    for (const name of names) {
+      const abs = path.join(dirAbs, name);
+      let st: fs.Stats;
+      try {
+        st = fs.lstatSync(abs);
+      } catch {
+        continue;
+      }
+      if (st.isDirectory()) {
+        if (name === ".git" || name === "node_modules") continue;
+        if (!visit(abs)) return false;
+        continue;
+      }
+      // Regular files, symlinks (never followed) and any other non-directory entry.
+      if (paths.length >= limits.maxWalkFiles) {
+        capped = true;
+        return false;
+      }
+      paths.push(toPosix(path.relative(cwd, abs)));
+    }
+    return true;
+  };
+  visit(cwd);
+  return { paths, mode: "walk", capped };
+}
+
+export function listScanSet(cwd: string): ScanSet {
+  let out: string;
+  try {
+    out = execFileSync("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard"], {
+      cwd,
+      maxBuffer: gitMaxBuffer,
+      stdio: ["ignore", "pipe", "ignore"],
+      encoding: "utf8",
+    });
+  } catch {
+    return walkWorkspace(cwd);
+  }
+  const seen = new Set<string>();
+  const paths: string[] = [];
+  for (const p of out.split("\0")) {
+    if (p.length === 0 || seen.has(p)) continue;
+    seen.add(p);
+    paths.push(p);
+  }
+  return { paths, mode: "git", capped: false };
+}
+
+function realpathOrNull(p: string): string | null {
+  try {
+    return fs.realpathSync.native(p);
+  } catch {
+    return null;
+  }
+}
+
+function isWithin(child: string, dir: string): boolean {
+  return child === dir || child.startsWith(dir.endsWith(path.sep) ? dir : dir + path.sep);
+}
+
+function isTrackedFile(realFile: string): boolean {
+  try {
+    execFileSync(
+      "git",
+      ["ls-files", "--error-unmatch", "--", ":(literal)" + path.basename(realFile)],
+      { cwd: path.dirname(realFile), stdio: ["ignore", "ignore", "ignore"] }
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Opened non-blocking and checked with fstat on the open descriptor, so a
+// FIFO or other special file named by the env var can never block the read
+// (and cannot be swapped in between a check and the read). A non-regular
+// file takes the null path: "unreadable" for the env source, "none" for the
+// default file (code review round 1).
+const openNonBlocking = fs.constants.O_RDONLY | (fs.constants.O_NONBLOCK ?? 0);
+
+function loadKeywordFile(file: string): { keywords: string[]; dev: number; ino: number; real: string } | null {
+  let fd: number | null = null;
+  try {
+    fd = fs.openSync(file, openNonBlocking);
+    const st = fs.fstatSync(fd);
+    if (!st.isFile()) return null;
+    const text = fs.readFileSync(fd, "utf8");
+    const real = fs.realpathSync.native(file);
+    return { keywords: parseKeywordList(text), dev: st.dev, ino: st.ino, real };
+  } catch {
+    return null;
+  } finally {
+    if (fd !== null) {
+      try {
+        fs.closeSync(fd);
+      } catch {
+        // ignore: the read already succeeded or failed
+      }
+    }
+  }
+}
+
+export function resolveKeywordSource(
+  cwd: string,
+  env: Record<string, string | undefined>,
+  inGit: boolean
+): KeywordSource {
+  const fromEnv = env.AGC_HYGIENE_KEYWORDS;
+  if (typeof fromEnv === "string" && fromEnv.length > 0) {
+    const abs = path.resolve(cwd, fromEnv);
+    const currentDir = path.resolve(cwd, ".current");
+    const roots = [currentDir];
+    const currentReal = realpathOrNull(currentDir);
+    if (currentReal !== null) roots.push(currentReal);
+    const candidates = [abs];
+    const absReal = realpathOrNull(abs);
+    if (absReal !== null) candidates.push(absReal);
+    if (candidates.some((c) => roots.some((r) => isWithin(c, r)))) return { kind: "refused" };
+    const loaded = loadKeywordFile(abs);
+    if (loaded === null) return { kind: "unreadable" };
+    return {
+      kind: "loaded",
+      keywords: loaded.keywords,
+      dev: loaded.dev,
+      ino: loaded.ino,
+      tracked: isTrackedFile(loaded.real),
+    };
+  }
+  if (!inGit) return { kind: "none" };
+  let commonDir: string;
+  try {
+    commonDir = execFileSync("git", ["rev-parse", "--git-common-dir"], {
+      cwd,
+      stdio: ["ignore", "pipe", "ignore"],
+      encoding: "utf8",
+    }).trim();
+  } catch {
+    return { kind: "none" };
+  }
+  if (commonDir.length === 0) return { kind: "none" };
+  // Resolved 2: a default file that exists but cannot be read is reported as "none".
+  const loaded = loadKeywordFile(path.join(path.resolve(cwd, commonDir), "agc-hygiene-keywords"));
+  if (loaded === null) return { kind: "none" };
+  return { kind: "loaded", keywords: loaded.keywords, dev: loaded.dev, ino: loaded.ino, tracked: false };
+}
+
+function hasNulPrefix(buf: Buffer): boolean {
+  return buf.subarray(0, limits.binarySniffBytes).includes(0);
+}
+
+export function scanWorkspace(
+  cwd: string,
+  set: ScanSet,
+  source: KeywordSource,
+  kw: KeywordMatcher | null
+): ScanOutcome {
+  const hits: Hit[] = [];
+  let skipped = 0;
+  const self = source.kind === "loaded" ? { dev: source.dev, ino: source.ino } : null;
+  const record = (rel: string, line: number | null, verdict: LineVerdict) => {
+    for (const category of verdict.listed) hits.push({ path: rel, line, category });
+    skipped += verdict.skipped.length;
+  };
+  for (const rel of set.paths) {
+    const abs = path.join(cwd, rel);
+    let st: fs.Stats;
+    try {
+      st = fs.lstatSync(abs);
+    } catch {
+      continue; // missing from disk (D4)
+    }
+    record(rel, null, classifyLine(rel, kw));
+    if (!st.isFile() || st.size > limits.maxContentBytes) continue;
+    if (self !== null && st.dev === self.dev && st.ino === self.ino) continue;
+    let buf: Buffer;
+    try {
+      buf = fs.readFileSync(abs);
+    } catch {
+      continue;
+    }
+    if (hasNulPrefix(buf)) continue;
+    const lines = buf.toString("utf8").split(/\r?\n/);
+    for (let i = 0; i < lines.length; i++) {
+      const verdict = classifyLine(lines[i], kw);
+      if (verdict.listed.length > 0 || verdict.skipped.length > 0) record(rel, i + 1, verdict);
+    }
+  }
+  return {
+    source: source.kind,
+    keywordFileTracked: source.kind === "loaded" && source.tracked,
+    walkCapped: set.capped,
+    hits,
+    skipped,
+  };
+}
+
+function errorMessage(err: unknown): string {
+  if (err !== null && typeof err === "object" && "message" in err) {
+    const m = (err as { message?: unknown }).message;
+    if (m !== undefined && m !== null) return String(m);
+  }
+  return String(err);
+}
+
+export function runHygieneScan(cwd: string, opts: HygieneScanOptions = {}): ScanOutcome | null {
+  const write = opts.write ?? ((line: string) => void process.stderr.write(`${line}\n`));
+  let kw: KeywordMatcher | null = null;
+  try {
+    const env = opts.env ?? process.env;
+    const set = listScanSet(cwd);
+    const source = resolveKeywordSource(cwd, env, set.mode === "git");
+    kw = source.kind === "loaded" ? compileKeywordMatcher(source.keywords) : null;
+    const outcome = scanWorkspace(cwd, set, source, kw);
+    for (const line of formatReport(outcome, kw)) write(line);
+    return outcome;
+  } catch (err) {
+    try {
+      const message = escapeForDisplay(maskText(errorMessage(err), kw).replace(/\s*[\r\n]+\s*/g, " ").trim());
+      write(hygieneCopy.error(message));
+    } catch {
+      // never throw: the advisory must not affect agc check
+    }
+    return null;
+  }
+}
