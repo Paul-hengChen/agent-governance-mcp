@@ -1,7 +1,7 @@
 # Fan-out: E250 `agc eject` 的路徑顯示跳脫 ＋ E251 環境變數表補列（單一 lane）
 base: 3c20ed1    integration branch: integ/e250
 
-**狀態：人類已核准（2026-09-28）。** 佇列 0k（人類裁決 2026-09-28：緊接 E234 之後）。E251（佇列 #72）依人類裁決（2026-09-28）併入本 lane，同一條 lane 做完兩張票。發版等本 lane 合併後再做。
+**狀態：已合併（2026-09-28，`integ/e250`）。** 佇列 0k（人類裁決 2026-09-28：緊接 E234 之後）。E251（佇列 #72）依人類裁決（2026-09-28）併入本 lane，同一條 lane 做完兩張票。發版等本 lane 合併後再做。
 
 ## 派工前核對（整合者，2026-09-28）
 - `git worktree list` 只有 primary；main 和 origin/main 都在 `3c20ed1`（E234 已合併，E251 已配號並排進佇列）；工作樹乾淨。
@@ -52,3 +52,9 @@ e250（單一 lane；merge 後跑 `node scripts/merge-invariants.mjs`）→ `int
 | 2026-09-28 | 人類 | E250 開始 fan-out；E251 併入同一條 lane；發版等 E250 合併後 | 整合者 session |
 | 2026-09-28 | 整合者 | 範圍只限 `agc eject` 的輸出；票面提到的「其他 init／check 回顯路徑的訊息」不在本 lane，發現就寫進 `pending-tickets.md`（細切票優先）；`git rm` 指令行的處理交給 PM | 本檔 |
 | 2026-09-28 | 人類 | 核准本清單，開始派工 | 整合者 session |
+| 2026-09-28 | 整合者 | e250 cut 預審：`git rm`／`rm` 行在含控制字元時改印說明，以及 linked worktree 清單與 agents 清單納入範圍，這兩項照原案接受；要求補 qa task（T-E250-06）和 AC→task 對照表，一輪談定 | 信箱 e250 to-lane#1／#2 |
+| 2026-09-28 | 整合者 | 驗證通過並合併（`e0737ed`，7 commits，16 檔皆在範圍內；review 第 1 輪 APPROVED、qa 第 1 輪 PASS，hop 4/10；lane 層與整合層全套皆 2955/2958 0 fail）；無衝突 → 無合併審查；以整合者本機關鍵字源跑 `agc check` 零實際命中；新票 E250-NEW-1／NEW-2 由 `finish --shipped` 配號 | 信箱 e250 to-integrator#3 |
+| 2026-09-28 | 人類 | E250-NEW-1／NEW-2 照預設排在佇列後段，不擋 v4.2.0 發版 | 整合者 session |
+
+## 結案
+- 日期 2026-09-28；合併 commit 見 `integ/e250` 的 merge；例外：無。
