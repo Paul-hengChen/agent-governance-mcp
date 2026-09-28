@@ -106,3 +106,34 @@ CHANGES_REQUESTED: the round-1 fixes and AC18 are correct, but `maskSpans` never
 - **required — maskSpans non-BMP infinite loop**: fixed. After each match, `lastIndex` now advances one whole code point from the match start: 2 code units when the first code point is above U+FFFF, otherwise 1. A progress guard also stops the loop if a match ever starts at or before the previous start. Reproduced end to end with synthetic keywords, one of two emoji and one of two CJK Extension-B ideographs plus an ASCII letter, each glued into a tracked file name with one home-path hit in the content. `agc check` exits 0 and prints both hits with the keyword masked as `***`. No non-BMP character and no stack trace appear in the output.
 - **Audit of the other global-regex loops**: the remaining loops are the `matchAll` calls in `findShapeMatches` and in the keyword `spans`, plus the `replace` calls with `g` flags. The engine advances these itself and is code-point aware under `u`, and none of the patterns can match empty (keywords are at least 2 code units, and every shape pattern consumes characters). The hand-written `exec` loop in `maskSpans` was the only one affected.
 - **recommended — D5 wording**: the PM's working-tree edit, which changes "pending human ratification" to "ratified", is committed together with this fix.
+
+## Round 3 — APPROVED — by code-reviewer
+
+Scope: `git diff 9a03d5d..HEAD` (commit 6a2ab17). Judged against the amended spec, AC1–AC18.
+
+## Summary
+- The round-2 crash case, re-run on the new HEAD, now exits **0** instead of 134. It is the same workspace as round 2: a two-emoji keyword, and a tracked file whose name holds that keyword and whose content has one home-path hit. Output: one `home-path` hit line with the keyword masked as `***`, one summary line, no non-BMP bytes in stdout or stderr, and no stack trace.
+- `maskSpans` now advances by one whole code point, and a progress guard stops the loop if a match does not start after the previous one. Unit checks gave the expected masks: a two-emoji keyword; the same keyword repeated back to back; an Extension-B keyword glued by an underscore to its own uppercase form (case-insensitive masking); overlapping `aa` occurrences in `aaaa`; and a stray leading emoji that is not part of a keyword, which is correctly left unmasked.
+- The D5 wording now records the human ratification.
+- Clean: `tsc --noEmit`, rebuilding `dist/` (no diff after the rebuild), `test/error-code-contract.test.mjs` (21/21), and AC16 on a hermetic `git archive HEAD` copy (only `hyg.kw.none` and `skipped 16`, 0 listed hits).
+
+## AC Completeness
+AC1–AC18 — implemented. AC1 is restored: the non-BMP keyword case keeps the exit code at 0. The evidence for the other ACs is as recorded in rounds 1 and 2.
+
+## Correctness
+No findings. I agree with sr's audit of the other global-regex loops. `matchAll` and the `g`-flag `replace` calls are advanced by the engine, which is code-point aware under `u`. Every pattern needs at least one character, and keywords are at least 2 code units long, so no loop can stall on an empty match.
+
+## Quality
+No findings.
+
+## Architecture
+No change since round 2. The fix is local to `maskSpans`.
+
+## Security
+No findings. The no-echo guarantee is verified again for non-BMP keywords in printed paths.
+
+## Performance
+No findings. `maskSpans` is linear: each iteration advances by at least one code point.
+
+## Verdict
+APPROVED: every required finding from rounds 1 and 2 is resolved and verified at runtime, and AC1–AC18 are implemented. The four out-of-lane expected-red tests remain the qa hop's re-baseline under the integrator's re-draw.
