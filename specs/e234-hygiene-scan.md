@@ -51,7 +51,10 @@ This skip applies only to the two home-path categories. There are no inline supp
 ### D5 — Output
 - Every line goes to **stderr** with the prefix `agc check — hygiene`, matching the other advisories.
 - There is one line per distinct (file, line, category). A file-name hit is its own line.
-- **The matched text is never echoed.** Any path that is printed is first masked: every span of it that matches either layer is replaced with `***`. Without this, printing a file name could reveal a keyword.
+- **The matched text is never echoed.** Any path that is printed is first masked: every span of it that matches either layer is replaced with `***`. Without this, printing a file name could reveal a keyword. **Masking is broader than detection** (amended after code review round 1, agreed with the integrator; pending human ratification in the coordinator's chat):
+  - Every printed path is masked, whether it comes from a file-name hit or a content hit. The mask replaces every case-insensitive substring occurrence of every keyword with `***`, with **no** word-boundary requirement, as well as every shape-layer span.
+  - Detection keeps D1's word boundaries unchanged, so hit counts and categories do not change.
+  - Why: a keyword glued to an underscore in a file name (for example `<kw>_notes.md`) is not a hit under D1, so it would otherwise go unmasked and leak whenever that file has some other hit.
 - **Cap**: at most 50 hit lines are listed, then one `hyg.more` line.
 - **Summary**: when there is at least one listed hit, one `hyg.summary` line follows the list.
 - **Silence**: with zero hits and zero skips, the scan prints nothing except `hyg.kw.none` or `hyg.kw.unreadable` when applicable.
@@ -62,7 +65,7 @@ This skip applies only to the two home-path categories. There are no inline supp
 Scan logic lives in a new TypeScript module (working name `tools/hygiene-scan.ts`, compiled to `dist/tools/`). `bin/agc-init.mjs` loads it with a dynamic `import()` of the compiled file, following the existing `loadLanePaths` pattern. If the module cannot be loaded, the result is one `hyg.error` line and the exit code does not change. The architect makes the final call on the file name, the exported function signatures, and how the pure matchers are separated from the git/fs I/O so that they can be unit-tested.
 
 ## Acceptance Criteria
-All proofs refer to `test/e234-hygiene-scan.test.mjs` (qa-authored). Tests build every hit-bearing input at runtime inside temp git repos. **No tracked file, including the test file itself, may contain a literal string that trips the scan.** Hit-shaped strings are assembled by concatenation, and keywords are synthetic nonsense words. **Hermetic env**: every AC1–AC16 case deletes `AGC_HYGIENE_KEYWORDS` from the child process env unless that case sets it on purpose. A case that must have no default keyword file uses its own temp git dir, never a git common dir shared with the checkout running the suite.
+All proofs refer to `test/e234-hygiene-scan.test.mjs` (qa-authored). Tests build every hit-bearing input at runtime inside temp git repos. **No tracked file, including the test file itself, may contain a literal string that trips the scan.** Hit-shaped strings are assembled by concatenation, and keywords are synthetic nonsense words. **Hermetic env**: every AC1–AC16 and AC18 case deletes `AGC_HYGIENE_KEYWORDS` from the child process env unless that case sets it on purpose. A case that must have no default keyword file uses its own temp git dir, never a git common dir shared with the checkout running the suite.
 
 - **AC1 (exit-code invariance)** — Given a workspace with adapters that are current, when `agc check` runs with a temp repo that contains hits in every category, then its exit code equals the exit code of the same run with the hits removed (0). The same holds for the stale-adapter case (1).
   proof: `node --test --test-name-pattern "AC1" test/e234-hygiene-scan.test.mjs`
@@ -98,6 +101,8 @@ All proofs refer to `test/e234-hygiene-scan.test.mjs` (qa-authored). Tests build
   proof: `node --test --test-name-pattern "AC16" test/e234-hygiene-scan.test.mjs`
 - **AC17 (docs sync)** — Given the change, when a reader opens `docs/install.md`'s `agc check` advisory paragraph and `docs/config.md`'s `agc check` rows, then both describe the hygiene scan: that it is advisory, the env var name, the default file location and format, the categories, and the fact that matches are never echoed. No other section of those files changes.
   proof: `git diff main...HEAD -- docs/install.md docs/config.md` shows only the `agc check` advisory paragraph and rows changed, and each names `AGC_HYGIENE_KEYWORDS`.
+- **AC18 (masking ignores word boundaries)** — Given a tracked file whose name is a synthetic keyword glued to an underscore (such as `<kw>_notes.md`, which D1 does not count as a keyword hit) and whose content has one shape hit, when `agc check` runs, then the content hit line is printed, the path in it shows `***` where the keyword was, no `keyword` hit is reported for that file, and the keyword appears nowhere in stdout or stderr.
+  proof: `node --test --test-name-pattern "AC18" test/e234-hygiene-scan.test.mjs`
 
 ### AC → implementing task
 Mapping route: this table in the spec. The task ledger descriptions are left as first written (roles do not hand-edit `tasks.md`, and void-plus-re-add would add id churn for a documentation-only change). T-E234-05 (qa) authors the tests for every AC in the table.
@@ -121,6 +126,7 @@ Mapping route: this table in the spec. The task ledger descriptions are left as 
 | AC15 | T-E234-03 |
 | AC16 | T-E234-01 (module pattern literals, spec and evidence do not match themselves), T-E234-04 (docs do not match themselves) |
 | AC17 | T-E234-04 |
+| AC18 | T-E234-01 (maskText) |
 
 ## Copy / Strings
 | string id | exact text (quote verbatim) | source |

@@ -108,7 +108,11 @@ export interface MatchSpan {
 
 export interface KeywordMatcher {
   readonly size: number; // count of usable keywords
+  // Detection: occurrences with an ASCII word boundary on both sides (D1).
   spans(text: string): Array<{ start: number; end: number }>;
+  // Masking: every case-insensitive substring occurrence, overlapping ones
+  // included, with no word-boundary check (D5 amendment, AC18).
+  maskSpans(text: string): Array<{ start: number; end: number }>;
 }
 
 export interface LineVerdict {
@@ -348,6 +352,7 @@ export function compileKeywordMatcher(keywords: readonly string[]): KeywordMatch
   const ordered = [...keywords].sort((a, b) => b.length - a.length);
   const alternation = ordered.map((k) => k.replace(regexSyntaxChars, "\\$&")).join("|");
   const re = new RegExp("(?<![A-Za-z0-9_])(?:" + alternation + ")(?![A-Za-z0-9_])", "giu");
+  const anywhere = new RegExp("(?:" + alternation + ")", "giu");
   return {
     size: keywords.length,
     spans(text: string) {
@@ -355,6 +360,18 @@ export function compileKeywordMatcher(keywords: readonly string[]): KeywordMatch
       for (const m of text.matchAll(re)) {
         const start = m.index ?? 0;
         found.push({ start, end: start + m[0].length });
+      }
+      return found;
+    },
+    maskSpans(text: string) {
+      // Restart one code unit after each match start, so an occurrence that
+      // overlaps an earlier, longer one is still found (and later merged).
+      const found: Array<{ start: number; end: number }> = [];
+      const scan = new RegExp(anywhere.source, anywhere.flags);
+      let m: RegExpExecArray | null;
+      while ((m = scan.exec(text)) !== null) {
+        found.push({ start: m.index, end: m.index + m[0].length });
+        scan.lastIndex = m.index + 1;
       }
       return found;
     },
@@ -382,7 +399,9 @@ export function maskText(text: string, kw: KeywordMatcher | null): string {
     start: s.start,
     end: s.end,
   }));
-  if (kw !== null) spans.push(...kw.spans(text));
+  // Masking is broader than detection (D5 amendment): keyword occurrences are
+  // masked even where D1's word boundary would not count them as a hit.
+  if (kw !== null) spans.push(...kw.maskSpans(text));
   if (spans.length === 0) return text;
   spans.sort((a, b) => a.start - b.start || a.end - b.end);
   const merged: Array<{ start: number; end: number }> = [];

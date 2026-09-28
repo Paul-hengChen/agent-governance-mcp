@@ -19,6 +19,10 @@ export interface KeywordMatcher {
         start: number;
         end: number;
     }>;
+    maskSpans(text: string): Array<{
+        start: number;
+        end: number;
+    }>;
 }
 export interface LineVerdict {
     listed: HygieneCategory[];

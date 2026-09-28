@@ -253,6 +253,7 @@ export function compileKeywordMatcher(keywords) {
     const ordered = [...keywords].sort((a, b) => b.length - a.length);
     const alternation = ordered.map((k) => k.replace(regexSyntaxChars, "\\$&")).join("|");
     const re = new RegExp("(?<![A-Za-z0-9_])(?:" + alternation + ")(?![A-Za-z0-9_])", "giu");
+    const anywhere = new RegExp("(?:" + alternation + ")", "giu");
     return {
         size: keywords.length,
         spans(text) {
@@ -260,6 +261,18 @@ export function compileKeywordMatcher(keywords) {
             for (const m of text.matchAll(re)) {
                 const start = m.index ?? 0;
                 found.push({ start, end: start + m[0].length });
+            }
+            return found;
+        },
+        maskSpans(text) {
+            // Restart one code unit after each match start, so an occurrence that
+            // overlaps an earlier, longer one is still found (and later merged).
+            const found = [];
+            const scan = new RegExp(anywhere.source, anywhere.flags);
+            let m;
+            while ((m = scan.exec(text)) !== null) {
+                found.push({ start: m.index, end: m.index + m[0].length });
+                scan.lastIndex = m.index + 1;
             }
             return found;
         },
@@ -288,8 +301,10 @@ export function maskText(text, kw) {
         start: s.start,
         end: s.end,
     }));
+    // Masking is broader than detection (D5 amendment): keyword occurrences are
+    // masked even where D1's word boundary would not count them as a hit.
     if (kw !== null)
-        spans.push(...kw.spans(text));
+        spans.push(...kw.maskSpans(text));
     if (spans.length === 0)
         return text;
     spans.sort((a, b) => a.start - b.start || a.end - b.end);
