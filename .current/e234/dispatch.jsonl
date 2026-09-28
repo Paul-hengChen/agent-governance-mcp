@@ -12,3 +12,8 @@
 {"ts":"2026-09-28T13:43:49.342Z","feature":"e234-hygiene-scan","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-09-28T13:45:58.263Z","feature":"e234-hygiene-scan","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-09-28T13:47:15.004Z","feature":"e234-hygiene-scan","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-28T13:47:40.476Z","feature":"e234-hygiene-scan","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-28T13:48:24.166Z","feature":"e234-hygiene-scan","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-28T13:49:09.679Z","feature":"e234-hygiene-scan","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-28T13:55:59.473Z","feature":"e234-hygiene-scan","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-28T13:59:08.884Z","feature":"e234-hygiene-scan","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
