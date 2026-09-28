@@ -38,6 +38,7 @@ export declare const FANOUT_CODES: {
     readonly primaryNotFound: "PRIMARY_NOT_FOUND";
     readonly worktreeEmpty: "WORKTREE_EMPTY";
     readonly worktreeTilde: "WORKTREE_TILDE";
+    readonly mailboxTilde: "MAILBOX_TILDE";
 };
 /**
  * validate warning for a dispatchable row whose worktree cell is an absolute
@@ -45,6 +46,11 @@ export declare const FANOUT_CODES: {
  * never repeats a local path in its own output.
  */
 export declare const WORKTREE_ABSOLUTE_WARN: (lane: string, line: number) => string;
+/**
+ * validate warning for an absolute `mailbox:` header (E248). Like
+ * WORKTREE_ABSOLUTE_WARN, the absolute value is deliberately NOT echoed.
+ */
+export declare const MAILBOX_ABSOLUTE_WARN: (line: number) => string;
 export declare const PINS_NONE = "\u7121";
 export declare const USAGE: string;
 export declare const E158_NOTE: (base: string, branch: string) => string;
@@ -114,6 +120,8 @@ export interface Manifest {
     title?: string;
     base?: string;
     mailbox?: string;
+    /** 1-based line of the `mailbox:` header match that won (first match). */
+    mailboxLine?: number;
     dispatchable: DispatchableLane[];
     provisional: ProvisionalLane[];
     pins: {
@@ -184,6 +192,26 @@ export type WorktreeResolution = {
  *   - otherwise (relative) → path.resolve(primary, cell)
  */
 export declare function resolveWorktree(cell: string, primary: string): WorktreeResolution;
+export type MailboxResolution = {
+    ok: true;
+    path: string;
+} | {
+    ok: false;
+    code: string;
+    message: string;
+};
+/**
+ * Resolve a manifest `mailbox:` header to the absolute mailbox root render
+ * substitutes (E248). Same rules as resolveWorktree, minus the empty case
+ * (MAILBOX_RE requires a non-space value, and render treats a blank source
+ * as absent before calling this). Pure: no fs access, no existence check.
+ *   - starts with "~"      → MAILBOX_TILDE (never shell-expanded; the value
+ *                            is not echoed in the message)
+ *   - absolute             → the header, byte-verbatim (no normalisation)
+ *   - otherwise (relative) → path.resolve(primary, header); `..` above
+ *                            primary is allowed (../<lanes-dir>/_mailbox)
+ */
+export declare function resolveMailboxHeader(header: string, primary: string): MailboxResolution;
 /**
  * Render the §3b dispatch prompt for one dispatchable lane. Every field comes
  * from a stated source (spec "Render field sources"); an absent source is an
