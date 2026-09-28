@@ -6,3 +6,4 @@
 {"ts":"2026-09-28T09:15:21.856Z","feature":"e243-init-path-escape-refusal","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-09-28T09:17:28.342Z","feature":"e243-init-path-escape-refusal","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-09-28T09:29:06.841Z","feature":"e243-init-path-escape-refusal","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-28T09:35:32.263Z","feature":"e243-init-path-escape-refusal","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}

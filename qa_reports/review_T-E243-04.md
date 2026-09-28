@@ -162,3 +162,7 @@ only if it goes red because of this change) stayed green — 18/18, unmodified.
 **PASS.** T-E243-04's full scope (AC1-AC14, plus the expected-red diff, the repro-first red
 evidence, and the message-echo escaping proof) is implemented, tested, and green. No untracked
 files remained in the worktree at run time.
+## 2026-09-28T09:35:32.251Z — PASS — by qa-engineer
+
+T-E243-04 PASS. Repro-first red confirmed against base 3663b3a (backslash/CR/LF/BEL segments did not refuse; backslash produced an exclude rule git reads as /ab/.current/ — git check-ignore returned no match and the real dir showed untracked; CR/LF wrote raw control bytes into the shared exclude file, splitting lines). Expected-red diff clean (2/2 manifest entries dispositioned via AC12's message-text update). Added AC15-AC20 to test/e239-init-subdir-exclude.test.mjs (backslash/CR/LF/other-C0/DEL refusal, repo-mode pass-through, agc check advisory, message-echo escaping proof — no raw CR/LF/ESC byte in printed output) and a new AC7 case to test/e108-eject.test.mjs (planExcludeEntry's unsafeSegment skip covers the widened class, same shape as the wildcard case). All new tests carry win32 skip guards per AC13. Copy Audit Gate: AC9/AC10/AC11 verified word-for-word via grep, no drift, no coverage gap. Full suite after commit (05e388f, e0061d8), clean worktree: 2914/2917 pass, 0 fail, 3 pre-existing unrelated skips. See qa_reports/review_T-E243-04.md.
+
