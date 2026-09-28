@@ -1332,7 +1332,10 @@ const GITIGNORE_UNSAFE_SEGMENT_RE = /[*?[\]\\\x00-\x1f\x7f]/;
 // CR and TAB become `\n` `\r` `\t`, every other C0 control byte and DEL
 // becomes `\xHH` (lowercase hex), and everything else — backslash and the
 // wildcard characters included — is left as-is. Display only: the raw
-// `unsafeSegment` value stays unescaped for every logic use.
+// `unsafeSegment` value stays unescaped for every logic use. The transform
+// assumes nothing about segment boundaries, so it is also applied to whole
+// display paths (eject's plan and stderr lines); a string with no control
+// byte comes back unchanged.
 function escapeSegmentForDisplay(segment) {
   return segment.replace(/[\x00-\x1f\x7f]/g, (ch) => {
     if (ch === "\n") return "\\n";
@@ -3210,6 +3213,15 @@ const STR_USAGE_EJECT =
 // never written to an exclude file; the rule shape is only reused for paths.
 const KNOWLEDGE_RULES = ["/design/", "/specs/", `/${BACKLOG_REL}`];
 
+// A path carrying a C0 control byte or DEL — the class escapeSegmentForDisplay()
+// rewrites. Such a path is printed escaped, so a paste-me command built from
+// it would name a different path than the one on disk, and embedding the raw
+// byte instead would carry it into whatever shell runs the command. The
+// command line is therefore replaced by this note.
+const CONTROL_CHAR_RE = /[\x00-\x1f\x7f]/;
+const STR_EJECT_CONTROL_CHAR_NOTE =
+  "note: one or more of the path(s) above contain a control character and cannot be pasted into a command safely — remove it by hand.";
+
 // Every flag is boolean; anything else (including a positional) is a usage
 // error raised before anything is read or written.
 function parseEjectArgs(argv) {
@@ -3245,9 +3257,11 @@ function ejectCannotDoBlock() {
   const tail =
     present.length === 0
       ? "       (none)\n"
-      : present.map((f) => `       ${f}\n`).join("") +
+      : present.map((f) => `       ${escapeSegmentForDisplay(f)}\n`).join("") +
         "     Remove them yourself with:\n" +
-        `       rm ${present.join(" ")}\n`;
+        (present.some((f) => CONTROL_CHAR_RE.test(f))
+          ? `       ${STR_EJECT_CONTROL_CHAR_NOTE}\n`
+          : `       rm ${present.join(" ")}\n`);
   return (
     "agc eject cannot do the following — review and act on these yourself:\n" +
     "  1. Rewrite git history: any of the above that was ever tracked remains in git history even after this command untracks or deletes it.\n" +
@@ -3270,7 +3284,8 @@ function ejectCannotDoBlock() {
 //                   changes a tracked file in the working tree, else absent.
 //                   Such a change is uncommitted until the adopter commits
 //                   it, so it is listed after the plan lines.
-//   display         the path named in that list (set with trackedChange)
+//   display         the path named in that list (set with trackedChange);
+//                   raw — escaped only where it is printed
 //   advisory        true for a report-only line that still prints when there
 //                   is nothing to eject (a file left for the adopter to review)
 
@@ -3313,7 +3328,7 @@ function planClaudeBlockEntry(ctx) {
   const abs = path.join(ctx.cwd, "CLAUDE.md");
   if (!fs.existsSync(abs)) return null;
   const display = workspaceDisplay(ctx.workspace, "CLAUDE.md");
-  const label = `(iii) host traces — ${display}`;
+  const label = `(iii) host traces — ${escapeSegmentForDisplay(display)}`;
   const existing = fs.readFileSync(abs, "utf-8");
   const beginIdx = existing.indexOf(CLAUDE_BEGIN);
   const endIdx = existing.indexOf(CLAUDE_END);
@@ -3356,7 +3371,7 @@ function planAdapterFileEntry(ctx, rel, tpl) {
   const abs = path.join(ctx.cwd, rel);
   if (lstatOrNull(abs) === null) return null;
   const display = workspaceDisplay(ctx.workspace, rel);
-  const label = `(iii) host traces — ${display}`;
+  const label = `(iii) host traces — ${escapeSegmentForDisplay(display)}`;
   let matches = false;
   try {
     const text = fs.readFileSync(abs, "utf-8");
@@ -3442,7 +3457,7 @@ function runEject(cwd, argv) {
   const repoRoot = resolveRepoRootOrNull(cwd);
   if (repoRoot !== null) resolvePrimaryRepoRoot(cwd, "eject", "agc eject");
   const linked = repoRoot === null ? [] : listWorktrees(repoRoot).slice(1).map((w) => w.path);
-  const linkedList = linked.map((p) => `  ${p}`).join("\n");
+  const linkedList = linked.map((p) => `  ${escapeSegmentForDisplay(p)}`).join("\n");
   if (yes && linked.length > 0) {
     throw new FeatureError(
       `agc eject: refusing --yes — linked worktree(s) still exist and would be stranded:\n` +
@@ -3475,7 +3490,7 @@ function runEject(cwd, argv) {
     if (p.knowledge && !purgeKnowledge) {
       if (onDisk) {
         const suffix = p.backlog ? " — may be this project's plan" : "";
-        const line = `${p.label} — ${p.display}: KEPT (pass --purge-knowledge to remove; never the default)${suffix}`;
+        const line = `${p.label} — ${escapeSegmentForDisplay(p.display)}: KEPT (pass --purge-knowledge to remove; never the default)${suffix}`;
         entries.push({ line: () => line, apply: null, untrackedDelete: false });
       }
       continue;
@@ -3486,7 +3501,7 @@ function runEject(cwd, argv) {
     }
     if (!onDisk) continue;
     entries.push({
-      line: (applied) => `${p.label} — ${p.display}: ${applied ? deletedWord : "DELETE"}`,
+      line: (applied) => `${p.label} — ${escapeSegmentForDisplay(p.display)}: ${applied ? deletedWord : "DELETE"}`,
       // rmSync removes a symlink itself, never what it points to.
       apply: () => fs.rmSync(abs, { recursive: true, force: true }),
       untrackedDelete: true,
@@ -3503,8 +3518,11 @@ function runEject(cwd, argv) {
     return;
   }
 
+  const cwdDisplay = escapeSegmentForDisplay(cwd);
   const header = [
-    yes ? `agc eject — applying to ${cwd}:` : `agc eject — plan for ${cwd} (dry-run; re-run with --yes to apply):`,
+    yes
+      ? `agc eject — applying to ${cwdDisplay}:`
+      : `agc eject — plan for ${cwdDisplay} (dry-run; re-run with --yes to apply):`,
   ];
   if (repoRoot !== null) {
     header.push(`  declared artifacts mode: ${declared}`);
@@ -3534,7 +3552,7 @@ function runEject(cwd, argv) {
       (yes
         ? "Tracked host-trace file(s) were changed in the working tree — this is uncommitted; review and commit it yourself:\n"
         : "will change tracked file(s) — uncommitted until you commit:\n") +
-        hostChanges.map((e) => `  ${e.display} (${e.trackedChange})\n`).join("")
+        hostChanges.map((e) => `  ${escapeSegmentForDisplay(e.display)} (${e.trackedChange})\n`).join("")
     );
   }
 
@@ -3543,10 +3561,12 @@ function runEject(cwd, argv) {
     // resolve when pasted at the repo root, so say so (same as init).
     process.stderr.write(
       `The following are tracked and were left untouched (agc does not run git rm):\n` +
-        tracked.map((p) => `  ${p.display}\n`).join("") +
+        tracked.map((p) => `  ${escapeSegmentForDisplay(p.display)}\n`).join("") +
         `Remove them (from the index and the working tree) with` +
         `${workspace.prefix === "" ? "" : " (run from the repository root)"}:\n` +
-        `  git rm -r ${tracked.map((p) => p.target).join(" ")}\n` +
+        (tracked.some((p) => CONTROL_CHAR_RE.test(p.target))
+          ? `  ${STR_EJECT_CONTROL_CHAR_NOTE}\n`
+          : `  git rm -r ${tracked.map((p) => p.target).join(" ")}\n`) +
         `Note: history still contains these files after that command.\n`
     );
   }

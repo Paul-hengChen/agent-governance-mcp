@@ -1,0 +1,6 @@
+{"ts":"2026-09-28T14:50:56.589Z","feature":"e250-eject-path-escape","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-28T14:54:50.423Z","feature":"e250-eject-path-escape","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-28T14:58:54.512Z","feature":"e250-eject-path-escape","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-28T14:59:38.963Z","feature":"e250-eject-path-escape","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-28T15:01:47.099Z","feature":"e250-eject-path-escape","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-28T15:19:24.446Z","feature":"e250-eject-path-escape","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}

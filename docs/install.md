@@ -217,6 +217,7 @@ agc eject --yes --purge-knowledge    # apply, including those
 - **Idempotent.** When nothing is left, it prints `agc eject — nothing to eject.` and exits 0.
 - **Refusals.** It exits 1 inside a linked worktree. `--yes` also exits 1 while any linked worktree exists, and names each one. Finish those lanes first (`agc feature finish`). A dry-run prints the same list as a warning. An unknown flag exits 2.
 - **Subdirectory workspaces.** Paths and exclude lines are computed for the current workspace's own prefix (`sub/.current/`, `/sub/tasks.md`, …). A sibling workspace elsewhere in the repo is never touched.
+- **Paths with control characters.** A printed path that contains a control character (for example LF, CR or ESC) is shown with visible escapes (`\n`, `\r`, `\x1b`), so it cannot split a line or reach the terminal raw. The escaped text no longer names the real path, so when any listed path has one, the `git rm -r` command (or the `rm` command for `~/.claude/agents/`) is replaced by a note asking you to remove the paths by hand. The paths eject deletes or edits itself are unchanged.
 
 | class | paths | disposition |
 |---|---|---|

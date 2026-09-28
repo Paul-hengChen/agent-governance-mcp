@@ -201,3 +201,4 @@ To opt-in: `mkdir -p .current` (the simplest path). To opt-out: rename `.current
 | `AGC_AUTO_ROUTE` | Set to `0` to disable auto-routing in `/teamwork` (restore the pre-v3.13 manual-routing behaviour where the coordinator surfaces the next role and waits). Default: on. |
 | `TW_AUTH_TOKEN` | HTTP mode only — see [docs/http-mode.md](http-mode.md). |
 | `TW_ALLOWED_ORIGINS` | HTTP mode only — see [docs/http-mode.md](http-mode.md). |
+| `AGC_HYGIENE_KEYWORDS` | Names the keyword-list file the advisory `agc check` information-hygiene scan reads for the `keyword` category. See [docs/install.md](install.md#keeping-governance-artifacts-out-of-git-agc-init---artifactslocalrepo). |
