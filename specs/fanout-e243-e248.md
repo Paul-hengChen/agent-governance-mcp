@@ -1,7 +1,7 @@
 # Fan-out: E243 ∥ E248（local 模式拒絕反斜線／控制字元 ∥ 清單 mailbox 標頭接受相對路徑）
 base: c29b4a4    integration branch: 每條 lane 各一條 integ/<lane>
 
-**狀態：人類核准 2026-09-28，派工中。** 佇列 0h（E243）＋ 0i（E248，人類裁決 2026-09-28 從 #69 提前、與 E243 並行）。E234（0j）與 E243 同改 `bin/agc-init.mjs`，排在 E243 合併之後，不在本波。
+**狀態：人類核准 2026-09-28；已結案（兩條 lane 皆合併進 main）。** 佇列 0h（E243）＋ 0i（E248，人類裁決 2026-09-28 從 #69 提前、與 E243 並行）。E234（0j）與 E243 同改 `bin/agc-init.mjs`，排在 E243 合併之後，不在本波。
 
 ## 派工前核對（整合者，2026-09-28）
 - `git worktree list` 只有 primary；main = origin/main = `c29b4a4`；工作樹乾淨；`tw_detect_drift` 無 drift（只有 T-REL4-02 的證據提示）。primary handoff 停在 `release-v4.0.0`。
@@ -56,3 +56,5 @@ e243 ∥ e248（檔案互斥，誰先 PASS 誰先合；每次 merge 後跑 `node
 | 2026-09-28 | 整合者 | `docs/install.md`（一條）歸 e243、`specs/e177a-fanout-manifest.md`（兩列）歸 e248；e106／e108 兩個既有測試預先劃給 e243 | 本檔 |
 | 2026-09-28 | 人類 | 核准本清單（含三項重劃與 E243 票面「三處訊息」實為兩處訊息＋一處文件＋eject 一處行為的更正），開始派工 | 整合者 session |
 | 2026-09-28 | 整合者 | e248 cut 預審原樣通過（`6770283`）；驗證通過並合併（`70fc318`，5 commits，14 檔皆在範圍內；review 第 1 輪 APPROVED、qa 第 1 輪 PASS，hop 4/10；lane 層全套 2916/2919 0 fail）；無衝突 → 無合併審查；無新票 | 信箱 e248 to-integrator#2 |
+| 2026-09-28 | 整合者 | e243 cut 預審要求三項（訊息回顯的控制字元要跳脫 → 新 AC14；AC6／AC7／AC13 補進 sr task；cut 先 commit），`9a07f6b` 談定；人類核准時未採用「反斜線也跳脫」的非必要建議 | 信箱 e243 to-lane#1／#2 |
+| 2026-09-28 | 整合者 | e243 驗證通過並合併（`1b8dcb8`，8 commits，13 檔皆在範圍內 —— lane 自報的 expected-red 檔屬 lane 證據，`fanout check` 不判越界；review 第 1 輪 APPROVED、qa 第 1 輪 PASS，hop 4/10；lane 層全套 2914/2917 0 fail）；無衝突 → 無合併審查；roll-up 的證據不符（handoff 只記 1 個完成）併入 E247 作第二個實例 | 信箱 e243 to-integrator#3 |
