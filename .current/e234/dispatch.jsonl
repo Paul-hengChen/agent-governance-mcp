@@ -1,0 +1,5 @@
+{"ts":"2026-09-28T11:37:52.259Z","feature":"e234-hygiene-scan","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-28T11:38:28.007Z","feature":"e234-hygiene-scan","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-28T11:41:00.113Z","feature":"e234-hygiene-scan","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-28T13:08:14.527Z","feature":"e234-hygiene-scan","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-28T13:08:51.267Z","feature":"e234-hygiene-scan","agent_id":"architect","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
