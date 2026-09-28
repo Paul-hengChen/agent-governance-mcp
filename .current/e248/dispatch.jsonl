@@ -1,1 +1,3 @@
 {"ts":"2026-09-28T08:57:36.982Z","feature":"e248-relative-mailbox-header","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-28T09:00:11.163Z","feature":"e248-relative-mailbox-header","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-28T09:01:55.303Z","feature":"e248-relative-mailbox-header","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}

@@ -25,8 +25,11 @@
 // it against the primary path it already computes; a cell that is already
 // absolute passes through byte-verbatim. This amends the `<worktree>` row of
 // the e177a "Render field sources" table (see
-// specs/e235b-relative-manifest-worktree-architecture.md). The parsed
-// path-token set is used only by `check`.
+// specs/e235b-relative-manifest-worktree-architecture.md). The optional
+// `mailbox:` header follows the same rule (E248, specs/e248-relative-mailbox-
+// header.md): a relative value resolves against primary, an absolute one
+// passes through byte-verbatim, and `--mailbox-root` still wins verbatim. The
+// parsed path-token set is used only by `check`.
 //
 // Reporting surface only: writes nothing, fires no gate, touches no git state
 // (git is only read, via execFileSync argv — never a shell).
@@ -118,6 +121,9 @@ export const FANOUT_CODES = {
   // the parser, so validate/check exit codes never change because of them.
   worktreeEmpty: "WORKTREE_EMPTY",
   worktreeTilde: "WORKTREE_TILDE",
+  // Render-only input error (E248): a `mailbox:` header starting with "~".
+  // Not raised by the parser, so validate never fails because of it.
+  mailboxTilde: "MAILBOX_TILDE",
 } as const;
 
 /**
@@ -127,6 +133,13 @@ export const FANOUT_CODES = {
  */
 export const WORKTREE_ABSOLUTE_WARN = (lane: string, line: number): string =>
   `WARN  lane ${lane} (line ${line}): worktree cell is an absolute path — write it relative to primary (e.g. ../<lanes-dir>/${lane}); render still accepts it`;
+
+/**
+ * validate warning for an absolute `mailbox:` header (E248). Like
+ * WORKTREE_ABSOLUTE_WARN, the absolute value is deliberately NOT echoed.
+ */
+export const MAILBOX_ABSOLUTE_WARN = (line: number): string =>
+  `WARN  mailbox header (line ${line}): mailbox: is an absolute path — write it relative to primary (e.g. ../<lanes-dir>/_mailbox); render still accepts it`;
 
 export const PINS_NONE = "無";
 
@@ -210,6 +223,8 @@ export interface Manifest {
   title?: string;
   base?: string;
   mailbox?: string;
+  /** 1-based line of the `mailbox:` header match that won (first match). */
+  mailboxLine?: number;
   dispatchable: DispatchableLane[];
   provisional: ProvisionalLane[];
   pins: { present: boolean; bullets: PinBullet[] };
@@ -356,7 +371,7 @@ export function parseManifest(text: string): Manifest {
   };
 
   // Header lines — first match anywhere in the file wins.
-  for (const l of lines) {
+  for (const [i, l] of lines.entries()) {
     if (m.title === undefined) {
       const t = TITLE_RE.exec(l);
       if (t) m.title = t[1].trim();
@@ -367,7 +382,10 @@ export function parseManifest(text: string): Manifest {
     }
     if (m.mailbox === undefined) {
       const mb = MAILBOX_RE.exec(l);
-      if (mb) m.mailbox = mb[1];
+      if (mb) {
+        m.mailbox = mb[1];
+        m.mailboxLine = i + 1;
+      }
     }
   }
   if (m.title === undefined) {
@@ -772,6 +790,31 @@ export function resolveWorktree(cell: string, primary: string): WorktreeResoluti
   return { ok: true, path: path.resolve(primary, cell) };
 }
 
+export type MailboxResolution = { ok: true; path: string } | { ok: false; code: string; message: string };
+
+/**
+ * Resolve a manifest `mailbox:` header to the absolute mailbox root render
+ * substitutes (E248). Same rules as resolveWorktree, minus the empty case
+ * (MAILBOX_RE requires a non-space value, and render treats a blank source
+ * as absent before calling this). Pure: no fs access, no existence check.
+ *   - starts with "~"      → MAILBOX_TILDE (never shell-expanded; the value
+ *                            is not echoed in the message)
+ *   - absolute             → the header, byte-verbatim (no normalisation)
+ *   - otherwise (relative) → path.resolve(primary, header); `..` above
+ *                            primary is allowed (../<lanes-dir>/_mailbox)
+ */
+export function resolveMailboxHeader(header: string, primary: string): MailboxResolution {
+  if (header.startsWith("~")) {
+    return {
+      ok: false,
+      code: FANOUT_CODES.mailboxTilde,
+      message: "mailbox: header starts with \"~\" — home-directory expansion is not performed; write it relative to primary (e.g. ../<lanes-dir>/_mailbox)",
+    };
+  }
+  if (path.isAbsolute(header)) return { ok: true, path: header };
+  return { ok: true, path: path.resolve(primary, header) };
+}
+
 function inputErr(code: string, message: string): FanoutError {
   return { code, scope: "input", message };
 }
@@ -809,9 +852,13 @@ export function renderPrompt(m: Manifest, laneId: string, opts: RenderOptions): 
   const reading = (opts.reading ?? []).filter((r) => r.trim() !== "");
   if (reading.length === 0) errors.push(inputErr(FANOUT_CODES.readingAbsent, "at least one --reading \"<text>\" is required (3b <計劃的必讀章節> + <票面 row>)"));
 
-  let mailboxRoot = opts.mailboxRoot ?? m.mailbox;
-  if (mailboxRoot !== undefined && mailboxRoot.trim() === "") mailboxRoot = undefined;
-  if (mailboxRoot === undefined) {
+  // Mailbox root: a non-blank --mailbox-root wins and is used byte-verbatim
+  // (never resolved). Otherwise the manifest header, resolved against primary
+  // below (E248). A blank flag falls through to the header, as before.
+  const flagRoot = opts.mailboxRoot !== undefined && opts.mailboxRoot.trim() !== "" ? opts.mailboxRoot : undefined;
+  const header = flagRoot === undefined && m.mailbox !== undefined && m.mailbox.trim() !== "" ? m.mailbox : undefined;
+  let mailboxRoot: string | undefined = flagRoot;
+  if (flagRoot === undefined && header === undefined) {
     errors.push(inputErr(FANOUT_CODES.mailboxRootAbsent, "no mailbox root: pass --mailbox-root <dir> or add a \"mailbox: <dir>\" line to the manifest"));
   }
 
@@ -842,6 +889,15 @@ export function renderPrompt(m: Manifest, laneId: string, opts: RenderOptions): 
     const wt = resolveWorktree(lane.worktree, primary);
     if (wt.ok) worktree = wt.path;
     else errors.push({ code: wt.code, scope: "row", lanes: [lane.lane], message: `lane ${lane.lane}: ${wt.message}` });
+  }
+
+  // Mailbox header: resolved against primary (E248), under the same skip as
+  // the worktree above — with no primary, PRIMARY_NOT_FOUND is the only
+  // report and there is never a cwd fallback.
+  if (header !== undefined && primary !== undefined) {
+    const mb = resolveMailboxHeader(header, primary);
+    if (mb.ok) mailboxRoot = mb.path;
+    else errors.push(inputErr(mb.code, mb.message));
   }
 
   if (errors.length > 0) return { ok: false, errors };
@@ -1156,10 +1212,15 @@ export function runValidate(args: string[]): CliResult {
   if (errors.length > 0) return fail(errors);
   // E235b: one non-fatal WARN per dispatchable row whose worktree cell is
   // absolute (exit code stays 0). Provisional rows have no worktree contract.
-  const warns = manifest.dispatchable
+  let warns = manifest.dispatchable
     .filter((l) => isAbsoluteWorktree(l.worktree))
     .map((l) => `${WORKTREE_ABSOLUTE_WARN(l.lane, l.line)}\n`)
     .join("");
+  // E248: one non-fatal WARN for an absolute `mailbox:` header. A "~" header
+  // is a render-time refusal only (like WORKTREE_TILDE), so no line here.
+  if (manifest.mailbox !== undefined && manifest.mailboxLine !== undefined && path.isAbsolute(manifest.mailbox)) {
+    warns += `${MAILBOX_ABSOLUTE_WARN(manifest.mailboxLine)}\n`;
+  }
   return {
     stdout: `fanout: ok — ${manifest.dispatchable.length} dispatchable lane(s), ${manifest.provisional.length} provisional, ${manifest.decisions.rows.length} decision(s)\n${warns}`,
     stderr: "",
