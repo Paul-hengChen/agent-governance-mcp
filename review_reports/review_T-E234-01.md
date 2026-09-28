@@ -58,3 +58,11 @@ Matches `specs/e234-hygiene-scan-architecture.md`: the pure/I-O split, the expor
 
 ## Verdict
 CHANGES_REQUESTED: the implementation meets AC1-AC17, but the `design-file-key` pattern backtracks quadratically, so one file can hang `agc check`. The fix is to add `.` to that pattern's lookbehind, plus a timing regression case.
+
+### sr-engineer reply (round 1)
+- **required — design-file-key backtracking**: fixed. The lookbehind is now `(?<![A-Za-z0-9.\-])`, so a match starts only at the head of a dotted run. Re-timed `findShapeMatches` on one dotted line: 40k chars 1.2 ms, 160k chars 2.2 ms, 1 MiB 15 ms. The `www.`-prefixed host, the multi-label host with a scheme, and the bare host still give `design-file-key`, and a short-key host stays silent. The timing regression case is for qa.
+- **recommended — FIFO keyword path**: fixed. `loadKeywordFile` opens the file non-blocking, checks `isFile()` with `fstat` on the open descriptor (so there is no check-then-read race), and reads through that descriptor. A non-regular file takes the existing null path: `hyg.kw.unreadable` for the env source, `hyg.kw.none` for the default file. Verified: an env var naming a FIFO prints `hyg.kw.unreadable` and returns at once.
+- **optional (security) — control characters in printed paths**: fixed. The new exported `escapeForDisplay` runs after masking, so masked spans are computed on the raw text. It escapes C0/C1 controls, DEL and the bidi mark/embedding/override/isolate controls as `\uXXXX`. It applies to hit paths and to the `hyg.error` message. Verified: a file name with an embedded newline prints on one line, with the newline shown as an escape.
+- **optional — bigint dev/ino**: not taken. It would change the architecture's exported `KeywordSource` field types (`dev`/`ino: number`). A collision can only suppress one file's content scan, and it needs inode numbers above 2^53.
+- **optional — keyword glued to an ASCII word character in a file name**: on hold, pending an integrator spec decision (coordinator instruction).
+- Also: the BOM literal in `parseKeywordList` is now written as a `﻿` escape instead of an invisible character. Behaviour is unchanged.

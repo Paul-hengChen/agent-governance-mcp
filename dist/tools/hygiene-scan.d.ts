@@ -64,6 +64,7 @@ export declare function parseKeywordList(text: string): string[];
 export declare function compileKeywordMatcher(keywords: readonly string[]): KeywordMatcher | null;
 export declare function classifyLine(text: string, kw: KeywordMatcher | null): LineVerdict;
 export declare function maskText(text: string, kw: KeywordMatcher | null): string;
+export declare function escapeForDisplay(text: string): string;
 export declare const hygieneCopy: Readonly<{
     hit: (p: string, line: number, category: HygieneCategory) => string;
     hitName: (p: string, category: HygieneCategory) => string;

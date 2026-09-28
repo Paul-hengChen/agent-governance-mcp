@@ -127,10 +127,13 @@ const shapePatterns = Object.freeze([
         home: false,
     },
     // design-file-key: the scheme is optional (the key is the secret); a template
-    // token key is rejected by the alphanumeric key class.
+    // token key is rejected by the alphanumeric key class. The lookbehind also
+    // excludes a dot, so a match can start only at the head of a dotted run:
+    // without it every position after a dot is a start and a long dotted line
+    // backtracks quadratically (code review round 1).
     {
         category: "design-file-key",
-        re: new RegExp(String.raw `(?<![A-Za-z0-9\-])(?:[A-Za-z0-9\-]+\.)*figma\.com[/](?:file|design|proto|board|slides|make)[/][A-Za-z0-9]{10,}`, "gi"),
+        re: new RegExp(String.raw `(?<![A-Za-z0-9.\-])(?:[A-Za-z0-9\-]+\.)*figma\.com[/](?:file|design|proto|board|slides|make)[/][A-Za-z0-9]{10,}`, "gi"),
         home: false,
     },
     // credential: vendor-prefixed secret shapes only.
@@ -226,7 +229,7 @@ export function findShapeMatches(text) {
     return out;
 }
 export function parseKeywordList(text) {
-    const body = text.startsWith("﻿") ? text.slice(1) : text;
+    const body = text.startsWith("\uFEFF") ? text.slice(1) : text;
     const seen = new Set();
     const out = [];
     for (const raw of body.split(/\r?\n/)) {
@@ -309,6 +312,15 @@ export function maskText(text, kw) {
     }
     return out + text.slice(cursor);
 }
+// C0/C1 controls, DEL, and the bidi mark/embedding/override/isolate controls.
+// A file name carrying one of these could otherwise forge extra advisory lines
+// or reorder the printed text on a terminal (code review round 1).
+const unsafeDisplayChars = /[\u0000-\u001f\u007f-\u009f\u200e\u200f\u202a-\u202e\u2066-\u2069]/g;
+// Applied after masking (spans are computed on the raw text), so escaping
+// never shifts a masked span. Each unsafe character is shown as a \u escape.
+export function escapeForDisplay(text) {
+    return text.replace(unsafeDisplayChars, (ch) => "\\u" + ch.charCodeAt(0).toString(16).padStart(4, "0"));
+}
 const prefix = "agc check — hygiene: ";
 export const hygieneCopy = Object.freeze({
     hit: (p, line, category) => `${prefix}${p}:${line} ${category}`,
@@ -337,7 +349,7 @@ export function formatReport(o, kw) {
     if (o.walkCapped)
         lines.push(hygieneCopy.walkCapped);
     for (const h of o.hits.slice(0, limits.maxListed)) {
-        const shown = maskText(h.path, kw);
+        const shown = escapeForDisplay(maskText(h.path, kw));
         lines.push(h.line === null ? hygieneCopy.hitName(shown, h.category) : hygieneCopy.hit(shown, h.line, h.category));
     }
     const more = o.hits.length - limits.maxListed;
@@ -439,15 +451,35 @@ function isTrackedFile(realFile) {
         return false;
     }
 }
+// Opened non-blocking and checked with fstat on the open descriptor, so a
+// FIFO or other special file named by the env var can never block the read
+// (and cannot be swapped in between a check and the read). A non-regular
+// file takes the null path: "unreadable" for the env source, "none" for the
+// default file (code review round 1).
+const openNonBlocking = fs.constants.O_RDONLY | (fs.constants.O_NONBLOCK ?? 0);
 function loadKeywordFile(file) {
+    let fd = null;
     try {
-        const text = fs.readFileSync(file, "utf8");
+        fd = fs.openSync(file, openNonBlocking);
+        const st = fs.fstatSync(fd);
+        if (!st.isFile())
+            return null;
+        const text = fs.readFileSync(fd, "utf8");
         const real = fs.realpathSync.native(file);
-        const st = fs.statSync(real);
         return { keywords: parseKeywordList(text), dev: st.dev, ino: st.ino, real };
     }
     catch {
         return null;
+    }
+    finally {
+        if (fd !== null) {
+            try {
+                fs.closeSync(fd);
+            }
+            catch {
+                // ignore: the read already succeeded or failed
+            }
+        }
     }
 }
 export function resolveKeywordSource(cwd, env, inGit) {
@@ -570,7 +602,7 @@ export function runHygieneScan(cwd, opts = {}) {
     }
     catch (err) {
         try {
-            const message = maskText(errorMessage(err), kw).replace(/\s*[\r\n]+\s*/g, " ").trim();
+            const message = escapeForDisplay(maskText(errorMessage(err), kw).replace(/\s*[\r\n]+\s*/g, " ").trim());
             write(hygieneCopy.error(message));
         }
         catch {
