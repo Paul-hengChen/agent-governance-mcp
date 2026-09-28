@@ -16,6 +16,59 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [4.2.0] - 2026-09-29
+
+MINOR release. It ships two lane features merged to `main` since v4.1.0: E234 (lane `e234`) and
+E250 with E251 (lane `e250`). Both are backwards-compatible. No tool input schema changed, and
+`agc check`'s exit code is unchanged.
+
+### Added
+
+- **E234: `agc check` runs an advisory information-hygiene scan (`tools/hygiene-scan.ts`,
+  `bin/agc-init.mjs`)**: `agc check` now scans the contents and file names of tracked and
+  untracked, non-ignored files for the classes of detail the constitution's Information hygiene
+  rule bans from durable output. It is advisory and never changes the exit code. Two layers run:
+  built-in generic shape patterns (categories `home-path`, `encoded-home-path`, `temp-path`,
+  `design-file-key`, `credential`, `work-item-link`, `internal-host`), and a keyword list the
+  adopter keeps in an untracked local file (category `keyword`), located through the
+  `AGC_HYGIENE_KEYWORDS` env var or a fixed file name in the git common dir, never read from
+  under `.current/`. Each hit is reported as file, line and category only; the matched text is
+  never echoed, and matching parts of printed paths are masked. Placeholder usernames are skipped
+  and only counted. When the scan module cannot load, `agc check` prints a fixed "scan skipped"
+  line and carries on. `docs/install.md` and `docs/config.md` describe the scan. Spec:
+  `specs/e234-hygiene-scan.md`; architecture: `specs/e234-hygiene-scan-architecture.md`. Tests:
+  `test/e234-hygiene-scan.test.mjs`; four existing exact-stderr `agc check` tests in
+  `test/agc-adapters.test.mjs` and `test/e106-init-artifacts-flag.test.mjs` were re-baselined
+  for the new advisory lines.
+
+### Fixed
+
+- **E250: `agc eject` shows every printed path with visible escapes (`bin/agc-init.mjs`)**: the
+  plan header's workspace path, the entry labels, the tracked-change and tracked lists, the
+  linked-worktree list and the host-agents list now render C0 control characters and DEL as
+  visible escapes (`\n`, `\r`, `\xHH`) through the existing `escapeSegmentForDisplay()`, so a
+  path cannot split a line or reach the terminal raw. When a listed path holds a control
+  character, the paste-me `git rm -r` / `rm` command line is replaced by a note to remove the
+  paths by hand. Ordinary output is byte-identical, and the paths eject operates on are
+  unchanged. `docs/install.md` describes the behavior. Spec: `specs/e250-eject-path-escape.md`.
+  Tests: `test/e250-eject-path-escape.test.mjs`.
+
+### Docs
+
+- **E251: env-var table row for the hygiene-scan keyword list (`docs/config.md`)**: the
+  Env-var overrides table now lists `AGC_HYGIENE_KEYWORDS` and links to the `docs/install.md`
+  section.
+
+### Notes
+
+- Evidence: this release archives the ticket-prefixed QA and code-review reports of both lanes
+  and of the release gate into `qa_reports/archive/release-v4.2.0/` and
+  `review_reports/archive/release-v4.2.0/`. Each lane's closed handoff is under
+  `.current/history/2026-09/<lane>/` (context, not changed). Fan-out manifests:
+  `specs/fanout-e234.md`, `specs/fanout-e250.md`. Release-gate spec: `specs/release-v4.2.0.md`.
+- Follow-ups filed by lane `e250` (E252, E253: other path echoes outside `agc eject`) are not
+  part of this release.
+
 ## [4.1.0] - 2026-09-28
 
 MINOR release. It ships two lane features merged to `main` since v4.0.0: E243 (lane `e243`) and
