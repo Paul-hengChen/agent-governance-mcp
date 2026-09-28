@@ -19,6 +19,10 @@
 //   AC12 -> "AC12: a non-template-matching AGENTS.md/.antigravityrules is flagged, never deleted"
 //   AC13 -> "AC13: absent adapter files are silently skipped"
 //   AC14 -> "AC14: exclude-line removal never touches LANE_EXCLUDE_RULES or unrelated lines"
+//   (E243) AC7 -> "AC7 (E243): eject skips the exclude-line plan entry cleanly on a
+//           wildcard or backslash workspace, same shape for both" — proves
+//           planExcludeEntry's unsafeSegment skip covers E243's widened class
+//           (specs/e243-init-path-escape-refusal.md) with no code change of its own
 //   AC15 -> "AC15: subdirectory eject never touches a sibling root workspace's artifacts"
 //   AC16 -> "AC16: eject refuses inside a linked worktree, same as feature start/finish"
 //   AC17 -> "AC17: outside a git repo, plain deletion still runs and exclude cleanup is skipped with a note"
@@ -609,6 +613,54 @@ test("AC14: exclude-line removal never touches LANE_EXCLUDE_RULES or unrelated l
   }
   for (const rule of ARTIFACT_EXCLUDE_RULES) {
     assert.doesNotMatch(after, new RegExp(`^${rule.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "m"));
+  }
+});
+
+// ---------------------------------------------------------------------------
+// AC7 (specs/e243-init-path-escape-refusal.md) — planExcludeEntry's existing
+// `unsafeSegment !== null` skip already covers the class E243 widened
+// (backslash, C0 control range, DEL), same as it already covered the E239
+// wildcard set: no code change, only this new coverage. A workspace with an
+// unsafe segment never had `init` write exclude rules there in the first
+// place (init refuses `--artifacts=local` for exactly this class), so eject
+// has nothing to remove — proven here by the plan carrying no
+// ".git/info/exclude" line at all (not a "skipped"/"nothing to remove" line
+// — the entry is entirely absent, per planExcludeEntry returning null), for
+// a wildcard-named workspace and a backslash-named workspace alike.
+// ---------------------------------------------------------------------------
+test("AC7 (E243): eject skips the exclude-line plan entry cleanly on a wildcard or backslash workspace, same shape for both", (t) => {
+  if (process.platform === "win32") {
+    t.skip(
+      'a literal backslash can never survive inside one path segment on win32 (path.sep is "\\\\") — see test/e239-init-subdir-exclude.test.mjs AC15 for the platform-behavior proof',
+    );
+    return;
+  }
+  for (const [label, name] of [
+    ["wildcard", "weird[dir]"],
+    ["backslash", "a\\b"],
+  ]) {
+    const repo = mkGitRepoWithCommit(`e108-e243-ac7-${label}-`);
+    const sub = path.join(repo, name);
+    fs.mkdirSync(sub, { recursive: true });
+    // `agc init --artifacts=local` itself would have refused here (E239's
+    // wildcard refusal, widened by E243 to also cover backslash/control
+    // characters) — hand-author the config the same way
+    // test/e239-init-subdir-exclude.test.mjs's AC13/AC19 cases do.
+    fs.mkdirSync(path.join(sub, ".current"), { recursive: true });
+    fs.writeFileSync(
+      path.join(sub, ".current", ".config.json"),
+      JSON.stringify({ schema_version: 2, host: "claude-code", artifacts: "local" }, null, 2) + "\n",
+    );
+
+    const r = runAgc(sub, ["eject"]);
+    assert.equal(r.status, 0, `${label}: exit code (stderr=${r.stderr})`);
+    assert.doesNotMatch(
+      r.stdout,
+      /host traces — \.git\/info\/exclude/,
+      `${label}: no exclude-line plan entry — init never had a chance to write rules there`,
+    );
+    assert.match(r.stdout, /agc eject — plan for /, `${label}: plan still prints normally, no crash`);
+    assert.match(r.stdout, ejectCannotDoRe(), `${label}: cannot-do block still present, unaffected`);
   }
 });
 
