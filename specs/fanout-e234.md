@@ -1,7 +1,7 @@
 # Fan-out: E234 資訊衛生規則的機械檢查（`agc check` 建議性掃描，單一 lane）
 base: b2dd238    integration branch: integ/e234
 
-**狀態：人類已核准（2026-09-28）。** 佇列 0j（人類裁決 2026-09-28：從 #61 提前，排在 E243 合併之後）。0k 的 E250 同改 `bin/agc-init.mjs`，排在本 lane 合併之後，不並行。
+**狀態：已合併（2026-09-28，`integ/e234`）。** 佇列 0j（人類裁決 2026-09-28：從 #61 提前，排在 E243 合併之後）。0k 的 E250 同改 `bin/agc-init.mjs`，排在本 lane 合併之後，不並行。
 
 ## 派工前核對（整合者，2026-09-28）
 - `git worktree list` 只有 primary；main = origin/main = `b2dd238`（v4.1.0 已發版並打 tag）；工作樹乾淨。
@@ -21,6 +21,7 @@ base: b2dd238    integration branch: integ/e234
 | e234 | E234 | feat/e234-hygiene-scan | ../agent-governance-mcp-lanes/e234 | `bin/agc-init.mjs`、`tools/hygiene-scan.ts`（新建，名稱由 architect 定）、上列新模組對應的 `dist/tools/**`、`docs/install.md`（只限 `agc check` 建議項那一段）、`docs/config.md`（只限 `agc check` 相關列）、`test/e234-*.test.mjs`、`test/fixtures/e234/**`、`specs/e234-*`、`qa_reports/*E234*`、`review_reports/*E234*`、`.current/e234/**` | `content/**`、goldens、budget、`prompts/**`、`gates/**`、`schema/**`、`templates/**`、`scripts/**`、其他 `tools/**`（只能 import）、其他 `dist/**`、其他 `test/**`（需要改 → 先寄信請整合者重劃）、其他 `docs/**`（含 `docs/backlog.md`）、`specs/fanout-*.md`、`CHANGELOG.md`、`package.json`、`CLAUDE.md`、`AGENTS.md` | 做：`agc check` 新增一個只警告、永不影響 exit code 的資訊衛生掃描；分兩層 —— (a) 內建的**形狀**樣式（本機絕對家目錄路徑、連字號編碼的家目錄路徑、系統暫存目錄路徑等，樣式本身是泛用的、不含任何具體名稱），(b) 從本機**不追蹤**來源讀取的**關鍵字**清單（位置與格式由 PM／architect 定，不得在 `.current/` 底下）；沒有關鍵字來源時只跑 (a) 並印一行說明；命中輸出只報檔案、行號與類別，**不回顯命中的字串**；掃描範圍涵蓋 tracked 檔內容、未追蹤且未被 ignore 的新檔內容，以及兩者的檔名；誤報以內建泛用佔位用戶名清單處理（見 Decisions）；文件同步。不做：阻擋（exit code 不變）、自動修正、git 歷史掃描、pre-commit hook、改寫規則散文、E250 | E231 ✓、E232 ✓、E240 ✓ |
 
 ## 所有權重劃（相對於 §3 預設 lane 表）
+- 執行中追加（整合者，信箱 e234 to-lane#4）：`test/agc-adapters.test.mjs` 的 AC-6／AC-7／E111(iv) 與 `test/e106-init-artifacts-flag.test.mjs` 的 AC12 → e234，只限 qa 改斷言（先濾掉 `agc check — hygiene` 開頭的行，原斷言不變，每檔一個 helper）。`fanout check` 會把這兩檔列為越界，屬已記錄的重劃。
 - 新模組 `tools/hygiene-scan.ts` 與其 `dist/` → e234（新建檔；若 architect 決定邏輯直接寫在 `bin/agc-init.mjs`，這兩項就不存在）。
 - `docs/install.md`、`docs/config.md` → e234：只限描述 `agc check` 建議項的段落／列。
 - 本波只有一條 lane，沒有共享生成物持有者：不得改變任何組合出的 prompt 內容。
@@ -54,3 +55,9 @@ e234（單一 lane；merge 後跑 `node scripts/merge-invariants.mjs`）→ `int
 | 2026-09-28 | 人類 | E234 從 #61 提前到 0j、排在 E243 合併之後；掃描關鍵字不得寫進 tracked 檔，只能從本機不追蹤的來源讀取；E250 從 #71 提前到 0k、緊接 E234 | 整合者 session |
 | 2026-09-28 | 整合者 | 關鍵字來源不得在 `.current/` 底下（本 repo 為 repo 模式，`.current/` tracked）；建議拆成泛用形狀樣式＋本機關鍵字兩層；範圍擴大到未追蹤新檔與檔名 （整合者建議） | 本檔 |
 | 2026-09-28 | 人類 | 核准本清單；(1) 掃描範圍擴大到未追蹤且未被 ignore 的新檔內容與檔名；(2) 關鍵字檔預設在 git-common-dir 底下，環境變數可覆寫，不在 `.current/`；(3) 誤報以內建泛用佔位用戶名清單處理、只印略過計數 | 整合者 session |
+| 2026-09-28 | 整合者 | e234 cut 預審兩輪：PM cut 要求三項（裸暫存根目錄不算命中、AC16 在 HEAD 的獨立副本上跑且所有 AC 清除關鍵字環境變數、AC→task 對照表）；architect 七個 Open Questions 照建議全收 | 信箱 e234 to-lane#1–#3 |
+| 2026-09-28 | 整合者 | 範圍外 4 個 exact-stderr 測試重劃給 e234（見所有權重劃）；code review 第 1 輪發現檔名中緊貼底線的關鍵字會未遮罩印出 → D5 修訂為印出路徑一律以子字串遮罩關鍵字（新 AC18），落實既有完成定義「不回顯命中字串」，人類於 lane session 追認 | 信箱 e234 to-lane#4／#5 |
+| 2026-09-28 | 整合者 | 驗證通過並合併（`8ababee`，16 commits，23 檔；越界僅上述重劃 2 檔；review 第 3 輪 APPROVED、qa 第 1 輪 PASS，hop 9/10；lane 層與整合層全套皆 2943/2946 0 fail）；無衝突 → 無合併審查；合併後以整合者本機關鍵字源重掃（tracked、未追蹤、檔名、證據檔、commit 訊息）零實際命中 —— 首次試跑的命中全是 repo 公開 GitHub 擁有者帳號（安裝網址、作者欄），屬公開身分而非外洩，已自本機關鍵字源移除；新票 E234-NEW-1 由 `finish --shipped` 配號 | 信箱 e234 to-integrator#6 |
+
+## 結案
+- 日期 2026-09-28；合併 commit 見 `integ/e234` 的 merge；例外：範圍外 2 個測試檔（已記錄的重劃）。
