@@ -139,5 +139,26 @@ test.
 
 ## Phase 4 — Full Suite Run (after commit)
 
-See commit + full-suite section below (Note §3: full suite run after committing, no untracked files
-in the worktree).
+Committed on `feat/e243-init-path-escape-refusal` (commit `05e388f`, `test(e243): E243 T-E243-04 —
+backslash/control-char refusal coverage + eject/message-escape proof`). Worktree was clean (`git
+status --short` — no output) before running.
+
+```
+$ npm test
+```
+
+**2914/2917 pass, 0 fail, 3 skipped** (`duration_ms: 161255.814542`). The 3 skips are pre-existing
+and unrelated to this change (none of AC15-AC20 or the new eject AC7 case skip on this platform —
+`process.platform === "darwin"` here, confirmed by the isolated per-file runs above showing 0
+skipped in both `test/e239-init-subdir-exclude.test.mjs` (20/20) and `test/e108-eject.test.mjs`
+(35/35)). Build (`npm run build`, part of the `pretest` hook) completed with zero errors. CI
+runnability: `npm test` ran headlessly to completion with zero human interaction.
+
+`test/e106-init-artifacts-flag.test.mjs` (the one file this lane's dispatch brief allows editing
+only if it goes red because of this change) stayed green — 18/18, unmodified.
+
+## Verdict
+
+**PASS.** T-E243-04's full scope (AC1-AC14, plus the expected-red diff, the repro-first red
+evidence, and the message-echo escaping proof) is implemented, tested, and green. No untracked
+files remained in the worktree at run time.
