@@ -147,7 +147,7 @@ agc init --artifacts=repo     # track them like any other file
 - **Re-running** without the flag keeps whatever is already declared; pass the flag again to switch.
 - **Outside a git repository**, `local` is still recorded; the exclude write is skipped with a one-line note.
 - An invalid value (`--artifacts=foo`) exits 2 with a usage error and writes nothing.
-- When the workspace path contains a gitignore wildcard character (`*`, `?`, `[`, `]`) in a directory name below the repo root, `local` refuses to run (exit 2, nothing written) because the exclude rule could match unintended files, while `--artifacts=repo` works there as usual.
+- When a directory name below the repo root in the workspace path contains a character unsafe for a gitignore exclude rule — a wildcard (`*`, `?`, `[`, `]`), a backslash (`\`), or a control character (including CR and LF) — `local` refuses to run (exit 2, nothing written) because the written rule could match unintended files or be split across lines, while `--artifacts=repo` works there as usual.
 
 `agc check` reports (advisory, exit code unaffected) when the key is undeclared, or when the declared choice disagrees with the repo: `local` with exclude rules missing or an artifact path tracked, `repo` with an artifact exclude rule present.
 
