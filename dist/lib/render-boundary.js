@@ -1,7 +1,8 @@
 // Coded by @sr-engineer
-// Render boundary: fences untrusted data so it cannot pose as instructions
-// (E137, Option B). THE one function that puts reported data — live handoff
-// state, PRD RAG chunks — into prompt text. Every render site
+// Render boundary: fences reported data in a labelled block it cannot
+// structurally break out of (E137, Option B). THE one function that puts
+// reported data — live handoff state, PRD RAG chunks — into prompt text.
+// Every render site
 // (prompts/build.ts's state block and Spec Context block,
 // bin/agent-governance-context.mjs's SessionStart state block) calls
 // renderDataBlock; none hand-builds a fence (spec AC1).

@@ -164,8 +164,9 @@ async function resolveHandoffPath() {
 }
 const handoffPath = await resolveHandoffPath();
 
-// The hook no longer inlines the raw handoff.md file, so untrusted state text
-// cannot inject instructions (E137, Option B + J2-NEW-1). It parses state
+// The hook no longer inlines the raw handoff.md file: reported state renders
+// inside a labelled fence it cannot structurally escape (E137, Option B +
+// J2-NEW-1). It parses state
 // through the compiled READ-ONLY parser (dist/tools/handoff-parse.js
 // parseHandoff: lane path first, legacy flat fallback, never migrates / locks
 // / creates a lane dir, throws HANDOFF_LAYOUT_CONFLICT on dual presence) and

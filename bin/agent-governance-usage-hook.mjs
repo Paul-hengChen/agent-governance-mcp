@@ -146,9 +146,10 @@ async function main() {
   }
   if (typeof budget !== "number" || !Number.isFinite(budget) || budget <= 0) return;
 
-  // Resolve the lane handoff path via the compiled lane-layout (E123 F1 L3)
-  // seam (dist/tools/lane-paths.js); path.resolve pins an ABSOLUTE workspace
-  // (L-SCHEMA-NEW-9). Import failure (dist/ missing) → no record, exit 0.
+  // Resolve the lane handoff path via the compiled lane-layout seam
+  // (dist/tools/lane-paths.js, E123 F1 L3); path.resolve pins an ABSOLUTE
+  // workspace (L-SCHEMA-NEW-9). Import failure (dist/ missing) → no record,
+  // exit 0.
   // Lane-then-flat fallback (E123c, J2-NEW-3), read-only (the readAndMigrate
   // AC13 posture) — an unmigrated workspace still holds only the flat
   // handoff.md, and must not record feature: null.

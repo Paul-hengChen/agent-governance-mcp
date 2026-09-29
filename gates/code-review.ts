@@ -3,7 +3,7 @@
 // tools/evidence-file.ts, no behavior change). Parallel to gates/qa-review.ts
 // but over <workspace>/review_reports/review_<task_id>.md. A per-id file's
 // existence is sufficient for hasCodeReviewEvidenceInFile(); when a per-id
-// file is absent, a lazy `covers:` label-line fallback (covering evidence, C3)
+// file is absent, a lazy `covers:` label-line fallback (C3)
 // lets one covering report satisfy additional ids — see parseCoversIds /
 // buildCoverageIndex in tools/evidence-file.ts (gate-agnostic plumbing).
 //

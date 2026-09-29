@@ -4,7 +4,7 @@
 // each QA round appends a timestamped section to
 // <workspace>/qa_reports/review_<task_id>.md. A per-id file's existence is
 // sufficient for hasEvidenceInFile(); when a per-id file is absent, a lazy
-// `covers:` label-line fallback (covering evidence, C3) lets one covering
+// `covers:` label-line fallback (C3) lets one covering
 // report satisfy additional ids — see parseCoversIds / buildCoverageIndex in
 // tools/evidence-file.ts (gate-agnostic plumbing).
 //
