@@ -1,5 +1,6 @@
 // Coded by @sr-engineer
-// Lease-override classifier (E10, e10-lease-override — mechanism 1).
+// Lease-override classifier: decides whether a write carries a human-attested
+// bypass of another feature's held lease (E10, mechanism 1).
 //
 // Classifies an incoming tw_update_state write's lease-override intent so the
 // orchestrator can decide bypass vs reject INSIDE its FEATURE_LEASE_HELD
@@ -16,10 +17,11 @@
 // human-readable reason. An unaudited bypass is rejected loud
 // (LEASE_OVERRIDE_AUDIT_MISSING), never silently accepted.
 //
-// The note signature mirrors E13's /^Released v/ closing-write marker
-// convention (gates/feature-lease.ts) — a pending_notes[0] prefix reused as a
-// load-bearing line — but here it is an AUDIT line the gate verifies, not a
-// passive terminal marker the predicate trusts.
+// The note signature mirrors the release-engineer's /^Released v/
+// closing-write marker convention (gates/feature-lease.ts, E13) — a
+// pending_notes[0] prefix reused as a load-bearing line — but here it is an
+// AUDIT line the gate verifies, not a passive terminal marker the predicate
+// trusts.
 //
 // TRANSIENT, write-scoped: this is a pure structural read of the INCOMING
 // tool args (NOT the parsed prev-state) — the field is never persisted to

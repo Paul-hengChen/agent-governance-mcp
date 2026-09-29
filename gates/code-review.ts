@@ -3,7 +3,7 @@
 // tools/evidence-file.ts, no behavior change). Parallel to gates/qa-review.ts
 // but over <workspace>/review_reports/review_<task_id>.md. A per-id file's
 // existence is sufficient for hasCodeReviewEvidenceInFile(); when a per-id
-// file is absent, a lazy `covers:` label-line fallback (c3-covering-evidence)
+// file is absent, a lazy `covers:` label-line fallback (covering evidence, C3)
 // lets one covering report satisfy additional ids — see parseCoversIds /
 // buildCoverageIndex in tools/evidence-file.ts (gate-agnostic plumbing).
 //
@@ -52,7 +52,7 @@ export function hasCodeReviewEvidenceInFile(
 ): { present: string[]; missing: string[] } {
   const present: string[] = [];
   const missing: string[] = [];
-  // c3-covering-evidence: identical lazy `covers:` fallback over
+  // Covering evidence (C3): identical lazy `covers:` fallback over
   // review_reports/ — built at most once per call, only on first miss (AC-6).
   let coverage: Map<string, string> | null = null;
   for (const id of taskIds) {

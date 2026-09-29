@@ -1,9 +1,10 @@
 // Coded by @sr-engineer
-// E23 (e23-evidence-schema-versioning, D1) — the evidence-schema version
-// vocabulary. Lives beside the validators (gates/) per the spec's placement
-// call, NOT in schema/versions.ts: this constant versions the EVIDENCE
-// CONVENTIONS (how gate predicates read qa_reports/*.md), not a persisted
-// artifact's shape — the handoff `evidence_schema` field that pins it is
+// The evidence-schema version vocabulary: which revision of the QA evidence
+// conventions a feature's reports are read under (E23). Lives beside the
+// validators (gates/) per the spec's placement call, NOT in
+// schema/versions.ts: this constant versions the EVIDENCE CONVENTIONS (how
+// gate predicates read qa_reports/*.md), not a persisted artifact's shape —
+// the handoff `evidence_schema` field that pins it is
 // itself covered by the handoff schema (v13).
 //
 // Version history:
