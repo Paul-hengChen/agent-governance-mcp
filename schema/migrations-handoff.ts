@@ -74,7 +74,7 @@ registerMigration<Record<string, unknown>, Record<string, unknown>>({
 });
 
 // v6 → v7: add optional next_role / resume_of / review_verdict protocol fields
-// (c9-protocol-fields). Additive STAMP-ONLY: bumps the version, seeds NO
+// (protocol fields, C9). Additive STAMP-ONLY: bumps the version, seeds NO
 // default for any of the three (DR-1) — absence means "no routing signal
 // recorded", and a synthesized default would fabricate a directive. Legacy
 // pending_notes token lines (`next_role: x` / `resume_of: y` / `review:
@@ -88,7 +88,7 @@ registerMigration<Record<string, unknown>, Record<string, unknown>>({
   up: (input) => ({ ...input, schema_version: 7 }),
 });
 
-// v7 → v8: add optional dispatch_pins map (c14-dispatch-pins). Additive
+// v7 → v8: add optional dispatch_pins map (C14). Additive
 // STAMP-ONLY: bumps the version, seeds NO default (AC-1) — absence means "no
 // pins recorded", and a synthesized default would fabricate a human directive.
 // Legacy `dispatch_pins: <role>=<model>` pending_notes lines (the C8-era
@@ -128,7 +128,7 @@ registerMigration<Record<string, unknown>, Record<string, unknown>>({
   up: (input) => ({ ...input, schema_version: 10 }),
 });
 
-// v10 → v11: add optional dispatch_mode field (e2-bugfix-repro-gate). Additive
+// v10 → v11: add optional dispatch_mode field (bugfix repro gate, E2). Additive
 // STAMP-ONLY: bumps the version, seeds NO default — absence === "feature"
 // (the default dispatch mode; the next_role / scope_decision absence-is-signal
 // precedent, NOT hop_count's seed-0). Seeding "feature" would be a redundant
@@ -142,7 +142,7 @@ registerMigration<Record<string, unknown>, Record<string, unknown>>({
 });
 
 // v11 → v12: add qa_rounds_total / review_rounds_total / visual_rounds_total
-// cumulative counters (e8-success-telemetry). SEEDS all three to 0 — the
+// cumulative counters (success telemetry, E8). SEEDS all three to 0 — the
 // hop_count v8→v9 counter precedent, NOT the stamp-only attestation precedent
 // (DR: a 0 count is the true pre-feature value, not a fabricated attestation;
 // AC8 — stale rows migrate in with all three = 0). Feature-scoped exactly like
@@ -161,17 +161,17 @@ registerMigration<Record<string, unknown>, Record<string, unknown>>({
   }),
 });
 
-// v12 → v13: add optional evidence_schema pin (e23-evidence-schema-versioning,
+// v12 → v13: add optional evidence_schema pin (evidence-schema versioning, E23
 // D1). Additive STAMP-ONLY: bumps the version, seeds NO default — the
 // migration invents NO pin for historical payloads (spec D1): an absent field
 // stays absent post-migration, and the gates treat absence as the v2
-// normalized-contains default (D2 fallback — v2 is a strict superset of v1,
-// so an absent pin can only newly ACCEPT, never newly reject). Seeding
+// normalized-contains default (D2 fallback — v2 is a strict superset of v1, so
+// an absent pin can only newly ACCEPT, never newly reject). Seeding
 // EVIDENCE_SCHEMA_CURRENT would fabricate a dispatch-time attestation the
 // feature never received; seeding 1 would newly REJECT crash-era artifacts —
-// the exact incident class E23 exists to close. Mirrors the v9→v10 /
-// v10→v11 stamp-only template. The orchestrator stamps the real pin on the
-// first accepted write of the NEXT new active_feature.
+// the exact incident class evidence-schema versioning exists to close (E23).
+// Mirrors the v9→v10 / v10→v11 stamp-only template. The orchestrator stamps
+// the real pin on the first accepted write of the NEXT new active_feature.
 registerMigration<Record<string, unknown>, Record<string, unknown>>({
   kind: "handoff",
   from: 12,
@@ -180,7 +180,7 @@ registerMigration<Record<string, unknown>, Record<string, unknown>>({
 });
 
 // v13 → v14: add optional cut_approved_source provenance attestation
-// (e114-cut-approval-inheritance). Additive STAMP-ONLY: bumps the version,
+// (cut-approval inheritance, E114). Additive STAMP-ONLY: bumps the version,
 // seeds NO default — absence === "non-inherited" (the safe direction: an old
 // handoff with no such field must never be read as claiming an inherited
 // approval). The migration invents NO claim for historical payloads: a
@@ -196,7 +196,7 @@ registerMigration<Record<string, unknown>, Record<string, unknown>>({
 });
 
 // v14 → v15: add optional dispatch_mechanism / dispatch_mechanism_tier per-hop
-// attestation fields (e123a-lane-layout-migration, E99 option (i) + the
+// attestation fields (lane-layout migration, E123a; E99 option (i) + the
 // self-reported tier). Additive STAMP-ONLY: bumps the version, seeds NOTHING —
 // absence === "not attested for this hop". Both fields are TRANSIENT (the
 // next_role / review_verdict per-hop lifetime), so a historical payload has no

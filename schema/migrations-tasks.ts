@@ -22,12 +22,13 @@ registerMigration<TasksPayload, TasksPayload>({
   up: (input) => ({ schema_version: 1, body: input.body }),
 });
 
-// v1 → v2 (e125a spec AC3 / D-D): stamp only, body untouched. The MEANING of
-// v2 is carried by WHICH PATH the file lives at: a v2 file at a legacy
-// taskPaths location is a read-only index, a v1 file there is an unmigrated
-// ledger, and `.current/<lane>/tasks.md` is the live ledger. That distinction
-// lives in the tasks lane migration, not in this step. The bump also makes a
-// pre-E125a server (max v1) refuse a v2 index loudly instead of writing to it.
+// v1 → v2 (lane task ledgers, E125a spec AC3 / D-D): stamp only, body
+// untouched. The MEANING of v2 is carried by WHICH PATH the file lives at: a
+// v2 file at a legacy taskPaths location is a read-only index, a v1 file there
+// is an unmigrated ledger, and `.current/<lane>/tasks.md` is the live ledger.
+// That distinction lives in the tasks lane migration, not in this step. The
+// bump also makes a server that predates lane ledgers (max v1) refuse a v2
+// index loudly instead of writing to it.
 registerMigration<TasksPayload, TasksPayload>({
   kind: "tasks",
   from: 1,

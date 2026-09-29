@@ -41,7 +41,8 @@ export function markStateRead(workspacePath: string): void {
       return false;
     }
   })();
-  // E123 F1 L1: handoff path via the lane seam (flat until J flips it).
+  // Handoff path via the lane-layout seam (E123 F1 L1; flat until the lane
+  // flip, step J, switches it).
   const handoffPath = workspaceExists
     ? resolveCurrentLanePaths(path.resolve(workspacePath)).handoffPath
     : null;
