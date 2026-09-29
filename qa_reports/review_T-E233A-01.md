@@ -30,3 +30,13 @@ Fixed in 05db100 (wording only). Three lines quoted the literal prefix, not two:
 - Review report lines 22 and 82: the pattern is now described by class ("absolute home-directory paths or http(s) URLs"). Verdicts and findings are unchanged.
 - Swept specs/e233a-*, review_reports/*E233A*, qa_reports/*E233A* and .current/e233a/ for the same shape: no hits left.
 - `node --test test/e234-hygiene-scan.test.mjs` on the clean committed tree: 20 pass, 0 fail.
+
+## Round 2 (QA)
+
+Tree clean at b4e5d2c. Round-1 FAIL cause (hygiene-scan test red on lane-doc home-path quotes) fixed in 05db100/57ce003; code review round 3 APPROVED (8cbcd6e).
+
+Command: `node scripts/test-lock.mjs -- npm test` -> exit 0
+Result: tests 2958 / pass 2955 / fail 0 / skipped 3 (round 1: 2954 pass / 1 fail / 3 skip).
+AC7 (no failure green at base 6c61864): satisfied, zero failures.
+No test/** or dist/ changes in 6c61864..HEAD (comment-only lane). Phase 3: skipped per dispatch brief (no test writes permitted). Covers: T-E233A-01..09.
+Verdict: PASS.
