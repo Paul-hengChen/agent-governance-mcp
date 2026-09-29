@@ -2,22 +2,23 @@
 schema_version: 15
 active_feature: "e233b-core-comments"
 status: "In_Progress"
-last_updated: "2026-09-29T12:11:48.531Z"
-last_agent: "sr-engineer"
+last_updated: "2026-09-29T12:13:19.225Z"
+last_agent: "qa-engineer"
 scope_decision: "single-feature"
 scope_decision_why: "Comment-only rewrite plus two prose citations; one disjoint lane, no shared layer."
 cut_approved: true
 dispatch_pins:
   sr-engineer: "fable"
 evidence_schema: 2
-next_role: "code-reviewer"
-dispatched_at: "2026-09-29T12:11:48.531Z"
+next_role: "qa-engineer"
+dispatched_at: "2026-09-29T12:13:19.225Z"
+review_verdict: "APPROVED"
 dispatch_mechanism: "task"
-dispatch_mechanism_tier: "fable"
+dispatch_mechanism_tier: "opus"
 qa_round: 0
-review_round: 1
+review_round: 0
 visual_round: 0
-hop_count: 4
+hop_count: 6
 qa_rounds_total: 0
 review_rounds_total: 1
 visual_rounds_total: 0
@@ -28,7 +29,7 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- sr-engineer: addressed code-reviewer Round 1 (C1 fixed at both E137 sites; Q1 and Q2 taken; dist rebuilt; AC1 31 files 0 bad, AC2 grep clean) — reply appended to review_reports/review_T-E233B-01.md
+- code-reviewer: Round 2 APPROVED — C1 fixed at both sites (context.mjs:167-169, render-boundary.ts:2-3), no other overclaiming E137 wording; AC1 31 files 0 bad, AC2-AC5 re-run clean; full suite not re-run (AC1 byte-identical)
 - review_report: review_reports/review_T-E233B-01.md
 
 ---

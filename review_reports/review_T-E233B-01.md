@@ -62,3 +62,48 @@ CHANGES_REQUESTED — every mechanical AC passes on reviewer re-run, but the rew
 - dist share rebuilt (dist/lib/render-boundary.*, dist/gates/{code-review,qa-review}.*); a second `npm run build` leaves `git status --short dist` empty.
 - Re-run: AC1 at BASE=6c61864 prints `31 files, 0 bad` (exit 0). AC2 grep prints nothing. AC3 stat prints 0. No test pins any of the reworded strings (grep over test/ is empty). I did not re-run the full suite: AC1 proves the emitted JS is byte-identical to base, so the round-1 AC6 result (0 fail) still holds.
 - Commit: fix(e233b) E233 T-E233B-01 (source + dist).
+
+## Round 2 — APPROVED — by code-reviewer
+
+covers: T-E233B-01, T-E233B-02, T-E233B-03, T-E233B-04, T-E233B-05, T-E233B-06
+
+## Summary
+- Re-review of fix commit fa289a0, plus bd37dbf (review report and state only). HEAD is bd37dbf.
+- The fix touched 12 files: bin/agent-governance-context.mjs, bin/agent-governance-usage-hook.mjs, lib/render-boundary.ts, gates/code-review.ts and gates/qa-review.ts, plus their dist counterparts (dist/lib/render-boundary.*, dist/gates/{code-review,qa-review}.*).
+- Correction to Round 1: I cited C1 at bin/agent-governance-context.mjs:488-489, which was wrong. The file has 289 lines, and the overclaiming text was at 167-168. The sr-engineer fixed the correct text, now at lines 167-169.
+- Verdict: APPROVED. C1 is resolved at both sites, Q1 and Q2 are taken, and every mechanical AC passes on the reviewer's re-run.
+
+## AC Completeness
+AC1 — implemented — reviewer re-run with BASE=6c61864 at HEAD bd37dbf prints `31 files, 0 bad`, exit 0.
+AC2 — implemented — the grep prints nothing (exit 1). The subjective half is now met: the C1 wording is accurate. See Correctness.
+AC3 — implemented — the stat pipeline prints `0`.
+AC4 — implemented — `npm run build` exits 0. Afterwards, `git status --short dist` is empty and `git diff --stat 6c61864...HEAD -- dist/tools | wc -l` prints `0`. The dist lines in fa289a0 match the source rewording.
+AC5 — implemented — `grep -n governance-recommendations CHANGELOG.md research/visual-fidelity.md` prints nothing. This round did not touch either file.
+AC6 — implemented (carried from Round 1) — the full suite was not re-run. The fix changes comments only, and AC1 proves the emitted JS is byte-identical to base, so the Round 1 run (2958 tests, 0 fail, under test-lock) still holds. No test pins the reworded strings.
+
+## Correctness
+- C1 is resolved.
+  - bin/agent-governance-context.mjs:167-169 now reads "reported state renders inside a labelled fence it cannot structurally escape".
+  - lib/render-boundary.ts:2-3 now reads "fences reported data in a labelled block it cannot structurally break out of".
+  - Both claim exactly what the threat model at lib/render-boundary.ts:9-19 guarantees: a labelled fence the body cannot structurally escape. Neither claims protection against persuasion.
+- I checked for other overclaiming E137 wording in the owned files. I scanned lines the lane added for inject, "pose as", untrusted, E137, "prompt-injection" and neutraliz, and listed every E137 mention in gates, bin, scripts, prompts, schema, guards, lib, transport and index.ts. None overclaims:
+  - prompts/build.ts:77 ("Prompt-injection hardening for the state block (E122)") names what the work is for. It is not a guarantee.
+  - The phrase "The fix below closes both" (prompts/build.ts:~89) was already present at base 6c61864, so this lane did not introduce it. It is out of scope here and not a finding.
+  - Every other E137 mention (prompts/build.ts:92, 144, 169, 190, 209, 419, 542, 547) describes a mechanism: routing, labels, the shared renderer, or the unclosable fence.
+
+## Quality
+- Q1 is resolved. In bin/agent-governance-usage-hook.mjs:149-152, the pointer now follows "lane-layout seam".
+- Q2 is resolved. The wording differs from my suggestion but is acceptable: "fallback (C3) lets one covering report satisfy additional ids" is self-explanatory.
+- **N1 (optional)** — The rewording left short ragged final lines in three places: bin/agent-governance-context.mjs:169 ("J2-NEW-1). It parses state"), lib/render-boundary.ts:5 ("Every render site") and bin/agent-governance-usage-hook.mjs:152 ("exit 0."). This is cosmetic only, because the spec forbids reflowing code, not comments. It does not block approval.
+
+## Architecture
+No change since Round 1. The fix changes comments only, and layering is unchanged.
+
+## Security
+The Round 1 documentation-overclaim concern is gone. The comments now state only the structural guarantee, so a maintainer is not led to skip reasoning about the persuasion residue. The new text adds no paths, URLs or codenames.
+
+## Performance
+No findings. The change is comments only, and AC1 confirms the emitted JS is byte-identical.
+
+## Verdict
+APPROVED — C1 is fixed at both sites with wording that matches the render boundary's threat model, no other overclaiming wording remains in the owned files, and AC1 through AC5 pass on the reviewer's re-run.
