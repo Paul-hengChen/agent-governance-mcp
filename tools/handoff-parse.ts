@@ -1,23 +1,17 @@
 // Coded by @sr-engineer
-// Tools: handoff.md parse/migrate/read responsibility (E36 —
-// e36-handoff-split-overload-adapter). Extracted verbatim from tools/handoff.ts
-// (pre-split readAndMigrate ~342 / parseHandoff ~516 / readHandoffState ~526 +
-// the four field-parse helpers), which stays a thin barrel re-exporting this
-// module's public surface so no importer churns. Kept SEPARATE from
-// tools/handoff-write.ts (the write responsibility) per the split's stated
-// goal: four responsibilities living in one file (parse/migrate, write, tool
-// handler, types) collapsed into one undifferentiated 1,276-line unit.
+// Tools: handoff.md parse / migrate / read. tools/handoff.ts stays a thin
+// barrel that re-exports this module's public surface, so importers never
+// change. Kept separate from tools/handoff-write.ts (writing) so parsing,
+// writing, the tool handler, and the types each live in their own module
+// instead of one large file. (E36)
 //
 // NOTE — deliberate circular import with tools/handoff-write.ts: readAndMigrate
 // / readHandoffState's migration write-back heal calls writeHandoffState (this
 // module → handoff-write.ts), and writeHandoffState's existing-state preserve
-// logic calls parseHandoff (handoff-write.ts → this module). That cycle
-// pre-dates this split (both directions lived in the same file); splitting
-// the file makes it a real cross-module ES import cycle instead of an
-// intra-file call graph. This is safe: both directions are ordinary function
-// calls made at RUNTIME (inside function bodies), never read at module-init
-// time, so Node's ESM live-binding semantics resolve it without error
-// regardless of which module is imported first.
+// logic calls parseHandoff (handoff-write.ts → this module). Both directions
+// are ordinary function calls made at RUNTIME (inside function bodies), never
+// read at module-init time, so Node's ESM live-binding semantics resolve the
+// cycle without error regardless of which module is imported first.
 import * as fs from "fs";
 import * as path from "path";
 import * as yaml from "js-yaml";
@@ -29,17 +23,17 @@ import { getLaneRegistrySummary } from "./lane-registry.js";
 import { notifyStaleDispatch } from "./stale-notify.js";
 import type { StaleDispatchAdvisory } from "./stale-notify.js";
 // gates/feature-lease.ts has ZERO imports (runtime leaf) — importing it here
-// adds no cycle. Single-owner extraction (E97): the release-closing-write
-// terminal-marker predicate now has exactly one definition, shared by the
-// feature-lease gate and this module's stale-dispatch advisory.
+// adds no cycle. The release-closing-write terminal-marker predicate has
+// exactly one definition, shared by the feature-lease gate and this module's
+// stale-dispatch advisory. (E97)
 import { isReleaseClosingWrite } from "../gates/feature-lease.js";
 // Type-only import (erased at compile): the runtime graph stays one-directional
 // (transitions.ts never imports handoff.ts / handoff-parse.ts / handoff-write.ts).
 import type { AgentName } from "./transitions.js";
 // Side-effect import: registers the handoff v0→v1 migration on module load.
-// (Relocated here from tools/handoff.ts, E36 — this is the module that
-// actually calls runMigrations; ES module caching means the side effect still
-// fires exactly once regardless of which file first imports it.)
+// It lives here because this is the module that actually calls
+// runMigrations; ES module caching means the side effect still fires exactly
+// once regardless of which file imports it first.
 import "../schema/migrations-handoff.js";
 import type {
   HandoffState,
@@ -71,16 +65,16 @@ const PENDING_NOTES_CHAR_LIMIT = 3000;
 // posture. Tunable in one line if 15 proves too tight.
 const STALE_DISPATCH_THRESHOLD_MIN = 15;
 
-// e235a — prd_path storage representation. In memory `prd_path` is always an
-// absolute path; on disk (file mode) it is stored relative to workspace_path so
-// a committed handoff.md never embeds a local absolute path. These three pure
-// helpers (path only, no I/O) are the single source for the relativize /
-// resolve / traversal-bound logic — handoff-write.ts, this file's read path,
-// and the two tools/registry.ts zod refines all call them.
+// How prd_path is stored. In memory `prd_path` is always an absolute path; on
+// disk (file mode) it is stored relative to workspace_path so a committed
+// handoff.md never embeds a local absolute path. These three pure helpers
+// (path only, no I/O) are the single source for the relativize / resolve /
+// traversal-bound logic — handoff-write.ts, this file's read path, and the
+// two tools/registry.ts zod refines all call them. (E235a)
 
 /** The workspace traversal bound. `candidateAbs` MUST already be resolved.
- *  Lexical (no realpath) — identical to the pre-e235a zod refines, so the
- *  bound is neither loosened nor tightened. */
+ *  Lexical (no realpath), matching the zod refines' original bound exactly,
+ *  so it is neither loosened nor tightened. */
 export function isInsideWorkspace(workspacePath: string, candidateAbs: string): boolean {
   const rel = path.relative(workspacePath, candidateAbs);
   return rel !== "" && !rel.startsWith("..") && !path.isAbsolute(rel);
@@ -106,8 +100,8 @@ export function resolveStoredPrdPath(workspacePath: string, stored: string): str
   return path.isAbsolute(stored) ? stored : abs;
 }
 
-// E123 F1 L1: resolved through the lane seam — `.current/<lane>/handoff.md`
-// since e123b9 J2 flipped it.
+// Resolved through the lane seam: the handoff lives at
+// `.current/<lane>/handoff.md`. (E123)
 function getHandoffPath(workspacePath: string): string {
   return resolveCurrentLanePaths(path.resolve(workspacePath)).handoffPath;
 }
@@ -260,11 +254,11 @@ const NEXT_ROLE_VALUES: readonly string[] = [
 ];
 const RESUME_OF_VALUES: readonly string[] = ["code-reviewer", "qa-engineer"];
 const REVIEW_VERDICT_VALUES: readonly string[] = ["APPROVED", "CHANGES_REQUESTED"];
-// v11 — legal dispatch_mode values (e2-bugfix-repro-gate), for the same
-// defensive parse-time filtering as the three v7 protocol fields.
+// Legal dispatch_mode values, for the same defensive parse-time filtering as
+// the three v7 protocol fields. (E2, handoff schema v11)
 const DISPATCH_MODE_VALUES: readonly string[] = ["feature", "bugfix"];
-// v15 — legal dispatch_mechanism values (e123a-lane-layout-migration, E99),
-// for the same defensive parse-time filtering as dispatch_mode above.
+// Legal dispatch_mechanism values, for the same defensive parse-time
+// filtering as dispatch_mode above. (E99, v15)
 const DISPATCH_MECHANISM_VALUES: readonly string[] = ["task", "switch_role", "inline"];
 // v15 — bound mirrored from the zod boundary (tools/registry.ts
 // dispatch_mechanism_tier .max(40)); parse-time we only need it to drop a
@@ -316,21 +310,20 @@ function parseDispatchPins(raw: unknown): Partial<Record<AgentName, string>> | u
   return count > 0 ? pins : undefined;
 }
 
-// v14 — legal shape for cut_approved_source (e114-cut-approval-inheritance):
-// "inherited:<parent-feature>" with a non-empty parent-feature suffix. Same
-// defensive-drop posture as the v7 parseEnumField / v8 parseDispatchPins
-// helpers above — a malformed hand-edited value (missing prefix, empty
-// suffix, non-string) collapses to undefined, never throws. Only the one
-// shape this ticket defines is accepted (spec Out of Scope).
+// Legal shape for cut_approved_source: "inherited:<parent-feature>" with a
+// non-empty parent-feature suffix. Same defensive-drop behaviour as the
+// parseEnumField / parseDispatchPins helpers above — a malformed hand-edited
+// value (missing prefix, empty suffix, non-string) becomes undefined, never
+// throws. No other shape is accepted. (E114, v14)
 const CUT_APPROVED_SOURCE_PREFIX = "inherited:";
 export function parseCutApprovedSource(raw: unknown): string | undefined {
   if (typeof raw !== "string") return undefined;
   if (!raw.startsWith(CUT_APPROVED_SOURCE_PREFIX)) return undefined;
-  // F2 fix (review_T-E114-01.md Finding 2): trim before the length test so a
-  // whitespace-only suffix ("inherited:   ") collapses to undefined instead of
-  // round-tripping as a persisted, API-visible claim naming no parent. Return
-  // `raw` UNCHANGED on success — trimming is for the validity test only, not
-  // for the stored/returned form, preserving AC3's verbatim round-trip.
+  // Trim before the length test so a whitespace-only suffix ("inherited:   ")
+  // becomes undefined instead of round-tripping as a persisted, API-visible
+  // claim that names no parent. Return `raw` UNCHANGED on success — trimming
+  // is only for the validity test, so the stored/returned value round-trips
+  // exactly. (E114)
   const parentFeature = raw.slice(CUT_APPROVED_SOURCE_PREFIX.length).trim();
   return parentFeature.length > 0 ? raw : undefined;
 }
@@ -400,9 +393,10 @@ function readAndMigrate(workspacePath: string): HandoffReadResult | null {
 
   const blockingReason = asString(frontmatter.blocking_reason) || undefined;
   const lastAgent = asString(frontmatter.last_agent) || undefined;
-  // e235a — stored relative (or legacy absolute); resolved to absolute here and
-  // bounded to workspace_path. An out-of-bounds value is dropped to absent
-  // (self-heals on the next write's carry-forward); the value is not echoed.
+  // Stored relative (or, in older files, absolute); resolved to absolute here
+  // and bounded to workspace_path. An out-of-bounds value is dropped to
+  // absent (it self-heals on the next write's carry-forward) and is not
+  // echoed. (E235a)
   const rawPrdPath = asString(frontmatter.prd_path) || undefined;
   const prdPath = rawPrdPath ? resolveStoredPrdPath(workspacePath, rawPrdPath) : undefined;
   if (rawPrdPath && !prdPath) {
@@ -419,10 +413,10 @@ function readAndMigrate(workspacePath: string): HandoffReadResult | null {
   // a string) collapses to `undefined` so the field is omitted via the
   // spread-guard below and the gate is free to fire.
   const cutApproved = frontmatter.cut_approved === true ? true : undefined;
-  // v14 — cut-approval inheritance attestation (e114-cut-approval-inheritance).
-  // Client-settable; defensively parsed same posture as dispatch_mode below:
-  // undefined when absent/malformed, so absence stays the "non-inherited"
-  // sentinel (the safe direction) rather than a false negative or positive.
+  // Cut-approval inheritance attestation. Set by the client; parsed
+  // defensively like dispatch_mode below: undefined when absent or
+  // malformed, so absence keeps meaning "not inherited" (the safe
+  // direction). (E114, v14)
   const cutApprovedSource = parseCutApprovedSource(frontmatter.cut_approved_source);
   // v6 — external-reference ledger (b8-external-ref-ledger). undefined when
   // absent/malformed, so absence flows to hasUnresolvedRefs as the
@@ -445,25 +439,25 @@ function readAndMigrate(workspacePath: string): HandoffReadResult | null {
   // v8 — dispatch_pins map (c14-dispatch-pins). undefined when absent /
   // malformed, so absence stays the "no pins recorded" sentinel.
   const dispatchPins = parseDispatchPins(frontmatter.dispatch_pins);
-  // v11 — dispatch_mode (e2-bugfix-repro-gate). undefined when absent /
-  // out-of-enum, so absence stays the "feature-mode default" sentinel.
+  // dispatch_mode: undefined when absent or not in the enum, so absence keeps
+  // meaning "feature mode, the default". (E2, v11)
   const dispatchMode = parseEnumField<DispatchMode>(
     frontmatter.dispatch_mode,
     DISPATCH_MODE_VALUES,
   );
-  // v15 — per-hop dispatch-mechanism attestation (e123a-lane-layout-migration,
-  // E99). TRANSIENT on the write side; here just defensively parsed —
-  // out-of-enum / malformed collapses to undefined (dropped, never rejected),
-  // so absence stays the "not attested for this hop" sentinel.
+  // Per-hop dispatch-mechanism attestation. Only kept for one write on the
+  // write side; here just parsed defensively — an out-of-enum or malformed
+  // value becomes undefined (dropped, never rejected), so absence keeps
+  // meaning "not attested for this hop". (E99, v15)
   const dispatchMechanism = parseEnumField<DispatchMechanism>(
     frontmatter.dispatch_mechanism,
     DISPATCH_MECHANISM_VALUES,
   );
   const dispatchMechanismTier = parseDispatchMechanismTier(frontmatter.dispatch_mechanism_tier);
-  // v13 — evidence_schema pin (e23-evidence-schema-versioning). Defensive
-  // positive-integer parse; absent/malformed stays undefined — absence is the
-  // "pre-E23 feature, v2 normalized-contains default" sentinel (D2), NEVER
-  // defaulted to 0 (unlike the counters: 0 is not a legal schema version).
+  // evidence_schema pin. Defensive positive-integer parse; absent or
+  // malformed stays undefined — absence means "feature started before pins
+  // existed, use the v2 normalized-contains rules". Never defaulted to 0
+  // (unlike the counters: 0 is not a legal schema version). (E23, v13)
   const evidenceSchemaRaw = Number(frontmatter.evidence_schema);
   const evidenceSchema =
     Number.isFinite(evidenceSchemaRaw) && evidenceSchemaRaw >= 1
@@ -483,9 +477,9 @@ function readAndMigrate(workspacePath: string): HandoffReadResult | null {
   const hopCountRaw = Number(frontmatter.hop_count);
   const hop_count =
     Number.isFinite(hopCountRaw) && hopCountRaw >= 0 ? Math.floor(hopCountRaw) : 0;
-  // v12 — cumulative round totals (e8-success-telemetry). Defaults missing /
-  // malformed to 0, the true pre-feature value (v11→v12 seed-0 migration
-  // precedent) — the exact hop_count defensive posture, per field.
+  // Cumulative round totals. Missing or malformed values default to 0, the
+  // true value before the fields existed (the v11→v12 migration also seeds
+  // 0) — the same defensive handling as hop_count, per field. (E8, v12)
   const qaRoundsTotalRaw = Number(frontmatter.qa_rounds_total);
   const qa_rounds_total =
     Number.isFinite(qaRoundsTotalRaw) && qaRoundsTotalRaw >= 0 ? Math.floor(qaRoundsTotalRaw) : 0;
@@ -578,39 +572,35 @@ export function readHandoffState(workspacePath: string): string {
     refreshSnapshotFor(workspacePath, flatPath, "handoff");
   }
 
-  // E24 (exemptions manifest) — read-time surface of .current/exemptions.json,
-  // the ONLY sanctioned §2 build-gate exemption channel. Same posture as the
-  // v10 stale_dispatch advisory below: pure read-time computation, no handoff
-  // schema field, informational, never blocks or throws (loadExemptions
-  // collapses every failure to zero-exemptions + loud errors[]). Surfaced on
-  // tw_get_state because it is the mandatory first action of every role —
-  // the cheapest single point where every agent already looks, so the
-  // exemption list (and its only-grows `count` metric) needs no second read
-  // and no drift-advisory plumbing. File-mode read path only, matching the
-  // sibling E10/E18 file-mode posture.
+  // Read-time view of .current/exemptions.json, the ONLY sanctioned channel
+  // for exempting a task from the §2 build gate. Like the stale_dispatch
+  // advisory below: computed at read time, no handoff schema field,
+  // informational, never blocks or throws (loadExemptions turns every failure
+  // into zero exemptions plus a loud errors[]). Shown on tw_get_state because
+  // every role calls it first — the one place every agent already looks, so
+  // the exemption list (and its only-grows `count` metric) needs no second
+  // read and no drift-advisory plumbing. File-mode read path only, like the
+  // other file-mode-only fields. (E24)
   const exemptions = loadExemptions(workspacePath);
 
-  // E31 (e31-config-nonfatal) — loud surface for a .current/.config.json that
-  // exists but cannot be used (unreadable / unparseable / non-object root /
-  // future schema_version). loadConfig degrades to defaults instead of
-  // throwing out of the markStateRead task-path resolution above (the
-  // pre-existing call site that made the mandatory pre-flight read throw —
-  // E22 QA Phase 1 finding); this field is what keeps that degradation
-  // readable rather than silent. null (clean or absent config) adds no key —
-  // valid/absent config envelopes stay byte-identical.
+  // Loud report of a .current/.config.json that exists but cannot be used
+  // (unreadable, unparseable, non-object root, or a future schema_version).
+  // loadConfig falls back to defaults instead of throwing out of the
+  // markStateRead task-path resolution above — a throw there would make the
+  // mandatory first read fail — and this field keeps that fallback visible
+  // rather than silent. null (clean or absent config) adds no key, so
+  // valid/absent config envelopes stay byte-identical. (E31)
   const configError = getConfigError(workspacePath);
 
-  // E132 (e132-lane-registry) — fast, cost-ceilinged sibling-lane advisory for
-  // tw_get_state (DoD 3). Same posture as exemptions/configError above: pure
-  // read-time computation, never throws. getLaneRegistrySummary's 200ms
-  // timeoutMs bounds only the `git worktree list` subprocess it shells out
-  // to; riding on top of that, additive and unbounded by the 200ms figure,
+  // Fast, cost-capped advisory about sibling lanes (git worktrees) for
+  // tw_get_state. Like exemptions/configError above: computed at read time,
+  // never throws. getLaneRegistrySummary's 200ms timeoutMs bounds only the
+  // `git worktree list` subprocess; on top of that, not covered by the 200ms,
   // is one synchronous parseHandoff read per sibling worktree (measured:
   // 34ms across 14 worktrees in this repo).
-  // null (0/1 worktrees, or nothing to report) adds no key — byte-identical
-  // legacy payload in the common, non-fan-out case. File-mode read path only,
-  // matching the sibling E10/E18/E24 posture (SQLite-mode readState in
-  // tools/storage-sqlite.ts is untouched).
+  // null (0/1 worktrees, or nothing to report) adds no key, so the common
+  // single-checkout payload is unchanged. File-mode read path only
+  // (SQLite-mode readState in tools/storage-sqlite.ts is untouched). (E132)
   const laneRegistry = getLaneRegistrySummary(workspacePath);
 
   const result = readAndMigrate(workspacePath);
@@ -664,14 +654,13 @@ export function readHandoffState(workspacePath: string): string {
       qaRoundsTotal: state.qa_rounds_total,
       reviewRoundsTotal: state.review_rounds_total,
       visualRoundsTotal: state.visual_rounds_total,
-      // E10 (e10-lease-override AC4) — the heal-write is hard-wired to the
-      // bookkeeping behavior UNCONDITIONALLY: a schema heal is mechanically
-      // non-substantive (never a real state transition), so it must preserve
-      // the pre-heal last_updated verbatim instead of extending a possibly-
-      // dead lease. Server-internal, no attestation needed (the same trust
-      // posture as the pendingNotes passthrough above). Always same-feature
-      // by construction, so writeHandoffState's same-feature guard always
-      // takes the preserve branch.
+      // The heal-write always behaves as a bookkeeping write: a schema heal
+      // is not a real state transition, so it must keep the pre-heal
+      // last_updated exactly instead of extending a lease that may be dead.
+      // Server-internal, so no attestation is needed (the same trust as the
+      // pendingNotes passthrough above). Always same-feature by
+      // construction, so writeHandoffState's same-feature guard always takes
+      // the preserve branch. (E10)
       bookkeepingWrite: true,
     }).catch(() => {
       /* swallowed — read still returns migrated state */
@@ -690,14 +679,13 @@ export function readHandoffState(workspacePath: string): string {
   if (totalChars > PENDING_NOTES_CHAR_LIMIT) {
     const kept: string[] = [];
     let charBudget = PENDING_NOTES_CHAR_LIMIT;
-    // E92 (e92-e86-handoff-write-boundary AC3) — a note that is PARTIALLY
-    // kept already gets an inline "…[truncated]" marker (above), but a note
-    // dropped WHOLLY (charBudget <= 0 before it is even considered) left no
-    // inline trace at all — its absence was signalled only by the sibling
-    // pending_notes_truncated advisory below, which a caller that does not
-    // specifically inspect it would never notice. omittedCount counts every
-    // note from the break point onward (index i within pendingNotes) so a
-    // single synthetic marker can be appended as the array's last entry.
+    // A note that is PARTIALLY kept already gets an inline "…[truncated]"
+    // marker (above), but a note dropped WHOLLY (charBudget <= 0 before it
+    // is even considered) would leave no inline trace — only the sibling
+    // pending_notes_truncated advisory below, which a caller who does not
+    // look for it never notices. omittedCount counts every note from the
+    // break point onward (index i within pendingNotes) so one synthetic
+    // marker can be appended as the array's last entry. (E92)
     let omittedCount = 0;
     for (let i = 0; i < pendingNotes.length; i++) {
       if (charBudget <= 0) {
@@ -714,9 +702,9 @@ export function readHandoffState(workspacePath: string): string {
       }
     }
     if (omittedCount > 0) {
-      // e92.omission_marker (specs/e92-e86-handoff-write-boundary.md
-      // Copy/Strings table — quoted verbatim except for the "{n}"
-      // substitution the table itself declares).
+      // Omission-marker text, quoted verbatim from the spec's Copy/Strings
+      // table except for the "{n}" substitution the table declares.
+      // (specs/e92-e86-handoff-write-boundary.md)
       kept.push(`…[${omittedCount} further note(s) omitted — see pending_notes_truncated]`);
     }
     pendingNotes = kept;
@@ -743,20 +731,20 @@ export function readHandoffState(workspacePath: string): string {
     }),
   };
 
-  // v10 — stale-dispatch advisory (d5-server-side-stale-dispatch-detection,
-  // DR-1). Pure read-time computation over persisted next_role + dispatched_at
-  // + wall clock: a fresh/post-compaction session with NO memory of dispatching
-  // gets the identical signal (AC-4). Informational only — never blocks a
-  // write, no GateErrorCode (DR-6). Defensive by construction: absence of
-  // either field, an unparsable stamp, or an in-window stamp all yield no key
-  // (AC-5); nothing here can throw or fail the read.
+  // Stale-dispatch advisory. Computed at read time from the persisted
+  // next_role + dispatched_at and the wall clock, so a fresh or
+  // post-compaction session with NO memory of dispatching gets the same
+  // signal. Informational only — never blocks a write, no GateErrorCode.
+  // Defensive: if either field is missing, the stamp is unparsable, or the
+  // stamp is still within the window, no key is added; nothing here can
+  // throw or fail the read. (D5, handoff schema v10)
   //
-  // E97: a release-engineer CLOSING write (isReleaseClosingWrite, the same
-  // single-owner E1A/E13 terminal-marker predicate gates/feature-lease.ts
-  // uses to release the feature lease) is excluded up front, before the
-  // elapsed-time arithmetic even runs — the shipped-and-handed-back-to-pm
-  // write is terminal, not a dispatch awaiting a response, so it must never
-  // read as stale regardless of how much wall-clock time has passed since.
+  // A release-engineer CLOSING write (isReleaseClosingWrite, the same
+  // terminal-marker predicate gates/feature-lease.ts uses to release the
+  // feature lease) is excluded up front, before any elapsed-time math: the
+  // write that ships and hands back to pm is terminal, not a dispatch
+  // awaiting a response, so it must never read as stale however much time
+  // has passed. (E97)
   let staleDispatch: Record<string, unknown> | undefined;
   if (state.next_role && state.dispatched_at && !isReleaseClosingWrite(state)) {
     const stampedMs = Date.parse(state.dispatched_at);
@@ -772,25 +760,25 @@ export function readHandoffState(workspacePath: string): string {
           message:
             `stale in-flight dispatch: ${state.next_role}, ` +
             `no state write for >${STALE_DISPATCH_THRESHOLD_MIN} min. ` +
-            // E29 — Crash-Resume pointer. The recovery protocol lives in the
-            // coordinator skill text only; if the coordinator itself is the
-            // dead party (or a lite/fresh session takes over), this line is
+            // Crash-Resume pointer. The recovery steps live only in the
+            // coordinator skill text; if the coordinator itself is the one
+            // that died (or a lite/fresh session takes over), this line is
             // the only in-band copy. One sentence, appended to the SAME
             // message field the stale-notify watch-file emit shares — no new
-            // advisory key, byte-shape unchanged for consumers.
+            // advisory key, byte shape unchanged for consumers. (E29)
             `Crash-Resume: ground-truth before re-dispatch — compare git status/diff ` +
             `against handoff claims, honor dispatch_pins, then resume the incumbent ` +
             `role (never blind re-dispatch); full protocol: skill-coordinator ` +
             `Crash-Resume Protocol.`,
         };
-        // E22 — opt-in push channel on the same threshold crossing: when the
-        // workspace armed `staleDispatchNotifyFile` in .current/.config.json,
+        // Opt-in push channel on the same threshold crossing: when the
+        // workspace set `staleDispatchNotifyFile` in .current/.config.json,
         // write the advisory to that watch-file so an EXTERNAL watcher can
-        // surface it without waiting for the next pull. Same posture as the
-        // advisory itself: never throws, never blocks the read (all failure
-        // modes collapse to a loud `notify.error`), no-op when the key is
-        // absent (null → no `notify` key at all, byte-identical pre-E22
-        // payload). Dedupe lives in the watch-file, not in handoff state.
+        // show it without waiting for the next read. Like the advisory
+        // itself: never throws, never blocks the read (every failure becomes
+        // a loud `notify.error`), and does nothing when the key is absent (no
+        // `notify` key at all, so the payload is unchanged). Dedupe lives in
+        // the watch-file, not in handoff state. (E22)
         const notify = notifyStaleDispatch(workspacePath, advisory);
         staleDispatch = { ...advisory, ...(notify && { notify }) };
       }

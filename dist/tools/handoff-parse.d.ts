@@ -1,8 +1,8 @@
 import "../schema/migrations-handoff.js";
 import type { HandoffState } from "./handoff-types.js";
 /** The workspace traversal bound. `candidateAbs` MUST already be resolved.
- *  Lexical (no realpath) — identical to the pre-e235a zod refines, so the
- *  bound is neither loosened nor tightened. */
+ *  Lexical (no realpath), matching the zod refines' original bound exactly,
+ *  so it is neither loosened nor tightened. */
 export declare function isInsideWorkspace(workspacePath: string, candidateAbs: string): boolean;
 /** Write side (AC1). Resolves `prdPath` against `workspacePath` and returns the
  *  POSIX-separator workspace-relative form, or `undefined` when it falls

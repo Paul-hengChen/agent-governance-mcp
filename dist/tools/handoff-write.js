@@ -1,10 +1,7 @@
 // Coded by @sr-engineer
-// Tools: handoff.md write responsibility (E36 — e36-handoff-split-overload-adapter).
-// Extracted verbatim from tools/handoff.ts (pre-split writeHandoffState +
-// WriteHandoffStateOptions, lines ~722-1270), which stays a thin barrel
-// re-exporting this module's public surface so no importer churns. Kept
-// SEPARATE from tools/handoff-parse.ts (the parse/migrate/read responsibility)
-// per the split's stated goal.
+// Tools: handoff.md writing. tools/handoff.ts stays a thin barrel that
+// re-exports this module's public surface, so importers never change. Kept
+// separate from tools/handoff-parse.ts (parse / migrate / read). (E36)
 //
 // NOTE — deliberate circular import with tools/handoff-parse.ts: see the
 // top-of-file note there. writeHandoffStateCore's existing-state preserve
@@ -13,14 +10,13 @@
 // (handoff-parse.ts → this module). Both directions are ordinary runtime
 // function calls, never read at module-init time, so the cycle is safe.
 //
-// Option-A adapter convergence (E36 part (b), human-approved, NON-breaking):
-// writeHandoffStateCore(opts) is now the ONE real implementation, taking only
-// the options-object shape. The exported writeHandoffState keeps BOTH public
-// overload signatures (options-object preferred; the 12-positional overload
-// stays @deprecated, removal deferred to v4.0.0 — NOT this ticket) but its
-// body is now a thin ~10-line dispatcher: options-shaped input goes straight
-// to writeHandoffStateCore; positional input is packed into a
-// WriteHandoffStateOptions object first. No public signature changed.
+// One implementation, two call shapes: writeHandoffStateCore(opts) is the
+// only real implementation and takes only the options object. The exported
+// writeHandoffState keeps BOTH public overload signatures (options object
+// preferred; the 12-positional overload stays @deprecated, removal planned
+// for v4.0.0) but its body is a thin ~10-line dispatcher: options-shaped
+// input goes straight to writeHandoffStateCore; positional input is packed
+// into a WriteHandoffStateOptions object first. (E36)
 import * as fs from "fs";
 import * as path from "path";
 import * as yaml from "js-yaml";
@@ -30,9 +26,8 @@ import { CURRENT_VERSIONS } from "../schema/versions.js";
 import { parseHandoff, parseCutApprovedSource, assertNoHandoffLayoutConflict, relativizePrdPath, } from "./handoff-parse.js";
 import { resolveCurrentLanePaths, resolveCurrentLane, resolveLaneDir, resolveLaneLockPath, } from "./lane-paths.js";
 import { hasFlatLaneFiles, migrateFlatToLaneLocked } from "./lane-migrate.js";
-// E123 F1 L1: the handoff path comes from the lane resolver
-// (`.current/<lane>/handoff.md` since the e123b9 J2 flip). path.resolve makes the
-// result absolute for a relative workspacePath (human-approved delta).
+// The handoff path comes from the lane resolver (`.current/<lane>/handoff.md`).
+// path.resolve makes the result absolute for a relative workspacePath. (E123)
 function getHandoffPath(workspacePath) {
     return resolveCurrentLanePaths(path.resolve(workspacePath)).handoffPath;
 }
@@ -46,10 +41,10 @@ function ensureDir(handoffPath) {
     }
 }
 /**
- * Real implementation (E36 Option-A convergence). Every writeHandoffState
- * call — options-object callers directly, positional callers via the thin
- * packing wrapper below — bottoms out here. Options-object shape ONLY: no
- * more first-arg discrimination inside the body.
+ * The real implementation. Every writeHandoffState call — options-object
+ * callers directly, positional callers via the thin packing wrapper below —
+ * ends up here. Options-object shape ONLY: the body never inspects the
+ * first argument's shape. (E36)
  *
  * Pending notes are written as plain list items (not checkboxes) to avoid
  * ambiguity with tracked task IDs in the completed section.
@@ -96,19 +91,19 @@ async function writeHandoffStateCore(opts) {
     // v13 — evidence_schema pin. Undefined unless the orchestrator stamps it,
     // with the same-feature preserve clause carrying any existing pin forward.
     const evidenceSchema = opts.evidenceSchema;
-    // v14 — cut_approved_source scalar. Left undefined by callers that don't set
-    // it (the same-feature preserve clause below carries any existing value
-    // forward, mirroring dispatch_mode's DR-8 posture — NOT evidence_schema's
-    // orchestrator-only posture, since this field is client-settable).
-    // F1 fix (review_T-E114-01.md Finding 1, AC4): sanitize through the same
-    // parseCutApprovedSource the read path uses, so a shape-forbidden value
-    // (missing prefix, empty/whitespace-only suffix, non-string, "") collapses
-    // to undefined here rather than being persisted verbatim. undefined then
-    // makes cutApprovedSourceNeedsExisting true below, so the existing valid
-    // record CARRIES FORWARD instead of being silently destroyed — nothing
-    // shape-forbidden ever reaches YAML. Deliberately not a zod regex at the
-    // registry boundary: AC4 forbids rejecting at the boundary, only forbids
-    // persisting a forbidden shape.
+    // cut_approved_source scalar. Left undefined by callers that don't set it
+    // (the same-feature preserve clause below carries any existing value forward,
+    // like dispatch_mode — not evidence_schema's orchestrator-only handling,
+    // since this field is set by the client).
+    // Sanitize through the same parseCutApprovedSource the read path uses, so
+    // a forbidden shape (missing prefix, empty/whitespace-only suffix,
+    // non-string, "") becomes undefined here instead of being persisted as-is.
+    // undefined then makes cutApprovedSourceNeedsExisting true below, so the
+    // existing valid record CARRIES FORWARD instead of being silently
+    // destroyed — nothing of a forbidden shape ever reaches YAML. Deliberately
+    // not a zod regex at the registry boundary: the value must never be
+    // rejected at the boundary, only never persisted in a forbidden shape.
+    // (E114)
     const cutApprovedSource = parseCutApprovedSource(opts.cutApprovedSource);
     // v12 — cumulative round totals. Left undefined by the legacy positional
     // overload's packing (architecture DR: it deliberately does NOT grow); the
@@ -116,10 +111,9 @@ async function writeHandoffStateCore(opts) {
     const qaRoundsTotal = opts.qaRoundsTotal;
     const reviewRoundsTotal = opts.reviewRoundsTotal;
     const visualRoundsTotal = opts.visualRoundsTotal;
-    // E10 — bookkeeping-write attestation. Left undefined by the legacy
-    // positional overload's packing (the heal-write call site always uses the
-    // options object directly; a positional caller always gets the
-    // fresh-stamp default).
+    // Bookkeeping-write attestation. Left undefined by the legacy positional
+    // overload's packing (the heal-write call site always uses the options
+    // object directly; a positional caller always gets a fresh stamp). (E10)
     const bookkeepingWrite = opts.bookkeepingWrite;
     // Hoist required strings to the names the body below already uses.
     const _activeFeature = activeFeature;
@@ -229,12 +223,12 @@ async function writeHandoffStateCore(opts) {
         //                                                      stale pins)
         let effectiveDispatchPins = dispatchPins;
         const dispatchPinsNeedsExisting = dispatchPins === undefined;
-        // v11 — dispatch_mode is FEATURE-SCOPED with NO PM-re-entry re-arm, the
-        // exact dispatch_pins/external_refs algorithm but SCALAR (e2 DR): a bug-
-        // vs-feature classification is stable for the life of the ticket — a PM
-        // bouncing a QA FAIL back to In_Progress must NOT silently flip the mode
-        // (so no cut_approved-style clause (2)); AC4 opt-out is an EXPLICIT PM
-        // write of "feature". The algorithm:
+        // dispatch_mode is FEATURE-SCOPED with NO PM-re-entry re-arm: the same
+        // rule as dispatch_pins/external_refs, but for a single value. A
+        // bug-vs-feature classification is stable for the life of the ticket — a
+        // PM bouncing a QA FAIL back to In_Progress must NOT silently flip the
+        // mode (so no cut_approved-style re-arm clause); opting out takes an
+        // EXPLICIT PM write of "feature". (E2) The rule:
         //   1. option dispatchMode !== undefined              → use it verbatim
         //   2. omitted && existing.active_feature === this    → carry existing
         //                                                       mode forward
@@ -243,11 +237,11 @@ async function writeHandoffStateCore(opts) {
         //                                                       absence = feature)
         let effectiveDispatchMode = dispatchMode;
         const dispatchModeNeedsExisting = dispatchMode === undefined;
-        // v13 — evidence_schema is FEATURE-SCOPED with NO PM-re-entry re-arm, the
-        // exact dispatch_mode scalar algorithm (e23 D1): the pin records which
-        // evidence conventions were CURRENT when the feature was dispatched — a
-        // stable dispatch-time fact for the life of the ticket, so no write in
-        // the chain (PM bounce included) may silently re-pin it. The algorithm:
+        // evidence_schema is FEATURE-SCOPED with NO PM-re-entry re-arm, the same
+        // single-value rule as dispatch_mode: the pin records which evidence
+        // conventions were CURRENT when the feature was dispatched — a stable
+        // fact for the life of the ticket, so no write in the chain (PM bounce
+        // included) may silently re-pin it. (E23) The rule:
         //   1. option evidenceSchema !== undefined            → use it verbatim
         //                                                       (orchestrator
         //                                                       stamp on feature
@@ -260,12 +254,12 @@ async function writeHandoffStateCore(opts) {
         //                                                       default)
         let effectiveEvidenceSchema = evidenceSchema;
         const evidenceSchemaNeedsExisting = evidenceSchema === undefined;
-        // v14 — cut_approved_source is FEATURE-SCOPED with NO PM-re-entry re-arm,
-        // the exact dispatch_mode scalar algorithm (e114 decision 3) — NOT
-        // cutApproved's re-arm-on-PM-re-entry clause: whether this lane inherited
-        // its approval from a parent feature is a stable fact about how the lane
-        // came to exist, established once, not a per-cut approval that must be
-        // re-witnessed on every PM bounce. The algorithm:
+        // cut_approved_source is FEATURE-SCOPED with NO PM-re-entry re-arm, the
+        // same single-value rule as dispatch_mode — not cutApproved's
+        // re-arm-on-PM-re-entry clause: whether this lane inherited its approval
+        // from a parent feature is a stable fact about how the lane came to
+        // exist, established once, not a per-cut approval that must be
+        // re-witnessed on every PM bounce. (E114) The rule:
         //   1. option cutApprovedSource !== undefined         → use it verbatim
         //   2. omitted && existing.active_feature === this    → carry existing
         //                                                        value forward
@@ -275,22 +269,20 @@ async function writeHandoffStateCore(opts) {
         //                                                        non-inherited)
         let effectiveCutApprovedSource = cutApprovedSource;
         const cutApprovedSourceNeedsExisting = cutApprovedSource === undefined;
-        // v15 — archive-on-feature-change (e116-archive-on-feature-change) needs
-        // the ON-DISK active_feature on EVERY write, not just on writes that omit
-        // one of the six fields above — the archive decision below
-        // (existing.active_feature !== this write's active_feature) has to see
-        // it even when a caller sets all six fields explicitly and this is not a
-        // bookkeeping write (the one combination that would otherwise skip the
-        // read entirely). Unlike the six flags above, this one does not gate a
-        // preserve/carry-forward decision on `existing` — it exists solely to
-        // force the read to always happen, so it is unconditionally true rather
-        // than piggybacking on an existing conditional.
+        // Archive-on-feature-change needs the ON-DISK active_feature on EVERY
+        // write, not just on writes that omit one of the six fields above — the
+        // archive decision below (existing.active_feature !== this write's
+        // active_feature) has to see it even when a caller sets all six fields
+        // explicitly and this is not a bookkeeping write (the one combination
+        // that would otherwise skip the read entirely). Unlike the six flags
+        // above, this one does not drive a keep/carry-forward decision on
+        // `existing` — it only forces the read to always happen, so it is
+        // unconditionally true rather than tied to an existing condition. (E116)
         const archiveCheckNeedsExisting = true;
-        // E10 — `existing` is hoisted out of the preserve block so the timestamp
-        // resolution below can read it; a bookkeeping write joins the trigger
-        // condition (it needs existing.last_updated). All other paths are
-        // unchanged: `existing` stays null unless some preserve clause needed the
-        // read, exactly as before.
+        // `existing` is declared outside the preserve block so the timestamp
+        // resolution below can read it; a bookkeeping write also triggers the
+        // read (it needs existing.last_updated). Otherwise `existing` stays null
+        // unless some preserve clause needed the read. (E10)
         let existing = null;
         if (effectivePrdPath === undefined ||
             effectiveScopeDecision === undefined ||
@@ -341,28 +333,28 @@ async function writeHandoffStateCore(opts) {
                     existing?.active_feature === _activeFeature ? existing?.cut_approved_source : undefined;
             }
         }
-        // v15 — archive-on-feature-change (e116-archive-on-feature-change). This
-        // is NOT a seventh member of the six-field preserve/reset pattern above:
-        // it never reads or writes cut_approved / external_refs / dispatch_pins /
-        // dispatch_mode / evidence_schema / cut_approved_source, and it never
-        // touches frontmatterData. It answers a different question — "does a
-        // COPY of the OLD file need to survive before this write overwrites it" —
-        // so it sits alongside that pattern rather than inside it. Fires only on
-        // an actual active_feature change (never on a same-feature write, AC3;
-        // never on a brand-new workspace, AC4 — both fall out of `existing` being
-        // null or unchanged). Runs inside the same withFileLock critical section,
-        // after the same verifyFreshness call above, and strictly before the
-        // tmp-write + rename publish below — so it captures exactly the
-        // "last known good" file the six-field preserve logic itself observed,
-        // with no new lock and no new freshness check.
+        // Archive-on-feature-change. This is NOT a seventh member of the
+        // six-field preserve/reset pattern above: it never reads or writes
+        // cut_approved / external_refs / dispatch_pins / dispatch_mode /
+        // evidence_schema / cut_approved_source, and it never touches
+        // frontmatterData. It answers a different question — "does a COPY of the
+        // OLD file need to survive before this write overwrites it" — so it sits
+        // beside that pattern rather than inside it. Fires only on an actual
+        // active_feature change (never on a same-feature write, never on a
+        // brand-new workspace — both follow from `existing` being null or
+        // unchanged). Runs inside the same withFileLock critical section, after
+        // the same verifyFreshness call above, and strictly before the tmp-write
+        // + rename publish below — so it captures exactly the last known good
+        // file the preserve logic itself read, with no new lock and no new freshness
+        // check. (E116)
         const featureChanged = existing !== null &&
             !!existing.active_feature &&
             existing.active_feature !== _activeFeature;
         if (featureChanged && fs.existsSync(handoffPath)) {
-            // e123b9 Decision 3 (spec AC6, J1-NEW-1): archive stays WORKSPACE-WIDE
-            // on purpose, not per-lane — filenames are globally unique and the dir
-            // is gitignored (E157); a per-lane split would only let an archive
-            // entry outlive the lane dir that produced it.
+            // The archive stays WORKSPACE-WIDE on purpose, not per lane: filenames
+            // are globally unique and the dir is gitignored; a per-lane split would
+            // only let an archive entry outlive the lane dir that produced it.
+            // (E123)
             const archiveDir = path.join(workspacePath, ".current", "archive");
             if (!fs.existsSync(archiveDir)) {
                 fs.mkdirSync(archiveDir, { recursive: true });
@@ -391,17 +383,16 @@ async function writeHandoffStateCore(opts) {
             // reconstruction from `existing`.
             fs.copyFileSync(handoffPath, archivePath);
         }
-        // E10 — timestamp resolution (e10-lease-override AC4/AC5, DR-5). Default:
-        // fresh stamp (unchanged). A bookkeeping write PRESERVES the existing
-        // on-disk last_updated verbatim so the incumbent lease's measured age
-        // keeps reflecting the last REAL write — guarded same-active_feature even
-        // though the orchestrator's AC6 gate already rejects the differing-feature
-        // combination: the migration heal-write in tools/handoff-parse.ts calls
-        // this writer DIRECTLY (no orchestrator), so the writer itself must never
-        // suppress a differing-feature freshness stamp (the pre-aged-clobber
-        // footgun). dispatched_at deliberately keeps its own now() (DR-6): the
-        // lease clock is last_updated; dispatched_at feeds the D5 stale-dispatch
-        // advisory, a separate concern.
+        // Timestamp resolution. Default: a fresh stamp. A bookkeeping write KEEPS
+        // the existing on-disk last_updated exactly, so the incumbent lease's
+        // measured age keeps reflecting the last REAL write. It is guarded to the
+        // same active_feature even though the orchestrator already rejects the
+        // differing-feature combination, because the migration heal-write in
+        // tools/handoff-parse.ts calls this writer DIRECTLY (no orchestrator):
+        // the writer itself must never suppress a new feature's fresh stamp,
+        // which would make its lease look older than it is. dispatched_at still
+        // gets its own now(): the lease clock is last_updated, while
+        // dispatched_at feeds the separate stale-dispatch advisory. (E10)
         let effectiveLastUpdated = now;
         if (bookkeepingWrite === true &&
             existing &&
@@ -418,9 +409,9 @@ async function writeHandoffStateCore(opts) {
         else if (isPmReentry) {
             effectiveCutApproved = undefined;
         }
-        // e235a — persist prd_path relative to workspace_path (never absolute). An
+        // Persist prd_path relative to workspace_path (never absolute). An
         // out-of-bounds value (only reachable from a direct, non-zod caller) is
-        // omitted rather than persisted verbatim; the value is not echoed.
+        // left out rather than persisted as-is; the value is not echoed. (E235a)
         if (effectivePrdPath) {
             const storedPrdPath = relativizePrdPath(workspacePath, effectivePrdPath);
             if (storedPrdPath) {
@@ -457,11 +448,12 @@ async function writeHandoffStateCore(opts) {
         // dispatched_at absence-is-signal emit posture).
         if (effectiveDispatchMode)
             frontmatterData.dispatch_mode = effectiveDispatchMode;
-        // v13 — evidence_schema: emit only when set. Absence === "pre-E23
-        // feature, v2 normalized-contains default at the gates" (e23 D2) — never
-        // materialize a pin the feature was not dispatched with. Explicit
+        // evidence_schema: write only when set. Absence means "feature started
+        // before pins existed, the gates use the v2 normalized-contains rules" —
+        // never invent a pin the feature was not dispatched with. Explicit
         // !== undefined guard (not truthiness): a schema version can never
         // legally be 0, but the guard style keeps the numeric intent obvious.
+        // (E23, v13)
         if (effectiveEvidenceSchema !== undefined) {
             frontmatterData.evidence_schema = effectiveEvidenceSchema;
         }
@@ -477,18 +469,18 @@ async function writeHandoffStateCore(opts) {
         // these fields replace (c9-protocol-fields DR on AC-3).
         if (nextRole)
             frontmatterData.next_role = nextRole;
-        // v10 — dispatch-liveness stamp (d5-server-side-stale-dispatch-detection,
-        // DR-2): stamp iff dispatching, on the SAME transient predicate and the
-        // SAME now() as last_updated, so dispatched_at === last_updated exactly
-        // whenever a dispatch is stamped (E10 exception, DR-6: a bookkeeping
-        // write that also dispatches preserves last_updated but stamps
-        // dispatched_at = now — acceptable, advisory only, not gated). Single-sourced HERE (not the
-        // orchestrator) so every write path — orchestrator, migration heal-write,
-        // positional callers — gets it for free. Server-derived, never
-        // client-supplied. Bare sync assignment (D3 best-effort discipline): can
-        // never throw, never fails a tw_update_state write. An omitting write
-        // drops it; a re-dispatching write re-stamps it (AC-3/AC-6 fall out of
-        // the nextRole transient lifecycle — do NOT join to the preserve read).
+        // Dispatch-liveness stamp: set only when this write dispatches (names a
+        // next_role), using the SAME now() as last_updated, so dispatched_at ===
+        // last_updated whenever a dispatch is stamped. Exception: a bookkeeping
+        // write that also dispatches keeps last_updated but stamps
+        // dispatched_at = now — acceptable, since it only feeds an advisory. Set
+        // HERE (not in the orchestrator) so every write path — orchestrator,
+        // migration heal-write, positional callers — gets it for free.
+        // Server-derived, never client-supplied. A plain synchronous assignment:
+        // it can never throw or fail a tw_update_state write. A write without a
+        // next_role drops it; a re-dispatching write re-stamps it (it follows
+        // nextRole's one-write lifetime — do NOT tie it to the preserve read).
+        // (D5, v10)
         if (nextRole)
             frontmatterData.dispatched_at = now;
         if (resumeOf)
@@ -561,14 +553,14 @@ ${pendingList}
         fs.writeFileSync(tmpPath, content, "utf-8");
         fs.renameSync(tmpPath, handoffPath);
         refreshSnapshotFor(workspacePath, handoffPath, "handoff");
-        // E10 — report the timestamp actually persisted (preserved on a
-        // bookkeeping write, fresh otherwise), not unconditionally now().
+        // Report the timestamp actually persisted (kept on a bookkeeping write,
+        // fresh otherwise), not always now(). (E10)
         return JSON.stringify({ success: true, path: handoffPath, updated_at: effectiveLastUpdated });
     });
 }
-// E36 Option-A: thin ~10-line dispatcher. Discriminate by first-arg shape and
-// delegate immediately to writeHandoffStateCore — no gate/preserve logic
-// lives at this boundary any more, that all moved into the core above.
+// Thin ~10-line dispatcher: pick the call shape from the first argument and
+// hand off to writeHandoffStateCore right away — no gate or preserve logic lives
+// at this boundary; it is all in the core above. (E36)
 export function writeHandoffState(workspacePathOrOpts, activeFeature, status, completedTasks, pendingNotes, blockingReason, lastAgent, qaRound, prdPath, reviewRound, visualRound, hopCount) {
     if (typeof workspacePathOrOpts === "object" && !Array.isArray(workspacePathOrOpts)) {
         return writeHandoffStateCore(workspacePathOrOpts);
