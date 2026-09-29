@@ -2856,8 +2856,8 @@ and the cross-AI review trail that drove v3.26.0–v3.27.0.
 ### Added (docs)
 
 - `docs/postmortem-visual-fidelity-gate.md` — postmortem of the visual-fidelity gate failure.
-- `research/oobe-visual-fidelity-governance-recommendations-2026-06-05.md` — Codex/GPT-5
-  governance recommendations.
+- A cross-AI governance recommendations note on visual fidelity (Codex/GPT-5; not retained in
+  the tree).
 - `research/oobe-visual-fidelity-improvement-plan.md` — Antigravity/Gemini 3.1 Pro improvement plan.
 - `research/design-fidelity-workflow.md`, `research/multi-ai-agent-pipeline-report.md` — supporting
   analysis.
