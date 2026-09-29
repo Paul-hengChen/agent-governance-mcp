@@ -114,3 +114,36 @@ No findings. Emitted JS is identical (AC1 plus the scratch-build byte comparison
 APPROVED — R1 and O1 are fully addressed, the new rewrites are accurate against the current code, and AC1-AC6 and AC8 hold over the whole range `6c61864..HEAD`.
 
 (Same-model-bias note: reviewer on opus, builder on fable.)
+
+## Round 3 — APPROVED — by code-reviewer
+
+covers: T-E233A-01, T-E233A-02, T-E233A-03, T-E233A-04, T-E233A-05, T-E233A-06, T-E233A-07, T-E233A-08, T-E233A-09
+
+## Summary
+- Re-review after QA round 1 FAIL. The e234 hygiene scan flagged the literal home-directory path prefix quoted in lane docs.
+- Fix range `81f3e28..HEAD` (05db100, 57ce003) changes 5 files: `specs/e233a-tools-comments.md` (1 line), `review_reports/review_T-E233A-01.md` (2 lines), `qa_reports/review_T-E233A-01.md` (+7, append only), and `.current/e233a/{handoff.md,dispatch.jsonl}` (lane state).
+- `git diff --name-only 81f3e28..HEAD -- tools dist` is empty, so the tools/ comment rewrite approved in Round 2 is unchanged.
+- Verdict: APPROVED.
+
+## AC Completeness
+AC1–AC6 — implemented — unchanged since Round 2. No `tools/` or `dist/` bytes changed in the fix range.
+AC7 — N/A for review (QA-owned full suite). `node --test test/e234-hygiene-scan.test.mjs` now passes 20/20 in this worktree. That is the check that failed in QA round 1.
+AC8 — implemented — the reworded proof `git diff 6c61864 -- tools | grep -E '^\+' | grep -E '/U[s]ers/|/h[o]me/|https?://'` is a correct, runnable check. Each bracket expression `[s]` / `[o]` matches exactly one character, so the ERE matches the same strings as the original pattern. The spec text itself no longer contains the literal prefix. Checks: (a) the proof prints nothing and exits 1; (b) the original unbracketed pattern also counts 0 on the same input; (c) a synthetic input with one macOS home path, one Linux home path, one URL and one `/usr/` line counts 3, so the pattern still catches real hits and ignores the control line.
+
+## Correctness
+No findings. In my own report, the diff of lines 22 and 82 changes only how the AC8 pattern is quoted: it is now described by class ("absolute home-directory paths (macOS or Linux style)", "the AC8 pattern"). The AC8 status (`implemented`), the R1/O2 references, both Round headers, and both Verdict sections are byte-identical to before. `grep -rnE '/U[s]ers/|/h[o]me/'` over the spec, both review files and `.current/e233a/` returns no matches.
+
+## Quality
+No findings. The bracket-split pattern is a common way to stop a pattern from matching its own text. Wording is clear.
+
+## Architecture
+No architecture spec for this feature. The fix range touches docs and lane state only.
+
+## Security
+No findings. The fix removes a username-shaped path fragment from committed docs, which is the point of the hygiene scan.
+
+## Performance
+No findings. No code changed.
+
+## Verdict
+APPROVED — the fix is wording only, the AC8 proof still matches exactly what it matched before, the failing hygiene test is green, and nothing outside the stated files changed.
