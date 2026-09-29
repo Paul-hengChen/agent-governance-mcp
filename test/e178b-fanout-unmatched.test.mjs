@@ -1,5 +1,5 @@
 // Coded by @qa-engineer
-// T-E178B-05 — tests for the `fanout check` warning about owned path tokens
+// Tests (T-E178B-05) for the `fanout check` warning about owned path tokens
 // that name no file (E208; tools/fanout-manifest.ts checkLane/unmatchedOwnedTokens,
 // scripts/fanout.mjs), per specs/e178b-lane-watch-tooling.md decisions (h)/(i), AC16-AC19.
 // AC20 (build + full suite on a clean committed tree) and AC21 (the lane's own

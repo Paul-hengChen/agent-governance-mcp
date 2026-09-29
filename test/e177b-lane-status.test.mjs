@@ -1,5 +1,5 @@
 // Coded by @qa-engineer
-// T-E177B-05 — tests for tools/lane-status.ts (specs/e177b-lane-status-tooling.md,
+// Tests (T-E177B-05) for tools/lane-status.ts (specs/e177b-lane-status-tooling.md,
 // AC1-AC6, AC5a-AC5d).
 //
 // Spec-to-Test map:

@@ -1,5 +1,5 @@
 // Coded by @qa-engineer
-// T-E125A-06: new coverage for specs/e125a-lane-local-ledgers.md AC4-AC11,
+// New coverage (T-E125A-06) for specs/e125a-lane-local-ledgers.md AC4-AC11,
 // AC4b, AC6b, AC14 (AC1-AC3/AC13 are covered in test/lane-paths.test.mjs,
 // test/lane-migrate.test.mjs, test/schema-versions.test.mjs and
 // test/tasks-versioning.test.mjs; AC12 is the existing SQLite suites, which

@@ -1,5 +1,5 @@
 // Coded by @qa-engineer
-// T-E177A-06 — tests for the parse/validate/render side of
+// Tests (T-E177A-06) for the parse/validate/render side of
 // tools/fanout-manifest.ts (specs/e177a-fanout-manifest.md, AC1-AC8, AC13,
 // AC14). T-E177A-07 (test/e177a-check-cli.test.mjs) covers checkLane, the
 // CLI exit contract and the full-suite run (AC16).

@@ -1,6 +1,6 @@
 // Coded by @qa-engineer
-// T-E112-03: verification-by-execution suite for the drift-detector fan-out and
-// feature-scope fix (E112, e112-drift-fanout-and-feature-scope), covering both distortion cases
+// Verification-by-execution suite for the drift-detector fan-out and
+// feature-scope fix (E112, task T-E112-03, e112-drift-fanout-and-feature-scope), covering both distortion cases
 // sr-engineer's T-E112-01 shipped in tools/drift.ts + tools/evidence-lookup.ts
 // (code-reviewer APPROVED round 2, review_reports/review_T-E112-01.md):
 //

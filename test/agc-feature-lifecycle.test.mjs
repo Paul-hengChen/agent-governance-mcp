@@ -1146,9 +1146,9 @@ test("AC29: the two retargeted comments read the lane-scoped path; .config.json 
   // Header note (near line 9) and the runInit body note (near line 351) —
   // both must describe the lane-scoped path, never the stale flat one.
   const headerLine = lines.slice(0, 20).find((l) => l.includes("any seeded prev tuple dead-ends"));
-  // Located by content, not a fixed line window (e106-init-artifacts-flag
+  // Located by content, not a fixed line window (the init --artifacts flag change, e106,
   // added --artifacts helpers ahead of runInit, pushing this comment further
-  // down than any window pinned to the pre-e106 file would find it).
+  // down than any window pinned to the file as it was before e106 would find it).
   const runInitStart = lines.findIndex((l) => l.includes("function runInit(cwd"));
   assert.ok(runInitStart !== -1, "expected to find the runInit function definition");
   const runInitLine = lines.slice(runInitStart, runInitStart + 30).find((l) => l.includes("no .current"));

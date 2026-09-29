@@ -70,7 +70,7 @@ function tmpWs() {
 }
 
 // Raw legacy-shaped fixture seeds always write the flat path deliberately
-// (that's the pre-e123b9-J2 shape being simulated).
+// (that's the shape from before the lane-scoped handoff path, e123b9 J2, being simulated).
 function writeRawHandoff(ws, body) {
   fs.writeFileSync(path.join(ws, ".current", "handoff.md"), body, "utf-8");
 }
@@ -124,20 +124,20 @@ test("hasCutApproval: rejects string 'true' (YAML strict parse contract)", () =>
 
 test("R-schema-1: writeHandoffState emits cut_approved: true in YAML when passed", async () => {
   // WHY: verifies the PM approval write path emits the field so the gate can read it.
-  // e2-bugfix-repro-gate re-baseline: schema_version bumped 10->11
+  // Re-baselined for the bugfix repro gate (e2): schema_version bumped 10->11
   // (dispatch_mode, stamp-only, seeds nothing); was 9->10 under
-  // d5-server-side-stale-dispatch-detection (dispatched_at, stamp-only,
-  // seeds nothing); was 8->9 under d2-server-brake-accounting (hop_count,
-  // seeded 0); was 7->8 under c14-dispatch-pins (dispatch_pins, stamp-only);
-  // was 6->7 under c9-protocol-fields (next_role/resume_of/review_verdict,
+  // stale-dispatch detection, d5 (dispatched_at, stamp-only,
+  // seeds nothing); was 8->9 under brake accounting, d2 (hop_count,
+  // seeded 0); was 7->8 under dispatch pins, c14 (dispatch_pins, stamp-only);
+  // was 6->7 under protocol fields, c9 (next_role/resume_of/review_verdict,
   // stamp-only).
   const ws = tmpWs();
   await seedHandoff(ws, { cutApproved: true });
   const raw = readRawHandoff(ws);
-  // e114-cut-approval-inheritance re-baseline: CURRENT_VERSIONS.handoff bumped
+  // Re-baselined for cut-approval inheritance (e114): CURRENT_VERSIONS.handoff bumped
   // 13->14 (cut_approved_source pin, stamp-only, seeds nothing). Was 12->13 under
-  // e23-evidence-schema-versioning (evidence_schema pin, stamp-only, seeds
-  // nothing). e123a-lane-layout-migration re-baseline: bumped 14->15
+  // evidence-schema versioning, e23 (evidence_schema pin, stamp-only, seeds
+  // nothing). Re-baselined for the lane-layout migration (e123a): bumped 14->15
   // (dispatch_mechanism/dispatch_mechanism_tier, stamp-only, seeds nothing).
   assert.match(raw, /schema_version:\s*15/, "schema_version must be 15 (e123a-lane-layout-migration)");
   assert.match(raw, /cut_approved:\s*true/, "cut_approved must be emitted as true");
@@ -418,12 +418,12 @@ test("M1: v4 → v5 migration is stamp-only (AC-7 — no default seeded for cut_
   // any default value. Absence is the unapproved sentinel. A default `false` would
   // be a redundant materialization of absence; a default `true` would be a false
   // attestation bypassing the gate for all legacy files.
-  // e123a-lane-layout-migration re-baseline: CURRENT_VERSIONS.handoff is
+  // Re-baselined for the lane-layout migration (e123a): CURRENT_VERSIONS.handoff is
   // now 15, so the manually-registered chain must reach 15 (adding the
   // v5->v6, v6->v7, v7->v8, v8->v9, v9->v10, v10->v11, v11->v12, v12->v13,
   // v13->v14, AND v14->v15 stamp-only/seed-only steps) or runMigrations
   // throws MISSING_MIGRATION_STEP against the new target. Was 14 under
-  // e114-cut-approval-inheritance. IMPORTANT: this
+  // the cut-approval inheritance change (e114). IMPORTANT: this
   // manual chain MUST reach the real CURRENT — leaving it short doesn't just
   // fail this test, it permanently clobbers the shared module-level migration
   // registry (via _clearRegistryForTests) for every later test in this file
@@ -462,7 +462,7 @@ test("M1: v4 → v5 migration is stamp-only (AC-7 — no default seeded for cut_
 test("M2: v4 → v5 migration preserves all existing fields (AC-7 — lossless)", () => {
   // WHY: AC-7 — no existing field may be modified or removed. Losslessness is
   // critical so that scope_decision, prd_path, qa_round, etc. survive the bump.
-  // e123a-lane-layout-migration re-baseline: see M1 comment — chain
+  // Re-baselined for the lane-layout migration (e123a): see M1 comment — chain
   // extended to v15.
   _clearRegistryForTests();
   registerMigration({ kind: "handoff", from: 0, to: 1, up: (i) => ({ ...i, schema_version: 1 }) });
@@ -665,7 +665,7 @@ test("C4: S04 — cut-approval gate stop-condition present in skill-coordinator.
 });
 
 // ============================================================================
-// b8-external-ref-ledger — EXTERNAL_REFS_UNRESOLVED gate (B8-QA)
+// External-ref ledger — EXTERNAL_REFS_UNRESOLVED gate (b8, B8-QA)
 // Same file-mode-only, prev-pinned-to-pm shape as CUT_APPROVAL_REQUIRED above,
 // but INVERSE polarity (DR-3: absence/empty/all-resolved CLEARS, not blocks)
 // and NO PM-re-entry re-arm (DR-4: only active_feature change resets it).

@@ -500,7 +500,7 @@ test("AC8 Round 2: the WIRED trigger (readHandoffState, via a standalone node pr
 });
 
 // ============================================================================
-// T-E123B9-08 (AC21) — interrupted-migration-then-read/write durability.
+// Interrupted-migration-then-read/write durability (T-E123B9-08, AC21).
 // specs/e123b9-lane-flip.md "## Amendment 2026-09-24", AC21 (covers AC16-20).
 // ============================================================================
 
@@ -828,9 +828,9 @@ test(
     }, "the next read must not throw, despite the stale lock");
     assert.equal(readJson.exists, true, "the next read must still see the (still-flat) handoff.md");
     assert.equal(readJson.active_feature, AC21_ACTIVE_FEATURE, "the next read must return the correct state");
-    // J2-NEW-12: the read's own single non-blocking lock attempt gets EEXIST
+    // The read's own single non-blocking lock attempt gets EEXIST
     // on the still-stale lock and does NOT check staleness — so it skips the
-    // migration outright. Assert the documented (not fixed) limitation:
+    // migration outright (J2-NEW-12). Assert the documented (not fixed) limitation:
     assert.ok(
       fs.existsSync(path.join(flatDir, "handoff.md")),
       "J2-NEW-12: the read must NOT complete the migration — handoff.md stays flat",

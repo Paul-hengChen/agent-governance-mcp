@@ -1,5 +1,5 @@
 // Coded by @qa-engineer
-// T-E125C-05: new coverage for specs/e125c-index-compaction.md AC1-AC6, AC10,
+// New coverage (T-E125C-05) for specs/e125c-index-compaction.md AC1-AC6, AC10,
 // AC11 (reverse-migration receipt/normalization behaviour, E195, + the
 // real-data compaction round trip). AC7-AC9, AC12-AC14 are proved by
 // `.current/e125c/compaction-procedure.md` (sr's evidence file) and by
@@ -11,7 +11,7 @@
 // under test/fixtures/e125c-frozen/ (byte-exact as of commit ed7432f, the
 // index-compaction snapshot AC11's facts describe) into a throwaway $TMPDIR
 // copy, and never read or write the live repo tree (E204:
-// T-E204-01 — the prior live-disk read drifted red the moment the primary
+// The prior live-disk read (T-E204-01) drifted red the moment the primary
 // ledger gained a row after ed7432f; see .current/e204/tasks.md).
 //
 // Spec-to-Test map:

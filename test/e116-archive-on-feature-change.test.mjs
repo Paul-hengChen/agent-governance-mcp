@@ -59,8 +59,8 @@ function mkWs(prefix = "e116-") {
   return ws;
 }
 
-// e123b9 J2 (spec AC1/AC9): the live handoff.md is lane-scoped now (these
-// fixture workspaces carry no `.git`, so `_primary`). archiveDir below is
+// The live handoff.md is lane-scoped now (these
+// fixture workspaces carry no `.git`, so `_primary`; e123b9 J2, spec AC1/AC9). archiveDir below is
 // UNCHANGED (spec AC6, Decision 3: stays workspace-wide, comment-only diff).
 function handoffPath(ws) {
   return resolveCurrentLanePaths(ws).handoffPath;

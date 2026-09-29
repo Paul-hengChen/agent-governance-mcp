@@ -1,5 +1,5 @@
 // Coded by @qa-engineer
-// T-E177A-07 — tests for checkLane() and the thin scripts/fanout.mjs CLI
+// Tests (T-E177A-07) for checkLane() and the thin scripts/fanout.mjs CLI
 // (specs/e177a-fanout-manifest.md, AC9-AC12, AC15). AC16 (build + suite) is
 // recorded in qa_reports/review_T-E177A-06.md after this file's commit, per
 // the qa-engineer SOP Phase 4 ("run after commit on a clean tree,

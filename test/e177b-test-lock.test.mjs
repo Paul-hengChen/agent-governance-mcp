@@ -1,5 +1,5 @@
 // Coded by @qa-engineer
-// T-E177B-04 — tests for scripts/test-lock.mjs (specs/e177b-lane-status-tooling.md,
+// Tests (T-E177B-04) for scripts/test-lock.mjs (specs/e177b-lane-status-tooling.md,
 // AC7-AC13, AC13a, AC13b).
 //
 // Spec-to-Test map:

@@ -61,7 +61,7 @@ test("T31 AC-2 heal: legacy v0 config (no schema_version) heals to v1 on disk", 
 
 test("T31 AC-2 fast-path: a config already at CURRENT triggers no write-back (mtime unchanged)", async () => {
   const ws = mkWorkspace();
-  // e106-init-artifacts-flag bumped CURRENT_VERSIONS.config to 2 — the
+  // Adding the "artifacts" config field (e106) bumped CURRENT_VERSIONS.config to 2 — the
   // fast-path fixture must sit AT current, not at the old literal 1, or this
   // now exercises the v1->v2 heal-write path instead of the no-op path it's
   // meant to isolate.

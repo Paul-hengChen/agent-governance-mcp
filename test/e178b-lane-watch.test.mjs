@@ -1,5 +1,5 @@
 // Coded by @qa-engineer
-// T-E178B-04 — tests for `lane-status --watch` (tools/lane-status.ts
+// Tests (T-E178B-04) for `lane-status --watch` (tools/lane-status.ts
 // runLaneWatch + helpers, scripts/lane-status.mjs routing), per
 // specs/e178b-lane-watch-tooling.md decisions (a)-(f), (j), AC1-AC9 and the
 // watch half of the cut pre-review check, AC15. AC10-AC14 live in

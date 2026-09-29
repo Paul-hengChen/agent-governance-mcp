@@ -63,11 +63,11 @@ export const SAFE_SEED_STAMP = "2026-01-01T00:00:00.123Z";
  */
 export const SUSPECT_SEED_STAMP = "2026-01-01T00:00:00.000Z";
 
-// e123b9 J2 (spec AC1/AC9): route through the lane-aware resolver instead of
+// Route through the lane-aware resolver instead of
 // restating the flat `.current/handoff.md` path — these fixture workspaces
 // carry no `.git`, so resolveCurrentLane resolves them to PRIMARY_LANE
 // (`_primary`), matching exactly what the production write path under test
-// now resolves to.
+// now resolves to (e123b9 J2, spec AC1/AC9).
 function handoffPath(workspacePath) {
   return resolveCurrentLanePaths(workspacePath).handoffPath;
 }

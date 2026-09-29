@@ -1,5 +1,5 @@
 // Coded by @qa-engineer
-// T-E115-03 — tests for tools/join-precondition.ts, the check that a lane's declared
+// Tests (T-E115-03) for tools/join-precondition.ts, the check that a lane's declared
 // identity matches its actual one at join time (specs/e115-join-precondition-check.md,
 // amended AC3, new AC9, AC1/AC2/AC4/AC5/AC6). Executed against a REAL scratch
 // git repo fixture with actual branches and commits (mkFixtureRepo) — per the

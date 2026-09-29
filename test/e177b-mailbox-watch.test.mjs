@@ -1,5 +1,5 @@
 // Coded by @qa-engineer
-// T-E177B-06 — tests for scripts/mailbox-watch.mjs (specs/e177b-lane-status-tooling.md,
+// Tests (T-E177B-06) for scripts/mailbox-watch.mjs (specs/e177b-lane-status-tooling.md,
 // AC14-AC20).
 //
 // Spec-to-Test map:

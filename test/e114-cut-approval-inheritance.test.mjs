@@ -77,7 +77,7 @@ async function dispatch(ws, args) {
 // ============================================================================
 
 test("AC1: v13->v14 migration is stamp-only — bumps schema_version only, seeds no cut_approved_source", () => {
-  // e123a-lane-layout-migration re-baseline: CURRENT_VERSIONS.handoff is now
+  // Re-baselined for the lane-layout migration (e123a): CURRENT_VERSIONS.handoff is now
   // 15, so a v13 payload run through the REAL (un-cleared) registry climbs
   // BOTH the v13->v14 step under test here AND the new v14->v15 step in the
   // same call — there is no way to isolate a single intermediate step from

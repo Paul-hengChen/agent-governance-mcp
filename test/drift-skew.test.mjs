@@ -129,7 +129,7 @@ test("T32 AC-6: future config schema_version surfaces as drift reason", async ()
   const report = JSON.parse(detectDrift(ws));
   assert.equal(report.driftDetected, true);
   assert.ok(
-    // e106-init-artifacts-flag bumped CURRENT_VERSIONS.config 1->2.
+    // Adding the artifacts config field (e106) bumped CURRENT_VERSIONS.config 1->2.
     report.details.some((d) => /Schema version skew: config on-disk v88 > server max v2/.test(d)),
     `expected config skew reason in ${JSON.stringify(report.details)}`,
   );
@@ -211,8 +211,8 @@ qa_round: 0
 // skew precheck's existsSync/readFileSync — so an UNMIGRATED flat
 // workspace's from-the-future handoff schema_version is caught here too,
 // not just an already-migrated one. This used to be a documented gap (the
-// "KNOWN GAP (J2-NEW-9)" test asserted the old throw); e123c closes it, so
-// this test now asserts the graceful reason instead (e123c AC8, closes
+// "KNOWN GAP (J2-NEW-9)" test asserted the old throw); the lane-layout follow-up closes it, so
+// this test now asserts the graceful reason instead (e123c, AC8; closes
 // J2-NEW-9 / J2-NEW-3's drift.ts bullet).
 // ============================================================================
 

@@ -538,7 +538,7 @@ test("E100 config class (2): an EXISTING host-less .config.json gains \"host\" o
 });
 
 test("E100 config class (3): an existing \"host\": \"cursor\" is preserved (over-correction guard); artifacts is independently upserted since none was declared", () => {
-  // e106-init-artifacts-flag: this fixture (outside git, no "artifacts" key
+  // With the init --artifacts flag (e106), this fixture (outside git, no "artifacts" key
   // declared) now ALSO gains "artifacts": "local" on the same run — the file
   // is no longer byte-identical and the bucket is "Updated", not "Skipped".
   // The host-specific guarantee (never overwritten) is unaffected and is
@@ -588,7 +588,7 @@ test("E100: falsy host values (\"\", null, false, 0) are all treated as absent a
       `host=${JSON.stringify(falsy)} must be repaired (reported Updated), not treated as a deliberate declaration`,
     );
     const cfg = JSON.parse(readConfig(ws));
-    // e106-init-artifacts-flag: this fixture runs outside git with no
+    // With the init --artifacts flag (e106), this fixture runs outside git with no
     // "artifacts" key declared, so it also gains "artifacts": "local".
     assert.deepEqual(
       cfg,
@@ -608,7 +608,7 @@ test("E100 reparse-guard proof: truthy-but-unusable host shapes a plain !host ch
   seedConfig(wsNum, JSON.stringify({ schema_version: 1, host: 42 }));
   const rNum = runAgc(wsNum, ["init"]);
   assert.equal(rNum.status, 0);
-  // e106-init-artifacts-flag: outside git, no "artifacts" declared -> also
+  // With the init --artifacts flag (e106): outside git, no "artifacts" declared -> also
   // gains "artifacts": "local".
   assert.deepEqual(JSON.parse(readConfig(wsNum)), { schema_version: 1, host: "claude-code", artifacts: "local" });
   assert.match(rNum.stdout, /Updated:.*\.current\/\.config\.json/);
@@ -625,7 +625,7 @@ test("E100 reparse-guard proof: a wrong-occurrence splice never proceeds — nes
   // falsely report success. Independently re-derived and run against the
   // real CLI (not just read from the source) per the QA brief's explicit
   // instruction not to ratify the review's proof unread.
-  // e106-init-artifacts-flag: "artifacts" has no shadow-key ambiguity in this
+  // With the init --artifacts flag (e106), "artifacts" has no shadow-key ambiguity in this
   // fixture (the key appears nowhere), so it independently upserts to
   // "local" on the same run — the whole-file bucket becomes "Updated", not
   // "Not updated". The host-specific reparse-guard property (never
@@ -687,7 +687,7 @@ test("E100 formatting preservation: a large real-shaped driftBaselineIds array i
   const after = readConfig(ws);
   const beforeLines = before.split("\n");
   const afterLines = after.split("\n");
-  // e106-init-artifacts-flag: this fixture (outside git, no "artifacts" key)
+  // With the init --artifacts flag (e106), this fixture (outside git, no "artifacts" key)
   // now gets TWO keys spliced in — "artifacts" then "host" — each inserted
   // right after the opening brace, so exactly two lines are added, not one.
   assert.equal(afterLines.length, beforeLines.length + 2, "exactly two lines must be added (artifacts + host)");

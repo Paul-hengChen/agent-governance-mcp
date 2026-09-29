@@ -1,5 +1,5 @@
 // Coded by @qa-engineer
-// T-E132-05 — tests for tools/lane-registry.ts (specs/e132-lane-registry.md,
+// Tests (T-E132-05) for tools/lane-registry.ts (specs/e132-lane-registry.md,
 // AC1-AC4, AC7-AC9) plus the tw_get_state wiring in tools/handoff-parse.ts.
 // AC5/AC6 (computeFeatureRollup-level hand-forward fixes) live in the
 // EXTENDED test/feature-rollup.test.mjs instead, per the dispatch brief's

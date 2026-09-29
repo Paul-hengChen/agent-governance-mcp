@@ -431,8 +431,8 @@ test("SMOKE-DELETED (F5 regression): a git-tracked but on-disk-deleted .md file 
 });
 
 // ============================================================================
-// E105-* — fix for three table shapes, (a) (b) (c), that the checker used to
-// misdiagnose (T-E105-01, feature e88-e105-md-table-checker, task T-E88E105-02).
+// Fix for three table shapes, (a) (b) (c), that the checker used to
+// misdiagnose (E105-* tests; T-E105-01, feature e88-e105-md-table-checker, task T-E88E105-02).
 // This shape occurs 0 times in this repo — a
 // green corpus run proves nothing about it, and neither does reading the
 // code (per specs/e88-e105-md-table-checker.md's own "Not a live defect"

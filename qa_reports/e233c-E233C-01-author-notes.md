@@ -24,3 +24,19 @@ words with the id only as a row label, banner label, or trailing pointer, and
 test-case labels that are not backlog ids (e.g. E1-E6 in baseline-manifest-gate).
 The AC4 heuristic lists only wrapped continuation fragments of multi-line
 comments; each belongs to a block that reads plainly.
+
+## Third pass
+
+The residual scan was widened to a case-insensitive id shape (an e/E id with
+optional letter, digit or hyphen segments, plus task ids and AC references),
+including leading `<id>:` and feature-slug labels. Leading id labels and
+slug-only labels (for example the init-artifacts-flag family in the adapters
+test, the lane-layout and cut-approval re-baseline notes, and task-id file
+headers) now lead with the behaviour and keep the id as a trailing pointer.
+Left unchanged: paths that merely contain an id, fixture names, test-case
+labels that are not backlog ids (E1-E6, P1-P9, t-a3-* style names), and
+trailing pointers such as `(e123b9 J2, spec AC1/AC9)`.
+
+Hygiene: no literal home-directory path prefix appears in any tracked text
+touched by this lane. The check script lives in the temp directory and builds
+its pattern at run time, so the prefix never appears verbatim in tracked files.

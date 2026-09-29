@@ -240,7 +240,7 @@ test("AC3: a pre-existing e125a tasks_moved feat marker for the closing lane is 
   const lane = path.join(mkTmp("e125b-ac3-lane-"), "lane");
   assert.equal(runAgc(repo, ["start", "e125b3-feat-marker", "--path", lane]).status, 0);
 
-  // Simulate an e125a forward-migration feat marker already sitting in root
+  // Simulate a feat marker from the earlier lane-ledger forward migration (e125a) already sitting in root
   // tasks.md for this lane (tools/tasks-lane-migrate.ts's featMarker shape).
   const markerLine = "<!-- tasks_moved: lane=e125b3 run=1 of=1 sections=1 -> .current/e125b3/tasks.md (E125a) -->";
   fs.writeFileSync(path.join(repo, "tasks.md"), `# Tasks\n\n${markerLine}\n`);

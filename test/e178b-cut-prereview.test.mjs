@@ -1,5 +1,5 @@
 // Coded by @qa-engineer
-// T-E178B-04 — tests for the cut pre-review fan-in check in
+// Tests (T-E178B-04) for the cut pre-review fan-in check in
 // tools/lane-status.ts: it reports whether a lane's written cut was sent to
 // the integrator for pre-review (E178b; specs/e178b-lane-watch-tooling.md,
 // decision (g)/(h)/(j), AC10-AC14). The watch-mode transition check (AC15) lives in
