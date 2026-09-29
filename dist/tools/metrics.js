@@ -1,17 +1,17 @@
 // Coded by @sr-engineer
-// Release-close success-metrics sidecar (e8-success-telemetry). One JSON line
-// per SHIPPED feature, appended to .current/metrics.jsonl at the
-// release-engineer terminal-marker write (E1A signature — see the single call
-// site in tools/handoff-orchestrator.ts). Observability, not authoritative
-// state — deliberately NOT governed by the handoff.ts 4-step mutating-tool
-// contract. Fully separate stream + module from tools/telemetry.ts's
-// gate-fire telemetry.jsonl (AC6): disjoint key sets, writers, lifecycles —
-// the D2 usage.jsonl / D3 telemetry.jsonl stream-separation precedent.
+// Release-close success-metrics sidecar. One JSON line per SHIPPED feature,
+// appended to .current/metrics.jsonl at the release-engineer terminal-marker
+// write (see the single call site in tools/handoff-orchestrator.ts).
+// Observability, not authoritative state — deliberately NOT governed by the
+// handoff.ts 4-step mutating-tool contract. A stream and module fully
+// separate from tools/telemetry.ts's gate-fire telemetry.jsonl: disjoint key
+// sets, writers, and lifecycles, like the usage.jsonl / telemetry.jsonl
+// split. (E8)
 import * as fs from "fs";
 import * as path from "path";
 import { enumerateLaneSidecarSources, resolveCurrentLanePaths } from "./lane-paths.js";
-// Sidecar location comes only from the lane resolver (E123 F1 L2): the
-// lane-scoped <ws>/.current/<lane>/metrics.jsonl since the J2 flip.
+// Sidecar location comes only from the lane resolver: the lane-scoped
+// <ws>/.current/<lane>/metrics.jsonl. (E123)
 function metricsPath(workspacePath) {
     return resolveCurrentLanePaths(workspacePath).metricsPath;
 }
@@ -30,9 +30,9 @@ export function emitFeatureMetrics(args) {
         // tickets = DISTINCT completed task ids for this feature's ticket code
         // across the workspace-root tasks.md (read fresh; config taskPaths
         // intentionally NOT consulted, matching release-engineer SOP step 7a's
-        // grep) plus every live and history-bucket lane ledger (e125a AC10 /
-        // AC14(c)). Deduplicated by id, so a stale copy of a row in `_primary`'s
-        // ledger, or a row still echoed in the root index, never counts twice.
+        // grep) plus every live and history-bucket lane ledger. Deduplicated by
+        // id, so a stale copy of a row in `_primary`'s ledger, or a row still
+        // echoed in the root index, never counts twice. (E125a)
         const escapedCode = code.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         const ticketLine = new RegExp(`^\\s*-\\s*\\[x\\]\\s*(T-${escapedCode}-\\S*)`);
         const ids = new Set();
@@ -60,17 +60,18 @@ export function emitFeatureMetrics(args) {
         catch {
             // unreadable package.json — record ships with released_version: null.
         }
-        // Idempotency guard (E12): skip the append when a record with the same
+        // Idempotency guard: skip the append when a record with the same
         // (feature, released_version) pair already exists. The PAIR is the key —
         // released_version === null is a valid key value, NOT a wildcard, so a
-        // second null-version emit for the same feature is also deduped (AC9). An
-        // existing record with an absent/non-string released_version normalizes to
-        // null so it compares equal to a computed null. Defensive read: a missing
-        // file means "no existing records" so the append proceeds (AC10); a
-        // malformed line is skipped without crashing (AC10); and any failure of the
-        // read itself fails OPEN — fall through to append rather than drop a
-        // legitimate record (AC11) — never throwing, per this module's contract.
+        // second null-version emit for the same feature is also deduped. An
+        // existing record with an absent/non-string released_version normalizes
+        // to null so it compares equal to a computed null. Defensive read: a
+        // missing file means "no existing records" so the append proceeds; a
+        // malformed line is skipped without crashing; and any failure of the read
+        // itself fails OPEN — fall through to append rather than drop a
+        // legitimate record — never throwing, per this module's contract.
         // Resolved once per emit (one HEAD read), reused for the read + append.
+        // (E12)
         const file = metricsPath(args.workspacePath);
         let alreadyEmitted = false;
         try {

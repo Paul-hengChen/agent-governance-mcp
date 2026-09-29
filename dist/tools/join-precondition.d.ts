@@ -18,13 +18,13 @@ export interface LaneAncestryResult {
  * result to `true` (AC1, AC2).
  */
 export declare function checkLaneAncestry(branches: string[], repoRoot: string): LaneAncestryResult[];
-/** The single membership finding possible under AC3's amended semantics:
- * this workspace's own actual `active_feature` is absent from EVERY row
- * declared in `.current/feature-split.md`. Names the full declared set
- * alongside the actual value — never one entry per non-matching row (a
- * Split Table has one row per planned lane, so sibling rows declaring a
- * different lane are expected, not mismatches; see Amendment History,
- * specs/e115-join-precondition-check.md:195). */
+/** The only membership finding possible: this workspace's own actual
+ * `active_feature` is absent from EVERY row declared in
+ * `.current/feature-split.md`. Names the full declared set alongside the
+ * actual value — never one entry per non-matching row (a Split Table has one
+ * row per planned lane, so sibling rows declaring a different lane are
+ * expected, not mismatches; see Amendment History,
+ * specs/e115-join-precondition-check.md). */
 export interface LaneIdentityMismatch {
     /** Every populated feature-identity value found in feature-split.md,
      * order as parsed. */

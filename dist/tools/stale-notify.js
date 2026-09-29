@@ -1,9 +1,9 @@
 // Coded by @sr-engineer
-// Stale-dispatch notify emit (E22, D5 follow-on / 104447-F0 A3).
+// Stale-dispatch notify emit. (E22)
 //
-// The v10 stale_dispatch advisory (tools/handoff.ts) is pull-only: computed at
-// tw_get_state time, so nobody sees it until the next session reads state —
-// the retro's 1h55m idle window went entirely unnoticed. This module adds the
+// The stale_dispatch advisory (tools/handoff-parse.ts) is pull-only: computed
+// at tw_get_state time, so nobody sees it until the next session reads state
+// — a long idle window can go entirely unnoticed. This module adds the
 // cheapest push channel: when the advisory fires AND the workspace has opted
 // in via `.current/.config.json`:
 //
@@ -13,17 +13,17 @@
 // watcher (fswatch / inotifywait / launchd → desktop notification, webhook,
 // anything) turns the mtime bump into a human-visible alert — the server
 // itself spawns no daemon, no timer thread, and owns no delivery mechanism
-// (E22 cut: watch-file emit ONLY).
+// (watch-file emit ONLY).
 //
 // Semantics:
 //   - Key absent (the default) → fully disarmed, null return, zero behavior
-//     change. Opt-in per workspace, the E24 exemptions / E5 auto-tier posture.
+//     change. Opt-in per workspace, like the exemptions / auto-tier keys.
 //   - One emit per distinct stale dispatch: before writing, the prior file
 //     content is read back and the emit is SKIPPED when its
 //     (dispatched_at, role) pair matches the current advisory — a watcher
 //     fires once per threshold crossing, not on every subsequent
 //     tw_get_state of the same stale window. The watch-file itself carries
-//     this dedupe cursor; no new handoff state (E22 cut constraint).
+//     this dedupe cursor; no new handoff state.
 //     A new dispatch (fresh dispatched_at stamp) re-arms naturally.
 //   - Payload: the advisory fields + workspace + emitted_at, pretty-printed
 //     JSON. Published atomically (tmp + rename, the atomicWriteConfig
@@ -35,8 +35,8 @@
 // session. Every failure mode (unreadable config, unwritable path, corrupt
 // prior file) collapses to a loud `error` string in the returned outcome,
 // which the caller surfaces inside the stale_dispatch payload itself — never
-// a throw, never a blocked read. File-mode read path only, matching the
-// sibling E10/E18/E24 file-mode posture.
+// a throw, never a blocked read. File-mode read path only, like the other
+// file-mode-only fields.
 import * as fs from "fs";
 import * as path from "path";
 import { getConfigError, loadConfig } from "./config.js";
@@ -46,11 +46,11 @@ import { getConfigError, loadConfig } from "./config.js";
  * (the default — caller surfaces nothing). NEVER throws — see module header.
  */
 export function notifyStaleDispatch(workspacePath, advisory) {
-    // Corrupt/unreadable config: since E31 loadConfig degrades to defaults
-    // instead of throwing, with the failure exposed via getConfigError(). Keep
-    // the E22 contract here — a broken config collapses to a loud per-emit
-    // error (never disarmed-null silence, never a throw), on top of the
-    // envelope-level `config_error` the read path now surfaces.
+    // Corrupt/unreadable config: loadConfig falls back to defaults instead of
+    // throwing, with the failure exposed via getConfigError(). This emit still
+    // treats a broken config as a loud per-emit error (never disarmed-null
+    // silence, never a throw), on top of the envelope-level `config_error`
+    // the read path shows. (E31)
     const configError = getConfigError(workspacePath);
     if (configError) {
         return {
