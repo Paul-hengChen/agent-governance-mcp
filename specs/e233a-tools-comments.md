@@ -11,7 +11,7 @@ Roughly 315 comment lines across 32 files under `tools/` explain themselves only
 
 ## Acceptance Criteria
 - **AC1 (behaviour invariance)** — Given every `tools/*.ts` file changed by this lane, when each file is transpiled with `removeComments: true` at base commit 6c61864 and at HEAD, then the two outputs are byte-identical for every file.
-  proof: `node .current/e233a/check-invariance.mjs` (script body in "Verification scripts" below; the sr-engineer writes it to `$TMPDIR` or the scratchpad, never into a tracked path) prints `invariance OK: <n> files` and exits 0.
+  proof: `node <scratch>/check-invariance.mjs` (run from the lane root) (script body in "Verification scripts" below; the sr-engineer writes it to `$TMPDIR` or the scratchpad, never into a tracked path) prints `invariance OK: <n> files` and exits 0.
 - **AC2 (no bare-id explanation)** — Given the comment lines under `tools/*.ts` that mention a ticket id, when each is stripped of the id, its slug in parentheses, and punctuation, then no comment block is left whose remaining explanation is empty or a single filler word; the id, where kept, is a trailing pointer such as `... (E31)`.
   proof: `node <scratch>/check-bare-ids.mjs` prints `bare-id OK` and exits 0 (heuristic below; reviewer additionally samples 20 rewritten comments by eye).
 - **AC3 (pinned watch-block prefix)** — Given `test/e178b-lane-watch.test.mjs` locates the watch block by source text, when `tools/lane-status.ts` is edited, then a line starting with `// Watch mode (E178b` still exists verbatim.

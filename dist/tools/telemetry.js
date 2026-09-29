@@ -16,8 +16,8 @@ import * as fs from "fs";
 import * as path from "path";
 import { gate } from "../gates/registry.js";
 import { resolveCurrentLanePaths } from "./lane-paths.js";
-// Sidecar location comes only from the lane resolver (E123 F1 L2). It still
-// returns the flat <ws>/.current/telemetry.jsonl until J flips the seam.
+// Sidecar location comes only from the lane resolver: the lane-scoped
+// <ws>/.current/<lane>/telemetry.jsonl. (E123)
 function telemetryPath(workspacePath) {
     return resolveCurrentLanePaths(workspacePath).telemetryPath;
 }

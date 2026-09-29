@@ -1,0 +1,5 @@
+{"ts":"2026-09-29T11:44:45.127Z","feature":"e233a-tools-comments","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-29T11:45:07.230Z","feature":"e233a-tools-comments","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-29T11:47:42.000Z","feature":"e233a-tools-comments","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-29T12:08:03.143Z","feature":"e233a-tools-comments","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-29T12:10:00.518Z","feature":"e233a-tools-comments","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
