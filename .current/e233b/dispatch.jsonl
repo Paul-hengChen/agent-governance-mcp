@@ -2,3 +2,6 @@
 {"ts":"2026-09-29T11:48:16.576Z","feature":"e233b-core-comments","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-09-29T11:59:04.208Z","feature":"e233b-core-comments","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
 {"ts":"2026-09-29T12:03:41.386Z","feature":"e233b-core-comments","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-29T12:04:32.954Z","feature":"e233b-core-comments","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-29T12:09:54.658Z","feature":"e233b-core-comments","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-29T12:11:48.532Z","feature":"e233b-core-comments","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
