@@ -88,29 +88,22 @@ const WorkspaceOnly = z.object({
   workspace_path: absoluteWorkspacePath,
 });
 
-// E86 (e92-e86-handoff-write-boundary AC1/AC2) — reject a free-text field
-// whose TRIMMED TAIL is leftover tool-call tag markup: a malformed
-// multi-argument tw_update_state/tw_add_task call bleeding a sibling
-// argument's literal tag fragment onto this field's tail (docs/backlog.md
-// E86: `<parameter name="pending_notes">` / `</scope_decision_why></invoke>`
-// tails observed live).
+// Reject a free-text field whose TRIMMED TAIL is leftover tool-call tag
+// markup: a malformed multi-argument tw_update_state/tw_add_task call can
+// bleed a sibling argument's literal tag fragment onto this field's tail
+// (e.g. `<parameter name="pending_notes">` or
+// `</scope_decision_why></invoke>`). (E86)
 //
-// Round-1 finding (F1, review_reports/review_T-E86-01.md): tail POSITION
-// ALONE is not narrow enough. agc's own documentation dialect routinely ends
-// sentences on a bare `<placeholder>` token (`<role>`, `<feature>`,
-// `<task-id>`, `<field>`, a byte-verbatim line of
+// Tail position alone is not narrow enough. agc's own documentation dialect
+// routinely ends sentences on a bare `<placeholder>` token (`<role>`,
+// `<feature>`, `<task-id>`, `<field>`, a byte-verbatim line of
 // content/coord-01-core-head.md's `(<N> units) ... <which fired>`) and
-// ordinary TypeScript prose does the same (`Promise<void>`, `Array<string>`).
-// A position-only check fires on all of them (AC2/AC5 violation). So the
-// predicate is now narrowed by BOTH tail position AND a genuine tool-call
-// signal — an attribute assignment (`name="..."`) or a close-tag slash
-// (`</...`) — neither of which a bare placeholder or a TS generic carries.
-// The same fragment quoted mid-string, with further prose following it, is
-// ordinary prose and MUST be accepted regardless (AC2; the E74
-// false-positive lesson) — this backlog row's own E86 paragraph, which
-// quotes such fragments as prose followed by more sentence, is a worked
-// counter-example the predicate must not flag, and it doesn't: the fragment
-// isn't at the tail.
+// ordinary TypeScript prose does the same (`Promise<void>`,
+// `Array<string>`). So the predicate requires BOTH tail position AND a
+// genuine tool-call signal — an attribute assignment (`name="..."`) or a
+// close-tag slash (`</...`) — neither of which a bare placeholder or a TS
+// generic carries. The same fragment quoted mid-string, with further prose
+// after it, is ordinary prose and MUST be accepted.
 //
 // Implementation: find the LAST "<" in the trimmed value; require everything
 // from there to the end of the string to be consumed by a tag-shaped
@@ -118,38 +111,28 @@ const WorkspaceOnly = z.object({
 // mid-attribute) AND require that fragment to carry the tool-call signal
 // above.
 //
-// Round-2 finding (F4, review_reports/review_T-E86-01.md): the attribute
-// value alternative is split in two, and only one of the two halves
-// actually forces the tag to be the tail. The TERMINATED half
-// (`"[^"]*"`) matches a complete `"value"` and MAY have arbitrary prose
-// after it elsewhere in the string, but that prose is what pushed the "<"
-// this match started from out of tail position in the first place — this
-// half never needs to reach end-of-string on its own, the outer
-// `\s*\/?>?$` anchor still does that job. The UNTERMINATED half
-// (`"[^"\s]*$`), which fires when the closing quote is missing, is where
-// the tail invariant actually has to be enforced explicitly: without the
-// `[^"\s]` exclusion and its own `$`, a greedy `[^"]*` would swallow
-// everything to end of string INCLUDING spaces and further sentences,
-// which is exactly what let a mid-string fragment like
-// `<parameter name="pending_notes and then three more sentences...`
-// reject in round 2 (AC2 violation — that fragment is not at the tail and
-// must be accepted). Excluding whitespace from the truncated value means
-// prose after the truncation point can no longer be absorbed, so the
-// match — and therefore the fire — only succeeds when the fragment
-// genuinely IS the tail.
+// The attribute-value alternative has two halves, and only one of them has
+// to force the tag to be the tail. The TERMINATED half (`"[^"]*"`) matches a
+// complete `"value"`; any prose after it would already have pushed the "<"
+// this match started from out of tail position, and the outer `\s*\/?>?$`
+// anchor still enforces the tail. The UNTERMINATED half (`"[^"\s]*$`),
+// which fires when the closing quote is missing, must enforce the tail
+// itself: without the `[^"\s]` exclusion and its own `$`, a greedy `[^"]*`
+// would swallow everything to the end of the string INCLUDING spaces and
+// further sentences, so a mid-string fragment like
+// `<parameter name="pending_notes and then three more sentences...` would
+// be wrongly rejected. Excluding whitespace from the truncated value means
+// prose after the truncation point cannot be absorbed, so the match only
+// succeeds when the fragment really IS the tail.
 //
-// What this predicate knowingly still does NOT catch (accepted, not
-// blocking, per round-2 coordinator scope decision — filed as NEW-3, a
-// purely-additive tag-name-vocabulary OR-branch, not implemented here):
-// a bare open tag with no attribute and no slash (`<parameter>`,
-// `<invoke>`, `<function_calls>`), a truncated attribute name with no `=`
-// yet (`<parameter name`), a self-closing tag with no attribute
-// (`<br/>`), and a single-quoted attribute (`<parameter name='x'>`, F3,
-// round 1). These are structurally indistinguishable from a bare
-// placeholder (`<role>`, `<div>`) without a tag-name vocabulary check,
-// which the design deliberately declines (see the F1 note above) —
-// widening this hole is the accepted price of closing F1 without
-// reintroducing it.
+// Known gaps, accepted: a bare open tag with no attribute and no slash
+// (`<parameter>`, `<invoke>`, `<function_calls>`), a truncated attribute
+// name with no `=` yet (`<parameter name`), a self-closing tag with no
+// attribute (`<br/>`), and a single-quoted attribute
+// (`<parameter name='x'>`). These look exactly like a bare placeholder
+// (`<role>`, `<div>`) without a tag-name vocabulary check, which the design
+// deliberately avoids (see the placeholder note above) — leaving them
+// uncaught is the price of never flagging ordinary prose.
 const TRAILING_TAG_FRAGMENT_RE =
   /<\/?[A-Za-z_][\w.:-]*(?:\s+[A-Za-z_][\w.:-]*(?:\s*=\s*(?:"[^"]*"|"[^"\s]*$))?)*\s*\/?>?$/;
 
@@ -175,9 +158,9 @@ function hasTrailingTagFragment(value: string): boolean {
   return hasToolCallSignal(tail);
 }
 
-// e86.rejection_message (specs/e92-e86-handoff-write-boundary.md Copy/Strings
-// table — quoted verbatim except for the "<field>" substitution the table
-// itself declares).
+// Rejection message text, quoted verbatim from the spec's Copy/Strings table
+// except for the "<field>" substitution the table declares.
+// (specs/e92-e86-handoff-write-boundary.md)
 function trailingTagFragmentMessage(field: string): string {
   return `Field "${field}" appears to end with leftover tool-call markup (a trailing tag fragment) — this usually means a malformed multi-argument call bled into this field. Re-issue the call with each argument in its own tag.`;
 }
@@ -279,48 +262,46 @@ const UpdateStateArgs = z
       })
       .strict()
       .optional(),
-    // v11 — dispatch_mode (e2-bugfix-repro-gate). Closed two-value enum:
-    // an out-of-enum value is rejected here, at the tool boundary, before any
-    // gate runs (the next_role closed-enum precedent). Absence === "feature"
-    // (the default) — the field is OPTIONAL and never seeded. DURABLE,
-    // feature-scoped (the dispatch_pins/external_refs lifetime, but scalar):
-    // carried forward across same-feature writes that omit it; dropped on
-    // active_feature change; NOT re-armed on PM re-entry. "bugfix" arms the
+    // dispatch_mode. Closed two-value enum: an out-of-enum value is
+    // rejected here, at the tool boundary, before any gate runs (like
+    // next_role's closed enum). Absence === "feature" (the default) — the
+    // field is OPTIONAL and never seeded. Kept for the feature's life (the
+    // dispatch_pins/external_refs rule, for a single value): carried
+    // forward across same-feature writes that omit it; dropped when
+    // active_feature changes; NOT re-armed on PM re-entry. "bugfix" arms the
     // file-mode repro-first gate (REPRO_MANIFEST_MISSING) on the
     // sr-engineer:In_Progress → code-reviewer:In_Progress fix-phase edge; it
-    // never gates a transition edge itself. File-mode only.
+    // never gates a transition edge itself. File-mode only. (E2, v11)
     dispatch_mode: z.enum(["feature", "bugfix"]).optional(),
-    // v14 — cut_approved_source (e114-cut-approval-inheritance). CLIENT-
-    // SETTABLE string, NOT closed-enum and NOT shape-validated at this
-    // boundary (contrast dispatch_mode's z.enum immediately above) — the
-    // server cannot verify a cross-workspace inheritance claim, so it accepts
-    // the writer's attestation here and defensively drops (never throws) any
-    // value that does not match the "inherited:<parent-feature>" shape at
-    // parse time (tools/handoff-parse.ts), mirroring dispatch_mode's
-    // defensive-drop posture rather than rejecting at this zod boundary.
-    // Contrast evidence_schema: server-stamped, deliberately NO zod arg here.
-    // DURABLE, feature-scoped (the dispatch_mode scalar algorithm): carried
-    // forward across same-feature writes that omit it; dropped on
-    // active_feature change; NOT re-armed on PM re-entry. Recording-only —
-    // never wired to a gate (AC9). File-mode only.
+    // cut_approved_source. A string set by the client, NOT a closed enum and
+    // NOT shape-validated at this boundary (unlike dispatch_mode's z.enum
+    // immediately above) — the server cannot verify a claim about another
+    // workspace, so it accepts the writer's attestation here and, at parse
+    // time (tools/handoff-parse.ts), silently drops any value that does not
+    // match the "inherited:<parent-feature>" shape rather than rejecting it
+    // at this zod boundary. Contrast evidence_schema, which the server stamps
+    // itself and which deliberately has NO zod arg here. Kept for the
+    // feature's life (the dispatch_mode single-value rule): carried forward
+    // across same-feature writes that omit it; dropped when active_feature
+    // changes; NOT re-armed on PM re-entry. For the record only — no gate
+    // reads it. File-mode only. (E114, v14)
     cut_approved_source: z.string().max(200).optional(),
-    // v15 — per-hop dispatch-mechanism attestation (e123a-lane-layout-
-    // migration, E99 option (i) + self-reported tier). dispatch_mechanism is a
-    // closed three-value enum rejected here, at the tool boundary, before any
-    // gate runs (the dispatch_mode / review_verdict closed-enum precedent).
-    // dispatch_mechanism_tier is bounded free text — the model-tier vocabulary
-    // is not owned by this server (the dispatch_pins value precedent).
-    // Attested, NOT verified. TRANSIENT, write-scoped (the next_role /
-    // review_verdict lifetime): persisted on THIS write only, never carried
-    // forward. Recording-only — no gate, no GateErrorCode, no predicate reads
-    // either field. File-mode only.
+    // Per-hop dispatch-mechanism attestation (with a self-reported tier).
+    // dispatch_mechanism is a closed three-value enum rejected here, at the
+    // tool boundary, before any gate runs (like dispatch_mode /
+    // review_verdict). dispatch_mechanism_tier is bounded free text — the
+    // model-tier vocabulary is not owned by this server (like dispatch_pins
+    // values). Attested, NOT verified. Applies to THIS write only (like
+    // next_role / review_verdict): never carried forward. For the record
+    // only — no gate, no GateErrorCode, no predicate reads either field.
+    // File-mode only. (E99, v15)
     dispatch_mechanism: z.enum(["task", "switch_role", "inline"]).optional(),
     dispatch_mechanism_tier: z.string().max(40).optional(),
-    // E10 (e10-lease-override) — two attested booleans, NO schema bump
-    // (architecture DR-1): neither is ever emitted to or read back from
-    // frontmatter. Both are TRANSIENT, write-scoped (the next_role/resume_of/
-    // review_verdict precedent, NOT the durable cut_approved/dispatch_mode
-    // precedent) and FILE-MODE only (spec AC9: SQLite mode ignores both).
+    // Two attested booleans, NO schema bump: neither is ever written to or
+    // read back from frontmatter. Both apply to THIS write only (like
+    // next_role/resume_of/review_verdict, unlike the durable
+    // cut_approved/dispatch_mode) and are FILE-MODE only (SQLite mode
+    // ignores both). (E10)
     // lease_override: human-attested FEATURE_LEASE_HELD bypass, any edge.
     // Consumed ONLY at the orchestrator lease gate from the incoming args;
     // requires a pending_notes[0] audit line matching /^lease-override:/
@@ -373,12 +354,12 @@ const UpdateStateArgs = z
     message: "active_feature must be a plain string id, not a serialised object",
     path: ["active_feature"],
   })
-  // E86 (AC1/AC2) — see hasTrailingTagFragment above. Checked against every
-  // free-text field named in the spec's Problem Statement as a historically
-  // affected field (pending_notes, scope_decision_why, qa_review,
-  // blocking_reason). Deliberately NOT a gate (gates/*.ts is L-GATE-owned) —
-  // this is a zod-level input-schema check, same layer as the
-  // "[object Object]" sentinel refine immediately above.
+  // Trailing tag-fragment check — see hasTrailingTagFragment above. Applied
+  // to every free-text field a malformed call has been seen to bleed into
+  // (pending_notes, scope_decision_why, qa_review, blocking_reason).
+  // Deliberately NOT a gate — this is a zod-level input-schema check, the
+  // same layer as the "[object Object]" sentinel refine immediately above.
+  // (E86)
   .superRefine((d, ctx) => {
     const scalarChecks: Array<{ field: string; value: string | undefined }> = [
       { field: "scope_decision_why", value: d.scope_decision_why },
@@ -431,9 +412,9 @@ const AddTaskArgs = z
     description: z.string().min(1).max(2000),
     section: z.string().min(1).max(200).optional(),
   })
-  // E86 (AC1/AC2) — the spec's Problem Statement names tw_add_task's
-  // `description` alongside pending_notes/scope_decision_why/qa_review as a
-  // free-text field the same malformed-call class can bleed into.
+  // Trailing tag-fragment check for tw_add_task's `description`, a free-text
+  // field the same malformed-call class can bleed into (like
+  // pending_notes/scope_decision_why/qa_review). (E86)
   .superRefine((d, ctx) => {
     if (hasTrailingTagFragment(d.description)) {
       ctx.addIssue({

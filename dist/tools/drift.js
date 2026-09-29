@@ -11,14 +11,14 @@ import { CURRENT_VERSIONS, peekVersion } from "../schema/versions.js";
 import { isHandAuthoredStamp } from "../gates/stamp-provenance.js";
 import { hasEvidenceAnywhere } from "./evidence-lookup.js";
 import { resolveCurrentLanePaths, resolveFlatLanePaths } from "./lane-paths.js";
-// e9a-stamp-integrity: the hand-authored-stamp predicate now lives in
-// gates/stamp-provenance.ts (E18 extracted it — single source of truth,
-// shared with the write-path STAMP_PROVENANCE_SUSPECT gate so the read-side
-// advisory and the write-side gate can never drift apart; see that module's
-// header for the shape rationale). THIS advisory stays advisory-only by
-// design: E1A's negative-age guard already fail-opens on an untrustworthy
-// stamp, so this is audit-trail signal, not a rejection path — the rejection
-// path is the E18 gate in tools/handoff-orchestrator.ts.
+// The hand-authored-stamp predicate lives in gates/stamp-provenance.ts — one
+// source of truth shared with the write-path STAMP_PROVENANCE_SUSPECT gate,
+// so the read-side advisory and the write-side gate can never drift apart
+// (see that module's header for the shape rationale). THIS advisory stays
+// advisory-only by design: the lease gate's negative-age guard already
+// fails open on an untrustworthy stamp, so this is an audit-trail signal,
+// not a rejection path — the rejection path is the stamp-provenance gate in
+// tools/handoff-orchestrator.ts. (E9A, E18)
 function computeStampAdvisory(lastUpdated) {
     if (!isHandAuthoredStamp(lastUpdated))
         return null;
@@ -27,28 +27,27 @@ function computeStampAdvisory(lastUpdated) {
         `the server's millisecond-entropy tw_update_state write path (new Date().toISOString()). ` +
         `Advisory only: verify how this stamp was produced.`);
 }
-// E112 case (b): detail line for the ids that WOULD have read as "Possible
-// vibe-coding drift" but have a QUALIFYING QA record on disk (root
-// qa_reports/, qa_reports/archive/<feature>/, or a `covers:` label line in
-// either — see tools/evidence-lookup.ts's content test: the last recorded
-// verdict must be PASS, or the file records no verdict at all). Names the
-// real structural cause instead of blaming the agent: `completed_tasks` is
-// feature-scoped and legitimately empties on an `active_feature` change, and
-// a merged parallel lane's ledger can be discarded on conflict (root cause
-// E150 — NOT fixed here; E112 is the detector). Explicitly warns that
-// `tw_sync` — the natural response to reported drift — is the WRONG remedy
-// for these ids: it would carry the previous feature's completion marks
-// forward into the new feature's ledger. One aggregate line (mirrors the
-// vibe-drift/handoff-ahead compression style above) rather than one line per
-// id — this bucket does not flip driftDetected and is never merged into
-// compressDriftDetails' output.
+// Detail line for the ids that WOULD have read as "Possible vibe-coding
+// drift" but have a QUALIFYING QA record on disk (root qa_reports/,
+// qa_reports/archive/<feature>/, or a `covers:` label line in either — see
+// tools/evidence-lookup.ts's content test: the last recorded verdict must be
+// PASS, or the file records no verdict at all). Names the real structural
+// cause instead of blaming the agent: `completed_tasks` is feature-scoped and
+// legitimately empties on an `active_feature` change, and a merged parallel
+// lane's ledger can be discarded on conflict (that root cause is not fixed
+// here; this only detects it). Explicitly warns that `tw_sync` — the natural
+// response to reported drift — is the WRONG remedy for these ids: it would
+// carry the previous feature's completion marks forward into the new
+// feature's ledger. One aggregate line (like the vibe-drift/handoff-ahead
+// compression style above) rather than one line per id — this bucket does
+// not flip driftDetected and is never merged into compressDriftDetails'
+// output. (E112, E150)
 //
-// C1 (round-2 fix) wording: round 1 asserted flatly "this is NOT
-// vibe-coding drift", which over-claimed what the check actually
-// establishes. The check inspects a RECORD, not the work itself — it can
-// say the record's last verdict reads PASS (or that no verdict was ever
-// recorded, the hand-authored-report case), not that the completion was
-// independently re-verified here. Worded accordingly below.
+// Wording: the check inspects a RECORD, not the work itself — it can say the
+// record's last verdict reads PASS (or that no verdict was ever recorded,
+// the hand-authored-report case), not that the completion was independently
+// re-verified here. So the line must not claim flatly that this "is NOT
+// vibe-coding drift".
 function buildEvidenceBackedLine(ids) {
     const idList = formatIdRange(ids);
     return (`${ids.length} task(s) (${idList}) show as completed in the task list with no matching entry in handoff ` +
@@ -60,11 +59,11 @@ function buildEvidenceBackedLine(ids) {
         `Do NOT run tw_sync to "fix" this: tw_sync would carry the previous feature's completion marks into the new ` +
         `feature's ledger. Verify via the cited qa_reports evidence instead.`);
 }
-// E112 case (a): fan-out scope advisory. Detects a LINKED git worktree the
-// same way bin/agc-init.mjs:607 (isLinkedWorktree) already does — a linked
-// worktree's `.git` is a FILE (git's "gitdir: <path>" gitfile) rather than a
-// directory. Pure fs.statSync, never shells out to git (the server charter is
-// that it does not touch git — see CLAUDE.md "What this server does NOT do").
+// Fan-out scope advisory. Detects a LINKED git worktree the same way
+// bin/agc-init.mjs (isLinkedWorktree) does — a linked worktree's `.git` is
+// a FILE (git's "gitdir: <path>" gitfile) rather than a directory. Pure
+// fs.statSync, never shells out to git (the server does not touch git — see
+// CLAUDE.md "What this server does NOT do"). (E112)
 function isLinkedWorktree(workspacePath) {
     try {
         return fs.statSync(path.join(workspacePath, ".git")).isFile();
@@ -84,16 +83,16 @@ function hasFeatureSplit(workspacePath) {
         return false;
     }
 }
-// E112 case (a): advisory-only, modelled on computeStampAdvisory above. Fires
-// whenever this workspace has active-scope incomplete tasks — the exact
-// condition under which "this workspace's ledger cannot see completions
-// recorded in a sibling lane" is a true, useful caveat. It never flips
-// driftDetected and is never merged into `details`: it is a SCOPE CAVEAT, not
-// a claim that anything is wrong. Per E109 (ratified: the server is
-// deliberately workspace-scoped, not cross-machine) this function reads ONLY
-// `workspacePath` — it never inspects another workspace, it only says that
-// this comparison's silence about other lanes is structural, not evidence of
-// their completeness.
+// Advisory-only, like computeStampAdvisory above. Fires whenever this
+// workspace has active-scope incomplete tasks — the exact condition under
+// which "this workspace's ledger cannot see completions recorded in a
+// sibling lane" is a true, useful caveat. It never flips driftDetected and
+// is never merged into `details`: it is a SCOPE CAVEAT, not a claim that
+// anything is wrong. The server is deliberately workspace-scoped, not
+// cross-machine, so this function reads ONLY `workspacePath` — it never
+// inspects another workspace, it only says that this comparison's silence
+// about other lanes is structural, not evidence of their completeness.
+// (E112, E109)
 function computeFanoutAdvisory(workspacePath, incompleteTasks) {
     if (incompleteTasks.length === 0)
         return null;
@@ -197,11 +196,11 @@ function compressDriftDetails(details) {
 function readArtifactVersion(workspacePath, kind) {
     try {
         if (kind === "handoff") {
-            // E123 F1 L1: handoff path via the lane seam. e123c (J2-NEW-9): the
-            // read-only lane-then-flat fallback readAndMigrate uses (e123b9
-            // AC13) — an unmigrated flat workspace's future-schema handoff must
-            // still surface here as graceful skew drift, not as the parser's raw
-            // refusal. No lock, no migration, no write.
+            // Handoff path via the lane seam, with the read-only lane-then-flat
+            // fallback readAndMigrate uses — an unmigrated flat workspace's
+            // future-schema handoff must still show up here as graceful skew
+            // drift, not as the parser's raw refusal. No lock, no migration, no
+            // write. (E123)
             const abs = path.resolve(workspacePath);
             const lanePath = resolveCurrentLanePaths(abs).handoffPath;
             const p = fs.existsSync(lanePath) ? lanePath : resolveFlatLanePaths(abs).handoffPath;
@@ -215,8 +214,8 @@ function readArtifactVersion(workspacePath, kind) {
             return peekVersion(parsed);
         }
         if (kind === "tasks") {
-            // e125a AC10: findTasksFile is lane-aware — the lane ledger, else the
-            // legacy file — so a future-schema root index still reports skew.
+            // findTasksFile is lane-aware — the lane ledger, else the legacy file —
+            // so a future-schema root index still reports skew. (E125a)
             const tasksPath = findTasksFile(workspacePath);
             if (!tasksPath)
                 return null;
@@ -308,10 +307,11 @@ export function detectDrift(workspacePath) {
         };
         return JSON.stringify(report);
     }
-    // e9a-stamp-integrity: computed once, right after handoff is confirmed
-    // non-null, then threaded into every return path from this point forward.
-    // No storage-mode scoping: last_updated is populated by both HandoffStorage
+    // Stamp advisory: computed once, right after handoff is confirmed non-null,
+    // then threaded into every return path from this point forward. No
+    // storage-mode scoping: last_updated is populated by both HandoffStorage
     // implementations via the same server-side new Date().toISOString() path.
+    // (E9A)
     const stampAdvisory = computeStampAdvisory(handoff.last_updated);
     if (!tasks) {
         const report = {
@@ -369,21 +369,21 @@ export function detectDrift(workspacePath) {
             drifts.push(`Handoff says ${taskId} completed, but task list shows it as incomplete.`);
         }
     }
-    // E112 case (b): an id that would otherwise read as "Possible vibe-coding
-    // drift" is instead diverted to evidenceBackedIds when a QUALIFYING QA
-    // record for it exists anywhere tools/evidence-lookup.ts looks
-    // (qa_reports/ root, qa_reports/archive/<feature>/, or a covers: label
-    // line in either — see that module's content test). The driftBaselineIds
-    // exemption above still runs FIRST and unchanged — E112 must not be solved
-    // by pushing this case onto that baseline (it advances once per release;
-    // active_feature changes far more often). Only ids that survive both
-    // checks and have NO qualifying evidence anywhere keep the exact original
-    // "Possible vibe-coding drift" string and keep flipping driftDetected.
+    // An id that would otherwise read as "Possible vibe-coding drift" is
+    // instead moved to evidenceBackedIds when a QUALIFYING QA record for it
+    // exists anywhere tools/evidence-lookup.ts looks (qa_reports/ root,
+    // qa_reports/archive/<feature>/, or a covers: label line in either — see
+    // that module's content test). The driftBaselineIds exemption above still
+    // runs FIRST and unchanged — this case must not be handled by pushing ids
+    // onto that baseline (it advances once per release; active_feature
+    // changes far more often). Only ids that survive both checks and have NO
+    // qualifying evidence anywhere keep the exact original "Possible
+    // vibe-coding drift" string and keep flipping driftDetected. (E112)
     //
-    // Q1/P1 (round-2 fix): the candidate ids are collected FIRST and looked up
-    // in one batch call, so hasEvidenceAnywhere builds each archive directory
-    // listing / covers: coverage index at most once per detectDrift call
-    // rather than once per drifted id.
+    // The candidate ids are collected FIRST and looked up in one batch call,
+    // so hasEvidenceAnywhere builds each archive directory listing / covers:
+    // coverage index at most once per detectDrift call rather than once per
+    // drifted id.
     const evidenceCandidateIds = completedTasks.filter((taskId) => !baselineIds.has(taskId) && !handoffTaskIds.includes(taskId));
     const evidenceQualifiedIds = hasEvidenceAnywhere(workspacePath, evidenceCandidateIds);
     const evidenceBackedIds = [];
@@ -403,9 +403,9 @@ export function detectDrift(workspacePath) {
             drifts.push(`Handoff status is ${handoff.status}, but ${incompleteTasks.length} tasks remain incomplete.`);
         }
     }
-    // E112 case (a): advisory-only, computed now that incompleteTasks is known.
-    // Never merged into `details`, never flips driftDetected (see
-    // computeFanoutAdvisory's header comment).
+    // Fan-out advisory, computed now that incompleteTasks is known. Never
+    // merged into `details`, never flips driftDetected (see
+    // computeFanoutAdvisory's header comment). (E112)
     const fanoutAdvisory = computeFanoutAdvisory(workspacePath, incompleteTasks);
     let details;
     if (drifts.length > 0) {
