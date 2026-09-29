@@ -1,7 +1,7 @@
 // Coded by @sr-engineer
 // tools/lane-ticket-allocation.ts — collision-free backlog-id allocation for
-// findings filed by lane worktrees (E124, e124-lane-ticket-allocation; spec
-// specs/e124-lane-ticket-allocation.md AC1-AC9).
+// findings filed by lane worktrees (spec:
+// specs/e124-lane-ticket-allocation.md). (E124)
 //
 // The problem this closes: two lanes forked from the same base both read
 // "max is E176" and both mint E177, and because each lane appends its own
@@ -10,19 +10,17 @@
 // real id at all. It files a candidate under a lane-local token
 // (`<LANE>-NEW-n`) in `.current/<lane>/pending-tickets.md`, and a single
 // writer later allocates real ids in one sequential apply that observes the
-// previous apply's result (AC5). Collision-freedom follows from that
-// single-writer discipline, which this module assumes but does not enforce.
+// previous apply's result. Collision-freedom follows from that single-writer
+// discipline, which this module assumes but does not enforce.
 //
-// PURE BY CONSTRUCTION (spec AC preamble): no `fs`, no `child_process`, no
-// clock, no environment read. Every impure edge — reading
+// PURE BY CONSTRUCTION: no `fs`, no `child_process`, no clock, no
+// environment read. Every impure edge — reading
 // `.current/<lane>/pending-tickets.md` (or `git show <branch>:<path>` for an
 // orphaned branch), reading `docs/backlog.md`, enumerating worktrees and
 // branches, writing results back — is an explicit argument or return value
-// owned by the caller. Wiring any of this into `agc feature start/finish`,
-// `agc check`, or an SOP is E124b, out of scope here. Nothing in this module
-// changes today's `NEW-TICKETS.md` convention (AC1).
+// owned by the caller (the `agc feature` CLI wires it up).
 //
-// FILE FORMAT (AC1). `pending-tickets.md` is ordinary markdown; only fenced
+// FILE FORMAT. `pending-tickets.md` is ordinary markdown; only fenced
 // blocks whose info string is exactly `pending-ticket` carry data, so
 // free-form discussion prose around them is ignored:
 //
@@ -38,8 +36,9 @@
 //
 // A block never carries an `id` field — the real id is the allocator's to
 // assign, never the lane's. Blocks under a `## Applied` heading are the
-// archive `markApplied` maintains (AC8): kept verbatim, never returned by
-// `parsePendingTickets`, so "has at least one unapplied entry" (AC7's input)
+// archive `markApplied` maintains: kept verbatim, never returned by
+// `parsePendingTickets`, so "has at least one unapplied entry" (the orphan
+// check's input) is a checkable fact rather than "the file exists".
 // is a checkable fact rather than "the file exists".
 //
 // Degrade-honestly (same posture as tools/lane-registry.ts): one malformed
@@ -63,13 +62,13 @@ export interface PendingTicketEntry {
   lane: string;
 }
 
-/** Optional third argument to `parsePendingTickets` (e179 AC6, ruling R1). */
+/** Optional third argument to `parsePendingTickets`. (E179) */
 export interface ParsePendingTicketsOptions {
   /** laneLocalIds that docs/backlog.md already records for THIS lane (from
    *  `findAppliedProvenance`). When provided, every well-formed ARCHIVED
    *  block (under `## Applied`) whose `lane_local_id` is NOT in the set is
    *  reported in `errors` — it will never be allocated. When omitted,
-   *  archived blocks are never inspected (the E124 behaviour). */
+   *  archived blocks are never inspected. (E179) */
   appliedLaneLocalIds?: ReadonlySet<string>;
 }
 
@@ -129,20 +128,20 @@ export interface AllocateTicketIdsInput {
 // ---------------------------------------------------------------------------
 
 const PENDING_INFO = "pending-ticket";
-// Backtick fences only (e179 AC9 removed tilde fences and the
-// info-string-may-not-contain-a-backtick special case that served them).
+// Backtick fences only (no tilde fences, so no special case for an info
+// string that may not contain a backtick). (E179)
 const OPEN_FENCE_RE = /^ {0,3}(`{3,})(.*)$/;
 const CLOSE_FENCE_RE = /^ {0,3}(`{3,})[ \t]*\r?$/;
 // A line that would open a `pending-ticket` block: the same info-string rule
 // the scanner applies (first whitespace token === "pending-ticket"). Used
-// only to detect an opener swallowed by an enclosing non-pending fence
-// (e179 AC7).
+// only to detect an opener swallowed by an enclosing non-pending fence.
+// (E179)
 const PENDING_OPENER_RE = /^ {0,3}(`{3,})[ \t]*pending-ticket(?:[ \t]|\r?$)/;
 // Only h1/h2 open or close a section; `## Applied` (case-sensitive, optional
 // trailing whitespace) is the archive heading markApplied writes.
 const SECTION_HEADING_RE = /^ {0,3}#{1,2}[ \t]/;
 const APPLIED_HEADING_RE = /^ {0,3}##[ \t]+Applied[ \t]*\r?$/;
-// An existing backlog id, including a sub-lettered split (E174a, E9A).
+// An existing backlog id, including a sub-lettered split (e.g. E174a, E9A).
 const BACKLOG_ID_RE = /^E\d+[A-Za-z]*$/;
 
 interface ScannedBlock {
@@ -166,7 +165,7 @@ interface AppliedSection {
 }
 
 /** A `pending-ticket` opener that sits inside an enclosing NON-pending fence
- *  and therefore never became a block (e179 AC7, ruling (b)). */
+ *  and therefore never became a block. (E179) */
 interface SwallowedOpener {
   /** 0-based line of the enclosing non-pending fence's opener. */
   fenceStart: number;
@@ -197,7 +196,7 @@ interface ScanResult {
  * contain `## Applied` or a shorter fence. Closing-fence rule follows
  * CommonMark: a backtick run at least as long as the opener's.
  *
- * Swallowed openers (e179 AC7): a `pending-ticket` opener seen while a
+ * Swallowed openers: a `pending-ticket` opener seen while a
  * NON-pending fence is open is recorded. When that fence closes, each one
  * whose run is >= the fence's run is reported as `closes-enclosing-fence`
  * (under CommonMark its closer necessarily ended the outer fence, so it can
@@ -349,9 +348,9 @@ function normalizeDependsOn(v: unknown): string[] | null {
 /**
  * Validates one scanned block in isolation (the per-block rules of
  * `parsePendingTickets`, minus the file-level duplicate check). Shared by
- * live and archived blocks (e179 AC6) so "archived well-formed block" and
- * "live entry" can never diverge. `error` is the reason only; the caller
- * prefixes the block's ordinal/line.
+ * live and archived blocks so "archived well-formed block" and "live entry"
+ * can never diverge. `error` is the reason only; the caller prefixes the
+ * block's ordinal/line. (E179)
  */
 function validateBlock(
   block: ScannedBlock,
@@ -412,7 +411,7 @@ function validateBlock(
 
 /**
  * Extracts every well-formed, unapplied `pending-ticket` block from a lane's
- * `pending-tickets.md` text (AC1/AC2). Prose, other fenced blocks, and
+ * `pending-tickets.md` text. Prose, other fenced blocks, and
  * blocks archived under `## Applied` are ignored. A block is skipped and
  * reported in `errors` — its siblings still parse — when it is unclosed,
  * is not a YAML mapping, lacks a non-empty string `lane_local_id`, `title`,
@@ -421,13 +420,14 @@ function validateBlock(
  * in `depends_on`), has a malformed `depends_on`/`source`/`body`, or repeats
  * a `lane_local_id` already taken by an earlier block in the same file.
  *
- * Also reported, never changing `entries` (e179):
- *   - AC7: a `pending-ticket` opener swallowed by an enclosing non-pending
+ * Also reported, never changing `entries`:
+ *   - a `pending-ticket` opener swallowed by an enclosing non-pending
  *     fence that is unclosed at EOF, or whose own closer ends that fence;
- *   - AC6 (only when `opts.appliedLaneLocalIds` is given): a well-formed
+ *   - (only when `opts.appliedLaneLocalIds` is given) a well-formed
  *     archived block whose `lane_local_id` has no provenance row in the
  *     backlog — a finding written below `## Applied` that would never be
  *     allocated. An archived block that fails validation is never reported.
+ *     (E179)
  * Never throws.
  */
 export function parsePendingTickets(
@@ -490,7 +490,7 @@ function tableCell(text: string): string {
 /** The provenance parenthetical's opening, up to and including the
  *  laneLocalId's closing backtick. The ONE composer of that text:
  *  `formatBacklogRow` writes it and `findAppliedProvenance` matches it, so a
- *  change to the row format cannot silently desynchronise the two (e179). */
+ *  change to the row format cannot silently desynchronise the two. (E179) */
 function provenancePrefix(lane: string, laneLocalId: string): string {
   return `(filed by lane \`${lane}\` as \`${laneLocalId}\``;
 }
@@ -625,7 +625,7 @@ const BACKLOG_ROW_ID_RE = /^[ \t]*\|[ \t]*E(\d+)[A-Za-z]*[ \t]*\|/;
 
 /**
  * Highest BASE number across every ticket-table row whose leading cell is
- * an `E<n>` id (AC6). A sub-lettered split counts by its base (`E174a` ->
+ * an `E<n>` id. A sub-lettered split counts by its base (`E174a` ->
  * 174, `E9A` -> 9) — ignoring it would undercount the true max, and an
  * undercount is exactly the collision this module exists to prevent. An id
  * mentioned in any later cell or in prose is never counted. Returns 0 when
@@ -645,7 +645,7 @@ export function extractMaxBacklogId(backlogText: string): number {
 }
 
 // ---------------------------------------------------------------------------
-// e179 — findAppliedProvenance / appendBacklogRows (finish-time wiring)
+// findAppliedProvenance / appendBacklogRows (finish-time wiring, E179)
 // ---------------------------------------------------------------------------
 
 // Same row shape as BACKLOG_ROW_ID_RE, capturing the whole leading-cell id.
@@ -654,14 +654,15 @@ const BACKLOG_ROW_FULL_ID_RE = /^[ \t]*\|[ \t]*(E\d+[A-Za-z]*)[ \t]*\|/;
 /**
  * laneLocalId -> backlog row id (e.g. "E190") for every ticket-table row
  * whose desc cell carries `formatBacklogRow`'s provenance parenthetical for
- * `lane` (e179 AC3(b) re-run idempotency, AC6 ruling R1). Only lines whose
- * leading cell is an `E<n>` id are scanned, so prose, fenced examples and
- * tables without an id column never match. The match is exact on both
- * values: the lane is compared as `formatBacklogRow` + the row's cell
- * transform would have written it, and the laneLocalId must be followed by
- * its closing backtick and then `)` or `;` — `e17` never matches `e179`, and
- * `X-NEW-1` never matches `X-NEW-10`. An escaped `\|` inside a captured
- * laneLocalId is unescaped. First occurrence wins. Pure.
+ * `lane` — so re-running finish is idempotent and archived blocks can be
+ * checked for provenance. Only lines whose leading cell is an `E<n>` id are
+ * scanned, so prose, fenced examples and tables without an id column never
+ * match. The match is exact on both values: the lane is compared as
+ * `formatBacklogRow` + the row's cell transform would have written it, and
+ * the laneLocalId must be followed by its closing backtick and then `)` or
+ * `;` — `e17` never matches `e179`, and `X-NEW-1` never matches `X-NEW-10`.
+ * An escaped `\|` inside a captured laneLocalId is unescaped. First
+ * occurrence wins. Pure. (E179)
  */
 export function findAppliedProvenance(backlogText: string, lane: string): Map<string, string> {
   const out = new Map<string, string>();
@@ -719,7 +720,7 @@ export function appendBacklogRows(backlogText: string, rows: string[]): string {
 
 /**
  * Branches that still carry at least one unapplied pending ticket but no
- * longer have a live worktree (AC7) — an abandoned lane's findings that
+ * longer have a live worktree — an abandoned lane's findings that
  * would otherwise be silently lost. Plain-data set logic: compares BRANCH
  * names against BRANCH names by exact string equality, never against lane
  * names, and never shells out. The caller normalizes both sides the same
@@ -728,14 +729,13 @@ export function appendBacklogRows(backlogText: string, rows: string[]): string {
  *
  * `hasUnappliedPendingTickets` must be computed by the caller as
  * `parsePendingTickets(text, lane).entries.length > 0` over the COMMITTED
- * `.current/<lane>/pending-tickets.md` of the branch's OWN lane only (e179
- * AC5, E179-NEW-2 option (a): the lane the branch resolves to, e.g.
- * `feat/e179-x` -> `e179`; a branch resolving to no lane is not a
- * candidate). Another lane's file the branch happens to carry — forked from
- * base between that lane's merge and its finish — is never consulted. And
- * NOT "the file exists": `markApplied` leaves the file in place with its
- * entries archived, so existence alone would report an already-applied lane
- * as an orphan forever.
+ * `.current/<lane>/pending-tickets.md` of the branch's OWN lane only (the
+ * lane the branch resolves to, e.g. `feat/e179-x` -> `e179`; a branch
+ * resolving to no lane is not a candidate). Another lane's file the branch
+ * happens to carry — forked from base between that lane's merge and its
+ * finish — is never consulted. And NOT "the file exists": `markApplied`
+ * leaves the file in place with its entries archived, so existence alone
+ * would report an already-applied lane as an orphan forever. (E179)
  *
  * Returns the matching branches in input order, de-duplicated; `[]` on
  * empty input.

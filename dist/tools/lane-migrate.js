@@ -1,39 +1,35 @@
 // Coded by @sr-engineer
-// Flat <-> live-lane layout migration runners (e123a-lane-layout-migration,
-// E123 F0, spec AC6-AC10/AC15; re-targeted and split by e123b9 J2, spec
-// AC2/AC5/AC12/AC15).
+// Flat <-> live-lane layout migration runners. (E123)
 //
 //   migrateFlatToLane(ws, opts?)       .current/<file>        -> .current/<lane>/<file>
 //   migrateLaneToFlat(ws, lane, opts?) .current/<lane>/<file> -> .current/<file>
 //
-// Each runner is TWO functions (e123b9 spec AC12): a lock-free `*Locked` core
+// Each runner is TWO functions: a lock-free `*Locked` core
 // that does the whole pre-flight + move critical section and assumes the
 // caller already holds the lane's lock, plus a thin public wrapper that
 // acquires that lock and calls the core — the same shape as
 // tools/handoff-write.ts's writeHandoffState / writeHandoffStateCore.
 // guards/file-lock.ts's withFileLock is O_EXCL-based and NOT re-entrant, so a
-// caller that already holds the lane lock (T-E123B9-02's
-// writeHandoffStateCore) MUST call the core; every other caller calls the
+// caller that already holds the lane lock (writeHandoffStateCore) MUST call
+// the core; every other caller calls the
 // wrapper. Nothing may acquire the same lock path twice on one call stack.
 //
-// Destination lane (e123b9 spec AC2, Decision 1, human 2026-09-23): the
-// flat->lane runner targets the BRANCH-based live resolver
-// (tools/lane-paths.ts's resolveCurrentLane), not the lane implied by the
-// flat handoff's active_feature. This modifies D1 of .current/feature-split.md
-// (its fallback rung). The runner therefore no longer parses the flat handoff
-// at all — and must not import tools/handoff-parse.ts, which (T-E123B9-02)
+// Destination lane: the flat->lane runner targets the BRANCH-based live
+// resolver (tools/lane-paths.ts's resolveCurrentLane), not the lane implied
+// by the flat handoff's active_feature. The runner therefore never parses the
+// flat handoff at all — and must not import tools/handoff-parse.ts, which
 // imports this module.
 //
-// Lock (e123b9 spec AC5, Decision 2): PER-LANE, at resolveLaneLockPath(ws,
+// Lock: PER-LANE, at resolveLaneLockPath(ws,
 // lane) = `.current/<lane>/.handoff.lock` — for flat->lane the destination
 // lane above, for lane->flat the source lane. A live writer of the same lane
 // takes the same lockfile, so the migration and that writer serialize.
 //
-// Candidate file set (e123a AC15): derived by ITERATING tools/lane-paths.ts's
+// Candidate file set: derived by ITERATING tools/lane-paths.ts's
 // LANE_FILES registry — never a second list of filenames. Anything that is
 // not a LANE_FILES entry (.current/.config.json, exemptions.json,
 // .current/feature-split.md, .current/archive/, ...) is never read, moved or
-// deleted by either runner. e125a (spec AC2, architecture D1): a LANE_FILES
+// deleted by either runner. A LANE_FILES
 // entry marked `noFlatCounterpart` (tasks.md) is ALSO never planned — its
 // legacy location is not `.current/<filename>`, and its flat<->lane
 // transition belongs to the tasks lane migration. lane->flat refuses outright
@@ -44,14 +40,14 @@
 //     handoff writer (tools/handoff-write.ts) ends on. The source file is
 //     already complete on disk, so the rename itself is the atomic publish:
 //     readers see the file at its old path or its new path, never partial.
-//     Bytes are untouched (e123a AC9 round trip is byte-identical).
-//   - Refuse, never clobber (e123a AC7): every check (required entry
+//     Bytes are untouched (a round trip is byte-identical).
+//   - Refuse, never clobber: every check (required entry
 //     present, destination conflict, lane-dir purity) runs BEFORE the first
 //     move. The required handoff.md at a destination with DIFFERENT bytes
 //     throws with both sides untouched; IDENTICAL bytes is a completed move
 //     from an interrupted prior run: the redundant source is removed and the
 //     entry is reported as moved (idempotent resume).
-//   - Sidecar merge, flat->lane ONLY (e123b9 spec AC15): an OPTIONAL
+//   - Sidecar merge, flat->lane ONLY: an OPTIONAL
 //     append-only JSONL entry (telemetry/metrics/usage/dispatch.jsonl)
 //     already present at the lane destination is the normal case (e.g. the
 //     usage hook appended to the lane path before the first tw_* call
@@ -59,7 +55,7 @@
 //     pre-existing lines — and published atomically (tmp + rename) inside the
 //     same critical section. The reverse runner keeps refuse-on-different-
 //     content for every entry: a merge cannot be un-merged.
-//   - Never merged (e179 AC10, DR-10): any optional entry that is NOT a
+//   - Never merged: any optional entry that is NOT a
 //     `.jsonl` append log — today pending-tickets.md, committed markdown —
 //     is required-shaped at the destination in both directions: identical
 //     bytes -> drop, different bytes -> refuse. Concatenating two markdown
@@ -68,16 +64,16 @@
 //     a hand-edited file. A future non-JSONL optional entry defaults here
 //     (the safe direction).
 //
-// Out of scope (spec): the live-lane -> .current/history/<YYYY-MM>/<lane>/
-// close-time move (E73/E125) is a different operation and is NOT here.
+// Out of scope: the live-lane -> .current/history/<YYYY-MM>/<lane>/
+// close-time move is a different operation and is NOT here.
 import * as fs from "fs";
 import * as path from "path";
 import { isLockPayloadStale, withFileLock } from "../guards/file-lock.js";
 import { LANE_FILES, HANDOFF_LOCK_FILENAME, isBytePrefix, isSafeLaneName, laneFile, resolveCurrentLane, resolveLaneDir, resolveLaneLockPath, } from "./lane-paths.js";
-// e125a (spec AC2, architecture D1): the LANE_FILES entries the E123 runners
-// plan moves for — every entry except a `noFlatCounterpart` one (tasks.md).
-// isStaleAtomicTmp below deliberately keeps iterating the FULL registry: a
-// stale `tasks.md.<pid>.<ms>.tmp` is still tolerable debris.
+// The LANE_FILES entries the flat<->lane runners plan moves for — every entry
+// except a `noFlatCounterpart` one (tasks.md). isStaleAtomicTmp below
+// deliberately keeps iterating the FULL registry: a stale
+// `tasks.md.<pid>.<ms>.tmp` is still tolerable debris. (E125a)
 const MOVABLE_LANE_FILES = LANE_FILES.filter((f) => !f.noFlatCounterpart);
 // The lane-local task ledger's filename (the registry owns the literal) and
 // its per-file lock sibling (architecture "Per-file tasks lock").
@@ -92,16 +88,16 @@ const ATOMIC_TMP_SUFFIX_RE = /^\.\d+\.\d+\.tmp$/;
 function isStaleAtomicTmp(name) {
     return LANE_FILES.some((f) => name.startsWith(f.filename) && ATOMIC_TMP_SUFFIX_RE.test(name.slice(f.filename.length)));
 }
-// e123b8 J1 (spec AC5): lane-dir debris migrateLaneToFlat tolerates — a
-// lockfile or a stale atomic-write temp file. Never moved. Since e123b9 J2
-// the lockfile in the lane dir is the lane lock the caller HOLDS, so the core
-// never deletes it (only withFileLock's release does); stale tmp files are
-// removed with the lane dir. Every other non-LANE_FILES entry still refuses.
-// e125a (spec AC2): `tasks.md.lock` alone is tolerable too. It is NOT the
-// caller's lock, so after the moves it is removed ONLY when stale
-// (guards/file-lock.ts's isLockPayloadStale — withFileLock's own predicate);
-// a live one (a tasks-ledger writer mid-operation) stays, and so does the
-// lane dir holding it.
+// Lane-dir debris migrateLaneToFlat tolerates — a lockfile or a stale
+// atomic-write temp file. Never moved. The lockfile in the lane dir is the
+// lane lock the caller HOLDS, so the core never deletes it (only
+// withFileLock's release does); stale tmp files are removed with the lane
+// dir. Every other non-LANE_FILES entry still refuses. (E123)
+// `tasks.md.lock` alone is tolerable too. It is NOT the caller's lock, so
+// after the moves it is removed ONLY when stale (guards/file-lock.ts's
+// isLockPayloadStale — withFileLock's own predicate); a live one (a
+// tasks-ledger writer mid-operation) stays, and so does the lane dir holding
+// it. (E125a)
 function isTolerableDebris(name) {
     return name === HANDOFF_LOCK_FILENAME || name === TASKS_LOCK_FILENAME || isStaleAtomicTmp(name);
 }
@@ -145,7 +141,7 @@ function removeDirIfEmpty(dir) {
 }
 // Append-only JSONL logs merge by concatenation; any other optional lane file
 // (pending-tickets.md) is required-shaped at the destination: identical bytes
-// -> drop, different bytes -> refuse, never merge (e179 AC10, DR-10).
+// -> drop, different bytes -> refuse, never merge. (E179)
 const isAppendLog = (e) => e.filename.endsWith(".jsonl");
 // Pre-flight over the registry. Throws — before anything is touched — on a
 // missing required entry or a conflicting destination. Returns the move plan
@@ -205,9 +201,9 @@ function planMoves(srcDir, destDir, direction, mergeSidecars, requiredMayBeAbsen
     return { plan, skipped };
 }
 // The byte-prefix check above is tools/lane-paths.ts's isBytePrefix — the
-// ONE predicate shared with the read-side aggregation (e123c spec, "Double-
-// count rule"), so a flat file this resume would drop is exactly a flat file
-// tw_gate_stats / sumUsageForFeature skip as half-merged.
+// ONE predicate shared with the read-side aggregation, so a flat file this
+// resume would drop is exactly a flat file tw_gate_stats /
+// sumUsageForFeature skip as half-merged. (E123)
 const NEWLINE = Buffer.from("\n");
 const MERGE_MAX_ATTEMPTS = 5;
 // AC15 merge: publish `src ++ dest` at `dest` atomically (tmp + rename), then
@@ -267,7 +263,7 @@ function executeMoves(plan) {
     return { moved, merged };
 }
 /**
- * LOCK-FREE CORE of the flat->lane migration (e123b9 spec AC12).
+ * LOCK-FREE CORE of the flat->lane migration. (E123)
  *
  * CONTRACT: the caller MUST already hold
  * `withFileLock(resolveLaneLockPath(workspacePath, lane))` for the exact
@@ -277,27 +273,26 @@ function executeMoves(plan) {
  * takes NO lock itself; calling the public migrateFlatToLane while holding
  * the lane lock would self-deadlock until LOCK_MAX_WAIT_MS and then fail,
  * because withFileLock is not re-entrant. Intended caller:
- * tools/handoff-write.ts's writeHandoffStateCore (T-E123B9-02), from inside
- * its own per-lane locked section, BEFORE it resolves handoffPath for the
- * write. The lane directory already exists (it hosts the held lock).
+ * tools/handoff-write.ts's writeHandoffStateCore, from inside its own
+ * per-lane locked section, BEFORE it resolves handoffPath for the write. The
+ * lane directory already exists (it hosts the held lock).
  *
  * Behaviour: moves every present flat LANE_FILES entry into
- * `.current/<lane>/`, sidecars first and handoff.md last (amendment AC17).
+ * `.current/<lane>/`, sidecars first and handoff.md last.
  * The required entry must be present at the flat source (throws otherwise,
  * nothing moved), except:
  *   - absent at the source and already in the lane (a completed or
  *     interrupted migration): any leftover flat sidecars are swept in via
- *     the AC15 merge/resume rule (amendment AC18); with none left over it is
- *     the loser of a concurrent race (AC-MIG-3) — `alreadyMigrated: true`,
- *     nothing touched;
- *   - absent at both paths with `opts.allowMissingRequired` (amendment
- *     AC19): the sidecars are moved, no throw.
+ *     the sidecar merge/resume rule; with none left over it is the loser of
+ *     a concurrent race — `alreadyMigrated: true`, nothing touched;
+ *   - absent at both paths with `opts.allowMissingRequired`: the sidecars
+ *     are moved, no throw.
  * Absent optional entries are skipped silently. An optional JSONL sidecar
- * already present in the lane is merged (flat lines first) — spec AC15; a
- * non-JSONL optional entry (pending-tickets.md) with different bytes at both
- * ends refuses instead, nothing moved (e179 AC10). handoff.md
- * at both paths with different bytes throws (dual presence is surfaced one
- * layer up as HANDOFF_LAYOUT_CONFLICT by T-E123B9-02; this is the backstop).
+ * already present in the lane is merged (flat lines first); a non-JSONL
+ * optional entry (pending-tickets.md) with different bytes at both ends
+ * refuses instead, nothing moved. handoff.md at both paths with different
+ * bytes throws (dual presence is reported one layer up as
+ * HANDOFF_LAYOUT_CONFLICT; this is the backstop).
  */
 export function migrateFlatToLaneLocked(workspacePath, opts = {}) {
     const lane = opts.lane ?? resolveCurrentLane(workspacePath);
@@ -380,7 +375,7 @@ export async function migrateFlatToLane(workspacePath, opts = {}) {
     }
 }
 /**
- * LOCK-FREE CORE of the lane->flat migration (e123b9 spec AC12).
+ * LOCK-FREE CORE of the lane->flat migration. (E123)
  *
  * CONTRACT: the caller MUST already hold
  * `withFileLock(resolveLaneLockPath(workspacePath, lane))`. This function
@@ -391,14 +386,14 @@ export async function migrateFlatToLane(workspacePath, opts = {}) {
  * empty, and otherwise leaves it holding just the lock for the caller to
  * remove after releasing (the public wrapper does exactly that).
  *
- * Behaviour (unchanged by e123b9 AC15 — no sidecar merge in this direction):
+ * Behaviour (no sidecar merge in this direction):
  * moves `.current/<lane>/`'s lane files back to flat `.current/`. Refuses
  * (throws, touches nothing) when the lane directory is missing, lacks the
  * required entry, holds anything that is not a LANE_FILES entry or tolerable
  * debris (a HANDOFF_LOCK_FILENAME regular file, a `tasks.md.lock` regular
  * file, a stale `<lane file>.<pid>.<ms>.tmp`), or a flat destination exists
- * with different content — and (e125a spec AC2) whenever the lane dir holds
- * tasks.md. Stale tmp debris and a stale tasks.md.lock are removed after the
+ * with different content — and whenever the lane dir holds tasks.md
+ * (E125a). Stale tmp debris and a stale tasks.md.lock are removed after the
  * moves; the held .handoff.lock and a live tasks.md.lock never are.
  */
 export function migrateLaneToFlatLocked(workspacePath, lane, opts = {}) {
@@ -415,8 +410,8 @@ export function migrateLaneToFlatLocked(workspacePath, lane, opts = {}) {
     catch {
         throw new Error(`lane-migrate (lane->flat): lane directory ${laneDir} not found — nothing moved`);
     }
-    // e125a (spec AC2, architecture D2): the lane-local ledger has no flat
-    // `.current/` home — refuse before any classification, touching nothing.
+    // The lane-local ledger has no flat `.current/` home — refuse before any
+    // classification, touching nothing. (E125a)
     if (isFile(path.join(laneDir, TASKS_FILENAME))) {
         throw new Error(`lane-migrate (lane->flat): ${laneDir} holds ${TASKS_FILENAME} — run the tasks reverse migration first; nothing moved`);
     }
