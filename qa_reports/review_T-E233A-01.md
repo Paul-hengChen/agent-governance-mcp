@@ -40,3 +40,62 @@ Result: tests 2958 / pass 2955 / fail 0 / skipped 3 (round 1: 2954 pass / 1 fail
 AC7 (no failure green at base 6c61864): satisfied, zero failures.
 No test/** or dist/ changes in 6c61864..HEAD (comment-only lane). Phase 3: skipped per dispatch brief (no test writes permitted). Covers: T-E233A-01..09.
 Verdict: PASS.
+## 2026-09-29T12:33:58.883Z — PASS — by qa-engineer
+
+Round 2 PASS. Full suite via test-lock: 2958 tests / 2955 pass / 0 fail / 3 skip (round 1: 1 fail, hygiene-scan on lane-doc home-path quotes, fixed 05db100/57ce003). AC7 met. No test/** changes; dist is rebuilt output of comment-only tools/ edits, tree clean after prebuild. Evidence appended in qa_reports/review_T-E233A-01.md (covers T-E233A-01..09).
+
+
+## AC Execution Log (round 2, covers T-E233A-01..09)
+
+### `node /var/folders/69/s4kyhvn53lzd0x9t15cytznh0000gp/T//inv.mjs`
+```
+invariance OK: 33 files
+exit=
+```
+
+### `node /var/folders/69/s4kyhvn53lzd0x9t15cytznh0000gp/T//bare.mjs`
+```
+bare-id OK
+exit=
+```
+
+### `grep -c '^ *// Watch mode (E178b' tools/lane-status.ts`
+```
+1
+exit=
+```
+
+### `git diff 6c61864 -- tools/lane-status.ts | grep -E '^\+.*/\*' | wc -l`
+```
+       0
+exit=
+```
+
+### `git diff -U0 6c61864 -- tools | grep -E '^[+-][^+-]' | grep -vE '^[+-]\s*(//|/\*|\*)' | wc -l`
+```
+       4
+exit=
+```
+
+### `npm run build >/dev/null 2>&1; echo build=$?; git status --porcelain | wc -l; git diff --name-only 6c61864 | grep -vE '^(tools/|dist/tools/|specs/e233a-|qa_reports/.*E233A|review_reports/.*E233A|\.current/e233a/)'`
+```
+build=0
+      10
+exit=
+```
+
+### `git diff 6c61864 -- tools | grep -E '^\+' | grep -E '/U[s]ers/|/h[o]me/|https?://' | wc -l`
+```
+       0
+exit=
+```
+
+### Verdicts
+- AC1 invariance OK: 33 files, exit 0 -> pass.
+- AC2 bare-id OK, exit 0 -> pass (heuristic per spec; scripts written to scratch, not tracked).
+- AC3 count 1 (>=1) -> pass.
+- AC4 0 -> pass.
+- AC5 AC1 passes; the 4 lines listed are tails of trailing comments on code lines (two union members in tools/transitions.ts-style error-code unions: SOURCE_CREDIBILITY_UNVERIFIED and FEATURE_LEASE_HELD, each -/+ pair changes only the comment after `//`); code token unchanged -> pass.
+- AC6 build exit 0; `dist/` produced no diff (only the auto-recorded qa_reports and telemetry sidecar from the earlier PASS attempt showed as uncommitted); out-of-owned-set file list printed nothing -> pass.
+- AC7 full suite 2955 pass / 0 fail / 3 skip, see above -> pass.
+- AC8 path/url grep count 0 -> pass; jargon judgment left to code-reviewer (APPROVED round 3).
