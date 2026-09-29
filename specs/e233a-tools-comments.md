@@ -25,7 +25,7 @@ Roughly 315 comment lines across 32 files under `tools/` explain themselves only
 - **AC7 (suite unchanged)** — Given the change is comment-only, when the full suite runs after commit with a clean tree, then it passes with the same count as base.
   proof: `npm test` (run by qa after commit; clean tree) reports 0 failures.
 - **AC8 (hygiene)** — Given the readability and information-hygiene rules, when the rewritten comments are read, then none adds an absolute path, username, employer-internal link, or codename, and none introduces governance-process jargon (round, gate, PASS/FAIL, tool-call names) where plain words describe the behaviour. Names of real functions, files, and config keys stay.
-  proof: `git diff 6c61864 -- tools | grep -E '^\+' | grep -E '/Users/|/home/|https?://'` prints nothing; the rest is a reviewer judgment.
+  proof: `git diff 6c61864 -- tools | grep -E '^\+' | grep -E '/U[s]ers/|/h[o]me/|https?://'` prints nothing; the rest is a reviewer judgment.
 
 ## Copy / Strings
 | string id | exact text (quote verbatim) | source |

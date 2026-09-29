@@ -19,7 +19,7 @@ AC4 — implemented — added lines matching `/\*` in lane-status = 0.
 AC5 — implemented — the only non-comment +/- lines are the two trailing-comment tails in tools/transitions.ts (`SOURCE_CREDIBILITY_UNVERIFIED`, `FEATURE_LEASE_HELD` union members: `// E4 (...) — emitted by the` -> `// Emitted by the`, and `// E1 (...) — emitted by the` -> `// Emitted by the`). The code before `//` is unchanged, and AC1 confirms it. Justified: the id moved to the end of each block, e.g. `(mirrors EXTERNAL_REFS_UNRESOLVED). (E4)`.
 AC6 — implemented — the only changes outside `tools/`, `dist/tools/`, `specs/e233a-`, `.current/e233a/` are none. All 105 dist files are under `dist/tools/`. The only uncommitted files are `.current/e233a/{handoff.md,dispatch.jsonl}`, written by this review's claim, which is an owned path. `npx tsc` exits 0.
 AC7 — N/A for review (QA-owned full suite).
-AC8 — implemented — no `/Users/`, `/home/` or `http(s)://` in added lines. By eye, the rewrites mostly remove governance jargon ("review round", "spec AC", "PM-ratified", "option a-min"). The leftovers are in untouched lines (see R1 and O2).
+AC8 — implemented — no absolute home-directory paths (macOS or Linux style) or `http(s)://` URLs in added lines. By eye, the rewrites mostly remove governance jargon ("review round", "spec AC", "PM-ratified", "option a-min"). The leftovers are in untouched lines (see R1 and O2).
 
 ## Correctness
 - **R1 (required)** — Incomplete rewrite of `e123bN`-cited comments, outside every stated constraint. Examples:
@@ -79,7 +79,7 @@ AC4 — implemented — `git diff 6c61864 -- tools/lane-status.ts | grep -E '^\+
 AC5 — implemented — the whole-range filter still prints only the two transitions.ts trailing-comment tails (`// E4 (...) — emitted by the` -> `// Emitted by the`, `// E1 (...) — emitted by the` -> `// Emitted by the`). Both were justified in Round 1, and the code before `//` is unchanged.
 AC6 — implemented — `git diff --name-only 6c61864` with the owned-path filter printed nothing. `git status --porcelain` shows only `.current/e233a/{handoff.md,dispatch.jsonl}`, which this review's claim write touched and which is an owned path. `npx tsc --outDir <scratch>` exits 0, and every emitted `tools/**/*.js` / `*.d.ts` is byte-identical to the committed `dist/tools/` (0 mismatches).
 AC7 — N/A for review (QA-owned full suite).
-AC8 — implemented — no added line matches `/Users/|/home/|https?://`. By eye, this round removes jargon ("round 1 fix", "NEW-4 fix", "code review round n", "NEW-TICKETS.md J2-NEW-2", "pre-J2", "spec ACn", "amendment ACn", "Decision 2") and adds none.
+AC8 — implemented — no added line matches the AC8 pattern (absolute home-directory paths or `http(s)://` URLs). By eye, this round removes jargon ("round 1 fix", "NEW-4 fix", "code review round n", "NEW-TICKETS.md J2-NEW-2", "pre-J2", "spec ACn", "amendment ACn", "Decision 2") and adds none.
 
 ## Correctness
 No findings. Accuracy checks on the new rewrites:
