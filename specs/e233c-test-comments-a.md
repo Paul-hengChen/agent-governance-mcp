@@ -63,7 +63,10 @@ Owned set (60 tracked files): `test/{a,b,d}*.test.mjs`, `test/{ch,com,conf,cons,
   introduces text the history-fixture meta-test (`test/render-structure.test.mjs`) flags
   (a pinned commit sha, `git show <rev>:<path>`, or `git log`). Existing comment mentions of
   `qa_reports/`/`review_reports/` files stay as they are (see Open Questions).
-  proof: `git diff -U0 6c61864..HEAD -- test | grep -E '^\+' | grep -nE '/Users/|/home/|https?://|git show|git log'` prints nothing.
+  proof: list the added lines of the test diff since 6c61864 and grep them for a home-directory
+  absolute-path prefix (macOS and Linux forms), an http(s) URL, and the two git history
+  subcommand strings; the pattern is assembled at run time in a `$TMPDIR` script so this spec
+  never carries the literal prefix. The grep prints nothing.
 - **AC6 (full suite, post-commit)** — Given the author's rewrite is committed and the worktree has
   no untracked files, when `node scripts/test-lock.mjs -- npm test` runs from the worktree, then
   it exits 0 with the same pass count as base (no test added, removed or renamed), and
