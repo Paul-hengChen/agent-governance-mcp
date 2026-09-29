@@ -1,9 +1,8 @@
 export declare const SECTION_HEADING_RE: RegExp;
 /**
- * AC6b (review round 1, C1): the lane ledger is absent but the legacy file
- * proves one must exist — a `_primary` v2+ index, `tasks_moved` markers for
- * this feat lane, or a newer-server schema. Thrown instead of reporting an
- * empty task list. `.code` stays outside the error-code-contract harvest.
+ * The lane ledger is absent but the legacy file proves one must exist — a
+ * `_primary` v2+ index, `tasks_moved` markers for this feat lane, or a
+ * newer-server schema. Thrown instead of reporting an empty task list. `.code` stays outside the error-code-contract harvest.
  */
 export declare class TasksLedgerAbsentError extends Error {
     readonly code = "TASKS_LEDGER_ABSENT";

@@ -106,8 +106,9 @@ function getHandoffPath(workspacePath: string): string {
   return resolveCurrentLanePaths(path.resolve(workspacePath)).handoffPath;
 }
 
-// e123b9 J2: the legacy (pre-flip) flat `.current/handoff.md`. The filename
-// comes from the resolved lane path, never restated.
+// The legacy flat `.current/handoff.md` written before handoff state moved
+// into per-lane directories. The filename comes from the resolved lane path,
+// never restated. (E123)
 export function getFlatHandoffPath(workspacePath: string): string {
   const abs = path.resolve(workspacePath);
   return path.join(abs, ".current", path.basename(getHandoffPath(abs)));
@@ -127,12 +128,12 @@ function lastUpdatedOf(filePath: string): string {
 }
 
 /**
- * e123b9 spec AC14: throw HANDOFF_LAYOUT_CONFLICT when BOTH the flat and the
- * lane-scoped handoff.md exist (the state a pre-flip server produces by
+ * Throw HANDOFF_LAYOUT_CONFLICT when BOTH the flat and the lane-scoped
+ * handoff.md exist (the state an older, flat-layout server produces by
  * writing the flat file after a restarted server migrated). Scoped to
- * handoff.md only — a sidecar on both sides is the migration's merge case
- * (AC15). A plain Error, deliberately NOT a GateErrorCode: it fires on reads
- * too. Touches nothing; callers run it before any move.
+ * handoff.md only — a sidecar on both sides is merged by the migration
+ * instead. A plain Error, deliberately NOT a GateErrorCode: it fires on reads
+ * too. Touches nothing; callers run it before any move. (E123)
  */
 export function assertNoHandoffLayoutConflict(workspacePath: string): void {
   const lanePath = getHandoffPath(workspacePath);
@@ -149,20 +150,20 @@ export function assertNoHandoffLayoutConflict(workspacePath: string): void {
   );
 }
 
-// e123b9 spec AC3/AC4/AC12 — own-workspace-only flat->lane migration for
-// readHandoffState. Trigger (amendment AC16): ANY flat LANE_FILES entry still
-// present (false forever once every flat file has moved — no flag file). The
-// AC14 dual-presence check runs first, before any move. A partial migration
-// (either move order) is completed here (AC18); flat sidecars with no
-// handoff.md anywhere are moved without throwing (AC19). readHandoffState is
-// synchronous (FileHandoffStorage.readState / HandoffStorage), so it cannot
-// await the public async migrateFlatToLane; instead it takes the SAME per-lane
-// lock (resolveLaneLockPath, same O_EXCL file + payload as withFileLock) with
-// one non-blocking attempt and runs the lock-free core under it. If the lock
-// is held (a concurrent migrator/writer — which migrates under that lock
-// itself — or a crashed holder, which the next writer's withFileLock clears)
-// the read skips the migration and reads read-only via readAndMigrate's
-// flat fallback. Errors from the core propagate (AC4).
+// Flat->lane migration for readHandoffState, own workspace only. Trigger:
+// ANY flat LANE_FILES entry still present (false forever once every flat
+// file has moved — no flag file). The dual-presence check runs first, before
+// any move. A partial migration (either move order) is completed here; flat
+// sidecars with no handoff.md anywhere are moved without throwing.
+// readHandoffState is synchronous (FileHandoffStorage.readState /
+// HandoffStorage), so it cannot await the public async migrateFlatToLane;
+// instead it takes the SAME per-lane lock (resolveLaneLockPath, same O_EXCL
+// file + payload as withFileLock) with one non-blocking attempt and runs the
+// lock-free core under it. If the lock is held (a concurrent migrator/writer
+// — which migrates under that lock itself — or a crashed holder, which the
+// next writer's withFileLock clears) the read skips the migration and reads
+// read-only via readAndMigrate's flat fallback. Errors from the core
+// propagate. (E123)
 function migrateOwnWorkspaceIfFlat(workspacePath: string): void {
   const abs = path.resolve(workspacePath);
   assertNoHandoffLayoutConflict(abs);
@@ -332,10 +333,10 @@ export function parseCutApprovedSource(raw: unknown): string | undefined {
 // migrated state plus a flag that lets readHandoffState fire a write-back
 // to heal the on-disk file. Callers that don't need the flag use parseHandoff.
 //
-// e123b9 spec AC13/AC14: SHARED by cross-workspace readers, so it NEVER
-// migrates, locks or creates anything. Dual presence throws
-// HANDOFF_LAYOUT_CONFLICT; otherwise it reads the lane path, falling back to
-// the legacy flat path read-only for a not-yet-migrated workspace.
+// SHARED by cross-workspace readers, so it NEVER migrates, locks or creates
+// anything. Dual presence throws HANDOFF_LAYOUT_CONFLICT; otherwise it reads
+// the lane path, falling back to the legacy flat path read-only for a
+// not-yet-migrated workspace. (E123)
 function readAndMigrate(workspacePath: string): HandoffReadResult | null {
   assertNoHandoffLayoutConflict(workspacePath);
   const lanePath = getHandoffPath(workspacePath);
@@ -344,8 +345,8 @@ function readAndMigrate(workspacePath: string): HandoffReadResult | null {
   try {
     content = fs.readFileSync(handoffPath, "utf-8");
   } catch (err) {
-    // e123b9 amendment AC20 (J2-NEW-7): ENOTDIR (a non-directory component
-    // in workspace_path) degrades exactly like ENOENT — "no prior state".
+    // ENOTDIR (a non-directory component in workspace_path) degrades exactly
+    // like ENOENT — "no prior state". (E123)
     const code = (err as NodeJS.ErrnoException).code;
     if (code !== "ENOENT" && code !== "ENOTDIR") throw err;
     // A concurrent migration may have renamed flat -> lane between the check
@@ -560,8 +561,8 @@ export function parseHandoff(workspacePath: string): HandoffState | null {
  * so the on-disk file heals to CURRENT on the first read.
  */
 export function readHandoffState(workspacePath: string): string {
-  // e123b9 AC3: migrate BEFORE markStateRead, so the freshness snapshot is
-  // taken of the file at its post-migration (lane) path.
+  // Migrate BEFORE markStateRead, so the freshness snapshot is taken of the
+  // file at its post-migration (lane) path. (E123)
   migrateOwnWorkspaceIfFlat(workspacePath);
   markStateRead(workspacePath);
   // Migration skipped (lock busy): this read comes from the flat fallback, so

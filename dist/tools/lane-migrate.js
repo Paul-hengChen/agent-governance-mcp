@@ -101,7 +101,7 @@ function isStaleAtomicTmp(name) {
 function isTolerableDebris(name) {
     return name === HANDOFF_LOCK_FILENAME || name === TASKS_LOCK_FILENAME || isStaleAtomicTmp(name);
 }
-// Keeps the pre-J2 "lane-migrate: invalid lane name" message prefix; the
+// Keeps the original "lane-migrate: invalid lane name" message prefix; the
 // predicate is tools/lane-paths.ts's single SAFE_LANE_RE owner.
 function assertSafeLane(lane) {
     if (!isSafeLaneName(lane)) {
@@ -146,13 +146,14 @@ const isAppendLog = (e) => e.filename.endsWith(".jsonl");
 // Pre-flight over the registry. Throws — before anything is touched — on a
 // missing required entry or a conflicting destination. Returns the move plan
 // plus the skipped (absent optional) filenames. `mergeSidecars` is true only
-// for flat->lane (spec AC15). `requiredMayBeAbsent` (flat->lane resume/AC19
-// only) leaves an absent required entry out of the plan instead of throwing;
-// the caller has already decided that is legal.
+// for flat->lane. `requiredMayBeAbsent` (flat->lane resume only) leaves an
+// absent required entry out of the plan instead of throwing; the caller has
+// already decided that is legal.
 //
-// e123b9 amendment AC17: the plan lists the optional sidecars FIRST and the
-// required entry (handoff.md) LAST, so an interrupted run leaves handoff.md
-// at its source and the own-workspace trigger (AC16) stays armed.
+// The plan lists the optional sidecars FIRST and the required entry
+// (handoff.md) LAST, so an interrupted run leaves handoff.md at its source
+// and hasFlatLaneFiles still fires on the next read or write, which then
+// finishes the move. (E123)
 function planMoves(srcDir, destDir, direction, mergeSidecars, requiredMayBeAbsent = false) {
     const plan = [];
     const skipped = [];
@@ -215,7 +216,7 @@ const MERGE_MAX_ATTEMPTS = 5;
 // a line appended to `dest` after it was read would be lost by the rename.
 // Optimistic guard: re-read `dest` just before the rename and rebuild if it
 // changed. This narrows the window to the stat->rename gap; it cannot close
-// it (see NEW-TICKETS.md J2-NEW-2).
+// it, so a line appended inside that gap can still be lost.
 function mergeSidecar(src, dest) {
     const srcBytes = fs.readFileSync(src);
     const sep = srcBytes.length > 0 && srcBytes[srcBytes.length - 1] !== NEWLINE[0] ? NEWLINE : Buffer.alloc(0);
@@ -319,11 +320,11 @@ export function migrateFlatToLaneLocked(workspacePath, opts = {}) {
     return { lane, moved, skipped, merged, alreadyMigrated: false };
 }
 /**
- * e123b9 amendment AC16: the own-workspace migration trigger — true iff ANY
+ * Own-workspace migration trigger: true iff ANY
  * LANE_FILES entry (handoff.md or a sidecar) still exists as a file at the
  * flat `<ws>/.current/<filename>`. Read-only. Shared by tools/handoff-parse.ts
  * (readHandoffState) and tools/handoff-write.ts (writeHandoffStateCore) so
- * both entry points use the same predicate.
+ * both entry points use the same predicate. (E123)
  */
 export function hasFlatLaneFiles(workspacePath) {
     const flatDir = path.join(workspacePath, ".current");

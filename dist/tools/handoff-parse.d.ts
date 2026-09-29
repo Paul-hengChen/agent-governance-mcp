@@ -16,12 +16,12 @@ export declare function relativizePrdPath(workspacePath: string, prdPath: string
 export declare function resolveStoredPrdPath(workspacePath: string, stored: string): string | undefined;
 export declare function getFlatHandoffPath(workspacePath: string): string;
 /**
- * e123b9 spec AC14: throw HANDOFF_LAYOUT_CONFLICT when BOTH the flat and the
- * lane-scoped handoff.md exist (the state a pre-flip server produces by
+ * Throw HANDOFF_LAYOUT_CONFLICT when BOTH the flat and the lane-scoped
+ * handoff.md exist (the state an older, flat-layout server produces by
  * writing the flat file after a restarted server migrated). Scoped to
- * handoff.md only — a sidecar on both sides is the migration's merge case
- * (AC15). A plain Error, deliberately NOT a GateErrorCode: it fires on reads
- * too. Touches nothing; callers run it before any move.
+ * handoff.md only — a sidecar on both sides is merged by the migration
+ * instead. A plain Error, deliberately NOT a GateErrorCode: it fires on reads
+ * too. Touches nothing; callers run it before any move. (E123)
  */
 export declare function assertNoHandoffLayoutConflict(workspacePath: string): void;
 export declare function parseCutApprovedSource(raw: unknown): string | undefined;

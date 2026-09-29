@@ -51,7 +51,7 @@ import type { LaneInfo, LaneListResult, LaneListProvider } from "./feature-rollu
 // Same frontmatter-block shape as tools/skill-frontmatter.ts's FRONTMATTER_RE
 // and tools/handoff-parse.ts's own frontmatter handling — a leading
 // `---\n...\n---` block. Deliberately a LOCAL regex + yaml.load, not
-// `parseHandoff` (decision re-confirmed at the e123b9 J2 re-point, AC7):
+// `parseHandoff`, for two reasons:
 // (1) a closed lane under .current/history/ is a historical snapshot that may
 // predate the live schema_version, and parseHandoff refuses loud (by design)
 // on an unparseable/future-schema handoff — one old snapshot must not take
@@ -61,7 +61,7 @@ import type { LaneInfo, LaneListResult, LaneListProvider } from "./feature-rollu
 // `last_updated` are extracted; nothing is migrated, locked, or written.
 const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
 
-// `.current/` subdirectories that are never lanes (spec AC7). Workspace-wide
+// `.current/` subdirectories that are never lanes. Workspace-wide
 // FILES (.config.json, feature-split.md, the lockfile, ...) are excluded by
 // the isDirectory() check; dot-dirs by isSafeLaneName.
 const NON_LANE_DIRS = new Set(["archive", "history"]);

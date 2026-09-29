@@ -118,22 +118,24 @@ async function writeHandoffStateCore(opts) {
     // Hoist required strings to the names the body below already uses.
     const _activeFeature = activeFeature;
     const _status = status;
-    // e123b9 J2 (spec AC5): per-lane lock `.current/<lane>/.handoff.lock`,
-    // built only by resolveLaneLockPath. ensureDir runs BEFORE the lock so the
-    // lane dir exists to host the lockfile.
+    // Each lane has its own lock, `.current/<lane>/.handoff.lock`, built only
+    // by resolveLaneLockPath, so writers in different lanes never block each
+    // other. ensureDir runs BEFORE the lock so the lane dir exists to host the
+    // lockfile. (E123)
     const absWorkspace = path.resolve(workspacePath);
     const lane = resolveCurrentLane(absWorkspace);
     ensureDir(getHandoffPath(workspacePath));
     const lockPath = resolveLaneLockPath(absWorkspace, lane);
     return withFileLock(lockPath, () => {
-        // e123b9 spec AC14: dual presence fails loud before any move.
+        // A handoff.md at both the flat and the lane location is ambiguous: fail
+        // loud before moving anything. (E123)
         assertNoHandoffLayoutConflict(workspacePath);
-        // e123b9 spec AC3/AC12, amendment AC16-AC19: any flat lane file left ->
-        // migrate into the lane we hold the lock for, via the lock-free core (the
-        // public migrateFlatToLane would re-take this lock and self-deadlock).
-        // Completes a partial migration; flat sidecars with no handoff.md anywhere
-        // move without throwing. Errors propagate (AC4). A race loser gets
-        // alreadyMigrated: true, no throw.
+        // Any lane file still at the flat `.current/` location is migrated into
+        // the lane we hold the lock for, via the lock-free core (the public
+        // migrateFlatToLane would re-take this lock and self-deadlock). This also
+        // completes a half-finished migration, and flat sidecars with no
+        // handoff.md anywhere move without throwing. Migration errors propagate.
+        // A caller that loses a race gets alreadyMigrated: true, no throw. (E123)
         if (hasFlatLaneFiles(absWorkspace)) {
             migrateFlatToLaneLocked(absWorkspace, { lane, allowMissingRequired: true });
         }

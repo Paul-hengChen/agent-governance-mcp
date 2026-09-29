@@ -49,11 +49,11 @@ export interface LaneToFlatOptions {
  */
 export declare function migrateFlatToLaneLocked(workspacePath: string, opts?: FlatToLaneOptions): FlatToLaneResult;
 /**
- * e123b9 amendment AC16: the own-workspace migration trigger — true iff ANY
+ * Own-workspace migration trigger: true iff ANY
  * LANE_FILES entry (handoff.md or a sidecar) still exists as a file at the
  * flat `<ws>/.current/<filename>`. Read-only. Shared by tools/handoff-parse.ts
  * (readHandoffState) and tools/handoff-write.ts (writeHandoffStateCore) so
- * both entry points use the same predicate.
+ * both entry points use the same predicate. (E123)
  */
 export declare function hasFlatLaneFiles(workspacePath: string): boolean;
 /**

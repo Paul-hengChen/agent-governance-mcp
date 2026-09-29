@@ -102,18 +102,18 @@ export declare function hasHistoryLedger(workspacePath: string, lane: string, fi
  */
 export declare function resolveLanePaths(workspacePath: string, lane: string): LanePaths;
 /**
- * Per-lane handoff lock path (e123b9 J2, spec AC5, Decision 2):
+ * Per-lane handoff lock path:
  * `<workspacePath>/.current/<lane>/${HANDOFF_LOCK_FILENAME}`. The single
  * composer of the lock path: tools/lane-migrate.ts's runners use it for the
- * migration's destination lane, and a live writer (tools/handoff-write.ts,
- * T-E123B9-02) uses it for the current branch's lane, so the migration and a
+ * migration's destination lane, and a live writer (tools/handoff-write.ts)
+ * uses it for the current branch's lane, so the migration and a
  * live writer of the SAME lane serialize on the SAME lockfile. Pure path
  * logic — does not create the lane directory; the lock acquirer does that
- * (withFileLock mkdirs the lock's parent before its O_EXCL open).
+ * (withFileLock mkdirs the lock's parent before its O_EXCL open). (E123)
  */
 export declare function resolveLaneLockPath(workspacePath: string, lane: string): string;
 /**
- * LIVE lane resolver (e123b0 spec AC2, D1): name the lane of the branch
+ * LIVE lane resolver: name the lane of the branch
  * currently checked out in `workspacePath`, by pure fs (no git subprocess, no
  * network — the tools/drift.ts precedent).
  *
@@ -123,14 +123,14 @@ export declare function resolveLaneLockPath(workspacePath: string, lane: string)
  * missing `.git`, an unreadable or malformed `.git`/HEAD — -> PRIMARY_LANE.
  *
  * NEVER throws. Production callers reach it through resolveCurrentLanePaths
- * (see the file header for the list).
+ * (see the file header for the list). (E123)
  */
 export declare function resolveCurrentLane(workspacePath: string): string;
 /**
- * The current lane's paths (e123b0 spec AC4): resolveLanePaths over
- * resolveCurrentLane. Since the e123b9 J2 flip this returns genuinely
- * lane-scoped `.current/<lane>/<filename>` paths — `.current/_primary/...`
- * on a primary checkout, `.current/<ticket-id>/...` on a `feat/<id>-*` lane.
+ * The current lane's paths: resolveLanePaths over resolveCurrentLane. It
+ * returns lane-scoped `.current/<lane>/<filename>` paths —
+ * `.current/_primary/...` on a primary checkout, `.current/<ticket-id>/...`
+ * on a `feat/<id>-*` lane. (E123)
  */
 export declare function resolveCurrentLanePaths(workspacePath: string): LanePaths;
 /**

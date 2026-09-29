@@ -495,33 +495,22 @@ export async function voidTaskInFile(workspacePath, taskId, reason) {
         const content = fs.readFileSync(result.filePath, "utf-8");
         const task = result.tasks.find((t) => t.id === taskId);
         if (!task) {
-            // Q1: distinguish "already voided" from "never existed" in file mode —
+            // Distinguish "already voided" from "never existed" in file mode —
             // the voided marker line is still literally on disk even though it no
             // longer parses as a task. The void marker ("- [-] ") is this tool's
             // own fixed write format, independent of any configured taskPattern,
             // so this scan is reliable regardless of taskPattern.
-            // C1 fix (review round 1): every other scan in this file normalises
-            // leading whitespace before matching (the duplicate-id re-scan below
-            // trims per-line, and parseTasks trims too), so an indented voided
-            // row is a fully supported row everywhere else. `^` alone missed it.
-            // NEW-3 fix (same round): `\b` requires a word character on the id's
-            // trailing side, which fails for ids ending in punctuation (e.g.
-            // "T-1.", "T-1)") even though they legally match the row's `(\S+)` id
-            // group — `(?=\s|$)` bounds the id correctly regardless of what
-            // character it ends in.
-            // R2-C1 fix (round 2): the round-1 fix normalised leading whitespace
-            // with `[ \t]*`, a two-character subset of what `String.prototype.trim()`
-            // strips (trim() also removes U+00A0, U+000B, U+000C, U+2000-U+200A,
-            // U+2028, U+2029, U+202F, U+205F, U+3000, U+FEFF, among others). Since
-            // `parseTasks` (see the top-level parse loop) and the duplicate-id
-            // re-scan directly below in `addTaskInFile` both trim() each line
-            // before matching, an indented voided row using one of those other
-            // whitespace characters parsed as a live task everywhere else in this
-            // file while staying invisible to this scan — reproducing C1 verbatim
-            // under a different indent character. Fixed by testing the anchored,
-            // unindented pattern against each line's own trim() output, byte-
-            // identical normalisation to both of those sites, rather than trying
-            // to enumerate whitespace inside the regex itself.
+            // Every other scan in this file trims each line before matching (the
+            // duplicate-id re-scan below in `addTaskInFile`, and `parseTasks`), so
+            // an indented voided row is a fully supported row everywhere else. This
+            // scan therefore tests the anchored, unindented pattern against each
+            // line's own trim() output — byte-identical normalisation to both of
+            // those sites, including the non-ASCII whitespace trim() strips (U+00A0,
+            // U+2000-U+200A, U+3000, U+FEFF, ...) that a `[ \t]*` prefix would miss.
+            // The id is bounded by `(?=\s|$)`, not `\b`: `\b` needs a word character
+            // on the id's trailing side, so it fails for ids ending in punctuation
+            // (e.g. "T-1.", "T-1)") that still legally match the row's `(\S+)` id
+            // group.
             const voidedPattern = new RegExp(`^- \\[-\\] ${escapeRegExp(taskId)}(?=\\s|$)`);
             const alreadyVoided = content.split("\n").some((line) => voidedPattern.test(line.trim()));
             if (alreadyVoided) {

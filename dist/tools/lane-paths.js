@@ -84,13 +84,13 @@ export function laneFile(key) {
         throw new Error(`lane-paths: unknown lane file key "${String(key)}"`);
     return entry;
 }
-// Basename of the handoff lockfile (e123b8 J1, spec AC3): the ONE owner of
-// the literal. tools/handoff-write.ts (writeHandoffState) and
-// tools/lane-migrate.ts (both runners) import it; no other copy of this
-// literal may exist under tools/. Not a LANE_FILES entry: it is a lock, not
-// lane state. e123b9 J2 (spec AC5, Decision 2, human 2026-09-23): the lock is
-// PER-LANE at `.current/<lane>/${HANDOFF_LOCK_FILENAME}` — see
-// resolveLaneLockPath below, the one place that path is composed.
+// Basename of the handoff lockfile: the ONE owner of the literal.
+// tools/handoff-write.ts (writeHandoffState) and tools/lane-migrate.ts (both
+// runners) import it; no other copy of this literal may exist under tools/.
+// Not a LANE_FILES entry: it is a lock, not lane state. The lock is PER-LANE
+// at `.current/<lane>/${HANDOFF_LOCK_FILENAME}`, so writers in different
+// lanes never contend — see resolveLaneLockPath below, the one place that
+// path is composed. (E123)
 export const HANDOFF_LOCK_FILENAME = ".handoff.lock";
 // Lane name used when a flat handoff's active_feature carries no parseable
 // ticket id (absent / empty / no leading id token).
@@ -223,14 +223,14 @@ export function resolveLanePaths(workspacePath, lane) {
     return out;
 }
 /**
- * Per-lane handoff lock path (e123b9 J2, spec AC5, Decision 2):
+ * Per-lane handoff lock path:
  * `<workspacePath>/.current/<lane>/${HANDOFF_LOCK_FILENAME}`. The single
  * composer of the lock path: tools/lane-migrate.ts's runners use it for the
- * migration's destination lane, and a live writer (tools/handoff-write.ts,
- * T-E123B9-02) uses it for the current branch's lane, so the migration and a
+ * migration's destination lane, and a live writer (tools/handoff-write.ts)
+ * uses it for the current branch's lane, so the migration and a
  * live writer of the SAME lane serialize on the SAME lockfile. Pure path
  * logic — does not create the lane directory; the lock acquirer does that
- * (withFileLock mkdirs the lock's parent before its O_EXCL open).
+ * (withFileLock mkdirs the lock's parent before its O_EXCL open). (E123)
  */
 export function resolveLaneLockPath(workspacePath, lane) {
     return path.join(resolveLaneDir(workspacePath, lane), HANDOFF_LOCK_FILENAME);
@@ -263,7 +263,7 @@ function headFilePath(workspacePath) {
     return path.join(path.resolve(workspacePath, gitdir), "HEAD");
 }
 /**
- * LIVE lane resolver (e123b0 spec AC2, D1): name the lane of the branch
+ * LIVE lane resolver: name the lane of the branch
  * currently checked out in `workspacePath`, by pure fs (no git subprocess, no
  * network — the tools/drift.ts precedent).
  *
@@ -273,7 +273,7 @@ function headFilePath(workspacePath) {
  * missing `.git`, an unreadable or malformed `.git`/HEAD — -> PRIMARY_LANE.
  *
  * NEVER throws. Production callers reach it through resolveCurrentLanePaths
- * (see the file header for the list).
+ * (see the file header for the list). (E123)
  */
 export function resolveCurrentLane(workspacePath) {
     try {
@@ -294,10 +294,10 @@ export function resolveCurrentLane(workspacePath) {
     }
 }
 /**
- * The current lane's paths (e123b0 spec AC4): resolveLanePaths over
- * resolveCurrentLane. Since the e123b9 J2 flip this returns genuinely
- * lane-scoped `.current/<lane>/<filename>` paths — `.current/_primary/...`
- * on a primary checkout, `.current/<ticket-id>/...` on a `feat/<id>-*` lane.
+ * The current lane's paths: resolveLanePaths over resolveCurrentLane. It
+ * returns lane-scoped `.current/<lane>/<filename>` paths —
+ * `.current/_primary/...` on a primary checkout, `.current/<ticket-id>/...`
+ * on a `feat/<id>-*` lane. (E123)
  */
 export function resolveCurrentLanePaths(workspacePath) {
     return resolveLanePaths(workspacePath, resolveCurrentLane(workspacePath));
@@ -334,9 +334,9 @@ export function isBytePrefix(candidate, authority) {
     return (authority.length >= candidate.length &&
         authority.subarray(0, candidate.length).equals(candidate));
 }
-// `.current/` subdirectories that are never lanes (e123b9 spec AC7). Files
-// (.config.json, feature-split.md, ...) are excluded by the isDirectory()
-// check, dot-dirs by isSafeLaneName.
+// `.current/` subdirectories that are never lanes. Files (.config.json,
+// feature-split.md, ...) are excluded by the isDirectory() check, dot-dirs by
+// isSafeLaneName. (E123)
 export const NON_LANE_DIRS = new Set(["archive", "history"]);
 // A `.current/history/<bucket>/` month bucket.
 export const HISTORY_BUCKET_RE = /^\d{4}-\d{2}$/;

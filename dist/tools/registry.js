@@ -94,11 +94,9 @@ function hasToolCallSignal(tagFragment) {
 function hasTrailingTagFragment(value) {
     // Trailing trim strips U+200B (zero width space, escaped rather than
     // embedded literally — an invisible literal in source is one silent
-    // autofix/edit away from disappearing with no visible diff, NEW-2 nit)
-    // alongside ordinary whitespace: plain `trimEnd()` leaves a trailing ZWS
-    // in place, which would otherwise let a tag fragment hide past the tail
-    // check (NEW-2, filed in round 1; folded in here since it's the same
-    // predicate).
+    // autofix/edit away from disappearing with no visible diff) alongside
+    // ordinary whitespace: plain `trimEnd()` leaves a trailing ZWS in place,
+    // which would otherwise let a tag fragment hide past the tail check.
     const trimmed = value.replace(/[\s\u200B]+$/, "");
     const lastLt = trimmed.lastIndexOf("<");
     if (lastLt === -1)

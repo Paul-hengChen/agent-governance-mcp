@@ -90,14 +90,14 @@ export interface FlatToLaneResult {
   moved: string[];
   // Filenames of optional LANE_FILES entries absent at the source.
   skipped: string[];
-  // Subset of `moved`: optional sidecars merged into a pre-existing lane file
-  // (e123b9 spec AC15). Empty on a fresh lane directory.
+  // Subset of `moved`: optional sidecars merged into a pre-existing lane
+  // file. Empty on a fresh lane directory. (E123)
   merged: string[];
   // true === nothing to do because the migration already happened: the flat
   // required entry is gone, the lane already holds it, and no flat sidecar is
-  // left over (the loser of a two-caller race, spec AC-MIG-3). moved /
-  // skipped / merged are all empty. Leftover flat sidecars are swept instead
-  // (e123b9 amendment AC18) and reported in moved, alreadyMigrated false.
+  // left over (the loser of a two-caller race). moved / skipped / merged are
+  // all empty. Leftover flat sidecars are swept instead and reported in
+  // moved, with alreadyMigrated false. (E123)
   alreadyMigrated: boolean;
 }
 
@@ -165,7 +165,7 @@ function isTolerableDebris(name: string): boolean {
   return name === HANDOFF_LOCK_FILENAME || name === TASKS_LOCK_FILENAME || isStaleAtomicTmp(name);
 }
 
-// Keeps the pre-J2 "lane-migrate: invalid lane name" message prefix; the
+// Keeps the original "lane-migrate: invalid lane name" message prefix; the
 // predicate is tools/lane-paths.ts's single SAFE_LANE_RE owner.
 function assertSafeLane(lane: unknown): asserts lane is string {
   if (!isSafeLaneName(lane)) {
@@ -226,13 +226,14 @@ interface PlannedMove {
 // Pre-flight over the registry. Throws — before anything is touched — on a
 // missing required entry or a conflicting destination. Returns the move plan
 // plus the skipped (absent optional) filenames. `mergeSidecars` is true only
-// for flat->lane (spec AC15). `requiredMayBeAbsent` (flat->lane resume/AC19
-// only) leaves an absent required entry out of the plan instead of throwing;
-// the caller has already decided that is legal.
+// for flat->lane. `requiredMayBeAbsent` (flat->lane resume only) leaves an
+// absent required entry out of the plan instead of throwing; the caller has
+// already decided that is legal.
 //
-// e123b9 amendment AC17: the plan lists the optional sidecars FIRST and the
-// required entry (handoff.md) LAST, so an interrupted run leaves handoff.md
-// at its source and the own-workspace trigger (AC16) stays armed.
+// The plan lists the optional sidecars FIRST and the required entry
+// (handoff.md) LAST, so an interrupted run leaves handoff.md at its source
+// and hasFlatLaneFiles still fires on the next read or write, which then
+// finishes the move. (E123)
 function planMoves(
   srcDir: string,
   destDir: string,
@@ -304,7 +305,7 @@ const MERGE_MAX_ATTEMPTS = 5;
 // a line appended to `dest` after it was read would be lost by the rename.
 // Optimistic guard: re-read `dest` just before the rename and rebuild if it
 // changed. This narrows the window to the stat->rename gap; it cannot close
-// it (see NEW-TICKETS.md J2-NEW-2).
+// it, so a line appended inside that gap can still be lost.
 function mergeSidecar(src: string, dest: string): void {
   const srcBytes = fs.readFileSync(src);
   const sep =
@@ -418,11 +419,11 @@ export function migrateFlatToLaneLocked(
 }
 
 /**
- * e123b9 amendment AC16: the own-workspace migration trigger — true iff ANY
+ * Own-workspace migration trigger: true iff ANY
  * LANE_FILES entry (handoff.md or a sidecar) still exists as a file at the
  * flat `<ws>/.current/<filename>`. Read-only. Shared by tools/handoff-parse.ts
  * (readHandoffState) and tools/handoff-write.ts (writeHandoffStateCore) so
- * both entry points use the same predicate.
+ * both entry points use the same predicate. (E123)
  */
 export function hasFlatLaneFiles(workspacePath: string): boolean {
   const flatDir = path.join(workspacePath, ".current");

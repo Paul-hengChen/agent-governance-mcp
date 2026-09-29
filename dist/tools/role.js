@@ -37,7 +37,9 @@ export function switchRole(role, workspacePath) {
     // Workspace-override-aware loader (workspace .current/ override > server
     // content/ default) — shared by skill/fragment composition below AND the
     // partial expansion further down.
-    // Workspace-wide by decision (e123b8 J1 AC8): role SOP overrides are NOT lane files — J2 must not route them through the lane-path resolver.
+    // Workspace-wide by design: role SOP overrides are NOT lane files, so they
+    // are read from `.current/<file>` directly, never through the lane-path
+    // resolver. (E123)
     const hasOverride = (f) => fs.existsSync(path.join(workspacePath, ".current", f));
     const loadFile = (f) => {
         const overridePath = path.join(workspacePath, ".current", f);

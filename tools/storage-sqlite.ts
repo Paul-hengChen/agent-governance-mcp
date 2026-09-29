@@ -353,10 +353,10 @@ export class SqliteHandoffStorage implements HandoffStorage {
     this.selectVoidedTombstoneStmt = this.db.prepare<[string, string]>(
       "SELECT task_id FROM voided_tasks WHERE workspace_path = ? AND task_id = ?",
     );
-    // NEW-4 fix: run the DELETE and the tombstone INSERT as one committed
-    // unit so a crash between them can never leave a deleted task with no
-    // tombstone (better-sqlite3 transactions are synchronous; either both
-    // statements land or neither does).
+    // Run the DELETE and the tombstone INSERT as one committed unit so a
+    // crash between them can never leave a deleted task with no tombstone
+    // (better-sqlite3 transactions are synchronous; either both statements
+    // land or neither does).
     this.txVoidTask = this.db.transaction(
       (workspacePath: string, taskId: string, reason: string, voidedAt: string) => {
         const info = this.voidTaskStmt.run(workspacePath, taskId);
@@ -776,10 +776,9 @@ export class SqliteHandoffStorage implements HandoffStorage {
         }),
       );
     }
-    // NEW-4 fix (review round 1): the DELETE and the tombstone INSERT run
-    // inside one db.transaction (txVoidTask) so a crash between them can
-    // never leave the task deleted with no tombstone — see its declaration
-    // above. Previously these were two independent .run() calls.
+    // The DELETE and the tombstone INSERT run inside one db.transaction
+    // (txVoidTask) so a crash between them can never leave the task deleted
+    // with no tombstone — see its declaration above.
     const info = this.txVoidTask(workspacePath, taskId, reason, new Date().toISOString());
     if (info.changes === 0) {
       return Promise.resolve(JSON.stringify({ error: `Task ${taskId} could not be voided (race).` }));

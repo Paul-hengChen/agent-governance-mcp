@@ -221,10 +221,10 @@ export class SqliteHandoffStorage {
         this.insertVoidedTombstoneStmt = this.db.prepare(`INSERT OR REPLACE INTO voided_tasks (workspace_path, task_id, reason, voided_at)
        VALUES (?, ?, ?, ?)`);
         this.selectVoidedTombstoneStmt = this.db.prepare("SELECT task_id FROM voided_tasks WHERE workspace_path = ? AND task_id = ?");
-        // NEW-4 fix: run the DELETE and the tombstone INSERT as one committed
-        // unit so a crash between them can never leave a deleted task with no
-        // tombstone (better-sqlite3 transactions are synchronous; either both
-        // statements land or neither does).
+        // Run the DELETE and the tombstone INSERT as one committed unit so a
+        // crash between them can never leave a deleted task with no tombstone
+        // (better-sqlite3 transactions are synchronous; either both statements
+        // land or neither does).
         this.txVoidTask = this.db.transaction((workspacePath, taskId, reason, voidedAt) => {
             const info = this.voidTaskStmt.run(workspacePath, taskId);
             if (info.changes === 0)
@@ -540,10 +540,9 @@ export class SqliteHandoffStorage {
                     `roll it back first (tw_rollback_task) if it needs to be undone.`,
             }));
         }
-        // NEW-4 fix (review round 1): the DELETE and the tombstone INSERT run
-        // inside one db.transaction (txVoidTask) so a crash between them can
-        // never leave the task deleted with no tombstone — see its declaration
-        // above. Previously these were two independent .run() calls.
+        // The DELETE and the tombstone INSERT run inside one db.transaction
+        // (txVoidTask) so a crash between them can never leave the task deleted
+        // with no tombstone — see its declaration above.
         const info = this.txVoidTask(workspacePath, taskId, reason, new Date().toISOString());
         if (info.changes === 0) {
             return Promise.resolve(JSON.stringify({ error: `Task ${taskId} could not be voided (race).` }));

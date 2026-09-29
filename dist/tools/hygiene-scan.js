@@ -130,7 +130,7 @@ const shapePatterns = Object.freeze([
     // token key is rejected by the alphanumeric key class. The lookbehind also
     // excludes a dot, so a match can start only at the head of a dotted run:
     // without it every position after a dot is a start and a long dotted line
-    // backtracks quadratically (code review round 1).
+    // backtracks quadratically.
     {
         category: "design-file-key",
         re: new RegExp(String.raw `(?<![A-Za-z0-9.\-])(?:[A-Za-z0-9\-]+\.)*figma\.com[/](?:file|design|proto|board|slides|make)[/][A-Za-z0-9]{10,}`, "gi"),
@@ -269,8 +269,8 @@ export function compileKeywordMatcher(keywords) {
             // that overlaps an earlier, longer one is still found (and later
             // merged). One code unit is not enough: under the u flag a lastIndex
             // inside a surrogate pair is moved back to the pair's start, so a match
-            // opening with a non-BMP character would be found again forever (code
-            // review round 2). The progress guard stops the loop if exec ever fails
+            // opening with a non-BMP character would be found again forever. The
+            // progress guard stops the loop if exec ever fails
             // to move past the previous start.
             const found = [];
             const scan = new RegExp(anywhere.source, anywhere.flags);
@@ -339,7 +339,7 @@ export function maskText(text, kw) {
 }
 // C0/C1 controls, DEL, and the bidi mark/embedding/override/isolate controls.
 // A file name carrying one of these could otherwise forge extra advisory lines
-// or reorder the printed text on a terminal (code review round 1).
+// or reorder the printed text on a terminal.
 const unsafeDisplayChars = /[\u0000-\u001f\u007f-\u009f\u200e\u200f\u202a-\u202e\u2066-\u2069]/g;
 // Applied after masking (spans are computed on the raw text), so escaping
 // never shifts a masked span. Each unsafe character is shown as a \u escape.
@@ -480,7 +480,7 @@ function isTrackedFile(realFile) {
 // FIFO or other special file named by the env var can never block the read
 // (and cannot be swapped in between a check and the read). A non-regular
 // file takes the null path: "unreadable" for the env source, "none" for the
-// default file (code review round 1).
+// default file.
 const openNonBlocking = fs.constants.O_RDONLY | (fs.constants.O_NONBLOCK ?? 0);
 function loadKeywordFile(file) {
     let fd = null;

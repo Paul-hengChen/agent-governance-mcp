@@ -105,11 +105,10 @@ export function localFallbackLaneList(repoRoot, opts) {
         };
         for (const line of block.split(/\r?\n/)) {
             if (line.startsWith("worktree ")) {
-                // Defensive flush (round 1 fix): a second "worktree " line inside
-                // what should have been one block (e.g. a block-detection edge case)
-                // starts a new lane instead of silently overwriting blockPath/
-                // blockBranch — converts a future parse failure into a correct
-                // parse rather than a silent drop.
+                // Defensive flush: a second "worktree " line inside what should have
+                // been one block (e.g. a block-detection edge case) starts a new lane
+                // instead of silently overwriting blockPath/blockBranch — converts a
+                // future parse failure into a correct parse rather than a silent drop.
                 if (blockPath !== null)
                     flush();
                 const wp = line.slice("worktree ".length).trim();

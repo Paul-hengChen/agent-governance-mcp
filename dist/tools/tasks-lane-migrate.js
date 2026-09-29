@@ -65,10 +65,9 @@ function splitSentinel(raw) {
     return { version: Number(m[1]), header: m[0], body: raw.slice(m[0].length) };
 }
 /**
- * AC6b (review round 1, C1): the lane ledger is absent but the legacy file
- * proves one must exist — a `_primary` v2+ index, `tasks_moved` markers for
- * this feat lane, or a newer-server schema. Thrown instead of reporting an
- * empty task list. `.code` stays outside the error-code-contract harvest.
+ * The lane ledger is absent but the legacy file proves one must exist — a
+ * `_primary` v2+ index, `tasks_moved` markers for this feat lane, or a
+ * newer-server schema. Thrown instead of reporting an empty task list. `.code` stays outside the error-code-contract harvest.
  */
 export class TasksLedgerAbsentError extends Error {
     code = "TASKS_LEDGER_ABSENT";
