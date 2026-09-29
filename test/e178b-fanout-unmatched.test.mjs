@@ -195,7 +195,7 @@ test("AC18 exit codes and line order", (t) => {
   ]);
   assert.deepEqual(lines.slice(firstWarn), [warn("ghost.mjs")]);
 
-  // WARN only: exit 0 — E208 never changes the exit code (decision (h)).
+  // WARN only: exit 0 — an unmatched-file warning never changes the exit code (E208, decision (h)).
   const inBounds = repoWith(t, { "README.md": "x" }, { "tools/real.ts": "r" });
   const warnOnly = checkLane(m, "e950", { base: "main", repo: inBounds }).report;
   assert.equal(warnOnly.exitCode, 0);
@@ -214,7 +214,7 @@ test("AC18 exit codes and line order", (t) => {
     assert.equal(r.exitCode, 2, args.join(" "));
     assert.equal(r.stdout, "", `${args.join(" ")}: no report on an input error`);
   }
-  // No new error code (decision (i)): the E208 path adds none.
+  // No new error code (decision (i)): the unmatched-file warning adds none (E208).
   assert.equal(Object.values(FANOUT_CODES).some((c) => /UNMATCHED|WARN/.test(String(c))), false);
 
   // The degrade note (git ls-tree failed) appears only when that read fails.

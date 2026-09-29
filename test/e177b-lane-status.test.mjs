@@ -76,7 +76,7 @@ const LANE_STATUS_SOURCE = fs.readFileSync(path.join(ROOT, "tools", "lane-status
 function git(args, cwd) {
   // A bounded timeout: a hung git subprocess (e.g. an unexpected interactive
   // prompt) must fail this one call loudly rather than stall the whole
-  // suite (E182-class hazard — see the e177b-test-lock/mailbox-watch fixups).
+  // suite (same hang class fixed in the test-lock and mailbox-watch tests, E182).
   return execFileSync("git", args, { cwd, encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"], timeout: 15_000 });
 }
 
@@ -300,7 +300,7 @@ test("AC5/AC5a/AC5b/AC5d: evidence cross-check independently counts PASS-only, i
   const wt = addWorktree(t, primary, "feat/e908-archivetest", "e177b-ac5-wt-");
   // The handoff under-claims on purpose: only T-E908-01 is in completed_tasks,
   // even though several more ids will turn out to be evidence-backed below —
-  // this is the E175(d) shape (AC5).
+  // the shape where a lane's handoff under-reports finished work (E175(d), AC5).
   await writeLane(wt, { activeFeature: "e908-archivetest", completedTasks: ["T-E908-01"], hopCount: 1 });
 
   const qaDir = path.join(wt, "qa_reports");

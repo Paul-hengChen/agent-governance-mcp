@@ -33,7 +33,7 @@
 //   bonus (fail-closed: an uncaught copy failure aborts the
 //          whole write, leaves the live ledger untouched,
 //          leaks no lock and no tmp file — Constitution's
-//          E150-class-loss-prevention posture, verified
+//          rule that a failed copy never loses ledger data (E150), verified
 //          empirically per the dispatch brief)              -> bonus
 
 import { test } from "node:test";

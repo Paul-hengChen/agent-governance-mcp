@@ -175,7 +175,7 @@ test("AC7: two concurrent wraps of the SAME lock never execute their commands in
 
   // A generous --max-wait safety net (never expected to fire: each hold is
   // 150ms) converts a hypothetical hang into a fast, loud failure instead of
-  // stalling the whole suite (E182-class hazard the integrator caught).
+  // stalling the whole suite (the hang class seen earlier in E182).
   const [r1, r2] = await Promise.all([
     runTestLock(["--lock-path", lockPath, "--poll-ms", "10", "--max-wait", "15"], [process.execPath, recorder, resultsFile, "150"]),
     runTestLock(["--lock-path", lockPath, "--poll-ms", "10", "--max-wait", "15"], [process.execPath, recorder, resultsFile, "150"]),

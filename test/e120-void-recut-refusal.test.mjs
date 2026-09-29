@@ -163,7 +163,7 @@ for (const [label, indent] of INDENT_FORMS) {
     assert.equal(next.progress.total, 1, `only the control row may count as live under indent ${label}`);
 
     // No live re-cut row for T-A may coexist with its void marker — the
-    // exact end-state E120 exists to prevent.
+    // exact end-state the re-cut refusal exists to prevent (E120).
     assert.equal(
       readTasks(ws).match(/^\s*- \[ \] T-A\b/m),
       null,
