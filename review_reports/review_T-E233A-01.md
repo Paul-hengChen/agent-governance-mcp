@@ -59,3 +59,58 @@ CHANGES_REQUESTED — behaviour invariance and accuracy are solid, but AC2 is on
 - **R1 — fixed.** All 13 leading-id comments (handoff-write.ts, handoff-parse.ts, lane-migrate.ts) and the in-sentence ids in lane-paths.ts, lane-registry.ts:54 and role.ts:60 now state the behaviour, with `(E123)` as a trailing pointer; the adjacent `spec ACn` / `amendment ACn` / `J2` / `T-E123B9-02` cross-references in those same blocks were dropped. role.ts:60 now reads in the present tense (overrides are read from `.current/<file>` directly, never through the lane-path resolver). Widened scan (`/\b[Ee]\d+[a-z0-9]*\b/`, plus a leading-id and an `e123bN`-shape pass) over all of `tools/`: `bare-id OK`; remaining hits are the 3 accepted lane-status.ts `/**` lines and two lane-paths.ts lines (138, 311) where `e123b0` / `e123b1` are example inputs to the ticket-id regex, not citations — kept on purpose.
 - **O1 — fixed**, plus the same jargon found by a wider grep in owned files: storage-sqlite.ts (both NEW-4 blocks), feature-rollup.ts (round 1 fix), lane-migrate.ts (NEW-TICKETS.md pointer, "pre-J2"), tasks-file.ts voided-row block (Q1/C1/NEW-3/R2-C1 history rewritten to current behaviour), tasks-lane-migrate.ts (AC6b/review round 1), hygiene-scan.ts (4x "code review round n"), registry.ts (NEW-2 notes). Example ids in lane-ticket-allocation.ts (`L-STATE-NEW-3`, `X-NEW-1`) are data, left alone.
 - lane-status.ts untouched this round. Re-verified: AC1 `invariance OK: 33 files`; AC3 = 1; AC4 = 0; AC5 unchanged (only the two transitions.ts trailing-comment tails); AC6 nothing outside owned paths, `dist/tools/**` rebuilt and committed, `npx tsc --noEmit` clean; AC8 grep empty.
+
+## Round 2 — APPROVED — by code-reviewer
+
+covers: T-E233A-01, T-E233A-02, T-E233A-03, T-E233A-04, T-E233A-05, T-E233A-06, T-E233A-07, T-E233A-08, T-E233A-09
+
+## Summary
+- Round-2 fix range `ae31d66..HEAD` (00e38fd, 7a0fde7): 12 `tools/*.ts` files, +117/-127, all comment lines, plus the rebuilt `dist/tools/**` and the sr reply appended to this report.
+- R1 is resolved. Every leading or in-sentence `e123bN` citation is rewritten to describe current behaviour, with `(E123)` as a trailing pointer. The only `e123bN` tokens left in `tools/` are example inputs to the ticket-id regex (lane-paths.ts:138, :311). That is correct, because they are data.
+- O1 is resolved, and so is the extra review jargon in tasks-file, tasks-lane-migrate, hygiene-scan, registry, storage-sqlite, feature-rollup and lane-migrate.
+- I re-ran every rewrite in this round against the code it describes. None of them misdescribes the code.
+- Verdict: APPROVED.
+
+## AC Completeness
+AC1 — implemented — my own copy of the spec's script, run against the whole range `6c61864..HEAD`, printed `invariance OK: 33 files` and exited 0.
+AC2 — implemented — a widened scan for `e123b[0-9]` in comment lines finds only the two example inputs at lane-paths.ts:138 and :311. The lane-status.ts `/**` single-line comments are unchanged; the round-1 judgment call (accepted, AC4 conflict) still applies. I read all 25 comment blocks this round rewrote, which covers the 20 the spec asks to sample.
+AC3 — implemented — `grep -c '^ *// Watch mode (E178b' tools/lane-status.ts` = 1.
+AC4 — implemented — `git diff 6c61864 -- tools/lane-status.ts | grep -E '^\+.*/\*' | wc -l` = 0. lane-status.ts is untouched this round.
+AC5 — implemented — the whole-range filter still prints only the two transitions.ts trailing-comment tails (`// E4 (...) — emitted by the` -> `// Emitted by the`, `// E1 (...) — emitted by the` -> `// Emitted by the`). Both were justified in Round 1, and the code before `//` is unchanged.
+AC6 — implemented — `git diff --name-only 6c61864` with the owned-path filter printed nothing. `git status --porcelain` shows only `.current/e233a/{handoff.md,dispatch.jsonl}`, which this review's claim write touched and which is an owned path. `npx tsc --outDir <scratch>` exits 0, and every emitted `tools/**/*.js` / `*.d.ts` is byte-identical to the committed `dist/tools/` (0 mismatches).
+AC7 — N/A for review (QA-owned full suite).
+AC8 — implemented — no added line matches `/Users/|/home/|https?://`. By eye, this round removes jargon ("round 1 fix", "NEW-4 fix", "code review round n", "NEW-TICKETS.md J2-NEW-2", "pre-J2", "spec ACn", "amendment ACn", "Decision 2") and adds none.
+
+## Correctness
+No findings. Accuracy checks on the new rewrites:
+- **tasks-file.ts:588-600 (voided-row block).** The text now describes current behaviour instead of the Q1/C1/NEW-3/R2-C1 fix history, and it is accurate:
+  - "Every other scan in this file trims each line before matching": `parseTasks` trims at :212, the `addTaskInFile` duplicate-id re-scan trims at :770, and the rollback scan trims at :671.
+  - "below in `addTaskInFile`" is right, because `addTaskInFile` (:696) follows `voidTaskInFile` (:536).
+  - "tests the anchored, unindented pattern against each line's own trim() output" matches :604-605.
+  - The `(?=\s|$)`-instead-of-`\b` explanation matches the regex at :604.
+  - The fix-history narrative was dropped and the current-behaviour reason kept, which is what the spec's Rewrite rule asks for.
+- **handoff-write.ts:266-269.** "writers in different lanes never block each other" is true, because `resolveLaneLockPath(absWorkspace, lane)` composes a per-lane lockfile.
+- **lane-migrate.ts:233-236.** "hasFlatLaneFiles still fires on the next read or write, which then finishes the move" is accurate. `hasFlatLaneFiles` gates migration on both entry points (handoff-parse.ts:170, handoff-write.ts:285), and handoff.md-last ordering keeps a flat file present after an interruption.
+- **lane-migrate.ts:305-308.** "it cannot close it, so a line appended inside that gap can still be lost" states the remaining risk in plain words, replacing the pointer to an untracked file.
+- **lane-registry.ts:54.** "for two reasons:" introduces the existing (1)/(2) list that follows, so it reads correctly.
+- **role.ts:60-62.** Now in the present tense and accurate: `hasOverride` joins `.current/<f>` directly (:63-64), not through the lane resolver.
+- **handoff-parse.ts / lane-paths.ts / storage-sqlite.ts / registry.ts / tasks-lane-migrate.ts / hygiene-scan.ts / feature-rollup.ts.** Each rewrite keeps the original technical content minus the ticket, AC and round references. No meaning was lost or changed.
+- No expected-red manifest needed: the diff touches no tests.
+
+## Quality
+- **optional**: two awkward reflows. tools/hygiene-scan.ts:186-188 leaves a ragged short line (`// progress guard stops the loop if exec ever fails` / `// to move past the previous start.`). tools/tasks-lane-migrate.ts:85 merged two sentences onto one 126-char JSDoc line instead of re-wrapping. Both are cosmetic, and the file already has lines this long, so neither blocks approval.
+- The round-1 lane-status.ts `/**` judgment call is carried forward unchanged (recommended, needs an AC4 spec amendment first).
+
+## Architecture
+No architecture spec. No layering change: AC1 invariance holds across all 33 files.
+
+## Security
+No findings. The change is comment-only, and AC8's grep is empty.
+
+## Performance
+No findings. Emitted JS is identical (AC1 plus the scratch-build byte comparison).
+
+## Verdict
+APPROVED — R1 and O1 are fully addressed, the new rewrites are accurate against the current code, and AC1-AC6 and AC8 hold over the whole range `6c61864..HEAD`.
+
+(Same-model-bias note: reviewer on opus, builder on fable.)
