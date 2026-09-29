@@ -1,6 +1,6 @@
 // Coded by @sr-engineer
-// Information-hygiene scan (e234-hygiene-scan, spec specs/e234-hygiene-scan.md,
-// architecture specs/e234-hygiene-scan-architecture.md). The fifth `agc check`
+// Information-hygiene scan (spec specs/e234-hygiene-scan.md, architecture
+// specs/e234-hygiene-scan-architecture.md). The fifth `agc check`
 // advisory: it warns about the classes of detail the constitution's
 // Information hygiene rule bans from durable output, and never changes the
 // exit code (bin/agc-init.mjs checkHygiene is the only caller).
@@ -17,7 +17,7 @@
 // Authoring rule: no pattern literal in this file may match its own source
 // text. Separators are written as one-character classes, host dots are
 // escaped, and each vendor prefix is followed by a character class, so the
-// scan stays silent over this file (spec AC16). Comments describe shapes in
+// scan stays silent over this file. Comments describe shapes in
 // prose only. Constant names avoid UPPER_SNAKE gate-code suffixes
 // (test/error-code-contract.test.mjs harvests tools/*.ts).
 //

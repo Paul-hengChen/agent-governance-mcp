@@ -1,6 +1,5 @@
 // Coded by @sr-engineer
-// Append-only per-hop dispatch-mechanism sidecar (e123a-lane-layout-migration,
-// E99 durability amendment 2026-09-23, spec AC13/AC14/AC15).
+// Append-only per-hop dispatch-mechanism sidecar. (E99)
 //
 // The handoff file keeps only the LAST hop, so the transient dispatch_mechanism /
 // dispatch_mechanism_tier fields (handoff schema v15) are overwritten by the
@@ -13,18 +12,17 @@
 // NEVER throws, never alters the caller's ToolResult. Deliberately NOT
 // governed by the handoff 4-step mutating-tool contract.
 //
-// Disjoint stream (AC14): this module writes ONLY its own sidecar. It never
+// Separate stream: this module writes ONLY its own sidecar. It never
 // touches the per-shipped-feature metrics sidecar (tools/metrics.ts, deduped
 // per feature by tw_gate_stats — a per-hop record would corrupt that
 // invariant) nor the gate-fire telemetry sidecar (tools/telemetry.ts).
 //
-// Raw and unconsumed in this ticket: no aggregator, drift check, or gate reads
-// it (E99 option (ii) is a separate, later cut).
+// Raw and unconsumed for now: no aggregator, drift check, or gate reads it.
 //
-// Path (e123b8 J1, spec AC1): resolveCurrentLanePaths(<absolute ws>)
-// .dispatchLogPath — the lane resolver owns both the filename (LANE_FILES)
-// and the directory, so this sidecar follows the handoff into its lane once
-// J2 flips the seam. Today it is still the flat `.current/dispatch.jsonl`.
+// Path: resolveCurrentLanePaths(<absolute ws>).dispatchLogPath — the lane
+// resolver owns both the filename (LANE_FILES) and the directory, so this
+// sidecar lives in the current lane next to its handoff:
+// `.current/<lane>/dispatch.jsonl`. (E123)
 
 import * as fs from "fs";
 import * as path from "path";
