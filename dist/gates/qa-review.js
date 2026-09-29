@@ -4,7 +4,7 @@
 // each QA round appends a timestamped section to
 // <workspace>/qa_reports/review_<task_id>.md. A per-id file's existence is
 // sufficient for hasEvidenceInFile(); when a per-id file is absent, a lazy
-// `covers:` label-line fallback (c3-covering-evidence) lets one covering
+// `covers:` label-line fallback (covering evidence, C3) lets one covering
 // report satisfy additional ids — see parseCoversIds / buildCoverageIndex in
 // tools/evidence-file.ts (gate-agnostic plumbing).
 //
@@ -24,15 +24,15 @@ function evidencePath(workspacePath, taskId) {
     const safe = taskId.replace(/[^A-Za-z0-9._-]/g, "_");
     return path.join(evidenceDir(workspacePath), `review_${safe}.md`);
 }
-// Exported alias (E32, e32-e33-gate-hardening): the QA completion-evidence
-// gate's rejection envelope names the exact expected per-id evidence file
-// path (mirrors the exported visualEvidencePath precedent in gates/visual.ts
-// — E23 named-path rejection posture). Thin delegate over the same sanitised
-// path the predicates below check, so the envelope can never name a path the
-// gate didn't test. Kept as a WRAPPER (not a rename) so the internal
-// `evidencePath` call sites stay literally intact — the covering-evidence
-// AC-6 code-path pin asserts the exact `fs.existsSync(evidencePath(...))`
-// source text inside hasEvidenceInFile.
+// Exported alias: the QA completion-evidence gate's rejection envelope names
+// the exact expected per-id evidence file path (mirrors the exported
+// visualEvidencePath precedent in gates/visual.ts — the same
+// name-the-expected-path rejection posture, E23). Thin delegate over the same
+// sanitised path the predicates below check, so the envelope can never name a
+// path the gate didn't test. Kept as a WRAPPER (not a rename) so the internal
+// `evidencePath` call sites stay literally intact — the covering-evidence AC-6
+// code-path pin asserts the exact `fs.existsSync(evidencePath(...))` source
+// text inside hasEvidenceInFile. (E32)
 export function qaEvidencePath(workspacePath, taskId) {
     return evidencePath(workspacePath, taskId);
 }
@@ -52,7 +52,7 @@ export async function recordReviewInFile(workspacePath, taskIds, status, reviewe
 export function hasEvidenceInFile(workspacePath, taskIds) {
     const present = [];
     const missing = [];
-    // c3-covering-evidence: coverage index over qa_reports/ `covers:` lines,
+    // Covering evidence (C3): coverage index over qa_reports/ `covers:` lines,
     // built at most once per call and ONLY on the first direct-file miss (AC-6).
     let coverage = null;
     for (const id of taskIds) {

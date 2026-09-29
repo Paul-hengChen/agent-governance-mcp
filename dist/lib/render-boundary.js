@@ -1,9 +1,10 @@
 // Coded by @sr-engineer
-// Render boundary (E137, specs/e137-render-sanitise.md, Option B). THE one
-// function that puts reported data — live handoff state, PRD RAG chunks — into
-// prompt text. Every render site (prompts/build.ts's state block and Spec
-// Context block, bin/agent-governance-context.mjs's SessionStart state block)
-// calls renderDataBlock; none hand-builds a fence (spec AC1).
+// Render boundary: fences untrusted data so it cannot pose as instructions
+// (E137, Option B). THE one function that puts reported data — live handoff
+// state, PRD RAG chunks — into prompt text. Every render site
+// (prompts/build.ts's state block and Spec Context block,
+// bin/agent-governance-context.mjs's SessionStart state block) calls
+// renderDataBlock; none hand-builds a fence (spec AC1).
 //
 // What it guarantees, and what it does not (spec Threat Model):
 //   - a BOUNDARY the body cannot structurally escape. The fence is a backtick

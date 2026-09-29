@@ -1,5 +1,6 @@
 // Coded by @sr-engineer
-// Expected-Red Diff gate predicates (c15-expected-red-manifest, AC-4). Third
+// Expected-Red Diff gate predicates: tests left red on purpose must be
+// declared up front and dispositioned by QA (C15, AC-4). Third
 // member of the evidence-existence gate family (MISSING_EVIDENCE /
 // MISSING_REVIEW_EVIDENCE): sr-engineer declares intentionally-red tests in a
 // feature-scoped plain-text manifest (qa_reports/expected-red_<feature>.txt,
@@ -47,7 +48,7 @@ function reviewPath(workspacePath, taskId) {
 // shape): the gate is armed iff the feature's manifest FILE exists. Absence
 // means "no expected reds declared" — the gate never fires, zero cost for
 // features with no intentional reds (same absence-is-non-blocking polarity as
-// external_refs / dispatch_pins, c9/c14 precedent). Returns the resolved path
+// the external_refs / dispatch_pins fields; C9/C14). Returns the resolved path
 // so the emit site can cite it in the error text.
 export function hasExpectedRedManifest(workspacePath, activeFeature) {
     const manifestPath = expectedRedManifestPath(workspacePath, activeFeature);
@@ -59,7 +60,7 @@ export function hasExpectedRedManifest(workspacePath, activeFeature) {
 // the ids being PASS'd contains a `## Expected-Red Diff` H2. Candidates per
 // id: the direct qa_reports/review_<id>.md; else — lazily, on the first
 // direct-file miss only (the hasEvidenceInFile precedent) — the file covering
-// the id via the c3 `covers:` label-line index. "At least one across all
+// the id via the `covers:` label-line index (C3). "At least one across all
 // ids" (not per-id): QA runs ONE suite-wide diff per round because the
 // manifest is feature-scoped, so one recorded disposition covers every id in
 // the round — a per-id requirement would force QA to duplicate the same diff
