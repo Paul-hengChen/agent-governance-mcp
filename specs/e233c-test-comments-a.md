@@ -115,22 +115,26 @@ Owned set (60 tracked files): `test/{a,b,d}*.test.mjs`, `test/{ch,com,conf,cons,
 
 - E231 (the hygiene rule) is shipped. No other lane's output is needed; e233c touches only its
   owned files.
-- Chain design (PM decision, records the coordinator's recommendation as accepted): only
-  qa-engineer may write `test/` (Constitution §2) and builder must not judge (§3.2), so the
-  chain is a three-hop qa/judge/qa sequence, with two distinct qa-engineer contexts:
-  1. After cut approval, PM writes `pm:In_Progress` with `next_role: qa-engineer` and
-     `cut_approved` (set by the coordinator). Author hop: a qa-engineer subagent rewrites the
-     comments and commits (`feat(e233c): E233C T-E233C-01 — …`), with NO `tw_*` state write.
-  2. Judge hop: PM (or the coordinator) writes `pm:In_Progress` with `next_role: code-reviewer`
-     and `resume_of: code-reviewer` (the single-role judge / resume edge
-     `pm:In_Progress → code-reviewer:In_Progress`). An independent code-reviewer judges the diff
-     (AC1–AC5, AC7) and writes `APPROVED` or `CHANGES_REQUESTED`. On CHANGES_REQUESTED the fix
-     goes back to the author role in a fresh dispatch; the review round cap applies.
-  3. Verify hop: on APPROVED, a FRESH qa-engineer context, not the author, runs AC1–AC7, records
-     evidence under `qa_reports/*E233C*`, and writes PASS (T-E233C-02). No architect,
-     researcher, sr-engineer or design-auditor hop: this is a comment-only pass with no design or
-     production-code change (`sr-engineer=fable` pin is unused here). No qa-visual (no visual
-     surface).
+- Chain design (PM decision, amended after integrator pre-review; same handoff path in all three
+  test lanes): only qa-engineer may write `test/` (Constitution §2) and builder must not judge
+  (§3.2), so two distinct qa-engineer contexts are used with an independent code-reviewer
+  between them. Every run that commits ends with its own state write (const-05).
+  1. After cut approval (`cut_approved` set by the coordinator on the `pm:In_Progress` tuple),
+     author hop A: a qa-engineer subagent writes `qa-engineer:In_Progress` with
+     `resume_of: qa-engineer`, rewrites the comments, commits
+     (`test(e233c): E233 T-E233C-01 — …`) and runs AC1/AC2/AC4/AC5 plus the per-file tests.
+  2. A then writes `qa-engineer:Blocked`, `next_role: pm`, with the Escalation call format note
+     "qa-engineer: authoring complete, not a failure — the approved cut requires independent
+     review". This is the only honest legal hand-off edge out of `qa-engineer:In_Progress`. The
+     lane coordinator stops once here per SOP and the human replies "continue" in the lane session.
+  3. PM routes `pm:In_Progress` → `code-reviewer:In_Progress` with `resume_of: code-reviewer`. An
+     independent code-reviewer judges the diff (AC1–AC5, AC7) and writes `APPROVED` or
+     `CHANGES_REQUESTED`. On CHANGES_REQUESTED the fix goes back to a fresh author dispatch via PM;
+     the review round cap applies.
+  4. Verify hop: on APPROVED, a FRESH qa-engineer Task dispatch (never the author A context)
+     re-runs AC1–AC7, records evidence under `qa_reports/*E233C*`, and writes PASS (T-E233C-02).
+     No architect, researcher, sr-engineer or design-auditor hop: comment-only pass, no design or
+     production-code change (`sr-engineer=fable` pin is unused here). No qa-visual.
 - External references: none. `docs/backlog.md` row E233 and `specs/fanout-e233.md` are tracked
   in-repo. No `external_refs` entry.
 - Scope decision: `single-feature`. One mechanical pass over one file class with a single
