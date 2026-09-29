@@ -47,13 +47,13 @@ Round 2 PASS. Full suite via test-lock: 2958 tests / 2955 pass / 0 fail / 3 skip
 
 ## AC Execution Log (round 2, covers T-E233A-01..09)
 
-### `node /var/folders/69/s4kyhvn53lzd0x9t15cytznh0000gp/T//inv.mjs`
+### `node <scratch>/inv.mjs`
 ```
 invariance OK: 33 files
 exit=
 ```
 
-### `node /var/folders/69/s4kyhvn53lzd0x9t15cytznh0000gp/T//bare.mjs`
+### `node <scratch>/bare.mjs`
 ```
 bare-id OK
 exit=
