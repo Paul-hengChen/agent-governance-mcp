@@ -1,8 +1,8 @@
 // Coded by @sr-engineer
 // tools/fanout-manifest.ts — fan-out manifest parser, dispatch-prompt
-// renderer and fan-in ownership check (E177a, e177a-fanout-manifest; spec:
-// specs/e177a-fanout-manifest.md — the normative format table there is the
-// contract this module implements).
+// renderer and fan-in ownership check. The normative format table in
+// specs/e177a-fanout-manifest.md is the contract this module implements.
+// (E177a)
 //
 // The integrator writes each wave's `specs/fanout-<wave>.md` by hand. This
 // module is the ONE parser for that format:
@@ -23,13 +23,12 @@
 // written relative to the primary checkout (e.g. `../<lanes-dir>/<lane>`) so a
 // tracked manifest never carries a local absolute path, and `render` resolves
 // it against the primary path it already computes; a cell that is already
-// absolute passes through byte-verbatim. This amends the `<worktree>` row of
-// the e177a "Render field sources" table (see
+// absolute passes through byte-verbatim (see
 // specs/e235b-relative-manifest-worktree-architecture.md). The optional
-// `mailbox:` header follows the same rule (E248, specs/e248-relative-mailbox-
-// header.md): a relative value resolves against primary, an absolute one
-// passes through byte-verbatim, and `--mailbox-root` still wins verbatim. The
-// parsed path-token set is used only by `check`.
+// `mailbox:` header follows the same rule: a relative value resolves against
+// primary, an absolute one passes through byte-verbatim, and `--mailbox-root`
+// still wins verbatim (E235b, E248). The parsed path-token set is used only
+// by `check`.
 //
 // Reporting surface only: writes nothing, fires no gate, touches no git state
 // (git is only read, via execFileSync argv — never a shell).
@@ -117,26 +116,27 @@ export const FANOUT_CODES = {
   readingAbsent: "READING_ABSENT",
   mailboxRootAbsent: "MAILBOX_ROOT_ABSENT",
   primaryNotFound: "PRIMARY_NOT_FOUND",
-  // Render-only row errors (E235b): an unusable worktree cell. Not raised by
-  // the parser, so validate/check exit codes never change because of them.
+  // Render-only row errors: an unusable worktree cell. Not raised by the
+  // parser, so validate/check exit codes never change because of them. (E235b)
   worktreeEmpty: "WORKTREE_EMPTY",
   worktreeTilde: "WORKTREE_TILDE",
-  // Render-only input error (E248): a `mailbox:` header starting with "~".
-  // Not raised by the parser, so validate never fails because of it.
+  // Render-only input error: a `mailbox:` header starting with "~". Not
+  // raised by the parser, so validate never fails because of it. (E248)
   mailboxTilde: "MAILBOX_TILDE",
 } as const;
 
 /**
  * validate warning for a dispatchable row whose worktree cell is an absolute
- * path (E235b). The absolute value is deliberately NOT echoed, so the warning
- * never repeats a local path in its own output.
+ * path. The absolute value is deliberately NOT echoed, so the warning never
+ * repeats a local path in its own output. (E235b)
  */
 export const WORKTREE_ABSOLUTE_WARN = (lane: string, line: number): string =>
   `WARN  lane ${lane} (line ${line}): worktree cell is an absolute path — write it relative to primary (e.g. ../<lanes-dir>/${lane}); render still accepts it`;
 
 /**
- * validate warning for an absolute `mailbox:` header (E248). Like
+ * validate warning for an absolute `mailbox:` header. Like
  * WORKTREE_ABSOLUTE_WARN, the absolute value is deliberately NOT echoed.
+ * (E248)
  */
 export const MAILBOX_ABSOLUTE_WARN = (line: number): string =>
   `WARN  mailbox header (line ${line}): mailbox: is an absolute path — write it relative to primary (e.g. ../<lanes-dir>/_mailbox); render still accepts it`;
@@ -739,8 +739,8 @@ export interface RenderOptions {
 
 export type RenderResult = { ok: true; prompt: string } | { ok: false; errors: FanoutError[] };
 
-// 64 MiB: `git ls-tree -r` (E208) lists every path at base; execFileSync's
-// 1 MiB default would fail on a large repo.
+// 64 MiB: `git ls-tree -r` lists every path at base (for the owned-token
+// existence check); execFileSync's 1 MiB default would fail on a large repo.
 const GIT_MAX_BUFFER = 64 * 1024 * 1024;
 
 function gitOut(args: string[], cwd: string): string {
@@ -767,8 +767,8 @@ export type WorktreeResolution = { ok: true; path: string } | { ok: false; code:
 
 /**
  * Resolve a manifest worktree cell to the absolute, `cd`-able path render
- * substitutes into the dispatch prompt (E235b). Pure: no fs access, no
- * existence check. Rules, in order:
+ * substitutes into the dispatch prompt. Pure: no fs access, no existence
+ * check. (E235b) Rules, in order:
  *   - empty (after trim)   → WORKTREE_EMPTY
  *   - starts with "~"      → WORKTREE_TILDE (never shell-expanded: the tool
  *                            does not guess a home directory)
@@ -794,9 +794,10 @@ export type MailboxResolution = { ok: true; path: string } | { ok: false; code: 
 
 /**
  * Resolve a manifest `mailbox:` header to the absolute mailbox root render
- * substitutes (E248). Same rules as resolveWorktree, minus the empty case
+ * substitutes. Same rules as resolveWorktree, minus the empty case
  * (MAILBOX_RE requires a non-space value, and render treats a blank source
  * as absent before calling this). Pure: no fs access, no existence check.
+ * (E248)
  *   - starts with "~"      → MAILBOX_TILDE (never shell-expanded; the value
  *                            is not echoed in the message)
  *   - absolute             → the header, byte-verbatim (no normalisation)
@@ -854,7 +855,7 @@ export function renderPrompt(m: Manifest, laneId: string, opts: RenderOptions): 
 
   // Mailbox root: a non-blank --mailbox-root wins and is used byte-verbatim
   // (never resolved). Otherwise the manifest header, resolved against primary
-  // below (E248). A blank flag falls through to the header, as before.
+  // below. A blank flag falls through to the header. (E248)
   const flagRoot = opts.mailboxRoot !== undefined && opts.mailboxRoot.trim() !== "" ? opts.mailboxRoot : undefined;
   const header = flagRoot === undefined && m.mailbox !== undefined && m.mailbox.trim() !== "" ? m.mailbox : undefined;
   let mailboxRoot: string | undefined = flagRoot;
@@ -881,9 +882,9 @@ export function renderPrompt(m: Manifest, laneId: string, opts: RenderOptions): 
     });
   }
 
-  // Worktree: resolved against primary (E235b). Skipped when primary is
-  // absent — there is no base to resolve against, and PRIMARY_NOT_FOUND
-  // already reports that condition.
+  // Worktree: resolved against primary. Skipped when primary is absent —
+  // there is no base to resolve against, and PRIMARY_NOT_FOUND already
+  // reports that condition. (E235b)
   let worktree: string | undefined;
   if (primary !== undefined) {
     const wt = resolveWorktree(lane.worktree, primary);
@@ -891,9 +892,9 @@ export function renderPrompt(m: Manifest, laneId: string, opts: RenderOptions): 
     else errors.push({ code: wt.code, scope: "row", lanes: [lane.lane], message: `lane ${lane.lane}: ${wt.message}` });
   }
 
-  // Mailbox header: resolved against primary (E248), under the same skip as
-  // the worktree above — with no primary, PRIMARY_NOT_FOUND is the only
-  // report and there is never a cwd fallback.
+  // Mailbox header: resolved against primary, under the same skip as the
+  // worktree above — with no primary, PRIMARY_NOT_FOUND is the only report
+  // and there is never a cwd fallback. (E248)
   if (header !== undefined && primary !== undefined) {
     const mb = resolveMailboxHeader(header, primary);
     if (mb.ok) mailboxRoot = mb.path;
@@ -1003,9 +1004,9 @@ export interface CheckReport {
   base: string;
   changed: string[];
   out: { path: string; forbidden?: string }[];
-  /** E208: exact 擁有 tokens matching no path at base and no file added on the branch. Warning only. */
+  /** Exact 擁有 tokens matching no path at base and no file added on the branch. Warning only. (E208) */
   unmatchedOwned: string[];
-  /** Set when the E208 existence check could not run (the git ls-tree read failed). */
+  /** Set when the owned-token existence check could not run (the git ls-tree read failed). (E208) */
   unmatchedCheckError?: string;
   output: string;
   exitCode: 0 | 1;
@@ -1013,25 +1014,25 @@ export interface CheckReport {
 
 export type CheckResult = { ok: true; report: CheckReport } | { ok: false; errors: FanoutError[] };
 
-/** E208 warning line (spec e178b Copy/Strings fanout.warn). */
+/** Warning line for an owned token that matches nothing (spec e178b Copy/Strings fanout.warn). (E208) */
 export const UNMATCHED_OWNED_WARN = (token: string, base: string, branch: string): string =>
   `WARN  ${token}  (擁有 token matches no path at ${base} and is not a glob or a file added on ${branch})`;
 
 /**
- * E208 glob token: contains `*` or `{`, or ends with `/`. Never warned about
- * — the lane may be the one creating the files it names.
+ * Glob token: contains `*` or `{`, or ends with `/`. Never warned about —
+ * the lane may be the one creating the files it names. (E208)
  */
 export function isGlobToken(token: string): boolean {
   return token.includes("*") || token.includes("{") || token.endsWith("/");
 }
 
 /**
- * E208 (spec e178b decision (i)) — the exact (non-glob) owned tokens that
- * match no path in `basePaths` and no file in `addedPaths` (files the lane
- * branch added vs base: a declared new file such as e177a's
- * `新檔 tools/fanout-manifest.ts`). Pure; each token reported once, in
- * 擁有 order. A token that matches nothing grants no ownership either, so it
- * is usually a prose aside that happens to be path-shaped.
+ * The exact (non-glob) owned tokens that match no path in `basePaths` and
+ * no file in `addedPaths` (files the lane branch added vs base: a declared
+ * new file such as `新檔 tools/fanout-manifest.ts`). Pure; each token
+ * reported once, in 擁有 order. A token that matches nothing grants no
+ * ownership either, so it is usually a prose aside that happens to be
+ * path-shaped. (E208)
  */
 export function unmatchedOwnedTokens(ownedTokens: string[], basePaths: string[], addedPaths: string[]): string[] {
   const out: string[] = [];
@@ -1059,8 +1060,9 @@ function refOk(ref: string, cwd: string): boolean {
 
 /**
  * Fan-in ownership check: every file the lane branch changed vs `<base>`
- * (committed changes only — E158) that is outside the owned tokens and the
- * implicit bookkeeping set is listed on its own OUT line; exit 1 if any.
+ * (committed changes only, so uncommitted work never counts) that is
+ * outside the owned tokens and the implicit bookkeeping set is listed on its
+ * own OUT line; exit 1 if any. (E158)
  */
 export function checkLane(m: Manifest, laneId: string, opts: CheckOptions = {}): CheckResult {
   const found = lookupLane(m, laneId);
@@ -1097,10 +1099,10 @@ export function checkLane(m: Manifest, laneId: string, opts: CheckOptions = {}):
     out.push({ path: p, forbidden: lane.forbiddenTokens.find((t) => matchesGlob(p, t)) });
   }
 
-  // E208 — owned-token existence check (warning only; exit code unchanged).
-  // Runs after the ref checks above, so both refs resolve here. --full-tree:
+  // Owned-token existence check (warning only; exit code unchanged). Runs
+  // after the ref checks above, so both refs resolve here. --full-tree:
   // ls-tree is otherwise relative to cwd, and the CLI's default --repo is the
-  // manifest's own directory (specs/), not the repo root.
+  // manifest's own directory (specs/), not the repo root. (E208)
   let unmatchedOwned: string[] = [];
   let unmatchedCheckError: string | undefined;
   try {
@@ -1120,7 +1122,7 @@ export function checkLane(m: Manifest, laneId: string, opts: CheckOptions = {}):
     `fanout check: ${lane.lane} — ${changed.length} file(s) changed, ${out.length} out of bounds`,
     E158_NOTE(base, lane.branch),
     PROSE_NOTE,
-    // E208 lines strictly AFTER every pre-existing line, which stay byte-identical.
+    // Warning lines go strictly AFTER every earlier line, which stay byte-identical. (E208)
     ...unmatchedOwned.map((t) => UNMATCHED_OWNED_WARN(t, base, lane.branch)),
     ...(unmatchedCheckError !== undefined
       ? [`note: 擁有 token existence check skipped — git ls-tree ${base} failed: ${unmatchedCheckError}`]
@@ -1210,14 +1212,14 @@ export function runValidate(args: string[]): CliResult {
   if ("error" in r) return fail([r.error]);
   const { manifest, errors } = validateManifest(r.text);
   if (errors.length > 0) return fail(errors);
-  // E235b: one non-fatal WARN per dispatchable row whose worktree cell is
-  // absolute (exit code stays 0). Provisional rows have no worktree contract.
+  // One non-fatal WARN per dispatchable row whose worktree cell is absolute
+  // (exit code stays 0). Provisional rows have no worktree contract. (E235b)
   let warns = manifest.dispatchable
     .filter((l) => isAbsoluteWorktree(l.worktree))
     .map((l) => `${WORKTREE_ABSOLUTE_WARN(l.lane, l.line)}\n`)
     .join("");
-  // E248: one non-fatal WARN for an absolute `mailbox:` header. A "~" header
-  // is a render-time refusal only (like WORKTREE_TILDE), so no line here.
+  // One non-fatal WARN for an absolute `mailbox:` header. A "~" header is a
+  // render-time refusal only (like WORKTREE_TILDE), so no line here. (E248)
   if (manifest.mailbox !== undefined && manifest.mailboxLine !== undefined && path.isAbsolute(manifest.mailbox)) {
     warns += `${MAILBOX_ABSOLUTE_WARN(manifest.mailboxLine)}\n`;
   }

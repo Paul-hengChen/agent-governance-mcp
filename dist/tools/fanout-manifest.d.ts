@@ -42,13 +42,14 @@ export declare const FANOUT_CODES: {
 };
 /**
  * validate warning for a dispatchable row whose worktree cell is an absolute
- * path (E235b). The absolute value is deliberately NOT echoed, so the warning
- * never repeats a local path in its own output.
+ * path. The absolute value is deliberately NOT echoed, so the warning never
+ * repeats a local path in its own output. (E235b)
  */
 export declare const WORKTREE_ABSOLUTE_WARN: (lane: string, line: number) => string;
 /**
- * validate warning for an absolute `mailbox:` header (E248). Like
+ * validate warning for an absolute `mailbox:` header. Like
  * WORKTREE_ABSOLUTE_WARN, the absolute value is deliberately NOT echoed.
+ * (E248)
  */
 export declare const MAILBOX_ABSOLUTE_WARN: (line: number) => string;
 export declare const PINS_NONE = "\u7121";
@@ -183,8 +184,8 @@ export type WorktreeResolution = {
 };
 /**
  * Resolve a manifest worktree cell to the absolute, `cd`-able path render
- * substitutes into the dispatch prompt (E235b). Pure: no fs access, no
- * existence check. Rules, in order:
+ * substitutes into the dispatch prompt. Pure: no fs access, no existence
+ * check. (E235b) Rules, in order:
  *   - empty (after trim)   → WORKTREE_EMPTY
  *   - starts with "~"      → WORKTREE_TILDE (never shell-expanded: the tool
  *                            does not guess a home directory)
@@ -202,9 +203,10 @@ export type MailboxResolution = {
 };
 /**
  * Resolve a manifest `mailbox:` header to the absolute mailbox root render
- * substitutes (E248). Same rules as resolveWorktree, minus the empty case
+ * substitutes. Same rules as resolveWorktree, minus the empty case
  * (MAILBOX_RE requires a non-space value, and render treats a blank source
  * as absent before calling this). Pure: no fs access, no existence check.
+ * (E248)
  *   - starts with "~"      → MAILBOX_TILDE (never shell-expanded; the value
  *                            is not echoed in the message)
  *   - absolute             → the header, byte-verbatim (no normalisation)
@@ -245,9 +247,9 @@ export interface CheckReport {
         path: string;
         forbidden?: string;
     }[];
-    /** E208: exact 擁有 tokens matching no path at base and no file added on the branch. Warning only. */
+    /** Exact 擁有 tokens matching no path at base and no file added on the branch. Warning only. (E208) */
     unmatchedOwned: string[];
-    /** Set when the E208 existence check could not run (the git ls-tree read failed). */
+    /** Set when the owned-token existence check could not run (the git ls-tree read failed). (E208) */
     unmatchedCheckError?: string;
     output: string;
     exitCode: 0 | 1;
@@ -259,26 +261,27 @@ export type CheckResult = {
     ok: false;
     errors: FanoutError[];
 };
-/** E208 warning line (spec e178b Copy/Strings fanout.warn). */
+/** Warning line for an owned token that matches nothing (spec e178b Copy/Strings fanout.warn). (E208) */
 export declare const UNMATCHED_OWNED_WARN: (token: string, base: string, branch: string) => string;
 /**
- * E208 glob token: contains `*` or `{`, or ends with `/`. Never warned about
- * — the lane may be the one creating the files it names.
+ * Glob token: contains `*` or `{`, or ends with `/`. Never warned about —
+ * the lane may be the one creating the files it names. (E208)
  */
 export declare function isGlobToken(token: string): boolean;
 /**
- * E208 (spec e178b decision (i)) — the exact (non-glob) owned tokens that
- * match no path in `basePaths` and no file in `addedPaths` (files the lane
- * branch added vs base: a declared new file such as e177a's
- * `新檔 tools/fanout-manifest.ts`). Pure; each token reported once, in
- * 擁有 order. A token that matches nothing grants no ownership either, so it
- * is usually a prose aside that happens to be path-shaped.
+ * The exact (non-glob) owned tokens that match no path in `basePaths` and
+ * no file in `addedPaths` (files the lane branch added vs base: a declared
+ * new file such as `新檔 tools/fanout-manifest.ts`). Pure; each token
+ * reported once, in 擁有 order. A token that matches nothing grants no
+ * ownership either, so it is usually a prose aside that happens to be
+ * path-shaped. (E208)
  */
 export declare function unmatchedOwnedTokens(ownedTokens: string[], basePaths: string[], addedPaths: string[]): string[];
 /**
  * Fan-in ownership check: every file the lane branch changed vs `<base>`
- * (committed changes only — E158) that is outside the owned tokens and the
- * implicit bookkeeping set is listed on its own OUT line; exit 1 if any.
+ * (committed changes only, so uncommitted work never counts) that is
+ * outside the owned tokens and the implicit bookkeeping set is listed on its
+ * own OUT line; exit 1 if any. (E158)
  */
 export declare function checkLane(m: Manifest, laneId: string, opts?: CheckOptions): CheckResult;
 export interface CliResult {

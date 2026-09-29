@@ -54,19 +54,17 @@ export declare const HANDOFF_LOCK_FILENAME = ".handoff.lock";
 export declare const LEGACY_LANE = "_legacy";
 export declare const PRIMARY_LANE = "_primary";
 /**
- * active_feature-derived lane name (e123a spec AC4, D1's original wording):
- * derive a lane name from a handoff's active_feature. Returns the lowercased
+ * Derive a lane name from a handoff's active_feature: the lowercased
  * leading ticket-id token, else LEGACY_LANE.
  *
- * e123b9 J2 (spec AC2, Decision 1, human 2026-09-23): the flat->lane
- * migration NO LONGER uses this — it targets the branch-based live resolver
- * instead. Kept exported for "what lane would this active_feature imply"
- * lookups; no production caller today.
+ * The flat->lane migration does NOT use this — it targets the branch-based
+ * live resolver instead. Kept exported for "what lane would this
+ * active_feature imply" lookups; no production caller today.
  *
  * MUST NEVER return PRIMARY_LANE ("_primary") — the branch-based resolution
  * (feat/<id>-*) and its PRIMARY_LANE fallback belong to the LIVE resolver
- * (resolveCurrentLane below), not this function. Shares TICKET_ID_RE with it
- * (e123b0 spec AC3).
+ * (resolveCurrentLane below), not this function. Shares TICKET_ID_RE with
+ * it. (E123)
  */
 export declare function resolveLaneName(activeFeature: string | undefined): string;
 /** true iff `lane` is a single safe path segment (see SAFE_LANE_RE). */
@@ -74,35 +72,33 @@ export declare function isSafeLaneName(lane: unknown): lane is string;
 /** `<workspacePath>/.current/<lane>` — the directory holding a lane's files. */
 export declare function resolveLaneDir(workspacePath: string, lane: string): string;
 /**
- * The `.current/history/<bucket>/` month bucket for a lane closed at `now`
- * (e125b spec AC1): the UTC year-month, `YYYY-MM`. Always satisfies
- * HISTORY_BUCKET_RE.
+ * The `.current/history/<bucket>/` month bucket for a lane closed at `now`:
+ * the UTC year-month, `YYYY-MM`. Always satisfies HISTORY_BUCKET_RE. (E125b)
  */
 export declare function resolveHistoryBucket(now?: Date): string;
 /**
  * `<workspacePath>/.current/history/<bucket>/<lane>` — where a closed lane's
- * `.current/<lane>/` directory lands (e125b spec AC1/AC6). Throws on a
- * `bucket` that is not exactly `YYYY-MM` (HISTORY_BUCKET_RE) or an unsafe
- * `lane` (not a single path segment), so it can never return a path outside
- * `.current/history/<bucket>/`. Pure path logic — creates nothing.
+ * `.current/<lane>/` directory lands. Throws on a `bucket` that is not
+ * exactly `YYYY-MM` (HISTORY_BUCKET_RE) or an unsafe `lane` (not a single
+ * path segment), so it can never return a path outside
+ * `.current/history/<bucket>/`. Pure path logic — creates nothing. (E125b)
  */
 export declare function resolveHistoryLaneDir(workspacePath: string, bucket: string, lane: string): string;
 /**
  * true iff some `.current/history/<bucket>/<lane>/<filename>` exists as a
- * regular file, for any HISTORY_BUCKET_RE bucket (e125b spec AC8, X7) — i.e.
- * lane `lane` has closed with that file in its history. Read-only (readdir /
- * stat); never throws — an unlistable dir, an unsafe lane or filename, or an
- * fs error all read as false (the enumerateLaneSidecarSources posture).
+ * regular file, for any HISTORY_BUCKET_RE bucket — i.e. lane `lane` has
+ * closed with that file in its history. Read-only (readdir / stat); never
+ * throws — an unlistable dir, an unsafe lane or filename, or an fs error all
+ * read as false (like enumerateLaneSidecarSources). (E125b)
  */
 export declare function hasHistoryLedger(workspacePath: string, lane: string, filename: string): boolean;
 /**
- * Lane-scoped paths (e123b9 J2, spec AC1): returns
- * `<workspacePath>/.current/<lane>/<filename>` for every LANE_FILES entry.
- * The shape is derived by iterating LANE_FILES — the filenames are never
- * restated here (e123a AC15 lineage). Throws on an unsafe `lane` (not a
+ * Lane-scoped paths: returns `<workspacePath>/.current/<lane>/<filename>`
+ * for every LANE_FILES entry. The shape is derived by iterating LANE_FILES —
+ * the filenames are never restated here. Throws on an unsafe `lane` (not a
  * single path segment); every lane the resolvers in this module produce is
  * safe by construction, so production callers (all via
- * resolveCurrentLanePaths) never hit that throw.
+ * resolveCurrentLanePaths) never hit that throw. (E123)
  */
 export declare function resolveLanePaths(workspacePath: string, lane: string): LanePaths;
 /**
@@ -138,23 +134,22 @@ export declare function resolveCurrentLane(workspacePath: string): string;
  */
 export declare function resolveCurrentLanePaths(workspacePath: string): LanePaths;
 /**
- * Legacy flat paths (e123c, E123 F2): `<workspacePath>/.current/<filename>`
- * for every LANE_FILES entry — the pre-E123 layout a not-yet-migrated
- * workspace still holds. Read-only fallbacks (tools/drift.ts's skew
- * precheck, bin/agent-governance-usage-hook.mjs, enumerateLaneSidecarSources)
- * resolve the flat copy through this one composer instead of restating a
- * filename. No live writer targets these paths.
+ * Legacy flat paths: `<workspacePath>/.current/<filename>` for every
+ * LANE_FILES entry — the old layout a not-yet-migrated workspace still
+ * holds. Read-only fallbacks (tools/drift.ts's skew precheck,
+ * bin/agent-governance-usage-hook.mjs, enumerateLaneSidecarSources) resolve
+ * the flat copy through this one composer instead of restating a filename.
+ * No live writer targets these paths. (E123)
  */
 export declare function resolveFlatLanePaths(workspacePath: string): LanePaths;
 /**
  * true iff `candidate`'s bytes are identical to, or a prefix of,
- * `authority`'s bytes. THE one byte-prefix predicate (e123c spec, "Double-
- * count rule", human amendment 2026-09-24): tools/lane-migrate.ts's
- * flat->lane resume check (a flat sidecar whose bytes already lead the lane
- * file = a merge that published but died before unlinking the flat source)
- * and enumerateLaneSidecarSources's read-side dedup both use it, so the
- * migrator and the aggregating readers agree on what "already counted"
- * means.
+ * `authority`'s bytes. THE one byte-prefix predicate for "already counted":
+ * tools/lane-migrate.ts's flat->lane resume check (a flat sidecar whose bytes
+ * already lead the lane file = a merge that published but died before
+ * unlinking the flat source) and enumerateLaneSidecarSources's read-side
+ * dedup both use it, so the migrator and the aggregating readers agree on
+ * what "already counted" means. (E123)
  */
 export declare function isBytePrefix(candidate: Buffer, authority: Buffer): boolean;
 export declare const NON_LANE_DIRS: ReadonlySet<string>;
@@ -178,9 +173,8 @@ export interface LaneSidecarSources {
 }
 /**
  * Every copy of one lane sidecar (`telemetry` / `metrics` / `usage` / ...)
- * a workspace's own `.current/` tree holds, deduplicated by CONTENT (e123c
- * spec, "Design — the dedup rule"; human amendment 2026-09-24). Scope is
- * this workspace only — never a sibling worktree.
+ * a workspace's own `.current/` tree holds, deduplicated by CONTENT. Scope
+ * is this workspace only — never a sibling worktree. (E123)
  *
  * Sources:
  *   live    `.current/<lane>/<file>` for each safe lane dir other than
@@ -192,11 +186,11 @@ export interface LaneSidecarSources {
  * Dedup (never by name alone — a long-lived lane such as `_primary` keeps
  * its live dir AND its history dirs):
  *   - a history copy of lane L is skipped iff isBytePrefix(history, live L)
- *     — a mid-move copy (spec AC4);
+ *     — a copy caught mid-move;
  *   - the flat file is skipped iff isBytePrefix(flat, X) for some counted
  *     lane copy X (live first, then history) — the shape an interrupted
  *     mergeSidecar leaves: `flat ++ lane` published at the lane path, flat
- *     not yet unlinked (spec AC5b). Any lane is checked, not only the
+ *     not yet unlinked. Any lane is checked, not only the
  *     current branch's: the branch may have changed since the migration, and
  *     the lane may since have closed into history.
  * Empty files are never skipped (they contribute zero records either way).
