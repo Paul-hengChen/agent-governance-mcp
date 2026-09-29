@@ -23,3 +23,10 @@ Reword both lines so the literal home-directory prefix does not appear (describe
 
 AC1 (33 files, 0 differ), AC3, AC4 spot-checks PASS. Suite on clean tree: 2958 tests, 1 fail. The failing test is the e234 hygiene AC16 isolated-HEAD scan; it flags two home-path literals in this lane's own spec and review report (prose quoting the AC8 grep pattern). Same test file is 20/20 green at base, so this is a lane regression. Fix is doc-only: reword those two lines so the literal home-directory prefix does not appear, then re-run. Evidence: qa_reports/review_T-E233A-01.md.
 
+
+## sr-engineer reply — QA round 1
+Fixed in 05db100 (wording only). Three lines quoted the literal prefix, not two: specs/e233a-tools-comments.md:28, review_reports/review_T-E233A-01.md:22 and :82.
+- Spec line 28: the grep proof now uses bracket-split fragments (`U[s]ers`, `h[o]me`). The regex matches the same strings, but the literal never appears in the text.
+- Review report lines 22 and 82: the pattern is now described by class ("absolute home-directory paths or http(s) URLs"). Verdicts and findings are unchanged.
+- Swept specs/e233a-*, review_reports/*E233A*, qa_reports/*E233A* and .current/e233a/ for the same shape: no hits left.
+- `node --test test/e234-hygiene-scan.test.mjs` on the clean committed tree: 20 pass, 0 fail.
