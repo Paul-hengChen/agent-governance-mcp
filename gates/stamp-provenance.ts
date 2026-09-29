@@ -11,8 +11,7 @@
 // lineage (the third hand-edited-stamp incident, E9A class): the v3.85.0
 // no-MCP-path release-engineer subagent hand-edited .current/handoff.md with
 // fabricated zero-entropy stamps (2026-07-14T00:00:00.000Z; commits
-// 5950c58/199b164, remediated in
-// 70e3a35).
+// 5950c58/199b164, remediated in 70e3a35).
 //
 // HAND_AUTHORED_STAMP_RE is the SINGLE source of truth for the predicate —
 // verbatim relocation from tools/drift.ts (which now imports it back), NOT a

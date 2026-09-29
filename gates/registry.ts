@@ -387,11 +387,10 @@ export const GATE_REGISTRY: readonly GateDefinition[] = [
     // review scope on the APPROVED handoff now travels ONLY in the transient
     // review_task_ids field (evidence-gated by MISSING_REVIEW_EVIDENCE), and
     // completed_tasks on ANY qa-engineer-stamped write is reserved for
-    // evidence-backed QA
-    // completions. Evaluated AFTER the qa_review auto-record so a legitimate
-    // PASS/FAIL write's just-recorded evidence satisfies it.
-    // tw_complete_task is untouched (own evidence path). File-mode only,
-    // matching the sibling attestation gates.
+    // evidence-backed QA completions. Evaluated AFTER the qa_review
+    // auto-record so a legitimate PASS/FAIL write's just-recorded evidence
+    // satisfies it. tw_complete_task is untouched (own evidence path).
+    // File-mode only, matching the sibling attestation gates.
     errorCode: "QA_COMPLETION_EVIDENCE_MISSING",
     producer: "orchestrator",
     envelope: "plain-text",
@@ -443,9 +442,9 @@ export const GATE_REGISTRY: readonly GateDefinition[] = [
     // Repro-first gate for bugfix-mode tickets (E2, AC2/AC6). Sibling of
     // EXPECTED_RED_DIFF_MISSING: same plain-text orchestrator envelope, same
     // qa_reports/expected-red_<feature>.txt manifest reused verbatim via
-    // hasExpectedRedManifest(). Fires on the
-    // fix-phase handoff (sr-engineer:In_Progress → code-reviewer:In_Progress)
-    // when prevState.dispatch_mode === "bugfix" but no repro manifest exists.
+    // hasExpectedRedManifest(). Fires on the fix-phase handoff
+    // (sr-engineer:In_Progress → code-reviewer:In_Progress) when
+    // prevState.dispatch_mode === "bugfix" but no repro manifest exists.
     // Blocks the write — never a silent skip, never a throw (AC6). NOT in
     // transitions.ts: this plain-text gate family is not in the
     // TransitionRejection["error"] union (DR-5).
