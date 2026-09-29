@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Coded by @sr-engineer
-// Thin CLI wrapper for the E126 merge-invariants check. All logic — argv
-// parsing included — lives in tools/merge-invariants.ts (compiled to
+// Thin CLI wrapper for the merge-invariants check, which verifies a merge
+// commit dropped no task rows, done-marks or sidecar lines (E126). All logic —
+// argv parsing included — lives in tools/merge-invariants.ts (compiled to
 // dist/tools/merge-invariants.js); this script only wires argv to it, prints
 // the report, and exits with its code, mirroring scripts/join-precondition.mjs
 // (plain Node ESM importing from dist/tools/*.js, zero script-level logic).

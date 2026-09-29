@@ -10,8 +10,9 @@
 //       and "blank line broke a single logical table into two" blocks (the
 //       second half never has its own delimiter row either).
 //
-// Four discriminators, each load-bearing (E74's own words — omit any and the
-// checker produces false positives worse than having no checker at all):
+// Four discriminators, each load-bearing (the originating ticket's own words,
+// E74 — omit any and the checker produces false positives worse than having no
+// checker at all):
 //   (i)   an escaped `\|` is a literal pipe, not a cell separator.
 //   (ii)  lines inside fenced code blocks (``` or ~~~) are never table rows.
 //   (iii) a table row must start with `|` at column 0 — an indented `|` line
@@ -43,16 +44,16 @@ const root = path.resolve(here, "..");
 // removing the exclusion — that re-opens the corruption.
 const EXCLUDED_DIR_PREFIXES = ["qa_reports/", "review_reports/"];
 
-// E88 — advisory-only (never affects exit code or allViolations): the
-// docs/backlog.md done-mark convention (`**DONE**` / `**PARTIAL**` /
-// `**VOID**`, optionally followed by `— shipped vX.Y.Z`) is free text with
-// no fixed cell position, and can be buried mid-cell where a truncated read
-// misses it (2026-08-21) or a mis-parsed row lands it in the wrong column
-// entirely (2026-08-28 v3.105.0, the E96/E74 unescaped-`\|` recurrence).
-// Pipe-escaping is already covered corpus-wide by rule 1's cell-count check
-// (verified 0 violations); this adds the position half, scoped to
-// docs/backlog.md's two known table shapes by exact header-cell match (not
-// filename heuristic alone, not corpus-wide) — see
+// Done-mark position advisory (E88) — advisory-only (never affects exit code
+// or allViolations): the docs/backlog.md done-mark convention (`**DONE**` /
+// `**PARTIAL**` / `**VOID**`, optionally followed by `— shipped vX.Y.Z`) is
+// free text with no fixed cell position, and can be buried mid-cell where a
+// truncated read misses it (2026-08-21) or a mis-parsed row lands it in the
+// wrong column entirely (2026-08-28 v3.105.0, the E96/E74 unescaped-`\|`
+// recurrence). Pipe-escaping is already covered corpus-wide by rule 1's
+// cell-count check (verified 0 violations); this adds the position half,
+// scoped to docs/backlog.md's two known table shapes by exact header-cell
+// match (not filename heuristic alone, not corpus-wide) — see
 // specs/e88-e105-md-table-checker.md Decisions §1-2. Shipped advisory, not
 // fatal, because the ticket table already carries 5 pre-existing
 // already-shipped rows (E39/E40/E58/E59/E71) that predate this check; making
@@ -70,23 +71,23 @@ const BACKLOG_REL_PATH = "docs/backlog.md";
 // after the token. "Should lead the cell" is a question about where the
 // marker OPENS, not what it closes around.
 //
-// Round-2 (code-reviewer C1): "opens with the token" is not the same
-// predicate as "is a done-mark" — 2 of the 6 round-1 advisories fired on
-// bold text that was not a marker at all: docs/backlog.md:193 quoted a
-// DIFFERENT row's mark (E48's) inside a code span, and :210 was prose on
-// E88's own still-open row ("the order table records them **DONE and
-// shipped**"). Measured over all 65 marker-bearing cells in the two scoped
-// tables: excluding any match whose opening falls inside a code span, AND
-// requiring the bold span to either self-close immediately after the token
-// (`**DONE**`) or carry a `vX.Y[.Z]` / ISO-date stamp INSIDE the span itself
-// (`**DONE — shipped v3.109.0**`, `**PARTIAL 2026-08-21 — …**`) gives
-// exactly the 4 genuine buried marks (E39/E40/E58/E59) with ZERO loss
-// across the other 63 cells — every compound-form mark still resolves, and
-// every leading mark still suppresses. Both axes are orthogonal to the
-// column-split axis where E88/E96 were historically defeated (an unescaped
-// `|` meeting a naive splitter) — `splitRow()` and `headerCellCount` are
-// untouched here. Fails toward SILENCE: no closing `**` found, or no
-// qualifying match at all, means no advisory — never a false claim.
+// Round-2 (code-reviewer C1): "opens with the token" is not the same predicate
+// as "is a done-mark" — 2 of the 6 round-1 advisories fired on bold text that
+// was not a marker at all: docs/backlog.md:193 quoted a DIFFERENT row's mark
+// (E48's) inside a code span, and :210 was prose on E88's own still-open row
+// ("the order table records them **DONE and shipped**"). Measured over all 65
+// marker-bearing cells in the two scoped tables: excluding any match whose
+// opening falls inside a code span, AND requiring the bold span to either
+// self-close immediately after the token (`**DONE**`) or carry a `vX.Y[.Z]` /
+// ISO-date stamp INSIDE the span itself (`**DONE — shipped v3.109.0**`,
+// `**PARTIAL 2026-08-21 — …**`) gives exactly the 4 genuine buried marks
+// (E39/E40/E58/E59) with ZERO loss across the other 63 cells — every
+// compound-form mark still resolves, and every leading mark still suppresses.
+// Both axes are orthogonal to the column-split axis where earlier done-mark
+// checks were historically defeated (E88/E96; an unescaped `|` meeting a naive
+// splitter) — `splitRow()` and `headerCellCount` are untouched here. Fails
+// toward SILENCE: no closing `**` found, or no qualifying match at all, means
+// no advisory — never a false claim.
 const DONE_MARK_OPEN_RE = /\*\*(DONE|PARTIAL|VOID)\b/g;
 const MARK_STAMP_RE = /v\d+(?:\.\d+){1,2}|\d{4}-\d{2}-\d{2}/;
 
@@ -157,15 +158,15 @@ function findCodeSpanRanges(text) {
 // alternative (fabricating a range anyway) risks swallowing a real,
 // un-quoted mark, which is the direction this file forbids.
 //
-// Measured (E88-style) over all 68 marker-bearing cells (75 candidate bold
-// DONE/PARTIAL/VOID opens) in the two scoped docs/backlog.md tables: adding
-// this exclusion flips exactly ONE cell's outcome — docs/backlog.md's E145
-// row (the candidate at desc-offset 483, inside the `*"…"*` quote of E59's
-// mark; the row's other two candidates at offsets 356/373 were already
-// suppressed by the round-2 code-span exclusion) — from a genuine
-// (non-leading) buried mark to correctly excluded. The other 67
-// marker-bearing cells are byte-identical in outcome: the same 4 rows
-// (E39 :165, E40 :166, E58 :180, E59 :181) still fire as advisories with
+// Measured the same way as the first advisory round (E88) over all 68
+// marker-bearing cells (75 candidate bold DONE/PARTIAL/VOID opens) in the two
+// scoped docs/backlog.md tables: adding this exclusion flips exactly ONE
+// cell's outcome — docs/backlog.md's E145 row (the candidate at desc-offset
+// 483, inside the `*"…"*` quote of E59's mark; the row's other two candidates
+// at offsets 356/373 were already suppressed by the round-2 code-span
+// exclusion) — from a genuine (non-leading) buried mark to correctly excluded.
+// The other 67 marker-bearing cells are byte-identical in outcome: the same 4
+// rows (E39 :165, E40 :166, E58 :180, E59 :181) still fire as advisories with
 // the same token/offset, and ZERO other cells lose a genuine mark.
 //
 // Residuals (measured by code-reviewer round 1, review_T-E145-01, recorded
@@ -439,14 +440,14 @@ function checkFile(relPath) {
       });
       continue;
     }
-    // E88: only a table shaped exactly like one of the two known
-    // docs/backlog.md headers is in scope, and only its designated column.
-    // Computed once per block (not per row) since the header doesn't change
-    // row to row; null when this block isn't one of the two known shapes,
-    // isn't in docs/backlog.md, or isn't a well-formed table at all (a
-    // headerless block above already `continue`d before reaching here, so
-    // rule 1's escape-aware `splitRow` is always the one doing the column
-    // split — never a second, naive parser beside it).
+    // Done-mark advisory scope (E88): only a table shaped exactly like one of
+    // the two known docs/backlog.md headers is in scope, and only its
+    // designated column. Computed once per block (not per row) since the
+    // header doesn't change row to row; null when this block isn't one of the
+    // two known shapes, isn't in docs/backlog.md, or isn't a well-formed table
+    // at all (a headerless block above already `continue`d before reaching
+    // here, so rule 1's escape-aware `splitRow` is always the one doing the
+    // column split — never a second, naive parser beside it).
     const doneMarkCol = isBacklogFile ? backlogDoneMarkColumn(splitRow(header.raw)) : null;
 
     // rows 0=header, 1=delimiter (skipped per discriminator iv); data starts at 2.
@@ -526,8 +527,9 @@ if (allViolations.length > 0) {
   console.error("\ncheck:md-tables — FAILED");
 }
 
-// E88 — advisory-only: printed regardless of the fatal outcome above, but
-// NEVER contributes to allViolations and NEVER changes the exit code below.
+// Done-mark advisories (E88) are advisory-only: printed regardless of the
+// fatal outcome above, but NEVER contributes to allViolations and NEVER
+// changes the exit code below.
 if (allAdvisories.length > 0) {
   console.log(
     `check:md-tables — ${allAdvisories.length} advisory note(s) (non-blocking, done-mark convention):\n`

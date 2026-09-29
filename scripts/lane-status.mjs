@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Coded by @sr-engineer
-// Thin CLI wrapper for E177b lane status + roll-up (T-E177B-05, spec AC1-6)
-// and the E178b `--watch` event stream (T-E178B-01, spec AC1-AC9).
+// Thin CLI wrapper for the per-lane status table + feature roll-up (E177b,
+// T-E177B-05, spec AC1-6) and the `--watch` lane event stream (E178b,
+// T-E178B-01, spec AC1-AC9).
 // All logic — argv parsing included — lives in tools/lane-status.ts
 // (compiled to dist/tools/lane-status.js); this script only routes argv to
 // it and prints the result, mirroring scripts/feature-rollup.mjs (zero

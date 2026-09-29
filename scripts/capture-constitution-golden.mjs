@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Coded by @sr-engineer
-// T-CNSO-02 (ticket A9, compose-not-strip) — golden-fixture capture.
-// T-E90-01 (ticket E90): completed to cover ALL 12 fixtures, and made fail-loud.
+// Golden-fixture capture for the composed constitution and coordinator skill
+// (first written for the compose-not-strip refactor, A9 / T-CNSO-02; later
+// extended to cover ALL 12 fixtures and made fail-loud, E90 / T-E90-01).
 //
 // THE STANDING REGENERATION TOOL for test/fixtures/compose-golden/. Originally
 // (A9) a one-shot pre-refactor capture: it snapshotted the CONSTITUTION PORTION
@@ -12,8 +13,8 @@
 // gone. What remains is the job every `const-*` / `coord-*` content ticket needs:
 // re-derive all 12 fixtures from the CURRENT source of truth after a content
 // edit, so the byte-equality assertions can be re-baselined by tool rather than
-// by hand (E90 was filed because two of the twelve had no tool at all and were
-// hand-rebuilt during E43).
+// by hand (two of the twelve once had no tool at all and were hand-rebuilt
+// during a content edit; E90, E43).
 //
 // It is a script, not a test file, so constitution §2 test-ownership does not
 // apply (architecture DR-5) — but the fixtures it writes ARE a qa-owned surface:
@@ -30,14 +31,14 @@
 //                         definition of "the monolith" that exists.
 //   1 skill monolith    — composeSkill("skill-coordinator.md", claude-code caps),
 //                         pinned by test/skill-manifest.test.mjs
-//                         t-golden-byte-identity. Never in this script's scope
-//                         before E90.
+//                         t-golden-byte-identity. Added to this script's scope
+//                         by the fail-loud rework (E90).
 //
-// FAIL LOUD (E90's sharper half): every capture either writes or exits non-zero.
-// The pre-E90 monolith branch printed a benign-looking "not re-captured" note and
-// exited 0 while a fixture that is load-bearing for a green suite went unwritten
-// — a tool that reports success while leaving two tests red is worse than a tool
-// that is absent.
+// FAIL LOUD (the sharper half of the fail-loud rework, E90): every capture
+// either writes or exits non-zero. The earlier monolith branch printed a
+// benign-looking "not re-captured" note and exited 0 while a fixture that is
+// load-bearing for a green suite went unwritten — a tool that reports success
+// while leaving two tests red is worse than a tool that is absent.
 //
 // Usage: npm run build && node scripts/capture-constitution-golden.mjs
 //        then: git diff test/fixtures/compose-golden/   (expect only intended moves)
@@ -58,8 +59,8 @@ const { buildPromptForRole } = await import(
 const { setActiveStorage, FileHandoffStorage } = await import(
   path.join(ROOT, "dist", "tools", "storage.js")
 );
-// E90: the two monolith fixtures are derived from the same manifests the
-// assertions use, so the tool cannot drift from the oracle.
+// The two monolith fixtures are derived from the same manifests the
+// assertions use, so the tool cannot drift from the oracle (E90).
 const { CONSTITUTION_SEGMENTS } = await import(
   path.join(ROOT, "dist", "prompts", "constitution-manifest.js")
 );
@@ -75,7 +76,7 @@ const CONTENT_DIR = path.join(ROOT, "content");
 const readContent = (file) => fs.readFileSync(path.join(CONTENT_DIR, file), "utf-8");
 
 // Every capture goes through here: a fixture that derives to empty is a broken
-// derivation, not a legitimate baseline, and must stop the run (E90 fail-loud).
+// derivation, not a legitimate baseline, and must stop the run (fail-loud, E90).
 function writeFixture(file, text, what) {
   if (typeof text !== "string" || text.length === 0) {
     throw new Error(`refusing to write empty fixture ${file} (${what}) — derivation produced no bytes`);
@@ -187,12 +188,12 @@ await captureHook("hook-lite.txt", {}); // default env => lite skill variant
 await captureHook("hook-full.txt", { AGC_DEFAULT_SKILL: "full" });
 
 // --- constitution monolith (cat == original invariant, T-CNSO-08) ---------
-// E90: derived from CONSTITUTION_SEGMENTS, not from content/constitution.md.
-// That file was deleted at T-CNSO-09/AC8, so the pre-E90 existsSync branch
+// Derived from CONSTITUTION_SEGMENTS, not from content/constitution.md (E90).
+// That file was deleted at T-CNSO-09/AC8, so the earlier existsSync branch
 // ALWAYS took its else arm and printed a note while writing nothing — leaving
 // compose-equivalence's AC8 assertion red after any const-* edit, with the
-// tool reporting success. The manifest concatenation below is byte-for-byte the
-// operation that assertion performs, which is what makes this fixture
+// tool reporting success. The manifest concatenation below is byte-for-byte
+// the operation that assertion performs, which is what makes this fixture
 // re-derivable at all now that the monolith file is gone.
 writeFixture(
   "constitution-monolith.txt",
@@ -201,20 +202,21 @@ writeFixture(
 );
 
 // --- coordinator skill monolith (T-D6-04 AC5 golden) ----------------------
-// E90: never in this script's scope, though test/skill-manifest.test.mjs's
-// t-golden-byte-identity pins it. Same shape as above: the capture IS the
-// assertion's own composition, under the full (claude-code) capability profile,
-// which is the profile the frozen golden was taken under.
+// Pinned by test/skill-manifest.test.mjs's t-golden-byte-identity, but outside
+// this script's scope until the fail-loud rework (E90). Same shape as above:
+// the capture IS the assertion's own composition, under the full (claude-code)
+// capability profile, which is the profile the frozen golden was taken under.
 writeFixture(
   "skill-coordinator-monolith.txt",
   composeSkill("skill-coordinator.md", hostCapabilitiesFor("claude-code"), readContent),
   'composeSkill("skill-coordinator.md", claude-code caps)',
 );
 
-// E90 completeness guard: every fixture the suite asserts against must have been
-// (re)written by this run. A fixture sitting in the directory that this tool does
-// not produce is exactly the E90 defect — silently un-regenerable — so surface it
-// here, at the one moment someone is looking, rather than in a red suite later.
+// Completeness guard (E90): every fixture the suite asserts against must have
+// been (re)written by this run. A fixture sitting in the directory that this
+// tool does not produce is exactly the defect that rework fixed — silently
+// un-regenerable — so surface it here, at the one moment someone is looking,
+// rather than in a red suite later.
 const onDisk = fs.readdirSync(OUT_DIR).filter((f) => f.endsWith(".txt")).sort();
 const captured = new Set(written.map(([file]) => file));
 const uncovered = onDisk.filter((f) => !captured.has(f));

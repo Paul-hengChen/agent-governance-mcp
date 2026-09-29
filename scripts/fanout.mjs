@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 // Coded by @sr-engineer
-// Thin CLI wrapper for the E177a fan-out manifest tool. All logic lives in
+// Thin CLI wrapper for the fan-out manifest tool, which validates and renders
+// a multi-lane feature split (E177a). All logic lives in
 // tools/fanout-manifest.ts (compiled to dist/tools/fanout-manifest.js) — this
-// script only routes the subcommand, prints the result and sets the exit
-// code, mirroring the scripts/feature-rollup.mjs pattern.
+// script only routes the subcommand, prints the result and sets the exit code,
+// mirroring the scripts/feature-rollup.mjs pattern.
 //
 // Exit codes: 0 = ok / in bounds, 1 = out of bounds (check only),
 //             2 = usage or any parse/input error.
