@@ -1,10 +1,10 @@
 // Coded by @qa-engineer
-// Tests for specs/e11-e12-release-integrity-batch.md AC1-AC4 (E11 —
-// check-version.mjs dist/index.js parity check), authored per T-E11E12-03
-// (AC5, qa-owned). No prior test/check-version.test.mjs existed — this file
-// is NEW, created under the dispatch's pre-authorization (tasks.md
-// T-E11E12-03 / the approved cut) since skill-qa-engineer §Phase 3a normally
-// requires asking before creating a parallel test file.
+// Tests for the check-version.mjs dist/index.js parity check
+// (specs/e11-e12-release-integrity-batch.md AC1-AC4, E11), authored under
+// T-E11E12-03 (AC5, qa-owned). No prior test/check-version.test.mjs existed —
+// this file is NEW, created under the dispatch's pre-authorization (the
+// approved cut) since the QA role's procedure normally requires asking before
+// creating a parallel test file.
 //
 // check-version.mjs resolves its own `root` from `import.meta.url` (dirname
 // of the script file, one level up) — it is NOT parameterized by cwd or argv.
@@ -22,7 +22,8 @@
 //   AC3 (dist absent -> exit 0, skip note, no crash)      -> CV-4
 //   AC4 (existing success line still prints unchanged)    -> CV-1, CV-4
 //
-// CV-5..CV-10 (E60, T-E60-01 item 4, qa-owned): lockfile version parity.
+// CV-5..CV-10: package-lock.json version parity with package.json
+// (E60, T-E60-01 item 4, qa-owned).
 // The backlog row's per-item contract requires pinning, at minimum: match ->
 // exit 0 + parity line; stale root `version` -> non-zero naming both
 // observed values; stale `packages[""].version` only -> non-zero; lockfile
@@ -30,7 +31,7 @@
 // code-reviewer's own probing (review_reports/review_T-E60-01.md, F2/round 2)
 // are pinned here too since nothing else pins them: a lockfile whose entire
 // content is the JSON literal `null` now takes the guarded shape-branch
-// message instead of throwing (round-2 fix), and a JSON array does NOT enter
+// message instead of throwing (fixed after review), and a JSON array does NOT enter
 // that `null`/non-object guard (typeof [] === "object") yet is still caught,
 // one level down, by the pre-existing "missing version fields" shape check —
 // so neither shape is a hole, by two different mechanisms.
@@ -237,15 +238,17 @@ test("CV-10: package-lock.json content is a JSON array -> does NOT enter the nul
 });
 
 // ============================================================================
-// check-transitions-sync.mjs — T-E39-03 coverage (E39/E58)
+// check-transitions-sync.mjs — coverage for the transitions-doc sync checker
+// (T-E39-03, E39/E58)
 // ============================================================================
 // scripts/check-transitions-sync.mjs (T-E39-01) shipped with zero test
 // coverage — its whole contract (the duplicate-row guard, the line-exact
 // heading anchor, the fail-loud-not-silent branches) was instead verified by
 // hand across three code-review rounds (review_reports/review_T-E39-01.md
 // C2/C3/Q1, re-verified R2/R3) and would regress silently without a pin.
-// tasks.md T-E39-03 item (2) names this file as the closest existing home for
-// a scripts/-level checker; using it rather than creating a new file.
+// The ticket's coverage item (T-E39-03 item (2)) names this file as the closest
+// existing home for a scripts/-level checker; using it rather than creating a
+// new file.
 //
 // Same fixture pattern as CV-1..CV-4 above (this file's own header, lines
 // 9-16): copy the REAL script byte-for-byte into a temp fixture root, lay out
@@ -257,14 +260,14 @@ test("CV-10: package-lock.json content is a JSON array -> does NOT enter the nul
 // "type": "module" package.json — the nearest one Node's ESM loader finds
 // when resolving a bare .js file's module format.
 //
-// Coverage map (T-E39-03 item (2) "cover at minimum"):
+// Coverage map (the minimum set the ticket requires, T-E39-03 item (2)):
 //   green on the corrected tree                              -> CTS-1
 //   RED on a seeded doc-side omission (row missing from mirror) -> CTS-2
 //   RED on a seeded doc-side extra row (in doc, absent from source) -> CTS-3
 //   RED, not a vacuous pass, heading absent entirely           -> CTS-4
 //   line-exact anchor: heading rename fails                    -> CTS-5
 //   line-exact anchor: inline prose mention still passes       -> CTS-6
-//   duplicate-row guard: wrong-then-correct (the round-1 false-green shape:
+//   duplicate-row guard: wrong-then-correct (the false-green shape found in review:
 //     "OK (21 keys, exact match)" printed while the doc visibly contained a
 //     wrong row) -> CTS-7
 //   duplicate-row guard: correct-then-wrong (duplicate message AND the

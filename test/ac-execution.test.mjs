@@ -1,5 +1,7 @@
 // Coded by @qa-engineer
-// Tests for specs/e3-outcome-shaped-acceptance.md (AC1-AC8) +
+// Tests for the AC-execution gate, which requires proof-annotated acceptance
+// criteria to have an execution log in the QA report
+// (specs/e3-outcome-shaped-acceptance.md AC1-AC8) +
 // specs/e3-outcome-shaped-acceptance-architecture.md Test Specification §1.
 // gates/ac-execution.ts is the fourth member of the evidence-existence gate
 // family (MISSING_EVIDENCE / VISUAL_EVIDENCE_MISSING / EXPECTED_RED_DIFF_MISSING):
@@ -25,7 +27,7 @@
 // review_T-E3-QA.md for the disposition write-up.
 //
 // Spec-to-Test map:
-//   AC1 (proof: schema, self-check)        -> verified via grep at T-E3-QA (AC Execution Log), not re-tested here
+//   AC1 (proof: schema, self-check)        -> verified via grep during QA (AC Execution Log, T-E3-QA), not re-tested here
 //   AC2 (proof: conditional, "where feasible") -> skill-content assertion below
 //   AC3 (Phase 3.5 heading, exact)          -> skill-content assertion below
 //   AC4 (arm check: hasProofAnnotatedAC)    -> U1-U6
@@ -262,9 +264,9 @@ async function seedQaInProgress(ws, feature) {
     pendingNotes: ["QA: claiming review"],
     lastAgent: "qa-engineer",
   });
-  // E148: force the seed's last_updated off the wall clock so the caller's
+  // Force the seed's last_updated off the wall clock so the caller's
   // follow-up handleUpdateState call below never has a ~1/60000 chance of
-  // tripping STAMP_PROVENANCE_SUSPECT (docs/backlog.md row E148).
+  // tripping STAMP_PROVENANCE_SUSPECT (E148, docs/backlog.md row E148).
   forceSeedStamp(ws);
 }
 
@@ -449,8 +451,9 @@ test("AC6: new Phase 3.5 references the existing Phase 4 FAIL escalation route a
   // documented today (pipe-delimited markdown table rows under "## Escalation
   // Routes"). AC6 itself still adds NO row for AC-execution failures (Phase
   // 3.5 reuses the pre-existing "Phase 4 FAIL" route, asserted above) — the
-  // table grew from 6 to 7 rows for an unrelated reason: E46 (T-E46-01,
-  // 2026-08-10) added the `contract defect | Blocked | ... | pm` row so a QA
+  // table grew from 6 to 7 rows for an unrelated reason: a
+  // `contract defect | Blocked | ... | pm` row was added (E46, T-E46-01,
+  // 2026-08-10) so a QA
   // agent has a status other than FAIL for a spec/design defect a human has
   // already approved diverging from. Pinning stays at the current count (now
   // 7) so a future accidental row add/removal still fails this test; it must

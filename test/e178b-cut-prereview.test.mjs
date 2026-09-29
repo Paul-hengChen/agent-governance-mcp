@@ -1,7 +1,8 @@
 // Coded by @qa-engineer
-// T-E178B-04 — tests for the E178b cut pre-review fan-in check in
-// tools/lane-status.ts (specs/e178b-lane-watch-tooling.md, decision (g)/(h)/(j),
-// AC10-AC14). The watch-mode transition AC15 lives in
+// T-E178B-04 — tests for the cut pre-review fan-in check in
+// tools/lane-status.ts: it reports whether a lane's written cut was sent to
+// the integrator for pre-review (E178b; specs/e178b-lane-watch-tooling.md,
+// decision (g)/(h)/(j), AC10-AC14). The watch-mode transition check (AC15) lives in
 // test/e178b-lane-watch.test.mjs, next to the other watch tests.
 //
 // WHY this check exists: in Wave 7.1 lane e212 wrote a cut and never sent it
@@ -23,11 +24,14 @@
 // the check itself reads only the filesystem, so no real worktree is needed.
 //
 // Spec-to-Test map:
-//   AC10 -> "AC10 sent"
-//   AC11 -> "AC11 missing explicit", "AC11 non-proposal ignored"
-//   AC12 -> "AC12 other states"
-//   AC13 -> "AC13 exit code unchanged"
-//   AC14 -> "AC14 header parser parity"
+//   a proposal is present -> reported as sent                       (AC10)  -> "AC10 sent"
+//   written cut but no proposal -> reported as `missing` explicitly;
+//     a non-proposal message that mentions a cut is ignored          (AC11)  -> "AC11 missing explicit", "AC11 non-proposal ignored"
+//   no spec / unreadable lane / no active_feature / no mailbox: the
+//     other states (n/a, not-checked, no-mailbox)                    (AC12)  -> "AC12 other states"
+//   the exit code stays 0 whatever the check finds                   (AC13)  -> "AC13 exit code unchanged"
+//   lane-status.ts reads message headers the same way the
+//     mailbox watch script does                                      (AC14)  -> "AC14 header parser parity"
 //   security smoke (path traversal, oversized file, empty input)
 //        -> "security smoke: ..."
 
@@ -116,7 +120,7 @@ function check(ws, lane, extra = {}) {
 const mailboxFile = (lane) => path.join(MAILBOX, lane, LANE_TO_INTEGRATOR_FILE);
 
 // ---------------------------------------------------------------------------
-// AC10
+// A proposal is present: reported as sent (AC10)
 // ---------------------------------------------------------------------------
 
 test("AC10 sent", { timeout: 30000 }, (t) => {
@@ -157,7 +161,7 @@ test("AC10 sent", { timeout: 30000 }, (t) => {
 });
 
 // ---------------------------------------------------------------------------
-// AC11
+// Written cut but no proposal: `missing`; non-proposal messages ignored (AC11)
 // ---------------------------------------------------------------------------
 
 test("AC11 missing explicit", { timeout: 30000 }, (t) => {
@@ -220,7 +224,7 @@ test("AC11 non-proposal ignored", () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC12
+// The other states: n/a, not-checked, no-mailbox (AC12)
 // ---------------------------------------------------------------------------
 
 test("AC12 other states", { timeout: 30000 }, (t) => {
@@ -269,7 +273,7 @@ test("AC12 other states", { timeout: 30000 }, (t) => {
 });
 
 // ---------------------------------------------------------------------------
-// AC13
+// Exit code is unchanged by the check's findings (AC13)
 // ---------------------------------------------------------------------------
 
 test("AC13 exit code unchanged", { timeout: 30000 }, (t) => {
@@ -295,7 +299,7 @@ test("AC13 exit code unchanged", { timeout: 30000 }, (t) => {
 });
 
 // ---------------------------------------------------------------------------
-// AC14
+// Header parsing matches the mailbox watch script (AC14)
 // ---------------------------------------------------------------------------
 
 test("AC14 header parser parity", () => {

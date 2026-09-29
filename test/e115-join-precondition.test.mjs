@@ -1,8 +1,9 @@
 // Coded by @qa-engineer
-// T-E115-03 — tests for tools/join-precondition.ts (specs/e115-join-precondition-check.md,
+// T-E115-03 — tests for tools/join-precondition.ts, the check that a lane's declared
+// identity matches its actual one at join time (specs/e115-join-precondition-check.md,
 // amended AC3, new AC9, AC1/AC2/AC4/AC5/AC6). Executed against a REAL scratch
 // git repo fixture with actual branches and commits (mkFixtureRepo) — per the
-// dispatch brief's explicit bar for this ticket: verify by EXECUTION, not by
+// ticket's explicit bar: verify by EXECUTION, not by
 // reading the diff. Style mirrors test/e116-archive-on-feature-change.test.mjs
 // (mkWs + writeHandoffState for the handoff side) and test/feature-rollup.test.mjs
 // (real on-disk fixtures over synthesized objects wherever the code under test
@@ -21,7 +22,7 @@
 //     handoff -> compared:false + reason, never a fabricated verdict)    -> AC4
 //   AC5 (no exported signature takes a second workspace-path arg; no
 //     read/exec parameterized outside repoRoot / repoRoot/.current/**)   -> AC5
-//   AC6 (exactly one HOOK POINT FOR E126 comment, no E126 logic)         -> AC6
+//   AC6 (exactly one hook-point comment for the later merge-invariants work, no logic for it) -> AC6
 //   AC9, new (markdown-decorated header + backtick/underscore-decorated
 //     declared values normalize before matching; internal underscore
 //     round-trips unchanged; decoration-only cell drops, never becomes
@@ -434,7 +435,7 @@ test("AC5: no read/exec call in tools/join-precondition.ts is parameterized outs
 });
 
 // ============================================================================
-// AC6 — exactly one HOOK POINT FOR E126 comment, no E126 assertion logic
+// AC6 — exactly one hook-point comment for the later merge-invariants work (E126), no assertion logic for it
 // ============================================================================
 
 test("AC6: exactly one 'HOOK POINT FOR E126' comment exists, and no E126 assertion logic accompanies it", () => {
@@ -445,7 +446,7 @@ test("AC6: exactly one 'HOOK POINT FOR E126' comment exists, and no E126 asserti
   assert.equal(scriptHookMatches.length, 0, "the CLI wrapper must carry zero hook-point comments of its own");
 
   // The hook point names what a future assertion needs but implements none
-  // of it: no live pre/post-merge counting logic, no E126-specific export.
+  // of it: no live pre/post-merge counting logic, no merge-invariants-specific export (E126).
   assert.doesNotMatch(SOURCE, /function\s+\w*[Ee]126\w*/, "no E126-named function may exist yet");
   assert.doesNotMatch(
     SOURCE,

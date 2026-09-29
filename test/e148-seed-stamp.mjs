@@ -18,7 +18,7 @@
 // code change (test/e28-shrink-warning.test.mjs:232, J1).
 //
 // gates/stamp-provenance.ts is CORRECT and is NOT modified by this ticket
-// (E148 hard constraint #1) — the regex's premise ("overwhelmingly unlikely")
+// (E148 hard constraint #1: the gate stays unmodified) — the regex's premise ("overwhelmingly unlikely")
 // is true, just not zero, and a test suite that seeds its own fixtures from
 // the wall clock should not rely on "unlikely". This module removes the
 // wall-clock dependency at the TEST layer only: after seeding, force the
@@ -27,7 +27,8 @@
 // helper already forces last_updated for lease-TTL purposes (same technique,
 // generalized and centralized so 20+ local reimplementations don't diverge).
 //
-// Also NOT a production-code change (E148 hard constraint #2): no argument is
+// Also NOT a production-code change (E148 hard constraint #2: production
+// code stays untouched): no argument is
 // added to tools/handoff-write.ts's writeHandoffState — that function still
 // only ever stamps new Date().toISOString() (or preserves verbatim under
 // bookkeeping_write). This module edits the on-disk fixture file directly,
@@ -134,7 +135,8 @@ export function freshNonSuspectStamp() {
  * pre-existing backdateLastUpdated() convention) — that computation carries
  * the SAME real millisecond entropy as any other now()-derived stamp (only
  * the minute/hour component shifts; seconds/ms pass through unchanged), so
- * it is independently susceptible to the E148 hazard, not just the plain
+ * it is independently susceptible to the hand-authored-stamp hazard
+ * described at the top of this file (E148), not just the plain
  * seed-then-write shape. Deterministically escapes HAND_AUTHORED_STAMP_RE
  * (ms forced !== 0) while leaving the requested age intact to the second.
  */

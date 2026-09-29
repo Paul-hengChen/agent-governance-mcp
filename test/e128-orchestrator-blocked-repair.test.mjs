@@ -1,6 +1,7 @@
 // Coded by @qa-engineer
-// Orchestrator end-to-end regression guard for E128 (docs/backlog.md ~line
-// 250) — the release-engineer incident of 2026-09-15.
+// Orchestrator end-to-end regression guard: a same-agent Blocked->Blocked
+// repair write must land (E128, docs/backlog.md ~line 250) — the
+// release-engineer incident of 2026-09-15.
 //
 // tools/transitions.ts is pure: `validateTransition` accepting a
 // same-agent Blocked->Blocked tuple (test/qa-flow.test.mjs T-QA-E128-01(a))
@@ -13,11 +14,11 @@
 // review_reports/review_T-E128-02.md C5 and the dispatch brief's coverage
 // priority 1 ("nothing in the original 5-case task row reaches it").
 //
-// Scenario (mirrors the E111 release incident verbatim):
+// Scenario (mirrors the 2026-09-15 release incident verbatim, E111):
 //   pm:In_Progress (seeded, cut-approved)
 //     -> sr-engineer:In_Progress            (build-entry hop)
 //     -> sr-engineer:Blocked (malformed)     (a real halt, argument-tag leak)
-//     -> sr-engineer:Blocked (repair)        (the E128 fix under test)
+//     -> sr-engineer:Blocked (repair)        (the fix under test, E128)
 //
 // What must be true after the repair write, PROVEN through the real pipeline,
 // not asserted against internal fields alone:
@@ -29,7 +30,7 @@
 //      different feature's pm:In_Progress write through the SAME real
 //      FEATURE_LEASE gate and confirming it is rejected, exactly as
 //      test/feature-lease.test.mjs FM2 proves for a Blocked incumbent. This
-//      is the property the E128 backlog row actually asks for: a repair that
+//      is the property the fix actually needs (E128): a repair that
 //      silently released the lease while a tagged, unpushed release waited
 //      on a human would defeat the ticket even though validateTransition
 //      alone would look correct.
@@ -71,7 +72,7 @@ async function seedCutApprovedPm(ws, feature) {
     lastAgent: "pm",
     cutApproved: true,
   });
-  // E148: force the seed's last_updated off the wall clock (docs/backlog.md
+  // Force the seed's last_updated off the wall clock (E148, docs/backlog.md
   // row E148) — see test/e148-seed-stamp.mjs. The subsequent hop1/hop2/hop3
   // chain below reads consecutively off each accepted write's OWN fresh
   // server stamp with no intervening tw_get_state read between them (that
@@ -123,9 +124,9 @@ test("E128-ORC: sr-engineer self-repairs a malformed Blocked record through the 
   assert.equal(afterHalt.hop_count, 1, "a same-agent status change (In_Progress -> Blocked) is not a role transition and must not tick hop_count");
 
   // Hop 3 (THE FIX UNDER TEST): sr-engineer repairs its OWN Blocked record —
-  // same agent, same status. Pre-E128 this was TRANSITION_REJECTED (no edge
-  // sr-engineer:Blocked -> sr-engineer:Blocked existed); post-E128 the step-3
-  // fast path admits it.
+  // same agent, same status. Before the fix this was TRANSITION_REJECTED (no edge
+  // sr-engineer:Blocked -> sr-engineer:Blocked existed); now the step-3
+  // fast path admits it (E128).
   const repair = await handleUpdateState({
     workspace_path: ws,
     active_feature: feature,
@@ -191,8 +192,8 @@ test("E128-ORC-2 (negative control): before the repair, the SAME malformed recor
   // fine here; no orchestrator or filesystem needed) so a reader of this
   // suite sees both halves: what was broken (this test, standing for the
   // record — sr-engineer:Blocked historically could reach ONLY
-  // In_Progress/pm/design-auditor, never itself) and what E128 fixes (the
-  // pipeline test above). Import path matches the rest of the file's dist/
+  // In_Progress/pm/design-auditor, never itself) and what the fix repairs (the
+  // pipeline test above, E128). Import path matches the rest of the file's dist/
   // convention.
   return import("../dist/tools/transitions.js").then(({ ALLOWED_TRANSITIONS }) => {
     const row = ALLOWED_TRANSITIONS.get("sr-engineer:Blocked") ?? [];

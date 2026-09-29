@@ -1,7 +1,8 @@
 // Coded by @qa-engineer
-// Tests for specs/e114-cut-approval-inheritance.md AC1-AC9, plus the two
-// review findings (review_reports/review_T-E114-01.md Round 1 F1/F2) pinned
-// so they cannot regress.
+// Tests for specs/e114-cut-approval-inheritance.md AC1-AC9, plus two review
+// findings pinned so they cannot regress: a malformed write destroying a valid
+// record (F1) and whitespace-only 'inherited:' values (F2)
+// (review_reports/review_T-E114-01.md Round 1).
 //
 // Spec-to-Test map:
 //   AC1 (v13->v14 migration is stamp-only, seeds nothing)        -> AC1
@@ -143,7 +144,7 @@ visual_rounds_total: 0
 // ============================================================================
 
 test("AC2: a handoff with no cut_approved_source reads back undefined — absence is the non-inherited default, never a false negative/positive", async () => {
-  // Case 1: a pre-E114 (legacy v13) handoff that never had the field at all.
+  // Case 1: a legacy (v13, written before this field existed) handoff that never had the field at all.
   const legacyWs = mkWs("e114-legacy-");
   writeRaw(
     legacyWs,
@@ -429,9 +430,9 @@ test("AC9: no gate predicate in gates/ reads cut_approved_source", () => {
 });
 
 // ============================================================================
-// F1 — review_reports/review_T-E114-01.md Finding 1: a malformed write must
-// not destroy a valid record; the preserve branch is feature-scoped, not a
-// blind keep-whatever-was-there.
+// F1 — a malformed write must not destroy a valid record; the preserve
+// branch is feature-scoped, not a blind keep-whatever-was-there
+// (review_reports/review_T-E114-01.md Finding 1).
 // ============================================================================
 
 test("F1-1: a malformed cut_approved_source write leaves a valid SAME-feature record intact (does not overwrite or delete it)", async () => {
@@ -497,8 +498,8 @@ test("F1-2: the preserve branch is feature-scoped, not a blind keep — a malfor
 });
 
 // ============================================================================
-// F2 — review_reports/review_T-E114-01.md Finding 2: 'inherited:' and
-// 'inherited:   ' (whitespace-only suffix) both read back undefined.
+// F2 — 'inherited:' and 'inherited:   ' (whitespace-only suffix) both read
+// back undefined (review_reports/review_T-E114-01.md Finding 2).
 // ============================================================================
 
 test("F2: 'inherited:' and 'inherited:   ' (whitespace-only feature suffix) both read back undefined, never a persisted claim naming no parent", () => {

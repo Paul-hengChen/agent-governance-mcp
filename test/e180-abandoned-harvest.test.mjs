@@ -2,7 +2,8 @@
 // Tests for specs/e180-abandoned-harvest.md AC1-AC13 — `agc feature finish
 // <ticket> --abandoned` harvesting git-ignored evidence (E180) and untracked
 // `.current/<ticket>/` (E194) into the primary checkout before the worktree
-// is removed, plus one E197 string assertion (AC13).
+// is removed, plus one assertion on the fallback wording of the closed-lane
+// pointer line (E197, AC13).
 //
 // Fixture conventions follow test/agc-feature-lifecycle.test.mjs and
 // test/agc-feature-finish-history.test.mjs (this repo's own precedent: every
@@ -137,7 +138,7 @@ function escRe(s) {
 }
 
 // ============================================================================
-// AC1-AC6 — E180 evidence harvest (planAbandonEvidenceHarvest /
+// AC1-AC6 — harvest of git-ignored evidence files (E180; planAbandonEvidenceHarvest /
 // applyAbandonEvidenceHarvest, bin/agc-init.mjs).
 // ============================================================================
 
@@ -276,7 +277,7 @@ test("AC5: a plain untracked (non-ignored) evidence file is unaffected — pre-e
   fs.writeFileSync(path.join(lane, "qa_reports", "review_T-E180D5-01.md"), "plain untracked\n");
 
   const r = runAgc(repo, ["finish", "e180d5", "--abandoned"]);
-  // AC1's new harvest logic never applies to this file — the pre-existing
+  // The evidence-harvest logic (AC1) never applies to this file — the pre-existing
   // native worktree-remove refusal over the moved-but-still-untracked file
   // fires exactly as it does today (test/agc-feature-lifecycle.test.mjs AC22).
   assert.notEqual(r.status, 0, "git worktree remove must still refuse over the non-ignored leftover");
@@ -297,8 +298,8 @@ test("AC6: the evidence harvest is idempotent across a later-step failure and re
   fs.mkdirSync(path.join(lane, "qa_reports"), { recursive: true });
   fs.writeFileSync(path.join(lane, "qa_reports", "review_T-E180D6-01.md"), "harvest me once\n");
 
-  // A LATER step (the E194 .current/<ticket>/ harvest, which runs after the
-  // E180 evidence harvest+move+commit) fails mid-copy: an unreadable file
+  // A LATER step (the .current/<ticket>/ harvest, E194, which runs after the
+  // evidence harvest+move+commit, E180) fails mid-copy: an unreadable file
   // forces fs.cpSync to throw EACCES (test/agc-feature-finish-history.test.mjs
   // AC9-R2 precedent for the equivalent --shipped harvest).
   const laneCurrentDir = path.join(lane, ".current", "e180d6");
@@ -313,7 +314,7 @@ test("AC6: the evidence harvest is idempotent across a later-step failure and re
     assert.match(first.stderr, /worktree and branch left in place/i);
 
     // The EARLIER evidence harvest (E180) must have already completed and
-    // committed, unaffected by the LATER (E194) failure.
+    // committed, unaffected by the LATER .current/<ticket>/ harvest failure (E194).
     assert.match(first.stdout, /harvested git-ignored evidence qa_reports\/review_T-E180D6-01\.md -> primary/);
     assert.match(first.stdout, /moved qa_reports\/review_T-E180D6-01\.md -> qa_reports\/abandoned\/e180d6\//);
     const harvestedEvidence = path.join(repo, "qa_reports", "abandoned", "e180d6", "review_T-E180D6-01.md");
@@ -350,7 +351,7 @@ test("AC6: the evidence harvest is idempotent across a later-step failure and re
 });
 
 // ============================================================================
-// AC7-AC12 — E194 `.current/<ticket>/` harvest (planAbandonCurrentHarvest /
+// AC7-AC12 — harvest of the untracked `.current/<ticket>/` directory (E194; planAbandonCurrentHarvest /
 // executeAbandonCurrentHarvest, bin/agc-init.mjs).
 // ============================================================================
 
@@ -409,8 +410,9 @@ test("AC9: a non-directory blocking the history path refuses before any mutation
   const lane = path.join(mkTmp("e180d9-lane-"), "lane");
   assert.equal(runAgc(repo, ["start", "e180d9-history-blocked", "--path", lane]).status, 0);
 
-  // An extra evidence file, to prove the E194 refusal is hoisted BEFORE the
-  // E180 evidence harvest/move/commit even runs.
+  // An extra evidence file, to prove the refusal from the .current/<ticket>/
+  // harvest (E194) is hoisted BEFORE the evidence harvest/move/commit (E180)
+  // even runs.
   fs.mkdirSync(path.join(lane, "qa_reports"), { recursive: true });
   fs.writeFileSync(path.join(lane, "qa_reports", "review_T-E180D9-01.md"), "should not move\n");
 
@@ -547,7 +549,7 @@ test("AC12: the adopter-shaped workspace — both harvests fire end-to-end", () 
 });
 
 // ============================================================================
-// AC13 — E197: closedLanePointerLine's fallback clause (--shipped path only;
+// AC13 — closedLanePointerLine's fallback clause wording (E197; --shipped path only;
 // AC1-AC12 above never touch it).
 // ============================================================================
 

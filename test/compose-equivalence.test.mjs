@@ -8,11 +8,11 @@
 //   AC4 (full design-armed equivalence) -> t-build-full-design, t-build-full-design-fd
 //   AC5 (fullDetail equivalence)        -> the four *-fd fixtures above (design + non-design,
 //                                           lite + full)
-//   AC7 (stripOriginTags keeps working) -> implicit in every fixture (golden captured post
-//                                           T-GTS stripOriginTags landing, pre-compose-not-strip)
+//   AC7 (stripOriginTags keeps working) -> implicit in every fixture (golden captured after
+//                                           stripOriginTags landed (T-GTS), before compose-not-strip)
 //   AC8 (single source of truth)        -> t-cat-equals-monolith (concatenating the 15
 //                                           manifest fragments reproduces the retired monolith
-//                                           byte-for-byte — the DR-1 Option R invariant)
+//                                           byte-for-byte — composition is literal concatenation, no normalization; DR-1 Option R)
 //   AC9 (hook byte-equivalence)         -> t-hook-lite, t-hook-full
 //   Dependencies (rationale §X refs)    -> t-rationale-refs-resolve-forward,
 //                                           t-rationale-sections-exist-in-fragments

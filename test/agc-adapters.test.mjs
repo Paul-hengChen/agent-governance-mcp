@@ -221,9 +221,9 @@ test("AC-5: agc check exits 1 and prints stale message to stderr when adapter st
 // AC-6: agc check exits 0 when all adapters are current
 // ---------------------------------------------------------------------------
 
-// E234: agc check now always runs the advisory hygiene scan, which may add
-// its own `agc check — hygiene` lines (e.g. hyg.kw.none). These assertions are
-// about the other checks, so they drop those lines first.
+// agc check now always runs the advisory hygiene scan, which may add its own
+// `agc check — hygiene` lines (e.g. hyg.kw.none). These assertions are about
+// the other checks, so they drop those lines first (E234).
 function withoutHygieneLines(stderr) {
   return stderr
     .split("\n")
@@ -276,9 +276,9 @@ test("AC-8: no verbatim constitution line appears in any adapter template (point
   // of the constitution. Any line that appears verbatim in the composed constitution
   // must not appear in any adapter template. (Programmatic line-intersection —
   // the same check the code-reviewer ran independently.)
-  // compose-not-strip (ticket A9, DR-6): content/constitution.md is retired (AC8);
-  // composeConstitution({chain:true,design:true}) reproduces it byte-for-byte
-  // (Option R, architecture DR-1), so this mechanical swap changes no assertion.
+  // compose-not-strip: content/constitution.md is retired, and
+  // composeConstitution({chain:true,design:true}) reproduces it byte-for-byte,
+  // so this mechanical swap changes no assertion (ticket A9).
   const { composeConstitution } = await import(path.join(PROJECT_ROOT, "dist", "prompts", "build.js"));
   const constitutionLines = new Set(
     composeConstitution({ chain: true, design: true })
@@ -339,8 +339,8 @@ test("AC-9b: bogus subcommand exits 2 and prints usage to stderr", () => {
 // ---------------------------------------------------------------------------
 // AC22 (specs/e108-agc-eject.md) — top-level usage text lists eject
 // (qa-owned additive extension of this file, per that spec's lane
-// ownership carve-out — see test/e108-eject.test.mjs for the rest of E108's
-// coverage; this is the one AC that spec assigns here instead.)
+// ownership carve-out — see test/e108-eject.test.mjs for the rest of the
+// agc eject coverage (E108); this is the one AC that spec assigns here instead.)
 // ---------------------------------------------------------------------------
 test("AC22: top-level usage text lists eject", () => {
   const ws = mkTmp("agc-adapters-ac22-");
@@ -473,7 +473,8 @@ test("version-poison: stamp and check use the agc package version, not the targe
 //     JSON is never clobbered -> "config class (3)"/"config class (4)" below
 //   T-E101-01 claude.md carries the judge-dispatch obligation; codex.md /
 //     antigravity.md do not -> "adapter-content class" below
-//   Dogfood payoff (review round 1 gap #9 / round 2 gap #6) -> "dogfood
+//   Dogfood payoff: a host written by agc init reaches the task-tool capability
+//     check through the real config loader (review round 1 gap #9 / round 2 gap #6) -> "dogfood
 //     payoff" below
 // Re-derivation note (2026-08-31, qa-engineer): round 2/3 of
 // review_reports/review_T-E100-01.md both assert the reparse guard at
@@ -504,9 +505,9 @@ test("E100 config class (1): fresh agc init writes host:\"claude-code\" into a b
   const r = runAgc(ws, ["init"]);
   assert.equal(r.status, 0, `exit code (stderr=${r.stderr})`);
   const cfg = JSON.parse(readConfig(ws));
-  // e106-init-artifacts-flag: schema_version is now 2, and a fresh workspace
-  // outside git (this fixture uses a plain mkdtemp, not a git repo) defaults
-  // to "artifacts": "local" (AC14).
+  // schema_version is now 2, and a fresh workspace outside git (this fixture
+  // uses a plain mkdtemp, not a git repo) defaults to "artifacts": "local"
+  // (init --artifacts flag, e106 AC14).
   assert.deepEqual(cfg, { schema_version: 2, host: "claude-code", artifacts: "local" });
   assert.match(r.stdout, /Created:.*\.current\/\.config\.json/, "fresh config must be reported under Created:");
 });
@@ -523,10 +524,10 @@ test("E100 config class (2): an EXISTING host-less .config.json gains \"host\" o
 
   const raw = readConfig(ws);
   const cfg = JSON.parse(raw); // must still be valid JSON
-  // e106-init-artifacts-flag: this fixture's schema_version (1) is NOT
-  // rewritten by the CLI (only the server's lazy migration bumps it); the
-  // fixture runs outside git, so "artifacts" is independently upserted to
-  // "local" alongside "host" (AC5/AC14).
+  // This fixture's schema_version (1) is NOT rewritten by the CLI (only the
+  // server's lazy migration bumps it); the fixture runs outside git, so
+  // "artifacts" is independently upserted to "local" alongside "host"
+  // (init --artifacts flag, e106 AC5/AC14).
   assert.deepEqual(cfg, {
     schema_version: 1,
     cutApprovalAutoTier: { "T1": "auto" },
@@ -752,7 +753,7 @@ test("T-E100-03: CLAUDE.md adopter prose survives the atomic write on BOTH mutat
   assert.equal(findTmpFiles(wsUpdated).length, 0, "updated: no CLAUDE.md.*.tmp residue in workspace root");
 });
 
-// --- E102/R3-A: symlinked CLAUDE.md is now written THROUGH, not replaced ---
+// --- symlinked CLAUDE.md is now written THROUGH, not replaced (E102 R3-A) ---
 
 test("E102/R3-A: a symlinked CLAUDE.md is written through the link (fs.realpathSync resolves target before deriving tmpPath) — link, prose, and mode all survive", () => {
   // Inverts the prior "KNOWN BEHAVIOUR (R3-A)" pin, which documented the
@@ -801,16 +802,16 @@ test("E102/R3-A: a symlinked CLAUDE.md is written through the link (fs.realpathS
   assert.equal(findTmpFiles(ws).length, 0, "no CLAUDE.md.*.tmp residue in the workspace root either");
 
   // agc check must now report OK against the REAL file, not a detached
-  // copy — this is the observable end of the silent-failure chain E102's
-  // row describes.
+  // copy — this is the observable end of the silent-failure chain of a
+  // symlinked CLAUDE.md being replaced by a detached copy (E102).
   const check = spawnSync(process.execPath, [AGC_INIT, "check"], { cwd: ws, encoding: "utf-8" });
   assert.equal(check.status, 0, `agc check (stderr=${check.stderr})`);
 });
 
-// --- E102/backlog-0f: dangling CLAUDE.md symlink is repaired, not left silently broken ---
+// --- dangling CLAUDE.md symlink is repaired, not left silently broken (E102, backlog 0f) ---
 
 test("E102/backlog-0f: agc init against a DANGLING CLAUDE.md symlink repairs it — exit 0, link preserved, canonical target created with the block (bin/agc-init.mjs:88-89)", () => {
-  // Backlog row 0f's dangling-symlink obligation, pinned against the shape
+  // The dangling-symlink obligation (backlog row 0f), pinned against the shape
   // code-reviewer verified end-to-end and named explicitly as pinnable
   // (review_reports/review_T-E102-01.md round 2, "Note for qa"):
   // fs.realpathSync(target) throws ENOENT on a dangling symlink, but no
@@ -818,8 +819,8 @@ test("E102/backlog-0f: agc init against a DANGLING CLAUDE.md symlink repairs it 
   // is false for a dangling symlink exactly as for a plain missing path, so
   // writeClaudeBlock's `!existsSync` branch (bin/agc-init.mjs:88-89) fires
   // first: fs.writeFileSync follows the dangling link and creates the
-  // canonical file, leaving the link itself intact. This is decision E's
-  // "fail-closed on a dangling one" point discharged end-to-end as a
+  // canonical file, leaving the link itself intact. This discharges decision E's
+  // "fail-closed on a dangling symlink" point, end-to-end as a
   // write-through REPAIR rather than a refusal — ratified by code-reviewer
   // as "better but different, not a regression" (round 2 Architecture
   // section) and relayed to the human as a divergence record, not an
@@ -845,13 +846,13 @@ test("E102/backlog-0f: agc init against a DANGLING CLAUDE.md symlink repairs it 
   assert.match(canonicalContent, /<!-- END agc-adapter -->/, "the newly-created canonical file must contain the agc adapter block");
 });
 
-// --- E102/R3-C: a failed write strands no .tmp and leaves target + link intact ---
+// --- a failed write strands no .tmp and leaves target + link intact (E102 R3-C) ---
 
 test("E102/R3-C: a failed write (read-only canonical directory) propagates the error and strands no .tmp, leaving the canonical file and the symlink untouched", () => {
   // code-reviewer round 1 verified this fixture manually ("Read-only
   // canonical dir (tmp never created) -> EACCES propagates, canonical
-  // unchanged, link intact, no stray file") as one of two R3-C failure
-  // branches; this pins it as an automated regression test. The other
+  // unchanged, link intact, no stray file") as one of two failure
+  // branches of that guarantee; this pins it as an automated regression test. The other
   // branch reviewer verified ("rename-fails-after-tmp-exists -> EISDIR
   // propagates, tmp cleaned up") requires resolvedTarget to already be a
   // directory at rename time while surviving an earlier
@@ -860,7 +861,8 @@ test("E102/R3-C: a failed write (read-only canonical directory) propagates the e
   // target as text before atomicWriteFile is ever called), and
   // atomicWriteFile is not exported for a direct unit-level test. That
   // variant is therefore not reachable through the public CLI surface,
-  // same class of limitation as F1's unreachable "(dangling)" diagnostic.
+  // same class of limitation as the unreachable "(dangling)" diagnostic
+  // noted in the dangling-symlink test above.
   const ws = mkTmp("e102-failed-write-");
   fs.mkdirSync(path.join(ws, "dotfiles"), { recursive: true });
   const canonical = path.join(ws, "dotfiles", "CLAUDE.md");
@@ -885,7 +887,7 @@ test("E102/R3-C: a failed write (read-only canonical directory) propagates the e
   }
 });
 
-// --- adapter-content class (T-E101-01) --------------------------------------
+// --- adapter-content class: claude.md carries the judge-dispatch obligation, others do not (T-E101-01) ---
 
 test("E101: templates/agent-adapters/claude.md states the judge-dispatch obligation naming code-reviewer and qa-engineer; codex.md and antigravity.md do NOT", () => {
   const tplDir = path.join(PROJECT_ROOT, "templates", "agent-adapters");
@@ -956,7 +958,7 @@ test("E100 dogfood payoff: agc-init-written host:\"claude-code\" flows through t
   assert.notEqual(composedWithHost, composedWithoutHost, "host-tagged fragment content must actually differ, not just be present/absent as a flag");
 });
 
-// --- E104 prevention (c): research/ tracked-binary advisory -----------------
+// --- research/ tracked-binary advisory (E104 prevention (c)) ----------------
 //
 // Two halves, per review_reports/review_T-E104-03.md (carried forward from
 // code-reviewer Round 1 and Round 2, unaddressed by sr-engineer/code-reviewer
@@ -1031,12 +1033,12 @@ test("E104(ii): this repo has zero tracked binaries under research/ (the day-one
   // Contract: the ratchet docs/backlog.md promises is that THIS repo's own
   // research/ tree carries zero files matching the binary allowlist, not
   // merely that the CLI's warning logic works on a synthetic fixture (that
-  // is E104(i)'s job). Implemented independently of checkResearchBinaries()
+  // is the fixture-based test's job). Implemented independently of checkResearchBinaries()
   // itself so a future regression in the shipped check does not silently
   // blind this assertion too — but still via `-z` + NUL split, matching the
   // production implementation, per the explicit code-reviewer warning that
   // a naive `git ls-files` + `split("\n")` re-implementation would
-  // reintroduce the exact non-ASCII blind spot E104(i) exists to catch.
+  // reintroduce the exact non-ASCII blind spot the fixture-based test above exists to catch.
   const src = fs.readFileSync(AGC_INIT, "utf-8");
   const reLiteralMatch = src.match(/const RESEARCH_BINARY_RE = (\/.*\/i);/);
   assert.ok(
@@ -1064,27 +1066,27 @@ test("E104(ii): this repo has zero tracked binaries under research/ (the day-one
   );
 });
 
-// --- E111: linked-worktree evidence advisory (bin/agc-init.mjs
-// checkWorktreeEvidence(), :497-706) ----------------------------------------
+// --- Linked-worktree evidence advisory (bin/agc-init.mjs
+// checkWorktreeEvidence(), :497-706) (E111) -------------------------------
 //
 // This repo cannot reproduce the defect the advisory exists to catch — all
 // three evidence dirs (qa_reports/, review_reports/, specs/) are tracked
-// here with real content — so a FIXTURE is mandatory, exactly as E104
-// prevention (c) above did in this same file.
+// here with real content — so a FIXTURE is mandatory, exactly as the research/
+// tracked-binary advisory tests above did in this same file.
 //
-// Contract is review_reports/review_T-E111-01.md ROUND 3 (the binding
-// round — where round 2's text conflicts, round 3 governs) and its 23-row
-// behaviour matrix. Per that round's explicit ruling: assert ONLY on
+// The contract is the 23-row behaviour matrix in
+// review_reports/review_T-E111-01.md (round 3 is binding: it governs wherever
+// round 2's text conflicts). Per that round's explicit ruling: assert ONLY on
 // observable warn/silent stderr text + exit code, NEVER on which git
 // plumbing command fires — the ignore mechanism changed twice under
 // measurement during review (round 2's own suggested `git check-ignore -q
-// <dir>` was itself found broken against the C1 fixture), so a test
+// <dir>` was itself found broken against the linked-worktree fixture), so a test
 // grepping for `check-ignore` or `ls-files --others --ignored` would freeze
 // a mechanism this ticket exists to keep correctable.
 //
 // A "linked worktree" only exists once `.git` is a FILE (git's gitfile),
 // which requires a real primary repo plus `git worktree add` — a plain
-// `git init` temp dir (as E104 above uses) has `.git` as a directory and is
+// `git init` temp dir (as the research/ advisory tests above use) has `.git` as a directory and is
 // silent by construction (isLinkedWorktree() returns false). That absence
 // of gitfile-ness is itself row P1 below.
 

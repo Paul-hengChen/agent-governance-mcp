@@ -154,13 +154,13 @@ function withPath(binDir, fn) {
   }
 }
 
-// e123b9 J2 (spec AC7 — REDEFINED): getLaneFeatureHistory no longer reads
-// .current/archive/ at all — it scans live .current/<lane>/handoff.md plus
-// closed .current/history/<YYYY-MM>/<lane>/handoff.md. The D2/D3 lane-close
-// move that would POPULATE .current/history/ automatically is a later
-// ticket's job (spec Out of Scope) — tests that need a "closed lane" fixture
-// construct the directory directly, exactly as AC7's own proof text
-// prescribes ("fixture with one live lane + two closed lanes across two
+// getLaneFeatureHistory no longer reads .current/archive/ at all — it scans
+// live .current/<lane>/handoff.md plus closed
+// .current/history/<YYYY-MM>/<lane>/handoff.md (e123b9 J2, spec AC7 redefined).
+// The lane-close move that would POPULATE .current/history/ automatically is a
+// later ticket's job (out of scope for the spec) — tests that need a "closed
+// lane" fixture construct the directory directly, exactly as the spec's proof
+// text prescribes ("fixture with one live lane + two closed lanes across two
 // different YYYY-MM history buckets").
 function writeHistoryLaneFixture(ws, yyyymm, lane, activeFeature, lastUpdated = "2026-01-01T00:00:00.000Z") {
   const dir = path.join(ws, ".current", "history", yyyymm, lane);
@@ -228,13 +228,12 @@ test("AC2: laneRegistryList returns source:\"lane-registry\", AND scripts/featur
   await write(wsMatch, { activeFeature: "e132-ac2-feature", hopCount: 1, completedTasks: ["T-1"] });
 
   // A lane that PREVIOUSLY worked e132-ac2-feature but has since moved on.
-  // e123b9 J2 (spec AC7 — REDEFINED): featureHistory no longer comes from
-  // E116's .current/archive/ (that flat-era signal is gone by design — AC7
-  // no longer reads that directory at all); it comes from
-  // .current/history/<YYYY-MM>/<lane>/handoff.md, whose POPULATION (the
-  // D2/D3 lane-close move) is a later ticket's job (spec Out of Scope) — so
-  // the fixture constructs that closed-lane snapshot directly, exactly as
-  // AC7's own proof text prescribes.
+  // featureHistory no longer comes from the old flat-era .current/archive/
+  // directory (that signal is gone by design and is no longer read at all); it
+  // comes from .current/history/<YYYY-MM>/<lane>/handoff.md, whose population
+  // (the lane-close move) is a later ticket's job — so the fixture constructs
+  // that closed-lane snapshot directly, as the spec's proof text prescribes
+  // (e123b9 J2, AC7).
   const wsMovedOn = mkWs();
   writeHistoryLaneFixture(wsMovedOn, "2026-01", "_primary", "e132-ac2-feature", "2026-01-01T00:00:00.000Z");
   await write(wsMovedOn, { activeFeature: "some-other-feature", hopCount: 1 });
@@ -291,9 +290,9 @@ test("AC3: lane_registry is ABSENT and the payload is byte-identical whether git
   const natural = JSON.parse(naturalJson);
   assert.equal("lane_registry" in natural, false);
 
-  // Case 2: "git is unavailable" — AC3's own wording — simulated via a fake
+  // Case 2: "git is unavailable" — the spec's own wording — simulated via a fake
   // git that always errors loudly. Byte-identical output to Case 1 is the
-  // literal AC3 proof: both routes converge on "nothing to report."
+  // spec's literal proof: both routes converge on "nothing to report." (AC3)
   const binDir = makeFakeGitBin("#!/bin/sh\necho 'fatal: not a git repository' 1>&2\nexit 128\n");
   const unavailableJson = withPath(binDir, () => readHandoffState(ws));
 
@@ -442,15 +441,16 @@ test("gap-6: the ceiling bounds only the git subprocess — per-lane parseHandof
   );
 });
 
-// gap-4 (SHARPEST, still open per both review rounds): getLaneRegistrySummary
-// must SKIP the lane-history scan entirely — the whole justification for
-// having a second entry point rather than reusing laneRegistryList. Proven
-// behaviorally (real sentinel + timing contrast), never via source-text
-// inspection. e123b9 J2 (spec AC7 — REDEFINED): the sentinel is now a large
-// .current/history/<YYYY-MM>/ bucket (many closed-lane subdirectories) —
-// AC7 retired the old .current/archive/ scan entirely, so that directory no
-// longer costs laneRegistryList anything and can't serve as this test's
-// contrast fixture; the history bucket is the new expensive-to-scan target.
+// gap-4 (sharpest reviewer gap, still open after both review rounds):
+// getLaneRegistrySummary must SKIP the lane-history scan entirely — the whole
+// justification for having a second entry point rather than reusing
+// laneRegistryList. Proven behaviorally (real sentinel + timing contrast),
+// never via source-text inspection. The lane-history scan moved from
+// .current/archive/ to .current/history/<YYYY-MM>/ (e123b9 J2, spec AC7), so
+// the sentinel is now a large history bucket (many closed-lane
+// subdirectories): the old archive directory no longer costs laneRegistryList
+// anything and can't serve as the contrast fixture; the history bucket is the
+// new expensive-to-scan target.
 test("gap-4 (sharpest): getLaneRegistrySummary skips the lane-history scan entirely — laneRegistryList (the OTHER entry point) does not", async () => {
   const wsPlain = mkWs();
   await write(wsPlain, { activeFeature: "gap4-plain", hopCount: 1 });
@@ -494,7 +494,7 @@ test("gap-4 (sharpest): getLaneRegistrySummary skips the lane-history scan entir
   assert.equal(
     sentinelLane.featureHistory.length,
     // +1: the sentinel's own LIVE lane ("gap4-sentinel") is now also part of
-    // the combined featureHistory list (AC7 merges live + closed into one).
+    // the combined featureHistory list (live and closed lanes merge into one, AC7).
     SENTINEL_FILE_COUNT + 1,
     "sanity: the sentinel history bucket is real and IS observed by laneRegistryList",
   );
@@ -527,12 +527,11 @@ test("AC7: getLaneFeatureHistory returns featureHistory:null (NOT []) when .curr
 });
 
 test("AC7: getLaneFeatureHistory skips a malformed closed-lane file and returns the valid file's active_feature — never crashes, never falsely collapses to []", () => {
-  // e123b9 J2 (spec AC7 — REDEFINED): the malformed-sibling source is now a
-  // closed-lane history bucket entry, not a .current/archive/ file (that
-  // flat-era signal is gone by design — AC7 no longer reads that directory
-  // at all). No live lane is seeded here, so the result set is exactly the
-  // two history entries constructed below — isolating the skip-malformed
-  // behavior cleanly.
+  // The malformed-sibling source is now a closed-lane history bucket entry, not
+  // a .current/archive/ file (that flat-era signal is gone by design and is no
+  // longer read at all; e123b9 J2, AC7). No live lane is seeded here, so the
+  // result set is exactly the two history entries constructed below —
+  // isolating the skip-malformed behavior cleanly.
   const ws = mkWs();
   writeHistoryLaneFixture(ws, "2026-01", "gap7-valid-lane", "gap7-old", "2026-01-01T00:00:00.000Z");
 
@@ -551,9 +550,9 @@ test("AC7: getLaneFeatureHistory skips a malformed closed-lane file and returns 
 });
 
 // ============================================================================
-// T-E123B9-05 (i) — AC7 ordering: last_updated (never filesystem mtime),
+// Feature-history ordering: by last_updated (never filesystem mtime),
 // including the missing/unparseable-last-sorts-last and lane-name-tiebreak
-// rules, and the null / [] contract's own cases.
+// rules, and the null / [] contract's own cases (T-E123B9-05 (i), AC7).
 // ============================================================================
 
 function writeLiveLaneFixture(ws, lane, activeFeature, frontmatterExtra = "") {
@@ -631,15 +630,14 @@ test("AC7-FLATARCHIVE1 (e123b9 J2 — REDEFINED): a flat .current/archive/*.md-o
 });
 
 // ============================================================================
-// e125b spec AC5 (J2-NEW-4) — getLaneFeatureHistory also merges each lane
-// dir's metrics.jsonl {feature, ts} rows (readMetricsEntries), recovering a
-// long-lived lane's (e.g. _primary) SHIPPED predecessors that active_feature
-// overwrote in place. Test-file placement note (Phase 3a): the ticket named
+// getLaneFeatureHistory also merges each lane dir's metrics.jsonl
+// {feature, ts} rows (readMetricsEntries), recovering a long-lived lane's
+// (e.g. _primary) SHIPPED predecessors that active_feature overwrote in place
+// (e125b spec AC5, J2-NEW-4). Test-file placement note: the ticket named
 // test/lane-registry-feature-history.test.mjs (extend), but no file with
-// that name exists in this repo — the real, pre-existing AC7
-// getLaneFeatureHistory coverage above already lives in THIS file, so this
-// AC5 extension is placed alongside it rather than forking a same-purpose
-// file under a different name.
+// that name exists in this repo — the real, pre-existing getLaneFeatureHistory
+// coverage above already lives in THIS file, so this extension is placed
+// alongside it rather than forking a same-purpose file under a different name.
 // ============================================================================
 
 function writeMetricsFixture(ws, lane, rows) {

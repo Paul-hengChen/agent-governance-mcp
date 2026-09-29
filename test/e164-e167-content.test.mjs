@@ -1,6 +1,8 @@
 // Coded by @qa-engineer
-// Tests for feature: e164-e167-content-wave45 (docs/backlog.md rows E164/E167 +
-// NEW-TICKETS.md L-CONTENT-NEW-1/NEW-3; L-CONTENT-NEW-5 resolved in-cut).
+// Tests that pin the release-engineer SOP's CI-wait and tag-handling wording and
+// the lite-coordinator / PM cut-list wording (feature e164-e167-content-wave45;
+// docs/backlog.md rows E164/E167 + NEW-TICKETS.md L-CONTENT-NEW-1/NEW-3;
+// L-CONTENT-NEW-5 resolved in-cut).
 // Content-assertion tests, independent of the sr-engineer/code-reviewer claims in
 // review_reports/review_T-E164-01.md — these read the shipped prose directly.
 //
@@ -11,7 +13,7 @@
 //        consistent; 8b STOP deletes unpushed local tag before the Blocked write) -> t-ac2-*
 //   AC3 (9a carries the budget note, names DEFAULT_WAIT_SECONDS, no "480")  -> t-ac3-*
 //   AC4 (8c separates tag-create from tag-push; step labels unrenumbered)  -> t-ac4-*
-//   AC5 (E164+E167 single edit pass)                    -> not test-assertable;
+//   AC5 (both content changes land in one edit pass)   -> not test-assertable;
 //        recorded in qa_reports/review_T-E164-02.md per the dispatch brief.
 //   AC6 (lite: no inline `id | desc |` list; points at skill-pm Cut-Approval Gate) -> t-ac6-*
 //   AC7 (skill-pm `touches` excludes governance bookkeeping)               -> t-ac7-*

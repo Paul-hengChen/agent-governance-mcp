@@ -3,40 +3,42 @@
 // tools/storage-sqlite.ts SqliteHandoffStorage.voidTask, the tools/tasks.ts
 // delegator/handler, and the tools/registry.ts entry.
 //
-// No specs/e117-void-task.md exists — the backlog E117 row (docs/backlog.md)
-// IS the contract (PM/architect skipped per the mini-chain scope_decision).
-// The acceptance point the ticket names is the E112 live consequence:
-// tw_get_next_task must stop offering a voided row, in BOTH storage modes.
+// No specs/e117-void-task.md exists — the backlog row for the void tool
+// (docs/backlog.md, E117) IS the contract (PM/architect skipped per the
+// mini-chain scope_decision). The acceptance point the ticket names:
+// tw_get_next_task must stop offering a voided row, in BOTH storage modes
+// (a live consequence found under E112).
 // Three rounds of code-reviewer scrutiny (review_reports/review_T-E117-01.md)
 // turned up further properties that are the real risk surface; this file
 // pins exactly those, per the qa dispatch brief:
 //
-//   Section 1 — E112 acceptance point (both modes)
-//   Section 2 — C1: completion guard reads the LEDGER (handoff.completed_tasks),
-//               not just the tasks.md mirror checkbox (both modes)
-//   Section 3 — C2/C5: the post-write invariant refuses (and leaves the file
+//   Section 1 — a voided row is never offered again (both modes; E112)
+//   Section 2 — completion guard reads the LEDGER (handoff.completed_tasks),
+//               not just the tasks.md mirror checkbox (both modes; C1)
+//   Section 3 — the post-write invariant refuses (and leaves the file
 //               byte-untouched) under a custom taskPattern and under a
-//               newline-bearing reason
-//   Section 4 — Q1: BOTH modes now distinguish already-voided from
-//               never-existed (E120 update, 2026-09-17 — SEE BELOW: this
+//               newline-bearing reason (C2/C5)
+//   Section 4 — BOTH modes now distinguish already-voided from
+//               never-existed (Q1; E120 update, 2026-09-17 — SEE BELOW: this
 //               used to be a deliberate file/SQLite asymmetry; it no longer
 //               is, see the E120 note immediately following this list)
 //   Section 5 — invisibility to parseTasksFromFile / tw_detect_drift / tw_sync
 //   Section 0/6 — basic contract (not rollback/complete, id reuse, [x] refusal,
 //               unknown id) + registry/dispatch wiring
 //
-// E120 update (2026-09-17, docs/backlog.md order 0v, closed in
+// Update: re-cutting a voided task id is now refused (E120, 2026-09-17,
+// docs/backlog.md order 0v, closed in
 // `feat/e120-e131-e122-wave1-gate-render`, review_reports/review_T-E120131-01.md,
-// APPROVED round 3): this file's original "a voided id becomes reusable in a
+// APPROVED round 3). This file's original "a voided id becomes reusable in a
 // re-cut via addTask" test (old Section 0) and its "Q1 (SQLite mode): ...
 // uniform not-found ... deliberate asymmetry" test (old Section 4) BOTH
-// asserted the PRE-E120 contract as correct. That contract was the defect:
-// C4 below (id reuse inherits stale review/QA evidence) is exactly what a
+// asserted the old, pre-refusal contract as correct. That contract was the defect:
+// id reuse inheriting stale review/QA evidence (finding C4 below) is exactly what a
 // permitted re-cut let happen — a never-reviewed re-cut satisfied
 // MISSING_REVIEW_EVIDENCE and the QA completion-evidence gate by inheriting
 // the voided incarnation's leftover `review_reports/`/`qa_reports/` files,
-// keyed only by task id with no void-generation field. E120 closes it by
-// REFUSING the re-cut outright in both storage modes (a `voidedPattern` scan
+// keyed only by task id with no void-generation field. The fix is to
+// REFUSE the re-cut outright in both storage modes (a `voidedPattern` scan
 // in `addTaskInFile`; a `voided_tasks` tombstone table in SQLite, since
 // `voidTaskStmt` DELETEs the tasks row and would otherwise erase the
 // evidence needed to refuse). Both tests below are rewritten in place to
@@ -201,7 +203,7 @@ test("E120: a re-cut of a voided id is REFUSED via addTask — reverses the old 
   assert.equal(voided.success, true);
 
   const readded = JSON.parse(await addTask(ws, "T-A", "entirely different work", "P"));
-  // THE TRAP this test used to fall into (pre-E120): `success: true` here
+  // THE TRAP this test used to fall into (before re-cuts were refused, E120): `success: true` here
   // was the recorded defect, not a passing contract — a re-cut silently
   // inherited the voided incarnation's review/QA evidence. Assert the
   // refusal positively, not just "not success".
@@ -225,7 +227,7 @@ test("E120: a re-cut of a voided id is REFUSED via addTask — reverses the old 
 });
 
 // ===========================================================================
-// Section 1 — E112 acceptance point: a voided row is never offered again
+// Section 1 — a voided row is never offered again (E112 acceptance point)
 // ===========================================================================
 
 test("E112 (file mode): getNextTask skips a voided row and progress.total drops", async () => {
@@ -401,13 +403,14 @@ sqliteTest("E120/Q1 (SQLite mode): re-void now reports alreadyVoided:true; never
     const first = JSON.parse(await storage.voidTask(dir, "T-A", "mis-cut"));
     assert.equal(first.success, true);
 
-    // THE TRAP this test used to fall into (pre-E120): "uniform not-found,
-    // neither carries alreadyVoided" was the recorded C3 gap this test used
-    // to pin as correct — SQLite's DELETE discarded the voided state, so it
-    // could not tell already-voided from never-existed apart. The
-    // voided_tasks tombstone (tools/storage-sqlite.ts) now survives the
-    // DELETE precisely so addTask/voidTask CAN refuse against it, giving
-    // SQLite the same Q1 distinction file mode already had.
+    // THE TRAP this test used to fall into (before re-cuts were refused, E120):
+    // "uniform not-found, neither carries alreadyVoided" was a recorded gap
+    // (finding C3) this test used to pin as correct — SQLite's DELETE
+    // discarded the voided state, so it could not tell already-voided from
+    // never-existed apart. The voided_tasks tombstone
+    // (tools/storage-sqlite.ts) now survives the DELETE precisely so
+    // addTask/voidTask CAN refuse against it, giving SQLite the same
+    // already-voided vs never-existed distinction file mode already had (Q1).
     const reVoid = JSON.parse(await storage.voidTask(dir, "T-A", "again"));
     assert.match(reVoid.error, /already voided/);
     assert.equal(

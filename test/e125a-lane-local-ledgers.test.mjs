@@ -178,7 +178,7 @@ test("AC4b: an ignored feat-lane path (real git init + .gitignore, feat/e999-x) 
   assert.ok(!fs.existsSync(receiptPath(ws)), "no receipt may be created");
   assert.equal(readRoot(ws), V1 + B, "root must be byte-identical — no marker either");
 
-  // None of AC6b's TASKS_LEDGER_ABSENT cases may fire in this workspace.
+  // None of the ledger-absent refusals (TASKS_LEDGER_ABSENT, AC6b) may fire in this workspace.
   assert.doesNotThrow(() => getNextTaskFromFile(ws));
 });
 
@@ -756,15 +756,14 @@ test("AC14-3: emitFeatureMetrics' ticket count is unaffected by the feat-first s
 });
 
 // ===========================================================================
-// e125b spec AC8 (X7, ownership extended by integrator pre-review
-// 2026-09-25) — a _primary section for a lane whose ledger has CLOSED into
+// A _primary section for a lane whose ledger has CLOSED into
 // .current/history/<bucket>/<lane>/tasks.md (not merely moved to another
 // LIVE lane dir, AC14-1's shape) is foreign for exactly the same reason: the
 // SAME makeForeignCheck existence check in tools/tasks-file.ts, now ORed with
-// hasHistoryLedger (T-E125B-01). Placed alongside the AC14 tests above (the
-// nearest e125a D12 fixture test, per this ticket's Test-file placement) —
-// these two tests are the history-bucket-shaped twins of AC14-1 and
-// AC14-1(d) respectively.
+// hasHistoryLedger (e125b spec AC8, T-E125B-01; ownership extended by the
+// integrator pre-review 2026-09-25). Placed alongside the AC14 tests above (the
+// nearest fixture test for the merge-interleave rule) — these two tests are
+// the history-bucket-shaped twins of AC14-1 and AC14-1(d) respectively.
 // ===========================================================================
 
 function historyLaneTasksPath(ws, bucket, lane) {
@@ -779,7 +778,7 @@ test("AC8 (e125b, X7): a _primary section for a CLOSED (history-bucket) lane is 
     V2 + "# Tasks\n\n## Active\n- [ ] T-A own row\n\n## e999-x\n- [ ] T-E999-01 stale foreign row\n",
   );
   // e999's OWN ledger is not live any more — it closed into the history
-  // bucket (e125b AC1), exactly what `agc feature finish --shipped` would
+  // bucket (e125b AC1: closed lanes move to history), exactly what `agc feature finish --shipped` would
   // have produced.
   fs.mkdirSync(path.dirname(historyLaneTasksPath(ws, "2026-09", "e999")), { recursive: true });
   fs.writeFileSync(historyLaneTasksPath(ws, "2026-09", "e999"), V2 + "## e999-x\n- [ ] T-E999-01 real row\n");

@@ -307,19 +307,19 @@ test("AC5/AC5a/AC5b/AC5d: evidence cross-check independently counts PASS-only, i
   // Flat dir: the claimed id has real PASS evidence (no mismatch contribution
   // from this one).
   writeReview(qaDir, "T-E908-01");
-  // AC5b — a FAIL-only file must never count as evidence.
+  // A FAIL-only file must never count as evidence (AC5b).
   writeReview(qaDir, "T-E908-03-failonly", { status: "FAIL" });
-  // AC5b — a FAIL round followed by a later PASS round DOES count.
+  // A FAIL round followed by a later PASS round DOES count (AC5b).
   writeReview(qaDir, "T-E908-04-failthenpass", { status: "FAIL" });
   writeReview(qaDir, "T-E908-04-failthenpass", { status: "PASS", append: true });
-  // AC5d — a PASS file exists on disk, but the id is voided in the lane's own
-  // ledger: it must be EXCLUDED from evidenceIds, and surfaced in excludedVoided.
+  // A PASS file exists on disk, but the id is voided in the lane's own
+  // ledger: it must be EXCLUDED from evidenceIds, and surfaced in excludedVoided (AC5d).
   writeReview(qaDir, "T-E908-05-voided");
   writeVoidedRow(wt, "e908", "T-E908-05-voided");
 
-  // AC5a — a release-style archive holding a whole wave's evidence: several
+  // A release-style archive holding a whole wave's evidence: several
   // OUT-OF-SCOPE ids (no "e908" token) plus ONE in-scope id. None of the
-  // out-of-scope ids may be counted or flagged.
+  // out-of-scope ids may be counted or flagged (AC5a).
   const archiveDir = path.join(qaDir, "archive", "e908-archivetest");
   writeReview(archiveDir, "T-E908-02-archived"); // in scope (carries "e908")
   writeReview(archiveDir, "T-E125A-01");

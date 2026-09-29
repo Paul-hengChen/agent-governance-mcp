@@ -618,11 +618,12 @@ test("C2: S02 — verbatim hint string in dist/index.js", () => {
 test("C3: S03 — inline cut draft table header present verbatim in skill-pm.md", () => {
   // WHY: S03 is the exact table header PM must present inline. If it drifts,
   // the human reviewer sees a different column layout than the spec mandates.
-  // e110-pm-parallel-lane-template (qa-owned re-baseline, coordinator AC8
-  // amendment 2026-09-23): the old 5-column header (`id | desc | depends_on |
-  // est. files | design-link`) is gone from skill-pm.md — AC4 replaces it with
-  // a 6-column header that adds `touches` before `design-link`, so both cannot
-  // hold. Updated to the new literal, byte-for-byte, per spec AC4.
+  // Re-baselined for the parallel-lane PM template (e110, qa-owned; coordinator
+  // amendment 2026-09-23, AC8): the old 5-column header (`id | desc |
+  // depends_on | est. files | design-link`) is gone from skill-pm.md — the new
+  // template replaces it with a 6-column header that adds `touches` before
+  // `design-link`, so both cannot hold. Updated to the new literal,
+  // byte-for-byte (spec AC4).
   const SKILL_PM = fs.readFileSync(
     path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "content", "skill-pm.md"),
     "utf-8",
@@ -637,9 +638,9 @@ test("C4: S04 — cut-approval gate stop-condition present in skill-coordinator.
   // WHY: S04 is the coordinator stop-condition that prevents auto-routing from
   // hopping through the cut-approval gate. Without it, the auto-routing loop
   // would route to build before human approval.
-  // d6-host-capability-compose-axis (T-D6-04): content/skill-coordinator.md is
-  // retired — reconstruct the full monolith via the real composer (taskTool:true
-  // reproduces it byte-for-byte, AC5) instead of raw-reading the deleted file.
+  // content/skill-coordinator.md is retired — reconstruct the full monolith via
+  // the real composer (taskTool:true reproduces it byte-for-byte, AC5) instead
+  // of raw-reading the deleted file (d6-host-capability-compose-axis, T-D6-04).
   const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
   const { composeSkill, hostCapabilitiesFor } = await import(path.join(root, "dist", "prompts", "skill-manifest.js"));
   const COORD = composeSkill(

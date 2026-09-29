@@ -285,8 +285,8 @@ test("AC17: a second, independent mailbox-watch process on the SAME file refuses
   // can itself take well over a second, and a first watch that expired (and
   // released its lock) in the meantime would make the second process start
   // a REAL, unbounded watch of its own instead of ever being refused — which
-  // is exactly the hang the integrator caught (E182-class: real timers
-  // racing real process-spawn latency under load). The 20s test timeout is
+  // is exactly the hang the integrator caught (real timers racing real
+  // process-spawn latency under load; E182). The 20s test timeout is
   // this test's own hard backstop regardless.
   let firstChild = null;
   t.after(() => {

@@ -1,11 +1,12 @@
 // Coded by @qa-engineer
-// T-E126-05 — tests for tools/merge-invariants.ts (specs/e126-merge-invariants.md,
+// Tests for tools/merge-invariants.ts, the post-merge check that no ledger row,
+// done-mark or sidecar record was lost (T-E126-05; specs/e126-merge-invariants.md,
 // AMENDED at commit e405de8, human-approved). The amendment revised condition
 // (c) of the Compaction exemption to reconcile over the UNION of distinct
-// closed task_ids across BOTH parents (not per-parent, code-review round 1's
-// R-1 finding), required ledger-line trimming to match tools/tasks-file.ts
-// (R-2), and required the informational COMPACTED breakdown to dedup by
-// task_id rather than raw parent x file occurrences (Q-1).
+// closed task_ids across BOTH parents (not per-parent; code-review finding R-1),
+// required ledger-line trimming to match tools/tasks-file.ts (R-2), and required
+// the informational COMPACTED breakdown to dedup by task_id rather than raw
+// parent x file occurrences (Q-1).
 //
 // The implementation under test (eed6689) PREDATES this amendment. Per the
 // qa dispatch brief, the following cases are EXPECTED TO FAIL against the
@@ -18,8 +19,8 @@
 //     row must not be silently invisible to merge-invariants"
 //   - "Q-1: the informational COMPACTED breakdown must dedup by task_id,
 //     matching the header count, not double-count a row held in both parents"
-// Every other case below is already implemented (code-reviewer T-E126-01..04,
-// review_reports/review_T-E126-01.md) and is expected to PASS today.
+// Every other case below is already implemented and reviewed
+// (review_reports/review_T-E126-01.md) and is expected to PASS today.
 //
 // Every fixture is a REAL, throwaway git repo built under os.tmpdir() (never
 // inside this repo) via `git commit-tree` against explicitly constructed
@@ -41,7 +42,7 @@
 //   AC7  -> "AC7: unrelated histories exit NO_MERGE_BASE"
 //   AC8  -> "AC8: clean merge exits 0"
 //   AC9  -> "AC9: bad ref / non-repo / usage errors exit USAGE_ERROR"
-//   AC11 -> four counter-example tests + one clean-compaction test (see below)
+//   AC11 (compaction exemption) -> four counter-example tests + one clean-compaction test (see below)
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -362,7 +363,7 @@ test("AC9: bad ref / non-repo / usage errors exit USAGE_ERROR", () => {
   const emptyRef = runMergeInvariants("", root);
   assert.equal(emptyRef.code, "USAGE_ERROR");
 
-  // CLI argv edge cases (runMergeInvariantsCli, T-E126-03 surface).
+    // CLI argv edge cases (runMergeInvariantsCli).
   const missingRefValue = runMergeInvariantsCli(["--ref"], root);
   assert.equal(missingRefValue.code, "USAGE_ERROR");
 
@@ -546,8 +547,9 @@ test("R-2: an indented checkbox row that is tasks-file.ts-visible must not be si
     },
     p2Files: { "tasks.md": "## Active\n" },
     mergeFiles: {
-      // Both rows dropped from the merge; T-CTRL-01 is the ordinary AC1 case
-      // (must be reported), T-IND-01 is the R-2 case under test.
+            // Both rows dropped from the merge; T-CTRL-01 is an ordinary dropped row
+            // (must be reported), T-IND-01 is an indented checkbox row that must also be
+            // seen (R-2).
       "tasks.md": "## Active\n",
     },
   });

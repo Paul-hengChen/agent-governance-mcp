@@ -2,8 +2,8 @@
 // Tests for specs/e125b-lane-close-writeback.md AC1/AC2/AC3/AC9/AC10/AC11/
 // AC12 — the `agc feature finish --shipped` lane-close writeback in
 // bin/agc-init.mjs (planLaneClose/executeLaneClose/executeHarvestRefresh/
-// closedLanePointerLine/applyClosedLanePointer), plus the AC11 base-sha write
-// at `agc feature start`.
+// closedLanePointerLine/applyClosedLanePointer), plus the base-sha write at
+// `agc feature start` (AC11).
 //
 // Every scratch repo is a real git repository built under os.tmpdir(), per
 // the test/agc-feature-lifecycle.test.mjs precedent this file reuses
@@ -15,14 +15,15 @@
 //         committed on --base)                          -> AC1
 //   AC2  (exactly one Closed Lanes pointer line, HTML comment, never a
 //         checkbox row)                                  -> AC2
-//   AC3  (a pre-existing e125a tasks_moved feat marker for the lane is
-//         replaced by the one Closed Lanes pointer)       -> AC3
+//   AC3  (a pre-existing "tasks moved" marker left for the lane by the earlier
+//         lane-local-ledger step (e125a) is replaced by the one Closed Lanes pointer)       -> AC3
 //   AC9  (gitignored-shape harvest: fs-copy before worktree removal, never
 //         committed, advisory line; re-run re-harvest (R1); partial-failure
 //         rollback (R2); zero-write lane no-op)            -> AC9-HARVEST,
 //                                                              AC9-R1, AC9-R2,
 //                                                              AC9-ZEROWRITE
-//   AC10 (root tasks.md as the LIVE ledger (AC4b shape): the Closed Lanes
+//   AC10 (root tasks.md as the LIVE ledger (the shape where the repo-root task
+//         file is itself the ledger): the Closed Lanes
 //         pointer line parses as zero tasks)               -> AC10
 //   AC11 (base_sha = the fork point agc feature start resolved, NOT the
 //         branch tip nor merge-base at finish time when base advanced;
@@ -229,7 +230,8 @@ test("AC2: a re-run of finish --shipped after the lane already closed never appe
 });
 
 // ============================================================================
-// AC3 — a pre-existing e125a tasks_moved feat marker for the lane is removed;
+// AC3 — a pre-existing "tasks moved" marker (left by the earlier lane-local-ledger
+// step, e125a) for the lane is removed;
 // the Closed Lanes pointer is the ONE authoritative row left.
 // ============================================================================
 
@@ -275,8 +277,8 @@ test("AC3: a feat marker belonging to a DIFFERENT lane is left untouched when th
 
 // ============================================================================
 // AC9 — gitignored .current/: fs-copy harvest before worktree removal, never
-// committed; the R1 re-harvest note and R2 partial-failure rollback note are
-// part of the contract (dispatch brief).
+// committed; the re-harvest note (R1) and the partial-failure rollback note (R2)
+// are part of the contract (dispatch brief).
 // ============================================================================
 
 test("AC9-HARVEST: an UNTRACKED (gitignored) .current/<ticket>/ is fs-copy harvested into .current/history/<bucket>/<ticket>/ before the worktree is removed, and the copy is never committed", () => {
@@ -316,10 +318,10 @@ test("AC9-ZEROWRITE: a lane whose .current/<ticket>/ directory does not exist at
   const repo = makePrimaryRepo({ gitignore: ".current/\n" });
   const lane = path.join(mkTmp("e125b-ac9-zw-lane-"), "lane");
   assert.equal(runAgc(repo, ["start", "e125b9z-zero-write", "--path", lane]).status, 0);
-  // AC11 (T-E125B-07) means `agc feature start` itself already wrote
-  // .current/e125b9z/base-sha — remove the WHOLE directory so this fixture
-  // hits the genuine "does not exist either" branch AC9's final sentence
-  // describes, not the "only base-sha" harvest-of-one-file branch.
+  // `agc feature start` itself already wrote .current/e125b9z/base-sha (AC11,
+  // T-E125B-07) — remove the WHOLE directory so this fixture hits the genuine
+  // "does not exist either" branch described at the end of AC9, not the
+  // "only base-sha" harvest-of-one-file branch.
   fs.rmSync(path.join(lane, ".current", "e125b9z"), { recursive: true, force: true });
 
   const r = runAgc(repo, ["finish", "e125b9z", "--shipped"]);
@@ -427,14 +429,14 @@ test("AC9-R2 (partial-failure rollback): a harvest that fails part-way leaves NO
 });
 
 // ============================================================================
-// AC10 — root tasks.md as the LIVE ledger (AC4b shape, .gitignore covers
-// .current/): the Closed Lanes pointer contributes exactly zero tasks to
+// AC10 — root tasks.md as the LIVE ledger (the shape where the repo-root task
+// file is itself the ledger; .gitignore covers .current/): the Closed Lanes pointer contributes exactly zero tasks to
 // every tw_* reader.
 // ============================================================================
 
 test("AC10: in a workspace whose .gitignore covers .current/ (root tasks.md is the live ledger), the Closed Lanes pointer line parses as zero tasks", async () => {
   const repo = makePrimaryRepo({ gitignore: ".current/\n" });
-  // A real task row already on root tasks.md — the AC4b shape where root IS
+  // A real task row already on root tasks.md — the shape where root IS
   // the ledger tw_* itself reads/writes, never an index.
   fs.writeFileSync(path.join(repo, "tasks.md"), "<!-- schema_version: 1 -->\n# Tasks\n\n## Active\n- [ ] T01 an ordinary live task\n");
   git(repo, ["add", "tasks.md"]);
@@ -491,7 +493,8 @@ test("AC11-UNKNOWN: a lane with no base-sha file (simulating a lane started befo
   const repo = makePrimaryRepo();
   const lane = path.join(mkTmp("e125b-ac11-unk-lane-"), "lane");
   assert.equal(runAgc(repo, ["start", "e125b11b-no-base-sha", "--path", lane]).status, 0);
-  // Simulate a pre-E125b lane: delete the base-sha file this start just wrote.
+  // Simulate a lane created before base-sha was recorded (E125b): delete the
+  // base-sha file this start just wrote.
   fs.rmSync(path.join(lane, ".current", "e125b11b", "base-sha"), { force: true });
 
   mergeLane(repo, "feat/e125b11b-no-base-sha");
@@ -572,7 +575,7 @@ test("AC12: --pr with --abandoned is rejected (the flag applies only to --shippe
 // ============================================================================
 // Security smoke — a branch name that would break the single-line HTML
 // comment shape is refused outright, nothing applied, nothing removed (AC2's
-// injection guard, code-review round 1 "Pointer-line injection" finding).
+// injection guard, from a code-review finding on pointer-line injection).
 // ============================================================================
 
 test("boundary: a branch name containing \"-->\" is refused before any mutation (would otherwise break the tasks.md comment line)", () => {

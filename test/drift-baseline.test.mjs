@@ -266,10 +266,10 @@ test("AC-6: non-string entries in driftBaselineIds are filtered out, not fatal",
 });
 
 // ---------------------------------------------------------------------------
-// E112 re-baseline: driftBaselineIds runs FIRST — before the new evidence-aware
+// driftBaselineIds runs FIRST — before the new evidence-aware
 // vibe-drift split (tools/evidence-lookup.ts) ever runs. A baselined id must
 // never spend a trip through the evidence lookup, whether or not qualifying
-// evidence happens to exist on disk for it.
+// evidence happens to exist on disk for it (E112 re-baseline).
 // ---------------------------------------------------------------------------
 
 test("E112: driftBaselineIds excludes an id BEFORE the evidence lookup runs, whether or not a qualifying QA file also exists", async () => {

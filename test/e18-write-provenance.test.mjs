@@ -1,15 +1,17 @@
 // Coded by @qa-engineer
-// Tests for backlog E18 — write-provenance hardening (T-E18-01, T-E18-02).
+// Tests for two write-provenance hardening gates — a stamp-provenance gate
+// and a QA-evidence gate (backlog E18; T-E18-01, T-E18-02).
 // Spec = docs/backlog.md "## E18 — Write-provenance hardening" section. Both
 // gates close a hole exploited during the PREVIOUS chain (E5): incident (a) a
-// hand-authored closing write (third E9A-class, fabricated zero-entropy
-// stamps 2026-07-14T00:00:00.000Z, commits 5950c58/199b164); incident (b) an
-// identity-swap gate evasion (a code-reviewer subagent's SECOND write,
-// stamped agent_id="qa-engineer", pre-filling completed_tasks T-E5-01/02/03
-// before any qa-engineer ran, with zero evidence on disk).
+// hand-authored closing write (the third hand-authored-stamp incident,
+// fabricated zero-entropy stamps 2026-07-14T00:00:00.000Z, commits
+// 5950c58/199b164); incident (b) an identity-swap gate evasion (a code-reviewer
+// subagent's SECOND write, stamped agent_id="qa-engineer", pre-filling
+// completed_tasks T-E5-01/02/03 before any qa-engineer ran, with zero evidence
+// on disk).
 //
-// Mirrors the gate-test conventions in test/feature-lease.test.mjs (E10
-// lease-override / bookkeeping-write sections) and
+// Mirrors the gate-test conventions in test/feature-lease.test.mjs (its
+// lease-override / bookkeeping-write sections, E10) and
 // test/reviewer-completed-tasks-gate.test.mjs (FM4/FM5 APPROVED-row positive
 // control pattern) — same helpers, same storage-mode split, same
 // "seed via raw writeHandoffState, gate via handleUpdateState" shape.
@@ -32,16 +34,17 @@
 //     qa_reports) is now REJECTED — the exemption is removed         -> QAEV-4a
 //   QA-evidence gate: the AMENDED APPROVED-row shape (review_task_ids
 //     manifest, completed_tasks EMPTY) is ACCEPTED, ledger stays []  -> QAEV-4b
-//   Incident replay: the exact E5 identity-swap shape is now
-//     rejected                                                  -> QAEV-INCIDENT
+//   Incident replay: the exact identity-swap shape from the earlier chain (E5)
+//     is now rejected                                           -> QAEV-INCIDENT
 //   QA-evidence gate is file-mode only (SQLite inert)            -> QAEV-SQL
 //   Content pins: const-08 origin tags + skill-release-engineer
 //     COORDINATOR-RELAYED hard line                              -> CONTENT-1..3
 //
-// E32 amendment (2026-07-16, e32-e33-gate-hardening): the fourth
-// E9A/E18-class incident showed the APPROVED-row `completed_tasks`
-// exemption above was itself the hole — an unsanctioned pre-fill riding the
-// (code-reviewer,In_Progress)->(qa-engineer,In_Progress) edge was
+// Amendment (2026-07-16, e32-e33-gate-hardening; E32): a fourth incident of
+// the same hand-authored / identity-swap class showed the APPROVED-row
+// `completed_tasks` exemption above was itself the hole — an unsanctioned
+// pre-fill riding the (code-reviewer,In_Progress)->(qa-engineer,In_Progress)
+// edge was byte-identical to the sanctioned write. QAEV-4a/b replace the old
 // byte-identical to the sanctioned write. QAEV-4a/b replace the old
 // single QAEV-4 exemption test with the amended contract (specs/
 // c16-c10-role-boundary.md Amendment section; review_reports/
@@ -100,8 +103,9 @@ async function seedFileState(ws, feature, agent, status) {
     pendingNotes: ["seed"],
     lastAgent: agent,
   });
-  // E148 (docs/backlog.md row E148): force the seed's last_updated off the
-  // wall clock — see test/e148-seed-stamp.mjs. Harmless where a caller
+  // Force the seed's last_updated off the wall clock, so a live timestamp can
+  // never randomly look hand-authored (~1/60000 flake; E148) — see
+  // test/e148-seed-stamp.mjs. Harmless where a caller
   // (STAMP-1/2/3) immediately overwrites it again via setLastUpdated(...,
   // SUSPECT_STAMP) — those tests seed a suspect shape ON PURPOSE.
   forceSeedStamp(ws);
@@ -126,8 +130,8 @@ function writeCodeReviewEvidence(ws, taskId) {
 }
 
 // A hand-authored-shaped stamp: seconds "00", milliseconds ".000" — matches
-// gates/stamp-provenance.ts's HAND_AUTHORED_STAMP_RE. Distinct from the E10
-// AC4 fixture's date ("2026-05-01") so this file's fixtures are independent.
+// gates/stamp-provenance.ts's HAND_AUTHORED_STAMP_RE. Distinct from the date
+// ("2026-05-01") the feature-lease test fixture uses (E10, AC4), so this file's fixtures are independent.
 const SUSPECT_STAMP = "2026-07-14T00:00:00.000Z";
 
 // ---------------------------------------------------------------------------
@@ -137,11 +141,11 @@ const SUSPECT_STAMP = "2026-07-14T00:00:00.000Z";
 
 test("sanity: SUSPECT_STAMP matches isHandAuthoredStamp; a real ms-entropy stamp does not", () => {
   assert.equal(isHandAuthoredStamp(SUSPECT_STAMP), true);
-  // E148 (docs/backlog.md row E148): asserting against a LIVE new Date()
-  // read here would itself carry the same ~1/60000 flake this whole ticket
-  // is about (this exact call used to be that flake, just as a bare
+  // Asserting against a LIVE new Date() read here would itself carry a
+  // ~1/60000 flake (a live stamp can randomly land on the hand-authored shape;
+  // this exact call used to be that flake, just as a bare
   // assertion rather than a JSON.parse crash) — SAFE_SEED_STAMP is a fixed
-  // ms-entropy-shaped stamp instead, deterministically not-suspect.
+  // ms-entropy-shaped stamp instead, deterministically not-suspect (E148).
   assert.equal(isHandAuthoredStamp(SAFE_SEED_STAMP), false, "an ms-entropy stamp must not land on seconds=00/ms=.000");
   assert.equal(hasStampRemediationAudit({ pending_notes: ["stamp-remediation: x"] }), true);
   assert.equal(hasStampRemediationAudit({ pending_notes: ["not a remediation note"] }), false);
@@ -293,8 +297,8 @@ sqliteDescribe("STAMP-SQL: SQLite mode — a suspect on-disk stamp has NO effect
         pendingNotes: ["seed"],
         lastAgent: "release-engineer",
       });
-      // Direct row poke to a hand-authored-shaped stamp (E13-AC4b convention
-      // — storage.db is a plain runtime property; TS `private` is
+      // Direct row poke to a hand-authored-shaped stamp (same convention as the
+      // E13 AC4b test — storage.db is a plain runtime property; TS `private` is
       // compile-time only).
       storage.db
         .prepare("UPDATE handoff_state SET last_updated = ? WHERE workspace_path = ?")
@@ -381,8 +385,8 @@ test("QAEV-3: a cumulative list-back (only ids ALREADY on disk, no new ones) is 
     pendingNotes: ["seed — already completed"],
     lastAgent: "qa-engineer",
   });
-  // E148: force the seed's last_updated off the wall clock (docs/backlog.md
-  // row E148) — see test/e148-seed-stamp.mjs.
+  // Force the seed's last_updated off the wall clock so a live timestamp can
+  // never randomly look hand-authored (E148) — see test/e148-seed-stamp.mjs.
   forceSeedStamp(ws);
   resetSession(ws);
   markStateRead(ws);
@@ -459,7 +463,7 @@ test("QAEV-4b (E32 amendment): the AMENDED APPROVED-row shape — review_task_id
 });
 
 // ---------------------------------------------------------------------------
-// Incident replay: reproduce the E5 identity-swap write shape EXACTLY — a
+// Incident replay: reproduce the identity-swap write shape from the earlier chain (E5) EXACTLY — a
 // legitimate APPROVED handoff (empty completed_tasks manifest) followed by a
 // SECOND self-looped write, still stamped agent_id="qa-engineer", pre-filling
 // completed_tasks with the real task ids and zero qa_reports evidence. Per

@@ -32,10 +32,9 @@ function writeRawHandoff(ws, body) {
   fs.writeFileSync(path.join(ws, ".current", "handoff.md"), body);
 }
 
-// e123b9 J2 (spec AC1): tools/drift.ts's skew precheck (readOnDiskVersion,
-// tools/drift.ts:248) reads the raw file at resolveCurrentLanePaths(...)
-// .handoffPath — the LANE path — with no AC13-style lane-then-flat fallback
-// of its own. Writes an ALREADY-MIGRATED fixture directly at that path, for
+// tools/drift.ts's skew precheck (readOnDiskVersion, tools/drift.ts:248) reads
+// the raw file at resolveCurrentLanePaths(...).handoffPath — the LANE path —
+// with no lane-then-flat fallback of its own (e123b9 J2, spec AC1/AC13). Writes an ALREADY-MIGRATED fixture directly at that path, for
 // tests that need the skew precheck to actually see the file (see
 // NEW-TICKETS.md J2-NEW-9 for the unmigrated-workspace gap this exposes).
 function writeRawHandoffAtLanePath(ws, body) {
@@ -63,15 +62,15 @@ test("T32: no version-skew drift when handoff/tasks/config are at CURRENT", asyn
 
 test("T32 AC-6: future handoff schema_version surfaces as a drift reason (not a thrown error)", async () => {
   const ws = mkWorkspace();
-  // e123b9 J2 (spec AC1/AC14): write directly at the LANE path — an
-  // already-migrated workspace whose handoff was written by a newer server.
+  // Write directly at the LANE path — an already-migrated workspace whose
+  // handoff was written by a newer server (e123b9 J2, spec AC1/AC14).
   // (a) do NOT call seedHandoffAndTasks first: it also writes a real handoff
   // via writeHandoffState, and a second, different fixture at the SAME lane
   // path would just overwrite it, not create dual presence — but layering
   // two intents in one fixture is needless; write tasks.md directly instead.
   // (b) do NOT write this fixture at the flat path either: tools/drift.ts's
   // skew precheck (readOnDiskVersion) reads ONLY the lane path with no
-  // AC13-style fallback, so a flat-only fixture is invisible to it — see
+  // lane-then-flat fallback (spec AC13), so a flat-only fixture is invisible to it — see
   // NEW-TICKETS.md J2-NEW-9 for that gap, covered separately below.
   fs.writeFileSync(path.join(ws, "tasks.md"), "<!-- schema_version: 1 -->\n# Tasks\n\n## Active\n");
   writeRawHandoffAtLanePath(
@@ -174,8 +173,8 @@ test("T32: empty workspace yields no version-skew rows", () => {
 
 test("T32: skew detection short-circuits parser-based drift reasons", async () => {
   const ws = mkWorkspace();
-  // e123b9 J2 (spec AC1): at the LANE path (see the AC-6 test above for
-  // why — tools/drift.ts's skew precheck has no flat fallback). Seed a
+  // Seed at the LANE path (see the AC-6 test above for why — tools/drift.ts's
+  // skew precheck has no flat fallback; e123b9 J2, spec AC1). Seed a
   // future handoff + a tasks.md with a completed task. Without the
   // early-return, parseHandoff would throw before completed-task drift
   // analysis. With early-return, we get only the skew reason — no
@@ -206,14 +205,15 @@ qa_round: 0
 });
 
 // ============================================================================
-// e123c AC8 (closes J2-NEW-9 / J2-NEW-3's drift.ts bullet): tools/drift.ts's
-// readArtifactVersion "handoff" branch now adds a read-only lane-then-flat
+// The skew precheck now falls back from the lane path to the flat path:
+// tools/drift.ts's readArtifactVersion "handoff" branch now adds a read-only lane-then-flat
 // fallback (mirroring readAndMigrate's own AC13 fallback exactly) before the
 // skew precheck's existsSync/readFileSync — so an UNMIGRATED flat
 // workspace's from-the-future handoff schema_version is caught here too,
 // not just an already-migrated one. This used to be a documented gap (the
 // "KNOWN GAP (J2-NEW-9)" test asserted the old throw); e123c closes it, so
-// this test now asserts the graceful reason instead.
+// this test now asserts the graceful reason instead (e123c AC8, closes
+// J2-NEW-9 / J2-NEW-3's drift.ts bullet).
 // ============================================================================
 
 test("AC8: an UNMIGRATED flat workspace with a from-the-future handoff schema_version IS caught by the skew precheck — a graceful 'Schema version skew' drift reason, not a thrown error", async () => {

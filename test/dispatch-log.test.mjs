@@ -1,5 +1,7 @@
 // Coded by @qa-engineer
-// Tests for specs/e123a-lane-layout-migration.md AC13/AC14/AC15 (T-E123A3-08,
+// Tests for the dispatch-log sidecar: append on write, isolation from the other
+// sidecars, and where its filename comes from
+// (specs/e123a-lane-layout-migration.md AC13/AC14/AC15; T-E123A3-08,
 // covering T-E123A3-04's tools/dispatch-log.ts + its
 // tools/handoff-orchestrator.ts wiring).
 //
@@ -30,10 +32,10 @@ function mkWorkspace(prefix = "dispatch-log-") {
   return ws;
 }
 
-// e123b9 J2 (spec AC1/AC9): sidecars are LANE_FILES entries — resolve
-// through the lane-aware resolver (these fixture workspaces carry no `.git`,
-// so this resolves to `.current/_primary/`), matching tools/telemetry.ts /
-// tools/metrics.ts.
+// Sidecars are LANE_FILES entries — resolve through the lane-aware resolver
+// (these fixture workspaces carry no `.git`, so this resolves to
+// `.current/_primary/`), matching tools/telemetry.ts / tools/metrics.ts
+// (e123b9 J2, spec AC1/AC9).
 function telemetryPath(ws) {
   return resolveCurrentLanePaths(ws).telemetryPath;
 }
@@ -239,7 +241,7 @@ test("THROW2: when the dispatch-log append fails (EISDIR), handleUpdateState's r
   // path/updated_at are inherently workspace- and time-specific (different
   // tmpdir, different wall-clock instant) — normalize those two volatile
   // fields out before comparing, so the assertion isolates exactly the
-  // invariant AC13 cares about: the dispatch-log append's success/failure
+  // invariant under test (AC13): the dispatch-log append's success/failure
   // must never leak into the tool's own response shape.
   const goodPayload = JSON.parse(goodResult.content[0].text);
   const badPayload = JSON.parse(badResult.content[0].text);

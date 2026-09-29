@@ -65,7 +65,7 @@ const PROJECT_ROOT = path.resolve(path.dirname(__filename), "..");
 const AGC_INIT = path.join(PROJECT_ROOT, "bin", "agc-init.mjs");
 const LANE_PATHS_DIST_URL = pathToFileURL(path.join(PROJECT_ROOT, "dist", "tools", "lane-paths.js")).href;
 
-// Dummy secret for AC10/AC-QA-1 — a QA-authored sentinel, never a real secret.
+// Dummy secret for the .env-copy test (AC10, AC-QA-1) — a QA-authored sentinel, never a real secret.
 const DUMMY_ENV_CONTENT = "DUMMY_KEY=placeholder-value-e73-qa-sentinel\n";
 const DUMMY_SENTINEL = "placeholder-value-e73-qa-sentinel";
 
@@ -156,12 +156,12 @@ function runAgcCheck(cwd) {
 }
 
 // ---------------------------------------------------------------------------
-// E179 helpers — finish-time pending-ticket allocation (specs/e179-*.md).
+// Helpers for finish-time pending-ticket allocation (E179, specs/e179-*.md).
 // ---------------------------------------------------------------------------
 
 // Seeds docs/backlog.md with a real ticket-table header + the given rows
 // (default: a single `E1` seed row) and commits it, so extractMaxBacklogId
-// has a known, non-zero starting point in every E179 fixture.
+// has a known, non-zero starting point in every allocation fixture below.
 function seedBacklog(repo, rows = ["| E1 | seed ticket | P2 | none | — | — |"]) {
   fs.mkdirSync(path.join(repo, "docs"), { recursive: true });
   const body =
@@ -175,7 +175,7 @@ function seedBacklog(repo, rows = ["| E1 | seed ticket | P2 | none | — | — |
   git(repo, ["commit", "-m", "seed backlog"]);
 }
 
-// One well-formed `pending-ticket` fenced block (E124's format).
+// One well-formed `pending-ticket` fenced block (the pending-ticket block format, E124).
 function pendingBlock(laneLocalId, title, priority = "P2", extra = "") {
   return `\`\`\`pending-ticket\nlane_local_id: ${laneLocalId}\ntitle: ${title}\npriority: ${priority}\n${extra}\`\`\`\n`;
 }
@@ -314,7 +314,7 @@ test("AC6: a registered-but-missing worktree path refuses (git worktree prune ca
   const laneParent = mkTmp("agc-feature-lane6c-");
   const lane = path.join(laneParent, "ghost");
   // Register a worktree under a DIFFERENT branch name so it never collides
-  // with the branch-exists check below, isolating the third AC6 clause.
+  // with the branch-exists check below, isolating the third refusal clause (AC6).
   git(repo, ["worktree", "add", "-b", "other-branch-6c", lane]);
   fs.rmSync(lane, { recursive: true, force: true }); // dir gone, still registered
   const r = runAgc(repo, ["start", "e6c-ghost", "--path", lane]);
@@ -532,7 +532,7 @@ test("AC21: --abandoned precondition refuses on an unrelated dirty file, then su
   fs.writeFileSync(path.join(lane, "qa_reports", "review_T-E21X-01.md"), "evidence\n");
   // Evidence is TRACKED so the second run (after the unrelated change is
   // discarded) can cleanly succeed via git mv + commit — isolating the
-  // precondition itself from AC24's separate untracked-leftover rough edge.
+  // precondition itself from the separate untracked-leftover rough edge (AC24).
   git(lane, ["add", "qa_reports/review_T-E21X-01.md"]);
   git(lane, ["commit", "-m", "add evidence"]);
   fs.writeFileSync(path.join(lane, "README.md"), "unrelated uncommitted change\n");
@@ -569,8 +569,8 @@ test("AC22/AC23/AC24: bounded-token evidence move, tracked commit, and the untra
   git(lane, ["commit", "-m", "add decoy evidence"]);
 
   const r = runAgc(repo, ["finish", "e22x", "--abandoned"]);
-  // AC24: the untracked move leaves a `??` entry behind, so the same run's
-  // `git worktree remove` refuses — surfaced verbatim, never --forced.
+  // The untracked move leaves a `??` entry behind, so the same run's
+  // `git worktree remove` refuses — surfaced verbatim, never --forced (AC24).
   assert.notEqual(r.status, 0, "worktree remove must refuse because of the lingering untracked move");
   assert.match(r.stderr, /modified or untracked/i);
   assert.match(r.stdout, /moved qa_reports\/review_T-E22X-01\.md -> qa_reports\/abandoned\/e22x\//);
@@ -589,7 +589,7 @@ test("AC22/AC23/AC24: bounded-token evidence move, tracked commit, and the untra
   const status = git(lane, ["status", "--porcelain", "--untracked-files=all"]);
   assert.match(status, /\?\? review_reports\/abandoned\/e22x\/review_T-E22X-02\.md/);
 
-  // AC23: tracked evidence was committed on the branch.
+  // Tracked evidence was committed on the branch (AC23).
   const stat = git(repo, ["show", "--stat", "--no-renames", "refs/heads/feat/e22x-evidence"]);
   assert.match(stat, /qa_reports\/abandoned\/e22x\/review_T-E22X-01\.md/);
   const log = git(repo, ["log", "-1", "--format=%s", "refs/heads/feat/e22x-evidence"]);
@@ -650,9 +650,9 @@ test("AC26: an all-tracked-evidence --abandoned run keeps the branch and drops t
 });
 
 // ===========================================================================
-// E179 — finish-time pending-ticket allocation (specs/e179-ticket-allocation-
+// Finish-time pending-ticket allocation wiring (E179; specs/e179-ticket-allocation-
 // wiring.md AC2-AC5, the G1-G4 preconditions, and the error-refusal gate).
-// AC1/AC6/AC7/AC9/AC10 are covered elsewhere (test/lane-paths.test.mjs,
+// The remaining ACs (AC1/AC6/AC7/AC9/AC10) are covered elsewhere (test/lane-paths.test.mjs,
 // test/lane-ticket-allocation.test.mjs, test/lane-migrate.test.mjs) — this
 // section is exclusively the `agc feature finish`/`agc check` WIRING.
 // ===========================================================================
@@ -685,12 +685,12 @@ test("AC2 proof (1): finish --shipped applies a lane's 2-entry pending-tickets.m
   // The commit landed on --base (main) — the lane branch no longer exists
   // after finish --shipped removes it.
   assert.ok(!branchExists(repo, "feat/e179a-two-entries"), "branch must be deleted after a shipped finish");
-  // e125b AC1/AC2 (spec-mandated re-baseline, qa_reports/expected-red_e125b-
-  // lane-close-writeback.txt): --shipped now lands a SECOND, adjacent commit
-  // after the pending-apply commit — the lane-close writeback (AC1's git mv +
-  // AC2's Closed Lanes pointer) — so `git log -1` is that close commit, not
-  // the pending-apply one any more. The pending-apply commit is still there,
-  // one hop back.
+  // --shipped now lands a SECOND, adjacent commit after the pending-apply
+  // commit — the lane-close writeback (a git mv of the lane dir plus a Closed
+  // Lanes pointer) — so the newest commit is that close commit, not the
+  // pending-apply one any more. The pending-apply commit is still there, one
+  // hop back (spec-mandated re-baseline, e125b AC1/AC2,
+  // qa_reports/expected-red_e125b-lane-close-writeback.txt).
   const log = git(repo, ["log", "-1", "--format=%s"]).trim();
   assert.match(
     log,
@@ -699,10 +699,10 @@ test("AC2 proof (1): finish --shipped applies a lane's 2-entry pending-tickets.m
   const priorLog = git(repo, ["log", "-1", "--skip=1", "--format=%s"]);
   assert.match(priorLog, /allocate E2, E3 from lane e179a \(shipped\)/, "the pending-apply commit must still exist, one hop before the close commit");
 
-  // e125b AC1: the old flat .current/e179a/ path is gone — the lane's
+  // The old flat .current/e179a/ path is gone — the lane's
   // pending-tickets.md (archived under "## Applied" by the SAME pending-apply
   // commit, before the close moved it) now lives under
-  // .current/history/<YYYY-MM>/e179a/ instead.
+  // .current/history/<YYYY-MM>/e179a/ instead (e125b AC1).
   assert.ok(!fs.existsSync(path.join(repo, ".current", "e179a")), "the old flat .current/e179a/ path must no longer exist after the close writeback");
   const historyRoot = path.join(repo, ".current", "history");
   const buckets = fs.readdirSync(historyRoot);
@@ -975,8 +975,8 @@ test("AC5 proof (1): agc check surfaces a branch with an unapplied pending-ticke
   assert.equal(runAgc(repo, ["start", "e179n-orphan", "--path", lane]).status, 0);
   writePendingTickets(lane, "e179n", pendingBlock("L-E179N-NEW-1", "Orphaned finding"));
   commitPendingTickets(lane, "e179n");
-  // Worktree gone WITHOUT finish — the "abandoned and forgotten" case AC5
-  // exists to surface.
+  // Worktree gone WITHOUT finish — the "abandoned and forgotten" case the
+  // orphan-lane advisory exists to surface (AC5).
   git(repo, ["worktree", "remove", "--force", lane]);
 
   const r = runAgcCheck(repo);
@@ -1059,13 +1059,13 @@ test("AC5 proof (4) (E179-NEW-2, human ruling 2026-09-25, option (a) — own-lan
 });
 
 // ---------------------------------------------------------------------------
-// e125b spec AC4 (S1 resolved — the orphan scan never reads
-// .current/history/, because --shipped also deletes the branch, so a closed
-// lane is never a candidate in the first place; candidates are drawn from
-// refs/heads/ only). Test-file placement note (Phase 3a): the ticket named
+// The orphan scan never reads .current/history/, because --shipped also
+// deletes the branch, so a closed lane is never a candidate in the first
+// place; candidates are drawn from refs/heads/ only (e125b spec AC4, S1
+// resolved). Test-file placement note: the ticket named
 // test/agc-orphan-lanes.test.mjs (extend), but no file with that name exists
-// in this repo — the real, pre-existing orphan-lane coverage (AC5 proof
-// (1)-(4) above) already lives in THIS file, so this AC4 extension is placed
+// in this repo — the real, pre-existing orphan-lane coverage (the AC5 cases
+// above) already lives in THIS file, so this extension is placed
 // alongside it rather than forking a same-purpose file under a different name.
 // ---------------------------------------------------------------------------
 

@@ -1,18 +1,19 @@
 // Coded by @qa-engineer
-// Tests for backlog E16 / T-EB-02 (option B, content-only): broadening the
+// Tests for the judge-dispatch charter broadening (backlog E16 / T-EB-02, option B,
+// content-only): broadening the
 // Amend-Resume Edge charter in content/const-08-chain-31-mid.md §3.1 so the
 // resume_of-gated pm->{code-reviewer,qa-engineer} edge is ALSO the sanctioned
 // door for a PM-sanctioned FRESH single-role judge dispatch on a test-only /
 // evidence-only ticket — not only a mid-chain resume of a previously
-// stranded role (the shape T-E15-01 actually used, disclosed honestly in
+// stranded role (the shape an earlier test-only ticket, T-E15-01, actually used, disclosed honestly in
 // qa_reports/review_T-E15-01.md as a narrower-than-literal fit). Plus the
 // pointer-only note added to content/coord-03-core-fallback.md's Amend-Resume
 // relay escalation row.
 //
-// Mirrors the T-E1-02/T-E1-03 skill-text pinning convention (see
+// Mirrors the skill-text pinning convention (T-E1-02/T-E1-03; see
 // test/feature-lease.test.mjs S1-S6): these are pure grep/string-containment
 // assertions against the shipped content files — no server code changed
-// (T-EB-03 review independently confirmed tools/transitions.ts, gates/,
+// (the later review, T-EB-03, independently confirmed tools/transitions.ts, gates/,
 // index.ts are byte-identical via `git status`; that is a one-time fact
 // about this diff, recorded in qa_reports/review_T-EB-04.md's AC Execution
 // Log rather than re-encoded as a unit test here — a `git status --porcelain`
@@ -73,7 +74,7 @@ test("E16-01: const-08 §3.1 Single-role judge dispatch charter is appended to t
 
 // ---------------------------------------------------------------------------
 // E16-02: the load-bearing "fresh dispatch, not only resume" phrase — this is
-// the actual scope expansion; T-E15-01 needed a FRESH single-role dispatch,
+// the actual scope expansion; an earlier test-only ticket (T-E15-01) needed a FRESH single-role dispatch,
 // not a resume of a role stranded earlier in the SAME chain.
 // ---------------------------------------------------------------------------
 test("E16-02: const-08 §3.1 charter names a FRESH judge dispatch as sanctioned, not only a mid-chain resume", () => {

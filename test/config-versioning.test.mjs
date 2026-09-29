@@ -99,7 +99,7 @@ test("T31 AC-4 (re-pinned E31): future schema_version degrades non-fatally — l
   assert.match(err, new RegExp(`config on-disk version 99 > server max ${CURRENT_VERSIONS.config}`));
 });
 
-// ---------- AC15 (e106): config v1→v2 heal-on-read is stamp-only ----------
+// ---------- config v1→v2 heal-on-read is stamp-only (AC15, e106) ----------
 
 test("AC15 (e106): config v1→v2 is stamp-only; artifacts stays absent", () => {
   const ws = mkWorkspace();
@@ -114,7 +114,7 @@ test("AC15 (e106): config v1→v2 is stamp-only; artifacts stays absent", () => 
   );
 });
 
-// ---------- AC16 (e106): artifacts field narrow-typed, non-fatal ----------
+// ---------- artifacts field narrow-typed, non-fatal (AC16, e106) ----------
 
 test("artifacts field narrow-typed, non-fatal on garbage input", () => {
   const wsLocal = mkWorkspace();
