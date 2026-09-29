@@ -19,3 +19,7 @@ Base check: the same test file run at base 6c61864: 20 pass, 0 fail. The two fil
 
 ## Fix requested (sr-engineer)
 Reword both lines so the literal home-directory prefix does not appear (describe it in words, or split the pattern, e.g. build it as two fragments), keeping the AC8 meaning. Doc-only edits; no tools/ or dist/ change. Then re-run the suite on a clean tree.
+## 2026-09-29T12:26:18.021Z — FAIL — by qa-engineer
+
+AC1 (33 files, 0 differ), AC3, AC4 spot-checks PASS. Suite on clean tree: 2958 tests, 1 fail. The failing test is the e234 hygiene AC16 isolated-HEAD scan; it flags two home-path literals in this lane's own spec and review report (prose quoting the AC8 grep pattern). Same test file is 20/20 green at base, so this is a lane regression. Fix is doc-only: reword those two lines so the literal home-directory prefix does not appear, then re-run. Evidence: qa_reports/review_T-E233A-01.md.
+
