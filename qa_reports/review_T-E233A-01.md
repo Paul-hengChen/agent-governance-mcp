@@ -103,3 +103,7 @@ exit=
 
 Round 2 PASS. Full suite via test-lock: 2958 tests / 2955 pass / 0 fail / 3 skip (round 1 had 1 fail, fixed). AC1-AC8 proofs executed and logged under ## AC Execution Log in qa_reports/review_T-E233A-01.md (covers T-E233A-01..09). No test/** changes; dist rebuild clean.
 
+
+## Post-PASS correction
+
+The AC Execution Log headings for the two check scripts carried an absolute temp-directory path, which the E234 hygiene scan (AC16) flagged at committed HEAD. Headings now name only the script. Re-run on the corrected commit: `npm test` via the test lock = 2958 tests, 2955 pass, 0 fail, 3 skipped, 0 cancelled; `test/e234-hygiene-scan.test.mjs` = 20 tests, 20 pass, 0 fail.
