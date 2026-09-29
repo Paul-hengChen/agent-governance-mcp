@@ -15,10 +15,10 @@ export declare class TasksMigrationBusyError extends Error {
 }
 /**
  * The `_primary` reverse-run receipt sha: sha256(normalizeIndexBody(body)).
- * Shared by the forward stamp, the reverse check and the E125c one-off
- * compaction, so the sanctioned post-forward root edits (`agc feature
+ * Shared by the forward stamp, the reverse check and the one-off index
+ * compaction, so the allowed root edits after a forward run (`agc feature
  * finish --shipped` removing a lane's markers and appending a Closed Lanes
- * pointer) never break the reverse (E195). Pure.
+ * pointer) never break the reverse. Pure. (E125c, E195)
  */
 export declare function primaryIndexReceiptSha(body: string): string;
 /**
@@ -30,8 +30,8 @@ export declare function isLanePathIgnored(workspacePath: string, lanePath: strin
 /**
  * The file tw_* reads and writes as the task ledger: the lane ledger, except
  * in a workspace whose absent lane path is git-ignored — there the legacy
- * file stays the ledger exactly as before E125a (or, with none yet, the
- * first taskPaths candidate, the pre-E125a add target).
+ * file stays the ledger (or, with none yet, the first taskPaths candidate).
+ * (E125a)
  */
 export declare function resolveTasksLedgerPath(workspacePath: string, laneTasksPath: string): string;
 /** The one-line option-A advisory (Copy `tasks.ignored-lane-advisory`), or null. */
@@ -60,21 +60,21 @@ export declare function ensureTasksMigratedLocked(workspacePath: string, laneTas
  */
 export declare function ensureTasksMigrated(workspacePath: string): boolean;
 /**
- * D-E `_primary` reverse. Refuses, touching nothing, unless the legacy file
- * is a v2+ index carrying TASKS_INDEX_NOTICE AND the receipt's bodySha256
- * equals primaryIndexReceiptSha(its trailing body) — or, for a receipt
- * stamped before E125c, sha256 of that raw body (AC5). A missing/unreadable
- * receipt refuses too. Normalization makes exactly two post-forward root
- * edits sanctioned (E195): removed `tasks_moved` markers and a `## Closed
- * Lanes` section; any other change refuses (X4b).
- * Then: legacy := v1 sentinel + the lane ledger's CURRENT body (D11), minus
- * the ledger marker lines no longer in the root (AC3), with the root's CL
- * section(s) carried to the end in place of the ledger's own (AC2), and
- * `.current/_primary/tasks.md` + the receipt are deleted. With no CL section
- * on either side the ledger body is kept verbatim (pre-E125c behaviour).
- * O-3: the restored root always carries a v1 sentinel, so a v0
- * (sentinel-less) original, e.g. the `agc init` scaffold, round-trips to its
- * body under a v1 sentinel, not byte-identically (AC7 pins a v1 fixture).
+ * `_primary` reverse. Refuses, touching nothing, unless the legacy file is a
+ * v2+ index carrying TASKS_INDEX_NOTICE AND the receipt's bodySha256 equals
+ * primaryIndexReceiptSha(its trailing body) — or, for a receipt stamped
+ * before index normalization existed, sha256 of that raw body. A missing or
+ * unreadable receipt refuses too. Normalization allows exactly two root
+ * edits after the forward run: removed `tasks_moved` markers and a `##
+ * Closed Lanes` section; any other change refuses. (E125c, E195)
+ * Then: legacy := v1 sentinel + the lane ledger's CURRENT body, minus the
+ * ledger marker lines no longer in the root, with the root's Closed Lanes
+ * section(s) carried to the end in place of the ledger's own, and
+ * `.current/_primary/tasks.md` + the receipt are deleted. With no Closed
+ * Lanes section on either side the ledger body is kept verbatim.
+ * The restored root always carries a v1 sentinel, so a v0 (sentinel-less)
+ * original, e.g. the `agc init` scaffold, round-trips to its body under a
+ * v1 sentinel, not byte-identically.
  */
 export declare function migratePrimaryReverse(workspacePath: string): void;
 /**

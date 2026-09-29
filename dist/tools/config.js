@@ -13,25 +13,26 @@
 //       "allowSchemaChange": false,
 //       "allowDesignArmed": false
 //     },
-//     "staleDispatchNotifyFile": ".current/stale-dispatch.notify", // opt-in E22 stale-dispatch watch-file emit; absent = disarmed
+//     "staleDispatchNotifyFile": ".current/stale-dispatch.notify", // opt-in stale-dispatch watch-file emit; absent = disarmed
 //     "artifacts": "local"                          // "local" | "repo": declared git posture for governance runtime artifacts; absent = undeclared
 //   }
 //
-// tokenBudgetPerFeature accounting (d2-server-brake-accounting): the ceiling
-// is now backed by the durable .current/usage.jsonl sidecar — appended per
-// dispatch by the opt-in PostToolUse hook (bin/agent-governance-usage-hook.mjs)
-// and summed feature-scoped via tools/usage-accounting.ts — rather than the
-// coordinator's in-memory model arithmetic. The coordinator falls back to the
-// B9 agent-*.jsonl hand-sum only when the sidecar is absent (hook not wired).
+// tokenBudgetPerFeature accounting: the ceiling is backed by the durable
+// .current/usage.jsonl sidecar — appended per dispatch by the opt-in
+// PostToolUse hook (bin/agent-governance-usage-hook.mjs) and summed per
+// feature by tools/usage-accounting.ts — rather than the coordinator's
+// in-memory arithmetic. The coordinator falls back to hand-summing the
+// agent-*.jsonl transcripts only when the sidecar is absent (hook not
+// wired). (D2)
 import * as fs from "fs";
 import * as path from "path";
 import { CURRENT_VERSIONS, runMigrations } from "../schema/versions.js";
 // Side-effect import: registers the config v0→v1 migration on module load.
 import "../schema/migrations-config.js";
 import { resolveCurrentLanePaths } from "./lane-paths.js";
-// Conservative defaults per the E5 backlog risk note ("start conservative").
-// Applied per-field when the arming key is present but a field is omitted
-// or invalid. The tier itself is opt-in: these defaults never arm it.
+// Conservative defaults, starting small on purpose. Applied per field when
+// the arming key is present but a field is omitted or invalid. The tier
+// itself is opt-in: these defaults never arm it. (E5)
 export const CUT_APPROVAL_AUTO_TIER_DEFAULTS = {
     maxFiles: 2,
     maxPriority: "P3",
@@ -55,10 +56,10 @@ const DEFAULT_TASK_PATHS = [
 //   - [ ] auth-refactor write migration
 export const DEFAULT_TASK_REGEX = /^- \[([ x])\] (\S+)\s+(.+)$/;
 const configCache = new Map();
-// Shared non-fatal load core (E31). Returns the typed config view plus the
-// loud load error, serving/refreshing the mtime cache. NEVER throws on
-// config-file fatality — every failure mode collapses to
-// { config: {}, error: <message naming the path + problem> }.
+// Shared non-fatal load core. Returns the typed config view plus the loud
+// load error, serving/refreshing the mtime cache. NEVER throws on a bad
+// config file — every failure becomes
+// { config: {}, error: <message naming the path + problem> }. (E31)
 function loadConfigEntry(workspacePath) {
     const configPath = path.join(workspacePath, ".current", ".config.json");
     // Re-stat on every call (C18): a cache hit is only served when the on-disk
@@ -122,12 +123,12 @@ function loadConfigEntry(workspacePath) {
         configCache.set(workspacePath, entry);
         return entry;
     }
-    // Schema-versioning lazy migrate-on-read (Phase 4). Bumps an absent or
-    // older schema_version up to CURRENT_VERSIONS.config. A FUTURE on-disk
-    // version throws inside runMigrations (refuse-loud, AC-4) — since E31 that
-    // refusal is captured as a loud config_error instead of propagating into
-    // the pre-flight read: guessing at a shape this server does not understand
-    // is still refused, but the refusal no longer blocks tw_get_state.
+    // Lazy migrate-on-read. Bumps an absent or older schema_version up to
+    // CURRENT_VERSIONS.config. A FUTURE on-disk version throws inside
+    // runMigrations (refuse loudly) — that refusal is caught as a loud
+    // config_error instead of propagating into the pre-flight read: a shape
+    // this server does not understand is still refused, but the refusal does
+    // not block tw_get_state. (E31)
     let migration;
     try {
         migration = runMigrations("config", parsed);
@@ -241,22 +242,22 @@ function loadConfigEntry(workspacePath) {
     return entry;
 }
 /**
- * Typed workspace config view. Absent file OR any config-file fatality
+ * Typed workspace config view. Absent file OR any unusable config file
  * (unreadable, unparseable, non-object root, future schema_version) returns
- * the empty config — defaults in effect. NEVER throws (E31): the failure is
- * surfaced via getConfigError(), not a pre-flight-blocking exception.
+ * the empty config — defaults in effect. NEVER throws: the failure is
+ * reported via getConfigError(), not a pre-flight-blocking exception. (E31)
  */
 export function loadConfig(workspacePath) {
     return loadConfigEntry(workspacePath).config;
 }
 /**
  * Loud config-load error for the workspace, or null when the config loaded
- * clean or is simply absent (E31). Non-null means loadConfig() is currently
+ * clean or is simply absent. Non-null means loadConfig() is currently
  * serving defaults IN PLACE OF a config file that exists but cannot be used —
- * the message names the config path and the parse/read problem. Surfaced as
- * `config_error` on every tw_get_state envelope so the degradation is never
+ * the message names the config path and the parse/read problem. Returned as
+ * `config_error` on every tw_get_state envelope so the fallback is never
  * silent. Same mtime-cached core as loadConfig — no extra I/O on the happy
- * path.
+ * path. (E31)
  */
 export function getConfigError(workspacePath) {
     return loadConfigEntry(workspacePath).error;
@@ -275,25 +276,23 @@ export function resolveTaskPaths(workspacePath) {
     return rels.map((p) => path.join(workspacePath, p));
 }
 /**
- * e125a (architecture Interface Contracts): the current lane's ledger
- * `.current/<lane>/tasks.md` when it exists, else the legacy file
- * (findLegacyTasksFile). Side-effect-free — no write, no migration, ever:
- * guards/session.ts's markStateRead snapshots this path at tw_get_state
- * time. It is NOT the ledger reader: tools/tasks-file.ts reads only the lane
- * path; this fallback serves the freshness snapshot and index-only readers
- * (tools/drift.ts's schema-skew check).
+ * The current lane's ledger `.current/<lane>/tasks.md` when it exists, else
+ * the legacy file (findLegacyTasksFile). Side-effect-free — no write, no
+ * migration, ever: guards/session.ts's markStateRead snapshots this path at
+ * tw_get_state time. It is NOT the ledger reader: tools/tasks-file.ts reads
+ * only the lane path; this fallback serves the freshness snapshot and
+ * index-only readers (tools/drift.ts's schema-skew check). (E125a)
  */
 export function findTasksFile(workspacePath) {
     const lanePath = resolveCurrentLanePaths(workspacePath).tasksPath;
     return fs.existsSync(lanePath) ? lanePath : findLegacyTasksFile(workspacePath);
 }
 /**
- * e125a (spec D-C, architecture D8): the pre-E125a resolver's pick — the first
- * resolveTaskPaths() candidate that exists AND is not nested inside a
- * `.current/<dir>/` (a lane-local ledger never counts as legacy; flat
- * `.current/tasks.md` does). Pure, read-only. Consumed by
+ * The legacy task file: the first resolveTaskPaths() candidate that exists
+ * AND is not nested inside a `.current/<dir>/` (a lane-local ledger never
+ * counts as legacy; flat `.current/tasks.md` does). Pure, read-only. Used by
  * tools/tasks-lane-migrate.ts (the forward/reverse migration) and, via
- * findTasksFile's fallback, by index-only readers.
+ * findTasksFile's fallback, by index-only readers. (E125a)
  */
 export function findLegacyTasksFile(workspacePath) {
     const currentDir = path.join(workspacePath, ".current");

@@ -12,10 +12,10 @@ export class FileHandoffStorage {
         return readHandoffState(workspacePath);
     }
     writeState(workspacePathOrOpts, activeFeature, status, completedTasks, pendingNotes, blockingReason, lastAgent, qaRound, prdPath, reviewRound, visualRound) {
-        // E36 Option-A: dual-dispatch body collapses to "if object → options
-        // path; else pack positionals → options → call" — targeting the ONE real
-        // options-object writeHandoffState implementation directly (not its own
-        // positional overload, which is itself just this same packing).
+        // Dual-dispatch body: "if object → options path; else pack positionals
+        // → options → call", targeting the ONE real options-object
+        // writeHandoffState implementation directly (not its own positional
+        // overload, which is itself just this same packing). (E36)
         if (typeof workspacePathOrOpts === "object" && !Array.isArray(workspacePathOrOpts)) {
             return writeHandoffState(workspacePathOrOpts);
         }
