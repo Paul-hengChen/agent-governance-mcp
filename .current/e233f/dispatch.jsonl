@@ -9,3 +9,4 @@
 {"ts":"2026-09-30T06:13:00.237Z","feature":"e233f-content-ids","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
 {"ts":"2026-09-30T06:13:14.568Z","feature":"e233f-content-ids","agent_id":"code-reviewer","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-09-30T06:15:25.022Z","feature":"e233f-content-ids","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-30T06:20:17.535Z","feature":"e233f-content-ids","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
