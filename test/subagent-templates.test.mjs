@@ -296,7 +296,7 @@ test("b9 AC3/Copy-Strings: skill-coordinator.md has a Token Budget Brake section
 });
 
 // ---------------------------------------------------------------------------
-// AC5 (v3.20.0): README sub-section heading
+// The README carries a subagent-install sub-section with its exact heading (AC5, v3.20.0)
 // ---------------------------------------------------------------------------
 
 test("AC5: README adds ### Claude Code subagent install (auto model-routing) sub-section (S05)", () => {
@@ -334,7 +334,7 @@ test("v3.21.0 AC4: README surfaces @teamwork and @lite primaries", () => {
 });
 
 // ---------------------------------------------------------------------------
-// v3.21.1 AC1 / AC2: watermark reminder in every template
+// Every template carries the watermark reminder, and it stays tier-agnostic (AC1 / AC2, v3.21.1)
 // ---------------------------------------------------------------------------
 
 test("v3.21.1 AC1: every template body contains the watermark reminder, tier-agnostic (v3.58.0, C5a)", () => {

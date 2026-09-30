@@ -1,6 +1,7 @@
 // Coded by @qa-engineer
 // Tests for spec: specs/skill-evolution-v3.11.md.
-// Spec-to-Test map: AC-10/AC-11 -> t1..t7.
+// Spec-to-Test map: the new role skills, role-switch registration and skill-file
+// sanity requirements (AC-10/AC-11) -> t1..t7.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
