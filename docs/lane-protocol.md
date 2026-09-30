@@ -61,6 +61,7 @@
 ## 5. 信箱（lane ↔ 整合者）
 
 位置：派工 prompt 給的 `<mailbox>/<lane>/`。
+信箱在 `agc feature finish` 拆除 lane 時才會刪除（預設位置由 finish 處理），lane 自己不用清。
 - `to-integrator.md`：**只有你寫**（只在檔尾附加）
 - `to-lane.md`：**只有整合者寫**
 
