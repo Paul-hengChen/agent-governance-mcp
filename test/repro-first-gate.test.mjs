@@ -1,26 +1,26 @@
 // Coded by @qa-engineer
-// Tests for specs/e2-bugfix-repro-gate.md (T-E2-05).
+// Tests for the bugfix repro-first gate (specs/e2-bugfix-repro-gate.md, T-E2-05).
 //
-// e2-bugfix-repro-gate adds two things on top of the C15 expected-red
-// machinery: (1) a new first-class handoff field `dispatch_mode?: "feature" |
+// The repro-first gate adds two things on top of the existing expected-red
+// manifest machinery: (1) a new first-class handoff field `dispatch_mode?: "feature" |
 // "bugfix"` (schema v10 -> v11, stamp-only), and (2) a new plain-text
 // orchestrator gate, REPRO_MANIFEST_MISSING, that blocks the bugfix-mode
 // fix-phase handoff (sr-engineer:In_Progress -> code-reviewer:In_Progress)
-// until qa_reports/expected-red_<feature>.txt (the C15 manifest, reused
+// until qa_reports/expected-red_<feature>.txt (the existing expected-red manifest, reused
 // verbatim) exists. Neither the manifest predicate (hasExpectedRedManifest)
 // nor gates/expected-red.ts changed — see test/gates-expected-red.test.mjs
 // for that module's own unit coverage.
 //
 // Spec-to-Test map:
-//   AC1 (default routing, no architect hop)         -> chain/skill-text mechanics only; not server-enforced, no dedicated test (PM judgment call, spec Out of Scope)
-//   AC2 (repro-first gate blocks fix-phase write)    -> G1, G2
-//   AC3 (strict PASS load-bearing in bugfix mode)    -> skill-qa-engineer prose (S3); machine floor is the existing EXPECTED_RED_DIFF_MISSING gate, covered in test/gates-expected-red.test.mjs
-//   AC4 (opt back into full chain / feature mode)    -> D6
-//   AC5 (feature-mode chains byte-unchanged)         -> G3
-//   AC6 (clean rejection, never silent-skip/throw)   -> G1 (message), G4 (Blocked escape never gated)
+//   default routing, no architect hop (AC1)         -> chain/skill-text mechanics only; not server-enforced, no dedicated test (PM judgment call, spec Out of Scope)
+//   repro-first gate blocks fix-phase write (AC2)    -> G1, G2
+//   strict PASS load-bearing in bugfix mode (AC3)    -> skill-qa-engineer prose (S3); machine floor is the existing EXPECTED_RED_DIFF_MISSING gate, covered in test/gates-expected-red.test.mjs
+//   opt back into full chain / feature mode (AC4)    -> D6
+//   feature-mode chains byte-unchanged (AC5)         -> G3
+//   clean rejection, never silent-skip/throw (AC6)   -> G1 (message), G4 (Blocked escape never gated)
 //   dispatch_mode field mechanics (parse/emit/carry) -> D1..D6, Z1, M1
 //   file-mode only (SQLite ignores dispatch_mode)    -> G5
-//   skill-text pinning (T-E2-03)                     -> S1, S2, S3
+//   skill-text pinning of the repro-first wording (T-E2-03) -> S1, S2, S3
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -238,8 +238,8 @@ test("D6 (AC4 opt-back-in): an explicit PM write of dispatch_mode=\"feature\" ov
 });
 
 // ============================================================================
-// Z1: zod boundary rejection (tools/registry.ts UpdateStateArgs) — out-of-enum
-// dispatch_mode rejected before any gate/handler logic runs
+// The zod boundary rejects an out-of-enum dispatch_mode before any gate or handler
+// logic runs (tools/registry.ts UpdateStateArgs; test label Z1)
 // ============================================================================
 
 const UPDATE_STATE_ENTRY = TOOL_REGISTRY.find((e) => e.name === "tw_update_state");
@@ -262,7 +262,7 @@ test("Z1: tw_update_state rejects an out-of-enum dispatch_mode value at the zod 
 });
 
 // ============================================================================
-// M1: migration v10 -> v11 stamp-only on an old (v10) on-disk file
+// Migration v10 -> v11 only stamps the version on an old (v10) on-disk file (test label M1)
 // ============================================================================
 
 test("M1: a hand-written v10 handoff file migrates to v11 on read — dispatch_mode stays absent (no seed), sibling fields preserved", () => {
@@ -295,21 +295,23 @@ next_role: "sr-engineer"
   assert.equal(state.active_feature, "legacy-v10-feat");
   assert.equal(state.hop_count, 2, "hop_count preserved across v10->v11->v12");
   assert.equal(state.next_role, "sr-engineer", "sibling v7 field preserved across v10->v11->v12");
-  // e8-success-telemetry re-baseline: the file also climbs v11->v12, seeding
-  // the three new cumulative totals to 0 (the hop_count counter precedent).
+  // Re-baselined for the success-telemetry schema bump (e8-success-telemetry): the
+  // file also climbs v11->v12, seeding the three new cumulative totals to 0
+  // (same as the hop_count counter before them).
   assert.equal(state.qa_rounds_total, 0, "v11->v12 seeds qa_rounds_total: 0 (e8-success-telemetry)");
   assert.equal(state.review_rounds_total, 0, "v11->v12 seeds review_rounds_total: 0 (e8-success-telemetry)");
   assert.equal(state.visual_rounds_total, 0, "v11->v12 seeds visual_rounds_total: 0 (e8-success-telemetry)");
-  // e23-evidence-schema-versioning re-baseline: the file also climbs v12->v13,
-  // seeding NO evidence_schema default (D1 — migration invents no pin,
-  // absence-is-signal, same posture as dispatch_mode above).
+  // Re-baselined for the evidence-schema versioning bump (e23-evidence-schema-versioning):
+  // the file also climbs v12->v13, seeding NO evidence_schema default (the
+  // migration invents no pin; absence is the signal, same posture as
+  // dispatch_mode above; D1).
   assert.equal(state.evidence_schema, undefined, "v12->v13 must NOT seed evidence_schema (absence-is-signal, e23-evidence-schema-versioning D1)");
-  // e114-cut-approval-inheritance re-baseline: the file also climbs v13->v14,
-  // seeding NO cut_approved_source default (absence-is-signal, migration
+  // Re-baselined for the cut-approval inheritance bump (e114-cut-approval-inheritance):
+  // the file also climbs v13->v14, seeding NO cut_approved_source default (absence-is-signal, migration
   // invents no claim, same posture as dispatch_mode/evidence_schema above).
   assert.equal(state.cut_approved_source, undefined, "v13->v14 must NOT seed cut_approved_source (absence-is-signal, e114-cut-approval-inheritance)");
-  // e123a-lane-layout-migration re-baseline: the file also climbs v14->v15,
-  // seeding NO dispatch_mechanism/dispatch_mechanism_tier default
+  // Re-baselined for the lane-layout migration bump (e123a-lane-layout-migration):
+  // the file also climbs v14->v15, seeding NO dispatch_mechanism/dispatch_mechanism_tier default
   // (absence-is-signal, same posture as cut_approved_source/evidence_schema
   // above).
   assert.equal(state.dispatch_mechanism, undefined, "v14->v15 must NOT seed dispatch_mechanism (absence-is-signal, e123a-lane-layout-migration)");
@@ -332,8 +334,8 @@ async function seedSrEngineerBugfixState(ws, feature, { dispatchMode } = { dispa
     lastAgent: "sr-engineer",
     ...(dispatchMode !== undefined ? { dispatchMode } : {}),
   });
-  // E148 (docs/backlog.md row E148): force the seed's last_updated off the
-  // wall clock — see test/e148-seed-stamp.mjs.
+  // Force the seed's last_updated off the wall clock so a timestamp collision
+  // cannot flake the freshness check — see test/e148-seed-stamp.mjs (E148).
   forceSeedStamp(ws);
   resetSession(ws);
   markStateRead(ws);
@@ -356,7 +358,7 @@ test("G1: sr-engineer -> code-reviewer handoff is BLOCKED with REPRO_MANIFEST_MI
   assert.ok(result.isError, "the fix-phase handoff must be blocked when the repro manifest is absent");
   assert.match(result.content[0].text, /REPRO_MANIFEST_MISSING/, "the rejection must name the dedicated error code (AC2), never a silent skip");
   assert.match(result.content[0].text, /g1-feat/, "the rejection must name the active feature");
-  // AC6: the failure mode is a clear, actionable rejection message, not a crash.
+  // The failure mode is a clear, actionable rejection message, not a crash (AC6).
   assert.equal(typeof result.content[0].text, "string");
   assert.ok(result.content[0].text.length > 0);
 });

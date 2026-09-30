@@ -12,8 +12,8 @@ import { fileURLToPath } from "node:url";
 const __filename = fileURLToPath(import.meta.url);
 const PROJECT_ROOT = path.resolve(path.dirname(__filename), "..");
 
-// d6-host-capability-compose-axis (T-D6-04): content/skill-coordinator.md is
-// retired — it is no longer a compose source. readContentFile composes the
+// The monolithic content/skill-coordinator.md is retired, so it is no longer a
+// compose source (host-capability compose axis, T-D6-04). readContentFile composes the
 // full-capability (taskTool:true) reconstruction for that one filename
 // (byte-identical to the retired monolith, AC5) and falls through to a plain
 // read for every other (unsplit) content file.
@@ -38,7 +38,7 @@ test("AC-10/11: tw_switch_role logic and registry registration", async () => {
   // Use dynamic import to avoid ESM static resolution issues with dist/
   const { switchRole } = await import(path.join(PROJECT_ROOT, "dist", "tools", "role.js"));
 
-  // AC-11: `switchRole` returns the SOP body correctly
+  // `switchRole` returns the SOP body correctly (AC-11)
   const docWriterRes = JSON.parse(switchRole("doc-writer", PROJECT_ROOT));
   assert.match(docWriterRes.sop, /# Skill: doc-writer/, "doc-writer skill file must contain its header");
 
@@ -72,28 +72,28 @@ test("AC-10: transitions.ts AgentName union constraint (side-channel)", () => {
 });
 
 test("AC-10: schema/versions.ts schema versions track e123a-lane-layout-migration bump", () => {
-  // c9-protocol-fields bumped handoff to 7 (next_role/resume_of/review_verdict,
-  // stamp-only migration, DR-1). b8-external-ref-ledger had bumped it to 6
-  // (external_refs for EXTERNAL_REFS_UNRESOLVED). c14-dispatch-pins bumped it to
-  // 8 (dispatch_pins, stamp-only migration, AC-1). d2-server-brake-accounting
-  // bumped it to 9 (hop_count, seeded 0, DR-3). d5-server-side-stale-dispatch-
-  // detection bumped it to 10 (dispatched_at, stamp-only, seeds nothing,
-  // DR-7 — next_role's direct companion). e2-bugfix-repro-gate bumped it to
-  // 11 (dispatch_mode, stamp-only, seeds nothing — the dispatch_pins/
-  // external_refs feature-scoped carry-forward algorithm, but scalar).
-  // e8-success-telemetry bumped it to 12 (qa_rounds_total/
-  // review_rounds_total/visual_rounds_total, seeded 0 — the hop_count counter
-  // precedent, DR-1 file-mode-only). e23-evidence-schema-versioning bumped it
-  // to 13 (evidence_schema pin, stamp-only, seeds nothing — the dispatch_mode
-  // scalar algorithm). e114-cut-approval-inheritance bumped it to 14
-  // (cut_approved_source, stamp-only, seeds nothing — the dispatch_mode
-  // scalar algorithm again). e123a-lane-layout-migration now bumps it to 15
-  // (dispatch_mechanism/dispatch_mechanism_tier, stamp-only, seeds nothing —
-  // the dispatch_mode scalar algorithm again). sqlite stays at 2 —
+  // Handoff version history: v6 added external_refs for EXTERNAL_REFS_UNRESOLVED (b8-external-ref-ledger).
+  // v7 added next_role/resume_of/review_verdict,
+  // stamp-only migration, DR-1 (c9-protocol-fields). v8 added dispatch_pins,
+  // stamp-only migration, AC-1 (c14-dispatch-pins). v9 added hop_count, seeded
+  // 0, DR-3 (d2-server-brake-accounting). v10 added dispatched_at, stamp-only,
+  // seeds nothing, DR-7 — next_role's direct companion (d5-server-side-stale-dispatch-detection).
+  // v11 added dispatch_mode,
+  // stamp-only, seeds nothing — the dispatch_pins/external_refs
+  // feature-scoped carry-forward algorithm, but scalar (e2-bugfix-repro-gate).
+  // v12 added qa_rounds_total/review_rounds_total/visual_rounds_total, seeded
+  // 0 — like the hop_count counter, DR-1 file-mode-only (e8-success-telemetry).
+  // v13 added the evidence_schema pin, stamp-only, seeds nothing — the
+  // dispatch_mode scalar algorithm (e23-evidence-schema-versioning). v14 added
+  // cut_approved_source, stamp-only, seeds nothing — the dispatch_mode scalar
+  // algorithm again (e114-cut-approval-inheritance). v15 added
+  // dispatch_mechanism/dispatch_mechanism_tier, stamp-only, seeds nothing —
+  // the dispatch_mode scalar algorithm again (e123a-lane-layout-migration).
+  // sqlite stays at 2 —
   // hop_count IS added there too, but via an idempotent addColumnIfMissing
   // ALTER (DR-2), no schema_meta bump, the exact mechanism visual_round
   // used; unlike dispatch_pins/external_refs/dispatched_at/dispatch_mode/the
-  // three e8 totals/evidence_schema/cut_approved_source/dispatch_mechanism/
+  // three cumulative round totals/evidence_schema/cut_approved_source/dispatch_mechanism/
   // dispatch_mechanism_tier, which are handoff-YAML frontmatter only, no
   // SQLite column at all (DR-5/DR-1).
   const versionsTs = fs.readFileSync(path.join(PROJECT_ROOT, "schema", "versions.ts"), "utf-8");
