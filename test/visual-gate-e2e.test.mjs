@@ -52,7 +52,7 @@ function seedVisualEvidence(ws, taskId) {
   );
 }
 
-// ---------- AC-5 — VISUAL_EVIDENCE_MISSING composition ----------
+// ---------- VISUAL_EVIDENCE_MISSING composition: declared baselines need evidence (AC-5) ----------
 
 test("AC-5: handler composition — PASS rejected when baselines declared but visual evidence missing", () => {
   // Why: unit tests verify hasVisualBaselinesInDesign + hasVisualEvidenceInFile
@@ -105,7 +105,7 @@ test("AC-5: handler composition — no baselines → gate dormant even with no e
   // The handler skips hasVisualEvidenceInFile entirely in this branch.
 });
 
-// ---------- AC-6 — Round 6 sentinel ----------
+// ---------- the visual round-6 sentinel fires once the cap is crossed (AC-6) ----------
 
 test("AC-6: Round 6 sentinel — fires on cap-cross from prev=5", () => {
   // Why: the v3.14.1 predicate fix changes `=== 6 && === 5` to
@@ -188,7 +188,7 @@ test("AC-7: visual_round survives a subsequent read+write cycle", async () => {
   assert.equal(stateAfterCycle.visual_round, 4, "round 2 read MUST preserve visual_round");
 });
 
-// ---------- AC-10 — VISUAL_ROUND_EXCEEDED composition ----------
+// ---------- VISUAL_ROUND_EXCEEDED composition: past the cap only pm may proceed (AC-10) ----------
 
 test("AC-10: handler composition — VISUAL_ROUND_EXCEEDED rejects everything except (pm, In_Progress)", () => {
   // Why: assert the round-cap branch via validateTransition. This is the

@@ -64,13 +64,13 @@ test("AC1: content/skill-coordinator-lite.md exists with required sections + har
   assert.ok(fs.existsSync(skillPath), "skill file must exist");
   const body = fs.readFileSync(skillPath, "utf-8");
 
-  // Required sections per AC1
+  // The skill file must carry every required section (AC1)
   assert.match(body, /^#\s+Skill:\s+coordinator-lite/m, "title section");
   assert.match(body, /##\s+Persona/, "Persona section");
 
   assert.match(body, /##\s+SOP/, "SOP section");
 
-  // AC1 hard rules
+  // The hard rules the skill must state (AC1)
   assert.match(body, /tw_detect_drift/, "must mention drift check policy");
   assert.match(body, /tw_switch_role/, "must mention no role switching");
   assert.ok(

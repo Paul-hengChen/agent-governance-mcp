@@ -45,7 +45,7 @@ const ESCALATION_REQUIRED_KEYS = Object.freeze([
 ]);
 
 // ---------------------------------------------------------------------------
-// AC-2 — checkWatermark
+// checkWatermark: the reply ends with the required role/tier watermark (AC-2)
 // ---------------------------------------------------------------------------
 
 /**
@@ -117,7 +117,7 @@ function extractEscalationCall(text) {
 }
 
 // ---------------------------------------------------------------------------
-// AC-3 — checkTerseCap
+// checkTerseCap: the reply stays within the terse length cap (AC-3)
 // ---------------------------------------------------------------------------
 
 /** Structured-artifact carve-out: a markdown pipe table (header + separator row). */
@@ -179,7 +179,7 @@ export function checkTerseCap(reply) {
 }
 
 // ---------------------------------------------------------------------------
-// AC-4 — checkEscalationShape
+// checkEscalationShape: an escalation carries all four required keys (AC-4)
 // ---------------------------------------------------------------------------
 
 /**
@@ -214,7 +214,7 @@ export function checkEscalationShape(reply) {
 }
 
 // ---------------------------------------------------------------------------
-// AC-5 — checkBannedPhrases
+// checkBannedPhrases: the reply avoids the banned filler phrases (AC-5)
 // ---------------------------------------------------------------------------
 
 /**
