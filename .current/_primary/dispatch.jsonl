@@ -45,3 +45,14 @@
 {"ts":"2026-09-28T16:18:04.258Z","feature":"release-v4.2.0","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
 {"ts":"2026-09-28T16:19:10.274Z","feature":"release-v4.2.0","agent_id":"release-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-09-28T16:27:28.707Z","feature":"release-v4.2.0","agent_id":"release-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-30T06:55:06.237Z","feature":"release-v4.2.1","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":null}
+{"ts":"2026-09-30T07:04:35.079Z","feature":"release-v4.2.1","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-30T07:04:51.334Z","feature":"release-v4.2.1","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-30T07:09:17.705Z","feature":"release-v4.2.1","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-30T07:10:24.123Z","feature":"release-v4.2.1","agent_id":"release-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-30T07:16:16.607Z","feature":"release-v4.2.1","agent_id":"release-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-30T07:22:30.511Z","feature":"release-v4.2.1","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":null}
+{"ts":"2026-09-30T07:26:19.718Z","feature":"release-v4.2.1","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":null}
+{"ts":"2026-09-30T07:26:25.443Z","feature":"release-v4.2.1","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":null}
+{"ts":"2026-09-30T07:27:52.649Z","feature":"release-v4.2.1","agent_id":"release-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-30T07:44:22.627Z","feature":"release-v4.2.1","agent_id":"release-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
