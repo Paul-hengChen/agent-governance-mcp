@@ -36,5 +36,7 @@ export interface LexTable {
 export declare function dq(multiline: boolean, interp?: Interp): StringForm;
 export declare const charLit: StringForm;
 export declare function slashBody(raw: string): string;
+export declare function hashBody(raw: string): string;
+export declare function docBody(raw: string): string;
 export declare function lexTable(text: string, t: LexTable): LexedLine[];
 //# sourceMappingURL=comment-lex.d.ts.map

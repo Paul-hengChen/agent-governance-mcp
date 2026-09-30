@@ -3,6 +3,7 @@ export interface LexedLine {
     kind: LineKind;
     body: string;
     delimiterOnly: boolean;
+    docstring?: true;
 }
 export type TagRule = (line: LexedLine) => boolean | null;
 export type LangId = "js" | "c" | "java" | "csharp" | "go" | "kotlin" | "swift" | "rust" | "python" | "shell" | "ruby";

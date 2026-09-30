@@ -8,6 +8,7 @@ export interface LexedLine {
   kind: LineKind;
   body: string;
   delimiterOnly: boolean;
+  docstring?: true;
 }
 
 export type TagRule = (line: LexedLine) => boolean | null;

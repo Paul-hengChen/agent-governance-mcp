@@ -9,22 +9,71 @@ export const charLit = Object.freeze({ first: "'", re: /'(?:\\.|[^\\'\n])*'/y })
 export function slashBody(raw) {
     return raw.trim().replace(/^(?:\/\/+|\/\*+|\*+(?!\/))/, "").trimStart();
 }
+export function hashBody(raw) {
+    return raw.trim().replace(/^#+/, "").trimStart();
+}
+export function docBody(raw) {
+    return raw.trim().replace(/^[rRuU]?(?:"""|''')/, "").trimStart();
+}
+const bodies = {
+    slash: slashBody,
+    hash: hashBody,
+    beginEnd: (raw) => raw.trim(),
+    doc: docBody,
+};
 const slashDelims = new Set(["/*", "/**", "*/"]);
+const docDelim = /^[rRuU]?(?:"""|''')$/;
+const shellBreaks = new Set([" ", "\t", ";", "&", "|", "(", ")", "<", ">"]);
 function isWordChar(c) {
     return c !== undefined && /[A-Za-z0-9_]/.test(c);
+}
+function opensLineComment(t, s, i) {
+    if (t.line === "//")
+        return s.startsWith("//", i);
+    return s[i] === "#" && (!t.hashWordStart || i === 0 || shellBreaks.has(s[i - 1]));
+}
+function leavesHole(top, c) {
+    const hole = top?.closer.interp;
+    if (top === undefined || hole === undefined)
+        return false;
+    if (c === hole.openCh)
+        top.depth++;
+    else if (c === hole.closeCh) {
+        if (top.depth === 0)
+            return true;
+        top.depth--;
+    }
+    return false;
 }
 export function lexTable(text, t) {
     const raw = text.split(/\r?\n/);
     const hasCode = raw.map(() => false);
-    const hasComment = raw.map(() => false);
+    const origin = raw.map(() => null);
+    const delim = raw.map(() => false);
+    const tracker = t.docstrings?.();
     let mode = "code";
     let closer = null;
+    let asComment = false;
+    let carried = "slash";
     let depth = 0;
     const frames = [];
     for (let ln = 0; ln < raw.length; ln++) {
         const s = raw[ln];
-        if (mode === "block")
-            hasComment[ln] = true;
+        const mark = (o) => (origin[ln] ??= o);
+        if (ln === 0 && t.shebang && s.startsWith("#!")) {
+            hasCode[0] = true;
+            continue;
+        }
+        if (mode === "beginEnd" || (mode === "code" && t.beginEnd && /^=begin(?:\s|$)/.test(s))) {
+            mark("beginEnd");
+            if (mode === "code")
+                [mode, delim[ln]] = ["beginEnd", true];
+            else if (/^=end(?:\s|$)/.test(s))
+                [mode, delim[ln]] = ["code", true];
+            continue;
+        }
+        if (mode === "block" || (mode === "str" && asComment))
+            mark(carried);
         else if (mode === "str")
             hasCode[ln] = true;
         let escapedNewline = false;
@@ -72,48 +121,56 @@ export function lexTable(text, t) {
                 i++;
                 continue;
             }
-            if (t.line === "//" && s.startsWith("//", i)) {
-                hasComment[ln] = true;
+            if (opensLineComment(t, s, i)) {
+                mark(t.line === "//" ? "slash" : "hash");
                 break;
             }
             if (t.block && s.startsWith("/*", i)) {
-                hasComment[ln] = true;
-                mode = "block";
-                depth = 1;
+                mark("slash");
+                [mode, depth, carried] = ["block", 1, "slash"];
                 i += 2;
                 continue;
             }
-            hasCode[ln] = true;
-            const top = frames[frames.length - 1];
-            const hole = top?.closer.interp;
-            if (top !== undefined && hole !== undefined) {
-                if (c === hole.openCh)
-                    top.depth++;
-                else if (c === hole.closeCh && top.depth > 0)
-                    top.depth--;
-                else if (c === hole.closeCh) {
-                    [mode, closer] = ["str", top.closer];
-                    frames.pop();
-                    i++;
-                    continue;
-                }
+            if (leavesHole(frames[frames.length - 1], c)) {
+                hasCode[ln] = true;
+                [mode, closer] = ["str", frames.pop()?.closer ?? null];
+                i++;
+                continue;
             }
             const hit = matchString(t, s, i);
             if (hit === null) {
+                hasCode[ln] = true;
+                tracker?.code(s, i);
                 i++;
                 continue;
             }
             i += hit.len;
-            if (hit.closer !== null)
-                [mode, closer] = ["str", hit.closer];
+            if (hit.closer === null) {
+                hasCode[ln] = true;
+                continue;
+            }
+            [mode, closer] = ["str", hit.closer];
+            asComment = tracker !== undefined && tracker.string(hit.closer.docCandidate === true);
+            if (asComment)
+                [carried, origin[ln]] = ["doc", origin[ln] ?? "doc"];
+            else
+                hasCode[ln] = true;
         }
         if (mode === "str" && closer !== null && !closer.multiline && !escapedNewline)
             mode = "code";
+        if (mode === "code")
+            tracker?.lineEnd(s.endsWith("\\"));
     }
-    return raw.map((s, i) => {
-        const kind = hasCode[i] ? "code" : hasComment[i] ? "comment" : "blank";
-        return { kind, body: kind === "comment" ? slashBody(s) : "", delimiterOnly: slashDelims.has(s.trim()) };
-    });
+    return raw.map((s, i) => lexedLine(t, s, hasCode[i], origin[i], delim[i]));
+}
+function lexedLine(t, s, code, o, d) {
+    const kind = code ? "code" : o !== null ? "comment" : "blank";
+    const trimmed = s.trim();
+    const delimiterOnly = d || (t.block !== undefined && slashDelims.has(trimmed)) || (t.docstrings !== undefined && docDelim.test(trimmed));
+    const line = { kind, body: kind === "comment" && o !== null ? bodies[o](s) : "", delimiterOnly };
+    if (kind === "comment" && o === "doc")
+        line.docstring = true;
+    return line;
 }
 function matchString(t, s, i) {
     for (const f of t.strings) {
