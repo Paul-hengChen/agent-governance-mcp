@@ -735,7 +735,7 @@ test("Fixture C (AC4/REQUIRE, AC6): REQUIRE branch fires with verbatim AC4 error
   // Simulate a PM/architect-chain release: specs/release-engineer-complete-staging.md
   // exists in the tree, but git diff HEAD~1 --name-only shows metadata bumps only.
   // Expected: simulatePostCommitCheck returns pass=false, branch=REQUIRE, with the
-  // exact byte-identical pre-E44 AC4 error string.
+  // exact byte-identical error text from before the conditional check existed (E44, AC4).
 
   const activeFeature = "release-engineer-complete-staging";
   const gitDiffHeadNameOnly = [
@@ -852,7 +852,7 @@ test("Fixture H (AC4/REQUIRE non-weakening, F6): spec-in-tree wins over SKIP eve
 // ---------------------------------------------------------------------------
 const V3113_PENDING_NOTES =
   "Multi-feature release: e109-workspace-feature-anchoring (E109+E146), e145-md-tables-cited-donemark, e148-stamp-provenance-test-flake.";
-const V3113_SPECS_IN_TREE = { "e109-workspace-feature-anchoring": true }; // e145/e148 have none
+const V3113_SPECS_IN_TREE = { "e109-workspace-feature-anchoring": true }; // the other two named features have no spec file (e145, e148)
 
 test("Fixture I (AC4/MULTI-FEATURE, AC5): named features with no spec file are logged-and-skipped by design (E142(b) Decision) — the real v3.113.0 shape passes", () => {
   const gitDiffRange = ["CHANGELOG.md", "specs/e109-workspace-feature-anchoring.md", "content/coord-03-core-fallback.md"].join("\n");
@@ -870,7 +870,7 @@ test("Fixture I (AC4/MULTI-FEATURE, AC5): named features with no spec file are l
 });
 
 test("Fixture J (AC4/MULTI-FEATURE, AC5): a named feature whose spec DOES exist but is absent from the range STOPs, naming that feature's spec path", () => {
-  const gitDiffRange = ["CHANGELOG.md", "content/coord-03-core-fallback.md"].join("\n"); // e109's spec missing from range
+  const gitDiffRange = ["CHANGELOG.md", "content/coord-03-core-fallback.md"].join("\n"); // the anchoring feature's spec file is absent from the diff range (e109)
   const result = simulatePostCommitCheck(
     gitDiffRange,
     "e148-stamp-provenance-test-flake",
@@ -1500,12 +1500,12 @@ test("E7-AC1: content/const-15-core-tail.md §6 carries the sanctioned-git-ops w
   assert.ok(bulletMatch, "must carry the 'Sanctioned git operations (ALL roles)' bullet in const-15-core-tail.md §6");
   const bullet = bulletMatch[0];
 
-  // Sanctioned verbs (load-bearing — AC1)
+  // Sanctioned verbs: the bullet must whitelist each one (load-bearing, AC1)
   for (const verb of ["`git add`", "`git commit`", "`git tag`", "fast-forward `git push`"]) {
     assert.ok(bullet.includes(verb), `sanctioned-git-ops bullet must whitelist ${verb} (E7-AC1)`);
   }
 
-  // Forbidden verbs (load-bearing — AC1)
+  // Forbidden verbs: the bullet must name each one as off-limits (load-bearing, AC1)
   for (const verb of ["`git reset`", "`git rebase`", "`git clean`", "force-push (`git push --force`)", "`git checkout --force`"]) {
     assert.ok(bullet.includes(verb), `sanctioned-git-ops bullet must forbid ${verb} (E7-AC1)`);
   }
@@ -1989,7 +1989,7 @@ test("E49 step 7a (F7 regression — the single most important assertion in this
   // (`git log --diff-filter=A` sees no add event for an untracked file). An
   // empty result here silently orphans evidence without failing the release
   // (combined with "zero matches = silent no-op") — this is the exact defect
-  // class F7 exists to close.
+  // class that silently dropped evidence codes and that the guard exists to close (F7).
   const workingTree = ["qa_reports/review_T-E36-01.md"];
   const prevTagTree = []; // v3.92.1's qa_reports/ tree does not contain this file
   const { codes } = deriveCodesFromWorkingTree(workingTree, prevTagTree);
