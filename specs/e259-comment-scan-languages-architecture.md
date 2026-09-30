@@ -163,14 +163,14 @@ All regexes are sticky. `dq(multi)` = `{ first: '"', re: /"/y, close: { end: '"'
 
 | table | forms, in order |
 |---|---|
-| `cTable` (c-like; `.h` included) | raw `/(?:u8|u|U|L)?R"([^\s()\\]{0,16})\(/y` wordStart → `end: ")" + m[1] + '"'`, escape none, multiline; `dq(false)`; `charLit`. Block not nested. |
+| `cTable` (c-like; `.h` included) | raw `/(?:u8\|u\|U\|L)?R"([^\s()\\]{0,16})\(/y` wordStart → `end: ")" + m[1] + '"'`, escape none, multiline; `dq(false)`; `charLit`. Block not nested. |
 | `javaTable` | text block `/"""/y` → `end: '"""'`, backslash, multiline; `dq(false)`; `charLit`. |
 | `goTable` | raw `` /`/y `` → `` end: "`" ``, none, multiline; `dq(false)`; `charLit`. |
-| `csharpTable` | raw `/\$*("{3,})/y` → `end: m[1]` (same quote count), none, multiline; verbatim `/(?:\$@|@\$?)"/y` → `end: '"'`, **doubled**, multiline; interpolated `/\$+"/y` → `dq(false)` closer; `dq(false)`; `charLit`. `///` is an ordinary `//` line. Not nested. |
-| `rustTable` | raw `/(?:b|c)?r(#*)"/y` wordStart → `end: '"' + m[1]`, none, multiline; `dq(true)` (Rust strings span lines; `b"`/`c"` fall through here because the prefix is a code char); char `/'(?:\\(?:u\{[0-9A-Fa-f_]{1,6}\}|x[0-9A-Fa-f]{2}|.)|[^\\'\n])'/yu` complete-match — exactly one char, so `'a` (lifetime, label) is a plain code char. Nested. |
+| `csharpTable` | raw `/\$*("{3,})/y` → `end: m[1]` (same quote count), none, multiline; verbatim `/(?:\$@\|@\$?)"/y` → `end: '"'`, **doubled**, multiline; interpolated `/\$+"/y` → `dq(false)` closer; `dq(false)`; `charLit`. `///` is an ordinary `//` line. Not nested. |
+| `rustTable` | raw `/(?:b\|c)?r(#*)"/y` wordStart → `end: '"' + m[1]`, none, multiline; `dq(true)` (Rust strings span lines; `b"`/`c"` fall through here because the prefix is a code char); char `/'(?:\\(?:u\{[0-9A-Fa-f_]{1,6}\}\|x[0-9A-Fa-f]{2}\|.)\|[^\\'\n])'/yu` complete-match — exactly one char, so `'a` (lifetime, label) is a plain code char. Nested. |
 | `kotlinTable` | raw `/"""/y` → `end: '"""'`, none, multiline, interp `${`; `dq(false)` + interp `${`; `charLit`. Nested. |
-| `swiftTable` | extended `/(#+)("""|")/y` wordStart → `end: m[2] + m[1]`, none, multiline iff `m[2] === '"""'`; `/"""/y` → backslash, multiline, interp `\(`; `dq(false)` + interp `\(`. No char literal. Nested. |
-| `pythonTable` | prefixed `/[rRbBuUfF]{1,2}("""|'''|"|')/y` wordStart; unprefixed `/("""|'''|"|')/y`. Closer: `end: m[1]`, backslash (a raw string still cannot end at `\"`), multiline iff triple, `docCandidate` iff triple and the prefix is empty or one of `r R u U`. `line: "#"`, shebang, tracker `pythonDocstrings`. No interp (f-strings: D7). |
+| `swiftTable` | extended `/(#+)("""\|")/y` wordStart → `end: m[2] + m[1]`, none, multiline iff `m[2] === '"""'`; `/"""/y` → backslash, multiline, interp `\(`; `dq(false)` + interp `\(`. No char literal. Nested. |
+| `pythonTable` | prefixed `/[rRbBuUfF]{1,2}("""\|'''\|"\|')/y` wordStart; unprefixed `/("""\|'''\|"\|')/y`. Closer: `end: m[1]`, backslash (a raw string still cannot end at `\"`), multiline iff triple, `docCandidate` iff triple and the prefix is empty or one of `r R u U`. `line: "#"`, shebang, tracker `pythonDocstrings`. No interp (f-strings: D7). |
 | `shellTable` | ANSI-C `/\$'/y` → `end: "'"`, backslash, multiline; `/'/y` → `end: "'"`, none, multiline; `dq(true)`. `line: "#"`, `hashWordStart`, shebang. |
 | `rubyTable` | special globals `/\$['"]/y` complete-match (`$'`, `$"` are variables, not strings); `/"/y` and `` /`/y `` → backslash, multiline, interp `#{`; `/'/y` → backslash, multiline. `line: "#"`, `beginEnd`, shebang. |
 
