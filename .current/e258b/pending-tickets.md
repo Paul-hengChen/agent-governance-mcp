@@ -1,5 +1,7 @@
 # Pending tickets — lane e258b
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E258B-NEW-1
 title: Extend the agc check comment-length scan beyond JS/TS (other // and /* */ languages, and # languages)
@@ -14,5 +16,3 @@ body: |
   Python triple quotes), Go backtick strings, Kotlin/Swift multi-line strings, and
   Python docstrings (comment or string?). Nested block comments (Rust, Swift, Kotlin).
 ```
-
-## Applied
