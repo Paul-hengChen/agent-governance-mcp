@@ -1,3 +1,6 @@
 {"ts":"2026-09-30T10:09:32.570Z","feature":"e246-mailbox-teardown","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
 {"ts":"2026-09-30T10:13:03.182Z","feature":"e246-mailbox-teardown","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-09-30T10:14:29.828Z","feature":"e246-mailbox-teardown","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-30T10:17:51.166Z","feature":"e246-mailbox-teardown","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-30T10:18:31.323Z","feature":"e246-mailbox-teardown","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-30T10:20:49.438Z","feature":"e246-mailbox-teardown","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
