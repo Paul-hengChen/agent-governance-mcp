@@ -1,7 +1,7 @@
 # Fan-out: E233 註解只寫票號 → 改寫成白話（＋ E241 併入）
 base: 276d574    integration branch: integ/e233a（第一段五條並行 lane 共用一條）；第二段 integ/e233f
 
-**狀態：第一段已合併（2026-09-30，`integ/e233a`）；第二段 e233f 人類核准派工（2026-09-30）。** 票面自己寫了切法：「按目錄切（`tools/`、`gates/`、`bin/`+`scripts/`、`test/` 分幾批、`content/` 因為 budget 放最後），每一片一條小 mini-chain」。本檔照這個切法分成 6 條 lane：**第一段 5 條並行**（原始碼 2 條、測試 3 條），**第二段 1 條**（`content/`，第一段合併後再派工）。E241（佇列 #64，已註明「併入 E233 一起做」）放進 e233b。
+**狀態：兩段皆已合併（2026-09-30；第一段 `integ/e233a`，第二段 `integ/e233f`）。** 票面自己寫了切法：「按目錄切（`tools/`、`gates/`、`bin/`+`scripts/`、`test/` 分幾批、`content/` 因為 budget 放最後），每一片一條小 mini-chain」。本檔照這個切法分成 6 條 lane：**第一段 5 條並行**（原始碼 2 條、測試 3 條），**第二段 1 條**（`content/`，第一段合併後再派工）。E241（佇列 #64，已註明「併入 E233 一起做」）放進 e233b。
 
 ## 派工前核對（整合者，2026-09-29）
 - `git worktree list` 只有 primary；main = origin/main = `276d574`；沒有殘留的 `feat/*`／`integ/*` branch。
@@ -97,8 +97,16 @@ base: 276d574    integration branch: integ/e233a（第一段五條並行 lane �
 | 2026-09-30 | 整合者 | e233d 回報的 e132 gap-6 偶發失敗不屬任何 lane 範圍，由整合者配號 E254，佇列 #75 | 本檔 |
 | 2026-09-30 | 人類 | 核准第二段 e233f 派工 | 整合者 session |
 | 2026-09-30 | 整合者 | e233f 前提重新核對：被其他測試釘住的 content 原文必須保持一字不差；budget 上限不得自行放寬（需人類裁決）；origin/rationale 標籤內的票號同規則、低優先 | 本檔 |
+| 2026-09-30 | 整合者 | e233f cut 預審通過：被釘住原文 grep-before-edit、budget 零餘裕下長度中性、超標即 escalate；AC 旁已有白話的 AC 引用不算裸引用 | 信箱 e233f to-lane#2 |
+| 2026-09-30 | 整合者 | e233f 核對通過並合併（hop 7/10、零修正迴圈；lane 層與整合層全套皆 2958/2955/0/3；budget 上限未改，受限檔案 0 至 −6 bytes；7 個 golden 重產、冪等）；review 的選配意見 O1（skill-release-engineer 的 E104 指標會誤導）併入 E233F-NEW-1 配號後的那一列 | 信箱 e233f to-integrator#3 |
 
 ## 結案（第一段）
 - 日期 2026-09-30；合併 branch `integ/e233a`（e233a→e233b→e233c→e233d→e233e，皆 `--no-ff`）；例外：無衝突、無合併審查。
 - 彙總（每條 lane 各自對照上限，合計僅供參考）：e233a 9 張 task／hop 9；e233b 6／6；e233c 2／9；e233d 13／5；e233e 12／9；合計 42 張 task、38 hop。三條 lane 用到 hop 9/10，主要成本是作者第一輪改寫標準太窄與證據檔的路徑問題。
 - 新票：E254（整合者）；E233B-NEW-1 由 `finish --shipped` 配號。
+
+## 結案（第二段）
+- 日期 2026-09-30；合併 branch `integ/e233f`（e233f，`--no-ff`）；例外：無衝突、無合併審查。
+- 彙總：e233f 4 張 task／hop 7。E233 全票合計 6 條 lane、46 張 task、45 hop（僅供參考，上限按 lane 計）。
+- 新票：E233F-NEW-1 由 `finish --shipped` 配號，O1 併入該列。
+- 附記：e233f 兩次 qa dispatch 以 `model=sonnet` 派出，回覆與 state 卻自報 `fable`（E99 類的自報不一致訊號，僅記錄）。
