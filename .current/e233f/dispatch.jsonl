@@ -1,1 +1,4 @@
 {"ts":"2026-09-30T05:45:11.424Z","feature":"e233f-content-ids","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-30T05:49:16.935Z","feature":"e233f-content-ids","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-30T05:55:55.572Z","feature":"e233f-content-ids","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-30T06:00:01.897Z","feature":"e233f-content-ids","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}

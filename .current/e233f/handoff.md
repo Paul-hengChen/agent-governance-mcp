@@ -2,22 +2,23 @@
 schema_version: 15
 active_feature: "e233f-content-ids"
 status: "In_Progress"
-last_updated: "2026-09-30T05:45:11.419Z"
-last_agent: "pm"
+last_updated: "2026-09-30T06:00:01.895Z"
+last_agent: "sr-engineer"
 prd_path: "specs/e233f-content-ids.md"
 scope_decision: "single-feature"
 scope_decision_why: "One lane, one ticket stage (E233 stage 2); content-only rewording sliced into 3 sr tasks + 1 qa authoring task; no design arm."
+cut_approved: true
 dispatch_pins:
   sr-engineer: "fable"
 evidence_schema: 2
-next_role: "sr-engineer"
-dispatched_at: "2026-09-30T05:45:11.419Z"
+next_role: "code-reviewer"
+dispatched_at: "2026-09-30T06:00:01.895Z"
 dispatch_mechanism: "task"
-dispatch_mechanism_tier: "opus"
+dispatch_mechanism_tier: "fable"
 qa_round: 0
 review_round: 0
 visual_round: 0
-hop_count: 1
+hop_count: 2
 qa_rounds_total: 0
 review_rounds_total: 0
 visual_rounds_total: 0
@@ -28,11 +29,14 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- Spec: specs/e233f-content-ids.md (AC1-AC12, proof commands dry-run OK at base 58528d5). Cut awaiting integrator pre-review (mailbox) + human approval; cut_approved NOT set (Task-dispatched pm).
-- Chain: sr-engineer T-E233F-01..03 -> code-reviewer -> qa-engineer author T-E233F-04 (writes qa-engineer:Blocked = authoring done) -> pm resume_of code-reviewer -> code-reviewer (T-E233F-04 diff) -> fresh Task qa verifier PASS (all ACs, full suite under test-lock, clean tree, final HEAD).
-- Budget: context-budget caps are exact measured values with ZERO headroom; rewrites in const-*/coord-*/skill-pm/skill-sr must be net length-neutral or shorter after strip passes. Cannot fit -> Blocked + mailbox escalate; never raise a ceiling.
-- Pinned strings: grep test/ for each id before editing; spec AC4 lists known pins (release-staging, feature-lease, e178a, e130). Goldens/equivalence tests expected red between sr and T-E233F-04 -> sr records qa_reports/expected-red_e233f-content-ids.txt.
-- Tier note: pm frontmatter default is sonnet but this hop actually ran on opus; attested the actual tier.
+- sr-engineer: T-E233F-01, T-E233F-02, T-E233F-03 ready for code review — commits 13db92f (01), 2538389 (02), c4a5283 (03) on feat/e233f-content-ids.
+- Checks at c4a5283: AC6 uneven=0; AC7 non-id removed lines=0; AC8 skeleton-mismatch=0; AC4 five pinned strings all ok; context-budget.test.mjs 54/54 green with no ceiling touched; tsc --noEmit clean. Full suite (test-lock wrapped, same content as c4a5283): 2958 tests, 2948 pass, 7 fail, 3 skipped — the 7 fails are exactly the compose-golden / byte-equivalence tests in qa_reports/expected-red_e233f-content-ids.txt (6 compose-equivalence, 1 skill-manifest), expected green after the T-E233F-04 golden regen.
+- Capped-file net byte deltas (AC5): const-08 0, coord-03 -1, coord-04 0, coord-06 -4, skill-pm -5, skill-sr-engineer -6, skill-architect -2. Uncapped growth: skill-integrator +11, skill-qa-engineer +28, constitution-rationale +60, skill-release-engineer grew (not capped).
+- Disposition EDITED (1/2): skill-release-engineer, 35 spans — D5 manual rebase x2, D10 row, E39 sync check, E71(b), F2 fix, N4 hazard, AC4 branches x2, E64+E65 batch, E76/E71b x2, F2/F5/F4, E76 failure modes, E71a/E71b x2, E17/E83 convention, pre-E44, E109 reasoning, E163 hole, E82 (ii)/(i), E1A contract and triple, D10 Hard rule, E84 x2, E64+E65+E55, pre-E49, E1 lease, E104 note, E95 check.
+- Disposition EDITED (2/2): const-08 (E1/E1A/E13 header lineage); coord-03 (E99 mismatch signal, pre-D2 counter); coord-04 (E103's dispatch); coord-06 (pre-D2 B9 hand-sum, B9 behavior); skill-pm (A10 boundary blur); skill-sr-engineer (C15 format); skill-architect (R1's PASS gate — not named in any task line, folded into T-E233F-03); skill-integrator (E192 constraints); skill-qa-engineer (Pre-E3 specs); constitution-rationale (how B6 happened, Retrospective A0).
+- Disposition LEFT AS POINTER (id already beside plain words): const-05, const-15, coord-01 (F0 is an example feature id), coord-02, rest of coord-03/04 and skill-pm, skill-code-reviewer and skill-design-auditor (all trailing pointers or inside origin tags), skill-qa-visual (B0/B1/B2 are the file's own step labels, not ticket ids), and the remaining skill-integrator / release-engineer / constitution-rationale lines.
+- Disposition PINNED-HELD: 'Reason (E17 forensics)' and 'fabricated code-review round for E15' (test/feature-lease; the reason text follows the colon); '(the E222 precedent)' (test/e178a); '**Root-file completeness (E94)**' and '**Existence pre-filter, mandatory (E71a)**' (test/release-staging); 'post-E125a' (test/e130; plain words added around it: 'after the per-lane ledger move, post-E125a').
+- AC2: every origin tag in content/ is a pure '(vX, Eyy)' provenance pointer, left alone; the prose rationale blocks in release-engineer (E82 (ii), pre-E49, E104 note, E95 check, E84) and constitution-rationale were rewritten under AC1. AC3: no fence, code span, key, enum or error code touched (skeleton check). test/** not touched.
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.
