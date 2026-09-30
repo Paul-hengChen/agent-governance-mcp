@@ -1163,8 +1163,7 @@ test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the 
   // margin re-verified against the non-design floor below: 9924 − 7826 = 2098 ~tok,
   // unchanged from the prior pairing (E231).
   // Comment-discipline rule bullet (const-15, core-tagged) re-measured at 10057 ~tok (exact);
-  // cap raised from 9924 to that exact value, zero headroom (E258). Saving margin vs the
-  // non-design floor below: 10057 − 7959 = 2098 ~tok, unchanged.
+  // cap raised from 9924 to that exact value, zero headroom (E258).
   assert.ok(stripped <= 10057, `stripped constitution (${stripped} ~tok) must be ≤ 10057 (AC8 design-arm floor, E258 re-baseline)`);
   assert.ok(
     raw - stripped >= 240,
