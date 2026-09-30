@@ -889,7 +889,7 @@ test("E12-U3 (AC10/AC11): metrics.jsonl unreadable mid-read (permissions error) 
   assert.equal(own.length, 1, "AC11 — the new record for this feature is appended, never silently dropped, whether the read failed open or succeeded normally");
 });
 
-// ---------- deriveTicketCode (AC4) ----------
+// ---------- deriveTicketCode: ticket code taken from the feature slug (AC4) ----------
 
 test("E8-D1: deriveTicketCode derives the leading alnum token before the first hyphen, uppercased", () => {
   assert.equal(deriveTicketCode("e8-success-telemetry"), "E8");

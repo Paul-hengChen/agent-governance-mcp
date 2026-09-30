@@ -105,7 +105,7 @@ test("FM1: code-reviewer CHANGES_REQUESTED-shaped write carrying non-empty compl
     active_feature: "rctg-fm1",
     status: "FAIL",
     agent_id: "code-reviewer",
-    completed_tasks: ["T-BOGUS-01"], // the C16 ledger-pollution shape
+    completed_tasks: ["T-BOGUS-01"], // the bogus-id shape that once polluted the task ledger (C16)
     pending_notes: ["code-reviewer: found a correctness issue"],
   });
   assert.ok(result.isError, "a code-reviewer write with non-empty completed_tasks must be rejected");
@@ -300,7 +300,7 @@ for (const [role, label] of NON_QA_SELF_LOOP_IDENTITIES) {
       active_feature: feature,
       status: "In_Progress",
       agent_id: role,
-      completed_tasks: ["T-BOGUS-01"], // the E40 prefill shape
+      completed_tasks: ["T-BOGUS-01"], // the bogus-id shape a template prefill once produced (E40)
       pending_notes: [`${role}: self-loop`],
     });
     assert.ok(result.isError, `agent_id="${role}" carrying non-empty completed_tasks must be rejected`);

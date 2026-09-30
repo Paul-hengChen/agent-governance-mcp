@@ -170,7 +170,7 @@ test("T3: AC-3 fire — credibility cell carries a non-full-page-composite value
 });
 
 // ===========================================================================
-// T4: AC-1 clear — compliant audited row
+// T4: a compliant audited row clears the credibility check (AC-1)
 // ===========================================================================
 
 test("T4: AC-1 clear — audited row with full-page-composite passes", () => {
@@ -263,7 +263,7 @@ test("T7: zero audited rows (all deferred) → ok:true (BASELINE_MANIFEST_MISSIN
 });
 
 // ===========================================================================
-// T8: AC-4 dormancy — non-fetch-based modes
+// T8: the credibility gate stays dormant in modes that do not fetch sources (AC-4)
 // ===========================================================================
 
 test("T8: AC-4 dormancy — image/pdf/paper/no-design modes never fire, even with a non-compliant audited row", () => {
@@ -445,7 +445,7 @@ test("T13: AC-8 — S02 static suffix verbatim (runtime hintStatic); dynamic pre
 });
 
 // ===========================================================================
-// T14: AC-9 coordinator Auto-Routing stop-condition
+// T14: the coordinator's Auto-Routing stops when the gate rejects, instead of retrying (AC-9)
 // ===========================================================================
 
 test("T14: AC-9 — coordinator stop-condition references the gate, credibility, and SOURCE_CREDIBILITY_UNVERIFIED", async () => {
