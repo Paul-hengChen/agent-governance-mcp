@@ -6,28 +6,28 @@ import { lexTable } from "./comment-lex.js";
 import { cTable, csharpTable, goTable, javaTable } from "./comment-lang-c.js";
 import { kotlinTable, rustTable, swiftTable } from "./comment-lang-nested.js";
 import { pythonTable, rubyTable, shellTable } from "./comment-lang-hash.js";
+import { atTags, cTags, csharpTags, noTags, pythonTags, swiftTags } from "./comment-tags.js";
 export const jsLang = Object.freeze({
     id: "js",
     exts: [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts"],
     lex: lexJs,
     tags: jsTags,
 });
-const noTags = () => null;
-function tableLang(id, exts, table) {
-    return Object.freeze({ id, exts, lex: (text) => lexTable(text, table), tags: noTags });
+function tableLang(id, exts, table, tags) {
+    return Object.freeze({ id, exts, lex: (text) => lexTable(text, table), tags });
 }
 export const langRegistry = Object.freeze([
     jsLang,
-    tableLang("c", [".c", ".h", ".cc", ".cpp", ".cxx", ".hpp"], cTable),
-    tableLang("java", [".java"], javaTable),
-    tableLang("csharp", [".cs"], csharpTable),
-    tableLang("go", [".go"], goTable),
-    tableLang("kotlin", [".kt", ".kts"], kotlinTable),
-    tableLang("swift", [".swift"], swiftTable),
-    tableLang("rust", [".rs"], rustTable),
-    tableLang("python", [".py"], pythonTable),
-    tableLang("shell", [".sh", ".bash", ".zsh"], shellTable),
-    tableLang("ruby", [".rb"], rubyTable),
+    tableLang("c", [".c", ".h", ".cc", ".cpp", ".cxx", ".hpp"], cTable, cTags),
+    tableLang("java", [".java"], javaTable, atTags),
+    tableLang("csharp", [".cs"], csharpTable, csharpTags),
+    tableLang("go", [".go"], goTable, atTags),
+    tableLang("kotlin", [".kt", ".kts"], kotlinTable, atTags),
+    tableLang("swift", [".swift"], swiftTable, swiftTags),
+    tableLang("rust", [".rs"], rustTable, atTags),
+    tableLang("python", [".py"], pythonTable, pythonTags),
+    tableLang("shell", [".sh", ".bash", ".zsh"], shellTable, noTags),
+    tableLang("ruby", [".rb"], rubyTable, atTags),
 ]);
 const byExt = new Map(langRegistry.flatMap((l) => l.exts.map((e) => [e, l])));
 export function langForPath(rel) {
