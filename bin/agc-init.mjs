@@ -1219,6 +1219,29 @@ async function checkHygiene(cwd) {
   }
 }
 
+async function loadCommentScan() {
+  try {
+    return await import(new URL("../dist/tools/comment-scan.js", import.meta.url).href);
+  } catch {
+    return null;
+  }
+}
+
+// Comment-length scan (E258B): advisory, never touches the exit code.
+async function checkComments(cwd) {
+  const skipped = (why) => process.stderr.write(`agc check — comments: scan skipped (${why})\n`);
+  const mod = await loadCommentScan();
+  if (mod === null || typeof mod.runCommentScan !== "function") {
+    skipped("cannot load dist/tools/comment-scan.js — run `npm run build`");
+    return;
+  }
+  try {
+    mod.runCommentScan(cwd, { write: (l) => process.stderr.write(`${l}\n`) });
+  } catch {
+    skipped("unexpected error");
+  }
+}
+
 // --- subcommand: check -----------------------------------------------------
 async function runCheck(cwd) {
   checkResearchBinaries(cwd); // advisory; never affects exit code
@@ -1226,6 +1249,7 @@ async function runCheck(cwd) {
   await checkOrphanLanes(cwd); // advisory; never affects exit code
   checkArtifactsDrift(cwd); // advisory; never affects exit code
   await checkHygiene(cwd); // advisory; never affects exit code
+  await checkComments(cwd);
 
   const ver = installedVersion();
   const stale = [];
