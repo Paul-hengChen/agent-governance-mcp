@@ -1,5 +1,5 @@
 // Coded by @qa-engineer
-// D4 behavioral-eval harness — output-invariant checkers (T-D4-03, spec AC-1..AC-5).
+// Behavioral-eval harness: output-invariant checkers for model replies (D4, T-D4-03, spec AC-1..AC-5).
 //
 // Four pure functions that inspect a model reply string and return a
 // pass/fail verdict + human-readable reason, synchronously, with NO I/O and
@@ -10,12 +10,12 @@
 // BEFORE any live API dollar is spent (AC-6).
 //
 // checkWatermark reuses validateWatermark from dist/lib/watermark-check.js
-// (AC-2) rather than re-implementing detection. validateWatermark is itself
+// (the spec's reuse rule, AC-2) rather than re-implementing detection. validateWatermark is itself
 // built directly on WATERMARK_REGEX + buildWatermark (see that file), and it
 // is the EXACT function the coordinator/coordinator-lite SOPs call to
 // post-validate a relayed subagent reply — so importing it here is the
 // strongest form of "never disagree with the live post-validation path"
-// AC-2 asks for, not merely a partial reuse of the two lower-level exports.
+// the reuse rule asks for (AC-2), not merely a partial reuse of the two lower-level exports.
 //
 // checkTerseCap and checkEscalationShape share one internal helper,
 // `extractEscalationCall`, so the "is this an escalation?" detection used by
@@ -51,7 +51,7 @@ const ESCALATION_REQUIRED_KEYS = Object.freeze([
 /**
  * Verify a reply ends with the canonical `— @<name> (<tier>)` watermark
  * (Constitution §1). Delegates entirely to `validateWatermark` — see module
- * header for why that satisfies AC-2's "reuse, never re-implement" mandate.
+ * header for why that satisfies the "reuse, never re-implement" mandate (AC-2).
  *
  * @param {string} reply
  * @param {string} name - expected `<role>` token

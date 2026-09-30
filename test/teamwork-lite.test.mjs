@@ -1,7 +1,8 @@
 // Coded by @qa-engineer
 // Tests for /teamwork-lite prompt entry point (spec: lite-mode-coordinator).
-// Spec-to-Test map: AC1→t1, AC2→t2, AC3→t3+t5, AC4→t4, AC5→entire suite (load/build).
-// AC6 (README) is verified manually in T42, not here.
+// Spec-to-Test map: skill file sections (AC1)→t1, entry point (AC2)→t2, routing rules (AC3)→t3+t5,
+// registration (AC4)→t4, load/build health (AC5)→entire suite.
+// The README requirement (AC6) is checked by hand during release review, not by this file (T42).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";

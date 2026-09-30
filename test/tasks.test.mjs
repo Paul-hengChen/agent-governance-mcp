@@ -14,9 +14,9 @@ import { markStateRead, resetSession } from "../dist/guards/session.js";
 
 function mkWorkspaceWithTasks(taskBody) {
   // Seeded at the workspace ROOT, unstamped (v0/legacy shape) — no .git, so
-  // resolveCurrentLane(ws) is PRIMARY_LANE ("_primary"). e125a's lazy forward
-  // migration (spec D-C) copies this into `.current/_primary/tasks.md` (the
-  // live ledger tw_* actually reads/writes, spec D-F/AC9) on the FIRST
+  // resolveCurrentLane(ws) is PRIMARY_LANE ("_primary"). The lazy forward
+  // migration to per-lane ledgers copies this into `.current/_primary/tasks.md` (the
+  // live ledger tw_* actually reads/writes) on the FIRST
   // task-list access below — transparent to every test that only inspects
   // getNextTask/completeTask/rollbackTask's own return value.
   const ws = fs.mkdtempSync(path.join(os.tmpdir(), "twtasks-"));
@@ -26,11 +26,11 @@ function mkWorkspaceWithTasks(taskBody) {
   return ws;
 }
 
-// e125a: after the first access migrates the root fixture above into the
-// lane ledger, every subsequent tw_* write lands ONLY there (spec D-F/AC9) —
-// so a post-mutation file-content check must read from wherever the ledger
-// currently lives, not unconditionally from root (root freezes into a
-// read-only v2 index the instant migration happens, spec D-C/AC4).
+// After the first access migrates the root fixture above into the lane
+// ledger, every subsequent tw_* write lands ONLY there — so a post-mutation
+// file-content check must read from wherever the ledger currently lives, not
+// unconditionally from root (root freezes into a read-only v2 index the
+// instant migration happens). (e125a, spec D-F/AC9 and D-C/AC4)
 function laneTasksPath(ws) {
   return path.join(ws, ".current", "_primary", "tasks.md");
 }

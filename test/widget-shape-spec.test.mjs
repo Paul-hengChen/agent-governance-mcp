@@ -1,5 +1,5 @@
 // Coded by @qa-engineer
-// Tests for specs/pixel-perfect-fixes-v3.14.md — AC-1, AC-2.
+// Tests for specs/pixel-perfect-fixes-v3.14.md — the Visual Widgets schema and extraction contract (AC-1, AC-2).
 // Asserts the SOP markdown for skill-pm + skill-design-auditor carries
 // the Visual Widgets schema contract. Server enforcement of widget content
 // is deferred to v3.15.0 (architecture §A); these tests lint the SOPs.
@@ -24,7 +24,7 @@ const SKILL_QA_VISUAL = path.join(PROJECT_ROOT, "content", "skill-qa-visual.md")
 const { composeConstitution } = await import(path.join(PROJECT_ROOT, "dist", "prompts", "build.js"));
 const CONSTITUTION = composeConstitution({ chain: true, design: true });
 
-// ---------- AC-1: skill-pm Visual Widgets schema ----------
+// ---------- skill-pm declares the Visual Widgets schema (AC-1) ----------
 
 test("AC-1: skill-pm.md declares Visual Widgets as a required H2 section", () => {
   const body = fs.readFileSync(SKILL_PM, "utf-8");
@@ -62,7 +62,7 @@ test("AC-1: skill-pm cross-references Constitution §1 Visual Widgets exception"
   assert.match(body, /scope violation/i, "must declare primitive substitution = scope violation");
 });
 
-// ---------- AC-2: design-auditor extraction contract ----------
+// ---------- design-auditor declares its extraction contract (AC-2) ----------
 
 test("AC-2: skill-design-auditor declares Visual Widgets in Artifact Schema", () => {
   const body = fs.readFileSync(SKILL_DESIGN_AUDITOR, "utf-8");
@@ -106,15 +106,15 @@ test("AC-2: heuristics distinguish widget from styled primitive (out-of-scope cl
 
 test("AC-2: PM copies Visual Widgets verbatim from design-auditor output", () => {
   // Round-trip: design-auditor produces the table, PM consumes it. The
-  // copy-verbatim instruction lives in skill-pm; AC-2 also asks the
-  // auditor side to declare its output is meant to be copied.
+  // copy-verbatim instruction lives in skill-pm; the spec also asks the
+  // auditor side to declare its output is meant to be copied (AC-2).
   const auditorBody = fs.readFileSync(SKILL_DESIGN_AUDITOR, "utf-8");
   const pmBody = fs.readFileSync(SKILL_PM, "utf-8");
   assert.match(auditorBody, /PM copies this verbatim into `specs\/<feature>\.md`/, "auditor must declare verbatim copy contract");
   assert.match(pmBody, /design\/<feature>\.md.*Visual Widgets/i, "PM must reference design/<feature>.md Visual Widgets");
 });
 
-// ---------- R6: skill-qa-visual widget shape verification (SOP-level enforcement) ----------
+// ---------- skill-qa-visual carries widget shape verification, enforced at SOP level (R6) ----------
 
 test("R6: skill-qa-visual carries the Widget Shape Verification checklist", () => {
   const body = fs.readFileSync(SKILL_QA_VISUAL, "utf-8");
@@ -128,7 +128,7 @@ test("R6: checklist rule — shape miss precedes pixel diff (gates Step B)", () 
   assert.match(body, /do NOT proceed to Step B/i, "shape miss must short-circuit Step B");
 });
 
-// ---------- R5: Constitution §1 MVP exception ----------
+// ---------- Constitution §1 carries the MVP exception for Visual Widgets (R5) ----------
 
 test("R5: Constitution §1 carries the Visual Widgets exception clause", () => {
   const body = CONSTITUTION;
