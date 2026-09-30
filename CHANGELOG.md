@@ -16,6 +16,45 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [4.2.1] - 2026-09-30
+
+PATCH release. It ships E233 (six lanes, `e233a` to `e233f`) and E241 (merged with lane `e233b`)
+since v4.2.0. Both are readability changes with no observable behavior change. No tool input
+schema, prompt schema or state file format changed, and `package.json` dependencies are
+unchanged.
+
+### Changed
+
+- **E233: comments that cited only a bare backlog id now say what they mean in plain words
+  (`tools/`, `gates/`, `guards/`, `lib/`, `schema/`, `prompts/`, `bin/`, `scripts/`,
+  `index.ts`, `test/`)**: code and test comments whose only explanation was a ticket id now
+  state the behavior or the reason, keeping the id only as a trailing pointer. The changes are
+  comment-only, and `dist/` is rebuilt from the edited sources. Slice specs: `specs/e233a-tools-comments.md`,
+  `specs/e233b-core-comments.md`, `specs/e233c-test-comments-a.md`,
+  `specs/e233d-test-comments-b.md`, `specs/e233e-test-comments-c.md`; fan-out manifest:
+  `specs/fanout-e233.md`.
+- **E233: ticket-id references in role and constitution text rewritten in plain words
+  (`content/`)**: where a ticket id in a `content/` fragment was the only explanation, the text
+  now states it directly, with the id kept as a trailing pointer. Text that other tests pin
+  verbatim is byte-identical, every context-budget ceiling is unchanged, and the compose goldens
+  under `test/fixtures/compose-golden/` were regenerated. Spec: `specs/e233f-content-ids.md`.
+
+### Docs
+
+- **E241: a citation of a file that does not exist replaced with a plain description
+  (`CHANGELOG.md`, `research/visual-fidelity.md`)**: the 3.27.1 CHANGELOG entry and the
+  research file header named a recommendations file that is not in the tree; both now describe
+  it in words. Other historical CHANGELOG citations are accurate release history and stay.
+
+### Notes
+
+- Evidence: this release archives the ticket-prefixed QA and code-review reports of the six
+  E233 lanes and of the release gate into `qa_reports/archive/release-v4.2.1/` and
+  `review_reports/archive/release-v4.2.1/`, and lane `e233f`'s expected-red manifest into
+  `qa_reports/archive/e233f-content-ids/`. Each lane's closed handoff is under
+  `.current/history/2026-09/<lane>/` (context, not changed).
+- Follow-ups filed during these lanes (E254, E255, E256, E257) are not part of this release.
+
 ## [4.2.0] - 2026-09-29
 
 MINOR release. It ships two lane features merged to `main` since v4.1.0: E234 (lane `e234`) and
