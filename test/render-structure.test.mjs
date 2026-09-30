@@ -1,5 +1,5 @@
 // Coded by @qa-engineer
-// Tests for backlog row E69 (docs/backlog.md:192) — the render-structure
+// Tests for the backlog row that asked for a render-structure check (E69, docs/backlog.md:192) — the render-structure
 // regression test the row mandates in the SAME cut as the fence relocation:
 // "assert on applyTextTransforms({fullDetail:false}) output that every
 // numbered step header and top-level bullet still begins a line. ONE
@@ -7,9 +7,9 @@
 // file; nothing in the suite renders any SOP through the strip pass today."
 //
 // Spec-to-Test map (backlog row is the spec — mini-chain, no specs/<feature>.md):
-//   E69 AC (fence relocation, content/skill-release-engineer.md)
+//   Fence-relocation criterion (E69; content/skill-release-engineer.md)
 //     -> "T-E69-01 AC", "detector soundness against the ffa4082 baseline"
-//   E69 AC (class-wide regression test, all 11 role SOPs + constitution)
+//   Class-wide regression-test criterion (E69; all 11 role SOPs + constitution)
 //     -> "structural sweep", "cross-SOP render sweep (switchRole)",
 //        "cross-SOP render sweep (buildPromptForRole)", "constitution fragments"
 //
@@ -25,7 +25,7 @@
 // directly onto whatever line followed `end`. When that following line is a
 // numbered step header (`7b. **...`) or a top-level bullet (`- **...`, `` - ` ``,
 // `- [ ]`), the fused result no longer parses as a list item or heading at all
-// — exactly the two release-engineer sites E69 was filed over (backlog.md:192),
+// — exactly the two release-engineer sites the backlog row was filed over (E69, backlog.md:192),
 // found by hand, twice, across two review rounds.
 //
 // Two independent detectors are used and cross-checked against each other and
@@ -49,8 +49,8 @@
 //      and it is exercised through BOTH real render paths (`tw_switch_role` /
 //      tools/role.ts, and the MCP prompt / prompts/build.ts) per the dispatch
 //      brief's instruction that both paths matter — `tw_switch_role` is the
-//      one E69's two live instances actually shipped through (prompts/text-
-//      transforms.ts:1-18, E51 note).
+//      one the two live glued-line instances (E69) actually shipped through (prompts/text-
+//      transforms.ts:1-18, note on the shared render path, E51).
 //
 // Both detectors agree exactly on every finding below (cross-validated during
 // authorship): the 2 known ffa4082 sites, 0 in the fixed content/skill-release-
@@ -58,9 +58,9 @@
 // nothing rendered any OTHER role SOP through the strip pass — 3 more live sites
 // in content/skill-pm.md (x2) and content/skill-qa-engineer.md (x1) and
 // content/skill-architect.md (x1). Those 4 were OUT OF SCOPE for this ticket
-// (T-E69-01/T-E71-01 touched only content/skill-release-engineer.md) — see the
+// (the two earlier fence tickets touched only content/skill-release-engineer.md; T-E69-01/T-E71-01) — see the
 // "KNOWN, TRACKED debt" escalation in qa_reports/review_T-E69-02.md. They were
-// tracked as an exact ratchet (not silently excluded) until E75 (T-E75-01)
+// tracked as an exact ratchet (not silently excluded) until a follow-up ticket (E75, T-E75-01)
 // relocated all 4 fences — newline/whitespace only, prose byte-identical,
 // verified by both code-reviewer and qa-engineer (review_reports/review_T-E75-01.md,
 // qa_reports/review_T-E75-02.md) — paying the debt to zero. The ratchet below
@@ -160,7 +160,7 @@ function findLineGlueFindings(text) {
 // A detector that matches nothing on a known-broken input is worse than no
 // detector (dispatch brief instruction) — this is the guard-the-guard check.
 //
-// HERMETIC FIXTURE (E77, docs/backlog.md:200, fixed 2026-08-18): this used to
+// HERMETIC FIXTURE (the no-history-fixture fix, E77, docs/backlog.md:200, fixed 2026-08-18): this used to
 // build the baseline by reading repository history —
 // `execFileSync("git", ["show", "ffa4082:content/skill-release-engineer.md"])`
 // — which requires the `ffa4082` commit object to exist in the clone. CI
@@ -185,17 +185,17 @@ function findLineGlueFindings(text) {
 // since both operate on fixed-width local context (a rationale span, or a
 // single rendered line) that never crosses outside these excerpts.
 //
-// STALE-BUT-CORRECT NOTE (E163, 2026-09-22): both excerpts below say
+// STALE-BUT-CORRECT NOTE (after the release step-8 split, E163, 2026-09-22): both excerpts below say
 // "step 8's `git add`" / "step 8's AC4 SKIP branch" — the live
 // content/skill-release-engineer.md no longer has a single "step 8" at all;
-// E163 split it into 8a (commit + push branch) / 8b (CI gate) / 8c (tag +
+// the release-gate-ordering change (E163) split it into 8a (commit + push branch) / 8b (CI gate) / 8c (tag +
 // push). Do NOT "fix" that by editing the strings below to say 8a/8b/8c.
 // These two constants are frozen, byte-identical RENDERER INPUT copied from
-// commit ffa4082 (predating E163 by over a month) — they exist only to
+// commit ffa4082 (predating that split, E163, by over a month) — they exist only to
 // exercise findAsymmetricRationaleSpans/applyTextTransforms/
 // findLineGlueFindings against a KNOWN historical glue shape, never to
 // assert anything about the current live SOP text. That is exactly why this
-// test stayed green through the E163 rename and is correctly absent from
+// test stayed green through the step rename (E163) and is correctly absent from
 // qa_reports/expected-red_e163-ci-gate-ordering.txt: it never read the live
 // file to begin with, so the rename couldn't have turned it red. Editing
 // these strings to match the current SOP would break the "verified
@@ -235,7 +235,7 @@ test("detector soundness: both detectors reproduce exactly the 2 known ffa4082 g
 });
 
 // ---------------------------------------------------------------------------
-// T-E69-02 AC: content/skill-release-engineer.md — the file this ticket fixed
+// Release-engineer render check (T-E69-02): content/skill-release-engineer.md — the file this ticket fixed
 // — is clean through BOTH real render paths. Positive assertions (each
 // bullet/header DOES begin its own rendered line), not just "0 findings",
 // per the ticket's literal wording.
@@ -268,7 +268,7 @@ test("T-E69-02 AC: content/skill-release-engineer.md renders glue-free via build
 });
 
 // ---------------------------------------------------------------------------
-// T-E8795-02 — behavioural pin for the E87/E95 Evidence-Citation Convention.
+// Behavioural pin for the Evidence-Citation Convention and the CHANGELOG citation check (T-E8795-02; E87/E95).
 //
 // WHY a golden-refresh + cap-bump ALONE would not catch a regression: the
 // compose-golden fixture and the context-budget floor both PASS just as
@@ -316,7 +316,7 @@ test("T-E8795-02 AC: coord-03 Evidence-Citation Convention (E87) renders at full
 });
 
 test("T-E8795-02 AC: skill-release-engineer.md CHANGELOG citation check (E95) renders at fullDetail=false, rationale stripped, zero raw markers", () => {
-  // Bullet re-baselined (T-E142-05, E142(a)/AC3): label gained a
+  // Bullet re-baselined after the release-range check change (T-E142-05, E142(a)): label gained a
   // "range-corrected — E142(a)" suffix when the check moved from `--cached`
   // alone to the union of the release range and staged changes.
   const text = applyTextTransforms(composedSkillBody("skill-release-engineer.md"), { fullDetail: false });
@@ -362,11 +362,11 @@ test("T-E8795-02 AC: the E87 fence is block-style, not asymmetric — no glue fi
 // independent of any render-path wiring.
 //
 // CLOSED DEBT (was escalated to pm in qa_reports/review_T-E69-02.md — OUT OF
-// SCOPE for the original E69 ticket, which touched only content/skill-release-
+// SCOPE for the original render-structure ticket (E69), which touched only content/skill-release-
 // engineer.md): content/skill-pm.md carried 2 live asymmetric spans and
 // content/skill-qa-engineer.md and content/skill-architect.md carried 1 each —
-// same defect class as E69, discovered by this test but tracked rather than
-// fixed at the time. E75 (T-E75-01) relocated all 4 fences (newline/whitespace
+// same defect class as that ticket (E69), discovered by this test but tracked rather than
+// fixed at the time. a follow-up (E75, T-E75-01) relocated all 4 fences (newline/whitespace
 // only, prose byte-identical — independently verified by code-reviewer and
 // qa-engineer, review_reports/review_T-E75-01.md and
 // qa_reports/review_T-E75-02.md), paying the debt to zero. The allowlist below
@@ -405,7 +405,7 @@ test("structural sweep: every content/{skill-,const-,coord-}*.md fragment has ze
 // Cross-SOP render sweep — both real render paths, for every tw_switch_role
 // role plus teamwork/teamwork-lite. Render-level cross-check of the structural
 // sweep above: confirms the source-level findings actually do (or don't)
-// produce a symptom in the real dispatch text, through both paths E51 unified.
+// produce a symptom in the real dispatch text, through both paths the shared-render-path work (E51) unified.
 // ---------------------------------------------------------------------------
 
 const ROLE_TO_SKILLFILE = {
@@ -436,12 +436,12 @@ const EXPECTED_RENDER_GLUE_COUNTS = {
 };
 
 test("cross-SOP render sweep (tw_switch_role): glue-finding counts match the tracked debt list exactly, for every role", () => {
-  // Collect-then-assert (E75/T-E75-02): iterate every role fully BEFORE any
+  // Collect-then-assert (fence follow-up, E75/T-E75-02): iterate every role fully BEFORE any
   // assertion, then compare the whole map in one assert.deepEqual. A
   // per-iteration assert.equal would fail-fast on the first mismatching role
   // (alphabetically/insertion-order first is "pm") and never exercise the
   // rest of the roles in that run — exactly what happened while this ratchet
-  // was red for E75 (code-reviewer verified architect/qa-engineer separately
+  // was red during the fence follow-up (E75; code-reviewer verified architect/qa-engineer separately
   // by hand because the loop never reached them). Collecting first means a
   // single run always reports every role's actual count, not just the first
   // one to differ.
@@ -496,12 +496,12 @@ test("constitution fragments: all 4 chain x design compose combinations are glue
 });
 
 // ---------------------------------------------------------------------------
-// T-E77-02 (docs/backlog.md:200, 2026-08-18 amendment, folded into the same
+// History-fixture meta-test (T-E77-02; docs/backlog.md:200, 2026-08-18 amendment, folded into the same
 // cut/dispatch as T-E77-01 above by human decision — same file, same qa
 // review surface): class-wide meta-test asserting that NO file under test/
 // reads repository HISTORY as a fixture — a pinned sha, `git show
 // <rev>:<path>`, or `git log` used to source expected test data. This is
-// exactly the class T-E77-01 fixed one instance of (the `git show
+// exactly the class the first fix (T-E77-01) fixed one instance of (the `git show
 // ffa4082:content/skill-release-engineer.md` call two sections above, before
 // this ticket).
 //
@@ -517,16 +517,16 @@ test("constitution fragments: all 4 chain x design compose combinations are glue
 // PREV_TAG via `` `git describe --tags --abbrev=0` ``: that is a string
 // literal being checked with .includes(), never an actual git invocation).
 // The predicate below is "reads history as a fixture", not "calls git" — a
-// coarser guard false-positives on all five files, which per E74's own
+// coarser guard false-positives on all five files, which, per the lesson of an earlier over-broad guard (E74),
 // lesson is worse than no guard: it trains readers to ignore it.
 //
 // The detector purposely does NOT do a flat textual grep of the whole file
-// for the word "git" (E74-shaped trap) — it looks for actual subprocess
+// for the word "git" (the over-broad-grep trap, E74) — it looks for actual subprocess
 // invocations whose git subcommand is `show`/`log`, or whose argument is a
 // bare pinned commit sha, using a small tokenizer that strips comments and
 // string/regex literal contents first so:
 //   (a) a COMMENT that merely quotes or describes such a call (e.g. this
-//       very file's own T-E77-01 provenance note two sections above, which
+//       very file's own provenance note for the first fix (T-E77-01) two sections above, which
 //       literally spells out the old `execFileSync("git", ["show", ...])`
 //       call for provenance) is never mistaken for a live call site, and
 //   (b) a regex literal containing a bare backtick or quote character (e.g.
@@ -712,7 +712,7 @@ function extractGitArgTokens(argsText) {
 
 const PINNED_SHA_RE = /^[0-9a-f]{7,40}$/i;
 
-// The T-E77-02 predicate: a git invocation reads HISTORY as a fixture when
+// The history-fixture predicate (T-E77-02): a git invocation reads HISTORY as a fixture when
 // its subcommand is `show` or `log`, or when any of its arguments is a bare
 // pinned commit sha used as a ref.
 function findHistoryFixtureReads(rawSource) {
@@ -775,7 +775,7 @@ test("T-E77-02 meta-test: no file under test/ reads repository history as a fixt
 
 // Assembles the reconstructed pre-fix invocation text from parts at runtime
 // (never as one static contiguous `execFileSync("git", [...` literal in THIS
-// file's own source) so the T-E77-02 sweep test above -- which scans this
+// file's own source) so the history-fixture sweep test above (T-E77-02) -- which scans this
 // same file among test/*.mjs -- does not mistake this guard-the-guard demo
 // DATA for a live call site in render-structure.test.mjs itself. The
 // assembled STRING VALUE handed to findHistoryFixtureReads below is
@@ -786,8 +786,8 @@ function assembleReconstructedCall(execFn, bin, subArgs, opts) {
 }
 
 test("T-E77-02 guard-the-guard: the history-fixture detector reds against the pre-fix `git show ffa4082:...` line", () => {
-  // Reconstructed verbatim from the pre-E77-01 render-structure.test.mjs
-  // (see git blame / the E77 backlog row for the original commit) -- NOT
+  // Reconstructed verbatim from the pre-fix (T-E77-01) render-structure.test.mjs
+  // (see git blame / the no-history-fixture backlog row (E77) for the original commit) -- NOT
   // read via `git show` here, since this guard-the-guard check must itself
   // never read repository history. Demonstrates the detector would have
   // caught the actual historical defect, per the row's instruction to
@@ -810,7 +810,7 @@ test("T-E77-02 guard-the-guard: the history-fixture detector reds against the pr
   // wrapper) and a SOP-prose string assertion (release-staging.test.mjs's
   // `.includes("git describe --tags ...")` style check) must NOT be flagged
   // -- guards against solving the false-negative at the cost of a new
-  // false-positive on the very shapes T-E77-02's scope trap calls out.
+  // false-positive on the very shapes the scope trap of the history-fixture test (T-E77-02) calls out.
   const legitimateSnippet = `
     function git(args, cwd) { return execFileSync("git", args, { cwd, encoding: "utf-8" }).trim(); }
     const headSha = git(["rev-parse", "HEAD"], root);

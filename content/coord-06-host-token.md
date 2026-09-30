@@ -27,9 +27,9 @@ feature-scoped and durable — the sidecar survives context loss, session kills,
 invocations of the same feature; any future coordinator instance recomputes the same total by
 re-reading the file. Do NOT keep a parallel in-memory total as the source of truth, and do NOT
 persist totals to `handoff.md` or any tool argument — the sidecar is the ledger. WHEN
-`.current/<lane>/usage.jsonl` is absent (hook not wired) → DO fall back to the pre-D2 B9 hand-sum: read
+`.current/<lane>/usage.jsonl` is absent (hook not wired) → DO fall back to the old hand-sum (B9): read
 each completed dispatch's `agent-*.jsonl` entry and accumulate the same four `usage.*` fields
-in-memory for the lifetime of this `/teamwork` invocation (B9 behavior preserved for un-wired
+in-memory for the lifetime of this `/teamwork` invocation (hand-sum preserved for un-wired
 users) → ELSE the sidecar sum is authoritative.
 
 WHEN the running total reaches or exceeds 80% of `tokenBudgetPerFeature` → DO stop instead of

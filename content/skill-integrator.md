@@ -130,7 +130,7 @@ Pass → `type: close` on the report; otherwise `type: reply` naming what is mis
 - full-suite pass/total, with the full log saved to a scratch file, not returned;
 - the `pending-tickets.md` / `## Applied` / root `NEW-TICKETS.md` check.
 
-The five E192 constraints hold: (1) **read-only** — no git writes, no `tw_update_state`, no edits, no test authoring; the close / send-back decision stays yours; (2) **the report is a claim** — re-anchor it yourself (`git rev-parse <branch>` equals the reported sha; grep the saved log's summary line for pass/total) before `close`; (3) **serial runs** — never parallel (E182, `test-lock`); (4) **never a lane's session** — a fresh context that was never any lane's builder (§3.2); (5) **not code-reviewer / qa-engineer** — those are judges that write verdicts and state; this is claim-vs-branch verification.
+The five verifier constraints (E192) hold: (1) **read-only** — no git writes, no `tw_update_state`, no edits, no test authoring; the close / send-back decision stays yours; (2) **the report is a claim** — re-anchor it yourself (`git rev-parse <branch>` equals the reported sha; grep the saved log's summary line for pass/total) before `close`; (3) **serial runs** — never parallel (E182, `test-lock`); (4) **never a lane's session** — a fresh context that was never any lane's builder (§3.2); (5) **not code-reviewer / qa-engineer** — those are judges that write verdicts and state; this is claim-vs-branch verification.
 
 ### 5b. Merge
 

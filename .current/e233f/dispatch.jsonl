@@ -1,0 +1,12 @@
+{"ts":"2026-09-30T05:45:11.424Z","feature":"e233f-content-ids","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-30T05:49:16.935Z","feature":"e233f-content-ids","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-30T05:55:55.572Z","feature":"e233f-content-ids","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-30T06:00:01.897Z","feature":"e233f-content-ids","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-30T06:00:48.738Z","feature":"e233f-content-ids","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-30T06:06:13.638Z","feature":"e233f-content-ids","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-30T06:12:25.072Z","feature":"e233f-content-ids","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-30T06:12:57.351Z","feature":"e233f-content-ids","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-30T06:13:00.237Z","feature":"e233f-content-ids","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-30T06:13:14.568Z","feature":"e233f-content-ids","agent_id":"code-reviewer","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-30T06:15:25.022Z","feature":"e233f-content-ids","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-30T06:20:17.535Z","feature":"e233f-content-ids","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
