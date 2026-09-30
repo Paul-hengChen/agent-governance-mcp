@@ -1,20 +1,20 @@
 // Coded by @sr-engineer
-// tools/lane-registry.ts — read-only lane registry (E132,
-// e132-lane-registry). Promotes tools/feature-rollup.ts's
-// `localFallbackLaneList` into a dedicated module for two consumers with
-// genuinely different cost profiles: (1) E113's feature roll-up
-// (`laneRegistryList`, below), which wants feature-history attribution and
-// can afford a lane-history scan per lane because it is occasional and
-// human-invoked; (2) `tw_get_state` (`getLaneRegistrySummary`, below), the
-// hottest read in the server, which must never pay for a ticket-list read or
-// a lane-history scan just to answer "who else is working, and on what."
+// tools/lane-registry.ts — read-only lane registry. Moves
+// tools/feature-rollup.ts's `localFallbackLaneList` behind a dedicated
+// module for two consumers with very different cost profiles: (1) the
+// feature roll-up (`laneRegistryList`, below), which wants feature-history
+// attribution and can afford a lane-history scan per lane because it is
+// occasional and human-invoked; (2) `tw_get_state` (`getLaneRegistrySummary`,
+// below), the hottest read in the server, which must never pay for a
+// ticket-list read or a lane-history scan just to answer "who else is
+// working, and on what." (E132)
 //
 // Deliberately NOT a registry file that lanes write into. A written registry
-// re-introduces a shared write target — precisely what the E123 layout
-// exists to eliminate — and goes stale the moment a lane dies without
+// brings back a shared write target — exactly what per-lane state
+// directories exist to avoid — and goes stale the moment a lane dies without
 // cleaning up. A derived list cannot be wrong because it has no stored copy
 // to drift. This module is READ-ONLY: it performs no writes, creates no
-// lockfile, sends no heartbeat, and authors no lane-side state (AC8).
+// lockfile, sends no heartbeat, and authors no lane-side state.
 //
 // Neither exported function reimplements worktree enumeration or handoff
 // parsing: both delegate to `localFallbackLaneList` (tools/feature-rollup.ts)
@@ -48,7 +48,7 @@ import { isSafeLaneName, laneFile } from "./lane-paths.js";
 // Same frontmatter-block shape as tools/skill-frontmatter.ts's FRONTMATTER_RE
 // and tools/handoff-parse.ts's own frontmatter handling — a leading
 // `---\n...\n---` block. Deliberately a LOCAL regex + yaml.load, not
-// `parseHandoff` (decision re-confirmed at the e123b9 J2 re-point, AC7):
+// `parseHandoff`, for two reasons:
 // (1) a closed lane under .current/history/ is a historical snapshot that may
 // predate the live schema_version, and parseHandoff refuses loud (by design)
 // on an unparseable/future-schema handoff — one old snapshot must not take
@@ -57,7 +57,7 @@ import { isSafeLaneName, laneFile } from "./lane-paths.js";
 // arbitrary sibling lane dir at all. Only `active_feature` and
 // `last_updated` are extracted; nothing is migrated, locked, or written.
 const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
-// `.current/` subdirectories that are never lanes (spec AC7). Workspace-wide
+// `.current/` subdirectories that are never lanes. Workspace-wide
 // FILES (.config.json, feature-split.md, the lockfile, ...) are excluded by
 // the isDirectory() check; dot-dirs by isSafeLaneName.
 const NON_LANE_DIRS = new Set(["archive", "history"]);
@@ -148,12 +148,12 @@ function readMetricsEntries(file) {
 }
 /**
  * Enumerates live and closed lane handoffs under `workspacePath/.current/`
- * (plus each lane dir's metrics.jsonl shipped-close rows, e125b AC5) and
- * returns their feature names ordered by timestamp.
- * Strictly read-only (AC13: readdir/stat/readFile only — no lock, no
- * migration, no file or dir creation). Never throws: an unlistable dir, a
- * malformed file, missing frontmatter, or a non-string `active_feature` are
- * skipped silently.
+ * (plus each lane dir's metrics.jsonl shipped-close rows) and returns their
+ * feature names ordered by timestamp.
+ * Strictly read-only (readdir/stat/readFile only — no lock, no migration, no
+ * file or dir creation). Never throws: an unlistable dir, a malformed file,
+ * missing frontmatter, or a non-string `active_feature` are skipped
+ * silently. (E125b)
  */
 export function getLaneFeatureHistory(workspacePath) {
     try {
@@ -237,13 +237,13 @@ export function getLaneFeatureHistory(workspacePath) {
 }
 /**
  * LaneListProvider-conformant (same signature as `localFallbackLaneList`) —
- * the provider E113's roll-up wires in (DoD 2, scripts/feature-rollup.mjs).
+ * the provider the feature roll-up wires in (scripts/feature-rollup.mjs).
  * Delegates worktree enumeration + handoff parsing entirely to
- * `localFallbackLaneList` (zero duplicated git-shelling) and additionally
+ * `localFallbackLaneList` (no duplicated git-shelling) and additionally
  * attaches `featureHistory` per lane via `getLaneFeatureHistory`. `source`
  * reads `"lane-registry"` — the union member `tools/feature-rollup.ts`
  * reserved for this module — whenever this function, not
- * `localFallbackLaneList`, is used as the provider.
+ * `localFallbackLaneList`, is used as the provider. (E113)
  */
 export function laneRegistryList(repoRoot) {
     const result = localFallbackLaneList(repoRoot);

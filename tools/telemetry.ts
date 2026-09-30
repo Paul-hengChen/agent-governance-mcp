@@ -26,8 +26,8 @@ export interface TelemetryEvent {
   feature: string | null;
 }
 
-// Sidecar location comes only from the lane resolver (E123 F1 L2). It still
-// returns the flat <ws>/.current/telemetry.jsonl until J flips the seam.
+// Sidecar location comes only from the lane resolver: the lane-scoped
+// <ws>/.current/<lane>/telemetry.jsonl. (E123)
 function telemetryPath(workspacePath: string): string {
   return resolveCurrentLanePaths(workspacePath).telemetryPath;
 }

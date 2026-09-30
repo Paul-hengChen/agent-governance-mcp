@@ -1,11 +1,9 @@
 // Coded by @sr-engineer
-// Archive-aware QA-evidence lookup for tools/drift.ts (E112,
-// e112-drift-fanout-and-feature-scope). Read-only, consumed ONLY by drift.ts's
-// evidence-aware split of the "Possible vibe-coding drift" bucket — NOT by
-// gates/qa-review.ts's hasEvidenceInFile, which deliberately scans
-// qa_reports/ root only (MISSING_EVIDENCE is a live gate predicate; widening
-// its scan would change gate behaviour, which is out of scope here — see this
-// feature's dispatch brief).
+// Archive-aware QA-evidence lookup for tools/drift.ts. Read-only, consumed
+// ONLY by drift.ts's evidence-aware split of the "Possible vibe-coding drift"
+// bucket — NOT by gates/qa-review.ts's hasEvidenceInFile, which deliberately
+// scans qa_reports/ root only (MISSING_EVIDENCE is a live gate predicate;
+// widening its scan would change gate behaviour). (E112)
 //
 // This module extends the SAME id-file convention
 // (qa_reports/review_<id>.md) that gates/qa-review.ts checks at root into the
@@ -17,14 +15,13 @@
 // still recognized as "evidence exists on disk" here, exactly as it would be
 // pre-archive.
 //
-// --- C1 (round-2 fix): existence is the wrong test, verdict content is the
-// right one ------------------------------------------------------------
-// round-1 tested only that a `qa_reports/review_<id>.md` file EXISTED.
+// --- Existence is the wrong test; verdict content is the right one -------
+// A bare "does `qa_reports/review_<id>.md` exist?" test is not enough:
 // gates/qa-review.ts's `recordReviewInFile` writes BOTH PASS and FAIL rounds
 // into that exact path, and CREATES the file on a FAIL round — so the very
-// server write that records a rejected QA round manufactured the artifact
-// that silenced this detector. Reproduced end-to-end against this fix: a
-// FAIL-only file no longer counts as evidence.
+// server write that records a rejected QA round would manufacture the file
+// that silences this detector. A FAIL-only file therefore does not count as
+// evidence.
 //
 // The rule, applied identically to a direct per-id file AND to a file reached
 // via a `covers:` line:
@@ -36,13 +33,13 @@
 //      evidence. A verdict-less file is, by construction, NOT something the
 //      FAIL-record back door can produce (the FAIL path is exactly what
 //      writes a verdict section) — it is a hand-authored covering report,
-//      the same c3-covering-evidence trust class the MISSING_EVIDENCE gate
+//      the same covering-evidence trust class the MISSING_EVIDENCE gate
 //      (gates/qa-review.ts's hasEvidenceInFile) already accepts on existence
 //      alone. Requiring more here than that gate requires at completion time
 //      would make this detector stricter than the gate it is meant to
 //      corroborate, and would resurface false "vibe-coding drift" alarms on
 //      already-shipped work carrying exactly the hand-authored reports this
-//      codebase sanctions (docs/backlog.md's c3-covering-evidence rows).
+//      codebase sanctions (docs/backlog.md's covering-evidence rows).
 //
 // Residual trade-off (stated, not hidden): this rule still admits (a) a
 // hand-created, zero-byte or prose-only file with no verdict section, and
@@ -51,7 +48,7 @@
 // whether the covering report's own body is about the id it names. Both are
 // the same hand-authored trust class gates/qa-review.ts already extends
 // credit to via bare existence; this module does not attempt to close that
-// wider gap, only the FAIL-record back door C1 identified (a file the
+// wider gap, only the FAIL-record back door described above (a file the
 // SERVER ITSELF wrote as a rejection).
 
 import * as fs from "fs";
@@ -74,12 +71,12 @@ function safeReaddir(dir: string): string[] {
   }
 }
 
-// lstatSync, NOT statSync (A1 fix): a symlink under qa_reports/archive/ must
-// NOT be followed outside the workspace (E109: this detector is anchored to
+// lstatSync, NOT statSync: a symlink under qa_reports/archive/ must NOT be
+// followed outside the workspace (this detector is anchored to
 // workspacePath). lstatSync reports on the link itself, so a symlinked entry
 // — even one pointing at a real directory — is never treated as a directory
 // here and is excluded from the archive scan, confining evidence to paths
-// actually inside the workspace tree.
+// actually inside the workspace tree. (E109)
 function safeIsDirectory(p: string): boolean {
   try {
     return fs.lstatSync(p).isDirectory();

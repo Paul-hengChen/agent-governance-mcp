@@ -1,6 +1,6 @@
 // Coded by @sr-engineer
-// Information-hygiene scan (e234-hygiene-scan, spec specs/e234-hygiene-scan.md,
-// architecture specs/e234-hygiene-scan-architecture.md). The fifth `agc check`
+// Information-hygiene scan (spec specs/e234-hygiene-scan.md, architecture
+// specs/e234-hygiene-scan-architecture.md). The fifth `agc check`
 // advisory: it warns about the classes of detail the constitution's
 // Information hygiene rule bans from durable output, and never changes the
 // exit code (bin/agc-init.mjs checkHygiene is the only caller).
@@ -17,7 +17,7 @@
 // Authoring rule: no pattern literal in this file may match its own source
 // text. Separators are written as one-character classes, host dots are
 // escaped, and each vendor prefix is followed by a character class, so the
-// scan stays silent over this file (spec AC16). Comments describe shapes in
+// scan stays silent over this file. Comments describe shapes in
 // prose only. Constant names avoid UPPER_SNAKE gate-code suffixes
 // (test/error-code-contract.test.mjs harvests tools/*.ts).
 //
@@ -216,7 +216,7 @@ const shapePatterns: readonly ShapePattern[] = Object.freeze([
   // token key is rejected by the alphanumeric key class. The lookbehind also
   // excludes a dot, so a match can start only at the head of a dotted run:
   // without it every position after a dot is a start and a long dotted line
-  // backtracks quadratically (code review round 1).
+  // backtracks quadratically.
   {
     category: "design-file-key",
     re: new RegExp(
@@ -368,8 +368,8 @@ export function compileKeywordMatcher(keywords: readonly string[]): KeywordMatch
       // that overlaps an earlier, longer one is still found (and later
       // merged). One code unit is not enough: under the u flag a lastIndex
       // inside a surrogate pair is moved back to the pair's start, so a match
-      // opening with a non-BMP character would be found again forever (code
-      // review round 2). The progress guard stops the loop if exec ever fails
+      // opening with a non-BMP character would be found again forever. The
+      // progress guard stops the loop if exec ever fails
       // to move past the previous start.
       const found: Array<{ start: number; end: number }> = [];
       const scan = new RegExp(anywhere.source, anywhere.flags);
@@ -433,7 +433,7 @@ export function maskText(text: string, kw: KeywordMatcher | null): string {
 
 // C0/C1 controls, DEL, and the bidi mark/embedding/override/isolate controls.
 // A file name carrying one of these could otherwise forge extra advisory lines
-// or reorder the printed text on a terminal (code review round 1).
+// or reorder the printed text on a terminal.
 const unsafeDisplayChars = /[\u0000-\u001f\u007f-\u009f\u200e\u200f\u202a-\u202e\u2066-\u2069]/g;
 
 // Applied after masking (spans are computed on the raw text), so escaping
@@ -580,7 +580,7 @@ function isTrackedFile(realFile: string): boolean {
 // FIFO or other special file named by the env var can never block the read
 // (and cannot be swapped in between a check and the read). A non-regular
 // file takes the null path: "unreadable" for the env source, "none" for the
-// default file (code review round 1).
+// default file.
 const openNonBlocking = fs.constants.O_RDONLY | (fs.constants.O_NONBLOCK ?? 0);
 
 function loadKeywordFile(file: string): { keywords: string[]; dev: number; ino: number; real: string } | null {

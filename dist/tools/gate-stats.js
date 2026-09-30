@@ -1,27 +1,26 @@
 // Coded by @sr-engineer
-// tw_gate_stats — per-gate fire-count coverage reader (E26, 104447-F0 §4-D).
-// Aggregates the two observability sidecars the E6 rule-retirement retro
+// tw_gate_stats — per-gate fire-count coverage reader. Aggregates the two
+// observability sidecars the rule-retirement retro
 // (docs/gate-retro-procedure.md) consumes, so the retro runs on data instead
-// of raw `jq` + hand-categorization (the 2026-07-13 / 2026-07-15 retros both
-// hand-tallied; the second one confirmed this ticket's shape):
+// of raw `jq` + hand-counting (E26). The two sidecars:
 //
 //   telemetry.jsonl  — one line per GATE_REGISTRY-cataloged rejection
-//                      (tools/telemetry.ts, D3): {ts, gate, error_code,
+//                      (tools/telemetry.ts): {ts, gate, error_code,
 //                      agent_id, feature}
-//   metrics.jsonl    — one line per SHIPPED feature (tools/metrics.ts, E8):
+//   metrics.jsonl    — one line per SHIPPED feature (tools/metrics.ts):
 //                      {ts, feature, tickets, qa_rounds, review_rounds,
 //                      visual_rounds, hops, one_pass, released_version}
 //
-// LANE-AWARE (e123c, E123 F2): since the E123 lane flip the writers append to
+// LANE-AWARE: the writers append to
 // `.current/<lane>/<file>`, so each sidecar is read from EVERY copy this
 // workspace's `.current/` tree holds — live lanes, closed
 // `.current/history/<YYYY-MM>/<lane>/` lanes, and a not-yet-migrated flat
 // `.current/<file>` — via tools/lane-paths.ts's enumerateLaneSidecarSources,
 // which drops a copy only when its bytes are a prefix of / identical to
 // another counted copy (a mid-move history copy, a half-merged flat file).
-// Every such skip is disclosed in `caveats`. Scope is this workspace only.
+// Every such skip is disclosed in `caveats`. Scope is this workspace only. (E123)
 //
-// CATEGORY BOUNDARY (the load-bearing E26 requirement): telemetry can prove a
+// CATEGORY BOUNDARY (the load-bearing requirement): telemetry can prove a
 // *gate-backed* rule dead or alive — every enforcement path emits a
 // GATE_REGISTRY error code, so zero fires over a window is real evidence
 // (though it may still mean deterrence or an unexercised edge, never
@@ -43,11 +42,11 @@ import { enumerateLaneSidecarSources, resolveCurrentLanePaths, resolveFlatLanePa
 // ==========================================
 // Prose-behavioral catalog
 // ==========================================
-// The rules the 104447 retro's dead-rule table names that CANNOT be
-// adjudicated from this tool's data (backlog E26: "token brake,
-// dispatch_pins, read cap, terse cap et al."). Deliberately illustrative,
-// not exhaustive — most constitution prose is un-gated; these are the ones
+// Rules that CANNOT be judged from this tool's data (token brake,
+// dispatch_pins, read cap, terse cap et al.). Deliberately illustrative, not
+// exhaustive — most constitution prose has no gate; these are the ones
 // retros have already tried (and failed) to judge by gate-fire counts.
+// (E26)
 const TRANSCRIPT_SAMPLING = "Transcript sampling — inspect real session transcripts for compliance; " +
     "this tool carries NO signal for this rule.";
 export const PROSE_BEHAVIORAL_RULES = [
@@ -83,10 +82,10 @@ export const PROSE_BEHAVIORAL_RULES = [
             "D2 is HOP_CAP_EXCEEDED, which IS counted above.",
     },
 ];
-// Parse every counted copy of one sidecar and concatenate (e123c). A missing
+// Parse every counted copy of one sidecar and concatenate. A missing
 // sidecar everywhere is the normal young-workspace case (exists: false); an
 // unreadable copy is simply not a source — this reporting tool never blocks
-// on I/O.
+// on I/O. (E123)
 function readJsonlSidecar(workspacePath, key) {
     const { sources, skipped } = enumerateLaneSidecarSources(workspacePath, key);
     const out = {
@@ -231,8 +230,9 @@ export function computeGateStats(workspacePath) {
     }
     unregistered.sort((a, b) => b.fires - a.fires);
     // ---- metrics.jsonl (every lane copy) → per-feature outcomes ----
-    // The E12 dedupe below runs over the CONCATENATION of every source, so it
-    // also heals the same shipped-feature record appearing in two copies.
+    // The (feature, released_version) dedupe below runs over the
+    // CONCATENATION of every source, so it also heals the same shipped-feature
+    // record appearing in two copies. (E12)
     const met = readJsonlSidecar(workspacePath, "metrics");
     const perFeature = [];
     const seenOutcomes = new Set();
@@ -240,9 +240,10 @@ export function computeGateStats(workspacePath) {
     for (const rec of met.records) {
         const feature = str(rec.feature) ?? "(unknown)";
         const releasedVersion = str(rec.released_version); // non-string → null (E12 normalization)
-        // Read-time dedupe on the E12 idempotency key: JSON.stringify of the
-        // tuple is collision-safe (a raw `${feature}|${version}` join is not —
-        // "a|b"+null vs "a"+"b|null").
+        // Read-time dedupe on the (feature, released_version) idempotency key:
+        // JSON.stringify of the tuple is collision-safe (a raw
+        // `${feature}|${version}` join is not — "a|b"+null vs "a"+"b|null").
+        // (E12)
         const key = JSON.stringify([feature, releasedVersion]);
         if (seenOutcomes.has(key)) {
             duplicatesSkipped++;

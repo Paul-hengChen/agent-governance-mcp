@@ -67,18 +67,18 @@ export interface HandoffStorage {
   getNextTask(workspacePath: string): string;
   completeTask(workspacePath: string, taskId: string, note?: string): Promise<string>;
   rollbackTask(workspacePath: string, taskId: string, reason: string): Promise<string>;
-  // Void a task (E117): marks a row as "should never have existed" rather
-  // than "done, then reverted". Legal only on an incomplete row; an
+  // Void a task: marks a row as "should never have existed" rather than
+  // "done, then reverted". Legal only on an incomplete row; an
   // already-completed row is refused. A voided (or unknown) task id is
   // invisible to getNextTask, listTasks, tw_detect_drift, and tw_sync — none
-  // of them distinguish the two, both simply don't exist to them, so a
+  // of them tell the two apart, both simply don't exist to them, so a
   // voided row is never re-offered, never counted as completed/incomplete,
   // and never flagged as drift. voidTask itself is the one exception, and
   // only in FILE mode: re-voiding an already-voided id returns a distinct
   // `alreadyVoided: true` flag rather than a bare not-found, because the
   // voided marker line is still literally on disk to scan for. SQLite/HTTP
-  // mode reports both cases uniformly as not-found — no alreadyVoided
-  // distinction there (reason is not persisted; see C3).
+  // mode reports both cases the same way, as not-found (reason is not
+  // persisted there). (E117)
   voidTask(workspacePath: string, taskId: string, reason: string): Promise<string>;
   addTask(
     workspacePath: string,
@@ -141,10 +141,10 @@ export class FileHandoffStorage implements HandoffStorage {
     reviewRound?: number,
     visualRound?: number,
   ): Promise<string> {
-    // E36 Option-A: dual-dispatch body collapses to "if object → options
-    // path; else pack positionals → options → call" — targeting the ONE real
-    // options-object writeHandoffState implementation directly (not its own
-    // positional overload, which is itself just this same packing).
+    // Dual-dispatch body: "if object → options path; else pack positionals
+    // → options → call", targeting the ONE real options-object
+    // writeHandoffState implementation directly (not its own positional
+    // overload, which is itself just this same packing). (E36)
     if (typeof workspacePathOrOpts === "object" && !Array.isArray(workspacePathOrOpts)) {
       return writeHandoffState(workspacePathOrOpts);
     }

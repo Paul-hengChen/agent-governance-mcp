@@ -35,9 +35,9 @@ function stripSentinel(content: string): { version?: number; body: string } {
   return { version: Math.floor(version), body: content.slice(match[0].length) };
 }
 
-// e125a D-D / option A: a v2+ file at a legacy path means "index", so a
-// legacy-path LEDGER (git-ignored lane path, AC4b) is kept at v1. Only a lane
-// ledger `.current/<lane>/tasks.md` is stamped CURRENT.
+// A v2+ file at a legacy path means "index", so a legacy-path LEDGER (used
+// when the lane path is git-ignored) is kept at v1. Only a lane ledger
+// `.current/<lane>/tasks.md` is stamped CURRENT. (E125a)
 const LEGACY_LEDGER_VERSION = 1;
 function sentinelVersionFor(filePath: string): number {
   const isLaneLedger = path.basename(path.dirname(path.dirname(filePath))) === ".current";
@@ -77,37 +77,34 @@ interface ParseResult {
   migrationApplied: boolean;
 }
 
-// E131 parser hardening (second half — see containsLineBreak above for the
-// input-boundary half). The input-boundary guard only defends the tw_* RPC
-// path; a tasks.md hand-edited directly (the row that filed this defect
-// explicitly calls out as the most likely real trigger) never passes
-// through any mutator at all, so the parser itself must not let a
-// terminator-corrupted row disappear silently. FORBIDDEN_TERMINATOR_RE
-// detects the two JS-only line terminators (U+2028/U+2029); TASK_LINE_SHAPE_RE
-// is a loose, terminator-tolerant recognizer for "this looks like a
-// checkbox task row" (open `[ ]`, done `[x]`, or voided `[-]`) that, unlike
-// the configured taskPattern, does not require reaching `$` — it only needs
-// to match the checkbox marker and the start of the id token, both of which
-// sit before the point a U+2028/U+2029 would appear in a note or reason
-// suffix. Scoped to the DEFAULT_TASK_REGEX row shape; a workspace running a
-// fully custom taskPattern with a structurally different row shape is not
-// covered by this specific heuristic (there is no generic way to detect
-// "matches an arbitrary custom pattern except for the terminator" without
-// knowing that pattern's structure) — the input-boundary guard remains the
-// primary defense for the RPC path in that case.
+// Parser-side half of the line-terminator defence (see containsLineBreak
+// below for the input-boundary half). The input-boundary guard only covers
+// the tw_* RPC path; a tasks.md edited by hand — the most likely real
+// trigger — never passes through a mutator, so the parser itself must not
+// let a terminator-corrupted row disappear silently.
+// FORBIDDEN_TERMINATOR_RE detects the two JS-only line terminators
+// (U+2028/U+2029); TASK_LINE_SHAPE_RE is a loose, terminator-tolerant
+// recogniser for "this looks like a checkbox task row" (open `[ ]`, done
+// `[x]`, or voided `[-]`) that, unlike the configured taskPattern, does not
+// need to reach `$` — it only needs the checkbox marker and the start of the
+// id token, both of which come before any U+2028/U+2029 in a note or reason
+// suffix. Scoped to the DEFAULT_TASK_REGEX row shape: a workspace with a
+// fully custom taskPattern of a different shape is not covered (there is no
+// generic way to detect "matches an arbitrary custom pattern except for the
+// terminator" without knowing that pattern), so the input-boundary guard
+// remains the main defence for the RPC path there. (E131)
 const FORBIDDEN_TERMINATOR_RE = /[\u2028\u2029]/;
-// C2 fix (review round 1): the checkbox class deliberately excludes `-` (the
-// void marker). A voided row's unparseability is BY DESIGN \u2014 voidTaskInFile's
-// own doc comment states it disappears from every default-shaped reader on
-// purpose \u2014 so this shape heuristic must not treat a voided row as the E131
-// corruption case. Only an open `[ ]` or completed `[x]` row triggers the
-// throw below.
+// The checkbox class deliberately excludes `-` (the void marker). A voided
+// row is unparseable BY DESIGN — voidTaskInFile's doc comment says it
+// disappears from every default-shaped reader on purpose — so this shape
+// check must not mistake a voided row for terminator corruption. Only an
+// open `[ ]` or completed `[x]` row triggers the throw below. (E131)
 const TASK_LINE_SHAPE_RE = /^- \[[ x]\]\s+\S/;
 
-// e125a (spec D-F / AC9): the ledger is ONLY the current lane's
-// `.current/<lane>/tasks.md`. A legacy root file is never a read fallback —
-// except in a workspace whose lane path is git-ignored (option A, AC4b),
-// where the legacy file stays the ledger (resolveTasksLedgerPath).
+// The ledger is ONLY the current lane's `.current/<lane>/tasks.md`. A legacy
+// root file is never a read fallback — except in a workspace whose lane path
+// is git-ignored, where the legacy file stays the ledger
+// (resolveTasksLedgerPath). (E125a)
 function laneTasksPathOf(workspacePath: string): string {
   return resolveCurrentLanePaths(workspacePath).tasksPath;
 }
@@ -116,10 +113,10 @@ function ledgerPathOf(workspacePath: string): string {
   return resolveTasksLedgerPath(workspacePath, laneTasksPathOf(workspacePath));
 }
 
-// e125a D12 / AC14(a): true iff `section` belongs to ANOTHER lane that has
-// its own live ledger — the sibling `.current/<thatLane>/<same filename>` of
-// the `_primary` ledger at `primaryTasksPath`. Such a section in `_primary`'s
-// ledger is a stale pre-extraction copy and is excluded from every read.
+// True iff `section` belongs to ANOTHER lane that has its own live ledger —
+// the sibling `.current/<thatLane>/<same filename>` of the `_primary` ledger
+// at `primaryTasksPath`. Such a section in `_primary`'s ledger is a stale
+// copy left from before the split and is excluded from every read. (E125a)
 function makeForeignCheck(primaryTasksPath: string): (section: string) => boolean {
   const seen = new Map<string, boolean>();
   const lanesDir = path.dirname(path.dirname(primaryTasksPath));
@@ -129,7 +126,7 @@ function makeForeignCheck(primaryTasksPath: string): (section: string) => boolea
     let foreign = seen.get(lane);
     if (foreign === undefined) {
       const filename = path.basename(primaryTasksPath);
-      // e125b AC8 (X7): a lane whose ledger closed into .current/history/ is foreign too.
+      // A lane whose ledger was closed into .current/history/ is foreign too. (E125b)
       foreign =
         fs.existsSync(path.join(lanesDir, lane, filename)) ||
         hasHistoryLedger(path.dirname(lanesDir), lane, filename);
@@ -154,11 +151,10 @@ function isFresh(workspacePath: string, filePath: string): boolean {
   }
 }
 
-// e125a AC11: a forward migration THIS call performed (R-1: the migrate
-// functions report it) is the session's own write. When the session
-// snapshot was fresh against the pre-migration file, carry it over to the
-// new lane ledger so the next mutation does not trip STATE DRIFT on the
-// path switch.
+// A forward migration THIS call performed (the migrate functions report it)
+// is the session's own write. When the session snapshot was fresh against
+// the pre-migration file, carry it over to the new lane ledger so the next
+// mutation does not trip STATE DRIFT on the path switch. (E125a)
 function carrySnapshot(workspacePath: string, laneTasksPath: string, migrated: boolean, wasFresh: boolean): void {
   if (migrated && wasFresh) refreshSnapshotFor(workspacePath, laneTasksPath, "tasks");
 }
@@ -219,16 +215,16 @@ function parseTasks(workspacePath: string): ParseResult | null {
       tasks.push(task);
       continue;
     }
-    // E131 — fail loud instead of silently erasing. An ordinary strict-parse
-    // miss (blank line, prose, a `## ` heading already handled above) is
-    // expected and stays silently skipped, as always. But a line that (a)
-    // is shaped like a checkbox task row AND (b) carries a JS-only line
-    // terminator (U+2028/U+2029) the strict regex's trailing `(.+)$` cannot
-    // cross is exactly the E131 corruption case: the row is genuinely on
-    // disk (this loop already reached it — split("\n") never broke on the
-    // terminator), but would otherwise vanish from parseTasksFromFile,
-    // getNextTask, tw_detect_drift and tw_sync all at once with no signal
-    // anywhere. Refuse to let that happen quietly.
+    // Fail loud instead of silently erasing. An ordinary strict-parse miss
+    // (blank line, prose, a `## ` heading already handled above) is
+    // expected and stays silently skipped. But a line that (a) looks like a
+    // checkbox task row AND (b) carries a JS-only line terminator
+    // (U+2028/U+2029) that the strict regex's trailing `(.+)$` cannot cross
+    // is a corrupted row: it is really on disk (this loop reached it —
+    // split("\n") never breaks on the terminator), but would otherwise
+    // vanish from parseTasksFromFile, getNextTask, tw_detect_drift and
+    // tw_sync all at once with no signal anywhere. Refuse to let that happen
+    // quietly. (E131)
     if (FORBIDDEN_TERMINATOR_RE.test(trimmedLine) && TASK_LINE_SHAPE_RE.test(trimmedLine)) {
       throw new Error(
         `tasks.md is corrupted: an open or completed checkbox task row contains a U+2028 ` +
@@ -308,34 +304,28 @@ function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-// C1 (round 2, review_reports/review_T-E121-01.md) — the newline half of
-// E121, sibling to the $-expansion half already fixed above. `tasks.md` is a
-// line-oriented format: one task is one physical line, and every mutator
-// below embeds a caller-supplied string into that line (via a replacer
-// function, or — in addTaskInFile — plain concatenation). A caller-supplied
-// value containing "\n" or "\r" is therefore not merely awkward, it is
-// structurally incompatible: it plants an independently parseable line
-// elsewhere in the file, which the E117 post-write invariant (voidTaskInFile
-// only) cannot see because that check defends `taskId` only, and which the
-// three sibling mutators cannot see at all because they have no such check.
-// Refuse loud, at the input boundary, before any write — reusing this file's
-// own "a silent no-op is worse than a loud refusal here" precedent
-// (voidTaskInFile's post-write refusal below) rather than silently
-// flattening text the caller typed.
+// Input-boundary refusal of line breaks in caller-supplied text. `tasks.md`
+// is line-oriented: one task is one physical line, and every mutator below
+// embeds a caller-supplied string into that line (via a replacer function,
+// or — in addTaskInFile — plain concatenation). A value containing "\n" or
+// "\r" is structurally incompatible: it plants an independently parseable
+// line elsewhere in the file (a forged task row), which voidTaskInFile's
+// post-write check cannot see because it defends `taskId` only, and which
+// the three sibling mutators cannot see at all. So refuse loudly at the
+// input boundary, before any write — a silent no-op is worse than a loud
+// refusal here — rather than silently flattening text the caller typed.
+// (E121)
 //
-// E131 widening: JavaScript counts U+2028 LINE SEPARATOR and U+2029
-// PARAGRAPH SEPARATOR as line terminators for regex purposes (`.` cannot
-// consume them and an un-anchored `$` cannot cross them) even though
-// String.prototype.split("\n") — used throughout this file — does not
-// split on them. A caller-supplied value carrying one of these characters
-// therefore lands on disk as what a human reader sees as one physical
-// line, yet is invisible to parseTaskLine's regex match: the row survives
-// in tasks.md but silently vanishes from parseTasksFromFile, getNextTask,
-// tw_detect_drift and tw_sync simultaneously (E131, measured identical at
-// base and at the E121 tree — pre-existing, not an E121 regression). Same
-// refusal contract as the CR/LF guard above, now covering both directions
-// of the line-erasure family (E121 forged rows via CR/LF; E131 erases rows
-// via U+2028/U+2029) with a single widened character class.
+// The same refusal covers U+2028 LINE SEPARATOR and U+2029 PARAGRAPH
+// SEPARATOR: JavaScript treats them as line terminators for regex purposes
+// (`.` cannot consume them and an un-anchored `$` cannot cross them) even
+// though String.prototype.split("\n") — used throughout this file — does not
+// split on them. A value carrying one lands on disk as what a human sees as
+// one physical line, yet parseTaskLine's regex cannot match it: the row
+// stays in tasks.md but silently vanishes from parseTasksFromFile,
+// getNextTask, tw_detect_drift and tw_sync at once. One widened character
+// class therefore covers both ways a line can go wrong: CR/LF forges rows,
+// U+2028/U+2029 erases them. (E131)
 function containsLineBreak(s: string): boolean {
   return /[\r\n\u2028\u2029]/.test(s);
 }
@@ -368,8 +358,8 @@ export async function completeTaskInFile(
         `unrelated, independently parseable line in the file.`,
     });
   }
-  // e125a: lock the LANE ledger (never a legacy path), verify freshness
-  // against the pre-migration path, then migrate under the lock.
+  // Lock the LANE ledger (never a legacy path), verify freshness against the
+  // pre-migration path, then migrate under the lock. (E125a)
   const filePath = findTasksFile(workspacePath);
   if (!filePath) {
     return JSON.stringify({ error: "No task list file found." });
@@ -405,9 +395,9 @@ export async function completeTaskInFile(
     // Replacer FUNCTION, not a replacement string: `note` is caller-derived
     // and String.replace's replacement-string grammar interprets $&, $`, $',
     // $1, $$ — a note quoting a task row verbatim (ordinary during a re-cut)
-    // can splice arbitrary surrounding file content into the write. A
+    // could splice arbitrary surrounding file content into the write. A
     // function's return value is used literally, so no `$` sequence in
-    // `suffix` is ever expanded (E121, docs/backlog.md order 0t).
+    // `suffix` is ever expanded. (E121)
     content = content.replace(oldPattern, (_match, p1: string) => `- [x] ${taskId}${p1}${suffix}`);
 
     atomicWrite(result.filePath, content);
@@ -447,8 +437,8 @@ export async function rollbackTaskInFile(
         `unrelated, independently parseable line in the file.`,
     });
   }
-  // e125a: lock the LANE ledger (never a legacy path), verify freshness
-  // against the pre-migration path, then migrate under the lock.
+  // Lock the LANE ledger (never a legacy path), verify freshness against the
+  // pre-migration path, then migrate under the lock. (E125a)
   const filePath = findTasksFile(workspacePath);
   if (!filePath) {
     return JSON.stringify({ error: "No task list file found." });
@@ -483,7 +473,7 @@ export async function rollbackTaskInFile(
     }
     // Replacer FUNCTION, not a replacement string — see completeTaskInFile
     // above for why: `reason` is caller-derived and must never pass through
-    // String.replace's $&/$`/$'/$1/$$ replacement grammar (E121).
+    // String.replace's $&/$`/$'/$1/$$ replacement grammar. (E121)
     content = content.replace(
       oldPattern,
       (_match, p1: string) => `- [ ] ${taskId}${p1} (reverted: ${reason})`,
@@ -498,52 +488,46 @@ export async function rollbackTaskInFile(
 
 /**
  * Void a task: mark it as never-should-have-existed rather than "done, then
- * reverted" (E117). Reuses the existing checkbox-line format with a marker
- * checkmark char, `-`, that DEFAULT_TASK_REGEX's `[ x]` character class (and
- * any custom taskPattern following the same "space or x" convention) cannot
- * match — so a voided line is structurally invisible to parseTaskLine and
- * therefore to every consumer of parseTasksFromFile: getNextTaskFromFile
- * (E112's fix — a voided row is never offered again), tw_detect_drift (never
- * counted as completed or incomplete, never flagged as vibe-coding drift),
- * and tw_sync (never a reconcile or refused-vibe-drift candidate).
+ * reverted". Reuses the checkbox-line format with a marker char, `-`, that
+ * DEFAULT_TASK_REGEX's `[ x]` character class (and any custom taskPattern
+ * following the same "space or x" convention) cannot match — so a voided
+ * line is invisible to parseTaskLine and therefore to every consumer of
+ * parseTasksFromFile: getNextTaskFromFile (a voided row is never offered
+ * again), tw_detect_drift (never counted as completed or incomplete, never
+ * flagged as drift), and tw_sync (never a reconcile or refused-drift
+ * candidate). (E117)
  *
- * E120 update: the voided line's invisibility to the DEFAULT_TASK_REGEX-
- * shaped ID-uniqueness scan in addTaskInFile used to make the task ID
- * legally reusable in a re-cut (E117's original intent). That turned out to
- * be a defect, not a feature: review_reports/review_<id>.md and
- * qa_reports/review_<id>.md are existence-based and keyed only by id, so a
- * re-cut of a voided id silently inherited the voided incarnation's
- * review/QA evidence and satisfied both gates for work nobody reviewed.
- * addTaskInFile now scans for the fixed `- [-] <id>` void-marker format
- * directly (see the voidedPattern check there) and refuses the re-cut
- * outright — a re-cut is different work, and refusing removes the state in
- * which the bug is expressible rather than adding a version field every
- * future evidence reader would have to honour. The voided marker line
- * itself is unchanged by this: it stays on disk, still invisible to
- * parseTaskLine, still exactly as this comment originally described.
+ * A voided id can NOT be reused by a re-cut. review_reports/review_<id>.md
+ * and qa_reports/review_<id>.md are existence-based and keyed only by id, so
+ * a re-cut of a voided id would silently inherit the voided task's
+ * review/QA evidence and pass both gates for work nobody reviewed.
+ * addTaskInFile therefore scans for the fixed `- [-] <id>` void-marker
+ * format directly (see the voidedPattern check there) and refuses the
+ * re-cut outright: a re-cut is different work, and refusing removes the
+ * state in which the problem can occur instead of adding a version field
+ * every future evidence reader would have to honour. The voided marker line
+ * itself stays on disk, still invisible to parseTaskLine. (E120)
  *
  * Only a currently-incomplete (`[ ]`) row may be voided; an already-completed
  * (`[x]`) row is refused. Completion is checked against BOTH the tasks.md
- * mirror and the authoritative `handoff.completed_tasks` ledger (round 2,
- * C1) — tasks.md can lag the ledger (the exact state tw_sync exists to
- * repair), and voiding in that window would delete the row a completion
- * check depends on, making the drift permanently unreachable
- * (tools/drift.ts builds its id vocabulary from tasks.md alone). A task id
- * that is already voided is reported distinctly from one that never
- * existed (round 2, Q1) — the voided line, marker included, is still on
- * disk and there is no threat model that benefits from hiding it locally.
+ * mirror and the authoritative `handoff.completed_tasks` ledger — tasks.md
+ * can lag the ledger (the exact state tw_sync exists to repair), and voiding
+ * in that window would delete the row a completion check depends on, making
+ * the drift permanently unreachable (tools/drift.ts builds its id
+ * vocabulary from tasks.md alone). A task id that is already voided is
+ * reported differently from one that never existed — the voided line,
+ * marker included, is still on disk and nothing is gained by hiding it.
  *
  * Before committing the write, the POST-WRITE invariant — "after this
  * write, taskId must not parse as a task" — is asserted against the REAL
- * content about to be written (round 3, C5; supersedes round 2's C2, which
- * checked a hand-rebuilt replacement line instead and missed both a
- * newline and a `$`-expansion escape from that line). The candidate content
+ * content about to be written (not a hand-rebuilt replacement line, which
+ * can miss both a newline and a `$`-expansion escape). The candidate content
  * is produced by the exact same String.replace call used for the actual
- * write, then re-parsed line-by-line — as parseTasks() itself parses the
+ * write, then re-parsed line by line — as parseTasks() itself parses the
  * file — against the WORKSPACE'S CONFIGURED taskPattern, not just the
- * default regex the doc paragraph above assumes. The void is refused if
- * taskId still comes back as a task anywhere in the resulting file (live
- * or "completed", on the voided line or on a line planted elsewhere by the
+ * default regex the paragraph above assumes. The void is refused if taskId
+ * still comes back as a task anywhere in the resulting file (live or
+ * "completed", on the voided line or on a line planted elsewhere by the
  * reason text). A custom taskPattern using a different completion
  * convention than the default's `[ x]` class could otherwise accept the
  * write and report success while the row keeps being offered — a silent
@@ -581,8 +565,8 @@ export async function voidTaskInFile(
         `unrelated, independently parseable line in the file.`,
     });
   }
-  // e125a: lock the LANE ledger (never a legacy path), verify freshness
-  // against the pre-migration path, then migrate under the lock.
+  // Lock the LANE ledger (never a legacy path), verify freshness against the
+  // pre-migration path, then migrate under the lock. (E125a)
   const filePath = findTasksFile(workspacePath);
   if (!filePath) {
     return JSON.stringify({ error: "No task list file found." });
@@ -601,33 +585,22 @@ export async function voidTaskInFile(
 
     const task = result.tasks.find((t) => t.id === taskId);
     if (!task) {
-      // Q1: distinguish "already voided" from "never existed" in file mode —
+      // Distinguish "already voided" from "never existed" in file mode —
       // the voided marker line is still literally on disk even though it no
       // longer parses as a task. The void marker ("- [-] ") is this tool's
       // own fixed write format, independent of any configured taskPattern,
       // so this scan is reliable regardless of taskPattern.
-      // C1 fix (review round 1): every other scan in this file normalises
-      // leading whitespace before matching (the duplicate-id re-scan below
-      // trims per-line, and parseTasks trims too), so an indented voided
-      // row is a fully supported row everywhere else. `^` alone missed it.
-      // NEW-3 fix (same round): `\b` requires a word character on the id's
-      // trailing side, which fails for ids ending in punctuation (e.g.
-      // "T-1.", "T-1)") even though they legally match the row's `(\S+)` id
-      // group — `(?=\s|$)` bounds the id correctly regardless of what
-      // character it ends in.
-      // R2-C1 fix (round 2): the round-1 fix normalised leading whitespace
-      // with `[ \t]*`, a two-character subset of what `String.prototype.trim()`
-      // strips (trim() also removes U+00A0, U+000B, U+000C, U+2000-U+200A,
-      // U+2028, U+2029, U+202F, U+205F, U+3000, U+FEFF, among others). Since
-      // `parseTasks` (see the top-level parse loop) and the duplicate-id
-      // re-scan directly below in `addTaskInFile` both trim() each line
-      // before matching, an indented voided row using one of those other
-      // whitespace characters parsed as a live task everywhere else in this
-      // file while staying invisible to this scan — reproducing C1 verbatim
-      // under a different indent character. Fixed by testing the anchored,
-      // unindented pattern against each line's own trim() output, byte-
-      // identical normalisation to both of those sites, rather than trying
-      // to enumerate whitespace inside the regex itself.
+      // Every other scan in this file trims each line before matching (the
+      // duplicate-id re-scan below in `addTaskInFile`, and `parseTasks`), so
+      // an indented voided row is a fully supported row everywhere else. This
+      // scan therefore tests the anchored, unindented pattern against each
+      // line's own trim() output — byte-identical normalisation to both of
+      // those sites, including the non-ASCII whitespace trim() strips (U+00A0,
+      // U+2000-U+200A, U+3000, U+FEFF, ...) that a `[ \t]*` prefix would miss.
+      // The id is bounded by `(?=\s|$)`, not `\b`: `\b` needs a word character
+      // on the id's trailing side, so it fails for ids ending in punctuation
+      // (e.g. "T-1.", "T-1)") that still legally match the row's `(\S+)` id
+      // group.
       const voidedPattern = new RegExp(`^- \\[-\\] ${escapeRegExp(taskId)}(?=\\s|$)`);
       const alreadyVoided = content.split("\n").some((line) => voidedPattern.test(line.trim()));
       if (alreadyVoided) {
@@ -665,35 +638,30 @@ export async function voidTaskInFile(
       });
     }
 
-    // C5 fix (round 3, replaces the round-2 C2 check): assert the
-    // POST-WRITE invariant — "after this write, taskId must not parse as a
-    // task" — over the REAL content about to be written, not over a string
-    // rebuilt alongside it. Build newContent via the exact same
-    // String.replace call used for the actual write (so any `$`-expansion
-    // in `reason` — $&, $1, $$, etc. — is already baked in, exactly as it
-    // will be on disk), then re-parse it the way parseTasks() does: split
-    // into real lines and run parseTaskLine per line against the
-    // workspace's configured taskPattern.
+    // Assert the POST-WRITE invariant — "after this write, taskId must not
+    // parse as a task" — over the REAL content about to be written, not a
+    // string rebuilt alongside it. Build newContent with the exact same
+    // String.replace call used for the actual write (so any `$`-expansion in
+    // `reason` — $&, $1, $$, etc. — is already baked in, exactly as it will
+    // be on disk), then re-parse it the way parseTasks() does: split into
+    // real lines and run parseTaskLine per line against the workspace's
+    // configured taskPattern.
     //
     // By this point `reason` cannot contain a newline — the input-boundary
-    // guard at the top of this function (C1, round 2) already refused that
-    // case before any read or write, closing the vector this check used to
-    // be the ONLY thing catching (review_reports/review_T-E121-01.md C1: the
-    // guard here defends `parsed.id === taskId` only, so a *different*
-    // forged id, e.g. from a newline-bearing reason, sailed straight past
-    // it — that gap is now closed structurally at the boundary, not here).
+    // guard at the top of this function already refused that before any read
+    // or write. That matters because this check only compares
+    // `parsed.id === taskId`, so a *different* forged id (for example from a
+    // newline-bearing reason) would pass it; the boundary guard closes that.
     // Replacer FUNCTION, not a replacement string — see completeTaskInFile
     // above for why: `reason` is caller-derived and must never pass through
-    // String.replace's $&/$`/$'/$1/$$ replacement grammar (E121).
+    // String.replace's $&/$`/$'/$1/$$ replacement grammar. (E121)
     //
-    // This check remains load-bearing for what's left: a same-id
-    // resurrection that doesn't need a newline at all — e.g. a custom
-    // taskPattern whose checkmark class also matches the void marker char
-    // `-` (test C2), so the voided line itself still parses as `taskId`
-    // under that pattern. Newline-bearing and $-expansion payloads are both
-    // now refused upstream of this point; this check is the remaining
-    // backstop for the taskPattern-shape case, not a substitute for either
-    // upstream fix.
+    // What this check still catches: a same-id resurrection that needs no
+    // newline at all — e.g. a custom taskPattern whose checkmark class also
+    // matches the void marker char `-`, so the voided line itself still
+    // parses as `taskId` under that pattern. Newline and $-expansion payloads
+    // are both refused before this point; this check is the remaining
+    // backstop for the taskPattern-shape case, not a substitute for either.
     const newContent = content.replace(
       oldPattern,
       (_match, p1: string) => `- [-] ${taskId}${p1} (voided: ${reason})`,
@@ -721,9 +689,9 @@ export async function voidTaskInFile(
 }
 
 /**
- * Append a new task to the current lane's ledger `.current/<lane>/tasks.md`
- * (e125a AC9), creating it with a minimal scaffold if absent. Never writes a
- * legacy task file.
+ * Append a new task to the current lane's ledger `.current/<lane>/tasks.md`,
+ * creating it with a minimal scaffold if absent. Never writes a legacy task
+ * file. (E125a)
  */
 export async function addTaskInFile(
   workspacePath: string,
@@ -780,8 +748,8 @@ export async function addTaskInFile(
     }
 
     const targetSection = section?.trim() || "Active";
-    // e125a D12 / AC14(d): `_primary` must not grow a row that its own
-    // ownership filter would immediately hide.
+    // `_primary` must not grow a row that its own ownership filter would
+    // immediately hide. (E125a)
     if (isPrimaryLedger(targetPath) && makeForeignCheck(targetPath)(targetSection)) {
       return JSON.stringify({
         error:
@@ -804,40 +772,27 @@ export async function addTaskInFile(
           return JSON.stringify({ error: `Task ${taskId} already exists.` });
         }
       }
-      // E120: the scans above use `regex` (DEFAULT_TASK_REGEX or a custom
-      // taskPattern), whose checkmark class is `[ x]` by convention and so —
-      // by design (see voidTaskInFile's doc comment above) — never matches a
-      // voided row's `- [-] <id>` marker line. That is exactly what
-      // previously let a re-cut of a voided id sail past this uniqueness
-      // check and reuse the id: review_reports/review_<id>.md and
-      // qa_reports/review_<id>.md are existence-based, keyed only by id, so
-      // the voided incarnation's leftover evidence silently satisfied the
-      // gates for a never-reviewed re-cut (E120). Settled closure: refuse
-      // the re-cut outright rather than stamp evidence with a void
-      // generation — a re-cut is different work, and this removes the state
-      // in which the bug is expressible instead of adding a version field
-      // every future evidence reader would have to honour. Scan for the
-      // fixed void-marker format directly (independent of any configured
-      // taskPattern, exactly as the "already voided" check in
-      // voidTaskInFile does), and refuse loud in the same style as the
-      // "already exists" refusals above.
-      // C1 fix (review round 1): matches the identical correction in
-      // voidTaskInFile's Q1 check above — `^` alone missed an indented void
-      // marker (every other scan in this function normalises whitespace
-      // first), which let a re-cut of an indented-then-voided id bypass
-      // this very refusal. NEW-3 fix (same round): `(?=\s|$)` replaces `\b`
-      // so ids ending in a non-word character (e.g. "T-1.", "T-1)") are
-      // still bounded correctly.
-      // R2-C1 fix (round 2): identical correction to voidTaskInFile's Q1
-      // check — `[ \t]*` only absorbed space/tab, a subset of what trim()
-      // strips, so an id voided behind one of the other whitespace
-      // characters (NBSP, VT, FF, the various Unicode space separators,
-      // BOM, ...) still parsed as a live task via the duplicate-id re-scan
-      // three lines above (which trims per-line) while staying invisible to
-      // this scan, letting the re-cut through. Fixed the same way: test the
-      // anchored, unindented pattern against each line's own trim() output —
-      // byte-identical normalisation to the re-scan directly above and to
-      // parseTasks.
+      // The scans above use `regex` (DEFAULT_TASK_REGEX or a custom
+      // taskPattern), whose checkmark class is `[ x]` by convention and so,
+      // by design (see voidTaskInFile's doc comment above), never matches a
+      // voided row's `- [-] <id>` marker line. Without a separate check, a
+      // re-cut of a voided id would pass this uniqueness check and reuse the
+      // id — and because review_reports/review_<id>.md and
+      // qa_reports/review_<id>.md are existence-based and keyed only by id,
+      // the voided task's leftover evidence would satisfy the gates for a
+      // re-cut nobody reviewed. So refuse the re-cut outright: a re-cut is
+      // different work. Scan for the fixed void-marker format directly
+      // (independent of any configured taskPattern, exactly as voidTaskInFile's
+      // "already voided" check does), and refuse loudly in the same style as
+      // the "already exists" refusals above. (E120)
+      // Matching details, identical to voidTaskInFile's "already voided"
+      // check: test the anchored, unindented pattern against each line's own
+      // trim() output — the same normalisation as the duplicate-id re-scan
+      // directly above and as parseTasks — so an id voided behind any
+      // leading whitespace trim() strips (spaces, tabs, NBSP, VT, FF, the
+      // Unicode space separators, BOM, ...) is still caught. `(?=\s|$)`
+      // rather than `\b` bounds ids that end in a non-word character (e.g.
+      // "T-1.", "T-1)").
       const voidedPattern = new RegExp(`^- \\[-\\] ${escapeRegExp(taskId)}(?=\\s|$)`);
       const wasVoided = content.split("\n").some((line) => voidedPattern.test(line.trim()));
       if (wasVoided) {

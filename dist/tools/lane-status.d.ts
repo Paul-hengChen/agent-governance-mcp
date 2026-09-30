@@ -168,23 +168,23 @@ export declare function featureTicketToken(activeFeature: string | null): string
  *  e.g. token "e177b" matches "T-E177B-04" but not "T-E177-04". */
 export declare function idCarriesTicketToken(id: string, token: string): boolean;
 /**
- * AC5 / AC5a-AC5d — independently count the task ids backed by qa evidence
+ * Independently count the task ids backed by qa evidence
  * on disk in one lane's worktree, and compare against the handoff's
  * completed_tasks. Never trusts the handoff's own count.
  *
  * Evidence sources: `qa_reports/*.md` and `qa_reports/archive/<feature>/*.md`
  * — each file's `review_<id>.md` id and its `covers:` ids. The SAME filters
- * apply to both directories; neither is ever scanned unfiltered (AC5a):
- *   - PASS-only (AC5b): a file with no `— PASS — by qa-engineer` round
+ * apply to both directories; neither is ever scanned unfiltered:
+ *   - PASS-only: a file with no `— PASS — by qa-engineer` round
  *     contributes nothing.
  *   - in scope: the id is in completed_tasks, OR carries the feature's ticket
  *     token as a delimited segment (`e177b-lane-status-tooling` → `e177b` →
  *     `T-E177B-04` in scope, `T-E125A-01` not). A worktree's `qa_reports/`
  *     holds every merged feature's evidence, and a release archive holds a
  *     whole wave's.
- *   - no token (AC5c): scoping falls back to completed_tasks membership
+ *   - no token: scoping falls back to completed_tasks membership
  *     alone, and the report states it (TOKEN_NOT_DERIVABLE_NOTE).
- *   - voided (AC5d): an id voided in the lane's own tasks ledger never counts.
+ *   - voided: an id voided in the lane's own tasks ledger never counts.
  *     `lane` names that ledger (`.current/<lane>/`); computeLaneStatus passes
  *     the branch's lane (`feat/<id>-*` → id, else PRIMARY_LANE, mirroring
  *     the live resolver). Omitted, it defaults to the feature's ticket token,
@@ -215,7 +215,7 @@ export interface CutPrereviewInput {
     mailboxRoot: string;
 }
 /**
- * Decision (g) — did a lane that has a written cut (`specs/<active_feature>.md`
+ * Did a lane that has a written cut (`specs/<active_feature>.md`
  * in its worktree) send it for pre-review? Read-only; never throws. States:
  *   sent (to-integrator#<seq>) — first matching block;
  *   missing     — spec exists, no matching block (or the file is absent);
@@ -223,7 +223,7 @@ export interface CutPrereviewInput {
  *   n/a         — no spec;
  *   not-checked — lane unreadable, no active_feature, or a name that is not
  *                 a safe single path segment (never joined into a path).
- * Policy-neutral: whether a given lane must send a cut is E178a's decision.
+ * Policy-neutral: whether a given lane must send a cut is not decided here. (E178b)
  */
 export declare function checkCutPrereview(input: CutPrereviewInput): CutPrereviewCheck;
 /**
@@ -352,14 +352,15 @@ export declare function diffWatchState(prev: LaneWatchState, next: LaneWatchStat
  */
 export declare function readLaneWatchState(key: string, info: LaneInfo, readHandoff: (workspacePath: string) => HandoffState | null, mailboxRoot?: string): LaneWatchState;
 /**
- * Parse a --baseline value (`<lane>=<fp>,...`) against the watched keys
- * (e178b AC5). A repeated key, a malformed entry or an empty value is always
- * a usage error, and the whole value is validated before anything is printed.
+ * Parse a --baseline value (`<lane>=<fp>,...`, the fingerprints a previous
+ * watch printed) against the watched keys. A repeated key, a malformed entry
+ * or an empty value is always a usage error, and the whole value is
+ * validated before anything is printed.
  * An unknown key (one naming no watched lane) is a usage error unless
- * `unknownIsGone` is set — the default watch set (e223 decision (a)), where it
- * is a lane that closed since the last watch. Such keys are kept in the
- * returned map, in --baseline order, for the caller to report as gone; an
- * all-gone value is not empty (e223 decision (b)).
+ * `unknownIsGone` is set — the default watch set, where it is a lane that
+ * closed since the last watch. Such keys are kept in the returned map, in
+ * --baseline order, for the caller to report as gone; an all-gone value is
+ * not empty. (E178b, E223)
  */
 export declare function parseWatchBaseline(value: string | undefined, keys: readonly string[], opts?: {
     unknownIsGone?: boolean;

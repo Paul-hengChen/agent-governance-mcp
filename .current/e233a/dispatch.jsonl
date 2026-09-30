@@ -1,0 +1,15 @@
+{"ts":"2026-09-29T11:44:45.127Z","feature":"e233a-tools-comments","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-29T11:45:07.230Z","feature":"e233a-tools-comments","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-29T11:47:42.000Z","feature":"e233a-tools-comments","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-29T12:08:03.143Z","feature":"e233a-tools-comments","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-29T12:10:00.518Z","feature":"e233a-tools-comments","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-29T12:10:59.668Z","feature":"e233a-tools-comments","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-29T12:13:52.363Z","feature":"e233a-tools-comments","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-29T12:19:29.247Z","feature":"e233a-tools-comments","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-29T12:20:19.360Z","feature":"e233a-tools-comments","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-29T12:21:43.541Z","feature":"e233a-tools-comments","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-29T12:26:18.030Z","feature":"e233a-tools-comments","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-09-29T12:28:07.709Z","feature":"e233a-tools-comments","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-09-29T12:29:06.312Z","feature":"e233a-tools-comments","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-29T12:30:04.752Z","feature":"e233a-tools-comments","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-29T12:34:32.736Z","feature":"e233a-tools-comments","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}

@@ -1,6 +1,5 @@
 // Coded by @sr-engineer
-// Legacy tasks.md -> lane-local `.current/<lane>/tasks.md` migration
-// (e125a-lane-local-ledgers, spec D-C/D-D/D-E, architecture D4-D7/D12-D14).
+// Legacy tasks.md -> lane-local `.current/<lane>/tasks.md` migration. (E125a)
 //
 //   _primary : COPY the legacy body into the lane ledger, then re-stamp the
 //              legacy file as a v2 index (sentinel + notice + body) and write
@@ -9,18 +8,18 @@
 //              into the lane ledger; each contiguous run becomes one marker
 //              line in the legacy file, whose sentinel is left untouched.
 //
-// A legacy file at v2+ is an index, never a forward source (D13) — but a
-// MISSING ledger it proves must exist is loud, never empty (AC6b,
-// TasksLedgerAbsentError). A git-ignored lane path skips the migration and
-// keeps the legacy file as the ledger (option A, AC4b). Lock order
-// (D4): the lane's tasks lock OUTER, the legacy file's lock INNER. Both are
-// taken with a small synchronous bounded-wait lock (D5) whose timeout throws
-// TasksMigrationBusyError — never a silent skip (D14).
+// A legacy file at v2+ is an index, never a forward source — but a MISSING
+// ledger it proves must exist is reported loudly, never treated as empty
+// (TasksLedgerAbsentError). A git-ignored lane path skips the migration and
+// keeps the legacy file as the ledger. Lock order: the lane's tasks lock
+// OUTER, the legacy file's lock INNER. Both are taken with a small
+// synchronous bounded-wait lock whose timeout throws
+// TasksMigrationBusyError — never a silent skip.
 //
-// Reverse (spec D-E/D11, AC7/AC8; runner-only, no CLI): migratePrimaryReverse
-// and migrateFeatReverse restore the legacy file from the lane ledger's
-// CURRENT body and delete the ledger. Every precondition is checked before
-// the first write, so a refused run touches nothing.
+// Reverse (runner-only, no CLI): migratePrimaryReverse and
+// migrateFeatReverse restore the legacy file from the lane ledger's CURRENT
+// body and delete the ledger. Every precondition is checked before the
+// first write, so a refused run touches nothing.
 import { execFileSync } from "child_process";
 import * as crypto from "crypto";
 import * as fs from "fs";
@@ -66,10 +65,9 @@ function splitSentinel(raw) {
     return { version: Number(m[1]), header: m[0], body: raw.slice(m[0].length) };
 }
 /**
- * AC6b (review round 1, C1): the lane ledger is absent but the legacy file
- * proves one must exist — a `_primary` v2+ index, `tasks_moved` markers for
- * this feat lane, or a newer-server schema. Thrown instead of reporting an
- * empty task list. `.code` stays outside the error-code-contract harvest.
+ * The lane ledger is absent but the legacy file proves one must exist — a
+ * `_primary` v2+ index, `tasks_moved` markers for this feat lane, or a
+ * newer-server schema. Thrown instead of reporting an empty task list. `.code` stays outside the error-code-contract harvest.
  */
 export class TasksLedgerAbsentError extends Error {
     code = "TASKS_LEDGER_ABSENT";
@@ -161,7 +159,7 @@ function atomicWriteRaw(filePath, content) {
 function sha256(text) {
     return crypto.createHash("sha256").update(text, "utf-8").digest("hex");
 }
-// ---------- E125c / E195: index normalization (spec Definitions) ----------
+// ---------- index normalization for the reverse-run receipt (E125c, E195) ----------
 // Re-declared from bin/agc-init.mjs (applyClosedLanePointer) — bin/ is not
 // importable from tools/: the Closed Lanes heading, and the line that ends
 // its section (the next `#`/`##` heading).
@@ -225,10 +223,10 @@ function normalizeIndexBody(body) {
 }
 /**
  * The `_primary` reverse-run receipt sha: sha256(normalizeIndexBody(body)).
- * Shared by the forward stamp, the reverse check and the E125c one-off
- * compaction, so the sanctioned post-forward root edits (`agc feature
+ * Shared by the forward stamp, the reverse check and the one-off index
+ * compaction, so the allowed root edits after a forward run (`agc feature
  * finish --shipped` removing a lane's markers and appending a Closed Lanes
- * pointer) never break the reverse (E195). Pure.
+ * pointer) never break the reverse. Pure. (E125c, E195)
  */
 export function primaryIndexReceiptSha(body) {
     return sha256(normalizeIndexBody(body));
@@ -252,12 +250,12 @@ function splitBlocks(body) {
         blocks.shift();
     return { blocks, trailingNewline };
 }
-// D-C `_primary`: lane ledger first (the commit point), then the receipt,
-// then the legacy index — an interruption never hides the ledger.
-// E125c (R1 = A): a root `## Closed Lanes` section stays in the index only —
-// the ledger copy is the body without it (canonical trailing newline), so
-// both round trips are byte-exact. A body with no CL section is copied
-// verbatim (pre-E125c forward, AC6 condition ii).
+// `_primary` forward: lane ledger first (the commit point), then the
+// receipt, then the legacy index — an interruption never hides the ledger.
+// A root `## Closed Lanes` section stays in the index only — the ledger copy
+// is the body without it (canonical trailing newline), so both round trips
+// are byte-exact. A body with no Closed Lanes section is copied verbatim.
+// (E125c)
 function migratePrimaryForward(workspacePath, legacyPath, laneTasksPath, body) {
     const split = splitLines(body);
     const { rest, closedLanes } = peelClosedLanes(split.lines);
@@ -325,8 +323,8 @@ export function isLanePathIgnored(workspacePath, lanePath) {
 /**
  * The file tw_* reads and writes as the task ledger: the lane ledger, except
  * in a workspace whose absent lane path is git-ignored — there the legacy
- * file stays the ledger exactly as before E125a (or, with none yet, the
- * first taskPaths candidate, the pre-E125a add target).
+ * file stays the ledger (or, with none yet, the first taskPaths candidate).
+ * (E125a)
  */
 export function resolveTasksLedgerPath(workspacePath, laneTasksPath) {
     if (fs.existsSync(laneTasksPath) || !isLanePathIgnored(workspacePath, laneTasksPath))
@@ -505,21 +503,21 @@ function readReceiptSha(workspacePath) {
     }
 }
 /**
- * D-E `_primary` reverse. Refuses, touching nothing, unless the legacy file
- * is a v2+ index carrying TASKS_INDEX_NOTICE AND the receipt's bodySha256
- * equals primaryIndexReceiptSha(its trailing body) — or, for a receipt
- * stamped before E125c, sha256 of that raw body (AC5). A missing/unreadable
- * receipt refuses too. Normalization makes exactly two post-forward root
- * edits sanctioned (E195): removed `tasks_moved` markers and a `## Closed
- * Lanes` section; any other change refuses (X4b).
- * Then: legacy := v1 sentinel + the lane ledger's CURRENT body (D11), minus
- * the ledger marker lines no longer in the root (AC3), with the root's CL
- * section(s) carried to the end in place of the ledger's own (AC2), and
- * `.current/_primary/tasks.md` + the receipt are deleted. With no CL section
- * on either side the ledger body is kept verbatim (pre-E125c behaviour).
- * O-3: the restored root always carries a v1 sentinel, so a v0
- * (sentinel-less) original, e.g. the `agc init` scaffold, round-trips to its
- * body under a v1 sentinel, not byte-identically (AC7 pins a v1 fixture).
+ * `_primary` reverse. Refuses, touching nothing, unless the legacy file is a
+ * v2+ index carrying TASKS_INDEX_NOTICE AND the receipt's bodySha256 equals
+ * primaryIndexReceiptSha(its trailing body) — or, for a receipt stamped
+ * before index normalization existed, sha256 of that raw body. A missing or
+ * unreadable receipt refuses too. Normalization allows exactly two root
+ * edits after the forward run: removed `tasks_moved` markers and a `##
+ * Closed Lanes` section; any other change refuses. (E125c, E195)
+ * Then: legacy := v1 sentinel + the lane ledger's CURRENT body, minus the
+ * ledger marker lines no longer in the root, with the root's Closed Lanes
+ * section(s) carried to the end in place of the ledger's own, and
+ * `.current/_primary/tasks.md` + the receipt are deleted. With no Closed
+ * Lanes section on either side the ledger body is kept verbatim.
+ * The restored root always carries a v1 sentinel, so a v0 (sentinel-less)
+ * original, e.g. the `agc init` scaffold, round-trips to its body under a
+ * v1 sentinel, not byte-identically.
  */
 export function migratePrimaryReverse(workspacePath) {
     const dir = "primary reverse";

@@ -1,6 +1,6 @@
 // Coded by @sr-engineer
-// tools/lane-status.ts — lane observability + roll-up for the integrator
-// (E177b, e177b-lane-status-tooling, T-E177B-05, spec AC1-AC6).
+// tools/lane-status.ts — lane observability + roll-up for the integrator.
+// (E177b)
 //
 // Replaces the integrator's by-hand lane read (per-worktree handoff reads,
 // `git log` / `git status` per lane, adding hop/round counts against caps,
@@ -8,36 +8,36 @@
 // every one of those failing by hand; this module makes them mechanical.
 //
 // REPORTING SURFACE ONLY — like tools/feature-rollup.ts it fires no gate,
-// writes nothing, and never makes a cap span workspaces (E109).
+// writes nothing, and never makes a cap span workspaces (the server is
+// deliberately workspace-scoped). (E109)
 //
 // Data sources (all imported, none modified — lane boundary):
 //   - lane list: tools/lane-registry.ts `laneRegistryList` (itself
 //     `git worktree list` via tools/feature-rollup.ts). NEVER any
-//     `specs/fanout-*.md` manifest (E177a's concern, AC1).
+//     `specs/fanout-*.md` manifest — that is tools/fanout-manifest.ts's job.
 //   - handoff round fields: tools/handoff-parse.ts `parseHandoff` (the
 //     LaneInfo shape carries hop but not review/qa rounds).
 //   - same-feature hop/ticket totals: tools/feature-rollup.ts
 //     `computeFeatureRollup`, fed this module's already-derived lane list so
-//     nothing is re-derived (AC4).
+//     nothing is re-derived.
 //   - caps: tools/transitions.ts `HOP_CAP_EXPORTED` / `ROUND_CAP_EXPORTED` /
-//     `REVIEW_ROUND_CAP_EXPORTED` — never a hardcoded number (AC4).
+//     `REVIEW_ROUND_CAP_EXPORTED` — never a hardcoded number.
 //   - evidence: tools/evidence-file.ts `parseCoversIds` (covers: label
-//     lines) + direct `review_<id>.md` filenames, PASS rounds only (AC5).
+//     lines) + direct `review_<id>.md` filenames, PASS rounds only.
 //   - ticket token + lane ledger location: tools/lane-paths.ts
 //     `resolveLaneName` / `LEGACY_LANE` / `PRIMARY_LANE` / `isSafeLaneName` /
-//     `laneFile` — imported, never a restated ticket-id regex (the e73/e126
-//     import-only precedent). Deliberately not lane-paths' lane-path
-//     resolver functions: each has its own pinned caller allow-list
-//     (CALLERS1 / CALLERS3 in test/lane-paths.test.mjs) that this ticket is
-//     not authorized to extend, and the row's branch already names the lane.
+//     `laneFile` — imported, never a restated ticket-id regex. Deliberately
+//     not lane-paths' lane-path resolver functions: each has its own pinned
+//     caller allow-list (CALLERS1 / CALLERS3 in test/lane-paths.test.mjs),
+//     and the row's branch already names the lane.
 //
-// E178b adds a `--watch` mode (`runLaneWatch`, T-E178B-01): a polling event
-// stream over every lane's handoff state for the integrator's Monitor tool,
-// with scripts/mailbox-watch.mjs's baseline / `expiring — re-arm` / exit-code
+// `--watch` mode (`runLaneWatch`): a polling event stream over every lane's
+// handoff state for the integrator's Monitor tool, with
+// scripts/mailbox-watch.mjs's baseline / `expiring — re-arm` / exit-code
 // conventions. Each tick reads ONLY the lane list + each lane's handoff — no
-// git log/status, no evidence cross-check (spec decision (b), AC7).
+// git log/status, no evidence cross-check, so a tick stays cheap. (E178b)
 //
-// Degrade-honestly (same posture as tools/feature-rollup.ts, AC3): a lane
+// Degrade-honestly (same posture as tools/feature-rollup.ts): a lane
 // whose handoff is missing/unparseable is always CARRIED with
 // `readable: false` and a reason string — never dropped, never zero-filled —
 // and the whole report is marked degraded with a stated reason.
@@ -359,23 +359,23 @@ function voidedTaskIds(workspacePath: string, lane: string): Set<string> {
 }
 
 /**
- * AC5 / AC5a-AC5d — independently count the task ids backed by qa evidence
+ * Independently count the task ids backed by qa evidence
  * on disk in one lane's worktree, and compare against the handoff's
  * completed_tasks. Never trusts the handoff's own count.
  *
  * Evidence sources: `qa_reports/*.md` and `qa_reports/archive/<feature>/*.md`
  * — each file's `review_<id>.md` id and its `covers:` ids. The SAME filters
- * apply to both directories; neither is ever scanned unfiltered (AC5a):
- *   - PASS-only (AC5b): a file with no `— PASS — by qa-engineer` round
+ * apply to both directories; neither is ever scanned unfiltered:
+ *   - PASS-only: a file with no `— PASS — by qa-engineer` round
  *     contributes nothing.
  *   - in scope: the id is in completed_tasks, OR carries the feature's ticket
  *     token as a delimited segment (`e177b-lane-status-tooling` → `e177b` →
  *     `T-E177B-04` in scope, `T-E125A-01` not). A worktree's `qa_reports/`
  *     holds every merged feature's evidence, and a release archive holds a
  *     whole wave's.
- *   - no token (AC5c): scoping falls back to completed_tasks membership
+ *   - no token: scoping falls back to completed_tasks membership
  *     alone, and the report states it (TOKEN_NOT_DERIVABLE_NOTE).
- *   - voided (AC5d): an id voided in the lane's own tasks ledger never counts.
+ *   - voided: an id voided in the lane's own tasks ledger never counts.
  *     `lane` names that ledger (`.current/<lane>/`); computeLaneStatus passes
  *     the branch's lane (`feat/<id>-*` → id, else PRIMARY_LANE, mirroring
  *     the live resolver). Omitted, it defaults to the feature's ticket token,
@@ -432,7 +432,7 @@ export function checkLaneEvidence(
 }
 
 // ---------------------------------------------------------------------------
-// Cut pre-review fan-in (E178b T-E178B-02, spec decision (g), AC10-AC15)
+// Cut pre-review fan-in: did each lane send its written cut for pre-review? (E178b)
 // ---------------------------------------------------------------------------
 
 /** The lane-side mailbox file, as docs/lane-protocol.md §5 names it. */
@@ -504,7 +504,7 @@ function isRegularFile(p: string): boolean {
 }
 
 /**
- * Decision (g) — did a lane that has a written cut (`specs/<active_feature>.md`
+ * Did a lane that has a written cut (`specs/<active_feature>.md`
  * in its worktree) send it for pre-review? Read-only; never throws. States:
  *   sent (to-integrator#<seq>) — first matching block;
  *   missing     — spec exists, no matching block (or the file is absent);
@@ -512,7 +512,7 @@ function isRegularFile(p: string): boolean {
  *   n/a         — no spec;
  *   not-checked — lane unreadable, no active_feature, or a name that is not
  *                 a safe single path segment (never joined into a path).
- * Policy-neutral: whether a given lane must send a cut is E178a's decision.
+ * Policy-neutral: whether a given lane must send a cut is not decided here. (E178b)
  */
 export function checkCutPrereview(input: CutPrereviewInput): CutPrereviewCheck {
   const notChecked = (reason: string): CutPrereviewCheck => ({
@@ -695,7 +695,7 @@ export function computeLaneStatus(opts: ComputeLaneStatusOptions = {}): LaneStat
       );
     }
 
-    // E178b decision (g) — cut pre-review fan-in, only when asked for.
+    // Cut pre-review fan-in, only when a mailbox root was given. (E178b)
     if (opts.mailboxRoot !== undefined) {
       row.cutPrereview = checkCutPrereview({
         workspacePath: info.workspacePath,
@@ -1261,7 +1261,7 @@ export function runLaneStatusCli(
 }
 
 // ---------------------------------------------------------------------------
-// Watch mode (E178b T-E178B-01, spec AC1-AC9, decisions (a)-(f), (j))
+// Watch mode (E178b)
 // ---------------------------------------------------------------------------
 //
 // A multi-lane polling event stream, the handoff-state twin of
@@ -1270,8 +1270,7 @@ export function runLaneStatusCli(
 // ready-to-run re-arm command carrying the fingerprint of every lane's state
 // line AS THIS WATCH LAST READ IT (never a fresh read at expiry), so a
 // transition landing between two watches still fires as
-// `changed since last watch:` (decision (d)). Read-only, no watch lock
-// (decision (e)).
+// `changed since last watch:`. Read-only, no watch lock.
 
 /** Mirrors scripts/mailbox-watch.mjs `DEFAULT_DEADLINE_MINUTES` — tools/ cannot
  *  import scripts/*.mjs under the tsconfig, so the value is declared here and
@@ -1422,14 +1421,15 @@ export function readLaneWatchState(
 }
 
 /**
- * Parse a --baseline value (`<lane>=<fp>,...`) against the watched keys
- * (e178b AC5). A repeated key, a malformed entry or an empty value is always
- * a usage error, and the whole value is validated before anything is printed.
+ * Parse a --baseline value (`<lane>=<fp>,...`, the fingerprints a previous
+ * watch printed) against the watched keys. A repeated key, a malformed entry
+ * or an empty value is always a usage error, and the whole value is
+ * validated before anything is printed.
  * An unknown key (one naming no watched lane) is a usage error unless
- * `unknownIsGone` is set — the default watch set (e223 decision (a)), where it
- * is a lane that closed since the last watch. Such keys are kept in the
- * returned map, in --baseline order, for the caller to report as gone; an
- * all-gone value is not empty (e223 decision (b)).
+ * `unknownIsGone` is set — the default watch set, where it is a lane that
+ * closed since the last watch. Such keys are kept in the returned map, in
+ * --baseline order, for the caller to report as gone; an all-gone value is
+ * not empty. (E178b, E223)
  */
 export function parseWatchBaseline(
   value: string | undefined,
@@ -1565,12 +1565,12 @@ async function watchLoop(
   // in the list (lanes join/leave as the list changes).
   const keys = named ? [...new Set(named)] : [...first.lanes.keys()];
   // Under --lanes an unknown key can only be a typo (absent named lanes stay
-  // watched); in the default set it is a lane closed since the last watch
-  // (e223 decision (a)). Exact match only (decision (f)).
+  // watched); in the default set it is a lane closed since the last watch.
+  // Exact match only. (E223)
   const baselines = parseWatchBaseline(args.baseline, keys, { unknownIsGone: !named }); // throws WatchUsageError
-  // e223 decisions (c)-(e): gone keys are reported once after the watched-lane
-  // start lines, in --baseline order; never counted in `armed:`, never
-  // tracked in `last`, so the next re-arm --baseline omits them.
+  // Gone keys are reported once after the watched-lane start lines, in
+  // --baseline order; never counted in `armed:`, never tracked in `last`, so
+  // the next re-arm --baseline omits them. (E223)
   const goneKeys = named ? [] : [...baselines.keys()].filter((k) => !keys.includes(k));
   const last = new Map<string, LaneWatchState | null>();
 
@@ -1626,7 +1626,7 @@ async function watchLoop(
       if (next === null) {
         if (had && prev !== null) io.out(`[${key}] gone`);
         // Default set: a gone lane leaves the watched set and the re-arm
-        // baseline, so it is reported gone once (e223 decision (e)). Named: kept.
+        // baseline, so it is reported gone once. Named: kept. (E223)
         if (named) last.set(key, null);
         else last.delete(key);
         continue;

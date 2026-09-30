@@ -84,18 +84,20 @@ export declare function validateTransition(req: TransitionRequest): TransitionRe
  *   - (pm, In_Progress)           → 0
  *   - everything else             → prev_visual_round
  *
- * hop_count (v9, d2-server-brake-accounting):
- *   - feature_changed             → base resets to 0 (AC-3; the ONLY reset —
- *     (pm, In_Progress) does NOT reset it, unlike the three rounds — DR-6)
- *   - role transition (next.agent !== prev.agent) → base + 1 (DR-9)
+ * hop_count (handoff schema v9):
+ *   - feature_changed             → base resets to 0 (the ONLY reset —
+ *     (pm, In_Progress) does NOT reset it, unlike the three rounds)
+ *   - role transition (next.agent !== prev.agent) → base + 1
  *   - everything else (self-loops, same-agent status changes) → base
+ *   (D2)
  *
- * qa_rounds_total / review_rounds_total / visual_rounds_total (v12,
- * e8-success-telemetry): cumulative mirrors of the per-cycle counters. Each
- * total ticks in lock-step with its per-cycle counter's FAIL branch (the FAIL
- * predicates are copied verbatim so total and cycle counters can never diverge
- * on which event counts), but NEVER resets except on feature change — NOT on
- * QA PASS, NOT on (pm, In_Progress) re-entry (hop_count's reset rule, AC8).
+ * qa_rounds_total / review_rounds_total / visual_rounds_total (handoff
+ * schema v12): cumulative mirrors of the per-cycle counters. Each total
+ * ticks in step with its per-cycle counter's FAIL branch (the FAIL
+ * predicates are copied verbatim so total and cycle counters can never
+ * diverge on which event counts), but NEVER resets except on feature
+ * change — NOT on QA PASS, NOT on (pm, In_Progress) re-entry (hop_count's
+ * reset rule). (E8)
  */
 export declare function computeNewRound(prev_qa_round: number, prev_review_round: number, prev_visual_round: number, next: TransitionTuple, prev?: TransitionTuple, next_pending_notes?: ReadonlyArray<string>, prev_hop_count?: number, feature_changed?: boolean, prev_qa_rounds_total?: number, prev_review_rounds_total?: number, prev_visual_rounds_total?: number): {
     qa_round: number;

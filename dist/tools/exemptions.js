@@ -1,6 +1,6 @@
 // Coded by @sr-engineer
-// Exemptions-manifest loader (E24, 104447-F0 C2). Reads the workspace's
-// declarative build-gate exemption manifest:
+// Exemptions-manifest loader. Reads the workspace's declarative build-gate
+// exemption manifest: (E24)
 //
 //   .current/exemptions.json shape:
 //   {
@@ -18,12 +18,12 @@
 // §2 build gate (ZERO compile/type errors): gate checks (role SOPs — sr build
 // step, code-reviewer, qa suite triage) subtract manifest-exempted paths
 // automatically, and a prose-only exemption (pending_notes, review prose,
-// chat) counts as NOT exempted. Rationale (backlog E24): a rule everyone
-// knows is permanently violated teaches agents that rules are negotiable —
-// the exemption must be a declared, expiring, countable artifact instead of
-// re-litigated prose.
+// chat) counts as NOT exempted. Rationale: a rule everyone knows is
+// permanently violated teaches agents that rules are negotiable — the
+// exemption must be a declared, expiring, countable artifact instead of
+// argued-over prose.
 //
-// Fail direction — never silently exempt (E24 cut constraint):
+// Fail direction — never silently exempt:
 //   - absent file            → null (zero exemptions, no signal — the normal case)
 //   - structural malformation (unreadable, bad JSON, non-object root,
 //     unsupported schema_version, `exemptions` not an array)
@@ -41,7 +41,7 @@
 // helper, and the loader runs once per tw_get_state — no hot path to cache.)
 //
 // Expiry conditions are recorded strings the retro/humans check — the server
-// does NOT evaluate them (E24 cut: no speculative expiry-enforcement engine).
+// does NOT evaluate them (deliberately no expiry-enforcement engine).
 // The exemption count is the monitorable only-grows metric: surfaced on every
 // tw_get_state, and the manifest is a committed workspace file, so growth is
 // auditable via its git history.

@@ -1,6 +1,6 @@
 // Coded by @sr-engineer
 // tools/merge-invariants.ts — post-merge ledger/sidecar preservation check
-// (E126, e126-merge-invariants; spec: specs/e126-merge-invariants.md).
+// (spec: specs/e126-merge-invariants.md). (E126)
 //
 // tw_detect_drift compares two views of ONE workspace's current state, so a
 // merge that drops a lane's task rows AND their [x] marks symmetrically reads
@@ -16,7 +16,7 @@ import { execFileSync } from "node:child_process";
 import { resolveTaskRegex } from "./config.js";
 import { HISTORY_BUCKET_RE, isBytePrefix, isSafeLaneName, NON_LANE_DIRS } from "./lane-paths.js";
 import { SECTION_HEADING_RE } from "./tasks-lane-migrate.js";
-// --- exit-code table (spec T-E126-02) ----------------------------------------
+// --- exit-code table ---------------------------------------------------------
 export const MERGE_INVARIANTS_EXIT = {
     PASS: 0,
     FAIL: 1,
@@ -446,7 +446,7 @@ export function runMergeInvariants(ref = "HEAD", repoRoot = process.cwd()) {
     }
 }
 // =============================================================================
-// T-E126-03 — argv surface (kept here so scripts/merge-invariants.mjs has zero logic)
+// argv surface (kept here so scripts/merge-invariants.mjs has zero logic)
 // =============================================================================
 /** Parse argv (`[ref] [--ref <ref>] [abs-repo-root]`) and run; never throws. */
 export function runMergeInvariantsCli(argv, cwd) {

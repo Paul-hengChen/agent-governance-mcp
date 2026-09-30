@@ -16,7 +16,7 @@ export interface FlatToLaneOptions {
 export interface LaneToFlatOptions {
 }
 /**
- * LOCK-FREE CORE of the flat->lane migration (e123b9 spec AC12).
+ * LOCK-FREE CORE of the flat->lane migration. (E123)
  *
  * CONTRACT: the caller MUST already hold
  * `withFileLock(resolveLaneLockPath(workspacePath, lane))` for the exact
@@ -26,35 +26,34 @@ export interface LaneToFlatOptions {
  * takes NO lock itself; calling the public migrateFlatToLane while holding
  * the lane lock would self-deadlock until LOCK_MAX_WAIT_MS and then fail,
  * because withFileLock is not re-entrant. Intended caller:
- * tools/handoff-write.ts's writeHandoffStateCore (T-E123B9-02), from inside
- * its own per-lane locked section, BEFORE it resolves handoffPath for the
- * write. The lane directory already exists (it hosts the held lock).
+ * tools/handoff-write.ts's writeHandoffStateCore, from inside its own
+ * per-lane locked section, BEFORE it resolves handoffPath for the write. The
+ * lane directory already exists (it hosts the held lock).
  *
  * Behaviour: moves every present flat LANE_FILES entry into
- * `.current/<lane>/`, sidecars first and handoff.md last (amendment AC17).
+ * `.current/<lane>/`, sidecars first and handoff.md last.
  * The required entry must be present at the flat source (throws otherwise,
  * nothing moved), except:
  *   - absent at the source and already in the lane (a completed or
  *     interrupted migration): any leftover flat sidecars are swept in via
- *     the AC15 merge/resume rule (amendment AC18); with none left over it is
- *     the loser of a concurrent race (AC-MIG-3) — `alreadyMigrated: true`,
- *     nothing touched;
- *   - absent at both paths with `opts.allowMissingRequired` (amendment
- *     AC19): the sidecars are moved, no throw.
+ *     the sidecar merge/resume rule; with none left over it is the loser of
+ *     a concurrent race — `alreadyMigrated: true`, nothing touched;
+ *   - absent at both paths with `opts.allowMissingRequired`: the sidecars
+ *     are moved, no throw.
  * Absent optional entries are skipped silently. An optional JSONL sidecar
- * already present in the lane is merged (flat lines first) — spec AC15; a
- * non-JSONL optional entry (pending-tickets.md) with different bytes at both
- * ends refuses instead, nothing moved (e179 AC10). handoff.md
- * at both paths with different bytes throws (dual presence is surfaced one
- * layer up as HANDOFF_LAYOUT_CONFLICT by T-E123B9-02; this is the backstop).
+ * already present in the lane is merged (flat lines first); a non-JSONL
+ * optional entry (pending-tickets.md) with different bytes at both ends
+ * refuses instead, nothing moved. handoff.md at both paths with different
+ * bytes throws (dual presence is reported one layer up as
+ * HANDOFF_LAYOUT_CONFLICT; this is the backstop).
  */
 export declare function migrateFlatToLaneLocked(workspacePath: string, opts?: FlatToLaneOptions): FlatToLaneResult;
 /**
- * e123b9 amendment AC16: the own-workspace migration trigger — true iff ANY
+ * Own-workspace migration trigger: true iff ANY
  * LANE_FILES entry (handoff.md or a sidecar) still exists as a file at the
  * flat `<ws>/.current/<filename>`. Read-only. Shared by tools/handoff-parse.ts
  * (readHandoffState) and tools/handoff-write.ts (writeHandoffStateCore) so
- * both entry points use the same predicate.
+ * both entry points use the same predicate. (E123)
  */
 export declare function hasFlatLaneFiles(workspacePath: string): boolean;
 /**
@@ -72,7 +71,7 @@ export declare function hasFlatLaneFiles(workspacePath: string): boolean;
  */
 export declare function migrateFlatToLane(workspacePath: string, opts?: FlatToLaneOptions): Promise<FlatToLaneResult>;
 /**
- * LOCK-FREE CORE of the lane->flat migration (e123b9 spec AC12).
+ * LOCK-FREE CORE of the lane->flat migration. (E123)
  *
  * CONTRACT: the caller MUST already hold
  * `withFileLock(resolveLaneLockPath(workspacePath, lane))`. This function
@@ -83,14 +82,14 @@ export declare function migrateFlatToLane(workspacePath: string, opts?: FlatToLa
  * empty, and otherwise leaves it holding just the lock for the caller to
  * remove after releasing (the public wrapper does exactly that).
  *
- * Behaviour (unchanged by e123b9 AC15 — no sidecar merge in this direction):
+ * Behaviour (no sidecar merge in this direction):
  * moves `.current/<lane>/`'s lane files back to flat `.current/`. Refuses
  * (throws, touches nothing) when the lane directory is missing, lacks the
  * required entry, holds anything that is not a LANE_FILES entry or tolerable
  * debris (a HANDOFF_LOCK_FILENAME regular file, a `tasks.md.lock` regular
  * file, a stale `<lane file>.<pid>.<ms>.tmp`), or a flat destination exists
- * with different content — and (e125a spec AC2) whenever the lane dir holds
- * tasks.md. Stale tmp debris and a stale tasks.md.lock are removed after the
+ * with different content — and whenever the lane dir holds tasks.md
+ * (E125a). Stale tmp debris and a stale tasks.md.lock are removed after the
  * moves; the held .handoff.lock and a live tasks.md.lock never are.
  */
 export declare function migrateLaneToFlatLocked(workspacePath: string, lane: string, opts?: LaneToFlatOptions): LaneToFlatResult;

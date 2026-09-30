@@ -112,7 +112,7 @@ export interface TransitionRejection {
                                     // (it reads handoff state + storage kind); union extension is
                                     // for handler-side narrowing + envelope consistency (mirrors
                                     // CUT_APPROVAL_REQUIRED).
-    | "SOURCE_CREDIBILITY_UNVERIFIED" // E4 (e4-design-source-credibility-gate) — emitted by the
+    | "SOURCE_CREDIBILITY_UNVERIFIED" // Emitted by the
                                     // handoff-orchestrator gate at the pm → {architect,sr-engineer}
                                     // :In_Progress edge when a fetch-based design/<feature>.md has an
                                     // audited ## Source row lacking credibility: full-page-composite.
@@ -120,8 +120,8 @@ export interface TransitionRejection {
                                     // handoff YAML) — DIFFERENT from EXTERNAL_REFS_UNRESOLVED /
                                     // CUT_APPROVAL_REQUIRED. NOT produced by validateTransition (this
                                     // module stays pure / fs-free); union extension is for handler-side
-                                    // narrowing + envelope consistency (mirrors EXTERNAL_REFS_UNRESOLVED).
-    | "FEATURE_LEASE_HELD"          // E1 (e1-feature-scoped-state-design) — emitted by the
+                                    // narrowing + envelope consistency (mirrors EXTERNAL_REFS_UNRESOLVED). (E4)
+    | "FEATURE_LEASE_HELD"          // Emitted by the
                                     // handoff-orchestrator lease gate when a write carries a
                                     // DIFFERENT active_feature while the incumbent feature is
                                     // non-terminal (status != PASS; Blocked counts as held) and
@@ -130,7 +130,7 @@ export interface TransitionRejection {
                                     // by validateTransition (the lease is derived from prevState,
                                     // which this pure module never reads); union extension is for
                                     // handler-side narrowing + envelope consistency (mirrors
-                                    // SCOPE_DECISION_REQUIRED).
+                                    // SCOPE_DECISION_REQUIRED). (E1)
     | "AGENT_ID_REQUIRED";
   attempted: {
     prev_agent: string | null;
@@ -206,15 +206,11 @@ const ALLOWED: ReadonlyMap<string, AllowedNext> = new Map<string, AllowedNext>([
   ["pm:Blocked", [
     { agent: "pm", status: "In_Progress" },
     { agent: "pm", status: "Blocked" },
-    // (E58, F0 cut) — content/skill-pm.md:28 stamps next_role="design-auditor"
-    // on a pm Blocked write, but this key lacked the edge, so a coordinator
-    // honoring that next_role literally hit TRANSITION_REJECTED. Fourth
-    // instance of the E45/E53 :Blocked-reachability defect family, and the
-    // first found by a deliberate audit (E53's own "audit every role" pass)
-    // rather than by accident. Same shape as E53's sr-engineer:Blocked gap
-    // (a :Blocked key existed but was missing one outbound edge), deliberately
-    // left out of E53 to avoid breaching that ticket's own exhaustively-proven
-    // AC4. Mirrored in specs/qa-flow-enforcement-architecture.md.
+    // content/skill-pm.md stamps next_role="design-auditor" on a pm Blocked
+    // write, so this key needs the edge: without it a coordinator honouring
+    // that next_role literally would hit TRANSITION_REJECTED. Every role's
+    // :Blocked key must reach each destination its SOP's escalation rows
+    // name. Mirrored in specs/qa-flow-enforcement-architecture.md. (E58)
     { agent: "design-auditor", status: "In_Progress" },
   ]],
   ["architect:In_Progress", [
@@ -234,14 +230,10 @@ const ALLOWED: ReadonlyMap<string, AllowedNext> = new Map<string, AllowedNext>([
   ["sr-engineer:Blocked", [
     { agent: "sr-engineer", status: "In_Progress" },
     { agent: "pm", status: "In_Progress" },
-    // v3.98.0 (E53, gap B) — content/skill-sr-engineer.md:50's "visual
-    // structure unspecified" escalation row routes Blocked -> design-auditor,
-    // an edge this key lacked (only the self-loop and the pm escape existed).
-    // Found by the audit E53 itself required ("audit every other role's
-    // :Blocked reachability in the same pass" — not just the filed
-    // release-engineer gap); same defect shape as E45's qa-engineer fix, an
-    // omission rather than a design decision. Mirrored in
-    // specs/qa-flow-enforcement-architecture.md:159.
+    // content/skill-sr-engineer.md's "visual structure unspecified"
+    // escalation row routes Blocked -> design-auditor, so this key needs that
+    // edge alongside the self-loop and the pm escape. Mirrored in
+    // specs/qa-flow-enforcement-architecture.md. (E53)
     { agent: "design-auditor", status: "In_Progress" },
   ]],
   ["code-reviewer:In_Progress", [
@@ -265,44 +257,32 @@ const ALLOWED: ReadonlyMap<string, AllowedNext> = new Map<string, AllowedNext>([
   ["qa-engineer:Blocked", [
     { agent: "sr-engineer", status: "In_Progress" },
     { agent: "qa-engineer", status: "In_Progress" },
-    // v3.95.0 (E45) — pm's escape edge, restoring symmetry with the other
-    // six <role>:Blocked rows (researcher/design-auditor/pm/architect/
-    // sr-engineer/code-reviewer all have Blocked -> pm:In_Progress; this was
-    // the only one missing it). The control case proves the gap was an
-    // omission, not a design decision: the "qa-engineer:FAIL" row below
-    // already has a pm:In_Progress escape for the same "hand back to PM"
-    // shape.
+    // pm escape edge, matching the other six <role>:Blocked rows
+    // (researcher/design-auditor/pm/architect/sr-engineer/code-reviewer all
+    // have Blocked -> pm:In_Progress), and the "qa-engineer:FAIL" row below,
+    // which already has a pm:In_Progress escape for the same "hand back to
+    // PM" shape.
     //
-    // To be precise about what content/skill-qa-engineer.md's Escalation
-    // Routes actually say (its ONLY Blocked row routes to sr-engineer, not
-    // pm; the two spec-defect rows — copy coverage gap, visual token
-    // coverage gap — both prescribe FAIL -> pm, an edge that already
-    // existed): this change does not restore a broken SOP-prescribed route.
-    // It covers a *Blocked* reading of a spec-defect situation that the SOP
-    // itself routes via FAIL. That reading is defensible on its own terms —
-    // observed live 2026-08-07, in an adopter acceptance project, feature
-    // button-figma-realign (full account in
-    // research/adopter-button-realign-qa-blocked-dead-end.md): QA hit
-    // "## Visual Structural Assertions" rows asserting a superseded Figma
-    // source after a human-approved sanctioned divergence. Marking `pass`
-    // would have written a falsehood into the evidence trail; marking `fail`
-    // would have blamed an implementation doing exactly what was approved.
-    // QA wrote Blocked instead — reasonable, since a contract defect is not
-    // an implementation failure and FAIL charges the qa_round budget for it —
-    // and from that Blocked state PM was unreachable, forcing the PM
-    // amendment to be recorded on a qa-engineer write with an in-band
-    // ATTRIBUTION NOTE, dirtying provenance on a spec file the SOP assigns
-    // to PM. This edge closes that dead end and restores row symmetry; it
-    // does not claim the SOP's FAIL -> pm route was ever broken.
+    // content/skill-qa-engineer.md routes spec-defect situations (copy
+    // coverage gap, visual token coverage gap) via FAIL -> pm, and that route
+    // is unchanged. This edge covers QA choosing Blocked for a spec defect
+    // instead — for example "## Visual Structural Assertions" rows that
+    // assert a superseded design source after a human-approved divergence.
+    // Marking `pass` would write a falsehood into the evidence trail, marking
+    // `fail` would blame an implementation doing exactly what was approved,
+    // and FAIL also charges the qa_round budget for a contract defect. So QA
+    // may write Blocked, and from Blocked PM must be reachable; otherwise the
+    // PM amendment would have to be recorded on a qa-engineer write,
+    // muddying who changed the spec.
     //
-    // No `resume_of` requirement on this edge (human decision, loose
-    // variant): resume_of is the PM RETURN-leg field gating (pm, In_Progress)
-    // -> {code-reviewer, qa-engineer} (§ALLOWED_TRANSITIONS Amend-Resume
-    // Edge, step 3.5 of validateTransition); requiring it on this OUTBOUND
-    // edge would make qa-engineer:Blocked asymmetric with both the six peer
-    // Blocked rows above (none require resume_of to reach pm) and the
-    // qa-engineer:FAIL -> pm edge it mirrors. Mirrored in
-    // specs/qa-flow-enforcement-architecture.md:161.
+    // No `resume_of` requirement on this edge: resume_of gates the PM
+    // RETURN leg (pm, In_Progress) -> {code-reviewer, qa-engineer}
+    // (§ALLOWED_TRANSITIONS Amend-Resume Edge, step 3.5 of
+    // validateTransition); requiring it on this OUTBOUND edge would make
+    // qa-engineer:Blocked differ from the six peer Blocked rows above (none
+    // require resume_of to reach pm) and from the qa-engineer:FAIL -> pm edge
+    // it mirrors. Mirrored in specs/qa-flow-enforcement-architecture.md.
+    // (E45)
     { agent: "pm", status: "In_Progress" },
   ]],
   ["qa-engineer:FAIL", [
@@ -316,16 +296,13 @@ const ALLOWED: ReadonlyMap<string, AllowedNext> = new Map<string, AllowedNext>([
     // wedge where post-PASS release work had no entry edge and subagents
     // fell back to mis-stamping agent_id="pm" or hand-editing handoff.md.
     { agent: "release-engineer", status: "In_Progress" },
-    // v3.94.0 (E37) — design-auditor's post-PASS opening edge, restoring
-    // parity with the null:null opener's design-auditor:In_Progress entry
-    // (:177). "Previous feature closed, next may open" is the same position
-    // whether the workspace is fresh or between features; C13 added
-    // release-engineer here but never restored this edge, so the
-    // design-armed chain's canonical opening move (coordinator dispatches
-    // design-auditor before PM) worked only on a workspace's first feature
-    // and was TRANSITION_REJECTED on every feature thereafter (6 of 7
-    // observed fires / 2 workspaces / 5 features, 07-21..07-23, adopter-project
-    // telemetry; the 7th is the qa-engineer:FAIL shape, deferred to E38).
+    // design-auditor may open the next feature after a PASS, matching the
+    // null:null opener's design-auditor:In_Progress entry above: "previous
+    // feature closed, next may open" is the same position whether the
+    // workspace is fresh or between features. Without this edge the
+    // design-armed chain's opening move (coordinator dispatches
+    // design-auditor before PM) would work only on a workspace's first
+    // feature and be TRANSITION_REJECTED on every later one. (E37)
     { agent: "design-auditor", status: "In_Progress" },
   ]],
   // v3.49.0 (C13) — release-engineer's legal closing write. Hands back to pm
@@ -333,32 +310,24 @@ const ALLOWED: ReadonlyMap<string, AllowedNext> = new Map<string, AllowedNext>([
   // covered by the generic self-loop fast path in validateTransition.
   ["release-engineer:In_Progress", [
     { agent: "pm", status: "In_Progress" },
-    // v3.98.0 (E53) — the missing entry edge into release-engineer:Blocked.
-    // content/skill-release-engineer.md carries six Blocked escalation rows
-    // (:152-157, plus step 7a's empty-baseline guard, now converted to a
-    // table row) that instruct the role to halt via exactly this write, but
-    // no :Blocked key existed for this agent at all — unlike every other
-    // role, which all carry a :Blocked entry edge. Found by code-reviewer
-    // during E50 round 1
-    // (review_reports/archive/e50-release-sop-step7a-hardening/review_T-E50-02.md,
-    // F10); same family as E45's qa-engineer:Blocked gap but a different
-    // shape (E45's role HAD a :Blocked key, missing one outbound edge; this
-    // role had no key at all). Mirrored in
-    // specs/qa-flow-enforcement-architecture.md:164.
+    // Entry edge into release-engineer:Blocked.
+    // content/skill-release-engineer.md has several Blocked escalation rows
+    // (including step 7a's empty-baseline guard) that tell the role to halt
+    // via exactly this write, and every role needs a :Blocked entry edge for
+    // its own escalations. Mirrored in
+    // specs/qa-flow-enforcement-architecture.md. (E53)
     { agent: "release-engineer", status: "Blocked" },
   ]],
-  // v3.98.0 (E53) — release-engineer's new :Blocked key, opened by the entry
-  // edge above. Destinations derived from skill-release-engineer.md's own
-  // six Blocked rows (:152-157) plus the converted step 7a guard: five
-  // resolve to human — a halt, resumed here via the self-loop back to
-  // In_Progress or handed to pm for recovery (e.g. D10's push-rejection row)
-  // — and the `npm test` regression row (:153) names qa-engineer, not pm, so
-  // pm alone would have been the wrong destination set. Self -> In_Progress
-  // and -> pm:In_Progress mirror the six peer :Blocked keys' shape; ->
-  // qa-engineer:In_Progress has precedent in qa-engineer:Blocked ->
-  // sr-engineer:In_Progress (route to the role that must fix) — neither is a
-  // new pattern. Mirrored in specs/qa-flow-enforcement-architecture.md
-  // (new row after :164).
+  // release-engineer's :Blocked key, opened by the entry edge above.
+  // Destinations come from skill-release-engineer.md's own Blocked rows plus
+  // its step 7a guard: most resolve to a human — a halt, resumed here via the
+  // self-loop back to In_Progress or handed to pm for recovery (e.g. a
+  // rejected push) — and the `npm test` regression row names qa-engineer,
+  // not pm, so pm alone would be the wrong destination set.
+  // Self -> In_Progress and -> pm:In_Progress follow the six peer :Blocked
+  // keys' shape; -> qa-engineer:In_Progress follows qa-engineer:Blocked ->
+  // sr-engineer:In_Progress (route to the role that must fix). Mirrored in
+  // specs/qa-flow-enforcement-architecture.md. (E53)
   ["release-engineer:Blocked", [
     { agent: "release-engineer", status: "In_Progress" },
     { agent: "pm", status: "In_Progress" },
@@ -520,17 +489,16 @@ export function validateTransition(req: TransitionRequest): TransitionRejection 
     );
   }
 
-  // 3. self-loop fast path (E128). Two explicit named (prev, next) status
-  // pairs — In_Progress→In_Progress (original) and Blocked→Blocked (E128,
-  // backlog docs/backlog.md ~line 250) — deliberately NOT a
-  // `prev.status === next.status` wildcard. A same-agent Blocked record can
-  // now correct itself (the release-engineer incident of 2026-09-15: a
-  // malformed Blocked payload had no same-status repair edge, only
-  // status-misstating ones). PASS and FAIL are excluded on purpose: PASS is
-  // terminal by design (E86 recorded a qa-engineer:PASS→PASS correction being
-  // *correctly* rejected), and a wildcard here would also silently open
-  // FAIL→FAIL. Naming the two pairs keeps PASS/FAIL terminality structurally
-  // unreachable by this fast path rather than merely untested.
+  // 3. self-loop fast path. Two explicit named (prev, next) status pairs —
+  // In_Progress→In_Progress and Blocked→Blocked — deliberately NOT a
+  // `prev.status === next.status` wildcard. Blocked→Blocked lets a
+  // same-agent Blocked record correct itself (for example a malformed
+  // Blocked payload) without misstating its status. PASS and FAIL are
+  // excluded on purpose: PASS is terminal by design (a qa-engineer PASS→PASS
+  // "correction" must be rejected), and a wildcard here would also silently
+  // open FAIL→FAIL. Naming the two pairs keeps PASS/FAIL terminality
+  // structurally unreachable by this fast path rather than merely untested.
+  // (E128)
   if (
     req.prev.agent !== null &&
     req.prev.agent === req.next.agent &&
@@ -598,18 +566,20 @@ export function validateTransition(req: TransitionRequest): TransitionRejection 
  *   - (pm, In_Progress)           → 0
  *   - everything else             → prev_visual_round
  *
- * hop_count (v9, d2-server-brake-accounting):
- *   - feature_changed             → base resets to 0 (AC-3; the ONLY reset —
- *     (pm, In_Progress) does NOT reset it, unlike the three rounds — DR-6)
- *   - role transition (next.agent !== prev.agent) → base + 1 (DR-9)
+ * hop_count (handoff schema v9):
+ *   - feature_changed             → base resets to 0 (the ONLY reset —
+ *     (pm, In_Progress) does NOT reset it, unlike the three rounds)
+ *   - role transition (next.agent !== prev.agent) → base + 1
  *   - everything else (self-loops, same-agent status changes) → base
+ *   (D2)
  *
- * qa_rounds_total / review_rounds_total / visual_rounds_total (v12,
- * e8-success-telemetry): cumulative mirrors of the per-cycle counters. Each
- * total ticks in lock-step with its per-cycle counter's FAIL branch (the FAIL
- * predicates are copied verbatim so total and cycle counters can never diverge
- * on which event counts), but NEVER resets except on feature change — NOT on
- * QA PASS, NOT on (pm, In_Progress) re-entry (hop_count's reset rule, AC8).
+ * qa_rounds_total / review_rounds_total / visual_rounds_total (handoff
+ * schema v12): cumulative mirrors of the per-cycle counters. Each total
+ * ticks in step with its per-cycle counter's FAIL branch (the FAIL
+ * predicates are copied verbatim so total and cycle counters can never
+ * diverge on which event counts), but NEVER resets except on feature
+ * change — NOT on QA PASS, NOT on (pm, In_Progress) re-entry (hop_count's
+ * reset rule). (E8)
  */
 export function computeNewRound(
   prev_qa_round: number,
@@ -675,11 +645,10 @@ export function computeNewRound(
   const hopBase = feature_changed ? 0 : prev_hop_count;
   const hop_count = isRoleTransition ? hopBase + 1 : hopBase;
 
-  // v12 cumulative totals (e8-success-telemetry). Base is
-  // `feature_changed ? 0 : prev_total` (hop_count's reset rule); each FAIL
-  // predicate is copied verbatim from the per-cycle branches above
-  // (qa_round / review_round / visual_round) so the two families can never
-  // diverge on which event counts.
+  // Cumulative totals. Base is `feature_changed ? 0 : prev_total`
+  // (hop_count's reset rule); each FAIL predicate is copied verbatim from
+  // the per-cycle branches above (qa_round / review_round / visual_round) so
+  // the two families can never diverge on which event counts. (E8, v12)
   const qaTotBase = feature_changed ? 0 : prev_qa_rounds_total;
   const qa_rounds_total =
     next.agent === "qa-engineer" && next.status === "FAIL" ? qaTotBase + 1 : qaTotBase;

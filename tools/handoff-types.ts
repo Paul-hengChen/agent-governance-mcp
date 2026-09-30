@@ -1,13 +1,12 @@
 // Coded by @sr-engineer
-// Shared handoff.md types (E36 — e36-handoff-split-overload-adapter).
-// Extracted from tools/handoff.ts so the parse module (tools/handoff-parse.ts)
-// and the write module (tools/handoff-write.ts) can both depend on the same
-// HandoffState / protocol-field types WITHOUT importing each other's types —
-// only the two runtime functions (parseHandoff / writeHandoffState) cross the
-// parse↔write boundary (the pre-existing heal-write / existing-state-preserve
-// circular call, unchanged by this split; see tools/handoff-parse.ts and
-// tools/handoff-write.ts top-of-file notes). tools/handoff.ts re-exports every
-// type below verbatim so no importer of the pre-split barrel churns.
+// Shared handoff.md types. Kept in their own module so the parse module
+// (tools/handoff-parse.ts) and the write module (tools/handoff-write.ts) can
+// share the HandoffState / protocol-field types WITHOUT importing each
+// other's types — only the two runtime functions (parseHandoff /
+// writeHandoffState) cross the parse↔write boundary (the heal-write /
+// existing-state-preserve circular call; see the top-of-file notes in both
+// modules). tools/handoff.ts re-exports every type below verbatim so
+// importers of the barrel never change. (E36)
 
 // Type-only import (erased at compile): the runtime graph stays one-directional
 // (transitions.ts never imports handoff.ts / handoff-parse.ts / handoff-write.ts).
@@ -37,13 +36,13 @@ export type ResumeOfTarget = "code-reviewer" | "qa-engineer";
 // Code-reviewer verdict values (handoff schema v7, c9-protocol-fields).
 export type ReviewVerdict = "APPROVED" | "CHANGES_REQUESTED";
 
-// Dispatch-mode classification (handoff schema v11, e2-bugfix-repro-gate).
+// Dispatch-mode classification. (handoff schema v11, E2)
 export type DispatchMode = "feature" | "bugfix";
 
-// Per-hop dispatch-mechanism attestation values (handoff schema v15,
-// e123a-lane-layout-migration, E99 option (i)). Which mechanism carried THIS
-// hop: a Task-spawned subagent, an in-context tw_switch_role swap, or inline
-// work with no role hand-off at all. Attested, not verified.
+// Per-hop dispatch-mechanism attestation values: which mechanism carried
+// THIS hop — a Task-spawned subagent, an in-context tw_switch_role swap, or
+// inline work with no role hand-off at all. Attested, not verified.
+// (handoff schema v15, E99)
 export type DispatchMechanism = "task" | "switch_role" | "inline";
 
 export interface HandoffState {
@@ -76,25 +75,24 @@ export interface HandoffState {
   // DR-6 — the hop cap is a session-length circuit breaker, harder to clear
   // than the per-task round caps by design).
   hop_count: number;
-  // v12 (e8-success-telemetry) — cumulative per-feature round totals. Each
-  // ticks in lock-step with its per-cycle counter's FAIL branch (computed by
-  // computeNewRound, single site) but NEVER resets except on active_feature
-  // change — NOT on QA PASS, NOT on (pm, In_Progress) re-entry (hop_count's
-  // reset rule byte-for-byte, AC8). FILE-MODE runtime treatment is identical
-  // to hop_count: the parser ALWAYS materializes all three (missing/malformed
-  // defaults to 0) and the serializer ALWAYS emits them (even 0). Declared
-  // OPTIONAL at the type level ONLY because their persistence is file-mode-only
-  // (DR-1: storage-sqlite.ts is untouched — sqlite schema stays v2, and its
-  // parse() never constructs them; their sole consumer, the release-close
-  // metrics emit, fires only under FileHandoffStorage). Consumers read via
-  // `state.qa_rounds_total ?? 0` (the blueprint's own access pattern).
+  // Cumulative per-feature round totals. Each ticks in step with its
+  // per-cycle counter's FAIL branch (computed in one place, computeNewRound)
+  // but NEVER resets except when active_feature changes — not on QA PASS,
+  // not on (pm, In_Progress) re-entry (exactly hop_count's reset rule). In
+  // file mode they behave like hop_count: the parser ALWAYS fills all three
+  // (missing/malformed defaults to 0) and the serializer ALWAYS writes them
+  // (even 0). Optional at the type level ONLY because only file mode
+  // persists them (storage-sqlite.ts is untouched — the sqlite schema stays
+  // v2 and its parse() never sets them; their only consumer, the
+  // release-close metrics emit, runs only under FileHandoffStorage).
+  // Consumers read `state.qa_rounds_total ?? 0`. (E8, handoff schema v12)
   qa_rounds_total?: number;
   review_rounds_total?: number;
   visual_rounds_total?: number;
   // Optional absolute path to the workspace's PRD file. Consumed by the RAG
   // lazy-reindex hook in prompts/build.ts:appendSpecContext. When absent, the
   // hook falls back to discovering PRD.md/docs/PRD.md/specs/PRD.md.
-  // Absolute in memory (resolved at parse); stored workspace-relative on disk (e235a).
+  // Absolute in memory (resolved at parse); stored workspace-relative on disk. (E235a)
   prd_path?: string;
   // Scope-decision attestation (handoff schema v4, server-scope-decision-gate).
   // Set to "single-feature" by the PM to attest the feature is appropriately
@@ -116,26 +114,24 @@ export interface HandoffState {
   // across an active_feature change, and reset to undefined on every PM
   // In_Progress re-entry that does not explicitly re-pass it.
   cut_approved?: boolean;
-  // Cut-approval inheritance attestation (handoff schema v14,
-  // e114-cut-approval-inheritance). CLIENT-SETTABLE, NOT server-stamped: the
-  // writer's own honest claim that this workspace's cut_approved: true was
-  // NOT witnessed in this workspace's own conversation turn but inherited
-  // from a parent feature's human approval (the server cannot verify a
-  // cross-workspace claim, so it records the writer's attestation rather
-  // than stamping one it cannot check — contrast evidence_schema below,
-  // which the server DOES stamp because it is a fact the server itself
-  // computes). Shape: "inherited:<parent-feature>" — anything else is
-  // dropped defensively at parse time, never rejected at the boundary.
-  // FEATURE-SCOPED (the exact dispatch_mode scalar algorithm, NOT
-  // cut_approved's PM-re-entry reset above): carried across
-  // same-active_feature writes that omit it, dropped on active_feature
-  // change, NOT re-armed on PM re-entry — inheritance is a stable fact about
-  // how this lane came to exist, not a per-cut approval that must be
-  // re-witnessed on every PM bounce. ABSENT by default — undefined ===
-  // "non-inherited" (the safe direction; the v13→v14 migration seeds
-  // nothing). Recording-only: does NOT by itself satisfy
-  // CUT_APPROVAL_REQUIRED or any other gate — no gate predicate reads this
-  // field.
+  // Cut-approval inheritance attestation. SET BY THE CLIENT, NOT stamped by
+  // the server: the writer's own honest claim that this workspace's
+  // cut_approved: true was NOT given in this workspace's own conversation
+  // but inherited from a parent feature's human approval. The server cannot
+  // verify a claim about another workspace, so it records the writer's word
+  // rather than stamping something it cannot check (contrast
+  // evidence_schema below, which the server stamps because it computes it
+  // itself). Shape: "inherited:<parent-feature>" — anything else is dropped
+  // defensively at parse time, never rejected at the boundary.
+  // FEATURE-SCOPED (the dispatch_mode single-value rule, NOT cut_approved's
+  // PM-re-entry reset above): carried across same-active_feature writes that
+  // omit it, dropped when active_feature changes, NOT re-armed on PM
+  // re-entry — inheritance is a stable fact about how this lane came to
+  // exist, not a per-cut approval to be re-given on every PM bounce. ABSENT
+  // by default — undefined === "not inherited" (the safe direction; the
+  // v13→v14 migration seeds nothing). For the record only: it does NOT by
+  // itself satisfy CUT_APPROVAL_REQUIRED or any other gate — no gate
+  // predicate reads this field. (E114, handoff schema v14)
   cut_approved_source?: string;
   // External-reference ledger (handoff schema v6, b8-external-ref-ledger).
   // Populated by the PM during the Resource Audit Gate: one entry per external
@@ -199,56 +195,55 @@ export interface HandoffState {
   // to tw_get_state readers via the `{ ...state }` view (User Story 2 — the
   // dispatched role reads its OWN pin to stamp its watermark at the source).
   dispatch_pins?: Partial<Record<AgentName, string>>;
-  // Dispatch-mode ticket classification (handoff schema v11,
-  // e2-bugfix-repro-gate). Absence === "feature" (the default) — a bugfix-mode
-  // ticket is marked by the PM at cut time with dispatch_mode: "bugfix", which
-  // arms the file-mode repro-first gate (REPRO_MANIFEST_MISSING) on the
-  // sr-engineer:In_Progress → code-reviewer:In_Progress fix-phase edge and
-  // makes QA's Phase 0.5 expected-red disposition load-bearing. FEATURE-SCOPED
-  // (the exact dispatch_pins/external_refs algorithm, but SCALAR): carried
-  // across same-active_feature writes that omit it, dropped on active_feature
-  // change, NOT re-armed on PM re-entry (a stable ticket classification,
-  // unlike cut_approved which re-arms per cut). Changeable by an explicit PM
-  // write (AC4 opt-back-in: set "feature" or route to architect). FILE-MODE
-  // ONLY: SqliteHandoffStorage.writeState ignores it (mirrors dispatch_pins
-  // DR-5) — the gates it arms are file-mode only anyway. dispatch_mode never
-  // gates a transition edge; transitions.ts stays pure (DR on AC1/AC5).
+  // Dispatch-mode ticket classification. Absence === "feature" (the
+  // default). The PM marks a bug-fix ticket at cut time with dispatch_mode:
+  // "bugfix", which arms the file-mode repro-first gate
+  // (REPRO_MANIFEST_MISSING) on the sr-engineer:In_Progress →
+  // code-reviewer:In_Progress fix-phase edge and makes QA's Phase 0.5
+  // expected-red check decisive. FEATURE-SCOPED (the dispatch_pins /
+  // external_refs rule, for a single value): carried across
+  // same-active_feature writes that omit it, dropped when active_feature
+  // changes, NOT re-armed on PM re-entry (a stable classification, unlike
+  // cut_approved which re-arms per cut). An explicit PM write can change it
+  // (set "feature" or route to architect). File mode only:
+  // SqliteHandoffStorage.writeState ignores it, like dispatch_pins — the
+  // gates it arms are file-mode only anyway. dispatch_mode never gates a
+  // transition edge; transitions.ts stays pure. (E2, handoff schema v11)
   dispatch_mode?: DispatchMode;
-  // Evidence-schema pin (handoff schema v13, e23-evidence-schema-versioning
-  // D1). SERVER-STAMPED, NEVER CLIENT-SUPPLIED: the orchestrator stamps
-  // EVIDENCE_SCHEMA_CURRENT (gates/evidence-schema.ts) on the first accepted
-  // write of a new active_feature — there is deliberately NO zod arg on
-  // tw_update_state for it. Pins which evidence-heading-match convention the
-  // qa_reports/*.md gate predicates run under for the LIFE of the feature
-  // (v1 = exact-anchored H2 match, v2 = normalized-contains), so a
-  // mid-flight tightening of the conventions can never retroactively
-  // invalidate crash-era artifacts (the 104447-F0 incident class).
-  // FEATURE-SCOPED (the exact dispatch_mode scalar algorithm): carried
-  // across same-active_feature writes that omit it, dropped on
-  // active_feature change (then re-stamped by the orchestrator at the new
-  // feature's first write), NOT re-armed on PM re-entry. ABSENT for pre-E23
-  // in-flight features — absence gets the v2 normalized-contains default at
-  // the gates (D2 fallback: v2 is a strict superset of v1, it can only
-  // newly ACCEPT; the v12→v13 migration invents NO pin). FILE-MODE ONLY:
-  // SqliteHandoffStorage ignores it (both evidence gates are file-mode-only).
+  // Evidence-schema pin. STAMPED BY THE SERVER, NEVER CLIENT-SUPPLIED: the
+  // orchestrator stamps EVIDENCE_SCHEMA_CURRENT (gates/evidence-schema.ts)
+  // on the first accepted write of a new active_feature — there is
+  // deliberately NO zod arg on tw_update_state for it. It fixes which
+  // evidence-heading-match rule the qa_reports/*.md gate predicates use for
+  // the LIFE of the feature (v1 = exact-anchored H2 match, v2 =
+  // normalized-contains), so tightening the rules mid-flight can never
+  // invalidate evidence files written earlier (for example after a crash).
+  // FEATURE-SCOPED (the dispatch_mode single-value rule): carried across
+  // same-active_feature writes that omit it, dropped when active_feature
+  // changes (then re-stamped at the new feature's first write), NOT
+  // re-armed on PM re-entry. ABSENT for features started before pins
+  // existed — absence gets the v2 normalized-contains rules at the gates
+  // (v2 is a strict superset of v1, so it can only newly ACCEPT; the
+  // v12→v13 migration invents NO pin). File mode only: SqliteHandoffStorage
+  // ignores it (both evidence gates are file-mode only).
+  // (E23, handoff schema v13)
   evidence_schema?: number;
-  // Per-hop dispatch-mechanism attestation (handoff schema v15,
-  // e123a-lane-layout-migration, E99 option (i)). The ACTING role's own
-  // self-report of which mechanism carried this hop (Task subagent vs
-  // in-context tw_switch_role vs inline) — attested, NOT verified: the server
-  // cannot observe how it was invoked. Closed enum, zod-enforced at the tool
-  // boundary; a malformed on-disk value is dropped defensively at parse time.
-  // TRANSIENT, per-hop — the exact next_role / review_verdict lifetime (AC-3
-  // of c9-protocol-fields): absent on any write that omits it, NEVER carried
-  // forward. Do NOT "fix" this into the dispatch_pins/external_refs
-  // feature-scoped preserve or the dispatch_mode scalar carry: a mechanism
-  // attested by an earlier hop lingering on a later hop's record would
-  // misattribute the later hop — the exact indistinguishability E99 exists to
-  // close. The durable per-hop history lives in the append-only
-  // .current/dispatch.jsonl sidecar (T-E123A3-04), not here. ABSENT by default
-  // — undefined === "not attested for this hop" (the v14→v15 migration seeds
-  // nothing). Recording-only: no gate predicate reads it. FILE-MODE ONLY:
-  // SqliteHandoffStorage.writeState ignores it.
+  // Per-hop dispatch-mechanism attestation: the ACTING role's own report of
+  // which mechanism carried this hop (Task subagent vs in-context
+  // tw_switch_role vs inline) — attested, NOT verified: the server cannot
+  // observe how it was invoked. Closed enum, zod-enforced at the tool
+  // boundary; a malformed on-disk value is dropped defensively at parse
+  // time. Lives for ONE write only, like next_role / review_verdict: absent
+  // on any write that omits it, NEVER carried forward. Do NOT "fix" this
+  // into the dispatch_pins/external_refs feature-scoped preserve or the
+  // dispatch_mode single-value carry: a mechanism reported by an earlier hop
+  // lingering on a later hop's record would credit the wrong hop — exactly
+  // the ambiguity this field exists to remove. The durable per-hop history
+  // lives in the append-only .current/dispatch.jsonl sidecar, not here.
+  // ABSENT by default — undefined === "not attested for this hop" (the
+  // v14→v15 migration seeds nothing). For the record only: no gate
+  // predicate reads it. File mode only: SqliteHandoffStorage.writeState
+  // ignores it. (E99, handoff schema v15)
   dispatch_mechanism?: DispatchMechanism;
   // Companion to dispatch_mechanism (handoff schema v15): the acting role's
   // SELF-REPORTED model tier for this hop (e.g. "fable", "opus"). Bounded free

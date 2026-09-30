@@ -1,10 +1,8 @@
 // Coded by @sr-engineer
 // Tools: handoff state read/write with format enforcement.
 //
-// THIN BARREL (E36 — e36-handoff-split-overload-adapter). This file used to
-// hold four responsibilities in one 1,276-line unit: parse/migrate,
-// write, the tw_get_state tool handler, and the shared types. Those now live
-// in dedicated modules:
+// Thin barrel. Parsing, writing, the tw_get_state tool handler, and the
+// shared types each live in a dedicated module:
 //   - tools/handoff-types.ts    — HandoffState / ExternalRef / protocol-field types
 //   - tools/handoff-parse.ts    — readAndMigrate, parseHandoff, readHandoffState
 //   - tools/handoff-write.ts    — WriteHandoffStateOptions, writeHandoffState
@@ -13,8 +11,8 @@
 //     there now)
 // This file re-exports the public API verbatim so existing importers
 // (prompts/build.ts, tools/storage.ts, tools/storage-sqlite.ts, and every
-// test/*.test.mjs importing "../dist/tools/handoff.js") resolve unchanged —
-// zero import-path churn.
+// test/*.test.mjs importing "../dist/tools/handoff.js") resolve unchanged.
+// (E36)
 export type {
   ExternalRefState,
   ExternalRef,

@@ -1,13 +1,12 @@
 // Coded by @sr-engineer
 // tools/join-precondition.ts — join-ticket build-entry precondition check
-// (E115, e115-join-precondition-check; spec:
-// specs/e115-join-precondition-check.md). A join ticket's `depends_on`
-// satisfaction today exists only as prose — a sentence like "J1a PASS at
-// 0637e61, L3+L4 merged at 3245bb9" that nothing ever checked, because the
-// dependency's PASS lives in another workspace's `.current/handoff.md` that
-// this workspace never reads (and per E109's anchoring rule, never should —
-// governance state is workspace-scoped). Two independent local, cheap checks
-// close that gap WITHOUT becoming a cross-workspace read:
+// (spec: specs/e115-join-precondition-check.md). Without it, whether a join
+// ticket's `depends_on` is satisfied exists only as prose — a sentence like
+// "J1a PASS at 0637e61, L3+L4 merged at 3245bb9" that nothing checks —
+// because the dependency's PASS lives in another workspace's
+// `.current/handoff.md`, which this workspace never reads (governance state
+// is workspace-scoped by design). Two independent local, cheap checks close
+// that gap WITHOUT becoming a cross-workspace read: (E115, E109)
 //
 //   1. `git merge-base --is-ancestor <lane-branch> HEAD` — answerable from
 //      local git object history alone (shared across worktrees of the same
@@ -19,14 +18,14 @@
 //      requires no read of any other workspace either.
 //      checkDeclaredVsActualLaneIdentity below.
 //
-// AC5 is the load-bearing invariant of this whole module: ZERO cross-
-// workspace reads. Neither exported function below takes a second
-// workspace-path argument, and no read/exec call here is ever parameterized
-// by anything other than the single `repoRoot` passed in (or
-// `repoRoot/.current/**` under it). Contrast tools/feature-rollup.ts (E113),
-// which deliberately DOES read sibling worktrees for a different, explicitly
-// opted-into reporting purpose (a feature-wide roll-up) — this module is the
-// opposite of that by design and must stay that way.
+// The load-bearing invariant of this whole module: ZERO cross-workspace
+// reads. Neither exported function below takes a second workspace-path
+// argument, and no read/exec call here is ever parameterized by anything
+// other than the single `repoRoot` passed in (or `repoRoot/.current/**`
+// under it). Contrast tools/feature-rollup.ts, which deliberately DOES read
+// sibling worktrees for a different, explicitly opted-into reporting purpose
+// (a feature-wide roll-up) — this module is the opposite by design and must
+// stay that way.
 //
 // Out of scope (see spec): this is a callable build-entry self-check, not a
 // new hard gate in gates/registry.ts / UPDATE_STATE_GATE_PIPELINE. Nothing
@@ -86,13 +85,13 @@ export function checkLaneAncestry(branches: string[], repoRoot: string): LaneAnc
   });
 }
 
-/** The single membership finding possible under AC3's amended semantics:
- * this workspace's own actual `active_feature` is absent from EVERY row
- * declared in `.current/feature-split.md`. Names the full declared set
- * alongside the actual value — never one entry per non-matching row (a
- * Split Table has one row per planned lane, so sibling rows declaring a
- * different lane are expected, not mismatches; see Amendment History,
- * specs/e115-join-precondition-check.md:195). */
+/** The only membership finding possible: this workspace's own actual
+ * `active_feature` is absent from EVERY row declared in
+ * `.current/feature-split.md`. Names the full declared set alongside the
+ * actual value — never one entry per non-matching row (a Split Table has one
+ * row per planned lane, so sibling rows declaring a different lane are
+ * expected, not mismatches; see Amendment History,
+ * specs/e115-join-precondition-check.md). */
 export interface LaneIdentityMismatch {
   /** Every populated feature-identity value found in feature-split.md,
    * order as parsed. */
@@ -296,13 +295,13 @@ export function renderJoinPreconditionReport(
     // HOOK POINT FOR E126: this is the join moment — every depends_on
     // branch above is confirmed as an ancestor of HEAD and lane identity is
     // either clear or honestly unverifiable, so the caller is about to
-    // proceed with the actual join/merge. E126's eventual post-merge
-    // ledger-preservation assertion will need to snapshot this workspace's
-    // pre-merge completed_tasks/[x] counts right here, then compare them
-    // against the post-merge counts once the join lands, to catch a merge
-    // that silently drops or overwrites completed-task history. Not
-    // implemented here — E126 is Wave 6, blocked on E123/E125; this comment
-    // marks the extension point only.
+    // proceed with the actual join/merge. A ledger-preservation check that
+    // wanted to compare pre-merge and post-merge completed_tasks/[x] counts
+    // would snapshot the pre-merge counts right here, to catch a merge that
+    // silently drops or overwrites completed-task history. Nothing is
+    // implemented here; tools/merge-invariants.ts checks a finished merge
+    // commit from git history instead. This comment marks the extension
+    // point only.
     lines.push("VERDICT: join precondition satisfied — clear to proceed.");
   } else {
     lines.push(

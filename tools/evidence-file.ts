@@ -92,10 +92,11 @@ export function sliceH2Section(content: string, heading: string): string | null 
   return nextIdx === -1 ? rest : rest.slice(0, nextIdx);
 }
 
-// ---------- E23 (e23-evidence-schema-versioning, D2) — schema-keyed slicing ----------
+// ---------- schema-keyed slicing (E23) ----------
 // The exact-anchored sliceH2Section above (`^##\s+<heading>\b` — prefix text
-// never matches) was the 104447-F0 incident root cause: `## Phase 3.5 — AC
-// Execution Log` failed the gate solely on its heading prefix. The siblings
+// never matches) rejects a heading that merely has extra leading text, e.g.
+// `## Phase 3.5 — AC Execution Log` failed the gate solely on its heading
+// prefix. The siblings
 // below key matching behavior off the feature's pinned evidence_schema:
 //   evidenceSchema === 1        → today's exact-anchored behavior, unchanged.
 //   evidenceSchema >= 2 OR absent → normalized-contains: an H2 line matches

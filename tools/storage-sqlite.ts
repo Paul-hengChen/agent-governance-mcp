@@ -23,9 +23,9 @@ import {
 } from "./rag.js";
 import { runSqliteMigrations } from "../schema/migrations-sqlite.js";
 
-// C1 (E117 round 2): same word-boundary escape used by tools/drift.ts and
-// tools/sync.ts when matching a task id against the free-text
-// handoff.completed_tasks ledger entries.
+// The same word-boundary escape tools/drift.ts and tools/sync.ts use when
+// matching a task id against the free-text handoff.completed_tasks ledger
+// entries. (E117)
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -185,14 +185,13 @@ export class SqliteHandoffStorage implements HandoffStorage {
   private completeTaskStmt: Database.Statement<[string | null, string, string]>;
   private rollbackTaskStmt: Database.Statement<[string, string, string]>;
   private voidTaskStmt: Database.Statement<[string, string]>;
-  // E120 tombstone (see the voided_tasks CREATE TABLE comment above).
+  // Void tombstone (see the voided_tasks CREATE TABLE comment above). (E120)
   private insertVoidedTombstoneStmt: Database.Statement<[string, string, string, string]>;
   private selectVoidedTombstoneStmt: Database.Statement<[string, string]>;
-  // NEW-4 fix (review round 1 on T-E120131-01): the DELETE and the tombstone
-  // INSERT must commit atomically — a crash between two independent
-  // statements would leave the task deleted with no tombstone, silently
-  // reopening the E120 re-cut path for that id with no way to detect it
-  // afterwards. Mirrors the txUpsert pattern above.
+  // The DELETE and the tombstone INSERT must commit atomically — a crash
+  // between two independent statements would leave the task deleted with no
+  // tombstone, silently allowing a re-cut of that id with no way to detect
+  // it afterwards. Same pattern as txUpsert above. (E120)
   private txVoidTask: (workspacePath: string, taskId: string, reason: string, voidedAt: string) => Database.RunResult;
 
   private insertReportStmt: Database.Statement<[string, string, string, string, string, string]>;
@@ -330,22 +329,23 @@ export class SqliteHandoffStorage implements HandoffStorage {
       `UPDATE tasks SET completed = 0, reverted_reason = ?, note = NULL
        WHERE workspace_path = ? AND task_id = ? AND completed = 1`,
     );
-    // E117 — void semantics deliberately DELETE the row rather than add a
-    // "voided" column/state: no schema bump, and it produces the exact same
-    // behavioral parity file mode gets from a regex-invisible marker line —
-    // every reader (listTasks/getNextTask/tw_detect_drift/tw_sync/addTask's
-    // duplicate-id check) treats the id as though it never existed, so it is
-    // never re-offered and is legally reusable in a re-cut. `completed = 0`
-    // in the WHERE clause is the same defense-in-depth guard completeTaskStmt/
-    // rollbackTaskStmt use — an already-completed row cannot be voided.
+    // Voiding deliberately DELETEs the row rather than adding a "voided"
+    // column/state: no schema bump, and it gives the same behaviour file mode
+    // gets from a regex-invisible marker line — every reader
+    // (listTasks/getNextTask/tw_detect_drift/tw_sync/addTask's duplicate-id
+    // check) treats the id as though it never existed, so it is never
+    // re-offered (a re-cut of the id is refused separately, via the tombstone
+    // below). `completed = 0` in the WHERE clause is the same second-line
+    // guard completeTaskStmt/rollbackTaskStmt use — an already-completed row
+    // cannot be voided. (E117)
     this.voidTaskStmt = this.db.prepare<[string, string]>(
       `DELETE FROM tasks WHERE workspace_path = ? AND task_id = ? AND completed = 0`,
     );
-    // E120 tombstone — survives the DELETE above so addTask can refuse a
-    // re-cut (INSERT OR REPLACE: this id should never be voided twice once
-    // addTask enforces the refusal below, but REPLACE keeps this statement
-    // inert rather than throwing if a pre-fix DB ever raced two voids of the
-    // same id before this column existed).
+    // Void tombstone — survives the DELETE above so addTask can refuse a
+    // re-cut. INSERT OR REPLACE: an id should never be voided twice once
+    // addTask refuses the re-cut, but REPLACE keeps this statement harmless
+    // rather than throwing if an older DB ever recorded two voids of the
+    // same id. (E120)
     this.insertVoidedTombstoneStmt = this.db.prepare<[string, string, string, string]>(
       `INSERT OR REPLACE INTO voided_tasks (workspace_path, task_id, reason, voided_at)
        VALUES (?, ?, ?, ?)`,
@@ -353,10 +353,10 @@ export class SqliteHandoffStorage implements HandoffStorage {
     this.selectVoidedTombstoneStmt = this.db.prepare<[string, string]>(
       "SELECT task_id FROM voided_tasks WHERE workspace_path = ? AND task_id = ?",
     );
-    // NEW-4 fix: run the DELETE and the tombstone INSERT as one committed
-    // unit so a crash between them can never leave a deleted task with no
-    // tombstone (better-sqlite3 transactions are synchronous; either both
-    // statements land or neither does).
+    // Run the DELETE and the tombstone INSERT as one committed unit so a
+    // crash between them can never leave a deleted task with no tombstone
+    // (better-sqlite3 transactions are synchronous; either both statements
+    // land or neither does).
     this.txVoidTask = this.db.transaction(
       (workspacePath: string, taskId: string, reason: string, voidedAt: string) => {
         const info = this.voidTaskStmt.run(workspacePath, taskId);
@@ -517,10 +517,11 @@ export class SqliteHandoffStorage implements HandoffStorage {
     reviewRound?: number,
     visualRound?: number,
   ): Promise<string>;
-  // E36 Option-A: thin ~10-line dispatcher — if the first arg is already the
-  // options shape, hand it straight to the real impl (writeStateCore); else
-  // pack the positional args into that same options shape first. No gate/
-  // persistence logic lives at this boundary any more — see writeStateCore.
+  // Thin ~10-line dispatcher — if the first arg is already the options
+  // shape, hand it straight to the real implementation (writeStateCore);
+  // else pack the positional args into that same options shape first. No
+  // gate/persistence logic lives at this boundary — see writeStateCore.
+  // (E36)
   writeState(
     workspacePathOrOpts: string | WriteHandoffStateOptions,
     activeFeature?: string,
@@ -550,21 +551,21 @@ export class SqliteHandoffStorage implements HandoffStorage {
       reviewRound,
       visualRound,
       // hopCount / scopeDecision / scopeDecisionWhy are NOT part of the
-      // legacy positional overload — matches the pre-E36 behavior where the
-      // positional branch left them undefined (normalising to 0/null below).
+      // legacy positional overload — the positional branch leaves them
+      // undefined (normalising to 0/null below).
     });
   }
 
   /**
-   * Real implementation (E36 Option-A convergence). Both writeState overloads
-   * bottom out here via the thin dispatcher above — options-object shape
-   * only, no more first-arg discrimination in the body.
-   * NOTE (DR-5 precedent): the file-mode-only frontmatter fields —
-   * cutApproved (handoff v5), externalRefs (v6), nextRole / resumeOf /
-   * reviewVerdict (v7), and dispatchPins (v8, c14-dispatch-pins AC-5) — are
-   * deliberately NOT destructured here and never round-trip in SQLite. The
-   * gates that consume them either read the incoming write args or are
-   * file-mode only; no DDL change, sqlite schema_version unchanged.
+   * The real implementation. Both writeState overloads end up here via the
+   * thin dispatcher above — options-object shape only; the body never
+   * inspects the first argument's shape. (E36)
+   * The file-mode-only frontmatter fields — cutApproved (handoff v5),
+   * externalRefs (v6), nextRole / resumeOf / reviewVerdict (v7), and
+   * dispatchPins (v8) — are deliberately NOT destructured here and never
+   * round-trip in SQLite. The gates that use them either read the incoming
+   * write args or are file-mode only; no DDL change, sqlite schema_version
+   * unchanged.
    */
   private writeStateCore(opts: WriteHandoffStateOptions): Promise<string> {
     const workspacePath = opts.workspacePath;
@@ -736,11 +737,11 @@ export class SqliteHandoffStorage implements HandoffStorage {
   voidTask(workspacePath: string, taskId: string, reason: string): Promise<string> {
     const existing = this.selectTaskStmt.get(workspacePath, taskId) as TaskRow | undefined;
     if (!existing) {
-      // E120: distinguish "already voided" from "never existed" — the same
-      // Q1 parity file mode already gives via its on-disk "- [-] <id>"
-      // marker line (see voidTaskInFile's doc comment in tools/tasks-file.ts).
-      // Without the tombstone table this branch could not tell the two
-      // apart, because voidTaskStmt below DELETEs the row.
+      // Tell "already voided" apart from "never existed" — the same
+      // distinction file mode gives via its on-disk "- [-] <id>" marker line
+      // (see voidTaskInFile's doc comment in tools/tasks-file.ts). Without
+      // the tombstone table this branch could not tell the two apart,
+      // because voidTaskStmt below DELETEs the row. (E120)
       const tombstone = this.selectVoidedTombstoneStmt.get(workspacePath, taskId) as
         | { task_id: string }
         | undefined;
@@ -754,14 +755,15 @@ export class SqliteHandoffStorage implements HandoffStorage {
       }
       return Promise.resolve(JSON.stringify({ error: `Task ${taskId} not found.` }));
     }
-    // C1 (E117 round 2): `existing.completed` is the TASKS TABLE's own flag —
-    // the mode-symmetric equivalent of the tasks.md checkbox, not the
-    // authoritative record. handoff.completed_tasks (this.parse()) is, per
+    // `existing.completed` is the TASKS TABLE's own flag — the SQLite
+    // equivalent of the tasks.md checkbox, not the authoritative record.
+    // handoff.completed_tasks (this.parse()) is authoritative, per
     // tools/sync.ts/tools/drift.ts, and a row can be `completed = 0` here
     // while the ledger already lists it done. voidTaskStmt DELETEs the row,
     // so guarding only on the table flag would make that inconsistency
-    // unrecoverable rather than merely stale. Match word-boundary against the
-    // ledger's free-text entries, mirroring the file-mode guard exactly.
+    // unrecoverable rather than merely stale. Match word-boundary against
+    // the ledger's free-text entries, exactly like the file-mode guard.
+    // (E117)
     const handoff = this.parse(workspacePath);
     const ledgerRe = new RegExp(`\\b${escapeRegExp(taskId)}\\b`);
     const ledgerCompleted = !!handoff && handoff.completed_tasks.some((c) => ledgerRe.test(c));
@@ -774,10 +776,9 @@ export class SqliteHandoffStorage implements HandoffStorage {
         }),
       );
     }
-    // NEW-4 fix (review round 1): the DELETE and the tombstone INSERT run
-    // inside one db.transaction (txVoidTask) so a crash between them can
-    // never leave the task deleted with no tombstone — see its declaration
-    // above. Previously these were two independent .run() calls.
+    // The DELETE and the tombstone INSERT run inside one db.transaction
+    // (txVoidTask) so a crash between them can never leave the task deleted
+    // with no tombstone — see its declaration above.
     const info = this.txVoidTask(workspacePath, taskId, reason, new Date().toISOString());
     if (info.changes === 0) {
       return Promise.resolve(JSON.stringify({ error: `Task ${taskId} could not be voided (race).` }));
@@ -797,13 +798,13 @@ export class SqliteHandoffStorage implements HandoffStorage {
     if (existing) {
       return Promise.resolve(JSON.stringify({ error: `Task ${taskId} already exists.` }));
     }
-    // E120: refuse a re-cut of a voided task id outright — settled closure,
-    // mirrors the voidedPattern scan in addTaskInFile (tools/tasks-file.ts).
-    // voidTaskStmt above DELETEs the tasks row (by design — see its own
-    // comment), so without this tombstone check a voided id would be
-    // silently reusable here, and review_reports/qa_reports rows keyed by
-    // that id (no foreign key to tasks) would satisfy the evidence gates
-    // for a re-cut nobody reviewed.
+    // Refuse a re-cut of a voided task id outright, like the voidedPattern
+    // scan in addTaskInFile (tools/tasks-file.ts). voidTaskStmt above
+    // DELETEs the tasks row (by design — see its own comment), so without
+    // this tombstone check a voided id would be silently reusable here, and
+    // review_reports/qa_reports rows keyed by that id (no foreign key to
+    // tasks) would satisfy the evidence gates for a re-cut nobody reviewed.
+    // (E120)
     const tombstone = this.selectVoidedTombstoneStmt.get(workspacePath, taskId) as
       | { task_id: string }
       | undefined;

@@ -1,8 +1,8 @@
 import "../schema/migrations-handoff.js";
 import type { HandoffState } from "./handoff-types.js";
 /** The workspace traversal bound. `candidateAbs` MUST already be resolved.
- *  Lexical (no realpath) — identical to the pre-e235a zod refines, so the
- *  bound is neither loosened nor tightened. */
+ *  Lexical (no realpath), matching the zod refines' original bound exactly,
+ *  so it is neither loosened nor tightened. */
 export declare function isInsideWorkspace(workspacePath: string, candidateAbs: string): boolean;
 /** Write side (AC1). Resolves `prdPath` against `workspacePath` and returns the
  *  POSIX-separator workspace-relative form, or `undefined` when it falls
@@ -16,12 +16,12 @@ export declare function relativizePrdPath(workspacePath: string, prdPath: string
 export declare function resolveStoredPrdPath(workspacePath: string, stored: string): string | undefined;
 export declare function getFlatHandoffPath(workspacePath: string): string;
 /**
- * e123b9 spec AC14: throw HANDOFF_LAYOUT_CONFLICT when BOTH the flat and the
- * lane-scoped handoff.md exist (the state a pre-flip server produces by
+ * Throw HANDOFF_LAYOUT_CONFLICT when BOTH the flat and the lane-scoped
+ * handoff.md exist (the state an older, flat-layout server produces by
  * writing the flat file after a restarted server migrated). Scoped to
- * handoff.md only — a sidecar on both sides is the migration's merge case
- * (AC15). A plain Error, deliberately NOT a GateErrorCode: it fires on reads
- * too. Touches nothing; callers run it before any move.
+ * handoff.md only — a sidecar on both sides is merged by the migration
+ * instead. A plain Error, deliberately NOT a GateErrorCode: it fires on reads
+ * too. Touches nothing; callers run it before any move. (E123)
  */
 export declare function assertNoHandoffLayoutConflict(workspacePath: string): void;
 export declare function parseCutApprovedSource(raw: unknown): string | undefined;

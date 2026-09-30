@@ -14,19 +14,18 @@ export interface LaneInfo {
     /** false when this lane's handoff could not be found/parsed. */
     readable: boolean;
     error?: string;
-    /** E132 hand-forward 1/2: this lane's completed_tasks, when the provider
+    /** This lane's completed_tasks, when the provider
      * already read the handoff and can populate it for free (both
      * localFallbackLaneList and lane-registry.ts's laneRegistryList do).
      * undefined = provider left it unpopulated (computeFeatureRollup falls
      * back to its own parseHandoff read for this lane, preserving prior
      * behavior for third-party providers). null is not currently produced by
-     * either built-in provider but is a legal "known absent" value. */
+     * either built-in provider but is a legal "known absent" value. (E132) */
     completedTasks?: string[] | null;
-    /** E132 hand-forward 3: this lane's past active_feature values, oldest to
-     * newest, best-effort. Only laneRegistryList populates this (see
-     * tools/lane-registry.ts) — localFallbackLaneList leaves it undefined,
-     * deliberately, to avoid every existing caller paying for an archive scan
-     * it never asked for. */
+    /** This lane's past active_feature values, oldest to newest, best-effort.
+     * Only laneRegistryList populates this (see tools/lane-registry.ts) —
+     * localFallbackLaneList leaves it undefined, deliberately, so existing
+     * callers never pay for a history scan they did not ask for. (E132) */
     featureHistory?: string[] | null;
 }
 /** The result of deriving the lane list for a repo. */
@@ -38,7 +37,8 @@ export interface LaneListResult {
     degradedReason?: string;
 }
 /** A pluggable lane-list data source. localFallbackLaneList is the default;
- * E132's tools/lane-registry.ts is a drop-in replacement, same signature. */
+ * tools/lane-registry.ts's laneRegistryList is a drop-in replacement, same
+ * signature. (E132) */
 export type LaneListProvider = (repoRoot: string) => LaneListResult;
 export declare function localFallbackLaneList(repoRoot: string, opts?: {
     timeoutMs?: number;
@@ -54,9 +54,9 @@ export interface RollupReportLane {
     status: string | null;
     hopCount: number | null;
     readable: boolean;
-    /** Passthrough of LaneInfo.featureHistory (E132 hand-forward 3) — only
-     * populated when the caller supplied a provider that computes it
-     * (laneRegistryList); undefined for localFallbackLaneList lanes. */
+    /** Passthrough of LaneInfo.featureHistory — only populated when the caller
+     * supplied a provider that computes it (laneRegistryList); undefined for
+     * localFallbackLaneList lanes. (E132) */
     featureHistory?: string[] | null;
 }
 export interface RollupReport {
