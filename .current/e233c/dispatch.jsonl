@@ -14,3 +14,4 @@
 {"ts":"2026-09-30T02:45:44.100Z","feature":"e233c-test-comments-a","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-09-30T02:45:48.913Z","feature":"e233c-test-comments-a","agent_id":"code-reviewer","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-09-30T02:46:53.661Z","feature":"e233c-test-comments-a","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-30T02:55:36.958Z","feature":"e233c-test-comments-a","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
