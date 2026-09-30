@@ -1,0 +1,44 @@
+fn main() {
+    let a = r#"
+// raw1 1
+// raw1 2
+// raw1 3
+// raw1 4
+// raw1 5
+// raw1 6
+// raw1 7
+// raw1 8
+"#;
+    let b = r##"
+// raw2 1
+// raw2 2
+// raw2 3
+// raw2 4
+// raw2 5
+// raw2 6
+// raw2 7
+// raw2 8
+"# bare hash quote
+"##;
+    let c = b"
+// bytes 1
+// bytes 2
+// bytes 3
+// bytes 4
+// bytes 5
+// bytes 6
+// bytes 7
+// bytes 8
+";
+    let d = "multi
+// multi 1
+// multi 2
+// multi 3
+// multi 4
+// multi 5
+// multi 6
+// multi 7
+// multi 8
+";
+    // real comment
+}

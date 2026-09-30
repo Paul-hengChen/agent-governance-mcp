@@ -1,0 +1,45 @@
+x = '''
+# assign 1
+# assign 2
+# assign 3
+# assign 4
+# assign 5
+# assign 6
+# assign 7
+# assign 8
+'''
+f(
+"""
+# arg 1
+# arg 2
+# arg 3
+# arg 4
+# arg 5
+# arg 6
+# arg 7
+# arg 8
+"""
+)
+y = 1
+z = """
+# after 1
+# after 2
+# after 3
+# after 4
+# after 5
+# after 6
+# after 7
+# after 8
+"""
+if ok:
+    w = """
+# if 1
+# if 2
+# if 3
+# if 4
+# if 5
+# if 6
+# if 7
+# if 8
+"""
+# real comment

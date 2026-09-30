@@ -1,0 +1,20 @@
+var s = `
+// raw 1
+// raw 2
+// raw 3
+// raw 4
+// raw 5
+// raw 6
+// raw 7
+// raw 8
+/* open in raw
+`
+x := 1 // it's "note
+// after 1
+// after 2
+// after 3
+// after 4
+// after 5
+// after 6
+// after 7
+// after 8

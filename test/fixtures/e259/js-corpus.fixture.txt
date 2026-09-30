@@ -1,0 +1,46 @@
+#!/usr/bin/env node
+const re1 = /\/\/ not a comment/g;
+const re2 = /[/*]+/.test("x"); // trailing after regex class
+const div = a / b / c; // division, not regex
+const tpl = `line one // in template
+/* still template ${nest(`inner // tpl ${deep}`)} */
+more`;
+const s1 = "a // b", s2 = 'c /* d */';
+x = y ? /re\/x/ : 1 / 2;
+return /^\/\*/.test(z);
+// run of seven
+// 2
+// 3
+// 4
+// 5
+// 6
+// 7
+
+// run of eight
+// 2
+// 3
+// 4
+// 5
+// 6
+// 7
+// 8
+/**
+ * Doc block with tags.
+ * @param a first
+ *   continued
+ * @returns thing
+ * more prose one
+ * more prose two
+ * @see elsewhere
+ * prose after see 1
+ * prose after see 2
+ * prose after see 3
+ * prose after see 4
+ * prose after see 5
+ */
+function f(a) { return a; }
+/* one */ code(); /* two
+   spans */ more();
+if (a) { /* inline */ }
+/* unterminated span keeps following lines as comment
+still comment

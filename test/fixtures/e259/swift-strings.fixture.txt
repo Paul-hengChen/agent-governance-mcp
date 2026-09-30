@@ -1,0 +1,24 @@
+let a = """
+// triple 1
+// triple 2
+// triple 3
+// triple 4
+// triple 5
+// triple 6
+// triple 7
+// triple 8
+\(x)
+"""
+let b = #"one // line \#(x) "quoted""#
+let c = #"""
+// ext3 1
+// ext3 2
+// ext3 3
+// ext3 4
+// ext3 5
+// ext3 6
+// ext3 7
+// ext3 8
+\#(x) and "quote"
+"""#
+// real comment

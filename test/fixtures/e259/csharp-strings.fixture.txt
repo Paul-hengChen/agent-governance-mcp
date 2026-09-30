@@ -1,0 +1,44 @@
+var a = @"
+// verbatim 1
+// verbatim 2
+// verbatim 3
+// verbatim 4
+// verbatim 5
+// verbatim 6
+// verbatim 7
+// verbatim 8
+say ""hi"" // text
+";
+var b = $@"
+// interp 1
+// interp 2
+// interp 3
+// interp 4
+// interp 5
+// interp 6
+// interp 7
+// interp 8
+{x}
+";
+var c = """
+// raw3 1
+// raw3 2
+// raw3 3
+// raw3 4
+// raw3 5
+// raw3 6
+// raw3 7
+// raw3 8
+""";
+var d = """"
+// raw4 1
+// raw4 2
+// raw4 3
+// raw4 4
+// raw4 5
+// raw4 6
+// raw4 7
+// raw4 8
+has """ inside
+"""";
+// real comment
