@@ -52,3 +52,44 @@ No findings. The change is comments only, with no runtime effect (AC1).
 
 ## Verdict
 CHANGES_REQUESTED — the pass is accurate and readable almost everywhere, but a duplicated comment line (e18:48), 20 misindented comment lines in 5 files, and a rewrite that misstates the E105 fix's scope (check-md-tables:434-436) must be fixed first. Each is a small, mechanical fix.
+
+## Round 2 — APPROVED — by code-reviewer
+
+## Summary
+- Fix round 5cc2bc2 (test comments, 18 files) plus 3f1dedd (state and author notes). I read every test hunk in 679d4a3..HEAD.
+- All three required findings and all three recommended findings from round 1 are resolved. The two optional items (e16:129-132 grammar, e125c:13-14 capitalisation) were left as they are, which is acceptable.
+- The fix round introduced no new defects. Re-scans for indentation against base, adjacent duplicated lines, and new comment lines over 120 columns all came back empty across every changed file.
+- Verdict: APPROVED.
+
+## AC Completeness
+AC1 — implemented — comment-stripped comparison over 6c61864..HEAD: `files=57 bad=0`, exit 0.
+AC2 — implemented — the spec's scope filter over `git diff --name-only 6c61864..HEAD` prints nothing.
+AC3 — implemented — the round-1 findings are resolved (see Correctness and Quality). The fix hunks are accurate to the code beside them.
+AC4 — implemented (advisory) — no new bare-id comment blocks. The fix round only re-wraps, re-indents or rewords existing plain-word text.
+AC5 — implemented — re-scan of the added lines over 6c61864..HEAD (same run-time-assembled pattern class as round 1) found no matches.
+AC6 — not judged here (verifier hop).
+AC7 — implemented — compose-equivalence changed only by re-wrapping comment line 15, which is covered by AC1 = 0.
+
+## Correctness
+- Round-1 required (e18 duplicate) — resolved. test/e18-write-provenance.test.mjs:47 is now followed directly by "single QAEV-4 exemption test…"; the duplicated line is gone.
+- Round-1 required (check-md-tables:434-436 scope) — resolved. It now reads: "Fix for how the checker tells the three no-delimiter causes apart: (a) blank-split, (b) missing delimiter, (c) mis-sized delimiter. Adjacent tables whose header cell counts differ used to be reported as (a) even when the cause was (b) or (c)". This matches E105-B/E105-C, which require (b)/(c) to be reported, never blank-split, and E105-CONTINUATION, which keeps (a) as blank-split. The unclear "This shape" became "Two adjacent tables with different header cell counts occur 0 times in this repo", which reads on its own.
+- Round-1 recommended (e115 header) — resolved. test/e115-join-precondition.test.mjs:2-4 now names both checks: branch merged (ancestry) and declared-vs-actual identity.
+- No new accuracy issues in the fix hunks.
+
+## Quality
+- Round-1 required (indentation) — resolved. All 20 lines were re-indented to match the next code line: dispatch-pins:778-779/817-818, e106:153-155, e108:229-230/352/396, e126:366/550-552, e137-render-sanitise:343-344/366-368. The indent-vs-base scan now reports no file.
+- Round-1 recommended ("D-D"/"D-F" and slug lead) — resolved. e117:99/102/110, e120:98 and e121:95/105 now say "Lane-local-ledger re-baseline (e125a, …)", "the root "index" shape" and "spec AC9". The three copies of the block now match.
+- Round-1 recommended (lines over 120 columns) — resolved. All 8 lines were rewrapped (ac-execution:30-31, compose-equivalence:15-16, drift-skew:37-39, e121:32-34, e122:183-185, e128-blocked-self-loop-repro:3-4, e130:40-42, e178b-cut-prereview:29-30). The long-line scan now reports none.
+- **optional**, cosmetic, non-blocking — a few rewrapped blocks have uneven line lengths (e.g. e121:34 and e130:42 are long compared with their neighbours, though still under 120). Not worth another hop.
+
+## Architecture
+No change. Comments only.
+
+## Security
+No findings. The AC5 re-scan is clean.
+
+## Performance
+No findings. Comments only.
+
+## Verdict
+APPROVED — every round-1 required and recommended finding is fixed, the mechanical checks (AC1 bad=0, AC2, AC5) pass, and the fix round added no new defects.
