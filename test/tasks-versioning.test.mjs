@@ -1,7 +1,7 @@
 // Coded by @qa-engineer
-// T29: tasks.md schema-versioning sentinel + migration. Imports compiled dist/.
+// Tasks-file schema-versioning sentinel and migration. Imports compiled dist/. (T29)
 //
-// e125a-lane-local-ledgers re-baseline (qa-owned, spec AC13 "Test impact"):
+// Re-baselined for lane-local task ledgers (qa-owned; e125a-lane-local-ledgers, spec AC13 "Test impact"):
 // CURRENT_VERSIONS.tasks bumped 1 -> 2, and tw_* now reads/writes ONLY the
 // current lane's ledger `.current/<lane>/tasks.md` (spec D-F/AC9) — a
 // workspace with no .git resolves to lane "_primary" (tools/lane-paths.ts
@@ -29,7 +29,7 @@ import {
 import { resetSession } from "../dist/guards/session.js";
 
 function mkWorkspace() {
-  // e125a: no .git -> resolveCurrentLane(ws) === "_primary" (PRIMARY_LANE).
+  // With no .git, the current lane resolves to "_primary" (PRIMARY_LANE); this is the lane-local ledger layout (e125a).
   // No pre-seeded root tasks.md — addTaskInFile creates the lane ledger
   // fresh (spec AC9's "unmigrated feat/primary lane with no rows in root").
   return fs.mkdtempSync(path.join(os.tmpdir(), "twtv-"));
@@ -56,7 +56,7 @@ function read(ws) {
 // step leaves the body untouched; only the sentinel digit changes here.
 const SENTINEL_LINE = "<!-- schema_version: 2 -->";
 
-// ---------- AC-1: sentinel on every write ----------
+// ---------- every write stamps the version sentinel (AC-1) ----------
 
 test("AC-1: addTaskInFile creates new tasks.md with sentinel on line 1", async () => {
   const ws = mkWorkspace();
@@ -101,7 +101,7 @@ test("AC-1: re-write idempotent — sentinel not duplicated", async () => {
   assert.equal(matches.length, 1, "expected exactly one sentinel");
 });
 
-// ---------- AC-2: heal-on-read for getNextTaskFromFile ----------
+// ---------- getNextTaskFromFile heals a missing sentinel on read (AC-2) ----------
 
 test("AC-2: getNextTaskFromFile heals sentinel-less tasks.md on first read", () => {
   const ws = mkWorkspace();
@@ -171,7 +171,7 @@ test("AC-2 boundary: parseTasksFromFile does NOT trigger heal-on-read (drift pat
   assert.equal(after, before, "parseTasksFromFile must be read-only (drift relies on this)");
 });
 
-// ---------- AC-4: refuse-loud on future versions ----------
+// ---------- a file from a newer version is refused loudly (AC-4) ----------
 
 test("AC-4: parseTasksFromFile refuses-loud when sentinel version > CURRENT", () => {
   const ws = mkWorkspace();

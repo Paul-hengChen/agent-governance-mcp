@@ -233,13 +233,13 @@ test("drift: empty details array returns no-drift message (not compressed)", asy
   const report = JSON.parse(detectDrift(ws));
   assert.equal(report.driftDetected, false);
   assert.match(report.details[0], /No drift detected/);
-  // E112 re-baseline (case-a negative pin): this fixture seeds ZERO tasks, so
+  // Negative pin for the fan-out advisory (E112 re-baseline): this fixture seeds ZERO tasks, so
   // incompleteTasks is empty and the legacy clean string must be returned
   // BYTE-IDENTICAL (not merely "matches /No drift detected/", which the
   // scope-qualified string also coincidentally matches — see
   // review_reports/review_T-E112-01.md round-2 C3/C4). fanoutAdvisory must be
-  // null. This was the exact gap code-reviewer flagged as "the whole E112
-  // surface is untested" — the incomplete-tasks>0 branch is pinned instead in
+  // null. This was the exact gap the code review flagged as "the whole fan-out
+  // advisory surface is untested" — the incomplete-tasks>0 branch is pinned instead in
   // test/e112-drift-fanout-feature-scope.test.mjs (case(a) NDI shape / lane
   // signals), which this loose regex-only assertion could never have caught.
   assert.equal(report.fanoutAdvisory, null);

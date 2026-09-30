@@ -69,7 +69,7 @@ function makeResult(text) {
 }
 
 // ============================================================================
-// AC1, AC12 — prd_path schema + round-trip + preservation
+// prd_path schema, round-trip and preservation across writes (AC1, AC12)
 // ============================================================================
 
 test("prd_path round-trip: file mode writes and reads back the path", async () => {

@@ -1,5 +1,5 @@
 // Coded by @sr-engineer
-// D4 behavioral-eval harness — bundle loader (T-D4-01, spec AC-8).
+// Bundle loader for the behavioral-eval harness (D4, T-D4-01, spec AC-8).
 //
 // Thin wrapper around the compiled buildPromptForRole() so eval scenarios
 // receive EXACTLY the bundle a real dispatch would: constitution (composed per
