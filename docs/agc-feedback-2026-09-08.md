@@ -528,7 +528,7 @@ B 豁免的理由：本 repo 的讀者都是 agc 使用者，且 `docs/backlog.m
 
 ## H7 — 註解長話短說
 
-**狀態**：✅ **done 2026-09-28** —— E107 併入 E231 出貨（constitution §6 *Generic citation*，merge `f95e4ae`）
+**狀態**：🟡 **部分完成** —— E231（merge `f95e4ae`）只出了可讀性規則（*Generic citation*），沒有管篇幅；篇幅規則另開 **E258**（2026-09-30）
 
 實測（NDI `app/web/src` 非測試檔）：**33,584 行原始碼、11,247 行註解 → 33%**。
 最極端的檔案：
