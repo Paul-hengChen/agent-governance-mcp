@@ -1,5 +1,7 @@
 # Pending tickets — lane e233f
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E233F-NEW-1
 title: skill-release-engineer step 13a cites its own line numbers, and they are already stale
@@ -13,5 +15,3 @@ body: |
   so replace them with a reference to the step or heading name. This is a rule-text change, which is
   outside E233's comment-only scope.
 ```
-
-## Applied
