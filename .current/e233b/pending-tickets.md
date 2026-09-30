@@ -1,5 +1,7 @@
 # Pending tickets — lane e233b
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E233B-NEW-1
 title: research/visual-fidelity.md header and old CHANGELOG entries still name source files with a product-style filename prefix that may be a project codename
@@ -14,5 +16,3 @@ body: |
   and must stay. Needs a human call: is the prefix a codename? If yes, describe those names by class
   without rewriting the substance of the history; if no, close as not-a-leak.
 ```
-
-## Applied
