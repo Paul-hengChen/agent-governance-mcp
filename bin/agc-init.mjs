@@ -33,7 +33,8 @@
 //              git worktree from the primary checkout (node_modules symlinked,
 //              .env byte-copied), and tear it down again with a merge guard
 //              (--shipped) or an evidence-to-abandoned/ disposition
-//              (--abandoned). See the "subcommand: feature" section below.
+//              (--abandoned), removing the lane's default-location mailbox
+//              too. See the "subcommand: feature" section below.
 //   agc eject [--yes] [--purge-knowledge]
 //              Print (default) or apply the removal plan for agc's runtime
 //              artifacts, process evidence and host traces; tracked paths are
@@ -1319,7 +1320,10 @@ const STR_USAGE_FEATURE =
   "          commits it, removes the worktree, and keeps the branch. Either\n" +
   "          way, the lane's .current/<lane>/pending-tickets.md findings (if\n" +
   "          any) first get real ids, appended to docs/backlog.md and\n" +
-  "          committed on --base in the primary checkout.\n";
+  "          committed on --base in the primary checkout. Also deletes\n" +
+  "          <worktree-parent>/_mailbox/<lane>/ when it holds only\n" +
+  "          to-integrator.md, to-lane.md and watch-lock sidecars; otherwise\n" +
+  "          keeps it with a warning.\n";
 
 // Exclude rules upserted into the SHARED info/exclude (git-common-dir), never
 // the tracked .gitignore. `/node_modules` has no trailing slash on purpose:
@@ -2175,6 +2179,79 @@ function removeWorktreeNoForce(repoRoot, lanePath, hint) {
         `${lanePath} left in place` + (hint ? `\n${hint}` : "")
     );
   }
+}
+
+// --- finish-time mailbox teardown (E246, specs/e246-mailbox-teardown.md) ---
+const MAILBOX_MESSAGE_FILES = new Set(["to-integrator.md", "to-lane.md"]);
+const MAILBOX_WATCH_LOCK_RE = /^\..+\.watch-lock$/;
+
+// Same liveness rule as scripts/mailbox-watch.mjs isPidAlive (EPERM = alive);
+// duplicated because bin/ ships standalone.
+function isMailboxPidAlive(pid) {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    return Boolean(err) && err.code === "EPERM";
+  }
+}
+
+/**
+ * Why the mailbox at `dir` must be kept, or null when it is safe to delete.
+ * Only regular files named as a message file or a `.*.watch-lock` sidecar
+ * with a dead holder pid are deletable. Throws on fs errors.
+ */
+function mailboxKeepReason(dir) {
+  const st = fs.lstatSync(dir);
+  if (!st.isDirectory()) return "not a plain directory";
+  for (const name of fs.readdirSync(dir).sort()) {
+    const est = fs.lstatSync(path.join(dir, name));
+    if (!est.isFile()) return `unknown entry ${name}`;
+    if (MAILBOX_MESSAGE_FILES.has(name)) continue;
+    if (!MAILBOX_WATCH_LOCK_RE.test(name)) return `unknown entry ${name}`;
+    let holder;
+    try {
+      holder = JSON.parse(fs.readFileSync(path.join(dir, name), "utf8"));
+    } catch {
+      return `unparseable watch-lock ${name}`;
+    }
+    if (holder === null || typeof holder !== "object" || !Number.isInteger(holder.pid)) {
+      return `unparseable watch-lock ${name}`;
+    }
+    if (isMailboxPidAlive(holder.pid)) return `watch-lock ${name} held by live pid ${holder.pid}`;
+  }
+  return null;
+}
+
+/**
+ * Delete the lane's default-location mailbox `<dirname(lanePath)>/_mailbox/<ticketId>/`.
+ * Call only after the worktree is removed. Never throws: an absent mailbox is
+ * silent, anything unrecognised keeps the folder with one stderr warning.
+ */
+function removeLaneMailbox(lanePath, ticketId) {
+  const dir = path.join(path.dirname(lanePath), "_mailbox", ticketId);
+  const keep = (reason) =>
+    process.stderr.write(`agc feature finish — kept mailbox ${dir}: ${reason}\n`);
+  let reason;
+  try {
+    reason = mailboxKeepReason(dir);
+  } catch (err) {
+    if (err && err.code === "ENOENT" && !fs.existsSync(dir)) return;
+    keep(`unreadable (${err && err.code ? err.code : String(err)})`);
+    return;
+  }
+  if (reason !== null) {
+    keep(reason);
+    return;
+  }
+  try {
+    fs.rmSync(dir, { recursive: true });
+  } catch (err) {
+    keep(`delete failed (${err && err.code ? err.code : String(err)})`);
+    return;
+  }
+  process.stdout.write(`agc feature finish — removed mailbox ${dir}\n`);
 }
 
 // --- finish-time pending-ticket apply (E179, specs/e179-*.md) ---------------
@@ -3152,6 +3229,7 @@ async function runFeatureFinish(cwd, argv) {
     applyShippedEvidenceHarvest(evidenceHarvest);
     removeWorktreeNoForce(repoRoot, lanePath); // AC17/AC19
     process.stdout.write(`agc feature finish — removed worktree ${lanePath}\n`);
+    removeLaneMailbox(lanePath, ticketId); // E246: before branch -d, so its refusal cannot skip it
     const del = gitTry(repoRoot, ["branch", "-d", branch]); // safe delete, never -D
     if (del.status !== 0) {
       process.stderr.write(del.stderr);
@@ -3195,6 +3273,7 @@ async function runFeatureFinish(cwd, argv) {
   if (currentHarvest !== null) executeAbandonCurrentHarvest(currentHarvest);
   removeWorktreeNoForce(repoRoot, lanePath, hint);
   process.stdout.write(`agc feature finish — removed worktree ${lanePath}\n`);
+  removeLaneMailbox(lanePath, ticketId);
   // AC26 — the branch is deliberately kept (the orphan-lane detector needs
   // it, E124).
   process.stdout.write(`agc feature finish — kept branch ${branch} (abandoned lanes keep their branch)\n`);
