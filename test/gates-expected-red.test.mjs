@@ -1,7 +1,7 @@
 // Coded by @qa-engineer
-// Tests for specs/c15-expected-red-manifest.md — T-C15-07 (unit) + T-C15-08
-// (integration). gates/expected-red.ts is the third member of the
-// evidence-existence gate family (MISSING_EVIDENCE / VISUAL_EVIDENCE_MISSING):
+// Tests for the expected-red manifest check in gates/expected-red.ts, unit
+// and integration. It works like the other evidence-existence checks
+// (MISSING_EVIDENCE / VISUAL_EVIDENCE_MISSING):
 // sr-engineer declares intentionally-red tests in a feature-scoped manifest
 // (qa_reports/expected-red_<feature>.txt); qa-engineer diffs the actual suite
 // run against it and records the disposition under a `## Expected-Red Diff`
@@ -14,6 +14,7 @@
 //   AC-4 disposition check (hasExpectedRedDisposition)  -> U6-U12
 //   AC-4 PASS gate composition (EXPECTED_RED_DIFF_MISSING) -> I1-I4
 //   AC-5 file-mode only                                 -> I5
+// (specs/c15-expected-red-manifest.md, T-C15-07, T-C15-08)
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -170,10 +171,10 @@ test("U13: empty task id list -> present:false (no ids to satisfy the gate)", ()
 // ============================================================================
 // I1-I4 — Integration: handleUpdateState composition (EXPECTED_RED_DIFF_MISSING)
 //
-// These drive the REAL tw_update_state orchestrator (tools/handoff-orchestrator.ts
-// handleUpdateState), not a re-implementation of its predicate — matching the
-// test/qa-flow.test.mjs C1-07 convention. qa_review text is passed on the PASS
-// write; the server's recordReview step (which runs BEFORE the evidence gates)
+// These drive the REAL state-write orchestrator (tools/handoff-orchestrator.ts
+// handleUpdateState), not a re-implementation of its predicate, the same way
+// test/qa-flow.test.mjs does (C1-07). qa_review text is passed on the PASS
+// write; the server's recordReview step (which runs BEFORE the evidence checks)
 // appends it verbatim into qa_reports/review_<id>.md, so a qa_review string
 // containing "## Expected-Red Diff" becomes the on-disk disposition section —
 // exactly the real sr-engineer/qa-engineer flow, not a test-only shortcut.
@@ -190,8 +191,9 @@ async function seedQaInProgress(ws, feature) {
     pendingNotes: ["QA: claiming review"],
     lastAgent: "qa-engineer",
   });
-  // E148: force the seed's last_updated off the wall clock (docs/backlog.md
-  // row E148) — see test/e148-seed-stamp.mjs.
+  // Replace the seed's wall-clock last_updated with a fixed stamp that cannot
+  // look hand-authored, so the write path's stamp check stays quiet. See
+  // test/e148-seed-stamp.mjs. (E148)
   forceSeedStamp(ws);
 }
 
@@ -323,16 +325,14 @@ test("I5: gate is wrapped in instanceof FileHandoffStorage — a non-file storag
 test("I5b: source pins the guard — both hasExpectedRedManifest call sites are FileHandoffStorage-guarded (e2-bugfix-repro-gate re-baseline)", () => {
   // Why: I5 proves the predicate itself; this pins that the ACTUAL call
   // site(s) in tools/handoff-orchestrator.ts use it (a refactor that hoists
-  // the expected-red gate out of the guard would regress AC-5 silently
-  // otherwise). e2-bugfix-repro-gate (T-E2-02) added a SECOND
-  // hasExpectedRedManifest(parsed.workspace_path...) call site — the
-  // repro-first gate, placed earlier in the file than this original PASS-path
-  // gate — guarded by a compound multi-line
-  // `if (storage instanceof FileHandoffStorage && ...)`, not the single-line
-  // literal this test used to `lastIndexOf` unconditionally. A bare
-  // `src.indexOf(...)` now lands on THAT new call site first, so this test
-  // disambiguates the two sites explicitly instead of assuming there is only
-  // one.
+  // the expected-red check out of the file-mode guard would silently break
+  // AC-5 otherwise). There are TWO hasExpectedRedManifest(parsed.workspace_path...)
+  // call sites: the bugfix reproduction check, earlier in the file, guarded
+  // by a compound multi-line `if (storage instanceof FileHandoffStorage && ...)`,
+  // and the PASS-path check, guarded by a single-line literal. A bare
+  // `src.indexOf(...)` lands on the first one, so this test tells the two
+  // sites apart explicitly instead of assuming there is only one.
+  // (e2-bugfix-repro-gate, T-E2-02)
   const root = path.resolve(import.meta.dirname, "..");
   const src = fs.readFileSync(path.join(root, "tools", "handoff-orchestrator.ts"), "utf-8");
 
@@ -346,7 +346,7 @@ test("I5b: source pins the guard — both hasExpectedRedManifest call sites are 
     "exactly two hasExpectedRedManifest(parsed.workspace_path...) call sites are expected",
   );
 
-  // Site 1 (repro-first gate, T-E2-02): guarded by the compound multi-line
+  // Site 1 (the bugfix reproduction check, T-E2-02): guarded by the compound multi-line
   // `if (storage instanceof FileHandoffStorage && ...)`. Assert the
   // substring immediately precedes the call site with no intervening block
   // close, and that it contains the compound `&&` continuation (not the

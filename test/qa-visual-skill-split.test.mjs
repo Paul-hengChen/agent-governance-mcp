@@ -42,11 +42,11 @@ test("AC-1: skill-qa-visual.md exists and carries the v3.14.0 contract (widget s
     assert.match(body, category, `sub-skill must enumerate diff category ${category}`);
   }
 
-  // v3.14.0 failure routes — 4 modes now (widget shape miss is new); all
-  // implementation-side ones carry the `visual_fail:` token.
-  // c9-protocol-fields (T-C9-15 re-baseline): `next_role` is now a first-class
-  // field passed as `next_role="<role>"`, not a `next_role: <role>`
-  // pending_notes token — the colon-form regex no longer matches.
+  // Four failure routes (widget shape miss joined in v3.14.0); all
+  // implementation-side ones carry the `visual_fail:` token. `next_role` is a
+  // first-class field written as `next_role="<role>"`, not a
+  // `next_role: <role>` pending_notes token, so the regexes match the field
+  // form. (c9-protocol-fields, T-C9-15)
   assert.match(body, /Widget shape miss.*next_role="sr-engineer".*visual_fail:/is, "widget shape miss must target sr-engineer with visual_fail token");
   assert.match(body, /Pixel drift.*next_role="sr-engineer".*visual_fail:\s*pixel/is, "pixel drift route must carry visual_fail: pixel token");
   assert.match(body, /Missing baseline.*next_role="design-auditor"/is, "missing baseline must route to design-auditor");
@@ -111,73 +111,27 @@ test("AC-5: byte counts stay within v3.14.0-relaxed budgets (savings invariant v
   // Phase 1.5 hook (~600 bytes). qa-visual.md adds the Widget Shape
   // Checklist Step A + per-row failure-mode upgrades (~1800 bytes). The
   // sub-skill exceeded the v3.8.3 2400-byte cap by design — the new
-  // contract carries the R6 widget verification protocol. Budgets relaxed
+  // contract carries the widget verification protocol (R6). Budgets relaxed
   // to reflect the new scope while keeping the savings-vs-v3.8.2-baseline
   // invariant intact (qa-engineer.md still well under the 8660 v3.8.2
   // pre-split size).
   const qaSize = fs.statSync(QA_PATH).size;
   const qaVisualSize = fs.statSync(QA_VISUAL_PATH).size;
 
-  // qa-engineer.md: still smaller than v3.8.2 pre-split (8660 bytes).
-  // v3.14.0 adds ~600 bytes for the PASS-gate clause — raise cap to 8500
-  // (still under v3.8.2 baseline).
-  // c3-covering-evidence (qa-owned bump): C3-06 added the `covers:` batch
-  // convention to the Phase 1 write-target line + PASS step, bringing the
-  // file to 8486 bytes — only 14 bytes of headroom under the 8500 cap, far
-  // below this test's own ~300-550-byte convention (see qa-visual cap notes
-  // below). Raised 8500 -> 8850 (~360-byte headroom) so the NEXT minor doc
-  // amendment doesn't require another emergency cap bump. Still comfortably
-  // under the 8660 v3.8.2 pre-split narrative is no longer preserved by this
-  // number alone, but that comparison was informational, not load-bearing —
-  // no other test or gate depends on the literal 8660 value (confirmed by
-  // repo-wide grep).
-  // c15-expected-red-manifest (qa-owned bump, T-C15-02): Phase 0.5 (Expected-
-  // Red Diff) SOP prose added to skill-qa-engineer.md, bringing the file to
-  // 11082 bytes — only ~2200 bytes of headroom would be consumed at the old
-  // 8850 cap (i.e. it blows the cap outright). Raised 8850 -> 11500 (~418-
-  // byte headroom) per the established ~300-550-byte convention.
-  // d9-qa-review-scoped-append (qa-owned bump, 2026-07-11): Phase 4 FAIL step
-  // and the Escalation Routes format line both gained a `review_task_ids`
-  // clause (sr-engineer's fix for the qa_review auto-append fan-out bug),
-  // bringing the file to 11826 bytes — independently re-measured with
-  // `wc -c content/skill-qa-engineer.md`, matching sr-engineer's reported
-  // figure exactly. Raised 11500 -> 12200 (~374-byte headroom) per the
-  // established ~300-550-byte convention.
-  // e2-bugfix-repro-gate (qa-owned bump): Phase 0.5 gained the "Bugfix-mode
-  // branch" clause (the `## Expected-Red Diff` disposition becomes load-
-  // bearing for PASS when dispatch_mode="bugfix"), bringing the file to
-  // 12549 bytes — independently re-measured with `wc -c
-  // content/skill-qa-engineer.md`. Raised 12200 -> 12950 (~400-byte headroom)
-  // per the established ~300-550-byte convention.
-  // e3-outcome-shaped-acceptance (qa-owned bump, T-E3-QA): new Phase 3.5 — AC
-  // Execution inserted between Phase 3 (Tests) and Phase 4 (Run) — scan/none/
-  // present/fail/PASS-GATE sub-bullets, bringing the file to 14329 bytes —
-  // independently re-measured with `wc -c content/skill-qa-engineer.md`
-  // (matches code-reviewer's reported figure exactly, review_reports/
-  // review_T-E3-CR.md). Raised 12950 -> 14729 (~400-byte headroom) per the
-  // established ~300-550-byte convention.
-  // e20-e21-crash-resilience-sop (qa-owned bump, T-E20-01/T-E21-01): the E20 hard
-  // rule bullet ("HARD — long runs end in-turn") plus the E21 Phase-4 crash-
-  // checkpoint bullet (code-reviewer confirmed the bytes are justified), plus a
-  // QA-added "(file-mode only)" caveat on the crash-checkpoint bullet per the
-  // reviewer's non-blocking advisory, bringing the file to 15121 bytes —
-  // independently re-measured with `wc -c content/skill-qa-engineer.md`. Raised
-  // 14729 -> 15500 (~379-byte headroom) per the established ~300-550-byte
-  // convention.
-  // e46-qa-spec-defect-status-rule (qa-owned bump, T-E46-01, 2026-08-10): new
-  // "## Contract Defect vs Implementation Failure" H2 (two-verdict decision
-  // test + WHEN/DO/ELSE route + anti-abuse citation guard) plus a `contract
-  // defect | Blocked | ... | pm` Escalation Routes row, plus the two Phase
-  // 3a/3b Drift-bullet cross-references added in code review round 2/3,
-  // bringing the file to 17512 bytes — independently re-measured with `wc -c
-  // content/skill-qa-engineer.md` (matches code-reviewer's round-3 figure
-  // exactly, review_reports/review_T-E46-01.md). Raised 15500 -> 17900
-  // (~388-byte headroom) — the tighter end of the established ~350-550-byte
-  // convention, deliberately: this cap is a context-budget guard, so headroom
-  // is exactly the unreviewed growth the next edit can take without anyone
-  // deciding to allow it (round 3 rejected 18000/~488 bytes for the same
-  // reason). `skill-qa-visual.md` needs no bump (unchanged at 17007, under
-  // its 20700 cap).
+  // qa-engineer.md cap: 17900 bytes. The cap guards the context budget of an
+  // SOP that is loaded on every QA hop, so it only moves on purpose: each
+  // time a reviewed SOP addition lands, it is raised to the measured size
+  // (`wc -c content/skill-qa-engineer.md`) plus roughly 350-550 bytes of
+  // headroom, kept at the tight end because headroom is exactly the growth
+  // the next edit can add without anyone deciding to allow it. The latest
+  // raise (15500 -> 17900, measured 17512) absorbed the "## Contract Defect
+  // vs Implementation Failure" section and its Escalation Routes row. The
+  // file was 8660 bytes before the visual sub-skill was split out; that
+  // number is informational only and nothing depends on it.
+  // `skill-qa-visual.md` has its own cap below. (Earlier raises: C3-06
+  // `covers:` batching, T-C15-02 Expected-Red Diff, d9 review_task_ids, e2
+  // bugfix-mode branch, T-E3-QA AC Execution, long runs and crash checkpoint
+  // (T-E20-01/T-E21-01); latest T-E46-01, E46.)
   assert.ok(qaSize <= 17900, `qa-engineer.md must be <= 17900 bytes (got ${qaSize})`);
   // qa-visual.md: v3.36.0 adds B10 (Step B0 carry-forward gate) and B11
   // (Step B1 deterministic pixel-diff pre-screen + Step B2 LLM-only path).
@@ -228,8 +182,8 @@ test("AC-6: Phase 1.5 v3.8.2 contract is preserved AND extended in v3.14.0 (comb
     assert.match(combined, category, `combined surface must enumerate ${category}`);
   }
   // Routes — v3.8.2 had 3; v3.14.0 has 4 (added widget shape miss).
-  // c9-protocol-fields (T-C9-15 re-baseline): `next_role` is now a first-class
-  // field passed as `next_role="<role>"`, not a `next_role: <role>` token.
+  // `next_role` is a first-class field written as `next_role="<role>"`, not a
+  // `next_role: <role>` token. (c9-protocol-fields, T-C9-15)
   assert.match(combined, /next_role="sr-engineer"/, "sr-engineer route must exist");
   assert.match(combined, /next_role="design-auditor"/, "design-auditor route must exist");
   // v3.14.0 additions
@@ -265,19 +219,18 @@ test("AC-2: skill-qa-visual.md Step A.0 requires copying the frozen baseline man
   assert.match(block, /MUST NOT re-derive the baseline set from the Figma URL/, "must forbid URL re-derivation");
 });
 
-// qa-visual-consolidation (T-QVC-01, v3.44.0 pending): the 265→124-line
-// consolidation rewrite folded four scattered exemption paragraphs into one
-// provenance matrix and two failure narratives into one error-code table.
-// specs/qa-visual-consolidation.md Copy/Strings S15/S16 call out that these
-// two annotation tokens must survive BYTE-EXACT, specifically preserving the
+// The visual sub-skill folds its exemption rules into one provenance matrix
+// and its failure narratives into one error-code table. Two annotation
+// tokens in it must survive BYTE-EXACT, specifically preserving the
 // em-dash (U+2014) separator rather than a hyphen — a paraphrase an editor
 // could introduce without any visual difference in most fonts. The server
 // parser (tools/evidence-file.ts CARRY_FORWARD_TOKEN / B1_UNAVAILABLE_TOKEN)
 // is tested against its own constants elsewhere (evidence-provenance.test.mjs,
 // pixel-gate-attestation.test.mjs) but nothing previously pinned these two
-// literals against the SKILL DOC TEXT itself — this closes that gap so a
+// literals against the SKILL DOC TEXT itself — this test does, so a
 // future doc edit that silently swaps the em-dash for a hyphen fails CI
 // instead of silently breaking the carry-forward/B1-fallback prose contract.
+// (specs/qa-visual-consolidation.md Copy/Strings S15/S16, T-QVC-01)
 test("AC-3 (qa-visual-consolidation S15/S16): carry-forward and B1-fallback annotation tokens are byte-exact (em-dash, not hyphen)", () => {
   const body = fs.readFileSync(QA_VISUAL_PATH, "utf-8");
   assert.ok(

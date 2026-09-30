@@ -1,12 +1,12 @@
 // Coded by @qa-engineer
-// Tests for specs/e213-shipped-ignored-shape.md AC1-AC17 — `agc feature
-// finish <ticket> --shipped` in the all-ignored adopter shape
-// (an adopter-shaped project: root tasks.md and .current/ both git-ignored),
-// which today either hard-fails (E213) or silently deletes git-ignored
-// qa_reports/review_reports/specs evidence with the worktree (E214), plus
-// one --abandoned output-clarity fix (E216, the in-lane `moved` line no
-// longer misreads as a second durable copy for a file already harvested to
-// primary).
+// Tests for `agc feature finish <ticket> --shipped` in a project where root
+// tasks.md and .current/ are both git-ignored. Without these fixes the
+// command either failed outright on the ignored tasks.md, or deleted
+// git-ignored qa_reports/, review_reports/ and specs/ evidence together with
+// the worktree. Also covers one --abandoned output fix: the in-lane `moved`
+// line must not read as a second durable copy when the file was already
+// copied to the primary checkout. (specs/e213-shipped-ignored-shape.md
+// AC1-AC17; E213, E214, E216)
 //
 // Fixture convention (this repo's own precedent, restated in
 // test/e180-abandoned-harvest.test.mjs and test/agc-feature-finish-
@@ -16,7 +16,7 @@
 // reused per the spec's own Dependencies note.
 //
 // A load-bearing empirical fact (verified directly against the system git
-// before writing these tests, same as e180's own note): `git worktree
+// before writing these tests, and noted the same way in the e180 tests): `git worktree
 // remove` (never --force) deletes untracked-and-git-ignored content
 // WITHOUT refusing, but DOES refuse over untracked-but-NOT-ignored content.
 // AC1-AC3/AC6-AC12/AC14/AC16/AC17's fixtures are all-ignored shapes that
@@ -76,7 +76,7 @@ after(() => {
 });
 
 // ---------------------------------------------------------------------------
-// git / agc helpers (test/e180-abandoned-harvest.test.mjs precedent).
+// git / agc helpers, same shape as test/e180-abandoned-harvest.test.mjs's.
 // ---------------------------------------------------------------------------
 function git(cwd, args) {
   return execFileSync("git", args, { cwd, encoding: "utf-8" });
@@ -142,11 +142,11 @@ function writeFile(abs, content) {
   fs.writeFileSync(abs, content);
 }
 
-// Commits `.current/<ticket>/` on the lane's own branch (the fixture shape
-// AC1 uses to isolate the E213 fsonly-line from the separate, always-fs-copy
-// untracked-.current/ advisory AC2 tests on its own): `tracked` then reads
-// true from the primary's own perspective post-merge, and the close step
-// takes the `git mv` branch instead of the fs-copy branch.
+// Commits `.current/<ticket>/` on the lane's own branch. AC1 uses this shape
+// to test the git-ignored tasks.md line on its own, apart from the separate
+// untracked-.current/ copy message that AC2 tests: `tracked` then reads true
+// from the primary's own perspective after the merge, and the close step
+// takes the `git mv` branch instead of the plain file-copy branch.
 function commitLaneCurrentDir(lanePath, ticketId) {
   git(lanePath, ["add", "-f", "--", `.current/${ticketId}`]);
   git(lanePath, ["commit", "-m", `track .current/${ticketId}/`]);
@@ -170,7 +170,8 @@ function readTasksMd(repo) {
 }
 
 // ============================================================================
-// E213 — root tasks.md git-ignored: fs-only pointer (AC1-AC5).
+// Root tasks.md is git-ignored: the lane-close pointer is written to the
+// file directly, with no `git add`. (AC1-AC5, E213)
 // ============================================================================
 
 test("AC1: tasks.md git-ignored — fs-only pointer write, no git add, fsonly-line once", () => {
@@ -185,7 +186,8 @@ test("AC1: tasks.md git-ignored — fs-only pointer write, no git add, fsonly-li
   const r = runAgc(repo, ["finish", "e213t1", "--shipped"]);
   assert.equal(r.status, 0, `stderr=${r.stderr}`);
 
-  // Copy / Strings e213.tasks-fsonly-line, printed exactly once.
+  // The spec's exact message for a git-ignored tasks.md, printed exactly
+  // once. (Copy / Strings e213.tasks-fsonly-line)
   const fsonly =
     /agc feature finish — tasks\.md is git-ignored here: wrote the lane-close pointer to it directly \(fs write, not committed\)/g;
   const matches = r.stdout.match(fsonly) ?? [];
@@ -242,7 +244,8 @@ test("AC3: tasks.md git-ignored + zero-write .current/ — nocommit-line replace
 
   assert.doesNotMatch(r.stdout, /harvested untracked \.current/, "nothing exists to harvest — no harvest line");
   assert.doesNotMatch(r.stdout, /recorded lane e213t3 under/, "the plain recorded-lane line must be replaced, not just supplemented");
-  // Copy / Strings e213.tasks-nocommit-line, verbatim.
+  // The spec's exact message when nothing was committed, verbatim.
+  // (Copy / Strings e213.tasks-nocommit-line)
   assert.match(
     r.stdout,
     /agc feature finish — lane e213t3 closed with no primary commit \(nothing here is git-tracked: tasks\.md and \.current\/e213t3\/ are both git-ignored\) — the fs-only writes above are this lane's only durable record/,
@@ -311,7 +314,8 @@ test("AC5: a later step failing after a successful untracked harvest leaves no s
 });
 
 // ============================================================================
-// E214 — `--shipped` evidence harvest (AC6-AC11, AC16, AC17).
+// `--shipped` copies git-ignored evidence to the primary checkout before the
+// worktree is removed. (E214, AC6-AC11, AC16, AC17)
 // ============================================================================
 
 test("AC6: recursive evidence harvest, nested path preserved, across qa_reports/ and review_reports/, no ticket-token filter", () => {
@@ -330,7 +334,8 @@ test("AC6: recursive evidence harvest, nested path preserved, across qa_reports/
   const r = runAgc(repo, ["finish", "e213t6", "--shipped"]);
   assert.equal(r.status, 0, `stderr=${r.stderr}`);
 
-  // Copy / Strings e180.evidence-harvest-line (reused verbatim, archive/<ticket>/ destination).
+  // The existing evidence-copy message, reused verbatim, with the
+  // archive/<ticket>/ destination. (Copy / Strings e180.evidence-harvest-line)
   assert.match(
     r.stdout,
     /agc feature finish — harvested git-ignored evidence qa_reports\/top\.md -> primary qa_reports\/archive\/e213t6\/top\.md \(fs copy, not committed — qa_reports\/ is git-ignored here and not linked outside the worktree, so `git worktree remove` would otherwise delete it silently\)/,
@@ -370,9 +375,9 @@ test("AC7: an evidence dir symlinked outside the worktree gets no primary copy",
   const lane = path.join(mkTmp("e213t7-lane-"), "lane");
   assert.equal(runAgc(repo, ["start", "e213t7-symlinked-outside", "--path", lane]).status, 0);
 
-  // The coord-03 bootstrap shape: qa_reports is a symlink resolving OUTSIDE
-  // the worktree. Committed on the lane's own branch (e180 AC2 precedent) so
-  // the symlink itself is TRACKED — otherwise `git worktree remove` (never
+  // The lane bootstrap shape from the coordinator SOP (coord-03): qa_reports
+  // is a symlink resolving OUTSIDE the worktree. Committed on the lane's own
+  // branch (as in e180 AC2) so the symlink itself is TRACKED — otherwise `git worktree remove` (never
   // --force) refuses over the symlink entry as untracked-and-not-ignored
   // content, independent of anything this spec's harvest logic decides.
   const outside = mkTmp("e213t7-outside-evidence-");
@@ -409,7 +414,8 @@ test("AC8: a differing primary destination refuses before any mutation — workt
   const r = runAgc(repo, ["finish", "e213t8", "--shipped"]);
   assert.notEqual(r.status, 0, "must refuse — nothing moved");
 
-  // Copy / Strings e180.evidence-harvest-refuse-line, --shipped verb token.
+  // The existing refusal message, with `--shipped` as the verb.
+  // (Copy / Strings e180.evidence-harvest-refuse-line)
   assert.match(
     r.stderr,
     /agc feature finish --shipped: harvest destination already exists in the primary checkout and differs \(nothing moved\):/,
@@ -465,9 +471,9 @@ test("AC10: an untracked-but-not-ignored file is left to git's own refusal; a si
   mergeLane(repo, "feat/e213t10-plain-untracked");
 
   const r = runAgc(repo, ["finish", "e213t10", "--shipped"]);
-  // The pre-existing native worktree-remove refusal over the plain,
-  // never-ignored leftover fires exactly as it does today (mirrors E180 AC5)
-  // — but only AFTER the ignored sibling has already durably harvested.
+  // git's own worktree-remove refusal over the plain, never-ignored leftover
+  // still fires unchanged, but only AFTER the ignored sibling has already
+  // been copied to the primary checkout. (E180 AC5)
   assert.notEqual(r.status, 0, "git worktree remove must still refuse over the non-ignored leftover");
   assert.match(r.stderr, /modified or untracked/i);
   assert.match(r.stdout, /harvested git-ignored evidence qa_reports\/ignored-evidence\.md -> primary qa_reports\/archive\/e213t10\/ignored-evidence\.md/);
@@ -479,7 +485,7 @@ test("AC10: an untracked-but-not-ignored file is left to git's own refusal; a si
   assert.ok(fs.existsSync(lane), "the worktree must be left in place — git itself refused the removal");
   assert.ok(fs.existsSync(path.join(lane, "qa_reports", "plain-not-ignored.md")));
 
-  gitTry(repo, ["worktree", "remove", "--force", lane]); // cleanup, matches AC22/e180-AC5 precedent
+  gitTry(repo, ["worktree", "remove", "--force", lane]); // cleanup: git refused the removal above, so the worktree is still there (e180 AC5)
 });
 
 test("AC11: no files under any evidence dir — no harvest attempted, nothing errors", () => {
@@ -523,7 +529,8 @@ test("AC12: the adopter-shaped workspace — every harvest fires end-to-end", ()
 
   // AC1: fs-only tasks.md pointer, no git add.
   assert.match(r.stdout, /tasks\.md is git-ignored here: wrote the lane-close pointer to it directly/);
-  // E125b (untracked .current/<ticket>/ harvest) still fires independently.
+  // The separate copy of an untracked .current/<ticket>/ into history still
+  // fires on its own. (E125b)
   assert.match(r.stdout, /harvested untracked \.current\/e213t12\/ into \.current\/history\//);
   // AC3-shape "no primary commit" line — nothing here is git-tracked at all.
   assert.match(r.stdout, /lane e213t12 closed with no primary commit/);
@@ -551,7 +558,8 @@ test("AC12: the adopter-shaped workspace — every harvest fires end-to-end", ()
 });
 
 // ============================================================================
-// E216 — `--abandoned` in-lane `moved` line qualification (AC14, AC15).
+// `--abandoned`: the in-lane `moved` line says when the file was also
+// copied to the primary checkout. (AC14, AC15, E216)
 // ============================================================================
 
 test("AC14: --abandoned qualifies the moved line for a file harvested to primary", () => {
@@ -566,7 +574,8 @@ test("AC14: --abandoned qualifies the moved line for a file harvested to primary
   assert.equal(r.status, 0, `stderr=${r.stderr}`);
 
   assert.match(r.stdout, /harvested git-ignored evidence qa_reports\/review_e213t14-01\.md -> primary qa_reports\/abandoned\/e213t14\//);
-  // Copy / Strings e216.moved-qualified-line, verbatim.
+  // The spec's qualified `moved` message, verbatim.
+  // (Copy / Strings e216.moved-qualified-line)
   assert.match(
     r.stdout,
     /agc feature finish — moved qa_reports\/review_e213t14-01\.md -> qa_reports\/abandoned\/e213t14\/review_e213t14-01\.md \(inside the lane worktree only — removed with it; the primary copy harvested above is the durable one\)/,
@@ -635,7 +644,8 @@ test("AC17a: a symlink whose target resolves is dereferenced — content copied,
   const lane = path.join(mkTmp("e213t17a-lane-"), "lane");
   assert.equal(runAgc(repo, ["start", "e213t17a-symlink-deref", "--path", lane]).status, 0);
   writeFile(path.join(lane, "qa_reports", "real.md"), "real content\n");
-  // A resolving symlink INSIDE the walked tree (not the E207 dangling shape).
+  // A symlink INSIDE the walked tree whose target exists (unlike the dangling
+  // symlink case). (E207)
   fs.symlinkSync(path.join(lane, "qa_reports", "real.md"), path.join(lane, "qa_reports", "link-to-real.md"));
   mergeLane(repo, "feat/e213t17a-symlink-deref");
 
@@ -674,7 +684,8 @@ test("AC17b: a symlink whose target does not resolve refuses before any mutation
   const r = runAgc(repo, ["finish", "e213t17b", "--shipped"]);
   assert.notEqual(r.status, 0, "an unresolvable symlink must refuse the whole harvest for its dir — never silently skipped, never silently copied dangling");
 
-  // Copy / Strings e214.evidence-harvest-symlink-refuse-line, verbatim.
+  // The spec's refusal message for an unresolvable symlink, verbatim.
+  // (Copy / Strings e214.evidence-harvest-symlink-refuse-line)
   assert.match(
     r.stderr,
     /agc feature finish --shipped: harvest of qa_reports\/ found unresolvable symlink\(s\) — refusing before any mutation \(nothing moved\):/,

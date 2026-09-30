@@ -1,22 +1,21 @@
 // Coded by @qa-engineer
-// Tests for backlog E24 (104447-F0 C2) / T-E24-01/02/03: the declarative
-// build-gate exemption manifest `.current/exemptions.json` — the ONLY
-// sanctioned exemption channel for the Constitution §2 ZERO-errors gate.
-// T-E24-01 is the never-throw loader (tools/exemptions.ts); T-E24-02 is the
-// read-time surface on both tw_get_state envelope branches
-// (tools/handoff.ts); T-E24-03 is the const-05 §2 "Build-gate exemptions"
-// bullet + golden/monolith regeneration (content-only, pinned by prose grep
-// here — token-budget consequences are re-baselined separately in
-// test/context-budget.test.mjs).
+// Tests the declared build-error exemption file `.current/exemptions.json` —
+// the ONLY allowed way to exempt a known error from the Constitution §2
+// "zero build errors" rule. Three parts: the loader that never throws
+// (tools/exemptions.ts, T-E24-01); the exemptions shown on both branches of
+// the state-read envelope (tools/handoff.ts, T-E24-02); and the const-05 §2
+// "Build-gate exemptions" bullet, checked here by text search (T-E24-03;
+// its token-budget effect is checked in test/context-budget.test.mjs).
+// (E24)
 //
 // Fail-direction under test throughout: never-silently-exempt. A malformed
 // manifest or entry must ALWAYS collapse toward "not exempted" (zero
 // exemptions + loud errors, or that one entry dropped), never toward
 // granting an exemption nobody validated.
 //
-// Spec-to-test map (backlog E24 row + code-reviewer's APPROVED
-// review_reports/review_T-E24-01.md, which independently confirmed the
-// never-throw guarantee and both envelope return paths):
+// Spec-to-test map (the backlog row is the spec; the code review separately
+// confirmed the never-throw guarantee and both envelope return paths,
+// review_reports/review_T-E24-01.md):
 //   loader: absent file                     -> L1
 //   loader: valid manifest                  -> L2
 //   loader: mixed-validity (valid + invalid) -> L3
@@ -61,7 +60,8 @@ function writeManifest(ws, body) {
 }
 
 // ============================================================================
-// L1-L9 — loader matrix (tools/exemptions.ts, T-E24-01)
+// Loader cases: absent, valid, mixed, malformed and unreadable manifests
+// (tools/exemptions.ts; L1-L9, T-E24-01)
 // ============================================================================
 
 test("L1: absent .current/exemptions.json -> null (zero exemptions, no signal — the normal case)", () => {
@@ -217,7 +217,8 @@ test("L9: count is exactly the number of VALID entries, not raw JSON array lengt
 });
 
 // ============================================================================
-// G1-G3 — tw_get_state envelope surface (tools/handoff.ts, T-E24-02)
+// Exemptions shown in the state-read envelope, or absent when there is no
+// manifest (tools/handoff.ts; G1-G3, T-E24-02)
 // ============================================================================
 
 test("G1: exists:false envelope branch (no handoff.md yet) STILL surfaces exemptions when a manifest is present", () => {
@@ -279,9 +280,10 @@ test("G3: the `exemptions` key is entirely ABSENT from the envelope when no mani
 });
 
 // ============================================================================
-// P1-P5 — const-05-core-standards.md §2 "Build-gate exemptions" bullet
-// (content-only pin, T-E24-03; mirrors the T-E16 charter-pinning grep
-// convention — token-budget consequences live in test/context-budget.test.mjs)
+// Text checks on the const-05-core-standards.md §2 "Build-gate exemptions"
+// bullet, in the same text-search style as the other content checks;
+// token-budget effects live in test/context-budget.test.mjs. (P1-P5,
+// T-E24-03, T-E16)
 // ============================================================================
 
 const CONST_05 = fs.readFileSync(path.join(ROOT, "content", "const-05-core-standards.md"), "utf-8");

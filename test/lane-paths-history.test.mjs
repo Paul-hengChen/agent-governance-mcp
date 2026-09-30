@@ -1,7 +1,9 @@
 // Coded by @qa-engineer
-// Tests for specs/e125b-lane-close-writeback.md AC6 (T-E125B-01's new
-// closed-lane history resolvers in tools/lane-paths.ts), plus the AC8/X7
-// hasHistoryLedger predicate the same task registers.
+// Tests for the closed-lane history resolvers in tools/lane-paths.ts, which
+// decide where a finished lane's ledger is archived under
+// .current/history/<bucket>/, plus the hasHistoryLedger predicate that
+// reports whether any such archive exists
+// (specs/e125b-lane-close-writeback.md AC6 and AC8/X7; T-E125B-01).
 //
 // Spec-to-Test map:
 //   AC6 (resolveHistoryBucket: UTC YYYY-MM; resolveHistoryLaneDir: throws on
@@ -14,10 +16,10 @@
 // This file is scoped to the pure/read-only resolvers themselves — the
 // fixture-driven proof that `agc feature finish --shipped` actually WRITES
 // into `.current/history/<bucket>/<lane>/` lives in
-// test/agc-feature-finish-history.test.mjs (AC1/AC9), and X7's read/refuse
-// integration through tools/tasks-file.ts's makeForeignCheck lives in
-// test/e125a-lane-local-ledgers.test.mjs (the nearest e125a D12 fixture
-// test, per this ticket's Test-file placement).
+// test/agc-feature-finish-history.test.mjs (AC1/AC9), and the read/refuse
+// integration through tools/tasks-file.ts's makeForeignCheck (X7) lives in
+// test/e125a-lane-local-ledgers.test.mjs, next to the lane-ledger fixtures
+// it needs (e125a D12).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";

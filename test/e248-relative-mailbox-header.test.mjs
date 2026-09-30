@@ -1,6 +1,7 @@
 // Coded by @qa-engineer
-// T-E248-02 — tests for the primary-relative manifest `mailbox:` header
-// (specs/e248-relative-mailbox-header.md AC1-AC9). Pins the
+// Tests for the manifest `mailbox:` header, which may be relative to the
+// primary checkout (specs/e248-relative-mailbox-header.md AC1-AC9). T-E248-02.
+// Pins the
 // resolveMailboxHeader contract, the render-only input error MAILBOX_TILDE,
 // the non-fatal validate WARN, `--mailbox-root` precedence, and the
 // no-primary skip (PRIMARY_NOT_FOUND is the only report).
@@ -44,7 +45,7 @@ const ROOT = path.resolve(path.dirname(__filename), "..");
 // ---------------------------------------------------------------------------
 // Manifest builder — mirrors test/e177a-manifest.test.mjs's manifestText(),
 // extended with an optional `mailboxLines` insert right after `base:` (the
-// same position the sr-engineer diff uses in test/e177a-manifest.test.mjs's
+// same position the implementation change uses in test/e177a-manifest.test.mjs's
 // `wave7.replace(/^(base:.*)$/m, "$1\nmailbox: /hdr")` probe).
 // ---------------------------------------------------------------------------
 
@@ -248,9 +249,9 @@ test("AC7 relative header with no primary", () => {
   assert.equal(absResult.ok, false);
   assert.deepEqual(absResult.errors.map((e) => e.code), ["PRIMARY_NOT_FOUND"]);
 
-  // Reviewer's optional pin (accepted as intended behaviour, review_reports/review_T-E248-01.md
-  // "Ruling"): a ~ header with no primary reports only PRIMARY_NOT_FOUND too (E235b worktree-skip
-  // precedent) — the tilde check is skipped entirely when there is no primary to resolve against.
+  // A ~ header with no primary also reports only PRIMARY_NOT_FOUND, the same way the
+  // relative-worktree check skips when there is no primary: the tilde check is skipped
+  // entirely when there is no primary to resolve against. Intended behaviour. (E235b, T-E248-01)
   const tildeHeader = parseManifest(manifestText({ mailboxLines: ["mailbox: ~/mb"] }));
   const tildeResult = renderPrompt(tildeHeader, "e1", { ...FULL_BASE, manifestDir: notRepo });
   assert.equal(tildeResult.ok, false);

@@ -1,18 +1,18 @@
 // Coded by @qa-engineer
-// T-E113-03 — tests for tools/feature-rollup.ts (specs/e113-feature-level-rollup.md,
-// AC2-AC5).
+// Tests for tools/feature-rollup.ts, the per-feature hop and ticket roll-up
+// across lanes (specs/e113-feature-level-rollup.md, AC2-AC5; T-E113-03).
 //
 // Spec-to-Test map:
 //   AC2 (seam/shape)                -> t-seam-marker, t-provider-swap-zero-callsite
 //   AC3 (multi-lane sum vs cap)      -> t-sum-against-hop-cap-exported
-//   AC3 + round-1 regression        -> t-round1-regression-no-cross-feature-sum
-//     (the code-reviewer's round-1 blocking finding: computeFeatureRollup once
-//     summed EVERY lane in the repo, not just the ones belonging to the
-//     requested feature — reproduced live as `hop: 54, OVER BY 44` for a
-//     feature whose true total was 3. Fixed at tools/feature-rollup.ts:298
-//     (`matchingLanes = lanes.filter(lane => lane.activeFeature === featureId)`).
-//     This is the single most important test in this file: it pins the fix so
-//     a future edit cannot silently regress the filter.)
+//   AC3 + cross-feature regression  -> t-round1-regression-no-cross-feature-sum
+//     (computeFeatureRollup must sum only the lanes whose active feature is
+//     the requested one. An earlier version summed every lane in the repo and
+//     reported `hop: 54, OVER BY 44` for a feature whose true total was 3; the
+//     fix is the `matchingLanes = lanes.filter(lane => lane.activeFeature ===
+//     featureId)` filter in tools/feature-rollup.ts. This is the most important
+//     test in this file: it stops a future edit from silently dropping that
+//     filter.)
 //   AC4 (unreadable lane carried, not dropped/zero-filled) -> t-unreadable-lane-carried
 //   AC5 (ROLL-UP INCOMPLETE banner leads output, degrade-honestly)
 //                                    -> t-banner-zero-matching, t-banner-unattributable
@@ -21,8 +21,7 @@
 // trust a LaneListProvider's own `hopCount`/`activeFeature` for ticket counts —
 // for every lane the provider reports `readable: true`, it independently
 // re-reads that lane's own `.current/handoff.md` via parseHandoff() to obtain
-// `completed_tasks` (tools/feature-rollup.ts:261, code-reviewer round-1/2
-// finding #2). A provider claiming `readable: true` for a workspace with no
+// `completed_tasks` (tools/feature-rollup.ts). A provider claiming `readable: true` for a workspace with no
 // real handoff on disk gets silently downgraded to `readable: false` by that
 // second read — which would corrupt exactly the fixtures this file needs to
 // hold `degraded: false` (the "healthy no-banner path"). So every lane this
@@ -107,13 +106,13 @@ test("AC2: localFallbackLaneList is exported and is the documented default provi
 });
 
 test("AC2: a substitute LaneListProvider works with the SAME computeFeatureRollup call site (zero call-site change)", async () => {
-  // WHY: AC2's entire point is that E132's eventual tools/lane-registry.ts
-  // provider can be dropped in by swapping only the `laneListProvider` value
-  // passed in `opts` — computeFeatureRollup's own signature and call shape
-  // must not need to change. Prove it by calling the exact same function,
-  // with the exact same option shape, against two unrelated custom providers
-  // (one labelled "local-fallback", one labelled "lane-registry" as E132's
-  // eventual provider would be) and confirming both are honored identically.
+  // WHY: AC2's entire point is that the tools/lane-registry.ts provider can
+  // be dropped in by swapping only the `laneListProvider` value passed in
+  // `opts` — computeFeatureRollup's own signature and call shape must not
+  // need to change. Prove it by calling the exact same function, with the
+  // exact same option shape, against two unrelated custom providers (one
+  // labelled "local-fallback", one labelled "lane-registry" like the real
+  // registry provider) and confirming both are honored identically. (E132)
   const ws = await mkRealLane({ activeFeature: "seam-feature", hopCount: 2 });
 
   const laneInfo = {
@@ -402,24 +401,23 @@ test("AC5: no bare numeric total line prints without the banner across every deg
 });
 
 // ============================================================================
-// T-E132-05 (qa-engineer) — EXTENSION for specs/e132-lane-registry.md AC5/AC6
-// plus code-reviewer's coverage gaps (review_reports/review_T-E132-04.md
-// round 1 :389 + round 2 :705) that exercise tools/feature-rollup.ts's own
-// localFallbackLaneList / computeFeatureRollup / renderRollupReport directly
-// (the lane-registry.ts-specific gaps live in the NEW
-// test/e132-lane-registry.test.mjs instead). The 11 tests above this line
-// are byte-unmodified against e784a3b per both review rounds' compatibility
-// evidence — nothing above this point was touched.
+// Extension: the lane-registry spec's AC5/AC6 (specs/e132-lane-registry.md)
+// plus the coverage gaps a code review found, all exercising
+// tools/feature-rollup.ts's own localFallbackLaneList / computeFeatureRollup /
+// renderRollupReport directly. Gaps specific to lane-registry.ts live in
+// test/e132-lane-registry.test.mjs instead. The tests above this line keep
+// their original bodies, so they still prove the earlier contract holds.
+// (T-E132-05)
 //
 // Spec-to-Test map (this extension):
 //   AC5 (hand-forward 1/2 — provider completedTasks preferred, N not 2N reads)
 //                                                   -> "AC5 (E132): ..."
 //   AC6 (hand-forward 3 — historical-only match surfaced, not summed)
 //                                                   -> "AC6 (E132): ..." (also covers gap 11,
-//        the C3 positive control: a readable moved-on lane must still
+//        the positive control for gap 3: a readable moved-on lane must still
 //        degrade AND print the note)
 //
-// code-reviewer gaps covered here:
+// Review-found gaps covered here (labels match the test names):
 //   gap 1  (C1, two-sided stderr cleanliness)       -> "gap-1 (C1..."
 //   gap 2  (C2, CRLF == LF result)                  -> "gap-2 (C2..."
 //   gap 3 & 10 (C3 refined + adversarial combo)      -> "gap-3 & gap-10..."
@@ -454,7 +452,7 @@ function withPath(binDir, fn) {
   }
 }
 
-// ---------- AC5 (E132 hand-forward 1/2): provider completedTasks preferred, N not 2N reads ----------
+// ---------- AC5: provider completedTasks preferred, N not 2N reads (E132 hand-forward 1/2) ----------
 
 test("AC5 (E132): computeFeatureRollup prefers the provider's completedTasks over a second parseHandoff read — proven by deleting the on-disk handoff after the provider is built, so a stray re-read surfaces loudly instead of silently succeeding", async () => {
   // WHY this proof shape instead of a call-count spy: ESM named exports
@@ -500,7 +498,7 @@ test("AC5 (E132): computeFeatureRollup prefers the provider's completedTasks ove
   assert.equal(report.degraded, false, "a provider-populated lane must never trigger the unreadable-lane degrade path");
 });
 
-// ---------- AC6 (E132 hand-forward 3): historical-only match surfaced, not summed ----------
+// ---------- AC6: historical-only match surfaced, not summed (E132 hand-forward 3) ----------
 
 test("AC6 (E132): a lane whose featureHistory includes featureId but whose CURRENT active_feature differs is excluded from totals/capComparison, sets degraded:true with a stated reason, and renderRollupReport prints a note line naming the count (also covers gap-11's positive control)", async () => {
   const wsMatch = await mkRealLane({ activeFeature: "ac6-feature", hopCount: 4, completedTasks: ["T-1"] });
@@ -539,7 +537,7 @@ test("AC6 (E132): a lane whose featureHistory includes featureId but whose CURRE
   assert.match(rendered, new RegExp(wsMovedOn.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 });
 
-// ---------- gap-1 (C1, two-sided): stderr cleanliness ----------
+// ---------- git failure output stays off the process stderr, yet reaches degradedReason (gap-1, C1) ----------
 
 test("gap-1 (C1, two-sided): localFallbackLaneList's git failure never prints to the real process stderr, AND the diagnostic still reaches degradedReason", () => {
   const nonGitDir = fs.mkdtempSync(path.join(os.tmpdir(), "twfr-c1-"));
@@ -560,15 +558,15 @@ test("gap-1 (C1, two-sided): localFallbackLaneList's git failure never prints to
 
   const capturedStderr = chunks.join("");
   // Half 1: the real process stderr channel (this MCP server's stdio-transport
-  // log channel, per code-reviewer C1) must carry no `fatal:` line — a
-  // regression to inherited stdio would fail this half.
+  // log channel) must carry no `fatal:` line — a regression to inherited
+  // stdio would fail this half.
   assert.doesNotMatch(capturedStderr, /fatal:/, "git's stderr must not be inherited onto the process's own stderr");
 
   // Half 2: the diagnostic must still reach degradedReason — Node only
   // appends CAPTURED stderr onto the thrown Error's message, so a regression
   // to stdio:["ignore","pipe","ignore"] (dropping stderr instead of piping
   // it) would pass half 1 but silently fail this half. A one-sided test
-  // would pass either wrong direction (code-reviewer round-2 gap-1 refinement).
+  // would pass either wrong direction.
   assert.match(
     result.degradedReason ?? "",
     /fatal:|not a git repository/i,
@@ -578,7 +576,7 @@ test("gap-1 (C1, two-sided): localFallbackLaneList's git failure never prints to
   assert.deepEqual(result.lanes, []);
 });
 
-// ---------- gap-2 (C2): CRLF porcelain == LF porcelain result ----------
+// ---------- CRLF porcelain gives the same result as LF porcelain (gap-2, C2) ----------
 
 test("gap-2 (C2): CRLF-terminated porcelain output produces the SAME lane set as the LF fixture — only the line ending differs", () => {
   const wsA = fs.mkdtempSync(path.join(os.tmpdir(), "twfr-crlf-a-"));
@@ -599,7 +597,7 @@ test("gap-2 (C2): CRLF-terminated porcelain output produces the SAME lane set as
   assert.equal(crlfResult.lanes.length, 2);
 });
 
-// ---------- gap-3 & gap-10 (C3 refined + adversarial combo) ----------
+// ---------- an unreadable lane reports its read failure, never a "moved on" note (gap-3 & gap-10, C3) ----------
 
 test("gap-3 & gap-10 (C3, refined + adversarial): an UNREADABLE lane whose featureHistory would otherwise match reports the read-failure reason (never the 'moved on' note), even alongside a readable MATCHING lane — and degraded stays true", async () => {
   const wsMatch = await mkRealLane({ activeFeature: "c3-feature", hopCount: 2, completedTasks: ["T-1"] });
@@ -627,8 +625,8 @@ test("gap-3 & gap-10 (C3, refined + adversarial): an UNREADABLE lane whose featu
   // filter) prevents that.
   assert.equal(report.degraded, true);
 
-  // gap-3 (refined): the unreadable lane's own read-failure reason takes
-  // precedence over the false "moved on" claim (round-1 C3 defect).
+  // gap-3: the unreadable lane's own read-failure reason takes precedence
+  // over the false "moved on" claim an earlier version printed.
   assert.doesNotMatch(report.degradedReason ?? "", /previously worked/);
   assert.match(report.degradedReason ?? "", /could not be read\/parsed/);
 

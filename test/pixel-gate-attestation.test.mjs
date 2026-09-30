@@ -735,14 +735,12 @@ test("E5: AC-9 — full verbatim PIXEL_GATE_ATTESTATION_MISSING copy string in d
 // ===========================================================================
 
 test("AC-9: package.json version field is valid semver >= historical floor 3.42.0", () => {
-  // Why: AC-9 originally pinned "package.json version == <exact release>", which
-  // required a qa-engineer test edit on every single release (a quiet §2 exception
-  // by precedent — see specs/c7-version-assertion-ownership.md Problem Statement).
-  // Relaxed to what the AC actually needs: valid semver shape + a monotonic floor at
-  // the version this AC-9 originally shipped in (3.42.0, per this file's own section
-  // header). Numeric tuple comparison, not string comparison, so a value like "3.100.0"
-  // doesn't falsely fail against a "3.42.0" floor. Passes unmodified at every future
-  // version.
+  // Why: pinning an exact release version would force a test edit on every
+  // release. What the AC needs is a valid semver shape plus a floor at the
+  // version this feature shipped in (3.42.0). Numeric tuple comparison, not
+  // string comparison, so a value like "3.100.0" doesn't falsely fail against
+  // a "3.42.0" floor. Passes unmodified at every future version.
+  // (specs/c7-version-assertion-ownership.md)
   const pkgPath = path.join(path.dirname(new URL(import.meta.url).pathname), "..", "package.json");
   const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
   assert.match(pkg.version, /^\d+\.\d+\.\d+$/, `package.json version must be valid semver, got "${pkg.version}"`);

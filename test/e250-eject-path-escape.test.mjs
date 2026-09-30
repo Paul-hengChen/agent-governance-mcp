@@ -1,12 +1,13 @@
 // Coded by @qa-engineer
-// Tests for specs/e250-eject-path-escape.md AC1-AC11, AC13, AC14 (AC12, the
-// E251 docs/config.md row, is verified by grep against docs/config.md and
-// docs/install.md — see qa_reports/review_T-E250-06.md — not a test case
-// here). AC13 (test/e108-eject.test.mjs, owned by no lane task, passes
-// unmodified) is verified by the full-suite run this ticket's QA phase
-// performs, not a duplicate in-process spawn of that file here — same
-// precedent as test/e108-eject.test.mjs's own AC22/AC23, which defer to a
-// different file / grep rather than re-asserting in place.
+// Tests that `agc eject` shows paths containing control characters (LF, CR,
+// ESC) in escaped form, so a directory name cannot split its output across
+// lines, and that it prints a manual-removal note instead of a shell
+// command embedding the raw byte. Spec: specs/e250-eject-path-escape.md
+// AC1-AC11, AC13, AC14. AC12 (a docs/config.md row, E251) is checked by searching
+// docs/config.md and docs/install.md, not by a test here. AC13
+// (test/e108-eject.test.mjs passes unmodified) is covered by the full-suite
+// run rather than by spawning that file again here — the same way
+// test/e108-eject.test.mjs's own AC22/AC23 defer to another file or a search.
 //
 // Spec-to-test map:
 //   AC1  -> "AC1: workspace path containing LF — dry-run plan header is escaped and stays one line"
@@ -48,18 +49,12 @@
 // embedding 0x00-0x1F (and, in practice, 0x7F) in a filename, so a
 // CR/LF/ESC-bearing directory name cannot even be constructed there.
 //
-// Repro-red (T-E250-06, per this lane's dispatch brief): before authoring
-// this suite, the AC1 and AC6 scenarios below were run against
-// bin/agc-init.mjs as it existed at this lane's base commit 8437af1 (`git
-// show 8437af1:bin/agc-init.mjs`, temporarily swapped into the tracked file
-// via a byte-identical backup/restore — never `git checkout --`/`reset` —
-// then run standalone against a throwaway $TMPDIR fixture and restored
-// immediately after). Both were red against that base: AC1's workspace path
-// (containing a raw LF) split the dry-run plan header across two lines
-// instead of showing an escaped `\n`, and AC6's control-character-bearing
-// tracked path printed a `git rm -r` line embedding the raw control byte
-// instead of the manual-removal note — confirming the gap this ticket closes
-// actually existed before the fix. Transcript: qa_reports/review_T-E250-06.md.
+// The AC1 and AC6 scenarios below were confirmed to fail against
+// bin/agc-init.mjs from before the fix (commit 8437af1): a workspace path
+// with a raw LF split the dry-run plan header across two lines instead of
+// showing an escaped `\n`, and a tracked path with a control character
+// printed a `git rm -r` line embedding the raw byte instead of the
+// manual-removal note. So these tests do catch the defect. (T-E250-06)
 //
 // Security/boundary smoke (SOP Phase 3d): a combined-control-character
 // boundary case is covered under "boundary:" below. Auth/permission tests
@@ -256,7 +251,7 @@ test("AC3: subdirectory prefix containing CR — host-trace and class-line label
   const sub = path.join(repo, name);
   fs.mkdirSync(sub, { recursive: true });
   // Explicit repo mode: a CR-bearing prefix is unsafe for a gitignore rule
-  // (E243), so local mode would refuse here — repo mode sidesteps that
+  // (see E243), so local mode would refuse here — repo mode sidesteps that
   // refusal, same as test/e239-init-subdir-exclude.test.mjs's AC18.
   initWorkspace(sub, "repo");
   addProcessEvidence(sub);

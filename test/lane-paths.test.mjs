@@ -1,37 +1,35 @@
 // Coded by @qa-engineer
-// Tests for specs/e123a-lane-layout-migration.md AC4/AC5/AC15 (T-E123A3-08,
-// covering T-E123A3-03's tools/lane-paths.ts) AND
-// specs/e123b0-lane-runtime-resolver.md AC1-AC5 (T-E123B0-03, covering
-// T-E123B0-01's widening of the same module).
+// Tests for tools/lane-paths.ts, which maps a workspace and lane name to the
+// per-lane files under .current/<lane>/ and works out which lane the current
+// checkout belongs to. Covers specs/e123a-lane-layout-migration.md
+// AC4/AC5/AC15 and specs/e123b0-lane-runtime-resolver.md AC1-AC5.
+// (T-E123A3-08, T-E123B0-03)
 //
 // Spec-to-Test map:
 //   e123a AC4 (resolveLaneName: leading ticket-id token, "_legacy" fallback,
 //        MUST NEVER return "_primary")                -> RN1..RN9 (table-driven)
 //   e123a AC5 (resolveLanePaths: derived-by-iterating-LANE_FILES stub,
-//        identical output for every lane arg, zero production callers of the
-//        FUNCTION resolveLanePaths itself (still true; L1-L3 call
-//        resolveCurrentLanePaths, not resolveLanePaths directly);
+//        only a short, listed set of callers of the FUNCTION resolveLanePaths
+//        itself (the lane-aware code calls resolveCurrentLanePaths instead);
 //        dispatch-log.ts imports its filename FROM LANE_FILES) -> RP1..RP4, CALLERS1
-//        (CALLERS2 was AC5's own literal "lane-paths"-module-name proof; it
-//        is now an ALLOW-LIST of the sanctioned F0+L1-L3 importer set, not a
-//        zero-callers check — see CALLERS2 below)
+//        (CALLERS2 lists every module allowed to import "lane-paths", so a
+//        new, unreviewed importer fails — see CALLERS2 below)
 //   e123a AC15 (LANE_FILES is the single owner — resolveLanePaths's returned
 //        key count equals LANE_FILES.length)          -> REG1, REG2
 //   e123b0 AC1 (PRIMARY_LANE = "_primary" export)      -> AC1-1
 //   e123b0 AC2 (resolveCurrentLane: pure-fs HEAD read over temp dirs — .git
 //        dir, gitfile abs/relative gitdir, detached HEAD, missing .git,
 //        malformed gitfile — never throws)             -> CL1..CLn (table-driven)
-//   e123b0 AC3 (TICKET_ID_RE widened to accept trailing alnum; e123b0/b1/b9
-//        resolve to themselves; F0 examples + _legacy fallback still hold;
-//        resolveLaneName never returns _primary)        -> RESOLVE_LANE_NAME_CASES
+//   e123b0 AC3 (TICKET_ID_RE accepts a trailing letter/digit suffix, so ids
+//        like e123b0/b1/b9 resolve to themselves; the older examples and the
+//        _legacy fallback still hold; resolveLaneName never returns _primary)
+//                                                        -> RESOLVE_LANE_NAME_CASES
 //        additions below + existing RN-never-primary sweep
 //   e123b0 AC4 (resolveCurrentLanePaths === resolveLanePaths(ws,
 //        resolveCurrentLane(ws)) — zero behaviour change)  -> CLP1..CLPn
-//   e123b0 AC5 (zero production callers of resolveCurrentLane AT e123b0's
-//        own merge; L1-L3 add the sanctioned callers per spec AC5's own text
-//        "L1-L3 add them" and .current/feature-split.md rows 1.1-1.3) ->
-//        CALLERS3, now an ALLOW-LIST of that exact sanctioned set, not a
-//        zero-callers check
+//   e123b0 AC5 (only reviewed modules call resolveCurrentLane)   ->
+//        CALLERS3, an allow-list of those callers, so a new, unreviewed
+//        caller fails
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -73,9 +71,9 @@ const RESOLVE_LANE_NAME_CASES = [
   ["E99", "e99", "bare uppercase ticket id, no trailing hyphenated slug — must lowercase"],
   ["e1x-some-feature", "e1x", "ticket id with a trailing single-letter suffix after the digits"],
   ["not-a-ticket-at-all", LEGACY_LANE, "ordinary English words with hyphens, no digit run"],
-  // e123b0 AC3 — TICKET_ID_RE widened ([a-z]* -> [a-z0-9]* trailing suffix)
-  // so the S0/L/J ids resolve DISTINCTLY from one another and from their
-  // shared "e123b" prefix, instead of colliding on truncation.
+  // TICKET_ID_RE accepts a trailing [a-z0-9]* suffix, so sibling ids that
+  // share a prefix (e123b0, e123b1, e123b9) resolve distinctly from one
+  // another and from "e123b" instead of colliding on truncation. (e123b0 AC3)
   ["e123b0-lane-runtime-resolver", "e123b0", "AC3: widened suffix resolves this ticket's own id distinctly (was truncated before the widening)"],
   ["e123b1-core-write-path", "e123b1", "AC3: a sibling parallel-lane id resolves distinctly from e123b0/e123b9"],
   ["e123b9", "e123b9", "AC3: bare id with a digit trailing suffix, no hyphenated slug at all"],
@@ -105,11 +103,10 @@ test("RN-type-guard: resolveLaneName never throws on a non-string activeFeature 
 });
 
 // ============================================================================
-// e123b8 J1 AC6 — TICKET_ID_RE narrowed from `\d+[a-z0-9]*` to `\d[a-z0-9]*`
-// (ONE mandatory digit, not a second overlapping quantifier over the same
-// [0-9] characters) so a long digit run can no longer make the two adjacent
-// quantifiers backtrack across O(n) splits of themselves. Timing-free per the
-// spec's own proof line: the assertion below is a `{ timeout }` ceiling on
+// AC6 — TICKET_ID_RE uses `\d[a-z0-9]*` (ONE mandatory digit), not
+// `\d+[a-z0-9]*`: two adjacent quantifiers over the same [0-9] characters let
+// a long digit run backtrack across O(n) splits of themselves. (e123b8 J1)
+// Timing-free by design: the assertion below is a `{ timeout }` ceiling on
 // the WHOLE test, never a measured-duration comparison, because measuring
 // wall-clock milliseconds directly is exactly the kind of assertion that
 // flakes under CI load. If TICKET_ID_RE regresses to a two-quantifier shape,
@@ -139,8 +136,8 @@ test(
 
 // ============================================================================
 // AC15 — LANE_FILES is the single canonical registry: exactly 8 entries,
-// 1 required + 7 optional (e179 spec AC1 added pendingTickets; e125a spec
-// AC1 added tasks; e125b spec AC11 added baseSha).
+// 1 required + 7 optional (pendingTickets, tasks and baseSha were the last
+// three added; e179 AC1, e125a AC1, e125b AC11).
 // ============================================================================
 
 test("REG1: LANE_FILES has exactly 8 entries — 1 required (handoff) + 7 optional (telemetry/metrics/usage/dispatch/pendingTickets/tasks/baseSha)", () => {
@@ -166,13 +163,13 @@ test("REG1: LANE_FILES has exactly 8 entries — 1 required (handoff) + 7 option
   );
 });
 
-// e125b spec AC11 — baseSha MUST be a registered LANE_FILES entry (not a
-// standalone composer): a file inside .current/<lane>/ that migrateLaneToFlat
+// baseSha MUST be a registered LANE_FILES entry (not a standalone composer):
+// a file inside .current/<lane>/ that migrateLaneToFlat
 // doesn't recognize makes the whole lane refuse to reverse-migrate (see
-// test/lane-migrate.test.mjs). required:false (a lane started before this
-// ticket shipped has none) and deliberately NO noFlatCounterpart — unlike
-// tasks.md, no other migration module owns base-sha's flat<->lane transition,
-// so the E123 runners must move it themselves.
+// test/lane-migrate.test.mjs). required:false (an older lane has none) and
+// deliberately NO noFlatCounterpart — unlike tasks.md, no other migration
+// module owns base-sha's flat<->lane transition, so the flat<->lane
+// migration runners must move it themselves. (e125b AC11)
 test("AC11 (e125b): LANE_FILES carries the baseSha entry — key, filename, required:false, no noFlatCounterpart", () => {
   const baseShaEntry = LANE_FILES.find((f) => f.key === "baseSha");
   assert.ok(baseShaEntry, "LANE_FILES must carry a 'baseSha' entry (e125b spec AC11)");
@@ -190,8 +187,8 @@ test("AC11 (e125b): LanePaths exposes baseShaPath at .current/<lane>/base-sha (v
   assert.equal(paths.baseShaPath, path.join("/some/workspace", ".current", "e125b", "base-sha"));
 });
 
-// e125a spec AC1: LanePaths gains tasksPath, and resolveLanePaths(ws,
-// "e125a").tasksPath resolves under the lane's own directory.
+// Each lane keeps its own task ledger: resolveLanePaths(ws, "e125a").tasksPath
+// resolves under that lane's directory. (e125a AC1)
 test("AC1 (e125a): resolveLanePaths exposes tasksPath at .current/<lane>/tasks.md", () => {
   const paths = resolveLanePaths("/some/workspace", "e125a");
   assert.equal(paths.tasksPath, path.join("/some/workspace", ".current", "e125a", "tasks.md"));
@@ -204,9 +201,9 @@ test("REG2: laneFile() looks up a registry entry by key and throws on an unknown
 });
 
 // ============================================================================
-// e179 AC1 — pending-tickets.md: a registered, optional LANE_FILES entry with
-// a matching LanePaths field, exposed by BOTH path resolvers (lane-scoped and
-// legacy-flat).
+// pending-tickets.md is a registered, optional LANE_FILES entry with a
+// matching LanePaths field, exposed by BOTH path resolvers (lane-scoped and
+// legacy-flat). (e179 AC1)
 // ============================================================================
 
 test("AC1 (e179): LANE_FILES carries the pendingTickets entry — key, filename, and required:false", () => {
@@ -262,8 +259,8 @@ test("RP3: resolveLanePaths's returned key count equals LANE_FILES.length (AC15 
 });
 
 test("RP4 (e123b9 J2, spec AC1 — FLIPPED, retires the old tolerate-anything contract): resolveLanePaths THROWS on an unsafe lane argument — a hostile string, undefined, null, or empty", () => {
-  // The lane now composes into a real filesystem path segment (AC1), so
-  // assertSafeLaneName (Q5, review_reports/review_T-E123B9-01.md) rejects
+  // The lane becomes a real filesystem path segment (AC1), so
+  // assertSafeLaneName rejects
   // anything that isn't one safe path segment — traversal strings, and
   // non-string/empty values that would otherwise resolve to "undefined"/""
   // on disk.
@@ -274,9 +271,10 @@ test("RP4 (e123b9 J2, spec AC1 — FLIPPED, retires the old tolerate-anything co
 });
 
 // ============================================================================
-// AC5 (Decision 2, T-E123B9-05) — resolveLaneLockPath: the lock moves from
-// workspace-wide (.current/.handoff.lock) to per-lane
-// (.current/<lane>/.handoff.lock). One table covers several lane shapes so a
+// AC5 — resolveLaneLockPath: the handoff lock is per-lane
+// (.current/<lane>/.handoff.lock), not workspace-wide (.current/.handoff.lock),
+// so lanes never block each other's writes. (Decision 2, T-E123B9-05)
+// One table covers several lane shapes so a
 // regression that special-cases any one of them (e.g. only _primary) fails
 // loud.
 // ============================================================================
@@ -302,33 +300,25 @@ test("LOCK2 (AC5): resolveLaneLockPath composes resolveLaneDir + the single-owne
 });
 
 // ============================================================================
-// AC5 — allow-listed callers (T-E123BI-01 retarget, 2026-09-23). AC5's own
-// literal proof (`grep -rln "lane-paths" ...`) was ALWAYS going to grow past
-// "zero callers": it was a real spec-proof defect at e123a/e123b0 time
-// (L-SCHEMA-NEW-6, confirmed by code-reviewer's Round 1 review of
-// T-E123A3-07) because AC15 already mandated tools/dispatch-log.ts and
-// tools/lane-migrate.ts to import FROM lane-paths.ts, and it was DESIGNED to
-// grow further at F1 time: e123b0's own spec AC5 states "L1-L3 add them" —
-// L1-L3 (e123b1/e123b2/e123b3) route the write-path core, sidecars, prompt
-// builder, and bin/ hooks through resolveCurrentLane(Paths) per
-// .current/feature-split.md rows 1.1-1.3. CALLERS1 above still asserts a
-// REAL zero-callers invariant (the resolveLanePaths FUNCTION itself, as
-// opposed to the module, has no caller outside its own file — L1-L3 call
-// resolveCurrentLanePaths, never resolveLanePaths directly). This test is no
-// longer that: it is an ALLOW-LIST of the verified-sanctioned "lane-paths"
-// module importers, so a FUTURE unlisted importer still fails it.
+// AC5 — allow-listed callers. Every module that imports "lane-paths" must be
+// on a reviewed list, so a new importer cannot appear unnoticed. The list is
+// expected to grow: AC15 requires tools/dispatch-log.ts and
+// tools/lane-migrate.ts to import FROM lane-paths.ts, and the write path,
+// sidecars, prompt builder and bin/ hooks all go through
+// resolveCurrentLane(Paths). CALLERS1 above pins the separate, narrower list
+// of callers of the resolveLanePaths FUNCTION itself.
+// (T-E123BI-01, L-SCHEMA-NEW-6)
 // ============================================================================
 
 test("CALLERS1 (e125b spec AC11 — allow-list, was a zero-callers check): grep -rn resolveLanePaths tools/ gates/ guards/ prompts/ bin/ index.ts names exactly tools/lane-paths.ts + bin/agc-init.mjs — a NEW unlisted caller still fails this", () => {
-  // e125b AC11 (REQUIRED-2, the prior draft's blocker fix): every base-sha
-  // consumer calls resolveLanePaths(ws, lane).baseShaPath directly — the same
+  // Every base-sha consumer calls resolveLanePaths(ws, lane).baseShaPath
+  // directly — the same
   // generic, registry-derived path every other lane file already goes
   // through — instead of a standalone composer. bin/agc-init.mjs is now a
   // genuine, sanctioned new caller: runFeatureStart writes baseShaPath after
   // `git worktree add`, and runFeatureFinish's readLaneBaseSha reads it back.
-  // This is no longer a real zero-callers invariant (that claim died the
-  // moment AC11 shipped) — it is an allow-list, so a FUTURE unlisted caller
-  // of the resolveLanePaths FUNCTION still fails it.
+  // The test is an allow-list, so a FUTURE unlisted caller of the
+  // resolveLanePaths FUNCTION still fails it. (e125b AC11)
   const dirs = ["tools", "gates", "guards", "prompts", "bin", "index.ts"];
   let output;
   try {
@@ -356,83 +346,65 @@ test("CALLERS1 (e125b spec AC11 — allow-list, was a zero-callers check): grep 
 });
 
 test("CALLERS2 (allow-list): grep -rln \"lane-paths\" tools/ gates/ guards/ prompts/ bin/ index.ts names exactly the sanctioned F0 + L1-L3 importer set — a NEW unlisted importer still fails this", () => {
-  // Sanctioned per .current/feature-split.md rows 1.0-1.3 (F0 done, L1-L3
-  // done on this branch) — verified by cross-checking each hit's import
-  // statement against the row that assigned it that file, 2026-09-23.
+  // Each entry was checked against the spec that introduced the import before
+  // it was added. Grouped by the change that added it; the group labels
+  // (F0, L1-L3, J2, F2) are the rows of the lane-layout feature split.
   const SANCTIONED_LANE_PATHS_IMPORTERS = [
-    // F0 (e123a/e123b0, row 1.0, done): AC15-mandated LANE_FILES/laneFile/
-    // resolveLaneName consumers, plus the module's own declaration.
+    // The module itself plus the LANE_FILES/laneFile/resolveLaneName consumers
+    // AC15 requires. (F0, e123a/e123b0)
     "tools/dispatch-log.ts",
     "tools/lane-migrate.ts",
     "tools/lane-paths.ts",
-    // L1 — e123b1-core-write-path (row 1.1, done on this branch).
+    // The handoff write path and its session guard. (L1, e123b1)
     "guards/session.ts",
     "tools/drift.ts",
     "tools/handoff-parse.ts",
     "tools/handoff-write.ts",
-    // L2 — e123b2-sidecars-lane-tools (row 1.2, done on this branch).
+    // The metrics and telemetry sidecar writers. (L2, e123b2)
     "tools/metrics.ts",
     "tools/telemetry.ts",
-    // L3 — e123b3-prompts-hooks (row 1.3, done on this branch).
+    // The prompt builder and the bin/ hooks. (L3, e123b3)
     "bin/agent-governance-context.mjs",
     "bin/agent-governance-usage-hook.mjs",
     "prompts/build.ts",
-    // J2 — e123b9-lane-flip (spec AC10): a genuine new importer, verified
-    // against the spec before allow-listing — tools/lane-registry.ts imports
-    // isSafeLaneName (AC7's lane-name filter for getLaneFeatureHistory), not
-    // a restated copy. qa_reports/expected-red_e123b9-lane-flip.txt records
-    // this was the one expected addition.
+    // tools/lane-registry.ts imports isSafeLaneName for getLaneFeatureHistory's
+    // lane-name filter instead of keeping its own copy. (J2, e123b9 AC7/AC10)
     "tools/lane-registry.ts",
-    // F2 — e123c-cross-lane-aggregation (spec AC1, AC11): two genuine new
-    // importers, verified against the spec before allow-listing —
-    // tools/gate-stats.ts imports enumerateLaneSidecarSources/
+    // Cross-lane sidecar readers: tools/gate-stats.ts imports
+    // enumerateLaneSidecarSources/
     // resolveCurrentLanePaths/resolveFlatLanePaths (the cross-lane sidecar
     // reader), and tools/usage-accounting.ts imports
     // enumerateLaneSidecarSources/resolveCurrentLanePaths (sumUsageForFeature
-    // aggregation + AC7's write-target retarget). Both are qa_reports/
-    // expected-red_e123c-cross-lane-aggregation.txt CALLERS2 entries.
+    // aggregation and its lane-scoped write target). (F2, e123c AC1/AC11)
     "tools/gate-stats.ts",
     "tools/usage-accounting.ts",
-    // T-E73-04B (e73-agc-feature-lifecycle): a genuine new importer,
-    // verified against the spec before allow-listing — bin/agc-init.mjs
-    // dynamically imports dist/tools/lane-paths.js for `agc feature start`/
-    // `finish` (spec AC3/AC4: reuse resolveLaneName/resolveCurrentLane
-    // rather than copy the ticket-id regex). Recorded in
-    // qa_reports/expected-red_e73-agc-feature-lifecycle.txt.
+    // bin/agc-init.mjs dynamically imports dist/tools/lane-paths.js for
+    // `agc feature start`/`finish`, reusing resolveLaneName/resolveCurrentLane
+    // rather than copying the ticket-id regex. (e73 AC3/AC4, T-E73-04B)
     "bin/agc-init.mjs",
-    // e125a-lane-local-ledgers (spec AC1/AC10, architecture T-01/T-02/T-04):
-    // three genuine new importers, verified against the spec/architecture
-    // before allow-listing.
-    //   tools/tasks-lane-migrate.ts (new module, T-02/T-03) imports
+    // Lane-local task ledgers: three importers. (e125a AC1/AC10)
+    //   tools/tasks-lane-migrate.ts imports
     //     PRIMARY_LANE/laneFile/resolveCurrentLanePaths/resolveLaneDir/
     //     resolveLaneName for the forward/reverse lane-ledger migration.
-    //   tools/config.ts (T-02/T-04) imports resolveCurrentLanePaths —
-    //     findTasksFile now checks the lane path first (architecture
-    //     Interface Contracts), still side-effect-free.
-    //   tools/tasks-file.ts (T-04) imports LEGACY_LANE/PRIMARY_LANE/
-    //     resolveCurrentLanePaths/resolveLaneName — tw_* now reads/writes
-    //     only the current lane's ledger (spec D-F/AC9).
+    //   tools/config.ts imports resolveCurrentLanePaths — findTasksFile
+    //     checks the lane path first, still side-effect-free.
+    //   tools/tasks-file.ts imports LEGACY_LANE/PRIMARY_LANE/
+    //     resolveCurrentLanePaths/resolveLaneName — the task tools read and
+    //     write only the current lane's ledger.
     "tools/config.ts",
     "tools/tasks-file.ts",
     "tools/tasks-lane-migrate.ts",
-    // e126-merge-invariants (T-E126-01): a genuine new importer, verified
-    // against the spec before allow-listing — tools/merge-invariants.ts
-    // imports isSafeLaneName/NON_LANE_DIRS/HISTORY_BUCKET_RE/isBytePrefix
-    // (spec Dependencies: "Reuse by import only, never restate") for its
-    // whole-tree ledger/sidecar enumeration over arbitrary git commits.
-    // Recorded in qa_reports/expected-red_e126-merge-invariants.txt.
+    // tools/merge-invariants.ts imports isSafeLaneName/NON_LANE_DIRS/
+    // HISTORY_BUCKET_RE/isBytePrefix (reuse by import, never a restated copy)
+    // for its whole-tree ledger/sidecar enumeration over arbitrary git
+    // commits. (e126, T-E126-01)
     "tools/merge-invariants.ts",
-    // e177b-lane-status-tooling (spec AC5/AC5a/AC5c, code-review round 1 R1
-    // fix): a genuine new importer, verified against the amended spec before
-    // allow-listing — tools/lane-status.ts imports resolveLaneName/
-    // LEGACY_LANE/PRIMARY_LANE/isSafeLaneName/laneFile for the evidence
-    // cross-check's ticket-token parsing and lane-ledger path, replacing a
-    // byte-copied ticket-id regex the round-1 review flagged as a guard
-    // dodge. It does not call resolveCurrentLane/resolveLanePaths (CALLERS1/
-    // CALLERS3 unaffected). Recorded in
-    // qa_reports/expected-red_e177b-lane-status-tooling.txt (qa-added, per
-    // the spec's human-approved ownership extension — sr-engineer is not
-    // authorized to edit this file).
+    // tools/lane-status.ts imports resolveLaneName/LEGACY_LANE/PRIMARY_LANE/
+    // isSafeLaneName/laneFile for the evidence cross-check's ticket-token
+    // parsing and lane-ledger path, instead of a copied ticket-id regex that
+    // would drift from the real one. It does not call
+    // resolveCurrentLane/resolveLanePaths (CALLERS1/CALLERS3 unaffected).
+    // (e177b AC5/AC5a/AC5c, review fix R1)
     "tools/lane-status.ts",
   ].sort();
   let output;
@@ -457,7 +429,7 @@ test("CALLERS2 (allow-list): grep -rln \"lane-paths\" tools/ gates/ guards/ prom
 });
 
 // ============================================================================
-// e123b0 AC1 — PRIMARY_LANE export.
+// AC1 — PRIMARY_LANE export. (e123b0)
 // ============================================================================
 
 test("AC1-1: PRIMARY_LANE is exported and equals \"_primary\"", () => {
@@ -465,9 +437,10 @@ test("AC1-1: PRIMARY_LANE is exported and equals \"_primary\"", () => {
 });
 
 // ============================================================================
-// e123b0 AC2/AC3 — resolveCurrentLane: pure-fs HEAD read, table-driven over
+// AC2/AC3 — resolveCurrentLane: pure-fs HEAD read, table-driven over
 // temp dirs. Every workspace is created under os.tmpdir() (never the repo
 // root) and removed via t.after(), per a fixture never surviving its test.
+// (e123b0)
 // ============================================================================
 
 function mkWorkspace(t) {
@@ -639,9 +612,9 @@ test("CL-type-guard: resolveCurrentLane never throws on a non-string workspacePa
 });
 
 // ============================================================================
-// e123b0 AC4 — resolveCurrentLanePaths === resolveLanePaths(ws,
-// resolveCurrentLane(ws)): still today's flat paths, zero behaviour change,
-// across the branch shapes exercised above.
+// AC4 — resolveCurrentLanePaths is exactly resolveLanePaths(ws,
+// resolveCurrentLane(ws)) across the branch shapes exercised above, so the
+// two resolvers can never disagree about a lane's files. (e123b0)
 // ============================================================================
 
 test("CLP1: resolveCurrentLanePaths(ws) deep-equals resolveLanePaths(ws, resolveCurrentLane(ws)) for a feat-branch workspace", (t) => {
@@ -673,66 +646,56 @@ test("CLP3 (e123b9 J2, spec AC1 — FLIPPED): resolveCurrentLanePaths returns ge
 });
 
 // ============================================================================
-// e123b0 AC5 — allow-listed callers of resolveCurrentLane (T-E123BI-01
-// retarget, 2026-09-23). AC5's own text says "L1-L3 add them" — that was
-// never a permanent zero-callers invariant past e123b0's own merge, it was a
-// serialization gate (nothing else may start before e123b0 merges). L1-L3
-// (e123b1/e123b2/e123b3) route the write-path core, sidecars, prompt
-// builder, and bin/ hooks through resolveCurrentLane(Paths) per
-// .current/feature-split.md rows 1.1-1.3, exactly as designed. This test is
-// now an ALLOW-LIST of that sanctioned caller set, so a FUTURE unlisted
-// caller still fails it.
+// AC5 — allow-listed callers of resolveCurrentLane. The write-path core,
+// sidecars, prompt builder and bin/ hooks all go through
+// resolveCurrentLane(Paths); this test lists every reviewed caller, so a new,
+// unreviewed caller fails. (e123b0 AC5, T-E123BI-01)
 // ============================================================================
 
 test("CALLERS3 (allow-list): grep -rn resolveCurrentLane tools/ gates/ guards/ prompts/ bin/ index.ts names exactly the sanctioned L1-L3 caller set — a NEW unlisted caller still fails this", () => {
-  // Sanctioned per .current/feature-split.md rows 1.0-1.3 (F0 done, L1-L3
-  // done on this branch) — verified by cross-checking each hit's import
-  // statement against the row that assigned it that file, 2026-09-23.
+  // Each entry was checked against the spec that introduced the import before
+  // it was added. Grouped by the change that added it; the group labels
+  // (F0, L1-L3, J2, F2) are the rows of the lane-layout feature split.
   const SANCTIONED_RESOLVE_CURRENT_LANE_CALLERS = [
-    // F0 — tools/lane-paths.ts itself (row 1.0, done): declaration + comments.
+    // tools/lane-paths.ts itself: the declaration and its comments. (F0)
     "tools/lane-paths.ts",
-    // L1 — e123b1-core-write-path (row 1.1, done on this branch).
+    // The handoff write path and its session guard. (L1, e123b1)
     "guards/session.ts",
     "tools/drift.ts",
     "tools/handoff-parse.ts",
     "tools/handoff-write.ts",
-    // L2 — e123b2-sidecars-lane-tools (row 1.2, done on this branch).
+    // The metrics and telemetry sidecar writers. (L2, e123b2)
     "tools/metrics.ts",
     "tools/telemetry.ts",
-    // L3 — e123b3-prompts-hooks (row 1.3, done on this branch).
+    // The prompt builder and the bin/ hooks. (L3, e123b3)
     "bin/agent-governance-context.mjs",
     "bin/agent-governance-usage-hook.mjs",
     "prompts/build.ts",
-    // J1 — e123b8-flip-prep (row 1.8, spec AC1/AC9): dispatchLogPath now
-    // calls resolveCurrentLanePaths (a raw `resolveCurrentLane` grep also
-    // matches the "...Paths" substring, so the AC1 routing shows up here too).
+    // dispatchLogPath calls resolveCurrentLanePaths (a raw
+    // `resolveCurrentLane` grep also matches the "...Paths" substring, so this
+    // routing shows up here too). (J1, e123b8 AC1/AC9)
     "tools/dispatch-log.ts",
-    // J2 — e123b9-lane-flip (spec AC2, Decision 1, T-E123B9-05 AC10): a
-    // genuine new caller, verified against the spec before allow-listing —
-    // migrateFlatToLane's destination lane now defaults to
-    // resolveCurrentLane(ws) (opts.lane ?? resolveCurrentLane(workspacePath)),
-    // not the retired active_feature-derived resolveLaneName.
+    // migrateFlatToLane's destination lane defaults to resolveCurrentLane(ws)
+    // (opts.lane ?? resolveCurrentLane(workspacePath)), because the lane is
+    // decided by the checked-out branch, not by active_feature.
+    // (J2, e123b9 AC2, T-E123B9-05)
     "tools/lane-migrate.ts",
-    // F2 — e123c-cross-lane-aggregation (spec AC1, AC11): two genuine new
-    // callers, verified against the spec before allow-listing —
     // tools/gate-stats.ts calls resolveCurrentLanePaths for the report's
     // current-lane path/caveat; tools/usage-accounting.ts calls it for
-    // AC7's appendUsageRecord write target. Both also match this grep via
+    // appendUsageRecord's write target. (F2, e123c AC1/AC7/AC11) Both also match this grep via
     // enumerateLaneSidecarSources's own doc-comment substring, same as
     // lane-registry.ts above.
     "tools/gate-stats.ts",
     "tools/usage-accounting.ts",
-    // T-E73-04B (e73-agc-feature-lifecycle): a genuine new caller, verified
-    // against the spec before allow-listing — bin/agc-init.mjs's
-    // runFeatureStart calls resolveCurrentLane(lanePath) to print the lane
-    // id (spec AC3), and runFeatureFinish calls it per-worktree to find the
-    // exact-match lane (spec AC?, finish's no-substring-match rule).
-    // Recorded in qa_reports/expected-red_e73-agc-feature-lifecycle.txt.
+    // bin/agc-init.mjs's runFeatureStart calls resolveCurrentLane(lanePath)
+    // to print the lane id, and runFeatureFinish calls it per worktree to find
+    // the exact-match lane (finish never matches on a substring).
+    // (e73 AC3, T-E73-04B)
     "bin/agc-init.mjs",
-    // e125a-lane-local-ledgers: three genuine new callers (all reach
-    // resolveCurrentLane via resolveCurrentLanePaths, which this grep's
-    // pattern also matches as a substring) — see CALLERS2's matching entries
-    // above for the exact call sites.
+    // Lane-local task ledgers: three callers, all reaching resolveCurrentLane
+    // via resolveCurrentLanePaths (which this grep also matches as a
+    // substring) — see CALLERS2's matching entries above for the call sites.
+    // (e125a)
     "tools/config.ts",
     "tools/tasks-file.ts",
     "tools/tasks-lane-migrate.ts",
@@ -764,13 +727,11 @@ test("CALLERS3 (allow-list): grep -rn resolveCurrentLane tools/ gates/ guards/ p
 });
 
 // ============================================================================
-// e123b8 J1 AC1 — tools/dispatch-log.ts's dispatchLogPath() gets
-// `dispatch.jsonl` from resolveCurrentLanePaths(<absolute ws>).dispatchLogPath,
-// not from a direct `.current/` join. Pre-e123b9 J2 this was a byte-identical
-// flat join (the resolver itself was still flat; only the CALL SITE had
-// moved). e123b9 J2 flips resolveLanePaths itself (spec AC1), so the result
-// is now genuinely lane-scoped — AC1-DL1 below asserts that, not the retired
-// flat-join contract.
+// AC1 — tools/dispatch-log.ts's dispatchLogPath() gets `dispatch.jsonl` from
+// resolveCurrentLanePaths(<absolute ws>).dispatchLogPath, not from a direct
+// `.current/` join, so the dispatch log follows the same lane layout as every
+// other lane file. The result is lane-scoped, which AC1-DL1 below asserts.
+// (e123b8 J1, e123b9 J2)
 // ============================================================================
 
 test("AC1-DL1 (e123b9 J2, spec AC1 — FLIPPED): dispatchLogPath(absoluteWs) is lane-scoped .current/_primary/dispatch.jsonl for a workspace with no .git (PRIMARY_LANE fallback)", () => {
@@ -787,8 +748,8 @@ test("AC1-DL3: dispatchLogPath resolves a RELATIVE workspacePath to an absolute 
   const relative = "relative-workspace-dir";
   const result = dispatchLogPath(relative);
   assert.ok(path.isAbsolute(result), `dispatchLogPath("${relative}") must return an absolute path, got: ${result}`);
-  // e123b9 J2 (spec AC1): resolve(relative) has no .git of its own, so
-  // resolveCurrentLane falls back to PRIMARY_LANE.
+  // resolve(relative) has no .git of its own, so resolveCurrentLane falls
+  // back to PRIMARY_LANE. (e123b9 J2, AC1)
   assert.equal(result, path.join(path.resolve(relative), ".current", "_primary", "dispatch.jsonl"));
 });
 

@@ -1,16 +1,12 @@
 // Coded by @qa-engineer
-// Order-pin test for E35 (e35-gate-pipeline-extraction) — T-E35-01.
-//
-// Before E35, tw_update_state's gate check order was enforced only by a
-// "frozen-additive" comment in tools/handoff-orchestrator.ts: a human
-// convention, not a machine assertion. E35 extracted that hand-woven
-// if-block sequence into UPDATE_STATE_GATE_PIPELINE, an ordered array of
-// {name, codes, run} steps (gates/pipeline.ts + tools/handoff-orchestrator.ts).
-// This suite is the replacement enforcement mechanism the ticket left to QA
-// (review_reports/review_T-E35-01.md, pending_notes): it pins the step
+// Pins the order of the checks a state write runs through. The checks are an
+// ordered array, UPDATE_STATE_GATE_PIPELINE, of {name, codes, run} steps
+// (gates/pipeline.ts + tools/handoff-orchestrator.ts); the order used to be
+// kept only by a comment, which nothing enforced. This suite pins the step
 // NAME sequence (18 steps) and each step's CODES array, so that a future
 // edit which reorders steps, renames a step, or silently drops/adds a code
 // fails a test instead of silently drifting from the documented order.
+// (E35, e35-gate-pipeline-extraction, T-E35-01)
 //
 // Two independent assertions:
 //   1. Exact ordered name+codes pin (t-order-exact) — literal expected
@@ -41,9 +37,8 @@ const { ALL_GATE_CODES, TRANSITION_GATE_CODES } = await import(
   "../dist/gates/registry.js"
 );
 
-// The frozen 18-step sequence, transcribed from tools/handoff-orchestrator.ts
-// (source of truth) as of the E35 extraction. Order matters — this array IS
-// the order pin.
+// The fixed 18-step sequence, copied from tools/handoff-orchestrator.ts
+// (the source of truth). Order matters — this array IS the order pin. (E35)
 const EXPECTED_PIPELINE = [
   { name: "TRANSITION_VALIDATION", codes: TRANSITION_GATE_CODES },
   { name: "STAMP_PROVENANCE_SUSPECT", codes: ["STAMP_PROVENANCE_SUSPECT"] },
@@ -55,15 +50,12 @@ const EXPECTED_PIPELINE = [
   { name: "SOURCE_CREDIBILITY_UNVERIFIED", codes: ["SOURCE_CREDIBILITY_UNVERIFIED"] },
   { name: "REPRO_MANIFEST_MISSING", codes: ["REPRO_MANIFEST_MISSING"] },
   { name: "REVIEW_VERDICT_STATUS_MISMATCH", codes: ["REVIEW_VERDICT_STATUS_MISMATCH"] },
-  // e40-nonqa-completed-tasks-write-gate (qa-owned re-baseline, T-E40-03):
-  // this step's codes[] widened from 1 -> 2 entries. The step itself
-  // generalizes the reviewer-only completed_tasks gate (c16) to every
-  // non-qa identity (docs/backlog.md E40) — same step NAME (no rename: the
-  // c16 envelope for agent_id="code-reviewer" stays byte-identical, so
-  // retiring the published step name would lie about that continuity), but
-  // it now emits a second code, NON_QA_COMPLETED_TASKS_REJECTED, for every
-  // other non-qa agent_id. Order is unchanged — still directly after
-  // REVIEW_VERDICT_STATUS_MISMATCH and before QA_REVIEW_RECORD.
+  // This step has two codes. It rejects completed_tasks from any role other
+  // than qa-engineer: code-reviewer keeps its original code and envelope
+  // unchanged, which is why the step keeps its original name, and every other
+  // non-qa agent_id gets NON_QA_COMPLETED_TASKS_REJECTED. It sits directly
+  // after REVIEW_VERDICT_STATUS_MISMATCH and before QA_REVIEW_RECORD.
+  // (E40, e40-nonqa-completed-tasks-write-gate, T-E40-03, c16)
   { name: "REVIEWER_COMPLETED_TASKS_REJECTED", codes: ["REVIEWER_COMPLETED_TASKS_REJECTED", "NON_QA_COMPLETED_TASKS_REJECTED"] },
   { name: "QA_REVIEW_RECORD", codes: ["QA_REVIEW_TARGET_REQUIRED"] },
   { name: "QA_COMPLETION_EVIDENCE_MISSING", codes: ["QA_COMPLETION_EVIDENCE_MISSING"] },

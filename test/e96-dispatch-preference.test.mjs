@@ -1,36 +1,39 @@
 // Coded by @qa-engineer
-// Tests for: docs/backlog.md E96 row (option (i)) — T-E96-01 / T-E96-02.
-// Spec = the backlog row + handoff scope_decision_why (no specs/e96-*.md; a
-// content-only, non-design, mini-chain cut). Class assertions per the qa
-// dispatch brief, preferring class over instance pins (E66 option (ii) /
-// E69 precedent) — each test below pins a REGRESSION CLASS, not a byte diff:
+// Tests that the coordinator SOP prefers real subagent dispatch (Task) and only
+// falls back to in-context role switching when Task is genuinely unavailable —
+// a host system-prompt nudge is not a reason to fall back once the user has
+// asked for the chain. The spec is the backlog row (option (i)); there is no
+// specs/ file. (E96, T-E96-01, T-E96-02)
 //
-//   1. t-anti-nudge-request  -> coord-02 states an explicit /teamwork (or
+// Each test checks a kind of regression, not a byte diff:
+//
+//   1. t-anti-nudge-request  -> coord-02 states that an explicit /teamwork (or
 //      equivalent explicit coordinator entry) invocation IS the user's
-//      request for subagent dispatch (closes the E96 root cause: a host
-//      system-prompt nudge is not grounds for the fallback once the user
-//      has already asked, via /teamwork, for the chain).
+//      request for subagent dispatch. That is the root cause this fixes: a
+//      host system-prompt nudge is not grounds for the fallback once the user
+//      has already asked, via /teamwork, for the chain.
 //   2. t-when-do-compose-axis-* -> the WHEN/DO §3.2 surfacing rule composes
 //      ONLY under hostCapabilitiesFor("claude-code") and is ABSENT from the
-//      lean (undefined host) profile. This is the round-1 code-review defect
-//      (review_reports/review_T-E96-01.md): the rule and its Task-capability
-//      premise must live on the SAME side of the D6 host-capability compose
-//      axis, or it fires as a false positive on every hop under the default
-//      (undeclared-host) profile. A prose grep over a single file cannot
-//      catch this — it is a property of composeSkill's per-fragment host
-//      tag, so the test composes both profiles through the real render path.
+//      lean (undefined host) profile. The rule assumes the Task tool exists,
+//      so the rule and that assumption must sit on the SAME side of the
+//      host-capability compose axis; otherwise the rule fires as a false
+//      alarm on every hop under the default (undeclared-host) profile. A code
+//      review of the first draft caught exactly this. A text search over one
+//      file cannot catch it — it depends on composeSkill's per-fragment host
+//      tag — so the test composes both profiles through the real render
+//      path. (D6)
 //   3. t-fallback-genuine-unavailability / t-fallback-self-contained -> coord-03's
 //      fallback is (a) conditioned on genuine tool unavailability (host
 //      advertises no Task, or the Task call errors/unknown-subagent-types),
-//      (b) self-contained — no cross-fragment "above" back-reference into
-//      coord-02 (round-1 C2: a lean-profile reader would see the pointer with
-//      no referent), and (c) the bare, unqualified "graceful and silent"
-//      framing (silent = the E96 defect) is gone from the file.
+//      (b) self-contained — no "above" pointer into coord-02, since a reader
+//      of the lean profile would see the pointer with nothing it points to
+//      (C2), and (c) the bare, unqualified "graceful and silent" wording is
+//      gone from the file, because a silent fallback is the defect itself.
 //
-// These are class assertions, not diff pins: each greps for the SHAPE of the
-// guarantee (host-tag placement, self-containment, absence of the retired
-// unqualified phrase) rather than the exact sentence, so a future rewording
-// that preserves the guarantee keeps passing and one that breaks it fails.
+// Each test searches for the SHAPE of the guarantee (host-tag placement,
+// self-containment, absence of the retired unqualified phrase) rather than
+// the exact sentence, so a future rewording that preserves the guarantee
+// keeps passing and one that breaks it fails.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -98,9 +101,9 @@ test("t-when-do-compose-axis-present-cc: the WHEN/DO §3.2 surfacing rule IS pre
 });
 
 test("t-when-do-same-fragment-as-dispatch-mechanic: the WHEN/DO rule lives in coord-02 (host:claude-code), NOT coord-03 (core)", () => {
-  // Pins the round-1 -> round-2 fix itself, not just its compose outcome: the
-  // rule and its Task-capability premise must be the SAME fragment so they
-  // can never land on opposite sides of the D6 host-capability axis again.
+  // Pins the fix itself, not just its compose outcome: the rule and the Task
+  // capability it assumes must be in the SAME fragment, so they can never
+  // land on opposite sides of the host-capability axis again. (D6)
   assert.match(coord02, WHEN_DO_MARKER, "coord-02 (host:claude-code) must carry the WHEN/DO surfacing rule");
   assert.doesNotMatch(coord03, WHEN_DO_MARKER, "coord-03 (core, composes on every host) must NOT carry the WHEN/DO surfacing rule");
 });
@@ -127,9 +130,9 @@ test("t-fallback-self-contained: coord-03's fallback conditioning names its own 
   // Scoped to the Fallback paragraph itself (its first line/sentence group) —
   // coord-03 legitimately contains OTHER, same-file "...above" self-references
   // elsewhere (the Claim-vs-state "row above", the Cut-approval "writer
-  // obligation above"); those are intra-file, not cross-fragment, and review
-  // round 1 (review_reports/review_T-E96-01.md, C2) explicitly did not flag
-  // them. What must be gone is a pointer FROM the fallback line INTO coord-02's
+  // obligation above"); those point within the same file, not into another
+  // fragment, and the code review deliberately left them alone (C2).
+  // What must be gone is a pointer FROM the fallback line INTO coord-02's
   // text, e.g. the retired "(the fallback heuristic above)".
   const fallbackPara = coord03.split("\n\n")[0];
   assert.match(fallbackPara, /^\*\*Fallback \(`tw_switch_role`\)\*\*/, "test is scoped to the Fallback paragraph — fixture assumption changed?");

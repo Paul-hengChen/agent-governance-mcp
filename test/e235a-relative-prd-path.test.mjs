@@ -11,20 +11,21 @@
 //                                                     escape, equal-to-workspace, prefix-sibling,
 //                                                     direct-writer out-of-bounds drop, no stderr echo)
 //
-// WHY: e235a moves file-mode `prd_path` storage from an absolute local path
-// (which leaks the OS account name into committed `.current/<lane>/handoff.md`
-// history — Constitution §6 Information hygiene) to a workspace-relative
-// on-disk form, resolved back to absolute in memory at read time. These tests
-// pin the write/read round-trip (AC1/AC2), the backward-compat legacy-absolute
-// path (AC3), and the AC4 traversal bound that a relative encoding newly
-// requires at read time (drop-to-absent, per architecture DR-2/DR-3 — never
-// reject the whole read, never echo the offending value).
+// WHY: in file mode `prd_path` is stored on disk relative to the workspace,
+// not as an absolute local path, because the absolute form leaks the OS
+// account name into committed `.current/<lane>/handoff.md` history
+// (Constitution §6 Information hygiene). It is resolved back to absolute in
+// memory at read time. These tests pin the write/read round-trip (AC1/AC2),
+// the legacy absolute value still being accepted (AC3), and the traversal
+// bound a relative value needs at read time (AC4): an out-of-bounds value is
+// dropped as if absent, the read never fails as a whole, and the offending
+// value is never echoed (architecture DR-2/DR-3).
 //
 // Strategy: unit-level against the compiled dist/ helpers and parse/write
 // entry points — same pattern as test/handoff-migration.test.mjs and
-// test/writestate-options-object.test.mjs (both edited alongside this file
-// per DR-5/OQ-1 to re-point their own out-of-workspace synthetic prd_path
-// fixtures inside their temp workspace).
+// test/writestate-options-object.test.mjs (both moved their own synthetic
+// prd_path fixtures inside their temp workspace, since an out-of-workspace
+// value is now dropped; architecture DR-5/OQ-1).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";

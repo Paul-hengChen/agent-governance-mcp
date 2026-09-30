@@ -1,0 +1,3 @@
+{"ts":"2026-09-29T11:50:45.742Z","feature":"e233d-test-comments-b","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-30T02:16:56.368Z","feature":"e233d-test-comments-b","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-30T02:17:48.419Z","feature":"e233d-test-comments-b","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}

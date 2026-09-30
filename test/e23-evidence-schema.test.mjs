@@ -1,13 +1,14 @@
 // Coded by @qa-engineer
-// Tests for specs/e23-evidence-schema-versioning.md AC1-AC6. D1 pins an
-// integer `evidence_schema` into the handoff (server-stamped, feature-scoped,
-// v13); D2 keys the two evidence-heading gates (visual report schema,
-// AC-execution disposition) off that pin so a mid-flight tightening of the
-// heading-match convention can never retroactively invalidate crash-era
-// artifacts (the 104447-F0 incident: `## Phase 3.5 — AC Execution Log`
-// rejected on heading PREFIX alone); D3 makes the three rejection envelopes
-// name the missing section/expected string, the file path checked, and the
-// evidence-schema version the check ran under.
+// Tests for evidence-schema versioning. The handoff carries an integer
+// `evidence_schema` (stamped by the server, feature-scoped, handoff v13).
+// The two evidence-heading checks (visual report schema, AC-execution log)
+// read that pin, so tightening the heading-match rule mid-feature can never
+// invalidate evidence already written for a feature in flight. The case
+// that motivated this: a `## Phase 3.5 — AC Execution Log` heading was
+// rejected for its prefix alone, although the content was all there. The
+// three rejection envelopes name the missing section or expected string,
+// the file path checked, and the evidence-schema version the check ran
+// under. (specs/e23-evidence-schema-versioning.md AC1-AC6, D1-D3)
 //
 // Spec-to-Test map:
 //   AC1 (stamp/carry/drop-restamp + no-client-supply)  -> AC1-1..AC1-6
@@ -57,9 +58,9 @@ function writeRaw(ws, body) {
   fs.writeFileSync(path.join(ws, ".current", "handoff.md"), body);
 }
 
-// readRaw is always called AFTER a real writer call, which now writes to the
-// lane-scoped path (e123b9 J2, spec AC1) — these fixture workspaces carry no
-// `.git`, so that's `_primary`.
+// readRaw is always called AFTER a real writer call, which writes to the
+// lane-scoped path — these fixture workspaces carry no `.git`, so that's
+// `_primary`. (e123b9 J2, spec AC1)
 function readRaw(ws) {
   return fs.readFileSync(resolveCurrentLanePaths(ws).handoffPath, "utf-8");
 }
@@ -90,13 +91,13 @@ function writeVisual(ws, taskId, body) {
 // Drives the REAL tw_update_state orchestrator (matches test/ac-execution.test.mjs
 // I1-I3b convention: handleUpdateState directly, not the TOOL_REGISTRY wrapper).
 async function dispatch(ws, args) {
-  // E148 (docs/backlog.md row E148): force any already-on-disk last_updated
-  // off the wall clock before re-snapshotting freshness, so a chain of
+  // Force any already-on-disk last_updated off the wall clock before
+  // re-snapshotting freshness, so a chain of
   // several dispatch() calls on the same workspace never has a cumulative
   // ~1/60000-per-hop chance of a spurious STAMP_PROVENANCE_SUSPECT (a
   // brand-new workspace with no handoff.md yet is a no-op — nothing to
-  // force, and nothing gated on a first write anyway). See
-  // test/e148-seed-stamp.mjs.
+  // force, and nothing gated on a first write anyway). (E148, see
+  // test/e148-seed-stamp.mjs)
   forceSeedStampIfExists(ws);
   resetSession(ws);
   markStateRead(ws);
@@ -132,11 +133,11 @@ test("AC1-2: a subsequent same-feature write (no client arg exists to set it) pr
 test("AC1-3: an active_feature change drops a stale pin and re-stamps EVIDENCE_SCHEMA_CURRENT — never carries the old value forward", async () => {
   setActiveStorage(new FileHandoffStorage());
   const ws = mkWorkspace();
-  // Hand-author a v13 handoff for an "old" feature pinned at v1 — simulating a
-  // hypothetical pre-D2 feature dispatched under a hypothetical future v3+
-  // tightening. If the pin were carried across a feature change instead of
-  // dropped, this test would observe evidence_schema staying 1 on the NEW
-  // feature — the exact bug D1's feature-scoped drop rule exists to prevent.
+  // Hand-author a v13 handoff for an "old" feature pinned at v1, as if an
+  // older feature were still in flight when a stricter rule shipped. If the
+  // pin were carried across a feature change instead of dropped, this test
+  // would observe evidence_schema staying 1 on the NEW feature — the exact
+  // bug the feature-scoped drop rule exists to prevent. (spec D1)
   writeRaw(
     ws,
     `---
@@ -188,7 +189,7 @@ test("AC1-4: evidence_schema is not a client-settable arg — a hostile write_op
   // has no `evidenceSchema` passthrough from a hostile caller trying to smuggle
   // one in under a different option name; only the orchestrator's own internal
   // `evidenceSchema: feature_changed ? EVIDENCE_SCHEMA_CURRENT : undefined`
-  // ever sets it (D1 "server-stamped, never client-supplied").
+  // ever sets it ("server-stamped, never client-supplied", spec D1).
   resetSession(ws);
   markStateRead(ws);
   await writeHandoffState({
@@ -267,15 +268,15 @@ evidence_schema: 1
 // ============================================================================
 
 test("AC2-1: a v12 fixture migrates to v13 with schema_version becoming 15 and NO evidence_schema seeded", () => {
-  // e123a-lane-layout-migration re-baseline: CURRENT is now 15, so the
-  // manually-registered chain must extend two steps further (v13→v14,
+  // The handoff schema's CURRENT version is 15, so the manually-registered
+  // chain must extend two steps past v13 (v13→v14,
   // cut_approved_source pin, stamp-only, seeds nothing; v14→v15,
   // dispatch_mechanism/dispatch_mechanism_tier pin, stamp-only, seeds
   // nothing) or runMigrations throws MISSING_MIGRATION_STEP against the new
   // target — same shared module-level registry hazard as AC2-2 below and
   // dispatch-pins.test.mjs's M1/M3. The v12→v13 step under test is still
   // asserted via the evidence_schema-specific assertions below; only the
-  // runner's *target* moved.
+  // runner's *target* moved. (e123a-lane-layout-migration)
   _clearRegistryForTests();
   registerMigration({ kind: "handoff", from: 0, to: 1, up: (i) => ({ ...i, schema_version: 1 }) });
   registerMigration({ kind: "handoff", from: 1, to: 2, up: (i) => ({ ...i, schema_version: 2 }) });
@@ -347,8 +348,8 @@ visual_rounds_total: 0
 // pin 2/absent, still FAILS under pin 1 (exact replay of the 104447-F0 incident)
 // ============================================================================
 
-// The EXACT incident heading (spec AC3): a prefixed H2 that only ever failed
-// pre-E23 on heading PREFIX, never on missing content.
+// The EXACT heading from the original case (spec AC3): a prefixed H2 that
+// used to fail on its heading PREFIX alone, never on missing content.
 const INCIDENT_HEADING = "## Phase 3.5 — AC Execution Log";
 
 test("AC3-1: the incident heading clears the AC-execution disposition gate under pin 2 (D2 normalized-contains)", () => {
@@ -443,14 +444,15 @@ async function seedInProgress(ws, feature, lastAgent = "qa-engineer") {
     pendingNotes: ["QA: claiming review"],
     lastAgent,
     // Simulates a feature already dispatched under EVIDENCE_SCHEMA_CURRENT (the
-    // orchestrator's real D1 stamp on the feature's first accepted write) so
+    // orchestrator's real stamp on the feature's first accepted write, spec D1) so
     // the PASS write below (same active_feature, no change) carries the pin
     // forward and the envelope names a concretely-stamped "v2", not the
     // absent-pin default label.
     evidenceSchema: 2,
   });
-  // E148: force the seed's last_updated off the wall clock (docs/backlog.md
-  // row E148) — see test/e148-seed-stamp.mjs.
+  // Force the seed's last_updated to a fixed value, so a wall-clock stamp
+  // can never trip STAMP_PROVENANCE_SUSPECT on the write under test (E148,
+  // see test/e148-seed-stamp.mjs).
   forceSeedStamp(ws);
 }
 
@@ -565,16 +567,15 @@ test("AC5-3: AC_EXECUTION_LOG_MISSING names the expected heading, the review fil
 // ============================================================================
 
 test("AC6-1: tw_update_state's zod arg surface carries no evidence_schema key (server-stamped only, D1)", () => {
-  // e114-cut-approval-inheritance re-baseline (test-infra fix, not a version
-  // constant): tools/registry.ts's cut_approved_source zod-arg comment now
-  // legitimately CONTRASTS itself against evidence_schema ("Contrast
+  // tools/registry.ts's cut_approved_source zod-arg comment legitimately
+  // CONTRASTS itself against evidence_schema ("Contrast
   // evidence_schema: server-stamped, deliberately NO zod arg here.") — spec
   // AC6 itself calls out this exact contrast. That is prose, not a
   // declaration, so a blind substring search over the whole file is too
-  // blunt and now false-positives on it. AC6's real invariant is narrower:
+  // blunt and false-positives on it. AC6's real invariant is narrower:
   // no zod schema key and no hand-written JSON-Schema property may be NAMED
-  // evidence_schema. Tighten the check to that shape — the invariant is
-  // unchanged, only the over-broad detection mechanism is.
+  // evidence_schema, so the check looks for exactly that shape.
+  // (e114-cut-approval-inheritance)
   const registrySrc = fs.readFileSync(path.join(PROJECT_ROOT, "tools", "registry.ts"), "utf-8");
   assert.ok(
     !/\bevidence_schema:\s*z\./.test(registrySrc),

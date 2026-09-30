@@ -1,23 +1,22 @@
 // Coded by @qa-engineer
-// Tests for specs/e124-lane-ticket-allocation.md AC1-AC8, covering
-// T-E124-01's tools/lane-ticket-allocation.ts (code-reviewer APPROVED,
-// review_reports/review_T-E124-01.md).
+// Tests for tools/lane-ticket-allocation.ts: turning lane-filed pending
+// tickets into real backlog ids, and finding lanes whose worktree is gone.
+// (specs/e124-lane-ticket-allocation.md AC1-AC8, T-E124-01)
 //
 // AC9 (allocateTicketIds/markApplied take no `disposition` parameter — a
 // finding filed on an abandoned lane applies identically to one on a
-// shipped lane) is verified by signature inspection per this ticket's
-// dispatch brief, not a runnable test: dist/tools/lane-ticket-allocation.js
+// shipped lane) is checked by reading the signatures, not by a runnable
+// test: dist/tools/lane-ticket-allocation.js
 // exports `allocateTicketIds(input)` (one parameter) and
 // `markApplied(fileText, appliedLaneLocalIds)` (two parameters) — neither
 // accepts a disposition argument.
 //
-// OUT OF SCOPE, deliberately untested here: the reviewer's two recommended
-// (non-blocking) findings — L-STATE-NEW-2 (a pending-ticket block appended
-// after an existing `## Applied` section is silently archived instead of
-// reported) and L-STATE-NEW-3 (a stray unmatched fence in prose silently
-// swallows the next pending-ticket block). Asserting either of today's
-// behaviours as correct would enshrine a bug as a contract; both are filed
-// for E124b / this lane's next round instead.
+// OUT OF SCOPE, deliberately untested here: two known suspect behaviours —
+// a pending-ticket block appended after an existing `## Applied` section is
+// silently archived instead of reported, and a stray unmatched fence in
+// prose silently swallows the next pending-ticket block. Asserting either
+// of today's behaviours as correct would turn a bug into a contract; both
+// are tracked as follow-up work instead. (L-STATE-NEW-2, L-STATE-NEW-3, E124b)
 //
 // Spec-to-Test map:
 //   AC1 -> "parsePendingTickets ignores NEW-TICKETS.md-shaped prose and extracts only fenced pending-ticket blocks"
@@ -394,11 +393,11 @@ priority: P1
 });
 
 // ---------------------------------------------------------------------------
-// e179 AC6 (ruling R1) — parsePendingTickets(text, lane, opts?): archived
+// parsePendingTickets(text, lane, opts?): archived
 // blocks are inspected ONLY when opts.appliedLaneLocalIds is given; with it,
 // an archived block whose lane_local_id has no matching provenance is
 // reported (it will never be allocated), never removed from `entries`
-// either way (archived stays archived regardless).
+// either way (archived stays archived regardless). (e179 AC6, ruling R1)
 // ---------------------------------------------------------------------------
 
 const AC6_ARCHIVED_FIXTURE = `
@@ -437,10 +436,10 @@ test("AC6 proof (3): opts.appliedLaneLocalIds contains the block's own lane_loca
 });
 
 // ---------------------------------------------------------------------------
-// e179 AC7 (ruling (b)) — a pending-ticket opener swallowed by an enclosing
-// non-pending fence is reported in TWO sub-cases (unclosed-at-eof,
-// closes-enclosing-fence), never in `entries`; a strictly-longer enclosing
-// fence (legitimate CommonMark nesting) stays silent under both.
+// A pending-ticket opener swallowed by an enclosing non-pending fence is
+// reported in TWO sub-cases (unclosed-at-eof, closes-enclosing-fence),
+// never in `entries`; a strictly-longer enclosing fence (legitimate
+// CommonMark nesting) stays silent under both. (e179 AC7, ruling (b))
 // ---------------------------------------------------------------------------
 
 test("AC7 proof (1) unclosed-at-eof: an outer fence opened and never closed, containing a pending-ticket opener, is reported and never becomes an entry", () => {
@@ -500,10 +499,10 @@ test("AC7 proof (3): a pending-ticket example correctly nested inside a STRICTLY
 });
 
 // ---------------------------------------------------------------------------
-// e179 AC9 — the speculative surface (tilde fences, comma-separated
-// depends_on, the post-loop isSafeInteger(next) overflow throw) is deleted.
-// Every existing test above exercises only retained behaviour and passes
-// unmodified; these are the new AC9-specific probes plus its own grep proof.
+// Unneeded parser features (tilde fences, comma-separated depends_on, the
+// post-loop isSafeInteger(next) overflow throw) are removed. The tests above
+// exercise only retained behaviour; these probe that the removed features
+// stay gone, plus a grep proof. (e179 AC9)
 // ---------------------------------------------------------------------------
 
 test("AC9: a tilde-fenced pending-ticket-shaped block is now inert prose — tilde fences are no longer recognized", () => {

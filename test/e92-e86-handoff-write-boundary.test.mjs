@@ -1,19 +1,19 @@
 // Coded by @qa-engineer
-// T-QA-01 for specs/e92-e86-handoff-write-boundary.md (AC1-AC5), covering
-// T-E86-01 / T-E92-01. Full AC1-AC5 coverage per the repro file's own
-// disclaimer ("NOT full AC1-AC5 coverage — that is qa-engineer's job").
+// Tests the write-boundary check that rejects a state-write text field ending in
+// leftover tool-call markup (a malformed multi-argument call bleeding into one
+// field), and the marker written when whole pending notes are dropped for size.
+// Spec: specs/e92-e86-handoff-write-boundary.md, AC1-AC5. Full AC1-AC5
+// coverage; the separate repro file covers only the reproduction.
+// (T-QA-01, T-E86-01, T-E92-01)
 //
-// WHY this file exists (not just "what it asserts"): code-reviewer's round-3
-// report (review_reports/review_T-E86-01.md, "Guidance for T-QA-01") states
-// plainly that all 1866 pre-existing tests passed at EVERY round, including
-// the two rounds that shipped confirmed AC2 violations (F1: bare
-// placeholders/TS generics rejected; F4: a tag fragment quoted mid-string
-// with further prose rejected). Green was never coverage for this predicate.
-// Both blockers were found by sweeping real corpus lines through the shipped
-// `run()` path, not by hand-written cases — so this file leads with that
-// method (the corpus sweep near the bottom) rather than treating it as an
-// afterthought, and pins the two rounds' false positives as regression
-// tests so a re-tightening of the regex cannot silently reintroduce them.
+// Why this file leads with a corpus sweep: the whole existing suite stayed green
+// while two drafts of this check wrongly rejected valid text (F1: bare
+// placeholders and TS generics rejected; F4: a tag fragment quoted mid-string
+// with more prose after it rejected). A green suite was never coverage for this
+// check. Both defects were found by running real corpus lines through the
+// shipped `run()` path, not by hand-written cases, so the corpus sweep near
+// the bottom is the main method here, and both false positives are pinned as
+// regression tests so a later tightening of the regex cannot bring them back.
 //
 // Spec-to-test map:
 //   AC1 (reject true-positive tails, verbatim message) -> "AC1:" tests
@@ -26,8 +26,8 @@
 //                                                          corpus sweep,
 //                                                          full suite (npm test)
 //
-// Guarded fields under test (spec Problem Statement + review round-3
-// guidance item 3): pending_notes[i], scope_decision_why, qa_review,
+// Guarded fields under test (spec Problem Statement and the code review's
+// guidance): pending_notes[i], scope_decision_why, qa_review,
 // blocking_reason (all via tw_update_state), and tw_add_task's description.
 //
 // Workspace note: AC1/AC2/NEW-3/NEW-4/whitespace/corpus tests exercise only
@@ -175,8 +175,8 @@ function assertAccepted(tool, rawArgs) {
 
 // ==========================================================================
 // AC1 — true-positive direction: reject, with the verbatim spec message,
-// not a length-cap message. Shapes drawn from all three review rounds'
-// confirmed true positives (review_reports/review_T-E86-01.md).
+// not a length-cap message. The shapes are the real leftover-markup tails
+// the code review confirmed.
 // ==========================================================================
 const TRUE_POSITIVE_TAILS = [
   ["complete open tag with an attribute", '<parameter name="pending_notes">'],
@@ -197,14 +197,14 @@ for (const field of GUARDED_FIELDS) {
 }
 
 // ==========================================================================
-// AC2 — false-positive direction (highest priority per the round-3 review:
-// both shipped blockers lived here). Two families:
-//   (a) round-1 F1: bare agc placeholders and ordinary TS generics at the
-//       tail, including the byte-verbatim content/coord-01-core-head.md
-//       "verdict" line the round-1 report cited by name.
-//   (b) round-2 F4: a tag fragment with an UNTERMINATED quote followed by
-//       further prose — the shape "anyone documenting this feature produces
-//       naturally, including you, writing qa_review" (dispatch brief). This
+// AC2 — valid text that must be accepted. This matters most: both defects
+// that shipped in drafts of the check were here. Two families:
+//   (a) bare agc placeholders and ordinary TS generics at the tail,
+//       including the exact content/coord-01-core-head.md "verdict" line,
+//       which a draft wrongly rejected. (F1)
+//   (b) a tag fragment with an UNTERMINATED quote followed by more prose —
+//       the shape anyone describing this feature writes naturally, for
+//       example in qa_review. (F4) This
 //       is asserted across ALL FIVE guarded fields, not just one.
 // ==========================================================================
 const ROUND1_FALSE_POSITIVES = [
@@ -250,9 +250,9 @@ for (const field of GUARDED_FIELDS) {
 }
 
 test("AC2: a fragment quoted mid-string then closed, with prose both before and after, is accepted (this spec's own worked example)", () => {
-  // specs/e92-e86-handoff-write-boundary.md AC2 names its own E86 paragraph,
-  // which quotes such fragments as prose followed by more sentences, as the
-  // worked counter-example the predicate must not flag.
+  // The spec's own paragraph about this check quotes such fragments as prose
+  // followed by more sentences; AC2 names it as the worked example the check
+  // must not flag. (specs/e92-e86-handoff-write-boundary.md AC2)
   const value =
     'E86 targets tails like <parameter name="pending_notes"> or </invoke>-style fragments bleeding in, but this sentence just quotes them as prose and keeps going.';
   for (const field of GUARDED_FIELDS) {
@@ -261,14 +261,13 @@ test("AC2: a fragment quoted mid-string then closed, with prose both before and 
 });
 
 // ==========================================================================
-// Deliberate accepted misses (NEW-3, NEW-4, and round-1 F3) — pin these as
-// ACCEPTED, not as failures. Per NEW-TICKETS.md and review_reports/
-// review_T-E86-01.md round 3 "Guidance for T-QA-01" item 6: these are
-// argued trade-offs of the no-tag-name-vocabulary design (a bare
+// Deliberately accepted misses — pin these as ACCEPTED, not as failures.
+// They are a chosen trade-off of a design with no list of tag names (a bare
 // <parameter>/<invoke> is structurally indistinguishable from <role>/<div>
 // without a vocabulary check, which the design deliberately declines), NOT
 // gaps to close. A future "tightening" that makes any of these reject again
 // must consciously update this test, not stumble into it as a side effect.
+// (NEW-3, NEW-4, F3)
 // ==========================================================================
 const ACCEPTED_BY_DESIGN_SHAPES = [
   ["NEW-3: bare open tag <parameter> (no attribute, no slash)", "the bleed tail was <parameter>"],
@@ -329,16 +328,14 @@ for (const field of ["qa_review", "pending_notes[0]"]) {
 }
 
 test("Whitespace boundary (static): tools/registry.ts and its dist mirror contain the U+200B escape, not a raw invisible byte", () => {
-  // Reproduces code-reviewer's own round-3 verification method
-  // (`LC_ALL=C grep -c` for the raw e2 80 8b byte sequence returning 0) as an
-  // automated, permanent check. A source file's TEXT containing the six
+  // Automates the check the code reviewer ran by hand
+  // (`LC_ALL=C grep -c` for the raw e2 80 8b byte sequence returning 0). A source file's TEXT containing the six
   // ASCII characters `\`, `u`, `2`, `0`, `0`, `B` (the escape) does NOT match
   // a literal U+200B codepoint when read as a string — only an actual
   // invisible character embedded in the file would. This guards the OTHER
   // failure mode from the behavioral test above: someone replacing the
-  // escape with a literal invisible character, which is fragile in exactly
-  // the way the round-2 review flagged (a lint autofix or copy-paste could
-  // delete it with no visible diff).
+  // escape with a literal invisible character, which is fragile because a
+  // lint autofix or copy-paste could delete it with no visible diff.
   for (const rel of ["tools/registry.ts", "dist/tools/registry.js"]) {
     const text = fs.readFileSync(path.join(PROJECT_ROOT, rel), "utf-8");
     const rawZwsCount = (text.match(/​/gu) || []).length;
@@ -420,10 +417,10 @@ test("Corpus sweep: every non-blank line of content/*.md and docs/backlog.md is 
 });
 
 // ==========================================================================
-// AC3 (E92) — whole-note-drop synthetic omission marker. Reproduces the
-// five fixtures code-reviewer verified by execution in round 1
-// (review_reports/review_T-E86-01.md "E92 / AC3 — no findings"), run
-// against THIS lane's compiled dist rather than re-trusting the claim.
+// AC3 — when whole pending notes are dropped for size, a marker line says
+// how many were omitted. Re-runs the five fixtures the code reviewer ran,
+// against the compiled dist, instead of trusting that earlier result.
+// (E92)
 // ==========================================================================
 function mkWorkspace() {
   const ws = fs.mkdtempSync(path.join(os.tmpdir(), "e92e86-qa-"));
@@ -482,7 +479,7 @@ test("AC3: 3000 + 50x10-char notes -> omitted=50, marker byte-exact", async () =
 });
 
 // ==========================================================================
-// AC4 (E92, negative requirement) — reading a pre-existing over-cap
+// AC4 (negative requirement, E92) — reading a pre-existing over-cap
 // scope_decision_why (simulating data written before the write-time zod
 // ceiling existed) must not throw. This cut introduces NO read-path length
 // re-validation (spec Out of Scope) — asserting "does not throw" is the

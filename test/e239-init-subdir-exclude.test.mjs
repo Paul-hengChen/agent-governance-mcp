@@ -1,16 +1,17 @@
 // Coded by @qa-engineer
-// Tests for specs/e239-init-subdir-exclude.md AC1-AC13 (AC14 is verified by
-// grep, not a test case here — see qa_reports/review_T-E239-02.md; AC3 is
-// the existing test/e106-init-artifacts-flag.test.mjs suite passing
-// unmodified, per the spec's own proof — this file never edits that suite's
-// existing assertions, only appends one additive regression case for AC3).
+// Tests that `agc init` run from a subdirectory of a git repo writes
+// .git/info/exclude rules anchored under that subdirectory, and that
+// `agc check` reads them back the same way (specs/e239-init-subdir-exclude.md
+// AC1-AC13). AC14 is checked by grep, not by a test here. AC3 is the existing
+// test/e106-init-artifacts-flag.test.mjs suite passing unchanged; this file
+// only adds one regression case to it.
 //
-// Also tests specs/e243-init-path-escape-refusal.md AC15-AC20 (T-E243-04):
-// AC8's and AC13's message-text regexes above were updated in place for the
-// widened refusal copy (AC12); AC15-AC20 are new cases appended after AC13,
-// below the "E243" banner comment. AC6/AC7/AC13(E243)/AC8(E243) are
-// code-level confirmations per the spec, not separate test cases here — see
-// that spec's own Acceptance Criteria for the exact proof each one cites.
+// Also tests that a subdirectory name containing a backslash or a control
+// character is refused for local mode, like the other gitignore-unsafe names
+// (specs/e243-init-path-escape-refusal.md AC15-AC20). Those cases follow the
+// "E243" banner below. The AC8 and AC13 message patterns match the wider
+// refusal text (AC12). AC6/AC7/AC13(E243)/AC8(E243) are code-level
+// confirmations in that spec, not separate test cases here. (T-E243-04)
 //
 // Spec-to-test map:
 //   AC1  -> "AC1: subdir default-local writes subdir-prefixed exclude rules"
@@ -33,17 +34,13 @@
 // and never the ambient global git config) — same discipline as
 // test/e106-init-artifacts-flag.test.mjs, which this file is a sibling of.
 //
-// Repro-red (T-E239-02, per the spec's "Cut amendments" section): before
-// authoring this suite, the AC1/AC2 scenario below was run against the lane
-// base's bin/agc-init.mjs (d0c66f0, extracted via `git show
-// d0c66f0:bin/agc-init.mjs`) in a throwaway $TMPDIR fixture. It failed both
-// ways: .git/info/exclude gained the un-prefixed root-anchored rules
-// (/.current/, /tasks.md, /qa_reports/, /review_reports/) regardless of
-// cwd=sub, and neither `git check-ignore -v sub/.current/anything` nor
-// `git check-ignore -v sub/tasks.md` matched (exit 1, no match) — confirming
-// the bug this ticket fixes. That repro is not itself committed (it is not a
-// standing regression check, just the required red-before-fix evidence);
-// see qa_reports/review_T-E239-02.md for the transcript.
+// The bug these tests guard against: without the subdirectory prefix,
+// .git/info/exclude gets root-anchored rules (/.current/, /tasks.md,
+// /qa_reports/, /review_reports/) even when init runs in `sub`, so
+// `git check-ignore -v sub/.current/anything` and `git check-ignore -v
+// sub/tasks.md` match nothing and the scaffold shows up as untracked. The
+// AC1/AC2 scenario was confirmed to fail that way on the code before the
+// fix. (T-E239-02)
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -399,35 +396,26 @@ test("AC13: agc check advises rather than mis-tests on a gitignore-unsafe subdir
 });
 
 // ---------------------------------------------------------------------------
-// E243 — widens the one shared predicate (repoRelativeWorkspacePrefix()'s
-// unsafeSegment, computed via GITIGNORE_UNSAFE_SEGMENT_RE) beyond the E239
-// gitignore-wildcard set to also cover a literal backslash and the C0
-// control range (0x01-0x1F) + DEL (0x7F). AC15-AC20 below are new; AC8/AC13
-// above had their pinned message-text assertions updated in place (AC12).
+// Backslash and control-character subdirectory names. The one shared
+// predicate (repoRelativeWorkspacePrefix()'s unsafeSegment, computed via
+// GITIGNORE_UNSAFE_SEGMENT_RE) treats a literal backslash and the C0 control
+// range (0x01-0x1F) + DEL (0x7F) as unsafe, on top of the gitignore wildcard
+// characters. AC15-AC20 below cover these names; AC8/AC13 above match the
+// wider refusal text (AC12).
 //
-// Repro-first (specs/e243-init-path-escape-refusal.md Dependencies note):
-// before authoring AC15-AC20, the backslash/CR/LF/BEL scenarios below were
-// run against `bin/agc-init.mjs` as it existed at the lane's base commit
-// 3663b3a (`git show 3663b3a:bin/agc-init.mjs`, executed standalone in a
-// throwaway $TMPDIR fixture) — confirming the gap this ticket closes
-// actually existed before the fix. All were red: the base script's narrower
-// `GITIGNORE_WILDCARD_RE = /[*?[\]]/` does not match a backslash or any
-// control byte, so `init --artifacts=local` did NOT refuse for any of them —
-// it wrote a `.config.json` declaring "local" and wrote the (wrong) exclude
-// rule. Confirmed two ways: a backslash segment ("a\b") produced a written
-// rule git reads as `/ab/.current/` — `git check-ignore -v` on the real
-// `a\b/.current/foo` path returned exit 1 (no match), and `git status
-// --short` showed the real directory itself as untracked (`?? "a\\b/"`),
-// i.e. created-but-invisible-to-the-refusal, exactly the defect this ticket
-// names; a CR-bearing segment produced a raw 0x0D byte written straight into
-// `.git/info/exclude`, splitting the one intended rule across lines. Not
-// itself committed — this transcript lives in this round's review doc
-// (qa_reports/review_T-E243-04.md), same discipline as this file's own
-// AC1/AC2 repro-red note above.
+// Why these names must be refused for local mode: a pattern that only knows
+// the wildcard characters (`/[*?[\]]/`) lets them through, and init then
+// writes a `.config.json` declaring "local" plus a wrong exclude rule. A
+// backslash segment ("a\b") becomes a rule git reads as `/ab/.current/`, so
+// `git check-ignore -v` on the real `a\b/.current/foo` path matches nothing
+// and `git status --short` shows the directory as untracked
+// (`?? "a\\b/"`). A CR-bearing segment writes a raw 0x0D byte into
+// `.git/info/exclude`, splitting the one intended rule across lines. Both
+// failures were confirmed on the code before the fix. (E243)
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
-// AC15 (E243) — backslash subdir name refuses local mode cleanly
+// AC15 — backslash subdir name refuses local mode cleanly (E243)
 // ---------------------------------------------------------------------------
 test("AC15: backslash subdir name refuses local mode cleanly", (t) => {
   if (process.platform === "win32") {
@@ -461,7 +449,7 @@ test("AC15: backslash subdir name refuses local mode cleanly", (t) => {
 });
 
 // ---------------------------------------------------------------------------
-// AC16 (E243) — CR/LF subdir name refuses local mode cleanly
+// AC16 — CR/LF subdir name refuses local mode cleanly (E243)
 // ---------------------------------------------------------------------------
 test("AC16: CR/LF subdir name refuses local mode cleanly", (t) => {
   if (process.platform === "win32") {
@@ -487,7 +475,7 @@ test("AC16: CR/LF subdir name refuses local mode cleanly", (t) => {
 });
 
 // ---------------------------------------------------------------------------
-// AC17 (E243) — other C0/DEL subdir name refuses local mode cleanly
+// AC17 — other C0/DEL subdir name refuses local mode cleanly (E243)
 // ---------------------------------------------------------------------------
 test("AC17: other C0/DEL subdir name refuses local mode cleanly", (t) => {
   if (process.platform === "win32") {
@@ -515,7 +503,7 @@ test("AC17: other C0/DEL subdir name refuses local mode cleanly", (t) => {
 });
 
 // ---------------------------------------------------------------------------
-// AC18 (E243) — backslash/control-character subdir name is fine under explicit repo mode
+// AC18 — backslash/control-character subdir name is fine under explicit repo mode (E243)
 // ---------------------------------------------------------------------------
 test("AC18: backslash/control-character subdir name is fine under explicit repo mode", (t) => {
   if (process.platform === "win32") {
@@ -546,7 +534,7 @@ test("AC18: backslash/control-character subdir name is fine under explicit repo 
 });
 
 // ---------------------------------------------------------------------------
-// AC19 (E243) — agc check advises rather than mis-tests on a backslash/control-character path
+// AC19 — agc check advises rather than mis-tests on a backslash/control-character path (E243)
 // ---------------------------------------------------------------------------
 test("AC19: agc check advises rather than mis-tests on a backslash/control-character path", (t) => {
   if (process.platform === "win32") {
@@ -578,7 +566,7 @@ test("AC19: agc check advises rather than mis-tests on a backslash/control-chara
 });
 
 // ---------------------------------------------------------------------------
-// AC20 (E243) — message printed for a CR/LF/ESC segment contains no raw control byte
+// AC20 — message printed for a CR/LF/ESC segment contains no raw control byte (E243)
 // ---------------------------------------------------------------------------
 test("AC20: message printed for a CR/LF/ESC segment contains no raw control byte", (t) => {
   if (process.platform === "win32") {

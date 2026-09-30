@@ -39,19 +39,18 @@ test("AC-1: design-auditor Source manifest schema is exhaustive + source-agnosti
 });
 
 test("AC-2: multi-pass Hard rule has line cap, pass ceiling, and forced manifest progress", () => {
-  // Why: A1's anti-abuse properties. Without the per-pass line cap (≤ 250)
-  // a single audit can token-explode; without the 5-pass ceiling we lose the
-  // constitution §5 anti-loop guarantee; without "MUST flip ≥ 1 deferred→audited"
-  // an agent could loop forever producing no-op passes. All three are load-bearing.
+  // Why: the multi-pass design audit's anti-abuse properties. Without the
+  // per-pass line cap (≤ 250) a single audit can token-explode; without the
+  // 5-pass ceiling we lose the constitution §5 anti-loop guarantee; without
+  // "MUST flip ≥ 1 deferred→audited" an agent could loop forever producing
+  // no-op passes. All three are load-bearing. (A1)
   //
-  // a12-partials-limits-registry (T-A12-07/T-A12-09, AC4 sweep): skill-design-auditor.md
-  // no longer bare-restates "≤ 250 lines per pass" / "5 passes per feature" — those are
-  // now sourced from the `pass_budget` Limits-table entry (content/const-01-core-head.md)
-  // and referenced by name (AC4: "reference the name... never restate the number"). The
-  // anti-abuse property this test guards (a real per-pass line cap + a real pass ceiling
-  // exist and are enforced) still holds — it's verified in two parts: (a) the skill text
-  // names `pass_budget`, and (b) the Limits table resolves that name to the same 250/5
-  // values this test used to pin directly.
+  // skill-design-auditor.md does not restate "≤ 250 lines per pass" / "5 passes
+  // per feature": it names the `pass_budget` entry of the Limits table
+  // (content/const-01-core-head.md), so the numbers live in one place. The
+  // property is therefore checked in two parts: (a) the skill text names
+  // `pass_budget`, and (b) the Limits table resolves that name to 250/5.
+  // (a12-partials-limits-registry, T-A12-07/T-A12-09)
   const body = fs.readFileSync(AUDITOR_PATH, "utf-8");
   const limits = fs.readFileSync(path.join(PROJECT_ROOT, "content", "const-01-core-head.md"), "utf-8");
 

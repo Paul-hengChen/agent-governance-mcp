@@ -1,21 +1,15 @@
 // Coded by @qa-engineer
-// Tests for backlog E5 (docs/backlog.md:1016-1047) / T-E5-01/02/03:
-// (a) coordinator Backlog Intake Loop (coord-03-core-fallback.md), (b) tiered
-// cut-approval — Constitution §3.1 Cut-Approval Auto-Tier (const-08-chain-31-mid.md)
-// + tools/config.ts `cutApprovalAutoTier` threshold key, (c) Cheapest-Compliant-Path
-// Intake step 4a (coord-07-core-sop.md).
+// Tests three coordinator intake rules and their config key:
+// (a) the coordinator Backlog Intake Loop (coord-03-core-fallback.md), (b) tiered
+// cut approval — Constitution §3.1 Cut-Approval Auto-Tier (const-08-chain-31-mid.md)
+// plus the tools/config.ts `cutApprovalAutoTier` threshold key, which lets small
+// cuts under a configured threshold skip the human approval stop, and (c) the
+// Cheapest-Compliant-Path Intake step 4a (coord-07-core-sop.md).
+// (E5, T-E5-01, T-E5-02, T-E5-03)
 //
-// State-integrity note (qa-engineer disclosure): the handoff's completed_tasks
-// ledger for T-E5-01/02/03 was pre-filled by an out-of-band write impersonating
-// qa-engineer BEFORE this suite ran (tw_detect_drift confirmed tasks.md
-// checkboxes were still unchecked at claim time). This file, plus the
-// independently re-measured context-budget ratchets in
-// test/context-budget.test.mjs and the golden-fixture re-baselines in
-// test/compose-equivalence.test.mjs / test/skill-manifest.test.mjs, is what
-// actually establishes T-E5-01/02/03 as verified — not the prior write.
-//
-// Config-side spec-to-test map (tools/config.ts CutApprovalAutoTier, mirrors
-// the T-B9-03 tokenBudgetPerFeature precedent in test/token-budget-config.test.mjs):
+// Config-side spec-to-test map (tools/config.ts CutApprovalAutoTier; same
+// layout as the tokenBudgetPerFeature tests in test/token-budget-config.test.mjs,
+// T-B9-03):
 //   absent key -> disabled                          -> t-absent-key, t-absent-file
 //   present {} -> conservative defaults              -> t-empty-object-defaults
 //   non-object/array/null/primitive -> treated as absent (non-fatal) ->
@@ -31,9 +25,8 @@
 //   CUT_APPROVAL_AUTO_TIER_DEFAULTS export shape -> t-defaults-export-shape
 //   byte-identical regression for workspaces without the key -> t-existing-fields-untouched
 //
-// Content-pin spec-to-test map (mirrors the E16 charter-pinning convention,
-// test/e16-judge-dispatch-charter.test.mjs): pure grep/string-containment
-// assertions against the shipped content files.
+// Content spec-to-test map: plain text-containment checks against the shipped
+// content files, in the same style as test/e16-judge-dispatch-charter.test.mjs.
 //   const-08 auto-tier bullet: trust rule + same-write recording + HALT-over-
 //     threshold language -> t-const08-trust-rule, t-const08-same-write-recording,
 //     t-const08-halt-over-threshold, t-const08-advisory-not-enforced
@@ -276,8 +269,8 @@ test("T-E5-02 config: existing config fields are untouched when cutApprovalAutoT
 });
 
 // ===========================================================================
-// Content pins — const-08 / coord-03 / coord-07 (mirrors the E16
-// charter-pinning convention, test/e16-judge-dispatch-charter.test.mjs)
+// Content checks — const-08 / coord-03 / coord-07 (text-containment, same
+// style as test/e16-judge-dispatch-charter.test.mjs)
 // ===========================================================================
 
 function readContentFile(f) {

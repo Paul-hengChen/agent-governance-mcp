@@ -1,24 +1,27 @@
 // Coded by @qa-engineer
-// Tests for backlog E20/E21 (docs/backlog.md) / T-E20-01, T-E21-01.
-// Spec = the two backlog table rows themselves (E20, E21) — content-only,
-// mini-chain (sr -> code-reviewer -> qa), no specs/<feature>.md file, per the
-// handoff's scope_decision_why. Both fixes are two-line additions to
-// content/skill-qa-engineer.md and content/skill-sr-engineer.md; templates
-// were confirmed (by sr-engineer, re-confirmed here) to be thin pointers that
-// need no mirror edit — this suite pins ONLY the two skill files.
+// Tests that the qa-engineer and sr-engineer role SOPs carry two rules:
+// a long test or build run must finish (or be collected) within the same
+// turn, because In_Progress has no "waiting on results" state; and before a
+// long regression run the role writes a crash checkpoint with
+// bookkeeping_write, so a resumed session can pick up from it. Both rules are
+// two-line additions to content/skill-qa-engineer.md and
+// content/skill-sr-engineer.md. The agent templates only point at those
+// files and need no copy, so this suite checks only the two skill files.
+// The spec is the backlog rows themselves; there is no specs/ file.
+// (E20, E21, T-E20-01, T-E21-01)
 //
 // Spec-to-Test map:
-//   E20 hard line present verbatim in skill-qa-engineer.md Hard rules  -> QA-E20-1, QA-E20-2
-//   E20 hard line present verbatim in skill-sr-engineer.md step 4b     -> SR-E20-1, SR-E20-2
-//   E21 crash-checkpoint bullet in skill-qa-engineer.md Phase 4        -> QA-E21-1, QA-E21-2, QA-E21-3
-//   E21 crash-checkpoint step in skill-sr-engineer.md step 4a          -> SR-E21-1, SR-E21-2, SR-E21-3
-//   Both E21 bullets carry the qa-added "(file-mode only)" accuracy
-//     caveat (bookkeeping_write is file-mode-only per tools/registry.ts
-//     + handoff-orchestrator.ts — see QA review doc) -> QA-E21-4, SR-E21-4
-//   Byte/token budgets absorbing these four new lines stay green        -> covered by
+//   same-turn long-run rule, verbatim, in skill-qa-engineer.md Hard rules -> QA-E20-1, QA-E20-2
+//   same-turn long-run rule, verbatim, in skill-sr-engineer.md step 4b    -> SR-E20-1, SR-E20-2
+//   crash-checkpoint bullet in skill-qa-engineer.md Phase 4              -> QA-E21-1, QA-E21-2, QA-E21-3
+//   crash-checkpoint step in skill-sr-engineer.md step 4a                -> SR-E21-1, SR-E21-2, SR-E21-3
+//   Both crash-checkpoint lines say "(file-mode only)", because
+//     bookkeeping_write only works in file mode (tools/registry.ts
+//     + handoff-orchestrator.ts)                                         -> QA-E21-4, SR-E21-4
+//   Byte/token budgets still hold with these four new lines              -> covered by
 //     test/context-budget.test.mjs (skill-sr cap) and
 //     test/qa-visual-skill-split.test.mjs AC-5 (skill-qa-engineer.md cap),
-//     re-baselined in the same round as this file — not duplicated here.
+//     updated together with this file — not duplicated here.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -36,7 +39,7 @@ function readContentFile(f) {
 const SKILL_QA = readContentFile("skill-qa-engineer.md");
 const SKILL_SR = readContentFile("skill-sr-engineer.md");
 
-// --- E20: "HARD — long runs end in-turn" ------------------------------------
+// --- Long runs end in the same turn: "HARD — long runs end in-turn" (E20) ---
 
 test("QA-E20-1: skill-qa-engineer.md Hard rules carries the E20 hard line with its origin tag", () => {
   assert.match(
@@ -77,7 +80,7 @@ test("SR-E20-2: skill-sr-engineer.md's step 4b states the same synchronous-or-po
   );
 });
 
-// --- E21: crash checkpoint via bookkeeping_write ----------------------------
+// --- Crash checkpoint written via bookkeeping_write (E21) -------------------
 
 test("QA-E21-1: skill-qa-engineer.md Phase 4 carries the E21 crash-checkpoint bullet with its origin tag", () => {
   assert.match(

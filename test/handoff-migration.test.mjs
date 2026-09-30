@@ -277,11 +277,11 @@ test("AC-7 / AC-10(f): v3 handoff migrates to v4 on read — scope_decision unde
   // active_feature, last_agent, round counters) must survive untouched.
   const ws = mkWorkspace();
   resetSession();
-  // e235a/DR-5 (OQ-1): the legacy-absolute prd_path fixture must resolve
-  // INSIDE this test's own temp workspace, or AC4's read-time traversal
-  // guard now drops it to absent (it is no longer a bare made-up path).
-  // Still a genuinely absolute value on disk — AC3's verbatim-passthrough
-  // path is what this test pins.
+  // The legacy absolute prd_path fixture must resolve INSIDE this test's own
+  // temp workspace, or the read-time traversal guard drops it to absent (AC4).
+  // It is still a genuinely absolute value on disk, because the verbatim
+  // passthrough of absolute values is what this test pins (AC3).
+  // (e235a, DR-5, OQ-1)
   const legacyPrdPath = path.join(ws, "specs", "legacy-v3-feat.md");
   writeRaw(
     ws,
@@ -350,12 +350,8 @@ scope_decision_why: "one screen, no sub-flows"
 
 test("AC-7: scope_decision round-trips through writeHandoffState → readback (v10 stamp)", async () => {
   // Why: the modern options-object write must emit scope_decision into YAML and
-  // parse it back identically, stamped at v15 (e123a-lane-layout-migration
-  // re-baseline; was v14/e114-cut-approval-inheritance, v13/e23-evidence-
-  // schema-versioning, v12/e8-success-telemetry, v11/e2-bugfix-repro-gate,
-  // v10/d5-server-side-stale-dispatch-detection, v9/d2-server-brake-accounting,
-  // v8/c14-dispatch-pins, v7/c9-protocol-fields, v6/b8-external-ref-ledger).
-  // This is the PM attestation write path.
+  // parse it back identically, stamped at the current schema version (v15).
+  // This is the path PM's scope attestation is written through.
   const ws = mkWorkspace();
   resetSession();
   parseHandoff(ws);
@@ -388,11 +384,11 @@ test("field preservation: a downstream write omitting scope_decision does NOT dr
   const ws = mkWorkspace();
   resetSession();
   parseHandoff(ws);
-  // e235a/DR-5 (OQ-1): a direct (non-zod) writeHandoffState caller now has its
-  // prd_path relativized-then-resolved through the same in-bounds guard
-  // (DR-3), so the fixture must sit inside this test's own temp workspace or
-  // the write-side guard omits it entirely — defeating the very carry-forward
-  // this test pins.
+  // A direct (non-zod) writeHandoffState caller has its prd_path made
+  // relative and then resolved through the same in-bounds guard, so the
+  // fixture must sit inside this test's own temp workspace or the write-side
+  // guard omits it entirely — defeating the very carry-forward this test
+  // pins. (e235a, DR-5, DR-3, OQ-1)
   const preservePrdPath = path.join(ws, "specs", "preserve-feat.md");
   // PM write: records attestation + prd_path.
   await writeHandoffState({
@@ -427,7 +423,7 @@ test("field preservation: a downstream write omitting scope_decision does NOT dr
 });
 
 test("AC-3/c9: a downstream write omitting next_role/resume_of/review_verdict DOES drop them — transient, write-scoped, NOT blindly preserved (contrast with scope_decision/prd_path above)", async () => {
-  // Why: c9-protocol-fields AC-3 is the deliberate INVERSE of the test above.
+  // Why: this is the deliberate INVERSE of the test above (c9-protocol-fields AC-3).
   // next_role/resume_of/review_verdict are single-hop directives to the
   // IMMEDIATE next reader — identical lifetime to the pending_notes lines
   // they replace (wholesale-replaced every write, never carried forward).
@@ -479,10 +475,8 @@ test("AC-3/c9: a downstream write omitting next_role/resume_of/review_verdict DO
 test("AC-10(g): future v16 handoff refuses-loud against a v15 server (no silent downgrade)", () => {
   // Why: forward-compat safety. A handoff written by a newer server (v16) must
   // NOT be silently parsed by this v15 server — runMigrations throws because
-  // on-disk version > server max. No new code; this pins the behavior for the
-  // e123a-lane-layout-migration version bump specifically (v14→v15; was
-  // v13→v14 under e114-cut-approval-inheritance). A hypothetical v16 file
-  // must still refuse-loud against the current v15 server.
+  // the on-disk version is above the server max, so a newer file is refused
+  // loudly instead of being downgraded.
   const ws = mkWorkspace();
   resetSession();
   writeRaw(
@@ -524,8 +518,8 @@ test("AC-7/B8: v5 handoff (no external_refs) migrates to v6 on read — field st
   // where a no-seed migration still leaves the gate ARMED).
   const ws = mkWorkspace();
   resetSession();
-  // e235a/DR-5 (OQ-1): same repoint as the v3→v4 fixture above — the legacy-
-  // absolute prd_path must resolve inside this test's own temp workspace.
+  // Same as the v3→v4 fixture above: the legacy absolute prd_path must
+  // resolve inside this test's own temp workspace. (e235a, DR-5, OQ-1)
   const legacyPrdPath = path.join(ws, "specs", "legacy-v5-feat.md");
   writeRaw(
     ws,
@@ -563,27 +557,17 @@ prd_path: "${legacyPrdPath}"
 });
 
 test("AC-1/C9: v6→v10 migration chain stamps version only — external_refs survives, new protocol fields (incl. dispatch_pins, dispatched_at) stay absent, hop_count seeds 0", async () => {
-  // Why: AC-8/B8's old no-op assertion pinned CURRENT === 6; c9-protocol-fields
-  // bumped CURRENT to 7 (this test originally isolated the v6→v7 step),
-  // c14-dispatch-pins bumped CURRENT to 8, d2-server-brake-accounting bumped
-  // CURRENT to 9, d5-server-side-stale-dispatch-detection bumped CURRENT to
-  // 10, e2-bugfix-repro-gate bumped CURRENT to 11, e8-success-telemetry bumped
-  // CURRENT to 12, e23-evidence-schema-versioning bumped CURRENT to 13,
-  // e114-cut-approval-inheritance bumped CURRENT to 14, and
-  // e123a-lane-layout-migration now bumps CURRENT to 15 — a v6 payload is
-  // nine steps BEHIND current, so runMigrations climbs the full
-  // v6→v7→v8→v9→v10→v11→v12→v13→v14→v15 chain in one call (the runner walks
-  // current→target stepwise; there is no way to isolate a single intermediate
-  // step from the public API). This re-baseline exercises that chain:
-  // losslessness of the sibling v6 attestation field (external_refs) plus
-  // DR-1's no-seed contract for the three c9 fields, the c14 dispatch_pins
-  // field, the d5 dispatched_at field (DR-7), the e2 dispatch_mode field, the
-  // e23 evidence_schema field (D1 — migration invents no pin), the e114
-  // cut_approved_source field (migration invents no claim), the e123a
-  // dispatch_mechanism/dispatch_mechanism_tier fields (migration invents no
-  // attestation), DR-3's hop_count: 0 seed (the counter precedent, not a
-  // stamp-only no-seed field), AND the e8 qa_rounds_total/review_rounds_total/
-  // visual_rounds_total: 0 seed (same counter precedent).
+  // Why: a v6 payload is nine steps BEHIND the current v15, so runMigrations
+  // climbs the full v6→v7→v8→v9→v10→v11→v12→v13→v14→v15 chain in one call
+  // (the runner walks current→target stepwise; there is no way to isolate a
+  // single intermediate step from the public API). This test pins that chain:
+  // the v6 field external_refs survives unchanged, and migration invents no
+  // value for fields that only a writer can attest — next_role/resume_of/
+  // review_verdict, dispatch_pins, dispatched_at, dispatch_mode,
+  // evidence_schema, cut_approved_source, and dispatch_mechanism/
+  // dispatch_mechanism_tier. Counters are different: hop_count and
+  // qa_rounds_total/review_rounds_total/visual_rounds_total are seeded to 0.
+  // (AC-8/B8, DR-1, DR-3, DR-7, D1)
   const { runMigrations } = await import("../dist/schema/versions.js");
   const v6Payload = {
     schema_version: 6,
@@ -613,12 +597,12 @@ test("AC-1/C9: v6→v10 migration chain stamps version only — external_refs su
 });
 
 test("AC-1/C9: round-trip — re-running runMigrations on the now-v10 payload is a no-op (applied === [])", async () => {
-  // Why: T-C9-07 fixture #3 — the runner's own no-op contract (schema/versions.ts
+  // Why: the runner's own no-op contract (schema/versions.ts
   // `current === target` short-circuit). A stale v6 handoff healed once must not
   // be re-migrated on a second pass (e.g. two concurrent reads racing the healing
-  // write-back, or a plain re-read of an already-current file).
-  // e123a-lane-layout-migration re-baseline: CURRENT is now 15, so the first
-  // pass climbs v6→v7→v8→v9→v10→v11→v12→v13→v14→v15.
+  // write-back, or a plain re-read of an already-current file). With CURRENT at
+  // 15, the first pass climbs v6→v7→v8→v9→v10→v11→v12→v13→v14→v15.
+  // (T-C9-07 fixture #3)
   const { runMigrations } = await import("../dist/schema/versions.js");
   const v6Payload = {
     schema_version: 6,
@@ -634,10 +618,10 @@ test("AC-1/C9: round-trip — re-running runMigrations on the now-v10 payload is
 });
 
 test("AC-9/C9: v6 handoff (legacy next_role/resume_of/review tokens in pending_notes) migrates to v7 on read — fields stay undefined, pending_notes byte-verbatim, other fields preserved", () => {
-  // Why: T-C9-07 fixture #1 — DR-2's "inert" contract. A pre-ship v6 file whose
-  // pending_notes still carries the OLD string-convention tokens must climb to
-  // v7 WITHOUT any semantic extraction into the new structured fields — absence
-  // stays absence, and pending_notes is left byte-verbatim (AC-9).
+  // Why: migration is inert. A v6 file whose pending_notes still carries the
+  // OLD string-convention tokens must climb to v7 WITHOUT any semantic
+  // extraction into the new structured fields — absence stays absence, and
+  // pending_notes is left byte-verbatim (AC-9). (T-C9-07 fixture #1, DR-2)
   const ws = mkWorkspace();
   resetSession();
   writeRaw(

@@ -1,9 +1,11 @@
 // Coded by @sr-engineer
-// Minimal bugfix-mode repro for specs/e92-e86-handoff-write-boundary.md
-// (T-E86-01 / T-E92-01 repro-first carve-out, skill-sr-engineer step 3b).
-// NOT full AC1-AC5 coverage — that is qa-engineer's job (T-QA-01). This file
-// exists only to prove RED against the un-fixed code before the fix landed,
-// per qa_reports/expected-red_e92-e86-handoff-write-boundary.txt.
+// Minimal reproduction tests for the two handoff-write boundary bugs in
+// specs/e92-e86-handoff-write-boundary.md: a pending_notes entry that ends in
+// leftover tool-call markup must be rejected with its own message, and a
+// wholly dropped note must leave an omission marker. They were written to
+// fail against the unfixed code first, which proves they detect the bugs.
+// Full AC1-AC5 coverage lives in test/e92-e86-handoff-write-boundary.test.mjs.
+// (E86, E92, T-E86-01, T-E92-01)
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -52,7 +54,7 @@ test("E92 repro: a wholly-dropped pending_notes entry leaves a synthetic omissio
 
   // Three 1000-char notes exactly fill the 3000-char read-view budget; a
   // fourth 1000-char note is dropped WHOLLY (charBudget <= 0 before it is
-  // considered) per specs/e92-e86-handoff-write-boundary.md AC3.
+  // considered), so the marker must appear. (spec AC3)
   const notes = [0, 1, 2, 3].map((i) => `n${i}-`.padEnd(1000, "x"));
   await writeHandoffState(ws, "e92-e86-handoff-write-boundary", "In_Progress", [], notes, undefined, "sr-engineer");
 
