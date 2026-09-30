@@ -10,7 +10,7 @@ When the parent (this coordinator) dispatches a role via `Task(subagent_type="<r
 /^—\s@[\w-]+\s\([\w-]+\)$/i
 ```
 
-The leading character MUST be U+2014 (EM DASH, `—`), not a hyphen-minus or en-dash. The `<name>` and `<tier>` captured tokens MUST also match the dispatched subagent's `name` frontmatter and `model` frontmatter (case-insensitive). A mismatched name (e.g. reply ends `— @wrong-name (haiku)` while dispatched as `@lite`) is treated as absent. Under E103's explicit `model` dispatch, this is the SAME tier the coordinator already resolved and passed as `model=` on the `Task(...)` call.
+The leading character MUST be U+2014 (EM DASH, `—`), not a hyphen-minus or en-dash. The `<name>` and `<tier>` captured tokens MUST also match the dispatched subagent's `name` frontmatter and `model` frontmatter (case-insensitive). A mismatched name (e.g. reply ends `— @wrong-name (haiku)` while dispatched as `@lite`) is treated as absent. Under explicit `model` dispatch (E103), this is the SAME tier the coordinator already resolved and passed as `model=` on the `Task(...)` call.
 
 **Pinned-tier expectation** — this is a **self-report** check, not a served-model verification: the
 watermark is prose the dispatched role writes about itself, so a mismatch means only that the reply
