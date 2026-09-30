@@ -4,18 +4,18 @@
 // conditional-check rework, mini-chain, backlog rows ARE the spec.
 //
 // Spec-to-Test map:
-//   AC1 (explicit directory enumeration)           -> t-ac1-directory-list
-//   AC2 (pre-commit git diff --cached --stat)      -> t-ac2-verify-cmd, t-fixture-a, t-fixture-b
-//   AC3 (inverted failure-mode wording)            -> t-ac3-failure-mode-wording
-//   AC4 (post-commit spec-file check, E44 conditional:
-//        REQUIRE/SKIP/UNCLASSIFIABLE)              -> t-ac4-post-commit-check, t-fixture-c..h,
+//   explicit directory enumeration (AC1)           -> t-ac1-directory-list
+//   pre-commit git diff --cached --stat (AC2)      -> t-ac2-verify-cmd, t-fixture-a, t-fixture-b
+//   inverted failure-mode wording (AC3)            -> t-ac3-failure-mode-wording
+//   post-commit spec-file check with its three conditional branches
+//        REQUIRE/SKIP/UNCLASSIFIABLE (AC4, E44)   -> t-ac4-post-commit-check, t-fixture-c..h,
 //                                                      "AC4 branch exhaustiveness"
-//   AC5 (shim reinforcement hint, <=2 sentences)   -> t-ac5-shim-hint
-//   AC6 (this test file itself exercises fixtures) -> t-fixture-a, t-fixture-b, t-fixture-c..h
-//   AC7 (npm test green)                           -> exercised by running npm test
-//   AC8/AC9 (version 3.22.1)                       -> subagent-templates.test.mjs "v3.22.1 AC9"
-//   E49 step 7a (ticket-code SET derivation, working-tree +
-//        PREV_TAG membership predicate)            -> "E49 step 7a" test block below
+//   shim reinforcement hint, <=2 sentences (AC5)   -> t-ac5-shim-hint
+//   this test file itself exercises fixtures (AC6) -> t-fixture-a, t-fixture-b, t-fixture-c..h
+//   npm test green (AC7)                           -> exercised by running npm test
+//   version 3.22.1 (AC8/AC9)                       -> subagent-templates.test.mjs "v3.22.1 AC9"
+//   step 7a ticket-code set derivation (working-tree listing plus a
+//        previous-tag membership predicate; E49)   -> "E49 step 7a" test block below
 //
 // WHY: the release-engineer SOP lives purely in prompt text
 // (content/skill-release-engineer.md), loaded by tw_switch_role("release-engineer").
@@ -66,10 +66,10 @@ const CONST15 = fs.readFileSync(
 
 // The directories the SOP declares as feature source dirs (AC1, AC2, AC3).
 // "gates/" added (E64): tsconfig.json's `include` gained `gates/**/*.ts` (the
-// AC-B5.5 root-cause fix, review_reports/review_T-E645-02.md round 2 R2-1),
-// which makes AC-B5.5 correctly derive gates/ as an expected source dir — this
-// list must carry it too, or AC-B5.5 reds (it is a pure set difference between
-// tsconfig's `include` and this array; see AC-B5.5 below).
+// root-cause fix for the tsconfig-derived directory check, review_reports/review_T-E645-02.md
+// round 2 R2-1), which makes that check (AC-B5.5) correctly derive gates/ as an expected
+// source dir — this list must carry it too, or that check fails (it is a pure set
+// difference between tsconfig's `include` and this array; see the AC-B5.5 test below).
 // "docs/", "research/", "multi-agent-scripts/", ".github/" added (E66, T-E66-02):
 // the same three (docs/, research/, multi-agent-scripts/) that were missing
 // from the git-add line, the AC2 cross-reference set, and the Expected-scope
@@ -85,8 +85,8 @@ const CONST15 = fs.readFileSync(
 const FEATURE_DIRS = ["lib/", "tools/", "schema/", "guards/", "gates/", "prompts/", "bin/", "scripts/", "content/", "templates/", "specs/", "test/", "qa_reports/", "review_reports/", "docs/", "research/", "multi-agent-scripts/", ".github/", "transport/"];
 
 // Top-level repo directories deliberately OUTSIDE FEATURE_DIRS — hand-
-// classified, not derived (E66, T-E66-02): unlike AC-B5.5's tsconfig-`include`
-// derivation, there is no meta-guard that can tell "shipped metadata",
+// classified, not derived (E66, T-E66-02): unlike the tsconfig-`include`
+// derivation used for source dirs (AC-B5.5), there is no meta-guard that can tell "shipped metadata",
 // "gitignored dependency tree", or "session bookkeeping" apart from "feature
 // source" automatically, so this partition is maintained by hand and the
 // Partition test below exists precisely to make its staleness loud instead of
@@ -111,15 +111,16 @@ const NON_SOURCE_DIRS = [
 const METADATA_PATHS = ["tsconfig.json", "package.json", "package-lock.json", "index.ts", "CHANGELOG.md", "README.md", "dist/"];
 const E65_METADATA_PATHS = [".current/.config.json", "docs/backlog.md", "CLAUDE.md", "AGENTS.md", ".antigravityrules"];
 // Two more root files joined the git-add line and the existence pre-filter
-// (T-E94-01): CONTRIBUTING.md was the v3.104.2 escape itself (edited by
-// T-E6X-01, absent from the de9326c release commit, backfilled by b55991a);
+// after a release missed one: CONTRIBUTING.md was the v3.104.2 escape itself (an earlier
+// ticket had edited it, yet it was missing from that release's commit and only
+// backfilled afterwards; T-E94-01, T-E6X-01);
 // tasks.md is this repo's own live task ledger, same "root file that never
 // got staged" risk class. package-lock.json was NOT re-added here — E60
 // already staged it (see METADATA_PATHS above).
 const E94_METADATA_PATHS = ["CONTRIBUTING.md", "tasks.md"];
-// E198(b) (T-E130-07 re-baseline, e130-lane-default): a third root-ledger
-// path joins the git-add line and the existence pre-filter. Post-E125a,
-// `tw_complete_task` on primary writes `.current/_primary/tasks.md`, not
+// A third root-ledger path joins the git-add line and the existence pre-filter
+// (re-baselined under T-E130-07 / E198(b)). Since each lane got
+// its own ledger (E125a), `tw_complete_task` on primary writes `.current/_primary/tasks.md`, not
 // root `tasks.md` — so the primary task ledger `tw_complete_task` actually
 // mutates was silently left out of the release commit until this ticket.
 // Kept as its own named array (not folded into E94_METADATA_PATHS) so the
@@ -170,8 +171,8 @@ function scopeDecisionWhyRecordsMiniChain(scopeDecisionWhy) {
 }
 
 // A realistic mini-chain scope_decision_why, in the shape this repo's own
-// handoff actually carries for this feature (tw_get_state, active_feature
-// e44-e49-release-sop-conditional-checks): "... mini-chain sr-engineer ->
+// handoff actually carries for this feature (tw_get_state, whose active_feature
+// was the release-SOP conditional-checks work, e44-e49): "... mini-chain sr-engineer ->
 // code-reviewer -> qa-engineer, PM/ARCH skipped ...".
 const MINI_CHAIN_SCOPE_WHY =
   "Backlog rows ARE the spec -> mini-chain sr-engineer -> code-reviewer -> qa-engineer, PM/ARCH skipped (E35-E38/E45/E46 pattern).";
@@ -363,7 +364,7 @@ test("AC2: skill-release-engineer.md includes pre-commit 'git diff --cached --st
 
 test("AC2 (E94): Root-file completeness check — the two EXTRACTED commands, EXECUTED, discriminate the v3.104.2 escape from a correct release across four workspace shapes (adopter repo with no .current/, source outside FEATURE_DIRS, .current/ dirty, and the escape/PASS pair code-reviewer verified empirically)", () => {
   // Contract (T-E94-01 item 3, round-2 APPROVED review_reports/review_T-E94-01.md):
-  // AC2's directory cross-reference only ever sees the 19 FEATURE_DIRS, so a
+  // The directory cross-reference (AC2) only ever sees the 19 FEATURE_DIRS, so a
   // root-level file that never got staged passed silently -- exactly how
   // v3.104.2 shipped a tree missing CONTRIBUTING.md. The fix is two commands,
   // run AFTER `git add`, whose combined empty output is the PASS signal:
@@ -382,7 +383,7 @@ test("AC2 (E94): Root-file completeness check — the two EXTRACTED commands, EX
   assert.ok(sentenceEnd > -1, "must find the Root-file completeness paragraph's STOP sentence");
   const section = SKILL.slice(labelIdx, sentenceEnd);
 
-  // C1 regression guard: the paragraph is allowed to NAME `git status --short`
+  // Regression guard (review finding C1): the paragraph is allowed to NAME `git status --short`
   // as the anti-pattern it replaces (round-2 APPROVED text does exactly that,
   // "so a future editor doesn't reintroduce the same non-discriminating
   // form") -- what it must never do is key the actual STOP condition on it.
@@ -841,10 +842,11 @@ test("Fixture H (AC4/REQUIRE non-weakening, F6): spec-in-tree wins over SKIP eve
 });
 
 // ---------------------------------------------------------------------------
-// Fixtures I/J/K (AC4/MULTI-FEATURE, AC5, E142(b)): the real v3.113.0 shape —
-// pending_notes = "Multi-feature release: e109-workspace-feature-anchoring
-// (E109+E146), e145-md-tables-cited-donemark, e148-stamp-provenance-test-
-// flake." — verified against this repo's actual git history (git log -p -S
+// Fixtures I/J/K (the multi-feature release cases; AC4/MULTI-FEATURE, AC5, E142(b)): the real
+// v3.113.0 shape — pending_notes = "Multi-feature release:
+// three features named: the workspace-anchoring one (E109+E146, e109-workspace-feature-anchoring),
+// the md-tables one (e145-md-tables-cited-donemark) and the stamp-flake one
+// (slug e148-stamp-provenance-test-flake), in that order." — verified against this repo's actual git history (git log -p -S
 // "Multi-feature release:" -- .current/handoff.md): e109-workspace-feature-
 // anchoring.md exists under specs/, e145/e148 do not (mini-chain backlog-row-
 // as-spec tickets), which is exactly the E142(b) Decision's "logged and
@@ -889,8 +891,8 @@ test("Fixture J (AC4/MULTI-FEATURE, AC5): a named feature whose spec DOES exist 
 });
 
 test("Fixture K (AC4/MULTI-FEATURE non-weakening): MULTI-FEATURE fires regardless of the active feature's own specExistsInTree or scope_decision_why", () => {
-  // MULTI-FEATURE is a totally separate detection path (code-reviewer round 2
-  // F1): it must never fall through to REQUIRE or SKIP/UNCLASSIFIABLE just
+  // MULTI-FEATURE is a totally separate detection path (code-reviewer round 2,
+  // finding F1): it must never fall through to REQUIRE or SKIP/UNCLASSIFIABLE just
   // because the active_feature itself has (or lacks) a spec, or because
   // scope_decision_why happens to read like a mini-chain record.
   const gitDiffRange = ["CHANGELOG.md", "specs/e109-workspace-feature-anchoring.md"].join("\n");
@@ -972,9 +974,9 @@ test("AC-B5.5: every repo source directory appears in FEATURE_DIRS or metadata l
   // heuristic, which was the drift source that let transport/ slip out of
   // release staging in v3.24.0.
   //
-  // AC-B6.3: guard uses getTsConfigSourceDirs, not EXCLUDED_DIRS.
-  // AC-B6.4: if tsconfig lists a dir absent from FEATURE_DIRS, the assertion
-  //           surfaces it automatically (naming the missing dir).
+  // The guard uses getTsConfigSourceDirs, not EXCLUDED_DIRS (AC-B6.3).
+  // If tsconfig lists a dir absent from FEATURE_DIRS, the assertion surfaces it
+  // automatically, naming the missing dir (AC-B6.4).
   const tsconfigPath = path.join(ROOT, "tsconfig.json");
   const tsconfigDirs = getTsConfigSourceDirs(tsconfigPath);
 
@@ -1064,7 +1066,7 @@ test("Partition (E66, T-E66-02): every top-level repo directory is classified in
 });
 
 // ---------------------------------------------------------------------------
-// Phase 4 — C13: release-engineer legal handoff write path (v3.49.0)
+// Phase 4 — release-engineer legal handoff write path (C13, v3.49.0)
 // ---------------------------------------------------------------------------
 // WHY: specs/c13-release-engineer-write-path.md AC5 replaced the old
 // "Side-channel constraint" workaround with a CRITICAL Hard rule telling
@@ -1154,7 +1156,7 @@ test("C13-AC6: shim watermark and tw_get_state/tw_switch_role invocation lines a
 });
 
 // ---------------------------------------------------------------------------
-// Phase 5 — D10: release-engineer git-stop-rule (non-fast-forward push /
+// Phase 5 — release-engineer git-stop rule (D10; non-fast-forward push /
 // concurrent-release collision)
 // ---------------------------------------------------------------------------
 // WHY: specs/d10-release-engineer-git-stop-rule.md documents an incident where
@@ -1206,7 +1208,7 @@ test("D10-AC2: skill-release-engineer.md Hard rule routes to status=Blocked with
 test("D10-AC1/AC2: skill-release-engineer.md Hard rule includes the worked pending_notes example and the incident-reason clause", () => {
   // Contract: the Hard rule gives a literal pending_notes=[...] example
   // (this file's existing convention for other Blocked examples) plus the
-  // D10 incident rationale, so the rule reads as self-justifying under
+  // rationale from the git-stop incident (D10), so the rule reads as self-justifying under
   // context pressure rather than a bare directive.
   assert.ok(
     SKILL.includes(
@@ -1247,7 +1249,7 @@ test("D10-AC3: skill-release-engineer.md Escalation Routes table has a matching 
 
 test("D10-AC4: release-engineer.md shim contains the verbatim D10 reinforcement hint (<=2 sentences)", () => {
   // Contract: the shim must mirror the Hard rule's STOP instruction and
-  // forbidden-command list as a compact, C13-pattern reinforcement hint —
+  // forbidden-command list as a compact reinforcement hint in the same style as the earlier write-path hints (C13) —
   // the anchor that survives even under haiku-tier context pressure.
   const hint =
     "CRITICAL: On any non-fast-forward push rejection or concurrent-release collision, STOP — NEVER `git reset`, `git rebase`, `git checkout --force`, or `git clean`. Write `status=Blocked` with the local release commit SHA in `pending_notes` and hand back to the coordinator/human for recovery.";
@@ -1281,7 +1283,7 @@ test("D10-AC4: shim watermark and tw_get_state/tw_switch_role invocation lines a
 });
 
 // ---------------------------------------------------------------------------
-// Phase 5.5 — E53: release-engineer:Blocked reachability (v3.98.0)
+// Phase 5.5 — release-engineer:Blocked must be reachable (E53, v3.98.0)
 // ---------------------------------------------------------------------------
 // WHY: docs/backlog.md's E53 row + review_reports/review_T-E53-01.md. Before
 // this cut, step 7a's own empty-baseline guard (:84 area) and every row in
@@ -1420,9 +1422,9 @@ test("E53: Escalation Routes rows :152-154 and :156 (not already byte-pinned by 
 });
 
 test("E53/E163: the Escalation Routes table now carries 9 data rows — E163's two new rows placed FIRST, the E53 empty-baseline-hazard row still LAST", () => {
-  // Re-baselined for E163 (qa_reports/expected-red_e163-ci-gate-ordering.txt):
-  // this test previously pinned the table at 7 data rows (6 pre-existing + the
-  // E53 empty-baseline-hazard row, appended last). E163 adds two more rows —
+  // Re-baselined for the CI-gate ordering change (E163; see the expected-red manifest
+  // for e163-ci-gate-ordering): this test previously pinned the table at 7 data rows
+  // (6 pre-existing + the empty-baseline-hazard row from E53, appended last). E163 adds two more rows —
   // "pre-flight CI gate red (step 2a)" and "CI gate failure (step 8b)" — so
   // the pin re-baselines to 9. This is NOT loosened into a bare count: it
   // still guards additive-only table growth (no row duplicated, dropped, or
@@ -1540,7 +1542,7 @@ test("E7-AC3: content/const-15-core-tail.md is tagged 'core' in prompts/constitu
 });
 
 test("E7-AC1/AC3: the sanctioned-git-ops bullet reaches the COMPOSED (not raw) constitution text on both the tightest (lite, non-design) and broadest (full-chain, design-armed) dispatch arms (spec AC1's composed-text requirement, AC3)", () => {
-  // AC3's own proof text calls out "the new AC1 pinning test itself running
+  // The proof text for the composed-text requirement (AC3) calls out "the new AC1 pinning test itself running
   // against the composed (not raw) constitution text" — the raw-fragment
   // assertions above (E7-AC1) pin the bullet's content; this test pins its
   // REACHABILITY through composeConstitution() on the narrowest arm (lite,
@@ -1600,8 +1602,8 @@ test("E7-AC2: content/skill-release-engineer.md's D10 bullet cross-references th
 // above (only 1 of the 8 was a verbatim mirror; the rest — STOP-exit table
 // rows, server-enforced-gates bullets, mermaid decision branches — were
 // structures the live SOPs never contained at all). Re-deriving from the tree
-// rather than from the deletion count (review_T-E48-02.md round 1/2, finding
-// C2) surfaced 3 previously-unpinned LIVE sites that were never in the
+// rather than from the deletion count surfaced 3 previously-unpinned LIVE sites
+// (review_T-E48-02.md round 1/2, finding C2) that were never in the
 // original 9: content/skill-release-engineer.md:56-58, the §6a
 // dependency-audit-disposition mechanism itself — the exact "cite the
 // advisory record's row, don't improvise a rationale" behavior E57/E59 exist
@@ -1722,13 +1724,13 @@ test("E59: all 4 live §6 dependency-audit normative sites carry the disposition
 //   round 1 (E49) — hunt ticket/feature SLUGS in commit subjects/bodies. Wrong
 //     on the exact release it was written for: v3.95.0 yielded {E37,E38}
 //     (disjoint from the right answer {E45,E46}), because shipped tickets
-//     appear in the range only as bare codes, never as slugs (F1/F2/F3).
+//     appear in the range only as bare codes, never as slugs (review findings F1-F3).
 //   round 2 (E49) — committed history only (`git log --diff-filter=A`). Fixed
-//     F1-F3, but silently returns EMPTY on v3.93.0 and v3.94.0 — 2 of the last
+//     the round-1 findings, but silently returns EMPTY on v3.93.0 and v3.94.0 — 2 of the last
 //     6 releases — because qa_reports/ evidence is routinely UNTRACKED at
-//     step-7a time (step 8's `git add qa_reports/` is what first commits it).
+//     the time step 7a runs (step 8's `git add qa_reports/` is what first commits it).
 //     Combined with "zero matches = silent no-op", this is a regression versus
-//     the pre-E49 rule, which archived those releases correctly by
+//     the rule before E49, which archived those releases correctly by
 //     working-tree existence (F7 — the round-2 BLOCKING finding).
 //   round 3 (E49, APPROVED) — enumerate root-level qa_reports/ files as they
 //     sit in the WORKING TREE right now, and use the git range only as a
@@ -1738,13 +1740,13 @@ test("E59: all 4 live §6 dependency-audit normative sites carry the disposition
 //     empty for. Round 3 also recorded N4 (non-blocking then): an
 //     empty/unresolvable PREV_TAG baseline makes `grep -vxFf` pass its WHOLE
 //     input through — a mass-sweep hazard, explicitly left unfixed.
-//   E50 round 1 — (a) closed N4 with a guard, but shipped it as a single
-//     global flag (F9: permanently wedges any workspace that has never
+//   Round 1 of E50 — (a) guarded the empty-baseline mass-sweep hazard (N4), but shipped
+//     the guard as a single global flag (F9: permanently wedges any workspace that has never
 //     produced a review_reports/ tree) and (b) added zero-match logging that
 //     expanded an UNBOUND `$CODES` variable, printing `{∅}` on every release,
 //     including non-empty ones (F8) — CHANGES_REQUESTED.
-//   E50 round 2 (APPROVED, shipped) — F8 closed by binding `CODES=$( { ... } |
-//     ... )`; F9 closed by splitting the single flag into per-tree
+//   Round 2 of E50 (APPROVED, shipped) — the unbound-variable defect (F8) closed by
+//     binding `CODES=$( { ... } | ... )`; F9 closed by splitting the single flag into per-tree
 //     STOP_QA/STOP_RR/EXCLUDE_QA/EXCLUDE_RR, so an absent or never-seeded
 //     review_reports/ tree no longer blocks qa_reports/'s half and does not
 //     recur release after release. (c) extends the whole predicate to
@@ -1752,8 +1754,8 @@ test("E59: all 4 live §6 dependency-audit normative sites carry the disposition
 //     qa_reports/archive/ — the two streams share basenames, verified against
 //     the real v3.96.0 review_T-E4X-03.md collision).
 // These tests pin the ACTUALLY SHIPPED (E50 round 2) text and behavior — not
-// any earlier draft — per review_T-E50-02.md's "Test-coverage note for
-// T-E50-03" (12 items, sequenced by consequence).
+// any earlier draft — per the "Test-coverage note for T-E50-03" in
+// review_T-E50-02.md (12 items, sequenced by consequence).
 
 // Model of the shipped filename -> code extraction (E50 round 2, F8/attack 1):
 //   sed -E 's#.*<slash>##' | grep -oE '^[a-z_]*T-[A-Za-z0-9]+-' \
@@ -1917,10 +1919,10 @@ test("E49 step 7a: skill text pins the ACTUALLY SHIPPED derivation literally, bo
 });
 
 test("E50 step 7a (N14 CLOSED — pin repointed at the EXECUTABLE CODES= fence): does not resurrect the round-2 committed-history-only rule (a substring pin on the round-2 command must fail)", () => {
-  // N14 (review_T-E50-02.md round 2): the PRE-EXISTING version of this test
+  // Stale-pin fix (finding N14, review_T-E50-02.md round 2): the PRE-EXISTING version of this test
   // anchored on `/```\n(\s*find qa_reports -maxdepth 1[\s\S]*?)```/`, which
   // matches the FIRST fence beginning "find qa_reports -maxdepth 1" — after
-  // E50, that is the ILLUSTRATIVE fence (content/skill-release-engineer.md's
+  // the change in E50, that is the ILLUSTRATIVE fence (content/skill-release-engineer.md's
   // "Derive the ticket-code SET" prose block), not the CODES= fence the role
   // actually executes. Reintroducing `git log`/`--diff-filter=A` into the
   // CODES= fence would have left that stale pin green. Repointed here at the
@@ -1948,7 +1950,7 @@ test("E50 step 7a (N14 CLOSED — pin repointed at the EXECUTABLE CODES= fence):
 });
 
 test("E50 step 7a (N14 follow-up): the illustrative fence and the executable CODES= fence carry an identical find/grep -vxFf predicate pair per tree", () => {
-  // N14's remedy is sequenced: this ticket repoints the pin (test above); a
+  // The remedy for that stale-pin finding (N14) is sequenced: this ticket repoints the pin (test above); a
   // follow-up ticket collapses the two fences into one, since every future
   // edit to the membership predicate currently has to be made twice and only
   // one copy is under test. Until that lands, pin that the duplicate cannot
@@ -2041,7 +2043,7 @@ test("E49 step 7a (F4 negative fixture): a bare-code prose mention with no evide
 
 test("E49 step 7a: already-archived evidence never re-enters, in both the rename and untracked-add shapes", () => {
   // An archive move records as a rename (git diff --cached --name-status:
-  // R100 qa_reports/review_*.md -> qa_reports/archive/.../review_*.md), which
+  // a 100%-similarity rename entry, qa_reports/review_*.md -> qa_reports/archive/.../review_*.md), which
   // -maxdepth 1 already excludes by not descending into archive/ at all; when
   // rename detection doesn't fire (untracked source), it lands as an A under
   // archive/ instead of at root, same exclusion applies.
@@ -2121,7 +2123,7 @@ test("E49/E44 step-order pin: step 7a precedes step 8a (the commit) in the file,
   assert.ok(idx8a > -1, "must find step 8a's header text (E163: step 8 split into 8a/8b/8c)");
   assert.ok(idx7a < idx8a, "step 7a must precede step 8a in file order — 7a's moves must land IN the release commit step 8a creates");
 
-  // F2 (round 1 BLOCKING, CLOSED round 2): the round-1 worked example silently
+  // Guard against a future-state read (finding F2, blocking in round 1 and closed in round 2): the round-1 worked example silently
   // read state from the future — slugs that exist only inside the release
   // commit itself, which does not exist yet when 7a runs. Guard against that
   // defect class returning: 7a's own section (through 7b/7c/7d, up to the
@@ -2161,7 +2163,7 @@ test("E50 step 7a (Item 3 — 14-row filename-shape matrix, attack 1): the shipp
     ["README.md", null], // no prefix, no T-<CODE>- token
     ["REVIEW_T-E51-01.md", null], // uppercase prefix breaks the lowercase [a-z_]* class
     ["review_t-e51-01.md", null], // lowercase "t-" breaks the literal uppercase "T-" match
-    ["review_T-PGAT.md", null], // N16: no trailing "-<segment>" after the code, invisible end-to-end
+    ["review_T-PGAT.md", null], // no trailing "-<segment>" after the code, so it is invisible end-to-end (N16)
   ];
   for (const [filename, expected] of cases) {
     assert.equal(
@@ -2708,7 +2710,7 @@ test("residual (review round 2, Minor 2; retargeted E76 round 2): review_reports
 });
 
 // ---------------------------------------------------------------------------
-// T-E76-02 pins (E76 round 2, code-reviewer's explicit recommendation): a
+// Class-assertion pins added under T-E76-02 (E76 round 2, code-reviewer's explicit recommendation): a
 // CLASS assertion over an instance pin, per the E66/E69 precedent both cited
 // by name in review_reports/review_T-E76-01.md's Round 2 Architecture
 // section as the durable control code-reviewer chose INSTEAD OF a third
