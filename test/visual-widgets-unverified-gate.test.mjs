@@ -1,6 +1,6 @@
 // Coded by @qa-engineer
-// Tests for specs/v3.15.0.md — AC-1..AC-5.
-// Asserts the R6 server-enforced Widget Shape Verification gate:
+// Tests for the widget-shape verification gate (specs/v3.15.0.md, AC-1..AC-5).
+// Asserts the server-enforced Widget Shape Verification gate (R6):
 //   parseVisualWidgetsChecklist parses the markdown checkbox section,
 //   hasUncheckedWidgets aggregates unchecked rows per task-id,
 //   and the index.ts handler composition (unit-tested via the primitives
@@ -70,7 +70,7 @@ test("AC-1: hasUncheckedWidgets composes to per-task missing widget list", () =>
   });
 });
 
-// ---------- AC-2 — all checked → accept (gate passes through) ----------
+// ---------- every row checked means the gate passes through (AC-2) ----------
 
 test("AC-2: hasUncheckedWidgets returns ok:true when every row is checked", () => {
   const ws = mkWorkspace();
@@ -104,7 +104,7 @@ test("AC-3: empty input string → empty rows (defensive)", () => {
   assert.deepEqual(parseVisualWidgetsChecklist(""), []);
 });
 
-// ---------- AC-4 — error envelope lists every offending task + widget ----------
+// ---------- the error envelope lists every offending task and widget (AC-4) ----------
 
 test("AC-4: hasUncheckedWidgets aggregates unchecked widgets across multiple tasks", () => {
   // Why: one PASS attempt may include multiple task ids; the gate MUST

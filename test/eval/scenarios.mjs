@@ -1,5 +1,5 @@
 // Coded by @qa-engineer
-// D4 behavioral-eval harness — scripted scenarios (T-D4-06, spec AC-7).
+// Scripted scenarios for the behavioral-eval harness: each pairs a role with a canned task (D4, T-D4-06, spec AC-7).
 //
 // Each scenario names a role + tier + a canned task (the user-message text
 // a live dispatch would receive alongside the role's assembled bundle) plus
@@ -170,7 +170,7 @@ const RAW_SCENARIOS = [
 /**
  * The scripted scenario set (spec AC-7). Each entry carries a precomputed
  * `bundle` (the exact system-prompt text a real dispatch would receive,
- * assembled via `loadBundle` against the frozen fixture workspace — AC-8).
+ * assembled via `loadBundle` against the frozen fixture workspace; spec AC-8).
  */
 export const scenarios = RAW_SCENARIOS.map((scenario) => {
   assertKnownRole(scenario.role, scenario.id);

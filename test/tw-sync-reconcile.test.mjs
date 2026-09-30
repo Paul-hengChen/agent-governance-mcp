@@ -1,6 +1,6 @@
 // Coded by @qa-engineer
-// R10 — tw_sync / reconcileTasks: mirror tasks.md checkboxes to the authoritative
-// handoff.completed_tasks (handoff → tasks only). Verifies the SAFE direction
+// tw_sync / reconcileTasks mirrors tasks.md checkboxes to the authoritative
+// handoff.completed_tasks (handoff → tasks only; R10). Verifies the SAFE direction
 // flips, the REFUSED direction (vibe drift) is never promoted, idempotence, and
 // the no-handoff guard. Tests drive the rebuilt dist directly (same convention as
 // drift-archived-tasks.test.mjs).

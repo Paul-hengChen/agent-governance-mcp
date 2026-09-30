@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 // Coded by @sr-engineer
-// D4 behavioral-eval harness — live eval runner (T-D4-07, spec AC-9..AC-12).
+// Live runner for the behavioral-eval harness (D4, T-D4-07, spec AC-9..AC-12).
 //
 // On-demand (`npm run eval`), NEVER per-commit (AC-9): dispatches each
-// scripted scenario (test/eval/scenarios.mjs, T-D4-06) to a real model via
+// scripted scenario (test/eval/scenarios.mjs) to a real model via
 // @anthropic-ai/sdk, using the scenario's precomputed `bundle` (assembled by
-// buildPromptForRole against the frozen fixture workspace — AC-8) as the
+// buildPromptForRole against the frozen fixture workspace; spec AC-8) as the
 // system prompt and the scenario's `task` as the user message, then runs
-// `scenario.assertions` (closures over test/eval/lib/assertions.mjs,
-// T-D4-03) against the reply text.
+// `scenario.assertions` (closures over the reply checks in
+// test/eval/lib/assertions.mjs) against the reply text.
 //
 // Ordering is deliberate:
 //   1. ANTHROPIC_API_KEY check FIRST, before any dynamic import — a missing
@@ -36,7 +36,7 @@
 const ENV_KEY = "ANTHROPIC_API_KEY";
 
 // ---------------------------------------------------------------------------
-// AC-11 — fail fast on missing API key (before ANY import or network call)
+// Fail fast on a missing API key, before ANY import or network call (AC-11)
 // ---------------------------------------------------------------------------
 
 if (!process.env[ENV_KEY]) {
