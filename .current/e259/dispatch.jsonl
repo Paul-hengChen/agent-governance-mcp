@@ -5,3 +5,4 @@
 {"ts":"2026-09-30T10:48:32.936Z","feature":"e259-comment-scan-languages","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
 {"ts":"2026-09-30T10:50:38.833Z","feature":"e259-comment-scan-languages","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-09-30T11:00:26.745Z","feature":"e259-comment-scan-languages","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-30T11:02:30.593Z","feature":"e259-comment-scan-languages","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
