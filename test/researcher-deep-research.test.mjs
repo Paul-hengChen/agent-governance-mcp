@@ -1,6 +1,6 @@
 // Coded by @qa-engineer
 // Tests for spec: specs/researcher-deep-research-integration.md.
-// Spec-to-Test map: AC-1 -> t1; AC-2 -> t2; AC-3 -> t3; AC-4 -> t4;
+// Spec-to-Test map (researcher deep-research integration): AC-1 -> t1; AC-2 -> t2; AC-3 -> t3; AC-4 -> t4;
 //                   AC-5 -> t5 (built-prompt trigger behaviour via buildResearcherPrompt).
 //
 // WHY: the researcher role's deep-research wiring lives purely in prompt text

@@ -95,7 +95,7 @@ test("T30 AC-2 reopen: second runSqliteMigrations is a no-op (applied: [])", asy
   }
 });
 
-// ---------- AC-4: refuse-loud on future versions ----------
+// ---------- a database from a newer version is refused loudly (AC-4) ----------
 
 test("T30 AC-4: refuses-loud when on-disk sqlite version > CURRENT", async () => {
   const dbPath = mkDbPath();

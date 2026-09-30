@@ -15,7 +15,7 @@ import {
   VISUAL_ROUND_CAP_EXPORTED,
 } from "../dist/tools/transitions.js";
 
-// ---------- AC-8: counter semantics ----------
+// ---------- the visual-round counter increments on a visual failure (AC-8) ----------
 
 test("AC-8: (qa-engineer, FAIL) + visual_fail: token → visual_round increments", () => {
   // Why: visual_round is a *narrow* counter — only ticks when the FAIL is
@@ -85,7 +85,7 @@ test("AC-8: other writes hold visual_round unchanged", () => {
   }
 });
 
-// ---------- AC-8: round-cap lock ----------
+// ---------- the visual round cap is exported and locks further rounds (AC-8) ----------
 
 test("AC-8: VISUAL_ROUND_CAP exported as 6 (5 rounds visible + 1 lock index)", () => {
   // Why: Constitution §3.1 declares "cap is 5 rounds" — the off-by-one
@@ -124,7 +124,7 @@ test("AC-8: visual_round at cap allows (pm, In_Progress)", () => {
   assert.equal(rejection, null, "PM rebudget must be the only accepted transition at cap");
 });
 
-// ---------- AC-9: split escalation ----------
+// ---------- a mid-loop hand-off from sr-engineer to pm is allowed (AC-9) ----------
 
 test("AC-9: at visual_round=3, (sr-engineer → pm, In_Progress) is accepted", () => {
   // Why: the constitutional split-escalation early-escape path. Without
