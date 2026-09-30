@@ -1,4 +1,59 @@
-echo $# ${#a} a#b
-echo "#x" '#x'
-ls # note
-# note
+echo $# '
+# inside 1
+# inside 2
+# inside 3
+# inside 4
+# inside 5
+# inside 6
+# inside 7
+# inside 8
+'
+echo ${#a} '
+# inside 1
+# inside 2
+# inside 3
+# inside 4
+# inside 5
+# inside 6
+# inside 7
+# inside 8
+'
+echo a#b '
+# inside 1
+# inside 2
+# inside 3
+# inside 4
+# inside 5
+# inside 6
+# inside 7
+# inside 8
+'
+echo "#x" '
+# inside 1
+# inside 2
+# inside 3
+# inside 4
+# inside 5
+# inside 6
+# inside 7
+# inside 8
+'
+echo '#x' '
+# inside 1
+# inside 2
+# inside 3
+# inside 4
+# inside 5
+# inside 6
+# inside 7
+# inside 8
+'
+ls # it's a note
+# block 1
+# block 2
+# block 3
+# block 4
+# block 5
+# block 6
+# block 7
+# block 8
