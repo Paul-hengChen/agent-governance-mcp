@@ -1,7 +1,7 @@
 # Fan-out: E258 註解篇幅規則（規則散文 ∥ `agc check` 建議性掃描）
 base: 64fccf5    integration branch: integ/e258
 
-**狀態：人類核准 2026-09-30；已派工。** 佇列 #79。把 backlog E258 拆成兩條並行 lane：e258a 寫規則散文與 reviewer 檢查項（持有全部共享生成物），e258b 做 `agc check` 的註解篇幅掃描。兩條 lane 的檔案互不重疊；唯一的交界是掃描輸出的行首字串，由本檔固定（見「交界契約」）。
+**狀態：人類核准 2026-09-30；已結案（兩條 lane 皆合併進 main）。** 佇列 #79。把 backlog E258 拆成兩條並行 lane：e258a 寫規則散文與 reviewer 檢查項（持有全部共享生成物），e258b 做 `agc check` 的註解篇幅掃描。兩條 lane 的檔案互不重疊；唯一的交界是掃描輸出的行首字串，由本檔固定（見「交界契約」）。
 
 ## 派工前核對（整合者，2026-09-30）
 - `git worktree list` 只有 primary；main = origin/main = `64fccf5`（v4.2.1 已發版並打 tag，`ff6f111` 為發版後記帳）；工作樹乾淨；`tw_detect_drift` 無 drift（只有 T-REL4-02 的證據提示）。primary handoff 停在 `release-v4.2.1`。
@@ -61,3 +61,11 @@ e258a（持有共享生成物，先合）→ e258b（每次 merge 後跑 `node s
 | 2026-09-30 | 人類 | 註解規則照 Linux kernel coding style §8 的精神；門檻：檔案比例 30%、區塊 7 行、只掃 diff；只約束在 agc 管理的 workspace 裡工作的 agent | coordinator session；`docs/backlog.md` E258 |
 | 2026-09-30 | 整合者 | 拆成 e258a（規則散文＋共享生成物）∥ e258b（掃描），以 `agc check — comments` 行首字串為交界契約；兩個釘住 `agc check` 輸出的測試 helper 事先重劃給 e258b （整合者建議） | 本檔 |
 | 2026-09-30 | 人類 | 核准本清單（含拆票與重劃）；R1：三點掃描補充全部照做；R2：(i) 允許 `context-budget` 上限提高，幅度以 qa 實測為準 | 整合者 session |
+| 2026-09-30 | 整合者 | e258a 預審：reviewer 檢查項改為對 diff 新增的每則註解套用規則，警告只是觸發（採納）；e258b 兩段預審：摘要行指名 Comment discipline、只掃 JS/TS 須寫明並另開其他語言票、OQ1 照 architect 提案（AC14b 自檢＋lane diff 證據須貼輸出）、不得以行尾註解承載說明（皆採納） | 信箱 e258a to-lane#1–#2；e258b to-lane#1–#3 |
+| 2026-09-30 | 整合者 | 兩條 lane 驗證通過（e258a `1ae5753`、e258b `0499095`，皆 0 越界，review 與 qa 皆第一輪通過）；合併無衝突 → 無合併審查。合併後 `agc check` 標出 e258a 的註解（當時掃描不存在，lane review 看不到）→ 派 code-reviewer 在 integ 上審：5 保留、1 退回（e258a 測試檔頭 16 行、對應表列出不存在的測試名稱）→ 退回 e258a，qa 以 T-E258A-03 縮為 3 行並刪一行重複說明（`a00926a`），重新合併後該警告消失 | 信箱 e258a to-lane#4–#7；`review_reports/review_integ-e258-comments.md` |
+| 2026-09-30 | 整合者 | 例外紀錄：e258a 的 qa 在 T-E258A-03 對自己未發佈的 commit 用了一次 `git commit --amend`（constitution §6 對所有角色禁止）；被改寫的 sha 沒有被任何證據、信箱或狀態檔引用，lane 自行申報；不再改寫歷史，只在此記錄 | 信箱 e258a to-integrator#5 |
+
+## 結案
+- 日期 2026-09-30；合併 commit 見 `integ/e258` 的 merge；整合層全套 2998 / 2995 pass / 0 fail / 3 skipped；roll-up：e258a hop 6/10、e258b hop 5/10，review／qa 皆第一輪通過（e258a 另有一次整合後退回）。
+- 例外：上列 `--amend` 一次；`lane-status --rollup e258` 因 lane 的 active_feature 名稱不同而判定 undetermined，改以 `--lanes e258a,e258b` 取得數字。
+- 完成定義七項全部成立（「輸出行首一致」已在 integ 上以 grep 兩邊確認；diff 實測以 8 行暫存檔觸發 `long-block 8 lines` 後刪除）。
