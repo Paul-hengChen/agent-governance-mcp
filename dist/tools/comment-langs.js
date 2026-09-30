@@ -2,13 +2,24 @@
 // Language registry for the comment-length scan: extension -> lexer + tag rule.
 // Design: specs/e259-comment-scan-languages-architecture.md.
 import { jsTags, lexJs } from "./comment-lang-js.js";
+import { lexTable } from "./comment-lex.js";
+import { cTable, goTable, javaTable } from "./comment-lang-c.js";
 export const jsLang = Object.freeze({
     id: "js",
     exts: [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts"],
     lex: lexJs,
     tags: jsTags,
 });
-export const langRegistry = Object.freeze([jsLang]);
+const noTags = () => null;
+function tableLang(id, exts, table) {
+    return Object.freeze({ id, exts, lex: (text) => lexTable(text, table), tags: noTags });
+}
+export const langRegistry = Object.freeze([
+    jsLang,
+    tableLang("c", [".c", ".h", ".cc", ".cpp", ".cxx", ".hpp"], cTable),
+    tableLang("java", [".java"], javaTable),
+    tableLang("go", [".go"], goTable),
+]);
 const byExt = new Map(langRegistry.flatMap((l) => l.exts.map((e) => [e, l])));
 export function langForPath(rel) {
     const segs = rel.split("/");

@@ -4,6 +4,8 @@
 
 import type { LangSpec } from "./comment-types.js";
 import { jsTags, lexJs } from "./comment-lang-js.js";
+import { lexTable, type LexTable } from "./comment-lex.js";
+import { cTable, goTable, javaTable } from "./comment-lang-c.js";
 
 export const jsLang: LangSpec = Object.freeze({
   id: "js",
@@ -12,7 +14,18 @@ export const jsLang: LangSpec = Object.freeze({
   tags: jsTags,
 });
 
-export const langRegistry: readonly LangSpec[] = Object.freeze([jsLang]);
+const noTags = () => null;
+
+function tableLang(id: LangSpec["id"], exts: string[], table: LexTable): LangSpec {
+  return Object.freeze({ id, exts, lex: (text: string) => lexTable(text, table), tags: noTags });
+}
+
+export const langRegistry: readonly LangSpec[] = Object.freeze([
+  jsLang,
+  tableLang("c", [".c", ".h", ".cc", ".cpp", ".cxx", ".hpp"], cTable),
+  tableLang("java", [".java"], javaTable),
+  tableLang("go", [".go"], goTable),
+]);
 
 const byExt = new Map<string, LangSpec>(langRegistry.flatMap((l) => l.exts.map((e) => [e, l] as const)));
 
