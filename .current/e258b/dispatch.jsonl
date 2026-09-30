@@ -6,3 +6,4 @@
 {"ts":"2026-09-30T08:34:40.555Z","feature":"e258b-comment-scan","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
 {"ts":"2026-09-30T08:35:21.942Z","feature":"e258b-comment-scan","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-09-30T08:38:23.699Z","feature":"e258b-comment-scan","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-30T08:46:43.837Z","feature":"e258b-comment-scan","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
