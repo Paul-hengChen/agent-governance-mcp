@@ -12,7 +12,8 @@
 //                                           stripOriginTags landed (T-GTS), before compose-not-strip)
 //   AC8 (single source of truth)        -> t-cat-equals-monolith (concatenating the 15
 //                                           manifest fragments reproduces the retired monolith
-//                                           byte-for-byte — composition is literal concatenation, no normalization; DR-1 Option R)
+//                                           byte-for-byte — composition is literal concatenation,
+//                                           no normalization; DR-1 Option R)
 //   AC9 (hook byte-equivalence)         -> t-hook-lite, t-hook-full
 //   Dependencies (rationale §X refs)    -> t-rationale-refs-resolve-forward,
 //                                           t-rationale-sections-exist-in-fragments

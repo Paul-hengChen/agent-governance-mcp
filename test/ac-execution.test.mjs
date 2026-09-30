@@ -27,7 +27,8 @@
 // review_T-E3-QA.md for the disposition write-up.
 //
 // Spec-to-Test map:
-//   AC1 (proof: schema, self-check)        -> verified via grep during QA (AC Execution Log, T-E3-QA), not re-tested here
+//   AC1 (proof: schema, self-check)        -> verified via grep during QA (AC Execution Log, T-E3-QA),
+//                                              not re-tested here
 //   AC2 (proof: conditional, "where feasible") -> skill-content assertion below
 //   AC3 (Phase 3.5 heading, exact)          -> skill-content assertion below
 //   AC4 (arm check: hasProofAnnotatedAC)    -> U1-U6

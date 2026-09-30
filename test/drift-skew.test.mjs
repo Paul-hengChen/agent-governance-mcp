@@ -34,8 +34,9 @@ function writeRawHandoff(ws, body) {
 
 // tools/drift.ts's skew precheck (readOnDiskVersion, tools/drift.ts:248) reads
 // the raw file at resolveCurrentLanePaths(...).handoffPath — the LANE path —
-// with no lane-then-flat fallback of its own (e123b9 J2, spec AC1/AC13). Writes an ALREADY-MIGRATED fixture directly at that path, for
-// tests that need the skew precheck to actually see the file (see
+// with no lane-then-flat fallback of its own (e123b9 J2, spec AC1/AC13). Writes an
+// ALREADY-MIGRATED fixture directly at that path, for tests that need the skew
+// precheck to actually see the file (see
 // NEW-TICKETS.md J2-NEW-9 for the unmigrated-workspace gap this exposes).
 function writeRawHandoffAtLanePath(ws, body) {
   const p = resolveCurrentLanePaths(ws).handoffPath;

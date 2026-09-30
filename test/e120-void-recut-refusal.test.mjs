@@ -95,7 +95,7 @@ try {
 // re-baseline as test/e117-void-task.test.mjs — seed the lane-local ledger
 // DIRECTLY at `.current/_primary/tasks.md` (no .git in these fixtures ⇒
 // resolveCurrentLane === PRIMARY_LANE), the exact file tw_* now reads and
-// writes (spec D-F/AC9).
+// writes (spec AC9).
 function laneTasksPath(ws) {
   return path.join(ws, ".current", "_primary", "tasks.md");
 }

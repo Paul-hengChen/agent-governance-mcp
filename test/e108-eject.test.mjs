@@ -226,8 +226,8 @@ test("AC1: dry-run prints the full four-class plan, touches nothing", () => {
   initWorkspace(repo, "local");
   addProcessEvidence(repo);
   addDomainKnowledge(repo);
-    // design/specs are tracked; docs/backlog.md, the runtime artifacts, and
-    // the host-trace files are left untracked (the setup this dry-run case needs, AC1).
+  // design/specs are tracked; docs/backlog.md, the runtime artifacts, and
+  // the host-trace files are left untracked (the setup this dry-run case needs, AC1).
   git(repo, ["add", "design", "specs"]);
   git(repo, ["commit", "-q", "-m", "tracked design/specs"]);
 
@@ -349,7 +349,7 @@ test("AC4: --yes --purge-knowledge prints git rm for tracked design/specs, does 
   assert.ok(fs.existsSync(path.join(repo, "design", "feature.md")), "design/ must NOT be deleted (tracked)");
   assert.ok(fs.existsSync(path.join(repo, "specs", "feature.md")), "specs/ must NOT be deleted (tracked)");
 
-    // Every other disposition from the plain --yes run (AC2) still applies.
+  // Every other disposition from the plain --yes run (AC2) still applies.
   assert.equal(fs.existsSync(path.join(repo, ".current")), false);
   assert.equal(fs.existsSync(path.join(repo, "tasks.md")), false);
   assert.equal(fs.existsSync(path.join(repo, "qa_reports")), false);
@@ -393,7 +393,7 @@ test("AC5: repo-mode tracked artifacts get a git rm command, never a delete", ()
   const gitRmMatches = r.stderr.match(/git rm -r /g) ?? [];
   assert.equal(gitRmMatches.length, 1, `expected exactly one git rm -r line, stderr=${r.stderr}`);
 
-    // Host traces still run exactly as in a plain --yes run (AC2) — deleted/edited even though tracked.
+  // Host traces still run exactly as in a plain --yes run (AC2) — deleted/edited even though tracked.
   assert.equal(fs.existsSync(path.join(repo, "CLAUDE.md")), false, "tracked CLAUDE.md (block-only) still deleted");
   assert.equal(fs.existsSync(path.join(repo, "AGENTS.md")), false, "tracked AGENTS.md still deleted");
   assert.equal(fs.existsSync(path.join(repo, ".antigravityrules")), false, "tracked .antigravityrules still deleted");

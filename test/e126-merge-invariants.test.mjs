@@ -363,7 +363,7 @@ test("AC9: bad ref / non-repo / usage errors exit USAGE_ERROR", () => {
   const emptyRef = runMergeInvariants("", root);
   assert.equal(emptyRef.code, "USAGE_ERROR");
 
-    // CLI argv edge cases (runMergeInvariantsCli).
+  // CLI argv edge cases (runMergeInvariantsCli).
   const missingRefValue = runMergeInvariantsCli(["--ref"], root);
   assert.equal(missingRefValue.code, "USAGE_ERROR");
 
@@ -547,9 +547,9 @@ test("R-2: an indented checkbox row that is tasks-file.ts-visible must not be si
     },
     p2Files: { "tasks.md": "## Active\n" },
     mergeFiles: {
-            // Both rows dropped from the merge; T-CTRL-01 is an ordinary dropped row
-            // (must be reported), T-IND-01 is an indented checkbox row that must also be
-            // seen (R-2).
+      // Both rows dropped from the merge; T-CTRL-01 is an ordinary dropped row
+      // (must be reported), T-IND-01 is an indented checkbox row that must also be
+      // seen (R-2).
       "tasks.md": "## Active\n",
     },
   });

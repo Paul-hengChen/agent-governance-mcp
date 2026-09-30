@@ -45,7 +45,6 @@
 // `completed_tasks` exemption above was itself the hole — an unsanctioned
 // pre-fill riding the (code-reviewer,In_Progress)->(qa-engineer,In_Progress)
 // edge was byte-identical to the sanctioned write. QAEV-4a/b replace the old
-// byte-identical to the sanctioned write. QAEV-4a/b replace the old
 // single QAEV-4 exemption test with the amended contract (specs/
 // c16-c10-role-boundary.md Amendment section; review_reports/
 // review_T-E32-01.md rounds 1-2). See also test/e32-e33-gate-hardening.test.mjs

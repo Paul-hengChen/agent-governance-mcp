@@ -29,9 +29,9 @@
 // addTask's taskId guard was the only *live* forging site before it, so it
 // is deliberately not tested alone; all four mutators get a taskId case.
 //
-// The EXPLICIT-refusal assertion (the point of guarding all four mutators): for complete/rollback/void with a line-break-bearing taskId,
-// this file asserts POSITIVELY on /task_id must not contain a line break/
-// AND NEGATIVELY that the message does NOT match
+// The EXPLICIT-refusal assertion (the point of guarding all four mutators): for
+// complete/rollback/void with a line-break-bearing taskId, this file asserts
+// POSITIVELY on /task_id must not contain a line break/ AND NEGATIVELY that the message does NOT match
 // /not found|Could not find|No incomplete/i. Without the negative
 // assertion, a test cannot tell a STATED invariant (the input-boundary
 // guard) from INCIDENTAL lookup-order safety (the earlier behaviour,
@@ -92,7 +92,7 @@ setActiveStorage(new FileHandoffStorage());
 // resetSession/markStateRead sequencing so the freshness guard doesn't trip).
 // ---------------------------------------------------------------------------
 
-// e125a-lane-local-ledgers re-baseline (qa-owned, spec AC13 "Test impact";
+// Lane-local-ledger re-baseline (e125a, qa-owned, spec AC13 "Test impact";
 // review_reports/review_T-E125A-05.md "Expected-Red Sampling"): a workspace
 // fixture stamped `CURRENT_VERSIONS.tasks` (now 2) at the workspace ROOT is
 // the workspace-"index" shape, not an unmigrated ledger — tw_* would throw
@@ -102,7 +102,7 @@ setActiveStorage(new FileHandoffStorage());
 // re-baseline as test/e117-void-task.test.mjs — seed the lane-local ledger
 // DIRECTLY at `.current/_primary/tasks.md` (no .git in these fixtures ⇒
 // resolveCurrentLane === PRIMARY_LANE), the exact file tw_* now reads,
-// writes, and locks (spec D-F/AC9).
+// writes, and locks (spec AC9).
 function laneTasksPath(ws) {
   return path.join(ws, ".current", "_primary", "tasks.md");
 }

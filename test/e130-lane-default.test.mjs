@@ -37,9 +37,9 @@
 // outside content/**), so the contract under test is that the shipped
 // WORDING actually encodes the approved decisions (the ruling that trigger (a)
 // is checked before trigger (b), the decision on how to handle the cwd-reset
-// problem (E127), the release-staging fix (E198(b))) — not that some code compiles. A plausible-sounding paraphrase that
-// silently drops the ordering, the refusal path, or the tracked-evidence
-// carve-out would defeat the point of the fix while still "reading fine" on
+// problem (E127), the release-staging fix (E198(b))) — not that some code compiles.
+// A plausible-sounding paraphrase that silently drops the ordering, the refusal path,
+// or the tracked-evidence carve-out would defeat the point of the fix while still "reading fine" on
 // a skim; these tests pin the load-bearing phrases and their relative order
 // so a future edit that regresses the wording fails CI instead of shipping
 // quietly.

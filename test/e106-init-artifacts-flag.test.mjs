@@ -150,9 +150,9 @@ test("AC3: fresh local writes exclude rules + config key", () => {
 // ---------------------------------------------------------------------------
 test("AC4: fresh repo writes config key only, no exclude write", () => {
   const repo = mkGitRepo("e106-ac4-");
-    // `git init` always creates .git/info/exclude with its own commented
-    // default template — the claim under test (AC4) is that --artifacts=repo leaves that
-    // file untouched, not that it never exists.
+  // `git init` always creates .git/info/exclude with its own commented
+  // default template — the claim under test (AC4) is that --artifacts=repo leaves that
+  // file untouched, not that it never exists.
   const before = readExclude(repo);
   const r = runAgc(repo, ["init", "--artifacts=repo"]);
   assert.equal(r.status, 0, `exit code (stderr=${r.stderr})`);

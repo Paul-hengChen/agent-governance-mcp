@@ -775,8 +775,8 @@ test("Z6: tw_update_state ACCEPTS a valid dispatch_pins map for all 8 AgentName 
     pendingNotes: ["seed"],
     lastAgent: "pm",
   });
-    // Force the seed's last_updated off the wall clock so it cannot trip the
-    // stamp-provenance check (E148, docs/backlog.md) — see test/e148-seed-stamp.mjs.
+  // Force the seed's last_updated off the wall clock so it cannot trip the
+  // stamp-provenance check (E148, docs/backlog.md) — see test/e148-seed-stamp.mjs.
   forceSeedStamp(ws);
   resetSession();
   markStateRead(ws);
@@ -814,8 +814,8 @@ test("Z7: tw_update_state ACCEPTS an empty dispatch_pins object ({} clears, per 
     lastAgent: "pm",
     dispatchPins: { pm: "opus" },
   });
-    // Force the seed's last_updated off the wall clock so it cannot trip the
-    // stamp-provenance check (E148, docs/backlog.md) — see test/e148-seed-stamp.mjs.
+  // Force the seed's last_updated off the wall clock so it cannot trip the
+  // stamp-provenance check (E148, docs/backlog.md) — see test/e148-seed-stamp.mjs.
   forceSeedStamp(ws);
   resetSession();
   markStateRead(ws);

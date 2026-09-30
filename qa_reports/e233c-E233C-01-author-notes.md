@@ -40,3 +40,21 @@ trailing pointers such as `(e123b9 J2, spec AC1/AC9)`.
 Hygiene: no literal home-directory path prefix appears in any tracked text
 touched by this lane. The check script lives in the temp directory and builds
 its pattern at run time, so the prefix never appears verbatim in tracked files.
+
+## Review round 1 fixes
+
+Required: removed the duplicated line in the write-provenance test; restored 20
+comment lines (five files) to the indent of the code they describe, then re-ran
+a per-file comment-indent versus next-code-line comparison against base, which
+now reports no new mismatch; rewrote the table-checker header so it says the fix
+tells the three no-delimiter causes apart (blank-split, missing delimiter,
+mis-sized delimiter) and that adjacent tables with different header cell counts
+were the case reported wrongly, with a clear referent for "occurs 0 times".
+
+Recommended: join-precondition header now covers both checks (branch merged,
+declared versus actual identity); the void-task, re-cut and injection re-baseline
+notes share one lead wording and the design-decision codes were replaced by
+plain words; all added lines over 120 columns were rewrapped (none remain).
+
+Checks re-run: comment-stripped comparison bad=0; hygiene grep on added lines
+prints nothing; per-file tests for every changed file pass.

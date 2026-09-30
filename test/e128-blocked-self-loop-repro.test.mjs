@@ -1,6 +1,7 @@
 // Coded by @sr-engineer
 // Minimal bugfix-mode repro for the rejected self-correcting Blocked->Blocked
-// write (backlog E128, docs/backlog.md ~line 250) / skill-sr-engineer step 3b repro-first carve-out. NOT full coverage —
+// write (backlog E128, docs/backlog.md ~line 250) / skill-sr-engineer step 3b
+// repro-first carve-out. NOT full coverage —
 // that is qa-engineer's job (T-QA-E128-01). This file exists only to prove
 // RED against the un-fixed tools/transitions.ts before the fix landed, per
 // qa_reports/expected-red_e128-blocked-self-loop.txt.

@@ -340,8 +340,8 @@ test("AC3: heading → notice → envelope label → fence, in order (build.ts a
 // =============================================================================
 
 test("build.ts and hook state blocks are byte-identical", async () => {
-    // WHY: two sites rendering the same state differently is how the earlier fix
-    // (E122) shipped with the hook still raw. Byte-identity proves both go through one renderer.
+  // WHY: two sites rendering the same state differently is how the earlier fix
+  // (E122) shipped with the hook still raw. Byte-identity proves both go through one renderer.
   const ws = mkWs();
   try {
     await writeLaneState(ws, "ac4-feat", [
@@ -363,9 +363,9 @@ test("build.ts and hook state blocks are byte-identical", async () => {
 // =============================================================================
 
 test("hook: fence-closing note stays inside the block", async () => {
-    // The exact exploit from before the shared boundary (pre-E137): the raw
-    // handoff.md body carries a line of three backticks followed by the
-    // injection, which used to close the hook's ```yaml fence.
+  // The exact exploit from before the shared boundary (pre-E137): the raw
+  // handoff.md body carries a line of three backticks followed by the
+  // injection, which used to close the hook's ```yaml fence.
   const ws = mkWs();
   try {
     const lanePath = await writeLaneState(ws, "ac5-feat", [`quoting an error:\n\`\`\`\n${INJECTION}`]);

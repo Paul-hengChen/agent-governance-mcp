@@ -431,9 +431,11 @@ test("SMOKE-DELETED (F5 regression): a git-tracked but on-disk-deleted .md file 
 });
 
 // ============================================================================
-// Fix for three table shapes, (a) (b) (c), that the checker used to
-// misdiagnose (E105-* tests; T-E105-01, feature e88-e105-md-table-checker, task T-E88E105-02).
-// This shape occurs 0 times in this repo — a
+// Fix for how the checker tells the three no-delimiter causes apart: (a) blank-split,
+// (b) missing delimiter, (c) mis-sized delimiter. Adjacent tables whose header cell counts
+// differ used to be reported as (a) even when the cause was (b) or (c)
+// (E105-* tests; T-E105-01, feature e88-e105-md-table-checker, task T-E88E105-02).
+// Two adjacent tables with different header cell counts occur 0 times in this repo — a
 // green corpus run proves nothing about it, and neither does reading the
 // code (per specs/e88-e105-md-table-checker.md's own "Not a live defect"
 // note). Every case below is fixture-based. The strongest pin is behavioural

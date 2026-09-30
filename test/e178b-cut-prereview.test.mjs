@@ -26,7 +26,8 @@
 // Spec-to-Test map:
 //   a proposal is present -> reported as sent                       (AC10)  -> "AC10 sent"
 //   written cut but no proposal -> reported as `missing` explicitly;
-//     a non-proposal message that mentions a cut is ignored          (AC11)  -> "AC11 missing explicit", "AC11 non-proposal ignored"
+//     a non-proposal message that mentions a cut is ignored          (AC11)
+//       -> "AC11 missing explicit", "AC11 non-proposal ignored"
 //   no spec / unreadable lane / no active_feature / no mailbox: the
 //     other states (n/a, not-checked, no-mailbox)                    (AC12)  -> "AC12 other states"
 //   the exit code stays 0 whatever the check finds                   (AC13)  -> "AC13 exit code unchanged"

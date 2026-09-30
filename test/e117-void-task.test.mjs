@@ -96,10 +96,10 @@ try {
 // calls getNextTask() before a mutating call would then spuriously trip the
 // freshness guard (STATE DRIFT) on a file nothing actually changed.
 //
-// e125a-lane-local-ledgers re-baseline (qa-owned, spec AC13 "Test impact";
+// Lane-local-ledger re-baseline (e125a, qa-owned, spec AC13 "Test impact";
 // review_reports/review_T-E125A-05.md "Expected-Red Sampling"): a workspace
 // fixture stamped `CURRENT_VERSIONS.tasks` (now 2) at the workspace ROOT is
-// no longer an unmigrated ledger — v2 at a legacy path IS the D-D "index"
+// no longer an unmigrated ledger — v2 at a legacy path IS the root "index"
 // shape, so tw_* would now throw TASKS_LEDGER_ABSENT (AC6b) instead of
 // reading it. This file's fixtures are about void semantics, not migration
 // mechanics (that has its own dedicated coverage in
@@ -107,7 +107,7 @@ try {
 // re-baseline is taken here: seed the lane-local ledger DIRECTLY at
 // `.current/_primary/tasks.md` (no .git in these fixtures ⇒
 // resolveCurrentLane === PRIMARY_LANE) — the exact file tw_* now reads and
-// writes (spec D-F/AC9) — rather than a root file that must first migrate.
+// writes (spec AC9) — rather than a root file that must first migrate.
 function laneTasksPath(ws) {
   return path.join(ws, ".current", "_primary", "tasks.md");
 }
