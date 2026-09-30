@@ -22,4 +22,15 @@ export const goTable = Object.freeze({
     block: { nested: false },
     strings: [{ first: "\x60", re: /\x60/y, close: () => multi("\x60", "none") }, dq(false), charLit],
 });
+export const csharpTable = Object.freeze({
+    line: "//",
+    block: { nested: false },
+    strings: [
+        { first: '$"', re: /\$*("{3,})/y, close: (m) => multi(m[1], "none") },
+        { first: "$@", re: /(?:\$@|@\$?)"/y, close: () => multi('"', "doubled") },
+        { first: "$", re: /\$+"/y, close: () => ({ end: '"', escape: "backslash", multiline: false }) },
+        dq(false),
+        charLit,
+    ],
+});
 //# sourceMappingURL=comment-lang-c.js.map

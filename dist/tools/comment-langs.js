@@ -3,7 +3,8 @@
 // Design: specs/e259-comment-scan-languages-architecture.md.
 import { jsTags, lexJs } from "./comment-lang-js.js";
 import { lexTable } from "./comment-lex.js";
-import { cTable, goTable, javaTable } from "./comment-lang-c.js";
+import { cTable, csharpTable, goTable, javaTable } from "./comment-lang-c.js";
+import { kotlinTable, rustTable, swiftTable } from "./comment-lang-nested.js";
 export const jsLang = Object.freeze({
     id: "js",
     exts: [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts"],
@@ -18,7 +19,11 @@ export const langRegistry = Object.freeze([
     jsLang,
     tableLang("c", [".c", ".h", ".cc", ".cpp", ".cxx", ".hpp"], cTable),
     tableLang("java", [".java"], javaTable),
+    tableLang("csharp", [".cs"], csharpTable),
     tableLang("go", [".go"], goTable),
+    tableLang("kotlin", [".kt", ".kts"], kotlinTable),
+    tableLang("swift", [".swift"], swiftTable),
+    tableLang("rust", [".rs"], rustTable),
 ]);
 const byExt = new Map(langRegistry.flatMap((l) => l.exts.map((e) => [e, l])));
 export function langForPath(rel) {

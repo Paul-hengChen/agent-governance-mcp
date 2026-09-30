@@ -43,6 +43,11 @@ export interface LexTable {
 
 type Mode = "code" | "block" | "str";
 
+interface Frame {
+  closer: Closer;
+  depth: number;
+}
+
 export function dq(multiline: boolean, interp?: Interp): StringForm {
   const closer: Closer = { end: '"', escape: "backslash", multiline, interp };
   return { first: '"', re: /"/y, close: () => closer };
@@ -66,6 +71,8 @@ export function lexTable(text: string, t: LexTable): LexedLine[] {
   const hasComment = raw.map(() => false);
   let mode: Mode = "code";
   let closer: Closer | null = null;
+  let depth = 0;
+  const frames: Frame[] = [];
   for (let ln = 0; ln < raw.length; ln++) {
     const s = raw[ln];
     if (mode === "block") hasComment[ln] = true;
@@ -77,16 +84,26 @@ export function lexTable(text: string, t: LexTable): LexedLine[] {
       if (mode === "block") {
         if (s.startsWith("*/", i)) {
           i += 2;
-          mode = "code";
+          if (--depth === 0) mode = "code";
+        } else if (t.block?.nested && s.startsWith("/*", i)) {
+          i += 2;
+          depth++;
         } else i++;
         continue;
       }
       if (mode === "str" && closer !== null) {
-        if (closer.escape === "backslash" && c === "\\") {
+        const end = closer.end;
+        if (closer.interp && s.startsWith(closer.interp.open, i)) {
+          frames.push({ closer, depth: 0 });
+          i += closer.interp.open.length;
+          mode = "code";
+        } else if (closer.escape === "backslash" && c === "\\") {
           if (i === s.length - 1) escapedNewline = true;
           i += 2;
-        } else if (s.startsWith(closer.end, i)) {
-          i += closer.end.length;
+        } else if (closer.escape === "doubled" && s.startsWith(end + end, i)) {
+          i += 2 * end.length;
+        } else if (s.startsWith(end, i)) {
+          i += end.length;
           mode = "code";
         } else i++;
         continue;
@@ -102,10 +119,23 @@ export function lexTable(text: string, t: LexTable): LexedLine[] {
       if (t.block && s.startsWith("/*", i)) {
         hasComment[ln] = true;
         mode = "block";
+        depth = 1;
         i += 2;
         continue;
       }
       hasCode[ln] = true;
+      const top = frames[frames.length - 1];
+      const hole = top?.closer.interp;
+      if (top !== undefined && hole !== undefined) {
+        if (c === hole.openCh) top.depth++;
+        else if (c === hole.closeCh && top.depth > 0) top.depth--;
+        else if (c === hole.closeCh) {
+          [mode, closer] = ["str", top.closer];
+          frames.pop();
+          i++;
+          continue;
+        }
+      }
       const hit = matchString(t, s, i);
       if (hit === null) {
         i++;
