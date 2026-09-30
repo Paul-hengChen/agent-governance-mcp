@@ -1,7 +1,7 @@
 # Fan-out: E246 信箱收尾 ∥ E259 註解掃描擴大到其他語言
 base: 7746626    integration branch: integ/e246-e259
 
-**狀態：人類核准 2026-09-30；派工中。** 佇列 #80（E259）與 E246（P3）。兩條並行 lane，檔案互不重疊，沒有共享生成物（兩條都不動 `content/` 的組合片段、goldens、budget）。E260（佇列 #81）不在這一波：它會改到兩條 lane 的檔案，等本波合併後另開清單。
+**狀態：人類核准 2026-09-30；已結案（兩條 lane 皆合併進 main）。** 佇列 #80（E259）與 E246（P3）。兩條並行 lane，檔案互不重疊，沒有共享生成物（兩條都不動 `content/` 的組合片段、goldens、budget）。E260（佇列 #81）不在這一波：它會改到兩條 lane 的檔案，等本波合併後另開清單。
 
 ## 派工前核對（整合者，2026-09-30）
 - `git worktree list` 只有 primary；main = origin/main = `7746626`（v4.3.0 已發版，`3c3e649` 為發版後記帳，`7746626` 為 E260 開票）；工作樹乾淨；`tw_detect_drift` 無 drift（只有 T-REL4-02 的證據提示）。primary handoff 停在 `release-v4.3.0`。
@@ -59,3 +59,13 @@ e246 → e259（兩條檔案互斥，順序無依賴；每次 merge 後跑 `node
 | 2026-09-30 | 整合者 | 拆成 e246 ∥ e259；`docs/install.md` 整份給 e259，E246 的文件句子列入整合後；`test/e258b-comment-scan.test.mjs` 兩處斷言事先重劃給 e259；`test/e178a-integrator-role.test.mjs` 條件式重劃給 e246 | 本檔 |
 | 2026-09-30 | 整合者 | e246 只處理預設位置（worktree 上層目錄的 `_mailbox/`）：finish 不讀 fan-out 清單，無從得知 `--mailbox-root` 或 `mailbox:` 標頭的自訂位置；自訂位置交給 SOP 的手動步驟 | 本檔 |
 | 2026-09-30 | 人類 | 核准本清單（含四項重劃／切分），開始派工 | 整合者 session |
+| 2026-09-30 | 整合者 | e246 核對：第一次回報退回（qa 在 review 之後加的 24 行測試檔頭沒有經過 step 4b 判定，比照 E258 前例）；T-E246-02 縮為 6 行並經非作者 reviewer 判定後通過（`dd6c119`，全套 3013/3010/0/3，0 越界，hop 9/10）；reviewer 的非阻擋意見（測試檔 L57 `setupLane` 註解列出 helper 未回傳的 `lane` 鍵）不再改，併入 E260 的測試註解 lane | 信箱 e246 to-lane#3、to-integrator#5 |
+| 2026-09-30 | 整合者 | e259 預審兩段：PM cut 接受（Java text block、Swift `#"…"#`、`.d.mts`／`.d.cts` 排除、`.h` 以 C++ 解析、D6 標記表）；整合者一度要 lane 等 architect 預審完才呈人類，隨即更正（cut 核准前 server 不放行 architect hop）；architect 無 Open Questions，四項已定事項接受 | 信箱 e259 to-lane#1–#3 |
+| 2026-09-30 | 整合者 | e259 核對通過（`a70fc0e`，全套 3028/3025/0/3，review 與 qa 皆第一輪通過，hop 5/10）；越界 2 檔皆接受：`test/e258b-comment-scan.test.mjs` 的已重劃斷言（3+/3−）、本票新建的測試 helper `test/e259-lib.mjs` | 信箱 e259 to-integrator#3 |
+
+## 結案
+- 日期 2026-09-30；合併 branch `integ/e246-e259`（e246 `564aad4` → e259 `d269648`，皆 `--no-ff`）；兩次合併零衝突 → 無合併審查；每次合併後 merge-invariants PASS；重建 `dist/` 無差異；整合層全套 3043/3040/0/3。
+- 彙總（上限按 lane 計，合計僅供參考）：e246 2 張 task／hop 9/10（一次整合者退回：測試檔頭 24 行未經 step 4b 判定）；e259 9 張 task／hop 5/10；review／qa 皆第一輪通過。
+- 例外：`lane-status` 回報 e246 EVIDENCE MISMATCH（handoff `completed_tasks` 為空，磁碟上有 T-E246-01、T-E246-02 兩份 PASS 證據）—— E150 類（ledger 不跨寫入保留），證據齊全，接受不退回。
+- 完成定義七項全部成立：`docs/install.md` 的 finish 段落補上信箱一句；實測以暫存 `.py`／`.rs` 各 8 行註解觸發兩行 `long-block 8 lines` 後刪除；舊信箱於 `finish` 後清除（見下一個 commit）。
+- 新票：E259-NEW-1 由 `finish --shipped` 配號。
