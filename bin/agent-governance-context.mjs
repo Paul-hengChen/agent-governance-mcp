@@ -147,7 +147,7 @@ const skillVariant = process.env.AGC_DEFAULT_SKILL === "full"
 const constitution = await composeConstitution(skillVariant === "skill-coordinator.md");
 const rawSkill = await composeSkillText(skillVariant);
 
-// E123 F1 L3: the lane handoff path comes from the compiled lane-layout seam
+// The lane handoff path (E123 F1 L3) comes from the compiled lane-layout seam
 // (dist/tools/lane-paths.js), never a restated filename; path.resolve pins an
 // ABSOLUTE workspace (L-SCHEMA-NEW-9). Fail-loud: if the import fails (dist/
 // missing during a partial install), return null so the "hook misconfigured"
@@ -164,16 +164,18 @@ async function resolveHandoffPath() {
 }
 const handoffPath = await resolveHandoffPath();
 
-// E137 (specs/e137-render-sanitise.md, Option B + J2-NEW-1): the hook no longer
-// inlines the raw handoff.md file. It parses state through the compiled
-// READ-ONLY parser (dist/tools/handoff-parse.js parseHandoff: lane path first,
-// legacy flat fallback, never migrates / locks / creates a lane dir, throws
-// HANDOFF_LAYOUT_CONFLICT on dual presence) and renders it through the SAME
-// function buildPromptForRole uses (dist/prompts/build.js
-// renderHandoffStateBlock -> lib/render-boundary.ts renderDataBlock), so both
-// render sites emit byte-identical, bounded, labelled state blocks. Fail-loud:
-// if either import fails (dist/ missing during a partial install), return null
-// so the "hook misconfigured" hint fires below — never fall back to a raw read.
+// The hook no longer inlines the raw handoff.md file: reported state renders
+// inside a labelled fence it cannot structurally escape (E137, Option B +
+// J2-NEW-1). It parses state
+// through the compiled READ-ONLY parser (dist/tools/handoff-parse.js
+// parseHandoff: lane path first, legacy flat fallback, never migrates / locks
+// / creates a lane dir, throws HANDOFF_LAYOUT_CONFLICT on dual presence) and
+// renders it through the SAME function buildPromptForRole uses
+// (dist/prompts/build.js renderHandoffStateBlock -> lib/render-boundary.ts
+// renderDataBlock), so both render sites emit byte-identical, bounded,
+// labelled state blocks. Fail-loud: if either import fails (dist/ missing
+// during a partial install), return null so the "hook misconfigured" hint
+// fires below — never fall back to a raw read.
 async function loadStateRenderer() {
   try {
     const parseMod = await import(
@@ -268,9 +270,10 @@ process.stdout.write(
   })
 );
 
-// C11 L2 dedup marker: record that the FULL constitution was just emitted so
-// a /teamwork* prompt fetch within the next 120s can substitute the S03
-// sentinel instead of a second full copy (read by index.ts hookMarkerFresh).
+// Constitution dedup marker (C11 L2): record that the FULL constitution was
+// just emitted so a /teamwork* prompt fetch within the next 120s can
+// substitute the S03 sentinel instead of a second full copy (read by index.ts
+// hookMarkerFresh).
 // Written ONLY on this successful full-body emit — never on the
 // misconfigured-hint branch above. Fail-safe by construction: if the write
 // fails (e.g. no .current/ dir in a tasks.md/TODO.md-only workspace, or a

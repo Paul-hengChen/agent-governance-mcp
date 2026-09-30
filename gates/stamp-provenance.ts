@@ -1,16 +1,17 @@
 // Coded by @sr-engineer
-// Stamp-provenance predicates (E18, e18-write-provenance — fix a).
+// Stamp-provenance predicates: block the next write over a handoff whose
+// last_updated looks hand-authored rather than server-stamped (E18 fix a).
 //
-// Escalates the E9A read-only stampAdvisory (tools/drift.ts) into a blocking
+// Escalates the read-only stampAdvisory (tools/drift.ts, E9A) into a blocking
 // gate on the file-mode tw_update_state write path: when the CURRENT on-disk
-// handoff `last_updated` matches the hand-authored stamp shape, the next
-// write is rejected `STAMP_PROVENANCE_SUSPECT` unless it acknowledges the
+// handoff `last_updated` matches the hand-authored stamp shape, the next write
+// is rejected `STAMP_PROVENANCE_SUSPECT` unless it acknowledges the
 // contamination via an audited remediation note — forcing the next writer to
 // record the anomaly instead of silently overwriting the evidence. Incident
-// lineage (third E9A-class): the v3.85.0 no-MCP-path release-engineer
-// subagent hand-edited .current/handoff.md with fabricated zero-entropy
-// stamps (2026-07-14T00:00:00.000Z; commits 5950c58/199b164, remediated in
-// 70e3a35).
+// lineage (the third hand-edited-stamp incident, E9A class): the v3.85.0
+// no-MCP-path release-engineer subagent hand-edited .current/handoff.md with
+// fabricated zero-entropy stamps (2026-07-14T00:00:00.000Z; commits
+// 5950c58/199b164, remediated in 70e3a35).
 //
 // HAND_AUTHORED_STAMP_RE is the SINGLE source of truth for the predicate —
 // verbatim relocation from tools/drift.ts (which now imports it back), NOT a

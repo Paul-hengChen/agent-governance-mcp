@@ -16,8 +16,8 @@
 // fixed portion, so the emitted string stays byte-identical to pre-refactor
 // behavior. The EXISTING gate tests assert that byte-parity; see DR-2.
 //
-// Evaluation order is NOT encoded here (no evalOrder field): since E35
-// (e35-gate-pipeline-extraction) it lives as data in the ordered
+// Evaluation order is NOT encoded here (no evalOrder field): since the
+// pipeline extraction (E35) it lives as data in the ordered
 // UPDATE_STATE_GATE_PIPELINE array in tools/handoff-orchestrator.ts
 // (previously the physical if-block sequence there — spec AC-7, DR-5).
 // This registry is a keyed lookup, never a dispatch loop.
@@ -80,7 +80,7 @@ export interface GateDefinition {
   readonly documentedInProse: boolean;
 }
 
-// errorCode → doc-file mapping (T-C12-01, c12-registry-field-consumers).
+// errorCode → doc-file mapping: which prose file documents each code (C12).
 // For each errorCode, the content/*.md file(s) that backtick-quote it — the
 // documentedInProse anchor set. Consumed by the AC2 literal-parity assertions
 // in test/error-code-contract.test.mjs (T-C12-02/03): when an entry's
@@ -123,11 +123,11 @@ export interface GateDefinition {
 //   QA_REVIEW_TARGET_REQUIRED       skill-qa-engineer.md
 //   AC_EXECUTION_LOG_MISSING        skill-qa-engineer.md
 
-// The 33-gate catalog, in documentation order (e40-nonqa-completed-tasks-write-gate
-// added the 33rd, NON_QA_COMPLETED_TASKS_REJECTED — the reviewer-only
-// completed_tasks gate generalized to every non-qa identity). Array order is DOC order only —
-// it MUST NOT be relied on for evaluation order (DR-5; that lives in
-// handoff-orchestrator.ts as the ordered UPDATE_STATE_GATE_PIPELINE array, E35).
+// The 33-gate catalog, in documentation order (the non-qa completed_tasks write gate, E40,
+// added the 33rd, NON_QA_COMPLETED_TASKS_REJECTED — the reviewer-only completed_tasks gate
+// generalized to every non-qa identity). Array order is DOC order only — it MUST NOT be relied
+// on for evaluation order (DR-5; that lives in handoff-orchestrator.ts as the ordered
+// UPDATE_STATE_GATE_PIPELINE array, E35).
 export const GATE_REGISTRY: readonly GateDefinition[] = [
   // ---- transition-json (codes 1-6, producer: validateTransition) ----
   {
@@ -240,7 +240,7 @@ export const GATE_REGISTRY: readonly GateDefinition[] = [
     documentedInProse: true,
   },
   {
-    // E4 (e4-design-source-credibility-gate) — FOURTH build-entry attestation gate on the
+    // Design-source credibility gate (E4) — FOURTH build-entry attestation gate on the
     // pm:In_Progress -> {architect,sr-engineer}:In_Progress edge, after scope-decision /
     // cut-approval / external-refs. UNLIKE those three (file-mode only, read handoff YAML),
     // this gate reads design/<feature>.md directly via fs, so it is STORAGE-MODE-AGNOSTIC
@@ -279,14 +279,14 @@ export const GATE_REGISTRY: readonly GateDefinition[] = [
     documentedInProse: true,
   },
   {
-    // E10 (e10-lease-override, AC1/AC2) — human-attested lease-override audit
-    // gate. Fires INSIDE the FEATURE_LEASE_HELD branch (DR-3: an override with
-    // nothing to bypass is inert), file-mode only, iff the write carries
-    // lease_override: true but its pending_notes[0] audit line is absent or
-    // mismatched. An audited override (pending_notes[0] matching
-    // /^lease-override:/) BYPASSES the lease-held rejection for this write
-    // only; an unaudited one is rejected loud here — never silently accepted,
-    // never silently downgraded to the plain FEATURE_LEASE_HELD envelope.
+    // Human-attested lease-override audit gate (E10, AC1/AC2). Fires INSIDE
+    // the FEATURE_LEASE_HELD branch (DR-3: an override with nothing to bypass
+    // is inert), file-mode only, iff the write carries lease_override: true
+    // but its pending_notes[0] audit line is absent or mismatched. An audited
+    // override (pending_notes[0] matching /^lease-override:/) BYPASSES the
+    // lease-held rejection for this write only; an unaudited one is rejected
+    // loud here — never silently accepted, never silently downgraded to the
+    // plain FEATURE_LEASE_HELD envelope.
     errorCode: "LEASE_OVERRIDE_AUDIT_MISSING",
     producer: "orchestrator",
     envelope: "orchestrator-json",
@@ -301,15 +301,16 @@ export const GATE_REGISTRY: readonly GateDefinition[] = [
     documentedInProse: true,
   },
   {
-    // E10 (e10-lease-override, AC6) — bookkeeping-write same-feature
-    // restriction. A bookkeeping_write: true attestation is valid ONLY on a
+    // Bookkeeping-write same-feature restriction (E10, AC6). A
+    // bookkeeping_write: true attestation is valid ONLY on a
     // same-active_feature write (it preserves the incumbent's last_updated,
     // spec AC5); a differently-featured write is itself a fresh claim, and
     // suppressing ITS freshness stamp would let a brand-new feature's lease
-    // look artificially pre-aged — the exact premature-clobber race E1/E1A
-    // closed. Rejected loud, never silently accepted or downgraded. Inline in
-    // the orchestrator reusing the already-computed feature_changed boolean,
-    // guarded by prevState so a fresh workspace never trips it (DR-4).
+    // look artificially pre-aged — the exact premature-clobber race the
+    // feature lease closed (E1/E1A). Rejected loud, never silently accepted or
+    // downgraded. Inline in the orchestrator reusing the already-computed
+    // feature_changed boolean, guarded by prevState so a fresh workspace never
+    // trips it (DR-4).
     errorCode: "BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE",
     producer: "orchestrator",
     envelope: "orchestrator-json",
@@ -326,8 +327,8 @@ export const GATE_REGISTRY: readonly GateDefinition[] = [
     documentedInProse: true,
   },
   {
-    // E18 (e18-write-provenance, fix a) — stamp-provenance gate. Escalates
-    // the E9A read-only stampAdvisory (tools/drift.ts) to a blocking write-
+    // Stamp-provenance gate (E18 fix a). Escalates the read-only
+    // stampAdvisory (tools/drift.ts, E9A) to a blocking write-
     // path gate: when the CURRENT on-disk handoff last_updated matches the
     // hand-authored stamp shape (gates/stamp-provenance.ts — the SAME
     // predicate the advisory uses, extracted, not forked), the next write is
@@ -369,27 +370,27 @@ export const GATE_REGISTRY: readonly GateDefinition[] = [
     documentedInProse: true,
   },
   {
-    // E18 (e18-write-provenance, fix b) — qa completion-evidence gate. Closes
-    // the identity-swap side door REVIEWER_COMPLETED_TASKS_REJECTED cannot
-    // see (E5 incident: a code-reviewer subagent made a second write stamped
-    // agent_id="qa-engineer", pre-filling completed_tasks with zero evidence
-    // on disk). Any qa-engineer-stamped write whose completed_tasks adds ids
+    // QA completion-evidence gate (E18 fix b). Closes the identity-swap side
+    // door REVIEWER_COMPLETED_TASKS_REJECTED cannot see (the incident, E5: a
+    // code-reviewer subagent made a second write stamped agent_id=
+    // "qa-engineer", pre-filling completed_tasks with zero evidence on disk).
+    // Any qa-engineer-stamped write whose completed_tasks adds ids
     // NOT already in the on-disk handoff's completed set must have per-id QA
     // evidence on disk via the existing hasEvidenceInFile convention
     // (gates/qa-review.ts — reused, not forked; covers: coverage honored).
     // Ids already in the on-disk set are exempt (a qa write legitimately
     // passes the full cumulative list back). NO edge/verdict exemption —
-    // c16 contract amendment (E32, e32-e33-gate-hardening): the former
+    // the role-boundary contract was amended (C16, E32): the former
     // APPROVED-row exemption was removed entirely because the incident write
-    // is byte-identical to the sanctioned manifest shape (fourth
-    // E9A/E18-class incident, 2026-07-16); review scope on the APPROVED
-    // handoff now travels ONLY in the transient review_task_ids field
-    // (evidence-gated by MISSING_REVIEW_EVIDENCE), and completed_tasks on
-    // ANY qa-engineer-stamped write is reserved for evidence-backed QA
-    // completions. Evaluated AFTER the qa_review auto-record so a legitimate
-    // PASS/FAIL write's just-recorded evidence satisfies it.
-    // tw_complete_task is untouched (own evidence path). File-mode only,
-    // matching the sibling attestation gates.
+    // is byte-identical to the sanctioned manifest shape (the fourth
+    // identity-swap / hand-written-state incident, 2026-07-16; E9A/E18 class);
+    // review scope on the APPROVED handoff now travels ONLY in the transient
+    // review_task_ids field (evidence-gated by MISSING_REVIEW_EVIDENCE), and
+    // completed_tasks on ANY qa-engineer-stamped write is reserved for
+    // evidence-backed QA completions. Evaluated AFTER the qa_review
+    // auto-record so a legitimate PASS/FAIL write's just-recorded evidence
+    // satisfies it. tw_complete_task is untouched (own evidence path).
+    // File-mode only, matching the sibling attestation gates.
     errorCode: "QA_COMPLETION_EVIDENCE_MISSING",
     producer: "orchestrator",
     envelope: "plain-text",
@@ -438,12 +439,12 @@ export const GATE_REGISTRY: readonly GateDefinition[] = [
     documentedInProse: true,
   },
   {
-    // E2 (e2-bugfix-repro-gate, AC2/AC6) — repro-first gate for bugfix-mode
-    // tickets. Sibling of EXPECTED_RED_DIFF_MISSING: same plain-text
-    // orchestrator envelope, same qa_reports/expected-red_<feature>.txt
-    // manifest reused verbatim via hasExpectedRedManifest(). Fires on the
-    // fix-phase handoff (sr-engineer:In_Progress → code-reviewer:In_Progress)
-    // when prevState.dispatch_mode === "bugfix" but no repro manifest exists.
+    // Repro-first gate for bugfix-mode tickets (E2, AC2/AC6). Sibling of
+    // EXPECTED_RED_DIFF_MISSING: same plain-text orchestrator envelope, same
+    // qa_reports/expected-red_<feature>.txt manifest reused verbatim via
+    // hasExpectedRedManifest(). Fires on the fix-phase handoff
+    // (sr-engineer:In_Progress → code-reviewer:In_Progress) when
+    // prevState.dispatch_mode === "bugfix" but no repro manifest exists.
     // Blocks the write — never a silent skip, never a throw (AC6). NOT in
     // transitions.ts: this plain-text gate family is not in the
     // TransitionRejection["error"] union (DR-5).
@@ -641,16 +642,16 @@ export const GATE_REGISTRY: readonly GateDefinition[] = [
     documentedInProse: true,
   },
   {
-    // E3 (e3-outcome-shaped-acceptance, AC4/AC5) — AC-Execution-Log gate.
+    // AC-Execution-Log gate: QA must log each spec `proof:` run (E3, AC4/AC5).
     // Sibling of EXPECTED_RED_DIFF_MISSING: same plain-text orchestrator
     // envelope, same existence-only trust boundary, same file-mode-only
     // posture. Arms by parsing specs/<feature>.md for >= 1 line-leading
     // `proof:` annotation (gates/ac-execution.ts, NO handoff schema field —
     // Decision b); clears on a `## AC Execution Log` H2 in a PASS'd id's
     // qa_reports/review_<id>.md (covers: files count — Decision c,
-    // per-feature at-least-one-across-ids). Pre-E3 specs carry zero `proof:`
-    // lines → dormant (AC5). NOT in TransitionRejection["error"] nor
-    // TRANSITION_GATE_CODES (plain-text family, DR-5/DR-8 posture).
+    // per-feature at-least-one-across-ids). Specs older than this gate carry
+    // zero `proof:` lines → dormant (AC5). NOT in TransitionRejection["error"]
+    // nor TRANSITION_GATE_CODES (plain-text family, DR-5/DR-8 posture).
     errorCode: "AC_EXECUTION_LOG_MISSING",
     producer: "orchestrator",
     envelope: "plain-text",

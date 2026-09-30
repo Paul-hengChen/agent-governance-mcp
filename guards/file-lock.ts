@@ -32,7 +32,7 @@ function isAlive(pid: number): boolean {
 
 // true iff the lockfile at `lockPath` is held by a dead PID, is older than
 // LOCK_STALE_MS, or (corrupt payload) has an mtime older than LOCK_STALE_MS.
-// Exported (e125a, architecture D9) so tools/tasks-lane-migrate.ts's sync
+// Exported (E125a, architecture D9) so tools/tasks-lane-migrate.ts's sync
 // lock and tools/lane-migrate.ts's debris check share withFileLock's exact
 // stale predicate. Pure extraction of the former private looksStale.
 export function isLockPayloadStale(lockPath: string): boolean {

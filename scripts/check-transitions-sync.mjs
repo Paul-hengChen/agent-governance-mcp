@@ -9,20 +9,20 @@
 // treats as authoritative for parity checks), fail loud rather than skip
 // silently, exit non-zero with an actionable message.
 //
-// E39/E58 (docs/backlog.md, .current/feature-split.md F0): this table has
-// drifted from ALLOWED_TRANSITIONS before (E37 round 1 found 9 divergent
-// sites across 16 mirrored rows) with nothing to catch it. Both sides are
+// Why this exists: this table has drifted from ALLOWED_TRANSITIONS before (a
+// review round once found 9 divergent sites across 16 mirrored rows) with
+// nothing to catch it (E39/E58; the finding was E37 round 1). Both sides are
 // structured data — a Map in compiled JS, a markdown table with a fixed
-// three-column shape — so a set-equality check is genuinely mechanizable
-// here, unlike a hand-written prose expansion of a prose source, which has
-// no structured source to diff against — the docs/skills/* mirror tree was
-// exactly that case, and E48 deleted it rather than trying to check it.
+// three-column shape — so a set-equality check is genuinely mechanizable here,
+// unlike a hand-written prose expansion of a prose source, which has no
+// structured source to diff against — the docs/skills/* mirror tree was
+// exactly that case, and it was deleted rather than checked (E48).
 //
-// Hard requirement (explicit ticket condition, same defect class as E50's
-// `grep -vxFf` empty-baseline bug): if this script cannot find or parse the
-// mirror table, or cannot load ALLOWED_TRANSITIONS, that MUST be a failure,
-// never a vacuous pass. An empty parse silently agreeing with an empty
-// source would defeat the entire point of the check.
+// Hard requirement (explicit ticket condition, same defect class as an earlier
+// `grep -vxFf` empty-baseline bug, E50): if this script cannot find or parse
+// the mirror table, or cannot load ALLOWED_TRANSITIONS, that MUST be a
+// failure, never a vacuous pass. An empty parse silently agreeing with an
+// empty source would defeat the entire point of the check.
 //
 // Wiring (package.json): `postbuild`, deliberately NOT `prebuild` despite
 // check-version.mjs's own placement there. This check imports
@@ -58,7 +58,8 @@ function fail(message) {
 // treats dist/index.js as the thing that must stay honest (the v3.74.0
 // near-miss it guards against), and structured-source-vs-structured-table is
 // exactly why this artifact is mechanizable — regex-parsing the .ts would
-// reintroduce the same "one side isn't really structured" problem E48 hit.
+// reintroduce the same "one side isn't really structured" problem that sank
+// the prose mirror tree (E48).
 
 if (!existsSync(distPath)) {
   fail(
@@ -138,11 +139,11 @@ while ((m = rowPattern.exec(section)) !== null) {
   const tuples = [...cellsRaw.matchAll(/\(([\w-]+),\s*(\w+)\)/g)]
     .map(([, agent, status]) => `(${agent}, ${status})`)
     .sort();
-  // Duplicate-key guard: without this, mirrorTable.set is last-write-wins
-  // and a stray duplicate row (e.g. a re-drift shaped like appending a new
-  // row for a key that already has one, instead of editing it in place —
-  // exactly the shape of the E58 edit itself) silently passes with only its
-  // last occurrence ever checked.
+  // Duplicate-key guard: without this, mirrorTable.set is last-write-wins and
+  // a stray duplicate row (e.g. a re-drift shaped like appending a new row for
+  // a key that already has one, instead of editing it in place — exactly the
+  // shape of an earlier edit to this very table, E58) silently passes with only
+  // its last occurrence ever checked.
   if (mirrorTable.has(key)) {
     fail(`duplicate mirror row for ${key} — the later row silently wins`);
   }

@@ -170,7 +170,7 @@ server.setRequestHandler(GetPromptRequestSchema, async (request) => {
   const entry = PROMPT_REGISTRY.find((e) => e.name === name);
   if (!entry) throw new Error(`Prompt not found: ${name}`);
 
-  // C11 dedup — decide omit BEFORE recording delivery (fail-safe: any doubt
+  // Constitution dedup (C11) — decide omit BEFORE recording delivery (fail-safe: any doubt
   // => false => full constitution emitted).
   const omit = constitutionDeliveredFor.has(ws) || hookMarkerFresh(ws);
   constitutionDeliveredFor.add(ws); // this session now "has" the constitution

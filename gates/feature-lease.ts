@@ -1,5 +1,6 @@
 // Coded by @sr-engineer
-// Feature-lease predicate (E1, e1-feature-scoped-state-design — option a-min).
+// Feature-lease predicate: while one feature's recent in-flight state owns the
+// workspace, a write for a different feature is refused (E1, option a-min).
 //
 // The lease is DERIVED, not stored: a pure predicate over the three oldest,
 // universal handoff fields (`active_feature`, `status`, `last_updated`) that
@@ -8,7 +9,7 @@
 // (a-explicit)/(b) (spec Decision Records).
 //
 // Semantics (spec §Decision, calibrations PM-ratified 2026-07-12; terminal
-// marker + negative-age guard per §Amendment (2026-07-12), E1A):
+// marker + negative-age guard per the spec's §Amendment (2026-07-12); E1A):
 //   FEATURE_LEASE_HELD  ⇔  prevState exists
 //                          ∧ prevState.active_feature ≠ incomingFeature
 //                          ∧ prevState.status ∉ { "PASS" }
@@ -19,14 +20,15 @@
 //   feature is still the workspace's owner awaiting human recovery, not free
 //   to be clobbered. The `status !== "PASS"` clause encodes this — Blocked,
 //   In_Progress, and FAIL are all non-terminal.
-// - Release-engineer closing-write terminal marker (E1A item 1; third
-//   conjunct broadened by E13, e13-terminal-marker-advisory): the signature
+// - Release-engineer closing-write terminal marker (the amendment's item 1,
+//   E1A; third conjunct later broadened, E13): the signature
 //   `last_agent === "release-engineer" ∧ status === "In_Progress" ∧
 //   (next_role === "pm" ∨ pending_notes[0] =~ /^Released v/)` is terminal —
 //   the feature has shipped and the chain is handed back to pm, so the lease
 //   is released immediately instead of waiting out the TTL.
-//   E13 rationale — the exact triple's `next_role === "pm"` conjunct failed
-//   silently twice, each time re-arming a dead lease for the TTL window:
+//   Why the third conjunct was broadened (E13) — the exact triple's
+//   `next_role === "pm"` conjunct failed silently twice, each time re-arming
+//   a dead lease for the TTL window:
 //   * first occurrence (v3.75.0 close-out): the closing write simply omitted
 //     `next_role` (transient field, omission never rejected);
 //   * second occurrence (v3.77.0 close-out): the closing write DID carry the
@@ -53,7 +55,7 @@
 //     — none match, consistent with Blocked-counts-as-held;
 //   * other roles' `next_role="pm"` handbacks fail the `last_agent` conjunct.
 //   FILE-MODE-ONLY by accepted asymmetry, enforced at the ORCHESTRATOR CALL
-//   SITE for the E13 disjunct: SqliteHandoffStorage never persists
+//   SITE for the pending_notes disjunct: SqliteHandoffStorage never persists
 //   `next_role` (absent → never matches), and although SQLite DOES persist
 //   pending_notes, tools/handoff-orchestrator.ts passes `pending_notes` into
 //   this predicate ONLY under FileHandoffStorage (undefined otherwise), so
@@ -69,7 +71,8 @@
 //   lock's stale-self-heal posture: a lease that cannot prove freshness does
 //   not block the workspace.
 // - A future-dated `last_updated` (ageMs < 0 — clock skew, wrong timezone,
-//   hand-edited state) likewise fails freshness → lease NOT held (E1A item 2).
+//   hand-edited state) likewise fails freshness → lease NOT held
+//   (amendment item 2, E1A).
 //   Same fail-open posture as NaN: a stamp that cannot establish a
 //   trustworthy, non-negative elapsed time does not block the workspace.
 //   Zero tolerance, no skew-grace tunable — binary, matching the NaN precedent.
@@ -87,12 +90,12 @@ export interface FeatureLeaseFields {
   active_feature: string;
   status: string;
   last_updated: string;
-  // E1A terminal-marker inputs — OPTIONAL: both are absent in SQLite mode
+  // Terminal-marker inputs (E1A) — OPTIONAL: both are absent in SQLite mode
   // (SqliteHandoffStorage never persists next_role) and on file-mode states
   // that predate them; absence simply never matches the terminal clause.
   last_agent?: string;
   next_role?: string;
-  // E13 terminal-marker input — OPTIONAL: the durable closing-signature
+  // Durable terminal-marker input (E13) — OPTIONAL: the closing-signature
   // disjunct reads pending_notes[0]. FILE-MODE ONLY by call-site contract:
   // the orchestrator passes this ONLY under FileHandoffStorage (undefined in
   // SQLite mode, even though SQLite persists pending_notes) so SQLite lease
@@ -101,12 +104,12 @@ export interface FeatureLeaseFields {
   pending_notes?: string[];
 }
 
-// E97 (single-owner extraction): the E1A/E13 terminal-marker predicate,
-// pulled out of isFeatureLeaseHeld verbatim so it has exactly one owner.
+// The release-engineer closing-write (terminal-marker) predicate, pulled out
+// of isFeatureLeaseHeld verbatim so it has exactly one owner (E97).
 // Before this extraction, gates/feature-lease.ts and
 // tools/handoff-parse.ts's stale-dispatch advisory encoded two different
 // ideas of "the release-engineer closing write": the lease predicate
-// carried the full E1A/E13 terminal-marker logic, while the stale-dispatch
+// carried the full terminal-marker logic, while the stale-dispatch
 // advisory carried no predicate at all — that asymmetry let a released
 // feature's closing write still read as a stale in-flight dispatch.
 // Re-stating the predicate in a second module would convert today's
@@ -115,24 +118,24 @@ export interface FeatureLeaseFields {
 //
 // Behavior is byte-identical to the inlined condition this replaces —
 // isFeatureLeaseHeld below now just calls it. See the inline comments
-// below, inside this function, for the full E1A/E13 rationale this
-// predicate encodes.
+// below, inside this function, and the file header for the full rationale
+// this predicate encodes (E1A, E13).
 export function isReleaseClosingWrite(
   state: Pick<FeatureLeaseFields, "last_agent" | "status" | "next_role" | "pending_notes">,
 ): boolean {
   return (
-    // E1A terminal marker: release-engineer's CLOSING write — shipped, handed
+    // Terminal marker: release-engineer's CLOSING write — shipped, handed
     // back to pm. The opening write matches neither third-conjunct disjunct
     // (no next_role, "starting release..." notes — in-flight release stays
     // held, D9/D10), escalations route elsewhere or set Blocked, and other
     // roles' pm-handbacks fail the last_agent test.
     state.last_agent === "release-engineer" &&
     state.status === "In_Progress" &&
-    // E13: next_role is TRANSIENT (AC-3) — it can be omitted at write time
+    // next_role is TRANSIENT (AC-3) — it can be omitted at write time
     // (first incident class) or dropped later by the migration heal-write
     // (second class). The closing write's pending_notes signature ("Released
     // vX.Y.Z" first, per SOP step 12) survives both, so accept EITHER. Strict
-    // superset of the pre-E13 exact triple.
+    // superset of the original exact triple (E13).
     (state.next_role === "pm" ||
       /^Released v/.test(state.pending_notes?.[0] ?? ""))
   );
@@ -153,6 +156,6 @@ export function isFeatureLeaseHeld(
   const ageMs = nowMs - Date.parse(prevState.last_updated);
   // NaN (unparseable last_updated) fails the comparison → lease not held.
   // Negative age (future-dated stamp, clock skew) likewise → lease not held
-  // (E1A item 2): cannot prove non-negative elapsed time, fail open.
+  // (amendment item 2, E1A): cannot prove non-negative elapsed time, fail open.
   return ageMs >= 0 && ageMs < ttlMin * 60_000;
 }

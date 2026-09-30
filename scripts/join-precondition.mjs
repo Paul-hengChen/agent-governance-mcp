@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 // Coded by @sr-engineer
-// Thin CLI wrapper for the E115 join precondition check. All logic lives in
-// tools/join-precondition.ts (compiled to dist/tools/join-precondition.js) —
-// this script only wires argv to it and prints the result, mirroring the
-// existing scripts/feature-rollup.mjs pattern (plain Node ESM importing from
-// dist/tools/*.js, zero script-level logic of its own).
+// Thin CLI wrapper for the join precondition check: a join ticket may start
+// only once the lane branches it depends on are merged into HEAD (E115). All
+// logic lives in tools/join-precondition.ts (compiled to
+// dist/tools/join-precondition.js) — this script only wires argv to it and
+// prints the result, mirroring the existing scripts/feature-rollup.mjs pattern
+// (plain Node ESM importing from dist/tools/*.js, zero script-level logic of
+// its own).
 //
 // This is the manual entry point a join ticket's build-entry step runs
 // deliberately before starting work (spec: specs/e115-join-precondition-check.md)

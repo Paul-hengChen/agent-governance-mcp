@@ -157,19 +157,19 @@ function writeClaudeBlock(cwd, stampedBlock) {
 // crash) leaves the target truncated or empty — on a real .config.json that
 // can mean hundreds of driftBaselineIds silently stop applying.
 //
-// E102 (decided by the human 2026-09-16: symlinks ARE a supported layout,
-// hardlinks are NOT): `target` is resolved through any
-// symlink BEFORE `tmpPath` is derived from it. Without this, a symlinked
-// `CLAUDE.md` (dotfiles-managed, monorepo-shared) gets DESTROYED rather than
-// written through — `renameSync` replaces whatever sits at its destination
-// path, and for a symlink destination that means the link itself is
-// unlinked and replaced by a detached regular file (POSIX rename(2)
-// semantics: a symlink destination is swapped, never followed). The
-// canonical file the link points at silently keeps its old content forever,
-// and `agc check` then reports OK against the detached copy — the failure
-// has no error and looks like success. The precedent for resolving +
-// guarding a symlink already exists a few hundred lines below in
-// checkWorktreeEvidence's isSafelyLinkedOutside.
+// Symlinked adapter files are followed, not replaced (E102; decided by the
+// human 2026-09-16: symlinks ARE a supported layout, hardlinks are NOT):
+// `target` is resolved through any symlink BEFORE `tmpPath` is derived from
+// it. Without this, a symlinked `CLAUDE.md` (dotfiles-managed,
+// monorepo-shared) gets DESTROYED rather than written through — `renameSync`
+// replaces whatever sits at its destination path, and for a symlink
+// destination that means the link itself is unlinked and replaced by a
+// detached regular file (POSIX rename(2) semantics: a symlink destination is
+// swapped, never followed). The canonical file the link points at silently
+// keeps its old content forever, and `agc check` then reports OK against the
+// detached copy — the failure has no error and looks like success. The
+// precedent for resolving + guarding a symlink already exists a few hundred
+// lines below in checkWorktreeEvidence's isSafelyLinkedOutside.
 //
 // fs.realpathSync THROWS (ENOENT) on a DANGLING symlink (one whose target
 // does not exist) — the catch below is DEFENSIVE ONLY. Every current call
@@ -224,7 +224,7 @@ function atomicWriteFile(target, content) {
     throw err;
   }
 
-  // E102 / R3-C: preserve the existing file's mode instead of letting a
+  // Preserve the existing file's mode (E102 / R3-C) instead of letting a
   // freshly-created tmp file take the process default (0666 & ~umask,
   // typically 0644) — without this, a deliberately-restricted 0600
   // CLAUDE.md silently widens to 0644 on every write through this
@@ -244,13 +244,13 @@ function atomicWriteFile(target, content) {
     if (mode !== undefined) fs.chmodSync(tmpPath, mode);
     fs.renameSync(tmpPath, resolvedTarget);
   } finally {
-    // E102 / R3-C: a failure between opening tmpPath and the rename above
-    // (ENOSPC mid-write is the realistic case) must not strand a partial
-    // `.tmp` file beside the target file (the resolved target's directory —
-    // e.g. the dotfiles dir a symlinked CLAUDE.md points into, not
-    // necessarily the repo). A successful renameSync already
-    // consumed tmpPath, so this unlink is a normal no-op on the success
-    // path (ENOENT, swallowed) and only does real cleanup on failure.
+    // Clean up the tmp file (E102 / R3-C): a failure between opening tmpPath
+    // and the rename above (ENOSPC mid-write is the realistic case) must not
+    // strand a partial `.tmp` file beside the target file (the resolved
+    // target's directory — e.g. the dotfiles dir a symlinked CLAUDE.md points
+    // into, not necessarily the repo). A successful renameSync already
+    // consumed tmpPath, so this unlink is a normal no-op on the success path
+    // (ENOENT, swallowed) and only does real cleanup on failure.
     try {
       fs.unlinkSync(tmpPath);
     } catch {
@@ -298,8 +298,9 @@ function upsertHostKey(abs) {
   // tools/config.ts:255-258 surfaces `host` only when it is a non-empty
   // string. A `host` key that exists but holds "", null, or false reads as
   // ABSENT to that consumer, so treating hasOwnProperty alone as "declared"
-  // silently reinstates the exact E100 defect this function exists to close
-  // — permanently, since a plain presence check never becomes false again.
+  // silently reinstates the exact defect this function exists to close (a host
+  // key present but empty read as declared, E100) — permanently, since a plain
+  // presence check never becomes false again.
   const hasHostKey = Object.prototype.hasOwnProperty.call(parsed, "host");
   const hostIsDeclared =
     hasHostKey && typeof parsed.host === "string" && parsed.host.length > 0;
@@ -718,11 +719,11 @@ function runInit(cwd, argv = []) {
 }
 
 // --- research/ binary-residue advisory (E104 prevention (c)) ---------------
-// E104: 33 third-party confidential screenshots sat under research/assets/ in
-// a public repo for ~3 months. .gitignore now excludes research/assets/ and
-// CONTRIBUTING.md documents the convention (both shipped separately); this is
-// the mechanical check that a tracked binary hasn't slipped past that
-// convention regardless.
+// Why this exists: 33 third-party confidential screenshots sat under
+// research/assets/ in a public repo for ~3 months. .gitignore now excludes
+// research/assets/ and CONTRIBUTING.md documents the convention (both shipped
+// separately); this is the mechanical check that a tracked binary hasn't
+// slipped past that convention regardless.
 //
 // Classification: an extension allowlist against `git ls-files` output (the
 // same allowlist used to measure this repo's zero-tracked-binary baseline),
@@ -780,16 +781,16 @@ function checkResearchBinaries(cwd) {
 }
 
 // --- linked-worktree evidence advisory (E111 prevention) --------------------
-// E111: a lane git worktree bootstrapped without the symlink-back-to-primary
-// discipline (content/coord-03-core-fallback.md's Feature-Scope Gate
-// bootstrap obligation) ends up with REAL, gitignored copies of qa_reports/,
-// review_reports/, and specs/ instead of links — and `git worktree remove`
-// deletes a lane's entire code-review + QA evidence trail along with it.
-// Measured 2026-09-08 (docs/agc-feedback-2026-09-08.md H2 (a) + H2-b B1):
-// 4 of 7 tickets had zero evidence copy left in primary, all four PASS and
-// therefore teardown-eligible. The mechanism this check backs up is the
-// bootstrap symlink itself; this is the belt-and-suspenders detector for
-// when that step was skipped.
+// Why this exists: a lane git worktree bootstrapped without the
+// symlink-back-to-primary discipline (content/coord-03-core-fallback.md's
+// Feature-Scope Gate bootstrap obligation) ends up with REAL, gitignored
+// copies of qa_reports/, review_reports/, and specs/ instead of links — and
+// `git worktree remove` deletes a lane's entire code-review + QA evidence
+// trail along with it. Measured 2026-09-08 (docs/agc-feedback-2026-09-08.md H2
+// (a) + H2-b B1): 4 of 7 tickets had zero evidence copy left in primary, all
+// four PASS and therefore teardown-eligible. The mechanism this check backs up
+// is the bootstrap symlink itself; this is the belt-and-suspenders detector
+// for when that step was skipped.
 //
 // Worktree detection: a LINKED worktree has a `.git` FILE (git's "gitdir:
 // <path>" gitfile) rather than a `.git` directory — that is git's own
@@ -814,9 +815,9 @@ function checkResearchBinaries(cwd) {
 //           when one file in it is a plain untracked straggler (e.g. an
 //           uncommitted report) — the remedy there is "commit it", not
 //           "symlink the whole tracked directory away", which would stage
-//           a mass deletion. A gitignored evidence dir (the E111 defect
-//           shape) or a plain untracked dir with zero tracked files still
-//           warns, OR
+//           a mass deletion. A gitignored evidence dir (the defect shape this
+//           advisory exists for) or a plain untracked dir with zero tracked
+//           files still warns, OR
 //   (b) the entry IS a symlink, but does not resolve OUTSIDE this worktree
 //       (see isSafelyLinkedOutside below) — a link into the lane itself, or
 //       a dangling link, protects nothing.
@@ -1038,7 +1039,7 @@ function checkWorktreeEvidence(cwd) {
   }
 }
 
-// E179 AC5 — orphan-lane advisory. A local branch whose committed
+// Orphan-lane advisory (E179 AC5). A local branch whose committed
 // `.current/<lane>/pending-tickets.md` still holds an unapplied entry but has
 // no live worktree is a lane whose findings may be stranded. Every git read
 // here is repo-global (branch refs, their trees, the worktree list), so the
@@ -1053,9 +1054,10 @@ function checkWorktreeEvidence(cwd) {
 // resolveCurrentLane would name it (`feat/<id>-*` -> `<id>`); a branch that
 // resolves to no lane is skipped, and another lane's file the branch happens
 // to carry (forked from base between that lane's merge and its finish) is
-// never read. Never `.current/history/` — S1 DECIDED by E125b (spec AC4):
-// the scan does not need to read history/, because `agc feature finish
-// --shipped` (the only writer into `.current/history/`) also deletes the
+// never read. Never `.current/history/` — a settled design question (S1,
+// decided with the lane-close writeback, E125b spec AC4): the scan does not
+// need to read history/, because `agc feature finish --shipped` (the only
+// writer into `.current/history/`) also deletes the
 // lane's branch, so a closed lane is never a candidate here in the first
 // place (candidates come from refs/heads/ only). That is a structural
 // non-applicability, not a relaxation of what "orphan" means. Advisory:
@@ -1188,9 +1190,10 @@ function checkArtifactsDrift(cwd) {
   }
 }
 
-// Information-hygiene scan (e234-hygiene-scan). The scan logic lives in the
-// compiled dist/tools/hygiene-scan.js, loaded like loadLanePaths. Returns null
-// instead of throwing: agc check must never fail over an advisory.
+// Information-hygiene scan: flags absolute paths and similar leaks in tracked
+// files (E234). The scan logic lives in the compiled
+// dist/tools/hygiene-scan.js, loaded like loadLanePaths. Returns null instead
+// of throwing: agc check must never fail over an advisory.
 async function loadHygieneScan() {
   try {
     return await import(new URL("../dist/tools/hygiene-scan.js", import.meta.url).href);
@@ -1260,9 +1263,10 @@ async function runCheck(cwd) {
 // --- subcommand: feature (E73) ---------------------------------------------
 // `agc feature start` / `agc feature finish` — lane lifecycle plumbing on top
 // of `git worktree`. Mechanism only (specs/e73-agc-feature-lifecycle.md):
-// whether lanes are the default workflow is E130. Applying/numbering pending-
-// ticket files at finish time and `agc check`'s orphan-lane advisory are
-// E179 (E124b) — see "finish-time pending-ticket apply" below.
+// whether lanes are the default workflow is a separate policy (E130).
+// Applying/numbering pending-ticket files at finish time and `agc check`'s
+// orphan-lane advisory live further down (E179, E124b) — see "finish-time
+// pending-ticket apply" below.
 //
 // Lane naming has exactly ONE source of truth: tools/lane-paths.ts's
 // TICKET_ID_RE, reached only through its exported functions (resolveLaneName
@@ -1817,7 +1821,7 @@ async function runFeatureStart(cwd, argv) {
   for (const line of out) process.stdout.write(`${line}\n`);
   for (const line of warn) process.stderr.write(`${line}\n`);
 
-  // e125b AC11 — persist the fork point this command already resolved, so
+  // Persist the fork point this command already resolved (E125b AC11), so
   // `finish --shipped` can record it even after base advances past it. After
   // bootstrapLaneEnv, so the exclude rule covering it is already in place.
   // Best-effort: a failed write only degrades the pointer to base_sha=unknown.
@@ -1872,7 +1876,8 @@ function escapeRegExp(s) {
 //                          <dir>/abandoned/<ticket-id>/, and one commit when
 //                          anything is staged. Returns { committed,
 //                          untrackedMoved } for reporting.
-// apply(plan(...).moves) is exactly the pre-E179 single-function behaviour.
+// apply(plan(...).moves) is exactly the original single-function behaviour
+// from before the split (E179).
 function planAbandonEvidence(lanePath, ticketId) {
   // Bounded token: the id delimited by _ - . or a string edge, case-
   // insensitive — `e73` never matches `e730` / `e73b`.
@@ -1927,7 +1932,7 @@ function planAbandonEvidence(lanePath, ticketId) {
   return { moves };
 }
 
-// E180 (spec AC1–AC6) — mark each move whose file `git worktree remove`
+// Mark each move whose file `git worktree remove` (E180, spec AC1–AC6)
 // (never --force) would delete WITHOUT refusing: untracked, git-ignored, and
 // its evidence dir not a symlink resolving outside the worktree. Such a move
 // gets `harvestAbs` (its primary-checkout copy target, same relative path as
@@ -1948,7 +1953,7 @@ function planAbandonEvidenceHarvest(lanePath, moves) {
   }
   const conflicts = [];
   for (const m of atRisk) {
-    // E216 AC14 — the primary copy (made this run, or already there
+    // The primary copy (E216 AC14; made this run, or already there
     // byte-identical) is this file's durable one; the in-lane move is not.
     m.harvested = true;
     const harvestAbs = path.join(repoRoot, m.dst);
@@ -1981,7 +1986,7 @@ function evidenceAtRisk(lanePath, m) {
   );
 }
 
-// E180 — the fs copies planAbandonEvidenceHarvest asked for, ALL before the
+// The fs copies planAbandonEvidenceHarvest asked for (E180), ALL before the
 // first move, so a copy that throws leaves every evidence file where it was
 // (re-running finds the copies already made identical — AC4).
 function applyAbandonEvidenceHarvest(lanePath, moves) {
@@ -2053,8 +2058,9 @@ function applyAbandonEvidence(lanePath, ticketId, moves) {
   return { committed, untrackedMoved };
 }
 
-// E194 (spec AC7–AC12) — `.current/<ticket>/` that the lane never tracked on
-// its own branch (the git-ignored-`.current/` adopter shape, or a lane that
+// Harvest of an untracked lane state dir (E194, spec AC7–AC12) —
+// `.current/<ticket>/` that the lane never tracked on its own branch (the
+// git-ignored-`.current/` adopter shape, or a lane that
 // simply never committed it) is its only governance record, and
 // `git worktree remove` deletes the ignored part silently. Read-only plan,
 // run before any --abandoned mutation: null when there is nothing to harvest
@@ -2148,14 +2154,15 @@ function removeWorktreeNoForce(repoRoot, lanePath, hint) {
 }
 
 // --- finish-time pending-ticket apply (E179, specs/e179-*.md) ---------------
-// A lane files new findings in `.current/<lane>/pending-tickets.md` (E124's
-// format) and never picks a real backlog id. `agc feature finish` is the ONE
-// sanctioned numbering step: it reads the pending file and docs/backlog.md
-// fresh from git's object db (never a long-lived in-memory copy — AC4),
-// allocates ids above the backlog's current max, appends the rows, archives
-// the entries with markApplied, and commits — all BEFORE the worktree is
-// removed, so any refusal leaves the lane exactly as today's other
-// precondition failures do. Every check runs before the first mutation.
+// A lane files new findings in `.current/<lane>/pending-tickets.md` (the
+// pending-ticket format, E124) and never picks a real backlog id.
+// `agc feature finish` is the ONE sanctioned numbering step: it reads the
+// pending file and docs/backlog.md fresh from git's object db (never a
+// long-lived in-memory copy — AC4), allocates ids above the backlog's current
+// max, appends the rows, archives the entries with markApplied, and commits —
+// all BEFORE the worktree is removed, so any refusal leaves the lane exactly
+// as today's other precondition failures do. Every check runs before the first
+// mutation.
 
 const BACKLOG_REL = "docs/backlog.md";
 // docs/backlog.md is already ~0.7 MB; execFileSync's 1 MiB default maxBuffer
@@ -2327,10 +2334,11 @@ function newPendingText(alloc, plan) {
 
 // --shipped (spec AC2, AC4; architecture "Step order — --shipped" 3–M3).
 // The lane is merged, so both files are read from --base. Split in two
-// (e125b) so the lane-close plan's own checks and the combined primary-state
-// precondition (assertPrimaryWritable over BOTH commits' paths) run after
-// these content refusals but before this commit: planPendingOnShipped only
-// reads and refuses; commitPendingOnShipped mutates. null = silent no-op.
+// (for the lane-close writeback, E125b) so the lane-close plan's own checks
+// and the combined primary-state precondition (assertPrimaryWritable over BOTH
+// commits' paths) run after these content refusals but before this commit:
+// planPendingOnShipped only reads and refuses; commitPendingOnShipped mutates.
+// null = silent no-op.
 async function planPendingOnShipped({ lanePaths, repoRoot, base, lane }) {
   const pendingRel = path.posix.join(".current", lane, lanePaths.laneFile("pendingTickets").filename);
   const pendingText = readBlob(repoRoot, base, pendingRel);
@@ -2378,7 +2386,7 @@ function commitPendingOnShipped({ repoRoot, base, lane, pending }) {
 //               in its own worktree, fs-copied (never committed) into the
 //               history bucket before the worktree is removed; the pointer
 //               is still committed (AC9/AC10).
-// E213: when root tasks.md is itself git-ignored (the same adopter shape), the
+// When root tasks.md is itself git-ignored (the same adopter shape, E213), the
 // pointer is written to it fs-only — never `git add`ed (git refuses an ignored
 // path) — and the close commit carries only the `.current/` paths, or is
 // skipped outright when nothing else needs one.
@@ -2389,8 +2397,9 @@ const TASKS_REL = "tasks.md";
 const CLOSED_LANES_HEADING = "## Closed Lanes";
 const CLOSED_LANES_HEADING_RE = /^##\s+Closed Lanes\s*$/;
 const SECTION_OR_TITLE_RE = /^#{1,2}\s/;
-// e125a's feat marker (tools/tasks-lane-migrate.ts featMarker /
-// MARKER_LANE_RE): `<!-- tasks_moved: lane=<lane> run=... -> ... -->`.
+// The lane-ledger migration's feat marker (E125a; tools/tasks-lane-migrate.ts
+// featMarker / MARKER_LANE_RE):
+// `<!-- tasks_moved: lane=<lane> run=... -> ... -->`.
 const TASKS_MOVED_LANE_RE = /^<!-- tasks_moved: lane=([A-Za-z0-9_-]+) /;
 // A git object id: SHA-1 (40 hex) or SHA-256 (64 hex).
 const BASE_SHA_RE = /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/;
@@ -2409,10 +2418,10 @@ function hasClosedLanePointer(text, ticketId, branch) {
   return text.split("\n").some((line) => line.startsWith(prefix));
 }
 
-// tasks.md text -> the same text with every e125a feat marker for `lane`
-// removed (AC3: its target `.current/<lane>/tasks.md` is about to move) and
-// `line` appended as the last row of the `## Closed Lanes` section, which is
-// created at the end of the file when absent. Pure.
+// tasks.md text -> the same text with every lane-migration feat marker for
+// `lane` removed (AC3: its target `.current/<lane>/tasks.md` is about to move)
+// and `line` appended as the last row of the `## Closed Lanes` section, which
+// is created at the end of the file when absent. Pure.
 function applyClosedLanePointer(text, lane, line) {
   const trailingNewline = text.endsWith("\n");
   let lines = text === "" ? [] : (trailingNewline ? text.slice(0, -1) : text).split("\n");
@@ -2438,7 +2447,8 @@ function applyClosedLanePointer(text, lane, line) {
 
 // The lane's recorded fork point (T-E125B-07), read from the lane WORKTREE
 // (the file is worktree-local — see LANE_EXCLUDE_RULES). Anything but a bare
-// object id (absent, unreadable, a lane started before E125b) -> "unknown".
+// object id (absent, unreadable, a lane started before fork points were
+// recorded, E125b) -> "unknown".
 function readLaneBaseSha(lanePaths, lanePath, ticketId) {
   try {
     const text = fs.readFileSync(lanePaths.resolveLanePaths(lanePath, ticketId).baseShaPath, "utf-8").trim();
@@ -2514,7 +2524,7 @@ function sameFileBytes(a, b) {
 // is already in tasks.md (a re-run after a later step — typically a refused
 // `git worktree remove` — failed). The close itself is not redone, but the
 // lane's git-ignored state may have changed since the first run's harvest
-// (e125b R1): every such file whose history copy is missing or differs is
+// (E125b R1): every such file whose history copy is missing or differs is
 // returned as `refresh` so the re-run re-harvests it before the worktree goes.
 function planLaneClose({ lanePaths, repoRoot, lanePath, ticketId, branch, pr, now }) {
   const tasksAbs = path.join(repoRoot, TASKS_REL);
@@ -2576,7 +2586,7 @@ function planLaneClose({ lanePaths, repoRoot, lanePath, ticketId, branch, pr, no
     // Picks the harvest advisory's reason clause: the spec's ignored-`.current/`
     // shape vs a lane that simply never committed `.current/<lane>/`.
     sourceIgnored: gitTry(repoRoot, ["check-ignore", "-q", "--", laneRel]).status === 0,
-    // E213 AC1 — exit 0 only: a TRACKED tasks.md is never reported ignored
+    // Exit 0 only (E213 AC1): a TRACKED tasks.md is never reported ignored
     // (check-ignore consults the index), so it keeps the committed path (AC4).
     tasksIgnored: gitTry(repoRoot, ["check-ignore", "-q", "--", TASKS_REL]).status === 0,
     laneRel,
@@ -2606,7 +2616,7 @@ function missingDirs(dir, stopAt) {
 const CLOSE_NOT_APPLIED =
   "lane close not applied, worktree and branch left in place (re-running finish is safe)";
 
-// E213 T02 (AC5): every stdout line this step prints is buffered in `out` and
+// Every stdout line this step prints is buffered in `out` (E213 T02, AC5) and
 // flushed only once the step's mutations have all durably succeeded — the
 // close commit landed, or (no commit needed) the fs-only pointer write did —
 // so a failed-and-rolled-back run never claims a harvest that no longer
@@ -2618,7 +2628,7 @@ function executeLaneClose({ repoRoot, base, close }) {
   } = close;
   const createdDirs = missingDirs(path.dirname(histAbs), path.join(repoRoot, ".current"));
   const out = [];
-  // Set BEFORE cpSync (e125b R2): a copy that throws part-way has already
+  // Set BEFORE cpSync (E125b R2): a copy that throws part-way has already
   // created histAbs, and planLaneClose asserted histAbs was absent, so
   // everything under it is this run's own output and rollback may remove it.
   let harvestStarted = false;
@@ -2695,7 +2705,7 @@ function executeLaneClose({ repoRoot, base, close }) {
     );
   }
 
-  // E213 AC3 — an ignored tasks.md leaves the commit only the `.current/`
+  // An ignored tasks.md (E213 AC3) leaves the commit only the `.current/`
   // paths a tracked lane dir moves; with neither, no commit is attempted at
   // all (never an empty-pathspec one).
   const rels = [...(tasksIgnored ? [] : [TASKS_REL]), ...(tracked ? [laneRel, histRel] : [])];
@@ -2734,7 +2744,7 @@ function executeLaneClose({ repoRoot, base, close }) {
   process.stdout.write(out.join(""));
 }
 
-// The alreadyClosed re-run's re-harvest (e125b R1): copy each git-ignored
+// The alreadyClosed re-run's re-harvest (E125b R1): copy each git-ignored
 // lane file whose history copy is missing or differs (planLaneClose's
 // `refresh`) over that copy, BEFORE removeWorktreeNoForce. Overwriting is
 // lossless by construction: agc's only writer of that history dir is the
@@ -2767,11 +2777,12 @@ function executeHarvestRefresh({ ticketId, refresh }) {
 // `git worktree remove` (never --force) deletes untracked, git-ignored files
 // WITHOUT refusing, so a lane whose qa_reports/ / review_reports/ / specs/ are
 // git-ignored and not linked back to primary would lose its whole review
-// trail on --shipped. The same shape E180 closed for --abandoned, with three
-// deliberate differences: every file is taken (no ticket-token filter — the
-// worktree is a dedicated lane's and goes for good), the walk is recursive
-// (each file keeps its path relative to the dir root), and the destination is
-// the release-engineer 7a convention `<dir>/archive/<ticket>/<relpath>`.
+// trail on --shipped. The same shape was already closed for --abandoned
+// (E180), with three deliberate differences: every file is taken (no
+// ticket-token filter — the worktree is a dedicated lane's and goes for good),
+// the walk is recursive (each file keeps its path relative to the dir root),
+// and the destination is the release-engineer 7a convention
+// `<dir>/archive/<ticket>/<relpath>`.
 //   planShippedEvidenceHarvest  — reads and refuses only (AC8, AC17), run
 //                                 with planLaneClose before any mutation.
 //   applyShippedEvidenceHarvest — the fs copies, just before the worktree is
@@ -3019,7 +3030,7 @@ async function runFeatureFinish(cwd, argv) {
   if (Boolean(opts.shipped) === Boolean(opts.abandoned)) {
     throw usageError("agc feature finish: exactly one of --shipped / --abandoned is required");
   }
-  // e125b AC12 — operator-supplied PR number; never queried from a PR host.
+  // Operator-supplied PR number (E125b AC12); never queried from a PR host.
   if (opts.pr !== undefined) {
     if (!/^\d+$/.test(opts.pr)) {
       throw usageError(`agc feature finish: invalid --pr ${JSON.stringify(opts.pr)} (expected a number)`);
@@ -3082,17 +3093,18 @@ async function runFeatureFinish(cwd, argv) {
       process.stderr.write(anc.stderr);
       throw new FeatureError(`agc feature finish --shipped: merge check failed — nothing removed`);
     }
-    // E179 AC2 — apply the lane's pending tickets on --base before teardown;
-    // then E125b AC1/AC2/AC9 — close the lane's .current/<lane>/ into history
-    // and record the pointer, also on --base. Every refusal (pending content,
-    // close plan, E214 evidence-harvest plan, then primary state over BOTH
+    // Apply the lane's pending tickets on --base before teardown (E179 AC2);
+    // then close the lane's .current/<lane>/ into history and record the
+    // pointer, also on --base (E125b AC1/AC2/AC9). Every refusal (pending
+    // content, close plan, evidence-harvest plan, then primary state over BOTH
     // commits' paths) runs before the first mutation.
     const pending = await planPendingOnShipped({ lanePaths, repoRoot, base, lane: ticketId });
     const close = planLaneClose({
       lanePaths, repoRoot, lanePath, ticketId, branch, pr: opts.pr ?? "none", now: new Date(),
     });
-    // E214 — planned on every run, the alreadyClosed re-run included (a
-    // refused worktree remove leaves the evidence at risk until it goes).
+    // The shipped evidence harvest (E214) is planned on every run, the
+    // alreadyClosed re-run included (a refused worktree remove leaves the
+    // evidence at risk until it goes).
     const evidenceHarvest = planShippedEvidenceHarvest({ repoRoot, lanePath, ticketId });
     if (pending !== null || !close.alreadyClosed) {
       assertPrimaryWritable(
@@ -3128,9 +3140,9 @@ async function runFeatureFinish(cwd, argv) {
     return;
   }
 
-  // --abandoned: no merge guard (AC20). E179 AC3 — pending tickets first
-  // (their checks include the evidence precondition, hoisted), then the
-  // evidence move as its own commit (DR-4). E194 — the `.current/<ticket>/`
+  // --abandoned: no merge guard (AC20). Pending tickets first (E179 AC3;
+  // their checks include the evidence precondition, hoisted), then the
+  // evidence move as its own commit (DR-4). The `.current/<ticket>/`
   // harvest is planned (its refusal included) before any of those mutations
   // and executed last, just before the worktree is removed.
   const currentHarvest = planAbandonCurrentHarvest({
@@ -3159,7 +3171,8 @@ async function runFeatureFinish(cwd, argv) {
   if (currentHarvest !== null) executeAbandonCurrentHarvest(currentHarvest);
   removeWorktreeNoForce(repoRoot, lanePath, hint);
   process.stdout.write(`agc feature finish — removed worktree ${lanePath}\n`);
-  // AC26 — the branch is deliberately kept (E124's orphan detector needs it).
+  // AC26 — the branch is deliberately kept (the orphan-lane detector needs
+  // it, E124).
   process.stdout.write(`agc feature finish — kept branch ${branch} (abandoned lanes keep their branch)\n`);
 }
 

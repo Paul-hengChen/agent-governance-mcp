@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // Coded by @sr-engineer
-// Retro summarizer for the e8-success-telemetry sidecar (AC9). Reads
-// .current/metrics.jsonl (one JSON line per SHIPPED feature, appended by
-// tools/metrics.ts at the release-engineer terminal-marker write) and prints
-// a per-feature table plus an aggregate line — one-pass rate and mean
+// Retro summarizer for the per-feature success-telemetry sidecar (E8 AC9).
+// Reads .current/metrics.jsonl (one JSON line per SHIPPED feature, appended by
+// tools/metrics.ts at the release-engineer terminal-marker write) and prints a
+// per-feature table plus an aggregate line — one-pass rate and mean
 // qa/review/visual rounds + mean hops — usable directly in a retro without
 // hand-tallying. Zero-dep, pure Node stdlib, ESM.
 //

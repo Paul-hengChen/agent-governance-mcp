@@ -34,7 +34,8 @@
 //
 // Unlike check-version.mjs's advisory git-tag note, nothing here is advisory:
 // a `git fetch origin` failure (network/auth) is itself a FAIL for the push
-// check — this script never silently skips the check that closes the E9 gap.
+// check — this script never silently skips the check that closes the gap it
+// exists for: a "Released" claim nobody verified (E9).
 //
 // --close-out mode (E84): `node scripts/verify-release.mjs --close-out` runs
 // ONLY a standalone ahead-of-upstream assertion — no version is resolved or
@@ -42,14 +43,13 @@
 // not run. It exists to be runnable AFTER the governance bookkeeping commit
 // (handoff/metrics — kept separate from the release commit per E71c; tasks.md
 // is staged by step 8a's release commit itself, never by this bookkeeping
-// commit, per E143) has landed and pushed HEAD past the release tag. Since
-// E141, a normal run's Check 1 already tolerates that single bookkeeping-only
-// commit automatically
-// (with an explicit tolerance note) — --close-out remains for what the
-// tolerance does not cover: real source changes ahead of the tag, or a tag
-// that is not an ancestor of HEAD, where a normal run still fails Check 1 by
-// construction. Today this is a manual, documented command; no automatic
-// invocation point exists yet.
+// commit, per E143) has landed and pushed HEAD past the release tag. A normal
+// run's Check 1 now already tolerates that single bookkeeping-only commit
+// automatically (E141; with an explicit tolerance note) — --close-out remains
+// for what the tolerance does not cover: real source changes ahead of the tag,
+// or a tag that is not an ancestor of HEAD, where a normal run still fails
+// Check 1 by construction. Today this is a manual, documented command; no
+// automatic invocation point exists yet.
 //
 // --ci-check mode (E163): `node scripts/verify-release.mjs --ci-check
 // [--strict] [--sha <sha>]` runs ONLY the CI ground-truth logic that Check 6
@@ -240,15 +240,16 @@ console.log(`check:release — target version v${version}`);
 // tolerates a tag followed ONLY by commit(s) that touch paths in this list
 // and nothing else; any other path in range keeps the FAIL.
 //
-// E174a: since the E123 lane flip, 13a stages `.current/<lane>/handoff.md` +
+// Lane-layout paths (E174a): since state moved into per-lane directories (the
+// lane flip, E123), 13a stages `.current/<lane>/handoff.md` +
 // `.current/<lane>/*.jsonl` (lane = resolveCurrentLane(): `_primary` or a
-// ticket id). Any single-segment lane dir is accepted, not only the
-// release's own — the tolerance is about bookkeeping-only commits.
-// LANE_SEGMENT_RE_SRC mirrors tools/lane-paths.ts: its char class is
-// SAFE_LANE_RE / isSafeLaneName, its negative lookahead is NON_LANE_DIRS
-// (archive, history). Kept standalone (no dist/ import) on purpose; a
-// drift-guard test pins the mirror. The flat forms stay accepted for
-// pre-flip workspaces and tag ranges that predate the flip.
+// ticket id). Any single-segment lane dir is accepted, not only the release's
+// own — the tolerance is about bookkeeping-only commits. LANE_SEGMENT_RE_SRC
+// mirrors tools/lane-paths.ts: its char class is SAFE_LANE_RE /
+// isSafeLaneName, its negative lookahead is NON_LANE_DIRS (archive, history).
+// Kept standalone (no dist/ import) on purpose; a drift-guard test pins the
+// mirror. The flat forms stay accepted for pre-flip workspaces and tag ranges
+// that predate the flip.
 const LANE_SEGMENT_RE_SRC = "(?!(?:archive|history)\\/)[A-Za-z0-9_][A-Za-z0-9_-]*";
 const BOOKKEEPING_PATH_RES = [
   /^\.current\/handoff\.md$/,
@@ -256,8 +257,8 @@ const BOOKKEEPING_PATH_RES = [
   /^tasks\.md$/,
   new RegExp(`^\\.current\\/${LANE_SEGMENT_RE_SRC}\\/handoff\\.md$`),
   new RegExp(`^\\.current\\/${LANE_SEGMENT_RE_SRC}\\/[^/]+\\.jsonl$`),
-  // E126 T-E126-04 (X5 / E198(a), spec AC10): lane-local task ledgers are
-  // bookkeeping too — a lane's tw_add_task / tw_complete_task write touches
+  // Lane-local task ledgers are bookkeeping too (E126 T-E126-04; X5 / E198(a),
+  // spec AC10) — a lane's tw_add_task / tw_complete_task write touches
   // `.current/<lane>/tasks.md` exactly as it touches that lane's handoff.md
   // and *.jsonl. The `_primary` literal is subsumed by the lane regex; it is
   // listed explicitly so the release lane's own ledger reads at a glance.
@@ -443,10 +444,10 @@ runCheck("dist committed+parity", (fails) => {
 // way — the release's own run was still in flight, 56s in, and the check
 // reported PASS off the prior day's green run on a different sha).
 //
-// E165: the branch is DERIVED from the current checkout, never hardcoded to
-// `main` (a release cut from a maintenance/hotfix branch previously had its
-// CI interrogated on main's runs, so the sha never matched and the operator
-// was told CI never answered when it had been asked about the wrong branch).
+// The branch is DERIVED from the current checkout (E165), never hardcoded to
+// `main` (a release cut from a maintenance/hotfix branch previously had its CI
+// interrogated on main's runs, so the sha never matched and the operator was
+// told CI never answered when it had been asked about the wrong branch).
 // Order: the checkout's upstream (`@{u}`, remote prefix stripped) -> else the
 // current local branch -> a detached HEAD has no branch, which is a
 // cannot-obtain-ground-truth condition (WARN here; FAIL under --strict). The
@@ -454,37 +455,37 @@ runCheck("dist committed+parity", (fails) => {
 // observed returning fortnight-old runs. Only the branch is derived — how the
 // released sha is resolved (from the tag, per E147) is unchanged.
 //
-// E80: on a healthy release, THIS commit's CI run is almost always STILL IN
-// FLIGHT the moment this check runs (step 9a fires seconds after the
-// triggering push) — so the sha-not-found branch below is the DEFAULT path
-// on a healthy release, not a degraded one, and giving up on the first miss
-// let releases ship with CI silently unverified. That branch now
+// Bounded poll (E80): on a healthy release, THIS commit's CI run is almost
+// always STILL IN FLIGHT the moment this check runs (step 9a fires seconds
+// after the triggering push) — so the sha-not-found branch below is the
+// DEFAULT path on a healthy release, not a degraded one, and giving up on the
+// first miss let releases ship with CI silently unverified. That branch now
 // bounded-polls `gh run list` for the released sha instead of giving up
 // immediately: budget from AGC_VERIFY_CI_WAIT_SECONDS (default 480 seconds;
-// `0` = no wait, exactly one `gh` call — the pre-E80 behavior), polling every
-// ~20s and printing progress to stdout (never stderr — see below). A
-// completed run for this sha appearing mid-poll is evaluated exactly as
-// before: success -> OK, non-success -> the existing FAIL.
+// `0` = no wait, exactly one `gh` call — the behavior before polling existed),
+// polling every ~20s and printing progress to stdout (never stderr — see
+// below). A completed run for this sha appearing mid-poll is evaluated exactly
+// as before: success -> OK, non-success -> the existing FAIL.
 //
-// Graceful degradation is still load-bearing (backlog E14 / T-EB-01,
-// extended by E78 and E80): any inability to OBTAIN ground truth for THIS
-// commit — no derivable branch (detached HEAD, E165), gh not installed, gh
-// unauthenticated, network/API error, unparseable output, zero completed
-// runs, or the poll budget expiring with
-// no completed run found for this sha — emits the SAME WARN and leaves the
-// check green, preserving the pre-E14 exit-0 path exactly (E78's contract
-// preserved, not inverted: the poll only improves the odds of finding
-// ground truth, it never turns a miss into a FAIL). The ONLY failure mode is
-// a definitively red answer: a completed run for THIS commit whose
-// conclusion is not "success".
+// Graceful degradation is still load-bearing (backlog E14 / T-EB-01, extended
+// by E78 and E80): any inability to OBTAIN ground truth for THIS commit — no
+// derivable branch (detached HEAD, E165), gh not installed, gh
+// unauthenticated, network/API error, unparseable output, zero completed runs,
+// or the poll budget expiring with no completed run found for this sha — emits
+// the SAME WARN and leaves the check green, preserving the exit-0 path that
+// predates Check 6 exactly (the sha-match contract, E78, is preserved, not
+// inverted: the poll only improves the odds of finding ground truth, it never
+// turns a miss into a FAIL). The ONLY failure mode is a definitively red
+// answer: a completed run for THIS commit whose conclusion is not "success".
 
 // --- Shared CI ground-truth evaluator (E163) --------------------------------
 // Factored out of Check 6 so SOP steps 2a and 8b (the --ci-check mode above)
 // reuse this exact sha-resolution-and-poll mechanism rather than a second
 // implementation. `strict` is the only behavioral parameter: false reproduces
-// Check 6's pre-E163 behavior byte-for-byte (WARN-and-continue on any
-// inability to obtain ground truth); true converts every one of those WARN
-// conditions into a FAIL instead — used by step 8b, never by Check 6 itself.
+// Check 6's behavior from before this extraction byte-for-byte
+// (WARN-and-continue on any inability to obtain ground truth); true converts
+// every one of those WARN conditions into a FAIL instead — used by step 8b,
+// never by Check 6 itself.
 function evaluateCIGroundTruth({ sha: releaseSha, strict, fails }) {
   // WARNs (and poll-progress lines) go to stdout, not stderr: the script's
   // contract (pinned by VR-8) reserves stderr for FAIL lines — a fully
@@ -509,7 +510,7 @@ function evaluateCIGroundTruth({ sha: releaseSha, strict, fails }) {
   const waitBudgetSeconds =
     Number.isFinite(parsedBudget) && parsedBudget >= 0 ? parsedBudget : DEFAULT_WAIT_SECONDS;
 
-  // E165: the branch whose CI runs are ground truth is DERIVED from the
+  // The branch whose CI runs are ground truth (E165) is DERIVED from the
   // current checkout, never assumed to be `main` — a release cut from a
   // maintenance/hotfix branch must interrogate that branch's runs, not
   // main's. Derivation order:

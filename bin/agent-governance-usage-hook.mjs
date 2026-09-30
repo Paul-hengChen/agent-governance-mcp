@@ -135,8 +135,8 @@ async function main() {
   // Opt-in gate (AC-9): positive finite tokenBudgetPerFeature required.
   // Raw read + parse (not tools/config.js): loadConfig heals schema_version
   // on read (a write) — the wrong posture for a best-effort observer hook
-  // that must never write config or exit non-zero. (Since E31 loadConfig no
-  // longer throws on malformed JSON, but the heal-on-read objection stands.)
+  // that must never write config or exit non-zero. (loadConfig no longer
+  // throws on malformed JSON, E31, but the heal-on-read objection stands.)
   let budget;
   try {
     const config = JSON.parse(fs.readFileSync(path.join(currentDir, ".config.json"), "utf-8"));
@@ -146,10 +146,11 @@ async function main() {
   }
   if (typeof budget !== "number" || !Number.isFinite(budget) || budget <= 0) return;
 
-  // E123 F1 L3: resolve the lane handoff path via the compiled lane-layout
-  // seam (dist/tools/lane-paths.js); path.resolve pins an ABSOLUTE workspace
-  // (L-SCHEMA-NEW-9). Import failure (dist/ missing) → no record, exit 0.
-  // e123c (J2-NEW-3): lane-then-flat fallback, read-only (the readAndMigrate
+  // Resolve the lane handoff path via the compiled lane-layout seam
+  // (dist/tools/lane-paths.js, E123 F1 L3); path.resolve pins an ABSOLUTE
+  // workspace (L-SCHEMA-NEW-9). Import failure (dist/ missing) → no record,
+  // exit 0.
+  // Lane-then-flat fallback (E123c, J2-NEW-3), read-only (the readAndMigrate
   // AC13 posture) — an unmigrated workspace still holds only the flat
   // handoff.md, and must not record feature: null.
   let handoffPath;

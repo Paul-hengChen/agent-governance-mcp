@@ -21,8 +21,8 @@ import { sliceH2Section, sliceH2SectionAt, findH2LineAt, splitTableCells, parseU
 // Constitution §3.1 visual evidence gate: when `design/<active_feature>.md`
 // contains a `## Visual Baselines` H2, PASS additionally requires
 // `qa_reports/visual_<task-id>.md` for every task id in the round.
-// Exported as of E23 (D3): the VISUAL_EVIDENCE_MISSING / VISUAL_REPORT_INCOMPLETE
-// emit sites in tools/handoff-orchestrator.ts name the exact file path checked.
+// Exported so the VISUAL_EVIDENCE_MISSING / VISUAL_REPORT_INCOMPLETE emit
+// sites in tools/handoff-orchestrator.ts name the exact file path checked (E23 D3).
 export function visualEvidencePath(workspacePath, taskId) {
     const safe = taskId.replace(/[^A-Za-z0-9._-]/g, "_");
     return path.join(workspacePath, "qa_reports", `visual_${safe}.md`);
@@ -234,7 +234,7 @@ const REQUIRED_VISUAL_SECTIONS = [
 // Guards against `\bPASS\b`-anywhere false positives like "NOT PASS",
 // "PASS blocked", "not ready to PASS". Reads the trailing value of the
 // `## Verdict — <value>` heading, else the first non-empty body line.
-// E23 (D2): only heading LOCATION is evidence-schema-keyed (pin 1 = exact
+// Only heading LOCATION is evidence-schema-keyed (E23 D2; pin 1 = exact
 // anchor, pin >=2 / absent = normalized-contains, so `## Phase 4 — Verdict:
 // PASS` locates). The verdict VALUE parse keeps its exact-token semantics —
 // normalization never applies to the value.
@@ -245,7 +245,7 @@ function verdictIsPass(content, evidenceSchema) {
     if (headLine !== null) {
         // Strip up to and including the FIRST "verdict" token in the heading
         // line, then leading separators. Under pin 1 the line is exact-anchored
-        // (`^##\s+Verdict\b…`), so this is equivalent to the pre-E23
+        // (`^##\s+Verdict\b…`), so this is equivalent to the legacy
         // `replace(/^##\s+Verdict\b/i, "")` prefix strip; under v2 it also
         // handles prefixed headings like `## Phase 4 — Verdict: PASS`.
         const m = /verdict/i.exec(headLine);
@@ -267,7 +267,7 @@ function verdictIsPass(content, evidenceSchema) {
     return firstToken === "PASS";
 }
 // Pure validator over a single visual report's content.
-// E23 (D2): `evidenceSchema` keys HEADING LOCATION only — pin 1 replays the
+// `evidenceSchema` keys HEADING LOCATION only (E23 D2) — pin 1 replays the
 // legacy exact-anchored sliceH2Section behavior; pin >=2 or absent uses
 // normalized-contains, so `## Widget Shape Verification (v2 grid)` style
 // suffixed/prefixed headings satisfy section presence. Row parsing
@@ -318,8 +318,8 @@ export function designDeclaresStructuralAssertions(workspacePath, activeFeature)
 // Composition helper. Validates each present visual_<id>.md against the v3.26
 // schema. Missing files are skipped (existence is enforced upstream by
 // hasVisualEvidenceInFile). Returns the failing task ids with their detail.
-// E23 (D2): threads the feature's pinned evidence_schema through to the pure
-// validator; the orchestrator resolves the pin from the handoff state.
+// Threads the feature's pinned evidence_schema through to the pure
+// validator; the orchestrator resolves the pin from the handoff state (E23 D2).
 export function validateVisualReports(workspacePath, taskIds, evidenceSchema) {
     const byTaskId = {};
     for (const id of taskIds) {
@@ -555,7 +555,7 @@ export function parseBaselineManifestRows(content) {
     let statusIdx = -1;
     let pointerIdx = -1;
     let mediumIdx = -1;
-    let credibilityIdx = -1; // E4: located by the `credibility` header; -1 => column absent
+    let credibilityIdx = -1; // Found by the `credibility` header (E4); -1 => column absent
     let headerLine = null;
     for (const line of tableLines) {
         if (/^\|[\s:|-]+\|?$/.test(line))
@@ -597,7 +597,7 @@ export function parseBaselineManifestRows(content) {
             ? "audited"
             : normalizeStatus(effStatusIdx < cells.length ? cells[effStatusIdx] : "");
         const isAudited = status === "audited" && pointer.trim().length > 0;
-        // E4: credibility located by header only (no positional fallback) — absent
+        // Credibility is located by header only (no positional fallback, E4) — absent
         // header / short row → "". Normalized trim().toLowerCase() so the gate can
         // compare directly to the literal "full-page-composite".
         const credibility = credibilityIdx >= 0 && credibilityIdx < cells.length
@@ -669,7 +669,7 @@ export function checkBaselineManifest(workspacePath, activeFeature) {
     }
     return { ok: true, code: null, detail: "", designPath, auditedCount };
 }
-// ---------- E4 — Source-credibility gate (e4-design-source-credibility-gate) ----------
+// ---------- Source-credibility gate (E4) ----------
 // Build-entry attestation gate on the pm:In_Progress -> {architect,sr-engineer}:In_Progress
 // edge. Confirms the design-auditor's step-2b Source-Credibility Classification actually
 // ran and recorded its verdict: every `audited` `## Source` row of a fetch-based design
@@ -709,7 +709,8 @@ export function checkSourceCredibility(workspacePath, activeFeature) {
     if (mode === null || !FETCH_BASED_MODES.includes(mode)) {
         return { ok: true, offendingRows: [], designPath, mode }; // AC-4 (non-fetch mode)
     }
-    // AC-4: no `## Source` section at all → dormant (pre-E4 / pre-manifest designs).
+    // AC-4: no `## Source` section at all → dormant (designs that predate
+    // this gate or the asset manifest).
     if (sliceH2Section(content, "Source") === null) {
         return { ok: true, offendingRows: [], designPath, mode };
     }
