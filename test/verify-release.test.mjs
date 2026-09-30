@@ -825,10 +825,10 @@ test("VR-8 (AC8): multi-cause failure surfaces every FAIL in one run (no short-c
   // dist-committed+parity check, isolating the four intended failures.
   const { root } = mkFixtureRepo({
     version: "8.1.0",
-    tag: "none", // AC1 fails
-    changelog: null, // AC5 fails
-    distUncommitted: true, // AC6 fails (version itself still matches)
-    origin: "no-upstream", // AC3 fails
+    tag: "none", // the release tag is missing, so the tag check fails (AC1)
+    changelog: null, // no CHANGELOG entry, so the changelog check fails (AC5)
+    distUncommitted: true, // dirty dist/ fails the dist-clean check (AC6); the version itself still matches
+    origin: "no-upstream", // no upstream branch, so the pushed check fails (AC3)
   });
   const result = runVerify(root, ["v8.1.0"]);
   assert.notEqual(result.status, 0);
