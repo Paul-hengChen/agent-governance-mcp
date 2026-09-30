@@ -26,7 +26,7 @@ function seedVisualReport(ws, taskId, body) {
   fs.writeFileSync(path.join(ws, "qa_reports", `visual_${taskId}.md`), body);
 }
 
-// ---------- AC-1 — unchecked → reject ----------
+// ---------- an unchecked row is rejected (AC-1) ----------
 
 test("AC-1: parseVisualWidgetsChecklist returns unchecked rows when `- [ ]` present", () => {
   // Why: the load-bearing case. A qa-engineer who left a widget unchecked
@@ -82,7 +82,7 @@ test("AC-2: hasUncheckedWidgets returns ok:true when every row is checked", () =
   assert.deepEqual(result.uncheckedByTaskId, {});
 });
 
-// ---------- AC-3 — missing section → accept (backwards-compat) ----------
+// ---------- a missing section is accepted, for backwards compatibility (AC-3) ----------
 
 test("AC-3: missing `## Widget Shape Verification` section → empty parse → accept", () => {
   // Why: pre-v3.15.0 visual reports didn't have this section. Backwards-
@@ -129,7 +129,7 @@ test("AC-4: hasUncheckedWidgets aggregates unchecked widgets across multiple tas
   // T02 is absent from the dict because all its rows are checked.
 });
 
-// ---------- AC-5 — permissive whitespace, strict bracket content ----------
+// ---------- whitespace is forgiving but the bracket content is strict (AC-5) ----------
 
 test("AC-5: `[x]` and `[X]` both count as checked (case-insensitive on x)", () => {
   const rows = parseVisualWidgetsChecklist(
