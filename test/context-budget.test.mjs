@@ -1,14 +1,14 @@
 // Coded by @qa-engineer
 // Tests for spec: specs/context-budget-reduction.md.
 // Spec-to-Test map:
-//   AC1 (measurement)          -> t-measure-runs, t-measure-labels
-//   AC2 (reduction)            -> t-strip-reduces, t-lean-under-target
-//   AC3 (enforcement preserved)-> t-lite-omits-chain, t-lite-keeps-universal,
+//   measurement (AC1) -> t-measure-runs, t-measure-labels
+//   reduction (AC2) -> t-strip-reduces, t-lean-under-target
+//   enforcement preserved (AC3) -> t-lite-omits-chain, t-lite-keeps-universal,
 //                                 t-full-keeps-chain, t-hook-lite, t-hook-full
-//   AC4 (no routing regression)-> t-full-keeps-chain (chain roles still receive
+//   no routing regression (AC4) -> t-full-keeps-chain (chain roles still receive
 //                                 §3.1/§4 verbatim; transition logic untouched —
 //                                 covered by the existing transitions test suite)
-//   DR-4 (manifest imported, not regex-copied) -> t-manifest-not-duplicated
+//   manifest imported, not regex-copied (DR-4) -> t-manifest-not-duplicated
 //
 // WHY: the always-on token reduction works by composing OUT the chain-only
 // fragments (constitution §3.1, §4) for LITE contexts only. The risk is twofold —
@@ -24,7 +24,7 @@
 // those two strippers' internals (unit tests, DR-3 regex parity, cross-axis
 // permutation/orphan-marker sweeps) is removed; tests that probed OUTCOMES (what
 // a dispatch mode contains/omits) are re-pointed to composeConstitution() and
-// continue to hold — proving AC2/AC3/AC4 equivalence empirically, not just by
+// continue to hold — proving the reduction/enforcement/routing equivalence (AC2/AC3/AC4) empirically, not just by
 // construction. stripRationale/stripOriginTags are UNCHANGED and every test of
 // them below is kept verbatim.
 
@@ -45,7 +45,7 @@ const { stripRationale, stripOriginTags, buildPromptForRole, composeConstitution
 const { setActiveStorage, FileHandoffStorage } = await import(path.join(ROOT, "dist", "tools", "storage.js"));
 // d6-host-capability-compose-axis (T-D6-04): content/skill-coordinator.md is
 // retired — reads of it below go through the real composer (taskTool:true
-// reproduces the monolith byte-for-byte, AC5) instead of a raw fs.readFileSync
+// reproduces the monolith byte-for-byte; AC5) instead of a raw fs.readFileSync
 // against a file that no longer exists on disk.
 const { composeSkill, hostCapabilitiesFor } = await import(path.join(ROOT, "dist", "prompts", "skill-manifest.js"));
 function readSkillFile(f) {
@@ -78,7 +78,7 @@ const CONSTITUTION = composeConstitution({ chain: true, design: true });
 
 // The hook's lite composition (chain fragments excluded, design fragments kept — the
 // hook never stripped design; see architecture Hook Parity Contract) with the blank-run
-// collapse the old stripChainOnly performed. Reused by the AC2/AC3 lean-bundle tests
+// collapse the old stripChainOnly performed. Reused by the reduction/enforcement (AC2/AC3) lean-bundle tests
 // below, which previously called the now-deleted stripChainOnly(CONSTITUTION) directly.
 const LEAN_CONSTITUTION = composeConstitution({ chain: false, design: true }).replace(/\n{3,}/g, "\n\n");
 
@@ -88,7 +88,7 @@ const UNIVERSAL_MARKERS = ["NO YAPPING", "Strict typing", "Anti-Loop Circuit Bre
 
 // governance-text-load (F-B, v3.31.0): rule/gate/SOP markers that MUST survive stripRationale.
 // These are the operative clauses the agent acts on — only "Reason:/Rationale:" prose is fenced.
-// Spec AC9: no fence may swallow a rule heading, gate name, MUST clause, or numbered SOP step.
+// Losslessness rule (spec AC9): no fence may swallow a rule heading, gate name, MUST clause, or numbered SOP step.
 const PM_RULE_MARKERS = [
   // SOP step numbers
   "1. `tw_get_state`",
@@ -124,14 +124,14 @@ const SR_RULE_MARKERS = [
   "QA Round Reply",
 ];
 
-// --- AC2 (a12-partials-limits-registry, T-A12-04): partial-substitution byte-identity ---
-// WHY: specs/a12-partials-limits-registry-architecture.md's Byte-Identity Contract (AC2)
+// --- Partial-substitution byte-identity (AC2; a12-partials-limits-registry, T-A12-04) ---
+// WHY: specs/a12-partials-limits-registry-architecture.md's Byte-Identity Contract (its AC2)
 // requires buildPromptForRole's composed output for the 5 partial-adopting roles
 // (architect, pm, design-auditor, researcher, sr-engineer) to be byte-identical, on the
 // SKILL portion, to the pre-refactor hand-authored step-1 line. The direct expandPartials
 // unit test below is architecture's "Recommended primary AC2 assertion"; the per-role
 // buildPromptForRole assertions are the end-to-end proof that both render paths (build.ts
-// AND tools/role.ts, DR-4) actually wire it in — a regression in either wiring site would
+// AND tools/role.ts; architecture decision DR-4) actually wire it in — a regression in either wiring site would
 // either leak a raw {{PARTIAL:...}} token or drop the line entirely.
 const STEP1_LINE = "1. `tw_get_state` → `tw_detect_drift`.";
 const PARTIAL_ADOPTING_SKILLS = [
@@ -144,7 +144,7 @@ const PARTIAL_ADOPTING_SKILLS = [
 
 test("AC2: expandPartials(step1-preflight token) equals the exact pre-refactor step-1 line (byte-identical)", () => {
   // WHY: this is the whole byte-identity contract distilled to one call — the loaded
-  // partial file, minus its one conventional trailing newline (DR-3), must equal the
+  // partial file, minus its one conventional trailing newline (architecture decision DR-3), must equal the
   // literal bytes every one of the 5 skills used to hand-author on their own step-1 line.
   const actual = expandPartials("{{PARTIAL:step1-preflight}}", loadPartial);
   assert.equal(actual, STEP1_LINE, "expandPartials must reproduce the exact pre-refactor step-1 line, byte-for-byte");
@@ -174,10 +174,10 @@ for (const skillFile of PARTIAL_ADOPTING_SKILLS) {
 }
 
 test("AC2/DR-4: tools/role.ts switchRole (the second render path) also expands the step-1 partial for all 5 roles", async () => {
-  // WHY: switchRole does NOT flow through buildPromptForRole (architecture DR-4) — a
+  // WHY: switchRole does NOT flow through buildPromptForRole (the wiring decision, architecture DR-4) — a
   // separate wiring site that, if missed, would leak the raw token specifically on the
   // tw_switch_role tool path while buildPromptForRole looked fine. Exercise both to close
-  // the full DR-4 contract.
+  // the full wiring contract (DR-4).
   const { switchRole } = await import(path.join(ROOT, "dist", "tools", "role.js"));
   const ws = fs.mkdtempSync(path.join(os.tmpdir(), "twa12-role-"));
   try {
@@ -199,7 +199,7 @@ test("AC2/DR-4: tools/role.ts switchRole (the second render path) also expands t
 });
 
 test("DR-5 guard (T-A12-09): no literal {{PARTIAL:...}} token may appear in any const-*.md, skill-coordinator.md, or skill-coordinator-lite.md source file", () => {
-  // WHY: architecture DR-5 — the SessionStart hook renders ONLY skill-coordinator.md /
+  // WHY: the hook-scope decision (architecture DR-5) — the SessionStart hook renders ONLY skill-coordinator.md /
   // skill-coordinator-lite.md, and neither adopts the partial mechanism; const-*.md
   // fragments never carried the step-1 line at all. None of these render through
   // expandPartials (build.ts only calls it on the DISPATCHED skill file, never on the
@@ -221,7 +221,7 @@ test("DR-5 guard (T-A12-09): no literal {{PARTIAL:...}} token may appear in any 
   }
 });
 
-// --- AC2: reduction -------------------------------------------------------
+// --- reduction (AC2) -------------------------------------------------------
 
 test("AC2: lean always-on bundle is below the raw baseline and within target (<= 5415 ~tok)", () => {
   // v3.24.0 (B2 backlog fix): cap raised from 2100 → 2300 to provide ~200-token
@@ -272,7 +272,7 @@ test("AC2: lean always-on bundle is below the raw baseline and within target (<=
   // per the established Phase-2 convention (no additional headroom).
   // c7-version-assertion-ownership (qa-owned bump, AC-8): cap raised from 3386 → 3491 to
   // absorb the const-05-core-standards.md "Test ownership" bullet rewrite (S01: narrow
-  // import/require-path-retarget carve-out naming the A10 precedent, net +420 chars).
+  // import/require-path-retarget carve-out naming the earlier import-retarget precedent (A10), net +420 chars).
   // const-05-core-standards.md is core (untagged chain/design), so it loads on this lean
   // path too. Independently re-measured (not trusted from sr-engineer's or
   // code-reviewer's notes) at 3491 ~tok (exact); cap set to the exact measured value per
@@ -296,7 +296,7 @@ test("AC2: lean always-on bundle is below the raw baseline and within target (<=
   // 4027 to absorb the new `## Limits` table inserted at the top of
   // const-01-core-head.md (before §1) — const-01 is core-head (untagged chain/design),
   // so it loads on this lean path too. skill-coordinator-lite.md does not adopt the
-  // {{PARTIAL:...}} mechanism (spec DR-5), so no skill-side change here. Independently
+  // {{PARTIAL:...}} mechanism (spec decision DR-5), so no skill-side change here. Independently
   // re-measured (not trusted from sr-engineer's or code-reviewer's notes) at 4027 ~tok
   // (exact); cap set to the exact measured value per the established Phase-2 convention
   // (no additional headroom).
@@ -312,7 +312,7 @@ test("AC2: lean always-on bundle is below the raw baseline and within target (<=
   // to absorb the new §6 "Sanctioned git operations (ALL roles)" whitelist bullet in
   // const-15-core-tail.md (core-tagged — includeSegment returns true unconditionally, so
   // it ships on this lean/lite path too; the bullet is unfenced — no rationale fence, per
-  // the AC7 exactly-two-fences pin — so its full text counts on every path). Measured at
+  // the exactly-two-fences pin (AC7) — so its full text counts on every path). Measured at
   // 4297 ~tok (exact); cap set to the exact measured value per the established Phase-2
   // convention (no additional headroom). This bump also re-syncs the test title with the
   // live assert (the title had stalled at "<= 3087" since the a11-escalation-grammar bump
@@ -354,7 +354,7 @@ test("AC2: lean always-on bundle is below the raw baseline and within target (<=
   // (+201) to absorb the three-branch rewrite of const-05's §2 *Conditional test writing*
   // bullet (230 → 1032 chars). This is the always-on lean bundle, so this is the widest
   // blast radius any const-05 edit has — the bullet ships in every dispatch mode. Bought
-  // deliberately: the pre-E43 one-sentence form was unexecutable for a Task-dispatched
+  // deliberately: the earlier one-sentence form (before E43) was unexecutable for a Task-dispatched
   // qa-engineer (docs/backlog.md E43) and had already forced a documented deviation in
   // E38's QA round, so the growth buys a rule that no longer requires violating it.
   // Independently re-measured by qa (NOT trusted from sr-engineer's handoff or the
@@ -386,11 +386,11 @@ test("AC2: lean always-on bundle is below the raw baseline and within target (<=
   // every dispatch mode including lite. Independently re-measured (not trusted from
   // sr-engineer's or code-reviewer's handoff notes) at 5415 ~tok (exact); cap raised
   // from 5157 to that exact measured value, per the established Phase-2 convention of
-  // setting the cap to the measured figure with no extra headroom (E231).
+  // setting the cap to the measured figure with no extra headroom (zero-headroom convention, E231).
   assert.ok(lean <= 5415, `lean always-on (${lean} ~tok) must meet the <= 5415 target (E231 re-baseline)`);
 });
 
-// --- AC3: enforcement preserved ------------------------------------------
+// --- enforcement preserved (AC3) ------------------------------------------
 
 test("AC3: lite (stripped) constitution OMITS chain-only sections", () => {
   for (const m of CHAIN_MARKERS) {
@@ -416,21 +416,21 @@ test("AC3/AC4: full (chain-role) constitution RETAINS chain-only sections verbat
 // compose-not-strip (ticket A9): the "exactly one balanced chain-only fence"
 // test that lived here is REMOVED (T-CNSO-07) — it asserted on the marker-pairing
 // mechanics of a strip pipeline that no longer exists. Composition now selects
-// fragments by tag, never parses markers (AC11: the unbalanced-fence failure
+// fragments by tag, never parses markers (the unbalanced-fence failure (AC11)
 // class is gone structurally, not guarded against). See T-manifest-not-duplicated
 // below and test/compose-equivalence.test.mjs for the replacement equivalence
 // contract.
 
-// --- AC3: SessionStart hook integration ----------------------------------
+// --- SessionStart hook integration (AC3) ----------------------------------
 
-// Test-isolation fix (C6C11-QA, review_reports/review_C6C11-REV.md N2): this
+// Test-isolation fix (prompt-state-injection QA, C6C11-QA, review_reports/review_C6C11-REV.md N2): this
 // used to run the hook with CLAUDE_PROJECT_DIR=ROOT, which writes a REAL C11
 // L2 dedup marker (bin/agent-governance-context.mjs's trailing
 // `.agc-hook-marker.json` write) into THIS repo's own `.current/`. That marker
 // is cross-process BY DESIGN (index.ts's hookMarkerFresh reads it from disk),
 // so a later, unrelated test *process* — test/teamwork-lite.test.mjs AC3b —
 // spawning the real server against `PROJECT_ROOT` (== this same ROOT) within
-// the 120s window correctly (per the C11 fail-safe contract) saw a fresh
+// the 120s window correctly (per the prompt-state dedup fail-safe contract, C11) saw a fresh
 // marker and substituted the S03 sentinel for the constitution, failing
 // AC3b's `# Constitution v` assertion. That is the product working as
 // designed colliding with a shared on-disk side effect of THIS file's test
@@ -477,7 +477,7 @@ test("AC3: SessionStart hook FULL output retains chain sections", () => {
 // /teamwork then /teamwork-lite — see test/prompt-state-footer.test.mjs's
 // e2e dedup test for the end-to-end proof that this mechanism actually fires).
 // This test isolates the PURE size delta buildPromptForRole's omitConstitution
-// param produces (index.ts's L1/L2 decision, DR-6): the second fetch in a
+// param produces (index.ts's L1/L2 decision; DR-6): the second fetch in a
 // dual-injection session pays only the S03 sentinel's cost instead of a full
 // second constitution copy.
 test("AC-9: omitConstitution=true bundle is measurably smaller than the full bundle by a concrete floor", async () => {
@@ -505,7 +505,7 @@ test("AC-9: omitConstitution=true bundle is measurably smaller than the full bun
   );
 });
 
-// --- AC1: measurement script ---------------------------------------------
+// --- measurement script (AC1) ---------------------------------------------
 
 test("AC1: measure-context-cost script runs headlessly and exits 0", () => {
   // execFileSync throws on non-zero exit — reaching the assert means exit 0.
@@ -528,11 +528,11 @@ test("AC1: measure script prints the spec'd Copy/Strings labels + token table", 
   assert.match(out, /~tokens/, "must print a token column");
 });
 
-// --- DR-4: shared manifest, not duplicated regex --------------------------
+// --- shared manifest, not duplicated regex (DR-4) --------------------------
 
 test("DR-4: hook and measure script import the shared constitution-manifest (no duplicated chain-only regex)", () => {
-  // WHY: DR-3 ("keep 3 stripChainOnly regex copies in sync by inspection") is
-  // replaced by DR-4 ("one exported CONSTITUTION_SEGMENTS + includeSegment,
+  // WHY: the old approach (DR-3, "keep 3 stripChainOnly regex copies in sync by inspection") is
+  // replaced by the new approach (DR-4, "one exported CONSTITUTION_SEGMENTS + includeSegment,
   // imported by build.ts, the hook, and the measure script") — architecture
   // compose-not-strip-overlays-architecture.md. The parity contract is now
   // STRUCTURAL (one shared list) instead of TEXTUAL (matching regex literals).
@@ -555,7 +555,7 @@ test("DR-4: hook and measure script import the shared constitution-manifest (no 
 
 // ============================================================================
 // governance-tag-strip (T-GTS-07): new coverage for the fourth sibling stripper,
-// stripOriginTags. Mirrors the AC1 (stripDesignOnly)/AC9 (stripRationale) unit-test
+// stripOriginTags. Mirrors the stripDesignOnly (AC1) / stripRationale (AC9) unit-test
 // pattern already established above: idempotence, no-marker passthrough, and
 // span-removal at the unit level; a mixed-content site (paren shared between a
 // provenance tag and real normative text) at both the string level and end-to-end
@@ -565,7 +565,7 @@ test("DR-4: hook and measure script import the shared constitution-manifest (no 
 // ============================================================================
 
 test("T-GTS-07/AC3: stripOriginTags is idempotent, no-marker passthrough, and removes fenced spans", () => {
-  // WHY: same unit contract as the three sibling strippers (AC3 of the spec) — a
+  // WHY: same unit contract as the three sibling strippers (spec AC3) — a
   // safety-default no-op on unfenced text, idempotent on already-stripped text, and a
   // real content shrink on fenced text with zero orphan markers left behind.
   const noop = "no markers here";
@@ -587,7 +587,7 @@ test("T-GTS-07/AC3: stripOriginTags is idempotent, no-marker passthrough, and re
 });
 
 test("T-GTS-07/AC2: mixed-content site keeps its normative half after stripOriginTags (string-level)", () => {
-  // WHY: AC2's disqualifying-finding contract, pinned directly against a known
+  // WHY: the disqualifying-finding contract (AC2), pinned directly against a known
   // mixed-content site (skill-pm.md's Visual Structural Assertions gate) — the fence
   // wraps ONLY the "v3.26.0;" provenance substring, sharing a parenthetical with the
   // real MUST-clause qualifier "MANDATORY when …". Deleting the whole paren (the
@@ -622,7 +622,7 @@ test("T-GTS-07/AC1/AC2: mixed-content site survives end-to-end through buildProm
 });
 
 test("T-GTS-07/AC4: stripOriginTags composes order-independently with stripRationale", () => {
-  // WHY: AC4's order-independence contract, narrowed post-compose-not-strip (T-CNSO-07)
+  // WHY: the order-independence contract (AC4), narrowed post-compose-not-strip (T-CNSO-07)
   // to the two text-transform strippers that still exist — stripChainOnly/stripDesignOnly
   // are DELETED; chain/design selection is now a fragment-file-inclusion decision made
   // BEFORE either stripper runs, not a regex race the strippers could interact with. Origin
@@ -641,7 +641,7 @@ test("T-GTS-07/AC4: stripOriginTags composes order-independently with stripRatio
 // rule heading, gate name, MUST clause, or numbered SOP step. These tests pin the
 // invariant that every operative clause the agent acts on survives the strip. A
 // regression (fence accidentally wrapping a rule) would silently drop governance
-// enforcement for every chain-role dispatch (spec AC9, v3.31.0).
+// enforcement for every chain-role dispatch (losslessness, spec AC9, v3.31.0).
 
 test("AC9: stripRationale is idempotent and leaves text without fences unchanged", () => {
   const noop = "no fences here";
@@ -716,7 +716,7 @@ test("AC9: every operative rule/gate/SOP marker survives stripRationale in skill
 });
 
 test("AC1/AC2: skill-pm stripped token count meets ≤ 4376 cap", () => {
-  // WHY: the spec's re-grounded AC1 target (measured lossless, current file size
+  // WHY: the spec's re-grounded reduction target (AC1) (measured lossless, current file size
   // including F-A growth) must hold so each pm role dispatch is within budget.
   // pm-cut-approval-gate (qa-owned bump): cap raised from 2322 → 2850 to absorb
   // the step 7a Cut-Approval Gate SOP addition to skill-pm.md (inline cut draft
@@ -821,7 +821,7 @@ test("AC1/AC2: skill-pm stripped token count meets ≤ 4376 cap", () => {
 });
 
 test("AC1/AC2: skill-sr-engineer stripped token count meets ≤ 2642 cap", () => {
-  // WHY: the spec's re-grounded AC2 target must hold for sr-engineer dispatch budget.
+  // WHY: the spec's re-grounded reduction target (AC2) must hold for sr-engineer dispatch budget.
   // v3.28.0 (qa-owned bump): cap raised from 2048 → 2210 to absorb the
   // design-asset-source-rule feature's "Source assets, don't redraw them (v3.28.0)"
   // rule added to skill-sr-engineer's Design-Aware Pre-Flight step 3a. Actual
@@ -885,15 +885,15 @@ test("AC1/AC2: skill-sr-engineer stripped token count meets ≤ 2642 cap", () =>
 });
 
 // --- governance-text-load Round-2: constitution rationale fencing (T-GTL-06/07) ---
-// WHY: R2 extended the strip to the highest-leverage lever — the constitution, injected
+// WHY: the second round (R2) extended the strip to the highest-leverage lever — the constitution, injected
 // on EVERY role-bundle dispatch. The §1 L16 (HTML-primitive example list) and §7 L143
 // (external-artifact example list) parentheticals are the ONLY two pure-illustration spans;
 // everything else in §1/§7 is rule-dense and §3.1/§3.2 is a hard exclusion zone. These
-// tests pin: (AC7) §3.x is byte-untouched, (AC8) the measured token floor holds, (AC9)
+// tests pin: (AC7, byte-untouched) §3.x, (AC8, token floor) the measured floor holds, (AC9, losslessness)
 // stripping is lossless w.r.t. every normative rule/gate/heading. See
 // specs/governance-text-load-architecture.md R2 "Test thresholds that change".
 
-// Markers that MUST survive stripRationale on the constitution (AC9 — operative rules).
+// Markers that MUST survive stripRationale on the constitution (operative rules; AC9).
 const CONST_RULE_MARKERS = [
   "## 1.",                          // §1 heading
   "## 7.",                          // §7 heading
@@ -945,7 +945,7 @@ test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the 
   // loads), so the rationale-stripped figure grows vs Phase 1. MEASURED on THIS working tree
   // with the test's own chars/4 estimator (NOT assumed): raw 4311 → rationale-stripped
   // 4239 ~tok (exact). This is the design-arm (kept-path) cost; it is the price of the
-  // ~1830 ~tok saving on the NON-DESIGN dispatch path (pinned by the AC8 non-design test
+  // ~1830 ~tok saving on the NON-DESIGN dispatch path (pinned by the non-design floor test (AC8)
   // below). package.json stays 3.33.0 (release human-owned).
   // v3.28.0 (qa-owned bump): cap raised from 4239 → 4304 to absorb the
   // design-asset-source-rule constitution §1 Design-sourced assets line (sits inside
@@ -1054,7 +1054,7 @@ test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the 
   // e7-governed-git-surface (sr-owned bump per T-E7-03, AC4): cap raised from 7064 → 7275
   // to absorb the new §6 "Sanctioned git operations (ALL roles)" whitelist bullet in
   // const-15-core-tail.md (core-tagged, loads on every arm including this design-arm
-  // path; the bullet carries NO rationale fence — the AC7 exactly-two-fences pin above
+  // path; the bullet carries NO rationale fence — the exactly-two-fences pin (AC7) above
   // forbids a third — so its full text, incident reason included, counts here).
   // Measured at 7275 ~tok (exact); cap set to the exact measured value per the
   // established Phase-2 convention (no additional headroom). Saving margin re-verified:
@@ -1314,7 +1314,7 @@ test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/b
   // detection" row's fresh-session pointer clause, the intro rewrite noting
   // both triggers route to Crash-Resume, and the new step 0 prepended to the
   // Crash-Resume Protocol (T-D5-03). No constitution-side change in this
-  // ticket (DR-6 — no new gate/GateErrorCode), so this bundle's growth is
+  // ticket (decision DR-6 — no new gate/GateErrorCode), so this bundle's growth is
   // 100% skill-coordinator-side. Independently re-measured (not trusted from
   // code-reviewer's review note) at 13298 ~tok (exact); cap set to the exact
   // measured value per the established Phase-2 convention (no additional
@@ -1478,10 +1478,10 @@ test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/b
   // (no additional headroom).
   // e91-e103-dispatch-pin-mechanics (qa-owned bump, T-E103-01/T-E91-01): cap raised from
   // 18369 -> 18570 (+201) to absorb content/coord-02-host-dispatch.md's new REQUIRED
-  // `model` dispatch-argument clause (E103 (iii): resolve from `dispatch_pins` else that
+  // `model` dispatch-argument clause (the third clause of E103: resolve from `dispatch_pins` else that
   // role's `~/.claude/agents/<role>.md` `model` frontmatter; no-resolvable-tier escape
   // hatch) plus content/coord-03-core-fallback.md's Crash-Resume step 3 reword and
-  // content/coord-04-host-watermark.md's Pinned-tier expectation reword (E91 (iii): both
+  // content/coord-04-host-watermark.md's Pinned-tier expectation reword (the third clause of E91: both
   // retire enforcement-implying "verify/actually served/silently degrades" framing for an
   // honest self-report-detection framing; no verification mechanism added). All three
   // touched fragments are `core`/`host:claude-code`-tagged in files that are never part of
@@ -1726,21 +1726,21 @@ test("AC9/AC-P2-3: fullDetail retains both example lists verbatim (design-arm-aw
 // ============================================================================
 // constitution-conditional-load (AC1–AC8): the THIRD, feature-conditional strip
 // axis (stripDesignOnly). On a NON-design feature the server-side visual gates are
-// inert, so §3.2 (minus R10) + the §3.1 visual bullets bind NO role and are stripped
+// inert, so §3.2 (minus the reconcile rule, R10) + the §3.1 visual bullets bind NO role and are stripped
 // from the dispatch; on a DESIGN-armed feature the full visual governance loads
 // unchanged. Gated on the SAME arm signal the server PASS gates use
 // (hasDesignModeRequiringVisual) — text present iff the gates can fire (HC1/HC3).
 // Spec: specs/constitution-conditional-load.md.
 //
 // Spec-to-Test map:
-//   AC1 (non-design strips)        -> t-ccl-strip-helper, t-ccl-build-nondesign-strips
-//   AC2 (design loads full)        -> t-ccl-build-design-loads, t-ccl-design-byte-equal
-//   AC3 (safe default)             -> t-ccl-no-state-strips, t-ccl-no-design-file-strips
-//   AC4 (byte-unchanged surviving) -> t-ccl-r10-byte-equal, t-ccl-nonvisual-byte-equal
-//   AC5/HC5 (composition)          -> t-ccl-six-permutations, t-ccl-zero-orphans
-//   AC6 (anti-sweep both arms)     -> t-ccl-antisweep-both-arms
-//   AC7 (lite interaction)         -> t-ccl-lite-nondesign-consistent
-//   AC8 (rebaseline floors)        -> t-ccl-nondesign-floor + the two rebaselined
+//   non-design strips (AC1) -> t-ccl-strip-helper, t-ccl-build-nondesign-strips
+//   design loads full (AC2) -> t-ccl-build-design-loads, t-ccl-design-byte-equal
+//   safe default (AC3) -> t-ccl-no-state-strips, t-ccl-no-design-file-strips
+//   byte-unchanged surviving (AC4) -> t-ccl-r10-byte-equal, t-ccl-nonvisual-byte-equal
+//   composition (AC5/HC5) -> t-ccl-six-permutations, t-ccl-zero-orphans
+//   anti-sweep both arms (AC6) -> t-ccl-antisweep-both-arms
+//   lite interaction (AC7) -> t-ccl-lite-nondesign-consistent
+//   rebaseline floors (AC8) -> t-ccl-nondesign-floor + the two rebaselined
 //                                     AC8 floors above (4200 / 7665)
 // ============================================================================
 
@@ -1766,7 +1766,7 @@ const DESIGN_ONLY_SENTINELS = [
 // Anti-sweep CONTRACT sentinels: NON-visual rules that physically sit inside or
 // adjacent to the gated spans and MUST survive on BOTH arms (HC4). These are the
 // cross-role contracts the gate must never sweep away.
-// governance-tag-strip (T-GTS-04): the R10 sentinel lost its "(R10)" suffix — the bare
+// governance-tag-strip (T-GTS-04): the reconcile-rule sentinel (R10) lost its "(R10)" suffix — the bare
 // finding code is now inside an origin fence (`reconcile<!-- origin:start --> (R10)<!--
 // origin:end -->.**`), stripped unconditionally before this sentinel is checked.
 const ANTI_SWEEP_SENTINELS = [
@@ -1844,7 +1844,7 @@ async function buildOnFixture({ mode, skillFile = "skill-sr-engineer.md", noStat
   return text;
 }
 
-// --- AC1: non-design strips the gatable visual span ----------------------
+// --- non-design strips the gatable visual span (AC1) ----------------------
 
 // compose-not-strip (ticket A9, T-CNSO-07): the "AC1: stripDesignOnly removes the
 // design-only span and is idempotent" unit test that lived here is REMOVED —
@@ -1870,7 +1870,7 @@ test("AC1: chain-role build on a NON-design workspace OMITS the §3.2 body + the
   }
 });
 
-// --- AC2: design-armed loads the full visual governance ------------------
+// --- design-armed loads the full visual governance (AC2) ------------------
 
 test("AC2: chain-role build on a DESIGN-armed workspace LOADS the full §3.2 + visual §3.1", async () => {
   // WHY: the inverse contract. With design/<feature>.md `## Mode` = figma (≠ no-design),
@@ -1905,7 +1905,7 @@ test("AC2/AC4: the gated spans on the DESIGN arm are byte-equal to the constitut
   assert.ok(text.includes(srcSpan), "design-arm §3.2 span must be byte-identical to constitution source (post stripOriginTags)");
 });
 
-// --- AC3: safe default — no state / no design file => strip ---------------
+// --- safe default — no state / no design file => strip (AC3) ---------------
 
 test("AC3: NO handoff state => behaves as non-design (strips)", async () => {
   // WHY: the budget win is provably safe when no design exists. With no handoff state at
@@ -1929,10 +1929,10 @@ test("AC3: state present but NO design file, AND `## Mode` = no-design, both => 
   }
 });
 
-// --- AC4: surviving rules are byte-identical to source --------------------
+// --- surviving rules are byte-identical to source (AC4) --------------------
 
 test("AC4: §3.2 R10 (carve-out) survives byte-equal on BOTH arms — the gate never rewords it", async () => {
-  // WHY: R10 (Sequential-context assumption + reconcile) physically ends §3.2 but is
+  // WHY: the reconcile rule (R10; Sequential-context assumption + reconcile) physically ends §3.2 but is
   // NON-visual (tw_detect_drift / tw_sync after fan-out) — it is carved OUT of fence 3,
   // which ends BEFORE R10. It must appear byte-identical to source on BOTH the design and
   // non-design arms (HC2/HC4). Extract the R10 bullet from source and assert containment.
@@ -1971,7 +1971,7 @@ test("AC4: every surviving (non-gated) rule on the non-design arm is byte-identi
   );
 });
 
-// --- AC5 / HC5: composition across all three axes -------------------------
+// --- composition across all three axes (AC5 / HC5) -------------------------
 
 // compose-not-strip (ticket A9, T-CNSO-07): the two "AC5/HC5" tests that lived
 // here — "all 6 strip-order permutations are byte-identical" and "every strip
@@ -1985,7 +1985,7 @@ test("AC4: every surviving (non-gated) rule on the non-design arm is byte-identi
 // and test/compose-equivalence.test.mjs for the byte-identity contract that
 // makes the structural claim empirical rather than assumed.
 
-// --- AC6: anti-sweep — non-visual contracts survive BOTH arms -------------
+// --- anti-sweep — non-visual contracts survive BOTH arms (AC6) -------------
 
 test("AC6: non-visual contracts (scope-decision, R10, §4 diagram) survive on BOTH arms", async () => {
   // WHY: the CONTRACT-PROTECTION assertion. §3.1 scope-decision gate sits BETWEEN two gated
@@ -2001,7 +2001,7 @@ test("AC6: non-visual contracts (scope-decision, R10, §4 diagram) survive on BO
   }
 });
 
-// --- AC7: lite interaction ------------------------------------------------
+// --- lite interaction (AC7) ------------------------------------------------
 
 test("AC7: lite + non-design strips §3.2 once (no reintroduction), consistent with chain-only", async () => {
   // WHY: lite mode already strips chain-only (which WRAPS §3.1+§4, and §3.2 sits inside it),
@@ -2020,7 +2020,7 @@ test("AC7: lite + non-design strips §3.2 once (no reintroduction), consistent w
   assert.ok(!liteNonDesign.includes("3.2 Visual Verdict Authority"), "lite already strips §3.2 (inside chain-only)");
 });
 
-// --- AC8: rebaseline + pin the new non-design figure ----------------------
+// --- rebaseline + pin the new non-design figure (AC8) ----------------------
 
 test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 7826 ~tok)", () => {
   // WHY: this is the BUDGET WIN that justified the feature, and it must be regression-guarded.
@@ -2272,7 +2272,7 @@ test("AC8/HC3: build.ts arm probe uses the SAME helper as the server PASS gates"
   // tools/handoff-orchestrator.ts; index.ts itself no longer imports this helper directly.
   const buildSrc = fs.readFileSync(path.join(ROOT, "prompts", "build.ts"), "utf-8");
   const orchestratorSrc = fs.readFileSync(path.join(ROOT, "tools", "handoff-orchestrator.ts"), "utf-8");
-  // gate-registry refactor (A10 + A2): hasDesignModeRequiringVisual moved from
+  // gate-registry refactor (A10, A2): hasDesignModeRequiringVisual moved from
   // tools/evidence-file.ts to gates/visual.ts; both call sites now import it from
   // the gates/visual module (still the SAME single helper — identity preserved).
   assert.match(buildSrc, /import\s*\{\s*hasDesignModeRequiringVisual\s*\}\s*from\s*["']\.\.\/gates\/visual\.js["']/,
@@ -2292,15 +2292,15 @@ test("AC8/HC3: build.ts arm probe uses the SAME helper as the server PASS gates"
 // the §4 reflow is REORDER-ONLY). Spec: specs/constitution-conditional-load.md §Phase 2.
 //
 // Spec-to-Test map:
-//   AC-P2-1 (§4 visual block strips on non-design)  -> t-p2-s4-nondesign-strips
-//   AC-P2-2 (§4 visual block loads on design)        -> t-p2-s4-design-loads
-//   AC-P2-3 (§1 L16/17 + L19 strip / load)           -> t-p2-s1-strip-load,
+//   §4 visual block strips on non-design (AC-P2-1) -> t-p2-s4-nondesign-strips
+//   §4 visual block loads on design (AC-P2-2) -> t-p2-s4-design-loads
+//   §1 L16/17 + L19 strip / load (AC-P2-3) -> t-p2-s1-strip-load,
 //                                                       t-p2-fullDetail-design-aware (above)
-//   AC-P2-4 (HC-NEST permutation sweep)              -> t-p2-hcnest-permutations
-//   AC-P2-5 (reflow is reorder-only)                 -> t-p2-reflow-reorder-only
-//   AC-P2-6 (non-visual §4/§1 survives both arms)    -> t-p2-antisweep-both-arms
-//   AC-P2-7 (AC8 floor re-measured)                  -> the four AC8/AC-P2-7 floors above
-//   AC-P2-8 (composition order-independent)          -> t-ccl-six-permutations (above) +
+//   HC-NEST permutation sweep (AC-P2-4) -> t-p2-hcnest-permutations
+//   reflow is reorder-only (AC-P2-5) -> t-p2-reflow-reorder-only
+//   non-visual §4/§1 survives both arms (AC-P2-6) -> t-p2-antisweep-both-arms
+//   AC8 floor re-measured (AC-P2-7) -> the four AC8/AC-P2-7 floors above
+//   composition order-independent (AC-P2-8) -> t-ccl-six-permutations (above) +
 //                                                       t-p2-hcnest-permutations
 // ============================================================================
 
