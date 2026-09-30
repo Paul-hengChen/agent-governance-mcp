@@ -1,5 +1,7 @@
 # Pending tickets — lane e259
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E259-NEW-1
 title: Shell comment scan misses # blocks after a backslash-escaped quote outside a string
@@ -12,5 +14,3 @@ body: |
   Under-flag only; no crash or hang. Not in the known-misread list or docs/install.md.
   Fix: skip the character after \ in shell code mode, or list it as a known misread.
 ```
-
-## Applied
