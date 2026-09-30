@@ -47,3 +47,7 @@ Lane-diff evidence: `node bin/agc-init.mjs check` in the lane worktree after com
 ## Phase 4 run
 `npm test` (prebuild + node --test test/*.test.mjs) at a clean, fully-committed tree: 3028 tests, 3025 pass, 0 fail, 3 skipped, exit 0; tree still clean after (dist rebuild is byte-identical). Headless, zero interaction.
 Out of scope, not a FAIL: pending-ticket E259-NEW-1 (shell backslash-escaped quote under-flag).
+## 2026-09-30T11:15:18.803Z — PASS — by qa-engineer
+
+PASS. npm test at clean tree 3025/3028 pass (3 skipped, 0 fail). Expected-Red Diff clean (2/2 e258b manifest entries confirmed red pre-edit, re-baselined). AC1-AC28 proofs executed green; AC29 lane boundary clean; agc check — comments lines on lane diff: none. See qa_reports/review_T-E259-01.md.
+
