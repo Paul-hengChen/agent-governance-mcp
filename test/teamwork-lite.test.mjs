@@ -1,7 +1,8 @@
 // Coded by @qa-engineer
 // Tests for /teamwork-lite prompt entry point (spec: lite-mode-coordinator).
-// Spec-to-Test map: AC1→t1, AC2→t2, AC3→t3+t5, AC4→t4, AC5→entire suite (load/build).
-// AC6 (README) is verified manually in T42, not here.
+// Spec-to-Test map: skill file sections (AC1)→t1, entry point (AC2)→t2, routing rules (AC3)→t3+t5,
+// registration (AC4)→t4, load/build health (AC5)→entire suite.
+// The README requirement (AC6) is checked by hand during release review, not by this file (T42).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -64,13 +65,13 @@ test("AC1: content/skill-coordinator-lite.md exists with required sections + har
   assert.ok(fs.existsSync(skillPath), "skill file must exist");
   const body = fs.readFileSync(skillPath, "utf-8");
 
-  // Required sections per AC1
+  // The skill file must carry every required section (AC1)
   assert.match(body, /^#\s+Skill:\s+coordinator-lite/m, "title section");
   assert.match(body, /##\s+Persona/, "Persona section");
 
   assert.match(body, /##\s+SOP/, "SOP section");
 
-  // AC1 hard rules
+  // The hard rules the skill must state (AC1)
   assert.match(body, /tw_detect_drift/, "must mention drift check policy");
   assert.match(body, /tw_switch_role/, "must mention no role switching");
   assert.ok(

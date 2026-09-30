@@ -18,19 +18,19 @@
 // features.
 //
 // Spec-to-Test map:
-//   AC1 (tag missing)                                -> VR-1
-//   AC2 (tag exists, not at HEAD)                     -> VR-2
-//   AC3 (no upstream / not pushed / fetch failure)     -> VR-3
-//   AC4 (check-version.mjs fails, stderr propagated)   -> VR-4
-//   AC5 (CHANGELOG missing entry)                      -> VR-5
-//   AC6 (dist uncommitted changes)                     -> VR-6
-//   AC7 (committed dist parity mismatch)                -> VR-7
-//   AC8 (all 6 checks report OK -> OK lines + ALL PASSED) -> VR-8
-//   AC9 (SOP step 9a + Escalation Routes row)            -> VR-9
-//   AC10 (post-closing-write tw_get_state read-back)     -> VR-10
+//   tag missing (AC1)                                -> VR-1
+//   tag exists, not at HEAD (AC2)                     -> VR-2
+//   no upstream / not pushed / fetch failure (AC3)     -> VR-3
+//   check-version.mjs fails, stderr propagated (AC4)   -> VR-4
+//   CHANGELOG missing entry (AC5)                      -> VR-5
+//   dist uncommitted changes (AC6)                     -> VR-6
+//   committed dist parity mismatch (AC7)                -> VR-7
+//   all 6 checks report OK -> OK lines + ALL PASSED (AC8) -> VR-8
+//   SOP step 9a + Escalation Routes row (AC9)            -> VR-9
+//   post-closing-write tw_get_state read-back (AC10)     -> VR-10
 //   Security smoke (boundary inputs)                     -> VR-SEC-1..4
 //
-// T-EB-04 (E14, backlog row + T-EB-01) additions — Check 6 "CI ground-truth":
+// Check 6 "CI ground-truth" tests (T-EB-04, E14):
 //   Check 6 red at the release commit (FAIL)              -> VR-11
 //   Check 6 green at the release commit (OK, no WARN)      -> VR-12
 //   Check 6 degradation: gh binary missing (ENOENT)       -> VR-13
@@ -38,28 +38,30 @@
 //   Check 6 degradation: zero completed runs               -> VR-15
 //   Check 6 degradation: unparseable gh output (bonus)    -> VR-16
 //
-// T-E78-01/T-E78-02 (E78) additions — sha-matched ground truth, closing the
-// v3.102.2 stale-green regression (a green run from an EARLIER commit was
-// accepted as ground truth for a release whose own CI was still in flight):
+// Sha-matched ground truth, closing the v3.102.2 stale-green regression (a
+// green run from an EARLIER commit was accepted as ground truth for a release
+// whose own CI was still in flight) (T-E78-01/T-E78-02, E78):
 //   green run at a DIFFERENT commit -> WARN (stale-green, the core fix)  -> VR-17
 //   red run at a DIFFERENT commit -> WARN, does not block                -> VR-18
 //   matching red buried at position 8/10 in the run window -> still FAIL -> VR-19
-// VR-11/VR-12 above are retargeted (not new) for this same change: both
-// previously shimmed a dummy headSha that could never match a real fixture
-// HEAD, which degrades to WARN under sha-matched code.
+// The two earlier Check 6 tests (VR-11, VR-12) were retargeted, not added, for
+// this same change: both previously shimmed a dummy headSha that could never
+// match a real fixture HEAD, which degrades to WARN under sha-matched code.
 //
-// T-E80-02 (E80) additions — the sha-not-found branch now bounded-polls
-// `gh run list` instead of giving up on the first miss (a healthy release's
-// own CI run is almost always still in flight the moment step 9a runs):
+// Bounded polling: when the release commit's sha is not found yet, the check
+// now polls `gh run list` within a time budget instead of giving up on the
+// first miss, because a healthy release's own CI run is almost always still
+// in flight the moment step 9a runs (T-E80-02, E80):
 //   sha absent, then present+success on a later gh call -> OK, no WARN -> VR-20
-//   poll budget expires, sha still absent -> byte-identical pre-E80 WARN -> VR-21
+//   poll budget expires, sha still absent -> byte-identical earlier WARN -> VR-21
 //   AGC_VERIFY_CI_WAIT_SECONDS=0 -> exactly one gh call, no wall-clock wait -> VR-22
-// VR-17/VR-18 above are amended (not retargeted) for this same change: both
-// drive the sha-not-found branch, so each now pins AGC_VERIFY_CI_WAIT_SECONDS=0
-// explicitly — otherwise, with runVerifyWithPath's child inheriting an unset
-// process.env var, each would silently block for the full 600s default
-// (~20 minutes of suite slowdown, not a red; heads-up from code-reviewer's
-// T-E80-01 review). VR-9 is retargeted to assert step 9a's new wording, which
+// The stale-green and non-blocking-red tests (VR-17, VR-18) were amended, not
+// retargeted, for this same change: both drive the sha-not-found branch, so each
+// now pins AGC_VERIFY_CI_WAIT_SECONDS=0 explicitly. Otherwise, with
+// runVerifyWithPath's child inheriting an unset process.env var, each would
+// silently block for the full 600s default (~20 minutes of suite slowdown, not
+// a red; heads-up from the code-reviewer's review of the earlier polling
+// ticket, T-E80-01). VR-9 is retargeted to assert step 9a's new wording, which
 // distinguishes "the poll is running, let it finish" from "genuinely
 // degraded environment" instead of one catch-all WARN sentence.
 // These use a `gh` shim on PATH (a tiny executable script placed in a temp
@@ -67,70 +69,69 @@
 // convention above still drives every git-facing check exactly as before;
 // only Check 6's external `gh` dependency is substituted.
 //
-// T-E8284-02 (E82/E84) additions — scripts/verify-release.mjs's CI-wait
-// default (Check 6) and the new --close-out mode (E84's "nothing local is
-// ahead of upstream" assertion, runnable after the governance bookkeeping
-// commit lands and HEAD sits past the release tag):
-//   AC1 (E82): CI-wait budget defaults to 480s when unset, pinned
+// CI-wait default and the new --close-out mode: scripts/verify-release.mjs's
+// Check 6 wait budget, plus a mode that asserts "nothing local is ahead of
+// upstream", runnable after the governance bookkeeping commit lands and HEAD
+// sits past the release tag (T-E8284-02, E82/E84):
+//   CI-wait budget defaults to 480s when unset, pinned (AC1, E82)
 //     BEHAVIORALLY off the script's own first "...left in budget" poll-
 //     progress line, never by grepping the source for the literal 480    -> VR-23
-//   AC3 (E84): --close-out FAILs when HEAD is ahead of its @{u} upstream,
+//   --close-out FAILs when HEAD is ahead of its @{u} upstream, (AC3, E84)
 //     names the ahead count, and never runs Check 1 (tag-at-HEAD) — proven
 //     against a fixture shape a reversed `HEAD..@{u}` range would silently
 //     PASS, so the pin actually discriminates direction, not just exit code -> VR-24
-//   AC4 (E84): --close-out exits 0 with a distinct `CLOSE-OUT PASSED` line
+//   --close-out exits 0 with a distinct `CLOSE-OUT PASSED` line (AC4, E84)
 //     when HEAD == upstream and demonstrably never runs Checks 1/3/4/5/6
 //     (absence of their `OK:` lines asserted, not merely exit 0); a second
 //     fixture with a deliberately-corrupt package.json proves no version is
 //     ever resolved in this mode (a crash, not CLOSE-OUT PASSED, would
 //     result if it were)                                              -> VR-25, VR-26
-//   AC2/AC5 (regression): VR-1..VR-22/VR-SEC-1..4 above are unmodified by
-//     this addition — see qa_reports/review_T-E8284-02.md for the full-suite
-//     run this claim rests on.
+//   regression: the earlier tests VR-1..VR-22 and VR-SEC-1..4 are unmodified by
+//     this addition (AC2/AC5) — see qa_reports/review_T-E8284-02.md for the
+//     full-suite run this claim rests on.
 //
-// E141 additions (T-E141-01/T-E141-02) — specs/e141-tag-at-head-bookkeeping-
-// tolerance.md AC1-AC6: Check 1 (tag-at-HEAD) now tolerates a tag followed
-// ONLY by governance-bookkeeping commit(s) (.current/handoff.md,
-// .current/*.jsonl, tasks.md):
-//   AC1 (tag == HEAD, byte-identical, no tolerance note)      -> VR-28
-//   AC2 (bookkeeping-only range tolerated, NOTE printed;       -> VR-27
-//        non-bookkeeping range still FAILs, named sha+path)    -> VR-2 (amended)
-//   AC3 (offending sha(s)/path(s) named in the FAIL)            -> VR-2 (amended), VR-27/32
-//   AC4 (non-ancestor tag keeps the ORIGINAL FAIL, no range     -> VR-29
+// Tag-at-HEAD bookkeeping tolerance: Check 1 (tag-at-HEAD) now tolerates a tag
+// followed ONLY by governance-bookkeeping commit(s) (.current/handoff.md,
+// .current/*.jsonl, tasks.md) (T-E141-01/T-E141-02, E141;
+// specs/e141-tag-at-head-bookkeeping-tolerance.md AC1-AC6):
+//   tag == HEAD, byte-identical, no tolerance note (AC1)      -> VR-28
+//   bookkeeping-only range tolerated, NOTE printed; (AC2)      -> VR-27
+//        non-bookkeeping range still FAILs, named sha+path     -> VR-2 (amended)
+//   offending sha(s)/path(s) named in the FAIL (AC3)            -> VR-2 (amended), VR-27/32
+//   non-ancestor tag keeps the ORIGINAL FAIL, no range (AC4)    -> VR-29
 //        enumeration — ancestry is a precondition, not a
-//        substitute, for the tolerance)
-//   AC5 (Check 2 untouched — an unpushed bookkeeping commit      -> VR-30
+//        substitute, for the tolerance
+//   Check 2 untouched — an unpushed bookkeeping commit (AC5)     -> VR-30
 //        still FAILs pushed-to-origin even though Check 1
-//        tolerates it)
-//   AC6 (merge handling / empty-range unreachability verified    -> T-E141-01
-//        by the code-reviewer via scratchpad fixtures, not          review
-//        re-derived into this file — see review_reports/            (see spec
-//        review_T-E141-01.md)                                       out-of-scope
+//        tolerates it
+//   merge handling / empty-range unreachability verified (AC6)   -> covered by the
+//        by the code-reviewer via scratchpad fixtures, not          code-reviewer's
+//        re-derived into this file — see review_reports/            review (see the
+//        review_T-E141-01.md                                        spec's out-of-scope
 //                                                                    note)
-// T-E141-01 review, non-blocking observations pinned as documented current
-// behaviour (qa-engineer judgement call, T-E141-02):
-//   observation 4 (deleting an allowlisted path is tolerated)   -> VR-31
-//   observation 5 (a non-ASCII allowlisted filename fails       -> VR-32
-//        closed)
-// VR-2 was re-pointed (not left as-is): its "behind-head" fixture now
+// The code-reviewer's non-blocking observations from that review, pinned as
+// documented current behaviour (qa-engineer judgement call, T-E141-02):
+//   deleting an allowlisted path is tolerated (observation 4)   -> VR-31
+//   a non-ASCII allowlisted filename fails closed (observation 5) -> VR-32
+// The "behind-head" test (VR-2) was re-pointed, not left as-is: its fixture now
 // commits to src/real-change.js instead of AFTER-TAG.md so it stays an
 // unambiguous non-bookkeeping commit under the new tolerance, and its
-// assertions were strengthened to pin AC3's sha+path detail and the absence
-// of a tolerance note — see mkFixtureRepo's tag block and VR-2 itself.
+// assertions were strengthened to pin the offending sha+path detail (AC3) and
+// the absence of a tolerance note — see mkFixtureRepo's tag block and VR-2 itself.
 //
-// T-E142-01 additions (E147) — specs/e142-release-tooling-wave25.md AC1/AC2:
-// Check 6's `releaseSha` now resolves from the release tag first (same
-// two-call pattern Check 1 uses), falling back to `git rev-parse HEAD` only
-// when no such tag exists yet. This closes the defect a wave release exposes:
-// pre-fix, Check 6 unconditionally used HEAD, so a governance-bookkeeping
-// commit landed on top of the actual release commit (the E141
-// "behind-head-bookkeeping" shape) made Check 6 poll/match CI runs against
-// the WRONG commit.
-//   AC1 (tag at A, bookkeeping commit B on top -> resolves/matches A, never
-//        B, even when a red run is shimmed against B)              -> VR-33
-//   AC2 (no tag yet -> unchanged fallback to HEAD, still matches a run
+// Check 6 release-sha resolution: `releaseSha` now resolves from the release tag
+// first (same two-call pattern Check 1 uses), falling back to `git rev-parse
+// HEAD` only when no such tag exists yet (T-E142-01, E147;
+// specs/e142-release-tooling-wave25.md AC1/AC2). This closes the defect a wave
+// release exposes: pre-fix, Check 6 unconditionally used HEAD, so a
+// governance-bookkeeping commit landed on top of the actual release commit (the
+// "behind-head-bookkeeping" shape from the tag-at-HEAD tolerance work) made
+// Check 6 poll/match CI runs against the WRONG commit.
+//   tag at A, bookkeeping commit B on top -> resolves/matches A, never
+//        B, even when a red run is shimmed against B (AC1)          -> VR-33
+//   no tag yet -> unchanged fallback to HEAD, still matches a run (AC2)
 //        recorded against HEAD's own sha; VR-1/VR-8's tag-missing fixtures
-//        also stay green unmodified, regression-confirmed)          -> VR-34
+//        also stay green unmodified, regression-confirmed           -> VR-34
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -226,9 +227,10 @@ function defaultChangelog(version) {
  *                     "behind-head-a1-config" | "behind-head-a1-feature-split" |
  *                     "behind-head-nonascii" |
  *                     "diverged" | "none" (default "at-head") — see the tag
- *                     block below for what each E141 mode reproduces (E174a
- *                     added the four lane-path tolerance shapes plus the
- *                     four A1 negative-case shapes).
+ *                     block below for what each bookkeeping-tolerance mode
+ *                     reproduces (lane-path work added the four lane-path
+ *                     tolerance shapes plus the four negative-case shapes;
+ *                     see the E141, E174a and A1 tickets).
  *   origin            "pushed" | "no-upstream" | "not-pushed" | "unreachable" | "none"
  *   distUncommitted   if true, dirty the working-tree dist/index.js after commit
  */
@@ -276,22 +278,22 @@ function mkFixtureRepo({
   // "none": no origin remote configured at all (fetch fails "not found").
 
   if (tag === "behind-head") {
-    // AC2/AC3 (E141): a REAL, non-bookkeeping change after the tag — never
-    // tolerated. Deliberately pathed under src/ (not on the E141 allowlist)
-    // so this fixture cannot be mistaken for a bookkeeping-only commit (VR-2
-    // was re-pointed here per T-E141-02 — the fixture must stay unambiguous
-    // even though the pre-E141 name "AFTER-TAG.md" was already technically
-    // off the allowlist).
+    // A REAL, non-bookkeeping change after the tag — never tolerated.
+    // Deliberately pathed under src/ (not on the bookkeeping allowlist)
+    // so this fixture cannot be mistaken for a bookkeeping-only commit (the
+    // behind-head test VR-2 was re-pointed here — the fixture must stay unambiguous
+    // even though the earlier name "AFTER-TAG.md" was already technically
+    // off the allowlist) (AC2/AC3, E141; T-E141-02).
     git(["tag", `v${version}`], root);
     fs.mkdirSync(path.join(root, "src"), { recursive: true });
     fs.writeFileSync(path.join(root, "src", "real-change.js"), "// real change after tag\n");
     git(["add", "-A"], root);
     git(["commit", "-q", "-m", "after tag: real change"], root);
   } else if (tag === "behind-head-bookkeeping") {
-    // AC2 (E141): the v3.111.0 shape — exactly ONE commit after the tag
+    // The v3.111.0 shape — exactly ONE commit after the tag
     // touching ONLY SOP step 13a's bookkeeping paths. Must be tolerated:
     // Check 1 OK with an explicit NOTE naming the tolerated count, never a
-    // silent pass.
+    // silent pass (AC2, E141).
     git(["tag", `v${version}`], root);
     fs.mkdirSync(path.join(root, ".current"), { recursive: true });
     fs.writeFileSync(path.join(root, ".current", "handoff.md"), "status: PASS\n");
@@ -300,10 +302,10 @@ function mkFixtureRepo({
     git(["add", "-A"], root);
     git(["commit", "-q", "-m", "chore(governance): post-release bookkeeping"], root);
   } else if (tag === "behind-head-bookkeeping-delete") {
-    // T-E141-01 review observation 4 (non-blocking, pinned here): deleting
-    // an allowlisted bookkeeping path is tolerated — the path is bookkeeping
-    // either way. The file must exist BEFORE the tag so the post-tag commit
-    // can delete it.
+    // Deleting an allowlisted bookkeeping path is tolerated — the path is
+    // bookkeeping either way (a non-blocking code-reviewer observation, pinned
+    // here as current behaviour: T-E141-01 review observation 4). The file must
+    // exist BEFORE the tag so the post-tag commit can delete it.
     fs.mkdirSync(path.join(root, ".current"), { recursive: true });
     fs.writeFileSync(path.join(root, ".current", "telemetry.jsonl"), "{}\n");
     git(["add", "-A"], root);
@@ -312,8 +314,9 @@ function mkFixtureRepo({
     git(["rm", "-q", ".current/telemetry.jsonl"], root);
     git(["commit", "-q", "-m", "chore(governance): drop stale telemetry sidecar"], root);
   } else if (tag === "behind-head-bookkeeping-lane") {
-    // E174a: since the E123 lane flip, 13a stages `.current/<lane>/...`
-    // paths, not the flat `.current/...` forms VR-27 above already pins.
+    // Since bookkeeping moved into per-lane directories, SOP step 13a stages
+    // `.current/<lane>/...` paths, not the flat `.current/...` forms VR-27 above
+    // already pins (E174a; lane layout change E123).
     // One post-tag commit touching ONLY lane-scoped bookkeeping paths across
     // two lanes (_primary's handoff.md + telemetry.jsonl, a ticket lane's
     // dispatch.jsonl + usage.jsonl) must still be tolerated as a whole.
@@ -327,37 +330,37 @@ function mkFixtureRepo({
     git(["add", "-A"], root);
     git(["commit", "-q", "-m", "chore(governance): post-release bookkeeping (lane-scoped)"], root);
   } else if (tag === "behind-head-bookkeeping-archived-lane") {
-    // E174a: a lane literally NAMED "archived" is a distinct, safe lane
+    // A lane literally NAMED "archived" is a distinct, safe lane
     // segment — NOT the excluded "archive" directory (NON_LANE_DIRS).
-    // Must be tolerated like any other lane.
+    // Must be tolerated like any other lane (E174a).
     git(["tag", `v${version}`], root);
     fs.mkdirSync(path.join(root, ".current", "archived"), { recursive: true });
     fs.writeFileSync(path.join(root, ".current", "archived", "handoff.md"), "status: PASS\n");
     git(["add", "-A"], root);
     git(["commit", "-q", "-m", "chore(governance): post-release bookkeeping (archived lane)"], root);
   } else if (tag === "behind-head-bookkeeping-tasks-primary") {
-    // E126 T-E126-04/T-E126-06 (X5/E198(a), spec AC10): a lane's tw_add_task
-    // / tw_complete_task write touches `.current/_primary/tasks.md` exactly
-    // as it already touches that lane's handoff.md/*.jsonl (E174a) — one
-    // post-tag commit touching ONLY that literal path must still be
-    // tolerated, mirroring VR-39's shape one-for-one but for tasks.md.
+    // A lane's tw_add_task / tw_complete_task write touches
+    // `.current/_primary/tasks.md` exactly as it already touches that lane's
+    // handoff.md/*.jsonl — one post-tag commit touching ONLY that literal
+    // path must still be tolerated, mirroring VR-39's shape one-for-one but
+    // for tasks.md (E126 T-E126-04/T-E126-06, spec AC10; E174a).
     git(["tag", `v${version}`], root);
     fs.mkdirSync(path.join(root, ".current", "_primary"), { recursive: true });
     fs.writeFileSync(path.join(root, ".current", "_primary", "tasks.md"), "- [x] done\n");
     git(["add", "-A"], root);
     git(["commit", "-q", "-m", "chore(governance): post-release bookkeeping (_primary tasks.md)"], root);
   } else if (tag === "behind-head-bookkeeping-tasks-lane") {
-    // E126 T-E126-04/T-E126-06 (X5/E198(a), spec AC10): the lane-scoped
-    // regex addition — `.current/<lane>/tasks.md` — mirroring VR-39's
-    // lane-scoped handoff.md/*.jsonl shape for tasks.md.
+    // The lane-scoped counterpart: `.current/<lane>/tasks.md` is tolerated too,
+    // mirroring VR-39's lane-scoped handoff.md/*.jsonl shape for tasks.md
+    // (tickets T-E126-04/T-E126-06, spec AC10).
     git(["tag", `v${version}`], root);
     fs.mkdirSync(path.join(root, ".current", "e126x"), { recursive: true });
     fs.writeFileSync(path.join(root, ".current", "e126x", "tasks.md"), "- [x] done\n");
     git(["add", "-A"], root);
     git(["commit", "-q", "-m", "chore(governance): post-release bookkeeping (lane tasks.md)"], root);
   } else if (tag === "behind-head-bookkeeping-archive-dir") {
-    // E174a: `.current/archive/...` is the excluded aggregation directory
-    // (NON_LANE_DIRS), never a lane — a commit touching it must NOT be
+    // `.current/archive/...` is the excluded aggregation directory
+    // (NON_LANE_DIRS), never a lane (E174a) — a commit touching it must NOT be
     // tolerated even though the shape otherwise mimics a lane-scoped
     // bookkeeping path.
     git(["tag", `v${version}`], root);
@@ -369,8 +372,8 @@ function mkFixtureRepo({
     git(["add", "-A"], root);
     git(["commit", "-q", "-m", "chore(governance): post-release bookkeeping (archive dir)"], root);
   } else if (tag === "behind-head-bookkeeping-history-dir") {
-    // E174a: `.current/history/...` is the other excluded directory
-    // (NON_LANE_DIRS) — same non-tolerance as the archive-dir case above.
+    // `.current/history/...` is the other excluded directory
+    // (NON_LANE_DIRS) — same non-tolerance as the archive-dir case above (E174a).
     git(["tag", `v${version}`], root);
     fs.mkdirSync(path.join(root, ".current", "history", "2026-01", "e001"), { recursive: true });
     fs.writeFileSync(
@@ -380,7 +383,7 @@ function mkFixtureRepo({
     git(["add", "-A"], root);
     git(["commit", "-q", "-m", "chore(governance): post-release bookkeeping (history dir)"], root);
   } else if (tag === "behind-head-a1-nested-lane") {
-    // A1 (human-mandated negative case): a two-segment path under .current/
+    // A human-mandated negative case: a two-segment path under .current/
     // is never a lane — LANE_SEGMENT_RE_SRC/isSafeLaneName only ever match a
     // single path segment. Must NOT be tolerated.
     git(["tag", `v${version}`], root);
@@ -389,7 +392,7 @@ function mkFixtureRepo({
     git(["add", "-A"], root);
     git(["commit", "-q", "-m", "chore(governance): post-release bookkeeping (nested path)"], root);
   } else if (tag === "behind-head-a1-dot-lane") {
-    // A1: a dot-prefixed lane name is not a safe path segment
+    // A dot-prefixed lane name is not a safe path segment (human-mandated negative case)
     // (isSafeLaneName's first-char class excludes "."). Must NOT be
     // tolerated.
     git(["tag", `v${version}`], root);
@@ -398,25 +401,26 @@ function mkFixtureRepo({
     git(["add", "-A"], root);
     git(["commit", "-q", "-m", "chore(governance): post-release bookkeeping (dot lane)"], root);
   } else if (tag === "behind-head-a1-config") {
-    // A1: .current/.config.json is explicitly NOT a lane file (backlog
-    // E174a scope note) and must stay top-level / out of the allowlist.
+    // .current/.config.json is explicitly NOT a lane file (per the lane-path
+    // scope note in the backlog, E174a) and must stay top-level / out of the
+    // allowlist (human-mandated negative case).
     git(["tag", `v${version}`], root);
     fs.mkdirSync(path.join(root, ".current"), { recursive: true });
     fs.writeFileSync(path.join(root, ".current", ".config.json"), "{}\n");
     git(["add", "-A"], root);
     git(["commit", "-q", "-m", "chore(governance): post-release bookkeeping (config)"], root);
   } else if (tag === "behind-head-a1-feature-split") {
-    // A1: .current/<lane>/feature-split.md is not a LANE_FILES entry (only
+    // .current/<lane>/feature-split.md is not a LANE_FILES entry (only
     // handoff.md + the *.jsonl sidecars are) — must NOT be tolerated even
-    // though it sits directly under a valid lane dir.
+    // though it sits directly under a valid lane dir (human-mandated negative case).
     git(["tag", `v${version}`], root);
     fs.mkdirSync(path.join(root, ".current", "_primary"), { recursive: true });
     fs.writeFileSync(path.join(root, ".current", "_primary", "feature-split.md"), "# split\n");
     git(["add", "-A"], root);
     git(["commit", "-q", "-m", "chore(governance): post-release bookkeeping (feature-split)"], root);
   } else if (tag === "behind-head-nonascii") {
-    // T-E141-01 review observation 5 (non-blocking, pinned here): a
-    // non-ASCII allowlisted filename fails closed under default
+    // A non-ASCII allowlisted filename fails closed (a non-blocking code-reviewer
+    // observation, pinned here as current behaviour: T-E141-01 review observation 5) under default
     // core.quotePath — git emits it quoted/octal-escaped, which matches no
     // allowlist regex, so the commit is (correctly) treated as a
     // non-bookkeeping offender rather than silently tolerated.
@@ -426,8 +430,8 @@ function mkFixtureRepo({
     git(["add", "-A"], root);
     git(["commit", "-q", "-m", "chore(governance): add metrics sidecar (non-ascii name)"], root);
   } else if (tag === "diverged") {
-    // AC4 (E141): tag exists but is NOT an ancestor of HEAD (wrong branch /
-    // rewritten history). Ancestry is a precondition of the tolerance, never
+    // The tag exists but is NOT an ancestor of HEAD (wrong branch /
+    // rewritten history) (AC4, E141). Ancestry is a precondition of the tolerance, never
     // a substitute for it — the ORIGINAL "does not point at HEAD" FAIL must
     // stay byte-identical, with no range enumeration appended.
     git(["checkout", "-q", "-b", "release-branch"], root);
@@ -532,7 +536,7 @@ function noGhSystemPath() {
   return dir;
 }
 
-// `extraEnv` merges OVER `process.env` (after `PATH`) — every E80 poll test
+// `extraEnv` merges OVER `process.env` (after `PATH`) — every bounded-poll test (E80)
 // uses this to pin AGC_VERIFY_CI_WAIT_SECONDS explicitly rather than relying
 // on this test process's own (unset) shell inheritance, so a developer's
 // exported value can never silently change test behavior (T-E80-01 review
@@ -551,7 +555,7 @@ function ghJsonShim(json) {
 
 // A `gh` shim that returns a DIFFERENT canned response on each successive
 // invocation (last response repeats for any calls beyond the list) — used to
-// prove the E80 poll loop actually re-queries `gh` rather than caching its
+// prove the bounded poll loop (E80) actually re-queries `gh` rather than caching its
 // first answer. Each response is written to its own file so a multi-line
 // JSON payload never has to survive re-quoting inside the shell script body.
 function mkGhSequenceShim(jsons) {
@@ -589,7 +593,7 @@ function mkGhCallCounterShim(json) {
 }
 
 // ---------------------------------------------------------------------------
-// VR-1 (AC1): tag missing
+// The release tag is missing (VR-1, AC1)
 // ---------------------------------------------------------------------------
 test("VR-1 (AC1): tag does not exist -> exit non-zero, failure line names the tag and says it does not exist", () => {
   const { root } = mkFixtureRepo({ version: "1.2.3", tag: "none" });
@@ -603,14 +607,15 @@ test("VR-1 (AC1): tag does not exist -> exit non-zero, failure line names the ta
 });
 
 // ---------------------------------------------------------------------------
-// VR-2 (AC2/AC3, amended by T-E141-02): tag exists but points at a commit
-// other than HEAD, due to a REAL (non-bookkeeping) commit. Since E141, "tag
+// The tag exists but points at a commit other than HEAD, due to a REAL
+// (non-bookkeeping) commit (VR-2, AC2/AC3; amended by T-E141-02). Since the
+// bookkeeping tolerance landed (E141), "tag
 // != HEAD" is no longer categorically a FAIL — it FAILs only when the range
 // contains a non-bookkeeping path (AC2's second half / AC3). Re-pointed at
 // src/real-change.js (tag: "behind-head", see mkFixtureRepo) so this pin
 // cannot be satisfied by the new tolerance and does not silently re-break
-// AC2 by asserting a blanket rule the spec no longer makes true. Also pins
-// AC3's offender detail: the FAIL names the offending sha and path.
+// the range rule by asserting a blanket rule the spec no longer makes true. Also
+// pins the offender detail: the FAIL names the offending sha and path (AC2, AC3).
 // ---------------------------------------------------------------------------
 test("VR-2 (AC2/AC3): tag exists but HEAD moved on with a REAL (non-bookkeeping) commit -> exit non-zero, failure line names both commits, sha, and offending path; no tolerance note fires", () => {
   const { root, firstCommitSha } = mkFixtureRepo({ version: "2.0.0", tag: "behind-head" });
@@ -638,7 +643,7 @@ test("VR-2 (AC2/AC3): tag exists but HEAD moved on with a REAL (non-bookkeeping)
 });
 
 // ---------------------------------------------------------------------------
-// VR-3 (AC3): push-status checks — no upstream / not pushed / fetch failure
+// Push-status checks: no upstream / not pushed / fetch failure (VR-3, AC3)
 // ---------------------------------------------------------------------------
 test("VR-3 (AC3): no upstream tracking branch configured -> exit non-zero, reports 'no upstream tracking branch configured'", () => {
   const { root } = mkFixtureRepo({ version: "3.0.0", tag: "at-head", origin: "no-upstream" });
@@ -679,7 +684,7 @@ test("VR-3 (AC3): no origin remote configured at all -> exit non-zero (fetch fai
 });
 
 // ---------------------------------------------------------------------------
-// VR-4 (AC4): check-version.mjs itself fails -> stderr propagated verbatim
+// When check-version.mjs itself fails, its stderr is propagated verbatim (VR-4, AC4)
 // ---------------------------------------------------------------------------
 test("VR-4 (AC4): check-version.mjs failing (package.json/index.ts mismatch) -> non-zero exit, its stderr surfaced verbatim, not re-implemented", () => {
   const { root } = mkFixtureRepo({
@@ -698,7 +703,7 @@ test("VR-4 (AC4): check-version.mjs failing (package.json/index.ts mismatch) -> 
 });
 
 // ---------------------------------------------------------------------------
-// VR-5 (AC5): CHANGELOG has no entry for the target version
+// The CHANGELOG has no entry for the target version (VR-5, AC5)
 // ---------------------------------------------------------------------------
 test("VR-5 (AC5): CHANGELOG.md missing entirely -> exit non-zero, failure line names the missing version", () => {
   const { root } = mkFixtureRepo({ version: "5.0.0", changelog: null, tag: "at-head" });
@@ -719,7 +724,7 @@ test("VR-5 (AC5): CHANGELOG.md present but has no heading for the target version
 });
 
 // ---------------------------------------------------------------------------
-// VR-6 (AC6): dist/ has uncommitted working-tree changes
+// dist/ has uncommitted working-tree changes (VR-6, AC6)
 // ---------------------------------------------------------------------------
 test("VR-6 (AC6): dist/ has uncommitted changes -> exit non-zero, says dist must be rebuilt and committed; AC7 sub-check still runs independently and reports OK", () => {
   const { root } = mkFixtureRepo({
@@ -744,7 +749,7 @@ test("VR-6 (AC6): dist/ has uncommitted changes -> exit non-zero, says dist must
 });
 
 // ---------------------------------------------------------------------------
-// VR-7 (AC7): committed dist/index.js at HEAD carries the wrong version
+// The committed dist/index.js at HEAD carries the wrong version (VR-7, AC7)
 // ---------------------------------------------------------------------------
 test("VR-7 (AC7): committed dist/index.js at HEAD has a stale version -> exit non-zero, failure line names both versions", () => {
   const { root } = mkFixtureRepo({
@@ -775,15 +780,16 @@ test("VR-7 (AC7): dist/index.js absent at HEAD (never committed) -> exit non-zer
 });
 
 // ---------------------------------------------------------------------------
-// VR-8 (AC8): all six checks report OK (title corrected T-EB-04 — Check 6/E14
-// landed after this test was first authored against 5 checks; the loop
-// below was asserting OK lines by name, never a count, so it stayed green
-// through E14 by accident rather than by design — see review_T-EB-03.md).
+// All six checks report OK (VR-8, AC8). The title was corrected when Check 6
+// (the CI ground-truth check) landed after this test was first authored
+// against 5 checks; the loop below was asserting OK lines by name, never a
+// count, so it stayed green through that addition by accident rather than by
+// design (T-EB-04, E14; see review_T-EB-03.md).
 // Check 6 is included in the OK-line loop below: the fixture's origin is a
 // local bare repo, not a real GitHub remote, so `gh run list` cannot resolve
 // a host and Check 6 degrades via WARN — but a WARN is not a fail, so it
 // still reports OK and the run still exits 0 with empty stderr. This is
-// intentionally NOT gh-shimmed (unlike VR-11..VR-16 below): it pins the
+// intentionally NOT gh-shimmed (unlike the Check 6 tests VR-11..VR-16 below): it pins the
 // real, unmodified environment behavior a bare `npm test` run hits.
 // ---------------------------------------------------------------------------
 test("VR-8 (AC8): all 6 checks report OK -> one OK line per check, final ALL CHECKS PASSED line, exit 0", () => {
@@ -825,10 +831,10 @@ test("VR-8 (AC8): multi-cause failure surfaces every FAIL in one run (no short-c
   // dist-committed+parity check, isolating the four intended failures.
   const { root } = mkFixtureRepo({
     version: "8.1.0",
-    tag: "none", // AC1 fails
-    changelog: null, // AC5 fails
-    distUncommitted: true, // AC6 fails (version itself still matches)
-    origin: "no-upstream", // AC3 fails
+    tag: "none", // the release tag is missing, so the tag check fails (AC1)
+    changelog: null, // no CHANGELOG entry, so the changelog check fails (AC5)
+    distUncommitted: true, // dirty dist/ fails the dist-clean check (AC6); the version itself still matches
+    origin: "no-upstream", // no upstream branch, so the pushed check fails (AC3)
   });
   const result = runVerify(root, ["v8.1.0"]);
   assert.notEqual(result.status, 0);
@@ -841,17 +847,16 @@ test("VR-8 (AC8): multi-cause failure surfaces every FAIL in one run (no short-c
 });
 
 // ---------------------------------------------------------------------------
-// VR-11 (E14, T-EB-01; retargeted E78/T-E78-02): Check 6 — a definitively red
-// completed CI run AT THE RELEASE COMMIT STOPs the release; every other check
-// still runs and reports OK (no short-circuit), matching the
-// Checks-run-independently invariant already pinned for VR-8's
-// multi-cause-failure test.
+// Check 6: a definitively red completed CI run AT THE RELEASE COMMIT STOPs the
+// release; every other check still runs and reports OK (no short-circuit),
+// matching the checks-run-independently invariant already pinned for VR-8's
+// multi-cause-failure test (VR-11; T-EB-01, E14; retargeted by T-E78-02, E78).
 //
-// RETARGET NOTE (T-E78-02): this test previously shimmed a dummy
+// RETARGET NOTE (sha-matching change, T-E78-02): this test previously shimmed a dummy
 // `headSha: "2222...2"` that could never equal a real fixture repo's actual
 // HEAD. Under pre-E78 code (ground truth = runs[0], sha unchecked) that
 // dummy sha was irrelevant and the test passed for the wrong reason; under
-// E78's sha-matched code it now WARNs ("this commit's CI has not completed
+// the sha-matched code (E78) it now WARNs ("this commit's CI has not completed
 // yet") instead of FAILing, because the shimmed run's headSha never matches
 // this fixture's real HEAD. Retargeted, not retired — the FAIL path is the
 // single most consequential assertion in this cut, so it is resolved via the
@@ -894,9 +899,9 @@ test("VR-11 (E14): shimmed gh reports a red completed run AT the release commit 
 });
 
 // ---------------------------------------------------------------------------
-// VR-12 (E14; retargeted E78/T-E78-02): Check 6 — a green completed CI run AT
-// THE RELEASE COMMIT reports OK with no WARN. Same retarget rationale as
-// VR-11 above: the dummy `headSha: "1111...1"` never matched a real fixture
+// Check 6: a green completed CI run AT THE RELEASE COMMIT reports OK with no
+// WARN (VR-12; E14; retargeted by T-E78-02, E78). Same retarget rationale as
+// the red-run test VR-11 above: the dummy `headSha: "1111...1"` never matched a real fixture
 // HEAD, so under E78's sha-matched code this degraded to WARN instead of OK.
 // ---------------------------------------------------------------------------
 test("VR-12 (E14): shimmed gh reports a successful completed run AT the release commit -> OK line, exit 0, no WARN emitted, empty stderr", () => {
@@ -926,12 +931,13 @@ test("VR-12 (E14): shimmed gh reports a successful completed run AT the release 
 });
 
 // ---------------------------------------------------------------------------
-// VR-17 (E78, T-E78-02 behavior 1 — THE regression this ticket fixes): a
-// completed GREEN run whose headSha is a DIFFERENT commit than the one being
-// released must NOT satisfy the check — it must WARN, exactly like the
+// The core stale-green regression the sha-matching change fixes (VR-17, E78):
+// a completed GREEN run whose headSha is a DIFFERENT
+// commit than the one being released must NOT satisfy the check — it must
+// WARN, exactly like the
 // v3.102.2 incident (a stale green run from an earlier commit was accepted
 // as ground truth for a release whose own CI was still in flight). This is
-// the core "stale-green" case T-E78-01 exists to close; VR-12 above only
+// the core "stale-green" case the sha-matching change exists to close (T-E78-01); VR-12 above only
 // proves the matching-sha green path, which is necessary but not sufficient.
 // ---------------------------------------------------------------------------
 test("VR-17 (E78): shimmed gh reports a green completed run at a DIFFERENT commit -> WARN (stale-green, v3.102.2 regression), never OK, exit 0, empty stderr", () => {
@@ -968,7 +974,7 @@ test("VR-17 (E78): shimmed gh reports a green completed run at a DIFFERENT commi
 });
 
 // ---------------------------------------------------------------------------
-// VR-18 (E78, T-E78-02 behavior — non-blocking on an unrelated red): a
+// A red run at another commit does not block (VR-18; E78, T-E78-02): a
 // completed RED run at a DIFFERENT commit must not block the release either
 // — it is just as much "the wrong answer" as a stale green, not a fatal
 // mismatch. Only a red run AT the release commit (VR-11) is a FAIL.
@@ -990,8 +996,9 @@ test("VR-18 (E78): shimmed gh reports a red completed run at a DIFFERENT commit 
       ]),
     ),
   );
-  // wait=0 (T-E80-02): same reasoning as VR-17 above — this drives the
-  // sha-not-found branch, so pin the budget rather than inherit it.
+  // Wait budget pinned to 0: same reasoning as the stale-green test VR-17 above —
+  // this drives the sha-not-found branch, so pin the budget rather than inherit
+  // it (T-E80-02).
   const result = runVerifyWithPath(root, `${shimDir}:${noGhSystemPath()}`, ["v10.0.7"], {
     AGC_VERIFY_CI_WAIT_SECONDS: "0",
   });
@@ -1002,7 +1009,7 @@ test("VR-18 (E78): shimmed gh reports a red completed run at a DIFFERENT commit 
 });
 
 // ---------------------------------------------------------------------------
-// VR-19 (E78, window coverage): the release commit's run is not runs[0] — it
+// Window coverage (VR-19, E78): the release commit's run is not runs[0] — it
 // is buried at position 8 of a 10-run `--limit 10` window, behind several
 // unrelated completed runs. Proves the window is genuinely searched with
 // `.find`, not just `runs[0]` (which pre-E78 code effectively assumed).
@@ -1037,8 +1044,8 @@ test("VR-19 (E78): a matching red run found deep in the 10-run window (position 
 });
 
 // ---------------------------------------------------------------------------
-// VR-20 (E80, T-E80-02(a)): the sha-not-found branch now bounded-polls
-// instead of giving up on the first miss — a completed run for THIS commit
+// Polling finds a late run (VR-20; E80, T-E80-02(a)): the sha-not-found branch
+// now bounded-polls instead of giving up on the first miss — a completed run for THIS commit
 // that shows up mid-poll (not on the first `gh` call) must resolve to a
 // genuine OK, never a WARN, exactly as if it had matched on the first call.
 // Proves the poll loop actually re-queries `gh` rather than caching its
@@ -1085,9 +1092,9 @@ test("VR-20 (E80): sha absent on the first gh call, present+success on a later c
 });
 
 // ---------------------------------------------------------------------------
-// VR-21 (E80, T-E80-02(b)): the poll's own budget can expire with the sha
-// STILL absent — E78's contract must stay intact on this path: the SAME
-// WARN text as the pre-E80 immediate-miss branch (VR-17/VR-18), the check
+// Poll budget expiry (VR-21; E80, T-E80-02(b)): the poll's own budget can expire
+// with the sha STILL absent — the sha-matching contract must stay intact on this
+// path: the SAME WARN text as the earlier immediate-miss branch (VR-17/VR-18), the check
 // still green, exit 0. No new FAIL mode is introduced by adding the poll.
 // ---------------------------------------------------------------------------
 test("VR-21 (E80): poll budget expires with the sha still absent -> byte-identical pre-E80 WARN text, check green, exit 0", () => {
@@ -1123,8 +1130,8 @@ test("VR-21 (E80): poll budget expires with the sha still absent -> byte-identic
 });
 
 // ---------------------------------------------------------------------------
-// VR-22 (E80, T-E80-02(c)): AGC_VERIFY_CI_WAIT_SECONDS=0 is the documented
-// opt-out — it must perform EXACTLY one `gh` call (not "return fast", which
+// Wait-seconds opt-out (VR-22; E80, T-E80-02(c)): AGC_VERIFY_CI_WAIT_SECONDS=0 is
+// the documented opt-out — it must perform EXACTLY one `gh` call (not "return fast", which
 // a slow single call could also satisfy) and incur no wall-clock wait at
 // all, preserving the pre-E80 single-call behavior byte-for-byte.
 // ---------------------------------------------------------------------------
@@ -1155,13 +1162,13 @@ test("VR-22 (E80): AGC_VERIFY_CI_WAIT_SECONDS=0 performs exactly one gh call and
 });
 
 // ---------------------------------------------------------------------------
-// VR-13 (E14): Check 6 degradation — gh binary missing (ENOENT) -> WARN on
-// stdout, check still reports OK, release still exits 0. The ONLY failure
+// Check 6 degradation: gh binary missing (ENOENT) -> WARN on
+// stdout (VR-13, E14), check still reports OK, release still exits 0. The ONLY failure
 // mode is a definitively red completed run (VR-11); every "cannot obtain
 // ground truth" path must degrade gracefully, never block a release on
 // missing/unconfigured tooling.
 //
-// CI-flake fix (post-v3.83.0, VR-13 CI Fix): this test previously ran with a
+// CI-flake fix (post-v3.83.0; for the gh-missing test VR-13): this test previously ran with a
 // hardcoded `PATH="/usr/bin:/bin"`, reasoning "git lives there but gh
 // doesn't" — true on a macOS/Homebrew checkout, false on GitHub's
 // ubuntu-latest hosted runner, which installs the `gh` CLI via apt at
@@ -1186,8 +1193,8 @@ test("VR-13 (E14 degradation): gh binary not on PATH -> WARN on stdout naming gh
 });
 
 // ---------------------------------------------------------------------------
-// VR-14 (E14 degradation): Check 6 — gh exits non-zero (auth/network/API
-// error) -> WARN on stdout carrying gh's own error detail, never a FAIL.
+// Check 6 degradation: gh exits non-zero (auth/network/API error) -> WARN on
+// stdout carrying gh's own error detail, never a FAIL (VR-14, E14).
 // ---------------------------------------------------------------------------
 test("VR-14 (E14 degradation): gh exits non-zero (API/auth error) -> WARN on stdout with gh's error surfaced, exit 0", () => {
   const { root } = mkFixtureRepo({ version: "10.0.3", tag: "at-head", origin: "pushed" });
@@ -1205,8 +1212,8 @@ test("VR-14 (E14 degradation): gh exits non-zero (API/auth error) -> WARN on std
 });
 
 // ---------------------------------------------------------------------------
-// VR-15 (E14 degradation): Check 6 — zero completed CI runs found (e.g. a
-// brand-new repo, or CI renamed/disabled) -> WARN on stdout, never a FAIL.
+// Check 6 degradation: zero completed CI runs found (e.g. a brand-new repo, or
+// CI renamed/disabled) -> WARN on stdout, never a FAIL (VR-15, E14).
 // ---------------------------------------------------------------------------
 test("VR-15 (E14 degradation): zero completed CI runs on main -> WARN on stdout, never a FAIL, exit 0", () => {
   const { root } = mkFixtureRepo({ version: "10.0.4", tag: "at-head", origin: "pushed" });
@@ -1222,8 +1229,8 @@ test("VR-15 (E14 degradation): zero completed CI runs on main -> WARN on stdout,
 });
 
 // ---------------------------------------------------------------------------
-// VR-16 (E14 degradation, bonus coverage): unparseable gh stdout (malformed
-// JSON) -> WARN on stdout, never a FAIL. Beyond the task's named three
+// Check 6 degradation, bonus coverage: unparseable gh stdout (malformed JSON)
+// -> WARN on stdout, never a FAIL (VR-16, E14). Beyond the task's named three
 // degradation paths (gh missing / API error / zero runs), but exercises the
 // JSON.parse try/catch branch the code-reviewer called out by name in
 // review_T-EB-03.md as verified-but-not-yet-test-pinned.
@@ -1242,7 +1249,7 @@ test("VR-16 (E14 degradation, bonus): unparseable gh output -> WARN on stdout, n
 });
 
 // ---------------------------------------------------------------------------
-// VR-9 (AC9): content/skill-release-engineer.md SOP step + Escalation Routes row
+// The release-engineer SOP step and its Escalation Routes row (content/skill-release-engineer.md) (VR-9, AC9)
 // ---------------------------------------------------------------------------
 test("VR-9 (AC9): skill-release-engineer.md requires verify-release.mjs after push/gh-release and before the closing write, plus a matching Escalation Routes row", () => {
   assert.match(
@@ -1280,17 +1287,17 @@ test("VR-9 (AC9): skill-release-engineer.md requires verify-release.mjs after pu
     "SOP step 9a must explicitly forbid the closing write and the done-report on FAIL",
   );
 
-  // E80 retarget (T-E80-02): step 9a used to describe ONE catch-all WARN
+  // Retargeted for the bounded-polling change: step 9a used to describe ONE catch-all WARN
   // sentence for "gh missing/unauthenticated or zero completed runs". It now
   // must distinguish "the script itself is bounded-polling — let it run"
   // from "WARN-and-continue is reserved for a genuinely degraded
-  // environment" — the wait-vs-degraded split this cut introduced.
+  // environment" — the wait-vs-degraded split this cut introduced (T-E80-02, E80).
   //
-  // E82(ii) retarget (T-W15-02, stale pin): this used to assert a hardcoded
+  // Retargeted again because the old pin went stale: this used to assert a hardcoded
   // "~10 minutes" figure. That figure went stale the moment
-  // DEFAULT_WAIT_SECONDS changed to 480s (E82), which is the exact defect
-  // E82(ii) exists to fix — step 9a now cites the constant by NAME instead
-  // of restating a number. See VR-9b below for the behavioral pin that
+  // DEFAULT_WAIT_SECONDS changed to 480s, which is the exact defect
+  // this second retarget exists to fix — step 9a now cites the constant by NAME instead
+  // of restating a number (E82(ii), T-W15-02). See VR-9b below for the behavioral pin that
   // keeps this from going stale the same way a second time.
   assert.match(
     SKILL,
@@ -1310,9 +1317,9 @@ test("VR-9 (AC9): skill-release-engineer.md requires verify-release.mjs after pu
 });
 
 // ---------------------------------------------------------------------------
-// VR-9b (E82(ii) BEHAVIORAL PIN, T-W15-02 QA SCOPE 4/5): a pin that merely
-// matches the current prose string recreates the exact staleness E82 exists
-// to prevent — the prior VR-9 wording hardcoded "~10 minutes" and silently
+// Behavioral pin for the SOP's poll-budget sentence (VR-9b; E82(ii), T-W15-02):
+// a pin that merely matches the current prose string recreates the exact
+// staleness the CI-wait default change exists to prevent — the prior VR-9 wording hardcoded "~10 minutes" and silently
 // went stale when DEFAULT_WAIT_SECONDS changed to 480s. This test instead
 // pins the PROPERTY: step 9a's CI-poll-budget sentence must carry no
 // hardcoded duration literal, and the constant it cites by name must
@@ -1334,12 +1341,13 @@ test("VR-9b (E82(ii) behavioral pin): step 9a's CI-poll-budget sentence carries 
   // mention the historical "~10 minutes" figure and "480s" as a maintenance
   // note explaining WHY citation replaced a literal — that is a note to a
   // future editor, not an operating instruction, and re-litigating it here
-  // would just be N10's fence-visibility question again, not E82(ii)'s.
+  // would just reopen the earlier question of whether that rationale fence is
+  // visible to the executing role, which is not this test's concern (N10, E82(ii)).
   const step9aOperational = SKILL.slice(idxStep9a, idxRationaleStart);
 
   // (a) No hardcoded duration literal for the CI poll budget in the
   // OPERATIONAL text a release-engineer actually executes. This is the
-  // precise staleness class E82 was filed against.
+  // precise staleness class the CI-wait default change was filed against (E82).
   assert.doesNotMatch(
     step9aOperational,
     /~?\d+\s*(seconds?|secs?|minutes?|mins?)\b/i,
@@ -1356,9 +1364,10 @@ test("VR-9b (E82(ii) behavioral pin): step 9a's CI-poll-budget sentence carries 
   // (c) The citation is not just self-consistent prose: the named constant
   // must actually be defined, as a real numeric constant, in the script it
   // points at. Deliberately NOT pinning the literal 480 here — that would
-  // reintroduce the exact staleness-on-value-change hazard E82 exists to
-  // avoid, on the test side instead of the prose side. VR-23 elsewhere pins
-  // the live 480s behavior; this pin only guards that the identifier step
+  // reintroduce the exact staleness-on-value-change hazard the CI-wait default
+  // change exists to avoid, on the test side instead of the prose side (E82).
+  // The default-budget test (VR-23) pins the live 480s behavior elsewhere; this
+  // pin only guards that the identifier step
   // 9a cites still resolves to something.
   assert.match(
     REAL_VERIFY_SCRIPT,
@@ -1368,8 +1377,8 @@ test("VR-9b (E82(ii) behavioral pin): step 9a's CI-poll-budget sentence carries 
 });
 
 // ---------------------------------------------------------------------------
-// VR-9c (N11 pin, T-W15-02 QA SCOPE 5/5, non-blocking per code-reviewer round
-// 3): step 13a's non-empty-stage assertion tests that SOMETHING staged, not
+// Bounded claim for the non-empty-stage check (VR-9c; T-W15-02, a non-blocking
+// code-reviewer note): step 13a's non-empty-stage assertion tests that SOMETHING staged, not
 // that EVERYTHING did. Pin exactly what it guarantees — no more — so the
 // bounded property is not silently overclaimed later as "closes all
 // partial-staging failure". Known gap, recorded rather than fixed here: if
@@ -1395,8 +1404,8 @@ test("VR-9c (N11): step 13a's non-empty-stage assertion is scoped to catching a 
   const step13aBlock = SKILL.slice(idxStep13a, idxStep13b);
 
   // The enumerate-then-stage pattern (N9 fix) — never a raw shell glob.
-  // E174a: the enumeration + stage targets the derived lane dir, not a flat
-  // .current/ glob.
+  // The enumeration + stage targets the derived lane dir, not a flat
+  // .current/ glob (E174a).
   assert.match(
     step13aBlock,
     /JSONL=\$\(find "\.current\/\$LANE" -maxdepth 1 -name "\*\.jsonl"\)/,
@@ -1412,8 +1421,8 @@ test("VR-9c (N11): step 13a's non-empty-stage assertion is scoped to catching a 
     /git add -- "\.current\/\$LANE\/handoff\.md" tasks\.md/,
     "E143: 13a's git add must NOT name tasks.md — step 8 owns staging it",
   );
-  // E174a: the lane is derived via the compiled resolver, never hardcoded to
-  // _primary and never re-parsed from the branch name in shell.
+  // The lane is derived via the compiled resolver, never hardcoded to
+  // _primary and never re-parsed from the branch name in shell (E174a).
   assert.match(
     step13aBlock,
     /LANE=\$\(node --input-type=module -e "import \{resolveCurrentLane\} from \\"\.\/dist\/tools\/lane-paths\.js\\"; console\.log\(resolveCurrentLane\(process\.cwd\(\)\)\)"\)/,
@@ -1452,7 +1461,7 @@ test("VR-9c (N11): step 13a's non-empty-stage assertion is scoped to catching a 
 });
 
 // ---------------------------------------------------------------------------
-// VR-10 (AC10): post-closing-write tw_get_state read-back
+// A tw_get_state read-back follows the closing write (VR-10, AC10)
 // ---------------------------------------------------------------------------
 test("VR-10 (AC10): skill-release-engineer.md requires a tw_get_state read-back immediately after the closing write, before the final reply", () => {
   const idxStep12 = SKILL.indexOf("**Closing write**");
@@ -1517,17 +1526,17 @@ test("VR-SEC-4: oversized version argument -> rejected by regex validation, exit
 });
 
 // ---------------------------------------------------------------------------
-// T-E8284-02 (E82/E84): the 480s default poll budget and the --close-out
-// mode, per specs/e82-e84-release-verify-tooling.md AC1/AC3/AC4.
+// The 480s default poll budget and the --close-out mode, per
+// specs/e82-e84-release-verify-tooling.md AC1/AC3/AC4 (T-E8284-02, E82/E84).
 // ---------------------------------------------------------------------------
 
-// VR-23 (AC1, E82): the Check 6 poll budget must default to 480s when
-// AGC_VERIFY_CI_WAIT_SECONDS is unset — pinned BEHAVIORALLY by reading the
+// Default poll budget (VR-23; AC1, E82): the Check 6 poll budget must default to
+// 480s when AGC_VERIFY_CI_WAIT_SECONDS is unset — pinned BEHAVIORALLY by reading the
 // script's own first poll-progress line ("...left in budget"), never by
 // grepping the source for the literal 480. A grep pin (the spec's own AC1
 // `proof:` line, already executed in the AC Execution Log) passes against a
 // file that says 480 in a comment and a DIFFERENT number in the constant —
-// exactly the E82 defect shape this test exists to catch instead.
+// exactly the stale-constant defect shape (E82) this test exists to catch instead.
 //
 // The script's own deadline runs up to 480 real seconds if left alone, so
 // this drives the child asynchronously (spawn, not spawnSync) and kills it
@@ -1593,8 +1602,9 @@ test("VR-23 (AC1, E82): AGC_VERIFY_CI_WAIT_SECONDS unset -> first poll line repo
 });
 
 // ---------------------------------------------------------------------------
-// VR-24 (AC3, E84): --close-out FAILs when HEAD is ahead of its @{u}
-// upstream, names the ahead count, and never runs Check 1 (tag-at-HEAD).
+// Close-out ahead-of-upstream failure (VR-24; AC3, E84): --close-out FAILs when
+// HEAD is ahead of its @{u} upstream, names the ahead count, and never runs
+// Check 1 (tag-at-HEAD).
 //
 // This is the load-bearing pin for the whole ticket: scripts/verify-release.mjs
 // computes the ahead count via the range `@{u}..HEAD`. The fixture below
@@ -1652,8 +1662,8 @@ test("VR-24 (AC3, E84): --close-out FAILs when HEAD is ahead of upstream, names 
 });
 
 // ---------------------------------------------------------------------------
-// VR-25 (AC4, E84): --close-out exits 0 with a distinct CLOSE-OUT PASSED
-// line when HEAD == upstream, and demonstrably never runs Checks 1/3/4/5/6
+// Close-out success (VR-25; AC4, E84): --close-out exits 0 with a distinct
+// CLOSE-OUT PASSED line when HEAD == upstream, and demonstrably never runs Checks 1/3/4/5/6
 // — asserted on the ABSENCE of their `OK:`/check-name output, not merely on
 // exit 0 (an exit-0-only pin would equally pass a build that silently
 // skipped every check for the wrong reason).
@@ -1694,8 +1704,8 @@ test("VR-25 (AC4, E84): --close-out exits 0, prints CLOSE-OUT PASSED, and skips 
 });
 
 // ---------------------------------------------------------------------------
-// VR-26 (AC4, E84): strengthens VR-25 — --close-out must not even ATTEMPT to
-// resolve a version. A deliberately-corrupt package.json (invalid JSON)
+// Close-out never resolves a version (VR-26; AC4, E84): strengthens the
+// close-out success test VR-25 — --close-out must not even ATTEMPT to resolve a version. A deliberately-corrupt package.json (invalid JSON)
 // would throw if the version-resolution code path executed at all; since
 // that code sits OUTSIDE the runCheck wrapper, an uncaught throw there would
 // crash the process (a stack trace + non-zero exit), never CLOSE-OUT PASSED.
@@ -1716,16 +1726,17 @@ test("VR-26 (AC4, E84): --close-out still passes against a fixture whose package
 });
 
 // ---------------------------------------------------------------------------
-// E141 additions (T-E141-02) — Check 1's bookkeeping-commit tolerance.
-// specs/e141-tag-at-head-bookkeeping-tolerance.md AC1-AC6. VR-2 above was
+// Check 1's bookkeeping-commit tolerance tests (T-E141-02, E141;
+// specs/e141-tag-at-head-bookkeeping-tolerance.md AC1-AC6). VR-2 above was
 // amended (not retargeted) to keep pinning the non-bookkeeping FAIL path;
 // the tests below pin the new tolerance itself plus its two guard rails
-// (AC4 ancestry precondition, AC5 Check 2 independence) and two of the
-// T-E141-01 code-reviewer's non-blocking observations worth a cheap pin.
+// (the ancestry precondition, and Check 2's independence) and two of the
+// code-reviewer's non-blocking observations (T-E141-01) worth a cheap pin,
+// covering AC4 and AC5.
 // ---------------------------------------------------------------------------
 
-// VR-27 (AC2, E141): the human's stated bar, half 1 — a single post-tag
-// commit touching ONLY the SOP step 13a bookkeeping paths (the v3.111.0
+// Bookkeeping-only range is tolerated (VR-27; AC2, E141): the human's stated
+// bar, half 1 — a single post-tag commit touching ONLY the SOP step 13a bookkeeping paths (the v3.111.0
 // shape: .current/handoff.md + .current/metrics.jsonl + tasks.md in one
 // commit) must be TOLERATED — Check 1 OK, with an explicit NOTE naming the
 // tolerated commit count so the audit trail shows a tolerance fired rather
@@ -1753,8 +1764,8 @@ test("VR-27 (AC2, E141): one post-tag commit touching only .current/handoff.md +
   assert.equal(result.stderr, "", "a tolerated pass must not print anything to stderr");
 });
 
-// VR-28 (AC1, E141): tag == HEAD stays byte-identical to the pre-E141
-// behaviour — the equality path returns before any new code runs, so no
+// Tag == HEAD is unchanged (VR-28; AC1, E141): it stays byte-identical to the
+// behaviour before the tolerance existed — the equality path returns before any new code runs, so no
 // tolerance note is ever printed even though the tolerance machinery now
 // exists in the same check.
 test("VR-28 (AC1, E141): tag == HEAD -> plain 'OK: tag-at-HEAD', no tolerance note, byte-identical to pre-E141 behaviour", () => {
@@ -1770,8 +1781,8 @@ test("VR-28 (AC1, E141): tag == HEAD -> plain 'OK: tag-at-HEAD', no tolerance no
   );
 });
 
-// VR-29 (AC4, E141): ancestry is a precondition of the tolerance, never a
-// substitute for it. A tag on a divergent branch (not an ancestor of HEAD)
+// Ancestry precondition (VR-29; AC4, E141): ancestry is a precondition of the
+// tolerance, never a substitute for it. A tag on a divergent branch (not an ancestor of HEAD)
 // keeps the ORIGINAL "does not point at HEAD" FAIL, with no range
 // enumeration appended — the tolerance code path is never reached because
 // the ancestry check short-circuits first.
@@ -1799,8 +1810,8 @@ test("VR-29 (AC4, E141): tag is NOT an ancestor of HEAD (diverged branch) -> ori
   assert.doesNotMatch(result.stdout, /NOTE: tag-at-HEAD/);
 });
 
-// VR-30 (AC5, E141): the human's stated bar, half 2 — a tolerated Check 1
-// must never make an unpushed release look clean. Check 2 (pushed-to-origin)
+// Check 2 stays independent (VR-30; AC5, E141): the human's stated bar, half 2 —
+// a tolerated Check 1 must never make an unpushed release look clean. Check 2 (pushed-to-origin)
 // is untouched and compares HEAD to @{u} directly, so it fires independently
 // of whatever Check 1 decided. Fixture: push the release commit, then add
 // the bookkeeping commit LOCALLY ONLY (mkFixtureRepo pushes origin before
@@ -1832,10 +1843,11 @@ test("VR-30 (AC5, E141): genuinely unpushed bookkeeping commit -> Check 1 tolera
   );
 });
 
-// VR-31 (E141, T-E141-01 review observation 4 — non-blocking, pinned as
-// documented current behaviour): a post-tag commit that DELETES an
-// allowlisted bookkeeping path is tolerated. The path is bookkeeping either
-// way, whether it is written or removed.
+// Deleting a bookkeeping path is tolerated (VR-31): a post-tag commit that
+// DELETES an allowlisted bookkeeping path is tolerated — a non-blocking
+// code-reviewer observation, pinned as documented current behaviour. The path
+// is bookkeeping either way, whether it is written or removed; see review
+// observation 4 in T-E141-01 (E141).
 test("VR-31 (E141, observation 4 pin): a post-tag commit deleting an allowlisted bookkeeping file is tolerated -> Check 1 OK with tolerance NOTE", () => {
   const { root } = mkFixtureRepo({ version: "7.0.0", tag: "behind-head-bookkeeping-delete" });
   // Push the tolerated commit too, isolating Check 1 (see VR-27's comment).
@@ -1846,9 +1858,9 @@ test("VR-31 (E141, observation 4 pin): a post-tag commit deleting an allowlisted
   assert.match(result.stdout, /NOTE: tag-at-HEAD — tolerated 1 governance-bookkeeping commit\(s\)/);
 });
 
-// VR-32 (E141, T-E141-01 review observation 5 — non-blocking, pinned as
-// documented current behaviour): a non-ASCII allowlisted filename fails
-// CLOSED. Under default core.quotePath, git reports the path
+// A non-ASCII filename fails closed (VR-32): a non-ASCII allowlisted filename
+// fails CLOSED — a non-blocking code-reviewer observation, pinned as documented
+// current behaviour (E141, T-E141-01 review observation 5). Under default core.quotePath, git reports the path
 // quoted/octal-escaped, which matches none of the allowlist regexes, so the
 // commit is (correctly) treated as touching a non-bookkeeping path rather
 // than silently tolerated.
@@ -1866,11 +1878,11 @@ test("VR-32 (E141, observation 5 pin): a non-ASCII allowlisted filename fails CL
 });
 
 // ---------------------------------------------------------------------------
-// VR-39..VR-42 (E174a): lane-path additions to Check 1's bookkeeping
-// tolerance (BOOKKEEPING_PATH_RES / LANE_SEGMENT_RE_SRC). VR-27/VR-31 above
-// already pin the flat `.current/handoff.md` + `.current/*.jsonl` shape
-// stays tolerated post-flip; these pin the lane-scoped shapes the E123 flip
-// introduced, plus the two directories that must NEVER be mistaken for a
+// Lane-path additions to Check 1's bookkeeping tolerance (VR-39..VR-42, E174a;
+// BOOKKEEPING_PATH_RES / LANE_SEGMENT_RE_SRC). VR-27/VR-31 above already pin
+// that the flat `.current/handoff.md` + `.current/*.jsonl` shape stays tolerated
+// after bookkeeping moved into per-lane directories (E123); these pin the
+// lane-scoped shapes that layout introduced, plus the two directories that must NEVER be mistaken for a
 // lane (archive/history are aggregation dirs, not lane dirs).
 // ---------------------------------------------------------------------------
 
@@ -1926,8 +1938,8 @@ test("VR-42 (E174a): a post-tag commit touching .current/history/... is NOT tole
 });
 
 // ---------------------------------------------------------------------------
-// VR-43..VR-46 (A1, human-mandated negative cases, E174a): each of these
-// paths superficially resembles an allowlisted lane-scoped bookkeeping path
+// Look-alike lane paths are rejected (VR-43..VR-46; human-mandated negative
+// cases, E174a): each of these paths superficially resembles an allowlisted lane-scoped bookkeeping path
 // but must NOT be tolerated. Each fixture's post-tag commit touches exactly
 // one such path; Check 1 must FAIL, not silently pass.
 // ---------------------------------------------------------------------------
@@ -1972,7 +1984,8 @@ test("VR-46 (A1): .current/_primary/feature-split.md is NOT tolerated -> Check 1
 });
 
 // ---------------------------------------------------------------------------
-// VR-47 (A2, human-mandated drift-guard test, code-reviewer R1 on
+// Drift guard between the script's lane regex and the compiled lane-path
+// helpers (VR-47; a human-mandated drift-guard test raised in code review on
 // scripts/verify-release.mjs:249-250): the comment there claims "a
 // drift-guard test pins the mirror" between LANE_SEGMENT_RE_SRC (plus its
 // archive/history exclusion) and the real dist/tools/lane-paths.js
@@ -2003,7 +2016,7 @@ test("VR-47 (A2): verify-release.mjs's LANE_SEGMENT_RE_SRC + archive/history exc
 
   // The archive/history exclusion, parsed out of the extracted source
   // itself (never hand-typed), then compared against NON_LANE_DIRS by set
-  // equality — the A2 requirement, not just a spot-check.
+  // equality — the human-mandated requirement (A2), not just a spot-check.
   const lookaheadMatch = laneSegSrc.match(/^\(\?!\(\?:([A-Za-z|]+)\)\\\/\)/);
   assert.ok(
     lookaheadMatch,
@@ -2018,7 +2031,8 @@ test("VR-47 (A2): verify-release.mjs's LANE_SEGMENT_RE_SRC + archive/history exc
 
   // Full-segment acceptance, derived from the dist exports over a probe
   // set — not a re-derivation of SAFE_LANE_RE's char class (not exported),
-  // exactly per the A2 instruction. LANE_SEGMENT_RE_SRC's exclusion
+  // exactly as the human-mandated drift-guard instruction (A2) requires.
+  // LANE_SEGMENT_RE_SRC's exclusion
   // lookahead is context-dependent (it peeks for a following "/"), so it
   // must be exercised the SAME way BOOKKEEPING_PATH_RES actually embeds it
   // — inside a full `.current/<lane>/handoff.md` path, not as a bare,
@@ -2062,10 +2076,10 @@ test("VR-47 (A2): verify-release.mjs's LANE_SEGMENT_RE_SRC + archive/history exc
 });
 
 // ---------------------------------------------------------------------------
-// VR-33 (AC1, E147/T-E142-01): Check 6 sha resolution — the original defect's
-// exact reproduction shape. A release tag sits at commit A; a
+// Check 6 resolves the release sha from the tag (VR-33; AC1, E147/T-E142-01) —
+// the original defect's exact reproduction shape. A release tag sits at commit A; a
 // governance-bookkeeping-only commit B lands on top of it (HEAD), the same
-// "behind-head-bookkeeping" shape E141 already tolerates for Check 1. A
+// "behind-head-bookkeeping" shape the tag-at-HEAD tolerance already accepts for Check 1. A
 // completed CI run is recorded against A's sha ONLY. Pre-fix, Check 6
 // resolved `releaseSha` unconditionally from `git rev-parse HEAD` (= B), so
 // it would poll/match against B, never see the real run recorded for A, and
@@ -2137,8 +2151,8 @@ test("VR-33 (AC1, E147): tag at commit A, bookkeeping-only commit B on top (HEAD
 });
 
 // ---------------------------------------------------------------------------
-// VR-34 (AC2, E147/T-E142-01): no tag exists yet -> Check 6's `releaseSha`
-// falls back to `git rev-parse HEAD`, unchanged from pre-fix behavior. Pins
+// Check 6 falls back to HEAD when no tag exists (VR-34; AC2, E147/T-E142-01): no
+// tag exists yet -> Check 6's `releaseSha` falls back to `git rev-parse HEAD`, unchanged from pre-fix behavior. Pins
 // the fallback's actual sha-resolution outcome (a real gh shim recording a
 // green run against HEAD's own sha must still be matched) rather than only
 // "does not crash without a tag" (already covered by VR-1/VR-8, which use
@@ -2175,19 +2189,19 @@ test("VR-34 (AC2, E147): no tag exists yet -> Check 6's releaseSha falls back to
 });
 
 // ---------------------------------------------------------------------------
-// T-E165-01 (docs/backlog.md E165, Wave 4.5 L-RELTOOL) — Check 6's CI branch
-// is now DERIVED from the checkout (deriveCIBranch), never hardcoded to
+// Check 6's CI branch is now DERIVED from the checkout (deriveCIBranch), never hardcoded to
 // "main": a release cut from a maintenance/hotfix branch must interrogate
 // THAT branch's CI runs, not main's. No specs/<feature>.md exists for this
-// mini-chain ticket (PM/architect skipped) — the spec is docs/backlog.md's
-// E165 row plus the handoff's scope_decision_why, per the dispatch brief.
+// mini-chain ticket (PM/architect skipped) — the spec is the ticket's row in
+// docs/backlog.md plus the handoff's scope_decision_why, per the dispatch brief
+// (ticket T-E165-01, backlog E165).
 //
-// Test map (scope_decision_why's two non-negotiable ACs for E165):
+// Test map (scope_decision_why's two non-negotiable acceptance criteria):
 //   non-main branch -> gh receives --branch <branch> AND --workflow CI -> VR-35
 //   detached HEAD, lenient -> zero gh calls, WARN stdout, exit 0        -> VR-36
 //   detached HEAD, --ci-check --strict -> zero gh calls, FAIL, exit 1  -> VR-37
 //   no upstream configured -> falls back to the current local branch   -> VR-38
-// VR-11..VR-34 above are unmodified by this addition: every existing fixture
+// The earlier Check 6 tests VR-11..VR-34 above are unmodified by this addition: every existing fixture
 // pushes branch "main" with `-u origin main` (mkFixtureRepo's default), so
 // deriveCIBranch resolves the identical "main" it always did — confirmed by
 // the full-suite run this test's own review (review_reports/review_T-E166-01.md)
@@ -2212,7 +2226,7 @@ function mkGhArgvCaptureShim() {
 test("VR-35 (E165): non-main fixture branch -> gh run list receives --branch <that branch> AND --workflow CI", () => {
   const { root } = mkFixtureRepo({ version: "10.3.0", tag: "none", origin: "pushed" });
   // A release cut from a maintenance/hotfix branch, not main — the shape
-  // E165's own top-of-file comment names as the motivating regression.
+  // this file's branch-derivation comment names as the motivating regression (E165).
   git(["checkout", "-q", "-b", "release/10.3.x"], root);
   git(["push", "-q", "-u", "origin", "release/10.3.x"], root);
 
@@ -2290,15 +2304,16 @@ test("VR-38 (E165): no upstream tracking configured -> falls back to the current
 });
 
 // ---------------------------------------------------------------------------
-// VR-48/VR-49 (E126 T-E126-04/T-E126-06, X5/E198(a), spec AC10): the two new
-// BOOKKEEPING_PATH_RES entries added for `.current/_primary/tasks.md` (a
-// literal, mirroring the `_primary` handoff.md tolerance) and lane-scoped
+// Tolerating tasks.md bookkeeping: the two new BOOKKEEPING_PATH_RES entries added
+// for `.current/_primary/tasks.md` (a literal, mirroring the `_primary`
+// handoff.md tolerance) and lane-scoped
 // `.current/<lane>/tasks.md` (a LANE_SEGMENT_RE_SRC-reusing regex, mirroring
-// the existing lane-scoped handoff.md/*.jsonl entries). Both mirror
-// VR-39/VR-40 one-for-one, substituting tasks.md for handoff.md/telemetry.jsonl.
+// the existing lane-scoped handoff.md/*.jsonl entries). Both mirror the
+// lane-path tests VR-39/VR-40 one-for-one, substituting tasks.md for
+// handoff.md/telemetry.jsonl (tests VR-48/VR-49; T-E126-04/T-E126-06, spec AC10).
 //
-// VR-47 (the LANE_SEGMENT_RE_SRC <-> isSafeLaneName/NON_LANE_DIRS drift
-// guard) is NOT extended here: T-E126-04's lane-scoped tasks.md regex reuses
+// The drift guard between LANE_SEGMENT_RE_SRC and isSafeLaneName/NON_LANE_DIRS
+// is NOT extended here: the lane-scoped tasks.md regex reuses
 // the SAME `LANE_SEGMENT_RE_SRC` constant VR-47 already pins (spec
 // Dependencies: "reuse by import only, never restate") rather than
 // restating a second copy of the lane-segment pattern, so there is nothing

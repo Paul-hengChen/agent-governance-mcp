@@ -23,8 +23,8 @@ const REPO_ROOT = path.resolve(__dirname, "..");
 const TEMPLATE_DIR = path.join(REPO_ROOT, "templates", "claude-code-agents");
 const SKILL_DIR = path.join(REPO_ROOT, "content");
 
-// d6-host-capability-compose-axis (T-D6-04): content/skill-coordinator.md is
-// retired — it is no longer a compose source (all 3 render paths route through
+// The monolithic content/skill-coordinator.md is retired (host-capability compose axis, T-D6-04):
+// it is no longer a compose source (all 3 render paths route through
 // composeSkill/SKILL_SEGMENTS). readSkillFile composes the full-capability
 // (taskTool:true) reconstruction, which reproduces the retired monolith
 // byte-for-byte (AC5) — a drop-in replacement for the raw reads below.
@@ -91,7 +91,7 @@ function readTemplateRaw(role) {
 }
 
 // ---------------------------------------------------------------------------
-// AC1 (v3.20.0) + AC1/AC2 (v3.21.0): templates exist with expected file names
+// Templates exist with the expected file names (AC1, v3.20.0; AC1/AC2, v3.21.0)
 // ---------------------------------------------------------------------------
 
 test("AC1: templates/claude-code-agents/ contains the expected 12 subagent files", () => {
@@ -198,7 +198,7 @@ test("AC1 contract: each template tier mirrors content/skill-*.md recommended_mo
 });
 
 // ---------------------------------------------------------------------------
-// AC3 / AC4 (v3.20.0): skill-coordinator.md dispatch sub-bullets — unchanged
+// The coordinator's dispatch sub-bullets are unchanged (AC3 / AC4, v3.20.0)
 // ---------------------------------------------------------------------------
 
 test("AC3: skill-coordinator.md §Auto-Routing has Subagent Dispatch sub-bullet (S06)", () => {
@@ -235,8 +235,8 @@ test("AC4: skill-coordinator.md §Auto-Routing documents tw_switch_role fallback
 });
 
 // ---------------------------------------------------------------------------
-// c17-dispatch-brief-template (spec AC1/AC2): canonical Dispatch Brief Template
-// section — the Subagent Dispatch paragraph must point at it (not a hand-paraphrased
+// Canonical Dispatch Brief Template section (c17-dispatch-brief-template, spec AC1/AC2):
+// the Subagent Dispatch paragraph must point at it (not a hand-paraphrased
 // prompt= restatement), and the fenced template must carry the six invariant lines
 // verbatim so every Task-dispatch brief opens identically.
 // ---------------------------------------------------------------------------
@@ -268,7 +268,7 @@ test("c17 AC1/AC2: skill-coordinator.md has a Dispatch Brief Template section re
 });
 
 // ---------------------------------------------------------------------------
-// b9-token-budget-brake (spec AC3/Copy-Strings budget.stop-note): the new
+// Token budget brake wording (b9-token-budget-brake, spec AC3/Copy-Strings budget.stop-note): the new
 // "Token Budget Brake" section must exist and the Escalation Routes row must
 // quote the budget.stop-note string verbatim — this is the sole Copy/Strings
 // entry this feature ships, and it is easy for a future prose rewrite of the
@@ -296,7 +296,7 @@ test("b9 AC3/Copy-Strings: skill-coordinator.md has a Token Budget Brake section
 });
 
 // ---------------------------------------------------------------------------
-// AC5 (v3.20.0): README sub-section heading
+// The README carries a subagent-install sub-section with its exact heading (AC5, v3.20.0)
 // ---------------------------------------------------------------------------
 
 test("AC5: README adds ### Claude Code subagent install (auto model-routing) sub-section (S05)", () => {
@@ -334,11 +334,11 @@ test("v3.21.0 AC4: README surfaces @teamwork and @lite primaries", () => {
 });
 
 // ---------------------------------------------------------------------------
-// v3.21.1 AC1 / AC2: watermark reminder in every template
+// Every template carries the watermark reminder, and it stays tier-agnostic (AC1 / AC2, v3.21.1)
 // ---------------------------------------------------------------------------
 
 test("v3.21.1 AC1: every template body contains the watermark reminder, tier-agnostic (v3.58.0, C5a)", () => {
-  // C5a: the CRITICAL reminder no longer hardcodes the frontmatter model:
+  // The CRITICAL reminder no longer hardcodes the frontmatter model:
   // tier — a dispatch_pins override (e.g. sr-engineer pinned to "fable")
   // would otherwise tell the subagent to stamp the WRONG tier. The
   // reminder now instructs the subagent to stamp whichever tier it was
@@ -481,8 +481,8 @@ test("AC8: package.json + index.ts versions match", () => {
 });
 
 // ---------------------------------------------------------------------------
-// e9a-stamp-integrity AC2: release-engineer.md dispatch template carries the
-// no-MCP-path relay paragraph forward into the dispatch context itself
+// The release-engineer.md dispatch template carries the no-MCP-path relay
+// paragraph (stamp integrity, e9a-stamp-integrity AC2) forward into the dispatch context itself
 // (not only the skill SOP loaded later via tw_switch_role).
 // ---------------------------------------------------------------------------
 

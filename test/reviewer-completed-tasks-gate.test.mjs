@@ -1,31 +1,28 @@
 // Coded by @qa-engineer
-// Tests for specs/c16-c10-role-boundary.md — AC-3/AC-4 (T-C16-05).
+// Tests for the role-boundary spec (specs/c16-c10-role-boundary.md, AC-3/AC-4, T-C16-05).
 //
 // Spec-to-Test map:
-//   AC-3 bullet 1 (reject non-empty completed_tasks on agent_id=code-reviewer,
-//     file mode)                                          -> FM1
-//   AC-3 bullet 1 (same, SQLite/HTTP mode — storage-agnostic per DR-5)
-//                                                          -> SQ1
-//   AC-3 bullet 2 (Phase-2 claim write, completed_tasks=[],
-//     unaffected — file mode)                              -> FM2
-//   AC-3 bullet 2 (same, SQLite mode)                       -> SQ2
-//   AC-3 bullet 2 (zod-default completed_tasks omitted entirely, full
-//     TOOL_REGISTRY dispatch — crash-safety per review_T-C16-01.md finding)
-//                                                          -> FM3
-//   AC-3 bullet 3 (APPROVED row, agent_id=qa-engineer: new gate does not
+//   reject non-empty completed_tasks on code-reviewer, file mode (AC-3 bullet 1) -> FM1
+//   the same rejection in SQLite/HTTP mode, storage-agnostic (AC-3 bullet 1, DR-5) -> SQ1
+//   the Phase-2 claim write, completed_tasks=[], stays unaffected, file mode (AC-3 bullet 2) -> FM2
+//   the same claim write stays unaffected in SQLite mode (AC-3 bullet 2) -> SQ2
+//   completed_tasks omitted entirely (zod default) through the full
+//     TOOL_REGISTRY dispatch, crash-safety per the code review finding
+//     from review_T-C16-01.md (AC-3 bullet 2) -> FM3
+//   the APPROVED row with agent_id=qa-engineer: the new gate does not
 //     fire; pre-existing MISSING_REVIEW_EVIDENCE still fires correctly —
-//     file mode) — RE-PINNED (E32 amendment, e32-e33-gate-hardening):
+//     file mode (AC-3 bullet 3) — RE-PINNED after the gate-hardening amendment (e32-e33-gate-hardening):
 //     review scope now travels via review_task_ids, completed_tasks stays
 //     empty (a non-empty completed_tasks on this write would instead hit
 //     the amended QA_COMPLETION_EVIDENCE_MISSING gate first — see
 //     test/e18-write-provenance.test.mjs QAEV-4a/b and
 //     test/e32-e33-gate-hardening.test.mjs C2/P6a/P6b/P6c)
 //                                                          -> FM4, FM5
-//   AC-3 bullet 3 (same, SQLite mode — unaffected by the E32 amendment:
+//   the same APPROVED row in SQLite mode — unaffected by the amendment:
 //     QA_COMPLETION_EVIDENCE_MISSING is file-mode only, so SQ3 keeps the
-//     pre-amendment completed_tasks shape)                 -> SQ3
+//     pre-amendment completed_tasks shape (AC-3 bullet 3)  -> SQ3
 //
-// WHY: the C16 incident was a code-reviewer write's `completed_tasks` field
+// WHY: the original incident (C16) was a code-reviewer write's `completed_tasks` field
 // polluting the handoff ledger with ids qa-engineer never actually completed
 // (the CHANGES_REQUESTED self-stamped row). The new REVIEWER_COMPLETED_TASKS_
 // REJECTED gate (tools/handoff-orchestrator.ts, sibling of
@@ -81,14 +78,14 @@ async function seedFileState(ws, feature, agent, status) {
     pendingNotes: ["seed"],
     lastAgent: agent,
   });
-  // E148 (docs/backlog.md row E148): force the seed's last_updated off the
-  // wall clock — see test/e148-seed-stamp.mjs.
+  // Force the seed's last_updated off the wall clock, so the freshness
+  // stamp cannot look suspicious (E148) — see test/e148-seed-stamp.mjs.
   forceSeedStamp(ws);
 }
 
 // ---------------------------------------------------------------------------
-// FM1 — AC-3 bullet 1: code-reviewer write with non-empty completed_tasks is
-// REJECTED with REVIEWER_COMPLETED_TASKS_REJECTED (file mode).
+// A code-reviewer write with non-empty completed_tasks is
+// REJECTED with REVIEWER_COMPLETED_TASKS_REJECTED, file mode (FM1, AC-3 bullet 1).
 // ---------------------------------------------------------------------------
 
 test("FM1: code-reviewer CHANGES_REQUESTED-shaped write carrying non-empty completed_tasks is REJECTED (file mode)", async () => {
@@ -105,7 +102,7 @@ test("FM1: code-reviewer CHANGES_REQUESTED-shaped write carrying non-empty compl
     active_feature: "rctg-fm1",
     status: "FAIL",
     agent_id: "code-reviewer",
-    completed_tasks: ["T-BOGUS-01"], // the C16 ledger-pollution shape
+    completed_tasks: ["T-BOGUS-01"], // the bogus-id shape that once polluted the task ledger (C16)
     pending_notes: ["code-reviewer: found a correctness issue"],
   });
   assert.ok(result.isError, "a code-reviewer write with non-empty completed_tasks must be rejected");
@@ -116,8 +113,8 @@ test("FM1: code-reviewer CHANGES_REQUESTED-shaped write carrying non-empty compl
 });
 
 // ---------------------------------------------------------------------------
-// FM2 — AC-3 bullet 2: the Phase-2 claim write (agent_id=code-reviewer,
-// completed_tasks=[]) is unaffected (file mode).
+// The Phase-2 claim write (agent_id=code-reviewer,
+// completed_tasks=[]) is unaffected, file mode (FM2, AC-3 bullet 2).
 // ---------------------------------------------------------------------------
 
 test("FM2: code-reviewer claim write (completed_tasks=[]) is ACCEPTED — unaffected (file mode)", async () => {
@@ -138,10 +135,10 @@ test("FM2: code-reviewer claim write (completed_tasks=[]) is ACCEPTED — unaffe
 });
 
 // ---------------------------------------------------------------------------
-// FM3 — AC-3 bullet 2 (crash-safety): completed_tasks OMITTED entirely at the
+// Crash-safety: completed_tasks OMITTED entirely at the
 // real tw_update_state boundary (zod default []) does not throw and is
 // ACCEPTED, exercising the full TOOL_REGISTRY dispatch (zod parse -> handler
-// -> orchestrator), not a hand-built parsed object.
+// -> orchestrator), not a hand-built parsed object (FM3, AC-3 bullet 2).
 // ---------------------------------------------------------------------------
 
 const UPDATE_STATE_ENTRY = TOOL_REGISTRY.find((e) => e.name === "tw_update_state");
@@ -166,9 +163,9 @@ test("FM3: tw_update_state with completed_tasks omitted defaults to [] (zod) and
 });
 
 // ---------------------------------------------------------------------------
-// FM4 / FM5 — AC-3 bullet 3: the APPROVED row is untouched by the new
+// The APPROVED row is untouched by the new
 // REVIEWER_COMPLETED_TASKS_REJECTED gate — it keys on agent_id, not on which
-// role authored the call. RE-PINNED (E32 amendment, e32-e33-gate-hardening):
+// role authored the call (FM4 / FM5, AC-3 bullet 3). RE-PINNED after the gate-hardening amendment (e32-e33-gate-hardening):
 // review scope now travels via the transient review_task_ids field, with
 // completed_tasks staying EMPTY on this row (a non-empty completed_tasks
 // here would instead be caught by the amended QA_COMPLETION_EVIDENCE_MISSING
@@ -235,7 +232,8 @@ test("FM5 (E32 amendment): qa-engineer APPROVED-row write with review_task_ids a
 });
 
 // ---------------------------------------------------------------------------
-// E40 (e40-nonqa-completed-tasks-write-gate, T-E40-03) additions below.
+// Additions below cover the widening of the gate to every non-qa identity
+// (ticket e40-nonqa-completed-tasks-write-gate, T-E40-03).
 //
 // Spec-to-test map (docs/backlog.md E40 row is the spec; no separate
 // specs/<feature>.md — mini-chain, PM/ARCH skipped, per scope_decision_why):
@@ -245,14 +243,14 @@ test("FM5 (E32 amendment): qa-engineer APPROVED-row write with review_task_ids a
 //   REJECTED envelope (proven byte-identical above, FM1/SQ1, untouched by
 //   this feature) and qa-engineer keeps the UNCHANGED E18/E32
 //   QA_COMPLETION_EVIDENCE_MISSING path (FM4/FM5/SQ3, also untouched)  ->
-//     FM6-FM11 (one per identity: sr-engineer, pm, architect, researcher,
-//     design-auditor, release-engineer)
+//     one test per identity (FM6-FM11): sr-engineer, pm, architect, researcher,
+//     design-auditor, release-engineer
 //   the bypass itself — a non-qa write prefilling an id must now be
 //   rejected AT THE FIRST WRITE, not merely somewhere downstream, and the
 //   pre-existing QA_COMPLETION_EVIDENCE_MISSING set-difference gate must
 //   still be armed on a genuinely-new id afterward (proving E18/E32 was
 //   not loosened to compensate)                                        ->
-//     BYPASS-FM (file mode), BYPASS-SQL (SQLite mode)
+//     a file-mode test (BYPASS-FM) and a SQLite-mode test (BYPASS-SQL)
 //
 // TEST-DESIGN HAZARD (flagged forward by the code-reviewer,
 // review_reports/review_T-E40-01.md round 2): the widened step sits AFTER
@@ -300,7 +298,7 @@ for (const [role, label] of NON_QA_SELF_LOOP_IDENTITIES) {
       active_feature: feature,
       status: "In_Progress",
       agent_id: role,
-      completed_tasks: ["T-BOGUS-01"], // the E40 prefill shape
+      completed_tasks: ["T-BOGUS-01"], // the bogus-id shape a template prefill once produced (E40)
       pending_notes: [`${role}: self-loop`],
     });
     assert.ok(result.isError, `agent_id="${role}" carrying non-empty completed_tasks must be rejected`);
@@ -365,9 +363,9 @@ test("BYPASS-FM: a non-qa prefill write is rejected AT THE FIRST WRITE; the down
   // Phase-2 claim shape), then to qa-engineer (empty claim), so the sequence
   // reaches a real (qa-engineer, In_Progress) prev-tuple honestly rather than
   // skipping straight to an illegal edge.
-  // E148: WRITE1 was rejected (never landed), so the on-disk stamp is still
+  // WRITE1 was rejected (never landed), so the on-disk stamp is still
   // the seed's forced-safe value — nothing new to force here. Belt-and-
-  // braces anyway since it's a no-op if already safe.
+  // braces anyway since it's a no-op if already safe (seed-stamp fix E148).
   forceSeedStamp(ws);
   resetSession(ws);
   markStateRead(ws);
@@ -381,8 +379,8 @@ test("BYPASS-FM: a non-qa prefill write is rejected AT THE FIRST WRITE; the down
   });
   assert.ok(!advance1.isError, `legitimate sr-engineer->code-reviewer advance must not be rejected; got: ${advance1.content?.[0]?.text}`);
 
-  // E148: advance1 was ACCEPTED and stamped a fresh, wall-clock last_updated
-  // — force it safe before it becomes advance2's prevState.
+  // advance1 was ACCEPTED and stamped a fresh, wall-clock last_updated
+  // — force it safe before it becomes advance2's prevState (E148).
   forceSeedStamp(ws);
   resetSession(ws);
   markStateRead(ws);
@@ -409,8 +407,8 @@ test("BYPASS-FM: a non-qa prefill write is rejected AT THE FIRST WRITE; the down
   // id, it is genuinely new from the E18/E32 gate's point of view, so it must
   // be caught there — proving that gate is still armed and was not loosened
   // or reordered to compensate for the new upstream gate.
-  // E148: advance2 was ACCEPTED and stamped a fresh, wall-clock last_updated
-  // — force it safe before it becomes WRITE2's prevState.
+  // advance2 was ACCEPTED and stamped a fresh, wall-clock last_updated
+  // — force it safe before it becomes WRITE2's prevState (E148).
   forceSeedStamp(ws);
   resetSession(ws);
   markStateRead(ws);
@@ -553,7 +551,7 @@ sqliteDescribe("SQLite mode: REVIEWER_COMPLETED_TASKS_REJECTED gate matrix", () 
   });
 
   // -------------------------------------------------------------------------
-  // SQ4 / BYPASS-SQL — E40 additions, SQLite mode. The widened gate keys
+  // SQLite-mode coverage of the widened gate (SQ4 / BYPASS-SQL, E40). The widened gate keys
   // only on parsed.agent_id/parsed.completed_tasks (no FileHandoffStorage
   // guard — see gates/registry.ts's NON_QA_COMPLETED_TASKS_REJECTED entry's
   // "Applies in file and SQLite/HTTP mode alike" clause), so it must behave

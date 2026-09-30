@@ -1,5 +1,6 @@
 // Coded by @qa-engineer
-// Tests for specs/pixel-perfect-fixes-v3.14.md — AC-8, AC-9, AC-11.
+// Tests for the visual-round counter, cap and hand-off rules
+// (specs/pixel-perfect-fixes-v3.14.md — AC-8, AC-9, AC-11).
 // Asserts the visual_round sub-loop semantics:
 //   - increments only on (qa-engineer, FAIL) + pending_notes.visual_fail:
 //   - resets on PASS or (pm, In_Progress)
@@ -15,7 +16,7 @@ import {
   VISUAL_ROUND_CAP_EXPORTED,
 } from "../dist/tools/transitions.js";
 
-// ---------- AC-8: counter semantics ----------
+// ---------- the visual-round counter increments on a visual failure (AC-8) ----------
 
 test("AC-8: (qa-engineer, FAIL) + visual_fail: token → visual_round increments", () => {
   // Why: visual_round is a *narrow* counter — only ticks when the FAIL is
@@ -85,7 +86,7 @@ test("AC-8: other writes hold visual_round unchanged", () => {
   }
 });
 
-// ---------- AC-8: round-cap lock ----------
+// ---------- the visual round cap is exported and locks further rounds (AC-8) ----------
 
 test("AC-8: VISUAL_ROUND_CAP exported as 6 (5 rounds visible + 1 lock index)", () => {
   // Why: Constitution §3.1 declares "cap is 5 rounds" — the off-by-one
@@ -124,7 +125,7 @@ test("AC-8: visual_round at cap allows (pm, In_Progress)", () => {
   assert.equal(rejection, null, "PM rebudget must be the only accepted transition at cap");
 });
 
-// ---------- AC-9: split escalation ----------
+// ---------- a mid-loop hand-off from sr-engineer to pm is allowed (AC-9) ----------
 
 test("AC-9: at visual_round=3, (sr-engineer → pm, In_Progress) is accepted", () => {
   // Why: the constitutional split-escalation early-escape path. Without
@@ -155,13 +156,13 @@ test("AC-9: split escalation also allowed at rounds 4 and 5 (Round 3-5 window)",
   }
 });
 
-// ---------- AC-11: handoff schema v3 round-trip via computeNewRound ----------
+// ---------- handoff schema v3 round-trips through computeNewRound (AC-11) ----------
 
 test("AC-11: pre-v3.14 callers (no prev_visual_round) work unchanged (backwards compat)", () => {
   // Why: the prev_visual_round parameter is required positionally now,
   // but downstream Storage/handoff parsers default missing fields to 0.
   // Passing 0 explicitly should match historical behaviour.
-  // d2-server-brake-accounting (qa-owned re-baseline): computeNewRound's
+  // Re-baselined expectation (d2-server-brake-accounting): computeNewRound's
   // return shape gained hop_count (v9, additive). No prev arg here (defaults
   // to null agent), so next.agent="sr-engineer" is a role transition and
   // prev_hop_count/feature_changed both default → hop_count = 0 + 1 = 1.
@@ -169,7 +170,7 @@ test("AC-11: pre-v3.14 callers (no prev_visual_round) work unchanged (backwards 
     2, 1, 0,
     { agent: "sr-engineer", status: "In_Progress" },
   );
-  // e8-success-telemetry (qa-owned re-baseline): computeNewRound's return
+  // Re-baselined expectation (e8-success-telemetry): computeNewRound's return
   // shape gained qa_rounds_total/review_rounds_total/visual_rounds_total (v12,
   // additive). No prev_*_total args here (all default to 0), and next.agent
   // is neither qa-engineer nor code-reviewer, so none of the three FAIL

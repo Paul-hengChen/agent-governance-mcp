@@ -1,5 +1,5 @@
 // Coded by @qa-engineer
-// Tests for specs/v3.15.0.md — AC-6..AC-10.
+// Tests for the options-object call form of writeHandoffState (specs/v3.15.0.md, AC-6..AC-10).
 // Asserts the writeHandoffState dual API:
 //   - options-object overload produces identical handoff state as positional
 //   - positional signature still works (backwards-compat)
@@ -40,7 +40,7 @@ function readNormalized(ws) {
   return raw.replace(/last_updated: "[^"]*"/, 'last_updated: "<TS>"');
 }
 
-// ---------- AC-6 — options-object overload ----------
+// ---------- the options-object overload works (AC-6) ----------
 
 test("AC-6: writeHandoffState({...options}) writes equivalent state to positional call", async () => {
   // Why: dual API requires that both call shapes produce the SAME on-disk
@@ -109,12 +109,12 @@ test("AC-6: options-object accepts all fields and persists them", async () => {
   assert.deepEqual(state.completed_tasks, ["T01", "T02"]);
 });
 
-// ---------- AC-7 — interface support both call shapes ----------
+// ---------- the storage interface supports both call shapes (AC-7) ----------
 // (Indirectly tested via FileHandoffStorage / SqliteHandoffStorage integration
 // in the existing storage tests; the storage.ts interface compiles cleanly
 // is asserted by `npm run build`.)
 
-// ---------- AC-8 — index.ts handler uses options-object form ----------
+// ---------- the server handler uses the options-object form (AC-8) ----------
 
 test("AC-8: dist/tools/handoff-orchestrator.js source contains the options-object call site (no positional regression)", () => {
   // Why: the handler MUST use the new form per AC-8. A regression to the
@@ -131,7 +131,7 @@ test("AC-8: dist/tools/handoff-orchestrator.js source contains the options-objec
   );
 });
 
-// ---------- AC-9 — @deprecated JSDoc present ----------
+// ---------- the positional signature carries a @deprecated JSDoc (AC-9) ----------
 
 test("AC-9: @deprecated JSDoc present on positional writeHandoffState signature", () => {
   // Why: the deprecation tag is the only mechanism by which a caller learns
@@ -154,7 +154,7 @@ test("AC-9: @deprecated tag also present on HandoffStorage interface positional 
   assert.match(storageTs, /@deprecated v3\.15\.0:/, "interface @deprecated tag must reference v3.15.0");
 });
 
-// ---------- AC-10 — backwards-compat defaults ----------
+// ---------- older positional callers still get backwards-compatible defaults (AC-10) ----------
 
 test("AC-10: positional writeHandoffState with 8 args (pre-v3.9.0 baseline) defaults round counters to 0", async () => {
   // Why: a caller from the pre-v3.9.0 era passing only the first 8 args
@@ -192,9 +192,9 @@ test("AC-10: options-object with omitted optional fields defaults to historical 
   assert.deepEqual(state.pending_notes, []);
 });
 
-// ---------- E36 — thin-adapter delegation parity (handoff-write.ts) ----------
+// ---------- the thin positional adapter matches the options-object call (handoff-write.ts, E36) ----------
 //
-// E36 converged writeHandoffState's positional overload onto a thin arg-
+// A later refactor (E36) converged writeHandoffState's positional overload onto a thin arg-
 // packing adapter over writeHandoffStateCore(opts). These tests pin that
 // convergence at the byte level: a positional-form call covering the FULL
 // legacy 12-positional arg list (including all three round counters, which
@@ -203,16 +203,15 @@ test("AC-10: options-object with omitted optional fields defaults to historical 
 // must produce output byte-identical to the equivalent options-object call.
 // A future edit that swaps, drops, or renames a field while re-packing the
 // adapter's positional args will fail this test even if every individual
-// field's VALUE still round-trips correctly in isolation (which the AC-6/
-// AC-10 tests above would not catch, since they compare parsed fields, not
+// field's VALUE still round-trips correctly in isolation (which the options-
+// object and backwards-compat tests above (AC-6/AC-10) would not catch, since they compare parsed fields, not
 // argument-POSITION-to-field mapping).
 
 test("E36: positional writeHandoffState (full 12-arg form, all 3 round counters + blockingReason + prdPath) is byte-identical to the equivalent options-object call", async () => {
   const wsPositional = mkWorkspace();
   const wsOptions = mkWorkspace();
-  // e235a/DR-5 (OQ-1): prd_path is now relativized against ITS OWN
-  // workspacePath on write (DR-3 in-bounds guard applies even to this direct,
-  // non-zod call). wsPositional and wsOptions are two distinct temp dirs, so
+  // prd_path is now relativized against ITS OWN workspacePath on write
+  // (the in-bounds guard applies even to this direct, non-zod call). wsPositional and wsOptions are two distinct temp dirs, so
   // a single shared absolute literal can no longer be used — each call gets
   // its own in-bounds absolute path built from the SAME relative suffix, so
   // both writes relativize to the identical on-disk string and the
@@ -275,7 +274,7 @@ test("E36: positional writeHandoffState (full 12-arg form, all 3 round counters 
   assert.equal(state.prd_path, prdPathPositional);
 });
 
-// ---------- E36 — thin-adapter delegation parity (storage.ts FileHandoffStorage) ----------
+// ---------- FileHandoffStorage's own positional packing matches the options-object call (storage.ts, E36) ----------
 //
 // storage.ts's FileHandoffStorage.writeState carries its OWN independent
 // positional→options packing (it does not simply forward raw positional args
@@ -285,14 +284,13 @@ test("E36: positional writeHandoffState (full 12-arg form, all 3 round counters 
 // introduced without the handoff-write.ts test above catching it. Note:
 // unlike the 12-positional writeHandoffState signature, FileHandoffStorage's
 // positional overload stops at visualRound (11 args, no hopCount) — this
-// matches the pre-E36 forward-declared HandoffStorage interface.
+// matches the older forward-declared HandoffStorage interface (from before E36).
 
 test("E36: FileHandoffStorage.writeState positional (full 11-arg form, all 3 round counters + blockingReason + prdPath) is byte-identical to the equivalent options-object call", async () => {
   const wsPositional = mkWorkspace();
   const wsOptions = mkWorkspace();
   const storage = new FileHandoffStorage();
-  // e235a/DR-5 (OQ-1): same repoint as the writeHandoffState positional test
-  // above — each workspace gets its own in-bounds absolute prd_path built
+  // Same repoint as the writeHandoffState positional test above (e235a) — each workspace gets its own in-bounds absolute prd_path built
   // from the SAME relative suffix so both writes still relativize to an
   // identical on-disk string.
   const prdRelative = path.join("specs", "other-prd.md");

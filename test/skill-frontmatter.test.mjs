@@ -1,6 +1,7 @@
 // Coded by @qa-engineer
 // Tests for tools/skill-frontmatter.ts and the tools/role.ts integration.
-// Covers AC7 of specs/model-routing.md (parser positive / missing / malformed)
+// Covers the frontmatter parser's positive, missing and malformed cases
+// (spec: specs/model-routing.md, AC7)
 // + a regression guard that every shipped content/skill-*.md still ships a
 // valid recommended_model frontmatter — the silent-disable failure mode
 // flagged in specs/model-routing-architecture.md DR-3.
@@ -99,14 +100,14 @@ test("every content/skill-*.md carries a valid recommended_model frontmatter", (
   );
   // We ship 12 skill files (see specs/model-routing.md AC1). Guard the count
   // so a deleted file is caught here too.
-  // d6-host-capability-compose-axis (T-D6-04): content/skill-coordinator.md
-  // was retired — it is split into content/coord-NN-*.md fragments (headerless
+  // The single coordinator skill file, content/skill-coordinator.md, was retired
+  // and split into content/coord-NN-*.md fragments (T-D6-04; headerless
   // byte-slices, deliberately NOT the skill-*.md prefix so they don't land in
   // this glob) composed via composeSkill/SKILL_SEGMENTS. Count drops 12 -> 11.
-  // e178a-integrator-role (T-E178A-06, qa-only ownership grant, Q6): adds
-  // content/skill-integrator.md (the new `integrator` MCP prompt's SOP).
+  // The new `integrator` role adds content/skill-integrator.md, the SOP behind
+  // its MCP prompt (T-E178A-06, e178a).
   // Count rises 11 -> 12 again — this is a genuinely new skill file, not a
-  // reversion of the T-D6-04 split.
+  // reversion of the coordinator split.
   assert.equal(files.length, 12, "expected 12 skill files in content/ (skill-coordinator.md retired — see coord-NN-*.md fragments; skill-integrator.md added — e178a)");
 
   const tiers = new Set(MODEL_TIERS);

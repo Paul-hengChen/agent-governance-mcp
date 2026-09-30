@@ -1,16 +1,16 @@
 // Coded by @qa-engineer
-// T-B9-03: tools/config.ts tokenBudgetPerFeature field (v3.62.0+, B9).
+// The optional tokenBudgetPerFeature config field read by tools/config.ts (v3.62.0+, T-B9-03, B9).
 // Spec: specs/b9-token-budget-brake.md — AC1, AC4, AC6.
 // New file — human consent given at cut approval (§2 conditional-test-writing).
 //
 // Spec-to-Test map:
-//   AC1 (absent key / absent file -> brake disabled) ->
+//   absent key / absent file -> brake disabled (AC1) ->
 //     t-ac1-absent-key, t-ac1-absent-file
-//   AC4 (non-positive/non-finite values filtered to absent, non-fatal) ->
+//   non-positive/non-finite values filtered to absent, non-fatal (AC4) ->
 //     t-ac4-string, t-ac4-negative, t-ac4-zero, t-ac4-infinity-overflow,
 //     t-ac4-null, t-ac4-empty-string, t-ac4-numeric-looking-string,
 //     t-ac4-valid-positive-control
-//   AC6 (byte-identical regression for workspaces without the key) ->
+//   byte-identical regression for workspaces without the key (AC6) ->
 //     t-ac6-existing-fields-untouched, t-ac6-never-created-file
 //
 // WHY: this field is a coordinator-SOP-level advisory brake with NO
@@ -65,7 +65,7 @@ function writeConfig(ws, body) {
   writeRawConfig(ws, JSON.stringify(body));
 }
 
-// ---------- AC1: absent -> brake disabled ----------
+// ---------- an absent key or file leaves the brake disabled (AC1) ----------
 
 test("T-B9-03 AC1: config file exists with other fields but no tokenBudgetPerFeature key -> field absent", () => {
   const ws = mkWorkspace();
@@ -90,7 +90,7 @@ test("T-B9-03 AC1: .current/.config.json does not exist at all -> field absent",
   assert.deepEqual(cfg, {}, "no-file workspace still returns the empty WorkspaceConfig shape");
 });
 
-// ---------- AC4: invalid values filtered to absent (non-fatal) ----------
+// ---------- invalid values are filtered to absent, without failing (AC4) ----------
 
 test("T-B9-03 AC4: string value is filtered to absent", () => {
   const ws = mkWorkspace();
@@ -162,7 +162,7 @@ test("T-B9-03 AC4 boundary: large-but-finite value is accepted, not mistaken for
   assert.equal(cfg.tokenBudgetPerFeature, Number.MAX_SAFE_INTEGER);
 });
 
-// ---------- AC6: byte-identical regression for workspaces without the key ----------
+// ---------- workspaces without the key behave byte-identically to before (AC6) ----------
 
 test("T-B9-03 AC6: existing config fields are untouched when tokenBudgetPerFeature is absent", () => {
   const ws = mkWorkspace();

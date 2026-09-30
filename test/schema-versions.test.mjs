@@ -22,37 +22,36 @@ function reset() {
 // ---------- CURRENT_VERSIONS / VERSION_WHEN_ABSENT ----------
 
 test("CURRENT_VERSIONS exposes the four kinds at their e123a-lane-layout-migration levels", () => {
-  // c9-protocol-fields bumped handoff to 7 (added next_role/resume_of/
-  // review_verdict — stamp-only migration, DR-1). b8-external-ref-ledger had
-  // bumped it to 6 (external_refs). c14-dispatch-pins bumped it to 8 (added
-  // dispatch_pins — stamp-only migration, AC-1). d2-server-brake-accounting
-  // bumped it to 9 (added hop_count — seeded 0, DR-3; sibling of
-  // qa_round/review_round/visual_round, not a stamp-only attestation).
-  // d5-server-side-stale-dispatch-detection bumped it to 10 (added
-  // dispatched_at — stamp-only, seeds nothing, DR-7; next_role's direct
-  // companion). e2-bugfix-repro-gate bumped it to 11 (added dispatch_mode
-  // — stamp-only, seeds nothing; the dispatch_pins/external_refs feature-
-  // scoped carry-forward algorithm, but scalar). e8-success-telemetry bumped
-  // it to 12 (added qa_rounds_total/review_rounds_total/visual_rounds_total —
-  // seeded 0, the hop_count counter precedent, NOT stamp-only).
-  // e23-evidence-schema-versioning bumped it to 13 (added evidence_schema
-  // pin — stamp-only, seeds nothing; the dispatch_mode scalar algorithm).
-  // e114-cut-approval-inheritance bumped it to 14 (added
-  // cut_approved_source — stamp-only, seeds nothing; the dispatch_mode
-  // scalar algorithm again). e123a-lane-layout-migration now bumps it to 15
-  // (added dispatch_mechanism/dispatch_mechanism_tier — stamp-only, seeds
-  // nothing; the dispatch_mode scalar algorithm again).
+  // Handoff version history, one step per schema change:
+  // v6 added external_refs (b8-external-ref-ledger).
+  // v7 added next_role/resume_of/review_verdict — stamp-only migration, DR-1 (c9-protocol-fields).
+  // v8 added dispatch_pins — stamp-only migration, AC-1 (c14-dispatch-pins).
+  // v9 added hop_count — seeded 0, DR-3; sibling of qa_round/review_round/
+  // visual_round, not a stamp-only attestation (d2-server-brake-accounting).
+  // v10 added dispatched_at — stamp-only, seeds nothing, DR-7; next_role's
+  // direct companion (d5-server-side-stale-dispatch-detection).
+  // v11 added dispatch_mode — stamp-only, seeds nothing; follows the
+  // dispatch_pins/external_refs feature-scoped carry-forward algorithm, but
+  // scalar (e2-bugfix-repro-gate).
+  // v12 added qa_rounds_total/review_rounds_total/visual_rounds_total —
+  // seeded 0, like the hop_count counter, NOT stamp-only (e8-success-telemetry).
+  // v13 added the evidence_schema pin — stamp-only, seeds nothing; the
+  // dispatch_mode scalar algorithm (e23-evidence-schema-versioning).
+  // v14 added cut_approved_source — stamp-only, seeds nothing; the
+  // dispatch_mode scalar algorithm again (e114-cut-approval-inheritance).
+  // v15 added dispatch_mechanism/dispatch_mechanism_tier — stamp-only, seeds
+  // nothing; the dispatch_mode scalar algorithm again (e123a-lane-layout-migration).
   // sqlite stays at 2 — hop_count IS persisted there too, via the idempotent
   // addColumnIfMissing ALTER (DR-2), the exact mechanism that added
   // visual_round without a versioned bump; unlike external_refs/
-  // dispatch_pins/dispatched_at/dispatch_mode/the three e8 totals/evidence_schema/
+  // dispatch_pins/dispatched_at/dispatch_mode/the three cumulative round totals/evidence_schema/
   // cut_approved_source/dispatch_mechanism/dispatch_mechanism_tier, which are
   // handoff-YAML frontmatter only (DR-5/DR-1 — SqliteHandoffStorage ignores
-  // those). e125a-lane-local-ledgers bumps tasks to 2 (stamp-only — the
-  // MEANING of v2 is carried by WHICH PATH the file lives at, D-D; the step
-  // itself leaves the body untouched). e106-init-artifacts-flag bumps config
-  // to v2 (added the optional "artifacts" key — stamp-only, seeds nothing;
-  // the dispatch_mode/cut_approved_source scalar-stamp algorithm again).
+  // those). The tasks schema moves to 2 (stamp-only — the MEANING of v2 is
+  // carried by WHICH PATH the file lives at, D-D; the step itself leaves the
+  // body untouched; e125a-lane-local-ledgers). The config schema moves to v2
+  // (added the optional "artifacts" key — stamp-only, seeds nothing; the
+  // dispatch_mode/cut_approved_source scalar-stamp algorithm again; see e106-init-artifacts-flag).
   assert.equal(CURRENT_VERSIONS.handoff, 15);
   assert.equal(CURRENT_VERSIONS.tasks, 2);
   assert.equal(CURRENT_VERSIONS.sqlite, 2);
@@ -124,8 +123,8 @@ test("registerMigration idempotent overwrite — last write wins", () => {
   reset();
   // Register v0→v1 twice (overwrite test); also register v1→v2, v2→v3, v3→v4, v4→v5,
   // v5→v6, v6→v7, v7→v8, v8→v9, v9→v10, v10→v11, v11→v12, v12→v13, v13→v14, and
-  // v14→v15 since CURRENT_VERSIONS.handoff is now 15
-  // (e123a-lane-layout-migration) — the runner must climb the full chain.
+  // v14→v15 since CURRENT_VERSIONS.handoff is now 15 (the lane-layout
+  // migration level, e123a-lane-layout-migration) — the runner must climb the full chain.
   registerMigration({ kind: "handoff", from: 0, to: 1, up: () => ({ schema_version: 1, who: "first" }) });
   registerMigration({ kind: "handoff", from: 0, to: 1, up: () => ({ schema_version: 1, who: "second" }) });
   registerMigration({ kind: "handoff", from: 1, to: 2, up: (input) => ({ ...input, schema_version: 2 }) });
@@ -231,7 +230,7 @@ test("runMigrations no-op when current === target", () => {
 
 test("runMigrations applies single v1→v2 step", () => {
   reset();
-  // e106-init-artifacts-flag bumped CURRENT_VERSIONS.config to 2, so every
+  // The config schema is now at version 2 (e106-init-artifacts-flag), so every
   // kind's target is now >= 2 — no kind stops at v1 any more. Isolate the
   // single-step path by starting the input AT v1 (current=1) with only the
   // 1->2 step registered, the same shift the real config migration itself
@@ -254,7 +253,7 @@ test("runMigrations applies single v1→v2 step", () => {
 
 test("runMigrations refuses-loud when on-disk version > current (AC-4)", () => {
   reset();
-  // e123a-lane-layout-migration: CURRENT_VERSIONS.handoff === 15, so the
+  // CURRENT_VERSIONS.handoff === 15 (lane-layout migration level, e123a-lane-layout-migration), so the
   // "server max" surfaced in the refuse-loud error tracks the bumped value.
   assert.throws(
     () => runMigrations("handoff", { schema_version: 99 }),
@@ -283,7 +282,7 @@ test("runMigrations refuses-loud on missing step", () => {
 
 test("runMigrations composes a multi-step chain v0→v2 (now the real config target)", () => {
   reset();
-  // e106-init-artifacts-flag bumped CURRENT_VERSIONS.config to 2, so this is
+  // The config schema is now at version 2 (e106-init-artifacts-flag), so this is
   // no longer hypothetical: a fresh config genuinely walks two real steps
   // (0->1, 1->2) to reach CURRENT. Register both and assert full composition.
   registerMigration({

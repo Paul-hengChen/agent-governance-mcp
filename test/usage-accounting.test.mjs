@@ -1,19 +1,19 @@
 // Coded by @qa-engineer
 // Tests for specs/d2-server-brake-accounting.md — the durable, hook-appended
 // token-usage sidecar (tools/usage-accounting.ts) and its PostToolUse writer
-// (bin/agent-governance-usage-hook.mjs), T-D2-05.
+// (bin/agent-governance-usage-hook.mjs) (T-D2-05).
 //
 // Spec-to-Test map:
-//   AC-5 (durable, out-of-band usage record, not hand-summed) -> t-append-*,
+//   durable, out-of-band usage record, not hand-summed (AC-5) -> t-append-*,
 //                                                                 t-hook-writes-record
-//   AC-4 (crash/compaction — fresh read reconstructs the
-//         feature-scoped token total from disk)                -> t-crash-*
-//   AC-7 (no duplicate/conflated telemetry streams — disjoint
-//         key sets vs telemetry.jsonl)                          -> t-ac7-*
-//   AC-9 (opt-in; absence of tokenBudgetPerFeature = zero
-//         behavior change / no sidecar writes)                  -> t-hook-noop-*
+//   crash/compaction — a fresh read reconstructs the
+//         feature-scoped token total from disk (AC-4)          -> t-crash-*
+//   no duplicate/conflated telemetry streams — disjoint
+//         key sets vs telemetry.jsonl (AC-7)                    -> t-ac7-*
+//   opt-in; absence of tokenBudgetPerFeature = zero
+//         behavior change / no sidecar writes (AC-9)            -> t-hook-noop-*
 //
-// WHY: the token-usage sidecar is D2's second breaker (alongside hop_count).
+// WHY: the token-usage sidecar is the server-side brake's second breaker (alongside hop_count) (D2).
 // It is deliberately NOT governed by the handoff.ts 4-step mutating-tool
 // contract — it's a best-effort, lock-free, never-throw append the
 // PostToolUse hook performs out-of-band from the coordinator's own memory.
@@ -54,11 +54,11 @@ function mkWs(prefix = "usage-") {
   return ws;
 }
 
-// e123c AC7: appendUsageRecord's write target moved from the flat
+// appendUsageRecord's write target moved from the flat
 // usagePath(ws) to the CURRENT LANE's usage.jsonl (resolveCurrentLanePaths).
 // readUsageLines is this file's own test-helper "what did the writer just
 // produce" reader, so it must read from the same place the writer now
-// targets — never the (now-unwritten) flat path.
+// targets — never the (now-unwritten) flat path (e123c, AC7).
 function currentUsagePath(ws) {
   return resolveCurrentLanePaths(ws).usagePath;
 }
@@ -83,7 +83,7 @@ test("t-usagepath: usagePath resolves to <ws>/.current/usage.jsonl", () => {
 });
 
 // ============================================================================
-// AC-5: appendUsageRecord — durable, best-effort append
+// appendUsageRecord: durable, best-effort append (AC-5)
 // ============================================================================
 
 test("t-append-creates-file: appendUsageRecord creates .current/usage.jsonl and writes one JSON line", () => {
@@ -143,10 +143,10 @@ test("t-append-never-throws: appendUsageRecord swallows a write failure instead 
 });
 
 // ============================================================================
-// AC7 (e123c, E123 F2): appendUsageRecord's write target is the CURRENT
-// LANE's usage.jsonl — never the flat path — even on a workspace whose
-// checked-out branch names a real lane (not just the no-.git PRIMARY_LANE
-// fallback every other test above exercises).
+// appendUsageRecord's write target is the CURRENT LANE's usage.jsonl —
+// never the flat path — even on a workspace whose checked-out branch names
+// a real lane (not just the no-.git PRIMARY_LANE fallback every other test
+// above exercises) (AC7, e123c).
 // ============================================================================
 
 test("AC7: on a workspace checked out to feat/e123c-cross-lane-aggregation, appendUsageRecord writes to .current/e123c/usage.jsonl — never .current/usage.jsonl", () => {
@@ -168,7 +168,7 @@ test("AC7: on a workspace checked out to feat/e123c-cross-lane-aggregation, appe
 });
 
 // ============================================================================
-// AC-5/DR-5: sumUsageForFeature — feature-scoped running total
+// sumUsageForFeature: feature-scoped running total (AC-5, DR-5)
 // ============================================================================
 
 test("t-sum-absent-file: sumUsageForFeature returns 0 when usage.jsonl does not exist (hook not wired / no dispatches yet)", () => {
@@ -232,13 +232,13 @@ test("t-sum-empty-file: sumUsageForFeature returns 0 for a zero-byte usage.jsonl
 });
 
 // ============================================================================
-// AC6 (e123c, E123 F2): sumUsageForFeature fans out across live/history/flat
+// sumUsageForFeature fans out across live/history/flat sidecar files
 // EXACTLY like tw_gate_stats (the same enumerateLaneSidecarSources, the
 // same content-based dedup) — this fixture builds the same three-source
-// layout as the e26-gate-stats AC4(a)/AC5b tests: a live-vs-history
+// layout as the gate-stats aggregation tests (e26-gate-stats): a live-vs-history
 // prefix/identical duplicate (skipped) AND a half-merged flat file
 // (skipped), plus a distinct-lane history copy with no live counterpart
-// (never skipped).
+// (never skipped) (AC6, e123c).
 // ============================================================================
 
 function usageRecordLine(feature, tokens) {
@@ -289,7 +289,7 @@ test("AC6: sumUsageForFeature aggregates across live/history/flat with the same 
 });
 
 // ============================================================================
-// AC-7: usage.jsonl vs telemetry.jsonl — disjoint key sets
+// usage.jsonl vs telemetry.jsonl: disjoint key sets (AC-7)
 // ============================================================================
 
 test("t-ac7-disjoint-keys: a usage.jsonl record's key set is disjoint from telemetry.jsonl's documented shape", () => {
@@ -322,8 +322,8 @@ test("t-ac7-separate-files: usage.jsonl and telemetry.jsonl are two distinct fil
 });
 
 // ============================================================================
-// AC-4: crash/compaction — a fresh read (no in-memory total) reconstructs the
-// feature-scoped token total purely from disk
+// Crash/compaction: a fresh read (no in-memory total) reconstructs the
+// feature-scoped token total purely from disk (AC-4)
 // ============================================================================
 
 test("t-crash-reconstruct: N independent appendUsageRecord calls (simulating N separate dispatch processes) sum correctly on a completely fresh read", () => {
@@ -357,7 +357,7 @@ test("t-crash-reconstruct-mixed-features: reconstruction stays feature-scoped ev
 });
 
 // ============================================================================
-// AC-9 / opt-in hook contract: bin/agent-governance-usage-hook.mjs
+// Opt-in hook contract: bin/agent-governance-usage-hook.mjs (AC-9)
 // ============================================================================
 
 function runHook(payload, { cwd, timeoutMs = 5000 } = {}) {
@@ -492,10 +492,9 @@ test("t-hook-feature-null-when-no-handoff: dispatch.feature is null when handoff
 });
 
 // ============================================================================
-// AC9 (e123c, E123 F2 — closes J2-NEW-3's second bullet): the hook's
-// readActiveFeature caller now falls back to the FLAT handoff.md when no
-// lane-scoped copy exists, so an unmigrated workspace records its real
-// active_feature instead of null.
+// The hook's readActiveFeature caller falls back to the FLAT handoff.md
+// when no lane-scoped copy exists, so an unmigrated workspace records its
+// real active_feature instead of null (AC9, e123c, J2-NEW-3).
 // ============================================================================
 
 test("AC9: hook records active_feature from the FLAT handoff.md on an unmigrated workspace (no .current/<lane>/ dir at all)", () => {

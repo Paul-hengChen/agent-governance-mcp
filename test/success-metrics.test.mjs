@@ -6,13 +6,13 @@
 // review_reports/review_T-E8-06.md).
 //
 // Spec-to-Test map:
-//   AC8 (migration seed-0, feature-scoped reset)         -> Migration section
+//   migration seed-0, feature-scoped reset (AC8)         -> Migration section
 //   Mechanism (computeNewRound totals)                    -> Counter semantics section
 //   hop_count-mirror parse/serialize contract              -> Handoff plumbing section
-//   AC1/AC2/AC6/AC7 (emit hook)                            -> Emit hook section
-//   AC3 (one_pass)                                         -> one_pass section
-//   AC4 (deriveTicketCode / <CODE> convention)              -> deriveTicketCode section
-//   AC9 (summarizer)                                        -> Summarizer section
+//   emit hook (AC1/AC2/AC6/AC7)                            -> Emit hook section
+//   one_pass (AC3)                                         -> one_pass section
+//   deriveTicketCode / <CODE> convention (AC4)              -> deriveTicketCode section
+//   summarizer (AC9)                                        -> Summarizer section
 //   skill-release-engineer.md step 11b                     -> see test/feature-lease.test.mjs S8
 
 import { test } from "node:test";
@@ -63,9 +63,9 @@ function mkWs(prefix = "e8-") {
   return ws;
 }
 
-// e123b9 J2 (spec AC1/AC9): metrics.jsonl is a LANE_FILES sidecar — resolve
+// metrics.jsonl is a per-lane sidecar file, so resolve its path
 // through the lane-aware resolver (these fixture workspaces carry no `.git`,
-// so this resolves to `.current/_primary/`), matching tools/metrics.ts.
+// so this resolves to `.current/_primary/`), matching tools/metrics.ts; ticket e123b9 J2, spec AC1/AC9.
 function metricsPath(ws) {
   return resolveCurrentLanePaths(ws).metricsPath;
 }
@@ -92,8 +92,8 @@ function readMetricsLines(ws) {
 const UPDATE_STATE_ENTRY = TOOL_REGISTRY.find((e) => e.name === "tw_update_state");
 
 async function dispatch(ws, args) {
-  // E148 (docs/backlog.md row E148): force any already-on-disk last_updated
-  // off the wall clock before re-snapshotting freshness — closes the
+  // Force any already-on-disk last_updated
+  // off the wall clock before re-snapshotting freshness (E148) — closes the
   // ~1/60000-per-hop STAMP_PROVENANCE_SUSPECT hazard across the
   // multi-dispatch() chains below in one place. No-op on a brand-new
   // workspace (nothing to force; a first write is never gated anyway). See
@@ -110,7 +110,7 @@ async function dispatch(ws, args) {
 // ============================================================================
 
 test("E8-M1: registered v11->v12 step seeds all three totals to 0, additive/lossless", () => {
-  // e123a-lane-layout-migration re-baseline: CURRENT is now 15, so the
+  // Re-baselined for the lane-layout migration bump (e123a-lane-layout-migration): CURRENT is now 15, so the
   // manually-registered chain must extend two steps further (v13→v14,
   // cut_approved_source pin, stamp-only, seeds nothing; v14→v15,
   // dispatch_mechanism/dispatch_mechanism_tier pin, stamp-only, seeds
@@ -177,17 +177,18 @@ test("E8-M2: a v0 legacy handoff (real registry) migrates all the way to CURRENT
   assert.equal(state.review_rounds_total, 0, "v0 legacy chain lands with review_rounds_total seeded 0");
   assert.equal(state.visual_rounds_total, 0, "v0 legacy chain lands with visual_rounds_total seeded 0");
   assert.equal(state.evidence_schema, undefined, "v0 legacy chain lands with evidence_schema NOT seeded (e23-evidence-schema-versioning D1 — absence-is-signal)");
-  // readHandoffState above is the AC3 own-workspace migration trigger — the
+  // readHandoffState above is what triggers the own-workspace migration (AC3) — the
   // flat fixture seeded above has already moved to the lane-scoped path.
   const raw = fs.readFileSync(currentHandoffPath(ws), "utf-8");
   assert.match(raw, /schema_version:\s*15/, "on-disk heal lands at v15");
 });
 
 test("E8-M3: a v16 handoff refuses-loud against this v15 server (no silent downgrade)", () => {
-  // e123a-lane-layout-migration re-baseline (coupled bump, not a bare
+  // Re-baselined for the lane-layout migration bump (coupled bump, not a bare
   // constant swap): CURRENT is now 15, so "the future" this test probes must
   // move to 16 or the payload/assertion pair collapses to the incoherent
-  // "16 > server max 16" — was v15-vs-v14 under e114-cut-approval-inheritance.
+  // "16 > server max 16" — it was v15-vs-v14 before the cut-approval-inheritance
+  // bump (e123a-lane-layout-migration, e114-cut-approval-inheritance).
   const ws = mkWs("e8-future-");
   resetSession(ws);
   fs.writeFileSync(
@@ -243,7 +244,7 @@ hop_count: 4
   );
   readHandoffState(ws);
   await new Promise((resolve) => setTimeout(resolve, 30));
-  // readHandoffState above is the AC3 own-workspace migration trigger.
+  // readHandoffState above is what triggers the own-workspace migration (AC3).
   const healed = fs.readFileSync(currentHandoffPath(ws), "utf-8");
   assert.match(healed, /schema_version:\s*15/, "heal lands at CURRENT (v15)");
   // v11 file had no totals at all (pre-e8 shape) -> migration seeds 0, and the
@@ -252,10 +253,10 @@ hop_count: 4
   assert.match(healed, /review_rounds_total:\s*0/, "heal write persists the seeded review_rounds_total");
   assert.match(healed, /visual_rounds_total:\s*0/, "heal write persists the seeded visual_rounds_total");
   assert.match(healed, /hop_count:\s*4/, "sibling hop_count survives the heal write untouched");
-  // e123a-lane-layout-migration re-baseline: the v11->v12->v13->v14->v15
+  // Re-baselined for the lane-layout migration bump: the v11->v12->v13->v14->v15
   // heal also climbs the new v14->v15 step, which seeds NO
   // dispatch_mechanism/dispatch_mechanism_tier default (absence-is-signal,
-  // migration invents no attestation).
+  // migration invents no attestation) (e123a-lane-layout-migration).
   assert.doesNotMatch(healed, /evidence_schema:/, "heal write does NOT materialize an evidence_schema pin (e23-evidence-schema-versioning D1)");
   assert.doesNotMatch(healed, /cut_approved_source:/, "heal write does NOT materialize a cut_approved_source claim (e114-cut-approval-inheritance)");
   assert.doesNotMatch(healed, /dispatch_mechanism:/, "heal write does NOT materialize a dispatch_mechanism claim (e123a-lane-layout-migration)");
@@ -386,8 +387,8 @@ test("E8-C7: other writes (non-FAIL, non-feature-change) hold all three totals s
 });
 
 test("E8-C8: legacy computeNewRound callers omitting the 3 new prev-total args (and feature_changed/prev_hop_count) still compile and default totals to 0", () => {
-  // Mirrors AC-10/AC-11's pre-v3.14/pre-v9 backwards-compat pins for
-  // visual_round/hop_count — the same widen-additively-defaulted contract.
+  // Mirrors the earlier pre-v3.14/pre-v9 backwards-compat pins for
+  // visual_round/hop_count (AC-10/AC-11) — the same widen-additively-defaulted contract.
   const r = computeNewRound(1, 0, 0, { agent: "qa-engineer", status: "FAIL" });
   assert.equal(r.qa_rounds_total, 1, "with all prev-totals defaulted to 0 and no feature_changed, a qa FAIL still ticks 0 -> 1");
   assert.equal(r.review_rounds_total, 0);
@@ -494,7 +495,7 @@ test("E8-H4: writeHandoffState ALWAYS serializes the 3 totals into YAML, even wh
 // ============================================================================
 // Emit hook: fires exactly once on the closing-write signature
 // (FileHandoffStorage), record shape correctness, no-emit negative space,
-// AC2 best-effort/never-throw, one_pass truth table, deriveTicketCode.
+// best-effort/never-throw emit (AC2), one_pass truth table, deriveTicketCode.
 // ============================================================================
 
 function seedTasksAndPackage(ws, { code, checked = 2, unchecked = 1, version = "1.2.3" } = {}) {
@@ -535,7 +536,7 @@ test("E8-E1: full realistic chain — release-engineer terminal-marker write emi
   assert.deepEqual(readMetricsLines(ws), [], "opening write must not emit a metrics record");
 
   // Closing write (release-engineer self-loop, next_role="pm") — the exact
-  // E1A terminal marker — must emit exactly one record.
+  // the release-closing terminal marker — must emit exactly one record (E1A).
   res = await dispatch(ws, {
     active_feature: feature,
     status: "In_Progress",
@@ -726,23 +727,23 @@ test("E8-E9: emitFeatureMetrics never throws directly, regardless of inputs (def
 });
 
 // ============================================================================
-// E12 (specs/e11-e12-release-integrity-batch.md AC6-AC12) — dedupe guard:
+// Dedupe guard for release-close metrics (specs/e11-e12-release-integrity-batch.md AC6-AC12):
 // same (feature, released_version) pair skipped, new version appends, null
 // treated as a real key, cross-feature no collision, malformed line skipped,
-// missing/unreadable file fails open. Authored per T-E11E12-03 (AC13,
-// qa-owned). D1-D3 drive the guard through the REAL release-engineer
+// missing/unreadable file fails open. qa-owned (T-E11E12-03, AC13).
+// The dedupe tests D1-D3 drive the guard through the REAL release-engineer
 // closing-write signature (the exact double-fire reproduced at v3.74.0); U1-U3
 // drive emitFeatureMetrics directly for the cases the dispatch chain can't
 // cheaply isolate (null-key dedupe, cross-feature independence, fail-open on
 // an unreadable metrics.jsonl).
 //
 // Spec-to-Test map:
-//   AC7 (same feature+version dispatched twice -> 1 line)       -> E12-D1
-//   AC8 (version changes between dispatches -> 2 lines)         -> E12-D2
-//   AC10 (pre-existing malformed line doesn't crash the guard)  -> E12-D3
-//   AC9 (null released_version dedupes against null only)       -> E12-U1
-//   AC6/AC8 (cross-feature, same version -> no collision)       -> E12-U2
-//   AC10/AC11 (unreadable metrics.jsonl fails open -> appends)  -> E12-U3
+//   same feature+version dispatched twice -> 1 line (AC7)       -> E12-D1
+//   version changes between dispatches -> 2 lines (AC8)         -> E12-D2
+//   pre-existing malformed line doesn't crash the guard (AC10)  -> E12-D3
+//   null released_version dedupes against null only (AC9)       -> E12-U1
+//   cross-feature, same version -> no collision (AC6/AC8)       -> E12-U2
+//   unreadable metrics.jsonl fails open -> appends (AC10/AC11)  -> E12-U3
 // ============================================================================
 
 test("E12-D1 (AC7): dispatching the release-engineer closing-write signature TWICE for the same feature+package.json version appends exactly ONE metrics line — the v3.74.0 double-fire scenario, closed", async () => {
@@ -889,7 +890,7 @@ test("E12-U3 (AC10/AC11): metrics.jsonl unreadable mid-read (permissions error) 
   assert.equal(own.length, 1, "AC11 — the new record for this feature is appended, never silently dropped, whether the read failed open or succeeded normally");
 });
 
-// ---------- deriveTicketCode (AC4) ----------
+// ---------- deriveTicketCode: ticket code taken from the feature slug (AC4) ----------
 
 test("E8-D1: deriveTicketCode derives the leading alnum token before the first hyphen, uppercased", () => {
   assert.equal(deriveTicketCode("e8-success-telemetry"), "E8");

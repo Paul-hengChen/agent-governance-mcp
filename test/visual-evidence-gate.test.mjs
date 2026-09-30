@@ -77,7 +77,7 @@ test("AC-5: active_feature with path-unsafe characters is sanitised (slashes col
   assert.ok(!result.designPath.includes("/evil/"), "slashes in feature name must be sanitised");
 });
 
-// ---------- v3.14.1 AC-3 — sanitiser collapses `..` literal ----------
+// ---------- sanitiser collapses the `..` literal (AC-3, v3.14.1) ----------
 
 test("v3.14.1 AC-3: sanitiser collapses `..` literal in active_feature", () => {
   // Why: v3.14.0 sanitiser replaced `/` with `_` so `../etc/passwd` could
@@ -107,10 +107,10 @@ test("v3.14.1 AC-3: single `.` survives (legitimate filename character)", () => 
   assert.ok(result.designPath.endsWith("feat.v2.md"), "single dots must survive");
 });
 
-// ---------- v3.14.1 AC-9 — read-error silent-swallow (confirm intentional) ----------
+// ---------- a read error is silently swallowed, intentionally (AC-9, v3.14.1) ----------
 
 test("v3.14.1 AC-9: hasVisualBaselinesInDesign silently returns { present: false } on read error", () => {
-  // Why: AC-9 confirms the silent-swallow is intentional (matches
+  // Why: the silent-swallow is confirmed intentional (AC-9; matches
   // hasEvidenceInFile convention — existence-check rather than error
   // propagation). A future fail-loud variant would be a v3.15.0 API change.
   // This test pins the current contract so a refactor doesn't accidentally
@@ -220,12 +220,12 @@ function writeDesignWithMode(ws, feature, modeText) {
   fs.writeFileSync(path.join(dir, `${feature}.md`), modeText);
 }
 
-// ---------- AC-1 — hasDesignModeRequiringVisual: all three Mode shapes ----------
+// ---------- hasDesignModeRequiringVisual recognises all three Mode shapes (AC-1) ----------
 
 test("v3.16.0 AC-1: ## Mode H2 section style — figma → required:true", () => {
   // Why: the design-auditor template may emit a `## Mode` H2 heading with the
   // mode value on the next content line. The parser MUST accept this shape
-  // (D4 — permissive parser for both real-world forms).
+  // (the parser is deliberately permissive so both real-world forms work; D4).
   const ws = mkWorkspace();
   writeDesignWithMode(ws, "feat", "# design/feat\n\n## Mode\n\nfigma\n\n## Source manifest\n- figma | 1:1 | yes | audited\n");
   const r = hasDesignModeRequiringVisual(ws, "feat");
@@ -254,7 +254,7 @@ test("v3.16.0 AC-1: mode: inline key style — no-design → required:false", ()
   assert.equal(r.mode, "no-design");
 });
 
-// ---------- AC-1 — real modes arm the gate ----------
+// ---------- real design modes arm the visual gate (AC-1) ----------
 
 test("v3.16.0 AC-1: real mode (figma) → required:true (via inline bullet form)", () => {
   // Why: asserts the core AC-1 invariant — any real mode other than no-design
@@ -265,7 +265,7 @@ test("v3.16.0 AC-1: real mode (figma) → required:true (via inline bullet form)
   assert.equal(r.required, true, "figma mode must arm the gate");
 });
 
-// ---------- AC-10 — no design file → gate silent ----------
+// ---------- no design file means the gate stays silent (AC-10) ----------
 
 test("v3.16.0 AC-10: no design file → required:false (non-UI workspace)", () => {
   // Why: the most common non-UI case. No design/<feature>.md means the gate
@@ -338,7 +338,7 @@ test("v3.16.0 AC-1: em-dash separator is handled — **Mode** — xd", () => {
   assert.equal(r.mode, "xd");
 });
 
-// ---------- D3 — exclusion encoding: no-design is the only exempt mode ----------
+// ---------- exclusion encoding: no-design is the only exempt mode (D3) ----------
 
 test("v3.16.0 D3: paper mode arms the gate (no raster-only exemption list)", () => {
   // Why: locked Q-OQ1 decided ALL modes except no-design arm the gate.
@@ -576,7 +576,7 @@ test("Edge: sr-engineer self-loop NOT blocked (non-pm predecessor)", () => {
   assert.equal(gateWouldFire(ws, "feat-x", prev, next), false);
 });
 
-// ---------- AC-4 — rejection envelope + verbatim hint (Copy Audit Gate) ----------
+// ---------- rejection envelope + verbatim hint (Copy Audit Gate, AC-4) ----------
 
 test("AC-4: SCOPE_DECISION_REQUIRED hint in tools/handoff-orchestrator.ts matches the spec Copy/Strings verbatim", () => {
   // Why (Copy Audit Gate): AC-4 mandates the hint be the verbatim string from
@@ -632,7 +632,7 @@ test("AC-4: rejection envelope shape — error/attempted/allowed/hint keys prese
   assert.match(block.slice(0, 1600), /isError:\s*true/, "isError:true rejection");
 });
 
-// ---------- AC-8 — union member, handler-side-only ----------
+// ---------- the rejection code is a union member raised only by the handler (AC-8) ----------
 
 test("AC-8: SCOPE_DECISION_REQUIRED is in the TransitionRejection.error union (transitions.ts)", () => {
   // Why: AC-8 requires the error token be added to the union for handler-side

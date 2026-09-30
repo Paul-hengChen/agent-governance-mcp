@@ -18,13 +18,13 @@ import {
 } from "../dist/guards/session.js";
 import { resolveCurrentLanePaths } from "../dist/tools/lane-paths.js";
 
-// e123b9 J2 (spec AC1 — FLIPPED): markStateRead snapshots the LANE-scoped
-// handoff path (these fixture workspaces carry no `.git`, so `_primary`),
+// markStateRead snapshots the LANE-scoped handoff path (these fixture workspaces carry no `.git`, so `_primary`),
 // not the flat one — the raw fixture this file's tests directly manipulate
 // (bypassing the migration-aware read/write path entirely, since this is a
 // unit test of guards/session.ts's own mtime-comparison semantics) must live
 // at that same resolved path for markStateRead's snapshot and
-// verifyFreshness's later stat to agree on what they're comparing.
+// verifyFreshness's later stat to agree on what they're comparing
+// (lane-scoped snapshot behaviour: e123b9 J2, spec AC1).
 function mkWorkspace() {
   const ws = fs.mkdtempSync(path.join(os.tmpdir(), "twsess-"));
   const handoff = resolveCurrentLanePaths(ws).handoffPath;

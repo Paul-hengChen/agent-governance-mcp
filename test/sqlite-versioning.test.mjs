@@ -1,5 +1,5 @@
 // Coded by @qa-engineer
-// T30: SQLite schema_meta table + migration runner. Imports compiled dist/.
+// SQLite schema_meta table + migration runner (T30). Imports compiled dist/.
 // Per-test workspaces use mkdtempSync so each Database file is fresh.
 
 import { test } from "node:test";
@@ -17,7 +17,7 @@ function mkDbPath(prefix = "sqlitever-") {
   return path.join(dir, "tw.db");
 }
 
-// ---------- AC-1: schema_meta table created, sqlite row at CURRENT ----------
+// ---------- schema_meta table is created with the sqlite row at CURRENT (AC-1) ----------
 
 test("T30 AC-1: runSqliteMigrations creates schema_meta and seeds sqlite at CURRENT", async () => {
   const db = new Database(mkDbPath());
@@ -52,7 +52,7 @@ test("T30 AC-1: schema_meta primary key prevents duplicate kind rows", async () 
   }
 });
 
-// ---------- AC-2: lazy migration on first call + idempotent re-open ----------
+// ---------- migration runs lazily on first call and re-opening is idempotent (AC-2) ----------
 
 test("T30 AC-2 legacy: pre-versioning DB (no schema_meta) migrates up to CURRENT", async () => {
   const dbPath = mkDbPath();
@@ -95,7 +95,7 @@ test("T30 AC-2 reopen: second runSqliteMigrations is a no-op (applied: [])", asy
   }
 });
 
-// ---------- AC-4: refuse-loud on future versions ----------
+// ---------- a database from a newer version is refused loudly (AC-4) ----------
 
 test("T30 AC-4: refuses-loud when on-disk sqlite version > CURRENT", async () => {
   const dbPath = mkDbPath();
@@ -115,7 +115,7 @@ test("T30 AC-4: refuses-loud when on-disk sqlite version > CURRENT", async () =>
   }
 });
 
-// ---------- AC-5: per-step atomicity (version bump in same tx as DDL) ----------
+// ---------- each migration step is atomic: version bump shares the DDL transaction (AC-5) ----------
 
 test("T30 atomic tx: version bump happens with the step (multi-step v0→v1→v2 visible together)", async () => {
   const dbPath = mkDbPath();

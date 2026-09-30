@@ -1,24 +1,24 @@
 // Coded by @qa-engineer
-// Tests for specs/d3-gate-fire-telemetry.md — T-D3-05.
+// Tests for the gate-fire telemetry sidecar, specs/d3-gate-fire-telemetry.md (T-D3-05).
 //
 // Spec-to-Test map:
-//   AC-1 (rejection emits exactly one 5-key line)              -> INT1
-//   AC-2 (pass-through emits nothing)                          -> NE1
-//   AC-3 (dir auto-created, no crash, one line)                -> SHAPE1 (implicit — every
+//   rejection emits exactly one 5-key line (AC-1)              -> INT1
+//   pass-through emits nothing (AC-2)                          -> NE1
+//   dir auto-created, no crash, one line (AC-3)                -> SHAPE1 (implicit — every
 //                                                                  emitGateTelemetry call
 //                                                                  below starts from a
 //                                                                  workspace with no .current/)
-//   AC-4 (telemetry throw never masks/alters the real ToolResult) -> THROW1, THROW2
-//   AC-5 (`gate` sourced from GATE_REGISTRY producer, not re-derived) -> SHAPE1, PRODUCER1, PRODUCER2, UNKNOWN1
-//   AC-6 (fixed 5-key shape; nulls not omitted, never "undefined") -> SHAPE1, NULL1, NULL2, BOUNDARY1
-//   AC-7 (best-effort append, no lock — not independently testable
-//         via a unit test; verified by code inspection per
+//   telemetry throw never masks/alters the real ToolResult (AC-4) -> THROW1, THROW2
+//   `gate` sourced from GATE_REGISTRY producer, not re-derived (AC-5) -> SHAPE1, PRODUCER1, PRODUCER2, UNKNOWN1
+//   fixed 5-key shape; nulls not omitted, never "undefined" (AC-6) -> SHAPE1, NULL1, NULL2, BOUNDARY1
+//   best-effort append with no lock — not independently testable
+//         via a unit test; verified by code inspection (AC-7,
 //         review_reports/review_T-D3-04.md)                    -> n/a
 //   extractGateCodeFromText helper (Mechanism §1)               -> EXTRACT1..EXTRACT4
 //
-// WHY this file exists: T-D3-05's task row (human-approved cut) explicitly
-// directs authoring this file — no prior telemetry test coverage existed for
-// the D3 emit point (tools/telemetry.ts, wired into tools/handoff-orchestrator.ts's
+// WHY this file exists: the human-approved cut explicitly directs authoring
+// it (T-D3-05) — no prior telemetry test coverage existed for
+// the gate-fire emit point (tools/telemetry.ts, wired into tools/handoff-orchestrator.ts's
 // handleUpdateState wrapper). Each test below encodes a spec AC's invariant,
 // not just the current code shape, so a future refactor that silently drops a
 // guarantee (e.g. re-introduces a throw path, or omits a null field) fails loud.
@@ -42,10 +42,10 @@ function mkWorkspace(prefix = "telemetry-") {
   return ws;
 }
 
-// e123b9 J2 (spec AC1/AC9): telemetry.jsonl is a LANE_FILES sidecar — resolve
+// telemetry.jsonl is a per-lane sidecar file — resolve
 // it through the lane-aware resolver, not the retired flat path. These
 // fixture workspaces carry no `.git`, so this resolves to `.current/_primary/`,
-// matching what tools/telemetry.ts itself now resolves to.
+// matching what tools/telemetry.ts itself now resolves to (e123b9, spec AC1/AC9).
 function telemetryPath(ws) {
   return resolveCurrentLanePaths(ws).telemetryPath;
 }
@@ -88,8 +88,8 @@ test("EXTRACT4: every real GATE_REGISTRY code round-trips through the exact '⛔
 });
 
 // ---------------------------------------------------------------------------
-// SHAPE1 / PRODUCER — AC-5/AC-6: exactly 5 keys, `gate` sourced from the
-// registry's producer field (not re-derived / hardcoded).
+// Exactly 5 keys, `gate` sourced from the registry's producer field (not
+// re-derived / hardcoded) (SHAPE1 / PRODUCER, AC-5/AC-6).
 // ---------------------------------------------------------------------------
 
 test("SHAPE1: emitGateTelemetry appends exactly one line with exactly the 5 keys {ts, gate, error_code, agent_id, feature}", () => {
@@ -141,8 +141,8 @@ test("UNKNOWN1: an error_code absent from GATE_REGISTRY yields gate:'unknown' an
 });
 
 // ---------------------------------------------------------------------------
-// NULL — AC-6: missing agent_id/active_feature are JSON null, never omitted,
-// never the literal string "undefined".
+// Missing agent_id/active_feature are JSON null, never omitted, never the
+// literal string "undefined" (NULL, AC-6).
 // ---------------------------------------------------------------------------
 
 test("NULL1: agent_id=null, feature=undefined both serialize as JSON null (present, not omitted)", () => {
@@ -204,7 +204,7 @@ test("BOUNDARY3 (documents current behavior, not a spec violation): empty-string
 });
 
 // ---------------------------------------------------------------------------
-// NE1 — AC-2: pass-through (non-error) handleUpdateState calls emit nothing.
+// Pass-through (non-error) handleUpdateState calls emit nothing (NE1, AC-2).
 // ---------------------------------------------------------------------------
 
 test("NE1: a successful (non-rejected) handleUpdateState call appends no telemetry line", async () => {
@@ -225,8 +225,8 @@ test("NE1: a successful (non-rejected) handleUpdateState call appends no telemet
 });
 
 // ---------------------------------------------------------------------------
-// INT1 — AC-1: a real rejection fired through the full handleUpdateState
-// wrapper lands the exact expected line in .current/telemetry.jsonl.
+// A real rejection fired through the full handleUpdateState wrapper lands
+// the exact expected line in .current/telemetry.jsonl (INT1, AC-1).
 // ---------------------------------------------------------------------------
 
 test("INT1: a real TRANSITION_REJECTED fired via handleUpdateState lands exactly one matching line in .current/telemetry.jsonl", async () => {
@@ -261,8 +261,8 @@ test("INT1: a real TRANSITION_REJECTED fired via handleUpdateState lands exactly
 });
 
 // ---------------------------------------------------------------------------
-// THROW — AC-4: telemetry failure (mkdir/append throws) never masks or
-// alters the real gate ToolResult. Reproduced with a REAL filesystem throw
+// A telemetry failure (mkdir/append throws) never masks or alters the real
+// gate ToolResult (THROW, AC-4). Reproduced with a REAL filesystem throw
 // (no fs mocking): workspace_path points at a plain file, so
 // fs.mkdirSync(path.join(workspacePath, ".current"), {recursive:true}) inside
 // emitGateTelemetry hits ENOTDIR.
@@ -292,7 +292,7 @@ test("THROW2: when emitGateTelemetry's internal append fails, handleUpdateState'
   });
   assert.ok(fs.existsSync(telemetryPath(goodWs)), "control run must have actually appended telemetry");
 
-  // Experiment: e123b9 J2 (spec AC1/AC13) narrowed what "workspace_path is a
+  // Experiment: the lane-aware path resolution (e123b9, spec AC1/AC13) narrowed what "workspace_path is a
   // plain file" can mean — readAndMigrate now does its own readFileSync
   // (with only ENOENT swallowed) once it has picked a candidate path, so
   // making the WHOLE workspace_path a non-directory now throws ENOTDIR one

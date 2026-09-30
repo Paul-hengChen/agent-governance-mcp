@@ -1,22 +1,22 @@
 // Coded by @qa-engineer
 // Tests for spec: specs/d6-host-capability-compose-axis.md + its architecture doc.
-// T-D6-04 (a): host-state unit tests for prompts/skill-manifest.ts (composeSkill,
+// Host-state unit tests for prompts/skill-manifest.ts (composeSkill,
 // hostCapabilitiesFor, includeSkillSegment) and the config `host` precedence /
 // `.current/` whole-file-override / unsplit-passthrough contracts the three call
 // sites (prompts/build.ts, tools/role.ts switchRole, bin/agent-governance-context.mjs)
-// depend on.
+// depend on (T-D6-04 part a).
 //
 // Spec-to-Test map:
-//   AC1 (taskTool:true includes host fragments)         -> t-full-includes-host,
+//   taskTool:true includes host fragments (AC1)         -> t-full-includes-host,
 //                                                           t-golden-byte-identity
-//   AC2 (taskTool:false excludes host fragments)         -> t-lean-excludes-host,
+//   taskTool:false excludes host fragments (AC2)         -> t-lean-excludes-host,
 //                                                           t-lean-exact-core-concat
-//   AC3 (absent/unknown signal defaults SAFE/lean)       -> t-hostcaps-default-lean,
+//   absent/unknown signal defaults SAFE/lean (AC3)       -> t-hostcaps-default-lean,
 //                                                           t-buildPromptForRole-default-lean
-//   AC4 (ConstitutionSegment/includeSegment shape reuse) -> t-includeSkillSegment-pure,
+//   ConstitutionSegment/includeSegment shape reuse (AC4) -> t-includeSkillSegment-pure,
 //                                                           implicit in composeSkill shape below
-//   AC5 (golden byte-identity, full composition)         -> t-golden-byte-identity
-//   AC7 (both host states covered; suite stays green)    -> whole file
+//   golden byte-identity, full composition (AC5)         -> t-golden-byte-identity
+//   both host states covered; suite stays green (AC7)    -> whole file
 //
 // Precedence-order coverage (architecture Interface Contracts, composeSkill):
 //   (1) whole-file `.current/` override, bypassing host filtering entirely
@@ -50,8 +50,8 @@ const {
 const { buildPromptForRole, stripOriginTags, stripRationale } = await import(path.join(ROOT, "dist", "prompts", "build.js"));
 const { switchRole } = await import(path.join(ROOT, "dist", "tools", "role.js"));
 const { setActiveStorage, FileHandoffStorage } = await import(path.join(ROOT, "dist", "tools", "storage.js"));
-// E51 (T-E51-03): the shared strip pass, plus the two stages switchRole runs it
-// after — needed to prove parity rather than re-implement the pipeline here.
+// The shared strip pass, plus the two stages switchRole runs it
+// after (E51, T-E51-03) — needed to prove parity rather than re-implement the pipeline here.
 const { applyTextTransforms } = await import(path.join(ROOT, "dist", "prompts", "text-transforms.js"));
 const { parseSkillFile } = await import(path.join(ROOT, "dist", "tools", "skill-frontmatter.js"));
 const { expandPartials } = await import(path.join(ROOT, "dist", "prompts", "partials-manifest.js"));
@@ -111,10 +111,10 @@ test("t-includeSkillSegment-pure: \"core\" always includes; \"host:claude-code\"
 });
 
 // ---------------------------------------------------------------------------
-// AC5 — golden byte-identity: composeSkill under the full-capability profile
-// reproduces the retired monolith byte-for-byte. Compared against the FROZEN
+// Golden byte-identity: composeSkill under the full-capability profile
+// reproduces the retired monolith byte-for-byte (AC5). Compared against the FROZEN
 // fixture (test/fixtures/compose-golden/skill-coordinator-monolith.txt), never
-// the live content/skill-coordinator.md, which T-D6-04 retires in this same PR.
+// the live content/skill-coordinator.md, which the same change retires (T-D6-04).
 // ---------------------------------------------------------------------------
 
 test("t-golden-byte-identity (AC1/AC5): composeSkill(\"skill-coordinator.md\", {taskTool:true}) === frozen golden monolith, byte-for-byte", () => {
@@ -133,15 +133,15 @@ test("t-full-includes-host (AC1): full composition contains every host-tagged fr
 });
 
 // ---------------------------------------------------------------------------
-// e91-e103-dispatch-pin-mechanics behavioural pin (qa-owned, code-reviewer
-// round-3 request): the golden byte-identity test above pins BYTES — it would
-// pass just as well if a future edit silently dropped one of E103/E91's new
-// obligations, so long as the fixture was re-baselined to match. This test
+// Behavioural pin for the dispatch-pin mechanics (qa-owned, requested in code
+// review; ticket e91-e103-dispatch-pin-mechanics): the golden byte-identity test above pins BYTES — it would
+// pass just as well if a future edit silently dropped one of the two new
+// dispatch-pin obligations (E103, E91), so long as the fixture was re-baselined to match. This test
 // pins BEHAVIOUR instead: it runs the exact render path a dispatching
 // coordinator experiences (composeSkill under claude-code caps -> strip the
 // frontmatter block the way buildPromptForRole's own `body` slice does ->
-// stripOriginTags -> stripRationale, matching test/context-budget.test.mjs's
-// AC8 bundle construction) and asserts the new/reworded spans SURVIVE into
+// stripOriginTags -> stripRationale, matching the bundle construction in
+// test/context-budget.test.mjs, AC8) and asserts the new/reworded spans SURVIVE into
 // that composed text, while the three retired enforcement-implying strings do
 // NOT appear anywhere in it. A future edit that deletes the obligation itself
 // (not just its bytes) fails THIS test even after a clean golden re-baseline.
@@ -152,8 +152,8 @@ test("t-e91-e103-behavioural-pin: explicit-model dispatch obligation and self-re
   const body = raw.startsWith("---") ? raw.slice(raw.indexOf("---", 3) + 3).trimStart() : raw;
   const composed = stripRationale(stripOriginTags(body));
 
-  // E103 (iii): the model argument is required on every Task dispatch, with an
-  // explicit resolution order and a stop-and-report escape hatch.
+  // The model argument is required on every Task dispatch, with an
+  // explicit resolution order and a stop-and-report escape hatch (E103 iii).
   assert.match(
     composed,
     /the `model` argument is REQUIRED on every call, omitting it is the defect/,
@@ -170,8 +170,8 @@ test("t-e91-e103-behavioural-pin: explicit-model dispatch obligation and self-re
     "coord-02's no-resolvable-tier escape hatch must survive composition",
   );
 
-  // E91 (iii): the coordinator has no channel to confirm which model actually
-  // served a turn — pins are self-reported, not verified.
+  // The coordinator has no channel to confirm which model actually
+  // served a turn — pins are self-reported, not verified (E91 iii).
   assert.match(
     composed,
     /that is how a dispatch-time `model` pin gets silently dropped from the resume call/,
@@ -217,8 +217,8 @@ test("t-e91-e103-behavioural-pin: explicit-model dispatch obligation and self-re
 });
 
 // ---------------------------------------------------------------------------
-// AC2 — lean composition excludes every host-tagged fragment, keeps every core
-// fragment. Verified two ways: (a) negative/positive content assertions on the
+// Lean composition excludes every host-tagged fragment, keeps every core
+// fragment (AC2). Verified two ways: (a) negative/positive content assertions on the
 // unique per-fragment markers above, AND (b) exact string equality against an
 // INDEPENDENTLY concatenated core-only reconstruction (hardcoded fragment list,
 // not derived from SKILL_SEGMENTS — so a registry bug can't hide from this test).
@@ -379,7 +379,7 @@ test("t-switchRole-does-not-throw: switchRole succeeds for every ROLE_SKILL_MAP 
 });
 
 // ---------------------------------------------------------------------------
-// E51 — strip parity across BOTH skill-render paths (T-E51-03).
+// Strip parity across BOTH skill-render paths (E51, T-E51-03).
 //
 // The defect: stripOriginTags/stripRationale ran on the prompts/build.ts path
 // only. tools/role.ts switchRole — the path tw_switch_role dispatch actually
@@ -388,14 +388,14 @@ test("t-switchRole-does-not-throw: switchRole succeeds for every ROLE_SKILL_MAP 
 // that the fence convention exists to keep away from that exact reader.
 //
 // Spec-to-Test map (ACs from the E51 cut, docs/backlog.md row E51):
-//   AC1 (no marker in switchRole output, every role)  -> t-e51-switchRole-marker-free,
+//   no marker in switchRole output, every role (AC1)  -> t-e51-switchRole-marker-free,
 //                                                        t-e51-witness-fences-exist-in-source
-//   AC2 (compose-golden fixtures byte-identical)      -> t-golden-byte-identity above +
+//   compose-golden fixtures byte-identical (AC2)      -> t-golden-byte-identity above +
 //                                                        test/compose-equivalence.test.mjs
 //                                                        (assert-not-rebaseline: a differing
 //                                                        fixture is a FAIL, never regenerated)
-//   AC3 (strippers still importable from build.js)    -> t-e51-build-reexport-surface
-//   AC5 (hook path deliberately untouched)            -> t-e51-hook-remains-non-caller
+//   strippers still importable from build.js (AC3)    -> t-e51-build-reexport-surface
+//   hook path deliberately untouched (AC5)            -> t-e51-hook-remains-non-caller
 //   shared-pass contract (fullDetail semantics)       -> t-e51-applyTextTransforms-contract
 //   body-only, frontmatter intact                     -> t-e51-frontmatter-survives-strip
 //   whole-file override also stripped                 -> t-e51-override-is-stripped

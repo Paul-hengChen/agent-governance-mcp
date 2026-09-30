@@ -1,5 +1,5 @@
 // Coded by @qa-engineer
-// Tests for specs/bug-fixes-v3.14.1.md — AC-5, AC-6, AC-7, AC-10.
+// Tests for specs/bug-fixes-v3.14.1.md — evidence gate, round sentinel, round persistence and no-design pass-through (AC-5, AC-6, AC-7, AC-10).
 //
 // These tests assert the COMPOSITION through index.ts handler logic:
 //   tw_update_state path: validateTransition → visual evidence gate →
@@ -52,7 +52,7 @@ function seedVisualEvidence(ws, taskId) {
   );
 }
 
-// ---------- AC-5 — VISUAL_EVIDENCE_MISSING composition ----------
+// ---------- VISUAL_EVIDENCE_MISSING composition: declared baselines need evidence (AC-5) ----------
 
 test("AC-5: handler composition — PASS rejected when baselines declared but visual evidence missing", () => {
   // Why: unit tests verify hasVisualBaselinesInDesign + hasVisualEvidenceInFile
@@ -105,7 +105,7 @@ test("AC-5: handler composition — no baselines → gate dormant even with no e
   // The handler skips hasVisualEvidenceInFile entirely in this branch.
 });
 
-// ---------- AC-6 — Round 6 sentinel ----------
+// ---------- the visual round-6 sentinel fires once the cap is crossed (AC-6) ----------
 
 test("AC-6: Round 6 sentinel — fires on cap-cross from prev=5", () => {
   // Why: the v3.14.1 predicate fix changes `=== 6 && === 5` to
@@ -145,7 +145,7 @@ test("AC-6: Round 6 sentinel — does NOT fire when already past cap", () => {
   assert.equal(newPredicate, false, "sentinel must inject exactly once");
 });
 
-// ---------- AC-7 — visual_round persistence end-to-end ----------
+// ---------- visual_round persists end-to-end across writes (AC-7) ----------
 
 test("AC-7: visual_round persists across writeState → readback", async () => {
   // Why: assert that the writeState + parseHandoff round-trip preserves
@@ -188,7 +188,7 @@ test("AC-7: visual_round survives a subsequent read+write cycle", async () => {
   assert.equal(stateAfterCycle.visual_round, 4, "round 2 read MUST preserve visual_round");
 });
 
-// ---------- AC-10 — VISUAL_ROUND_EXCEEDED composition ----------
+// ---------- VISUAL_ROUND_EXCEEDED composition: past the cap only pm may proceed (AC-10) ----------
 
 test("AC-10: handler composition — VISUAL_ROUND_EXCEEDED rejects everything except (pm, In_Progress)", () => {
   // Why: assert the round-cap branch via validateTransition. This is the
@@ -337,10 +337,10 @@ test("v3.16.0 AC-1 STEP2: baselines present + missing visual_<task>.md → VISUA
   assert.deepEqual(visEv.missing, ["T01"], "missing visual evidence → server emits VISUAL_EVIDENCE_MISSING");
 });
 
-// ---------- AC-10: no-design / no design file → gate silent, PASS proceeds ----------
+// ---------- no-design mode or no design file: gate stays silent and PASS proceeds (AC-10) ----------
 
 test("v3.16.0 AC-10: no-design mode → gate silent (both STEP 1 and STEP 2 skipped)", () => {
-  // Why: AC-10 non-UI pass-through regression guard. mode=no-design must
+  // Why: regression guard so non-UI work passes through untouched (AC-10). mode=no-design must
   // leave both gates dormant so infra/server features are not affected.
   const ws = mkWorkspace();
   seedDesignWithModeOnly(ws, "feat-nod", "no-design");
@@ -374,7 +374,7 @@ test("v3.16.0 AC-10: no design file at all → gate silent, PASS proceeds", () =
 test("v3.16.0 AC-1: baselines present + evidence present → PASS (all gates satisfied)", () => {
   // Why: the complete PASS scenario. Armed mode, baselines declared, visual
   // evidence written. Both STEP 1 falls through and STEP 2 finds all evidence
-  // present. This mirrors the AC-1 backwards-compat row in the architecture:
+  // present. This mirrors the backwards-compatibility row in the architecture (AC-1):
   // "Design file, mode != no-design, ## Visual Baselines PRESENT — Unaffected".
   const ws = mkWorkspace();
   seedDesignWithModeAndBaselines(ws, "feat-happy", "figma");
