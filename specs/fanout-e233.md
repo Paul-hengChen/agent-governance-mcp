@@ -1,7 +1,7 @@
 # Fan-out: E233 註解只寫票號 → 改寫成白話（＋ E241 併入）
 base: 276d574    integration branch: integ/e233a（第一段五條並行 lane 共用一條）；第二段 integ/e233f
 
-**狀態：人類核准 2026-09-29，第一段派工。** 票面自己寫了切法：「按目錄切（`tools/`、`gates/`、`bin/`+`scripts/`、`test/` 分幾批、`content/` 因為 budget 放最後），每一片一條小 mini-chain」。本檔照這個切法分成 6 條 lane：**第一段 5 條並行**（原始碼 2 條、測試 3 條），**第二段 1 條**（`content/`，第一段合併後再派工）。E241（佇列 #64，已註明「併入 E233 一起做」）放進 e233b。
+**狀態：第一段已合併（2026-09-30，`integ/e233a`）；第二段 e233f 待重新核對後派工。** 票面自己寫了切法：「按目錄切（`tools/`、`gates/`、`bin/`+`scripts/`、`test/` 分幾批、`content/` 因為 budget 放最後），每一片一條小 mini-chain」。本檔照這個切法分成 6 條 lane：**第一段 5 條並行**（原始碼 2 條、測試 3 條），**第二段 1 條**（`content/`，第一段合併後再派工）。E241（佇列 #64，已註明「併入 E233 一起做」）放進 e233b。
 
 ## 派工前核對（整合者，2026-09-29）
 - `git worktree list` 只有 primary；main = origin/main = `276d574`；沒有殘留的 `feat/*`／`integ/*` branch。
@@ -80,3 +80,15 @@ base: 276d574    integration branch: integ/e233a（第一段五條並行 lane �
 | 2026-09-29 | 人類 | E233 開始 fan-out | 整合者 session |
 | 2026-09-29 | 整合者 | 照票面切法分成 6 條 lane（原始碼 2、測試 3、content 1）；E241 照佇列 #64 的註記併入 e233b；content 照票面放第二段 | 本檔 |
 | 2026-09-29 | 人類 | 核准本清單（5 條並行 ＋ content 殿後），開始派工；`dist/index.js` 權限由人類 `chmod 644` 還原 | 整合者 session |
+| 2026-09-29 | 整合者 | e233b 的 E241 範圍不放寬：只改清理後新舊名字都不存在的那一個 recommendations 檔；其他 CHANGELOG 引用已合併掉的 research 檔屬於照實的歷史，不動 | 信箱 e233b to-lane#2 |
+| 2026-09-29 | 整合者 | 三條測試 lane 統一交接路徑：qa 作者寫 `qa-engineer:Blocked`（撰寫完成，不是失敗）→ pm → code-reviewer（resume_of）→ 全新 Task 派出的 qa 驗證者寫 PASS；作者不寫 state 不符合 const-05 | 信箱 e233c／e233d／e233e |
+| 2026-09-29 | 整合者 | 跨 lane 通知三則：全套一律包 test-lock；證據與 spec 不寫本機路徑字面值（e234 AC16 會抓）；票號偵測要涵蓋小寫與帶字母段的 id；最後的全套在最後的 HEAD 上跑 | 信箱各 lane |
+| 2026-09-30 | 整合者 | e233a 第一次收工退回：報告寫全套綠，但 3573a23 上 e234 AC16 紅（qa 證據檔寫了暫存目錄路徑，且全套在該 commit 之前跑）；修正後 fdc7bcb 重跑綠 | 信箱 e233a to-lane#3 |
+| 2026-09-30 | 整合者 | 五條逐條核對通過（各自在回報 HEAD 乾淨樹重跑全套 2958/2955/0/3）；依序 merge 進 integ/e233a，零衝突 → 無合併審查；每次 merge 後 merge-invariants PASS；重建 dist/ 無差異；整合層全套 2958/2955/0/3 | 本檔 |
+| 2026-09-30 | 整合者 | lane-status 彙總的 EVIDENCE MISMATCH：e233e 的驗證報告以 `covers:` 涵蓋 T-13..24 但沒有 PASS 標頭（格式差異，實質證據齊全）；e233c 為 covers 行解析誤判。接受，不退回 | 本檔 |
+| 2026-09-30 | 整合者 | e233d 回報的 e132 gap-6 偶發失敗不屬任何 lane 範圍，由整合者配號 E254，佇列 #75 | 本檔 |
+
+## 結案（第一段）
+- 日期 2026-09-30；合併 branch `integ/e233a`（e233a→e233b→e233c→e233d→e233e，皆 `--no-ff`）；例外：無衝突、無合併審查。
+- 彙總（每條 lane 各自對照上限，合計僅供參考）：e233a 9 張 task／hop 9；e233b 6／6；e233c 2／9；e233d 13／5；e233e 12／9；合計 42 張 task、38 hop。三條 lane 用到 hop 9/10，主要成本是作者第一輪改寫標準太窄與證據檔的路徑問題。
+- 新票：E254（整合者）；E233B-NEW-1 由 `finish --shipped` 配號。
