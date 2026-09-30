@@ -84,7 +84,7 @@ failed/unverified structural row, or a non-PASS verdict returns
 assertions": nothing checked is the focus bar present? is the group box present? is the
 primary button the accent color?). If the gate is armed but the design omits the
 assertions section entirely, PASS returns `VISUAL_ASSERTIONS_REQUIRED` — a hard error,
-deliberately *not* a silent fallback, because a silent fallback is how B6 happened.
+deliberately *not* a silent fallback, because a silent fallback is how the late-armed gate (B6) happened.
 
 **Scope-decision gate (v3.30.0).** This closes the routing-chain half of retrospective
 finding A0 — "the oversized → ask-the-human gate never fired". The whole 9-screen OOBE
@@ -220,7 +220,7 @@ not run this tooling.
 
 See Constitution §7.
 
-Retrospective A0 and the "scope honesty" open question are the motivation. The prior rollout's
+The never-fired oversized-task gate (retrospective A0) and the "scope honesty" open question are the motivation. The prior rollout's
 spec referenced a Figma file as the design source, but the design-auditor hit limits and
 collapsed inline (taxonomy C5/A6), so the references were never fully fetched or verified —
 node-ids "resolved" by name pointed at the wrong screens (`4888:*` was Network), and wrong
