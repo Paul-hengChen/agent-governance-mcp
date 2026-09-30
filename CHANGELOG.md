@@ -16,6 +16,54 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [4.3.0] - 2026-09-30
+
+MINOR release. It ships E258 (comment discipline) since v4.2.1, merged as two lanes, `e258a` and
+`e258b`, through `integ/e258`. The constitution gains a normative rule and `agc check` gains a new
+advisory check. No tool input schema, prompt schema or state file format changed, and
+`package.json` dependencies are unchanged. Fan-out plan and close box: `specs/fanout-e258.md`.
+
+### Added
+
+- **E258: constitution §6 *Comment discipline* (`content/const-15-core-tail.md`)**: a comment says
+  WHAT the code does and WHY, never HOW. Inside a function body only a short warning about
+  something non-obvious is allowed; the explanation goes at the head of the function. Long
+  rationale goes in a tracked spec or the commit message, with at most a one-line pointer in the
+  comment. A doc comment opens with a one-sentence summary of at most 80 columns, and a `##`
+  heading inside a comment is sent back as a pasted spec. Spec: `specs/e258a-comment-rule.md`.
+- **E258: code-reviewer step 4b (`content/skill-code-reviewer.md`)**: the reviewer applies the
+  rule to every comment a diff adds and judges each `agc check — comments` warning, either keeping
+  it with a one-line reason in the review report or sending it back to be trimmed.
+- **E258: advisory, diff-scoped comment scan in `agc check` (`tools/comment-scan.ts`,
+  `bin/agc-init.mjs`, `dist/tools/comment-scan.*`)**: only lines the current change adds are
+  scanned. `long-block` fires for a comment block over 7 counted lines that the change adds to or
+  edits (JSDoc `@param`/`@returns`/`@return`/`@throws`/`@example` tags and bare `/*`/`*/` lines
+  not counted); `high-ratio` fires for a file whose comment lines exceed 30% of its non-blank
+  lines when the change adds a comment line, with files under 50 non-blank lines exempt. JS/TS
+  only (`.ts/.tsx/.js/.jsx/.mjs`). It never changes the exit code. Documented in
+  `docs/install.md` and `docs/config.md`. Specs: `specs/e258b-comment-scan.md`,
+  `specs/e258b-comment-scan-architecture.md`.
+
+### Changed
+
+- **E258: four context-budget ceilings raised to measured values
+  (`test/context-budget.test.mjs`)**, and the compose goldens under
+  `test/fixtures/compose-golden/` regenerated for the new constitution bullet. New tests:
+  `test/e258a-comment-rule.test.mjs`, `test/e258b-comment-scan.test.mjs` (fixtures under
+  `test/fixtures/e258b/`).
+
+### Notes
+
+- Evidence: this release archives lane `e258a`'s QA and code-review reports and expected-red
+  manifest into `qa_reports/archive/e258a-comment-rule/` and
+  `review_reports/archive/e258a-comment-rule/`, lane `e258b`'s into
+  `qa_reports/archive/e258b-comment-scan/` and `review_reports/archive/e258b-comment-scan/`, the
+  integration comment check into `review_reports/archive/e258/`, and the release gate's QA
+  reports into `qa_reports/archive/release-v4.3.0/`. Release-gate spec: `specs/release-v4.3.0.md`.
+  Each lane's closed handoff is under `.current/history/2026-09/<lane>/` (context, not changed).
+- H7 in `docs/agc-feedback-2026-09-08.md` is marked done. E259 (extend the comment scan beyond
+  JS/TS) was filed from lane `e258b` and is not part of this release.
+
 ## [4.2.1] - 2026-09-30
 
 PATCH release. It ships E233 (six lanes, `e233a` to `e233f`) and E241 (merged with lane `e233b`)
