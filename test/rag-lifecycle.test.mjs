@@ -145,7 +145,7 @@ test("schema: re-opening SQLite DB does not throw on prd_path migration", async 
 });
 
 // ============================================================================
-// AC2 — resolvePrdPath
+// resolvePrdPath: locating the PRD file for a workspace (AC2)
 // ============================================================================
 
 test("resolvePrdPath: returns state.prd_path when it exists on disk", () => {
@@ -228,7 +228,7 @@ test("resolvePrdPath: PRD.md at root precedes docs/PRD.md", () => {
 });
 
 // ============================================================================
-// AC3, AC4, AC5, AC6, AC7, AC13 — appendSpecContext behaviour
+// appendSpecContext behaviour: how retrieved PRD context is appended to the prompt (AC3-AC7, AC13)
 // ============================================================================
 
 // Mock storage helpers — used to drive appendSpecContext without spinning SQLite.
@@ -358,7 +358,7 @@ test("appendSpecContext: reindex failure (upsertPrdChunks throws) returns prompt
 });
 
 // ============================================================================
-// AC5 — coalesce concurrent runs
+// Coalescing: the in-flight indexing registry lets concurrent runs share one (AC5)
 // ============================================================================
 
 test("rag-coalesce: setInflight / getInflight round-trip + deleteInflight clears", async () => {
@@ -410,7 +410,7 @@ test("rag-coalesce: awaitAllInflightFor for unrelated workspace is a no-op", asy
 });
 
 // ============================================================================
-// AC8, AC11 — deletePrdChunks
+// deletePrdChunks: clearing a workspace's indexed PRD chunks (AC8, AC11)
 // ============================================================================
 
 test(
@@ -460,7 +460,7 @@ test("FileHandoffStorage: lacks deletePrdChunks method (file-mode no-op contract
 });
 
 // ============================================================================
-// AC10 — Tombstone sweep
+// Tombstone sweep: dropping chunks of workspaces whose directory is gone (AC10)
 // ============================================================================
 
 test(

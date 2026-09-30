@@ -109,7 +109,7 @@ test("AC-6: options-object accepts all fields and persists them", async () => {
   assert.deepEqual(state.completed_tasks, ["T01", "T02"]);
 });
 
-// ---------- AC-7 — interface support both call shapes ----------
+// ---------- the storage interface supports both call shapes (AC-7) ----------
 // (Indirectly tested via FileHandoffStorage / SqliteHandoffStorage integration
 // in the existing storage tests; the storage.ts interface compiles cleanly
 // is asserted by `npm run build`.)
