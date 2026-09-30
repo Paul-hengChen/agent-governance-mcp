@@ -1,0 +1,53 @@
+{
+ "js-corpus": {
+  "kinds": "c,c,c,c,c,c,c,c,c,c,m,m,m,m,m,m,m,b,m,m,m,m,m,m,m,m,md,m,m,m,m,m,m,m,m,m,m,m,m,md,c,c,c,c,m,m,m",
+  "blocks": [
+   [
+    11,
+    17,
+    7
+   ],
+   [
+    19,
+    40,
+    15
+   ],
+   [
+    45,
+    47,
+    3
+   ]
+  ],
+  "nonBlank": 46,
+  "commentLines": 32
+ },
+ "lexer-mix": {
+  "kinds": "c,c,c,c,c,c,m,m,b,m,m,m,c,b",
+  "blocks": [
+   [
+    7,
+    8,
+    2
+   ],
+   [
+    10,
+    12,
+    3
+   ]
+  ],
+  "nonBlank": 12,
+  "commentLines": 5
+ },
+ "jsdoc-tags": {
+  "kinds": "md,m,m,m,m,m,m,m,m,m,m,m,m,md,c,b",
+  "blocks": [
+   [
+    1,
+    14,
+    5
+   ]
+  ],
+  "nonBlank": 15,
+  "commentLines": 14
+ }
+}

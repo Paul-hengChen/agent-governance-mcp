@@ -1,0 +1,13 @@
+const a = "// not a comment";
+const b = '/* nor this */';
+const c = `// tpl
+  /* still template */`;
+const d = /\/\/ re/.test(a);
+const e = 1; // trailing
+// run one a
+// run one b
+
+// run two
+/* span a
+   span b */
+const f = 1 / 2; // division then comment

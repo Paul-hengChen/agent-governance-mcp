@@ -1,11 +1,13 @@
 // Coded by @sr-engineer
-// Comment-length scan (E258B): the sixth `agc check` advisory. It flags long
-// comment blocks and comment-heavy files in the lines the current change
-// adds, and never changes the exit code. Rules, lexer and rationale:
-// specs/e258b-comment-scan.md and specs/e258b-comment-scan-architecture.md.
+// Comment-length scan (E258B, E259): the sixth `agc check` advisory. It flags
+// long comment blocks and comment-heavy files in the lines the current change
+// adds, and never changes the exit code. Rules and rationale: specs/e258b-*
+// and specs/e259-comment-scan-languages*.md.
 import * as fs from "fs";
 import * as path from "path";
 import { execFileSync } from "node:child_process";
+import { jsLang, langForPath, scannedExtensions } from "./comment-langs.js";
+export { lexJs as lexLines } from "./comment-lang-js.js";
 export const commentLimits = Object.freeze({
     maxBlockLines: 7,
     maxRatioPercent: 30,
@@ -19,160 +21,30 @@ export const commentCopy = Object.freeze({
     block: (p, line, n) => `${prefix}: ${p}:${line} long-block ${n} lines (limit ${commentLimits.maxBlockLines})`,
     ratio: (p, pct, n) => `${prefix}: ${p} high-ratio ${pct}% of ${n} non-blank lines are comments (limit ${commentLimits.maxRatioPercent}%)`,
     more: (n) => `${prefix}: … ${n} more warning(s) not listed`,
-    summary: (n, m) => `${prefix}: ${n} warning(s) in ${m} file(s) (only .ts/.tsx/.js/.jsx/.mjs are scanned) — advisory; ` +
+    summary: (n, m) => `${prefix}: ${n} warning(s) in ${m} file(s) (only ${scannedExtensions().join("/")} are scanned) — advisory; ` +
         "keep a comment to WHAT and WHY, move long rationale to a tracked spec or the commit message " +
         "(see Comment discipline, constitution section 6)",
     error: (why) => `${prefix}: scan skipped (${why})`,
     whyLoad: "cannot load dist/tools/comment-scan.js — run `npm run build`",
     whyUnexpected: "unexpected error",
 });
-// Tokens after which a `/` starts a regex literal rather than a division.
-const regexAfterPunct = new Set("(,=:[!&|?{};+-*%<>~^".split(""));
-const regexAfterWord = new Set([
-    "return", "typeof", "instanceof", "in", "of", "new", "delete", "void",
-    "throw", "case", "do", "else", "yield", "await",
-]);
-const delimiterLines = new Set(["/*", "/**", "*/"]);
-const excludedTags = new Set(["param", "returns", "return", "throws", "example"]);
-function isIdentChar(c) {
-    return /[A-Za-z0-9_$]/.test(c);
-}
-function commentBody(raw) {
-    return raw.trim().replace(/^(?:\/\/+|\/\*+|\*+(?!\/))/, "").trimStart();
-}
-export function lexLines(text) {
-    const raw = text.split(/\r?\n/);
-    const hasCode = raw.map(() => false);
-    const hasComment = raw.map(() => false);
-    let state = "code";
-    const tplDepth = [];
-    let lastSig = "";
-    let word = "";
-    let wordOpen = false;
-    let first = 0;
-    if (text.startsWith("#!")) {
-        hasCode[0] = true;
-        first = 1;
-    }
-    for (let ln = first; ln < raw.length; ln++) {
-        const s = raw[ln];
-        if (state === "block")
-            hasComment[ln] = true;
-        else if (state !== "code")
-            hasCode[ln] = true;
-        let escapedNewline = false;
-        for (let i = 0; i < s.length; i++) {
-            const c = s[i];
-            if (state === "line" || state === "block") {
-                hasComment[ln] = true;
-                if (state === "block" && c === "*" && s[i + 1] === "/") {
-                    i++;
-                    state = "code";
-                }
-                continue;
-            }
-            if (state !== "code") {
-                hasCode[ln] = true;
-                if (c === "\\") {
-                    if (i === s.length - 1)
-                        escapedNewline = true;
-                    i++;
-                }
-                else if (state === "sq" || state === "dq") {
-                    if (c === (state === "sq" ? "'" : '"'))
-                        [state, lastSig, word] = ["code", '"', ""];
-                }
-                else if (state === "tpl") {
-                    if (c === "`")
-                        [state, lastSig, word] = ["code", "`", ""];
-                    else if (c === "$" && s[i + 1] === "{") {
-                        i++;
-                        tplDepth.push(0);
-                        [state, lastSig, word] = ["code", "{", ""];
-                    }
-                }
-                else if (state === "regex") {
-                    if (c === "[")
-                        state = "regexClass";
-                    else if (c === "/")
-                        [state, lastSig, word] = ["code", ")", ""];
-                }
-                else if (c === "]") {
-                    state = "regex";
-                }
-                continue;
-            }
-            if (/\s/.test(c)) {
-                wordOpen = false;
-                continue;
-            }
-            if (c === "/" && (s[i + 1] === "/" || s[i + 1] === "*")) {
-                hasComment[ln] = true;
-                state = s[i + 1] === "/" ? "line" : "block";
-                i++;
-                continue;
-            }
-            hasCode[ln] = true;
-            if (isIdentChar(c)) {
-                word = wordOpen ? word + c : c;
-                wordOpen = true;
-                lastSig = c;
-                continue;
-            }
-            const regexOk = lastSig === "" || regexAfterPunct.has(lastSig) || (isIdentChar(lastSig) && regexAfterWord.has(word));
-            wordOpen = false;
-            word = "";
-            lastSig = c;
-            if (c === "'")
-                state = "sq";
-            else if (c === '"')
-                state = "dq";
-            else if (c === "`")
-                state = "tpl";
-            else if (c === "/" && regexOk)
-                state = "regex";
-            else if (c === "{" && tplDepth.length > 0)
-                tplDepth[tplDepth.length - 1]++;
-            else if (c === "}" && tplDepth.length > 0) {
-                if (tplDepth[tplDepth.length - 1] === 0) {
-                    tplDepth.pop();
-                    state = "tpl";
-                }
-                else
-                    tplDepth[tplDepth.length - 1]--;
-            }
-        }
-        if (state === "line")
-            state = "code";
-        else if ((state === "sq" || state === "dq") && !escapedNewline)
-            state = "code";
-        else if (state === "regex" || state === "regexClass")
-            state = "code";
-        wordOpen = false;
-    }
-    return raw.map((s, i) => {
-        const kind = hasCode[i] ? "code" : hasComment[i] ? "comment" : "blank";
-        return {
-            kind,
-            body: kind === "comment" ? commentBody(s) : "",
-            delimiterOnly: delimiterLines.has(s.trim()),
-        };
-    });
-}
-function countBlock(lines, start, end) {
+// ---------------------------------------------------------------------------
+// Pure layer: text in, lines / findings out. No I/O.
+// ---------------------------------------------------------------------------
+function countBlock(lines, start, end, rule) {
     let excluding = false;
     let counted = 0;
     for (let i = start; i <= end; i++) {
-        const tag = /^@([A-Za-z]+)/.exec(lines[i].body);
-        if (tag)
-            excluding = excludedTags.has(tag[1]);
+        const t = rule(lines[i]);
+        if (t !== null)
+            excluding = t;
         if (!lines[i].delimiterOnly && !excluding)
             counted++;
     }
     return counted;
 }
-export function analyzeText(text) {
-    const lines = lexLines(text);
+export function analyzeText(text, lang = jsLang) {
+    const lines = lang.lex(text);
     const blocks = [];
     let nonBlank = 0;
     let commentLines = 0;
@@ -188,7 +60,7 @@ export function analyzeText(text) {
         let j = i;
         while (j + 1 < lines.length && lines[j + 1].kind === "comment")
             j++;
-        blocks.push({ start: i + 1, end: j + 1, counted: countBlock(lines, i, j) });
+        blocks.push({ start: i + 1, end: j + 1, counted: countBlock(lines, i, j, lang.tags) });
     }
     return { lines, nonBlank, commentLines, blocks };
 }
@@ -279,9 +151,7 @@ export function parseAddedLines(patch) {
     return out;
 }
 export function isScannablePath(rel) {
-    if (!/\.(?:ts|tsx|js|jsx|mjs)$/.test(rel) || rel.endsWith(".d.ts"))
-        return false;
-    return !rel.split("/").some((seg) => seg === "dist" || seg === "node_modules");
+    return langForPath(rel) !== null;
 }
 function displayPath(p) {
     return p.replace(/[\x00-\x1f\x7f]/g, (c) => `\\x${c.charCodeAt(0).toString(16).padStart(2, "0")}`);
@@ -374,11 +244,12 @@ export function runCommentScan(cwd, opts = {}) {
             return null;
         const findings = [];
         for (const [rel, added] of collectAdded(cwd, base)) {
-            if (!isScannablePath(rel))
+            const lang = langForPath(rel);
+            if (lang === null)
                 continue;
             const text = readScannable(cwd, rel);
             if (text !== null)
-                findings.push(...findingsForFile(rel, analyzeText(text), added));
+                findings.push(...findingsForFile(rel, analyzeText(text, lang), added));
         }
         for (const line of formatFindings(findings))
             write(line);

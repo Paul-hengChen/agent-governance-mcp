@@ -1,0 +1,6 @@
+# e259-comment-scan-languages — intentional reds left by sr-engineer (T-E259-01).
+# T-E259-01 widens the scanned set (.cjs/.mts/.cts are now scanned) and derives the
+# summary extension list from the registry (spec D8). These are the two e258b
+# assertions the spec reassigns to qa (AC2/AC3); qa edits them in T-E259-07.
+test/e258b-comment-scan.test.mjs | AC8: isScannablePath applies the D3 name rules case-sensitively
+test/e258b-comment-scan.test.mjs | AC11: 60 blocks list 50 hits, one more line naming 10 and one summary, all on stderr; a clean diff prints nothing

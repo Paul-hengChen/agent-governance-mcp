@@ -242,8 +242,8 @@ test("AC8: only .ts/.tsx/.js/.jsx/.mjs outside dist and node_modules are reporte
 });
 
 test("AC8: isScannablePath applies the D3 name rules case-sensitively", () => {
-  for (const ok of ["a.ts", "src/b.tsx", "c.js", "d.jsx", "e.mjs"]) assert.equal(isScannablePath(ok), true, ok);
-  for (const no of ["x.d.ts", "dist/y.js", "a/node_modules/z.js", "w.py", "a.cjs", "a.mts", "A.TS"]) {
+  for (const ok of ["a.ts", "src/b.tsx", "c.js", "d.jsx", "e.mjs", "a.cjs", "a.mts", "a.cts", "w.py"]) assert.equal(isScannablePath(ok), true, ok);
+  for (const no of ["x.d.ts", "x.d.mts", "x.d.cts", "dist/y.js", "a/node_modules/z.js", "w.yaml", "A.TS"]) {
     assert.equal(isScannablePath(no), false, no);
   }
 });
@@ -353,7 +353,7 @@ test("AC11: 60 blocks list 50 hits, one more line naming 10 and one summary, all
   assert.equal(lines.length, 52, lines.slice(-3).join(" | "));
   assert.equal(blockHits(r.stderr).length, 50);
   assert.equal(lines[50], `${PREFIX}: … 10 more warning(s) not listed`);
-  assert.match(lines[51], /^agc check — comments: 60 warning\(s\) in 60 file\(s\) \(only \.ts\/\.tsx\/\.js\/\.jsx\/\.mjs are scanned\) — advisory; /);
+  assert.match(lines[51], /^agc check — comments: 60 warning\(s\) in 60 file\(s\) \(only \.bash\/\.c\/\.cc\/\.cjs\/\.cpp\/\.cs\/\.cts\/\.cxx\/\.go\/\.h\/\.hpp\/\.java\/\.js\/\.jsx\/\.kt\/\.kts\/\.mjs\/\.mts\/\.py\/\.rb\/\.rs\/\.sh\/\.swift\/\.ts\/\.tsx\/\.zsh are scanned\) — advisory; /);
   assert.ok(lines[0].includes("f00.ts:1") && lines[49].includes("f49.ts:1"), "sorted by path");
   assert.equal(r.stdout.includes(PREFIX), false);
   const clean = mkRepo("e258b-ac11-clean-");

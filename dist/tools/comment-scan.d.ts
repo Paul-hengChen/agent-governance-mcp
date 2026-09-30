@@ -1,3 +1,6 @@
+import type { LangSpec, LexedLine } from "./comment-types.js";
+export type { LineKind, LexedLine } from "./comment-types.js";
+export { lexJs as lexLines } from "./comment-lang-js.js";
 export declare const commentLimits: Readonly<{
     readonly maxBlockLines: 7;
     readonly maxRatioPercent: 30;
@@ -6,12 +9,6 @@ export declare const commentLimits: Readonly<{
     readonly maxContentBytes: 1048576;
     readonly binarySniffBytes: 8192;
 }>;
-export type LineKind = "blank" | "code" | "comment";
-export interface LexedLine {
-    kind: LineKind;
-    body: string;
-    delimiterOnly: boolean;
-}
 export interface CommentBlock {
     start: number;
     end: number;
@@ -47,8 +44,7 @@ export declare const commentCopy: Readonly<{
     whyLoad: "cannot load dist/tools/comment-scan.js — run `npm run build`";
     whyUnexpected: "unexpected error";
 }>;
-export declare function lexLines(text: string): LexedLine[];
-export declare function analyzeText(text: string): FileAnalysis;
+export declare function analyzeText(text: string, lang?: LangSpec): FileAnalysis;
 export declare function formatPct(comment: number, nonBlank: number): string;
 export declare function findingsForFile(p: string, a: FileAnalysis, added: AddedLines): Finding[];
 export declare function unquoteGitPath(s: string): string;
