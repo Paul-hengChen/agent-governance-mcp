@@ -1,7 +1,7 @@
 # Fan-out: E233 註解只寫票號 → 改寫成白話（＋ E241 併入）
 base: 276d574    integration branch: integ/e233a（第一段五條並行 lane 共用一條）；第二段 integ/e233f
 
-**狀態：第一段已合併（2026-09-30，`integ/e233a`）；第二段 e233f 待重新核對後派工。** 票面自己寫了切法：「按目錄切（`tools/`、`gates/`、`bin/`+`scripts/`、`test/` 分幾批、`content/` 因為 budget 放最後），每一片一條小 mini-chain」。本檔照這個切法分成 6 條 lane：**第一段 5 條並行**（原始碼 2 條、測試 3 條），**第二段 1 條**（`content/`，第一段合併後再派工）。E241（佇列 #64，已註明「併入 E233 一起做」）放進 e233b。
+**狀態：第一段已合併（2026-09-30，`integ/e233a`）；第二段 e233f 人類核准派工（2026-09-30）。** 票面自己寫了切法：「按目錄切（`tools/`、`gates/`、`bin/`+`scripts/`、`test/` 分幾批、`content/` 因為 budget 放最後），每一片一條小 mini-chain」。本檔照這個切法分成 6 條 lane：**第一段 5 條並行**（原始碼 2 條、測試 3 條），**第二段 1 條**（`content/`，第一段合併後再派工）。E241（佇列 #64，已註明「併入 E233 一起做」）放進 e233b。
 
 ## 派工前核對（整合者，2026-09-29）
 - `git worktree list` 只有 primary；main = origin/main = `276d574`；沒有殘留的 `feat/*`／`integ/*` branch。
@@ -33,7 +33,15 @@ base: 276d574    integration branch: integ/e233a（第一段五條並行 lane �
 | e233d | E233 | feat/e233d-test-comments-b | ../agent-governance-mcp-lanes/e233d | `test/e{2,3,4,5,6,7,8,9}*.test.mjs`、`test/er*.test.mjs`、`test/{f,g,h,i,j,k,l,m,n,o,p,q}*.test.mjs`、`specs/e233d-*`、`qa_reports/*E233D*`、`review_reports/*E233D*`、`.current/e233d/**` | `content/**`、goldens、budget、`test/render-structure.test.mjs`、其他 `test/**`、`test/fixtures/**`、所有原始碼目錄、`dist/**`、`docs/**`、`specs/fanout-*.md`、`CHANGELOG.md`、`package.json` | 做：所擁有的測試檔（約 37 檔、約 360 行；含 `test/error-code-contract.test.mjs`）裡的票號註解改寫成白話。只改註解。不做：fixtures | E231 ✓ |
 | e233e | E233 | feat/e233e-test-comments-c | ../agent-governance-mcp-lanes/e233e | `test/r{a,el,ep,es,ev}*.test.mjs`、`test/{s,t,u,v,w}*.test.mjs`、`test/eval/**`、`specs/e233e-*`、`qa_reports/*E233E*`、`review_reports/*E233E*`、`.current/e233e/**` | `content/**`、goldens、budget、`test/render-structure.test.mjs`、其他 `test/**`、`test/fixtures/**`、所有原始碼目錄、`dist/**`、`docs/**`、`specs/fanout-*.md`、`CHANGELOG.md`、`package.json` | 做：所擁有的測試檔（約 11 檔、約 306 行；`release-staging` 140 行、`verify-release` 105 行佔大宗）裡的票號註解改寫成白話。只改註解。不做：fixtures | E231 ✓ |
 
-## Lanes（第二段，序列，暫定 —— 第一段合併後重新核對再派工）
+## 第二段派工前核對（整合者，2026-09-30）
+- main = origin/main = `37599d2`（第一段五條已合併、收尾，CI 綠）；`git worktree list` 只有 primary；工作樹乾淨；信箱 `_mailbox/e233f` 不存在（新建）。
+- 量測（`content/*.md`，可見文字 vs `<!-- origin/rationale -->` 標籤內）：共 189 處票號，其中 39 處在組裝時會被移除的標籤內；可見的集中在 `skill-release-engineer.md`（129）、`skill-integrator.md`（12）。多數本來就是句尾指標，本 lane 只處理「票號是唯一解釋」的地方。
+- **被其他測試釘住的 content 原文**（最重要）：已合併的測試檔用字串或 regex 斷言 `content/` 裡含票號的原文，例如 `test/release-staging.test.mjs:380`（`**Root-file completeness (E94)**`）、`:2536`（`**Existence pre-filter, mandatory (E71a)**`）、`test/feature-lease.test.mjs:1659`（`(E17)`）、`:1695`、`:1707`、`test/e178a-integrator-role.test.mjs:329`（`(the E222 precedent)`）、`test/e130-lane-default.test.mjs:303`（`post-E125a`）。這些測試檔不歸本 lane，斷言也不是註解，所以**本 lane 必須讓每一個被釘住的原文保持一字不差**（票號本來就可以留作句尾指標）。改每一處之前先 grep `test/` 確認；全套測試是最後防線。
+- **budget**：改寫成白話會讓組合出的 prompt 變長。`test/context-budget.test.mjs` 的上限若因此被超過，**不得自行放寬** —— 放寬上限屬於人類裁決，寄 `type: escalate`。goldens 由 qa 重新產生並逐段說明。
+- `<!-- origin/rationale -->` 標籤內的票號只給維護者看、組裝時移除：規則相同，優先度較低。
+- `dist/` 不受影響（content 在執行時讀取，不經編譯）；`dist/**` 保留在擁有清單只為了重建後若有差異可以 commit。
+
+## Lanes（第二段，序列）
 | lane | 票 | branch | worktree | 擁有 | 禁止 | 範圍切線 | 相依 |
 |---|---|---|---|---|---|---|---|
 | e233f | E233 | feat/e233f-content-ids | ../agent-governance-mcp-lanes/e233f | `content/**`、`test/fixtures/compose-golden/**`、`test/context-budget.test.mjs`、`test/render-structure.test.mjs`、`dist/**`（只限重建）、`specs/e233f-*`、`qa_reports/*E233F*`、`review_reports/*E233F*`、`.current/e233f/**` | 其他 `test/**`、所有原始碼目錄、`templates/**`、`docs/**`、`specs/fanout-*.md`、`CHANGELOG.md`、`package.json`、`CLAUDE.md`、`AGENTS.md` | 做：`content/` 13 檔約 99 處票號引用改寫成白話（票號只留句尾指標），以及 `test/context-budget.test.mjs`（79 行）、`test/render-structure.test.mjs`（42 行）的票號註解；goldens／budget 由 qa 重新產生並逐段說明。組合出的 prompt 會變，所以要守住 budget floor。不做：`content/` 的規則內容本身 | e233a、e233b、e233c、e233d、e233e 合併 |
@@ -87,6 +95,8 @@ base: 276d574    integration branch: integ/e233a（第一段五條並行 lane �
 | 2026-09-30 | 整合者 | 五條逐條核對通過（各自在回報 HEAD 乾淨樹重跑全套 2958/2955/0/3）；依序 merge 進 integ/e233a，零衝突 → 無合併審查；每次 merge 後 merge-invariants PASS；重建 dist/ 無差異；整合層全套 2958/2955/0/3 | 本檔 |
 | 2026-09-30 | 整合者 | lane-status 彙總的 EVIDENCE MISMATCH：e233e 的驗證報告以 `covers:` 涵蓋 T-13..24 但沒有 PASS 標頭（格式差異，實質證據齊全）；e233c 為 covers 行解析誤判。接受，不退回 | 本檔 |
 | 2026-09-30 | 整合者 | e233d 回報的 e132 gap-6 偶發失敗不屬任何 lane 範圍，由整合者配號 E254，佇列 #75 | 本檔 |
+| 2026-09-30 | 人類 | 核准第二段 e233f 派工 | 整合者 session |
+| 2026-09-30 | 整合者 | e233f 前提重新核對：被其他測試釘住的 content 原文必須保持一字不差；budget 上限不得自行放寬（需人類裁決）；origin/rationale 標籤內的票號同規則、低優先 | 本檔 |
 
 ## 結案（第一段）
 - 日期 2026-09-30；合併 branch `integ/e233a`（e233a→e233b→e233c→e233d→e233e，皆 `--no-ff`）；例外：無衝突、無合併審查。
