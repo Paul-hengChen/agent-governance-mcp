@@ -1,0 +1,29 @@
+<!-- schema_version: 2 -->
+# Tasks
+
+## Active
+
+- [-] T-E233E-01 [P0] qa-engineer: author .current/e233e/check-comments-only.mjs and check-id-only.mjs; verify pass on empty diff and fail on a code-changing probe | depends_on: none (voided: Re-cut per integrator pre-review; no evidence exists)
+- [-] T-E233E-02 [P0] qa-engineer: rewrite id-only comments to plain language in release-staging and verify-release tests (comments only) | depends_on: T-E233E-01 (voided: Re-cut per integrator pre-review; no evidence exists)
+- [-] T-E233E-03 [P1] qa-engineer: rewrite comments in stale-dispatch-detection, success-metrics, skill-manifest, source-credibility-gate, reviewer-completed-tasks-gate, repro-first-gate, subagent-templates, schema-versions tests | depends_on: T-E233E-01 (voided: Re-cut per integrator pre-review; no evidence exists)
+- [-] T-E233E-04 [P1] qa-engineer: rewrite comments in the remaining owned test files incl. test/eval/scenarios.mjs and run-eval.mjs (fixtures excluded) | depends_on: T-E233E-01 (voided: Re-cut per integrator pre-review; no evidence exists)
+- [-] T-E233E-05 [P0] code-reviewer (independent): judge full diff vs AC1-AC4,AC6, run both scripts, write review report | depends_on: T-E233E-02, T-E233E-03, T-E233E-04 (voided: Re-cut per integrator pre-review; no evidence exists)
+- [-] T-E233E-06 [P0] qa-engineer (separate non-authoring instance): post-commit clean-tree full suite via test-lock plus mechanical check; PASS/FAIL | depends_on: T-E233E-05 (voided: Re-cut per integrator pre-review; no evidence exists)
+- [-] T-E233E-07 [P1] qa-engineer: rewrite comments in tasks-versioning, rag-lifecycle, writestate-options-object, token-efficiency, teamwork-lite tests (5 files) | depends_on: T-E233E-01 (voided: Superseded by clean re-cut; depended on voided id)
+- [-] T-E233E-08 [P1] qa-engineer: rewrite comments in tasks, visual-gate-e2e, widget-shape-spec, visual-widgets-unverified-gate, tw-sync-reconcile tests (5 files) | depends_on: T-E233E-01 (voided: Superseded by clean re-cut; depended on voided id)
+- [-] T-E233E-09 [P1] qa-engineer: rewrite comments in test/eval/scenarios.mjs, test/eval/run-eval.mjs, visual-round-transitions, researcher-deep-research, sqlite-versioning (5 files; eval fixtures excluded) | depends_on: T-E233E-01 (voided: Superseded by clean re-cut; depended on voided id)
+- [-] T-E233E-10 [P1] qa-engineer: rewrite comments in test/session.test.mjs and any owned file the sweep shows still carrying an id-only comment and not in tasks 02-09 (at most 5 files total) | depends_on: T-E233E-01 (voided: Superseded by clean re-cut; depended on voided id)
+- [-] T-E233E-11 [P0] code-reviewer (independent Task context): judge full diff vs AC1-AC4,AC6, run both scripts, advisory id-only list, write review report | depends_on: T-E233E-02, T-E233E-03, T-E233E-04, T-E233E-05, T-E233E-06, T-E233E-07, T-E233E-08, T-E233E-09, T-E233E-10 (voided: Superseded by clean re-cut; depended on voided id)
+- [-] T-E233E-12 [P0] qa-engineer verifier in a NEW Task-dispatched context (never a continued conversation with the author context): after commit on a clean tree run test-lock full suite plus mechanical script; write qa report under a filename distinct from the author's; PASS/FAIL on AC2,AC3,AC5 | depends_on: T-E233E-11 (voided: Superseded by clean re-cut; depended on voided id)
+- [ ] T-E233E-13 [P0] qa-engineer: author .current/e233e/check-comments-only.mjs and check-id-only.mjs (lane tooling, not referenced by npm test or any shipped path); prove pass on empty diff and fail on a code-changing probe run on COPIES under $TMPDIR only, never in the working tree | depends_on: none
+- [ ] T-E233E-14 [P0] qa-engineer: rewrite id-only comments to plain language in test/release-staging.test.mjs (1 file, comments only) | depends_on: T-E233E-13
+- [ ] T-E233E-15 [P0] qa-engineer: rewrite id-only comments to plain language in test/verify-release.test.mjs (1 file, comments only) | depends_on: T-E233E-13
+- [ ] T-E233E-16 [P1] qa-engineer: rewrite comments in stale-dispatch-detection, success-metrics, skill-manifest, source-credibility-gate, reviewer-completed-tasks-gate tests (5 files) | depends_on: T-E233E-13
+- [ ] T-E233E-17 [P1] qa-engineer: rewrite comments in repro-first-gate, subagent-templates, schema-versions, skill-evolution-v3.11, token-budget-config tests (5 files) | depends_on: T-E233E-13
+- [ ] T-E233E-18 [P1] qa-engineer: rewrite comments in usage-accounting, watermark-check, visual-evidence-gate, skill-frontmatter, telemetry tests (5 files) | depends_on: T-E233E-13
+- [ ] T-E233E-19 [P1] qa-engineer: rewrite comments in tasks-versioning, rag-lifecycle, writestate-options-object, token-efficiency tests (4 files) | depends_on: T-E233E-13
+- [ ] T-E233E-20 [P1] qa-engineer: rewrite comments in teamwork-lite, tasks, visual-gate-e2e, widget-shape-spec tests (4 files) | depends_on: T-E233E-13
+- [ ] T-E233E-21 [P1] qa-engineer: rewrite comments in visual-widgets-unverified-gate, tw-sync-reconcile tests, test/eval/scenarios.mjs, test/eval/run-eval.mjs (4 files; eval fixtures excluded) | depends_on: T-E233E-13
+- [ ] T-E233E-22 [P1] qa-engineer: rewrite comments in visual-round-transitions, researcher-deep-research, sqlite-versioning, session tests (4 files) | depends_on: T-E233E-13
+- [ ] T-E233E-23 [P0] code-reviewer (independent Task context): judge full diff vs AC1-AC4,AC6, run both scripts, sweep owned set for any missed id-only comment, advisory id-only list, write review report | depends_on: T-E233E-14, T-E233E-15, T-E233E-16, T-E233E-17, T-E233E-18, T-E233E-19, T-E233E-20, T-E233E-21, T-E233E-22
+- [ ] T-E233E-24 [P0] qa-engineer verifier in a NEW Task-dispatched context (never a continued conversation with the author context): after commit on a clean tree run test-lock full suite plus mechanical script; write qa report under a filename distinct from the author's; PASS/FAIL on AC2,AC3,AC5 | depends_on: T-E233E-23
