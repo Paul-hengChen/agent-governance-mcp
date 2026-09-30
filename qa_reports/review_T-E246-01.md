@@ -38,3 +38,7 @@ The AC7 `branch -d` case was NOT dropped: a real refusal was constructible, so t
 
 ## Result
 Full-suite result recorded in the verdict write.
+## 2026-09-30T10:27:14.527Z — PASS — by qa-engineer
+
+T-E246-01 PASS. test/e246-mailbox-teardown.test.mjs: 15/15 green, covering AC1-AC11 (AC12 via git diff --stat: only owned paths). The AC7 'branch -d refuses' case was built with a real refusal (stale refs/heads/<branch>.lock), so it was not dropped. Full npm test with clean worktree: 3010 pass / 3 skipped / 0 fail of 3013. e178a and skill-frontmatter pins unchanged and green. Copy audit clean; no expected-red manifest. Evidence: qa_reports/review_T-E246-01.md.
+
