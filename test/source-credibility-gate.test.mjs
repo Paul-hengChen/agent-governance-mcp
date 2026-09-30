@@ -14,17 +14,17 @@
 // pointer to model on both files.
 //
 // Spec-to-Test map:
-//   AC-1 (credibility attestation on audited rows) -> T1, T2, T4, T5, T6, T7, T12
-//   AC-2 (existing STOP unchanged — regression guard, no code path here; covered
-//         by content/skill-design-auditor.md prose, not a code assertion)
-//   AC-3 (server gate blocks on missing/wrong attestation) -> T3, T5
-//   AC-4 (dormant outside fetch-based-mode arm / no design file / no ## Source) -> T8, T9a, T9b
-//   AC-5 (independent of BASELINE_MANIFEST_MISSING/BASELINE_PROVENANCE_INCOMPLETE) -> T6, T7
-//   AC-6 (pinned to pm predecessor — resume safety) -> T10
-//   AC-7 (storage-mode agnostic — no instanceof FileHandoffStorage guard) -> T11
-//   AC-8 (hint format + byte-exact S02) -> T13
-//   AC-9 (coordinator Auto-Routing stop-condition) -> T14
-//   AC-10 (build gate) -> exercised by `npm run build && npm audit ... && npm test`,
+//   credibility attestation on audited rows (AC-1) -> T1, T2, T4, T5, T6, T7, T12
+//   existing STOP stays unchanged — a regression guard with no code path here (AC-2);
+//         covered by content/skill-design-auditor.md prose, not a code assertion
+//   server gate blocks on missing/wrong attestation (AC-3) -> T3, T5
+//   dormant outside fetch-based-mode arm / no design file / no ## Source (AC-4) -> T8, T9a, T9b
+//   independent of BASELINE_MANIFEST_MISSING/BASELINE_PROVENANCE_INCOMPLETE (AC-5) -> T6, T7
+//   pinned to pm predecessor — resume safety (AC-6) -> T10
+//   storage-mode agnostic — no instanceof FileHandoffStorage guard (AC-7) -> T11
+//   hint format + byte-exact S02 (AC-8) -> T13
+//   coordinator Auto-Routing stop-condition (AC-9) -> T14
+//   build gate (AC-10) -> exercised by `npm run build && npm audit ... && npm test`,
 //         not a unit test in this file (see T-E4-05 task closing step).
 
 import { test } from "node:test";
@@ -106,7 +106,7 @@ function armedDesignBody(mode, sourceBody) {
 }
 
 // ===========================================================================
-// T1/T2: AC-1 fire — missing / empty credibility cell on an audited row
+// A missing or empty credibility cell on an audited row makes the gate fire (T1/T2, AC-1)
 // ===========================================================================
 
 test("T1: AC-1 fire — credibility column absent entirely on an audited row", () => {
@@ -145,7 +145,7 @@ test("T2: AC-1 fire — credibility column present but cell blank on an audited 
 });
 
 // ===========================================================================
-// T3: AC-3 fire — wrong (non-full-page-composite) value
+// A wrong (non-full-page-composite) credibility value makes the gate fire (T3, AC-3)
 // ===========================================================================
 
 test("T3: AC-3 fire — credibility cell carries a non-full-page-composite value", () => {
@@ -170,7 +170,7 @@ test("T3: AC-3 fire — credibility cell carries a non-full-page-composite value
 });
 
 // ===========================================================================
-// T4: a compliant audited row clears the credibility check (AC-1)
+// A compliant audited row clears the credibility check (T4, AC-1)
 // ===========================================================================
 
 test("T4: AC-1 clear — audited row with full-page-composite passes", () => {
@@ -192,7 +192,7 @@ test("T4: AC-1 clear — audited row with full-page-composite passes", () => {
 });
 
 // ===========================================================================
-// T5: AC-3 multi-row — offendingRows lists ONLY the offender
+// With several rows, offendingRows lists ONLY the offender (T5, AC-3)
 // ===========================================================================
 
 test("T5: AC-3 multi-row — one compliant + one wrong; offendingRows names only the offender", () => {
@@ -217,7 +217,7 @@ test("T5: AC-3 multi-row — one compliant + one wrong; offendingRows names only
 });
 
 // ===========================================================================
-// T6: deferred/out-of-scope rows never gated
+// Deferred/out-of-scope rows are never gated (T6)
 // ===========================================================================
 
 test("T6: deferred row with blank credibility is ignored alongside a compliant audited row", () => {
@@ -241,7 +241,7 @@ test("T6: deferred row with blank credibility is ignored alongside a compliant a
 });
 
 // ===========================================================================
-// T7: zero audited rows — AC-5 independence from BASELINE_MANIFEST_MISSING
+// Zero audited rows: independent of BASELINE_MANIFEST_MISSING (T7, AC-5)
 // ===========================================================================
 
 test("T7: zero audited rows (all deferred) → ok:true (BASELINE_MANIFEST_MISSING owns that case)", () => {
@@ -263,7 +263,7 @@ test("T7: zero audited rows (all deferred) → ok:true (BASELINE_MANIFEST_MISSIN
 });
 
 // ===========================================================================
-// T8: the credibility gate stays dormant in modes that do not fetch sources (AC-4)
+// The credibility gate stays dormant in modes that do not fetch sources (T8, AC-4)
 // ===========================================================================
 
 test("T8: AC-4 dormancy — image/pdf/paper/no-design modes never fire, even with a non-compliant audited row", () => {
@@ -290,7 +290,7 @@ test("T8: AC-4 dormancy — image/pdf/paper/no-design modes never fire, even wit
 });
 
 // ===========================================================================
-// T9: AC-4 dormancy — no design file / no ## Source section
+// The gate stays dormant with no design file or no ## Source section (T9, AC-4)
 // ===========================================================================
 
 test("T9a: AC-4 dormancy — no design/<feature>.md file at all", () => {
@@ -309,7 +309,7 @@ test("T9b: AC-4 dormancy — fetch-based mode with no ## Source section at all (
 });
 
 // ===========================================================================
-// T10: AC-6 resume safety — arm condition pinned to prev=pm
+// Resume safety: the arm condition is pinned to a previous pm hop (T10, AC-6)
 // ===========================================================================
 
 test("T10: AC-6 — the orchestrator arm condition requires prevTuple.agent === \"pm\" (resume safety)", () => {
@@ -342,7 +342,7 @@ test("T10: AC-6 — the orchestrator arm condition requires prevTuple.agent === 
 });
 
 // ===========================================================================
-// T11: AC-7 storage-mode agnostic — NO instanceof FileHandoffStorage guard
+// The gate is storage-mode agnostic — NO instanceof FileHandoffStorage guard (T11, AC-7)
 // ===========================================================================
 
 test("T11: AC-7 — the E4 gate block carries NO instanceof FileHandoffStorage guard (contrast cut-approval/external-refs)", () => {
@@ -371,7 +371,7 @@ test("T11: AC-7 — the E4 gate block carries NO instanceof FileHandoffStorage g
 });
 
 // ===========================================================================
-// T12: parser — credibility column added to BaselineManifestRow
+// Parser: the credibility column is added to BaselineManifestRow (T12)
 // ===========================================================================
 
 test("T12: parseBaselineManifestRows populates credibility (normalized) from a header-bearing table; \"\" when column absent", () => {
@@ -401,7 +401,7 @@ test("T12: parseBaselineManifestRows populates credibility (normalized) from a h
 });
 
 // ===========================================================================
-// T13: AC-8 hint verbatim (S02) — static suffix + dynamic prefix + error code
+// The rejection hint is verbatim — static suffix + dynamic prefix + error code (T13, AC-8, S02)
 // ===========================================================================
 
 test("T13: AC-8 — S02 static suffix verbatim (runtime hintStatic); dynamic prefix + error code in dist/tools/handoff-orchestrator.js", () => {
@@ -445,15 +445,15 @@ test("T13: AC-8 — S02 static suffix verbatim (runtime hintStatic); dynamic pre
 });
 
 // ===========================================================================
-// T14: the coordinator's Auto-Routing stops when the gate rejects, instead of retrying (AC-9)
+// The coordinator's Auto-Routing stops when the gate rejects, instead of retrying (T14, AC-9)
 // ===========================================================================
 
 test("T14: AC-9 — coordinator stop-condition references the gate, credibility, and SOURCE_CREDIBILITY_UNVERIFIED", async () => {
   // Why: AC-9 — Auto-Routing must halt and surface the problem to the human
   // instead of retrying the same rejected write in a loop. Compose the full
   // skill-coordinator.md the same way cut-approval-gate.test.mjs's C4 does
-  // (DR-6: the stop-condition lives in content/coord-03-core-fallback.md, one
-  // of the fragments composeSkill assembles).
+  // (the stop-condition lives in content/coord-03-core-fallback.md, one
+  // of the fragments composeSkill assembles; DR-6).
   const { composeSkill, hostCapabilitiesFor } = await import(
     path.join(PROJECT_ROOT, "dist", "prompts", "skill-manifest.js")
   );

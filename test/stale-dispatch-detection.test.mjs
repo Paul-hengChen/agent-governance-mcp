@@ -1,13 +1,13 @@
 // Coded by @qa-engineer
 // Tests for spec: specs/d5-server-side-stale-dispatch-detection.md (AC-1..AC-9)
 // + specs/d5-server-side-stale-dispatch-detection-architecture.md (DR-1..DR-8).
-// T-D5-05 — qa-owned test deliverable per the architecture's Test Plan.
+// The qa-owned test deliverable from the architecture's Test Plan (T-D5-05).
 //
 // Spec-to-Test map:
-//   AC-1 (stamp persisted on dispatch, server-not-memory)      -> T1, T1b
-//   AC-2 (staleness surfaced on read, not enforced on write)   -> T4, T4b, T5, T6
-//   AC-3 (stamp clears/replaces on the dispatched role's write)-> T3
-//   AC-4 (detection works from a completely fresh context)     -> T4 (parseHandoff
+//   stamp persisted on dispatch, server-not-memory (AC-1)      -> T1, T1b
+//   staleness surfaced on read, not enforced on write (AC-2)   -> T4, T4b, T5, T6
+//   stamp clears/replaces on the dispatched role's write (AC-3)-> T3
+//   detection works from a completely fresh context (AC-4)     -> T4 (parseHandoff
 //                                                                  in-memory has
 //                                                                  no bearing on
 //                                                                  the read — the
@@ -20,33 +20,33 @@
 //                                                                  from any prior
 //                                                                  write this
 //                                                                  process made)
-//   AC-5 (no false positive within the threshold window)       -> T5, T5b (exact
+//   no false positive within the threshold window (AC-5)       -> T5, T5b (exact
 //                                                                  boundary)
-//   AC-6 (feature-scoped: no stale-dispatch bleed)              -> T7
-//   AC-8 (existing next_role/hop_count/round-cap/dispatch_pins/
-//         cut_approved/external_refs semantics byte-identical) -> T10 (full-suite
+//   feature-scoped: no stale-dispatch bleed (AC-6)              -> T7
+//   existing next_role/hop_count/round-cap/dispatch_pins/cut_approved/
+//         external_refs semantics stay byte-identical (AC-8) -> T10 (full-suite
 //         cross-reference; every sibling *.test.mjs file in this repo continues
 //         to assert its own contract unmodified — see the note on T10 below)
-//   AC-9 / DR-5 (SQLite scope explicit + tested, file-mode-only) -> T9
-//   AC-10 / DR-7 (v9→v10 migration, stamp-only, seeds nothing)   -> T8
+//   SQLite scope explicit + tested, file-mode-only (AC-9 / DR-5) -> T9
+//   v9→v10 migration, stamp-only, seeds nothing (AC-10 / DR-7)   -> T8
 //
-// WHY: D5's entire mechanism is "coordinator-memory bookkeeping made durable."
+// WHY: the whole stale-dispatch mechanism is "coordinator-memory bookkeeping made durable" (D5).
 // The tests below deliberately never rely on in-process memory of a prior write
 // to prove the staleness signal — T4/T4b hand-write the fixture with `fs`
 // directly (no writeHandoffState call precedes the read), modeling the "fresh
 // coordinator session, post-compaction, no transcript" scenario AC-4 requires.
 //
-// E97 addendum (T-E97-01, single-owner extraction): gates/feature-lease.ts's
-// inlined E1A/E13 terminal-marker condition is now an exported predicate,
+// Addendum: the single-owner extraction of the release-closing check. The
+// terminal-marker condition that gates/feature-lease.ts used to inline is now an exported predicate,
 // `isReleaseClosingWrite`, with exactly two call sites — isFeatureLeaseHeld
 // (pinned end-to-end at the lease layer by test/feature-lease.test.mjs,
-// including the opening-write non-regression case at its own E13-AC3) and
+// including its opening-write non-regression case) and
 // the stale-dispatch advisory guard below at tools/handoff-parse.ts:503,
 // which is THIS file's layer. The E97-A* tests pin the exported predicate
 // directly (both disjuncts, plus the opening-write and ordinary-dispatch
 // negatives) so a future edit to the shared function is caught from BOTH
 // consumers, not just one — re-arming exactly the single-owner guarantee
-// E97 exists to hold. The E97-B* tests pin the same shapes end-to-end
+// that extraction exists to hold (E97, T-E97-01). The E97-B* tests pin the same shapes end-to-end
 // through readHandoffState, proving the wiring at handoff-parse.ts's guard
 // site, not just the predicate in isolation.
 
@@ -98,7 +98,7 @@ function isoMinutesAgo(n) {
 }
 
 // ============================================================================
-// AC-1: dispatch stamp is persisted, server-derived, not coordinator memory
+// The dispatch stamp is persisted and server-derived, not coordinator memory (AC-1)
 // ============================================================================
 
 test("T1: a write that sets next_role stamps dispatched_at === last_updated (AC-1)", async () => {
@@ -145,7 +145,7 @@ test("T1b: a write that omits next_role stamps NO dispatched_at (no dispatch in 
 });
 
 // ============================================================================
-// AC-3: stamp clears (or is replaced) when the dispatched role writes back
+// The stamp clears (or is replaced) when the dispatched role writes back (AC-3)
 // ============================================================================
 
 test("T3: the dispatched role's own write clears dispatched_at (omits next_role) or re-stamps it (sets a new next_role)", async () => {
@@ -208,10 +208,10 @@ test("T3: the dispatched role's own write clears dispatched_at (omits next_role)
 });
 
 // ============================================================================
-// AC-2 / AC-4: staleness surfaced on tw_get_state read, correct from a
+// Staleness is surfaced on tw_get_state read, correct from a
 // completely fresh context (no writeHandoffState call precedes the read —
 // the fixture is hand-written with `fs` directly, modeling a fresh/
-// post-compaction session with zero in-process memory of any dispatch).
+// post-compaction session with zero in-process memory of any dispatch) (AC-2 / AC-4).
 // ============================================================================
 
 test("T4: a next_role stamped >15 min ago surfaces stale_dispatch with the verbatim message and exact shape (AC-2, AC-4)", () => {
@@ -247,10 +247,10 @@ dispatched_at: "${staleStamp}"
   assert.ok(parsed.stale_dispatch.elapsed_minutes >= 16, "elapsed_minutes must reflect the actual elapsed time (floored)");
   assert.equal(
     parsed.stale_dispatch.message,
-    // e29-crash-resume-pointer (qa-owned re-pin, T-E29-01, e-p3-tail-batch): the
-    // base Copy/Strings row sentence is now followed by the Crash-Resume
-    // pointer sentence (tools/handoff.ts, appended to the SAME message field
-    // the E22 watch-file emit shares — no new advisory key).
+    // qa-owned re-pin: the base Copy/Strings row sentence is now followed by
+    // the Crash-Resume pointer sentence (tools/handoff.ts, appended to the SAME
+    // message field the watch-file emit shares — no new advisory
+    // key; ticket e29-crash-resume-pointer / T-E29-01).
     "stale in-flight dispatch: sr-engineer, no state write for >15 min. " +
       "Crash-Resume: ground-truth before re-dispatch — compare git status/diff " +
       "against handoff claims, honor dispatch_pins, then resume the incumbent " +
@@ -300,10 +300,9 @@ dispatched_at: "${staleStamp}"
   assert.equal(parsed.stale_dispatch.role, "architect");
   assert.equal(
     parsed.stale_dispatch.message,
-    // e29-crash-resume-pointer (qa-owned re-pin, T-E29-01, e-p3-tail-batch): same
-    // verbatim message as T4 above (role name swapped) — proves the Crash-Resume
-    // pointer is a pure function of (next_role, dispatched_at, now), not
-    // process-local state.
+    // Same verbatim message as T4 above (role name swapped) — proves the
+    // Crash-Resume pointer is a pure function of (next_role, dispatched_at,
+    // now), not process-local state (e29-crash-resume-pointer, T-E29-01).
     "stale in-flight dispatch: architect, no state write for >15 min. " +
       "Crash-Resume: ground-truth before re-dispatch — compare git status/diff " +
       "against handoff claims, honor dispatch_pins, then resume the incumbent " +
@@ -313,8 +312,8 @@ dispatched_at: "${staleStamp}"
 });
 
 // ============================================================================
-// AC-5: no false positive within the threshold window (including the exact
-// boundary — the compare is strictly ">", not ">=")
+// No false positive within the threshold window (including the exact
+// boundary — the compare is strictly ">", not ">=") (AC-5)
 // ============================================================================
 
 test("T5: a next_role stamped 5 min ago (well within the window) surfaces NO stale_dispatch (AC-5)", () => {
@@ -377,8 +376,8 @@ dispatched_at: "${boundaryStamp}"
 });
 
 // ============================================================================
-// AC-2 (defensive computation): a malformed stamp is inert — never throws,
-// never surfaces a signal
+// Defensive computation: a malformed stamp is inert — never throws,
+// never surfaces a signal (AC-2)
 // ============================================================================
 
 test("T6: a malformed dispatched_at value is inert — no throw, no stale_dispatch signal", () => {
@@ -413,9 +412,9 @@ dispatched_at: "not-a-date"
 });
 
 // ============================================================================
-// AC-6: feature-scoped — no stale-dispatch bleed across an active_feature
-// change (a fortiori: dispatched_at is every-write-scoped transient, DR-3 —
-// strictly stronger than dispatch_pins/external_refs' feature-scoped carry)
+// Feature-scoped — no stale-dispatch bleed across an active_feature
+// change (a fortiori: dispatched_at is every-write-scoped transient —
+// strictly stronger than dispatch_pins/external_refs' feature-scoped carry) (AC-6, DR-3)
 // ============================================================================
 
 test("T7: active_feature change drops dispatched_at even though next_role was just stamped on feature A (AC-6)", async () => {
@@ -457,8 +456,8 @@ test("T7: active_feature change drops dispatched_at even though next_role was ju
 });
 
 // ============================================================================
-// AC-10 / DR-7: v9→v10 migration is stamp-only, seeds nothing; forward-compat
-// refuse-loud for a hypothetical v11 file
+// The v9→v10 migration is stamp-only and seeds nothing; forward-compat
+// refuse-loud for a hypothetical v11 file (AC-10 / DR-7)
 // ============================================================================
 
 test("T8: a v9 handoff (no dispatched_at) migrates to v10 on read — field stays undefined, hop_count/sibling fields preserved (DR-7)", async () => {
@@ -492,22 +491,22 @@ next_role: "sr-engineer"
   assert.equal(state.active_feature, "legacy-v9-feat");
   assert.equal(state.hop_count, 3, "hop_count preserved across v9→v10→v11→v12");
   assert.equal(state.next_role, "sr-engineer", "sibling v7 field preserved across v9→v10→v11→v12");
-  // e8-success-telemetry re-baseline: the file also climbs v11→v12, seeding
-  // the three new cumulative totals to 0 (the hop_count counter precedent).
+  // Re-baselined for the success-telemetry schema bump: the file also climbs v11→v12, seeding
+  // the three new cumulative totals to 0 (the hop_count counter precedent) (e8-success-telemetry).
   assert.equal(state.qa_rounds_total, 0, "v11→v12 seeds qa_rounds_total: 0 (e8-success-telemetry)");
   assert.equal(state.review_rounds_total, 0, "v11→v12 seeds review_rounds_total: 0 (e8-success-telemetry)");
   assert.equal(state.visual_rounds_total, 0, "v11→v12 seeds visual_rounds_total: 0 (e8-success-telemetry)");
-  // e23-evidence-schema-versioning re-baseline: the file also climbs v12→v13,
-  // seeding NO evidence_schema default (D1 — absence-is-signal, migration
-  // invents no pin).
+  // Re-baselined for the evidence-schema bump: the file also climbs v12→v13,
+  // seeding NO evidence_schema default (absence-is-signal, migration
+  // invents no pin) (e23-evidence-schema-versioning, D1).
   assert.equal(state.evidence_schema, undefined, "v12→v13 must NOT seed evidence_schema (absence-is-signal, e23-evidence-schema-versioning D1)");
-  // e114-cut-approval-inheritance re-baseline: the file also climbs v13→v14,
+  // Re-baselined for the cut-approval-inheritance bump: the file also climbs v13→v14,
   // seeding NO cut_approved_source default (absence-is-signal, migration
-  // invents no claim).
+  // invents no claim) (e114-cut-approval-inheritance).
   assert.equal(state.cut_approved_source, undefined, "v13→v14 must NOT seed cut_approved_source (absence-is-signal, e114-cut-approval-inheritance)");
-  // e123a-lane-layout-migration re-baseline: the file also climbs v14→v15,
+  // Re-baselined for the lane-layout migration bump: the file also climbs v14→v15,
   // seeding NO dispatch_mechanism/dispatch_mechanism_tier default
-  // (absence-is-signal, migration invents no attestation).
+  // (absence-is-signal, migration invents no attestation) (e123a-lane-layout-migration).
   assert.equal(state.dispatch_mechanism, undefined, "v14→v15 must NOT seed dispatch_mechanism (absence-is-signal, e123a-lane-layout-migration)");
 
   // On-disk heal: readHandoffState's fire-and-forget write-back lands at v15.
@@ -525,10 +524,11 @@ next_role: "sr-engineer"
 });
 
 test("T8b: a future v16 handoff refuses-loud against this v15 server (no silent downgrade)", () => {
-  // e123a-lane-layout-migration re-baseline (coupled bump, not a bare
+  // Re-baselined for the lane-layout migration bump (coupled bump, not a bare
   // constant swap): CURRENT is now 15, so "the future" this test probes must
   // move to 16 or the payload/assertion pair collapses to the incoherent
-  // "16 > server max 16" — was v15-vs-v14 under e114-cut-approval-inheritance.
+  // "16 > server max 16" — it was v15-vs-v14 before the cut-approval-inheritance
+  // bump (e123a-lane-layout-migration, e114-cut-approval-inheritance).
   const ws = mkWs();
   resetSession();
   writeRaw(
@@ -555,9 +555,9 @@ qa_round: 0
 });
 
 // ============================================================================
-// E97 (T-E97-01): isReleaseClosingWrite — the single-owner E1A/E13 predicate,
+// isReleaseClosingWrite — the single-owner release-closing predicate,
 // pinned directly (A-series) and end-to-end through the stale-dispatch
-// advisory guard it now gates (B-series).
+// advisory guard it now gates (B-series) (E97, T-E97-01).
 // ============================================================================
 
 test('E97-A1: isReleaseClosingWrite — disjunct 1 (next_role === "pm") matches regardless of pending_notes content', () => {
@@ -749,8 +749,8 @@ dispatched_at: "${staleStamp}"
 });
 
 // ============================================================================
-// AC-9 / DR-5: SQLite/HTTP-mode scope is explicit — file-mode-only by
-// construction, tested (not a silent gap)
+// SQLite/HTTP-mode scope is explicit — file-mode-only by
+// construction, tested (not a silent gap) (AC-9 / DR-5)
 // ============================================================================
 
 const sqliteDescribe = (name, fn) =>
@@ -789,9 +789,9 @@ sqliteDescribe("T9: SQLite storage never persists or surfaces dispatched_at/stal
 });
 
 // ============================================================================
-// AC-8: sanity cross-check — the version this suite targets, so a future
+// Sanity cross-check — the version this suite targets, so a future
 // bump doesn't silently make the tests above assert against the wrong CURRENT
-// (the substantive AC-8 regression guard is that every *OTHER* pre-existing
+// (the substantive regression guard, AC-8, is that every *OTHER* pre-existing
 // test file in this repo — dispatch-pins/handoff-versioning/handoff-migration/
 // schema-versions/cut-approval-gate/context-budget/drift-skew/skill-evolution
 // — continues to pass unmodified in its own semantics, re-baselined only for
