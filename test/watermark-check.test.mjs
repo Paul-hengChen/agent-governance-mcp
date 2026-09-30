@@ -2,15 +2,15 @@
 // Tests for spec: specs/subagent-watermark-parent-validation.md
 //
 // Spec-to-Test map:
-//   AC3 (validateWatermark contract)   -> t-present-correct, t-absent-appends,
+//   validateWatermark contract (AC3)   -> t-present-correct, t-absent-appends,
 //                                         t-hyphen-treated-absent,
 //                                         t-wrong-name-treated-absent,
 //                                         t-wrong-tier-treated-absent,
 //                                         t-whitespace-tolerant,
 //                                         t-empty-reply,
 //                                         t-idempotent
-//   AC5 (required fixture coverage)    -> same tests (fixture set is a subset)
-//   AC6 (no regressions, pure fn)      -> t-no-io-imports, t-buildWatermark-format
+//   required fixture coverage (AC5)    -> same tests (fixture set is a subset)
+//   no regressions, pure fn (AC6)      -> t-no-io-imports, t-buildWatermark-format
 //
 // WHY: validateWatermark is the single point of truth for watermark compliance
 // in the parent coordinator. These fixtures encode the behavioral contract
@@ -32,8 +32,8 @@ const { validateWatermark, buildWatermark, WATERMARK_REGEX } = await import(
 );
 
 // ---------------------------------------------------------------------------
-// AC5 fixture 1 — watermark present, correct name + tier → present:true,
-//                 corrected unchanged.
+// Fixture 1: watermark present, correct name + tier → present:true,
+//            corrected unchanged (AC5).
 // WHY: the happy path — subagent already emitted the watermark correctly;
 //      the parent must relay the reply verbatim without appending anything.
 // ---------------------------------------------------------------------------
@@ -46,7 +46,7 @@ test("t-present-correct: correct watermark → present:true, corrected unchanged
 });
 
 // ---------------------------------------------------------------------------
-// AC5 fixture 2 — watermark absent entirely → present:false, corrected appends suffix.
+// Fixture 2: watermark absent entirely → present:false, corrected appends suffix (AC5).
 // WHY: the primary correction case; parent appends the canonical suffix so the
 //      user always sees a compliant watermark regardless of haiku attention drift.
 // ---------------------------------------------------------------------------
@@ -67,7 +67,7 @@ test("t-absent-appends: missing watermark → present:false, corrected ends with
 });
 
 // ---------------------------------------------------------------------------
-// AC5 / Decision 3 — hyphen-minus instead of EM DASH treated as absent.
+// A hyphen-minus instead of an EM DASH is treated as absent (AC5, spec Decision 3).
 // WHY: the spec mandates U+2014 (EM DASH) as the required leading character;
 //      a hyphen-minus impersonator must not pass the gate — it would silently
 //      accept a malformed watermark and prevent correct suffix injection.
@@ -84,8 +84,8 @@ test("t-hyphen-treated-absent: hyphen-minus instead of em-dash → present:false
 });
 
 // ---------------------------------------------------------------------------
-// AC5 fixture 3 — watermark present but wrong name → present:false.
-// WHY: Decision 3 final bullet: a reply ending `— @wrong-name (haiku)` while
+// Fixture 3: watermark present but wrong name → present:false (AC5).
+// WHY: the spec's final rule on watermark identity (Decision 3): a reply ending `— @wrong-name (haiku)` while
 //      dispatched as `@lite` must be treated as absent — the coordinator must
 //      not relay a watermark attributing the reply to a different subagent.
 // ---------------------------------------------------------------------------
@@ -118,7 +118,7 @@ test("t-wrong-tier-treated-absent: wrong tier in watermark → present:false", (
 });
 
 // ---------------------------------------------------------------------------
-// AC5 fixture 4 — whitespace on last line → treated as present.
+// Fixture 4: whitespace on last line → treated as present (AC5).
 // WHY: haiku sometimes emits trailing spaces or a trailing newline after the
 //      watermark. Failing on whitespace noise would cause double-appending
 //      on every reply even when the watermark is structurally correct.
@@ -139,7 +139,7 @@ test("t-whitespace-trailing-newline: trailing blank lines after watermark → pr
 });
 
 // ---------------------------------------------------------------------------
-// AC5 fixture 5 — empty reply → corrected is just the watermark (no leading newline).
+// Fixture 5: empty reply → corrected is just the watermark, no leading newline (AC5).
 // WHY: an empty subagent reply must still produce a compliant relay; prepending
 //      a newline to an empty string would create a visually broken output like
 //      "\n— @lite (haiku)" with a spurious leading blank line.
@@ -166,8 +166,8 @@ test("t-whitespace-only-reply: whitespace-only reply → present:false, correcte
 });
 
 // ---------------------------------------------------------------------------
-// T-C5C18-06 (AC-2, v3.58.0 C5b) — mismatched watermark is REPLACED, not
-// double-stamped. Prior to C5b, the mismatched branch fell through to the
+// A mismatched watermark is REPLACED, not double-stamped (T-C5C18-06, AC-2,
+// v3.58.0). Before that fix, the mismatched branch fell through to the
 // same append-only path as "absent", producing TWO trailing watermark lines
 // (the wrong one left in place + the correct one appended). These are the
 // regression-guard tests: any reversion to append-only-on-mismatch fails here.
@@ -221,12 +221,12 @@ test("t-mismatch-crlf: CRLF body before a wrong watermark is preserved and norma
 });
 
 // ---------------------------------------------------------------------------
-// T-C5C18-06 (AC-2) — idempotency of the mismatched (replace) branch
-// specifically, as distinct from the existing t-idempotent test (which only
-// exercises the absent branch). A correct→re-validate cycle on a
-// mismatch-corrected reply must converge to present:true with exactly one
-// watermark line, proving the parent cannot accumulate watermarks across
-// retries when the subagent's own reply already carried a wrong one.
+// Idempotency of the mismatched (replace) branch specifically, as distinct
+// from the existing t-idempotent test (which only exercises the absent
+// branch). A correct→re-validate cycle on a mismatch-corrected reply must
+// converge to present:true with exactly one watermark line, proving the
+// parent cannot accumulate watermarks across retries when the subagent's own
+// reply already carried a wrong one (T-C5C18-06, AC-2).
 // ---------------------------------------------------------------------------
 
 test("t-mismatch-idempotent: correcting a mismatched watermark twice converges, no double-append", () => {
@@ -335,7 +335,7 @@ test("t-regex-spec: WATERMARK_REGEX matches spec-documented detection regex", ()
 });
 
 // ---------------------------------------------------------------------------
-// AC6 — no I/O or external imports in the util (pure function guarantee).
+// No I/O or external imports in the util: pure function guarantee (AC6).
 // WHY: watermark-check.ts is declared NO I/O in its file header.
 //      Confirming the compiled JS has no require('fs') or dynamic import
 //      of I/O modules prevents accidental injection of side effects.
