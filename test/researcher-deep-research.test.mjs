@@ -1,7 +1,12 @@
 // Coded by @qa-engineer
 // Tests for spec: specs/researcher-deep-research-integration.md.
-// Spec-to-Test map (researcher deep-research integration): AC-1 -> t1; AC-2 -> t2; AC-3 -> t3; AC-4 -> t4;
-//                   AC-5 -> t5 (built-prompt trigger behaviour via buildResearcherPrompt).
+// Spec-to-Test map (researcher deep-research integration):
+//   standalone invocation defaults to shallow depth (AC-1)          -> t1
+//   deep depth warns on token cost, then uses /deep-research (AC-2) -> t2
+//   graceful fallback when /deep-research is unavailable (AC-3)     -> t3
+//   shallow depth never forces /deep-research (AC-4)                -> t4
+//   the built researcher prompt carries the directives, checked via
+//   buildResearcherPrompt (AC-5)                                    -> t5
 //
 // WHY: the researcher role's deep-research wiring lives purely in prompt text
 // (skill-researcher.md), loaded verbatim by buildPromptForRole. There is no
