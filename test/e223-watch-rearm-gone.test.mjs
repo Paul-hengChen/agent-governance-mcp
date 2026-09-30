@@ -1,11 +1,11 @@
 // Coded by @qa-engineer
-// T-E223-02 — tests for E223: in the default `lane-status --watch` set (no
-// --lanes), a --baseline key that names no lane in the current list is a lane
-// that CLOSED since the last watch, reported `[<lane>] gone` — not a usage
-// error. Spec: specs/e223-watch-rearm-gone.md decisions (a)-(g), AC1-AC4.
-// AC5 lives in test/e178b-lane-watch.test.mjs "AC5 re-arm round trip" (its
-// usage-error loop was updated for decision (g)); AC6 (build + full suite on a
-// clean committed tree) is recorded in qa_reports/review_T-E223-01.md.
+// In the default `lane-status --watch` set (no --lanes), a --baseline key that
+// names no lane in the current list is a lane that CLOSED since the last
+// watch; it is reported `[<lane>] gone`, not treated as a usage error.
+// Spec: specs/e223-watch-rearm-gone.md decisions (a)-(g), AC1-AC4. AC5 lives
+// in test/e178b-lane-watch.test.mjs "AC5 re-arm round trip"; AC6 (build plus
+// full suite on a clean committed tree) is a one-time check, not a test in
+// this file. (E223, T-E223-01, T-E223-02)
 //
 // WHY: the integrator's monitor loop is "run the re-arm command the previous
 // watch printed". Removing a lane's worktree between two watches used to make
@@ -59,7 +59,7 @@ function handoff(feature, over = {}) {
   };
 }
 
-/** The e178b decision (c) state line, spelled out independently of the tool. */
+/** The per-lane state line the watch prints, spelled out independently of the tool so a format change is caught (e178b decision (c)). */
 function stateLine(h) {
   const v = (x) => (x === null || x === undefined || String(x).trim() === "" ? "-" : String(x).trim().replace(/\s+/g, "_"));
   return [

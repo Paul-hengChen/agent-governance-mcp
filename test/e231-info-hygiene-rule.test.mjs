@@ -1,5 +1,7 @@
 // Coded by @qa-engineer
-// Tests for spec: specs/e231-info-hygiene-rule.md (ticket E231, lane e231-info-hygiene-rule).
+// Tests that the information-hygiene and generic-citation rule bullets are
+// present in the constitution and survive composition in every dispatch
+// mode. Spec: specs/e231-info-hygiene-rule.md. (E231)
 //
 // Spec-to-Test map:
 //   AC1 -> "AC1" tests below (both new bullets' key phrases, verbatim, in
@@ -12,14 +14,13 @@
 //   line: AC3 by a direct `git diff` read (not a standing test — a one-line
 //   CONTRIBUTING.md sentence has no ongoing regression risk of its own beyond
 //   what test/compose-equivalence.test.mjs already pins for composed output);
-//   AC4 by the test/context-budget.test.mjs ceiling bumps (qa-owned, this
-//   ticket's other task); AC5 is implied by AC1 asserting the bullets are
+//   AC4 by the test/context-budget.test.mjs size ceilings; AC5 is implied by AC1 asserting the bullets are
 //   ADDITIONS (the surrounding §5/§6/§7 text this file reads is untouched by
 //   construction — any accidental edit to it would desync this file's own
 //   phrase anchors); AC6 is a repo-wide `git diff --stat` scope check, not a
 //   unit of composed output this file's helpers can observe.
 //
-// Per the qa dispatch brief: the new bullets keep the spec's own line
+// The new bullets keep the spec's own line
 // wrapping (content/const-15-core-tail.md wraps prose at ~90 columns), so
 // every phrase below is checked against a WHITESPACE-NORMALIZED copy of the
 // fragment (all runs of whitespace collapsed to a single space) rather than

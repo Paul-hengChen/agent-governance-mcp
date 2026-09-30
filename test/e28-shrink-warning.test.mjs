@@ -1,16 +1,13 @@
 // Coded by @qa-engineer
-// Tests for backlog E28 (docs/backlog.md row E28) / T-E28-01: the
-// wholesale-replace shrink warning on tw_update_state's dispatch_pins /
-// external_refs fields. tools/handoff-orchestrator.ts:1264-1315 is the unit
-// under test — both fields REPLACE (never merge) on write, so a writer that
-// forgets read-before-write silently drops entries; this feature appends an
-// advisory `warnings` array to the success envelope naming the dropped
-// entries when THIS write shrinks the on-disk prior set (same-feature writes
-// only). Warn-only: never rejects, no new arg, no schema bump.
-//
-// The backlog row IS the spec for this ticket — no specs/<feature>.md exists.
-// Cross-checked against code-reviewer's APPROVED review_reports/review_T-E25-01.md
-// (batched review covering T-E28-01) §Correctness.
+// Tests for the shrink warning on tw_update_state's dispatch_pins and
+// external_refs fields. Both fields REPLACE (never merge) on write, so a
+// writer that forgets to read before writing silently drops entries. When
+// THIS write drops entries from the set already on disk (same-feature
+// writes only), the success envelope gains a `warnings` array naming them.
+// Unit under test: the shrink check in tools/handoff-orchestrator.ts.
+// Warn-only: never rejects, no new argument, no schema bump. The
+// requirements come from the backlog row, not a specs/ file; an
+// independent code review checked the same behaviour. (E28, T-E28-01)
 //
 // Spec-to-test map:
 //   shrink write warns, naming dropped entries (dispatch_pins)   -> W1
@@ -18,17 +15,13 @@
 //   omitting the field on write is silent (server carry-forward) -> S1, S2
 //   a feature-change write is silent even though the set shrinks -> F1, F2
 //   envelope stays valid, additive JSON (no keys dropped/altered)-> J1, J2
-//   reviewer probe 1: same-cardinality SWAP now WARNS naming the
-//     dropped entry (E33 entry-identity diff, e32-e33-gate-hardening) -> P1a, P1b
-//     (re-pinned post-E33: the old strict-cardinality `nextSize <
-//      prevLength` compare that let equal-count swaps drop entries
-//      silently is replaced by an entry-identity diff — dispatch_pins by
-//      key set, external_refs by ref string — so a same-count swap now
-//      warns too. See tools/handoff-orchestrator.ts:1297-1342 and
-//      review_reports/review_T-E32-01.md "T-E33-01 — CORRECT" section.)
-//   reviewer probe 2: no strict-envelope consumer breaks         -> J1, J2
-//     (additive key only; grep confirms no test/*.mjs asserts an exact key
-//      set on the tw_update_state response envelope)
+//   a same-size SWAP that drops an entry also WARNS, naming it     -> P1a, P1b
+//     (detection compares entries, not counts — dispatch_pins by key
+//      set, external_refs by ref string — so swapping one entry for
+//      another cannot drop it silently) (E33)
+//   no consumer that expects an exact envelope breaks             -> J1, J2
+//     (additive key only; no test/*.mjs asserts an exact key set on
+//      the tw_update_state response envelope)
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -62,9 +55,9 @@ async function seedAndRead(opts) {
     lastAgent: "pm",
     ...opts.seed,
   });
-  // E148: force the seed's last_updated off the wall clock so the follow-up
+  // Force the seed's last_updated off the wall clock so the follow-up
   // tw_update_state write below never has a ~1/60000 chance of tripping
-  // STAMP_PROVENANCE_SUSPECT (docs/backlog.md row E148).
+  // STAMP_PROVENANCE_SUSPECT. (E148)
   forceSeedStamp(ws);
   resetSession();
   markStateRead(ws);
@@ -171,8 +164,8 @@ test("S2: omitting external_refs entirely on a same-feature write is silent (car
 
 // ============================================================================
 // F1/F2: a feature-change write is silent even though the set shrinks — a
-// feature change legitimately drops both feature-scoped fields (existing
-// AC-3/AC-4 semantics from c14-dispatch-pins), so E28 must not warn here.
+// feature change legitimately drops both feature-scoped fields, so the
+// shrink warning must not fire here. (c14-dispatch-pins AC-3/AC-4)
 // ============================================================================
 
 test("F1: switching active_feature while supplying a SMALLER dispatch_pins map is silent (feature-scoped drop is legitimate)", async () => {
@@ -188,7 +181,7 @@ test("F1: switching active_feature while supplying a SMALLER dispatch_pins map i
     completed_tasks: [],
     // FEATURE_LEASE_HELD guards the per-workspace mutual-exclusion slot — a
     // second feature can't take the slot while e28-feat-a's lease is live.
-    // This test is about E28's shrink-warning polarity on a feature change,
+    // This test is about the shrink warning's behaviour on a feature change,
     // not the lease gate itself, so bypass it via the documented human
     // lease-override attestation (pending_notes[0] must match /^lease-override:/).
     lease_override: true,
@@ -221,17 +214,14 @@ test("F2: switching active_feature while supplying a SMALLER external_refs ledge
 });
 
 // ============================================================================
-// J1/J2: the envelope stays valid, additive JSON — reviewer probe 2 (no
-// strict-envelope consumer breaks). Every original success-envelope key
-// (success/path/updated_at) survives byte-shape untouched; `warnings` is
-// purely additive and absent on non-shrink writes. A grep across test/*.mjs
-// (run manually during this QA round) turned up zero tests asserting an
-// exact/strict key set on the tw_update_state response envelope — the
-// agc-adapters "no stale warnings" pin (test/agc-adapters.test.mjs) is about
-// a DIFFERENT feature (agc check / AGENTS.md adapter staleness), not this
-// envelope, so it cannot be broken by this additive key (review_T-E25-01.md
-// §Correctness already made this same cross-check; re-verified here as a
-// standing regression guard).
+// J1/J2: the envelope stays valid, additive JSON, so no consumer that
+// expects an exact envelope breaks. Every original success-envelope key
+// (success/path/updated_at) survives untouched; `warnings` is purely
+// additive and absent on non-shrink writes. No test in test/*.mjs asserts
+// an exact key set on the tw_update_state response envelope; the "no stale
+// warnings" check in test/agc-adapters.test.mjs is about a different
+// feature (agc check adapter staleness), so this additive key cannot break
+// it. These tests keep that true going forward.
 // ============================================================================
 
 test("J1: a shrink-write envelope keeps success/path/updated_at intact AND additively gains warnings", async () => {
@@ -265,16 +255,13 @@ test("J2: a non-shrink write's envelope carries NO warnings key at all (byte-ide
 });
 
 // ============================================================================
-// P1a/P1b: reviewer probe 1 — same-cardinality SWAP. RE-PINNED (E33,
-// e32-e33-gate-hardening): shrink detection is now an ENTRY-IDENTITY diff
-// (dispatch_pins by key set, external_refs by ref string), not cardinality,
-// so a same-count entry swap that drops a prior entry WARNS, naming the
-// dropped entry — the E28-as-shipped `nextSize < prevLength` compare that
-// let this through silently is fixed. code-reviewer verified this live
-// (review_reports/review_T-E32-01.md "T-E33-01 — CORRECT, no findings" /
-// round-2 "T-E33-01 regression ... CLEAN"). A value-only pin change (key
-// survives) or an external_refs state advance (ref survives) is still NOT a
-// drop and stays silent — see W1/W2/S1/S2/F1/F2 above, unchanged.
+// P1a/P1b: a same-size SWAP. Shrink detection compares entries, not counts
+// (dispatch_pins by key set, external_refs by ref string), so a same-count
+// swap that drops a prior entry WARNS and names the dropped entry. A plain
+// size compare would let such a swap through silently. A value-only pin
+// change (key survives) or an external_refs state advance (ref survives) is
+// still NOT a drop and stays silent — see W1/W2/S1/S2/F1/F2 above.
+// (E33, test/e32-e33-gate-hardening.test.mjs, T-E33-01)
 // ============================================================================
 
 test("P1a (probe 1, post-E33): a same-count dispatch_pins SWAP drops an entry and WARNS, naming it", async () => {

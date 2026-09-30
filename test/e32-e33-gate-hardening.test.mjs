@@ -1,22 +1,22 @@
 // Coded by @qa-engineer
-// Permanent regression coverage for backlog E32/E33 (T-E32-01, T-E33-01),
-// specs/c16-c10-role-boundary.md "## Amendment — E32" section, and
-// review_reports/review_T-E32-01.md (both rounds — round 1
-// CHANGES_REQUESTED live-replay table + round 2 APPROVED live-replay table,
-// including PROBE 6 "divergent attack surface" analysis).
+// Permanent regression coverage for the rule that a state write may only
+// mark tasks complete when each one has its own QA evidence file under
+// qa_reports/. A code review's report under review_reports/ is not enough on
+// its own, and the check has no exemption for the code-reviewer handoff.
+// (specs/c16-c10-role-boundary.md "## Amendment — E32"; E32, E33,
+// T-E32-01, T-E33-01)
 //
-// WHY THIS FILE EXISTS (not folded into e18-write-provenance.test.mjs /
-// reviewer-completed-tasks-gate.test.mjs): those files' QAEV-4a/b and FM4/FM5
-// tests were MODERNIZED (old assertion flipped) to match the amended
-// contract; this file adds NET-NEW permanent regression pins for shapes that
-// had no prior test at all — most importantly the exact incident replay this
-// ticket exists to close. If this file's R1 test is ever accidentally
-// deleted or weakened, the fourth E9A/E18-class incident (e-p3-tail-batch,
-// 2026-07-16) can silently recur.
+// Why this is a separate file: test/e18-write-provenance.test.mjs and
+// test/reviewer-completed-tasks-gate.test.mjs already test the amended rule
+// (their QAEV-4a/b and FM4/FM5 cases), but only by flipping older
+// assertions. This file adds shapes that had no test at all, most
+// importantly an exact replay of the real incident where a code-reviewer
+// write marked a whole batch complete with no QA evidence. If the R1 test
+// below is deleted or weakened, that incident can come back unnoticed.
 //
-// Spec-to-test map (labels mirror code-reviewer's own round-2 live-replay
-// table in review_reports/review_T-E32-01.md verbatim, for direct
-// traceability):
+// Spec-to-test map (the labels match the ones the code review of this
+// change used when it replayed each shape, so the two can be compared
+// line by line; review_reports/review_T-E32-01.md):
 //   R1 — exact incident replay (verdict carried, completed_tasks grown,
 //     review_reports covers-file present, qa_reports ABSENT) -> REJECTED,
 //     ledger unpolluted                                       -> R1 (PERMANENT PIN)
@@ -27,13 +27,13 @@
 //   C2 — amended compliant shape (review_task_ids, completed_tasks
 //     empty) MINUS review evidence -> MISSING_REVIEW_EVIDENCE           -> C2
 //   C3 — legit qa-engineer PASS with own qa_review auto-record
-//     satisfies the completion-evidence gate for its own ids            -> C3
-//   PROBE 6 — the two gates (QA_COMPLETION_EVIDENCE_MISSING /
-//     MISSING_REVIEW_EVIDENCE) are orthogonal: divergent completed_tasks
+//     satisfies the completion-evidence check for its own ids           -> C3
+//   PROBE 6 — the two checks (QA_COMPLETION_EVIDENCE_MISSING /
+//     MISSING_REVIEW_EVIDENCE) are independent: divergent completed_tasks
 //     vs review_task_ids id sets, each independently evidenced or not   -> P6a, P6b, P6c
-//   Rejection-envelope content (E23 named-path posture): offending
-//     ids, the expected qa_reports/review_<id>.md path(s) per id, and
-//     the covers: fallback mention                                     -> ENV-1, ENV-2
+//   Rejection message names the offending ids, the expected
+//     qa_reports/review_<id>.md path(s) per id, and the covers:
+//     fallback, so the writer knows what to add (E23)                  -> ENV-1, ENV-2
 //
 // (C1 — compliant amended shape ACCEPTED — is covered by QAEV-4b in
 // test/e18-write-provenance.test.mjs; C4 — carry-forward no-growth
@@ -68,13 +68,15 @@ async function seedFileState(ws, feature, agent, status) {
     pendingNotes: ["seed"],
     lastAgent: agent,
   });
-  // E148 (docs/backlog.md row E148): force the seed's last_updated off the
-  // wall clock — see test/e148-seed-stamp.mjs. Every gated handleUpdateState
-  // call below reads this seed as its prevState (same-feature continuation,
-  // no lease-freshness dependency), so SAFE_SEED_STAMP's fixed 2026-01-01
-  // date is safe here, exactly like test/e18-write-provenance.test.mjs's
-  // seedFileState. Call precedes the caller's own resetSession/markStateRead
-  // re-snapshot, matching the helper's documented ordering contract.
+  // Pin the seed's last_updated to a fixed stamp instead of the wall clock,
+  // so the server's check for made-up timestamps cannot fire at random on a
+  // genuine seed (test/e148-seed-stamp.mjs). Every handleUpdateState call
+  // below reads this seed as its previous state for the same feature and
+  // never depends on lease freshness, so SAFE_SEED_STAMP's fixed 2026-01-01
+  // date is safe here, as in test/e18-write-provenance.test.mjs's
+  // seedFileState. The call comes before the caller's own
+  // resetSession/markStateRead re-snapshot, the order the helper requires.
+  // (E148)
   forceSeedStamp(ws);
 }
 
@@ -85,10 +87,9 @@ function writeQaEvidence(ws, taskId) {
 }
 
 // Writes a SINGLE review_reports/ file carrying a `covers:` line naming
-// every id in `taskIds` — mirrors the real e-p3-tail-batch incident shape
-// (one batched code-review report covering all 6 T-ids via `covers:`,
-// per review_reports/review_T-E32-01.md itself, which opens with
-// `covers: T-E32-01, T-E33-01`).
+// every id in `taskIds`. This matches the real incident, where one batched
+// code-review report listed every task of the batch on its `covers:` line.
+// (e-p3-tail-batch)
 function writeCodeReviewCoversFile(ws, primaryId, taskIds) {
   const dir = path.join(ws, "review_reports");
   fs.mkdirSync(dir, { recursive: true });
@@ -100,10 +101,12 @@ function writeCodeReviewCoversFile(ws, primaryId, taskIds) {
 }
 
 // ===========================================================================
-// R1 — PERMANENT REGRESSION PIN: the exact e-p3-tail-batch incident shape.
-// This is the incident review_reports/review_T-E32-01.md was filed to close
-// (round-2 replay table, row R1). DO NOT weaken or delete this test without
-// re-reading specs/c16-c10-role-boundary.md's Amendment section first.
+// PERMANENT REGRESSION PIN: the exact shape of the real incident. A
+// code-reviewer write carrying an APPROVED verdict grows completed_tasks
+// with the batch ids while only a code-review report exists; it must be
+// rejected and the task ledger left untouched. DO NOT weaken or delete this
+// test without re-reading specs/c16-c10-role-boundary.md's Amendment
+// section first. (e-p3-tail-batch, R1)
 // ===========================================================================
 
 test("R1 (PERMANENT REGRESSION PIN): the exact e-p3-tail-batch incident — review_verdict=APPROVED carried, completed_tasks grown with the batch ids, review_reports covers-file present, qa_reports ABSENT — is REJECTED, ledger unpolluted", async () => {
@@ -111,11 +114,10 @@ test("R1 (PERMANENT REGRESSION PIN): the exact e-p3-tail-batch incident — revi
   const ws = mkWs("e32e33-r1-");
   await seedFileState(ws, "r1-incident-feat", "code-reviewer", "In_Progress");
   const ids = ["T-R1-01", "T-R1-02", "T-R1-03"];
-  // review_reports/ evidence present (covers-file, exactly like the real
-  // incident's review_reports/review_T-E25-01.md) — deliberately NO
-  // qa_reports/ evidence anywhere. Under the OLD (pre-amendment) exemption
-  // this write was ACCEPTED because it rode the sanctioned edge; the
-  // amendment removes that exemption entirely.
+  // A code-review covers-file is present, as in the real incident, and
+  // deliberately there is NO qa_reports/ evidence anywhere. Coming from the
+  // code-reviewer's normal handoff must not exempt the write from needing
+  // QA evidence.
   writeCodeReviewCoversFile(ws, "T-R1-01", ids);
   resetSession(ws);
   markStateRead(ws);
@@ -192,13 +194,12 @@ test("R4: verdict + completed_tasks growth + ZERO review evidence anywhere is RE
 });
 
 // ===========================================================================
-// C2 — amended compliant shape (review_task_ids, completed_tasks empty)
-// MINUS review evidence -> MISSING_REVIEW_EVIDENCE. Confirms the re-pointed
-// gate did NOT go dead: the amendment closes R1 without disabling review
-// evidence enforcement. (Same underlying shape as the modernized FM4 in
-// test/reviewer-completed-tasks-gate.test.mjs; pinned again here under the
-// review's own "C2" label for 1:1 traceability against
-// review_reports/review_T-E32-01.md's round-2 replay table.)
+// The compliant shape (review_task_ids set, completed_tasks empty) but with
+// no review evidence is rejected with MISSING_REVIEW_EVIDENCE. This shows
+// that closing the R1 hole did not switch off the review-evidence check.
+// The same shape is covered as FM4 in
+// test/reviewer-completed-tasks-gate.test.mjs; it is repeated here under the
+// label the code review used. (C2)
 // ===========================================================================
 
 test("C2: amended shape (review_task_ids, completed_tasks empty) minus review evidence is REJECTED by MISSING_REVIEW_EVIDENCE — the re-pointed gate is still alive", async () => {
@@ -227,11 +228,11 @@ test("C2: amended shape (review_task_ids, completed_tasks empty) minus review ev
 });
 
 // ===========================================================================
-// C3 — legit qa-engineer PASS with its own qa_review auto-record. The
-// completion-evidence gate (handoff-orchestrator.ts:753) runs AFTER the
-// qa_review auto-record (:701-703), so a genuine PASS write satisfies its
-// own evidence requirement in the SAME write, with no pre-existing
-// qa_reports/ file needed.
+// A genuine qa-engineer PASS write with a qa_review is accepted. The
+// completion-evidence check in tools/handoff-orchestrator.ts runs after the
+// qa_review is auto-recorded as a report, so the write supplies its own
+// evidence in the SAME write, with no qa_reports/ file needed beforehand.
+// (C3)
 // ===========================================================================
 
 test("C3: legit qa-engineer PASS write with qa_review (auto-recorded as its own evidence) is ACCEPTED", async () => {
@@ -256,11 +257,10 @@ test("C3: legit qa-engineer PASS write with qa_review (auto-recorded as its own 
 });
 
 // ===========================================================================
-// PROBE 6 — divergent-field matrix: can a writer evade one gate by stuffing
-// the OTHER field with evidenced ids while the first field grows with
-// DIFFERENT unevidenced ids? review_reports/review_T-E32-01.md round 2
-// confirms: no — the two gates are orthogonal, each demanding its own
-// evidence directory. These three tests pin that conclusion permanently.
+// Can a writer slip past one check by filling the OTHER field with
+// evidenced ids while the first field grows with DIFFERENT ids that have no
+// evidence? No: the two checks are independent, and each demands its own
+// evidence directory. These three tests pin that. (PROBE 6)
 // ===========================================================================
 
 test("P6a: review_task_ids=[A] (evidenced via review_reports) but completed_tasks grows with [B] (NO qa_reports) -> REJECTED QA_COMPLETION_EVIDENCE_MISSING, ledger []", async () => {
@@ -335,12 +335,12 @@ test("P6c: both fields diverge but BOTH are fully evidenced -> ACCEPTED, ledger 
 });
 
 // ===========================================================================
-// Rejection-envelope content (E23 named-path posture): the
-// QA_COMPLETION_EVIDENCE_MISSING envelope must name the offending id(s), the
-// EXACT expected qa_reports/review_<id>.md path per offending id (the same
-// sanitised path hasEvidenceInFile checked — via the exported qaEvidencePath
-// wrapper), and mention the covers: fallback — so a writer fixing the
-// rejection knows precisely which artifact clears the gate.
+// The QA_COMPLETION_EVIDENCE_MISSING rejection must name the offending
+// id(s), the EXACT expected qa_reports/review_<id>.md path per offending id
+// (the same sanitised path hasEvidenceInFile checked, via the exported
+// qaEvidencePath wrapper), and mention the covers: fallback, so a writer
+// fixing the rejection knows precisely which file to add. (ENV-1, ENV-2;
+// E23)
 // ===========================================================================
 
 test("ENV-1: QA_COMPLETION_EVIDENCE_MISSING envelope names each offending id and its exact expected qa_reports/review_<id>.md path", async () => {

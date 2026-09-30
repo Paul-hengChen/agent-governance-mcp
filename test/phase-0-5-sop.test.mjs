@@ -59,10 +59,10 @@ test("AC-4: Phase 0.5 wires the split-escalation guidance for visual_round >= 3"
   // The implementer-side mirror of the §3.1 split escalation. sr-engineer
   // needs to know when to abandon and ask PM to split, instead of grinding
   // to threshold renegotiation.
-  // c9-protocol-fields (T-C9-14 re-baseline): `next_role` is now a first-class
-  // field (`next_role=pm` in prose / a bare `pm` Escalation Routes table cell),
-  // not a `next_role: pm` pending_notes token — the colon-form regex no longer
-  // matches either representation.
+  // `next_role` is a first-class state field (`next_role=pm` in prose, or a
+  // bare `pm` Escalation Routes table cell), not a `next_role: pm`
+  // pending_notes token, so the check looks for the `=` form.
+  // (c9-protocol-fields, T-C9-14)
   const body = fs.readFileSync(SKILL_SR, "utf-8");
   assert.match(body, /visual_round\s*>=\s*3/, "must reference visual_round >= 3 threshold");
   assert.match(body, /visual_split_requested:/, "must include the pending_notes token");
@@ -112,8 +112,8 @@ test("AC-3: skill-architect Visual Harness Gate (4a) blocks back to PM if harnes
   // Why: without this gate, PM could skip enumerating the harness task and
   // sr-engineer would have nothing to build. The architect's job is to
   // *verify* PM did the task-list work, not to add the task itself.
-  // c9-protocol-fields (T-C9-14 re-baseline): `next_role` is now a first-class
-  // field (`next_role=pm` in prose / a bare `pm` Escalation Routes table cell).
+  // The routing back to PM is checked in the first-class `next_role=pm`
+  // form, not as a pending_notes token. (c9-protocol-fields, T-C9-14)
   const body = fs.readFileSync(SKILL_ARCHITECT, "utf-8");
   assert.match(body, /4a\.\s+\*\*Visual Harness Gate\*\*/, "step 4a Visual Harness Gate must exist");
   assert.match(body, /visual harness task missing/i, "block message must name the missing task");

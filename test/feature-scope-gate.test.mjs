@@ -23,9 +23,10 @@ import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-// d6-host-capability-compose-axis (T-D6-04): content/skill-coordinator.md is
-// retired — reconstruct the full monolith via the real composer (taskTool:true
-// reproduces it byte-for-byte, AC5) instead of raw-reading the deleted file.
+// content/skill-coordinator.md no longer exists: the coordinator SOP is
+// composed from fragments. Rebuild the full text through the real composer
+// (taskTool:true reproduces the old file byte-for-byte) instead of reading a
+// deleted file. (d6-host-capability-compose-axis, T-D6-04)
 const { composeSkill, hostCapabilitiesFor } = await import(path.join(ROOT, "dist", "prompts", "skill-manifest.js"));
 const COORD = composeSkill(
   "skill-coordinator.md",

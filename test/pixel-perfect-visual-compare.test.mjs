@@ -101,10 +101,9 @@ test("AC-4: v3.14.0 — four distinct failure routes (widget shape + pixel drift
   // v3.14.0: routes expanded from 3 to 4. Widget shape miss is new; pixel
   // drift retains the prior drift slot. Missing baseline → design-auditor;
   // implementation routes carry visual_fail: token for visual_round bump.
-  // c9-protocol-fields (T-C9-15 re-baseline): `next_role` is now a first-class
-  // field passed as `next_role="<role>"` (quoted tw_update_state arg), not a
-  // `next_role: <role>` pending_notes token — the colon-form regex no longer
-  // matches.
+  // The routes name the next role as a state-write argument,
+  // `next_role="<role>"`, not as a `next_role: <role>` line in pending_notes,
+  // so the patterns below match the quoted form. (c9-protocol-fields, T-C9-15)
   const body = fs.readFileSync(QA_VISUAL_PATH, "utf-8");
 
   // Widget shape miss (new in v3.14.0) → sr-engineer with visual_fail token

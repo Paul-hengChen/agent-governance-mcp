@@ -1,27 +1,24 @@
 // Coded by @qa-engineer
-// Tests for backlog E26 (104447-F0 §4-D) / T-E26-01/02/03: `tw_gate_stats`,
-// the per-gate fire-count coverage reader over `.current/telemetry.jsonl`
-// (D3 gate fires) + `.current/metrics.jsonl` (E8 per-feature outcomes).
-// T-E26-01 is `computeGateStats()` (tools/gate-stats.ts); T-E26-02 is the
-// `tw_gate_stats` A1 registry entry (tools/registry.ts, no index.ts edit);
-// T-E26-03 is doc alignment (docs/gate-retro-procedure.md + CLAUDE.md roster)
-// — content-only, not test-bearing here (no prose-pin precedent exists for
-// this doc; see review_reports/review_T-E26-01.md for the reviewer's
-// independent verification of the doc edit).
+// Tests for the per-gate fire-count report: computeGateStats()
+// (tools/gate-stats.ts) reads `.current/telemetry.jsonl` (one line per
+// rejection a gate fired) and `.current/metrics.jsonl` (one line per shipped
+// feature's outcome), and the tool entry in tools/registry.ts exposes it as
+// the `tw_gate_stats` MCP tool. The matching doc edits
+// (docs/gate-retro-procedure.md and the CLAUDE.md tool list) are prose and
+// are not pinned here. (E26, T-E26-01..03)
 //
-// Load-bearing invariant under test throughout (the "coverage reader"
-// contract): every GATE_REGISTRY code lands in EXACTLY ONE of `fired` /
-// `zero_fire` — the retro adjudicates zero-fire codes, so they must be
-// enumerated, never silently omitted or double-counted. The second
-// load-bearing invariant is the structural category boundary: prose-
-// behavioral rules carry `fires: null` (never `0`), so a reader can never
-// conflate "not measured" with "never fired". Never-throws (the
-// tools/exemptions.ts loader posture) is the fail-direction for malformed
-// input and missing sidecars — no failure mode may block a retro.
+// Main invariant under test: every GATE_REGISTRY code lands in exactly one
+// of `fired` / `zero_fire`. The periodic gate retrospective decides what to
+// do about codes that never fired, so they must be listed, never silently
+// omitted or double-counted. Second invariant: rules that are prose-only
+// (no server check) carry `fires: null`, never `0`, so a reader can never
+// confuse "not measured" with "never fired". Malformed input and missing
+// sidecar files never throw (the same posture as the tools/exemptions.ts
+// loader): no bad input may stop the report from being produced.
 //
-// Spec-to-test map (backlog E26 row + code-reviewer's APPROVED
-// review_reports/review_T-E26-01.md, which independently verified the
-// registry-coverage, never-throws, and dedupe-collision-safety properties):
+// Spec-to-test map (the requirements, with the registry-coverage,
+// never-throws and dedupe properties also checked by an independent code
+// review):
 //   registry coverage: 33/33, no dupes across fired/zero_fire -> R1-R3
 //   fired bucketing + sort order (desc, ties -> catalog order)  -> F1-F3
 //   zero_fire bucketing + catalog order                          -> F1, F4
@@ -33,7 +30,7 @@
 //   metrics dedupe on (feature, released_version)                 -> DE1-DE3
 //   one_pass strict-boolean coercion                               -> DE4
 //   mean/rate null-on-zero-features                                -> DE5
-//   tw_gate_stats registry registration (A1, count 12)             -> T1-T2
+//   tw_gate_stats is one TOOL_REGISTRY entry (12 tools in total)   -> T1-T2
 //   handleGateStats MCP handler shape                               -> T3
 
 import { test } from "node:test";
@@ -94,17 +91,14 @@ function metricRecord({
 }
 
 // ============================================================================
-// R1-R3 — full GATE_REGISTRY coverage (T-E26-01)
+// R1-R3 — every GATE_REGISTRY code is covered by the report (T-E26-01)
 // ============================================================================
 
-// e40-nonqa-completed-tasks-write-gate (qa-owned re-baseline, T-E40-03):
-// GATE_REGISTRY grew 32 -> 33 (NON_QA_COMPLETED_TASKS_REJECTED, the
-// reviewer-only completed_tasks gate generalized to every non-qa identity —
-// docs/backlog.md E40). This coverage reader sums to registry length by
-// construction (tools/gate-stats.ts iterates GATE_REGISTRY, not a fixed
-// literal), so every hardcoded "32" sanity/coverage assert below moves to
-// "33" — a pure re-baseline of the registry's current size, not a change to
-// the coverage-reader contract itself.
+// The hardcoded "33" below is the current size of GATE_REGISTRY. The report
+// sums to the registry length by construction (tools/gate-stats.ts iterates
+// GATE_REGISTRY, not a fixed list), so when a gate is added this number
+// moves with it; the coverage contract itself does not change. The last
+// addition was NON_QA_COMPLETED_TASKS_REJECTED. (E40, T-E40-03)
 test("R1: with zero telemetry, EVERY GATE_REGISTRY code lands in zero_fire, fired is empty, count is 33", () => {
   const ws = mkWorkspace();
   const report = computeGateStats(ws);
@@ -450,17 +444,17 @@ test("DE5: mean_* and one_pass_rate are null (not 0 or NaN) when zero features e
 });
 
 // ============================================================================
-// AC1-AC5b — e123c (E123 F2) cross-lane sidecar aggregation.
-// tools/gate-stats.ts now reads EVERY copy of telemetry.jsonl/metrics.jsonl
+// AC1-AC5b — the report aggregates sidecars across lanes.
+// tools/gate-stats.ts reads EVERY copy of telemetry.jsonl/metrics.jsonl
 // this workspace's .current/ tree holds (live lanes, closed history lanes,
 // a not-yet-migrated flat file) via tools/lane-paths.ts's
-// enumerateLaneSidecarSources, deduplicating by CONTENT (never by name) per
-// specs/e123c-cross-lane-aggregation.md. All fixtures below build the raw
+// enumerateLaneSidecarSources, and deduplicates by CONTENT (never by file
+// name), so a copy mid-move is not counted twice. All fixtures below build the raw
 // `.current/` tree directly (mkWorkspace's flat-only shape isn't enough for
 // a fan-out fixture) — the R1-DE5 tests above already cover the flat-only
 // case exhaustively; AC1 below adds one EXPLICIT assertion that a flat-only
 // workspace's `sources` array names only the flat file (no lane copy exists
-// to fan out over or dedupe against).
+// to fan out over or dedupe against). (E123 F2, specs/e123c-cross-lane-aggregation.md)
 // ============================================================================
 
 function liveTelemetryPath(ws, lane) {
@@ -630,7 +624,7 @@ test('AC10: tw_gate_stats\'s tool description no longer states or implies a sing
 });
 
 // ============================================================================
-// T1-T3 — tw_gate_stats registry registration (T-E26-02, A1 pattern)
+// T1-T3 — tw_gate_stats is registered as a single TOOL_REGISTRY entry (T-E26-02)
 // ============================================================================
 
 test("T1: TOOL_REGISTRY contains tw_gate_stats, wired to run the same aggregation as handleGateStats, with a WorkspaceOnly-shaped input schema", async () => {

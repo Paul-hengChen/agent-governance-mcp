@@ -16,7 +16,8 @@
 //   default keyword file uses its own temp git dir (every temp repo here has
 //   one), never the common dir of the checkout running the suite.
 //
-// Spec-to-test map: qa_reports/review_T-E234-05.md.
+// The AC-by-AC map to these tests lives in the QA review of this feature
+// (qa_reports/archive/release-v4.2.0/review_T-E234-05.md).
 
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
@@ -175,8 +176,8 @@ function mkEveryCategoryRepo(prefix, { withHits }) {
 
 test("AC1: agc check exit code is the same with and without hits — 0 with current adapters, 1 with stale ones", () => {
   // Contract: the scan is advisory. Whatever it finds, agc check's exit code
-  // is decided by the adapter-stamp check alone (D5 "never changes the exit
-  // code in any branch"), so CI can never fail over a hygiene finding.
+  // is decided by the adapter-stamp check alone ("never changes the exit
+  // code in any branch"), so CI can never fail over a hygiene finding. (spec D5)
   for (const [version, expected] of [
     [AGC_VERSION, 0],
     ["0.0.1", 1],
@@ -200,8 +201,9 @@ test("AC1: agc check exit code is the same with and without hits — 0 with curr
 // ---------------------------------------------------------------------------
 
 test("AC2: each of the seven shape categories reports a hit line with the correct 1-based line number", () => {
-  // Contract: D2's shape table is binding coverage; the line number must point
-  // at the offending line (grep/IDE-clickable), counted from 1.
+  // Contract: every shape in the spec's shape table is detected, and the line
+  // number points at the offending line (grep/IDE-clickable), counted from 1.
+  // (spec D2)
   const repo = mkGitRepo("e234-ac2-");
   SHAPE_CATEGORIES.forEach((c, i) => {
     const pad = Array.from({ length: i + 1 }, () => "clean line");
@@ -260,8 +262,8 @@ test("AC4: an untracked file whose name holds a keyword gets a masked (file name
 // ---------------------------------------------------------------------------
 
 test("AC5: tracked and untracked-non-ignored files are scanned; a gitignored file is not", () => {
-  // Contract: the scan set is `git ls-files --cached --others --exclude-standard`
-  // (D4) — new drafts are caught before commit, ignored files never are.
+  // Contract: the scan set is `git ls-files --cached --others --exclude-standard`,
+  // so new drafts are caught before commit and ignored files never are. (spec D4)
   const repo = mkGitRepo("e234-ac5-");
   write(repo, ".gitignore", "ignored.txt\n");
   write(repo, "tracked.txt", shape["home-path"]() + "\n");
@@ -278,8 +280,8 @@ test("AC5: tracked and untracked-non-ignored files are scanned; a gitignored fil
 // ---------------------------------------------------------------------------
 
 test("AC6: a non-empty AGC_HYGIENE_KEYWORDS wins; unset or empty falls back to the git-common-dir default, shared by linked worktrees", () => {
-  // Contract: D1 precedence. The default file sits in the git common dir so
-  // every worktree of one repo shares one untracked list.
+  // Contract: keyword-source precedence. The default file sits in the git
+  // common dir so every worktree of one repo shares one untracked list. (spec D1)
   const repo = mkGitRepo("e234-ac6-");
   fs.writeFileSync(path.join(repo, ".git", "agc-hygiene-keywords"), KW_A + "\n");
   write(repo, "a.txt", `${KW_A}\n${KW_B}\n`);
@@ -351,9 +353,9 @@ test("AC8: a keyword list under the workspace's .current/ is refused and no keyw
 // ---------------------------------------------------------------------------
 
 test("AC9: comments, blanks, whitespace and 1-char entries are ignored; matching is case-insensitive, ASCII-word-bounded and literal", () => {
-  // Contract: D1 format + matching. A word boundary keeps a keyword from
-  // firing inside a longer identifier; literal matching means a keyword with
-  // regex metacharacters can never widen into a pattern.
+  // Contract: keyword-file format and matching. A word boundary keeps a
+  // keyword from firing inside a longer identifier; literal matching means a
+  // keyword with regex metacharacters can never widen into a pattern. (spec D1)
   const repo = mkGitRepo("e234-ac9-");
   write(repo, "main.txt", ["Zorblax-app", "zorblaxing", "zorblax_x", "a lone q here", "qwyxxc appears"].join("\n") + "\n");
   write(repo, "meta.txt", ["vq.zk", "vqazk", "(rr)+", "rrrr", "p|w", "p w"].join("\n") + "\n");
@@ -383,8 +385,8 @@ test("AC9: comments, blanks, whitespace and 1-char entries are ignored; matching
 // ---------------------------------------------------------------------------
 
 test("AC10: placeholder username segments are skipped and counted, only the real one is listed (home-path and encoded-home-path)", () => {
-  // Contract: D3 / human ruling 3. Docs use placeholder home paths; those are
-  // counted in one skipped line instead of flooding the report.
+  // Contract: docs use placeholder home paths; those are counted in one
+  // skipped line instead of flooding the report. (spec D3, human ruling 3)
   for (const cat of ["home-path", "encoded-home-path"]) {
     const repo = mkGitRepo("e234-ac10-");
     const segs = ["me", "<name>", "$USER", "…", SEG];
@@ -428,7 +430,8 @@ test("AC11: an in-workspace keyword list is never content-scanned; a tracked one
 // ---------------------------------------------------------------------------
 
 test("AC12: 60 hits list exactly 50 lines, then a more line naming 10 and a summary naming 60", () => {
-  // Contract: D5 cap keeps the output readable; the summary still counts all.
+  // Contract: a cap on printed hits keeps the output readable; the summary
+// still counts all. (spec D5)
   const repo = mkGitRepo("e234-ac12-");
   write(repo, "many.txt", Array.from({ length: 60 }, (_, i) => shape["home-path"](SEG + i)).join("\n") + "\n");
   commitAll(repo);
@@ -450,8 +453,8 @@ test("AC12: 60 hits list exactly 50 lines, then a more line naming 10 and a summ
 // ---------------------------------------------------------------------------
 
 test("AC13: a NUL-bearing file, a >1 MiB file and a tracked symlink give no content hit; a hit in a name still reports", () => {
-  // Contract: D4 content gate — binaries, huge files and symlink targets are
-  // not read; file names are still checked.
+  // Contract: binaries, huge files and symlink targets are not read; file
+  // names are still checked. (spec D4)
   const repo = mkGitRepo("e234-ac13-");
   const hit = shape["home-path"]() + "\n";
   write(repo, "blob.dat", Buffer.concat([Buffer.from("x\0y\n"), Buffer.from(hit)]));
@@ -471,8 +474,9 @@ test("AC13: a NUL-bearing file, a >1 MiB file and a tracked symlink give no cont
 // ---------------------------------------------------------------------------
 
 test("AC14: outside git the walk reports shape and keyword hits, skips node_modules/, and keeps the exit code", () => {
-  // Contract: D4 no-git walk. The env keyword source is still honoured, and
-  // vendored dependencies are not the maintainer's text.
+  // Contract: outside a git repo the scan walks the directory. The env keyword
+  // source is still honoured, and vendored dependencies are skipped because
+  // they are not the maintainer's text. (spec D4)
   const ws = mkTmp("e234-ac14-");
   write(ws, "hit.txt", `${shape["home-path"]()}\n${KW_A}\n`);
   write(ws, "node_modules/pkg/hit.txt", `${shape["home-path"]()}\n${KW_A}\n`);
@@ -498,8 +502,8 @@ function mkPkgCopy(prefix, stubModule) {
 }
 
 test("AC15: a clean workspace with a keyword list prints no hygiene line; a module that fails to load or throws prints one hyg.error line and keeps the exit code", () => {
-  // Contract: D5 silence (no noise when nothing is wrong) and resilience (the
-  // advisory can never break agc check).
+  // Contract: silence (no noise when nothing is wrong) and resilience (the
+  // advisory can never break agc check). (spec D5)
   const clean = mkGitRepo("e234-ac15-clean-");
   fs.writeFileSync(path.join(clean, ".git", "agc-hygiene-keywords"), KW_A + "\n");
   write(clean, "README.md", "nothing to see\n");
@@ -587,8 +591,9 @@ test("AC17: docs/install.md and docs/config.md describe the hygiene scan (adviso
 // ---------------------------------------------------------------------------
 
 test("AC18: a keyword glued to an underscore in a file name is masked in a content-hit path, and is not a keyword hit", () => {
-  // Contract: D5 amendment — detection keeps D1's boundaries, masking does
-  // not, so a printed path can never leak a keyword the detector skipped.
+  // Contract: detection keeps the keyword word boundaries, masking does not,
+  // so a printed path can never leak a keyword the detector skipped.
+  // (spec D5 amendment, D1)
   const repo = mkGitRepo("e234-ac18-");
   fs.writeFileSync(path.join(repo, ".git", "agc-hygiene-keywords"), KW_A + "\n");
   write(repo, `${KW_A}_notes.md`, shape["home-path"]() + "\n");
@@ -600,7 +605,7 @@ test("AC18: a keyword glued to an underscore in a file name is masked in a conte
 });
 
 // ---------------------------------------------------------------------------
-// Code-review regression cases (review_reports/review_T-E234-01.md)
+// Cases an earlier code review found by running the scan (T-E234-01)
 // ---------------------------------------------------------------------------
 
 test("regression (review round 1): design-file-key stays linear on a long dotted line", () => {
@@ -620,7 +625,7 @@ test("regression (review round 1): design-file-key stays linear on a long dotted
 test("regression (review round 2): maskText terminates and masks a keyword that starts with a non-BMP code point", { timeout: 10_000 }, () => {
   // Contract: under the u flag a lastIndex inside a surrogate pair snaps back,
   // so a hand-rolled exec loop that advanced one code unit never ended and
-  // agc check died out of memory (exit 134). Keywords may be non-ASCII (D1).
+  // agc check died out of memory (exit 134). Keywords may be non-ASCII. (spec D1)
   const emojiKw = String.fromCodePoint(0x1f9ea, 0x1f9f2);
   const extBKw = String.fromCodePoint(0x20bb7) + "q";
   const m = compileKeywordMatcher([emojiKw, extBKw]);

@@ -1,10 +1,12 @@
 // Coded by @qa-engineer
-// T-E235B-06/07 — regression cases for the primary-relative manifest
-// `worktree` column (specs/e235b-relative-manifest-worktree.md AC1-AC3, AC6;
-// specs/e235b-relative-manifest-worktree-architecture.md R1-R11). Pins the
-// resolveWorktree / isAbsoluteWorktree contract, the render-only row errors
-// WORKTREE_EMPTY / WORKTREE_TILDE, the non-fatal validate WARN, and the
-// "no behavior change" architecture decision for checkLane / lane-status.
+// Regression cases for the fan-out manifest's `worktree` column, which may
+// now be written relative to the primary checkout. Pins the resolveWorktree /
+// isAbsoluteWorktree contract, the render-only row errors WORKTREE_EMPTY /
+// WORKTREE_TILDE, the non-fatal validate WARN, and the decision that
+// checkLane and lane-status behave exactly as before, since neither reads
+// that column. (specs/e235b-relative-manifest-worktree.md AC1-AC3, AC6;
+// specs/e235b-relative-manifest-worktree-architecture.md R1-R11;
+// T-E235B-06/07)
 //
 // Manifest builder mirrors test/e177a-manifest.test.mjs's manifestText() so
 // each assertion's cause stays visible next to the expectation. Repo helpers
@@ -114,7 +116,8 @@ function setBranch(root, name, sha) {
 }
 
 // ---------------------------------------------------------------------------
-// R1
+// A relative worktree cell is resolved against the primary checkout's path
+// in the rendered lane prompt. (R1)
 // ---------------------------------------------------------------------------
 
 test("R1 relative resolves", () => {
@@ -125,7 +128,8 @@ test("R1 relative resolves", () => {
 });
 
 // ---------------------------------------------------------------------------
-// R2
+// An absolute worktree cell is rendered exactly as written, trailing slash
+// included, so existing manifests keep their output. (R2)
 // ---------------------------------------------------------------------------
 
 test("R2 absolute passes through byte-verbatim", () => {
@@ -136,8 +140,8 @@ test("R2 absolute passes through byte-verbatim", () => {
 });
 
 // ---------------------------------------------------------------------------
-// R3 — AC2 golden: an absolute cell renders byte-identically to the golden
-// except the one worktree line, which equals the absolute cell verbatim.
+// An absolute cell renders byte-identically to the golden except the one
+// worktree line, which equals the absolute cell verbatim. (R3, AC2)
 // ---------------------------------------------------------------------------
 
 test("R3 AC2 golden", () => {
@@ -170,7 +174,8 @@ test("R3 AC2 golden", () => {
 });
 
 // ---------------------------------------------------------------------------
-// R4
+// An empty worktree cell is refused with WORKTREE_EMPTY instead of rendering
+// a prompt with no worktree. (R4)
 // ---------------------------------------------------------------------------
 
 test("R4 empty cell", () => {
@@ -199,7 +204,8 @@ test("R4 empty cell", () => {
 });
 
 // ---------------------------------------------------------------------------
-// R5
+// A cell starting with `~` is refused with WORKTREE_TILDE, because the tilde
+// would not be expanded and would name a different directory per user. (R5)
 // ---------------------------------------------------------------------------
 
 test("R5 tilde cell", () => {
@@ -218,7 +224,8 @@ test("R5 tilde cell", () => {
 });
 
 // ---------------------------------------------------------------------------
-// R6
+// When the primary checkout cannot be found, only PRIMARY_NOT_FOUND is
+// reported, with no extra worktree error piled on top. (R6)
 // ---------------------------------------------------------------------------
 
 test("R6 primary absent", () => {
@@ -243,8 +250,8 @@ test("R6 primary absent", () => {
 });
 
 // ---------------------------------------------------------------------------
-// R7 — AC3: checkLane is byte-identical whether the worktree cell is
-// relative or absolute (checkLane never reads that column).
+// checkLane output is byte-identical whether the worktree cell is relative
+// or absolute, because checkLane never reads that column. (R7, AC3)
 // ---------------------------------------------------------------------------
 
 test("R7 check unaffected (AC3)", () => {
@@ -266,7 +273,8 @@ test("R7 check unaffected (AC3)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// R8 — parse keeps the raw cell; errors are unaffected by which form it is.
+// Parsing keeps the raw cell, and parse errors do not depend on which form
+// it is. (R8)
 // ---------------------------------------------------------------------------
 
 test("R8 parse unaffected", () => {
@@ -277,8 +285,8 @@ test("R8 parse unaffected", () => {
 });
 
 // ---------------------------------------------------------------------------
-// R9 — AC3: tools/lane-status.ts has no fanout-manifest coupling, and a
-// relative-cell manifest under specs/ does not change its listing.
+// tools/lane-status.ts does not depend on the fan-out manifest, and a
+// relative-cell manifest under specs/ does not change its listing. (R9, AC3)
 // ---------------------------------------------------------------------------
 
 test("R9 lane-status unaffected (AC3)", async () => {
@@ -331,7 +339,8 @@ test("R9 lane-status unaffected (AC3)", async () => {
 });
 
 // ---------------------------------------------------------------------------
-// R10 — validate CLI warning
+// The validate CLI still exits 0 on an absolute cell but prints a WARN line
+// that never echoes the absolute value; a relative cell prints no WARN. (R10)
 // ---------------------------------------------------------------------------
 
 test("R10 validate warning (CLI)", () => {
@@ -355,8 +364,8 @@ test("R10 validate warning (CLI)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// R11 — repo sweep: every tracked manifest / fixture this lane owns is
-// already in the relative form and validates with zero WARN lines. Pins AC6.
+// Every tracked manifest and fixture this lane owns is already in the
+// relative form and validates with zero WARN lines. (R11, AC6)
 // ---------------------------------------------------------------------------
 
 function mdFiles(dir, filterFn = () => true) {

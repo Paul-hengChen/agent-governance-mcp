@@ -1,7 +1,11 @@
 // Coded by @qa-engineer
-// Tests for specs/c6-c11-prompt-state-injection.md (C6 fail-loud footer +
-// C11 constitution dedup) and specs/c6-c11-prompt-state-injection-architecture.md
-// (S01a/S01b/S02/S03 contracts, L1/L2 dedup, DR-6/DR-7).
+// Tests for the state footer appended to every role prompt: when the handoff
+// file is missing or unreadable, the prompt says so loudly (naming the paths
+// it looked at) instead of silently showing no state; and the constitution
+// is delivered only once per session, not again by both the hook and the
+// prompt. The footer cases are S01a/S01b/S02/S03 and the two de-dup layers
+// are L1/L2. (C6, C11; specs/c6-c11-prompt-state-injection.md and
+// specs/c6-c11-prompt-state-injection-architecture.md, DR-6/DR-7)
 //
 // Spec-to-Test map:
 //   AC-1 (genuine fresh, S01b)               -> t-s01b-*
@@ -48,13 +52,15 @@ const { setActiveStorage, FileHandoffStorage } = await import(path.join(ROOT, "d
 
 setActiveStorage(new FileHandoffStorage());
 
-// e123b9 J2 (spec AC1 — FLIPPED): resolveCurrentLanePaths is lane-scoped now.
-// None of this file's fixture workspaces carry a `.git` (they're plain
+// resolveCurrentLanePaths is lane-scoped. None of this file's fixture
+// workspaces carry a `.git` (they're plain
 // mkdtempSync temp dirs), so resolveCurrentLane falls back to PRIMARY_LANE
 // ("_primary") for every one of them — prompts/build.ts (a sanctioned
 // resolveCurrentLanePaths caller) resolves the same way in production.
+// (e123b9 J2, spec AC1)
 const HANDOFF_REL = path.join(".current", "_primary", "handoff.md");
-// E137 (footer.bothpaths): the legacy flat path the read-only parser falls back to.
+// The older flat path the read-only parser falls back to (Copy/Strings
+// footer.bothpaths, E137).
 const FLAT_HANDOFF_REL = path.join(".current", "handoff.md");
 const S03_HEADLINE = "constitution already in context via hook — omitted";
 const S03_RECOVERY = "(If you do NOT see the governance constitution earlier in this session, " +
@@ -123,9 +129,9 @@ test("AC-1/S01b: genuinely fresh managed workspace names the resolved path + sou
     const text = buildPromptForRole("skill-coordinator-lite.md", "d", ws, false, "workspace_path arg", false)
       .messages[0].content.text;
     assert.ok(text.includes(path.join(ws, HANDOFF_REL)), "footer must name the exact resolved handoff path");
-    // E137 AC7 (spec ruling item 4, Copy/Strings footer.bothpaths): the read
-    // path falls back lane -> flat, so the "not found" diagnostic must name
-    // BOTH absolute paths that were looked at, verbatim.
+    // The read path falls back lane -> flat, so the "not found" diagnostic must
+    // name BOTH absolute paths that were looked at, verbatim. (E137 AC7, spec
+    // ruling item 4, Copy/Strings footer.bothpaths)
     assert.ok(
       text.includes(`No handoff.md found at ${path.join(ws, HANDOFF_REL)} or at the legacy flat path ${path.join(ws, FLAT_HANDOFF_REL)}`),
       "S01b must name both the lane path and the legacy flat path (E137 footer.bothpaths)",
@@ -166,7 +172,7 @@ test("AC-2/S01a: unmanaged path renders 'resolution suspect', names path+source,
       .messages[0].content.text;
     assert.ok(text.includes("resolution suspect"), "an unmanaged path must render the S01a stronger lead");
     assert.ok(text.includes(ws), "footer must name the resolved (wrong) path — this is what makes a mismatch diffable (AC-2)");
-    // E137 AC7 (footer.bothpaths): S01a names both absolute paths too.
+    // S01a (wrong path) names both absolute paths too. (E137 AC7, footer.bothpaths)
     assert.ok(
       text.includes(`No handoff.md found at ${path.join(ws, HANDOFF_REL)} or at the legacy flat path ${path.join(ws, FLAT_HANDOFF_REL)}`),
       "S01a must name both the lane path and the legacy flat path (E137 footer.bothpaths)",
@@ -217,8 +223,8 @@ test("AC-3/S02: a future schema_version (refuse-loud migration throw) also rende
 });
 
 // ---------------------------------------------------------------------------
-// Task item 2 — normal handoff -> state JSON block UNCHANGED (C6 must be
-// additive-only on the not-found/error branches; the happy path is untouched).
+// Normal handoff -> state JSON block UNCHANGED: the loud footer is added only
+// on the not-found/error branches; the happy path is untouched. (C6, task item 2)
 // ---------------------------------------------------------------------------
 
 test("normal handoff: state parses -> JSON state block renders exactly as before C6 (no S01/S02 text)", async () => {
@@ -280,8 +286,9 @@ test("DR-6: omitConstitution=true changes ONLY the constitution slice — skill 
 });
 
 // ---------------------------------------------------------------------------
-// C6-03 / AC-6 — resolvePrdPath's existsSync guard (test-only per DR-7: no
-// production change; this regression-locks the guard that already exists).
+// AC-6 — resolvePrdPath's existsSync guard: a stale prd_path pointing at a
+// missing file is dropped. No production change here; these tests keep the
+// existing guard from being removed. (C6-03, DR-7)
 // ---------------------------------------------------------------------------
 
 function fixtureState(prdPath) {
@@ -363,7 +370,7 @@ test("C6-03/AC-6: a LIVE (existing) state.prd_path is still trusted verbatim (co
 // generous ceiling — a failure backstop, not the expected runtime — so the
 // test resolves fast under normal load and only pays the full wait when the
 // server genuinely never replies (cold-start-under-full-suite-concurrency
-// was flaking the old fixed-sleep-then-kill version: see docs/backlog.md E15).
+// made an older fixed-sleep-then-kill version flaky). (E15)
 function sendPromptRequests(spawnOpts, requests, waitMs = 20000) {
   return new Promise((resolve) => {
     const dist = path.join(ROOT, "dist", "index.js");
@@ -517,7 +524,7 @@ test("C11/AC-7 L2 fail-safe: stale (>120s), malformed, and absent markers all de
 });
 
 // ---------------------------------------------------------------------------
-// D1 — prompt-arg-workspace-fallback (specs/d1-prompt-arg-workspace-fallback.md)
+// A workspace_path prompt arg that does not look like a path is ignored.
 // looksLikePath() gates resolveWorkspacePath()'s arg-acceptance branch so a
 // free-text workspace_path arg (Claude Code's slash-command convention stuffs
 // any text typed after "/teamwork ..." into this single argument slot) falls
@@ -527,9 +534,9 @@ test("C11/AC-7 L2 fail-safe: stale (>120s), malformed, and absent markers all de
 // top-level IIFE connects a stdio transport unconditionally at import time,
 // with no guard; verified by reading index.ts directly), so every case below
 // spawns the real compiled server via sendPromptRequests, exactly like the
-// existing AC-4/AC-7/AC-8 e2e tests.
+// existing AC-4/AC-7/AC-8 e2e tests. (D1, specs/d1-prompt-arg-workspace-fallback.md)
 //
-// D1 Spec-to-Test map:
+// Spec-to-Test map for this block:
 //   AC-1 (non-path-shaped arg falls back)        -> t-d1-ac1
 //   AC-2 (existing-dir arg unchanged)             -> already covered above (the
 //                                                     AC-4/e2e dedup test's 3rd
@@ -638,8 +645,8 @@ test("D1/AC-5: absent workspace_path arg is byte-identical to pre-D1 — still r
 });
 
 // ---------------------------------------------------------------------------
-// e123b8 J1 AC2 — normalizeWorkspacePath (index.ts): resolveWorkspacePath's
-// result must be absolute AND normalized for EVERY source. A bare "~" or a
+// AC2 — normalizeWorkspacePath (index.ts): resolveWorkspacePath's
+// result must be absolute AND normalized for EVERY source. (e123b8 J1) A bare "~" or a
 // leading "~/" expands to os.homedir(); path.resolve then anchors a relative
 // path at the server's cwd; an already-absolute input is unchanged.
 // normalizeWorkspacePath/resolveWorkspacePath live in index.ts, which — like

@@ -1,18 +1,16 @@
 // Coded by @qa-engineer
-// Tests for spec: p0-onboarding-lite-default.
-// Covers bin/agc-init.mjs scaffolding (T43), package.json bin wiring (T44),
+// Tests the onboarding path that defaults new workspaces to lite mode:
+// bin/agc-init.mjs scaffolding (T43), package.json bin wiring (T44),
 // and bin/agent-governance-context.mjs lite-default variant switching (T45).
-// Spec-to-Test map lives in qa_reports/review_p0-onboarding-lite-default.md.
+// The spec-to-test map was kept in the QA review for this work, not here.
+// (p0-onboarding-lite-default)
 //
-// AC1/AC2/AC3 contract-flip (E34, 2026-07-17, qa-engineer): `agc init` used
-// to seed `.current/handoff.md` with a `pm:Not_Started` tuple that has NO
-// outgoing ALLOWED_TRANSITIONS edge — every consumer workspace was dead on
-// arrival (live incident, an adopter project). The fix (bin/agc-init.mjs) stops
-// writing handoff.md entirely: the transition matrix's only fresh-workspace
-// key is `null:null` (file absent), so the first `pm:In_Progress` write
-// creates it via the normal edge. AC1/AC2/AC3 below are re-pinned to this new
-// contract; see qa_reports/expected-red_e34-agc-init-dead-end-seed.txt and
-// qa_reports/review_T-E34-01.md for the full disposition.
+// AC1/AC2/AC3 pin that `agc init` does NOT write `.current/handoff.md`. A
+// seeded `pm:Not_Started` state has no outgoing ALLOWED_TRANSITIONS edge, so
+// a freshly initialised workspace could never make its first state write.
+// The only fresh-workspace key in the transition matrix is `null:null` (file
+// absent), so the first `pm:In_Progress` write creates the file through the
+// normal edge. (E34, T-E34-01)
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -62,14 +60,11 @@ test("AC1: agc init creates .config.json + tasks.md with expected templates, no 
     "agc init must NOT create .current/handoff.md (E34 — a seeded prev tuple dead-ends ALLOWED_TRANSITIONS)",
   );
 
-  // E100 re-pin (2026-08-31, T-E100-02): configTemplate now carries a
-  // "host": "claude-code" key so a brand-new workspace's coordinator prompt
-  // composition includes the host-tagged fragments (prompts/skill-manifest.ts)
-  // from its very first `agc init`. Was `{ schema_version: 1 }` — this shape
-  // change is the declared, expected red in
-  // qa_reports/expected-red_e100-e101-dispatch-declaration.txt.
-  // e106-init-artifacts-flag re-pin: schema_version is now 2, and this
-  // fixture (outside git) defaults to "artifacts": "local" (AC1/AC14).
+  // configTemplate carries a "host": "claude-code" key so a brand-new
+  // workspace's coordinator prompt includes the host-tagged fragments
+  // (prompts/skill-manifest.ts) from its very first `agc init`. (E100,
+  // T-E100-02) schema_version is 2, and because this fixture is outside git
+  // it defaults to "artifacts": "local". (e106-init-artifacts-flag AC1/AC14)
   const cfg = JSON.parse(fs.readFileSync(path.join(ws, ".current", ".config.json"), "utf-8"));
   assert.deepEqual(cfg, { schema_version: 2, host: "claude-code", artifacts: "local" });
 
@@ -79,16 +74,14 @@ test("AC1: agc init creates .config.json + tasks.md with expected templates, no 
 });
 
 test("AC2: agc init leaves .config.json and tasks.md byte-for-byte unchanged on re-run of a FRESH init (re-pinned E34; scope narrowed by E100 — see companion below)", () => {
-  // E100 (2026-08-31, T-E100-02): this title's "byte-for-byte unchanged"
-  // claim is now true ONLY for the fresh-init-then-rerun shape exercised
-  // here — run 1 already seeds "host": "claude-code" via configTemplate, so
-  // run 2 hits the has-host short-circuit and skips. It is NOT a general
-  // "re-run never touches .config.json" claim any more: a config that
-  // predates E100 (host-less) is deliberately CHANGED on re-run — that is
-  // the whole point of the upsert (T-E100-01). See the companion test
-  // immediately below for that (complementary) case. Flagged by
-  // code-reviewer round 2/3 (review_reports/review_T-E100-01.md, QA gap #1)
-  // as "a green test whose title is false" pre-fix.
+  // This title's "byte-for-byte unchanged" claim holds ONLY for the
+  // fresh-init-then-rerun shape tested here: run 1 already writes
+  // "host": "claude-code" via configTemplate, so run 2 sees the host key and
+  // skips. It is NOT a general "re-run never touches .config.json" claim: a
+  // host-less config from an older init is deliberately CHANGED on re-run,
+  // which is the point of the upsert. The companion test below covers that
+  // case; without it this test's title would overstate what it checks.
+  // (E100, T-E100-01, T-E100-02)
   const ws = mkTmp("agc-init-ac2-");
   assert.equal(runInit(ws).status, 0);
 
@@ -113,12 +106,11 @@ test("AC2: agc init leaves .config.json and tasks.md byte-for-byte unchanged on 
 });
 
 test("AC2-companion (E100): a pre-existing host-less .config.json (pre-E100 shape) is CHANGED on re-run — host added, schema_version + every other key preserved", () => {
-  // Complements AC2 above: proves the byte-identical claim is scoped to
-  // fresh-init, not general. A workspace that ran `agc init` before E100
-  // shipped has a .config.json with no "host" key — re-running `agc init`
-  // (the documented dogfood migration step) MUST upsert it, not leave it
-  // alone, or the two workspaces that demonstrated the original defect
-  // (this repo, an adopter project) would stay host-less forever.
+  // Complements AC2 above: proves the byte-identical claim is limited to a
+  // fresh init. A workspace initialised by an older `agc init` has a
+  // .config.json with no "host" key. Re-running `agc init` (the documented
+  // migration step) MUST add it, not leave the file alone, or existing
+  // workspaces would stay host-less forever. (E100)
   const ws = mkTmp("agc-init-ac2-companion-hostless-");
   fs.mkdirSync(path.join(ws, ".current"), { recursive: true });
   const preE100Config = '{\n  "schema_version": 1,\n  "cutApprovalAutoTier": {}\n}\n';
@@ -138,8 +130,8 @@ test("AC2-companion (E100): a pre-existing host-less .config.json (pre-E100 shap
     preE100Config,
     "content MUST change on re-run — this is the E100 self-heal, deliberately the opposite of AC2's byte-identical claim for a fresh config",
   );
-  // e106-init-artifacts-flag: this fixture (outside git, no "artifacts" key)
-  // also gains "artifacts": "local" on the same re-run.
+  // This fixture is outside git and has no "artifacts" key, so the same
+  // re-run also adds "artifacts": "local". (e106-init-artifacts-flag)
   assert.deepEqual(
     JSON.parse(after),
     { schema_version: 1, cutApprovalAutoTier: {}, host: "claude-code", artifacts: "local" },

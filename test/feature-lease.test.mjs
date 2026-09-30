@@ -1,15 +1,15 @@
 // Coded by @qa-engineer
-// Tests for specs/e1-feature-scoped-state-design.md (T-E1-05).
+// Tests for the feature lease: while one feature is fresh and unfinished in
+// the workspace, a write that starts a DIFFERENT feature is rejected with
+// FEATURE_LEASE_HELD instead of silently overwriting the first feature's
+// state. The lease is a pure predicate over three handoff fields that every
+// storage mode already has (active_feature/status/last_updated), so it needs
+// no schema bump and behaves the same in file AND SQLite mode. See
+// gates/feature-lease.ts and the lease check in tools/handoff-orchestrator.ts.
+// (specs/e1-feature-scoped-state-design.md, T-E1-05)
 //
-// The E1 feature lease converts the D5/D9/D10 "second feature silently
-// clobbers the workspace slot" incident class into a loud, governed rejection
-// (FEATURE_LEASE_HELD). It is derive-only (a-min): a pure predicate over the
-// three oldest, universal handoff fields (active_feature/status/last_updated)
-// — no schema bump, uniform in file AND SQLite storage mode. See
-// gates/feature-lease.ts and tools/handoff-orchestrator.ts's gate block.
-//
-// Ratified calibrations (PM, 2026-07-12 — see spec "Open Questions —
-// resolved"): LEASE_TTL_MIN = 30; Blocked counts as lease-held = YES.
+// Settled values from the spec: LEASE_TTL_MIN = 30, and a Blocked incumbent
+// still holds the lease.
 //
 // Spec-to-Test map:
 //   isFeatureLeaseHeld same-feature short-circuit    -> P1
@@ -20,7 +20,7 @@
 //   isFeatureLeaseHeld null/undefined prevState        -> P6
 //   Orchestrator gate — file mode                      -> FM1..FM5
 //   Orchestrator gate — SQLite mode                     -> SQ1..SQ3
-//   Skill-text pinning (T-E1-02/T-E1-03 prose)          -> S1..S5
+//   Skill-text pinning (release SOP + coordinator prose) -> S1..S5
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -144,9 +144,9 @@ function mkWs(prefix = "flease-") {
 function backdateLastUpdated(ws, minutesAgo) {
   const p = resolveCurrentLanePaths(ws).handoffPath;
   const raw = fs.readFileSync(p, "utf-8");
-  // E148 (docs/backlog.md row E148): nonSuspectStampAt carries the same real
-  // seconds entropy as a plain now()-derived backdate but deterministically
-  // forces ms !== 0, so this can never itself land on HAND_AUTHORED_STAMP_RE.
+  // nonSuspectStampAt gives the same real seconds as a plain now()-based
+  // backdate but always forces ms !== 0, so the backdated stamp can never
+  // look hand-authored to HAND_AUTHORED_STAMP_RE. (E148)
   const stamp = nonSuspectStampAt(-minutesAgo * 60_000);
   fs.writeFileSync(p, raw.replace(/^last_updated:\s*"[^"]*"$/m, `last_updated: "${stamp}"`), "utf-8");
 }
@@ -162,12 +162,12 @@ async function seedFileState(ws, feature, agent, status) {
     pendingNotes: ["seed"],
     lastAgent: agent,
   });
-  // E148: force the seed's last_updated off the wall clock, but KEEP it
-  // fresh (unlike test/e148-seed-stamp.mjs's default SAFE_SEED_STAMP, which
-  // is a fixed 2026-01-01 date) — many tests in this file (FM1/FM2, the E10
-  // AC1/AC2/AC5 series) depend on the seeded incumbent being FRESH relative
-  // to Date.now() for FEATURE_LEASE_HELD to actually hold, which a stale
-  // fixed-past stamp would silently break. See test/e148-seed-stamp.mjs.
+  // Replace the seed's wall-clock last_updated with a stamp that cannot look
+  // hand-authored, but keep it FRESH (unlike test/e148-seed-stamp.mjs's
+  // default SAFE_SEED_STAMP, a fixed 2026-01-01 date). Many tests here (FM1/FM2,
+  // the lease-override AC1/AC2/AC5 series) need the seeded incumbent to be
+  // fresh relative to Date.now() so FEATURE_LEASE_HELD actually holds; a fixed
+  // past stamp would let the lease expire and silently break them. (E148)
   forceSeedStamp(ws, freshNonSuspectStamp());
 }
 
@@ -390,8 +390,9 @@ sqliteDescribe("SQLite mode: FEATURE_LEASE_HELD gate matrix", () => {
 });
 
 // ============================================================================
-// Skill-text pinning (T-E1-02 release-SOP re-baseline + T-E1-03 coordinator
-// escalation row / gate note), mirroring the T-D10-03/C13-06 pinning convention.
+// Skill-text pinning: the release SOP and the coordinator's escalation row
+// must keep describing the lease, so an edit to the prose cannot silently
+// drop it. Same grep-based style as the other skill-text pins. (T-E1-02, T-E1-03)
 // ============================================================================
 
 function readContentFile(f) {
@@ -466,9 +467,10 @@ test("S6: content/coord-03-core-fallback.md carries the FEATURE_LEASE_HELD Escal
 });
 
 // ============================================================================
-// E1A amendment (post-release lease terminal-marker + negative-age guard)
-// -- specs/e1-feature-scoped-state-design.md, "## Amendment (2026-07-12)"
-// AC-E1A-1..7. gates/feature-lease.ts:70-94.
+// Release closing write releases the lease, and a future-dated last_updated
+// never holds it (a negative age must not count as fresh).
+// specs/e1-feature-scoped-state-design.md, "## Amendment (2026-07-12)"
+// AC-E1A-1..7; gates/feature-lease.ts. (E1A)
 //
 // Spec-to-Test map (E1A):
 //   AC-E1A-1 (closing write releases the lease)         -> E1A-1
@@ -499,8 +501,8 @@ test("E1A-1: release-engineer's CLOSING-write signal (last_agent=release-enginee
 test("E1A-2: release-engineer's OPENING write (no next_role set) still HOLDS the lease (AC-E1A-2)", () => {
   // WHY: the opening write (SOP step 2) never sets next_role. If the terminal
   // clause fired here too, the lease would release WHILE release mechanics
-  // (git commit/tag/push) are still in flight — reopening exactly the
-  // D5/D9/D10 race the lease exists to prevent.
+  // (git commit/tag/push) are still in flight, letting a second feature take
+  // over the workspace mid-release, which is what the lease exists to prevent.
   const prev = {
     active_feature: "feat-x",
     status: "In_Progress",
@@ -556,7 +558,7 @@ test("E1A-3c: release-engineer escalation with next_role=qa-engineer still HOLDS
 });
 
 test("E1A-3d: release-engineer with next_role explicitly undefined still HOLDS (AC-E1A-3 / no-next_role variant)", () => {
-  // WHY: distinct from E1A-2's "key never set" shape — this pins that an
+  // WHY: distinct from the E1A-2 test's "key never set" shape — this pins that an
   // explicit `next_role: undefined` (as opposed to the key being entirely
   // absent from the object) is likewise never `=== "pm"` and therefore never
   // satisfies the terminal clause. Both shapes must behave identically.
@@ -667,10 +669,10 @@ test("S7: content/skill-release-engineer.md SOP step 12 pins agent_id=\"release-
 });
 
 // ============================================================================
-// S8 (e8-success-telemetry, T-E8-05/T-E8-07): step 11b's informational
-// success-metrics note pins alongside the still-byte-intact E1A step-12
-// contract — the two must coexist, not clobber one another. Extends the S7
-// pinning convention above rather than duplicating a new test file.
+// S8: the release SOP's informational success-metrics note (step 11b) must
+// sit alongside the unchanged step-12 lease-release contract; adding one
+// must not overwrite the other. Same pinning style as S7 above.
+// (e8-success-telemetry, T-E8-05/T-E8-07)
 // ============================================================================
 
 test("S8: content/skill-release-engineer.md carries step 11b — the success-metrics emit note is automatic/best-effort and names .current/<lane>/metrics.jsonl (E174a)", () => {
@@ -702,15 +704,13 @@ test("S8: content/skill-release-engineer.md carries step 11b — the success-met
 });
 
 // ============================================================================
-// E13 (e13-terminal-marker-advisory) — terminal-marker resilience to the
-// heal-drop class. Repro-first (bugfix mode, spec AC7): E13-R1 below was
-// authored BEFORE the gates/feature-lease.ts predicate change and verified RED
-// against the unmodified predicate (recorded in
-// qa_reports/expected-red_e13-terminal-marker-advisory.txt); it turns green
-// with the T-E13-02 fix.
+// The release-closing marker must survive a later heal-write that drops
+// next_role: a durable closing signature in pending_notes still releases
+// the lease. E13-R1 below reproduces the original bug and was confirmed
+// failing against the old gates/feature-lease.ts predicate before the fix
+// (spec AC7). (E13, e13-terminal-marker-advisory, T-E13-06)
 //
-// Spec-to-Test map (E13, sr-engineer repro slice — qa-engineer extends per
-// T-E13-06):
+// Spec-to-Test map:
 //   AC2 (second occurrence: heal drops next_role,
 //        pending_notes preserved -> lease released)   -> E13-R1
 //   AC1 (first occurrence: next_role never set at write
@@ -725,22 +725,20 @@ test("S8: content/skill-release-engineer.md carries step 11b — the success-met
 // ============================================================================
 
 test("E13-R1: heal-drop class — closing write carried the full terminal triple, then a heal-style re-persist preserved pending_notes verbatim but dropped the transient next_role; the lease must be RELEASED (spec AC2, second occurrence)", async () => {
-  // WHY: the v3.77.0 close-out incident. The closing write was CORRECT when
-  // written (full E1A triple, confirmed by read-back). Later, an unrelated
-  // read triggered readHandoffState's fire-and-forget migration heal-write
-  // (tools/handoff.ts ~506-544), which re-passes pendingNotes verbatim
-  // (~line 523) but — per next_role's documented TRANSIENT semantics (AC-3) —
-  // never carries next_role forward. The pre-E13 terminal marker keyed on
-  // next_role === "pm" surviving indefinitely, so the post-heal state wrongly
-  // re-armed a dead lease and stalled the next feature's PM start for the
-  // ~30-min TTL. The durable closing signature (pending_notes[0] =~
-  // /^Released v/) survives the heal; the marker must accept it.
+  // WHY: a correct closing write (full terminal triple) can later be
+  // rewritten by readHandoffState's background migration heal-write
+  // (tools/handoff.ts), which keeps pendingNotes verbatim but, because
+  // next_role is transient, never carries next_role forward. A marker that
+  // relied only on next_role === "pm" would then treat a shipped feature's
+  // lease as held and stall the next feature's PM start for the ~30-min TTL.
+  // The closing signature (pending_notes[0] =~ /^Released v/) survives the
+  // heal, so the marker must accept it.
   setActiveStorage(new FileHandoffStorage());
   const ws = mkWs("flease-e13r1-");
   resetSession(ws);
   markStateRead(ws);
 
-  // Step 1 — release-engineer's closing write, full E1A terminal triple +
+  // Step 1 — release-engineer's closing write, full terminal triple +
   // closing-signature pending_notes (skill-release-engineer SOP step 12).
   await writeHandoffState({
     workspacePath: ws,
@@ -778,8 +776,8 @@ test("E13-R1: heal-drop class — closing write carried the full terminal triple
   assert.equal(postHeal.last_agent, "release-engineer", "sanity: last_agent preserved by the heal-style re-persist");
   assert.equal(postHeal.pending_notes[0], "Released v3.77.0", "sanity: pending_notes preserved verbatim by the heal-style re-persist");
 
-  // THE BUG (red pre-fix): the feature genuinely shipped, but the post-heal
-  // state no longer matches the exact triple, so the pre-E13 predicate
+  // THE BUG this reproduces: the feature genuinely shipped, but the post-heal
+  // state no longer matches the exact triple, so a triple-only predicate
   // reports the lease HELD and the next feature stalls out the TTL window.
   assert.equal(
     isFeatureLeaseHeld(postHeal, "feat-y", Date.now(), LEASE_TTL_MIN),
@@ -790,10 +788,9 @@ test("E13-R1: heal-drop class — closing write carried the full terminal triple
 
 test("E13-AC1: first-occurrence class — next_role never set on the closing write ITSELF (no heal involved), closing-signature pending_notes present — lease released (spec AC1)", () => {
   // WHY: distinct from E13-R1 (AC2), which needs a two-step heal-drop to
-  // reach the shape. AC1 is the v3.75.0 incident: release-engineer's closing
-  // write omitted next_role from the start (coordinator briefed it to, per
-  // the spec Problem Statement) — there is no prior "full triple" write and
-  // no heal step. The durable pending_notes signature alone must be enough.
+  // reach the shape. Here release-engineer's closing write omits next_role
+  // from the start — there is no prior "full triple" write and no heal step.
+  // The durable pending_notes signature alone must be enough.
   const prev = {
     active_feature: "feat-x",
     status: "In_Progress",
@@ -812,13 +809,12 @@ test("E13-AC1: first-occurrence class — next_role never set on the closing wri
 });
 
 test("E13-AC3: opening write regression assertion — pending_notes carries the OPENING signature (not /^Released v/), so the new disjunct never fires and the lease stays held (spec AC3)", () => {
-  // WHY: E1A-2 already pins "opening write holds" pre-E13. This test targets
-  // the E13 addition specifically: prove the new pending_notes disjunct does
-  // NOT accidentally widen to match the opening write's own notes ("release-
-  // engineer: starting release for <feature>"), which never begins with
-  // "Released v". Without this explicit case, a future edit to the regex
-  // (e.g. loosening the anchor) could silently reopen the D9/D10 race and no
-  // AC3 test would catch it directly at the pending_notes level.
+  // WHY: E1A-2 already pins "opening write holds" via next_role. This test
+  // pins that the pending_notes signature check does NOT widen to match the
+  // opening write's own notes ("release-engineer: starting release for
+  // <feature>"), which never begin with "Released v". Without it, loosening
+  // the regex anchor could release the lease mid-release and no test would
+  // catch it at the pending_notes level.
   const prev = {
     active_feature: "feat-x",
     status: "In_Progress",
@@ -836,12 +832,11 @@ test("E13-AC3: opening write regression assertion — pending_notes carries the 
 
 test("E13-AC5: Blocked status WITH closing-signature pending_notes still HOLDS — the pending_notes disjunct cannot bypass the status==='In_Progress' conjunct (spec AC5)", () => {
   // WHY: E1A-3b already pins Blocked+next_role="pm" still holds. This test
-  // targets the E13 addition specifically: even in the (contrived, but
+  // covers the pending_notes signature too: even in the (contrived, but
   // worth pinning) case where pending_notes ALSO carries the closing
   // signature, an interrupted/failed release sitting Blocked must not be
-  // mistaken for "shipped" — the status conjunct is evaluated with AND, not
-  // overridden by either disjunct branch. This is the defense-in-depth case
-  // the spec's AC5 escalation clause is meant to cover for the new disjunct.
+  // mistaken for "shipped" — the status check is combined with AND and is
+  // never overridden by either signature branch.
   const prev = {
     active_feature: "feat-x",
     status: "Blocked",
@@ -894,9 +889,9 @@ test("E13-AC6: content/skill-release-engineer.md carries the E13 terminal-marker
 // ============================================================================
 // E13-AC4: SQLite-mode orchestrator path — the call site passes
 // `pending_notes: undefined` for non-FileHandoffStorage, so the closing-
-// signature disjunct can never fire in SQLite mode even when the persisted
-// row's pending_notes would otherwise match it. Lease behavior stays
-// byte-for-byte TTL-bounded, unchanged from pre-E13 (spec AC4).
+// signature branch can never fire in SQLite mode even when the persisted
+// row's pending_notes would otherwise match it. In SQLite mode the lease
+// is still released only by the TTL (spec AC4).
 // ============================================================================
 
 sqliteDescribe("SQLite mode: E13 closing-signature pending_notes are inert (AC4)", () => {
@@ -1007,24 +1002,22 @@ test("S8b: step 11b sits between step 11 and step 12 (ordering) and the E1A step
 });
 
 // ============================================================================
-// E10 (e10-lease-override) — two additive, orthogonal mechanisms on top of the
-// E1/E1A/E13 lease predicate above: `lease_override` (human-attested bypass of
-// FEATURE_LEASE_HELD, any edge) and `bookkeeping_write` (non-substantive-write
-// timestamp preservation, same-feature only). Both file-mode only, both
-// transient/write-scoped (never persisted, never carried forward — spec AC3).
-// specs/e10-lease-override.md AC1-AC9; architecture DR-1: NO schema bump,
-// neither field is ever emitted to or read back from frontmatter.
-// §2 test-ownership: qa-engineer-owned (T-E10-08) — sr-engineer authored no
-// tests here (gates/lease-override.ts, tools/handoff-orchestrator.ts,
-// tools/handoff.ts changes only).
+// Two independent additions on top of the lease predicate above:
+// `lease_override` (a human-attested bypass of FEATURE_LEASE_HELD, on any
+// edge) and `bookkeeping_write` (an administrative same-feature write keeps
+// the existing last_updated, so it does not refresh the lease). Both are
+// file-mode only and apply to one write only — never persisted, never
+// carried forward (spec AC3) — so neither field is ever written to or read
+// back from frontmatter and no schema bump is needed.
+// (E10, specs/e10-lease-override.md AC1-AC9, DR-1, T-E10-08)
 //
-// Spec-to-Test map (E10):
+// Spec-to-Test map:
 //   AC1 (audited lease_override bypasses FEATURE_LEASE_HELD)   -> E10-AC1
 //   AC2 (unaudited override rejected, no silent fallthrough)    -> E10-AC2a, E10-AC2b
 //   AC3 (lease_override transient, never carried forward)       -> E10-AC3
 //   AC4 (migration heal-write preserves pre-heal last_updated)  -> "AC4 (e10): ..."
-//        (exact name from qa_reports/expected-red_e10-lease-override.txt —
-//        the authored red->green repro test, T-E10-01 reassigned to qa per §2)
+//        (the exact name the fix's reproduction list uses; the test was
+//        confirmed failing before the fix and passing after, T-E10-01)
 //   AC5 (bookkeeping_write preserves last_updated same-feature;
 //        sibling write without the flag still stamps fresh now())  -> E10-AC5a, E10-AC5b
 //   AC6 (bookkeeping_write + different active_feature hard-rejected;
@@ -1128,10 +1121,10 @@ test("E10-AC3: lease_override is transient — write N's bypass does NOT leak fo
   // is now the incumbent, freshly stamped by write N (In_Progress, seconds
   // old) — the normal FEATURE_LEASE_HELD predicate must hold it; there is no
   // residual bypass carried forward from write N's attestation.
-  // E148 (docs/backlog.md row E148): write N's own accepted write just
-  // stamped a live wall-clock last_updated; force it off the wall clock
-  // (staying FRESH, which this test's "seconds old" premise requires) before
-  // it becomes write N+1's prevState.
+  // Write N just stamped a live wall-clock last_updated; replace it with a
+  // stamp that cannot look hand-authored (staying FRESH, which this test's
+  // "seconds old" premise requires) before it becomes write N+1's prevState.
+  // (E148)
   forceSeedStamp(ws, freshNonSuspectStamp());
   resetSession(ws);
   markStateRead(ws);
@@ -1149,15 +1142,13 @@ test("E10-AC3: lease_override is transient — write N's bypass does NOT leak fo
   assert.equal(parseHandoff(ws).active_feature, "flease-b", "flease-b must remain the incumbent after the correctly-rejected write");
 });
 
-// --- AC4 repro (T-E10-01, red->green; see qa_reports/expected-red_e10-lease-override.txt) ---
+// --- AC4: the migration heal-write keeps the original last_updated ---
 //
-// Exact test name specified by sr-engineer's manifest (§2 reassignment: qa-
-// engineer authors this, since only qa may write test files). Red-proof
-// method (recorded in Phase 0.5 disposition below): the assertion fails
-// against pre-E10 code, verified by temporarily removing `bookkeepingWrite:
-// true` from the heal call site in tools/handoff.ts's readHandoffState (or
-// `git stash` the E10 diff) and observing last_updated stamped to now();
-// green against the landed fix.
+// The test name must stay exactly as written: the fix's reproduction list
+// names it. The assertion fails if `bookkeepingWrite: true` is removed from
+// the heal call site in tools/handoff.ts's readHandoffState, because
+// last_updated is then stamped to now(); it passes with the fix in place.
+// (T-E10-01)
 test("AC4 (e10): migration heal-write preserves pre-heal last_updated verbatim", async () => {
   setActiveStorage(new FileHandoffStorage());
   const ws = mkWs("flease-e10ac4-");
@@ -1201,14 +1192,13 @@ last_agent: "pm"
     "the migration heal-write must preserve the pre-heal last_updated verbatim, not stamp now() (AC4)",
   );
 
-  // e18-write-provenance (qa-owned re-baseline, T-E18-01): the preserved
-  // ORIGINAL_LAST_UPDATED ("2026-05-01T00:00:00.000Z") happens to match the new
-  // STAMP_PROVENANCE_SUSPECT gate's hand-authored stamp shape (seconds 00, ms
-  // .000) — an intended behavior change, not a regression (this is exactly the
-  // v0 fixture's own hand-authored shape, not a heal artifact). Prove the gate
-  // genuinely fires on this real lease scenario BEFORE proving the audited
-  // remediation note clears it — a vacuous "it fires" claim would mask a
-  // mis-wired gate just as easily as a missing one.
+  // The preserved ORIGINAL_LAST_UPDATED ("2026-05-01T00:00:00.000Z") has the
+  // hand-authored stamp shape (seconds 00, ms .000) that the
+  // STAMP_PROVENANCE_SUSPECT check rejects. That rejection is intended (it is
+  // the v0 fixture's own hand-authored stamp, not a heal artifact). Prove the
+  // check really fires here BEFORE proving the audited remediation note
+  // clears it, so a mis-wired check cannot pass unnoticed.
+  // (e18-write-provenance, T-E18-01)
   const suspectResult = await handleUpdateState({
     workspace_path: ws,
     active_feature: "flease-e10ac4-next",
@@ -1229,9 +1219,9 @@ last_agent: "pm"
     "the incumbent must remain untouched after the STAMP_PROVENANCE_SUSPECT rejection",
   );
 
-  // Practical consequence (the ORIGINAL AC4 pin, preserved): once the write
-  // acknowledges the contamination via an audited stamp-remediation note (which
-  // only clears the NEW E18 gate — it does not touch the feature-lease
+  // Practical consequence (the AC4 pin): once the write acknowledges the
+  // suspect stamp via an audited stamp-remediation note (which only clears
+  // the stamp-provenance check — it does not touch the feature-lease
   // predicate itself), the SUBSEQUENT different-feature write must still be
   // evaluated against the ORIGINAL (~2 months stale) age, not a heal-refreshed
   // fresh one — TTL auto-expiry releases the lease immediately.
@@ -1448,8 +1438,8 @@ sqliteDescribe("SQLite mode: E10 lease_override / bookkeeping_write are both ine
 
 // --- AC8 (const-08 §3.1 bullets pinning) ---
 //
-// Convention: mirrors E13's AC6 skill-text pinning test (S/AC-numbered tests
-// above, e.g. E13-AC6) and E1/E1A's S1-S8 series — grep-based, targets the
+// Convention: mirrors the skill-text pinning tests above (E13-AC6 and the
+// S1-S8 series) — grep-based, targets the
 // exact heading/bold-label + load-bearing substrings rather than the full
 // prose (prose wording is free-text, not pinned verbatim beyond the load-
 // bearing clauses spec AC8 calls out).
@@ -1492,11 +1482,12 @@ test("E10-AC8b: content/const-08-chain-31-mid.md carries the Bookkeeping-Write b
 });
 
 // ============================================================================
-// E9A (e9a-stamp-integrity, T-E9A-05): no-MCP-path relay Hard rule + amended
-// Output rule pinning. Mirrors the S1-S7 / T-E7-05 skill-text pinning
-// convention above — grep-based, targets the load-bearing phrases the
-// forensics converged on (never hand-edit / RELAY REQUIRED: prefix /
-// exact-literal-payload requirement) rather than the full prose.
+// Release-engineer without an MCP connection must never hand-edit the
+// handoff: it relays the state write instead. Pins that Hard rule and the
+// amended Output rule. Same grep-based skill-text pinning as S1-S7 above,
+// targeting the load-bearing phrases (never hand-edit / RELAY REQUIRED:
+// prefix / exact-literal-payload requirement) rather than the full prose.
+// (E9A, e9a-stamp-integrity, T-E9A-05; convention from T-E7-05)
 // ============================================================================
 
 test("E9A-S1: content/skill-release-engineer.md carries the CRITICAL no-MCP-path relay Hard rule, never hand-edit", () => {
@@ -1612,7 +1603,7 @@ test("E9A-S5 (regression guard): the pre-existing pinned template blocks survive
     "CRITICAL: End every reply with `— @release-engineer (<the model tier you were actually invoked with>)` per Constitution §1 (watermark).",
     "watermark reminder must remain the first non-blank body line, unshifted by the new E9A paragraph",
   );
-  // Pre-existing D10 push-rejection CRITICAL paragraph, still present verbatim.
+  // The pre-existing push-rejection CRITICAL paragraph is still present verbatim. (D10)
   assert.ok(
     tpl.includes(
       "CRITICAL: On any non-fast-forward push rejection or concurrent-release collision, STOP",
@@ -1630,14 +1621,14 @@ test("E9A-S5 (regression guard): the pre-existing pinned template blocks survive
 });
 
 // ============================================================================
-// E17 (e17-release-record-integrity, T-E17-04): record-integrity Hard rule
-// pinning. Mirrors the E9A-S1..S5 convention immediately above (same two
-// target files: content/skill-release-engineer.md's Hard rules block +
-// templates/claude-code-agents/release-engineer.md) — grep-based, targets
-// the four load-bearing phrases the backlog E17 row named rather than the
-// full prose: (i) git-diff-stat-derived file lists, (ii)
-// exists-on-disk-at-write-time, (iii) never-from-memory-of-the-dispatch-brief,
-// (iv) no-fabricated-review/QA rounds.
+// Release records must describe only what really happened. Pins the
+// record-integrity Hard rule, same style as the E9A-S1..S5 tests above
+// (same two target files: content/skill-release-engineer.md's Hard rules
+// block + templates/claude-code-agents/release-engineer.md). Grep-based, on
+// four load-bearing phrases rather than the full prose: (i) file lists come
+// from git diff --stat, (ii) cited files exist on disk when written, (iii)
+// never written from memory of the dispatch brief, (iv) no invented review
+// or QA rounds. (E17, e17-release-record-integrity, T-E17-04)
 // ============================================================================
 
 test("E17-S1: content/skill-release-engineer.md carries the CRITICAL record-integrity Hard rule bullet", () => {
@@ -1679,15 +1670,13 @@ test("E17-S2: the record-integrity Hard rule's incident-reason tail names the v3
   const ruleLine = ruleMatch[0];
   const ruleIdx = skill.indexOf(ruleLine);
 
-  // Retarget (T-W15-02, stale pin): the reason tail moved off the bullet
-  // LINE into a `<!-- rationale:start/end -->` fence immediately below it —
-  // asymmetrically with its three sibling CRITICAL Hard rules (E9A, D10,
-  // D10-adjacent, all of which keep their Reason tails inline and unfenced).
-  // prompts/build.ts:436 strips rationale fences on every buildPromptForRole
-  // dispatch, so this text no longer reaches a dispatched release-engineer
-  // at runtime (code-reviewer round 2/3, N10/N12) — this test therefore
-  // checks the SOURCE FILE only, same as before, but now asserts the fence
-  // itself EXISTS rather than assuming inline placement. That assertion is
+  // This rule's reason tail sits in a `<!-- rationale:start/end -->` fence
+  // right below the bullet line, unlike its three sibling CRITICAL Hard
+  // rules, which keep their Reason tails inline and unfenced.
+  // prompts/build.ts strips rationale fences on every buildPromptForRole
+  // dispatch, so this text does not reach a dispatched release-engineer
+  // at runtime. This test therefore checks the SOURCE FILE only and asserts
+  // the fence itself EXISTS rather than assuming inline placement. That assertion is
   // the point: it makes the asymmetry a pinned, visible fact of this test
   // suite rather than something a future edit could silently drop or
   // silently "fix" (by unfencing, or by deleting the tail outright) without
@@ -1764,21 +1753,21 @@ test("E17-S4 (regression guard): the pre-existing pinned template blocks and ski
     "CRITICAL: End every reply with `— @release-engineer (<the model tier you were actually invoked with>)` per Constitution §1 (watermark).",
     "watermark reminder must remain the first non-blank body line, unshifted by the new E17 paragraph",
   );
-  // Pre-existing D10 push-rejection CRITICAL paragraph, still present verbatim.
+  // The pre-existing push-rejection CRITICAL paragraph is still present verbatim. (D10)
   assert.ok(
     tpl.includes(
       "CRITICAL: On any non-fast-forward push rejection or concurrent-release collision, STOP",
     ),
     "pre-existing D10 push-rejection CRITICAL paragraph must still be present",
   );
-  // Pre-existing E9A no-MCP-path relay paragraph, still present verbatim.
+  // The pre-existing no-MCP-path relay paragraph is still present verbatim. (E9A)
   assert.ok(
     /CRITICAL: If this session has no MCP tool-invocation path at all/.test(tpl),
     "pre-existing E9A no-MCP-path relay CRITICAL paragraph must still be present",
   );
-  // Pre-existing driftBaselineIds paragraph, still present — the new E17
-  // paragraph sits between the RELAY-REQUIRED (E9A) and driftBaselineIds
-  // paragraphs per the backlog E17 row, and must not have displaced either.
+  // Pre-existing driftBaselineIds paragraph, still present — the
+  // record-integrity paragraph sits between the RELAY-REQUIRED and
+  // driftBaselineIds paragraphs, and must not have displaced either. (E17)
   assert.ok(
     tpl.includes("append this release's shipped task IDs to `driftBaselineIds`"),
     "pre-existing driftBaselineIds paragraph must still be present",
@@ -1792,8 +1781,9 @@ test("E17-S4 (regression guard): the pre-existing pinned template blocks and ski
   assert.ok(exampleIdx > 0, "example line must not be the first line");
   assert.equal(lines[exampleIdx - 1].trim(), "", "line before the example suffix must be blank");
 
-  // Skill-side regression: pre-existing D10 + E9A Hard rules and SOP step 8
-  // HEREDOC commit-message prose are byte-unchanged by the new E17 bullet.
+  // Skill-side regression: the push-rejection and relay Hard rules and the
+  // SOP step 8 HEREDOC commit-message prose are byte-unchanged by the
+  // record-integrity bullet. (D10, E9A, E17)
   const skill = readContentFile("skill-release-engineer.md");
   assert.ok(
     skill.includes(

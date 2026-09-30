@@ -1,14 +1,15 @@
 // Coded by @qa-engineer
-// Tests for backlog E22 (D5 follow-on / 104447-F0 A3) / T-E22-01: the opt-in
-// stale-dispatch watch-file notify emit. tools/stale-notify.ts
+// Tests for the opt-in stale-dispatch watch-file notify: when a dispatched
+// role goes quiet past the threshold, the server can write a small watch-file
+// that an outside tool can watch. tools/stale-notify.ts
 // (`notifyStaleDispatch`) is the unit under test; tools/handoff.ts wires it
-// into the v10 `stale_dispatch` advisory at `readHandoffState` (tw_get_state)
-// time; tools/config.ts surfaces the arming key `staleDispatchNotifyFile`.
+// into the v10 `stale_dispatch` advisory at `readHandoffState` time (the
+// state read every session starts with); tools/config.ts surfaces the arming
+// key `staleDispatchNotifyFile`. (E22, T-E22-01)
 //
-// The backlog row (docs/backlog.md E22) IS the spec for this ticket — no
-// specs/<feature>.md exists. Spec-to-test map against the row's own claims,
-// cross-checked against code-reviewer's APPROVED review_reports/review_T-E22-01.md:
-//   opt-in / key absent = fully disarmed, byte-identical pre-E22 payload -> I1, I2, U1-U3
+// There is no specs/<feature>.md for this ticket; the backlog row is the
+// spec. Map of its claims to tests:
+//   opt-in / key absent = fully disarmed, payload unchanged from before   -> I1, I2, U1-U3
 //   armed emit on threshold crossing, correct payload + atomic publish     -> U4, U5, I3
 //   dedupe: one emit per (dispatched_at, role), cursor lives in watch-file -> U6-U8, I4
 //   fresh emit on re-arm (new dispatched_at) / hand-deleted watch-file     -> U7, U9, I5
@@ -16,20 +17,16 @@
 //     unwritable dir, dir-as-target, corrupt prior watch-file)               I7, I8, I9
 //   file-mode only, no new handoff state / no schema bump                 -> I1 (schema
 //                                                                             pin), S1
-//   code-reviewer's flagged vector: corrupt/future-schema config + stale  -> I7, I8,
-//     dispatch — RE-PINNED post-E31 (e31-config-nonfatal, qa-engineer):        I7b/I8b
-//     at E22 QA time the read threw before notify.error was ever reached
-//     (escalated as backlog E31, a non-blocking correctness finding, not a
-//     T-E22-01 FAIL). E31 made loadConfig non-fatal server-wide, so this
-//     vector now matches the review doc's ORIGINAL claim: tw_get_state
-//     returns an envelope carrying `config_error`, never throws (see the
-//     I7-I9 block header comment below for the full writeup).
+//   corrupt/future-schema config + stale dispatch: the state read        -> I7, I8,
+//     returns a normal envelope carrying `config_error` and never throws,     I7b/I8b
+//     because loadConfig degrades to defaults instead of throwing (see
+//     the I7-I9 block header below). (E31)
 //     Common disarmed path (valid config, key absent) unperturbed          -> I2
 //
 // Fail-direction under test throughout: fail LOUD, never SILENT and never
 // THROWN. A broken config or an unwritable watch-file must surface inside
-// `stale_dispatch.notify.error`, never crash the mandatory tw_get_state
-// pre-flight read, and never be swallowed into a false "disarmed" null.
+// `stale_dispatch.notify.error`, never crash the mandatory first state
+// read, and never be swallowed into a false "disarmed" null.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -69,15 +66,14 @@ function isoMinutesAgo(n) {
   return new Date(Date.now() - n * 60000).toISOString();
 }
 
-// e123b9 J2 (spec AC3/AC14): the FIRST call in a test simulates a legacy
-// pre-migration fixture and belongs at the flat path. Some tests (I5) call
-// this a SECOND time on the SAME workspace, between two readHandoffState()
-// calls, to simulate "the coordinator writing a fresh dispatch" — by then
-// the first readHandoffState() has already migrated the workspace (AC3), so
-// a second flat-path write would create genuine dual presence and trip
-// HANDOFF_LAYOUT_CONFLICT (AC14) instead of exercising I5's actual target
-// (re-arming the stale-dispatch watch). Write wherever the CURRENT live
-// handoff already lives — the lane path once migrated, else flat.
+// Writes the handoff wherever the live one currently lives. The FIRST call in
+// a test simulates a legacy pre-migration fixture, so it lands at the flat
+// path. Some tests (I5) call this a SECOND time on the same workspace,
+// between two readHandoffState() calls, to simulate the coordinator writing
+// a fresh dispatch. By then the first read has already migrated the
+// workspace to the lane path, so a second flat-path write would leave two
+// handoff files and trip HANDOFF_LAYOUT_CONFLICT instead of testing the
+// re-arm. Hence: the lane path once migrated, else flat. (e123b9 J2)
 function writeRawHandoff(ws, { staleStamp, nextRole = "sr-engineer", schemaVersion = CURRENT_VERSIONS.handoff }) {
   const lanePath = resolveCurrentLanePaths(ws).handoffPath;
   const target = fs.existsSync(lanePath) ? lanePath : path.join(ws, ".current", "handoff.md");
@@ -424,31 +420,22 @@ test("I6: armed config but the dispatch is still WITHIN the threshold window -> 
 });
 
 // ============================================================================
-// I7-I9 — code-reviewer's flagged vector: corrupt/future-schema config +
-// stale dispatch. review_reports/review_T-E22-01.md originally claimed this
-// "will newly surface stale_dispatch.notify.error even when E22 was never
-// armed" (fail-loud-but-never-throws). At E22 QA time that claim did NOT
-// hold: `readHandoffState` called `markStateRead` -> `findTasksFile` ->
-// `resolveTaskPaths` -> `loadConfig` for TASK-PATH resolution BEFORE the
-// stale_dispatch/notify computation was reached, and THAT EARLIER loadConfig
-// call threw uncaught on corrupt/future-schema config — the whole
-// tw_get_state pre-flight read threw, never reaching notify at all. Filed as
-// backlog E31 (qa_reports/review_T-E22-01.md Phase 1).
+// I7-I9 — a corrupt or future-schema config combined with a stale dispatch.
+// The state read must stay loud but never throw. `readHandoffState` calls
+// `markStateRead` -> `findTasksFile` -> `resolveTaskPaths` -> `loadConfig`
+// for task-path resolution before the stale-dispatch notify is computed, so
+// a throwing loadConfig would break the whole mandatory first read.
 //
-// RE-PINNED (E31, e31-config-nonfatal): loadConfig no longer throws on ANY
-// config-file fatality (unreadable/unparseable/non-object-root/future-schema)
-// — it degrades to defaults and the failure is cached + surfaced via
-// getConfigError(), which tools/handoff.ts spreads onto the tw_get_state
-// envelope as `config_error`. The ORIGINAL review_T-E22-01.md claim is now
-// the ACTUAL contract: corrupt/future-schema config + stale dispatch no
-// longer throws — tw_get_state returns a normal envelope carrying
-// `config_error`, and (because notifyStaleDispatch's own getConfigError()
-// check short-circuits before ever touching staleDispatchNotifyFile) the
-// stale_dispatch advisory's notify sub-object also surfaces a matching
-// per-emit error (tools/stale-notify.ts) rather than emitting or going silent.
-// I7b/I8b re-confirm the SAME non-throw holds even with zero stale-dispatch
-// involvement (bare workspace, no handoff.md at all) — proving the fix lives
-// in loadConfig itself, not in the stale-dispatch wiring.
+// loadConfig therefore never throws on any config-file problem
+// (unreadable/unparseable/non-object-root/future-schema): it degrades to
+// defaults, caches the failure and surfaces it via getConfigError(), which
+// tools/handoff.ts spreads onto the state-read envelope as `config_error`.
+// notifyStaleDispatch checks getConfigError() first and returns before it
+// touches staleDispatchNotifyFile, so the stale_dispatch advisory's notify
+// sub-object carries a matching error (tools/stale-notify.ts) rather than
+// emitting or going silent. I7b/I8b show the same non-throw on a bare
+// workspace with no handoff.md at all, so the protection lives in loadConfig
+// itself, not in the stale-dispatch wiring. (E31, e31-config-nonfatal)
 // ============================================================================
 
 test("I7 (re-pinned E31): corrupt (unparsable) .config.json + stale dispatch -> tw_get_state returns an envelope carrying config_error, never throws", () => {
@@ -498,7 +485,7 @@ test("I7b/I8b (re-pinned E31) — pre-existing-scope pin still holds: the SAME n
   resetSession();
   writeConfig(ws, "{ this is broken json");
   // No handoff.md written at all — there is no next_role/dispatched_at, so
-  // there is nothing for E22's stale-dispatch wiring to even react to. The
+  // there is nothing for the stale-dispatch wiring to even react to. The
   // (non-)throw is entirely a task-path config-resolution behavior.
   let parsed;
   assert.doesNotThrow(() => {
@@ -529,28 +516,29 @@ test("I9: armed config but the watch-file's target path is an existing directory
 });
 
 // ============================================================================
-// S1 — no new handoff state / no schema bump (backlog row's explicit
-// constraint): E22 must not require a schema_version change to plumb.
+// S1 — no new handoff state and no schema bump: the watch-file notify keeps
+// its dedupe cursor in the watch-file itself, so it must not need a
+// schema_version change. (E22)
 // ============================================================================
 
 test("S1: sanity — CURRENT_VERSIONS.handoff/config are unchanged by E22 (no schema bump; the dedupe cursor lives entirely in the watch-file, not in handoff state)", () => {
   assert.equal(CURRENT_VERSIONS.handoff, 15, "E22 must not have bumped the handoff schema version");
-  // e106-init-artifacts-flag bumped config 1->2 (unrelated to E22) — this
-  // sanity check pins the CURRENT value, not that E22 itself left it at 1.
+  // The config schema is at 2 for an unrelated reason (the init artifacts
+  // flag); this pins the current value, not that the notify left it at 1.
+  // (e106-init-artifacts-flag)
   assert.equal(CURRENT_VERSIONS.config, 2, "E22 must not have bumped the config schema version");
 });
 
 // ============================================================================
-// E29 (T-E29-01, e-p3-tail-batch, qa-owned new coverage) — reviewer probe 3:
-// the Crash-Resume pointer appended to `stale_dispatch.message` (tools/handoff.ts)
-// must (a) actually reach the E22 watch-file payload end-to-end through the
-// real tw_get_state -> notifyStaleDispatch wiring, and (b) not disturb the
-// (dispatched_at, role) dedupe contract — the dedupe key is a TUPLE, not the
-// message string, so a longer message must not re-arm or break a repeat read.
-// Distinct from the unit-level advisory() fixture helper above (which builds
-// its OWN fabricated pre-E29 message and never exercises tools/handoff.ts's
-// real message-construction code at all) — these two tests are the only ones
-// in this file that assert on the REAL end-to-end message content.
+// The Crash-Resume pointer appended to `stale_dispatch.message`
+// (tools/handoff.ts) must (a) reach the watch-file payload end-to-end through
+// the real readHandoffState -> notifyStaleDispatch wiring, and (b) not
+// disturb the (dispatched_at, role) dedupe: the dedupe key is that pair, not
+// the message string, so a longer message must not re-arm or break a repeat
+// read. The unit-level advisory() fixture helper above builds its own
+// made-up message and never runs the real message code, so these two tests
+// are the only ones here that check the real end-to-end message. (E29,
+// T-E29-01)
 // ============================================================================
 
 test("E29a: the watch-file payload's message carries the E29 Crash-Resume pointer end-to-end (not just the base Copy/Strings sentence)", () => {
@@ -592,7 +580,7 @@ test("E29b (probe 3): a longer E29 message does not break the (dispatched_at, ro
   assert.equal(second.stale_dispatch.notify.emitted, false, "dedupe key is (dispatched_at, role), not message content — repeat read must still be a skip");
   assert.equal(second.stale_dispatch.notify.skipped_duplicate, true);
   // message content itself is irrelevant to the dedupe decision, but it
-  // should remain the same E29-shaped string on the advisory even on the
+  // should still carry the Crash-Resume pointer on the advisory even on the
   // deduped read (the advisory is recomputed fresh every read; only the
   // WATCH-FILE emit is skipped).
   assert.match(second.stale_dispatch.message, /Crash-Resume/);

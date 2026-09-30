@@ -22,11 +22,11 @@ import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-// d6-host-capability-compose-axis (T-D6-04): content/skill-coordinator.md is
-// retired — it is no longer a compose source (all 3 render paths route
-// through composeSkill/SKILL_SEGMENTS). Reconstruct the full monolith text via
-// the real composer (taskTool:true reproduces it byte-for-byte, AC5) instead
-// of raw-reading a file that no longer exists.
+// content/skill-coordinator.md no longer exists: all 3 render paths compose
+// the coordinator SOP through composeSkill/SKILL_SEGMENTS. Rebuild the full
+// text through the real composer (taskTool:true reproduces the old file
+// byte-for-byte) instead of reading a file that no longer exists.
+// (d6-host-capability-compose-axis, T-D6-04)
 const { composeSkill, hostCapabilitiesFor } = await import(path.join(ROOT, "dist", "prompts", "skill-manifest.js"));
 const COORD = composeSkill(
   "skill-coordinator.md",

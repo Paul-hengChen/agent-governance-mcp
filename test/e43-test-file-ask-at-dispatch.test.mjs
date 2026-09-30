@@ -1,15 +1,15 @@
 // Coded by @qa-engineer
-// Tests for ticket E43 (docs/backlog.md, order 7) — T-E43-02.
+// Tests that the decision "may qa-engineer create a new test file?" is made by the
+// dispatcher at brief time, not asked of the user by a subagent that cannot ask.
 //
-// The defect E43 closed: Constitution §2's *Conditional test writing* bullet said
-// "qa-engineer MUST ask the user before creating any [test file]", which a Task-dispatched
-// subagent cannot do — no ask channel, no resumption path. Its only available compliances
-// were (a) halt the round and lose the context or (b) decide and disclose; E38's QA round
-// took (b) and recorded the deviation. A rule everyone must violate to function teaches
-// that rules are negotiable, so the fix moves the ask UPSTREAM to the dispatcher, who is
-// reachable by a human at brief time.
+// Why: Constitution §2's *Conditional test writing* bullet used to say "qa-engineer MUST
+// ask the user before creating any [test file]". A Task-dispatched subagent has no way to
+// ask and no way to resume, so it could only stop and lose its context, or decide on its
+// own and disclose it. A rule that every run must break teaches that rules are optional,
+// so the ask now happens upstream, at the dispatcher, whom a human can reach when the
+// brief is written. The backlog row is the spec; there is no specs/ file. (E43, T-E43-02)
 //
-// Ticket-to-Test map (the backlog row is the spec — mini-chain, no specs/ file):
+// Ticket-to-Test map:
 //   fix (i) dispatcher decides            -> t-e43-branch-a-reads-the-brief,
 //                                            t-e43-coord02-template-line,
 //                                            t-e43-coord02-rule-is-target-conditional
@@ -22,12 +22,12 @@
 //   normative text must not be stripped   -> t-e43-branches-survive-strip
 //   guard-the-guard (must red pre-fix)    -> t-e43-assertions-red-against-pre-e43-text
 //
-// WHY these are CLASS assertions where possible (E66 option (ii) / E69 precedent, both of
-// which paid off): the realistic regression is not "someone deletes branch (b)" — it is
+// Why these check the shape of the rule rather than today's exact wording, where possible:
+// the realistic regression is not "someone deletes branch (b)" — it is
 // someone adding a fourth branch that reintroduces a fall-through, adding a conditional
 // template line without stating when it applies, or drifting the `Test-file placement`
 // label in one of the three files that must agree on it. Instance pins on today's wording
-// would miss all three.
+// would miss all three. (Same approach as E66 option (ii) and E69.)
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -50,8 +50,9 @@ const QA_SOP = read("skill-qa-engineer.md");
 // three files — drift here is silent (the brief carries a line nobody is told to read).
 const PLACEMENT_LABEL = "Test-file placement";
 
-// Hermetic fixture: the exact pre-E43 §2 sentence. Embedded as a literal, NOT read from
-// git history — test/render-structure.test.mjs's E77 meta-test forbids history-as-fixture.
+// Self-contained fixture: the exact §2 sentence from before this fix. Embedded as a literal,
+// NOT read from git history, because test/render-structure.test.mjs forbids tests that read
+// fixtures out of git history. (E77)
 const PRE_E43_BULLET =
   "- **Conditional test writing** (qa-engineer): Not every task needs new tests. If existing test files cover the scope, modify them. If NO relevant test file exists, qa-engineer MUST ask the user before creating any — do not assume.";
 
@@ -82,7 +83,7 @@ test("t-e43-branches-partition-with-catch-all (round-1 F2): §2's branches are o
 
   // The class invariant, not an instance pin: whatever the last branch says, its predicate
   // must be residual ("otherwise"), so no acting context can fall through all of them. The
-  // pre-fix round-1 text failed exactly here — (b) required a reachable human and (c)
+  // first draft of the fix failed exactly here — (b) required a reachable human and (c)
   // required Task dispatch, leaving an unattended inline run uncovered.
   const last = b.get(letters[letters.length - 1]);
   assert.match(last, /^otherwise\b/i, `the last branch must be a catch-all beginning "otherwise" — got: ${last.slice(0, 80)}`);
@@ -112,9 +113,9 @@ test("t-e43-no-silent-create-or-skip: both unaccountable outcomes are barred, no
 });
 
 test("t-e43-retired-form-absent-everywhere: the unexecutable pre-E43 instruction survives in no content file", () => {
-  // Class assertion across every constitution fragment and role SOP, not just the two
-  // files this ticket edited: the whole point of E43 is that this instruction cannot be
-  // complied with under Task dispatch, so a copy of it anywhere is the same defect.
+  // Checks every constitution fragment and role SOP, not just the two files this change
+  // edited: this instruction cannot be followed under Task dispatch, so a copy of it
+  // anywhere is the same defect. (E43)
   const files = fs.readdirSync(CONTENT).filter((f) => /^(const-\d\d-|coord-\d\d-|skill-).*\.md$/.test(f));
   assert.ok(files.length > 20, "sanity: the content/ sweep must actually be finding fragments");
   const offenders = files.filter((f) => /MUST ask the user before creating/i.test(read(f)) || /ask the user whether tests are needed/i.test(read(f)));
@@ -176,11 +177,11 @@ test("t-e43-placement-label-is-one-string: the dispatcher, the SOP, and §2 agre
 });
 
 test("t-e43-branches-survive-strip: the normative branch text is delivered in NON-fullDetail bundles too", () => {
-  // Guards the efficiency temptation recorded in review_reports/review_T-E43-01.md Round 2:
-  // rationale-fencing part of this bullet would strip it from every non-fullDetail bundle.
+  // Guards against a tempting size saving that an earlier code review pointed out: marking
+  // part of this bullet as rationale would strip it from every non-fullDetail bundle.
   // Fencing the CAUSAL clause is a legitimate future option; fencing any part of the three
   // branches, or the halting prohibition, would silently delete the rule from the bundle
-  // every dispatched role actually receives.
+  // every dispatched role actually receives. (T-E43-01)
   const rendered = applyTextTransforms(CONST05, { fullDetail: false });
   const bullet = conditionalBullet(rendered);
   const b = branches(bullet);
@@ -190,9 +191,10 @@ test("t-e43-branches-survive-strip: the normative branch text is delivered in NO
 });
 
 test("t-e43-assertions-red-against-pre-e43-text (guard-the-guard): the pins above genuinely detect the pre-E43 wording", () => {
-  // A regression pin that cannot fail against the defect it names is decoration. Replay the
-  // three load-bearing assertions against the hermetic pre-E43 literal and require each to
-  // throw. (E69/E76/E77 precedent: demonstrate the red, don't assert the green only.)
+  // A regression check that cannot fail against the defect it names proves nothing. Replay
+  // the three key assertions against the self-contained pre-fix literal and require each to
+  // throw: show the check fails on the old text, don't only show it passes on the new.
+  // (E69, E76, E77)
   assert.throws(() => {
     const b = branches(PRE_E43_BULLET);
     assert.deepEqual([...b.keys()], ["a", "b", "c"]);
@@ -206,9 +208,9 @@ test("t-e43-assertions-red-against-pre-e43-text (guard-the-guard): the pins abov
     assert.doesNotMatch(PRE_E43_BULLET, /MUST ask the user before creating/i);
   }, "the retired-form sweep must red on the pre-E43 bullet");
 
-  // And the round-1 text (branches present, but (c) pinned to Task dispatch and
-  // create-only) must red on BOTH round-1 findings — otherwise the F1/F2 pins would have
-  // passed the very draft the code reviewer rejected.
+  // And the first draft of the fix (branches present, but (c) limited to Task dispatch and
+  // to creating a file) must fail BOTH checks the code reviewer asked for — otherwise the
+  // F1/F2 checks would have passed the very draft the reviewer rejected.
   const ROUND1_BULLET =
     "- **Conditional test writing** (qa-engineer): If NO relevant test file exists, resolve placement by the channel actually available to you: (a) your dispatch brief names the target test file(s) or pre-authorizes creation → proceed on it, no ask; (b) no such line, but a human is reachable in your own context → ask before creating; (c) Task-dispatched, brief silent, no ask channel → decide, create, and disclose the choice in BOTH `pending_notes` and `qa_review`. Never create silently.";
   const r1 = branches(ROUND1_BULLET);

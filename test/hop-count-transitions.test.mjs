@@ -1,6 +1,6 @@
 // Coded by @qa-engineer
-// Tests for specs/d2-server-brake-accounting.md — the server-computed,
-// persisted hop_count counter and its HOP_CAP_EXCEEDED gate (T-D2-05).
+// Tests for the server-computed, persisted hop_count counter and its
+// HOP_CAP_EXCEEDED rejection. (specs/d2-server-brake-accounting.md, T-D2-05)
 //
 // Spec-to-Test map:
 //   AC-1 (persisted, server-computed field)      -> t-compute-*, t-e2e-accumulate
@@ -18,11 +18,11 @@
 // WHY: the hop counter is the one remaining cost-side circuit breaker
 // (const-01 Limits `hop` cap = 10) that used to live only in the
 // coordinator's in-memory arithmetic — exactly the failure mode a context
-// compaction or crash could silently reset. This ticket moves it onto the
+// compaction or crash could silently reset. It now uses the
 // same persisted, server-enforced machinery as qa_round/review_round/
 // visual_round; these tests pin that the new sibling mechanism (a) computes
 // correctly in isolation, (b) enforces the cap end-to-end through the real
-// tw_update_state orchestrator, and (c) survives a simulated crash by
+// state-write orchestrator, and (c) survives a simulated crash by
 // reconstructing purely from what's on disk (or in SQLite).
 
 import { test } from "node:test";
@@ -58,22 +58,22 @@ function mkWs(prefix = "hopcap-") {
   return ws;
 }
 
-// e1-feature-scoped-state-design (qa-owned re-baseline, T-E1-05): the E1
-// feature-lease gate now rejects ANY write whose active_feature differs from
+// The feature lease rejects ANY write whose active_feature differs from
 // the incumbent's while the incumbent is non-terminal (status != PASS) AND
 // fresh (last_updated within LEASE_TTL_MIN=30 min) — see
 // specs/e1-feature-scoped-state-design.md. t-e2e-feature-reset below writes a
-// NEW active_feature over a still-In_Progress incumbent, which is now exactly
-// the clobber FEATURE_LEASE_HELD exists to reject. This helper backdates the
+// NEW active_feature over a still-In_Progress incumbent, which is exactly
+// the overwrite FEATURE_LEASE_HELD exists to reject. This helper backdates the
 // incumbent's persisted last_updated past the TTL so the lease has gone stale
 // BEFORE the feature-change write — letting the fixture reach the hop_count
 // reset assertion it was written to test, without altering that assertion.
+// (T-E1-05)
 function backdateLastUpdated(ws, minutesAgo) {
   const p = resolveCurrentLanePaths(ws).handoffPath;
   const raw = fs.readFileSync(p, "utf-8");
-  // E148 (docs/backlog.md row E148): nonSuspectStampAt carries the same real
-  // seconds entropy as a plain now()-derived backdate but deterministically
-  // forces ms !== 0, so this can never itself land on HAND_AUTHORED_STAMP_RE.
+  // nonSuspectStampAt gives the same real seconds as a plain now()-based
+  // backdate but always forces ms !== 0, so the backdated stamp can never
+  // look hand-authored to HAND_AUTHORED_STAMP_RE. (E148)
   const stamp = nonSuspectStampAt(-minutesAgo * 60_000);
   const patched = raw.replace(/^last_updated:\s*"[^"]*"$/m, `last_updated: "${stamp}"`);
   fs.writeFileSync(p, patched, "utf-8");
@@ -82,10 +82,10 @@ function backdateLastUpdated(ws, minutesAgo) {
 const UPDATE_STATE_ENTRY = TOOL_REGISTRY.find((e) => e.name === "tw_update_state");
 
 async function dispatch(ws, args) {
-  // E148: force any already-on-disk last_updated off the wall clock before
-  // re-snapshotting freshness — closes the hazard across chained dispatch()
-  // calls, not just the initial seed. No-op on a brand-new workspace. See
-  // test/e148-seed-stamp.mjs.
+  // Replace any already-on-disk wall-clock last_updated with a stamp that
+  // cannot look hand-authored before re-snapshotting freshness, so chained
+  // dispatch() calls stay safe, not just the initial seed. No-op on a
+  // brand-new workspace. See test/e148-seed-stamp.mjs. (E148)
   forceSeedStampIfExists(ws);
   resetSession(ws);
   markStateRead(ws);
@@ -427,11 +427,11 @@ test("t-e2e-feature-reset: an active_feature change resets hop_count to a fresh 
   const atCap = await climbToHopCap(ws, "hop-reset-feat-a");
   assert.equal(atCap.hop_count, HOP_CAP_EXPORTED, "precondition: hop_count is at cap for feature-a");
 
-  // E1 feature-lease: age the incumbent (feature-a, still In_Progress) past
-  // LEASE_TTL_MIN=30 so the upcoming cross-feature write isn't rejected with
+  // Age the incumbent (feature-a, still In_Progress) past LEASE_TTL_MIN=30
+  // so the upcoming cross-feature write isn't rejected with
   // FEATURE_LEASE_HELD before it ever reaches the hop-cap/reset logic under
-  // test — this fixture predates the lease gate and modeled an in-flight
-  // clobber the gate now correctly blocks (see helper comment above).
+  // test. Without the backdate, the feature lease correctly blocks this
+  // overwrite (see helper comment above).
   backdateLastUpdated(ws, 31);
 
   // A NEW active_feature write on a legal edge from sr-engineer:In_Progress

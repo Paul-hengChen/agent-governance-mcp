@@ -1,15 +1,16 @@
 // Coded by @qa-engineer
-// Tests for specs/d9-qa-review-scoped-append.md — AC1 through AC4 (T-D9-05).
+// Tests that a state write's qa_review text is recorded only against the
+// task(s) the write names, never copied into every open task's evidence.
+// Spec: specs/d9-qa-review-scoped-append.md, AC1 through AC4. (T-D9-05)
 //
-// WHY this file exists (not folded into an existing one): the D8 incident
-// this spec fixes is an end-to-end orchestrator behavior — a real
-// tw_update_state write's qa_review auto-append fanning out into every open
-// task's evidence file/row. test/reviewer-completed-tasks-gate.test.mjs is
-// the closest sibling (same class of bug: an orchestrator gate keyed on
-// parsed write args, exercised via handleUpdateState against BOTH storage
-// backends) and this file mirrors its structure and helpers deliberately.
-// tasks.md row T-D9-05 and specs/d9-qa-review-scoped-append.md Dependencies
-// both sanction a new file for this cut.
+// Why a separate file: the defect is end-to-end orchestrator behaviour. A
+// real state write carrying qa_review used to append that text into the
+// evidence file (or SQLite row) of every open task, not just the reviewed
+// one (D8). test/reviewer-completed-tasks-gate.test.mjs covers the same
+// kind of bug (an orchestrator check keyed on parsed write arguments, run
+// through handleUpdateState against both storage backends), so this file
+// deliberately mirrors its structure and helpers. The spec's Dependencies
+// section allows a new file for this work.
 //
 // Spec-to-Test map:
 //   AC1 (FAIL + review_task_ids=["T-X"] touches ONLY T-X, file mode)  -> FM1
@@ -18,10 +19,10 @@
 //   AC2 (same, SQLite mode)                                          -> SQ2
 //   AC3 (both empty -> QA_REVIEW_TARGET_REQUIRED, nothing recorded, file) -> FM3
 //   AC3 (same, SQLite mode)                                          -> SQ3
-//   AC4 (N open tasks, exactly 1 evidence file/row changes, file mode) -> FM1 (same test — the D8 incident shape IS the AC1 test)
+//   AC4 (N open tasks, exactly 1 evidence file/row changes, file mode) -> FM1 (same test — the many-open-tasks shape that broke IS the AC1 test)
 //   AC4 (same, SQLite mode — exactly 1 reports row, not N)            -> SQ1
-//   AC5 (read-side untouched) is a code-review-owned architectural
-//     invariant, not independently exercised here — see review_reports/review_T-D9-01.md.
+//   AC5 (read side untouched) is a design property checked by code review,
+//     not exercised here. (review_reports/review_T-D9-01.md)
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -72,18 +73,20 @@ async function seedFileState(ws, feature, agent, status) {
     pendingNotes: ["seed"],
     lastAgent: agent,
   });
-  // E148 (docs/backlog.md row E148): force the seed's last_updated off the
-  // wall clock — see test/e148-seed-stamp.mjs.
+  // Pin the seed's last_updated to a fixed value instead of the wall clock,
+  // so it can never land on the whole-minute ".000" shape that makes the
+  // next write look hand-authored and get refused. (E148, see
+  // test/e148-seed-stamp.mjs)
   forceSeedStamp(ws);
 }
 
-// Recreates the actual D8 incident precondition: a tasks.md with N > 1 open
-// (incomplete) tasks, the exact shape the deleted `storage.listTasks(...)
+// Builds the shape that used to break: a tasks.md with N > 1 open
+// (incomplete) tasks, which the removed `storage.listTasks(...)
 // .filter((t) => !t.completed)` fallback used to fan out into. Also seeds a
 // pre-existing qa_reports/ evidence file for each "other" task, so the test
 // can assert their content is byte-identical afterward — not merely that no
-// NEW file appeared (the actual D8 incident appended verbatim TEXT into
-// pre-existing unrelated files, it did not only create new ones).
+// NEW file appeared, because the old bug appended text into existing,
+// unrelated files rather than only creating new ones. (D8)
 function seedOpenTasksAndPriorEvidence(ws, targetId, otherIds) {
   const lines = [`- [ ] ${targetId} the task actually under review`];
   for (const id of otherIds) lines.push(`- [ ] ${id} an unrelated open task`);
@@ -136,8 +139,8 @@ test("FM1/AC1/AC4: FAIL write with review_task_ids=[T-X] among N open tasks touc
   assert.match(targetBody, /FAIL — full test suite regression/, "target file must carry the FAIL text");
 
   // Every OTHER open task's evidence file must be BYTE-IDENTICAL to its
-  // pre-write content — this is the exact invariant the D8 incident broke
-  // (verbatim duplicate-append into unrelated files).
+  // pre-write content — the old bug broke exactly this by appending a copy
+  // of the review text into unrelated files. (D8)
   for (const id of otherIds) {
     const otherPath = path.join(ws, "qa_reports", `review_${id}.md`);
     const afterBody = fs.readFileSync(otherPath, "utf-8");
@@ -335,7 +338,7 @@ sqliteDescribe("SQLite mode: QA_REVIEW_TARGET_REQUIRED / scoped-append gate matr
         lastAgent: "qa-engineer",
       });
       // Seed N pre-existing report rows for OTHER tasks — the SQLite
-      // equivalent of the D8 incident's pre-existing polluted review files.
+      // counterpart of the unrelated review files the old bug appended into.
       await storage.recordReview(dir, ["T-QRSA-SQL-OTHER-1", "T-QRSA-SQL-OTHER-2"], "PASS", "qa-engineer", "prior unrelated PASS");
       resetSession(dir);
       storage.readState(dir);

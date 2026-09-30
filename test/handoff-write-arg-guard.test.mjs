@@ -51,9 +51,9 @@ const DIST_INDEX = path.join(PROJECT_ROOT, "dist", "index.js");
  * `messages` has appeared on stdout (parsed incrementally as data arrives).
  * `waitMs` is a generous ceiling — a failure backstop, not the expected
  * runtime — so the test resolves fast under normal load and only pays the
- * full wait when the server genuinely never replies (cold-start-under-full-
- * suite-concurrency was flaking the old fixed-sleep-then-kill version: see
- * docs/backlog.md E15).
+ * full wait when the server genuinely never replies. A fixed sleep before
+ * killing the server flaked when the full suite's concurrency slowed the
+ * server's cold start. (E15)
  *
  * @param {object[]} messages - JSON-RPC message objects to send in order.
  * @param {number}   [waitMs=20000] - ceiling ms before giving up and killing.

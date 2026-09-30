@@ -24,8 +24,9 @@ function mkWorkspace() {
 }
 
 // writeRaw always seeds a RAW pre-migration fixture at the legacy flat path
-// (that's the shape being simulated: a pre-e123b9-J2 on-disk file) — left
-// flat deliberately, per e123b9 J2 spec AC1/AC9.
+// .current/handoff.md, because that is the old on-disk layout these tests
+// simulate; it is left flat on purpose, not moved to a lane directory.
+// (e123b9 J2, spec AC1/AC9)
 function writeRaw(ws, body) {
   const p = path.join(ws, ".current", "handoff.md");
   fs.writeFileSync(p, body);
@@ -59,19 +60,11 @@ test("AC-1: writeHandoffState stamps schema_version: 15 in YAML (e123a-lane-layo
   parseHandoff(ws);
   await writeHandoffState(ws, "feat-x", "In_Progress", [], ["next"], undefined, "pm", 0);
   const content = read(ws);
-  // c9-protocol-fields bump: handoff schema was 7 (added next_role/resume_of/
-  // review_verdict, stamp-only migration). b8-external-ref-ledger had added
-  // external_refs (=6). c14-dispatch-pins bumped it to 8 (added dispatch_pins,
-  // stamp-only migration). d2-server-brake-accounting bumped it to 9 (added
-  // hop_count, seeded to 0). d5-server-side-stale-dispatch-detection bumped it
-  // to 10 (added dispatched_at, stamp-only, seeds nothing). e2-bugfix-repro-gate
-  // bumped it to 11 (added dispatch_mode, stamp-only, seeds nothing).
-  // e8-success-telemetry (qa-owned re-baseline) bumps it to 12 (added
-  // qa_rounds_total/review_rounds_total/visual_rounds_total, seeded to 0).
-  // e114-cut-approval-inheritance (qa-owned re-baseline) bumps it to 14
-  // (added evidence_schema pin, stamp-only, seeds nothing).
-  // e123a-lane-layout-migration (qa-owned re-baseline) bumps it to 15 (added
-  // dispatch_mechanism/dispatch_mechanism_tier, stamp-only, seeds nothing).
+  // A fresh write is stamped with the current handoff schema version, 15.
+  // Every schema bump must update this literal on purpose; what each version
+  // added is listed in docs/schema-versions.md. The latest bump added
+  // dispatch_mechanism/dispatch_mechanism_tier and seeds nothing.
+  // (e123a-lane-layout-migration)
   assert.match(content, /schema_version:\s*15/);
 });
 
@@ -120,10 +113,8 @@ qa_round: 0
   await yieldMacrotask();
 
   const healed = read(ws);
-  // e23-evidence-schema-versioning (qa-owned re-baseline): chain climbs
-  // v0→v1→v2→v3→v4→v5→v6→v7→v8→v9→v10→v11→v12→v13→v14; e123a-lane-layout-
-  // migration (qa-owned re-baseline) extends it one more step to v15; healed
-  // file lands at CURRENT (=15).
+  // A v0 file climbs every migration step in order, v0 → v1 → … → v15, and
+  // the healed file lands at the current version (15).
   assert.match(healed, /schema_version:\s*15/);
 });
 
@@ -203,9 +194,8 @@ qa_round: 0
   assert.equal(parsed.active_feature, "round-trip");
   assert.deepEqual(parsed.completed_tasks, ["T01"]);
   assert.deepEqual(parsed.pending_notes, ["next_role: pm"]);
-  // e114-cut-approval-inheritance (qa-owned re-baseline): v0 → v1 →
-  // ... → v12 → v13 → v14 chain; e123a-lane-layout-migration (qa-owned
-  // re-baseline) extends it to v15, where CURRENT now lands.
+  // The migration runs the full v0 → v1 → … → v15 chain and the file lands
+  // at the current version (15).
   assert.match(read(ws), /schema_version:\s*15/);
 });
 
@@ -294,9 +284,8 @@ qa_round: 0
   // Both reads return migrated state without throwing.
   assert.equal(JSON.parse(json1).active_feature, "concurrent");
   assert.equal(JSON.parse(json2).active_feature, "concurrent");
-  // File ended up healed (one of the writes won; the other swallowed quietly).
-  // e114-cut-approval-inheritance / e123a-lane-layout-migration (qa-owned
-  // re-baselines): chain lands at CURRENT (=15).
+  // File ended up healed (one of the writes won; the other swallowed quietly)
+  // at the current version (15).
   assert.match(read(ws), /schema_version:\s*15/);
 });
 

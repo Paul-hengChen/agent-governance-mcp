@@ -1,38 +1,37 @@
 // Coded by @qa-engineer
-// Tests for backlog E38 (docs/backlog.md row E38) / T-E38-01: the
-// write-time next_role LOOKAHEAD ADVISORY. tools/handoff-orchestrator.ts
-// (effectiveAllowedSuccessors, :1231-1300ish, and the post-write advisory
-// block feeding the E28-precedent success-envelope `warnings` array) is the
-// unit under test. Non-rejecting by construction: no GATE_REGISTRY entry, no
-// error code, no pipeline step. The feature's entire value is that the
-// warning can be trusted — both defects code-reviewer found in
-// review_reports/review_T-E38-01.md (round 1: hardcoded feature_changed:false
-// false-warned on the just-shipped E37 qa-engineer:PASS -> design-auditor
-// edge at hop cap; round 2: an over-broad self-loop filter emptied the
-// remedy list on qa-engineer:In_Progress / pm:Blocked, printing a
-// categorically false "(none ...)" message) were INVISIBLE in the diff and
-// found only by sweeping states x counter regimes — so these tests go
-// through the tw_update_state tool boundary (the shape a user actually
-// sees), not just the bare helper.
+// Tests for the write-time next_role lookahead warning: when a state write
+// names a next_role that cannot legally act from the state just written,
+// the success envelope's `warnings` array says so and lists the roles that
+// can. tools/handoff-orchestrator.ts (effectiveAllowedSuccessors and the
+// post-write warning block) is the unit under test. It never rejects: no
+// GATE_REGISTRY entry, no error code, no pipeline step. (E38, T-E38-01)
 //
-// No specs/<feature>.md exists — the backlog row + review_reports/review_T-E38-01.md
-// (three rounds) are the spec. File placement: no existing test file (e28's,
-// e35's, qa-flow's) covers next_role-lookahead scope, so this is a new file,
-// mirroring test/e28-shrink-warning.test.mjs's through-the-tool pattern (same
-// warnings-array envelope mechanism, same seed-then-single-write shape).
+// The warning is only useful if it can be trusted, so false warnings and
+// empty remedy lists are the failures that matter. Two such defects were
+// invisible in the diff and showed up only when every state was tried under
+// each counter setting: a hardcoded feature_changed:false warned wrongly on
+// the legal qa-engineer:PASS -> design-auditor edge at the hop cap, and an
+// over-broad self-loop filter emptied the remedy list on
+// qa-engineer:In_Progress and pm:Blocked, printing a false "(none ...)"
+// message. That is why these tests go through the tw_update_state tool
+// boundary (what a user actually sees), not just the bare helper.
+//
+// The requirements come from the backlog row, not a specs/ file. The
+// through-the-tool shape (seed a state, then one write) mirrors
+// test/e28-shrink-warning.test.mjs, which uses the same `warnings` array.
 //
 // Spec-to-test map:
-//   live 07-23 shape fires, remedy names pm:In_Progress + sr-engineer:In_Progress -> L1
-//   E37 edge silent at hop 2 (trivially, in-table)                          -> S-E37-lo
-//   E37 edge silent at hop 10 (the ROUND-1 REGRESSION PIN)                  -> S-E37-hi
-//   resume_of whitelist: pm:In_Progress + next_role=code-reviewer silent    -> S-RESUME
-//   round-cap collapse whitelist: qa_round at cap, next_role=pm silent     -> S-ROUNDCAP
-//   self-loop whitelist: sr-engineer:In_Progress self-loop silent          -> S-SELFLOOP
-//   non-empty, NAMED remedy on qa-engineer:In_Progress (ROUND-2 REGRESSION
-//     PIN — round 2 emptied this exact list)                                -> R-QA-IP
-//   non-empty, NAMED remedy on pm:Blocked (ROUND-2 REGRESSION PIN)          -> R-PM-BLOCKED
+//   the originally reported shape warns, remedy names pm:In_Progress + sr-engineer:In_Progress -> L1
+//   qa-engineer:PASS -> design-auditor silent at hop 2 (in-table)     -> S-E37-lo
+//   same edge silent at hop 10 (guards the hop-cap false warning)     -> S-E37-hi
+//   resume_of allowance: pm:In_Progress + next_role=code-reviewer silent -> S-RESUME
+//   capped-counter allowance: qa_round at cap, next_role=pm silent    -> S-ROUNDCAP
+//   self-loop allowance: sr-engineer:In_Progress self-loop silent     -> S-SELFLOOP
+//   non-empty, NAMED remedy on qa-engineer:In_Progress (guards the
+//     emptied-remedy-list defect)                                       -> R-QA-IP
+//   non-empty, NAMED remedy on pm:Blocked (same defect)               -> R-PM-BLOCKED
 //   never rejects: bogus next_role still succeeds and persists             -> N-NEVERREJECT
-//   coexists with E28: one write, two warnings, neither clobbers the other -> C-E28COEXIST
+//   coexists with the shrink warning: one write, two warnings, neither clobbers the other -> C-E28COEXIST
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -75,8 +74,9 @@ async function seedAndRead(opts) {
     visualRound: opts.visualRound ?? 0,
     ...(opts.seed ?? {}),
   });
-  // E148: force the seed's last_updated off the wall clock — see
-  // test/e148-seed-stamp.mjs (docs/backlog.md row E148).
+  // Force the seed's last_updated to a fixed value, so a wall-clock stamp
+  // can never look hand-written and trip STAMP_PROVENANCE_SUSPECT on the
+  // write under test (E148, see test/e148-seed-stamp.mjs).
   forceSeedStamp(ws);
   resetSession();
   markStateRead(ws);
@@ -101,9 +101,9 @@ function envelopeOf(result) {
 
 // Extracts the "Actual allowed next (agent:status) pair(s): X." segment from
 // a next_role warning string, so tests assert on the NAMED successors rather
-// than merely "the string is non-empty" — the round-2 regression printed a
+// than merely "the string is non-empty" — an earlier defect printed a
 // non-empty-LOOKING but categorically FALSE message, so presence alone is
-// not a sufficient pin.
+// not a sufficient check.
 function remedyOf(warning) {
   const m = warning.match(/pair\(s\): (.*?)\. next_role is advisory-only/);
   assert.ok(m, `warning must contain the "pair(s): ..." remedy segment; got: ${warning}`);
@@ -133,11 +133,11 @@ test("L1: qa-engineer:FAIL + next_role=design-auditor warns, remedy names pm:In_
 });
 
 // ============================================================================
-// S-E37-lo / S-E37-hi: silent on E37's newly-legal edge, at hop 2 AND hop 10.
-// hop 10 is the ROUND-1 REGRESSION PIN: the hardcoded feature_changed:false
-// bug computed a SMALLER allowed set at hop cap and would have false-warned
-// on exactly this edge, re-emitting as prose the false signal E37 shipped
-// one commit earlier to delete.
+// S-E37-lo / S-E37-hi: silent on the legal qa-engineer:PASS -> design-auditor
+// edge, at hop 2 AND hop 10. Hop 10 matters most: a hardcoded
+// feature_changed:false computed a SMALLER allowed set at the hop cap and
+// warned wrongly on exactly this edge, repeating as a warning the false
+// rejection that making this edge legal had just removed. (E37)
 // ============================================================================
 
 test("S-E37-lo: qa-engineer:PASS + next_role=design-auditor is silent at hop_count=2", async () => {
@@ -211,8 +211,9 @@ test("S-ROUNDCAP: qa_round at cap collapses the allowed set to pm alone, and nex
 });
 
 test("S-SELFLOOP: sr-engineer:In_Progress self-loop (next_role=sr-engineer) is silent", async () => {
-  // pm:In_Progress -> sr-engineer:In_Progress is a build-entry hop gated by
-  // CUT_APPROVAL_REQUIRED — orthogonal to E38, so clear it on the seed.
+  // pm:In_Progress -> sr-engineer:In_Progress needs an approved ticket cut
+  // (CUT_APPROVAL_REQUIRED), which is unrelated to the lookahead warning, so
+  // the seed sets it.
   const ws = await seedAndRead({ lastAgent: "pm", status: "In_Progress", seed: { cutApproved: true } });
   const result = await runUpdate(ws, {
     agent_id: "sr-engineer",
@@ -228,7 +229,7 @@ test("S-SELFLOOP: sr-engineer:In_Progress self-loop (next_role=sr-engineer) is s
 });
 
 // ============================================================================
-// R-QA-IP / R-PM-BLOCKED: the ROUND-2 REGRESSION PIN. Round 2's over-broad
+// R-QA-IP / R-PM-BLOCKED: guards the emptied-remedy-list defect. An over-broad
 // `e.agent === nextTuple.agent` filter emptied the remedy list on exactly
 // these two states (every legal successor is same-agent), printing the
 // categorically false "(none ...)" fallback. Assert the REAL successors are
@@ -305,9 +306,9 @@ test("N-NEVERREJECT: a write carrying a bogus next_role still succeeds and still
 });
 
 // ============================================================================
-// C-E28COEXIST: a write that trips BOTH the E28 shrink warning and the E38
-// lookahead advisory must carry both entries in `warnings`, neither
-// clobbering the other.
+// C-E28COEXIST: a write that trips BOTH the shrink warning (dispatch_pins
+// lost an entry) and the lookahead warning must carry both entries in
+// `warnings`, neither clobbering the other. (E28, E38)
 // ============================================================================
 
 test("C-E28COEXIST: a single write triggering both a shrink warning and a lookahead advisory yields both, uncorrupted", async () => {
@@ -320,8 +321,8 @@ test("C-E28COEXIST: a single write triggering both a shrink warning and a lookah
     agent_id: "qa-engineer",
     status: "FAIL",
     blocking_reason: "e38/e28 coexistence probe",
-    dispatch_pins: { "sr-engineer": "fable" }, // drops release-engineer -> E28 shrink warning
-    next_role: "design-auditor", // not in {sr-engineer, pm} for qa-engineer:FAIL -> E38 advisory
+    dispatch_pins: { "sr-engineer": "fable" }, // drops release-engineer -> shrink warning (E28)
+    next_role: "design-auditor", // not in {sr-engineer, pm} for qa-engineer:FAIL -> lookahead warning (E38)
   });
   const envelope = envelopeOf(result);
   assert.ok(Array.isArray(envelope.warnings), "warnings array must be present");
