@@ -61,7 +61,7 @@ test("T31 AC-2 heal: legacy v0 config (no schema_version) heals to v1 on disk", 
 
 test("T31 AC-2 fast-path: a config already at CURRENT triggers no write-back (mtime unchanged)", async () => {
   const ws = mkWorkspace();
-  // e106-init-artifacts-flag bumped CURRENT_VERSIONS.config to 2 — the
+  // Adding the "artifacts" config field (e106) bumped CURRENT_VERSIONS.config to 2 — the
   // fast-path fixture must sit AT current, not at the old literal 1, or this
   // now exercises the v1->v2 heal-write path instead of the no-op path it's
   // meant to isolate.
@@ -99,7 +99,7 @@ test("T31 AC-4 (re-pinned E31): future schema_version degrades non-fatally — l
   assert.match(err, new RegExp(`config on-disk version 99 > server max ${CURRENT_VERSIONS.config}`));
 });
 
-// ---------- AC15 (e106): config v1→v2 heal-on-read is stamp-only ----------
+// ---------- config v1→v2 heal-on-read is stamp-only (AC15, e106) ----------
 
 test("AC15 (e106): config v1→v2 is stamp-only; artifacts stays absent", () => {
   const ws = mkWorkspace();
@@ -114,7 +114,7 @@ test("AC15 (e106): config v1→v2 is stamp-only; artifacts stays absent", () => 
   );
 });
 
-// ---------- AC16 (e106): artifacts field narrow-typed, non-fatal ----------
+// ---------- artifacts field narrow-typed, non-fatal (AC16, e106) ----------
 
 test("artifacts field narrow-typed, non-fatal on garbage input", () => {
   const wsLocal = mkWorkspace();

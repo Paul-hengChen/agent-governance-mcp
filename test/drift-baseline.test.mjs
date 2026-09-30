@@ -1,5 +1,5 @@
 // Coded by @qa-engineer
-// C4-05: drift-baseline-exemption — AC-1 through AC-7.
+// Drift-baseline exemption, covering AC-1 through AC-7 (C4-05).
 //
 // Contract under test: task IDs listed in `.current/.config.json` →
 // `driftBaselineIds` are acknowledged as already-shipped-and-reconciled and
@@ -230,7 +230,7 @@ test("AC-5: FAIL status with incomplete tasks still reports, baseline notwithsta
 
 test("AC-6: CURRENT_VERSIONS.config stays 2 (this feature's own precedent) and a fixture already at CURRENT loads unmigrated", async () => {
   const ws = mkWorkspace();
-  // e106-init-artifacts-flag bumped CURRENT_VERSIONS.config 1->2 (stamp-only,
+  // Adding the artifacts config field (e106) bumped CURRENT_VERSIONS.config 1->2 (stamp-only,
   // unrelated to this drift-baseline-exemption feature) — the fixture must
   // sit AT the new CURRENT to still exercise "loads unmigrated", not the
   // heal-write path.
@@ -266,10 +266,10 @@ test("AC-6: non-string entries in driftBaselineIds are filtered out, not fatal",
 });
 
 // ---------------------------------------------------------------------------
-// E112 re-baseline: driftBaselineIds runs FIRST — before the new evidence-aware
+// driftBaselineIds runs FIRST — before the new evidence-aware
 // vibe-drift split (tools/evidence-lookup.ts) ever runs. A baselined id must
 // never spend a trip through the evidence lookup, whether or not qualifying
-// evidence happens to exist on disk for it.
+// evidence happens to exist on disk for it (E112 re-baseline).
 // ---------------------------------------------------------------------------
 
 test("E112: driftBaselineIds excludes an id BEFORE the evidence lookup runs, whether or not a qualifying QA file also exists", async () => {

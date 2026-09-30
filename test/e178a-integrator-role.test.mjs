@@ -1,6 +1,6 @@
 // Coded by @qa-engineer
 // Tests for spec: specs/e178a-integrator-role.md (ticket E178a, lane e178a).
-// D11: `integrator` is a prompt only — never a tw_switch_role / agent_id role.
+// The integrator is a prompt only — never a tw_switch_role / agent_id role (spec decision D11).
 // These are content-assertion tests (independent of the sr-engineer/
 // code-reviewer claims in review_reports/review_T-E178A-01.md): they read
 // the shipped SOP, the constitution fragment, docs/lane-protocol.md,
@@ -8,19 +8,20 @@
 // directly, so a plausible-sounding paraphrase that silently drops an AC's
 // substance fails here even though it "reads fine" on a skim.
 //
-// Spec-to-Test map: AC1 -> t below named "AC1", AC2 -> "AC2", … AC17 -> "AC17"
-// (one test per AC number; test names are prefixed "AC<n>" per the qa
+// Spec-to-Test map: each spec acceptance criterion has one test named after it —
+// AC1 -> t below named "AC1", AC2 -> "AC2", … AC17 -> "AC17"
+// (see the spec for each criterion's text; one test per AC number; test names are prefixed "AC<n>" per the qa
 // dispatch brief so `--test-name-pattern "AC<n>"` selects it — note "AC1" as
 // an unanchored regex also matches AC10..AC17, which is harmless: every test
 // in this file passes in the same run this proof is taken in).
 //
 // Out of scope here (per the spec's own proof: lines, already asserted by
 // pre-existing suites, not duplicated):
-//   - AC17's golden/budget re-baseline itself: proven by the full `npm test`
+//   - The golden/budget re-baseline itself (AC17): proven by the full `npm test`
 //     run this ticket's PASS is conditioned on, not re-derived in this file.
 //   - The broader content/{skill-,const-,coord-}*.md glue sweep: covered by
 //     test/render-structure.test.mjs's own structural-sweep test (green in
-//     the same run). AC17's own zero-findings check below is this file's
+//     the same run). The zero-findings check below (AC17) is this file's
 //     independent proof for content/skill-integrator.md specifically.
 
 import { test } from "node:test";
@@ -58,12 +59,12 @@ function mkWorkspace() {
 const INTEGRATOR_DESCRIPTION =
   "Integrator — plan parallel lanes, pre-review cuts, verify lane reports, merge, tear down. Cross-lane; writes no handoff state.";
 
-// E229 (history-independent scope tests): a permanent test must not assert on
+// History-independent scope tests (E229): a permanent test must not assert on
 // a specific historical commit SHA unless the assertion is inherently about
 // a historical diff (per docs/lane-protocol.md's guard note) — and even then
 // it must guard the SHA lookup and skip LOUDLY, never silently, when the SHA
-// is absent (shallow clone, adopter fork, or the E104 single-commit
-// recreation). Mirrors test/e130-lane-default.test.mjs's own copy of this
+// is absent (shallow clone, adopter fork, or a single-commit
+// recreation of the repo; E104). Mirrors test/e130-lane-default.test.mjs's own copy of this
 // helper (duplicated rather than imported — no shared test-support module
 // exists, and each file's proof is meant to stand on its own).
 function unresolvedSha(...shas) {
@@ -169,11 +170,11 @@ test("AC2: manual steps replaced by references to shipped mechanisms; no restate
   );
 });
 
-// E229 AC3: fully history-independent replacement for "diff vs base is
+// Fully history-independent replacement for "diff vs base is
 // additive-only" — pins the actual first-11 order/content/skillFile directly
 // (byte-for-byte from tools/registry.ts as it stands 2026-09-27, 942f994),
 // needs no git history at all, and never skips. Strictly stronger than the
-// diff-based check it replaces.
+// diff-based check it replaces (E229 AC3).
 const FROZEN_FIRST_11_PROMPTS = [
   { name: "sr-engineer", description: "Load constitution, skill, state. Run first.", skillFile: "skill-sr-engineer.md" },
   { name: "researcher", description: "Deep research. Load constitution, skill, state.", skillFile: "skill-researcher.md" },
@@ -287,10 +288,11 @@ test("AC6: const-15 §6 — integrator-only git grant; base list + FORBIDDEN ent
   );
 });
 
-// E229 AC5: split out — "how many lines were added at ticket time" has no
+// Split out — "how many lines were added at ticket time" has no
 // current-tree equivalent, so this sub-check stays inherently historical and
-// is guarded + loud-skipped (same contract as e130's AC4/AC14) rather than
-// folded into the substance test above.
+// is guarded + loud-skipped (same guard contract as
+// test/e130-lane-default.test.mjs) rather than folded into the substance test
+// above (E229 AC5).
 test("AC6 (historical): const-15 §6 addition stays terse vs base", (t) => {
   if (skipIfHistoryAbsent(t, "const-15 §6 addition added-lines-count (<= 6) vs base " + BASE_SHA, BASE_SHA)) return;
   const addedLines = execFileSync("git", ["diff", BASE_SHA, "--", "content/const-15-core-tail.md"], { cwd: ROOT, encoding: "utf-8" })
@@ -422,8 +424,8 @@ test("AC15: provenance repointed to skill-integrator.md; PROMPT_TEMPLATE_3B's pr
   assert.ok(!/commands\/integrator/.test(FANOUT_MANIFEST_TS), "tools/fanout-manifest.ts must no longer cite .claude/commands/integrator.md");
   assert.ok(FANOUT_MANIFEST_TS.includes("the single canonical copy"), "fanout-manifest.ts comment must state it is the single canonical copy");
 
-  // E229 AC6: current-tree assertion on the doc-comment directly above
-  // PROMPT_TEMPLATE_3B — replaces the "comment-only diff vs base" check
+  // Current-tree assertion on the doc-comment directly above
+  // PROMPT_TEMPLATE_3B (E229 AC6) — replaces the "comment-only diff vs base" check
   // (which needed git history) without adding a second copy of the
   // template's bytes: test/e177a-manifest.test.mjs's "AC6 render e177a" test
   // already pins those bytes against

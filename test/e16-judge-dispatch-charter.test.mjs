@@ -1,18 +1,19 @@
 // Coded by @qa-engineer
-// Tests for backlog E16 / T-EB-02 (option B, content-only): broadening the
+// Tests for the judge-dispatch charter broadening (backlog E16 / T-EB-02, option B,
+// content-only): broadening the
 // Amend-Resume Edge charter in content/const-08-chain-31-mid.md §3.1 so the
 // resume_of-gated pm->{code-reviewer,qa-engineer} edge is ALSO the sanctioned
 // door for a PM-sanctioned FRESH single-role judge dispatch on a test-only /
 // evidence-only ticket — not only a mid-chain resume of a previously
-// stranded role (the shape T-E15-01 actually used, disclosed honestly in
+// stranded role (the shape an earlier test-only ticket, T-E15-01, actually used, disclosed honestly in
 // qa_reports/review_T-E15-01.md as a narrower-than-literal fit). Plus the
 // pointer-only note added to content/coord-03-core-fallback.md's Amend-Resume
 // relay escalation row.
 //
-// Mirrors the T-E1-02/T-E1-03 skill-text pinning convention (see
+// Mirrors the skill-text pinning convention (T-E1-02/T-E1-03; see
 // test/feature-lease.test.mjs S1-S6): these are pure grep/string-containment
 // assertions against the shipped content files — no server code changed
-// (T-EB-03 review independently confirmed tools/transitions.ts, gates/,
+// (the later review, T-EB-03, independently confirmed tools/transitions.ts, gates/,
 // index.ts are byte-identical via `git status`; that is a one-time fact
 // about this diff, recorded in qa_reports/review_T-EB-04.md's AC Execution
 // Log rather than re-encoded as a unit test here — a `git status --porcelain`
@@ -47,9 +48,9 @@ const CONST08 = readContentFile("const-08-chain-31-mid.md");
 const COORD03 = readContentFile("coord-03-core-fallback.md");
 
 // ---------------------------------------------------------------------------
-// E16-01: the new charter clause is scoped inside the existing Amend-Resume
+// The new charter clause is scoped inside the existing Amend-Resume
 // Edge bullet (not a standalone rule) and does not remove/weaken the
-// pre-existing "resume_of field required" mechanism it broadens.
+// pre-existing "resume_of field required" mechanism it broadens (E16-01).
 // ---------------------------------------------------------------------------
 test("E16-01: const-08 §3.1 Single-role judge dispatch charter is appended to the Amend-Resume Edge bullet, resume_of is still required", () => {
   assert.match(
@@ -72,9 +73,9 @@ test("E16-01: const-08 §3.1 Single-role judge dispatch charter is appended to t
 });
 
 // ---------------------------------------------------------------------------
-// E16-02: the load-bearing "fresh dispatch, not only resume" phrase — this is
-// the actual scope expansion; T-E15-01 needed a FRESH single-role dispatch,
-// not a resume of a role stranded earlier in the SAME chain.
+// The load-bearing "fresh dispatch, not only resume" phrase — this is
+// the actual scope expansion; an earlier test-only ticket (T-E15-01) needed a FRESH single-role dispatch,
+// not a resume of a role stranded earlier in the SAME chain (E16-02).
 // ---------------------------------------------------------------------------
 test("E16-02: const-08 §3.1 charter names a FRESH judge dispatch as sanctioned, not only a mid-chain resume", () => {
   assert.match(
@@ -90,8 +91,8 @@ test("E16-02: const-08 §3.1 charter names a FRESH judge dispatch as sanctioned,
 });
 
 // ---------------------------------------------------------------------------
-// E16-03: same trust mechanics as the pre-existing edge — attestation-based,
-// server checks field<->target consistency only, not truthfulness.
+// Same trust mechanics as the pre-existing edge — attestation-based,
+// server checks field<->target consistency only, not truthfulness (E16-03).
 // ---------------------------------------------------------------------------
 test("E16-03: const-08 §3.1 charter carries the same attestation-only trust mechanics as the pre-existing edge", () => {
   assert.match(
@@ -102,7 +103,7 @@ test("E16-03: const-08 §3.1 charter carries the same attestation-only trust mec
 });
 
 // ---------------------------------------------------------------------------
-// E16-04/E16-05: judge-roles-only — the field opens no edge to any build
+// Judge-roles-only (E16-04/E16-05) — the field opens no edge to any build
 // role, so a code-bearing forward flow can never use it to skip the judges.
 // This is the "does not weaken" half of the review's "broadens without
 // weakening" verdict — pin it explicitly so a future edit cannot silently
@@ -125,10 +126,10 @@ test("E16-05: const-08 §3.1 charter's no-build-role-edge sentence forecloses a 
 });
 
 // ---------------------------------------------------------------------------
-// E16-06: content/coord-03-core-fallback.md's Amend-Resume relay row gets a
+// The content/coord-03-core-fallback.md's Amend-Resume relay row gets a
 // pointer-only addition to the new charter — no mechanism duplicated here
 // (mechanism stays single-sourced in the constitution per the file's own
-// stated convention).
+// stated convention) (E16-06).
 // ---------------------------------------------------------------------------
 test("E16-06: coord-03 Amend-Resume relay escalation row points to the Constitution §3.1 charter (pointer-only, no duplicated mechanism)", () => {
   assert.match(

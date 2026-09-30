@@ -1,9 +1,10 @@
 // Coded by @qa-engineer
 // Tests for spec: specs/e118-reviewer-ac-completeness.md.
-// Backlog E118 (P1, re-scoped 2026-09-16 to option (iv)) — code-reviewer gains a
-// per-AC completeness obligation (an 8th `## AC Completeness` report section) and
-// codified finding tiers (required/recommended/optional), so a diff that is
-// correct-but-incomplete is stopped at review, not one round later at QA.
+// code-reviewer gains a per-AC completeness obligation (an 8th
+// `## AC Completeness` report section) and codified finding tiers
+// (required/recommended/optional), so a diff that is correct-but-incomplete is
+// stopped at review, not one round later at QA (backlog E118, P1, re-scoped
+// 2026-09-16 to option (iv)).
 //
 // Spec-to-Test map:
 //   AC1 (obligation exists)                      -> "AC1 - ..."
@@ -176,9 +177,9 @@ test("AC5 - the six pre-existing schema bullets plus Verdict are byte-identical 
 // Pinned literal (BASE=11fcd6b) of the ```markdown fenced example block's
 // content (the group ```markdown\n(...)\n``` captures), typed out verbatim
 // here rather than fetched via a git-history read at test time — test/ files
-// must not read repository history as a fixture (T-E77-02,
-// test/render-structure.test.mjs). This is the entire example BEFORE the
-// E118 edit added the `## AC Completeness` section.
+// must not read repository history as a fixture (the hermetic-fixture rule,
+// T-E77-02, test/render-structure.test.mjs). This is the entire example BEFORE the
+// edit that added the `## AC Completeness` section (E118).
 const BASE_EXAMPLE_BLOCK =
   "# Review — T42\n" +
   "\n" +
@@ -244,7 +245,7 @@ test("AC7 - token discipline: file grows by at most 1200 bytes over BASE (9525 b
   const size = fs.statSync(SKILL_PATH).size;
   const BASE_SIZE = 9525;
   const growth = size - BASE_SIZE;
-  // eslint-disable-next-line no-console -- AC7 requires the measured number on record.
+  // eslint-disable-next-line no-console -- the token-discipline check requires the measured number on record (AC7).
   console.log(`AC7: measured content/skill-code-reviewer.md size=${size} bytes, growth=${growth} bytes over BASE=${BASE_SIZE}`);
   assert.ok(growth >= 0, `size ${size} is smaller than BASE ${BASE_SIZE} — unexpected shrink`);
   assert.ok(size <= 10725, `size ${size} exceeds the AC7 cap of 10725 (BASE ${BASE_SIZE} + 1200)`);

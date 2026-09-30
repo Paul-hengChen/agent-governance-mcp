@@ -1,5 +1,6 @@
 // Coded by @qa-engineer
-// Tests for spec: specs/e130-lane-default.md (tickets E130 + E199 + E198(b),
+// Tests that the shipped wording makes the per-feature worktree lane the default
+// working path (spec: specs/e130-lane-default.md; E130, E199, E198(b);
 // lane e130-lane-default). Content-assertion tests, independent of the
 // sr-engineer/code-reviewer claims in review_reports/review_T-E130-09.md —
 // these read the shipped prose (and, for AC1, the real composer's output)
@@ -34,11 +35,11 @@
 //
 // WHY: this is a prose-only content lane (no executable code path touched
 // outside content/**), so the contract under test is that the shipped
-// WORDING actually encodes the approved decisions (the integrator's AC1(a)-
-// before-(b) ruling, the E127 cwd-reset disposition, the E198(b) staging
-// fix) — not that some code compiles. A plausible-sounding paraphrase that
-// silently drops the ordering, the refusal path, or the tracked-evidence
-// carve-out would defeat the point of the fix while still "reading fine" on
+// WORDING actually encodes the approved decisions (the ruling that trigger (a)
+// is checked before trigger (b), the decision on how to handle the cwd-reset
+// problem (E127), the release-staging fix (E198(b))) — not that some code compiles.
+// A plausible-sounding paraphrase that silently drops the ordering, the refusal path,
+// or the tracked-evidence carve-out would defeat the point of the fix while still "reading fine" on
 // a skim; these tests pin the load-bearing phrases and their relative order
 // so a future edit that regresses the wording fails CI instead of shipping
 // quietly.
@@ -64,12 +65,12 @@ const CONST_05 = fs.readFileSync(path.join(ROOT, "content", "const-05-core-stand
 const CONST_15 = fs.readFileSync(path.join(ROOT, "content", "const-15-core-tail.md"), "utf-8");
 const RELEASE_ENGINEER = fs.readFileSync(path.join(ROOT, "content", "skill-release-engineer.md"), "utf-8");
 
-// E229 (history-independent scope tests): a permanent test must not assert on
+// History-independent scope tests (E229): a permanent test must not assert on
 // a specific historical commit SHA unless the assertion is inherently about
 // a historical diff (per docs/lane-protocol.md's guard note) — and even then
 // it must guard the SHA lookup and skip LOUDLY, never silently, when the SHA
-// is absent (shallow clone, adopter fork, or the E104 single-commit
-// recreation). `unresolvedSha` returns the first of `shas` that does not
+// is absent (shallow clone, adopter fork, or a repo history recreated as a
+// single commit (E104)). `unresolvedSha` returns the first of `shas` that does not
 // resolve via `git rev-parse --verify <sha>^{commit}`, or null if all
 // resolve. `skipIfHistoryAbsent` is the loud-skip wrapper: it prints a
 // console.warn containing the literal substring `HISTORY-DEPENDENT AC
@@ -147,7 +148,8 @@ test("AC1: trigger (b) names the Complexity Scope Gate by heading only — no co
 
 // ---------------------------------------------------------------------------
 // AC3: the cwd-reset rule must stand on its own (no docs/-rooted citation) —
-// this is the documented half of E127's disposition and must be portable to
+// this is the documented half of the decision on the cwd-reset problem (E127)
+// and must be portable to
 // adopter bundles that never receive docs/lane-protocol.md.
 // ---------------------------------------------------------------------------
 
@@ -169,9 +171,9 @@ test("AC3: the Lane-start default paragraph states every subsequent tw_* call's 
 // bootstrap; one-sentence refusal path. Plus the zero-code-change guarantee
 // (git diff --stat over bin/ tools/ scripts/ from the fan-out base).
 //
-// E222: the diff range is pinned to `121ddc8..5896bdd` (e130's own commit
+// The diff range is pinned to `121ddc8..5896bdd` (e130's own commit
 // range — 5896bdd is e130's final lane commit, reachable from HEAD) rather
-// than `121ddc8...HEAD`. A HEAD-relative range makes this AC fail on every
+// than `121ddc8...HEAD` (E222). A HEAD-relative range makes this AC fail on every
 // commit that lands after e130, since anything else touching bin/tools/
 // scripts widens the diff this test inspects; e130's own scope guarantee is
 // about e130's commits, not about however far HEAD has since moved.
@@ -197,7 +199,7 @@ test("AC4: zero code changes accompany this ticket outside content/** — git di
 // ---------------------------------------------------------------------------
 // AC5: the rule applies universally (every ticket, every session) but
 // triggers conditionally, because the Complexity Scope Gate itself is
-// self-limiting (待決 B's settled conclusion).
+// self-limiting (the settled answer to open question B).
 // ---------------------------------------------------------------------------
 
 test("AC5: the Lane-start default paragraph declares universal applicability with conditional, self-limiting triggering", () => {
@@ -216,8 +218,8 @@ test("AC6: the Worktree bootstrap obligation paragraph states the symlink precon
   const worktreeObligation = extractBetween(COORD_03, "**Worktree bootstrap obligation**", "\n\n## Escalation Routes", "AC6");
   assert.match(worktreeObligation, /needed ONLY when untracked/, "must state the symlink is needed ONLY when untracked");
   assert.match(worktreeObligation, /a tracked-evidence repo carries evidence to the lane via the lane branch's own commits instead, no symlink needed/, "must state the tracked-evidence alternative verbatim");
-  // Round-2 fix (review_reports/review_T-E130-09.md R2): the follow-on sentence must
-  // agree with the untracked-only carve-out, not flatly contradict it.
+  // The follow-on sentence must agree with the untracked-only carve-out, not
+  // flatly contradict it (review round-2 fix, review_reports/review_T-E130-09.md).
   assert.doesNotMatch(worktreeObligation, /a fresh worktree has none of these by default/, "the pre-fix contradictory wording ('none of these by default') must not reappear");
   assert.match(worktreeObligation, /an untracked one is absent from a fresh worktree/, "the fixed wording must scope 'absent from a fresh worktree' to the untracked case");
 });
@@ -253,8 +255,9 @@ test("AC8: const-15's Document Priority section carries the reported-data paragr
 
 // ---------------------------------------------------------------------------
 // AC9: const-05's task-list hand-edit rule drops the stale "only PM's
-// initial bootstrapping write is exempt" clause — post-E125a, the first
-// tw_add_task call creates the ledger through the tool, never by hand.
+// initial bootstrapping write is exempt" clause — now that ledgers are lane-local
+// (E125a), the first tw_add_task call creates the ledger through the tool,
+// never by hand.
 // ---------------------------------------------------------------------------
 
 test("AC9: const-05's task-list hand-edit rule no longer carries the stale PM-bootstrapping exemption clause", () => {
@@ -305,9 +308,9 @@ test("AC11: the Artifact allowlist bullet names .current/_primary/tasks.md and e
 // AC14: scope containment — every changed path since the fan-out base
 // (121ddc8) matches an owned glob for this lane; zero forbidden paths.
 //
-// E222: the diff range is pinned to `121ddc8..5896bdd` (e130's own commit
+// The diff range is pinned to `121ddc8..5896bdd` (e130's own commit
 // range — 5896bdd is e130's final lane commit, reachable from HEAD) rather
-// than `121ddc8...HEAD`, for the same reason as AC4 above: this AC asserts
+// than `121ddc8...HEAD` (E222), for the same reason as AC4 above: this AC asserts
 // e130's own scope containment, and a HEAD-relative range would fail on
 // every later commit that touches a path outside e130's owned list,
 // regardless of which lane made that later change.

@@ -1,11 +1,12 @@
 // Coded by @qa-engineer
-// Tests for specs/e137-render-sanitise.md AC10 (T-E137-03 / T-E137-06):
-// appendSpecContext renders SQLite PRD RAG chunks through the SAME shared
-// render boundary (lib/render-boundary.ts renderDataBlock) as the state block.
+// Tests for how PRD RAG chunks are rendered into prompts (specs/e137-render-sanitise.md
+// AC10, T-E137-03 / T-E137-06): appendSpecContext renders SQLite PRD RAG chunks
+// through the SAME shared render boundary (lib/render-boundary.ts renderDataBlock)
+// as the state block.
 //
 // WHY: PRD chunks are the threat model's named vector — retrieved markdown
 // that can legitimately contain its own fenced code blocks and imperative
-// prose ("run the migration", "ignore the old flow"). Before E137 the chunks
+// prose ("run the migration", "ignore the old flow"). Before the shared boundary (E137) the chunks
 // were concatenated under the heading as raw top-level markdown, so a chunk's
 // imperative sentence was indistinguishable from authored SOP text and a
 // chunk's fence line could restructure the prompt. The contract pinned here:
@@ -15,10 +16,11 @@
 // is the declared residue, not tested.
 //
 // Spec-to-Test map:
-//   AC10 -> "spec context: chunk text fenced + labelled, adaptive fence"
+//   AC10 (chunk text is fenced, labelled and uses an adaptive fence) ->
+//           "spec context: chunk text fenced + labelled, adaptive fence"
 //           + "spec context: fence adapts past the longest chunk run"
 //           + "spec context: no chunks → prompt unchanged (no empty block)"
-// The AC10 regression half (test/rag.test.mjs, test/rag-lifecycle.test.mjs
+// The regression half of AC10 (test/rag.test.mjs, test/rag-lifecycle.test.mjs
 // pass UNMODIFIED) is proven by running those files; see the AC Execution Log
 // in qa_reports/review_T-E137-05.md.
 

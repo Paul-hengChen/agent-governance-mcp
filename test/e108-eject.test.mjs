@@ -1,8 +1,9 @@
 // Coded by @qa-engineer
-// Tests for specs/e108-agc-eject.md AC1-AC25 (AC22 tests top-level usage text
-// in test/agc-adapters.test.mjs instead — see the additive case there; AC23
-// is verified by grep proof against docs/install.md, not a test case here,
-// per this file's dispatch brief).
+// Tests for the `agc eject` command (specs/e108-agc-eject.md AC1-AC25). The
+// top-level usage-text case (AC22) lives in test/agc-adapters.test.mjs instead
+// (see the additive case there); the docs check (AC23) is verified by a grep
+// proof against docs/install.md, not a test case here, per this file's
+// dispatch brief.
 //
 // Spec-to-test map:
 //   AC1  -> "AC1: dry-run prints the full four-class plan, touches nothing"
@@ -21,8 +22,9 @@
 //   AC14 -> "AC14: exclude-line removal never touches LANE_EXCLUDE_RULES or unrelated lines"
 //   (E243) AC7 -> "AC7 (E243): eject skips the exclude-line plan entry cleanly on a
 //           wildcard or backslash workspace, same shape for both" — proves
-//           planExcludeEntry's unsafeSegment skip covers E243's widened class
-//           (specs/e243-init-path-escape-refusal.md) with no code change of its own
+//           planExcludeEntry's unsafeSegment skip also covers the wider set of
+//           unsafe path characters that init later began refusing (E243,
+//           specs/e243-init-path-escape-refusal.md), with no code change of its own
 //   AC15 -> "AC15: subdirectory eject never touches a sibling root workspace's artifacts"
 //   AC16 -> "AC16: eject refuses inside a linked worktree, same as feature start/finish"
 //   AC17 -> "AC17: outside a git repo, plain deletion still runs and exclude cleanup is skipped with a note"
@@ -53,7 +55,7 @@
 // under this file's control and never leaks the operator's own machine state
 // into an assertion.
 //
-// Security/boundary smoke (SOP Phase 3d): boundary inputs (empty-string arg,
+// Security/boundary smoke check: boundary inputs (empty-string arg,
 // a very long garbage flag, a flag carrying embedded whitespace/newlines) are
 // covered under "boundary:" below. Auth/permission tests are N/A — agc eject
 // has no access-control surface (a local CLI acting on the caller's own
@@ -128,7 +130,7 @@ function mkGitRepoWithCommit(prefix) {
 }
 
 // Runs the real CLI with HOME pinned to a fresh temp dir (never the ambient
-// $HOME) and stdin explicitly closed (AC20: eject must never read stdin).
+// $HOME) and stdin explicitly closed (eject must never read stdin, AC20).
 function runAgc(cwd, args, { home } = {}) {
   const HOME = home ?? mkTmpHome();
   return spawnSync(process.execPath, [AGC_INIT, ...args], {
@@ -225,7 +227,7 @@ test("AC1: dry-run prints the full four-class plan, touches nothing", () => {
   addProcessEvidence(repo);
   addDomainKnowledge(repo);
   // design/specs are tracked; docs/backlog.md, the runtime artifacts, and
-  // the host-trace files are left untracked (AC1's own precondition set).
+  // the host-trace files are left untracked (the setup this dry-run case needs, AC1).
   git(repo, ["add", "design", "specs"]);
   git(repo, ["commit", "-q", "-m", "tracked design/specs"]);
 
@@ -347,7 +349,7 @@ test("AC4: --yes --purge-knowledge prints git rm for tracked design/specs, does 
   assert.ok(fs.existsSync(path.join(repo, "design", "feature.md")), "design/ must NOT be deleted (tracked)");
   assert.ok(fs.existsSync(path.join(repo, "specs", "feature.md")), "specs/ must NOT be deleted (tracked)");
 
-  // Every other AC2 disposition still applies.
+  // Every other disposition from the plain --yes run (AC2) still applies.
   assert.equal(fs.existsSync(path.join(repo, ".current")), false);
   assert.equal(fs.existsSync(path.join(repo, "tasks.md")), false);
   assert.equal(fs.existsSync(path.join(repo, "qa_reports")), false);
@@ -391,7 +393,7 @@ test("AC5: repo-mode tracked artifacts get a git rm command, never a delete", ()
   const gitRmMatches = r.stderr.match(/git rm -r /g) ?? [];
   assert.equal(gitRmMatches.length, 1, `expected exactly one git rm -r line, stderr=${r.stderr}`);
 
-  // Host traces still run exactly as in AC2 — deleted/edited even though tracked.
+  // Host traces still run exactly as in a plain --yes run (AC2) — deleted/edited even though tracked.
   assert.equal(fs.existsSync(path.join(repo, "CLAUDE.md")), false, "tracked CLAUDE.md (block-only) still deleted");
   assert.equal(fs.existsSync(path.join(repo, "AGENTS.md")), false, "tracked AGENTS.md still deleted");
   assert.equal(fs.existsSync(path.join(repo, ".antigravityrules")), false, "tracked .antigravityrules still deleted");
@@ -618,15 +620,16 @@ test("AC14: exclude-line removal never touches LANE_EXCLUDE_RULES or unrelated l
 
 // ---------------------------------------------------------------------------
 // AC7 (specs/e243-init-path-escape-refusal.md) — planExcludeEntry's existing
-// `unsafeSegment !== null` skip already covers the class E243 widened
-// (backslash, C0 control range, DEL), same as it already covered the E239
-// wildcard set: no code change, only this new coverage. A workspace with an
-// unsafe segment never had `init` write exclude rules there in the first
-// place (init refuses `--artifacts=local` for exactly this class), so eject
-// has nothing to remove — proven here by the plan carrying no
-// ".git/info/exclude" line at all (not a "skipped"/"nothing to remove" line
-// — the entry is entirely absent, per planExcludeEntry returning null), for
-// a wildcard-named workspace and a backslash-named workspace alike.
+// `unsafeSegment !== null` skip already covers the wider set of unsafe path
+// characters that `agc init` now refuses (backslash, C0 control range, DEL),
+// just as it already covered the wildcard set (E243, E239): no code change,
+// only this new coverage. A workspace with an unsafe segment never had `init`
+// write exclude rules there in the first place (init refuses
+// `--artifacts=local` for exactly this class), so eject has nothing to remove
+// — proven here by the plan carrying no ".git/info/exclude" line at all (not a
+// "skipped"/"nothing to remove" line — the entry is entirely absent, per
+// planExcludeEntry returning null), for a wildcard-named workspace and a
+// backslash-named workspace alike.
 // ---------------------------------------------------------------------------
 test("AC7 (E243): eject skips the exclude-line plan entry cleanly on a wildcard or backslash workspace, same shape for both", (t) => {
   if (process.platform === "win32") {
@@ -642,9 +645,9 @@ test("AC7 (E243): eject skips the exclude-line plan entry cleanly on a wildcard 
     const repo = mkGitRepoWithCommit(`e108-e243-ac7-${label}-`);
     const sub = path.join(repo, name);
     fs.mkdirSync(sub, { recursive: true });
-    // `agc init --artifacts=local` itself would have refused here (E239's
-    // wildcard refusal, widened by E243 to also cover backslash/control
-    // characters) — hand-author the config the same way
+    // `agc init --artifacts=local` itself would have refused here (the wildcard
+    // refusal, later widened to also cover backslash/control characters, E239/E243)
+    // — hand-author the config the same way
     // test/e239-init-subdir-exclude.test.mjs's AC13/AC19 cases do.
     fs.mkdirSync(path.join(sub, ".current"), { recursive: true });
     fs.writeFileSync(
@@ -926,9 +929,9 @@ test("AC25: --yes refuses while linked worktrees exist; dry-run warns", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Tracked host-trace changes (integrator-accepted AC5 clarification, QA round
-// 1 finding fixed in ceb3c4a) — cases A-D and G pinned per code-reviewer's
-// round-2 recommendation (review_reports/review_T-E108-01.md, "Round 2").
+// Tracked host-trace files (host config that git tracks) are still deleted or
+// edited by eject, not just reported — cases A-D and G from the code review's
+// round-2 table (review_reports/review_T-E108-01.md, "Round 2").
 // ---------------------------------------------------------------------------
 
 // Case A: all three host-trace files tracked, CLAUDE.md block-only (whole
@@ -1037,8 +1040,9 @@ test("tracked host-trace: no-op branches (no block, KEPT-advisory) never appear 
 // git rm -r line forms: root (no qualifier) vs subdirectory (qualifier)
 // ---------------------------------------------------------------------------
 test("git rm -r line: root workspace never prints the subdirectory qualifier (see AC5/AC6)", () => {
-  // Covered directly by AC5 and AC6 above; this test only pins the negative
-  // assertion as its own named case per this file's dispatch brief.
+  // Covered directly by the tracked-artifact cases above (AC5, AC6); this test
+  // only pins the negative assertion as its own named case per this file's
+  // dispatch brief.
   const repo = mkGitRepoWithCommit("e108-gitrmroot-");
   fs.mkdirSync(path.join(repo, ".current"), { recursive: true });
   fs.writeFileSync(

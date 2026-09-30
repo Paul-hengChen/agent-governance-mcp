@@ -302,10 +302,11 @@ test("AC-6c: ##  Completed  (extra whitespace) is treated as archive section", a
 });
 
 // ---------------------------------------------------------------------------
-// E112 re-baseline: the archived-section filter composes with the new
-// case-(a)/(b) mechanisms exactly as it composed with the pre-existing
-// baseline/handoff-ahead directions above — an archived task is excluded from
-// `activeScopeTasks` BEFORE either new mechanism ever sees it.
+// Re-baseline for the evidence-aware drift split (E112): the archived-section
+// filter composes with the two newer drift mechanisms (cases (a) and (b))
+// exactly as it composed with the pre-existing baseline/handoff-ahead
+// directions above — an archived task is excluded from `activeScopeTasks`
+// BEFORE either new mechanism ever sees it.
 // ---------------------------------------------------------------------------
 
 test("E112: an incomplete archived (## Completed) task does not count toward fanoutAdvisory's active-scope tally", async () => {

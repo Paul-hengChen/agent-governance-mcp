@@ -1,5 +1,5 @@
 // Coded by @qa-engineer
-// Tests for E120 (docs/backlog.md order 0v) — a re-cut task id used to
+// Tests for the refusal to re-cut a voided task id (E120, docs/backlog.md order 0v) — a re-cut task id used to
 // inherit the review and QA evidence of the incarnation that was voided, so
 // a never-reviewed re-cut satisfied MISSING_REVIEW_EVIDENCE and the QA
 // completion-evidence gate. Closed in
@@ -10,20 +10,21 @@
 // the tasks row and would otherwise erase the state needed to refuse.
 //
 // This file is the home the qa dispatch brief names for the refusal matrix;
-// the two rewritten E117-era tests asserting the headline contract
+// the two rewritten void-task tests (from the earlier void-task ticket, E117)
+// asserting the headline contract
 // (re-cut refused / SQLite alreadyVoided parity) stay in
 // test/e117-void-task.test.mjs, which they were already pinning under the
-// old (pre-E120) contract.
+// old contract (before the refusal existed).
 //
 // review_reports/review_T-E120131-01.md (round 3, APPROVED) is the record
 // this file executes:
 //
-//   Section 1 — the nine-indent matrix (round 2's R2-C1 finding, round 3's
-//               independent re-verification). THE highest-value property:
+//   Section 1 — the nine-indent matrix (raised in review round 2 as finding
+//               R2-C1, independently re-verified in round 3). THE highest-value property:
 //               it caught two successive incomplete fixes (round 1's `\b`
 //               boundary bug, round 2's `[ \t]*` two-character subset of
 //               `trim()`). Four sites (parseTasks, the duplicate-id
-//               re-scan, voidTaskInFile's Q1 check, addTaskInFile's re-cut
+//               re-scan, voidTaskInFile's void-marker check (Q1), addTaskInFile's re-cut
 //               refusal) must all agree on what "leading whitespace" means;
 //               a fifth definition is the regression this section guards.
 //   Section 2 — no false refusal: a `- [-] <id>` marker embedded in another
@@ -33,7 +34,7 @@
 //               false-refused these exact cases (round 3, "item 3").
 //   Section 3 — id-boundary controls: prefix collision (T-12 vs T-1),
 //               punctuation-terminated ids (T-1.), a `T-1.5` vs `T-1`
-//               control (the NEW-3 false-positive `\b` used to produce),
+//               control (the false-positive `\b` used to produce, NEW-3),
 //               and a regex-metacharacter id (T-A+B) — `escapeRegExp`
 //               coverage.
 //   Section 4 — SQLite parity: refusal after void, `alreadyVoided` vs a
@@ -46,7 +47,7 @@
 //   NEW-2 (evidence file path lowercases ids, reproducing E120 through a
 //   case change on a case-insensitive filesystem — its own ticket, not a
 //   task-id uniqueness defect), NEW-5 (a fully custom taskPattern is not
-//   covered by the E131 parser-shape heuristic — input boundary remains the
+//   covered by the parser-shape heuristic (E131) — input boundary remains the
 //   defense there), NEW-6 (a void marker hidden after an embedded CR/U+2028/
 //   U+2029 mid-`\n`-line is unreachable through the tw_* API — every mutator
 //   already refuses those characters in taskId/description/note/reason).
@@ -84,17 +85,17 @@ try {
 // File-mode helpers (mirrors test/e117-void-task.test.mjs).
 // ---------------------------------------------------------------------------
 
-// e125a-lane-local-ledgers re-baseline (qa-owned, spec AC13 "Test impact";
+// Lane-local-ledger re-baseline (e125a, qa-owned, spec AC13 "Test impact";
 // review_reports/review_T-E125A-05.md "Expected-Red Sampling"): a workspace
 // fixture stamped `CURRENT_VERSIONS.tasks` (now 2) at the workspace ROOT is
-// the D-D "index" shape, not an unmigrated ledger — tw_* would throw
+// the root "index" shape, not an unmigrated ledger — tw_* would throw
 // TASKS_LEDGER_ABSENT (AC6b) reading it. These fixtures are about the
 // void/re-cut refusal matrix, not migration mechanics (that has its own
 // dedicated coverage in test/e125a-lane-local-ledgers.test.mjs), so — same
 // re-baseline as test/e117-void-task.test.mjs — seed the lane-local ledger
 // DIRECTLY at `.current/_primary/tasks.md` (no .git in these fixtures ⇒
 // resolveCurrentLane === PRIMARY_LANE), the exact file tw_* now reads and
-// writes (spec D-F/AC9).
+// writes (spec AC9).
 function laneTasksPath(ws) {
   return path.join(ws, ".current", "_primary", "tasks.md");
 }
@@ -163,7 +164,7 @@ for (const [label, indent] of INDENT_FORMS) {
     assert.equal(next.progress.total, 1, `only the control row may count as live under indent ${label}`);
 
     // No live re-cut row for T-A may coexist with its void marker — the
-    // exact end-state E120 exists to prevent.
+    // exact end-state the re-cut refusal exists to prevent (E120).
     assert.equal(
       readTasks(ws).match(/^\s*- \[ \] T-A\b/m),
       null,

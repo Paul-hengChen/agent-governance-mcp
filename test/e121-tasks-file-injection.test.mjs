@@ -1,13 +1,13 @@
 // Coded by @qa-engineer
-// Tests for E121 (docs/backlog.md order 0t) — tools/tasks-file.ts's four
-// mutators (completeTaskInFile, rollbackTaskInFile, voidTaskInFile,
-// addTaskInFile) refusing caller-supplied strings that would forge a task
-// row via either `$`-expansion (round 1, String.replace replacement-string
-// grammar) or line injection (rounds 2-3, plain string concatenation /
-// replacer-function embedding of a line-break-bearing value).
+// Tests that tools/tasks-file.ts's four mutators (completeTaskInFile,
+// rollbackTaskInFile, voidTaskInFile, addTaskInFile) refuse caller-supplied
+// strings that would forge a task row via either `$`-expansion (String.replace
+// replacement-string grammar) or line injection (plain string concatenation /
+// replacer-function embedding of a line-break-bearing value). E121, docs/backlog.md
+// order 0t.
 //
-// review_reports/review_T-E121-01.md (round 3, APPROVED) is the spec this
-// file executes. THE TRAP (round 3's own words, restated because it is the
+// The approved review report review_reports/review_T-E121-01.md is the spec this
+// file executes. THE TRAP (restated from that report because it is the
 // whole point of this file): the PRE-FIX behaviour also returned
 // `success: true`. Asserting "no crash", `success === true`, or
 // `error === undefined` is NOT a test of this defect — every one of those
@@ -22,26 +22,25 @@
 // Every must-refuse case below pins at least (a) + (b) + (c); most also
 // pin (d) and (e).
 //
-// Coverage floor (round 3's "the 8 MUST-REFUSE cells", field x mutator):
+// Coverage floor (the review's "8 MUST-REFUSE cells", field x mutator):
 // completeTask(taskId), completeTask(note); rollbackTask(taskId),
 // rollbackTask(reason); voidTask(taskId), voidTask(reason); addTask(taskId),
-// addTask(description). The taskId column is round 3's own new work —
-// addTask's taskId guard was the only *live* forging site pre-round-3, so it
+// addTask(description). The taskId column was the last one added —
+// addTask's taskId guard was the only *live* forging site before it, so it
 // is deliberately not tested alone; all four mutators get a taskId case.
 //
-// The EXPLICIT-refusal assertion (round 3's "the point of the all-four
-// decision"): for complete/rollback/void with a line-break-bearing taskId,
-// this file asserts POSITIVELY on /task_id must not contain a line break/
-// AND NEGATIVELY that the message does NOT match
+// The EXPLICIT-refusal assertion (the point of guarding all four mutators): for
+// complete/rollback/void with a line-break-bearing taskId, this file asserts
+// POSITIVELY on /task_id must not contain a line break/ AND NEGATIVELY that the message does NOT match
 // /not found|Could not find|No incomplete/i. Without the negative
-// assertion, a test cannot tell a STATED invariant (the round-3 boundary
-// guard) from INCIDENTAL lookup-order safety (the pre-round-3 behaviour,
+// assertion, a test cannot tell a STATED invariant (the input-boundary
+// guard) from INCIDENTAL lookup-order safety (the earlier behaviour,
 // where a newline-bearing id merely failed `Array.find` and returned a
 // not-found error) — and a refactor that hoisted line construction above
 // the `find()` call would go undetected by a test that only checked the
 // call refused.
 //
-// Settled boundary, pinned not re-derived (round 2, confirmed round 3): for
+// Settled boundary, pinned not re-derived (settled in review): for
 // ROW FORGING, LF is the WHOLE class. Every line-splitting reader in this
 // file splits on LF alone — parseTasks (tools/tasks-file.ts:80-92,
 // `migratedBody.split("\n")`), addTaskInFile's duplicate scan (:521,
@@ -58,9 +57,9 @@
 //
 // Explicitly OUT of scope for this file (do not fix, do not test as if
 // fixed, do not let them block PASS):
-//   - R2-C2: U+2028/U+2029 make a row *unparseable* (erasure, not forgery),
+//   - U+2028/U+2029 make a row *unparseable* (erasure, not forgery),
 //     measured identical at base and working tree — pre-existing, filed as
-//     its own ticket. No failing test for this is written here.
+//     its own ticket (review finding R2-C2). No failing test for this is written here.
 //   - tools/registry.ts's `task_id: z.string().min(1)` schema — the
 //     coordinator declined to tighten the public tool contract; the file
 //     boundary is the chosen closure.
@@ -93,17 +92,17 @@ setActiveStorage(new FileHandoffStorage());
 // resetSession/markStateRead sequencing so the freshness guard doesn't trip).
 // ---------------------------------------------------------------------------
 
-// e125a-lane-local-ledgers re-baseline (qa-owned, spec AC13 "Test impact";
+// Lane-local-ledger re-baseline (e125a, qa-owned, spec AC13 "Test impact";
 // review_reports/review_T-E125A-05.md "Expected-Red Sampling"): a workspace
 // fixture stamped `CURRENT_VERSIONS.tasks` (now 2) at the workspace ROOT is
-// the D-D "index" shape, not an unmigrated ledger — tw_* would throw
-// TASKS_LEDGER_ABSENT (AC6b) reading it. These fixtures are about the E121
-// injection-guard refusal matrix, not migration mechanics (that has its own
+// the workspace-"index" shape, not an unmigrated ledger — tw_* would throw
+// TASKS_LEDGER_ABSENT (spec AC6b) reading it. These fixtures are about the
+// injection-guard refusal matrix (E121), not migration mechanics (that has its own
 // dedicated coverage in test/e125a-lane-local-ledgers.test.mjs), so — same
 // re-baseline as test/e117-void-task.test.mjs — seed the lane-local ledger
 // DIRECTLY at `.current/_primary/tasks.md` (no .git in these fixtures ⇒
 // resolveCurrentLane === PRIMARY_LANE), the exact file tw_* now reads,
-// writes, and locks (spec D-F/AC9).
+// writes, and locks (spec AC9).
 function laneTasksPath(ws) {
   return path.join(ws, ".current", "_primary", "tasks.md");
 }
@@ -345,12 +344,13 @@ test("must-succeed: voidTask on a backtick id with a benign reason succeeds norm
 });
 
 // ===========================================================================
-// E131 (docs/backlog.md order 13s) — added to this file per the backlog
+// Line-separator (U+2028/U+2029) row-erasure cases (E131, docs/backlog.md order
+// 13s) — added to this file per the backlog
 // row's own placement ("qa-owned cases in the existing
 // test/e121-tasks-file-injection.test.mjs") and the qa dispatch brief.
 //
-// E131 is the erasure sibling of this file's forging defect, NOT the same
-// bug: U+2028 LINE SEPARATOR and U+2029 PARAGRAPH SEPARATOR are JS-only line
+// This defect is the erasure sibling of this file's forging defect, NOT the same
+// bug (E131): U+2028 LINE SEPARATOR and U+2029 PARAGRAPH SEPARATOR are JS-only line
 // terminators that `String.prototype.split("\n")` (used throughout
 // tools/tasks-file.ts) does NOT split on, but that `.` cannot cross and an
 // un-anchored `$` cannot cross either. So a row carrying one is physically a
@@ -377,10 +377,11 @@ test("must-succeed: voidTask on a backtick id with a benign reason succeeds norm
 //   the defense for a tasks.md hand-edited directly, which never passes
 //   through the input boundary at all. Critically, a VOIDED row carrying
 //   the same character must NOT throw: its invisibility to every reader is
-//   the voidTaskInFile contract (E117), not the E131 corruption case, and
+//   the voidTaskInFile contract (E117), not the line-separator corruption
+//   case (E131), and
 //   the shape heuristic (`TASK_LINE_SHAPE_RE`) deliberately excludes the
-//   void marker's `-` checkmark for exactly this reason (round 1's C2
-//   finding — the pre-fix heuristic wrongly matched voided rows too).
+//   void marker's `-` checkmark for exactly this reason (an earlier review
+//   finding, C2 — the pre-fix heuristic wrongly matched voided rows too).
 // ===========================================================================
 
 const E131_TERMINATORS = [

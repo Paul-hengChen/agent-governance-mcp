@@ -25,15 +25,15 @@
 //   AC3 (no archive on a same-feature write)                -> AC3
 //   AC4 (no archive on the first-ever write)                -> AC4
 //   AC5 (filename sanitization: charset AND the .slice(0,200)
-//        length clamp — including the C1 regression's exact
-//        233-char wedge threshold, the 500-char schema max,
+//        length clamp — including the exact 233-char name
+//        length that once overflowed the filename limit (C1 regression), the 500-char schema max,
 //        an unconditional-clamp check beyond the schema max,
 //        and the replace-before-slice ordering with
 //        multi-byte input)                                 -> AC5
 //   bonus (fail-closed: an uncaught copy failure aborts the
 //          whole write, leaves the live ledger untouched,
-//          leaks no lock and no tmp file — Constitution's
-//          E150-class-loss-prevention posture, verified
+//          leaks no lock and no tmp file — the rule that a
+//          failed copy never loses ledger data (E150), verified
 //          empirically per the dispatch brief)              -> bonus
 
 import { test } from "node:test";
@@ -59,8 +59,8 @@ function mkWs(prefix = "e116-") {
   return ws;
 }
 
-// e123b9 J2 (spec AC1/AC9): the live handoff.md is lane-scoped now (these
-// fixture workspaces carry no `.git`, so `_primary`). archiveDir below is
+// The live handoff.md is lane-scoped now (these
+// fixture workspaces carry no `.git`, so `_primary`; e123b9 J2, spec AC1/AC9). archiveDir below is
 // UNCHANGED (spec AC6, Decision 3: stays workspace-wide, comment-only diff).
 function handoffPath(ws) {
   return resolveCurrentLanePaths(ws).handoffPath;
@@ -164,8 +164,8 @@ test("AC1: archive captures the outgoing ledger verbatim on feature change", asy
 // ============================================================================
 // AC2 — live handoff.md still resets on feature change (the central tension):
 // the six feature-scoped fields carry forward on a SAME-feature write, but
-// drop on a feature-CHANGE write. A future edit that "improves" E116 by
-// preserving state across a feature change must fail this test.
+// drop on a feature-CHANGE write. A future edit that "improves" archive-on-change by
+// preserving state across a feature change must fail this test (E116).
 // ============================================================================
 
 test("AC2: live handoff still resets on feature change — six feature-scoped fields carry forward same-feature, drop on feature change", async () => {
@@ -194,7 +194,7 @@ test("AC2: live handoff still resets on feature change — six feature-scoped fi
 
   // Write 2: SAME feature, omit all six fields entirely. This is the
   // contrast baseline — carry-forward-if-omitted is the existing, unchanged
-  // behavior E116 must not touch.
+  // behavior the archive-on-change work (E116) must not touch.
   await write(ws, {
     activeFeature: "e116-tension",
     status: "In_Progress",
@@ -295,7 +295,8 @@ test("AC4: no archive on the first-ever write to a fresh workspace", async () =>
 
 // ============================================================================
 // AC5 — filename sanitization: charset containment AND the length clamp,
-// including the C1 regression's exact wedge threshold.
+// including the exact 233-char threshold at which an over-long feature name
+// overflowed the archive filename limit and wedged the workspace (C1 regression).
 // ============================================================================
 
 test("AC5-1: a '/'-and-'..'-bearing active_feature sanitizes to a plain filename that cannot escape .current/archive/", async () => {

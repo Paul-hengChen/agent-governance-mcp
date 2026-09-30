@@ -1,6 +1,6 @@
 // Coded by @qa-engineer
-// T-E125C-05: new coverage for specs/e125c-index-compaction.md AC1-AC6, AC10,
-// AC11 (E195 reverse-migration receipt/normalization behaviour + the
+// New coverage (T-E125C-05) for specs/e125c-index-compaction.md AC1-AC6, AC10,
+// AC11 (reverse-migration receipt/normalization behaviour, E195, + the
 // real-data compaction round trip). AC7-AC9, AC12-AC14 are proved by
 // `.current/e125c/compaction-procedure.md` (sr's evidence file) and by
 // grep/golden checks run directly (see qa_reports/review_T-E125C-05.md ##
@@ -9,9 +9,9 @@
 // repo root; AC10/AC11 read FROZEN copies of tasks.md /
 // .current/_primary/tasks.md / .current/tasks-index-receipt.json checked in
 // under test/fixtures/e125c-frozen/ (byte-exact as of commit ed7432f, the
-// E125c compaction snapshot AC11's facts describe) into a throwaway $TMPDIR
+// index-compaction snapshot AC11's facts describe) into a throwaway $TMPDIR
 // copy, and never read or write the live repo tree (E204:
-// T-E204-01 — the prior live-disk read drifted red the moment the primary
+// The prior live-disk read (T-E204-01) drifted red the moment the primary
 // ledger gained a row after ed7432f; see .current/e204/tasks.md).
 //
 // Spec-to-Test map:
@@ -20,15 +20,15 @@
 //   AC3  (root-side marker removal tolerated)           -> AC3 removed markers
 //   AC4  (any other hand-edit still refuses)            -> AC4 hand-edit refuses
 //   AC5  (legacy raw-sha receipt accepted)              -> AC5 legacy receipt
-//   AC6  (CL-bearing double round trip; no-CL forward
+//   AC6  (double round trip with a Closed Lanes (CL) section; no-CL forward
 //         unchanged modulo the disclosed receipt
 //         deviation, F1)                                 -> AC6 double round trip,
 //                                                           AC6 forward unchanged without CL
 //   AC10 (real-data round trip)                          -> AC10 real-data round trip
 //   AC11 (consumer parity: parseTasksFromFile,
 //         getNextTaskFromFile, emitFeatureMetrics)        -> AC11 consumer parity
-//   F2 (reviewer finding, pinned as known behaviour,
-//       E125c-NEW-5 — NOT a failure)                      -> F2 fabricated marker absorbed
+//   F2 (reviewer finding pinned as known behaviour, not a
+//       failure: a fabricated marker is absorbed; E125c-NEW-5) -> F2 fabricated marker absorbed
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -48,7 +48,7 @@ import { setActiveStorage, FileHandoffStorage } from "../dist/tools/storage.js";
 
 setActiveStorage(new FileHandoffStorage());
 
-// T-E77-02 (hermetic test fixture rule): no test/ file may read repository
+// Hermetic test fixture rule (T-E77-02): no test/ file may read repository
 // HISTORY as a fixture (`git show <rev>:<path>`, `git log`, a pinned sha
 // ref). AC10/AC11 satisfy this by reading FROZEN, checked-in copies under
 // test/fixtures/e125c-frozen/ via plain fs (no git invocation anywhere in
@@ -56,7 +56,7 @@ setActiveStorage(new FileHandoffStorage());
 // clean" precondition to maintain. The frozen copies are byte-exact
 // snapshots of the repo's tasks.md / .current/_primary/tasks.md /
 // .current/tasks-index-receipt.json as of commit ed7432f (cited here in a
-// plain comment only, per T-E77-02); refreshing them is a deliberate,
+// plain comment only, per that rule); refreshing them is a deliberate,
 // reviewed fixture update, not something this test file ever does itself.
 const __filename = fileURLToPath(import.meta.url);
 const FIXTURES = path.resolve(path.dirname(__filename), "fixtures", "e125c-frozen");
@@ -173,7 +173,7 @@ test("AC2 closed-lanes carry: a Closed-Lanes-shaped append to the post-forward r
 
 test("AC2 closed-lanes carry: a CL section that is NOT trailing in the root (prose follows it) is still carried, moved to the end of the restored body", () => {
   const ws = mkPrimaryWorkspace("e125c-ac2-nontrailing-");
-  // A CL-bearing v1 root (the AC6 R1 shape) where a later section follows CL —
+  // A CL-bearing v1 root (the shape the AC6 round-trip tests use) where a later section follows CL —
   // an unusual but well-formed input; the reverse must still relocate CL to
   // the end rather than drop it or leave it mid-body.
   const B =
@@ -247,7 +247,7 @@ test("AC4 hand-edit refuses: a hand-edited task row (not a marker, not CL) still
 });
 
 // ===========================================================================
-// AC5 — a legacy receipt (stamped pre-E125c as sha256(raw body)) is still
+// AC5 — a legacy receipt (stamped before index compaction (E125c) as sha256(raw body)) is still
 // accepted when the root body is byte-identical to that raw body.
 // ===========================================================================
 
@@ -263,7 +263,7 @@ test("AC5 legacy receipt: a receipt stamped as sha256(raw body) (pre-E125c shape
 
   assert.notEqual(sha256(B), primaryIndexReceiptSha(B), "sanity: the two sha flavours really do differ on this body");
 
-  // Overwrite with the LEGACY shape a pre-E125c stamp would have written.
+  // Overwrite with the LEGACY shape a stamp from before index compaction (E125c) would have written.
   fs.writeFileSync(receiptPath(ws), `${JSON.stringify({ bodySha256: sha256(B) })}\n`);
 
   assert.doesNotThrow(() => migratePrimaryReverse(ws), "AC5: receipt === sha256(raw body) must be accepted, not just receipt === primaryIndexReceiptSha(body)");
@@ -436,10 +436,10 @@ test("AC11 consumer parity: parseTasksFromFile returns only the kept sections' r
 });
 
 // ===========================================================================
-// F2 (code-reviewer finding, review_reports/review_T-E125C-04.md — filed as
-// E125c-NEW-5, accepted by the integrator as a known residue, NOT a QA
-// failure): a hand-fabricated tasks_moved marker line in the root index is
-// silently absorbed by the reverse rather than refused. Pinned here so a
+// F2 — a hand-fabricated tasks_moved marker line in the root index is
+// silently absorbed by the reverse rather than refused (a code-reviewer finding,
+// review_reports/review_T-E125C-04.md, filed as E125c-NEW-5 and accepted by the
+// integrator as a known residue, NOT a QA failure). Pinned here so a
 // future hardening (recording the forward-time marker set in the receipt)
 // flips this deliberately, with a red test as the signal.
 // ===========================================================================

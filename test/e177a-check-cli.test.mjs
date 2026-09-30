@@ -1,5 +1,5 @@
 // Coded by @qa-engineer
-// T-E177A-07 — tests for checkLane() and the thin scripts/fanout.mjs CLI
+// Tests (T-E177A-07) for checkLane() and the thin scripts/fanout.mjs CLI
 // (specs/e177a-fanout-manifest.md, AC9-AC12, AC15). AC16 (build + suite) is
 // recorded in qa_reports/review_T-E177A-06.md after this file's commit, per
 // the qa-engineer SOP Phase 4 ("run after commit on a clean tree,
@@ -19,11 +19,15 @@
 // end-to-end check of the spec's own worked example.
 //
 // Spec-to-Test map:
-//   AC9  -> "AC9 check in bounds"
-//   AC10 -> "AC10 check out of bounds"
-//   AC11 -> "AC11 E158 disclaimer"
-//   AC12 -> "AC12 check base and refs"
-//   AC15 -> "AC15 CLI contract"
+//   AC9  (check passes, exit 0, when every changed file is in the lane's owned paths)
+//        -> "AC9 check in bounds"
+//   AC10 (check fails, exit 1, when a changed file is outside the owned paths)
+//        -> "AC10 check out of bounds"
+//   AC11 (report says only committed changes were checked and prose limits are
+//        not machine-checked, E158) -> "AC11 E158 disclaimer"
+//   AC12 (check honours the base ref and explicit branch refs)
+//        -> "AC12 check base and refs"
+//   AC15 (the CLI's own exit and output contract) -> "AC15 CLI contract"
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -86,7 +90,7 @@ function fanoutManifest() {
 }
 
 // ---------------------------------------------------------------------------
-// AC9
+// AC9 — check passes when every changed file is in bounds
 // ---------------------------------------------------------------------------
 
 test("AC9 check in bounds", () => {
@@ -121,7 +125,7 @@ test("AC9 check in bounds", () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC10
+// AC10 — check fails when a changed file is out of bounds
 // ---------------------------------------------------------------------------
 
 test("AC10 check out of bounds", () => {
@@ -175,7 +179,7 @@ test("AC10 check out of bounds", () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC11
+// AC11 — report disclaimers (committed-only scope, prose limits unchecked)
 // ---------------------------------------------------------------------------
 
 test("AC11 E158 disclaimer", () => {
@@ -212,7 +216,7 @@ test("AC11 E158 disclaimer", () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC12
+// AC12 — base ref and branch refs
 // ---------------------------------------------------------------------------
 
 test("AC12 check base and refs", () => {
@@ -264,7 +268,7 @@ test("AC12 check base and refs", () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC15
+// AC15 — CLI exit and output contract
 // ---------------------------------------------------------------------------
 
 function runCli(args, cwd = ROOT) {

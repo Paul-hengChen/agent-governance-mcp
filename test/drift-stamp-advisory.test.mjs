@@ -1,5 +1,6 @@
 // Coded by @qa-engineer
-// e9a-stamp-integrity (T-E9A-05): stampAdvisory behavior — AC3/AC4.
+// stampAdvisory behavior: the drift report's advisory for hand-authored timestamp
+// stamps (feature e9a-stamp-integrity, T-E9A-05; AC3/AC4).
 //
 // Contract under test: tw_detect_drift's DriftReport gets a new, purely
 // additive top-level field, `stampAdvisory: string | null`. Non-null (a plain

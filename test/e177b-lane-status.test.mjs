@@ -1,5 +1,5 @@
 // Coded by @qa-engineer
-// T-E177B-05 — tests for tools/lane-status.ts (specs/e177b-lane-status-tooling.md,
+// Tests (T-E177B-05) for tools/lane-status.ts (specs/e177b-lane-status-tooling.md,
 // AC1-AC6, AC5a-AC5d).
 //
 // Spec-to-Test map:
@@ -76,7 +76,7 @@ const LANE_STATUS_SOURCE = fs.readFileSync(path.join(ROOT, "tools", "lane-status
 function git(args, cwd) {
   // A bounded timeout: a hung git subprocess (e.g. an unexpected interactive
   // prompt) must fail this one call loudly rather than stall the whole
-  // suite (E182-class hazard — see the e177b-test-lock/mailbox-watch fixups).
+  // suite (same hang class fixed in the test-lock and mailbox-watch tests, E182).
   return execFileSync("git", args, { cwd, encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"], timeout: 15_000 });
 }
 
@@ -300,26 +300,26 @@ test("AC5/AC5a/AC5b/AC5d: evidence cross-check independently counts PASS-only, i
   const wt = addWorktree(t, primary, "feat/e908-archivetest", "e177b-ac5-wt-");
   // The handoff under-claims on purpose: only T-E908-01 is in completed_tasks,
   // even though several more ids will turn out to be evidence-backed below —
-  // this is the E175(d) shape (AC5).
+  // the shape where a lane's handoff under-reports finished work (E175(d), AC5).
   await writeLane(wt, { activeFeature: "e908-archivetest", completedTasks: ["T-E908-01"], hopCount: 1 });
 
   const qaDir = path.join(wt, "qa_reports");
   // Flat dir: the claimed id has real PASS evidence (no mismatch contribution
   // from this one).
   writeReview(qaDir, "T-E908-01");
-  // AC5b — a FAIL-only file must never count as evidence.
+  // A FAIL-only file must never count as evidence (AC5b).
   writeReview(qaDir, "T-E908-03-failonly", { status: "FAIL" });
-  // AC5b — a FAIL round followed by a later PASS round DOES count.
+  // A FAIL round followed by a later PASS round DOES count (AC5b).
   writeReview(qaDir, "T-E908-04-failthenpass", { status: "FAIL" });
   writeReview(qaDir, "T-E908-04-failthenpass", { status: "PASS", append: true });
-  // AC5d — a PASS file exists on disk, but the id is voided in the lane's own
-  // ledger: it must be EXCLUDED from evidenceIds, and surfaced in excludedVoided.
+  // A PASS file exists on disk, but the id is voided in the lane's own
+  // ledger: it must be EXCLUDED from evidenceIds, and surfaced in excludedVoided (AC5d).
   writeReview(qaDir, "T-E908-05-voided");
   writeVoidedRow(wt, "e908", "T-E908-05-voided");
 
-  // AC5a — a release-style archive holding a whole wave's evidence: several
+  // A release-style archive holding a whole wave's evidence: several
   // OUT-OF-SCOPE ids (no "e908" token) plus ONE in-scope id. None of the
-  // out-of-scope ids may be counted or flagged.
+  // out-of-scope ids may be counted or flagged (AC5a).
   const archiveDir = path.join(qaDir, "archive", "e908-archivetest");
   writeReview(archiveDir, "T-E908-02-archived"); // in scope (carries "e908")
   writeReview(archiveDir, "T-E125A-01");

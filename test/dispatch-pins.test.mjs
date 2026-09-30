@@ -114,7 +114,7 @@ next_role: "sr-engineer"
 });
 
 test("M1b: readHandoffState's fire-and-forget write-back heals the v7 file to v10 on disk", async () => {
-  // e123a-lane-layout-migration (qa-owned re-baseline): CURRENT_VERSIONS.handoff
+  // Re-baselined for the lane-layout migration (e123a, qa-owned): CURRENT_VERSIONS.handoff
   // is now 15 (v14→v15 added dispatch_mechanism/dispatch_mechanism_tier,
   // stamp-only, seeds nothing). A v7 file heals all the way to v15 in one
   // fire-and-forget write-back, seeding hop_count: 0 (DR-3, from the earlier
@@ -149,10 +149,10 @@ qa_round: 0
 });
 
 test("M2: future v16 handoff refuses-loud against a v15 server (no silent downgrade)", () => {
-  // WHY: forward-compat safety, mirroring the AC-10(g) c9-protocol-fields
+  // WHY: forward-compat safety, mirroring the AC-10(g) protocol-fields (c9)
   // precedent (v7 file against a v6 server; here v16 against v15 — re-baselined
-  // by e123a-lane-layout-migration, qa-owned, since v15 is now CURRENT and no
-  // longer "the future"; was v15-vs-v14 under e114-cut-approval-inheritance).
+  // for the lane-layout migration (e123a, qa-owned), since v15 is now CURRENT and no
+  // longer "the future"; was v15-vs-v14 under the cut-approval inheritance change, e114).
   // A handoff written by a newer server must never be silently parsed.
   const ws = mkWs();
   resetSession();
@@ -187,7 +187,7 @@ test("M3: registry-level v7→v8→v9→v10 steps are pure, stamp-only/seed-only
   // WHY: pins the migration steps themselves (schema/migrations-handoff.ts),
   // not just their effect through parseHandoff — a direct unit test of the
   // runner registration, matching the M1/M2 cut-approval-gate.test.mjs
-  // convention. e123a-lane-layout-migration (qa-owned re-baseline): CURRENT
+  // convention. Re-baselined for the lane-layout migration (e123a, qa-owned): CURRENT
   // is now 15, so the isolated chain re-registered here must extend one step
   // further (v14→v15, dispatch_mechanism/dispatch_mechanism_tier pin,
   // stamp-only, seeds nothing) or every subsequent read in this file hits
@@ -775,8 +775,8 @@ test("Z6: tw_update_state ACCEPTS a valid dispatch_pins map for all 8 AgentName 
     pendingNotes: ["seed"],
     lastAgent: "pm",
   });
-  // E148 (docs/backlog.md row E148): force the seed's last_updated off the
-  // wall clock — see test/e148-seed-stamp.mjs.
+  // Force the seed's last_updated off the wall clock so it cannot trip the
+  // stamp-provenance check (E148, docs/backlog.md) — see test/e148-seed-stamp.mjs.
   forceSeedStamp(ws);
   resetSession();
   markStateRead(ws);
@@ -814,8 +814,8 @@ test("Z7: tw_update_state ACCEPTS an empty dispatch_pins object ({} clears, per 
     lastAgent: "pm",
     dispatchPins: { pm: "opus" },
   });
-  // E148: force the seed's last_updated off the wall clock (docs/backlog.md
-  // row E148) — see test/e148-seed-stamp.mjs.
+  // Force the seed's last_updated off the wall clock so it cannot trip the
+  // stamp-provenance check (E148, docs/backlog.md) — see test/e148-seed-stamp.mjs.
   forceSeedStamp(ws);
   resetSession();
   markStateRead(ws);
@@ -833,9 +833,9 @@ test("Z7: tw_update_state ACCEPTS an empty dispatch_pins object ({} clears, per 
 
 // Sanity: CURRENT_VERSIONS.handoff really is 15 in this build (guards every
 // test above against silently testing the wrong target version).
-// e123a-lane-layout-migration (qa-owned re-baseline): bumped 14 -> 15
+// Re-baselined for the lane-layout migration (e123a, qa-owned): bumped 14 -> 15
 // (dispatch_mechanism/dispatch_mechanism_tier, stamp-only, seeds nothing);
-// was 13 -> 14 under e114-cut-approval-inheritance (cut_approved_source,
+// was 13 -> 14 under the cut-approval inheritance change, e114 (cut_approved_source,
 // stamp-only, seeds nothing).
 test("sanity: CURRENT_VERSIONS.handoff is 15 (e123a-lane-layout-migration)", () => {
   assert.equal(CURRENT_VERSIONS.handoff, 15);

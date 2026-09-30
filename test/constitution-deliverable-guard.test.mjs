@@ -27,10 +27,10 @@ import { fileURLToPath } from "node:url";
 const __filename = fileURLToPath(import.meta.url);
 const ROOT = path.resolve(path.dirname(__filename), "..");
 
-// compose-not-strip (ticket A9, DR-6): content/constitution.md is retired (AC8);
-// composeConstitution({chain:true,design:true}) reproduces it byte-for-byte
-// (Option R, architecture DR-1), so every marker-string assertion below is
-// unaffected by this mechanical swap.
+// content/constitution.md is retired (AC8); composeConstitution({chain:true,
+// design:true}) reproduces it byte-for-byte (the chosen composition option,
+// architecture DR-1), so every marker-string assertion below is unaffected by
+// this mechanical swap (compose-not-strip, ticket A9, DR-6).
 const { composeConstitution } = await import(
   path.join(ROOT, "dist", "prompts", "build.js")
 );

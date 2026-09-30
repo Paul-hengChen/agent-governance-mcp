@@ -1,5 +1,7 @@
 // Coded by @qa-engineer
-// Tests for T-E166-01 (docs/backlog.md row E166, Wave 4.5 L-RELTOOL).
+// Tests that the release-engineer agent template defers to the skill's staging
+// list instead of restating it (T-E166-01, docs/backlog.md row E166, Wave 4.5
+// L-RELTOOL).
 //
 // No specs/<feature>.md exists for this mini-chain ticket (PM/architect
 // skipped per the human-approved cut recorded in the handoff's
@@ -10,17 +12,17 @@
 // by this ticket) and the shim's <=2-sentence reinforcement-hint shape
 // (which the new wording also satisfies, confirmed green below) — none of
 // its existing assertions check for ABSENCE of a restated path list or that
-// the shim points at a specific SOP anchor, which is what E166 actually
-// changed. Disclosed per the dispatch brief's "your call; disclose it."
+// the shim points at a specific SOP anchor, which is what this ticket actually
+// changed (E166). Disclosed per the dispatch brief's "your call; disclose it."
 //
 // Contract under test (docs/backlog.md E166 / scope_decision_why):
-//   T-E166-01: templates/claude-code-agents/release-engineer.md drops its
+//   templates/claude-code-agents/release-engineer.md (T-E166-01) drops its
 //   OWN restated staging path list and defers to content/skill-
 //   release-engineer.md step 8a's enumerated list ("Stage explicitly") and
 //   its "Pre-commit verify" sub-step — never restating a shorter/staler copy
 //   a haiku-tier agent could follow instead of the single normative list.
 //
-// Test map:
+// Test map (criterion -> test name):
 //   AC (no restated path list)         -> T-E166-01a
 //   AC (defers to SOP step 8a by name) -> T-E166-01b
 //   AC (anchors exist in step 8a)      -> T-E166-01c

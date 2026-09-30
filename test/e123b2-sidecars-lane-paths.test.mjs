@@ -1,24 +1,25 @@
 // Coded by @qa-engineer
-// Tests for T-E123B2-01 (specs live in handoff.scope_decision_why — E123 F1 L2,
-// feature-split.md row 1.2; PM/ARCH skipped per the human's mini-chain cut).
+// Tests that the telemetry and metrics sidecar files are located through the
+// lane-path resolver (T-E123B2-01; the spec lived in the handoff's
+// scope_decision_why and feature-split.md row 1.2, with no separate spec file).
 //
 // AC1: telemetryPath()/metricsPath() derive their sidecar location ONLY from
 //      resolveCurrentLanePaths(workspacePath) — never from a hand-rolled
 //      path.join(workspacePath, ".current", "<literal filename>"). This file
 //      tests that contract behaviourally.
 //
-// e123b9 J2 (spec AC1) FLIPPED resolveLanePaths: it no longer ignores `lane`.
-// This file's original charter ("zero behaviour change across lanes until
-// F1/J flips resolveLanePaths") is retired by construction — THIS is that
-// flip ticket. LANE1/LANE2/LANE3 below now assert the OPPOSITE of their
+// The lane flip (e123b9 J2, spec AC1) changed resolveLanePaths: it no longer
+// ignores `lane`. This file's original charter ("zero behaviour change across
+// lanes until resolveLanePaths is flipped") therefore no longer applies — the
+// flip has now landed. LANE1/LANE2/LANE3 below now assert the OPPOSITE of their
 // original premise: the sidecar location DOES depend on the checked-out
 // branch's lane, exactly as AC1 specifies, while still routing exclusively
 // through resolveCurrentLanePaths (never a hand-rolled `.current/<literal>`
 // join) — that resolver-only-source-of-truth contract is what AC1/AC4
 // actually protect; only the concrete path shape changed.
 //
-// Spec-to-Test map (per dispatch brief's AC1-AC6, re-pointed by e123b9 J2):
-//   AC4 (this file's own charter) -> LANE1 (feat/e999-x), LANE2 (main)
+// Spec-to-Test map (AC1-AC6 from the dispatch brief, re-pointed by the lane flip):
+//   AC4 (sidecar path comes only from the lane resolver) -> LANE1 (feat/e999-x), LANE2 (main)
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -45,8 +46,8 @@ function mkLaneWorkspace(branch, prefix) {
   return ws;
 }
 
-// e123b9 J2 (spec AC1 — FLIPPED): the sidecar's expected location is now
-// lane-scoped — derived from resolveCurrentLanePaths itself, so this stays
+// The sidecar's expected location is now lane-scoped (lane flip, e123b9 J2,
+// spec AC1) — derived from resolveCurrentLanePaths itself, so this stays
 // the single source of truth rather than a second, independently-restated
 // path shape.
 function expectedTelemetryPath(ws) {

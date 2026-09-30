@@ -1,6 +1,6 @@
 // Coded by @qa-engineer
-// T-E112-03: verification-by-execution suite for E112
-// (e112-drift-fanout-and-feature-scope), covering both distortion cases
+// Verification-by-execution suite for the drift-detector fan-out and
+// feature-scope fix (E112, task T-E112-03, e112-drift-fanout-and-feature-scope), covering both distortion cases
 // sr-engineer's T-E112-01 shipped in tools/drift.ts + tools/evidence-lookup.ts
 // (code-reviewer APPROVED round 2, review_reports/review_T-E112-01.md):
 //
@@ -343,7 +343,7 @@ test("driftBaselineIds precedence: a baselined id with PASS evidence on disk is 
 
 // ===========================================================================
 // Regression pins — driftBaselineIds, the archived-## Completed filter,
-// handoff-ahead, and FAIL/Blocked must be behaviourally UNCHANGED by E112.
+// handoff-ahead, and FAIL/Blocked must be behaviourally UNCHANGED by the fan-out/feature-scope fix (E112).
 // ===========================================================================
 
 test("regression: driftBaselineIds still fully suppresses drift with no evidence file present at all", async () => {
@@ -575,8 +575,8 @@ test("field presence (early return 4/4): handoff exists but no tasks file -> fan
 // handoff conflict left only ONE feature's ledger, while tasks.md kept every
 // lane's [x] marks. T-E148-01/02 are real QA PASSes with qa_reports/ evidence
 // on disk; T-E145-01/02 have neither an evidence file nor a ledger entry.
-// Root cause is E150 (no durable ledger home) — E112 is the DETECTOR ticket
-// and does not fix E150; it must stop mis-calling the evidenced ids drift.
+// Root cause is a missing durable ledger home (E150); the drift-detector fix
+// (E112) does not cure that, but it must stop mis-calling the evidenced ids drift.
 // ===========================================================================
 
 test("measured incident (2026-09-18 shape): merged-lane ledger reset — evidenced ids are no longer vibe drift, unevidenced sibling-lane ids still report incomplete", async () => {

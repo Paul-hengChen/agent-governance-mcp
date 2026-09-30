@@ -1,7 +1,7 @@
 // Coded by @qa-engineer
-// T-E178B-05 — tests for the E208 warning in `fanout check`
-// (tools/fanout-manifest.ts checkLane/unmatchedOwnedTokens, scripts/fanout.mjs),
-// per specs/e178b-lane-watch-tooling.md decisions (h)/(i), AC16-AC19.
+// Tests (T-E178B-05) for the `fanout check` warning about owned path tokens
+// that name no file (E208; tools/fanout-manifest.ts checkLane/unmatchedOwnedTokens,
+// scripts/fanout.mjs), per specs/e178b-lane-watch-tooling.md decisions (h)/(i), AC16-AC19.
 // AC20 (build + full suite on a clean committed tree) and AC21 (the lane's own
 // `fanout check specs/fanout-wave7.2.md e178b --base 121ddc8`) are whole-ticket
 // runs recorded in qa_reports/review_T-E178B-05.md after the commit, per
@@ -23,10 +23,10 @@
 // and `git diff --diff-filter=A` reads run for real.
 //
 // Spec-to-Test map:
-//   AC16 -> "AC16 unmatched exact token warns"
-//   AC17 -> "AC17 no false warnings"
-//   AC18 -> "AC18 exit codes and line order"
-//   AC19 -> "AC19 E208 regression"
+//   AC16 (an exact owned token naming no file warns)      -> "AC16 unmatched exact token warns"
+//   AC17 (globs, existing and newly added files never warn) -> "AC17 no false warnings"
+//   AC18 (exit codes unchanged, WARN lines come last)     -> "AC18 exit codes and line order"
+//   AC19 (real wave7 row's prose-aside token warns)       -> "AC19 E208 regression"
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -116,7 +116,7 @@ function repoWith(t, baseFiles, branchFiles) {
 }
 
 // ---------------------------------------------------------------------------
-// AC16
+// AC16 — an exact owned token that names no file warns
 // ---------------------------------------------------------------------------
 
 test("AC16 unmatched exact token warns", (t) => {
@@ -135,7 +135,7 @@ test("AC16 unmatched exact token warns", (t) => {
 });
 
 // ---------------------------------------------------------------------------
-// AC17
+// AC17 — globs, existing files and newly added files never warn
 // ---------------------------------------------------------------------------
 
 test("AC17 no false warnings", (t) => {
@@ -169,7 +169,7 @@ test("AC17 no false warnings", (t) => {
 });
 
 // ---------------------------------------------------------------------------
-// AC18
+// AC18 — exit codes are unchanged and WARN lines come after the existing lines
 // ---------------------------------------------------------------------------
 
 test("AC18 exit codes and line order", (t) => {
@@ -195,7 +195,7 @@ test("AC18 exit codes and line order", (t) => {
   ]);
   assert.deepEqual(lines.slice(firstWarn), [warn("ghost.mjs")]);
 
-  // WARN only: exit 0 — E208 never changes the exit code (decision (h)).
+  // WARN only: exit 0 — an unmatched-file warning never changes the exit code (E208, decision (h)).
   const inBounds = repoWith(t, { "README.md": "x" }, { "tools/real.ts": "r" });
   const warnOnly = checkLane(m, "e950", { base: "main", repo: inBounds }).report;
   assert.equal(warnOnly.exitCode, 0);
@@ -214,7 +214,7 @@ test("AC18 exit codes and line order", (t) => {
     assert.equal(r.exitCode, 2, args.join(" "));
     assert.equal(r.stdout, "", `${args.join(" ")}: no report on an input error`);
   }
-  // No new error code (decision (i)): the E208 path adds none.
+  // No new error code (decision (i)): the unmatched-file warning adds none (E208).
   assert.equal(Object.values(FANOUT_CODES).some((c) => /UNMATCHED|WARN/.test(String(c))), false);
 
   // The degrade note (git ls-tree failed) appears only when that read fails.
@@ -222,7 +222,7 @@ test("AC18 exit codes and line order", (t) => {
 });
 
 // ---------------------------------------------------------------------------
-// AC19
+// AC19 — the real wave7 row's prose-aside token triggers the warning
 // ---------------------------------------------------------------------------
 
 test("AC19 E208 regression", (t) => {

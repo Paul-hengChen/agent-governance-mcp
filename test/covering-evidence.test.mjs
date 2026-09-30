@@ -214,15 +214,16 @@ test("buildCoverageIndex: files with no covers: line contribute nothing", () => 
   assert.equal(index.size, 0);
 });
 
-// Regression guard for specs/d7-qa-reports-archive.md AC8-b: a released
-// feature's evidence files get moved under qa_reports/archive/<feature>/.
+// Regression guard: a released feature's evidence files get moved under
+// qa_reports/archive/<feature>/.
 // buildCoverageIndex's readdirSync-then-filter must tolerate that
 // subdirectory sitting alongside root-level .md files — a bare directory
 // name has no ".md" suffix, so it is filtered out before any readFileSync,
-// never descended into. This pins the exact invariant AC8-b describes
-// (rather than re-deriving it from the "non-.md files are ignored" test
-// above, since a directory and a non-.md *file* exercise the same filter
-// line but are worth distinguishing for a reader auditing archive-safety).
+// never descended into. This pins the exact archive-safety invariant
+// (specs/d7-qa-reports-archive.md AC8-b) rather than re-deriving it from the
+// "non-.md files are ignored" test above, since a directory and a non-.md
+// *file* exercise the same filter line but are worth distinguishing for a
+// reader auditing archive-safety.
 test("buildCoverageIndex: tolerates an archive/ subdirectory alongside real .md files (AC8-b)", () => {
   const ws = tmpWs();
   const dir = path.join(ws, "qa_reports");

@@ -1,5 +1,5 @@
 // Coded by @qa-engineer
-// T-E178B-04 — tests for `lane-status --watch` (tools/lane-status.ts
+// Tests (T-E178B-04) for `lane-status --watch` (tools/lane-status.ts
 // runLaneWatch + helpers, scripts/lane-status.mjs routing), per
 // specs/e178b-lane-watch-tooling.md decisions (a)-(f), (j), AC1-AC9 and the
 // watch half of the cut pre-review check, AC15. AC10-AC14 live in
@@ -14,7 +14,8 @@
 // (and nothing else prints one), a lane that breaks or leaves is SAID rather
 // than dropped, and a transition landing between two watches still fires
 // after the re-arm because the re-arm command carries fingerprints of the
-// states this watch LAST READ (decision (d), the mailbox-watch AC16 rule).
+// states this watch LAST READ (the same rule the mailbox watch follows;
+// decision (d), mailbox-watch AC16).
 //
 // Harness: runLaneWatch is driven in-process with an injected lane-list
 // provider, handoff reader and io (fake clock whose sleep() advances time and
@@ -182,7 +183,7 @@ async function runWatch(argv, world, { onSleep } = {}) {
 }
 
 // ---------------------------------------------------------------------------
-// AC1
+// AC1 — a baseline is printed when the watch starts
 // ---------------------------------------------------------------------------
 
 test("AC1 baseline on start", async () => {
@@ -212,7 +213,7 @@ test("AC1 baseline on start", async () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC2
+// AC2 — one line per watched-field transition; changes to other fields stay silent
 // ---------------------------------------------------------------------------
 
 test("AC2 transition line", async () => {
@@ -261,7 +262,7 @@ test("AC2 non-watched field silent", async () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC3
+// AC3 — a lane that breaks or leaves is reported, not silently dropped
 // ---------------------------------------------------------------------------
 
 test("AC3 degrade honestly", async () => {
@@ -347,7 +348,7 @@ test("AC3 degrade honestly: degraded-empty list and duplicate basenames", async 
 });
 
 // ---------------------------------------------------------------------------
-// AC4
+// AC4 — deadline expiry (exit 3) prints the re-arm command
 // ---------------------------------------------------------------------------
 
 test("AC4 expiry and re-arm command", async (t) => {
@@ -400,7 +401,7 @@ test("AC4 expiry and re-arm command", async (t) => {
 });
 
 // ---------------------------------------------------------------------------
-// AC5
+// AC5 — the re-arm command round-trips the last-read fingerprints
 // ---------------------------------------------------------------------------
 
 test("AC5 re-arm round trip", async () => {
@@ -457,7 +458,7 @@ test("AC5 re-arm round trip", async () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC6
+// AC6 — argument validation rules for the watch flags
 // ---------------------------------------------------------------------------
 
 test("AC6 argument rules", async () => {
@@ -520,7 +521,7 @@ test("AC6 argument rules", async () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC7
+// AC7 — each tick reads only the lane list and handoffs (no git)
 // ---------------------------------------------------------------------------
 
 test("AC7 tick reads only list + handoff", { timeout: 60000 }, async (t) => {
@@ -577,7 +578,7 @@ test("AC7 tick reads only list + handoff", { timeout: 60000 }, async (t) => {
 });
 
 // ---------------------------------------------------------------------------
-// AC8
+// AC8 — constants shared with the mailbox watch stay identical
 // ---------------------------------------------------------------------------
 
 test("AC8 constants parity", () => {
@@ -596,7 +597,7 @@ test("AC8 constants parity", () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC9
+// AC9 — the real script run end to end with a short deadline
 // ---------------------------------------------------------------------------
 
 function git(args, cwd) {
@@ -664,7 +665,7 @@ test("AC9 script end to end", { timeout: 60000 }, async (t) => {
 });
 
 // ---------------------------------------------------------------------------
-// AC15
+// AC15 — the cut pre-review transition is announced by the watch
 // ---------------------------------------------------------------------------
 
 test("AC15 prereview transition", async (t) => {

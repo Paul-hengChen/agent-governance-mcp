@@ -1,7 +1,8 @@
 // Coded by @qa-engineer
-// Tests for specs/e106-init-artifacts-flag.md AC1-AC14 (+ AC16 CLI-level;
-// AC15/AC16 unit-level narrow-typing coverage lives in
-// test/config-versioning.test.mjs — this file adds an AC16 end-to-end check
+// Tests for the `agc init --artifacts` flag and the matching `agc check` drift
+// reports (specs/e106-init-artifacts-flag.md AC1-AC14, plus the CLI-level AC16;
+// unit-level narrow typing of the config value (AC15/AC16) lives in
+// test/config-versioning.test.mjs — this file adds an end-to-end check (AC16)
 // that a real `agc init` write round-trips through the real loadConfig()).
 //
 // Spec-to-test map:
@@ -22,12 +23,12 @@
 //   AC14 -> "AC14: local outside a git repo skips the exclude write and notes it, no error"
 //   AC16 -> "AC16 (CLI end-to-end): loadConfig() surfaces the artifacts value agc init just wrote"
 //
-// Every scratch repo exercising AC1/AC3/AC4/AC5/AC6/AC7/AC8/AC9-AC13/AC16 is a
-// REAL git repository built under os.tmpdir() via `git init` + a local
+// The scratch repos in the flag and drift cases (AC1/AC3-AC11/AC13/AC16) are
+// REAL git repositories built under os.tmpdir() via `git init` + a local
 // identity (never this checkout or the lane worktree, and never the ambient
-// global git config). AC2/AC12/AC14 deliberately run outside any prior
-// commit (AC2: empty repo, per the spec's own proof) or outside git entirely
-// (AC12/AC14).
+// global git config). The invalid-value, undeclared-advisory and outside-git
+// cases (AC2/AC12/AC14) deliberately run outside any prior commit (AC2: empty
+// repo, per the spec's own proof) or outside git entirely (AC12/AC14).
 
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
@@ -150,7 +151,7 @@ test("AC3: fresh local writes exclude rules + config key", () => {
 test("AC4: fresh repo writes config key only, no exclude write", () => {
   const repo = mkGitRepo("e106-ac4-");
   // `git init` always creates .git/info/exclude with its own commented
-  // default template — the AC4 claim is that --artifacts=repo leaves that
+  // default template — the claim under test (AC4) is that --artifacts=repo leaves that
   // file untouched, not that it never exists.
   const before = readExclude(repo);
   const r = runAgc(repo, ["init", "--artifacts=repo"]);
@@ -333,9 +334,9 @@ test("AC11: agc check does not confuse LANE_EXCLUDE_RULES entries for artifact d
 // ---------------------------------------------------------------------------
 // AC12 — agc check prints the undeclared-artifacts advisory, exit 0
 // ---------------------------------------------------------------------------
-// E234: agc check now always runs the advisory hygiene scan, which may add
-// its own `agc check — hygiene` lines (e.g. hyg.kw.none). AC12 is about the
-// artifacts advisory, so it drops those lines first.
+// agc check now always runs the advisory hygiene scan (E234), which may add
+// its own `agc check — hygiene` lines (e.g. hyg.kw.none). This case is about the
+// artifacts advisory (AC12), so it drops those lines first.
 function withoutHygieneLines(stderr) {
   return stderr
     .split("\n")
@@ -424,14 +425,15 @@ test("boundary: --artifacts as the last argv token with no value attached is rej
 });
 
 // ---------------------------------------------------------------------------
-// AC3 regression (E239, appended per docs/lane-protocol.md §3 test-ownership
-// carve-out — additive only, no existing assertion above is touched): the
-// subdirectory-anchor fix (specs/e239-init-subdir-exclude.md) must leave the
-// root-cwd path byte-identical — no workspace-qualifier text, no prefixed
-// rule strings, and the already-tracked warning must carry no
-// "(run from the repository root)" qualifier, which only ever applies when
-// cwd is a subdirectory. Root-cwd subdir-specific AC1-AC13 coverage itself
-// lives in test/e239-init-subdir-exclude.test.mjs (qa-engineer's own file).
+// Root-cwd regression check (AC3, E239; appended additively under the lane
+// test-ownership carve-out in docs/lane-protocol.md §3 — no existing assertion
+// above is touched): the subdirectory-anchor fix
+// (specs/e239-init-subdir-exclude.md) must leave the root-cwd path
+// byte-identical — no workspace-qualifier text, no prefixed rule strings, and
+// the already-tracked warning must carry no "(run from the repository root)"
+// qualifier, which only ever applies when cwd is a subdirectory. The
+// subdirectory cases themselves live in test/e239-init-subdir-exclude.test.mjs
+// (qa-engineer's own file).
 // ---------------------------------------------------------------------------
 test("AC3 regression (E239): root cwd emits no subdir-qualifier text and no prefixed rule strings", () => {
   const repo = mkGitRepo("e106-e239-ac3-");
