@@ -1,19 +1,6 @@
 // Coded by @qa-engineer
 // Tests for spec: specs/e258a-comment-rule.md (lane e258a, T-E258A-02).
-//
-// Spec-to-Test map:
-//   AC1 (bullet placement)        -> t-ac1-placement
-//   AC2 (five clauses)            -> t-ac2-what-why, t-ac2-function-body, t-ac2-rationale-home,
-//                                    t-ac2-doc-comment-shape, t-ac2-heading-pasted-spec
-//   AC3 (every compose mode)      -> t-ac3-compose-modes
-//   AC4 (no jargon / ticket id)   -> t-ac4-no-jargon
-//   AC5 (reviewer check, bytes)   -> t-ac5-reviewer-prefix-bytes, t-ac5-reviewer-check-text
-//   Boundary / security smoke     -> t-boundary-single-bullet, t-boundary-no-control-chars
-//
-// WHY: the rule is prose, so a regression is silent — someone trims a clause, reorders the
-// section, or retypes the scan prefix with a hyphen, and nothing fails. The scan lane emits
-// the same prefix string byte-for-byte; a one-byte mismatch would make the reviewer check
-// silently stop matching. Each assertion encodes the contract, not the current wording.
+// WHY: the rule is prose, so a silent regression (trimmed clause, retyped scan prefix) fails nothing.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
