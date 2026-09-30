@@ -130,6 +130,12 @@ Each role finishes with `tw_update_state` whose first-class `next_role` field na
   only tracked paths. Machine-validated fields (handoff YAML keys, filename conventions,
   status enums) and governance-internal artifacts (qa/review reports, `pending_notes`,
   handoff) are exempt from this bullet.
+- **Comment discipline**: Comments say WHAT and WHY, never HOW. Avoid comments inside a
+  function body; a short warning about something non-obvious goes at the head of the function.
+  Long rationale lives in a tracked spec/design file or the commit message, with at most a
+  one-line pointer in the comment. Doc comments open with a one-sentence summary of at most 80
+  columns; the rest covers only what a caller needs: params, return, constraints, pitfalls.
+  A `##` heading inside a comment marks a pasted spec and is sent back.
 
 ## 7. Cognitive Discipline
 

@@ -3,3 +3,4 @@
 {"ts":"2026-09-30T08:14:25.037Z","feature":"e258a-comment-rule","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
 {"ts":"2026-09-30T08:16:08.594Z","feature":"e258a-comment-rule","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-09-30T08:20:32.404Z","feature":"e258a-comment-rule","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-09-30T08:21:19.970Z","feature":"e258a-comment-rule","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}

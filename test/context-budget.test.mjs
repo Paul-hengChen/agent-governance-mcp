@@ -223,7 +223,7 @@ test("DR-5 guard (T-A12-09): no literal {{PARTIAL:...}} token may appear in any 
 
 // --- reduction (AC2) -------------------------------------------------------
 
-test("AC2: lean always-on bundle is below the raw baseline and within target (<= 5415 ~tok)", () => {
+test("AC2: lean always-on bundle is below the raw baseline and within target (<= 5548 ~tok)", () => {
   // v3.24.0 (B2 backlog fix): cap raised from 2100 → 2300 to provide ~200-token
   // editing headroom. The v3.22.0 raise (2000 → 2100) left only a 2-token margin
   // (2098/2100), meaning any minor constitution/skill edit broke CI unexpectedly.
@@ -387,7 +387,9 @@ test("AC2: lean always-on bundle is below the raw baseline and within target (<=
   // sr-engineer's or code-reviewer's handoff notes) at 5415 ~tok (exact); cap raised
   // from 5157 to that exact measured value, per the established Phase-2 convention of
   // setting the cap to the measured figure with no extra headroom (zero-headroom convention, E231).
-  assert.ok(lean <= 5415, `lean always-on (${lean} ~tok) must meet the <= 5415 target (E231 re-baseline)`);
+  // Comment-discipline rule bullet (const-15) added to the core-tagged fragment: re-measured
+  // at 5548 ~tok (exact); cap raised from 5415 to that exact value, zero headroom (E258).
+  assert.ok(lean <= 5548, `lean always-on (${lean} ~tok) must meet the <= 5548 target (E258 re-baseline)`);
 });
 
 // --- enforcement preserved (AC3) ------------------------------------------
@@ -937,7 +939,7 @@ test("AC7: exactly two balanced rationale fences, both outside §3.x", () => {
   assert.equal(ends, 2, "exactly two rationale:end markers");
 });
 
-test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the measured floor (≤ 9924 ~tok)", () => {
+test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the measured floor (≤ 10057 ~tok)", () => {
   // WHY: floor REBASELINED by constitution-conditional-load PHASE 2. Phase 2 extends the
   // design-only axis to two more spans (§4 visual prose S3–S5 + P-AUDITOR, and §1 L16/L17/L19),
   // adding 3 MORE design-only fence pairs (now 6 pairs / 12 marker lines total, up from
@@ -1160,14 +1162,17 @@ test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the 
   // value, per the established Phase-2 convention (no additional headroom). Saving
   // margin re-verified against the non-design floor below: 9924 − 7826 = 2098 ~tok,
   // unchanged from the prior pairing (E231).
-  assert.ok(stripped <= 9924, `stripped constitution (${stripped} ~tok) must be ≤ 9924 (AC8 design-arm floor, E231 re-baseline)`);
+  // Comment-discipline rule bullet (const-15, core-tagged) re-measured at 10057 ~tok (exact);
+  // cap raised from 9924 to that exact value, zero headroom (E258). Saving margin vs the
+  // non-design floor below: 10057 − 7959 = 2098 ~tok, unchanged.
+  assert.ok(stripped <= 10057, `stripped constitution (${stripped} ~tok) must be ≤ 10057 (AC8 design-arm floor, E258 re-baseline)`);
   assert.ok(
     raw - stripped >= 240,
     `constitution rationale+origin-tag saving (${raw - stripped} ~tok) must be ≥ 240 (AC8 measured min, c14-dispatch-pins re-baseline)`,
   );
 });
 
-test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 20310 ~tok)", () => {
+test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 20434 ~tok)", () => {
   // WHY: the constitution is injected on every dispatch; the full coordinator bundle is
   // the worst case. Compose the chain-role bundle the way buildPromptForRole does:
   // rationale-stripped constitution + SEP + rationale-stripped skill body. Floor
@@ -1671,7 +1676,9 @@ test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/b
   // skill side, matching buildPromptForRole's own order) at 20310 ~tok exactly; cap
   // raised from 20044 to that exact measured value, per the established Phase-2
   // convention (no additional headroom) (E231).
-  assert.ok(bundle <= 20310, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 20310 (AC8 design-arm floor, E231 re-baseline)`);
+  // Comment-discipline rule bullet (const-15, core-tagged) re-measured at 20434 ~tok (exact);
+  // cap raised from 20310 to that exact value, zero headroom (E258).
+  assert.ok(bundle <= 20434, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 20434 (AC8 design-arm floor, E258 re-baseline)`);
 });
 
 test("AC9: every operative rule/gate/heading survives stripRationale on the constitution", () => {
@@ -2022,7 +2029,7 @@ test("AC7: lite + non-design strips §3.2 once (no reintroduction), consistent w
 
 // --- rebaseline + pin the new non-design figure (AC8) ----------------------
 
-test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 7826 ~tok)", () => {
+test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 7959 ~tok)", () => {
   // WHY: this is the BUDGET WIN that justified the feature, and it must be regression-guarded.
   // On a non-design chain dispatch buildPromptForRole emits stripDesignOnly(stripRationale(source)).
   // REBASELINED by constitution-conditional-load PHASE 2: Phase 2 strips two MORE spans on the
@@ -2206,8 +2213,8 @@ test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is
   // measured value per the established Phase-2 convention (no additional headroom).
   // Saving margin re-verified: design-arm 9187 − non-design 7089 = 2098 ~tok, unchanged,
   // still ≥ 2080 (the row sits outside the design-only fences).
-  const ratStripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));         // design-arm path: 9924 (E231 re-baseline)
-  const nonDesign = approxTokens(stripRationale(stripOriginTags(composeConstitution({ chain: true, design: false })))); // non-design path: 7826 (E231 re-baseline)
+  const ratStripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));         // design-arm path: 10057 (E258 re-baseline)
+  const nonDesign = approxTokens(stripRationale(stripOriginTags(composeConstitution({ chain: true, design: false })))); // non-design path: 7959 (E258 re-baseline)
   // e43-test-file-ask-at-dispatch (qa-owned bump, T-E43-02): floor raised from 7089 →
   // 7276 (+187), identical to the design-arm delta above because const-05 is a core
   // (untagged) fragment present in both paths. Independently re-measured at 7276 ~tok
@@ -2231,7 +2238,10 @@ test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is
   // value, per the established Phase-2 convention (no additional headroom). The
   // design-only saving stays 9924 − 7826 = 2098 ~tok, unchanged from the prior pairing
   // (E231).
-  assert.ok(nonDesign <= 7826, `non-design constitution (${nonDesign} ~tok) must be ≤ 7826 (AC8 non-design floor, E231 re-baseline)`);
+  // Comment-discipline rule bullet (const-15, core-tagged) re-measured at 7959 ~tok (exact);
+  // cap raised from 7826 to that exact value, zero headroom (E258); design-only saving
+  // 10057 − 7959 = 2098 ~tok, unchanged.
+  assert.ok(nonDesign <= 7959, `non-design constitution (${nonDesign} ~tok) must be ≤ 7959 (AC8 non-design floor, E258 re-baseline)`);
   assert.ok(
     ratStripped - nonDesign >= 2080,
     `design-only strip saving (${ratStripped - nonDesign} ~tok) must be ≥ 2080 (a12-followup-qa-round-name re-baseline)`,
