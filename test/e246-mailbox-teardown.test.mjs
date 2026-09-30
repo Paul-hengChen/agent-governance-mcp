@@ -1,27 +1,9 @@
 // Coded by @qa-engineer
-// Tests for specs/e246-mailbox-teardown.md AC1-AC11: `agc feature finish`
-// removes the lane's default-location mailbox `<dirname(worktree)>/_mailbox/<lane>/`
-// (bin/agc-init.mjs removeLaneMailbox) and refuses to delete anything it does
-// not recognise or that a live watch still holds.
-//
-// Why these tests exist: a stale mailbox lets a later lane with the same name
-// inherit old messages, but deleting an unrecognised file or a live watch's
-// lock would destroy someone's work. Each case pins one side of that line.
-// Mailboxes are created under a temp dir next to a temp lane worktree — never
-// the real lanes mailbox.
-//
-// Spec-to-Test map:
-//   AC1+AC8 -> "shipped removes clean mailbox"
-//   AC2     -> "abandoned removes clean mailbox"
-//   AC3     -> "dead watch-lock sidecars are removed"
-//   AC4     -> "unknown entry keeps folder and warns" (+ subdirectory / symlink variants)
-//   AC5     -> "live watch-lock keeps folder and warns", "unparseable watch-lock keeps folder and warns"
-//   AC6     -> "absent mailbox is a silent no-op", "sibling mailbox untouched"
-//   AC7     -> "shipped mailbox removed even when branch -d refuses",
-//              "refused worktree removal leaves mailbox"
-//   AC9     -> "usage text mentions mailbox"
-//   AC10    -> "integrator SOP names mailbox reset and finish cleanup"
-//   AC11    -> "lane-protocol names mailbox lifecycle"
+// Tests `agc feature finish` mailbox teardown: removes the lane's default-location
+// mailbox (bin/agc-init.mjs removeLaneMailbox) and refuses to delete anything
+// unrecognised or held by a live watch. Uses temp dirs, never the real mailbox.
+// WHY: a stale mailbox leaks old messages to a same-named lane; a wrong delete loses work.
+// Spec: specs/e246-mailbox-teardown.md (AC ids are in the test names).
 
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
