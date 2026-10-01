@@ -1,29 +1,8 @@
 // Coded by @qa-engineer
-// New coverage (T-E125A-06) for specs/e125a-lane-local-ledgers.md AC4-AC11,
-// AC4b, AC6b, AC14 (AC1-AC3/AC13 are covered in test/lane-paths.test.mjs,
-// test/lane-migrate.test.mjs, test/schema-versions.test.mjs and
-// test/tasks-versioning.test.mjs; AC12 is the existing SQLite suites, which
-// this feature does not touch; AC10 is covered by test/success-metrics.test.mjs
-// / test/drift-skew.test.mjs plus the AC9 tests below). Imports compiled
-// dist/. Every fixture lives under os.tmpdir() and is never the repo root.
-//
-// Spec-to-Test map:
-//   AC4  (_primary forward)                          -> AC4
-//   AC4b (ignored lane path: no migration, option A)  -> AC4b-primary,
-//                                                        AC4b-feat, AC4b-control
-//   AC5  (feat forward, non-adjacent runs + no-op)     -> AC5a, AC5b
-//   AC6  (idempotent / lock contention)                -> AC6-idempotent-*,
-//                                                        AC6-busy-*
-//   AC6b (ledger absent but required: loud, never
-//         empty) + the feat-on-v2-no-marker empty
-//         start (AC14(b))                              -> AC6b-a, AC6b-b,
-//                                                        AC6b-c, AC6b-empty-start
-//   AC7  (round trip)                                  -> AC7a, AC7b
-//   AC8  (reverse refusals)                             -> AC8-primary-*,
-//                                                        AC8-feat-*
-//   AC9  (tw_* read/write lane-local only)              -> AC9
-//   AC11 (freshness)                                    -> AC11
-//   AC14 (merge interleave ownership filter)             -> AC14-1, AC14-2, AC14-3
+// Tests for specs/e125a-lane-local-ledgers.md AC4-AC11, AC4b, AC6b, AC14. AC1-AC3 and AC13 are covered by test/lane-paths.test.mjs, test/lane-migrate.test.mjs,
+// test/schema-versions.test.mjs and test/tasks-versioning.test.mjs; AC12 by the existing SQLite suites; AC10 by test/success-metrics.test.mjs and
+// test/drift-skew.test.mjs plus the AC9 tests here. Imports compiled dist/; fixtures live under os.tmpdir(), never the repo root.
+// Rationale: specs/e260f-comment-rationale.md (test/e125a-lane-local-ledgers.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -61,14 +40,8 @@ function mkWorkspace(prefix = "e125a-") {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
 }
 
-// A FAKE .git (pure fs — resolveCurrentLane only ever reads HEAD via fs, per
-// tools/lane-paths.ts) is enough for every test below that wants "not
-// git-ignored" behaviour: isLanePathIgnored's `git check-ignore` spawn fails
-// against this non-repo (no real git internals) and that failure is caught
-// and treated as "not ignored" — the exact same fallback as "no .git at
-// all" (spec D-F: "any error → not ignored"). AC4b is the ONE place that
-// needs a REAL git repo (below), because it specifically exercises `git
-// check-ignore` actually consulting a real .gitignore.
+// A FAKE .git (pure fs; resolveCurrentLane only reads HEAD) is enough wherever "not git-ignored" behaviour is wanted: isLanePathIgnored's
+// `git check-ignore` fails against a non-repo and is treated as not ignored, the same as no .git at all. AC4b alone needs a REAL repo.
 function mkFeatWorkspaceFake(lane, prefix = "e125a-feat-") {
   const ws = mkWorkspace(prefix);
   fs.mkdirSync(path.join(ws, ".git"));
@@ -755,16 +728,8 @@ test("AC14-3: emitFeatureMetrics' ticket count is unaffected by the feat-first s
   assert.equal(lines[0].tickets, 1, "T-E999-01 must be counted exactly once across the root, _primary's stale copy, and e999's own ledger");
 });
 
-// ===========================================================================
-// A _primary section for a lane whose ledger has CLOSED into
-// .current/history/<bucket>/<lane>/tasks.md (not merely moved to another
-// LIVE lane dir, AC14-1's shape) is foreign for exactly the same reason: the
-// SAME makeForeignCheck existence check in tools/tasks-file.ts, now ORed with
-// hasHistoryLedger (e125b spec AC8, T-E125B-01; ownership extended by the
-// integrator pre-review 2026-09-25). Placed alongside the AC14 tests above (the
-// nearest fixture test for the merge-interleave rule) — these two tests are
-// the history-bucket-shaped twins of AC14-1 and AC14-1(d) respectively.
-// ===========================================================================
+// A _primary section for a lane whose ledger has closed into .current/history/<bucket>/<lane>/tasks.md is foreign for the same reason as a moved
+// one: makeForeignCheck in tools/tasks-file.ts ORs in hasHistoryLedger. These are the history-bucket twins of AC14-1 and AC14-1(d).
 
 function historyLaneTasksPath(ws, bucket, lane) {
   return path.join(ws, ".current", "history", bucket, lane, "tasks.md");

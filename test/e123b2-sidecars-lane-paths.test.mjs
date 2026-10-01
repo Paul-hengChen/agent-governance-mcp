@@ -1,25 +1,9 @@
 // Coded by @qa-engineer
-// Tests that the telemetry and metrics sidecar files are located through the
-// lane-path resolver (T-E123B2-01; the spec lived in the handoff's
-// scope_decision_why and feature-split.md row 1.2, with no separate spec file).
-//
-// AC1: telemetryPath()/metricsPath() derive their sidecar location ONLY from
-//      resolveCurrentLanePaths(workspacePath) — never from a hand-rolled
-//      path.join(workspacePath, ".current", "<literal filename>"). This file
-//      tests that contract behaviourally.
-//
-// The lane flip (e123b9 J2, spec AC1) changed resolveLanePaths: it no longer
-// ignores `lane`. This file's original charter ("zero behaviour change across
-// lanes until resolveLanePaths is flipped") therefore no longer applies — the
-// flip has now landed. LANE1/LANE2/LANE3 below now assert the OPPOSITE of their
-// original premise: the sidecar location DOES depend on the checked-out
-// branch's lane, exactly as AC1 specifies, while still routing exclusively
-// through resolveCurrentLanePaths (never a hand-rolled `.current/<literal>`
-// join) — that resolver-only-source-of-truth contract is what AC1/AC4
-// actually protect; only the concrete path shape changed.
-//
-// Spec-to-Test map (AC1-AC6 from the dispatch brief, re-pointed by the lane flip):
-//   AC4 (sidecar path comes only from the lane resolver) -> LANE1 (feat/e999-x), LANE2 (main)
+// Tests that the telemetry and metrics sidecar files are located through the lane-path resolver (no separate spec file).
+// AC1: telemetryPath()/metricsPath() derive their location only from resolveCurrentLanePaths(workspacePath), never a hand-rolled
+// path.join(workspacePath, ".current", "<literal>"). Since the lane flip the location does depend on the branch's lane (LANE1/LANE2/LANE3),
+// but still only through the resolver. AC4 maps to LANE1 (feat/e999-x) and LANE2 (main).
+// Rationale: specs/e260f-comment-rationale.md (test/e123b2-sidecars-lane-paths.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";

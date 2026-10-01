@@ -1,51 +1,9 @@
 // Coded by @qa-engineer
-// Tests for the lane-layout flip: reversibility, non-reentrant lock, cross-process
-// concurrency safety, own-workspace-only migration and the dual-presence conflict
-// (specs/e123b9-lane-flip.md AC8, AC12, AC-MIG-3, AC13, AC14; T-E123B9-05 (c)-(g)).
-// These are the wired-integration / durability
-// proofs the spec's own proof lines call for that don't fit naturally
-// inside test/lane-migrate.test.mjs (move mechanics) or
-// test/lane-paths.test.mjs (pure path resolution) — this file exercises the
-// OWN-WORKSPACE entry points (readHandoffState/writeHandoffState) and real
-// cross-process concurrency against real fixtures.
-//
-// Spec-to-test map:
-//   AC8  (reversibility on the real flat layout, both rounds)   -> AC8 Round 1 / Round 2
-//   AC12 (non-reentrant lock: a write against an unmigrated
-//         flat fixture completes within a bounded timeout)      -> AC12
-//   AC-MIG-3 (concurrency-safety: two processes never both move,
-//         never observe half-moved state, never lose a write)   -> AC-MIG-3
-//   AC13 (own-workspace-only migration; cross-workspace reads
-//         stay read-only)                                       -> AC13
-//   AC14 (dual-presence conflict, scoped to handoff.md only)     -> AC14
-//
-// Environment note: this worktree's live tw_* calls are served by the
-// PRIMARY checkout's OLD pre-flip server (it still writes the flat
-// .current/handoff.md regardless of what this ticket ships here) — so every
-// test below verifies dist/ output and standalone node calls, never this
-// session's own tw_get_state/tw_update_state behavior.
-//
-// --- Addendum: interrupted-migration durability (T-E123B9-08, AC21) --------
-// A crashed migrator's stale per-lane lock makes the NEXT READ skip a partial
-// migration (it still returns correct state, read-only, never wrong) — only
-// the NEXT WRITE (whose withFileLock acquisition checks staleness) clears the
-// dead-PID lock and finishes the job. A review of the earlier fix recorded
-// this as a real, non-blocking gap (J2-NEW-12, review_T-E123B9-06.md). The
-// tests below are durable, interrupted-layout fixtures (never synthesized in
-// the same process that would run the migration first) plus one REAL
-// child-process death, reproducing exactly that gap and asserting the
-// documented fallback. Amendment 2026-09-24 (specs/e123b9-lane-flip.md
-// "## Amendment 2026-09-24", AC21, covering AC16-AC20).
-//
-// Spec-to-test map (this addendum):
-//   AC16-AC18 (interrupted-layout resume, new + legacy ordering,
-//              mid-merge)                              -> "AC21(a) ..." tests
-//   AC12/J2-NEW-12 (a real crash leaves a stale lock;
-//              read skips, write clears+completes)      -> "AC21(b) ..." test
-//   AC19 (flat sidecars, no handoff anywhere)            -> "AC21(c) ..." tests
-//   AC20 (ENOTDIR degrades like ENOENT)                  -> "AC21(d) ..." test
-//   AC8  (reversibility) stays green                     -> the existing
-//              "AC8 Round 1" / "AC8 Round 2" tests above, unchanged (e)
+// Tests for the lane-layout flip (specs/e123b9-lane-flip.md): reversibility (AC8), non-reentrant lock (AC12), cross-process concurrency (AC-MIG-3),
+// own-workspace-only migration (AC13), dual-presence conflict (AC14). They exercise readHandoffState/writeHandoffState and real child processes against
+// real fixtures, verifying dist/ output, never this session's own tw_* calls. Addendum (AC21, covering AC16-AC20): durable interrupted-migration
+// fixtures plus one real child-process death; a stale lock makes the next read skip a partial migration, and only the next write finishes it.
+// Rationale: specs/e260f-comment-rationale.md (test/e123b9-lane-flip.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -96,17 +54,8 @@ function mkFlatFixtureWithSidecars(prefix = "e123b9-flip-sc-") {
   return ws;
 }
 
-// A test-BUILT flat fixture, never the primary checkout's live .current/
-// (human decision A, 2026-09-24): AC8 Round 1/2 used to
-// fs.cpSync-style-copy <repo-root>/agent-governance-mcp/.current/,
-// which has had no flat handoff.md since commit b7a566f migrated the
-// primary itself to .current/_primary/ (Round 1's "genuine first migration"
-// sanity check then failed, and Round 2 hit ENOENT on .current/handoff.md;
-// recorded as finding F2-NEW-1). This builds a self-contained, ALREADY-AT-CURRENT
-// (schema_version: 15) flat layout carrying every LANE_FILES entry (not
-// just telemetry.jsonl), so both rounds exercise a genuine multi-sidecar
-// flat->lane->flat round trip without depending on any real checkout's
-// on-disk state, on this or any other machine.
+// A test-built flat fixture, never the primary checkout's live .current/ (which has no flat handoff.md since it migrated itself): already at the
+// current schema and carrying every LANE_FILES entry, so both AC8 rounds exercise a real multi-sidecar flat->lane->flat round trip on any machine.
 function mkFullFlatFixture(prefix = "e123b9-ac8-full-") {
   const ws = mkFlatFixture(prefix);
   fs.writeFileSync(path.join(ws, ".current", "telemetry.jsonl"), '{"ts":"2026-01-01T00:00:00.000Z","gate":"orchestrator","error_code":"TRANSITION_REJECTED","agent_id":"sr-engineer","feature":"e123b9-flip-fixture"}\n');
@@ -460,19 +409,9 @@ test("AC8 Round 2: the WIRED trigger (readHandoffState, via a standalone node pr
   const after = hashTree(scratchCurrent);
   const diffs = diffTrees(before, after).filter((d) => !d.startsWith("CHANGED: handoff.md ("));
 
-  // ONE additional, narrow, named tolerance beyond the lock/tmp clause of the
-  // reversibility rule (AC8), specific to Round 2 (the WIRED path, which Round 1's direct
-  // runner calls never exercise): readHandoffState's fire-and-forget schema
-  // heal is a real, documented, additive-only side effect
-  // (schema/migrations-handoff.js's v14->v15 step is stamp-only — bumps the
-  // literal, seeds no field). The fixture is built already AT CURRENT
-  // (schema_version: 15), so this branch is expected to be a no-op here —
-  // it stays as a tolerance, not an assumed no-op, so a future CURRENT bump
-  // doesn't silently start failing this test. Verified by a direct
-  // line-by-line diff against the captured pre-migration text: tolerate
-  // ONLY a changed `schema_version:` line — every other line, including
-  // `last_updated`, must be byte-for-byte identical; any other difference
-  // still fails this test.
+  // One narrow tolerance beyond the lock/tmp clause of the reversibility rule, for Round 2 (the wired path): readHandoffState's fire-and-forget
+  // schema heal is additive only, and a no-op here because the fixture is already at the current schema. Tolerate ONLY a changed `schema_version:`
+  // line (a future version bump must not start failing this); every other line, `last_updated` included, must be byte-identical.
   const rawHandoffAfter = fs.readFileSync(path.join(scratchCurrent, "handoff.md"), "utf-8");
   if (rawHandoffBefore !== rawHandoffAfter) {
     const beforeLines = rawHandoffBefore.split("\n");
@@ -753,15 +692,8 @@ ac21RunInterruptedCase("mid-merge: lane sidecar already starts with flat bytes",
   },
 });
 
-// ============================================================================
-// AC21(b) — a REAL process death mid-migration leaves the per-lane lock
-// stale (recorded as a non-blocking review finding, J2-NEW-12,
-// review_T-E123B9-06.md): the NEXT READ does not clear a
-// dead-PID lock (its own lock acquisition is a single non-blocking attempt,
-// EEXIST -> skip), so it returns CORRECT state without throwing but leaves
-// the layout split; only the NEXT WRITE (whose withFileLock acquisition
-// checks staleness via looksStale) clears the lock and finishes the job.
-// ============================================================================
+// AC21(b): a real process death mid-migration leaves the per-lane lock stale. The next read skips it (a single non-blocking lock attempt) and
+// returns correct state without throwing but leaves the layout split; only the next write, whose withFileLock checks staleness, clears it and finishes.
 
 test(
   "AC21(b) [J2-NEW-12]: a real crashed child process leaves a stale per-lane lock — the next read returns correct state but does not complete the migration; the next write clears the stale lock and completes it",
