@@ -1,9 +1,10 @@
 // Coded by @qa-engineer
-// Tests for specs/e116-archive-on-feature-change.md AC1-AC5, run against the real writeHandoffState (via dist/), verified by execution.
-// writeHandoffState() is called directly, not through tw_update_state, like test/e114-cut-approval-inheritance.test.mjs, so multi-write
-// scenarios skip ALLOWED_TRANSITIONS friction; resetSession()/markStateRead(ws) before each write mirror that file's pre-flight convention.
-// Test names carry the AC number; "bonus" pins fail-closed: a copy failure aborts the write, leaves the live ledger untouched, leaks no lock or tmp file.
-// Rationale: specs/e260f-comment-rationale.md (test/e116-archive-on-feature-change.test.mjs).
+// Tests for specs/e116-archive-on-feature-change.md AC1-AC5 against the real
+// writeHandoffState (via dist/), called directly rather than through tw_update_state, as in
+// test/e114-cut-approval-inheritance.test.mjs. The "bonus" cases pin fail-closed: a copy
+// failure aborts the write, leaves the live ledger untouched, leaks no lock or tmp file.
+// Rationale: specs/e260f-comment-rationale.md
+// (test/e116-archive-on-feature-change.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -332,9 +333,11 @@ test("AC5-4: the clamp is UNCONDITIONAL — a 10000-char active_feature (beyond 
 });
 
 test("AC5-5: replace-before-slice ordering — multi-byte input (astral emoji, 3-byte CJK) yields a pure-ASCII, byte-safe stem", async () => {
-  // The regex has no /u flag, so it replaces each UTF-16 code unit (each surrogate half, each CJK point) with "-" before
-  // .slice(0, 200) runs. The stem is then pure ASCII and NAME_MAX (bytes) agrees with the slice (code units); slice-then-replace
-  // could leave an unpaired surrogate. This pins the ordering: byteLength equals char length at every clamp boundary.
+  // The regex has no /u flag, so it replaces each UTF-16 code unit (each surrogate half,
+  // each CJK point) with "-" before .slice(0, 200) runs. The stem is then pure ASCII and
+  // NAME_MAX (bytes) agrees with the slice (code units); slice-then-replace could leave an
+  // unpaired surrogate. This pins the ordering: byteLength equals char length at every
+  // clamp boundary.
   const ws = mkWs();
   // 190 allowed ASCII chars + 5 astral emoji (10 UTF-16 code units, straddling
   // the 200-unit boundary at position 190-199) + 3-byte CJK padding well past

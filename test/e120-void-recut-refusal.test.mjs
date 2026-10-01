@@ -1,8 +1,9 @@
 // Coded by @qa-engineer
-// Tests for the refusal to re-cut a voided task id: a re-cut used to inherit the review and QA evidence of the voided incarnation, so a never-reviewed
-// re-cut satisfied MISSING_REVIEW_EVIDENCE. Both storage modes now refuse (a voidedPattern scan in addTaskInFile; a voided_tasks tombstone table in SQLite).
-// Headline contract tests stay in test/e117-void-task.test.mjs; this file holds the matrix: 1 nine-indent forms (every site must agree on what leading
-// whitespace means); 2 no false refusal for a marker embedded in another row; 3 id-boundary controls; 4 SQLite parity and per-workspace tombstones.
+// Tests for refusing a re-cut of a voided task id (a re-cut used to inherit the voided
+// incarnation's review and QA evidence) in both storage modes. Headline cases live in
+// test/e117-void-task.test.mjs; this file is the matrix: 1 nine-indent forms, 2 no false
+// refusal for a marker embedded in another row, 3 id-boundary controls, 4 SQLite parity and
+// per-workspace tombstones.
 // Rationale: specs/e260f-comment-rationale.md (test/e120-void-recut-refusal.test.mjs).
 
 import { test } from "node:test";
@@ -31,8 +32,10 @@ try {
 // File-mode helpers (mirrors test/e117-void-task.test.mjs).
 // ---------------------------------------------------------------------------
 
-// Fixtures seed the lane-local ledger directly at `.current/_primary/tasks.md` (no .git, so the lane is the primary lane): a root-level v2 file is the
-// index shape and tw_* would throw TASKS_LEDGER_ABSENT. Same approach as test/e117-void-task.test.mjs; migration has its own tests in test/e125a-lane-local-ledgers.test.mjs.
+// Fixtures seed the lane-local ledger directly at `.current/_primary/tasks.md` (no .git, so
+// the lane is the primary lane): a root-level v2 file is the index shape and tw_* would
+// throw TASKS_LEDGER_ABSENT. Same approach as test/e117-void-task.test.mjs; migration has
+// its own tests in test/e125a-lane-local-ledgers.test.mjs.
 function laneTasksPath(ws) {
   return path.join(ws, ".current", "_primary", "tasks.md");
 }

@@ -1,9 +1,10 @@
 // Coded by @qa-engineer
-// Tests for specs/e118-reviewer-ac-completeness.md: code-reviewer gains a per-AC completeness obligation (an 8th AC Completeness report section)
-// and codified finding tiers, so a correct-but-incomplete diff stops at review. Test names carry the AC number; AC8-AC11 are QA-run, not unit tests here.
-// Each test pins a contract, not today's shape: the bullet's conditionality on the spec file, the exact eight-name order, the tier line surviving
-// dispatch stripping, the SKIP literal's byte-exact em-dash form, and the seven older bullets' immutability (sha256, so it works in a shallow CI clone).
-// Rationale: specs/e260f-comment-rationale.md (test/e118-reviewer-ac-completeness.test.mjs).
+// Tests for specs/e118-reviewer-ac-completeness.md: code-reviewer gains a per-AC
+// completeness report section and codified finding tiers. Each test pins a contract, not
+// today's shape: the eight-name order, the tier line surviving dispatch stripping, the
+// byte-exact SKIP em-dash, the older bullets' sha256.
+// Rationale: specs/e260f-comment-rationale.md
+// (test/e118-reviewer-ac-completeness.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";

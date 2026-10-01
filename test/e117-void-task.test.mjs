@@ -1,8 +1,9 @@
 // Coded by @qa-engineer
-// Tests for `tw_void_task` (tools/tasks-file.ts voidTaskInFile, SqliteHandoffStorage.voidTask, the tools/tasks.ts handler, the registry entry).
-// No spec file exists; the backlog row is the contract. Core point: tw_get_next_task must stop offering a voided row in both storage modes.
-// Sections: 1 never re-offered; 2 completion guard reads the ledger, not the tasks.md checkbox; 3 post-write invariant; 4 already-voided vs
-// never-existed in both modes; 5 invisible to parse, drift and sync; 0/6 basics and wiring. A voided id cannot be re-cut (matrix: test/e120-void-recut-refusal.test.mjs).
+// Tests for `tw_void_task` (voidTaskInFile in tools/tasks-file.ts,
+// SqliteHandoffStorage.voidTask, the tools/tasks.ts handler, the registry entry); the
+// backlog row is the contract. Core point: tw_get_next_task never offers a voided row, in
+// both storage modes. A voided id cannot be re-cut (matrix:
+// test/e120-void-recut-refusal.test.mjs).
 // Rationale: specs/e260f-comment-rationale.md (test/e117-void-task.test.mjs).
 
 import { test } from "node:test";
@@ -36,10 +37,13 @@ try {
 // File-mode helpers (mirrors test/tasks.test.mjs)
 // ---------------------------------------------------------------------------
 
-// The tasks.md sentinel must be present and current, or getNextTaskFromFile's heal-on-read migration rewrites tasks.md on the first
-// read, bumps its mtime past the markStateRead() snapshot, and trips the freshness guard on a file nothing changed.
-// Fixtures seed the lane-local ledger directly at `.current/_primary/tasks.md` (no .git, so the lane is the primary lane): a root-level
-// v2 file is the index shape and tw_* would throw TASKS_LEDGER_ABSENT. Migration has its own tests in test/e125a-lane-local-ledgers.test.mjs.
+// The tasks.md sentinel must be present and current, or getNextTaskFromFile's heal-on-read
+// migration rewrites tasks.md on the first read, bumps its mtime past the markStateRead()
+// snapshot, and trips the freshness guard on a file nothing changed. Fixtures seed the
+// lane-local ledger directly at `.current/_primary/tasks.md` (no .git, so the lane is the
+// primary lane): a root-level v2 file is the index shape and tw_* would throw
+// TASKS_LEDGER_ABSENT. Migration has its own tests in
+// test/e125a-lane-local-ledgers.test.mjs.
 function laneTasksPath(ws) {
   return path.join(ws, ".current", "_primary", "tasks.md");
 }
@@ -253,8 +257,9 @@ sqliteTest("C1 (SQLite mode): a task the ledger considers complete cannot be voi
   }
 });
 
-// Section 3, post-write invariant: a void must never report success while leaving the row live, checked against the real written
-// content. Both vectors must refuse loudly and leave tasks.md byte-for-byte untouched (a refused write leaves no sentinel behind).
+// Section 3, post-write invariant: a void must never report success while leaving the row
+// live, checked against the real written content. Both vectors must refuse loudly and leave
+// tasks.md byte-for-byte untouched (a refused write leaves no sentinel behind).
 
 test("C2: a custom taskPattern under which the voided marker still parses as a task is refused, file untouched", async () => {
   const ws = mkWorkspaceWithTasks(`## P\n- [ ] T-A first\n- [ ] T-B second\n`);
@@ -329,8 +334,9 @@ sqliteTest("E120/Q1 (SQLite mode): re-void now reports alreadyVoided:true; never
     const first = JSON.parse(await storage.voidTask(dir, "T-A", "mis-cut"));
     assert.equal(first.success, true);
 
-// After the re-cut refusal, SQLite keeps a voided_tasks tombstone (tools/storage-sqlite.ts) that survives the DELETE, so a second
-// void reports alreadyVoided, matching file mode's already-voided vs never-existed distinction.
+// After the re-cut refusal, SQLite keeps a voided_tasks tombstone (tools/storage-sqlite.ts)
+// that survives the DELETE, so a second void reports alreadyVoided, matching file mode's
+// already-voided vs never-existed distinction.
     const reVoid = JSON.parse(await storage.voidTask(dir, "T-A", "again"));
     assert.match(reVoid.error, /already voided/);
     assert.equal(
