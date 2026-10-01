@@ -24,21 +24,19 @@ const { composeConstitution } = await import(
 const CONSTITUTION = composeConstitution({ chain: true, design: true });
 
 // ---------------------------------------------------------------------------
-// REQUIRED_VISUAL_SECTIONS is read from the compiled output of tools/evidence-file.ts so the test
-// self-syncs when the array changes; a failed import (dist not built) fails loudly on purpose.
+// REQUIRED_VISUAL_SECTIONS is parsed from the TypeScript source of gates/visual.ts (fs.readFileSync, no
+// dist import; the array sits near gates/visual.ts:251) so the test self-syncs when the array changes.
 // ---------------------------------------------------------------------------
 const { REQUIRED_VISUAL_SECTIONS_EXPORT } = await (async () => {
-  // evidence-file.ts does not export REQUIRED_VISUAL_SECTIONS directly (it is
-  // `const` not `export const`). We derive it from the built JS by extracting
-  // the names from a validateVisualReport call on a known-missing input, since
-  // that returns the missingSections array. A simpler approach: parse the TS
-  // source for the array literal so we don't need an export.
+  // gates/visual.ts does not export REQUIRED_VISUAL_SECTIONS (it is `const`,
+  // not `export const`), so parse the TS source for the array literal
+  // instead of importing it.
   const src = fs.readFileSync(
     path.join(ROOT, "gates", "visual.ts"),
     "utf-8",
   );
-  // Match the REQUIRED_VISUAL_SECTIONS array literal in tools/evidence-file.ts.
-  // Sync point: tools/evidence-file.ts:342 — REQUIRED_VISUAL_SECTIONS.
+  // Match the REQUIRED_VISUAL_SECTIONS array literal in gates/visual.ts.
+  // Sync point: gates/visual.ts near line 251 — REQUIRED_VISUAL_SECTIONS.
   const m = src.match(
     /const REQUIRED_VISUAL_SECTIONS\s*=\s*\[([\s\S]*?)\]\s*as const/,
   );
