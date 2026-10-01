@@ -148,3 +148,36 @@ Appended by sr-engineer as blocks are trimmed: one entry per moved rationale, he
 
 ### bin/agc-init.mjs — abandoned-evidence harvest planning (E180)
 - `planAbandonEvidenceHarvest` follows spec AC1-AC6. It takes the primary checkout from the first entry of `listWorktrees`, so neither caller's signature had to change.
+
+### bin/agc-init.mjs — finish-time pending-ticket apply (E179)
+- The pending file and `docs/backlog.md` are read fresh from git's object database, never from a long-lived in-memory copy (AC4).
+- Everything happens before the worktree is removed, and every check runs before the first mutation, so any refusal leaves the lane exactly as the other precondition failures do.
+
+### bin/agc-init.mjs — finish-time lane close writeback (E125b)
+- The two shapes are told apart by `hasTrackedContent` on primary. Tracked: `.current/<lane>/` was merged in on `--base`, so it is moved with `git mv` and the pointer is added, in one path-limited commit on `--base` (AC1/AC2). Untracked: the adopter git-ignores `.current/`, so the lane's only copy is in its own worktree; it is fs-copied (never committed) into the history bucket before the worktree is removed, and the pointer is still committed (AC9/AC10).
+- When root `tasks.md` is itself git-ignored (the same adopter shape, E213), the pointer is written to it fs-only and never `git add`ed, because git refuses an ignored path. The close commit then carries only the `.current/` paths, or is skipped when nothing else needs one.
+- `executeLaneClose` restores every file it touched when the commit fails.
+- The `alreadyClosed` re-run's re-harvest (R1) overwrites a differing history copy safely: agc's only writer of that history directory is the harvest of this same live lane directory, so a differing copy is an older snapshot the lane has since superseded, and the result equals a first close run now.
+
+### bin/agc-init.mjs — finish --shipped evidence harvest (E214)
+- The three differences from the `--abandoned` harvest (E180) are deliberate: every file is taken, with no ticket-token filter, because the worktree belongs to one dedicated lane and goes away for good; the walk is recursive and each file keeps its path relative to the directory root; and the destination follows the release-engineer 7a convention `<dir>/archive/<ticket>/<relpath>`.
+- `planShippedEvidenceHarvest` runs together with `planLaneClose` before any mutation; `applyShippedEvidenceHarvest` copies just before the worktree is removed.
+- Why "at risk" is decided per file and not per directory: the directory-level check is the same quirk described for `hasIgnoredUntrackedContent`. A `git check-ignore` exit other than 0 or 1 (128, for a path beyond a symlink) cannot prove the file survives removal, so it fails toward harvesting, as `evidenceAtRisk` does. Exit 1 is a plain untracked file, which git's own `worktree remove` refuses over (AC10).
+- `walkEvidenceTree` stops a symlink cycle because the content the cycle points at is already walked by the ancestor that closed it.
+
+### bin/agc-init.mjs — eject subcommand
+- Domain knowledge (`design/`, `specs/`, `docs/backlog.md`) is kept unless `--purge-knowledge`, because it is the project's own rationale and plan, not agc bookkeeping. Host traces are CLAUDE.md's adapter block, `AGENTS.md`, `.antigravityrules`, and this workspace's artifact lines in `.git/info/exclude`.
+- Each path's disposition is decided from the actual index, never from the declared `artifacts` value. A tracked path is only named in a printed `git rm -r` line, because removing it changes what every clone sees and cannot remove it from history. eject never runs a git command that changes the repository, and never reads stdin.
+- Plan entries: "Nothing to eject" means no entry has an `apply` and nothing is tracked. A `trackedChange` stays uncommitted until the adopter commits it, so those entries are listed after the plan lines, by `display`. An `advisory` line covers, for example, a file left for the adopter to review.
+
+### bin/agent-governance-context.mjs — composition and state rendering
+- Compose-not-strip (A9) replaced a duplicated `stripChainOnly` regex and a read of the old monolithic `content/constitution.md`. The DR-3 "keep the regex in sync" contract became structural, one imported manifest (`specs/compose-not-strip-overlays-architecture.md` DR-4). The hook never stripped design-only text, which is why design-tagged fragments are always included; the lite blank-run collapse is the one the old `stripChainOnly` did.
+- Fail-loud on a missing `dist/` (a partial install): the composers return `""` and the state loader returns `null`, so the "hook misconfigured" hint fires instead of a partial bundle or a raw read.
+- The read-only parser (`parseHandoff`) tries the lane path first with a legacy flat fallback, never migrates, locks or creates a lane directory, and throws `HANDOFF_LAYOUT_CONFLICT` when both exist. Rendering goes through `dist/prompts/build.js` `renderHandoffStateBlock`, which calls `renderDataBlock` in `lib/render-boundary.ts`, so the hook and the prompt builder emit byte-identical, bounded, labelled blocks.
+- The dedup marker write can fail in a `tasks.md`- or `TODO.md`-only workspace with no `.current/`; a failed marker write must never break the hook.
+
+### bin/agent-governance-usage-hook.mjs — opt-in and environment
+- Payload fields read: `tool_name`, `tool_input`, `tool_response`, `cwd`. The `dist/` import follows the SessionStart hook's pattern.
+- Opt-in rules in full: a record is written only when `tool_name` is `"Task"`, `<workspace>/.current/` exists, and `.current/.config.json` sets `tokenBudgetPerFeature` to a positive finite number. An absent file, absent key or invalid value is a silent no-op: no file, no accounting.
+- Best-effort follows D3's `emitGateTelemetry` discipline: the hook never blocks or alters the Task result.
+- Env overrides: `AGC_SERVER_ROOT` (aliases `TEAMWORK_SERVER_ROOT`, `SDD_SERVER_ROOT`) points at a different agent-governance-mcp checkout; `CLAUDE_PROJECT_DIR` is the workspace fallback when the payload has no `cwd`.

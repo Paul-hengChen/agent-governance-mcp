@@ -1916,15 +1916,12 @@ function removeLaneMailbox(lanePath, ticketId) {
 }
 
 // --- finish-time pending-ticket apply (E179, specs/e179-*.md) ---------------
-// A lane files new findings in `.current/<lane>/pending-tickets.md` (the
-// pending-ticket format, E124) and never picks a real backlog id.
-// `agc feature finish` is the ONE sanctioned numbering step: it reads the
-// pending file and docs/backlog.md fresh from git's object db (never a
-// long-lived in-memory copy — AC4), allocates ids above the backlog's current
-// max, appends the rows, archives the entries with markApplied, and commits —
-// all BEFORE the worktree is removed, so any refusal leaves the lane exactly
-// as today's other precondition failures do. Every check runs before the first
-// mutation.
+// A lane files findings in `.current/<lane>/pending-tickets.md` (E124) and never
+// picks a real backlog id. `agc feature finish` is the ONE numbering step: it
+// reads the pending file and docs/backlog.md fresh from git's object db (AC4),
+// allocates ids above the backlog max, appends the rows, archives the entries
+// with markApplied and commits, all BEFORE the worktree is removed. Every check
+// runs before the first mutation (why: see specs/e260c-bin-scripts.md).
 
 const BACKLOG_REL = "docs/backlog.md";
 // docs/backlog.md is already ~0.7 MB; execFileSync's 1 MiB default maxBuffer
@@ -2138,22 +2135,12 @@ function commitPendingOnShipped({ repoRoot, base, lane, pending }) {
 }
 
 // --- finish-time lane close writeback (E125b, specs/e125b-*.md) -----------
-// `--shipped` moves the lane's `.current/<lane>/` governance history into
-// `.current/history/<YYYY-MM>/<lane>/` and leaves ONE durable pointer line
-// under root tasks.md's `## Closed Lanes` (never a checkbox row, X3). Two
-// shapes, told apart by hasTrackedContent on primary:
-//   tracked   — `.current/<lane>/` merged in on --base: `git mv` + the
-//               pointer, one path-limited commit on --base (AC1/AC2);
-//   untracked — the adopter git-ignores `.current/`: the lane's only copy is
-//               in its own worktree, fs-copied (never committed) into the
-//               history bucket before the worktree is removed; the pointer
-//               is still committed (AC9/AC10).
-// When root tasks.md is itself git-ignored (the same adopter shape, E213), the
-// pointer is written to it fs-only — never `git add`ed (git refuses an ignored
-// path) — and the close commit carries only the `.current/` paths, or is
-// skipped outright when nothing else needs one.
-// planLaneClose only reads and refuses; executeLaneClose mutates and
-// restores every file it touched on a failed commit.
+// `--shipped` moves `.current/<lane>/` into `.current/history/<YYYY-MM>/<lane>/`
+// and leaves ONE pointer line under root tasks.md's `## Closed Lanes` (never a
+// checkbox row, X3). Tracked lane dir: `git mv` + one commit on --base (AC1/AC2);
+// untracked: fs-copied from the lane worktree, never committed (AC9/AC10). An
+// ignored root tasks.md is written fs-only (E213; see specs/e260c-bin-scripts.md).
+// planLaneClose only reads and refuses; executeLaneClose mutates and restores.
 
 const TASKS_REL = "tasks.md";
 const CLOSED_LANES_HEADING = "## Closed Lanes";
@@ -2506,14 +2493,11 @@ function executeLaneClose({ repoRoot, base, close }) {
   process.stdout.write(out.join(""));
 }
 
-// The alreadyClosed re-run's re-harvest (E125b R1): copy each git-ignored
-// lane file whose history copy is missing or differs (planLaneClose's
-// `refresh`) over that copy, BEFORE removeWorktreeNoForce. Overwriting is
-// lossless by construction: agc's only writer of that history dir is the
-// harvest of this same live lane dir, so a differing copy is an older snapshot
-// the lane has since superseded — the result equals a first close run now.
-// Files present only in the history copy are kept. A failed copy leaves the
-// worktree in place; re-running redoes the comparison.
+// The alreadyClosed re-run's re-harvest (E125b R1): copy each git-ignored lane
+// file whose history copy is missing or differs (planLaneClose's `refresh`)
+// over that copy, BEFORE removeWorktreeNoForce. Overwriting is lossless (why:
+// see specs/e260c-bin-scripts.md). Files only in the history copy are kept; a
+// failed copy leaves the worktree in place, and a re-run redoes the comparison.
 function executeHarvestRefresh({ ticketId, refresh }) {
   try {
     for (const f of refresh.files) {
@@ -2537,29 +2521,18 @@ function executeHarvestRefresh({ ticketId, refresh }) {
 
 // --- finish --shipped evidence harvest (E214, specs/e213-shipped-ignored-shape.md) ---
 // `git worktree remove` (never --force) deletes untracked, git-ignored files
-// WITHOUT refusing, so a lane whose qa_reports/ / review_reports/ / specs/ are
-// git-ignored and not linked back to primary would lose its whole review
-// trail on --shipped. The same shape was already closed for --abandoned
-// (E180), with three deliberate differences: every file is taken (no
-// ticket-token filter — the worktree is a dedicated lane's and goes for good),
-// the walk is recursive (each file keeps its path relative to the dir root),
-// and the destination is the release-engineer 7a convention
-// `<dir>/archive/<ticket>/<relpath>`.
-//   planShippedEvidenceHarvest  — reads and refuses only (AC8, AC17), run
-//                                 with planLaneClose before any mutation.
-//   applyShippedEvidenceHarvest — the fs copies, just before the worktree is
-//                                 removed (never committed).
+// WITHOUT refusing, so ignored evidence dirs not linked back to primary would
+// lose the lane's review trail. Like --abandoned (E180) but every file, walked
+// recursively, into `<dir>/archive/<ticket>/<relpath>` (specs/e260c-bin-scripts.md).
+//   planShippedEvidenceHarvest  — reads and refuses only (AC8, AC17), before any mutation.
+//   applyShippedEvidenceHarvest — the fs copies, just before removal; never committed.
 
-// Every regular file under `rootAbs` (a real directory, or a symlink to one
-// the caller already resolved), as { rel, readAbs } with `rel` posix and
-// relative to the evidence dir root. A symlink is DEREFERENCED (AC17, E207):
-// `readAbs` is its resolved target, so the harvest copies content, never a
-// link back into the worktree about to be removed; a symlink to a directory
-// is walked through. A symlink that does not resolve lands in `dangling`
-// (with `rel` for the caller to report). `chain` holds the real paths of the
-// directories on the current descent, so a link cycle stops instead of
-// recursing forever — the content it points at is already walked by the
-// ancestor that closed the cycle.
+// Every regular file under `rootAbs` (a real directory, or a symlink to one the
+// caller resolved), as { rel, readAbs } with `rel` posix and relative to the
+// evidence dir root. A symlink is DEREFERENCED (AC17, E207): content is copied,
+// never a link into the worktree about to go, and a dir link is walked through.
+// An unresolvable link lands in `dangling`. `chain` holds the real paths on the
+// current descent, so a link cycle stops (its target is already walked).
 function walkEvidenceTree(dirAbs, relPrefix, chain, files, dangling) {
   let entries;
   try {
@@ -2619,16 +2592,12 @@ function blockingAncestor(abs, stopAt) {
   return null;
 }
 
-// Read-only. Returns { copies: [{ src, dst, dir, readAbs, dstAbs }] } — the
-// copies still to make (an identical destination already there, a re-run,
-// needs none — AC9) — or throws, before anything is mutated, on an
-// unresolvable symlink among the at-risk files (AC17) or a differing
-// destination (AC8). "At risk" is per FILE, never per directory
-// (hasIgnoredUntrackedContent): untracked, and `git check-ignore` not exit 1
-// — any other non-zero (128: a path beyond a symlink) cannot prove the file
-// survives, so it fails toward harvesting, as evidenceAtRisk does. A plain
-// untracked file (exit 1) is left alone: git's own worktree remove refuses
-// over it (AC10).
+// Read-only. Returns { copies: [{ src, dst, dir, readAbs, dstAbs }] }, the
+// copies still to make (an identical destination needs none, AC9), or throws
+// before any mutation on an unresolvable symlink (AC17) or a differing
+// destination (AC8). "At risk" is per FILE: untracked, and `git check-ignore`
+// not exit 1; other non-zero exits fail toward harvesting, as evidenceAtRisk
+// does. A plain untracked file (exit 1) is left alone: remove refuses (AC10).
 function planShippedEvidenceHarvest({ repoRoot, lanePath, ticketId }) {
   const tracked = new Set(
     git(lanePath, ["ls-files", "-z", "--", ...SHIPPED_EVIDENCE_DIRS])
@@ -2962,21 +2931,12 @@ function handleFeatureError(err) {
 }
 
 // --- subcommand: eject -----------------------------------------------------
-// `agc eject` takes agc back out of a workspace. What it touches, by class:
-//   (i)    machine state     .current/
-//   (ii-b) process evidence  tasks.md, qa_reports/, review_reports/
-//   (ii-a) domain knowledge  design/, specs/, docs/backlog.md — kept unless
-//                            --purge-knowledge, since they are the project's
-//                            own rationale and plan, not agc bookkeeping
-//   (iii)  host traces       CLAUDE.md's adapter block, AGENTS.md and
-//                            .antigravityrules, and this workspace's
-//                            artifact lines in .git/info/exclude
-// Dry-run unless --yes. The disposition of every path is decided from the
-// actual index, never from the declared "artifacts" value: an untracked path
-// is deleted from disk; a tracked one is only named in one printed
-// `git rm -r` line, because removing it changes what every clone sees and
-// cannot remove it from history. eject never runs a git command that changes
-// the repository, and never reads stdin.
+// `agc eject` takes agc back out of a workspace, by class: (i) machine state
+// .current/; (ii-b) process evidence tasks.md, qa_reports/, review_reports/;
+// (ii-a) domain knowledge design/, specs/, docs/backlog.md, kept unless
+// --purge-knowledge; (iii) host traces: adapter files and this workspace's
+// exclude lines. Dry-run unless --yes. Untracked paths are deleted; tracked
+// ones only named in a printed `git rm -r` line. Why: specs/e260c-bin-scripts.md.
 
 const STR_USAGE_EJECT =
   "  eject [--yes] [--purge-knowledge]\n" +
@@ -3051,20 +3011,13 @@ function ejectCannotDoBlock() {
   );
 }
 
-// Plan entry shape, shared by every class:
-//   line(applied)   the plan line — applied=false for the dry-run wording
-//   apply           performs the entry under --yes; null for a line that only
-//                   reports (a KEPT path). "Nothing to eject" means no entry
-//                   has an apply and nothing is tracked.
+// Plan entry shape, shared by every class (details: specs/e260c-bin-scripts.md):
+//   line(applied)   the plan line; applied=false gives the dry-run wording
+//   apply           performs the entry under --yes; null for a report-only line
 //   untrackedDelete true when apply deletes an untracked path from disk
-//   trackedChange   host traces only: "edited" or "deleted" when apply
-//                   changes a tracked file in the working tree, else absent.
-//                   Such a change is uncommitted until the adopter commits
-//                   it, so it is listed after the plan lines.
-//   display         the path named in that list (set with trackedChange);
-//                   raw — escaped only where it is printed
-//   advisory        true for a report-only line that still prints when there
-//                   is nothing to eject (a file left for the adopter to review)
+//   trackedChange   host traces only: "edited" or "deleted" (uncommitted change)
+//   display         the path named in that list; raw, escaped only when printed
+//   advisory        true for a report-only line that prints even with nothing to eject
 
 // Host-trace entries (class iii), in plan order: the CLAUDE.md adapter block,
 // AGENTS.md / .antigravityrules, and this workspace's artifact exclude lines.

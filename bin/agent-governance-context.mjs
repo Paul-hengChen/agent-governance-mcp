@@ -1,20 +1,11 @@
 #!/usr/bin/env node
 // SessionStart hook helper for agent-governance-mcp.
-//
-// Reads the constitution + skill (workspace override or server default) and
-// the current handoff state, then emits Claude Code's `additionalContext`
-// JSON on stdout so the session boots with everything the agent needs to
-// follow the rules.
-//
-// Behavior:
-// - If the workspace looks agent-governance-managed (has .current/, tasks.md, or
-//   TODO.md), inject the full context block.
-// - Otherwise, exit silently with no output — unrelated projects stay clean.
-//
-// Env overrides:
-//   AGC_SERVER_ROOT (alias: TEAMWORK_SERVER_ROOT, SDD_SERVER_ROOT) — point at a different
-//     agent-governance-mcp checkout.
-//   CLAUDE_PROJECT_DIR — workspace path (set by Claude Code).
+// Emits Claude Code's `additionalContext` JSON on stdout with the constitution,
+// skill (workspace override or server default) and current handoff state, but
+// only when the workspace looks managed (.current/, tasks.md or TODO.md);
+// otherwise it exits silently with no output, so unrelated projects stay clean.
+// Env: AGC_SERVER_ROOT (alias: TEAMWORK_SERVER_ROOT, SDD_SERVER_ROOT) points at
+// another checkout; CLAUDE_PROJECT_DIR is the workspace (set by Claude Code).
 
 import * as fs from "fs";
 import * as path from "path";
@@ -55,19 +46,13 @@ function loadContent(filename) {
   return readSafe(path.join(SERVER_ROOT, "content", filename));
 }
 
-// Compose-not-strip (ticket A9): the constitution is assembled additively from
-// the ordered fragment manifest (single source of truth, shared with
-// prompts/build.ts and scripts/measure-context-cost.mjs via the compiled
-// dist/prompts/constitution-manifest.js). This replaces the old duplicated
-// stripChainOnly regex + monolithic content/constitution.md read — the DR-3
-// "keep the regex in sync" contract is now structural (one imported manifest),
-// see specs/compose-not-strip-overlays-architecture.md DR-4. The hook ALWAYS
-// includes the design-tagged fragments (it never stripped design-only text);
-// lite additionally applies the \n{3,} blank-run collapse the old
-// stripChainOnly performed, so lite output stays byte-identical.
-// Fail-loud: if the manifest import fails (dist/ missing during a partial
-// install), return "" so the existing "hook misconfigured" hint fires below —
-// never silently ship a partial bundle.
+// Compose-not-strip (ticket A9): the constitution is assembled from the ordered
+// fragment manifest in dist/prompts/constitution-manifest.js, the one source
+// shared with prompts/build.ts and scripts/measure-context-cost.mjs (DR-4).
+// Design-tagged fragments are always included; lite also collapses \n{3,}
+// blank runs so its output stays byte-identical. Fail-loud: if the import
+// fails, return "" so the "hook misconfigured" hint fires below, never a
+// partial bundle. Background: see specs/e260c-bin-scripts.md.
 async function composeConstitution(wantChain) {
   try {
     const mod = await import(
@@ -83,17 +68,12 @@ async function composeConstitution(wantChain) {
   }
 }
 
-// Host-capability skill composition (ticket D6): the skill text is composed
-// from the per-skill fragment registry via the compiled
-// dist/prompts/skill-manifest.js (same single-source-of-truth pattern as the
-// constitution manifest above). The hook is Claude-Code-only BY CONSTRUCTION,
-// so its STRUCTURAL default when no `.current/.config.json` "host" is set is
-// the full profile { taskTool: true } — an explicit config host still
-// overrides even here (a workspace can force-lean). Unsplit skills (e.g. the
-// lite coordinator) pass through whole-file; a whole-file .current/ override
-// is returned verbatim. Fail-loud: if the manifest import fails (dist/
-// missing during a partial install), return "" so the existing "hook
-// misconfigured" hint fires below — same contract as composeConstitution.
+// Host-capability skill composition (ticket D6): the skill text comes from the
+// fragment registry in dist/prompts/skill-manifest.js, like the constitution.
+// The hook is Claude-Code-only, so with no "host" in .current/.config.json it
+// defaults to the full profile { taskTool: true }; an explicit host still
+// overrides. Unsplit skills and a whole-file .current/ override pass through
+// as-is. Fail-loud: on import failure return "", same as composeConstitution.
 async function composeSkillText(skillFile) {
   try {
     const mod = await import(
@@ -164,18 +144,13 @@ async function resolveHandoffPath() {
 }
 const handoffPath = await resolveHandoffPath();
 
-// The hook no longer inlines the raw handoff.md file: reported state renders
-// inside a labelled fence it cannot structurally escape (E137, Option B +
-// J2-NEW-1). It parses state
-// through the compiled READ-ONLY parser (dist/tools/handoff-parse.js
-// parseHandoff: lane path first, legacy flat fallback, never migrates / locks
-// / creates a lane dir, throws HANDOFF_LAYOUT_CONFLICT on dual presence) and
-// renders it through the SAME function buildPromptForRole uses
-// (dist/prompts/build.js renderHandoffStateBlock -> lib/render-boundary.ts
-// renderDataBlock), so both render sites emit byte-identical, bounded,
-// labelled state blocks. Fail-loud: if either import fails (dist/ missing
-// during a partial install), return null so the "hook misconfigured" hint
-// fires below — never fall back to a raw read.
+// State renders inside a labelled fence it cannot structurally escape (E137,
+// Option B + J2-NEW-1), never as the raw handoff.md file: parsed by the
+// READ-ONLY dist/tools/handoff-parse.js parseHandoff, rendered by the same
+// renderHandoffStateBlock buildPromptForRole uses, so both sites emit
+// byte-identical state blocks. Fail-loud: if either import fails, return null
+// so the "hook misconfigured" hint fires below; never fall back to a raw read.
+// Parser behaviour: see specs/e260c-bin-scripts.md.
 async function loadStateRenderer() {
   try {
     const parseMod = await import(
@@ -270,15 +245,11 @@ process.stdout.write(
   })
 );
 
-// Constitution dedup marker (C11 L2): record that the FULL constitution was
-// just emitted so a /teamwork* prompt fetch within the next 120s can
-// substitute the S03 sentinel instead of a second full copy (read by index.ts
-// hookMarkerFresh).
-// Written ONLY on this successful full-body emit — never on the
-// misconfigured-hint branch above. Fail-safe by construction: if the write
-// fails (e.g. no .current/ dir in a tasks.md/TODO.md-only workspace, or a
-// permissions error), there is simply no marker and the server re-emits the
-// full constitution — a marker write failure must never break the hook.
+// Constitution dedup marker (C11 L2): record that the FULL constitution was just
+// emitted, so a /teamwork* prompt fetch within 120s can use the S03 sentinel
+// instead of a second copy (read by index.ts hookMarkerFresh). Written ONLY on
+// this full-body emit. Fail-safe: if the write fails (no .current/, permissions),
+// there is no marker and the server re-emits the full constitution.
 try {
   fs.writeFileSync(
     path.join(workspace, ".current", ".agc-hook-marker.json"),
