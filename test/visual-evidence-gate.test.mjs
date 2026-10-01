@@ -371,19 +371,11 @@ test("v3.16.0 AC-1: empty active_feature → required:false (defensive)", () => 
 });
 
 // ============================================================================
-// v3.30.0 — Scope Decision Gate (server-scope-decision-gate)
-// Tests for specs/server-scope-decision-gate.md AC-1..AC-6, AC-10 (a)-(e) and
-// specs/qa-flow-enforcement-architecture.md → ## Scope Decision Gate edge cases.
-//
-// The SCOPE_DECISION_REQUIRED gate lives handler-side in index.ts at the
-// build-entry edge (pm:In_Progress → {architect,sr-engineer}:In_Progress). It
-// is built from two primitives the handler ANDs:
-//   (1) hasDesignModeRequiringVisual(ws, feature).required  (arm signal)
-//   (2) hasScopeDecision(ws, prevState)                     (satisfying artifact)
-// alongside the four tuple conditions. These tests exercise hasScopeDecision
-// directly (the new primitive) AND replicate the handler's exact predicate so a
-// refactor that re-orders the conditions in index.ts regresses an assertion
-// here — mirroring the composition convention in visual-gate-e2e.test.mjs.
+// v3.30.0 — Scope Decision Gate (specs/server-scope-decision-gate.md)
+// SCOPE_DECISION_REQUIRED fires on pm -> {architect, sr-engineer} when
+// hasDesignModeRequiringVisual arms it and hasScopeDecision finds no artifact.
+// These test hasScopeDecision directly and replicate the handler's predicate,
+// so a reorder of its conditions fails here (as in visual-gate-e2e.test.mjs).
 // ============================================================================
 
 // Mirrors the index.ts:741-748 guard predicate verbatim. Returns true iff the

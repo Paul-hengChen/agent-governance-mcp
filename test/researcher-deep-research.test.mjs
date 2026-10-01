@@ -1,19 +1,8 @@
 // Coded by @qa-engineer
-// Tests for spec: specs/researcher-deep-research-integration.md.
-// Spec-to-Test map (researcher deep-research integration):
-//   standalone invocation defaults to shallow depth (AC-1)          -> t1
-//   deep depth warns on token cost, then uses /deep-research (AC-2) -> t2
-//   graceful fallback when /deep-research is unavailable (AC-3)     -> t3
-//   shallow depth never forces /deep-research (AC-4)                -> t4
-//   the built researcher prompt carries the directives, checked via
-//   buildResearcherPrompt (AC-5)                                    -> t5
-//
-// WHY: the researcher role's deep-research wiring lives purely in prompt text
-// (skill-researcher.md), loaded verbatim by buildPromptForRole. There is no
-// server-enforced trigger — the contract IS the SOP wording reaching the agent.
-// These tests pin that wording so a future edit can't silently drop the
-// standalone-default-shallow rule (v3.16.1: standalone is the cost-frugal path,
-// deep is opt-in and must warn on token cost) or the /deep-research directive.
+// Tests for specs/researcher-deep-research-integration.md (AC-1..AC-5 map to
+// t1..t5). The deep-research wiring is prompt text only (skill-researcher.md),
+// so these pin its wording: standalone runs default to shallow, deep is opt-in
+// and warns on token cost, a missing /deep-research falls back gracefully.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";

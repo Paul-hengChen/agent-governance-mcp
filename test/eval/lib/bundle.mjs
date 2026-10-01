@@ -1,17 +1,9 @@
 // Coded by @sr-engineer
-// Bundle loader for the behavioral-eval harness (D4, T-D4-01, spec AC-8).
-//
-// Thin wrapper around the compiled buildPromptForRole() so eval scenarios
-// receive EXACTLY the bundle a real dispatch would: constitution (composed per
-// dispatch mode) + role skill + state footer. No re-implementation — any
-// compose-pipeline change (fragment manifest, origin/rationale strip) flows
-// into eval bundles automatically on the next `npm run build`.
-//
-// Bundles are assembled against the frozen fixture workspace under
-// test/eval/fixtures/workspace/ — NEVER this repo's live .current/handoff.md —
-// so scenario bundles are reproducible run to run regardless of the repo's own
-// in-flight feature state (AC-8). buildPromptForRole -> parseHandoff is
-// read-only (no migration write-back), so the fixture is never mutated (AC-12).
+// Bundle loader for the behavioral-eval harness (specs/d4-behavioral-eval-harness.md):
+// a thin wrapper over the compiled buildPromptForRole(), so scenarios get the
+// exact bundle a real dispatch would and compose changes flow in on build. It
+// reads the frozen fixture workspace, never this repo's live handoff, so bundles
+// are reproducible; parseHandoff never writes back, so the fixture is not mutated.
 
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
