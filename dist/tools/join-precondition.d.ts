@@ -8,14 +8,10 @@ export interface LaneAncestryResult {
     error?: string;
 }
 /**
- * For each branch in `branches`, runs `git merge-base --is-ancestor <branch>
- * HEAD` with `cwd` pinned to `repoRoot` — never any other path. Never
- * throws: per branch, a clean negative (git exit 1 — the branch exists but
- * is simply not merged yet) degrades to `{ isAncestor: false }` with no
- * error, while any other failure (unknown/deleted branch, corrupt repo, git
- * unavailable, etc.) degrades to `{ isAncestor: false, error }` — naming the
- * failure rather than crashing the caller or silently coercing an unknown
- * result to `true` (AC1, AC2).
+ * For each branch, runs `git merge-base --is-ancestor <branch> HEAD` with
+ * `cwd` pinned to `repoRoot`. Never throws: a clean "not merged yet" (git
+ * exit 1) is `{ isAncestor: false }`; any other failure (unknown branch, git
+ * unavailable, corrupt repo) is `{ isAncestor: false, error }`, never `true`.
  */
 export declare function checkLaneAncestry(branches: string[], repoRoot: string): LaneAncestryResult[];
 /** The only membership finding possible: this workspace's own actual
@@ -38,29 +34,12 @@ export interface LaneIdentityCheckResult {
     mismatches: LaneIdentityMismatch[];
 }
 /**
- * Reads THIS workspace's own `.current/feature-split.md` (never any other
- * workspace's) for its declared per-row feature identity, and checks
- * MEMBERSHIP of THIS workspace's own actual `.current/handoff.md`
- * `active_feature` (read via `parseHandoff(repoRoot)` — no other path is
- * ever read) within the full declared set (AC3, amended round 1). A Split
- * Table has one row per PLANNED lane, so at most one row can ever equal
- * this single workspace's `active_feature` — sibling rows declaring a
- * different lane are the expected, healthy shape, not a mismatch:
- *   - `actual` present in ANY declared row -> satisfied, `mismatches: []`,
- *     regardless of how many sibling rows declare something else.
- *   - `actual` absent from EVERY declared row -> exactly ONE finding
- *     naming the full declared set alongside `actual` (never one finding
- *     per non-matching row — that was the round-1 defect: it fabricated a
- *     mismatch on every healthy multi-row plan).
- * Rows are never skipped or special-cased by a `status` column — that
- * would make pass/fail depend on status-column hygiene, a remedy the PM
- * considered and refuted (Amendment History, spec:195).
- *
- * Degrades honestly rather than fabricating a verdict (AC4): when
- * `feature-split.md` is absent, when it has no recognizable feature-identity
- * column, or when this workspace's own handoff can't be read/has no
- * active_feature, this returns `{ compared: false, reason }` — never a
- * fabricated match or mismatch.
+ * Checks that THIS workspace's own handoff `active_feature` is a member of the
+ * feature ids declared in its own `.current/feature-split.md` (one row per
+ * planned lane, so non-matching sibling rows are healthy). Absent from every
+ * row -> exactly one finding naming the full declared set. No split file, no
+ * identity column, or no readable active_feature -> `{ compared: false, reason }`.
+ * Why: specs/e260b-rationale.md (tools/join-precondition.ts)
  */
 export declare function checkDeclaredVsActualLaneIdentity(repoRoot: string): LaneIdentityCheckResult;
 /**

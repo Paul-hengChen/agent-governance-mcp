@@ -71,7 +71,7 @@ function loadXenova() {
     _modulePromise = (async () => {
         try {
             // Dynamic import keeps @xenova/transformers strictly optional at runtime.
-            // If users uninstall it, TS compilation may need a stub — see types/.
+            // If users uninstall it, TS compilation may need a local type stub.
             const mod = await import("@xenova/transformers");
             return mod;
         }

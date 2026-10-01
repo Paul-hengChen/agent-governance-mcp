@@ -1,17 +1,10 @@
 // Coded by @sr-engineer
-// tools/merge-invariants.ts — post-merge ledger/sidecar preservation check
-// (spec: specs/e126-merge-invariants.md). (E126)
-//
-// tw_detect_drift compares two views of ONE workspace's current state, so a
-// merge that drops a lane's task rows AND their [x] marks symmetrically reads
-// as "no drift". This module is the git-native complement: given a merge
-// commit M (parents P1, P2, merge-base B) it asserts
-//   AC1 every task_id present at P1/P2 is present at M (or COMPACTED),
-//   AC2 every task_id [x] at P1/P2 is [x] at M (or COMPACTED),
-//   AC3 every sidecar (kind, lane) has count(M) >= P1 + P2 - B.
-// Every tree is read through `git ls-tree` / `git cat-file` — NEVER the
-// working directory — so any already-made merge commit can be checked.
-// Reporting surface only: fires no gate, writes nothing, touches no git state.
+// Post-merge ledger/sidecar preservation check (E126), the git-native
+// complement to tw_detect_drift: for merge commit M (parents P1, P2, base B),
+// task ids and [x] marks at P1/P2 survive at M (or COMPACTED), and every
+// sidecar (kind, lane) has count(M) >= P1 + P2 - B. Reads trees through git,
+// never the working directory; fires no gate and writes nothing.
+// Why: specs/e260b-rationale.md (tools/merge-invariants.ts)
 import { execFileSync } from "node:child_process";
 import { resolveTaskRegex } from "./config.js";
 import { HISTORY_BUCKET_RE, isBytePrefix, isSafeLaneName, NON_LANE_DIRS } from "./lane-paths.js";

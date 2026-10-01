@@ -1,13 +1,9 @@
 // Coded by @sr-engineer
-// Registry pattern (registry-pattern, backlog A1): single declarative registry
-// per surface (tools, prompts). index.ts iterates TOOL_REGISTRY /
-// PROMPT_REGISTRY instead of maintaining three independent registration sites
-// per tool (JSON Schema literal, zod const, dispatcher case) and two per
-// prompt (metadata array, if-chain). Adding a tool/prompt is one entry here.
-//
-// Placement is load-bearing (AC-7): this file lives under tools/ so
-// test/error-code-contract.test.mjs's CODE_SOURCE_FILES glob scans it
-// automatically. Do NOT move it to a top-level registry/ directory.
+// Registry pattern: one declarative registry per surface. index.ts iterates
+// TOOL_REGISTRY / PROMPT_REGISTRY, so adding a tool or prompt is one entry
+// here instead of a JSON Schema literal, zod const and dispatcher case.
+// Placement is load-bearing: this file stays under tools/ so
+// test/error-code-contract.test.mjs's CODE_SOURCE_FILES glob scans it.
 import * as path from "node:path";
 import { z } from "zod";
 import { handleDetectDrift } from "./drift.js";
@@ -40,51 +36,12 @@ const absoluteWorkspacePath = z
 const WorkspaceOnly = z.object({
     workspace_path: absoluteWorkspacePath,
 });
-// Reject a free-text field whose TRIMMED TAIL is leftover tool-call tag
-// markup: a malformed multi-argument tw_update_state/tw_add_task call can
-// bleed a sibling argument's literal tag fragment onto this field's tail
-// (e.g. `<parameter name="pending_notes">` or
-// `</scope_decision_why></invoke>`). (E86)
-//
-// Tail position alone is not narrow enough. agc's own documentation dialect
-// routinely ends sentences on a bare `<placeholder>` token (`<role>`,
-// `<feature>`, `<task-id>`, `<field>`, a byte-verbatim line of
-// content/coord-01-core-head.md's `(<N> units) ... <which fired>`) and
-// ordinary TypeScript prose does the same (`Promise<void>`,
-// `Array<string>`). So the predicate requires BOTH tail position AND a
-// genuine tool-call signal — an attribute assignment (`name="..."`) or a
-// close-tag slash (`</...`) — neither of which a bare placeholder or a TS
-// generic carries. The same fragment quoted mid-string, with further prose
-// after it, is ordinary prose and MUST be accepted.
-//
-// Implementation: find the LAST "<" in the trimmed value; require everything
-// from there to the end of the string to be consumed by a tag-shaped
-// fragment (open or close, complete with a closing ">" or truncated
-// mid-attribute) AND require that fragment to carry the tool-call signal
-// above.
-//
-// The attribute-value alternative has two halves, and only one of them has
-// to force the tag to be the tail. The TERMINATED half (`"[^"]*"`) matches a
-// complete `"value"`; any prose after it would already have pushed the "<"
-// this match started from out of tail position, and the outer `\s*\/?>?$`
-// anchor still enforces the tail. The UNTERMINATED half (`"[^"\s]*$`),
-// which fires when the closing quote is missing, must enforce the tail
-// itself: without the `[^"\s]` exclusion and its own `$`, a greedy `[^"]*`
-// would swallow everything to the end of the string INCLUDING spaces and
-// further sentences, so a mid-string fragment like
-// `<parameter name="pending_notes and then three more sentences...` would
-// be wrongly rejected. Excluding whitespace from the truncated value means
-// prose after the truncation point cannot be absorbed, so the match only
-// succeeds when the fragment really IS the tail.
-//
-// Known gaps, accepted: a bare open tag with no attribute and no slash
-// (`<parameter>`, `<invoke>`, `<function_calls>`), a truncated attribute
-// name with no `=` yet (`<parameter name`), a self-closing tag with no
-// attribute (`<br/>`), and a single-quoted attribute
-// (`<parameter name='x'>`). These look exactly like a bare placeholder
-// (`<role>`, `<div>`) without a tag-name vocabulary check, which the design
-// deliberately avoids (see the placeholder note above) — leaving them
-// uncaught is the price of never flagging ordinary prose.
+// Reject a free-text field whose TRIMMED TAIL is leftover tool-call tag markup
+// bled in by a malformed multi-argument call (e.g. `</invoke>`). It needs BOTH
+// tail position AND a tool-call signal (an attribute assignment `name="..."`
+// or a close-tag slash), so prose ending on a bare `<placeholder>` or a TS
+// generic like `Promise<void>` is accepted. (E86)
+// Why: specs/e260b-rationale.md (tools/registry.ts)
 const TRAILING_TAG_FRAGMENT_RE = /<\/?[A-Za-z_][\w.:-]*(?:\s+[A-Za-z_][\w.:-]*(?:\s*=\s*(?:"[^"]*"|"[^"\s]*$))?)*\s*\/?>?$/;
 // A genuine tool-call signal: a close-tag slash, or an attribute assignment
 // (`name="value"`, optionally with the closing quote truncated away).
@@ -181,19 +138,11 @@ const UpdateStateArgs = z
     // review_verdict: code-reviewer verdict; checked against status by the
     // REVIEW_VERDICT_STATUS_MISMATCH orchestrator gate (AC-5).
     review_verdict: z.enum(["APPROVED", "CHANGES_REQUESTED"]).optional(),
-    // v8 — dispatch_pins map (c14-dispatch-pins). CLOSED KEYS, OPEN VALUES
-    // (AC-2): keys are the same 8 AgentName literals next_role validates
-    // against — an unknown key is rejected here, at the tool boundary, before
-    // any gate runs (`.strict()`, mirrors the next_role closed-enum
-    // precedent). Values are bounded free text (non-empty, ≤ 100 chars)
-    // naming the pinned model tier — deliberately NOT closed-enum: the legal
-    // model-tier vocabulary is not owned by this server and evolves
-    // independently; a typo'd model name is a client-side error the server
-    // does not gate on (same trust class as scope_decision_why). DURABLE,
-    // feature-scoped (AC-3/AC-4): REPLACES the whole map when provided (never
-    // merged key-by-key); carried forward across same-feature writes that
-    // omit it; dropped on active_feature change. File-mode only, no gate
-    // (AC-5).
+    // v8 dispatch_pins map: CLOSED KEYS (the 8 AgentName literals; `.strict()`
+    // rejects an unknown key here), OPEN VALUES (bounded free text naming a
+    // model tier; this server does not own that vocabulary). Feature-scoped:
+    // REPLACES the whole map when provided, carried across same-feature
+    // writes, dropped on active_feature change. File-mode only, no gate.
     dispatch_pins: z
         .object({
         pm: z.string().min(1).max(100).optional(),
@@ -207,65 +156,43 @@ const UpdateStateArgs = z
     })
         .strict()
         .optional(),
-    // dispatch_mode. Closed two-value enum: an out-of-enum value is
-    // rejected here, at the tool boundary, before any gate runs (like
-    // next_role's closed enum). Absence === "feature" (the default) — the
-    // field is OPTIONAL and never seeded. Kept for the feature's life (the
-    // dispatch_pins/external_refs rule, for a single value): carried
-    // forward across same-feature writes that omit it; dropped when
-    // active_feature changes; NOT re-armed on PM re-entry. "bugfix" arms the
-    // file-mode repro-first gate (REPRO_MANIFEST_MISSING) on the
-    // sr-engineer:In_Progress → code-reviewer:In_Progress fix-phase edge; it
-    // never gates a transition edge itself. File-mode only. (E2, v11)
+    // dispatch_mode: closed two-value enum, rejected here before any gate.
+    // Absence === "feature"; never seeded. Feature-scoped like dispatch_pins:
+    // carried across same-feature writes, dropped on active_feature change,
+    // NOT re-armed on PM re-entry. "bugfix" arms the file-mode repro-first
+    // check (REPRO_MANIFEST_MISSING) on the sr-engineer -> code-reviewer
+    // edge. File-mode only. (E2, v11)
     dispatch_mode: z.enum(["feature", "bugfix"]).optional(),
-    // cut_approved_source. A string set by the client, NOT a closed enum and
-    // NOT shape-validated at this boundary (unlike dispatch_mode's z.enum
-    // immediately above) — the server cannot verify a claim about another
-    // workspace, so it accepts the writer's attestation here and, at parse
-    // time (tools/handoff-parse.ts), silently drops any value that does not
-    // match the "inherited:<parent-feature>" shape rather than rejecting it
-    // at this zod boundary. Contrast evidence_schema, which the server stamps
-    // itself and which deliberately has NO zod arg here. Kept for the
-    // feature's life (the dispatch_mode single-value rule): carried forward
-    // across same-feature writes that omit it; dropped when active_feature
-    // changes; NOT re-armed on PM re-entry. For the record only — no gate
-    // reads it. File-mode only. (E114, v14)
+    // cut_approved_source: client-set free text, NOT validated here. The
+    // server cannot verify a claim about another workspace, so
+    // tools/handoff-parse.ts silently drops a value not shaped
+    // "inherited:<parent-feature>" (contrast evidence_schema, which the server
+    // stamps itself and so has no arg). Feature-scoped like dispatch_mode;
+    // recording only, no gate reads it. File-mode only. (E114, v14)
     cut_approved_source: z.string().max(200).optional(),
-    // Per-hop dispatch-mechanism attestation (with a self-reported tier).
-    // dispatch_mechanism is a closed three-value enum rejected here, at the
-    // tool boundary, before any gate runs (like dispatch_mode /
-    // review_verdict). dispatch_mechanism_tier is bounded free text — the
-    // model-tier vocabulary is not owned by this server (like dispatch_pins
-    // values). Attested, NOT verified. Applies to THIS write only (like
-    // next_role / review_verdict): never carried forward. For the record
-    // only — no gate, no GateErrorCode, no predicate reads either field.
+    // Per-hop dispatch-mechanism attestation: dispatch_mechanism is a closed
+    // three-value enum checked here; dispatch_mechanism_tier is bounded free
+    // text (the model-tier vocabulary is not this server's). Attested, NOT
+    // verified; this write only, never carried forward; no gate reads either.
     // File-mode only. (E99, v15)
     dispatch_mechanism: z.enum(["task", "switch_role", "inline"]).optional(),
     dispatch_mechanism_tier: z.string().max(40).optional(),
-    // Two attested booleans, NO schema bump: neither is ever written to or
-    // read back from frontmatter. Both apply to THIS write only (like
-    // next_role/resume_of/review_verdict, unlike the durable
-    // cut_approved/dispatch_mode) and are FILE-MODE only (SQLite mode
-    // ignores both). (E10)
-    // lease_override: human-attested FEATURE_LEASE_HELD bypass, any edge.
-    // Consumed ONLY at the orchestrator lease gate from the incoming args;
-    // requires a pending_notes[0] audit line matching /^lease-override:/
-    // (LEASE_OVERRIDE_AUDIT_MISSING otherwise — gates/lease-override.ts).
+    // Two attested booleans, NO schema bump (never in frontmatter): this write
+    // only, file-mode only. (E10)
+    // lease_override: human-attested FEATURE_LEASE_HELD bypass on any edge,
+    // read only by the orchestrator lease gate; requires a pending_notes[0]
+    // line matching /^lease-override:/ (gates/lease-override.ts).
     lease_override: z.boolean().optional(),
     // bookkeeping_write: non-substantive-write attestation. Consumed ONLY as
     // a writeHandoffState option selecting last_updated (preserve the
     // incumbent's stamp instead of now()); valid on same-active_feature
     // writes only (BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE otherwise, AC6).
     bookkeeping_write: z.boolean().optional(),
-    // v9 — d9-qa-review-scoped-append. Task id(s) the qa_review evidence
-    // auto-record targets (agent_id=qa-engineer, status PASS/FAIL). Same
-    // shape/limits as completed_tasks. TRANSIENT, write-scoped (c9-protocol-
-    // fields convention, like next_role/resume_of/review_verdict): consumed
-    // ONLY by the id-resolution in handoff-orchestrator.ts — never persisted,
-    // never carried across writes. Resolution: review_task_ids if non-empty,
-    // else completed_tasks; both empty on a qa_review-bearing write is
-    // rejected with QA_REVIEW_TARGET_REQUIRED (the old "every open task"
-    // fan-out fallback is deleted — D8 incident).
+    // v9 review_task_ids: the task id(s) the qa_review evidence auto-record
+    // targets. Transient, never persisted; read only by the orchestrator's id
+    // resolution: review_task_ids if non-empty, else completed_tasks; both
+    // empty on a qa_review-bearing write is rejected with
+    // QA_REVIEW_TARGET_REQUIRED (no "every open task" fallback).
     review_task_ids: z.array(z.string().max(500)).max(200).optional(),
 })
     .refine((d) => d.status !== "PASS" || d.agent_id === "qa-engineer", {
@@ -371,14 +298,11 @@ const SwitchRoleArgs = z.object({
 // alphanumerics, dot, underscore, dash, slash. Bounds user-supplied input
 // before it reaches the dynamic loader.
 const EMBEDDING_MODEL_RE = /^[A-Za-z0-9._\-]+\/[A-Za-z0-9._\-]+$/;
-// v3.14.1 — explicit allowlist on top of the format regex.
-// Background: regex-only validation let any HF Hub repo through. A client
-// passing `embedding_model: "attacker/evil-model"` would download a crafted
-// .onnx, parsed by onnxruntime-web → protobufjs (CVE-2026-41242 / RCE).
-// Closing the schema attack surface by trusting only Xenova-org-hosted models.
-// See research/xenova-reachability.md for the full reachability trace.
-// To add a model: open a PR amending this set + spot-checking the .onnx
-// provenance (HF commit history + Xenova-org membership).
+// Explicit allowlist on top of the format regex (v3.14.1): regex-only
+// validation let any HF Hub repo through, and a crafted .onnx parsed by
+// onnxruntime-web -> protobufjs is an RCE (CVE-2026-41242). Only
+// Xenova-org-hosted models are trusted; see research/xenova-reachability.md.
+// Adding a model means a PR plus an .onnx provenance spot-check.
 const ALLOWED_EMBEDDING_MODELS = new Set([
     "Xenova/all-MiniLM-L6-v2", // DEFAULT — small, English, 384-d
     "Xenova/bge-small-en-v1.5", // alternative — BGE small English
@@ -815,14 +739,11 @@ export const TOOL_REGISTRY = [
     }),
 ];
 // ==========================================
-// PROMPT_REGISTRY (T-REG-07) — single source of truth per prompt id:
-// feeds BOTH prompts/list (metadata map) and prompts/get (find + build) in
-// index.ts, replacing the metadata array and the 11-branch if-chain.
-// Order and descriptions are FROZEN to the pre-refactor
-// ListPromptsRequestSchema output (AC-4 byte-identical), including the
-// `teamwork` / `teamwork-lite` backwards-compat ids mapped to the
-// coordinator skill files. Entries are declarative (C6 DR-2): `skillFile`
-// names the content/skill-*.md the handler feeds to buildPromptForRole.
+// PROMPT_REGISTRY: one entry per prompt id, feeding both prompts/list and
+// prompts/get in index.ts. Order and descriptions are FROZEN to the
+// pre-refactor list output, including the `teamwork` / `teamwork-lite`
+// backwards-compat ids. `skillFile` names the content/skill-*.md file the
+// handler feeds to buildPromptForRole.
 // ==========================================
 const PROMPT_WORKSPACE_ARG = {
     name: "workspace_path",

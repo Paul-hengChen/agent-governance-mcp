@@ -65,15 +65,11 @@ export function switchRole(role, workspacePath) {
     // partial-adopting role. The loader mirrors the skill override resolution
     // above (workspace .current/ override > server content/ default).
     const { frontmatter, body: taggedBody } = parseSkillFile(expandPartials(raw, loadFile));
-    // Same second-path reasoning as the partial expansion above, for the strip
-    // passes: switchRole must apply stripOriginTags/stripRationale just as
-    // buildPromptForRole does, otherwise every SOP delivered through
-    // tw_switch_role leaks raw <!-- origin:… --> / <!-- rationale:… --> markers
-    // to the acting agent — the reader those fences exist to keep them away
-    // from. Shared pass, one implementation: prompts/text-transforms.ts.
-    // fullDetail: false because tw_switch_role IS a dispatch (no
-    // full-detail/authoring mode exists here), and the BODY only — frontmatter
-    // is parsed off above, and recommended_model is read from it below. (E51)
+    // Same second-path reasoning for the strip passes: without
+    // applyTextTransforms, every SOP delivered via tw_switch_role would leak raw
+    // origin/rationale markers to the acting agent. fullDetail: false because
+    // tw_switch_role IS a dispatch; body only, since recommended_model is read
+    // from the frontmatter parsed off above. (E51)
     const body = applyTextTransforms(taggedBody, { fullDetail: false });
     let instruction = `Context-loading only: the server is returning the "${role}" SOP for you to follow. ` +
         `No server-side role enforcement exists — other tw_* tools remain callable regardless. ` +

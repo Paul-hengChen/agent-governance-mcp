@@ -1,17 +1,9 @@
 // Coded by @sr-engineer
-// Append-only gate-fire telemetry sidecar (D3). Observability, not
-// authoritative state — deliberately NOT governed by the handoff.ts 4-step
-// mutating-tool contract (lock → freshness → atomic write → refresh
-// snapshot). Mirrors the existing best-effort, lock-free append precedent
-// in gates/qa-review.ts's recordReviewInFile (spec AC-7).
-//
-// D2 consumer (this module's spec AC-9, resolved by D2 AC-7/DR-4): per-dispatch
-// token-usage cost records live in the SIBLING module tools/usage-accounting.ts
-// and its SEPARATE sidecar file .current/usage.jsonl — two files, two modules,
-// disjoint key sets ({ts, feature, dispatch, usage{…}} vs this module's
-// {ts, gate, error_code, agent_id, feature}). This module remains gate-fire
-// telemetry ONLY and emits ONLY the 5 fields below; D2's hop-cap gate fires
-// (HOP_CAP_EXCEEDED) flow through here unchanged.
+// Append-only gate-fire telemetry sidecar: observability, not authoritative
+// state, so deliberately outside the handoff 4-step mutating-tool contract
+// (like the best-effort lock-free append in gates/qa-review.ts). Emits ONLY
+// the 5 gate-fire fields below; per-dispatch token usage lives in
+// tools/usage-accounting.ts and its own `.current/usage.jsonl`. (D3)
 
 import * as fs from "fs";
 import * as path from "path";

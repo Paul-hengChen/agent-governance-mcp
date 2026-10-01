@@ -1,12 +1,8 @@
 // Coded by @sr-engineer
-// Release-close success-metrics sidecar. One JSON line per SHIPPED feature,
-// appended to .current/metrics.jsonl at the release-engineer terminal-marker
-// write (see the single call site in tools/handoff-orchestrator.ts).
-// Observability, not authoritative state — deliberately NOT governed by the
-// handoff.ts 4-step mutating-tool contract. A stream and module fully
-// separate from tools/telemetry.ts's gate-fire telemetry.jsonl: disjoint key
-// sets, writers, and lifecycles, like the usage.jsonl / telemetry.jsonl
-// split. (E8)
+// Release-close success-metrics sidecar: one JSON line per SHIPPED feature in
+// the lane's metrics.jsonl, appended at the release-engineer terminal-marker
+// write (single call site in tools/handoff-orchestrator.ts). Observability,
+// not governed state, and separate from the gate-fire telemetry stream. (E8)
 import * as fs from "fs";
 import * as path from "path";
 import { enumerateLaneSidecarSources, resolveCurrentLanePaths } from "./lane-paths.js";
@@ -60,18 +56,10 @@ export function emitFeatureMetrics(args) {
         catch {
             // unreadable package.json — record ships with released_version: null.
         }
-        // Idempotency guard: skip the append when a record with the same
-        // (feature, released_version) pair already exists. The PAIR is the key —
-        // released_version === null is a valid key value, NOT a wildcard, so a
-        // second null-version emit for the same feature is also deduped. An
-        // existing record with an absent/non-string released_version normalizes
-        // to null so it compares equal to a computed null. Defensive read: a
-        // missing file means "no existing records" so the append proceeds; a
-        // malformed line is skipped without crashing; and any failure of the read
-        // itself fails OPEN — fall through to append rather than drop a
-        // legitimate record — never throwing, per this module's contract.
-        // Resolved once per emit (one HEAD read), reused for the read + append.
-        // (E12)
+        // Idempotency: skip the append when a record with the same (feature,
+        // released_version) pair exists; null is a key value, not a wildcard, and
+        // an absent version normalizes to null. The read fails OPEN (append rather
+        // than drop a record) and never throws. Path resolved once per emit. (E12)
         const file = metricsPath(args.workspacePath);
         let alreadyEmitted = false;
         try {

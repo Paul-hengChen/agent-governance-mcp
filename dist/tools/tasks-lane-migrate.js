@@ -1,25 +1,10 @@
 // Coded by @sr-engineer
-// Legacy tasks.md -> lane-local `.current/<lane>/tasks.md` migration. (E125a)
-//
-//   _primary : COPY the legacy body into the lane ledger, then re-stamp the
-//              legacy file as a v2 index (sentinel + notice + body) and write
-//              the reverse-run receipt `.current/tasks-index-receipt.json`.
-//   feat lane: MOVE every `## ` section whose heading's ticket id is the lane
-//              into the lane ledger; each contiguous run becomes one marker
-//              line in the legacy file, whose sentinel is left untouched.
-//
-// A legacy file at v2+ is an index, never a forward source — but a MISSING
-// ledger it proves must exist is reported loudly, never treated as empty
-// (TasksLedgerAbsentError). A git-ignored lane path skips the migration and
-// keeps the legacy file as the ledger. Lock order: the lane's tasks lock
-// OUTER, the legacy file's lock INNER. Both are taken with a small
-// synchronous bounded-wait lock whose timeout throws
-// TasksMigrationBusyError — never a silent skip.
-//
-// Reverse (runner-only, no CLI): migratePrimaryReverse and
-// migrateFeatReverse restore the legacy file from the lane ledger's CURRENT
-// body and delete the ledger. Every precondition is checked before the
-// first write, so a refused run touches nothing.
+// Legacy tasks.md -> lane-local `.current/<lane>/tasks.md` migration (E125a):
+// `_primary` COPIES the legacy body into the ledger and re-stamps the legacy
+// file as a v2 index plus a reverse-run receipt; a feat lane MOVES its own
+// `## ` sections out, leaving one marker line per contiguous run. A v2+ legacy
+// file is an index, never a source. Reverse runners restore from the ledger.
+// Why: specs/e260b-rationale.md (tools/tasks-lane-migrate.ts)
 import { execFileSync } from "child_process";
 import * as crypto from "crypto";
 import * as fs from "fs";
@@ -264,10 +249,10 @@ function migratePrimaryForward(workspacePath, legacyPath, laneTasksPath, body) {
     atomicWriteRaw(receiptPath(workspacePath), `${JSON.stringify({ bodySha256: primaryIndexReceiptSha(body) })}\n`);
     atomicWriteRaw(legacyPath, `${currentSentinel()}${TASKS_INDEX_NOTICE}\n${body}`);
 }
-// D-C feat lane. Zero matching sections: no-op (false; the first
+// Feat-lane forward (D-C). Zero matching sections: no-op (false; the first
 // tw_add_task creates the lane ledger). Every marker carries the run total
-// `of=<N>` so the reverse can detect ANY missing marker (C2). Lane ledger
-// first, then the marked legacy file.
+// `of=<N>` so the reverse can detect ANY missing marker. Lane ledger first,
+// then the marked legacy file.
 function migrateFeatForward(legacyPath, laneTasksPath, lane, legacy) {
     const { blocks, trailingNewline } = splitBlocks(legacy.body);
     const total = blocks.filter((b, i) => b.lane === lane && (i === 0 || blocks[i - 1].lane !== lane)).length;
@@ -407,17 +392,13 @@ function preScanMustMigrate(lane, laneTasksPath, legacyPath) {
     });
 }
 /**
- * CORE (architecture Interface Contracts): the caller MUST already hold
- * `${laneTasksPath}.lock`, where `laneTasksPath` is
- * `resolveCurrentLanePaths(ws).tasksPath` resolved ONCE by the caller (the
- * four tools/tasks-file.ts mutators, via withFileLock) — so the lock held
- * and the ledger written can never diverge. The lane is that path's parent
- * directory name. (Deviation from the blueprint's `(ws, lane)` signature:
- * spec AC1 routes every tools/ caller through resolveCurrentLanePaths.)
- * Takes only the inner legacy-file lock. Returns true iff THIS call wrote a
- * migration (R-1). No-op (false) when the lane ledger exists, no legacy file
- * exists, the lane path is git-ignored (AC4b), or there is nothing to move
- * (D13). Throws TasksLedgerAbsentError (AC6b) and TasksMigrationBusyError.
+ * CORE: the caller MUST hold `${laneTasksPath}.lock`, where `laneTasksPath` is
+ * `resolveCurrentLanePaths(ws).tasksPath` resolved ONCE by the caller, so the
+ * lock held and the ledger written never diverge (spec AC1 routes every caller
+ * through resolveCurrentLanePaths). Takes only the inner legacy-file lock.
+ * True iff THIS call migrated; false on an existing ledger, no legacy file, a
+ * git-ignored lane path or nothing to move. Throws TasksLedgerAbsentError and
+ * TasksMigrationBusyError.
  */
 export function ensureTasksMigratedLocked(workspacePath, laneTasksPath) {
     const lane = path.basename(path.dirname(laneTasksPath));
@@ -504,20 +485,11 @@ function readReceiptSha(workspacePath) {
 }
 /**
  * `_primary` reverse. Refuses, touching nothing, unless the legacy file is a
- * v2+ index carrying TASKS_INDEX_NOTICE AND the receipt's bodySha256 equals
- * primaryIndexReceiptSha(its trailing body) — or, for a receipt stamped
- * before index normalization existed, sha256 of that raw body. A missing or
- * unreadable receipt refuses too. Normalization allows exactly two root
- * edits after the forward run: removed `tasks_moved` markers and a `##
- * Closed Lanes` section; any other change refuses. (E125c, E195)
- * Then: legacy := v1 sentinel + the lane ledger's CURRENT body, minus the
- * ledger marker lines no longer in the root, with the root's Closed Lanes
- * section(s) carried to the end in place of the ledger's own, and
- * `.current/_primary/tasks.md` + the receipt are deleted. With no Closed
- * Lanes section on either side the ledger body is kept verbatim.
- * The restored root always carries a v1 sentinel, so a v0 (sentinel-less)
- * original, e.g. the `agc init` scaffold, round-trips to its body under a
- * v1 sentinel, not byte-identically.
+ * v2+ index with TASKS_INDEX_NOTICE whose body matches the receipt's
+ * bodySha256 (normalized by primaryIndexReceiptSha, or raw for an older
+ * receipt). Then legacy := v1 sentinel + the ledger's CURRENT body (see
+ * restoredPrimaryBody), and the ledger and receipt are deleted. A v0 original
+ * round-trips under a v1 sentinel, not byte-identically. (E125c, E195)
  */
 export function migratePrimaryReverse(workspacePath) {
     const dir = "primary reverse";
@@ -553,14 +525,12 @@ function restoredPrimaryBody(ledgerBody, indexBody) {
     return joinCanonical([...trimTrailingBlank(own.rest), ...carried]);
 }
 /**
- * D-E feat reverse for `lane`. The lane's markers in the legacy file must be
- * runs 1..N in document order, every one carrying the same `of=<N>`, with
- * exactly N markers (C2: a missing LAST marker refuses too; missing /
- * duplicated / out-of-order / malformed refuses). The ledger's `## ` blocks are handed back in order:
- * each marker takes the next `sections=<n>` blocks; any leftover content
- * (sections added lane-locally) goes right after the last marker's run, or
- * at the end of the file when N = 0. The legacy sentinel line is kept
- * verbatim; the ledger is deleted.
+ * Feat reverse for `lane`. The lane's legacy-file markers must be runs 1..N
+ * in document order, all with the same `of=<N>` and exactly N of them
+ * (missing, duplicated, out-of-order or malformed refuses). Each marker takes
+ * back the ledger's next `sections=<n>` `## ` blocks; leftover lane-local
+ * sections go after the last run (or at EOF when N = 0). The legacy sentinel
+ * line is kept verbatim; the ledger is deleted.
  */
 export function migrateFeatReverse(workspacePath, lane) {
     const dir = "feat reverse";

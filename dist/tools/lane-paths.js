@@ -1,55 +1,17 @@
 // Coded by @sr-engineer
-// Lane-layout seam. The CANONICAL and ONLY owner of the set of lane-scoped
-// `.current/` filenames: every consumer — resolveLanePaths below,
-// tools/lane-migrate.ts's two runners, tools/dispatch-log.ts's sidecar name —
-// derives its file set by iterating LANE_FILES, never by restating a
-// filename. Adding a lane file later is one LANE_FILES entry plus a schema
-// migration step (see the `tasks` entry below for an example). (E123)
-//
-// resolveLanePaths returns lane-scoped `.current/<lane>/<filename>` paths.
-// Every production lane-file call site goes through resolveCurrentLanePaths
-// (tools/handoff-parse.ts, tools/handoff-write.ts, tools/drift.ts,
-// tools/telemetry.ts, tools/metrics.ts, tools/dispatch-log.ts,
-// guards/session.ts, prompts/build.ts, both bin/ hooks), so they all get
-// lane-scoped paths. The flat `.current/<filename>` layout is legacy —
-// reached only through tools/lane-migrate.ts's runners, never written by a
-// live writer.
-//
-// Pure path/string logic everywhere EXCEPT three read-only functions:
-// resolveCurrentLane (statSync / readFileSync on `.git` and HEAD),
-// enumerateLaneSidecarSources (readdir / readFile over `.current/`), and
-// hasHistoryLedger (readdir / stat over `.current/history/`) — never a git
-// subprocess, never a write. No imports beyond `fs` and `path`.
+// Lane-layout seam, sole owner of the lane-scoped `.current/` filenames: every
+// consumer (resolveLanePaths, the migration runners, dispatch-log) iterates
+// LANE_FILES. Production call sites use resolveCurrentLanePaths; flat
+// `.current/<filename>` is legacy, reached only by the migration runners.
+// Pure path logic except three read-only fs helpers (resolveCurrentLane too).
+// Why: specs/e260b-rationale.md (this file's section)
 import * as fs from "fs";
 import * as path from "path";
-// The registry. Exactly 8 entries — 1 required, 7 optional.
-// `.current/.config.json`, a workspace's exemptions.json, and
-// .current/feature-split.md are deliberately NOT lane files. (E123)
-//
-// pendingTickets: a lane's filed-but-unnumbered findings (the format parsed
-// by tools/lane-ticket-allocation.ts), applied to docs/backlog.md by `agc
-// feature finish`. `required: false` is load-bearing — a lane that files no
-// finding has no such file, and a required entry would make every ordinary
-// lane->flat migration refuse. Unlike the four JSONL sidecars it is
-// committed markdown, so tools/lane-migrate.ts never concatenate-merges it.
-// (E179)
-//
-// tasks: the lane-local task ledger `.current/<lane>/tasks.md`.
-// `required: false` — a lane with no tasks has no ledger.
-// `noFlatCounterpart` — its legacy location is the taskPaths-resolved root
-// file, not `.current/tasks.md`, so the flat<->lane runners never move it.
-// (E125a)
-//
-// baseSha: `.current/<lane>/base-sha`, the fork-point commit `agc feature
-// start` resolved (40/64-hex sha, plain text), read back by `agc feature
-// finish --shipped` for the `lane_closed:` pointer line. It MUST be
-// registered: a file inside `.current/<lane>/` that is not a LANE_FILES
-// entry makes tools/lane-migrate.ts's lane->flat runner refuse the whole
-// lane. `required: false` + a non-`.jsonl` name, exactly like pendingTickets
-// (never concatenate-merged; identical bytes at both ends drop, different
-// bytes refuse). Deliberately NO noFlatCounterpart: no other migration
-// module owns its flat<->lane transition, so the flat<->lane runners must
-// move it. (E125b)
+// The registry: exactly 8 entries, 1 required, 7 optional. `.config.json`,
+// exemptions.json and feature-split.md are deliberately NOT lane files.
+// Every file inside `.current/<lane>/` must be registered here, or the
+// lane->flat runner refuses the whole lane. Per-entry notes (pendingTickets,
+// tasks, baseSha): specs/e260b-rationale.md, this file's section. (E123)
 export const LANE_FILES = [
     { key: "handoff", filename: "handoff.md", required: true },
     { key: "telemetry", filename: "telemetry.jsonl", required: false },
@@ -60,10 +22,10 @@ export const LANE_FILES = [
     { key: "tasks", filename: "tasks.md", required: false, noFlatCounterpart: true },
     { key: "baseSha", filename: "base-sha", required: false },
 ];
-// Registry key -> LanePaths field name. Keys only, never filenames (AC15 is
-// about filenames). Typed as a total Record over LaneFileKey, so adding a
-// LANE_FILES entry without a matching field here (and in LanePaths) is a
-// compile error rather than a silently missing path.
+// Registry key -> LanePaths field (resolveLanePaths' shape). Keys only, never
+// filenames (AC15 is about filenames). Typed as a total Record over
+// LaneFileKey, so adding a LANE_FILES entry without a matching field here
+// (and in LanePaths) is a compile error rather than a silently missing path.
 const LANE_PATH_FIELD = {
     handoff: "handoffPath",
     telemetry: "telemetryPath",
@@ -99,30 +61,17 @@ export const LEGACY_LANE = "_legacy";
 // (main, integ/*, fix/*, detached HEAD, no/unreadable .git). Returned ONLY by
 // the live resolver (resolveCurrentLane) — never by resolveLaneName.
 export const PRIMARY_LANE = "_primary";
-// Leading ticket-id token: letters, then one digit, then optional trailing
-// alphanumerics, terminated by "-" or end of string ("e163-ci-gate-ordering"
-// -> "e163", "e123a-lane-layout-migration" -> "e123a", "e123b0" -> "e123b0").
-// The single owner of the pattern: resolveLaneName and resolveCurrentLane
-// both use it. The captured set is [a-z0-9] only, so the result is always a
-// safe single path segment.
-// Exactly ONE mandatory digit, then [a-z0-9]*: writing `\d+[a-z0-9]*` would
-// let two adjacent quantifiers both claim a digit run, so a long digit
-// string with no terminator would backtrack quadratically. The accepted
-// language is identical (`\d+[a-z0-9]*` == `\d[a-z0-9]*`), and so is the
-// capture — both quantifiers are greedy and anchored by (?:-|$). (E123)
+// Leading ticket-id token ("e163-ci-gate-ordering" -> "e163", "e123b0" ->
+// "e123b0"), the single owner of the pattern; the capture is [a-z0-9] only,
+// so the result is a safe path segment. Exactly ONE mandatory digit: two
+// adjacent digit-claiming quantifiers would backtrack quadratically on a long
+// unterminated digit run, and the accepted language is identical. (E123)
 const TICKET_ID_RE = /^([a-z]+\d[a-z0-9]*)(?:-|$)/i;
 /**
- * Derive a lane name from a handoff's active_feature: the lowercased
- * leading ticket-id token, else LEGACY_LANE.
- *
- * The flat->lane migration does NOT use this — it targets the branch-based
- * live resolver instead. Kept exported for "what lane would this
- * active_feature imply" lookups; no production caller today.
- *
- * MUST NEVER return PRIMARY_LANE ("_primary") — the branch-based resolution
- * (feat/<id>-*) and its PRIMARY_LANE fallback belong to the LIVE resolver
- * (resolveCurrentLane below), not this function. Shares TICKET_ID_RE with
- * it. (E123)
+ * Derive a lane name from a handoff's active_feature: the lowercased leading
+ * ticket-id token, else LEGACY_LANE. MUST NEVER return PRIMARY_LANE; branch
+ * resolution belongs to resolveCurrentLane below. The flat->lane migration
+ * does not use this; kept for lookups, no production caller today. (E123)
  */
 export function resolveLaneName(activeFeature) {
     if (typeof activeFeature !== "string")
@@ -223,24 +172,21 @@ export function resolveLanePaths(workspacePath, lane) {
     return out;
 }
 /**
- * Per-lane handoff lock path:
- * `<workspacePath>/.current/<lane>/${HANDOFF_LOCK_FILENAME}`. The single
- * composer of the lock path: tools/lane-migrate.ts's runners use it for the
- * migration's destination lane, and a live writer (tools/handoff-write.ts)
- * uses it for the current branch's lane, so the migration and a
- * live writer of the SAME lane serialize on the SAME lockfile. Pure path
- * logic — does not create the lane directory; the lock acquirer does that
- * (withFileLock mkdirs the lock's parent before its O_EXCL open). (E123)
+ * Per-lane handoff lock path `.current/<lane>/${HANDOFF_LOCK_FILENAME}`, the
+ * single composer of it, so the migration runners and a live writer of the
+ * SAME lane serialize on the SAME lockfile. Pure path logic: the lock
+ * acquirer creates the lane directory. (E123)
  */
 export function resolveLaneLockPath(workspacePath, lane) {
     return path.join(resolveLaneDir(workspacePath, lane), HANDOFF_LOCK_FILENAME);
 }
-// `ref: refs/heads/<branch>` — the only HEAD shape that names a branch. A
-// detached HEAD is a bare sha and does not match.
+// `ref: refs/heads/<branch>` — the only HEAD shape that names a branch, so
+// the only one resolveCurrentLane maps to a lane. A detached HEAD is a bare
+// sha and does not match.
 const HEAD_REF_RE = /^ref:\s*refs\/heads\/(\S+)$/;
 const GITDIR_RE = /^gitdir:\s*(.+)$/;
 const FEAT_PREFIX = "feat/";
-// Locate the HEAD file for `workspacePath` by pure fs: `.git` directory ->
+// resolveCurrentLane's HEAD locator, by pure fs: `.git` directory ->
 // `.git/HEAD`; `.git` gitfile (`gitdir: <path>`, a linked worktree or
 // submodule) -> `<gitdir>/HEAD`, a relative gitdir resolved against the
 // workspace. Returns null for a missing `.git` or a malformed gitfile.
@@ -263,17 +209,11 @@ function headFilePath(workspacePath) {
     return path.join(path.resolve(workspacePath, gitdir), "HEAD");
 }
 /**
- * LIVE lane resolver: name the lane of the branch
- * currently checked out in `workspacePath`, by pure fs (no git subprocess, no
- * network — the tools/drift.ts precedent).
- *
- * `feat/<rest>` where `<rest>` starts with a ticket-id token -> the lowercased
- * id (`feat/e123b1-core-write-path` -> `e123b1`). Anything else — `main`,
- * `integ/*`, `fix/*`, a `feat/` branch with no id token, a detached HEAD, a
- * missing `.git`, an unreadable or malformed `.git`/HEAD — -> PRIMARY_LANE.
- *
- * NEVER throws. Production callers reach it through resolveCurrentLanePaths
- * (see the file header for the list). (E123)
+ * LIVE lane resolver, by pure fs (no git subprocess): `feat/<rest>` whose
+ * `<rest>` starts with a ticket-id token -> the lowercased id
+ * (`feat/e123b1-core-write-path` -> `e123b1`); anything else (main, integ/*,
+ * a feat/ branch with no id, detached HEAD, missing or malformed .git) ->
+ * PRIMARY_LANE. NEVER throws. (E123)
  */
 export function resolveCurrentLane(workspacePath) {
     try {
@@ -364,31 +304,12 @@ function readFileBytes(p) {
     }
 }
 /**
- * Every copy of one lane sidecar (`telemetry` / `metrics` / `usage` / ...)
- * a workspace's own `.current/` tree holds, deduplicated by CONTENT. Scope
- * is this workspace only — never a sibling worktree. (E123)
- *
- * Sources:
- *   live    `.current/<lane>/<file>` for each safe lane dir other than
- *           NON_LANE_DIRS;
- *   history `.current/history/<YYYY-MM>/<lane>/<file>` — two buckets holding
- *           the same lane name are distinct closures, both kept;
- *   flat    the legacy `.current/<file>`.
- *
- * Dedup (never by name alone — a long-lived lane such as `_primary` keeps
- * its live dir AND its history dirs):
- *   - a history copy of lane L is skipped iff isBytePrefix(history, live L)
- *     — a copy caught mid-move;
- *   - the flat file is skipped iff isBytePrefix(flat, X) for some counted
- *     lane copy X (live first, then history) — the shape an interrupted
- *     mergeSidecar leaves: `flat ++ lane` published at the lane path, flat
- *     not yet unlinked. Any lane is checked, not only the
- *     current branch's: the branch may have changed since the migration, and
- *     the lane may since have closed into history.
- * Empty files are never skipped (they contribute zero records either way).
- *
- * Strictly read-only; never throws — an unlistable dir or unreadable file is
- * simply not a source.
+ * Every copy of one lane sidecar in this workspace's own `.current/` tree
+ * (live lane dirs, `history/<YYYY-MM>/<lane>/`, legacy flat), deduplicated by
+ * CONTENT, never by name. A non-empty copy that is a byte prefix of its own
+ * lane's live copy (history) or of any counted live or history copy (flat) is
+ * a half-finished move or merge and is skipped. Read-only; never throws.
+ * Why: specs/e260b-rationale.md (this file's section)
  */
 export function enumerateLaneSidecarSources(workspacePath, key) {
     const filename = laneFile(key).filename;

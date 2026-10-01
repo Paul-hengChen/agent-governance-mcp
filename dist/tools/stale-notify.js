@@ -1,42 +1,10 @@
 // Coded by @sr-engineer
-// Stale-dispatch notify emit. (E22)
-//
-// The stale_dispatch advisory (tools/handoff-parse.ts) is pull-only: computed
-// at tw_get_state time, so nobody sees it until the next session reads state
-// — a long idle window can go entirely unnoticed. This module adds the
-// cheapest push channel: when the advisory fires AND the workspace has opted
-// in via `.current/.config.json`:
-//
-//   { "staleDispatchNotifyFile": ".current/stale-dispatch.notify" }
-//
-// the server writes the advisory payload to that watch-file. An EXTERNAL
-// watcher (fswatch / inotifywait / launchd → desktop notification, webhook,
-// anything) turns the mtime bump into a human-visible alert — the server
-// itself spawns no daemon, no timer thread, and owns no delivery mechanism
-// (watch-file emit ONLY).
-//
-// Semantics:
-//   - Key absent (the default) → fully disarmed, null return, zero behavior
-//     change. Opt-in per workspace, like the exemptions / auto-tier keys.
-//   - One emit per distinct stale dispatch: before writing, the prior file
-//     content is read back and the emit is SKIPPED when its
-//     (dispatched_at, role) pair matches the current advisory — a watcher
-//     fires once per threshold crossing, not on every subsequent
-//     tw_get_state of the same stale window. The watch-file itself carries
-//     this dedupe cursor; no new handoff state.
-//     A new dispatch (fresh dispatched_at stamp) re-arms naturally.
-//   - Payload: the advisory fields + workspace + emitted_at, pretty-printed
-//     JSON. Published atomically (tmp + rename, the atomicWriteConfig
-//     convention) so a watcher never reads a torn file. NOT schema-versioned:
-//     this is a transient signal file, not persisted governance state.
-//
-// Never throws (the tools/exemptions.ts posture): this sits on the
-// tw_get_state read path — the mandatory first action of every role in every
-// session. Every failure mode (unreadable config, unwritable path, corrupt
-// prior file) collapses to a loud `error` string in the returned outcome,
-// which the caller surfaces inside the stale_dispatch payload itself — never
-// a throw, never a blocked read. File-mode read path only, like the other
-// file-mode-only fields.
+// Push channel for the pull-only stale_dispatch advisory (E22): when it fires
+// and `.current/.config.json` sets `staleDispatchNotifyFile`, the payload is
+// written atomically to that watch-file for an external watcher to alert on.
+// Key absent = disarmed; one emit per distinct (dispatched_at, role). Never
+// throws, since it sits on the tw_get_state read path; failures become `error`.
+// Why: specs/e260b-rationale.md (tools/stale-notify.ts)
 import * as fs from "fs";
 import * as path from "path";
 import { getConfigError, loadConfig } from "./config.js";

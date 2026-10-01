@@ -1,32 +1,18 @@
 // Coded by @sr-engineer
-// Release-close success-metrics sidecar. One JSON line per SHIPPED feature,
-// appended to .current/metrics.jsonl at the release-engineer terminal-marker
-// write (see the single call site in tools/handoff-orchestrator.ts).
-// Observability, not authoritative state — deliberately NOT governed by the
-// handoff.ts 4-step mutating-tool contract. A stream and module fully
-// separate from tools/telemetry.ts's gate-fire telemetry.jsonl: disjoint key
-// sets, writers, and lifecycles, like the usage.jsonl / telemetry.jsonl
-// split. (E8)
+// Release-close success-metrics sidecar: one JSON line per SHIPPED feature in
+// the lane's metrics.jsonl, appended at the release-engineer terminal-marker
+// write (single call site in tools/handoff-orchestrator.ts). Observability,
+// not governed state, and separate from the gate-fire telemetry stream. (E8)
 
 import * as fs from "fs";
 import * as path from "path";
 import { enumerateLaneSidecarSources, resolveCurrentLanePaths } from "./lane-paths.js";
 
-// ROUND SEMANTICS — read before interpreting any *_rounds value. The three
-// round fields count REWORK ONLY: a QA FAIL, a code-reviewer
-// CHANGES_REQUESTED, a visual-round FAIL. That is the definition in
-// specs/e8-success-telemetry.md, and the counters this module reads
-// (transitions.ts computeNewRound) implement it exactly — a round that ends
-// APPROVED or PASS increments nothing. So a feature reviewed once and
-// approved on the first pass records `review_rounds: 0`, the same value as a
-// feature that was never reviewed at all: BY DESIGN, not an off-by-one. Read
-// these as "how much rework did it take", never as "how many rounds ran".
-// Two reasons the terminal round must NOT be folded in here: `one_pass` is
-// defined as all three being 0, so counting it would make one_pass
-// permanently false and destroy this record's headline metric; and this emit
-// site never sees a verdict (emitFeatureMetrics receives only the three
-// totals), so it cannot tell an APPROVED close from any other. A rounds-RUN
-// signal, if ever wanted, belongs in NEW fields alongside these. (E52, E85)
+// ROUND SEMANTICS: the three *_rounds fields count REWORK ONLY (QA FAIL,
+// CHANGES_REQUESTED, visual FAIL), so a review approved first time records
+// `review_rounds: 0`, the same as no review, by design. Read them as "how much
+// rework", never "how many rounds ran". Why the terminal round is not folded
+// in: specs/e260b-rationale.md (tools/metrics.ts). (E52, E85)
 export interface FeatureMetricRecord {
   ts: string; // ISO-8601 emit time == the release-close moment (DR-4)
   feature: string;
@@ -99,18 +85,10 @@ export function emitFeatureMetrics(args: {
       // unreadable package.json — record ships with released_version: null.
     }
 
-    // Idempotency guard: skip the append when a record with the same
-    // (feature, released_version) pair already exists. The PAIR is the key —
-    // released_version === null is a valid key value, NOT a wildcard, so a
-    // second null-version emit for the same feature is also deduped. An
-    // existing record with an absent/non-string released_version normalizes
-    // to null so it compares equal to a computed null. Defensive read: a
-    // missing file means "no existing records" so the append proceeds; a
-    // malformed line is skipped without crashing; and any failure of the read
-    // itself fails OPEN — fall through to append rather than drop a
-    // legitimate record — never throwing, per this module's contract.
-    // Resolved once per emit (one HEAD read), reused for the read + append.
-    // (E12)
+    // Idempotency: skip the append when a record with the same (feature,
+    // released_version) pair exists; null is a key value, not a wildcard, and
+    // an absent version normalizes to null. The read fails OPEN (append rather
+    // than drop a record) and never throws. Path resolved once per emit. (E12)
     const file = metricsPath(args.workspacePath);
     let alreadyEmitted = false;
     try {

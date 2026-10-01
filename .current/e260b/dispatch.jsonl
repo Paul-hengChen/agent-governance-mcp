@@ -1,0 +1,15 @@
+{"ts":"2026-10-01T04:17:00.940Z","feature":"e260b-tools-i-z","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-10-01T04:25:29.131Z","feature":"e260b-tools-i-z","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-01T04:39:17.653Z","feature":"e260b-tools-i-z","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-10-01T04:55:05.634Z","feature":"e260b-tools-i-z","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-10-01T04:56:04.027Z","feature":"e260b-tools-i-z","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-01T05:01:32.658Z","feature":"e260b-tools-i-z","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-01T05:11:05.457Z","feature":"e260b-tools-i-z","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-10-01T05:13:23.025Z","feature":"e260b-tools-i-z","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-01T05:46:36.178Z","feature":"e260b-tools-i-z","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-01T05:48:14.754Z","feature":"e260b-tools-i-z","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-10-01T05:48:49.767Z","feature":"e260b-tools-i-z","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-10-01T05:49:51.163Z","feature":"e260b-tools-i-z","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-01T05:51:01.975Z","feature":"e260b-tools-i-z","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-01T05:51:41.617Z","feature":"e260b-tools-i-z","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-10-01T05:56:13.265Z","feature":"e260b-tools-i-z","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}

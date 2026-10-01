@@ -1,21 +1,10 @@
 // Coded by @sr-engineer
-// Tool: tw_sync — reconcile tasks.md checkboxes to the server-authoritative
-// handoff.completed_tasks (handoff → tasks direction ONLY). v3.26.0 (R10).
-//
-// Background/parallel subagents + inline-coordinator execution can leave
-// tasks.md `[x]` checkboxes out of sync with the handoff ledger (a prior visual rollout:
-// handoff recorded T18–T35 completed while tasks.md T01–T26 stayed unflipped).
-// The state-machine assumes sequential single-context handoffs; this op is the
-// sanctioned reconcile for the drift those execution modes produce.
-//
-// SAFETY (load-bearing): tw_sync mirrors the AUTHORITATIVE ledger onto tasks.md.
-// It NEVER writes handoff, and it NEVER promotes a tasks.md-only `[x]` into the
-// handoff completed_tasks — doing so would bypass the qa-only PASS gate. Tasks
-// that are `[x]` in tasks.md but absent from handoff (vibe-coding drift) are
-// REPORTED, never reconciled. Because every id it flips is already in
-// handoff.completed_tasks (which only a qa-authorized PASS path could populate),
-// tw_sync needs no agent_id gate — it cannot create a completion that wasn't
-// already recorded.
+// Tool: tw_sync — reconcile tasks.md checkboxes to the authoritative
+// handoff.completed_tasks, handoff -> tasks ONLY. Parallel or inline execution
+// can leave `[x]` marks behind the ledger. It never writes handoff and never
+// promotes a tasks.md-only `[x]` (that would bypass the qa-only PASS path);
+// such rows are reported. Every id it flips is already recorded as complete,
+// so it needs no agent_id gate. Why: specs/e260b-rationale.md (tools/sync.ts)
 import { getActiveStorage } from "./storage.js";
 import { enforcePreFlight } from "../guards/session.js";
 function escapeRegExp(s) {

@@ -1,23 +1,10 @@
 // Coded by @sr-engineer
-// Per-dispatch token-usage accounting sidecar. Sibling module of
-// tools/telemetry.ts — same best-effort, lock-free, never-throw append
-// discipline, different concern. Records live in usage.jsonl, a SEPARATE
-// file from telemetry.jsonl; the two streams are told apart by their
-// disjoint key sets:
-//   usage.jsonl     → { ts, feature, dispatch, usage{…} }
-//   telemetry.jsonl → { ts, gate, error_code, agent_id, feature }
-// Writer: bin/agent-governance-usage-hook.mjs (PostToolUse hook on Task,
-// active only when config tokenBudgetPerFeature is set). Reader: the
-// coordinator's Token Budget Brake via sumUsageForFeature (feature-scoped).
-// Observability/accounting, not authoritative state — deliberately NOT
-// governed by the handoff.ts 4-step mutating-tool contract. (D2)
-//
-// LANE-AWARE: appendUsageRecord writes the CURRENT lane's
-// `.current/<lane>/usage.jsonl`; sumUsageForFeature sums every copy this
-// workspace's `.current/` tree holds (live lanes, closed history lanes, a
-// not-yet-migrated flat file) through tools/lane-paths.ts's
-// enumerateLaneSidecarSources — the same content-based dedup tw_gate_stats
-// applies, silently (a single number has no caveats channel). (E123)
+// Per-dispatch token-usage sidecar, the sibling of tools/telemetry.ts (same
+// best-effort, lock-free, never-throw append; disjoint key sets, separate
+// usage.jsonl). Writer: bin/agent-governance-usage-hook.mjs; reader:
+// sumUsageForFeature, summing every lane copy via tools/lane-paths.ts's
+// enumerateLaneSidecarSources dedup. Not authoritative state. (D2, E123)
+// Why: specs/e260b-rationale.md (tools/usage-accounting.ts)
 
 import * as fs from "fs";
 import * as path from "path";

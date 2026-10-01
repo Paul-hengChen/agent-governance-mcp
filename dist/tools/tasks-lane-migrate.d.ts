@@ -36,17 +36,13 @@ export declare function resolveTasksLedgerPath(workspacePath: string, laneTasksP
 /** The one-line option-A advisory (Copy `tasks.ignored-lane-advisory`), or null. */
 export declare function tasksLaneAdvisory(workspacePath: string): string | null;
 /**
- * CORE (architecture Interface Contracts): the caller MUST already hold
- * `${laneTasksPath}.lock`, where `laneTasksPath` is
- * `resolveCurrentLanePaths(ws).tasksPath` resolved ONCE by the caller (the
- * four tools/tasks-file.ts mutators, via withFileLock) — so the lock held
- * and the ledger written can never diverge. The lane is that path's parent
- * directory name. (Deviation from the blueprint's `(ws, lane)` signature:
- * spec AC1 routes every tools/ caller through resolveCurrentLanePaths.)
- * Takes only the inner legacy-file lock. Returns true iff THIS call wrote a
- * migration (R-1). No-op (false) when the lane ledger exists, no legacy file
- * exists, the lane path is git-ignored (AC4b), or there is nothing to move
- * (D13). Throws TasksLedgerAbsentError (AC6b) and TasksMigrationBusyError.
+ * CORE: the caller MUST hold `${laneTasksPath}.lock`, where `laneTasksPath` is
+ * `resolveCurrentLanePaths(ws).tasksPath` resolved ONCE by the caller, so the
+ * lock held and the ledger written never diverge (spec AC1 routes every caller
+ * through resolveCurrentLanePaths). Takes only the inner legacy-file lock.
+ * True iff THIS call migrated; false on an existing ledger, no legacy file, a
+ * git-ignored lane path or nothing to move. Throws TasksLedgerAbsentError and
+ * TasksMigrationBusyError.
  */
 export declare function ensureTasksMigratedLocked(workspacePath: string, laneTasksPath: string): boolean;
 /**
@@ -60,31 +56,20 @@ export declare function ensureTasksMigratedLocked(workspacePath: string, laneTas
 export declare function ensureTasksMigrated(workspacePath: string): boolean;
 /**
  * `_primary` reverse. Refuses, touching nothing, unless the legacy file is a
- * v2+ index carrying TASKS_INDEX_NOTICE AND the receipt's bodySha256 equals
- * primaryIndexReceiptSha(its trailing body) — or, for a receipt stamped
- * before index normalization existed, sha256 of that raw body. A missing or
- * unreadable receipt refuses too. Normalization allows exactly two root
- * edits after the forward run: removed `tasks_moved` markers and a `##
- * Closed Lanes` section; any other change refuses. (E125c, E195)
- * Then: legacy := v1 sentinel + the lane ledger's CURRENT body, minus the
- * ledger marker lines no longer in the root, with the root's Closed Lanes
- * section(s) carried to the end in place of the ledger's own, and
- * `.current/_primary/tasks.md` + the receipt are deleted. With no Closed
- * Lanes section on either side the ledger body is kept verbatim.
- * The restored root always carries a v1 sentinel, so a v0 (sentinel-less)
- * original, e.g. the `agc init` scaffold, round-trips to its body under a
- * v1 sentinel, not byte-identically.
+ * v2+ index with TASKS_INDEX_NOTICE whose body matches the receipt's
+ * bodySha256 (normalized by primaryIndexReceiptSha, or raw for an older
+ * receipt). Then legacy := v1 sentinel + the ledger's CURRENT body (see
+ * restoredPrimaryBody), and the ledger and receipt are deleted. A v0 original
+ * round-trips under a v1 sentinel, not byte-identically. (E125c, E195)
  */
 export declare function migratePrimaryReverse(workspacePath: string): void;
 /**
- * D-E feat reverse for `lane`. The lane's markers in the legacy file must be
- * runs 1..N in document order, every one carrying the same `of=<N>`, with
- * exactly N markers (C2: a missing LAST marker refuses too; missing /
- * duplicated / out-of-order / malformed refuses). The ledger's `## ` blocks are handed back in order:
- * each marker takes the next `sections=<n>` blocks; any leftover content
- * (sections added lane-locally) goes right after the last marker's run, or
- * at the end of the file when N = 0. The legacy sentinel line is kept
- * verbatim; the ledger is deleted.
+ * Feat reverse for `lane`. The lane's legacy-file markers must be runs 1..N
+ * in document order, all with the same `of=<N>` and exactly N of them
+ * (missing, duplicated, out-of-order or malformed refuses). Each marker takes
+ * back the ledger's next `sections=<n>` `## ` blocks; leftover lane-local
+ * sections go after the last run (or at EOF when N = 0). The legacy sentinel
+ * line is kept verbatim; the ledger is deleted.
  */
 export declare function migrateFeatReverse(workspacePath: string, lane: string): void;
 //# sourceMappingURL=tasks-lane-migrate.d.ts.map
