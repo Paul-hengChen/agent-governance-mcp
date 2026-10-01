@@ -379,8 +379,9 @@ function readFileBytes(p: string): Buffer | null {
 /**
  * Every copy of one lane sidecar in this workspace's own `.current/` tree
  * (live lane dirs, `history/<YYYY-MM>/<lane>/`, legacy flat), deduplicated by
- * CONTENT, never by name: a copy that is a byte prefix of a counted copy is a
- * half-finished move or merge and is skipped. Read-only; never throws.
+ * CONTENT, never by name. A non-empty copy that is a byte prefix of its own
+ * lane's live copy (history) or of any counted live or history copy (flat) is
+ * a half-finished move or merge and is skipped. Read-only; never throws.
  * Why: specs/e260b-rationale.md (this file's section)
  */
 export function enumerateLaneSidecarSources(

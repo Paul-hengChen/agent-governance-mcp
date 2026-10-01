@@ -112,3 +112,7 @@ Budget: at most 5 files and 300 changed lines per task. Baseline long-block line
 | T-E260B-09 | Close-out: run `npm run build`, commit rebuilt `dist/tools/{i..z}*`, fill the "Kept 8-20 line blocks" table (every remaining 8-20 block, `file:start-end` at final HEAD, one-line reason), run `measure-comments.mjs` and `check-invariance.mjs` (both exit 0), run AC5-AC7, AC10, AC11 greps, confirm `git status --porcelain` empty | 0 source (dist and spec only) | dist regenerated; spec about 60 |
 
 The final full-suite run (AC13) is qa's, on the final committed HEAD.
+
+## Amendment 1 (after PASS, integrator close-out to-lane#3)
+- **T-E260B-10**: fix review finding R1 (review_reports/review_T-E260B-01.md). The trimmed JSDoc on `enumerateLaneSidecarSources` in `tools/lane-paths.ts` says any copy that is a byte prefix of a counted copy is skipped. The code is narrower: empty files are never skipped, and a history copy is compared only against its own lane's live copy. Reword the comment to match the code (the reviewer's wording or equivalent), comment-only, at most 7 counted lines. AC1–AC14 still apply; in particular AC14 token counts must not change. Rebuild `dist/tools/lane-paths.*`. Remove R1 from the E260B-NEW-1 block in `.current/e260b/pending-tickets.md`; O1 and O3 stay.
+- Chain: sr-engineer (fable) → code-reviewer → qa-engineer on the new HEAD; final full suite on the final HEAD including the evidence commit.
