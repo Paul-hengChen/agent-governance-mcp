@@ -17,3 +17,15 @@ Self-test (every edit reverted with `git checkout` afterwards):
 | D | untracked `test/zz-new.test.mjs`, a blank line appended to `test/render-structure.test.mjs` | `scope: 3 bad path(s)` |
 | E | first line changed | `form: first line changed` |
 | F | a bare `// E123:` line and a home-directory path plus `git log` in a comment | `bare-id: 1`, `hygiene: 2 problem(s)` |
+
+## T-E260H-12 — rationale spec skeleton
+
+`specs/e260h-comment-rationale.md` created with the intro and the Retained blocks table; `node scripts/check-md-tables.mjs` reports 0 malformed tables.
+
+## Trim tasks
+
+One row per task; `proof` is `node .current/e260h/proof.mjs --changed-only` on the task's HEAD (cumulative over every file changed so far).
+
+| task | files | blocks of 8+ trimmed | retained 8–20 | proof |
+|---|---|---|---|---|
+| T-E260H-13 | `test/release-staging.test.mjs` base lines 1–1500 | 18 (header 36 lines, longest) | 0 | emit/leaves 0 differ; only part-B blocks left over 7 |
