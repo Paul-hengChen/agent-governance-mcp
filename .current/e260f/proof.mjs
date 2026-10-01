@@ -3,6 +3,7 @@
 // Usage, from the worktree root: node .current/e260f/proof.mjs [--base <rev>] [--changed-only] [--list-mid]
 //   --base          base revision (default: first line of .current/e260f/base-sha)
 //   --changed-only  run the >20 and bare-id checks on changed files only (per-task runs)
+//                   (cited-paths and width always look at the lines added since base)
 //   --list-mid      also print every 8-20 line block as `<file>:<line> <counted>`
 // Prints one line per check, then `proof: PASS` or `proof: FAIL (<checks>)`; exit 1 on FAIL.
 import { execFileSync } from "node:child_process";
@@ -16,7 +17,7 @@ const { analyzeText } = await import(new URL("../../dist/tools/comment-scan.js",
 
 const LANE_RE = /^test\/e[12][^/]*$/;
 const OWNED = [/^specs\/e260f-[^/]*$/, /^qa_reports\/[^/]*E260F[^/]*$/, /^review_reports\/[^/]*E260F[^/]*$/, /^\.current\/e260f\//];
-const BARE_ID_ID = String.raw`(?:(?:E|AC|DR|T-)[\w-]*\d|\(?e[0-9][a-z0-9-]*\)?)`;
+const BARE_ID_ID = String.raw`(?:(?:E|AC|DR|T-)[\w-]*\d[\w-]*|\(?e[0-9][a-z0-9-]*\)?)`;
 const BARE_ID = new RegExp(String.raw`^\s*(?:\/\/|\/\*|\*|#)[^A-Za-z0-9]*(?:${BARE_ID_ID}[^A-Za-z0-9]*)+$`);
 const DIRECTIVE = /@ts-(ignore|expect-error|nocheck|check)|eslint-(disable|enable)/;
 // Home-directory style absolute path, assembled from parts so this file carries no literal prefix.
@@ -143,6 +144,43 @@ if (flag("--list-mid")) {
   for (const m of mid) console.log(`  ${m}`);
 }
 report("bare-id", bare.length === 0, `bare-id: ${bare.length}`, bare);
+
+// cited-paths (AC8) and width (AC13): both look at the comment lines added or rewritten since base
+const tracked = new Set(lines(git("ls-files")));
+const isTracked = (p) => tracked.has(p) || [...tracked].some((t) => t.startsWith(p.endsWith("/") ? p : `${p}/`));
+const PATH_TOKEN = /\b(?:qa_reports|review_reports|specs|test|docs|tools|gates|lib|content|prompts|scripts)\/[\w@.*<>{}$/-]*[\w*/]/g;
+const added = []; // { f, n, text } comment lines present at HEAD that the diff adds
+for (const f of changed) {
+  const head = headText(f).split(/\r?\n/);
+  const kinds = analyzeText(headText(f)).lines;
+  for (const h of git("diff", "-U0", base, "--", f).split("\n")) {
+    const m = /^@@ -\S+ \+(\d+)(?:,(\d+))? @@/.exec(h);
+    if (!m) continue;
+    const start = Number(m[1]);
+    const count = m[2] === undefined ? 1 : Number(m[2]);
+    for (let n = start; n < start + count; n++) {
+      if (kinds[n - 1]?.kind === "comment") added.push({ f, n, text: head[n - 1] });
+    }
+  }
+}
+const badPaths = [];
+for (const { f, n, text } of added) {
+  for (const t of text.match(PATH_TOKEN) ?? []) {
+    if (/[*<>{}$]/.test(t)) continue; // glob or placeholder, not a literal path
+    if (!isTracked(t)) badPaths.push(`${f}:${n} ${t}`);
+  }
+}
+report("cited-paths", badPaths.length === 0, `cited-paths: ${badPaths.length} untracked`, badPaths);
+const widths = added.map((a) => a.text.length).sort((x, y) => x - y);
+const median = widths.length ? (widths[(widths.length - 1) >> 1] + widths[widths.length >> 1]) / 2 : 0;
+const maxW = widths.length ? widths[widths.length - 1] : 0;
+const wide = added.filter((a) => a.text.length > 120).map((a) => `${a.f}:${a.n} ${a.text.length}`);
+report(
+  "width",
+  wide.length === 0 && median <= 100,
+  `width: ${added.length} added comment lines, max ${maxW}${maxW <= 120 ? " <=120" : " >120"}, median ${median}${median <= 100 ? " <=100" : " >100"}`,
+  wide.length > 12 ? [...wide.slice(0, 12), `... ${wide.length - 12} more over 120`] : wide,
+);
 
 // form (AC9)
 const pinned = (text) => text.split(/\r?\n/).filter((l) => /^\s*(\/\*!|\/\/\/\s*<reference)/.test(l)).join("\n");
