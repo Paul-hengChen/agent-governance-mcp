@@ -1,5 +1,7 @@
 # Pending tickets — lane e260a
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E260A-NEW-1
 title: Comment trims leave tools/ files over agc check's 30% comment ratio, and some // file headers open with a first sentence over 80 columns
@@ -15,5 +17,3 @@ body: |
   Decide whether the Comment discipline summary rule covers // module headers and whether the ratio warning needs a follow-up trim.
   If both answers are yes, do it in one pass across all lanes' files after the E260 wave closes.
 ```
-
-## Applied
