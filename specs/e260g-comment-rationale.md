@@ -104,7 +104,7 @@ Config-side spec-to-test map (`CutApprovalAutoTier` in tools/config.ts). Tests a
 
 Content spec-to-test map (plain text-containment checks against the shipped content files, in the style of `test/e16-judge-dispatch-charter.test.mjs`; titles are `T-E5-01 content: ...`, `T-E5-02 content: ...`, `T-E5-03 content: ...`):
 
-- const-08 auto-tier bullet, trust rule plus same-write recording plus halt-over-threshold language: the four `T-E5-02 content: const-08 ...` tests ("trust rule", "SAME write", "HALTs exactly as today", "opt-in ... and advisory")
+- const-08 auto-tier bullet, trust rule plus same-write recording plus halt-over-threshold language: the five `T-E5-02 content: const-08 ...` tests ("trust rule", "SAME write", "HALTs exactly as today", "opt-in ... and advisory")
 - coord-03 Backlog Intake Loop present plus the never-auto-hop-to-release-engineer bound: "carries the Backlog Intake Loop section", "never auto-hops to release-engineer"
 - coord-07 SOP step 4a present plus the §2/§3.2 hard-floor sentence: "carries step 4a", "hard floor is never bypassed"
 
@@ -173,7 +173,7 @@ Spec: specs/d4-behavioral-eval-harness.md. The live runner (test/eval/run-eval.m
 
 ## test/feature-rollup.test.mjs
 
-Spec: specs/e113-feature-level-rollup.md (AC2-AC5). Test-title map (tests are titled `AC2: ...`, `AC3: ...`, `AC4: ...`, `AC5: ...`, `round-1 regression PIN: ...`; the `t-*` labels from the spec do not appear in the file): AC2 (seam and shape) is the three `AC2:` tests (SEAM FOR E132 marker, `localFallbackLaneList` export, substitute `LaneListProvider`); AC3 (multi-lane sum against the hop cap) is the `AC3:` test; AC3 plus the cross-feature regression is `round-1 regression PIN`; AC4 (an unreadable lane is carried, not dropped or zero-filled) is the two `AC4:` tests; AC5 (the ROLL-UP INCOMPLETE banner leads the output, degrade honestly) is the `AC5:` tests (zero matching lanes, unattributable lane, no bare total without the banner).
+Spec: specs/e113-feature-level-rollup.md (AC2-AC5). Test-title map (tests are titled `AC2: ...`, `AC3: ...`, `AC4: ...`, `AC5: ...`, `round-1 regression PIN: ...`; the `t-*` labels came from the old file header and do not appear in the file now): AC2 (seam and shape) is the three `AC2:` tests (SEAM FOR E132 marker, `localFallbackLaneList` export, substitute `LaneListProvider`); AC3 (multi-lane sum against the hop cap) is the `AC3:` test; AC3 plus the cross-feature regression is `round-1 regression PIN`; AC4 (an unreadable lane is carried, not dropped or zero-filled) is the two `AC4:` tests; AC5 (the ROLL-UP INCOMPLETE banner leads the output, degrade honestly) is the `AC5:` tests (zero matching lanes, unattributable lane, no bare total without the banner).
 
 The cross-feature regression is the most important test in the file. An earlier version summed every lane in the repo and reported `hop: 54, OVER BY 44` for a feature whose true total was 3; the fix is the `matchingLanes = lanes.filter(lane => lane.activeFeature === featureId)` filter in tools/feature-rollup.ts, and the test stops a future edit from silently dropping it.
 

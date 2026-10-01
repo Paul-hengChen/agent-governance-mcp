@@ -3,8 +3,7 @@
 // non-object or future-schema .current/.config.json: the tw_get_state pre-flight
 // read goes through it, so a throw there blocks every other call. getConfigError(ws)
 // reports the failure while defaults are served in place of an unusable config file.
-// Known and accepted: under a corrupt config the task-mutation tools ignore the custom
-// taskPaths/taskPattern (completeTaskInFile errors loudly, addTaskInFile writes the lane ledger).
+// Known and accepted: under a corrupt config the task-mutation tools ignore the custom taskPaths/taskPattern (completeTaskInFile errors loudly, addTaskInFile writes the lane ledger).
 // Rationale: specs/e260g-comment-rationale.md (test/e31-config-nonfatal.test.mjs).
 
 import { test } from "node:test";
