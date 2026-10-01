@@ -1,7 +1,7 @@
 # Fan-out: E260 縮減本 repo 既有的長註解
 base: e9a19f2    integration branch: integ/e260（第一波）；integ/e260-w2（第二波）；integ/e260i（第三波）
 
-**狀態：人類核准 2026-10-01；第一波已合併（`integ/e260`），第二波待派工。** 佇列 #81。人類已核准的切法：依目錄切 8 條只改註解的 lane，分兩波各 4 條（第一波原始碼、第二波測試），最後第三波 e260i 單獨做兩個 budget／結構測試檔。各波之間沒有檔案重疊，分波只為了控制同時進行的 lane 數，以及讓原始碼的 `dist/` 先穩定。
+**狀態：人類核准 2026-10-01；第一波已合併（`integ/e260`），第二波派工中。** 佇列 #81。人類已核准的切法：依目錄切 8 條只改註解的 lane，分兩波各 4 條（第一波原始碼、第二波測試），最後第三波 e260i 單獨做兩個 budget／結構測試檔。各波之間沒有檔案重疊，分波只為了控制同時進行的 lane 數，以及讓原始碼的 `dist/` 先穩定。
 
 ## 派工前核對（整合者，2026-10-01）
 - `git worktree list` 只有 primary；main = origin/main = `e9a19f2`（v4.4.0 已發版，`8ec02d2` 記帳，`e9a19f2` 開 E262）；工作樹乾淨；沒有殘留的 `feat/*`／`integ/*` branch。`tw_detect_drift` 無 drift（只有 T-REL4-02 的證據提示）。
@@ -117,6 +117,7 @@ base: e9a19f2    integration branch: integ/e260（第一波）；integ/e260-w2�
 | 2026-10-01 | 整合者 | e260b 第一次收工退回：review R1（`tools/lane-paths.ts` 的 `enumerateLaneSidecarSources` 文件註解被縮減後說得比程式寬）由 lane 自己修，第二波只改測試、無人能修；O1、O3（base 就已過時）留在 E260B-NEW-1 | 信箱 e260b to-lane#3 |
 | 2026-10-01 | 整合者 | 四條逐條核對通過：整合者自行比對去註解轉譯與 AST 葉節點（排除 JSDoc）皆與 base 相同；各在回報 HEAD 乾淨樹重跑全套 3043/3040/0/3；沒有 lane 刪掉 `@ts-*`／`eslint-*`／`__PURE__` 指令註解。依序 merge 進 `integ/e260`，零衝突 → 無合併審查；每次 merge 後 merge-invariants PASS；重建 `dist/` 無差異；整合層全套 3043/3040/0/3 | 本檔 |
 | 2026-10-01 | 整合者 | lane-status 的 e260b EVIDENCE MISMATCH（PM 重開後 handoff `completed_tasks` 只剩 T-10，磁碟上 10 份 PASS 證據、帳本 10/10）為 E150 類，證據齊全，接受不退回 | 本檔 |
+| 2026-10-01 | 整合者 | 第二波前提重新核對（main `97193e8`）：`test/` 自 base 起沒有任何變動，四條測試 lane 的量測與上表一字不差；刪掉 `test/` 所有純註解行後全套 3043/3040/0 → 沒有測試讀其他測試檔的註解，第二波沒有註解原文釘點；第一波的「不准出現」類檔案清單只掃原始碼目錄，不含 `test/`。帶給第二波的驗證腳本經驗：除了 `removeComments` 轉譯，也比對 AST 葉節點（排除 JSDoc），並確認沒有刪掉 `@ts-*`／`eslint-*` 指令註解 | 本檔 |
 
 ## 結案（第一波）
 - 日期 2026-10-01；合併 branch `integ/e260`（e260a `759c920` → e260b `c488ba7` → e260c `d4c7c8b` → e260d `8d7baa0`，皆 `--no-ff`）；例外：無衝突、無合併審查。
