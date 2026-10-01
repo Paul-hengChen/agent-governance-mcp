@@ -218,3 +218,23 @@ The handoff and SQLite history is the one listed under `test/skill-evolution-v3.
 ## test/watermark-check.test.mjs
 
 Spec-to-test map for `specs/subagent-watermark-parent-validation.md`: the `validateWatermark` contract (AC3) is covered by `t-present-correct`, `t-absent-appends`, `t-hyphen-treated-absent`, `t-wrong-name-treated-absent`, `t-wrong-tier-treated-absent`, `t-whitespace-tolerant`, `t-empty-reply` and `t-idempotent`; the required fixtures (AC5) are a subset of those; no regressions and a pure function (AC6) are `t-no-io-imports` and `t-buildWatermark-format`. The fixtures encode Decisions 2 and 3 of the spec.
+
+## test/qa-review-scoped-append.test.mjs
+
+A real write carrying `qa_review` used to append that text into the evidence file, or SQLite row, of every open task rather than only the reviewed one. Spec-to-test map for `specs/d9-qa-review-scoped-append.md`: AC1 (a FAIL with `review_task_ids=["T-X"]` touches only T-X) FM1 in file mode, SQ1 in SQLite mode; AC2 (a PASS with `completed_tasks` behaves as before) FM2, SQ2; AC3 (both empty gives `QA_REVIEW_TARGET_REQUIRED` and records nothing) FM3, SQ3; AC4 (with N open tasks exactly one evidence file or row changes) FM1 and SQ1, since the many-open-tasks shape that broke is the AC1 test. AC5 (the read side is untouched) is a design property checked in code review. The spec's Dependencies section allowed a new test file.
+
+## test/repro-first-gate.test.mjs
+
+Spec-to-test map for `specs/e2-bugfix-repro-gate.md`:
+
+| criterion | tests |
+|---|---|
+| AC1 default routing with no architect hop | none: chain and SOP mechanics, not server-enforced (the spec's Out of Scope) |
+| AC2 the gate blocks the fix-phase write | G1, G2 |
+| AC3 strict PASS is load-bearing in bugfix mode | the QA SOP wording (S3); the machine floor is `EXPECTED_RED_DIFF_MISSING`, covered in `test/gates-expected-red.test.mjs` |
+| AC4 opting back into the full chain (feature mode) | D6 |
+| AC5 feature-mode chains unchanged | G3 |
+| AC6 a clean rejection, never a silent skip or throw | G1 (message), G4 (the Blocked escape is never gated) |
+| `dispatch_mode` parse, emit and carry-forward | D1 to D6, Z1, M1 |
+| file mode only (SQLite ignores the field) | G5 |
+| SOP wording of the repro-first rule | S1, S2, S3 |

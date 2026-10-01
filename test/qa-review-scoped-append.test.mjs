@@ -1,28 +1,10 @@
 // Coded by @qa-engineer
-// Tests that a state write's qa_review text is recorded only against the
-// task(s) the write names, never copied into every open task's evidence.
-// Spec: specs/d9-qa-review-scoped-append.md, AC1 through AC4. (T-D9-05)
-//
-// Why a separate file: the defect is end-to-end orchestrator behaviour. A
-// real state write carrying qa_review used to append that text into the
-// evidence file (or SQLite row) of every open task, not just the reviewed
-// one (D8). test/reviewer-completed-tasks-gate.test.mjs covers the same
-// kind of bug (an orchestrator check keyed on parsed write arguments, run
-// through handleUpdateState against both storage backends), so this file
-// deliberately mirrors its structure and helpers. The spec's Dependencies
-// section allows a new file for this work.
-//
-// Spec-to-Test map:
-//   AC1 (FAIL + review_task_ids=["T-X"] touches ONLY T-X, file mode)  -> FM1
-//   AC1 (same, SQLite mode)                                          -> SQ1
-//   AC2 (PASS + completed_tasks back-compat unchanged, file mode)     -> FM2
-//   AC2 (same, SQLite mode)                                          -> SQ2
-//   AC3 (both empty -> QA_REVIEW_TARGET_REQUIRED, nothing recorded, file) -> FM3
-//   AC3 (same, SQLite mode)                                          -> SQ3
-//   AC4 (N open tasks, exactly 1 evidence file/row changes, file mode) -> FM1 (same test — the many-open-tasks shape that broke IS the AC1 test)
-//   AC4 (same, SQLite mode — exactly 1 reports row, not N)            -> SQ1
-//   AC5 (read side untouched) is a design property checked by code review,
-//     not exercised here. (review_reports/review_T-D9-01.md)
+// Tests that a write's qa_review text is recorded only against the task(s) the
+// write names, never copied into every open task's evidence
+// (specs/d9-qa-review-scoped-append.md AC1-AC4). The defect was end-to-end, so
+// this mirrors test/reviewer-completed-tasks-gate.test.mjs: handleUpdateState
+// against both storage backends.
+// Spec-to-test map: specs/e260h-comment-rationale.md (test/qa-review-scoped-append.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";

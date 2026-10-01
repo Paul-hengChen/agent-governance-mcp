@@ -1,26 +1,10 @@
 // Coded by @qa-engineer
-// Behavioral-eval harness: output-invariant checkers for model replies (D4, T-D4-03, spec AC-1..AC-5).
-//
-// Four pure functions that inspect a model reply string and return a
-// pass/fail verdict + human-readable reason, synchronously, with NO I/O and
-// NO network call (AC-1). These are the "cheap gate" the live runner
-// (test/eval/run-eval.mjs, T-D4-07) trusts on every scenario reply — but they
-// are trustworthy only because test/eval-assertions.test.mjs (T-D4-05)
-// exercises each one against a hand-written compliant + violating fixture
-// BEFORE any live API dollar is spent (AC-6).
-//
-// checkWatermark reuses validateWatermark from dist/lib/watermark-check.js
-// (the spec's reuse rule, AC-2) rather than re-implementing detection. validateWatermark is itself
-// built directly on WATERMARK_REGEX + buildWatermark (see that file), and it
-// is the EXACT function the coordinator/coordinator-lite SOPs call to
-// post-validate a relayed subagent reply — so importing it here is the
-// strongest form of "never disagree with the live post-validation path"
-// the reuse rule asks for (AC-2), not merely a partial reuse of the two lower-level exports.
-//
-// checkTerseCap and checkEscalationShape share one internal helper,
-// `extractEscalationCall`, so the "is this an escalation?" detection used by
-// the terse-cap carve-out (Constitution §1) and the shape check itself
-// (Constitution §3, Escalation call format) can never drift apart.
+// Behavioral-eval harness: four pure checkers for model replies (specs/d4-behavioral-eval-harness.md),
+// each returning a verdict and reason with no I/O. test/eval-assertions.test.mjs
+// proves each against compliant and violating fixtures before any paid run.
+// checkWatermark reuses validateWatermark, the function the coordinator SOPs use
+// to post-validate replies; checkTerseCap and checkEscalationShape share
+// `extractEscalationCall`, so their escalation detection cannot drift apart.
 
 import { validateWatermark } from "../../../dist/lib/watermark-check.js";
 

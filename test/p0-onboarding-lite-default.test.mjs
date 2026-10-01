@@ -1,16 +1,10 @@
 // Coded by @qa-engineer
 // Tests the onboarding path that defaults new workspaces to lite mode:
-// bin/agc-init.mjs scaffolding (T43), package.json bin wiring (T44),
-// and bin/agent-governance-context.mjs lite-default variant switching (T45).
-// The spec-to-test map was kept in the QA review for this work, not here.
-// (p0-onboarding-lite-default)
-//
-// AC1/AC2/AC3 pin that `agc init` does NOT write `.current/handoff.md`. A
-// seeded `pm:Not_Started` state has no outgoing ALLOWED_TRANSITIONS edge, so
-// a freshly initialised workspace could never make its first state write.
-// The only fresh-workspace key in the transition matrix is `null:null` (file
-// absent), so the first `pm:In_Progress` write creates the file through the
-// normal edge. (E34, T-E34-01)
+// bin/agc-init.mjs scaffolding, package.json bin wiring and the lite-default
+// variant in bin/agent-governance-context.mjs. AC1-AC3 pin that `agc init`
+// writes no `.current/handoff.md`: a seeded `pm:Not_Started` has no outgoing
+// edge, and only `null:null` (file absent) lets the first `pm:In_Progress`
+// write create it (E34).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -74,14 +68,10 @@ test("AC1: agc init creates .config.json + tasks.md with expected templates, no 
 });
 
 test("AC2: agc init leaves .config.json and tasks.md byte-for-byte unchanged on re-run of a FRESH init (re-pinned E34; scope narrowed by E100 — see companion below)", () => {
-  // This title's "byte-for-byte unchanged" claim holds ONLY for the
-  // fresh-init-then-rerun shape tested here: run 1 already writes
-  // "host": "claude-code" via configTemplate, so run 2 sees the host key and
-  // skips. It is NOT a general "re-run never touches .config.json" claim: a
-  // host-less config from an older init is deliberately CHANGED on re-run,
-  // which is the point of the upsert. The companion test below covers that
-  // case; without it this test's title would overstate what it checks.
-  // (E100, T-E100-01, T-E100-02)
+  // "Byte-for-byte unchanged" holds only for this fresh-init rerun: run 1
+  // already writes "host", so run 2 skips. An older host-less config is
+  // deliberately changed on rerun (the upsert, E100); the companion test below
+  // covers that case.
   const ws = mkTmp("agc-init-ac2-");
   assert.equal(runInit(ws).status, 0);
 
