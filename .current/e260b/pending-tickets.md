@@ -1,5 +1,7 @@
 # Pending tickets — lane e260b
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E260B-NEW-1
 title: Comment accuracy fixes in tools/i-z left after the E260 trim (one padded line, three comments stale since before E260)
@@ -16,5 +18,3 @@ body: |
   Each fix must keep the grep-pinned token counts (test/lane-paths, test/lane-migrate allow-lists)
   and stay comment-only.
 ```
-
-## Applied
