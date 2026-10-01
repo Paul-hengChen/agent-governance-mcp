@@ -2,6 +2,7 @@
 // Tests for specs/e114-cut-approval-inheritance.md. Test names carry the AC number. F1 and F2 pin two
 // review findings: a malformed write must not destroy a valid record (the preserve branch is
 // feature-scoped, not a blind keep), and 'inherited:' with only whitespace reads back undefined.
+// Rationale: specs/e260f-comment-rationale.md (test/e114-cut-approval-inheritance.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
