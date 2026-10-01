@@ -1,36 +1,10 @@
 // Coded by @qa-engineer
-// Tests for the role-boundary spec (specs/c16-c10-role-boundary.md, AC-3/AC-4, T-C16-05).
-//
-// Spec-to-Test map:
-//   reject non-empty completed_tasks on code-reviewer, file mode (AC-3 bullet 1) -> FM1
-//   the same rejection in SQLite/HTTP mode, storage-agnostic (AC-3 bullet 1, DR-5) -> SQ1
-//   the Phase-2 claim write, completed_tasks=[], stays unaffected, file mode (AC-3 bullet 2) -> FM2
-//   the same claim write stays unaffected in SQLite mode (AC-3 bullet 2) -> SQ2
-//   completed_tasks omitted entirely (zod default) through the full
-//     TOOL_REGISTRY dispatch, crash-safety per the code review finding
-//     from review_T-C16-01.md (AC-3 bullet 2) -> FM3
-//   the APPROVED row with agent_id=qa-engineer: the new gate does not
-//     fire; pre-existing MISSING_REVIEW_EVIDENCE still fires correctly —
-//     file mode (AC-3 bullet 3) — RE-PINNED after the gate-hardening amendment (e32-e33-gate-hardening):
-//     review scope now travels via review_task_ids, completed_tasks stays
-//     empty (a non-empty completed_tasks on this write would instead hit
-//     the amended QA_COMPLETION_EVIDENCE_MISSING gate first — see
-//     test/e18-write-provenance.test.mjs QAEV-4a/b and
-//     test/e32-e33-gate-hardening.test.mjs C2/P6a/P6b/P6c)
-//                                                          -> FM4, FM5
-//   the same APPROVED row in SQLite mode — unaffected by the amendment:
-//     QA_COMPLETION_EVIDENCE_MISSING is file-mode only, so SQ3 keeps the
-//     pre-amendment completed_tasks shape (AC-3 bullet 3)  -> SQ3
-//
-// WHY: the original incident (C16) was a code-reviewer write's `completed_tasks` field
-// polluting the handoff ledger with ids qa-engineer never actually completed
-// (the CHANGES_REQUESTED self-stamped row). The new REVIEWER_COMPLETED_TASKS_
-// REJECTED gate (tools/handoff-orchestrator.ts, sibling of
-// REVIEW_VERDICT_STATUS_MISMATCH) closes that class server-side. It is
-// deliberately storage-agnostic (keys only on parsed args, no
-// `instanceof FileHandoffStorage` guard) so it must fire identically whether
-// the active storage backend is file-mode or SQLite/HTTP — these tests pin
-// both backends rather than trusting the "no guard" code-read alone.
+// Tests for the role-boundary spec (specs/c16-c10-role-boundary.md, AC-3/AC-4).
+// A code-reviewer write once stamped ids into completed_tasks that qa-engineer
+// never completed; REVIEWER_COMPLETED_TASKS_REJECTED blocks that server-side. It
+// keys only on parsed args, so the tests pin file mode and SQLite mode alike.
+// Later sections widen the gate to every non-qa identity (E40).
+// Spec-to-test map: specs/e260h-comment-rationale.md (test/reviewer-completed-tasks-gate.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -163,18 +137,10 @@ test("FM3: tw_update_state with completed_tasks omitted defaults to [] (zod) and
 });
 
 // ---------------------------------------------------------------------------
-// The APPROVED row is untouched by the new
-// REVIEWER_COMPLETED_TASKS_REJECTED gate — it keys on agent_id, not on which
-// role authored the call (FM4 / FM5, AC-3 bullet 3). RE-PINNED after the gate-hardening amendment (e32-e33-gate-hardening):
-// review scope now travels via the transient review_task_ids field, with
-// completed_tasks staying EMPTY on this row (a non-empty completed_tasks
-// here would instead be caught by the amended QA_COMPLETION_EVIDENCE_MISSING
-// gate FIRST — see test/e18-write-provenance.test.mjs QAEV-4a). The
-// pre-existing MISSING_REVIEW_EVIDENCE gate downstream must still fire
-// correctly off review_task_ids (FM4: evidence absent -> rejected by
-// MISSING_REVIEW_EVIDENCE, NOT by the new gate) and clear when evidence
-// exists (FM5: positive control, proves the new gate is truly inert on this
-// path and that completed_tasks stays unpolluted).
+// FM4 / FM5: the APPROVED row (agent_id=qa-engineer) is untouched by the new
+// gate. Review scope travels in review_task_ids and completed_tasks stays empty
+// (a non-empty one would hit QA_COMPLETION_EVIDENCE_MISSING first). FM4: no
+// evidence -> MISSING_REVIEW_EVIDENCE; FM5: evidence present -> accepted.
 // ---------------------------------------------------------------------------
 
 test("FM4 (E32 amendment): qa-engineer APPROVED-row write with review_task_ids and NO review evidence is rejected by MISSING_REVIEW_EVIDENCE, not the new gate (file mode)", async () => {
@@ -232,41 +198,11 @@ test("FM5 (E32 amendment): qa-engineer APPROVED-row write with review_task_ids a
 });
 
 // ---------------------------------------------------------------------------
-// Additions below cover the widening of the gate to every non-qa identity
-// (ticket e40-nonqa-completed-tasks-write-gate, T-E40-03).
-//
-// Spec-to-test map (docs/backlog.md E40 row is the spec; no separate
-// specs/<feature>.md — mini-chain, PM/ARCH skipped, per scope_decision_why):
-//   the reviewer-only completed_tasks gate (above) generalized to every
-//   non-qa identity, rejecting with the NEW NON_QA_COMPLETED_TASKS_REJECTED
-//   code, while code-reviewer keeps the UNCHANGED REVIEWER_COMPLETED_TASKS_
-//   REJECTED envelope (proven byte-identical above, FM1/SQ1, untouched by
-//   this feature) and qa-engineer keeps the UNCHANGED E18/E32
-//   QA_COMPLETION_EVIDENCE_MISSING path (FM4/FM5/SQ3, also untouched)  ->
-//     one test per identity (FM6-FM11): sr-engineer, pm, architect, researcher,
-//     design-auditor, release-engineer
-//   the bypass itself — a non-qa write prefilling an id must now be
-//   rejected AT THE FIRST WRITE, not merely somewhere downstream, and the
-//   pre-existing QA_COMPLETION_EVIDENCE_MISSING set-difference gate must
-//   still be armed on a genuinely-new id afterward (proving E18/E32 was
-//   not loosened to compensate)                                        ->
-//     a file-mode test (BYPASS-FM) and a SQLite-mode test (BYPASS-SQL)
-//
-// TEST-DESIGN HAZARD (flagged forward by the code-reviewer,
-// review_reports/review_T-E40-01.md round 2): the widened step sits AFTER
-// AGENT_ID_REQUIRED, TRANSITION_REJECTED, and CUT_APPROVAL_REQUIRED in
-// UPDATE_STATE_GATE_PIPELINE. A per-role test that seeds an ILLEGAL
-// prev-tuple shadows on an earlier gate and passes for the WRONG reason —
-// concretely, seeding prev=pm:In_Progress (cut_approved unset) and then
-// writing agent_id="architect" would hit CUT_APPROVAL_REQUIRED, not this
-// gate; a raw agent_id="doc-writer" write would hit AGENT_ID_REQUIRED (not
-// even a real AgentName in tools/transitions.ts). Every FM6-FM11 case below
-// therefore seeds a LEGAL prev-tuple via the generic self-loop fast path
-// (validateTransition step 3: prev.agent === next.agent, both In_Progress —
-// accepted unconditionally, before the table lookup and before any of the
-// pm->{architect,sr-engineer}-pinned build-entry gates, none of which match
-// a same-agent self-loop) and asserts the SPECIFIC new error code, not
-// merely that the write failed.
+// The gate widened to every non-qa identity (E40): FM6-FM11 expect
+// NON_QA_COMPLETED_TASKS_REJECTED per role, and BYPASS-FM / BYPASS-SQL pin the
+// bypass. The gate sits after AGENT_ID_REQUIRED, TRANSITION_REJECTED and
+// CUT_APPROVAL_REQUIRED, so each case seeds a legal same-agent self-loop and
+// asserts the specific code; an illegal prev-tuple would fail on an earlier gate.
 // ---------------------------------------------------------------------------
 
 const NON_QA_SELF_LOOP_IDENTITIES = [
@@ -319,20 +255,11 @@ for (const [role, label] of NON_QA_SELF_LOOP_IDENTITIES) {
 }
 
 // ---------------------------------------------------------------------------
-// BYPASS-FM — the regression pin for the bypass itself (file mode). Mirrors
-// the exact incident shape the code-reviewer constructed end-to-end in
-// review_reports/review_T-E40-01.md ("WRITE1"/"WRITE2"): a non-qa write
-// prefills an id, then a qa-engineer PASS carries that SAME id with zero
-// qa_reports/ evidence anywhere on disk. Pre-E40, WRITE1 was accepted and
-// WRITE2 was ALSO accepted (the E18/E32 set-difference gate diffs against
-// the already-poisoned on-disk set, so the id contributes zero difference —
-// this is the bypass). This test asserts the fix lands at the correct
-// SITE: WRITE1 itself must fail with NON_QA_COMPLETED_TASKS_REJECTED (not
-// merely "the sequence fails somewhere"), the ledger must stay unpoisoned,
-// and — the control proving E18/E32 was not loosened to compensate — the
-// downstream qa-engineer write carrying the same never-persisted id must
-// still be caught by QA_COMPLETION_EVIDENCE_MISSING, because the id is now
-// genuinely new rather than already on disk.
+// BYPASS-FM (file mode): a non-qa write prefilled an id, then a qa-engineer
+// write carried the same id with no evidence and was accepted, because the
+// set-difference gate compared against the already-poisoned ledger. Now the
+// first write fails with NON_QA_COMPLETED_TASKS_REJECTED, the ledger stays
+// clean, and the qa-engineer write is still caught by QA_COMPLETION_EVIDENCE_MISSING.
 // ---------------------------------------------------------------------------
 
 test("BYPASS-FM: a non-qa prefill write is rejected AT THE FIRST WRITE; the downstream qa-engineer write carrying the same id is still caught by QA_COMPLETION_EVIDENCE_MISSING (file mode)", async () => {
@@ -394,21 +321,10 @@ test("BYPASS-FM: a non-qa prefill write is rejected AT THE FIRST WRITE; the down
   });
   assert.ok(!advance2.isError, `legitimate code-reviewer->qa-engineer advance must not be rejected; got: ${advance2.content?.[0]?.text}`);
 
-  // WRITE2 — the qa-engineer write carrying the SAME never-persisted id, with
-  // NO qa_reports/ evidence anywhere and deliberately NO qa_review field: a
-  // qa_review-bearing PASS/FAIL write auto-records its own evidence BEFORE
-  // the completion-evidence gate runs (QA_REVIEW_RECORD precedes
-  // QA_COMPLETION_EVIDENCE_MISSING in the pipeline, by design — a legitimate
-  // PASS/FAIL satisfies the gate with the evidence that same write just
-  // recorded), which would satisfy the gate for the wrong reason and prove
-  // nothing about the bypass. This mirrors the QAEV-4a shape in
-  // test/e18-write-provenance.test.mjs exactly (completed_tasks non-empty, no
-  // qa_review, no evidence pre-staged). Because WRITE1 never persisted the
-  // id, it is genuinely new from the E18/E32 gate's point of view, so it must
-  // be caught there — proving that gate is still armed and was not loosened
-  // or reordered to compensate for the new upstream gate.
-  // advance2 was ACCEPTED and stamped a fresh, wall-clock last_updated
-  // — force it safe before it becomes WRITE2's prevState (E148).
+  // WRITE2: the qa-engineer write with the same id, no evidence and no
+  // qa_review (a qa_review write records its own evidence first and would pass
+  // for the wrong reason). The id was never persisted, so the evidence gate
+  // must catch it. advance2 stamped a wall-clock last_updated; force it safe.
   forceSeedStamp(ws);
   resetSession(ws);
   markStateRead(ws);
@@ -594,17 +510,9 @@ sqliteDescribe("SQLite mode: REVIEWER_COMPLETED_TASKS_REJECTED gate matrix", () 
     }
   });
 
-  // BYPASS-SQL mirrors BYPASS-FM's WRITE1 half — the load-bearing claim that
-  // the widened gate rejects the prefill AT THE FIRST WRITE identically
-  // under SqliteHandoffStorage, "c16 keys only on parsed args" (T-E40-03).
-  // It does NOT replay BYPASS-FM's WRITE2 half: the downstream
-  // QA_COMPLETION_EVIDENCE_MISSING set-difference gate is explicitly
-  // FILE-MODE ONLY (content/const-08-chain-31-mid.md's QA Completion-
-  // Evidence row; tools/handoff-orchestrator.ts's `storage instanceof
-  // FileHandoffStorage` guard on that gate, pre-existing and untouched by
-  // this feature) — asserting it fires in SQLite mode here would assert a
-  // behavior the codebase documents as out of scope, not a real regression
-  // check.
+  // BYPASS-SQL replays only BYPASS-FM's first write: QA_COMPLETION_EVIDENCE_MISSING
+  // is file-mode only, so asserting the second half here would test behaviour
+  // the codebase documents as out of scope.
   test("BYPASS-SQL: a non-qa prefill write is rejected AT THE FIRST WRITE, ledger stays unpoisoned (SQLite mode)", async () => {
     const { dir, dbPath } = mkSqliteWorkspace("rctg-bypass-sql-");
     try {

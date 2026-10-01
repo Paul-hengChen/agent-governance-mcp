@@ -1,54 +1,10 @@
 // Coded by @qa-engineer
-// Tests for spec: specs/d5-server-side-stale-dispatch-detection.md (AC-1..AC-9)
-// + specs/d5-server-side-stale-dispatch-detection-architecture.md (DR-1..DR-8).
-// The qa-owned test deliverable from the architecture's Test Plan (T-D5-05).
-//
-// Spec-to-Test map:
-//   stamp persisted on dispatch, server-not-memory (AC-1)      -> T1, T1b
-//   staleness surfaced on read, not enforced on write (AC-2)   -> T4, T4b, T5, T6
-//   stamp clears/replaces on the dispatched role's write (AC-3)-> T3
-//   detection works from a completely fresh context (AC-4)     -> T4 (parseHandoff
-//                                                                  in-memory has
-//                                                                  no bearing on
-//                                                                  the read — the
-//                                                                  signal is
-//                                                                  derived purely
-//                                                                  from the raw
-//                                                                  hand-written
-//                                                                  fixture + wall
-//                                                                  clock, never
-//                                                                  from any prior
-//                                                                  write this
-//                                                                  process made)
-//   no false positive within the threshold window (AC-5)       -> T5, T5b (exact
-//                                                                  boundary)
-//   feature-scoped: no stale-dispatch bleed (AC-6)              -> T7
-//   existing next_role/hop_count/round-cap/dispatch_pins/cut_approved/
-//         external_refs semantics stay byte-identical (AC-8) -> T10 (full-suite
-//         cross-reference; every sibling *.test.mjs file in this repo continues
-//         to assert its own contract unmodified — see the note on T10 below)
-//   SQLite scope explicit + tested, file-mode-only (AC-9 / DR-5) -> T9
-//   v9→v10 migration, stamp-only, seeds nothing (AC-10 / DR-7)   -> T8
-//
-// WHY: the whole stale-dispatch mechanism is "coordinator-memory bookkeeping made durable" (D5).
-// The tests below deliberately never rely on in-process memory of a prior write
-// to prove the staleness signal — T4/T4b hand-write the fixture with `fs`
-// directly (no writeHandoffState call precedes the read), modeling the "fresh
-// coordinator session, post-compaction, no transcript" scenario AC-4 requires.
-//
-// Addendum: the single-owner extraction of the release-closing check. The
-// terminal-marker condition that gates/feature-lease.ts used to inline is now an exported predicate,
-// `isReleaseClosingWrite`, with exactly two call sites — isFeatureLeaseHeld
-// (pinned end-to-end at the lease layer by test/feature-lease.test.mjs,
-// including its opening-write non-regression case) and
-// the stale-dispatch advisory guard below at tools/handoff-parse.ts:503,
-// which is THIS file's layer. The E97-A* tests pin the exported predicate
-// directly (both disjuncts, plus the opening-write and ordinary-dispatch
-// negatives) so a future edit to the shared function is caught from BOTH
-// consumers, not just one — re-arming exactly the single-owner guarantee
-// that extraction exists to hold (E97, T-E97-01). The E97-B* tests pin the same shapes end-to-end
-// through readHandoffState, proving the wiring at handoff-parse.ts's guard
-// site, not just the predicate in isolation.
+// Tests for specs/d5-server-side-stale-dispatch-detection.md: the dispatch stamp
+// is persisted, staleness is surfaced on read and never enforced on write, and
+// detection works from a fresh context, so T4/T4b hand-write fixtures with `fs`
+// and rely on no in-process memory. The E97 tests pin isReleaseClosingWrite,
+// shared with the feature-lease gate, directly and through readHandoffState.
+// Spec-to-test map: specs/e260h-comment-rationale.md (test/stale-dispatch-detection.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -261,14 +217,10 @@ dispatched_at: "${staleStamp}"
 });
 
 test("T4b: the same signal fires identically whether the reading session has any prior memory of this workspace or not (AC-4, correct-by-construction)", () => {
-  // WHY: AC-4's actual claim isn't "the code path is X" — it's that TWO
-  // independent readers (a continuing session that dispatched moments ago and
-  // is now stale, vs. a session that has NEVER called tw_get_state on this
-  // workspace before) get byte-identical advisories, because the computation
-  // is a pure function of (next_role, dispatched_at, Date.now()) with no
-  // process-local cache or memoization. We simulate "no memory" by using a
-  // workspace this test process has never touched, and compare its output
-  // shape against T4's — same fields, same derivation, no special-cased path.
+  // Two readers, one that dispatched moments ago and one that never read this
+  // workspace, get identical advisories: the result is a pure function of
+  // (next_role, dispatched_at, Date.now()) with no cache. Uses an untouched
+  // workspace and compares its output with T4's.
   const ws = mkWs();
   const staleStamp = isoMinutesAgo(20);
   writeRaw(
@@ -697,16 +649,10 @@ dispatched_at: "${staleStamp}"
 });
 
 test('E97-B3 (C2, pinned as intended): a release-engineer -> pm write that is an ESCALATION rather than the closing write also suppresses stale_dispatch and the E22 watch-file emit — accepted strict-superset consequence, not a defect', () => {
-  // code-reviewer round 1 finding C2 (review_reports/review_T-E94-01.md):
-  // isReleaseClosingWrite's disjunct 1 (next_role === "pm") does not inspect
-  // pending_notes at all, so ANY release-engineer write that routes to pm
-  // with status In_Progress matches it — including a genuine escalation
-  // (e.g. an unresolved dependency-advisory STOP routed to pm) that is not
-  // actually "shipped". Narrowing the predicate here would recreate the
-  // two-owner divergence E97 exists to kill (the lease gate already treats
-  // this exact state as lease-released), so this is intentional, not a bug —
-  // this test exists to make the widening loud if it is ever narrowed back
-  // (which would be its own kind of regression) rather than silent.
+  // isReleaseClosingWrite matches any release-engineer -> pm In_Progress write,
+  // including an escalation that did not ship. That is intentional: narrowing
+  // it would recreate the two-owner divergence with the lease gate. This test
+  // makes a later narrowing loud.
   const ws = mkWs();
   resetSession();
   fs.writeFileSync(
@@ -789,13 +735,9 @@ sqliteDescribe("T9: SQLite storage never persists or surfaces dispatched_at/stal
 });
 
 // ============================================================================
-// Sanity cross-check — the version this suite targets, so a future
-// bump doesn't silently make the tests above assert against the wrong CURRENT
-// (the substantive regression guard, AC-8, is that every *OTHER* pre-existing
-// test file in this repo — dispatch-pins/handoff-versioning/handoff-migration/
-// schema-versions/cut-approval-gate/context-budget/drift-skew/skill-evolution
-// — continues to pass unmodified in its own semantics, re-baselined only for
-// the version-number/token-floor bump, never for a behavior change).
+// Sanity cross-check of the schema version this suite targets. The real
+// regression guard for AC-8 is that every other test file keeps passing with
+// unchanged semantics.
 // ============================================================================
 
 test("T10: sanity — CURRENT_VERSIONS.handoff is 15 (e123a-lane-layout-migration)", () => {

@@ -104,3 +104,43 @@ Footer cases: S01a (wrong path, visible), S01b (genuinely fresh), S02 (parse or 
 Map for `specs/d1-prompt-arg-workspace-fallback.md`: AC-1 (a non-path arg falls back) `t-d1-ac1`; AC-2 (an existing-dir arg is unchanged) is covered by the third fetch of the e2e de-dup test; AC-3 (path-shaped but missing) `t-d1-ac3`; AC-4 (the end-to-end repro) `t-d1-ac4`; AC-5 (absent arg unchanged) `t-d1-ac5` plus every earlier case with empty arguments.
 
 Map for the workspace normalization tests (AC2): bare `~`, `~/x`, a relative path and an absolute path (the contrast case), each its own `AC2/...` test. On POSIX `os.homedir()` reads `HOME`, so the tilde fixtures override it to a throwaway directory under the temp dir, never the developer's real home.
+
+## test/reviewer-completed-tasks-gate.test.mjs
+
+Spec-to-test map for `specs/c16-c10-role-boundary.md` AC-3:
+
+| behaviour | tests |
+|---|---|
+| a non-empty `completed_tasks` on a code-reviewer write is rejected, in file mode and in SQLite mode | FM1, SQ1 |
+| the Phase-2 claim write with `completed_tasks=[]` is unaffected, both modes | FM2, SQ2 |
+| `completed_tasks` omitted entirely (zod default) through the full `TOOL_REGISTRY` dispatch does not crash | FM3 |
+| the APPROVED row with `agent_id=qa-engineer`: the new gate does not fire and `MISSING_REVIEW_EVIDENCE` still does (file mode, re-pinned after the gate-hardening amendment so review scope travels in `review_task_ids`) | FM4, FM5 |
+| the same row in SQLite mode keeps the pre-amendment `completed_tasks` shape, because `QA_COMPLETION_EVIDENCE_MISSING` is file-mode only | SQ3 |
+| the gate widened to every non-qa identity (backlog row E40; the backlog row is the spec): `NON_QA_COMPLETED_TASKS_REJECTED` for sr-engineer, pm, architect, researcher, design-auditor and release-engineer, while code-reviewer keeps its unchanged envelope and qa-engineer keeps the evidence path | FM6 to FM11 |
+| the bypass: a non-qa prefill is rejected at the first write, and the evidence gate is still armed for the genuinely new id afterwards | BYPASS-FM, BYPASS-SQL |
+
+The gate is storage-agnostic on purpose: it reads only the parsed arguments, with no file-storage guard, so it must fire the same way on both backends, and the tests pin both rather than trusting a code read. The pipeline-order hazard behind the self-loop seeding was flagged by the code-reviewer of E40: seeding `pm:In_Progress` without `cut_approved` and writing as architect would hit `CUT_APPROVAL_REQUIRED`, and a `doc-writer` write would hit `AGENT_ID_REQUIRED`, since it is not an agent name in `tools/transitions.ts`. The self-loop is accepted before the table lookup and before every build-entry gate. The bypass shape is the code-reviewer's end-to-end reproduction; in the evidence step the qa_review-recording step runs before the completion-evidence gate by design, which is why WRITE2 carries no `qa_review`.
+
+## test/stale-dispatch-detection.test.mjs
+
+Spec-to-test map for `specs/d5-server-side-stale-dispatch-detection.md` and its architecture:
+
+| criterion | tests |
+|---|---|
+| AC-1 stamp persisted on dispatch, on the server rather than in memory | T1, T1b |
+| AC-2 staleness surfaced on read, not enforced on write | T4, T4b, T5, T6 |
+| AC-3 stamp cleared or replaced by the dispatched role's write | T3 |
+| AC-4 detection from a completely fresh context: the signal is derived from a hand-written fixture and the wall clock, never from a write this process made | T4 |
+| AC-5 no false positive within the threshold, including the exact boundary | T5, T5b |
+| AC-6 feature-scoped, no bleed | T7 |
+| AC-8 the other handoff semantics stay byte-identical (every sibling test file keeps passing unmodified) | T10 |
+| AC-9 SQLite scope explicit: file mode only | T9 |
+| AC-10 the v9 to v10 migration only stamps and seeds nothing | T8 |
+
+The mechanism makes coordinator-memory bookkeeping durable, which is why no test relies on in-process memory of an earlier write. `isReleaseClosingWrite` was extracted from the feature-lease gate so it has exactly two callers, `isFeatureLeaseHeld` (pinned in `test/feature-lease.test.mjs`) and the stale-dispatch advisory in `tools/handoff-parse.ts`; the E97-A tests pin the predicate itself and the E97-B tests pin the wiring through `readHandoffState`. The predicate's design is in `specs/e13-terminal-marker-advisory.md`.
+
+## test/skill-manifest.test.mjs
+
+Spec-to-test map for `specs/d6-host-capability-compose-axis.md`: AC1 (`taskTool:true` includes host fragments) `t-full-includes-host`, `t-golden-byte-identity`; AC2 (`taskTool:false` excludes them) `t-lean-excludes-host`, `t-lean-exact-core-concat`; AC3 (absent or unknown signal defaults to lean) `t-hostcaps-default-lean`, `t-buildPromptForRole-default-lean`; AC4 (segment shape reuse) `t-includeSkillSegment-pure`; AC5 (golden byte identity) `t-golden-byte-identity`; AC7 both host states, whole file. `composeSkill` precedence: a whole-file `.current/` override bypasses host filtering (`t-override-bypass-lean`, `t-override-bypass-full`); registry fragments are filtered by predicate (the AC1 and AC2 tests); an unsplit skill passes through whole (`t-unsplit-passthrough`, `t-switchRole-unsplit-host-independent`). An explicit config `host` wins over the in-server lean default (`t-config-host-precedence-*`); the hook's structural default is the caller's concern.
+
+Strip parity (backlog row E51, the backlog row is the spec): AC1 no marker in switchRole output for any role (`t-e51-switchRole-marker-free`, `t-e51-witness-fences-exist-in-source`); AC2 compose-golden fixtures byte-identical (`t-golden-byte-identity` and `test/compose-equivalence.test.mjs`; a differing fixture is a failure, never regenerated); AC3 strippers still importable from `build.js` (`t-e51-build-reexport-surface`); AC5 the hook path deliberately untouched (`t-e51-hook-remains-non-caller`); the shared-pass `fullDetail` contract, frontmatter surviving the strip and the whole-file override also stripped (`t-e51-applyTextTransforms-contract`, `t-e51-frontmatter-survives-strip`, `t-e51-override-is-stripped`).
