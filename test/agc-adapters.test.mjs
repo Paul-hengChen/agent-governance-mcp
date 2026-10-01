@@ -724,21 +724,9 @@ test("T-E100-03: CLAUDE.md adopter prose survives the atomic write on BOTH mutat
 // --- symlinked CLAUDE.md is now written THROUGH, not replaced (E102 R3-A) ---
 
 test("E102/R3-A: a symlinked CLAUDE.md is written through the link (fs.realpathSync resolves target before deriving tmpPath) — link, prose, and mode all survive", () => {
-  // Inverts the prior "KNOWN BEHAVIOUR (R3-A)" pin, which documented the
-  // pre-fix defect (fs.renameSync replacing the link itself with a detached
-  // regular file, leaving the canonical target stale forever). Decided by
-  // the human 2026-09-16 (docs/backlog.md E102 row / plan section 8
-  // decision E): symlinks ARE a supported layout, so this is no longer a
-  // documented limitation to leave undisturbed — it is a regression to
-  // catch. atomicWriteFile now resolves `target` via fs.realpathSync before
-  // deriving tmpPath, so renameSync lands on the CANONICAL path and the
-  // link is never touched. Verified end-to-end by code-reviewer round 1/2
-  // (review_reports/review_T-E102-01.md) against the real binary; this test
-  // makes that verification a standing, re-run-on-every-CI-build gate
-  // rather than a one-time manual observation, and it inverts cleanly: the
-  // old assertions (linkIsSymlink === false, canonicalStillHasOldBlock ===
-  // true) are now false by design, which is exactly what "pinned so a
-  // change here is deliberate, not silent" was for.
+  // Inverts the earlier KNOWN BEHAVIOUR (R3-A) pin: symlinks are a supported layout (human decision
+  // 2026-09-16, docs/backlog.md E102), so atomicWriteFile resolves the real path and the link is never replaced.
+  // More: specs/e260e-comment-rationale.md (agc-adapters.test.mjs).
   const ws = mkTmp("e102-symlink-through-");
   fs.mkdirSync(path.join(ws, "dotfiles"), { recursive: true });
   const canonical = path.join(ws, "dotfiles", "CLAUDE.md");
@@ -779,23 +767,10 @@ test("E102/R3-A: a symlinked CLAUDE.md is written through the link (fs.realpathS
 // --- dangling CLAUDE.md symlink is repaired, not left silently broken (E102, backlog 0f) ---
 
 test("E102/backlog-0f: agc init against a DANGLING CLAUDE.md symlink repairs it — exit 0, link preserved, canonical target created with the block (bin/agc-init.mjs:88-89)", () => {
-  // The dangling-symlink obligation (backlog row 0f), pinned against the shape
-  // code-reviewer verified end-to-end and named explicitly as pinnable
-  // (review_reports/review_T-E102-01.md round 2, "Note for qa"):
-  // fs.realpathSync(target) throws ENOENT on a dangling symlink, but no
-  // call site ever reaches atomicWriteFile with one — fs.existsSync(target)
-  // is false for a dangling symlink exactly as for a plain missing path, so
-  // writeClaudeBlock's `!existsSync` branch (bin/agc-init.mjs:88-89) fires
-  // first: fs.writeFileSync follows the dangling link and creates the
-  // canonical file, leaving the link itself intact. This discharges decision E's
-  // "fail-closed on a dangling symlink" point, end-to-end as a
-  // write-through REPAIR rather than a refusal — ratified by code-reviewer
-  // as "better but different, not a regression" (round 2 Architecture
-  // section) and relayed to the human as a divergence record, not an
-  // escalation. The realpathSync ENOENT catch inside atomicWriteFile itself
-  // is NOT exercised by this test — it is unreachable from every current
-  // call site and atomicWriteFile is not exported, so its "(dangling)"
-  // diagnostic string cannot be pinned through the public CLI surface.
+  // Dangling-symlink obligation (backlog row 0f): existsSync is false for a dangling link, so
+  // writeClaudeBlock's !existsSync branch writes through the link and creates the canonical file.
+  // atomicWriteFile's own ENOENT catch is unreachable from the public CLI surface.
+  // More: specs/e260e-comment-rationale.md (agc-adapters.test.mjs).
   const ws = mkTmp("e102-dangling-");
   fs.mkdirSync(path.join(ws, "dotfiles"), { recursive: true }); // parent dir exists; the file inside it does NOT -> the link is dangling, not doubly-broken
   const link = path.join(ws, "CLAUDE.md");
@@ -817,20 +792,9 @@ test("E102/backlog-0f: agc init against a DANGLING CLAUDE.md symlink repairs it 
 // --- a failed write strands no .tmp and leaves target + link intact (E102 R3-C) ---
 
 test("E102/R3-C: a failed write (read-only canonical directory) propagates the error and strands no .tmp, leaving the canonical file and the symlink untouched", () => {
-  // code-reviewer round 1 verified this fixture manually ("Read-only
-  // canonical dir (tmp never created) -> EACCES propagates, canonical
-  // unchanged, link intact, no stray file") as one of two failure
-  // branches of that guarantee; this pins it as an automated regression test. The other
-  // branch reviewer verified ("rename-fails-after-tmp-exists -> EISDIR
-  // propagates, tmp cleaned up") requires resolvedTarget to already be a
-  // directory at rename time while surviving an earlier
-  // fs.readFileSync(target, "utf-8") as text -- a contradiction at every
-  // current call site (writeClaudeBlock and upsertHostKey both read the
-  // target as text before atomicWriteFile is ever called), and
-  // atomicWriteFile is not exported for a direct unit-level test. That
-  // variant is therefore not reachable through the public CLI surface,
-  // same class of limitation as the unreachable "(dangling)" diagnostic
-  // noted in the dangling-symlink test above.
+  // Failure branch 1 of the write guarantee: a read-only canonical dir propagates the error, strands
+  // no .tmp, and leaves canonical file and link untouched. The rename-fails branch is unreachable via the CLI.
+  // More: specs/e260e-comment-rationale.md (agc-adapters.test.mjs).
   const ws = mkTmp("e102-failed-write-");
   fs.mkdirSync(path.join(ws, "dotfiles"), { recursive: true });
   const canonical = path.join(ws, "dotfiles", "CLAUDE.md");
@@ -884,15 +848,10 @@ test("E101: templates/agent-adapters/claude.md states the judge-dispatch obligat
 // --- dogfood payoff (the mechanism must actually pay off) -------------------
 
 test("E100 dogfood payoff: agc-init-written host:\"claude-code\" flows through to hostCapabilitiesFor().taskTool === true via the real loadConfig() pipeline", async () => {
-  // The QA gaps from all three review rounds converge on the same point:
-  // presence of the "host" key is the MECHANISM, not the acceptance — the
-  // acceptance is that the coordinator's host-tagged fragments actually
-  // render. prompts/skill-manifest.ts's own test suite (test/skill-manifest
-  // .test.mjs) thoroughly covers composeSkill given a synthetic
-  // hostCapabilitiesFor() result; what is untested anywhere else is the
-  // END of the pipeline that begins at `agc init` writing the real file on
-  // disk. This test closes that gap: real CLI write -> real loadConfig()
-  // read -> real hostCapabilitiesFor().
+  // Presence of the "host" key is the mechanism, not the acceptance: this closes the gap between
+  // `agc init` writing the real file and the coordinator's host-tagged fragments rendering
+  // (real CLI write -> real loadConfig() -> real hostCapabilitiesFor()).
+  // More: specs/e260e-comment-rationale.md (agc-adapters.test.mjs).
   const { loadConfig } = await import(path.join(PROJECT_ROOT, "dist", "tools", "config.js"));
   const { hostCapabilitiesFor, composeSkill } = await import(
     path.join(PROJECT_ROOT, "dist", "prompts", "skill-manifest.js")
@@ -928,24 +887,10 @@ test("E100 dogfood payoff: agc-init-written host:\"claude-code\" flows through t
 
 // --- research/ tracked-binary advisory (E104 prevention (c)) ----------------
 //
-// Two halves, per review_reports/review_T-E104-03.md (carried forward from
-// code-reviewer Round 1 and Round 2, unaddressed by sr-engineer/code-reviewer
-// by design — test authorship is qa-engineer's under Constitution §2):
-//
-//   (i)  a behavioural assertion on a fixture repo, including a non-ASCII
-//        filename — the exact case Round 1 found silently missed because
-//        `git ls-files` (no `-z`) C-quotes any non-ASCII path under git's
-//        default core.quotePath=true, so the $-anchored allowlist regex
-//        never matches the quoted line. A regression back to that shape
-//        would be silent without this case.
-//   (ii) a standing assertion that THIS repo has zero tracked binaries under
-//        research/ — the ratchet docs/backlog.md promises ("a clean ratchet
-//        that goes green on day one"). This must NOT be implemented via a
-//        naive `git ls-files` + `split("\n")` re-implementation, or it
-//        reintroduces the exact core.quotePath blind spot (i) closes while
-//        looking green — so it uses `-z` + NUL split here too, and reads
-//        the allowlist regex's literal text out of bin/agc-init.mjs (never
-//        retyped) so the two can never silently drift apart.
+// Two halves: (i) a fixture repo including a non-ASCII filename (git ls-files without -z C-quotes it
+// and the allowlist regex would miss it), (ii) a standing assertion that this repo tracks no research/
+// binaries, using -z + NUL split and the allowlist regex read out of bin/agc-init.mjs.
+// More: specs/e260e-comment-rationale.md (agc-adapters.test.mjs).
 
 test("E104(i): agc check warns on tracked binaries under research/, INCLUDING a non-ASCII (CJK) filename, and stays silent on a text decoy and on a nested out-of-pathspec binary", () => {
   // Contract: checkResearchBinaries() must catch the exact class of file
@@ -998,15 +943,9 @@ test("E104(i): agc check warns on tracked binaries under research/, INCLUDING a 
 });
 
 test("E104(ii): this repo has zero tracked binaries under research/ (the day-one-green ratchet), verified via -z + NUL split so the assertion itself cannot inherit the core.quotePath blind spot", () => {
-  // Contract: the ratchet docs/backlog.md promises is that THIS repo's own
-  // research/ tree carries zero files matching the binary allowlist, not
-  // merely that the CLI's warning logic works on a synthetic fixture (that
-  // is the fixture-based test's job). Implemented independently of checkResearchBinaries()
-  // itself so a future regression in the shipped check does not silently
-  // blind this assertion too — but still via `-z` + NUL split, matching the
-  // production implementation, per the explicit code-reviewer warning that
-  // a naive `git ls-files` + `split("\n")` re-implementation would
-  // reintroduce the exact non-ASCII blind spot the fixture-based test above exists to catch.
+  // Contract: THIS repo's research/ tree carries zero files matching the binary allowlist (the
+  // docs/backlog.md ratchet), checked independently of checkResearchBinaries() but via -z + NUL split.
+  // More: specs/e260e-comment-rationale.md (agc-adapters.test.mjs).
   const src = fs.readFileSync(AGC_INIT, "utf-8");
   const reLiteralMatch = src.match(/const RESEARCH_BINARY_RE = (\/.*\/i);/);
   assert.ok(
@@ -1034,29 +973,11 @@ test("E104(ii): this repo has zero tracked binaries under research/ (the day-one
   );
 });
 
-// --- Linked-worktree evidence advisory (bin/agc-init.mjs
-// checkWorktreeEvidence(), :497-706) (E111) -------------------------------
-//
-// This repo cannot reproduce the defect the advisory exists to catch — all
-// three evidence dirs (qa_reports/, review_reports/, specs/) are tracked
-// here with real content — so a FIXTURE is mandatory, exactly as the research/
-// tracked-binary advisory tests above did in this same file.
-//
-// The contract is the 23-row behaviour matrix in
-// review_reports/review_T-E111-01.md (round 3 is binding: it governs wherever
-// round 2's text conflicts). Per that round's explicit ruling: assert ONLY on
-// observable warn/silent stderr text + exit code, NEVER on which git
-// plumbing command fires — the ignore mechanism changed twice under
-// measurement during review (round 2's own suggested `git check-ignore -q
-// <dir>` was itself found broken against the linked-worktree fixture), so a test
-// grepping for `check-ignore` or `ls-files --others --ignored` would freeze
-// a mechanism this ticket exists to keep correctable.
-//
-// A "linked worktree" only exists once `.git` is a FILE (git's gitfile),
-// which requires a real primary repo plus `git worktree add` — a plain
-// `git init` temp dir (as the research/ advisory tests above use) has `.git` as a directory and is
-// silent by construction (isLinkedWorktree() returns false). That absence
-// of gitfile-ness is itself row P1 below.
+// --- Linked-worktree evidence advisory (bin/agc-init.mjs checkWorktreeEvidence()) (E111) ---
+// A fixture is mandatory: this repo tracks all three evidence dirs, so it cannot reproduce the
+// defect. The contract is the 23-row matrix in review_reports/review_T-E111-01.md (round 3
+// binding); assert only warn/silent stderr text and exit code, never which git command fires.
+// More: specs/e260e-comment-rationale.md (agc-adapters.test.mjs).
 
 function mkWorktreeFixture(prefix) {
   const primary = mkTmp(`${prefix}primary-`);
@@ -1083,14 +1004,9 @@ test("E111(i): agc check warns on a plain untracked real evidence dir inside a l
   fs.mkdirSync(path.join(worktree, "qa_reports"), { recursive: true });
   fs.writeFileSync(path.join(worktree, "qa_reports", "review_T1.md"), "evidence\n");
 
-  // W3: gitignored dir + force-added tracked .gitkeep + untracked real
-  // evidence sitting right next to it. Round 1's C1 hole: a directory-level
-  // membership test (`git ls-files -- rel`) sees the tracked .gitkeep and
-  // calls the whole directory "tracked", staying silent while real evidence
-  // sits untracked beside it. Round 2's own proposed fix (`git check-ignore
-  // -q` on the DIRECTORY) was itself measured broken on this exact shape in
-  // round 3 review — reopening C1 while claiming to close R2 — which is
-  // exactly why this test must never pin the plumbing, only the outcome.
+  // W3: gitignored dir + force-added tracked .gitkeep + untracked real evidence beside it: a
+  // directory-level membership test would stay silent. Pins the outcome, never the git plumbing.
+  // More: specs/e260e-comment-rationale.md (agc-adapters.test.mjs).
   fs.writeFileSync(path.join(worktree, ".gitignore"), "review_reports/\n");
   fs.mkdirSync(path.join(worktree, "review_reports"), { recursive: true });
   fs.writeFileSync(path.join(worktree, "review_reports", ".gitkeep"), "");
