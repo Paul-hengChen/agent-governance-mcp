@@ -220,3 +220,40 @@ I5 follows the convention of `test/cut-approval-gate.test.mjs` (S1, XS1): the ga
 ## test/handoff-migration.test.mjs
 
 Three in-body blocks were shortened; the comments now carry the contract and the cited spec holds the rest (`specs/server-scope-decision-gate.md`). The v6 to v10 test (AC-8/B8) lists every field that migration must not invent: next_role, resume_of, review_verdict, dispatch_pins, dispatched_at, dispatch_mode, evidence_schema, cut_approved_source, dispatch_mechanism and dispatch_mechanism_tier. The runner walks current to target stepwise, so the public API cannot isolate one intermediate step. The next_role/resume_of/review_verdict inverse test belongs to the c9-protocol-fields ticket (AC-3): these three are single-hop directives with the same lifetime as the pending_notes lines they replaced, so a stale `next_role: architect` from three writes ago must not linger.
+
+## test/hop-count-transitions.test.mjs
+
+Specs: `specs/d2-server-brake-accounting.md` (T-D2-05), `specs/e1-feature-scoped-state-design.md` (T-E1-05). Spec-to-test map:
+
+- AC-1, persisted and server-computed field: `t-compute-*`, `t-e2e-accumulate`.
+- AC-2, hop cap enforced server-side: `t-gate-*`, `t-e2e-cap-fires`.
+- AC-3, hop count resets per feature: `t-compute-feature-reset`, `t-gate-feature-bypass`, `t-e2e-feature-reset`.
+- AC-4, survives a coordinator crash or compaction: `t-crash-file`, `t-crash-sqlite`.
+- AC-8, the existing round caps are unchanged and take precedence over the hop-cap override: `t-precedence-*`.
+- DR-6, a pm landing does not reset hop_count: `t-compute-pm-no-reset`, `t-e2e-landing-no-reset`.
+- DR-9, increment only on role transitions: `t-compute-self-loop-holds`.
+
+Why: the hop counter is the one remaining cost-side circuit breaker (const-01 Limits, `hop` cap 10) that used to live only in the coordinator's in-memory arithmetic, exactly the failure a context compaction or crash could silently reset. It now uses the same persisted, server-enforced machinery as qa_round, review_round and visual_round; the tests pin that the sibling mechanism (a) computes correctly in isolation, (b) enforces the cap end to end through the real state-write orchestrator, and (c) survives a simulated crash by reconstructing purely from what is on disk or in SQLite.
+
+End-to-end climb: it bounces pm and sr-engineer through two real ALLOWED_TRANSITIONS rows (`pm:In_Progress` to sr-engineer, and back), so every write is a counted role transition (DR-9), none touches qa_round, review_round or visual_round (no FAIL or PASS in the sequence), and the file-mode CUT_APPROVAL_REQUIRED, SCOPE_DECISION_REQUIRED and EXTERNAL_REFS_UNRESOLVED build-entry gates stay quiet as long as every pm write carries `cut_approved: true` (those gates key on the previous pm write's attestation, and `cut_approved` re-arms to undefined on every bare PM re-entry).
+
+`backdateLastUpdated`: the feature lease rejects any write whose `active_feature` differs from the incumbent's while the incumbent is non-terminal (status not PASS) and fresh (`last_updated` within LEASE_TTL_MIN, 30 minutes). `t-e2e-feature-reset` writes a new feature over a still In_Progress incumbent, exactly the overwrite FEATURE_LEASE_HELD rejects, so the helper backdates the persisted `last_updated` past the TTL before the feature-change write, without altering the reset assertion.
+
+## test/lane-migrate.test.mjs
+
+Specs: `specs/e123a-lane-layout-migration.md` (AC6-AC10, AC15; tasks T-E123A3-05, T-E123A3-08). Spec-to-test map:
+
+- AC6, flat to lane full-fixture move, optional-file skip, never touches `.config.json`, `exemptions.json`, `tasks.md` or `feature-split.md`, derived from LANE_FILES: FL1, FL2, FL3.
+- AC7, a differing destination throws and both sides stay untouched: CONFLICT1, CONFLICT2 (bonus: identical-content resume).
+- AC8, lane to flat is the exact reverse and the empty lane dir is removed: REV1, REV2.
+- AC9, round trip byte-identical modulo schema_version: RT1.
+- AC10, unwired (zero callers outside the module's own test), later replaced by the AC3, AC12 and AC13 checks: CALLERS1.
+- AC15, moved plus skipped key count equals LANE_FILES.length on both runners: COUNT1, COUNT2.
+
+Shortened in-body blocks, with the detail that no longer sits next to the code:
+
+- Debris tolerance (AC5, ticket e123b8 J1): the three AC5-DEBRIS fixtures are AC5's own worked examples; REV3 already proves that any other non-LANE_FILES entry still refuses. AC5-DEBRIS4's lock-path case (ticket e123b9 J2): the per-lane lock now lives at `.current/<lane>/.handoff.lock`, the name the AC5-DEBRIS series probes.
+- base-sha (AC11, e125b, T-E125B-01): registering base-sha as a LANE_FILES entry is what lets a lane holding it reverse-migrate without refusing; RT1 already proves the full-fixture round trip byte-identical now that `seedAllFiveFiles` seeds it.
+- Wired through the lock-free cores (AC3, AC12, AC13, which replaced the AC10 unwired check; e123b9 J2): `writeHandoffStateCore` and `readHandoffState`'s non-blocking attempt call the core directly. The CALLERS scan excludes dist/ and test/ and matches `name(` so `migrateFlatToLaneLocked(` (see CALLERS-LOCKED) is not a hit.
+- `noFlatCounterpart` (specs e125a AC1 and AC2, architecture D1 and D2): OPTIONAL_FILENAMES and ALL_FILENAMES stay derived from the full registry so a future flat-movable entry is caught automatically; MOVABLE_FILENAMES mirrors the unexported MOVABLE_LANE_FILES filter in tools/lane-migrate.ts.
+- Sidecar merge (ticket e123b9, T-E123B9-05 (h)) and pendingTickets (ticket e179 AC10): pending-tickets.md is committed markdown, so concatenating two copies would yield two `## Applied` sections and duplicate lane_local_ids.
