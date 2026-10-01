@@ -15,3 +15,4 @@
 {"ts":"2026-10-01T09:49:41.805Z","feature":"e260g-test-e3-l-comment-trim","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-10-01T10:20:20.175Z","feature":"e260g-r3-fix","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-10-01T10:20:27.081Z","feature":"e260g-r3-fix","agent_id":"qa-engineer","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-01T10:27:14.209Z","feature":"e260g-r3-fix","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
