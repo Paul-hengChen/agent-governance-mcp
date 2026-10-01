@@ -1,50 +1,10 @@
 // Coded by @qa-engineer
-// Tests (T-E132-05) for tools/lane-registry.ts (specs/e132-lane-registry.md,
-// AC1-AC4, AC7-AC9) plus the tw_get_state wiring in tools/handoff-parse.ts.
-// AC5/AC6 (computeFeatureRollup-level hand-forward fixes) live in the
-// EXTENDED test/feature-rollup.test.mjs instead, per the dispatch brief's
-// file split.
-//
-// Spec-to-Test map:
-//   AC1 (laneRegistryList read-only)              -> "AC1: ..."
-//   AC2 (LaneListProvider + actually consumed)     -> "AC2: ..."
-//   AC3 (wired into tw_get_state, non-blocking)    -> "AC3: ..." (x2) + "gap-7: ..."
-//   AC4 (cost ceiling honored)                     -> "AC4: ..." + "gap-6: ..."
-//   AC7 (degrade-honestly for getLaneFeatureHistory) -> "AC7: ..." (x2)
-//   AC8 (no writable state)                        -> "AC8: ..."
-//   AC9 (build + boot safety)                      -> "AC9: ..." (boot-smoke half only;
-//        `npm run build` exit 0 is separately re-verified as part of QA's
-//        Phase 4 gate sequence, not re-run inside this unit test)
-//
-// code-reviewer's 12 qa gaps (review_reports/review_T-E132-04.md, round 1
-// :389 + round 2 :705) mapped into this file where they exercise
-// tools/lane-registry.ts or the tools/handoff-parse.ts wiring specifically:
-//   gap 4 (sharpest — getLaneRegistrySummary must SKIP the archive scan)
-//                                                   -> "gap-4 (sharpest): ..."
-//   gap 6 (AC4 ceiling measured end-to-end, N parseHandoff reads additive)
-//                                                   -> "gap-6: ..."
-//   gap 7 (both readHandoffState returns)          -> "gap-7: ..."
-// gaps 1, 2, 3, 5, 8, 9, 10, 11, 12 (localFallbackLaneList porcelain
-// parsing / computeFeatureRollup C3 combos / predicate parity) live in the
-// EXTENDED test/feature-rollup.test.mjs, since they exercise
-// tools/feature-rollup.ts directly.
-//
-// WHY fake `git` shims instead of mocking: this codebase's compiled output
-// is real ESM (package.json "type":"module", tsconfig "module":"NodeNext").
-// Empirically (verified live against this exact Node 22 install), `node:test`'s
-// `mock.method` cannot redefine `fs.readdirSync` or any other core-module
-// export ("Cannot redefine property") because ESM module-namespace bindings
-// are non-configurable — there is no way to intercept `execFileSync`/
-// `readdirSync` calls made inside the compiled dist/ modules from a sibling
-// test file. Per the dispatch brief's own steer ("prefer real fixtures over
-// mocks at the git/filesystem boundary"), every test below instead prepends
-// a tiny real, executable `git` shim script onto PATH — a real subprocess,
-// a real read of real files — rather than intercepting an in-process call.
-// AC1/AC2/AC3's "2+ real worktrees" fixtures use REAL temp directories with
-// REAL `.current/handoff.md` files (via the production writeHandoffState
-// path), never synthetic LaneInfo objects — only the git-porcelain layer
-// itself is shimmed, since real `git worktree list` cannot be pointed at
-// arbitrary unrelated directories.
+// Tests for tools/lane-registry.ts (specs/e132-lane-registry.md AC1-AC4, AC7-AC9) plus the
+// tw_get_state wiring in tools/handoff-parse.ts. AC5/AC6 and the localFallbackLaneList /
+// computeFeatureRollup cases live in test/feature-rollup.test.mjs. Case names carry the
+// spec AC or the code-reviewer gap number (gap-4, gap-6, gap-7;
+// review_reports/archive/e115-join-precondition-check/review_T-E132-04.md).
+// Rationale: specs/e260f-comment-rationale.md (test/e132-lane-registry.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -86,21 +46,10 @@ async function write(ws, opts) {
   });
 }
 
-/** A real, executable `git` that always `cat`s a fixed, JS-controlled byte
- *  sequence — lets a test dictate the EXACT porcelain bytes (including CRLF)
- *  without any shell-escaping hazard, since the content is written to a data
- *  file by Node itself and the shim just echoes it verbatim.
- *
- *  Warms the shim up with one throwaway invocation before returning: the
- *  FIRST exec of a brand-new script path measurably costs 200ms+ in this
- *  sandboxed dev environment (confirmed empirically — a cold spawn of a
- *  freshly-written, freshly-chmod'd shell script consistently took
- *  ~200-220ms here, vs ~10ms once the exact same path had been executed
- *  once already), which would make every "should complete within the
- *  spec's 200ms ceiling" test in this file flake on first exec through no
- *  fault of the code under test. This warm-up is a test-environment
- *  accommodation only — it exercises the exact same shim a real test then
- *  measures, so it changes nothing about what's being asserted. */
+/** A real, executable `git` that `cat`s a fixed JS-controlled byte sequence, so a test
+ *  dictates the exact porcelain bytes (including CRLF) with no shell-escaping hazard. Warms
+ *  the shim up with one throwaway call before returning: the first exec of a new script path
+ *  costs 200ms+ in this sandbox and would flake the 200ms-ceiling tests. */
 function fakeGitCat(content) {
   const binDir = fs.mkdtempSync(path.join(os.tmpdir(), "e132-fakegit-"));
   const dataPath = path.join(binDir, "porcelain.txt");
@@ -154,14 +103,10 @@ function withPath(binDir, fn) {
   }
 }
 
-// getLaneFeatureHistory no longer reads .current/archive/ at all — it scans
-// live .current/<lane>/handoff.md plus closed
-// .current/history/<YYYY-MM>/<lane>/handoff.md (e123b9 J2, spec AC7 redefined).
-// The lane-close move that would POPULATE .current/history/ automatically is a
-// later ticket's job (out of scope for the spec) — tests that need a "closed
-// lane" fixture construct the directory directly, exactly as the spec's proof
-// text prescribes ("fixture with one live lane + two closed lanes across two
-// different YYYY-MM history buckets").
+// getLaneFeatureHistory scans live .current/<lane>/handoff.md plus closed
+// .current/history/<YYYY-MM>/<lane>/handoff.md (e123b9 J2, spec AC7); it no longer reads
+// .current/archive/. Closed-lane fixtures are built directly, as the spec's proof text
+// prescribes (one live lane + two closed lanes across two history buckets).
 function writeHistoryLaneFixture(ws, yyyymm, lane, activeFeature, lastUpdated = "2026-01-01T00:00:00.000Z") {
   const dir = path.join(ws, ".current", "history", yyyymm, lane);
   fs.mkdirSync(dir, { recursive: true });
@@ -382,19 +327,11 @@ test("AC4: getLaneRegistrySummary never blocks or throws — returns null within
   assert.ok(elapsed < 2000, `expected to return well within the ceiling (git sleeps 5s), took ${elapsed}ms`);
 });
 
-// gap-6: the 200ms figure bounds only the git subprocess — the N per-lane
-// parseHandoff reads riding on top are additive and NOT counted against it.
-//
-// WHY padded completedTasks + min-of-3 trials: on this machine, tiny real
-// handoff.md files are cached/parsed so fast (single-digit ms even at 25+
-// lanes — measured empirically) that scheduler jitter alone can invert a
-// single-shot small-vs-large comparison (observed live: a bare N=2-vs-25
-// version of this test flaked ~4/15 runs). Padding completedTasks makes each
-// lane's real parseHandoff work (regex + markdown-list parse over the
-// Completed section) heavy enough to produce a reliable, order-of-magnitude
-// separation instead of a few-millisecond one; taking the min of 3 trials
-// per side absorbs one-off scheduling spikes rather than trusting a single
-// sample. This changes only the fixture's *size*, not what's being proven.
+// gap-6: the 200ms figure bounds only the git subprocess; the N per-lane parseHandoff reads
+// on top are additive and not counted against it. Padded completedTasks + min-of-3 trials:
+// tiny handoff files parse so fast that jitter alone flaked a bare 2-vs-25 comparison
+// (~4/15 runs); padding makes each lane's parse heavy enough for an order-of-magnitude gap,
+// and min-of-3 absorbs scheduling spikes. Only the fixture size changes.
 test("gap-6: the ceiling bounds only the git subprocess — per-lane parseHandoff reads are additive on top of it (elapsed time scales with sibling-lane count, not flat)", async () => {
   const PADDING_TASKS = Array.from({ length: 8000 }, (_, i) => `T-PADDING-${i}`);
 
@@ -441,16 +378,11 @@ test("gap-6: the ceiling bounds only the git subprocess — per-lane parseHandof
   );
 });
 
-// gap-4 (sharpest reviewer gap, still open after both review rounds):
-// getLaneRegistrySummary must SKIP the lane-history scan entirely — the whole
-// justification for having a second entry point rather than reusing
-// laneRegistryList. Proven behaviorally (real sentinel + timing contrast),
-// never via source-text inspection. The lane-history scan moved from
-// .current/archive/ to .current/history/<YYYY-MM>/ (e123b9 J2, spec AC7), so
-// the sentinel is now a large history bucket (many closed-lane
-// subdirectories): the old archive directory no longer costs laneRegistryList
-// anything and can't serve as the contrast fixture; the history bucket is the
-// new expensive-to-scan target.
+// gap-4 (sharpest): getLaneRegistrySummary must SKIP the lane-history scan entirely; that
+// is the whole reason for a second entry point beside laneRegistryList. Proven
+// behaviourally (real sentinel + timing contrast), never by source-text inspection. The
+// sentinel is a large .current/history/<YYYY-MM>/ bucket of closed-lane subdirectories
+// (e123b9 J2, spec AC7), the new expensive-to-scan target.
 test("gap-4 (sharpest): getLaneRegistrySummary skips the lane-history scan entirely — laneRegistryList (the OTHER entry point) does not", async () => {
   const wsPlain = mkWs();
   await write(wsPlain, { activeFeature: "gap4-plain", hopCount: 1 });
@@ -458,20 +390,11 @@ test("gap-4 (sharpest): getLaneRegistrySummary skips the lane-history scan entir
   const wsSentinel = mkWs();
   await write(wsSentinel, { activeFeature: "gap4-sentinel", hopCount: 1 });
 
-  // Plant a LARGE, real, parseable .current/history/<YYYY-MM>/ bucket as the
-  // sentinel — a real fixture, not a mock (node:test's mock.method cannot
-  // intercept fs.readdirSync from a compiled ESM module — see file header).
-  // If getLaneRegistrySummary ever performed a lane-history scan (readdirSync
-  // + statSync + readFileSync + yaml.load per closed-lane subdir, same as
-  // getLaneFeatureHistory), its wall-clock time would necessarily grow with
-  // subdir count — exactly like laneRegistryList's below. It must not: that
-  // is the entire justification for this function existing as a second
-  // entry point (tools/lane-registry.ts module header).
-  // 3000 (not a smaller count): empirically, a smaller sentinel (1500) gave
-  // margins as tight as ~2.5x between the two entry points on this machine
-  // (page cache makes a freshly-written history bucket deceptively fast to
-  // scan), which flaked under load. 3000 subdirs consistently produced a
-  // 9-14x margin across repeated runs — a much safer separation from noise.
+  // Plant a LARGE, real, parseable history bucket as the sentinel (a real fixture;
+  // mock.method cannot intercept fs from compiled ESM). A history scan would grow
+  // wall-clock with subdir count, as laneRegistryList's does below; getLaneRegistrySummary
+  // must not. 3000 subdirs, not 1500: 1500 gave margins as tight as ~2.5x (page cache makes
+  // fresh buckets fast to scan) and flaked; 3000 gave 9-14x.
   const SENTINEL_FILE_COUNT = 3000;
   for (let i = 0; i < SENTINEL_FILE_COUNT; i++) {
     writeHistoryLaneFixture(wsSentinel, "2026-01", `lane-${i}`, `gap4-sentinel-history-${i}`);
@@ -629,16 +552,12 @@ test("AC7-FLATARCHIVE1 (e123b9 J2 — REDEFINED): a flat .current/archive/*.md-o
   );
 });
 
-// ============================================================================
-// getLaneFeatureHistory also merges each lane dir's metrics.jsonl
-// {feature, ts} rows (readMetricsEntries), recovering a long-lived lane's
-// (e.g. _primary) SHIPPED predecessors that active_feature overwrote in place
-// (e125b spec AC5, J2-NEW-4). Test-file placement note: the ticket named
-// test/lane-registry-feature-history.test.mjs (extend), but no file with
-// that name exists in this repo — the real, pre-existing getLaneFeatureHistory
-// coverage above already lives in THIS file, so this extension is placed
-// alongside it rather than forking a same-purpose file under a different name.
-// ============================================================================
+// =============================================================================
+// getLaneFeatureHistory also merges each lane dir's metrics.jsonl {feature, ts} rows
+// (readMetricsEntries), recovering a long-lived lane's (e.g. _primary) shipped predecessors
+// that active_feature overwrote in place (e125b spec AC5, J2-NEW-4). Placed in this file
+// because the extension file the ticket named does not exist and the existing coverage
+// lives here. =============================================================================
 
 function writeMetricsFixture(ws, lane, rows) {
   const dir = path.join(ws, ".current", lane);
@@ -740,11 +659,9 @@ test("AC8: tools/lane-registry.ts performs no fs writes — no call to fs.write*
 // ============================================================================
 // AC9 — build + boot safety for the new three-module import cycle
 // ============================================================================
-// `npm run build` exiting 0 is verified separately as part of QA's own
-// Phase 4 gate sequence (re-running the full build here would duplicate that
-// top-level step); this test covers the boot-smoke half specifically named
-// by the spec's AC9 proof line — a TDZ/circular-import failure surfaces at
-// boot, not in unit tests.
+// `npm run build` exit 0 is verified in QA's Phase 4 gate, not re-run here; this covers the
+// boot-smoke half of AC9 (a TDZ/circular-import failure surfaces at boot, not in unit
+// tests).
 
 test("AC9: dist/index.js boots cleanly with the new lane-registry import cycle — \"online\" appears on stderr, no thrown error", async () => {
   await new Promise((resolve, reject) => {

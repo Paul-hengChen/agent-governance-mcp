@@ -1,40 +1,10 @@
 // Coded by @qa-engineer
-// Tests (T-E178B-04) for `lane-status --watch` (tools/lane-status.ts
-// runLaneWatch + helpers, scripts/lane-status.mjs routing), per
-// specs/e178b-lane-watch-tooling.md decisions (a)-(f), (j), AC1-AC9 and the
-// watch half of the cut pre-review check, AC15. AC10-AC14 live in
-// test/e178b-cut-prereview.test.mjs. AC20 (build + full suite on a clean
-// committed tree) is recorded in qa_reports/review_T-E178B-04.md after the
-// commit, per docs/lane-protocol.md §3 — there is no in-file assertion for it.
-//
-// WHY the watch exists: the mailbox watch only wakes when a lane WRITES, so a
-// lane that skips a protocol step (Wave 7.1 e212: PM straight to a qa hop, no
-// cut sent) stays invisible. The watch's contract is therefore about never
-// losing an event: every watched-field transition prints exactly one line
-// (and nothing else prints one), a lane that breaks or leaves is SAID rather
-// than dropped, and a transition landing between two watches still fires
-// after the re-arm because the re-arm command carries fingerprints of the
-// states this watch LAST READ (the same rule the mailbox watch follows;
-// decision (d), mailbox-watch AC16).
-//
-// Harness: runLaneWatch is driven in-process with an injected lane-list
-// provider, handoff reader and io (fake clock whose sleep() advances time and
-// runs a per-sleep hook that mutates lane state between ticks). This keeps
-// every test deterministic and fast — the exit-3 expiry path never waits out
-// a real deadline (AC9). Only AC7's no-git proof and AC9's end-to-end run use
-// real subprocesses.
-//
-// Spec-to-Test map:
-//   AC1  -> "AC1 baseline on start"
-//   AC2  -> "AC2 transition line", "AC2 non-watched field silent"
-//   AC3  -> "AC3 degrade honestly"
-//   AC4  -> "AC4 expiry and re-arm command"
-//   AC5  -> "AC5 re-arm round trip"
-//   AC6  -> "AC6 argument rules"
-//   AC7  -> "AC7 tick reads only list + handoff"
-//   AC8  -> "AC8 constants parity"
-//   AC9  -> "AC9 script end to end"
-//   AC15 -> "AC15 prereview transition"
+// Tests (T-E178B-04) for `lane-status --watch` (tools/lane-status.ts runLaneWatch,
+// scripts/lane-status.mjs routing), specs/e178b-lane-watch-tooling.md decisions (a)-(f), (j),
+// AC1-AC9 and AC15 (AC10-AC14: test/e178b-cut-prereview.test.mjs; AC20 is recorded in
+// qa_reports/archive/release-v4.0.0/review_T-E178B-04.md). Contract: never lose an event,
+// every watched-field transition prints exactly one line. Case names carry the AC.
+// Rationale: specs/e260f-comment-rationale.md (test/e178b-lane-watch.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";

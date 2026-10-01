@@ -1,70 +1,10 @@
 // Coded by @qa-engineer
-// Tests for the state-render injection fix (E122, docs/backlog.md) — prompts/build.ts's
-// sanitizeForRender() / STRUCTURAL_MARKER_RE / STATE_BLOCK_DATA_NOTICE, added
-// to close the "state render injection" hole: buildPromptForRole used to
-// JSON.stringify(state, null, 2) the LIVE handoff state verbatim into every
-// dispatch prompt, so any free-text field a role writes (pending_notes,
-// blocking_reason, scope_decision_why, dispatch_pins values, external_refs[].ref
-// — in principle any string leaf the schema carries) reached the NEXT role's
-// context unfiltered, and a role that happened to quote a real markdown
-// structural marker (a task-row checkbox, a numbered SOP step header) in its
-// own prose produced text indistinguishable, to a structural scanner, from
-// AUTHORED SOP/task-list content.
-//
-// WHY A NEW HERMETIC FILE (dispatch instruction, review_reports/review_T-E122-01.md
-// "FOR QA" note): test/render-structure.test.mjs covers this fix only
-// INCIDENTALLY — it renders buildPromptForRole against THIS repo's own live
-// `.current/handoff.md`, so its one relevant assertion (0 glue findings on the
-// live dispatch text) reds without the fix only while this repo's own
-// pending_notes happens to carry a quoted structural marker. The moment
-// pending_notes changes (e.g. this very feature's PASS write), that witness
-// passes with or without sanitizeForRender — a green count that proves
-// nothing durable. Every test below builds its OWN isolated workspace
-// (os.tmpdir() fixture, the same idiom test/dispatch-pins.test.mjs uses) with
-// hand-authored handoff state, so it is independent of what this repo's live
-// handoff.md happens to contain on any given day.
-//
-// NOT RE-TESTED HERE (already covered, and out of this ticket's bounds):
-//   - test/render-structure.test.mjs's own detector soundness (ffa4082
-//     baseline, cross-SOP sweep) — unchanged, untouched by this fix.
-//   - content/** — the fix only touches the render boundary; no content/ fragment changed (E122).
-//
-// Spec-to-Test map (backlog row is the spec — mini-chain, no specs/<feature>.md
-// per the dispatch's design-pass note; review_reports/review_T-E122-01.md is
-// the review that established these properties):
-//   marker regex is the byte-identical union of the detector's two regexes
-//     (review "Correctness" #1)                          -> "regex union pin"
-//   strictly additive transform (nothing deleted/reordered/truncated)
-//     (review "Correctness" #2, "Quality" idempotence note)
-//                                                          -> "additive invariant"
-//   adversarial marker shapes get neutralized                -> "marker coverage"
-//   already-quoted markers accumulate a second pair (cosmetic,
-//     accepted, not a regression; NEW-11)                 -> "pre-quoted marker"
-//   deep clone: no caller mutation, nested object/array leaves, non-string
-//     leaves preserved (review "Correctness" #3)           -> "deep clone / leaf shapes"
-//   golden-capture separator constraint (review "Security" positive finding)
-//                                                          -> "separator ordering"
-//   injection half deliberately NOT closed; must not silently pass as closed
-//     (NEW-8)                                              -> "NEW-8 (accepted, not a bug)"
-//
-// KNOWN, ACCEPTED, NOT TESTED HERE (see review_reports/review_T-E122-01.md and
-// this feature's qa_review write for the full accounting):
-//   - null-leaf guard (build.ts:123's `value &&` check) and the cycle-guard /
-//     non-plain-leaf branches (NEW-9/NEW-10) are LATENT and UNREACHABLE through
-//     any real parse path: tools/handoff-parse.ts's `asString` coercion turns
-//     every scalar into a real string (never a bare `null`), and
-//     parseDispatchPins (handoff-parse.ts:152) drops any non-string pin value
-//     outright — confirmed by reading both, not assumed. sanitizeForRender
-//     itself is NOT exported by prompts/build.ts (verified: `grep -n "^export"
-//     prompts/build.ts` — module-private), so it cannot be unit-tested in
-//     isolation without either an export (sr-engineer's file, out of qa
-//     scope this cut) or hand-copying its implementation into this test file
-//     (which would test a COPY, not the shipped code — the exact vacuous-test
-//     failure mode this file exists to avoid). This mirrors the code
-//     reviewer's own characterization of the adjacent cycle-guard finding:
-//     latent, not reachable, not a regression. Every property below is
-//     therefore pinned through the REAL public entry point
-//     (buildPromptForRole), against a real (if synthetic) parsed HandoffState.
+// Tests for the state-render injection fix: sanitizeForRender / STRUCTURAL_MARKER_RE /
+// STATE_BLOCK_DATA_NOTICE in prompts/build.ts. Free-text handoff fields (pending_notes,
+// blocking_reason, ...) used to reach the next role's prompt verbatim, so a quoted
+// structural marker looked authored. sanitizeForRender is module-private, so each property
+// is pinned through the public buildPromptForRole.
+// Rationale: specs/e260f-comment-rationale.md (test/e122-state-render-injection.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -109,14 +49,9 @@ function render(ws, skillFile = "skill-qa-engineer.md") {
   return buildPromptForRole(skillFile, "probe", ws, false).messages[0].content.text;
 }
 
-// The additive-transform invariant (review_reports/review_T-E122-01.md
-// "Correctness" #2): sanitizeForRender may only INSERT backtick characters —
-// it may never delete, reorder, or substitute anything else. Stripping every
-// backtick from both the rendered value and the original raw value must
-// therefore always yield the identical string, regardless of whether the
-// original already contained backticks of its own (the pre-quoted-marker
-// case below). This is a stronger, exact pin of "strictly additive" than a
-// qualitative read — it holds byte-for-byte or the test fails.
+// Additive invariant: sanitizeForRender may only insert backticks. Stripping every backtick
+// from the rendered and the original value must yield identical strings, even when the
+// original already held backticks. Exact, byte for byte, not a qualitative read.
 function assertAdditiveOnly(renderedValue, originalValue, label) {
   assert.equal(
     renderedValue.split("`").join(""),
@@ -125,17 +60,9 @@ function assertAdditiveOnly(renderedValue, originalValue, label) {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Property: the marker regex is the detector's own union, byte-identical.
-// (review_reports/review_T-E122-01.md "Correctness" #1 — "the single most
-// important correctness property of the change... if either side drifts,
-// coverage silently develops a hole.")
-//
-// Extracted from the LIVE source text of both files (not hand-copied
-// literals) so this test keeps pinning the real relationship even if either
-// file's regex is edited later — a hand-transcribed copy would silently stop
-// being the thing it claims to guard the moment either side changed.
-// ---------------------------------------------------------------------------
+// Property: the marker regex is the detector's own union, byte-identical. Both regexes are
+// extracted from the live source text, not hand-copied, so the pin keeps guarding the real
+// relationship; if either side drifts, coverage silently develops a hole.
 
 function extractRegexLiteral(sourceText, constName) {
   const re = new RegExp(`const ${constName} = (/(?:\\\\/|[^/\\n])+/[a-z]*);`);
@@ -162,15 +89,10 @@ test("regex union pin: STRUCTURAL_MARKER_RE (build.ts) is byte-identical to NUMH
   assert.equal(structural.flags, "g", "sanitizer regex must be global (it is used with .replace across the whole string)");
 });
 
-// ---------------------------------------------------------------------------
-// Fixture: one rich synthetic HandoffState exercising every leaf shape named
-// in the dispatch — adversarial markers, a pre-quoted marker, nested object
-// (dispatch_pins), array of objects (external_refs), array of strings
-// (completed_tasks / pending_notes), and non-string leaves (numbers,
-// booleans). Built once per test via writeHandoffState (the real write path,
-// not hand-authored YAML) so the fixture is a real, schema-valid
-// HandoffState, then rendered through the real buildPromptForRole call site.
-// ---------------------------------------------------------------------------
+// Fixture: one synthetic HandoffState covering adversarial markers, a pre-quoted marker, a
+// nested object (dispatch_pins), an array of objects (external_refs), arrays of strings,
+// and non-string leaves. Built via writeHandoffState so it is schema-valid, then rendered
+// through buildPromptForRole.
 
 const NOTE_NUMHEADER = "step 7b. **Drift-baseline acknowledgment**";
 const NOTE_BULLET_BOLD = "- **Foo** happened";
@@ -329,17 +251,11 @@ test("NEW-8 (accepted, not a bug): imperative prose with no markdown structural 
   const ws = await buildFixture();
   const state = extractStateBlock(render(ws));
 
-  // This is the exact property review_reports/review_T-E122-01.md's
-  // "Security" section demonstrates and files as NEW-8: STRUCTURAL_MARKER_RE
-  // matches markdown structure only, so a note with no markdown-shaped
-  // fragment in it renders byte-for-byte untouched, instruction-shaped
-  // language included. Per the coordinator's recorded scope decision
-  // (handoff pending_notes, this feature) this is EXPECTED and ACCEPTED —
-  // this fix closes the structural symptom, not the injection surface (E122) — so this
-  // test asserts the current (accepted) behaviour, not a defect. If this
-  // assertion ever starts failing because some future change starts
-  // rewriting plain imperative prose, that is a signal the mitigation
-  // strategy changed, not that this test is broken.
+  // Accepted limit: STRUCTURAL_MARKER_RE matches markdown structure only, so a note with no
+  // markdown-shaped fragment renders byte-for-byte untouched, instruction-shaped language
+  // included. The fix closes the structural symptom, not the injection surface, so this
+  // asserts the accepted behaviour. If it ever fails because plain imperative prose starts
+  // being rewritten, the mitigation strategy changed.
   const idx = state.pending_notes.indexOf(NOTE_INJECTION);
   assert.notEqual(idx, -1, "the injection-shaped note must be present in pending_notes");
   assert.equal(state.pending_notes[idx], NOTE_INJECTION, "prose with no structural marker shape must render byte-for-byte unmodified (NEW-8, mitigated-not-closed, not this ticket's job to fix)");

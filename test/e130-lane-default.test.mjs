@@ -1,48 +1,10 @@
 // Coded by @qa-engineer
-// Tests that the shipped wording makes the per-feature worktree lane the default
-// working path (spec: specs/e130-lane-default.md; E130, E199, E198(b);
-// lane e130-lane-default). Content-assertion tests, independent of the
-// sr-engineer/code-reviewer claims in review_reports/review_T-E130-09.md —
-// these read the shipped prose (and, for AC1, the real composer's output)
-// directly.
-//
-// Spec-to-Test map:
-//   AC1  (coord-03 Feature-Scope Gate: exactly 3 trigger lines, (a) before
-//         (b), (b) names "Complexity Scope Gate" by heading, no file:line
-//         pointer in the composed content)              -> t-ac1-*
-//   AC3  (cwd-reset rule self-contained, no docs/ path,
-//         chain-runs-in-lane sentence)                   -> t-ac3-*
-//   AC4  (default path invokes `agc feature start`, disclaims a new
-//         bootstrap, one-sentence refusal path; zero bin/tools/scripts diff) -> t-ac4-*
-//   AC5  (rule's scope: universal but conditional, self-limiting because the
-//         Complexity Scope Gate is)                      -> t-ac5-*
-//   AC6  (Worktree bootstrap obligation: symlink needed ONLY when untracked;
-//         tracked-evidence repo carries evidence via lane branch commits)    -> t-ac6-*
-//   AC7  (pre-v3.20.0 sentence relocated into the Fallback paragraph)        -> t-ac7-*
-//   AC8  (const-15 Document Priority: verbatim reported-data paragraph)      -> t-ac8-*
-//   AC9  (const-05 hand-edit rule: stale bootstrapping-exemption clause
-//         removed)                                       -> t-ac9-*
-//   AC10 (coord-01 Split Table: equal `order` = parallel)                   -> t-ac10-*
-//   AC11 (skill-release-engineer step 8a: `.current/_primary/tasks.md`
-//         staged in both the git-add list and the PATHS= pre-filter, plus
-//         the Artifact allowlist bullet)                  -> t-ac11-*
-//   AC14 (scope containment: every changed path since 121ddc8 matches an
-//         owned glob, zero forbidden paths)                -> t-ac14-*
-//   (AC2, AC12, AC13 are pinned by pre-existing suites per the spec's own
-//    proof: lines — test/feature-lease.test.mjs, test/release-staging.test.mjs,
-//    test/context-budget.test.mjs/render-structure.test.mjs/skill-manifest.test.mjs
-//    — and are not duplicated here.)
-//
-// WHY: this is a prose-only content lane (no executable code path touched
-// outside content/**), so the contract under test is that the shipped
-// WORDING actually encodes the approved decisions (the ruling that trigger (a)
-// is checked before trigger (b), the decision on how to handle the cwd-reset
-// problem (E127), the release-staging fix (E198(b))) — not that some code compiles.
-// A plausible-sounding paraphrase that silently drops the ordering, the refusal path,
-// or the tracked-evidence carve-out would defeat the point of the fix while still "reading fine" on
-// a skim; these tests pin the load-bearing phrases and their relative order
-// so a future edit that regresses the wording fails CI instead of shipping
-// quietly.
+// Content-assertion tests that the shipped wording makes the per-feature worktree lane the
+// default working path (specs/e130-lane-default.md; E130, E199, E198(b)). They read the
+// shipped prose (and, for AC1, the real composer's output) directly, pinning the load-bearing
+// phrases and their order so a paraphrase that drops one fails CI. Case names are prefixed
+// AC<N>; AC2, AC12 and AC13 are pinned by pre-existing suites.
+// Rationale: specs/e260f-comment-rationale.md (test/e130-lane-default.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -65,18 +27,12 @@ const CONST_05 = fs.readFileSync(path.join(ROOT, "content", "const-05-core-stand
 const CONST_15 = fs.readFileSync(path.join(ROOT, "content", "const-15-core-tail.md"), "utf-8");
 const RELEASE_ENGINEER = fs.readFileSync(path.join(ROOT, "content", "skill-release-engineer.md"), "utf-8");
 
-// History-independent scope tests (E229): a permanent test must not assert on
-// a specific historical commit SHA unless the assertion is inherently about
-// a historical diff (per docs/lane-protocol.md's guard note) — and even then
-// it must guard the SHA lookup and skip LOUDLY, never silently, when the SHA
-// is absent (shallow clone, adopter fork, or a repo history recreated as a
-// single commit (E104)). `unresolvedSha` returns the first of `shas` that does not
-// resolve via `git rev-parse --verify <sha>^{commit}`, or null if all
-// resolve. `skipIfHistoryAbsent` is the loud-skip wrapper: it prints a
-// console.warn containing the literal substring `HISTORY-DEPENDENT AC
-// SKIPPED` (greppable in CI logs) plus the missing sha and the unchecked
-// invariant, calls `t.skip(...)`, and returns true so the caller can bail out
-// of the rest of the test body before running the (now-impossible) git diff.
+// History-independent scope tests (E229): a permanent test must not assert on a historical
+// commit SHA unless the assertion is about a historical diff, and then must guard the
+// lookup and skip loudly. `unresolvedSha` returns the first of `shas` that does not resolve
+// (null if all do); `skipIfHistoryAbsent` prints a console.warn with the substring
+// `HISTORY-DEPENDENT AC SKIPPED`, calls `t.skip(...)` and returns true so the caller bails
+// out.
 function unresolvedSha(...shas) {
   for (const sha of shas) {
     try {
@@ -167,16 +123,10 @@ test("AC3: the Lane-start default paragraph states every subsequent tw_* call's 
 });
 
 // ---------------------------------------------------------------------------
-// AC4: default path invokes `agc feature start`; disclaims a hand-rolled
-// bootstrap; one-sentence refusal path. Plus the zero-code-change guarantee
-// (git diff --stat over bin/ tools/ scripts/ from the fan-out base).
-//
-// The diff range is pinned to `121ddc8..5896bdd` (e130's own commit
-// range — 5896bdd is e130's final lane commit, reachable from HEAD) rather
-// than `121ddc8...HEAD` (E222). A HEAD-relative range makes this AC fail on every
-// commit that lands after e130, since anything else touching bin/tools/
-// scripts widens the diff this test inspects; e130's own scope guarantee is
-// about e130's commits, not about however far HEAD has since moved.
+// AC4: default path invokes `agc feature start`; disclaims a hand-rolled bootstrap;
+// one-sentence refusal path. Plus the zero-code-change guarantee (git diff --stat over bin/
+// tools/ scripts/). The range is pinned to `121ddc8..5896bdd` (e130's own commits, E222): a
+// HEAD-relative range would fail on every later commit touching those dirs.
 // ---------------------------------------------------------------------------
 
 test("AC4: trigger (b) invokes agc feature start, disclaims a new/hand-rolled bootstrap, and states the one-sentence refusal path", () => {
@@ -305,15 +255,9 @@ test("AC11: the Artifact allowlist bullet names .current/_primary/tasks.md and e
 });
 
 // ---------------------------------------------------------------------------
-// AC14: scope containment — every changed path since the fan-out base
-// (121ddc8) matches an owned glob for this lane; zero forbidden paths.
-//
-// The diff range is pinned to `121ddc8..5896bdd` (e130's own commit
-// range — 5896bdd is e130's final lane commit, reachable from HEAD) rather
-// than `121ddc8...HEAD` (E222), for the same reason as AC4 above: this AC asserts
-// e130's own scope containment, and a HEAD-relative range would fail on
-// every later commit that touches a path outside e130's owned list,
-// regardless of which lane made that later change.
+// AC14: scope containment — every changed path since the fan-out base (121ddc8) matches an
+// owned glob; zero forbidden paths. Range pinned to `121ddc8..5896bdd` (e130's own commits,
+// E222), same reason as AC4.
 // ---------------------------------------------------------------------------
 
 test("AC14: every path changed since 121ddc8 matches this lane's owned-files list, with zero forbidden paths", (t) => {

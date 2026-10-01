@@ -1,40 +1,10 @@
 // Coded by @qa-engineer
-// Tests (T-E178B-04) for the cut pre-review fan-in check in
-// tools/lane-status.ts: it reports whether a lane's written cut was sent to
-// the integrator for pre-review (E178b; specs/e178b-lane-watch-tooling.md,
-// decision (g)/(h)/(j), AC10-AC14). The watch-mode transition check (AC15) lives in
-// test/e178b-lane-watch.test.mjs, next to the other watch tests.
-//
-// WHY this check exists: in Wave 7.1 lane e212 wrote a cut and never sent it
-// to the integrator for pre-review; nothing noticed until someone asked. The
-// check must therefore (1) SAY `missing` explicitly — never stay silent — when
-// a lane has a written cut (specs/<active_feature>.md) but no cut proposal in
-// its to-integrator.md, (2) never count a non-proposal message that merely
-// mentions a cut (a report or ack is not a request for pre-review), and
-// (3) stay a pure reporting surface: exit 0 whatever it finds (decision (h)),
-// and emit nothing at all unless --mailbox-root is given (decision (j)).
-//
-// Fixtures: test/fixtures/e178b/mailbox/<lane>/to-integrator.md are COPIED
-// shapes of the recognizer corpus the spec cites (decision (g) examples:
-// `E177a PM cut pre-review`, `cut-draft`, `cut T-E204-01`, `e126 cut 預審`),
-// never the live _mailbox/ corpus. The mailbox root is read-only here, so the
-// fixture directory is used in place. Lane workspaces are throwaway temp dirs
-// whose BASENAME is the lane name, because the tool keys `<dir>/<lane>/` by
-// worktree basename. They are served through an injected LaneListProvider:
-// the check itself reads only the filesystem, so no real worktree is needed.
-//
-// Spec-to-Test map:
-//   a proposal is present -> reported as sent                       (AC10)  -> "AC10 sent"
-//   written cut but no proposal -> reported as `missing` explicitly;
-//     a non-proposal message that mentions a cut is ignored          (AC11)
-//       -> "AC11 missing explicit", "AC11 non-proposal ignored"
-//   no spec / unreadable lane / no active_feature / no mailbox: the
-//     other states (n/a, not-checked, no-mailbox)                    (AC12)  -> "AC12 other states"
-//   the exit code stays 0 whatever the check finds                   (AC13)  -> "AC13 exit code unchanged"
-//   lane-status.ts reads message headers the same way the
-//     mailbox watch script does                                      (AC14)  -> "AC14 header parser parity"
-//   security smoke (path traversal, oversized file, empty input)
-//        -> "security smoke: ..."
+// Tests (T-E178B-04) for the cut pre-review fan-in check in tools/lane-status.ts: whether a
+// lane's written cut was sent to the integrator for pre-review (E178b;
+// specs/e178b-lane-watch-tooling.md decisions (g)/(h)/(j), AC10-AC14). A written cut with no
+// cut proposal in to-integrator.md is reported `missing`; a non-proposal mentioning a cut
+// does not count; report-only (exit 0), silent without --mailbox-root.
+// Rationale: specs/e260f-comment-rationale.md (test/e178b-cut-prereview.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";

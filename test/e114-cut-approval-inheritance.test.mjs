@@ -1,22 +1,10 @@
 // Coded by @qa-engineer
-// Tests for specs/e114-cut-approval-inheritance.md AC1-AC9, plus two review
-// findings pinned so they cannot regress: a malformed write destroying a valid
-// record (F1) and whitespace-only 'inherited:' values (F2)
-// (review_reports/review_T-E114-01.md Round 1).
-//
-// Spec-to-Test map:
-//   AC1 (v13->v14 migration is stamp-only, seeds nothing)        -> AC1
-//   AC2 (absence === non-inherited, own case)                    -> AC2
-//   AC3 (tw_update_state write round-trips verbatim)              -> AC3
-//   AC4 (malformed values drop defensively at parse, never throw) -> AC4-1..AC4-3
-//   AC5 (feature-scoped carry-forward, drop on active_feature change,
-//        no PM-re-entry re-arm — mirrors dispatch_mode/dispatch_pins) -> AC5-1..AC5-3
-//   AC6 (zod arg accepts it client-settable)                      -> AC6
-//   AC7 (docs/schema-versions.md has both the v13 and v14 rows)   -> AC7
-//   AC9 (zero gates read the field)                               -> AC9
-//   F1 (malformed write must not destroy a valid record; the      -> F1-1, F1-2
-//       preserve branch is feature-scoped, not a blind keep)
-//   F2 ('inherited:' and 'inherited:   ' both read back undefined) -> F2
+// Tests for specs/e114-cut-approval-inheritance.md. Test names carry the AC number. F1 and
+// F2 pin two review findings: a malformed write must not destroy a valid record (the
+// preserve branch is feature-scoped, not a blind keep), and 'inherited:' with only
+// whitespace reads back undefined.
+// Rationale: specs/e260f-comment-rationale.md
+// (test/e114-cut-approval-inheritance.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";

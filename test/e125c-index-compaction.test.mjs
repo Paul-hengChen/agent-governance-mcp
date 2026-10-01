@@ -1,34 +1,10 @@
 // Coded by @qa-engineer
-// New coverage (T-E125C-05) for specs/e125c-index-compaction.md AC1-AC6, AC10,
-// AC11 (reverse-migration receipt/normalization behaviour, E195, + the
-// real-data compaction round trip). AC7-AC9, AC12-AC14 are proved by
-// `.current/e125c/compaction-procedure.md` (sr's evidence file) and by
-// grep/golden checks run directly (see qa_reports/review_T-E125C-05.md ##
-// AC Execution Log) — this file carries no test case for them. Imports
-// compiled dist/. Every fixture lives under os.tmpdir() and is never the
-// repo root; AC10/AC11 read FROZEN copies of tasks.md /
-// .current/_primary/tasks.md / .current/tasks-index-receipt.json checked in
-// under test/fixtures/e125c-frozen/ (byte-exact as of commit ed7432f, the
-// index-compaction snapshot AC11's facts describe) into a throwaway $TMPDIR
-// copy, and never read or write the live repo tree (E204:
-// The prior live-disk read (T-E204-01) drifted red the moment the primary
-// ledger gained a row after ed7432f; see .current/e204/tasks.md).
-//
-// Spec-to-Test map:
-//   AC1  (identity round trip, no CL/no markers)        -> AC1 identity round trip
-//   AC2  (Closed Lanes carried across reverse)          -> AC2 closed-lanes carry
-//   AC3  (root-side marker removal tolerated)           -> AC3 removed markers
-//   AC4  (any other hand-edit still refuses)            -> AC4 hand-edit refuses
-//   AC5  (legacy raw-sha receipt accepted)              -> AC5 legacy receipt
-//   AC6  (double round trip with a Closed Lanes (CL) section; no-CL forward
-//         unchanged modulo the disclosed receipt
-//         deviation, F1)                                 -> AC6 double round trip,
-//                                                           AC6 forward unchanged without CL
-//   AC10 (real-data round trip)                          -> AC10 real-data round trip
-//   AC11 (consumer parity: parseTasksFromFile,
-//         getNextTaskFromFile, emitFeatureMetrics)        -> AC11 consumer parity
-//   F2 (reviewer finding pinned as known behaviour, not a
-//       failure: a fabricated marker is absorbed; E125c-NEW-5) -> F2 fabricated marker absorbed
+// Tests for specs/e125c-index-compaction.md AC1-AC6, AC10, AC11: reverse-migration receipt
+// and normalization behaviour, plus the real-data compaction round trip. AC10/AC11 read
+// frozen copies of two tasks files and a receipt from test/fixtures/e125c-frozen/, never
+// the live repo tree (a live read drifted red when the primary ledger gained a row). F2
+// pins a reviewer finding as known behaviour: a fabricated marker is absorbed.
+// Rationale: specs/e260f-comment-rationale.md (test/e125c-index-compaction.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -48,16 +24,10 @@ import { setActiveStorage, FileHandoffStorage } from "../dist/tools/storage.js";
 
 setActiveStorage(new FileHandoffStorage());
 
-// Hermetic test fixture rule (T-E77-02): no test/ file may read repository
-// HISTORY as a fixture (`git show <rev>:<path>`, `git log`, a pinned sha
-// ref). AC10/AC11 satisfy this by reading FROZEN, checked-in copies under
-// test/fixtures/e125c-frozen/ via plain fs (no git invocation anywhere in
-// this file) — never the live repo tree, so there is no "working tree
-// clean" precondition to maintain. The frozen copies are byte-exact
-// snapshots of the repo's tasks.md / .current/_primary/tasks.md /
-// .current/tasks-index-receipt.json as of commit ed7432f (cited here in a
-// plain comment only, per that rule); refreshing them is a deliberate,
-// reviewed fixture update, not something this test file ever does itself.
+// Hermetic fixture rule: no test file may read repository history (git show, git log, a
+// pinned sha ref). AC10/AC11 read frozen, checked-in copies under
+// test/fixtures/e125c-frozen/ via plain fs, never the live tree. Refreshing them is a
+// deliberate, reviewed fixture update.
 const __filename = fileURLToPath(import.meta.url);
 const FIXTURES = path.resolve(path.dirname(__filename), "fixtures", "e125c-frozen");
 
@@ -435,14 +405,10 @@ test("AC11 consumer parity: parseTasksFromFile returns only the kept sections' r
   assert.equal(lines[0].tickets, 7, "emitFeatureMetrics must count exactly 7 T-E125A-* ids, deduplicated across root + _primary ledger");
 });
 
-// ===========================================================================
-// F2 — a hand-fabricated tasks_moved marker line in the root index is
-// silently absorbed by the reverse rather than refused (a code-reviewer finding,
-// review_reports/review_T-E125C-04.md, filed as E125c-NEW-5 and accepted by the
-// integrator as a known residue, NOT a QA failure). Pinned here so a
-// future hardening (recording the forward-time marker set in the receipt)
-// flips this deliberately, with a red test as the signal.
-// ===========================================================================
+// F2: a hand-fabricated tasks_moved marker line in the root index is silently absorbed by
+// the reverse rather than refused (a reviewer finding accepted as known residue, not a
+// failure). Pinned so a future hardening, such as recording the marker set in the receipt,
+// flips it deliberately.
 
 test("F2 (pinned known behaviour, not a failure): a hand-fabricated tasks_moved marker line added to the root only is silently dropped by the reverse instead of refusing", () => {
   const ws = mkPrimaryWorkspace("e125c-f2-");

@@ -1,27 +1,10 @@
 // Coded by @qa-engineer
-// Tests that the qa-engineer and sr-engineer role SOPs carry two rules:
-// a long test or build run must finish (or be collected) within the same
-// turn, because In_Progress has no "waiting on results" state; and before a
-// long regression run the role writes a crash checkpoint with
-// bookkeeping_write, so a resumed session can pick up from it. Both rules are
-// two-line additions to content/skill-qa-engineer.md and
-// content/skill-sr-engineer.md. The agent templates only point at those
-// files and need no copy, so this suite checks only the two skill files.
-// The spec is the backlog rows themselves; there is no specs/ file.
-// (E20, E21, T-E20-01, T-E21-01)
-//
-// Spec-to-Test map:
-//   same-turn long-run rule, verbatim, in skill-qa-engineer.md Hard rules -> QA-E20-1, QA-E20-2
-//   same-turn long-run rule, verbatim, in skill-sr-engineer.md step 4b    -> SR-E20-1, SR-E20-2
-//   crash-checkpoint bullet in skill-qa-engineer.md Phase 4              -> QA-E21-1, QA-E21-2, QA-E21-3
-//   crash-checkpoint step in skill-sr-engineer.md step 4a                -> SR-E21-1, SR-E21-2, SR-E21-3
-//   Both crash-checkpoint lines say "(file-mode only)", because
-//     bookkeeping_write only works in file mode (tools/registry.ts
-//     + handoff-orchestrator.ts)                                         -> QA-E21-4, SR-E21-4
-//   Byte/token budgets still hold with these four new lines              -> covered by
-//     test/context-budget.test.mjs (skill-sr cap) and
-//     test/qa-visual-skill-split.test.mjs AC-5 (skill-qa-engineer.md cap),
-//     updated together with this file — not duplicated here.
+// Tests that the qa-engineer and sr-engineer role SOPs carry two rules: a long test or
+// build run finishes (or is collected) within the same turn (E20), and a crash checkpoint
+// with bookkeeping_write (file-mode only) precedes a long regression run (E21). Only
+// content/skill-qa-engineer.md and content/skill-sr-engineer.md are checked; the spec is
+// the backlog rows. Test ids: QA/SR-E20-1/2 same-turn; QA/SR-E21-1..4 checkpoint.
+// Rationale: specs/e260f-comment-rationale.md (test/e20-e21-crash-resilience.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";

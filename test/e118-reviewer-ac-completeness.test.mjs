@@ -1,31 +1,10 @@
 // Coded by @qa-engineer
-// Tests for spec: specs/e118-reviewer-ac-completeness.md.
-// code-reviewer gains a per-AC completeness obligation (an 8th
-// `## AC Completeness` report section) and codified finding tiers
-// (required/recommended/optional), so a diff that is correct-but-incomplete is
-// stopped at review, not one round later at QA (backlog E118, P1, re-scoped
-// 2026-09-16 to option (iv)).
-//
-// Spec-to-Test map:
-//   AC1 (obligation exists)                      -> "AC1 - ..."
-//   AC2 (report dimension exists, 8th H2, order)  -> "AC2 - ..."
-//   AC3 (tiers codified in the schema)            -> "AC3 - ..."
-//   AC4 (SKIP when no spec file)                  -> "AC4 - ..."
-//   AC5 (Quality/Architecture/Performance et al.
-//        NOT rewritten — byte-identical to BASE)  -> "AC5 - ..."
-//   AC6 (example report updated, minimally)        -> "AC6 - ..."
-//   AC7 (token discipline)                        -> "AC7 - ..."
-//   AC8-AC11 are QA-run, not per-AC unit tests in this file (golden regen,
-//   context-budget, full suite, scope-boundary grep — see
-//   qa_reports/review_T-E118-01.md ## AC Execution Log).
-//
-// WHY these assertions (not just "the string exists somewhere"): each test
-// pins the *contract* the spec's design decisions (D1-D6) settled — the
-// bullet's conditionality on specs/<feature>.md, the exact eight-name order,
-// the tier line surviving dispatch stripping, the SKIP literal's byte-exact
-// em-dash form, and the seven pre-existing bullets' literal immutability
-// (pinned by sha256, so it works in a shallow CI clone per AC5's proof) —
-// not merely today's implementation shape.
+// Tests for specs/e118-reviewer-ac-completeness.md: code-reviewer gains a per-AC
+// completeness report section and codified finding tiers. Each test pins a contract, not
+// today's shape: the eight-name order, the tier line surviving dispatch stripping, the
+// byte-exact SKIP em-dash, the older bullets' sha256.
+// Rationale: specs/e260f-comment-rationale.md
+// (test/e118-reviewer-ac-completeness.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";

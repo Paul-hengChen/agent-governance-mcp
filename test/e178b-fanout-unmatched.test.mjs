@@ -1,32 +1,10 @@
 // Coded by @qa-engineer
-// Tests (T-E178B-05) for the `fanout check` warning about owned path tokens
-// that name no file (E208; tools/fanout-manifest.ts checkLane/unmatchedOwnedTokens,
-// scripts/fanout.mjs), per specs/e178b-lane-watch-tooling.md decisions (h)/(i), AC16-AC19.
-// AC20 (build + full suite on a clean committed tree) and AC21 (the lane's own
-// `fanout check specs/fanout-wave7.2.md e178b --base 121ddc8`) are whole-ticket
-// runs recorded in qa_reports/review_T-E178B-05.md after the commit, per
-// docs/lane-protocol.md §3 — there is no in-file assertion for them.
-//
-// WHY: `fanout check` grants ownership to every path-shaped backtick span in a
-// lane's 擁有 cell. A prose aside such as wave7 e177a's
-// "同 `feature-rollup.mjs` 模式" therefore silently became an owned token
-// (E208), widening the lane's bounds without anyone deciding it. The warning
-// must fire on exactly those tokens — an exact token that names no file at
-// base and no file the branch added — and on nothing a lane legitimately
-// declares (a glob, an existing file, a new file it created). And because
-// every integrator script already parses `fanout check`'s output and exit
-// code, the change must be purely additive: pre-existing lines byte-identical
-// and in order, WARN lines strictly after them, exit codes unchanged.
-//
-// Fixtures are real throwaway git repos built with `git commit-tree` (same
-// helpers as test/e177a-check-cli.test.mjs), so checkLane's own `git ls-tree`
-// and `git diff --diff-filter=A` reads run for real.
-//
-// Spec-to-Test map:
-//   AC16 (an exact owned token naming no file warns)      -> "AC16 unmatched exact token warns"
-//   AC17 (globs, existing and newly added files never warn) -> "AC17 no false warnings"
-//   AC18 (exit codes unchanged, WARN lines come last)     -> "AC18 exit codes and line order"
-//   AC19 (real wave7 row's prose-aside token warns)       -> "AC19 E208 regression"
+// Tests (T-E178B-05) for the `fanout check` warning about owned path tokens that name no
+// file (E208; tools/fanout-manifest.ts, scripts/fanout.mjs; specs/e178b-lane-watch-tooling.md
+// decisions (h)/(i), AC16-AC19). AC20 and AC21 are whole-ticket runs recorded in
+// qa_reports/archive/release-v4.0.0/review_T-E178B-05.md. The change is purely additive:
+// WARN lines follow the existing byte-identical output, exit codes unchanged.
+// Rationale: specs/e260f-comment-rationale.md (test/e178b-fanout-unmatched.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";

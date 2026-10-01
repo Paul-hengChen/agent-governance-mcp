@@ -1,31 +1,10 @@
 // Coded by @qa-engineer
-// Tests (T-E177A-06) for the parse/validate/render side of
-// tools/fanout-manifest.ts (specs/e177a-fanout-manifest.md, AC1-AC8, AC13,
-// AC14). T-E177A-07 (test/e177a-check-cli.test.mjs) covers checkLane, the
-// CLI exit contract and the full-suite run (AC16).
-//
-// Fixtures: test/fixtures/e177a/fanout-wave7.md, fanout-wave6.md and
-// fanout-wave5.1.md are byte copies of the tracked specs at base 98052c6
-// (`git show 98052c6:specs/fanout-<w>.md`) — never edit specs/fanout-*.md
-// itself; edit the copies here instead. test/fixtures/e177a/render-e177a
-// .golden.txt is the exact-string render golden (AC6), captured once from the real
-// renderPrompt() output against fanout-wave7.md (verified field-by-field
-// against the spec's Render field sources table before being frozen).
-// Every other manifest in this file is synthetic, built inline so each
-// assertion's cause is visible next to the expectation, mirroring
-// test/e126-merge-invariants.test.mjs's style of small literal fixtures.
-//
-// Spec-to-Test map:
-//   AC1  (a real manifest parses into its fields)             -> "AC1 wave7 parses"
-//   AC2  (validating a real manifest reports no errors)       -> "AC2 validate wave7 exit 0"
-//   AC3  (a provisional lane cannot be rendered)              -> "AC3 provisional lane refused"
-//   AC4  (older manifests without the newer sections fail)    -> "AC4 legacy manifests fail loudly"
-//   AC5  (malformed manifests report specific error codes)    -> "AC5 malformed manifests"
-//   AC6  (rendered prompt equals the frozen golden text)      -> "AC6 render e177a"
-//   AC7  (prompt points at the lane protocol, not a copy)     -> "AC7 no lane-protocol text in prompt"
-//   AC8  (each rendered field comes from its documented source) -> "AC8 render field sources"
-//   AC13 (decisions-table rows are validated)                 -> "AC13 decisions validation"
-//   AC14 (dispatch-pin bullets are validated)                 -> "AC14 pins validation"
+// Tests (T-E177A-06) for the parse/validate/render side of tools/fanout-manifest.ts
+// (specs/e177a-fanout-manifest.md, AC1-AC8, AC13, AC14); test/e177a-check-cli.test.mjs
+// covers checkLane, the CLI exit contract and the full-suite run (AC16). Fixtures under
+// test/fixtures/e177a/ are byte copies of the tracked fanout specs at base 98052c6 plus an
+// exact-string render golden for AC6; every other manifest is synthetic and inline.
+// Rationale: specs/e260f-comment-rationale.md (test/e177a-manifest.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";

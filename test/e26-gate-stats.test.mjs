@@ -1,37 +1,10 @@
 // Coded by @qa-engineer
-// Tests for the per-gate fire-count report: computeGateStats()
-// (tools/gate-stats.ts) reads `.current/telemetry.jsonl` (one line per
-// rejection a gate fired) and `.current/metrics.jsonl` (one line per shipped
-// feature's outcome), and the tool entry in tools/registry.ts exposes it as
-// the `tw_gate_stats` MCP tool. The matching doc edits
-// (docs/gate-retro-procedure.md and the CLAUDE.md tool list) are prose and
-// are not pinned here. (E26, T-E26-01..03)
-//
-// Main invariant under test: every GATE_REGISTRY code lands in exactly one
-// of `fired` / `zero_fire`. The periodic gate retrospective decides what to
-// do about codes that never fired, so they must be listed, never silently
-// omitted or double-counted. Second invariant: rules that are prose-only
-// (no server check) carry `fires: null`, never `0`, so a reader can never
-// confuse "not measured" with "never fired". Malformed input and missing
-// sidecar files never throw (the same posture as the tools/exemptions.ts
-// loader): no bad input may stop the report from being produced.
-//
-// Spec-to-test map (the requirements, with the registry-coverage,
-// never-throws and dedupe properties also checked by an independent code
-// review):
-//   registry coverage: 33/33, no dupes across fired/zero_fire -> R1-R3
-//   fired bucketing + sort order (desc, ties -> catalog order)  -> F1-F3
-//   zero_fire bucketing + catalog order                          -> F1, F4
-//   by_feature / by_agent / first_ts / last_ts accumulation      -> F5
-//   unregistered-code bucket                                     -> U1
-//   prose_behavioral fires:null invariant (never 0)               -> P1-P2
-//   malformed-line handling (never throws, loud counting)         -> M1-M4
-//   missing-sidecar degradation (never throws, honest caveats)    -> D1-D2
-//   metrics dedupe on (feature, released_version)                 -> DE1-DE3
-//   one_pass strict-boolean coercion                               -> DE4
-//   mean/rate null-on-zero-features                                -> DE5
-//   tw_gate_stats is one TOOL_REGISTRY entry (12 tools in total)   -> T1-T2
-//   handleGateStats MCP handler shape                               -> T3
+// Tests for the per-gate fire-count report: computeGateStats() (tools/gate-stats.ts) reads
+// `.current/telemetry.jsonl` and `.current/metrics.jsonl`; tools/registry.ts exposes it as
+// `tw_gate_stats` (E26, T-E26-01..03). Invariants: every GATE_REGISTRY code lands in exactly
+// one of `fired` / `zero_fire`; prose-only rules carry `fires: null`, never `0`; malformed
+// input and missing sidecars never throw. Test ids: R registry, F bucketing, U/P/M/D/DE/T.
+// Rationale: specs/e260f-comment-rationale.md (test/e26-gate-stats.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -443,19 +416,13 @@ test("DE5: mean_* and one_pass_rate are null (not 0 or NaN) when zero features e
   assert.equal(report.metrics.mean_hops, 6);
 });
 
-// ============================================================================
-// AC1-AC5b — the report aggregates sidecars across lanes.
-// tools/gate-stats.ts reads EVERY copy of telemetry.jsonl/metrics.jsonl
-// this workspace's .current/ tree holds (live lanes, closed history lanes,
-// a not-yet-migrated flat file) via tools/lane-paths.ts's
-// enumerateLaneSidecarSources, and deduplicates by CONTENT (never by file
-// name), so a copy mid-move is not counted twice. All fixtures below build the raw
-// `.current/` tree directly (mkWorkspace's flat-only shape isn't enough for
-// a fan-out fixture) — the R1-DE5 tests above already cover the flat-only
-// case exhaustively; AC1 below adds one EXPLICIT assertion that a flat-only
-// workspace's `sources` array names only the flat file (no lane copy exists
-// to fan out over or dedupe against). (E123 F2, specs/e123c-cross-lane-aggregation.md)
-// ============================================================================
+// AC1-AC5b: the report aggregates sidecars across lanes. tools/gate-stats.ts reads EVERY
+// copy of telemetry.jsonl/metrics.jsonl under this workspace's .current/ tree (live lanes,
+// closed history lanes, a flat file) via tools/lane-paths.ts's enumerateLaneSidecarSources
+// and deduplicates by CONTENT, never file name, so a copy mid-move is not counted twice.
+// Fixtures build the raw `.current/` tree directly; AC1 adds one explicit assertion that a
+// flat-only workspace's `sources` names only the flat file. (E123 F2,
+// specs/e123c-cross-lane-aggregation.md)
 
 function liveTelemetryPath(ws, lane) {
   return path.join(ws, ".current", lane, "telemetry.jsonl");

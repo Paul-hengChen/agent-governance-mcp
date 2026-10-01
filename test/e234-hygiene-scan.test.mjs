@@ -1,23 +1,10 @@
 // Coded by @qa-engineer
-// Tests for specs/e234-hygiene-scan.md AC1-AC18: the advisory
-// information-hygiene scan run by `agc check` (tools/hygiene-scan.ts, wired in
-// bin/agc-init.mjs runCheck()).
-//
-// Test rules this file follows (spec Acceptance Criteria preamble):
-// - Every hit-bearing input is built at runtime inside a temp repo or dir under
-//   os.tmpdir(); nothing is written into this checkout.
-// - Keywords are synthetic nonsense words only.
-// - Every hit-shaped literal is assembled by concatenation (see `shape` below),
-//   so this file itself never trips the scan it tests. AC16 proves that on a
-//   copy of committed HEAD, which contains this file.
-// - Hermetic env: every child run starts from `baseEnv()`, which deletes
-//   AGC_HYGIENE_KEYWORDS and isolates git from system/global config. A case
-//   that needs a keyword source sets one on purpose. A case that must have no
-//   default keyword file uses its own temp git dir (every temp repo here has
-//   one), never the common dir of the checkout running the suite.
-//
-// The AC-by-AC map to these tests lives in the QA review of this feature
-// (qa_reports/archive/release-v4.2.0/review_T-E234-05.md).
+// Tests for specs/e234-hygiene-scan.md AC1-AC18: the advisory information-hygiene scan run
+// by `agc check` (tools/hygiene-scan.ts, bin/agc-init.mjs runCheck()). Hit-bearing input is
+// built at runtime in a temp repo, keywords are synthetic, and hit-shaped literals are
+// assembled by concatenation (see `shape`) so this file never trips the scan (AC16). Every
+// child run uses `baseEnv()`: no AGC_HYGIENE_KEYWORDS, git isolated from global config.
+// Rationale: specs/e260f-comment-rationale.md (test/e234-hygiene-scan.test.mjs).
 
 import { test, after } from "node:test";
 import assert from "node:assert/strict";

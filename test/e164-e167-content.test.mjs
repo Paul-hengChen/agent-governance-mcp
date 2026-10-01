@@ -1,31 +1,10 @@
 // Coded by @qa-engineer
-// Tests that pin the release-engineer SOP's CI-wait and tag-handling wording and
-// the lite-coordinator / PM cut-list wording (feature e164-e167-content-wave45;
-// docs/backlog.md rows E164/E167 + NEW-TICKETS.md L-CONTENT-NEW-1/NEW-3;
-// L-CONTENT-NEW-5 resolved in-cut).
-// Content-assertion tests, independent of the sr-engineer/code-reviewer claims in
-// review_reports/review_T-E164-01.md — these read the shipped prose directly.
-//
-// Spec-to-Test map:
-//   AC1 (8b: normal-budget-first, lowered-budget-only-after-first-kill, hung run
-//        ends in printed strict FAIL)                  -> t-ac1-*
-//   AC2 (fix_try-capped re-runs -> Blocked/human; Escalation Routes 8b row
-//        consistent; 8b STOP deletes unpushed local tag before the Blocked write) -> t-ac2-*
-//   AC3 (9a carries the budget note, names DEFAULT_WAIT_SECONDS, no "480")  -> t-ac3-*
-//   AC4 (8c separates tag-create from tag-push; step labels unrenumbered)  -> t-ac4-*
-//   AC5 (both content changes land in one edit pass)   -> not test-assertable;
-//        recorded in qa_reports/review_T-E164-02.md per the dispatch brief.
-//   AC6 (lite: no inline `id | desc |` list; points at skill-pm Cut-Approval Gate) -> t-ac6-*
-//   AC7 (skill-pm `touches` excludes governance bookkeeping)               -> t-ac7-*
-//
-// WHY: this is a prose-only content lane (no executable code path touched), so the
-// contract under test is that the shipped WORDING actually encodes the approved
-// decisions (docs/backlog.md E164/E167 rows, handoff scope_decision_why) — not that
-// some code compiles. A plausible-sounding paraphrase that silently drops the
-// sequencing, the named cap, or the tag-deletion clause would defeat the whole
-// point of the fix while still "reading fine" on a skim; these tests pin the
-// load-bearing phrases and their relative order so a future edit that regresses
-// the wording fails CI instead of shipping quietly.
+// Tests pinning the release-engineer SOP CI-wait/tag wording and the lite-coordinator / PM
+// cut-list wording (feature e164-e167-content-wave45; docs/backlog.md rows E164/E167),
+// independent of review_reports/archive/e164-e167-content-wave45/review_T-E164-01.md.
+// Case names are prefixed AC<N>; AC5 (one edit pass) is not test-assertable, see
+// qa_reports/archive/e164-e167-content-wave45/review_T-E164-02.md.
+// Rationale: specs/e260f-comment-rationale.md (test/e164-e167-content.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
