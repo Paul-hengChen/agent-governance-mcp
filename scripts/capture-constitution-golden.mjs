@@ -1,45 +1,9 @@
 #!/usr/bin/env node
 // Coded by @sr-engineer
-// Golden-fixture capture for the composed constitution and coordinator skill
-// (first written for the compose-not-strip refactor, A9 / T-CNSO-02; later
-// extended to cover ALL 12 fixtures and made fail-loud, E90 / T-E90-01).
-//
-// THE STANDING REGENERATION TOOL for test/fixtures/compose-golden/. Originally
-// (A9) a one-shot pre-refactor capture: it snapshotted the CONSTITUTION PORTION
-// of every dispatch mode's output from the old strip pipeline so the
-// compose-not-strip refactor could be proven byte-equivalent (spec ACs 2–5, 9;
-// asserted by the qa-authored test/compose-equivalence.test.mjs, T-CNSO-08).
-// That sequencing framing is history — the monolith and the strip code are both
-// gone. What remains is the job every `const-*` / `coord-*` content ticket needs:
-// re-derive all 12 fixtures from the CURRENT source of truth after a content
-// edit, so the byte-equality assertions can be re-baselined by tool rather than
-// by hand (two of the twelve once had no tool at all and were hand-rebuilt
-// during a content edit; E90, E43).
-//
-// It is a script, not a test file, so constitution §2 test-ownership does not
-// apply (architecture DR-5) — but the fixtures it writes ARE a qa-owned surface:
-// re-baselining them is a qa task, running this tool is how qa does it.
-//
-// Captures (into test/fixtures/compose-golden/), 12 total:
-//   8 build.ts fixtures — lite/full × design/non-design × fullDetail on/off
-//   2 hook fixtures     — bin/agent-governance-context.mjs lite + full
-//   1 constitution monolith — cat(CONSTITUTION_SEGMENTS) over content/, the
-//                         exact operation test/compose-equivalence.test.mjs's
-//                         AC8 invariant asserts. Derived from the MANIFEST, not
-//                         from content/constitution.md: that file was deleted at
-//                         A9/AC8, and the manifest concatenation is now the only
-//                         definition of "the monolith" that exists.
-//   1 skill monolith    — composeSkill("skill-coordinator.md", claude-code caps),
-//                         pinned by test/skill-manifest.test.mjs
-//                         t-golden-byte-identity. Added to this script's scope
-//                         by the fail-loud rework (E90).
-//
-// FAIL LOUD (the sharper half of the fail-loud rework, E90): every capture
-// either writes or exits non-zero. The earlier monolith branch printed a
-// benign-looking "not re-captured" note and exited 0 while a fixture that is
-// load-bearing for a green suite went unwritten — a tool that reports success
-// while leaving two tests red is worse than a tool that is absent.
-//
+// Regenerates the 12 golden fixtures in test/fixtures/compose-golden/ from the
+// current content/ sources, so a const-*/coord-* edit is re-baselined by tool.
+// Fail loud: every capture writes its fixture or exits non-zero.
+// Fixture list, ownership and history: see specs/e260c-bin-scripts.md.
 // Usage: npm run build && node scripts/capture-constitution-golden.mjs
 //        then: git diff test/fixtures/compose-golden/   (expect only intended moves)
 
@@ -188,13 +152,9 @@ await captureHook("hook-lite.txt", {}); // default env => lite skill variant
 await captureHook("hook-full.txt", { AGC_DEFAULT_SKILL: "full" });
 
 // --- constitution monolith (cat == original invariant, T-CNSO-08) ---------
-// Derived from CONSTITUTION_SEGMENTS, not from content/constitution.md (E90).
-// That file was deleted at T-CNSO-09/AC8, so the earlier existsSync branch
-// ALWAYS took its else arm and printed a note while writing nothing — leaving
-// compose-equivalence's AC8 assertion red after any const-* edit, with the
-// tool reporting success. The manifest concatenation below is byte-for-byte
-// the operation that assertion performs, which is what makes this fixture
-// re-derivable at all now that the monolith file is gone.
+// Derived from CONSTITUTION_SEGMENTS (content/constitution.md is gone): this
+// concatenation is byte for byte what compose-equivalence's AC8 assertion does.
+// Why the old existsSync branch was removed: see specs/e260c-bin-scripts.md.
 writeFixture(
   "constitution-monolith.txt",
   CONSTITUTION_SEGMENTS.map((s) => readContent(s.file)).join(""),

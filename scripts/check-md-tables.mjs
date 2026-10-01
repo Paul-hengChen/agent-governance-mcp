@@ -1,24 +1,11 @@
 #!/usr/bin/env node
 // Fail the build if a git-tracked Markdown file carries a malformed GFM table.
-//
-// Two rules, both measured against this repo (see docs/backlog.md E74):
-//   (1) every data row's cell count must equal its header row's cell count.
-//   (2) every table block must carry a delimiter row (the `|---|---|` line)
-//       immediately after its header, and must not be split across a blank
-//       line — a block whose first two lines aren't [header, delimiter] is
-//       flagged whole, which is what catches both "no delimiter row" blocks
-//       and "blank line broke a single logical table into two" blocks (the
-//       second half never has its own delimiter row either).
-//
-// Four discriminators, each load-bearing (the originating ticket's own words,
-// E74 — omit any and the checker produces false positives worse than having no
-// checker at all):
-//   (i)   an escaped `\|` is a literal pipe, not a cell separator.
-//   (ii)  lines inside fenced code blocks (``` or ~~~) are never table rows.
-//   (iii) a table row must start with `|` at column 0 — an indented `|` line
-//         is a lazy-continuation line of a `- [ ]` list item, not a row.
-//   (iv)  the delimiter row itself is skipped by rule (1)'s cell-count check;
-//         a table block ends at the first line that isn't a column-0 `|` row.
+// Rule 1: every data row has as many cells as its header row.
+// Rule 2: every table block starts with [header, delimiter row]; this also
+//   catches one table split in two by a blank line.
+// Discriminators (E74): (i) an escaped `\|` is a literal pipe; (ii) fenced
+// code is never a table; (iii) a row starts with `|` at column 0; (iv) rule 1
+// skips the delimiter row. Why each is needed: see specs/e260c-bin-scripts.md.
 
 import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
@@ -28,66 +15,23 @@ import * as path from "node:path";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..");
 
-// qa_reports/ is a write-once forensic artifact and review_reports/archive/
-// likewise; live review_reports/ is not write-once (it was written twice
-// during this feature) but is excluded anyway because it holds the same
-// kind of recorded evidence (backlog E74/E17): the fix this checker would
-// otherwise demand — escaping `|` inside a recorded shell command — changes
-// what that command means (POSIX BRE `\|` is alternation, not an escaped
-// literal; verified on this platform's grep, `^\| N/A` then matches every
-// line, not just the intended prefix). A misrendered table cell in an
-// evidence file is cheaper than a falsified command, so these directories
-// are out of scope for this lint. Measured blast radius: this excludes 565
-// of 806 tracked .md files but conceals exactly 2 rule-1 (cell-count)
-// sites and 0 rule-2 (no-delimiter) sites — narrowing the exclusion further
-// would not shrink coverage in practice. Do not "tidy this away" by
-// removing the exclusion — that re-opens the corruption.
+// qa_reports/ and review_reports/ hold recorded evidence, where the fix this
+// lint would demand (escaping `|` in a recorded shell command) changes what
+// the command means. Do not remove this exclusion; reasoning and measured
+// blast radius: see specs/e260c-bin-scripts.md.
 const EXCLUDED_DIR_PREFIXES = ["qa_reports/", "review_reports/"];
 
-// Done-mark position advisory (E88) — advisory-only (never affects exit code
-// or allViolations): the docs/backlog.md done-mark convention (`**DONE**` /
-// `**PARTIAL**` / `**VOID**`, optionally followed by `— shipped vX.Y.Z`) is
-// free text with no fixed cell position, and can be buried mid-cell where a
-// truncated read misses it (2026-08-21) or a mis-parsed row lands it in the
-// wrong column entirely (2026-08-28 v3.105.0, the E96/E74 unescaped-`\|`
-// recurrence). Pipe-escaping is already covered corpus-wide by rule 1's
-// cell-count check (verified 0 violations); this adds the position half,
-// scoped to docs/backlog.md's two known table shapes by exact header-cell
-// match (not filename heuristic alone, not corpus-wide) — see
-// specs/e88-e105-md-table-checker.md Decisions §1-2. Shipped advisory, not
-// fatal, because the ticket table already carries 5 pre-existing
-// already-shipped rows (E39/E40/E58/E59/E71) that predate this check; making
-// it fatal today would force an off-topic docs/backlog.md normalization pass
-// into this ticket (see NEW-TICKETS.md L-MDTOOL-N1).
+// Done-mark position advisory (E88), advisory-only (never affects the exit
+// code or allViolations): a `**DONE**` / `**PARTIAL**` / `**VOID**` mark
+// buried mid-cell is easy to miss. Scoped to docs/backlog.md's two known
+// table shapes by exact header match. Why advisory: see specs/e260c-bin-scripts.md.
 const BACKLOG_REL_PATH = "docs/backlog.md";
-// Matches the OPENING of the bold marker only (`**DONE`, with a word
-// boundary so `**PARTIALLY**` — real prose in this file, not a marker —
-// doesn't false-positive). Deliberately does NOT anchor the closing `**`:
-// the live corpus's dominant convention bolds the trailing "— shipped
-// vX.Y.Z" (or "(vX.Y.Z)") INSIDE the same span as the token
-// (`**DONE — shipped v3.109.0**`, `**DONE (v3.105.1)**`), not as plain text
-// after a self-closed `**DONE**` — measured 92 DONE / 7 PARTIAL / 3 VOID
-// bold-marker instances, only 30 of the 92 DONE ones self-close immediately
-// after the token. "Should lead the cell" is a question about where the
-// marker OPENS, not what it closes around.
-//
-// Round-2 (code-reviewer C1): "opens with the token" is not the same predicate
-// as "is a done-mark" — 2 of the 6 round-1 advisories fired on bold text that
-// was not a marker at all: docs/backlog.md:193 quoted a DIFFERENT row's mark
-// (E48's) inside a code span, and :210 was prose on E88's own still-open row
-// ("the order table records them **DONE and shipped**"). Measured over all 65
-// marker-bearing cells in the two scoped tables: excluding any match whose
-// opening falls inside a code span, AND requiring the bold span to either
-// self-close immediately after the token (`**DONE**`) or carry a `vX.Y[.Z]` /
-// ISO-date stamp INSIDE the span itself (`**DONE — shipped v3.109.0**`,
-// `**PARTIAL 2026-08-21 — …**`) gives exactly the 4 genuine buried marks
-// (E39/E40/E58/E59) with ZERO loss across the other 63 cells — every
-// compound-form mark still resolves, and every leading mark still suppresses.
-// Both axes are orthogonal to the column-split axis where earlier done-mark
-// checks were historically defeated (E88/E96; an unescaped `|` meeting a naive
-// splitter) — `splitRow()` and `headerCellCount` are untouched here. Fails
-// toward SILENCE: no closing `**` found, or no qualifying match at all, means
-// no advisory — never a false claim.
+// Matches the opening of a bold marker (`**DONE`, word boundary so
+// `**PARTIALLY**` does not match). The closing `**` is not anchored: the
+// corpus mostly bolds the "— shipped vX.Y.Z" stamp inside the same span.
+// findGenuineDoneMark then skips code-span matches and requires the span to
+// self-close or carry a version/date stamp. Fails toward silence.
+// Measurements behind both rules: see specs/e260c-bin-scripts.md.
 const DONE_MARK_OPEN_RE = /\*\*(DONE|PARTIAL|VOID)\b/g;
 const MARK_STAMP_RE = /v\d+(?:\.\d+){1,2}|\d{4}-\d{2}-\d{2}/;
 
@@ -124,67 +68,12 @@ function findCodeSpanRanges(text) {
   return ranges;
 }
 
-// Round-3 (E145, coordinator forensics corrected the ticket's own premise —
-// see docs/backlog.md E145 and the handoff pending_notes for this feature):
-// round 2's code-span exclusion (above) closed the citation door for a
-// QUOTED CODE excerpt (docs/backlog.md:193's `` `**DONE**` `` inside
-// backticks) but not for a quoted PROSE excerpt — this repo's citation
-// convention for quoting another row's text verbatim is an italic-wrapped,
-// double-quoted span, `*"…"*` (not a code span at all). docs/backlog.md's
-// own E145 row demonstrates the recurrence: it quotes E59's row inline as
-// `*"… E57's deliverable **DONE** (shipped v3.99.0, commit 25d231e)"*`, and
-// that bold span self-closes with a version stamp, so round 2's test
-// (self-closes OR carries a stamp) qualifies it exactly like a genuine mark
-// would — the citation door is the QUALIFYING test, not the code-span gate.
-//
-// Verified this is NOT the same false positive the ticket's own close-out
-// note named: docs/backlog.md:181 (E59's row) is NOT a citation of E57 — E57
-// shipped v3.98.0 (E57's own last-cell mark), while :181's desc-cell mark
-// reads "**DONE** (shipped v3.99.0, commit 25d231e)", the same version AND
-// commit as E59's OWN last-cell mark. :181 is structurally identical to
-// :165/:166/:180 (original desc prose, then an appended own-row close-out
-// mark) — a true positive. Silencing it would have been the real loss.
-//
-// Fix is exclusion-only, same shape as findCodeSpanRanges(): find every
-// `*"…"*` span (an opening `*"` not itself part of a `**` run, closed by
-// the NEXT `"*` not itself opening a new `**` run) and treat it exactly
-// like a code span for this predicate. An unpaired opening delimiter (no
-// matching `"*` anywhere later in the cell) yields NO citation range —
-// it is not a real citation span, so the candidate falls through to the
-// normal code-span/stamp tests, and a qualifying one still ADVISES. This
-// is the same direction CS-UNMATCHED-BACKTICK and CS-UNPAIRED-3BACKTICK
-// already take for an unpaired backtick run: an unmatched opener is a
-// literal, not a span boundary, so it never suppresses a candidate — the
-// alternative (fabricating a range anyway) risks swallowing a real,
-// un-quoted mark, which is the direction this file forbids.
-//
-// Measured the same way as the first advisory round (E88) over all 68
-// marker-bearing cells (75 candidate bold DONE/PARTIAL/VOID opens) in the two
-// scoped docs/backlog.md tables: adding this exclusion flips exactly ONE
-// cell's outcome — docs/backlog.md's E145 row (the candidate at desc-offset
-// 483, inside the `*"…"*` quote of E59's mark; the row's other two candidates
-// at offsets 356/373 were already suppressed by the round-2 code-span
-// exclusion) — from a genuine (non-leading) buried mark to correctly excluded.
-// The other 67 marker-bearing cells are byte-identical in outcome: the same 4
-// rows (E39 :165, E40 :166, E58 :180, E59 :181) still fire as advisories with
-// the same token/offset, and ZERO other cells lose a genuine mark.
-//
-// Residuals (measured by code-reviewer round 1, review_T-E145-01, recorded
-// here — neither changes behaviour, both fail toward this file's documented
-// safe direction, and neither occurs in the live corpus):
-//   - The close search below takes the NEXT `"*` anywhere later in the
-//     cell, unbounded and not code-span-aware: a `*"` opener that itself
-//     sits inside a code span (e.g. `` `a *" b` ``) can still open a range
-//     that extends past it, silencing a genuine mark it should not reach.
-//     One-line hardening for a follow-up ticket: skip an opener whose
-//     index is `insideCodeSpan`.
-//   - The predicate is deliberately narrow: `*"…"*` only. Other citation
-//     costumes — `*"…"*` with typographic quotes, plain `"…"`, `**"…"**`,
-//     or bare `*…*` — still advise on a cited mark. This is intentional,
-//     not an oversight: widening to plain quotes or bare italics would
-//     start excluding ordinary prose emphasis, i.e. silencing genuine
-//     marks — the direction this ticket forbids. Revisit only if a second
-//     costume actually appears in the corpus.
+// Round 3 (E145): a `*"…"*` span, this repo's style for quoting another
+// row's text, is excluded exactly like a code span, since a quoted mark
+// with a stamp would otherwise qualify. An unpaired `*"` opener yields no
+// range, so the candidate still advises. Deliberately narrow: other quote
+// styles still advise, because widening would silence genuine marks.
+// Measurement, the true positive it keeps and known residuals: see specs/e260c-bin-scripts.md.
 function findCitationQuoteRanges(text) {
   const ranges = [];
   const openRe = /(?<!\*)\*"(?!\*)/g;
@@ -201,14 +90,10 @@ function findCitationQuoteRanges(text) {
 }
 
 // Returns { index, token } for the first bold DONE/PARTIAL/VOID span in
-// `cellTrimmed` that (a) does not open inside a code span, (b) does not open
-// inside a `*"…"*` citation-quote span (round 3, E145), and (c) either
-// self-closes immediately after the token or carries a version/date stamp
-// inside the span — else null. `matchAll` (not a shared/global `.exec`
-// loop) is deliberate: it clones the regex and its `lastIndex` per call, so
-// a module-scope `/g` regex reused across many rows/files never leaks
-// state between calls (the exact silent-skip risk C2 flagged for a `/g`
-// regex reused at module scope).
+// `cellTrimmed` that opens outside any code span and citation quote and
+// either self-closes or carries a version/date stamp; else null. `matchAll`
+// clones the module-scope `/g` regex per call, so no `lastIndex` state
+// leaks between rows.
 function findGenuineDoneMark(cellTrimmed) {
   const codeSpans = findCodeSpanRanges(cellTrimmed);
   const citationQuotes = findCitationQuoteRanges(cellTrimmed);
@@ -291,21 +176,12 @@ function checkFile(relPath) {
   }
   const lines = raw.split("\n");
 
-  // Group lines into maximal contiguous runs of column-0 `|` lines, skipping
-  // fenced-code interiors entirely (discriminator ii) and never letting an
-  // indented `|` line join a run (discriminator iii, via the raw ^\| test).
-  //
-  // Fence state tracks the opening character and run length, not just a
-  // parity toggle: CommonMark only closes a fence with the same character,
-  // a run length >= the opening's, and no info string on the closing line.
-  // A bare toggle mis-closes a 4-backtick block on an inner 3-backtick
-  // fence, un-fencing the rest of the file for the remainder of the toggle
-  // parity — reproduced as both a false positive (100%-fenced file flagged)
-  // and a silent false negative (a real cell-count defect after such a
-  // block reported as 0 malformed tables, exit 0). This repo already
-  // carries 4-backtick fences (content/coord-01-core-head.md:50,
-  // content/coord-02-host-dispatch.md:5) — do not regress to toggle
-  // semantics.
+  // Group lines into maximal runs of column-0 `|` lines, skipping fenced-code
+  // interiors (discriminator ii) and never joining an indented `|` line (iii).
+  // Fence state keeps the opening char and run length: CommonMark closes a
+  // fence only on the same char, a run >= the opening's, and no info string.
+  // Do not regress to a parity toggle; it mis-closes the 4-backtick fences
+  // this repo has. Failure modes: see specs/e260c-bin-scripts.md.
   let fenceChar = null; // null when not inside a fence
   let fenceLen = 0;
   let run = [];
@@ -367,40 +243,13 @@ function checkFile(relPath) {
     const hasDelimiter = delimiterRowPresent && delimiterCellCount === headerCellCount;
 
     if (!hasDelimiter) {
-      // Three distinct causes land here (E74 F6) and only one of them is
-      // fixed by touching a blank line — conflating them produces a
-      // confidently wrong remedy:
-      //   (a) a blank line split one logical table into two headerless
-      //       halves; this block is the second half. Fix: the blank line.
-      //   (b) the block genuinely has no delimiter row. Fix: add one.
-      //   (c) a delimiter row is present but its cell count doesn't match
-      //       the header (created by rule 1's own fix, F3) — "no delimiter
-      //       row" would be factually false here. Fix: the delimiter row.
-      //
-      // Discriminator for (a) vs (b)/(c): walk up past this block's own
-      // preceding blank line(s) to the nearest non-blank line. A column-0
-      // `|` row there means SOME table's content lives earlier in the file
-      // — but a leading pipe alone doesn't tell us it's THIS block's own
-      // header/delimiter being continued (E105): two genuinely separate,
-      // adjacent tables produce the exact same shape (blank line, then a
-      // column-0 `|` line above it) even though the earlier run belongs to
-      // a different, already-complete table. Following the (a) remedy
-      // (delete the blank line) in that case merges two distinct tables and
-      // demotes the second header to a data row — the corruption this
-      // checker exists to catch.
-      //
-      // Tie-break (E105, verified against docs/backlog.md:78 vs :170 (a
-      // true continuation, both 6-cell headers) and :168 (an unrelated
-      // 9-cell adjacent row that a naive adjacent-line check would
-      // misclassify as a continuation)): find the RUN that nearest
-      // non-blank line belongs to, and compare ITS HEADER's cell count —
-      // not the nearest row's own cell count, which may be a delimiter or
-      // data row — against this block's header cell count. Equal counts
-      // mean this block really is the second half of that same table (a).
-      // A mismatch means the prior run is a different, complete table; this
-      // block gets no credit for the blank line and falls through to
-      // missing-delimiter/mis-sized-delimiter (b/c) like any other
-      // standalone headerless block.
+      // Three causes land here and need different fixes (E74 F6):
+      //   (a) blank-split: a blank line split one table; fix the blank line.
+      //   (b) missing-delimiter: no delimiter row; add one.
+      //   (c) mis-sized-delimiter: delimiter cell count differs from the header.
+      // (a) also needs the nearest earlier run's HEADER cell count to equal this
+      // block's (E105), so two separate adjacent tables are never merged.
+      // Reasoning and the backlog rows it was verified on: see specs/e260c-bin-scripts.md.
       const prevLineNo = header.lineNo - 1;
       const precededByBlankLine = prevLineNo >= 1 && lines[prevLineNo - 1].trim() === "";
       let priorNonBlankIsTableRow = false;
@@ -440,14 +289,10 @@ function checkFile(relPath) {
       });
       continue;
     }
-    // Done-mark advisory scope (E88): only a table shaped exactly like one of
-    // the two known docs/backlog.md headers is in scope, and only its
-    // designated column. Computed once per block (not per row) since the
-    // header doesn't change row to row; null when this block isn't one of the
-    // two known shapes, isn't in docs/backlog.md, or isn't a well-formed table
-    // at all (a headerless block above already `continue`d before reaching
-    // here, so rule 1's escape-aware `splitRow` is always the one doing the
-    // column split — never a second, naive parser beside it).
+    // Done-mark advisory scope (E88): the designated column of a known
+    // docs/backlog.md table shape, computed once per block; null otherwise.
+    // Headerless blocks already `continue`d above, so the escape-aware
+    // splitRow is always the column splitter.
     const doneMarkCol = isBacklogFile ? backlogDoneMarkColumn(splitRow(header.raw)) : null;
 
     // rows 0=header, 1=delimiter (skipped per discriminator iv); data starts at 2.

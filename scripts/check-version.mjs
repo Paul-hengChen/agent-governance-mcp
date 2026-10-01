@@ -31,14 +31,9 @@ if (m[1] !== pkg.version) {
 }
 
 // Compiled-artifact parity: dist/index.js is what `npx github:...#<tag>`
-// consumers actually run. A stale dist (built before the version bump) shipping
-// alongside correctly-bumped source + package.json is the v3.74.0 near-miss —
-// dist carried "3.73.1" while everything else was "3.74.0" and the check still
-// passed. If dist/index.js exists we assert its Server() literal too, and fail
-// loud on either a mismatch OR a parse failure (a guard that can't find what it
-// checks must not pass silently). If dist/index.js is absent (fresh clone before
-// `npm run build`), we skip with a note — mirroring the git-tag check's
-// "not in a git checkout" tolerance.
+// consumers run, so its Server() literal must match too (in the v3.74.0
+// near-miss a stale dist still said "3.73.1"). A mismatch or parse failure
+// fails loud; an absent dist/ (unbuilt checkout) is skipped with a note.
 const distPath = path.join(root, "dist", "index.js");
 if (existsSync(distPath)) {
   const distSrc = readFileSync(distPath, "utf-8");
@@ -66,14 +61,9 @@ if (existsSync(distPath)) {
 }
 
 // Lockfile parity (E60): package-lock.json's root `version` and
-// `packages[""].version` are maintained by nothing else in this pipeline — a
-// dependency-only `npm install` refreshes them as an incidental side effect,
-// which is exactly why the field silently drifts behind package.json on
-// releases that don't happen to touch a dependency. If package-lock.json
-// exists we assert both fields against pkg.version, and fail loud on either a
-// mismatch OR a parse/shape failure (a guard that can't find what it checks
-// must not pass silently). If package-lock.json is absent, we skip with a
-// note — mirroring the dist/ tolerance above.
+// `packages[""].version` change only as a side effect of `npm install`, so
+// they drift on releases with no dependency change. A mismatch or a
+// parse/shape failure fails loud; an absent lockfile is skipped with a note.
 const lockPath = path.join(root, "package-lock.json");
 if (existsSync(lockPath)) {
   let lock;

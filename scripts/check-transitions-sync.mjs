@@ -1,41 +1,10 @@
 #!/usr/bin/env node
 // Fail if the "## ALLOWED_TRANSITIONS Matrix" mirror table in
 // specs/qa-flow-enforcement-architecture.md drifts from the compiled
-// ALLOWED_TRANSITIONS source of truth in tools/transitions.ts.
-//
-// Pattern follows scripts/check-version.mjs: resolve root from
-// import.meta.url, read from dist/ (the compiled artifact, not the .ts
-// source — dist is what actually ships and is what check-version.mjs itself
-// treats as authoritative for parity checks), fail loud rather than skip
-// silently, exit non-zero with an actionable message.
-//
-// Why this exists: this table has drifted from ALLOWED_TRANSITIONS before (a
-// review round once found 9 divergent sites across 16 mirrored rows) with
-// nothing to catch it (E39/E58; the finding was E37 round 1). Both sides are
-// structured data — a Map in compiled JS, a markdown table with a fixed
-// three-column shape — so a set-equality check is genuinely mechanizable here,
-// unlike a hand-written prose expansion of a prose source, which has no
-// structured source to diff against — the docs/skills/* mirror tree was
-// exactly that case, and it was deleted rather than checked (E48).
-//
-// Hard requirement (explicit ticket condition, same defect class as an earlier
-// `grep -vxFf` empty-baseline bug, E50): if this script cannot find or parse
-// the mirror table, or cannot load ALLOWED_TRANSITIONS, that MUST be a
-// failure, never a vacuous pass. An empty parse silently agreeing with an
-// empty source would defeat the entire point of the check.
-//
-// Wiring (package.json): `postbuild`, deliberately NOT `prebuild` despite
-// check-version.mjs's own placement there. This check imports
-// ALLOWED_TRANSITIONS from dist/, which changes on every edit to
-// tools/transitions.ts; hooked at `prebuild` it would run BEFORE `tsc`, so
-// `npm run build` right after editing transitions.ts would validate the
-// PREVIOUS build's dist — the exact "compare against stale compiled output"
-// failure this ticket exists to prevent, reintroduced by the wiring itself.
-// check-version.mjs's dist check tolerates the same prebuild timing because
-// what it pins (the version literal) does not change mid-edit the way a
-// transition table does. `postbuild` runs after `tsc` and still fires on
-// every `npm run build` and every `npm test` (via `pretest` -> `build` ->
-// `postbuild`), so it is exercised in the same places, against fresh output.
+// ALLOWED_TRANSITIONS in dist/tools/transitions.js (same pattern as
+// check-version.mjs). A missing or unparseable table or source is a failure,
+// never a vacuous pass. Wired at `postbuild`, not `prebuild`, so it checks
+// fresh dist output. Why it exists and why postbuild: see specs/e260c-bin-scripts.md.
 
 import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
