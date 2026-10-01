@@ -1,8 +1,9 @@
 // Coded by @qa-engineer
-// Tests that `agc eject` shows paths containing control characters (LF, CR, ESC) in escaped form, so a directory name cannot split its output across lines, and prints a manual-removal note instead of a shell command embedding the raw byte.
-// Spec: specs/e250-eject-path-escape.md AC1-AC11, AC13, AC14. AC12 (a docs/config.md row, E251) is checked by search; AC13 (test/e108-eject.test.mjs passes unmodified) by the full-suite run; AC14's assertions sit inside the AC1/AC3/AC4/AC5 cases.
-// Coverage: LF, CR and ESC are each exercised (workspace dir, subdirectory prefix, linked-worktree dir, $HOME dir); a "boundary:" case combines all three. Every scratch repo is a real git repo under os.tmpdir() and each real bin/agc-init.mjs call runs with HOME at a fresh empty temp dir unless AC10/AC11 override it.
-// Every control-character fixture is skipped on win32 (NTFS forbids 0x00-0x1F in filenames). AC1 and AC6 were confirmed to fail against bin/agc-init.mjs before the fix (commit 8437af1). (T-E250-06)
+// Tests that `agc eject` shows paths containing control characters (LF, CR, ESC) in escaped
+// form, so a directory name cannot split its output, and prints a manual-removal note, not a
+// shell command with the raw byte (specs/e250-eject-path-escape.md AC1-AC11, AC13, AC14;
+// T-E250-06). AC12 is checked by search, AC13 by the full suite. Fixtures: real git repos
+// under os.tmpdir() with HOME at a fresh temp dir; skipped on win32 (NTFS forbids 0x00-0x1F).
 // Rationale: specs/e260f-comment-rationale.md (test/e250-eject-path-escape.test.mjs).
 
 import { test } from "node:test";

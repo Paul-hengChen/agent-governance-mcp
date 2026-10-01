@@ -1,7 +1,9 @@
 // Coded by @qa-engineer
-// Tests for the manifest `mailbox:` header, which may be relative to the primary checkout (specs/e248-relative-mailbox-header.md AC1-AC9). T-E248-02.
-// Pins the resolveMailboxHeader contract, the render-only input error MAILBOX_TILDE, the non-fatal validate WARN, `--mailbox-root` precedence, and the no-primary skip (PRIMARY_NOT_FOUND is the only report). Test names start with the AC number.
-// The manifest builder mirrors test/e177a-manifest.test.mjs's manifestText() and test/e235b-relative-worktree.test.mjs's rowWithWorktree(); every fixture is built under os.tmpdir(), never inside this repo.
+// Tests for the manifest `mailbox:` header, which may be relative to the primary checkout
+// (specs/e248-relative-mailbox-header.md AC1-AC9; T-E248-02). Pins the resolveMailboxHeader
+// contract, the input error MAILBOX_TILDE, the non-fatal validate WARN, `--mailbox-root`
+// precedence and the no-primary skip. Test names start with the AC number; fixtures are
+// built under os.tmpdir() (builders mirror e177a-manifest and e235b-relative-worktree).
 // Rationale: specs/e260f-comment-rationale.md (test/e248-relative-mailbox-header.test.mjs).
 
 import { test } from "node:test";

@@ -1,7 +1,9 @@
 // Coded by @qa-engineer
-// Tests that `agc init` run from a subdirectory of a git repo writes .git/info/exclude rules anchored under that subdirectory and that `agc check` reads them back the same way (specs/e239-init-subdir-exclude.md AC1-AC13). AC14 is checked by grep; AC3 is the existing test/e106-init-artifacts-flag.test.mjs suite passing unchanged, to which this file adds one regression case.
-// Also tests that a subdirectory name containing a backslash or control character is refused for local mode, like other gitignore-unsafe names (specs/e243-init-path-escape-refusal.md AC15-AC20, after the "E243" banner below). (T-E243-04)
-// Every scratch repo is a REAL git repository under os.tmpdir() with a local identity (never this checkout or the ambient global git config), as in test/e106-init-artifacts-flag.test.mjs. The AC1/AC2 scenario was confirmed to fail on the code before the fix: without the subdirectory prefix the scaffold shows up as untracked. (T-E239-02)
+// Tests that `agc init` run from a subdirectory of a git repo writes .git/info/exclude
+// rules anchored under that subdirectory and that `agc check` reads them back the same way
+// (specs/e239-init-subdir-exclude.md AC1-AC13; T-E239-02). AC3 is the existing e106 suite
+// passing unchanged. Also: a subdirectory name with a backslash or control character is
+// refused for local mode (specs/e243-init-path-escape-refusal.md AC15-AC20; T-E243-04).
 // Rationale: specs/e260f-comment-rationale.md (test/e239-init-subdir-exclude.test.mjs).
 
 import { test } from "node:test";
@@ -357,8 +359,13 @@ test("AC13: agc check advises rather than mis-tests on a gitignore-unsafe subdir
   );
 });
 
-// Backslash and control-character subdirectory names (E243). The shared predicate (repoRelativeWorkspacePrefix()'s unsafeSegment, via GITIGNORE_UNSAFE_SEGMENT_RE) treats a literal backslash, the C0 control range (0x01-0x1F) and DEL (0x7F) as unsafe, on top of the gitignore wildcards.
-// AC15-AC20 below cover these names; AC8/AC13 above match the wider refusal text (AC12). Without the refusal, init would write a `.config.json` declaring "local" plus a wrong exclude rule (a backslash segment becomes `/ab/.current/`; a CR writes a raw 0x0D byte into `.git/info/exclude`).
+// Backslash and control-character subdirectory names (E243). The shared predicate
+// (repoRelativeWorkspacePrefix()'s unsafeSegment, via GITIGNORE_UNSAFE_SEGMENT_RE) treats a
+// literal backslash, the C0 control range (0x01-0x1F) and DEL (0x7F) as unsafe, on top of
+// the gitignore wildcards. AC15-AC20 below cover these names; AC8/AC13 above match the
+// wider refusal text (AC12). Without the refusal, init would write a `.config.json`
+// declaring "local" plus a wrong exclude rule (a backslash segment becomes `/ab/.current/`;
+// a CR writes a raw 0x0D byte into `.git/info/exclude`).
 
 // ---------------------------------------------------------------------------
 // AC15 — backslash subdir name refuses local mode cleanly (E243)

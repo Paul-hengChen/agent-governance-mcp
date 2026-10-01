@@ -1,8 +1,9 @@
 // Coded by @qa-engineer
-// Tests the declared build-error exemption file `.current/exemptions.json`, the ONLY allowed way to exempt a known error from the Constitution §2 "zero build errors" rule: the never-throwing loader (tools/exemptions.ts, T-E24-01);
-// the exemptions shown on both branches of the state-read envelope (tools/handoff.ts, T-E24-02); the const-05 §2 "Build-gate exemptions" bullet, checked by text search (T-E24-03; its token budget is in test/context-budget.test.mjs). (E24)
-// Fail direction throughout: never-silently-exempt. A malformed manifest or entry must collapse toward "not exempted" (zero exemptions plus loud errors, or that one entry dropped), never toward an unvalidated exemption.
-// Test ids: loader L1-L9, envelope G1-G3, prose pin P1-P5. The backlog row is the spec; never-throw and both envelope paths were confirmed in review_reports/review_T-E24-01.md.
+// Tests the declared build-error exemption file `.current/exemptions.json`, the ONLY
+// allowed way to exempt a known error from the Constitution §2 "zero build errors" rule:
+// the never-throwing loader (tools/exemptions.ts), the state-read envelope (tools/handoff.ts)
+// and the const-05 §2 bullet (E24; backlog row is the spec). Fail direction: toward "not
+// exempted", never an unvalidated exemption. Test ids: loader L1-L9, envelope G1-G3, prose P1-P5.
 // Rationale: specs/e260f-comment-rationale.md (test/e24-exemptions.test.mjs).
 
 import { test } from "node:test";
