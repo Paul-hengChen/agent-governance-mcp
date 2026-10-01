@@ -1,5 +1,7 @@
 # Pending tickets — lane e260h
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E260H-NEW-1
 title: test/subagent-templates.test.mjs still maps the teamwork template to the retired content/skill-coordinator.md
@@ -30,5 +32,3 @@ body: |
   points no other spec records, but nothing in test/qa-flow.test.mjs points to it; add a
   one-line pointer. Both edits are in test/, so qa-engineer authors them.
 ```
-
-## Applied
