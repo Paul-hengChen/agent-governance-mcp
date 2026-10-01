@@ -169,7 +169,7 @@ export const UPDATE_STATE_GATE_PIPELINE = [
                 // it applies to this write only. The audit check lives inside this
                 // lease-held branch on purpose: an override with nothing to bypass
                 // does nothing, so an unaudited lease_override on an unheld lease is
-                // never rejected. (E10)
+                // never rejected.
                 const leaseFileMode = storage instanceof FileHandoffStorage;
                 const overrideClass = classifyLeaseOverride(parsed);
                 if (leaseFileMode && overrideClass === "audited") {
@@ -774,16 +774,11 @@ export const UPDATE_STATE_GATE_PIPELINE = [
                                 isError: true,
                             };
                         }
-                        // v3.38.0 — Baseline provenance gate (qa-visual-baseline-provenance, AC-1/AC-2).
-                        // The v3.27 schema gate confirmed the report's STRUCTURE is complete and every
-                        // row reads pass/accepted; it could NOT confirm the agent diffed a real baseline.
-                        // This gate parses each per-surface prose sub-section under ## Region Diff and
-                        // rejects PASS when a diffed (non-carry-forward) surface lacks a baseline:
-                        // fingerprint or a diff-metric: value. Opt-in (D2): dormant for reports with no
-                        // baseline: line anywhere (legacy/pre-provenance). Carry-forward surfaces are
-                        // exempt (AC-3); a "B1 tool unavailable — LLM fallback" note satisfies the
-                        // metric requirement (AC-4). FIFTH and LAST visual sub-gate — runs only on an
-                        // otherwise-clean, armed report.
+                        // Baseline provenance gate: in each per-surface sub-section under
+                        // `## Region Diff`, a diffed (not carry-forward) surface needs a
+                        // baseline: fingerprint or a diff-metric: value. Dormant for
+                        // reports with no baseline: line. A "B1 tool unavailable — LLM
+                        // fallback" note satisfies the metric requirement.
                         const prov = checkVisualProvenance(parsed.workspace_path, parsed.completed_tasks);
                         if (!prov.ok) {
                             const listing = Object.entries(prov.offendingByTaskId)
@@ -798,16 +793,11 @@ export const UPDATE_STATE_GATE_PIPELINE = [
                                 isError: true,
                             };
                         }
-                        // v3.40.0 — Baseline manifest gate (figma-baseline-manifest-gate).
-                        // SIXTH and LAST visual sub-gate. The v3.38 provenance gate confirmed
-                        // each diffed surface carries a real baseline+diff; this gate confirms
-                        // the design-auditor FROZE the baseline node-id selection in the
-                        // design file's ## Source manifest (step 2c) rather than eyeball-picking
-                        // or re-deriving it. Opt-in (AC-N3): dormant when ## Source is absent
-                        // (pre-v3.40 designs). Single-surface (1 audited row) is exempt from
-                        // the provenance-section requirement (AC-3); multi-surface (>=2) must
-                        // record filter-conditions + exclusion-reasons in
-                        // ## Baseline Selection Provenance (AC-2).
+                        // Baseline manifest gate: the design-auditor must have frozen the
+                        // baseline node-id selection in the design file's `## Source`
+                        // manifest. Dormant when `## Source` is absent. A single audited
+                        // row is exempt; two or more must record filter conditions and
+                        // exclusion reasons under `## Baseline Selection Provenance`.
                         const manifest = checkBaselineManifest(parsed.workspace_path, parsed.active_feature);
                         if (!manifest.ok) {
                             const text = manifest.code === "BASELINE_MANIFEST_MISSING"
@@ -815,16 +805,11 @@ export const UPDATE_STATE_GATE_PIPELINE = [
                                 : gate("BASELINE_PROVENANCE_INCOMPLETE").hintStatic;
                             return { content: [{ type: "text", text }], isError: true };
                         }
-                        // v3.42.0 — Pixel-gate attestation (qa-visual-pixel-gate-attestation,
-                        // AC-2/AC-5). SEVENTH and LAST visual sub-gate. The v3.38 provenance
-                        // gate (now tightened by DIFF_METRIC_PLACEHOLDERS, AC-1) confirms each
-                        // diffed surface carries a REAL baseline + non-placeholder diff-metric;
-                        // this gate confirms qa-visual POSITIVELY attested the pixel gate ran
-                        // to completion (`pixel_gate_complete: true`) per surface. Closes the
-                        // F2 false-pass: a skipped diff can no longer ride structural assertions
-                        // to PASS. Opt-in (mirrors provenance D2): dormant for reports with no
-                        // baseline: line anywhere. Carry-forward surfaces are exempt (AC-4);
-                        // the B1 LLM-fallback path STILL requires the attestation (AC-5).
+                        // Pixel-gate attestation: qa-visual must attest
+                        // `pixel_gate_complete: true` per surface, so a skipped diff cannot
+                        // ride structural assertions to PASS. Dormant for reports with no
+                        // baseline: line; carry-forward surfaces are exempt; the B1
+                        // LLM-fallback path still needs the attestation.
                         const attestation = checkPixelGateAttestation(parsed.workspace_path, parsed.completed_tasks);
                         if (!attestation.ok) {
                             const listing = Object.entries(attestation.offendingByTaskId)
@@ -856,19 +841,12 @@ export const UPDATE_STATE_GATE_PIPELINE = [
         run: (ctx) => {
             const { parsed, storage } = ctx;
             if (parsed.status === "PASS" && parsed.completed_tasks.length > 0) {
-                // v3.57.0 — Expected-Red Diff gate (c15-expected-red-manifest, AC-4).
-                // Mirrors VISUAL_EVIDENCE_MISSING's arming polarity: dormant unless
-                // sr-engineer declared qa_reports/expected-red_<feature>.txt (absence
-                // = "no expected reds", zero cost — the external_refs/dispatch_pins
-                // precedent). When armed, at least ONE qa_reports/review_<id>.md for
-                // the PASS'd ids (or a file covering one of them via the c3 covers:
-                // convention) must contain a ## Expected-Red Diff H2 recording QA's
-                // Phase 0.5 suite-vs-manifest diff disposition. Existence-of-section
-                // only — the server does NOT run the test suite or validate the diff
-                // content (same trust boundary as MISSING_EVIDENCE). FILE-MODE ONLY
-                // (AC-5): the manifest is a qa_reports/ file convention; SQLite/HTTP
-                // mode has no equivalent — skip explicitly, mirroring the
-                // cut-approval / external-refs guards.
+                // Expected-red diff gate: dormant unless sr-engineer declared
+                // qa_reports/expected-red_<feature>.txt. When armed, at least one
+                // review file for the PASS'd ids (or a covers: file) must have an
+                // `## Expected-Red Diff` section with QA's suite-vs-manifest
+                // disposition. Section existence only; the server runs no tests.
+                // File mode only: the manifest is a qa_reports/ file.
                 if (storage instanceof FileHandoffStorage) {
                     const manifest = hasExpectedRedManifest(parsed.workspace_path, parsed.active_feature);
                     if (manifest.present) {
@@ -907,7 +885,7 @@ export const UPDATE_STATE_GATE_PIPELINE = [
                         // The disposition heading match runs under the feature's pinned
                         // evidence schema: under pin >=2 or no pin, a heading such as
                         // `## Phase 3.5 — AC Execution Log` also clears; pin 1 keeps the
-                        // exact anchor. (E23)
+                        // exact anchor.
                         const disposition = hasAcExecutionLogDisposition(parsed.workspace_path, parsed.completed_tasks, evidenceSchemaPin);
                         if (!disposition.present) {
                             // Name the expected heading, every review file path inspected,
@@ -938,16 +916,11 @@ export const UPDATE_STATE_GATE_PIPELINE = [
         codes: ["MISSING_REVIEW_EVIDENCE"],
         run: async (ctx) => {
             const { parsed, storage, prevTuple, nextTuple } = ctx;
-            // Code-reviewer evidence gate. Mirrors the PASS gate above for the
-            // sr ↔ code-reviewer → qa handoff. Only fires when the previous tuple
-            // is (code-reviewer, In_Progress) AND the next tuple hands off to qa.
-            // The review-scope manifest travels in the transient review_task_ids
-            // field; completed_tasks on the APPROVED handoff is no longer used
-            // for it (any growth there is rejected upstream by
-            // QA_COMPLETION_EVIDENCE_MISSING). Resolution follows the qa_review
-            // rule: review_task_ids if non-empty, else completed_tasks (so
-            // carry-forward ids on an older-style write still get their review
-            // evidence checked here). (C16, E32)
+            // Code-reviewer evidence gate: on the code-reviewer:In_Progress →
+            // qa-engineer:In_Progress handoff, every id in review scope needs
+            // review evidence. Scope is review_task_ids if non-empty, else
+            // completed_tasks, as for qa_review, so carry-forward ids on an
+            // older-style write are still checked.
             const reviewScopeIds = parsed.review_task_ids && parsed.review_task_ids.length > 0
                 ? parsed.review_task_ids
                 : parsed.completed_tasks;
@@ -986,44 +959,13 @@ const ALL_AGENT_NAMES = [
     "release-engineer",
 ];
 const ALL_STATUS_NAMES = ["In_Progress", "PASS", "FAIL", "Blocked"];
-// Computes the ACTUAL set of states allowed to follow a given state
-// (typically the state a write just landed on), by calling validateTransition
-// itself for every (agent, status) pair rather than re-deriving a second,
-// divergent notion of "allowed" from the static ALLOWED table. This is the
-// only way to correctly honor the three edges that sit OUTSIDE that table:
-//   (a) the Amend-Resume `resume_of` edge: pm:In_Progress →
-//       {code-reviewer, qa-engineer}:In_Progress, legal only when a write
-//       sets resume_of to that exact role. A future write's resume_of value
-//       is unknowable from here, so by default this function ASSUMES it
-//       would be set to match — treating the edge as reachable, never as
-//       illegal. When unsure, stay silent: a false warning on a legal
-//       routing directive is worse than a missed one. Pass
-//       `assumeResumeOf: false` to get the strict (resume_of-independent)
-//       set instead — the caller uses it to tell conditional edges apart
-//       from unconditional ones in the printed message.
-//   (b) the round/hop-cap overrides, which collapse the allowed set to
-//       {pm: In_Progress} alone once a round counter is at cap. The three
-//       round-cap overrides in validateTransition (tools/transitions.ts)
-//       have no feature_changed term — each returns null for
-//       (pm,In_Progress) unconditionally — so passing the post-write round
-//       counters here reproduces the exact collapse the next real
-//       transition attempt will see. The hop-cap override in the same
-//       function is DIFFERENT: it reads feature_changed and a future write
-//       that opens a new feature (`true`) bypasses the gate entirely, so
-//       whether a next-feature write is legal at hop cap is unknowable from
-//       here — the same "unknowable input" shape as (a). This function
-//       therefore unions BOTH feature_changed branches per candidate: a
-//       candidate counts as reachable if EITHER accepts it. Below the hop
-//       cap the branches are identical, so this changes nothing there;
-//       at/above it, it trades a false warning on an illegal same-feature
-//       next_role (the accepted under-warn direction — the
-//       hop-cap-cross sentinel below, guarded by `new_hop_count >=
-//       HOP_CAP_EXPORTED && prev_hop_count < HOP_CAP_EXPORTED`, already
-//       covers that writer) for never warning on a legal next-feature one.
-//   (c) the self-loop fast path (same agent, In_Progress → In_Progress),
-//       which bypasses the static table entirely.
-// Pure / fs-free (like transitions.ts itself): 64 in-memory calls, no I/O.
-// (E38)
+// The states allowed to follow `prev`, found by calling validateTransition for
+// every (agent, status) pair, so the three edges outside the static ALLOWED
+// table are honoured: the resume_of edge (assumed set unless
+// `assumeResumeOf: false`), the round/hop-cap collapse to pm:In_Progress, and
+// the self-loop fast path. Both feature_changed branches are unioned unless
+// `featureChanged` pins one. Pure: 64 in-memory calls, no I/O.
+// Why: specs/e260a-tools-a-h-rationale.md, "tools/handoff-orchestrator.ts — effectiveAllowedSuccessors".
 function effectiveAllowedSuccessors(prev, counters, options = {}) {
     const { assumeResumeOf = true, featureChanged } = options;
     // `featureChanged` lets a caller pin the union to one branch instead of
@@ -1165,14 +1107,11 @@ async function handleUpdateStateCore(parsed) {
     if (new_visual_round >= 6 && prev_visual_round < 6) {
         pending.unshift("⛔ Visual Round 6: forced rollback to pm — no further pixel iteration allowed until PM rebudgets scope or threshold.");
     }
-    // v9 (d2-server-brake-accounting) — hop-cap-cross sentinel. Same
-    // `new >= cap && prev < cap` predicate as the three round sentinels
-    // above: fires exactly once per cap-cross from any prior value. This
-    // write itself is still accepted (the counter only REACHED cap here);
-    // the NEXT counted role transition trips HOP_CAP_EXCEEDED in
-    // validateTransition, which admits only the (pm, In_Progress) landing
-    // — and that landing does NOT reset hop_count (DR-6): only an
-    // active_feature change does.
+    // Hop-cap-cross sentinel, same `new >= cap && prev < cap` predicate as
+    // the round sentinels above. This write is still accepted (the counter
+    // only reached cap); the next counted role transition trips
+    // HOP_CAP_EXCEEDED, which admits only the pm:In_Progress landing, and
+    // that landing does not reset hop_count — only a feature change does.
     if (new_hop_count >= HOP_CAP_EXPORTED && prev_hop_count < HOP_CAP_EXPORTED) {
         pending.unshift(`⛔ Hop cap reached (hop_count=${new_hop_count}/${HOP_CAP_EXPORTED}): ` +
             "next role transition will be rejected (HOP_CAP_EXCEEDED) — only (pm, In_Progress) may land. " +
@@ -1199,10 +1138,10 @@ async function handleUpdateStateCore(parsed) {
         // file-mode-only attestation fields below.
         hopCount: new_hop_count,
         // Cumulative totals, computed by computeNewRound alongside
-        // hop_count and persisted in file-mode frontmatter ONLY:
+        // hop_count and persisted in file-mode frontmatter only:
         // SqliteHandoffStorage.writeState ignores all three, because their
         // only consumer, the release-close metrics emit, runs only under
-        // FileHandoffStorage. (E8, v12)
+        // FileHandoffStorage.
         qaRoundsTotal: new_qa_rounds_total,
         reviewRoundsTotal: new_review_rounds_total,
         visualRoundsTotal: new_visual_rounds_total,
@@ -1228,14 +1167,11 @@ async function handleUpdateStateCore(parsed) {
         // writeHandoffState). File mode only: SqliteHandoffStorage.writeState
         // ignores it. (E2, v11)
         dispatchMode: parsed.dispatch_mode,
-        // evidence_schema, stamped by the server. SET here on the first
-        // accepted write of a new active_feature (feature_changed includes
-        // the fresh-workspace case); OMITTED on same-feature writes so
-        // writeHandoffState's feature-scoped carry keeps the existing pin
-        // exactly — including having no pin, for features started before
-        // pins existed (the migration invents none). Never client-supplied:
-        // `parsed` has no such field. File mode only:
-        // SqliteHandoffStorage.writeState ignores it. (E23, v13)
+        // evidence_schema, stamped by the server: set on the first accepted
+        // write of a new active_feature (including a fresh workspace) and
+        // omitted on same-feature writes, so writeHandoffState's carry keeps
+        // the existing pin exactly, even no pin for older features. Never
+        // client-supplied. File mode only: SqliteHandoffStorage ignores it.
         evidenceSchema: feature_changed ? EVIDENCE_SCHEMA_CURRENT : undefined,
         // cut_approved_source, passed straight through: a feature-scoped
         // scalar using the same carry-forward as dispatch_mode (carry-forward
@@ -1243,7 +1179,6 @@ async function handleUpdateStateCore(parsed) {
         // client (parsed.cut_approved_source comes straight from the zod
         // arg), unlike the server-stamped evidenceSchema above. No gate reads
         // it. File mode only: SqliteHandoffStorage.writeState ignores it.
-        // (E114, v14)
         cutApprovedSource: parsed.cut_approved_source,
         // dispatch_mechanism / dispatch_mechanism_tier, passed straight
         // through and self-reported by the writer. They apply to this hop
@@ -1262,13 +1197,10 @@ async function handleUpdateStateCore(parsed) {
         bookkeepingWrite: parsed.bookkeeping_write,
     });
     // Append one line per hop to the dispatch-mechanism sidecar so the
-    // record survives later state rewrites. Reached only AFTER the state
-    // write above succeeded (a throwing writeState never gets here), and
-    // only when this write carried dispatch_mechanism: a write without it
-    // appends nothing. appendDispatchRecord never throws (the same
-    // contract as emitGateTelemetry), so the ToolResult below is
-    // identical with or without this hook. It writes only its own
-    // sidecar — never the metrics or gate-fire telemetry streams. (E99)
+    // record survives later state rewrites. Runs only after the state write
+    // succeeded and only when this write carried dispatch_mechanism.
+    // appendDispatchRecord never throws, so the ToolResult is unchanged
+    // either way; it writes only its own sidecar.
     if (parsed.dispatch_mechanism) {
         appendDispatchRecord(parsed.workspace_path, {
             feature: parsed.active_feature,
@@ -1293,15 +1225,12 @@ async function handleUpdateStateCore(parsed) {
             // swallow — state write is the source of truth; cleanup is opportunistic
         }
     }
-    // Release-close metrics emit. Fires on the terminal-marker signature
-    // (the same "feature has shipped" predicate gates/feature-lease.ts
-    // trusts): the release-engineer's closing self-loop routing back to
-    // pm. File mode only — the marker keys on next_role, which
-    // SqliteHandoffStorage never persists. Totals are read from
-    // prevState: the closing write is a release-engineer self-loop, so
-    // computeNewRound carries them over unchanged and prevState is
-    // authoritative. emitFeatureMetrics never throws, so the ToolResult
-    // below is identical with or without this hook. (E8)
+    // Release-close metrics emit, on the terminal-marker signature that
+    // gates/feature-lease.ts also trusts: the release-engineer's closing
+    // self-loop routing back to pm. File mode only (the marker keys on
+    // next_role). Totals come from prevState: on that self-loop
+    // computeNewRound carries them over unchanged. emitFeatureMetrics never
+    // throws, so the ToolResult is the same with or without this hook.
     if (storage instanceof FileHandoffStorage &&
         parsed.agent_id === "release-engineer" &&
         parsed.status === "In_Progress" &&
@@ -1315,21 +1244,12 @@ async function handleUpdateStateCore(parsed) {
             hops: prevState?.hop_count ?? 0,
         });
     }
-    // Shrink warning for fields a write replaces wholesale (dispatch_pins
-    // and external_refs). A writer that skips read-before-write silently
-    // drops entries. When THIS write supplied one of them and the supplied
-    // set drops any prior entry (same-feature writes only — a feature
-    // change legitimately drops both feature-scoped fields), append an
-    // advisory `warnings` array to the success envelope naming the dropped
-    // entries. Detection compares entry identity — dispatch_pins by key,
-    // external_refs by ref string — not counts, so a same-size (or even
-    // growing) set that swaps out a prior entry warns too. Warn-only:
-    // never rejects, no new arg, no schema bump, and any failure here
-    // leaves the original envelope untouched (the state write already
-    // succeeded). A pin whose VALUE changes but whose key survives is not
-    // a drop (values are free-text tiers, and re-pinning a role is normal
-    // use); the same holds for an external_refs entry whose state advances
-    // under an unchanged ref. (E28, E33)
+    // Shrink warning for the wholesale-replaced fields dispatch_pins and
+    // external_refs: on a same-feature write that supplied one and dropped
+    // a prior entry, add an advisory `warnings` array naming the dropped
+    // entries. Compares entry identity (pin key, ref string), not counts; a
+    // changed value under a surviving key is not a drop. Warn-only: any
+    // failure here leaves the original envelope untouched.
     const shrinkWarnings = [];
     if (prevState && !feature_changed) {
         if (parsed.dispatch_pins) {
@@ -1355,19 +1275,12 @@ async function handleUpdateStateCore(parsed) {
             }
         }
     }
-    // next_role lookahead at write time. next_role is documented at the
-    // tool boundary as "advisory metadata only — enum-validated but NOT
-    // cross-checked against ALLOWED_TRANSITIONS", so a legal write can
-    // name a next_role that the very next hop is certain to
-    // TRANSITION_REJECT (for example qa-engineer:FAIL written with
-    // next_role="design-auditor", whose allowed set is {sr-engineer, pm}).
-    // This warns ONLY when parsed.next_role is set AND names an agent
-    // outside the effective allowed-successor set of nextTuple (the state
-    // THIS write just landed on) under the post-write round/hop counters
-    // — the exact counters the next real transition will be checked
-    // against. Deliberately advisory: it only decorates the envelope
-    // after the write — no GATE_REGISTRY entry, no new error code, no
-    // pipeline step that can reject this write. (E38)
+    // next_role lookahead: next_role is advisory and not checked against
+    // ALLOWED_TRANSITIONS, so a legal write can name a role the next hop is
+    // certain to reject. Warn when parsed.next_role names an agent outside
+    // the effective allowed successors of nextTuple under the post-write
+    // round/hop counters. Advisory only: decorates the envelope after the
+    // write and never rejects.
     const nextRoleWarnings = [];
     if (parsed.next_role) {
         const counters = {
@@ -1379,39 +1292,19 @@ async function handleUpdateStateCore(parsed) {
         const effective = effectiveAllowedSuccessors(nextTuple, counters);
         const isLegalSuccessor = effective.some((e) => e.agent === parsed.next_role);
         if (!isLegalSuccessor) {
-            // Q2 fix (round 3, C2) — the printed remedy list must not
-            // (1) advertise a resume_of-conditional edge as unconditional
-            // routing advice, (2) advertise a hop-cap union-only edge (legal
-            // only if the next write opens a NEW feature, N1) as legal
-            // same-feature, or (3) exclude a same-agent STATUS CHANGE
-            // (qa:In_Progress -> qa:PASS/FAIL/Blocked, sr:In_Progress ->
-            // sr:Blocked) merely because it shares an agent with the state
-            // just written. Round 2's `e.agent === nextTuple.agent` filter
-            // conflated (3) with the genuine In_Progress->In_Progress
-            // self-loop fast path in validateTransition
-            // (tools/transitions.ts) and emptied the remedy list on
-            // qa-engineer:In_Progress and pm:Blocked, whose
-            // successors are ALL same-agent — resurrecting the categorically
-            // false "(none - ...)" fallback as live output. Excluding only
-            // the exact (agent, status) PAIR that was just written keeps
-            // that fallback dead (round-1 proof: no reachable state has an
-            // empty ALLOWED row) while still surfacing same-agent status
-            // changes as the genuinely actionable answer. Printing
-            // `agent:status` pairs (rather than deduped bare agent names)
-            // is what makes the narrowed filter informative instead of
-            // ambiguous.
+            // The remedy list prints `agent:status` pairs and excludes only the
+            // exact pair just written, not every same-agent state: some states
+            // (qa-engineer:In_Progress, pm:Blocked) have only same-agent
+            // successors. Edges legal only with resume_of are marked, not
+            // offered as unconditional advice.
             const strict = effectiveAllowedSuccessors(nextTuple, counters, {
                 assumeResumeOf: false,
             });
             const strictKeys = new Set(strict.map((e) => `${e.agent}:${e.status}`));
-            // N1 (round 3, non-blocking) — the C1 union's mirror cost: at
-            // hop cap, `effective` includes edges legal ONLY because
-            // feature_changed=true bypasses the hop-cap override in
-            // validateTransition (tools/transitions.ts). Recomputing with
-            // featureChanged pinned to false isolates the same-feature-legal
-            // subset; below the hop cap the two sets are identical
-            // (feature_changed is inert there, per the C1 fix's own
-            // comment), so this never annotates off-cap.
+            // At hop cap, `effective` also holds edges legal only because a
+            // feature change bypasses the hop-cap override. Recomputing with
+            // featureChanged pinned to false isolates the same-feature subset;
+            // below the cap the two sets match, so nothing is annotated there.
             const sameFeatureOnly = effectiveAllowedSuccessors(nextTuple, counters, {
                 featureChanged: false,
             });

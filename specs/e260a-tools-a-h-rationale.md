@@ -49,3 +49,11 @@ There is no fallback that stamps every open task when both `review_task_ids` and
 - No `prevState` guard: on a new workspace every claimed id is new, and a first-write completion claim with no evidence is exactly what this rejects.
 - `bookkeeping_write` touches do not grow the ledger. Ledgers polluted before this rule existed are left as they are.
 - File mode only, like the other attestation gates; SQLite's `hasEvidence` path is based on report rows and is out of scope.
+
+### tools/handoff-orchestrator.ts — effectiveAllowedSuccessors
+
+The function calls `validateTransition` itself for every (agent, status) pair instead of reading the static ALLOWED table, because three edges sit outside that table:
+
+- **The `resume_of` edge** (pm:In_Progress to code-reviewer or qa-engineer:In_Progress) is legal only when the write sets `resume_of` to that role. A future write's `resume_of` cannot be known here, so by default the edge counts as reachable: a false warning on a legal routing directive is worse than a missed one. `assumeResumeOf: false` returns the strict set, which the caller uses to mark conditional edges in its message.
+- **The round and hop caps** collapse the allowed set to pm:In_Progress. The three round-cap overrides ignore `feature_changed`, so passing the post-write counters reproduces exactly what the next transition will see. The hop-cap override does read `feature_changed`: a write that opens a new feature bypasses it, and whether the next write will do so is unknowable. So the function unions both `feature_changed` branches: a candidate counts if either accepts it. Below the hop cap the branches agree. At or above it, this accepts missing a warning on an illegal same-feature `next_role` (the hop-cap-cross sentinel already covers that writer) in exchange for never warning on a legal next-feature one.
+- **The self-loop fast path** (same agent, In_Progress to In_Progress) bypasses the static table entirely.
