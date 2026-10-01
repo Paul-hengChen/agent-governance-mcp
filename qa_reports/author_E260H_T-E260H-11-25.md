@@ -34,3 +34,4 @@ One row per task; `proof` is `node .current/e260h/proof.mjs --changed-only` on t
 | T-E260H-16 | `test/verify-release.test.mjs` base lines 1201–end | 16 (longest 24) | 0 | PASS; file has no block over 7 |
 | T-E260H-17 | `test/qa-flow.test.mjs`, `test/prompt-state-footer.test.mjs` | 16 + 4 (longest 37) | 0 | PASS |
 | T-E260H-18 | `test/reviewer-completed-tasks-gate.test.mjs`, `test/stale-dispatch-detection.test.mjs`, `test/skill-manifest.test.mjs`, `test/rag.test.mjs` | 6 + 4 + 4 + 1 (longest 51) | 0 | PASS |
+| T-E260H-19 | `test/qa-visual-skill-split.test.mjs`, `test/source-credibility-gate.test.mjs`, `test/token-budget-config.test.mjs`, `test/skill-evolution-v3.11.test.mjs`, `test/telemetry.test.mjs` | 5 + 3 + 1 + 2 + 2 (longest 38) | 0 | PASS |

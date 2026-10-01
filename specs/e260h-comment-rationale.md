@@ -144,3 +144,45 @@ The mechanism makes coordinator-memory bookkeeping durable, which is why no test
 Spec-to-test map for `specs/d6-host-capability-compose-axis.md`: AC1 (`taskTool:true` includes host fragments) `t-full-includes-host`, `t-golden-byte-identity`; AC2 (`taskTool:false` excludes them) `t-lean-excludes-host`, `t-lean-exact-core-concat`; AC3 (absent or unknown signal defaults to lean) `t-hostcaps-default-lean`, `t-buildPromptForRole-default-lean`; AC4 (segment shape reuse) `t-includeSkillSegment-pure`; AC5 (golden byte identity) `t-golden-byte-identity`; AC7 both host states, whole file. `composeSkill` precedence: a whole-file `.current/` override bypasses host filtering (`t-override-bypass-lean`, `t-override-bypass-full`); registry fragments are filtered by predicate (the AC1 and AC2 tests); an unsplit skill passes through whole (`t-unsplit-passthrough`, `t-switchRole-unsplit-host-independent`). An explicit config `host` wins over the in-server lean default (`t-config-host-precedence-*`); the hook's structural default is the caller's concern.
 
 Strip parity (backlog row E51, the backlog row is the spec): AC1 no marker in switchRole output for any role (`t-e51-switchRole-marker-free`, `t-e51-witness-fences-exist-in-source`); AC2 compose-golden fixtures byte-identical (`t-golden-byte-identity` and `test/compose-equivalence.test.mjs`; a differing fixture is a failure, never regenerated); AC3 strippers still importable from `build.js` (`t-e51-build-reexport-surface`); AC5 the hook path deliberately untouched (`t-e51-hook-remains-non-caller`); the shared-pass `fullDetail` contract, frontmatter surviving the strip and the whole-file override also stripped (`t-e51-applyTextTransforms-contract`, `t-e51-frontmatter-survives-strip`, `t-e51-override-is-stripped`).
+
+## test/qa-visual-skill-split.test.mjs
+
+Size-cap history. v3.14.0 relaxed both budgets: `skill-qa-engineer.md` gained a PASS-gate paragraph in the Phase 1.5 hook (about 600 bytes) and the visual sub-skill gained the widget shape checklist (about 1800 bytes), exceeding the v3.8.3 cap of 2400 bytes by design. The savings invariant against the v3.8.2 baseline still holds: the QA SOP was 8660 bytes before the split, a number that is informational only.
+
+- `skill-qa-engineer.md`: raised over time for `covers:` batching, the Expected-Red Diff phase, `review_task_ids`, the bugfix-mode branch, AC execution, long runs and the crash checkpoint, and most recently (15500 to 17900, measured 17512) for the "Contract Defect vs Implementation Failure" section and its Escalation Routes row.
+- `skill-qa-visual.md`: 9000 to 15000 in v3.36.0 (carry-forward gate and deterministic pixel-diff pre-screen, about 5400 bytes); 15000 to 16200 in v3.38.0 (baseline-provenance rules and the fidelity baseline scope guard, measured 15804); 16200 to 17600 in v3.39.0 (the baseline source-of-truth step, which copies the design-auditor manifest's frozen node-id list and forbids URL re-derivation, measured 17247); 17600 to 18100 in v3.40.0 (the baseline-manifest gate's server-enforcement note, measured 17928); 18100 to 20700 in v3.42.0 (pixel-gate attestation additions, measured 20180).
+
+## test/source-credibility-gate.test.mjs
+
+Modelled on `test/baseline-manifest-gate.test.mjs` (parser and predicate composition, no server spawn) and `test/cut-approval-gate.test.mjs` (resume safety, storage-mode skip, verbatim hint, compose stop-condition). Spec-to-test map for `specs/e4-design-source-credibility-gate.md`:
+
+| criterion | tests |
+|---|---|
+| AC-1 credibility attestation on audited rows | T1, T2, T4, T5, T6, T7, T12 |
+| AC-2 the existing STOP is unchanged (guarded by the design-auditor SOP prose, no code path here) | none |
+| AC-3 the gate blocks on a missing or wrong attestation | T3, T5 |
+| AC-4 dormant outside the fetch-based mode, with no design file or no Source section | T8, T9a, T9b |
+| AC-5 independent of the baseline-manifest gates | T6, T7 |
+| AC-6 pinned to a pm predecessor (resume safety) | T10 |
+| AC-7 storage-mode agnostic | T11 |
+| AC-8 hint format and byte-exact S02 | T13 |
+| AC-9 coordinator Auto-Routing stop-condition | T14 |
+| AC-10 build gate | the build, audit and test run, not a unit test |
+
+## test/token-budget-config.test.mjs
+
+Spec-to-test map for `specs/b9-token-budget-brake.md`: AC1 (absent key or file disables the brake) `t-ac1-absent-key`, `t-ac1-absent-file`; AC4 (non-positive or non-finite values filtered to absent, non-fatally) the `t-ac4-*` cases: string, negative, zero, infinity from overflow, null, empty string, numeric-looking string, and a valid positive control; AC6 (byte-identical for workspaces without the key) `t-ac6-existing-fields-untouched`, `t-ac6-never-created-file`.
+
+NaN is not tested: JSON has no NaN literal, so `JSON.parse` can never hand `loadConfig` a NaN for this field (an unquoted `NaN` makes the whole document a parse error, a different failure). The `Number.isFinite` guard that would reject it was checked by the code-reviewer by reading the source rather than by a test fabricating an unreachable input. Infinity is reachable through numeric overflow such as `1e400` and is tested.
+
+## test/skill-evolution-v3.11.test.mjs
+
+Handoff schema history behind the version assertion: v6 `external_refs` (b8-external-ref-ledger); v7 `next_role`, `resume_of`, `review_verdict`, stamp-only (c9-protocol-fields); v8 `dispatch_pins`, stamp-only (c14-dispatch-pins); v9 `hop_count`, seeded 0 (d2-server-brake-accounting); v10 `dispatched_at`, stamp-only (d5-server-side-stale-dispatch-detection); v11 `dispatch_mode`, the feature-scoped carry-forward but scalar (e2-bugfix-repro-gate); v12 the three cumulative round totals, seeded 0, file mode only (e8-success-telemetry); v13 the `evidence_schema` pin (e23-evidence-schema-versioning); v14 `cut_approved_source` (e114-cut-approval-inheritance); v15 `dispatch_mechanism` and `dispatch_mechanism_tier` (e123a-lane-layout-migration). From v13 on each is stamp-only and uses the `dispatch_mode` scalar algorithm. SQLite stays at version 2: `hop_count` is added there through an idempotent `addColumnIfMissing` ALTER with no `schema_meta` bump, the mechanism `visual_round` used; every other field above lives only in the handoff YAML frontmatter, with no SQLite column.
+
+The pending-notes token sweep covers the 13 files the c9-protocol-fields spec lists; most have narrower assertions elsewhere (compose goldens, context-budget caps, the phase-0.5 SOP test, the qa-visual split test, the pixel-perfect compare test), but `skill-code-reviewer`, `skill-release-engineer`, `skill-design-auditor`, `skill-doc-writer` and `skill-researcher` have no other test for this convention.
+
+## test/telemetry.test.mjs
+
+Spec-to-test map for `specs/d3-gate-fire-telemetry.md`: AC-1 a rejection emits exactly one 5-key line (INT1); AC-2 a pass emits nothing (NE1); AC-3 the directory is auto-created (SHAPE1, implicitly: every emit call starts from a workspace with no `.current/`); AC-4 a telemetry throw never masks or alters the real result (THROW1, THROW2); AC-5 `gate` comes from the `GATE_REGISTRY` producer, not re-derived (SHAPE1, PRODUCER1, PRODUCER2, UNKNOWN1); AC-6 a fixed 5-key shape where nulls are kept and never "undefined" (SHAPE1, NULL1, NULL2, BOUNDARY1); AC-7 best-effort append with no lock, verified by code inspection, not unit-testable; the `extractGateCodeFromText` helper (EXTRACT1 to EXTRACT4). The human-approved cut asked for this file because no telemetry coverage existed for the emit point.
+
+THROW2 fixture: since the lane-aware path resolution, `readAndMigrate` does its own `readFileSync` with only ENOENT swallowed, so a non-directory `workspace_path` throws ENOTDIR inside the handoff read, before the gate and telemetry code the test isolates.

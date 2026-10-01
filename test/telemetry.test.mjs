@@ -1,27 +1,9 @@
 // Coded by @qa-engineer
-// Tests for the gate-fire telemetry sidecar, specs/d3-gate-fire-telemetry.md (T-D3-05).
-//
-// Spec-to-Test map:
-//   rejection emits exactly one 5-key line (AC-1)              -> INT1
-//   pass-through emits nothing (AC-2)                          -> NE1
-//   dir auto-created, no crash, one line (AC-3)                -> SHAPE1 (implicit — every
-//                                                                  emitGateTelemetry call
-//                                                                  below starts from a
-//                                                                  workspace with no .current/)
-//   telemetry throw never masks/alters the real ToolResult (AC-4) -> THROW1, THROW2
-//   `gate` sourced from GATE_REGISTRY producer, not re-derived (AC-5) -> SHAPE1, PRODUCER1, PRODUCER2, UNKNOWN1
-//   fixed 5-key shape; nulls not omitted, never "undefined" (AC-6) -> SHAPE1, NULL1, NULL2, BOUNDARY1
-//   best-effort append with no lock — not independently testable
-//         via a unit test; verified by code inspection (AC-7,
-//         review_reports/review_T-D3-04.md)                    -> n/a
-//   extractGateCodeFromText helper (Mechanism §1)               -> EXTRACT1..EXTRACT4
-//
-// WHY this file exists: the human-approved cut explicitly directs authoring
-// it (T-D3-05) — no prior telemetry test coverage existed for
-// the gate-fire emit point (tools/telemetry.ts, wired into tools/handoff-orchestrator.ts's
-// handleUpdateState wrapper). Each test below encodes a spec AC's invariant,
-// not just the current code shape, so a future refactor that silently drops a
-// guarantee (e.g. re-introduces a throw path, or omits a null field) fails loud.
+// Tests for the gate-fire telemetry sidecar (specs/d3-gate-fire-telemetry.md):
+// tools/telemetry.ts, wired into the handleUpdateState wrapper. Each test pins
+// an AC invariant, so a refactor that adds a throw path or drops a null field
+// fails loudly.
+// Spec-to-test map: specs/e260h-comment-rationale.md (test/telemetry.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -292,18 +274,10 @@ test("THROW2: when emitGateTelemetry's internal append fails, handleUpdateState'
   });
   assert.ok(fs.existsSync(telemetryPath(goodWs)), "control run must have actually appended telemetry");
 
-  // Experiment: the lane-aware path resolution (e123b9, spec AC1/AC13) narrowed what "workspace_path is a
-  // plain file" can mean — readAndMigrate now does its own readFileSync
-  // (with only ENOENT swallowed) once it has picked a candidate path, so
-  // making the WHOLE workspace_path a non-directory now throws ENOTDIR one
-  // step earlier than this test's target (inside the handoff-read path,
-  // before the gate/telemetry code this test isolates is even reached).
-  // Narrow the fault to exactly emitGateTelemetry's own write instead: a real
-  // workspace directory whose `.current/` exists (so the handoff read
-  // degrades to "no prior state" exactly as before, via the ordinary ENOENT
-  // branch) but whose lane directory (`.current/_primary`, AC1) is a PLAIN
-  // FILE — so only telemetry.jsonl's own `mkdirSync(..., {recursive:true})`
-  // (tools/telemetry.ts) hits ENOTDIR and must swallow it internally per AC-4.
+  // Making the whole workspace_path a plain file now throws ENOTDIR in the
+  // handoff read, before the code under test. So `.current/` is a real dir
+  // (the read degrades as before) and only the lane dir `.current/_primary` is
+  // a file: just telemetry's own mkdirSync hits ENOTDIR and must swallow it.
   const badWs = fs.mkdtempSync(path.join(os.tmpdir(), "telemetry-throw2-bad-"));
   fs.mkdirSync(path.join(badWs, ".current"), { recursive: true });
   fs.writeFileSync(path.join(badWs, ".current", "_primary"), "not a directory");

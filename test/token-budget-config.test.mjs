@@ -1,41 +1,10 @@
 // Coded by @qa-engineer
-// The optional tokenBudgetPerFeature config field read by tools/config.ts (v3.62.0+, T-B9-03, B9).
-// Spec: specs/b9-token-budget-brake.md — AC1, AC4, AC6.
-// New file — human consent given at cut approval (§2 conditional-test-writing).
-//
-// Spec-to-Test map:
-//   absent key / absent file -> brake disabled (AC1) ->
-//     t-ac1-absent-key, t-ac1-absent-file
-//   non-positive/non-finite values filtered to absent, non-fatal (AC4) ->
-//     t-ac4-string, t-ac4-negative, t-ac4-zero, t-ac4-infinity-overflow,
-//     t-ac4-null, t-ac4-empty-string, t-ac4-numeric-looking-string,
-//     t-ac4-valid-positive-control
-//   byte-identical regression for workspaces without the key (AC6) ->
-//     t-ac6-existing-fields-untouched, t-ac6-never-created-file
-//
-// WHY: this field is a coordinator-SOP-level advisory brake with NO
-// server-side gate and NO schema bump (spec AC5) — the only load-bearing
-// contract a test CAN pin is loadConfig's filter-and-ignore behavior at the
-// config-parsing boundary. These tests encode the invariant "an invalid or
-// absent budget must be indistinguishable from a workspace that never heard
-// of this feature" (AC1/AC6), not just today's specific rejection branches,
-// so a future refactor of the numeric guard can't silently start throwing or
-// silently start accepting garbage.
-//
-// NaN is intentionally NOT exercised here: JSON has no NaN literal, so
-// JSON.parse can never hand loadConfig a NaN for this field (an unquoted
-// `NaN` token in the file is a parse error for the WHOLE document, a
-// different failure mode than this field-level filter). The
-// `Number.isFinite` guard that would reject a NaN if one ever reached it
-// (tools/config.ts:136-139) was independently verified by code-reviewer via
-// direct source read (review_reports/review_T-B9-01.md line 15), not by a
-// test that fabricates an unreachable input. Infinity IS reachable through
-// valid JSON via numeric-literal overflow (e.g. `1e400`) and is exercised
-// below.
-//
-// Each test uses a fresh tmp workspace so the module-level configCache key
-// (workspacePath) doesn't collide — same convention as
-// test/config-versioning.test.mjs and test/config-cache.test.mjs.
+// Tests for the optional tokenBudgetPerFeature field in tools/config.ts
+// (specs/b9-token-budget-brake.md AC1, AC4, AC6). The brake is advisory, with no
+// server gate, so the contract is loadConfig's filter: an invalid or absent
+// budget must look exactly like a workspace that never heard of the feature.
+// Each test uses a fresh tmp workspace so the config cache keys do not collide.
+// Spec-to-test map and why NaN is not tested: specs/e260h-comment-rationale.md (test/token-budget-config.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
