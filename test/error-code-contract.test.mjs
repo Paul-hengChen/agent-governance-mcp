@@ -1,7 +1,8 @@
 // Coded by @qa-engineer
 // Parity test between GATE_REGISTRY (dist/gates/registry.js), the gate error codes emitted by
-// source, and the codes named in content/*.md. The three code sets must agree, every
-// documentedInProse entry must appear in a doc, and each entry must be self-consistent.
+// source, and the codes named in content/*.md. Registry and source codes must match, doc codes
+// must be a subset of the registry, every documentedInProse entry must appear in a doc, and
+// each entry must be self-consistent.
 // Needs a built tree; npm test's prebuild step guarantees dist/.
 // Rationale: specs/e260g-comment-rationale.md (test/error-code-contract.test.mjs).
 
@@ -314,7 +315,7 @@ test("c9-protocol-fields: REVIEW_VERDICT_STATUS_MISMATCH is a GATE_REGISTRY entr
 });
 
 // AC-7 (relaxed): this file intentionally depends on a built tree, since it imports the real
-// gates/registry.js (AC-5). The assertion below pins that dependency so reverting to source-text
+// built dist/gates/registry.js (AC-5). The assertion below pins that dependency so reverting to source-text
 // scanning would be a deliberate, visible choice.
 
 test("AC-7 (relaxed): this test file intentionally imports dist/gates/registry.js (requires a built tree; npm test's prebuild step guarantees it)", () => {

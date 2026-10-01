@@ -20,7 +20,11 @@ const inLane = (f) => LANE_RE.test(f);
 const FORBIDDEN = ["src", "tools", "gates", "prompts", "schema", "lib", "guards", "transport", "bin", "scripts",
   "index.ts", "dist", "content", "templates", "docs", "specs/fanout-*.md", "CHANGELOG.md", "package.json",
   "CLAUDE.md", "AGENTS.md", ".antigravityrules", ".current/history", "test/eval", "test/fixtures"];
-const BARE_ID = /^\s*(\/\/|\/\*|\*|#)\s*\(?E[0-9]+[a-z]?\b[^A-Za-z]*(\(e[0-9][a-z0-9-]*\))?\s*[:—-]?\s*$/;
+const BARE_ID_OLD = /^\s*(\/\/|\/\*|\*|#)\s*\(?E[0-9]+[a-z]?\b[^A-Za-z]*(\(e[0-9][a-z0-9-]*\))?\s*[:—-]?\s*$/;
+const ID_TOKEN = "(?:E|AC|DR|T-)[\\w-]*\\d";
+const BARE_ID_WIDE = new RegExp(`^\\s*(?://|/\\*|\\*|#)\\s*[(\\[]?(?:${ID_TOKEN}\\b[\\s,;.:()\\[\\]/—-]*)+$`);
+const BARE_ID = { test: (l) => BARE_ID_OLD.test(l) || BARE_ID_WIDE.test(l) };
+const PATH_CITE = /(?<![\w./<-])(?:\.?[\w-]+\/)+[\w.-]+\.(?:ts|mjs|cjs|js|md|json)\b/g;
 const DIRECTIVE = /@ts-(ignore|expect-error|nocheck|check)|eslint-|__PURE__/g;
 
 const argv = process.argv.slice(2);
@@ -135,6 +139,21 @@ if (flag("--list-mid")) {
   for (const m of mid) console.log(`  ${m}`);
 }
 report("bare-id", bare.length === 0, `bare-id: ${bare.length}`, bare);
+
+// cited paths (AC7): repo-relative paths in comment lines this lane added must be git-tracked
+const tracked = new Set(lines(git("ls-files")));
+const pathBad = [];
+for (const f of changed) {
+  const baseSrc = baseText(f); // a path the base file already cited is old wording, not a new citation
+  const baseLines = new Set(baseSrc.split(/\r?\n/).map((l) => l.trim()));
+  const text = headText(f);
+  const raw = text.split(/\r?\n/);
+  analyzeText(text).lines.forEach((l, i) => {
+    if (l.kind !== "comment" || baseLines.has(raw[i].trim())) return;
+    for (const p of raw[i].match(PATH_CITE) ?? []) if (!tracked.has(p) && !baseSrc.includes(p)) pathBad.push(`${f}:${i + 1} ${p}`);
+  });
+}
+report("cited-paths", pathBad.length === 0, `cited-paths: ${pathBad.length} untracked`, pathBad);
 
 // form (AC8)
 const pinned = (text) => text.split(/\r?\n/).filter((l) => /^\s*(\/\*!|\/\/\/\s*<reference|#!)/.test(l)).join("\n");

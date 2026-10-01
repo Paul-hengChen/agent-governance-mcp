@@ -1,6 +1,8 @@
 // Coded by @qa-engineer
-// Tests for specs/handoff-write-arg-guard.md (AC-1 to AC-4): tw_update_state rejects a workspace_path ending in .current and the "[object Object]" feature sentinel, and the older PASS and prd_path refines still fire.
-// Runs through the real stdio server (dist/index.js), the only public way to reach the unexported UpdateStateArgs schema.
+// Tests for specs/handoff-write-arg-guard.md (AC-1 to AC-4): tw_update_state rejects a workspace_path
+// ending in .current and the "[object Object]" feature sentinel, and the older PASS and prd_path
+// refines still fire. Runs through the real stdio server (dist/index.js), the only public way to
+// reach the unexported UpdateStateArgs schema.
 // Rationale: specs/e260g-comment-rationale.md (test/handoff-write-arg-guard.test.mjs).
 
 import { test } from "node:test";

@@ -169,8 +169,7 @@ test("t-e43-branches-survive-strip: the normative branch text is delivered in NO
 test("t-e43-assertions-red-against-pre-e43-text (guard-the-guard): the pins above genuinely detect the pre-E43 wording", () => {
   // A regression check that cannot fail against the defect it names proves nothing. Replay
   // the three key assertions against the self-contained pre-fix literal and require each to
-  // throw: show the check fails on the old text, don't only show it passes on the new.
-  // (E69, E76, E77)
+  // throw: show the check fails on the old text, don't only show it passes on the new (E69, E76, E77).
   assert.throws(() => {
     const b = branches(PRE_E43_BULLET);
     assert.deepEqual([...b.keys()], ["a", "b", "c"]);

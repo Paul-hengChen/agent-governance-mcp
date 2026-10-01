@@ -22,7 +22,7 @@ Contract under test (backlog row and the `loadConfigEntry` doc comment in tools/
 - `getConfigError(ws)` surfaces the loud failure (path and problem) exactly when `loadConfig` is serving defaults in place of a config file that exists but cannot be used; null when clean or absent.
 - `tw_get_state` (`readHandoffState`) spreads `config_error` onto both the `exists:false` and the normal envelope; clean or absent config adds no key, so the envelope stays byte-identical to the shape before the change.
 - The mtime cache behind `loadConfig` also caches the load error; fixing the file bumps mtime and invalidates the cached error on the next call, so it self-heals without a server restart.
-- Known and accepted ("QA probe 1" tests, raised in code review, documented, not fixed): task-mutation tools (`completeTask`, `addTask` via `resolveTaskPaths` and `resolveTaskRegex`) share the same non-throwing core, so a corrupt config makes them silently fall back to `DEFAULT_TASK_PATHS` and `DEFAULT_TASK_REGEX` instead of the workspace's custom `taskPattern` and `taskPaths`. That is predictable (never a crash, never a mis-write) but not surfaced as an error by the mutation tools; only the `config_error` key makes the degradation discoverable. By design per spec ("degrade to defaults loudly-but-readable" is scoped to the pre-flight read); the suite documents the behaviour and does not change it.
+- Known and accepted ("QA probe 1" tests, raised in code review, documented, not fixed): task-mutation tools (`completeTask`, `addTask` via `resolveTaskPaths` and `resolveTaskRegex`) share the same non-throwing core, so under a corrupt config they resolve `DEFAULT_TASK_PATHS` and `DEFAULT_TASK_REGEX` instead of the workspace's custom `taskPattern` and `taskPaths`. The tests show the effect per tool: `completeTaskInFile` returns a loud JSON error ("No task list file found.") and `addTaskInFile` writes the lane ledger `.current/<lane>/tasks.md`. Neither crashes or mis-writes, but the mutation tools do not surface the config problem; only the `config_error` key makes the degradation discoverable. By design per spec ("degrade to defaults loudly-but-readable" is scoped to the pre-flight read); the suite documents the behaviour and does not change it.
 - Not covered: a chmod after the config is cached goes unnoticed until mtime changes, a known limitation of the mtime cache.
 
 ## test/e32-e33-gate-hardening.test.mjs
@@ -89,28 +89,28 @@ Why the tests check the shape of the rule rather than today's exact wording, whe
 
 Tickets: E5. The file tests three coordinator intake rules and their config key. The config side follows the layout of the `tokenBudgetPerFeature` tests in `test/token-budget-config.test.mjs` (T-B9-03).
 
-Config-side spec-to-test map (`CutApprovalAutoTier` in tools/config.ts):
+Config-side spec-to-test map (`CutApprovalAutoTier` in tools/config.ts). Tests are titled `T-E5-02 config: ...`; the map names each by a phrase from its title:
 
-- absent key means disabled: `t-absent-key`, `t-absent-file`
-- present `{}` gives conservative defaults: `t-empty-object-defaults`
-- non-object, array, null or primitive is treated as absent (non-fatal): `t-string-value`, `t-number-value`, `t-null-value`, `t-array-value`
-- `maxFiles` fractional positive is floored, not defaulted: `t-maxfiles-fractional`
-- `maxFiles` negative, zero, non-finite or non-number falls back to the default: `t-maxfiles-negative`, `t-maxfiles-zero`, `t-maxfiles-infinity`, `t-maxfiles-string`
-- `maxPriority` valid `^P\d+$` is surfaced verbatim: `t-maxpriority-valid`
-- `maxPriority` malformed pattern falls back to the default: `t-maxpriority-no-p`, `t-maxpriority-trailing-space`, `t-maxpriority-non-digit`
-- `allowSchemaChange` and `allowDesignArmed` accept strict `=== true` only: `t-booleans-strict-true`, `t-booleans-truthy-non-true-stays-false`
-- `CUT_APPROVAL_AUTO_TIER_DEFAULTS` export shape: `t-defaults-export-shape`
-- byte-identical regression for workspaces without the key: `t-existing-fields-untouched`
+- absent key means disabled: "no cutApprovalAutoTier key", "does not exist at all"
+- present `{}` gives conservative defaults: "present-but-empty {} object"
+- non-object, array, null or primitive is treated as absent (non-fatal): "a string value", "a number value", "null for", "an array for"
+- `maxFiles` fractional positive is floored, not defaulted: "fractional positive maxFiles is floored"
+- `maxFiles` negative, zero, non-finite or non-number falls back to the default: "negative maxFiles", "zero maxFiles", "numeric-literal overflow", "a string maxFiles"
+- `maxPriority` valid `^P\d+$` is surfaced verbatim: "a valid ^P\d+$ maxPriority"
+- `maxPriority` malformed pattern falls back to the default: "missing the 'P' prefix", "trailing whitespace", "non-digit maxPriority"
+- `allowSchemaChange` and `allowDesignArmed` accept strict `=== true` only: "accept only the literal boolean true", "truthy-but-not-true values"
+- `CUT_APPROVAL_AUTO_TIER_DEFAULTS` export shape: "DEFAULTS export has the exact conservative shape"
+- byte-identical regression for workspaces without the key: "existing config fields are untouched"
 
-Content spec-to-test map (plain text-containment checks against the shipped content files, in the style of `test/e16-judge-dispatch-charter.test.mjs`):
+Content spec-to-test map (plain text-containment checks against the shipped content files, in the style of `test/e16-judge-dispatch-charter.test.mjs`; titles are `T-E5-01 content: ...`, `T-E5-02 content: ...`, `T-E5-03 content: ...`):
 
-- const-08 auto-tier bullet, trust rule plus same-write recording plus halt-over-threshold language: `t-const08-trust-rule`, `t-const08-same-write-recording`, `t-const08-halt-over-threshold`, `t-const08-advisory-not-enforced`
-- coord-03 Backlog Intake Loop present plus the never-auto-hop-to-release-engineer bound: `t-coord03-intake-loop-present`, `t-coord03-never-auto-hop-release`
-- coord-07 SOP step 4a present plus the §2/§3.2 hard-floor sentence: `t-coord07-step4a-present`, `t-coord07-hard-floor`
+- const-08 auto-tier bullet, trust rule plus same-write recording plus halt-over-threshold language: the four `T-E5-02 content: const-08 ...` tests ("trust rule", "SAME write", "HALTs exactly as today", "opt-in ... and advisory")
+- coord-03 Backlog Intake Loop present plus the never-auto-hop-to-release-engineer bound: "carries the Backlog Intake Loop section", "never auto-hops to release-engineer"
+- coord-07 SOP step 4a present plus the §2/§3.2 hard-floor sentence: "carries step 4a", "hard floor is never bypassed"
 
 ## test/e90-golden-capture-completeness.test.mjs
 
-Tickets: E90, E43. Two of the twelve golden fixtures were once hand-rebuilt, so they existed only as files the regeneration tool could not reproduce. Map of claims to tests: all 12 fixtures captured is `t-captured-equals-on-disk` and `t-asserted-equals-on-disk`; every fixture the suite asserts against has a capture in the script is the three-way tie across both tests.
+Tickets: E90, E43. Two of the twelve golden fixtures were once hand-rebuilt, so they existed only as files the regeneration tool could not reproduce. Map of claims to tests: all 12 fixtures captured is the pair of tests "capturedSet has no accidental duplicates and is exactly 12" and "the set of fixtures ... captures equals the set present in test/fixtures/compose-golden/"; every fixture the suite asserts against has a capture in the script is the test "every fixture the consuming suites assert against ... has a capture in the script", which closes the three-way tie.
 
 Why: the capture script has its own completeness check (on-disk minus captured exits 1), but it only runs when someone runs the script by hand. Without this file, an edit that adds a golden fixture the suite asserts against without a capture for it, or adds a capture whose fixture never lands on disk, would go unnoticed until the next manual regeneration. This file runs the same "capture set equals fixture set" check on every `npm test` and also ties in the fixtures the two consuming suites (`compose-equivalence.test.mjs`, `skill-manifest.test.mjs`) read via `readGolden` or the `GOLDEN` constant. That three-way tie is stronger than the script's two-way check: a fixture an assertion depends on that has no capture and is not on disk is invisible to on-disk-minus-captured (both sets omit it), but shows up here.
 
@@ -173,7 +173,7 @@ Spec: specs/d4-behavioral-eval-harness.md. The live runner (test/eval/run-eval.m
 
 ## test/feature-rollup.test.mjs
 
-Spec: specs/e113-feature-level-rollup.md (AC2-AC5). Test-label map: AC2 (seam and shape) is `t-seam-marker` and `t-provider-swap-zero-callsite`; AC3 (multi-lane sum against the hop cap) is `t-sum-against-hop-cap-exported`; AC3 plus the cross-feature regression is `t-round1-regression-no-cross-feature-sum`; AC4 (an unreadable lane is carried, not dropped or zero-filled) is `t-unreadable-lane-carried`; AC5 (the ROLL-UP INCOMPLETE banner leads the output, degrade honestly) is `t-banner-zero-matching` and `t-banner-unattributable`.
+Spec: specs/e113-feature-level-rollup.md (AC2-AC5). Test-title map (tests are titled `AC2: ...`, `AC3: ...`, `AC4: ...`, `AC5: ...`, `round-1 regression PIN: ...`; the `t-*` labels from the spec do not appear in the file): AC2 (seam and shape) is the three `AC2:` tests (SEAM FOR E132 marker, `localFallbackLaneList` export, substitute `LaneListProvider`); AC3 (multi-lane sum against the hop cap) is the `AC3:` test; AC3 plus the cross-feature regression is `round-1 regression PIN`; AC4 (an unreadable lane is carried, not dropped or zero-filled) is the two `AC4:` tests; AC5 (the ROLL-UP INCOMPLETE banner leads the output, degrade honestly) is the `AC5:` tests (zero matching lanes, unattributable lane, no bare total without the banner).
 
 The cross-feature regression is the most important test in the file. An earlier version summed every lane in the repo and reported `hop: 54, OVER BY 44` for a feature whose true total was 3; the fix is the `matchingLanes = lanes.filter(lane => lane.activeFeature === featureId)` filter in tools/feature-rollup.ts, and the test stops a future edit from silently dropping it.
 

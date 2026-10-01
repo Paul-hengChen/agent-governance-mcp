@@ -3,6 +3,7 @@
 // Covers (1) review_round default of 0 on legacy fixtures, (2) the AC-9
 // stderr warning emission when an in-flight ticket sits at
 // sr-engineer:In_Progress at migration time. Imports compiled dist/.
+// Rationale: specs/e260g-comment-rationale.md (test/handoff-migration.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";

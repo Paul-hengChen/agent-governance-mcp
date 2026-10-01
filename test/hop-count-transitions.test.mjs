@@ -1,7 +1,8 @@
 // Coded by @qa-engineer
 // Tests for the server-computed, persisted hop_count counter and its HOP_CAP_EXCEEDED rejection
-// (specs/d2-server-brake-accounting.md): computed in isolation (t-compute-*), enforced through the real orchestrator
-// (t-gate-*, t-e2e-*), and rebuilt from disk or SQLite after a simulated crash (t-crash-*).
+// (specs/d2-server-brake-accounting.md): computed in isolation (t-compute-*), enforced by validateTransition
+// (t-gate-*) and end to end through the real orchestrator (t-e2e-*), and rebuilt from disk or SQLite after a
+// simulated crash (t-crash-*).
 // Rationale: specs/e260g-comment-rationale.md (test/hop-count-transitions.test.mjs).
 
 import { test } from "node:test";

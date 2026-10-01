@@ -1073,8 +1073,7 @@ test("E10-AC3: lease_override is transient — write N's bypass does NOT leak fo
 // The test name must stay exactly as written: the fix's reproduction list
 // names it. The assertion fails if `bookkeepingWrite: true` is removed from
 // the heal call site in tools/handoff.ts's readHandoffState, because
-// last_updated is then stamped to now(); it passes with the fix in place.
-// (T-E10-01)
+// last_updated is then stamped to now(); it passes with the fix in place (T-E10-01).
 test("AC4 (e10): migration heal-write preserves pre-heal last_updated verbatim", async () => {
   setActiveStorage(new FileHandoffStorage());
   const ws = mkWs("flease-e10ac4-");

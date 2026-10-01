@@ -3,7 +3,8 @@
 // non-object or future-schema .current/.config.json: the tw_get_state pre-flight
 // read goes through it, so a throw there blocks every other call. getConfigError(ws)
 // reports the failure while defaults are served in place of an unusable config file.
-// Known and accepted: the task-mutation tools degrade to default task paths silently.
+// Known and accepted: under a corrupt config the task-mutation tools ignore the custom
+// taskPaths/taskPattern (completeTaskInFile errors loudly, addTaskInFile writes the lane ledger).
 // Rationale: specs/e260g-comment-rationale.md (test/e31-config-nonfatal.test.mjs).
 
 import { test } from "node:test";
@@ -192,10 +193,11 @@ test("E31 cache invalidation: breaking a previously-clean config file (mtime bum
 });
 
 // ============================================================================
-// Task-mutation tools silently fall back to DEFAULT_TASK_PATHS /
-// DEFAULT_TASK_REGEX under a corrupt config. These tests document that
-// by-design behavior; they do not change it. ("QA probe 1", raised in code
-// review)
+// Under a corrupt config the task tools resolve DEFAULT_TASK_PATHS /
+// DEFAULT_TASK_REGEX instead of the custom taskPaths/taskPattern: completeTaskInFile
+// then returns a loud error and addTaskInFile writes the lane ledger. These tests
+// document that by-design behavior; they do not change it. ("QA probe 1", raised in
+// code review)
 // ============================================================================
 
 const CUSTOM_TASK_PATTERN = "^\\* (DONE|TODO) (\\S+) (.+)$";
@@ -222,10 +224,10 @@ test("E31 QA probe 1 baseline: a clean config with custom taskPattern+taskPaths 
 });
 
 test("E31 QA probe 1: corrupting the SAME workspace's config after the precondition read already migrated the task file into the lane ledger leaves it discoverable — e125a's lane ledger no longer depends on config taskPaths once migrated", () => {
-// The precondition read is the first task-list access, so it migrates the custom
-// task file into the lane ledger (lane "_primary", no .git here); after that config
-// taskPaths no longer affect discovery. The never-migrated case is the addTaskInFile
-// probe below (specs/e125a-lane-local-ledgers.md AC13).
+  // The precondition read is the first task-list access, so it migrates the custom
+  // task file into the lane ledger (lane "_primary", no .git here); after that config
+  // taskPaths no longer affect discovery. The never-migrated case is the addTaskInFile
+  // probe below (specs/e125a-lane-local-ledgers.md AC13).
   const ws = mkWorkspace();
   writeConfig(ws, { taskPattern: CUSTOM_TASK_PATTERN, taskPaths: [CUSTOM_TASK_REL] });
   writeCustomTasksFile(ws);
@@ -269,10 +271,10 @@ test("E31 QA probe 1: completeTaskInFile against a config-degraded workspace ret
 });
 
 test("E31 QA probe 1: addTaskInFile against a config-degraded workspace silently targets the lane-local ledger instead of the workspace's custom taskPaths (documented fallback, not fixed — e125a moved the fallback destination itself)", async () => {
-// No lane ledger and no legacy file exist yet (the "migration never happened" case),
-// so addTaskInFile falls back to the current lane's ledger `.current/<lane>/tasks.md`,
-// never a config-resolved path, and the configured custom path stays unused while
-// config is corrupt (specs/e125a-lane-local-ledgers.md AC13).
+  // No lane ledger and no legacy file exist yet (the "migration never happened" case),
+  // so addTaskInFile falls back to the current lane's ledger `.current/<lane>/tasks.md`,
+  // never a config-resolved path, and the configured custom path stays unused while
+  // config is corrupt (specs/e125a-lane-local-ledgers.md AC13).
   const ws = mkWorkspace();
   writeConfig(ws, { taskPattern: CUSTOM_TASK_PATTERN, taskPaths: [CUSTOM_TASK_REL] });
   // No pre-existing task file this time — addTaskInFile creates one.

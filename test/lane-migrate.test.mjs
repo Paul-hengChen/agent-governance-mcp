@@ -369,8 +369,7 @@ test("AC11 (e125b): a lane dir containing base-sha reverse-migrates (migrateLane
 // ============================================================================
 // The migration is wired into the server only through the lock-free cores (migrateFlatToLaneLocked,
 // migrateLaneToFlatLocked). The public lock-acquiring wrappers stay referenced only inside tools/lane-migrate.ts: a
-// caller already holding the per-lane lock must call the core, or it would self-deadlock re-acquiring the lock
-// (AC12).
+// caller already holding the per-lane lock must call the core, or it would self-deadlock re-acquiring the lock (AC12).
 // ============================================================================
 
 test("CALLERS1 (e123b9 J2, spec AC12): the PUBLIC migrateFlatToLane(/migrateLaneToFlat( wrappers are CALLED ONLY in tools/lane-migrate.ts's own SOURCE — never by readHandoffState/writeHandoffStateCore/tw_get_state/tw_update_state/any gates/ predicate/index.ts/TOOL_REGISTRY", () => {
