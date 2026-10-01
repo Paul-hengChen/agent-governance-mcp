@@ -1,5 +1,7 @@
 # Pending tickets — lane e260f
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E260F-NEW-1
 title: Name git stash drop as forbidden in the sanctioned-git list, and warn that a judge's stash sweeps up its own uncommitted handoff write
@@ -32,5 +34,3 @@ body: |
   E260 base; lane e260f found it in its last review round, when no qa authoring round was left in its
   hop budget. Comment-only fix in a test file, so a qa-engineer must make it.
 ```
-
-## Applied
