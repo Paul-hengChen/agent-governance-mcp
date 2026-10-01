@@ -1,28 +1,11 @@
 #!/usr/bin/env node
 // PostToolUse hook (matcher: Task) for agent-governance-mcp — D2 durable
-// token-usage accounting.
-//
-// Reads the PostToolUse JSON payload from stdin (tool_name, tool_input,
-// tool_response, cwd) and appends one UsageRecord to the workspace's
-// current-lane .current/<lane>/usage.jsonl via
-// dist/tools/usage-accounting.js (the SessionStart hook's dist/-import
-// pattern).
-//
-// Opt-in (AC-9): a record is written ONLY when ALL of the following hold —
-//   - tool_name === "Task"
-//   - <workspace>/.current/ exists
-//   - .current/.config.json sets tokenBudgetPerFeature to a positive finite
-//     number (absent file / absent key / invalid value → silent no-op, no
-//     file, no accounting)
-//
-// Best-effort throughout (D3's emitGateTelemetry discipline): any failure is
-// swallowed, the hook ALWAYS exits 0 and never blocks or alters the Task
-// result.
-//
-// Env overrides:
-//   AGC_SERVER_ROOT (alias: TEAMWORK_SERVER_ROOT, SDD_SERVER_ROOT) — point at
-//     a different agent-governance-mcp checkout.
-//   CLAUDE_PROJECT_DIR — workspace fallback when the payload carries no cwd.
+// token-usage accounting: reads the PostToolUse JSON payload from stdin and
+// appends one UsageRecord to .current/<lane>/usage.jsonl via
+// dist/tools/usage-accounting.js. Opt-in (AC-9): only for tool_name "Task",
+// with .current/ present and tokenBudgetPerFeature a positive finite number.
+// Best-effort: any failure is swallowed; always exits 0, never alters the Task.
+// Env overrides and the full opt-in rules: see specs/e260c-bin-scripts.md.
 
 import * as fs from "fs";
 import * as path from "path";

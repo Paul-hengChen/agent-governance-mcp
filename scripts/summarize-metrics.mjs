@@ -1,18 +1,11 @@
 #!/usr/bin/env node
 // Coded by @sr-engineer
-// Retro summarizer for the per-feature success-telemetry sidecar (E8 AC9).
-// Reads .current/metrics.jsonl (one JSON line per SHIPPED feature, appended by
-// tools/metrics.ts at the release-engineer terminal-marker write) and prints a
-// per-feature table plus an aggregate line — one-pass rate and mean
-// qa/review/visual rounds + mean hops — usable directly in a retro without
-// hand-tallying. Zero-dep, pure Node stdlib, ESM.
-//
+// Retro summarizer for the per-feature success-telemetry sidecar (E8 AC9): reads
+// .current/metrics.jsonl (one line per shipped feature, from tools/metrics.ts)
+// and prints a per-feature table plus the one-pass rate and mean rounds and hops.
+// Malformed lines are skipped and counted, never thrown on; see specs/e260c-bin-scripts.md.
 // Usage: node scripts/summarize-metrics.mjs [path-to-metrics.jsonl]
 //        (default: .current/metrics.jsonl relative to the current directory)
-//
-// Malformed lines are skipped, counted, and reported — never thrown on
-// (mirrors the append-only-sidecar caveat in docs/gate-retro-procedure.md:
-// a rare interleaved line under concurrent writes is an accepted cost).
 
 import { readFileSync } from "node:fs";
 import * as path from "node:path";

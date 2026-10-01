@@ -1,19 +1,10 @@
 #!/usr/bin/env node
-// T320 — Always-on context budget measurement spike (spec: context-budget-reduction).
-//
-// Quantifies the token weight of the always-on context bundle so the reduction
-// in T321/T322 has a measured baseline (AC1). Dependency-free: token count is a
-// deterministic chars/4 approximation (the same heuristic Anthropic/OpenAI docs
-// cite for English-heavy prose), so the report is diff-able across runs.
-//
-// Two injection paths are measured:
-//   1. SessionStart hook (bin/agent-governance-context.mjs) — constitution +
-//      default skill, injected every managed-workspace session. Both the `lite`
-//      (default) and `full` skill variants are reported.
-//   2. buildPromptForRole (prompts/build.ts) — constitution + role skill,
-//      re-bundled into each of the 7 registered prompts. The volatile state
-//      block is excluded so the figure is the stable, always-injected cost.
-//
+// Always-on context budget measurement (T320, spec: context-budget-reduction):
+// the token weight of the always-on bundle as a deterministic chars/4
+// approximation, so the report diffs cleanly across runs. Measures the
+// SessionStart hook (constitution + default skill, lite and full variants) and
+// buildPromptForRole per registered prompt (constitution + role skill, state
+// block excluded). Background: see specs/e260c-bin-scripts.md.
 // Usage: node scripts/measure-context-cost.mjs
 
 import * as fs from "fs";
@@ -29,14 +20,10 @@ function approxTokens(text) {
   return Math.ceil(text.length / 4);
 }
 
-// Compose-not-strip (ticket A9): every constitution figure below is composed
-// from the shared fragment manifest (dist/prompts/constitution-manifest.js) —
-// the same single source of truth prompts/build.ts and the SessionStart hook
-// use — instead of reading a monolithic constitution.md and mirroring the
-// deleted stripChainOnly/stripDesignOnly regexes locally (old DR-3 "keep in
-// sync by inspection" is replaced by the structural import, architecture DR-4).
-// stripRationale is imported from the compiled build.js for the same reason
-// (no local reporting mirror to drift).
+// Compose-not-strip (A9): every constitution figure is composed from the
+// shared fragment manifest, the same source prompts/build.ts and the hook use,
+// and stripRationale comes from the compiled build.js, so no local mirror of
+// the strip logic can drift (architecture DR-4).
 const { CONSTITUTION_SEGMENTS, includeSegment } = await import(
   pathToFileURL(path.join(ROOT, "dist", "prompts", "constitution-manifest.js")).href
 );

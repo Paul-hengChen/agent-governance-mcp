@@ -1,85 +1,11 @@
 #!/usr/bin/env node
-// Release self-check (E9). Verifies that the release artifacts a done-report
-// claims actually exist BEFORE the claim is made: (1) tag exists and points at
-// HEAD — or, when HEAD has moved past the tag, every commit ahead of it is a
-// governance-bookkeeping commit only (E141: touches nothing outside
-// .current/<lane>/handoff.md, .current/<lane>/*.jsonl, tasks.md — lane paths
-// per E174a, flat .current/ forms still accepted); any other path, or a tag
-// that is not an ancestor of HEAD, keeps the FAIL — (2) HEAD is pushed to the
-// upstream tracking branch, (3)
-// scripts/check-version.mjs is green (invoked as a subprocess, never
-// re-implemented), (4) CHANGELOG.md has an entry for the target version,
-// (5) dist/ is committed and the committed dist/index.js Server() literal
-// matches the target version, (6) CI ground truth (E14/E78/E80): the
-// COMPLETED CI run for THIS release's sha on the release's branch (derived
-// from the checkout's upstream, E165) concluded success —
-// self-reported "npm test green" is not a substitute for what CI actually
-// said. When that run hasn't completed yet, Check 6 bounded-polls `gh run
-// list` for it (default ~480 seconds via AGC_VERIFY_CI_WAIT_SECONDS, `0` = no
-// wait, exactly one `gh` call) before giving up. Check 6 degrades gracefully by
-// design: when `gh` is missing, unauthenticated, there are no completed CI
-// runs to read, or the poll budget expires with this sha still not found, it
-// WARNs and continues (never blocks a release on missing tooling or a
-// slow-finishing run); it FAILs ONLY on a definitively non-success conclusion
-// for this sha.
-//
-// Checks run independently — a failure in one never prevents the others from
-// running and reporting — so a multi-cause failure surfaces every cause in a
-// single run. Any failure exits non-zero with per-check FAIL lines; the script
-// can therefore never underwrite a false "Released" claim.
-//
-// Usage: node scripts/verify-release.mjs [vX.Y.Z]
-// When the version argument is omitted, the target defaults to package.json's
-// `version` field.
-//
-// Unlike check-version.mjs's advisory git-tag note, nothing here is advisory:
-// a `git fetch origin` failure (network/auth) is itself a FAIL for the push
-// check — this script never silently skips the check that closes the gap it
-// exists for: a "Released" claim nobody verified (E9).
-//
-// --close-out mode (E84): `node scripts/verify-release.mjs --close-out` runs
-// ONLY a standalone ahead-of-upstream assertion — no version is resolved or
-// required, and Check 1 (tag-at-HEAD) and the version-dependent Checks 3-6 do
-// not run. It exists to be runnable AFTER the governance bookkeeping commit
-// (handoff/metrics — kept separate from the release commit per E71c; tasks.md
-// is staged by step 8a's release commit itself, never by this bookkeeping
-// commit, per E143) has landed and pushed HEAD past the release tag. A normal
-// run's Check 1 now already tolerates that single bookkeeping-only commit
-// automatically (E141; with an explicit tolerance note) — --close-out remains
-// for what the tolerance does not cover: real source changes ahead of the tag,
-// or a tag that is not an ancestor of HEAD, where a normal run still fails
-// Check 1 by construction. Today this is a manual, documented command; no
-// automatic invocation point exists yet.
-//
-// --ci-check mode (E163): `node scripts/verify-release.mjs --ci-check
-// [--strict] [--sha <sha>]` runs ONLY the CI ground-truth logic that Check 6
-// already implements below (same sha-resolution shape, same bounded poll via
-// `gh run list`, same AGC_VERIFY_CI_WAIT_SECONDS budget) — factored out so
-// neither release-SOP call site duplicates it. No version is resolved and no
-// tag is required; the sha checked defaults to `git rev-parse HEAD` (or the
-// literal passed via --sha). Two call sites, two postures:
-//   - release-engineer SOP step 2a (lenient, no --strict): a pre-flight gate
-//     at release entry, on whatever HEAD already is — a definite `failure`
-//     conclusion for that sha exits non-zero (STOP); an inconclusive read
-//     (`gh` missing/unauthenticated, no completed runs, poll budget expired
-//     with this sha still not found) WARNs and exits 0, identical to Check
-//     6's own graceful degradation (E14/E78/E80) — there is nothing to
-//     protect yet at this point, so "we don't know" is not a reason to
-//     refuse to start.
-//   - release-engineer SOP step 8b (--strict): the gate between the branch
-//     push (8a) and the tag push (8c) — the one point in the SOP before an
-//     immutable artifact (the tag) is published. `--strict` disables the
-//     WARN-and-continue path entirely: every condition that would normally
-//     WARN instead FAILs, so an inconclusive CI read STOPs the release
-//     exactly like a definite red does. This is intentionally stricter than
-//     Check 6 (step 9a), which runs AFTER publication and rightly treats
-//     "can't tell" as non-blocking — there is nothing left to prevent by
-//     then. Before the tag push, there still is.
-// Exit code: 0 on OK/WARN (lenient) or OK only (strict); 1 on FAIL. Output
-// mirrors the OK:/WARN:/FAIL: lines Check 6 already prints, under a
-// `check:release — CI-CHECK PASSED/FAILED` summary distinct from the
-// full-run and --close-out summaries so a caller can grep unambiguously for
-// its own mode's result.
+// Release self-check (E9): verifies a done-report's release claims before they
+// are made. Checks run independently and any FAIL exits non-zero:
+// (1) tag at HEAD, or only bookkeeping commits ahead of it (E141), (2) HEAD
+// pushed upstream, (3) check-version.mjs green, (4) CHANGELOG entry, (5) dist/
+// committed with a matching Server() version, (6) CI ground truth for this sha.
+// Usage: node scripts/verify-release.mjs [vX.Y.Z] | --close-out | --ci-check [--strict] [--sha <sha>]
+// Modes, posture and degradation rules: see specs/e260c-bin-scripts.md.
 
 import { readFileSync } from "node:fs";
 import { execFileSync, spawnSync } from "node:child_process";
@@ -143,13 +69,9 @@ function runCheck(name, fn) {
 }
 
 // --- Close-out mode (E84): standalone ahead-of-upstream assertion -----------
-// Deliberately does NOT run Check 1 (tag-at-HEAD) or any version-dependent
-// check (3-6), and resolves no version argument at all — this mode exists to
-// be runnable AFTER the governance bookkeeping commit lands and HEAD sits, by
-// design, past the release tag. It closes the temporal gap Check 2 cannot:
-// Check 2 runs BEFORE the bookkeeping commit exists, so at that point there
-// is nothing unpushed yet to see (this is what left 6cd767b / v3.102.5 one
-// commit ahead of origin/main, undetected, for a full release cycle).
+// Runs no tag or version check, so it works AFTER the bookkeeping commit has
+// moved HEAD past the release tag. Check 2 runs before that commit exists and
+// cannot see it unpushed (how 6cd767b / v3.102.5 sat one commit ahead of origin).
 if (closeOut) {
   runCheck("ahead-of-upstream", (fails) => {
     try {
@@ -231,25 +153,12 @@ if (!/^\d+\.\d+\.\d+$/.test(version)) {
 console.log(`check:release — target version v${version}`);
 
 // --- Bookkeeping-path allowlist (E141) ---------------------------------------
-// The paths SOP step 13a stages when it closes a release out: the handoff's
-// closing write and the per-run telemetry/metrics/usage sidecars. `tasks.md`
-// is staged by step 8's release commit, never by 13a (E143) — it stays in
-// this allowlist anyway as a harmless superset: tolerating a stray
-// tasks.md-only commit in range costs nothing, so the list is a safety
-// margin rather than a precise mirror of 13a's `git add`. Check 1 below
-// tolerates a tag followed ONLY by commit(s) that touch paths in this list
-// and nothing else; any other path in range keeps the FAIL.
-//
-// Lane-layout paths (E174a): since state moved into per-lane directories (the
-// lane flip, E123), 13a stages `.current/<lane>/handoff.md` +
-// `.current/<lane>/*.jsonl` (lane = resolveCurrentLane(): `_primary` or a
-// ticket id). Any single-segment lane dir is accepted, not only the release's
-// own — the tolerance is about bookkeeping-only commits. LANE_SEGMENT_RE_SRC
-// mirrors tools/lane-paths.ts: its char class is SAFE_LANE_RE /
-// isSafeLaneName, its negative lookahead is NON_LANE_DIRS (archive, history).
-// Kept standalone (no dist/ import) on purpose; a drift-guard test pins the
-// mirror. The flat forms stay accepted for pre-flip workspaces and tag ranges
-// that predate the flip.
+// Paths SOP step 13a stages at close-out (handoff, telemetry/metrics/usage
+// sidecars), plus `tasks.md` as a harmless superset. Check 1 tolerates commits
+// touching only these. Lane forms (E174a): any `.current/<lane>/`, lane as
+// resolveCurrentLane() names it; LANE_SEGMENT_RE_SRC mirrors tools/lane-paths.ts
+// (SAFE_LANE_RE, NON_LANE_DIRS) without a dist/ import, pinned by a drift-guard
+// test. Flat forms stay for pre-flip workspaces. See specs/e260c-bin-scripts.md.
 const LANE_SEGMENT_RE_SRC = "(?!(?:archive|history)\\/)[A-Za-z0-9_][A-Za-z0-9_-]*";
 const BOOKKEEPING_PATH_RES = [
   /^\.current\/handoff\.md$/,
@@ -434,58 +343,16 @@ runCheck("dist committed+parity", (fails) => {
 
 // --- Check 6: CI ground truth on the derived branch (E14; sha-matched per ---
 // --- E78; bounded-poll per E80; branch derived per E165) ---------------------
-// Reads recent COMPLETED runs of the CI workflow (`--workflow CI`) on the
-// release's branch via the gh CLI and finds the one whose headSha matches the commit actually being
-// released — NOT just "whatever completed run happens to be listed first".
-// A fast release push can complete `git push` + `gh release` before its own
-// CI run finishes; when that happens, the previously-first completed run
-// belongs to an EARLIER commit, and treating its conclusion as ground truth
-// for THIS release answers a different question (E78: v3.102.2 shipped this
-// way — the release's own run was still in flight, 56s in, and the check
-// reported PASS off the prior day's green run on a different sha).
-//
-// The branch is DERIVED from the current checkout (E165), never hardcoded to
-// `main` (a release cut from a maintenance/hotfix branch previously had its CI
-// interrogated on main's runs, so the sha never matched and the operator was
-// told CI never answered when it had been asked about the wrong branch).
-// Order: the checkout's upstream (`@{u}`, remote prefix stripped) -> else the
-// current local branch -> a detached HEAD has no branch, which is a
-// cannot-obtain-ground-truth condition (WARN here; FAIL under --strict). The
-// `--workflow CI` qualifier is kept: without it `gh run list --branch` was
-// observed returning fortnight-old runs. Only the branch is derived — how the
-// released sha is resolved (from the tag, per E147) is unchanged.
-//
-// Bounded poll (E80): on a healthy release, THIS commit's CI run is almost
-// always STILL IN FLIGHT the moment this check runs (step 9a fires seconds
-// after the triggering push) — so the sha-not-found branch below is the
-// DEFAULT path on a healthy release, not a degraded one, and giving up on the
-// first miss let releases ship with CI silently unverified. That branch now
-// bounded-polls `gh run list` for the released sha instead of giving up
-// immediately: budget from AGC_VERIFY_CI_WAIT_SECONDS (default 480 seconds;
-// `0` = no wait, exactly one `gh` call — the behavior before polling existed),
-// polling every ~20s and printing progress to stdout (never stderr — see
-// below). A completed run for this sha appearing mid-poll is evaluated exactly
-// as before: success -> OK, non-success -> the existing FAIL.
-//
-// Graceful degradation is still load-bearing (backlog E14 / T-EB-01, extended
-// by E78 and E80): any inability to OBTAIN ground truth for THIS commit — no
-// derivable branch (detached HEAD, E165), gh not installed, gh
-// unauthenticated, network/API error, unparseable output, zero completed runs,
-// or the poll budget expiring with no completed run found for this sha — emits
-// the SAME WARN and leaves the check green, preserving the exit-0 path that
-// predates Check 6 exactly (the sha-match contract, E78, is preserved, not
-// inverted: the poll only improves the odds of finding ground truth, it never
-// turns a miss into a FAIL). The ONLY failure mode is a definitively red
-// answer: a completed run for THIS commit whose conclusion is not "success".
+// Ground truth is the completed `--workflow CI` run whose headSha is the
+// released commit, never simply the newest run (E78), on the branch derived
+// from the checkout (E165). A not-yet-listed run is polled for (E80); any
+// inability to get an answer WARNs, and only a non-success conclusion for this
+// sha FAILs. See specs/e260c-bin-scripts.md.
 
 // --- Shared CI ground-truth evaluator (E163) --------------------------------
-// Factored out of Check 6 so SOP steps 2a and 8b (the --ci-check mode above)
-// reuse this exact sha-resolution-and-poll mechanism rather than a second
-// implementation. `strict` is the only behavioral parameter: false reproduces
-// Check 6's behavior from before this extraction byte-for-byte
-// (WARN-and-continue on any inability to obtain ground truth); true converts
-// every one of those WARN conditions into a FAIL instead — used by step 8b,
-// never by Check 6 itself.
+// Check 6 and --ci-check (SOP steps 2a and 8b) share this one implementation.
+// `strict` is the only parameter: false is Check 6's WARN-and-continue on any
+// inability to get ground truth; true turns each such WARN into a FAIL (8b).
 function evaluateCIGroundTruth({ sha: releaseSha, strict, fails }) {
   // WARNs (and poll-progress lines) go to stdout, not stderr: the script's
   // contract (pinned by VR-8) reserves stderr for FAIL lines — a fully
@@ -510,20 +377,10 @@ function evaluateCIGroundTruth({ sha: releaseSha, strict, fails }) {
   const waitBudgetSeconds =
     Number.isFinite(parsedBudget) && parsedBudget >= 0 ? parsedBudget : DEFAULT_WAIT_SECONDS;
 
-  // The branch whose CI runs are ground truth (E165) is DERIVED from the
-  // current checkout, never assumed to be `main` — a release cut from a
-  // maintenance/hotfix branch must interrogate that branch's runs, not
-  // main's. Derivation order:
-  //   1. the checkout's upstream (`@{u}`), remote prefix stripped — the
-  //      branch as the remote (and therefore GitHub Actions) names it;
-  //   2. otherwise the current local branch name;
-  //   3. a detached HEAD (`HEAD`) has no branch at all — that is a
-  //      cannot-obtain-ground-truth condition, reported via warn() (so the
-  //      strict pre-tag gate turns it into a FAIL, and the lenient paths
-  //      degrade exactly like every other inconclusive read).
-  // Returns { branch, label } on success — `label` is the human-readable
-  // name used where messages previously said `origin/main` (the full upstream
-  // ref when one exists, else the bare branch) — or null after warn().
+  // The CI branch (E165) is derived from the checkout, never assumed `main`:
+  // the upstream (`@{u}`) with its remote prefix stripped, else the local branch;
+  // a detached HEAD has none and goes through warn(). Returns { branch, label }
+  // (`label` is the full upstream ref when there is one) or null after warn().
   function deriveCIBranch() {
     let current;
     try {
@@ -639,14 +496,10 @@ function evaluateCIGroundTruth({ sha: releaseSha, strict, fails }) {
       return;
     }
 
-    // Ground truth for THIS release is the completed run whose headSha IS the
-    // commit being released — not runs[0], which is merely the most recently
-    // completed run on the derived branch and may belong to an earlier, unrelated commit
-    // (E78). A completed run for an earlier commit is not "nothing to go on"
-    // (that's the zero-runs branch above) and it is not "this commit is red"
-    // either — it is simply the wrong answer, so it degrades exactly like any
-    // other cannot-obtain-ground-truth path rather than being accepted or
-    // treated as a fatal mismatch.
+    // Ground truth is the completed run whose headSha IS the released commit,
+    // not runs[0], which may belong to an earlier commit (E78). A run for an
+    // earlier commit is neither "no runs" nor "red", so it degrades like any
+    // other cannot-obtain-ground-truth path.
     const matched = runs.find((r) => r.headSha === releaseSha);
     if (matched) {
       const { conclusion, headSha, url } = matched;
