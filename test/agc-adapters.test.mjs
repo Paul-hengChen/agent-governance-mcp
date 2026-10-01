@@ -975,7 +975,8 @@ test("E104(ii): this repo has zero tracked binaries under research/ (the day-one
 
 // --- Linked-worktree evidence advisory (bin/agc-init.mjs checkWorktreeEvidence()) (E111) ---
 // A fixture is mandatory: this repo tracks all three evidence dirs, so it cannot reproduce the
-// defect. The contract is the 23-row matrix in review_reports/review_T-E111-01.md (round 3
+// defect. The contract is the 23-row matrix in
+// review_reports/archive/e111-lane-worktree-evidence/review_T-E111-01.md (round 3
 // binding); assert only warn/silent stderr text and exit code, never which git command fires.
 // More: specs/e260e-comment-rationale.md (agc-adapters.test.mjs).
 

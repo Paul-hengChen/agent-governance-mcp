@@ -656,7 +656,8 @@ test("CS-ESCAPED-PIPE-ADJACENT: an escaped `\\|` sitting next to a code span, wi
 
 // ============================================================================
 // CQ-* — findCitationQuoteRanges() / citation-exclusion discriminator tests (T-E145-02): the 9 cases
-// named in review_reports/review_T-E145-01.md, on the ticket-table shape, asserting class behaviour
+// named in review_reports/archive/e145-md-tables-cited-donemark/review_T-E145-01.md, on the ticket-table
+// shape, asserting class behaviour
 // (advisory fires / stays silent), never a fixed offset.
 // ============================================================================
 
@@ -763,7 +764,7 @@ test("CQ-RESIDUAL-SPAN-SWALLOW (pins C3 as a RECORDED residual, currently silent
 // ============================================================================
 // AC7 — the real docs/backlog.md run for real via the actual script; asserts only exit 0, never
 // a count or line numbers, since backlog edits would red a pin. Advisory count lives in
-// qa_reports/review_T-E88E105-02.md. More: specs/e260e-comment-rationale.md (check-md-tables.test.mjs).
+// qa_reports/archive/wave1.5-content-catchup/review_T-E88E105-02.md. More: specs/e260e-comment-rationale.md (check-md-tables.test.mjs).
 // ============================================================================
 
 test("AC7 (real corpus, informational count NOT pinned here): `node scripts/check-md-tables.mjs` against this actual repository's docs/backlog.md still exits 0 — the E88 advisory must never turn a pre-existing row fatal", () => {
