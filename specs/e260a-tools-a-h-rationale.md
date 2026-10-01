@@ -76,3 +76,32 @@ The round and hop counters (`qa_round`, `review_round`, `visual_round`, `hop_cou
 ### tools/drift.ts — buildEvidenceBackedLine
 
 A qualifying record is one in the root `qa_reports/`, in `qa_reports/archive/<feature>/`, or a `covers:` label line in either, whose last recorded verdict is PASS or which records no verdict at all (the content test in `tools/evidence-lookup.ts`). Such ids are not agent error: `completed_tasks` is feature-scoped and legitimately empties when `active_feature` changes, and a merged parallel lane's ledger can be discarded on a merge conflict. This line only detects that; it does not fix the cause. `tw_sync`, the natural response to reported drift, is the wrong remedy because it would carry the previous feature's completion marks into the new feature's ledger. The line is one aggregate line, like the other compressed drift lines, and is never merged into `compressDriftDetails` output. Because the check reads a record and not the work itself, the line must not claim flatly that this "is NOT vibe-coding drift".
+
+### tools/feature-rollup.ts — roll-up
+
+The roll-up exists so a PM or coordinator can list a multi-lane feature's lanes, sum each lane's ticket, status and hop count, and show the total to a human before declaring the feature closed (the feature-close roll-up obligation in `content/coord-03-core-fallback.md`). Degrading honestly is the property that matters: the module's whole point is to stop a per-lane brake being read as the feature-wide figure, so dropping an unreadable lane or presenting a partial sum as a verified total would repeat that mistake.
+
+- Lane list: `localFallbackLaneList` (a git-worktree scan) is the default provider. `laneRegistryList` in `tools/lane-registry.ts` has the same signature and is passed through the `laneListProvider` option of `computeFeatureRollup` with no call-site changes.
+- Feature attribution: every lane is shown in the table, but only lanes whose `activeFeature` equals the requested feature id are summed into `totals` and `capComparison`. `active_feature` is a heuristic (a lane may have moved on to a later feature), so when no lane matches, or a readable lane records no `active_feature`, the report degrades instead of quietly adding the lane to the totals.
+
+### tools/evidence-lookup.ts — verdict rule
+
+`hasEvidenceInFile` in `gates/qa-review.ts` deliberately scans only the `qa_reports/` root: it is a live gate predicate, and widening its scan would change gate behaviour. This module extends the same `review_<id>.md` convention into the release-engineer archive tree, so a released, archived PASS still counts as evidence on disk.
+
+Existence alone is the wrong test. `recordReviewInFile` writes both PASS and FAIL rounds to `review_<id>.md` and creates the file on a FAIL round, so the server write that records a rejection would otherwise create the file that silences the drift detector. The rule, applied the same way to a per-id file and to a file reached through a `covers:` line:
+
+1. If the file has one or more verdict sections (the `<ts> — PASS|FAIL — by <reviewer>` H2 that `recordReviewInFile` appends in time order), the last one must be PASS.
+2. If it has no verdict section at all, it still counts. The FAIL path always writes a verdict section, so a verdict-less file is a hand-authored covering report, the same trust class `hasEvidenceInFile` accepts on existence. Requiring more here than the gate requires at completion would raise false drift alarms on shipped work.
+
+Known gap, accepted: the rule still admits an empty or prose-only file with no verdict section, and a `covers:` line naming an id inside a report that never judged it, because only the verdict shape is inspected. Both are the hand-authored trust class the gate already credits; this module closes only the gap where a file the server wrote as a rejection would count as evidence.
+
+### tools/exemptions.ts — loadExemptions
+
+- A prose-only exemption (pending notes, review text, chat) counts as not exempted. A rule everyone knows is permanently broken teaches agents that rules are negotiable, so an exemption must be a declared, expiring, countable file instead.
+- Failure always leans toward enforcement: an absent file means no exemptions and no signal; a structural problem (unreadable, bad JSON, non-object root, unsupported `schema_version`, `exemptions` not an array) voids the whole manifest with loud errors; a bad entry is dropped while valid siblings survive, like the per-field filter in `tools/config.ts`.
+- It never throws because it runs on the `tw_get_state` read path, the first call every role makes; a throw would block everything else. For the same reason it has no mtime cache like `tools/config.ts`: it runs once per read, so there is no hot path to cache.
+- `expires_when` is a recorded string that humans and the retro check; the server does not evaluate it. The exemption count is shown on every `tw_get_state` and can only grow, and the manifest is committed, so its growth is visible in git history.
+
+### tools/hygiene-scan.ts — authoring rule
+
+The scan runs over this repository, including this file, so no pattern literal here may match its own source text: separators are written as one-character classes, host dots are escaped, each vendor prefix is followed by a character class, and comments describe shapes in prose only. Constant names avoid UPPER_SNAKE gate-code suffixes because `test/error-code-contract.test.mjs` harvests such names from `tools/*.ts`. The keyword layer reads its list only from a local, untracked source: `AGC_HYGIENE_KEYWORDS`, else `agc-hygiene-keywords` in the git common directory. Imports are limited to `fs`, `path` and `execFileSync` from `node:child_process`, always called with an argument array and never through a shell. Specs: `specs/e234-hygiene-scan.md` and `specs/e234-hygiene-scan-architecture.md`.

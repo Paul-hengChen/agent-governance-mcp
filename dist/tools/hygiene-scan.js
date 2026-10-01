@@ -1,28 +1,10 @@
 // Coded by @sr-engineer
-// Information-hygiene scan (spec specs/e234-hygiene-scan.md, architecture
-// specs/e234-hygiene-scan-architecture.md). The fifth `agc check`
-// advisory: it warns about the classes of detail the constitution's
-// Information hygiene rule bans from durable output, and never changes the
-// exit code (bin/agc-init.mjs checkHygiene is the only caller).
-//
-// Two layers:
-//   - shape: built-in generic patterns that name nothing concrete;
-//   - keyword: a literal list read only from a local, untracked source
-//     (AGC_HYGIENE_KEYWORDS, else agc-hygiene-keywords in the git common dir).
-//
-// Two tiers inside this file: a PURE layer (strings in, spans / verdicts /
-// lines out; no I/O) and an I/O layer (listScanSet, resolveKeywordSource,
-// scanWorkspace, runHygieneScan) that is the only code touching git or fs.
-//
-// Authoring rule: no pattern literal in this file may match its own source
-// text. Separators are written as one-character classes, host dots are
-// escaped, and each vendor prefix is followed by a character class, so the
-// scan stays silent over this file. Comments describe shapes in
-// prose only. Constant names avoid UPPER_SNAKE gate-code suffixes
-// (test/error-code-contract.test.mjs harvests tools/*.ts).
-//
-// Imports are limited to fs, path and node:child_process (execFileSync with an
-// argv array, never a shell). No other tools/ module is imported.
+// Information-hygiene scan, the fifth `agc check` advisory; never changes the
+// exit code. A pure layer plus an I/O layer (listScanSet, resolveKeywordSource,
+// scanWorkspace, runHygieneScan) that alone touches git or fs.
+// Authoring rule: no pattern literal here may match this file's own source,
+// and constant names avoid UPPER_SNAKE gate-code suffixes.
+// Why: specs/e260a-tools-a-h-rationale.md, "tools/hygiene-scan.ts — authoring rule".
 import * as fs from "fs";
 import * as path from "path";
 import { execFileSync } from "node:child_process";
