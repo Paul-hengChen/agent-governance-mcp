@@ -49,7 +49,6 @@ export declare const WORKTREE_ABSOLUTE_WARN: (lane: string, line: number) => str
 /**
  * validate warning for an absolute `mailbox:` header. Like
  * WORKTREE_ABSOLUTE_WARN, the absolute value is deliberately NOT echoed.
- * (E248)
  */
 export declare const MAILBOX_ABSOLUTE_WARN: (line: number) => string;
 export declare const PINS_NONE = "\u7121";
@@ -183,14 +182,10 @@ export type WorktreeResolution = {
     message: string;
 };
 /**
- * Resolve a manifest worktree cell to the absolute, `cd`-able path render
- * substitutes into the dispatch prompt. Pure: no fs access, no existence
- * check. (E235b) Rules, in order:
- *   - empty (after trim)   → WORKTREE_EMPTY
- *   - starts with "~"      → WORKTREE_TILDE (never shell-expanded: the tool
- *                            does not guess a home directory)
- *   - absolute             → the cell, byte-verbatim (no normalisation)
- *   - otherwise (relative) → path.resolve(primary, cell)
+ * Resolve a manifest worktree cell to an absolute, `cd`-able path.
+ * render substitutes it into the dispatch prompt. Pure: no fs access. Empty →
+ * WORKTREE_EMPTY; leading "~" → WORKTREE_TILDE (no home expansion);
+ * absolute → the cell, byte-verbatim; relative → path.resolve(primary, cell).
  */
 export declare function resolveWorktree(cell: string, primary: string): WorktreeResolution;
 export type MailboxResolution = {
@@ -202,16 +197,11 @@ export type MailboxResolution = {
     message: string;
 };
 /**
- * Resolve a manifest `mailbox:` header to the absolute mailbox root render
- * substitutes. Same rules as resolveWorktree, minus the empty case
- * (MAILBOX_RE requires a non-space value, and render treats a blank source
- * as absent before calling this). Pure: no fs access, no existence check.
- * (E248)
- *   - starts with "~"      → MAILBOX_TILDE (never shell-expanded; the value
- *                            is not echoed in the message)
- *   - absolute             → the header, byte-verbatim (no normalisation)
- *   - otherwise (relative) → path.resolve(primary, header); `..` above
- *                            primary is allowed (../<lanes-dir>/_mailbox)
+ * Resolve a manifest `mailbox:` header to an absolute mailbox root.
+ * Same rules as resolveWorktree minus the empty case (MAILBOX_RE requires a
+ * value, and render treats a blank source as absent). Pure: no fs access.
+ * Leading "~" → MAILBOX_TILDE (value not echoed); absolute → byte-verbatim;
+ * relative → path.resolve(primary, header), and `..` above primary is allowed.
  */
 export declare function resolveMailboxHeader(header: string, primary: string): MailboxResolution;
 /**
@@ -269,12 +259,11 @@ export declare const UNMATCHED_OWNED_WARN: (token: string, base: string, branch:
  */
 export declare function isGlobToken(token: string): boolean;
 /**
- * The exact (non-glob) owned tokens that match no path in `basePaths` and
- * no file in `addedPaths` (files the lane branch added vs base: a declared
- * new file such as `新檔 tools/fanout-manifest.ts`). Pure; each token
- * reported once, in 擁有 order. A token that matches nothing grants no
- * ownership either, so it is usually a prose aside that happens to be
- * path-shaped. (E208)
+ * Owned exact (non-glob) tokens that match no base or added path.
+ * `addedPaths` are files the lane branch added vs base (a declared new file
+ * such as `新檔 tools/fanout-manifest.ts`). Pure; each token reported once, in
+ * 擁有 order. A token that matches nothing grants no ownership either, so it
+ * is usually a prose aside that happens to be path-shaped.
  */
 export declare function unmatchedOwnedTokens(ownedTokens: string[], basePaths: string[], addedPaths: string[]): string[];
 /**

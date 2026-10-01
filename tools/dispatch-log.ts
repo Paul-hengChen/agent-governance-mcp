@@ -1,28 +1,10 @@
 // Coded by @sr-engineer
-// Append-only per-hop dispatch-mechanism sidecar. (E99)
-//
-// The handoff file keeps only the LAST hop, so the transient dispatch_mechanism /
-// dispatch_mechanism_tier fields (handoff schema v15) are overwritten by the
-// next write. This module durably records every hop that attested them: one
-// JSON line {ts, feature, agent_id, dispatch_mechanism, dispatch_mechanism_tier}
-// per accepted tw_update_state write that CARRIED dispatch_mechanism.
-//
-// Mirrors tools/telemetry.ts's emitGateTelemetry contract exactly:
-// observability, not authoritative state — best-effort, lock-free append,
-// NEVER throws, never alters the caller's ToolResult. Deliberately NOT
-// governed by the handoff 4-step mutating-tool contract.
-//
-// Separate stream: this module writes ONLY its own sidecar. It never
-// touches the per-shipped-feature metrics sidecar (tools/metrics.ts, deduped
-// per feature by tw_gate_stats — a per-hop record would corrupt that
-// invariant) nor the gate-fire telemetry sidecar (tools/telemetry.ts).
-//
-// Raw and unconsumed for now: no aggregator, drift check, or gate reads it.
-//
-// Path: resolveCurrentLanePaths(<absolute ws>).dispatchLogPath — the lane
-// resolver owns both the filename (LANE_FILES) and the directory, so this
-// sidecar lives in the current lane next to its handoff:
-// `.current/<lane>/dispatch.jsonl`. (E123)
+// Append-only per-hop dispatch-mechanism sidecar: one JSON line {ts, feature,
+// agent_id, dispatch_mechanism, dispatch_mechanism_tier} per accepted write
+// carrying dispatch_mechanism, since the handoff keeps only the last hop.
+// Best-effort, lock-free, never throws; writes only its own sidecar, at
+// resolveCurrentLanePaths(<absolute ws>).dispatchLogPath.
+// Why: specs/e260a-tools-a-h-rationale.md, "tools/dispatch-log.ts — sidecar".
 
 import * as fs from "fs";
 import * as path from "path";

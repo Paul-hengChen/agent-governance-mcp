@@ -105,3 +105,45 @@ Known gap, accepted: the rule still admits an empty or prose-only file with no v
 ### tools/hygiene-scan.ts — authoring rule
 
 The scan runs over this repository, including this file, so no pattern literal here may match its own source text: separators are written as one-character classes, host dots are escaped, each vendor prefix is followed by a character class, and comments describe shapes in prose only. Constant names avoid UPPER_SNAKE gate-code suffixes because `test/error-code-contract.test.mjs` harvests such names from `tools/*.ts`. The keyword layer reads its list only from a local, untracked source: `AGC_HYGIENE_KEYWORDS`, else `agc-hygiene-keywords` in the git common directory. Imports are limited to `fs`, `path` and `execFileSync` from `node:child_process`, always called with an argument array and never through a shell. Specs: `specs/e234-hygiene-scan.md` and `specs/e234-hygiene-scan-architecture.md`.
+
+### tools/config.ts — config file
+
+An example `.current/.config.json` using every field:
+
+```json
+{
+  "taskPattern": "<JS regex source>",
+  "taskPaths": ["tasks.md", "TODO.md"],
+  "driftBaselineIds": ["T470", "T471"],
+  "tokenBudgetPerFeature": 500000,
+  "cutApprovalAutoTier": { "maxFiles": 2, "maxPriority": "P3", "allowSchemaChange": false, "allowDesignArmed": false },
+  "staleDispatchNotifyFile": ".current/stale-dispatch.notify",
+  "artifacts": "local"
+}
+```
+
+- `taskPattern` is matched against the trimmed line: group 1 is the checkmark (`" "` or `"x"`), group 2 the task id, group 3 the description.
+- `driftBaselineIds` lists ids acknowledged as shipped and reconciled; `tw_detect_drift` leaves them out of the vibe-coding drift check.
+- `tokenBudgetPerFeature` is an opt-in ceiling on the coordinator's summed `usage.*` tokens; non-positive or non-finite values count as absent. The sum comes from the `.current/usage.jsonl` sidecar, appended per dispatch by the opt-in PostToolUse hook (`bin/agent-governance-usage-hook.mjs`) and summed per feature by `tools/usage-accounting.ts`, rather than the coordinator's in-memory arithmetic. Only without the hook does the coordinator fall back to hand-summing the `agent-*.jsonl` transcripts.
+- `cutApprovalAutoTier`: the key's presence, even `{}`, arms the tier; omitted fields take the conservative defaults shown.
+
+### tools/fanout-manifest.ts — never guess
+
+The integrator writes each wave's `specs/fanout-<wave>.md` by hand, and this module is the one parser for that format. `parseManifest` / `validateManifest` read the title, the `base:` and `mailbox:` header lines, every lanes table (eight columns, dispatchable or provisional), the dispatch-pin bullets and the decisions table, and collect every format error instead of fixing anything up. `renderPrompt` builds the integrator's dispatch prompt from one dispatchable row plus explicit CLI inputs. `checkLane` compares `git diff --no-renames --name-only <base>...<branch>` against the row's owned path tokens and lists every path outside them; the parsed path-token set is used only there.
+
+A legacy manifest (older waves used a differently named decisions heading and a provisional-ownership column) is reported by name as unreadable in that part and never mapped onto the current format. Row cells are rendered byte for byte, with one exception: the `worktree` cell is written relative to the primary checkout (for example `../<lanes-dir>/<lane>`) so a tracked manifest never carries a local absolute path, and `render` resolves it against the primary path it already computes. A cell that is already absolute passes through unchanged. The optional `mailbox:` header follows the same rule, and `--mailbox-root` still wins as given. See `specs/e235b-relative-manifest-worktree-architecture.md`.
+
+### tools/gate-stats.ts — category boundary
+
+The two sidecars hold: `telemetry.jsonl`, one line per rejection catalogued in `GATE_REGISTRY` (`{ts, gate, error_code, agent_id, feature}`, written by `tools/telemetry.ts`), and `metrics.jsonl`, one line per shipped feature (`{ts, feature, tickets, qa_rounds, review_rounds, visual_rounds, hops, one_pass, released_version}`, written by `tools/metrics.ts`). The retro in `docs/gate-retro-procedure.md` consumes them, so it runs on data instead of hand-counting.
+
+- Lanes: the writers append to `.current/<lane>/<file>`, so each sidecar is read from every copy in this workspace's `.current/` tree: live lanes, closed lanes under `.current/history/<YYYY-MM>/<lane>/`, and a not-yet-migrated flat file. A copy is dropped only when its bytes are a prefix of, or identical to, another counted copy (a history copy caught mid-move, a half-merged flat file). The scope is this workspace only.
+- The category boundary is the load-bearing requirement. Telemetry can show a gate-backed rule alive or dead: every enforcement path emits a registry error code, so zero fires over a window is real evidence (though it may still mean deterrence or an unexercised edge, never automatic retirement). Prose-only rules (the read cap, the terse cap, honouring `dispatch_pins`, the coordinator token-budget brake and others) have no server gate and so no telemetry: zero fires for them means nothing was measured, not that nothing was violated. Their rows live in a separate array whose `fires` is `null`, never 0, so a reader cannot mistake "not measured" for "never fired".
+- It never throws, like the `tools/exemptions.ts` loader: a missing sidecar is the normal case for a young workspace (zero counts and a note), a malformed line is skipped and counted (an interleaved line from concurrent lock-free appends is an accepted cost), and no failure may block a retro.
+
+### tools/dispatch-log.ts — sidecar
+
+- Like `emitGateTelemetry` in `tools/telemetry.ts`, this is observability, not authoritative state: best-effort, lock-free append, never throws, never changes the caller's result, and not subject to the handoff file's lock, freshness and atomic-write contract.
+- It writes only its own sidecar. It never touches the per-shipped-feature metrics sidecar, which `tw_gate_stats` dedupes per feature (a per-hop record would break that), or the gate-fire telemetry sidecar.
+- Nothing reads it yet: no aggregator, drift check or gate.
+- The lane resolver owns both the file name (in `LANE_FILES`) and the directory, so the sidecar sits in the current lane next to its handoff, at `.current/<lane>/dispatch.jsonl`.

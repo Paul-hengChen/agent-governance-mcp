@@ -1,42 +1,10 @@
 // Coded by @sr-engineer
-// tw_gate_stats — per-gate fire-count coverage reader. Aggregates the two
-// observability sidecars the rule-retirement retro
-// (docs/gate-retro-procedure.md) consumes, so the retro runs on data instead
-// of raw `jq` + hand-counting (E26). The two sidecars:
-//
-//   telemetry.jsonl  — one line per GATE_REGISTRY-cataloged rejection
-//                      (tools/telemetry.ts): {ts, gate, error_code,
-//                      agent_id, feature}
-//   metrics.jsonl    — one line per SHIPPED feature (tools/metrics.ts):
-//                      {ts, feature, tickets, qa_rounds, review_rounds,
-//                      visual_rounds, hops, one_pass, released_version}
-//
-// LANE-AWARE: the writers append to
-// `.current/<lane>/<file>`, so each sidecar is read from EVERY copy this
-// workspace's `.current/` tree holds — live lanes, closed
-// `.current/history/<YYYY-MM>/<lane>/` lanes, and a not-yet-migrated flat
-// `.current/<file>` — via tools/lane-paths.ts's enumerateLaneSidecarSources,
-// which drops a copy only when its bytes are a prefix of / identical to
-// another counted copy (a mid-move history copy, a half-merged flat file).
-// Every such skip is disclosed in `caveats`. Scope is this workspace only. (E123)
-//
-// CATEGORY BOUNDARY (the load-bearing requirement): telemetry can prove a
-// *gate-backed* rule dead or alive — every enforcement path emits a
-// GATE_REGISTRY error code, so zero fires over a window is real evidence
-// (though it may still mean deterrence or an unexercised edge, never
-// auto-retirement). Prose-behavioral rules (§5 read cap, §1 terse cap,
-// dispatch_pins honoring, the coordinator token-budget brake, et al.) have NO
-// server gate and therefore NO telemetry: zero fires for them is absence of
-// measurement, not absence of violations. The output makes this structural —
-// prose-behavioral rows live in a separate array whose `fires` is `null`
-// (never 0), so a reader cannot conflate "not measured" with "never fired".
-//
-// Never throws (the tools/exemptions.ts loader posture): this is a read-only
-// reporting tool — a missing sidecar is the normal young-workspace case
-// (zero counts + a note), a malformed line is skipped and counted loudly
-// (the scripts/summarize-metrics.mjs discipline; an interleaved line under
-// concurrent lock-free appends is an accepted cost per
-// docs/gate-retro-procedure.md), and no failure mode may block a retro.
+// tw_gate_stats: aggregates telemetry.jsonl (one line per GATE_REGISTRY
+// rejection) and metrics.jsonl (one line per shipped feature) for the
+// rule-retirement retro. Reads every lane's copy via tools/lane-paths.ts's
+// enumerateLaneSidecarSources; skips are disclosed in `caveats`. Prose-only
+// rules have no gate, so their rows report `fires: null`, never 0. Never throws.
+// Why: specs/e260a-tools-a-h-rationale.md, "tools/gate-stats.ts — category boundary".
 
 import { GATE_REGISTRY, type GateProducer } from "../gates/registry.js";
 import {
@@ -126,10 +94,9 @@ export interface GateStatsReport {
     exists: boolean;
     lines_total: number;
     lines_malformed: number;
-    // Records dropped by the (feature, released_version) idempotency key —
+    // Records dropped by the (feature, released_version) idempotency key,
     // the same key tools/metrics.ts dedupes on at append time; older
-    // double-appends written before that dedupe existed are healed here at
-    // read time. (E12)
+    // double-appends are healed here at read time.
     duplicates_skipped: number;
     features: number;
     one_pass_count: number;
@@ -146,11 +113,9 @@ export interface GateStatsReport {
 // ==========================================
 // Prose-behavioral catalog
 // ==========================================
-// Rules that CANNOT be judged from this tool's data (token brake,
-// dispatch_pins, read cap, terse cap et al.). Deliberately illustrative, not
-// exhaustive — most constitution prose has no gate; these are the ones
-// retros have already tried (and failed) to judge by gate-fire counts.
-// (E26)
+// Rules this tool's data cannot judge (token brake, dispatch_pins, read cap,
+// terse cap and others). Illustrative, not exhaustive: these are the ones
+// retros have tried to judge by gate-fire counts.
 const TRANSCRIPT_SAMPLING =
   "Transcript sampling — inspect real session transcripts for compliance; " +
   "this tool carries NO signal for this rule.";
@@ -391,7 +356,6 @@ export function computeGateStats(workspacePath: string): GateStatsReport {
     // Read-time dedupe on the (feature, released_version) idempotency key:
     // JSON.stringify of the tuple is collision-safe (a raw
     // `${feature}|${version}` join is not — "a|b"+null vs "a"+"b|null").
-    // (E12)
     const key = JSON.stringify([feature, releasedVersion]);
     if (seenOutcomes.has(key)) {
       duplicatesSkipped++;

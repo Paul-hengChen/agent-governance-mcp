@@ -54,9 +54,8 @@ export interface RollupReportLane {
     status: string | null;
     hopCount: number | null;
     readable: boolean;
-    /** Passthrough of LaneInfo.featureHistory — only populated when the caller
-     * supplied a provider that computes it (laneRegistryList); undefined for
-     * lanes from localFallbackLaneList. */
+    /** Passthrough of LaneInfo.featureHistory. Set only by providers that
+     * compute it (laneRegistryList); undefined for localFallbackLaneList lanes. */
     featureHistory?: string[] | null;
 }
 export interface RollupReport {

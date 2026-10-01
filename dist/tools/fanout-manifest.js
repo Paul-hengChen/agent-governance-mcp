@@ -1,37 +1,10 @@
 // Coded by @sr-engineer
-// tools/fanout-manifest.ts — fan-out manifest parser, dispatch-prompt
-// renderer and fan-in ownership check. The normative format table in
-// specs/e177a-fanout-manifest.md is the contract this module implements.
-// (E177a)
-//
-// The integrator writes each wave's `specs/fanout-<wave>.md` by hand. This
-// module is the ONE parser for that format:
-//   - parseManifest / validateManifest — line-based markdown parse of the
-//     title, `base:` / `mailbox:` header lines, every `## Lanes…` table
-//     (8-column dispatchable vs provisional), `## Dispatch pins…` bullets and
-//     the `## Decisions…` table; every format error is collected, none is
-//     "fixed up".
-//   - renderPrompt — the integrator SOP §3b dispatch prompt built from one
-//     dispatchable row plus explicitly supplied CLI inputs.
-//   - checkLane — `git diff --no-renames --name-only <base>...<branch>` vs
-//     the row's owned path tokens; every out-of-bounds path is listed.
-//
-// Load-bearing property: the tool NEVER guesses. A legacy manifest (Wave 6's
-// `## 人類裁決`, Wave 7.2's `擁有（暫定）` columns) is reported by name as
-// unreadable in that part; it is never mapped onto the current format. Row
-// cells are rendered byte-verbatim, with one exception: the `worktree` cell is
-// written relative to the primary checkout (e.g. `../<lanes-dir>/<lane>`) so a
-// tracked manifest never carries a local absolute path, and `render` resolves
-// it against the primary path it already computes; a cell that is already
-// absolute passes through byte-verbatim (see
-// specs/e235b-relative-manifest-worktree-architecture.md). The optional
-// `mailbox:` header follows the same rule: a relative value resolves against
-// primary, an absolute one passes through byte-verbatim, and `--mailbox-root`
-// still wins verbatim (E235b, E248). The parsed path-token set is used only
-// by `check`.
-//
-// Reporting surface only: writes nothing, fires no gate, touches no git state
-// (git is only read, via execFileSync argv — never a shell).
+// Fan-out manifest parser (parseManifest / validateManifest), dispatch-prompt
+// renderer (renderPrompt) and fan-in ownership check (checkLane); the format
+// contract is the table in specs/e177a-fanout-manifest.md. It never guesses:
+// a legacy manifest part is reported unreadable by name. Read-only: writes
+// nothing, fires no gate; git is read via execFileSync argv, never a shell.
+// Why: specs/e260a-tools-a-h-rationale.md, "tools/fanout-manifest.ts — never guess".
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -124,7 +97,6 @@ export const WORKTREE_ABSOLUTE_WARN = (lane, line) => `WARN  lane ${lane} (line 
 /**
  * validate warning for an absolute `mailbox:` header. Like
  * WORKTREE_ABSOLUTE_WARN, the absolute value is deliberately NOT echoed.
- * (E248)
  */
 export const MAILBOX_ABSOLUTE_WARN = (line) => `WARN  mailbox header (line ${line}): mailbox: is an absolute path — write it relative to primary (e.g. ../<lanes-dir>/_mailbox); render still accepts it`;
 export const PINS_NONE = "無";
@@ -630,14 +602,10 @@ export function isAbsoluteWorktree(cell) {
     return path.isAbsolute(cell);
 }
 /**
- * Resolve a manifest worktree cell to the absolute, `cd`-able path render
- * substitutes into the dispatch prompt. Pure: no fs access, no existence
- * check. (E235b) Rules, in order:
- *   - empty (after trim)   → WORKTREE_EMPTY
- *   - starts with "~"      → WORKTREE_TILDE (never shell-expanded: the tool
- *                            does not guess a home directory)
- *   - absolute             → the cell, byte-verbatim (no normalisation)
- *   - otherwise (relative) → path.resolve(primary, cell)
+ * Resolve a manifest worktree cell to an absolute, `cd`-able path.
+ * render substitutes it into the dispatch prompt. Pure: no fs access. Empty →
+ * WORKTREE_EMPTY; leading "~" → WORKTREE_TILDE (no home expansion);
+ * absolute → the cell, byte-verbatim; relative → path.resolve(primary, cell).
  */
 export function resolveWorktree(cell, primary) {
     if (cell.trim() === "") {
@@ -655,16 +623,11 @@ export function resolveWorktree(cell, primary) {
     return { ok: true, path: path.resolve(primary, cell) };
 }
 /**
- * Resolve a manifest `mailbox:` header to the absolute mailbox root render
- * substitutes. Same rules as resolveWorktree, minus the empty case
- * (MAILBOX_RE requires a non-space value, and render treats a blank source
- * as absent before calling this). Pure: no fs access, no existence check.
- * (E248)
- *   - starts with "~"      → MAILBOX_TILDE (never shell-expanded; the value
- *                            is not echoed in the message)
- *   - absolute             → the header, byte-verbatim (no normalisation)
- *   - otherwise (relative) → path.resolve(primary, header); `..` above
- *                            primary is allowed (../<lanes-dir>/_mailbox)
+ * Resolve a manifest `mailbox:` header to an absolute mailbox root.
+ * Same rules as resolveWorktree minus the empty case (MAILBOX_RE requires a
+ * value, and render treats a blank source as absent). Pure: no fs access.
+ * Leading "~" → MAILBOX_TILDE (value not echoed); absolute → byte-verbatim;
+ * relative → path.resolve(primary, header), and `..` above primary is allowed.
  */
 export function resolveMailboxHeader(header, primary) {
     if (header.startsWith("~")) {
@@ -863,12 +826,11 @@ export function isGlobToken(token) {
     return token.includes("*") || token.includes("{") || token.endsWith("/");
 }
 /**
- * The exact (non-glob) owned tokens that match no path in `basePaths` and
- * no file in `addedPaths` (files the lane branch added vs base: a declared
- * new file such as `新檔 tools/fanout-manifest.ts`). Pure; each token
- * reported once, in 擁有 order. A token that matches nothing grants no
- * ownership either, so it is usually a prose aside that happens to be
- * path-shaped. (E208)
+ * Owned exact (non-glob) tokens that match no base or added path.
+ * `addedPaths` are files the lane branch added vs base (a declared new file
+ * such as `新檔 tools/fanout-manifest.ts`). Pure; each token reported once, in
+ * 擁有 order. A token that matches nothing grants no ownership either, so it
+ * is usually a prose aside that happens to be path-shaped.
  */
 export function unmatchedOwnedTokens(ownedTokens, basePaths, addedPaths) {
     const out = [];
