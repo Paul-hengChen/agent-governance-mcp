@@ -1,31 +1,10 @@
 // Coded by @sr-engineer
-// tw_update_state gate-policy orchestration. Kept separate from
-// tools/handoff.ts so "read/write handoff state" and "gate policy
-// orchestration" stay apart (this module imports tools/transitions.ts +
-// tools/evidence-file.ts; handoff.ts does not).
-//
-// Check order is frozen and additive: new checks are inserted at a chosen
-// position, existing ones are never reordered or merged. The order is data —
-// the ordered UPDATE_STATE_GATE_PIPELINE array below. Full order: preflight →
-// PASS/qa-engineer gate → ctx derivation → pipeline [transition validation →
-// stamp-provenance gate (before the lease gate: the lease predicate
-// consumes last_updated, so provenance resolves first) → feature-lease gate
-// → lease-override bypass/audit → bookkeeping-write feature-change gate
-// → scope-decision gate → cut-approval gate → external-refs gate →
-// source-credibility gate → repro-first gate (bugfix mode only) →
-// review-verdict/status mismatch gate → reviewer completed_tasks gate →
-// QA evidence record → qa completion-evidence gate (after the record
-// so a qa_review-bearing write's own evidence counts) → PASS evidence gate →
-// visual sub-gates → expected-red diff gate → AC-execution-log gate →
-// code-reviewer evidence gate] → round-cap sentinels → storage.writeState →
-// PASS RAG GC hook. No reorder, no merge, no early-return removal — the order
-// is asserted by the qa-owned order-pin test, not a comment. Gate bodies keep
-// their original deep indentation on purpose: the source-pin suites
-// (error-code-contract, ac-execution I5b, gates-expected-red) assert exact
-// byte shapes, so do not re-indent. (E35)
-//
-// The 4-step mutating-tool contract (lock → freshness → atomic write → refresh
-// snapshot) lives inside tools/handoff.ts writeState — NOT here.
+// tw_update_state gate-policy orchestration. The handoff read/write path and
+// its lock → freshness → atomic write contract live in tools/handoff.ts.
+// The check order is frozen and additive: UPDATE_STATE_GATE_PIPELINE below is
+// the order, and a test pins it. Insert new checks; never reorder or merge.
+// Do not re-indent gate bodies: some tests pin their exact byte shape.
+// Why: specs/e260a-tools-a-h-rationale.md, "tools/handoff-orchestrator.ts — check order".
 import { enforcePreFlight } from "../guards/session.js";
 import { getActiveStorage, FileHandoffStorage } from "./storage.js";
 import { requireQaEngineer, validateTransition, computeNewRound, ALLOWED_TRANSITIONS, HOP_CAP_EXPORTED, } from "./transitions.js";
@@ -51,7 +30,6 @@ import { runUpdateStatePipeline, } from "../gates/pipeline.js";
 // because both are MCP tool handlers for the same handoff.md surface (read
 // vs. write); they are not part of the parse/write library code that
 // tools/handoff.ts re-exports. registry.ts imports both from this module.
-// (E36)
 // ==========================================
 // --- No guard: reading state IS the pre-flight check ---
 export async function handleGetState(args) {
@@ -86,13 +64,10 @@ export async function handleUpdateState(parsed) {
     return result;
 }
 // The tw_update_state gate pipeline: this array IS the frozen, additive check
-// order. Each step body is the original gate block, kept byte-for-byte with
-// its comments. Add a gate by inserting a step at its specified position —
-// never by editing a neighbour's body. One step per gate family; the
-// PASS-path visual sub-gates share derived state (armCheck/visualGate) and
-// so stay one step with their internal order unchanged. The only side effect
-// in the middle of the sequence (the qa_review auto-record) stays in its own
-// step at the same position (QA_REVIEW_RECORD). (E35)
+// order. Add a gate by inserting a step at its position, never by editing a
+// neighbour's body. One step per gate family; the PASS-path visual sub-gates
+// share derived state (armCheck/visualGate) and stay one step. The qa_review
+// auto-record, the only side effect mid-sequence, keeps its own step.
 export const UPDATE_STATE_GATE_PIPELINE = [
     {
         name: "TRANSITION_VALIDATION",
@@ -130,24 +105,13 @@ export const UPDATE_STATE_GATE_PIPELINE = [
         codes: ["STAMP_PROVENANCE_SUSPECT"],
         run: (ctx) => {
             const { parsed, storage, prevState } = ctx;
-            // Stamp-Provenance Gate. When the on-disk last_updated looks
-            // hand-authored (gates/stamp-provenance.ts — the same predicate the
-            // read-only stampAdvisory in tools/drift.ts uses), reject any write
-            // that does not acknowledge it with pending_notes[0] matching
-            // /^stamp-remediation:/ (note-only, like the lease-override audit
-            // note; no companion boolean). Runs after validateTransition, so every
-            // transition-shaped rejection is still reported first, and before the
-            // feature-lease gate, because the lease predicate trusts last_updated:
-            // on a suspect stamp its freshness answer is unreliable. The freshness
-            // guard inside writeState (lock → verifyFreshness → atomic write →
-            // refresh) is unrelated: it compares file mtimes, never the stamp
-            // content. Guarded by prevState so the first write to a brand-new
-            // workspace is never gated (no existing handoff, nothing to distrust).
-            // Self-clearing: any accepted write stamps a fresh now(), so the
-            // remediation write itself removes the condition — it must be a
-            // normal write, since a bookkeeping_write would keep the suspect stamp.
-            // File mode only: SQLite/HTTP stamps come from the DB write path,
-            // like the sibling attestation gates. (E18)
+            // Stamp-provenance gate: when the on-disk last_updated looks hand-authored,
+            // reject any write whose pending_notes[0] does not start with
+            // "stamp-remediation:". Runs before the feature-lease gate, which trusts
+            // last_updated. No prevState (a new workspace) means nothing to distrust.
+            // Self-clearing: the accepted remediation write stamps a fresh now().
+            // File mode only.
+            // Why: specs/e260a-tools-a-h-rationale.md, "tools/handoff-orchestrator.ts — STAMP_PROVENANCE_SUSPECT".
             if (storage instanceof FileHandoffStorage &&
                 prevState &&
                 isHandAuthoredStamp(prevState.last_updated) &&
@@ -179,28 +143,12 @@ export const UPDATE_STATE_GATE_PIPELINE = [
         codes: ["FEATURE_LEASE_HELD", "LEASE_OVERRIDE_AUDIT_MISSING"],
         run: (ctx) => {
             const { parsed, storage, prevState, prevTuple, nextTuple } = ctx;
-            // Feature-Lease Gate. Stops a second feature from silently overwriting
-            // the first: a write carrying a DIFFERENT active_feature is rejected
-            // while the incumbent feature is unfinished (status != PASS — Blocked
-            // still counts as holding the lease) and fresh (last_updated within
-            // LEASE_TTL_MIN). So each workspace_path holds at most one unfinished
-            // feature. Same-feature writes never gate (feature_changed false
-            // short-circuits inside the predicate). Runs first among the
-            // state-reading gates — after validateTransition, before the
-            // build-entry attestation gates — so "may this feature take the slot
-            // at all?" is answered before any per-edge attestation. Works in BOTH
-            // storage modes: the core clauses read active_feature / status /
-            // last_updated, which the SQLite row also has. The release-engineer
-            // closing-write terminal marker also reads last_agent / next_role,
-            // which only file mode persists, so that clause never matches under
-            // SQLite (accepted asymmetry). The marker's pending_notes clause is
-            // limited to file mode HERE at the call site, not inside the pure
-            // predicate: SQLite does persist pending_notes, so passing prevState
-            // wholesale would quietly extend terminal-marker relief to SQLite
-            // mode. The explicit lease-fields object below therefore passes
-            // pending_notes only under FileHandoffStorage, and SQLite inputs stay
-            // TTL-bounded only. Kept out of transitions.ts, which stays pure and
-            // fs-free (like SCOPE_DECISION_REQUIRED). (E1, E13)
+            // Feature-lease gate: reject a write with a different active_feature while
+            // the incumbent feature is unfinished (status != PASS; Blocked still holds)
+            // and fresh (last_updated within LEASE_TTL_MIN), so a workspace holds at
+            // most one unfinished feature. Runs before the build-entry attestation
+            // gates. pending_notes is passed only in file mode, on purpose.
+            // Why: specs/e260a-tools-a-h-rationale.md, "tools/handoff-orchestrator.ts — FEATURE_LEASE".
             const leaseFields = prevState
                 ? {
                     active_feature: prevState.active_feature,
@@ -291,15 +239,11 @@ export const UPDATE_STATE_GATE_PIPELINE = [
         codes: ["BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE"],
         run: (ctx) => {
             const { parsed, storage, prevState, feature_changed } = ctx;
-            // A bookkeeping_write must keep the same feature. Checked inline right
-            // after the lease block: it is a one-line comparison against the
-            // feature_changed value the orchestrator already computed. Guarded by
-            // prevState so a fresh workspace passes rather than failing
-            // (writeHandoffState's same-feature guard falls back to now() there).
-            // File mode only. It rejects instead of quietly downgrading to a
-            // normal write because marking a brand-new feature's first claim as
-            // "bookkeeping" would keep the old last_updated and make its lease
-            // look older than it is, letting another feature take the slot. (E10)
+            // A bookkeeping_write must keep the same feature (file mode only; a fresh
+            // workspace with no prevState passes). Rejected rather than downgraded to
+            // a normal write: calling a new feature's first claim "bookkeeping" would
+            // keep the old last_updated and make its lease look older than it is,
+            // letting another feature take the slot.
             if (storage instanceof FileHandoffStorage &&
                 parsed.bookkeeping_write === true &&
                 prevState &&
@@ -331,16 +275,11 @@ export const UPDATE_STATE_GATE_PIPELINE = [
         codes: ["SCOPE_DECISION_REQUIRED"],
         run: (ctx) => {
             const { parsed, prevState, prevTuple, nextTuple } = ctx;
-            // v3.30.0 — Scope Decision Gate (server-scope-decision-gate). Fires on
-            // the build-entry edge (pm:In_Progress → {architect,sr-engineer}:In_Progress)
-            // when the design is armed (mode != no-design) but no scope decision is
-            // recorded. Pinning prev=pm makes re-entry/resume safe: the
-            // architect→sr-engineer and sr-engineer self-loop edges have a non-pm
-            // predecessor and are never gated. Structurally independent of the visual
-            // gate (different edge, different artifacts; shares only the arm helper).
-            // Placed here — after validateTransition accepts, before the evidence
-            // blocks — so all transition-shaped rejects read first. NOT in
-            // transitions.ts (that stays pure / fs-free; mirrors VISUAL_BASELINES_REQUIRED).
+            // Scope-decision gate: on the build-entry edge (pm:In_Progress →
+            // {architect,sr-engineer}:In_Progress), reject when the design is armed
+            // (mode != no-design) and no scope decision is recorded. Pinning prev=pm
+            // keeps re-entry safe: architect→sr-engineer and the sr-engineer
+            // self-loop are never gated. Kept out of transitions.ts, which stays pure.
             if ((nextTuple.agent === "architect" || nextTuple.agent === "sr-engineer") &&
                 nextTuple.status === "In_Progress" &&
                 prevTuple.agent === "pm" &&
@@ -379,20 +318,11 @@ export const UPDATE_STATE_GATE_PIPELINE = [
         codes: ["CUT_APPROVAL_REQUIRED"],
         run: (ctx) => {
             const { prevState, prevTuple, nextTuple } = ctx;
-            // v5 — Cut-Approval Gate (pm-cut-approval-gate). Fires on the same
-            // build-entry edge (pm:In_Progress → {architect,sr-engineer}:In_Progress)
-            // as the scope-decision gate, but is UNCONDITIONAL (not arm-gated): a
-            // human must approve the ticket cut before ANY build role receives the
-            // handoff, visual feature or not. Runs SECOND, directly after the
-            // scope-decision gate (D1): independent error code, no merged envelope,
-            // so each hint stays actionable and tests assert each in isolation.
-            // Pinning prev=pm keeps resume/re-entry safe — architect→sr-engineer and
-            // the sr self-loop have a non-pm predecessor and are never gated.
-            // FILE-MODE ONLY (D5): cut_approved lives in the handoff YAML frontmatter
-            // only; in SQLite/HTTP mode the parsed prev-state never carries it, so
-            // the gate would always fire. Skip the gate unless the active storage is
-            // the file implementation. NOT in transitions.ts (that stays pure /
-            // fs-free; mirrors SCOPE_DECISION_REQUIRED).
+            // Cut-approval gate: same build-entry edge as the scope-decision gate, but
+            // unconditional — a human approves the ticket cut before any build role
+            // gets the handoff. Its own error code, not a merged envelope, so each
+            // hint stays actionable. File mode only: cut_approved lives in the handoff
+            // frontmatter, so under SQLite/HTTP the gate would always fire.
             if (getActiveStorage() instanceof FileHandoffStorage &&
                 (nextTuple.agent === "architect" || nextTuple.agent === "sr-engineer") &&
                 nextTuple.status === "In_Progress" &&
@@ -431,21 +361,12 @@ export const UPDATE_STATE_GATE_PIPELINE = [
         codes: ["EXTERNAL_REFS_UNRESOLVED"],
         run: (ctx) => {
             const { prevState, prevTuple, nextTuple } = ctx;
-            // v6 — External-Refs Gate (b8-external-ref-ledger). THIRD build-entry
-            // attestation gate, back-to-back after scope-decision and cut-approval
-            // on the same pm:In_Progress → {architect,sr-engineer}:In_Progress edge.
-            // Unconditional (not arm-gated on design mode); the gate only FIRES when
-            // the prev state's external_refs ledger carries >=1 entry with
-            // state === "unresolved". INVERSE polarity to cut_approved (DR-3):
-            // absence / empty / all-resolved falls straight through (AC-2) —
-            // absence means "PM's Resource Audit Gate found zero external refs".
-            // Pinning prev=pm keeps resume/re-entry safe (AC-3): architect→sr and
-            // the sr self-loop have a non-pm predecessor and are never re-blocked
-            // by a ledger populated on an earlier PM write. FILE-MODE ONLY (AC-5):
-            // external_refs lives in the handoff YAML frontmatter only; in
-            // SQLite/HTTP mode prevState never carries it, so skip explicitly
-            // rather than gate on an always-empty read. NOT in transitions.ts
-            // (that stays pure / fs-free; mirrors CUT_APPROVAL_REQUIRED).
+            // External-refs gate: third attestation gate on the build-entry edge.
+            // Fires only when prevState.external_refs has an entry with state
+            // "unresolved"; absent or empty means PM's resource audit found none.
+            // Pinning prev=pm keeps a ledger from an earlier PM write from
+            // re-blocking later hops. File mode only: the ledger lives in the
+            // handoff frontmatter.
             if (getActiveStorage() instanceof FileHandoffStorage &&
                 (nextTuple.agent === "architect" || nextTuple.agent === "sr-engineer") &&
                 nextTuple.status === "In_Progress" &&
