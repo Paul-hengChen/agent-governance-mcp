@@ -20,6 +20,9 @@ _(No active tasks — ready for the next feature.)_
 - [x] T-REL430-01 [P0] qa-engineer: verify AC1 + AC2 (diff scope and per-lane evidence) | depends_on: none
 - [x] T-REL430-02 [P0] qa-engineer: verify AC3 + AC4 (full suite, clean build, version check) | depends_on: none
 - [x] T-REL430-03 [P0] qa-engineer: verify AC5 + AC6 (comment-scan spot-check, v4.2.1 non-regression) | depends_on: none
+- [x] T-REL440-01 [P0] qa-engineer: verify AC1 + AC2 (diff scope and per-lane evidence, e246 empty-ledger quirk noted) | depends_on: none
+- [x] T-REL440-02 [P0] qa-engineer: verify AC3 + AC4 (full suite, clean build, version check) | depends_on: none
+- [x] T-REL440-03 [P0] qa-engineer: verify AC5 + AC6 + AC7 (extended-scan spot-check, finish mailbox teardown, v4.3.0 non-regression) | depends_on: none
 
 ## Compacted History
 <!-- compacted: E125c 2026-09-26 — 67 sections, 891 [x] rows, 26 [-] rows summarized below; full rows: git log -i --grep <ticket-id>, or git log -p -- .current/_primary/tasks.md (pre-compaction commit 165b72d is auxiliary and invalidated by a history rewrite, E104) -->

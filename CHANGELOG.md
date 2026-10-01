@@ -16,6 +16,58 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [4.4.0] - 2026-10-01
+
+MINOR release. It ships E246 (lane mailbox teardown) and E259 (comment scan for more languages)
+since v4.3.0, merged as lanes `e246` and `e259` through `integ/e246-e259`. `agc feature finish`
+gains new behavior and the advisory `agc check` comment scan covers new languages. No tool input
+schema, prompt schema or state file format changed, and `package.json` dependencies are
+unchanged. Fan-out plan and close box: `specs/fanout-e246-e259.md`.
+
+### Added
+
+- **E259: the `agc check` comment-length scan now covers 26 file extensions
+  (`tools/comment-scan.ts`, `tools/comment-lex.ts`, `tools/comment-langs.ts`,
+  `tools/comment-lang-js.ts`, `tools/comment-lang-c.ts`, `tools/comment-lang-nested.ts`,
+  `tools/comment-lang-hash.ts`, `tools/comment-python.ts`, `tools/comment-tags.ts`,
+  `tools/comment-types.ts`, `dist/tools/comment-*`)**: the scan is now driven by per-language
+  lexer tables. Besides the E258 JS/TS set it reads `.cjs .mts .cts`, C and C++
+  (`.c .h .cc .cpp .cxx .hpp`), `.java`, `.cs`, `.go`, `.kt .kts`, `.swift`, `.rs`, and the `#`
+  languages `.py .sh .bash .zsh .rb`. Python docstrings count as comments. Each language's raw,
+  multi-line and backtick string forms and nested block comments are handled so they are not read
+  as comments, and doc-tag lines are excluded per language. YAML, TOML and unknown extensions are
+  skipped. JS/TS output is byte-identical to E258. It still never changes the exit code. Known
+  misreads are listed in `docs/install.md`; `docs/config.md` lists the extensions. Specs:
+  `specs/e259-comment-scan-languages.md`, `specs/e259-comment-scan-languages-architecture.md`.
+
+### Changed
+
+- **E246: `agc feature finish` removes the lane's integrator mailbox (`bin/agc-init.mjs`)**: on
+  both `--shipped` and `--abandoned`, right after the worktree is removed, `finish` deletes
+  `<worktree parent>/_mailbox/<lane>/` when it holds only `to-integrator.md`, `to-lane.md` and
+  watch-lock files whose watch has exited. Anything else in it, or a watch still running, keeps
+  the folder with one warning line; the exit code is unchanged, and an absent mailbox is silent.
+  A later lane with the same name no longer inherits old messages. The integrator SOP
+  (`content/skill-integrator.md`) now resets a same-name mailbox at stage 3 and stops the mailbox
+  watch before `finish` at stage 6, deleting a non-default-location mailbox by hand.
+  `docs/lane-protocol.md` and `docs/install.md` are updated. Spec: `specs/e246-mailbox-teardown.md`.
+- **Tests**: new `test/e246-mailbox-teardown.test.mjs`, `test/e259-comment-scan-brace.test.mjs`,
+  `test/e259-comment-scan-hash.test.mjs`, `test/e259-comment-scan-limits.test.mjs`,
+  `test/e259-lib.mjs` (fixtures under `test/fixtures/e259/`); two assertions in
+  `test/e258b-comment-scan.test.mjs` reassigned to the new tables.
+
+### Notes
+
+- Evidence: this release archives lane `e246`'s QA and code-review reports into
+  `qa_reports/archive/e246-mailbox-teardown/` and `review_reports/archive/e246-mailbox-teardown/`,
+  lane `e259`'s QA and code-review reports and expected-red manifest into
+  `qa_reports/archive/e259-comment-scan-languages/` and
+  `review_reports/archive/e259-comment-scan-languages/`, and the release gate's QA reports into
+  `qa_reports/archive/release-v4.4.0/`. Release-gate spec: `specs/release-v4.4.0.md`. Each lane's
+  closed handoff is under `.current/history/2026-09/<lane>/` (context, not changed).
+- E260 (trim this repo's existing long comments) and E261 (shell scan misses backslash-escaped
+  quotes, filed from lane `e259`) are filed in `docs/backlog.md` and are not part of this release.
+
 ## [4.3.0] - 2026-09-30
 
 MINOR release. It ships E258 (comment discipline) since v4.2.1, merged as two lanes, `e258a` and
