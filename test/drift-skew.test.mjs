@@ -64,8 +64,9 @@ test("T32: no version-skew drift when handoff/tasks/config are at CURRENT", asyn
 test("T32 AC-6: future handoff schema_version surfaces as a drift reason (not a thrown error)", async () => {
   const ws = mkWorkspace();
   // Write directly at the LANE path: an already-migrated workspace whose handoff was written by a newer
-  // server (e123b9 J2, AC1/AC14). Write tasks.md directly, and not at the flat path, which the skew
-  // precheck cannot see (AC13). More: specs/e260e-comment-rationale.md (drift-skew.test.mjs).
+  // server (e123b9 J2, AC1/AC14). Write tasks.md directly. This test covers the lane-path case only; the
+  // flat-path case (precheck falls back lane-then-flat) is covered separately below (AC8).
+  // More: specs/e260e-comment-rationale.md (drift-skew.test.mjs).
   fs.writeFileSync(path.join(ws, "tasks.md"), "<!-- schema_version: 1 -->\n# Tasks\n\n## Active\n");
   writeRawHandoffAtLanePath(
     ws,
