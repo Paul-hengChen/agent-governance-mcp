@@ -1,52 +1,11 @@
 #!/usr/bin/env node
 // Coded by @sr-engineer
-// scripts/test-lock.mjs — serialize full-suite `npm test` runs across every
-// worktree of one repo (E177b T-E177B-04, spec AC7-AC13; backlog E182).
-//
-// Wave 5: concurrent lanes' full-suite runs starved each other and flaked.
-// macOS has no `flock`, so this wraps a command in a repo-scoped lock:
-//
+// Serializes full-suite runs across every worktree of one repo with one lock
+// under `git rev-parse --git-common-dir` (macOS has no flock; E177b, E182).
 //   node scripts/test-lock.mjs [--max-wait <s>] [--lock-path <p>] [--poll-ms <ms>]
 //                              [--notify-interval <s>] -- <cmd> [args...]
-//
-// Lock scope (AC8): ONE lock file under `git rev-parse --git-common-dir`, so
-// every linked worktree of the same primary contends for the same file —
-// never a per-worktree lock. Not a machine-global lock (spec Out of Scope).
-//
-// Acquire loop (AC10/AC11, R1): its OWN O_EXCL loop (`fs.openSync(p, "wx")`),
-// deliberately NOT guards/file-lock.ts — that module treats a lock older than
-// 30s as stale even with a live holder and throws after 10s, both wrong for
-// a multi-minute suite. Here staleness is decided ONLY by holder-PID
-// liveness (`process.kill(pid, 0)`), never by the lock's age. The single
-// exception is an UNPARSEABLE payload (a holder that died between create and
-// write): it is reclaimed once its mtime is older than CORRUPT_GRACE_MS,
-// because a live holder writes its payload immediately after creating.
-//
-// Holder liveness (AC13b): once the wrapped command is spawned, the payload
-// is rewritten to carry its `childPid` too, and the lock is held while EITHER
-// pid is alive — a SIGKILLed wrapper (no cleanup runs) whose child is still
-// running is never treated as a dead holder.
-//
-// Reclaim (AC13a): removing a stale lock is serialized per stale incarnation
-// behind an O_EXCL guard file `<lock>.reclaim-<hash of the stale content>`.
-// Only the guard's winner may unlink the lock, and only after re-reading it
-// and finding that exact stale content — so with any number of waiters there
-// is no window in which two of them both believe they hold the lock (see
-// reclaimStale).
-//
-// Waiting (AC12): prints `waiting for test lock held by pid <p> (<worktree>)
-// since <t>` on entering the wait and every --notify-interval seconds
-// (default 30) while queued. No --max-wait = wait forever (queue, never
-// throw). With --max-wait, a timeout exits LOCK_TIMEOUT_EXIT_CODE (AC13).
-//
-// Re-entrancy (AC9): the holder exports AGC_TEST_LOCK_HELD=<lock path> to the
-// wrapped command. A nested invocation that resolves the SAME lock path runs
-// its command directly without acquiring — no self-deadlock. A nested
-// invocation that resolves a DIFFERENT lock path (e.g. a test using
-// --lock-path in a temp dir, or a fixture repo) locks normally, so tests that
-// exercise this script from inside `npm test` still see real locking.
-//
-// Pure node, no shell: the wrapped command is spawned with an argv array.
+// Staleness is holder-pid liveness only, never lock age; a nested run on the
+// same lock skips acquiring. Details: see specs/e260c-bin-scripts.md.
 
 import { spawn, execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -147,23 +106,10 @@ export function readLock(lockPath) {
 
 /**
  * AC13a — remove the stale file at `targetPath` whose content we observed as
- * `observedRaw`, safely against any number of concurrent reclaimers.
- *
- * Reclaimers of one stale incarnation contend on an O_EXCL guard file named
- * after a hash of that content. Invariant: a given lock content can leave the
- * lock path only by (a) its own holder releasing it (that holder is dead
- * here), or (b) the current winner of its guard. So the winner re-reads the
- * lock and, if it still holds exactly `observedRaw`, unlinks it — no other
- * process can have replaced it between that read and the unlink (a new lock
- * can only be CREATED once the path is absent). A loser simply returns and
- * the caller's acquire loop retries. The winner removes its guard afterwards;
- * a late reclaimer of the same incarnation that wins the guard then finds
- * different (or no) content and unlinks nothing.
- *
- * A guard whose own creator died mid-reclaim (SIGKILL in a microsecond
- * window) would wedge that incarnation forever, so a dead-pid guard (or an
- * unparseable one past CORRUPT_GRACE_MS) is reclaimed with this same
- * function, one level down. Never throws.
+ * `observedRaw`, safe against any number of concurrent reclaimers: only the
+ * winner of an O_EXCL guard named after that content's hash may unlink it, and
+ * only while it still holds exactly that content. A dead or corrupt guard is
+ * reclaimed the same way, one level down. Never throws. See specs/e260c-bin-scripts.md.
  */
 export function reclaimStale(targetPath, observedRaw, depth = 0) {
   const digest = createHash("sha256").update(observedRaw).digest("hex").slice(0, 16);
