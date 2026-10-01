@@ -21,3 +21,4 @@
 {"ts":"2026-10-01T10:34:44.891Z","feature":"e260g-r3-fix","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-10-01T10:34:51.656Z","feature":"e260g-r3-fix","agent_id":"code-reviewer","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-10-01T10:36:35.845Z","feature":"e260g-r3-fix","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-01T10:42:11.516Z","feature":"e260g-r3-fix","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
