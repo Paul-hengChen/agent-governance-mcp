@@ -1,37 +1,10 @@
 // Coded by @qa-engineer
-// Tests for the write-time next_role lookahead warning: when a state write
-// names a next_role that cannot legally act from the state just written,
-// the success envelope's `warnings` array says so and lists the roles that
-// can. tools/handoff-orchestrator.ts (effectiveAllowedSuccessors and the
-// post-write warning block) is the unit under test. It never rejects: no
-// GATE_REGISTRY entry, no error code, no pipeline step. (E38, T-E38-01)
-//
-// The warning is only useful if it can be trusted, so false warnings and
-// empty remedy lists are the failures that matter. Two such defects were
-// invisible in the diff and showed up only when every state was tried under
-// each counter setting: a hardcoded feature_changed:false warned wrongly on
-// the legal qa-engineer:PASS -> design-auditor edge at the hop cap, and an
-// over-broad self-loop filter emptied the remedy list on
-// qa-engineer:In_Progress and pm:Blocked, printing a false "(none ...)"
-// message. That is why these tests go through the tw_update_state tool
-// boundary (what a user actually sees), not just the bare helper.
-//
-// The requirements come from the backlog row, not a specs/ file. The
-// through-the-tool shape (seed a state, then one write) mirrors
-// test/e28-shrink-warning.test.mjs, which uses the same `warnings` array.
-//
-// Spec-to-test map:
-//   the originally reported shape warns, remedy names pm:In_Progress + sr-engineer:In_Progress -> L1
-//   qa-engineer:PASS -> design-auditor silent at hop 2 (in-table)     -> S-E37-lo
-//   same edge silent at hop 10 (guards the hop-cap false warning)     -> S-E37-hi
-//   resume_of allowance: pm:In_Progress + next_role=code-reviewer silent -> S-RESUME
-//   capped-counter allowance: qa_round at cap, next_role=pm silent    -> S-ROUNDCAP
-//   self-loop allowance: sr-engineer:In_Progress self-loop silent     -> S-SELFLOOP
-//   non-empty, NAMED remedy on qa-engineer:In_Progress (guards the
-//     emptied-remedy-list defect)                                       -> R-QA-IP
-//   non-empty, NAMED remedy on pm:Blocked (same defect)               -> R-PM-BLOCKED
-//   never rejects: bogus next_role still succeeds and persists             -> N-NEVERREJECT
-//   coexists with the shrink warning: one write, two warnings, neither clobbers the other -> C-E28COEXIST
+// Tests the write-time next_role lookahead warning: when a state write names a
+// next_role that cannot legally act from the state just written, the success
+// envelope's `warnings` lists the roles that can. Unit under test:
+// tools/handoff-orchestrator.ts; it never rejects. Tests go through the
+// tw_update_state boundary, since false warnings and empty remedy lists matter.
+// Rationale: specs/e260g-comment-rationale.md (test/e38-next-role-lookahead.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";

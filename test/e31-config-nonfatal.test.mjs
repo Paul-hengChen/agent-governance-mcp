@@ -1,41 +1,10 @@
 // Coded by @qa-engineer
 // Tests that loadConfig NEVER throws on a corrupt, unparseable, unreadable,
-// non-object or future-schema .current/.config.json. The mandatory
-// tw_get_state pre-flight read sits on this call path (guards/session.ts
-// markStateRead -> findTasksFile -> resolveTaskPaths -> loadConfig), so a
-// throw there blocks the one call everything else depends on. The matching
-// "degrades, does not throw" checks for older cases live in
-// test/config-versioning.test.mjs and test/e22-stale-notify.test.mjs.
-// (E31, T-E31-01)
-//
-// Contract under test (from the backlog row and the tools/config.ts
-// loadConfigEntry doc comment):
-//   - loadConfig(ws) NEVER throws; any config-file fatality collapses to
-//     the empty config ({}), defaults in effect.
-//   - getConfigError(ws) surfaces the loud failure (path + problem) exactly
-//     when loadConfig is currently serving defaults IN PLACE OF a config
-//     file that exists but can't be used; null when clean or absent.
-//   - tw_get_state (readHandoffState) spreads config_error onto BOTH the
-//     exists:false and normal envelope shapes; clean/absent config adds NO
-//     key at all (envelope stays byte-identical to the shape before this
-//     change).
-//   - The mtime cache that backs loadConfig also caches the load
-//     error; fixing the file bumps mtime, which invalidates the cached
-//     error on the next call (self-heals, no server restart needed). (C18)
-//   - Known and accepted, the "QA probe 1" tests below (raised in code
-//     review, documented, not fixed):
-//     task-mutation tools (completeTask/addTask via resolveTaskPaths /
-//     resolveTaskRegex) share the same non-throwing loadConfig core, so a
-//     corrupt config makes them silently fall back to
-//     DEFAULT_TASK_PATHS/DEFAULT_TASK_REGEX instead of the workspace's
-//     custom taskPattern/taskPaths — predictable (never a crash, never a
-//     mis-write) but NOT itself surfaced as an error by the mutation tools;
-//     only the tw_get_state envelope's config_error makes the degradation
-//     discoverable. By-design per spec ("degrade to defaults
-//     loudly-but-readable" is scoped to the pre-flight read); this suite
-//     documents the behavior, it does not change it.
-//   Not covered here: a chmod after the config is cached is not noticed
-//   until mtime changes, a known limitation of the mtime cache (C18).
+// non-object or future-schema .current/.config.json: the tw_get_state pre-flight
+// read goes through it, so a throw there blocks every other call. getConfigError(ws)
+// reports the failure while defaults are served in place of an unusable config file.
+// Known and accepted: the task-mutation tools degrade to default task paths silently.
+// Rationale: specs/e260g-comment-rationale.md (test/e31-config-nonfatal.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -253,16 +222,10 @@ test("E31 QA probe 1 baseline: a clean config with custom taskPattern+taskPaths 
 });
 
 test("E31 QA probe 1: corrupting the SAME workspace's config after the precondition read already migrated the task file into the lane ledger leaves it discoverable — e125a's lane ledger no longer depends on config taskPaths once migrated", () => {
-  // The precondition read below is not just a sanity check: it is the FIRST
-  // task-list access, so it triggers the forward migration into a lane-local
-  // ledger (no .git in this fixture ⇒ lane "_primary"). The custom file's
-  // body is copied into `.current/_primary/tasks.md`, which the server reads
-  // from then on. Once that ledger exists, config's taskPaths never re-enter
-  // task discovery, so corrupting config AFTER this point can no longer hide
-  // the task list. That is intended, not a regression. The case where the
-  // migration never happened (corrupt config -> task file silently not found)
-  // is covered by the addTaskInFile probe below. (e125a-lane-local-ledgers
-  // spec AC13, D-C, D-F/AC9; T-E125A-05)
+// The precondition read is the first task-list access, so it migrates the custom
+// task file into the lane ledger (lane "_primary", no .git here); after that config
+// taskPaths no longer affect discovery. The never-migrated case is the addTaskInFile
+// probe below (specs/e125a-lane-local-ledgers.md AC13).
   const ws = mkWorkspace();
   writeConfig(ws, { taskPattern: CUSTOM_TASK_PATTERN, taskPaths: [CUSTOM_TASK_REL] });
   writeCustomTasksFile(ws);
@@ -306,15 +269,10 @@ test("E31 QA probe 1: completeTaskInFile against a config-degraded workspace ret
 });
 
 test("E31 QA probe 1: addTaskInFile against a config-degraded workspace silently targets the lane-local ledger instead of the workspace's custom taskPaths (documented fallback, not fixed — e125a moved the fallback destination itself)", async () => {
-  // No lane ledger and no legacy file exist yet at ANY candidate path (this
-  // is the "migration never happened" case — the sibling probe above covers
-  // "already migrated"), so addTaskInFile's fallback target is now ALWAYS
-  // the current lane's ledger `.current/<lane>/tasks.md` (here "_primary",
-  // no .git in this fixture) — never a config-resolved path, degraded or
-  // not (spec D-F/AC9), rather than flat DEFAULT_TASK_PATHS[0] =
-  // `.current/tasks.md`. The workspace's configured custom path is still
-  // never used while config is corrupt — that part of the documented
-  // fallback is unchanged. (e125a-lane-local-ledgers spec AC13)
+// No lane ledger and no legacy file exist yet (the "migration never happened" case),
+// so addTaskInFile falls back to the current lane's ledger `.current/<lane>/tasks.md`,
+// never a config-resolved path, and the configured custom path stays unused while
+// config is corrupt (specs/e125a-lane-local-ledgers.md AC13).
   const ws = mkWorkspace();
   writeConfig(ws, { taskPattern: CUSTOM_TASK_PATTERN, taskPaths: [CUSTOM_TASK_REL] });
   // No pre-existing task file this time — addTaskInFile creates one.

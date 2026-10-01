@@ -1,33 +1,9 @@
 // Coded by @qa-engineer
 // Tests that the decision "may qa-engineer create a new test file?" is made by the
-// dispatcher at brief time, not asked of the user by a subagent that cannot ask.
-//
-// Why: Constitution §2's *Conditional test writing* bullet used to say "qa-engineer MUST
-// ask the user before creating any [test file]". A Task-dispatched subagent has no way to
-// ask and no way to resume, so it could only stop and lose its context, or decide on its
-// own and disclose it. A rule that every run must break teaches that rules are optional,
-// so the ask now happens upstream, at the dispatcher, whom a human can reach when the
-// brief is written. The backlog row is the spec; there is no specs/ file. (E43, T-E43-02)
-//
-// Ticket-to-Test map:
-//   fix (i) dispatcher decides            -> t-e43-branch-a-reads-the-brief,
-//                                            t-e43-coord02-template-line,
-//                                            t-e43-coord02-rule-is-target-conditional
-//   round-1 F1 (two-sided outcome)        -> t-e43-branch-c-is-two-sided
-//   round-1 F2 (branches must partition)  -> t-e43-branches-partition-with-catch-all
-//   no-silent-either-direction            -> t-e43-no-silent-create-or-skip
-//   retired unexecutable form is gone     -> t-e43-retired-form-absent-everywhere
-//   §2 no-restatement + brief-first       -> t-e43-qa-sop-defers-to-const2
-//   cross-file label coherence            -> t-e43-placement-label-is-one-string
-//   normative text must not be stripped   -> t-e43-branches-survive-strip
-//   guard-the-guard (must red pre-fix)    -> t-e43-assertions-red-against-pre-e43-text
-//
-// Why these check the shape of the rule rather than today's exact wording, where possible:
-// the realistic regression is not "someone deletes branch (b)" — it is
-// someone adding a fourth branch that reintroduces a fall-through, adding a conditional
-// template line without stating when it applies, or drifting the `Test-file placement`
-// label in one of the three files that must agree on it. Instance pins on today's wording
-// would miss all three. (Same approach as E66 option (ii) and E69.)
+// dispatcher at brief time, not asked of the user by a subagent that cannot ask
+// (Constitution §2, Conditional test writing). The checks assert the shape of the
+// rule (branches partition, the label agrees across three files), not exact wording.
+// Rationale: specs/e260g-comment-rationale.md (test/e43-test-file-ask-at-dispatch.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
