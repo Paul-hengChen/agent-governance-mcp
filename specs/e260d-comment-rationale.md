@@ -34,3 +34,12 @@ The ordered `UPDATE_STATE_GATE_PIPELINE` array lives in `tools/handoff-orchestra
 This module stays a runtime near-leaf: every import is `import type`, erased at compile time, and `runUpdateStatePipeline` needs none of them at runtime. The runtime import chain is `tools/registry.ts` to `tools/handoff-orchestrator.ts` to `gates/pipeline.ts`, with only erased type-only edges pointing back, so it cannot form a cycle.
 
 The per-write context is derived once, in the context-building phase of `handleUpdateStateCore` (previous-state parse, round and hop inputs, `feature_changed`, the evidence-schema pin). A gate step must not derive a value that later steps or the final write depend on, because that would make step order affect more than which rejection wins.
+
+## gates/visual.ts
+
+The visual report schema validator exists because the earlier gate checked only that the report file existed and that no widget row was left unchecked, and a visual false-PASS showed that evidence existing is not the same as evidence being meaningful. The required sections, the row checks and the verdict rule are in `specs/constitution-v3.27-sync-consistency-architecture.md`.
+
+- No authorship check on `## Allowed Differences`: the visual report is read only on a qa-engineer PASS, so its contents are already within QA's authority. The coordinator override that broke an earlier rollout came through the dispatch prompt, which the builder-is-not-judge rule now blocks, not through this file. The validator therefore does not search the report for "coordinator policy" markers, which would be brittle and easy to game.
+- Opt-in by design contract: the caller runs the validator only when the design declares `## Visual Structural Assertions`, which every design-auditor since the schema gate emits for a mode other than `no-design`. Older designs lack the section, so their visual reports keep passing on the existence and widget-shape checks alone.
+
+The other visual sub-gates point to their own specs from the code: `specs/qa-visual-baseline-provenance.md`, `specs/qa-visual-pixel-gate-attestation.md`, `specs/figma-baseline-manifest-gate.md`, `specs/e4-design-source-credibility-gate-architecture.md`, and `specs/e23-evidence-schema-versioning.md` for where the verdict heading is found.
