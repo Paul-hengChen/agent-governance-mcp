@@ -1,28 +1,9 @@
 // Coded by @qa-engineer
-// Tests for spec: specs/dependency-security-protobufjs.md (protobufjs/qs)
-//   and the E57 backlog row (docs/backlog.md) for sharp — mini-chain,
-//   backlog row is the spec, no specs/<feature>.md file.
-// Spec-to-Test map: AC1/AC4 -> these tests (the override pins that clear the
-//   advisories must stay in place and meet the patched-version floor).
-//   AC2 (embedding runtime) + AC3 (suite green) are verified by the audit +
-//   manual embedding smoke + the full suite itself, not re-run here (a real
-//   embedding test needs network/model download — unfit for the headless CI suite).
-//   E57 AC1/AC2 (sharp floor, SDK/transformers pins unchanged) -> the sharp
-//   tests below; AC5's reachability narrative is prose, not testable here.
-//
-// WHY: the protobufjs/qs/sharp advisories all reach the tree only
-// transitively, so the fix is a package.json `overrides` pin. Nothing else
-// encodes that pin — if a future dependency edit drops it, the vulnerabilities
-// silently return and the audit gate would only catch it at the next manual
-// run. This test fails loudly the moment a pin floor regresses.
-//
-// WHY (duplicate-key guard, E57): sr-engineer's first edit to add the sharp
-// override created a SECOND top-level `"overrides"` key alongside the
-// pre-existing one. `JSON.parse` silently keeps only the last duplicate key,
-// so `pkg.overrides` parsed as an object with all three entries even though
-// the raw file was malformed — a purely-parsed assertion could not have
-// caught this; only a raw-text check for exactly one `"overrides":` key can.
-// Caught in review only by a version mismatch, not by any existing test.
+// Tests for specs/dependency-security-protobufjs.md and the sharp row in docs/backlog.md:
+// the package.json `overrides` pins that clear the advisories must stay and meet their version floors.
+// Also guards against a duplicate top-level "overrides" key, which JSON.parse hides.
+// Runtime embedding and suite-green checks are out of scope here (they need network or run elsewhere).
+// More: specs/e260e-comment-rationale.md (dependency-overrides.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";

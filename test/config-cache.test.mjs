@@ -1,29 +1,9 @@
 // Coded by @qa-engineer
-// T-C5C18-07: tools/config.ts configCache mtime-based invalidation (v3.58.0, C18).
-// Spec: specs/c5-c18-watermark-configcache.md — AC-4, AC-5.
-//
-// Spec-to-Test map:
-//   AC-4 (same-process content+mtime bump becomes visible, no restart) ->
-//     t-ac4-content-mtime-bump, t-ac4-driftbaselineids-append, t-ac4-fast-path
-//   AC-5 (absent -> create -> delete -> recreate transitions, no crash,
-//         no stale positive/negative caching) ->
-//     t-ac5-full-transition-cycle, t-ac5-repeated-absent-reads,
-//     t-ac5-existence-flip-beats-mtime-equality
-//
-// WHY: before the invalidation fix (C18), configCache was set-once/read-many with no invalidation
-// path — a post-release driftBaselineIds append (content/skill-release-
-// engineer.md SOP step 10 as of this comment's authoring; later renumbered to step
-// 7b, E65) was invisible to tw_detect_drift until the server process
-// restarted. These tests pin the "re-stat every call, compare
-// existence+mtime" contract so a future "optimize away the stat call"
-// refactor cannot silently reintroduce the stale-forever cache.
-//
-// Unlike test/config-versioning.test.mjs (which uses a FRESH workspace per
-// test because it only cares about single-call read/migrate behavior), these
-// tests reuse ONE workspace across MULTIPLE loadConfig calls within a test —
-// that's the only way to exercise the cache's hit/miss decision at all.
-// fs.utimesSync is used to pin exact mtimes (verified round-trip-exact on
-// this filesystem) so assertions don't depend on wall-clock timing gaps.
+// Tests for tools/config.ts configCache mtime-based invalidation (specs/c5-c18-watermark-configcache.md, AC-4/AC-5).
+// Contract: every loadConfig call re-stats the config file and compares existence and mtime, so a
+// same-process content change or an absent/create/delete/recreate cycle is never served stale.
+// One workspace is reused across several loadConfig calls per test; utimesSync pins exact mtimes.
+// More: specs/e260e-comment-rationale.md (config-cache.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
