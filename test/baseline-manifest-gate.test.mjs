@@ -1,16 +1,9 @@
 // Coded by @qa-engineer
-// Tests for the v3.40.0 baseline manifest gate (figma-baseline-manifest-gate):
-//   parseBaselineManifestRows(content)            — pure parser (AC-6/AC-7)
-//   hasBaselineProvenance(content)                — pure predicate (AC-8)
-//   checkBaselineManifest(workspacePath, feature) — composition helper (AC-1..AC-4/AC-N1..AC-N4)
-//
-// AC coverage map:
-//   P1-P9:  parseBaselineManifestRows purity + column parsing
-//   H1-H6:  hasBaselineProvenance section-scoped detection
-//   C1-C11: checkBaselineManifest composition + gate decision tree
-//   E1-E6:  end-to-end via tw_update_state PASS handler (wiring + verbatim strings)
-//   AC-9:   package.json + index.ts Server() version = "3.40.0"
-//   AC-10:  CHANGELOG.md [3.40.0] entry with both error codes
+// Tests for the baseline manifest gate (figma-baseline-manifest-gate): parseBaselineManifestRows,
+// hasBaselineProvenance, and the checkBaselineManifest composition helper (AC-1..AC-10).
+// Groups: P parser, H provenance detection, C composition and decision tree,
+// E end-to-end via the tw_update_state PASS handler, AC-9/AC-10 version and CHANGELOG checks.
+// More: specs/e260e-comment-rationale.md (baseline-manifest-gate.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -83,8 +76,8 @@ function writeVisualEvidence(ws, taskId) {
   );
 }
 
-// Build a design file body that is armed (mode = figma), has ## Visual Baselines,
-// ## Visual Structural Assertions, and the given ## Source section body (or none).
+// Build a design file body that is armed (mode = figma), has the Visual Baselines and
+// Visual Structural Assertions sections, and the given Source section body (or none).
 function armedDesignBody({ sourceSectionBody = null, provenanceSectionBody = null } = {}) {
   let body = `# design/test-feature
 
@@ -475,17 +468,9 @@ test("C11: robustness — fs error / unreadable path → dormant (never throws)"
   assert.doesNotThrow(() => checkBaselineManifest("", ""));
 });
 
-// ===========================================================================
-// E1-E6: End-to-end gate tests (via tw_update_state PASS handler)
-//
-// These tests drive the composition through index.ts PASS handler logic via
-// the same primitive calls the handler makes (armCheck + visualGate + helpers).
-// The E2/E3 cases that require the manifest gate to FIRE also need upstream
-// gates (evidence, widget-shape, schema, provenance) to be satisfied.
-// We verify wiring via: (a) handler primitive composition, (b) dist/index.js
-// contains verbatim error strings (exact Copy/Strings contract), and
-// (c) e2e tw_update_state calls with writeHandoffState for state-not-written.
-// ===========================================================================
+// E1-E6: End-to-end gate tests via the tw_update_state PASS handler primitives (armCheck,
+// visualGate, helpers), plus verbatim error strings in dist/index.js. Cases where the manifest
+// gate fires also need the upstream gates (evidence, widget-shape, schema, provenance) satisfied.
 
 test("E1: AC-4/AC-N1 — no-design workspace, gate completely silent (armCheck.required=false)", () => {
   // Why: AC-4/AC-N1 — neither error code must ever be emittable for no-design mode.
