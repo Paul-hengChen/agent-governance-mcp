@@ -11,3 +11,18 @@ Blocks of 8 to 20 counted lines that stay in the code, each with a one-line reas
 | file | line at HEAD | counted | reason |
 |---|---|---|---|
 | — | — | — | none yet; tasks T-E260D-02 to T-E260D-07 add rows |
+
+## gates/feature-lease.ts
+
+The lease semantics (derive-only lease, `Blocked` counts as held, TTL expiry, fail-open on an unparseable or future-dated stamp) are in `specs/e1-feature-scoped-state-design.md`, including its 2026-07-12 amendment. The broadened closing-write marker (the `pending_notes[0]` `/^Released v/` disjunct, the two incidents behind it, and the file-mode-only call-site scoping) is in `specs/e13-terminal-marker-advisory.md`. Neither is copied here.
+
+What no spec held is why `isReleaseClosingWrite` is a separate export. Before it was extracted, the lease predicate carried the whole closing-write test while the stale-dispatch advisory in `tools/handoff-parse.ts` carried none, so a released feature's closing write still read as a stale in-flight dispatch. Writing the same test a second time in that module would turn the asymmetry into a later divergence. One predicate with two callers cannot diverge, so the lease predicate and the advisory both call this one function, and its behaviour is identical to the condition it replaced inside `isFeatureLeaseHeld`.
+
+## gates/stamp-provenance.ts
+
+The stamp shape itself is in `specs/e9a-stamp-integrity.md`. The gate was added after a third hand-edited-stamp incident, in which a release subagent with no MCP path edited `.current/handoff.md` by hand and wrote zero-entropy stamps such as `2026-07-14T00:00:00.000Z`. It turns the read-only stamp advisory in `tools/drift.ts` into a block on the file-mode write path, so the next writer must record the anomaly instead of silently overwriting the evidence.
+
+- One predicate: the regex lives here, and the read-side advisory and the write-side gate both call `isHandAuthoredStamp`, so they cannot drift apart. Server stamps come from `new Date().toISOString()` and carry millisecond entropy; seconds `00` with milliseconds `.000` matches every confirmed hand-authored stamp in handoff history and is very unlikely from the server.
+- Note only, no boolean: `lease_override` pairs a boolean (the intent to bypass a lease that is legitimately held) with an audit note, and an unaudited boolean gets its own reject. Here the gate arms from the on-disk state alone, there is no separate intent to declare, and the `stamp-remediation:` note is both the acknowledgment and the audit trail. A boolean would add tool surface without adding trust.
+- Self-disarming: any accepted write stamps a fresh `now()`, so the gate clears itself. A remediation write must therefore be a normal write; a `bookkeeping_write` keeps the suspect stamp.
+- File mode only: SQLite and HTTP stamps come from the database write path, as for the sibling attestation gates. A new workspace with no previous state is never gated.
