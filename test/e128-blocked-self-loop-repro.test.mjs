@@ -1,8 +1,9 @@
 // Coded by @sr-engineer
-// Minimal bugfix-mode repro for the rejected self-correcting Blocked->Blocked write (backlog E128), the repro-first carve-out of skill-sr-engineer step 3b.
-// Not full coverage (qa-engineer's T-QA-E128-01 owns that). It asserts the desired behaviour: a same-agent, same-status Blocked write is accepted by
-// validateTransition. It was red against the un-fixed tools/transitions.ts, whose step-3 self-loop fast path only knew In_Progress->In_Progress
-// (see qa_reports/expected-red_e128-blocked-self-loop.txt).
+// Minimal bugfix-mode repro for the rejected self-correcting Blocked->Blocked write
+// (backlog E128), the repro-first carve-out of skill-sr-engineer step 3b. Not full coverage.
+// Asserts the desired behaviour: a same-agent, same-status Blocked write is accepted by
+// validateTransition. Red against the un-fixed tools/transitions.ts, whose self-loop fast
+// path knew only In_Progress->In_Progress (qa_reports/expected-red_e128-blocked-self-loop.txt).
 // Rationale: specs/e260f-comment-rationale.md (test/e128-blocked-self-loop-repro.test.mjs).
 
 import { test } from "node:test";

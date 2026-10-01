@@ -1,8 +1,9 @@
 // Coded by @qa-engineer
-// Content-assertion tests that the shipped wording makes the per-feature worktree lane the default working path (specs/e130-lane-default.md; E130, E199, E198(b)).
-// They read the shipped prose (and, for AC1, the real composer's output) directly, pinning the load-bearing phrases and their relative order
-// (trigger (a) before (b), the refusal path, the tracked-evidence carve-out) so a paraphrase that drops one fails CI. Case names are prefixed AC<N>.
-// AC2, AC12, AC13 are pinned by pre-existing suites (feature-lease, release-staging, context-budget/render-structure/skill-manifest).
+// Content-assertion tests that the shipped wording makes the per-feature worktree lane the
+// default working path (specs/e130-lane-default.md; E130, E199, E198(b)). They read the
+// shipped prose (and, for AC1, the real composer's output) directly, pinning the load-bearing
+// phrases and their order so a paraphrase that drops one fails CI. Case names are prefixed
+// AC<N>; AC2, AC12 and AC13 are pinned by pre-existing suites.
 // Rationale: specs/e260f-comment-rationale.md (test/e130-lane-default.test.mjs).
 
 import { test } from "node:test";
@@ -26,9 +27,12 @@ const CONST_05 = fs.readFileSync(path.join(ROOT, "content", "const-05-core-stand
 const CONST_15 = fs.readFileSync(path.join(ROOT, "content", "const-15-core-tail.md"), "utf-8");
 const RELEASE_ENGINEER = fs.readFileSync(path.join(ROOT, "content", "skill-release-engineer.md"), "utf-8");
 
-// History-independent scope tests (E229): a permanent test must not assert on a historical commit SHA unless the assertion is about a historical diff,
-// and then must guard the lookup and skip loudly. `unresolvedSha` returns the first of `shas` that does not resolve (null if all do);
-// `skipIfHistoryAbsent` prints a console.warn with the substring `HISTORY-DEPENDENT AC SKIPPED`, calls `t.skip(...)` and returns true so the caller bails out.
+// History-independent scope tests (E229): a permanent test must not assert on a historical
+// commit SHA unless the assertion is about a historical diff, and then must guard the
+// lookup and skip loudly. `unresolvedSha` returns the first of `shas` that does not resolve
+// (null if all do); `skipIfHistoryAbsent` prints a console.warn with the substring
+// `HISTORY-DEPENDENT AC SKIPPED`, calls `t.skip(...)` and returns true so the caller bails
+// out.
 function unresolvedSha(...shas) {
   for (const sha of shas) {
     try {
@@ -119,9 +123,10 @@ test("AC3: the Lane-start default paragraph states every subsequent tw_* call's 
 });
 
 // ---------------------------------------------------------------------------
-// AC4: default path invokes `agc feature start`; disclaims a hand-rolled bootstrap; one-sentence refusal path. Plus the zero-code-change
-// guarantee (git diff --stat over bin/ tools/ scripts/). The range is pinned to `121ddc8..5896bdd` (e130's own commits, E222): a HEAD-relative
-// range would fail on every later commit touching those dirs.
+// AC4: default path invokes `agc feature start`; disclaims a hand-rolled bootstrap;
+// one-sentence refusal path. Plus the zero-code-change guarantee (git diff --stat over bin/
+// tools/ scripts/). The range is pinned to `121ddc8..5896bdd` (e130's own commits, E222): a
+// HEAD-relative range would fail on every later commit touching those dirs.
 // ---------------------------------------------------------------------------
 
 test("AC4: trigger (b) invokes agc feature start, disclaims a new/hand-rolled bootstrap, and states the one-sentence refusal path", () => {
@@ -250,8 +255,9 @@ test("AC11: the Artifact allowlist bullet names .current/_primary/tasks.md and e
 });
 
 // ---------------------------------------------------------------------------
-// AC14: scope containment — every changed path since the fan-out base (121ddc8) matches an owned glob; zero forbidden paths.
-// Range pinned to `121ddc8..5896bdd` (e130's own commits, E222), same reason as AC4.
+// AC14: scope containment — every changed path since the fan-out base (121ddc8) matches an
+// owned glob; zero forbidden paths. Range pinned to `121ddc8..5896bdd` (e130's own commits,
+// E222), same reason as AC4.
 // ---------------------------------------------------------------------------
 
 test("AC14: every path changed since 121ddc8 matches this lane's owned-files list, with zero forbidden paths", (t) => {

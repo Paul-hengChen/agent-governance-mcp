@@ -1,8 +1,9 @@
 // Coded by @qa-engineer
-// Tests for tools/merge-invariants.ts, the post-merge check that no ledger row, done-mark or sidecar record was lost
-// (specs/e126-merge-invariants.md, as amended at e405de8). Fixtures are real throwaway git repos under os.tmpdir(), built with `git commit-tree`
-// against explicit trees; the tool only reads via `git ls-tree` / `git cat-file`. Cases are named by spec AC (AC1-AC9, AC11), plus R-1 (compaction
-// check (c) reconciles over the union of closed ids across both parents), R-2 (ledger lines are trimmed like tasks-file.ts) and Q-1 (COMPACTED breakdown dedups by task_id).
+// Tests for tools/merge-invariants.ts, the post-merge check that no ledger row, done-mark
+// or sidecar record was lost (specs/e126-merge-invariants.md, as amended at e405de8).
+// Fixtures are real throwaway git repos; the tool reads committed objects only (never the
+// working directory), via git ls-tree / cat-file / merge-base / rev-parse. Cases are named
+// by spec AC (AC1-AC9, AC11) plus the amendment findings R-1, R-2 and Q-1.
 // Rationale: specs/e260f-comment-rationale.md (test/e126-merge-invariants.test.mjs).
 
 import { test } from "node:test";
@@ -434,8 +435,9 @@ test("AC11: a row added under an already-compacted section name is MISSING when 
 });
 
 // --- counter-example (iv): R-1 cross-parent UNION ---
-// Check (c) must reconcile over the union of distinct closed ids across both parents (here 5), not per parent (each side has 4),
-// so a manifest of "4 done" is a MISSING x5 / exit 1, not a silent COMPACTED x5 / exit 0.
+// Check (c) must reconcile over the union of distinct closed ids across both parents (here
+// 5), not per parent (each side has 4), so a manifest of "4 done" is a MISSING x5 / exit 1,
+// not a silent COMPACTED x5 / exit 0.
 
 test("AC11: a merge that compacts S while both parents added different closed rows exceeding the manifest count reports every row MISSING, exit 1 (R-1 5-vs-4 fixture)", () => {
   const { root, merge } = mkMergeFixture({
@@ -482,8 +484,9 @@ test("AC11: a merge that compacts S while both parents added different closed ro
 // =============================================================================
 // R-2 — ledger-line trimming must match tools/tasks-file.ts
 // =============================================================================
-// An indented checkbox row is a counted row for tasks-file.ts (it trims each line), so merge-invariants must see it too;
-// otherwise dropping it in a merge yields zero findings instead of MISSING (a silent loss).
+// An indented checkbox row is a counted row for tasks-file.ts (it trims each line), so
+// merge-invariants must see it too; otherwise dropping it in a merge yields zero findings
+// instead of MISSING (a silent loss).
 
 test("R-2: an indented checkbox row that is tasks-file.ts-visible must not be silently invisible to merge-invariants when dropped by a merge", () => {
   const { root, merge } = mkMergeFixture({
@@ -521,7 +524,8 @@ test("R-2: an indented checkbox row that is tasks-file.ts-visible must not be si
 // =============================================================================
 // Q-1 — COMPACTED breakdown must dedup by task_id
 // =============================================================================
-// A task_id held identically in both parents must count once in the file/section breakdown, so the breakdown sums to the header count.
+// A task_id held identically in both parents must count once in the file/section breakdown,
+// so the breakdown sums to the header count.
 
 test("Q-1: the informational COMPACTED breakdown dedups by task_id, matching the header count", () => {
   const { root, merge } = mkMergeFixture({

@@ -1,9 +1,9 @@
 // Coded by @qa-engineer
-// Orchestrator end-to-end regression guard (E128): a same-agent Blocked->Blocked repair write must land through the real 18-step pipeline,
-// not just pass validateTransition (the pure rule is covered by test/qa-flow.test.mjs T-QA-E128-01(a)). Drives handleUpdateState from dist/
-// against a scratch workspace, replaying the 2026-09-15 release incident: pm -> sr-engineer In_Progress -> Blocked (malformed) -> Blocked (repair).
-// After the repair: corrected fields persist, status stays Blocked, hop_count and next_role are untouched, and the feature lease is NOT released
-// (a different feature's pm write is still rejected by FEATURE_LEASE).
+// Orchestrator end-to-end regression guard (E128): a same-agent Blocked->Blocked repair
+// write must land through the real 18-step pipeline, not just pass validateTransition.
+// Drives handleUpdateState from dist/ against a scratch workspace, replaying the 2026-09-15
+// release incident. After the repair: fields persist, status stays Blocked, hop_count and
+// next_role are untouched, and the feature lease is not released.
 // Rationale: specs/e260f-comment-rationale.md (test/e128-orchestrator-blocked-repair.test.mjs).
 
 import { test } from "node:test";
@@ -43,8 +43,10 @@ async function seedCutApprovedPm(ws, feature) {
     lastAgent: "pm",
     cutApproved: true,
   });
-  // Force the seed's last_updated off the wall clock (see test/e148-seed-stamp.mjs). The hop chain below reads off each accepted write's own
-  // server stamp with no re-read between hops (the incident's no-re-read shape, deliberately not re-seeded), so each hop keeps the usual ~1/60000 residual collision chance.
+  // Force the seed's last_updated off the wall clock (see test/e148-seed-stamp.mjs). The
+  // hop chain below reads off each accepted write's own server stamp with no re-read
+  // between hops (the incident's no-re-read shape, deliberately not re-seeded), so each hop
+  // keeps the usual ~1/60000 residual collision chance.
   forceSeedStamp(ws);
 }
 
@@ -151,8 +153,10 @@ test("E128-ORC: sr-engineer self-repairs a malformed Blocked record through the 
 });
 
 test("E128-ORC-2 (negative control): before the repair, the SAME malformed record has no self-correcting edge other than the one E128 adds — a status-misstating edge is what the incident actually hit", () => {
-  // Pins the negative shape of the incident, so a reader sees both halves: sr-engineer:Blocked historically reached only
-  // In_Progress/pm/design-auditor, never itself (the pipeline test above shows the fix). Imports from the pure module; dist/ path convention.
+  // Pins the negative shape of the incident, so a reader sees both halves:
+  // sr-engineer:Blocked historically reached only In_Progress/pm/design-auditor, never
+  // itself (the pipeline test above shows the fix). Imports from the pure module; dist/
+  // path convention.
   return import("../dist/tools/transitions.js").then(({ ALLOWED_TRANSITIONS }) => {
     const row = ALLOWED_TRANSITIONS.get("sr-engineer:Blocked") ?? [];
     const hasStaticSelfLoop = row.some((c) => c.agent === "sr-engineer" && c.status === "Blocked");
