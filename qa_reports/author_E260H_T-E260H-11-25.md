@@ -44,3 +44,7 @@ One row per task; `proof` is `node .current/e260h/proof.mjs --changed-only` on t
 ## T-E260H-25 — lane-wide proof and full suite
 
 Lane-wide `node .current/e260h/proof.mjs --list-mid` (not `--changed-only`) on the committed trims: `changed: 38 file(s)`, `scope: ok`, `emit: 38 files, 0 differ`, `leaves: 38 files, 0 differ`, `scanned: 47 file(s)`, `>20: 0`, `8-20: 0 block(s)`, `bare-id: 0`, `directives: ok`, `form: ok`, `hygiene: ok`, `proof: PASS`. The 38 changed files are exactly the 38 owned files that had a block over 7 at base; nothing was added or deleted under `test/`. No block of 8 to 20 lines remains, so the Retained blocks table in `specs/e260h-comment-rationale.md` has no rows.
+
+Full suite on the clean committed HEAD `315f092` (`git status --porcelain | wc -l` printed 0 before and after the run; the prebuild left `dist/` unchanged): `node scripts/test-lock.mjs -- npm test` gave `# tests 3043`, `# pass 3040`, `# fail 0`, `# cancelled 0`, `# skipped 3`, `exit=0`. That equals the base record of 3043 / 3040 / 0 / 3, so no test was added, removed or renamed (AC9) and the suite is green (AC10). This evidence commit changes only this report, after the run.
+
+Authoring is complete. T-E260H-26 (a fresh qa-engineer, after code review) re-runs AC1 to AC11 independently.
