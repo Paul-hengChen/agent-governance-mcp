@@ -674,28 +674,12 @@ function hasUntrackedContent(cwd, rel) {
   }
 }
 
-// The distinguisher this check exists for: a directory holding untracked
-// content should still warn when that content is the ONLY thing in it
-// (gitignored evidence dirs, or a plain untracked dir with nothing tracked
-// yet — the defect's central shapes), but must stay silent when the
-// directory is one this repo already tracks and the untracked file is
-// merely a straggler (e.g. an uncommitted report mid-review) — the remedy
-// there is "commit it", not "symlink the whole directory away".
-//
-// This is deliberately NOT `git check-ignore` on the DIRECTORY path — an
-// earlier candidate that does not survive measurement against a
-// force-added tracked `.gitkeep` inside a gitignored dir: once a directory
-// holds even one tracked file, git must walk into it to reach that file, so
-// `check-ignore`
-// on the directory itself reports "not ignored" even though the gitignore
-// rule still applies to every untracked file inside it. Measured directly
-// on that exact shape: `git check-ignore -q -- review_reports` exits 1
-// (not ignored) while `git check-ignore -q -- review_reports/report.md`
-// (the untracked file itself) exits 0 (ignored). Checking file-by-file
-// instead of directory-by-directory survives that quirk, so this asks
-// whether any UNTRACKED file under the directory is itself ignored —
-// `--others --ignored --exclude-standard` is the ls-files incantation for
-// exactly that set. Same fail-closed-and-silent catch as the others above.
+// Warns when untracked content is all a directory holds, but stays silent for
+// a straggler in a directory this repo already tracks (the fix there is to
+// commit it). Checks file by file with `--others --ignored --exclude-standard`,
+// because `git check-ignore` on the directory itself gets it wrong once a
+// tracked file sits inside: see specs/e260c-bin-scripts.md.
+// Same fail-closed-and-silent catch as the others above.
 function hasIgnoredUntrackedContent(cwd, rel) {
   try {
     const out = execFileSync(
@@ -709,15 +693,11 @@ function hasIgnoredUntrackedContent(cwd, rel) {
   }
 }
 
-// The other half of the distinguisher above: a directory with zero tracked files
-// is indistinguishable from a fresh gitignored evidence dir even when it
-// isn't itself gitignored (e.g. an adopter who .gitignore'd nothing but
-// also never committed anything under qa_reports/), so it must still warn.
-// Same `-z` / NUL-split / execFileSync-argv / fail-closed-and-silent
-// discipline as hasUntrackedContent above — on error this reports "zero
-// tracked files", which only matters when hasUntrackedContent also
-// evaluated true in the same environment, and that call fails closed the
-// same way, so the two never disagree in a way that manufactures a warning.
+// The other half of the distinguisher above: a directory with zero tracked
+// files looks like a fresh gitignored evidence dir even when nothing ignores
+// it, so it must still warn. Same `-z` / argv / fail-closed discipline as
+// hasUntrackedContent. An error reads as "zero tracked files", which never
+// manufactures a warning, because hasUntrackedContent fails closed the same way.
 function hasTrackedContent(cwd, rel) {
   try {
     const out = execFileSync("git", ["ls-files", "-z", "--", rel], {
@@ -807,29 +787,13 @@ function checkWorktreeEvidence(cwd) {
   }
 }
 
-// Orphan-lane advisory (E179 AC5). A local branch whose committed
-// `.current/<lane>/pending-tickets.md` still holds an unapplied entry but has
-// no live worktree is a lane whose findings may be stranded. Every git read
-// here is repo-global (branch refs, their trees, the worktree list), so the
-// output is byte-identical from the primary checkout and from any lane —
-// unlike checkWorktreeEvidence, this is deliberately NOT gated on
-// isLinkedWorktree. Candidates are ALL local branches (DR-6: an orphan by
-// definition has no worktree entry); `git worktree list` supplies only the
-// live set, and an entry whose directory is gone (removed without finish,
-// not yet pruned) is not live (DR-9). Own-lane only (spec AC5, E179-NEW-2
-// option (a), human ruling 2026-09-25): a branch is judged ONLY by
-// `.current/<its own lane>/pending-tickets.md`, where its lane is what
-// resolveCurrentLane would name it (`feat/<id>-*` -> `<id>`); a branch that
-// resolves to no lane is skipped, and another lane's file the branch happens
-// to carry (forked from base between that lane's merge and its finish) is
-// never read. Never `.current/history/` — a settled design question (S1,
-// decided with the lane-close writeback, E125b spec AC4): the scan does not
-// need to read history/, because `agc feature finish --shipped` (the only
-// writer into `.current/history/`) also deletes the
-// lane's branch, so a closed lane is never a candidate here in the first
-// place (candidates come from refs/heads/ only). That is a structural
-// non-applicability, not a relaxation of what "orphan" means. Advisory:
-// never throws, never exits, never affects the exit code.
+// Orphan-lane advisory (E179 AC5): a local branch with no live worktree whose
+// committed `.current/<lane>/pending-tickets.md` still holds an unapplied entry.
+// Every git read is repo-global, so unlike checkWorktreeEvidence this is not
+// gated on isLinkedWorktree. A branch is judged only by its own lane's file
+// (the lane resolveCurrentLane would name); a branch with no lane is skipped.
+// Never reads `.current/history/`. Advisory: never throws or exits.
+// Why each rule holds: see specs/e260c-bin-scripts.md.
 async function checkOrphanLanes(cwd) {
   let probe;
   try {
@@ -879,30 +843,12 @@ async function checkOrphanLanes(cwd) {
 }
 
 // --- artifacts declared-vs-actual advisory ---------------------------------
-// Compares the "artifacts" choice recorded by `agc init` against the repo's
-// real state, so a mismatch is caught before it reaches a shared branch.
-// Advisory only — WARN to stderr, never affects the exit code, like the
-// other advisories above (a workspace-local drift signal, not a stale
-// install). Read straight from the file rather than via the server's
-// loadConfig, which heal-writes on read; `agc check` must not write.
-//   undeclared -> one line, unconditionally (no git state is consulted)
-//   "local"    -> a line if any of the workspace's artifact exclude rules is
-//                 missing from the shared exclude, plus one per tracked
-//                 artifact path
-//   "repo"     -> a line if any of the workspace's artifact exclude rules is
-//                 present; the test is on those exact strings, so
-//                 LANE_EXCLUDE_RULES entries written by `agc feature start`
-//                 never trip it
-// "The workspace's rules" are artifactExcludeRulesForPrefix() for `cwd`'s
-// repo-relative prefix — the same set `agc init` would write from `cwd` — so
-// a root workspace and a subdirectory workspace in one repo never count each
-// other's rules. A "local" workspace whose path has a gitignore-wildcard
-// segment gets one "cannot verify" line instead: `agc init` refuses to write
-// rules there, and testing a pattern that may not mean what it spells would
-// give a wrong answer either way.
-// Silent when there is no parseable .current/.config.json at all (not an agc
-// workspace, or a broken config the server already reports), and silent on
-// the git-dependent branches outside a git repo or on any git failure.
+// Compares the "artifacts" choice `agc init` recorded with the repo's real
+// state. Advisory: WARN to stderr only. Reads the file directly, not via
+// loadConfig, which heal-writes; `agc check` must not write. Undeclared always
+// warns; "local" warns on a missing exclude rule or a tracked artifact path;
+// "repo" warns on a present rule. Silent without a parseable config or on git
+// failure. Which rules count, and wildcard paths: see specs/e260c-bin-scripts.md.
 function checkArtifactsDrift(cwd) {
   let parsed;
   try {
@@ -1053,22 +999,12 @@ async function runCheck(cwd) {
 }
 
 // --- subcommand: feature (E73) ---------------------------------------------
-// `agc feature start` / `agc feature finish` — lane lifecycle plumbing on top
-// of `git worktree`. Mechanism only (specs/e73-agc-feature-lifecycle.md):
-// whether lanes are the default workflow is a separate policy (E130).
-// Applying/numbering pending-ticket files at finish time and `agc check`'s
-// orphan-lane advisory live further down (E179, E124b) — see "finish-time
-// pending-ticket apply" below.
-//
-// Lane naming has exactly ONE source of truth: tools/lane-paths.ts's
-// TICKET_ID_RE, reached only through its exported functions (resolveLaneName
-// to validate a slug before any git mutation, resolveCurrentLane to name the
-// lane a checked-out branch belongs to). No second copy of the pattern lives
-// here, and no lane name is ever persisted to a tracked file (E123 F1-S0).
-//
-// Every git call is execFileSync with an argv array (no shell), matching the
-// house pattern above. `.env` is only ever byte-copied with fs.copyFileSync —
-// its contents are never read into a JS string, logged, or returned (§6).
+// `agc feature start` / `agc feature finish` — lane lifecycle on top of
+// `git worktree`. Mechanism only; whether lanes are the default workflow is E130.
+// Lane names come only from tools/lane-paths.ts's exported functions and are
+// never written to a tracked file (E123 F1-S0). Every git call is execFileSync
+// with an argv array; `.env` is only byte-copied, never read into a string (§6).
+// More: see specs/e260c-bin-scripts.md.
 
 const STR_USAGE_FEATURE =
   "  feature start <ticket-slug> [--base <branch>] [--path <dir>]\n" +
@@ -1093,48 +1029,31 @@ const STR_USAGE_FEATURE =
   "          keeps it with a warning.\n";
 
 // Exclude rules upserted into the SHARED info/exclude (git-common-dir), never
-// the tracked .gitignore. `/node_modules` has no trailing slash on purpose:
-// the lane's node_modules is a SYMLINK, which a directory-only `node_modules/`
-// pattern (the common adopter form) does not match — AC12.
-// `/.current/**/base-sha` (e125b AC11): the fork-point file `start` writes
-// into the new lane is worktree-local — `finish --shipped` reads it from the
-// lane worktree before removing it and records it in the tasks.md pointer
-// line. Ignoring it keeps a fresh lane's `git status` clean (AC8), lets
-// `git worktree remove` (never --force) succeed on a lane that never
-// committed its `.current/<lane>/` (AC13), and keeps a harvested history copy
-// of it from dirtying the primary checkout. `**` also covers the
-// `.current/history/<bucket>/<lane>/` copy and a reverse-migrated flat copy.
+// the tracked .gitignore. `/node_modules` has no trailing slash because the
+// lane's node_modules is a SYMLINK, which `node_modules/` does not match (AC12).
+// `/.current/**/base-sha` ignores the worktree-local fork-point file `start`
+// writes (e125b AC11). Why: see specs/e260c-bin-scripts.md.
 const LANE_EXCLUDE_RULES = [".env", "/node_modules", "/.current/**/base-sha"];
 
 // Exclude rules `agc init --artifacts=local` upserts into the same shared
-// info/exclude — a second, independent set from LANE_EXCLUDE_RULES above.
-// Root-anchored like `/node_modules`. Only governance RUNTIME artifacts are
-// listed: specs/, design/ and research/ are prose meant to stay tracked.
-// `agc check` keys its artifacts-drift test on these exact strings, so a
-// lane-bootstrap entry can never be mistaken for an artifacts choice.
-// These are the rules for a workspace AT the repo root; a workspace in a
-// subdirectory gets them prefixed with its repo-relative path — always go
-// through artifactExcludeRulesForPrefix() / artifactPathsForPrefix() below.
+// info/exclude, independent of LANE_EXCLUDE_RULES. Root-anchored, runtime
+// artifacts only: specs/, design/ and research/ stay tracked. `agc check` keys
+// its drift test on these exact strings, so a lane rule never reads as an
+// artifacts choice. A subdirectory workspace must go through
+// artifactExcludeRulesForPrefix() / artifactPathsForPrefix() below.
 const ARTIFACT_EXCLUDE_RULES = ["/.current/", "/tasks.md", "/qa_reports/", "/review_reports/"];
 
-// Characters unsafe inside a workspace path segment that agc writes verbatim
-// into a gitignore exclude rule: the wildcard metacharacters `* ? [ ]` (the
-// rule would match more than the literal directory), a backslash (git reads it
-// as an escape, so `/a\b/` means `/ab/`), and the C0 control range plus DEL
-// (a CR or LF would split one rule across lines of the shared exclude file;
-// no control byte has a legitimate use in a directory name). Escaping is not
-// attempted — callers refuse or skip instead. This is the ONE place the class
-// is defined; every caller reads repoRelativeWorkspacePrefix().unsafeSegment.
+// Characters unsafe in a path segment agc writes verbatim into a gitignore
+// rule: the wildcards `* ? [ ]` (match too much), a backslash (git reads an
+// escape) and the C0 controls plus DEL (a CR or LF splits the rule). No
+// escaping is attempted; callers refuse or skip. The ONE definition of the
+// class: every caller reads repoRelativeWorkspacePrefix().unsafeSegment.
 const GITIGNORE_UNSAFE_SEGMENT_RE = /[*?[\]\\\x00-\x1f\x7f]/;
 
-// A copy of an unsafe `segment` fit to print inside a one-line message: LF,
-// CR and TAB become `\n` `\r` `\t`, every other C0 control byte and DEL
-// becomes `\xHH` (lowercase hex), and everything else — backslash and the
-// wildcard characters included — is left as-is. Display only: the raw
-// `unsafeSegment` value stays unescaped for every logic use. The transform
-// assumes nothing about segment boundaries, so it is also applied to whole
-// display paths (eject's plan and stderr lines); a string with no control
-// byte comes back unchanged.
+// A copy of an unsafe `segment` fit for a one-line message: LF, CR and TAB
+// become `\n` `\r` `\t`, other C0 bytes and DEL become `\xHH` (lowercase hex),
+// everything else is unchanged. Display only; logic keeps the raw
+// `unsafeSegment`. Also applied to whole display paths (eject's plan and stderr).
 function escapeSegmentForDisplay(segment) {
   return segment.replace(/[\x00-\x1f\x7f]/g, (ch) => {
     if (ch === "\n") return "\\n";
@@ -1144,15 +1063,11 @@ function escapeSegmentForDisplay(segment) {
   });
 }
 
-// Where workspace `cwd` sits inside the work tree at `repoRoot`, as the
-// `/`-separated repo-relative path agc anchors its artifact rules and
-// pathspecs at: "" when `cwd` IS the repo root, "sub" or "pkgs/app" for a
-// subdirectory. Both sides are canonicalised first, because git reports the
-// toplevel with symlinks resolved while `cwd` may still contain them.
-// `unsafeSegment` names the first path segment carrying a character that is
-// unsafe for a gitignore exclude rule (null when there is none); callers must
-// not write or test an exclude rule built from such a prefix. Pure apart from the realpath calls,
-// so re-deriving it for the same workspace always yields the same prefix.
+// Where workspace `cwd` sits inside the work tree at `repoRoot`, as a
+// `/`-separated repo-relative path: "" at the root, "sub" or "pkgs/app" below.
+// Both sides are canonicalised, because git reports the toplevel with
+// symlinks resolved. `unsafeSegment` is the first segment unsafe for a
+// gitignore rule (null if none); callers must not build a rule from it.
 function repoRelativeWorkspacePrefix(repoRoot, cwd) {
   const rel = path.relative(canonicalPath(repoRoot), canonicalPath(cwd));
   if (rel === ".." || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel)) {
@@ -1164,16 +1079,11 @@ function repoRelativeWorkspacePrefix(repoRoot, cwd) {
   return { prefix, unsafeSegment };
 }
 
-// The exact exclude lines `agc init --artifacts=local` writes for a
-// workspace whose repoRelativeWorkspacePrefix() is `prefix`. `prefix === ""`
-// returns ARTIFACT_EXCLUDE_RULES unchanged; otherwise each rule is re-anchored
-// under the prefix (`/.current/` -> `/sub/.current/`). Anything that needs to
-// know which lines a given workspace's init wrote — the drift check below,
-// and an uninstall/eject path that has to remove precisely those lines —
-// should rebuild them with this function and the same prefix rather than
-// assume the root set. `baseRules` defaults to ARTIFACT_EXCLUDE_RULES; any
-// other root-anchored rule list (e.g. eject's domain-knowledge paths) is
-// re-anchored the same way.
+// The exact exclude lines `agc init --artifacts=local` writes for a workspace
+// whose repoRelativeWorkspacePrefix() is `prefix`: the root set unchanged for
+// "", else each rule re-anchored (`/.current/` -> `/sub/.current/`). The drift
+// check and eject rebuild them here instead of assuming the root set.
+// `baseRules` may be any other root-anchored list (eject's knowledge paths).
 function artifactExcludeRulesForPrefix(prefix, baseRules = ARTIFACT_EXCLUDE_RULES) {
   return prefix === "" ? [...baseRules] : baseRules.map((rule) => `/${prefix}${rule}`);
 }
@@ -1447,16 +1357,11 @@ function resolveRepoRootOrNull(cwd) {
   }
 }
 
-// The `artifactPaths` entries (from artifactPathsForPrefix) that have at
-// least one file in the index of the repo at `repoRoot` — one entry per
-// artifact path, not per file, so a workspace with thousands of tracked
-// `.current/` files still gets a short, actionable list. Serves `agc init`
-// (the tracked-tree warning and the omitted-flag refusal to default) and
-// `agc check` (local-mode drift) from one definition. Run from the repo root,
-// so the targets are repo-relative. `-z` keeps non-ASCII paths unquoted;
-// literal pathspecs keep a directory name with a wildcard character from
-// being read as a glob. Throws on git failure; callers decide whether that
-// is fatal.
+// The `artifactPaths` entries with at least one file in the index at
+// `repoRoot`, one per path rather than per file, so the list stays short.
+// Shared by `agc init` (tracked-tree warning, omitted-flag refusal) and
+// `agc check` (local-mode drift). `-z` keeps non-ASCII paths unquoted; literal
+// pathspecs stop a wildcard in a name being globbed. Throws on git failure.
 function trackedArtifactPaths(repoRoot, artifactPaths) {
   const out = git(repoRoot, [
     "--literal-pathspecs",
@@ -1662,17 +1567,13 @@ function escapeRegExp(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-// `finish --abandoned` evidence disposition (AC21–AC25), split in two so the
-// precondition can run before any other mutation (E179 AC3(a), G4):
-//   planAbandonEvidence  — the precondition + destination-clash check; reads
-//                          only, mutates nothing, throws on refusal. Returns
-//                          { moves }.
-//   applyAbandonEvidence — git mv (tracked) / fs.renameSync (untracked) into
-//                          <dir>/abandoned/<ticket-id>/, and one commit when
-//                          anything is staged. Returns { committed,
-//                          untrackedMoved } for reporting.
-// apply(plan(...).moves) is exactly the original single-function behaviour
-// from before the split (E179).
+// `finish --abandoned` evidence disposition (AC21–AC25), split so the
+// precondition runs before any other mutation (E179 AC3(a), G4):
+//   planAbandonEvidence  — precondition + clash check; read-only, throws on
+//                          refusal. Returns { moves }.
+//   applyAbandonEvidence — git mv / fs.renameSync into <dir>/abandoned/<id>/,
+//                          one commit if staged. Returns { committed, untrackedMoved }.
+// apply(plan(...).moves) is the same behaviour as before the split.
 function planAbandonEvidence(lanePath, ticketId) {
   // Bounded token: the id delimited by _ - . or a string edge, case-
   // insensitive — `e73` never matches `e730` / `e73b`.
@@ -1727,15 +1628,11 @@ function planAbandonEvidence(lanePath, ticketId) {
   return { moves };
 }
 
-// Mark each move whose file `git worktree remove` (E180, spec AC1–AC6)
-// (never --force) would delete WITHOUT refusing: untracked, git-ignored, and
-// its evidence dir not a symlink resolving outside the worktree. Such a move
-// gets `harvestAbs` (its primary-checkout copy target, same relative path as
-// the local `dst`) when that copy must still be made; an identical primary
-// copy already there (a re-run — AC4/AC6) needs none; a differing one refuses
-// the whole run here, in the read-only phase (AC3). Mutates only the plan
-// objects. Primary = listWorktrees' first entry, so neither caller's
-// signature changes.
+// Mark each move whose file `git worktree remove` (never --force) would delete
+// without refusing (untracked, ignored, evidence dir not linked outside; E180)
+// with `harvestAbs`, its primary-checkout copy target. An identical primary
+// copy needs none (re-run, AC4/AC6); a differing one refuses the run here, in
+// the read-only phase (AC3). Mutates only the plan objects.
 function planAbandonEvidenceHarvest(lanePath, moves) {
   const atRisk = moves.filter((m) => !m.tracked && evidenceAtRisk(lanePath, m));
   if (atRisk.length === 0) return;
@@ -1853,15 +1750,12 @@ function applyAbandonEvidence(lanePath, ticketId, moves) {
   return { committed, untrackedMoved };
 }
 
-// Harvest of an untracked lane state dir (E194, spec AC7–AC12) —
-// `.current/<ticket>/` that the lane never tracked on its own branch (the
-// git-ignored-`.current/` adopter shape, or a lane that
-// simply never committed it) is its only governance record, and
-// `git worktree remove` deletes the ignored part silently. Read-only plan,
-// run before any --abandoned mutation: null when there is nothing to harvest
-// (absent — AC11; linked outside the worktree; any tracked content — AC8),
-// a refusal when the primary history path is taken by a non-directory (AC9),
-// else the copy to make.
+// Harvest of an untracked lane state dir `.current/<ticket>/` (E194, AC7–AC12):
+// if the lane never tracked it, it is the only governance record, and
+// `git worktree remove` deletes the ignored part. Read-only, before any
+// --abandoned mutation: null with nothing to harvest (absent, AC11; linked
+// outside; any tracked content, AC8), a refusal if the primary history path
+// is a non-directory (AC9), else the copy to make.
 function planAbandonCurrentHarvest({ lanePaths, lanePath, ticketId, branch, now }) {
   const laneRel = path.posix.join(".current", ticketId);
   const laneAbs = path.join(lanePath, ".current", ticketId);
