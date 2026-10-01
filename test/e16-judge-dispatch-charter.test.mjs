@@ -1,8 +1,9 @@
 // Coded by @qa-engineer
-// Tests for the judge-dispatch charter broadening (backlog E16 / T-EB-02, content only): the Amend-Resume Edge charter in content/const-08-chain-31-mid.md §3.1 is
-// broadened so the resume_of-gated pm->{code-reviewer,qa-engineer} edge is also the sanctioned door for a PM-sanctioned FRESH single-role judge dispatch on a
-// test-only or evidence-only ticket, not only a mid-chain resume; plus a pointer-only note in content/coord-03-core-fallback.md's relay row. Pure string-containment
-// assertions on shipped content (the skill-text pinning convention of test/feature-lease.test.mjs S1-S6); the lasting guard that the edge still requires resume_of is test/qa-flow.test.mjs (C1-07). Cases E16-01..E16-06.
+// Tests for the judge-dispatch charter broadening (backlog E16 / T-EB-02, content only):
+// the Amend-Resume Edge in content/const-08-chain-31-mid.md §3.1 is also the door for a
+// fresh single-role judge dispatch on a test-only or evidence-only ticket, plus a pointer
+// note in content/coord-03-core-fallback.md's relay row. String-containment assertions on
+// shipped content; test/qa-flow.test.mjs (C1-07) guards that the edge needs resume_of.
 // Rationale: specs/e260f-comment-rationale.md (test/e16-judge-dispatch-charter.test.mjs).
 
 import { test } from "node:test";

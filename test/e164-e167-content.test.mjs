@@ -1,8 +1,9 @@
 // Coded by @qa-engineer
-// Tests that pin the release-engineer SOP's CI-wait and tag-handling wording and the lite-coordinator / PM cut-list wording (feature e164-e167-content-wave45;
-// docs/backlog.md rows E164/E167). Content-assertion tests that read the shipped prose directly, independent of the sr-engineer/code-reviewer claims in review_reports/review_T-E164-01.md.
-// Prose-only lane, so the contract is that the wording encodes the approved decisions (the sequencing, the named cap, the tag-deletion clause); a paraphrase dropping one would read fine on
-// a skim, hence the phrase and order pins. Case names are prefixed AC<N>; AC5 (one edit pass) is not test-assertable and is recorded in qa_reports/review_T-E164-02.md.
+// Tests pinning the release-engineer SOP CI-wait/tag wording and the lite-coordinator / PM
+// cut-list wording (feature e164-e167-content-wave45; docs/backlog.md rows E164/E167),
+// independent of review_reports/archive/e164-e167-content-wave45/review_T-E164-01.md.
+// Case names are prefixed AC<N>; AC5 (one edit pass) is not test-assertable, see
+// qa_reports/archive/e164-e167-content-wave45/review_T-E164-02.md.
 // Rationale: specs/e260f-comment-rationale.md (test/e164-e167-content.test.mjs).
 
 import { test } from "node:test";

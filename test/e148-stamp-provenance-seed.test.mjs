@@ -1,8 +1,9 @@
 // Coded by @qa-engineer
-// Deterministic proof that seeding a test workspace cannot trip the stamp-provenance gate at random (E148, docs/backlog.md row E148).
-// gates/stamp-provenance.ts arms STAMP_PROVENANCE_SUSPECT when the on-disk `last_updated` matches HAND_AUTHORED_STAMP_RE, which a wall-clock seed hits ~1/60000 of the time;
-// a green re-run proves nothing, so this file forces the exact suspect shape. SEED-1: the gate fires every time on a suspect seed. SEED-2: the write still succeeds with
-// the audited stamp-remediation note. SEED-3: forceSeedStamp (test/e148-seed-stamp.mjs) with the SAFE stamp makes seed-then-write succeed with no Date.now() dependency. The gate is unmodified; no spec file, the backlog row is the spec.
+// Deterministic proof that seeding a test workspace cannot trip the stamp-provenance gate
+// at random (E148; docs/backlog.md row E148 is the spec, no spec file). A wall-clock seed
+// hits the suspect shape ~1/60000 of the time, so this file forces it. SEED-1: the gate
+// fires every time on a suspect seed. SEED-2: the write still succeeds with the audited
+// remediation note. SEED-3: forceSeedStamp (test/e148-seed-stamp.mjs) with the SAFE stamp.
 // Rationale: specs/e260f-comment-rationale.md (test/e148-stamp-provenance-seed.test.mjs).
 
 import { test } from "node:test";
@@ -110,8 +111,9 @@ test("SEED-2: the same deterministically-suspect seed, remediated, succeeds and 
 });
 
 // ---------------------------------------------------------------------------
-// SEED-3: the actual fix for the random gate trip (E148). forceSeedStamp with the SAFE stamp makes seed-then-write succeed with ZERO dependency
-// on Date.now(): structurally incapable of landing on the suspect shape, on every run.
+// SEED-3: the actual fix for the random gate trip (E148). forceSeedStamp with the SAFE
+// stamp makes seed-then-write succeed with ZERO dependency on Date.now(): structurally
+// incapable of landing on the suspect shape, on every run.
 // ---------------------------------------------------------------------------
 
 test("SEED-3: forceSeedStamp(ws, SAFE_SEED_STAMP) makes the seed-then-write path succeed deterministically, independent of Date.now()", async () => {

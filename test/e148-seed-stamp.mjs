@@ -1,8 +1,9 @@
 // Coded by @qa-engineer
-// Shared deterministic-stamp helpers for seed-then-write tests (docs/backlog.md row E148). The hazard: gates/stamp-provenance.ts arms
-// STAMP_PROVENANCE_SUSPECT when the on-disk `last_updated` matches HAND_AUTHORED_STAMP_RE (/T\d{2}:\d{2}:00\.000Z$/), and only the ".000" ms term is load-bearing.
-// A test that seeds via writeHandoffState() lets the wall clock pick that stamp, so ~1/60000 of runs hit the suspect shape and the next gated write is refused.
-// The gate is correct and untouched; these helpers force the on-disk stamp at the test layer only. Callers MUST markStateRead AFTER forceSeedStamp, or verifyFreshness rejects the write as stale.
+// Shared deterministic-stamp helpers for seed-then-write tests (docs/backlog.md row E148).
+// gates/stamp-provenance.ts arms STAMP_PROVENANCE_SUSPECT when the on-disk `last_updated`
+// matches HAND_AUTHORED_STAMP_RE; a wall-clock seed hits that shape in ~1/60000 of runs.
+// These helpers force the stamp at the test layer only (the gate is untouched). Callers MUST
+// markStateRead AFTER forceSeedStamp, or verifyFreshness rejects the write as stale.
 // Rationale: specs/e260f-comment-rationale.md (test/e148-seed-stamp.mjs).
 
 import * as fs from "node:fs";
@@ -39,9 +40,11 @@ function handoffPath(workspacePath) {
 }
 
 /**
- * Rewrite the on-disk handoff.md `last_updated` frontmatter field in place to `stamp` (default SAFE_SEED_STAMP). Call AFTER the seed write
- * and BEFORE the next markStateRead(ws) that re-snapshots freshness (the hop-count-transitions backdateLastUpdated() convention).
- * Throws if no `last_updated` line is found: a workspace with no seeded handoff.md is a test-author mistake, not a case to no-op through.
+ * Rewrite the on-disk handoff.md `last_updated` frontmatter field in place to `stamp`
+ * (default SAFE_SEED_STAMP). Call AFTER the seed write and BEFORE the next
+ * markStateRead(ws) that re-snapshots freshness (the hop-count-transitions
+ * backdateLastUpdated() convention). Throws if no `last_updated` line is found: a workspace
+ * with no seeded handoff.md is a test-author mistake, not a case to no-op through.
  */
 export function forceSeedStamp(workspacePath, stamp = SAFE_SEED_STAMP) {
   const p = handoffPath(workspacePath);
@@ -54,9 +57,11 @@ export function forceSeedStamp(workspacePath, stamp = SAFE_SEED_STAMP) {
 }
 
 /**
- * Same as forceSeedStamp, but a silent no-op when handoff.md does not exist yet (a first-ever write has no prevState and is never gated).
- * For use inside a shared dispatch()-style wrapper that re-snapshots freshness (resetSession + markStateRead) on every call and both seeds
- * and drives the write(s) under test, so the hazard is closed at every step of a multi-call chain.
+ * Same as forceSeedStamp, but a silent no-op when handoff.md does not exist yet (a
+ * first-ever write has no prevState and is never gated). For use inside a shared
+ * dispatch()-style wrapper that re-snapshots freshness (resetSession + markStateRead) on
+ * every call and both seeds and drives the write(s) under test, so the hazard is closed at
+ * every step of a multi-call chain.
  */
 export function forceSeedStampIfExists(workspacePath, stamp = SAFE_SEED_STAMP) {
   if (!fs.existsSync(handoffPath(workspacePath))) return;
@@ -64,18 +69,21 @@ export function forceSeedStampIfExists(workspacePath, stamp = SAFE_SEED_STAMP) {
 }
 
 /**
- * A "now, but never suspect" stamp: wall-clock time with milliseconds forced away from 0. Use where the seed must be fresh relative to
- * Date.now() (feature-lease TTL math, staleness checks) so a fixed stamp like SAFE_SEED_STAMP would break the test. Deterministically escapes
- * HAND_AUTHORED_STAMP_RE, which requires ms === "000".
+ * A "now, but never suspect" stamp: wall-clock time with milliseconds forced away from 0.
+ * Use where the seed must be fresh relative to Date.now() (feature-lease TTL math,
+ * staleness checks) so a fixed stamp like SAFE_SEED_STAMP would break the test.
+ * Deterministically escapes HAND_AUTHORED_STAMP_RE, which requires ms === "000".
  */
 export function freshNonSuspectStamp() {
   return nonSuspectStampAt(0);
 }
 
 /**
- * freshNonSuspectStamp at an arbitrary offset from now (milliseconds; negative = past). Replaces a hand-rolled
- * `new Date(Date.now() - minutesAgo * 60_000).toISOString()` backdate, which keeps real ms entropy and so is itself exposed to the E148 hazard.
- * Deterministically escapes HAND_AUTHORED_STAMP_RE (ms forced !== 0) and keeps the requested age intact to the second.
+ * freshNonSuspectStamp at an arbitrary offset from now (milliseconds; negative = past).
+ * Replaces a hand-rolled `new Date(Date.now() - minutesAgo * 60_000).toISOString()`
+ * backdate, which keeps real ms entropy and so is itself exposed to the E148 hazard.
+ * Deterministically escapes HAND_AUTHORED_STAMP_RE (ms forced !== 0) and keeps the
+ * requested age intact to the second.
  */
 export function nonSuspectStampAt(offsetMs) {
   const d = new Date(Date.now() + offsetMs);
