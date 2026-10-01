@@ -1,8 +1,9 @@
 // Coded by @qa-engineer
-// Tests for the state-render injection fix: sanitizeForRender / STRUCTURAL_MARKER_RE / STATE_BLOCK_DATA_NOTICE in prompts/build.ts. Free-text handoff
-// fields (pending_notes, blocking_reason, ...) used to reach the next role's prompt verbatim, so a quoted structural marker looked authored.
-// Hermetic by design: every test builds its own os.tmpdir() workspace, because test/render-structure.test.mjs only covers this via this repo's live handoff.
-// sanitizeForRender is module-private, so each property is pinned through the public buildPromptForRole, never a copy of the implementation.
+// Tests for the state-render injection fix: sanitizeForRender / STRUCTURAL_MARKER_RE /
+// STATE_BLOCK_DATA_NOTICE in prompts/build.ts. Free-text handoff fields (pending_notes,
+// blocking_reason, ...) used to reach the next role's prompt verbatim, so a quoted
+// structural marker looked authored. sanitizeForRender is module-private, so each property
+// is pinned through the public buildPromptForRole.
 // Rationale: specs/e260f-comment-rationale.md (test/e122-state-render-injection.test.mjs).
 
 import { test } from "node:test";
@@ -48,8 +49,9 @@ function render(ws, skillFile = "skill-qa-engineer.md") {
   return buildPromptForRole(skillFile, "probe", ws, false).messages[0].content.text;
 }
 
-// Additive invariant: sanitizeForRender may only insert backticks. Stripping every backtick from the rendered and the original value
-// must yield identical strings, even when the original already held backticks. Exact, byte for byte, not a qualitative read.
+// Additive invariant: sanitizeForRender may only insert backticks. Stripping every backtick
+// from the rendered and the original value must yield identical strings, even when the
+// original already held backticks. Exact, byte for byte, not a qualitative read.
 function assertAdditiveOnly(renderedValue, originalValue, label) {
   assert.equal(
     renderedValue.split("`").join(""),
@@ -58,8 +60,9 @@ function assertAdditiveOnly(renderedValue, originalValue, label) {
   );
 }
 
-// Property: the marker regex is the detector's own union, byte-identical. Both regexes are extracted from the live source text, not hand-copied,
-// so the pin keeps guarding the real relationship; if either side drifts, coverage silently develops a hole.
+// Property: the marker regex is the detector's own union, byte-identical. Both regexes are
+// extracted from the live source text, not hand-copied, so the pin keeps guarding the real
+// relationship; if either side drifts, coverage silently develops a hole.
 
 function extractRegexLiteral(sourceText, constName) {
   const re = new RegExp(`const ${constName} = (/(?:\\\\/|[^/\\n])+/[a-z]*);`);
@@ -86,8 +89,10 @@ test("regex union pin: STRUCTURAL_MARKER_RE (build.ts) is byte-identical to NUMH
   assert.equal(structural.flags, "g", "sanitizer regex must be global (it is used with .replace across the whole string)");
 });
 
-// Fixture: one synthetic HandoffState covering adversarial markers, a pre-quoted marker, a nested object (dispatch_pins), an array of objects
-// (external_refs), arrays of strings, and non-string leaves. Built via writeHandoffState so it is schema-valid, then rendered through buildPromptForRole.
+// Fixture: one synthetic HandoffState covering adversarial markers, a pre-quoted marker, a
+// nested object (dispatch_pins), an array of objects (external_refs), arrays of strings,
+// and non-string leaves. Built via writeHandoffState so it is schema-valid, then rendered
+// through buildPromptForRole.
 
 const NOTE_NUMHEADER = "step 7b. **Drift-baseline acknowledgment**";
 const NOTE_BULLET_BOLD = "- **Foo** happened";
@@ -246,9 +251,11 @@ test("NEW-8 (accepted, not a bug): imperative prose with no markdown structural 
   const ws = await buildFixture();
   const state = extractStateBlock(render(ws));
 
-  // Accepted limit: STRUCTURAL_MARKER_RE matches markdown structure only, so a note with no markdown-shaped fragment renders byte-for-byte
-  // untouched, instruction-shaped language included. The fix closes the structural symptom, not the injection surface, so this asserts the
-  // accepted behaviour. If it ever fails because plain imperative prose starts being rewritten, the mitigation strategy changed.
+  // Accepted limit: STRUCTURAL_MARKER_RE matches markdown structure only, so a note with no
+  // markdown-shaped fragment renders byte-for-byte untouched, instruction-shaped language
+  // included. The fix closes the structural symptom, not the injection surface, so this
+  // asserts the accepted behaviour. If it ever fails because plain imperative prose starts
+  // being rewritten, the mitigation strategy changed.
   const idx = state.pending_notes.indexOf(NOTE_INJECTION);
   assert.notEqual(idx, -1, "the injection-shaped note must be present in pending_notes");
   assert.equal(state.pending_notes[idx], NOTE_INJECTION, "prose with no structural marker shape must render byte-for-byte unmodified (NEW-8, mitigated-not-closed, not this ticket's job to fix)");

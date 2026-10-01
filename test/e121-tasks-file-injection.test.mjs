@@ -1,8 +1,9 @@
 // Coded by @qa-engineer
-// Tests that the four mutators in tools/tasks-file.ts (complete, rollback, void, add) refuse caller strings that would forge a task row via
-// `$`-expansion (String.replace grammar) or line injection. The pre-fix code also returned success: true, so "no crash" proves nothing: a must-refuse
-// case pins an {error} naming the offending field (e.g. /task_id must not contain a line break/), tasks.md byte-identical, the forged id absent, and (via the shared helper) row count unchanged and no .lock left.
-// For line-break taskIds it also asserts the message is not a not-found error, telling a stated guard from incidental lookup-order safety.
+// Tests that the four mutators in tools/tasks-file.ts (complete, rollback, void, add)
+// refuse caller strings that would forge a task row via `$`-expansion or line injection.
+// The pre-fix code also returned success: true, so "no crash" proves nothing: a must-refuse
+// case pins an {error} naming the offending field, tasks.md byte-identical, and the forged
+// id absent.
 // Rationale: specs/e260f-comment-rationale.md (test/e121-tasks-file-injection.test.mjs).
 
 import { test } from "node:test";
@@ -26,8 +27,10 @@ setActiveStorage(new FileHandoffStorage());
 // resetSession/markStateRead sequencing so the freshness guard doesn't trip).
 // ---------------------------------------------------------------------------
 
-// Fixtures seed the lane-local ledger directly at `.current/_primary/tasks.md` (no .git, so the lane is the primary lane): a root-level v2 file is the
-// index shape and tw_* would throw TASKS_LEDGER_ABSENT. Same approach as test/e117-void-task.test.mjs; migration has its own tests in test/e125a-lane-local-ledgers.test.mjs.
+// Fixtures seed the lane-local ledger directly at `.current/_primary/tasks.md` (no .git, so
+// the lane is the primary lane): a root-level v2 file is the index shape and tw_* would
+// throw TASKS_LEDGER_ABSENT. Same approach as test/e117-void-task.test.mjs; migration has
+// its own tests in test/e125a-lane-local-ledgers.test.mjs.
 function laneTasksPath(ws) {
   return path.join(ws, ".current", "_primary", "tasks.md");
 }
@@ -199,9 +202,11 @@ test("CR-only in taskId is refused as a hygiene/consistency matter, not because 
   assert.equal(readTasks(ws), before, "a refused CR-bearing call must also leave tasks.md byte-identical");
 });
 
-// Must-succeed set (over-refusal floor). No id containing a line break can round-trip through tasks.md (parseTasks splits on "\n" and
-// DEFAULT_TASK_REGEX captures the id as (\S+)), so the refused set is exactly the unrepresentable set and no realistic or
-// machine-derived id is newly refused. The cases below are the empirical half of that argument.
+// Must-succeed set (over-refusal floor). No id containing a line break can round-trip
+// through tasks.md (parseTasks splits on "\n" and DEFAULT_TASK_REGEX captures the id as
+// (\S+)), so the refused set is exactly the unrepresentable set and no realistic or
+// machine-derived id is newly refused. The cases below are the empirical half of that
+// argument.
 
 test("must-succeed: addTask accepts a spread of benign id shapes with no line break", async () => {
   const benignIds = [
@@ -260,9 +265,11 @@ test("must-succeed: voidTask on a backtick id with a benign reason succeeds norm
   assert.equal(result.success, true, `expected voidTask to succeed, got: ${JSON.stringify(result)}`);
 });
 
-// Line-separator (U+2028/U+2029) row erasure, the erasure sibling of the forging defect: these JS-only line terminators are not split by
-// split("\n"), so a row carrying one is a single line on disk yet unparseable. Closed twice: Part A, the input boundary (containsLineBreak
-// widened, same eight call sites); Part B, the parser, which fails loud on a live-shaped row carrying one but not on a voided row.
+// Line-separator (U+2028/U+2029) row erasure, the erasure sibling of the forging defect:
+// these JS-only line terminators are not split by split("\n"), so a row carrying one is a
+// single line on disk yet unparseable. Closed twice: Part A, the input boundary
+// (containsLineBreak widened, same eight call sites); Part B, the parser, which fails loud
+// on a live-shaped row carrying one but not on a voided row.
 // Rationale: specs/e260f-comment-rationale.md (test/e121-tasks-file-injection.test.mjs).
 
 const E131_TERMINATORS = [
