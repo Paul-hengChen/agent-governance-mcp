@@ -1,17 +1,9 @@
 // Coded by @sr-engineer
-// QA-evidence gate predicates (A2 split — verbatim relocation from
-// tools/evidence-file.ts, no behavior change). File-mode QA evidence I/O:
-// each QA round appends a timestamped section to
-// <workspace>/qa_reports/review_<task_id>.md. A per-id file's existence is
-// sufficient for hasEvidenceInFile(); when a per-id file is absent, a lazy
-// `covers:` label-line fallback (C3) lets one covering
-// report satisfy additional ids — see parseCoversIds / buildCoverageIndex in
-// tools/evidence-file.ts (gate-agnostic plumbing).
-//
-// Registry linkage: the QA-evidence gate (MISSING_EVIDENCE) emits its hint at
-// the orchestrator emit site, which sources gate("MISSING_EVIDENCE").hintStatic
-// from gates/registry.ts (DR-2). These predicates return present/missing data
-// only and do not consume hint text, so no registry import is added here.
+// QA evidence gate predicates: each QA round appends a timestamped section to
+// qa_reports/review_<task_id>.md. A per-id file's existence is enough; when it is
+// absent, a lazy `covers:` fallback lets one covering report satisfy other ids
+// (parseCoversIds / buildCoverageIndex in tools/evidence-file.ts).
+// Spec: specs/c3-covering-evidence.md.
 
 import * as fs from "fs";
 import * as path from "path";
@@ -28,15 +20,10 @@ function evidencePath(workspacePath: string, taskId: string): string {
   return path.join(evidenceDir(workspacePath), `review_${safe}.md`);
 }
 
-// Exported alias: the QA completion-evidence gate's rejection envelope names
-// the exact expected per-id evidence file path (mirrors the exported
-// visualEvidencePath precedent in gates/visual.ts — the same
-// name-the-expected-path rejection posture, E23). Thin delegate over the same
-// sanitised path the predicates below check, so the envelope can never name a
-// path the gate didn't test. Kept as a WRAPPER (not a rename) so the internal
-// `evidencePath` call sites stay literally intact — the covering-evidence AC-6
-// code-path pin asserts the exact `fs.existsSync(evidencePath(...))` source
-// text inside hasEvidenceInFile. (E32)
+// Exported so the QA completion-evidence rejection names the exact expected file,
+// the same sanitised path the predicates below check. A wrapper, not a rename:
+// test/covering-evidence.test.mjs pins the literal
+// `fs.existsSync(evidencePath(...))` text inside hasEvidenceInFile.
 export function qaEvidencePath(workspacePath: string, taskId: string): string {
   return evidencePath(workspacePath, taskId);
 }

@@ -1,20 +1,9 @@
 // Coded by @sr-engineer
-// Cut-Approval Gate predicate (A2 split — verbatim relocation from
-// tools/evidence-file.ts, no behavior change).
-//
-// pm-cut-approval-gate. Reports whether the PREV handoff state carries an
-// explicit cut approval. Pure equality check — never touches the filesystem,
-// never throws. The handoffState passed in is the already-parsed PREV state
-// (the attestation must have been recorded by the preceding pm:In_Progress
-// write), mirroring hasScopeDecision's prev-state contract. Strict `=== true`:
-// absence (undefined) and a literal `false` both fail the gate. There is NO
-// filesystem fallback (unlike hasScopeDecision, which also honors
-// .current/feature-split.md) — cut approval is a pure boolean with one source
-// of truth, the handoff field.
-//
-// Registry linkage: the CUT_APPROVAL_REQUIRED hint is emitted at the
-// orchestrator emit site via gate("CUT_APPROVAL_REQUIRED").hintStatic (DR-2);
-// this predicate returns a boolean only, so no registry import is added here.
+// Cut-approval gate predicate: true only when the previous handoff state (the
+// preceding pm:In_Progress write) carries cut_approved === true. Absence and a
+// literal false both fail. Unlike hasScopeDecision there is no file fallback:
+// the handoff field is the one source of truth. Pure, never throws.
+// Spec: specs/pm-cut-approval-gate.md.
 
 export function hasCutApproval(
   handoffState: { cut_approved?: boolean } | null | undefined,

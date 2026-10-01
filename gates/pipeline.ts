@@ -1,40 +1,20 @@
 // Coded by @sr-engineer
-// Gate-step pipeline contract for the tw_update_state orchestrator: the gates
-// run as an ordered list of steps instead of one long if-chain (E35). Extends
-// the registry pattern (gates/registry.ts: gate METADATA as data, A10) with
-// the other half: gate ORDER as data.
-//
-// The ordered UPDATE_STATE_GATE_PIPELINE array itself lives in
-// tools/handoff-orchestrator.ts — deliberately NOT here — because the per-gate
-// emit bodies are byte-verbatim relocations of the inline if-blocks that
-// preceded the pipeline, and the source-pin suites assert their literals
-// (error codes, arm predicate names, envelope keys, even guard indentation)
-// against THAT file: test/error-code-contract.test.mjs (orchestrator-producer
-// codes + AC2 predicate names), test/ac-execution.test.mjs I5b, and
-// test/gates-expected-red.test.mjs (compound/single-line guard shapes).
-// This module is the shared, dependency-light contract: the ctx shape the
-// orchestrator derives once per write, the step shape, and the
-// first-rejection-wins runner.
-//
-// Runtime near-leaf: every import below is `import type` (erased at compile
-// time) and runUpdateStatePipeline itself needs none of them at runtime, so
-// the import DAG stays strictly acyclic — tools/registry.ts →
-// tools/handoff-orchestrator.ts → gates/pipeline.ts, with only erased
-// type-only back-edges.
+// Gate-step pipeline contract for tw_update_state: the per-write context, the step
+// shape, and the first-rejection-wins runner. Gate order is data, but the ordered
+// UPDATE_STATE_GATE_PIPELINE array lives in tools/handoff-orchestrator.ts, where
+// source-pin tests assert its literals. Every import here is `import type`, so the
+// runtime import graph stays acyclic.
+// Rationale: specs/e260d-comment-rationale.md (gates/pipeline.ts).
 
 import type { ToolResult, UpdateStateInput } from "../tools/registry.js";
 import type { HandoffState, HandoffStorage } from "../tools/storage.js";
 import type { TransitionTuple } from "../tools/transitions.js";
 import type { GateErrorCode } from "./registry.js";
 
-// The per-write context every gate step reads. Derivation happens ONCE, in
-// handleUpdateStateCore's ctx-building phase (prev-state parse, round/hop
-// inputs, feature_changed, evidence-schema pin resolution) — a gate step NEVER
-// derives values that later steps or the final write depend on (a hard
-// constraint of the pipeline design: derivation belongs in the ctx-building
-// phase, not inside gate entries). Purely-gate-local derivations (e.g. the
-// feature-lease gate's leaseFields projection, the code-reviewer evidence
-// gate's reviewScopeIds resolution) stay inside their step, byte-verbatim.
+// The per-write context every gate step reads, derived once before the pipeline
+// runs. A step never derives a value that later steps or the final write depend
+// on; gate-local derivations (such as the feature-lease field projection) stay
+// inside their step.
 export interface UpdateStateGateContext {
   readonly parsed: UpdateStateInput;
   readonly storage: HandoffStorage;

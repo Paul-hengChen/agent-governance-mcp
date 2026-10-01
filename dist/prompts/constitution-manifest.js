@@ -1,30 +1,12 @@
 // Coded by @sr-engineer
-// Compose-not-strip (ticket A9): the single ordered manifest of constitution
-// fragment files + the inclusion predicate. This is the SINGLE SOURCE OF TRUTH
-// for "which governance text ships on which dispatch" — imported by
-// prompts/build.ts, bin/agent-governance-context.mjs (dynamic import of the
-// compiled dist/prompts/constitution-manifest.js), and
-// scripts/measure-context-cost.mjs. It replaces the old DR-3 "keep the
-// stripChainOnly regex copies in sync" contract with a structural one: one
-// shared list, no duplicated regexes (see
-// specs/compose-not-strip-overlays-architecture.md, DR-4).
-//
-// Each fragment is a VERBATIM byte-slice of the retired monolith
-// content/constitution.md (DR-1, Option R): the <!-- chain-only:* --> /
-// <!-- design-only:* --> structural markers are retained INSIDE the fragments
-// as inert boundary text — composition selects fragments by tag and never
-// parses markers, so a malformed marker can no longer change shipped
-// governance text (spec AC11). Invariant: concatenating every fragment in
-// manifest order reproduces the old monolith byte-for-byte (golden baseline:
-// test/fixtures/compose-golden/constitution-monolith.txt).
-//
-// Origin (<!-- origin:* -->) and rationale (<!-- rationale:* -->) spans stay
-// wherever they physically fall inside fragments; they are handled by the
-// stripOriginTags / stripRationale text-transform passes run over the
-// assembled result (prompts/build.ts pipeline: compose → stripOriginTags
-// always → stripRationale unless fullDetail).
-// Ordered — index order IS document order. Concatenation of every entry === the
-// retired content/constitution.md monolith.
+// Ordered constitution fragment manifest plus its inclusion predicate: the one
+// place that decides which governance text ships on which dispatch (read by
+// prompts/build.ts, the SessionStart hook via dist/, and the measure script).
+// Fragments are verbatim slices of the retired single-file constitution; their
+// structural markers stay inside as inert text and are never parsed.
+// Rationale: specs/compose-not-strip-overlays-architecture.md.
+// Ordered: index order is document order, and concatenating every entry
+// reproduces the retired single-file constitution.
 export const CONSTITUTION_SEGMENTS = [
     { file: "const-01-core-head.md", tag: "core" },
     { file: "const-02-design-mvp.md", tag: "design" },

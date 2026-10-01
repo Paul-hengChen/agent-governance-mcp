@@ -1,11 +1,10 @@
 // Coded by @sr-engineer
-// SQLite DDL migrations. Storage-sqlite.ts calls runSqliteMigrations() at
+// SQLite DDL migrations. storage-sqlite.ts calls runSqliteMigrations() at
 // construction time, after the bootstrap CREATE TABLE IF NOT EXISTS block.
-//
-// Unlike file-based artifacts, the "payload" is the live Database handle and
-// each step performs DDL/data changes in place. The version row in the
-// schema_meta table is updated inside the SAME transaction as the step's DDL
-// so a crashed migration leaves the version untouched (AC-5).
+// Each step changes the live Database in place, and the schema_meta version row
+// is updated in the SAME transaction as the step's DDL, so a crashed migration
+// leaves the version untouched (atomic migrations, AC-5 of
+// specs/schema-versioning.md).
 import { CURRENT_VERSIONS } from "./versions.js";
 // v0 → v1: no-op DDL. The initial table set (handoff_state, tasks, reports,
 // prd_chunks) is materialised by the CREATE TABLE IF NOT EXISTS block in
@@ -49,15 +48,11 @@ const STEPS = [
     },
 ];
 /**
- * Run pending SQLite migrations against an open Database. Idempotent:
- * - creates schema_meta if missing,
- * - reads the on-disk sqlite version (no row → 0),
- * - refuses-loud when on-disk version > CURRENT_VERSIONS.sqlite (AC-4),
- * - walks every step from current up to CURRENT inside per-step transactions,
- *   bumping schema_meta.version inside the same tx as the DDL (AC-2, AC-5),
- * - returns the applied step list so callers can log / surface in drift checks.
- *
- * Callers MUST invoke this AFTER bootstrap DDL has run on the connection.
+ * Run pending SQLite migrations against an open Database, idempotently: create
+ * schema_meta if missing, read the on-disk version (no row → 0), refuse loud
+ * when it is above CURRENT_VERSIONS.sqlite, then run each step in its own
+ * transaction together with its version bump. Returns the applied steps so
+ * callers can log them. Callers MUST invoke this AFTER bootstrap DDL has run.
  */
 export function runSqliteMigrations(db) {
     db.exec(`CREATE TABLE IF NOT EXISTS schema_meta (

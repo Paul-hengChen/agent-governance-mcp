@@ -18,15 +18,12 @@ import { cleanupStaleSessions } from "./guards/session.js";
 import { setActiveStorage } from "./tools/storage.js";
 import { TOOL_REGISTRY, PROMPT_REGISTRY } from "./tools/registry.js";
 import { appendSpecContext, buildPromptForRole, } from "./prompts/build.js";
-// Shape-only heuristic (D1): does the string look like a PATH ATTEMPT at all?
-// Claude Code's slash-command convention stuffs free text typed after the
-// command into the single `workspace_path` argument slot, so prose (in any
-// script) arrives here masquerading as a path. True for absolute Unix paths,
-// Windows paths, relative dot-prefixed paths, and ~/ home-shorthand; false for
-// prose, which essentially never contains a separator or a leading dot/tilde.
-// Deliberately shape-only — no existence check (spec: shape-gating takes
-// precedence; a non-path-shaped arg is discarded unconditionally). Exported
-// for unit tests.
+// Shape-only check: does the string look like a path attempt at all? Claude
+// Code's slash-command convention puts free text typed after the command into
+// the `workspace_path` slot, so prose arrives here as a "path". True for Unix,
+// Windows, dot-relative and ~/ paths; prose almost never has a separator or a
+// leading dot or tilde. No existence check; exported for unit tests.
+// Spec: specs/d1-prompt-arg-workspace-fallback.md.
 export function looksLikePath(s) {
     return /[/\\]/.test(s) || s.startsWith(".") || s.startsWith("~");
 }
@@ -67,17 +64,11 @@ export function resolveWorkspacePath(args) {
     return { path: resolved, source, managed };
 }
 // ==========================================
-// Constitution dedup (C11, DR-4/DR-6) — decided AT THE HANDLER so
-// buildPromptForRole stays pure. Both layers fail SAFE: any doubt => emit the
-// full constitution (false-omission is catastrophic; double-injection is
-// benign token waste).
-//   L1: in-memory per-workspace "already delivered this process" flag —
-//       covers prompt→prompt (AC-8); resets when the stdio server exits
-//       (== session end). Keyed by resolved workspace path (HTTP mode note:
-//       the S03 recovery sentinel covers the rare same-workspace concurrent
-//       session).
-//   L2: windowed marker written by the SessionStart hook — covers hook→prompt
-//       (AC-7) for the boot-then-/teamwork repro.
+// Constitution dedup, decided at the handler so buildPromptForRole stays pure.
+// Two fail-safe layers (any doubt emits the full constitution): a per-workspace
+// in-memory flag for prompt-to-prompt repeats in this process, and a windowed
+// marker written by the SessionStart hook for hook-to-prompt.
+// Spec: specs/c6-c11-prompt-state-injection-architecture.md.
 // ==========================================
 const constitutionDeliveredFor = new Set();
 const HOOK_MARKER_WINDOW_MS = 120_000; // 2 min (DR-4)

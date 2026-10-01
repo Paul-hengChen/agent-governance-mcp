@@ -52,18 +52,12 @@ function loadContent(filename: string, workspacePath?: string): string {
   return fs.readFileSync(filePath, "utf-8");
 }
 
-// Compose-not-strip (ticket A9): assemble the constitution ADDITIVELY from the
-// ordered fragment manifest instead of stripping fenced spans out of a
-// monolith. A fragment ships iff its tag's predicate holds for the dispatch
-// (`chain` = non-lite dispatch, `design` = design-armed feature); excluded
-// fragments simply never load, so the old unbalanced-fence failure class is
-// gone structurally (spec AC11 — stripChainOnly / stripDesignOnly are deleted,
-// no fence validator replaces them). Fragments are verbatim monolith slices
-// with structural markers retained as inert text (DR-1, Option R):
-// composeConstitution({ chain: true, design: true }) reproduces the retired
-// content/constitution.md byte-for-byte. Exported so tests (and any script)
-// can snapshot the full document directly. join("") — fragments carry their
-// own newlines (they partition the monolith with no gaps or overlaps).
+// Assemble the constitution additively from the fragment manifest: a fragment
+// ships iff its tag's predicate holds (`chain` = non-lite dispatch, `design` =
+// design-armed feature), so excluded text never loads. With both flags true
+// the output reproduces the retired single-file constitution byte for byte;
+// exported so tests can snapshot it. Fragments carry their own newlines.
+// Rationale: specs/compose-not-strip-overlays-architecture.md.
 export function composeConstitution(
   opts: { chain: boolean; design: boolean },
   workspacePath?: string,
@@ -74,42 +68,13 @@ export function composeConstitution(
     .join("");
 }
 
-// Prompt-injection hardening for the state block (E122): the state block below
-// JSON.stringify()s the live handoff state verbatim into the dispatch prompt.
-// Every free-text field a role writes (pending_notes, scope_decision_why,
-// blocking_reason, qa_review, and in principle any other string the schema
-// carries) therefore reaches the NEXT role's context unfiltered. That is two
-// distinct problems, not one: (1) the reading role's model can mistake
-// reported-state prose for an instruction to follow (ordinary prompt-injection
-// shape); (2) a role that happens to quote a real markdown structural marker
-// in its own prose — a task-row checkbox `- [ ] T-xxx`, a numbered SOP step
-// header `7b. **...**` — produces rendered text indistinguishable, to any
-// downstream structural scanner, from AUTHORED SOP/task-list content
-// (test/render-structure.test.mjs's glue detector is exactly such a scanner,
-// and quoting one is the literal mechanism that reds it). The fix below closes
-// both, at render time only — nothing on disk changes, and content/ is
-// untouched (that lane's fix, if any, is content-only and out of bounds here).
-// A later hardening (E137) routed the SessionStart hook's state block
-// (bin/agent-governance-context.mjs) through the same sanitizer via
-// renderHandoffStateBlock below, and bounded both sites with the shared
-// lib/render-boundary.ts fence.
-//
-// STRUCTURAL_MARKER_RE matches the same two marker shapes a structural
-// detector (or a human skimming the dispatch) would read as live SOP/task-list
-// structure: a numbered step header (`7b. **`) or a top-level bullet/checkbox
-// (`- **`, `` - ` ``, `- [ ]`/`- [x]`). neutralizeStructuralMarkers wraps every
-// occurrence found inside a free-text VALUE in a backtick pair — the same
-// "quote it as code" convention this codebase's own content already uses to
-// mark illustrative syntax as literal (e.g. content/skill-pm.md's worked cut-
-// line example) — so the marker survives, verbatim and fully readable, but
-// renders as clearly-quoted data rather than live structure. sanitizeForRender
-// walks the ENTIRE parsed state (a deep clone; the in-memory object and the
-// on-disk file are never mutated) so every string leaf gets this treatment,
-// not just the four fields named above — the schema can grow a fifth free-text
-// field tomorrow and this still holds. STATE_BLOCK_DATA_NOTICE is the other
-// half: an explicit framing sentence, ahead of the fence, telling the reading
-// role that every value below is reported data to read for context, never an
-// instruction to follow — independent of what it happens to say.
+// Render-time prompt-injection hardening for the state block. Free-text state
+// values reach the next role's context, where prose could read as an
+// instruction or, when it quotes a step header (`7b. **`) or a bullet/checkbox
+// (`- **`, `` - ` ``, `- [ ]`), as authored SOP or task-list structure.
+// sanitizeForRender deep-clones the state and backtick-quotes every such marker
+// in every string leaf; STATE_BLOCK_DATA_NOTICE frames every value as data.
+// Rationale: specs/e260d-comment-rationale.md (prompts/build.ts).
 const STRUCTURAL_MARKER_RE = /\d+[a-z]?\.\s\*\*|-\s(?:\*\*|`|\[[ xX]\])/g;
 
 function neutralizeStructuralMarkers(text: string): string {
@@ -166,14 +131,10 @@ const STATE_LOOKUP_FAILED_HEADING = "## ⚠️ Current Project State — Lookup 
 const SPEC_CONTEXT_HEADING = "## 📄 Spec Context (RAG — top-5 chunks)";
 
 /**
- * The ONE renderer for a parsed handoff state (E137), shared by
- * buildPromptForRole and bin/agent-governance-context.mjs (the SessionStart
- * hook imports it from dist/), so both sites emit byte-identical state blocks
- * (spec AC4). sanitizeForRender (E122) runs first (a deep clone — the caller's
- * object is never mutated); JSON encoding escapes every newline, so no value
- * can start a line of its own; renderDataBlock supplies the unclosable fence.
- * Additive (spec AC11): JSON.parse of the fence body deep-equals
- * sanitizeForRender(state).
+ * The one renderer for a parsed handoff state, shared by buildPromptForRole
+ * and the SessionStart hook (via dist/) so both emit byte-identical blocks.
+ * sanitizeForRender deep-clones first, JSON encoding escapes every newline,
+ * and renderDataBlock supplies the unclosable fence (specs/e137-render-sanitise.md).
  */
 export function renderHandoffStateBlock(state: HandoffState): string {
   const safeState = sanitizeForRender(state);
@@ -221,19 +182,10 @@ export function describeMissingHandoff(workspacePath: string): string {
   );
 }
 
-// Both strip passes and their canonical order now live in ./text-transforms.ts
-// (E51) because buildPromptForRole is not the only skill-render path —
-// tools/role.ts `switchRole` renders the SAME skill text for tw_switch_role
-// and applies the same passes through applyTextTransforms. The earlier
-// "single-copy by design: only buildPromptForRole calls it"
-// (governance-text-load-architecture DR-2, v3.31.0) still holds in the sense
-// that matters — there is exactly ONE implementation, now shared rather than
-// private — and DR-3's 3-copy parity rule still does not apply, since
-// bin/agent-governance-context.mjs remains a deliberate non-caller.
-//
-// Re-exported verbatim: tests (test/context-budget.test.mjs) and
-// scripts/measure-context-cost.mjs import both names from dist/prompts/build.js,
-// and that public surface is preserved unchanged.
+// Both strip passes and their order live in ./text-transforms.ts, shared with
+// tools/role.ts switchRole, the second skill-render path. Re-exported here
+// unchanged because tests and scripts/measure-context-cost.mjs import both
+// names from dist/prompts/build.js.
 export { stripRationale, stripOriginTags } from "./text-transforms.js";
 
 // The lite coordinator skill marks a server-read-only, no-chain context.
@@ -494,15 +446,10 @@ export function buildPromptForRole(
     );
     constitution = applyTextTransforms(assembled, { fullDetail });
   }
-  // Host-capability axis (ticket D6): the skill text is composed from its
-  // fragment registry (prompts/skill-manifest.ts) filtered by the workspace's
-  // declared host capabilities — a drop-in swap for the old unconditional
-  // loadContent(skillFile). Unsplit skills pass through whole-file; a
-  // whole-file .current/ override bypasses composition verbatim. In-server
-  // GetPrompt default (no config `host`) is the LEAN profile
-  // { taskTool: false } (architecture Q2); the SessionStart hook is the
-  // CC-structural full path. Everything downstream (expandPartials →
-  // parseSkillFile → strip passes) operates on the composed string unchanged.
+  // Compose the skill from its fragment registry, filtered by the workspace's
+  // declared host capabilities. Unsplit skills pass through whole; a whole-file
+  // .current/ override bypasses composition. With no config `host`, GetPrompt
+  // uses the lean profile { taskTool: false }.
   const hostCaps = hostCapabilitiesFor(loadConfig(workspacePath).host);
   const rawSkill = composeSkill(
     skillFile,
@@ -527,15 +474,13 @@ export function buildPromptForRole(
   // mirror call site (E51), passing fullDetail: false.
   const skill = applyTextTransforms(taggedBody, { fullDetail });
 
-  // Fail-loud footer (C6 DR-3): the old single silent "Fresh project" line
-  // collapsed three distinct situations. Split them:
-  //   state parsed non-null -> JSON state block (unchanged)
+  // Fail-loud footer, one rendering per situation:
+  //   state parsed non-null -> JSON state block
   //   parse threw           -> S02 (path + error text; NOT a fresh project)
   //   no file, not managed  -> S01a (resolution suspect: path + source)
   //   no file, managed      -> S01b (genuine fresh: path + source)
-  // The lane handoff path (E123 F1 L3) comes from the lane-layout seam, never a
-  // restated filename. path.resolve pins an ABSOLUTE workspace (L-SCHEMA-NEW-9:
-  // a relative path would resolve against the server's cwd).
+  // path.resolve pins an absolute workspace (a relative one would resolve
+  // against the server's cwd).
   const handoffPath = resolveCurrentLanePaths(path.resolve(workspacePath)).handoffPath;
   let stateBlock: string;
   if (state) {

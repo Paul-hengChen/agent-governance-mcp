@@ -1,0 +1,16 @@
+{"ts":"2026-10-01T04:21:48.296Z","feature":"e260d-core-dirs-comment-trim","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-01T04:28:25.350Z","feature":"e260d-core-dirs-comment-trim","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-01T04:31:33.478Z","feature":"e260d-core-dirs-comment-trim","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-10-01T04:39:42.057Z","feature":"e260d-core-dirs-comment-trim","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-10-01T04:42:38.824Z","feature":"e260d-core-dirs-comment-trim","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-10-01T04:46:02.721Z","feature":"e260d-core-dirs-comment-trim","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-10-01T04:48:25.550Z","feature":"e260d-core-dirs-comment-trim","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-10-01T04:51:36.188Z","feature":"e260d-core-dirs-comment-trim","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-10-01T04:53:36.567Z","feature":"e260d-core-dirs-comment-trim","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-10-01T04:57:00.884Z","feature":"e260d-core-dirs-comment-trim","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-10-01T05:02:25.392Z","feature":"e260d-core-dirs-comment-trim","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-10-01T05:06:41.734Z","feature":"e260d-core-dirs-comment-trim","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-10-01T05:08:04.659Z","feature":"e260d-core-dirs-comment-trim","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-01T05:23:16.194Z","feature":"e260d-core-dirs-comment-trim","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-01T05:24:13.824Z","feature":"e260d-core-dirs-comment-trim","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-10-01T05:28:36.570Z","feature":"e260d-core-dirs-comment-trim","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}

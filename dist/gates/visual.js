@@ -1,19 +1,10 @@
 // Coded by @sr-engineer
-// Visual sub-gate predicates (A2 split — verbatim relocation from
-// tools/evidence-file.ts, no behavior change). Home of all seven visual
-// sub-gate checks (baselines arm, evidence existence, widget-shape, schema,
-// provenance, baseline-manifest, pixel-gate attestation) plus the design-mode
-// arm signal consumed by prompts/build.ts.
-//
-// Shared low-level plumbing (section slicing, table/checkbox cell parsers)
-// stays in tools/evidence-file.ts and is imported below — per the A2 decision
-// rule, those helpers are kept generic so this module does not become a util
-// dump.
-//
-// Registry linkage: the visual sub-gate hints are emitted at the orchestrator
-// emit sites via gate("VISUAL_*"/"BASELINE_*"/"PIXEL_*").hintStatic (DR-2).
-// These predicates return typed check results only, so no registry import is
-// added here (the verbatim move keeps behavior byte-identical).
+// Visual sub-gate predicates: the seven PASS-time visual checks (baselines arm,
+// evidence existence, widget shape, report schema, provenance, baseline
+// manifest, pixel-gate attestation), the build-entry source-credibility check
+// and the design-mode arm signal read by prompts/build.ts. They return typed
+// results only; the orchestrator emits the registry hints. Section and table
+// parsers stay generic in tools/evidence-file.ts.
 import * as fs from "fs";
 import * as path from "path";
 import { sliceH2Section, sliceH2SectionAt, findH2LineAt, splitTableCells, parseUncheckedLabels, parseAssertionFailures, parseRegionDiffFailures, normalizeStatus, } from "../tools/evidence-file.js";
@@ -202,26 +193,12 @@ export function hasUncheckedWidgets(workspacePath, taskIds) {
         uncheckedByTaskId,
     };
 }
-// ---------- v3.26.0 — Visual report schema validation ----------
-// Constitution §3.2 + skill-qa-visual report schema. The pre-v3.26 gate checked
-// only file existence + unchecked widget rows; a prior visual false-PASS showed
-// "evidence exists" != "evidence is meaningful". This validator parses the
-// required sections and rejects PASS on: a missing required section, any
-// failed/unverified canonical-state row, any failed/unverified structural
-// assertion, or a non-PASS verdict.
-//
-// Authorship note (R1): `## Allowed Differences` is qa-owned BY CONSTRUCTION —
-// the visual report is consulted only on a qa-engineer PASS, so its contents are
-// already within qa authority. The coordinator override that broke a prior rollout
-// happened via the dispatch PROMPT (now blocked by Constitution §3.2 +
-// skill-coordinator), NOT by writing this file. We therefore do NOT keyword-sniff
-// for "coordinator policy" markers (brittle / gameable).
-//
-// Backwards-compat: strictness is OPT-IN via the design contract. The caller
-// applies this validator only when the design file declares
-// `## Visual Structural Assertions` (a v3.26 design-auditor always emits it for
-// mode != no-design). Pre-v3.26 designs lack that section → old visual reports
-// keep passing on the existence + widget-shape gate alone.
+// ---------- Visual report schema validation ----------
+// Rejects PASS on a missing required section, a failed or unverified
+// canonical-state or structural-assertion row, or a non-PASS verdict. The caller
+// applies it only when the design declares `## Visual Structural Assertions`,
+// so older reports keep passing on existence and widget shape alone.
+// Rationale: specs/e260d-comment-rationale.md (gates/visual.ts).
 const REQUIRED_VISUAL_SECTIONS = [
     "Widget Shape Verification",
     "Canonical State Verification",
@@ -230,14 +207,11 @@ const REQUIRED_VISUAL_SECTIONS = [
     "Allowed Differences",
     "Verdict",
 ];
-// Verdict gate (HARD): the verdict's value must normalize to exactly PASS.
-// Guards against `\bPASS\b`-anywhere false positives like "NOT PASS",
-// "PASS blocked", "not ready to PASS". Reads the trailing value of the
-// `## Verdict — <value>` heading, else the first non-empty body line.
-// Only heading LOCATION is evidence-schema-keyed (E23 D2; pin 1 = exact
-// anchor, pin >=2 / absent = normalized-contains, so `## Phase 4 — Verdict:
-// PASS` locates). The verdict VALUE parse keeps its exact-token semantics —
-// normalization never applies to the value.
+// Verdict gate (HARD): the verdict value must normalize to exactly PASS, so
+// "NOT PASS" or "PASS blocked" never count. Reads the trailing value of the
+// `## Verdict — <value>` heading, else the first non-empty body line. Only the
+// heading location follows the evidence-schema pin; the value parse stays exact
+// (specs/e23-evidence-schema-versioning.md).
 function verdictIsPass(content, evidenceSchema) {
     const headLine = findH2LineAt(content, "Verdict", evidenceSchema);
     const body = sliceH2SectionAt(content, "Verdict", evidenceSchema);
@@ -345,14 +319,11 @@ const B1_UNAVAILABLE_TOKEN = "B1 tool unavailable — LLM fallback";
 // Placeholder values that must NOT satisfy the non-empty fingerprint test (D1).
 // Lowercased compare; the empty string is included so a bare `baseline:` fails.
 const FINGERPRINT_PLACEHOLDERS = new Set(["<fingerprint>", "todo", "tbd", "n/a", "none", "-", ""]);
-// v3.42.0 — qa-visual-pixel-gate-attestation AC-1. Lowercased-trimmed tokens that a
-// `diff-metric:` value must NOT equal. A placeholder means the pixel gate did not run
-// to completion (skipped / dimension mismatch / not-yet-done), so it counts as absent.
-// `"dimensionsmatch=false"` is the normalized form of the comparator's
-// `dimensionsMatch=false` emit; `"dimensions mismatch"` covers the human-prose variant.
-// The empty string is a member so a bare `diff-metric:` (no value) is rejected by the
-// same path. The B1-fallback token (`B1 tool unavailable — LLM fallback`) is deliberately
-// NOT a member (AC-5) — it proves the LLM-fallback path ran to completion.
+// Lowercased, trimmed `diff-metric:` values meaning the pixel gate did not run to
+// completion (skipped, dimension mismatch, not done), so they count as absent.
+// `dimensionsmatch=false` is the comparator's emit, lowercased; the empty string
+// catches a bare `diff-metric:`. The B1-fallback token is deliberately not a
+// member: it proves the fallback path ran. Spec: specs/qa-visual-pixel-gate-attestation.md.
 const DIFF_METRIC_PLACEHOLDERS = new Set([
     "n/a",
     "skipped",
@@ -447,16 +418,11 @@ export function parseVisualProvenanceRows(content) {
     }
     return rows;
 }
-// Composition helper (fs). Mirrors validateVisualReports. For each task id, reads
-// visual_<id>.md (skips if absent — existence is enforced upstream by
-// hasVisualEvidenceInFile), parses the provenance rows, and applies the gate.
-//
-// Opt-in (D2): a report with NO non-null fingerprint anywhere is legacy /
-// pre-provenance — it contributes no offenses (the gate is dormant for it). Once
-// any surface declares a real `baseline:`, the whole report opts into strict mode
-// and EVERY non-carry-forward surface must carry both a fingerprint (AC-1) and a
-// diff metric OR the B1-fallback token (AC-2 + AC-4). Carry-forward surfaces are
-// exempt from both (AC-3).
+// Composition helper (fs), mirrors validateVisualReports. Reads visual_<id>.md per
+// task id (absent: skip; existence is enforced upstream by hasVisualEvidenceInFile).
+// Opt-in: a report with no real `baseline:` anywhere is legacy and stays dormant.
+// Otherwise every non-carry-forward surface needs a fingerprint and a
+// non-placeholder diff metric or the B1-fallback token.
 export function checkVisualProvenance(workspacePath, taskIds) {
     const offendingByTaskId = {};
     for (const id of taskIds) {
@@ -494,16 +460,11 @@ export function checkVisualProvenance(workspacePath, taskIds) {
     }
     return { ok: Object.keys(offendingByTaskId).length === 0, offendingByTaskId };
 }
-// fs composition helper (mirrors checkVisualProvenance, AC-10). For each task id: read
-// visual_<id>.md (skip if absent — existence is enforced upstream by
-// hasVisualEvidenceInFile), parse rows, apply the gate. Never throws (fs errors → skip).
-//
-// Opt-in (mirrors provenance D2): dormant for a report with no non-null fingerprint
-// anywhere (legacy/pre-provenance) — this is what makes AC-8 hold. Once any surface
-// declares a real `baseline:`, EVERY non-carry-forward surface must carry
-// `pixel_gate_complete: true`. Carry-forward surfaces are exempt (AC-4). The B1
-// LLM-fallback path is NOT exempt — it must STILL attest (AC-5): a valid execution of
-// the pixel gate, not a skip.
+// fs composition helper, mirrors checkVisualProvenance. Reads visual_<id>.md per
+// task id (absent: skip; existence is enforced upstream by hasVisualEvidenceInFile);
+// never throws (fs errors skip). Same opt-in as provenance: dormant when no surface
+// declares a real `baseline:`. Otherwise every non-carry-forward surface must carry
+// `pixel_gate_complete: true`, including a B1-fallback surface.
 export function checkPixelGateAttestation(workspacePath, taskIds) {
     const offendingByTaskId = {};
     for (const id of taskIds) {
@@ -669,30 +630,22 @@ export function checkBaselineManifest(workspacePath, activeFeature) {
     }
     return { ok: true, code: null, detail: "", designPath, auditedCount };
 }
-// ---------- Source-credibility gate (E4) ----------
-// Build-entry attestation gate on the pm:In_Progress -> {architect,sr-engineer}:In_Progress
-// edge. Confirms the design-auditor's step-2b Source-Credibility Classification actually
-// ran and recorded its verdict: every `audited` `## Source` row of a fetch-based design
-// carries `credibility: full-page-composite`. Reuses the module's existing
-// designFilePath / parseDesignMode / sliceH2Section + the extended
-// parseBaselineManifestRows — one read of the identical `## Source` table (DR-1). The
-// composition helper touches fs; it never throws (fs errors -> dormant ok:true).
+// ---------- Source-credibility gate ----------
+// Build-entry gate on the pm to architect or sr-engineer hop: every audited
+// `## Source` row of a fetch-based design must carry
+// `credibility: full-page-composite`, proving the design-auditor's step-2b
+// classification ran. Reuses parseBaselineManifestRows, so the table is read once.
+// Spec: specs/e4-design-source-credibility-gate-architecture.md.
 // Explicit INCLUSION list (spec Dependencies point 4 / DR-2) — deliberately NARROWER
 // than hasDesignModeRequiringVisual's "any mode != no-design" EXCLUSION. Matches step 2b's
 // own scope so the gate never false-fires on image/pdf/paper/no-design.
 const FETCH_BASED_MODES = ["figma", "sketch", "xd", "penpot"];
-// Composition helper (fs). Mirrors checkBaselineManifest's dormant/fail shape. Reads
-// design/<feature>.md once via designFilePath(). Never throws (fs errors → dormant).
-// Decision tree:
-//   1. no activeFeature OR file absent               → { ok:true }  (AC-4)
-//   2. parseDesignMode(content) not in FETCH_BASED_MODES → { ok:true }  (AC-4)
-//   3. sliceH2Section(content,"Source") === null      → { ok:true }  (AC-4)
-//   4. audited rows whose normalized credibility !== "full-page-composite"
-//        → { ok:false, offendingRows:["<medium>/<pointer>", …] }  (AC-1, AC-3)
-//   5. zero audited rows, or all audited rows compliant → { ok:true }
-// The fetch-based INCLUSION list in step 2 is the whole arm — `mode != no-design`
-// is NOT re-checked broadly (DR-2). Independent of the PASS-time baseline-manifest
-// gates (AC-5): different edge, different check.
+// Composition helper (fs), mirrors checkBaselineManifest. Reads design/<feature>.md
+// once and never throws (fs errors are dormant). ok:true when there is no active
+// feature or file, the mode is not in FETCH_BASED_MODES, `## Source` is absent, or
+// every audited row is compliant; else ok:false listing "<medium>/<pointer>" for
+// each audited row whose credibility is not "full-page-composite". Independent of
+// the PASS-time baseline-manifest gates: different edge, different check.
 export function checkSourceCredibility(workspacePath, activeFeature) {
     const designPath = designFilePath(workspacePath, activeFeature);
     const dormant = { ok: true, offendingRows: [], designPath, mode: null };

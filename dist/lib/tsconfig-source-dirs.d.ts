@@ -1,11 +1,9 @@
 /**
- * Parse a `tsconfig.json` `include` array and return the unique top-level
- * source directory names it references.
- *
- * For each glob entry containing a `/`, the leading segment before the first
- * `/` is taken as the directory name (no trailing slash — the guard appends
- * its own). Bare-file entries with no `/` (e.g. "index.ts") are skipped.
- * Non-string entries and a missing/non-array `include` yield an empty result.
+ * Return the unique top-level directory names a `tsconfig.json` `include`
+ * array references: the segment before the first `/` of each glob, with no
+ * trailing slash (the guard appends its own). Bare-file entries such as
+ * "index.ts", non-string entries and a missing or non-array `include`
+ * contribute nothing.
  *
  * @param tsconfigPath Absolute path to a `tsconfig.json` file.
  * @returns Deduplicated directory names, in first-seen order.
