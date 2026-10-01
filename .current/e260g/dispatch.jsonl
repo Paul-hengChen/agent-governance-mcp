@@ -10,3 +10,6 @@
 {"ts":"2026-10-01T09:22:43.613Z","feature":"e260g-test-e3-l-comment-trim","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
 {"ts":"2026-10-01T09:23:06.978Z","feature":"e260g-test-e3-l-comment-trim","agent_id":"qa-engineer","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-10-01T09:43:23.532Z","feature":"e260g-test-e3-l-comment-trim","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-10-01T09:43:59.285Z","feature":"e260g-test-e3-l-comment-trim","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-01T09:44:07.703Z","feature":"e260g-test-e3-l-comment-trim","agent_id":"code-reviewer","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-01T09:49:41.805Z","feature":"e260g-test-e3-l-comment-trim","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
