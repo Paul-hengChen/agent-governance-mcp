@@ -2,7 +2,7 @@
 schema_version: 15
 active_feature: "e260d-core-dirs-comment-trim"
 status: "In_Progress"
-last_updated: "2026-10-01T04:53:36.563Z"
+last_updated: "2026-10-01T05:02:25.390Z"
 last_agent: "sr-engineer"
 prd_path: "specs/e260d-core-dirs-comment-trim.md"
 scope_decision: "single-feature"
@@ -12,7 +12,7 @@ dispatch_pins:
   sr-engineer: "fable"
 evidence_schema: 2
 next_role: "sr-engineer"
-dispatched_at: "2026-10-01T04:53:36.563Z"
+dispatched_at: "2026-10-01T05:02:25.390Z"
 dispatch_mechanism: "task"
 dispatch_mechanism_tier: "fable"
 qa_round: 0
@@ -29,10 +29,10 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- sr-engineer: T-E260D-05 built (commit titled `chore(e260d): E260 T-E260D-05 — ...`, HEAD after f5ec388) — comment-only trim of gates/visual.ts (10 blocks of 8-20) and index.ts (2 blocks) + dist/gates/visual.{js,js.map,d.ts.map} and dist/index.{js,js.map,d.ts.map} (.d.ts unchanged). Next: T-E260D-06 (sr-engineer); code-reviewer only after T-01..T-07 are all built.
-- proof --changed-only (15 changed files lane-wide): scope ok, emit 15/0 differ, tokens 15/0 differ, pins 15/0 count changes, >20 0 unexpected (1 allowed), bare-id 0, form ok, proof: PASS. --list-mid shows no remaining gates/visual.ts or index.ts block (all trimmed to <=7; header = Coded by + 6). No Retained-blocks rows added. tsc --noEmit clean; npm run build moved only the six dist files above. check-md-tables exit 0. check-version OK (4.4.0). Tests reading these files' source or dist (error-code-contract, subagent-templates, e23-evidence-schema, baseline-manifest-gate, pixel-gate-attestation, constitution-deliverable-guard, lane-paths, lane-migrate, visual-*, source-credibility-gate, evidence-provenance, check-version, prompt-state-footer, handoff-write-arg-guard, qa-flow, cut-approval-gate, context-budget) 733/733; e132-lane-registry, release-staging, verify-release, writestate-options-object 172/172.
-- index.ts pins kept: Server() version literal untouched (check-version.mjs, subagent-templates AC8, baseline-manifest-gate/pixel-gate-attestation AC-9); no `evidence_schema` added (e23); no AGC_AUTO_ROUTE or lane-path tokens added. gates/visual.ts: REQUIRED_VISUAL_SECTIONS literal untouched (constitution-deliverable-guard).
-- Pointers (each verified tracked and holding the dropped rationale): looksLikePath -> specs/d1-prompt-arg-workspace-fallback.md; constitution dedup L1/L2 -> specs/c6-c11-prompt-state-injection-architecture.md; verdict heading location -> specs/e23-evidence-schema-versioning.md; provenance -> specs/qa-visual-baseline-provenance.md; diff-metric placeholders -> specs/qa-visual-pixel-gate-attestation.md; baseline manifest -> specs/figma-baseline-manifest-gate.md; source credibility -> specs/e4-design-source-credibility-gate-architecture.md; report-schema authorship + opt-in rationale -> new `## gates/visual.ts` section in specs/e260d-comment-rationale.md (cites specs/constitution-v3.27-sync-consistency-architecture.md for the section/row/verdict rules).
+- sr-engineer: T-E260D-06 built (commit titled `chore(e260d): E260 T-E260D-06 — ...`, HEAD after 5880059) — comment-only trim of prompts/{build,constitution-manifest,partials-manifest,skill-manifest,text-transforms}.ts (all 14 blocks of 8+ lines, incl. the 36-line state-sanitizer block and 35-line skill-manifest header, now <=7; headers = Coded by + 6) + dist/prompts/{build,constitution-manifest,partials-manifest,skill-manifest,text-transforms}.{js,js.map,d.ts.map} and dist/prompts/build.d.ts (renderHandoffStateBlock JSDoc). No other dist file moved. Next: T-E260D-07 (sr-engineer); code-reviewer only after T-01..T-07 are all built.
+- Stale path: all 3 mentions of the retired content/constitution.md (build.ts composeConstitution comment, constitution-manifest.ts header + CONSTITUTION_SEGMENTS comment) now read 'the retired single-file constitution'; grep finds none left in prompts/. No template literal or string touched; lane-paths / resolveCurrentLane counts in build.ts unchanged (3/3).
+- proof --changed-only (20 files lane-wide): scope ok, emit 20/0, tokens 20/0, pins 20/0, >20 0 unexpected (1 allowed), bare-id 0, form ok, proof: PASS; --list-mid shows no prompts/ block. No Retained-blocks rows added. tsc --noEmit clean; check-md-tables exit 0. Tests: 24 files reading prompts/ source or dist (compose-equivalence, context-budget, render-structure, e122, e137, prompt-state-footer, skill-manifest, skill-frontmatter, release-staging, lane-paths, lane-migrate, teamwork-lite, subagent-templates, agc-adapters, rag*, ...) 653 pass/1 skip; a second set of 25 files using compose-golden/expandPartials/strip*/composeSkill/composeConstitution/switchRole (incl. e90-golden-capture-completeness, e258a-comment-rule) 523 pass/0 fail. git status shows nothing under test/.
+- Pointers (each verified tracked): constitution manifest + composeConstitution -> specs/compose-not-strip-overlays-architecture.md; partials -> specs/a12-partials-limits-registry-architecture.md; origin strip -> specs/governance-tag-strip.md; single-copy rule -> specs/governance-text-load-architecture.md; renderHandoffStateBlock -> specs/e137-render-sanitise.md; new sections `## prompts/build.ts` (state-sanitizer rationale), `## prompts/skill-manifest.ts` (separate-registry reason, coord-NN naming, T-D6-03 audit outcomes) and `## prompts/text-transforms.ts` (why the passes moved to a shared module, order independence) in specs/e260d-comment-rationale.md.
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.

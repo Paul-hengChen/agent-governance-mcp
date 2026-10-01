@@ -43,3 +43,30 @@ The visual report schema validator exists because the earlier gate checked only 
 - Opt-in by design contract: the caller runs the validator only when the design declares `## Visual Structural Assertions`, which every design-auditor since the schema gate emits for a mode other than `no-design`. Older designs lack the section, so their visual reports keep passing on the existence and widget-shape checks alone.
 
 The other visual sub-gates point to their own specs from the code: `specs/qa-visual-baseline-provenance.md`, `specs/qa-visual-pixel-gate-attestation.md`, `specs/figma-baseline-manifest-gate.md`, `specs/e4-design-source-credibility-gate-architecture.md`, and `specs/e23-evidence-schema-versioning.md` for where the verdict heading is found.
+
+## prompts/build.ts
+
+The constitution composition, the golden byte-identity invariant and the pass order (compose, then `stripOriginTags`, then `stripRationale` unless full detail) are in `specs/compose-not-strip-overlays-architecture.md`. The shared state renderer, the length-adaptive fence and the envelope labels are in `specs/e137-render-sanitise.md`. The footer situations and the constitution dedup are in `specs/c6-c11-prompt-state-injection-architecture.md`. None of that is copied here.
+
+What no spec held in full is why the state block is sanitized at render time. `buildPromptForRole` serializes the live handoff state into the dispatch prompt, so every free-text field a role writes (`pending_notes`, `scope_decision_why`, `blocking_reason`, `qa_review`, and any string the schema adds later) reaches the next role's context unfiltered. That is two problems. First, the reading model can mistake reported prose for an instruction. Second, a note that quotes a real markdown structural marker, such as a task checkbox `- [ ] T-xxx` or a numbered SOP step header `7b. **...**`, renders as text that a structural scanner (for example the glue detector in `test/render-structure.test.mjs`) cannot tell apart from authored SOP or task-list content.
+
+`sanitizeForRender` walks a deep clone of the whole parsed state, so the in-memory object and the file on disk are never changed, and every string leaf gets the treatment, not only the fields named above. Each marker is wrapped in a backtick pair, the same "quote it as code" convention the content files use for illustrative syntax, so the text stays verbatim and readable but renders as quoted data. `STATE_BLOCK_DATA_NOTICE` is the other half: one sentence ahead of the fence telling the reader that every value is reported data, never an instruction. The fix is render-time only. `STRUCTURAL_MARKER_RE` and `sanitizeForRender` stay declared in this file because a test extracts the regex literal from `dist/prompts/build.js`.
+
+## prompts/skill-manifest.ts
+
+The host-capability axis, the lean default when no host is configured, the SessionStart hook's structural `{ taskTool: true }` default (a config `host` still overrides it), the precedence order of `composeSkill` and the audit criteria are in `specs/d6-host-capability-compose-axis-architecture.md`. Two points from the old comments are not there.
+
+- Why skills get their own registry instead of a new tag on `ConstitutionSegment`: the constitution and the skills are different documents with different segment sets and axes. Overloading `CONSTITUTION_SEGMENTS` would break its golden invariant (concatenating every entry reproduces the retired single-file constitution) and its predicate signature.
+- Fragment naming: fragments are named `coord-NN-*.md`, not `skill-*.md`. That prefix is reserved for whole skill files that carry frontmatter; the skill-frontmatter regression guard globs `content/skill-*.md` and requires `recommended_model` in every match, while fragments are headerless slices. The tag lives in the registry, not in the filename. (The architecture spec's file list still says `skill-coord-NN-*.md`; the shipped names are the ones in `SKILL_SEGMENTS`.)
+
+Audit outcomes for the non-coordinator skills, one line each:
+
+- `skill-sr-engineer.md`, `skill-researcher.md`, `skill-qa-engineer.md`: no prose that only Claude Code can act on; left whole.
+- `skill-architect.md`: none either; its "subcommand dispatch" wording is a code example.
+- `skill-pm.md`: not split. The Cut-Approval Gate's "Task-subagent dispatch" clause is one branch of a shared rule about who writes `cut_approved`, which every host needs, so it stays core (the tie-break never loses a shared rule).
+
+## prompts/text-transforms.ts
+
+Why the two strip passes live in their own module: they used to be private to `buildPromptForRole` in `prompts/build.ts`. That fixed one render path of two. `tools/role.ts` (`switchRole`, behind `tw_switch_role`) is the second path and the one most subagent dispatch goes through, and it applied neither pass, so every role SOP delivered that way carried raw origin and rationale markers that the acting agent is meant never to see. Both paths now call `applyTextTransforms`. There is still exactly one implementation, now shared rather than private, so the single-copy decision in `specs/governance-text-load-architecture.md` holds, and its multi-copy parity rule still does not apply because the SessionStart hook remains a deliberate non-caller.
+
+Why the passes compose in either order: origin fences never straddle a rationale boundary or a fragment seam (they may nest inside a rationale span), and the `\n{3,}` collapse in `stripOriginTags` also normalizes any blank run left at a fragment seam. The fence markup itself is in `specs/governance-tag-strip.md`.

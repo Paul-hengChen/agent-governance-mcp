@@ -4,14 +4,10 @@ export declare function composeConstitution(opts: {
     design: boolean;
 }, workspacePath?: string): string;
 /**
- * The ONE renderer for a parsed handoff state (E137), shared by
- * buildPromptForRole and bin/agent-governance-context.mjs (the SessionStart
- * hook imports it from dist/), so both sites emit byte-identical state blocks
- * (spec AC4). sanitizeForRender (E122) runs first (a deep clone — the caller's
- * object is never mutated); JSON encoding escapes every newline, so no value
- * can start a line of its own; renderDataBlock supplies the unclosable fence.
- * Additive (spec AC11): JSON.parse of the fence body deep-equals
- * sanitizeForRender(state).
+ * The one renderer for a parsed handoff state, shared by buildPromptForRole
+ * and the SessionStart hook (via dist/) so both emit byte-identical blocks.
+ * sanitizeForRender deep-clones first, JSON encoding escapes every newline,
+ * and renderDataBlock supplies the unclosable fence (specs/e137-render-sanitise.md).
  */
 export declare function renderHandoffStateBlock(state: HandoffState): string;
 /**

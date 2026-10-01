@@ -1,22 +1,10 @@
 // Coded by @sr-engineer
-// Partials registry (ticket A12): the single source of truth for "which
-// {{PARTIAL:<token>}} maps to which content file", mirroring
-// constitution-manifest.ts's data-module style (A9 pattern: ordered data
-// registry + pure function, no fs access in the module itself).
-//
-// Substitution contract (specs/a12-partials-limits-registry-architecture.md):
-// - Single non-recursive pass — substituted text is NOT re-scanned; a
-//   {{PARTIAL:…}} inside a partial's own body is left verbatim (partials
-//   referencing partials is explicitly unsupported, spec Out of Scope).
-// - Byte-identity (AC2/DR-3): exactly one trailing \r?\n is stripped from
-//   each loaded partial, so a token sitting alone on its line in a skill
-//   expands back to the identical pre-refactor line (the skill's own
-//   surrounding newlines are preserved).
-// - Unknown token → fail-loud visible marker (DR-6), never silent
-//   passthrough — mirrors loadContent's "[ERROR: … not found]" convention.
-// - `load` is injected so this module stays fs-free; each render path
-//   (prompts/build.ts buildPromptForRole AND tools/role.ts switchRole — the
-//   second render path, DR-4) supplies its own .current-override-aware loader.
+// Partials registry: maps each {{PARTIAL:<token>}} to its content file, plus a
+// pure expander. One non-recursive pass (a token inside a partial body stays
+// verbatim); exactly one trailing newline is stripped from each partial so a
+// token alone on its line expands to the identical line; an unknown token
+// renders a visible error marker. `load` is injected so this module stays fs-free.
+// Rationale: specs/a12-partials-limits-registry-architecture.md.
 
 export interface PartialSegment {
   readonly token: string; // the <token> in {{PARTIAL:<token>}} (no braces, no prefix)
