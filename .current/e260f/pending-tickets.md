@@ -19,4 +19,18 @@ body: |
   uncommitted until the role commits them.
 ```
 
+```pending-ticket
+lane_local_id: E260F-NEW-2
+title: Fix the wiring pointer in the test/e22-stale-notify header (says tools/handoff.ts; the call is in tools/handoff-parse.ts)
+priority: P3
+depends_on: [E260]
+source: code-reviewer, lane e260f review round 2 (review_reports/review_T-E260F-22.md, finding R2-2)
+body: |
+  The header comment of test/e22-stale-notify.test.mjs says notifyStaleDispatch is wired by
+  tools/handoff.ts into the stale_dispatch advisory. The import and call live in
+  tools/handoff-parse.ts (the handoff module split moved it). The pointer was already wrong at the
+  E260 base; lane e260f found it in its last review round, when no qa authoring round was left in its
+  hop budget. Comment-only fix in a test file, so a qa-engineer must make it.
+```
+
 ## Applied
