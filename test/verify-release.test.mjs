@@ -1,137 +1,10 @@
 // Coded by @qa-engineer
-// Tests for specs/e9-release-self-check.md AC1-AC10 (E9 — release self-check
-// script + SOP wiring), authored per T-E9-04 (QA build scope, pre-authorized
-// new-file creation per the human-approved cut — skill-qa-engineer Phase 3a
-// normally requires asking before creating a parallel test file).
-//
-// scripts/verify-release.mjs resolves its own `root` from `import.meta.url`
-// (dirname of the script file, one level up) and every git check runs with
-// `cwd: root` — so, exactly like test/check-version.test.mjs, each test
-// copies the REAL script byte-for-byte into a temp fixture root's scripts/
-// dir and drives it against a REAL, fully-controlled git repo (a local temp
-// "origin" bare repo stands in for the remote — no network access, no mocked
-// git output). This exercises the actual shipped git logic (tag resolution,
-// upstream tracking, fetch failure, dist parity) rather than a
-// reimplementation. VR-9/VR-10 (AC9/AC10) are grep-based SOP-text assertions
-// against content/skill-release-engineer.md, following the
-// test/release-staging.test.mjs precedent for prompt-text-is-the-contract
-// features.
-//
-// Spec-to-Test map:
-//   tag missing (AC1)                                -> VR-1
-//   tag exists, not at HEAD (AC2)                     -> VR-2
-//   no upstream / not pushed / fetch failure (AC3)     -> VR-3
-//   check-version.mjs fails, stderr propagated (AC4)   -> VR-4
-//   CHANGELOG missing entry (AC5)                      -> VR-5
-//   dist uncommitted changes (AC6)                     -> VR-6
-//   committed dist parity mismatch (AC7)                -> VR-7
-//   all 6 checks report OK -> OK lines + ALL PASSED (AC8) -> VR-8
-//   SOP step 9a + Escalation Routes row (AC9)            -> VR-9
-//   post-closing-write tw_get_state read-back (AC10)     -> VR-10
-//   Security smoke (boundary inputs)                     -> VR-SEC-1..4
-//
-// Check 6 "CI ground-truth" tests (T-EB-04, E14):
-//   Check 6 red at the release commit (FAIL)              -> VR-11
-//   Check 6 green at the release commit (OK, no WARN)      -> VR-12
-//   Check 6 degradation: gh binary missing (ENOENT)       -> VR-13
-//   Check 6 degradation: gh exits non-zero (auth/API err)  -> VR-14
-//   Check 6 degradation: zero completed runs               -> VR-15
-//   Check 6 degradation: unparseable gh output (bonus)    -> VR-16
-//
-// Sha-matched ground truth, closing the v3.102.2 stale-green regression (a
-// green run from an EARLIER commit was accepted as ground truth for a release
-// whose own CI was still in flight) (T-E78-01/T-E78-02, E78):
-//   green run at a DIFFERENT commit -> WARN (stale-green, the core fix)  -> VR-17
-//   red run at a DIFFERENT commit -> WARN, does not block                -> VR-18
-//   matching red buried at position 8/10 in the run window -> still FAIL -> VR-19
-// The two earlier Check 6 tests (VR-11, VR-12) were retargeted, not added, for
-// this same change: both previously shimmed a dummy headSha that could never
-// match a real fixture HEAD, which degrades to WARN under sha-matched code.
-//
-// Bounded polling: when the release commit's sha is not found yet, the check
-// now polls `gh run list` within a time budget instead of giving up on the
-// first miss, because a healthy release's own CI run is almost always still
-// in flight the moment step 9a runs (T-E80-02, E80):
-//   sha absent, then present+success on a later gh call -> OK, no WARN -> VR-20
-//   poll budget expires, sha still absent -> byte-identical earlier WARN -> VR-21
-//   AGC_VERIFY_CI_WAIT_SECONDS=0 -> exactly one gh call, no wall-clock wait -> VR-22
-// The stale-green and non-blocking-red tests (VR-17, VR-18) were amended, not
-// retargeted, for this same change: both drive the sha-not-found branch, so each
-// now pins AGC_VERIFY_CI_WAIT_SECONDS=0 explicitly. Otherwise, with
-// runVerifyWithPath's child inheriting an unset process.env var, each would
-// silently block for the full 600s default (~20 minutes of suite slowdown, not
-// a red; heads-up from the code-reviewer's review of the earlier polling
-// ticket, T-E80-01). VR-9 is retargeted to assert step 9a's new wording, which
-// distinguishes "the poll is running, let it finish" from "genuinely
-// degraded environment" instead of one catch-all WARN sentence.
-// These use a `gh` shim on PATH (a tiny executable script placed in a temp
-// dir prepended to PATH) rather than the real `gh` binary — the fixture-repo
-// convention above still drives every git-facing check exactly as before;
-// only Check 6's external `gh` dependency is substituted.
-//
-// CI-wait default and the new --close-out mode: scripts/verify-release.mjs's
-// Check 6 wait budget, plus a mode that asserts "nothing local is ahead of
-// upstream", runnable after the governance bookkeeping commit lands and HEAD
-// sits past the release tag (T-E8284-02, E82/E84):
-//   CI-wait budget defaults to 480s when unset, pinned (AC1, E82)
-//     BEHAVIORALLY off the script's own first "...left in budget" poll-
-//     progress line, never by grepping the source for the literal 480    -> VR-23
-//   --close-out FAILs when HEAD is ahead of its @{u} upstream, (AC3, E84)
-//     names the ahead count, and never runs Check 1 (tag-at-HEAD) — proven
-//     against a fixture shape a reversed `HEAD..@{u}` range would silently
-//     PASS, so the pin actually discriminates direction, not just exit code -> VR-24
-//   --close-out exits 0 with a distinct `CLOSE-OUT PASSED` line (AC4, E84)
-//     when HEAD == upstream and demonstrably never runs Checks 1/3/4/5/6
-//     (absence of their `OK:` lines asserted, not merely exit 0); a second
-//     fixture with a deliberately-corrupt package.json proves no version is
-//     ever resolved in this mode (a crash, not CLOSE-OUT PASSED, would
-//     result if it were)                                              -> VR-25, VR-26
-//   regression: the earlier tests VR-1..VR-22 and VR-SEC-1..4 are unmodified by
-//     this addition (AC2/AC5) — see qa_reports/review_T-E8284-02.md for the
-//     full-suite run this claim rests on.
-//
-// Tag-at-HEAD bookkeeping tolerance: Check 1 (tag-at-HEAD) now tolerates a tag
-// followed ONLY by governance-bookkeeping commit(s) (.current/handoff.md,
-// .current/*.jsonl, tasks.md) (T-E141-01/T-E141-02, E141;
-// specs/e141-tag-at-head-bookkeeping-tolerance.md AC1-AC6):
-//   tag == HEAD, byte-identical, no tolerance note (AC1)      -> VR-28
-//   bookkeeping-only range tolerated, NOTE printed; (AC2)      -> VR-27
-//        non-bookkeeping range still FAILs, named sha+path     -> VR-2 (amended)
-//   offending sha(s)/path(s) named in the FAIL (AC3)            -> VR-2 (amended), VR-27/32
-//   non-ancestor tag keeps the ORIGINAL FAIL, no range (AC4)    -> VR-29
-//        enumeration — ancestry is a precondition, not a
-//        substitute, for the tolerance
-//   Check 2 untouched — an unpushed bookkeeping commit (AC5)     -> VR-30
-//        still FAILs pushed-to-origin even though Check 1
-//        tolerates it
-//   merge handling / empty-range unreachability verified (AC6)   -> covered by the
-//        by the code-reviewer via scratchpad fixtures, not          code-reviewer's
-//        re-derived into this file — see review_reports/            review (see the
-//        review_T-E141-01.md                                        spec's out-of-scope
-//                                                                    note)
-// The code-reviewer's non-blocking observations from that review, pinned as
-// documented current behaviour (qa-engineer judgement call, T-E141-02):
-//   deleting an allowlisted path is tolerated (observation 4)   -> VR-31
-//   a non-ASCII allowlisted filename fails closed (observation 5) -> VR-32
-// The "behind-head" test (VR-2) was re-pointed, not left as-is: its fixture now
-// commits to src/real-change.js instead of AFTER-TAG.md so it stays an
-// unambiguous non-bookkeeping commit under the new tolerance, and its
-// assertions were strengthened to pin the offending sha+path detail (AC3) and
-// the absence of a tolerance note — see mkFixtureRepo's tag block and VR-2 itself.
-//
-// Check 6 release-sha resolution: `releaseSha` now resolves from the release tag
-// first (same two-call pattern Check 1 uses), falling back to `git rev-parse
-// HEAD` only when no such tag exists yet (T-E142-01, E147;
-// specs/e142-release-tooling-wave25.md AC1/AC2). This closes the defect a wave
-// release exposes: pre-fix, Check 6 unconditionally used HEAD, so a
-// governance-bookkeeping commit landed on top of the actual release commit (the
-// "behind-head-bookkeeping" shape from the tag-at-HEAD tolerance work) made
-// Check 6 poll/match CI runs against the WRONG commit.
-//   tag at A, bookkeeping commit B on top -> resolves/matches A, never
-//        B, even when a red run is shimmed against B (AC1)          -> VR-33
-//   no tag yet -> unchanged fallback to HEAD, still matches a run (AC2)
-//        recorded against HEAD's own sha; VR-1/VR-8's tag-missing fixtures
-//        also stay green unmodified, regression-confirmed           -> VR-34
+// Tests for scripts/verify-release.mjs (specs/e9-release-self-check.md and its
+// follow-ups). Each test copies the real script into a temp root and runs it
+// against a real git repo with a local bare "origin", so the shipped git logic
+// is exercised, not a reimplementation; Check 6 swaps only `gh` for a PATH shim.
+// SOP-wording tests grep content/skill-release-engineer.md.
+// Spec-to-test map (VR-1..VR-34): specs/e260h-comment-rationale.md (test/verify-release.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -206,33 +79,12 @@ function defaultChangelog(version) {
 }
 
 /**
- * Build a fully-controlled real git repo (with a local bare "origin") to
- * drive scripts/verify-release.mjs's actual git logic. Returns { root, run }.
- *
- * Options:
- *   version           target/package.json version (default "1.0.0")
- *   indexVersion      index.ts Server() version (default = version)
- *   distVersion       committed dist/index.js Server() version (default = version)
- *   distContent       raw override for dist/index.js content (null = omit file)
- *   changelog         raw CHANGELOG.md content (null = omit file)
- *   tag               "at-head" | "behind-head" | "behind-head-bookkeeping" |
- *                     "behind-head-bookkeeping-delete" |
- *                     "behind-head-bookkeeping-lane" |
- *                     "behind-head-bookkeeping-archived-lane" |
- *                     "behind-head-bookkeeping-tasks-primary" |
- *                     "behind-head-bookkeeping-tasks-lane" |
- *                     "behind-head-bookkeeping-archive-dir" |
- *                     "behind-head-bookkeeping-history-dir" |
- *                     "behind-head-a1-nested-lane" | "behind-head-a1-dot-lane" |
- *                     "behind-head-a1-config" | "behind-head-a1-feature-split" |
- *                     "behind-head-nonascii" |
- *                     "diverged" | "none" (default "at-head") — see the tag
- *                     block below for what each bookkeeping-tolerance mode
- *                     reproduces (lane-path work added the four lane-path
- *                     tolerance shapes plus the four negative-case shapes;
- *                     see the E141, E174a and A1 tickets).
- *   origin            "pushed" | "no-upstream" | "not-pushed" | "unreachable" | "none"
- *   distUncommitted   if true, dirty the working-tree dist/index.js after commit
+ * Build a real git repo with a local bare "origin" to drive the script's git
+ * logic; returns { root, run }. Options: version (default "1.0.0"),
+ * indexVersion and distVersion (default to version), distContent and changelog
+ * (null omits the file), tag (fixture shape, default "at-head"; the tag block
+ * below explains each), origin ("pushed", "no-upstream", "not-pushed",
+ * "unreachable", "none") and distUncommitted (dirty dist/index.js after commit).
  */
 function mkFixtureRepo({
   version = "1.0.0",
@@ -467,15 +319,9 @@ function runVerify(root, args = []) {
 }
 
 /**
- * Check 6 (E14) shims `gh` via a real executable on PATH rather than mocking
- * spawnSync — this exercises the actual `spawnSync("gh", ...)` resolution
- * path in scripts/verify-release.mjs, mirroring the "drive the real script
- * against a real environment" convention the rest of this file uses for git.
- *
- * `runVerifyWithPath` overrides the CHILD PROCESS's PATH so verify-release.mjs
- * finds the shim (or, for the gh-missing case, finds no `gh` at all) while
- * `git` still resolves from a real system path — isolating Check 6 without
- * disturbing Checks 1-5.
+ * Shim `gh` with a real executable on PATH, so the script's own
+ * `spawnSync("gh", ...)` lookup runs. `runVerifyWithPath` sets the child's
+ * PATH so it finds the shim (or no `gh` at all) while `git` still resolves.
  */
 function mkGhShim(scriptBody) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "gh-shim-"));
@@ -506,25 +352,10 @@ function resolveOnPath(bin) {
   throw new Error(`resolveOnPath: could not find '${bin}' on PATH=${process.env.PATH}`);
 }
 
-// A PATH containing ONLY the external binaries this test file legitimately
-// needs and NOTHING ELSE (crucially, never `gh`): `git` (Checks 1/2/5's
-// `execFileSync("git", ...)` and check-version.mjs's git calls — `node`
-// itself is invoked via the absolute `process.execPath`, and
-// check-version.mjs's `execSync` shells out to the literal `/bin/sh`, not a
-// PATH-resolved `sh`) plus `cat` (the `ghJsonShim` fixtures' `#!/bin/sh`
-// bodies pipe their canned JSON through `cat <<'EOF' ... EOF`, an external
-// command the shell resolves via PATH — `echo`-only shim bodies need
-// nothing extra, since `echo` is a shell builtin).
-//
-// A fixed "/usr/bin:/bin" (the prior approach) is NOT a safe "no gh" PATH on
-// every host: GitHub's ubuntu-latest hosted runner image installs the `gh`
-// CLI via apt at /usr/bin/gh, so that static path silently stops being
-// gh-less in CI (VR-13 root cause — it degraded to the real `gh`, which then
-// hit the gh-run-list-failed branch instead of ENOENT, and only the ENOENT
-// wording was pinned). Building the shim from whatever this test runner's
-// OWN environment actually resolves makes the "no gh anywhere on PATH"
-// guarantee hold on any machine, not just ones shaped like a macOS/Homebrew
-// checkout.
+// A PATH holding only the binaries these tests need, and never `gh`: `git`, and
+// `cat` for the shims' heredoc bodies (`node` runs via process.execPath). It is
+// built from this runner's own PATH because a fixed "/usr/bin:/bin" is not
+// gh-less on hosted CI runners, which install `gh` at /usr/bin/gh.
 let _noGhSystemPathDir;
 function noGhSystemPath() {
   if (_noGhSystemPathDir) return _noGhSystemPathDir;
@@ -607,15 +438,10 @@ test("VR-1 (AC1): tag does not exist -> exit non-zero, failure line names the ta
 });
 
 // ---------------------------------------------------------------------------
-// The tag exists but points at a commit other than HEAD, due to a REAL
-// (non-bookkeeping) commit (VR-2, AC2/AC3; amended by T-E141-02). Since the
-// bookkeeping tolerance landed (E141), "tag
-// != HEAD" is no longer categorically a FAIL — it FAILs only when the range
-// contains a non-bookkeeping path (AC2's second half / AC3). Re-pointed at
-// src/real-change.js (tag: "behind-head", see mkFixtureRepo) so this pin
-// cannot be satisfied by the new tolerance and does not silently re-break
-// the range rule by asserting a blanket rule the spec no longer makes true. Also
-// pins the offender detail: the FAIL names the offending sha and path (AC2, AC3).
+// VR-2: the tag is behind HEAD because of a real (non-bookkeeping) commit. Since
+// the bookkeeping tolerance (E141), tag != HEAD fails only for such a commit,
+// so the fixture commits src/real-change.js ("behind-head"). The FAIL must name
+// the offending sha and path (AC2, AC3).
 // ---------------------------------------------------------------------------
 test("VR-2 (AC2/AC3): tag exists but HEAD moved on with a REAL (non-bookkeeping) commit -> exit non-zero, failure line names both commits, sha, and offending path; no tolerance note fires", () => {
   const { root, firstCommitSha } = mkFixtureRepo({ version: "2.0.0", tag: "behind-head" });
@@ -780,17 +606,10 @@ test("VR-7 (AC7): dist/index.js absent at HEAD (never committed) -> exit non-zer
 });
 
 // ---------------------------------------------------------------------------
-// All six checks report OK (VR-8, AC8). The title was corrected when Check 6
-// (the CI ground-truth check) landed after this test was first authored
-// against 5 checks; the loop below was asserting OK lines by name, never a
-// count, so it stayed green through that addition by accident rather than by
-// design (T-EB-04, E14; see review_T-EB-03.md).
-// Check 6 is included in the OK-line loop below: the fixture's origin is a
-// local bare repo, not a real GitHub remote, so `gh run list` cannot resolve
-// a host and Check 6 degrades via WARN — but a WARN is not a fail, so it
-// still reports OK and the run still exits 0 with empty stderr. This is
-// intentionally NOT gh-shimmed (unlike the Check 6 tests VR-11..VR-16 below): it pins the
-// real, unmodified environment behavior a bare `npm test` run hits.
+// VR-8: all six checks report OK. The fixture origin is a local bare repo, so
+// `gh run list` cannot resolve a host and Check 6 degrades to WARN, which still
+// reports OK with exit 0. Deliberately not gh-shimmed: it pins what a plain
+// `npm test` run hits.
 // ---------------------------------------------------------------------------
 test("VR-8 (AC8): all 6 checks report OK -> one OK line per check, final ALL CHECKS PASSED line, exit 0", () => {
   const { root } = mkFixtureRepo({ version: "8.0.0", tag: "at-head", origin: "pushed" });
@@ -847,23 +666,10 @@ test("VR-8 (AC8): multi-cause failure surfaces every FAIL in one run (no short-c
 });
 
 // ---------------------------------------------------------------------------
-// Check 6: a definitively red completed CI run AT THE RELEASE COMMIT STOPs the
-// release; every other check still runs and reports OK (no short-circuit),
-// matching the checks-run-independently invariant already pinned for VR-8's
-// multi-cause-failure test (VR-11; T-EB-01, E14; retargeted by T-E78-02, E78).
-//
-// RETARGET NOTE (sha-matching change, T-E78-02): this test previously shimmed a dummy
-// `headSha: "2222...2"` that could never equal a real fixture repo's actual
-// HEAD. Under pre-E78 code (ground truth = runs[0], sha unchecked) that
-// dummy sha was irrelevant and the test passed for the wrong reason; under
-// the sha-matched code (E78) it now WARNs ("this commit's CI has not completed
-// yet") instead of FAILing, because the shimmed run's headSha never matches
-// this fixture's real HEAD. Retargeted, not retired — the FAIL path is the
-// single most consequential assertion in this cut, so it is resolved via the
-// same `git(["rev-parse", "HEAD"], root)` the real script itself uses, not a
-// placeholder. Independently confirmed (outside this file, via a standalone
-// probe fixture) that setting the shimmed headSha to the fixture's real HEAD
-// makes the red-run FAIL path arm correctly before this retarget was written.
+// VR-11: a red completed CI run at the release commit STOPs the release, and
+// every other check still runs and reports OK. The shimmed headSha is the
+// fixture's real HEAD (`git rev-parse HEAD`, as the script does): a dummy sha
+// would only WARN under sha-matching (E78) and pass for the wrong reason.
 // ---------------------------------------------------------------------------
 test("VR-11 (E14): shimmed gh reports a red completed run AT the release commit -> exit non-zero, FAIL names conclusion+headSha+url, other 5 checks still OK", () => {
   const { root } = mkFixtureRepo({ version: "10.0.0", tag: "at-head", origin: "pushed" });
@@ -931,14 +737,9 @@ test("VR-12 (E14): shimmed gh reports a successful completed run AT the release 
 });
 
 // ---------------------------------------------------------------------------
-// The core stale-green regression the sha-matching change fixes (VR-17, E78):
-// a completed GREEN run whose headSha is a DIFFERENT
-// commit than the one being released must NOT satisfy the check — it must
-// WARN, exactly like the
-// v3.102.2 incident (a stale green run from an earlier commit was accepted
-// as ground truth for a release whose own CI was still in flight). This is
-// the core "stale-green" case the sha-matching change exists to close (T-E78-01); VR-12 above only
-// proves the matching-sha green path, which is necessary but not sufficient.
+// VR-17: a green run at a different commit must WARN, not satisfy the check.
+// This is the v3.102.2 stale-green regression, where an earlier commit's green
+// run was accepted while the release's own CI was still running.
 // ---------------------------------------------------------------------------
 test("VR-17 (E78): shimmed gh reports a green completed run at a DIFFERENT commit -> WARN (stale-green, v3.102.2 regression), never OK, exit 0, empty stderr", () => {
   const { root } = mkFixtureRepo({ version: "10.0.6", tag: "at-head", origin: "pushed" });
@@ -1044,12 +845,8 @@ test("VR-19 (E78): a matching red run found deep in the 10-run window (position 
 });
 
 // ---------------------------------------------------------------------------
-// Polling finds a late run (VR-20; E80, T-E80-02(a)): the sha-not-found branch
-// now bounded-polls instead of giving up on the first miss — a completed run for THIS commit
-// that shows up mid-poll (not on the first `gh` call) must resolve to a
-// genuine OK, never a WARN, exactly as if it had matched on the first call.
-// Proves the poll loop actually re-queries `gh` rather than caching its
-// first (miss) answer.
+// VR-20 (E80): a run for this commit that appears on a later `gh` call, not the
+// first, resolves to OK, which proves the poll re-queries `gh`.
 // ---------------------------------------------------------------------------
 test("VR-20 (E80): sha absent on the first gh call, present+success on a later call -> OK, no WARN, exit 0", () => {
   const { root } = mkFixtureRepo({ version: "10.0.9", tag: "at-head", origin: "pushed" });
@@ -1162,23 +959,10 @@ test("VR-22 (E80): AGC_VERIFY_CI_WAIT_SECONDS=0 performs exactly one gh call and
 });
 
 // ---------------------------------------------------------------------------
-// Check 6 degradation: gh binary missing (ENOENT) -> WARN on
-// stdout (VR-13, E14), check still reports OK, release still exits 0. The ONLY failure
-// mode is a definitively red completed run (VR-11); every "cannot obtain
-// ground truth" path must degrade gracefully, never block a release on
-// missing/unconfigured tooling.
-//
-// CI-flake fix (post-v3.83.0; for the gh-missing test VR-13): this test previously ran with a
-// hardcoded `PATH="/usr/bin:/bin"`, reasoning "git lives there but gh
-// doesn't" — true on a macOS/Homebrew checkout, false on GitHub's
-// ubuntu-latest hosted runner, which installs the `gh` CLI via apt at
-// /usr/bin/gh. There, this PATH resolved the REAL gh, which (unauthenticated,
-// no GH_TOKEN) exited non-zero with an auth error — the WARN text for that
-// path is pinned by VR-14, not this test's ENOENT wording — turning this test
-// red on every CI run since v3.83.0. `noGhSystemPath()` builds the "no gh
-// anywhere" PATH from whatever `git` THIS test process's own PATH resolves
-// to, so the guarantee holds on any host, not just ones shaped like this
-// author's machine.
+// VR-13: with no `gh` binary, Check 6 WARNs on stdout and still reports OK.
+// Only a red completed run fails; every path that cannot get ground truth
+// degrades. Uses noGhSystemPath() (see above): a fixed PATH resolved the real
+// `gh` on hosted CI runners and turned this test red.
 // ---------------------------------------------------------------------------
 test("VR-13 (E14 degradation): gh binary not on PATH -> WARN on stdout naming gh unavailability, check still OK, exit 0", () => {
   const { root } = mkFixtureRepo({ version: "10.0.2", tag: "at-head", origin: "pushed" });
@@ -1287,18 +1071,9 @@ test("VR-9 (AC9): skill-release-engineer.md requires verify-release.mjs after pu
     "SOP step 9a must explicitly forbid the closing write and the done-report on FAIL",
   );
 
-  // Retargeted for the bounded-polling change: step 9a used to describe ONE catch-all WARN
-  // sentence for "gh missing/unauthenticated or zero completed runs". It now
-  // must distinguish "the script itself is bounded-polling — let it run"
-  // from "WARN-and-continue is reserved for a genuinely degraded
-  // environment" — the wait-vs-degraded split this cut introduced (T-E80-02, E80).
-  //
-  // Retargeted again because the old pin went stale: this used to assert a hardcoded
-  // "~10 minutes" figure. That figure went stale the moment
-  // DEFAULT_WAIT_SECONDS changed to 480s, which is the exact defect
-  // this second retarget exists to fix — step 9a now cites the constant by NAME instead
-  // of restating a number (E82(ii), T-W15-02). See VR-9b below for the behavioral pin that
-  // keeps this from going stale the same way a second time.
+  // Step 9a must separate "the script is polling, let it run" from "WARN and
+  // continue only in a degraded environment" (E80), and cite the wait constant
+  // by name instead of a duration (E82); VR-9b pins that property.
   assert.match(
     SKILL,
     /the script itself bounded-polls `gh run list` for it \(E80\/E82; default is `DEFAULT_WAIT_SECONDS` in `scripts\/verify-release\.mjs`, overridable via `AGC_VERIFY_CI_WAIT_SECONDS`, `0` to opt out\) before giving up/,
@@ -1317,15 +1092,10 @@ test("VR-9 (AC9): skill-release-engineer.md requires verify-release.mjs after pu
 });
 
 // ---------------------------------------------------------------------------
-// Behavioral pin for the SOP's poll-budget sentence (VR-9b; E82(ii), T-W15-02):
-// a pin that merely matches the current prose string recreates the exact
-// staleness the CI-wait default change exists to prevent — the prior VR-9 wording hardcoded "~10 minutes" and silently
-// went stale when DEFAULT_WAIT_SECONDS changed to 480s. This test instead
-// pins the PROPERTY: step 9a's CI-poll-budget sentence must carry no
-// hardcoded duration literal, and the constant it cites by name must
-// actually exist in scripts/verify-release.mjs — so a future rename or
-// removal of DEFAULT_WAIT_SECONDS (without updating this prose) fails this
-// assertion directly, instead of drifting a second time unnoticed.
+// VR-9b (E82): an earlier step 9a wording hardcoded "~10 minutes" and went stale
+// when the default changed. This pins the property instead: the poll-budget
+// sentence has no duration literal, and the constant it names exists in
+// scripts/verify-release.mjs.
 // ---------------------------------------------------------------------------
 test("VR-9b (E82(ii) behavioral pin): step 9a's CI-poll-budget sentence carries no hardcoded duration literal and sources it from DEFAULT_WAIT_SECONDS", () => {
   const idxStep9a = SKILL.indexOf("9a. **Release self-check**");
@@ -1334,15 +1104,9 @@ test("VR-9b (E82(ii) behavioral pin): step 9a's CI-poll-budget sentence carries 
   assert.ok(idxStep9a > -1, "step 9a must be present");
   assert.ok(idxRationaleStart > idxStep9a, "step 9a's rationale fence must be present");
   assert.ok(idxStep10 > idxRationaleStart, "step 10's retirement pointer must follow step 9a's rationale fence");
-  // (a) is scoped to the OPERATIONAL sentence only — up to the rationale
-  // fence — because that fence is stripped by prompts/build.ts's
-  // stripRationale on every dispatch (fullDetail=false) and never reaches
-  // the executing release-engineer. The fence is explicitly ALLOWED to
-  // mention the historical "~10 minutes" figure and "480s" as a maintenance
-  // note explaining WHY citation replaced a literal — that is a note to a
-  // future editor, not an operating instruction, and re-litigating it here
-  // would just reopen the earlier question of whether that rationale fence is
-  // visible to the executing role, which is not this test's concern (N10, E82(ii)).
+  // (a) covers the operational sentence only, up to the rationale fence:
+  // stripRationale removes that fence from every dispatch, and it may keep the
+  // old figures as a note to future editors.
   const step9aOperational = SKILL.slice(idxStep9a, idxRationaleStart);
 
   // (a) No hardcoded duration literal for the CI poll budget in the
@@ -1361,14 +1125,9 @@ test("VR-9b (E82(ii) behavioral pin): step 9a's CI-poll-budget sentence carries 
     "step 9a must cite DEFAULT_WAIT_SECONDS in scripts/verify-release.mjs by name as the source of the poll budget",
   );
 
-  // (c) The citation is not just self-consistent prose: the named constant
-  // must actually be defined, as a real numeric constant, in the script it
-  // points at. Deliberately NOT pinning the literal 480 here — that would
-  // reintroduce the exact staleness-on-value-change hazard the CI-wait default
-  // change exists to avoid, on the test side instead of the prose side (E82).
-  // The default-budget test (VR-23) pins the live 480s behavior elsewhere; this
-  // pin only guards that the identifier step
-  // 9a cites still resolves to something.
+  // (c) The named constant must be a real numeric constant in the script. The
+  // value 480 is deliberately not pinned here (VR-23 pins the live behaviour),
+  // or a value change would make this test stale.
   assert.match(
     REAL_VERIFY_SCRIPT,
     /const\s+DEFAULT_WAIT_SECONDS\s*=\s*\d+\s*;/,
@@ -1377,24 +1136,11 @@ test("VR-9b (E82(ii) behavioral pin): step 9a's CI-poll-budget sentence carries 
 });
 
 // ---------------------------------------------------------------------------
-// Bounded claim for the non-empty-stage check (VR-9c; T-W15-02, a non-blocking
-// code-reviewer note): step 13a's non-empty-stage assertion tests that SOMETHING staged, not
-// that EVERYTHING did. Pin exactly what it guarantees — no more — so the
-// bounded property is not silently overclaimed later as "closes all
-// partial-staging failure". Known gap, recorded rather than fixed here: if
-// `find` under-reports (e.g. `.current/` reached via a symlink, which BSD
-// `find` will not descend into without `-L`), `handoff.md` still stages, the
-// cached diff is non-empty, this assertion passes, and the `.jsonl` sidecars
-// are silently omitted from the bookkeeping commit. Swept up by the next
-// release's own 13a run; not this ticket's to close.
-//
-// Re-baselined (T-E142-05, E143/AC7): `tasks.md` is no longer one of the
-// paths 13a's own `git add` names — step 8's release commit owns staging and
-// committing `tasks.md` now (see content/skill-release-engineer.md's
-// Artifact-ownership list), never 13a. This assertion is updated to match
-// that ratified decision, not weakened: the guaranteed property below
-// (non-empty-stage catches only a TOTAL staging failure) is unaffected by
-// which paths are named in the `git add` line.
+// VR-9c: step 13a's non-empty-stage check catches a total staging failure
+// only, not partial under-staging; this pins exactly that. Known gap: if
+// `find` under-reports (BSD `find` does not follow a symlinked `.current/`), the
+// `.jsonl` sidecars are silently left out. `tasks.md` is staged by step 8, not
+// 13a (E143). Details: specs/e260h-comment-rationale.md (test/verify-release.test.mjs).
 // ---------------------------------------------------------------------------
 test("VR-9c (N11): step 13a's non-empty-stage assertion is scoped to catching a fully-empty stage, not partial under-staging", () => {
   const idxStep13a = SKILL.indexOf("13a. **Bookkeeping commit + push**");
@@ -1530,18 +1276,10 @@ test("VR-SEC-4: oversized version argument -> rejected by regex validation, exit
 // specs/e82-e84-release-verify-tooling.md AC1/AC3/AC4 (T-E8284-02, E82/E84).
 // ---------------------------------------------------------------------------
 
-// Default poll budget (VR-23; AC1, E82): the Check 6 poll budget must default to
-// 480s when AGC_VERIFY_CI_WAIT_SECONDS is unset — pinned BEHAVIORALLY by reading the
-// script's own first poll-progress line ("...left in budget"), never by
-// grepping the source for the literal 480. A grep pin (the spec's own AC1
-// `proof:` line, already executed in the AC Execution Log) passes against a
-// file that says 480 in a comment and a DIFFERENT number in the constant —
-// exactly the stale-constant defect shape (E82) this test exists to catch instead.
-//
-// The script's own deadline runs up to 480 real seconds if left alone, so
-// this drives the child asynchronously (spawn, not spawnSync) and kills it
-// the instant the first poll line lands — the test window is a few hundred
-// milliseconds, not eight minutes.
+// VR-23 (E82): with AGC_VERIFY_CI_WAIT_SECONDS unset the budget defaults to 480s,
+// read from the script's first "...left in budget" line, not grepped from source:
+// a grep passes when a comment says 480 and the constant differs. The child is
+// spawned and killed at the first poll line, so the test takes milliseconds.
 test("VR-23 (AC1, E82): AGC_VERIFY_CI_WAIT_SECONDS unset -> first poll line reports ~480s left in budget, never ~600s", async () => {
   const { root } = mkFixtureRepo({ version: "10.0.12", tag: "at-head", origin: "pushed" });
   const decoyJson = JSON.stringify([
@@ -1602,20 +1340,10 @@ test("VR-23 (AC1, E82): AGC_VERIFY_CI_WAIT_SECONDS unset -> first poll line repo
 });
 
 // ---------------------------------------------------------------------------
-// Close-out ahead-of-upstream failure (VR-24; AC3, E84): --close-out FAILs when
-// HEAD is ahead of its @{u} upstream, names the ahead count, and never runs
-// Check 1 (tag-at-HEAD).
-//
-// This is the load-bearing pin for the whole ticket: scripts/verify-release.mjs
-// computes the ahead count via the range `@{u}..HEAD`. The fixture below
-// (`origin: "not-pushed"`) pushes a commit then adds ONE local-only commit
-// on top, so HEAD is a strict descendant of its upstream — @{u} is an
-// ANCESTOR of HEAD. A reversed `HEAD..@{u}` range (commits reachable from
-// @{u} but not from HEAD) is therefore EMPTY on this exact fixture, since
-// every commit @{u} can reach is also reachable from HEAD — the
-// reversed-range bug would silently report 0 and exit 0. Only the correct
-// direction fails here, so this assertion actually discriminates: it would
-// go red the instant someone flipped the range, not merely "pass either way".
+// VR-24 (E84): --close-out FAILs when HEAD is ahead of @{u}, names the ahead
+// count and never runs Check 1. The fixture adds one local commit on top of
+// the pushed one, so a reversed `HEAD..@{u}` range would be empty and pass;
+// only the correct `@{u}..HEAD` fails, so the test discriminates direction.
 // ---------------------------------------------------------------------------
 test("VR-24 (AC3, E84): --close-out FAILs when HEAD is ahead of upstream, names the ahead count, never runs tag-at-HEAD", () => {
   const { root } = mkFixtureRepo({ version: "10.0.13", tag: "at-head", origin: "not-pushed" });
@@ -1726,13 +1454,9 @@ test("VR-26 (AC4, E84): --close-out still passes against a fixture whose package
 });
 
 // ---------------------------------------------------------------------------
-// Check 1's bookkeeping-commit tolerance tests (T-E141-02, E141;
-// specs/e141-tag-at-head-bookkeeping-tolerance.md AC1-AC6). VR-2 above was
-// amended (not retargeted) to keep pinning the non-bookkeeping FAIL path;
-// the tests below pin the new tolerance itself plus its two guard rails
-// (the ancestry precondition, and Check 2's independence) and two of the
-// code-reviewer's non-blocking observations (T-E141-01) worth a cheap pin,
-// covering AC4 and AC5.
+// Check 1's bookkeeping-commit tolerance (specs/e141-tag-at-head-bookkeeping-tolerance.md):
+// the tolerance itself, its two guard rails (the ancestry precondition and
+// Check 2's independence) and two code-reviewer observations worth a pin.
 // ---------------------------------------------------------------------------
 
 // Bookkeeping-only range is tolerated (VR-27; AC2, E141): the human's stated
@@ -1810,14 +1534,9 @@ test("VR-29 (AC4, E141): tag is NOT an ancestor of HEAD (diverged branch) -> ori
   assert.doesNotMatch(result.stdout, /NOTE: tag-at-HEAD/);
 });
 
-// Check 2 stays independent (VR-30; AC5, E141): the human's stated bar, half 2 —
-// a tolerated Check 1 must never make an unpushed release look clean. Check 2 (pushed-to-origin)
-// is untouched and compares HEAD to @{u} directly, so it fires independently
-// of whatever Check 1 decided. Fixture: push the release commit, then add
-// the bookkeeping commit LOCALLY ONLY (mkFixtureRepo pushes origin before
-// the tag block runs, so "behind-head-bookkeeping" + origin "pushed" lands
-// the bookkeeping commit unpushed by construction — the real T-E141-01
-// review shape, reproduced here rather than re-derived).
+// VR-30 (E141): a tolerated Check 1 must never make an unpushed release look
+// clean; Check 2 compares HEAD with @{u} directly. mkFixtureRepo pushes before
+// the tag block runs, so this fixture's bookkeeping commit is unpushed.
 test("VR-30 (AC5, E141): genuinely unpushed bookkeeping commit -> Check 1 tolerates it (OK+NOTE) but Check 2 still FAILs 'local commits not pushed'", () => {
   const { root } = mkFixtureRepo({
     version: "6.0.0",
@@ -1878,12 +1597,8 @@ test("VR-32 (E141, observation 5 pin): a non-ASCII allowlisted filename fails CL
 });
 
 // ---------------------------------------------------------------------------
-// Lane-path additions to Check 1's bookkeeping tolerance (VR-39..VR-42, E174a;
-// BOOKKEEPING_PATH_RES / LANE_SEGMENT_RE_SRC). VR-27/VR-31 above already pin
-// that the flat `.current/handoff.md` + `.current/*.jsonl` shape stays tolerated
-// after bookkeeping moved into per-lane directories (E123); these pin the
-// lane-scoped shapes that layout introduced, plus the two directories that must NEVER be mistaken for a
-// lane (archive/history are aggregation dirs, not lane dirs).
+// Lane-path shapes of Check 1's bookkeeping tolerance (VR-39..VR-42, E174a):
+// per-lane bookkeeping files, plus archive/ and history/, which are never lanes.
 // ---------------------------------------------------------------------------
 
 test("VR-39 (E174a): a post-tag commit touching only .current/_primary/{handoff.md,telemetry.jsonl} + .current/e174a/{dispatch.jsonl,usage.jsonl} -> Check 1 OK with tolerance NOTE", () => {
@@ -1984,21 +1699,11 @@ test("VR-46 (A1): .current/_primary/feature-split.md is NOT tolerated -> Check 1
 });
 
 // ---------------------------------------------------------------------------
-// Drift guard between the script's lane regex and the compiled lane-path
-// helpers (VR-47; a human-mandated drift-guard test raised in code review on
-// scripts/verify-release.mjs:249-250): the comment there claims "a
-// drift-guard test pins the mirror" between LANE_SEGMENT_RE_SRC (plus its
-// archive/history exclusion) and the real dist/tools/lane-paths.js
-// isSafeLaneName / NON_LANE_DIRS — this is that test. It reads
-// LANE_SEGMENT_RE_SRC's *actual source text* out of the real committed
-// script (never a re-typed copy, so it cannot silently drift from what
-// ships) via the real JS engine (`new Function`, not a hand-rolled
-// unescaper, so JS string-escaping is interpreted exactly as node would),
-// extracts the archive/history exclusion list the same way, and checks both
-// against the real compiled dist/tools/lane-paths.js exports over a probe
-// set. Changing either side alone — widening/narrowing SAFE_LANE_RE,
-// changing NON_LANE_DIRS, or editing LANE_SEGMENT_RE_SRC without mirroring
-// the change — turns this test red.
+// VR-47: drift guard between the script's LANE_SEGMENT_RE_SRC (plus its
+// archive/history exclusion) and dist/tools/lane-paths.js (isSafeLaneName,
+// NON_LANE_DIRS). It reads the regex source from the committed script through
+// `new Function`, so escaping is read as node reads it, and checks both sides
+// over a probe set; changing either side alone fails.
 // ---------------------------------------------------------------------------
 
 test("VR-47 (A2): verify-release.mjs's LANE_SEGMENT_RE_SRC + archive/history exclusion stay mirrored to dist/tools/lane-paths.js isSafeLaneName / NON_LANE_DIRS", async () => {
@@ -2029,14 +1734,9 @@ test("VR-47 (A2): verify-release.mjs's LANE_SEGMENT_RE_SRC + archive/history exc
     "verify-release.mjs's excluded-directory names must set-equal dist/tools/lane-paths.js's NON_LANE_DIRS — either side changing alone must turn this red",
   );
 
-  // Full-segment acceptance, derived from the dist exports over a probe
-  // set — not a re-derivation of SAFE_LANE_RE's char class (not exported),
-  // exactly as the human-mandated drift-guard instruction (A2) requires.
-  // LANE_SEGMENT_RE_SRC's exclusion
-  // lookahead is context-dependent (it peeks for a following "/"), so it
-  // must be exercised the SAME way BOOKKEEPING_PATH_RES actually embeds it
-  // — inside a full `.current/<lane>/handoff.md` path, not as a bare,
-  // unanchored-by-slash segment string.
+  // Acceptance is derived from the dist exports over a probe set (SAFE_LANE_RE
+  // is not exported). The exclusion lookahead peeks for a following "/", so it
+  // is tested inside a full `.current/<lane>/handoff.md` path.
   const scriptRe = new RegExp(`^\\.current\\/${laneSegSrc}\\/handoff\\.md$`);
   const scriptAccepts = (candidate) => scriptRe.test(`.current/${candidate}/handoff.md`);
   const distAccepts = (candidate) => isSafeLaneName(candidate) && !NON_LANE_DIRS.has(candidate);
@@ -2076,17 +1776,9 @@ test("VR-47 (A2): verify-release.mjs's LANE_SEGMENT_RE_SRC + archive/history exc
 });
 
 // ---------------------------------------------------------------------------
-// Check 6 resolves the release sha from the tag (VR-33; AC1, E147/T-E142-01) —
-// the original defect's exact reproduction shape. A release tag sits at commit A; a
-// governance-bookkeeping-only commit B lands on top of it (HEAD), the same
-// "behind-head-bookkeeping" shape the tag-at-HEAD tolerance already accepts for Check 1. A
-// completed CI run is recorded against A's sha ONLY. Pre-fix, Check 6
-// resolved `releaseSha` unconditionally from `git rev-parse HEAD` (= B), so
-// it would poll/match against B, never see the real run recorded for A, and
-// (per this fixture's second, deliberately-red entry) could even FAIL a
-// release off a fabricated bookkeeping-commit CI status that has nothing to
-// do with the code actually being released. Post-fix, `releaseSha` resolves
-// from the tag itself (A) before ever considering HEAD.
+// VR-33 (E147): tag at commit A, a bookkeeping-only commit B on top. Check 6
+// used to resolve the sha from HEAD (B), missing A's run and even failing on
+// B's deliberately red run; it now resolves from the tag (A) first.
 // ---------------------------------------------------------------------------
 test("VR-33 (AC1, E147): tag at commit A, bookkeeping-only commit B on top (HEAD) -> Check 6 resolves/matches against A, never polls or matches B", () => {
   const { root, firstCommitSha } = mkFixtureRepo({
@@ -2151,12 +1843,8 @@ test("VR-33 (AC1, E147): tag at commit A, bookkeeping-only commit B on top (HEAD
 });
 
 // ---------------------------------------------------------------------------
-// Check 6 falls back to HEAD when no tag exists (VR-34; AC2, E147/T-E142-01): no
-// tag exists yet -> Check 6's `releaseSha` falls back to `git rev-parse HEAD`, unchanged from pre-fix behavior. Pins
-// the fallback's actual sha-resolution outcome (a real gh shim recording a
-// green run against HEAD's own sha must still be matched) rather than only
-// "does not crash without a tag" (already covered by VR-1/VR-8, which use
-// this same tag:"none" fixture with no gh shim at all).
+// VR-34 (E147): with no tag, Check 6 falls back to HEAD. A shimmed green run at
+// HEAD's sha must still match; VR-1 and VR-8 only show no crash without a tag.
 // ---------------------------------------------------------------------------
 test("VR-34 (AC2, E147): no tag exists yet -> Check 6's releaseSha falls back to HEAD (unchanged), matches a green run recorded against HEAD's own sha", () => {
   const { root } = mkFixtureRepo({ version: "10.2.0", tag: "none", origin: "pushed" });
@@ -2189,29 +1877,12 @@ test("VR-34 (AC2, E147): no tag exists yet -> Check 6's releaseSha falls back to
 });
 
 // ---------------------------------------------------------------------------
-// Check 6's CI branch is now DERIVED from the checkout (deriveCIBranch), never hardcoded to
-// "main": a release cut from a maintenance/hotfix branch must interrogate
-// THAT branch's CI runs, not main's. No specs/<feature>.md exists for this
-// mini-chain ticket (PM/architect skipped) — the spec is the ticket's row in
-// docs/backlog.md plus the handoff's scope_decision_why, per the dispatch brief
-// (ticket T-E165-01, backlog E165).
-//
-// Test map (scope_decision_why's two non-negotiable acceptance criteria):
-//   non-main branch -> gh receives --branch <branch> AND --workflow CI -> VR-35
-//   detached HEAD, lenient -> zero gh calls, WARN stdout, exit 0        -> VR-36
-//   detached HEAD, --ci-check --strict -> zero gh calls, FAIL, exit 1  -> VR-37
-//   no upstream configured -> falls back to the current local branch   -> VR-38
-// The earlier Check 6 tests VR-11..VR-34 above are unmodified by this addition: every existing fixture
-// pushes branch "main" with `-u origin main` (mkFixtureRepo's default), so
-// deriveCIBranch resolves the identical "main" it always did — confirmed by
-// the full-suite run this test's own review (review_reports/review_T-E166-01.md)
-// rests on, and re-confirmed by this file's own regression run below.
-//
-// A tiny `gh` shim that records its OWN invocation argv (rather than just
-// returning canned JSON, like every VR-1x/2x shim above) — this is the only
-// way to assert "gh received exactly these two flags" or "gh was never
-// invoked at all", neither of which a canned-response shim can prove on its
-// own.
+// Check 6 derives the CI branch from the checkout (deriveCIBranch, E165), so a
+// release from a maintenance branch queries that branch's runs, not main's.
+// VR-35..VR-38: branch and workflow flags, detached HEAD lenient and strict,
+// fallback to the local branch. Existing fixtures push "main", so earlier tests
+// are unaffected. This shim records its own argv to prove which flags `gh` got,
+// or that it was never called.
 function mkGhArgvCaptureShim() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "gh-shim-argv-"));
   const argvPath = path.join(dir, "argv");
@@ -2304,20 +1975,9 @@ test("VR-38 (E165): no upstream tracking configured -> falls back to the current
 });
 
 // ---------------------------------------------------------------------------
-// Tolerating tasks.md bookkeeping: the two new BOOKKEEPING_PATH_RES entries added
-// for `.current/_primary/tasks.md` (a literal, mirroring the `_primary`
-// handoff.md tolerance) and lane-scoped
-// `.current/<lane>/tasks.md` (a LANE_SEGMENT_RE_SRC-reusing regex, mirroring
-// the existing lane-scoped handoff.md/*.jsonl entries). Both mirror the
-// lane-path tests VR-39/VR-40 one-for-one, substituting tasks.md for
-// handoff.md/telemetry.jsonl (tests VR-48/VR-49; T-E126-04/T-E126-06, spec AC10).
-//
-// The drift guard between LANE_SEGMENT_RE_SRC and isSafeLaneName/NON_LANE_DIRS
-// is NOT extended here: the lane-scoped tasks.md regex reuses
-// the SAME `LANE_SEGMENT_RE_SRC` constant VR-47 already pins (spec
-// Dependencies: "reuse by import only, never restate") rather than
-// restating a second copy of the lane-segment pattern, so there is nothing
-// new for that drift guard to mirror.
+// Tasks-ledger bookkeeping tolerance (VR-48, VR-49; E126): `.current/_primary/tasks.md`
+// and `.current/<lane>/tasks.md`, mirroring VR-39 and VR-40. The lane regex reuses
+// LANE_SEGMENT_RE_SRC, which VR-47 already pins, so the drift guard is not extended.
 // ---------------------------------------------------------------------------
 
 test("VR-48 (E126 AC10): a post-tag commit touching only .current/_primary/tasks.md -> Check 1 OK with tolerance NOTE", () => {

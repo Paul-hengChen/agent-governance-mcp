@@ -1,33 +1,10 @@
 // Coded by @qa-engineer
-// Tests for spec: specs/d6-host-capability-compose-axis.md + its architecture doc.
-// Host-state unit tests for prompts/skill-manifest.ts (composeSkill,
-// hostCapabilitiesFor, includeSkillSegment) and the config `host` precedence /
-// `.current/` whole-file-override / unsplit-passthrough contracts the three call
-// sites (prompts/build.ts, tools/role.ts switchRole, bin/agent-governance-context.mjs)
-// depend on (T-D6-04 part a).
-//
-// Spec-to-Test map:
-//   taskTool:true includes host fragments (AC1)         -> t-full-includes-host,
-//                                                           t-golden-byte-identity
-//   taskTool:false excludes host fragments (AC2)         -> t-lean-excludes-host,
-//                                                           t-lean-exact-core-concat
-//   absent/unknown signal defaults SAFE/lean (AC3)       -> t-hostcaps-default-lean,
-//                                                           t-buildPromptForRole-default-lean
-//   ConstitutionSegment/includeSegment shape reuse (AC4) -> t-includeSkillSegment-pure,
-//                                                           implicit in composeSkill shape below
-//   golden byte-identity, full composition (AC5)         -> t-golden-byte-identity
-//   both host states covered; suite stays green (AC7)    -> whole file
-//
-// Precedence-order coverage (architecture Interface Contracts, composeSkill):
-//   (1) whole-file `.current/` override, bypassing host filtering entirely
-//       -> t-override-bypass-lean, t-override-bypass-full
-//   (2) registry fragments filtered by predicate                 -> the AC1/AC2 tests
-//   (3) unsplit skill -> whole-file passthrough, host-independent -> t-unsplit-passthrough,
-//       t-switchRole-unsplit-host-independent
-// Config `host` field precedence (explicit config wins over the in-server lean
-// default; the hook's structural CC default is a caller-side ternary, not this
-// module's concern) -> t-config-host-precedence-full-path,
-//                       t-config-host-precedence-lean-default
+// Tests for specs/d6-host-capability-compose-axis.md: host-state unit tests for
+// prompts/skill-manifest.ts (composeSkill, hostCapabilitiesFor,
+// includeSkillSegment), plus the config `host` precedence, `.current/` override
+// and unsplit-passthrough contracts its three call sites depend on.
+// Spec-to-test map and precedence coverage:
+// specs/e260h-comment-rationale.md (test/skill-manifest.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -133,18 +110,11 @@ test("t-full-includes-host (AC1): full composition contains every host-tagged fr
 });
 
 // ---------------------------------------------------------------------------
-// Behavioural pin for the dispatch-pin mechanics (qa-owned, requested in code
-// review; ticket e91-e103-dispatch-pin-mechanics): the golden byte-identity test above pins BYTES — it would
-// pass just as well if a future edit silently dropped one of the two new
-// dispatch-pin obligations (E103, E91), so long as the fixture was re-baselined to match. This test
-// pins BEHAVIOUR instead: it runs the exact render path a dispatching
-// coordinator experiences (composeSkill under claude-code caps -> strip the
-// frontmatter block the way buildPromptForRole's own `body` slice does ->
-// stripOriginTags -> stripRationale, matching the bundle construction in
-// test/context-budget.test.mjs, AC8) and asserts the new/reworded spans SURVIVE into
-// that composed text, while the three retired enforcement-implying strings do
-// NOT appear anywhere in it. A future edit that deletes the obligation itself
-// (not just its bytes) fails THIS test even after a clean golden re-baseline.
+// Behavioural pin for the dispatch-pin obligations (E91, E103). The golden test
+// pins bytes, which a re-baseline could make pass after an obligation was
+// dropped. This runs the coordinator's real render path (composeSkill, strip
+// frontmatter, stripOriginTags, stripRationale) and asserts the obligations
+// survive and the three retired enforcement-implying strings are absent.
 // ---------------------------------------------------------------------------
 
 test("t-e91-e103-behavioural-pin: explicit-model dispatch obligation and self-report framing survive strip passes; retired enforcement wording does not", () => {
@@ -349,12 +319,9 @@ test("t-config-host-precedence: a workspace-local whole-file .current/skill-coor
 });
 
 // ---------------------------------------------------------------------------
-// switchRole (tools/role.ts) — the second render path. No role in
-// ROLE_SKILL_MAP maps to a split skill today (only skill-coordinator.md is
-// split, and it is not switchRole-reachable — code-reviewer's dormant-path
-// note), so host filtering has no OBSERVABLE effect via switchRole yet. This
-// pins the invariant that DOES hold today: an unsplit skill's switchRole
-// output is host-independent, regardless of the workspace's declared host.
+// switchRole (tools/role.ts), the second render path. No switchRole-reachable
+// role maps to a split skill yet, so host filtering has no visible effect
+// there; this pins that an unsplit skill's output is host-independent.
 // ---------------------------------------------------------------------------
 
 test("t-switchRole-unsplit-host-independent: switchRole(\"sr-engineer\", ws) returns identical sop text with and without host:\"claude-code\" configured", () => {
@@ -379,26 +346,11 @@ test("t-switchRole-does-not-throw: switchRole succeeds for every ROLE_SKILL_MAP 
 });
 
 // ---------------------------------------------------------------------------
-// Strip parity across BOTH skill-render paths (E51, T-E51-03).
-//
-// The defect: stripOriginTags/stripRationale ran on the prompts/build.ts path
-// only. tools/role.ts switchRole — the path tw_switch_role dispatch actually
-// uses, and the busier of the two — applied neither, so every role SOP handed to
-// an acting agent carried raw <!-- origin:… --> / <!-- rationale:… --> markers
-// that the fence convention exists to keep away from that exact reader.
-//
-// Spec-to-Test map (ACs from the E51 cut, docs/backlog.md row E51):
-//   no marker in switchRole output, every role (AC1)  -> t-e51-switchRole-marker-free,
-//                                                        t-e51-witness-fences-exist-in-source
-//   compose-golden fixtures byte-identical (AC2)      -> t-golden-byte-identity above +
-//                                                        test/compose-equivalence.test.mjs
-//                                                        (assert-not-rebaseline: a differing
-//                                                        fixture is a FAIL, never regenerated)
-//   strippers still importable from build.js (AC3)    -> t-e51-build-reexport-surface
-//   hook path deliberately untouched (AC5)            -> t-e51-hook-remains-non-caller
-//   shared-pass contract (fullDetail semantics)       -> t-e51-applyTextTransforms-contract
-//   body-only, frontmatter intact                     -> t-e51-frontmatter-survives-strip
-//   whole-file override also stripped                 -> t-e51-override-is-stripped
+// Strip parity across both skill-render paths (E51). switchRole, the busier
+// path, used to skip stripOriginTags and stripRationale, so role SOPs reached
+// agents with raw origin and rationale markers. These tests pin marker-free
+// output for every role and the strip-pass contract.
+// Spec-to-test map: specs/e260h-comment-rationale.md (test/skill-manifest.test.mjs).
 // ---------------------------------------------------------------------------
 
 const ORIGIN_MARKER = "<!-- origin:";

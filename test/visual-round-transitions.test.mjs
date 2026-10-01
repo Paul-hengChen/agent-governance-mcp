@@ -1,11 +1,9 @@
 // Coded by @qa-engineer
 // Tests for the visual-round counter, cap and hand-off rules
-// (specs/pixel-perfect-fixes-v3.14.md — AC-8, AC-9, AC-11).
-// Asserts the visual_round sub-loop semantics:
-//   - increments only on (qa-engineer, FAIL) + pending_notes.visual_fail:
-//   - resets on PASS or (pm, In_Progress)
-//   - cap at 6 (5 fails then lock to pm)
-//   - split escalation at visual_round >= 3 — sr-engineer → pm allowed
+// (specs/pixel-perfect-fixes-v3.14.md — AC-8, AC-9, AC-11): it increments only
+// on a qa-engineer FAIL with a visual_fail: note, resets on PASS or
+// (pm, In_Progress), caps at 6 (five fails, then pm only), and from round 3
+// allows the sr-engineer -> pm split escalation.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";

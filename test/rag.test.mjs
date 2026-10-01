@@ -1,11 +1,8 @@
 // Coded by @qa-engineer
-// Tests for the RAG pipeline (tools/rag.ts, tools/storage-sqlite.ts RAG methods,
-// prompts/build.ts appendSpecContext, index.ts IndexPrdArgs refinements).
-// Run via `node --test`. Imports compiled output from dist/.
-//
-// Embedding model loading (the real @xenova/transformers path) is intentionally
-// NOT exercised here — that's covered by scripts/smoke-rag.mjs end-to-end so CI
-// doesn't pay 4s of cold-start latency on every run.
+// Tests for the RAG pipeline (tools/rag.ts, the RAG methods of
+// tools/storage-sqlite.ts, appendSpecContext in prompts/build.ts and the
+// IndexPrdArgs refinements in index.ts), run from dist/. Loading the real
+// embedding model is left to scripts/smoke-rag.mjs, so CI skips its cold start.
 
 import { test, after } from "node:test";
 import assert from "node:assert/strict";

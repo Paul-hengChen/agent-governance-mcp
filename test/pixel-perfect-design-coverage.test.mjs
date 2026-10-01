@@ -1,11 +1,7 @@
 // Coded by @qa-engineer
-// Tests for spec: specs/pixel-perfect-design-coverage.md (Phase 1: A1 + A2).
-// Spec-to-Test map: AC-1→t1, AC-2→t2, AC-3→t3, AC-4→t4, AC-5→t5, AC-6→t6.
-//
-// These are integration-level checks on the I/O boundary: prompts/build.ts loads
-// content/skill-*.md verbatim into rendered prompts, so the markdown contract
-// shipped here IS the runtime behaviour. No pure-logic units exist for this
-// markdown-only feature.
+// Tests for specs/pixel-perfect-design-coverage.md (AC-1..AC-6 map to t1..t6).
+// prompts/build.ts loads content/skill-*.md verbatim, so the markdown contract
+// is the runtime behaviour; there is no pure logic to unit-test.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -39,18 +35,10 @@ test("AC-1: design-auditor Source manifest schema is exhaustive + source-agnosti
 });
 
 test("AC-2: multi-pass Hard rule has line cap, pass ceiling, and forced manifest progress", () => {
-  // Why: the multi-pass design audit's anti-abuse properties. Without the
-  // per-pass line cap (≤ 250) a single audit can token-explode; without the
-  // 5-pass ceiling we lose the constitution §5 anti-loop guarantee; without
-  // "MUST flip ≥ 1 deferred→audited" an agent could loop forever producing
-  // no-op passes. All three are load-bearing. (A1)
-  //
-  // skill-design-auditor.md does not restate "≤ 250 lines per pass" / "5 passes
-  // per feature": it names the `pass_budget` entry of the Limits table
-  // (content/const-01-core-head.md), so the numbers live in one place. The
-  // property is therefore checked in two parts: (a) the skill text names
-  // `pass_budget`, and (b) the Limits table resolves that name to 250/5.
-  // (a12-partials-limits-registry, T-A12-07/T-A12-09)
+  // The multi-pass audit's anti-abuse limits: a per-pass line cap (no token
+  // blow-up), a pass ceiling (the anti-loop rule) and forced progress (no no-op
+  // passes). The skill names `pass_budget` and the Limits table in
+  // content/const-01-core-head.md holds the numbers, so both are checked.
   const body = fs.readFileSync(AUDITOR_PATH, "utf-8");
   const limits = fs.readFileSync(path.join(PROJECT_ROOT, "content", "const-01-core-head.md"), "utf-8");
 

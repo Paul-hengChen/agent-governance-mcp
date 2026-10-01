@@ -1,37 +1,11 @@
 #!/usr/bin/env node
 // Coded by @sr-engineer
-// Live runner for the behavioral-eval harness (D4, T-D4-07, spec AC-9..AC-12).
-//
-// On-demand (`npm run eval`), NEVER per-commit (AC-9): dispatches each
-// scripted scenario (test/eval/scenarios.mjs) to a real model via
-// @anthropic-ai/sdk, using the scenario's precomputed `bundle` (assembled by
-// buildPromptForRole against the frozen fixture workspace; spec AC-8) as the
-// system prompt and the scenario's `task` as the user message, then runs
-// `scenario.assertions` (closures over the reply checks in
-// test/eval/lib/assertions.mjs) against the reply text.
-//
-// Ordering is deliberate:
-//   1. ANTHROPIC_API_KEY check FIRST, before any dynamic import — a missing
-//      key exits non-zero with a one-line error naming the env var, having
-//      done zero work: no SDK load, no scenario/bundle assembly, no network
-//      call, no silent skip (AC-11). scenarios.mjs and the SDK are imported
-//      dynamically AFTER the check for exactly this reason.
-//   2. Every scenario tier is resolved to a model id up front, before the
-//      first API call — an unknown tier fails loudly at $0 spend instead of
-//      surfacing after earlier (paid) scenarios already ran.
-//   3. Scenarios then run sequentially; a per-scenario API error marks that
-//      scenario FAIL and the run continues (retry/backoff is explicitly out
-//      of scope per the spec), so one transient failure still yields a full
-//      report.
-//
-// Output contract (AC-10): one PASS/FAIL line per scenario (FAIL lines list
-// each failing assertion's reason), a summary count, and a non-zero exit iff
-// any scenario failed — composable into a pre-release gate check.
-//
-// Governance safety (AC-12): this runner calls no tw_* tool and never reads
-// or writes .current/, tasks.md, or any other governance state. Its only
-// filesystem reads happen inside the scenario import (dist/ + content/ +
-// the fixture workspace), all read-only.
+// Live runner for the behavioral-eval harness (specs/d4-behavioral-eval-harness.md),
+// run on demand with `npm run eval`, never per commit. It checks the API key
+// before any import, resolves every tier before the first call, and runs the
+// scenarios in order, a per-scenario error failing only that scenario. It prints
+// one PASS/FAIL line each plus a summary, exits non-zero if any failed, and
+// touches no governance state. Details: specs/e260h-comment-rationale.md (test/eval/run-eval.mjs).
 
 const ENV_KEY = "ANTHROPIC_API_KEY";
 

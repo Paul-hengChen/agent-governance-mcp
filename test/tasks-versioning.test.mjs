@@ -1,17 +1,9 @@
 // Coded by @qa-engineer
-// Tasks-file schema-versioning sentinel and migration. Imports compiled dist/. (T29)
-//
-// Re-baselined for lane-local task ledgers (qa-owned; e125a-lane-local-ledgers, spec AC13 "Test impact"):
-// CURRENT_VERSIONS.tasks bumped 1 -> 2, and tw_* now reads/writes ONLY the
-// current lane's ledger `.current/<lane>/tasks.md` (spec D-F/AC9) — a
-// workspace with no .git resolves to lane "_primary" (tools/lane-paths.ts
-// resolveCurrentLane), so every fixture here now seeds/reads
-// `.current/_primary/tasks.md` directly instead of a root `tasks.md`. This
-// sidesteps the separate D-C forward-migration mechanism entirely (that
-// mechanism — legacy root -> lane ledger — has its own dedicated coverage in
-// test/e125a-lane-local-ledgers.test.mjs AC4-AC8); these tests stay scoped to
-// what they always tested: the sentinel/versioning contract of the file
-// tasks-file.ts actually reads and writes.
+// Tasks-file schema-versioning sentinel and migration, from dist/. Since
+// lane-local ledgers (tasks v2), tw_* reads only `.current/<lane>/tasks.md` and a
+// workspace with no .git is lane "_primary", so fixtures use
+// `.current/_primary/tasks.md`. The root-to-lane migration is covered in
+// test/e125a-lane-local-ledgers.test.mjs.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";

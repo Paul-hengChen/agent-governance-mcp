@@ -1,39 +1,10 @@
 // Coded by @qa-engineer
-// Tests for spec: specs/release-engineer-complete-staging.md (v3.22.1);
-// backlog.md E44/E49 rows (docs/backlog.md:161,172) for the T-E44-01/T-E49-01
-// conditional-check rework, mini-chain, backlog rows ARE the spec.
-//
-// Spec-to-Test map:
-//   explicit directory enumeration (AC1)           -> t-ac1-directory-list
-//   pre-commit git diff --cached --stat (AC2)      -> t-ac2-verify-cmd, t-fixture-a, t-fixture-b
-//   inverted failure-mode wording (AC3)            -> t-ac3-failure-mode-wording
-//   post-commit spec-file check with its three conditional branches
-//        REQUIRE/SKIP/UNCLASSIFIABLE (AC4, E44)   -> t-ac4-post-commit-check, t-fixture-c..h,
-//                                                      "AC4 branch exhaustiveness"
-//   shim reinforcement hint, <=2 sentences (AC5)   -> t-ac5-shim-hint
-//   this test file itself exercises fixtures (AC6) -> t-fixture-a, t-fixture-b, t-fixture-c..h
-//   npm test green (AC7)                           -> exercised by running npm test
-//   version 3.22.1 (AC8/AC9)                       -> subagent-templates.test.mjs "v3.22.1 AC9"
-//   step 7a ticket-code set derivation (working-tree listing plus a
-//        previous-tag membership predicate; E49)   -> "E49 step 7a" test block below
-//
-// WHY: the release-engineer SOP lives purely in prompt text
-// (content/skill-release-engineer.md), loaded by tw_switch_role("release-engineer").
-// There is no server enforcement — the contract IS the SOP wording reaching the
-// haiku-tier agent. These tests pin (a) that the staging instruction enumerates
-// required directories explicitly, (b) that the pre-commit verify step is present,
-// (c) that the failure-mode wording is inverted (source dirs are EXPECTED, not
-// blocked), (d) that the post-commit spec-file sanity check's three branches
-// (REQUIRE/SKIP/UNCLASSIFIABLE, E44) fire correctly and mutually exclusively, and
-// (e) that step 7a's ticket-code SET derivation (E49) is coupled to the file
-// content that actually shipped, not to substring presence alone — the derivation
-// changed twice during review (review_reports/review_T-E4X-03.md rounds 1-3:
-// slug-hunting over commit prose -> committed-history --diff-filter=A, silently
-// EMPTY on 2 of the last 6 releases -> working-tree enumeration with the git range
-// used only as a membership predicate, APPROVED round 3). Behavioral-simulation
-// fixtures use mocked git output (strings, not real git processes) consistent with
-// test/feature-scope-gate.test.mjs and test/researcher-deep-research.test.mjs
-// patterns.
+// Tests for specs/release-engineer-complete-staging.md and the release-SOP
+// conditional checks (backlog rows E44, E49). The release-engineer SOP is
+// prompt text only (content/skill-release-engineer.md), so these tests pin its
+// wording: staging list, pre-commit verify, post-commit spec-file branches and
+// step 7a ticket-code derivation, using git output mocked as strings.
+// Spec-to-test map and history: specs/e260h-comment-rationale.md (test/release-staging.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -64,34 +35,16 @@ const CONST15 = fs.readFileSync(
 // can exercise branching without spawning a real git process).
 // ---------------------------------------------------------------------------
 
-// The directories the SOP declares as feature source dirs (AC1, AC2, AC3).
-// "gates/" added (E64): tsconfig.json's `include` gained `gates/**/*.ts` (the
-// root-cause fix for the tsconfig-derived directory check, review_reports/review_T-E645-02.md
-// round 2 R2-1), which makes that check (AC-B5.5) correctly derive gates/ as an expected
-// source dir — this list must carry it too, or that check fails (it is a pure set
-// difference between tsconfig's `include` and this array; see the AC-B5.5 test below).
-// "docs/", "research/", "multi-agent-scripts/", ".github/" added (E66, T-E66-02):
-// the same three (docs/, research/, multi-agent-scripts/) that were missing
-// from the git-add line, the AC2 cross-reference set, and the Expected-scope
-// list at cut time, plus .github/ (review_T-E66-01.md round-1 N1 — the only
-// tracked top-level dir the coordinator's `ls -d */`-based measurement never
-// saw, since that glob hides dot-directories). None of the four are
-// TypeScript source roots (AC-B5.5 derives its expected set purely from
-// tsconfig.json's `include`, so it can never wake for any of them — that's
-// why E64's fix pattern, repairing `include`, doesn't generalize here and
-// hand-enumeration is the only option), and none belong in NON_SOURCE_DIRS
-// below (all four are tracked and feature-touchable, per skill-release-
-// engineer.md:173).
+// The directories the SOP declares as feature source dirs (AC1-AC3). The
+// AC-B5.5 test derives TypeScript roots from tsconfig.json `include`, so gates/
+// must be listed here too. docs/, research/, multi-agent-scripts/ and .github/
+// are not TypeScript roots, so no derivation finds them; they are hand-listed.
+// History: specs/e260h-comment-rationale.md (test/release-staging.test.mjs).
 const FEATURE_DIRS = ["lib/", "tools/", "schema/", "guards/", "gates/", "prompts/", "bin/", "scripts/", "content/", "templates/", "specs/", "test/", "qa_reports/", "review_reports/", "docs/", "research/", "multi-agent-scripts/", ".github/", "transport/"];
 
-// Top-level repo directories deliberately OUTSIDE FEATURE_DIRS — hand-
-// classified, not derived (E66, T-E66-02): unlike the tsconfig-`include`
-// derivation used for source dirs (AC-B5.5), there is no meta-guard that can tell "shipped metadata",
-// "gitignored dependency tree", or "session bookkeeping" apart from "feature
-// source" automatically, so this partition is maintained by hand and the
-// Partition test below exists precisely to make its staleness loud instead of
-// silent (the failure mode that let docs/, research/, multi-agent-scripts/,
-// and .github/ go missing from FEATURE_DIRS in the first place).
+// Top-level dirs deliberately outside FEATURE_DIRS. Nothing can derive this
+// partition, so it is kept by hand and the Partition test below fails loudly
+// when a new top-level dir is not classified.
 const NON_SOURCE_DIRS = [
   "dist/", // build output; already enumerated in METADATA_PATHS below (staged via `npm run build` only per the release-engineer Artifact allowlist, never hand-edited or staged as feature source)
   "node_modules/", // gitignored dependency tree (repo .gitignore); never tracked, never staged, never appears in a release diff
@@ -118,25 +71,17 @@ const E65_METADATA_PATHS = [".current/.config.json", "docs/backlog.md", "CLAUDE.
 // got staged" risk class. package-lock.json was NOT re-added here — E60
 // already staged it (see METADATA_PATHS above).
 const E94_METADATA_PATHS = ["CONTRIBUTING.md", "tasks.md"];
-// A third root-ledger path joins the git-add line and the existence pre-filter
-// (re-baselined under T-E130-07 / E198(b)). Since each lane got
-// its own ledger (E125a), `tw_complete_task` on primary writes `.current/_primary/tasks.md`, not
-// root `tasks.md` — so the primary task ledger `tw_complete_task` actually
-// mutates was silently left out of the release commit until this ticket.
-// Kept as its own named array (not folded into E94_METADATA_PATHS) so the
-// ownership/origin ticket stays traceable at the call site, same convention
-// as E65_METADATA_PATHS/E94_METADATA_PATHS above.
+// The primary task ledger joins the git-add line (E198(b)): since each lane got
+// its own ledger, `tw_complete_task` on primary writes `.current/_primary/tasks.md`,
+// which the release commit used to leave out. Kept as its own named array so
+// the ticket that added it stays traceable, like the arrays above.
 const E198B_METADATA_PATHS = [".current/_primary/tasks.md"];
 
 /**
- * Simulate the pre-commit verification logic described in AC2:
- * given a mock `git status --short` output and a mock `git diff --cached --stat`
- * output, return { pass: boolean, missing: string[] }.
- *
- * A staging set is FAIL if any FEATURE_DIR that has changes in `git status` is
- * absent from `git diff --cached --stat`. "Metadata-only" staging (only
- * package.json / index.ts / CHANGELOG.md / README.md / dist/) is a FAIL when
- * source dirs have pending edits.
+ * Simulate the AC2 pre-commit verify: given mock `git status --short` and
+ * `git diff --cached --stat` output, return { pass, missing }. FAIL when a
+ * FEATURE_DIR has changes but is not staged, so metadata-only staging fails
+ * while source dirs have pending edits.
  */
 function simulatePreCommitVerify(gitStatusShort, gitDiffCachedStat) {
   // Which feature dirs appear changed in git status?
@@ -149,18 +94,10 @@ function simulatePreCommitVerify(gitStatusShort, gitDiffCachedStat) {
 }
 
 /**
- * Detect whether a handoff's `scope_decision_why` free-text field records a
- * backlog-row-as-spec mini-chain (PM/architect skipped, backlog rows serve as
- * the spec) — the SKIP-branch trigger from E44 (content/skill-release-engineer.md:87).
- *
- * NOTE (F6, non-blocking, review_reports/review_T-E4X-03.md round 1): this is
- * inherently a judgement call over free text — `scope_decision_why` is optional
- * and unstructured (`z.string().max(2000).optional()`, tools/registry.ts) and no
- * schema field encodes chain shape. This function models a reasonable release-
- * engineer reading of the signal (both "mini-chain" and a PM/architect-skipped
- * marker present) for fixture purposes; it is not a claim that the real SOP step
- * is mechanically decidable — F6 documents that gap and is out of this ticket's
- * scope to close.
+ * Whether `scope_decision_why` records a backlog-row-as-spec mini-chain
+ * (PM/architect skipped), the SKIP-branch trigger (E44). The field is optional
+ * free text, so this models a reasonable reading for fixtures; it does not
+ * claim the real SOP step is mechanically decidable.
  */
 function scopeDecisionWhyRecordsMiniChain(scopeDecisionWhy) {
   if (!scopeDecisionWhy) return false;
@@ -196,35 +133,12 @@ const AC4_UNCLASSIFIABLE_STOP =
   "AC4 unclassifiable: no specs/<active_feature>.md in the tree, pending_notes does not record a multi-feature release, and scope_decision_why does not record a backlog-row-as-spec mini-chain — record the dispatch shape in scope_decision_why (or author specs/<active_feature>.md) and re-run.";
 
 /**
- * Simulate the post-commit sanity check described in AC4 (E44, conditional on
- * dispatch shape; re-baselined per E142(b)/AC4-AC5 — content/skill-release-
- * engineer.md step 8's "Post-commit sanity check (AC4, range-corrected)"
- * bullet, FOUR branches):
- * given a mock `git diff <prev-tag>..HEAD --name-only` output, the
- * active_feature name, whether `specs/<active_feature>.md` exists ANYWHERE in
- * the working tree, the handoff's `scope_decision_why` text, and (E142(b))
- * `pending_notes`, return
- * { pass: boolean, branch: "REQUIRE"|"MULTI-FEATURE"|"SKIP"|"UNCLASSIFIABLE", errorMsg: string|null }.
- *
- * Branch logic (exhaustive over S=specExistsInTree, M=recordsMultiFeature,
- * W=recordsMiniChain — code-reviewer round 2 F1's re-derivation, all four
- * assignments covered, all six pairs unsatisfiable):
- *   - M (pending_notes records "Multi-feature release: ...")     -> MULTI-FEATURE,
- *     UNCONDITIONALLY (never weighed against S or W — a totally separate
- *     detection path; REQUIRE explicitly excludes this case).
- *   - S ∧ ¬M                                                     -> REQUIRE
- *   - ¬S ∧ ¬M ∧ W                                                -> SKIP
- *   - ¬S ∧ ¬M ∧ ¬W                                               -> UNCLASSIFIABLE
- *
- * MULTI-FEATURE's own internal rule (E142(b) Decision — logged-and-skipped by
- * design): for each named feature (stripped of any trailing parenthetical
- * annotation, e.g. "e109-workspace-feature-anchoring (E109+E146)" ->
- * "e109-workspace-feature-anchoring"), a feature with NO specs/<name>.md in
- * the tree is logged and skipped — never a STOP. A feature whose spec DOES
- * exist but is absent from the range STOPs with the same message shape as
- * REQUIRE, naming that feature's spec path. `multiFeatureSpecsInTree` lets a
- * fixture declare, per named feature, whether its spec exists in the tree
- * (mirrors the real fs-existence check without touching the filesystem).
+ * Simulate the AC4 post-commit spec-file check (content/skill-release-engineer.md
+ * step 8). Returns { pass, branch, errorMsg }. Branches, with S = spec exists
+ * in tree, M = pending_notes records "Multi-feature release: ...", W = mini-chain:
+ * M -> MULTI-FEATURE (always); S and not M -> REQUIRE; neither, W -> SKIP;
+ * otherwise UNCLASSIFIABLE. Under MULTI-FEATURE a named feature with no spec in
+ * the tree is skipped; one whose spec exists but is not in the range STOPs.
  */
 function simulatePostCommitCheck(
   gitDiffRange,
@@ -285,18 +199,9 @@ function simulatePostCommitCheck(
 // ---------------------------------------------------------------------------
 
 test("AC1: skill-release-engineer.md's git-add line enumerates every required staging directory and metadata path IN ITS CAPTURE GROUP (rescoped, E64/T-E645-03 point 2)", () => {
-  // Contract: the git add instruction must name each required directory by
-  // path. Abstract language ("touched files", "all relevant files") is
-  // prohibited.
-  //
-  // Rescoped from a whole-document `SKILL.includes(dir)` check
-  // (review_reports/review_T-E645-02.md round 1 F1 layer 3): that form is
-  // vacuous — every one of the 15 dirs is satisfied by prose elsewhere in the
-  // file, so deleting the entire `git add lib/ tools/ …` line outright still
-  // left the old assertion at 60/60 green. A pin that survives deletion of
-  // the thing it pins protects nothing. This form extracts the git-add line
-  // itself and asserts against ONLY its capture group, so removing or
-  // truncating the line is now a genuine, detectable red.
+  // The git-add line must name each required directory by path. The test
+  // asserts against that line's capture group only: a whole-document search was
+  // vacuous, since prose elsewhere names every dir and deleting the line stayed green.
   const gitAddMatch = SKILL.match(/^\s+git add (.+)$/m);
   assert.ok(gitAddMatch, "must find the git-add line in the staging instruction (AC1)");
   const stagedTokens = gitAddMatch[1].split(/\s+/).filter(Boolean);
@@ -363,20 +268,12 @@ test("AC2: skill-release-engineer.md includes pre-commit 'git diff --cached --st
 });
 
 test("AC2 (E94): Root-file completeness check — the two EXTRACTED commands, EXECUTED, discriminate the v3.104.2 escape from a correct release across four workspace shapes (adopter repo with no .current/, source outside FEATURE_DIRS, .current/ dirty, and the escape/PASS pair code-reviewer verified empirically)", () => {
-  // Contract (T-E94-01 item 3, round-2 APPROVED review_reports/review_T-E94-01.md):
-  // The directory cross-reference (AC2) only ever sees the 19 FEATURE_DIRS, so a
-  // root-level file that never got staged passed silently -- exactly how
-  // v3.104.2 shipped a tree missing CONTRIBUTING.md. The fix is two commands,
-  // run AFTER `git add`, whose combined empty output is the PASS signal:
-  //   git diff --name-only -- . ':!.current'                     (tracked, left unstaged)
-  //   git ls-files --others --exclude-standard -- . ':!.current'  (untracked, never staged)
-  // `git status --short` was rejected in round 1 (C1) because it prints
-  // already-staged paths too (`M ` vs ` M`), so it fires identically on a
-  // correct release and on the escape. This test EXTRACTS the two live
-  // commands from the SOP text (never hardcodes a second copy — a future
-  // wording edit is exercised, not bypassed) and actually RUNS them in
-  // scratch git repos, mirroring the round-2 reviewer's own four-shape
-  // verification method rather than trusting the prose.
+  // The directory cross-reference sees only FEATURE_DIRS, so a root file left
+  // unstaged passed silently (how v3.104.2 shipped without CONTRIBUTING.md).
+  // The SOP's two commands, run after `git add`, print nothing on PASS. This
+  // test extracts them from the SOP text and runs them in scratch git repos
+  // across four workspace shapes. Why `git status --short` was rejected:
+  // specs/e260h-comment-rationale.md (test/release-staging.test.mjs).
   const labelIdx = SKILL.indexOf("**Root-file completeness (E94)**");
   assert.ok(labelIdx > -1, "must find the Root-file completeness (E94) label");
   const sentenceEnd = SKILL.indexOf("If either command's output is non-empty", labelIdx);
@@ -842,14 +739,9 @@ test("Fixture H (AC4/REQUIRE non-weakening, F6): spec-in-tree wins over SKIP eve
 });
 
 // ---------------------------------------------------------------------------
-// Fixtures I/J/K (the multi-feature release cases; AC4/MULTI-FEATURE, AC5, E142(b)): the real
-// v3.113.0 shape — pending_notes = "Multi-feature release:
-// three features named: the workspace-anchoring one (E109+E146, e109-workspace-feature-anchoring),
-// the md-tables one (e145-md-tables-cited-donemark) and the stamp-flake one
-// (slug e148-stamp-provenance-test-flake), in that order." — verified against this repo's actual git history (git log -p -S
-// "Multi-feature release:" -- .current/handoff.md): e109-workspace-feature-
-// anchoring.md exists under specs/, e145/e148 do not (mini-chain backlog-row-
-// as-spec tickets), which is exactly the E142(b) Decision's "logged and
+// Fixtures I/J/K: multi-feature releases (AC4 MULTI-FEATURE branch, E142(b)),
+// modelled on the real v3.113.0 pending note. Only the first named feature has
+// a spec under specs/; the other two are mini-chain tickets, the "logged and
 // skipped by design" case.
 // ---------------------------------------------------------------------------
 const V3113_PENDING_NOTES =
@@ -967,16 +859,9 @@ test("AC4 branch exhaustiveness: exactly one of REQUIRE/MULTI-FEATURE/SKIP/UNCLA
 // ---------------------------------------------------------------------------
 
 test("AC-B5.5: every repo source directory appears in FEATURE_DIRS or metadata list", () => {
-  // WHY: the authoritative list of TypeScript source roots is tsconfig.json
-  // `include`. Deriving the expected dirs from it means a newly added source
-  // directory triggers a guard failure automatically — no manual update to any
-  // test-side list required. This replaces the old hand-maintained EXCLUDED_DIRS
-  // heuristic, which was the drift source that let transport/ slip out of
-  // release staging in v3.24.0.
-  //
-  // The guard uses getTsConfigSourceDirs, not EXCLUDED_DIRS (AC-B6.3).
-  // If tsconfig lists a dir absent from FEATURE_DIRS, the assertion surfaces it
-  // automatically, naming the missing dir (AC-B6.4).
+  // The expected source dirs come from tsconfig.json `include`, so a new
+  // source directory fails this guard with no test-side list to update. The
+  // hand-kept list it replaced is how transport/ slipped out of v3.24.0 staging.
   const tsconfigPath = path.join(ROOT, "tsconfig.json");
   const tsconfigDirs = getTsConfigSourceDirs(tsconfigPath);
 
@@ -1005,28 +890,11 @@ test("AC-B5.5: every repo source directory appears in FEATURE_DIRS or metadata l
 });
 
 test("Partition (E66, T-E66-02): every top-level repo directory is classified in exactly one of FEATURE_DIRS / NON_SOURCE_DIRS", () => {
-  // WHY: FEATURE_DIRS/NON_SOURCE_DIRS is a hand-maintained partition, not a
-  // derived one — AC-B5.5 above already proves the tsconfig-`include`
-  // derivation route doesn't generalize here (docs/, research/,
-  // multi-agent-scripts/ are not TypeScript source roots, so that guard can
-  // never wake for them). A hand-maintained list's failure mode is silent
-  // staleness: a new top-level directory lands on disk and nobody remembers
-  // to add it anywhere — exactly what happened to docs/, research/,
-  // multi-agent-scripts/, and .github/ before this ticket. This test makes
-  // that failure mode loud: enumerate real top-level directories and assert
-  // the partition still covers every one of them, so the next directory
-  // created reds a test instead of going silently unstaged.
-  //
-  // Enumeration source: `git ls-files` (tracked paths), NOT `fs.readdirSync`
-  // or `ls -d */`. `ls -d */` is exactly the tool whose blind spot produced
-  // this ticket (review_T-E66-01.md round-1 N1): it hides dot-directories, so
-  // .github/ and .current/ were never in the coordinator's original
-  // NON_SOURCE_DIRS candidate set. A raw filesystem readdir has the opposite
-  // problem — it would also surface contributor-local, untracked scratch
-  // directories (editor/IDE state, ad hoc local backup dirs, etc.) that have
-  // nothing to do with this repo's structure and would make the test fail
-  // non-deterministically machine-to-machine. `git ls-files` is deterministic
-  // and reproducible on every clone and in CI, and DOES enumerate dot-dirs.
+  // FEATURE_DIRS and NON_SOURCE_DIRS are kept by hand, and a hand-kept list
+  // goes stale silently. This enumerates the real top-level dirs and asserts
+  // each is classified, so a new directory fails here instead of going unstaged.
+  // It uses `git ls-files`: `ls -d */` hides dot-dirs, and a raw readdir would
+  // pick up untracked local scratch dirs and vary by machine.
   const trackedTopDirs = execSync("git ls-files", { cwd: ROOT, encoding: "utf-8" })
     .split("\n")
     .filter(Boolean)
@@ -1066,19 +934,12 @@ test("Partition (E66, T-E66-02): every top-level repo directory is classified in
 });
 
 // ---------------------------------------------------------------------------
-// Phase 4 — release-engineer legal handoff write path (C13, v3.49.0)
+// Phase 4 — release-engineer handoff write path (specs/c13-release-engineer-write-path.md)
 // ---------------------------------------------------------------------------
-// WHY: specs/c13-release-engineer-write-path.md AC5 replaced the old
-// "Side-channel constraint" workaround with a CRITICAL Hard rule telling
-// release-engineer to STOP on any tw_* ⛔ rejection rather than hand-edit
-// .current/handoff.md or tasks.md (the exact anti-pattern the v3.48.0
-// incident exhibited). AC6/AC7 require the same STOP reminder — plus a
-// driftBaselineIds reminder — to also land as dual-anchored, ≤2-sentence
-// reinforcement hints in the haiku-tier template shim, and require both to
-// survive as regression-testable literals. We pin load-bearing substrings
-// (not whole paragraphs) so future rewording that preserves intent doesn't
-// spuriously fail, but silent removal of the STOP instruction or the
-// driftBaselineIds reminder does.
+// The SOP must STOP on any tw_* rejection instead of hand-editing handoff.md
+// or tasks.md, and the shim must repeat it with a driftBaselineIds reminder.
+// We pin load-bearing substrings, not paragraphs, so rewording passes but
+// removal fails.
 
 test("C13-AC5: skill-release-engineer.md contains the verbatim CRITICAL STOP-on-⛔ rule", () => {
   // Contract: the Hard rules section must instruct STOP + hand-back on ANY
@@ -1156,24 +1017,11 @@ test("C13-AC6: shim watermark and tw_get_state/tw_switch_role invocation lines a
 });
 
 // ---------------------------------------------------------------------------
-// Phase 5 — release-engineer git-stop rule (D10; non-fast-forward push /
-// concurrent-release collision)
+// Phase 5 — release-engineer git-stop rule (specs/d10-release-engineer-git-stop-rule.md)
 // ---------------------------------------------------------------------------
-// WHY: specs/d10-release-engineer-git-stop-rule.md documents an incident where
-// a haiku-tier release-engineer hit a non-fast-forward push (a concurrent D2
-// session had advanced main) and "resolved" it by aborting a rebase and
-// running `git reset HEAD~1`, discarding its own committed release — only the
-// reflog made recovery possible. AC1-AC3 require a Hard rule + matching
-// Escalation Routes row in content/skill-release-engineer.md that forbids
-// destructive git recovery and instead routes to a Blocked handoff with the
-// local release-commit SHA. AC4 requires a mirroring ≤2-sentence
-// reinforcement hint in the haiku-tier shim, without touching the watermark
-// or tw_get_state/tw_switch_role lines. AC5 requires this test file to pin
-// the verbatim Copy/Strings substrings from both files, following the same
-// load-bearing-substring convention as the AC1-AC5/C13 tests above — we pin
-// substrings (not whole paragraphs) so future rewording that preserves
-// intent doesn't spuriously fail, but silent removal of the STOP rule,
-// the forbidden-command list, or the Blocked/SHA/hand-back contract does.
+// After a non-fast-forward push, the SOP forbids destructive git recovery and
+// routes to Blocked with the local release-commit SHA; the shim mirrors it.
+// Substrings are pinned, as above, so rewording passes but removal fails.
 
 test("D10-AC1: skill-release-engineer.md Hard rule STOPs on non-fast-forward push / collision and forbids destructive git recovery", () => {
   // Contract: the Hard rule must instruct immediate STOP and explicitly
@@ -1283,29 +1131,12 @@ test("D10-AC4: shim watermark and tw_get_state/tw_switch_role invocation lines a
 });
 
 // ---------------------------------------------------------------------------
-// Phase 5.5 — release-engineer:Blocked must be reachable (E53, v3.98.0)
+// Phase 5.5 — release-engineer:Blocked must be reachable (E53)
 // ---------------------------------------------------------------------------
-// WHY: docs/backlog.md's E53 row + review_reports/review_T-E53-01.md. Before
-// this cut, step 7a's own empty-baseline guard (:84 area) and every row in
-// the Escalation Routes table above (:152-157) instructed release-engineer to
-// halt via `status=Blocked`, but `tools/transitions.ts` had NO
-// `release-engineer:Blocked` key and no entry edge into it at all — the SOP
-// prescribed a write the server would TRANSITION_REJECTED. content/
-// skill-release-engineer.md carried two explicit claims that this was by
-// design ("...`release-engineer:Blocked` is not a reachable transition into
-// this role on any edge...", ":84"; "**Step 7a's empty-baseline hazard is NOT
-// a row in this table**...", former :159) and step 7a's guard was an
-// in-SOP-only halt-and-surface rather than a real state transition. E53 opens
-// the edge in tools/transitions.ts (test/qa-flow.test.mjs T-E53-03 pins the
-// state-machine side) and, on the content side, deletes both now-false
-// claims and converts step 7a's guard into a genuine Escalation Routes table
-// row. These tests cover the content assertions T-E53-03 owns: zero
-// remaining unreachable claims, the new row's presence and shape, and the
-// four Escalation Routes rows (:152-154, :156) that
-// test/release-staging.test.mjs:757 (D10, :155) and
-// test/verify-release.test.mjs:701 (release self-check, :157) do NOT already
-// byte-pin — so this block covers what those two don't, rather than
-// duplicating them.
+// The SOP told release-engineer to halt with `status=Blocked`, but the server
+// had no edge into that state. E53 opened the edge (pinned in test/qa-flow.test.mjs)
+// and removed the SOP's "unreachable" claims. These tests cover the content side.
+// Background: specs/e260h-comment-rationale.md (test/release-staging.test.mjs).
 
 test("E53: zero remaining claims that release-engineer:Blocked is unreachable", () => {
   // Contract: both pre-E53 falsehoods must be gone. Pinned as exact substrings
@@ -1355,15 +1186,9 @@ test("E53: step 7a's empty-baseline STOP is now a genuine Escalation Routes tabl
 });
 
 test("E53: pending-note escaping caveat — the :84 guard clause and the new table row are semantically verbatim but NOT byte-equal, and normalise identically", () => {
-  // Contract (flagged by code-reviewer, review_T-E53-01.md, for T-E53-03
-  // specifically): a markdown table cell MUST escape a literal `|` as `\|`
-  // or the row splits — so the new row's message reads
-  // `<qa_reports\|review_reports>` while the step 7a prose at :84 (not inside
-  // a table cell) keeps the bare `<qa_reports|review_reports>`. A naive
-  // byte-equality assertion across both occurrences would fail spuriously;
-  // this test locks in that they are equal AFTER normalising `\|` -> `|`,
-  // and that the raw forms really do differ (proving the normalisation step
-  // is load-bearing, not vacuous).
+  // A markdown table cell escapes `|` as `\|`, so the new row and the step 7a
+  // prose differ byte for byte. This asserts they are equal after normalising
+  // `\|` to `|`, and that the raw forms differ, so the normalising is needed.
   const proseMatch = SKILL.match(
     /WHEN either is set → \*\*STOP\*\*: `"(step 7a has no membership baseline for <qa_reports\|review_reports>[^"]*)"`/,
   );
@@ -1422,18 +1247,9 @@ test("E53: Escalation Routes rows :152-154 and :156 (not already byte-pinned by 
 });
 
 test("E53/E163: the Escalation Routes table now carries 9 data rows — E163's two new rows placed FIRST, the E53 empty-baseline-hazard row still LAST", () => {
-  // Re-baselined for the CI-gate ordering change (E163; see the expected-red manifest
-  // for e163-ci-gate-ordering): this test previously pinned the table at 7 data rows
-  // (6 pre-existing + the empty-baseline-hazard row from E53, appended last). E163 adds two more rows —
-  // "pre-flight CI gate red (step 2a)" and "CI gate failure (step 8b)" — so
-  // the pin re-baselines to 9. This is NOT loosened into a bare count: it
-  // still guards additive-only table growth (no row duplicated, dropped, or
-  // silently reordered) AND now also pins WHERE the new rows landed. The
-  // cut placed E163's two rows FIRST (they fire earliest in the SOP's step
-  // order — 2a before the version bump, 8b before the tag push), so this
-  // test asserts that placement explicitly rather than only counting rows;
-  // a row inserted in the middle, or the hazard row losing its "last" spot,
-  // still fails this test exactly as the row-count pin used to.
+  // E163 added two Escalation Routes rows, placed first because they fire
+  // earliest in the SOP. This pins 9 rows and their order, not a bare count:
+  // a duplicated, dropped or reordered row, or the hazard row losing last place, fails.
   const tableStart = SKILL.indexOf("| situation | status | pending note | next_role |");
   const scopeRuleStart = SKILL.indexOf("**Expected vs unrelated scope rule**");
   assert.ok(tableStart > -1 && scopeRuleStart > -1, "must locate both the table header and the scope-rule paragraph");
@@ -1482,20 +1298,11 @@ test("Expected vs unrelated scope rule (E64, T-E645-03 point 3): the scope-rule 
 });
 
 // ---------------------------------------------------------------------------
-// Phase 6 — E7: governed git surface (generalized sanctioned-git-ops
-// whitelist, ALL roles)
+// Phase 6 — governed git surface for all roles (specs/e7-governed-git-surface.md)
 // ---------------------------------------------------------------------------
-// WHY: specs/e7-governed-git-surface.md generalizes D10's release-engineer-only
-// STOP rule into one core-tagged constitution bullet (content/const-15-core-tail.md
-// §6) binding every role, and turns release-engineer's own D10 bullet into a
-// pointer rather than a restatement. AC1 pins the new §6 bullet's load-bearing
-// verbs (sanctioned + forbidden) and the STOP/Blocked/hand-back phrase, all in
-// the SAME bullet (so the pointer-vs-restatement split can't silently drift the
-// two halves apart). AC2 pins the cross-reference sentence appended to the
-// existing D10 bullet. AC5 (non-regression) is already covered by the D10-AC1
-// through D10-AC4 tests above, unmodified — those substrings still had to
-// survive byte-identical for this section's tests to be meaningful at all;
-// re-asserting that overlap here would be redundant, not additional coverage.
+// The D10 release-only STOP rule became one constitution bullet for every role,
+// and the D10 bullet now points to it. AC1 pins both halves in the same bullet
+// so they cannot drift apart; AC2 pins the D10 cross-reference sentence.
 
 test("E7-AC1: content/const-15-core-tail.md §6 carries the sanctioned-git-ops whitelist bullet — sanctioned verbs, forbidden verbs, and the STOP/Blocked/hand-back phrase, all in the same bullet (spec AC1)", () => {
   const bulletMatch = CONST15.match(/- \*\*Sanctioned git operations \(ALL roles\)\*\*:.*$/m);
@@ -1579,55 +1386,12 @@ test("E7-AC2: content/skill-release-engineer.md's D10 bullet cross-references th
 });
 
 // ---------------------------------------------------------------------------
-// Phase 6.5 — E59: §6 dependency-audit waiver-escape closure (structural,
-// all-sites regression pin)
+// Phase 6.5 — dependency-audit waiver escape stays closed (E59, re-baselined by E48)
 // ---------------------------------------------------------------------------
-// WHY: docs/backlog.md E59 (origin: review_T-E57-01 F7) closed the "unless
-// waived in the PR description with rationale" escape that let five HIGH
-// advisories ride release-to-release untouched (E57). The escape was
-// restated, in slightly different words each time, at 9 live normative sites
-// spread across 3 files (const-15's source bullet + 8 mirrors/table-rows/
-// diagram edges in docs/skills/release-engineer.md and
-// docs/skills/sr-engineer.md) — three independent review passes (coordinator,
-// sr-engineer, code-reviewer) each re-derived a DIFFERENT site count (5, then
-// 6, then 7) before a full-tree enumeration by site (not by grep-hit) settled
-// on 9 (review_T-E59-01.md Round 2). That history — every prior single-pattern
-// sweep missed at least one live site — is exactly why this pin is structural
-// rather than a single string match.
-//
-// RE-BASELINED 2026-08-17 (E48, human decision, no salvage): docs/skills/ was
-// deleted entirely — it was never on the prompt path (prompts/build.ts and
-// tools/role.ts compose from content/ only) and 9 of its 12 files had never
-// been touched since their creation commit. That removes 8 of the 9 sites
-// above (only 1 of the 8 was a verbatim mirror; the rest — STOP-exit table
-// rows, server-enforced-gates bullets, mermaid decision branches — were
-// structures the live SOPs never contained at all). Re-deriving from the tree
-// rather than from the deletion count surfaced 3 previously-unpinned LIVE sites
-// (review_T-E48-02.md round 1/2, finding C2) that were never in the
-// original 9: content/skill-release-engineer.md:56-58, the §6a
-// dependency-audit-disposition mechanism itself — the exact "cite the
-// advisory record's row, don't improvise a rationale" behavior E57/E59 exist
-// to enforce. The re-baselined enumeration is therefore 9 -> 4, NOT 9 -> 1:
-// const-15's source bullet plus those 3 sites.
-//   (a) a repo-tree sweep for the literal word "waived" across content/ (the
-//       only tree left — docs/skills/ no longer exists). Every historical
-//       escape phrasing used this exact verb form ("waived in the PR
-//       description[, with rationale]", "unwaived", "no / waived" —
-//       confirmed against git history, commit 95d6376..HEAD). The RETAINED
-//       "Toolchains lacking an audit command waive the rule" sentence and the
-//       "...is NOT a waiver..."/"...waiver..." clauses (const-15:11,
-//       skill-release-engineer.md:57) all use different words ("waive" /
-//       "waiver"), so this sweep has zero legitimate positives to exclude —
-//       the escape reappearing ANYWHERE in content/, not just at one of the 4
-//       known sites (including a future 5th site nobody has enumerated yet),
-//       reds this test.
-//   (b) presence, at each of the 4 enumerated sites, of the disposition-
-//       channel language the escape was replaced with — so silently deleting
-//       or truncating a site's fixed text (which would not reintroduce the
-//       word "waived") is caught too.
-// Together (a) and (b) fail on: the escape word reappearing anywhere, OR any
-// of the 4 known sites losing its replacement text — the two ways this
-// defect could recur.
+// The "unless waived in the PR description" escape let HIGH advisories ride
+// release to release, and every single-pattern sweep missed a live site. So the
+// pin is structural: "waived" appears nowhere in content/ (a), and each of the 4
+// known sites keeps its replacement text (b). History: specs/e260h-comment-rationale.md (test/release-staging.test.mjs).
 
 function listMarkdownFilesRecursive(dir) {
   return fs
@@ -1685,17 +1449,9 @@ test("E59: all 4 live §6 dependency-audit normative sites carry the disposition
     },
   ];
 
-  // Re-baselined 9 -> 4, NOT 9 -> 1 (E48, 2026-08-17): E48 deleted docs/skills/
-  // entirely, which removes 8 of the original 9 sites (7 of those 8 were
-  // structures — STOP-exit table rows, server-enforced-gates bullets, mermaid
-  // decision branches — the live SOPs never contained at all; only 1 was a
-  // verbatim mirror). That deletion alone would leave only const-15's source
-  // bullet pinned. But re-deriving from the tree instead of from the deletion
-  // count surfaced 3 previously-unpinned LIVE sites that were never in the
-  // original 9-site enumeration: content/skill-release-engineer.md:56-58, the
-  // §6a dependency-audit-disposition mechanism itself (the "cite the advisory
-  // record's row, don't improvise a rationale" behavior E57/E59 exist to
-  // enforce). Net: -8 mirror sites, +3 previously-uncounted live sites = 4.
+  // 4 sites: E48 deleted docs/skills/ (8 of the original 9 sites), and a
+  // re-derivation from the tree found 3 unpinned live sites in
+  // content/skill-release-engineer.md (history: see the Phase 6.5 header).
   assert.equal(sites.length, 4, "this enumeration must itself stay at 4 sites (re-baselined 2026-08-17, E48 + review_T-E48-02.md round 1/2 C2: -8 docs/skills/ mirror sites deleted by E48, +3 previously-unpinned live content/skill-release-engineer.md:56-58 sites added) — update it deliberately, not by accident, if the site set changes");
 
   for (const { body, anchor, label } of sites) {
@@ -1714,58 +1470,19 @@ test("E59: all 4 live §6 dependency-audit normative sites carry the disposition
 });
 
 // ---------------------------------------------------------------------------
-// Phase 7 — E49/E50: step 7a ticket-code SET derivation (working-tree
-// enumeration + PREV_TAG membership predicate, unioned across qa_reports/ and
-// review_reports/)
+// Phase 7 — step 7a ticket-code set derivation (E49, E50): working-tree
+// enumeration with a PREV_TAG membership test, over qa_reports/ and review_reports/
 // ---------------------------------------------------------------------------
-// WHY: review_reports/review_T-E4X-03.md and review_reports/review_T-E50-02.md
-// document that this derivation's literal text changed FOUR times across two
-// tickets:
-//   round 1 (E49) — hunt ticket/feature SLUGS in commit subjects/bodies. Wrong
-//     on the exact release it was written for: v3.95.0 yielded {E37,E38}
-//     (disjoint from the right answer {E45,E46}), because shipped tickets
-//     appear in the range only as bare codes, never as slugs (review findings F1-F3).
-//   round 2 (E49) — committed history only (`git log --diff-filter=A`). Fixed
-//     the round-1 findings, but silently returns EMPTY on v3.93.0 and v3.94.0 — 2 of the last
-//     6 releases — because qa_reports/ evidence is routinely UNTRACKED at
-//     the time step 7a runs (step 8's `git add qa_reports/` is what first commits it).
-//     Combined with "zero matches = silent no-op", this is a regression versus
-//     the rule before E49, which archived those releases correctly by
-//     working-tree existence (F7 — the round-2 BLOCKING finding).
-//   round 3 (E49, APPROVED) — enumerate root-level qa_reports/ files as they
-//     sit in the WORKING TREE right now, and use the git range only as a
-//     MEMBERSHIP TEST against PREV_TAG's tree. Backtested against all six of
-//     this repo's last releases in six detached worktrees, reproducing every
-//     "actually archived" outcome including the two that round 2 returned
-//     empty for. Round 3 also recorded N4 (non-blocking then): an
-//     empty/unresolvable PREV_TAG baseline makes `grep -vxFf` pass its WHOLE
-//     input through — a mass-sweep hazard, explicitly left unfixed.
-//   Round 1 of E50 — (a) guarded the empty-baseline mass-sweep hazard (N4), but shipped
-//     the guard as a single global flag (F9: permanently wedges any workspace that has never
-//     produced a review_reports/ tree) and (b) added zero-match logging that
-//     expanded an UNBOUND `$CODES` variable, printing `{∅}` on every release,
-//     including non-empty ones (F8) — CHANGES_REQUESTED.
-//   Round 2 of E50 (APPROVED, shipped) — the unbound-variable defect (F8) closed by
-//     binding `CODES=$( { ... } | ... )`; F9 closed by splitting the single flag into per-tree
-//     STOP_QA/STOP_RR/EXCLUDE_QA/EXCLUDE_RR, so an absent or never-seeded
-//     review_reports/ tree no longer blocks qa_reports/'s half and does not
-//     recur release after release. (c) extends the whole predicate to
-//     review_reports/ under a PARALLEL archive dir (never folded into
-//     qa_reports/archive/ — the two streams share basenames, verified against
-//     the real v3.96.0 review_T-E4X-03.md collision).
-// These tests pin the ACTUALLY SHIPPED (E50 round 2) text and behavior — not
-// any earlier draft — per the "Test-coverage note for T-E50-03" in
-// review_T-E50-02.md (12 items, sequenced by consequence).
+// The derivation changed four times across two tickets, and two earlier forms
+// were wrong on real releases. These tests pin the shipped text and behaviour
+// (E50 round 2). Round history: specs/e260h-comment-rationale.md (test/release-staging.test.mjs).
 
-// Model of the shipped filename -> code extraction (E50 round 2, F8/attack 1):
+// Model of the shipped filename -> code extraction (step 7a):
 //   sed -E 's#.*<slash>##' | grep -oE '^[a-z_]*T-[A-Za-z0-9]+-' \
 //     | sed -E 's/^[a-z_]*T-//; s/-$//' | tr 'a-z' 'A-Z'
-// (literal shell text elided above to avoid a stray "*<slash>" closing this
-// block comment early — the shell strips the leading directory with a basic
-// sed substitution). Operates on a BASENAME (callers strip the directory
-// themselves via path.posix.basename, matching the shipped pipeline's own
-// ordering). Returns the uppercased code, or null when the filename carries
-// no `T-<CODE>-` segment reachable from an anchored `[a-z_]*` prefix run.
+// Takes a basename (callers strip the directory, as the pipeline does) and
+// returns the uppercased code, or null when no `T-<CODE>-` segment follows an
+// anchored `[a-z_]*` prefix.
 function codeFromFilename(basename) {
   const m = basename.match(/^[a-z_]*T-([A-Za-z0-9]+)-/);
   return m ? m[1].toUpperCase() : null;
@@ -1919,14 +1636,9 @@ test("E49 step 7a: skill text pins the ACTUALLY SHIPPED derivation literally, bo
 });
 
 test("E50 step 7a (N14 CLOSED — pin repointed at the EXECUTABLE CODES= fence): does not resurrect the round-2 committed-history-only rule (a substring pin on the round-2 command must fail)", () => {
-  // Stale-pin fix (finding N14, review_T-E50-02.md round 2): the PRE-EXISTING version of this test
-  // anchored on `/```\n(\s*find qa_reports -maxdepth 1[\s\S]*?)```/`, which
-  // matches the FIRST fence beginning "find qa_reports -maxdepth 1" — after
-  // the change in E50, that is the ILLUSTRATIVE fence (content/skill-release-engineer.md's
-  // "Derive the ticket-code SET" prose block), not the CODES= fence the role
-  // actually executes. Reintroducing `git log`/`--diff-filter=A` into the
-  // CODES= fence would have left that stale pin green. Repointed here at the
-  // fence that opens with the `CODES=$( {` binding (E50 round 2, F8).
+  // The old pin matched the first "find qa_reports -maxdepth 1" fence, which is
+  // the illustrative one, so re-adding committed-history logic to the executed
+  // fence stayed green. It now anchors on the `CODES=$( {` fence the role runs.
   const fenceMatch = SKILL.match(/```\n(\s*CODES=\$\( \{[\s\S]*?)```/);
   assert.ok(fenceMatch, "must find step 7a's EXECUTABLE CODES= fenced derivation code block");
   const fence = fenceMatch[1];
@@ -2072,16 +1784,9 @@ test("E49 step 7a (N2): filenames with no T-<CODE>- substring (expected-red_*) a
 });
 
 test("E50 step 7a (Item 0 — F9 CLOSED, N4 hazard closed): an empty PREV_TAG baseline WITH root files present now STOPs instead of admitting every root-level file", () => {
-  // This test REPLACES, in place, the prior pin at this exact location that
-  // asserted deriveCodesFromWorkingTree(["...E45...","...OLD..."], []) ->
-  // ["E45","OLD"] as "current (unguarded) behavior ... NOT this ticket's to
-  // fix" (round 3's N4). review_T-E50-02.md's Item 0 is explicit: E50 exists
-  // to close exactly this hazard, so leaving that pin standing beside a new
-  // guard test would assert the mass-sweep this ticket was written to kill —
-  // two tests pinning opposite behaviors is a contradiction, and the stale
-  // one reads as sanction for the permissive path. Rewritten in place; the
-  // ["E45","OLD"] fixture is carried forward as the set that must NOT be
-  // produced.
+  // Replaces, in place, a pin that asserted the unguarded mass-sweep
+  // (["E45","OLD"]) as current behaviour; keeping both would pin opposite
+  // behaviours. That set is now what must NOT be produced.
   const workingTree = ["qa_reports/review_T-E45-01.md", "qa_reports/review_T-OLD-01.md"];
   const prevTagTree = []; // empty baseline: no tags yet, or PREV_TAG predates qa_reports/
 
@@ -2140,12 +1845,9 @@ test("E49/E44 step-order pin: step 7a precedes step 8a (the commit) in the file,
 });
 
 // ---------------------------------------------------------------------------
-// Phase 8 — E50: step 7a per-tree empty-baseline guard, review_reports/
-// extension, and the extraction-chain filename-shape matrix.
-// review_reports/review_T-E50-02.md, "Test-coverage note for T-E50-03 —
-// FINAL, supersedes Round 1" (12 items, ordered by consequence). Items 0
-// (guard flip) and 1 (N14 fence repoint) are addressed in place above; the
-// remainder follow here.
+// Phase 8 — step 7a per-tree empty-baseline guard, the review_reports/
+// extension and the filename-shape matrix (E50; the guard flip and the
+// fence repoint are covered above).
 // ---------------------------------------------------------------------------
 
 test("E50 step 7a (Item 3 — 14-row filename-shape matrix, attack 1): the shipped extraction chain produces exactly these codes, or none", () => {
@@ -2213,15 +1915,10 @@ test("E50 step 7a (F9 — per-tree guard, all shapes): tree absent, baseline emp
 });
 
 test("E50 step 7a (Item 4 — F9 CLOSED, the permanent-wedge shape from round 1): a workspace whose review_reports/ tree never exists proceeds across THREE CONSECUTIVE releases, not just once", () => {
-  // Round 1's F9 finding: a global-OR guard STOPped this shape at release 2
-  // and recurred at release 3, forever -- self-inflicted, since nothing in
-  // the loop ever creates review_reports/. A fix that merely DEFERS the STOP
-  // (e.g. only clears at release 2) would still fail this test, because it
-  // asserts the SAME workspace shape at three consecutive tags. Mature
-  // workspace: qa_reports/ already has a non-empty baseline BEFORE this
-  // fixture's window (a "review_T-PRIOR-01.md" from an earlier release) so
-  // qa_reports/'s own guard outcome is "included" throughout, isolating
-  // review_reports/'s permanent absence as the only variable under test.
+  // A global guard STOPped this shape at release 2 and at every release after,
+  // since nothing creates review_reports/. Three consecutive tags catch a fix
+  // that only defers the STOP. qa_reports/ has a prior baseline, so the
+  // absence of review_reports/ is the only variable.
   const releases = [
     {
       prevTag: "v1.0.0",
@@ -2410,12 +2107,9 @@ test("E50 step 7a: the guard block precedes the CODES= derivation, mkdir, and mo
 });
 
 // ---------------------------------------------------------------------------
-// Phase 9 — E65 (step-8/10/11 ordering + adapter-stamp bump) and E55
-// (terminal handback naming), T-E645-03 points 4-5.
-// review_reports/review_T-E645-02.md rounds 1-2 APPROVED sr's step-order
-// change (F-OK-4) and the E55 terminal step (F-OK-6); these pins hold the
-// order itself, since order is the entire defect E65 documents — a review
-// that reads the moved steps without checking their sequence would miss it.
+// Phase 9 — E65 (step 8/10/11 ordering, adapter-stamp bump) and E55 (terminal
+// handback naming). These pin the order itself, since the wrong order was the
+// whole defect and a review of the moved steps can miss it.
 // ---------------------------------------------------------------------------
 
 test("E65: the five newly-staged metadata paths appear in step 8's git-add line", () => {
@@ -2481,15 +2175,10 @@ test("E55: the terminal handback step names the post-release PM/backlog-intake d
 });
 
 // ---------------------------------------------------------------------------
-// Phase 10 — E71 (docs/backlog.md:194, incl. the 2026-08-17 v3.102.1 amendment):
-// four release-SOP defects found only when the SOP is EXECUTED, not read.
-// review_reports/review_T-E69-01.md's coverage note for this ticket: "no pin
-// *could* have caught either round-1 blocker — prefer executing the snippets
-// over string-matching them". (a) and (b) below therefore extract the SOP's
-// own fenced/inline shell snippets programmatically and EXECUTE them (with a
-// negative control reproducing the pre-fix defect in the same shell), rather
-// than asserting on their string form. (c) and (d) are pure wording fixes with
-// no executable component and are pinned as content assertions.
+// Phase 10 — E71: four release-SOP defects found only by executing the SOP.
+// (a) and (b) extract the SOP's own shell snippets and run them, with a
+// negative control reproducing the pre-fix defect; (c) and (d) are wording
+// fixes, pinned as content assertions.
 // ---------------------------------------------------------------------------
 
 const which = (bin) => {
@@ -2501,22 +2190,9 @@ const which = (bin) => {
 };
 
 test("E71(a): the git-add line stages exactly 34 paths (19 directories + 15 metadata), set-equal to FEATURE_DIRS/METADATA_PATHS/E65_METADATA_PATHS/E94_METADATA_PATHS/E198B_METADATA_PATHS", () => {
-  // Coverage note 2 (review_reports/review_T-E69-01.md, both rounds): the
-  // capture group now includes a leading "--" (E71a's `git add --`), so an
-  // exact-token-count pin must normalize it away, or the raw token count is
-  // off by one (35 including "--", not the true 34).
-  //
-  // Re-baselined 31->33 / 12->14 metadata (T-E94-01): CONTRIBUTING.md and
-  // tasks.md joined the git-add line and the existence pre-filter; see
-  // E94_METADATA_PATHS above. package-lock.json was NOT re-added — E60
-  // already staged it (test/release-staging.test.mjs METADATA_PATHS,
-  // predates this change).
-  //
-  // Re-baselined 33->34 / 14->15 metadata (T-E130-07, E198(b)): a third
-  // root-ledger path, `.current/_primary/tasks.md`, joined the git-add line
-  // and the existence pre-filter (E198B_METADATA_PATHS above) — post-E125a,
-  // `tw_complete_task` on primary writes there, not to root `tasks.md`, so
-  // the release commit was silently missing the ledger it actually mutates.
+  // The capture group starts with "--" (`git add --`), so the token count
+  // drops it. The count grew with CONTRIBUTING.md and tasks.md (E94) and with
+  // `.current/_primary/tasks.md` (E198(b)); see the *_METADATA_PATHS arrays above.
   const gitAddMatch = SKILL.match(/^\s+git add (.+)$/m);
   assert.ok(gitAddMatch, "must find the git-add line");
   const stagedTokens = gitAddMatch[1].split(/\s+/).filter(Boolean).filter((t) => t !== "--");
@@ -2650,36 +2326,12 @@ test("E71(d): step 7c names the DONE-but-unreleased pre-marked-row shape and sta
   assert.match(section7c, /do NOT append a duplicate row/, "step 7c must forbid appending a duplicate row for the same feature (E71d)");
 });
 
-// Residual from review_reports/review_T-E69-01.md round 2 ("Minor 2"),
-// RETARGETED by E76 round 2 (review_reports/review_T-E76-01.md, code-reviewer
-// Quality item): the underlying asymmetry is UNCHANGED -- code-reviewer
-// confirmed it is "still exactly present" -- but E76 rewrote step 7a's move
-// loop from one-bullet-per-tree (each an inline `[ -z "$EXCLUDE_*" ] &&`
-// prefix on its own line) into a single heredoc block where the two move
-// loops share one `for c in $CODES; do ... done` and the review_reports side
-// is now guarded by an ENCLOSING `if [ -z "$EXCLUDE_RR" ]; then ... fi`
-// rather than an inline prefix on the same line as the `find`. The old
-// predicates searched for a literal `<CODE>` placeholder and an inline
-// `&&` guard on the match line itself -- both stale against the rewritten
-// text (`<CODE>` is now the shell variable `${c}`, and the guard moved to
-// the line above) -- so the test died at `assert.ok(rrLine)` before ever
-// reaching the guard assertions, silently stopping being a ratchet on the
-// asymmetry it exists to pin. Retargeted, not retired: the qa_reports move
-// example is STILL not EXCLUDE_QA-guarded (:143), while the review_reports
-// move example IS EXCLUDE_RR-guarded, now via the enclosing `if` at :146
-// rather than an inline `&&` at :147. Consequence if executed with
-// EXCLUDE_QA set is unchanged: one stderr line from `find`, nothing moved,
-// exit 0 -- noise, not damage.
-// QA DECISION (this ticket, not a new sr round): PASS, not FAIL, same as
-// before -- code-reviewer did not block on this in either round (cosmetic
-// asymmetry, zero behavioral difference on any path), and QA's own scope is
-// failing tests/missing coverage/test-infra defects, not this kind of
-// readability asymmetry. Pinned here as an EXACT ratchet on BOTH the guard's
-// shape and its presence/absence: this test reds the moment either guard's
-// presence changes, OR the review_reports guard's shape reverts from an
-// enclosing `if` back to an inline `&&` prefix -- so a future fix to :143
-// (adding an `EXCLUDE_QA` guard to the qa_reports loop) forces this pin to be
-// updated rather than drifting unnoticed either direction.
+// Known asymmetry, pinned as a ratchet: step 7a's review_reports move loop is
+// guarded by an enclosing `if [ -z "$EXCLUDE_RR" ]`, while the qa_reports loop
+// has no EXCLUDE_QA guard. Running it with EXCLUDE_QA set only prints one
+// stderr line, so it was passed as cosmetic. The test fails if either guard's
+// presence changes or the RR guard reverts to an inline `&&`, so a fix must
+// update this pin. History: specs/e260h-comment-rationale.md (test/release-staging.test.mjs).
 test("residual (review round 2, Minor 2; retargeted E76 round 2): review_reports move example is EXCLUDE_RR-guarded via an enclosing if; qa_reports move example is NOT YET EXCLUDE_QA-guarded (known asymmetry, non-blocking, PASSed by qa-engineer -- see qa_reports/review_T-E76-02.md)", () => {
   const lines = SKILL.split("\n");
   const rrIdx = lines.findIndex((l) => l.includes("find review_reports -maxdepth 1 -name \"review_T-${c}-*.md\""));
@@ -2710,15 +2362,9 @@ test("residual (review round 2, Minor 2; retargeted E76 round 2): review_reports
 });
 
 // ---------------------------------------------------------------------------
-// Class-assertion pins added under T-E76-02 (E76 round 2, code-reviewer's explicit recommendation): a
-// CLASS assertion over an instance pin, per the E66/E69 precedent both cited
-// by name in review_reports/review_T-E76-01.md's Round 2 Architecture
-// section as the durable control code-reviewer chose INSTEAD OF a third
-// sr-engineer round. These extract step 7a's five fragments mechanically
-// (the same extraction shape N14/E50's fence-repointing tests above already
-// use) and assemble them exactly as the SOP instructs, so the assertions
-// below run against the ACTUAL shipped script text, not a hand-copied
-// restatement of it that could silently drift from the source.
+// Class-assertion pins (E76): instead of pinning one instance, these extract
+// step 7a's five fragments and assemble them as the SOP instructs, so the
+// assertions run against the shipped script text, not a hand copy of it.
 // ---------------------------------------------------------------------------
 
 /**
@@ -2735,15 +2381,10 @@ function dedentFence(fenceText) {
 }
 
 /**
- * Mask the INTERIOR of quoted strings (replacing bytes with 'x', preserving
- * the quote characters themselves and all other structure) for the quote
- * types named in `quotes`. Used to tell a real shell-level `VAR=` assignment
- * or `$VAR` reference apart from a variable name that merely appears as
- * human-readable STRING DATA -- e.g. step 7a's own STOP message embeds the
- * literal text `(PREV_TAG='$PREV_TAG')` inside MSG's double-quoted value,
- * purely to show the operator what the printed message will look like. That
- * substring reads exactly like a `PREV_TAG=` assignment to a naive scanner,
- * which would silently defeat the very class check this pin exists to be.
+ * Mask the interior of quoted strings (quote types in `quotes`) with 'x',
+ * keeping the quotes and all other structure. This tells a real shell `VAR=`
+ * or `$VAR` apart from one inside string data, such as step 7a's STOP message
+ * text `(PREV_TAG='$PREV_TAG')`, which would otherwise defeat the class check.
  */
 function maskQuoted(text, quotes) {
   let out = "";
@@ -2768,21 +2409,11 @@ function maskQuoted(text, quotes) {
 }
 
 /**
- * Compute the set of shell variable names ASSIGNED within a script and the
- * set REFERENCED (via `$VAR` / `${VAR}`) anywhere within it.
- *
- * Assigned: scanned on a copy with BOTH quote types' interiors masked -- a
- * real assignment's LHS name is always outside any quoting (`VAR=value`,
- * never `"VAR"=value`), so masking removes false hits from string DATA that
- * merely looks like `VAR=`. `for VAR in ...; do` loop headers count too --
- * they bind VAR exactly as an assignment would.
- *
- * Referenced: scanned on a copy with only SINGLE-quote interiors masked --
- * bash does not interpolate inside single-quoted strings (step 7a's own
- * `COVERS_RE='...'` and `tr 'a-z' 'A-Z'` are single-quoted and contain no
- * `$`, so this never bites here, but the distinction is correct in general),
- * while a double-quoted `$VAR` (e.g. `"$PREV_TAG"`) is a genuine reference
- * and must stay visible to the scan.
+ * Sets of shell variable names assigned and referenced (`$VAR`, `${VAR}`) in a
+ * script. Assignments are scanned with both quote types masked (an assignment
+ * name is never quoted) and include `for VAR in` headers. References are
+ * scanned with only single quotes masked, since bash expands `$VAR` inside
+ * double quotes but not inside single quotes.
  */
 function extractAssignedAndReferenced(script) {
   const forAssignment = maskQuoted(script, ["'", '"']);
@@ -2857,14 +2488,9 @@ test("T-E76-02 (class assertion, closes F1): every variable REFERENCED anywhere 
     `sanity (non-load-bearing): assigned-but-never-referenced variables found: ${assignedNotReferenced.join(", ")} -- the shipped text has none; if this now fails, someone added a dead assignment (harmless, but update this pin's comment if intentional)`,
   );
 
-  // GUARD-THE-GUARD (this pin must red against the round-1 text, demonstrated
-  // rather than asserted): round 1's enumeration named only fragments 2-7
-  // ("everything below") and never listed the PREV_TAG bullet above it -- so
-  // the script round 1 actually told the executor to assemble omitted
-  // fragment 1 entirely. Reconstruct that exact omission against the CURRENT
-  // (round-2, otherwise-correct) fragments 2-5 and confirm the invariant
-  // above would have caught it: PREV_TAG is read by the guard but bound
-  // nowhere in a script that omits fragment 1.
+  // Guard the guard: round 1's assembly list omitted fragment 1, the PREV_TAG
+  // binding. Rebuild that omission from the current fragments 2-5 and confirm
+  // the invariant above catches it: PREV_TAG is read but never bound.
   const round1Reconstruction = [frags.frag2, frags.frag3, frags.frag4, frags.frag5].join("\n");
   const round1 = extractAssignedAndReferenced(round1Reconstruction);
   const round1ReferencedNotAssigned = [...round1.referenced].filter((v) => !round1.assigned.has(v));
@@ -2876,14 +2502,10 @@ test("T-E76-02 (class assertion, closes F1): every variable REFERENCED anywhere 
 });
 
 test("T-E76-02 (class assertion, pins fragment 3's identity): exactly ONE fence in step 7a opens with the executable `CODES=$(` binding", () => {
-  // Distinguishes the one EXECUTABLE derivation fence from the illustrative
-  // find/grep example fence immediately above it (":107-111", never bound to
-  // CODES, shown only to explain the per-tree predicate) -- an executor (or
-  // a future edit) that assembled the illustrative fence instead would bind
-  // nothing, silently reproducing the E76 empty-derivation hazard (round 2's
-  // Quality section: "the wrong fence prints the files it failed to derive
-  // from, directly above {∅}"). Scoped to step 7a only, not the whole file --
-  // step 8's unrelated `bash -c` existence-pre-filter fence is out of scope.
+  // Tells the one executable derivation fence apart from the illustrative
+  // find/grep fence above it; assembling the illustrative one would bind
+  // nothing and reproduce the empty-derivation hazard. Scoped to step 7a, since
+  // step 8 has an unrelated `bash -c` fence.
   const start = SKILL.indexOf("7a. **Archive shipped");
   const end = SKILL.indexOf("7b. **Drift-baseline");
   assert.ok(start > -1 && end > start, "must find step 7a's section boundaries");

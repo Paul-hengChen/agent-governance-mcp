@@ -1,13 +1,8 @@
 // Coded by @qa-engineer
 // Tests for specs/bug-fixes-v3.14.1.md — evidence gate, round sentinel, round persistence and no-design pass-through (AC-5, AC-6, AC-7, AC-10).
-//
-// These tests assert the COMPOSITION through index.ts handler logic:
-//   tw_update_state path: validateTransition → visual evidence gate →
-//   computeNewRound → writeState → readback.
-// They drive the same primitives the handler calls; without them, a refactor
-// to index.ts that re-orders the gates could silently regress v3.14.0
-// contracts (visual_round persistence, VISUAL_EVIDENCE_MISSING rejection,
-// VISUAL_ROUND_EXCEEDED rejection, Round 6 sentinel injection).
+// They drive the primitives the tw_update_state handler calls, in its order
+// (validateTransition, visual evidence gate, computeNewRound, writeState,
+// readback), so a reorder of the gates fails here.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -233,15 +228,9 @@ test("AC-10: handler composition — computeNewRound resets visual_round on PM r
 
 // ============================================================================
 // v3.16.0 — PASS-gate ordering & mutual exclusion (visual-fidelity-gate-hardening, AC-1, AC-10)
-// Tests for the new arming signal + VISUAL_BASELINES_REQUIRED short-circuit in index.ts.
-//
-// The index.ts PASS gate (lines ~711-778) now runs in two steps:
-//   STEP 1 (NEW): armCheck = hasDesignModeRequiringVisual — if required=true AND
-//                 baselines absent → VISUAL_BASELINES_REQUIRED (fires FIRST, D2).
-//   STEP 2 (existing): visualGate.present → check visual evidence + widget rows.
-//
-// These integration tests drive the same helper calls the handler makes so a
-// future reorder of the gate steps would surface as a test failure here.
+// Step 1: when the design mode requires visuals and baselines are absent,
+// VISUAL_BASELINES_REQUIRED fires first. Step 2: the existing visual evidence
+// and widget-row checks. These drive the handler's helper calls in that order.
 // ============================================================================
 
 function seedDesignWithModeOnly(ws, feature, mode) {

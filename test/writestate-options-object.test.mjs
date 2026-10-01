@@ -193,19 +193,10 @@ test("AC-10: options-object with omitted optional fields defaults to historical 
 });
 
 // ---------- the thin positional adapter matches the options-object call (handoff-write.ts, E36) ----------
-//
-// A later refactor (E36) converged writeHandoffState's positional overload onto a thin arg-
-// packing adapter over writeHandoffStateCore(opts). These tests pin that
-// convergence at the byte level: a positional-form call covering the FULL
-// legacy 12-positional arg list (including all three round counters, which
-// occupy adjacent, easily-transposed slots — qaRound at index 8, reviewRound
-// at index 10, visualRound at index 11 — plus blockingReason and prdPath)
-// must produce output byte-identical to the equivalent options-object call.
-// A future edit that swaps, drops, or renames a field while re-packing the
-// adapter's positional args will fail this test even if every individual
-// field's VALUE still round-trips correctly in isolation (which the options-
-// object and backwards-compat tests above (AC-6/AC-10) would not catch, since they compare parsed fields, not
-// argument-POSITION-to-field mapping).
+// The positional overload of writeHandoffState packs its 12 args into the
+// options object. The full positional call must be byte-identical to the
+// options call; the round counters sit in adjacent, easily swapped slots, and
+// tests that compare parsed fields cannot catch an argument-position mix-up.
 
 test("E36: positional writeHandoffState (full 12-arg form, all 3 round counters + blockingReason + prdPath) is byte-identical to the equivalent options-object call", async () => {
   const wsPositional = mkWorkspace();
@@ -275,16 +266,9 @@ test("E36: positional writeHandoffState (full 12-arg form, all 3 round counters 
 });
 
 // ---------- FileHandoffStorage's own positional packing matches the options-object call (storage.ts, E36) ----------
-//
-// storage.ts's FileHandoffStorage.writeState carries its OWN independent
-// positional→options packing (it does not simply forward raw positional args
-// to tools/handoff-write.ts's adapter — it packs its own options object and
-// always calls writeHandoffState's options-object overload directly). That
-// makes it a second, separate site where an arg-order regression could be
-// introduced without the handoff-write.ts test above catching it. Note:
-// unlike the 12-positional writeHandoffState signature, FileHandoffStorage's
-// positional overload stops at visualRound (11 args, no hopCount) — this
-// matches the older forward-declared HandoffStorage interface (from before E36).
+// FileHandoffStorage.writeState packs its own options object, a second place an
+// arg-order regression could hide. Its positional overload stops at visualRound
+// (11 args, no hopCount), matching the older HandoffStorage interface.
 
 test("E36: FileHandoffStorage.writeState positional (full 11-arg form, all 3 round counters + blockingReason + prdPath) is byte-identical to the equivalent options-object call", async () => {
   const wsPositional = mkWorkspace();

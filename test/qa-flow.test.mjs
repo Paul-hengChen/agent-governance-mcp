@@ -302,14 +302,10 @@ test("validateTransition: self-loop does NOT apply across status change", () => 
 });
 
 // ---------- Blocked→Blocked self-loop fast path (T-QA-E128-01, E128) ----------
-//
-// A role stranded in Blocked with a malformed record needs a way to correct
-// its own record without misstating its status. tools/transitions.ts step 3
-// accepts same-agent Blocked→Blocked as a second explicitly named (prev, next)
-// pair next to In_Progress→In_Progress. It is deliberately NOT a
-// `prev.status === next.status` wildcard, so the terminal PASS and FAIL
-// states stay unreachable through this path. These tests pin the added edges
-// and the terminality of every role as a permanent regression guard.
+// A role stranded in Blocked with a malformed record may correct its own record
+// without misstating its status. transitions.ts step 3 names same-agent
+// Blocked→Blocked as an explicit pair, not a same-status wildcard, so PASS and
+// FAIL stay terminal. These tests pin the added edges and every role's terminality.
 
 test("T-QA-E128-01(a): same-agent Blocked→Blocked self-loop is accepted for all 8 roles", () => {
   // WHY: the fast path is role-agnostic (it keys only on prev.agent ===
@@ -717,11 +713,8 @@ qa_round: -7
 // ============================================================================
 // T67 / AC-12 — v3.9.0 code-reviewer chain coverage
 // ============================================================================
-// These tests cover the NEW behavior introduced by the code-reviewer role
-// split. Existing tests above were revised (not deleted) to match v3.9.0
-// contracts where AC-2 mandated edge removal made the prior assertions
-// obsolete (sr→qa direct edge; single-return computeNewRound; schema v1).
-// Revisions are documented inline at each touched site.
+// New behaviour from the code-reviewer role split. Earlier tests whose edges
+// v3.9.0 removed were revised, not deleted; each revision is noted inline.
 
 // ---------- AC-12(a) — new ALLOWED edges accept ----------
 
@@ -1032,11 +1025,9 @@ test("AC-12: code-reviewer agent is in ALLOWED_TRANSITIONS keys", () => {
 // ============================================================================
 // release-engineer is a full member of the routing chain (T-MATRIX-A5, v3.28.0)
 // ============================================================================
-// WHY: release-engineer must appear in the AgentName union, the isAgent()
-// guard, and the ALLOWED map. If any of the three is missing, a handoff that
-// lands in (release-engineer, PASS) gets an empty allowed set and the chain
-// is wedged with no valid next transition. A regression that removes any of
-// the three sites makes one or more of these tests fail. (T-MATRIX-A5)
+// release-engineer must be in the AgentName union, the isAgent() guard and the
+// ALLOWED map; missing any one leaves (release-engineer, PASS) with no legal
+// next transition and wedges the chain.
 
 // ---------- isAgent recognises release-engineer (T-MATRIX-A5(a)) ----------
 
@@ -1133,24 +1124,11 @@ test("T-MATRIX-A5: release-engineer:PASS row is present in ALLOWED_TRANSITIONS (
 
 // ============================================================================
 // Amend-Resume edge: pm may hand back to the role it interrupted (C1-07)
-// The pm:In_Progress -> {code-reviewer, qa-engineer}:In_Progress edge is
-// opened only by the structured `next_resume_of` field on TransitionRequest.
-// A `resume_of: <target>` line in pending notes no longer opens it, and there
-// is no fallback that reads pending notes. These tests pin: (a) the exact
-// field accepts, (b) a missing field rejects, (c) a field naming the wrong
-// role rejects, (d) the old pending-notes line alone is ignored, (e) the
-// round cap still wins over a valid field, (f) the older pm:In_Progress edges
-// do not depend on the field, and (g) the Scope Decision and Cut-Approval
-// checks neither fire on the new edges nor get weaker on their own (positive
-// control). (backlog C1, spec AC-8) (c9-protocol-fields T-C9-09, AC-4/DR-2/DR-6)
 // ============================================================================
-// WHY: this narrowly scoped edge lets pm hand back directly to a downstream
-// role (code-reviewer/qa-engineer) it interrupted mid-chain, instead of a
-// made-up detour through sr-engineer (specs/pm-repair-resume-routing.md).
-// Spec-to-test map: AC-2 -> t-c1-accept-*; AC-3 -> t-c1-reject-*;
-// c9 AC-4/AC-9 -> t-c1-inert-*; AC-1/AC-8(e) -> t-c1-gate-isolation-*;
-// AC-8(d) -> t-c1-preexisting-*; architecture Test Surface item 7 ->
-// t-c1-roundcap-precedence.
+// pm:In_Progress -> {code-reviewer, qa-engineer}:In_Progress opens only via the
+// structured `next_resume_of` field, never a pending-notes line, so pm can
+// return to an interrupted role without a detour (specs/pm-repair-resume-routing.md,
+// specs/c9-protocol-fields.md). Covers accept, reject, inert notes, round-cap precedence, gate isolation.
 
 // ---------- AC-2: accept — exact field, exact role ----------
 
@@ -1404,14 +1382,10 @@ test("C1-07: qa_round at cap (4) rejects the resume edge even with a valid resum
 });
 
 // ---------- Gate isolation (AC-1 / AC-8(e)) — integration via handleUpdateState ----------
-// WHY: the resume edge must never arm or weaken the Scope Decision / Cut-Approval
-// gates (tools/handoff-orchestrator.ts), which fire ONLY on
-// pm:In_Progress -> {architect,sr-engineer}:In_Progress. These tests exercise the
-// real orchestrator (not just validateTransition) on a design-armed workspace with
-// neither scope_decision nor cut_approved recorded, and assert: (a) the new edges
-// (pm -> code-reviewer / qa-engineer, with a valid marker) trip NEITHER gate; (b)
-// the pre-existing pm -> sr-engineer edge in the SAME unattested armed state STILL
-// trips the gates (positive control — proves the new edge did not weaken them).
+// The resume edge must never arm or weaken the Scope Decision and Cut-Approval
+// gates, which fire only on pm -> {architect, sr-engineer}. On an armed workspace
+// with neither attestation, the new edges trip neither gate, and pm -> sr-engineer
+// still trips both (positive control). Runs the real orchestrator.
 
 function mkGateWorkspace(feature = "c1-gate-fixture") {
   const ws = fs.mkdtempSync(path.join(os.tmpdir(), "twc1gate-"));
@@ -1601,17 +1575,11 @@ test("C1-07: resume_of marker is single-use — pending_notes are replaced (not 
 
 // ============================================================================
 // Closed enums and the review-verdict/status consistency check (T-C9-10)
-// (c9-protocol-fields, spec AC-2/AC-5, architecture §Test Thresholds T-C9-10)
 // ============================================================================
-// WHY: next_role, resume_of and review_verdict are closed-enum handoff
-// fields. Two separate server layers must be pinned: (1) the zod boundary
-// (tools/registry.ts) rejects an out-of-enum value BEFORE any check runs —
-// tested directly against the real TOOL_REGISTRY entry
-// (spec.zodSchema.parse), not a hand-written schema copy; (2) the
-// REVIEW_VERDICT_STATUS_MISMATCH plain-text orchestrator check
-// (tools/handoff-orchestrator.ts) enforces verdict<->status consistency on
-// code-reviewer writes ONLY, and fires only when review_verdict is PRESENT
-// and disagrees with status. (AC-5, DR-8)
+// next_role, resume_of and review_verdict are closed enums. Two layers are
+// pinned: the real TOOL_REGISTRY zod schema rejects an out-of-enum value before
+// any check, and REVIEW_VERDICT_STATUS_MISMATCH fires only on a code-reviewer
+// write whose review_verdict is present and disagrees with status (specs/c9-protocol-fields.md).
 
 // ---------- AC-2: zod enum rejection at the tool boundary ----------
 
@@ -1724,14 +1692,11 @@ async function seedState(ws, feature, agent, status, extra = {}) {
   forceSeedStamp(ws);
 }
 
-// | agent_id       | review_verdict     | status      | expect            |
-// |----------------|---------------------|-------------|--------------------|
-// | code-reviewer  | APPROVED            | FAIL        | reject             |
-// | code-reviewer  | CHANGES_REQUESTED   | In_Progress | reject             |
-// | code-reviewer  | APPROVED            | In_Progress | accept             |
-// | code-reviewer  | CHANGES_REQUESTED   | FAIL        | accept             |
-// | code-reviewer  | (absent)            | FAIL        | accept (never fires) |
-// | sr-engineer    | APPROVED            | In_Progress | accept (non-reviewer never fires) |
+// Expected outcomes (agent_id, review_verdict, status -> result):
+//   code-reviewer APPROVED + FAIL, CHANGES_REQUESTED + In_Progress -> reject;
+//   code-reviewer APPROVED + In_Progress, CHANGES_REQUESTED + FAIL -> accept;
+//   code-reviewer with no verdict + FAIL -> accept (never fires);
+//   sr-engineer APPROVED + In_Progress -> accept (non-reviewer never fires).
 
 test("T-C9-10/AC-5: code-reviewer APPROVED + status=FAIL is REJECTED (polarity mismatch)", async () => {
   setActiveStorage(new FileHandoffStorage());
@@ -1849,17 +1814,10 @@ test("T-C9-10/AC-5: sr-engineer write carrying review_verdict=APPROVED is ACCEPT
 // ============================================================================
 // release-engineer has a legal write path in and out (T-MATRIX-C13, v3.49.0)
 // ============================================================================
-// WHY: release-engineer needs a legal entry edge out of (qa-engineer, PASS)
-// and a row for (release-engineer, In_Progress). Without the row, landing
-// there gives an empty allowed set and wedges the chain (the same kind of
-// wedge the release-engineer:PASS tests above guard). When a write is
-// rejected with no legal path, an agent may be tempted to hand-edit
-// handoff.md instead of stopping, so the path must exist. Two edges provide
-// it: qa-engineer:PASS → release-engineer:In_Progress (open) and
-// release-engineer:In_Progress → pm:In_Progress (close). These tests pin
-// the two edges, the non-empty allowed set, the unchanged earlier
-// qa-engineer:PASS successors, and steady round counters across the new hop.
-// (specs/c13-release-engineer-write-path.md, T-MATRIX-A5)
+// Without a legal path an agent may hand-edit handoff.md instead of stopping.
+// Pins qa-engineer:PASS → release-engineer:In_Progress, release-engineer:In_Progress
+// → pm:In_Progress, a non-empty allowed set, the unchanged earlier PASS successors
+// and steady round counters (specs/c13-release-engineer-write-path.md).
 
 // ---------- opening edge — qa-engineer:PASS → release-engineer:In_Progress (T-MATRIX-C13(a)) ----------
 
@@ -1899,19 +1857,10 @@ test("T-MATRIX-C13: release-engineer:In_Progress → pm:In_Progress accepted", (
 // ---------- rejected edge + no-wedge guard (T-MATRIX-C13(c)) ----------
 
 test("T-MATRIX-C13: release-engineer:In_Progress → sr-engineer:In_Progress REJECTED with non-empty allowed set", () => {
-  // WHY: release-engineer's SOP hands back only to pm among other roles
-  // (AC2) — it does not route to sr-engineer, researcher, architect, or
-  // qa-engineer directly. Critically, the allowed set must be NON-EMPTY: an
-  // empty allowed set from a reachable (release-engineer, In_Progress) tuple
-  // is exactly the wedge this path exists to prevent (the same guard the
-  // release-engineer:PASS tests make, T-MATRIX-A5(d)). A regression that
-  // dropped the row entirely would make ALLOWED.get(...) return undefined ->
-  // allowed=[] here.
-  //
-  // The row also carries release-engineer:In_Progress -> release-engineer:Blocked
-  // (the entry edge into Blocked), so it has TWO successors. The no-wedge
-  // assertions (non-empty, no sr-engineer leak) are what catch a real wedge;
-  // the exact-shape pin below just records the intended row. (E53, v3.98.0)
+  // release-engineer hands back only to pm (or Blocked), never sr-engineer. The
+  // allowed set must be non-empty: a missing row returns allowed=[] and wedges
+  // the chain. The no-wedge assertions catch a real wedge; the exact-shape pin
+  // records the intended two-successor row (E53).
   const r = validateTransition({
     prev: { agent: "release-engineer", status: "In_Progress" },
     next: { agent: "sr-engineer", status: "In_Progress" },
@@ -1955,15 +1904,10 @@ test("T-MATRIX-C13: release-engineer:In_Progress → qa-engineer:In_Progress REJ
 });
 
 test("T-MATRIX-C13: release-engineer:In_Progress row is present in ALLOWED_TRANSITIONS and non-empty (wedge regression)", () => {
-  // WHY: static-map counterpart of the two rejection tests above. Without a
-  // "release-engineer:In_Progress" key, ALLOWED.get(...) returns undefined,
-  // which validateTransition treats as allowed=[] for EVERY next tuple — a
-  // tuple with zero outbound edges wedges the chain. This test requires the key
-  // to exist AND to carry at least one target.
-  //
-  // The exact shape below includes release-engineer:Blocked as the row's
-  // second successor (the entry edge into Blocked); researcher, architect and
-  // the role itself are correctly absent. (E53, v3.98.0, AC1)
+  // Static-map counterpart of the rejection tests: with no
+  // "release-engineer:In_Progress" key every next tuple is rejected and the
+  // chain wedges. The key must exist with at least one target; the exact shape
+  // includes release-engineer:Blocked as the second successor (E53).
   assert.ok(
     ALLOWED_TRANSITIONS.has("release-engineer:In_Progress"),
     "ALLOWED_TRANSITIONS must have a 'release-engineer:In_Progress' key (absent before C13 — the wedge)",
@@ -2069,15 +2013,10 @@ test("T-MATRIX-C13: computeNewRound re-zeros all three counters on release-engin
 // ============================================================================
 // design-auditor may open the next feature after a PASS (T-E37-01, v3.94.0)
 // ============================================================================
-// WHY: the qa-engineer:PASS row ("previous feature closed, next may open")
-// must admit design-auditor:In_Progress, just as the null:null
-// fresh-workspace opener does. The design-armed chain opens each feature by
-// dispatching design-auditor BEFORE pm, so the auditor's token tables feed
-// the spec. Without this entry that opening move works on a workspace's
-// first feature and is TRANSITION_REJECTED on every later one, which was
-// seen in real use. qa-engineer:FAIL is deliberately NOT widened (a QA
-// failure starts a fix loop — sr-engineer/pm — not a re-audit), and the
-// reject test below pins that limit as a deliberate choice. (E37, E38)
+// The design-armed chain opens each feature with design-auditor before pm, so
+// qa-engineer:PASS must admit design-auditor:In_Progress, or every feature after
+// the first is rejected. qa-engineer:FAIL is deliberately not widened (a failure
+// starts a fix loop, not a re-audit); a reject test pins that.
 
 // ---------- opening edge — qa-engineer:PASS → design-auditor:In_Progress (T-E37-01(a)) ----------
 
@@ -2129,16 +2068,10 @@ test("T-E37-01: qa-engineer:FAIL → design-auditor:In_Progress still REJECTED (
 // ---------- round counters hold across the design-auditor hop (T-E37-01(c)) ----------
 
 test("T-E37-01: computeNewRound holds qa_round/review_round/visual_round steady across qa-engineer:PASS → design-auditor:In_Progress", () => {
-  // WHY: same expectation as the release-engineer hop test above
-  // (T-MATRIX-C13(e)). next=(design-auditor, In_Progress) matches none of
-  // computeNewRound's reset-or-increment branches (all keyed on qa-engineer or
-  // pm as next.agent), so all three counters must hold from a nonzero prior
-  // value. This is safe at any REACHABLE qa-engineer:PASS state — PASS already
-  // zeroes qa_round and visual_round, and review_round was zeroed by the
-  // code-reviewer:In_Progress → qa-engineer:In_Progress hop that must precede
-  // PASS — but the pin is cheap insurance: a future edit that adds
-  // design-auditor to a reset branch would silently clear a live counter, and
-  // this test would be the only thing to catch it.
+  // Same expectation as the release-engineer hop test: design-auditor matches
+  // no reset or increment branch, so all three counters hold from nonzero. A
+  // reachable PASS state already has them at zero, but a future edit adding
+  // design-auditor to a reset branch would otherwise go unnoticed.
   assert.deepEqual(
     computeNewRound(2, 3, 4, { agent: "design-auditor", status: "In_Progress" }, { agent: "qa-engineer", status: "PASS" }),
     { qa_round: 2, review_round: 3, visual_round: 4, hop_count: 1, qa_rounds_total: 0, review_rounds_total: 0, visual_rounds_total: 0 },
@@ -2153,23 +2086,10 @@ test("T-E37-01: computeNewRound holds qa_round/review_round/visual_round steady 
 // ============================================================================
 // qa-engineer:Blocked can escape to pm:In_Progress (T-E45-01, v3.95.0)
 // ============================================================================
-// WHY: the qa-engineer:Blocked row of ALLOWED in tools/transitions.ts
-// carries { agent: "pm", status: "In_Progress" }, like the other six
-// <role>:Blocked rows. Without it, QA halted at Blocked on a contract defect
-// (honestly markable neither PASS nor FAIL) has no way to reach pm
-// (research/adopter-button-realign-qa-blocked-dead-end.md). The edge needs
-// no resume_of, matching the qa-engineer:FAIL -> pm edge and all six peer
-// Blocked rows; resume_of gates only pm's RETURN edge (step 3.5 of
-// validateTransition).
-//
-// A purely additive row edit can land with the suite still green if nothing
-// asserts the row's exact membership. These tests close that gap: the
-// positive accept, a row-equality pin (same shape as the qa-engineer:PASS row
-// pin above) so the next additive edit to this row cannot land silently,
-// regression pins on the sibling qa-engineer:In_Progress row and the three
-// round-cap override envelopes, and the next_role lookahead advisory's
-// check on a Blocked state, both silent (pm now legal) and still firing
-// (a truly unreachable next_role). (E45, E38)
+// QA halted at Blocked on a contract defect needs a way to pm, like the other
+// Blocked rows; the edge needs no resume_of (that gates only pm's return edge).
+// Pins the accept, the exact row membership, sibling rows, the round-cap
+// envelopes and the next_role lookahead advisory on a Blocked state.
 
 // ---------- positive accept: the edge the ticket exists for ----------
 
@@ -2348,19 +2268,9 @@ test("T-E45-01/E38: qa-engineer:Blocked write with an unreachable next_role STIL
 // release-engineer:Blocked is reachable, and sr-engineer:Blocked can route
 // to design-auditor (T-E53-03, v3.98.0, E53)
 // ============================================================================
-// WHY: content/skill-release-engineer.md's step 7a empty-baseline guard and
-// six Escalation Routes rows tell the role to halt by writing
-// release-engineer:Blocked, so that state must be reachable. The matrix has
-// the entry edge plus a release-engineer:Blocked key with three destinations
-// (self-resume, pm recovery, and qa-engineer for the npm-test-regression
-// row). The same kind of gap is closed for sr-engineer:
-// content/skill-sr-engineer.md routes Blocked -> design-auditor on "visual
-// structure unspecified". That is five edges in total. The positive-accept
-// groups below pin each edge individually; the row-equality pins fix each
-// row's full membership and order; and the exhaustive sweep at the end
-// re-derives the whole accepted edge set from source, so a later edit that
-// opens or closes ANY edge anywhere in the matrix (not just these five) fails
-// loudly here.
+// The release and sr-engineer SOPs halt via Blocked, so five edges open here.
+// Each is pinned, each row's membership and order is pinned, and a final sweep
+// re-derives the whole accepted edge set, so any matrix change fails loudly.
 
 // ---------- positive accepts: the five edges this ticket opens ----------
 
@@ -2600,20 +2510,11 @@ const E128_NEW_EDGES_7 = [
 ].sort();
 
 test("T-E53-03(h): exhaustive matrix sweep — accepted edge set is EXACTLY the 76 tuples E53+E58+E128 leave standing (durable form of the reviewer's 1056-tuple differential; extended by T-E39-03 for E58's pm:Blocked -> design-auditor:In_Progress edge, and by T-QA-E128-01 for the 7 Blocked->Blocked self-loops)", () => {
-  // WHY: this test builds the full 1056-tuple universe (33 prev tuples x 32
-  // next tuples) from source and pins the resulting accepted set as a literal
-  // snapshot, so any future edit that opens or closes ANY edge anywhere in
-  // ALLOWED_TRANSITIONS fails here with an actionable diff, the same way the
-  // row-equality pins above do for a single row. It is deliberately a positive
-  // pin (the accepted set), not a hand-listed set of rejected tuples: a
-  // rejected-tuple list only proves the tuples someone thought to write down
-  // are still rejected, and says nothing about tuples nobody listed; pinning
-  // the accepted set is exhaustive by construction, since anything not in the
-  // expected set is implicitly asserted rejected.
-  //
-  // The count 76 is computed, not assumed: E53_BASELINE_69.length (69) +
-  // E128_NEW_EDGES_7.length (7) = 76, and the sweep below independently
-  // reproduces 76 from source. (E53 AC4, T-E53-01)
+  // Builds all 1056 (prev, next) tuples from source and pins the accepted set as
+  // a literal, so opening or closing any edge fails with a diff. Pinning the
+  // accepted set is exhaustive by construction; a list of rejected tuples covers
+  // only the ones someone wrote down. 76 = 69 baseline + 7 Blocked self-loops,
+  // and the sweep reproduces it from source.
   const EXPECTED = [...E53_BASELINE_69, ...E128_NEW_EDGES_7].sort();
   assert.equal(EXPECTED.length, 76, "69 baseline + 7 new Blocked self-loops must equal 76");
 
@@ -2627,15 +2528,9 @@ test("T-E53-03(h): exhaustive matrix sweep — accepted edge set is EXACTLY the 
 });
 
 test("T-QA-E128-01(f): differential — accepted-edge-set minus the E53 baseline equals EXACTLY the 7 named Blocked self-loops, with zero removals", () => {
-  // WHY: the literal 69/76 snapshot above proves the count and the full set,
-  // but a future fast-path edit that swaps one accepted edge for another while
-  // keeping the total at 76 would pass a length-only check and could slip past
-  // a reviewer skimming a large literal diff. This test checks the SHAPE of
-  // the change directly — set subtraction both ways — independent of the
-  // literal pin, so the two tests would have to fail in exactly matching ways
-  // to both be wrong. It asserts the invariant ("the fast path only ever ADDS
-  // same-agent Blocked self-loops"), not just a snapshot of its current
-  // output. (E66, E69)
+  // A length-only check misses an edit that swaps one edge for another at 76.
+  // This checks the shape of the change by set subtraction both ways: the fast
+  // path only ever adds same-agent Blocked self-loops.
   const sortedAccepted = sweepAcceptedEdges();
 
   const added = sortedAccepted.filter((e) => !E53_BASELINE_69.includes(e));

@@ -72,30 +72,10 @@ test("AC-10: transitions.ts AgentName union constraint (side-channel)", () => {
 });
 
 test("AC-10: schema/versions.ts schema versions track e123a-lane-layout-migration bump", () => {
-  // Handoff version history: v6 added external_refs for EXTERNAL_REFS_UNRESOLVED (b8-external-ref-ledger).
-  // v7 added next_role/resume_of/review_verdict,
-  // stamp-only migration, DR-1 (c9-protocol-fields). v8 added dispatch_pins,
-  // stamp-only migration, AC-1 (c14-dispatch-pins). v9 added hop_count, seeded
-  // 0, DR-3 (d2-server-brake-accounting). v10 added dispatched_at, stamp-only,
-  // seeds nothing, DR-7 — next_role's direct companion (d5-server-side-stale-dispatch-detection).
-  // v11 added dispatch_mode,
-  // stamp-only, seeds nothing — the dispatch_pins/external_refs
-  // feature-scoped carry-forward algorithm, but scalar (e2-bugfix-repro-gate).
-  // v12 added qa_rounds_total/review_rounds_total/visual_rounds_total, seeded
-  // 0 — like the hop_count counter, DR-1 file-mode-only (e8-success-telemetry).
-  // v13 added the evidence_schema pin, stamp-only, seeds nothing — the
-  // dispatch_mode scalar algorithm (e23-evidence-schema-versioning). v14 added
-  // cut_approved_source, stamp-only, seeds nothing — the dispatch_mode scalar
-  // algorithm again (e114-cut-approval-inheritance). v15 added
-  // dispatch_mechanism/dispatch_mechanism_tier, stamp-only, seeds nothing —
-  // the dispatch_mode scalar algorithm again (e123a-lane-layout-migration).
-  // sqlite stays at 2 —
-  // hop_count IS added there too, but via an idempotent addColumnIfMissing
-  // ALTER (DR-2), no schema_meta bump, the exact mechanism visual_round
-  // used; unlike dispatch_pins/external_refs/dispatched_at/dispatch_mode/the
-  // three cumulative round totals/evidence_schema/cut_approved_source/dispatch_mechanism/
-  // dispatch_mechanism_tier, which are handoff-YAML frontmatter only, no
-  // SQLite column at all (DR-5/DR-1).
+  // Each handoff bump from v6 to v15 added frontmatter fields (most stamp-only,
+  // seeding nothing); sqlite stays at 2 because only hop_count reached SQLite,
+  // via an idempotent ALTER with no schema_meta bump.
+  // Version history: specs/e260h-comment-rationale.md (test/skill-evolution-v3.11.test.mjs).
   const versionsTs = fs.readFileSync(path.join(PROJECT_ROOT, "schema", "versions.ts"), "utf-8");
   assert.match(versionsTs, /handoff:\s*15,/, "CURRENT_VERSIONS.handoff must be 15 (e123a-lane-layout-migration)");
   assert.match(versionsTs, /sqlite:\s*2,/, "CURRENT_VERSIONS.sqlite must remain 2");
@@ -129,19 +109,9 @@ test("AC-10: skill-file schema sanity checks (grep assertions)", () => {
 });
 
 test("c9-protocol-fields (T-C9-12..16, AC-7): all 13 in-scope content files have retired the next_role:/resume_of:/review: pending_notes token convention", () => {
-  // Why: AC-7 requires that every content file previously instructing roles to
-  // embed `next_role: <role>`, `resume_of: <role>`, or `review: APPROVED|
-  // CHANGES_REQUESTED` INSIDE pending_notes be updated to reference the
-  // corresponding first-class handoff field instead. This is a repo-wide
-  // regression sweep across the exact 13-file list the spec enumerates
-  // (Dependencies / Resource Audit Gate) — most individual files already have
-  // narrower assertions elsewhere (compose-equivalence goldens, context-budget
-  // token caps, phase-0-5-sop, qa-visual-skill-split, pixel-perfect-visual-
-  // compare); this test is the belt-and-braces sweep proving NONE of the 13
-  // still carries the retired pending_notes token shape, including the 5
-  // files (skill-code-reviewer, skill-release-engineer, skill-design-auditor,
-  // skill-doc-writer, skill-researcher) with no other test touching this
-  // specific convention.
+  // Every content file that told roles to put `next_role:`, `resume_of:` or
+  // `review:` inside pending_notes must now point to the first-class field.
+  // A sweep over the spec's 13 files; five of them have no other test for it.
   const AC7_FILES = [
     "const-05-core-standards.md",
     "const-08-chain-31-mid.md",

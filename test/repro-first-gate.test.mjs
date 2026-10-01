@@ -1,26 +1,10 @@
 // Coded by @qa-engineer
-// Tests for the bugfix repro-first gate (specs/e2-bugfix-repro-gate.md, T-E2-05).
-//
-// The repro-first gate adds two things on top of the existing expected-red
-// manifest machinery: (1) a new first-class handoff field `dispatch_mode?: "feature" |
-// "bugfix"` (schema v10 -> v11, stamp-only), and (2) a new plain-text
-// orchestrator gate, REPRO_MANIFEST_MISSING, that blocks the bugfix-mode
-// fix-phase handoff (sr-engineer:In_Progress -> code-reviewer:In_Progress)
-// until qa_reports/expected-red_<feature>.txt (the existing expected-red manifest, reused
-// verbatim) exists. Neither the manifest predicate (hasExpectedRedManifest)
-// nor gates/expected-red.ts changed — see test/gates-expected-red.test.mjs
-// for that module's own unit coverage.
-//
-// Spec-to-Test map:
-//   default routing, no architect hop (AC1)         -> chain/skill-text mechanics only; not server-enforced, no dedicated test (PM judgment call, spec Out of Scope)
-//   repro-first gate blocks fix-phase write (AC2)    -> G1, G2
-//   strict PASS load-bearing in bugfix mode (AC3)    -> skill-qa-engineer prose (S3); machine floor is the existing EXPECTED_RED_DIFF_MISSING gate, covered in test/gates-expected-red.test.mjs
-//   opt back into full chain / feature mode (AC4)    -> D6
-//   feature-mode chains byte-unchanged (AC5)         -> G3
-//   clean rejection, never silent-skip/throw (AC6)   -> G1 (message), G4 (Blocked escape never gated)
-//   dispatch_mode field mechanics (parse/emit/carry) -> D1..D6, Z1, M1
-//   file-mode only (SQLite ignores dispatch_mode)    -> G5
-//   skill-text pinning of the repro-first wording (T-E2-03) -> S1, S2, S3
+// Tests for the bugfix repro-first gate (specs/e2-bugfix-repro-gate.md): the
+// handoff field `dispatch_mode` ("feature" | "bugfix", schema v11, stamp-only)
+// and REPRO_MANIFEST_MISSING, which blocks a bugfix-mode sr-engineer ->
+// code-reviewer handoff until qa_reports/expected-red_<feature>.txt exists. The
+// manifest predicate is unchanged (see test/gates-expected-red.test.mjs).
+// Spec-to-test map: specs/e260h-comment-rationale.md (test/repro-first-gate.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";

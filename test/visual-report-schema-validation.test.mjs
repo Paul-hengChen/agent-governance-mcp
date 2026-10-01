@@ -1,11 +1,9 @@
 // Coded by @qa-engineer
-// Tests for the v3.26.0 visual-report SCHEMA validator (Constitution §3.2):
-//   validateVisualReport(content)            — pure section/row validator
-//   validateVisualReports(ws, taskIds)        — per-task composition over files
-//   designDeclaresStructuralAssertions(ws,f)  — backwards-compat opt-in signal
-// Closes the false-PASS hole: existence + widget-shape was insufficient;
-// this gate rejects PASS on missing sections, failed/unverified canonical-state
-// or structural-assertion rows, or a non-PASS verdict.
+// Tests for the v3.26.0 visual-report schema validator (Constitution §3.2):
+// validateVisualReport, validateVisualReports and the opt-in signal
+// designDeclaresStructuralAssertions. A report that merely exists is not enough:
+// PASS is rejected on a missing section, a failed or unverified canonical-state
+// or structural row, or a non-PASS verdict.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";

@@ -1,12 +1,8 @@
 // Coded by @qa-engineer
-// Tests for spec: specs/qa-visual-skill-split.md (v3.8.3).
-// Spec-to-Test map: AC-1→t1, AC-2→t2, AC-3→t3, AC-4→t4, AC-5→t5, AC-6→t6, AC-7→t7.
-//
-// Integration-level checks on the I/O boundary: prompts/build.ts loads
-// content/skill-*.md verbatim, and the qa-engineer agent uses the Read tool
-// at runtime to load the visual sub-skill. Both the trim (qa-engineer.md
-// hook) and the moved content (qa-visual.md) must shipped together for the
-// lazy-load contract to function.
+// Tests for specs/qa-visual-skill-split.md (AC-1..AC-7 map to t1..t7). The
+// prompt builder loads content/skill-*.md verbatim and qa-engineer reads the
+// visual sub-skill at runtime, so the trimmed SOP hook and the moved content
+// (qa-visual.md) must ship together for lazy loading to work.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -107,61 +103,20 @@ test("AC-4: SOP step numbering 1..7 sequential with no duplicates", () => {
 });
 
 test("AC-5: byte counts stay within v3.14.0-relaxed budgets (savings invariant vs v3.8.2 baseline)", () => {
-  // v3.14.0: qa-engineer.md adds a one-paragraph PASS-gate clause to the
-  // Phase 1.5 hook (~600 bytes). qa-visual.md adds the Widget Shape
-  // Checklist Step A + per-row failure-mode upgrades (~1800 bytes). The
-  // sub-skill exceeded the v3.8.3 2400-byte cap by design — the new
-  // contract carries the widget verification protocol (R6). Budgets relaxed
-  // to reflect the new scope while keeping the savings-vs-v3.8.2-baseline
-  // invariant intact (qa-engineer.md still well under the 8660 v3.8.2
-  // pre-split size).
+  // Size caps keep the split's savings: qa-engineer.md stays well under its
+  // pre-split size even after later SOP additions.
   const qaSize = fs.statSync(QA_PATH).size;
   const qaVisualSize = fs.statSync(QA_VISUAL_PATH).size;
 
-  // qa-engineer.md cap: 17900 bytes. The cap guards the context budget of an
-  // SOP that is loaded on every QA hop, so it only moves on purpose: each
-  // time a reviewed SOP addition lands, it is raised to the measured size
-  // (`wc -c content/skill-qa-engineer.md`) plus roughly 350-550 bytes of
-  // headroom, kept at the tight end because headroom is exactly the growth
-  // the next edit can add without anyone deciding to allow it. The latest
-  // raise (15500 -> 17900, measured 17512) absorbed the "## Contract Defect
-  // vs Implementation Failure" section and its Escalation Routes row. The
-  // file was 8660 bytes before the visual sub-skill was split out; that
-  // number is informational only and nothing depends on it.
-  // `skill-qa-visual.md` has its own cap below. (Earlier raises: C3-06
-  // `covers:` batching, T-C15-02 Expected-Red Diff, d9 review_task_ids, e2
-  // bugfix-mode branch, T-E3-QA AC Execution, long runs and crash checkpoint
-  // (T-E20-01/T-E21-01); latest T-E46-01, E46.)
+  // qa-engineer.md cap: 17900 bytes. This SOP loads on every QA hop, so the
+  // cap moves only on purpose: after a reviewed addition it is raised to the
+  // measured size (`wc -c`) plus about 350-550 bytes, kept tight because
+  // headroom is growth nobody decided to allow. Raise history:
+  // specs/e260h-comment-rationale.md (test/qa-visual-skill-split.test.mjs).
   assert.ok(qaSize <= 17900, `qa-engineer.md must be <= 17900 bytes (got ${qaSize})`);
-  // qa-visual.md: v3.36.0 adds B10 (Step B0 carry-forward gate) and B11
-  // (Step B1 deterministic pixel-diff pre-screen + Step B2 LLM-only path).
-  // These are SOP-prose insertions totalling ~5400 bytes on top of the
-  // v3.26.0 9000-byte cap, bringing the file to ~14444 bytes. Cap raised
-  // 9000 → 15000 with ~550-byte headroom for future minor amendments.
-  // This is a scoped cost: qa-visual is lazy-loaded ONLY when the visual
-  // gate arms (design mode != no-design), so non-visual tasks pay zero.
-  // v3.38.0 (qa-owned bump): cap raised from 15000 → 16200 to absorb the
-  // F0 baseline-provenance gate SOP prose (provenance metadata rules,
-  // baseline:/diff-metric: line conventions) plus the F2 retro-sop-hardening
-  // Step A.5 fidelity baseline scope validation guard. Both additions are
-  // intentionally shipped content; actual size is 15804 bytes. Cap of 16200
-  // provides ~396-byte headroom consistent with the ~350–550-byte convention.
-  // v3.39.0 (qa-owned bump): cap raised from 16200 → 17600 to absorb the
-  // figma-baseline-mechanical-selection Step A.0 (Baseline Source-of-Truth)
-  // SOP prose — requires copying the design-auditor Source manifest's frozen
-  // baseline node-id list verbatim and forbids URL re-derivation (~1043 bytes).
-  // Intentionally shipped content; actual size is 17247 bytes. Cap of 17600
-  // provides ~353-byte headroom consistent with the ~350–550-byte convention.
-  // v3.40.0 (qa-owned bump): cap raised from 17600 → 18100 to absorb the
-  // figma-baseline-manifest-gate Step A.0 server-enforcement note in
-  // skill-qa-visual.md (BASELINE_MANIFEST_MISSING / BASELINE_PROVENANCE_INCOMPLETE
-  // error code documentation + gate-dormancy opt-in note). Actual size is
-  // 17928 bytes. Cap of 18100 provides ~172-byte headroom.
-  // v3.42.0 (qa-owned bump): cap raised from 18100 → 20700 to absorb the
-  // qa-visual-pixel-gate-attestation AC-11 additions — Step B1/B2 pixel_gate_complete
-  // requirement, B1-fallback path attestation note, Report schema update, and
-  // dimensionsMatch=false failure-mode instruction. Intentionally shipped content;
-  // actual size is 20180 bytes. Cap of 20700 provides ~520-byte headroom.
+  // qa-visual.md cap: 20700 bytes, under the same headroom convention. It is
+  // lazy-loaded only when the visual gate arms, so non-visual tasks pay nothing.
+  // Raise history: specs/e260h-comment-rationale.md (test/qa-visual-skill-split.test.mjs).
   assert.ok(qaVisualSize <= 20700, `qa-visual.md must be <= 20700 bytes (got ${qaVisualSize})`);
 });
 
@@ -219,18 +174,10 @@ test("AC-2: skill-qa-visual.md Step A.0 requires copying the frozen baseline man
   assert.match(block, /MUST NOT re-derive the baseline set from the Figma URL/, "must forbid URL re-derivation");
 });
 
-// The visual sub-skill folds its exemption rules into one provenance matrix
-// and its failure narratives into one error-code table. Two annotation
-// tokens in it must survive BYTE-EXACT, specifically preserving the
-// em-dash (U+2014) separator rather than a hyphen — a paraphrase an editor
-// could introduce without any visual difference in most fonts. The server
-// parser (tools/evidence-file.ts CARRY_FORWARD_TOKEN / B1_UNAVAILABLE_TOKEN)
-// is tested against its own constants elsewhere (evidence-provenance.test.mjs,
-// pixel-gate-attestation.test.mjs) but nothing previously pinned these two
-// literals against the SKILL DOC TEXT itself — this test does, so a
-// future doc edit that silently swaps the em-dash for a hyphen fails CI
-// instead of silently breaking the carry-forward/B1-fallback prose contract.
-// (specs/qa-visual-consolidation.md Copy/Strings S15/S16, T-QVC-01)
+// Two annotation tokens in the visual sub-skill must stay byte-exact, em-dash
+// (U+2014) included: a hyphen looks the same in most fonts. The parser
+// constants in tools/evidence-file.ts are tested elsewhere; this pins the doc
+// text, so a silent em-dash swap fails CI (specs/qa-visual-consolidation.md S15/S16).
 test("AC-3 (qa-visual-consolidation S15/S16): carry-forward and B1-fallback annotation tokens are byte-exact (em-dash, not hyphen)", () => {
   const body = fs.readFileSync(QA_VISUAL_PATH, "utf-8");
   assert.ok(

@@ -1,19 +1,9 @@
 // Coded by @qa-engineer
-// Tests for specs/e8-success-telemetry.md, refined by
-// specs/e8-success-telemetry-architecture.md (blueprint) — the v11->v12
-// cumulative round-counter schema bump + release-close metrics emit +
-// summarizer CLI (T-E8-01..05, code-reviewer APPROVED zero findings,
-// review_reports/review_T-E8-06.md).
-//
-// Spec-to-Test map:
-//   migration seed-0, feature-scoped reset (AC8)         -> Migration section
-//   Mechanism (computeNewRound totals)                    -> Counter semantics section
-//   hop_count-mirror parse/serialize contract              -> Handoff plumbing section
-//   emit hook (AC1/AC2/AC6/AC7)                            -> Emit hook section
-//   one_pass (AC3)                                         -> one_pass section
-//   deriveTicketCode / <CODE> convention (AC4)              -> deriveTicketCode section
-//   summarizer (AC9)                                        -> Summarizer section
-//   skill-release-engineer.md step 11b                     -> see test/feature-lease.test.mjs S8
+// Tests for specs/e8-success-telemetry.md: the v11 to v12 cumulative
+// round-counter schema bump, the release-close metrics emit and the summarizer
+// CLI. Sections: migration, counter semantics, handoff plumbing, emit hook,
+// one_pass, deriveTicketCode, summarizer; the release SOP step 11b is pinned in
+// test/feature-lease.test.mjs S8.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -727,23 +717,11 @@ test("E8-E9: emitFeatureMetrics never throws directly, regardless of inputs (def
 });
 
 // ============================================================================
-// Dedupe guard for release-close metrics (specs/e11-e12-release-integrity-batch.md AC6-AC12):
-// same (feature, released_version) pair skipped, new version appends, null
-// treated as a real key, cross-feature no collision, malformed line skipped,
-// missing/unreadable file fails open. qa-owned (T-E11E12-03, AC13).
-// The dedupe tests D1-D3 drive the guard through the REAL release-engineer
-// closing-write signature (the exact double-fire reproduced at v3.74.0); U1-U3
-// drive emitFeatureMetrics directly for the cases the dispatch chain can't
-// cheaply isolate (null-key dedupe, cross-feature independence, fail-open on
-// an unreadable metrics.jsonl).
-//
-// Spec-to-Test map:
-//   same feature+version dispatched twice -> 1 line (AC7)       -> E12-D1
-//   version changes between dispatches -> 2 lines (AC8)         -> E12-D2
-//   pre-existing malformed line doesn't crash the guard (AC10)  -> E12-D3
-//   null released_version dedupes against null only (AC9)       -> E12-U1
-//   cross-feature, same version -> no collision (AC6/AC8)       -> E12-U2
-//   unreadable metrics.jsonl fails open -> appends (AC10/AC11)  -> E12-U3
+// Dedupe guard for release-close metrics (specs/e11-e12-release-integrity-batch.md
+// AC6-AC12). D1-D3 drive it through the real release-engineer closing write
+// (the v3.74.0 double fire); U1-U3 call emitFeatureMetrics directly for null
+// keys, cross-feature independence and fail-open on an unreadable file.
+// Spec-to-test map: specs/e260h-comment-rationale.md (test/success-metrics.test.mjs).
 // ============================================================================
 
 test("E12-D1 (AC7): dispatching the release-engineer closing-write signature TWICE for the same feature+package.json version appends exactly ONE metrics line — the v3.74.0 double-fire scenario, closed", async () => {

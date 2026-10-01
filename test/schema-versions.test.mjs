@@ -22,36 +22,11 @@ function reset() {
 // ---------- CURRENT_VERSIONS / VERSION_WHEN_ABSENT ----------
 
 test("CURRENT_VERSIONS exposes the four kinds at their e123a-lane-layout-migration levels", () => {
-  // Handoff version history, one step per schema change:
-  // v6 added external_refs (b8-external-ref-ledger).
-  // v7 added next_role/resume_of/review_verdict — stamp-only migration, DR-1 (c9-protocol-fields).
-  // v8 added dispatch_pins — stamp-only migration, AC-1 (c14-dispatch-pins).
-  // v9 added hop_count — seeded 0, DR-3; sibling of qa_round/review_round/
-  // visual_round, not a stamp-only attestation (d2-server-brake-accounting).
-  // v10 added dispatched_at — stamp-only, seeds nothing, DR-7; next_role's
-  // direct companion (d5-server-side-stale-dispatch-detection).
-  // v11 added dispatch_mode — stamp-only, seeds nothing; follows the
-  // dispatch_pins/external_refs feature-scoped carry-forward algorithm, but
-  // scalar (e2-bugfix-repro-gate).
-  // v12 added qa_rounds_total/review_rounds_total/visual_rounds_total —
-  // seeded 0, like the hop_count counter, NOT stamp-only (e8-success-telemetry).
-  // v13 added the evidence_schema pin — stamp-only, seeds nothing; the
-  // dispatch_mode scalar algorithm (e23-evidence-schema-versioning).
-  // v14 added cut_approved_source — stamp-only, seeds nothing; the
-  // dispatch_mode scalar algorithm again (e114-cut-approval-inheritance).
-  // v15 added dispatch_mechanism/dispatch_mechanism_tier — stamp-only, seeds
-  // nothing; the dispatch_mode scalar algorithm again (e123a-lane-layout-migration).
-  // sqlite stays at 2 — hop_count IS persisted there too, via the idempotent
-  // addColumnIfMissing ALTER (DR-2), the exact mechanism that added
-  // visual_round without a versioned bump; unlike external_refs/
-  // dispatch_pins/dispatched_at/dispatch_mode/the three cumulative round totals/evidence_schema/
-  // cut_approved_source/dispatch_mechanism/dispatch_mechanism_tier, which are
-  // handoff-YAML frontmatter only (DR-5/DR-1 — SqliteHandoffStorage ignores
-  // those). The tasks schema moves to 2 (stamp-only — the MEANING of v2 is
-  // carried by WHICH PATH the file lives at, D-D; the step itself leaves the
-  // body untouched; e125a-lane-local-ledgers). The config schema moves to v2
-  // (added the optional "artifacts" key — stamp-only, seeds nothing; the
-  // dispatch_mode/cut_approved_source scalar-stamp algorithm again; see e106-init-artifacts-flag).
+  // Each handoff bump from v6 to v15 added frontmatter fields; sqlite stays at
+  // 2 (only hop_count reached it, via an idempotent ALTER). tasks v2 is
+  // stamp-only, its meaning carried by the file's lane-local path; config v2
+  // added the optional "artifacts" key, stamp-only.
+  // Version history: specs/e260h-comment-rationale.md (test/schema-versions.test.mjs).
   assert.equal(CURRENT_VERSIONS.handoff, 15);
   assert.equal(CURRENT_VERSIONS.tasks, 2);
   assert.equal(CURRENT_VERSIONS.sqlite, 2);

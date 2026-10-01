@@ -1,31 +1,10 @@
 // Coded by @qa-engineer
-// Tests for spec: specs/e4-design-source-credibility-gate.md (e4-design-source-credibility-gate)
-// + specs/e4-design-source-credibility-gate-architecture.md (Test Specification §B).
-//
-// Covers the new build-entry attestation gate SOURCE_CREDIBILITY_UNVERIFIED on the
-// pm:In_Progress -> {architect,sr-engineer}:In_Progress edge: the parser's new
-// `credibility` column on BaselineManifestRow (gates/visual.ts), the composition
-// helper checkSourceCredibility(...), the orchestrator's storage-agnostic /
-// prev-pinned arm condition, the S02 hint verbatim text, and the coordinator
-// Auto-Routing stop-condition (AC-9). Modeled on test/baseline-manifest-gate.test.mjs
-// (parser/predicate composition-test convention, no server spawn) and
-// test/cut-approval-gate.test.mjs (resume-safety / storage-mode-skip / S0x-verbatim /
-// composeSkill stop-condition patterns) per the architecture's Test Specification §B
-// pointer to model on both files.
-//
-// Spec-to-Test map:
-//   credibility attestation on audited rows (AC-1) -> T1, T2, T4, T5, T6, T7, T12
-//   existing STOP stays unchanged — a regression guard with no code path here (AC-2);
-//         covered by content/skill-design-auditor.md prose, not a code assertion
-//   server gate blocks on missing/wrong attestation (AC-3) -> T3, T5
-//   dormant outside fetch-based-mode arm / no design file / no ## Source (AC-4) -> T8, T9a, T9b
-//   independent of BASELINE_MANIFEST_MISSING/BASELINE_PROVENANCE_INCOMPLETE (AC-5) -> T6, T7
-//   pinned to pm predecessor — resume safety (AC-6) -> T10
-//   storage-mode agnostic — no instanceof FileHandoffStorage guard (AC-7) -> T11
-//   hint format + byte-exact S02 (AC-8) -> T13
-//   coordinator Auto-Routing stop-condition (AC-9) -> T14
-//   build gate (AC-10) -> exercised by `npm run build && npm audit ... && npm test`,
-//         not a unit test in this file (see T-E4-05 task closing step).
+// Tests for specs/e4-design-source-credibility-gate.md: the build-entry gate
+// SOURCE_CREDIBILITY_UNVERIFIED on pm -> {architect, sr-engineer}, the
+// `credibility` column parsed in gates/visual.ts, checkSourceCredibility, the
+// storage-agnostic pm-pinned arm condition, the S02 hint and the coordinator
+// stop-condition. Composition tests, no server spawn.
+// Spec-to-test map: specs/e260h-comment-rationale.md (test/source-credibility-gate.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -346,15 +325,10 @@ test("T10: AC-6 — the orchestrator arm condition requires prevTuple.agent === 
 // ===========================================================================
 
 test("T11: AC-7 — the E4 gate block carries NO instanceof FileHandoffStorage guard (contrast cut-approval/external-refs)", () => {
-  // Why: AC-7/DR-4 — unlike cut_approved/external_refs (handoff-YAML, file-mode
-  // only), the source-credibility attestation lives in design/<feature>.md, a
-  // workspace file read via fs independent of handoff storage kind. The gate
-  // must fire identically in file-mode and SQLite/HTTP mode, so its block must
-  // NOT be nested inside a `getActiveStorage() instanceof FileHandoffStorage`
-  // check. We isolate the E4 gate's own block (checkSourceCredibility call up
-  // to its SOURCE_CREDIBILITY_UNVERIFIED emit) and assert the guard is absent
-  // there — composition assertion against the compiled orchestrator, same
-  // convention as cut-approval-gate.test.mjs's S1/XG-both-edges.
+  // The attestation lives in design/<feature>.md, read with fs whatever the
+  // handoff storage, so the gate must fire in file and SQLite mode alike. This
+  // isolates the gate's block in the compiled orchestrator and asserts it has
+  // no FileHandoffStorage guard.
   const startIdx = DIST_ORCHESTRATOR.indexOf("checkSourceCredibility(parsed.workspace_path");
   assert.ok(startIdx >= 0, "checkSourceCredibility call site not found in dist/tools/handoff-orchestrator.js");
   const endIdx = DIST_ORCHESTRATOR.indexOf("SOURCE_CREDIBILITY_UNVERIFIED", startIdx);
@@ -405,17 +379,10 @@ test("T12: parseBaselineManifestRows populates credibility (normalized) from a h
 // ===========================================================================
 
 test("T13: AC-8 — S02 static suffix verbatim (runtime hintStatic); dynamic prefix + error code in dist/tools/handoff-orchestrator.js", () => {
-  // Why: AC-8/DR-9 — the hint is split as dynamic prefix (emit site) + static
-  // suffix (registry hintStatic), reproducing spec S02 byte-for-byte when
-  // concatenated. The leading space on hintStatic is load-bearing.
-  //
-  // NOTE: gates/registry.ts builds hintStatic via a source-level `+` string
-  // concatenation across multiple literal fragments; tsc emits that as three
-  // separate string literals joined by `+` (no compile-time constant folding),
-  // so a raw dist-text .includes() search for the already-concatenated string
-  // never matches the compiled source. We instead import the live `gate(...)`
-  // function and read the RUNTIME-evaluated (JS-concatenated) value — the same
-  // value the orchestrator actually uses when building the envelope.
+  // The hint is a dynamic prefix plus the registry's static suffix, together
+  // byte-equal to spec S02; the leading space on hintStatic matters. tsc keeps
+  // the registry's `+` concatenation unfolded, so the test reads the runtime
+  // value from gate(...) rather than searching dist text.
   const entry = gate("SOURCE_CREDIBILITY_UNVERIFIED");
   const STATIC_SUFFIX =
     " Every audited row in a fetch-based design (figma/sketch/xd/penpot) must carry " +

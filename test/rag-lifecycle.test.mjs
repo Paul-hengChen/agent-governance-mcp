@@ -1,13 +1,9 @@
 // Coded by @qa-engineer
-// Tests for rag-lifecycle-automation feature (T21-T25).
-// - tools/handoff.ts: prd_path parse/serialize + preservation
-// - tools/storage-sqlite.ts: prd_path column + migration + deletePrdChunks + tombstone sweep
-// - tools/rag-coalesce.ts: shared in-flight registry
-// - prompts/build.ts: resolvePrdPath, lazy reindex, canLazyReindex split
-//
-// Real-embedding paths (cold-start 3.8s) are NOT exercised here — covered by
-// scripts/smoke-rag.mjs end-to-end. The lazy reindex failure path IS tested by
-// pointing buildPrdChunks at a non-existent PRD.
+// Tests for the RAG lifecycle automation: prd_path parse, serialize and
+// preservation (tools/handoff.ts), the SQLite prd_path column, chunk deletion and
+// tombstone sweep, the shared in-flight registry (tools/rag-coalesce.ts) and lazy
+// reindex in prompts/build.ts. Real embeddings are left to scripts/smoke-rag.mjs;
+// the reindex failure path is tested with a missing PRD.
 
 import { test, after } from "node:test";
 import assert from "node:assert/strict";

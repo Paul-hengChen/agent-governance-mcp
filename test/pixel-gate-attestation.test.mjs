@@ -1,21 +1,9 @@
 // Coded by @qa-engineer
-// Tests for the v3.42.0 pixel-gate attestation feature (qa-visual-pixel-gate-attestation):
-//   isPlaceholderDiffMetric(value)                    — pure predicate (AC-1/AC-10)
-//   parsePixelGateAttestation(body)                   — pure predicate (AC-3/AC-10)
-//   parseVisualProvenanceRows(content)                — pure parser (pixelGateComplete field added)
-//   checkPixelGateAttestation(workspacePath, taskIds) — fs composition helper (AC-2/AC-4/AC-5/AC-7/AC-8)
-//   dist/index.js verbatim error strings              — Copy/Strings gate (AC-9)
-//
-// AC coverage map (cross-referenced to specs/qa-visual-pixel-gate-attestation.md):
-//   PD1-PD11: isPlaceholderDiffMetric — placeholder set members, null, whitespace/case variants, non-placeholder
-//   PA1-PA8:  parsePixelGateAttestation — attestation detection, AC-3 label-line variants, edge cases
-//   PR1-PR4:  parseVisualProvenanceRows — pixelGateComplete field correctly populated
-//   CK1-CK10: checkPixelGateAttestation — composition helper + gate decision tree
-//   E1-E5:    dist/index.js verbatim error strings (PIXEL_GATE_ATTESTATION_MISSING, VISUAL_PROVENANCE_MISSING.placeholder)
-//   AC-4:     carry-forward surfaces exempt from attestation
-//   AC-5:     B1-LLM-fallback surface must still carry pixel_gate_complete: true (NOT exempt)
-//   AC-7:     non-armed / no-design workspace — gate dormant
-//   AC-8:     legacy pre-provenance report (no baseline:) — gate dormant
+// Tests for the pixel-gate attestation (specs/qa-visual-pixel-gate-attestation.md):
+// the pure predicates isPlaceholderDiffMetric (PD) and parsePixelGateAttestation
+// (PA), parseVisualProvenanceRows (PR), the fs helper checkPixelGateAttestation
+// (CK) and the verbatim error strings in dist/index.js (E).
+// AC map: specs/e260h-comment-rationale.md (test/pixel-gate-attestation.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -200,12 +188,9 @@ function legacyReport(surfaceId = "surface1") {
 }
 
 // ===========================================================================
-// PD1-PD11: isPlaceholderDiffMetric — pure predicate (AC-1/AC-10)
-//
-// Contract: true when null, OR when normalized (trim+lower+collapse-spaces)
-// value is in DIFF_METRIC_PLACEHOLDERS = {n/a, skipped, skip, dimensionsmatch=false,
-// dimensions mismatch, todo, tbd, none, -, ""}.
-// false when value is a real numeric string or a non-placeholder token.
+// PD1-PD11: isPlaceholderDiffMetric. True for null or for a value that, trimmed,
+// lower-cased and space-collapsed, is in DIFF_METRIC_PLACEHOLDERS; false for a
+// real numeric string or any other token.
 // ===========================================================================
 
 test("PD1: AC-1/AC-10 purity — null → true (absent counts as placeholder)", () => {
@@ -696,15 +681,9 @@ test("E4: AC-9 — PIXEL_GATE_ATTESTATION_MISSING message includes spec referenc
 });
 
 test("E5: AC-9 — full verbatim PIXEL_GATE_ATTESTATION_MISSING copy string in dist/index.js", () => {
-  // Why: the spec Copy/Strings table pins the full error envelope. The compiled dist
-  // splits the string across template literal concatenation lines, so we verify each
-  // clause that must appear in the source text. Any paraphrase or truncation breaks
-  // the operator runbook.
-  // The clauses below match the three string segments as emitted by index.ts:
-  //   `⛔ PIXEL_GATE_ATTESTATION_MISSING: ${listing}. Each non-carry-forward `  (line 1)
-  //   `surface in qa_reports/visual_<id>.md must carry '- pixel_gate_complete: true' `  (line 2)
-  //   `in its ### <surface id> prose sub-section under ## Region Diff. Carry-forward `  (line 3)
-  //   `surfaces are exempt. See specs/qa-visual-pixel-gate-attestation.md.`  (line 4)
+  // The spec's Copy/Strings table pins the full error envelope, which the
+  // compiled dist splits across concatenated template literals, so each
+  // required clause is checked on its own. A paraphrase breaks the runbook.
   assert.ok(
     DIST_INDEX.includes("⛔ PIXEL_GATE_ATTESTATION_MISSING:"),
     "PIXEL_GATE_ATTESTATION_MISSING prefix (clause 1) must appear in dist/index.js",
