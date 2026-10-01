@@ -1,31 +1,8 @@
 // Coded by @qa-engineer
-// Tests that the information-hygiene and generic-citation rule bullets are
-// present in the constitution and survive composition in every dispatch
-// mode. Spec: specs/e231-info-hygiene-rule.md. (E231)
-//
-// Spec-to-Test map:
-//   AC1 -> "AC1" tests below (both new bullets' key phrases, verbatim, in
-//          content/const-15-core-tail.md §6)
-//   AC2 -> "AC2" test below (both bullets survive composition on all four
-//          dispatch arms: lite/chain x design/non-design, because
-//          const-15-core-tail.md is core-tagged and includeSegment("core", …)
-//          returns true unconditionally)
-//   AC3, AC4, AC5, AC6 are covered elsewhere per the spec's own Test surfaces
-//   line: AC3 by a direct `git diff` read (not a standing test — a one-line
-//   CONTRIBUTING.md sentence has no ongoing regression risk of its own beyond
-//   what test/compose-equivalence.test.mjs already pins for composed output);
-//   AC4 by the test/context-budget.test.mjs size ceilings; AC5 is implied by AC1 asserting the bullets are
-//   ADDITIONS (the surrounding §5/§6/§7 text this file reads is untouched by
-//   construction — any accidental edit to it would desync this file's own
-//   phrase anchors); AC6 is a repo-wide `git diff --stat` scope check, not a
-//   unit of composed output this file's helpers can observe.
-//
-// The new bullets keep the spec's own line
-// wrapping (content/const-15-core-tail.md wraps prose at ~90 columns), so
-// every phrase below is checked against a WHITESPACE-NORMALIZED copy of the
-// fragment (all runs of whitespace collapsed to a single space) rather than
-// against the raw multi-line source — a phrase that happens to straddle a
-// wrap point must still match.
+// Tests that the information-hygiene and generic-citation rule bullets are present in the constitution and survive composition in every dispatch mode. Spec: specs/e231-info-hygiene-rule.md. (E231)
+// AC1 checks both bullets' key phrases verbatim in content/const-15-core-tail.md §6; AC2 checks they survive composition on all four dispatch arms. AC3-AC6 are covered elsewhere (see the rationale file).
+// Every phrase is checked against a WHITESPACE-NORMALIZED copy of the fragment (runs of whitespace collapsed to one space), because the fragment wraps prose at ~90 columns and a phrase may straddle a wrap point.
+// Rationale: specs/e260f-comment-rationale.md (test/e231-info-hygiene-rule.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";

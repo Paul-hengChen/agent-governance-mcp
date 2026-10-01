@@ -1,31 +1,8 @@
 // Coded by @qa-engineer
-// Regression cases for the fan-out manifest's `worktree` column, which may
-// now be written relative to the primary checkout. Pins the resolveWorktree /
-// isAbsoluteWorktree contract, the render-only row errors WORKTREE_EMPTY /
-// WORKTREE_TILDE, the non-fatal validate WARN, and the decision that
-// checkLane and lane-status behave exactly as before, since neither reads
-// that column. (specs/e235b-relative-manifest-worktree.md AC1-AC3, AC6;
-// specs/e235b-relative-manifest-worktree-architecture.md R1-R11;
-// T-E235B-06/07)
-//
-// Manifest builder mirrors test/e177a-manifest.test.mjs's manifestText() so
-// each assertion's cause stays visible next to the expectation. Repo helpers
-// (mkRepo/commitTree/setBranch) mirror test/e177a-check-cli.test.mjs — every
-// fixture here is a real, throwaway git repo under os.tmpdir(), never inside
-// this repo.
-//
-// Spec-to-Test map (architecture "Regression cases" R1-R11):
-//   R1  -> "R1 relative resolves"
-//   R2  -> "R2 absolute passes through byte-verbatim"
-//   R3  -> "R3 AC2 golden"
-//   R4  -> "R4 empty cell"
-//   R5  -> "R5 tilde cell"
-//   R6  -> "R6 primary absent"
-//   R7  -> "R7 check unaffected (AC3)"
-//   R8  -> "R8 parse unaffected"
-//   R9  -> "R9 lane-status unaffected (AC3)"
-//   R10 -> "R10 validate warning (CLI)"
-//   R11 -> "R11 repo sweep"
+// Regression cases for the fan-out manifest's `worktree` column, which may now be written relative to the primary checkout. Pins the resolveWorktree / isAbsoluteWorktree contract, the render-only row errors WORKTREE_EMPTY / WORKTREE_TILDE,
+// the non-fatal validate WARN, and that checkLane and lane-status behave exactly as before. (specs/e235b-relative-manifest-worktree.md AC1-AC3, AC6; specs/e235b-relative-manifest-worktree-architecture.md R1-R11; T-E235B-06/07)
+// Test names start with R1..R11 (architecture "Regression cases"). The manifest builder mirrors test/e177a-manifest.test.mjs's manifestText(); repo helpers mirror test/e177a-check-cli.test.mjs, and every fixture is a throwaway git repo under os.tmpdir().
+// Rationale: specs/e260f-comment-rationale.md (test/e235b-relative-worktree.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";

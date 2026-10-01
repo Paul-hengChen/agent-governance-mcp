@@ -1,22 +1,8 @@
 // Coded by @qa-engineer
-// Tests for evidence-schema versioning. The handoff carries an integer
-// `evidence_schema` (stamped by the server, feature-scoped, handoff v13).
-// The two evidence-heading checks (visual report schema, AC-execution log)
-// read that pin, so tightening the heading-match rule mid-feature can never
-// invalidate evidence already written for a feature in flight. The case
-// that motivated this: a `## Phase 3.5 — AC Execution Log` heading was
-// rejected for its prefix alone, although the content was all there. The
-// three rejection envelopes name the missing section or expected string,
-// the file path checked, and the evidence-schema version the check ran
-// under. (specs/e23-evidence-schema-versioning.md AC1-AC6, D1-D3)
-//
-// Spec-to-Test map:
-//   AC1 (stamp/carry/drop-restamp + no-client-supply)  -> AC1-1..AC1-6
-//   AC2 (migration invents no pin)                      -> AC2-1, AC2-2
-//   AC3 (incident-replay heading, pin 2/absent clears, pin 1 still fails) -> AC3-1..AC3-3
-//   AC4 (suffixed/prefixed headings pass under pin 2; missing sections still reject) -> AC4-1, AC4-2
-//   AC5 (envelope substrings: section/string, path, version, all 3 codes) -> AC5-1..AC5-3
-//   AC6 (zod tw_update_state surface unchanged)         -> AC6-1
+// Tests for evidence-schema versioning: the handoff carries a server-stamped, feature-scoped integer `evidence_schema` (handoff v13) that the two evidence-heading checks (visual report schema, AC-execution log) read,
+// so tightening the heading rule mid-feature never invalidates evidence already written for a feature in flight. Motivating case: a `## Phase 3.5 — AC Execution Log` heading was rejected for its prefix alone.
+// The three rejection envelopes name the missing section or expected string, the file path checked and the evidence-schema version. (specs/e23-evidence-schema-versioning.md AC1-AC6, D1-D3) Test ids: AC1-1..AC1-6, AC2-1/2, AC3-1..3, AC4-1/2, AC5-1..3, AC6-1.
+// Rationale: specs/e260f-comment-rationale.md (test/e23-evidence-schema.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -268,15 +254,8 @@ evidence_schema: 1
 // ============================================================================
 
 test("AC2-1: a v12 fixture migrates to v13 with schema_version becoming 15 and NO evidence_schema seeded", () => {
-  // The handoff schema's CURRENT version is 15, so the manually-registered
-  // chain must extend two steps past v13 (v13→v14,
-  // cut_approved_source pin, stamp-only, seeds nothing; v14→v15,
-  // dispatch_mechanism/dispatch_mechanism_tier pin, stamp-only, seeds
-  // nothing) or runMigrations throws MISSING_MIGRATION_STEP against the new
-  // target — same shared module-level registry hazard as AC2-2 below and
-  // dispatch-pins.test.mjs's M1/M3. The v12→v13 step under test is still
-  // asserted via the evidence_schema-specific assertions below; only the
-  // runner's *target* moved. (e123a-lane-layout-migration)
+  // The handoff schema's CURRENT version is 15, so the manually-registered chain must extend past v13 (v13→v14 cut_approved_source pin; v14→v15 dispatch_mechanism/tier pin; both stamp-only)
+  // or runMigrations throws MISSING_MIGRATION_STEP against the new target (same shared-registry hazard as AC2-2 and dispatch-pins.test.mjs M1/M3). (e123a-lane-layout-migration)
   _clearRegistryForTests();
   registerMigration({ kind: "handoff", from: 0, to: 1, up: (i) => ({ ...i, schema_version: 1 }) });
   registerMigration({ kind: "handoff", from: 1, to: 2, up: (i) => ({ ...i, schema_version: 2 }) });
@@ -567,15 +546,8 @@ test("AC5-3: AC_EXECUTION_LOG_MISSING names the expected heading, the review fil
 // ============================================================================
 
 test("AC6-1: tw_update_state's zod arg surface carries no evidence_schema key (server-stamped only, D1)", () => {
-  // tools/registry.ts's cut_approved_source zod-arg comment legitimately
-  // CONTRASTS itself against evidence_schema ("Contrast
-  // evidence_schema: server-stamped, deliberately NO zod arg here.") — spec
-  // AC6 itself calls out this exact contrast. That is prose, not a
-  // declaration, so a blind substring search over the whole file is too
-  // blunt and false-positives on it. AC6's real invariant is narrower:
-  // no zod schema key and no hand-written JSON-Schema property may be NAMED
-  // evidence_schema, so the check looks for exactly that shape.
-  // (e114-cut-approval-inheritance)
+  // tools/registry.ts's cut_approved_source zod-arg comment legitimately contrasts itself against evidence_schema (spec AC6 calls out this contrast), so a blind substring search of the whole file false-positives.
+  // AC6's real invariant is narrower: no zod schema key and no hand-written JSON-Schema property may be NAMED evidence_schema, so the check looks for exactly that shape. (e114-cut-approval-inheritance)
   const registrySrc = fs.readFileSync(path.join(PROJECT_ROOT, "tools", "registry.ts"), "utf-8");
   assert.ok(
     !/\bevidence_schema:\s*z\./.test(registrySrc),
