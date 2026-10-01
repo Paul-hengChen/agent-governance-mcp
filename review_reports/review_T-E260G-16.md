@@ -56,3 +56,7 @@ Range `f249f1b..feca935` (fix `6234fe8`; state commit `feca935`).
 - All four round-1 required findings are fixed and their new wording is true against the code. All recommended items are fixed except the proof's cited-paths exemption breadth (T-E260G-09), which does not block. The four optional items left undone do not block.
 
 Verdict: CHANGES_REQUESTED — a one-line join in the e31 header (8 to 7 counted lines) restores AC5. Nothing else blocks.
+
+## Round 3 — note — by code-reviewer (opus)
+
+The round 2 required item (e31 header at 8 counted lines, AC5) is resolved under T-E260G-17 (feature `e260g-r3-fix`); see review_reports/review_T-E260G-17.md, APPROVED.

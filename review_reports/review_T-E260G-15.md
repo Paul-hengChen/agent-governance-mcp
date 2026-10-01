@@ -52,3 +52,7 @@ Range `f249f1b..feca935` (fix `6234fe8`).
 - Round 1 optional lane-migrate:373: **fixed**. Folded into :372 (119 characters, in line with the file's other lines).
 - The lane-migrate:61 and :625 `.current/tasks.md` exemptions in the new cited-paths check are correct: these are runtime fixture paths that base already named, not repo citations.
 - Nothing in this task's files blocks. The lane verdict follows T-E260G-10.
+
+## Round 3 — note — by code-reviewer (opus)
+
+The round 2 required item (e31 header at 8 counted lines, AC5) is resolved under T-E260G-17 (feature `e260g-r3-fix`); see review_reports/review_T-E260G-17.md, APPROVED.

@@ -52,3 +52,7 @@ Range `f249f1b..feca935` (fix `6234fe8`).
   - optional — specs/e260g-comment-rationale.md:176 — "the `t-*` labels from the spec do not appear in the file". No spec carries those labels either (grep over specs/ finds none; they came from the old test comment). Say "from the old file header".
 - Round 1 optional feature-lease:1077: **fixed**. Folded into :1076.
 - Nothing in this task's files blocks. The lane verdict follows T-E260G-10.
+
+## Round 3 — note — by code-reviewer (opus)
+
+The round 2 required item (e31 header at 8 counted lines, AC5) is resolved under T-E260G-17 (feature `e260g-r3-fix`); see review_reports/review_T-E260G-17.md, APPROVED.

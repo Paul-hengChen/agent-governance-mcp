@@ -52,3 +52,7 @@ Range `f249f1b..feca935` (fix `6234fe8`).
 - Round 1 required error-code-contract:317: **fixed**. :317-318 now reads "imports the real built dist/gates/registry.js (AC-5)", a tracked path that matches the import at :17-19 and the assertion at :321-327.
 - Round 1 recommended error-code-contract:3: **fixed**. :3-5 "Registry and source codes must match, doc codes must be a subset of the registry, every documentedInProse entry must appear in a doc" matches the tests at :146 (equality), :173 (subset) and :186.
 - Nothing in this task's files blocks. The lane verdict follows T-E260G-10. The proof's cited-paths check would not catch a return of the :318 bug (see the T-E260G-09 Round 2 note), but the text at HEAD is correct.
+
+## Round 3 — note — by code-reviewer (opus)
+
+The round 2 required item (e31 header at 8 counted lines, AC5) is resolved under T-E260G-17 (feature `e260g-r3-fix`); see review_reports/review_T-E260G-17.md, APPROVED.

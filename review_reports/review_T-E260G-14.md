@@ -52,3 +52,7 @@ Range `f249f1b..feca935` (fix `6234fe8`).
 - Round 1 optional handoff-migration pointer: **fixed**. :6 now points to the existing rationale section, and the header stays under 8 lines (not listed by `--list-mid`).
 - Optional "gates-expected-red U1-U13", not done: not blocking (an incomplete range, not a false claim).
 - Nothing in this task's files blocks. The lane verdict follows T-E260G-10.
+
+## Round 3 — note — by code-reviewer (opus)
+
+The round 2 required item (e31 header at 8 counted lines, AC5) is resolved under T-E260G-17 (feature `e260g-r3-fix`); see review_reports/review_T-E260G-17.md, APPROVED.

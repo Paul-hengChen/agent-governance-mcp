@@ -65,3 +65,7 @@ Range `f249f1b..feca935` (fix `6234fe8`).
 | file | line at HEAD | counted | reason |
 |---|---|---|---|
 | — | — | — | none (contradicted by e31:1, counted 8; see the finding above) |
+
+## Round 3 — note — by code-reviewer (opus)
+
+The round 2 required item (e31 header at 8 counted lines, AC5) is resolved under T-E260G-17 (feature `e260g-r3-fix`); see review_reports/review_T-E260G-17.md, APPROVED.

@@ -73,3 +73,7 @@ Range `f249f1b..feca935` (fix commit `6234fe8`). Proof at `feca935`: PASS (25 ch
   - recommended — proof.mjs:153 — the `!baseSrc.includes(p)` exemption is a substring match over the whole base file, code included. It therefore exempts any suffix of a base path. Control: putting the round-1 bug back (`gates/registry.js` at error-code-contract:318) gives `cited-paths: 0`, because base contains `dist/gates/registry.js`. Exempt only whole path tokens that the base file cites in comment lines.
   - optional — proof.mjs:25 — a range token such as `// E1A-1..7` is not matched (`7` alone is not an id token).
 - Optional "whitespace-reflow blind spot", not done: **not blocking**. I re-checked by hand: every added or removed line in `bdbffaf..feca935 -- test` is a comment or a blank line.
+
+## Round 3 — note — by code-reviewer (opus)
+
+The round 2 required item (e31 header at 8 counted lines, AC5) is resolved under T-E260G-17 (feature `e260g-r3-fix`); see review_reports/review_T-E260G-17.md, APPROVED.

@@ -54,3 +54,7 @@ Range `f249f1b..feca935` (fix `6234fe8`).
   - optional — specs/e260g-comment-rationale.md:107 — "the four `T-E5-02 content: const-08 ...` tests". The file has five such tests; the fifth (:308, per-field defaults) is unmapped. Say "four of the five".
 - Optional "e92 ruler 74/75 `=`", not done: cosmetic, not blocking.
 - Nothing in this task's files blocks. The lane verdict follows T-E260G-10.
+
+## Round 3 — note — by code-reviewer (opus)
+
+The round 2 required item (e31 header at 8 counted lines, AC5) is resolved under T-E260G-17 (feature `e260g-r3-fix`); see review_reports/review_T-E260G-17.md, APPROVED.
