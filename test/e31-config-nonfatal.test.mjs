@@ -1,9 +1,9 @@
 // Coded by @qa-engineer
 // Tests that loadConfig NEVER throws on a corrupt, unparseable, unreadable,
-// non-object or future-schema .current/.config.json: the tw_get_state pre-flight
-// read goes through it, so a throw there blocks every other call. getConfigError(ws)
-// reports the failure while defaults are served in place of an unusable config file.
-// Known and accepted: under a corrupt config the task-mutation tools ignore the custom taskPaths/taskPattern (completeTaskInFile errors loudly, addTaskInFile writes the lane ledger).
+// non-object or future-schema .current/.config.json (the tw_get_state pre-flight
+// reads it, so a throw blocks every call); getConfigError(ws) reports the failure.
+// Accepted: under a corrupt config the custom taskPaths/taskPattern are ignored
+// (completeTaskInFile errors loudly, addTaskInFile writes the lane ledger).
 // Rationale: specs/e260g-comment-rationale.md (test/e31-config-nonfatal.test.mjs).
 
 import { test } from "node:test";
