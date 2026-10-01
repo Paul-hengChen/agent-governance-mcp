@@ -1,8 +1,9 @@
 // Coded by @qa-engineer
-// Tests (T-E178B-04) for `lane-status --watch` (tools/lane-status.ts runLaneWatch + helpers, scripts/lane-status.mjs routing), per specs/e178b-lane-watch-tooling.md decisions (a)-(f), (j), AC1-AC9
-// and the watch half of the cut pre-review check, AC15 (AC10-AC14 are in test/e178b-cut-prereview.test.mjs; AC20 is recorded in qa_reports/review_T-E178B-04.md). The contract is never losing an event: every
-// watched-field transition prints exactly one line, a lane that breaks or leaves is said, not dropped, and a transition between two watches fires after the re-arm, whose command carries the fingerprints this watch last read (decision (d)).
-// runLaneWatch is driven in-process with an injected lane provider, handoff reader and fake-clock io; only AC7's no-git proof and AC9's end-to-end run use real subprocesses. Case names carry the AC.
+// Tests (T-E178B-04) for `lane-status --watch` (tools/lane-status.ts runLaneWatch,
+// scripts/lane-status.mjs routing), specs/e178b-lane-watch-tooling.md decisions (a)-(f), (j),
+// AC1-AC9 and AC15 (AC10-AC14: test/e178b-cut-prereview.test.mjs; AC20 is recorded in
+// qa_reports/archive/release-v4.0.0/review_T-E178B-04.md). Contract: never lose an event,
+// every watched-field transition prints exactly one line. Case names carry the AC.
 // Rationale: specs/e260f-comment-rationale.md (test/e178b-lane-watch.test.mjs).
 
 import { test } from "node:test";

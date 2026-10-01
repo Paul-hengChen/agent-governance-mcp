@@ -1,8 +1,9 @@
 // Coded by @qa-engineer
-// Tests (T-E178B-05) for the `fanout check` warning about owned path tokens that name no file (E208; tools/fanout-manifest.ts checkLane/unmatchedOwnedTokens, scripts/fanout.mjs;
-// specs/e178b-lane-watch-tooling.md decisions (h)/(i), AC16-AC19). AC20 and AC21 are whole-ticket runs recorded in qa_reports/review_T-E178B-05.md, with no in-file assertion.
-// The warning fires on exactly the exact tokens naming no file at base and none the branch added (a prose aside like a bare `feature-rollup.mjs` otherwise silently widens the lane's bounds) and
-// the change is purely additive: existing lines byte-identical and in order, WARN lines after them, exit codes unchanged. Fixtures are real git repos built like test/e177a-check-cli.test.mjs.
+// Tests (T-E178B-05) for the `fanout check` warning about owned path tokens that name no
+// file (E208; tools/fanout-manifest.ts, scripts/fanout.mjs; specs/e178b-lane-watch-tooling.md
+// decisions (h)/(i), AC16-AC19). AC20 and AC21 are whole-ticket runs recorded in
+// qa_reports/archive/release-v4.0.0/review_T-E178B-05.md. The change is purely additive:
+// WARN lines follow the existing byte-identical output, exit codes unchanged.
 // Rationale: specs/e260f-comment-rationale.md (test/e178b-fanout-unmatched.test.mjs).
 
 import { test } from "node:test";

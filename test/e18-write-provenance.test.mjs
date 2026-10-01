@@ -1,8 +1,9 @@
 // Coded by @qa-engineer
-// Tests for two write-provenance hardening gates, a stamp-provenance gate and a QA-evidence gate (backlog E18; T-E18-01, T-E18-02; spec = the E18 section of docs/backlog.md).
-// They close holes exploited in the previous chain (E5): a hand-authored closing write with fabricated zero-entropy stamps, and an identity-swap evasion where a code-reviewer subagent's second write,
-// stamped agent_id="qa-engineer", pre-filled completed_tasks before any qa-engineer ran. Same helpers and shape as test/feature-lease.test.mjs and test/reviewer-completed-tasks-gate.test.mjs.
-// Cases STAMP-1..5, STAMP-SQL, QAEV-1..4b, QAEV-INCIDENT, QAEV-SQL, CONTENT-1..3. The 2026-07-16 amendment (E32) replaced the old APPROVED-row exemption with QAEV-4a/b; permanent regression pins are in test/e32-e33-gate-hardening.test.mjs.
+// Tests for two write-provenance gates, stamp-provenance and QA-evidence (backlog E18;
+// T-E18-01, T-E18-02; spec = the E18 section of docs/backlog.md). They close two holes:
+// hand-authored closing writes with fabricated zero-entropy stamps, and an identity swap where
+// a code-reviewer's write stamped qa-engineer pre-filled completed_tasks. Cases STAMP-*,
+// QAEV-*, CONTENT-*; E32 regression pins live in test/e32-e33-gate-hardening.test.mjs.
 // Rationale: specs/e260f-comment-rationale.md (test/e18-write-provenance.test.mjs).
 
 import { test } from "node:test";
@@ -416,9 +417,11 @@ test("QAEV-4b (E32 amendment): the AMENDED APPROVED-row shape — review_task_id
 });
 
 // ---------------------------------------------------------------------------
-// Incident replay (E5 identity swap): a legitimate APPROVED handoff with an empty completed_tasks manifest, then a SECOND self-looped write still stamped
-// agent_id="qa-engineer" that pre-fills completed_tasks with zero qa_reports evidence. Its prevTuple is (qa-engineer, In_Progress), not (code-reviewer, In_Progress),
-// so it never lands on the exempt APPROVED-row edge: the gate closes the hole the exemption cannot (docs/backlog.md incident (b)).
+// Incident replay (E5 identity swap): a legitimate APPROVED handoff with an empty
+// completed_tasks manifest, then a SECOND self-looped write still stamped qa-engineer that
+// pre-fills completed_tasks with zero qa_reports evidence. Its prevTuple is (qa-engineer,
+// In_Progress), not (code-reviewer, In_Progress), so it never lands on the exempt APPROVED-row
+// edge: the gate closes the hole the exemption cannot (docs/backlog.md incident (b)).
 // ---------------------------------------------------------------------------
 
 test("QAEV-INCIDENT: the exact E5 identity-swap replay (APPROVED write, then a self-looped qa-engineer pre-fill with zero evidence) is REJECTED", async () => {

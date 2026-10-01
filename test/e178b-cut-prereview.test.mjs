@@ -1,8 +1,9 @@
 // Coded by @qa-engineer
-// Tests (T-E178B-04) for the cut pre-review fan-in check in tools/lane-status.ts: whether a lane's written cut was sent to the integrator for pre-review
-// (E178b; specs/e178b-lane-watch-tooling.md decisions (g)/(h)/(j), AC10-AC14; the watch-mode transition, AC15, is in test/e178b-lane-watch.test.mjs). A lane with a written cut
-// (specs/<active_feature>.md) but no cut proposal in its to-integrator.md must be reported `missing` explicitly (Wave 7.1 e212 sent none and nothing noticed); a non-proposal that merely mentions a cut does not count;
-// the check is report-only (exit 0) and emits nothing without --mailbox-root. Fixtures are copies of the recognizer corpus under test/fixtures/e178b/mailbox/<lane>/; lane workspaces are temp dirs named by lane, served through an injected LaneListProvider.
+// Tests (T-E178B-04) for the cut pre-review fan-in check in tools/lane-status.ts: whether a
+// lane's written cut was sent to the integrator for pre-review (E178b;
+// specs/e178b-lane-watch-tooling.md decisions (g)/(h)/(j), AC10-AC14). A written cut with no
+// cut proposal in to-integrator.md is reported `missing`; a non-proposal mentioning a cut
+// does not count; report-only (exit 0), silent without --mailbox-root.
 // Rationale: specs/e260f-comment-rationale.md (test/e178b-cut-prereview.test.mjs).
 
 import { test } from "node:test";

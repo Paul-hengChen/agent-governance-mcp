@@ -1,8 +1,9 @@
 // Coded by @qa-engineer
-// Tests for specs/e178a-integrator-role.md (ticket E178a). The integrator is a prompt only, never a tw_switch_role / agent_id role (spec decision D11).
-// Content-assertion tests independent of the sr-engineer/code-reviewer claims in review_reports/review_T-E178A-01.md: they read the shipped SOP, the constitution fragment,
-// docs/lane-protocol.md, tools/fanout-manifest.ts, CLAUDE.md/AGENTS.md and dist/ registries directly, so a paraphrase that drops an AC's substance fails here. One test per AC, named "AC<n>"
-// (an unanchored --test-name-pattern "AC1" also matches AC10..AC17, harmless). AC17's golden/budget re-baseline is proven by the full suite, not re-derived here.
+// Tests for specs/e178a-integrator-role.md (ticket E178a). The integrator is a prompt only,
+// never a tw_switch_role / agent_id role (spec decision D11). Content-assertion tests
+// independent of the claims in review_reports/archive/release-v4.0.0/review_T-E178A-01.md;
+// they read the shipped SOP, constitution fragment, docs, tools/fanout-manifest.ts and dist/
+// registries directly. One test per AC, named "AC<n>" ("AC1" also matches AC10..AC17).
 // Rationale: specs/e260f-comment-rationale.md (test/e178a-integrator-role.test.mjs).
 
 import { test } from "node:test";
@@ -40,9 +41,11 @@ function mkWorkspace() {
 const INTEGRATOR_DESCRIPTION =
   "Integrator — plan parallel lanes, pre-review cuts, verify lane reports, merge, tear down. Cross-lane; writes no handoff state.";
 
-// History-independent scope tests (E229): a permanent test must not assert on a historical commit SHA unless the assertion is about a historical diff
-// (docs/lane-protocol.md guard note), and then must guard the lookup and skip loudly (shallow clone, adopter fork, single-commit recreation, E104).
-// Mirrors test/e130-lane-default.test.mjs's copy of this helper, duplicated rather than imported so each file's proof stands alone.
+// History-independent scope tests (E229): a permanent test must not assert on a historical
+// commit SHA unless the assertion is about a historical diff (docs/lane-protocol.md guard
+// note), and then must guard the lookup and skip loudly (shallow clone, adopter fork,
+// single-commit recreation, E104). Mirrors test/e130-lane-default.test.mjs's copy of this
+// helper, duplicated rather than imported so each file's proof stands alone.
 function unresolvedSha(...shas) {
   for (const sha of shas) {
     try {
