@@ -1,13 +1,8 @@
 // Coded by @qa-engineer
-// Tests for spec: specs/pixel-perfect-visual-compare.md (Phase 2: Option B).
-// Spec-to-Test map: AC-1→t1, AC-2→t2, AC-3→t3, AC-4→t4, AC-5→t5, AC-6→t6, AC-7→t7.
-// t8 is a regression guard on the SOP step renumbering (manual markdown
-// list renumbering bit us mid-implementation — see review_T49-T51.md).
-//
-// These are integration-level checks on the I/O boundary: prompts/build.ts
-// loads content/skill-*.md verbatim into the rendered prompt, so the markdown
-// contract shipped here IS the runtime behaviour. No pure-logic units exist
-// for this markdown-only feature.
+// Tests for specs/pixel-perfect-visual-compare.md (AC-1..AC-7 map to t1..t7; t8
+// guards the SOP step numbering, which broke once during manual renumbering).
+// prompts/build.ts loads content/skill-*.md verbatim, so the markdown contract
+// is the runtime behaviour; there is no pure logic to unit-test.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -27,19 +22,11 @@ const QA_PATH = path.join(PROJECT_ROOT, "content", "skill-qa-engineer.md");
 const QA_VISUAL_PATH = path.join(PROJECT_ROOT, "content", "skill-qa-visual.md");
 
 test("AC-1: design-auditor Artifact Schema declares Visual Baselines H2 with 4-col schema (v3.16.0: MANDATORY when mode != no-design)", () => {
-  // Why: AC-1 anchors the entire Phase 2 contract on a single schema entry.
-  // If the auditor doesn't declare *where* baselines live and *what* columns
-  // they carry, QA Phase 1.5 has no place to look — the gate degrades to
-  // permanent skip silently, defeating the feature. Surface id must FK to
-  // Source manifest so deferred / out-of-scope rows can't masquerade as
-  // baseline-capable.
-  //
-  // v3.16.0 (visual-fidelity-gate-hardening AC-2): the section changed from
-  // OPTIONAL to "MANDATORY when mode != no-design". The server now arms the
-  // visual gate on mode != no-design rather than on Visual Baselines presence,
-  // so absence with a real mode BLOCKS PASS (VISUAL_BASELINES_REQUIRED).
-  // The old "Absence MUST cause QA Phase 1.5 to skip silently" sentence is
-  // intentionally removed; absence is now only legitimate for mode = no-design.
+  // Without a declared home and columns for baselines, QA Phase 1.5 has nothing
+  // to read and the gate skips forever. Surface id must reference the Source
+  // manifest so deferred rows cannot pose as baselines. Since v3.16.0 the
+  // section is mandatory unless mode is no-design: the gate arms on mode, and
+  // a missing section blocks PASS (VISUAL_BASELINES_REQUIRED).
   const body = fs.readFileSync(AUDITOR_PATH, "utf-8");
 
   // Section heading present + marked MANDATORY when mode != no-design (v3.16.0)
@@ -153,14 +140,9 @@ test("AC-6: backwards-compat — v3.8.1 audits + non-UI workspaces still skip si
 });
 
 test("AC-7: v3.8.2 release entry is preserved in CHANGELOG (regression guard)", () => {
-  // Why: this test was written at the moment of the v3.8.2 release. Once
-  // shipped, its real job is to guard the [3.8.2] CHANGELOG entry against
-  // accidental deletion in future bumps (history must be append-only). The
-  // current-version coherence invariant is owned by the latest release's own
-  // test file (e.g. test/qa-visual-skill-split.test.mjs covers 3.8.3), so
-  // pinning package.json here would force this test to break every release.
-  // Same pattern as the v3.8.1 → v3.8.2 relaxation in
-  // test/pixel-perfect-design-coverage.test.mjs.
+  // Guards the [3.8.2] CHANGELOG entry against deletion (history is
+  // append-only). The current version is pinned by the latest release's own
+  // test, so pinning package.json here would break every release.
   const changelog = fs.readFileSync(path.join(PROJECT_ROOT, "CHANGELOG.md"), "utf-8");
 
   assert.match(changelog, /^##\s*\[3\.8\.2\]/m, "CHANGELOG must retain [3.8.2] release section");

@@ -1,23 +1,9 @@
 // Coded by @qa-engineer
-// Tests for spec: specs/subagent-watermark-parent-validation.md
-//
-// Spec-to-Test map:
-//   validateWatermark contract (AC3)   -> t-present-correct, t-absent-appends,
-//                                         t-hyphen-treated-absent,
-//                                         t-wrong-name-treated-absent,
-//                                         t-wrong-tier-treated-absent,
-//                                         t-whitespace-tolerant,
-//                                         t-empty-reply,
-//                                         t-idempotent
-//   required fixture coverage (AC5)    -> same tests (fixture set is a subset)
-//   no regressions, pure fn (AC6)      -> t-no-io-imports, t-buildWatermark-format
-//
-// WHY: validateWatermark is the single point of truth for watermark compliance
-// in the parent coordinator. These fixtures encode the behavioral contract
-// (Decision 2 + Decision 3 in the spec) so that any future refactor of the
-// regex, the correction strategy, or the name/tier matching logic cannot
-// silently regress. The "idempotency" fixture is particularly load-bearing:
-// it proves the parent cannot double-append by calling the util twice.
+// Tests for specs/subagent-watermark-parent-validation.md: validateWatermark is
+// the parent coordinator's single point of truth for watermark compliance.
+// The fixtures pin the regex, the correction strategy and the name and tier
+// matching; t-idempotent proves a second call never double-appends.
+// Spec-to-test map: specs/e260h-comment-rationale.md (test/watermark-check.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -221,12 +207,9 @@ test("t-mismatch-crlf: CRLF body before a wrong watermark is preserved and norma
 });
 
 // ---------------------------------------------------------------------------
-// Idempotency of the mismatched (replace) branch specifically, as distinct
-// from the existing t-idempotent test (which only exercises the absent
-// branch). A correct→re-validate cycle on a mismatch-corrected reply must
-// converge to present:true with exactly one watermark line, proving the
-// parent cannot accumulate watermarks across retries when the subagent's own
-// reply already carried a wrong one (T-C5C18-06, AC-2).
+// Idempotency of the mismatch (replace) branch; t-idempotent covers only the
+// absent branch. Re-validating a corrected reply converges to one watermark
+// line, so retries cannot pile up watermarks.
 // ---------------------------------------------------------------------------
 
 test("t-mismatch-idempotent: correcting a mismatched watermark twice converges, no double-append", () => {

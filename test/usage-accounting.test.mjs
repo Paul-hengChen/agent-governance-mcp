@@ -1,26 +1,10 @@
 // Coded by @qa-engineer
-// Tests for specs/d2-server-brake-accounting.md — the durable, hook-appended
-// token-usage sidecar (tools/usage-accounting.ts) and its PostToolUse writer
-// (bin/agent-governance-usage-hook.mjs) (T-D2-05).
-//
-// Spec-to-Test map:
-//   durable, out-of-band usage record, not hand-summed (AC-5) -> t-append-*,
-//                                                                 t-hook-writes-record
-//   crash/compaction — a fresh read reconstructs the
-//         feature-scoped token total from disk (AC-4)          -> t-crash-*
-//   no duplicate/conflated telemetry streams — disjoint
-//         key sets vs telemetry.jsonl (AC-7)                    -> t-ac7-*
-//   opt-in; absence of tokenBudgetPerFeature = zero
-//         behavior change / no sidecar writes (AC-9)            -> t-hook-noop-*
-//
-// WHY: the token-usage sidecar is the server-side brake's second breaker (alongside hop_count) (D2).
-// It is deliberately NOT governed by the handoff.ts 4-step mutating-tool
-// contract — it's a best-effort, lock-free, never-throw append the
-// PostToolUse hook performs out-of-band from the coordinator's own memory.
-// These tests pin the pure module (append/sum) in isolation, the opt-in hook
-// contract end-to-end (spawning the real bin/ script against real stdin
-// payloads), and the crash-survival property that motivated this feature in
-// the first place.
+// Tests for specs/d2-server-brake-accounting.md: the token-usage sidecar
+// (tools/usage-accounting.ts), the brake's second breaker next to hop_count, and
+// its PostToolUse writer (bin/agent-governance-usage-hook.mjs). The append is
+// best-effort, lock-free and never throws, outside the mutating-tool contract.
+// Pins the pure module, the opt-in hook end to end and crash survival.
+// Spec-to-test map: specs/e260h-comment-rationale.md (test/usage-accounting.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -232,13 +216,9 @@ test("t-sum-empty-file: sumUsageForFeature returns 0 for a zero-byte usage.jsonl
 });
 
 // ============================================================================
-// sumUsageForFeature fans out across live/history/flat sidecar files
-// EXACTLY like tw_gate_stats (the same enumerateLaneSidecarSources, the
-// same content-based dedup) — this fixture builds the same three-source
-// layout as the gate-stats aggregation tests (e26-gate-stats): a live-vs-history
-// prefix/identical duplicate (skipped) AND a half-merged flat file
-// (skipped), plus a distinct-lane history copy with no live counterpart
-// (never skipped) (AC6, e123c).
+// sumUsageForFeature reads live, history and flat sidecars exactly as
+// tw_gate_stats does, with the same dedup: a live-vs-history duplicate and a
+// half-merged flat file are skipped, a distinct-lane history copy is not.
 // ============================================================================
 
 function usageRecordLine(feature, tokens) {

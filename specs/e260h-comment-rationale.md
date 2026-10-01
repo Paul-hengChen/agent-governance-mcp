@@ -206,3 +206,15 @@ Every task's last line names the dispatch's role and tier for the watermark, as 
 ## test/eval/run-eval.mjs
 
 Order of operations: the API key check comes first, before any dynamic import, so a missing key exits non-zero with a one-line error naming the variable and having done no work (no SDK load, no bundle assembly, no network call, no silent skip); `scenarios.mjs` and the SDK are imported dynamically after it for that reason. Every tier is resolved to a model id before the first call, so an unknown tier fails at zero spend. Scenarios run sequentially; retry and backoff are out of scope, so an API error marks that scenario FAIL and the run continues to a full report. The only filesystem reads happen in the scenario import (`dist/`, `content/`, the fixture workspace), all read-only, and no `tw_*` tool is called.
+
+## test/usage-accounting.test.mjs
+
+Spec-to-test map for `specs/d2-server-brake-accounting.md`: AC-5 (a durable, out-of-band usage record, not hand-summed) `t-append-*`, `t-hook-writes-record`; AC-4 (after a crash or compaction a fresh read rebuilds the feature's token total from disk) `t-crash-*`; AC-7 (no duplicated or conflated telemetry streams: key sets disjoint from `telemetry.jsonl`) `t-ac7-*`; AC-9 (opt-in: without `tokenBudgetPerFeature` there is no behaviour change and no sidecar write) `t-hook-noop-*`. The hook tests spawn the real `bin/` script with real stdin payloads; crash survival is the property that motivated the feature. The fan-out test (AC6 of e123c) builds the same three-source layout as the gate-stats aggregation tests of e26-gate-stats.
+
+## test/schema-versions.test.mjs
+
+The handoff and SQLite history is the one listed under `test/skill-evolution-v3.11.test.mjs` above. Two further notes: v9 `hop_count` is a sibling of the round counters, seeded 0, not a stamp-only attestation, and v12's round totals are likewise seeded rather than stamp-only. The tasks schema v2 is stamp-only: the step leaves the body untouched, and the meaning of v2 is which path the file lives at (e125a-lane-local-ledgers). The config schema v2 added the optional `artifacts` key, stamp-only, seeding nothing (e106-init-artifacts-flag).
+
+## test/watermark-check.test.mjs
+
+Spec-to-test map for `specs/subagent-watermark-parent-validation.md`: the `validateWatermark` contract (AC3) is covered by `t-present-correct`, `t-absent-appends`, `t-hyphen-treated-absent`, `t-wrong-name-treated-absent`, `t-wrong-tier-treated-absent`, `t-whitespace-tolerant`, `t-empty-reply` and `t-idempotent`; the required fixtures (AC5) are a subset of those; no regressions and a pure function (AC6) are `t-no-io-imports` and `t-buildWatermark-format`. The fixtures encode Decisions 2 and 3 of the spec.
