@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Coded by @sr-engineer
-// Thin CLI wrapper for the fan-out manifest tool, which validates and renders
-// a multi-lane feature split (E177a); all logic is in tools/fanout-manifest.ts.
+// Thin CLI wrapper (all logic in tools/fanout-manifest.ts) that validates and
+// renders a multi-lane feature split (E177a); see specs/e260c-bin-scripts.md.
 // Exit codes: 0 = ok / in bounds, 1 = out of bounds (check only), 2 = usage or any parse/input error.
 // Usage: node scripts/fanout.mjs validate <manifest>
 //        node scripts/fanout.mjs render <manifest> <lane> --summary <text> --reading <text>... [--mailbox-root <dir>] [--primary <path>] [--base <sha>]

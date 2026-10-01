@@ -86,6 +86,50 @@ Tasks are cut so one sr-engineer session handles at most about 15 blocks and at 
 ## Dependencies / Prerequisites
 E258 (done). No design file (mode = no-design), so Visual Structural Assertions are omitted. No external references found in the supplied requirement documents beyond in-repo paths. Pinned comment strings: none found in `test/` for `bin/` or `scripts/` at the fan-out check; the full suite is the final judge.
 
+## Closing pass results (T-E260C-11)
+Measured with `analyzeText` (the `agc check` counter) over the 19 tracked JS files under `bin/` and `scripts/`. Before is `node .current/e260c/measure.mjs --ref b37178a`; after is `node .current/e260c/measure.mjs` on the final tree.
+
+| measure | before (b37178a) | after |
+|---|---|---|
+| blocks of 8-20 counted lines | 58 | 0 |
+| blocks over 20 counted lines | 17 | 0 |
+| longest block (counted lines) | 81 | 7 |
+| comment lines (all 19 files) | 2231 | 1265 |
+
+Per changed file (comment lines and longest block):
+
+| file | comment lines before | after | longest before | after |
+|---|---|---|---|---|
+| bin/agc-init.mjs | 1065 | 679 | 61 | 7 |
+| bin/agent-governance-context.mjs | 83 | 54 | 16 | 7 |
+| bin/agent-governance-usage-hook.mjs | 48 | 31 | 24 | 7 |
+| scripts/capture-constitution-golden.mjs | 88 | 48 | 43 | 7 |
+| scripts/check-md-tables.mjs | 234 | 79 | 61 | 7 |
+| scripts/check-transitions-sync.mjs | 63 | 32 | 37 | 7 |
+| scripts/check-version.mjs | 29 | 19 | 9 | 5 |
+| scripts/fanout.mjs | 13 | 7 | 13 | 7 |
+| scripts/feature-rollup.mjs | 16 | 7 | 16 | 7 |
+| scripts/join-precondition.mjs | 16 | 7 | 16 | 7 |
+| scripts/lane-status.mjs | 15 | 7 | 15 | 7 |
+| scripts/mailbox-watch.mjs | 100 | 61 | 46 | 7 |
+| scripts/measure-context-cost.mjs | 57 | 44 | 16 | 7 |
+| scripts/merge-invariants.mjs | 13 | 7 | 13 | 7 |
+| scripts/summarize-metrics.mjs | 20 | 13 | 14 | 7 |
+| scripts/test-lock.mjs | 104 | 50 | 48 | 7 |
+| scripts/verify-release.mjs | 249 | 102 | 81 | 7 |
+
+Kept 8-20 blocks: none. Every block in scope is 7 counted lines or fewer (`measure.mjs --fail-over 7` exits 0), so the review report has no keep reasons to copy.
+
+Leftover fixed in this pass: the four thin wrappers (`fanout`, `join-precondition`, `lane-status`, `merge-invariants`) are covered by the "thin CLI wrappers" entry below but had no `e260c-bin-scripts` pointer (AC3). The pointer was folded into existing header lines, so each header stays at 7 lines.
+
+Out-of-scope note for the reviewer: `content/skill-release-engineer.md` cites `scripts/verify-release.mjs:113-125` for the `--close-out` assertion. That line citation was already stale at base (the block sat at lines 153-193) and now sits at lines 75-115. `content/` is not owned by this lane, so it is left for a follow-up.
+
+Proof commands (all exit 0 on the final tree):
+- `node .current/e260c/check-invariance.mjs` prints `invariance OK: 17 files` (AC1).
+- `node .current/e260c/measure.mjs --fail-over 20` and `--fail-over 7` (AC2).
+- `node .current/e260c/check-tokens.mjs` prints `tokens OK: <n> files (<m> added on branch, skipped)`: for every path changed since b37178a that exists at base, each of `resolveLanePaths`, `lane-paths`, `resolveCurrentLane`, `migrateFlatToLane(`, `migrateLaneToFlat(`, `migrateFlatToLaneLocked` is present in exactly the same files as at base (integrator rule).
+- The AC4, AC5, AC7 and AC8 greps under Acceptance Criteria print nothing; AC5's added `/*` count (0) is not above the removed count (0).
+
 ## Kept rationale
 Appended by sr-engineer as blocks are trimmed: one entry per moved rationale, headed with file and a short topic, written in plain words. Empty at cut time.
 

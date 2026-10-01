@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Coded by @sr-engineer
-// Thin CLI wrapper (all logic, argv parsing included, in tools/lane-status.ts) for the
-// per-lane status table and roll-up (E177b) and the awaited `--watch` stream (E178b).
+// Thin CLI wrapper, all logic in tools/lane-status.ts: status table and roll-up
+// (E177b), and the awaited `--watch` stream (E178b); see specs/e260c-bin-scripts.md.
 // Usage: node scripts/lane-status.mjs [--rollup <feature-id> | --lanes a,b,... | --all]
 //                                     [--base <ref>] [--repo <path>] [--json] [--mailbox-root <dir>]
 //        node scripts/lane-status.mjs --watch [--lanes a,b,...] [--interval <s>] [--deadline <min>]

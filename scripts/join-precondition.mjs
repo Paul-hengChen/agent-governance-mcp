@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // Coded by @sr-engineer
-// Thin CLI wrapper for the join precondition check: a join ticket may start
-// only once the lane branches it depends on are merged into HEAD (E115); all
-// logic is in tools/join-precondition.ts. Run by hand at a join ticket's build
-// entry; it fires no gate (spec: specs/e115-join-precondition-check.md).
+// Thin CLI wrapper (all logic in tools/join-precondition.ts): a join ticket may
+// start only once the lane branches it depends on are merged into HEAD (E115).
+// Run by hand at a join ticket's build entry; it fires no gate. Specs:
+// specs/e115-join-precondition-check.md; see also specs/e260c-bin-scripts.md.
 // Usage: node scripts/join-precondition.mjs <depends_on-branch...> [repo-root]
 //        (repo-root defaults to cwd; when given, it must be the LAST argument and absolute)
 
