@@ -1,34 +1,10 @@
 // Coded by @qa-engineer
-// Tests for the `agc init --artifacts` flag and the matching `agc check` drift
-// reports (specs/e106-init-artifacts-flag.md AC1-AC14, plus the CLI-level AC16;
-// unit-level narrow typing of the config value (AC15/AC16) lives in
-// test/config-versioning.test.mjs — this file adds an end-to-end check (AC16)
-// that a real `agc init` write round-trips through the real loadConfig()).
-//
-// Spec-to-test map:
-//   AC1  -> "AC1: no flag defaults to local when nothing is tracked"
-//   AC2  -> "AC2: --artifacts=bogus exits 2, usage error, no partial write"
-//   AC3  -> "AC3: fresh local writes exclude rules + config key"
-//   AC4  -> "AC4: fresh repo writes config key only, no exclude write"
-//   AC5  -> "AC5: existing config upserts artifacts key, preserves other keys (untracked case)"
-//   AC6  -> "AC6: re-run without flag is a no-op when already declared"
-//   AC7  -> "AC7: already-tracked paths are detected and printed, never executed"
-//   AC8  -> "AC8: omitted flag on an already-tracked tree leaves the key undeclared and tells the user to choose"
-//   AC9  -> "AC9: agc check reports local-mode drift, exit 0" (two sub-cases: missing
-//           exclude rules, tracked path despite local mode)
-//   AC10 -> "AC10: agc check reports repo-mode drift when an artifact exclude rule is present, exit 0"
-//   AC11 -> "AC11: agc check does not confuse LANE_EXCLUDE_RULES entries for artifact drift"
-//   AC12 -> "AC12: agc check prints the undeclared-artifacts advisory, exit 0"
-//   AC13 -> "AC13: no drift line when declared+actual truly agree (local or repo)"
-//   AC14 -> "AC14: local outside a git repo skips the exclude write and notes it, no error"
-//   AC16 -> "AC16 (CLI end-to-end): loadConfig() surfaces the artifacts value agc init just wrote"
-//
-// The scratch repos in the flag and drift cases (AC1/AC3-AC11/AC13/AC16) are
-// REAL git repositories built under os.tmpdir() via `git init` + a local
-// identity (never this checkout or the lane worktree, and never the ambient
-// global git config). The invalid-value, undeclared-advisory and outside-git
-// cases (AC2/AC12/AC14) deliberately run outside any prior commit (AC2: empty
-// repo, per the spec's own proof) or outside git entirely (AC12/AC14).
+// Tests for `agc init --artifacts` and the matching `agc check` drift reports
+// (specs/e106-init-artifacts-flag.md). Test names carry the AC number.
+// Scratch repos are real git repos under os.tmpdir() with a local identity, never this
+// checkout or the global git config. The invalid-value, undeclared-advisory and outside-git
+// cases run with no prior commit or outside git entirely.
+// Rationale: specs/e260f-comment-rationale.md (test/e106-init-artifacts-flag.test.mjs).
 
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
@@ -424,17 +400,9 @@ test("boundary: --artifacts as the last argv token with no value attached is rej
   assert.match(r.stderr, /agc init: --artifacts must be "local" or "repo" \(got ""\)/);
 });
 
-// ---------------------------------------------------------------------------
-// Root-cwd regression check (AC3, E239; appended additively under the lane
-// test-ownership carve-out in docs/lane-protocol.md §3 — no existing assertion
-// above is touched): the subdirectory-anchor fix
-// (specs/e239-init-subdir-exclude.md) must leave the root-cwd path
-// byte-identical — no workspace-qualifier text, no prefixed rule strings, and
-// the already-tracked warning must carry no "(run from the repository root)"
-// qualifier, which only ever applies when cwd is a subdirectory. The
-// subdirectory cases themselves live in test/e239-init-subdir-exclude.test.mjs
-// (qa-engineer's own file).
-// ---------------------------------------------------------------------------
+// Root-cwd regression: the subdirectory exclude fix (specs/e239-init-subdir-exclude.md) must leave
+// root-cwd output unchanged, with no workspace qualifier, no prefixed rule strings, and no
+// "(run from the repository root)" text on the already-tracked warning.
 test("AC3 regression (E239): root cwd emits no subdir-qualifier text and no prefixed rule strings", () => {
   const repo = mkGitRepo("e106-e239-ac3-");
   fs.mkdirSync(path.join(repo, ".current"), { recursive: true });

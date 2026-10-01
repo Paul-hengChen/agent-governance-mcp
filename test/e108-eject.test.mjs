@@ -1,65 +1,10 @@
 // Coded by @qa-engineer
-// Tests for the `agc eject` command (specs/e108-agc-eject.md AC1-AC25). The
-// top-level usage-text case (AC22) lives in test/agc-adapters.test.mjs instead
-// (see the additive case there); the docs check (AC23) is verified by a grep
-// proof against docs/install.md, not a test case here, per this file's
-// dispatch brief.
-//
-// Spec-to-test map:
-//   AC1  -> "AC1: dry-run prints the full four-class plan, touches nothing"
-//   AC2  -> "AC2: --yes executes exactly the AC1 plan"
-//   AC3  -> "AC3: --purge-knowledge alone is still a dry-run and reports design/specs as tracked"
-//   AC4  -> "AC4: --yes --purge-knowledge prints git rm for tracked design/specs, does not delete them"
-//   AC5  -> "AC5: repo-mode tracked artifacts get a git rm command, never a delete"
-//   AC6  -> "AC6: disposition is per-path on actual tracked state, independent of the declared artifacts value"
-//   AC7  -> "AC7: docs/backlog.md is kept by default and handled as domain knowledge under --purge-knowledge"
-//   AC8  -> "AC8: CLAUDE.md with user prose keeps the prose, loses only the marked block"
-//   AC9  -> "AC9: CLAUDE.md holding only the block is deleted entirely"
-//   AC10 -> "AC10: CLAUDE.md absent or unmarked is silently skipped"
-//   AC11 -> "AC11: template-identical AGENTS.md/.antigravityrules are deleted"
-//   AC12 -> "AC12: a non-template-matching AGENTS.md/.antigravityrules is flagged, never deleted"
-//   AC13 -> "AC13: absent adapter files are silently skipped"
-//   AC14 -> "AC14: exclude-line removal never touches LANE_EXCLUDE_RULES or unrelated lines"
-//   (E243) AC7 -> "AC7 (E243): eject skips the exclude-line plan entry cleanly on a
-//           wildcard or backslash workspace, same shape for both" — proves
-//           planExcludeEntry's unsafeSegment skip also covers the wider set of
-//           unsafe path characters that init later began refusing (E243,
-//           specs/e243-init-path-escape-refusal.md), with no code change of its own
-//   AC15 -> "AC15: subdirectory eject never touches a sibling root workspace's artifacts"
-//   AC16 -> "AC16: eject refuses inside a linked worktree, same as feature start/finish"
-//   AC17 -> "AC17: outside a git repo, plain deletion still runs and exclude cleanup is skipped with a note"
-//   AC18 -> "AC18: idempotent second run reports nothing to eject"
-//   AC19 -> "AC19: the cannot-do block is always present, in both dry-run and --yes output"
-//   AC20 -> "AC20: eject never prompts, runs to completion with stdin closed"
-//   AC21 -> "AC21: an unknown flag is a usage error, exit 2, no changes"
-//   AC24 -> "AC24: plan header reports the declared artifacts mode and the no-recovery note"
-//   AC25 -> "AC25: --yes refuses while linked worktrees exist; dry-run warns"
-//
-// Additional coverage beyond the bare AC text, per the QA round-2 code
-// review's recommendation (review_reports/review_T-E108-01.md, "Round 2")
-// to pin the tracked-host-trace cases live-verified there, and per this
-// file's dispatch brief:
-//   "tracked host-trace: ..." tests -> cases A-D and G from that review's table
-//   "git rm -r line: ..." tests -> both the root form and the subdirectory
-//     "(run from the repository root)" form
-//   "cannot-do item 4: ..." tests -> the "(none)" filler and the populated
-//     ~/.claude/agents/*.md listing
-//
-// Every scratch repo is a REAL git repository built under os.tmpdir() via
-// `git init` + a local identity (never this checkout or the lane worktree,
-// and never the ambient global git config) — same discipline as
-// test/e106-init-artifacts-flag.test.mjs and test/e239-init-subdir-exclude.test.mjs.
-// Every invocation of the real bin/agc-init.mjs in this file runs with HOME
-// pointed at a fresh, empty per-test temp directory (never the real ambient
-// $HOME) so `agc eject`'s cannot-do item 4 (~/.claude/agents/*.md) is fully
-// under this file's control and never leaks the operator's own machine state
-// into an assertion.
-//
-// Security/boundary smoke check: boundary inputs (empty-string arg,
-// a very long garbage flag, a flag carrying embedded whitespace/newlines) are
-// covered under "boundary:" below. Auth/permission tests are N/A — agc eject
-// has no access-control surface (a local CLI acting on the caller's own
-// working tree).
+// Tests for the `agc eject` command (specs/e108-agc-eject.md). Test names carry the AC number.
+// The usage-text case lives in test/agc-adapters.test.mjs; the docs check is a grep proof, not a case.
+// Scratch repos are real git repos under os.tmpdir(), and every run of bin/agc-init.mjs gets a fresh
+// empty HOME so cannot-do item 4 (~/.claude/agents) never reads the operator's machine.
+// Boundary inputs are under "boundary:"; there is no access-control surface.
+// Rationale: specs/e260f-comment-rationale.md (test/e108-eject.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -618,19 +563,9 @@ test("AC14: exclude-line removal never touches LANE_EXCLUDE_RULES or unrelated l
   }
 });
 
-// ---------------------------------------------------------------------------
-// AC7 (specs/e243-init-path-escape-refusal.md) — planExcludeEntry's existing
-// `unsafeSegment !== null` skip already covers the wider set of unsafe path
-// characters that `agc init` now refuses (backslash, C0 control range, DEL),
-// just as it already covered the wildcard set (E243, E239): no code change,
-// only this new coverage. A workspace with an unsafe segment never had `init`
-// write exclude rules there in the first place (init refuses
-// `--artifacts=local` for exactly this class), so eject has nothing to remove
-// — proven here by the plan carrying no ".git/info/exclude" line at all (not a
-// "skipped"/"nothing to remove" line — the entry is entirely absent, per
-// planExcludeEntry returning null), for a wildcard-named workspace and a
-// backslash-named workspace alike.
-// ---------------------------------------------------------------------------
+// Unsafe-segment workspaces (wildcard, backslash): `agc init` refuses --artifacts=local there, so
+// eject has nothing to remove and the plan must carry no ".git/info/exclude" line at all
+// (specs/e243-init-path-escape-refusal.md).
 test("AC7 (E243): eject skips the exclude-line plan entry cleanly on a wildcard or backslash workspace, same shape for both", (t) => {
   if (process.platform === "win32") {
     t.skip(

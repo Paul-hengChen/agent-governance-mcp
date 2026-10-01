@@ -1,29 +1,10 @@
 // Coded by @qa-engineer
-// Verification-by-execution suite for the drift-detector fan-out and
-// feature-scope fix (E112, task T-E112-03, e112-drift-fanout-and-feature-scope), covering both distortion cases
-// sr-engineer's T-E112-01 shipped in tools/drift.ts + tools/evidence-lookup.ts
-// (code-reviewer APPROVED round 2, review_reports/review_T-E112-01.md):
-//
-//   (b) cross-feature false positive — completed_tasks is feature-scoped and
-//       legitimately empties on an active_feature change; ids with QUALIFYING
-//       QA evidence on disk divert into evidenceBackedIds instead of flipping
-//       driftDetected. "Qualifying" = the file's LAST recorded verdict section
-//       is PASS, or the file has NO verdict section at all (hand-authored
-//       covering report). A FAIL-only / PASS-then-FAIL file must NOT qualify.
-//   (a) structural fan-out blindness — advisory-only fanoutAdvisory field +
-//       scope-qualified clean headline when active-scope incomplete tasks
-//       exist. Never flips driftDetected, never enters `details`.
-//
-// This file builds every fixture on tmpfs (mkdtempSync) and asserts against
-// detectDrift's compiled output directly — never against this repo's own
-// qa_reports/ corpus, and never against live line numbers. It does NOT call
-// the live tw_detect_drift MCP tool (same rationale as
-// test/drift-archived-tasks.test.mjs: the running server may hold a stale
-// dist).
-//
-// Standing bar (the ticket's own words): 不要弱化偵測器去換取安靜 — both
-// cases must fire when they should AND stay silent when they should not.
-// Every group below proves both directions.
+// Drift-detector fan-out and feature-scope fixes (tools/drift.ts, tools/evidence-lookup.ts).
+// (b) Cross-feature false positive: ids with qualifying QA evidence on disk (last verdict section PASS, or no
+// verdict section) go to evidenceBackedIds instead of flipping driftDetected; a FAIL-only or PASS-then-FAIL file must not.
+// (a) Fan-out blindness: an advisory-only fanoutAdvisory field that never flips driftDetected or enters `details`.
+// Fixtures live on tmpfs and every group proves both directions: fire when it should, stay silent when it should not.
+// Rationale: specs/e260f-comment-rationale.md (test/e112-drift-fanout-feature-scope.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -250,14 +231,9 @@ test("C1 regression: a covers: report whose own last verdict is FAIL is REJECTED
   assert.equal(report.evidenceBackedIds.includes("T-C1E"), false);
 });
 
-// ===========================================================================
-// Mixed-bucket / bucket-re-tiering pins — diverting evidence-backed ids
-// changes the SIZE of the surviving vibe-drift bucket, which can silently
-// re-tier it across DRIFT_COMPRESS_THRESHOLD (5). Pin all three tiers, plus
-// the aliasing invariant that driftDetected is computed AFTER
-// details.push(buildEvidenceBackedLine) — safe only because
-// compressDriftDetails returns a FRESH array.
-// ===========================================================================
+// Mixed-bucket pins: diverting evidence-backed ids changes the surviving vibe-drift bucket size and can
+// re-tier it across DRIFT_COMPRESS_THRESHOLD (5). Pins all three tiers, plus the invariant that driftDetected
+// is computed after details.push(buildEvidenceBackedLine), safe only because compressDriftDetails returns a fresh array.
 
 test("mixed tier 1: 1 drifted + 1 evidence-backed -> driftDetected true, details.length===2, single-id tier preserved", async () => {
   const ws = mkWorkspace();
@@ -570,14 +546,9 @@ test("field presence (early return 4/4): handoff exists but no tasks file -> fan
   assert.deepEqual(report.evidenceBackedIds, []);
 });
 
-// ===========================================================================
-// The 2026-09-18 measured incident (E145/E148/E114 three-lane merge): a
-// handoff conflict left only ONE feature's ledger, while tasks.md kept every
-// lane's [x] marks. T-E148-01/02 are real QA PASSes with qa_reports/ evidence
-// on disk; T-E145-01/02 have neither an evidence file nor a ledger entry.
-// Root cause is a missing durable ledger home (E150); the drift-detector fix
-// (E112) does not cure that, but it must stop mis-calling the evidenced ids drift.
-// ===========================================================================
+// Measured incident (three-lane merge, 2026-09-18): a handoff conflict kept one feature's ledger while
+// tasks.md kept every lane's [x] marks. T-E148-01/02 have qa_reports evidence, T-E145-01/02 have none.
+// The root cause is a missing ledger home (E150); this fix must still stop calling the evidenced ids drift.
 
 test("measured incident (2026-09-18 shape): merged-lane ledger reset — evidenced ids are no longer vibe drift, unevidenced sibling-lane ids still report incomplete", async () => {
   const ws = mkWorkspace();

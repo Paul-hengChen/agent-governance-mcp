@@ -1,33 +1,10 @@
 // Coded by @qa-engineer
-// Tests (T-E115-03) for tools/join-precondition.ts, the join-time precondition check:
-// the lane branch is merged, and the lane's declared identity matches its actual one
-// (specs/e115-join-precondition-check.md,
-// amended AC3, new AC9, AC1/AC2/AC4/AC5/AC6). Executed against a REAL scratch
-// git repo fixture with actual branches and commits (mkFixtureRepo) — per the
-// ticket's explicit bar: verify by EXECUTION, not by
-// reading the diff. Style mirrors test/e116-archive-on-feature-change.test.mjs
-// (mkWs + writeHandoffState for the handoff side) and test/feature-rollup.test.mjs
-// (real on-disk fixtures over synthesized objects wherever the code under test
-// itself does a real read). AC7/AC8 are inspection-based and are recorded in
-// qa_reports/review_T-E115-03.md, not here (Constitution §2: this file owns
-// only what is proof-by-execution).
-//
-// Spec-to-Test map:
-//   AC1 (ancestry: merged vs unmerged, real git merge-base --is-ancestor) -> AC1
-//   AC2 (unknown/deleted branch degrades to false+error, never throws)   -> AC2
-//   AC3, amended (MEMBERSHIP — actual present in ANY declared row incl.
-//     a status:done row -> satisfied, mismatches:[]; actual absent from
-//     EVERY declared row -> exactly ONE finding naming the full declared
-//     set, never one finding per non-matching row)                       -> AC3
-//   AC4 (missing feature-split.md / unrecognizable column / unparseable
-//     handoff -> compared:false + reason, never a fabricated verdict)    -> AC4
-//   AC5 (no exported signature takes a second workspace-path arg; no
-//     read/exec parameterized outside repoRoot / repoRoot/.current/**)   -> AC5
-//   AC6 (exactly one hook-point comment for the later merge-invariants work, no logic for it) -> AC6
-//   AC9, new (markdown-decorated header + backtick/underscore-decorated
-//     declared values normalize before matching; internal underscore
-//     round-trips unchanged; decoration-only cell drops, never becomes
-//     an empty declared member)                                         -> AC9
+// Tests for tools/join-precondition.ts (specs/e115-join-precondition-check.md): the lane branch is merged and the
+// lane's declared identity matches its actual one. Runs against a real scratch git repo (mkFixtureRepo), verified by
+// execution, not by reading the diff. Test names carry the AC number; AC7 and AC8 are inspection-based, not here.
+// Amended AC3 is MEMBERSHIP: actual present in any declared row, even a done row, is satisfied; absent from every
+// row gives exactly one finding naming the full declared set.
+// Rationale: specs/e260f-comment-rationale.md (test/e115-join-precondition.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
