@@ -71,77 +71,38 @@ export interface AllocateTicketIdsInput {
 }
 /**
  * Extracts every well-formed, unapplied `pending-ticket` block from a lane's
- * `pending-tickets.md` text. Prose, other fenced blocks, and
- * blocks archived under `## Applied` are ignored. A block is skipped and
- * reported in `errors` — its siblings still parse — when it is unclosed,
- * is not a YAML mapping, lacks a non-empty string `lane_local_id`, `title`,
- * or `priority`, carries an `id` field (a lane never assigns real ids),
- * uses an `E<n>`-shaped `lane_local_id` (indistinguishable from a real id
- * in `depends_on`), has a malformed `depends_on`/`source`/`body`, or repeats
- * a `lane_local_id` already taken by an earlier block in the same file.
- *
- * Also reported, never changing `entries`:
- *   - a `pending-ticket` opener swallowed by an enclosing non-pending
- *     fence that is unclosed at EOF, or whose own closer ends that fence;
- *   - (only when `opts.appliedLaneLocalIds` is given) a well-formed
- *     archived block whose `lane_local_id` has no provenance row in the
- *     backlog — a finding written below `## Applied` that would never be
- *     allocated. An archived block that fails validation is never reported.
- *     (E179)
- * Never throws.
+ * `pending-tickets.md`; prose, other fences and `## Applied` blocks are
+ * ignored. A bad block (unclosed, not a mapping, a required field missing, an
+ * `id` field, an `E<n>`-shaped or duplicate `lane_local_id`, a malformed
+ * optional field) is skipped and reported in `errors`. Swallowed openers and,
+ * with `opts.appliedLaneLocalIds`, archived blocks with no backlog provenance
+ * row are reported too. Never throws. (E179)
  */
 export declare function parsePendingTickets(fileText: string, lane: string, opts?: ParsePendingTicketsOptions): ParsePendingTicketsResult;
 /**
- * Assigns sequential ids `E<currentMaxId+1>`, `E<currentMaxId+2>`, … to every
- * entry, batches in array order and entries within a batch in array order
- * (AC3) — deterministic; any cross-lane ordering policy is the caller's. The
- * ticket's `lane` is its batch's `lane`.
- *
- * Dependencies (AC4) are resolved after every id in the call is known, so a
- * forward reference resolves too. Per reference: an `E<n>`-shaped id
- * (sub-letters allowed) passes through unchanged; a lane-local token is
- * rewritten to the allocated id of the entry carrying that `laneLocalId` —
- * looked up in the dependent's own batch first, then across all other
- * batches — provided exactly one match exists at the first level that has
- * any. Zero matches, an ambiguous match, or a self-reference is reported in
- * `unresolvedDependencies` and left out of the ticket's `dependsOn` and its
- * `backlogRow`. Resolved ids are de-duplicated, first occurrence wins.
- *
- * Collision-freedom (AC5) holds under the single-writer, sequential-apply
- * discipline: a second call whose `currentMaxId` is re-derived from the
- * backlog after the first call's rows land (equivalently, the first call's
- * `maxAllocatedId`) starts strictly above every id the first call issued.
- * Takes no disposition parameter — shipped and abandoned lanes apply
- * identically (AC9).
- *
- * @throws RangeError when `currentMaxId` is not a non-negative safe integer
- *   (a caller bug — an allocator that guesses a base would reintroduce the
- *   very collision this module exists to prevent).
+ * Assigns sequential ids `E<currentMaxId+1>`, ... in batch, then entry, order
+ * (AC3); a ticket's `lane` is its batch's. Lane-local `depends_on` tokens are
+ * rewritten once every id is known; a missing, ambiguous or self reference
+ * lands in `unresolvedDependencies` instead. Collision-free (AC5) only under
+ * single-writer sequential apply.
+ * Why: specs/e260b-rationale.md (tools/lane-ticket-allocation.ts)
+ * @throws RangeError when `currentMaxId` is not a non-negative safe integer.
  */
 export declare function allocateTicketIds(input: AllocateTicketIdsInput): AllocationResult;
 /**
- * Highest BASE number across every ticket-table row whose leading cell is
- * an `E<n>` id. A sub-lettered split counts by its base (`E174a` ->
- * 174, `E9A` -> 9) — ignoring it would undercount the true max, and an
- * undercount is exactly the collision this module exists to prevent. An id
- * mentioned in any later cell or in prose is never counted. Returns 0 when
- * no row matches. Deliberately does NOT skip fenced code: counting an extra
- * `| E<n> |` line can only overcount, which wastes an id; skipping could
- * undercount, which collides — overcounting is the safe direction.
+ * Highest BASE number across ticket-table rows whose leading cell is an
+ * `E<n>` id (`E174a` -> 174); 0 when none. Fenced code is NOT skipped: an
+ * extra match can only overcount (wastes an id), while skipping could
+ * undercount (collides), so overcounting is the safe direction.
  */
 export declare function extractMaxBacklogId(backlogText: string): number;
 /**
- * laneLocalId -> backlog row id (e.g. "E190") for every ticket-table row
- * whose desc cell carries `formatBacklogRow`'s provenance parenthetical for
- * `lane` — so re-running finish is idempotent and archived blocks can be
- * checked for provenance. Only lines whose leading cell is an `E<n>` id are
- * scanned, so prose, fenced examples and tables without an id column never
- * match. The match is exact on both values: the lane is compared as
- * `formatBacklogRow` + the row's cell transform would have written it, and
- * the laneLocalId must be followed by its closing backtick and then `)` or
- * `;` — `e17` never matches `e179`, and `X-NEW-1` never matches `X-NEW-10`.
- * An escaped `\|` inside a captured laneLocalId is unescaped. First
- * occurrence wins. Pure. (E179)
+ * laneLocalId -> backlog row id (e.g. "E190") for every `E<n>`-led ticket row
+ * whose desc cell carries `formatBacklogRow`'s provenance for `lane`, so a
+ * re-run finish is idempotent. Exact on both values: the id must be followed
+ * by its closing backtick, then `)` or `;` (`X-NEW-1` never matches
+ * `X-NEW-10`); an escaped `\|` is unescaped; first occurrence wins. Pure.
+ * (E179)
  */
 export declare function findAppliedProvenance(backlogText: string, lane: string): Map<string, string>;
 /**
@@ -155,26 +116,12 @@ export declare function findAppliedProvenance(backlogText: string, lane: string)
  */
 export declare function appendBacklogRows(backlogText: string, rows: string[]): string;
 /**
- * Branches that still carry at least one unapplied pending ticket but no
- * longer have a live worktree — an abandoned lane's findings that
- * would otherwise be silently lost. Plain-data set logic: compares BRANCH
- * names against BRANCH names by exact string equality, never against lane
- * names, and never shells out. The caller normalizes both sides the same
- * way (e.g. strips `refs/heads/` from `git worktree list --porcelain`'s
- * `branch` lines) before calling.
- *
- * `hasUnappliedPendingTickets` must be computed by the caller as
- * `parsePendingTickets(text, lane).entries.length > 0` over the COMMITTED
- * `.current/<lane>/pending-tickets.md` of the branch's OWN lane only (the
- * lane the branch resolves to, e.g. `feat/e179-x` -> `e179`; a branch
- * resolving to no lane is not a candidate). Another lane's file the branch
- * happens to carry — forked from base between that lane's merge and its
- * finish — is never consulted. And NOT "the file exists": `markApplied`
- * leaves the file in place with its entries archived, so existence alone
- * would report an already-applied lane as an orphan forever. (E179)
- *
- * Returns the matching branches in input order, de-duplicated; `[]` on
- * empty input.
+ * Branches with at least one unapplied pending ticket but no live worktree:
+ * an abandoned lane's findings. Exact branch-name set logic, no shell-out.
+ * The caller normalizes both sides (e.g. strips `refs/heads/`) and computes
+ * `hasUnappliedPendingTickets` from `parsePendingTickets` over the branch's
+ * OWN lane's committed file, never from mere file existence. Returns matches
+ * in input order, de-duplicated. (E179)
  */
 export declare function detectOrphanLanes(branches: {
     branch: string;
@@ -183,20 +130,11 @@ export declare function detectOrphanLanes(branches: {
     orphans: string[];
 };
 /**
- * Returns `pending-tickets.md` text with every unapplied, well-formed block
- * whose `lane_local_id` is in `appliedLaneLocalIds` moved VERBATIM (fences
- * and payload byte-for-byte) to the end of the file's first `## Applied`
- * section, which is appended at end of file when absent (AC8). Records are
- * archived, never deleted. Re-parsing the result with `parsePendingTickets`
- * no longer returns the moved entries; every other entry, all prose, and
- * every block `parsePendingTickets` would skip as malformed stay exactly
- * where they were. One blank line directly following a moved block is
- * taken with it so no gap of doubled blank lines is left behind.
- *
- * Ids in `appliedLaneLocalIds` that match no unapplied block are ignored
- * (idempotent: re-running with the same ids is a no-op). When nothing
- * matches, the input is returned unchanged. Takes no disposition parameter
- * (AC9).
+ * Moves every unapplied, well-formed block whose `lane_local_id` is in
+ * `appliedLaneLocalIds` VERBATIM to the end of the first `## Applied`
+ * section, appended when absent (AC8): archived, never deleted. Everything
+ * else, malformed blocks included, stays put; one trailing blank line moves
+ * with its block. Unmatched ids are ignored, so a re-run is a no-op.
  */
 export declare function markApplied(fileText: string, appliedLaneLocalIds: string[]): string;
 //# sourceMappingURL=lane-ticket-allocation.d.ts.map

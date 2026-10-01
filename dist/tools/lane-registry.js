@@ -1,61 +1,19 @@
 // Coded by @sr-engineer
-// tools/lane-registry.ts — read-only lane registry. Moves
-// tools/feature-rollup.ts's `localFallbackLaneList` behind a dedicated
-// module for two consumers with very different cost profiles: (1) the
-// feature roll-up (`laneRegistryList`, below), which wants feature-history
-// attribution and can afford a lane-history scan per lane because it is
-// occasional and human-invoked; (2) `tw_get_state` (`getLaneRegistrySummary`,
-// below), the hottest read in the server, which must never pay for a
-// ticket-list read or a lane-history scan just to answer "who else is
-// working, and on what." (E132)
-//
-// Deliberately NOT a registry file that lanes write into. A written registry
-// brings back a shared write target — exactly what per-lane state
-// directories exist to avoid — and goes stale the moment a lane dies without
-// cleaning up. A derived list cannot be wrong because it has no stored copy
-// to drift. This module is READ-ONLY: it performs no writes, creates no
-// lockfile, sends no heartbeat, and authors no lane-side state.
-//
-// Neither exported function reimplements worktree enumeration or handoff
-// parsing: both delegate to `localFallbackLaneList` (tools/feature-rollup.ts)
-// for the actual derivation, so there remains exactly one place in the
-// codebase that shells out to `git worktree list`.
-//
-// Degrade-honestly (same posture as tools/feature-rollup.ts's own header):
-// an unreadable or unattributable lane is always CARRIED, never dropped and
-// never zero-filled; every degradation states a human-readable reason; a
-// partial figure is never presented as a verified total.
-//
-// NOTE — deliberate three-module circular import, documented not avoided:
-// tools/handoff-parse.ts -> tools/lane-registry.ts (this module, via
-// getLaneRegistrySummary) -> tools/feature-rollup.ts (via localFallbackLaneList)
-// -> tools/handoff-parse.ts (via parseHandoff). This is the same shape,
-// generalized to three nodes, as the existing documented
-// tools/handoff-parse.ts <-> tools/handoff-write.ts cycle (see the NOTE at
-// the top of tools/handoff-parse.ts). It is safe for the identical reason:
-// every cross-edge is an ordinary function call made at RUNTIME (inside a
-// function body — parseHandoff is called inside localFallbackLaneList's
-// loop, localFallbackLaneList is called inside this module's two exported
-// functions, and getLaneRegistrySummary is called inside
-// readHandoffState), never read at module-init time, so Node's ESM
-// live-binding semantics resolve it without error regardless of which
-// module is imported first.
+// Read-only lane registry, derived on every call, never a written registry
+// file. Consumers: the feature roll-up (`laneRegistryList`, with history) and
+// `tw_get_state` (`getLaneRegistrySummary`, cheap). Both delegate to
+// localFallbackLaneList, the one `git worktree list` caller. (E132)
+// The three-module import cycle through handoff-parse is deliberate and safe
+// (runtime-only edges): specs/e260b-rationale.md (tools/lane-registry.ts)
 import * as fs from "fs";
 import * as path from "path";
 import * as yaml from "js-yaml";
 import { localFallbackLaneList } from "./feature-rollup.js";
 import { isSafeLaneName, laneFile } from "./lane-paths.js";
-// Same frontmatter-block shape as tools/skill-frontmatter.ts's FRONTMATTER_RE
-// and tools/handoff-parse.ts's own frontmatter handling — a leading
-// `---\n...\n---` block. Deliberately a LOCAL regex + yaml.load, not
-// `parseHandoff`, for two reasons:
-// (1) a closed lane under .current/history/ is a historical snapshot that may
-// predate the live schema_version, and parseHandoff refuses loud (by design)
-// on an unparseable/future-schema handoff — one old snapshot must not take
-// out this whole best-effort read; (2) parseHandoff only ever resolves the
-// workspace's CURRENT lane (plus its flat fallback), so it cannot address an
-// arbitrary sibling lane dir at all. Only `active_feature` and
-// `last_updated` are extracted; nothing is migrated, locked, or written.
+// A leading `---\n...\n---` frontmatter block. Deliberately a local regex +
+// yaml.load, not parseHandoff: a closed-lane snapshot may predate the live
+// schema (parseHandoff refuses loud), and parseHandoff can only address the
+// current lane. Only `active_feature` and `last_updated` are extracted.
 const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
 // `.current/` subdirectories that are never lanes. Workspace-wide
 // FILES (.config.json, feature-split.md, the lockfile, ...) are excluded by
@@ -236,14 +194,9 @@ export function getLaneFeatureHistory(workspacePath) {
     }
 }
 /**
- * LaneListProvider-conformant (same signature as `localFallbackLaneList`) —
- * the provider the feature roll-up wires in (scripts/feature-rollup.mjs).
- * Delegates worktree enumeration + handoff parsing entirely to
- * `localFallbackLaneList` (no duplicated git-shelling) and additionally
- * attaches `featureHistory` per lane via `getLaneFeatureHistory`. `source`
- * reads `"lane-registry"` — the union member `tools/feature-rollup.ts`
- * reserved for this module — whenever this function, not
- * `localFallbackLaneList`, is used as the provider. (E113)
+ * LaneListProvider for the feature roll-up (scripts/feature-rollup.mjs):
+ * `localFallbackLaneList` plus `featureHistory` per lane via
+ * `getLaneFeatureHistory`, with `source` reading `"lane-registry"`. (E113)
  */
 export function laneRegistryList(repoRoot) {
     const result = localFallbackLaneList(repoRoot);
@@ -264,28 +217,11 @@ export function laneRegistryList(repoRoot) {
 const _laneRegistryListIsLaneListProvider = laneRegistryList;
 void _laneRegistryListIsLaneListProvider;
 /**
- * Fast, cost-ceilinged summary for `tw_get_state` (DoD 3). Calls
- * `localFallbackLaneList(repoRoot, { timeoutMs })` directly — NOT
- * `laneRegistryList` — deliberately skipping the lane-history scan: `tw_get_state`
- * does not need feature history, and every lane on this path pays for every
- * sibling's extra I/O on every single read.
- *
- * Returns `null` (no advisory to report) when there are 0 or 1 worktrees
- * total (nothing to show — most workspaces are not part of a fan-out) or
- * when git is unavailable/times out with zero lanes recovered. When 2+
- * worktrees are found and at least one sibling's handoff can't be read,
- * returns the advisory with `degraded: true` and a stated reason (that lane
- * is still carried in `lanes`, never dropped).
- *
- * `opts.timeoutMs` defaults to 200 — a fixed constant for production
- * callers (same posture as `STALE_DISPATCH_THRESHOLD_MIN`/`HOP_CAP`; never
- * config-driven), exposed only so a test can shorten it. This bounds only
- * the `git worktree list` subprocess `localFallbackLaneList` shells out to
- * — the N synchronous `parseHandoff` reads (one per sibling worktree) that
- * follow are additive on top of it, not covered by the 200ms figure.
- * Wrapped in try/catch as defense-in-depth: `localFallbackLaneList` already
- * never throws, but this function must never be the reason `tw_get_state`'s
- * mandatory first-action read fails.
+ * Fast summary for `tw_get_state`: calls `localFallbackLaneList` directly,
+ * skipping the lane-history scan every read would pay for. Returns null for
+ * 0-1 worktrees, or git unavailable with no lanes; an unreadable sibling is
+ * carried with `degraded: true` and a reason. `opts.timeoutMs` (default 200,
+ * a test-only knob) bounds only the `git worktree list` call. Never throws.
  */
 export function getLaneRegistrySummary(repoRoot, opts) {
     try {

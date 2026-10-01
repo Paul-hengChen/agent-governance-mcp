@@ -54,17 +54,10 @@ export declare const HANDOFF_LOCK_FILENAME = ".handoff.lock";
 export declare const LEGACY_LANE = "_legacy";
 export declare const PRIMARY_LANE = "_primary";
 /**
- * Derive a lane name from a handoff's active_feature: the lowercased
- * leading ticket-id token, else LEGACY_LANE.
- *
- * The flat->lane migration does NOT use this — it targets the branch-based
- * live resolver instead. Kept exported for "what lane would this
- * active_feature imply" lookups; no production caller today.
- *
- * MUST NEVER return PRIMARY_LANE ("_primary") — the branch-based resolution
- * (feat/<id>-*) and its PRIMARY_LANE fallback belong to the LIVE resolver
- * (resolveCurrentLane below), not this function. Shares TICKET_ID_RE with
- * it. (E123)
+ * Derive a lane name from a handoff's active_feature: the lowercased leading
+ * ticket-id token, else LEGACY_LANE. MUST NEVER return PRIMARY_LANE; branch
+ * resolution belongs to resolveCurrentLane below. The flat->lane migration
+ * does not use this; kept for lookups, no production caller today. (E123)
  */
 export declare function resolveLaneName(activeFeature: string | undefined): string;
 /** true iff `lane` is a single safe path segment (see SAFE_LANE_RE). */
@@ -102,28 +95,18 @@ export declare function hasHistoryLedger(workspacePath: string, lane: string, fi
  */
 export declare function resolveLanePaths(workspacePath: string, lane: string): LanePaths;
 /**
- * Per-lane handoff lock path:
- * `<workspacePath>/.current/<lane>/${HANDOFF_LOCK_FILENAME}`. The single
- * composer of the lock path: tools/lane-migrate.ts's runners use it for the
- * migration's destination lane, and a live writer (tools/handoff-write.ts)
- * uses it for the current branch's lane, so the migration and a
- * live writer of the SAME lane serialize on the SAME lockfile. Pure path
- * logic — does not create the lane directory; the lock acquirer does that
- * (withFileLock mkdirs the lock's parent before its O_EXCL open). (E123)
+ * Per-lane handoff lock path `.current/<lane>/${HANDOFF_LOCK_FILENAME}`, the
+ * single composer of it, so the migration runners and a live writer of the
+ * SAME lane serialize on the SAME lockfile. Pure path logic: the lock
+ * acquirer creates the lane directory. (E123)
  */
 export declare function resolveLaneLockPath(workspacePath: string, lane: string): string;
 /**
- * LIVE lane resolver: name the lane of the branch
- * currently checked out in `workspacePath`, by pure fs (no git subprocess, no
- * network — the tools/drift.ts precedent).
- *
- * `feat/<rest>` where `<rest>` starts with a ticket-id token -> the lowercased
- * id (`feat/e123b1-core-write-path` -> `e123b1`). Anything else — `main`,
- * `integ/*`, `fix/*`, a `feat/` branch with no id token, a detached HEAD, a
- * missing `.git`, an unreadable or malformed `.git`/HEAD — -> PRIMARY_LANE.
- *
- * NEVER throws. Production callers reach it through resolveCurrentLanePaths
- * (see the file header for the list). (E123)
+ * LIVE lane resolver, by pure fs (no git subprocess): `feat/<rest>` whose
+ * `<rest>` starts with a ticket-id token -> the lowercased id
+ * (`feat/e123b1-core-write-path` -> `e123b1`); anything else (main, integ/*,
+ * a feat/ branch with no id, detached HEAD, missing or malformed .git) ->
+ * PRIMARY_LANE. NEVER throws. (E123)
  */
 export declare function resolveCurrentLane(workspacePath: string): string;
 /**
@@ -172,31 +155,11 @@ export interface LaneSidecarSources {
     skipped: SkippedLaneSidecarSource[];
 }
 /**
- * Every copy of one lane sidecar (`telemetry` / `metrics` / `usage` / ...)
- * a workspace's own `.current/` tree holds, deduplicated by CONTENT. Scope
- * is this workspace only — never a sibling worktree. (E123)
- *
- * Sources:
- *   live    `.current/<lane>/<file>` for each safe lane dir other than
- *           NON_LANE_DIRS;
- *   history `.current/history/<YYYY-MM>/<lane>/<file>` — two buckets holding
- *           the same lane name are distinct closures, both kept;
- *   flat    the legacy `.current/<file>`.
- *
- * Dedup (never by name alone — a long-lived lane such as `_primary` keeps
- * its live dir AND its history dirs):
- *   - a history copy of lane L is skipped iff isBytePrefix(history, live L)
- *     — a copy caught mid-move;
- *   - the flat file is skipped iff isBytePrefix(flat, X) for some counted
- *     lane copy X (live first, then history) — the shape an interrupted
- *     mergeSidecar leaves: `flat ++ lane` published at the lane path, flat
- *     not yet unlinked. Any lane is checked, not only the
- *     current branch's: the branch may have changed since the migration, and
- *     the lane may since have closed into history.
- * Empty files are never skipped (they contribute zero records either way).
- *
- * Strictly read-only; never throws — an unlistable dir or unreadable file is
- * simply not a source.
+ * Every copy of one lane sidecar in this workspace's own `.current/` tree
+ * (live lane dirs, `history/<YYYY-MM>/<lane>/`, legacy flat), deduplicated by
+ * CONTENT, never by name: a copy that is a byte prefix of a counted copy is a
+ * half-finished move or merge and is skipped. Read-only; never throws.
+ * Why: specs/e260b-rationale.md (this file's section)
  */
 export declare function enumerateLaneSidecarSources(workspacePath: string, key: LaneFileKey): LaneSidecarSources;
 //# sourceMappingURL=lane-paths.d.ts.map

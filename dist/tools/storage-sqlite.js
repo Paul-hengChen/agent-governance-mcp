@@ -203,15 +203,10 @@ export class SqliteHandoffStorage {
        WHERE workspace_path = ? AND task_id = ? AND completed = 0`);
         this.rollbackTaskStmt = this.db.prepare(`UPDATE tasks SET completed = 0, reverted_reason = ?, note = NULL
        WHERE workspace_path = ? AND task_id = ? AND completed = 1`);
-        // Voiding deliberately DELETEs the row rather than adding a "voided"
-        // column/state: no schema bump, and it gives the same behaviour file mode
-        // gets from a regex-invisible marker line — every reader
-        // (listTasks/getNextTask/tw_detect_drift/tw_sync/addTask's duplicate-id
-        // check) treats the id as though it never existed, so it is never
-        // re-offered (a re-cut of the id is refused separately, via the tombstone
-        // below). `completed = 0` in the WHERE clause is the same second-line
-        // guard completeTaskStmt/rollbackTaskStmt use — an already-completed row
-        // cannot be voided. (E117)
+        // Voiding DELETEs the row instead of adding a voided state: no schema
+        // bump, and every reader then treats the id as never existing, matching
+        // file mode's regex-invisible marker (a re-cut is refused via the
+        // tombstone below). `completed = 0` keeps a completed row unvoidable. (E117)
         this.voidTaskStmt = this.db.prepare(`DELETE FROM tasks WHERE workspace_path = ? AND task_id = ? AND completed = 0`);
         // Void tombstone — survives the DELETE above so addTask can refuse a
         // re-cut. INSERT OR REPLACE: an id should never be voided twice once
@@ -367,15 +362,11 @@ export class SqliteHandoffStorage {
         });
     }
     /**
-     * The real implementation. Both writeState overloads end up here via the
-     * thin dispatcher above — options-object shape only; the body never
-     * inspects the first argument's shape. (E36)
-     * The file-mode-only frontmatter fields — cutApproved (handoff v5),
-     * externalRefs (v6), nextRole / resumeOf / reviewVerdict (v7), and
-     * dispatchPins (v8) — are deliberately NOT destructured here and never
-     * round-trip in SQLite. The gates that use them either read the incoming
-     * write args or are file-mode only; no DDL change, sqlite schema_version
-     * unchanged.
+     * The real implementation; both writeState overloads reach it with the
+     * options-object shape. File-mode-only frontmatter fields (cutApproved,
+     * externalRefs, nextRole / resumeOf / reviewVerdict, dispatchPins) are
+     * deliberately not destructured and never round-trip in SQLite: their gates
+     * read the incoming write args or are file-mode only. (E36)
      */
     writeStateCore(opts) {
         const workspacePath = opts.workspacePath;
@@ -522,15 +513,11 @@ export class SqliteHandoffStorage {
             }
             return Promise.resolve(JSON.stringify({ error: `Task ${taskId} not found.` }));
         }
-        // `existing.completed` is the TASKS TABLE's own flag — the SQLite
-        // equivalent of the tasks.md checkbox, not the authoritative record.
-        // handoff.completed_tasks (this.parse()) is authoritative, per
-        // tools/sync.ts/tools/drift.ts, and a row can be `completed = 0` here
-        // while the ledger already lists it done. voidTaskStmt DELETEs the row,
-        // so guarding only on the table flag would make that inconsistency
-        // unrecoverable rather than merely stale. Match word-boundary against
-        // the ledger's free-text entries, exactly like the file-mode guard.
-        // (E117)
+        // `existing.completed` is only the table's mirror flag; the handoff ledger
+        // is authoritative and may already list the task done. voidTaskStmt
+        // DELETEs the row, so guarding on the flag alone would make that
+        // inconsistency unrecoverable. Word-boundary match against the ledger,
+        // like the file-mode guard. (E117)
         const handoff = this.parse(workspacePath);
         const ledgerRe = new RegExp(`\\b${escapeRegExp(taskId)}\\b`);
         const ledgerCompleted = !!handoff && handoff.completed_tasks.some((c) => ledgerRe.test(c));

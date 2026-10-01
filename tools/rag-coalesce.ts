@@ -1,17 +1,10 @@
 // Coded by @sr-engineer
-// Process-wide coalesce registry for in-flight PRD indexing.
-//
-// Two call sites share this registry:
-//   1. index.ts `tw_index_prd` (explicit, user-triggered indexing)
-//   2. prompts/build.ts `appendSpecContext` (lazy auto-reindex on stale key)
-//
-// Without a shared registry, a concurrent role-prompt fetch + explicit
-// tw_index_prd for the same (workspace, prd_path) would run the slow embedding
-// pipeline twice and race on DELETE+INSERT inside `upsertPrdChunks`.
-//
-// Keyed by `${workspace_path}::${prd_path}`. Promises live for the duration
-// of an active index call (cleared in `finally` at the call site). Bounded by
-// concurrent client count, so no eviction needed.
+// Process-wide coalesce registry for in-flight PRD indexing, shared by
+// index.ts `tw_index_prd` and prompts/build.ts `appendSpecContext` so a
+// concurrent explicit and lazy index of one (workspace, prd_path) does not
+// run the embedding pipeline twice and race in `upsertPrdChunks`. Keyed
+// `${workspace_path}::${prd_path}`; entries are cleared in the call site's
+// `finally`, so the map is bounded by concurrent clients.
 
 const inflight = new Map<string, Promise<string>>();
 

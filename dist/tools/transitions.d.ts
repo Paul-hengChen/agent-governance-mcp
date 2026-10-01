@@ -41,63 +41,21 @@ type AllowedNext = ReadonlyArray<{
 }>;
 export declare const ALLOWED_TRANSITIONS: ReadonlyMap<string, AllowedNext>;
 /**
- * Validate a (prev → next) transition against the routing chain matrix.
- * Returns null on accept. Returns a rejection envelope on reject — the
- * caller surfaces it as the MCP error content (JSON-stringified).
- *
- * Precedence (highest → lowest):
- *   1. agent_id required when next.status is non-null
- *   2. round-cap override (qa_round >= 4 → only (pm, In_Progress))
- *   2.5 hop-cap override (v9: hop_count >= 10 on a counted role transition →
- *       only the (pm, In_Progress) landing; landing does NOT reset the count)
- *   3. self-loop fast path on same-agent In_Progress→In_Progress or
- *      same-agent Blocked→Blocked (two named pairs — NOT a same-status
- *      wildcard; PASS→PASS and FAIL→FAIL are deliberately excluded, see the
- *      inline comment at the fast-path check)
- *   3.5 Amend-Resume Edge (C1): pm:In_Progress → {code-reviewer,qa-engineer}:In_Progress
- *       iff the structured next_resume_of field names that exact role (v7)
- *   4. table lookup
+ * Validate a (prev -> next) transition against the routing matrix: null on
+ * accept, else a rejection envelope the caller surfaces as MCP error content.
+ * Precedence: 1 agent_id required; 2 round-cap override; 2.5 hop-cap override
+ * (only the pm landing passes; landing does not reset the count); 3 self-loop
+ * fast path (two named pairs); 3.5 Amend-Resume edge; 4 table lookup.
  */
 export declare function validateTransition(req: TransitionRequest): TransitionRejection | null;
 /**
- * Compute new round counters from prior counters + incoming tuple + prev tuple.
- * Returns qa_round, review_round AND visual_round (v3.14.0) so callers can
- * persist them together.
- *
- * qa_round:
- *   - (qa-engineer, FAIL)         → prev + 1
- *   - (qa-engineer, PASS)         → 0
- *   - (pm, In_Progress)           → 0
- *   - everything else             → prev_qa_round
- *
- * review_round:
- *   - (code-reviewer, FAIL)       → prev + 1
- *   - (qa-engineer, In_Progress) when prev was (code-reviewer, In_Progress) → 0
- *   - (pm, In_Progress)           → 0
- *   - everything else             → prev_review_round
- *
- * visual_round (v3.14.0):
- *   - (qa-engineer, FAIL) AND pending_notes contains `visual_fail:` → prev + 1
- *     (distinguishes pixel/widget drift from test-logic FAIL; only the former
- *     ticks the visual counter)
- *   - (qa-engineer, PASS)         → 0
- *   - (pm, In_Progress)           → 0
- *   - everything else             → prev_visual_round
- *
- * hop_count (handoff schema v9):
- *   - feature_changed             → base resets to 0 (the ONLY reset —
- *     (pm, In_Progress) does NOT reset it, unlike the three rounds)
- *   - role transition (next.agent !== prev.agent) → base + 1
- *   - everything else (self-loops, same-agent status changes) → base
- *   (D2)
- *
- * qa_rounds_total / review_rounds_total / visual_rounds_total (handoff
- * schema v12): cumulative mirrors of the per-cycle counters. Each total
- * ticks in step with its per-cycle counter's FAIL branch (the FAIL
- * predicates are copied verbatim so total and cycle counters can never
- * diverge on which event counts), but NEVER resets except on feature
- * change — NOT on QA PASS, NOT on (pm, In_Progress) re-entry (hop_count's
- * reset rule). (E8)
+ * New round counters from the prior counters and the incoming and prev
+ * tuples, returned together so callers persist them as one. The per-cycle
+ * qa/review/visual rounds tick on their FAIL (visual only with a
+ * `visual_fail:` note) and reset when their cycle closes or on
+ * (pm, In_Progress); hop_count ticks on a role change; the *_rounds_total
+ * mirrors and hop_count reset only on feature change.
+ * Full table: specs/e260b-rationale.md (tools/transitions.ts)
  */
 export declare function computeNewRound(prev_qa_round: number, prev_review_round: number, prev_visual_round: number, next: TransitionTuple, prev?: TransitionTuple, next_pending_notes?: ReadonlyArray<string>, prev_hop_count?: number, feature_changed?: boolean, prev_qa_rounds_total?: number, prev_review_rounds_total?: number, prev_visual_rounds_total?: number): {
     qa_round: number;

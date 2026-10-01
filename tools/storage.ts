@@ -67,18 +67,11 @@ export interface HandoffStorage {
   getNextTask(workspacePath: string): string;
   completeTask(workspacePath: string, taskId: string, note?: string): Promise<string>;
   rollbackTask(workspacePath: string, taskId: string, reason: string): Promise<string>;
-  // Void a task: marks a row as "should never have existed" rather than
-  // "done, then reverted". Legal only on an incomplete row; an
-  // already-completed row is refused. A voided (or unknown) task id is
-  // invisible to getNextTask, listTasks, tw_detect_drift, and tw_sync — none
-  // of them tell the two apart, both simply don't exist to them, so a
-  // voided row is never re-offered, never counted as completed/incomplete,
-  // and never flagged as drift. voidTask itself is the one exception, and
-  // only in FILE mode: re-voiding an already-voided id returns a distinct
-  // `alreadyVoided: true` flag rather than a bare not-found, because the
-  // voided marker line is still literally on disk to scan for. SQLite/HTTP
-  // mode reports both cases the same way, as not-found (reason is not
-  // persisted there). (E117)
+  // Void a task: mark a row "should never have existed". Legal only on an
+  // incomplete row. A voided or unknown id is invisible to getNextTask,
+  // listTasks, tw_detect_drift and tw_sync alike. Only FILE-mode voidTask
+  // tells them apart (`alreadyVoided: true`, since the marker line is still on
+  // disk); SQLite/HTTP reports both as not-found. (E117)
   voidTask(workspacePath: string, taskId: string, reason: string): Promise<string>;
   addTask(
     workspacePath: string,

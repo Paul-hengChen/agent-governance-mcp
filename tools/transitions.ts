@@ -113,24 +113,16 @@ export interface TransitionRejection {
                                     // for handler-side narrowing + envelope consistency (mirrors
                                     // CUT_APPROVAL_REQUIRED).
     | "SOURCE_CREDIBILITY_UNVERIFIED" // Emitted by the
-                                    // handoff-orchestrator gate at the pm → {architect,sr-engineer}
-                                    // :In_Progress edge when a fetch-based design/<feature>.md has an
-                                    // audited ## Source row lacking credibility: full-page-composite.
-                                    // STORAGE-MODE-AGNOSTIC (reads design/<feature>.md via fs, not
-                                    // handoff YAML) — DIFFERENT from EXTERNAL_REFS_UNRESOLVED /
-                                    // CUT_APPROVAL_REQUIRED. NOT produced by validateTransition (this
-                                    // module stays pure / fs-free); union extension is for handler-side
-                                    // narrowing + envelope consistency (mirrors EXTERNAL_REFS_UNRESOLVED). (E4)
+                                    // handoff-orchestrator gate at the pm -> build-entry edge when an
+                                    // audited ## Source row of a fetch-based design/<feature>.md lacks
+                                    // credibility: full-page-composite. Any storage mode (it reads the
+                                    // design file); handler-side only, since this module stays pure. (E4)
     | "FEATURE_LEASE_HELD"          // Emitted by the
                                     // handoff-orchestrator lease gate when a write carries a
-                                    // DIFFERENT active_feature while the incumbent feature is
-                                    // non-terminal (status != PASS; Blocked counts as held) and
-                                    // fresh (last_updated within LEASE_TTL_MIN). Both storage
-                                    // modes (reads only the three universal fields). NOT produced
-                                    // by validateTransition (the lease is derived from prevState,
-                                    // which this pure module never reads); union extension is for
-                                    // handler-side narrowing + envelope consistency (mirrors
-                                    // SCOPE_DECISION_REQUIRED). (E1)
+                                    // DIFFERENT active_feature while the incumbent is non-terminal
+                                    // (Blocked counts as held) and fresh (within LEASE_TTL_MIN). Both
+                                    // storage modes; handler-side only, since the lease derives from
+                                    // prevState, which this pure module never reads. (E1)
     | "AGENT_ID_REQUIRED";
   attempted: {
     prev_agent: string | null;
@@ -257,32 +249,12 @@ const ALLOWED: ReadonlyMap<string, AllowedNext> = new Map<string, AllowedNext>([
   ["qa-engineer:Blocked", [
     { agent: "sr-engineer", status: "In_Progress" },
     { agent: "qa-engineer", status: "In_Progress" },
-    // pm escape edge, matching the other six <role>:Blocked rows
-    // (researcher/design-auditor/pm/architect/sr-engineer/code-reviewer all
-    // have Blocked -> pm:In_Progress), and the "qa-engineer:FAIL" row below,
-    // which already has a pm:In_Progress escape for the same "hand back to
-    // PM" shape.
-    //
-    // content/skill-qa-engineer.md routes spec-defect situations (copy
-    // coverage gap, visual token coverage gap) via FAIL -> pm, and that route
-    // is unchanged. This edge covers QA choosing Blocked for a spec defect
-    // instead — for example "## Visual Structural Assertions" rows that
-    // assert a superseded design source after a human-approved divergence.
-    // Marking `pass` would write a falsehood into the evidence trail, marking
-    // `fail` would blame an implementation doing exactly what was approved,
-    // and FAIL also charges the qa_round budget for a contract defect. So QA
-    // may write Blocked, and from Blocked PM must be reachable; otherwise the
-    // PM amendment would have to be recorded on a qa-engineer write,
-    // muddying who changed the spec.
-    //
-    // No `resume_of` requirement on this edge: resume_of gates the PM
-    // RETURN leg (pm, In_Progress) -> {code-reviewer, qa-engineer}
-    // (§ALLOWED_TRANSITIONS Amend-Resume Edge, step 3.5 of
-    // validateTransition); requiring it on this OUTBOUND edge would make
-    // qa-engineer:Blocked differ from the six peer Blocked rows above (none
-    // require resume_of to reach pm) and from the qa-engineer:FAIL -> pm edge
-    // it mirrors. Mirrored in specs/qa-flow-enforcement-architecture.md.
-    // (E45)
+    // pm escape edge, matching the six peer <role>:Blocked rows and the
+    // qa-engineer:FAIL -> pm edge: QA may write Blocked for a spec defect
+    // (e.g. assertions against a superseded design source), where pass would
+    // falsify evidence and FAIL would blame a correct build and charge
+    // qa_round. No resume_of requirement on this OUTBOUND edge, like its
+    // peers. Mirrored in specs/qa-flow-enforcement-architecture.md. (E45)
     { agent: "pm", status: "In_Progress" },
   ]],
   ["qa-engineer:FAIL", [
@@ -318,15 +290,10 @@ const ALLOWED: ReadonlyMap<string, AllowedNext> = new Map<string, AllowedNext>([
     // specs/qa-flow-enforcement-architecture.md. (E53)
     { agent: "release-engineer", status: "Blocked" },
   ]],
-  // release-engineer's :Blocked key, opened by the entry edge above.
-  // Destinations come from skill-release-engineer.md's own Blocked rows plus
-  // its step 7a guard: most resolve to a human — a halt, resumed here via the
-  // self-loop back to In_Progress or handed to pm for recovery (e.g. a
-  // rejected push) — and the `npm test` regression row names qa-engineer,
-  // not pm, so pm alone would be the wrong destination set.
-  // Self -> In_Progress and -> pm:In_Progress follow the six peer :Blocked
-  // keys' shape; -> qa-engineer:In_Progress follows qa-engineer:Blocked ->
-  // sr-engineer:In_Progress (route to the role that must fix). Mirrored in
+  // release-engineer's :Blocked key, opened by the entry edge above. Targets
+  // follow skill-release-engineer.md's Blocked rows: the self-loop resumes a
+  // halt, pm takes recovery (e.g. a rejected push), and qa-engineer takes an
+  // `npm test` regression, routing to the role that must fix it. Mirrored in
   // specs/qa-flow-enforcement-architecture.md. (E53)
   ["release-engineer:Blocked", [
     { agent: "release-engineer", status: "In_Progress" },
@@ -395,22 +362,11 @@ function rejection(
 }
 
 /**
- * Validate a (prev → next) transition against the routing chain matrix.
- * Returns null on accept. Returns a rejection envelope on reject — the
- * caller surfaces it as the MCP error content (JSON-stringified).
- *
- * Precedence (highest → lowest):
- *   1. agent_id required when next.status is non-null
- *   2. round-cap override (qa_round >= 4 → only (pm, In_Progress))
- *   2.5 hop-cap override (v9: hop_count >= 10 on a counted role transition →
- *       only the (pm, In_Progress) landing; landing does NOT reset the count)
- *   3. self-loop fast path on same-agent In_Progress→In_Progress or
- *      same-agent Blocked→Blocked (two named pairs — NOT a same-status
- *      wildcard; PASS→PASS and FAIL→FAIL are deliberately excluded, see the
- *      inline comment at the fast-path check)
- *   3.5 Amend-Resume Edge (C1): pm:In_Progress → {code-reviewer,qa-engineer}:In_Progress
- *       iff the structured next_resume_of field names that exact role (v7)
- *   4. table lookup
+ * Validate a (prev -> next) transition against the routing matrix: null on
+ * accept, else a rejection envelope the caller surfaces as MCP error content.
+ * Precedence: 1 agent_id required; 2 round-cap override; 2.5 hop-cap override
+ * (only the pm landing passes; landing does not reset the count); 3 self-loop
+ * fast path (two named pairs); 3.5 Amend-Resume edge; 4 table lookup.
  */
 export function validateTransition(req: TransitionRequest): TransitionRejection | null {
   // 1. agent_id required
@@ -463,16 +419,12 @@ export function validateTransition(req: TransitionRequest): TransitionRejection 
     );
   }
 
-  // 2.5 hop-cap override (v9, d2-server-brake-accounting). Fourth round-style
-  // override — AFTER the qa/review/visual overrides (so their outputs stay
-  // byte-identical, AC-8) and BEFORE the self-loop fast path. Fires only when
-  // the feature's persisted hop_count is already at/over HOP_CAP AND the
-  // incoming write is a counted role transition (next.agent !== prev.agent,
-  // DR-9 — self-loops and same-agent status changes are NOT role transitions,
-  // so they fall through and are never hop-blocked) AND it is not the
-  // (pm, In_Progress) landing edge. A feature change resets the count (AC-3),
-  // so feature_changed=true bypasses the gate. The landing write does NOT
-  // reset hop_count (DR-6) — only an active_feature change does.
+  // 2.5 hop-cap override, after the qa/review/visual overrides (their outputs
+  // stay byte-identical) and before the self-loop fast path. Fires only when
+  // persisted hop_count >= HOP_CAP, the write is a counted role transition
+  // (next.agent !== prev.agent), and it is not the (pm, In_Progress) landing.
+  // A feature change resets the count, so it bypasses the check; the landing
+  // write does not reset it. (D2)
   const prev_hop_count = req.prev_hop_count ?? 0;
   if (
     !req.feature_changed &&
@@ -489,16 +441,10 @@ export function validateTransition(req: TransitionRequest): TransitionRejection 
     );
   }
 
-  // 3. self-loop fast path. Two explicit named (prev, next) status pairs —
-  // In_Progress→In_Progress and Blocked→Blocked — deliberately NOT a
-  // `prev.status === next.status` wildcard. Blocked→Blocked lets a
-  // same-agent Blocked record correct itself (for example a malformed
-  // Blocked payload) without misstating its status. PASS and FAIL are
-  // excluded on purpose: PASS is terminal by design (a qa-engineer PASS→PASS
-  // "correction" must be rejected), and a wildcard here would also silently
-  // open FAIL→FAIL. Naming the two pairs keeps PASS/FAIL terminality
-  // structurally unreachable by this fast path rather than merely untested.
-  // (E128)
+  // 3. self-loop fast path: exactly In_Progress->In_Progress and
+  // Blocked->Blocked (a Blocked record may correct itself), NOT a same-status
+  // wildcard, so PASS stays terminal and FAIL->FAIL stays closed by structure
+  // rather than merely by test. (E128)
   if (
     req.prev.agent !== null &&
     req.prev.agent === req.next.agent &&
@@ -508,16 +454,12 @@ export function validateTransition(req: TransitionRequest): TransitionRejection 
     return null;
   }
 
-  // 3.5 Amend-Resume Edge (C1, rewired by c9-protocol-fields AC-4). Additive:
-  // opens pm:In_Progress → {code-reviewer,qa-engineer}:In_Progress ONLY when
-  // the incoming write's structured resume_of field (threaded here as
-  // next_resume_of by the orchestrator) names that exact role. The static
-  // table has no such entry, so absent/mismatched fields fall through to the
-  // unchanged TRANSITION_REJECTED. Legacy `resume_of: <role>` pending_notes
-  // lines are INERT (DR-2 — not honored, not rejected). "Was actually
-  // stranded" is PM-attested (SOP, trust class of scope_decision_why); the
-  // server checks only field⟺target consistency. Pure (reads only
-  // prev/next/next_resume_of) — no fs, storage-agnostic.
+  // 3.5 Amend-Resume Edge: opens pm:In_Progress -> {code-reviewer,
+  // qa-engineer}:In_Progress ONLY when the structured resume_of field (passed
+  // as next_resume_of) names that exact role; otherwise the table rejects.
+  // Legacy `resume_of: <role>` pending_notes lines are inert. Whether the role
+  // was really stranded is PM-attested; the server checks only field/target
+  // consistency. Pure, storage-agnostic. (C1)
   if (
     req.prev.agent === "pm" &&
     req.prev.status === "In_Progress" &&
@@ -542,44 +484,13 @@ export function validateTransition(req: TransitionRequest): TransitionRejection 
 }
 
 /**
- * Compute new round counters from prior counters + incoming tuple + prev tuple.
- * Returns qa_round, review_round AND visual_round (v3.14.0) so callers can
- * persist them together.
- *
- * qa_round:
- *   - (qa-engineer, FAIL)         → prev + 1
- *   - (qa-engineer, PASS)         → 0
- *   - (pm, In_Progress)           → 0
- *   - everything else             → prev_qa_round
- *
- * review_round:
- *   - (code-reviewer, FAIL)       → prev + 1
- *   - (qa-engineer, In_Progress) when prev was (code-reviewer, In_Progress) → 0
- *   - (pm, In_Progress)           → 0
- *   - everything else             → prev_review_round
- *
- * visual_round (v3.14.0):
- *   - (qa-engineer, FAIL) AND pending_notes contains `visual_fail:` → prev + 1
- *     (distinguishes pixel/widget drift from test-logic FAIL; only the former
- *     ticks the visual counter)
- *   - (qa-engineer, PASS)         → 0
- *   - (pm, In_Progress)           → 0
- *   - everything else             → prev_visual_round
- *
- * hop_count (handoff schema v9):
- *   - feature_changed             → base resets to 0 (the ONLY reset —
- *     (pm, In_Progress) does NOT reset it, unlike the three rounds)
- *   - role transition (next.agent !== prev.agent) → base + 1
- *   - everything else (self-loops, same-agent status changes) → base
- *   (D2)
- *
- * qa_rounds_total / review_rounds_total / visual_rounds_total (handoff
- * schema v12): cumulative mirrors of the per-cycle counters. Each total
- * ticks in step with its per-cycle counter's FAIL branch (the FAIL
- * predicates are copied verbatim so total and cycle counters can never
- * diverge on which event counts), but NEVER resets except on feature
- * change — NOT on QA PASS, NOT on (pm, In_Progress) re-entry (hop_count's
- * reset rule). (E8)
+ * New round counters from the prior counters and the incoming and prev
+ * tuples, returned together so callers persist them as one. The per-cycle
+ * qa/review/visual rounds tick on their FAIL (visual only with a
+ * `visual_fail:` note) and reset when their cycle closes or on
+ * (pm, In_Progress); hop_count ticks on a role change; the *_rounds_total
+ * mirrors and hop_count reset only on feature change.
+ * Full table: specs/e260b-rationale.md (tools/transitions.ts)
  */
 export function computeNewRound(
   prev_qa_round: number,
