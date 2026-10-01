@@ -1,29 +1,10 @@
-// Per-workspace config loader for the agent-governance-mcp server.
-// All fields optional — absent file means "use the generic markdown-checkbox defaults".
-//
-// .current/.config.json shape:
-//   {
-//     "taskPattern": "<JS regex source string>",   // matched against trimmed line; group 1 = " "|"x" checkmark, group 2 = task ID, group 3 = description
-//     "taskPaths": ["tasks.md", "TODO.md"],         // workspace-relative candidate paths, tried in order
-//     "driftBaselineIds": ["T470", "T471"],         // task IDs acknowledged as shipped+reconciled; excluded from vibe-coding drift (tw_detect_drift)
-//     "tokenBudgetPerFeature": 500000,              // opt-in coordinator token-spend ceiling (raw summed usage.* tokens); non-positive/non-finite values treated as absent
-//     "cutApprovalAutoTier": {                      // opt-in §3.1 cut-approval auto-tier threshold; key PRESENT (even {}) = tier armed, absent = disabled
-//       "maxFiles": 2,                              //   omitted fields take these conservative defaults
-//       "maxPriority": "P3",
-//       "allowSchemaChange": false,
-//       "allowDesignArmed": false
-//     },
-//     "staleDispatchNotifyFile": ".current/stale-dispatch.notify", // opt-in stale-dispatch watch-file emit; absent = disarmed
-//     "artifacts": "local"                          // "local" | "repo": declared git posture for governance runtime artifacts; absent = undeclared
-//   }
-//
-// tokenBudgetPerFeature accounting: the ceiling is backed by the durable
-// .current/usage.jsonl sidecar — appended per dispatch by the opt-in
-// PostToolUse hook (bin/agent-governance-usage-hook.mjs) and summed per
-// feature by tools/usage-accounting.ts — rather than the coordinator's
-// in-memory arithmetic. The coordinator falls back to hand-summing the
-// agent-*.jsonl transcripts only when the sidecar is absent (hook not
-// wired). (D2)
+// Per-workspace config loader. Every .current/.config.json field is optional;
+// an absent file means the generic markdown-checkbox defaults. Fields without
+// a comment in WorkspaceConfig: taskPattern (regex source; groups: checkmark,
+// task id, description), taskPaths (candidate task files, tried in order),
+// driftBaselineIds (ids excluded from vibe-coding drift) and
+// tokenBudgetPerFeature (opt-in token ceiling; non-positive values = absent).
+// Why: specs/e260a-tools-a-h-rationale.md, "tools/config.ts — config file".
 import * as fs from "fs";
 import * as path from "path";
 import { CURRENT_VERSIONS, runMigrations } from "../schema/versions.js";
@@ -46,14 +27,9 @@ const DEFAULT_TASK_PATHS = [
     "tasks.md",
     "TODO.md",
 ];
-// Generic markdown-checkbox regex.
-//   Group 1: checkmark (" " or "x")
-//   Group 2: task ID (any non-whitespace token immediately after the checkbox)
-//   Group 3: description (everything after the ID)
-// Matches lines like:
-//   - [ ] T01 build login flow
-//   - [x] PROJ-42 fix race
-//   - [ ] auth-refactor write migration
+// Generic markdown-checkbox regex: group 1 checkmark (" " or "x"), group 2
+// task id (the token after the checkbox), group 3 description. Matches
+// `- [ ] T01 build login flow` and `- [x] PROJ-42 fix race`.
 export const DEFAULT_TASK_REGEX = /^- \[([ x])\] (\S+)\s+(.+)$/;
 const configCache = new Map();
 // Shared non-fatal load core. Returns the typed config view plus the loud
@@ -256,8 +232,7 @@ export function loadConfig(workspacePath) {
  * serving defaults IN PLACE OF a config file that exists but cannot be used —
  * the message names the config path and the parse/read problem. Returned as
  * `config_error` on every tw_get_state envelope so the fallback is never
- * silent. Same mtime-cached core as loadConfig — no extra I/O on the happy
- * path. (E31)
+ * silent. Same mtime-cached core as loadConfig — no extra I/O on the happy path.
  */
 export function getConfigError(workspacePath) {
     return loadConfigEntry(workspacePath).error;

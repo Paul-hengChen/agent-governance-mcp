@@ -1,17 +1,9 @@
 // Coded by @sr-engineer
-// Tools: handoff.md parse / migrate / read. tools/handoff.ts stays a thin
-// barrel that re-exports this module's public surface, so importers never
-// change. Kept separate from tools/handoff-write.ts (writing) so parsing,
-// writing, the tool handler, and the types each live in their own module
-// instead of one large file. (E36)
-//
-// NOTE — deliberate circular import with tools/handoff-write.ts: readAndMigrate
-// / readHandoffState's migration write-back heal calls writeHandoffState (this
-// module → handoff-write.ts), and writeHandoffState's existing-state preserve
-// logic calls parseHandoff (handoff-write.ts → this module). Both directions
-// are ordinary function calls made at RUNTIME (inside function bodies), never
-// read at module-init time, so Node's ESM live-binding semantics resolve the
-// cycle without error regardless of which module is imported first.
+// handoff.md parse / migrate / read; tools/handoff.ts re-exports it.
+// Deliberate import cycle with handoff-write.ts: the migration heal here
+// calls writeHandoffState and its preserve logic calls parseHandoff. Both are
+// runtime calls inside function bodies, never made at module init, so ESM
+// live bindings resolve the cycle whichever module loads first.
 import * as fs from "fs";
 import * as path from "path";
 import * as yaml from "js-yaml";
@@ -87,8 +79,7 @@ function getHandoffPath(workspacePath) {
     return resolveCurrentLanePaths(path.resolve(workspacePath)).handoffPath;
 }
 // The legacy flat `.current/handoff.md` written before handoff state moved
-// into per-lane directories. The filename comes from the resolved lane path,
-// never restated. (E123)
+// into per-lane directories. The filename comes from the resolved lane path.
 export function getFlatHandoffPath(workspacePath) {
     const abs = path.resolve(workspacePath);
     return path.join(abs, ".current", path.basename(getHandoffPath(abs)));
@@ -128,20 +119,13 @@ export function assertNoHandoffLayoutConflict(workspacePath) {
         `(typically the newer last_updated; the server does not decide for you); ` +
         `(3) delete the other file or move it out of .current/; (4) retry the tw_* call.`);
 }
-// Flat->lane migration for readHandoffState, own workspace only. Trigger:
-// ANY flat LANE_FILES entry still present (false forever once every flat
-// file has moved — no flag file). The dual-presence check runs first, before
-// any move. A partial migration (either move order) is completed here; flat
-// sidecars with no handoff.md anywhere are moved without throwing.
-// readHandoffState is synchronous (FileHandoffStorage.readState /
-// HandoffStorage), so it cannot await the public async migrateFlatToLane;
-// instead it takes the SAME per-lane lock (resolveLaneLockPath, same O_EXCL
-// file + payload as withFileLock) with one non-blocking attempt and runs the
-// lock-free core under it. If the lock is held (a concurrent migrator/writer
-// — which migrates under that lock itself — or a crashed holder, which the
-// next writer's withFileLock clears) the read skips the migration and reads
-// read-only via readAndMigrate's flat fallback. Errors from the core
-// propagate. (E123)
+// Flat-to-lane migration for readHandoffState, own workspace only; runs while
+// any flat lane file remains, after the dual-presence check. readHandoffState
+// is synchronous, so instead of the async migrateFlatToLane it makes one
+// non-blocking attempt on the same per-lane lock and runs the lock-free core,
+// which also completes a partial migration. If the lock is held it skips the
+// migration and reads through readAndMigrate's flat fallback. Core errors
+// propagate.
 function migrateOwnWorkspaceIfFlat(workspacePath) {
     const abs = path.resolve(workspacePath);
     assertNoHandoffLayoutConflict(abs);
@@ -299,20 +283,16 @@ export function parseCutApprovedSource(raw) {
         return undefined;
     // Trim before the length test so a whitespace-only suffix ("inherited:   ")
     // becomes undefined instead of round-tripping as a persisted, API-visible
-    // claim that names no parent. Return `raw` UNCHANGED on success — trimming
-    // is only for the validity test, so the stored/returned value round-trips
-    // exactly. (E114)
+    // claim that names no parent. Return `raw` unchanged on success: trimming
+    // is only for the validity test, so the stored value round-trips exactly.
     const parentFeature = raw.slice(CUT_APPROVED_SOURCE_PREFIX.length).trim();
     return parentFeature.length > 0 ? raw : undefined;
 }
-// Internal helper. Reads + parses + runs schema migrations. Returns the
-// migrated state plus a flag that lets readHandoffState fire a write-back
-// to heal the on-disk file. Callers that don't need the flag use parseHandoff.
-//
-// SHARED by cross-workspace readers, so it NEVER migrates, locks or creates
-// anything. Dual presence throws HANDOFF_LAYOUT_CONFLICT; otherwise it reads
-// the lane path, falling back to the legacy flat path read-only for a
-// not-yet-migrated workspace. (E123)
+// Reads, parses and migrates; the flag lets readHandoffState write the healed
+// state back. Callers that don't need the flag use parseHandoff. Shared by
+// cross-workspace readers, so it never moves files, locks or creates
+// anything: dual presence throws HANDOFF_LAYOUT_CONFLICT, otherwise it reads
+// the lane path and falls back read-only to the legacy flat path.
 function readAndMigrate(workspacePath) {
     assertNoHandoffLayoutConflict(workspacePath);
     const lanePath = getHandoffPath(workspacePath);
@@ -370,8 +350,7 @@ function readAndMigrate(workspacePath) {
     const lastAgent = asString(frontmatter.last_agent) || undefined;
     // Stored relative (or, in older files, absolute); resolved to absolute here
     // and bounded to workspace_path. An out-of-bounds value is dropped to
-    // absent (it self-heals on the next write's carry-forward) and is not
-    // echoed. (E235a)
+    // absent (it self-heals on the next write's carry-forward) and not echoed.
     const rawPrdPath = asString(frontmatter.prd_path) || undefined;
     const prdPath = rawPrdPath ? resolveStoredPrdPath(workspacePath, rawPrdPath) : undefined;
     if (rawPrdPath && !prdPath) {
@@ -388,8 +367,7 @@ function readAndMigrate(workspacePath) {
     const cutApproved = frontmatter.cut_approved === true ? true : undefined;
     // Cut-approval inheritance attestation. Set by the client; parsed
     // defensively like dispatch_mode below: undefined when absent or
-    // malformed, so absence keeps meaning "not inherited" (the safe
-    // direction). (E114, v14)
+    // malformed, so absence keeps meaning "not inherited".
     const cutApprovedSource = parseCutApprovedSource(frontmatter.cut_approved_source);
     // v6 — external-reference ledger (b8-external-ref-ledger). undefined when
     // absent/malformed, so absence flows to hasUnresolvedRefs as the
@@ -519,15 +497,10 @@ export function readHandoffState(workspacePath) {
     if (!fs.existsSync(getHandoffPath(workspacePath)) && fs.existsSync(flatPath)) {
         refreshSnapshotFor(workspacePath, flatPath, "handoff");
     }
-    // Read-time view of .current/exemptions.json, the ONLY sanctioned channel
-    // for exempting a task from the §2 build gate. Like the stale_dispatch
-    // advisory below: computed at read time, no handoff schema field,
-    // informational, never blocks or throws (loadExemptions turns every failure
-    // into zero exemptions plus a loud errors[]). Shown on tw_get_state because
-    // every role calls it first — the one place every agent already looks, so
-    // the exemption list (and its only-grows `count` metric) needs no second
-    // read and no drift-advisory plumbing. File-mode read path only, like the
-    // other file-mode-only fields. (E24)
+    // Read-time view of .current/exemptions.json, the only sanctioned way to
+    // exempt a task from the §2 build gate. Informational: never blocks or
+    // throws (loadExemptions turns failures into zero exemptions plus errors[]).
+    // Shown on tw_get_state because every role reads it first. File mode only.
     const exemptions = loadExemptions(workspacePath);
     // Loud report of a .current/.config.json that exists but cannot be used
     // (unreadable, unparseable, non-object root, or a future schema_version).
@@ -537,15 +510,10 @@ export function readHandoffState(workspacePath) {
     // rather than silent. null (clean or absent config) adds no key, so
     // valid/absent config envelopes stay byte-identical. (E31)
     const configError = getConfigError(workspacePath);
-    // Fast, cost-capped advisory about sibling lanes (git worktrees) for
-    // tw_get_state. Like exemptions/configError above: computed at read time,
-    // never throws. getLaneRegistrySummary's 200ms timeoutMs bounds only the
-    // `git worktree list` subprocess; on top of that, not covered by the 200ms,
-    // is one synchronous parseHandoff read per sibling worktree (measured:
-    // 34ms across 14 worktrees in this repo).
-    // null (0/1 worktrees, or nothing to report) adds no key, so the common
-    // single-checkout payload is unchanged. File-mode read path only
-    // (SQLite-mode readState in tools/storage-sqlite.ts is untouched). (E132)
+    // Cost-capped advisory about sibling lanes (git worktrees); never throws.
+    // The 200ms timeout bounds only `git worktree list`; each sibling also
+    // costs one synchronous parseHandoff read. null (0 or 1 worktrees) adds no
+    // key, so a single checkout's payload is unchanged. File mode only.
     const laneRegistry = getLaneRegistrySummary(workspacePath);
     const result = readAndMigrate(workspacePath);
     if (!result) {
@@ -562,17 +530,11 @@ export function readHandoffState(workspacePath) {
     }
     const { state, migrationApplied } = result;
     if (migrationApplied) {
-        // Defense-in-depth heal of stale on-disk files. Best-effort: a freshness
-        // error here just means another writer already healed the file (AC-5), so
-        // swallow it. Any other failure also non-fatal — the in-memory state we
-        // return is already at CURRENT.
-        // v12 — heal write converted from the legacy positional overload to the
-        // options object (architecture DR: prefer the modern form over growing the
-        // positional list to 15 params). Behaviorally identical for the pre-v12
-        // fields: transient v7 protocol fields stay omitted (dropped, AC-3) and
-        // the feature-scoped fields (external_refs / dispatch_pins / dispatch_mode
-        // / cut_approved) carry forward via the same-feature preserve clause in
-        // writeHandoffState — exactly as the positional call behaved.
+        // Best-effort heal of the stale on-disk file. A freshness error means
+        // another writer already healed it; any other failure is also non-fatal,
+        // since the returned state is already current. One-write fields stay
+        // omitted and feature-scoped fields carry forward via writeHandoffState's
+        // same-feature preserve rule.
         void writeHandoffState({
             workspacePath,
             activeFeature: state.active_feature,
@@ -671,20 +633,12 @@ export function readHandoffState(workspacePath) {
             },
         }),
     };
-    // Stale-dispatch advisory. Computed at read time from the persisted
-    // next_role + dispatched_at and the wall clock, so a fresh or
-    // post-compaction session with NO memory of dispatching gets the same
-    // signal. Informational only — never blocks a write, no GateErrorCode.
-    // Defensive: if either field is missing, the stamp is unparsable, or the
-    // stamp is still within the window, no key is added; nothing here can
-    // throw or fail the read. (D5, handoff schema v10)
-    //
-    // A release-engineer CLOSING write (isReleaseClosingWrite, the same
-    // terminal-marker predicate gates/feature-lease.ts uses to release the
-    // feature lease) is excluded up front, before any elapsed-time math: the
-    // write that ships and hands back to pm is terminal, not a dispatch
-    // awaiting a response, so it must never read as stale however much time
-    // has passed. (E97)
+    // Stale-dispatch advisory, computed at read time from next_role,
+    // dispatched_at and the clock, so a fresh session with no memory of the
+    // dispatch gets the same signal. Informational; adds no key when a field is
+    // missing, the stamp is unparsable or still in the window; never throws.
+    // A release-engineer closing write is terminal, not a dispatch awaiting a
+    // reply, so it is excluded and never reads as stale.
     let staleDispatch;
     if (state.next_role && state.dispatched_at && !isReleaseClosingWrite(state)) {
         const stampedMs = Date.parse(state.dispatched_at);
@@ -710,14 +664,11 @@ export function readHandoffState(workspacePath) {
                         `role (never blind re-dispatch); full protocol: skill-coordinator ` +
                         `Crash-Resume Protocol.`,
                 };
-                // Opt-in push channel on the same threshold crossing: when the
-                // workspace set `staleDispatchNotifyFile` in .current/.config.json,
-                // write the advisory to that watch-file so an EXTERNAL watcher can
-                // show it without waiting for the next read. Like the advisory
-                // itself: never throws, never blocks the read (every failure becomes
-                // a loud `notify.error`), and does nothing when the key is absent (no
-                // `notify` key at all, so the payload is unchanged). Dedupe lives in
-                // the watch-file, not in handoff state. (E22)
+                // Opt-in push: when .current/.config.json sets staleDispatchNotifyFile,
+                // also write the advisory to that watch-file for an external watcher.
+                // Never throws or blocks the read (failures become `notify.error`);
+                // no `notify` key when the setting is absent. Dedupe lives in the
+                // watch-file, not in handoff state.
                 const notify = notifyStaleDispatch(workspacePath, advisory);
                 staleDispatch = { ...advisory, ...(notify && { notify }) };
             }

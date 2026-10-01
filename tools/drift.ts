@@ -42,14 +42,10 @@ interface DriftReport {
   evidenceBackedIds: string[];
 }
 
-// The hand-authored-stamp predicate lives in gates/stamp-provenance.ts — one
-// source of truth shared with the write-path STAMP_PROVENANCE_SUSPECT gate,
-// so the read-side advisory and the write-side gate can never drift apart
-// (see that module's header for the shape rationale). THIS advisory stays
-// advisory-only by design: the lease gate's negative-age guard already
-// fails open on an untrustworthy stamp, so this is an audit-trail signal,
-// not a rejection path — the rejection path is the stamp-provenance gate in
-// tools/handoff-orchestrator.ts. (E9A, E18)
+// The hand-authored-stamp predicate lives in gates/stamp-provenance.ts,
+// shared with the write-path STAMP_PROVENANCE_SUSPECT gate so the two never
+// drift apart. This stays advisory-only: the lease gate already fails open on
+// an untrustworthy stamp, and rejection is that gate's job.
 function computeStampAdvisory(lastUpdated: string): string | null {
   if (!isHandAuthoredStamp(lastUpdated)) return null;
   return (
@@ -60,27 +56,13 @@ function computeStampAdvisory(lastUpdated: string): string | null {
   );
 }
 
-// Detail line for the ids that WOULD have read as "Possible vibe-coding
-// drift" but have a QUALIFYING QA record on disk (root qa_reports/,
-// qa_reports/archive/<feature>/, or a `covers:` label line in either — see
-// tools/evidence-lookup.ts's content test: the last recorded verdict must be
-// PASS, or the file records no verdict at all). Names the real structural
-// cause instead of blaming the agent: `completed_tasks` is feature-scoped and
-// legitimately empties on an `active_feature` change, and a merged parallel
-// lane's ledger can be discarded on conflict (that root cause is not fixed
-// here; this only detects it). Explicitly warns that `tw_sync` — the natural
-// response to reported drift — is the WRONG remedy for these ids: it would
-// carry the previous feature's completion marks forward into the new
-// feature's ledger. One aggregate line (like the vibe-drift/handoff-ahead
-// compression style above) rather than one line per id — this bucket does
-// not flip driftDetected and is never merged into compressDriftDetails'
-// output. (E112, E150)
-//
-// Wording: the check inspects a RECORD, not the work itself — it can say the
-// record's last verdict reads PASS (or that no verdict was ever recorded,
-// the hand-authored-report case), not that the completion was independently
-// re-verified here. So the line must not claim flatly that this "is NOT
-// vibe-coding drift".
+// Detail line for ids that would read as "Possible vibe-coding drift" but have
+// a qualifying QA record on disk (see tools/evidence-lookup.ts). It names the
+// structural cause instead of blaming the agent and warns that tw_sync is the
+// wrong remedy: it would carry the previous feature's marks into the new
+// ledger. One aggregate line; never flips driftDetected. The wording says the
+// record reads PASS, not that the work was re-verified.
+// Why: specs/e260a-tools-a-h-rationale.md, "tools/drift.ts — buildEvidenceBackedLine".
 function buildEvidenceBackedLine(ids: string[]): string {
   const idList = formatIdRange(ids);
   return (
@@ -119,16 +101,10 @@ function hasFeatureSplit(workspacePath: string): boolean {
   }
 }
 
-// Advisory-only, like computeStampAdvisory above. Fires whenever this
-// workspace has active-scope incomplete tasks — the exact condition under
-// which "this workspace's ledger cannot see completions recorded in a
-// sibling lane" is a true, useful caveat. It never flips driftDetected and
-// is never merged into `details`: it is a SCOPE CAVEAT, not a claim that
-// anything is wrong. The server is deliberately workspace-scoped, not
-// cross-machine, so this function reads ONLY `workspacePath` — it never
-// inspects another workspace, it only says that this comparison's silence
-// about other lanes is structural, not evidence of their completeness.
-// (E112, E109)
+// Advisory-only scope caveat: fires whenever this workspace has active-scope
+// incomplete tasks, because this ledger cannot see completions recorded in a
+// sibling lane. Never flips driftDetected and never joins `details`. Reads
+// only `workspacePath`: the server is deliberately workspace-scoped.
 function computeFanoutAdvisory(workspacePath: string, incompleteTasks: string[]): string | null {
   if (incompleteTasks.length === 0) return null;
   const signals: string[] = [];
@@ -244,10 +220,9 @@ function readArtifactVersion(workspacePath: string, kind: SchemaKind): number | 
   try {
     if (kind === "handoff") {
       // Handoff path via the lane seam, with the read-only lane-then-flat
-      // fallback readAndMigrate uses — an unmigrated flat workspace's
-      // future-schema handoff must still show up here as graceful skew
-      // drift, not as the parser's raw refusal. No lock, no migration, no
-      // write. (E123)
+      // fallback readAndMigrate uses, so an unmigrated flat workspace's
+      // future-schema handoff still shows up as graceful skew drift, not as
+      // the parser's raw refusal. No lock, no migration, no write.
       const abs = path.resolve(workspacePath);
       const lanePath = resolveCurrentLanePaths(abs).handoffPath;
       const p = fs.existsSync(lanePath) ? lanePath : resolveFlatLanePaths(abs).handoffPath;
@@ -358,9 +333,8 @@ export function detectDrift(workspacePath: string): string {
 
   // Stamp advisory: computed once, right after handoff is confirmed non-null,
   // then threaded into every return path from this point forward. No
-  // storage-mode scoping: last_updated is populated by both HandoffStorage
-  // implementations via the same server-side new Date().toISOString() path.
-  // (E9A)
+  // storage-mode scoping: both HandoffStorage implementations stamp
+  // last_updated through the same new Date().toISOString() path.
   const stampAdvisory = computeStampAdvisory(handoff.last_updated);
 
   if (!tasks) {
@@ -377,14 +351,11 @@ export function detectDrift(workspacePath: string): string {
     return JSON.stringify(report);
   }
 
-  // Exclude archived (`## Completed`) tasks from drift comparison so that
-  // tasks migrated by tw_complete_task don't misfire as "completed in task
-  // list but not in handoff" forever (AC-1). Backward-compat gate: only filter
-  // when the file actually uses the Active/Completed convention — i.e. some
-  // task carries an `Active` or `Completed` section. Legacy files with neither
-  // section name keep full-file behaviour unchanged (AC-3, AC-4). Active `[x]`
-  // tasks absent from handoff still surface as drift (AC-2); the returned
-  // tasksCompleted/tasksIncomplete reflect active scope only (AC-5).
+  // Exclude archived (`## Completed`) tasks so tasks moved there by
+  // tw_complete_task do not misfire as drift forever. Only when the file uses
+  // the Active/Completed convention; legacy files keep full-file behaviour.
+  // Active `[x]` tasks absent from handoff still surface, and tasksCompleted /
+  // tasksIncomplete reflect active scope only.
   const usesActiveCompletedConvention = tasks.some((t) => {
     const s = t.section.trim().toLowerCase();
     return s === "active" || s === "completed";
@@ -395,18 +366,11 @@ export function detectDrift(workspacePath: string): string {
 
   const { completed: completedTasks, incomplete: incompleteTasks } = partitionTasks(activeScopeTasks);
 
-  // Drift-baseline exemption (drift-baseline-exemption): task IDs listed in
-  // `.current/.config.json` → `driftBaselineIds` have been explicitly
-  // acknowledged as already-shipped-and-reconciled (sanctioned writer:
-  // release-engineer, post-PASS). They are excluded from the vibe-coding-drift
-  // comparison and from the reported tasksCompleted array ONLY (AC-1) —
-  // non-baselined IDs still surface (AC-2), and the handoff-ahead /
-  // FAIL-Blocked drift directions are untouched (AC-5). Absent file or absent
-  // field yields an empty set: zero behavior change (AC-3); in SQLite/HTTP
-  // mode the config file typically doesn't exist, so loadConfig() returns {}
-  // and this is a graceful no-op (AC-7). Composes independently with the
-  // archived-section filter above (AC-4): the baseline is checked against the
-  // already-active-scoped task set.
+  // Drift-baseline exemption: ids in `.current/.config.json` driftBaselineIds
+  // (written by release-engineer after PASS) are excluded from the
+  // vibe-coding-drift check and from tasksCompleted only; other drift
+  // directions are untouched. A missing file or field (the usual SQLite/HTTP
+  // case) yields an empty set. Checked against the active-scope task set.
   const baselineIds = new Set<string>(loadConfig(workspacePath).driftBaselineIds ?? []);
 
   const drifts: string[] = [];
@@ -428,21 +392,13 @@ export function detectDrift(workspacePath: string): string {
     }
   }
 
-  // An id that would otherwise read as "Possible vibe-coding drift" is
-  // instead moved to evidenceBackedIds when a QUALIFYING QA record for it
-  // exists anywhere tools/evidence-lookup.ts looks (qa_reports/ root,
-  // qa_reports/archive/<feature>/, or a covers: label line in either — see
-  // that module's content test). The driftBaselineIds exemption above still
-  // runs FIRST and unchanged — this case must not be handled by pushing ids
-  // onto that baseline (it advances once per release; active_feature
-  // changes far more often). Only ids that survive both checks and have NO
-  // qualifying evidence anywhere keep the exact original "Possible
-  // vibe-coding drift" string and keep flipping driftDetected. (E112)
-  //
-  // The candidate ids are collected FIRST and looked up in one batch call,
-  // so hasEvidenceAnywhere builds each archive directory listing / covers:
-  // coverage index at most once per detectDrift call rather than once per
-  // drifted id.
+  // An id that would otherwise read as "Possible vibe-coding drift" moves to
+  // evidenceBackedIds when a qualifying QA record exists anywhere
+  // tools/evidence-lookup.ts looks. The driftBaselineIds exemption still runs
+  // first; this case is not handled by growing that baseline, which advances
+  // once per release while active_feature changes far more often. Candidates
+  // are looked up in one batch so each archive listing and covers: index is
+  // built at most once per call.
   const evidenceCandidateIds = completedTasks.filter(
     (taskId) => !baselineIds.has(taskId) && !handoffTaskIds.includes(taskId),
   );

@@ -31,8 +31,7 @@ export declare function loadConfig(workspacePath: string): WorkspaceConfig;
  * serving defaults IN PLACE OF a config file that exists but cannot be used —
  * the message names the config path and the parse/read problem. Returned as
  * `config_error` on every tw_get_state envelope so the fallback is never
- * silent. Same mtime-cached core as loadConfig — no extra I/O on the happy
- * path. (E31)
+ * silent. Same mtime-cached core as loadConfig — no extra I/O on the happy path.
  */
 export declare function getConfigError(workspacePath: string): string | null;
 export declare function resolveTaskPaths(workspacePath: string): string[];

@@ -1,55 +1,10 @@
 // Coded by @sr-engineer
-// Archive-aware QA-evidence lookup for tools/drift.ts. Read-only, consumed
-// ONLY by drift.ts's evidence-aware split of the "Possible vibe-coding drift"
-// bucket — NOT by gates/qa-review.ts's hasEvidenceInFile, which deliberately
-// scans qa_reports/ root only (MISSING_EVIDENCE is a live gate predicate;
-// widening its scan would change gate behaviour). (E112)
-//
-// This module extends the SAME id-file convention
-// (qa_reports/review_<id>.md) that gates/qa-review.ts checks at root into the
-// release-engineer archive tree the Evidence-Citation Convention documents
-// (qa_reports/archive/<feature>/review_<id>.md — content/skill-release-engineer.md
-// SOP step 7a; CHANGELOG.md's "Evidence-Citation Convention" entry), plus the
-// `covers:` label-line fallback (parseCoversIds / buildCoverageIndex,
-// tools/evidence-file.ts) in both locations — so a released, archived PASS is
-// still recognized as "evidence exists on disk" here, exactly as it would be
-// pre-archive.
-//
-// --- Existence is the wrong test; verdict content is the right one -------
-// A bare "does `qa_reports/review_<id>.md` exist?" test is not enough:
-// gates/qa-review.ts's `recordReviewInFile` writes BOTH PASS and FAIL rounds
-// into that exact path, and CREATES the file on a FAIL round — so the very
-// server write that records a rejected QA round would manufacture the file
-// that silences this detector. A FAIL-only file therefore does not count as
-// evidence.
-//
-// The rule, applied identically to a direct per-id file AND to a file reached
-// via a `covers:` line:
-//   1. The file contains >= 1 verdict section (the
-//      `## <ts> — PASS|FAIL — by <reviewer>` shape recordReviewInFile
-//      writes) — the LAST one (recordReviewInFile appends chronologically,
-//      so last-wins is "what the QA record currently says") must be PASS.
-//   2. The file contains NO verdict section at all — it still counts as
-//      evidence. A verdict-less file is, by construction, NOT something the
-//      FAIL-record back door can produce (the FAIL path is exactly what
-//      writes a verdict section) — it is a hand-authored covering report,
-//      the same covering-evidence trust class the MISSING_EVIDENCE gate
-//      (gates/qa-review.ts's hasEvidenceInFile) already accepts on existence
-//      alone. Requiring more here than that gate requires at completion time
-//      would make this detector stricter than the gate it is meant to
-//      corroborate, and would resurface false "vibe-coding drift" alarms on
-//      already-shipped work carrying exactly the hand-authored reports this
-//      codebase sanctions (docs/backlog.md's covering-evidence rows).
-//
-// Residual trade-off (stated, not hidden): this rule still admits (a) a
-// hand-created, zero-byte or prose-only file with no verdict section, and
-// (b) a `covers:` line naming an id inside a report that never actually
-// judged that id — the content test only inspects the VERDICT shape, not
-// whether the covering report's own body is about the id it names. Both are
-// the same hand-authored trust class gates/qa-review.ts already extends
-// credit to via bare existence; this module does not attempt to close that
-// wider gap, only the FAIL-record back door described above (a file the
-// SERVER ITSELF wrote as a rejection).
+// Archive-aware QA-evidence lookup, used only by tools/drift.ts. Not used by
+// gates/qa-review.ts's hasEvidenceInFile, which is a live gate and scans the
+// qa_reports/ root only. Looks for review_<id>.md in the root and in
+// qa_reports/archive/<feature>/, plus `covers:` lines in both. A file counts
+// when its last verdict section is PASS or it has no verdict section at all.
+// Why: specs/e260a-tools-a-h-rationale.md, "tools/evidence-lookup.ts — verdict rule".
 
 import * as fs from "fs";
 import * as path from "path";
@@ -133,20 +88,12 @@ function fileQualifiesAsEvidence(filePath: string): boolean {
   return evidenceQualifies(content);
 }
 
-// Public: for each id in `taskIds`, true when a QUALIFYING QA record (per
-// evidenceQualifies above) exists anywhere this module knows to look —
-// qa_reports/ root, qa_reports/archive/*/, and the `covers:` fallback in
-// both. Never throws: an unreadable or absent qa_reports/ tree yields an
-// empty result for every id, never an exception (an id is sanitised before
-// any path is built, mirroring gates/qa-review.ts's precedent).
-//
-// Q1/P1 (round-2 fix): batch signature, mirroring the gates/qa-review.ts:71-78
-// hasEvidenceInFile precedent this module's header already named as its
-// model — round 1 inverted that shape (per-id, no memoisation), rebuilding
-// every archive directory listing and covers: coverage index from scratch on
-// EVERY drifted id. This entry point now builds the archive directory list
-// once and each covers: coverage index at most once per call, regardless of
-// how many ids are checked.
+// Public: for each id in `taskIds`, true when a qualifying QA record (per
+// evidenceQualifies above) exists in qa_reports/, qa_reports/archive/*/, or
+// a `covers:` line in either. Never throws: an unreadable or absent tree
+// yields an empty result, and ids are sanitised before any path is built.
+// Batch signature, like hasEvidenceInFile: the archive listing and each
+// covers: index are built at most once per call.
 export function hasEvidenceAnywhere(workspacePath: string, taskIds: string[]): Set<string> {
   const result = new Set<string>();
   if (taskIds.length === 0) return result;

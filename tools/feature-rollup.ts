@@ -1,41 +1,10 @@
 // Coded by @sr-engineer
-// tools/feature-rollup.ts — feature-level roll-up. Every feature-scoped cost
-// brake (hop_count, review_round/qa_round, telemetry, token budget) is
-// computed and capped per WORKSPACE, by design. That per-lane scoping is
-// correct for a single lane, but it means a feature fanned out across N git
-// worktrees never has its true total shown by any single lane's tw_get_state
-// read. This module is a REPORTING surface only — it fires no gate and makes
-// no cap span workspaces. It exists so a PM/coordinator can derive the lane
-// list, sum each lane's ticket/status/hop, and put the total in front of a
-// human before declaring a multi-lane feature closed
-// (content/coord-03-core-fallback.md, Feature-Scope Gate paragraph,
-// "Feature-close roll-up obligation"). (E113, E109)
-//
-// Degrade-honestly is the load-bearing property of this module: the whole
-// point is to stop a per-lane brake being read as if it were the
-// feature-wide figure. Dropping an unreadable lane, or presenting a
-// partial/single-lane sum as a verified feature total, would repeat exactly
-// that mistake.
-// An unreadable lane is always CARRIED (readable: false), never dropped and
-// never zero-filled; any degradation is stated explicitly in
-// degradedReason, and renderRollupReport leads with a "ROLL-UP INCOMPLETE"
-// banner whenever the result is degraded.
-//
-// Lane-list data source: localFallbackLaneList below (a git-worktree scan)
-// is the default, fully functional provider. tools/lane-registry.ts's
-// laneRegistryList is a drop-in replacement with the same signature, passed
-// through the LaneListProvider seam (computeFeatureRollup's
-// `laneListProvider` option, marked below) with no call-site changes —
-// only which provider function is passed differs. (E132)
-//
-// Feature attribution: every lane is CARRIED into the report and shown in
-// the table for context, but only lanes whose `activeFeature` equals the
-// requested featureId are summed into `totals`/`capComparison` — featureId
-// is not just a display label. `active_feature` is a heuristic (a lane may
-// have since rolled on to a later feature), so a lane that cannot be
-// attributed — zero lanes match, or a readable lane has no active_feature
-// recorded at all — degrades the report via the same degrade-honestly path
-// rather than silently entering totals.
+// Feature-level roll-up. Cost brakes (hop_count, rounds, telemetry, token
+// budget) are per workspace, so a feature fanned out across worktrees never
+// shows its true total in one lane. Reporting only: no gate, no cross-lane cap.
+// Degrade honestly: an unreadable or unattributable lane is carried, never
+// dropped or zero-filled, and a degraded result leads with "ROLL-UP INCOMPLETE".
+// Why: specs/e260a-tools-a-h-rationale.md, "tools/feature-rollup.ts — roll-up".
 
 import { execFileSync } from "node:child_process";
 import { parseHandoff } from "./handoff-parse.js";
@@ -82,8 +51,8 @@ export interface LaneListResult {
 }
 
 /** A pluggable lane-list data source. localFallbackLaneList is the default;
- * tools/lane-registry.ts's laneRegistryList is a drop-in replacement, same
- * signature. (E132) */
+ * tools/lane-registry.ts's laneRegistryList is a drop-in replacement with the
+ * same signature. */
 export type LaneListProvider = (repoRoot: string) => LaneListResult;
 
 // SEAM FOR E132: this is the default provider passed to computeFeatureRollup
@@ -102,14 +71,10 @@ export function localFallbackLaneList(
     output = execFileSync("git", ["worktree", "list", "--porcelain"], {
       cwd: repoRoot,
       encoding: "utf-8",
-      // Capture stderr instead of inheriting it (code-reviewer C1, round 1):
-      // execFileSync's default inherits stderr to the parent, and this
-      // function is now called from readHandoffState — the mandatory
-      // first-action read, inside the long-lived MCP server whose stderr IS
-      // the stdio-transport log channel. A non-git workspace's `git` failure
-      // must not print `fatal: ...` to that channel on every call. The
-      // detail is still available on err.stderr / err.message below for
-      // degradedReason.
+      // Capture stderr instead of inheriting it: this runs inside
+      // readHandoffState in the MCP server, whose stderr is the stdio
+      // transport's log channel, so a non-git workspace must not print
+      // `fatal: ...` there on every call. err.stderr still feeds degradedReason.
       stdio: ["ignore", "pipe", "pipe"],
       // undefined (the default, every existing call site incl.
       // scripts/feature-rollup.mjs) keeps the no-timeout behaviour. Only
@@ -127,16 +92,10 @@ export function localFallbackLaneList(
     };
   }
 
-  // Porcelain output is one blank-line-separated block per worktree, e.g.:
-  //   worktree /path
-  //   HEAD <sha>
-  //   branch refs/heads/<name>
-  // or, for a detached worktree:
-  //   worktree /path
-  //   HEAD <sha>
-  //   detached
-  // Parsed per-block (not per-line in isolation) so each worktree's branch
-  // line is attributed to the right worktree path.
+  // Porcelain output is one blank-line-separated block per worktree:
+  // `worktree <path>`, `HEAD <sha>`, then `branch refs/heads/<name>` or
+  // `detached`. Parsed per block so each branch line is attributed to the
+  // right worktree path.
   const branchByPath = new Map<string, string | null>();
   const worktreePaths: string[] = [];
   // CRLF-tolerant split (code-reviewer C2, round 1): /\n\n+/ does not match
@@ -275,9 +234,8 @@ export interface RollupReportLane {
   status: string | null;
   hopCount: number | null;
   readable: boolean;
-  /** Passthrough of LaneInfo.featureHistory — only populated when the caller
-   * supplied a provider that computes it (laneRegistryList); undefined for
-   * localFallbackLaneList lanes. (E132) */
+  /** Passthrough of LaneInfo.featureHistory. Set only by providers that
+   * compute it (laneRegistryList); undefined for localFallbackLaneList lanes. */
   featureHistory?: string[] | null;
 }
 
@@ -341,15 +299,10 @@ export function computeFeatureRollup(
         featureHistory: lane.featureHistory,
       };
     }
-    // Prefer the provider's own completedTasks when it populated one (an
-    // array — checked via Array.isArray, since LaneInfo.completedTasks may
-    // legally be null/undefined too). Both built-in providers
-    // (localFallbackLaneList, laneRegistryList) already read each lane's
-    // handoff to build LaneInfo, so re-reading it here would cost a second
-    // parseHandoff call per lane (2N reads total) for information the
-    // provider already has. Only fall back to a direct read when the
-    // provider left the field unpopulated — keeps third-party
-    // LaneListProviders that predate this field working. (E132)
+    // Prefer the provider's own completedTasks when it is an array (it may be
+    // null): both built-in providers already read each lane's handoff, so a
+    // second parseHandoff per lane would be wasted. Fall back to a direct read
+    // only when the provider left it unset, for older third-party providers.
     if (Array.isArray(lane.completedTasks)) {
       return {
         workspacePath: lane.workspacePath,

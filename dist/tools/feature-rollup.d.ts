@@ -37,8 +37,8 @@ export interface LaneListResult {
     degradedReason?: string;
 }
 /** A pluggable lane-list data source. localFallbackLaneList is the default;
- * tools/lane-registry.ts's laneRegistryList is a drop-in replacement, same
- * signature. (E132) */
+ * tools/lane-registry.ts's laneRegistryList is a drop-in replacement with the
+ * same signature. */
 export type LaneListProvider = (repoRoot: string) => LaneListResult;
 export declare function localFallbackLaneList(repoRoot: string, opts?: {
     timeoutMs?: number;
@@ -54,9 +54,8 @@ export interface RollupReportLane {
     status: string | null;
     hopCount: number | null;
     readable: boolean;
-    /** Passthrough of LaneInfo.featureHistory — only populated when the caller
-     * supplied a provider that computes it (laneRegistryList); undefined for
-     * localFallbackLaneList lanes. (E132) */
+    /** Passthrough of LaneInfo.featureHistory. Set only by providers that
+     * compute it (laneRegistryList); undefined for localFallbackLaneList lanes. */
     featureHistory?: string[] | null;
 }
 export interface RollupReport {

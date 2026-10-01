@@ -1,12 +1,8 @@
 // Coded by @sr-engineer
-// Shared handoff.md types. Kept in their own module so the parse module
-// (tools/handoff-parse.ts) and the write module (tools/handoff-write.ts) can
-// share the HandoffState / protocol-field types WITHOUT importing each
-// other's types — only the two runtime functions (parseHandoff /
-// writeHandoffState) cross the parse↔write boundary (the heal-write /
-// existing-state-preserve circular call; see the top-of-file notes in both
-// modules). tools/handoff.ts re-exports every type below verbatim so
-// importers of the barrel never change. (E36)
+// Shared handoff.md types, in their own module so handoff-parse.ts and
+// handoff-write.ts share them without importing each other's types; only
+// parseHandoff and writeHandoffState cross that boundary. tools/handoff.ts
+// re-exports every type here.
 
 // Type-only import (erased at compile): the runtime graph stays one-directional
 // (transitions.ts never imports handoff.ts / handoff-parse.ts / handoff-write.ts).
@@ -75,17 +71,11 @@ export interface HandoffState {
   // DR-6 — the hop cap is a session-length circuit breaker, harder to clear
   // than the per-task round caps by design).
   hop_count: number;
-  // Cumulative per-feature round totals. Each ticks in step with its
-  // per-cycle counter's FAIL branch (computed in one place, computeNewRound)
-  // but NEVER resets except when active_feature changes — not on QA PASS,
-  // not on (pm, In_Progress) re-entry (exactly hop_count's reset rule). In
-  // file mode they behave like hop_count: the parser ALWAYS fills all three
-  // (missing/malformed defaults to 0) and the serializer ALWAYS writes them
-  // (even 0). Optional at the type level ONLY because only file mode
-  // persists them (storage-sqlite.ts is untouched — the sqlite schema stays
-  // v2 and its parse() never sets them; their only consumer, the
-  // release-close metrics emit, runs only under FileHandoffStorage).
-  // Consumers read `state.qa_rounds_total ?? 0`. (E8, handoff schema v12)
+  // Cumulative per-feature round totals: each ticks with its per-cycle
+  // counter's FAIL branch (computeNewRound) and resets only when
+  // active_feature changes, like hop_count. In file mode the parser always
+  // fills them and the serializer always writes them; optional here only
+  // because SQLite never stores them. Read as `state.qa_rounds_total ?? 0`.
   qa_rounds_total?: number;
   review_rounds_total?: number;
   visual_rounds_total?: number;
@@ -103,69 +93,32 @@ export interface HandoffState {
   // Optional free-text rationale accompanying scope_decision. Not validated by
   // the server; recorded for the audit trail / next reader.
   scope_decision_why?: string;
-  // Ticket-cut approval attestation (handoff schema v5, pm-cut-approval-gate).
-  // Set to `true` by the PM on its pm:In_Progress write AFTER presenting the
-  // cut draft inline and obtaining human approval. Satisfies the
-  // CUT_APPROVAL_REQUIRED gate on the build-entry edge.
-  // ABSENT by default — undefined === "no approval recorded" === gate may fire.
-  // Pure boolean: the ONLY meaningful set value is `true`. A literal `false`
-  // is treated identically to absence by the gate (gate fires unless === true).
-  // FEATURE-SCOPED (see writeHandoffState reset/preserve rule): NOT preserved
-  // across an active_feature change, and reset to undefined on every PM
-  // In_Progress re-entry that does not explicitly re-pass it.
+  // Ticket-cut approval attestation: `true`, set by PM on its pm:In_Progress
+  // write after human approval of the cut, satisfies CUT_APPROVAL_REQUIRED.
+  // Absent or `false` means no approval. Feature-scoped and reset on every PM
+  // In_Progress re-entry that does not re-pass it (see writeHandoffState).
   cut_approved?: boolean;
-  // Cut-approval inheritance attestation. SET BY THE CLIENT, NOT stamped by
-  // the server: the writer's own honest claim that this workspace's
-  // cut_approved: true was NOT given in this workspace's own conversation
-  // but inherited from a parent feature's human approval. The server cannot
-  // verify a claim about another workspace, so it records the writer's word
-  // rather than stamping something it cannot check (contrast
-  // evidence_schema below, which the server stamps because it computes it
-  // itself). Shape: "inherited:<parent-feature>" — anything else is dropped
-  // defensively at parse time, never rejected at the boundary.
-  // FEATURE-SCOPED (the dispatch_mode single-value rule, NOT cut_approved's
-  // PM-re-entry reset above): carried across same-active_feature writes that
-  // omit it, dropped when active_feature changes, NOT re-armed on PM
-  // re-entry — inheritance is a stable fact about how this lane came to
-  // exist, not a per-cut approval to be re-given on every PM bounce. ABSENT
-  // by default — undefined === "not inherited" (the safe direction; the
-  // v13→v14 migration seeds nothing). For the record only: it does NOT by
-  // itself satisfy CUT_APPROVAL_REQUIRED or any other gate — no gate
-  // predicate reads this field. (E114, handoff schema v14)
+  // Cut-approval inheritance attestation, "inherited:<parent-feature>": the
+  // client's own claim that cut_approved came from a parent feature's
+  // approval. The server cannot verify another workspace, so it records the
+  // writer's word; any other shape is dropped at parse time. Feature-scoped,
+  // not re-armed on PM re-entry. Absent means "not inherited". No gate reads it.
+  // Why: specs/e260a-tools-a-h-rationale.md, "tools/handoff-write.ts — field lifetimes".
   cut_approved_source?: string;
-  // External-reference ledger (handoff schema v6, b8-external-ref-ledger).
-  // Populated by the PM during the Resource Audit Gate: one entry per external
-  // artifact the spec references, each classified fetched/indexed/
-  // user-confirmed-ignorable/unresolved. Backs the EXTERNAL_REFS_UNRESOLVED
-  // build-entry gate. ABSENT by default — undefined === "PM found zero external
-  // references" === gate CLEARS (inverse polarity to cut_approved, where absence
-  // BLOCKS; see architecture DR-3). FEATURE-SCOPED preserve: carried forward
-  // across same-feature writes that omit it, dropped on any active_feature
-  // change. NOT re-armed on PM re-entry (DR-4). FILE-MODE ONLY: never
-  // round-trips in SQLite. Surfaced verbatim to tw_get_state readers via the
-  // `{ ...state }` view in readHandoffState (User Story 3 — the architect reads
-  // the ledger from there; do not "optimize away" as unused).
+  // External-reference ledger, filled by PM during the resource audit; backs
+  // EXTERNAL_REFS_UNRESOLVED. Absent means PM found no external references,
+  // so the gate clears (the inverse of cut_approved). Feature-scoped, not
+  // re-armed on PM re-entry, file mode only. tw_get_state shows it verbatim
+  // through the `{ ...state }` view, where the architect reads it: keep it.
   external_refs?: ExternalRef[];
-  // Single-hop routing directive to the IMMEDIATE next reader (handoff schema
-  // v7, c9-protocol-fields). Enum-validated at the zod boundary against the 8
-  // AgentName values. Advisory metadata only — NOT cross-checked against
-  // ALLOWED_TRANSITIONS (AC-6, DR-4). TRANSIENT (AC-3): identical in lifetime
-  // to the pending_notes line it replaces — absent on any write that omits it,
-  // NEVER carried forward. Do NOT "fix" this into the prd_path/scope_decision
-  // blind-preserve or the external_refs/cut_approved feature-scoped preserve:
-  // a stale next_role from three writes ago lingering silently would be a
-  // behavioral regression versus the wholesale-replaced pending_notes it
-  // replaced.
+  // Single-hop routing directive for the next reader, enum-checked but not
+  // cross-checked against ALLOWED_TRANSITIONS. One write only: never carried
+  // forward, so a stale next_role cannot linger.
+  // Why: specs/e260a-tools-a-h-rationale.md, "tools/handoff-write.ts — field lifetimes".
   next_role?: AgentName;
-  // v10 (d5-server-side-stale-dispatch-detection) — server-stamped ISO-8601
-  // UTC timestamp recording WHEN this write set next_role. Direct companion to
-  // next_role: emitted by writeHandoffState iff next_role is set on THIS write,
-  // and — like next_role — never carried forward from existing state (transient,
-  // write-scoped, AC-3). NOT client-supplied: derived from the write's own
-  // now(). Absence === "no dispatch currently in flight" (the next_role /
-  // scope_decision absence-is-signal precedent, NOT hop_count's seed-0). FILE-
-  // MODE ONLY: SqliteHandoffStorage.writeState never persists next_role, so it
-  // never stamps this either (DR-5).
+  // Server-stamped ISO-8601 UTC time at which this write set next_role; same
+  // one-write lifetime as next_role. Absent means no dispatch is in flight.
+  // File mode only, since SQLite never stores next_role.
   dispatched_at?: string;
   // Which stranded role a PM Amend-Resume write targets (handoff schema v7).
   // Consumed by validateTransition via TransitionRequest.next_resume_of
@@ -180,78 +133,35 @@ export interface HandoffState {
   // Optional even on code-reviewer writes — absence never fires the gate.
   // TRANSIENT (AC-3): see next_role.
   review_verdict?: ReviewVerdict;
-  // Human model-tier pins per role (handoff schema v8, c14-dispatch-pins).
-  // Keys closed to the 8 AgentName values (zod-rejected at the tool boundary;
-  // defensively dropped at parse time); values are bounded free text naming
-  // the pinned model tier (NOT closed-enum — the model vocabulary is not owned
-  // by this server, spec AC-2). DURABLE DIRECTIVE, not a single-hop routing
-  // signal: REPLACE-wholesale when provided; FEATURE-SCOPED preserve when
-  // omitted — carried forward across same-feature writes, dropped on any
-  // active_feature change, NOT re-armed on PM re-entry (the exact external_refs
-  // algorithm, spec AC-3/AC-4 Decision Record — do NOT "fix" this into the
-  // transient next_role lifetime or the cut_approved PM-re-entry re-arm by
-  // analogy). ABSENT by default — undefined === "no pins recorded". FILE-MODE
-  // ONLY (AC-5): SqliteHandoffStorage.writeState ignores it. Surfaced verbatim
-  // to tw_get_state readers via the `{ ...state }` view (User Story 2 — the
-  // dispatched role reads its OWN pin to stamp its watermark at the source).
+  // Human model-tier pins per role. Keys are AgentName values (rejected at the
+  // tool boundary, dropped at parse time otherwise); values are free text,
+  // since this server does not own the model vocabulary. A durable directive:
+  // replaced whole when given, feature-scoped when omitted, file mode only.
+  // The dispatched role reads its own pin from tw_get_state to stamp its
+  // watermark.
   dispatch_pins?: Partial<Record<AgentName, string>>;
-  // Dispatch-mode ticket classification. Absence === "feature" (the
-  // default). The PM marks a bug-fix ticket at cut time with dispatch_mode:
-  // "bugfix", which arms the file-mode repro-first gate
-  // (REPRO_MANIFEST_MISSING) on the sr-engineer:In_Progress →
-  // code-reviewer:In_Progress fix-phase edge and makes QA's Phase 0.5
-  // expected-red check decisive. FEATURE-SCOPED (the dispatch_pins /
-  // external_refs rule, for a single value): carried across
-  // same-active_feature writes that omit it, dropped when active_feature
-  // changes, NOT re-armed on PM re-entry (a stable classification, unlike
-  // cut_approved which re-arms per cut). An explicit PM write can change it
-  // (set "feature" or route to architect). File mode only:
-  // SqliteHandoffStorage.writeState ignores it, like dispatch_pins — the
-  // gates it arms are file-mode only anyway. dispatch_mode never gates a
-  // transition edge; transitions.ts stays pure. (E2, handoff schema v11)
+  // Dispatch-mode classification; absence means "feature". PM sets "bugfix"
+  // at cut time, which arms REPRO_MANIFEST_MISSING on the sr-engineer →
+  // code-reviewer fix-phase edge and makes QA's expected-red check decisive.
+  // Feature-scoped, not re-armed on PM re-entry; an explicit PM write can
+  // change it. File mode only. It never gates a transition edge itself.
   dispatch_mode?: DispatchMode;
-  // Evidence-schema pin. STAMPED BY THE SERVER, NEVER CLIENT-SUPPLIED: the
-  // orchestrator stamps EVIDENCE_SCHEMA_CURRENT (gates/evidence-schema.ts)
-  // on the first accepted write of a new active_feature — there is
-  // deliberately NO zod arg on tw_update_state for it. It fixes which
-  // evidence-heading-match rule the qa_reports/*.md gate predicates use for
-  // the LIFE of the feature (v1 = exact-anchored H2 match, v2 =
-  // normalized-contains), so tightening the rules mid-flight can never
-  // invalidate evidence files written earlier (for example after a crash).
-  // FEATURE-SCOPED (the dispatch_mode single-value rule): carried across
-  // same-active_feature writes that omit it, dropped when active_feature
-  // changes (then re-stamped at the new feature's first write), NOT
-  // re-armed on PM re-entry. ABSENT for features started before pins
-  // existed — absence gets the v2 normalized-contains rules at the gates
-  // (v2 is a strict superset of v1, so it can only newly ACCEPT; the
-  // v12→v13 migration invents NO pin). File mode only: SqliteHandoffStorage
-  // ignores it (both evidence gates are file-mode only).
-  // (E23, handoff schema v13)
+  // Evidence-schema pin, stamped by the orchestrator (never by a client) on a
+  // new feature's first accepted write. It fixes which evidence-heading rule
+  // the gates use for the life of the feature (1 = exact H2 match, 2 =
+  // normalized contains), so tightening the rules later cannot invalidate
+  // evidence written earlier. Absent for older features, which get rule 2, a
+  // superset of rule 1. Feature-scoped, file mode only.
   evidence_schema?: number;
-  // Per-hop dispatch-mechanism attestation: the ACTING role's own report of
-  // which mechanism carried this hop (Task subagent vs in-context
-  // tw_switch_role vs inline) — attested, NOT verified: the server cannot
-  // observe how it was invoked. Closed enum, zod-enforced at the tool
-  // boundary; a malformed on-disk value is dropped defensively at parse
-  // time. Lives for ONE write only, like next_role / review_verdict: absent
-  // on any write that omits it, NEVER carried forward. Do NOT "fix" this
-  // into the dispatch_pins/external_refs feature-scoped preserve or the
-  // dispatch_mode single-value carry: a mechanism reported by an earlier hop
-  // lingering on a later hop's record would credit the wrong hop — exactly
-  // the ambiguity this field exists to remove. The durable per-hop history
-  // lives in the append-only .current/dispatch.jsonl sidecar, not here.
-  // ABSENT by default — undefined === "not attested for this hop" (the
-  // v14→v15 migration seeds nothing). For the record only: no gate
-  // predicate reads it. File mode only: SqliteHandoffStorage.writeState
-  // ignores it. (E99, handoff schema v15)
+  // Per-hop dispatch-mechanism attestation: the acting role's own report of
+  // what carried this hop, attested not verified. A malformed on-disk value is
+  // dropped at parse time. One write only: a value from an earlier hop would
+  // credit the wrong hop; the durable history is the dispatch.jsonl sidecar.
+  // No gate reads it. File mode only.
   dispatch_mechanism?: DispatchMechanism;
-  // Companion to dispatch_mechanism (handoff schema v15): the acting role's
-  // SELF-REPORTED model tier for this hop (e.g. "fable", "opus"). Bounded free
-  // text, NOT a closed enum — the model vocabulary is not owned by this server
-  // (the dispatch_pins value precedent). Compared against dispatch_pins it
-  // makes a pin-vs-actual mismatch visible in the record; nothing compares it
-  // automatically. TRANSIENT, per-hop — identical lifetime to
-  // dispatch_mechanism (absent on any omitting write, never carried forward).
-  // Recording-only, FILE-MODE ONLY.
+  // Companion to dispatch_mechanism: the acting role's self-reported model
+  // tier for this hop, free text. Comparing it with dispatch_pins shows a
+  // pin-vs-actual mismatch; nothing compares them automatically. Same
+  // one-write lifetime, file mode only.
   dispatch_mechanism_tier?: string;
 }

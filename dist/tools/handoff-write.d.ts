@@ -37,13 +37,8 @@ export interface WriteHandoffStateOptions {
     bookkeepingWrite?: boolean;
 }
 /**
- * Write handoff state. v3.15.0 dual API:
- *   - Modern (preferred): `writeHandoffState(options)` — pass a
- *     {@link WriteHandoffStateOptions} object. New call sites should use this
- *     form.
- *   - Legacy (deprecated): `writeHandoffState(workspacePath, activeFeature, …)`
- *     — 11 positional params. Retained for backwards-compat with v3.14.x
- *     callers; planned removal in v4.0.0.
+ * Write handoff state. Pass a {@link WriteHandoffStateOptions} object; the
+ * positional form is deprecated, planned for removal in v4.0.0.
  *
  * Pending notes are written as plain list items (not checkboxes) to avoid
  * ambiguity with tracked task IDs in the completed section.
