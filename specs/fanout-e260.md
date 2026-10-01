@@ -1,7 +1,7 @@
 # Fan-out: E260 縮減本 repo 既有的長註解
 base: e9a19f2    integration branch: integ/e260（第一波）；integ/e260-w2（第二波）；integ/e260i（第三波）
 
-**狀態：人類核准 2026-10-01；第一波派工中。** 佇列 #81。人類已核准的切法：依目錄切 8 條只改註解的 lane，分兩波各 4 條（第一波原始碼、第二波測試），最後第三波 e260i 單獨做兩個 budget／結構測試檔。各波之間沒有檔案重疊，分波只為了控制同時進行的 lane 數，以及讓原始碼的 `dist/` 先穩定。
+**狀態：人類核准 2026-10-01；第一波已合併（`integ/e260`），第二波待派工。** 佇列 #81。人類已核准的切法：依目錄切 8 條只改註解的 lane，分兩波各 4 條（第一波原始碼、第二波測試），最後第三波 e260i 單獨做兩個 budget／結構測試檔。各波之間沒有檔案重疊，分波只為了控制同時進行的 lane 數，以及讓原始碼的 `dist/` 先穩定。
 
 ## 派工前核對（整合者，2026-10-01）
 - `git worktree list` 只有 primary；main = origin/main = `e9a19f2`（v4.4.0 已發版，`8ec02d2` 記帳，`e9a19f2` 開 E262）；工作樹乾淨；沒有殘留的 `feat/*`／`integ/*` branch。`tw_detect_drift` 無 drift（只有 T-REL4-02 的證據提示）。
@@ -111,3 +111,16 @@ base: e9a19f2    integration branch: integ/e260（第一波）；integ/e260-w2�
 | 2026-10-01 | 人類 | E260 切法：依目錄 8 條只改註解的 lane、兩波各 4 條，最後 e260i；行為證明用 `removeComments` 轉譯 byte 一致＋全套綠；>20 行一律縮、8–20 行縮到 7 行內或寫一行保留理由；測試檔由 qa 改、交接照 E233；e246 第 57 行 `setupLane` 註解一併修 | coordinator session |
 | 2026-10-01 | 整合者 | `test/e*` 前後半依長區塊數平衡（e1*＋e2* ／ e3–e9＋er/ev），`test/_*` 歸 e260e，`test/eval/**` 歸 e260h；分三個整合 branch，每波合併後重新核對下一波前提 | 本檔 |
 | 2026-10-01 | 人類 | 核准本清單（含 `test/e*` 依長區塊數切、`test/_*` 歸 e260e、`test/eval/**` 歸 e260h、三條整合 branch），開始第一波派工 | 整合者 session |
+| 2026-10-01 | 整合者 | 第一波預審時補上清單漏列的註解原文釘點（以「刪掉所有純註解行後跑全套」實測：3043 測試中 8 個失敗，全部對應到下列釘點）：`bin/agc-init.mjs` 的 AC29 兩行註解（`test/agc-feature-lifecycle.test.mjs`）；`tools/handoff.ts`、`tools/storage.ts` 的 `@deprecated v3.15.0:`（`test/writestate-options-object.test.mjs`）；`tools/feature-rollup.ts` 的 `SEAM FOR E132`；`tools/fanout-manifest.ts` 裡 `PROMPT_TEMPLATE_3B` 上方的註解（`test/e178a-integrator-role.test.mjs`）；`tools/join-precondition.ts` 的 `HOOK POINT FOR E126` 恰好一次（`test/e115-join-precondition.test.mjs`）；`tools/lane-status.ts` 的 `// Watch mode (E178b`；`gates/registry.ts` 的錯誤碼對應表（`test/error-code-contract.test.mjs`） | 信箱 e260a／e260b／e260c／e260d to-lane#1 |
+| 2026-10-01 | 整合者 | 「不准出現」類釘點（刪註解實測抓不到）：`checkOrphanLanes` 函式內不得出現 `history`；`bin/agent-governance-context.mjs` 不得出現 `applyTextTransforms`／`stripOriginTags`／`stripRationale`；`scripts/fanout.mjs` 的 `from "../dist/` 恰好一次；`test/lane-paths.test.mjs`、`test/lane-migrate.test.mjs` 以檔案清單釘住 `resolveLanePaths`、`lane-paths`、`resolveCurrentLane`、`migrateFlatToLane(`、`migrateLaneToFlat(`、`migrateFlatToLaneLocked` 出現在哪些檔（註解也算；e260a、e260b 發現） | 信箱 e260c to-lane#1、各 lane to-lane#2 |
+| 2026-10-01 | 人類 | D1：`gates/registry.ts` 的錯誤碼對應表被 `test/error-code-contract.test.mjs` 解析且斷言 33 列，最少 34 行 → 採 (a)：33 列一字不改、其餘縮成一行指標，為唯一保留的 >20 行區塊；後續 E260D-NEW-1 把對應表搬進 `GATE_REGISTRY` 資料 | e260d lane session（信箱 e260d to-integrator#2） |
+| 2026-10-01 | 整合者 | e260b 第一次收工退回：review R1（`tools/lane-paths.ts` 的 `enumerateLaneSidecarSources` 文件註解被縮減後說得比程式寬）由 lane 自己修，第二波只改測試、無人能修；O1、O3（base 就已過時）留在 E260B-NEW-1 | 信箱 e260b to-lane#3 |
+| 2026-10-01 | 整合者 | 四條逐條核對通過：整合者自行比對去註解轉譯與 AST 葉節點（排除 JSDoc）皆與 base 相同；各在回報 HEAD 乾淨樹重跑全套 3043/3040/0/3；沒有 lane 刪掉 `@ts-*`／`eslint-*`／`__PURE__` 指令註解。依序 merge 進 `integ/e260`，零衝突 → 無合併審查；每次 merge 後 merge-invariants PASS；重建 `dist/` 無差異；整合層全套 3043/3040/0/3 | 本檔 |
+| 2026-10-01 | 整合者 | lane-status 的 e260b EVIDENCE MISMATCH（PM 重開後 handoff `completed_tasks` 只剩 T-10，磁碟上 10 份 PASS 證據、帳本 10/10）為 E150 類，證據齊全，接受不退回 | 本檔 |
+
+## 結案（第一波）
+- 日期 2026-10-01；合併 branch `integ/e260`（e260a `759c920` → e260b `c488ba7` → e260c `d4c7c8b` → e260d `8d7baa0`，皆 `--no-ff`）；例外：無衝突、無合併審查。
+- 量測（同一套掃描器，`integ/e260`）：e260a 8–20 行 82→0、>20 行 14→0、最長 52→7；e260b 60→0、23→0、68→7；e260c 58→0、17→0、81→7；e260d 50→0、16→1（D1 的 34 行）、87→34。四條都沒有保留 8–20 行的區塊。
+- 彙總（上限按 lane 計，合計僅供參考）：e260a 11 張 task／hop 4；e260b 10／8（一次 R1 退回）；e260c 9／4；e260d 7／4；合計 37 張 task、20 hop；review／qa 皆第一輪通過。
+- 新票：E260A-NEW-1、E260B-NEW-1、E260-NEW-1（e260c）、E260D-NEW-1、E260D-NEW-2 由 `finish --shipped` 配號。
+- 附記：e260c 的 `209c431` Co-Authored-By 寫 Opus 5.5，實際為 Fable 5.1（不 amend，僅記錄）。
