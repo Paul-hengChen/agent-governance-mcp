@@ -1,2 +1,4 @@
 {"ts":"2026-10-01T08:36:13.066Z","feature":"e260g-test-e3-l-comment-trim","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
 {"ts":"2026-10-01T08:43:47.784Z","feature":"e260g-test-e3-l-comment-trim","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-10-01T08:46:43.342Z","feature":"e260g-test-e3-l-comment-trim","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-01T08:51:32.711Z","feature":"e260g-test-e3-l-comment-trim","agent_id":"qa-engineer","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}

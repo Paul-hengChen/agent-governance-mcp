@@ -1,24 +1,9 @@
 // Coded by @qa-engineer
-// Parity test between the gate registry, the code that emits gate error
-// codes, and the docs that name them. It imports the real
-// GATE_REGISTRY/ALL_GATE_CODES from the built gates/registry.ts, the single
-// structured source of truth, and checks: the registry's code set equals
-// the codes harvested from source by the shape rule below, the codes
-// harvested from docs (backtick tokens) are a subset of the registry, every
-// `documentedInProse` entry appears in at least one content/*.md, and each
-// entry is self-consistent (hintStatic non-empty, errorCode literally present
-// in its producer file). A code added in one place but not the others fails
-// here. (spec gate-registry, specs/gate-registry-architecture.md, A10, A2,
-// A5, AC-1, AC-5; spec-to-test map in qa_reports/review_A10-10.md)
-//
-// TransitionRejection["error"] in tools/transitions.ts is a hand-written
-// union, deliberately not generated from the registry. Drift is caught
-// here instead: the union is pinned to an exact member count and must be a
-// subset of ALL_GATE_CODES (see the block further down). (DR-8)
-//
-// This file depends on a built tree (imports dist/gates/registry.js),
-// because the parity check needs the real registry. `npm test`'s prebuild
-// step guarantees dist/ exists before this file runs. (AC-7)
+// Parity test between GATE_REGISTRY (dist/gates/registry.js), the gate error codes emitted by
+// source, and the codes named in content/*.md. The three code sets must agree, every
+// documentedInProse entry must appear in a doc, and each entry must be self-consistent.
+// Needs a built tree; npm test's prebuild step guarantees dist/.
+// Rationale: specs/e260g-comment-rationale.md (test/error-code-contract.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -49,20 +34,9 @@ const { ROUND_CAP_EXPORTED, REVIEW_ROUND_CAP_EXPORTED, VISUAL_ROUND_CAP_EXPORTED
 // ---------------------------------------------------------------------------
 
 const TOKEN_RE = /\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*\b/g;
-// The suffix list must cover every gate error code's final word. A code
-// whose suffix is missing here is invisible to BOTH extractCodeCodes and
-// extractDocCodes (isGateErrorCode filters it out of both harvests the same
-// way), which would silently hide a missing-registry or missing-doc
-// regression for that gate. The spec-mandated code names are fixed, so a
-// new suffix is added here rather than the code being renamed:
-//   UNRESOLVED for EXTERNAL_REFS_UNRESOLVED (b8-external-ref-ledger, S01)
-//   MISMATCH for REVIEW_VERDICT_STATUS_MISMATCH (c9-protocol-fields, DR-7)
-//   HELD for FEATURE_LEASE_HELD (e1-feature-scoped-state-design, T-E1-05)
-//   CHANGE for BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE (e10-lease-override,
-//   T-E10-08)
-//   SUSPECT for STAMP_PROVENANCE_SUSPECT (e18-write-provenance)
-// Siblings such as LEASE_OVERRIDE_AUDIT_MISSING and
-// QA_COMPLETION_EVIDENCE_MISSING already match _MISSING.
+// The suffix list must cover every gate error code's final word; a code with a missing suffix
+// is invisible to both extractors and would hide a registry or doc regression. Add a suffix
+// here rather than renaming the code. Siblings such as LEASE_OVERRIDE_AUDIT_MISSING match _MISSING.
 const SUFFIX_RE = /_(REQUIRED|MISSING|INCOMPLETE|EXCEEDED|UNVERIFIED|REJECTED|UNRESOLVED|MISMATCH|HELD|CHANGE|SUSPECT)$/;
 const PREFIX_RE = /^MISSING_/;
 
@@ -114,15 +88,9 @@ function extractCodeCodes() {
   return codes;
 }
 
-// Doc side: backtick-delimited spans `TOKEN` whose inner text matches the
-// shape rule. Matched directly (backtick, shape-rule token, backtick) rather
-// than capturing arbitrary `([^`]+)` content and filtering afterwards —
-// content/*.md contains fenced code blocks whose embedded literal backticks
-// throw off naive open/close backtick pairing across the whole file, which
-// would corrupt spans for everything downstream in the same file. Anchoring
-// the token pattern between the backticks sidesteps that: it only ever
-// matches when a shape-rule token is flanked by exactly one backtick on
-// each side, regardless of unrelated backtick parity elsewhere in the file.
+// Doc side: match `TOKEN` directly (backtick, shape-rule token, backtick) instead of capturing
+// arbitrary backtick spans. Fenced code blocks in content/*.md contain literal backticks that
+// would throw off open/close pairing for the rest of the file.
 const BACKTICK_TOKEN_RE = /`([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*)`/g;
 
 function extractDocCodes() {
@@ -146,15 +114,8 @@ function fmt(codeMap, codes) {
     .join("; ");
 }
 
-// ---------------------------------------------------------------------------
-// GATE_REGISTRY is the single source of truth and holds exactly 33 entries.
-// The count is pinned so that adding or dropping a gate is a deliberate,
-// visible change to this test. The newest entry is
-// NON_QA_COMPLETED_TASKS_REJECTED, which extends the reviewer-only
-// completed_tasks check to every identity other than qa-engineer, so a
-// non-qa write cannot prefill completed_tasks ahead of a later qa write.
-// (AC-1, AC-5, E40, e40-nonqa-completed-tasks-write-gate)
-// ---------------------------------------------------------------------------
+// GATE_REGISTRY is the single source of truth. The entry count (33) is pinned so adding or
+// dropping a gate is a deliberate, visible change here. (AC-1, AC-5, E40)
 
 test("AC-1/AC-5: GATE_REGISTRY has exactly 33 entries (32 in, 33 out — e40-nonqa-completed-tasks-write-gate added NON_QA_COMPLETED_TASKS_REJECTED)", () => {
   assert.equal(
@@ -274,30 +235,11 @@ test("internal consistency: orchestrator-producer entries' errorCode literally a
   );
 });
 
-// ---------------------------------------------------------------------------
-// The TransitionRejection["error"] union in tools/transitions.ts is
-// deliberately not generated from the registry: it mixes codes that
-// validateTransition emits with handler-side codes it carries for type
-// narrowing at the emit site, so it is not a clean by-producer subset, and
-// narrowing it would silently delete documented members. Drift is caught
-// cheaply instead: the union is pinned at exactly 16 members and must be a
-// subset of ALL_GATE_CODES. (DR-8)
-// Membership today:
-//   - validateTransition-emitted codes include HOP_CAP_EXCEEDED (from the
-//     hop-cap override, the same emit-site class as
-//     QA_ROUND_EXCEEDED/REVIEW_ROUND_EXCEEDED/VISUAL_ROUND_EXCEEDED), which is
-//     why it is also in TRANSITION_GATE_CODES (gates/registry.ts).
-//   - handler-side-only members such as EXTERNAL_REFS_UNRESOLVED,
-//     FEATURE_LEASE_HELD and SOURCE_CREDIBILITY_UNVERIFIED are
-//     orchestrator-only codes, never emitted by validateTransition (which
-//     stays pure and does no file reads). They are in the union for the same
-//     reasons as CUT_APPROVAL_REQUIRED/SCOPE_DECISION_REQUIRED: narrowing at
-//     the emit site, the subset check below, and a complete catalog. (DR-9,
-//     DR-3)
-//   - plain-text orchestrator codes such as AC_EXECUTION_LOG_MISSING,
-//     EXPECTED_RED_DIFF_MISSING and REPRO_MANIFEST_MISSING are deliberately
-//     left out of both the union and TRANSITION_GATE_CODES.
-// ---------------------------------------------------------------------------
+// TransitionRejection["error"] (tools/transitions.ts) is a hand-written union, not generated from
+// the registry: it mixes validateTransition codes with handler-side codes kept for type narrowing.
+// Drift is caught by pinning it at 16 members and requiring it to be a subset of ALL_GATE_CODES.
+// Plain-text orchestrator codes (for example AC_EXECUTION_LOG_MISSING) stay out of both the union
+// and TRANSITION_GATE_CODES. (DR-8, DR-9)
 
 test("DR-8: TransitionRejection[\"error\"] union stays byte-identical at 16 members, all ⊆ ALL_GATE_CODES", () => {
   const transitionsSrc = readSource(path.join("tools", "transitions.ts"));
@@ -371,16 +313,9 @@ test("c9-protocol-fields: REVIEW_VERDICT_STATUS_MISMATCH is a GATE_REGISTRY entr
   );
 });
 
-// ---------------------------------------------------------------------------
-// AC-7 (relaxed, gate-registry era — architecture Test Impact, DR table):
-// this test file now INTENTIONALLY depends on a built tree, because AC-5
-// requires importing the real gates/registry.ts. The old "never import from
-// dist/, stays valid against an unbuilt tree" invariant is superseded by the
-// generative rewrite. This assertion pins the intentional dependency (so a
-// future edit that reverts to source-text scanning under the same filename
-// is a visible, deliberate choice rather than a silent regression) instead
-// of forbidding it.
-// ---------------------------------------------------------------------------
+// AC-7 (relaxed): this file intentionally depends on a built tree, since it imports the real
+// gates/registry.js (AC-5). The assertion below pins that dependency so reverting to source-text
+// scanning would be a deliberate, visible choice.
 
 test("AC-7 (relaxed): this test file intentionally imports dist/gates/registry.js (requires a built tree; npm test's prebuild step guarantees it)", () => {
   const selfText = readSource(path.join("test", "error-code-contract.test.mjs"));
@@ -410,16 +345,9 @@ test("AC1 (c12): every GATE_REGISTRY entry has non-empty triggerEdge/armConditio
   }
 });
 
-// ---------------------------------------------------------------------------
-// AC2 checkable-literal extraction helpers. Three mechanically checkable
-// literal shapes, per spec AC2 + the task breakdown: (1) a numeric round-cap
-// ("prev_x_round >= N"), (2) a named predicate/function-call identifier
-// (camelCase, e.g. hasDesignModeRequiringVisual), (3) an agent:status
-// transition-edge pair (e.g. pm:In_Progress). A fourth, SCREAMING_SNAKE
-// constant-name literal (ALLOWED_TRANSITIONS), is handled as its own pinned
-// case below — it is a single occurrence, not a repeating shape worth a
-// generic extractor.
-// ---------------------------------------------------------------------------
+// AC2 extraction helpers for three checkable literal shapes: a round cap ("prev_x_round >= N"),
+// a camelCase predicate name, and a role:Status edge pair. ALLOWED_TRANSITIONS, a single
+// SCREAMING_SNAKE constant, is pinned as its own case below instead of a generic extractor.
 
 const CAMEL_RE = /\b[a-z][a-z0-9]*(?:[A-Z][a-z0-9]*)+\b/g;
 function extractPredicateNames(text) {
@@ -465,14 +393,8 @@ test("AC2 (c12): round-cap entries' triggerEdge numeric literal matches the live
   }
 });
 
-// ---------------------------------------------------------------------------
-// AC2 (predicate names vs orchestrator emit sites): for every
-// producer:"orchestrator" entry whose armCondition contains a camelCase
-// predicate/function-call identifier, assert that identifier appears
-// literally in tools/handoff-orchestrator.ts — the file that actually calls
-// it. Catches a typo'd/renamed predicate in the registry copy that no longer
-// matches the real emit-site call.
-// ---------------------------------------------------------------------------
+// AC2: each orchestrator-producer armCondition predicate (camelCase identifier) must appear
+// literally in tools/handoff-orchestrator.ts, which catches a typo'd or renamed predicate.
 
 test("AC2 (c12): orchestrator-producer armCondition predicate names are literally present in tools/handoff-orchestrator.ts", () => {
   const orchestratorSrc = readSource(path.join("tools", "handoff-orchestrator.ts"));
@@ -493,18 +415,10 @@ test("AC2 (c12): orchestrator-producer armCondition predicate names are literall
   );
 });
 
-// ---------------------------------------------------------------------------
-// AC2 (transition-edge pairs vs doc-file mapping): for the three entries
-// whose triggerEdge names a bare "pm:In_Progress" edge (SCOPE_DECISION_
-// REQUIRED, CUT_APPROVAL_REQUIRED, EXTERNAL_REFS_UNRESOLVED — the pm→build
-// entry gates), assert the edge literal appears verbatim in >=1 of the
-// content/*.md file(s) that already backtick-quote that entry's errorCode
-// (per the documentedInProse doc-file mapping, spec AC2). The compound
-// "{architect,sr-engineer}:In_Progress" half of the same triggerEdge is not
-// a single role:Status literal (a brace-set precedes the colon) and is
-// intentionally not extracted — EDGE_RE only matches a bare role name
-// immediately before ":Status".
-// ---------------------------------------------------------------------------
+// AC2: for the three pm->build entry gates (SCOPE_DECISION_REQUIRED, CUT_APPROVAL_REQUIRED,
+// EXTERNAL_REFS_UNRESOLVED) the bare "pm:In_Progress" edge literal must appear verbatim in a
+// content/*.md file that already quotes the errorCode. The compound
+// "{architect,sr-engineer}:In_Progress" half is not extracted: EDGE_RE needs a bare role name.
 
 test("AC2 (c12): transition-edge-pair literals in triggerEdge appear verbatim in the mapped content/*.md doc file(s)", () => {
   const docCodes = extractDocCodes();
@@ -558,21 +472,10 @@ test("AC2 (c12): TRANSITION_REJECTED's ALLOWED_TRANSITIONS literal is a real tra
   );
 });
 
-// ---------------------------------------------------------------------------
-// Doc-file mapping vs actual backtick-quote sites: gates/registry.ts carries
-// a hand-written comment mapping each errorCode to the content/*.md file(s)
-// that backtick-quote it, and the checks above rely on it. Parse that
-// comment (it is prose, not an exported const, and comments do not survive
-// into dist/) and assert it lists exactly the same files extractDocCodes()
-// finds by scanning content/*.md. Without this, a stale mapping line (a doc
-// file renamed or removed, a code documented in a new place) would silently
-// make the AC2 checks above trust the wrong files. (T-C12-01)
-//
-// The count assert (33) comes first, but the per-code comparison below is
-// what catches a mapping line that is missing a newly added doc file; when
-// a code starts being quoted in a new doc, fix the mapping line in
-// gates/registry.ts, not this test. (T-E40-01 F1, T-E40-03)
-// ---------------------------------------------------------------------------
+// Doc-file mapping vs actual quote sites: gates/registry.ts carries a prose comment mapping each
+// errorCode to the content/*.md files that quote it. Comments do not survive into dist/, so it is
+// parsed from source and must list exactly the files extractDocCodes() finds. When a code starts
+// being quoted in a new doc, fix the mapping line in gates/registry.ts, not this test. (T-C12-01)
 
 function parseDocFileMappingComment() {
   const src = readSource(path.join("gates", "registry.ts"));
@@ -608,17 +511,10 @@ test("doc-file mapping (c12): gates/registry.ts's errorCode→doc-file mapping c
   }
 });
 
-// ---------------------------------------------------------------------------
-// AC3: explicit allowlist for every (errorCode, field) pair whose value is
-// free-form English with no mechanically checkable literal — "never silently
-// exempted without acknowledgment in the diff." Each entry below carries a
-// one-line reason. The closure test that follows asserts every one of the
-// 22*2 (triggerEdge, armCondition) pairs is EITHER covered by a checkable-
-// literal test above OR listed here — never neither, never both. clearingArtifact
-// is intentionally out of this classification (AC1's non-empty bar is its only
-// bar per spec AC2's wording, which names only triggerEdge/armCondition as the
-// checkable-literal fields).
-// ---------------------------------------------------------------------------
+// AC3: every (errorCode, field) pair with free-form English and no checkable literal is
+// allowlisted here with a one-line reason. The closure test below requires each pair to be
+// either checked above or listed here, never neither and never both. clearingArtifact is out of
+// this classification (AC1's non-empty bar is its only bar).
 
 const FREE_TEXT_ALLOWLIST = [
   { code: "AGENT_ID_REQUIRED", field: "triggerEdge", reason: "free English description of the null/unknown agent condition; no named predicate or edge-pair literal to check" },
@@ -658,85 +554,35 @@ const FREE_TEXT_ALLOWLIST = [
   // orchestrator-producer entry with a camelCase predicate literal.
   // (e1-feature-scoped-state-design)
   { code: "FEATURE_LEASE_HELD", field: "triggerEdge", reason: "free English describing a cross-feature condition (\"any write whose active_feature differs ... while the incumbent is non-terminal and fresh\"), no single role:Status edge pair or CAP_BY_CODE-style numeric literal" },
-  // REPRO_MANIFEST_MISSING's triggerEdge is
-  // "sr-engineer:In_Progress -> code-reviewer:In_Progress (file-mode only)".
-  // A real role:Status edge pair is present, but it is not in
-  // triggerEdgeCheckable (that set is CAP_BY_CODE keys plus the three
-  // pm->build-entry gates only); the trailing "(file-mode only)" qualifier and
-  // the lack of a CAP_BY_CODE numeric literal keep this pair out of the
-  // mechanical check. armCondition is NOT allowlisted: it contains the
-  // camelCase identifier "prevState", which literally appears in
-  // tools/handoff-orchestrator.ts, so it is mechanically checked like every
-  // other orchestrator-producer entry. (e2-bugfix-repro-gate)
+  // REPRO_MANIFEST_MISSING: triggerEdge has a real edge pair but is not in triggerEdgeCheckable
+  // (no cap literal, "(file-mode only)" qualifier). armCondition is checked mechanically via the
+  // prevState identifier, so it is not allowlisted. (e2-bugfix-repro-gate)
   { code: "REPRO_MANIFEST_MISSING", field: "triggerEdge", reason: "role:Status edge pair present but not in triggerEdgeCheckable (no CAP_BY_CODE numeric literal, not one of the three pm->build-entry gates); the \"(file-mode only)\" qualifier is free English" },
-  // SOURCE_CREDIBILITY_UNVERIFIED's triggerEdge is a real "pm:In_Progress ->
-  // {architect,sr-engineer}:In_Progress" role:Status edge pair, but it is not
-  // in triggerEdgeCheckable (not a CAP_BY_CODE numeric literal, not one of the
-  // three pm->build-entry gates named in EDGE_CHECKED_CODES). armCondition is
-  // NOT allowlisted: it names the real camelCase checkSourceCredibility(...)
-  // predicate call, which appears literally in tools/handoff-orchestrator.ts,
-  // so it is mechanically checked (armConditionCheckable) like every other
-  // orchestrator-producer entry. (e4-design-source-credibility-gate)
+  // SOURCE_CREDIBILITY_UNVERIFIED: triggerEdge has a real edge pair but is not in
+  // triggerEdgeCheckable (no cap literal, not a pm->build entry gate). armCondition is checked
+  // mechanically via checkSourceCredibility(...), so it is not allowlisted. (e4-design-source-credibility-gate)
   { code: "SOURCE_CREDIBILITY_UNVERIFIED", field: "triggerEdge", reason: "role:Status edge pair present but not in triggerEdgeCheckable (not a CAP_BY_CODE numeric literal, not one of the three pm->build-entry gates in EDGE_CHECKED_CODES)" },
-  // AC_EXECUTION_LOG_MISSING's triggerEdge ("status=PASS with
-  // completed_tasks, spec has >=1 proof: AC, ## AC Execution Log absent") is
-  // free English: no CAP_BY_CODE numeric literal, no role:Status edge pair,
-  // not one of the three pm->build-entry gates in EDGE_CHECKED_CODES.
-  // armCondition is NOT allowlisted: it names the real camelCase
-  // hasProofAnnotatedAC(...) predicate call, which appears literally in
-  // tools/handoff-orchestrator.ts, so it is mechanically checked
-  // (armConditionCheckable) like every other orchestrator-producer entry.
-  // (e3-outcome-shaped-acceptance, T-E3-QA)
+  // AC_EXECUTION_LOG_MISSING: triggerEdge is free English (no cap literal, no edge pair).
+  // armCondition is checked mechanically via hasProofAnnotatedAC(...), so it is not allowlisted.
+  // (e3-outcome-shaped-acceptance)
   { code: "AC_EXECUTION_LOG_MISSING", field: "triggerEdge", reason: "free English precondition list (\"status=PASS with completed_tasks, spec has >=1 proof: AC, ## AC Execution Log absent\"), no CAP_BY_CODE numeric literal or role:Status edge pair" },
-  // LEASE_OVERRIDE_AUDIT_MISSING's triggerEdge ("any write while
-  // FEATURE_LEASE_HELD would fire, carrying lease_override:true (file-mode
-  // only)") is free English: no CAP_BY_CODE numeric literal, no role:Status
-  // edge pair, not one of the three pm->build-entry gates in
-  // EDGE_CHECKED_CODES. armCondition is NOT allowlisted: it names the real
-  // camelCase classifyLeaseOverride(...) predicate call, which appears
-  // literally in tools/handoff-orchestrator.ts, so it is mechanically checked
-  // (armConditionCheckable) like every other orchestrator-producer entry.
-  // (e10-lease-override)
+  // LEASE_OVERRIDE_AUDIT_MISSING: triggerEdge is free English. armCondition is checked
+  // mechanically via classifyLeaseOverride(...), so it is not allowlisted. (e10-lease-override)
   { code: "LEASE_OVERRIDE_AUDIT_MISSING", field: "triggerEdge", reason: "free English precondition (\"any write while FEATURE_LEASE_HELD would fire, carrying lease_override:true (file-mode only)\"), no CAP_BY_CODE numeric literal or role:Status edge pair" },
-  // BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE's triggerEdge
-  // ("bookkeeping_write:true whose active_feature differs from the
-  // incumbent's (file-mode only)") is free English: no CAP_BY_CODE numeric
-  // literal, no role:Status edge pair. armCondition is NOT allowlisted: it
-  // contains the real camelCase "prevState" identifier, which appears
-  // literally in tools/handoff-orchestrator.ts, so it is mechanically checked
-  // (armConditionCheckable) like every other orchestrator-producer entry.
-  // (e10-lease-override)
+  // BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE: triggerEdge is free English. armCondition is checked
+  // mechanically (the prevState identifier), so it is not allowlisted. (e10-lease-override)
   { code: "BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE", field: "triggerEdge", reason: "free English precondition (\"bookkeeping_write:true whose active_feature differs from the incumbent's (file-mode only)\"), no CAP_BY_CODE numeric literal or role:Status edge pair" },
-  // STAMP_PROVENANCE_SUSPECT's triggerEdge ("any write while the on-disk
-  // handoff last_updated matches the hand-authored stamp shape (file-mode
-  // only)") is free English: no CAP_BY_CODE numeric literal, no role:Status
-  // edge pair, not one of the three pm->build-entry gates in
-  // EDGE_CHECKED_CODES. armCondition is NOT allowlisted: it names the real camelCase
-  // isHandAuthoredStamp(...)/hasStampRemediationAudit(...)/prevState identifiers, which
-  // appear literally in tools/handoff-orchestrator.ts, so it is mechanically checked
-  // (armConditionCheckable) like every other orchestrator-producer entry.
+  // STAMP_PROVENANCE_SUSPECT: triggerEdge is free English. armCondition is checked mechanically
+  // via isHandAuthoredStamp(...) and hasStampRemediationAudit(...), so it is not allowlisted.
   // (e18-write-provenance)
   { code: "STAMP_PROVENANCE_SUSPECT", field: "triggerEdge", reason: "free English precondition (\"any write while the on-disk handoff last_updated matches the hand-authored stamp shape (file-mode only)\"), no CAP_BY_CODE numeric literal or role:Status edge pair" },
-  // QA_COMPLETION_EVIDENCE_MISSING's triggerEdge contains a real role:Status
-  // edge pair ("code-reviewer:In_Progress -> qa-engineer:In_Progress"), but it
-  // is not in triggerEdgeCheckable (no CAP_BY_CODE numeric literal, not one of
-  // the three pm->build-entry gates in EDGE_CHECKED_CODES), the same case as
-  // REPRO_MANIFEST_MISSING/SOURCE_CREDIBILITY_UNVERIFIED above.
-  // armCondition is NOT allowlisted: it names the real camelCase hasEvidenceInFile(...)
-  // predicate call, which appears literally in tools/handoff-orchestrator.ts, so it is
-  // mechanically checked (armConditionCheckable) like every other orchestrator-producer
-  // entry. (e18-write-provenance)
+  // QA_COMPLETION_EVIDENCE_MISSING: triggerEdge has a real edge pair but is not in
+  // triggerEdgeCheckable (same case as REPRO_MANIFEST_MISSING). armCondition is checked
+  // mechanically via hasEvidenceInFile(...), so it is not allowlisted. (e18-write-provenance)
   { code: "QA_COMPLETION_EVIDENCE_MISSING", field: "triggerEdge", reason: "role:Status edge pair present (code-reviewer:In_Progress -> qa-engineer:In_Progress) but not in triggerEdgeCheckable (no CAP_BY_CODE numeric literal, not one of the three pm->build-entry gates); the \"(file-mode only)\" qualifier and set-difference precondition are free English" },
-  // Same two reasons and same shape as REVIEWER_COMPLETED_TASKS_REJECTED
-  // above, because NON_QA_COMPLETED_TASKS_REJECTED is the sibling branch of
-  // that same check (one step, two codes). (E40)
-  // triggerEdge is free English ("any write whose agent_id is present,
-  // is NOT qa-engineer, and is NOT code-reviewer, carrying non-empty
-  // completed_tasks") — no role:Status edge pair or CAP_BY_CODE numeric
-  // literal. armCondition ("agent_id present && agent_id !== \"qa-engineer\"
-  // && agent_id !== \"code-reviewer\" && completed_tasks.length > 0") is
-  // snake_case field-name shorthand, not a camelCase predicate/function-call
-  // literal, so extractPredicateNames() (CAMEL_RE) finds nothing to check.
+  // Sibling of REVIEWER_COMPLETED_TASKS_REJECTED (one check, two codes), so the same two reasons:
+  // triggerEdge is free English, and armCondition is snake_case shorthand, so CAMEL_RE finds
+  // nothing to check. (E40)
   { code: "NON_QA_COMPLETED_TASKS_REJECTED", field: "triggerEdge", reason: "free English, no checkable literal — same shape as REVIEWER_COMPLETED_TASKS_REJECTED, its sibling branch" },
   { code: "NON_QA_COMPLETED_TASKS_REJECTED", field: "armCondition", reason: "snake_case field-name shorthand, not a camelCase predicate/function-call literal — same shape as REVIEWER_COMPLETED_TASKS_REJECTED, its sibling branch" },
 ];

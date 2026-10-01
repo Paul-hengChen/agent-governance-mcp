@@ -141,3 +141,32 @@ Tickets: E96. A host system-prompt nudge is not a reason to fall back to in-cont
 3. `t-fallback-genuine-unavailability` and `t-fallback-self-contained`: coord-03's fallback is conditioned on genuine tool unavailability (host advertises no Task, or the Task call errors or reports unknown subagent types); it is self-contained, with no "above" pointer into coord-02, since a reader of the lean profile would see a pointer with nothing to point at (C2); and the bare, unqualified "graceful and silent" wording is gone, because a silent fallback is the defect itself.
 
 Each test searches for the shape of the guarantee (host-tag placement, self-containment, absence of the retired unqualified phrase) rather than the exact sentence, so a rewording that preserves the guarantee keeps passing and one that breaks it fails.
+
+## test/error-code-contract.test.mjs
+
+Spec: specs/gate-registry-architecture.md (A10, A2, A5, AC-1, AC-5). The file imports the real `GATE_REGISTRY` and `ALL_GATE_CODES` from the built gates/registry.ts, the single structured source of truth, and checks that:
+
+- the registry's code set equals the codes harvested from source by the shared shape rule;
+- the codes harvested from docs (backtick tokens) are a subset of the registry;
+- every `documentedInProse` entry appears in at least one content/*.md file;
+- each entry is self-consistent (`hintStatic` non-empty, `errorCode` literally present in its producer file).
+
+A code added in one place but not the others fails here. `TransitionRejection["error"]` in tools/transitions.ts is a hand-written union, deliberately not generated from the registry (DR-8); the union is pinned to an exact member count and must be a subset of `ALL_GATE_CODES`. The file depends on a built tree (AC-7); `npm test`'s prebuild step guarantees `dist/`.
+
+The round-cap constants (`ROUND_CAP_EXPORTED` and the review, visual and hop siblings) are imported so the `>= N` literals in `triggerEdge` are checked against the live transitions.ts values rather than trusted as hand-copied prose (c12-registry-field-consumers, d2-server-brake-accounting).
+
+The shape-rule suffix list grew one suffix per gate whose final word was missing; the spec-mandated code names are fixed, so the suffix is added instead of renaming the code:
+
+- `UNRESOLVED`: EXTERNAL_REFS_UNRESOLVED (b8-external-ref-ledger)
+- `MISMATCH`: REVIEW_VERDICT_STATUS_MISMATCH (c9-protocol-fields)
+- `HELD`: FEATURE_LEASE_HELD (e1-feature-scoped-state-design)
+- `CHANGE`: BOOKKEEPING_WRITE_INVALID_FEATURE_CHANGE (e10-lease-override)
+- `SUSPECT`: STAMP_PROVENANCE_SUSPECT (e18-write-provenance)
+
+Code-side source set: index.ts, tools/*.ts, schema/*.ts, guards/*.ts and gates/*.ts (the `listFiles("tools", ".ts")` glob does not reach gates/, so it is added explicitly).
+
+The newest registry entry at the time of the count pin was NON_QA_COMPLETED_TASKS_REJECTED (E40), which extends the reviewer-only `completed_tasks` check to every identity other than qa-engineer. The union membership notes: HOP_CAP_EXCEEDED is emitted by validateTransition's hop-cap override (same class as the three round-cap codes), hence also in `TRANSITION_GATE_CODES`; EXTERNAL_REFS_UNRESOLVED, FEATURE_LEASE_HELD and SOURCE_CREDIBILITY_UNVERIFIED are orchestrator-only and are in the union for narrowing at the emit site, the subset check and a complete catalog (DR-9, DR-3).
+
+## test/eval-assertions.test.mjs
+
+Spec: specs/d4-behavioral-eval-harness.md. The live runner (test/eval/run-eval.mjs) trusts the four checkers' verdicts against real model replies and spends real API dollars per run. If a checker silently regresses (for example the terse-cap exemption list drifts from Constitution section 1, or the escalation-shape key list drops a required key), the harness either fails compliant scenarios, burning budget on false negatives, or passes a real behavioural regression. This file proves each checker still does what its AC claims, with one compliant and one violating hand-written fixture per checker, before anything is spent trusting it. The file matches the `test/*.test.mjs` glob so it runs in plain `npm test` at zero API cost (AC-6).

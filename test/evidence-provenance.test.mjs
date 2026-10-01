@@ -1,16 +1,9 @@
 // Coded by @qa-engineer
-// Tests for the v3.38.0 baseline-provenance gate (qa-visual-baseline-provenance):
-//   parseVisualProvenanceRows(content)          — pure parser (AC-9)
-//   checkVisualProvenance(workspacePath, ids)    — composition helper (AC-1..AC-6)
-//
-// AC coverage map:
-//   AC-1: diffed surface missing baseline:             → flagged
-//   AC-2: diffed surface missing diff-metric:          → flagged
-//   AC-3: carry-forward surface                        → exempt
-//   AC-4: B1 tool unavailable — LLM fallback           → satisfies diff-metric
-//   AC-6: D2 presence-gated opt-in (zero baseline lines → gate dormant)
-//   AC-9: pure function — same input, same output, no I/O
-//   D1:   placeholder blacklist + emphasis-strip
+// Tests the baseline-provenance gate: parseVisualProvenanceRows(content), a pure parser, and
+// checkVisualProvenance(workspacePath, ids), the composition helper. Covers missing baseline or
+// diff-metric, carry-forward exemption, the LLM fallback, the presence-gated opt-in and the
+// placeholder blacklist.
+// Spec: specs/qa-visual-baseline-provenance.md.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
