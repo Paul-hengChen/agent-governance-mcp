@@ -6,3 +6,5 @@
 {"ts":"2026-10-01T09:02:00.854Z","feature":"e260f","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
 {"ts":"2026-10-01T09:31:00.712Z","feature":"e260f","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
 {"ts":"2026-10-01T09:32:19.916Z","feature":"e260f","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-10-01T09:33:01.745Z","feature":"e260f","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-01T09:40:58.293Z","feature":"e260f","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
