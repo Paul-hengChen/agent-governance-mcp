@@ -1,32 +1,9 @@
 // Coded by @sr-engineer
-// AC-Execution-Log gate predicates: a spec that declares `proof:` commands
-// cannot PASS until QA has logged running them (E3, AC4/AC5).
-// Structural twin of gates/expected-red.ts: arm by parsing a workspace file's
-// content (specs/<feature>.md declares >= 1 `proof:`-annotated AC), clear by a
-// `## AC Execution Log` H2 disposition in qa_reports/review_<id>.md recording
-// qa-engineer's Phase 3.5 per-AC proof runs (command + raw output/exit code +
-// pass/fail verdict, skill-qa-engineer).
-//
-// Trust boundary (spec AC4 / Out of Scope): the server checks EXISTENCE only —
-// >= 1 line-leading `proof:` in the spec (arm), disposition H2 present (clear).
-// It never executes the logged commands, never parses pass/fail out of stdout,
-// and never judges the proofs truthful; that stays with qa-engineer /
-// code-reviewer, the same division of labor as EXPECTED_RED_DIFF_MISSING /
-// VISUAL_EVIDENCE_MISSING.
-//
-// Arm detection (architecture Decision b): parse specs/<feature>.md — NO
-// handoff schema field, NO v13 bump. Every E-series arm precedent
-// (gates/visual.ts mode, gates/expected-red.ts manifest) arms by reading a
-// workspace file derived from active_feature; this gate follows it. Specs
-// written before this gate existed carry zero `proof:` lines → { armed: false
-// }, zero-cost dormant (AC5).
-//
-// Registry linkage: the AC_EXECUTION_LOG_MISSING hint is emitted at the
-// orchestrator emit site via gate("AC_EXECUTION_LOG_MISSING").hintStatic
-// (DR-2 pattern); these predicates return typed results only, so no registry
-// import is added here. FILE-MODE ONLY: the orchestrator guards the call site
-// with `storage instanceof FileHandoffStorage` — SQLite/HTTP mode has no
-// qa_reports/ file convention to hang the disposition off of.
+// AC-Execution-Log gate predicates: a spec that declares `proof:` commands cannot
+// PASS until QA logs running them under a `## AC Execution Log` H2 in
+// qa_reports/review_<id>.md. Arms on the spec file, not a handoff field. Checks
+// existence only: never runs the commands or judges their output. File mode only.
+// Design: specs/e3-outcome-shaped-acceptance-architecture.md.
 import * as fs from "fs";
 import * as path from "path";
 import { sliceH2SectionAt, buildCoverageIndex } from "../tools/evidence-file.js";
@@ -75,19 +52,12 @@ export function hasProofAnnotatedAC(workspacePath, activeFeature) {
     }
     return { armed: PROOF_LINE_RE.test(content), specPath };
 }
-// Disposition check (AC4, Decision c — per-feature, at-least-one-across-ids):
-// true iff AT LEAST ONE candidate review file for the ids being PASS'd
-// contains a `## AC Execution Log` H2. Candidates per id: the direct
-// qa_reports/review_<id>.md; else — lazily, on the first direct-file miss
-// only (the hasEvidenceInFile precedent) — the file covering the id via the
-// `covers:` label-line index (C3). "At least one across all ids" (not per-id):
-// the proofs describe the SPEC, so QA runs them once per round and one
-// recorded log covers every id in the round — a per-id requirement would
-// force QA to duplicate the same log N times. Verbatim clone of
-// hasExpectedRedDisposition's traversal. Never throws (fs errors → file
-// skipped). The heading match is evidence-schema-keyed (E23 D2) — pin 1 replays
-// the legacy exact anchor; pin >=2 or absent uses normalized-contains, so
-// `## Phase 3.5 — AC Execution Log` (the 104447-F0 incident heading) clears.
+// Disposition check: true iff at least one candidate review file for the ids
+// being PASS'd has a `## AC Execution Log` H2. Candidate per id: the direct
+// qa_reports/review_<id>.md, else (lazily, on first miss) the file that lists the
+// id in a `covers:` line. One log per round covers every id, because the proofs
+// describe the spec. The heading match follows the evidence-schema pin. Never
+// throws (fs errors skip the file). Same traversal as hasExpectedRedDisposition.
 export function hasAcExecutionLogDisposition(workspacePath, taskIds, evidenceSchema) {
     let coverage = null;
     const checked = new Set();

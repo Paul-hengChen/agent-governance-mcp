@@ -1,27 +1,10 @@
 // Coded by @sr-engineer
-// Expected-Red Diff gate predicates: tests left red on purpose must be
-// declared up front and dispositioned by QA (C15, AC-4). Third
-// member of the evidence-existence gate family (MISSING_EVIDENCE /
-// MISSING_REVIEW_EVIDENCE): sr-engineer declares intentionally-red tests in a
-// feature-scoped plain-text manifest (qa_reports/expected-red_<feature>.txt,
-// `<relative test file path> | <exact test name>` per line, blank/`#` lines
-// are comments); qa-engineer diffs it against the actual suite run (Phase 0.5,
-// skill-qa-engineer) and records the disposition under a `## Expected-Red
-// Diff` H2 in qa_reports/review_<id>.md.
-//
-// Trust boundary (spec AC-4 "Scope of the machine check"): the server checks
-// EXISTENCE only — manifest file present (arm), disposition H2 present
-// (clear). It never parses the manifest's rows and never runs the test suite;
-// diff-content correctness stays with qa-engineer / code-reviewer (AC-2 /
-// AC-3), the same division of labor as MISSING_EVIDENCE trusting the review
-// file's contents.
-//
-// Registry linkage: the EXPECTED_RED_DIFF_MISSING hint is emitted at the
-// orchestrator emit site via gate("EXPECTED_RED_DIFF_MISSING").hintStatic
-// (DR-2 pattern); these predicates return typed results only, so no registry
-// import is added here. FILE-MODE ONLY (AC-5): the orchestrator guards the
-// call site with `storage instanceof FileHandoffStorage` — SQLite/HTTP mode
-// has no qa_reports/ file convention to hang the manifest off of.
+// Expected-Red Diff gate predicates: sr-engineer lists tests left red on purpose
+// in qa_reports/expected-red_<feature>.txt (`<test file> | <test name>` per
+// line); QA records its diff against the suite run under a `## Expected-Red
+// Diff` H2 in qa_reports/review_<id>.md. Existence only: the manifest arms, the
+// H2 clears; rows are never parsed and tests never run. File mode only.
+// Spec: specs/c15-expected-red-manifest.md.
 
 import * as fs from "fs";
 import * as path from "path";
@@ -68,15 +51,11 @@ export function hasExpectedRedManifest(
   return { present: fs.existsSync(manifestPath), manifestPath };
 }
 
-// Disposition check (AC-4): true iff AT LEAST ONE candidate review file for
-// the ids being PASS'd contains a `## Expected-Red Diff` H2. Candidates per
-// id: the direct qa_reports/review_<id>.md; else — lazily, on the first
-// direct-file miss only (the hasEvidenceInFile precedent) — the file covering
-// the id via the `covers:` label-line index (C3). "At least one across all
-// ids" (not per-id): QA runs ONE suite-wide diff per round because the
-// manifest is feature-scoped, so one recorded disposition covers every id in
-// the round — a per-id requirement would force QA to duplicate the same diff
-// N times. Never throws (fs errors → file skipped).
+// Disposition check: true iff at least one candidate review file for the ids
+// being PASS'd has a `## Expected-Red Diff` H2. Candidate per id: the direct
+// qa_reports/review_<id>.md, else (lazily, on first miss) the file that lists the
+// id in a `covers:` line. The manifest is feature-scoped, so one diff per round
+// covers every id. Never throws (fs errors skip the file).
 export function hasExpectedRedDisposition(
   workspacePath: string,
   taskIds: string[],

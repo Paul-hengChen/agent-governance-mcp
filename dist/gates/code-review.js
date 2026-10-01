@@ -1,16 +1,9 @@
 // Coded by @sr-engineer
-// Code-review-evidence gate predicates (A2 split — verbatim relocation from
-// tools/evidence-file.ts, no behavior change). Parallel to gates/qa-review.ts
-// but over <workspace>/review_reports/review_<task_id>.md. A per-id file's
-// existence is sufficient for hasCodeReviewEvidenceInFile(); when a per-id
-// file is absent, a lazy `covers:` label-line fallback (C3)
-// lets one covering report satisfy additional ids — see parseCoversIds /
-// buildCoverageIndex in tools/evidence-file.ts (gate-agnostic plumbing).
-//
-// Registry linkage: the code-review-evidence gate (MISSING_REVIEW_EVIDENCE)
-// emits its hint at the orchestrator emit site via
-// gate("MISSING_REVIEW_EVIDENCE").hintStatic (DR-2). These predicates return
-// present/missing data only, so no registry import is added here.
+// Code-review evidence gate predicates over review_reports/review_<task_id>.md,
+// the parallel of gates/qa-review.ts. A per-id file's existence is enough; when
+// it is absent, a lazy `covers:` fallback lets one covering report satisfy
+// other ids (parseCoversIds / buildCoverageIndex in tools/evidence-file.ts).
+// Spec: specs/c3-covering-evidence.md.
 import * as fs from "fs";
 import * as path from "path";
 import { buildCoverageIndex } from "../tools/evidence-file.js";
