@@ -1,28 +1,9 @@
 // Coded by @qa-engineer
-// Tests for how PRD RAG chunks are rendered into prompts (specs/e137-render-sanitise.md
-// AC10, T-E137-03 / T-E137-06): appendSpecContext renders SQLite PRD RAG chunks
-// through the SAME shared render boundary (lib/render-boundary.ts renderDataBlock)
-// as the state block.
-//
-// WHY: PRD chunks are the threat model's named vector — retrieved markdown
-// that can legitimately contain its own fenced code blocks and imperative
-// prose ("run the migration", "ignore the old flow"). Before the shared boundary (E137) the chunks
-// were concatenated under the heading as raw top-level markdown, so a chunk's
-// imperative sentence was indistinguishable from authored SOP text and a
-// chunk's fence line could restructure the prompt. The contract pinned here:
-// heading kept verbatim, then the spec.envelope label, then ONE adaptive
-// fence whose content is the chunk text byte-for-byte (no escaping, no
-// truncation — the PRD must stay readable). Persuasion by the chunk's wording
-// is the declared residue, not tested.
-//
-// Spec-to-Test map:
-//   AC10 (chunk text is fenced, labelled and uses an adaptive fence) ->
-//           "spec context: chunk text fenced + labelled, adaptive fence"
-//           + "spec context: fence adapts past the longest chunk run"
-//           + "spec context: no chunks → prompt unchanged (no empty block)"
-// The regression half of AC10 (test/rag.test.mjs, test/rag-lifecycle.test.mjs
-// pass UNMODIFIED) is proven by running those files; see the AC Execution Log
-// in qa_reports/review_T-E137-05.md.
+// Tests for how PRD RAG chunks render into prompts (specs/e137-render-sanitise.md AC10): appendSpecContext renders SQLite PRD chunks through the
+// shared boundary (lib/render-boundary.ts renderDataBlock) as the state block does. Chunks are retrieved markdown that may hold fences and imperative
+// prose, so the contract is: heading verbatim, the spec.envelope label, then one adaptive fence holding the chunk text byte-for-byte (no escaping or truncation).
+// Persuasion by a chunk's wording is the declared residue, not tested. AC10's regression half is test/rag.test.mjs and test/rag-lifecycle.test.mjs passing unmodified.
+// Rationale: specs/e260f-comment-rationale.md (test/e137-rag-render.test.mjs).
 
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
