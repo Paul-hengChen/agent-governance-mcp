@@ -10,7 +10,7 @@ Blocks of 8 to 20 counted lines that stay in the code, each with a one-line reas
 
 | file | line at HEAD | counted | reason |
 |---|---|---|---|
-| — | — | — | none yet: filled in as tasks land |
+| — | — | — | none: every long block was cut to 7 counted lines or fewer |
 
 ## test/e31-config-nonfatal.test.mjs
 
