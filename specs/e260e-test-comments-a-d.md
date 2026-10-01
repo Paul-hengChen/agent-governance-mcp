@@ -1,11 +1,11 @@
 # e260e-test-comments-a-d
 
-Lane `e260e` of the E260 fan-out (wave 2, tests; shared rules in `specs/fanout-e260.md`, not restated here). Ticket E260. Task ids `T-E260E-01..06`. Base commit `bdbffaf`. Scope: comments only in the 28 owned test files listed below. Only qa-engineer edits `test/` (constitution section 2); the chain is the test-lane hand-off in the fan-out spec (qa authors, `qa-engineer:Blocked` = authoring done, pm, code-reviewer with `resume_of`, fresh Task-dispatched qa verifier writes PASS). No sr-engineer hop.
+Lane `e260e` of the E260 fan-out (wave 2, tests; shared rules in `specs/fanout-e260.md`, not restated here). Ticket E260. Task ids `T-E260E-12..11`. Base commit `bdbffaf`. Scope: comments only in the 28 owned test files listed below. Only qa-engineer edits `test/` (constitution section 2); the chain is the test-lane hand-off in the fan-out spec (qa authors, `qa-engineer:Blocked` = authoring done, pm, code-reviewer with `resume_of`, fresh Task-dispatched qa verifier writes PASS). No sr-engineer hop.
 
 ## Problem Statement
-The owned test files carry long comment blocks written before the Comment discipline rule: 59 blocks of 8 or more counted lines across 27 of the 28 files (45 of 8–20 lines, 14 over 20, longest 53 in `test/agc-feature-lifecycle.test.mjs`). They bury the test intent and drift from the code. This lane trims them to the E260 threshold, moves rationale still worth keeping to a tracked spec, and proves by machine that nothing but comments changed.
+The owned test files carry long comment blocks written before the Comment discipline rule: 59 blocks of 8 or more counted lines across 26 of the 28 files (45 of 8–20 lines, 14 over 20, longest 53 in `test/agc-feature-lifecycle.test.mjs`). They bury the test intent and drift from the code. This lane trims them to the E260 threshold, moves rationale still worth keeping to a tracked spec, and proves by machine that nothing but comments changed.
 
-Measurement note for the integrator: the fan-out table says 22 files, 41 mid blocks, 13 long blocks. Re-measured at base with the same counter (`analyzeText`, `dist/tools/comment-scan.js`), the 22 `test/{a,b,d,ch,com,conf,cons,cov,cu}*.test.mjs` files give exactly 41 and 13; the six `test/_*` helpers (named in the same Scope line) add 5 files with blocks (4 mid, 1 over 20, 28 files in all). This spec covers all 28; the totals above include the helpers.
+Measurement note: the fan-out table says 22 files, 41 mid blocks, 13 long blocks. That left out the six `test/_*` helpers (integrator measuring error, confirmed in pre-review). Re-measured at base with the same counter (`analyzeText`, `dist/tools/comment-scan.js`), the 22 test files give 41 and 13 and the helpers add 4 mid and 1 over 20, so the owned set is 28 files, 26 of them with a long block (`test/_lock-worker.mjs` and `test/config-versioning.test.mjs` have none), 45 blocks of 8–20 lines and 14 over 20. All six helpers are in scope.
 
 ## User Stories
 - As a maintainer reading a test, I want a short comment that says what it checks and why, so that I can find the intent without a page of history.
@@ -35,6 +35,8 @@ All commands run from the lane worktree root. `BASE` = `bdbffaf` (also in `.curr
   proof: `node .current/e260e/proof.mjs` prints `form: ok`.
 - **AC10 (suite green)**: Given the final HEAD with a clean committed tree, when the full suite runs, then it passes. A red test is reported to the coordinator and integrator, never re-baselined.
   proof: `git status --porcelain | wc -l` prints `0`, then `node scripts/test-lock.mjs -- npm test` exits 0.
+- **AC12 (the proof script is inspected, not trusted)**: Given `.current/e260e/proof.mjs` is the evidence for AC1–AC9 and AC11, when the code-reviewer and the fresh qa verifier work, then each reads the script itself (what it compares, which files it covers, what its exit code means) and records in the review/QA report that they did, rather than accepting its `proof: PASS` on trust. A script weakness is a finding.
+  proof: the reviewer's `review_reports/review_T-E260E-NN.md` and the verifier's QA report each state what was checked in `proof.mjs` (judgment, no single command).
 - **AC11 (whole-lane proof)**: Given the final HEAD, `node .current/e260e/proof.mjs` prints `proof: PASS` and exits 0.
   proof: `node .current/e260e/proof.mjs; echo "exit=$?"` ends `proof: PASS` and `exit=0`.
 
@@ -63,7 +65,7 @@ All commands run from the lane worktree root. `BASE` = `bdbffaf` (also in `.curr
 Wave 1 merged (base `bdbffaf` is after it). Shared artefacts that only one lane may touch (`content/**`, goldens, `test/context-budget.test.mjs`) are untouched here; a red test there is reported, not fixed.
 
 ### Measurement at base (re-run, same counter as `agc check`)
-Method: `analyzeText` from `dist/tools/comment-scan.js` over `git ls-files test` restricted to the owned globs (`test/_*`, `test/{a,b,d}*.test.mjs`, `test/{ch,com,conf,cons,cov,cu}*.test.mjs`, top level only). Result: **28 files, 27 with a long block, 45 blocks of 8–20 counted lines, 14 over 20.** Ranges are physical lines at BASE, bracket is the counted size, `**` marks over 20. The proof script's `--list-mid` and `>20` output regenerates this table at any commit.
+Method: `analyzeText` from `dist/tools/comment-scan.js` over `git ls-files test` restricted to the owned globs (`test/_*`, `test/{a,b,d}*.test.mjs`, `test/{ch,com,conf,cons,cov,cu}*.test.mjs`, top level only). Result: **28 files, 26 with a long block, 45 blocks of 8–20 counted lines, 14 over 20.** Ranges are physical lines at BASE, bracket is the counted size, `**` marks over 20. The proof script's `--list-mid` and `>20` output regenerates this table at any commit.
 
 | file | long blocks | ranges at BASE (counted lines) |
 |---|---|---|
@@ -100,4 +102,18 @@ Method: `analyzeText` from `dist/tools/comment-scan.js` over `git ls-files test`
 `.current/e260e/proof.mjs` (PM-authored, same shape as the archived e260d script, adapted to `.mjs` test files; no sr-engineer needed). Flags: `--base <rev>`, `--changed-only` (per-task `>20` and `bare-id` scope), `--list-mid`. Checks: `scope`, `emit`, `tokens`, `directives`, `>20`, `bare-id`, `form`; prints `proof: PASS` or `proof: FAIL (...)`. At base it reports 0 changed files and fails only `>20` (14 blocks), which is the expected starting state.
 
 ### Task batches
-Each task ends with a commit whose title carries `E260E` and the task id. Per-task evidence: `node .current/e260e/proof.mjs --changed-only` output for the files of that task, appended to the qa authoring notes. The last task also runs the whole-lane proof. The full suite (AC10) runs once, on the committed final HEAD, by the verifier.
+Task size rule (integrator pre-review): at most 5 files per task and about 300 counted comment lines per task (all comment blocks of the file counted, not only the long ones; a file over 300 splits by line range). Counts are `analyzeText` totals at base; "long" = lines inside the 8-or-more blocks that must change. `test/_lock-worker.mjs` and `test/config-versioning.test.mjs` have no long block and no task. Each trim task closes **AC1, AC2, AC3, AC5, AC6, AC7, AC8, AC9** for its own files; per-task evidence is `node .current/e260e/proof.mjs --changed-only` output in the qa authoring notes, and each task ends with a commit whose title carries `E260E` and the task id. T-E260E-22, the last authoring task, additionally closes **AC4, AC10, AC11** (whole-lane proof, then the full suite on the clean committed HEAD) before qa writes `qa-engineer:Blocked`; the fresh verifier re-runs both independently, and AC12 applies to the reviewer and the verifier.
+
+| task | files | counted comment lines (long / total) | closes |
+|---|---|---|---|
+| T-E260E-12 | the 5 `test/_e123b9-*.mjs` helpers | 87 / 94 | AC1–3, 5–9 |
+| T-E260E-13 | `compose-equivalence`, `config-cache`, `dependency-overrides`, `drift-stamp-advisory` (`.test.mjs`) | 102 / 189 | AC1–3, 5–9 |
+| T-E260E-14 | `ac-execution`, `agc-feature-finish-history` | 116 / 220 | AC1–3, 5–9 |
+| T-E260E-15 | `agc-feature-lifecycle`, `constitution-deliverable-guard` | 91 / 269 | AC1–3, 5–9 |
+| T-E260E-16 | `baseline-manifest-gate`, `covering-evidence` | 79 / 255 | AC1–3, 5–9 |
+| T-E260E-17 | `agc-adapters` lines 1–749 (blocks at L1, L464, L618) | 46 / 196 | AC1–3, 5–9 |
+| T-E260E-18 | `agc-adapters` lines 750–end (blocks L759 to L1118) | 115 / 148 | AC1–3, 5–9 |
+| T-E260E-19 | `check-md-tables`, `check-version` | 203 / 279 | AC1–3, 5–9 |
+| T-E260E-20 | `cut-approval-gate`, `design-auditor-volume-guard` | 94 / 280 | AC1–3, 5–9 |
+| T-E260E-21 | `dispatch-log`, `dispatch-mechanism`, `dispatch-pins`, `drift-archived-tasks` | 73 / 273 | AC1–3, 5–9 |
+| T-E260E-22 | `drift-baseline`, `drift-skew`; then whole-lane proof and full suite | 40 / 111 | AC1–3, 5–9, plus AC4, AC10, AC11 |
