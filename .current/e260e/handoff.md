@@ -2,16 +2,17 @@
 schema_version: 15
 active_feature: "E260E"
 status: "In_Progress"
-last_updated: "2026-10-01T08:43:46.522Z"
+last_updated: "2026-10-01T08:46:42.954Z"
 last_agent: "pm"
 scope_decision: "single-feature"
+cut_approved: true
 dispatch_pins:
   sr-engineer: "fable"
 evidence_schema: 2
 next_role: "qa-engineer"
-dispatched_at: "2026-10-01T08:43:46.522Z"
-dispatch_mechanism: "task"
-dispatch_mechanism_tier: "sonnet"
+dispatched_at: "2026-10-01T08:46:42.954Z"
+dispatch_mechanism: "inline"
+dispatch_mechanism_tier: "opus"
 qa_round: 0
 review_round: 0
 visual_round: 0
@@ -26,7 +27,8 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- PM re-cut per integrator pre-review (to-lane#1): tasks T-E260E-12..22 (01-11 voided, ids not reusable), <=5 files and <=~300 counted comment lines each, AC map per task, AC10/AC11/AC4 in last task T-E260E-22, AC12 proof.mjs inspection by reviewer and verifier. Awaiting human cut approval; coordinator sets cut_approved.
+- Cut approved by the human in the coordinator session (2026-10-01) after integrator pre-review passed at f70d66c (to-lane#2 close). Coordinator wrote cut_approved on the PM tuple.
+- Next: qa-engineer authors T-E260E-12..22 per specs/e260e-test-comments-a-d.md, then writes qa-engineer:Blocked (authoring done) -> pm -> code-reviewer (resume_of) -> fresh Task qa verifier PASS.
 - Owned set 28 files / 26 with a long block / 45 mid / 14 over 20.
 
 ---
