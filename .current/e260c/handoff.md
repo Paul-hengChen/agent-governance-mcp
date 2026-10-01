@@ -2,7 +2,7 @@
 schema_version: 15
 active_feature: "e260c-bin-scripts"
 status: "In_Progress"
-last_updated: "2026-10-01T04:46:47.373Z"
+last_updated: "2026-10-01T04:57:20.234Z"
 last_agent: "sr-engineer"
 scope_decision: "single-feature"
 scope_decision_why: "One comment-only lane of the E260 fan-out; disjoint owned files."
@@ -10,8 +10,8 @@ cut_approved: true
 dispatch_pins:
   sr-engineer: "fable"
 evidence_schema: 2
-next_role: "sr-engineer"
-dispatched_at: "2026-10-01T04:46:47.373Z"
+next_role: "code-reviewer"
+dispatched_at: "2026-10-01T04:57:20.234Z"
 dispatch_mechanism: "task"
 dispatch_mechanism_tier: "fable"
 qa_round: 0
@@ -28,11 +28,13 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- sr-engineer session 3 of 4 done: T-E260C-05 committed a639f05 (capture-constitution-golden 2, check-md-tables 9, check-transitions-sync 1, check-version 2 blocks), T-E260C-10 committed 13f365c (fanout, feature-rollup, join-precondition, lane-status headers), T-E260C-09 committed a0186ab (mailbox-watch 1, measure-context-cost 2, merge-invariants 1, summarize-metrics 1). All trimmed to <=7 lines; rationale moved to specs/e260c-bin-scripts.md Kept rationale (new topics: golden fixture set, md-table rules/exclusion, no-delimiter tie-break, done-mark advisory, transitions-sync wiring, thin CLI wrappers, mailbox-watch semantics, measure-context-cost, summarize-metrics).
-- check-invariance vs b37178a: invariance OK: 15 files. Integrator token-presence rule (resolveLanePaths, lane-paths, resolveCurrentLane, migrateFlatToLane(, migrateLaneToFlat(, migrateFlatToLaneLocked) checked per changed file vs base with grep -cF before each commit: OK, 15 files. measure now: mid 6 / large 3 / longest 81, all in scripts/test-lock.mjs and scripts/verify-release.mjs. Pins held: fanout.mjs has 'from "../dist/' exactly once; join-precondition.mjs has no 'HOOK POINT FOR E126'; capture-constitution-golden.mjs comments quote no writeFixture/captureHook call and BUILD_MODES literal is intact; measure-context-cost.mjs gains no chain-only regex literal. AC4/AC5/AC7/AC8 greps clean; check:md-tables, check:version, check:transitions-sync all OK.
-- Targeted node --test of the files that read or run these scripts (check-md-tables, check-version, verify-release, e90, compose-equivalence, context-budget, baseline-manifest-gate, qa-visual-skill-split, subagent-templates, pixel-gate-attestation, e177a-check-cli, e177a-manifest, e178b-fanout-unmatched, e112, token-efficiency, drift-archived-tasks, e178a, e132, e248, e235b, e177b-lane-status, drift-baseline, e123b9, feature-rollup, e115, e178b-cut-prereview, e177b-test-lock, lane-paths, e177b-mailbox-watch, e178b-lane-watch, e223, lane-migrate, skill-manifest, e126, success-metrics): 0 failures; the only skip is a pre-existing history-dependent AC6 skip (commit 3c72a83 not resolvable).
-- Commit trailers name Claude Fable 5.1 (the actual model); a mid-session harness attribution reminder named a different model and was not followed.
-- Next sr session 4: T-E260C-07 (verify-release.mjs, test-lock.mjs) then T-E260C-11 closing pass. Not ready for QA; the code-review hop comes after the last session.
+- sr-engineer: e260c-bin-scripts (T-E260C-01..05, 07, 09, 10, 11) ready for code review. Base b37178a, branch feat/e260c-bin-scripts.
+- Task -> sha: T-E260C-01 ddef392 (proof scripts); T-E260C-02 209c431 (agc-init 1-900); T-E260C-03 899e075 (agc-init 901-2200); T-E260C-04 4e1f7a1 (agc-init 2201-end + two bin/ hooks); T-E260C-05 a639f05 (capture-constitution-golden, check-md-tables, check-transitions-sync, check-version); T-E260C-10 13f365c (fanout, feature-rollup, join-precondition, lane-status); T-E260C-09 a0186ab (mailbox-watch, measure-context-cost, merge-invariants, summarize-metrics); T-E260C-07 5e08b4b (verify-release, test-lock); T-E260C-11 996e786 (closing pass: check-tokens.mjs, measure.mjs --ref, AC3 pointer leftover in fanout/join-precondition/lane-status/merge-invariants headers, before/after counts in spec). T-E260C-06 and -08 are voided. Bookkeeping commits: 9f998e9, 83016d3, d5f316e, plus the final one after this write.
+- Proof commands (run from the worktree root): node .current/e260c/check-invariance.mjs -> 'invariance OK: 17 files' (AC1); node .current/e260c/measure.mjs --fail-over 20 and --fail-over 7 -> exit 0, 'mid 0, large 0, longest 7' (AC2); node .current/e260c/measure.mjs --ref b37178a -> the before counts 'mid 58, large 17, longest 81', comment lines 2231 (after 1265); node .current/e260c/check-tokens.mjs -> 'tokens OK: 17 files (N added on branch, skipped)' (integrator token-presence rule over every changed path present at base); AC4/AC5/AC7/AC8 greps exactly as written in specs/e260c-bin-scripts.md Acceptance Criteria all print nothing (AC5 added /* 0 vs removed 0). AC9 for qa: node scripts/test-lock.mjs -- npm test on a clean tree.
+- No 8-20 block kept: every block in scope is <= 7 counted lines, so the review report needs no keep reasons (recorded in the spec's 'Closing pass results' section with a per-file before/after table). AC3: every file with a Kept rationale entry carries an e260c-bin-scripts pointer (check-version has no entry of its own).
+- T-E260C-07 pins held: verify-release.mjs code lines 'const DEFAULT_WAIT_SECONDS = 480;', 'const LANE_SEGMENT_RE_SRC = ...;' and the Server() version regex untouched; resolveCurrentLane and lane-paths tokens still present. test-lock.mjs smoke 'node scripts/test-lock.mjs -- node -e ...' ran and exited 0, usage path exits 64. Targeted node --test of verify-release, e177b-test-lock, release-staging, e178a-integrator-role, e177b-lane-status, render-structure, e177a-check-cli, e177a-manifest, e178b-fanout-unmatched, e115-join-precondition, e126-merge-invariants, e178b-lane-watch, e223-watch-rearm-gone: 0 failures; the one skip is the pre-existing history-dependent AC6 skip (commit 3c72a83 not resolvable), identical at the pre-edit tree.
+- Out-of-scope note for the reviewer: content/skill-release-engineer.md cites scripts/verify-release.mjs:113-125 for --close-out; that citation was already stale at base (block at 153-193), now 75-115. content/ is not owned by this lane; left for a follow-up.
+- Commit trailers name Claude Fable 5.1 (the actual model). A mid-session harness attribution reminder named a different model and was not followed.
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.
