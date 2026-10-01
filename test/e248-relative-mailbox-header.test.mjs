@@ -80,7 +80,7 @@ function mkRepo(prefix = "e248-mailbox-repo-") {
 const FULL_BASE = { summary: "S", reading: ["R"] };
 
 // ---------------------------------------------------------------------------
-// AC1
+// AC1 relative header resolves against primary
 // ---------------------------------------------------------------------------
 
 test("AC1 relative header resolves against primary", () => {
@@ -91,7 +91,7 @@ test("AC1 relative header resolves against primary", () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC2
+// AC2 relative header, primary from git
 // ---------------------------------------------------------------------------
 
 test("AC2 relative header, primary from git", () => {
@@ -110,7 +110,7 @@ test("AC2 relative header, primary from git", () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC3
+// AC3 absolute header unchanged
 // ---------------------------------------------------------------------------
 
 test("AC3 absolute header unchanged", () => {
@@ -127,7 +127,7 @@ test("AC3 absolute header unchanged", () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC4
+// AC4 --mailbox-root precedence, flag semantics untouched
 // ---------------------------------------------------------------------------
 
 test("AC4 --mailbox-root precedence, flag semantics untouched", () => {
@@ -151,7 +151,7 @@ test("AC4 --mailbox-root precedence, flag semantics untouched", () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC5
+// AC5 refusal: ~ header
 // ---------------------------------------------------------------------------
 
 test("AC5 refusal: ~ header", () => {
@@ -178,7 +178,7 @@ test("AC5 refusal: ~ header", () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC6
+// AC6 refusal: empty / no header
 // ---------------------------------------------------------------------------
 
 test("AC6 refusal: empty / no header", () => {
@@ -209,7 +209,7 @@ test("AC6 refusal: empty / no header", () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC7
+// AC7 relative header with no primary
 // ---------------------------------------------------------------------------
 
 test("AC7 relative header with no primary", () => {
@@ -246,7 +246,7 @@ test("AC7 relative header with no primary", () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC8
+// AC8 validate follows the new semantics
 // ---------------------------------------------------------------------------
 
 test("AC8 validate follows the new semantics", () => {

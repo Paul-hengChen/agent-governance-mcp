@@ -257,8 +257,7 @@ test("G3: the `exemptions` key is entirely ABSENT from the envelope when no mani
 // ============================================================================
 // Text checks on the const-05-core-standards.md §2 "Build-gate exemptions"
 // bullet, in the same text-search style as the other content checks;
-// token-budget effects live in test/context-budget.test.mjs. (P1-P5,
-// T-E24-03, T-E16)
+// token-budget effects live in test/context-budget.test.mjs. (P1-P5, T-E24-03, T-E16)
 // ============================================================================
 
 const CONST_05 = fs.readFileSync(path.join(ROOT, "content", "const-05-core-standards.md"), "utf-8");

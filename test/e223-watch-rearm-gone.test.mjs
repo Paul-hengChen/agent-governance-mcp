@@ -110,7 +110,7 @@ const baselineOf = (cmd) => {
 };
 
 // ---------------------------------------------------------------------------
-// AC1
+// AC1 gone key on start in the default set
 // ---------------------------------------------------------------------------
 
 test("AC1 gone key on start in the default set", async () => {
@@ -137,7 +137,7 @@ test("AC1 gone key on start in the default set", async () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC2
+// AC2 gone ordering
 // ---------------------------------------------------------------------------
 
 test("AC2 gone ordering", async () => {
@@ -169,7 +169,7 @@ test("AC2 gone ordering", async () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC3
+// AC3 gone keys are not carried
 // ---------------------------------------------------------------------------
 
 test("AC3 gone keys are not carried", async () => {
@@ -209,7 +209,7 @@ test("AC3 gone keys are not carried", async () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC4
+// AC4 --lanes unknown key stays a usage error
 // ---------------------------------------------------------------------------
 
 test("AC4 --lanes unknown key stays a usage error", async () => {
