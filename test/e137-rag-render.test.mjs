@@ -1,8 +1,9 @@
 // Coded by @qa-engineer
-// Tests for how PRD RAG chunks render into prompts (specs/e137-render-sanitise.md AC10): appendSpecContext renders SQLite PRD chunks through the
-// shared boundary (lib/render-boundary.ts renderDataBlock) as the state block does. Chunks are retrieved markdown that may hold fences and imperative
-// prose, so the contract is: heading verbatim, the spec.envelope label, then one adaptive fence holding the chunk text byte-for-byte (no escaping or truncation).
-// Persuasion by a chunk's wording is the declared residue, not tested. AC10's regression half is test/rag.test.mjs and test/rag-lifecycle.test.mjs passing unmodified.
+// Tests for how PRD RAG chunks render into prompts (specs/e137-render-sanitise.md AC10):
+// appendSpecContext fences SQLite PRD chunks via lib/render-boundary.ts renderDataBlock.
+// Contract: heading verbatim, the spec.envelope label, then one adaptive fence holding the
+// chunk text byte-for-byte (no escaping or truncation). AC10's regression half is
+// test/rag.test.mjs and test/rag-lifecycle.test.mjs passing unmodified.
 // Rationale: specs/e260f-comment-rationale.md (test/e137-rag-render.test.mjs).
 
 import { test, after } from "node:test";

@@ -1,8 +1,9 @@
 // Coded by @qa-engineer
-// Tests for tools/lane-registry.ts (specs/e132-lane-registry.md AC1-AC4, AC7-AC9) plus the tw_get_state wiring in tools/handoff-parse.ts.
-// AC5/AC6 and the localFallbackLaneList / computeFeatureRollup cases live in test/feature-rollup.test.mjs. Case names carry the spec AC or the
-// code-reviewer gap number (gap-4, gap-6, gap-7; review_reports/review_T-E132-04.md). Git is faked with real executable `git` shims prepended to PATH
-// (node:test mock.method cannot redefine ESM core-module exports); worktree fixtures are real temp dirs with real handoff files.
+// Tests for tools/lane-registry.ts (specs/e132-lane-registry.md AC1-AC4, AC7-AC9) plus the
+// tw_get_state wiring in tools/handoff-parse.ts. AC5/AC6 and the localFallbackLaneList /
+// computeFeatureRollup cases live in test/feature-rollup.test.mjs. Case names carry the
+// spec AC or the code-reviewer gap number (gap-4, gap-6, gap-7;
+// review_reports/archive/e115-join-precondition-check/review_T-E132-04.md).
 // Rationale: specs/e260f-comment-rationale.md (test/e132-lane-registry.test.mjs).
 
 import { test } from "node:test";
@@ -45,9 +46,10 @@ async function write(ws, opts) {
   });
 }
 
-/** A real, executable `git` that `cat`s a fixed JS-controlled byte sequence, so a test dictates the exact porcelain bytes (including CRLF)
- *  with no shell-escaping hazard. Warms the shim up with one throwaway call before returning: the first exec of a new script path costs 200ms+
- *  in this sandbox and would flake the 200ms-ceiling tests. A test-environment accommodation only. */
+/** A real, executable `git` that `cat`s a fixed JS-controlled byte sequence, so a test
+ *  dictates the exact porcelain bytes (including CRLF) with no shell-escaping hazard. Warms
+ *  the shim up with one throwaway call before returning: the first exec of a new script path
+ *  costs 200ms+ in this sandbox and would flake the 200ms-ceiling tests. */
 function fakeGitCat(content) {
   const binDir = fs.mkdtempSync(path.join(os.tmpdir(), "e132-fakegit-"));
   const dataPath = path.join(binDir, "porcelain.txt");
@@ -101,9 +103,10 @@ function withPath(binDir, fn) {
   }
 }
 
-// getLaneFeatureHistory scans live .current/<lane>/handoff.md plus closed .current/history/<YYYY-MM>/<lane>/handoff.md (e123b9 J2, spec AC7);
-// it no longer reads .current/archive/. Closed-lane fixtures are built directly, as the spec's proof text prescribes
-// (one live lane + two closed lanes across two history buckets).
+// getLaneFeatureHistory scans live .current/<lane>/handoff.md plus closed
+// .current/history/<YYYY-MM>/<lane>/handoff.md (e123b9 J2, spec AC7); it no longer reads
+// .current/archive/. Closed-lane fixtures are built directly, as the spec's proof text
+// prescribes (one live lane + two closed lanes across two history buckets).
 function writeHistoryLaneFixture(ws, yyyymm, lane, activeFeature, lastUpdated = "2026-01-01T00:00:00.000Z") {
   const dir = path.join(ws, ".current", "history", yyyymm, lane);
   fs.mkdirSync(dir, { recursive: true });
@@ -324,9 +327,11 @@ test("AC4: getLaneRegistrySummary never blocks or throws — returns null within
   assert.ok(elapsed < 2000, `expected to return well within the ceiling (git sleeps 5s), took ${elapsed}ms`);
 });
 
-// gap-6: the 200ms figure bounds only the git subprocess; the N per-lane parseHandoff reads on top are additive and not counted against it.
-// Padded completedTasks + min-of-3 trials: tiny handoff files parse so fast that jitter alone flaked a bare 2-vs-25 comparison (~4/15 runs);
-// padding makes each lane's parse heavy enough for an order-of-magnitude gap, and min-of-3 absorbs scheduling spikes. Only the fixture size changes.
+// gap-6: the 200ms figure bounds only the git subprocess; the N per-lane parseHandoff reads
+// on top are additive and not counted against it. Padded completedTasks + min-of-3 trials:
+// tiny handoff files parse so fast that jitter alone flaked a bare 2-vs-25 comparison
+// (~4/15 runs); padding makes each lane's parse heavy enough for an order-of-magnitude gap,
+// and min-of-3 absorbs scheduling spikes. Only the fixture size changes.
 test("gap-6: the ceiling bounds only the git subprocess — per-lane parseHandoff reads are additive on top of it (elapsed time scales with sibling-lane count, not flat)", async () => {
   const PADDING_TASKS = Array.from({ length: 8000 }, (_, i) => `T-PADDING-${i}`);
 
@@ -373,9 +378,11 @@ test("gap-6: the ceiling bounds only the git subprocess — per-lane parseHandof
   );
 });
 
-// gap-4 (sharpest): getLaneRegistrySummary must SKIP the lane-history scan entirely; that is the whole reason for a second entry point
-// beside laneRegistryList. Proven behaviourally (real sentinel + timing contrast), never by source-text inspection. The sentinel is a large
-// .current/history/<YYYY-MM>/ bucket of closed-lane subdirectories (e123b9 J2, spec AC7), the new expensive-to-scan target.
+// gap-4 (sharpest): getLaneRegistrySummary must SKIP the lane-history scan entirely; that
+// is the whole reason for a second entry point beside laneRegistryList. Proven
+// behaviourally (real sentinel + timing contrast), never by source-text inspection. The
+// sentinel is a large .current/history/<YYYY-MM>/ bucket of closed-lane subdirectories
+// (e123b9 J2, spec AC7), the new expensive-to-scan target.
 test("gap-4 (sharpest): getLaneRegistrySummary skips the lane-history scan entirely — laneRegistryList (the OTHER entry point) does not", async () => {
   const wsPlain = mkWs();
   await write(wsPlain, { activeFeature: "gap4-plain", hopCount: 1 });
@@ -383,9 +390,11 @@ test("gap-4 (sharpest): getLaneRegistrySummary skips the lane-history scan entir
   const wsSentinel = mkWs();
   await write(wsSentinel, { activeFeature: "gap4-sentinel", hopCount: 1 });
 
-  // Plant a LARGE, real, parseable history bucket as the sentinel (a real fixture; mock.method cannot intercept fs from compiled ESM). A history scan
-  // would grow wall-clock with subdir count, as laneRegistryList's does below; getLaneRegistrySummary must not.
-  // 3000 subdirs, not 1500: 1500 gave margins as tight as ~2.5x (page cache makes fresh buckets fast to scan) and flaked; 3000 gave 9-14x.
+  // Plant a LARGE, real, parseable history bucket as the sentinel (a real fixture;
+  // mock.method cannot intercept fs from compiled ESM). A history scan would grow
+  // wall-clock with subdir count, as laneRegistryList's does below; getLaneRegistrySummary
+  // must not. 3000 subdirs, not 1500: 1500 gave margins as tight as ~2.5x (page cache makes
+  // fresh buckets fast to scan) and flaked; 3000 gave 9-14x.
   const SENTINEL_FILE_COUNT = 3000;
   for (let i = 0; i < SENTINEL_FILE_COUNT; i++) {
     writeHistoryLaneFixture(wsSentinel, "2026-01", `lane-${i}`, `gap4-sentinel-history-${i}`);
@@ -544,10 +553,11 @@ test("AC7-FLATARCHIVE1 (e123b9 J2 — REDEFINED): a flat .current/archive/*.md-o
 });
 
 // =============================================================================
-// getLaneFeatureHistory also merges each lane dir's metrics.jsonl {feature, ts} rows (readMetricsEntries), recovering a long-lived lane's
-// (e.g. _primary) shipped predecessors that active_feature overwrote in place (e125b spec AC5, J2-NEW-4). Placed in this file because the
-// extension file the ticket named does not exist and the existing coverage lives here.
-// =============================================================================
+// getLaneFeatureHistory also merges each lane dir's metrics.jsonl {feature, ts} rows
+// (readMetricsEntries), recovering a long-lived lane's (e.g. _primary) shipped predecessors
+// that active_feature overwrote in place (e125b spec AC5, J2-NEW-4). Placed in this file
+// because the extension file the ticket named does not exist and the existing coverage
+// lives here. =============================================================================
 
 function writeMetricsFixture(ws, lane, rows) {
   const dir = path.join(ws, ".current", lane);
@@ -649,7 +659,9 @@ test("AC8: tools/lane-registry.ts performs no fs writes — no call to fs.write*
 // ============================================================================
 // AC9 — build + boot safety for the new three-module import cycle
 // ============================================================================
-// `npm run build` exit 0 is verified in QA's Phase 4 gate, not re-run here; this covers the boot-smoke half of AC9 (a TDZ/circular-import failure surfaces at boot, not in unit tests).
+// `npm run build` exit 0 is verified in QA's Phase 4 gate, not re-run here; this covers the
+// boot-smoke half of AC9 (a TDZ/circular-import failure surfaces at boot, not in unit
+// tests).
 
 test("AC9: dist/index.js boots cleanly with the new lane-registry import cycle — \"online\" appears on stderr, no thrown error", async () => {
   await new Promise((resolve, reject) => {
