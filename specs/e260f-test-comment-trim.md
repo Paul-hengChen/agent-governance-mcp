@@ -1,6 +1,6 @@
 # e260f-test-comment-trim
 
-Lane `e260f` of the E260 fan-out (wave 2, see `specs/fanout-e260.md`), ticket E260. Task ids `T-E260F-01..07`.
+Lane `e260f` of the E260 fan-out (wave 2, see `specs/fanout-e260.md`), ticket E260. Task ids `T-E260F-01 and T-E260F-08..21`.
 Scope: the comments in `test/e1*` and `test/e2*` (60 tracked files, `.test.mjs` plus `test/e148-seed-stamp.mjs` and `test/e259-lib.mjs`), and one wrong comment in `test/e246-mailbox-teardown.test.mjs`. Base commit `bdbffaf` (recorded in `.current/e260f/base-sha`).
 
 ## Problem Statement
@@ -65,16 +65,29 @@ All commands run from the lane worktree root. `BASE` = `bdbffaf`; the proof scri
 ### Measurement at base (re-run 2026-10-01 on `bdbffaf`, matches the fan-out table)
 Method: `analyzeText` over `git ls-files 'test/e1*' 'test/e2*'`. Result: **60 files, 53 with a long block, 60 blocks of 8-20 counted lines, 51 blocks over 20, longest 72**. Per-file counts come from the proof script (`--list-mid` and a base scan); the table below gives each task's file set and total counted lines in blocks of 8 or more (the task's authoring weight).
 
-| task | files (counted lines in blocks of 8+) | weight |
-|---|---|---|
-| T-E260F-02 | `e106-init-artifacts-flag`(42), `e108-eject`(75), `e112-drift-fanout-feature-scope`(42), `e114-cut-approval-inheritance`(19), `e115-join-precondition`(30), `e116-archive-on-feature-change`(48), `e117-void-task`(94), `e118-reviewer-ac-completeness`(28), `e120-void-recut-refusal`(71) | 449 |
-| T-E260F-03 | `e121-tasks-file-injection`(134), `e122-state-render-injection`(106), `e123b2-sidecars-lane-paths`(22), `e123b9-lane-flip`(81), `e125a-lane-local-ledgers`(44), `e125c-index-compaction`(49) | 436 |
-| T-E260F-04 | `e126-merge-invariants`(75), `e128-blocked-self-loop-repro`(21), `e128-orchestrator-blocked-repair`(53), `e130-lane-default`(80), `e132-lane-registry`(125), `e137-rag-render`(25), `e137-render-sanitise`(46) | 425 |
-| T-E260F-05 | `e148-seed-stamp.mjs`(81), `e148-stamp-provenance-seed`(44), `e16-judge-dispatch-charter`(32), `e164-e167-content`(28), `e166-template-defers-staging`(37), `e177a-check-cli`(30), `e177a-manifest`(28), `e177b-lane-status`(38), `e177b-mailbox-watch`(49), `e177b-test-lock`(44) | 411 |
-| T-E260F-06 | `e178a-integrator-role`(33), `e178b-cut-prereview`(37), `e178b-fanout-unmatched`(29), `e178b-lane-watch`(37), `e18-write-provenance`(66), `e180-abandoned-harvest`(45), `e20-e21-crash-resilience`(24), `e213-shipped-ignored-shape`(45), `e22-stale-notify`(66), `e223-watch-rearm-gone`(28) | 410 |
-| T-E260F-07 | `e23-evidence-schema`(37), `e231-info-hygiene-rule`(28), `e234-hygiene-scan`(20), `e235a-relative-prd-path`(28), `e235b-relative-worktree`(28), `e239-init-subdir-exclude`(61), `e24-exemptions`(31, plus the bare-id fix at line 9), `e246-mailbox-teardown`(0, plus the AC10 fix), `e248-relative-mailbox-header`(24), `e250-eject-path-escape`(62), `e258a-comment-rule`, `e258b-comment-scan`, `e259-comment-scan-brace`, `e259-comment-scan-hash`, `e259-comment-scan-limits`, `e259-lib.mjs` (these six have no long block; touched only if the proof script finds a Generic-citation miss), `e26-gate-stats`(47), `e28-shrink-warning`(43) | 410 |
+| task | files (counted lines in blocks of 8+) | weight | closes |
+|---|---|---|---|
+| T-E260F-01 | `.current/e260f/proof.mjs` (1 file, no test edit) | — | AC1-AC6, AC8, AC9, AC12 (the script implements the checks; final AC4 and AC12 runs are in T-E260F-21) |
+| T-E260F-08 | `e106-init-artifacts-flag`(42), `e108-eject`(75), `e112-drift-fanout-feature-scope`(42), `e114-cut-approval-inheritance`(19), `e115-join-precondition`(30) | 208 | AC5-AC9 |
+| T-E260F-09 | `e116-archive-on-feature-change`(48), `e117-void-task`(94), `e118-reviewer-ac-completeness`(28), `e120-void-recut-refusal`(71) | 241 | AC5-AC9 |
+| T-E260F-10 | `e121-tasks-file-injection`(134), `e122-state-render-injection`(106) | 240 | AC5-AC9 |
+| T-E260F-11 | `e123b2-sidecars-lane-paths`(22), `e123b9-lane-flip`(81), `e125a-lane-local-ledgers`(44), `e125c-index-compaction`(49) | 196 | AC5-AC9 |
+| T-E260F-12 | `e126-merge-invariants`(75), `e128-blocked-self-loop-repro`(21), `e128-orchestrator-blocked-repair`(53), `e130-lane-default`(80) | 229 | AC5-AC9 |
+| T-E260F-13 | `e132-lane-registry`(125), `e137-rag-render`(25), `e137-render-sanitise`(46) | 196 | AC5-AC9 |
+| T-E260F-14 | `e148-seed-stamp.mjs`(81), `e148-stamp-provenance-seed`(44), `e16-judge-dispatch-charter`(32), `e164-e167-content`(28), `e166-template-defers-staging`(37) | 222 | AC5-AC9 |
+| T-E260F-15 | `e177a-check-cli`(30), `e177a-manifest`(28), `e177b-lane-status`(38), `e177b-mailbox-watch`(49), `e177b-test-lock`(44) | 189 | AC5-AC9 |
+| T-E260F-16 | `e178a-integrator-role`(33), `e178b-cut-prereview`(37), `e178b-fanout-unmatched`(29), `e178b-lane-watch`(37), `e18-write-provenance`(66) | 202 | AC5-AC9 |
+| T-E260F-17 | `e180-abandoned-harvest`(45), `e20-e21-crash-resilience`(24), `e213-shipped-ignored-shape`(45), `e22-stale-notify`(66), `e223-watch-rearm-gone`(28) | 208 | AC5-AC9 |
+| T-E260F-18 | `e23-evidence-schema`(37), `e231-info-hygiene-rule`(28), `e234-hygiene-scan`(20), `e235a-relative-prd-path`(28), `e235b-relative-worktree`(28) | 141 | AC5-AC9 |
+| T-E260F-19 | `e239-init-subdir-exclude`(61), `e24-exemptions`(31, plus the bare-id fix at line 9), `e246-mailbox-teardown`(0, plus the `setupLane` comment fix), `e248-relative-mailbox-header`(24), `e250-eject-path-escape`(62) | 178 | AC5-AC10 |
+| T-E260F-20 | `e258a-comment-rule`, `e258b-comment-scan`, `e259-comment-scan-brace`, `e259-comment-scan-hash`, `e259-comment-scan-limits` (no long block; citation-only sweep, edited only if the proof script's `bare-id` finds a miss) | 0 | AC8, AC9 |
+| T-E260F-21 | `e259-lib.mjs`(0, citation sweep), `e26-gate-stats`(47), `e28-shrink-warning`(43); then the final proof run and the AC11 full suite on the clean committed HEAD, before the `qa-engineer:Blocked` write | 90 | AC5-AC9, AC11 |
 
-The task weights sum to the measured total, 2540 counted lines, so each qa authoring round carries about 410-450 counted lines.
+**Task size rule (task_size, integrator pre-review)**: every task touches at most 5 files, citation-only sweeps counted, and carries at most about 300 counted comment lines (the cut tops out at 241). No single file exceeds 300 counted lines (the largest is `e121-tasks-file-injection`, 134), so no file is split by line range.
+
+**AC-to-task map**: AC1, AC2, AC3, AC4, AC12 are implemented by the proof script (T-E260F-01) and run per task with `--changed-only`, then in full in T-E260F-21; AC5-AC9 are closed per file by T-E260F-08..21; AC10 by T-E260F-19; AC11 by T-E260F-21 (the last authoring task) and independently re-run by the fresh verifier on final HEAD.
+
+The task weights sum to the measured total, 2540 counted lines. (T-E260F-02..07 of the first cut were voided and replaced by T-E260F-08..21 under fresh ids so no stale evidence can attach.)
 
 ### Per-block disposition (how the qa author decides each block)
 Work top-down, one block at a time:
@@ -102,9 +115,12 @@ Work top-down, one block at a time:
 - **Negative control** (the verifier's own, not committed): in a throwaway copy, change one string literal and one comment in a lane file and confirm `emit` and `tokens` report it; delete one `@ts-*` or `eslint-*` line in the copy and confirm `directives` reports it. Record the outcome in the QA report by description.
 - **Why both emit and tokens**: `removeComments` emit erases types and some syntax forms; the leaf comparison catches a type-only or formatting-dependent edit. Both are mandated by the wave-2 re-check decision in `specs/fanout-e260.md`.
 
+### Pinned test: `test/e258b-comment-scan.test.mjs` (AC14b)
+The test "AC14b: this test file obeys the same limits" runs `analyzeText` on its own source and asserts the longest comment block is at most 7 and the comment ratio at most 30% (today 6 and 9/404). `test/e258b-comment-scan.test.mjs` is in T-E260F-20; if a citation fix touches it, any added comment must keep both limits.
+
 ### Chain and task shape
 - Chain (E233 test-lane edge, precedent `specs/e233e-test-comments-c.md`): pm `In_Progress` (this write, `next_role: qa-engineer`) -> qa-engineer author writes `Blocked` (authoring done, not failure) -> pm -> code-reviewer (`resume_of: code-reviewer`) -> fresh Task-dispatched qa-engineer verifier writes `PASS` and completes all tasks.
 - No architect hop: comment-only, no data model or API. Dispatch pin `sr-engineer=fable` is on record but no sr hop is cut (no source file changes).
-- T-E260F-01 is the proof script; T-E260F-02..07 are the file batches above, each one qa authoring round, committed per task. T-E260F-07 also carries the `e24` bare-id fix and the `e246` `setupLane` fix and creates nothing else. The skeleton of `specs/e260f-comment-rationale.md` is created by PM with this spec; tasks append sections and rows.
+- T-E260F-01 is the proof script; T-E260F-08..21 are the file batches above, each one qa authoring round, committed per task. T-E260F-19 carries the `e24` bare-id fix and the `e246` `setupLane` fix. T-E260F-21, the last authoring task, runs the full suite (AC11) on the clean committed HEAD before the `qa-engineer:Blocked` write. The skeleton of `specs/e260f-comment-rationale.md` is created by PM with this spec; tasks append sections and rows.
 - Information hygiene: the rationale spec, the proof script and evidence carry no absolute local paths; refer to the worktree as `../agent-governance-mcp-lanes/e260f` or by description.
 - Tests that read other tests' text: none for comments (wave-2 re-check: deleting every comment-only line in `test/` leaves the suite 3043/3040/0). Code-level readers exist (`test/e122-state-render-injection.test.mjs` reads a regex literal from `test/render-structure.test.mjs`; `test/e178a-integrator-role.test.mjs` reads assertions from `test/skill-frontmatter.test.mjs`); neither file is in this lane and comment edits cannot change them. The full suite on final HEAD is the last word (AC11).
