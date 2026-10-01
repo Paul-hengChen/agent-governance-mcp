@@ -1,31 +1,8 @@
 // Coded by @qa-engineer
-// In the default `lane-status --watch` set (no --lanes), a --baseline key that
-// names no lane in the current list is a lane that CLOSED since the last
-// watch; it is reported `[<lane>] gone`, not treated as a usage error.
-// Spec: specs/e223-watch-rearm-gone.md decisions (a)-(g), AC1-AC4. AC5 lives
-// in test/e178b-lane-watch.test.mjs "AC5 re-arm round trip"; AC6 (build plus
-// full suite on a clean committed tree) is a one-time check, not a test in
-// this file. (E223, T-E223-01, T-E223-02)
-//
-// WHY: the integrator's monitor loop is "run the re-arm command the previous
-// watch printed". Removing a lane's worktree between two watches used to make
-// that command exit 64 (unknown --baseline key), breaking the loop AND losing
-// the close event. The contract under test is therefore: (1) the printed
-// re-arm command keeps working after a lane closes, (2) the close is SAID
-// exactly once, (3) it is never carried forward (so the NEXT re-arm is valid
-// and the lane is not re-reported), and (4) under --lanes, where absent named
-// lanes stay watched, an unknown key can only be a typo and stays exit 64.
-//
-// Harness: same in-process pattern as test/e178b-lane-watch.test.mjs —
-// runLaneWatch driven with an injected lane-list provider, handoff reader and
-// a fake clock whose sleep() advances time, so expiry (exit 3) is instant.
-//
-// Spec-to-Test map:
-//   AC1 -> "AC1 gone key on start in the default set"
-//   AC2 -> "AC2 gone ordering"
-//   AC3 -> "AC3 gone keys are not carried"
-//   AC4 -> "AC4 --lanes unknown key stays a usage error"
-//   (+) -> "parseWatchBaseline boundary inputs" (security smoke: unit level)
+// In the default `lane-status --watch` set (no --lanes), a --baseline key naming no lane in the current list is a lane that CLOSED since the last watch: it is reported `[<lane>] gone`, not a usage error.
+// Spec: specs/e223-watch-rearm-gone.md decisions (a)-(g), AC1-AC4. AC5 lives in test/e178b-lane-watch.test.mjs "AC5 re-arm round trip"; AC6 (build plus full suite on a clean tree) is a one-time check. (E223, T-E223-01, T-E223-02)
+// Contract: the printed re-arm command keeps working after a lane closes, the close is said exactly once, never carried forward, and under --lanes an unknown key stays exit 64. Harness: in-process runLaneWatch with injected lane provider, handoff reader and fake clock, as in test/e178b-lane-watch.test.mjs.
+// Rationale: specs/e260f-comment-rationale.md (test/e223-watch-rearm-gone.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";

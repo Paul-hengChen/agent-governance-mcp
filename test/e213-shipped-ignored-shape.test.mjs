@@ -1,48 +1,9 @@
 // Coded by @qa-engineer
-// Tests for `agc feature finish <ticket> --shipped` in a project where root
-// tasks.md and .current/ are both git-ignored. Without these fixes the
-// command either failed outright on the ignored tasks.md, or deleted
-// git-ignored qa_reports/, review_reports/ and specs/ evidence together with
-// the worktree. Also covers one --abandoned output fix: the in-lane `moved`
-// line must not read as a second durable copy when the file was already
-// copied to the primary checkout. (specs/e213-shipped-ignored-shape.md
-// AC1-AC17; E213, E214, E216)
-//
-// Fixture convention (this repo's own precedent, restated in
-// test/e180-abandoned-harvest.test.mjs and test/agc-feature-finish-
-// history.test.mjs): every test file owns its fixture helpers rather than
-// importing across files. makePrimaryRepo/runAgc/mergeLane/historyBucket/
-// escRe below are the same shape as test/e180-abandoned-harvest.test.mjs's,
-// reused per the spec's own Dependencies note.
-//
-// A load-bearing empirical fact (verified directly against the system git
-// before writing these tests, and noted the same way in the e180 tests): `git worktree
-// remove` (never --force) deletes untracked-and-git-ignored content
-// WITHOUT refusing, but DOES refuse over untracked-but-NOT-ignored content.
-// AC1-AC3/AC6-AC12/AC14/AC16/AC17's fixtures are all-ignored shapes that
-// reach a full, clean `finish --shipped` (exit 0); AC10's plain untracked
-// sibling file reproduces today's pre-existing native refusal unchanged.
-//
-// Spec-to-test map:
-//   AC1  -> "AC1: tasks.md git-ignored — fs-only pointer write, no git add, fsonly-line once"
-//   AC2  -> "AC2: tasks.md git-ignored + untracked .current/ harvest — both advisories fire in mutation order"
-//   AC3  -> "AC3: tasks.md git-ignored + zero-write .current/ — nocommit-line replaces the recorded-lane line, no harvest line"
-//   AC4  -> "AC4: tasks.md NOT git-ignored — neither new E213 line ever prints" (existing suites are the primary proof, npm test)
-//   AC5  -> "AC5: a later step failing after a successful untracked harvest leaves no stale harvest line in stdout; re-run is safe"
-//   AC6  -> "AC6: recursive evidence harvest, nested path preserved, across qa_reports/ and review_reports/, no ticket-token filter"
-//   AC7  -> "AC7: an evidence dir symlinked outside the worktree gets no primary copy"
-//   AC8  -> "AC8: a differing primary destination refuses before any mutation — worktree, branch and other evidence untouched"
-//   AC9  -> "AC9: an identical primary destination does not refuse and finishes normally (idempotent re-run)"
-//   AC10 -> "AC10: an untracked-but-not-ignored file is left to git's own refusal; a sibling ignored file still harvests"
-//   AC11 -> "AC11: no files under any evidence dir — no harvest attempted, nothing errors"
-//   AC12 -> "AC12: the adopter-shaped workspace — every harvest fires end-to-end"
-//   AC13 -> proven by existing suites (test/e180-abandoned-harvest.test.mjs, test/agc-feature-finish-history.test.mjs,
-//           test/agc-feature-lifecycle.test.mjs) plus full `npm test`, per spec's own proof line — not re-tested here
-//   AC14 -> "AC14: --abandoned qualifies the moved line for a file harvested to primary"
-//   AC15 -> "AC15: --abandoned keeps the plain moved line for a file NOT harvested to primary"
-//   AC16 -> "AC16: specs/ is a full third member of SHIPPED_EVIDENCE_DIRS, harvested under the same rules"
-//   AC17a-> "AC17a: a symlink whose target resolves is dereferenced — content copied, primary never gains a symlink"
-//   AC17b-> "AC17b: a symlink whose target does not resolve refuses before any mutation, naming every such path"
+// Tests for `agc feature finish <ticket> --shipped` where root tasks.md and .current/ are both git-ignored: without these fixes the command failed on the ignored tasks.md, or deleted git-ignored qa_reports/,
+// review_reports/ and specs/ evidence with the worktree. Also covers one --abandoned fix: the in-lane `moved` line must not read as a second durable copy for a file already copied to primary. (specs/e213-shipped-ignored-shape.md AC1-AC17; E213, E214, E216)
+// Fixtures: every test file owns its helpers (test/e180-abandoned-harvest.test.mjs, test/agc-feature-finish-history.test.mjs); makePrimaryRepo/runAgc/mergeLane/historyBucket/escRe match e180's, reused per the spec's Dependencies note. Test names carry the AC number.
+// `git worktree remove` (never --force) deletes untracked-and-ignored content without refusing but refuses untracked-not-ignored content; AC10's plain untracked sibling reproduces that refusal. AC4 and AC13 are proven by existing suites plus full `npm test`.
+// Rationale: specs/e260f-comment-rationale.md (test/e213-shipped-ignored-shape.test.mjs).
 
 import { test, after } from "node:test";
 import assert from "node:assert/strict";

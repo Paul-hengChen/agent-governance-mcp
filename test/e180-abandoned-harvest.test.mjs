@@ -1,48 +1,9 @@
 // Coded by @qa-engineer
-// Tests for specs/e180-abandoned-harvest.md AC1-AC13 — `agc feature finish
-// <ticket> --abandoned` harvesting git-ignored evidence (E180) and untracked
-// `.current/<ticket>/` (E194) into the primary checkout before the worktree
-// is removed, plus one assertion on the fallback wording of the closed-lane
-// pointer line (E197, AC13).
-//
-// Fixture conventions follow test/agc-feature-lifecycle.test.mjs and
-// test/agc-feature-finish-history.test.mjs (this repo's own precedent: every
-// test file owns its fixture helpers rather than importing across files).
-// Every scratch repo/lane is a real git repository built under os.tmpdir()
-// via fs.mkdtempSync and torn down in the top-level `after` hook.
-//
-// A load-bearing empirical fact this file relies on throughout (verified
-// directly against the system git before writing these tests): `git worktree
-// remove` (never --force) refuses over MODIFIED or UNTRACKED-AND-NOT-IGNORED
-// content, but does NOT refuse over untracked content that IS git-ignored.
-// That is exactly why AC1-AC4/AC6-AC12's fixtures (whose "at risk" files are
-// by definition git-ignored — that is what makes them at risk in the first
-// place) can reach a full, clean `finish --abandoned` (worktree removed, exit
-// 0), while AC5's plain-untracked (never-ignored) file reproduces today's
-// pre-existing refusal unchanged (same shape as the existing AC22/AC24 test
-// in test/agc-feature-lifecycle.test.mjs).
-//
-// `agc feature start` itself already excludes `.current/**/base-sha` via the
-// shared `info/exclude` (LANE_EXCLUDE_RULES, bin/agc-init.mjs) regardless of
-// any project `.gitignore` — so a lane's `.current/<ticket>/base-sha` alone
-// is already git-ignored with zero project-level setup. Tests that need more
-// than base-sha to survive worktree removal add a project `.gitignore`
-// covering the relevant directories.
-//
-// Spec-to-test map:
-//   AC1  -> "AC1: an untracked, git-ignored evidence file is harvested into primary before the move"
-//   AC2  -> "AC2: an evidence dir symlinked outside the worktree gets no primary copy"
-//   AC3  -> "AC3: a differing primary destination refuses before any mutation"
-//   AC4  -> "AC4: an identical primary destination does not refuse"
-//   AC5  -> "AC5: a plain untracked (non-ignored) evidence file is unaffected — pre-existing behavior"
-//   AC6  -> "AC6: the evidence harvest is idempotent across a later-step failure and re-run"
-//   AC7  -> "AC7: an all-untracked .current/<ticket>/ is harvested in full, no exclusions"
-//   AC8  -> "AC8: a tracked .current/<ticket>/ gets no harvest copy"
-//   AC9  -> "AC9: a non-directory blocking the history path refuses before any mutation"
-//   AC10 -> "AC10: a pre-existing history directory is refreshed by copy-over, never delete"
-//   AC11 -> "AC11: a lane with no .current/<ticket>/ at all harvests nothing and errors on nothing"
-//   AC12 -> "AC12: the adopter-shaped workspace — both harvests fire end-to-end"
-//   AC13 -> "AC13: closedLanePointerLine's fallback clause reads case-insensitive git log -i --grep"
+// Tests for specs/e180-abandoned-harvest.md AC1-AC13: `agc feature finish <ticket> --abandoned` harvests git-ignored evidence (E180) and untracked `.current/<ticket>/` (E194) into the primary checkout
+// before the worktree is removed, plus one assertion on the closed-lane pointer line's fallback wording (E197, AC13). Test names carry the AC number.
+// Fixtures follow test/agc-feature-lifecycle.test.mjs and test/agc-feature-finish-history.test.mjs: every scratch repo/lane is a real git repository under os.tmpdir(), removed in the top-level `after` hook.
+// `git worktree remove` (never --force) refuses over modified or untracked-not-ignored content but not over git-ignored content, so AC1-AC4/AC6-AC12 reach a clean finish while AC5's plain untracked file reproduces the refusal.
+// Rationale: specs/e260f-comment-rationale.md (test/e180-abandoned-harvest.test.mjs).
 
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
