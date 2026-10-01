@@ -43,3 +43,12 @@ No findings. Comment-only; emit is byte-identical.
 
 ## Verdict
 CHANGES_REQUESTED (lane-wide) — this task is clean apart from recommended or optional items; the round is blocked by required findings in T-E260G-10, T-E260G-12 and T-E260G-15.
+
+## Round 2 — CHANGES_REQUESTED (lane-wide) — by code-reviewer (opus)
+
+Range `f249f1b..feca935` (fix `6234fe8`).
+
+- Round 1 recommended rationale :176 feature-rollup labels: **fixed**. The title map matches the real test titles (`AC2:` x3, `AC3:`, `round-1 regression PIN`, `AC4:` x2, `AC5:`).
+  - optional — specs/e260g-comment-rationale.md:176 — "the `t-*` labels from the spec do not appear in the file". No spec carries those labels either (grep over specs/ finds none; they came from the old test comment). Say "from the old file header".
+- Round 1 optional feature-lease:1077: **fixed**. Folded into :1076.
+- Nothing in this task's files blocks. The lane verdict follows T-E260G-10.

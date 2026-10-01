@@ -43,3 +43,12 @@ No findings. Comment-only; emit is byte-identical.
 
 ## Verdict
 CHANGES_REQUESTED — the hop-count header says the `t-gate-*` predicate tests go through the real orchestrator; they call validateTransition directly.
+
+## Round 2 — CHANGES_REQUESTED (lane-wide) — by code-reviewer (opus)
+
+Range `f249f1b..feca935` (fix `6234fe8`).
+
+- Round 1 required hop-count-transitions:3: **fixed**, and true. :3-5 "enforced by validateTransition (t-gate-*) and end to end through the real orchestrator (t-e2e-*)". All 7 `t-gate-*` tests open with `validateTransition({`; the `t-e2e-*` tests go through dispatch. The header is 5 counted lines.
+- Round 1 optional lane-migrate:373: **fixed**. Folded into :372 (119 characters, in line with the file's other lines).
+- The lane-migrate:61 and :625 `.current/tasks.md` exemptions in the new cited-paths check are correct: these are runtime fixture paths that base already named, not repo citations.
+- Nothing in this task's files blocks. The lane verdict follows T-E260G-10.

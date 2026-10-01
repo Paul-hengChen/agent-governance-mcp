@@ -63,3 +63,13 @@ No findings. It is a one-shot script, and each of the 25 files is transpiled twi
 
 ## Verdict
 CHANGES_REQUESTED (lane-wide) — this task has no required finding, but the round carries required accuracy and citation findings in T-E260G-10, T-E260G-12 and T-E260G-15.
+
+## Round 2 — CHANGES_REQUESTED — by code-reviewer (opus)
+
+Range `f249f1b..feca935` (fix commit `6234fe8`). Proof at `feca935`: PASS (25 changed; scope, emit, tokens, directives, >20, bare-id, cited-paths and form all ok). `--list-mid` prints `8-20: 1 block(s)` (e31:1, counted 8; see T-E260G-10).
+
+- Round 1 recommended "BARE_ID only E-ids": **fixed**. proof.mjs:23-26 adds `BARE_ID_WIDE` for E, AC, DR and T- ids. Scratch-clone controls: `// AC3`, `// DR-3`, `// T-E123A3-08`, `// (AC12).` and `  // (E69, E76, E77)` each fail the check; `// see the lease rule (E10)` passes, as it should.
+- Round 1 recommended "no cited-path check": **fixed with a gap**. proof.mjs:143-156 adds `cited-paths`. A new `tools/nope.ts` citation fails it, as it should. Without the exemption the check lists 7 lines, and all 7 are legitimate: runtime fixture paths (`.current/tasks.md` at lane-migrate:61 and :625, `.current/handoff.md`, `.current/.current/handoff.md`) and two "content/skill-coordinator.md no longer exists" notes.
+  - recommended — proof.mjs:153 — the `!baseSrc.includes(p)` exemption is a substring match over the whole base file, code included. It therefore exempts any suffix of a base path. Control: putting the round-1 bug back (`gates/registry.js` at error-code-contract:318) gives `cited-paths: 0`, because base contains `dist/gates/registry.js`. Exempt only whole path tokens that the base file cites in comment lines.
+  - optional — proof.mjs:25 — a range token such as `// E1A-1..7` is not matched (`7` alone is not an id token).
+- Optional "whitespace-reflow blind spot", not done: **not blocking**. I re-checked by hand: every added or removed line in `bdbffaf..feca935 -- test` is a comment or a blank line.

@@ -44,3 +44,15 @@ No findings. Comment-only; emit is byte-identical.
 
 ## Verdict
 CHANGES_REQUESTED (lane-wide) — these three files are clean apart from one recommended item, but the round has three required findings: e31:6 together with rationale :25 (T-E260G-10), error-code-contract:317 (T-E260G-12) and hop-count-transitions:3 (T-E260G-15).
+
+## Round 2 — CHANGES_REQUESTED — by code-reviewer (opus)
+
+Range `f249f1b..feca935` (fix `6234fe8`; state commit `feca935`).
+
+- Round 1 recommended lane-ticket-allocation:4: **fixed** ("…, not by a runnable test").
+  - optional — lane-ticket-allocation:4 is 133 characters against the file's roughly 118; rewrap if touched again.
+- Lane-wide at `feca935`: proof PASS, and `node scripts/check-md-tables.mjs` OK. Every round-2 changed line is a comment line (none added or removed code; no new `/*`).
+- **AC5 is now partial lane-wide**: `--list-mid` lists one 8-20 block (test/e31-config-nonfatal.test.mjs:1, counted 8), but the Retained blocks table says none. This is the one required finding (detail in T-E260G-10 Round 2).
+- All four round-1 required findings are fixed and their new wording is true against the code. All recommended items are fixed except the proof's cited-paths exemption breadth (T-E260G-09), which does not block. The four optional items left undone do not block.
+
+Verdict: CHANGES_REQUESTED — a one-line join in the e31 header (8 to 7 counted lines) restores AC5. Nothing else blocks.

@@ -43,3 +43,12 @@ No findings. Comment-only; emit is byte-identical.
 
 ## Verdict
 CHANGES_REQUESTED (lane-wide) — this task is clean apart from recommended or optional items; the round is blocked by required findings in T-E260G-10, T-E260G-12 and T-E260G-15.
+
+## Round 2 — CHANGES_REQUESTED (lane-wide) — by code-reviewer (opus)
+
+Range `f249f1b..feca935` (fix `6234fe8`).
+
+- Round 1 recommended handoff-write-arg-guard:2-3 width: **fixed**. Rewrapped to 4 lines of at most 102 characters; the header is 6 counted lines; the wording is unchanged and still true.
+- Round 1 optional handoff-migration pointer: **fixed**. :6 now points to the existing rationale section, and the header stays under 8 lines (not listed by `--list-mid`).
+- Optional "gates-expected-red U1-U13", not done: not blocking (an incomplete range, not a false claim).
+- Nothing in this task's files blocks. The lane verdict follows T-E260G-10.

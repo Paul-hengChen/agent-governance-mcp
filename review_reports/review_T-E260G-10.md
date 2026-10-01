@@ -47,3 +47,21 @@ No findings. Comment-only; emit is byte-identical.
 
 ## Verdict
 CHANGES_REQUESTED — the e31 header and its rationale line state a silent default-path fallback that the tests at e31:257 and e31:271 show is not what happens.
+
+## Round 2 — CHANGES_REQUESTED — by code-reviewer (opus)
+
+Range `f249f1b..feca935` (fix `6234fe8`).
+
+- Round 1 required e31:6: **fixed in wording**, and the new sentence is true. e31:6-7 now reads "under a corrupt config the task-mutation tools ignore the custom taskPaths/taskPattern (completeTaskInFile errors loudly, addTaskInFile writes the lane ledger)". That matches the tests at :257/:271 and tools/tasks-file.ts `addTaskInFile` (findTasksFile, then `resolveTasksLedgerPath`).
+- Round 1 required rationale :25: **fixed**. Checked against tools/config.ts `resolveTaskPaths` (DEFAULT_TASK_PATHS fallback) and the two probe tests.
+- Round 1 recommended e31:195: **fixed**. e31:196-200 is true: the tools resolve DEFAULT_TASK_PATHS/DEFAULT_TASK_REGEX through `resolveTaskPaths` and `resolveTaskRegex`, then completeTaskInFile errors and addTaskInFile writes the lane ledger.
+- Round 1 recommended e31 indent: **fixed** (:227-230, :274-277).
+- Round 1 optional e43:173: **fixed**. Folded into e43:172.
+- Optional "e32 tracked pointer in the rationale", not done: not blocking.
+- **required (new, AC5)** — test/e31-config-nonfatal.test.mjs:1-8 — the header grew to 8 counted lines (`analyzeText`: `{start:1,end:8,counted:8}`; `proof.mjs --list-mid` lists `test/e31-config-nonfatal.test.mjs:1 8`). The Retained blocks table in specs/e260g-comment-rationale.md:13 still says "none: every long block was cut to 7 counted lines or fewer", which is now false. Nothing in the block meets the keep criterion (a setup contract or pitfall with no better home), so it must be cut to 7. For example, join :4-5 or :6-7, or drop "Known and accepted:" into a single line. A table row would be the wrong fix.
+
+**Retained blocks** (AC5, as the spec states at `feca935`):
+
+| file | line at HEAD | counted | reason |
+|---|---|---|---|
+| — | — | — | none (contradicted by e31:1, counted 8; see the finding above) |

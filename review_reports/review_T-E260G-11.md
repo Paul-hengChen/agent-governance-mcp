@@ -44,3 +44,13 @@ No findings. Comment-only; emit is byte-identical.
 
 ## Verdict
 CHANGES_REQUESTED (lane-wide) — this task is clean apart from recommended or optional items; the round is blocked by required findings in T-E260G-10, T-E260G-12 and T-E260G-15.
+
+## Round 2 — CHANGES_REQUESTED (lane-wide) — by code-reviewer (opus)
+
+Range `f249f1b..feca935` (fix `6234fe8`).
+
+- Round 1 optional e92-e86:365 comma: **fixed**.
+- Round 1 recommended rationale labels for e5 and e90: **fixed**. I checked each quoted phrase against the real titles. All 29 quoted e5 phrases occur in `test/e5-intake-tiering.test.mjs` (`^P\d+$` appears escaped in the source, as `^P\\d+$`). The three e90 titles match :81, :89 and :102.
+  - optional — specs/e260g-comment-rationale.md:107 — "the four `T-E5-02 content: const-08 ...` tests". The file has five such tests; the fifth (:308, per-field defaults) is unmapped. Say "four of the five".
+- Optional "e92 ruler 74/75 `=`", not done: cosmetic, not blocking.
+- Nothing in this task's files blocks. The lane verdict follows T-E260G-10.
