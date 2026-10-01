@@ -1,8 +1,9 @@
 // Coded by @qa-engineer
-// Tests (T-E177B-04) for scripts/test-lock.mjs (specs/e177b-lane-status-tooling.md, AC7-AC13, AC13a, AC13b). Case names carry the AC.
-// Every spawn passes an explicit --lock-path in a fresh $TMPDIR dir, never the default from `git rev-parse --git-common-dir`: this file runs inside `npm test`, whose outer
-// wrap already holds this repo's real lock and exports AGC_TEST_LOCK_HELD, so a child resolving the same path would short-circuit re-entrantly (AC9) or deadlock the suite.
-// Timing is fractional-second throughout (--notify-interval, --poll-ms, --max-wait) so the file runs in seconds.
+// Tests (T-E177B-04) for scripts/test-lock.mjs (specs/e177b-lane-status-tooling.md,
+// AC7-AC13, AC13a, AC13b). Case names carry the AC. Every spawn passes an explicit
+// --lock-path in a fresh $TMPDIR dir, never the default from `git rev-parse
+// --git-common-dir`: npm test's outer wrap already holds the repo's real lock and exports
+// AGC_TEST_LOCK_HELD, so a child on that path would short-circuit (AC9) or deadlock.
 // Rationale: specs/e260f-comment-rationale.md (test/e177b-test-lock.test.mjs).
 
 import { test } from "node:test";
@@ -398,8 +399,10 @@ test("AC13b: SIGKILLing the wrapper does not free the lock while its spawned chi
   const lockPath = mkLockPath(t, "e177b-ac13b-");
   const dir = mkTmpDir(t, "e177b-ac13b-child-");
   const doneFile = path.join(dir, "done");
-  // The child's lifetime is test-controlled via a release file, not a fixed busy-wait: under suite load the kill -> wait-dead -> spawn-probe sequence can outlast
-  // any fixed window (E212). The child polls for the file; the test writes it only AFTER the probe has seen the child as the live lock holder.
+  // The child's lifetime is test-controlled via a release file, not a fixed busy-wait:
+  // under suite load the kill -> wait-dead -> spawn-probe sequence can outlast any fixed
+  // window (E212). The child polls for the file; the test writes it only AFTER the probe
+  // has seen the child as the live lock holder.
   const releaseFile = path.join(dir, "release");
   const childScript = path.join(dir, "child.mjs");
   fs.writeFileSync(

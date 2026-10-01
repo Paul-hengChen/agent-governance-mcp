@@ -1,7 +1,9 @@
 // Coded by @qa-engineer
-// Tests (T-E177B-06) for scripts/mailbox-watch.mjs (specs/e177b-lane-status-tooling.md, AC14-AC20). Case names carry the AC.
-// Two timing strategies: AC16/AC20 inject a fake clock (`now`/`sleep` in the `io` object main() accepts) because real timers cannot place a message exactly before or after the deadline check;
-// AC15/AC19 use real timers with fractional --interval/--deadline to test detection while polling; AC17 spawns two real OS processes because the refusal is a cross-process lock-file guarantee.
+// Tests (T-E177B-06) for scripts/mailbox-watch.mjs (specs/e177b-lane-status-tooling.md,
+// AC14-AC20). Case names carry the AC. AC16/AC20 inject a fake clock (`now`/`sleep` in the
+// `io` object main() accepts) to place a message exactly around the deadline check;
+// AC15/AC19 use real timers with fractional --interval/--deadline; AC17 spawns two real OS
+// processes because the refusal is a cross-process lock-file guarantee.
 // Rationale: specs/e260f-comment-rationale.md (test/e177b-mailbox-watch.test.mjs).
 
 import { test } from "node:test";
@@ -244,9 +246,11 @@ test("AC17: a second, independent mailbox-watch process on the SAME file refuses
   fs.writeFileSync(file, "");
   const lockPath = watchLockPath(file);
 
-  // A GENEROUS deadline on the first watch (never raced): it is killed explicitly below. A short self-expiring deadline is a suite-load hazard,
-  // since a first watch that expired and released its lock before the second process started would let that process run a real unbounded watch
-  // instead of being refused (the hang the integrator caught, E182). The 20s test timeout is the hard backstop.
+  // A GENEROUS deadline on the first watch (never raced): it is killed explicitly below. A
+  // short self-expiring deadline is a suite-load hazard, since a first watch that expired
+  // and released its lock before the second process started would let that process run a
+  // real unbounded watch instead of being refused (the hang the integrator caught, E182).
+  // The 20s test timeout is the hard backstop.
   let firstChild = null;
   t.after(() => {
     if (firstChild) {

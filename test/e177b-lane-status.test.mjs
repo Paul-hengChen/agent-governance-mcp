@@ -1,7 +1,9 @@
 // Coded by @qa-engineer
-// Tests (T-E177B-05) for tools/lane-status.ts (specs/e177b-lane-status-tooling.md, AC1-AC6, AC5a-AC5d). Case names carry the AC; AC5/AC5a/AC5b/AC5d share one
-// worktree fixture layering the four evidence filters. Real git repos plus real `git worktree add` are used, not a manifest, a shimmed git or synthetic LaneInfo, because
-// AC1-AC3 exercise computeLaneStatus's own `git log` / `git status --porcelain` calls; AC4-AC6 run the pure roll-up and render functions over a report that fixture produced.
+// Tests (T-E177B-05) for tools/lane-status.ts (specs/e177b-lane-status-tooling.md, AC1-AC6,
+// AC5a-AC5d). Case names carry the AC; AC5/AC5a/AC5b/AC5d share one worktree fixture
+// layering the four evidence filters. Real git repos and `git worktree add` are used because
+// AC1-AC3 exercise computeLaneStatus's own `git log` / `git status --porcelain` calls;
+// AC4-AC6 run the pure roll-up and render functions over a report that fixture produced.
 // Rationale: specs/e260f-comment-rationale.md (test/e177b-lane-status.test.mjs).
 
 import { test } from "node:test";

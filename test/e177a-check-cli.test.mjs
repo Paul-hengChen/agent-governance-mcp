@@ -1,8 +1,9 @@
 // Coded by @qa-engineer
-// Tests (T-E177A-07) for checkLane() and the thin scripts/fanout.mjs CLI (specs/e177a-fanout-manifest.md, AC9-AC12, AC15); test/e177a-manifest.test.mjs
-// covers AC1-AC8, AC13, AC14. AC16 (build + suite) has no in-file assertion; it is recorded in qa_reports/review_T-E177A-06.md after this file's commit (SOP Phase 4, clean tree).
-// Fixtures are real throwaway git repos under os.tmpdir() built with `git commit-tree` on explicit trees (as in test/e126-merge-invariants.test.mjs), so checkLane's real
-// `git diff --no-renames` read path runs over committed refs only. The manifest is the real test/fixtures/e177a/fanout-wave7.md, so the tests double as the spec's worked example.
+// Tests (T-E177A-07) for checkLane() and the thin scripts/fanout.mjs CLI
+// (specs/e177a-fanout-manifest.md, AC9-AC12, AC15); test/e177a-manifest.test.mjs covers
+// AC1-AC8, AC13, AC14. AC16 (build + suite) has no in-file assertion, see
+// qa_reports/archive/release-v4.0.0/review_T-E177A-06.md. Fixtures are real throwaway git
+// repos (committed refs only) plus the real test/fixtures/e177a/fanout-wave7.md.
 // Rationale: specs/e260f-comment-rationale.md (test/e177a-check-cli.test.mjs).
 
 import { test } from "node:test";

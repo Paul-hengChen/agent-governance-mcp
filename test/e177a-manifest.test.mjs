@@ -1,7 +1,9 @@
 // Coded by @qa-engineer
-// Tests (T-E177A-06) for the parse/validate/render side of tools/fanout-manifest.ts (specs/e177a-fanout-manifest.md, AC1-AC8, AC13, AC14);
-// test/e177a-check-cli.test.mjs covers checkLane, the CLI exit contract and the full-suite run (AC16). Fixtures under test/fixtures/e177a/ are byte copies of the tracked
-// fanout specs at base 98052c6 (edit the copies, never specs/fanout-*.md) plus an exact-string render golden for AC6; every other manifest is synthetic and built inline.
+// Tests (T-E177A-06) for the parse/validate/render side of tools/fanout-manifest.ts
+// (specs/e177a-fanout-manifest.md, AC1-AC8, AC13, AC14); test/e177a-check-cli.test.mjs
+// covers checkLane, the CLI exit contract and the full-suite run (AC16). Fixtures under
+// test/fixtures/e177a/ are byte copies of the tracked fanout specs at base 98052c6 plus an
+// exact-string render golden for AC6; every other manifest is synthetic and inline.
 // Rationale: specs/e260f-comment-rationale.md (test/e177a-manifest.test.mjs).
 
 import { test } from "node:test";
