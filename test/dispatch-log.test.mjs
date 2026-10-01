@@ -1,18 +1,7 @@
 // Coded by @qa-engineer
-// Tests for the dispatch-log sidecar: append on write, isolation from the other
-// sidecars, and where its filename comes from
-// (specs/e123a-lane-layout-migration.md AC13/AC14/AC15; T-E123A3-08,
-// covering T-E123A3-04's tools/dispatch-log.ts + its
-// tools/handoff-orchestrator.ts wiring).
-//
-// Spec-to-Test map:
-//   AC13 (a write carrying dispatch_mechanism appends exactly 1 line; a write
-//         omitting it appends 0; best-effort append never throws and never
-//         alters the ToolResult on failure)         -> INT1, INT2, INT3, THROW1, THROW2
-//   AC14 (sidecar isolation: metrics.jsonl/telemetry.jsonl line counts are
-//         NEVER touched by the dispatch-log append path)   -> ISO1
-//   AC15 (dispatch-log.ts imports its filename FROM LANE_FILES' `dispatch`
-//         entry — never a second hardcoded literal)          -> NAME1, NAME2
+// Tests for the dispatch-log sidecar: append on write, isolation from the other sidecars, and where its
+// filename comes from (specs/e123a-lane-layout-migration.md AC13/AC14/AC15; T-E123A3-08, covering
+// T-E123A3-04). Spec-to-Test map: specs/e260e-comment-rationale.md (dispatch-log.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";

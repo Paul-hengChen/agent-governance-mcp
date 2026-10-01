@@ -1,19 +1,7 @@
 // Coded by @qa-engineer
-// Tests for specs/e123a-lane-layout-migration.md AC2/AC3 (T-E123A3-08,
-// covering T-E123A3-01/02's dispatch_mechanism/dispatch_mechanism_tier
-// fields).
-//
-// Spec-to-Test map:
-//   AC2 (transient per-hop attestation: write A sets both, next omitting
-//        write on the same feature drops both — the next_role/review_verdict
-//        lifetime, NOT the dispatch_pins/external_refs feature-scoped carry)
-//     -> RT1 (writeHandoffState round trip), RT2 (real tw_update_state
-//        round trip through the orchestrator)
-//   AC3 (zod boundary: dispatch_mechanism is a closed 3-value enum rejected
-//        before the handler runs; dispatch_mechanism_tier is bounded free
-//        text, not a closed enum)
-//     -> Z1 (bogus enum value rejected), Z2 (oversized tier rejected),
-//        Z3 (valid enum values + arbitrary tier text both accepted)
+// Tests for specs/e123a-lane-layout-migration.md AC2/AC3 (T-E123A3-08, covering T-E123A3-01/02): the
+// transient dispatch_mechanism / dispatch_mechanism_tier fields and their zod boundary.
+// Spec-to-Test map: specs/e260e-comment-rationale.md (dispatch-mechanism.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
