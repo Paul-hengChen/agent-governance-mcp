@@ -1,75 +1,9 @@
 // Coded by @qa-engineer
-// Tests that tools/tasks-file.ts's four mutators (completeTaskInFile,
-// rollbackTaskInFile, voidTaskInFile, addTaskInFile) refuse caller-supplied
-// strings that would forge a task row via either `$`-expansion (String.replace
-// replacement-string grammar) or line injection (plain string concatenation /
-// replacer-function embedding of a line-break-bearing value). E121, docs/backlog.md
-// order 0t.
-//
-// The approved review report review_reports/review_T-E121-01.md is the spec this
-// file executes. THE TRAP (restated from that report because it is the
-// whole point of this file): the PRE-FIX behaviour also returned
-// `success: true`. Asserting "no crash", `success === true`, or
-// `error === undefined` is NOT a test of this defect — every one of those
-// assertions passes against the broken base build. What discriminates is:
-//   (a) an {error} matching /task_id must not contain a line break/ (or the
-//       matching field name for a payload guard),
-//   (b) tasks.md BYTE-IDENTICAL to its pre-call content,
-//   (c) the forged id/marker absent from the whole file,
-//   (d) parseTasksFromFile's row count unchanged,
-//   (e) no `.lock` artefact left behind (the guard fires before
-//       withFileLock is ever reached).
-// Every must-refuse case below pins at least (a) + (b) + (c); most also
-// pin (d) and (e).
-//
-// Coverage floor (the review's "8 MUST-REFUSE cells", field x mutator):
-// completeTask(taskId), completeTask(note); rollbackTask(taskId),
-// rollbackTask(reason); voidTask(taskId), voidTask(reason); addTask(taskId),
-// addTask(description). The taskId column was the last one added —
-// addTask's taskId guard was the only *live* forging site before it, so it
-// is deliberately not tested alone; all four mutators get a taskId case.
-//
-// The EXPLICIT-refusal assertion (the point of guarding all four mutators): for
-// complete/rollback/void with a line-break-bearing taskId, this file asserts
-// POSITIVELY on /task_id must not contain a line break/ AND NEGATIVELY that the message does NOT match
-// /not found|Could not find|No incomplete/i. Without the negative
-// assertion, a test cannot tell a STATED invariant (the input-boundary
-// guard) from INCIDENTAL lookup-order safety (the earlier behaviour,
-// where a newline-bearing id merely failed `Array.find` and returned a
-// not-found error) — and a refactor that hoisted line construction above
-// the `find()` call would go undetected by a test that only checked the
-// call refused.
-//
-// Settled boundary, pinned not re-derived (settled in review): for
-// ROW FORGING, LF is the WHOLE class. Every line-splitting reader in this
-// file splits on LF alone — parseTasks (tools/tasks-file.ts:80-92,
-// `migratedBody.split("\n")`), addTaskInFile's duplicate scan (:521,
-// `content.split("\n")`), voidTaskInFile's post-write invariant (:490,
-// `newContent.split("\n")`). DEFAULT_TASK_REGEX (tools/config.ts:100) has no
-// `m` flag, and resolveTaskRegex (tools/config.ts:353-364) builds a custom
-// pattern with `new RegExp(config.taskPattern)` — no flags argument — so a
-// workspace-configured taskPattern cannot introduce `m` either; `^`/`$`
-// always anchor to the whole candidate string. LF and CRLF forge at base and
-// are refused now; CR is refused too but only as a hygiene/consistency
-// matter (it never forged anything — see the CR test below, which does NOT
-// assert forging). U+2028/U+2029/NEL/VT/FF/NBSP do not forge in either
-// build, so no test here treats them as forging vectors.
-//
-// Explicitly OUT of scope for this file (do not fix, do not test as if
-// fixed, do not let them block PASS):
-//   - U+2028/U+2029 make a row *unparseable* (erasure, not forgery),
-//     measured identical at base and working tree — pre-existing, filed as
-//     its own ticket (review finding R2-C2). No failing test for this is written here.
-//   - tools/registry.ts's `task_id: z.string().min(1)` schema — the
-//     coordinator declined to tighten the public tool contract; the file
-//     boundary is the chosen closure.
-//   - SQLite mode — parameterised SQL, not a line-oriented store; not this
-//     defect.
-//
-// Fixture helpers below mirror test/e117-void-task.test.mjs's
-// mkWorkspaceWithTasks / readTasks (that file is NOT edited by this round —
-// its :298 case, `voidTaskInFile` refusing a newline+$&-bearing reason,
-// passes unchanged and stays that way as part of this fix's acceptance).
+// Tests that the four mutators in tools/tasks-file.ts (complete, rollback, void, add) refuse caller strings that would forge a task row via
+// `$`-expansion (String.replace grammar) or line injection. The pre-fix code also returned success: true, so "no crash" proves nothing: a must-refuse
+// case pins an {error} matching /task_id must not contain a line break/, tasks.md byte-identical, the forged id absent, row count unchanged, no .lock left.
+// For line-break taskIds it also asserts the message is not a not-found error, telling a stated guard from incidental lookup-order safety.
+// Rationale: specs/e260f-comment-rationale.md (test/e121-tasks-file-injection.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -92,17 +26,8 @@ setActiveStorage(new FileHandoffStorage());
 // resetSession/markStateRead sequencing so the freshness guard doesn't trip).
 // ---------------------------------------------------------------------------
 
-// Lane-local-ledger re-baseline (e125a, qa-owned, spec AC13 "Test impact";
-// review_reports/review_T-E125A-05.md "Expected-Red Sampling"): a workspace
-// fixture stamped `CURRENT_VERSIONS.tasks` (now 2) at the workspace ROOT is
-// the workspace-"index" shape, not an unmigrated ledger — tw_* would throw
-// TASKS_LEDGER_ABSENT (spec AC6b) reading it. These fixtures are about the
-// injection-guard refusal matrix (E121), not migration mechanics (that has its own
-// dedicated coverage in test/e125a-lane-local-ledgers.test.mjs), so — same
-// re-baseline as test/e117-void-task.test.mjs — seed the lane-local ledger
-// DIRECTLY at `.current/_primary/tasks.md` (no .git in these fixtures ⇒
-// resolveCurrentLane === PRIMARY_LANE), the exact file tw_* now reads,
-// writes, and locks (spec AC9).
+// Fixtures seed the lane-local ledger directly at `.current/_primary/tasks.md` (no .git, so the lane is the primary lane): a root-level v2 file is the
+// index shape and tw_* would throw TASKS_LEDGER_ABSENT. Same approach as test/e117-void-task.test.mjs; migration has its own tests in test/e125a-lane-local-ledgers.test.mjs.
 function laneTasksPath(ws) {
   return path.join(ws, ".current", "_primary", "tasks.md");
 }
@@ -274,17 +199,9 @@ test("CR-only in taskId is refused as a hygiene/consistency matter, not because 
   assert.equal(readTasks(ws), before, "a refused CR-bearing call must also leave tasks.md byte-identical");
 });
 
-// ===========================================================================
-// Must-succeed set (over-refusal floor). Structural reasoning (round 3,
-// R3-Q1 / part 5/9): no id containing a line break can round-trip through
-// tasks.md at all — parseTasks (tools/tasks-file.ts:80-92) splits on "\n"
-// and DEFAULT_TASK_REGEX (tools/config.ts:100) captures the id as (\S+),
-// which excludes \r and \n by construction, and .trim() strips a leading
-// CRLF's \r before the regex ever runs. The refused set is therefore exactly
-// the unrepresentable set — there is no realistic id shape, and no
-// machine-derived id from tw_sync/tw_detect_drift/getNextTask, that newly
-// gets refused. The cases below are the empirical half of that argument.
-// ===========================================================================
+// Must-succeed set (over-refusal floor). No id containing a line break can round-trip through tasks.md (parseTasks splits on "\n" and
+// DEFAULT_TASK_REGEX captures the id as (\S+)), so the refused set is exactly the unrepresentable set and no realistic or
+// machine-derived id is newly refused. The cases below are the empirical half of that argument.
 
 test("must-succeed: addTask accepts a spread of benign id shapes with no line break", async () => {
   const benignIds = [
@@ -343,46 +260,10 @@ test("must-succeed: voidTask on a backtick id with a benign reason succeeds norm
   assert.equal(result.success, true, `expected voidTask to succeed, got: ${JSON.stringify(result)}`);
 });
 
-// ===========================================================================
-// Line-separator (U+2028/U+2029) row-erasure cases (E131, docs/backlog.md order
-// 13s) — added to this file per the backlog
-// row's own placement ("qa-owned cases in the existing
-// test/e121-tasks-file-injection.test.mjs") and the qa dispatch brief.
-//
-// This defect is the erasure sibling of this file's forging defect, NOT the same
-// bug (E131): U+2028 LINE SEPARATOR and U+2029 PARAGRAPH SEPARATOR are JS-only line
-// terminators that `String.prototype.split("\n")` (used throughout
-// tools/tasks-file.ts) does NOT split on, but that `.` cannot cross and an
-// un-anchored `$` cannot cross either. So a row carrying one is physically a
-// single line on disk yet unparseable — the opposite direction from row
-// forging. Closed at two independent points (review_reports/
-// review_T-E120131-01.md rounds 1-3, APPROVED):
-//
-//   Part A (below) — the INPUT BOUNDARY: `containsLineBreak`, this file's
-//   own LF/CR guard, widened to include U+2028 and U+2029, reached from all
-//   eight existing call sites (taskId + payload field of each of the four
-//   mutators) — the exact coverage floor this file already established for
-//   line-break forging, now extended to the two new characters. Structured
-//   as one pair of characters (U+2028, U+2029) crossed with the same 8
-//   field x mutator matrix above, but this is an INPUT-BOUNDARY refusal
-//   test, not a forging test: U+2028/U+2029 do not plant a second row (LF
-//   remains the whole forging class per this file's header), they would
-//   silently ERASE the row that carries one if they ever reached disk. The
-//   refusal is what prevents that from ever being reachable through the
-//   tw_* API at all.
-//
-//   Part B (below) — the PARSER ITSELF: `parseTasks` (tools/tasks-file.ts)
-//   now fails LOUD instead of silently dropping a row that (a) is shaped
-//   like a live checkbox task row and (b) carries U+2028/U+2029 — this is
-//   the defense for a tasks.md hand-edited directly, which never passes
-//   through the input boundary at all. Critically, a VOIDED row carrying
-//   the same character must NOT throw: its invisibility to every reader is
-//   the voidTaskInFile contract (E117), not the line-separator corruption
-//   case (E131), and
-//   the shape heuristic (`TASK_LINE_SHAPE_RE`) deliberately excludes the
-//   void marker's `-` checkmark for exactly this reason (an earlier review
-//   finding, C2 — the pre-fix heuristic wrongly matched voided rows too).
-// ===========================================================================
+// Line-separator (U+2028/U+2029) row erasure, the erasure sibling of the forging defect: these JS-only line terminators are not split by
+// split("\n"), so a row carrying one is a single line on disk yet unparseable. Closed twice: Part A, the input boundary (containsLineBreak
+// widened, same eight call sites); Part B, the parser, which fails loud on a live-shaped row carrying one but not on a voided row.
+// Rationale: specs/e260f-comment-rationale.md (test/e121-tasks-file-injection.test.mjs).
 
 const E131_TERMINATORS = [
   ["U+2028 LINE SEPARATOR", "\u2028"],
