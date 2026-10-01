@@ -1,5 +1,7 @@
 # Pending tickets — lane e260d
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E260D-NEW-1
 title: Move the errorCode-to-doc-file mapping out of a comment in gates/registry.ts so its 42-line block can shrink
@@ -32,5 +34,3 @@ body: |
   to the shipped names (or add an amendment note). Docs only; lane e260d did not edit the spec because
   it is outside the comment-only E260 scope.
 ```
-
-## Applied
