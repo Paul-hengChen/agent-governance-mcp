@@ -1,22 +1,9 @@
 // Coded by @qa-engineer
-// Regression guard for the false-PASS class: a constitution deliverable is
-// reported done but the marker strings were never actually written to the file.
-//
-// Spec-to-Test map (feature: constitution-v3.27-sync-consistency):
-//   A3 (version header)      -> t-a3-version-header
-//   A1 (tw_sync pre-flight)  -> t-a1-tw-sync-preflight
-//   A2 (visual report schema)-> t-a2-visual-report-incomplete, t-a2-visual-assertions-required,
-//                               t-a2-required-sections
-//   A4 (wording correction)  -> t-a4-new-wording-present, t-a4-old-wording-absent
-//   B1 (terse carve-outs)    -> t-b1-assumption-gap, t-b1-acceptance-criteria
-//   B2 (design-baseline scope)-> t-b2-scope-baseline, t-b2-fidelity-defect
-//   B3 (intra-section priority)-> t-b3-override-markers, t-b3-circuit-breaker,
-//                                t-b3-inter-document-priority
-//
-// WHY: no prior test reads content/constitution.md, so a deliverable could be
-// committed as "done" without any of its text ever landing. This file pins
-// each v3.27.0 edit by asserting load-bearing marker strings so CI turns RED
-// the moment a required phrase is removed or was never written.
+// Regression guard for the false-PASS class: a constitution deliverable reported done while its
+// marker strings were never written. Pins each v3.27.0 edit (A1-A4, B1-B3 of
+// constitution-v3.27-sync-consistency) by asserting load-bearing marker strings, so CI turns red
+// when a required phrase is removed or was never written; test names carry the edit ids.
+// More: specs/e260e-comment-rationale.md (constitution-deliverable-guard.test.mjs).
 
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
@@ -37,13 +24,8 @@ const { composeConstitution } = await import(
 const CONSTITUTION = composeConstitution({ chain: true, design: true });
 
 // ---------------------------------------------------------------------------
-// REQUIRED_VISUAL_SECTIONS is read directly from the compiled output of
-// tools/evidence-file.ts so the test self-syncs when the array changes.
-// If the import fails (dist not built yet), the test itself will fail loudly —
-// that is intentional: "build before test" is already required by the project.
-//
-// If you change REQUIRED_VISUAL_SECTIONS in tools/evidence-file.ts (line 342),
-// rebuild (`npm run build`) and this test automatically reflects the new set.
+// REQUIRED_VISUAL_SECTIONS is read from the compiled output of tools/evidence-file.ts so the test
+// self-syncs when the array changes; a failed import (dist not built) fails loudly on purpose.
 // ---------------------------------------------------------------------------
 const { REQUIRED_VISUAL_SECTIONS_EXPORT } = await (async () => {
   // evidence-file.ts does not export REQUIRED_VISUAL_SECTIONS directly (it is
