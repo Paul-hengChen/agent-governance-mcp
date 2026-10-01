@@ -142,18 +142,19 @@ report("bare-id", bare.length === 0, `bare-id: ${bare.length}`, bare);
 
 // cited paths (AC7): repo-relative paths in comment lines this lane added must be git-tracked
 const tracked = new Set(lines(git("ls-files")));
-// exact path-token match: p is exempt only when the base file holds it as a whole path token
+// exact path-token match: p is exempt only when a base COMMENT line holds it as a whole path token
 // (not preceded or followed by a path character), so a suffix of a longer base path does not count
 const baseCitesToken = (src, p) => new RegExp(`(?<![\\w./-])${p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\w/-]|\\.\\w)`).test(src);
 const pathBad = [];
 for (const f of changed) {
   const baseSrc = baseText(f); // a path the base file already cited is old wording, not a new citation
+  const baseCmt = analyzeText(baseSrc).lines.map((l, i) => (l.kind === "comment" ? baseSrc.split(/\r?\n/)[i] : "")).join("\n");
   const baseLines = new Set(baseSrc.split(/\r?\n/).map((l) => l.trim()));
   const text = headText(f);
   const raw = text.split(/\r?\n/);
   analyzeText(text).lines.forEach((l, i) => {
     if (l.kind !== "comment" || baseLines.has(raw[i].trim())) return;
-    for (const p of raw[i].match(PATH_CITE) ?? []) if (!tracked.has(p) && !baseCitesToken(baseSrc, p)) pathBad.push(`${f}:${i + 1} ${p}`);
+    for (const p of raw[i].match(PATH_CITE) ?? []) if (!tracked.has(p) && !baseCitesToken(baseCmt, p)) pathBad.push(`${f}:${i + 1} ${p}`);
   });
 }
 report("cited-paths", pathBad.length === 0, `cited-paths: ${pathBad.length} untracked`, pathBad);
