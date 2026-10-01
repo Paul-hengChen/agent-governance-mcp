@@ -1,62 +1,9 @@
 // Coded by @qa-engineer
-// Tests for `tw_void_task` (E117) — tools/tasks-file.ts voidTaskInFile,
-// tools/storage-sqlite.ts SqliteHandoffStorage.voidTask, the tools/tasks.ts
-// delegator/handler, and the tools/registry.ts entry.
-//
-// No specs/e117-void-task.md exists — the backlog row for the void tool
-// (docs/backlog.md, E117) IS the contract (PM/architect skipped per the
-// mini-chain scope_decision). The acceptance point the ticket names:
-// tw_get_next_task must stop offering a voided row, in BOTH storage modes
-// (a live consequence found under E112).
-// Three rounds of code-reviewer scrutiny (review_reports/review_T-E117-01.md)
-// turned up further properties that are the real risk surface; this file
-// pins exactly those, per the qa dispatch brief:
-//
-//   Section 1 — a voided row is never offered again (both modes; E112)
-//   Section 2 — completion guard reads the LEDGER (handoff.completed_tasks),
-//               not just the tasks.md mirror checkbox (both modes; C1)
-//   Section 3 — the post-write invariant refuses (and leaves the file
-//               byte-untouched) under a custom taskPattern and under a
-//               newline-bearing reason (C2/C5)
-//   Section 4 — BOTH modes now distinguish already-voided from
-//               never-existed (Q1; E120 update, 2026-09-17 — SEE BELOW: this
-//               used to be a deliberate file/SQLite asymmetry; it no longer
-//               is, see the E120 note immediately following this list)
-//   Section 5 — invisibility to parseTasksFromFile / tw_detect_drift / tw_sync
-//   Section 0/6 — basic contract (not rollback/complete, id reuse, [x] refusal,
-//               unknown id) + registry/dispatch wiring
-//
-// Update: re-cutting a voided task id is now refused (E120, 2026-09-17,
-// docs/backlog.md order 0v, closed in
-// `feat/e120-e131-e122-wave1-gate-render`, review_reports/review_T-E120131-01.md,
-// APPROVED round 3). This file's original "a voided id becomes reusable in a
-// re-cut via addTask" test (old Section 0) and its "Q1 (SQLite mode): ...
-// uniform not-found ... deliberate asymmetry" test (old Section 4) BOTH
-// asserted the old, pre-refusal contract as correct. That contract was the defect:
-// id reuse inheriting stale review/QA evidence (finding C4 below) is exactly what a
-// permitted re-cut let happen — a never-reviewed re-cut satisfied
-// MISSING_REVIEW_EVIDENCE and the QA completion-evidence gate by inheriting
-// the voided incarnation's leftover `review_reports/`/`qa_reports/` files,
-// keyed only by task id with no void-generation field. The fix is to
-// REFUSE the re-cut outright in both storage modes (a `voidedPattern` scan
-// in `addTaskInFile`; a `voided_tasks` tombstone table in SQLite, since
-// `voidTaskStmt` DELETEs the tasks row and would otherwise erase the
-// evidence needed to refuse). Both tests below are rewritten in place to
-// assert the NEW contract. The full refusal matrix — nine leading-whitespace
-// forms, id-boundary controls, and the no-false-refusal cases — lives in
-// test/e120-void-recut-refusal.test.mjs (created for this cut per the qa
-// dispatch brief) rather than duplicated here.
-//
-// Deliberately NOT covered here (filed as separate, non-blocking backlog
-// rows per the dispatch brief — do not fix or block on these in this file):
-//   C3 (SQLite DELETE discards `reason`), C6 (`$\``/`$'` String.replace
-//   splicing — shared with rollbackTaskInFile/completeTaskInFile/
-//   addTaskInFile, out of scope for the same reason round 3 of the E117
-//   review gave: void's OWN contract is satisfied in every C6 repro, the
-//   damage is collateral to other rows). C4 (id reuse inherits stale
-//   review/QA evidence) is NO LONGER out of scope — see the E120 update
-//   above; it is closed and pinned by the two rewritten tests here plus
-//   test/e120-void-recut-refusal.test.mjs.
+// Tests for `tw_void_task` (tools/tasks-file.ts voidTaskInFile, SqliteHandoffStorage.voidTask, the tools/tasks.ts handler, the registry entry).
+// No spec file exists; the backlog row is the contract. Core point: tw_get_next_task must stop offering a voided row in both storage modes.
+// Sections: 1 never re-offered; 2 completion guard reads the ledger, not the tasks.md checkbox; 3 post-write invariant; 4 already-voided vs
+// never-existed in both modes; 5 invisible to parse, drift and sync; 0/6 basics and wiring. A voided id cannot be re-cut (matrix: test/e120-void-recut-refusal.test.mjs).
+// Rationale: specs/e260f-comment-rationale.md (test/e117-void-task.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -89,25 +36,10 @@ try {
 // File-mode helpers (mirrors test/tasks.test.mjs)
 // ---------------------------------------------------------------------------
 
-// The tasks.md sentinel MUST be present and current: without it,
-// getNextTaskFromFile's lazy "heal-on-read" migration (tools/tasks-file.ts)
-// applies an unlocked atomicWrite on the very first read, bumping tasks.md's
-// mtime out from under the markStateRead() snapshot below — any test that
-// calls getNextTask() before a mutating call would then spuriously trip the
-// freshness guard (STATE DRIFT) on a file nothing actually changed.
-//
-// Lane-local-ledger re-baseline (e125a, qa-owned, spec AC13 "Test impact";
-// review_reports/review_T-E125A-05.md "Expected-Red Sampling"): a workspace
-// fixture stamped `CURRENT_VERSIONS.tasks` (now 2) at the workspace ROOT is
-// no longer an unmigrated ledger — v2 at a legacy path IS the root "index"
-// shape, so tw_* would now throw TASKS_LEDGER_ABSENT (AC6b) instead of
-// reading it. This file's fixtures are about void semantics, not migration
-// mechanics (that has its own dedicated coverage in
-// test/e125a-lane-local-ledgers.test.mjs), so the reviewer's suggested
-// re-baseline is taken here: seed the lane-local ledger DIRECTLY at
-// `.current/_primary/tasks.md` (no .git in these fixtures ⇒
-// resolveCurrentLane === PRIMARY_LANE) — the exact file tw_* now reads and
-// writes (spec AC9) — rather than a root file that must first migrate.
+// The tasks.md sentinel must be present and current, or getNextTaskFromFile's heal-on-read migration rewrites tasks.md on the first
+// read, bumps its mtime past the markStateRead() snapshot, and trips the freshness guard on a file nothing changed.
+// Fixtures seed the lane-local ledger directly at `.current/_primary/tasks.md` (no .git, so the lane is the primary lane): a root-level
+// v2 file is the index shape and tw_* would throw TASKS_LEDGER_ABSENT. Migration has its own tests in test/e125a-lane-local-ledgers.test.mjs.
 function laneTasksPath(ws) {
   return path.join(ws, ".current", "_primary", "tasks.md");
 }
@@ -321,14 +253,8 @@ sqliteTest("C1 (SQLite mode): a task the ledger considers complete cannot be voi
   }
 });
 
-// ===========================================================================
-// Section 3 — C2/C5: post-write invariant. A void must never report success
-// while leaving the row live — checked against the REAL written content, not
-// a hand-rebuilt string. Both vectors below must refuse loudly AND leave
-// tasks.md byte-for-byte untouched (atomicWrite always prepends the
-// schema_version sentinel, so a refused write leaves no sentinel behind —
-// the reviewer's own signal for "nothing was written").
-// ===========================================================================
+// Section 3, post-write invariant: a void must never report success while leaving the row live, checked against the real written
+// content. Both vectors must refuse loudly and leave tasks.md byte-for-byte untouched (a refused write leaves no sentinel behind).
 
 test("C2: a custom taskPattern under which the voided marker still parses as a task is refused, file untouched", async () => {
   const ws = mkWorkspaceWithTasks(`## P\n- [ ] T-A first\n- [ ] T-B second\n`);
@@ -403,14 +329,8 @@ sqliteTest("E120/Q1 (SQLite mode): re-void now reports alreadyVoided:true; never
     const first = JSON.parse(await storage.voidTask(dir, "T-A", "mis-cut"));
     assert.equal(first.success, true);
 
-    // THE TRAP this test used to fall into (before re-cuts were refused, E120):
-    // "uniform not-found, neither carries alreadyVoided" was a recorded gap
-    // (finding C3) this test used to pin as correct — SQLite's DELETE
-    // discarded the voided state, so it could not tell already-voided from
-    // never-existed apart. The voided_tasks tombstone
-    // (tools/storage-sqlite.ts) now survives the DELETE precisely so
-    // addTask/voidTask CAN refuse against it, giving SQLite the same
-    // already-voided vs never-existed distinction file mode already had (Q1).
+// After the re-cut refusal, SQLite keeps a voided_tasks tombstone (tools/storage-sqlite.ts) that survives the DELETE, so a second
+// void reports alreadyVoided, matching file mode's already-voided vs never-existed distinction.
     const reVoid = JSON.parse(await storage.voidTask(dir, "T-A", "again"));
     assert.match(reVoid.error, /already voided/);
     assert.equal(

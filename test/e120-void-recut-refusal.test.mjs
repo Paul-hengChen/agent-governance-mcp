@@ -1,63 +1,9 @@
 // Coded by @qa-engineer
-// Tests for the refusal to re-cut a voided task id (E120, docs/backlog.md order 0v) — a re-cut task id used to
-// inherit the review and QA evidence of the incarnation that was voided, so
-// a never-reviewed re-cut satisfied MISSING_REVIEW_EVIDENCE and the QA
-// completion-evidence gate. Closed in
-// `feat/e120-e131-e122-wave1-gate-render` by REFUSING a re-cut of a voided
-// id outright in both storage modes: a `voidedPattern` scan in
-// `addTaskInFile` (tools/tasks-file.ts), and a `voided_tasks` tombstone
-// table in SQLite (tools/storage-sqlite.ts), since `voidTaskStmt` DELETEs
-// the tasks row and would otherwise erase the state needed to refuse.
-//
-// This file is the home the qa dispatch brief names for the refusal matrix;
-// the two rewritten void-task tests (from the earlier void-task ticket, E117)
-// asserting the headline contract
-// (re-cut refused / SQLite alreadyVoided parity) stay in
-// test/e117-void-task.test.mjs, which they were already pinning under the
-// old contract (before the refusal existed).
-//
-// review_reports/review_T-E120131-01.md (round 3, APPROVED) is the record
-// this file executes:
-//
-//   Section 1 — the nine-indent matrix (raised in review round 2 as finding
-//               R2-C1, independently re-verified in round 3). THE highest-value property:
-//               it caught two successive incomplete fixes (round 1's `\b`
-//               boundary bug, round 2's `[ \t]*` two-character subset of
-//               `trim()`). Four sites (parseTasks, the duplicate-id
-//               re-scan, voidTaskInFile's void-marker check (Q1), addTaskInFile's re-cut
-//               refusal) must all agree on what "leading whitespace" means;
-//               a fifth definition is the regression this section guards.
-//   Section 2 — no false refusal: a `- [-] <id>` marker embedded in another
-//               row's text (plain, after an embedded CR, after an embedded
-//               U+2028) must not block adding that id. Narrower than round
-//               2's rejected `m`-flag intermediate, which would have
-//               false-refused these exact cases (round 3, "item 3").
-//   Section 3 — id-boundary controls: prefix collision (T-12 vs T-1),
-//               punctuation-terminated ids (T-1.), a `T-1.5` vs `T-1`
-//               control (the false-positive `\b` used to produce, NEW-3),
-//               and a regex-metacharacter id (T-A+B) — `escapeRegExp`
-//               coverage.
-//   Section 4 — SQLite parity: refusal after void, `alreadyVoided` vs a
-//               distinct never-existed, and workspace-scoped tombstones (the
-//               same id stays addable in a DIFFERENT workspace).
-//
-// Deliberately NOT covered here (see review_reports/review_T-E120131-01.md
-// Architecture / NEW-TICKETS.md for why, and do not fix or block on these in
-// this file):
-//   NEW-2 (evidence file path lowercases ids, reproducing E120 through a
-//   case change on a case-insensitive filesystem — its own ticket, not a
-//   task-id uniqueness defect), NEW-5 (a fully custom taskPattern is not
-//   covered by the parser-shape heuristic (E131) — input boundary remains the
-//   defense there), NEW-6 (a void marker hidden after an embedded CR/U+2028/
-//   U+2029 mid-`\n`-line is unreachable through the tw_* API — every mutator
-//   already refuses those characters in taskId/description/note/reason).
-//   True crash-atomicity of the SQLite DELETE+tombstone transaction (NEW-4)
-//   was verified in review by fault injection against the vendored
-//   better-sqlite3 build (forcing a failure on the second statement and
-//   observing rollback); that is a code-inspection-grade property, not one
-//   this file re-derives — Section 4 below pins the OBSERVABLE contract
-//   (void, then immediately re-void reports alreadyVoided) that atomicity
-//   exists to guarantee.
+// Tests for the refusal to re-cut a voided task id: a re-cut used to inherit the review and QA evidence of the voided incarnation, so a never-reviewed
+// re-cut satisfied MISSING_REVIEW_EVIDENCE. Both storage modes now refuse (a voidedPattern scan in addTaskInFile; a voided_tasks tombstone table in SQLite).
+// Headline contract tests stay in test/e117-void-task.test.mjs; this file holds the matrix: 1 nine-indent forms (every site must agree on what leading
+// whitespace means); 2 no false refusal for a marker embedded in another row; 3 id-boundary controls; 4 SQLite parity and per-workspace tombstones.
+// Rationale: specs/e260f-comment-rationale.md (test/e120-void-recut-refusal.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -85,17 +31,8 @@ try {
 // File-mode helpers (mirrors test/e117-void-task.test.mjs).
 // ---------------------------------------------------------------------------
 
-// Lane-local-ledger re-baseline (e125a, qa-owned, spec AC13 "Test impact";
-// review_reports/review_T-E125A-05.md "Expected-Red Sampling"): a workspace
-// fixture stamped `CURRENT_VERSIONS.tasks` (now 2) at the workspace ROOT is
-// the root "index" shape, not an unmigrated ledger — tw_* would throw
-// TASKS_LEDGER_ABSENT (AC6b) reading it. These fixtures are about the
-// void/re-cut refusal matrix, not migration mechanics (that has its own
-// dedicated coverage in test/e125a-lane-local-ledgers.test.mjs), so — same
-// re-baseline as test/e117-void-task.test.mjs — seed the lane-local ledger
-// DIRECTLY at `.current/_primary/tasks.md` (no .git in these fixtures ⇒
-// resolveCurrentLane === PRIMARY_LANE), the exact file tw_* now reads and
-// writes (spec AC9).
+// Fixtures seed the lane-local ledger directly at `.current/_primary/tasks.md` (no .git, so the lane is the primary lane): a root-level v2 file is the
+// index shape and tw_* would throw TASKS_LEDGER_ABSENT. Same approach as test/e117-void-task.test.mjs; migration has its own tests in test/e125a-lane-local-ledgers.test.mjs.
 function laneTasksPath(ws) {
   return path.join(ws, ".current", "_primary", "tasks.md");
 }

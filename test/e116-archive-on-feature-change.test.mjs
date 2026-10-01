@@ -1,40 +1,9 @@
 // Coded by @qa-engineer
-// Tests for specs/e116-archive-on-feature-change.md AC1-AC5, executed against
-// the REAL writeHandoffState (tools/handoff-write.ts's writeHandoffStateCore,
-// via its dist/ compiled output) — per the human's explicit bar for this
-// ticket: verify by EXECUTION, not by reading the diff. AC6/AC7 are
-// inspection-only proofs (git diff --stat) and are recorded in
-// qa_reports/review_T-E116-04.md, not here.
-//
-// Calling convention: writeHandoffState() is called DIRECTLY (not through
-// TOOL_REGISTRY/tw_update_state), the same convention
-// test/e114-cut-approval-inheritance.test.mjs uses for its AC5/F1 multi-write
-// scenarios — the archive mechanism lives entirely inside
-// writeHandoffStateCore, and a direct call exercises the exact same function
-// production code goes through while staying free of ALLOWED_TRANSITIONS
-// gate-chain friction across the multiple sequential writes each scenario
-// below needs. resetSession()/markStateRead(ws) before each write mirror the
-// sibling file's pre-flight/freshness-guard convention exactly.
-//
-// Spec-to-Test map:
-//   AC1 (verbatim byte-copy of the outgoing ledger)        -> AC1
-//   AC2 (live handoff.md still resets on feature change —
-//        the central tension: same six fields carry
-//        forward on a same-feature write, drop on a
-//        feature-change write)                             -> AC2
-//   AC3 (no archive on a same-feature write)                -> AC3
-//   AC4 (no archive on the first-ever write)                -> AC4
-//   AC5 (filename sanitization: charset AND the .slice(0,200)
-//        length clamp — including the exact 233-char name
-//        length that once overflowed the filename limit (C1 regression), the 500-char schema max,
-//        an unconditional-clamp check beyond the schema max,
-//        and the replace-before-slice ordering with
-//        multi-byte input)                                 -> AC5
-//   bonus (fail-closed: an uncaught copy failure aborts the
-//          whole write, leaves the live ledger untouched,
-//          leaks no lock and no tmp file — the rule that a
-//          failed copy never loses ledger data (E150), verified
-//          empirically per the dispatch brief)              -> bonus
+// Tests for specs/e116-archive-on-feature-change.md AC1-AC5, run against the real writeHandoffState (via dist/), verified by execution.
+// writeHandoffState() is called directly, not through tw_update_state, like test/e114-cut-approval-inheritance.test.mjs, so multi-write
+// scenarios skip ALLOWED_TRANSITIONS friction; resetSession()/markStateRead(ws) before each write mirror that file's pre-flight convention.
+// Test names carry the AC number; "bonus" pins fail-closed: a copy failure aborts the write, leaves the live ledger untouched, leaks no lock or tmp file.
+// Rationale: specs/e260f-comment-rationale.md (test/e116-archive-on-feature-change.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -363,17 +332,9 @@ test("AC5-4: the clamp is UNCONDITIONAL — a 10000-char active_feature (beyond 
 });
 
 test("AC5-5: replace-before-slice ordering — multi-byte input (astral emoji, 3-byte CJK) yields a pure-ASCII, byte-safe stem", async () => {
-  // The regex /[^A-Za-z0-9._-]/g (no /u flag) matches per UTF-16 code unit,
-  // so it replaces EACH surrogate half of an astral emoji independently, and
-  // every 3-byte CJK code point, with a single ASCII "-" — BEFORE .slice(0,
-  // 200) ever runs. This guarantees the sliced stem is pure single-byte
-  // ASCII, so NAME_MAX (which counts bytes) and the 200-code-unit slice
-  // (which counts UTF-16 code units) agree. If a future edit reorders this
-  // to slice-then-replace, a string engineered so a surrogate pair straddles
-  // the 200-code-unit boundary risks leaving a malformed/unpaired surrogate
-  // in the byte-encoded filename — this test pins the CURRENT, correct
-  // ordering's guarantee: the stem is provably pure ASCII (byteLength ===
-  // char length) at every clamp boundary.
+  // The regex has no /u flag, so it replaces each UTF-16 code unit (each surrogate half, each CJK point) with "-" before
+  // .slice(0, 200) runs. The stem is then pure ASCII and NAME_MAX (bytes) agrees with the slice (code units); slice-then-replace
+  // could leave an unpaired surrogate. This pins the ordering: byteLength equals char length at every clamp boundary.
   const ws = mkWs();
   // 190 allowed ASCII chars + 5 astral emoji (10 UTF-16 code units, straddling
   // the 200-unit boundary at position 190-199) + 3-byte CJK padding well past
