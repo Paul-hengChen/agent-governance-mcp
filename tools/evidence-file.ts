@@ -1,29 +1,19 @@
 // Coded by @sr-engineer
-// Shared markdown/table read plumbing for the gates/ modules (A2 split).
-// This file used to be gate-central (15 has*/check*/validate* predicates); as
-// of the gate-registry refactor (A10 + A2) those predicates live in per-gate
-// modules under gates/ (gates/qa-review.ts, gates/code-review.ts,
-// gates/visual.ts, gates/scope-decision.ts, gates/cut-approval.ts). What
-// remains here is ONLY the low-level, gate-agnostic parsing plumbing shared by
-// the visual sub-gate parsers: H2 section slicing, table-cell splitting, and
-// the checkbox / assertion / region-diff / status cell parsers — plus the
-// `covers:` label-line coverage plumbing (c3-covering-evidence) consumed by
-// gates/qa-review.ts and gates/code-review.ts.
-//
-// This module imports NOTHING from gates/ (the dependency points the other
-// way: gates/*.ts import these helpers), keeping the import DAG acyclic.
+// Low-level, gate-agnostic markdown plumbing shared by the gates/ modules: H2
+// section slicing, table-cell splitting, the checkbox / assertion /
+// region-diff / status cell parsers, and the `covers:` label-line coverage
+// used by gates/qa-review.ts and gates/code-review.ts. The gate predicates
+// live in gates/. This module imports nothing from gates/, keeping the
+// import graph acyclic.
 
 import * as fs from "fs";
 import * as path from "path";
 
-// ---------- c3-covering-evidence — `covers:` label-line plumbing ----------
-// One real review file may declare `covers: <id1>, <id2>, ...` to satisfy the
-// evidence gates (MISSING_EVIDENCE / MISSING_REVIEW_EVIDENCE) for a batched
-// round, instead of N-1 one-line pointer stubs. File-mode only; the SQLite
-// hasEvidence / hasCodeReviewEvidence paths are untouched (they already record
-// one `reports` row per id). Gate-agnostic: the directory to scan is supplied
-// by the caller (gates/qa-review.ts → qa_reports/, gates/code-review.ts →
-// review_reports/); this module stays free of any gate knowledge.
+// ---------- `covers:` label-line plumbing ----------
+// One review file may declare `covers: <id1>, <id2>, ...` to satisfy the
+// evidence gates for a batched round instead of one stub per id. File mode
+// only (SQLite records one `reports` row per id). The caller supplies the
+// directory to scan, so this module stays free of gate knowledge.
 
 // Permissive label-line regex, mirroring the visual gate's BASELINE_LINE_RE /
 // DIFF_METRIC_LINE_RE style: optional leading bullet (`-`/`*`), optional
@@ -92,18 +82,12 @@ export function sliceH2Section(content: string, heading: string): string | null 
   return nextIdx === -1 ? rest : rest.slice(0, nextIdx);
 }
 
-// ---------- schema-keyed slicing (E23) ----------
-// The exact-anchored sliceH2Section above (`^##\s+<heading>\b` — prefix text
-// never matches) rejects a heading that merely has extra leading text, e.g.
-// `## Phase 3.5 — AC Execution Log` failed the gate solely on its heading
-// prefix. The siblings
-// below key matching behavior off the feature's pinned evidence_schema:
-//   evidenceSchema === 1        → today's exact-anchored behavior, unchanged.
-//   evidenceSchema >= 2 OR absent → normalized-contains: an H2 line matches
-//     the target when normalize(h2Text).includes(normalize(target)).
-// Absent-pin features get v2 because v2 is a strict superset of v1 (it can
-// only newly ACCEPT, never newly reject) — see gates/evidence-schema.ts.
-// sliceH2Section itself and its other callers are deliberately untouched.
+// ---------- schema-keyed slicing ----------
+// sliceH2Section above is exact-anchored, so a heading with extra leading text
+// (`## Phase 3.5 — AC Execution Log`) fails. The siblings below key matching
+// off the feature's pinned evidence_schema: 1 keeps the exact anchor; 2 or
+// absent matches when normalize(h2Text) includes normalize(target). Absent
+// pins get 2 because it only ever accepts more (see gates/evidence-schema.ts).
 
 // D2 normalize: lowercase, collapse every non-alphanumeric run to one space,
 // trim. Pure, never throws.
