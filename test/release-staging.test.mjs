@@ -1386,55 +1386,12 @@ test("E7-AC2: content/skill-release-engineer.md's D10 bullet cross-references th
 });
 
 // ---------------------------------------------------------------------------
-// Phase 6.5 — E59: §6 dependency-audit waiver-escape closure (structural,
-// all-sites regression pin)
+// Phase 6.5 — dependency-audit waiver escape stays closed (E59, re-baselined by E48)
 // ---------------------------------------------------------------------------
-// WHY: docs/backlog.md E59 (origin: review_T-E57-01 F7) closed the "unless
-// waived in the PR description with rationale" escape that let five HIGH
-// advisories ride release-to-release untouched (E57). The escape was
-// restated, in slightly different words each time, at 9 live normative sites
-// spread across 3 files (const-15's source bullet + 8 mirrors/table-rows/
-// diagram edges in docs/skills/release-engineer.md and
-// docs/skills/sr-engineer.md) — three independent review passes (coordinator,
-// sr-engineer, code-reviewer) each re-derived a DIFFERENT site count (5, then
-// 6, then 7) before a full-tree enumeration by site (not by grep-hit) settled
-// on 9 (review_T-E59-01.md Round 2). That history — every prior single-pattern
-// sweep missed at least one live site — is exactly why this pin is structural
-// rather than a single string match.
-//
-// RE-BASELINED 2026-08-17 (E48, human decision, no salvage): docs/skills/ was
-// deleted entirely — it was never on the prompt path (prompts/build.ts and
-// tools/role.ts compose from content/ only) and 9 of its 12 files had never
-// been touched since their creation commit. That removes 8 of the 9 sites
-// above (only 1 of the 8 was a verbatim mirror; the rest — STOP-exit table
-// rows, server-enforced-gates bullets, mermaid decision branches — were
-// structures the live SOPs never contained at all). Re-deriving from the tree
-// rather than from the deletion count surfaced 3 previously-unpinned LIVE sites
-// (review_T-E48-02.md round 1/2, finding C2) that were never in the
-// original 9: content/skill-release-engineer.md:56-58, the §6a
-// dependency-audit-disposition mechanism itself — the exact "cite the
-// advisory record's row, don't improvise a rationale" behavior E57/E59 exist
-// to enforce. The re-baselined enumeration is therefore 9 -> 4, NOT 9 -> 1:
-// const-15's source bullet plus those 3 sites.
-//   (a) a repo-tree sweep for the literal word "waived" across content/ (the
-//       only tree left — docs/skills/ no longer exists). Every historical
-//       escape phrasing used this exact verb form ("waived in the PR
-//       description[, with rationale]", "unwaived", "no / waived" —
-//       confirmed against git history, commit 95d6376..HEAD). The RETAINED
-//       "Toolchains lacking an audit command waive the rule" sentence and the
-//       "...is NOT a waiver..."/"...waiver..." clauses (const-15:11,
-//       skill-release-engineer.md:57) all use different words ("waive" /
-//       "waiver"), so this sweep has zero legitimate positives to exclude —
-//       the escape reappearing ANYWHERE in content/, not just at one of the 4
-//       known sites (including a future 5th site nobody has enumerated yet),
-//       reds this test.
-//   (b) presence, at each of the 4 enumerated sites, of the disposition-
-//       channel language the escape was replaced with — so silently deleting
-//       or truncating a site's fixed text (which would not reintroduce the
-//       word "waived") is caught too.
-// Together (a) and (b) fail on: the escape word reappearing anywhere, OR any
-// of the 4 known sites losing its replacement text — the two ways this
-// defect could recur.
+// The "unless waived in the PR description" escape let HIGH advisories ride
+// release to release, and every single-pattern sweep missed a live site. So the
+// pin is structural: "waived" appears nowhere in content/ (a), and each of the 4
+// known sites keeps its replacement text (b). History: specs/e260h-comment-rationale.md (test/release-staging.test.mjs).
 
 function listMarkdownFilesRecursive(dir) {
   return fs
@@ -1492,17 +1449,9 @@ test("E59: all 4 live §6 dependency-audit normative sites carry the disposition
     },
   ];
 
-  // Re-baselined 9 -> 4, NOT 9 -> 1 (E48, 2026-08-17): E48 deleted docs/skills/
-  // entirely, which removes 8 of the original 9 sites (7 of those 8 were
-  // structures — STOP-exit table rows, server-enforced-gates bullets, mermaid
-  // decision branches — the live SOPs never contained at all; only 1 was a
-  // verbatim mirror). That deletion alone would leave only const-15's source
-  // bullet pinned. But re-deriving from the tree instead of from the deletion
-  // count surfaced 3 previously-unpinned LIVE sites that were never in the
-  // original 9-site enumeration: content/skill-release-engineer.md:56-58, the
-  // §6a dependency-audit-disposition mechanism itself (the "cite the advisory
-  // record's row, don't improvise a rationale" behavior E57/E59 exist to
-  // enforce). Net: -8 mirror sites, +3 previously-uncounted live sites = 4.
+  // 4 sites: E48 deleted docs/skills/ (8 of the original 9 sites), and a
+  // re-derivation from the tree found 3 unpinned live sites in
+  // content/skill-release-engineer.md (history: see the Phase 6.5 header).
   assert.equal(sites.length, 4, "this enumeration must itself stay at 4 sites (re-baselined 2026-08-17, E48 + review_T-E48-02.md round 1/2 C2: -8 docs/skills/ mirror sites deleted by E48, +3 previously-unpinned live content/skill-release-engineer.md:56-58 sites added) — update it deliberately, not by accident, if the site set changes");
 
   for (const { body, anchor, label } of sites) {
@@ -1521,58 +1470,19 @@ test("E59: all 4 live §6 dependency-audit normative sites carry the disposition
 });
 
 // ---------------------------------------------------------------------------
-// Phase 7 — E49/E50: step 7a ticket-code SET derivation (working-tree
-// enumeration + PREV_TAG membership predicate, unioned across qa_reports/ and
-// review_reports/)
+// Phase 7 — step 7a ticket-code set derivation (E49, E50): working-tree
+// enumeration with a PREV_TAG membership test, over qa_reports/ and review_reports/
 // ---------------------------------------------------------------------------
-// WHY: review_reports/review_T-E4X-03.md and review_reports/review_T-E50-02.md
-// document that this derivation's literal text changed FOUR times across two
-// tickets:
-//   round 1 (E49) — hunt ticket/feature SLUGS in commit subjects/bodies. Wrong
-//     on the exact release it was written for: v3.95.0 yielded {E37,E38}
-//     (disjoint from the right answer {E45,E46}), because shipped tickets
-//     appear in the range only as bare codes, never as slugs (review findings F1-F3).
-//   round 2 (E49) — committed history only (`git log --diff-filter=A`). Fixed
-//     the round-1 findings, but silently returns EMPTY on v3.93.0 and v3.94.0 — 2 of the last
-//     6 releases — because qa_reports/ evidence is routinely UNTRACKED at
-//     the time step 7a runs (step 8's `git add qa_reports/` is what first commits it).
-//     Combined with "zero matches = silent no-op", this is a regression versus
-//     the rule before E49, which archived those releases correctly by
-//     working-tree existence (F7 — the round-2 BLOCKING finding).
-//   round 3 (E49, APPROVED) — enumerate root-level qa_reports/ files as they
-//     sit in the WORKING TREE right now, and use the git range only as a
-//     MEMBERSHIP TEST against PREV_TAG's tree. Backtested against all six of
-//     this repo's last releases in six detached worktrees, reproducing every
-//     "actually archived" outcome including the two that round 2 returned
-//     empty for. Round 3 also recorded N4 (non-blocking then): an
-//     empty/unresolvable PREV_TAG baseline makes `grep -vxFf` pass its WHOLE
-//     input through — a mass-sweep hazard, explicitly left unfixed.
-//   Round 1 of E50 — (a) guarded the empty-baseline mass-sweep hazard (N4), but shipped
-//     the guard as a single global flag (F9: permanently wedges any workspace that has never
-//     produced a review_reports/ tree) and (b) added zero-match logging that
-//     expanded an UNBOUND `$CODES` variable, printing `{∅}` on every release,
-//     including non-empty ones (F8) — CHANGES_REQUESTED.
-//   Round 2 of E50 (APPROVED, shipped) — the unbound-variable defect (F8) closed by
-//     binding `CODES=$( { ... } | ... )`; F9 closed by splitting the single flag into per-tree
-//     STOP_QA/STOP_RR/EXCLUDE_QA/EXCLUDE_RR, so an absent or never-seeded
-//     review_reports/ tree no longer blocks qa_reports/'s half and does not
-//     recur release after release. (c) extends the whole predicate to
-//     review_reports/ under a PARALLEL archive dir (never folded into
-//     qa_reports/archive/ — the two streams share basenames, verified against
-//     the real v3.96.0 review_T-E4X-03.md collision).
-// These tests pin the ACTUALLY SHIPPED (E50 round 2) text and behavior — not
-// any earlier draft — per the "Test-coverage note for T-E50-03" in
-// review_T-E50-02.md (12 items, sequenced by consequence).
+// The derivation changed four times across two tickets, and two earlier forms
+// were wrong on real releases. These tests pin the shipped text and behaviour
+// (E50 round 2). Round history: specs/e260h-comment-rationale.md (test/release-staging.test.mjs).
 
-// Model of the shipped filename -> code extraction (E50 round 2, F8/attack 1):
+// Model of the shipped filename -> code extraction (step 7a):
 //   sed -E 's#.*<slash>##' | grep -oE '^[a-z_]*T-[A-Za-z0-9]+-' \
 //     | sed -E 's/^[a-z_]*T-//; s/-$//' | tr 'a-z' 'A-Z'
-// (literal shell text elided above to avoid a stray "*<slash>" closing this
-// block comment early — the shell strips the leading directory with a basic
-// sed substitution). Operates on a BASENAME (callers strip the directory
-// themselves via path.posix.basename, matching the shipped pipeline's own
-// ordering). Returns the uppercased code, or null when the filename carries
-// no `T-<CODE>-` segment reachable from an anchored `[a-z_]*` prefix run.
+// Takes a basename (callers strip the directory, as the pipeline does) and
+// returns the uppercased code, or null when no `T-<CODE>-` segment follows an
+// anchored `[a-z_]*` prefix.
 function codeFromFilename(basename) {
   const m = basename.match(/^[a-z_]*T-([A-Za-z0-9]+)-/);
   return m ? m[1].toUpperCase() : null;
@@ -1726,14 +1636,9 @@ test("E49 step 7a: skill text pins the ACTUALLY SHIPPED derivation literally, bo
 });
 
 test("E50 step 7a (N14 CLOSED — pin repointed at the EXECUTABLE CODES= fence): does not resurrect the round-2 committed-history-only rule (a substring pin on the round-2 command must fail)", () => {
-  // Stale-pin fix (finding N14, review_T-E50-02.md round 2): the PRE-EXISTING version of this test
-  // anchored on `/```\n(\s*find qa_reports -maxdepth 1[\s\S]*?)```/`, which
-  // matches the FIRST fence beginning "find qa_reports -maxdepth 1" — after
-  // the change in E50, that is the ILLUSTRATIVE fence (content/skill-release-engineer.md's
-  // "Derive the ticket-code SET" prose block), not the CODES= fence the role
-  // actually executes. Reintroducing `git log`/`--diff-filter=A` into the
-  // CODES= fence would have left that stale pin green. Repointed here at the
-  // fence that opens with the `CODES=$( {` binding (E50 round 2, F8).
+  // The old pin matched the first "find qa_reports -maxdepth 1" fence, which is
+  // the illustrative one, so re-adding committed-history logic to the executed
+  // fence stayed green. It now anchors on the `CODES=$( {` fence the role runs.
   const fenceMatch = SKILL.match(/```\n(\s*CODES=\$\( \{[\s\S]*?)```/);
   assert.ok(fenceMatch, "must find step 7a's EXECUTABLE CODES= fenced derivation code block");
   const fence = fenceMatch[1];
@@ -1879,16 +1784,9 @@ test("E49 step 7a (N2): filenames with no T-<CODE>- substring (expected-red_*) a
 });
 
 test("E50 step 7a (Item 0 — F9 CLOSED, N4 hazard closed): an empty PREV_TAG baseline WITH root files present now STOPs instead of admitting every root-level file", () => {
-  // This test REPLACES, in place, the prior pin at this exact location that
-  // asserted deriveCodesFromWorkingTree(["...E45...","...OLD..."], []) ->
-  // ["E45","OLD"] as "current (unguarded) behavior ... NOT this ticket's to
-  // fix" (round 3's N4). review_T-E50-02.md's Item 0 is explicit: E50 exists
-  // to close exactly this hazard, so leaving that pin standing beside a new
-  // guard test would assert the mass-sweep this ticket was written to kill —
-  // two tests pinning opposite behaviors is a contradiction, and the stale
-  // one reads as sanction for the permissive path. Rewritten in place; the
-  // ["E45","OLD"] fixture is carried forward as the set that must NOT be
-  // produced.
+  // Replaces, in place, a pin that asserted the unguarded mass-sweep
+  // (["E45","OLD"]) as current behaviour; keeping both would pin opposite
+  // behaviours. That set is now what must NOT be produced.
   const workingTree = ["qa_reports/review_T-E45-01.md", "qa_reports/review_T-OLD-01.md"];
   const prevTagTree = []; // empty baseline: no tags yet, or PREV_TAG predates qa_reports/
 
@@ -1947,12 +1845,9 @@ test("E49/E44 step-order pin: step 7a precedes step 8a (the commit) in the file,
 });
 
 // ---------------------------------------------------------------------------
-// Phase 8 — E50: step 7a per-tree empty-baseline guard, review_reports/
-// extension, and the extraction-chain filename-shape matrix.
-// review_reports/review_T-E50-02.md, "Test-coverage note for T-E50-03 —
-// FINAL, supersedes Round 1" (12 items, ordered by consequence). Items 0
-// (guard flip) and 1 (N14 fence repoint) are addressed in place above; the
-// remainder follow here.
+// Phase 8 — step 7a per-tree empty-baseline guard, the review_reports/
+// extension and the filename-shape matrix (E50; the guard flip and the
+// fence repoint are covered above).
 // ---------------------------------------------------------------------------
 
 test("E50 step 7a (Item 3 — 14-row filename-shape matrix, attack 1): the shipped extraction chain produces exactly these codes, or none", () => {
@@ -2020,15 +1915,10 @@ test("E50 step 7a (F9 — per-tree guard, all shapes): tree absent, baseline emp
 });
 
 test("E50 step 7a (Item 4 — F9 CLOSED, the permanent-wedge shape from round 1): a workspace whose review_reports/ tree never exists proceeds across THREE CONSECUTIVE releases, not just once", () => {
-  // Round 1's F9 finding: a global-OR guard STOPped this shape at release 2
-  // and recurred at release 3, forever -- self-inflicted, since nothing in
-  // the loop ever creates review_reports/. A fix that merely DEFERS the STOP
-  // (e.g. only clears at release 2) would still fail this test, because it
-  // asserts the SAME workspace shape at three consecutive tags. Mature
-  // workspace: qa_reports/ already has a non-empty baseline BEFORE this
-  // fixture's window (a "review_T-PRIOR-01.md" from an earlier release) so
-  // qa_reports/'s own guard outcome is "included" throughout, isolating
-  // review_reports/'s permanent absence as the only variable under test.
+  // A global guard STOPped this shape at release 2 and at every release after,
+  // since nothing creates review_reports/. Three consecutive tags catch a fix
+  // that only defers the STOP. qa_reports/ has a prior baseline, so the
+  // absence of review_reports/ is the only variable.
   const releases = [
     {
       prevTag: "v1.0.0",
@@ -2217,12 +2107,9 @@ test("E50 step 7a: the guard block precedes the CODES= derivation, mkdir, and mo
 });
 
 // ---------------------------------------------------------------------------
-// Phase 9 — E65 (step-8/10/11 ordering + adapter-stamp bump) and E55
-// (terminal handback naming), T-E645-03 points 4-5.
-// review_reports/review_T-E645-02.md rounds 1-2 APPROVED sr's step-order
-// change (F-OK-4) and the E55 terminal step (F-OK-6); these pins hold the
-// order itself, since order is the entire defect E65 documents — a review
-// that reads the moved steps without checking their sequence would miss it.
+// Phase 9 — E65 (step 8/10/11 ordering, adapter-stamp bump) and E55 (terminal
+// handback naming). These pin the order itself, since the wrong order was the
+// whole defect and a review of the moved steps can miss it.
 // ---------------------------------------------------------------------------
 
 test("E65: the five newly-staged metadata paths appear in step 8's git-add line", () => {
@@ -2288,15 +2175,10 @@ test("E55: the terminal handback step names the post-release PM/backlog-intake d
 });
 
 // ---------------------------------------------------------------------------
-// Phase 10 — E71 (docs/backlog.md:194, incl. the 2026-08-17 v3.102.1 amendment):
-// four release-SOP defects found only when the SOP is EXECUTED, not read.
-// review_reports/review_T-E69-01.md's coverage note for this ticket: "no pin
-// *could* have caught either round-1 blocker — prefer executing the snippets
-// over string-matching them". (a) and (b) below therefore extract the SOP's
-// own fenced/inline shell snippets programmatically and EXECUTE them (with a
-// negative control reproducing the pre-fix defect in the same shell), rather
-// than asserting on their string form. (c) and (d) are pure wording fixes with
-// no executable component and are pinned as content assertions.
+// Phase 10 — E71: four release-SOP defects found only by executing the SOP.
+// (a) and (b) extract the SOP's own shell snippets and run them, with a
+// negative control reproducing the pre-fix defect; (c) and (d) are wording
+// fixes, pinned as content assertions.
 // ---------------------------------------------------------------------------
 
 const which = (bin) => {
@@ -2308,22 +2190,9 @@ const which = (bin) => {
 };
 
 test("E71(a): the git-add line stages exactly 34 paths (19 directories + 15 metadata), set-equal to FEATURE_DIRS/METADATA_PATHS/E65_METADATA_PATHS/E94_METADATA_PATHS/E198B_METADATA_PATHS", () => {
-  // Coverage note 2 (review_reports/review_T-E69-01.md, both rounds): the
-  // capture group now includes a leading "--" (E71a's `git add --`), so an
-  // exact-token-count pin must normalize it away, or the raw token count is
-  // off by one (35 including "--", not the true 34).
-  //
-  // Re-baselined 31->33 / 12->14 metadata (T-E94-01): CONTRIBUTING.md and
-  // tasks.md joined the git-add line and the existence pre-filter; see
-  // E94_METADATA_PATHS above. package-lock.json was NOT re-added — E60
-  // already staged it (test/release-staging.test.mjs METADATA_PATHS,
-  // predates this change).
-  //
-  // Re-baselined 33->34 / 14->15 metadata (T-E130-07, E198(b)): a third
-  // root-ledger path, `.current/_primary/tasks.md`, joined the git-add line
-  // and the existence pre-filter (E198B_METADATA_PATHS above) — post-E125a,
-  // `tw_complete_task` on primary writes there, not to root `tasks.md`, so
-  // the release commit was silently missing the ledger it actually mutates.
+  // The capture group starts with "--" (`git add --`), so the token count
+  // drops it. The count grew with CONTRIBUTING.md and tasks.md (E94) and with
+  // `.current/_primary/tasks.md` (E198(b)); see the *_METADATA_PATHS arrays above.
   const gitAddMatch = SKILL.match(/^\s+git add (.+)$/m);
   assert.ok(gitAddMatch, "must find the git-add line");
   const stagedTokens = gitAddMatch[1].split(/\s+/).filter(Boolean).filter((t) => t !== "--");
@@ -2457,36 +2326,12 @@ test("E71(d): step 7c names the DONE-but-unreleased pre-marked-row shape and sta
   assert.match(section7c, /do NOT append a duplicate row/, "step 7c must forbid appending a duplicate row for the same feature (E71d)");
 });
 
-// Residual from review_reports/review_T-E69-01.md round 2 ("Minor 2"),
-// RETARGETED by E76 round 2 (review_reports/review_T-E76-01.md, code-reviewer
-// Quality item): the underlying asymmetry is UNCHANGED -- code-reviewer
-// confirmed it is "still exactly present" -- but E76 rewrote step 7a's move
-// loop from one-bullet-per-tree (each an inline `[ -z "$EXCLUDE_*" ] &&`
-// prefix on its own line) into a single heredoc block where the two move
-// loops share one `for c in $CODES; do ... done` and the review_reports side
-// is now guarded by an ENCLOSING `if [ -z "$EXCLUDE_RR" ]; then ... fi`
-// rather than an inline prefix on the same line as the `find`. The old
-// predicates searched for a literal `<CODE>` placeholder and an inline
-// `&&` guard on the match line itself -- both stale against the rewritten
-// text (`<CODE>` is now the shell variable `${c}`, and the guard moved to
-// the line above) -- so the test died at `assert.ok(rrLine)` before ever
-// reaching the guard assertions, silently stopping being a ratchet on the
-// asymmetry it exists to pin. Retargeted, not retired: the qa_reports move
-// example is STILL not EXCLUDE_QA-guarded (:143), while the review_reports
-// move example IS EXCLUDE_RR-guarded, now via the enclosing `if` at :146
-// rather than an inline `&&` at :147. Consequence if executed with
-// EXCLUDE_QA set is unchanged: one stderr line from `find`, nothing moved,
-// exit 0 -- noise, not damage.
-// QA DECISION (this ticket, not a new sr round): PASS, not FAIL, same as
-// before -- code-reviewer did not block on this in either round (cosmetic
-// asymmetry, zero behavioral difference on any path), and QA's own scope is
-// failing tests/missing coverage/test-infra defects, not this kind of
-// readability asymmetry. Pinned here as an EXACT ratchet on BOTH the guard's
-// shape and its presence/absence: this test reds the moment either guard's
-// presence changes, OR the review_reports guard's shape reverts from an
-// enclosing `if` back to an inline `&&` prefix -- so a future fix to :143
-// (adding an `EXCLUDE_QA` guard to the qa_reports loop) forces this pin to be
-// updated rather than drifting unnoticed either direction.
+// Known asymmetry, pinned as a ratchet: step 7a's review_reports move loop is
+// guarded by an enclosing `if [ -z "$EXCLUDE_RR" ]`, while the qa_reports loop
+// has no EXCLUDE_QA guard. Running it with EXCLUDE_QA set only prints one
+// stderr line, so it was passed as cosmetic. The test fails if either guard's
+// presence changes or the RR guard reverts to an inline `&&`, so a fix must
+// update this pin. History: specs/e260h-comment-rationale.md (test/release-staging.test.mjs).
 test("residual (review round 2, Minor 2; retargeted E76 round 2): review_reports move example is EXCLUDE_RR-guarded via an enclosing if; qa_reports move example is NOT YET EXCLUDE_QA-guarded (known asymmetry, non-blocking, PASSed by qa-engineer -- see qa_reports/review_T-E76-02.md)", () => {
   const lines = SKILL.split("\n");
   const rrIdx = lines.findIndex((l) => l.includes("find review_reports -maxdepth 1 -name \"review_T-${c}-*.md\""));
@@ -2517,15 +2362,9 @@ test("residual (review round 2, Minor 2; retargeted E76 round 2): review_reports
 });
 
 // ---------------------------------------------------------------------------
-// Class-assertion pins added under T-E76-02 (E76 round 2, code-reviewer's explicit recommendation): a
-// CLASS assertion over an instance pin, per the E66/E69 precedent both cited
-// by name in review_reports/review_T-E76-01.md's Round 2 Architecture
-// section as the durable control code-reviewer chose INSTEAD OF a third
-// sr-engineer round. These extract step 7a's five fragments mechanically
-// (the same extraction shape N14/E50's fence-repointing tests above already
-// use) and assemble them exactly as the SOP instructs, so the assertions
-// below run against the ACTUAL shipped script text, not a hand-copied
-// restatement of it that could silently drift from the source.
+// Class-assertion pins (E76): instead of pinning one instance, these extract
+// step 7a's five fragments and assemble them as the SOP instructs, so the
+// assertions run against the shipped script text, not a hand copy of it.
 // ---------------------------------------------------------------------------
 
 /**
@@ -2542,15 +2381,10 @@ function dedentFence(fenceText) {
 }
 
 /**
- * Mask the INTERIOR of quoted strings (replacing bytes with 'x', preserving
- * the quote characters themselves and all other structure) for the quote
- * types named in `quotes`. Used to tell a real shell-level `VAR=` assignment
- * or `$VAR` reference apart from a variable name that merely appears as
- * human-readable STRING DATA -- e.g. step 7a's own STOP message embeds the
- * literal text `(PREV_TAG='$PREV_TAG')` inside MSG's double-quoted value,
- * purely to show the operator what the printed message will look like. That
- * substring reads exactly like a `PREV_TAG=` assignment to a naive scanner,
- * which would silently defeat the very class check this pin exists to be.
+ * Mask the interior of quoted strings (quote types in `quotes`) with 'x',
+ * keeping the quotes and all other structure. This tells a real shell `VAR=`
+ * or `$VAR` apart from one inside string data, such as step 7a's STOP message
+ * text `(PREV_TAG='$PREV_TAG')`, which would otherwise defeat the class check.
  */
 function maskQuoted(text, quotes) {
   let out = "";
@@ -2575,21 +2409,11 @@ function maskQuoted(text, quotes) {
 }
 
 /**
- * Compute the set of shell variable names ASSIGNED within a script and the
- * set REFERENCED (via `$VAR` / `${VAR}`) anywhere within it.
- *
- * Assigned: scanned on a copy with BOTH quote types' interiors masked -- a
- * real assignment's LHS name is always outside any quoting (`VAR=value`,
- * never `"VAR"=value`), so masking removes false hits from string DATA that
- * merely looks like `VAR=`. `for VAR in ...; do` loop headers count too --
- * they bind VAR exactly as an assignment would.
- *
- * Referenced: scanned on a copy with only SINGLE-quote interiors masked --
- * bash does not interpolate inside single-quoted strings (step 7a's own
- * `COVERS_RE='...'` and `tr 'a-z' 'A-Z'` are single-quoted and contain no
- * `$`, so this never bites here, but the distinction is correct in general),
- * while a double-quoted `$VAR` (e.g. `"$PREV_TAG"`) is a genuine reference
- * and must stay visible to the scan.
+ * Sets of shell variable names assigned and referenced (`$VAR`, `${VAR}`) in a
+ * script. Assignments are scanned with both quote types masked (an assignment
+ * name is never quoted) and include `for VAR in` headers. References are
+ * scanned with only single quotes masked, since bash expands `$VAR` inside
+ * double quotes but not inside single quotes.
  */
 function extractAssignedAndReferenced(script) {
   const forAssignment = maskQuoted(script, ["'", '"']);
@@ -2664,14 +2488,9 @@ test("T-E76-02 (class assertion, closes F1): every variable REFERENCED anywhere 
     `sanity (non-load-bearing): assigned-but-never-referenced variables found: ${assignedNotReferenced.join(", ")} -- the shipped text has none; if this now fails, someone added a dead assignment (harmless, but update this pin's comment if intentional)`,
   );
 
-  // GUARD-THE-GUARD (this pin must red against the round-1 text, demonstrated
-  // rather than asserted): round 1's enumeration named only fragments 2-7
-  // ("everything below") and never listed the PREV_TAG bullet above it -- so
-  // the script round 1 actually told the executor to assemble omitted
-  // fragment 1 entirely. Reconstruct that exact omission against the CURRENT
-  // (round-2, otherwise-correct) fragments 2-5 and confirm the invariant
-  // above would have caught it: PREV_TAG is read by the guard but bound
-  // nowhere in a script that omits fragment 1.
+  // Guard the guard: round 1's assembly list omitted fragment 1, the PREV_TAG
+  // binding. Rebuild that omission from the current fragments 2-5 and confirm
+  // the invariant above catches it: PREV_TAG is read but never bound.
   const round1Reconstruction = [frags.frag2, frags.frag3, frags.frag4, frags.frag5].join("\n");
   const round1 = extractAssignedAndReferenced(round1Reconstruction);
   const round1ReferencedNotAssigned = [...round1.referenced].filter((v) => !round1.assigned.has(v));
@@ -2683,14 +2502,10 @@ test("T-E76-02 (class assertion, closes F1): every variable REFERENCED anywhere 
 });
 
 test("T-E76-02 (class assertion, pins fragment 3's identity): exactly ONE fence in step 7a opens with the executable `CODES=$(` binding", () => {
-  // Distinguishes the one EXECUTABLE derivation fence from the illustrative
-  // find/grep example fence immediately above it (":107-111", never bound to
-  // CODES, shown only to explain the per-tree predicate) -- an executor (or
-  // a future edit) that assembled the illustrative fence instead would bind
-  // nothing, silently reproducing the E76 empty-derivation hazard (round 2's
-  // Quality section: "the wrong fence prints the files it failed to derive
-  // from, directly above {∅}"). Scoped to step 7a only, not the whole file --
-  // step 8's unrelated `bash -c` existence-pre-filter fence is out of scope.
+  // Tells the one executable derivation fence apart from the illustrative
+  // find/grep fence above it; assembling the illustrative one would bind
+  // nothing and reproduce the empty-derivation hazard. Scoped to step 7a, since
+  // step 8 has an unrelated `bash -c` fence.
   const start = SKILL.indexOf("7a. **Archive shipped");
   const end = SKILL.indexOf("7b. **Drift-baseline");
   assert.ok(start > -1 && end > start, "must find step 7a's section boundaries");

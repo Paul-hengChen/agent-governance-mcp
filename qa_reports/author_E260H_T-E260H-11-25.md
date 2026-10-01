@@ -29,3 +29,4 @@ One row per task; `proof` is `node .current/e260h/proof.mjs --changed-only` on t
 | task | files | blocks of 8+ trimmed | retained 8–20 | proof |
 |---|---|---|---|---|
 | T-E260H-13 | `test/release-staging.test.mjs` base lines 1–1500 | 18 (header 36 lines, longest) | 0 | emit/leaves 0 differ; only part-B blocks left over 7 |
+| T-E260H-14 | `test/release-staging.test.mjs` base lines 1501–end | 17 (longest 50) | 0 | PASS; file has no block over 7 |
