@@ -1,5 +1,7 @@
 # Pending tickets — lane e260g
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E260G-NEW-1
 title: Small comment and proof-script nits left in lane e260g's test files after the E260 trim
@@ -18,5 +20,3 @@ body: |
   whitespace-only reflow. Worth carrying into any future comment-trim proof script, not this one.
   Test-file edits are qa-engineer-only.
 ```
-
-## Applied
