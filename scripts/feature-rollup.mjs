@@ -1,18 +1,9 @@
 #!/usr/bin/env node
 // Coded by @sr-engineer
-// Thin CLI wrapper for the feature-level roll-up across lanes (E113). All
-// logic lives in tools/feature-rollup.ts (compiled to
-// dist/tools/feature-rollup.js) — this script only wires argv to it and prints
-// the result, mirroring the existing scripts/summarize-metrics.mjs /
-// scripts/smoke-rag.mjs pattern (plain Node ESM importing from
-// dist/tools/*.js, zero script-level logic of its own).
-//
-// This is the manual entry point the coord-03-core-fallback.md "Feature-close
-// roll-up obligation" points a PM/coordinator at before declaring a
-// multi-lane feature closed. It is also the forward hook for the eventual
-// `agc feature finish` (E130, Wave 7), which will call computeFeatureRollup /
-// renderRollupReport directly instead of shelling out to this script.
-//
+// Thin CLI wrapper for the feature-level roll-up across lanes (E113); all
+// logic is in tools/feature-rollup.ts. It is the manual entry point that the
+// "Feature-close roll-up obligation" in coord-03-core-fallback.md names
+// before a multi-lane feature is closed; see specs/e260c-bin-scripts.md.
 // Usage: node scripts/feature-rollup.mjs <feature-id> [repo-root]
 //        (repo-root defaults to the current working directory)
 

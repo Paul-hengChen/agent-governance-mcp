@@ -1,20 +1,11 @@
 #!/usr/bin/env node
 // Coded by @sr-engineer
 // Thin CLI wrapper for the join precondition check: a join ticket may start
-// only once the lane branches it depends on are merged into HEAD (E115). All
-// logic lives in tools/join-precondition.ts (compiled to
-// dist/tools/join-precondition.js) — this script only wires argv to it and
-// prints the result, mirroring the existing scripts/feature-rollup.mjs pattern
-// (plain Node ESM importing from dist/tools/*.js, zero script-level logic of
-// its own).
-//
-// This is the manual entry point a join ticket's build-entry step runs
-// deliberately before starting work (spec: specs/e115-join-precondition-check.md)
-// — it fires no gate and is not wired into UPDATE_STATE_GATE_PIPELINE.
-//
+// only once the lane branches it depends on are merged into HEAD (E115); all
+// logic is in tools/join-precondition.ts. Run by hand at a join ticket's build
+// entry; it fires no gate (spec: specs/e115-join-precondition-check.md).
 // Usage: node scripts/join-precondition.mjs <depends_on-branch...> [repo-root]
-//        (repo-root defaults to the current working directory; when given,
-//        it must be the LAST argument and an absolute path)
+//        (repo-root defaults to cwd; when given, it must be the LAST argument and absolute)
 
 import {
   checkLaneAncestry,
