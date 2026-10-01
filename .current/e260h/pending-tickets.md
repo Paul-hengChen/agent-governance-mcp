@@ -15,4 +15,20 @@ body: |
   checked against today, then fix the table and its comments together (qa-engineer owns test/).
 ```
 
+```pending-ticket
+lane_local_id: E260H-NEW-2
+title: Comment accuracy fixes in e260h test files left after the E260 trim (pixel-gate-attestation header names the wrong dist file; qa-flow rationale has no pointer)
+priority: P3
+depends_on: [E260]
+source: qa-engineer verifier, e260h T-E260H-26 (qa_reports/verify_E260H_T-E260H-26.md, findings F1, F2)
+body: |
+  Comment-only, non-blocking at QA. F1, stale at base: the header of
+  test/pixel-gate-attestation.test.mjs says the verbatim error-string tests (E) read
+  dist/index.js; they read dist/tools/handoff-orchestrator.js and dist/gates/registry.js,
+  as the file's own later comment says. The trim carried the wrong location over.
+  F2: specs/e260h-comment-rationale.md has a test/qa-flow.test.mjs section holding two
+  points no other spec records, but nothing in test/qa-flow.test.mjs points to it; add a
+  one-line pointer. Both edits are in test/, so qa-engineer authors them.
+```
+
 ## Applied
