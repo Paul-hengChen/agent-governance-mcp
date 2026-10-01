@@ -1,45 +1,9 @@
 // Coded by @qa-engineer
-// Tests the write-boundary check that rejects a state-write text field ending in
-// leftover tool-call markup (a malformed multi-argument call bleeding into one
-// field), and the marker written when whole pending notes are dropped for size.
-// Spec: specs/e92-e86-handoff-write-boundary.md, AC1-AC5. Full AC1-AC5
-// coverage; the separate repro file covers only the reproduction.
-// (T-QA-01, T-E86-01, T-E92-01)
-//
-// Why this file leads with a corpus sweep: the whole existing suite stayed green
-// while two drafts of this check wrongly rejected valid text (F1: bare
-// placeholders and TS generics rejected; F4: a tag fragment quoted mid-string
-// with more prose after it rejected). A green suite was never coverage for this
-// check. Both defects were found by running real corpus lines through the
-// shipped `run()` path, not by hand-written cases, so the corpus sweep near
-// the bottom is the main method here, and both false positives are pinned as
-// regression tests so a later tightening of the regex cannot bring them back.
-//
-// Spec-to-test map:
-//   AC1 (reject true-positive tails, verbatim message) -> "AC1:" tests
-//   AC2 (accept mid-string / false-positive tails)      -> "AC2:" tests,
-//                                                          NEW-3/NEW-4 tests,
-//                                                          corpus sweep
-//   AC3 (whole-note-drop omission marker)               -> "AC3:" tests
-//   AC4 (no read-path re-validation)                    -> "AC4:" tests
-//   AC5 (no new false rejections / just-under-cap)       -> "AC5:" tests,
-//                                                          corpus sweep,
-//                                                          full suite (npm test)
-//
-// Guarded fields under test (spec Problem Statement and the code review's
-// guidance): pending_notes[i], scope_decision_why, qa_review,
-// blocking_reason (all via tw_update_state), and tw_add_task's description.
-//
-// Workspace note: AC1/AC2/NEW-3/NEW-4/whitespace/corpus tests exercise only
-// the zod-level `superRefine` (schema validation), which never touches the
-// filesystem — `workspace_path` only needs `path.isAbsolute()` to hold, and
-// any downstream guard/handler rejection (e.g. PREFLIGHT_REQUIRED, since
-// tw_get_state was never called against this workspace) is irrelevant to
-// what these tests assert and is swallowed deliberately. A single
-// non-existent absolute path is reused across all of them — no tmpdir, no
-// fs writes, nothing to clean up. AC3/AC4 genuinely round-trip through
-// tools/handoff.js and DO use real tmpdir workspaces (os.tmpdir(), never the
-// repo root, per plan §2.5).
+// Tests the write-boundary check that rejects a state-write text field ending in leftover
+// tool-call markup, and the marker written when whole pending notes are dropped for size.
+// Spec: specs/e92-e86-handoff-write-boundary.md, AC1-AC5 (the separate repro file covers
+// only the reproduction). The corpus sweep near the bottom is the main method here.
+// Rationale: specs/e260g-comment-rationale.md (test/e92-e86-handoff-write-boundary.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -196,17 +160,12 @@ for (const field of GUARDED_FIELDS) {
   }
 }
 
-// ==========================================================================
-// AC2 — valid text that must be accepted. This matters most: both defects
-// that shipped in drafts of the check were here. Two families:
-//   (a) bare agc placeholders and ordinary TS generics at the tail,
-//       including the exact content/coord-01-core-head.md "verdict" line,
-//       which a draft wrongly rejected. (F1)
-//   (b) a tag fragment with an UNTERMINATED quote followed by more prose —
-//       the shape anyone describing this feature writes naturally, for
-//       example in qa_review. (F4) This
-//       is asserted across ALL FIVE guarded fields, not just one.
-// ==========================================================================
+// ===========================================================================
+// AC2: valid text that must be accepted; both defects in drafts of the check were here:
+// (a) bare agc placeholders and TS generics at the tail, e.g. the content/coord-01-core-head.md
+// "verdict" line (F1); (b) a tag fragment with an UNTERMINATED quote followed by prose (F4),
+// asserted across ALL FIVE guarded fields.
+// ===========================================================================
 const ROUND1_FALSE_POSITIVES = [
   ["bare <role> placeholder", "next hop is <role>"],
   ["bare specs/<feature> placeholder", "the spec is specs/<feature>"],
@@ -260,15 +219,11 @@ test("AC2: a fragment quoted mid-string then closed, with prose both before and 
   }
 });
 
-// ==========================================================================
-// Deliberately accepted misses — pin these as ACCEPTED, not as failures.
-// They are a chosen trade-off of a design with no list of tag names (a bare
-// <parameter>/<invoke> is structurally indistinguishable from <role>/<div>
-// without a vocabulary check, which the design deliberately declines), NOT
-// gaps to close. A future "tightening" that makes any of these reject again
-// must consciously update this test, not stumble into it as a side effect.
-// (NEW-3, NEW-4, F3)
-// ==========================================================================
+// ===========================================================================
+// Deliberately accepted misses, pinned as ACCEPTED: a design with no tag-name list cannot
+// tell a bare <parameter>/<invoke> from <role>/<div>. Tightening must update this test
+// consciously (NEW-3, NEW-4, F3).
+// ===========================================================================
 const ACCEPTED_BY_DESIGN_SHAPES = [
   ["NEW-3: bare open tag <parameter> (no attribute, no slash)", "the bleed tail was <parameter>"],
   ["NEW-3: bare open tag <invoke>", "the bleed tail was <invoke>"],
@@ -294,14 +249,11 @@ for (const field of GUARDED_FIELDS) {
   }
 }
 
-// ==========================================================================
-// Whitespace / Unicode boundary (NEW-2 and siblings). A trailing space,
-// tab, newline, CRLF, NBSP, U+2028, U+2029 or U+200B after a genuine
-// true-positive tail must NOT defeat the check. U+200B is the
-// regression-prone one: it depends on a single ​ escape in a single
-// character class at tools/registry.ts:169, and an editor/autofix could
-// silently delete the invisible escaped character with no visible diff.
-// ==========================================================================
+// ===========================================================================
+// Whitespace / Unicode boundary (NEW-2): a trailing space, tab, newline, CRLF, NBSP, U+2028,
+// U+2029 or U+200B after a true-positive tail must NOT defeat the check. U+200B is fragile:
+// it rests on one escape in one character class in tools/registry.ts that an autofix could delete.
+// ===========================================================================
 const TRAILING_WHITESPACE_VARIANTS = [
   ["trailing space", " "],
   ["trailing tab", "\t"],
@@ -328,14 +280,9 @@ for (const field of ["qa_review", "pending_notes[0]"]) {
 }
 
 test("Whitespace boundary (static): tools/registry.ts and its dist mirror contain the U+200B escape, not a raw invisible byte", () => {
-  // Automates the check the code reviewer ran by hand
-  // (`LC_ALL=C grep -c` for the raw e2 80 8b byte sequence returning 0). A source file's TEXT containing the six
-  // ASCII characters `\`, `u`, `2`, `0`, `0`, `B` (the escape) does NOT match
-  // a literal U+200B codepoint when read as a string — only an actual
-  // invisible character embedded in the file would. This guards the OTHER
-  // failure mode from the behavioral test above: someone replacing the
-  // escape with a literal invisible character, which is fragile because a
-  // lint autofix or copy-paste could delete it with no visible diff.
+  // Static check: the source holds the six ASCII characters of the escape, not a raw
+  // invisible U+200B byte (which a lint autofix or copy-paste could delete unnoticed).
+  // Guards the failure mode the behavioral test above cannot see.
   for (const rel of ["tools/registry.ts", "dist/tools/registry.js"]) {
     const text = fs.readFileSync(path.join(PROJECT_ROOT, rel), "utf-8");
     const rawZwsCount = (text.match(/​/gu) || []).length;
@@ -365,15 +312,12 @@ for (const { field, cap } of CAP_BOUNDARIES) {
   });
 }
 
-// ==========================================================================
-// Corpus sweep (AC2/AC5) — the method that actually caught both blockers.
-// Every non-blank line (up to the qa_review 10000-char cap — 3 lines in
-// docs/backlog.md exceed it and are skipped as a length-cap concern
-// unrelated to this predicate, not a markup one) of content/*.md and
-// docs/backlog.md, fed through the real shipped tw_update_state schema as a
-// qa_review value. Zero should reject. content/**.md is read-only sweep
-// input per the dispatch brief — nothing here writes to it.
-// ==========================================================================
+// ===========================================================================
+// Corpus sweep (AC2/AC5), the method that caught both blockers: every non-blank line of
+// content/*.md and docs/backlog.md (3 over the qa_review 10000-char cap are skipped) goes
+// through the shipped tw_update_state schema as a qa_review value; zero should reject.
+// content/ is read-only input here.
+// ===========================================================================
 test("Corpus sweep: every non-blank line of content/*.md and docs/backlog.md is accepted as a qa_review value", () => {
   const files = [
     ...fs
@@ -417,11 +361,9 @@ test("Corpus sweep: every non-blank line of content/*.md and docs/backlog.md is 
 });
 
 // ==========================================================================
-// AC3 — when whole pending notes are dropped for size, a marker line says
-// how many were omitted. Re-runs the five fixtures the code reviewer ran,
-// against the compiled dist, instead of trusting that earlier result.
-// (E92)
-// ==========================================================================
+// AC3: when whole pending notes are dropped for size, a marker line says how many were
+// omitted. Re-runs the five fixtures the code reviewer ran against the compiled dist.
+// ===========================================================================
 function mkWorkspace() {
   const ws = fs.mkdtempSync(path.join(os.tmpdir(), "e92e86-qa-"));
   fs.mkdirSync(path.join(ws, ".current"), { recursive: true });

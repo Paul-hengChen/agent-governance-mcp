@@ -1,11 +1,9 @@
 // Coded by @sr-engineer
 // Minimal reproduction tests for the two handoff-write boundary bugs in
-// specs/e92-e86-handoff-write-boundary.md: a pending_notes entry that ends in
-// leftover tool-call markup must be rejected with its own message, and a
-// wholly dropped note must leave an omission marker. They were written to
-// fail against the unfixed code first, which proves they detect the bugs.
-// Full AC1-AC5 coverage lives in test/e92-e86-handoff-write-boundary.test.mjs.
-// (E86, E92, T-E86-01, T-E92-01)
+// specs/e92-e86-handoff-write-boundary.md: a pending_notes entry ending in leftover
+// tool-call markup must be rejected with its own message, and a wholly dropped note must
+// leave an omission marker. Written to fail against the unfixed code first.
+// Full AC1-AC5 coverage: test/e92-e86-handoff-write-boundary.test.mjs.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";

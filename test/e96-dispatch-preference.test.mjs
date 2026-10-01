@@ -1,39 +1,9 @@
 // Coded by @qa-engineer
-// Tests that the coordinator SOP prefers real subagent dispatch (Task) and only
-// falls back to in-context role switching when Task is genuinely unavailable —
-// a host system-prompt nudge is not a reason to fall back once the user has
-// asked for the chain. The spec is the backlog row (option (i)); there is no
-// specs/ file. (E96, T-E96-01, T-E96-02)
-//
-// Each test checks a kind of regression, not a byte diff:
-//
-//   1. t-anti-nudge-request  -> coord-02 states that an explicit /teamwork (or
-//      equivalent explicit coordinator entry) invocation IS the user's
-//      request for subagent dispatch. That is the root cause this fixes: a
-//      host system-prompt nudge is not grounds for the fallback once the user
-//      has already asked, via /teamwork, for the chain.
-//   2. t-when-do-compose-axis-* -> the WHEN/DO §3.2 surfacing rule composes
-//      ONLY under hostCapabilitiesFor("claude-code") and is ABSENT from the
-//      lean (undefined host) profile. The rule assumes the Task tool exists,
-//      so the rule and that assumption must sit on the SAME side of the
-//      host-capability compose axis; otherwise the rule fires as a false
-//      alarm on every hop under the default (undeclared-host) profile. A code
-//      review of the first draft caught exactly this. A text search over one
-//      file cannot catch it — it depends on composeSkill's per-fragment host
-//      tag — so the test composes both profiles through the real render
-//      path. (D6)
-//   3. t-fallback-genuine-unavailability / t-fallback-self-contained -> coord-03's
-//      fallback is (a) conditioned on genuine tool unavailability (host
-//      advertises no Task, or the Task call errors/unknown-subagent-types),
-//      (b) self-contained — no "above" pointer into coord-02, since a reader
-//      of the lean profile would see the pointer with nothing it points to
-//      (C2), and (c) the bare, unqualified "graceful and silent" wording is
-//      gone from the file, because a silent fallback is the defect itself.
-//
-// Each test searches for the SHAPE of the guarantee (host-tag placement,
-// self-containment, absence of the retired unqualified phrase) rather than
-// the exact sentence, so a future rewording that preserves the guarantee
-// keeps passing and one that breaks it fails.
+// Tests that the coordinator SOP prefers real subagent dispatch (Task) and falls back to
+// in-context role switching only when Task is genuinely unavailable; a host system-prompt
+// nudge is not a reason once the user has asked for the chain. The spec is the backlog row
+// (option (i)). Each test checks the SHAPE of a guarantee, not an exact sentence.
+// Rationale: specs/e260g-comment-rationale.md (test/e96-dispatch-preference.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";

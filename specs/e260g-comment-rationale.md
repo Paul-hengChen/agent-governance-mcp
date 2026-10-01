@@ -84,3 +84,60 @@ Ticket-to-test map:
 - guard-the-guard (must be red pre-fix): `t-e43-assertions-red-against-pre-e43-text`
 
 Why the tests check the shape of the rule rather than today's exact wording, where possible: the realistic regression is not "someone deletes branch (b)". It is someone adding a fourth branch that reintroduces a fall-through, adding a conditional template line without stating when it applies, or drifting the `Test-file placement` label in one of the three files that must agree on it. Instance pins on today's wording would miss all three (same approach as E66 option (ii) and E69).
+
+## test/e5-intake-tiering.test.mjs
+
+Tickets: E5. The file tests three coordinator intake rules and their config key. The config side follows the layout of the `tokenBudgetPerFeature` tests in `test/token-budget-config.test.mjs` (T-B9-03).
+
+Config-side spec-to-test map (`CutApprovalAutoTier` in tools/config.ts):
+
+- absent key means disabled: `t-absent-key`, `t-absent-file`
+- present `{}` gives conservative defaults: `t-empty-object-defaults`
+- non-object, array, null or primitive is treated as absent (non-fatal): `t-string-value`, `t-number-value`, `t-null-value`, `t-array-value`
+- `maxFiles` fractional positive is floored, not defaulted: `t-maxfiles-fractional`
+- `maxFiles` negative, zero, non-finite or non-number falls back to the default: `t-maxfiles-negative`, `t-maxfiles-zero`, `t-maxfiles-infinity`, `t-maxfiles-string`
+- `maxPriority` valid `^P\d+$` is surfaced verbatim: `t-maxpriority-valid`
+- `maxPriority` malformed pattern falls back to the default: `t-maxpriority-no-p`, `t-maxpriority-trailing-space`, `t-maxpriority-non-digit`
+- `allowSchemaChange` and `allowDesignArmed` accept strict `=== true` only: `t-booleans-strict-true`, `t-booleans-truthy-non-true-stays-false`
+- `CUT_APPROVAL_AUTO_TIER_DEFAULTS` export shape: `t-defaults-export-shape`
+- byte-identical regression for workspaces without the key: `t-existing-fields-untouched`
+
+Content spec-to-test map (plain text-containment checks against the shipped content files, in the style of `test/e16-judge-dispatch-charter.test.mjs`):
+
+- const-08 auto-tier bullet, trust rule plus same-write recording plus halt-over-threshold language: `t-const08-trust-rule`, `t-const08-same-write-recording`, `t-const08-halt-over-threshold`, `t-const08-advisory-not-enforced`
+- coord-03 Backlog Intake Loop present plus the never-auto-hop-to-release-engineer bound: `t-coord03-intake-loop-present`, `t-coord03-never-auto-hop-release`
+- coord-07 SOP step 4a present plus the §2/§3.2 hard-floor sentence: `t-coord07-step4a-present`, `t-coord07-hard-floor`
+
+## test/e90-golden-capture-completeness.test.mjs
+
+Tickets: E90, E43. Two of the twelve golden fixtures were once hand-rebuilt, so they existed only as files the regeneration tool could not reproduce. Map of claims to tests: all 12 fixtures captured is `t-captured-equals-on-disk` and `t-asserted-equals-on-disk`; every fixture the suite asserts against has a capture in the script is the three-way tie across both tests.
+
+Why: the capture script has its own completeness check (on-disk minus captured exits 1), but it only runs when someone runs the script by hand. Without this file, an edit that adds a golden fixture the suite asserts against without a capture for it, or adds a capture whose fixture never lands on disk, would go unnoticed until the next manual regeneration. This file runs the same "capture set equals fixture set" check on every `npm test` and also ties in the fixtures the two consuming suites (`compose-equivalence.test.mjs`, `skill-manifest.test.mjs`) read via `readGolden` or the `GOLDEN` constant. That three-way tie is stronger than the script's two-way check: a fixture an assertion depends on that has no capture and is not on disk is invisible to on-disk-minus-captured (both sets omit it), but shows up here.
+
+The check is deliberately static (it reads the script's source text) instead of running the capture script, because the script overwrites the committed fixtures in `test/fixtures/compose-golden/` and running it inside `npm test` would silently rewrite the files the suite compares against. The extractors key off literal calls to the `writeFixture(...)` helper, so a dead branch that merely mentions a fixture name (for example `constitution-monolith.txt` in an unused `else`) is not counted as a capture.
+
+## test/e92-e86-handoff-write-boundary.test.mjs
+
+Tickets: E86, E92. Why the file leads with a corpus sweep: the whole existing suite stayed green while two drafts of this check wrongly rejected valid text (F1: bare placeholders and TS generics rejected; F4: a tag fragment quoted mid-string with more prose after it rejected). A green suite was never coverage for this check. Both defects were found by running real corpus lines through the shipped `run()` path, not by hand-written cases, so the corpus sweep near the bottom is the main method, and both false positives are pinned as regression tests so a later tightening of the regex cannot bring them back.
+
+Spec-to-test map:
+
+- AC1, reject true-positive tails with the verbatim message: "AC1:" tests
+- AC2, accept mid-string and false-positive tails: "AC2:" tests, NEW-3 and NEW-4 tests, corpus sweep
+- AC3, whole-note-drop omission marker: "AC3:" tests
+- AC4, no read-path re-validation: "AC4:" tests
+- AC5, no new false rejections and the just-under-cap case: "AC5:" tests, corpus sweep, full suite
+
+Guarded fields under test: `pending_notes[i]`, `scope_decision_why`, `qa_review`, `blocking_reason` (all via `tw_update_state`), and `tw_add_task`'s description.
+
+Workspace note: the AC1, AC2, NEW-3, NEW-4, whitespace and corpus tests exercise only the zod-level `superRefine`, which never touches the filesystem. `workspace_path` only needs `path.isAbsolute()` to hold, and any downstream guard or handler rejection (for example `PREFLIGHT_REQUIRED`, since `tw_get_state` was never called against this workspace) is irrelevant to what these tests assert and is swallowed deliberately. One non-existent absolute path is reused across all of them: no tmpdir, no fs writes, nothing to clean up. The AC3 and AC4 tests round-trip through tools/handoff.js and do use real tmpdir workspaces (`os.tmpdir()`, never the repo root).
+
+## test/e96-dispatch-preference.test.mjs
+
+Tickets: E96. A host system-prompt nudge is not a reason to fall back to in-context role switching once the user has asked for the chain. The spec is the backlog row (option (i)); there is no specs file. Each test checks a kind of regression, not a byte diff:
+
+1. `t-anti-nudge-request`: coord-02 states that an explicit `/teamwork` (or equivalent explicit coordinator entry) invocation is the user's request for subagent dispatch. This is the root cause the ticket fixes.
+2. `t-when-do-compose-axis-*`: the WHEN/DO §3.2 surfacing rule composes only under `hostCapabilitiesFor("claude-code")` and is absent from the lean (undefined host) profile. The rule assumes the Task tool exists, so the rule and that assumption must sit on the same side of the host-capability compose axis; otherwise the rule fires as a false alarm on every hop under the default (undeclared-host) profile. A code review of the first draft caught exactly this. A text search over one file cannot catch it, because it depends on `composeSkill`'s per-fragment host tag, so the test composes both profiles through the real render path (D6).
+3. `t-fallback-genuine-unavailability` and `t-fallback-self-contained`: coord-03's fallback is conditioned on genuine tool unavailability (host advertises no Task, or the Task call errors or reports unknown subagent types); it is self-contained, with no "above" pointer into coord-02, since a reader of the lean profile would see a pointer with nothing to point at (C2); and the bare, unqualified "graceful and silent" wording is gone, because a silent fallback is the defect itself.
+
+Each test searches for the shape of the guarantee (host-tag placement, self-containment, absence of the retired unqualified phrase) rather than the exact sentence, so a rewording that preserves the guarantee keeps passing and one that breaks it fails.
