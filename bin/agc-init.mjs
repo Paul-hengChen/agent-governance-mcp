@@ -1,45 +1,11 @@
 #!/usr/bin/env node
-// `agc` — agent-governance-mcp workspace CLI.
-//
-//   agc init [--artifacts=local|repo]
-//              Scaffold .current/.config.json, tasks.md, and per-agent entry
-//              adapters (CLAUDE.md, AGENTS.md, .antigravityrules). Idempotent:
-//              most existing files are skipped as-is; the CLAUDE.md adapter
-//              block and .current/.config.json's "host" key (E100) are each
-//              upserted in place. Deliberately does NOT write
-//              .current/<lane>/handoff.md (E34): any seeded prev tuple dead-ends the
-//              ALLOWED_TRANSITIONS lookup — the sanctioned fresh-workspace
-//              tuple is null:null, i.e. the file being absent, so the first
-//              pm:In_Progress write creates it via the normal edge.
-//              --artifacts records whether governance runtime artifacts stay
-//              out of git ("local": rules added to the shared
-//              .git/info/exclude, never .gitignore) or are tracked ("repo":
-//              config key only). Omitted, it defaults to "local" — unless an
-//              artifact path is already tracked, in which case nothing is
-//              declared and the user is asked to choose explicitly. Tracked
-//              paths are reported with the untrack command, never untracked.
-//   agc check  Warn if any deployed adapter is stamped with an older agc
-//              version than the one installed; exit 1 if any are stale.
-//              Also warns (advisory, never exit 1) if any tracked file
-//              under research/ looks like a binary asset (E104 prevention),
-//              and — inside a linked git worktree only — if qa_reports/,
-//              review_reports/, or specs/ is a real untracked directory
-//              instead of a symlink back to primary (E111 prevention), and
-//              if the declared "artifacts" choice is missing or disagrees
-//              with the repo's actual exclude / tracked state.
-//   agc feature start <ticket-slug> [--base <branch>] [--path <dir>]
-//   agc feature finish <ticket-id> (--shipped|--abandoned) [--base <branch>]
-//              Lane lifecycle (E73): cut a feat/<ticket-slug> branch + linked
-//              git worktree from the primary checkout (node_modules symlinked,
-//              .env byte-copied), and tear it down again with a merge guard
-//              (--shipped) or an evidence-to-abandoned/ disposition
-//              (--abandoned), removing the lane's default-location mailbox
-//              too. See the "subcommand: feature" section below.
-//   agc eject [--yes] [--purge-knowledge]
-//              Print (default) or apply the removal plan for agc's runtime
-//              artifacts, process evidence and host traces; tracked paths are
-//              only named in a printed `git rm -r` line. See the
-//              "subcommand: eject" section below.
+// `agc` — agent-governance-mcp workspace CLI (details: specs/e260c-bin-scripts.md).
+//   agc init [--artifacts=local|repo]  scaffold .current/.config.json, tasks.md, adapters.
+//     Never writes .current/<lane>/handoff.md: any seeded prev tuple dead-ends the
+//     ALLOWED_TRANSITIONS lookup, so the first pm:In_Progress write creates it (E34).
+//   agc check  exit 1 on a stale adapter stamp; every other check is advisory.
+//   agc feature start|finish  lane branch + linked worktree lifecycle (E73).
+//   agc eject [--yes] [--purge-knowledge]  print or apply the removal plan.
 
 import * as fs from "fs";
 import * as path from "path";
@@ -150,55 +116,11 @@ function writeClaudeBlock(cwd, stampedBlock) {
   return "appended";
 }
 
-// Atomic write for a file this script mutates IN PLACE (not create-if-
-// absent) — tmp file + fs.renameSync, mirroring the existing precedent in
-// the module this file writes for (tools/config.ts:326-333
-// atomicWriteConfig()), per CLAUDE.md's requirement for any write to a
-// governed artifact. Without this, an interruption mid-write (^C, ENOSPC,
-// crash) leaves the target truncated or empty — on a real .config.json that
-// can mean hundreds of driftBaselineIds silently stop applying.
-//
-// Symlinked adapter files are followed, not replaced (E102; decided by the
-// human 2026-09-16: symlinks ARE a supported layout, hardlinks are NOT):
-// `target` is resolved through any symlink BEFORE `tmpPath` is derived from
-// it. Without this, a symlinked `CLAUDE.md` (dotfiles-managed,
-// monorepo-shared) gets DESTROYED rather than written through — `renameSync`
-// replaces whatever sits at its destination path, and for a symlink
-// destination that means the link itself is unlinked and replaced by a
-// detached regular file (POSIX rename(2) semantics: a symlink destination is
-// swapped, never followed). The canonical file the link points at silently
-// keeps its old content forever, and `agc check` then reports OK against the
-// detached copy — the failure has no error and looks like success. The
-// precedent for resolving + guarding a symlink already exists a few hundred
-// lines below in checkWorktreeEvidence's isSafelyLinkedOutside.
-//
-// fs.realpathSync THROWS (ENOENT) on a DANGLING symlink (one whose target
-// does not exist) — the catch below is DEFENSIVE ONLY. Every current call
-// site (writeClaudeBlock's two branches, upsertHostKey's existsSync guard
-// plus its own readFileSync) pre-guards with fs.existsSync, which returns
-// false for a dangling symlink exactly as it does for a plain missing
-// path — so realpathSync here never actually observes a dangling symlink
-// today. The dangling case is handled earlier and better, at
-// writeClaudeBlock's `!existsSync` branch: fs.writeFileSync there follows
-// the dangling link and creates the canonical file, leaving the link
-// intact — write-through, not fail-closed. This catch exists only so a
-// future caller that skips the existsSync guard fails loudly instead of
-// silently mis-writing; because a plain missing file produces the exact
-// same ENOENT, it is distinguished from an actual dangling symlink via
-// lstatSync before the message is chosen, so it never blames a symlink
-// that isn't there.
-//
-// Hardlinks are UNSUPPORTED by decision, not oversight. A hardlink has no
-// separate "target" to resolve — it is a second directory entry for the
-// very same inode as every other name pointing at that file — so
-// fs.realpathSync(target) just returns `target` itself and this fix does
-// nothing for it: `renameSync` still breaks a hardlink's second name just
-// as silently as it broke a symlink. The only change that would also cover
-// hardlinks is reverting this function to a truncating in-place write (no
-// tmp file, no rename) — which is exactly the ^C/ENOSPC truncation risk
-// this tmp-file-plus-rename design exists to remove on the far more common
-// non-linked case. That risk is likelier and worse, so hardlinked adapter
-// files are declared out of scope rather than traded against it.
+// Atomic in-place write: tmp file + renameSync, like tools/config.ts
+// atomicWriteConfig(), so an interrupted write never truncates the target.
+// Symlinks are resolved first so the write goes through the link instead of
+// replacing it (E102). Hardlinks are unsupported by decision. Why, and what
+// the dangling-symlink catch is for: see specs/e260c-bin-scripts.md.
 function atomicWriteFile(target, content) {
   let resolvedTarget;
   try {
@@ -260,29 +182,12 @@ function atomicWriteFile(target, content) {
   }
 }
 
-// Upsert a top-level "host": "claude-code" key into an EXISTING
-// .current/.config.json (E100). Deliberately does NOT parse-and-restringify
-// the whole file: a real config.json can carry a large array
-// (`driftBaselineIds` — 558 entries in this repo's own workspace at the time
-// of writing) that a JSON.stringify round-trip would silently reformat just
-// to add one key. Instead this splices the key in next to the opening brace
-// (new key) or in place over an existing key's value (repair), reusing the
-// file's own indentation, so every other byte in the file — including array
-// formatting, key order, and unrelated whitespace — is left untouched.
+// Upsert top-level "host": "claude-code" into an EXISTING .current/.config.json
+// (E100) by a byte-preserving splice, not a JSON round-trip, so a large
+// driftBaselineIds array is never reformatted.
 //   returns "updated"   — key added or repaired, file rewritten
-//   returns "has-host"  — a `host` key already holds a non-empty string;
-//                         NEVER overwritten (a Cursor / Continue /
-//                         Anti-Gravity workspace may legitimately hold a
-//                         different declared value)
-//   returns "malformed" — not parseable as a JSON object, OR the `host`
-//                         key could not be rewritten unambiguously: either
-//                         a structurally odd value (array/object) with no
-//                         other host-key-shaped text anywhere in the file,
-//                         OR — the larger class — a `host`-shaped match
-//                         exists but the reparse guard below rejects the
-//                         result (e.g. a nested `host` key sorts earlier in
-//                         the text than the real top-level one); left
-//                         untouched either way
+//   returns "has-host"  — host already a non-empty string; never overwritten
+//   returns "malformed" — not a JSON object, or no unambiguous rewrite; untouched
 function upsertHostKey(abs) {
   const raw = fs.readFileSync(abs, "utf-8");
   let parsed;
@@ -312,17 +217,9 @@ function upsertHostKey(abs) {
   const updated = spliceTopLevelKey(raw, "host", '"claude-code"', hasHostKey);
   if (updated === null) return "malformed";
 
-  // Load-bearing, not belt-and-braces: this is what makes a wrong-occurrence
-  // splice safe. spliceTopLevelKey's key regex is unanchored and matches the FIRST
-  // `"host": <scalar>` in the file, which need not be the top-level key
-  // (e.g. a nested `host` can sort earlier in the text). `reparsed.host` is
-  // the value of the LAST top-level `host` after the splice; since that
-  // value was confirmed to NOT already be a non-empty string before the
-  // splice ran (`hostIsDeclared` above is false here — the value can be
-  // absent, "", null, false, or a truthy non-string like `42` / `{}` /
-  // `["x"]`; it is emphatically not always "falsy"), it can only become a
-  // non-empty string here if the splice actually hit the top-level
-  // occurrence. Any wrong-occurrence splice is caught below and rejected.
+  // Load-bearing reparse guard: the splice regex is unanchored and may hit a
+  // nested `host` first. The top-level value was not a non-empty string before
+  // the splice, so it is one now only if the splice hit the top-level key.
   let reparsed;
   try {
     reparsed = JSON.parse(updated);
@@ -337,37 +234,22 @@ function upsertHostKey(abs) {
   return "updated";
 }
 
-// Byte-preserving splice of one top-level `"<key>": <literal>` pair into the
-// raw text of a JSON object — shared by upsertHostKey and upsertArtifactsKey
-// so both keep every other byte of the file (array formatting, key order,
-// unrelated whitespace) untouched. `key` is always an internal literal (no
-// regex metacharacters), never user input. Returns the new text, or null
-// when there is nothing safe to splice. Callers MUST reparse the result and
-// confirm the top-level value actually changed: the key regex below is
-// unanchored, so it can hit a nested occurrence first.
-//   hasKey = true  -> repair the EXISTING key's value in place. Inserting a
-//                     second copy next to the opening brace would leave two
-//                     same-named keys in the text; JSON.parse silently keeps
-//                     whichever one is textually last, which is exactly the
-//                     ambiguity this splice exists to avoid.
-//   hasKey = false -> insert the pair right after the opening brace, reusing
-//                     the file's own indentation.
+// Byte-preserving splice of one top-level `"<key>": <literal>` pair, shared by
+// upsertHostKey and upsertArtifactsKey. `key` is an internal literal, never user
+// input. Returns the new text or null. Callers MUST reparse: the key regex is
+// unanchored and can hit a nested occurrence first.
+//   hasKey = true  -> repair the existing value in place (a second copy would
+//                     leave duplicate keys, and JSON.parse keeps the last one)
+//   hasKey = false -> insert after the opening brace, reusing the file's indent
 const JSON_SCALAR_SRC = /("(?:[^"\\]|\\.)*"|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?|true|false|null)/.source;
 
 function spliceTopLevelKey(raw, key, literal, hasKey) {
   if (hasKey) {
     const m = new RegExp(`("${key}"\\s*:\\s*)` + JSON_SCALAR_SRC).exec(raw);
     if (!m) {
-      // No `"<key>": <scalar>` shaped text exists ANYWHERE in the file —
-      // only reachable when the top-level value is itself non-scalar
-      // (array/object) AND no other key in the file happens to share the
-      // name with a scalar value either. Nothing safe to splice.
-      //
-      // This is NOT the guard against "found a match, but it's the wrong
-      // occurrence" — that case (a nested key shadows a top-level one that
-      // isn't a usable declared value, e.g. `{"host": [], "nested":
-      // {"host": "x"}}`) DOES match here and is spliced; the caller's
-      // REPARSE GUARD is what rejects a wrong-occurrence splice.
+      // No `"<key>": <scalar>` text anywhere: the top-level value is non-scalar
+      // and no other key shares the name. A wrong-occurrence match is not
+      // caught here; the caller's reparse guard rejects it.
       return null;
     }
     return raw.slice(0, m.index) + m[1] + literal + raw.slice(m.index + m[0].length);
@@ -392,21 +274,13 @@ function isArtifactsMode(v) {
   return v === "local" || v === "repo";
 }
 
-// Upsert a top-level "artifacts": "<value>" key into an EXISTING
-// .current/.config.json — the same byte-preserving splice and reparse guard
-// as upsertHostKey above, for the same reason (a large driftBaselineIds
-// array must not be reformatted just to add one key). One deliberate
-// difference: a key already declared with the OTHER valid value IS
-// overwritten, because this is only ever called with a value the user asked
-// for explicitly (or the fresh-workspace default when nothing is declared)
-// — switching local <-> repo is a legitimate request, whereas `host` has no
-// such explicit-intent signal.
+// Upsert top-level "artifacts": "<value>" into an EXISTING .current/.config.json,
+// with the same splice and reparse guard as upsertHostKey. Unlike `host`, the
+// other valid value IS overwritten: the value is always an explicit request
+// (or the fresh-workspace default), so switching local <-> repo is legitimate.
 //   returns "updated"       — key added, repaired, or switched; file rewritten
-//   returns "has-artifacts" — already declared with exactly this value;
-//                             file left byte-identical
-//   returns "malformed"     — not parseable as a JSON object, or the key
-//                             could not be rewritten unambiguously; left
-//                             untouched
+//   returns "has-artifacts" — already this value; file left byte-identical
+//   returns "malformed"     — not a JSON object, or no unambiguous rewrite
 function upsertArtifactsKey(abs, value) {
   const raw = fs.readFileSync(abs, "utf-8");
   let parsed;
@@ -668,14 +542,8 @@ function runInit(cwd, argv = []) {
       }
       continue;
     }
-    // mode === "skip" — checked for the same non-atomic-write exposure as
-    // writeClaudeBlock: NOT exposed. This branch only ever
-    // writes when `abs` does not already exist (the guard immediately
-    // below); an existing file — adopter prose included — is always left
-    // in the `skipped` bucket, untouched. There is no in-place mutation
-    // here to make atomic; the write below creates a file that had no
-    // prior content to lose, matching the "created" branch of
-    // writeClaudeBlock and the brand-new-.config.json path above.
+    // mode === "skip": writes only when `abs` does not exist yet, so there is
+    // no in-place mutation to make atomic; an existing file is left untouched.
     const abs = path.join(cwd, rel);
     if (fs.existsSync(abs)) {
       skipped.push(rel);
@@ -720,47 +588,20 @@ function runInit(cwd, argv = []) {
 }
 
 // --- research/ binary-residue advisory (E104 prevention (c)) ---------------
-// Why this exists: 33 third-party confidential screenshots sat under
-// research/assets/ in a public repo for ~3 months. .gitignore now excludes
-// research/assets/ and CONTRIBUTING.md documents the convention (both shipped
-// separately); this is the mechanical check that a tracked binary hasn't
-// slipped past that convention regardless.
-//
-// Classification: an extension allowlist against `git ls-files` output (the
-// same allowlist used to measure this repo's zero-tracked-binary baseline),
-// not a content-sniff. Trade-off: an extensionless or exotic-format binary
-// can slip through undetected (false negative), but a text file is never
-// misclassified as binary (no false positive from content heuristics on
-// e.g. large fixture text/JSON). For an advisory check the missed catch is
-// the acceptable side of that trade.
+// Flags a tracked binary under research/ (confidential screenshots once sat
+// there in a public repo). Classified by an extension allowlist, not content
+// sniffing: it may miss an exotic binary but never flags a text file.
 const RESEARCH_BINARY_RE = /\.(png|jpe?g|gif|pdf|fig|sketch|xd|webp|mp4|zip)$/i;
 
-// Advisory only — WARN, never a hard exit, unlike the stale-adapter check
-// below. `research/` is this repo's OWN naming convention, not a contract
-// every agc adopter shares: an adopter may have an unrelated research/
-// directory that legitimately holds versioned binaries (datasets, sample
-// PDFs, model checkpoints). `agc check` is a public CLI run in arbitrary
-// adopter workspaces, so a false positive there — failing an unrelated
-// release over a path-name collision we don't control — is worse than this
-// repo missing a regression we would also catch via review/dogfooding of
-// our own tree. Scoped to the `research` pathspec so it is a silent no-op
-// for the overwhelming majority of adopters who have no such directory.
+// Advisory only (warn, never exit 1): research/ is this repo's convention, and
+// an adopter's own research/ directory may legitimately hold binaries. Scoped
+// to the `research` pathspec, so it is a silent no-op for most adopters.
 function checkResearchBinaries(cwd) {
   let out;
   try {
-    // `-z` (NUL-terminated, unquoted paths) is load-bearing, not cosmetic:
-    // git's default core.quotePath=true C-quotes any path with non-ASCII
-    // bytes (e.g. a CJK filename), which both breaks a plain "\n" split on
-    // an embedded-newline name AND, worse, wraps quoted lines in a trailing
-    // `"` that the $-anchored regex below would never match — silently
-    // missing exactly the tracked-binary case (localized-name client
-    // assets) this check exists to catch. `execFileSync` with an argv array
-    // (not `execSync` with a shell string) means there is no shell to
-    // inject through even though every argument here is a fixed literal.
-    // Fails (ENOENT / exit 128) when git is missing, this isn't a git repo,
-    // or the repo has zero commits — all handled uniformly by the catch
-    // below; no separate "is this a repo" probe is needed since ls-files
-    // itself already fails closed in every one of those cases.
+    // `-z` is load-bearing: the default core.quotePath C-quotes non-ASCII
+    // paths, which the $-anchored regex would never match. argv form, no shell.
+    // Any git failure (no git, not a repo, no commits) lands in the catch.
     out = execFileSync("git", ["ls-files", "-z", "--", "research"], {
       cwd,
       encoding: "utf-8",
@@ -782,66 +623,12 @@ function checkResearchBinaries(cwd) {
 }
 
 // --- linked-worktree evidence advisory (E111 prevention) --------------------
-// Why this exists: a lane git worktree bootstrapped without the
-// symlink-back-to-primary discipline (content/coord-03-core-fallback.md's
-// Feature-Scope Gate bootstrap obligation) ends up with REAL, gitignored
-// copies of qa_reports/, review_reports/, and specs/ instead of links — and
-// `git worktree remove` deletes a lane's entire code-review + QA evidence
-// trail along with it. Measured 2026-09-08 (docs/agc-feedback-2026-09-08.md H2
-// (a) + H2-b B1): 4 of 7 tickets had zero evidence copy left in primary, all
-// four PASS and therefore teardown-eligible. The mechanism this check backs up
-// is the bootstrap symlink itself; this is the belt-and-suspenders detector
-// for when that step was skipped.
-//
-// Worktree detection: a LINKED worktree has a `.git` FILE (git's "gitdir:
-// <path>" gitfile) rather than a `.git` directory — that is git's own
-// on-disk signal, not a path-name heuristic, so a primary checkout can never
-// false-positive on its name and a linked worktree can never false-negative
-// on its own. Silent no-op in a primary checkout (no `.git` file to trip
-// it).
-//
-// Per-directory trigger: warn when EITHER —
-//   (a) the directory is a REAL directory (not a symlink) that is either —
-//         - completely EMPTY: the one moment remediation is free (`rmdir &&
-//           ln -s` loses nothing before there's any content to move). A
-//           correct bootstrap always yields a symlink and git can never
-//           track an empty directory, so "tracked and empty" can't reach
-//           this branch — zero false-positive cost. OR
-//         - holding at least one file git's index doesn't know about (see
-//           hasUntrackedContent below) THAT IS ALSO either itself ignored
-//           (see hasIgnoredUntrackedContent below) or backed by zero
-//           tracked files at all (see hasTrackedContent below). That second
-//           clause exists so a directory this repo already tracks
-//           (qa_reports/, review_reports/, specs/ here) stays SILENT even
-//           when one file in it is a plain untracked straggler (e.g. an
-//           uncommitted report) — the remedy there is "commit it", not
-//           "symlink the whole tracked directory away", which would stage
-//           a mass deletion. A gitignored evidence dir (the defect shape this
-//           advisory exists for) or a plain untracked dir with zero tracked
-//           files still warns, OR
-//   (b) the entry IS a symlink, but does not resolve OUTSIDE this worktree
-//       (see isSafelyLinkedOutside below) — a link into the lane itself, or
-//       a dangling link, protects nothing.
-// This repo tracks all three (qa_reports/, review_reports/, specs/) with
-// tracked content, so an incidental untracked straggler (an uncommitted
-// report mid-review, say) stays silent here too; the check exists for
-// adopter workspaces where those directories are gitignored, or are real
-// but hold no tracked files at all.
-//
-// Advisory only — WARN to stderr, never affects the exit code, same as
-// checkResearchBinaries above. It also has no enforcement teeth by design:
-// a qa-owned fixture test under test/ proves this detection logic against a
-// synthetic linked worktree; this is a human-facing nudge, not a gate — do
-// not compensate here by trying to make it fail closed harder than that.
-//
-// Known, accepted false positives (re-derive from first principles before
-// assuming either still holds): a git submodule working tree with
-// untracked evidence dirs still warns — advisory/exit-0, and disambiguating
-// a submodule gitfile from a worktree one isn't worth the complexity for a
-// warning that's harmless when wrong; a directory tracked under a different
-// case on a case-insensitive filesystem is currently silent as a side
-// effect of the tracked-dir-straggler exemption above, not by original
-// design.
+// In a linked worktree (`.git` is a file), warn per evidence dir when it is a
+// real directory that is empty, or holds untracked files and either some are
+// ignored or none are tracked; or when it is a symlink that does not resolve
+// outside the worktree. Without the link back to primary, `git worktree
+// remove` deletes the lane's evidence. Advisory only (exit 0). Trigger
+// details and known false positives: see specs/e260c-bin-scripts.md.
 const WORKTREE_EVIDENCE_DIRS = ["qa_reports", "review_reports", "specs"];
 
 function isLinkedWorktree(cwd) {
@@ -852,16 +639,10 @@ function isLinkedWorktree(cwd) {
   }
 }
 
-// A real directory with zero entries at all — no
-// tracked files (git can't track an empty directory) and no untracked ones
-// either — is the state a lane ends up in right after `mkdir -p
-// qa_reports review_reports specs` and before anything is written into
-// them. `git ls-files --others` reports nothing for an empty directory (an
-// empty dir isn't a "file" to walk), so hasUntrackedContent below is
-// necessarily silent here; this is a plain fs-level check that doesn't
-// depend on git at all. Fails closed to "not empty" on any read error (e.g.
-// permission denied) so it falls through to the untracked-content check
-// instead of risking a false positive somewhere this can't be evaluated.
+// A real directory with no entries at all, as right after `mkdir -p
+// qa_reports review_reports specs`. `git ls-files --others` is silent for an
+// empty dir, so this is a plain fs check. A read error counts as "not empty",
+// leaving the decision to the untracked-content check.
 function isEmptyDir(target) {
   try {
     return fs.readdirSync(target).length === 0;
@@ -870,24 +651,10 @@ function isEmptyDir(target) {
   }
 }
 
-// Deliberately NOT `git ls-files -- rel` (index-membership under rel): a
-// single force-added placeholder (the near-universal `git add -f
-// qa_reports/.gitkeep` pattern for a gitignored dir) makes that predicate
-// return true for the WHOLE directory even though real, untracked evidence
-// sits right next to the placeholder — the exact state a lane worktree
-// ends up in. The property
-// that actually matters is "does this directory hold any file the index
-// does NOT have", so this asks `--others` instead, deliberately WITHOUT
-// `--exclude-standard`: with it, an ignored-and-untracked file (the
-// gitignored-evidence-dir case this check exists for) is filtered back out
-// and the hole reopens; without it, `--others` reports every untracked
-// file regardless of ignore status, which is the one property a symlink
-// vs. a real directory actually differs on. Verified against both shapes
-// directly: a gitignored dir holding a tracked `.gitkeep` + untracked real
-// file, and a tracked-and-clean dir with one new not-yet-added file — only
-// the first two must warn, `--others` alone (no `--exclude-standard`)
-// reports non-empty for both and empty for a fully-tracked, fully-clean
-// directory.
+// Asks `git ls-files --others` (does the dir hold a file the index lacks?),
+// not index membership: one force-added .gitkeep would make the whole dir
+// look tracked. Deliberately WITHOUT `--exclude-standard`, which would filter
+// out the ignored-and-untracked files this check exists to find.
 function hasUntrackedContent(cwd, rel) {
   try {
     // Same `-z` / NUL-split / execFileSync-argv discipline as
