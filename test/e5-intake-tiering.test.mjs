@@ -1,39 +1,10 @@
 // Coded by @qa-engineer
-// Tests three coordinator intake rules and their config key:
-// (a) the coordinator Backlog Intake Loop (coord-03-core-fallback.md), (b) tiered
-// cut approval — Constitution §3.1 Cut-Approval Auto-Tier (const-08-chain-31-mid.md)
-// plus the tools/config.ts `cutApprovalAutoTier` threshold key, which lets small
-// cuts under a configured threshold skip the human approval stop, and (c) the
-// Cheapest-Compliant-Path Intake step 4a (coord-07-core-sop.md).
-// (E5, T-E5-01, T-E5-02, T-E5-03)
-//
-// Config-side spec-to-test map (tools/config.ts CutApprovalAutoTier; same
-// layout as the tokenBudgetPerFeature tests in test/token-budget-config.test.mjs,
-// T-B9-03):
-//   absent key -> disabled                          -> t-absent-key, t-absent-file
-//   present {} -> conservative defaults              -> t-empty-object-defaults
-//   non-object/array/null/primitive -> treated as absent (non-fatal) ->
-//     t-string-value, t-number-value, t-null-value, t-array-value
-//   maxFiles: fractional positive -> floored (not defaulted) -> t-maxfiles-fractional
-//   maxFiles: negative/zero/non-finite/non-number -> falls back to default ->
-//     t-maxfiles-negative, t-maxfiles-zero, t-maxfiles-infinity, t-maxfiles-string
-//   maxPriority: valid ^P\d+$ -> surfaced verbatim -> t-maxpriority-valid
-//   maxPriority: malformed pattern -> falls back to default -> t-maxpriority-no-p,
-//     t-maxpriority-trailing-space, t-maxpriority-non-digit
-//   allowSchemaChange/allowDesignArmed: strict === true only -> t-booleans-strict-true,
-//     t-booleans-truthy-non-true-stays-false
-//   CUT_APPROVAL_AUTO_TIER_DEFAULTS export shape -> t-defaults-export-shape
-//   byte-identical regression for workspaces without the key -> t-existing-fields-untouched
-//
-// Content spec-to-test map: plain text-containment checks against the shipped
-// content files, in the same style as test/e16-judge-dispatch-charter.test.mjs.
-//   const-08 auto-tier bullet: trust rule + same-write recording + HALT-over-
-//     threshold language -> t-const08-trust-rule, t-const08-same-write-recording,
-//     t-const08-halt-over-threshold, t-const08-advisory-not-enforced
-//   coord-03 Backlog Intake Loop present + never-auto-hop-to-release-engineer bound
-//     -> t-coord03-intake-loop-present, t-coord03-never-auto-hop-release
-//   coord-07 SOP step 4a present + §2/§3.2 hard-floor sentence
-//     -> t-coord07-step4a-present, t-coord07-hard-floor
+// Tests three coordinator intake rules and their config key: (a) the Backlog Intake Loop
+// (coord-03-core-fallback.md), (b) tiered cut approval, Constitution §3.1 Cut-Approval
+// Auto-Tier (const-08-chain-31-mid.md), with the tools/config.ts `cutApprovalAutoTier`
+// threshold key, and (c) Cheapest-Compliant-Path Intake step 4a (coord-07-core-sop.md).
+// Config tests mirror test/token-budget-config.test.mjs; content tests are text-containment checks.
+// Rationale: specs/e260g-comment-rationale.md (test/e5-intake-tiering.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";

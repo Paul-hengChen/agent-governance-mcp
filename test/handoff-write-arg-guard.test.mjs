@@ -1,33 +1,9 @@
 // Coded by @qa-engineer
-// Tests for specs/handoff-write-arg-guard.md — AC-1 through AC-4.
-//
-// Spec-to-Test map:
-//   AC-1 (valid args accepted)              → t-ac1-valid-root-path-accepted,
-//                                             t-ac1-valid-feature-string-accepted
-//   AC-2 (.current workspace_path rejected) → t-ac2-current-basename-rejected,
-//                                             t-ac2-exact-error-message,
-//                                             t-ac2-non-current-basename-accepted,
-//                                             t-ac2-current-as-parent-not-rejected
-//   AC-3 ([object Object] rejected)         → t-ac3-object-sentinel-rejected,
-//                                             t-ac3-exact-error-message,
-//                                             t-ac3-valid-feature-id-not-rejected
-//   AC-4 (no corrupt write produced)        → t-ac4-no-nested-current-dir,
-//                                             t-ac4-sentinel-not-persisted
-//
-// Regression guards (pre-existing refines must still fire):
-//   PASS/agent_id refine                    → t-reg-pass-requires-qa-engineer
-//   prd_path traversal refine               → t-reg-prd-path-traversal
-//
-// WHY: these guards are the only server-side barrier preventing two classes of
-// silent corruption: (1) doubly-nested .current/.current/handoff.md from a mis-
-// directed workspace_path, and (2) the JavaScript object-stringification artefact
-// "[object Object]" being persisted verbatim as the feature sentinel. Both violate
-// §7 (fail loud) and §3.1 (reject invalid tw_update_state writes).
-//
-// Strategy: tests exercise the real MCP dispatch boundary (dist/index.js spawned
-// as a stdio server) so the full Zod → handler → ZodError-catch pipeline runs. This
-// is the only public interface through which UpdateStateArgs can be exercised, since
-// the schema is not exported. The spawn pattern follows teamwork-lite.test.mjs.
+// Tests for specs/handoff-write-arg-guard.md (AC-1 to AC-4): tw_update_state rejects a workspace_path
+// ending in .current and the "[object Object]" feature sentinel, and the older PASS and prd_path
+// refines still fire. Runs through the real stdio server (dist/index.js), the only public way to
+// reach the unexported UpdateStateArgs schema.
+// Rationale: specs/e260g-comment-rationale.md (test/handoff-write-arg-guard.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -46,14 +22,8 @@ const DIST_INDEX = path.join(PROJECT_ROOT, "dist", "index.js");
 // ---------------------------------------------------------------------------
 
 /**
- * Spin up a fresh MCP stdio server, send a sequence of JSON-RPC messages,
- * and resolve as soon as a response for every id-bearing message in
- * `messages` has appeared on stdout (parsed incrementally as data arrives).
- * `waitMs` is a generous ceiling — a failure backstop, not the expected
- * runtime — so the test resolves fast under normal load and only pays the
- * full wait when the server genuinely never replies. A fixed sleep before
- * killing the server flaked when the full suite's concurrency slowed the
- * server's cold start. (E15)
+ * Spawn a fresh MCP stdio server, send `messages`, and resolve once every id-bearing message has a response.
+ * `waitMs` is only a failure backstop: a fixed sleep flaked when suite concurrency slowed the server's cold start.
  *
  * @param {object[]} messages - JSON-RPC message objects to send in order.
  * @param {number}   [waitMs=20000] - ceiling ms before giving up and killing.

@@ -3,6 +3,7 @@
 // Covers (1) review_round default of 0 on legacy fixtures, (2) the AC-9
 // stderr warning emission when an in-flight ticket sits at
 // sr-engineer:In_Progress at migration time. Imports compiled dist/.
+// Rationale: specs/e260g-comment-rationale.md (test/handoff-migration.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -258,12 +259,9 @@ review_round: 0
 
 // ============================================================================
 // v3.30.0 — handoff schema v3 → v4 migration + scope_decision round-trip
-// Tests for specs/server-scope-decision-gate.md AC-7, AC-10(f), AC-10(g) and
-// the field-preservation invariant (downstream omitting write must NOT drop
-// scope_decision NOR prd_path). The v3→v4 step is an additive NO-OP: it stamps
-// the version but seeds NO default for scope_decision, because absence is
-// meaningful (undefined === "no attestation recorded" === gate may fire). A
-// defaulted value would be a false attestation.
+// The v3→v4 step is an additive no-op: it stamps the version and seeds no default, because an absent
+// scope_decision means no attestation was recorded (specs/server-scope-decision-gate.md AC-7, AC-10). A
+// downstream write that omits scope_decision or prd_path must not drop either.
 // ============================================================================
 
 function readRaw(ws) {
@@ -423,17 +421,10 @@ test("field preservation: a downstream write omitting scope_decision does NOT dr
 });
 
 test("AC-3/c9: a downstream write omitting next_role/resume_of/review_verdict DOES drop them — transient, write-scoped, NOT blindly preserved (contrast with scope_decision/prd_path above)", async () => {
-  // Why: this is the deliberate INVERSE of the test above (c9-protocol-fields AC-3).
-  // next_role/resume_of/review_verdict are single-hop directives to the
-  // IMMEDIATE next reader — identical lifetime to the pending_notes lines
-  // they replace (wholesale-replaced every write, never carried forward).
-  // Blindly preserving them (like scope_decision/prd_path) would be a
-  // behavioral regression: a stale next_role="architect" from three writes
-  // ago would linger silently. This pins the round-trip: present
-  // immediately after the write that sets them, ABSENT on the very next
-  // write that omits them — even though that write is otherwise a plain
-  // same-feature continuation, not an active_feature change (which is what
-  // drops external_refs/cut_approved's feature-scoped preservation).
+  // Why: the deliberate inverse of the test above. next_role/resume_of/review_verdict are single-hop directives,
+  // replaced on every write like the pending_notes lines they supersede; carrying them forward (as scope_decision
+  // and prd_path are) would leave a stale next_role lingering. They are present after the write that sets them
+  // and absent on the next plain same-feature write.
   const ws = mkWorkspace();
   resetSession();
   parseHandoff(ws);
@@ -557,17 +548,10 @@ prd_path: "${legacyPrdPath}"
 });
 
 test("AC-1/C9: v6→v10 migration chain stamps version only — external_refs survives, new protocol fields (incl. dispatch_pins, dispatched_at) stay absent, hop_count seeds 0", async () => {
-  // Why: a v6 payload is nine steps BEHIND the current v15, so runMigrations
-  // climbs the full v6→v7→v8→v9→v10→v11→v12→v13→v14→v15 chain in one call
-  // (the runner walks current→target stepwise; there is no way to isolate a
-  // single intermediate step from the public API). This test pins that chain:
-  // the v6 field external_refs survives unchanged, and migration invents no
-  // value for fields that only a writer can attest — next_role/resume_of/
-  // review_verdict, dispatch_pins, dispatched_at, dispatch_mode,
-  // evidence_schema, cut_approved_source, and dispatch_mechanism/
-  // dispatch_mechanism_tier. Counters are different: hop_count and
-  // qa_rounds_total/review_rounds_total/visual_rounds_total are seeded to 0.
-  // (AC-8/B8, DR-1, DR-3, DR-7, D1)
+  // Why: a v6 payload sits nine steps behind the current v15 and the runner walks stepwise, so one call climbs the
+  // whole chain. external_refs survives; migration invents no value for fields only a writer can attest (next_role,
+  // resume_of, review_verdict, dispatch_pins, dispatched_at, dispatch_mode, evidence_schema, cut_approved_source,
+  // dispatch_mechanism and its tier), while hop_count and the three round totals seed to 0.
   const { runMigrations } = await import("../dist/schema/versions.js");
   const v6Payload = {
     schema_version: 6,

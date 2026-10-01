@@ -1,19 +1,9 @@
 // Coded by @qa-engineer
-// Tests for spec: specs/feature-split-lifecycle.md.
-// Spec-to-Test map:
-//   AC1 (status column)            -> t-status-column
-//   AC2 (done-marking on PASS)     -> t-done-marking
-//   AC3 (resume — no regenerate)   -> t-resume-no-regen
-//   AC4 (no redo)                  -> t-no-redo
-//   AC5 (by-id resume)             -> t-by-id-resume
-//   AC6 (footprint ≤ ~550)         -> t-footprint
-//   AC7 (single-feature unaffected)-> t-no-plan-path
-//
-// WHY: the Feature-Scope Gate writes a persistent .current/feature-split.md; without
-// lifecycle tracking a finished unit looks identical to a pending one, so the
-// coordinator can't resume safely and may redo work. These tests pin the status
-// column, the PASS→done reconcile, the resume-skip-done rule, and by-id hydration —
-// all prompt-layer contract that lives only in skill-coordinator.md.
+// Tests for spec: specs/feature-split-lifecycle.md (AC1-AC7; test names carry the labels).
+// The Feature-Scope Gate writes a persistent .current/feature-split.md; without lifecycle tracking
+// a finished unit looks like a pending one and the coordinator may redo work. Pins the status
+// column, the PASS-to-done reconcile, the resume-skip-done rule and by-id hydration, all prompt-layer
+// contract in the coordinator SOP text.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";

@@ -1,29 +1,9 @@
 // Coded by @qa-engineer
-// Tests for the server-computed, persisted hop_count counter and its
-// HOP_CAP_EXCEEDED rejection. (specs/d2-server-brake-accounting.md, T-D2-05)
-//
-// Spec-to-Test map:
-//   AC-1 (persisted, server-computed field)      -> t-compute-*, t-e2e-accumulate
-//   AC-2 (hop cap enforced server-side)           -> t-gate-*, t-e2e-cap-fires
-//   AC-3 (hop count resets per feature)           -> t-compute-feature-reset,
-//                                                     t-gate-feature-bypass,
-//                                                     t-e2e-feature-reset
-//   AC-4 (survives coordinator crash/compaction)  -> t-crash-file, t-crash-sqlite
-//   AC-8 (existing round caps unchanged / take
-//         precedence over the hop-cap override)   -> t-precedence-*
-//   DR-6 (pm landing does NOT reset hop_count)    -> t-compute-pm-no-reset,
-//                                                     t-e2e-landing-no-reset
-//   DR-9 (increment only on role transitions)     -> t-compute-self-loop-holds
-//
-// WHY: the hop counter is the one remaining cost-side circuit breaker
-// (const-01 Limits `hop` cap = 10) that used to live only in the
-// coordinator's in-memory arithmetic — exactly the failure mode a context
-// compaction or crash could silently reset. It now uses the
-// same persisted, server-enforced machinery as qa_round/review_round/
-// visual_round; these tests pin that the new sibling mechanism (a) computes
-// correctly in isolation, (b) enforces the cap end-to-end through the real
-// state-write orchestrator, and (c) survives a simulated crash by
-// reconstructing purely from what's on disk (or in SQLite).
+// Tests for the server-computed, persisted hop_count counter and its HOP_CAP_EXCEEDED rejection
+// (specs/d2-server-brake-accounting.md): computed in isolation (t-compute-*), enforced by validateTransition
+// (t-gate-*) and end to end through the real orchestrator (t-e2e-*), and rebuilt from disk or SQLite after a
+// simulated crash (t-crash-*).
+// Rationale: specs/e260g-comment-rationale.md (test/hop-count-transitions.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -58,16 +38,9 @@ function mkWs(prefix = "hopcap-") {
   return ws;
 }
 
-// The feature lease rejects ANY write whose active_feature differs from
-// the incumbent's while the incumbent is non-terminal (status != PASS) AND
-// fresh (last_updated within LEASE_TTL_MIN=30 min) — see
-// specs/e1-feature-scoped-state-design.md. t-e2e-feature-reset below writes a
-// NEW active_feature over a still-In_Progress incumbent, which is exactly
-// the overwrite FEATURE_LEASE_HELD exists to reject. This helper backdates the
-// incumbent's persisted last_updated past the TTL so the lease has gone stale
-// BEFORE the feature-change write — letting the fixture reach the hop_count
-// reset assertion it was written to test, without altering that assertion.
-// (T-E1-05)
+// The feature lease rejects a write whose active_feature differs from a fresh (within LEASE_TTL_MIN=30 min),
+// non-terminal incumbent (specs/e1-feature-scoped-state-design.md). t-e2e-feature-reset changes feature over an
+// In_Progress incumbent, so this helper backdates last_updated past the TTL to reach the hop_count reset assertion.
 function backdateLastUpdated(ws, minutesAgo) {
   const p = resolveCurrentLanePaths(ws).handoffPath;
   const raw = fs.readFileSync(p, "utf-8");
@@ -346,18 +319,10 @@ test("t-precedence-existing-round-caps-untouched: round-cap-only scenarios (hop 
 
 // ============================================================================
 // AC-1/AC-2/AC-3/DR-6: end-to-end through the real tw_update_state orchestrator
+// The climb bounces pm <-> sr-engineer (both real ALLOWED_TRANSITIONS rows), so every write is a counted role
+// transition and none touches a round counter. Every pm write carries cut_approved: true because the build-entry
+// gates key on the previous pm write's attestation, which a bare PM re-entry re-arms.
 // ============================================================================
-//
-// The climb uses a legal pm <-> sr-engineer bounce (both edges are real
-// ALLOWED_TRANSITIONS table rows: "pm:In_Progress" -> sr-engineer:In_Progress,
-// and "sr-engineer:In_Progress" -> pm:In_Progress) so EVERY write is a
-// counted role transition (DR-9), none of it touches qa_round/review_round/
-// visual_round (no FAIL/PASS anywhere in the sequence), and it never trips
-// the file-mode CUT_APPROVAL_REQUIRED/SCOPE_DECISION_REQUIRED/
-// EXTERNAL_REFS_UNRESOLVED build-entry gates as long as every pm-agent write
-// carries cut_approved: true (those gates key on the *previous* pm write's
-// attestation, and cut_approved re-arms to undefined on every bare PM
-// re-entry unless re-passed).
 
 // Drives hop_count from a fresh workspace up to exactly HOP_CAP_EXPORTED via
 // the pm<->sr-engineer bounce. Returns the final parsed state (last_agent is

@@ -1,31 +1,10 @@
 // Coded by @qa-engineer
-// Pins the order of the checks a state write runs through. The checks are an
-// ordered array, UPDATE_STATE_GATE_PIPELINE, of {name, codes, run} steps
-// (gates/pipeline.ts + tools/handoff-orchestrator.ts); the order used to be
-// kept only by a comment, which nothing enforced. This suite pins the step
-// NAME sequence (18 steps) and each step's CODES array, so that a future
-// edit which reorders steps, renames a step, or silently drops/adds a code
-// fails a test instead of silently drifting from the documented order.
-// (E35, e35-gate-pipeline-extraction, T-E35-01)
-//
-// Two independent assertions:
-//   1. Exact ordered name+codes pin (t-order-exact) — literal expected
-//      array, transcribed from the current tools/handoff-orchestrator.ts
-//      (verified against source, not invented) — catches reorder/rename/
-//      code-drift on ANY single step.
-//   2. Registry cross-check (t-codes-registry-parity) — flattening every
-//      step's codes and comparing (as a set) against gates/registry.ts'
-//      ALL_GATE_CODES, so the pin has a single source of truth for the
-//      *code catalog* itself rather than two independently-hand-maintained
-//      literal lists that could silently diverge. TRANSITION_VALIDATION's
-//      codes are asserted to be the *same array reference* as the
-//      registry-exported TRANSITION_GATE_CODES (not a re-typed literal) for
-//      the same reason.
-//
-// Imports from dist/ (built tree) — matches the established pin-suite
-// convention (test/hop-count-transitions.test.mjs, test/error-code-contract.
-// test.mjs): npm test's prebuild step guarantees dist/ exists before this
-// file runs.
+// Pins the order of the checks a state write runs through: the ordered array
+// UPDATE_STATE_GATE_PIPELINE (gates/pipeline.ts + tools/handoff-orchestrator.ts).
+// Pins the step NAME sequence (18 steps) and each step's CODES, so a reorder, rename
+// or dropped/added code fails a test; codes are cross-checked against gates/registry.ts.
+// Imports from dist/ (npm test's prebuild builds it).
+// Rationale: specs/e260g-comment-rationale.md (test/e35-pipeline-order.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";

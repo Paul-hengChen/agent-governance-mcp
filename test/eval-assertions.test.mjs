@@ -1,36 +1,9 @@
 // Coded by @qa-engineer
-// Zero-cost self-test of the D4 behavioral-eval harness's checkers
-// (test/eval/lib/assertions.mjs — T-D4-03). Matches the existing
-// test/*.test.mjs glob, so it runs inside plain `npm test` with zero API
-// cost, per spec AC-6.
-//
-// Spec-to-Test map (specs/d4-behavioral-eval-harness.md):
-//   AC-1 (pure, zero-cost, sync)        -> t-no-io-imports, t-all-sync
-//   AC-2 (checkWatermark reuse)         -> t-watermark-pass, t-watermark-fail,
-//                                          t-watermark-uses-validateWatermark
-//   AC-3 (checkTerseCap + exemptions)   -> t-terse-pass-short,
-//                                          t-terse-fail-long-no-exemption,
-//                                          t-terse-exempt-table,
-//                                          t-terse-exempt-escalation,
-//                                          t-terse-exempt-assumption-gap,
-//                                          t-terse-exempt-acceptance-criteria
-//   AC-4 (checkEscalationShape)         -> t-escalation-pass-field-order-free,
-//                                          t-escalation-fail-missing-key,
-//                                          t-escalation-fail-bad-status,
-//                                          t-escalation-fail-no-call
-//   AC-5 (checkBannedPhrases)           -> t-banned-pass, t-banned-fail
-//   AC-6 (self-test itself)             -> this whole file
-//
-// WHY: the live runner (test/eval/run-eval.mjs, T-D4-07) will trust these
-// four checkers' verdicts against real model replies, spending real API
-// dollars per run. If a checker's logic silently regresses (e.g. the terse
-// cap's exemption list drifts from Constitution §1, or the escalation-shape
-// key list drops one required key), the harness would either (a) fail
-// scenarios that are actually compliant, burning API budget on false
-// negatives, or worse (b) pass a real behavioral regression through. This
-// file proves each checker still does exactly what its AC claims — with one
-// hand-written compliant AND one hand-written violating fixture per checker
-// — before a single dollar is spent trusting it.
+// Zero-cost self-test of the D4 behavioral-eval harness checkers (test/eval/lib/assertions.mjs):
+// one compliant and one violating fixture per checker, so the live runner's verdicts can be
+// trusted before it spends API budget. Runs inside plain `npm test`.
+// Spec: specs/d4-behavioral-eval-harness.md (AC-1..AC-6).
+// Rationale: specs/e260g-comment-rationale.md (test/eval-assertions.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -168,14 +141,8 @@ test("t-terse-exempt-acceptance-criteria: long reply stating acceptance criteria
   assert.match(result.reason, /acceptance-criteria/);
 });
 
-// ---------------------------------------------------------------------------
-// AC-4 — checkEscalationShape
-// WHY: field order MUST be flexible (spec explicit), but all four keys are
-//      mandatory and the status value must be Blocked|FAIL — a missing key
-//      or a wrong status (e.g. a stray status=PASS with the other three
-//      keys) is exactly the class of regression that breaks the routing
-//      state machine in production, not just this test.
-// ---------------------------------------------------------------------------
+// AC-4: checkEscalationShape. Field order is free, but all four keys are mandatory and status
+// must be Blocked|FAIL; a missing key or a stray status=PASS breaks routing in production.
 
 test("t-escalation-pass-field-order-free: canonical call passes regardless of key order", () => {
   const reply =

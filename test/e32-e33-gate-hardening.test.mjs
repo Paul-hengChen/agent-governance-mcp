@@ -1,43 +1,9 @@
 // Coded by @qa-engineer
-// Permanent regression coverage for the rule that a state write may only
-// mark tasks complete when each one has its own QA evidence file under
-// qa_reports/. A code review's report under review_reports/ is not enough on
-// its own, and the check has no exemption for the code-reviewer handoff.
-// (specs/c16-c10-role-boundary.md "## Amendment — E32"; E32, E33,
-// T-E32-01, T-E33-01)
-//
-// Why this is a separate file: test/e18-write-provenance.test.mjs and
-// test/reviewer-completed-tasks-gate.test.mjs already test the amended rule
-// (their QAEV-4a/b and FM4/FM5 cases), but only by flipping older
-// assertions. This file adds shapes that had no test at all, most
-// importantly an exact replay of the real incident where a code-reviewer
-// write marked a whole batch complete with no QA evidence. If the R1 test
-// below is deleted or weakened, that incident can come back unnoticed.
-//
-// Spec-to-test map (the labels match the ones the code review of this
-// change used when it replayed each shape, so the two can be compared
-// line by line; review_reports/review_T-E32-01.md):
-//   R1 — exact incident replay (verdict carried, completed_tasks grown,
-//     review_reports covers-file present, qa_reports ABSENT) -> REJECTED,
-//     ledger unpolluted                                       -> R1 (PERMANENT PIN)
-//   R2 — R1 minus review_verdict                              -> R2
-//   R4 — verdict + growth + ZERO review evidence at all (no
-//     review_reports either) — proves QA_COMPLETION_EVIDENCE_MISSING
-//     fires independently of, and before, MISSING_REVIEW_EVIDENCE -> R4
-//   C2 — amended compliant shape (review_task_ids, completed_tasks
-//     empty) MINUS review evidence -> MISSING_REVIEW_EVIDENCE           -> C2
-//   C3 — legit qa-engineer PASS with own qa_review auto-record
-//     satisfies the completion-evidence check for its own ids           -> C3
-//   PROBE 6 — the two checks (QA_COMPLETION_EVIDENCE_MISSING /
-//     MISSING_REVIEW_EVIDENCE) are independent: divergent completed_tasks
-//     vs review_task_ids id sets, each independently evidenced or not   -> P6a, P6b, P6c
-//   Rejection message names the offending ids, the expected
-//     qa_reports/review_<id>.md path(s) per id, and the covers:
-//     fallback, so the writer knows what to add (E23)                  -> ENV-1, ENV-2
-//
-// (C1 — compliant amended shape ACCEPTED — is covered by QAEV-4b in
-// test/e18-write-provenance.test.mjs; C4 — carry-forward no-growth
-// ACCEPTED — is covered by QAEV-3 in the same file. Not duplicated here.)
+// Permanent regression coverage: a state write may only mark tasks complete when
+// each has its own QA evidence file under qa_reports/; a code-review report alone
+// is not enough, and the code-reviewer handoff has no exemption
+// (specs/c16-c10-role-boundary.md, Amendment — E32).
+// Rationale: specs/e260g-comment-rationale.md (test/e32-e33-gate-hardening.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -68,15 +34,9 @@ async function seedFileState(ws, feature, agent, status) {
     pendingNotes: ["seed"],
     lastAgent: agent,
   });
-  // Pin the seed's last_updated to a fixed stamp instead of the wall clock,
-  // so the server's check for made-up timestamps cannot fire at random on a
-  // genuine seed (test/e148-seed-stamp.mjs). Every handleUpdateState call
-  // below reads this seed as its previous state for the same feature and
-  // never depends on lease freshness, so SAFE_SEED_STAMP's fixed 2026-01-01
-  // date is safe here, as in test/e18-write-provenance.test.mjs's
-  // seedFileState. The call comes before the caller's own
-  // resetSession/markStateRead re-snapshot, the order the helper requires.
-  // (E148)
+  // Pin the seed's last_updated to a fixed stamp (test/e148-seed-stamp.mjs) so the
+  // made-up-timestamp check cannot fire at random on a genuine seed. Call it before
+  // the caller's own resetSession/markStateRead re-snapshot.
   forceSeedStamp(ws);
 }
 
@@ -101,12 +61,10 @@ function writeCodeReviewCoversFile(ws, primaryId, taskIds) {
 }
 
 // ===========================================================================
-// PERMANENT REGRESSION PIN: the exact shape of the real incident. A
-// code-reviewer write carrying an APPROVED verdict grows completed_tasks
-// with the batch ids while only a code-review report exists; it must be
-// rejected and the task ledger left untouched. DO NOT weaken or delete this
-// test without re-reading specs/c16-c10-role-boundary.md's Amendment
-// section first. (e-p3-tail-batch, R1)
+// PERMANENT REGRESSION PIN: replays the real incident. A code-reviewer write with an
+// APPROVED verdict grows completed_tasks while only a code-review report exists; it
+// must be rejected and the ledger left untouched. Do not weaken or delete without
+// re-reading specs/c16-c10-role-boundary.md (Amendment — E32).
 // ===========================================================================
 
 test("R1 (PERMANENT REGRESSION PIN): the exact e-p3-tail-batch incident — review_verdict=APPROVED carried, completed_tasks grown with the batch ids, review_reports covers-file present, qa_reports ABSENT — is REJECTED, ledger unpolluted", async () => {
@@ -194,12 +152,9 @@ test("R4: verdict + completed_tasks growth + ZERO review evidence anywhere is RE
 });
 
 // ===========================================================================
-// The compliant shape (review_task_ids set, completed_tasks empty) but with
-// no review evidence is rejected with MISSING_REVIEW_EVIDENCE. This shows
-// that closing the R1 hole did not switch off the review-evidence check.
-// The same shape is covered as FM4 in
-// test/reviewer-completed-tasks-gate.test.mjs; it is repeated here under the
-// label the code review used. (C2)
+// The compliant shape (review_task_ids set, completed_tasks empty) with no review
+// evidence is still rejected with MISSING_REVIEW_EVIDENCE: closing the R1 hole did
+// not switch off that check (also FM4 in test/reviewer-completed-tasks-gate.test.mjs).
 // ===========================================================================
 
 test("C2: amended shape (review_task_ids, completed_tasks empty) minus review evidence is REJECTED by MISSING_REVIEW_EVIDENCE — the re-pointed gate is still alive", async () => {
@@ -335,12 +290,9 @@ test("P6c: both fields diverge but BOTH are fully evidenced -> ACCEPTED, ledger 
 });
 
 // ===========================================================================
-// The QA_COMPLETION_EVIDENCE_MISSING rejection must name the offending
-// id(s), the EXACT expected qa_reports/review_<id>.md path per offending id
-// (the same sanitised path hasEvidenceInFile checked, via the exported
-// qaEvidencePath wrapper), and mention the covers: fallback, so a writer
-// fixing the rejection knows precisely which file to add. (ENV-1, ENV-2;
-// E23)
+// The QA_COMPLETION_EVIDENCE_MISSING rejection must name each offending id, the exact
+// expected qa_reports/review_<id>.md path (via the exported qaEvidencePath wrapper)
+// and the covers: fallback, so a writer knows which file to add.
 // ===========================================================================
 
 test("ENV-1: QA_COMPLETION_EVIDENCE_MISSING envelope names each offending id and its exact expected qa_reports/review_<id>.md path", async () => {

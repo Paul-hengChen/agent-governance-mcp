@@ -1,20 +1,9 @@
 // Coded by @qa-engineer
-// Tests for spec: specs/feature-scope-gate.md.
-// Spec-to-Test map:
-//   AC1 (placement)            -> t-section-before-design, t-sop-step
-//   AC2 (text-only, no fetch)  -> t-text-only
-//   AC3 (single vs multi)      -> t-verdict-branches
-//   AC4 (split schema)         -> t-schema-columns
-//   AC5 (footprint cap)        -> t-footprint
-//   AC6 (lite unaffected)      -> t-lite-clean
-//
-// WHY: the Feature-Scope Gate lives purely in prompt text (skill-coordinator.md),
-// loaded by the coordinator. There is no server enforcement — the contract IS the
-// SOP wording reaching the agent. These tests pin (a) that the gate exists, is
-// positioned upstream of design-source detection, and stays text-only, (b) that the
-// human-fill schema keeps its figma-link + notes columns, and (c) that the always-on
-// footprint stays bounded (this skill is injected every session) and never leaks
-// into the lite skill.
+// Tests for spec: specs/feature-scope-gate.md (AC1-AC6; test names carry the labels).
+// The Feature-Scope Gate lives purely in coordinator prompt text, so the contract is the wording
+// that reaches the agent. Pins that the gate exists upstream of design-source detection and stays
+// text-only, that the split schema keeps its figma-link and notes columns, and that the always-on
+// footprint stays bounded and never leaks into the lite skill.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";

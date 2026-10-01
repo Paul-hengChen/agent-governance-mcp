@@ -1,37 +1,9 @@
 // Coded by @qa-engineer
-// Guard: every golden fixture the suite asserts against must have a capture
-// in scripts/capture-constitution-golden.mjs, so a fixture can never again
-// exist only as a hand-built file that the regeneration tool cannot
-// reproduce. Two of the twelve fixtures were once hand-rebuilt that way.
-// (E90, E43, T-E90-01, T-E90-02)
-//
-// Map of the claims to tests:
-//   all 12 fixtures captured         -> t-captured-equals-on-disk,
-//                                        t-asserted-equals-on-disk
-//   every fixture the suite asserts against has a capture in the script
-//                                     -> both tests below (three-way tie)
-//
-// Why: the capture script has its own completeness check (on-disk minus
-// captured -> exit 1), but it only runs when someone runs the script by hand.
-// Without this file, an edit that (a) adds a golden fixture the suite asserts
-// against without adding a capture for it, or (b) adds a capture whose
-// fixture never lands on disk, would go unnoticed until the next manual
-// regeneration. This file runs the same "capture set == fixture set" check on
-// every `npm test`, and also ties in the fixtures the two consuming suites
-// (compose-equivalence.test.mjs, skill-manifest.test.mjs) actually read via
-// `readGolden`/the `GOLDEN` constant. That three-way tie is stronger than the
-// script's two-way check: a fixture an assertion depends on that has no
-// capture AND is not on disk is invisible to on-disk-minus-captured (both
-// sets simply omit it), but it shows up here.
-//
-// The check is deliberately STATIC (reads the script's source text) instead
-// of running the capture script: the script overwrites the committed
-// fixtures in test/fixtures/compose-golden/, and running it inside `npm test`
-// would silently rewrite the very files the suite compares against. The
-// extractors key off literal calls to the `writeFixture(...)` helper, so a
-// dead branch that merely mentions a fixture name (for example
-// "constitution-monolith.txt" in an unused `else`) is not counted as a
-// capture.
+// Guard: every golden fixture the suite asserts against must have a capture in
+// scripts/capture-constitution-golden.mjs, so a fixture can never exist only as a
+// hand-built file the regeneration tool cannot reproduce. The check is STATIC (reads the
+// script's source) because running the script would overwrite the committed fixtures.
+// Rationale: specs/e260g-comment-rationale.md (test/e90-golden-capture-completeness.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
