@@ -1,22 +1,8 @@
 // Coded by @qa-engineer
-// Tests for spec: specs/pm-cut-approval-gate.md (pm-cut-approval-gate feature).
-// Covers: handoff schema v5 field, hasCutApproval helper, reset semantics,
-//   server gate fire/clear (AC-1/AC-2), SQLite-mode skip (D5), v4→v5 migration
-//   purity (AC-6/AC-7), and Copy/Strings verbatim gate text (S01/S02).
-//
-// Spec-to-Test map:
-//   AC-1  (gate blocks without cut_approved)    → G1 / G2
-//   AC-2  (gate clears with cut_approved=true)  → G3
-//   AC-6  (schema: cut_approved field + migration) → M1 / M2 / M3
-//   AC-7  (migration pure and lossless)         → M4
-//   reset semantics (§1 architecture)           → R1 / R2 / R3 / R4 / R5
-//   SQLite-mode skip (D5)                       → S1
-//   Copy/Strings verbatim (S01/S02)             → C1 / C2
-//
-// WHY: the gate's correctness depends on a subtle three-branch reset rule for
-// `cut_approved`. Tests encode the CONTRACT (invariant), not just the behavior,
-// so future readers understand what each case is guarding against — particularly
-// the load-bearing QA-FAIL→PM re-entry reset (R5) that closes the stale-true hole.
+// Tests for spec: specs/pm-cut-approval-gate.md. Covers the handoff schema v5 field, hasCutApproval,
+// reset semantics, gate fire/clear (AC-1/AC-2), SQLite-mode skip (D5), v4→v5 migration purity
+// (AC-6/AC-7) and verbatim Copy/Strings gate text. Encodes the contract, esp. the QA-FAIL→PM re-entry reset (R5).
+// Spec-to-Test map: specs/e260e-comment-rationale.md (cut-approval-gate.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -124,13 +110,7 @@ test("hasCutApproval: rejects string 'true' (YAML strict parse contract)", () =>
 
 test("R-schema-1: writeHandoffState emits cut_approved: true in YAML when passed", async () => {
   // WHY: verifies the PM approval write path emits the field so the gate can read it.
-  // Re-baselined for the bugfix repro gate (e2): schema_version bumped 10->11
-  // (dispatch_mode, stamp-only, seeds nothing); was 9->10 under
-  // stale-dispatch detection, d5 (dispatched_at, stamp-only,
-  // seeds nothing); was 8->9 under brake accounting, d2 (hop_count,
-  // seeded 0); was 7->8 under dispatch pins, c14 (dispatch_pins, stamp-only);
-  // was 6->7 under protocol fields, c9 (next_role/resume_of/review_verdict,
-  // stamp-only).
+  // Re-baselined for the bugfix repro gate (e2): schema_version bumped 10->11; earlier bumps: specs/e260e-comment-rationale.md (cut-approval-gate.test.mjs).
   const ws = tmpWs();
   await seedHandoff(ws, { cutApproved: true });
   const raw = readRawHandoff(ws);
@@ -384,15 +364,9 @@ test("G3: gate clears when cut_approved === true (AC-2)", async () => {
 // ============================================================================
 
 test("S1: gate skips when active storage is not FileHandoffStorage (SQLite-mode skip)", () => {
-  // WHY: D5 — cut_approved is handoff-YAML frontmatter only. In SQLite/HTTP mode
-  // the parsed prev-state never carries it, so the gate would always fire and block
-  // every build entry. The gate is guarded by `instanceof FileHandoffStorage`.
-  // This test verifies the predicate directly rather than swapping the real SQLite
-  // storage (which requires a DB), consistent with composition-test convention.
-  //
-  // The gate condition in index.ts: `getActiveStorage() instanceof FileHandoffStorage`.
-  // A non-FileHandoffStorage object fails this instanceof check, so the gate block
-  // is unreachable — exactly the SQLite-skip behavior required.
+  // WHY: D5 — cut_approved is handoff-YAML frontmatter only, so in SQLite/HTTP mode the gate would
+  // always fire; it is guarded by `getActiveStorage() instanceof FileHandoffStorage`. This verifies
+  // the predicate directly instead of swapping in a real SQLite storage (which needs a DB).
   const fakeNonFileStorage = { writeState: () => {}, readState: () => {}, parse: () => null };
   assert.equal(
     fakeNonFileStorage instanceof FileHandoffStorage,
@@ -414,23 +388,10 @@ test("S1: gate skips when active storage is not FileHandoffStorage (SQLite-mode 
 // ============================================================================
 
 test("M1: v4 → v5 migration is stamp-only (AC-7 — no default seeded for cut_approved)", () => {
-  // WHY: AC-7 — only schema_version changes; cut_approved MUST NOT be seeded with
-  // any default value. Absence is the unapproved sentinel. A default `false` would
-  // be a redundant materialization of absence; a default `true` would be a false
-  // attestation bypassing the gate for all legacy files.
-  // Re-baselined for the lane-layout migration (e123a): CURRENT_VERSIONS.handoff is
-  // now 15, so the manually-registered chain must reach 15 (adding the
-  // v5->v6, v6->v7, v7->v8, v8->v9, v9->v10, v10->v11, v11->v12, v12->v13,
-  // v13->v14, AND v14->v15 stamp-only/seed-only steps) or runMigrations
-  // throws MISSING_MIGRATION_STEP against the new target. Was 14 under
-  // the cut-approval inheritance change (e114). IMPORTANT: this
-  // manual chain MUST reach the real CURRENT — leaving it short doesn't just
-  // fail this test, it permanently clobbers the shared module-level migration
-  // registry (via _clearRegistryForTests) for every later test in this file
-  // that reads through the REAL registry (M3/M4/X-malformed-parse below all
-  // regressed to MISSING_MIGRATION_STEP when this chain was one short). The
-  // v4->v5 step under test is still asserted in isolation via `result.applied`
-  // below.
+  // WHY: AC-7 — only schema_version changes; cut_approved MUST NOT be seeded (absence is the
+  // unapproved sentinel; a default `true` would bypass the gate for legacy files).
+  // The manual chain MUST reach the real CURRENT_VERSIONS.handoff or it clobbers the shared registry
+  // for later tests. More: specs/e260e-comment-rationale.md (cut-approval-gate.test.mjs).
   _clearRegistryForTests();
   // Register the chain manually so we can test v4→v5 in isolation.
   registerMigration({ kind: "handoff", from: 0, to: 1, up: (i) => ({ ...i, schema_version: 1 }) });
@@ -616,14 +577,9 @@ test("C2: S02 — verbatim hint string in dist/index.js", () => {
 });
 
 test("C3: S03 — inline cut draft table header present verbatim in skill-pm.md", () => {
-  // WHY: S03 is the exact table header PM must present inline. If it drifts,
-  // the human reviewer sees a different column layout than the spec mandates.
-  // Re-baselined for the parallel-lane PM template (e110, qa-owned; coordinator
-  // amendment 2026-09-23, AC8): the old 5-column header (`id | desc |
-  // depends_on | est. files | design-link`) is gone from skill-pm.md — the new
-  // template replaces it with a 6-column header that adds `touches` before
-  // `design-link`, so both cannot hold. Updated to the new literal,
-  // byte-for-byte (spec AC4).
+  // WHY: S03 is the exact table header PM must present inline; drift shows the reviewer a different
+  // layout than the spec mandates. Re-baselined for the parallel-lane PM template (e110, AC8): the
+  // 6-column header adds `touches` before `design-link`. More: specs/e260e-comment-rationale.md (cut-approval-gate.test.mjs).
   const SKILL_PM = fs.readFileSync(
     path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "content", "skill-pm.md"),
     "utf-8",
@@ -665,22 +621,9 @@ test("C4: S04 — cut-approval gate stop-condition present in skill-coordinator.
 });
 
 // ============================================================================
-// External-ref ledger — EXTERNAL_REFS_UNRESOLVED gate (b8, B8-QA)
-// Same file-mode-only, prev-pinned-to-pm shape as CUT_APPROVAL_REQUIRED above,
-// but INVERSE polarity (DR-3: absence/empty/all-resolved CLEARS, not blocks)
-// and NO PM-re-entry re-arm (DR-4: only active_feature change resets it).
-//
-// Spec-to-Test map:
-//   AC-1 (gate fires, unresolved)         -> XG1
-//   AC-2 (resolved/absent/empty clears)   -> X-pred-2/3/4, XG2
-//   AC-3 (pinned to pm predecessor)       -> XG-nonpm
-//   AC-4 (fires on both build edges)      -> XG-both-edges
-//   AC-5 (file-mode only)                 -> XS1
-//   AC-6 (REPLACE semantics, incl. [])    -> XR3, X-empty
-//   AC-7/AC-8 (v5->v6 migration, pure)    -> see test/handoff-migration.test.mjs
-//   DR-3 (malformed entries dropped)      -> X-malformed
-//   DR-4 (no PM re-entry re-arm; reset
-//         only on active_feature change)  -> XR1, XR2, XR4
+// External-ref ledger — EXTERNAL_REFS_UNRESOLVED gate (b8, B8-QA). Same file-mode-only, pm-predecessor
+// shape as CUT_APPROVAL_REQUIRED but inverse polarity (absence, empty or all-resolved clears) and no PM
+// re-entry re-arm (DR-3, DR-4). Spec-to-Test map: specs/e260e-comment-rationale.md (cut-approval-gate.test.mjs).
 // ============================================================================
 
 test("X-pred-1: hasUnresolvedRefs/listUnresolvedRefs fire on a mixed ledger, listing only the unresolved refs in order", () => {

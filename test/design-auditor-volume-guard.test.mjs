@@ -1,18 +1,7 @@
 // Coded by @qa-engineer
-// Tests for spec: specs/design-auditor-volume-guard.md.
-// Spec-to-Test map:
-//   AC1 (pre-fetch Volume Gate)   -> t-gate-present, t-gate-ordering
-//   AC2 (node-scoped fetch)       -> t-node-scoped
-//   AC3 (frame-scoped link)       -> t-frame-scoped, t-coord-footprint
-//   AC4 (fail-loud, never silent) -> t-fail-loud
-//   AC5 (fetch-modes only; cap kept) -> t-scope-modes, t-output-cap-intact
-//
-// WHY: the Feature-Scope Gate splits a PRD at the feature level, but a single
-// feature pointed at a whole-file Figma can still blow context on the FETCH. The
-// guard adds an input-side Volume Gate + node-scoped fetch (design-auditor) and a
-// frame-scoped-link instruction (coordinator). These live purely in prompt text, so
-// the contract IS the SOP wording — pin it so a future edit can't drop the gate,
-// silently truncate instead of stopping, or re-inflate the always-on coordinator skill.
+// Tests for spec: specs/design-auditor-volume-guard.md (AC1-AC5). The guard lives purely in prompt text, so
+// the contract IS the SOP wording: pin the Volume Gate, node-scoped fetch and frame-scoped link.
+// Spec-to-Test map and WHY: specs/e260e-comment-rationale.md (design-auditor-volume-guard.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
