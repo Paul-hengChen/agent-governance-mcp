@@ -1,26 +1,26 @@
 ---
 schema_version: 15
 active_feature: "e260g-test-e3-l-comment-trim"
-status: "Blocked"
-last_updated: "2026-10-01T09:06:31.622Z"
-blocking_reason: "Authoring complete (test-lane E233 handoff), not a failure: T-E260G-09..16 trims committed; awaiting pm then code-reviewer (resume_of) then fresh qa verifier"
-last_agent: "qa-engineer"
+status: "FAIL"
+last_updated: "2026-10-01T09:21:36.844Z"
+blocking_reason: "3 required comment-accuracy/citation findings: e31:6 + rationale :25 (silent default-path fallback contradicted by tests :257/:271), error-code-contract:317 (untracked path gates/registry.js), hop-count-transitions:3 (t-gate-* do not go through the orchestrator)."
+last_agent: "code-reviewer"
 scope_decision: "single-feature"
 scope_decision_why: "One comment-only lane over 28 owned test files; disjoint from the other wave-2 lanes by ownership globs."
-cut_approved: true
 dispatch_pins:
   sr-engineer: "fable"
 evidence_schema: 2
-next_role: "pm"
-dispatched_at: "2026-10-01T09:06:31.622Z"
+next_role: "qa-engineer"
+dispatched_at: "2026-10-01T09:21:36.844Z"
+review_verdict: "CHANGES_REQUESTED"
 dispatch_mechanism: "task"
-dispatch_mechanism_tier: "sonnet"
+dispatch_mechanism_tier: "opus"
 qa_round: 0
-review_round: 0
+review_round: 1
 visual_round: 0
-hop_count: 2
+hop_count: 4
 qa_rounds_total: 0
-review_rounds_total: 0
+review_rounds_total: 1
 visual_rounds_total: 0
 ---
 # Handoff State
@@ -29,18 +29,13 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- qa author progress: T-E260G-09 cbf1751 (proof.mjs: base run 0 changed, >20=21, 8-20=71, bare-id=4; negative control done in place on worktree files and restored: code edit fails emit+tokens, deleted eslint-disable fails directives, comment-only deletion stays clean).
-- T-E260G-10 b3595f6 (e31, e32-e33, e35, e38, e43: 11 long blocks -> 0, none retained; bare ids e32 L79/L343 fixed).
-- T-E260G-11 d8c90c9 (e5, e90, e92-e86-repro, e92-e86, e96: 10 long blocks -> 0, none retained; bare id e92-e86 L423 fixed).
-- Verifier notes: e32 pointer to an untracked review_reports path dropped; an e92-e86 comment holding a literal zero-width char was rewritten in ASCII (regex code line untouched).
-- T-E260G-12 9bc587a (error-code-contract, eval-assertions, evidence-provenance: 22 long blocks -> 0, none retained; error-code-contract code byte-identical, its 3 test files pass 72/72).
-- T-E260G-13 6a9f348 (feature-lease, feature-scope-gate, feature-split-lifecycle, feature-rollup: 16 long blocks -> 0, none retained; feature-lease bare id L1127 fixed; eslint-disable kept; 4 files pass 101/101).
-- T-E260G-14 d1d8e3a (gates-expected-red, handoff-migration, handoff-write-arg-guard trimmed; file-lock and handoff-versioning swept, nothing to change: 9 long blocks -> 0, none retained; 3 files pass 50/50).
-- T-E260G-15 f4dab7f (hop-count-transitions, lane-migrate trimmed; handoff.test swept clean: 15 long blocks -> 0, none retained; the 2 files pass 66/66).
-- T-E260G-16 2e90729 (lane-paths-history, lane-paths, lane-ticket-allocation: 9 long blocks -> 0, none retained; the 3 files plus lane-migrate pass 154/154, source-scan lists in lane-paths and lane-migrate unaffected). Follow-up ea794d9 closes the Retained blocks table in specs/e260g-comment-rationale.md as none (the 8-20 list is empty).
-- Lane-wide full proof (node .current/e260g/proof.mjs, no --changed-only): base bdbffaf, changed 25 files; scope ok; emit 25 files 0 differ; tokens 25 files 0 differ; directives 25 files 0 lost; >20: 0 unexpected; --list-mid 0 blocks; bare-id 0; form ok; proof: PASS. check-md-tables OK (473 files, 0 malformed).
-- AC9 suite on clean committed HEAD ea794d9 (git status --porcelain = 0 lines; node scripts/test-lock.mjs -- npm test): total 3043 / pass 3040 / fail 0 / skip 3, exit 0; equals the integrator base 3043/3040/0/3.
-- Tasks T-E260G-09..16 NOT flipped complete (verifier owns tw_complete_task). Next: pm, then code-reviewer with resume_of, then a fresh Task-dispatched qa verifier who re-runs AC9.
+- review_report: review_reports/review_T-E260G-09.md (per-task reports review_T-E260G-09..16.md, commit f71b5e3)
+- Route: findings go to the qa-engineer author (test/ is qa-only), not sr-engineer.
+- required: test/e31-config-nonfatal.test.mjs:6 says task-mutation tools 'degrade to default task paths silently'; completeTaskInFile errors loudly (test :257) and addTaskInFile writes the lane ledger (test :271). Fix specs/e260g-comment-rationale.md:25 too (same stale claim).
+- required: test/error-code-contract.test.mjs:317 cites untracked 'gates/registry.js'; use dist/gates/registry.js (AC7).
+- required: test/hop-count-transitions.test.mjs:3 says t-gate-* are 'enforced through the real orchestrator'; they call validateTransition directly. Split: validateTransition (t-gate-*), orchestrator (t-e2e-*).
+- recommended: e31:225-228,:272-275 lost 2-space indent; e31:195 same stale DEFAULT_TASK_PATHS claim; error-code-contract:3 'three code sets must agree' (docs are a subset); handoff-write-arg-guard:2-3 217/122-char lines, rewrap; lane-ticket-allocation:4 restore 'not by a runnable test'; rationale spec stale t-* labels for e5 (:94-109), e90 (:113), feature-rollup (:176); proof.mjs BARE_ID is E-ids only (// AC3 passes).
+- Re-run node .current/e260g/proof.mjs and node scripts/check-md-tables.mjs after the fix, then route back to code-reviewer for round 2.
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.
