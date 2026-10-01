@@ -4,3 +4,5 @@
 {"ts":"2026-10-01T08:49:43.830Z","feature":"e260h-test-m-z-eval","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-10-01T09:05:21.119Z","feature":"e260h-test-m-z-eval","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-10-01T09:12:21.035Z","feature":"e260h-test-m-z-eval","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-01T09:13:18.256Z","feature":"e260h-test-m-z-eval","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-01T09:13:41.970Z","feature":"e260h-test-m-z-eval","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
