@@ -46,6 +46,9 @@ const pins = {
   "tools/feature-rollup.ts": ["SEAM FOR E132"],
   "tools/fanout-manifest.ts": ["the single canonical copy"],
 };
+// Tests that list exactly which files mention these tokens count comments too.
+const callerTokens = ["lane-paths", "resolveLanePaths", "resolveCurrentLane", "migrateFlatToLane(",
+  "migrateLaneToFlat(", "migrateFlatToLaneLocked"];
 function template3bComment(src) {
   const decl = src.indexOf("export const PROMPT_TEMPLATE_3B");
   const start = decl < 0 ? -1 : src.lastIndexOf("/**", decl);
@@ -70,6 +73,10 @@ for (const f of changed) {
   }
   if (h.includes("lane-paths") && !b.includes("lane-paths")) out.push(`NEW-TOKEN ${f} lane-paths`);
   if (!h.includes("lane-paths") && b.includes("lane-paths")) out.push(`PIN-MISSING ${f} lane-paths`);
+  for (const t of callerTokens) {
+    const [nb, nh] = [b.split(t).length - 1, h.split(t).length - 1];
+    if (nb !== nh) out.push(`TOKEN-COUNT ${f} ${t} base=${nb} head=${nh}`);
+  }
 }
 
 out.forEach((l) => console.log(l));
