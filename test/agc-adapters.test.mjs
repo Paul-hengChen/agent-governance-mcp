@@ -1,10 +1,7 @@
 // Coded by @qa-engineer
-// Tests for spec: agc-cross-agent-adapter-scaffolding.
-// Covers bin/agc-init.mjs adapter scaffolding (T-TEMPLATES, T-INIT-EXTEND,
-// T-AGC-CHECK) and sub-command routing (AC-9).
-// All workspace I/O uses fs.mkdtempSync temp dirs — never the repo root —
-// because the repo root already has pre-staged AGENTS.md and .antigravityrules
-// that would poison init/check assertions (code-reviewer flag).
+// Tests for spec: agc-cross-agent-adapter-scaffolding: bin/agc-init.mjs adapter scaffolding
+// (T-TEMPLATES, T-INIT-EXTEND, T-AGC-CHECK) and sub-command routing (AC-9). All workspace I/O uses
+// fs.mkdtempSync temp dirs, never the repo root, which already has pre-staged adapter files.
 // Spec-to-Test map lives in qa_reports/review_T-TESTS.md.
 
 import { test } from "node:test";
@@ -464,25 +461,9 @@ test("version-poison: stamp and check use the agc package version, not the targe
 // =============================================================================
 // E100/E101 (T-E100-02) — .current/.config.json "host" upsert + adapter content
 // =============================================================================
-// Spec-to-Test map (docs/backlog.md E100/E101, tasks.md T-E100-01/T-E100-02):
-//   T-E100-01 (a) configTemplate carries "host": "claude-code"
-//     -> covered by test/p0-onboarding-lite-default.test.mjs AC1 (re-pinned)
-//   T-E100-01 (b) existing-file upsert path, preserving every other key +
-//     the file's own formatting -> "config class (2)" below
-//   T-E100-01 (c) an existing declared host is NEVER overwritten; malformed
-//     JSON is never clobbered -> "config class (3)"/"config class (4)" below
-//   T-E101-01 claude.md carries the judge-dispatch obligation; codex.md /
-//     antigravity.md do not -> "adapter-content class" below
-//   Dogfood payoff: a host written by agc init reaches the task-tool capability
-//     check through the real config loader (review round 1 gap #9 / round 2 gap #6) -> "dogfood
-//     payoff" below
-// Re-derivation note (2026-08-31, qa-engineer): round 2/3 of
-// review_reports/review_T-E100-01.md both assert the reparse guard at
-// bin/agc-init.mjs:228-236 is EXACTLY sufficient against a wrong-occurrence
-// splice (a nested "host" key sorting earlier in the file than the real
-// top-level one). That claim was re-derived from source here — not accepted
-// on the strength of two review rounds agreeing — and is pinned as its own
-// class ("reparse-guard proof" below) rather than left to stand on prose.
+// Pins the host upsert (existing keys and formatting preserved, a declared host never overwritten,
+// malformed JSON never clobbered), the per-host adapter content, and the reparse-guard proof.
+// Spec-to-Test map and re-derivation note: specs/e260e-comment-rationale.md (agc-adapters.test.mjs).
 
 function readConfig(ws) {
   return fs.readFileSync(path.join(ws, ".current", ".config.json"), "utf-8");
@@ -615,22 +596,9 @@ test("E100 reparse-guard proof: truthy-but-unusable host shapes a plain !host ch
 });
 
 test("E100 reparse-guard proof: a wrong-occurrence splice never proceeds — nested \"host\" sorting before a falsy top-level \"host\" leaves the file byte-identical", () => {
-  // This is THE case that proves bin/agc-init.mjs's reparse guard
-  // (:228-236) is load-bearing, and not merely the `!m` (no-match) branch:
-  // KEY_VALUE_RE is unanchored and matches the FIRST "host": <scalar> in the
-  // file textually, which here is the NESTED key, not the real top-level
-  // one. If the guard were absent (or written as a plain `!reparsed.host`
-  // falsy check instead of the actual "not a non-empty string" test), this
-  // input would splice the wrong occurrence and either corrupt the file or
-  // falsely report success. Independently re-derived and run against the
-  // real CLI (not just read from the source) per the QA brief's explicit
-  // instruction not to ratify the review's proof unread.
-  // With the init --artifacts flag (e106), "artifacts" has no shadow-key ambiguity in this
-  // fixture (the key appears nowhere), so it independently upserts to
-  // "local" on the same run — the whole-file bucket becomes "Updated", not
-  // "Not updated". The host-specific reparse-guard property (never
-  // splice-corrupted, even though the wrong "host" occurrence is textually
-  // first) is asserted directly below and is unaffected.
+  // The case that proves the reparse guard in bin/agc-init.mjs is load-bearing: the unanchored
+  // KEY_VALUE_RE matches the nested "host" first, so without the guard the wrong occurrence is spliced.
+  // More: specs/e260e-comment-rationale.md (agc-adapters.test.mjs).
   const ws = mkTmp("e100-guard-shadowed-");
   const before = JSON.stringify({ host: { a: 1 }, n: { host: "x" } });
   seedConfig(ws, before);
