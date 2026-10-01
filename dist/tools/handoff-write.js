@@ -1,22 +1,10 @@
 // Coded by @sr-engineer
-// Tools: handoff.md writing. tools/handoff.ts stays a thin barrel that
-// re-exports this module's public surface, so importers never change. Kept
-// separate from tools/handoff-parse.ts (parse / migrate / read). (E36)
-//
-// NOTE — deliberate circular import with tools/handoff-parse.ts: see the
-// top-of-file note there. writeHandoffStateCore's existing-state preserve
-// logic below calls parseHandoff (this module → handoff-parse.ts), and
-// handoff-parse.ts's migration write-back heal calls writeHandoffState
-// (handoff-parse.ts → this module). Both directions are ordinary runtime
-// function calls, never read at module-init time, so the cycle is safe.
-//
-// One implementation, two call shapes: writeHandoffStateCore(opts) is the
-// only real implementation and takes only the options object. The exported
-// writeHandoffState keeps BOTH public overload signatures (options object
-// preferred; the 12-positional overload stays @deprecated, removal planned
-// for v4.0.0) but its body is a thin ~10-line dispatcher: options-shaped
-// input goes straight to writeHandoffStateCore; positional input is packed
-// into a WriteHandoffStateOptions object first. (E36)
+// handoff.md writing; tools/handoff.ts re-exports it, handoff-parse.ts parses.
+// Deliberate import cycle with handoff-parse.ts: this module calls parseHandoff
+// and the migration heal calls writeHandoffState. Both are runtime calls, never
+// made at module init, so the cycle is safe. writeHandoffStateCore(opts) is the
+// one implementation; writeHandoffState packs the deprecated positional form
+// into options and forwards it.
 import * as fs from "fs";
 import * as path from "path";
 import * as yaml from "js-yaml";
@@ -91,19 +79,10 @@ async function writeHandoffStateCore(opts) {
     // v13 — evidence_schema pin. Undefined unless the orchestrator stamps it,
     // with the same-feature preserve clause carrying any existing pin forward.
     const evidenceSchema = opts.evidenceSchema;
-    // cut_approved_source scalar. Left undefined by callers that don't set it
-    // (the same-feature preserve clause below carries any existing value forward,
-    // like dispatch_mode — not evidence_schema's orchestrator-only handling,
-    // since this field is set by the client).
-    // Sanitize through the same parseCutApprovedSource the read path uses, so
-    // a forbidden shape (missing prefix, empty/whitespace-only suffix,
-    // non-string, "") becomes undefined here instead of being persisted as-is.
-    // undefined then makes cutApprovedSourceNeedsExisting true below, so the
-    // existing valid record CARRIES FORWARD instead of being silently
-    // destroyed — nothing of a forbidden shape ever reaches YAML. Deliberately
-    // not a zod regex at the registry boundary: the value must never be
-    // rejected at the boundary, only never persisted in a forbidden shape.
-    // (E114)
+    // Sanitized through the read path's parseCutApprovedSource, so a forbidden
+    // shape becomes undefined and the existing valid value carries forward;
+    // nothing of a forbidden shape reaches YAML. Not a zod regex at the
+    // registry boundary: the value is never rejected, only never persisted.
     const cutApprovedSource = parseCutApprovedSource(opts.cutApprovedSource);
     // v12 — cumulative round totals. Left undefined by the legacy positional
     // overload's packing (architecture DR: it deliberately does NOT grow); the
@@ -120,8 +99,7 @@ async function writeHandoffStateCore(opts) {
     const _status = status;
     // Each lane has its own lock, `.current/<lane>/.handoff.lock`, built only
     // by resolveLaneLockPath, so writers in different lanes never block each
-    // other. ensureDir runs BEFORE the lock so the lane dir exists to host the
-    // lockfile. (E123)
+    // other. ensureDir runs before the lock so the lane dir can host the lockfile.
     const absWorkspace = path.resolve(workspacePath);
     const lane = resolveCurrentLane(absWorkspace);
     ensureDir(getHandoffPath(workspacePath));
@@ -177,109 +155,44 @@ async function writeHandoffStateCore(opts) {
         let effectivePrdPath = prdPath;
         let effectiveScopeDecision = scopeDecision;
         let effectiveScopeDecisionWhy = scopeDecisionWhy;
-        // v5 — cut-approval is FEATURE-SCOPED, not write-sticky (pm-cut-approval-gate).
-        // It needs the on-disk active_feature for the same-feature carry-forward, so
-        // it shares the single existing-state read below with the prd_path /
-        // scope_decision preserve logic (no extra I/O). The consolidated algorithm:
-        //   1. option cutApproved === true                  → true   (PM approving now)
-        //   2. agent is pm && status In_Progress            → undefined (every PM
-        //                                                      re-entry re-arms — new
-        //                                                      feature, QA-FAIL bounce,
-        //                                                      scope rework all funnel
-        //                                                      here; closes the stale-
-        //                                                      true hole, so we do NOT
-        //                                                      copy scope_decision's
-        //                                                      blind preserve)
-        //   3. existing.active_feature === this active_feature → carry existing value
-        //                                                      forward (non-PM same-
-        //                                                      feature self-progression)
-        //   4. otherwise (feature changed)                  → undefined (drop stale)
+        // cut_approved is feature-scoped and re-armed on every PM In_Progress
+        // write (new feature, QA-FAIL bounce, scope rework), so a stale `true`
+        // never survives. Resolution: (1) explicit true → true; (2) PM re-entry →
+        // unset; (3) same active_feature on disk → carry; (4) otherwise → unset.
+        // Why: specs/e260a-tools-a-h-rationale.md, "tools/handoff-write.ts — field lifetimes".
         let effectiveCutApproved;
         const isPmReentry = lastAgent === "pm" && _status === "In_Progress";
         const cutApprovalNeedsExisting = cutApproved !== true && !isPmReentry;
-        // v6 — external_refs is FEATURE-SCOPED with NO PM-re-entry re-arm (DR-4).
-        // It deliberately does NOT copy cut_approved's clause (2): cut_approved
-        // re-arms on PM re-entry because its ABSENCE BLOCKS (re-arming forces
-        // re-approval); external_refs has INVERSE polarity — absence CLEARS — so
-        // re-arming here would silently DISCARD a valid ledger and un-block the
-        // EXTERNAL_REFS_UNRESOLVED gate. The consolidated algorithm (AC-6):
-        //   1. option externalRefs !== undefined             → use it verbatim
-        //                                                      (REPLACE, incl. [])
-        //   2. omitted && existing.active_feature === this   → carry existing
-        //                                                      ledger forward
-        //   3. omitted && active_feature changed             → undefined (drop
-        //                                                      stale ledger)
+        // external_refs: feature-scoped with no PM re-entry re-arm. Its absence
+        // clears the gate (the inverse of cut_approved), so re-arming would
+        // discard a valid ledger and unblock EXTERNAL_REFS_UNRESOLVED.
+        // Resolution: (1) given, even [] → replace; (2) omitted on the same
+        // feature → carry; (3) omitted after a feature change → unset.
         let effectiveExternalRefs = externalRefs;
         const externalRefsNeedsExisting = externalRefs === undefined;
-        // v8 — dispatch_pins is FEATURE-SCOPED with NO PM-re-entry re-arm, the
-        // exact external_refs algorithm (spec AC-3/AC-4). It is a durable human
-        // directive, not a single-hop routing signal — it must survive every write
-        // in the chain that doesn't concern it (the bug c14 fixes), and a PM
-        // bouncing a QA FAIL back to In_Progress must NOT silently un-pin a role
-        // mid-feature (so no cut_approved-style clause (2)). The algorithm:
-        //   1. option dispatchPins !== undefined             → use it verbatim
-        //                                                      (REPLACE, incl. {})
-        //   2. omitted && existing.active_feature === this   → carry existing
-        //                                                      pins forward
-        //   3. omitted && active_feature changed             → undefined (drop
-        //                                                      stale pins)
+        // dispatch_pins: the external_refs rule. Pins are a durable human
+        // directive, so a PM bouncing a QA FAIL must not un-pin a role mid-feature.
         let effectiveDispatchPins = dispatchPins;
         const dispatchPinsNeedsExisting = dispatchPins === undefined;
-        // dispatch_mode is FEATURE-SCOPED with NO PM-re-entry re-arm: the same
-        // rule as dispatch_pins/external_refs, but for a single value. A
-        // bug-vs-feature classification is stable for the life of the ticket — a
-        // PM bouncing a QA FAIL back to In_Progress must NOT silently flip the
-        // mode (so no cut_approved-style re-arm clause); opting out takes an
-        // EXPLICIT PM write of "feature". (E2) The rule:
-        //   1. option dispatchMode !== undefined              → use it verbatim
-        //   2. omitted && existing.active_feature === this    → carry existing
-        //                                                       mode forward
-        //   3. omitted && active_feature changed              → undefined (drop
-        //                                                       stale mode —
-        //                                                       absence = feature)
+        // dispatch_mode: the external_refs rule, for one value. Bug-vs-feature is
+        // stable for the life of the ticket; opting out takes an explicit PM write
+        // of "feature". Absence means "feature".
         let effectiveDispatchMode = dispatchMode;
         const dispatchModeNeedsExisting = dispatchMode === undefined;
-        // evidence_schema is FEATURE-SCOPED with NO PM-re-entry re-arm, the same
-        // single-value rule as dispatch_mode: the pin records which evidence
-        // conventions were CURRENT when the feature was dispatched — a stable
-        // fact for the life of the ticket, so no write in the chain (PM bounce
-        // included) may silently re-pin it. (E23) The rule:
-        //   1. option evidenceSchema !== undefined            → use it verbatim
-        //                                                       (orchestrator
-        //                                                       stamp on feature
-        //                                                       change)
-        //   2. omitted && existing.active_feature === this    → carry existing
-        //                                                       pin forward
-        //   3. omitted && active_feature changed              → undefined (drop
-        //                                                       stale pin —
-        //                                                       absence = v2
-        //                                                       default)
+        // evidence_schema: the external_refs rule. The pin records which evidence
+        // conventions were current at dispatch, so no write in the chain may
+        // re-pin it; the orchestrator supplies it only on a feature change.
+        // Absence means the v2 default.
         let effectiveEvidenceSchema = evidenceSchema;
         const evidenceSchemaNeedsExisting = evidenceSchema === undefined;
-        // cut_approved_source is FEATURE-SCOPED with NO PM-re-entry re-arm, the
-        // same single-value rule as dispatch_mode — not cutApproved's
-        // re-arm-on-PM-re-entry clause: whether this lane inherited its approval
-        // from a parent feature is a stable fact about how the lane came to
-        // exist, established once, not a per-cut approval that must be
-        // re-witnessed on every PM bounce. (E114) The rule:
-        //   1. option cutApprovedSource !== undefined         → use it verbatim
-        //   2. omitted && existing.active_feature === this    → carry existing
-        //                                                        value forward
-        //   3. omitted && active_feature changed               → undefined (drop
-        //                                                        stale claim —
-        //                                                        absence =
-        //                                                        non-inherited)
+        // cut_approved_source: the external_refs rule, not cut_approved's re-arm.
+        // Inheriting approval from a parent feature is established once, not
+        // re-witnessed on every PM bounce. Absence means non-inherited.
         let effectiveCutApprovedSource = cutApprovedSource;
         const cutApprovedSourceNeedsExisting = cutApprovedSource === undefined;
-        // Archive-on-feature-change needs the ON-DISK active_feature on EVERY
-        // write, not just on writes that omit one of the six fields above — the
-        // archive decision below (existing.active_feature !== this write's
-        // active_feature) has to see it even when a caller sets all six fields
-        // explicitly and this is not a bookkeeping write (the one combination
-        // that would otherwise skip the read entirely). Unlike the six flags
-        // above, this one does not drive a keep/carry-forward decision on
-        // `existing` — it only forces the read to always happen, so it is
-        // unconditionally true rather than tied to an existing condition. (E116)
+        // Archive-on-feature-change needs the on-disk active_feature on every
+        // write, even when a caller sets all six fields above and this is not a
+        // bookkeeping write, so this flag only forces the read to happen.
         const archiveCheckNeedsExisting = true;
         // `existing` is declared outside the preserve block so the timestamp
         // resolution below can read it; a bookkeeping write also triggers the
@@ -335,48 +248,29 @@ async function writeHandoffStateCore(opts) {
                     existing?.active_feature === _activeFeature ? existing?.cut_approved_source : undefined;
             }
         }
-        // Archive-on-feature-change. This is NOT a seventh member of the
-        // six-field preserve/reset pattern above: it never reads or writes
-        // cut_approved / external_refs / dispatch_pins / dispatch_mode /
-        // evidence_schema / cut_approved_source, and it never touches
-        // frontmatterData. It answers a different question — "does a COPY of the
-        // OLD file need to survive before this write overwrites it" — so it sits
-        // beside that pattern rather than inside it. Fires only on an actual
-        // active_feature change (never on a same-feature write, never on a
-        // brand-new workspace — both follow from `existing` being null or
-        // unchanged). Runs inside the same withFileLock critical section, after
-        // the same verifyFreshness call above, and strictly before the tmp-write
-        // + rename publish below — so it captures exactly the last known good
-        // file the preserve logic itself read, with no new lock and no new freshness
-        // check. (E116)
+        // Archive-on-feature-change: copy the old file before this write replaces
+        // it. Separate from the preserve rules above; it never touches
+        // frontmatterData. Fires only when active_feature actually changes, inside
+        // the same lock and after the same verifyFreshness, before the publish, so
+        // it captures exactly the file the preserve logic read.
         const featureChanged = existing !== null &&
             !!existing.active_feature &&
             existing.active_feature !== _activeFeature;
         if (featureChanged && fs.existsSync(handoffPath)) {
-            // The archive stays WORKSPACE-WIDE on purpose, not per lane: filenames
+            // The archive stays workspace-wide on purpose, not per lane: filenames
             // are globally unique and the dir is gitignored; a per-lane split would
             // only let an archive entry outlive the lane dir that produced it.
-            // (E123)
             const archiveDir = path.join(workspacePath, ".current", "archive");
             if (!fs.existsSync(archiveDir)) {
                 fs.mkdirSync(archiveDir, { recursive: true });
             }
-            // AC5 — sanitize before it reaches the filesystem: any character
-            // outside [A-Za-z0-9._-] collapses to "-", so a pathological
-            // active_feature (e.g. containing "/" or "..") cannot escape
-            // .current/archive/. Charset alone is not enough: active_feature is
-            // z.string().min(1).max(500) (tools/registry.ts), but the filesystem's
-            // NAME_MAX is 255, and the suffix below (".<pid>.<epoch>.md") already
-            // costs up to 1 + 7 (pid, generously sized for a Linux pid_max default)
-            // + 1 + 13 (epoch ms, good until year 2286) + 3 (".md") = 25 bytes.
-            // 255 - 25 leaves 230; clamp to 200 for headroom against any future
-            // growth in the pid/epoch widths. Truncation is lossless for the
-            // archive's purpose — the full outgoing active_feature still survives
-            // verbatim inside the copied file's own frontmatter (AC1), so nothing
-            // is actually lost by shortening only the filename. Without this
-            // clamp, a feature name of 233+ chars (5-digit pid) throws
-            // ENAMETOOLONG on every future feature-change write, permanently
-            // wedging the workspace on that feature with no tw_* recovery path.
+            // Sanitize before the name reaches the filesystem: characters outside
+            // [A-Za-z0-9._-] become "-", so the name cannot escape .current/archive/,
+            // and the length is clamped to 200 so the name plus its
+            // ".<pid>.<epoch>.md" suffix stays under NAME_MAX (255). Without the
+            // clamp a long feature name would throw ENAMETOOLONG on every later
+            // feature change. The full name survives inside the copied file.
+            // Why: specs/e260a-tools-a-h-rationale.md, "tools/handoff-write.ts — archive file name".
             const sanitizedOutgoingFeature = existing.active_feature
                 .replace(/[^A-Za-z0-9._-]/g, "-")
                 .slice(0, 200);
@@ -385,16 +279,11 @@ async function writeHandoffStateCore(opts) {
             // reconstruction from `existing`.
             fs.copyFileSync(handoffPath, archivePath);
         }
-        // Timestamp resolution. Default: a fresh stamp. A bookkeeping write KEEPS
-        // the existing on-disk last_updated exactly, so the incumbent lease's
-        // measured age keeps reflecting the last REAL write. It is guarded to the
-        // same active_feature even though the orchestrator already rejects the
-        // differing-feature combination, because the migration heal-write in
-        // tools/handoff-parse.ts calls this writer DIRECTLY (no orchestrator):
-        // the writer itself must never suppress a new feature's fresh stamp,
-        // which would make its lease look older than it is. dispatched_at still
-        // gets its own now(): the lease clock is last_updated, while
-        // dispatched_at feeds the separate stale-dispatch advisory. (E10)
+        // Timestamp: a fresh stamp, except a bookkeeping write keeps the on-disk
+        // last_updated so the lease age reflects the last real write. Guarded to
+        // the same feature here too, because the migration heal-write calls this
+        // writer without the orchestrator. dispatched_at still gets now(): it
+        // feeds the stale-dispatch advisory, not the lease.
         let effectiveLastUpdated = now;
         if (bookkeepingWrite === true &&
             existing &&
@@ -455,7 +344,6 @@ async function writeHandoffStateCore(opts) {
         // never invent a pin the feature was not dispatched with. Explicit
         // !== undefined guard (not truthiness): a schema version can never
         // legally be 0, but the guard style keeps the numeric intent obvious.
-        // (E23, v13)
         if (effectiveEvidenceSchema !== undefined) {
             frontmatterData.evidence_schema = effectiveEvidenceSchema;
         }
@@ -471,18 +359,11 @@ async function writeHandoffStateCore(opts) {
         // these fields replace (c9-protocol-fields DR on AC-3).
         if (nextRole)
             frontmatterData.next_role = nextRole;
-        // Dispatch-liveness stamp: set only when this write dispatches (names a
-        // next_role), using the SAME now() as last_updated, so dispatched_at ===
-        // last_updated whenever a dispatch is stamped. Exception: a bookkeeping
-        // write that also dispatches keeps last_updated but stamps
-        // dispatched_at = now — acceptable, since it only feeds an advisory. Set
-        // HERE (not in the orchestrator) so every write path — orchestrator,
-        // migration heal-write, positional callers — gets it for free.
-        // Server-derived, never client-supplied. A plain synchronous assignment:
-        // it can never throw or fail a tw_update_state write. A write without a
-        // next_role drops it; a re-dispatching write re-stamps it (it follows
-        // nextRole's one-write lifetime — do NOT tie it to the preserve read).
-        // (D5, v10)
+        // dispatched_at: stamped with the same now() as last_updated, only when
+        // this write names a next_role, and never carried forward. Set here so
+        // every write path (orchestrator, heal-write, positional callers) gets it.
+        // A bookkeeping write that dispatches keeps last_updated but still stamps
+        // dispatched_at; that only feeds an advisory. Server-derived; cannot throw.
         if (nextRole)
             frontmatterData.dispatched_at = now;
         if (resumeOf)
