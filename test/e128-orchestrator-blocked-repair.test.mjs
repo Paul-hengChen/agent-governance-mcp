@@ -1,39 +1,10 @@
 // Coded by @qa-engineer
-// Orchestrator end-to-end regression guard: a same-agent Blocked->Blocked
-// repair write must land (E128, docs/backlog.md ~line 250) — the
-// release-engineer incident of 2026-09-15.
-//
-// tools/transitions.ts is pure: `validateTransition` accepting a
-// same-agent Blocked->Blocked tuple (test/qa-flow.test.mjs T-QA-E128-01(a))
-// proves the RULE is correct but says nothing about whether a real
-// tw_update_state write actually LANDS through the full 18-step
-// UPDATE_STATE_GATE_PIPELINE (STAMP_PROVENANCE, FEATURE_LEASE, evidence
-// gates, atomic publish, session-snapshot refresh, ...). This file drives the
-// real orchestrator (`handleUpdateState` from the rebuilt `dist/`) against a
-// scratch workspace, reproducing the incident shape end to end, per
-// review_reports/review_T-E128-02.md C5 and the dispatch brief's coverage
-// priority 1 ("nothing in the original 5-case task row reaches it").
-//
-// Scenario (mirrors the 2026-09-15 release incident verbatim, E111):
-//   pm:In_Progress (seeded, cut-approved)
-//     -> sr-engineer:In_Progress            (build-entry hop)
-//     -> sr-engineer:Blocked (malformed)     (a real halt, argument-tag leak)
-//     -> sr-engineer:Blocked (repair)        (the fix under test, E128)
-//
-// What must be true after the repair write, PROVEN through the real pipeline,
-// not asserted against internal fields alone:
-//   1. The corrected blocking_reason and notes persist to disk.
-//   2. status stays "Blocked" (not misstated as In_Progress).
-//   3. hop_count does not move across the Blocked->Blocked write.
-//   4. No next_role terminal marker is recorded.
-//   5. THE FEATURE LEASE IS NOT RELEASED — proven by driving a second,
-//      different feature's pm:In_Progress write through the SAME real
-//      FEATURE_LEASE gate and confirming it is rejected, exactly as
-//      test/feature-lease.test.mjs FM2 proves for a Blocked incumbent. This
-//      is the property the fix actually needs (E128): a repair that
-//      silently released the lease while a tagged, unpushed release waited
-//      on a human would defeat the ticket even though validateTransition
-//      alone would look correct.
+// Orchestrator end-to-end regression guard (E128): a same-agent Blocked->Blocked repair write must land through the real 18-step pipeline,
+// not just pass validateTransition (the pure rule is covered by test/qa-flow.test.mjs T-QA-E128-01(a)). Drives handleUpdateState from dist/
+// against a scratch workspace, replaying the 2026-09-15 release incident: pm -> sr-engineer In_Progress -> Blocked (malformed) -> Blocked (repair).
+// After the repair: corrected fields persist, status stays Blocked, hop_count and next_role are untouched, and the feature lease is NOT released
+// (a different feature's pm write is still rejected by FEATURE_LEASE).
+// Rationale: specs/e260f-comment-rationale.md (test/e128-orchestrator-blocked-repair.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -72,15 +43,8 @@ async function seedCutApprovedPm(ws, feature) {
     lastAgent: "pm",
     cutApproved: true,
   });
-  // Force the seed's last_updated off the wall clock (E148, docs/backlog.md
-  // row E148) — see test/e148-seed-stamp.mjs. The subsequent hop1/hop2/hop3
-  // chain below reads consecutively off each accepted write's OWN fresh
-  // server stamp with no intervening tw_get_state read between them (that
-  // "same session, no re-read" shape is the incident replay this file
-  // exists to prove — deliberately not re-seeded mid-chain); each hop
-  // carries only the same ~1/60000 residual chance any real consecutive
-  // orchestrator write pair does, which this fix does not attempt to
-  // eliminate without breaking that fidelity.
+  // Force the seed's last_updated off the wall clock (see test/e148-seed-stamp.mjs). The hop chain below reads off each accepted write's own
+  // server stamp with no re-read between hops (the incident's no-re-read shape, deliberately not re-seeded), so each hop keeps the usual ~1/60000 residual collision chance.
   forceSeedStamp(ws);
 }
 
@@ -187,14 +151,8 @@ test("E128-ORC: sr-engineer self-repairs a malformed Blocked record through the 
 });
 
 test("E128-ORC-2 (negative control): before the repair, the SAME malformed record has no self-correcting edge other than the one E128 adds — a status-misstating edge is what the incident actually hit", () => {
-  // WHY: this is not a duplicate of the pipeline test above — it pins the
-  // NEGATIVE shape of the incident itself (import from the pure module is
-  // fine here; no orchestrator or filesystem needed) so a reader of this
-  // suite sees both halves: what was broken (this test, standing for the
-  // record — sr-engineer:Blocked historically could reach ONLY
-  // In_Progress/pm/design-auditor, never itself) and what the fix repairs (the
-  // pipeline test above, E128). Import path matches the rest of the file's dist/
-  // convention.
+  // Pins the negative shape of the incident, so a reader sees both halves: sr-engineer:Blocked historically reached only
+  // In_Progress/pm/design-auditor, never itself (the pipeline test above shows the fix). Imports from the pure module; dist/ path convention.
   return import("../dist/tools/transitions.js").then(({ ALLOWED_TRANSITIONS }) => {
     const row = ALLOWED_TRANSITIONS.get("sr-engineer:Blocked") ?? [];
     const hasStaticSelfLoop = row.some((c) => c.agent === "sr-engineer" && c.status === "Blocked");
