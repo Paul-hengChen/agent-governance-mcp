@@ -1,31 +1,9 @@
 // Coded by @qa-engineer
-// Tests that the release-engineer agent template defers to the skill's staging
-// list instead of restating it (T-E166-01, docs/backlog.md row E166, Wave 4.5
-// L-RELTOOL).
-//
-// No specs/<feature>.md exists for this mini-chain ticket (PM/architect
-// skipped per the human-approved cut recorded in the handoff's
-// scope_decision_why) — the spec IS docs/backlog.md's E166 row plus that
-// scope_decision_why text. New file, not an extension of
-// test/release-staging.test.mjs: that file's AC1-AC5 pin
-// content/skill-release-engineer.md's OWN canonical staging list (unchanged
-// by this ticket) and the shim's <=2-sentence reinforcement-hint shape
-// (which the new wording also satisfies, confirmed green below) — none of
-// its existing assertions check for ABSENCE of a restated path list or that
-// the shim points at a specific SOP anchor, which is what this ticket actually
-// changed (E166). Disclosed per the dispatch brief's "your call; disclose it."
-//
-// Contract under test (docs/backlog.md E166 / scope_decision_why):
-//   templates/claude-code-agents/release-engineer.md (T-E166-01) drops its
-//   OWN restated staging path list and defers to content/skill-
-//   release-engineer.md step 8a's enumerated list ("Stage explicitly") and
-//   its "Pre-commit verify" sub-step — never restating a shorter/staler copy
-//   a haiku-tier agent could follow instead of the single normative list.
-//
-// Test map (criterion -> test name):
-//   AC (no restated path list)         -> T-E166-01a
-//   AC (defers to SOP step 8a by name) -> T-E166-01b
-//   AC (anchors exist in step 8a)      -> T-E166-01c
+// Tests that the release-engineer agent template defers to the skill's staging list instead of restating it (docs/backlog.md row E166, Wave 4.5 L-RELTOOL).
+// No spec file; the backlog row is the spec. A new file, not an extension of test/release-staging.test.mjs, whose assertions do not check for the ABSENCE of a restated
+// path list or that the shim names a specific SOP anchor. Contract: templates/claude-code-agents/release-engineer.md drops its own path list and defers to
+// content/skill-release-engineer.md step 8a ("Stage explicitly") and its "Pre-commit verify" sub-step. Cases T-E166-01a/b/c.
+// Rationale: specs/e260f-comment-rationale.md (test/e166-template-defers-staging.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -43,15 +21,8 @@ const TEMPLATE = fs.readFileSync(TEMPLATE_PATH, "utf-8");
 const SKILL = fs.readFileSync(SKILL_PATH, "utf-8");
 
 test("T-E166-01a: template names NO staging path list — a restated run of directory paths would fail this", () => {
-  // The pre-fix line 11 restated a subset as two backtick spans:
-  //   `lib/ tools/ schema/ guards/ gates/ prompts/ bin/ transport/ scripts/
-  //    content/ templates/ specs/ test/ qa_reports/ review_reports/`
-  //   plus metadata `package.json index.ts CHANGELOG.md README.md dist/`
-  // Detect that SHAPE generically (>=3 consecutive whitespace-separated
-  // tokens each ending in "/") rather than grepping for the old literal
-  // list, so this assertion actually fails if ANY path list — the old one,
-  // a shorter one, or a newly-invented one — is restated in the template,
-  // per the dispatch brief's requirement.
+  // The old template line restated a subset as backtick spans of directories plus package.json etc. Detect that SHAPE generically (>=3 consecutive
+  // whitespace-separated tokens each ending in "/") so the assertion fails if ANY path list, old, shorter or newly invented, is restated.
   const restatedDirListPattern = /(?:\b[\w.-]+\/[ \t]+){2,}\b[\w.-]+\//;
   const match = TEMPLATE.match(restatedDirListPattern);
   assert.equal(

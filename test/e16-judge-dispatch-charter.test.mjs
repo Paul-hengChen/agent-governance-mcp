@@ -1,35 +1,9 @@
 // Coded by @qa-engineer
-// Tests for the judge-dispatch charter broadening (backlog E16 / T-EB-02, option B,
-// content-only): broadening the
-// Amend-Resume Edge charter in content/const-08-chain-31-mid.md §3.1 so the
-// resume_of-gated pm->{code-reviewer,qa-engineer} edge is ALSO the sanctioned
-// door for a PM-sanctioned FRESH single-role judge dispatch on a test-only /
-// evidence-only ticket — not only a mid-chain resume of a previously
-// stranded role (the shape an earlier test-only ticket, T-E15-01, actually used, disclosed honestly in
-// qa_reports/review_T-E15-01.md as a narrower-than-literal fit). Plus the
-// pointer-only note added to content/coord-03-core-fallback.md's Amend-Resume
-// relay escalation row.
-//
-// Mirrors the skill-text pinning convention (T-E1-02/T-E1-03; see
-// test/feature-lease.test.mjs S1-S6): these are pure grep/string-containment
-// assertions against the shipped content files — no server code changed
-// (the later review, T-EB-03, independently confirmed tools/transitions.ts, gates/,
-// index.ts are byte-identical via `git status`; that is a one-time fact
-// about this diff, recorded in qa_reports/review_T-EB-04.md's AC Execution
-// Log rather than re-encoded as a unit test here — a `git status --porcelain`
-// assertion would trivially pass forever once this feature is committed,
-// giving false confidence rather than a real regression guard. The actual
-// lasting regression guard for "the edge still requires resume_of and only
-// opens to the two judge roles" is the pre-existing C1-07 Amend-Resume Edge
-// suite in test/qa-flow.test.mjs, confirmed green and unmodified below).
-//
-// Spec-to-test map (backlog E16 row + T-EB-02 ticket text):
-//   charter broadens without narrowing (resume_of still required)   -> E16-01
-//   "fresh dispatch, not only mid-chain resume" load-bearing phrase -> E16-02
-//   same field / same trust mechanics as the pre-existing edge      -> E16-03
-//   judge-roles-only (no edge opened to any build role)             -> E16-04
-//   no-build-role-edge sentence (code-bearing flow can't skip judge) -> E16-05
-//   coord-03 Amend-Resume relay row carries a pointer to §3.1        -> E16-06
+// Tests for the judge-dispatch charter broadening (backlog E16 / T-EB-02, content only): the Amend-Resume Edge charter in content/const-08-chain-31-mid.md §3.1 is
+// broadened so the resume_of-gated pm->{code-reviewer,qa-engineer} edge is also the sanctioned door for a PM-sanctioned FRESH single-role judge dispatch on a
+// test-only or evidence-only ticket, not only a mid-chain resume; plus a pointer-only note in content/coord-03-core-fallback.md's relay row. Pure string-containment
+// assertions on shipped content (the skill-text pinning convention of test/feature-lease.test.mjs S1-S6); the lasting guard that the edge still requires resume_of is test/qa-flow.test.mjs (C1-07). Cases E16-01..E16-06.
+// Rationale: specs/e260f-comment-rationale.md (test/e16-judge-dispatch-charter.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";

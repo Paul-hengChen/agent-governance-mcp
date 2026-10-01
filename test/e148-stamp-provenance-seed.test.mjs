@@ -1,39 +1,9 @@
 // Coded by @qa-engineer
-// Deterministic proof that seeding a test workspace can no longer trip the
-// stamp-provenance gate at random (E148, docs/backlog.md row E148 / order row
-// 0t6, T-E148-01): "A gate that exists to catch fabricated timestamps
-// randomly fires on genuine ones, turning any seed-then-write test into a
-// coin flip." gates/stamp-provenance.ts arms STAMP_PROVENANCE_SUSPECT
-// whenever the CURRENT on-disk `last_updated` matches
-// HAND_AUTHORED_STAMP_RE = /T\d{2}:\d{2}:00\.000Z$/ (seconds "00" AND
-// milliseconds ".000"). That gate is CORRECT and unmodified here (the ticket's
-// first hard constraint: do not weaken the gate; E148) — its premise ("overwhelmingly unlikely from the server
-// write path") is true but not zero: ~1/60000 per accepted write. Any test
-// across the suite that seeds a workspace via writeHandoffState() and then
-// drives a gated tw_update_state write inherits that ~1/60000 chance of a
-// spurious STAMP_PROVENANCE_SUSPECT rejection — measured live on the
-// v3.112.0 release CI (run 35308236600): 2097/2100, green on re-run with no
-// code change (the J1 test in test/e28-shrink-warning.test.mjs:232).
-//
-// A green re-run of that test proves nothing (it's green 59999/60000 runs with
-// NO fix at all). This file instead forces the on-disk seed stamp to the EXACT suspect
-// shape deterministically (test/e148-seed-stamp.mjs's SUSPECT_SEED_STAMP),
-// removing the wall clock from the equation entirely, and demonstrates:
-//   (a) the gate fires 100% of the time on a suspect seed, not ~1/60000 of
-//       the time — the mechanism this whole ticket is about is real and
-//       reproducible on demand (SEED-1);
-//   (b) the seed-then-write path still SUCCEEDS once the write carries the
-//       audited stamp-remediation acknowledgment the gate requires
-//       (SEED-2) — the "succeeds" half of the acceptance bar, for a seed
-//       that deliberately matches the suspect shape;
-//   (c) test/e148-seed-stamp.mjs's forceSeedStamp() helper, applied with the
-//       SAFE (non-suspect) stamp now used across the other 20+ seed-then-write
-//       test files, makes an ordinary seed-then-write test succeed with ZERO
-//       dependency on Date.now() at all — every run, not "overwhelmingly
-//       likely" (SEED-3). This is the actual fix, proven directly rather
-//       than by absence-of-flake-so-far.
-//
-// No specs/<feature>.md exists — docs/backlog.md row E148 IS the spec.
+// Deterministic proof that seeding a test workspace cannot trip the stamp-provenance gate at random (E148, docs/backlog.md row E148).
+// gates/stamp-provenance.ts arms STAMP_PROVENANCE_SUSPECT when the on-disk `last_updated` matches HAND_AUTHORED_STAMP_RE, which a wall-clock seed hits ~1/60000 of the time;
+// a green re-run proves nothing, so this file forces the exact suspect shape. SEED-1: the gate fires every time on a suspect seed. SEED-2: the write still succeeds with
+// the audited stamp-remediation note. SEED-3: forceSeedStamp (test/e148-seed-stamp.mjs) with the SAFE stamp makes seed-then-write succeed with no Date.now() dependency. The gate is unmodified; no spec file, the backlog row is the spec.
+// Rationale: specs/e260f-comment-rationale.md (test/e148-stamp-provenance-seed.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -140,12 +110,8 @@ test("SEED-2: the same deterministically-suspect seed, remediated, succeeds and 
 });
 
 // ---------------------------------------------------------------------------
-// SEED-3: this is the actual fix for the random gate trip (E148), demonstrated
-// directly. forceSeedStamp applied with the SAFE (non-suspect) stamp —
-// exactly what the other seed-then-write test files now do — makes the seed-then-write path
-// succeed with ZERO dependency on Date.now(): not "vanishingly unlikely to
-// flake", but structurally incapable of landing on the suspect shape, on
-// every single run.
+// SEED-3: the actual fix for the random gate trip (E148). forceSeedStamp with the SAFE stamp makes seed-then-write succeed with ZERO dependency
+// on Date.now(): structurally incapable of landing on the suspect shape, on every run.
 // ---------------------------------------------------------------------------
 
 test("SEED-3: forceSeedStamp(ws, SAFE_SEED_STAMP) makes the seed-then-write path succeed deterministically, independent of Date.now()", async () => {
