@@ -19,7 +19,7 @@ const OWNED = /^test\/(_[^/]*|[abd][^/]*\.test\.mjs|(ch|com|conf|cons|cov|cu)[^/
 const BOOKKEEPING = /^(specs\/e260e-|qa_reports\/.*E260E|review_reports\/.*E260E|\.current\/e260e\/|tasks\.md$)/i;
 // Directive comments that must survive a trim (count must not drop).
 const DIRECTIVES = /@ts-(ignore|expect-error|nocheck|check)|eslint-(disable|enable)|__PURE__|#__PURE__|@vite-ignore/g;
-const BARE_ID = /^\s*(\/\/|\/\*|\*|#)\s*\(?E[0-9]+[a-z]?\b[^A-Za-z]*(\(e[0-9][a-z0-9-]*\))?\s*[:—-]?\s*$/;
+const BARE_ID = /^\s*(\/\/|\/\*|\*|#)\s*\(?(?:E[0-9]+[a-z]?|AC-?[0-9]+|DR-?[0-9]+|T-[A-Za-z0-9-]*[0-9])\b[^A-Za-z]*(\(e[0-9][a-z0-9-]*\))?\s*[:—-]?\s*$/;
 
 const argv = process.argv.slice(2);
 const flag = (f) => argv.includes(f);
@@ -48,15 +48,20 @@ const report = (name, ok, line, details = []) => {
   if (!ok) failed.push(name);
 };
 
-// scope (AC3)
-const ownedAll = lines(git("ls-files", "--", "test")).filter((f) => OWNED.test(f) && f.endsWith(".mjs"));
+// scope (AC4)
+// Emit/token checks parse with the TypeScript compiler, so only these extensions are checkable; any other owned
+// test/_* extension that changes fails loudly (below) instead of silently skipping emit and tokens.
+const CHECKABLE = /\.(mjs|cjs|js|mts|cts|ts)$/;
+const ownedAll = lines(git("ls-files", "--", "test")).filter((f) => OWNED.test(f) && CHECKABLE.test(f));
 const status = lines(git("diff", "--name-status", base)).map((l) => l.split("\t"));
 const untracked = lines(git("ls-files", "--others", "--exclude-standard"));
 const scopeBad = [
   ...status.filter(([s, f]) => !BOOKKEEPING.test(f) && (s !== "M" || !OWNED.test(f))).map(([s, ...f]) => `${s} ${f.join(" ")}`),
   ...untracked.filter((f) => !BOOKKEEPING.test(f)).map((f) => `?? ${f}`),
 ];
-const changed = status.filter(([s, f]) => s === "M" && OWNED.test(f) && f.endsWith(".mjs")).map(([, f]) => f);
+const changedAll = status.filter(([s, f]) => s === "M" && OWNED.test(f)).map(([, f]) => f);
+const changed = changedAll.filter((f) => CHECKABLE.test(f));
+scopeBad.push(...changedAll.filter((f) => !CHECKABLE.test(f)).map((f) => `unsupported extension, emit/tokens not checkable: ${f}`));
 console.log(`base: ${base.slice(0, 7)}, owned: ${ownedAll.length} file(s), changed: ${changed.length} file(s)`);
 report("scope", scopeBad.length === 0, scopeBad.length ? `scope: ${scopeBad.length} bad path(s)` : "scope: ok", scopeBad);
 
@@ -86,7 +91,7 @@ function leaves(text, f) {
 const tokBad = changed.filter((f) => leaves(baseText(f), f) !== leaves(headText(f), f));
 report("tokens", tokBad.length === 0, `tokens: ${changed.length} files, ${tokBad.length} differ`, tokBad);
 
-// directive comments kept (AC)
+// directive comments kept (AC3)
 const dirBad = [];
 for (const f of changed) {
   const nb = (baseText(f).match(DIRECTIVES) ?? []).length;
@@ -95,7 +100,7 @@ for (const f of changed) {
 }
 report("directives", dirBad.length === 0, `directives: ${changed.length} files, ${dirBad.length} count change(s)`, dirBad);
 
-// long blocks (AC4, AC5) and bare-id (AC7)
+// long blocks (AC5, AC6) and bare-id (AC8)
 const scanSet = flag("--changed-only") ? changed : ownedAll;
 const over = [];
 const mid = [];
@@ -118,7 +123,7 @@ if (flag("--list-mid")) {
 }
 report("bare-id", bare.length === 0, `bare-id: ${bare.length}`, bare);
 
-// form (AC8)
+// form (AC9)
 function comments(text, f) {
   const sf = ts.createSourceFile(f, text, ts.ScriptTarget.Latest, true);
   const seen = new Map();
