@@ -1,8 +1,9 @@
 // Coded by @qa-engineer
-// Tests for the per-gate fire-count report: computeGateStats() (tools/gate-stats.ts) reads `.current/telemetry.jsonl` (one line per gate rejection) and `.current/metrics.jsonl` (one line per shipped feature),
-// and tools/registry.ts exposes it as the `tw_gate_stats` MCP tool. The doc edits (docs/gate-retro-procedure.md, the CLAUDE.md tool list) are prose and not pinned here. (E26, T-E26-01..03)
-// Invariants: every GATE_REGISTRY code lands in exactly one of `fired` / `zero_fire` (never omitted or double-counted); prose-only rules carry `fires: null`, never `0`; malformed input and missing sidecars never throw.
-// Test ids: R1-R3 registry coverage, F1-F5 bucketing, U1 unregistered, P1-P2 prose, M1-M4 malformed, D1-D2 missing sidecar, DE1-DE5 dedupe and null-on-zero, T1-T3 tool entry.
+// Tests for the per-gate fire-count report: computeGateStats() (tools/gate-stats.ts) reads
+// `.current/telemetry.jsonl` and `.current/metrics.jsonl`; tools/registry.ts exposes it as
+// `tw_gate_stats` (E26, T-E26-01..03). Invariants: every GATE_REGISTRY code lands in exactly
+// one of `fired` / `zero_fire`; prose-only rules carry `fires: null`, never `0`; malformed
+// input and missing sidecars never throw. Test ids: R registry, F bucketing, U/P/M/D/DE/T.
 // Rationale: specs/e260f-comment-rationale.md (test/e26-gate-stats.test.mjs).
 
 import { test } from "node:test";
@@ -415,9 +416,13 @@ test("DE5: mean_* and one_pass_rate are null (not 0 or NaN) when zero features e
   assert.equal(report.metrics.mean_hops, 6);
 });
 
-// AC1-AC5b: the report aggregates sidecars across lanes. tools/gate-stats.ts reads EVERY copy of telemetry.jsonl/metrics.jsonl under this workspace's .current/ tree (live lanes, closed history lanes, a flat file)
-// via tools/lane-paths.ts's enumerateLaneSidecarSources and deduplicates by CONTENT, never file name, so a copy mid-move is not counted twice. Fixtures build the raw `.current/` tree directly;
-// AC1 adds one explicit assertion that a flat-only workspace's `sources` names only the flat file. (E123 F2, specs/e123c-cross-lane-aggregation.md)
+// AC1-AC5b: the report aggregates sidecars across lanes. tools/gate-stats.ts reads EVERY
+// copy of telemetry.jsonl/metrics.jsonl under this workspace's .current/ tree (live lanes,
+// closed history lanes, a flat file) via tools/lane-paths.ts's enumerateLaneSidecarSources
+// and deduplicates by CONTENT, never file name, so a copy mid-move is not counted twice.
+// Fixtures build the raw `.current/` tree directly; AC1 adds one explicit assertion that a
+// flat-only workspace's `sources` names only the flat file. (E123 F2,
+// specs/e123c-cross-lane-aggregation.md)
 
 function liveTelemetryPath(ws, lane) {
   return path.join(ws, ".current", lane, "telemetry.jsonl");
