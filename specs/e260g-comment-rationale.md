@@ -257,3 +257,45 @@ Shortened in-body blocks, with the detail that no longer sits next to the code:
 - Wired through the lock-free cores (AC3, AC12, AC13, which replaced the AC10 unwired check; e123b9 J2): `writeHandoffStateCore` and `readHandoffState`'s non-blocking attempt call the core directly. The CALLERS scan excludes dist/ and test/ and matches `name(` so `migrateFlatToLaneLocked(` (see CALLERS-LOCKED) is not a hit.
 - `noFlatCounterpart` (specs e125a AC1 and AC2, architecture D1 and D2): OPTIONAL_FILENAMES and ALL_FILENAMES stay derived from the full registry so a future flat-movable entry is caught automatically; MOVABLE_FILENAMES mirrors the unexported MOVABLE_LANE_FILES filter in tools/lane-migrate.ts.
 - Sidecar merge (ticket e123b9, T-E123B9-05 (h)) and pendingTickets (ticket e179 AC10): pending-tickets.md is committed markdown, so concatenating two copies would yield two `## Applied` sections and duplicate lane_local_ids.
+
+## test/lane-paths.test.mjs
+
+Specs: `specs/e123a-lane-layout-migration.md` (AC4, AC5, AC15; tasks T-E123A3-08), `specs/e123b0-lane-runtime-resolver.md` (AC1-AC5; task T-E123B0-03). Spec-to-test map:
+
+- e123a AC4, `resolveLaneName`: leading ticket-id token, `_legacy` fallback, must never return `_primary`: RN1..RN9 (table-driven).
+- e123a AC5, `resolveLanePaths` derived by iterating LANE_FILES, with only a short listed set of callers of the function itself (lane-aware code calls `resolveCurrentLanePaths` instead; dispatch-log.ts imports its filename from LANE_FILES): RP1..RP4, CALLERS1. CALLERS2 lists every module allowed to import `lane-paths`, so a new unreviewed importer fails.
+- e123a AC15, LANE_FILES is the single owner (the returned key count equals LANE_FILES.length): REG1, REG2.
+- e123b0 AC1, `PRIMARY_LANE = "_primary"` export: AC1-1.
+- e123b0 AC2, `resolveCurrentLane` pure-fs HEAD read over temp dirs (.git dir, gitfile with absolute or relative gitdir, detached HEAD, missing .git, malformed gitfile), never throws: CL1..CLn (table-driven).
+- e123b0 AC3, TICKET_ID_RE accepts a trailing letter or digit suffix so ids like e123b0, b1, b9 resolve to themselves, the older examples and the `_legacy` fallback still hold, and `resolveLaneName` never returns `_primary`: RESOLVE_LANE_NAME_CASES additions plus the existing RN never-primary sweep.
+- e123b0 AC4, `resolveCurrentLanePaths(ws)` equals `resolveLanePaths(ws, resolveCurrentLane(ws))`, zero behaviour change: CLP1..CLPn.
+- e123b0 AC5, only reviewed modules call `resolveCurrentLane`: CALLERS3, an allow-list.
+
+In-body blocks, with the detail dropped from beside the code: the AC6 regex test (ticket e123b8 J1) uses `{ timeout }` because measuring wall-clock milliseconds flakes under CI load; if TICKET_ID_RE regresses to a two-quantifier shape the test times out instead of passing slowly. The lock-path table is Decision 2 of T-E123B9-05. The allow-listed callers list (T-E123BI-01) grows because AC15 requires tools/dispatch-log.ts and tools/lane-migrate.ts to import from lane-paths.ts, and the write path, sidecars, prompt builder and bin/ hooks all go through `resolveCurrentLane(Paths)`. The base-sha consumers (ticket e125b AC11) call `resolveLanePaths(ws, lane).baseShaPath` directly, the same registry-derived path every other lane file uses, not a standalone composer. The lane-local task ledgers (ticket e125a AC1, AC10) have three importers: tools/tasks-lane-migrate.ts (PRIMARY_LANE, laneFile, resolveCurrentLanePaths, resolveLaneDir, resolveLaneName), tools/config.ts (resolveCurrentLanePaths; findTasksFile checks the lane path first and stays side-effect-free) and tools/tasks-file.ts (LEGACY_LANE, PRIMARY_LANE, resolveCurrentLanePaths, resolveLaneName).
+
+## test/lane-paths-history.test.mjs
+
+Spec: `specs/e125b-lane-close-writeback.md` (AC6, AC8, X7; task T-E125B-01). Spec-to-test map:
+
+- AC6, `resolveHistoryBucket` returns a UTC YYYY-MM bucket; `resolveHistoryLaneDir` throws on a malformed bucket or an unsafe lane and never returns a path outside `.current/history/<bucket>/`: BUCKET1..BUCKET3, HISTDIR1..HISTDIR6.
+- AC8, `hasHistoryLedger` is pure fs, scans every HISTORY_BUCKET_RE bucket and never throws: HASHIST1..HASHIST7.
+
+The file is scoped to the pure, read-only resolvers. The fixture-driven proof that `agc feature finish --shipped` writes into `.current/history/<bucket>/<lane>/` lives in `test/agc-feature-finish-history.test.mjs` (AC1, AC9), and the read and refuse integration through `makeForeignCheck` in tools/tasks-file.ts (X7) lives in `test/e125a-lane-local-ledgers.test.mjs`, next to the lane-ledger fixtures it needs (e125a D12).
+
+## test/lane-ticket-allocation.test.mjs
+
+Spec: `specs/e124-lane-ticket-allocation.md` (AC1-AC8; task T-E124-01). Spec-to-test map (test names):
+
+- AC1: "parsePendingTickets ignores NEW-TICKETS.md-shaped prose and extracts only fenced pending-ticket blocks".
+- AC2: "parses N valid blocks"; "a malformed block is skipped and reported, siblings still parse".
+- AC3: "allocateTicketIds assigns sequential ids across batches in input order".
+- AC4: "resolves same-batch lane-local dependency to its allocated id"; "an unresolvable depends_on is surfaced in unresolvedDependencies, not silently dropped".
+- AC5: "two sequential allocateTicketIds calls with re-derived currentMaxId never repeat an id".
+- AC6: "extractMaxBacklogId counts suffixed ids by base number and ignores prose-embedded ids, using a fixed fixture".
+- AC7: "detectOrphanLanes finds branches with a pending file whose worktree is gone, ignores branches without one"; "a branch-name vs lane-name mismatch does not falsely orphan a live branch".
+- AC8: "markApplied archives the named entries and leaves the rest parseable".
+- Below the map: boundary and security smoke tests (qa-engineer SOP Phase 3.d).
+
+AC9 (allocateTicketIds and markApplied take no `disposition` parameter, so a finding filed on an abandoned lane applies identically to one on a shipped lane) is checked by reading the signatures, not by a runnable test: `dist/tools/lane-ticket-allocation.js` exports `allocateTicketIds(input)` with one parameter and `markApplied(fileText, appliedLaneLocalIds)` with two.
+
+Deliberately untested, with the reason: two suspect behaviours (a pending-ticket block appended after an existing `## Applied` section is silently archived instead of reported, and a stray unmatched fence in prose silently swallows the next pending-ticket block). Asserting either of today's behaviours as correct would turn a bug into a contract; both are tracked as follow-up work (L-STATE-NEW-2, L-STATE-NEW-3, E124b).

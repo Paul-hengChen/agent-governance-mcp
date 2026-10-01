@@ -1,36 +1,10 @@
 // Coded by @qa-engineer
-// Tests for tools/lane-ticket-allocation.ts: turning lane-filed pending
-// tickets into real backlog ids, and finding lanes whose worktree is gone.
-// (specs/e124-lane-ticket-allocation.md AC1-AC8, T-E124-01)
-//
-// AC9 (allocateTicketIds/markApplied take no `disposition` parameter — a
-// finding filed on an abandoned lane applies identically to one on a
-// shipped lane) is checked by reading the signatures, not by a runnable
-// test: dist/tools/lane-ticket-allocation.js
-// exports `allocateTicketIds(input)` (one parameter) and
-// `markApplied(fileText, appliedLaneLocalIds)` (two parameters) — neither
-// accepts a disposition argument.
-//
-// OUT OF SCOPE, deliberately untested here: two known suspect behaviours —
-// a pending-ticket block appended after an existing `## Applied` section is
-// silently archived instead of reported, and a stray unmatched fence in
-// prose silently swallows the next pending-ticket block. Asserting either
-// of today's behaviours as correct would turn a bug into a contract; both
-// are tracked as follow-up work instead. (L-STATE-NEW-2, L-STATE-NEW-3, E124b)
-//
-// Spec-to-Test map:
-//   AC1 -> "parsePendingTickets ignores NEW-TICKETS.md-shaped prose and extracts only fenced pending-ticket blocks"
-//   AC2 -> "parses N valid blocks"
-//          "a malformed block is skipped and reported, siblings still parse"
-//   AC3 -> "allocateTicketIds assigns sequential ids across batches in input order"
-//   AC4 -> "resolves same-batch lane-local dependency to its allocated id"
-//          "an unresolvable depends_on is surfaced in unresolvedDependencies, not silently dropped"
-//   AC5 -> "two sequential allocateTicketIds calls with re-derived currentMaxId never repeat an id"
-//   AC6 -> "extractMaxBacklogId counts suffixed ids by base number and ignores prose-embedded ids, using a fixed fixture"
-//   AC7 -> "detectOrphanLanes finds branches with a pending file whose worktree is gone, ignores branches without one"
-//          "a branch-name vs lane-name mismatch does not falsely orphan a live branch"
-//   AC8 -> "markApplied archives the named entries and leaves the rest parseable"
-//   (below the map: boundary/security smoke tests per skill-qa-engineer Phase 3.d)
+// Tests for tools/lane-ticket-allocation.ts: turning lane-filed pending tickets into real backlog ids, and finding
+// lanes whose worktree is gone (specs/e124-lane-ticket-allocation.md AC1-AC8).
+// AC9 (no `disposition` parameter on allocateTicketIds or markApplied) is checked by reading the signatures.
+// Deliberately untested: a block after an existing `## Applied` section is silently archived, and a stray unmatched
+// fence swallows the next block. Both are tracked as follow-up work; asserting them would turn bugs into contracts.
+// Rationale: specs/e260g-comment-rationale.md (test/lane-ticket-allocation.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";

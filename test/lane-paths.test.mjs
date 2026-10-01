@@ -1,35 +1,10 @@
 // Coded by @qa-engineer
-// Tests for tools/lane-paths.ts, which maps a workspace and lane name to the
-// per-lane files under .current/<lane>/ and works out which lane the current
-// checkout belongs to. Covers specs/e123a-lane-layout-migration.md
-// AC4/AC5/AC15 and specs/e123b0-lane-runtime-resolver.md AC1-AC5.
-// (T-E123A3-08, T-E123B0-03)
-//
-// Spec-to-Test map:
-//   e123a AC4 (resolveLaneName: leading ticket-id token, "_legacy" fallback,
-//        MUST NEVER return "_primary")                -> RN1..RN9 (table-driven)
-//   e123a AC5 (resolveLanePaths: derived-by-iterating-LANE_FILES stub,
-//        only a short, listed set of callers of the FUNCTION resolveLanePaths
-//        itself (the lane-aware code calls resolveCurrentLanePaths instead);
-//        dispatch-log.ts imports its filename FROM LANE_FILES) -> RP1..RP4, CALLERS1
-//        (CALLERS2 lists every module allowed to import "lane-paths", so a
-//        new, unreviewed importer fails — see CALLERS2 below)
-//   e123a AC15 (LANE_FILES is the single owner — resolveLanePaths's returned
-//        key count equals LANE_FILES.length)          -> REG1, REG2
-//   e123b0 AC1 (PRIMARY_LANE = "_primary" export)      -> AC1-1
-//   e123b0 AC2 (resolveCurrentLane: pure-fs HEAD read over temp dirs — .git
-//        dir, gitfile abs/relative gitdir, detached HEAD, missing .git,
-//        malformed gitfile — never throws)             -> CL1..CLn (table-driven)
-//   e123b0 AC3 (TICKET_ID_RE accepts a trailing letter/digit suffix, so ids
-//        like e123b0/b1/b9 resolve to themselves; the older examples and the
-//        _legacy fallback still hold; resolveLaneName never returns _primary)
-//                                                        -> RESOLVE_LANE_NAME_CASES
-//        additions below + existing RN-never-primary sweep
-//   e123b0 AC4 (resolveCurrentLanePaths === resolveLanePaths(ws,
-//        resolveCurrentLane(ws)) — zero behaviour change)  -> CLP1..CLPn
-//   e123b0 AC5 (only reviewed modules call resolveCurrentLane)   ->
-//        CALLERS3, an allow-list of those callers, so a new, unreviewed
-//        caller fails
+// Tests for tools/lane-paths.ts, which maps a workspace and lane name to the per-lane files under .current/<lane>/
+// and works out which lane the current checkout belongs to (specs/e123a-lane-layout-migration.md AC4, AC5, AC15;
+// specs/e123b0-lane-runtime-resolver.md AC1-AC5).
+// Labels: RN (resolveLaneName), RP and REG (resolveLanePaths), CL and CLP (resolveCurrentLane and its paths),
+// CALLERS1-3 (allow-lists of reviewed importers and callers, so a new unreviewed one fails).
+// Rationale: specs/e260g-comment-rationale.md (test/lane-paths.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -103,28 +78,18 @@ test("RN-type-guard: resolveLaneName never throws on a non-string activeFeature 
 });
 
 // ============================================================================
-// AC6 — TICKET_ID_RE uses `\d[a-z0-9]*` (ONE mandatory digit), not
-// `\d+[a-z0-9]*`: two adjacent quantifiers over the same [0-9] characters let
-// a long digit run backtrack across O(n) splits of themselves. (e123b8 J1)
-// Timing-free by design: the assertion below is a `{ timeout }` ceiling on
-// the WHOLE test, never a measured-duration comparison, because measuring
-// wall-clock milliseconds directly is exactly the kind of assertion that
-// flakes under CI load. If TICKET_ID_RE regresses to a two-quantifier shape,
-// this test times out (fails) instead of silently passing slow.
+// AC6 — TICKET_ID_RE uses `\d[a-z0-9]*` (one mandatory digit), not `\d+[a-z0-9]*`: two adjacent quantifiers over
+// the same [0-9] characters let a long digit run backtrack across O(n) splits. Timing-free by design: the assertion
+// is a `{ timeout }` ceiling on the whole test, not a measured duration, which would flake under CI load.
 // ============================================================================
 
 test(
   "AC6-PERF: a 10k-digit ticket-id-shaped input with no valid terminator anywhere in the run returns promptly, not quadratically",
   { timeout: 5000 },
   () => {
-    // "e" + 10,000 digits + "@": [a-z]+ takes "e", \d[a-z0-9]* can only ever
-    // stop somewhere inside the digit run, and NONE of those stopping points
-    // is followed by "-" or end-of-string (the "@" blocks both) — so the
-    // match is guaranteed to fail only after exhausting every split point.
-    // That is precisely the failure shape that made the old `\d+[a-z0-9]*`
-    // (two quantifiers both claiming the same [0-9] characters) backtrack
-    // quadratically; the new single-mandatory-digit shape fails in one
-    // linear pass instead.
+    // "e" + 10,000 digits + "@": no stopping point inside the digit run is followed by "-" or end-of-string, so the
+    // match fails only after exhausting every split point. That is the shape that made the old two-quantifier regex
+    // backtrack quadratically; the single-mandatory-digit shape fails in one linear pass.
     const hostile = "e" + "9".repeat(10_000) + "@";
     assert.equal(
       resolveLaneName(hostile),
@@ -271,12 +236,9 @@ test("RP4 (e123b9 J2, spec AC1 — FLIPPED, retires the old tolerate-anything co
 });
 
 // ============================================================================
-// AC5 — resolveLaneLockPath: the handoff lock is per-lane
-// (.current/<lane>/.handoff.lock), not workspace-wide (.current/.handoff.lock),
-// so lanes never block each other's writes. (Decision 2, T-E123B9-05)
-// One table covers several lane shapes so a
-// regression that special-cases any one of them (e.g. only _primary) fails
-// loud.
+// AC5 — resolveLaneLockPath: the handoff lock is per-lane (.current/<lane>/.handoff.lock), not workspace-wide, so
+// lanes never block each other's writes. One table covers several lane shapes so a regression that special-cases
+// one (e.g. only _primary) fails loud.
 // ============================================================================
 
 const LOCK_PATH_CASES = [
@@ -300,25 +262,15 @@ test("LOCK2 (AC5): resolveLaneLockPath composes resolveLaneDir + the single-owne
 });
 
 // ============================================================================
-// AC5 — allow-listed callers. Every module that imports "lane-paths" must be
-// on a reviewed list, so a new importer cannot appear unnoticed. The list is
-// expected to grow: AC15 requires tools/dispatch-log.ts and
-// tools/lane-migrate.ts to import FROM lane-paths.ts, and the write path,
-// sidecars, prompt builder and bin/ hooks all go through
-// resolveCurrentLane(Paths). CALLERS1 above pins the separate, narrower list
-// of callers of the resolveLanePaths FUNCTION itself.
-// (T-E123BI-01, L-SCHEMA-NEW-6)
+// AC5 — allow-listed callers. Every module that imports "lane-paths" must be on a reviewed list, so a new importer
+// cannot appear unnoticed; the list is expected to grow. CALLERS1 above pins the narrower list of callers of the
+// resolveLanePaths function itself.
 // ============================================================================
 
 test("CALLERS1 (e125b spec AC11 — allow-list, was a zero-callers check): grep -rn resolveLanePaths tools/ gates/ guards/ prompts/ bin/ index.ts names exactly tools/lane-paths.ts + bin/agc-init.mjs — a NEW unlisted caller still fails this", () => {
-  // Every base-sha consumer calls resolveLanePaths(ws, lane).baseShaPath
-  // directly — the same
-  // generic, registry-derived path every other lane file already goes
-  // through — instead of a standalone composer. bin/agc-init.mjs is now a
-  // genuine, sanctioned new caller: runFeatureStart writes baseShaPath after
-  // `git worktree add`, and runFeatureFinish's readLaneBaseSha reads it back.
-  // The test is an allow-list, so a FUTURE unlisted caller of the
-  // resolveLanePaths FUNCTION still fails it. (e125b AC11)
+  // Every base-sha consumer calls resolveLanePaths(ws, lane).baseShaPath directly. bin/agc-init.mjs is a sanctioned
+  // caller: runFeatureStart writes baseShaPath after `git worktree add` and runFeatureFinish's readLaneBaseSha
+  // reads it back. The test is an allow-list, so a future unlisted caller still fails.
   const dirs = ["tools", "gates", "guards", "prompts", "bin", "index.ts"];
   let output;
   try {
@@ -382,15 +334,8 @@ test("CALLERS2 (allow-list): grep -rln \"lane-paths\" tools/ gates/ guards/ prom
     // `agc feature start`/`finish`, reusing resolveLaneName/resolveCurrentLane
     // rather than copying the ticket-id regex. (e73 AC3/AC4, T-E73-04B)
     "bin/agc-init.mjs",
-    // Lane-local task ledgers: three importers. (e125a AC1/AC10)
-    //   tools/tasks-lane-migrate.ts imports
-    //     PRIMARY_LANE/laneFile/resolveCurrentLanePaths/resolveLaneDir/
-    //     resolveLaneName for the forward/reverse lane-ledger migration.
-    //   tools/config.ts imports resolveCurrentLanePaths — findTasksFile
-    //     checks the lane path first, still side-effect-free.
-    //   tools/tasks-file.ts imports LEGACY_LANE/PRIMARY_LANE/
-    //     resolveCurrentLanePaths/resolveLaneName — the task tools read and
-    //     write only the current lane's ledger.
+    // Lane-local task ledgers: tools/tasks-lane-migrate.ts (forward/reverse ledger migration), tools/config.ts
+    // (findTasksFile checks the lane path first) and tools/tasks-file.ts (task tools touch only the current lane's ledger).
     "tools/config.ts",
     "tools/tasks-file.ts",
     "tools/tasks-lane-migrate.ts",

@@ -1,25 +1,10 @@
 // Coded by @qa-engineer
-// Tests for the closed-lane history resolvers in tools/lane-paths.ts, which
-// decide where a finished lane's ledger is archived under
-// .current/history/<bucket>/, plus the hasHistoryLedger predicate that
-// reports whether any such archive exists
-// (specs/e125b-lane-close-writeback.md AC6 and AC8/X7; T-E125B-01).
-//
-// Spec-to-Test map:
-//   AC6 (resolveHistoryBucket: UTC YYYY-MM; resolveHistoryLaneDir: throws on
-//        a malformed bucket or an unsafe lane, never returns a path outside
-//        .current/history/<bucket>/)                    -> BUCKET1..BUCKET3,
-//                                                            HISTDIR1..HISTDIR6
-//   AC8 (hasHistoryLedger: pure fs, scans every HISTORY_BUCKET_RE bucket,
-//        never throws)                                   -> HASHIST1..HASHIST7
-//
-// This file is scoped to the pure/read-only resolvers themselves — the
-// fixture-driven proof that `agc feature finish --shipped` actually WRITES
-// into `.current/history/<bucket>/<lane>/` lives in
-// test/agc-feature-finish-history.test.mjs (AC1/AC9), and the read/refuse
-// integration through tools/tasks-file.ts's makeForeignCheck (X7) lives in
-// test/e125a-lane-local-ledgers.test.mjs, next to the lane-ledger fixtures
-// it needs (e125a D12).
+// Tests for the closed-lane history resolvers in tools/lane-paths.ts (resolveHistoryBucket, resolveHistoryLaneDir,
+// hasHistoryLedger; specs/e125b-lane-close-writeback.md AC6, AC8): a UTC YYYY-MM bucket, no path outside
+// .current/history/<bucket>/, and a pure-fs archive check that never throws.
+// Scoped to the pure resolvers; the write into history lives in test/agc-feature-finish-history.test.mjs and the
+// refuse integration in test/e125a-lane-local-ledgers.test.mjs.
+// Rationale: specs/e260g-comment-rationale.md (test/lane-paths-history.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
