@@ -1,9 +1,8 @@
 // Coded by @qa-engineer
-// Tests for the `agc eject` command (specs/e108-agc-eject.md). Test names carry the AC number.
-// The usage-text case lives in test/agc-adapters.test.mjs; the docs check is a grep proof, not a case.
-// Scratch repos are real git repos under os.tmpdir(), and every run of bin/agc-init.mjs gets a fresh
-// empty HOME so cannot-do item 4 (~/.claude/agents) never reads the operator's machine.
-// Boundary inputs are under "boundary:"; there is no access-control surface.
+// Tests for the `agc eject` command (specs/e108-agc-eject.md). Test names carry the AC
+// number. The usage-text case lives in test/agc-adapters.test.mjs. Scratch repos are real
+// git repos under os.tmpdir(); every run of bin/agc-init.mjs gets a fresh empty HOME so
+// cannot-do item 4 (~/.claude/agents) never reads the operator's machine.
 // Rationale: specs/e260f-comment-rationale.md (test/e108-eject.test.mjs).
 
 import { test } from "node:test";
@@ -563,9 +562,9 @@ test("AC14: exclude-line removal never touches LANE_EXCLUDE_RULES or unrelated l
   }
 });
 
-// Unsafe-segment workspaces (wildcard, backslash): `agc init` refuses --artifacts=local there, so
-// eject has nothing to remove and the plan must carry no ".git/info/exclude" line at all
-// (specs/e243-init-path-escape-refusal.md).
+// Unsafe-segment workspaces (wildcard, backslash): `agc init` refuses --artifacts=local
+// there, so eject has nothing to remove and the plan must carry no ".git/info/exclude" line
+// at all (specs/e243-init-path-escape-refusal.md).
 test("AC7 (E243): eject skips the exclude-line plan entry cleanly on a wildcard or backslash workspace, same shape for both", (t) => {
   if (process.platform === "win32") {
     t.skip(

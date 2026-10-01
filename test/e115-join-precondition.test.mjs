@@ -1,9 +1,9 @@
 // Coded by @qa-engineer
-// Tests for tools/join-precondition.ts (specs/e115-join-precondition-check.md): the lane branch is merged and the
-// lane's declared identity matches its actual one. Runs against a real scratch git repo (mkFixtureRepo), verified by
-// execution, not by reading the diff. Test names carry the AC number; AC7 and AC8 are inspection-based, not here.
-// Amended AC3 is MEMBERSHIP: actual present in any declared row, even a done row, is satisfied; absent from every
-// row gives exactly one finding naming the full declared set.
+// Tests for tools/join-precondition.ts (specs/e115-join-precondition-check.md): the lane
+// branch is merged and the lane's declared identity matches its actual one, against a real
+// scratch git repo (mkFixtureRepo). Test names carry the AC number. Amended AC3 is
+// membership: an actual identity found in any declared row, even a done row, passes; absent
+// from every row gives one finding naming the full declared set.
 // Rationale: specs/e260f-comment-rationale.md (test/e115-join-precondition.test.mjs).
 
 import { test } from "node:test";

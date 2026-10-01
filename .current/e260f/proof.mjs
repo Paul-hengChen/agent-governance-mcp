@@ -4,6 +4,7 @@
 //   --base          base revision (default: first line of .current/e260f/base-sha)
 //   --changed-only  run the >20 and bare-id checks on changed files only (per-task runs)
 //                   (cited-paths and width always look at the lines added since base)
+//   --done <regex>  limit cited-paths and width to changed files matching <regex> (mid-lane runs)
 //   --list-mid      also print every 8-20 line block as `<file>:<line> <counted>`
 // Prints one line per check, then `proof: PASS` or `proof: FAIL (<checks>)`; exit 1 on FAIL.
 import { execFileSync } from "node:child_process";
@@ -150,7 +151,10 @@ const tracked = new Set(lines(git("ls-files")));
 const isTracked = (p) => tracked.has(p) || [...tracked].some((t) => t.startsWith(p.endsWith("/") ? p : `${p}/`));
 const PATH_TOKEN = /\b(?:qa_reports|review_reports|specs|test|docs|tools|gates|lib|content|prompts|scripts)\/[\w@.*<>{}$/-]*[\w*/]/g;
 const added = []; // { f, n, text } comment lines present at HEAD that the diff adds
+const doneAt = argv.indexOf("--done");
+const doneRe = doneAt >= 0 ? new RegExp(argv[doneAt + 1]) : null;
 for (const f of changed) {
+  if (doneRe && !doneRe.test(f)) continue;
   const head = headText(f).split(/\r?\n/);
   const kinds = analyzeText(headText(f)).lines;
   for (const h of git("diff", "-U0", base, "--", f).split("\n")) {

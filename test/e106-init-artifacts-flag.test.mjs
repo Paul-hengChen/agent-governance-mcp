@@ -1,9 +1,9 @@
 // Coded by @qa-engineer
 // Tests for `agc init --artifacts` and the matching `agc check` drift reports
-// (specs/e106-init-artifacts-flag.md). Test names carry the AC number.
-// Scratch repos are real git repos under os.tmpdir() with a local identity, never this
-// checkout or the global git config. The invalid-value, undeclared-advisory and outside-git
-// cases run with no prior commit or outside git entirely.
+// (specs/e106-init-artifacts-flag.md). Test names carry the AC number. Scratch repos are
+// real git repos under os.tmpdir() with a local identity, never this checkout or the global
+// git config. The invalid-value, undeclared-advisory and outside-git cases run with no
+// prior commit or outside git entirely.
 // Rationale: specs/e260f-comment-rationale.md (test/e106-init-artifacts-flag.test.mjs).
 
 import { test, after } from "node:test";
@@ -400,9 +400,9 @@ test("boundary: --artifacts as the last argv token with no value attached is rej
   assert.match(r.stderr, /agc init: --artifacts must be "local" or "repo" \(got ""\)/);
 });
 
-// Root-cwd regression: the subdirectory exclude fix (specs/e239-init-subdir-exclude.md) must leave
-// root-cwd output unchanged, with no workspace qualifier, no prefixed rule strings, and no
-// "(run from the repository root)" text on the already-tracked warning.
+// Root-cwd regression: the subdirectory exclude fix (specs/e239-init-subdir-exclude.md)
+// must leave root-cwd output unchanged, with no workspace qualifier, no prefixed rule
+// strings, and no "(run from the repository root)" text on the already-tracked warning.
 test("AC3 regression (E239): root cwd emits no subdir-qualifier text and no prefixed rule strings", () => {
   const repo = mkGitRepo("e106-e239-ac3-");
   fs.mkdirSync(path.join(repo, ".current"), { recursive: true });
