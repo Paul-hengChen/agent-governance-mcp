@@ -70,3 +70,53 @@ No findings. There are no runtime changes, because emit is byte-identical for al
 
 ## Verdict
 CHANGES_REQUESTED: the lane is provably comment-only and otherwise clean, but two rewritten comments are false about the code they describe (C1 `test/drift-skew.test.mjs:66-68`, C2 `test/constitution-deliverable-guard.test.mjs:27-28`, plus the matching rationale lines 56 and 129). The fix is a comment-only edit by the qa author, re-proved with `proof.mjs`.
+
+## Round 2 — APPROVED — by code-reviewer
+
+## Summary
+- Range `2706e4b..9aa9d7c`: fixes `ff98296` (C1), `1c0acdb` (C2), `e8ac81e` (R3) and `4f41d1c` (R1, R2, O4 in `.current/e260e/proof.mjs`), plus lane state commits `879ee18` and `9aa9d7c`. In `test/`, 4 files changed, all comment lines. The other changes are in `specs/e260e-comment-rationale.md`, `.current/e260e/proof.mjs` and lane state.
+- All six in-scope findings (C1, C2, R1, R2, R3, O4) are resolved. Per the PM, O1 and O2 were accepted as-is and are not raised again.
+- Comment-only still holds. I re-ran `node .current/e260e/proof.mjs` at HEAD `9aa9d7c` and it ends `proof: PASS` with `exit=0`: 26 files changed, 0 differ on emit, 0 on tokens, 0 directive count changes, `>20: 0`, `bare-id: 0`, `form: ok`. `--list-mid` is also clean.
+- New comment text was checked against the code it describes. Each repointed report path exists in `git ls-files`.
+- Verdict: APPROVED. Two Optional items are noted (N1, N2). Neither blocks.
+
+## AC Completeness
+The round-1 lines still stand. Only the ACs the fixes touch are restated here.
+AC7 — implemented — the rationale spec lines for C1 (`drift-skew` section, point (b)) and C2 (`constitution-deliverable-guard` section) are corrected and accurate. `node scripts/check-md-tables.mjs` exits 0.
+AC8 — implemented — `bare-id: 0` on the widened regex (see AC12).
+AC10 — implemented — no fix can change the suite, because emit is byte-identical for all 26 files. I did not repeat the full suite run. I ran the 4 touched files directly (`node --test` on drift-skew, constitution-deliverable-guard, check-md-tables and agc-adapters): 110 tests, 110 pass, 0 fail. The author's whole-suite figure (3043 / 3040 / 0 fail / 3 skipped) matches my round-1 run on byte-identical emit.
+AC11 — implemented — `proof: PASS`, `exit=0` at `9aa9d7c`.
+AC12 — implemented. I read the `proof.mjs` diff in full and mutation-tested it in a throwaway detached worktree, since removed:
+- **Widened bare-id (R1).** The new pattern is `(?:E[0-9]+[a-z]?|AC-?[0-9]+|DR-?[0-9]+|T-[A-Za-z0-9-]*[0-9])`. I appended `// AC3`, `// DR-3`, `// T-E123A3-08`, `// E57`, `// AC3 — has words so not bare` and `// T-E260E-12: trims the drift tests`. The script reported `bare-id: 4` on exactly the first four lines, `proof: FAIL (bare-id)` and exit 1. So the four id-only lines are caught and the two id-plus-words lines are not false positives. A lone `// AC3` mutation alone also gives exit 1.
+- **Unsupported extension (O4).** On a temporary base commit that adds `test/_fixture-r2.txt` and `test/_helper-r2.ts`, changing the `.txt` gives `scope: 1 bad path(s)` with the message `unsupported extension, emit/tokens not checkable: test/_fixture-r2.txt` and exit 1. It no longer passes silently.
+- **New checkable extensions.** A code change in `test/_helper-r2.ts` fails emit and tokens. A comment-only `.ts` change passes emit and tokens. It fails only `form` (first line changed), which is the correct AC9 behaviour. So `.ts` is genuinely checkable through `transpileModule`, not just accepted.
+- **Labels (R2).** The section comments now read scope (AC4), directives (AC3), long blocks (AC5, AC6), bare-id (AC8) and form (AC9), matching the spec as round 1 mapped it.
+
+## Correctness
+- **C1 — resolved** — `test/drift-skew.test.mjs:66-69` now says this test covers the lane-path case only, and that the flat-path case (precheck falls back lane-then-flat) is the AC8 test below. That matches `tools/drift.ts:222-228` (`fs.existsSync(lanePath) ? lanePath : resolveFlatLanePaths(abs).handoffPath`) and the AC8 test at `:208`. The rationale spec's point (b) is now explicitly past tense ("At the time it was written ... That gap has since been closed").
+- **C2 — resolved** — `test/constitution-deliverable-guard.test.mjs:27-28` now says the array is parsed from the `gates/visual.ts` source with `fs.readFileSync` and no dist import. That matches `:36-44`, and `gates/visual.ts:251` is where the array is declared. The inner comments at `:31-39`, which round 1 marked optional, are also corrected and now cite `gates/visual.ts`. The rationale line is corrected, and the "rebuild" advice is gone, which is right because the test reads source. The agc comment-ratio warning recorded in round 1 (30.2%) is cleared: `findingsForFile` on HEAD reports no findings for this file.
+- **N1 — optional (pre-existing, not lane-touched)** — `test/drift-skew.test.mjs:34-39` (the `writeRawHandoffAtLanePath` helper comment) and `:171-172` still say the skew precheck has "no lane-then-flat fallback" and "no flat fallback". That is the same stale claim as C1. Neither block is in the lane's diff against `bdbffaf`, so this is out of scope. It is worth a follow-up so the file stops contradicting its own AC8 block.
+
+## Quality
+- **R1, R2 — resolved** — see AC12.
+- **R3 — resolved** — the three test comments now cite paths that are all tracked:
+  - `review_reports/archive/e111-lane-worktree-evidence/review_T-E111-01.md`
+  - `review_reports/archive/e145-md-tables-cited-donemark/review_T-E145-01.md`
+  - `qa_reports/archive/wave1.5-content-catchup/review_T-E88E105-02.md`
+
+  All eight repointed spec paths are also tracked (`git ls-files --error-unmatch`).
+- **N2 — optional** — `specs/e260e-comment-rationale.md:50` still cites `qa_reports/expected-red_e73-agc-feature-lifecycle.txt`, which now lives at `qa_reports/archive/e73-agc-feature-lifecycle/expected-red_e73-agc-feature-lifecycle.txt`. It is the same class as R3 and was missed by the sweep, which targeted `review_*` paths. It is exempt under the Generic citation bullet and does not block.
+- The fix lines `test/check-md-tables.test.mjs:659-661` rewrap into a 35-column middle line, and `:767` is 136 columns. This is cosmetic and covered by O2, which was accepted, so it is not raised again.
+- **agc check — comments (SOP 4b)** — `findingsForFile` is clean at HEAD for all 4 touched files. `agc check` gives `OK (4.4.0)`.
+
+## Architecture
+No change since round 1. The fixes are comment-only, plus a self-contained edit to the lane-local proof script.
+
+## Security
+No findings. `proof.mjs` still calls `git` only through `execFileSync` with fixed arguments. The new `CHECKABLE` regex is anchored on the extension and is applied to tracked paths only.
+
+## Performance
+No findings. Runtime emit is unchanged for all 26 files. The `proof.mjs` change adds one extra filter pass over the changed list.
+
+## Verdict
+APPROVED — C1, C2, R1, R2, R3 and O4 are all resolved accurately, the lane is still provably comment-only (proof PASS, exit 0, re-run by me), and the two remaining items (N1, which is pre-existing, and N2, a missed archived path) are Optional.
