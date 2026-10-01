@@ -1,22 +1,8 @@
 // Coded by @qa-engineer
-// Drift-baseline exemption, covering AC-1 through AC-7 (C4-05).
-//
-// Contract under test: task IDs listed in `.current/.config.json` →
-// `driftBaselineIds` are acknowledged as already-shipped-and-reconciled and
-// therefore exempt from the vibe-coding-drift direction ONLY. The baseline
-// must never mute the handoff-ahead or FAIL/Blocked drift directions, and an
-// absent/empty baseline must be byte-identical to pre-feature behavior.
-//
-// Tests import detectDrift from the compiled dist (dist/tools/drift.js) and
-// construct synthetic file-mode workspaces on tmpfs, mirroring
-// test/drift-archived-tasks.test.mjs. They do NOT call the live
-// tw_detect_drift MCP tool — the running server may hold a stale pre-rebuild
-// dist. Each test uses a fresh mkdtemp workspace, so the per-path
-// loadConfig() memoization cache can never serve a stale config.
-//
-// tasks.md MUST begin with "<!-- schema_version: 1 -->" so that
-// checkVersionSkew and parseTasks() do not short-circuit before reaching the
-// baseline filter logic.
+// Drift-baseline exemption, AC-1 through AC-7 (C4-05). Contract: task ids in `.current/.config.json`
+// `driftBaselineIds` are exempt from the vibe-coding-drift direction ONLY, never from handoff-ahead or
+// FAIL/Blocked drift, and an absent or empty baseline is byte-identical to pre-feature behaviour.
+// Drives detectDrift from the compiled dist on tmpfs workspaces, not the live tool. More: specs/e260e-comment-rationale.md (drift-baseline.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";

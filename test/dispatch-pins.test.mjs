@@ -1,21 +1,8 @@
 // Coded by @qa-engineer
-// Tests for spec: specs/c14-dispatch-pins.md (T-C14-09, T-C14-10).
-//
-// Spec-to-Test map:
-//   AC-1 (schema bump v7→v8, stamp-only migration)   -> M1, M2, M3
-//   AC-2 (closed keys / open values, defensive parse)  -> P1, P2, P3, P4, P5, Z1-Z5
-//   AC-3 (REPLACE wholesale, incl. {} clears)          -> W1, W2
-//   AC-4 (feature-scoped carry-forward, no PM re-arm)  -> W3, W4, W5
-//   AC-5 (file-mode only, SQLite ignores)              -> S1
-//   AC-8 (legacy pending_notes line stays inert)       -> M4
-//
-// WHY: dispatch_pins is a DURABLE, feature-scoped directive (unlike the
-// transient c9 fields next_role/resume_of/review_verdict) that follows the
-// exact external_refs REPLACE + feature-scoped-preserve algorithm (AC-3/AC-4
-// Decision Record). These tests pin both polarities so a future edit can't
-// accidentally collapse dispatch_pins onto the cut_approved re-arm pattern or
-// the next_role transient-drop pattern — the two sibling algorithms this
-// ticket explicitly rejected by analogy.
+// Tests for spec: specs/c14-dispatch-pins.md (T-C14-09, T-C14-10). dispatch_pins is a durable,
+// feature-scoped directive using the external_refs REPLACE + preserve algorithm; both polarities are
+// pinned so it cannot collapse onto the cut_approved or next_role patterns.
+// Spec-to-Test map and WHY: specs/e260e-comment-rationale.md (dispatch-pins.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -184,15 +171,9 @@ qa_round: 0
 });
 
 test("M3: registry-level v7→v8→v9→v10 steps are pure, stamp-only/seed-only, and seed nothing extra (isolated from the full chain)", () => {
-  // WHY: pins the migration steps themselves (schema/migrations-handoff.ts),
-  // not just their effect through parseHandoff — a direct unit test of the
-  // runner registration, matching the M1/M2 cut-approval-gate.test.mjs
-  // convention. Re-baselined for the lane-layout migration (e123a, qa-owned): CURRENT
-  // is now 15, so the isolated chain re-registered here must extend one step
-  // further (v14→v15, dispatch_mechanism/dispatch_mechanism_tier pin,
-  // stamp-only, seeds nothing) or every subsequent read in this file hits
-  // "missing migration step handoff v14→v15" (the registry is a shared
-  // module-level singleton across tests in this file/process).
+  // WHY: pins the migration steps themselves (schema/migrations-handoff.ts), not just their effect through
+  // parseHandoff. Re-baselined for the lane-layout migration (e123a): the chain must reach the current
+  // version (15) or later reads hit a missing migration step. More: specs/e260e-comment-rationale.md (dispatch-pins.test.mjs).
   _clearRegistryForTests();
   registerMigration({ kind: "handoff", from: 0, to: 1, up: (i) => ({ ...i, schema_version: 1 }) });
   registerMigration({ kind: "handoff", from: 1, to: 2, up: (i) => ({ ...i, schema_version: 2 }) });

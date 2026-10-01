@@ -1,23 +1,10 @@
 // Coded by @qa-engineer
-// Test helper: real child-process worker for AC-MIG-3's cross-process
-// concurrency proof (T-E123B9-05 (e)). Mirrors test/_lock-worker.mjs's
-// existing convention (a tiny, argv-driven worker imported by node --test
-// via child_process.spawn) and the sr-engineer review's own scratch
-// verification technique (review_reports/review_T-E123B9-01.md's
-// scratchpad/cr/{child,stress}.mjs) — promoted here into a durable,
-// qa-owned fixture instead of a one-off scratch script.
-//
+// Child-process worker for the cross-process migration concurrency test.
 // argv: <workspacePath> <mode: "r" | "w"> <startAtEpochMs>
-//
-// Busy-waits until startAtEpochMs (all siblings spawned with the SAME target
-// instant) so every worker's real fs/lock work actually overlaps in
-// wall-clock time, then performs exactly one read (readHandoffState) or one
-// write (readHandoffState + writeHandoffState, mirroring a real tw_update_state
-// dispatch's own pre-flight-then-write shape) against the shared workspace.
-// Prints exactly one result line to stdout: "R-ok" / "R-missing" (a read
-// completed, exists true/false), "W-ok" (a write completed), or
-// "ERR <mode> <message-prefix>" (a caught error) — never throws uncaught,
-// so the parent's `spawn(...).on("exit")` always fires cleanly.
+// Busy-waits until the shared start instant so sibling workers' fs and lock work
+// overlaps, then does one read or one read-then-write against the workspace.
+// Prints one result line (R-ok, R-missing, W-ok, or ERR <mode> <prefix>); never throws.
+// More: specs/e260e-comment-rationale.md (_e123b9-migration-worker.mjs).
 
 import { readHandoffState } from "../dist/tools/handoff-parse.js";
 import { writeHandoffState } from "../dist/tools/handoff-write.js";

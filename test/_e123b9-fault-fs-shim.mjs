@@ -1,26 +1,10 @@
 // Coded by @qa-engineer
-// Fault-injection shim for T-E123B9-08 (AC21(b) / J2-NEW-12): a real
-// child-process crash mid-migration, so the per-lane lock is left stale.
-//
-// Loaded ONLY via _e123b9-fault-fs-loader.mjs's resolve hook, which redirects
-// the bare "fs" specifier (the exact form tools/lane-migrate.ts and every
-// other module under this compiled ESM tree import it as: `import * as fs
-// from "fs"`) to this file. Re-exports every real fs export unchanged except
-// renameSync, which is wrapped to count calls and, once the configured
-// threshold is hit, `process.exit(137)` immediately after the real rename
-// completed — no unwinding, no finally blocks run, exactly mirroring what a
-// killed/crashed real process does. This is a real OS-level process death,
-// not a simulated one: the calling `node` process actually terminates.
-//
-// Config via env var (set by the parent test before spawning the crash
-// worker child):
-//   CRASH_AFTER_RENAME=<n>  — exit(137) right after the n-th call to
-//                             fs.renameSync completes (1-indexed). Unset ==
-//                             no fault injection (plain passthrough).
-//
-// Imports the REAL implementation from "node:fs" (a distinct specifier the
-// loader does NOT intercept — see the loader's own comment), so this module
-// itself is never redirected back to itself.
+// Fault-injection fs shim for the real-crash migration test: re-exports real fs,
+// but counts renameSync calls and calls process.exit(137) right after the n-th one,
+// a genuine process death with no unwinding. Loaded only via the fault-fs loader.
+// Config: CRASH_AFTER_RENAME=<n> (1-indexed); unset means plain passthrough.
+// Imports the real fs from "node:fs", which the loader does not intercept.
+// More: specs/e260e-comment-rationale.md (_e123b9-fault-fs-shim.mjs).
 import * as real from "node:fs";
 export * from "node:fs";
 

@@ -1,25 +1,10 @@
 // Coded by @qa-engineer
-// stampAdvisory behavior: the drift report's advisory for hand-authored timestamp
-// stamps (feature e9a-stamp-integrity, T-E9A-05; AC3/AC4).
-//
-// Contract under test: tw_detect_drift's DriftReport gets a new, purely
-// additive top-level field, `stampAdvisory: string | null`. Non-null (a plain
-// informational string) when `handoff.last_updated` matches the hand-authored
-// round-second, zero-millisecond shape (`/T\d{2}:\d{2}:00\.000Z$/` —
-// research/e9a-stamp-forensics.md's 5 confirmed hits, round-hour/round-half-
-// hour included as a subset); null otherwise, including on every pre-`handoff`
-// early return. `driftDetected`/`details`/`tasksCompleted`/`tasksIncomplete`
-// must be byte-identical to what they would be without this field.
-//
-// Tests import detectDrift from the compiled dist (dist/tools/drift.js) and
-// construct synthetic file-mode workspaces on tmpfs, mirroring
-// test/drift-baseline.test.mjs / test/drift-archived-tasks.test.mjs. They do
-// NOT call the live tw_detect_drift MCP tool — the running server may hold a
-// stale pre-rebuild dist.
-//
-// tasks.md MUST begin with "<!-- schema_version: 1 -->" so that
-// checkVersionSkew and parseTasks() do not short-circuit before reaching the
-// stampAdvisory computation.
+// Tests the stampAdvisory field of tw_detect_drift's DriftReport (feature e9a-stamp-integrity).
+// Contract: non-null informational string when handoff.last_updated has the hand-authored
+// round-second, zero-millisecond shape, null otherwise; existing report fields are unchanged.
+// Imports detectDrift from dist/ over synthetic tmpfs workspaces (never the live MCP tool);
+// tasks.md must start with the schema_version comment so parsing reaches the advisory.
+// More: specs/e260e-comment-rationale.md (drift-stamp-advisory.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";

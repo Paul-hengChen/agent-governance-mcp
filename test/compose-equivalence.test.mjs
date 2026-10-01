@@ -1,32 +1,9 @@
 // Coded by @qa-engineer
-// Tests for spec: specs/compose-not-strip-overlays.md (ticket A9, T-CNSO-08).
-//
-// Spec-to-Test map:
-//   AC2 (lite equivalence)              -> t-build-lite-nondesign, t-build-lite-design,
-//                                           t-build-lite-nondesign-fd, t-build-lite-design-fd
-//   AC3 (full non-design equivalence)   -> t-build-full-nondesign, t-build-full-nondesign-fd
-//   AC4 (full design-armed equivalence) -> t-build-full-design, t-build-full-design-fd
-//   AC5 (fullDetail equivalence)        -> the four *-fd fixtures above (design + non-design,
-//                                           lite + full)
-//   AC7 (stripOriginTags keeps working) -> implicit in every fixture (golden captured after
-//                                           stripOriginTags landed (T-GTS), before compose-not-strip)
-//   AC8 (single source of truth)        -> t-cat-equals-monolith (concatenating the 15
-//                                           manifest fragments reproduces the retired monolith
-//                                           byte-for-byte — composition is literal concatenation,
-//                                           no normalization; DR-1 Option R)
-//   AC9 (hook byte-equivalence)         -> t-hook-lite, t-hook-full
-//   Dependencies (rationale §X refs)    -> t-rationale-refs-resolve-forward,
-//                                           t-rationale-sections-exist-in-fragments
-//
-// WHY (architecture: Golden-Snapshot / Equivalence Approach): the ticket's entire premise —
-// that additive composition is behavior-PRESERVING, not just architecturally cleaner — is an
-// empirical claim, not one provable by code inspection. These tests are the proof: they replay
-// the CURRENT (post-refactor) code path for every fixture-captured dispatch mode and assert
-// STRICT byte equality (no normalization — Option R/DR-1 guarantees literal identity) against
-// snapshots captured from the PRE-refactor strip pipeline (scripts/capture-constitution-golden.mjs,
-// T-CNSO-02, committed at test/fixtures/compose-golden/). If a future edit to
-// prompts/constitution-manifest.ts, prompts/build.ts, or bin/agent-governance-context.mjs ever
-// changes what a dispatch mode emits, this file — not just inspection of the diff — catches it.
+// Tests for specs/compose-not-strip-overlays.md: additive constitution composition must
+// emit exactly what the pre-refactor strip pipeline emitted, byte for byte, per dispatch mode
+// (lite/full, design/non-design, fullDetail), against goldens in test/fixtures/compose-golden/.
+// Also covers the hook byte-equivalence and that the fragments concatenate to the retired monolith.
+// More: specs/e260e-comment-rationale.md (compose-equivalence.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";

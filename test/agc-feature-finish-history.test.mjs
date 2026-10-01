@@ -1,36 +1,10 @@
 // Coded by @qa-engineer
-// Tests for specs/e125b-lane-close-writeback.md AC1/AC2/AC3/AC9/AC10/AC11/
-// AC12 — the `agc feature finish --shipped` lane-close writeback in
-// bin/agc-init.mjs (planLaneClose/executeLaneClose/executeHarvestRefresh/
-// closedLanePointerLine/applyClosedLanePointer), plus the base-sha write at
-// `agc feature start` (AC11).
-//
-// Every scratch repo is a real git repository built under os.tmpdir(), per
-// the test/agc-feature-lifecycle.test.mjs precedent this file reuses
-// fixture helpers from (duplicated locally — this repo's test files each own
-// their fixture helpers rather than importing across test files).
-//
-// Spec-to-Test map:
-//   AC1  (tracked-shape close: git mv into .current/history/<YYYY-MM>/<ticket>/,
-//         committed on --base)                          -> AC1
-//   AC2  (exactly one Closed Lanes pointer line, HTML comment, never a
-//         checkbox row)                                  -> AC2
-//   AC3  (a pre-existing "tasks moved" marker left for the lane by the earlier
-//         lane-local-ledger step (e125a) is replaced by the one Closed Lanes pointer)       -> AC3
-//   AC9  (gitignored-shape harvest: fs-copy before worktree removal, never
-//         committed, advisory line; re-run re-harvest (R1); partial-failure
-//         rollback (R2); zero-write lane no-op)            -> AC9-HARVEST,
-//                                                              AC9-R1, AC9-R2,
-//                                                              AC9-ZEROWRITE
-//   AC10 (root tasks.md as the LIVE ledger (the shape where the repo-root task
-//         file is itself the ledger): the Closed Lanes
-//         pointer line parses as zero tasks)               -> AC10
-//   AC11 (base_sha = the fork point agc feature start resolved, NOT the
-//         branch tip nor merge-base at finish time when base advanced;
-//         base_sha=unknown for a lane with no base-sha file)  -> AC11-FORKPOINT,
-//                                                                 AC11-UNKNOWN
-//   AC12 (--pr <n> -> pr=<n>; no --pr -> pr=none; --pr validates /^\d+$/)
-//                                                          -> AC12
+// Tests for specs/e125b-lane-close-writeback.md (AC1-AC3, AC9-AC12): the `agc feature finish
+// --shipped` lane-close writeback in bin/agc-init.mjs, and the base-sha write at `agc feature start`.
+// Every scratch repo is a real git repository under os.tmpdir(); fixture helpers are duplicated
+// from test/agc-feature-lifecycle.test.mjs because each test file owns its helpers.
+// Each AC maps to the test whose name starts with that AC id (AC9 splits into HARVEST, R1, R2, ZEROWRITE).
+// More: specs/e260e-comment-rationale.md (agc-feature-finish-history.test.mjs).
 
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
@@ -206,14 +180,9 @@ test("AC2: root tasks.md gains exactly one lane_closed pointer line under a new 
 });
 
 test("AC2: a re-run of finish --shipped after the lane already closed never appends a second pointer line (idempotent)", () => {
-  // This exercises planLaneClose's alreadyClosed branch on a lane with
-  // nothing git-ignored under .current/<ticket>/ (a tracked-only lane), so
-  // the re-run is a true no-op re-run (git worktree remove already
-  // succeeded and deleted the worktree on the first run — re-invoking
-  // `finish` on the SAME ticket a second time must find no linked worktree
-  // at all and refuse with THAT error, never a duplicate pointer). This
-  // proves the guard that actually prevents double-application: no worktree
-  // means no second run can reach planLaneClose's mutation path at all.
+  // Exercises planLaneClose's alreadyClosed branch on a tracked-only lane. The first run removed
+  // the worktree, so a second `finish` finds no linked worktree and refuses with that error,
+  // never a duplicate pointer.
   const repo = makePrimaryRepo();
   const lane = path.join(mkTmp("e125b-ac2-idem-lane-"), "lane");
   assert.equal(runAgc(repo, ["start", "e125b2b-idempotent", "--path", lane]).status, 0);

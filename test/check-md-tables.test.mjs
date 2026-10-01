@@ -1,55 +1,7 @@
 // Coded by @qa-engineer: tests for the markdown table integrity checker (T-E74-02).
-//
-// scripts/check-md-tables.mjs has no prior test/check-md-tables.test.mjs —
-// this file is NEW, created under a pre-authorization to add a test file
-// for this checker (T-E74-02; dispatch brief: "Test-file placement: creation pre-authorized —
-// test/check-md-tables.test.mjs is the suggested home"), following the
-// scratch-repo spawn pattern in test/check-version.test.mjs. UNLIKE
-// check-version.mjs, the checker calls `git ls-files` internally, so each
-// fixture is a REAL (throwaway) git repo: `git init` + write files + `git
-// add -A` — `git ls-files` reads the index, no commit is required. The
-// real script is copied byte-for-byte into `<fixture>/scripts/` (it
-// resolves its own root from `import.meta.url`), never touching this
-// repo's own tree.
-//
-// HARD CONSTRAINT: no fixture here may read this repo's git
-// HISTORY (a pinned sha, `git show <rev>:<path>`, `git log`) — that is
-// exactly the class test/render-structure.test.mjs's meta-test forbids
-// (T-E77-02).
-// Every fixture below is synthetic content invented for this file, git-
-// initialized fresh inside a tmpdir; nothing here reads a commit of THIS
-// repository. The literal real-repo "22 sites / 17 files, single pre-fix
-// pass names 21" oracle from the task text (T-E74-01/02) was verified BY HAND
-// (spawning the real script against a `git worktree` at the pre-fix
-// commit, then again after applying only the blank-line fix, then again
-// on the fully fixed tree) and is recorded in
-// qa_reports/review_T-E74-02.md's AC Execution note — deliberately NOT
-// baked into this permanent suite, both because it would violate the
-// no-history-read guard above and because the task itself says to prefer class
-// assertions over instance pins (the convention set by E66/E69). The
-// MASK-1/2/3 tests below reproduce the SAME masking mechanism at
-// fixture scale (a whole-table violation hiding a per-row defect; finding F4),
-// so the invariant stays pinned even after docs/backlog.md's content moves on.
-//
-// Spec-to-test map (rule text of T-E74-01 and numbered items of T-E74-02):
-//   AC (rule 1, cell-count)                          -> MASK-*, DELIM-SKIP, GD-*
-//   AC (rule 2, delimiter-row / blank-split, masking) -> MASK-1/2/3, MSG-A/B/C
-//   pre-fix tree reds, post-fix tree clean (T-E74-02 item 1) -> MASK-1 (reds),
-//                                                        MASK-3 (clean),
-//                                                        manual proof in
-//                                                        qa_reports/review_T-E74-02.md
-//   escaped `\|` is not a cell break (T-E74-02 item 2, i)        -> GD-1
-//   pipes inside fenced code are ignored (item 2, ii; finding F1) -> GD-2a, GD-2b
-//   an indented `|` line is not a table row (item 2, iii)         -> GD-3, EDGE-1
-//   delimiter-row handling (item 2, iv)                           -> DELIM-SKIP, MSG-C
-//   message correctness, not just detection (finding F6)          -> MSG-A, MSG-B, MSG-C
-//     — each asserts the EXACT emitted cause text, then follows the
-//       prescribed remedy and re-runs to confirm the violation actually
-//       clears (the strongest form the round-3 review ran by hand).
-//   tracked-but-deleted file must not crash with ENOENT (F5) -> SMOKE-DELETED
-//   boundary/security smoke                            -> SMOKE-EMPTY-REPO,
-//                                                          SMOKE-EMPTY-FILE,
-//                                                          SMOKE-CRLF
+// This file is new, created under a pre-authorization (T-E74-02). Each fixture is a real throwaway git repo with the real script copied into
+// `<fixture>/scripts/`; no fixture may read this repo's git history (render-structure meta-test).
+// Spec-to-test map and the by-hand oracle: specs/e260e-comment-rationale.md (check-md-tables.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -94,18 +46,9 @@ function run(root) {
 }
 
 // ============================================================================
-// Naive reconstruction of the pre-fix / never-fixed checker, one discriminator
-// at a time. Each of `escapeAware` / `fenceMode` / `columnZeroOnly` defaults
-// to the CORRECT (fixed) behaviour; a test flips exactly ONE to the naive
-// value so the fixture isolates that single discriminator's failure (each
-// discriminator must be demonstrated to red against a reconstruction of
-// the naive version; T-E74-02 item 2). `fenceMode: "none"` models a checker
-// that never special-cased fences at all (the basic fenced-code case);
-// `fenceMode: "toggle"` models the ACTUAL pre-fix bug this repo shipped and
-// round-2 review caught (finding F1) — a parity flip on any `>= 3` backtick/tilde
-// run, blind to character and run-length, which is right on a simple
-// open/close pair and wrong the moment an odd number of inner fence-marker
-// lines appears inside an outer fence of a different length.
+// Naive reconstruction of the pre-fix checker, one discriminator at a time (`escapeAware`, `fenceMode`,
+// `columnZeroOnly`): each defaults to the fixed behaviour and a test flips exactly one to the naive value.
+// More: specs/e260e-comment-rationale.md (check-md-tables.test.mjs).
 // ============================================================================
 
 function naiveSplitRow(raw, { escapeAware }) {
@@ -348,15 +291,9 @@ test("EDGE-1: an indented `|` continuation immediately above a blank-preceded de
 });
 
 // ============================================================================
-// MASK-1/2/3 — class-level reproduction of the masking mechanism (F4) that
-// backs the requirement to "prove it reds against the PRE-fix tree and
-// exits 0 after" (T-E74-02 item 1). Oracle: a single pre-fix pass under-names sites because a
-// whole-block violation masks a per-row defect inside it, and fixing just
-// the blank line surfaces the masked defect while the block violation
-// itself disappears — net count unchanged, composition changed). This
-// mirrors docs/backlog.md's real shape (a stray blank line splits a table,
-// concealing one bad row inside the second half) without pinning to that
-// file's line numbers or content.
+// MASK-1/2/3 — class-level reproduction of the masking mechanism (F4): a whole-block violation hides a
+// per-row defect, so fixing the blank line changes the composition, not the count (T-E74-02 item 1).
+// More: specs/e260e-comment-rationale.md (check-md-tables.test.mjs).
 // ============================================================================
 
 const MASK_PRE_FIX =
@@ -431,21 +368,9 @@ test("SMOKE-DELETED (F5 regression): a git-tracked but on-disk-deleted .md file 
 });
 
 // ============================================================================
-// Fix for how the checker tells the three no-delimiter causes apart: (a) blank-split,
-// (b) missing delimiter, (c) mis-sized delimiter. Adjacent tables whose header cell counts
-// differ used to be reported as (a) even when the cause was (b) or (c)
-// (E105-* tests; T-E105-01, feature e88-e105-md-table-checker, task T-E88E105-02).
-// Two adjacent tables with different header cell counts occur 0 times in this repo — a
-// green corpus run proves nothing about it, and neither does reading the
-// code (per specs/e88-e105-md-table-checker.md's own "Not a live defect"
-// note). Every case below is fixture-based. The strongest pin is behavioural
-// (the spec's proof line for the message check): assert the exact cause + message, then apply the
-// *prescribed* remedy and re-run to confirm the violation actually clears —
-// and, for the missing-delimiter case, also apply the OLD (pre-fix) remedy
-// and confirm it does NOT clear cleanly but instead produces 2 cell-count
-// violations — the exact corruption class the fix exists to prevent (E105; per the
-// spec's Problem Statement: "delete the blank line" on a real (b)/(c) case
-// merges two distinct tables and demotes the second header to a data row).
+// How the checker tells the three no-delimiter causes apart: (a) blank-split, (b) missing delimiter,
+// (c) mis-sized delimiter (E105-* tests, T-E88E105-02). Fixture-based; the strongest pin applies the
+// prescribed remedy and re-runs to confirm the violation clears. More: specs/e260e-comment-rationale.md (check-md-tables.test.mjs).
 // ============================================================================
 
 test("E105-B (AC2, missing-delimiter): two adjacent tables with DIFFERENT header cell counts, second headerless with no delimiter row at all — cause must be missing-delimiter, never blank-split", () => {
@@ -630,13 +555,9 @@ test("RESIDUAL-COINCIDENTAL-COLUMN-SHIFT (intended, not a bug — pinned per rou
 });
 
 // ============================================================================
-// CS-* — findCodeSpanRanges() / findGenuineDoneMark() discriminator tests.
-// This is a new parser in a file already defeated twice by parser subtlety
-// (the fence-toggle bug from review, F1, and the tie-break rule added with the
-// E105 fix). Independently re-derived
-// against CommonMark's code-span rule (an opening run of N backticks is
-// closed by the NEXT run of exactly N backticks; an unmatched run is a
-// literal backtick) rather than copied from any prior review's case list.
+// CS-* — findCodeSpanRanges() / findGenuineDoneMark() discriminator tests, re-derived from CommonMark's
+// code-span rule (a run of N backticks closes at the next run of exactly N; unmatched is literal).
+// More: specs/e260e-comment-rationale.md (check-md-tables.test.mjs).
 // ============================================================================
 
 test("CS-UNMATCHED-BACKTICK: a single backtick with no same-length partner anywhere in the cell is a literal, not a code-span opener — the marker after it still fires", () => {
@@ -734,13 +655,10 @@ test("CS-ESCAPED-PIPE-ADJACENT: an escaped `\\|` sitting next to a code span, wi
 });
 
 // ============================================================================
-// CQ-* — findCitationQuoteRanges() / citation-exclusion discriminator tests
-// (T-E145-02). The code-reviewer's review_reports/review_T-E145-01.md "Required
-// follow-through for qa-engineer" section names these 9 cases; the fix under
-// test shipped with ZERO direct coverage before this round. All fixtures use
-// the ticket-table shape (desc column) already established by the CS-* block
-// above. Per this file's own convention (since E66/E69), these assert class
-// behaviour (advisory fires / stays silent), never a fixed offset.
+// CQ-* — findCitationQuoteRanges() / citation-exclusion discriminator tests (T-E145-02): the 9 cases
+// named in review_reports/archive/e145-md-tables-cited-donemark/review_T-E145-01.md, on the ticket-table
+// shape, asserting class behaviour
+// (advisory fires / stays silent), never a fixed offset.
 // ============================================================================
 
 test("CQ-CITED-MARK-SUPPRESSED: a done-mark that appears only inside a `*\"…\"*` citation-quote span is not the row's OWN mark — no advisory", () => {
@@ -844,13 +762,9 @@ test("CQ-RESIDUAL-SPAN-SWALLOW (pins C3 as a RECORDED residual, currently silent
 });
 
 // ============================================================================
-// AC7 — the real docs/backlog.md in THIS repository, run for real (not a
-// fixture) via the actual script. Deliberately asserts ONLY exit 0 — never a
-// fixed advisory count or fixed line numbers, since docs/backlog.md is
-// edited concurrently by up to seven other Wave 1 lanes and a count pin here
-// would red on every unrelated backlog edit (see spec AC7's own proof line:
-// "informational, not a pass/fail gate"). The advisory-line count is
-// recorded as evidence in qa_reports/review_T-E88E105-02.md instead.
+// AC7 — the real docs/backlog.md run for real via the actual script; asserts only exit 0, never
+// a count or line numbers, since backlog edits would red a pin. Advisory count lives in
+// qa_reports/archive/wave1.5-content-catchup/review_T-E88E105-02.md. More: specs/e260e-comment-rationale.md (check-md-tables.test.mjs).
 // ============================================================================
 
 test("AC7 (real corpus, informational count NOT pinned here): `node scripts/check-md-tables.mjs` against this actual repository's docs/backlog.md still exits 0 — the E88 advisory must never turn a pre-existing row fatal", () => {

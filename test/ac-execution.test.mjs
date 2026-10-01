@@ -1,43 +1,10 @@
 // Coded by @qa-engineer
-// Tests for the AC-execution gate, which requires proof-annotated acceptance
-// criteria to have an execution log in the QA report
-// (specs/e3-outcome-shaped-acceptance.md AC1-AC8) +
-// specs/e3-outcome-shaped-acceptance-architecture.md Test Specification §1.
-// gates/ac-execution.ts is the fourth member of the evidence-existence gate
-// family (MISSING_EVIDENCE / VISUAL_EVIDENCE_MISSING / EXPECTED_RED_DIFF_MISSING):
-// PM annotates provable ACs with a `proof:` line; qa-engineer executes each
-// declared proof at Phase 3.5 and records the run under a `## AC Execution Log`
-// H2 in qa_reports/review_<id>.md; the server checks EXISTENCE of that section
-// only (never runs the proofs, never parses their output).
-//
-// PLACEMENT NOTE (deviation from architecture "Affected Files" / Test
-// Specification, which name this file `test/gates/ac-execution.test.mjs`):
-// `npm test` runs `node --test test/*.test.mjs` (package.json), a
-// NON-RECURSIVE shell glob — a file under a `test/gates/` subdirectory is
-// silently never collected (verified empirically: a probe file placed at
-// test/gates/_probe.test.mjs does not appear in the shell's glob expansion
-// and its test never runs). The architecture's own citation of a "mirror
-// test/gates/gates-expected-red.test.mjs" precedent is itself inaccurate —
-// that file lives flat at test/gates-expected-red.test.mjs, not nested. Every
-// existing *-gate test file in this repo is flat under test/ for exactly this
-// reason. Filing this suite at the nested path the architecture names would
-// ship a test that never executes under CI — a test-infra defect squarely in
-// QA's Phase 3 authority to fix (skill-qa-engineer "Scope"). This file is
-// placed at the flat, actually-collected path instead; see qa_reports/
-// review_T-E3-QA.md for the disposition write-up.
-//
-// Spec-to-Test map:
-//   AC1 (proof: schema, self-check)        -> verified via grep during QA (AC Execution Log, T-E3-QA),
-//                                              not re-tested here
-//   AC2 (proof: conditional, "where feasible") -> skill-content assertion below
-//   AC3 (Phase 3.5 heading, exact)          -> skill-content assertion below
-//   AC4 (arm check: hasProofAnnotatedAC)    -> U1-U6
-//   AC4 (disposition check: hasAcExecutionLogDisposition) -> U7-U14
-//   AC4 (PASS gate composition: AC_EXECUTION_LOG_MISSING) -> I1-I3b
-//   AC4 (`covers:` batch coverage)          -> U10, U11 (unit-level only; see NOTE above the removed integration "I4" attempt)
-//   AC5 (unarmed / no-spec-file dormant)    -> U3, U4, I3, I3b
-//   AC5 (file-mode only)                    -> I5
-//   AC6 (Phase 4 FAIL cross-reference, no new escalation row) -> skill-content assertion below
+// Tests for the AC-execution gate (gates/ac-execution.ts): proof-annotated acceptance criteria
+// need a `## AC Execution Log` section in qa_reports/review_<id>.md before PASS is accepted.
+// Specs: specs/e3-outcome-shaped-acceptance.md (AC1-AC8) and its architecture doc.
+// Placement: this file is flat under test/ because `npm test` globs test/*.test.mjs non-recursively.
+// U1-U14 are unit tests, I1-I5 integration; the server only checks the section exists.
+// More: specs/e260e-comment-rationale.md (ac-execution.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -246,12 +213,8 @@ test("U14: empty task id list -> present:false (no ids to satisfy the gate)", ()
 
 // ============================================================================
 // I1-I4 — Integration: handleUpdateState composition (AC_EXECUTION_LOG_MISSING)
-//
-// Drives the REAL tw_update_state orchestrator, matching the
-// test/gates-expected-red.test.mjs I1-I4 convention. qa_review text is passed
-// on the PASS write; the server's recordReview step appends it verbatim into
-// qa_reports/review_<id>.md, so a qa_review string containing
-// "## AC Execution Log" becomes the on-disk disposition section.
+// Drives the real tw_update_state orchestrator; the qa_review text on the PASS write is
+// recorded verbatim into qa_reports/review_<id>.md, so it can carry the AC Execution Log H2.
 // ============================================================================
 
 async function seedQaInProgress(ws, feature) {
@@ -368,20 +331,9 @@ test("I3b: PASS succeeds with zero overhead when no spec file exists at all (AC5
   assert.ok(!text.includes("AC_EXECUTION_LOG_MISSING"), "gate must never fire when the spec is absent");
 });
 
-// NOTE: no integration-level "I4" covers: test — recordReviewInFile
-// (gates/qa-review.ts) unconditionally creates/appends review_<id>.md for
-// EVERY id in completed_tasks on a qa_review-bearing write (the auto-record
-// step that runs before the gate check), so a PASS'd id always has a direct
-// file by the time hasAcExecutionLogDisposition runs, making the covers:
-// fallback path unreachable at this integration layer for the id actually
-// being PASS'd — confirmed empirically (an attempted integration test here
-// hit AC_EXECUTION_LOG_MISSING because auto-record's direct-but-H2-less file
-// for the target id takes precedence over another id's covers: file, exactly
-// per the "direct-hit takes precedence" contract U12 already pins). This is
-// the same shape as test/gates-expected-red.test.mjs's own I4, which tests
-// "at least one of two directly-PASS'd ids has the H2" rather than the
-// covers: routing itself. The covers: mechanism is fully exercised at the
-// unit level above (U10, U11) against hasAcExecutionLogDisposition directly.
+// NOTE: no integration-level covers: test exists. The auto-record step always creates a direct
+// review_<id>.md for every PASS'd id, and a direct hit takes precedence (U12), so the covers:
+// fallback is unreachable here; U10 and U11 exercise it at unit level.
 
 // ============================================================================
 // I5 — AC5: file-mode-only guard (SQLite-mode skip)
@@ -448,18 +400,9 @@ test("AC6: new Phase 3.5 references the existing Phase 4 FAIL escalation route a
     /Phase 3\.5[\s\S]*?Phase 4 FAIL/,
     "Phase 3.5 text must cross-reference the existing 'Phase 4 FAIL' escalation route",
   );
-  // Escalation Routes table row count: exactly one row per situation
-  // documented today (pipe-delimited markdown table rows under "## Escalation
-  // Routes"). AC6 itself still adds NO row for AC-execution failures (Phase
-  // 3.5 reuses the pre-existing "Phase 4 FAIL" route, asserted above) — the
-  // table grew from 6 to 7 rows for an unrelated reason: a
-  // `contract defect | Blocked | ... | pm` row was added (E46, T-E46-01,
-  // 2026-08-10) so a QA
-  // agent has a status other than FAIL for a spec/design defect a human has
-  // already approved diverging from. Pinning stays at the current count (now
-  // 7) so a future accidental row add/removal still fails this test; it must
-  // be bumped again, with a comment naming the ticket, on the next genuine
-  // addition — never silently re-numbered to make an unrelated diff pass.
+  // The Escalation Routes table is pinned at its current row count (7) so an accidental
+  // add or removal fails this test; bump it with a comment on the next genuine addition.
+  // AC6 adds no row for AC-execution failures (they reuse the Phase 4 FAIL route above).
   const tableStart = body.indexOf("## Escalation Routes");
   assert.ok(tableStart > 0, "## Escalation Routes section must exist");
   const tableBody = body.slice(tableStart);

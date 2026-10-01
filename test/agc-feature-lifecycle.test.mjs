@@ -1,56 +1,10 @@
 // Coded by @qa-engineer
-// Tests for specs/e73-agc-feature-lifecycle.md AC1-AC29 (+ AC-QA-1, §6
-// secrets) — `agc feature start` / `agc feature finish` in bin/agc-init.mjs.
-//
-// Every scratch repo is a real git repository built under os.tmpdir() via
-// fs.mkdtempSync and torn down in the top-level `after` hook — never inside
-// this checkout or the lane worktree it runs from (§2.5). `agc feature`
-// dynamically imports THIS project's own dist/tools/lane-paths.js (relative
-// to bin/agc-init.mjs's own location, not cwd), so pointing it at a scratch
-// repo elsewhere exercises the real code path without touching this repo's
-// tracked state.
-//
-// Spec-to-test map:
-//   AC1  -> "AC1: agc feature start creates branch + worktree, exit 0"
-//   AC2  -> "AC2: agc feature start refuses from inside a linked worktree"
-//   AC3  -> "AC3: printed lane id equals an independently-derived resolveCurrentLane"
-//   AC4  -> "AC4: a slug with no leading ticket id is rejected before any git mutation"
-//   AC5  -> "AC5: default --path is <dirname(repoRoot)>/<basename(repoRoot)>-lanes/<id>"
-//   AC6  -> "AC6: existing branch / existing path / registered-but-missing worktree all refuse cleanly"
-//   AC7  -> "AC7: agc feature start never rewrites the lane's tracked CLAUDE.md"
-//   AC8  -> "AC8: git status --porcelain is empty immediately after start"
-//   AC9  -> "AC9: node_modules is a symlink, resolves a primary-only dep, zero npm install" /
-//           "AC9: missing primary node_modules still succeeds, with a warning"
-//   AC10 -> "AC10: .env is byte-copied and its secret never reaches stdout/stderr" /
-//           "AC10: no primary .env means no lane .env and no error"
-//   AC11 -> "AC11: .env exclude upsert is idempotent across two starts"
-//   AC12 -> "AC12: /node_modules exclude upsert is idempotent and unconditional"
-//   AC13 -> "AC13: a pathological node_modules/ .gitignore still yields a clean status and a force-free finish"
-//   AC14 -> "AC14: stdout carries the shared-node_modules warning right after the symlink"
-//   AC15 -> "AC15: finish never deletes primary's real node_modules through the lane's symlink"
-//   AC16 -> "AC16: finish --shipped on an unmerged branch fails and touches nothing"
-//   AC17 -> "AC17: finish --shipped on a merged branch removes the worktree and deletes the branch"
-//   AC18 -> "AC18: finish refuses from inside any linked worktree, including the target"
-//   AC19 -> "AC19: finish --shipped on a dirty worktree fails with git's own error and removes nothing"
-//   AC20 -> "AC20: finish --abandoned succeeds on an unmerged branch (no merge guard)"
-//   AC21 -> "AC21: --abandoned precondition refuses on an unrelated dirty file, then succeeds after it's resolved"
-//   AC22 -> "AC22/AC23/AC24: bounded-token evidence move, commit, and the untracked rough edge" (combined fixture)
-//   AC23 -> same test, plus "AC23: zero tracked evidence matched means no new commit (no-op case)"
-//   AC24 -> covered in the AC22 combined test
-//   AC25 -> "AC25: --abandoned never touches specs/"
-//   AC26 -> "AC26: an all-tracked-evidence --abandoned run keeps the branch and drops the worktree"
-//   AC27 -> "AC27: docs/install.md documents both commands per the spec's required list"
-//   AC28 -> "AC28: docs/install.md states the .env-never-read-into-output guarantee"
-//   AC29 -> "AC29: the two retargeted comments read the lane-scoped path; .config.json mentions untouched"
-//   §6/AC-QA-1 -> folded into the AC10 dummy-secret test
-//   Security smoke -> "boundary:" tests at the end (empty slug, --base option
-//     injection, shell-metacharacter slug, oversized slug)
-//
-// Mechanical fallout (not a new AC, sr-engineer's expected-red manifest,
-// qa_reports/expected-red_e73-agc-feature-lifecycle.txt): this file does NOT
-// touch test/lane-paths.test.mjs — that allow-list update is a separate edit
-// in the same task, verified by "CALLERS2/CALLERS3 allow-list" assertions
-// re-run as part of the full suite gate, not duplicated here.
+// Tests for specs/e73-agc-feature-lifecycle.md (AC1-AC29, AC-QA-1, secrets): `agc feature start` and
+// `agc feature finish` in bin/agc-init.mjs. Every scratch repo is a real git repository under
+// os.tmpdir(), torn down in the top-level `after` hook, never inside this checkout.
+// Each AC maps to the test whose name starts with that AC id (AC22-AC24 share one combined test;
+// the secrets check is folded into the AC10 test); "boundary:" tests at the end are the security smoke.
+// More: specs/e260e-comment-rationale.md (agc-feature-lifecycle.test.mjs).
 
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
@@ -1059,14 +1013,9 @@ test("AC5 proof (4) (E179-NEW-2, human ruling 2026-09-25, option (a) — own-lan
 });
 
 // ---------------------------------------------------------------------------
-// The orphan scan never reads .current/history/, because --shipped also
-// deletes the branch, so a closed lane is never a candidate in the first
-// place; candidates are drawn from refs/heads/ only (e125b spec AC4, S1
-// resolved). Test-file placement note: the ticket named
-// test/agc-orphan-lanes.test.mjs (extend), but no file with that name exists
-// in this repo — the real, pre-existing orphan-lane coverage (the AC5 cases
-// above) already lives in THIS file, so this extension is placed
-// alongside it rather than forking a same-purpose file under a different name.
+// The orphan scan never reads .current/history/: --shipped deletes the branch, so a closed lane
+// is never a candidate (candidates come from refs/heads/ only; e125b spec AC4).
+// Placed in this file beside the existing orphan-lane (AC5) coverage; no agc-orphan-lanes test file exists.
 // ---------------------------------------------------------------------------
 
 test("AC4 (e125b, S1 — grep proof): checkOrphanLanes's own source in bin/agc-init.mjs never reads .current/history/ — no readdir/statSync/fs call anywhere in the function names \"history\"", () => {

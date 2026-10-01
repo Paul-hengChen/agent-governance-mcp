@@ -1,46 +1,8 @@
 // Coded by @qa-engineer
-// Tests for the check-version.mjs dist/index.js parity check
-// (specs/e11-e12-release-integrity-batch.md AC1-AC4, E11), authored under
-// T-E11E12-03 (AC5, qa-owned). No prior test/check-version.test.mjs existed —
-// this file is NEW, created under the dispatch's pre-authorization (the
-// approved cut) since the QA role's procedure normally requires asking before
-// creating a parallel test file.
-//
-// check-version.mjs resolves its own `root` from `import.meta.url` (dirname
-// of the script file, one level up) — it is NOT parameterized by cwd or argv.
-// So to exercise it against synthetic fixtures (matching / mismatched /
-// unparseable / absent dist), each test copies the REAL script byte-for-byte
-// into a temp fixture root's scripts/ dir and lays out package.json +
-// index.ts (+ dist/index.js) beside it, then spawns that copy. This drives
-// the actual shipped logic (not a reimplementation) while never touching the
-// real repo's package.json / index.ts / dist/index.js.
-//
-// Spec-to-Test map:
-//   AC1 (match -> exit 0, existing checks unchanged)      -> CV-1
-//   AC2 (dist mismatch -> exit non-zero, names both)      -> CV-2
-//   AC3 (dist parse-fail -> exit non-zero, fail loud)     -> CV-3
-//   AC3 (dist absent -> exit 0, skip note, no crash)      -> CV-4
-//   AC4 (existing success line still prints unchanged)    -> CV-1, CV-4
-//
-// CV-5..CV-10: package-lock.json version parity with package.json
-// (E60, T-E60-01 item 4, qa-owned).
-// The backlog row's per-item contract requires pinning, at minimum: match ->
-// exit 0 + parity line; stale root `version` -> non-zero naming both
-// observed values; stale `packages[""].version` only -> non-zero; lockfile
-// absent -> informational skip + exit 0. Two further shapes surfaced by the
-// code-reviewer's own probing (review_reports/review_T-E60-01.md, F2/round 2)
-// are pinned here too since nothing else pins them: a lockfile whose entire
-// content is the JSON literal `null` now takes the guarded shape-branch
-// message instead of throwing (fixed after review), and a JSON array does NOT enter
-// that `null`/non-object guard (typeof [] === "object") yet is still caught,
-// one level down, by the pre-existing "missing version fields" shape check —
-// so neither shape is a hole, by two different mechanisms.
-//   match -> exit 0, parity line prints                          -> CV-5
-//   stale root `version` only -> non-zero, names both observed   -> CV-6
-//   stale `packages[""].version` only (root matches) -> non-zero -> CV-7
-//   lockfile absent -> exit 0, informational skip note           -> CV-8
-//   JSON `null` content -> guarded shape message, not a crash    -> CV-9
-//   JSON array content -> still caught (shape check), not a hole -> CV-10
+// Tests for the check-version.mjs dist/index.js parity check (specs/e11-e12-release-integrity-batch.md
+// AC1-AC4, E11), authored under T-E11E12-03, plus package-lock parity CV-5..CV-10 (E60). Each test copies
+// the real script into a temp fixture root and spawns it, since it resolves its root from import.meta.url.
+// Spec-to-Test map: specs/e260e-comment-rationale.md (check-version.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -238,44 +200,10 @@ test("CV-10: package-lock.json content is a JSON array -> does NOT enter the nul
 });
 
 // ============================================================================
-// check-transitions-sync.mjs — coverage for the transitions-doc sync checker
-// (T-E39-03, E39/E58)
+// check-transitions-sync.mjs — coverage for the transitions-doc sync checker (T-E39-03, E39/E58).
+// Same copy-the-real-script fixture pattern as CV-1..CV-4, plus a "type": "module" package.json.
+// Coverage map CTS-1..CTS-10 and rationale: specs/e260e-comment-rationale.md (check-version.test.mjs).
 // ============================================================================
-// scripts/check-transitions-sync.mjs (T-E39-01) shipped with zero test
-// coverage — its whole contract (the duplicate-row guard, the line-exact
-// heading anchor, the fail-loud-not-silent branches) was instead verified by
-// hand across three code-review rounds (review_reports/review_T-E39-01.md
-// C2/C3/Q1, re-verified R2/R3) and would regress silently without a pin.
-// The ticket's coverage item (T-E39-03 item (2)) names this file as the closest
-// existing home for a scripts/-level checker; using it rather than creating a
-// new file.
-//
-// Same fixture pattern as CV-1..CV-4 above (this file's own header, lines
-// 9-16): copy the REAL script byte-for-byte into a temp fixture root, lay out
-// a synthetic dist/tools/transitions.js + specs/qa-flow-enforcement-
-// architecture.md beside it, spawn the copy — never touching this repo's
-// real dist/ or specs/. One addition versus the CV fixtures: this script
-// dynamically import()s dist/tools/transitions.js (check-version.mjs only
-// ever regex-reads dist/index.js as text), so the fixture root needs its own
-// "type": "module" package.json — the nearest one Node's ESM loader finds
-// when resolving a bare .js file's module format.
-//
-// Coverage map (the minimum set the ticket requires, T-E39-03 item (2)):
-//   green on the corrected tree                              -> CTS-1
-//   RED on a seeded doc-side omission (row missing from mirror) -> CTS-2
-//   RED on a seeded doc-side extra row (in doc, absent from source) -> CTS-3
-//   RED, not a vacuous pass, heading absent entirely           -> CTS-4
-//   line-exact anchor: heading rename fails                    -> CTS-5
-//   line-exact anchor: inline prose mention still passes       -> CTS-6
-//   duplicate-row guard: wrong-then-correct (the false-green shape found in review:
-//     "OK (21 keys, exact match)" printed while the doc visibly contained a
-//     wrong row) -> CTS-7
-//   duplicate-row guard: correct-then-wrong (duplicate message AND the
-//     entry-set diff both fire) -> CTS-8
-//   missing dist/tools/transitions.js fails loud, no skip       -> CTS-9
-//   heading found but zero data rows (a `## ` heading interposed between the
-//     section header and the table truncates the section to nothing)
-//     -> CTS-10
 
 const REAL_SYNC_SCRIPT = fs.readFileSync(
   path.join(PROJECT_ROOT, "scripts", "check-transitions-sync.mjs"),

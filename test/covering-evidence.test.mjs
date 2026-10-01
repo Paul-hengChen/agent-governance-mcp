@@ -1,18 +1,10 @@
 // Coded by @qa-engineer
-// Tests for specs/c3-covering-evidence.md — AC-1 through AC-6.
-//   parseCoversIds(content)                          — pure parser (C3-01)
-//   buildCoverageIndex(dir)                           — fs composition helper (C3-02)
-//   hasEvidenceInFile(ws, ids)                        — qa_reports/ gate + covers: fallback (C3-03)
-//   hasCodeReviewEvidenceInFile(ws, ids)               — review_reports/ gate + covers: fallback (C3-04)
-//
-// AC coverage map:
-//   AC-1: covering report satisfies N ids (code-reviewer path / review_reports/)
-//   AC-2: covering report satisfies N ids (QA path / qa_reports/)
-//   AC-3: partial coverage reports the exact missing subset
-//   AC-4: backward compatible — classic per-id files unaffected
-//   AC-5: malformed/empty/non-matching covers: line does not falsely satisfy
-//   AC-6: lazy evaluation — no directory scan when every id has its own file
-//   AC-7/AC-8 (SQLite unchanged / no schema bump) are scope-only, not exercised here.
+// Tests for specs/c3-covering-evidence.md (AC-1..AC-6): parseCoversIds, buildCoverageIndex,
+// hasEvidenceInFile (qa_reports/) and hasCodeReviewEvidenceInFile (review_reports/), each with a
+// covers: fallback. AC-1/AC-2 one report satisfies N ids; AC-3 partial coverage names the missing subset;
+// AC-4 per-id files unaffected; AC-5 malformed covers: lines never satisfy; AC-6 lazy evaluation.
+// AC-7/AC-8 (SQLite unchanged, no schema bump) are scope-only.
+// More: specs/e260e-comment-rationale.md (covering-evidence.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -45,36 +37,12 @@ function writeReviewReport(ws, filename, body) {
   fs.writeFileSync(path.join(dir, filename), body, "utf-8");
 }
 
-// AC-6 (lazy evaluation) test technique note:
-// A runtime call-count spy on fs.readdirSync was evaluated and found NOT
-// cleanly testable in this ESM setup. `tools/evidence-file.ts` does
-// `import * as fs from "fs"`; Node's ESM loader resolves the "fs" specifier
-// to a synthetic module whose bindings are captured once, at first
-// resolution in the process (empirically confirmed: mutating the CJS
-// `require("fs")` exports object AFTER any ESM module — including "node:fs",
-// "node:test", or the test file's own transitive graph — has first touched
-// the "fs" specifier no longer affects what evidence-file.js's `fs.*` calls
-// resolve to; direct assignment to the ESM namespace binding itself throws
-// "Cannot assign to read only property"). Because this test file necessarily
-// imports the compiled module up front (matching this repo's test
-// convention), by the time any test body runs, "fs" bindings are already
-// fixed — so a same-process spy cannot observe evidence-file.js's internal
-// fs.readdirSync calls. Per the AC-6 acceptance text ("code-path assertion or
-// spy — exact technique is a QA implementation choice"), AC-6 is instead
-// verified below via a source-order code-path assertion: reading the
-// relevant gates/*.ts module (gates/qa-review.ts / gates/code-review.ts,
-// post-A10 gate-registry split — relocated verbatim from
-// tools/evidence-file.ts) and confirming the direct-file-found branch
-// unconditionally `continue`s (skipping the rest of the loop body) BEFORE the
-// `buildCoverageIndex` call is reached, and that the call itself is guarded
-// by `coverage === null` (build-at-most-once-per-call). This pins the same
-// structural invariant a spy would have measured at runtime, and matches the
-// existing source-inspection convention used elsewhere in this suite (e.g.
-// visual-evidence-gate.test.mjs's AC-8 test reading transitions.ts directly).
-//
-// Slices from a start marker to end-of-file: each predicate under test is the
-// last export in its own gates/*.ts module, so there is no "next function"
-// marker to bound the slice on the other end.
+// AC-6 (lazy evaluation) is verified by a source-order code-path assertion, not a runtime spy:
+// ESM fs bindings are fixed before any test body runs, so a spy cannot see the module's readdirSync.
+// The assertion reads gates/qa-review.ts and gates/code-review.ts and checks the direct-file branch
+// continues before buildCoverageIndex, which is guarded by `coverage === null`.
+// sliceFrom slices from a start marker to end of file (each predicate is the last export in its module).
+// More: specs/e260e-comment-rationale.md (covering-evidence.test.mjs).
 function sliceFrom(source, startMarker) {
   const startIdx = source.indexOf(startMarker);
   assert.ok(startIdx !== -1, `marker not found: ${JSON.stringify(startMarker)}`);
@@ -214,16 +182,8 @@ test("buildCoverageIndex: files with no covers: line contribute nothing", () => 
   assert.equal(index.size, 0);
 });
 
-// Regression guard: a released feature's evidence files get moved under
-// qa_reports/archive/<feature>/.
-// buildCoverageIndex's readdirSync-then-filter must tolerate that
-// subdirectory sitting alongside root-level .md files — a bare directory
-// name has no ".md" suffix, so it is filtered out before any readFileSync,
-// never descended into. This pins the exact archive-safety invariant
-// (specs/d7-qa-reports-archive.md AC8-b) rather than re-deriving it from the
-// "non-.md files are ignored" test above, since a directory and a non-.md
-// *file* exercise the same filter line but are worth distinguishing for a
-// reader auditing archive-safety.
+// Regression guard: a released feature's evidence moves under qa_reports/archive/<feature>/, and
+// buildCoverageIndex must tolerate that subdirectory next to real .md files (specs/d7-qa-reports-archive.md AC8-b).
 test("buildCoverageIndex: tolerates an archive/ subdirectory alongside real .md files (AC8-b)", () => {
   const ws = tmpWs();
   const dir = path.join(ws, "qa_reports");

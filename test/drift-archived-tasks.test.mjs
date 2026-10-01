@@ -1,18 +1,8 @@
 // Coded by @qa-engineer
-// T472: drift-archived-task-exclusion — AC-1 through AC-7.
-//
-// Tests import detectDrift from the compiled dist (dist/tools/drift.js) and
-// construct synthetic file-mode workspaces on tmpfs. They do NOT call the
-// live tw_detect_drift MCP tool — the running server may hold a stale pre-
-// rebuild dist, and restarting it is a human-facing operation (AC note in
-// pending_notes). All assertions drive against the rebuilt artifact directly.
-//
-// tasks.md MUST begin with "<!-- schema_version: 1 -->" so that
-// checkVersionSkew and parseTasks() do not short-circuit before reaching the
-// archived-task filter logic.
-//
-// Handoff fixture uses schema_version: 3 (CURRENT_VERSIONS.handoff) in the
-// YAML front-matter so parseHandoff's lazy-migrate path does not mask drift.
+// T472: drift-archived-task-exclusion — AC-1 through AC-7. Drives detectDrift from the compiled dist
+// against synthetic file-mode workspaces on tmpfs, never the live tw_detect_drift tool (the running
+// server may hold a stale dist). tasks.md must begin with the schema_version comment, and the handoff
+// fixture is stamped current, so the archived-task filter is reached. More: specs/e260e-comment-rationale.md (drift-archived-tasks.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
