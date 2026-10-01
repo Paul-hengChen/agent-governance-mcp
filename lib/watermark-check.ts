@@ -1,28 +1,16 @@
 // Subagent reply watermark post-validation (v3.22.0).
-//
-// Pure utility used by the coordinator and coordinator-lite SOPs to detect
-// whether a subagent reply (relayed from a `Task` / Agent tool result) ends
-// with the canonical `— @<name> (<tier>)` watermark mandated by
-// Constitution §1 (watermark; `content/const-01-core-head.md`). If absent, the
-// parent appends the correct one to the relayed text; if it is present but
-// mismatched (wrong name/tier), the parent replaces the wrong trailing
-// watermark line with the canonical one (v3.58.0, C5b) before surfacing it
-// to the user.
-//
-// This file has NO I/O and NO external imports — it is safe to import from
-// any layer. See `specs/subagent-watermark-parent-validation.md` for the full
-// design rationale (Decisions 1–6).
+// The coordinator SOPs call it on a reply relayed from a `Task` / Agent tool
+// result to check for the canonical `— @<name> (<tier>)` watermark that
+// Constitution §1 requires: append it when absent, replace the trailing line
+// when the name or tier is wrong. NO I/O and NO external imports, so any layer
+// may import it. Design: specs/subagent-watermark-parent-validation.md;
+// replace-on-mismatch: specs/c5-c18-watermark-configcache.md.
 
 /**
- * Detection regex for the watermark line.
- *
- * - Leading character MUST be U+2014 (EM DASH, `—`); a hyphen-minus (`-`) or
- *   en-dash (`–`) is treated as absent.
- * - `<name>` and `<tier>` each match `[\w-]+` (alphanumeric, underscore,
- *   hyphen) — covers `lite`, `qa-engineer`, `sr-engineer`, `haiku`, `sonnet`,
- *   `opus`, etc.
- * - Case-insensitive (`/i`) to tolerate haiku capitalisation drift.
- * - Anchored to start/end of the (trimmed) last non-empty line.
+ * Detection regex for the watermark line: a leading U+2014 EM DASH (a hyphen
+ * or en dash counts as absent), then `@<name>` and `(<tier>)`, each `[\w-]+`.
+ * Case-insensitive to tolerate capitalisation drift; anchored to the whole
+ * trimmed last non-empty line.
  */
 export const WATERMARK_REGEX = /^—\s@[\w-]+\s\([\w-]+\)$/i;
 
@@ -50,31 +38,12 @@ export interface WatermarkCheckResult {
 }
 
 /**
- * Inspect a subagent reply for the mandatory watermark suffix.
- *
- * Behavior (matches AC3 of the v3.22.0 spec):
- *
- * - Returns `{ present: true, corrected: reply }` when the last non-empty
- *   line of `reply` (after stripping leading/trailing whitespace from that
- *   line) matches `WATERMARK_REGEX` AND the matched `<name>` and `<tier>`
- *   equal the expected `name` / `tier` arguments (case-insensitive).
- * - Returns `{ present: false, corrected: reply + "\n" + buildWatermark(...) }`
- *   when NO watermark line is present (absent case — plain append). The
- *   U+2014 EM DASH suffix uses the canonical form.
- * - Returns `{ present: false, corrected: <reply minus the wrong trailing
- *   watermark line> + "\n" + buildWatermark(...) }` when a watermark IS
- *   present but its name/tier don't match (mismatched case — replace, not
- *   double-stamp; v3.58.0, C5b). `corrected` always carries exactly ONE
- *   trailing watermark line.
- * - For an empty / whitespace-only reply, `corrected` is just the watermark
- *   string (no leading newline) so the relay is not visually broken.
- *
- * This function is pure and idempotent — calling it twice on a corrected
- * reply yields `present: true` on the second call.
- *
- * Callers (the coordinator / coordinator-lite SOPs) MUST only invoke this
- * when relaying a reply received from a `Task` / Agent tool call. See
- * Decision 4 (out-of-scope guard) in the spec.
+ * Check that `reply` ends with the watermark for `name` / `tier`: its last
+ * non-empty trimmed line matches `WATERMARK_REGEX` with the expected name and
+ * tier (case-insensitive). If so, `corrected` is `reply`; otherwise it ends
+ * with exactly one canonical line (appended, replacing a mismatched line, or
+ * alone for an empty reply). Pure and idempotent. Call it only when relaying a
+ * `Task` / Agent tool reply (the out-of-scope guard, Decision 4 of the spec).
  */
 export function validateWatermark(
   reply: string,

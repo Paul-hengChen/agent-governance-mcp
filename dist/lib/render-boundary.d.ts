@@ -17,15 +17,9 @@ export declare function longestBacktickRun(text: string): number;
 /** The fence for `body`: max(3, longest backtick run + 1) backticks. */
 export declare function fenceFor(body: string): string;
 /**
- * Render `heading`, optional `notice`, `label`, then `body` inside an
- * unclosable adaptive fence, joined by single newlines:
- *
- *   <heading>
- *   <notice>            (only when given)
- *   <label>
- *   <fence><lang>
- *   <body>
- *   <fence>
+ * Render `heading`, the optional `notice`, `label`, then `body` inside an
+ * unclosable adaptive fence, one per line: `<heading>`, `<notice>` (only when
+ * given), `<label>`, `<fence><lang>`, `<body>`, `<fence>`.
  */
 export declare function renderDataBlock(spec: DataBlockSpec): string;
 //# sourceMappingURL=render-boundary.d.ts.map

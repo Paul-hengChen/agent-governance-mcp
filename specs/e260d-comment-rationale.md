@@ -10,7 +10,7 @@ Blocks of 8 to 20 counted lines that stay in the code, each with a one-line reas
 
 | file | line at HEAD | counted | reason |
 |---|---|---|---|
-| — | — | — | none yet; tasks T-E260D-02 to T-E260D-07 add rows |
+| — | — | — | none: after T-E260D-07 every block in the lane is 7 counted lines or fewer, except the mapping table in `gates/registry.ts` (decision D1) |
 
 ## gates/feature-lease.ts
 

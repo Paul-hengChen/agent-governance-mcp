@@ -2,7 +2,7 @@
 schema_version: 15
 active_feature: "e260d-core-dirs-comment-trim"
 status: "In_Progress"
-last_updated: "2026-10-01T05:02:25.390Z"
+last_updated: "2026-10-01T05:06:41.731Z"
 last_agent: "sr-engineer"
 prd_path: "specs/e260d-core-dirs-comment-trim.md"
 scope_decision: "single-feature"
@@ -11,8 +11,8 @@ cut_approved: true
 dispatch_pins:
   sr-engineer: "fable"
 evidence_schema: 2
-next_role: "sr-engineer"
-dispatched_at: "2026-10-01T05:02:25.390Z"
+next_role: "code-reviewer"
+dispatched_at: "2026-10-01T05:06:41.731Z"
 dispatch_mechanism: "task"
 dispatch_mechanism_tier: "fable"
 qa_round: 0
@@ -29,10 +29,11 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- sr-engineer: T-E260D-06 built (commit titled `chore(e260d): E260 T-E260D-06 — ...`, HEAD after 5880059) — comment-only trim of prompts/{build,constitution-manifest,partials-manifest,skill-manifest,text-transforms}.ts (all 14 blocks of 8+ lines, incl. the 36-line state-sanitizer block and 35-line skill-manifest header, now <=7; headers = Coded by + 6) + dist/prompts/{build,constitution-manifest,partials-manifest,skill-manifest,text-transforms}.{js,js.map,d.ts.map} and dist/prompts/build.d.ts (renderHandoffStateBlock JSDoc). No other dist file moved. Next: T-E260D-07 (sr-engineer); code-reviewer only after T-01..T-07 are all built.
-- Stale path: all 3 mentions of the retired content/constitution.md (build.ts composeConstitution comment, constitution-manifest.ts header + CONSTITUTION_SEGMENTS comment) now read 'the retired single-file constitution'; grep finds none left in prompts/. No template literal or string touched; lane-paths / resolveCurrentLane counts in build.ts unchanged (3/3).
-- proof --changed-only (20 files lane-wide): scope ok, emit 20/0, tokens 20/0, pins 20/0, >20 0 unexpected (1 allowed), bare-id 0, form ok, proof: PASS; --list-mid shows no prompts/ block. No Retained-blocks rows added. tsc --noEmit clean; check-md-tables exit 0. Tests: 24 files reading prompts/ source or dist (compose-equivalence, context-budget, render-structure, e122, e137, prompt-state-footer, skill-manifest, skill-frontmatter, release-staging, lane-paths, lane-migrate, teamwork-lite, subagent-templates, agc-adapters, rag*, ...) 653 pass/1 skip; a second set of 25 files using compose-golden/expandPartials/strip*/composeSkill/composeConstitution/switchRole (incl. e90-golden-capture-completeness, e258a-comment-rule) 523 pass/0 fail. git status shows nothing under test/.
-- Pointers (each verified tracked): constitution manifest + composeConstitution -> specs/compose-not-strip-overlays-architecture.md; partials -> specs/a12-partials-limits-registry-architecture.md; origin strip -> specs/governance-tag-strip.md; single-copy rule -> specs/governance-text-load-architecture.md; renderHandoffStateBlock -> specs/e137-render-sanitise.md; new sections `## prompts/build.ts` (state-sanitizer rationale), `## prompts/skill-manifest.ts` (separate-registry reason, coord-NN naming, T-D6-03 audit outcomes) and `## prompts/text-transforms.ts` (why the passes moved to a shared module, order independence) in specs/e260d-comment-rationale.md.
+- sr-engineer: T-E260D-01..07 ready for code review. Built: T-01 8cdd4ac (proof script + rationale spec skeleton), T-02 0e9442e, T-03 5442a2e, T-04 f5ec388, T-05 5880059, T-06 c7ff4c2, T-07 = the commit titled `chore(e260d): E260 T-E260D-07 — ...` directly after c7ff4c2 (this state write is part of it).
+- T-E260D-07: comment-only trim of lib/{render-boundary,tsconfig-source-dirs,watermark-check}.ts and schema/{migrations-handoff,migrations-sqlite}.ts — all 13 long blocks (2 over 20: render-boundary header 24, validateWatermark JSDoc 25) now <=7 counted lines; headers = first line + <=6. lib/watermark-check.ts export names and every string/regex literal unchanged (emit + token proof). Rebuilt dist/lib/{render-boundary,tsconfig-source-dirs,watermark-check}.* and dist/schema/{migrations-handoff,migrations-sqlite}.*; no other dist file moved.
+- Pointers (each verified tracked and holding the rationale by grep): specs/e137-render-sanitise.md (Threat Model), specs/backlog-b6.md, specs/subagent-watermark-parent-validation.md + specs/c5-c18-watermark-configcache.md (replace on mismatch), specs/schema-versioning.md (AC-5 atomic migrations), specs/c9-protocol-fields-architecture.md, specs/e23-evidence-schema-versioning.md, specs/e114-cut-approval-inheritance.md, specs/e123a-lane-layout-migration.md. No new rationale section needed. Retained-blocks table row now states none remain (every lane block <=7 except the D1 mapping table).
+- Lane-wide proof, no flag: scope ok, emit 25/0, tokens 25/0, pins 25/0, >20 0 unexpected (1 allowed), 8-20: 0 blocks (--list-mid), bare-id 0, form ok, proof: PASS. No block outside T-07's files needed fixing. tsc --noEmit clean; check-md-tables exit 0; npm run build clean. Targeted tests (watermark-check, e137-render-sanitise, e137-rag-render, sqlite-versioning, handoff-migration) 61/61 pass; full suite NOT run (qa's).
+- pending-tickets.md: added E260D-NEW-2 (P3, depends_on [E260]) — specs/d6-host-capability-compose-axis-architecture.md names fragments skill-coord-NN-*.md, shipped files are content/coord-NN-*.md; spec not edited.
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.

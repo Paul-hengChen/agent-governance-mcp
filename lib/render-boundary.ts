@@ -1,27 +1,10 @@
 // Coded by @sr-engineer
-// Render boundary: fences reported data in a labelled block it cannot
-// structurally break out of (E137, Option B). THE one function that puts
-// reported data — live handoff state, PRD RAG chunks — into prompt text.
-// Every render site
-// (prompts/build.ts's state block and Spec Context block,
-// bin/agent-governance-context.mjs's SessionStart state block) calls
-// renderDataBlock; none hand-builds a fence (spec AC1).
-//
-// What it guarantees, and what it does not (spec Threat Model):
-//   - a BOUNDARY the body cannot structurally escape. The fence is a backtick
-//     run one longer than the longest backtick run anywhere in the body
-//     (minimum 3). Per CommonMark, a fenced code block closes only on a line
-//     whose backtick run is at least as long as the opening fence, so no line
-//     of the body can close it — whatever its line endings (LF or CRLF) or
-//     leading indentation;
-//   - an explicit LABEL, placed immediately ahead of the fence, telling the
-//     reader that everything inside is reported data.
-//   It does NOT stop a reader from being persuaded by what the data says. That
-//   residue is deliberately out of scope; no renderer can prevent it.
-//
-// Deterministic (no nonce), so output is byte-stable for tests. Pure: no I/O,
-// no imports — safe to import from any layer, including the SessionStart hook
-// via dist/.
+// Render boundary: the one function that puts reported data (live handoff
+// state, PRD RAG chunks) into prompt text, behind a label and inside a fence.
+// Every render site calls renderDataBlock; none hand-builds a fence. The fence
+// is one backtick longer than the body's longest backtick run (minimum 3), so
+// no body line can close it. Deterministic and pure (no I/O, no imports), so
+// any layer may import it. Threat model: specs/e137-render-sanitise.md.
 
 export interface DataBlockSpec {
   /** Heading line rendered first (authored text, not data). */
@@ -65,15 +48,9 @@ export function fenceFor(body: string): string {
 const INVALID_LANG_RE = /[`\r\n]/;
 
 /**
- * Render `heading`, optional `notice`, `label`, then `body` inside an
- * unclosable adaptive fence, joined by single newlines:
- *
- *   <heading>
- *   <notice>            (only when given)
- *   <label>
- *   <fence><lang>
- *   <body>
- *   <fence>
+ * Render `heading`, the optional `notice`, `label`, then `body` inside an
+ * unclosable adaptive fence, one per line: `<heading>`, `<notice>` (only when
+ * given), `<label>`, `<fence><lang>`, `<body>`, `<fence>`.
  */
 export function renderDataBlock(spec: DataBlockSpec): string {
   if (INVALID_LANG_RE.test(spec.lang)) {
