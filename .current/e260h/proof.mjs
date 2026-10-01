@@ -30,8 +30,8 @@ const HYGIENE = [
   ["home path", HOME],
   ["url", /https?:\/\//],
   ["sha", /\b(?=[0-9a-f]*[a-f])(?=[0-9a-f]*[0-9])[0-9a-f]{7,40}\b/],
-  ["git show", /git show/],
-  ["git log", /git log/],
+  ["git show", /\bgit show\b/],
+  ["git log", /\bgit log\b/],
 ];
 
 const argv = process.argv.slice(2);

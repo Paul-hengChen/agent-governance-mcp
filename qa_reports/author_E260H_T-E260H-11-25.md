@@ -30,3 +30,4 @@ One row per task; `proof` is `node .current/e260h/proof.mjs --changed-only` on t
 |---|---|---|---|---|
 | T-E260H-13 | `test/release-staging.test.mjs` base lines 1–1500 | 18 (header 36 lines, longest) | 0 | emit/leaves 0 differ; only part-B blocks left over 7 |
 | T-E260H-14 | `test/release-staging.test.mjs` base lines 1501–end | 17 (longest 50) | 0 | PASS; file has no block over 7 |
+| T-E260H-15 | `test/verify-release.test.mjs` base lines 1–1200 | 10 (header 134 lines, longest) | 0 | PASS for this range; `proof.mjs` hygiene regexes for `git show` and `git log` given word boundaries, since the comment phrase "git logic" tripped the bare substring |

@@ -43,3 +43,31 @@ Step 7a derivation rounds (backlog rows E49, E50):
 - E50 round 2 (shipped) bound the variable, split the flag per tree (`STOP_QA`, `STOP_RR`, `EXCLUDE_QA`, `EXCLUDE_RR`), and extended the predicate to `review_reports/` under a parallel archive directory, since the two trees share basenames.
 
 Move-loop asymmetry pin (backlog row E76): E76 rewrote step 7a's move loops into one heredoc block sharing a `for c in $CODES` loop, with the `review_reports` side wrapped in an enclosing `if`. The earlier predicates looked for a literal `<CODE>` placeholder and an inline `&&` guard, so they died before reaching the guard assertions and silently stopped pinning anything. The test was retargeted rather than retired; code-reviewer did not block on the asymmetry in either round, and fixing it is not QA's scope.
+
+## test/verify-release.test.mjs
+
+The tests drive the real `scripts/verify-release.mjs`. The script resolves its own root from `import.meta.url` and runs every git check with that root as the working directory, so each test copies the script byte for byte into a temp fixture root and runs it against a fully controlled git repo whose "origin" is a local bare repo: no network and no mocked git output. Check 6 (CI ground truth) replaces only the external `gh` dependency, with a small executable shim placed on a temp PATH. The SOP-wording tests (VR-9, VR-10) follow the `test/release-staging.test.mjs` precedent, where the prompt text is the contract.
+
+Spec-to-test map at the time of the trim:
+
+| behaviour | tests |
+|---|---|
+| tag missing (AC1); tag exists, not at HEAD (AC2); no upstream, not pushed or fetch failure (AC3) | VR-1, VR-2, VR-3 |
+| check-version fails with stderr propagated (AC4); CHANGELOG entry missing (AC5); dist uncommitted (AC6); committed dist parity mismatch (AC7) | VR-4 to VR-7 |
+| all checks OK with an ALL PASSED line (AC8); SOP step 9a and its Escalation Routes row (AC9); `tw_get_state` read-back after the closing write (AC10) | VR-8, VR-9, VR-10 |
+| security smoke on boundary inputs | VR-SEC-1 to VR-SEC-4 |
+| Check 6 red or green at the release commit (backlog row E14) | VR-11, VR-12 |
+| Check 6 degradation: `gh` missing, `gh` exits non-zero, zero completed runs, unparseable output | VR-13 to VR-16 |
+| sha-matched ground truth (backlog row E78): green or red at a different commit WARNs; a matching red at position 8 of 10 still fails | VR-17, VR-18, VR-19 |
+| bounded polling (backlog row E80): late run found, budget expires with the earlier WARN text, a zero wait makes one `gh` call | VR-20, VR-21, VR-22 |
+| CI-wait default of 480 seconds, read from the script's own first poll-progress line rather than grepped from source (backlog row E82) | VR-23 |
+| `--close-out` mode (backlog row E84): fails when HEAD is ahead of upstream, using a fixture a reversed range would pass; passes with `CLOSE-OUT PASSED` and never runs the other checks or resolves a version | VR-24, VR-25, VR-26 |
+| tag-at-HEAD bookkeeping tolerance (`specs/e141-tag-at-head-bookkeeping-tolerance.md`): tag at HEAD with no note, a bookkeeping-only range tolerated with a NOTE, offenders named, a non-ancestor tag keeps the original FAIL, Check 2 still fails an unpushed bookkeeping commit | VR-28, VR-27, VR-2, VR-29, VR-30 |
+| code-reviewer observations pinned as current behaviour: deleting an allowlisted path is tolerated; a non-ASCII allowlisted filename fails closed | VR-31, VR-32 |
+| Check 6 release-sha resolution (`specs/e142-release-tooling-wave25.md`): resolves from the release tag, not a bookkeeping commit on top; falls back to HEAD when no tag exists | VR-33, VR-34 |
+
+Merge handling and empty-range unreachability for the tolerance (AC6 of the E141 spec) were verified by the code-reviewer with separate fixtures and are not re-derived here.
+
+Retargeted tests: when sha-matching landed, VR-11 and VR-12 had shimmed a dummy `headSha` that could never match a fixture's HEAD; under the old code (ground truth was the first run, sha unchecked) they passed for the wrong reason, and under sha-matching they would only WARN, so they now use the fixture's real HEAD. VR-17 and VR-18 drive the sha-not-found branch and pin `AGC_VERIFY_CI_WAIT_SECONDS=0`; without it the child inherits an unset variable and each test would wait the full default budget. VR-2 was re-pointed at `src/real-change.js` so the bookkeeping tolerance cannot satisfy it. VR-8's title once said five checks; its loop asserted OK lines by name, not by count, so it stayed green by accident when Check 6 was added.
+
+The "no gh" PATH: a fixed `/usr/bin:/bin` worked on a macOS checkout but not on GitHub's hosted Ubuntu runner, which installs `gh` at `/usr/bin/gh`. There the real, unauthenticated `gh` exited non-zero, so VR-13 hit the auth-error branch (pinned by VR-14) instead of the missing-binary wording, and was red on every CI run until the PATH was built from the runner's own `git` location.
