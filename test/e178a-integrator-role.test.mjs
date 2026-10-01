@@ -1,28 +1,9 @@
 // Coded by @qa-engineer
-// Tests for spec: specs/e178a-integrator-role.md (ticket E178a, lane e178a).
-// The integrator is a prompt only — never a tw_switch_role / agent_id role (spec decision D11).
-// These are content-assertion tests (independent of the sr-engineer/
-// code-reviewer claims in review_reports/review_T-E178A-01.md): they read
-// the shipped SOP, the constitution fragment, docs/lane-protocol.md,
-// tools/fanout-manifest.ts, CLAUDE.md/AGENTS.md, and dist/ registries
-// directly, so a plausible-sounding paraphrase that silently drops an AC's
-// substance fails here even though it "reads fine" on a skim.
-//
-// Spec-to-Test map: each spec acceptance criterion has one test named after it —
-// AC1 -> t below named "AC1", AC2 -> "AC2", … AC17 -> "AC17"
-// (see the spec for each criterion's text; one test per AC number; test names are prefixed "AC<n>" per the qa
-// dispatch brief so `--test-name-pattern "AC<n>"` selects it — note "AC1" as
-// an unanchored regex also matches AC10..AC17, which is harmless: every test
-// in this file passes in the same run this proof is taken in).
-//
-// Out of scope here (per the spec's own proof: lines, already asserted by
-// pre-existing suites, not duplicated):
-//   - The golden/budget re-baseline itself (AC17): proven by the full `npm test`
-//     run this ticket's PASS is conditioned on, not re-derived in this file.
-//   - The broader content/{skill-,const-,coord-}*.md glue sweep: covered by
-//     test/render-structure.test.mjs's own structural-sweep test (green in
-//     the same run). The zero-findings check below (AC17) is this file's
-//     independent proof for content/skill-integrator.md specifically.
+// Tests for specs/e178a-integrator-role.md (ticket E178a). The integrator is a prompt only, never a tw_switch_role / agent_id role (spec decision D11).
+// Content-assertion tests independent of the sr-engineer/code-reviewer claims in review_reports/review_T-E178A-01.md: they read the shipped SOP, the constitution fragment,
+// docs/lane-protocol.md, tools/fanout-manifest.ts, CLAUDE.md/AGENTS.md and dist/ registries directly, so a paraphrase that drops an AC's substance fails here. One test per AC, named "AC<n>"
+// (an unanchored --test-name-pattern "AC1" also matches AC10..AC17, harmless). AC17's golden/budget re-baseline is proven by the full suite, not re-derived here.
+// Rationale: specs/e260f-comment-rationale.md (test/e178a-integrator-role.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -59,14 +40,9 @@ function mkWorkspace() {
 const INTEGRATOR_DESCRIPTION =
   "Integrator — plan parallel lanes, pre-review cuts, verify lane reports, merge, tear down. Cross-lane; writes no handoff state.";
 
-// History-independent scope tests (E229): a permanent test must not assert on
-// a specific historical commit SHA unless the assertion is inherently about
-// a historical diff (per docs/lane-protocol.md's guard note) — and even then
-// it must guard the SHA lookup and skip LOUDLY, never silently, when the SHA
-// is absent (shallow clone, adopter fork, or a single-commit
-// recreation of the repo; E104). Mirrors test/e130-lane-default.test.mjs's own copy of this
-// helper (duplicated rather than imported — no shared test-support module
-// exists, and each file's proof is meant to stand on its own).
+// History-independent scope tests (E229): a permanent test must not assert on a historical commit SHA unless the assertion is about a historical diff
+// (docs/lane-protocol.md guard note), and then must guard the lookup and skip loudly (shallow clone, adopter fork, single-commit recreation, E104).
+// Mirrors test/e130-lane-default.test.mjs's copy of this helper, duplicated rather than imported so each file's proof stands alone.
 function unresolvedSha(...shas) {
   for (const sha of shas) {
     try {

@@ -1,55 +1,9 @@
 // Coded by @qa-engineer
-// Tests for two write-provenance hardening gates — a stamp-provenance gate
-// and a QA-evidence gate (backlog E18; T-E18-01, T-E18-02).
-// Spec = docs/backlog.md "## E18 — Write-provenance hardening" section. Both
-// gates close a hole exploited during the PREVIOUS chain (E5): incident (a) a
-// hand-authored closing write (the third hand-authored-stamp incident,
-// fabricated zero-entropy stamps 2026-07-14T00:00:00.000Z, commits
-// 5950c58/199b164); incident (b) an identity-swap gate evasion (a code-reviewer
-// subagent's SECOND write, stamped agent_id="qa-engineer", pre-filling
-// completed_tasks T-E5-01/02/03 before any qa-engineer ran, with zero evidence
-// on disk).
-//
-// Mirrors the gate-test conventions in test/feature-lease.test.mjs (its
-// lease-override / bookkeeping-write sections, E10) and
-// test/reviewer-completed-tasks-gate.test.mjs (FM4/FM5 APPROVED-row positive
-// control pattern) — same helpers, same storage-mode split, same
-// "seed via raw writeHandoffState, gate via handleUpdateState" shape.
-//
-// Spec-to-Test map:
-//   STAMP gate fires on a suspect on-disk stamp                -> STAMP-1
-//   STAMP gate cleared by an audited stamp-remediation note,
-//     note persists verbatim in the written handoff            -> STAMP-2
-//   STAMP gate self-disarms after the accepted remediation write -> STAMP-3
-//   STAMP gate inert on a brand-new workspace (no prevState)    -> STAMP-4
-//   STAMP gate never trips on a real ms-entropy server stamp    -> STAMP-5
-//   STAMP gate is file-mode only (SQLite inert)                 -> STAMP-SQL
-//   QA-evidence gate rejects an unevidenced self-loop add,
-//     naming the missing ids                                   -> QAEV-1
-//   QA-evidence gate accepts once per-id evidence exists        -> QAEV-2
-//   QA-evidence gate does not re-gate a cumulative list-back
-//     (no NEW ids)                                              -> QAEV-3
-//   QA-evidence gate: the OLD sanctioned APPROVED-row shape
-//     (completed_tasks manifest + review_reports evidence, NO
-//     qa_reports) is now REJECTED — the exemption is removed         -> QAEV-4a
-//   QA-evidence gate: the AMENDED APPROVED-row shape (review_task_ids
-//     manifest, completed_tasks EMPTY) is ACCEPTED, ledger stays []  -> QAEV-4b
-//   Incident replay: the exact identity-swap shape from the earlier chain (E5)
-//     is now rejected                                           -> QAEV-INCIDENT
-//   QA-evidence gate is file-mode only (SQLite inert)            -> QAEV-SQL
-//   Content pins: const-08 origin tags + skill-release-engineer
-//     COORDINATOR-RELAYED hard line                              -> CONTENT-1..3
-//
-// Amendment (2026-07-16, e32-e33-gate-hardening; E32): a fourth incident of
-// the same hand-authored / identity-swap class showed the APPROVED-row
-// `completed_tasks` exemption above was itself the hole — an unsanctioned
-// pre-fill riding the (code-reviewer,In_Progress)->(qa-engineer,In_Progress)
-// edge was byte-identical to the sanctioned write. QAEV-4a/b replace the old
-// single QAEV-4 exemption test with the amended contract (specs/
-// c16-c10-role-boundary.md Amendment section; review_reports/
-// review_T-E32-01.md rounds 1-2). See also test/e32-e33-gate-hardening.test.mjs
-// for the permanent R1-incident regression pin, the P6a/P6b/P6c
-// divergent-field matrix, and the rejection-envelope content assertions.
+// Tests for two write-provenance hardening gates, a stamp-provenance gate and a QA-evidence gate (backlog E18; T-E18-01, T-E18-02; spec = the E18 section of docs/backlog.md).
+// They close holes exploited in the previous chain (E5): a hand-authored closing write with fabricated zero-entropy stamps, and an identity-swap evasion where a code-reviewer subagent's second write,
+// stamped agent_id="qa-engineer", pre-filled completed_tasks before any qa-engineer ran. Same helpers and shape as test/feature-lease.test.mjs and test/reviewer-completed-tasks-gate.test.mjs.
+// Cases STAMP-1..5, STAMP-SQL, QAEV-1..4b, QAEV-INCIDENT, QAEV-SQL, CONTENT-1..3. The 2026-07-16 amendment (E32) replaced the old APPROVED-row exemption with QAEV-4a/b; permanent regression pins are in test/e32-e33-gate-hardening.test.mjs.
+// Rationale: specs/e260f-comment-rationale.md (test/e18-write-provenance.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -462,18 +416,9 @@ test("QAEV-4b (E32 amendment): the AMENDED APPROVED-row shape — review_task_id
 });
 
 // ---------------------------------------------------------------------------
-// Incident replay: reproduce the identity-swap write shape from the earlier chain (E5) EXACTLY — a
-// legitimate APPROVED handoff (empty completed_tasks manifest) followed by a
-// SECOND self-looped write, still stamped agent_id="qa-engineer", pre-filling
-// completed_tasks with the real task ids and zero qa_reports evidence. Per
-// docs/backlog.md incident (b): "a second tw_update_state as
-// agent_id='qa-engineer' pre-filling completed_tasks T-E5-01/02/03 — before
-// any qa-engineer ran, with zero evidence on disk." The second write's
-// prevTuple is (qa-engineer, In_Progress) — the RESULT of the first write —
-// not (code-reviewer, In_Progress), so it does NOT land on the exempt
-// APPROVED-row edge (QAEV-4 above); this is exactly why the gate closes the
-// hole the APPROVED-row exemption cannot: the incident write is a SELF-LOOP
-// after the real handoff, not the handoff itself.
+// Incident replay (E5 identity swap): a legitimate APPROVED handoff with an empty completed_tasks manifest, then a SECOND self-looped write still stamped
+// agent_id="qa-engineer" that pre-fills completed_tasks with zero qa_reports evidence. Its prevTuple is (qa-engineer, In_Progress), not (code-reviewer, In_Progress),
+// so it never lands on the exempt APPROVED-row edge: the gate closes the hole the exemption cannot (docs/backlog.md incident (b)).
 // ---------------------------------------------------------------------------
 
 test("QAEV-INCIDENT: the exact E5 identity-swap replay (APPROVED write, then a self-looped qa-engineer pre-fill with zero evidence) is REJECTED", async () => {
