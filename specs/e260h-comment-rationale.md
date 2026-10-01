@@ -10,7 +10,7 @@ Blocks of 8 to 20 counted lines that stay in the tests, each with a one-line rea
 
 | file | line at HEAD | counted | reason |
 |---|---|---|---|
-| — | — | — | none yet: rows are added by the trim tasks |
+| — | — | — | none: after T-E260H-24 every comment block in the owned files is 7 counted lines or fewer |
 
 ## test/release-staging.test.mjs
 
