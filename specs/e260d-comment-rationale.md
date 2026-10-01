@@ -26,3 +26,11 @@ The stamp shape itself is in `specs/e9a-stamp-integrity.md`. The gate was added 
 - Note only, no boolean: `lease_override` pairs a boolean (the intent to bypass a lease that is legitimately held) with an audit note, and an unaudited boolean gets its own reject. Here the gate arms from the on-disk state alone, there is no separate intent to declare, and the `stamp-remediation:` note is both the acknowledgment and the audit trail. A boolean would add tool surface without adding trust.
 - Self-disarming: any accepted write stamps a fresh `now()`, so the gate clears itself. A remediation write must therefore be a normal write; a `bookkeeping_write` keeps the suspect stamp.
 - File mode only: SQLite and HTTP stamps come from the database write path, as for the sibling attestation gates. A new workspace with no previous state is never gated.
+
+## gates/pipeline.ts
+
+The ordered `UPDATE_STATE_GATE_PIPELINE` array lives in `tools/handoff-orchestrator.ts`, not in this module. Each step body there was moved byte for byte from the inline `if` block it replaced, and several tests assert those literals against that file: error codes, arm-predicate names, envelope keys and even guard indentation (`test/error-code-contract.test.mjs`, `test/ac-execution.test.mjs`, `test/gates-expected-red.test.mjs`). Moving the array here would break those source pins without changing behaviour.
+
+This module stays a runtime near-leaf: every import is `import type`, erased at compile time, and `runUpdateStatePipeline` needs none of them at runtime. The runtime import chain is `tools/registry.ts` to `tools/handoff-orchestrator.ts` to `gates/pipeline.ts`, with only erased type-only edges pointing back, so it cannot form a cycle.
+
+The per-write context is derived once, in the context-building phase of `handleUpdateStateCore` (previous-state parse, round and hop inputs, `feature_changed`, the evidence-schema pin). A gate step must not derive a value that later steps or the final write depend on, because that would make step order affect more than which rejection wins.

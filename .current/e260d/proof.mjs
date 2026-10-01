@@ -19,6 +19,8 @@ const FORBIDDEN = ["tools", "dist/tools", "test", "bin", "scripts", "content", "
   "specs/fanout-*.md", "CHANGELOG.md", "package.json", "CLAUDE.md", "AGENTS.md", ".antigravityrules", ".current/history"];
 const ALLOWED_MARK = /^\/\/\s{3}AGENT_ID_REQUIRED\s/;
 const ALLOWED_MAX = 34;
+// Tokens test/lane-paths and test/lane-migrate count per file, comments included.
+const PINNED_TOKENS = ["resolveLanePaths", "lane-paths", "resolveCurrentLane", "migrateFlatToLane(", "migrateLaneToFlat(", "migrateFlatToLaneLocked"];
 const BARE_ID = /^\s*(\/\/|\/\*|\*|#)\s*\(?E[0-9]+[a-z]?\b[^A-Za-z]*(\(e[0-9][a-z0-9-]*\))?\s*[:—-]?\s*$/;
 
 const argv = process.argv.slice(2);
@@ -85,6 +87,18 @@ function leaves(text, f) {
 }
 const tokBad = changed.filter((f) => leaves(baseText(f), f) !== leaves(headText(f), f));
 report("tokens", tokBad.length === 0, `tokens: ${changed.length} files, ${tokBad.length} differ`, tokBad);
+
+// pinned token counts per changed file (lane-paths / lane-migrate allow-lists)
+const countOf = (text, t) => text.split(t).length - 1;
+const pinBad = [];
+for (const f of changed) {
+  const [b, h] = [baseText(f), headText(f)];
+  for (const t of PINNED_TOKENS) {
+    const [nb, nh] = [countOf(b, t), countOf(h, t)];
+    if (nb !== nh) pinBad.push(`${f}: ${t} ${nb} -> ${nh}`);
+  }
+}
+report("pins", pinBad.length === 0, `pins: ${changed.length} files, ${pinBad.length} count change(s)`, pinBad);
 
 // long blocks (AC4, AC5) and bare-id (AC7)
 const scanSet = flag("--changed-only") ? changed : lines(git("ls-files", "--", ...LANE)).filter((f) => f.endsWith(".ts"));
