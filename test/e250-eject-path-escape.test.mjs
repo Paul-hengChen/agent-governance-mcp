@@ -1,65 +1,9 @@
 // Coded by @qa-engineer
-// Tests that `agc eject` shows paths containing control characters (LF, CR,
-// ESC) in escaped form, so a directory name cannot split its output across
-// lines, and that it prints a manual-removal note instead of a shell
-// command embedding the raw byte. Spec: specs/e250-eject-path-escape.md
-// AC1-AC11, AC13, AC14. AC12 (a docs/config.md row, E251) is checked by searching
-// docs/config.md and docs/install.md, not by a test here. AC13
-// (test/e108-eject.test.mjs passes unmodified) is covered by the full-suite
-// run rather than by spawning that file again here — the same way
-// test/e108-eject.test.mjs's own AC22/AC23 defer to another file or a search.
-//
-// Spec-to-test map:
-//   AC1  -> "AC1: workspace path containing LF — dry-run plan header is escaped and stays one line"
-//   AC2  -> "AC2: workspace path containing LF — --yes plan header is escaped the same way"
-//   AC3  -> "AC3: subdirectory prefix containing CR — host-trace and class-line labels show the escaped prefix"
-//   AC4  -> "AC4: subdirectory prefix containing CR — tracked host-trace changed-file list shows escaped path"
-//   AC5  -> "AC5: tracked artifact path under a CR-bearing prefix — stderr tracked list shows escaped display"
-//   AC6  -> "AC6: control-char-bearing tracked path — git rm -r line replaced by the manual-removal note"
-//   AC7  -> "AC7: ordinary path (no control character) — tracked-path stderr block is byte-for-byte unchanged"
-//   AC8  -> "AC8: linked worktree directory name containing ESC — dry-run warning shows escaped path"
-//   AC9  -> "AC9: linked worktree directory name containing ESC — --yes refusal shows escaped path, before any plan"
-//   AC10 -> "AC10: $HOME path containing LF — cannot-do item 4 listing shows the escaped path"
-//   AC11 -> "AC11: $HOME path containing LF — cannot-do rm line is replaced by the manual-removal note"
-//   AC13 -> verified by the unmodified test/e108-eject.test.mjs passing in the full suite run (see banner above)
-//   AC14 -> assertions embedded in the AC1/AC3/AC4/AC5 test cases (no separate test name), per the spec's own proof line
-//
-// Coverage note: LF, CR and ESC are each exercised at least once (AC1/AC2 use
-// LF in the workspace's own directory name; AC3-AC7 use CR in a subdirectory
-// prefix; AC8/AC9 use ESC in a linked-worktree directory name; AC10/AC11
-// reuse LF in $HOME's own directory name — a fs-only code path unrelated to
-// git, giving LF a second, independent surface). A "boundary:" case at the
-// bottom combines all three in one path segment.
-//
-// Every scratch repo is a REAL git repository built under os.tmpdir() via
-// `git init` + a local identity (never this checkout or the lane worktree,
-// and never the ambient global git config) — same discipline as
-// test/e108-eject.test.mjs and test/e239-init-subdir-exclude.test.mjs, which
-// this file borrows its fixture/spawn helpers and win32 skip-guard idiom
-// from directly.
-//
-// Every invocation of the real bin/agc-init.mjs below runs with HOME pointed
-// at a fresh, empty per-call temp directory (never the ambient $HOME) unless
-// a test explicitly overrides it (AC10/AC11, which need control over
-// $HOME's own path) — same discipline as test/e108-eject.test.mjs.
-//
-// Skip guard: every control-character fixture below is skipped on win32,
-// mirroring test/e108-eject.test.mjs's "AC7 (E243)" case and
-// test/e239-init-subdir-exclude.test.mjs's AC15-AC20 — NTFS forbids
-// embedding 0x00-0x1F (and, in practice, 0x7F) in a filename, so a
-// CR/LF/ESC-bearing directory name cannot even be constructed there.
-//
-// The AC1 and AC6 scenarios below were confirmed to fail against
-// bin/agc-init.mjs from before the fix (commit 8437af1): a workspace path
-// with a raw LF split the dry-run plan header across two lines instead of
-// showing an escaped `\n`, and a tracked path with a control character
-// printed a `git rm -r` line embedding the raw byte instead of the
-// manual-removal note. So these tests do catch the defect. (T-E250-06)
-//
-// Security/boundary smoke (SOP Phase 3d): a combined-control-character
-// boundary case is covered under "boundary:" below. Auth/permission tests
-// are N/A — agc eject has no access-control surface (a local CLI acting on
-// the caller's own working tree; see test/e108-eject.test.mjs's own N/A note).
+// Tests that `agc eject` shows paths containing control characters (LF, CR, ESC) in escaped form, so a directory name cannot split its output across lines, and prints a manual-removal note instead of a shell command embedding the raw byte.
+// Spec: specs/e250-eject-path-escape.md AC1-AC11, AC13, AC14. AC12 (a docs/config.md row, E251) is checked by search; AC13 (test/e108-eject.test.mjs passes unmodified) by the full-suite run; AC14's assertions sit inside the AC1/AC3/AC4/AC5 cases.
+// Coverage: LF, CR and ESC are each exercised (workspace dir, subdirectory prefix, linked-worktree dir, $HOME dir); a "boundary:" case combines all three. Every scratch repo is a real git repo under os.tmpdir() and each real bin/agc-init.mjs call runs with HOME at a fresh empty temp dir unless AC10/AC11 override it.
+// Every control-character fixture is skipped on win32 (NTFS forbids 0x00-0x1F in filenames). AC1 and AC6 were confirmed to fail against bin/agc-init.mjs before the fix (commit 8437af1). (T-E250-06)
+// Rationale: specs/e260f-comment-rationale.md (test/e250-eject-path-escape.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";

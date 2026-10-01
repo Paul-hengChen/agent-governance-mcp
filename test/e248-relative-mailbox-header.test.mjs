@@ -1,27 +1,8 @@
 // Coded by @qa-engineer
-// Tests for the manifest `mailbox:` header, which may be relative to the
-// primary checkout (specs/e248-relative-mailbox-header.md AC1-AC9). T-E248-02.
-// Pins the
-// resolveMailboxHeader contract, the render-only input error MAILBOX_TILDE,
-// the non-fatal validate WARN, `--mailbox-root` precedence, and the
-// no-primary skip (PRIMARY_NOT_FOUND is the only report).
-//
-// Manifest builder mirrors test/e177a-manifest.test.mjs's manifestText() /
-// test/e235b-relative-worktree.test.mjs's rowWithWorktree() style so each
-// assertion's cause stays visible next to the expectation. Every fixture is
-// built under os.tmpdir(), never inside this repo.
-//
-// Spec-to-Test map:
-//   AC1 -> "AC1 relative header resolves against primary"
-//   AC2 -> "AC2 relative header, primary from git"
-//   AC3 -> "AC3 absolute header unchanged"
-//   AC4 -> "AC4 --mailbox-root precedence, flag semantics untouched"
-//   AC5 -> "AC5 refusal: ~ header"
-//   AC6 -> "AC6 refusal: empty / no header"
-//   AC7 -> "AC7 relative header with no primary"
-//   AC8 -> "AC8 validate follows the new semantics"
-//   AC9 -> "AC9 format spec rows synced" (light in-repo check; the
-//          authoritative proof is `git diff main -- specs/e177a-fanout-manifest.md`)
+// Tests for the manifest `mailbox:` header, which may be relative to the primary checkout (specs/e248-relative-mailbox-header.md AC1-AC9). T-E248-02.
+// Pins the resolveMailboxHeader contract, the render-only input error MAILBOX_TILDE, the non-fatal validate WARN, `--mailbox-root` precedence, and the no-primary skip (PRIMARY_NOT_FOUND is the only report). Test names start with the AC number.
+// The manifest builder mirrors test/e177a-manifest.test.mjs's manifestText() and test/e235b-relative-worktree.test.mjs's rowWithWorktree(); every fixture is built under os.tmpdir(), never inside this repo.
+// Rationale: specs/e260f-comment-rationale.md (test/e248-relative-mailbox-header.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";

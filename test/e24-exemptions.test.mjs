@@ -1,34 +1,9 @@
 // Coded by @qa-engineer
-// Tests the declared build-error exemption file `.current/exemptions.json` —
-// the ONLY allowed way to exempt a known error from the Constitution §2
-// "zero build errors" rule. Three parts: the loader that never throws
-// (tools/exemptions.ts, T-E24-01); the exemptions shown on both branches of
-// the state-read envelope (tools/handoff.ts, T-E24-02); and the const-05 §2
-// "Build-gate exemptions" bullet, checked here by text search (T-E24-03;
-// its token-budget effect is checked in test/context-budget.test.mjs).
-// (E24)
-//
-// Fail-direction under test throughout: never-silently-exempt. A malformed
-// manifest or entry must ALWAYS collapse toward "not exempted" (zero
-// exemptions + loud errors, or that one entry dropped), never toward
-// granting an exemption nobody validated.
-//
-// Spec-to-test map (the backlog row is the spec; the code review separately
-// confirmed the never-throw guarantee and both envelope return paths,
-// review_reports/review_T-E24-01.md):
-//   loader: absent file                     -> L1
-//   loader: valid manifest                  -> L2
-//   loader: mixed-validity (valid + invalid) -> L3
-//   loader: bad JSON                        -> L4
-//   loader: non-object root (array/string/number/null) -> L5
-//   loader: future/unsupported schema_version -> L6
-//   loader: non-array `exemptions` field    -> L7
-//   loader: unreadable file (permissions)   -> L8
-//   loader: count === valid-entries-only    -> L9 (+ L3 exercises it too)
-//   tw_get_state envelope: exists:false branch surfaces exemptions -> G1
-//   tw_get_state envelope: exists:true branch surfaces exemptions  -> G2
-//   tw_get_state envelope: key absent entirely when no manifest    -> G3
-//   const-05 §2 prose pin (Build-gate exemptions bullet)           -> P1-P5
+// Tests the declared build-error exemption file `.current/exemptions.json`, the ONLY allowed way to exempt a known error from the Constitution §2 "zero build errors" rule: the never-throwing loader (tools/exemptions.ts, T-E24-01);
+// the exemptions shown on both branches of the state-read envelope (tools/handoff.ts, T-E24-02); the const-05 §2 "Build-gate exemptions" bullet, checked by text search (T-E24-03; its token budget is in test/context-budget.test.mjs). (E24)
+// Fail direction throughout: never-silently-exempt. A malformed manifest or entry must collapse toward "not exempted" (zero exemptions plus loud errors, or that one entry dropped), never toward an unvalidated exemption.
+// Test ids: loader L1-L9, envelope G1-G3, prose pin P1-P5. The backlog row is the spec; never-throw and both envelope paths were confirmed in review_reports/review_T-E24-01.md.
+// Rationale: specs/e260f-comment-rationale.md (test/e24-exemptions.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";

@@ -54,7 +54,7 @@ function runAgc(cwd, args) {
 }
 
 let seq = 0;
-// Starts a lane; returns { repo, lane, lanePath, mailbox, ticket, branch, mailboxRoot }.
+// Starts a lane; returns { repo, ticket, branch, lanePath, mailboxRoot, mailbox }.
 // The worktree sits in a fresh temp parent so `<parent>/_mailbox/<lane>` is private to the test.
 function setupLane(slug) {
   seq += 1;
