@@ -1,38 +1,10 @@
 // Coded by @qa-engineer
-// Scripted scenarios for the behavioral-eval harness: each pairs a role with a canned task (D4, T-D4-06, spec AC-7).
-//
-// Each scenario names a role + tier + a canned task (the user-message text
-// a live dispatch would receive alongside the role's assembled bundle) plus
-// an array of assertion functions — each `(reply) => {pass, reason}`,
-// closing over the checkers in test/eval/lib/assertions.mjs (T-D4-03) with
-// the scenario's own expected role/tier baked in, so the future runner
-// (test/eval/run-eval.mjs, T-D4-07) only needs to call
-// `scenario.assertions.map((check) => check(reply))` per scenario — it does
-// not need to know which checker takes which arguments.
-//
-// `bundle` is precomputed eagerly at module-load time via `loadBundle` (AC-8:
-// the runner must resolve prompts through the SAME buildPromptForRole path a
-// real dispatch uses, against the frozen fixture workspace, never this
-// repo's own live .current/handoff.md) — consuming test/eval/lib/bundle.mjs
-// per spec. `assertKnownRole` reuses `KNOWN_ROLES` so a typo'd scenario role
-// throws at import time (loud), matching bundle.mjs's own fail-loud contract
-// for `loadBundle` itself, rather than surfacing as a confusing runtime error
-// deep inside the (paid) live runner.
-//
-// Coverage (AC-7 minimum): sr-engineer task completion, qa-engineer PASS
-// reply, pm ambiguity->Blocked escalation, code-reviewer CHANGES_REQUESTED
-// escalation, and one lite/haiku-tier scenario (the watermark-omission class
-// named in the spec's Problem Statement). Two more (researcher, architect)
-// round out role coverage within the 5-10 range.
-//
-// Every task's final line explicitly states the dispatch's role+tier for the
-// watermark, mirroring how a REAL coordinator `Task(subagent_type=..., model=...)`
-// dispatch prompt names the pinned tier to the subagent (see Constitution §1
-// "Pin override" — the tier is supplied by the dispatcher, not inferred by
-// the subagent from the constitution text alone). This is not coaching the
-// model on content; it supplies exactly the dispatch metadata a real Task
-// call would carry, so the scenario tests behavior induced by the
-// bundle+task, not an artificially under-specified prompt.
+// Scripted scenarios for the behavioral-eval harness (specs/d4-behavioral-eval-harness.md):
+// each pairs a role and tier with a canned task and assertion closures
+// `(reply) => {pass, reason}` over test/eval/lib/assertions.mjs. `bundle` is
+// built at import through the real buildPromptForRole path against the frozen
+// fixture workspace, and an unknown role throws at import time.
+// Coverage and the dispatch-tier line: specs/e260h-comment-rationale.md (test/eval/scenarios.mjs).
 
 import { loadBundle, KNOWN_ROLES } from "./lib/bundle.mjs";
 import {

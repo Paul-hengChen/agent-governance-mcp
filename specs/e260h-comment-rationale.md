@@ -186,3 +186,23 @@ The pending-notes token sweep covers the 13 files the c9-protocol-fields spec li
 Spec-to-test map for `specs/d3-gate-fire-telemetry.md`: AC-1 a rejection emits exactly one 5-key line (INT1); AC-2 a pass emits nothing (NE1); AC-3 the directory is auto-created (SHAPE1, implicitly: every emit call starts from a workspace with no `.current/`); AC-4 a telemetry throw never masks or alters the real result (THROW1, THROW2); AC-5 `gate` comes from the `GATE_REGISTRY` producer, not re-derived (SHAPE1, PRODUCER1, PRODUCER2, UNKNOWN1); AC-6 a fixed 5-key shape where nulls are kept and never "undefined" (SHAPE1, NULL1, NULL2, BOUNDARY1); AC-7 best-effort append with no lock, verified by code inspection, not unit-testable; the `extractGateCodeFromText` helper (EXTRACT1 to EXTRACT4). The human-approved cut asked for this file because no telemetry coverage existed for the emit point.
 
 THROW2 fixture: since the lane-aware path resolution, `readAndMigrate` does its own `readFileSync` with only ENOENT swallowed, so a non-directory `workspace_path` throws ENOTDIR inside the handoff read, before the gate and telemetry code the test isolates.
+
+## test/success-metrics.test.mjs
+
+Dedupe-guard map (`specs/e11-e12-release-integrity-batch.md`): the same feature and version dispatched twice gives one line (AC7, E12-D1); a version change between dispatches gives two lines (AC8, E12-D2); a pre-existing malformed line does not crash the guard (AC10, E12-D3); a null `released_version` dedupes against null only (AC9, E12-U1); the same version under different features does not collide (AC6, AC8, E12-U2); an unreadable `metrics.jsonl` fails open and appends (AC10, AC11, E12-U3).
+
+## test/pixel-gate-attestation.test.mjs
+
+AC map for `specs/qa-visual-pixel-gate-attestation.md`: PD1 to PD11 cover the placeholder set, null, whitespace and case variants, and non-placeholders (AC-1, AC-10); PA1 to PA8 cover attestation detection, the AC-3 label-line variants and edge cases; PR1 to PR4 cover the `pixelGateComplete` field; CK1 to CK10 cover the composition helper and the gate decision tree (AC-2, AC-4, AC-5, AC-7, AC-8); E1 to E5 cover the verbatim error strings (AC-9). Carry-forward surfaces are exempt from attestation (AC-4); a B1 LLM-fallback surface still needs `pixel_gate_complete: true` (AC-5); the gate is dormant on a non-armed or no-design workspace (AC-7) and on a legacy report with no `baseline:` line (AC-8).
+
+## test/eval/scenarios.mjs
+
+Each scenario's assertions close over the expected role and tier, so the runner only calls `scenario.assertions.map((check) => check(reply))` without knowing each checker's arguments. Bundles are built from the frozen fixture workspace, never this repo's own live handoff. An unknown role throws at import (matching the fail-loud `loadBundle` contract) rather than deep inside the paid live run.
+
+Coverage (the spec's minimum): sr-engineer task completion, a qa-engineer PASS reply, pm escalating ambiguity to Blocked, code-reviewer CHANGES_REQUESTED, and one lite haiku-tier scenario for the watermark-omission class; researcher and architect round out the role coverage.
+
+Every task's last line names the dispatch's role and tier for the watermark, as a real coordinator Task dispatch names the pinned tier (constitution section 1, pin override). That is dispatch metadata a real call carries, not coaching on content, so each scenario tests behaviour induced by the bundle and task rather than an under-specified prompt.
+
+## test/eval/run-eval.mjs
+
+Order of operations: the API key check comes first, before any dynamic import, so a missing key exits non-zero with a one-line error naming the variable and having done no work (no SDK load, no bundle assembly, no network call, no silent skip); `scenarios.mjs` and the SDK are imported dynamically after it for that reason. Every tier is resolved to a model id before the first call, so an unknown tier fails at zero spend. Scenarios run sequentially; retry and backoff are out of scope, so an API error marks that scenario FAIL and the run continues to a full report. The only filesystem reads happen in the scenario import (`dist/`, `content/`, the fixture workspace), all read-only, and no `tw_*` tool is called.

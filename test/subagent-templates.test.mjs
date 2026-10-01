@@ -1,14 +1,8 @@
 // Coded by @qa-engineer
-// Tests for v3.20.0+ Claude Code subagent dispatch (specs/subagent-dispatch.md),
-// v3.21.0 short-name + teamwork-template additions (specs/subagent-short-names.md),
-// v3.21.1 watermark reminder (specs/subagent-watermark-reminder.md),
-// and v3.21.2 haiku watermark compliance (specs/subagent-watermark-haiku-compliance.md).
-// Locks the tier-consistency contract between templates/claude-code-agents/
-// and content/skill-*.md so a future tier change in one MUST be reflected in
-// the other. v3.21.0 reverses v3.20.0 AC2 (coordinator template now SHIPS as
-// `teamwork.md`); the FORBIDDEN_ROLES "coordinator absent" test is removed
-// accordingly. The load-bearing prose in content/skill-coordinator.md and
-// README.md is still verified.
+// Tests for Claude Code subagent dispatch (specs/subagent-dispatch.md and its
+// short-name and watermark follow-ups). Locks tier consistency between
+// templates/claude-code-agents/ and content/skill-*.md, so a tier change in
+// one must be mirrored in the other. The coordinator template ships as `teamwork.md`.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -72,15 +66,10 @@ const ROLE_TO_SKILL = {
   "teamwork": "skill-coordinator.md",
 };
 
-// Templates whose body legitimately delegates by file path instead of
-// tw_switch_role:
-//   - `lite`: lite mode is server-read-only (tools/transitions.ts rejects
-//     lite agent_id for any tw_* write). It references
-//     content/skill-coordinator-lite.md directly.
-//   - `teamwork`: the full coordinator role is NOT in the RoleName enum
-//     exposed by tw_switch_role (tools/role.ts ROLE_SKILL_MAP) — it's the
-//     dispatcher, not a destination. It references content/skill-coordinator.md
-//     directly.
+// Templates that delegate by file path instead of tw_switch_role: `lite` is
+// server-read-only and references content/skill-coordinator-lite.md; `teamwork`
+// is the dispatcher, not a tw_switch_role destination, and references
+// content/skill-coordinator.md.
 const FILE_PATH_DELEGATES = {
   "lite": /content\/skill-coordinator-lite\.md/,
   "teamwork": /content\/skill-coordinator\.md/,
@@ -156,20 +145,11 @@ test("AC1: every template body delegates to tw_get_state + tw_switch_role (S04 c
 // Tier-consistency regression guard
 // ---------------------------------------------------------------------------
 
-// MIRROR_EXEMPT_ROLES (added 2026-07-11, specs/d8-lite-recommended-model.md
-// Amendment / AC8): narrow, dated exemption from the tier-mirror assertion
-// below, for `lite` ONLY. d8 bumped content/skill-coordinator-lite.md's
-// `recommended_model` to `sonnet` for the direct/session-invoked surface
-// (no validating parent — a §1 watermark compliance failure ships straight
-// to the human), while deliberately leaving
-// templates/claude-code-agents/lite.md's `model: haiku` pin unchanged for the
-// Task-subagent dispatch surface (which DOES have a validating parent — the
-// full coordinator's `validateWatermark` step watches `@lite` replies and
-// corrects a dropped suffix before it reaches the human). The two surfaces'
-// risk profiles genuinely diverge for `lite`; this is the first legitimate
-// case of that, so the exemption narrows the assertion by exactly this one
-// row rather than weakening it for anyone else. Do NOT add further roles to
-// this map without the same kind of documented, spec-backed divergence.
+// MIRROR_EXEMPT_ROLES: a narrow exemption from the tier-mirror assertion, for
+// `lite` only (specs/d8-lite-recommended-model.md AC8). Its direct surface has
+// no validating parent, so the skill recommends sonnet; the Task-subagent
+// template stays haiku because the coordinator corrects a dropped watermark.
+// Add no role without the same kind of spec-backed divergence.
 const MIRROR_EXEMPT_ROLES = {
   "lite": "2026-07-11: specs/d8-lite-recommended-model.md Amendment — skill recommended_model bumped to sonnet (no validating parent on direct/session surface); template model stays haiku (Task-subagent surface has a validating parent, coordinator validateWatermark). See spec's Decision Amendment subsection and AC8.",
 };
