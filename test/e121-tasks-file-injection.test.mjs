@@ -1,7 +1,7 @@
 // Coded by @qa-engineer
 // Tests that the four mutators in tools/tasks-file.ts (complete, rollback, void, add) refuse caller strings that would forge a task row via
 // `$`-expansion (String.replace grammar) or line injection. The pre-fix code also returned success: true, so "no crash" proves nothing: a must-refuse
-// case pins an {error} matching /task_id must not contain a line break/, tasks.md byte-identical, the forged id absent, row count unchanged, no .lock left.
+// case pins an {error} naming the offending field (e.g. /task_id must not contain a line break/), tasks.md byte-identical, the forged id absent, and (via the shared helper) row count unchanged and no .lock left.
 // For line-break taskIds it also asserts the message is not a not-found error, telling a stated guard from incidental lookup-order safety.
 // Rationale: specs/e260f-comment-rationale.md (test/e121-tasks-file-injection.test.mjs).
 

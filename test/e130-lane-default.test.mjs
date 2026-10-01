@@ -1,7 +1,7 @@
 // Coded by @qa-engineer
 // Content-assertion tests that the shipped wording makes the per-feature worktree lane the default working path (specs/e130-lane-default.md; E130, E199, E198(b)).
 // They read the shipped prose (and, for AC1, the real composer's output) directly, pinning the load-bearing phrases and their relative order
-// (trigger (a) before (b), the refusal path, the tracked-evidence carve-out) so a paraphrase that drops one fails CI. Cases are t-ac<N>-*.
+// (trigger (a) before (b), the refusal path, the tracked-evidence carve-out) so a paraphrase that drops one fails CI. Case names are prefixed AC<N>.
 // AC2, AC12, AC13 are pinned by pre-existing suites (feature-lease, release-staging, context-budget/render-structure/skill-manifest).
 // Rationale: specs/e260f-comment-rationale.md (test/e130-lane-default.test.mjs).
 

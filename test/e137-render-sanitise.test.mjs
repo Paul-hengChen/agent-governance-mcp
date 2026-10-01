@@ -2,7 +2,7 @@
 // Tests for specs/e137-render-sanitise.md (Option B: one shared render boundary, an adaptive unclosable fence plus an explicit data label, at every
 // site that puts live handoff state into prompt text). The property pinned is that no byte of reported data can end its own block and the block is labelled
 // as data; persuasion by a note's wording is known residue and not tested. Hook runs use a throwaway temp workspace each (a successful run writes
-// `.current/.agc-hook-marker.json`, which AC6's before/after hash excludes). AC3/AC8/AC9/AC12 are proven by running the named unmodified suites.
+// `.current/.agc-hook-marker.json`, which AC6's before/after hash excludes). AC8/AC9/AC12 are proven by running the named unmodified suites (AC3 is also covered by the in-file label-order test).
 // Rationale: specs/e260f-comment-rationale.md (test/e137-render-sanitise.test.mjs).
 
 import { test } from "node:test";

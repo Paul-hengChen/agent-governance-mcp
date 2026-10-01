@@ -1,7 +1,7 @@
 // Coded by @qa-engineer
 // Tests for evidence-schema versioning: the handoff carries a server-stamped, feature-scoped integer `evidence_schema` (handoff v13) that the two evidence-heading checks (visual report schema, AC-execution log) read,
 // so tightening the heading rule mid-feature never invalidates evidence already written for a feature in flight. Motivating case: a `## Phase 3.5 — AC Execution Log` heading was rejected for its prefix alone.
-// The three rejection envelopes name the missing section or expected string, the file path checked and the evidence-schema version. (specs/e23-evidence-schema-versioning.md AC1-AC6, D1-D3) Test ids: AC1-1..AC1-6, AC2-1/2, AC3-1..3, AC4-1/2, AC5-1..3, AC6-1.
+// The three rejection envelopes name the missing section or expected string, the file path checked and the evidence-schema version. (specs/e23-evidence-schema-versioning.md AC1-AC6, D1-D3) Test ids: AC1-1..AC1-6, AC2-1/2, AC3-1..3, AC4-1/2, AC5-1..3, AC6-1/2.
 // Rationale: specs/e260f-comment-rationale.md (test/e23-evidence-schema.test.mjs).
 
 import { test } from "node:test";
