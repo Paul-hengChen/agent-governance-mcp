@@ -16,7 +16,8 @@ const { analyzeText } = await import(new URL("../../dist/tools/comment-scan.js",
 
 const LANE_RE = /^test\/e[12][^/]*$/;
 const OWNED = [/^specs\/e260f-[^/]*$/, /^qa_reports\/[^/]*E260F[^/]*$/, /^review_reports\/[^/]*E260F[^/]*$/, /^\.current\/e260f\//];
-const BARE_ID = /^\s*(\/\/|\/\*|\*|#)\s*\(?E[0-9]+[a-z]?\b[^A-Za-z]*(\(e[0-9][a-z0-9-]*\))?\s*[:—-]?\s*$/;
+const BARE_ID_ID = String.raw`(?:(?:E|AC|DR|T-)[\w-]*\d|\(?e[0-9][a-z0-9-]*\)?)`;
+const BARE_ID = new RegExp(String.raw`^\s*(?:\/\/|\/\*|\*|#)[^A-Za-z0-9]*(?:${BARE_ID_ID}[^A-Za-z0-9]*)+$`);
 const DIRECTIVE = /@ts-(ignore|expect-error|nocheck|check)|eslint-(disable|enable)/;
 // Home-directory style absolute path, assembled from parts so this file carries no literal prefix.
 const HOME_PATH = new RegExp(["/Us", "ers/", "|/ho", "me/", "|[A-Za-z]:\\\\Us", "ers\\\\"].join(""));
