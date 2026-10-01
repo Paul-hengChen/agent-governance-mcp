@@ -1,8 +1,9 @@
 // Coded by @qa-engineer
-// Tests for `agc feature finish <ticket> --shipped` where root tasks.md and .current/ are both git-ignored: without these fixes the command failed on the ignored tasks.md, or deleted git-ignored qa_reports/,
-// review_reports/ and specs/ evidence with the worktree. Also covers one --abandoned fix: the in-lane `moved` line must not read as a second durable copy for a file already copied to primary. (specs/e213-shipped-ignored-shape.md AC1-AC17; E213, E214, E216)
-// Fixtures: every test file owns its helpers (test/e180-abandoned-harvest.test.mjs, test/agc-feature-finish-history.test.mjs); makePrimaryRepo/runAgc/mergeLane/historyBucket/escRe match e180's, reused per the spec's Dependencies note. Test names carry the AC number.
-// `git worktree remove` (never --force) deletes untracked-and-ignored content without refusing but refuses untracked-not-ignored content; AC10's plain untracked sibling reproduces that refusal. AC13 has no in-file test (proven by existing suites plus full `npm test`); AC4 is asserted here, with existing suites as the primary proof.
+// Tests for `agc feature finish <ticket> --shipped` where root tasks.md and .current/ are
+// both git-ignored (specs/e213-shipped-ignored-shape.md AC1-AC17; E213, E214, E216):
+// the command must not fail on the ignored tasks.md nor delete ignored evidence with the
+// worktree. Also one --abandoned fix: the in-lane `moved` line must not read as a second
+// durable copy. Each file owns its helpers (match e180's); test names carry the AC number.
 // Rationale: specs/e260f-comment-rationale.md (test/e213-shipped-ignored-shape.test.mjs).
 
 import { test, after } from "node:test";

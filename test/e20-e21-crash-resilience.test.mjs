@@ -1,8 +1,9 @@
 // Coded by @qa-engineer
-// Tests that the qa-engineer and sr-engineer role SOPs carry two rules: a long test or build run must finish (or be collected) within the same turn, because In_Progress has no "waiting on results" state;
-// and before a long regression run the role writes a crash checkpoint with bookkeeping_write (file-mode only), so a resumed session can pick up from it.
-// Both are two-line additions to content/skill-qa-engineer.md and content/skill-sr-engineer.md; the agent templates only point at those files, so only the two skill files are checked. The spec is the backlog rows (no specs/ file). (E20, E21, T-E20-01, T-E21-01)
-// Test ids: QA-E20-1/2 and SR-E20-1/2 same-turn rule; QA-E21-1..3 and SR-E21-1..3 checkpoint; QA-E21-4 and SR-E21-4 the "(file-mode only)" wording. Byte/token budgets live in test/context-budget.test.mjs and test/qa-visual-skill-split.test.mjs.
+// Tests that the qa-engineer and sr-engineer role SOPs carry two rules: a long test or
+// build run finishes (or is collected) within the same turn (E20), and a crash checkpoint
+// with bookkeeping_write (file-mode only) precedes a long regression run (E21). Only
+// content/skill-qa-engineer.md and content/skill-sr-engineer.md are checked; the spec is
+// the backlog rows. Test ids: QA/SR-E20-1/2 same-turn; QA/SR-E21-1..4 checkpoint.
 // Rationale: specs/e260f-comment-rationale.md (test/e20-e21-crash-resilience.test.mjs).
 
 import { test } from "node:test";

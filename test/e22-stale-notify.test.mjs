@@ -1,8 +1,9 @@
 // Coded by @qa-engineer
-// Tests for the opt-in stale-dispatch watch-file notify: tools/stale-notify.ts (`notifyStaleDispatch`) is the unit under test, wired by tools/handoff.ts into the v10 `stale_dispatch` advisory at `readHandoffState` time,
-// armed by the `staleDispatchNotifyFile` key in tools/config.ts. No specs/ file; the backlog row is the spec. (E22, T-E22-01)
-// Fail direction throughout: fail LOUD, never SILENT and never THROWN. A broken config or unwritable watch-file surfaces in `stale_dispatch.notify.error`, never crashes the mandatory first state read, and is never swallowed into a false "disarmed" null.
-// Claim -> test ids: disarmed I1, I2, U1-U3; emit and atomic publish U4, U5, I3; dedupe U6-U8, I4; re-arm U7, U9, I5; never-throws U10-U15, I7-I9; corrupt/future config I7, I8, I7b, I8b (E31); no schema bump I1, S1.
+// Tests for the opt-in stale-dispatch watch-file notify: `notifyStaleDispatch` in
+// tools/stale-notify.ts, wired by tools/handoff.ts into the v10 `stale_dispatch` advisory
+// and armed by the `staleDispatchNotifyFile` key in tools/config.ts (E22, T-E22-01; the
+// backlog row is the spec). Fail direction: LOUD, never SILENT, never THROWN; errors land
+// in `stale_dispatch.notify.error`. Test ids: I* integration, U* unit, S1 no schema bump.
 // Rationale: specs/e260f-comment-rationale.md (test/e22-stale-notify.test.mjs).
 
 import { test } from "node:test";
@@ -43,8 +44,10 @@ function isoMinutesAgo(n) {
   return new Date(Date.now() - n * 60000).toISOString();
 }
 
-// Writes the handoff wherever the live one currently lives: the first call in a test lands at the flat (legacy) path, a second call (I5) lands at the lane path once the first read has migrated,
-// because a second flat write would leave two handoff files and trip HANDOFF_LAYOUT_CONFLICT. (e123b9 J2)
+// Writes the handoff wherever the live one currently lives: the first call in a test lands
+// at the flat (legacy) path, a second call (I5) lands at the lane path once the first read
+// has migrated, because a second flat write would leave two handoff files and trip
+// HANDOFF_LAYOUT_CONFLICT. (e123b9 J2)
 function writeRawHandoff(ws, { staleStamp, nextRole = "sr-engineer", schemaVersion = CURRENT_VERSIONS.handoff }) {
   const lanePath = resolveCurrentLanePaths(ws).handoffPath;
   const target = fs.existsSync(lanePath) ? lanePath : path.join(ws, ".current", "handoff.md");
@@ -390,9 +393,12 @@ test("I6: armed config but the dispatch is still WITHIN the threshold window -> 
   assert.equal(fs.existsSync(watchPath(ws)), false);
 });
 
-// I7-I9: a corrupt or future-schema config combined with a stale dispatch. The state read must stay loud but never throw: loadConfig degrades to defaults and surfaces the failure via getConfigError(),
-// which tools/handoff.ts spreads onto the envelope as `config_error`; notifyStaleDispatch checks it first, so the advisory's notify sub-object carries a matching error (tools/stale-notify.ts).
-// I7b/I8b show the same non-throw on a bare workspace, so the protection lives in loadConfig itself. (E31, e31-config-nonfatal)
+// I7-I9: a corrupt or future-schema config combined with a stale dispatch. The state read
+// must stay loud but never throw: loadConfig degrades to defaults and surfaces the failure
+// via getConfigError(), which tools/handoff.ts spreads onto the envelope as `config_error`;
+// notifyStaleDispatch checks it first, so the advisory's notify sub-object carries a
+// matching error (tools/stale-notify.ts). I7b/I8b show the same non-throw on a bare
+// workspace, so the protection lives in loadConfig itself. (E31, e31-config-nonfatal)
 
 test("I7 (re-pinned E31): corrupt (unparsable) .config.json + stale dispatch -> tw_get_state returns an envelope carrying config_error, never throws", () => {
   const ws = mkWorkspace();
@@ -479,13 +485,17 @@ test("I9: armed config but the watch-file's target path is an existing directory
 
 test("S1: sanity — CURRENT_VERSIONS.handoff/config are unchanged by E22 (no schema bump; the dedupe cursor lives entirely in the watch-file, not in handoff state)", () => {
   assert.equal(CURRENT_VERSIONS.handoff, 15, "E22 must not have bumped the handoff schema version");
-  // The config schema is at 2 for an unrelated reason (the init artifacts
-  // flag); this pins the current value, not that the notify left it at 1 (e106-init-artifacts-flag).
+  // The config schema is at 2 for an unrelated reason (the init artifacts flag,
+  // e106-init-artifacts-flag); this pins the current value, not that the notify left it
+  // at 1.
   assert.equal(CURRENT_VERSIONS.config, 2, "E22 must not have bumped the config schema version");
 });
 
-// The Crash-Resume pointer appended to `stale_dispatch.message` (tools/handoff.ts) must reach the watch-file payload through the real readHandoffState -> notifyStaleDispatch wiring,
-// and must not disturb the (dispatched_at, role) dedupe (the key is that pair, not the message). The unit-level advisory() helper builds its own message, so only these two tests check the real one. (E29, T-E29-01)
+// The Crash-Resume pointer appended to `stale_dispatch.message` (tools/handoff.ts) must
+// reach the watch-file payload through the real readHandoffState -> notifyStaleDispatch
+// wiring, and must not disturb the (dispatched_at, role) dedupe (the key is that pair, not
+// the message). The unit-level advisory() helper builds its own message, so only these two
+// tests check the real one. (E29, T-E29-01)
 
 test("E29a: the watch-file payload's message carries the E29 Crash-Resume pointer end-to-end (not just the base Copy/Strings sentence)", () => {
   const ws = mkWorkspace();

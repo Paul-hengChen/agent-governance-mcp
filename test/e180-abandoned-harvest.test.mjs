@@ -1,8 +1,9 @@
 // Coded by @qa-engineer
-// Tests for specs/e180-abandoned-harvest.md AC1-AC13: `agc feature finish <ticket> --abandoned` harvests git-ignored evidence (E180) and untracked `.current/<ticket>/` (E194) into the primary checkout
-// before the worktree is removed, plus one assertion on the closed-lane pointer line's fallback wording (E197, AC13). Test names carry the AC number.
-// Fixtures follow test/agc-feature-lifecycle.test.mjs and test/agc-feature-finish-history.test.mjs: every scratch repo/lane is a real git repository under os.tmpdir(), removed in the top-level `after` hook.
-// `git worktree remove` (never --force) refuses over modified or untracked-not-ignored content but not over git-ignored content, so AC1-AC4/AC6-AC12 reach a clean finish while AC5's plain untracked file reproduces the refusal.
+// Tests for specs/e180-abandoned-harvest.md AC1-AC13: `agc feature finish <ticket>
+// --abandoned` harvests git-ignored evidence (E180) and untracked `.current/<ticket>/`
+// (E194) into the primary checkout before the worktree is removed, plus the closed-lane
+// pointer line's fallback wording (E197, AC13). Test names carry the AC number; every
+// scratch repo/lane is a real git repository under os.tmpdir(), removed in `after`.
 // Rationale: specs/e260f-comment-rationale.md (test/e180-abandoned-harvest.test.mjs).
 
 import { test, after } from "node:test";
