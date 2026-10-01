@@ -1,8 +1,9 @@
 // Coded by @qa-engineer
-// Tests for specs/e125c-index-compaction.md AC1-AC6, AC10, AC11: reverse-migration receipt and normalization behaviour, plus the real-data compaction
-// round trip. AC7-AC9 and AC12-AC14 are proved by the compaction procedure evidence and grep/golden checks, not here. Imports compiled dist/;
-// fixtures live under os.tmpdir(). AC10/AC11 read frozen copies of the three ledgers from test/fixtures/e125c-frozen/, never the live repo tree
-// (a live read drifted red the moment the primary ledger gained a row). F2 pins a reviewer finding as known behaviour: a fabricated marker is absorbed.
+// Tests for specs/e125c-index-compaction.md AC1-AC6, AC10, AC11: reverse-migration receipt
+// and normalization behaviour, plus the real-data compaction round trip. AC10/AC11 read
+// frozen copies of two tasks files and a receipt from test/fixtures/e125c-frozen/, never
+// the live repo tree (a live read drifted red when the primary ledger gained a row). F2
+// pins a reviewer finding as known behaviour: a fabricated marker is absorbed.
 // Rationale: specs/e260f-comment-rationale.md (test/e125c-index-compaction.test.mjs).
 
 import { test } from "node:test";
@@ -23,8 +24,10 @@ import { setActiveStorage, FileHandoffStorage } from "../dist/tools/storage.js";
 
 setActiveStorage(new FileHandoffStorage());
 
-// Hermetic fixture rule: no test file may read repository history (git show, git log, a pinned sha ref). AC10/AC11 read frozen,
-// checked-in copies under test/fixtures/e125c-frozen/ via plain fs, never the live tree. Refreshing them is a deliberate, reviewed fixture update.
+// Hermetic fixture rule: no test file may read repository history (git show, git log, a
+// pinned sha ref). AC10/AC11 read frozen, checked-in copies under
+// test/fixtures/e125c-frozen/ via plain fs, never the live tree. Refreshing them is a
+// deliberate, reviewed fixture update.
 const __filename = fileURLToPath(import.meta.url);
 const FIXTURES = path.resolve(path.dirname(__filename), "fixtures", "e125c-frozen");
 
@@ -402,8 +405,10 @@ test("AC11 consumer parity: parseTasksFromFile returns only the kept sections' r
   assert.equal(lines[0].tickets, 7, "emitFeatureMetrics must count exactly 7 T-E125A-* ids, deduplicated across root + _primary ledger");
 });
 
-// F2: a hand-fabricated tasks_moved marker line in the root index is silently absorbed by the reverse rather than refused (a reviewer
-// finding accepted as known residue, not a failure). Pinned so a future hardening, such as recording the marker set in the receipt, flips it deliberately.
+// F2: a hand-fabricated tasks_moved marker line in the root index is silently absorbed by
+// the reverse rather than refused (a reviewer finding accepted as known residue, not a
+// failure). Pinned so a future hardening, such as recording the marker set in the receipt,
+// flips it deliberately.
 
 test("F2 (pinned known behaviour, not a failure): a hand-fabricated tasks_moved marker line added to the root only is silently dropped by the reverse instead of refusing", () => {
   const ws = mkPrimaryWorkspace("e125c-f2-");

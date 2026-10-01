@@ -1,8 +1,9 @@
 // Coded by @qa-engineer
-// Tests that the telemetry and metrics sidecar files are located through the lane-path resolver (no separate spec file).
-// AC1: telemetryPath()/metricsPath() derive their location only from resolveCurrentLanePaths(workspacePath), never a hand-rolled
-// path.join(workspacePath, ".current", "<literal>"). Since the lane flip the location does depend on the branch's lane (LANE1/LANE2/LANE3),
-// but still only through the resolver. AC4 maps to LANE1 (feat/e999-x) and LANE2 (main).
+// Tests that the telemetry and metrics sidecar files are located through the lane-path
+// resolver (no separate spec file). AC1: telemetryPath()/metricsPath() derive their
+// location only from resolveCurrentLanePaths(workspacePath), never a hand-rolled
+// path.join(workspacePath, ".current", "<literal>"); the location depends on the branch's
+// lane (LANE1/LANE2/LANE3) only through the resolver.
 // Rationale: specs/e260f-comment-rationale.md (test/e123b2-sidecars-lane-paths.test.mjs).
 
 import { test } from "node:test";

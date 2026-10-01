@@ -1,7 +1,8 @@
 // Coded by @qa-engineer
-// Tests for specs/e125a-lane-local-ledgers.md AC4-AC11, AC4b, AC6b, AC14. AC1-AC3 and AC13 are covered by test/lane-paths.test.mjs, test/lane-migrate.test.mjs,
-// test/schema-versions.test.mjs and test/tasks-versioning.test.mjs; AC12 by the existing SQLite suites; AC10 by test/success-metrics.test.mjs and
-// test/drift-skew.test.mjs plus the AC9 tests here. Imports compiled dist/; fixtures live under os.tmpdir(), never the repo root.
+// Tests for specs/e125a-lane-local-ledgers.md AC4-AC11, AC4b, AC6b, AC14. AC1-AC3, AC12 and
+// AC13 live in other files (test/lane-paths.test.mjs, test/lane-migrate.test.mjs, the
+// schema and tasks versioning tests, the SQLite suites); AC10 is covered by
+// test/success-metrics.test.mjs and test/drift-skew.test.mjs plus the AC9 tests here.
 // Rationale: specs/e260f-comment-rationale.md (test/e125a-lane-local-ledgers.test.mjs).
 
 import { test } from "node:test";
@@ -40,8 +41,10 @@ function mkWorkspace(prefix = "e125a-") {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
 }
 
-// A FAKE .git (pure fs; resolveCurrentLane only reads HEAD) is enough wherever "not git-ignored" behaviour is wanted: isLanePathIgnored's
-// `git check-ignore` fails against a non-repo and is treated as not ignored, the same as no .git at all. AC4b alone needs a REAL repo.
+// A FAKE .git (pure fs; resolveCurrentLane only reads HEAD) is enough wherever "not
+// git-ignored" behaviour is wanted: isLanePathIgnored's `git check-ignore` fails against a
+// non-repo and is treated as not ignored, the same as no .git at all. AC4b alone needs a
+// REAL repo.
 function mkFeatWorkspaceFake(lane, prefix = "e125a-feat-") {
   const ws = mkWorkspace(prefix);
   fs.mkdirSync(path.join(ws, ".git"));
@@ -728,8 +731,10 @@ test("AC14-3: emitFeatureMetrics' ticket count is unaffected by the feat-first s
   assert.equal(lines[0].tickets, 1, "T-E999-01 must be counted exactly once across the root, _primary's stale copy, and e999's own ledger");
 });
 
-// A _primary section for a lane whose ledger has closed into .current/history/<bucket>/<lane>/tasks.md is foreign for the same reason as a moved
-// one: makeForeignCheck in tools/tasks-file.ts ORs in hasHistoryLedger. These are the history-bucket twins of AC14-1 and AC14-1(d).
+// A _primary section for a lane whose ledger has closed into
+// .current/history/<bucket>/<lane>/tasks.md is foreign for the same reason as a moved one:
+// makeForeignCheck in tools/tasks-file.ts ORs in hasHistoryLedger. These are the
+// history-bucket twins of AC14-1 and AC14-1(d).
 
 function historyLaneTasksPath(ws, bucket, lane) {
   return path.join(ws, ".current", "history", bucket, lane, "tasks.md");
