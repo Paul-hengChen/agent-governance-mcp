@@ -1,8 +1,9 @@
 ---
 schema_version: 15
 active_feature: "e260g-test-e3-l-comment-trim"
-status: "In_Progress"
-last_updated: "2026-10-01T08:56:33.614Z"
+status: "Blocked"
+last_updated: "2026-10-01T09:06:31.622Z"
+blocking_reason: "Authoring complete (test-lane E233 handoff), not a failure: T-E260G-09..16 trims committed; awaiting pm then code-reviewer (resume_of) then fresh qa verifier"
 last_agent: "qa-engineer"
 scope_decision: "single-feature"
 scope_decision_why: "One comment-only lane over 28 owned test files; disjoint from the other wave-2 lanes by ownership globs."
@@ -10,8 +11,8 @@ cut_approved: true
 dispatch_pins:
   sr-engineer: "fable"
 evidence_schema: 2
-next_role: "qa-engineer"
-dispatched_at: "2026-10-01T08:56:33.614Z"
+next_role: "pm"
+dispatched_at: "2026-10-01T09:06:31.622Z"
 dispatch_mechanism: "task"
 dispatch_mechanism_tier: "sonnet"
 qa_round: 0
@@ -28,14 +29,18 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- Coordinator routing write (single-role qa dispatch on a test-only ticket, Constitution §3.1 charter): pm -> qa-engineer author, resume_of=qa-engineer. Recorded on behalf of the qa author, whose own In_Progress write was refused (TRANSITION_REJECTED) because the earlier routing write had no resume_of.
 - qa author progress: T-E260G-09 cbf1751 (proof.mjs: base run 0 changed, >20=21, 8-20=71, bare-id=4; negative control done in place on worktree files and restored: code edit fails emit+tokens, deleted eslint-disable fails directives, comment-only deletion stays clean).
-- T-E260G-10 b3595f6 (e31, e32-e33, e35, e38, e43: 11 long blocks -> 0, none retained; bare ids e32 L79/L343 fixed) - proof --changed-only PASS.
-- T-E260G-11 d8c90c9 (e5, e90, e92-e86-repro, e92-e86, e96: 10 long blocks -> 0, none retained; bare id e92-e86 L423 fixed) - proof --changed-only PASS.
-- Verifier notes: e32 pointer to an untracked review_reports path dropped; an e92-e86 comment holding a literal zero-width char was rewritten in ASCII (the regex code line is untouched). Tasks not flipped complete (verifier owns tw_complete_task).
-- T-E260G-12 9bc587a (error-code-contract, eval-assertions, evidence-provenance: 22 long blocks -> 0, none retained; error-code-contract parsing and assertion code byte-identical, its 3 test files pass 72/72). proof --changed-only: scope ok, emit 0 differ, tokens 0 differ, directives 0 lost, >20: 0 unexpected, bare-id 0, form ok, proof: PASS. check-md-tables OK. Server-written .current/e260g files committed in this commit.
-- T-E260G-13 6a9f348 (feature-lease, feature-scope-gate, feature-split-lifecycle, feature-rollup: 16 long blocks -> 0, none retained; feature-lease bare id L1127 fixed; eslint-disable kept; the 4 files pass 101/101). proof --changed-only: scope ok, emit 0 differ, tokens 0 differ, directives 0 lost, >20: 0 unexpected, bare-id 0, form ok, proof: PASS. check-md-tables OK. Retained blocks table still empty (none kept at 8-20).
-- Next: T-E260G-14..16. Tasks not flipped complete.
+- T-E260G-10 b3595f6 (e31, e32-e33, e35, e38, e43: 11 long blocks -> 0, none retained; bare ids e32 L79/L343 fixed).
+- T-E260G-11 d8c90c9 (e5, e90, e92-e86-repro, e92-e86, e96: 10 long blocks -> 0, none retained; bare id e92-e86 L423 fixed).
+- Verifier notes: e32 pointer to an untracked review_reports path dropped; an e92-e86 comment holding a literal zero-width char was rewritten in ASCII (regex code line untouched).
+- T-E260G-12 9bc587a (error-code-contract, eval-assertions, evidence-provenance: 22 long blocks -> 0, none retained; error-code-contract code byte-identical, its 3 test files pass 72/72).
+- T-E260G-13 6a9f348 (feature-lease, feature-scope-gate, feature-split-lifecycle, feature-rollup: 16 long blocks -> 0, none retained; feature-lease bare id L1127 fixed; eslint-disable kept; 4 files pass 101/101).
+- T-E260G-14 d1d8e3a (gates-expected-red, handoff-migration, handoff-write-arg-guard trimmed; file-lock and handoff-versioning swept, nothing to change: 9 long blocks -> 0, none retained; 3 files pass 50/50).
+- T-E260G-15 f4dab7f (hop-count-transitions, lane-migrate trimmed; handoff.test swept clean: 15 long blocks -> 0, none retained; the 2 files pass 66/66).
+- T-E260G-16 2e90729 (lane-paths-history, lane-paths, lane-ticket-allocation: 9 long blocks -> 0, none retained; the 3 files plus lane-migrate pass 154/154, source-scan lists in lane-paths and lane-migrate unaffected). Follow-up ea794d9 closes the Retained blocks table in specs/e260g-comment-rationale.md as none (the 8-20 list is empty).
+- Lane-wide full proof (node .current/e260g/proof.mjs, no --changed-only): base bdbffaf, changed 25 files; scope ok; emit 25 files 0 differ; tokens 25 files 0 differ; directives 25 files 0 lost; >20: 0 unexpected; --list-mid 0 blocks; bare-id 0; form ok; proof: PASS. check-md-tables OK (473 files, 0 malformed).
+- AC9 suite on clean committed HEAD ea794d9 (git status --porcelain = 0 lines; node scripts/test-lock.mjs -- npm test): total 3043 / pass 3040 / fail 0 / skip 3, exit 0; equals the integrator base 3043/3040/0/3.
+- Tasks T-E260G-09..16 NOT flipped complete (verifier owns tw_complete_task). Next: pm, then code-reviewer with resume_of, then a fresh Task-dispatched qa verifier who re-runs AC9.
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.
