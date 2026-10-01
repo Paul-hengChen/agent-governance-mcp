@@ -1,39 +1,9 @@
 // Coded by @qa-engineer
-// Tests (T-E177B-04) for scripts/test-lock.mjs (specs/e177b-lane-status-tooling.md,
-// AC7-AC13, AC13a, AC13b).
-//
-// Spec-to-Test map:
-//   AC7  (serialize two concurrent npm test wraps)      -> "AC7: ..."
-//   AC8  (one lock per shared git-common-dir)            -> "AC8: ..."
-//   AC9  (re-entrant: nested wrap does not self-deadlock) -> "AC9: ..."
-//   AC10 (dead-pid reclaim, staleness by liveness only)   -> "AC10: ..."
-//   AC11 (regression: live pid + ancient acquiredAt -> NOT reclaimed)
-//                                                          -> "AC11: ..."
-//   AC12 (waiting line format + repeats every notify interval)
-//                                                          -> "AC12: ..." (x2)
-//   AC13 (--max-wait -> reserved timeout exit code, distinct message)
-//                                                          -> "AC13: ..."
-//   AC13a (>=3 concurrent reclaimers of a dead lock -> exactly one holder ever)
-//                                                          -> "AC13a: ..."
-//   AC13b (SIGKILLed wrapper's still-live child blocks reclaim)
-//                                                          -> "AC13b: ..."
-//
-// WHY every spawned test-lock.mjs invocation below passes an explicit
-// --lock-path into a fresh $TMPDIR directory (never the default resolved
-// via `git rev-parse --git-common-dir`): this file itself runs INSIDE
-// `npm test`, which package.json now wraps through
-// `node scripts/test-lock.mjs -- node --test test/*.test.mjs` — the outer
-// suite process already holds THIS repo's real git-common-dir lock and
-// exports AGC_TEST_LOCK_HELD naming it. A child test-lock.mjs invocation
-// that resolved that SAME real lock path would either see the re-entrant
-// short-circuit (AC9) and never really lock at all, or (if AC9 didn't apply)
-// deadlock this very suite against itself. A private --lock-path in a fresh
-// tmpdir per test sidesteps both hazards and lets every test drive the
-// locking logic directly.
-//
-// Fast timing throughout: --notify-interval / --poll-ms / --max-wait are
-// always fractional-second, never the real 30s/10s defaults, so this whole
-// file runs in a few seconds, not minutes.
+// Tests (T-E177B-04) for scripts/test-lock.mjs (specs/e177b-lane-status-tooling.md, AC7-AC13, AC13a, AC13b). Case names carry the AC.
+// Every spawn passes an explicit --lock-path in a fresh $TMPDIR dir, never the default from `git rev-parse --git-common-dir`: this file runs inside `npm test`, whose outer
+// wrap already holds this repo's real lock and exports AGC_TEST_LOCK_HELD, so a child resolving the same path would short-circuit re-entrantly (AC9) or deadlock the suite.
+// Timing is fractional-second throughout (--notify-interval, --poll-ms, --max-wait) so the file runs in seconds.
+// Rationale: specs/e260f-comment-rationale.md (test/e177b-test-lock.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -428,14 +398,8 @@ test("AC13b: SIGKILLing the wrapper does not free the lock while its spawned chi
   const lockPath = mkLockPath(t, "e177b-ac13b-");
   const dir = mkTmpDir(t, "e177b-ac13b-child-");
   const doneFile = path.join(dir, "done");
-  // The child's lifetime is test-controlled via this release file instead of
-  // a fixed wall-clock busy-wait: under full-suite load, the kill -> wait-dead
-  // -> spawn-probe sequence below can take longer than any fixed window, so a
-  // clock-based "outlive the SIGKILL" bound is inherently racy (E212). The
-  // child polls for this file's existence (not a hard CPU busy-spin) and only
-  // the test writes it, and only AFTER the probe below has already observed
-  // the child as the still-alive lock holder — so the "child still alive
-  // while the probe runs" premise holds regardless of scheduling load.
+  // The child's lifetime is test-controlled via a release file, not a fixed busy-wait: under suite load the kill -> wait-dead -> spawn-probe sequence can outlast
+  // any fixed window (E212). The child polls for the file; the test writes it only AFTER the probe has seen the child as the live lock holder.
   const releaseFile = path.join(dir, "release");
   const childScript = path.join(dir, "child.mjs");
   fs.writeFileSync(

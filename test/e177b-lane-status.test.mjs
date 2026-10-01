@@ -1,41 +1,8 @@
 // Coded by @qa-engineer
-// Tests (T-E177B-05) for tools/lane-status.ts (specs/e177b-lane-status-tooling.md,
-// AC1-AC6, AC5a-AC5d).
-//
-// Spec-to-Test map:
-//   AC1 (lane list via tools/lane-registry.ts, never a fan-out manifest)
-//       -> "AC1: ...", "AC1 (structural): ..."
-//   AC2 (per-lane handoff fields + git log + git status)
-//       -> "AC2: ..."
-//   AC3 (unreadable lane carried, never dropped; report degraded)
-//       -> "AC3: no handoff.md at all ...", "AC3: unparseable handoff.md ...",
-//          "AC3: handoff parses but carries no active_feature ..."
-//   AC4 (--rollup sums vs the REAL exported cap constants)
-//       -> "AC4: ..."
-//   AC5 (independent evidence cross-check, never trusts the handoff's own count)
-//       -> "AC5/AC5a/AC5b/AC5d: ..." (one worktree fixture layering all four)
-//   AC5a (archive scoping parity — a release-style archive holding many
-//        unrelated features' evidence must not false-positive)
-//       -> same fixture as AC5, the "release-style archive" section
-//   AC5b (PASS-only evidence — a FAIL-only file never counts)
-//       -> same fixture, the "PASS-only" section
-//   AC5c (ticket token not derivable -> completed_tasks-only fallback, printed)
-//       -> "AC5c: ..."
-//   AC5d (voided ids excluded even with leftover evidence on disk)
-//       -> same fixture, the "voided" section
-//   AC6 (cross-feature --lanes/--all roll-up: per-lane caps, informational sum)
-//       -> "AC6: ..." (x3: --lanes subset, --all, missing lane name)
-//
-// WHY real git repos + real `git worktree add` (not a fan-out manifest, not a
-// shimmed `git`, not synthetic LaneInfo objects): AC1-AC3 exercise
-// computeLaneStatus's OWN `git log`/`git status --porcelain` subprocess calls
-// (tools/lane-status.ts:239-248, 489-509), which a synthetic LaneListProvider
-// bypasses entirely. The dispatch brief calls for temp git repos with real
-// worktrees for exactly this reason — see also test/agc-adapters.test.mjs's
-// mkWorktreeFixture for the same "a linked worktree needs a real primary repo
-// plus `git worktree add`" precedent. AC4/AC5/AC5a-d/AC6 exercise the PURE
-// roll-up/render functions over a `LaneStatusReport` a real fixture produced,
-// so no git shimming is needed there beyond the same real fixture.
+// Tests (T-E177B-05) for tools/lane-status.ts (specs/e177b-lane-status-tooling.md, AC1-AC6, AC5a-AC5d). Case names carry the AC; AC5/AC5a/AC5b/AC5d share one
+// worktree fixture layering the four evidence filters. Real git repos plus real `git worktree add` are used, not a manifest, a shimmed git or synthetic LaneInfo, because
+// AC1-AC3 exercise computeLaneStatus's own `git log` / `git status --porcelain` calls; AC4-AC6 run the pure roll-up and render functions over a report that fixture produced.
+// Rationale: specs/e260f-comment-rationale.md (test/e177b-lane-status.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";

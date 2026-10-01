@@ -1,42 +1,8 @@
 // Coded by @qa-engineer
-// Tests (T-E177B-06) for scripts/mailbox-watch.mjs (specs/e177b-lane-status-tooling.md,
-// AC14-AC20).
-//
-// Spec-to-Test map:
-//   AC14 (correct `--- msg` counting; armed line; no spurious fire on empty)
-//        -> "AC14: ..."
-//   AC15 (single-file exits 0 naming new count; multi-file names the file)
-//        -> "AC15: ..." (x2)
-//   AC16 (re-arm baseline = LAST-READ count, never a fresh re-sample at expiry;
-//        a message landing in the expiry-to-rearm gap must still fire)
-//        -> "AC16: ..."
-//   AC17 (second concurrent watch on the SAME file refuses to start)
-//        -> "AC17: ..." (real cross-process)
-//   AC18 (--send auto-stamps time/re/hop/seq per §5)
-//        -> "AC18: ..." (x4: seq, time, re, hop — incl. a real handoff read)
-//   AC19 (multi-file watches all named files; single-file exits on first)
-//        -> "AC19: ..."
-//   AC20 (multi-file expiring line carries EACH file's own last-read baseline
-//        in `key=N,...` form; default deadline < Monitor's 30-min cap;
-//        --deadline adjusts it)
-//        -> "AC20: ..." (x2)
-//
-// WHY two different timing strategies:
-//   - AC16/AC20 need to observe the EXACT instant a message arrives relative
-//     to the deadline check (before vs. after) — real timers can't guarantee
-//     that ordering deterministically, so those tests inject a fully fake
-//     clock (`now`/`sleep` overridden in the `io` object main() already
-//     accepts) that advances only when the code under test awaits it, and
-//     appends the "gap" message from inside that fake `sleep`.
-//   - AC15/AC19 test genuine mid-watch detection while the watch is actually
-//     polling, so they use REAL timers with fractional `--interval`/
-//     `--deadline` values (per the dispatch brief) to stay fast without
-//     losing the "detected while running" property.
-//   - AC17 spawns two REAL, separate OS processes (never in-process calls):
-//     the refusal is a cross-process guarantee (a sidecar lock file), and a
-//     real second process is the only way to prove a second, independent
-//     mailbox-watch invocation is refused rather than merely a second
-//     in-process call sharing this test's own module state.
+// Tests (T-E177B-06) for scripts/mailbox-watch.mjs (specs/e177b-lane-status-tooling.md, AC14-AC20). Case names carry the AC.
+// Two timing strategies: AC16/AC20 inject a fake clock (`now`/`sleep` in the `io` object main() accepts) because real timers cannot place a message exactly before or after the deadline check;
+// AC15/AC19 use real timers with fractional --interval/--deadline to test detection while polling; AC17 spawns two real OS processes because the refusal is a cross-process lock-file guarantee.
+// Rationale: specs/e260f-comment-rationale.md (test/e177b-mailbox-watch.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -278,16 +244,9 @@ test("AC17: a second, independent mailbox-watch process on the SAME file refuses
   fs.writeFileSync(file, "");
   const lockPath = watchLockPath(file);
 
-  // A GENEROUS deadline on the first watch (never raced against): we kill it
-  // explicitly below, on our own schedule, instead of letting it expire on
-  // its own. A short self-expiring deadline here is a suite-load hazard —
-  // under full-suite CPU contention, spawning + starting the SECOND process
-  // can itself take well over a second, and a first watch that expired (and
-  // released its lock) in the meantime would make the second process start
-  // a REAL, unbounded watch of its own instead of ever being refused — which
-  // is exactly the hang the integrator caught (real timers racing real
-  // process-spawn latency under load; E182). The 20s test timeout is
-  // this test's own hard backstop regardless.
+  // A GENEROUS deadline on the first watch (never raced): it is killed explicitly below. A short self-expiring deadline is a suite-load hazard,
+  // since a first watch that expired and released its lock before the second process started would let that process run a real unbounded watch
+  // instead of being refused (the hang the integrator caught, E182). The 20s test timeout is the hard backstop.
   let firstChild = null;
   t.after(() => {
     if (firstChild) {

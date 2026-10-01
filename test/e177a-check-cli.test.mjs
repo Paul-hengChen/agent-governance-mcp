@@ -1,33 +1,9 @@
 // Coded by @qa-engineer
-// Tests (T-E177A-07) for checkLane() and the thin scripts/fanout.mjs CLI
-// (specs/e177a-fanout-manifest.md, AC9-AC12, AC15). AC16 (build + suite) is
-// recorded in qa_reports/review_T-E177A-06.md after this file's commit, per
-// the qa-engineer SOP Phase 4 ("run after commit on a clean tree,
-// lane-protocol §3") — there is no in-file assertion for it.
-// test/e177a-manifest.test.mjs covers AC1-AC8, AC13, AC14 (parse/validate/
-// render side); this file is checkLane + the CLI's own exit contract.
-//
-// Every fixture here is a REAL, throwaway git repo built under os.tmpdir()
-// (never inside this repo) via `git commit-tree` against explicitly
-// constructed trees, mirroring test/e126-merge-invariants.test.mjs's
-// mkRepo()/commitTree() helpers — this gives full, deterministic control
-// over what the "branch" and "base" refs contain without an actual
-// checkout, while still exercising checkLane's real `git diff --no-renames`
-// read path (checkLane never reads a working tree, only committed refs).
-// The manifest under test is the real test/fixtures/e177a/fanout-wave7.md
-// (lane e177a's real 擁有/禁止 cells), so these tests double as an
-// end-to-end check of the spec's own worked example.
-//
-// Spec-to-Test map:
-//   AC9  (check passes, exit 0, when every changed file is in the lane's owned paths)
-//        -> "AC9 check in bounds"
-//   AC10 (check fails, exit 1, when a changed file is outside the owned paths)
-//        -> "AC10 check out of bounds"
-//   AC11 (report says only committed changes were checked and prose limits are
-//        not machine-checked, E158) -> "AC11 E158 disclaimer"
-//   AC12 (check honours the base ref and explicit branch refs)
-//        -> "AC12 check base and refs"
-//   AC15 (the CLI's own exit and output contract) -> "AC15 CLI contract"
+// Tests (T-E177A-07) for checkLane() and the thin scripts/fanout.mjs CLI (specs/e177a-fanout-manifest.md, AC9-AC12, AC15); test/e177a-manifest.test.mjs
+// covers AC1-AC8, AC13, AC14. AC16 (build + suite) has no in-file assertion; it is recorded in qa_reports/review_T-E177A-06.md after this file's commit (SOP Phase 4, clean tree).
+// Fixtures are real throwaway git repos under os.tmpdir() built with `git commit-tree` on explicit trees (as in test/e126-merge-invariants.test.mjs), so checkLane's real
+// `git diff --no-renames` read path runs over committed refs only. The manifest is the real test/fixtures/e177a/fanout-wave7.md, so the tests double as the spec's worked example.
+// Rationale: specs/e260f-comment-rationale.md (test/e177a-check-cli.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
