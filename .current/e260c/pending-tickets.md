@@ -1,5 +1,7 @@
 # Pending tickets — lane e260c
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E260-NEW-1
 title: skill-release-engineer cites a stale line range for the verify-release --close-out check
@@ -14,5 +16,3 @@ body: |
   script rot on every edit; cite the function or flag name instead.
   content/ is a shared generated input owned outside this lane.
 ```
-
-## Applied
