@@ -28,3 +28,9 @@ Proof script also printed `pins: 25 files, 0 count change(s)` and `proof: PASS`.
 Information hygiene: grep for local absolute-path literals over the rationale spec, the review report and proof.mjs found none.
 
 ## Phase 4
+- Build: `npm run build` exit 0, zero diff under `dist/`.
+- AC11: tree clean (`git status --porcelain | wc -l` = 0) at source HEAD `2bbddc4` (the last source change is `4da5fe9`; later commits are review and QA records only). `node scripts/test-lock.mjs -- npm test` exit 0: tests 3043, pass 3040, fail 0, skipped 3, cancelled 0. Tree still clean afterwards. pass.
+- Reviewer's two recommendations (proof.mjs form check one-directional, no directive-comment check): QA re-ran emit and token equality, which already prove no directive or non-comment text changed; the `/*!` and `/// <reference` constraint is covered by the emit and token proofs, so neither recommendation blocks.
+
+## Verdict
+PASS for T-E260D-01..07. No required findings; no round opened.
