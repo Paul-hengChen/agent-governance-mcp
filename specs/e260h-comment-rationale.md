@@ -75,3 +75,32 @@ The "no gh" PATH: a fixed `/usr/bin:/bin` worked on a macOS checkout but not on 
 VR-9c (step 13a non-empty-stage check): the assertion proves that something was staged, not that everything was, and the test pins exactly that so the property is not later overclaimed as closing all partial-staging failures. Known gap, recorded rather than fixed: if `find` under-reports, for example when `.current/` is reached through a symlink (BSD `find` does not descend without `-L`), `handoff.md` still stages, the cached diff is non-empty, the check passes, and the `.jsonl` sidecars are left out of the bookkeeping commit; the next release's own 13a run sweeps them up. Since backlog row E143, step 8's release commit stages `tasks.md` and 13a's `git add` no longer names it; the guaranteed property does not depend on which paths that line names.
 
 VR-47 exists because a comment in `scripts/verify-release.mjs` claims a drift-guard test pins the mirror between `LANE_SEGMENT_RE_SRC` and the lane-path helpers; the human asked for that test in code review.
+
+## test/qa-flow.test.mjs
+
+Every trimmed block here was cut to its plain-language core; the edge-by-edge reasoning lives in the specs the comments cite (`specs/pm-repair-resume-routing.md`, `specs/c9-protocol-fields.md`, `specs/c13-release-engineer-write-path.md`) and in `tools/transitions.ts`. Two points not held there:
+
+- `design-auditor` after a PASS: the missing `qa-engineer:PASS` edge was seen in real use, where the first feature of a workspace opened fine and every later one was rejected.
+- `qa-engineer:Blocked` to `pm` (backlog row E45): the dead end was recorded in `research/adopter-button-realign-qa-blocked-dead-end.md`. A purely additive row edit can land with the suite green unless something pins the row's exact membership, which is why the row-equality pin exists.
+
+## test/prompt-state-footer.test.mjs
+
+Footer cases: S01a (wrong path, visible), S01b (genuinely fresh), S02 (parse or migration error), S03 (recovery clause); de-dup layers L1 (in-memory set in the server) and L2 (the hook marker). Spec-to-test map for `specs/c6-c11-prompt-state-injection.md`:
+
+| criterion | tests |
+|---|---|
+| AC-1 genuine fresh (S01b) | `t-s01b-*` |
+| AC-2 wrong path visible, never a bare S01 | `t-s01a-*` |
+| AC-3 parse or migration errors (S02) | `t-s02-*` |
+| AC-4 workspace-resolution consistency: env threading, arg priority, cwd fallback, all through the real `index.ts` handler because `resolveWorkspacePath` lives there | `t-e2e-*` |
+| AC-5 this file | whole file |
+| AC-6 stale `prd_path` guard | `t-prd-*` |
+| AC-7, AC-8 single delivery (L1 and L2) | `t-e2e-dedup`, `t-l2-*` |
+| DR-5 S03 recovery clause not silent; DR-6 `buildPromptForRole` purity | `t-e2e-dedup`, `t-purity-*` |
+| a normal handoff is unchanged | `t-normal-handoff` |
+
+`resolveWorkspacePath`, the L1 set and `hookMarkerFresh` are not exported: `index.ts` runs a top-level IIFE that connects a stdio transport at load time, so importing `dist/index.js` in-process would take over the test runner's own stdin and stdout. The server-level tests therefore spawn the compiled server, as `test/teamwork-lite.test.mjs` does.
+
+Map for `specs/d1-prompt-arg-workspace-fallback.md`: AC-1 (a non-path arg falls back) `t-d1-ac1`; AC-2 (an existing-dir arg is unchanged) is covered by the third fetch of the e2e de-dup test; AC-3 (path-shaped but missing) `t-d1-ac3`; AC-4 (the end-to-end repro) `t-d1-ac4`; AC-5 (absent arg unchanged) `t-d1-ac5` plus every earlier case with empty arguments.
+
+Map for the workspace normalization tests (AC2): bare `~`, `~/x`, a relative path and an absolute path (the contrast case), each its own `AC2/...` test. On POSIX `os.homedir()` reads `HOME`, so the tilde fixtures override it to a throwaway directory under the temp dir, never the developer's real home.

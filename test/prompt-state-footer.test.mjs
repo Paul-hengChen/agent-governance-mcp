@@ -1,40 +1,10 @@
 // Coded by @qa-engineer
-// Tests for the state footer appended to every role prompt: when the handoff
-// file is missing or unreadable, the prompt says so loudly (naming the paths
-// it looked at) instead of silently showing no state; and the constitution
-// is delivered only once per session, not again by both the hook and the
-// prompt. The footer cases are S01a/S01b/S02/S03 and the two de-dup layers
-// are L1/L2. (C6, C11; specs/c6-c11-prompt-state-injection.md and
-// specs/c6-c11-prompt-state-injection-architecture.md, DR-6/DR-7)
-//
-// Spec-to-Test map:
-//   AC-1 (genuine fresh, S01b)               -> t-s01b-*
-//   AC-2 (wrong-path visible, never bare S01) -> t-s01a-*
-//   AC-3 (parse/migration errors, S02)        -> t-s02-*
-//   AC-4 (workspace-resolution consistency)   -> t-e2e-*  (env threading,
-//                                                arg priority, cwd fallback,
-//                                                all proven through the REAL
-//                                                index.ts handler, not just
-//                                                buildPromptForRole, since
-//                                                resolveWorkspacePath lives
-//                                                in index.ts)
-//   AC-5 (this file)                          -> entire file
-//   AC-6 (stale prd_path guard, C6-03/DR-7)   -> t-prd-*
-//   AC-7/AC-8 (single delivery, L1+L2 dedup)  -> t-e2e-dedup, t-l2-*
-//   DR-5 (S03 recovery clause non-silent)     -> t-e2e-dedup, t-purity-omit
-//   DR-6 (buildPromptForRole purity)          -> t-purity-*
-//   task item 2 (normal handoff unchanged)    -> t-normal-handoff
-//
-// index.ts's `resolveWorkspacePath`, the L1 in-memory Set, and `hookMarkerFresh`
-// are NOT exported for direct import — index.ts runs a top-level IIFE that
-// connects a stdio transport at module-load time, so importing dist/index.js
-// in-process would hijack this test runner's own stdin/stdout. Every AC-4/L1/L2
-// assertion below therefore spawns the REAL compiled server and talks
-// JSON-RPC over stdio, mirroring the only other suite that needs the live
-// handler (test/teamwork-lite.test.mjs AC3b). buildPromptForRole-level
-// assertions (S01a/S01b/S02/purity) call the pure function directly — no
-// server needed, since the footer decision tree and the omit branch both
-// live in prompts/build.ts.
+// Tests for the state footer on every role prompt: a missing or unreadable
+// handoff is reported loudly with the paths checked, and the constitution is
+// delivered once per session (specs/c6-c11-prompt-state-injection.md). index.ts
+// connects stdio at import, so server-level cases spawn the compiled server and
+// speak JSON-RPC; footer cases call buildPromptForRole directly.
+// Spec-to-test map: specs/e260h-comment-rationale.md (test/prompt-state-footer.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -356,12 +326,9 @@ test("C6-03/AC-6: a LIVE (existing) state.prd_path is still trusted verbatim (co
 });
 
 // ---------------------------------------------------------------------------
-// AC-4 / AC-7 / AC-8 / DR-5 — end-to-end through the REAL server process.
-// resolveWorkspacePath, the L1 in-memory dedup Set, and hookMarkerFresh all
-// live in index.ts, which cannot be imported in-process (its top-level IIFE
-// connects a stdio transport at import time) — so these spawn the compiled
-// server and drive it over JSON-RPC, exactly like test/teamwork-lite.test.mjs
-// AC3b already does.
+// AC-4 / AC-7 / AC-8 / DR-5 — end-to-end through the real server process,
+// since resolveWorkspacePath, the L1 dedup Set and hookMarkerFresh live in
+// index.ts and cannot be imported in-process.
 // ---------------------------------------------------------------------------
 
 // Response-driven: resolves as soon as every id-bearing request sent (the
@@ -524,33 +491,11 @@ test("C11/AC-7 L2 fail-safe: stale (>120s), malformed, and absent markers all de
 });
 
 // ---------------------------------------------------------------------------
-// A workspace_path prompt arg that does not look like a path is ignored.
-// looksLikePath() gates resolveWorkspacePath()'s arg-acceptance branch so a
-// free-text workspace_path arg (Claude Code's slash-command convention stuffs
-// any text typed after "/teamwork ..." into this single argument slot) falls
-// through to the CLAUDE_PROJECT_DIR/cwd chain instead of being treated as a
-// literal (bogus) path. resolveWorkspacePath/looksLikePath live in index.ts,
-// which — like the AC-4 block above — cannot be imported in-process (its
-// top-level IIFE connects a stdio transport unconditionally at import time,
-// with no guard; verified by reading index.ts directly), so every case below
-// spawns the real compiled server via sendPromptRequests, exactly like the
-// existing AC-4/AC-7/AC-8 e2e tests. (D1, specs/d1-prompt-arg-workspace-fallback.md)
-//
-// Spec-to-Test map for this block:
-//   AC-1 (non-path-shaped arg falls back)        -> t-d1-ac1
-//   AC-2 (existing-dir arg unchanged)             -> already covered above (the
-//                                                     AC-4/e2e dedup test's 3rd
-//                                                     fetch uses a real, existing
-//                                                     wsArg via workspace_path arg)
-//   AC-3 (path-shaped-but-missing arg unchanged)  -> t-d1-ac3
-//   AC-4 (end-to-end repro fixed)                 -> t-d1-ac4
-//   AC-5 (absent-arg behavior unchanged)          -> t-d1-ac5 (plus every
-//                                                     pre-existing arguments:{}
-//                                                     case above, unmodified)
-//   AC-6 (existing C6 footer tests still pass)    -> this whole file, unmodified
-//                                                     above this section
-//   AC-7 (full suite green)                       -> enforced at the npm test
-//                                                     level, not a single test
+// A workspace_path arg that does not look like a path is ignored: Claude Code
+// puts any text typed after "/teamwork ..." into that one slot, so
+// looksLikePath() sends free text to the CLAUDE_PROJECT_DIR/cwd chain instead
+// of treating it as a path (specs/d1-prompt-arg-workspace-fallback.md). Spawns
+// the real server, like the block above.
 // ---------------------------------------------------------------------------
 
 test("D1/AC-1: non-path-shaped (free-text) arg falls through to the CLAUDE_PROJECT_DIR env chain, never treated as a path", async () => {
@@ -645,31 +590,11 @@ test("D1/AC-5: absent workspace_path arg is byte-identical to pre-D1 — still r
 });
 
 // ---------------------------------------------------------------------------
-// AC2 — normalizeWorkspacePath (index.ts): resolveWorkspacePath's
-// result must be absolute AND normalized for EVERY source. (e123b8 J1) A bare "~" or a
-// leading "~/" expands to os.homedir(); path.resolve then anchors a relative
-// path at the server's cwd; an already-absolute input is unchanged.
-// normalizeWorkspacePath/resolveWorkspacePath live in index.ts, which — like
-// the AC-4/D1 blocks above — cannot be imported in-process (its top-level
-// IIFE connects a stdio transport unconditionally at import time), so every
-// case below spawns the real compiled server via sendPromptRequests.
-//
-// os.homedir() reads the $HOME env var on POSIX (Node docs), so the tilde
-// fixtures override HOME (via sendPromptRequests's env passthrough) to a
-// throwaway directory under os.tmpdir() — never the real developer $HOME.
-//
-// Each fixture is a genuinely-fresh managed workspace (S01b, no handoff.md
-// yet — see the AC-1/S01b block above), so the footer names the EXACT
-// resolved `.../.current/handoff.md` path (HANDOFF_REL) verbatim: that is a
-// direct proof the arg was expanded/resolved to the expected absolute path,
-// not just "some real workspace was found".
-//
-// AC2 Spec-to-Test map (proof: "table test covering ~, ~/x, a relative path,
-// and an absolute path"):
-//   bare "~"      -> AC2/tilde-bare
-//   "~/x"         -> AC2/tilde-subdir
-//   relative path -> AC2/relative
-//   absolute path -> AC2/absolute (unchanged, contrast case)
+// AC2 (normalizeWorkspacePath, index.ts): the resolved workspace is absolute and
+// normalized for every source: "~" and "~/x" expand to os.homedir(), a relative
+// path resolves against the server cwd, an absolute one is unchanged. Tilde
+// fixtures point HOME at a temp dir. Each is a fresh workspace, so the footer
+// names the exact resolved handoff path, proving the expansion.
 // ---------------------------------------------------------------------------
 
 test("AC2/tilde-bare: a bare \"~\" workspace_path arg expands to os.homedir() ($HOME override) and resolves to the real managed workspace living there", async () => {
