@@ -1,27 +1,9 @@
 // Coded by @qa-engineer
-// Tests for the shrink warning on tw_update_state's dispatch_pins and
-// external_refs fields. Both fields REPLACE (never merge) on write, so a
-// writer that forgets to read before writing silently drops entries. When
-// THIS write drops entries from the set already on disk (same-feature
-// writes only), the success envelope gains a `warnings` array naming them.
-// Unit under test: the shrink check in tools/handoff-orchestrator.ts.
-// Warn-only: never rejects, no new argument, no schema bump. The
-// requirements come from the backlog row, not a specs/ file; an
-// independent code review checked the same behaviour. (E28, T-E28-01)
-//
-// Spec-to-test map:
-//   shrink write warns, naming dropped entries (dispatch_pins)   -> W1
-//   shrink write warns, naming dropped entries (external_refs)   -> W2
-//   omitting the field on write is silent (server carry-forward) -> S1, S2
-//   a feature-change write is silent even though the set shrinks -> F1, F2
-//   envelope stays valid, additive JSON (no keys dropped/altered)-> J1, J2
-//   a same-size SWAP that drops an entry also WARNS, naming it     -> P1a, P1b
-//     (detection compares entries, not counts — dispatch_pins by key
-//      set, external_refs by ref string — so swapping one entry for
-//      another cannot drop it silently) (E33)
-//   no consumer that expects an exact envelope breaks             -> J1, J2
-//     (additive key only; no test/*.mjs asserts an exact key set on
-//      the tw_update_state response envelope)
+// Tests for the shrink warning on tw_update_state's dispatch_pins and external_refs fields. Both REPLACE (never merge) on write, so a writer that forgets to read first silently drops entries;
+// when THIS write drops entries from the set already on disk (same-feature writes only), the success envelope gains a `warnings` array naming them. Unit under test: the shrink check in tools/handoff-orchestrator.ts.
+// Warn-only: never rejects, no new argument, no schema bump. The requirements are the backlog row, not a specs/ file. (E28, T-E28-01)
+// Test ids: W1/W2 warns, S1/S2 omitted field silent, F1/F2 feature change silent, J1/J2 additive envelope, P1a/P1b same-size swap warns (E33).
+// Rationale: specs/e260f-comment-rationale.md (test/e28-shrink-warning.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -213,16 +195,8 @@ test("F2: switching active_feature while supplying a SMALLER external_refs ledge
   assert.equal(envelope.warnings, undefined, "a feature change must never trigger the shrink warning, regardless of cardinality");
 });
 
-// ============================================================================
-// J1/J2: the envelope stays valid, additive JSON, so no consumer that
-// expects an exact envelope breaks. Every original success-envelope key
-// (success/path/updated_at) survives untouched; `warnings` is purely
-// additive and absent on non-shrink writes. No test in test/*.mjs asserts
-// an exact key set on the tw_update_state response envelope; the "no stale
-// warnings" check in test/agc-adapters.test.mjs is about a different
-// feature (agc check adapter staleness), so this additive key cannot break
-// it. These tests keep that true going forward.
-// ============================================================================
+// J1/J2: the envelope stays valid, additive JSON: every original success-envelope key (success/path/updated_at) survives and `warnings` is absent on non-shrink writes.
+// No test in test/*.mjs asserts an exact key set on the tw_update_state envelope (the "no stale warnings" check in test/agc-adapters.test.mjs is about adapter staleness); these tests keep that true.
 
 test("J1: a shrink-write envelope keeps success/path/updated_at intact AND additively gains warnings", async () => {
   const ws = await seedAndRead({
@@ -254,15 +228,8 @@ test("J2: a non-shrink write's envelope carries NO warnings key at all (byte-ide
   );
 });
 
-// ============================================================================
-// P1a/P1b: a same-size SWAP. Shrink detection compares entries, not counts
-// (dispatch_pins by key set, external_refs by ref string), so a same-count
-// swap that drops a prior entry WARNS and names the dropped entry. A plain
-// size compare would let such a swap through silently. A value-only pin
-// change (key survives) or an external_refs state advance (ref survives) is
-// still NOT a drop and stays silent — see W1/W2/S1/S2/F1/F2 above.
-// (E33, test/e32-e33-gate-hardening.test.mjs, T-E33-01)
-// ============================================================================
+// P1a/P1b: a same-size SWAP. Shrink detection compares entries, not counts (dispatch_pins by key set, external_refs by ref string), so a swap that drops a prior entry WARNS and names it.
+// A value-only pin change or an external_refs state advance (the key or ref survives) is not a drop and stays silent (W1/W2/S1/S2/F1/F2 above). (E33, test/e32-e33-gate-hardening.test.mjs, T-E33-01)
 
 test("P1a (probe 1, post-E33): a same-count dispatch_pins SWAP drops an entry and WARNS, naming it", async () => {
   const ws = await seedAndRead({
