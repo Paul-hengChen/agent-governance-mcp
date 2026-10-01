@@ -138,4 +138,5 @@ base: e9a19f2    integration branch: integ/e260（第一波）；integ/e260-w2�
 - 整合者逐條自行核對：143 個改過的測試檔去註解轉譯與 AST 葉節點（排除 JSDoc）皆與 base 相同，指令註解數不變；各 lane 在回報 HEAD 乾淨樹重跑全套皆 3043/3040/0/3；`fanout check` 皆 0 越界。
 - 量測（同一套掃描器，`integ/e260-w2`）：e260e 8–20 行 45→0、>20 行 14→0、最長 53→7；e260f 60→0、51→0、72→7；e260g 71→0、21→0、42→7；e260h 117→0、30→0、134→7。四條都沒有保留 8–20 行的區塊。新增註解行超過 120 欄：e260e 8、e260f 0、e260g 2、e260h 1（base 的 `test/` 註解 17886 行中 29 行）。
 - 彙總（上限按 lane／feature 計，合計僅供參考）：e260e 11 張 task／hop 9（review 一次退回）；e260f 31／9（review 一次退回）；e260g 9／8+5（兩個 feature：`e260g-test-e3-l-comment-trim` 停在 8，`e260g-r3-fix` 5；review 三輪）；e260h 16／5（review、qa 皆第一輪通過）；合計 67 張 task、36 hop。
-- 新票：E260E-NEW-1、E260F-NEW-1、E260F-NEW-2、E260G-NEW-1、E260H-NEW-1、E260H-NEW-2 由 `finish --shipped` 配號。
+- 新票：`finish --shipped` 配號 E268（E260E-NEW-1）、E269／E270（E260F-NEW-1／2）、E271（E260G-NEW-1）、E272／E273（E260H-NEW-1／2），排進 `docs/v4.0.0-new-tickets.md` 佇列 #89–#94。四條 worktree、branch、信箱都已清掉，`integ/e260-w2` 已刪。
+- 附記：e260g 留下一份檔名含空格的證據 `qa_reports/review_T-E260G-09 T-E260G-10 … T-E260G-17.md`（多個 id 寫進檔名），不影響測試，留待 release 封存時一併處理；e260g、e260h 的 qa／pm commit trailer 寫 Sonnet 5.5（實際模型，不 amend）。
