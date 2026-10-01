@@ -1,50 +1,11 @@
 #!/usr/bin/env node
 // Coded by @sr-engineer
-// scripts/mailbox-watch.mjs — lane <-> integrator mailbox watcher + sender
-// (E177b T-E177B-06, spec AC14-AC20; mailbox format docs/lane-protocol.md §5).
-//
-// Replaces the Wave 5.1 hand-written shell loop, whose `grep -c ... || echo 0`
-// printed `0\n0` on an empty file and silently broke every integer comparison
-// after it (a message went unseen for ~15 minutes). Pure node — no shell word
-// splitting, no associative arrays, no grep.
-//
-// WATCH (default mode)
-//   node scripts/mailbox-watch.mjs <file> [--baseline <N>] [--deadline <min>] [--interval <s>]
-//     Single file = the lane's "wait for the next message" loop: exits 0 on the
-//     first new message, naming the new count — the Bash run_in_background
-//     shape (AC15, AC19).
-//   node scripts/mailbox-watch.mjs <f1> <f2> ... [--baseline k1=N1,k2=N2,...]
-//     Multi file = the integrator watching every lane's to-integrator.md: runs
-//     until the deadline, printing one `changed:` line per new message naming
-//     the file (a Monitor-tool event stream, AC15, AC19). Each file's key is
-//     its lane name = the mailbox path's parent directory
-//     (`<mailbox>/<lane>/to-integrator.md`); two files with the same key are
-//     refused loudly, never merged/overwritten (AC20).
-//
-//   Startup prints `armed: baseline N, current M` (AC14). At the deadline
-//   (default DEFAULT_DEADLINE_MINUTES = 29, below the Monitor tool's 30-minute
-//   cap; --deadline adjusts it) it prints `expiring — re-arm` and a ready-to-run
-//   re-arm command whose --baseline carries the LAST COUNT THIS WATCH READ —
-//   never a fresh re-sample at expiry time — so a message landing in the gap
-//   between this watch's expiry and the re-armed watch's start still fires
-//   (AC16, AC20). A baseline below the current count fires immediately.
-//
-//   Only one watch per mailbox file: a sidecar lock `.<name>.watch-lock` next
-//   to the file (holder pid liveness decides staleness) makes a second watch on
-//   the same file refuse to start (AC17).
-//
-// SEND
-//   node scripts/mailbox-watch.mjs <file> --send --from <lane|integrator> --type <t>
-//        --re <target> --body <text> [--hop <n>[/<cap>]] [--workspace <path>]
-//     Appends one §5 block, auto-stamping seq (file's last seq + 1), time (UTC,
-//     computed in-process), re (file-qualified `to-lane#n` / `to-integrator#n`;
-//     a bare `n` resolves to the OTHER file of the pair; anything else is kept
-//     as a short topic), and hop (`<n>/<cap>` on the lane side, read from the
-//     lane's handoff hop_count + HOP_CAP_EXPORTED unless --hop is given;
-//     integrator writes `—`) (AC18).
-//
-// Exit codes: 0 new message / sent; 3 deadline reached (re-arm); 4 refused
-// (file already watched); 1 runtime error; 64 usage error.
+// Lane <-> integrator mailbox watcher and sender (E177b, spec AC14-AC20; message
+// format in docs/lane-protocol.md §5). Pure node; watch, re-arm, lock and send
+// semantics and the shell loop it replaced: see specs/e260c-bin-scripts.md.
+// Watch: node scripts/mailbox-watch.mjs <file | f1 f2 ...> [--baseline <N> | k1=N1,...] [--deadline <min>] [--interval <s>]
+// Send:  node scripts/mailbox-watch.mjs <file> --send --from <lane|integrator> --type <t> --re <target> --body <text> [--hop <n>[/<cap>]] [--workspace <path>]
+// Exit codes: 0 new message / sent; 3 deadline reached (re-arm); 4 refused (file already watched); 1 runtime error; 64 usage error.
 
 import * as fs from "node:fs";
 import * as path from "node:path";
