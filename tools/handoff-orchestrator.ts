@@ -450,20 +450,12 @@ export const UPDATE_STATE_GATE_PIPELINE: readonly UpdateStateGateStep[] = [
     codes: ["SOURCE_CREDIBILITY_UNVERIFIED"],
     run: (ctx) => {
       const { parsed, prevTuple, nextTuple } = ctx;
-        // Source-Credibility Gate: the fourth build-entry attestation check on
-        // the pm:In_Progress -> {architect,sr-engineer}:In_Progress edge, after
-        // scope-decision / cut-approval / external-refs. Unlike those three
-        // (file mode only, reading handoff YAML), it reads
-        // design/<feature>.md directly via fs, so it works in every storage
-        // mode — no `getActiveStorage() instanceof FileHandoffStorage` guard.
-        // It arms on the fetch-based-mode inclusion list inside
-        // checkSourceCredibility, not the broader
-        // hasDesignModeRequiringVisual exclusion. Requiring prev=pm keeps
-        // resume and re-entry safe: architect->sr-engineer and the sr
-        // self-loop have a non-pm predecessor and are never gated. Kept out of
-        // transitions.ts, which stays pure and fs-free (like
-        // SCOPE_DECISION_REQUIRED). Independent of the PASS-time
-        // baseline-manifest gates: different edge, different check. (E4)
+        // Source-credibility gate: fourth attestation check on the build-entry
+        // edge. It reads design/<feature>.md directly, so it works in every
+        // storage mode (no FileHandoffStorage guard), and arms on the
+        // fetch-based-mode list inside checkSourceCredibility. Pinning prev=pm
+        // keeps re-entry safe. Independent of the PASS-time baseline-manifest
+        // gates: different edge, different check.
         if (
           (nextTuple.agent === "architect" || nextTuple.agent === "sr-engineer") &&
           nextTuple.status === "In_Progress" &&
@@ -507,22 +499,12 @@ export const UPDATE_STATE_GATE_PIPELINE: readonly UpdateStateGateStep[] = [
     codes: ["REPRO_MANIFEST_MISSING"],
     run: (ctx) => {
       const { parsed, storage, prevState, prevTuple, nextTuple } = ctx;
-        // Repro-First Gate, bugfix mode only. On the fix-phase handoff
-        // sr-engineer:In_Progress → code-reviewer:In_Progress, when the
-        // feature is dispatch_mode="bugfix" but no repro manifest
-        // (qa_reports/expected-red_<feature>.txt) exists, the write is
-        // blocked — never silently skipped, never thrown. The Blocked escape
-        // edge (sr-engineer → pm) is not checked here, so escalation always
-        // stays available. Reuses hasExpectedRedManifest(): a repro test is
-        // just a declared-red test recorded in the same manifest, so there is
-        // no new file and no new predicate. File mode only: the manifest is a
-        // qa_reports/ file and dispatch_mode lives only in the handoff YAML
-        // frontmatter (SQLite never carries it), matching the cut-approval /
-        // external-refs / expected-red guards. Placed after the external-refs
-        // gate and before the review-verdict/status-mismatch gate; it guards
-        // a different edge (sr→code-reviewer, not pm→build), so no existing
-        // gate moves. Kept out of transitions.ts: this plain-text gate family
-        // is not in the TransitionRejection union. (E2)
+        // Repro-first gate, bugfix mode only: on sr-engineer:In_Progress →
+        // code-reviewer:In_Progress, block when dispatch_mode is "bugfix" and no
+        // repro manifest (qa_reports/expected-red_<feature>.txt) exists. The
+        // Blocked escape edge to pm is not checked, so escalation stays open.
+        // A repro test is a declared-red test, so hasExpectedRedManifest() is
+        // reused. File mode only: the manifest and dispatch_mode are file-only.
         if (
           storage instanceof FileHandoffStorage &&
           prevState?.dispatch_mode === "bugfix" &&
@@ -553,19 +535,12 @@ export const UPDATE_STATE_GATE_PIPELINE: readonly UpdateStateGateStep[] = [
     codes: ["REVIEW_VERDICT_STATUS_MISMATCH"],
     run: (ctx) => {
       const { parsed } = ctx;
-        // v7 — Review-Verdict/Status Mismatch Gate (c9-protocol-fields AC-5).
-        // Plain-text envelope, modeled on MISSING_EVIDENCE /
-        // MISSING_REVIEW_EVIDENCE (DR-3): NOT threaded through
-        // TransitionRejection["error"] (that union stays at 13 members).
-        // Fires ONLY when a code-reviewer write carries a review_verdict AND
-        // it disagrees with status — absence never fires (a code-reviewer
-        // FAIL write with no verdict field is legal). Polarity (DR-8):
-        // APPROVED pairs with In_Progress (code-reviewer:In_Progress → qa);
-        // CHANGES_REQUESTED pairs with FAIL (code-reviewer:FAIL → sr) —
-        // matches the existing transition matrix + review_round semantics.
-        // Keys only on the INCOMING write args, so it is storage-agnostic
-        // (DR-5) — no FileHandoffStorage guard, unlike cut-approval /
-        // external-refs which read prev-state from disk.
+        // Review-verdict/status mismatch gate: fires only when a code-reviewer
+        // write carries a review_verdict that disagrees with status. APPROVED
+        // pairs with In_Progress, CHANGES_REQUESTED with FAIL; a FAIL write with
+        // no verdict is legal. Plain-text envelope, outside the
+        // TransitionRejection union. Reads only the incoming args, so it works
+        // in every storage mode.
         if (parsed.agent_id === "code-reviewer" && parsed.review_verdict) {
           const mismatch =
             (parsed.review_verdict === "APPROVED" && parsed.status !== "In_Progress") ||
@@ -591,22 +566,12 @@ export const UPDATE_STATE_GATE_PIPELINE: readonly UpdateStateGateStep[] = [
     codes: ["REVIEWER_COMPLETED_TASKS_REJECTED", "NON_QA_COMPLETED_TASKS_REJECTED"],
     run: (ctx) => {
       const { parsed } = ctx;
-        // Reviewer completed_tasks Gate. Sibling of
-        // REVIEW_VERDICT_STATUS_MISMATCH above — plain-text envelope, keyed
-        // only on the incoming parsed args (no FileHandoffStorage guard, so it
-        // applies the same in file mode and SQLite/HTTP mode). Rejects ANY
-        // code-reviewer-stamped write carrying a non-empty completed_tasks: a
-        // reviewer must not mark tasks done, and nothing downstream would
-        // catch it (MISSING_REVIEW_EVIDENCE only reads the manifest when
-        // nextTuple.agent === "qa-engineer"). Legitimate writes are
-        // untouched: the APPROVED handoff stamps agent_id="qa-engineer" and
-        // carries the review scope in the transient review_task_ids field
-        // (completed_tasks stays empty there; growth is rejected by
-        // QA_COMPLETION_EVIDENCE_MISSING below), and the claim write carries
-        // completed_tasks=[] (zod default) so it never fires. The envelope for
-        // agent_id="code-reviewer" is kept byte-identical: it is published,
-        // cited in skill-code-reviewer.md, and pinned by
-        // test/reviewer-completed-tasks-gate.test.mjs. (C16, E32)
+        // A code-reviewer write must not carry completed_tasks: nothing
+        // downstream would catch it. Legitimate writes pass: the APPROVED
+        // handoff is stamped qa-engineer and carries scope in review_task_ids,
+        // and the claim write has completed_tasks=[]. Reads only the incoming
+        // args (every storage mode). The envelope text is published, cited in
+        // skill-code-reviewer.md and pinned by a test: keep it byte-identical.
         if (parsed.agent_id === "code-reviewer" && parsed.completed_tasks.length > 0) {
           return {
             content: [{
@@ -619,22 +584,13 @@ export const UPDATE_STATE_GATE_PIPELINE: readonly UpdateStateGateStep[] = [
             isError: true,
           };
         }
-        // Extends the reviewer-only check above to EVERY identity other than
-        // qa-engineer. QA_COMPLETION_EVIDENCE_MISSING below only diffs an
-        // incoming qa-engineer write's completed_tasks against the ON-DISK
-        // set, so ids some other role already persisted before any qa-engineer
-        // write add zero difference and escape the per-id evidence check. So
-        // this predicate is strict, deliberately NOT a set difference (the
-        // set difference is exactly the gap being closed): any non-empty
-        // completed_tasks on a write whose agent_id is present and is neither
-        // "qa-engineer" (the evidence-backed completion path) nor
-        // "code-reviewer" (handled by the branch above) is rejected, whatever
-        // the ids. `parsed.agent_id &&` stops an absent agent_id from
-        // matching; validateTransition (AGENT_ID_REQUIRED, step 1 of this
-        // pipeline) already rejects such writes, so this is only a backstop.
-        // No exemptions: an exemption on this kind of check has reopened the
-        // hole before. tw_complete_task is untouched — it has its own evidence
-        // path and never goes through tw_update_state. (E40)
+        // Every identity other than qa-engineer is rejected on any non-empty
+        // completed_tasks, whatever the ids. Strict on purpose, not a set
+        // difference against the on-disk ledger: ids persisted by another role
+        // would add no difference and slip past the evidence gate below.
+        // `parsed.agent_id &&` is a backstop; validateTransition already rejects
+        // a missing agent_id. No exemptions. tw_complete_task is unaffected.
+        // Why: specs/e260a-tools-a-h-rationale.md, "tools/handoff-orchestrator.ts — NON_QA_COMPLETED_TASKS_REJECTED".
         if (
           parsed.agent_id &&
           parsed.agent_id !== "qa-engineer" &&
@@ -660,20 +616,12 @@ export const UPDATE_STATE_GATE_PIPELINE: readonly UpdateStateGateStep[] = [
     codes: ["QA_REVIEW_TARGET_REQUIRED"],
     run: async (ctx) => {
       const { parsed, storage } = ctx;
-        // Evidence record FIRST so the PASS gate below can observe the row /
-        // file just written. Only fires when QA attaches qa_review on a
-        // PASS or FAIL write.
-        // d9-qa-review-scoped-append — scoped target resolution: the review
-        // stamp lands on review_task_ids (if non-empty), else completed_tasks
-        // (the unchanged PASS back-compat path, AC2). The former "every
-        // incomplete task in the workspace" fallback is DELETED (AC1): it
-        // fired on every FAIL write (completed_tasks is legitimately empty
-        // there per the Escalation call format) and fanned the stamp into
-        // every open task's evidence file — the D8 incident polluted 11
-        // unrelated review files. Both empty now rejects loud with
-        // QA_REVIEW_TARGET_REQUIRED before anything is recorded (AC3) —
-        // never forge evidence, never silently drop it. Keys ONLY on the
-        // incoming parsed args, so it is storage-agnostic (file + SQLite).
+        // Record QA evidence first so the PASS gate below sees the row or file
+        // just written. Fires only on a qa-engineer PASS/FAIL write with
+        // qa_review. The stamp targets review_task_ids if non-empty, else
+        // completed_tasks; both empty is rejected with QA_REVIEW_TARGET_REQUIRED
+        // before anything is recorded. Reads only the incoming args.
+        // Why: specs/e260a-tools-a-h-rationale.md, "tools/handoff-orchestrator.ts — QA_REVIEW_RECORD".
         if (
           parsed.qa_review &&
           parsed.agent_id === "qa-engineer" &&
@@ -705,42 +653,13 @@ export const UPDATE_STATE_GATE_PIPELINE: readonly UpdateStateGateStep[] = [
     codes: ["QA_COMPLETION_EVIDENCE_MISSING"],
     run: (ctx) => {
       const { parsed, storage, prevState } = ctx;
-        // QA Completion-Evidence Gate. Closes the identity-swap side door
-        // that REVIEWER_COMPLETED_TASKS_REJECTED cannot see: another agent
-        // writing with agent_id="qa-engineer" to pre-fill completed_tasks
-        // before any real QA ran, with no evidence on disk. Any
-        // qa-engineer-stamped write whose completed_tasks adds ids NOT already
-        // in the on-disk handoff's completed set must have per-id QA evidence
-        // on disk via the gates/qa-review.ts convention (hasEvidenceInFile,
-        // reused; a per-id file or a covers: line). Only new ids are checked,
-        // so the normal cumulative flow still works: ids already on disk need
-        // no fresh evidence when QA passes the full list back. Placed after
-        // the qa_review auto-record above, the same way the PASS
-        // MISSING_EVIDENCE gate sees the row just written, so a legitimate
-        // PASS/FAIL write carrying qa_review satisfies this gate with its own
-        // freshly recorded evidence; an evidence-less pre-fill (In_Progress,
-        // no qa_review) has nothing on disk and is rejected, naming the ids.
-        // No exemptions, including the APPROVED handoff
-        // (code-reviewer:In_Progress → qa-engineer:In_Progress): a forged
-        // manifest write is byte-identical to a real one, so no predicate can
-        // tell them apart, and ids persisted that way would poison the on-disk
-        // baseline so later carry-forwards pass unchecked. Instead, review
-        // scope on an APPROVED handoff travels ONLY in the transient
-        // review_task_ids field (per skill-code-reviewer.md;
-        // MISSING_REVIEW_EVIDENCE below reads it), and completed_tasks on ANY
-        // agent_id=qa-engineer write is reserved for evidence-backed QA
-        // completions. So ANY qa-engineer-stamped write that GROWS
-        // completed_tasks vs the on-disk set without per-id QA evidence is
-        // rejected, whatever the status, review_verdict, or previous tuple.
-        // Carry-forward (no new ids) never gates by design; ledgers polluted
-        // before this rule are documented, not chased. bookkeeping_write
-        // touches don't grow the ledger; other identities are
-        // REVIEWER_COMPLETED_TASKS_REJECTED's job. tw_complete_task is
-        // untouched (its own evidence path). No prevState guard: on a
-        // brand-new workspace every claimed id is new, and a first-write
-        // completion claim with no evidence is exactly what this rejects.
-        // File mode only, like the sibling attestation gates (SQLite's
-        // hasEvidence path is reports-row-based and out of scope). (E18, E32)
+        // QA completion-evidence gate: a qa-engineer write whose completed_tasks
+        // adds ids not in the on-disk set needs per-id QA evidence on disk
+        // (hasEvidenceInFile: a per-id file or a covers: line), whatever the
+        // status. Ids already on disk need none. Runs after the qa_review record,
+        // so a write's own review counts. No exemptions and no prevState guard;
+        // other identities belong to the gate above. File mode only.
+        // Why: specs/e260a-tools-a-h-rationale.md, "tools/handoff-orchestrator.ts — QA_COMPLETION_EVIDENCE_MISSING".
         if (
           storage instanceof FileHandoffStorage &&
           parsed.agent_id === "qa-engineer" &&
@@ -751,11 +670,9 @@ export const UPDATE_STATE_GATE_PIPELINE: readonly UpdateStateGateStep[] = [
           if (newIds.length > 0) {
             const ev = hasEvidenceInFile(parsed.workspace_path, newIds);
             if (ev.missing.length > 0) {
-              // Name the exact expected evidence file per offending id — the
-              // same sanitised path hasEvidenceInFile checked — plus the
-              // covers: fallback, so the writer knows precisely which file
-              // clears the gate (like VISUAL_EVIDENCE_MISSING's expectedPaths
-              // listing). (E32, E23)
+              // Name the exact expected evidence file per offending id (the
+              // path hasEvidenceInFile checked) plus the covers: fallback, so
+              // the writer knows which file clears the gate.
               const expectedPaths = ev.missing
                 .map((id) => qaEvidencePath(parsed.workspace_path, id))
                 .join(", ");
@@ -834,9 +751,8 @@ export const UPDATE_STATE_GATE_PIPELINE: readonly UpdateStateGateStep[] = [
             const visEv = hasVisualEvidenceInFile(parsed.workspace_path, parsed.completed_tasks);
             if (visEv.missing.length > 0) {
               // Name the exact expected file path per missing id and the
-              // evidence-schema version the check ran under (this is an
-              // existence check — the version is context, not a match input).
-              // (E23)
+              // evidence-schema version the check ran under (an existence
+              // check: the version is context, not a match input).
               const expectedPaths = visEv.missing
                 .map((id) => visualEvidencePath(parsed.workspace_path, id))
                 .join(", ");
@@ -854,14 +770,10 @@ export const UPDATE_STATE_GATE_PIPELINE: readonly UpdateStateGateStep[] = [
                 isError: true,
               };
             }
-            // v3.15.0 — R6 server-enforced Widget Shape Verification gate.
-            // The previous gate confirmed every required visual_<id>.md exists.
-            // This gate now verifies the contents: any unchecked `[ ]` row in
-            // `## Widget Shape Verification` rejects PASS with the full list
-            // (per AC-4: one round-trip to surface every offending widget).
-            // Backwards-compat: visual reports without the `## Widget Shape
-            // Verification` section pass through (per AC-2/AC-3 — pre-v3.15.0
-            // reports didn't have the section, so absence = no claim).
+            // Widget-shape verification: any unchecked `[ ]` row under
+            // `## Widget Shape Verification` rejects PASS, listing every
+            // offending widget in one round-trip. Reports without that section
+            // pass: older reports never had it, so absence is no claim.
             const widgetsCheck = hasUncheckedWidgets(parsed.workspace_path, parsed.completed_tasks);
             if (!widgetsCheck.ok) {
               const listing = Object.entries(widgetsCheck.uncheckedByTaskId)
@@ -877,15 +789,11 @@ export const UPDATE_STATE_GATE_PIPELINE: readonly UpdateStateGateStep[] = [
                 isError: true,
               };
             }
-            // v3.27.0 — Visual report SCHEMA validation (Constitution §3.2).
-            // Existence + widget-shape was insufficient: a prior rollout shipped a bad
-            // UI under a nominal PASS because the report carried no canonical-state
-            // or structural-assertion claims. MANDATORY when the visual gate is
-            // armed (mode != no-design): the design MUST declare
-            // `## Visual Structural Assertions`. Missing it is NOT a silent
-            // backwards-compatible fallback (the v3.26.0 bug Codex flagged) — it
-            // is its own hard error VISUAL_ASSERTIONS_REQUIRED, mirroring how a
-            // missing `## Visual Baselines` blocks at v3.16.0.
+            // Visual report schema validation. Existence and widget shape are
+            // not enough: a report without canonical-state or structural claims
+            // can pass a bad UI. When the gate is armed, the design must declare
+            // `## Visual Structural Assertions`; a missing section is its own
+            // hard error, VISUAL_ASSERTIONS_REQUIRED, never a silent fallback.
             if (armCheck.required) {
               if (!designDeclaresStructuralAssertions(parsed.workspace_path, parsed.active_feature)) {
                 return {
