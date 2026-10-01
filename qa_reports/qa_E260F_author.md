@@ -36,3 +36,52 @@ None. The Retained blocks table in the rationale file stays "none yet".
 
 ## Note for the verifier
 Comment-only: the emit and token checks show every non-comment token unchanged against bdbffaf. Dispatch pin: sr-engineer=fable; this author ran as qa-engineer (sonnet).
+
+## Review round 1 fixes
+Review `review_reports/review_T-E260F-22.md` returned CHANGES_REQUESTED (Q1, C1 required; C2, C3 minor; P1-P3 proof gaps). Fix pass T-E260F-24..37. This section is an authoring record, not a PASS; a fresh verifier still owns the verdict.
+
+| fix task | commit | scope |
+|---|---|---|
+| T-E260F-24 | 4f4dbdf | proof.mjs: P1 letter-suffixed bare ids, P2 cited-paths (every cited path must be tracked), P3 width (AC13) |
+| T-E260F-25 | e00a4c3 | e106 e108 e112 e114 e115 |
+| T-E260F-26 | 5fbb98d | e116 e117 e118 e120 |
+| T-E260F-27 | 6e70f56 | e121 e122 |
+| T-E260F-28 | 0b66710 | e123b2 e123b9 e125a e125c (C3) |
+| T-E260F-29 | 89504d8 | e126 e128 x2 e130 (C2) |
+| T-E260F-30 | ed50072 | e132 e137 x2 (C1) |
+| T-E260F-31 | d2c9acf | e148 x2 e16 e164-e167 e166 (C1) |
+| T-E260F-32 | 2a406b2 | e177a-check-cli e177a-manifest e177b x3 (C1) |
+| T-E260F-33 | 4173c81 | e178a e178b x3 e18 (C1) |
+| T-E260F-34 | 8e841ee | e180 e20-e21 e213 e22 e223 |
+| T-E260F-35 | 25b2eb0 | e23 e231 e234 e235a e235b |
+| T-E260F-36 | d64ebe6 | e239 e24 e246 e248 e250 (AC10 e246 setupLane line and the e24 line 9 fix kept) |
+| T-E260F-37 | c63464c | e26 e28; e258*/e259* and e259-lib.mjs needed no edit (not wider than 100 columns; the e258b pin is untouched and 24/24 pass) |
+
+Method: every touched comment was re-wrapped to about 90 columns (max 98), never re-joined. Headers that grew past 7 lines when re-wrapped were genuinely cut to Coded-by + at most 5 lines + the Rationale pointer; history and restated AC maps were dropped because the rationale file already holds them (a few sentences were appended there: e239, e24, e250).
+
+Dispositions:
+- Q1 (line joining defeated AC5/AC6): fixed. All 54 files re-wrapped; width max 98, median 88; the 56 formerly joined blocks were trimmed to 7 lines or fewer, none needs a Retained-blocks reason.
+- C1 (seven untracked cited paths): fixed in T-29..33, each now points at a tracked archive path; the proof's cited-paths check reports 0 untracked.
+- C2 (e126 wording): fixed in T-E260F-29.
+- C3 (e125c "three ledgers"): fixed in T-E260F-28 ("two tasks files and a receipt").
+- P1 (letter-suffixed ids), P2 (cited-paths), P3 (width): added to the proof in T-E260F-24 and now run over all files.
+
+Final proof, `node .current/e260f/proof.mjs --base bdbffaf --list-mid` on clean committed HEAD c63464c (no --done, no --changed-only):
+```
+base: bdbffaf, changed: 54 file(s)
+scope: ok
+emit: 54 files, 0 differ
+tokens: 54 files, 0 differ
+directives: 0 removed
+>20: 0
+8-20: 0 block(s)
+bare-id: 0
+cited-paths: 0 untracked
+width: 588 added comment lines, max 98 <=120, median 88 <=100
+form: ok
+paths: 0
+proof: PASS
+```
+
+Suite (AC11): `node scripts/test-lock.mjs -- npm test` on clean committed HEAD c63464c: tests 3043, pass 3040, fail 0, cancelled 0, skipped 3 (exit 0). Only this record and `.current/e260f/` state were committed after that run (no test or source change). `check-md-tables` OK.
+
