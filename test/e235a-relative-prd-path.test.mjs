@@ -1,7 +1,9 @@
 // Coded by @qa-engineer
-// Tests for specs/e235a-relative-prd-path.md AC1-AC4. In file mode `prd_path` is stored relative to the workspace, because the absolute form leaks the OS account name into committed `.current/<lane>/handoff.md` history (Constitution §6 Information hygiene), and is resolved back to absolute in memory at read time.
-// AC1 "write stores relative prd_path"; AC2 "read resolves relative prd_path to absolute"; AC3 "legacy in-bounds absolute prd_path"; AC4 "resolved-path traversal guard": an out-of-bounds value is dropped as if absent, the read never fails as a whole, and the value is never echoed (architecture DR-2/DR-3).
-// Strategy: unit-level against the compiled dist/ helpers and parse/write entry points, as in test/handoff-migration.test.mjs and test/writestate-options-object.test.mjs (architecture DR-5/OQ-1).
+// Tests for specs/e235a-relative-prd-path.md AC1-AC4. In file mode `prd_path` is stored
+// relative to the workspace, because the absolute form leaks the OS account name into
+// committed handoff history (Constitution §6), and is resolved back to absolute in memory
+// at read time; an out-of-bounds value is dropped as if absent and never echoed (AC4,
+// architecture DR-2/DR-3). Unit-level against dist/ helpers and parse/write entry points.
 // Rationale: specs/e260f-comment-rationale.md (test/e235a-relative-prd-path.test.mjs).
 
 import { test } from "node:test";

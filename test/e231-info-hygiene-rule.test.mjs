@@ -1,7 +1,9 @@
 // Coded by @qa-engineer
-// Tests that the information-hygiene and generic-citation rule bullets are present in the constitution and survive composition in every dispatch mode. Spec: specs/e231-info-hygiene-rule.md. (E231)
-// AC1 checks both bullets' key phrases verbatim in content/const-15-core-tail.md §6; AC2 checks they survive composition on all four dispatch arms. AC3-AC6 are covered elsewhere (see the rationale file).
-// Every phrase is checked against a WHITESPACE-NORMALIZED copy of the fragment (runs of whitespace collapsed to one space), because the fragment wraps prose at ~90 columns and a phrase may straddle a wrap point.
+// Tests that the information-hygiene and generic-citation rule bullets are present in the
+// constitution and survive composition in every dispatch mode (specs/e231-info-hygiene-rule.md,
+// E231). AC1 checks key phrases verbatim in content/const-15-core-tail.md §6; AC2 checks all
+// four dispatch arms; AC3-AC6 live elsewhere. Phrases are matched against a
+// WHITESPACE-NORMALIZED copy because the fragment wraps prose and a phrase may straddle it.
 // Rationale: specs/e260f-comment-rationale.md (test/e231-info-hygiene-rule.test.mjs).
 
 import { test } from "node:test";

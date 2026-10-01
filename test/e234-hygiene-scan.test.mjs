@@ -1,7 +1,9 @@
 // Coded by @qa-engineer
-// Tests for specs/e234-hygiene-scan.md AC1-AC18: the advisory information-hygiene scan run by `agc check` (tools/hygiene-scan.ts, wired in bin/agc-init.mjs runCheck()). The AC-by-AC map is in qa_reports/archive/release-v4.2.0/review_T-E234-05.md.
-// Rules: hit-bearing input is built at runtime in a temp repo under os.tmpdir() (nothing is written into this checkout); keywords are synthetic nonsense words; every hit-shaped literal is assembled by concatenation (see `shape`) so this file never trips the scan it tests (AC16 proves it on a copy of committed HEAD).
-// Hermetic env: every child run starts from `baseEnv()`, which deletes AGC_HYGIENE_KEYWORDS and isolates git from system/global config; a case needing a keyword source sets one on purpose.
+// Tests for specs/e234-hygiene-scan.md AC1-AC18: the advisory information-hygiene scan run
+// by `agc check` (tools/hygiene-scan.ts, bin/agc-init.mjs runCheck()). Hit-bearing input is
+// built at runtime in a temp repo, keywords are synthetic, and hit-shaped literals are
+// assembled by concatenation (see `shape`) so this file never trips the scan (AC16). Every
+// child run uses `baseEnv()`: no AGC_HYGIENE_KEYWORDS, git isolated from global config.
 // Rationale: specs/e260f-comment-rationale.md (test/e234-hygiene-scan.test.mjs).
 
 import { test, after } from "node:test";

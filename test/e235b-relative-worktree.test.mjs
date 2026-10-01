@@ -1,7 +1,9 @@
 // Coded by @qa-engineer
-// Regression cases for the fan-out manifest's `worktree` column, which may now be written relative to the primary checkout. Pins the resolveWorktree / isAbsoluteWorktree contract, the render-only row errors WORKTREE_EMPTY / WORKTREE_TILDE,
-// the non-fatal validate WARN, and that checkLane and lane-status behave exactly as before. (specs/e235b-relative-manifest-worktree.md AC1-AC3, AC6; specs/e235b-relative-manifest-worktree-architecture.md R1-R11; T-E235B-06/07)
-// Test names start with R1..R11 (architecture "Regression cases"). The manifest builder mirrors test/e177a-manifest.test.mjs's manifestText(); repo helpers mirror test/e177a-check-cli.test.mjs, and every fixture is a throwaway git repo under os.tmpdir().
+// Regression cases for the fan-out manifest's `worktree` column, which may be written
+// relative to the primary checkout. Pins the resolveWorktree / isAbsoluteWorktree contract,
+// the row errors WORKTREE_EMPTY / WORKTREE_TILDE, the non-fatal validate WARN, and that
+// checkLane and lane-status behave as before (specs/e235b-relative-manifest-worktree.md
+// AC1-AC3, AC6; architecture R1-R11, the test names; T-E235B-06/07). Fixtures: throwaway repos.
 // Rationale: specs/e260f-comment-rationale.md (test/e235b-relative-worktree.test.mjs).
 
 import { test } from "node:test";
