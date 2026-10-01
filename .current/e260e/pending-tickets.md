@@ -1,5 +1,7 @@
 # Pending tickets — lane e260e
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E260E-NEW-1
 title: Comment accuracy fixes in e260e test files left after the E260 trim (stale fallback claim, two dead report pointers)
@@ -18,5 +20,3 @@ body: |
   base or HEAD; repoint it or drop the pointer.
   Each fix must stay comment-only (removeComments emit byte-identical).
 ```
-
-## Applied
