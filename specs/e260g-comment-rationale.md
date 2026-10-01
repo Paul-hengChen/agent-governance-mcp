@@ -170,3 +170,19 @@ The newest registry entry at the time of the count pin was NON_QA_COMPLETED_TASK
 ## test/eval-assertions.test.mjs
 
 Spec: specs/d4-behavioral-eval-harness.md. The live runner (test/eval/run-eval.mjs) trusts the four checkers' verdicts against real model replies and spends real API dollars per run. If a checker silently regresses (for example the terse-cap exemption list drifts from Constitution section 1, or the escalation-shape key list drops a required key), the harness either fails compliant scenarios, burning budget on false negatives, or passes a real behavioural regression. This file proves each checker still does what its AC claims, with one compliant and one violating hand-written fixture per checker, before anything is spent trusting it. The file matches the `test/*.test.mjs` glob so it runs in plain `npm test` at zero API cost (AC-6).
+
+## test/feature-rollup.test.mjs
+
+Spec: specs/e113-feature-level-rollup.md (AC2-AC5). Test-label map: AC2 (seam and shape) is `t-seam-marker` and `t-provider-swap-zero-callsite`; AC3 (multi-lane sum against the hop cap) is `t-sum-against-hop-cap-exported`; AC3 plus the cross-feature regression is `t-round1-regression-no-cross-feature-sum`; AC4 (an unreadable lane is carried, not dropped or zero-filled) is `t-unreadable-lane-carried`; AC5 (the ROLL-UP INCOMPLETE banner leads the output, degrade honestly) is `t-banner-zero-matching` and `t-banner-unattributable`.
+
+The cross-feature regression is the most important test in the file. An earlier version summed every lane in the repo and reported `hop: 54, OVER BY 44` for a feature whose true total was 3; the fix is the `matchingLanes = lanes.filter(lane => lane.activeFeature === featureId)` filter in tools/feature-rollup.ts, and the test stops a future edit from silently dropping it.
+
+Why real workspaces back the "readable" lanes: `computeFeatureRollup` does not trust a `LaneListProvider`'s own `hopCount` or `activeFeature` for ticket counts. For every lane the provider reports `readable: true`, it re-reads that lane's own `.current/handoff.md` through `parseHandoff()` to get `completed_tasks`. A provider claiming `readable: true` for a workspace with no real handoff on disk is silently downgraded to `readable: false`, which would corrupt the fixtures that must stay `degraded: false`. So each lane meant to stay readable has a real temp workspace with a real handoff (written the way `test/drift-skew.test.mjs` does it); only the deliberately unreadable and unattributable lanes are synthesized `LaneInfo` objects.
+
+The extension section (ticket E132, task T-E132-05) adds the lane-registry spec's AC5 and AC6 (specs/e132-lane-registry.md) plus review-found gaps; test names carry the labels:
+
+- AC5 hand-forward 1 and 2: provider `completedTasks` preferred, N reads not 2N.
+- AC6 hand-forward 3: a historical-only match is surfaced, not summed (also gap 11, the positive control: a readable moved-on lane must still degrade and print the note).
+- gap 1 (two-sided stderr cleanliness), gap 2 (CRLF equals LF), gap 3 and 10 (refined plus adversarial combination), gap 5 (branch extraction, detached gives null), gap 8 (`flush()` control flow, two worktree lines in one block), gap 9 (porcelain terminal shapes), gap 12 (predicate parity between `computeFeatureRollup` and `renderRollupReport`).
+
+The porcelain-shape tests prepend a small real executable `git` shim on PATH instead of mocking `execFileSync`: `node:test`'s `mock.method` cannot redefine a core-module export in this codebase's compiled ESM output ("Cannot redefine property"). The same limit rules out a call-count spy on `parseHandoff`, which is why the AC5 test deletes the file the provider's `workspacePath` points at: a second read would then find nothing.

@@ -1,35 +1,10 @@
 // Coded by @qa-engineer
-// Tests for tools/feature-rollup.ts, the per-feature hop and ticket roll-up
-// across lanes (specs/e113-feature-level-rollup.md, AC2-AC5; T-E113-03).
-//
-// Spec-to-Test map:
-//   AC2 (seam/shape)                -> t-seam-marker, t-provider-swap-zero-callsite
-//   AC3 (multi-lane sum vs cap)      -> t-sum-against-hop-cap-exported
-//   AC3 + cross-feature regression  -> t-round1-regression-no-cross-feature-sum
-//     (computeFeatureRollup must sum only the lanes whose active feature is
-//     the requested one. An earlier version summed every lane in the repo and
-//     reported `hop: 54, OVER BY 44` for a feature whose true total was 3; the
-//     fix is the `matchingLanes = lanes.filter(lane => lane.activeFeature ===
-//     featureId)` filter in tools/feature-rollup.ts. This is the most important
-//     test in this file: it stops a future edit from silently dropping that
-//     filter.)
-//   AC4 (unreadable lane carried, not dropped/zero-filled) -> t-unreadable-lane-carried
-//   AC5 (ROLL-UP INCOMPLETE banner leads output, degrade-honestly)
-//                                    -> t-banner-zero-matching, t-banner-unattributable
-//
-// WHY real workspaces for "readable" lanes: computeFeatureRollup does not
-// trust a LaneListProvider's own `hopCount`/`activeFeature` for ticket counts —
-// for every lane the provider reports `readable: true`, it independently
-// re-reads that lane's own `.current/handoff.md` via parseHandoff() to obtain
-// `completed_tasks` (tools/feature-rollup.ts). A provider claiming `readable: true` for a workspace with no
-// real handoff on disk gets silently downgraded to `readable: false` by that
-// second read — which would corrupt exactly the fixtures this file needs to
-// hold `degraded: false` (the "healthy no-banner path"). So every lane this
-// file wants to stay `readable: true` in the final report is backed by a real
-// temp workspace with a real handoff, written the same way test/drift-skew.
-// test.mjs does it; only the deliberately-unreadable and
-// deliberately-unattributable lanes are synthesized LaneInfo objects with no
-// workspace behind them.
+// Tests for tools/feature-rollup.ts, the per-feature hop and ticket roll-up across lanes
+// (specs/e113-feature-level-rollup.md, AC2-AC5). The most important case is the cross-feature
+// regression: only lanes whose active feature is the requested one may be summed.
+// Lanes meant to stay `readable: true` are backed by real temp workspaces, because the roll-up
+// re-reads each lane's handoff and downgrades a provider's `readable` claim when none exists.
+// Rationale: specs/e260g-comment-rationale.md (test/feature-rollup.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -169,15 +144,10 @@ test("AC3: sums matching lanes' hop_count and compares against the imported HOP_
 // ---------- Round-1 regression: cross-feature lanes must never enter totals ----------
 
 test("round-1 regression PIN: lanes belonging to OTHER features never enter totals/capComparison (healthy no-banner path)", async () => {
-  // WHY: this is the single most important case in this file. The shipped
-  // round-1 defect summed every lane in the repo regardless of which feature
-  // it belonged to, and reported the whole-repo sum as if it were this
-  // feature's total — observed live as `hop: 54, OVER BY 44` for a feature
-  // whose true total was 3, with `degraded: false` (no banner, since every
-  // lane parsed cleanly). This fixture reproduces that exact shape at a small
-  // scale: one lane that actually belongs to the requested feature at
-  // hopCount 4, plus two lanes belonging to OTHER features at hopCount 99
-  // each (99+99 alone would be "54"-style over-cap noise if wrongly summed).
+  // WHY: the most important case in this file. The shipped round-1 defect summed every lane in the
+  // repo regardless of feature (observed live as `hop: 54, OVER BY 44` for a feature whose true
+  // total was 3, with `degraded: false`). This fixture reproduces it at small scale: one matching
+  // lane at hopCount 4 plus two lanes of OTHER features at hopCount 99 each.
   const wsMatch = await mkRealLane({ activeFeature: "rollup-target", hopCount: 4, completedTasks: ["T-1"] });
   const wsOther1 = await mkRealLane({ activeFeature: "unrelated-feature-1", hopCount: 99 });
   const wsOther2 = await mkRealLane({ activeFeature: "unrelated-feature-2", hopCount: 99 });
@@ -350,15 +320,9 @@ test("AC5: banner leads the output (line index 0) when a readable lane has no ac
 });
 
 test("AC5 (spec proof, literal): a real `git worktree list` failure (non-git directory) degrades localFallbackLaneList honestly, and computeFeatureRollup/renderRollupReport surface the banner", () => {
-  // WHY: the spec's own AC5 proof line is "unit test forces a `git worktree
-  // list` failure and asserts the banner string appears and no bare numeric
-  // 'total' line appears without it." Every other AC5 test in this file
-  // exercises the property via an injected LaneListProvider (computeFeatureRollup's
-  // seam) — this test instead forces the actual outright-failure case named in
-  // the Design section ("not a git repo, or `git worktree list` errors") by
-  // running localFallbackLaneList itself against a freshly created, non-git
-  // temp directory, then threading that through computeFeatureRollup's DEFAULT
-  // provider (no laneListProvider override) via `repoRoot`.
+  // WHY: the spec's AC5 proof line forces a `git worktree list` failure and asserts the banner
+  // appears with no bare numeric total. This test forces the real outright failure (a non-git
+  // temp directory) through the DEFAULT provider via `repoRoot`; the other AC5 tests inject one.
   const nonGitDir = fs.mkdtempSync(path.join(os.tmpdir(), "twfr-nogit-"));
 
   const laneListResult = localFallbackLaneList(nonGitDir);
@@ -400,39 +364,10 @@ test("AC5: no bare numeric total line prints without the banner across every deg
   assert.ok(totalsIdx > 0, "a Totals line should still be present, just preceded by the banner");
 });
 
-// ============================================================================
-// Extension: the lane-registry spec's AC5/AC6 (specs/e132-lane-registry.md)
-// plus the coverage gaps a code review found, all exercising
-// tools/feature-rollup.ts's own localFallbackLaneList / computeFeatureRollup /
-// renderRollupReport directly. Gaps specific to lane-registry.ts live in
-// test/e132-lane-registry.test.mjs instead. The tests above this line keep
-// their original bodies, so they still prove the earlier contract holds.
-// (T-E132-05)
-//
-// Spec-to-Test map (this extension):
-//   AC5 (hand-forward 1/2 — provider completedTasks preferred, N not 2N reads)
-//                                                   -> "AC5 (E132): ..."
-//   AC6 (hand-forward 3 — historical-only match surfaced, not summed)
-//                                                   -> "AC6 (E132): ..." (also covers gap 11,
-//        the positive control for gap 3: a readable moved-on lane must still
-//        degrade AND print the note)
-//
-// Review-found gaps covered here (labels match the test names):
-//   gap 1  (C1, two-sided stderr cleanliness)       -> "gap-1 (C1..."
-//   gap 2  (C2, CRLF == LF result)                  -> "gap-2 (C2..."
-//   gap 3 & 10 (C3 refined + adversarial combo)      -> "gap-3 & gap-10..."
-//   gap 5  (branch extraction incl. detached->null) -> "gap-5..."
-//   gap 8  (flush() control flow, two worktree lines in one block)
-//                                                   -> "gap-8..."
-//   gap 9  (porcelain terminal shapes)              -> "gap-9..."
-//   gap 12 (predicate parity between computeFeatureRollup and
-//           renderRollupReport)                     -> "gap-12 (Q2..."
-//
-// WHY fake `git` shims instead of mocking execFileSync: see
-// test/e132-lane-registry.test.mjs's file header — node:test's mock.method
-// cannot redefine a core-module export in this codebase's real-ESM compiled
-// output ("Cannot redefine property"), so every porcelain-shape test below
-// prepends a small, real, executable `git` on PATH instead.
+// Extension: the lane-registry spec's AC5/AC6 (specs/e132-lane-registry.md) and the coverage
+// gaps a code review found, exercising localFallbackLaneList, computeFeatureRollup and
+// renderRollupReport directly. Test names carry the AC and gap labels. Porcelain-shape tests
+// put a small real `git` shim on PATH instead of mocking: see test/e132-lane-registry.test.mjs.
 
 function fakeGitCat(content) {
   const binDir = fs.mkdtempSync(path.join(os.tmpdir(), "twfr-fakegit-"));
@@ -455,15 +390,10 @@ function withPath(binDir, fn) {
 // ---------- AC5: provider completedTasks preferred, N not 2N reads (E132 hand-forward 1/2) ----------
 
 test("AC5 (E132): computeFeatureRollup prefers the provider's completedTasks over a second parseHandoff read — proven by deleting the on-disk handoff after the provider is built, so a stray re-read surfaces loudly instead of silently succeeding", async () => {
-  // WHY this proof shape instead of a call-count spy: ESM named exports
-  // (parseHandoff, imported into tools/feature-rollup.ts) are not mockable
-  // in this codebase's compiled output (see file header). Deleting the file
-  // the provider's own workspacePath points at is a sharper, more
-  // deterministic proof anyway: if computeFeatureRollup performs the second
-  // read the 2N-reads defect (hand-forward item 2) fixed, it will find
-  // NOTHING on disk (readable flips to false, ticketsCompleted becomes [])
-  // instead of quietly recovering the provider's value — a regression fails
-  // loudly no matter which direction it takes.
+  // WHY this proof shape instead of a call-count spy: ESM named exports are not mockable in this
+  // compiled output. Deleting the file the provider's workspacePath points at is sharper: a second
+  // read (the 2N-reads defect) would find nothing (readable flips to false, ticketsCompleted
+  // becomes []) instead of quietly recovering the provider's value, so a regression fails loudly.
   const ws = await mkRealLane({ activeFeature: "ac5-feature", hopCount: 3, completedTasks: ["ON-DISK-1", "ON-DISK-2"] });
 
   const provider = providerFor([
