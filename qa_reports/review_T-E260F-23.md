@@ -1,6 +1,6 @@
 # QA verifier record: T-E260F-23 (lane e260f, E260 comment-only trims of test/e1*, test/e2*)
 
-covers: T-E260F-01, T-E260F-08..T-E260F-37 (open lane tasks; T-E260F-02..07 voided)
+covers: T-E260F-01, T-E260F-08, T-E260F-09, T-E260F-10, T-E260F-11, T-E260F-12, T-E260F-13, T-E260F-14, T-E260F-15, T-E260F-16, T-E260F-17, T-E260F-18, T-E260F-19, T-E260F-20, T-E260F-21, T-E260F-22, T-E260F-23, T-E260F-24, T-E260F-25, T-E260F-26, T-E260F-27, T-E260F-28, T-E260F-29, T-E260F-30, T-E260F-31, T-E260F-32, T-E260F-33, T-E260F-34, T-E260F-35, T-E260F-36, T-E260F-37
 
 Verifier: fresh qa-engineer (sonnet), did not author the lane. Verified on clean committed HEAD fc5d4d5, base bdbffaf.
 
@@ -26,3 +26,7 @@ Phase 3: skipped (no test files authored; verifier only, per dispatch brief).
 - Process note: a prior judge's stash+drop lost a governance write; this verification used no stash.
 
 Verdict: PASS.
+## 2026-10-01T10:23:48.991Z — PASS — by qa-engineer
+
+Fresh verifier PASS on HEAD fc5d4d5: proof PASS (54 files, width max 98 median 88), negative control on a throwaway clone fails the proof, AC10 and e24:9 verified, scope contained, AC11 suite 3040/3043 pass, 0 fail, 3 skipped. See qa_reports/review_T-E260F-23.md.
+
