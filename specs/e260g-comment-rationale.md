@@ -186,3 +186,37 @@ The extension section (ticket E132, task T-E132-05) adds the lane-registry spec'
 - gap 1 (two-sided stderr cleanliness), gap 2 (CRLF equals LF), gap 3 and 10 (refined plus adversarial combination), gap 5 (branch extraction, detached gives null), gap 8 (`flush()` control flow, two worktree lines in one block), gap 9 (porcelain terminal shapes), gap 12 (predicate parity between `computeFeatureRollup` and `renderRollupReport`).
 
 The porcelain-shape tests prepend a small real executable `git` shim on PATH instead of mocking `execFileSync`: `node:test`'s `mock.method` cannot redefine a core-module export in this codebase's compiled ESM output ("Cannot redefine property"). The same limit rules out a call-count spy on `parseHandoff`, which is why the AC5 test deletes the file the provider's `workspacePath` points at: a second read would then find nothing.
+
+## test/handoff-write-arg-guard.test.mjs
+
+Spec: `specs/handoff-write-arg-guard.md`. Spec-to-test map (the test names carry the same labels):
+
+- AC-1, valid args accepted: `t-ac1-valid-root-path-accepted`, `t-ac1-valid-feature-string-accepted`.
+- AC-2, a `.current` workspace_path rejected: `t-ac2-current-basename-rejected`, `t-ac2-exact-error-message`, `t-ac2-non-current-basename-accepted`, `t-ac2-current-as-parent-not-rejected`.
+- AC-3, the `[object Object]` sentinel rejected: `t-ac3-object-sentinel-rejected`, `t-ac3-exact-error-message`, `t-ac3-valid-feature-id-not-rejected`.
+- AC-4, no corrupt write produced: `t-ac4-no-nested-current-dir`, `t-ac4-sentinel-not-persisted`.
+- Regression guards, the older refines still fire: `t-reg-pass-requires-qa-engineer` (PASS needs agent_id qa-engineer), `t-reg-prd-path-traversal`.
+
+Why: these guards are the only server-side barrier against two silent corruptions: a doubly nested `.current/.current/handoff.md` from a misdirected workspace_path, and the JavaScript object-stringification artefact `[object Object]` persisted verbatim as the feature sentinel. Both break constitution section 7 (fail loud) and section 3.1 (reject invalid tw_update_state writes).
+
+Strategy: the tests drive the real MCP dispatch boundary (dist/index.js as a stdio server) so the full Zod, handler and ZodError-catch pipeline runs; the schema is not exported, so this is the only public way to exercise `UpdateStateArgs`. The spawn pattern follows `test/teamwork-lite.test.mjs`. The `callServer` helper resolves as soon as every id-bearing request has a response; `waitMs` is only a failure ceiling, because a fixed sleep flaked when the full suite's concurrency slowed the server's cold start (ticket E15).
+
+## test/gates-expected-red.test.mjs
+
+Specs: `specs/c15-expected-red-manifest.md`. The check works like the other evidence-existence checks (MISSING_EVIDENCE, VISUAL_EVIDENCE_MISSING): sr-engineer declares intentionally red tests in `qa_reports/expected-red_<feature>.txt`; qa-engineer diffs the actual run against it and records the disposition under a `## Expected-Red Diff` H2 in `qa_reports/review_<id>.md`; the server checks that the section exists and nothing more.
+
+Spec-to-test map:
+
+- AC-1 (manifest artifact and format): not re-tested here; the file format is a plain-text convention, not machine-parsed (spec Out of Scope).
+- AC-4 arm check (`hasExpectedRedManifest`): U1-U5.
+- AC-4 disposition check (`hasExpectedRedDisposition`): U6-U12.
+- AC-4 PASS gate composition (`EXPECTED_RED_DIFF_MISSING`): I1-I4.
+- AC-5 file-mode only: I5, I5b.
+
+I1-I4 go through the real `handleUpdateState`, the way `test/qa-flow.test.mjs` does (C1-07). The server's recordReview step runs before the evidence checks and appends `qa_review` verbatim to `qa_reports/review_<id>.md`, so a `qa_review` containing `## Expected-Red Diff` becomes the on-disk disposition section, exactly as in the real sr-engineer and qa-engineer flow.
+
+I5 follows the convention of `test/cut-approval-gate.test.mjs` (S1, XS1): the gate is wrapped in `storage instanceof FileHandoffStorage` at the orchestrator call site, so a plain fake storage object fails the check, and no SQLite DB is needed because the predicate is a pure instanceof test. I5b pins the real call sites: a refactor that hoists the expected-red check out of the file-mode guard would silently break AC-5 otherwise (ticket e2-bugfix-repro-gate, task T-E2-02).
+
+## test/handoff-migration.test.mjs
+
+Three in-body blocks were shortened; the comments now carry the contract and the cited spec holds the rest (`specs/server-scope-decision-gate.md`). The v6 to v10 test (AC-8/B8) lists every field that migration must not invent: next_role, resume_of, review_verdict, dispatch_pins, dispatched_at, dispatch_mode, evidence_schema, cut_approved_source, dispatch_mechanism and dispatch_mechanism_tier. The runner walks current to target stepwise, so the public API cannot isolate one intermediate step. The next_role/resume_of/review_verdict inverse test belongs to the c9-protocol-fields ticket (AC-3): these three are single-hop directives with the same lifetime as the pending_notes lines they replaced, so a stale `next_role: architect` from three writes ago must not linger.

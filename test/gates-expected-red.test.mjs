@@ -1,20 +1,8 @@
 // Coded by @qa-engineer
-// Tests for the expected-red manifest check in gates/expected-red.ts, unit
-// and integration. It works like the other evidence-existence checks
-// (MISSING_EVIDENCE / VISUAL_EVIDENCE_MISSING):
-// sr-engineer declares intentionally-red tests in a feature-scoped manifest
-// (qa_reports/expected-red_<feature>.txt); qa-engineer diffs the actual suite
-// run against it and records the disposition under a `## Expected-Red Diff`
-// H2 in qa_reports/review_<id>.md; the server checks EXISTENCE of that
-// section only (never runs the suite, never parses the manifest rows).
-//
-// Spec-to-Test map:
-//   AC-1 (manifest artifact/format)                    -> covered by sr-engineer's own output; not re-tested here (file-format is a plain-text convention, not machine-parsed, per spec Out of Scope)
-//   AC-4 arm check (hasExpectedRedManifest)             -> U1-U5
-//   AC-4 disposition check (hasExpectedRedDisposition)  -> U6-U12
-//   AC-4 PASS gate composition (EXPECTED_RED_DIFF_MISSING) -> I1-I4
-//   AC-5 file-mode only                                 -> I5
-// (specs/c15-expected-red-manifest.md, T-C15-07, T-C15-08)
+// Tests for the expected-red manifest check in gates/expected-red.ts (specs/c15-expected-red-manifest.md):
+// U1-U12 unit-test the arm and disposition predicates, I1-I5 the PASS gate. The server checks only that a
+// `## Expected-Red Diff` section EXISTS in qa_reports/review_<id>.md; it never runs the suite or parses manifest rows.
+// Rationale: specs/e260g-comment-rationale.md (test/gates-expected-red.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -170,14 +158,9 @@ test("U13: empty task id list -> present:false (no ids to satisfy the gate)", ()
 
 // ============================================================================
 // I1-I4 — Integration: handleUpdateState composition (EXPECTED_RED_DIFF_MISSING)
-//
-// These drive the REAL state-write orchestrator (tools/handoff-orchestrator.ts
-// handleUpdateState), not a re-implementation of its predicate, the same way
-// test/qa-flow.test.mjs does (C1-07). qa_review text is passed on the PASS
-// write; the server's recordReview step (which runs BEFORE the evidence checks)
-// appends it verbatim into qa_reports/review_<id>.md, so a qa_review string
-// containing "## Expected-Red Diff" becomes the on-disk disposition section —
-// exactly the real sr-engineer/qa-engineer flow, not a test-only shortcut.
+// Drives the real orchestrator, as test/qa-flow.test.mjs does. The qa_review text on the PASS write is appended
+// to qa_reports/review_<id>.md before the evidence checks run, so a "## Expected-Red Diff" string there becomes
+// the on-disk disposition section.
 // ============================================================================
 
 async function seedQaInProgress(ws, feature) {
@@ -299,12 +282,8 @@ test("I4: partial disposition — manifest armed, one of two PASS'd ids' file ca
 
 // ============================================================================
 // I5 — AC-5: file-mode-only guard (SQLite-mode skip)
-//
-// Mirrors the established convention (test/cut-approval-gate.test.mjs S1/XS1):
-// the gate is wrapped in `storage instanceof FileHandoffStorage` at the
-// orchestrator call site. A plain fake storage object fails that check,
-// proving the guard — no real SQLite DB needed since the predicate is a pure
-// instanceof test, not a storage-mode branch inside a shared code path.
+// The gate sits behind `storage instanceof FileHandoffStorage` (convention of test/cut-approval-gate.test.mjs);
+// a plain fake storage object fails that check, so no SQLite DB is needed.
 // ============================================================================
 
 test("I5: gate is wrapped in instanceof FileHandoffStorage — a non-file storage fails the check (SQLite-mode skip, AC-5)", () => {
@@ -323,16 +302,10 @@ test("I5: gate is wrapped in instanceof FileHandoffStorage — a non-file storag
 });
 
 test("I5b: source pins the guard — both hasExpectedRedManifest call sites are FileHandoffStorage-guarded (e2-bugfix-repro-gate re-baseline)", () => {
-  // Why: I5 proves the predicate itself; this pins that the ACTUAL call
-  // site(s) in tools/handoff-orchestrator.ts use it (a refactor that hoists
-  // the expected-red check out of the file-mode guard would silently break
-  // AC-5 otherwise). There are TWO hasExpectedRedManifest(parsed.workspace_path...)
-  // call sites: the bugfix reproduction check, earlier in the file, guarded
-  // by a compound multi-line `if (storage instanceof FileHandoffStorage && ...)`,
-  // and the PASS-path check, guarded by a single-line literal. A bare
-  // `src.indexOf(...)` lands on the first one, so this test tells the two
-  // sites apart explicitly instead of assuming there is only one.
-  // (e2-bugfix-repro-gate, T-E2-02)
+  // Why: I5 proves the predicate; this pins the real call sites in tools/handoff-orchestrator.ts. There are two
+  // hasExpectedRedManifest(parsed.workspace_path...) calls: the bugfix reproduction check behind a multi-line
+  // `if (storage instanceof FileHandoffStorage && ...)`, and the PASS-path check behind a single-line literal.
+  // A bare `src.indexOf(...)` lands on the first one, so the test tells the two apart.
   const root = path.resolve(import.meta.dirname, "..");
   const src = fs.readFileSync(path.join(root, "tools", "handoff-orchestrator.ts"), "utf-8");
 
