@@ -86,3 +86,26 @@ For each trim task: `proof.mjs --changed-only` (with `--through` while later ran
 ## Rationale moved
 
 `specs/e260i-comment-rationale.md` gained, for `test/context-budget.test.mjs`: the spec-to-test map of the file header, the lean always-on bundle cap history, the omitConstitution floor note, the hook test isolation note, the design-arm constitution floor history, the teamwork coordinator bundle cap history, the pm and sr-engineer skill token cap histories, the non-design constitution floor history, the constitution-conditional-load test map and sentinel notes, the phase 2 test map; for `test/render-structure.test.mjs`: the header and detector rationale, the composed-body helper, the code-span exclusion, the hermetic baseline fixture, the Evidence-Citation pin, the structural sweep, collect-then-assert, the history-fixture meta-test and the reconstructed-call helper.
+
+## Round 1 fixes
+
+Fix commit: `c837f25`, applied on top of the review commit.
+
+| item | what changed |
+|---|---|
+| R1 | the rationale spec's lean cap-history intro now says the lean path loads core- and design-tagged fragments (chain-tagged ones are left out), checked against the lean composition call and the segment-inclusion rule; the "ships on the lean path" sentence now says core-tagged. The history rows stay as the record of the bump comments, and the intro says so. |
+| R2 | the e43 row now cites the Decision section of the archived E43 review report (path confirmed to exist; its Decision heading records the fencing rejection) instead of the backlog row. |
+| cap-rule ownership | the lean cap rule comment, the design-arm floor comment and the spec intro now say raises are qa-owned unless noted sr-owned. |
+| coordinator bundle comment | dropped the causal "so"; restored the base meaning ("injected on every dispatch; the full coordinator bundle is the worst case"; the coordinator "must keep the full section 3.2" on a design feature). |
+| conditional-load header | restored the reconcile-rule carve-out in plain words (section 3.2 minus the reconcile rule, plus the section 3.1 visual bullets), same line count. |
+| dangling label | removed the "Cap history by ticket:" line. |
+| fixture paragraph | the hermetic-baseline paragraph now names `content/skill-release-engineer.md` for "that file". |
+| this file | the directive narrowing is attributed to T-E260I-06; the "Rationale moved" list now includes the file-header map, lean, omitConstitution, hook isolation, design-arm, coordinator and skill cap histories. |
+
+Test files: comments only; new lines wrapped to 100 columns or fewer.
+
+Proof (`node .current/e260i/proof.mjs`): scope ok, emit 2/0 differ, leaves 2/0 differ, >20: 0, 8-20: 0, bare-id 0, directives, form, hygiene, width, reflow, pinned ok, `proof: PASS`.
+
+Targeted tests (context-budget, render-structure, e122): 76 tests, 76 pass, 0 fail.
+
+Full suite on the clean fix commit via the test lock: tests 3043, pass 3040, fail 0, cancelled 0, skipped 3.
