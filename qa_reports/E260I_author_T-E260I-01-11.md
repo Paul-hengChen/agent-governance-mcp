@@ -22,7 +22,7 @@ pinned: ok
 proof: PASS
 ```
 
-`scope: ok` is printed first. `--list-mid` lists no block, so the "Retained blocks" table of the rationale spec carries a single "none" row. The DIRECTIVE pattern of the proof script was narrowed in T-E260I-05..07 to `\bc8 (?:ignore|disable|enable)` (prose such as "the c8 growth above" matched the bare form); neither owned file has a real directive comment at base, accepted by the coordinator.
+`scope: ok` is printed first. `--list-mid` lists no block, so the "Retained blocks" table of the rationale spec carries a single "none" row. The DIRECTIVE pattern of the proof script was narrowed in T-E260I-06 to `\bc8 (?:ignore|disable|enable)` (prose such as "the c8 growth above" matched the bare form); neither owned file has a real directive comment at base, accepted by the coordinator.
 
 ## Full suite on the clean committed HEAD
 
@@ -85,4 +85,4 @@ For each trim task: `proof.mjs --changed-only` (with `--through` while later ran
 
 ## Rationale moved
 
-`specs/e260i-comment-rationale.md` gained, for `test/context-budget.test.mjs`: the non-design constitution floor history, the constitution-conditional-load test map and sentinel notes, the phase 2 test map; for `test/render-structure.test.mjs`: the header and detector rationale, the composed-body helper, the code-span exclusion, the hermetic baseline fixture, the Evidence-Citation pin, the structural sweep, collect-then-assert, the history-fixture meta-test and the reconstructed-call helper.
+`specs/e260i-comment-rationale.md` gained, for `test/context-budget.test.mjs`: the spec-to-test map of the file header, the lean always-on bundle cap history, the omitConstitution floor note, the hook test isolation note, the design-arm constitution floor history, the teamwork coordinator bundle cap history, the pm and sr-engineer skill token cap histories, the non-design constitution floor history, the constitution-conditional-load test map and sentinel notes, the phase 2 test map; for `test/render-structure.test.mjs`: the header and detector rationale, the composed-body helper, the code-span exclusion, the hermetic baseline fixture, the Evidence-Citation pin, the structural sweep, collect-then-assert, the history-fixture meta-test and the reconstructed-call helper.

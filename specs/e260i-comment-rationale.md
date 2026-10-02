@@ -32,7 +32,7 @@ The header also recorded the compose-not-strip change: the file used to call `st
 
 ### Lean always-on bundle cap history
 
-The lean-bundle test asserts `lean <= <cap>` in approximate tokens (characters divided by 4). Each raise was a qa-owned re-measure with the cap set to the exact measured size (the "zero headroom" convention), except the early raises that kept some headroom. The lean path loads core-tagged and chain-tagged constitution fragments and the lite coordinator skill, so an edit to any of them moves the figure. Ticket codes are those of the then-current backlog rows.
+The lean-bundle test asserts `lean <= <cap>` in approximate tokens (characters divided by 4). Each raise was a re-measure (qa-owned unless a row says sr-owned) with the cap set to the exact measured size (the "zero headroom" convention), except the early raises that kept some headroom. The lean path loads core- and design-tagged constitution fragments (chain-tagged ones are left out) and the lite coordinator skill, so an edit to any of them moves the figure. The rows below record what each bump comment said at the time. Ticket codes are those of the then-current backlog rows.
 
 | ticket or release | cap change | what the raise absorbed |
 |---|---|---|
@@ -55,13 +55,13 @@ The lean-bundle test asserts `lean <= <cap>` in approximate tokens (characters d
 | e24-exemptions-manifest | 4297 to 4485 (+188) | the section 2 "Build-gate exemptions" bullet in `const-05-core-standards.md`; exact |
 | e25-git-vocabulary | 4485 to 4544 (+59) | stash and stash-pop added to the sanctioned git list and the destructive file-checkout form clarified in `const-15-core-tail.md`; exact |
 | e59-const6-waiver-clause | 4544 to 4667 (+123) | the section 6 "Dependency audit at build gate" rewrite: the "waived in the PR description" escape became a pre-dated advisory-record disposition (advisory id, decision, re-review trigger) binding every build-running role; exact |
-| e43-test-file-ask-at-dispatch | 4667 to 4868 (+201) | the three-branch rewrite of the section 2 "Conditional test writing" bullet (230 to 1032 characters), bought deliberately because the one-sentence form was unexecutable for a Task-dispatched qa-engineer; fencing the causal clause as rationale was considered and rejected with the numbers in hand (see the backlog row for that ticket); exact |
+| e43-test-file-ask-at-dispatch | 4667 to 4868 (+201) | the three-branch rewrite of the section 2 "Conditional test writing" bullet (230 to 1032 characters), bought deliberately because the one-sentence form was unexecutable for a Task-dispatched qa-engineer; fencing the causal clause as rationale was considered and rejected with the numbers in hand (see the Decision section of `qa_reports/archive/e43-test-file-ask-at-dispatch/review_T-E43-02.md`); exact |
 | e130-lane-default | 4868 to 4912 (+44) | an edit to the hand-edit rule in `const-05-core-standards.md` (a net shrink) and a new sentence in the Document Priority paragraph of `const-15-core-tail.md` (a larger growth); exact |
 | e178a-integrator-role | 4912 to 5157 (+245) | the section 6 amendment in `const-15-core-tail.md`: the `git fetch` clause, the sub-bullet forbidding `commit --amend`, the integrator-only git-ops grant and the tool-internal-ops sub-bullet; the same delta appears in the design-arm, non-design and teamwork floors; exact |
 | E231 | 5157 to 5415 | a rule telling every role what it may never write in any durable output (comment, report, commit message), in the same core-tagged fragment; exact |
 | E258 | 5415 to 5548 | the Comment-discipline bullet in `const-15-core-tail.md`; exact |
 
-Why the growth was accepted: each bullet is core- or chain-tagged and ships on the lean path by design; the bumps track proportionate rule growth, not a blowout.
+Why the growth was accepted: each bullet is core-tagged and ships on the lean path by design; the bumps track proportionate rule growth, not a blowout.
 
 ### omitConstitution floor
 
@@ -301,7 +301,7 @@ A backtick immediately before the marker marks an inline code-span example of bu
 
 ### Hermetic baseline fixture
 
-The soundness test used to build its baseline by reading repository history (a history show of the pre-fix commit), which needs that commit object in the clone. CI uses a shallow checkout and failed with an invalid-object error while developer machines with deep clones passed, so the test depended on clone depth rather than on the code under test. The fix embeds the two known-broken spans as literals (`BASELINE_EXCERPT_MKDIR_P`, lines 119-120 of that file, and `BASELINE_EXCERPT_DRIFT_BASELINE`, lines 126-129), verified byte-for-byte against a deep-clone history show before the swap with both detectors' finding counts and content unchanged. It is a fixture swap, not a weakened guard: the excerpts exercise the same code paths (`RATIONALE_SPAN_RE`, `findAsymmetricRationaleSpans`, `applyTextTransforms` plus `findLineGlueFindings`) on the identical bytes, and omitting the rest of the file cannot change either detector's output because both work on local context (one span, or one rendered line).
+The soundness test used to build its baseline by reading repository history (a history show of the pre-fix commit), which needs that commit object in the clone. CI uses a shallow checkout and failed with an invalid-object error while developer machines with deep clones passed, so the test depended on clone depth rather than on the code under test. The fix embeds the two known-broken spans as literals (`BASELINE_EXCERPT_MKDIR_P`, lines 119-120 of `content/skill-release-engineer.md`, and `BASELINE_EXCERPT_DRIFT_BASELINE`, lines 126-129), verified byte-for-byte against a deep-clone history show before the swap with both detectors' finding counts and content unchanged. It is a fixture swap, not a weakened guard: the excerpts exercise the same code paths (`RATIONALE_SPAN_RE`, `findAsymmetricRationaleSpans`, `applyTextTransforms` plus `findLineGlueFindings`) on the identical bytes, and omitting the rest of the file cannot change either detector's output because both work on local context (one span, or one rendered line).
 
 The excerpts are frozen. They say "step 8's `git add`" and "step 8's AC4 SKIP branch" because they predate the release-gate-ordering change that split step 8 into 8a (commit and push branch), 8b (CI gate) and 8c (tag and push). Do not edit the strings to say 8a, 8b or 8c: they exist only to feed the detectors a known historical glue shape, never to assert about the live SOP, which is why the test stayed green through the rename and is correctly absent from the expected-red manifest of that ticket. Editing them would break the byte-for-byte provenance claim without buying anything.
 

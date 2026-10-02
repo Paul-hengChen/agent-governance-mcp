@@ -188,8 +188,9 @@ test("DR-5 guard (T-A12-09): no literal {{PARTIAL:...}} token may appear in any 
 // --- reduction (AC2) -------------------------------------------------------
 
 test("AC2: lean always-on bundle is below the raw baseline and within target (<= 5548 ~tok)", () => {
-  // Cap rule: each raise is a qa-owned re-measure, and the cap is set to the exact measured size
-  // (zero headroom). Bump history: specs/e260i-comment-rationale.md (test/context-budget.test.mjs).
+  // Cap rule: each raise is a re-measure (qa-owned unless noted sr-owned), and the cap is the
+  // exact measured size (zero headroom).
+  // Bump history: specs/e260i-comment-rationale.md (test/context-budget.test.mjs).
   const liteSkill = fs.readFileSync(path.join(ROOT, "content", "skill-coordinator-lite.md"), "utf-8");
   const SEP = "\n\n---\n\n";
   const raw = approxTokens(CONSTITUTION + SEP + liteSkill);
@@ -552,7 +553,8 @@ test("AC7: exactly two balanced rationale fences, both outside §3.x", () => {
 
 test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the measured floor (≤ 10057 ~tok)", () => {
   // WHY: the design arm keeps design-only fenced text, so this floor sits above the non-design one.
-  // Each cap is the exact re-measured value (chars/4 estimator), zero headroom, a qa-owned bump.
+  // Each cap is the exact re-measured value (chars/4 estimator), zero headroom; bumps are
+  // qa-owned unless noted sr-owned.
   // Bump history and saving margins: specs/e260i-comment-rationale.md, design-arm floor history.
   const raw = approxTokens(CONSTITUTION);
   const stripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));
@@ -565,9 +567,9 @@ test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the 
 });
 
 test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 20434 ~tok)", () => {
-  // WHY: the constitution ships on every dispatch, so the coordinator bundle is the worst case.
+  // WHY: constitution injected on every dispatch; the full coordinator bundle is the worst case.
   // Composed like buildPromptForRole: stripped constitution + SEP + stripped skill body.
-  // The coordinator is a chain role, so even on a design feature it keeps the full §3.2.
+  // The coordinator is a chain role, so on a design feature it must keep the full §3.2.
   // Caps are exact re-measured values (chars/4), zero headroom unless the history says so:
   // specs/e260i-comment-rationale.md, teamwork coordinator bundle cap history.
   const skillCoord = readSkillFile("skill-coordinator.md");
@@ -627,8 +629,8 @@ test("AC9/AC-P2-3: fullDetail retains both example lists verbatim (design-arm-aw
 // SURVIVING strippers is pinned above (T-GTS-07/AC4).
 
 // ============================================================================
-// constitution-conditional-load: on a non-design feature the visual governance (§3.2 and the
-// §3.1 visual bullets) is left out of the dispatch; a design-armed feature loads it whole.
+// constitution-conditional-load: on a non-design feature the visual governance (§3.2, minus the
+// reconcile rule, and the §3.1 visual bullets) is left out; a design-armed feature loads it whole.
 // The arm signal is the one the server PASS gates use (hasDesignModeRequiringVisual).
 // Spec: specs/constitution-conditional-load.md.
 // Rationale: specs/e260i-comment-rationale.md (test/context-budget.test.mjs).
@@ -894,7 +896,6 @@ test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is
   // like production (origin tags, then rationale, stripped); the non-design side composes without
   // the design fragments. The cap is the exact measured size (zero headroom) and the design-only
   // saving must stay at least 2080 ~tok, since core and chain edits land on both arms.
-  // Cap history by ticket:
   // Rationale: specs/e260i-comment-rationale.md (test/context-budget.test.mjs).
   const ratStripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));         // design-arm path: 10057 (E258 re-baseline)
   const nonDesign = approxTokens(stripRationale(stripOriginTags(composeConstitution({ chain: true, design: false })))); // non-design path: 7959 (E258 re-baseline)
