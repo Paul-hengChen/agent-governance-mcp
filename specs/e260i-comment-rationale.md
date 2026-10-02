@@ -106,6 +106,47 @@ The AC8 design-arm test measures `stripRationale(stripOriginTags(CONSTITUTION))`
 | E231 | 9666 to 9924 | the information-hygiene and generic-citation rule in the same core fragment; pairing back to 2098 |
 | E258 | 9924 to 10057 | the Comment-discipline bullet in `const-15-core-tail.md` |
 
+### Teamwork coordinator bundle cap history
+
+The design-arm coordinator test composes the bundle like `buildPromptForRole`: `stripRationale(stripOriginTags(CONSTITUTION))`, a separator, then `stripRationale(stripOriginTags(body))` for the coordinator skill, measured with chars/4. The coordinator is a chain role, so on a design feature it keeps the full section 3.2 (the false-PASS incident was a coordinator-authored accept-policy, so section 3.2 binds the coordinator on design work) and this worst-case bundle is the design-arm size. The six design-only marker pairs are not stripped on this arm, so the bundle grew at the phase-2 rebaseline. Each bump is qa-owned (sr-owned where noted) and set to the exact re-measured value, zero headroom, except where a row says otherwise. Constitution-side growth is the same delta as in the design-arm constitution floor history above.
+
+| ticket or release | cap change | what happened |
+|---|---|---|
+| constitution-conditional-load phase 2 | rebaselined to 7703 | measured exact on the working tree |
+| v3.28.0 | 7703 to 7768 | the design-sourced-assets line in section 1 plus the matching sr-engineer skill rule (marker-line cost counts on this arm) |
+| v3.40.0 | 7768 to 7987 | the Baseline manifest gate bullet (design-only fence) plus the qa-visual Step A.0 enforcement note |
+| pm-cut-approval-gate | 7987 to 8160 | the cut-approval stop-condition entry in the coordinator Auto-Routing section; measured 8109, so about 51 tokens of editing headroom (the one row with headroom) |
+| governance-tag-strip | 8160 down to 8078 | origin tags are now stripped from both constitution and skill body first, matching production; the coordinator skill carried three origin fences (Visual Verdict Boundary, Drift Reconcile, Subagent Token Observability); the headline saving of this feature for the worst-case per-dispatch bundle |
+| cut-approval-coordinator-attestation | 8078 to 8635 | the Cut-Approval Gate bullet in `const-08-chain-31-mid.md` plus the coordinator stop-condition 6 dedup and self-check rewrite; the handoff note said 8625, qa re-measured 8635 |
+| pm-repair-resume-routing (v3.47.0) | 8635 to 9050 | the Amend-Resume Edge bullet plus the coordinator Auto-Routing stop-condition 7 entry (the coordinator carries `resume_of` onto the routing write when relaying a PM amendment) |
+| a13-section1-polish | 9050 to 9106 | the Terse/Watermark rewrite in `const-01-core-head.md`; the coordinator skill was untouched |
+| a11-escalation-grammar | 9106 to 9545 | the canonical Escalation call format and WHEN/DO/ELSE bullets plus the coordinator Escalation Routes table conversion |
+| b8-external-ref-ledger | 9545 to 9699 | the section 7 rewrite plus a coordinator Auto-Routing stop condition for `EXTERNAL_REFS_UNRESOLVED` |
+| c8-crash-resume-protocol | 9699 to 10774 | 48 additive lines in the coordinator skill (the `dispatch_pins` convention, the Pinned-tier expectation, a new `## Crash-Resume Protocol` section of three steps, a Crash detection row), spec-mandated and purely additive, no constitution change |
+| c7-version-assertion-ownership | 10774 to 10879 | the Test ownership bullet rewrite (about 420 characters net); the c8 growth stacks unchanged |
+| c9-protocol-fields | 10879 to 11290 | the constitution-side growth of that ticket (+303) plus the coordinator Auto-Routing, Escalation Routes and Gate Summary prose rewrite (`next_role` and `resume_of` as first-class fields) |
+| c14-dispatch-pins | 11290 to 11415 | the pin-override bullet (+76) plus a rewrite of three `dispatch_pins` passages in the coordinator skill |
+| c5-c18-watermark-configcache | 11415 to 11445 | the coordinator Correction strategy prose rewrite (about +30), distinguishing absent (append) from mismatched (strip the wrong trailing line, then append the canonical one) |
+| c17-dispatch-brief-template | 11445 to 11815 | the Dispatch Brief Template subsection (a fenced template of six invariant lines plus framing) and the repointed `prompt=` phrasing; the handoff note said about 11815, confirmed exact |
+| b9-token-budget-brake | 11815 to 12247 | the Token Budget Brake subsection after Subagent Token Observability plus a Token budget brake Escalation Routes row; no schema bump, no server-side gate |
+| a12-partials-limits-registry | 12247 to 12538 | the constitution-side growth (+291: Limits table and reference-by-name rewrites); the coordinator skill does not adopt the partial mechanism |
+| a12-followup-qa-round-name | 12538 to 12547 | the `qa_round` name-reference growth (+8), constitution side only |
+| d2-server-brake-accounting | 12547 to 13046 | the `hop` cap row and `HOP_CAP_EXCEEDED` bullet in `const-01-core-head.md` plus the coordinator hop-counter rewrite (server-tracked `hop_count`), a Hop counter scope paragraph and a hop-cap Escalation Routes row |
+| d5-server-side-stale-dispatch-detection | 13046 to 13298 | coordinator prose only: a Stale-dispatch detection row, a fresh-session pointer on the Crash detection row, an intro rewrite, and a new step 0 in the Crash-Resume Protocol |
+| d6-host-capability-compose-axis | no bump | the monolithic coordinator skill file was retired; this cap now measures the historical everything-ships bundle, the full-capability composition (`taskTool: true` reproduces the monolith byte for byte), not the lean in-server default |
+| e1-feature-scoped-state-design | 13298 to 13537 | the Feature-Scope Gate note in the Fallback Playbook plus a `FEATURE_LEASE_HELD` Escalation Routes row in `coord-03-core-fallback.md` |
+| e4-design-source-credibility-gate | 13537 to 13669 | the Source-credibility gate stop-condition row in `coord-03-core-fallback.md` |
+| e10-lease-override | 13669 to 14333 | the Lease-Override and Bookkeeping-Write bullets (+665); the coordinator skill was untouched |
+| e7-governed-git-surface (sr-owned) | 14333 to 14544 | the section 6 sanctioned-git-ops whitelist bullet (+211 stripped); only the release-engineer skill, which is not in this bundle, gained a pointer |
+| e14-e16-release-hardening (sr-owned) | 14544 to 14740 | the single-role judge dispatch sentences (+160) plus a pointer-only sentence on the `coord-03-core-fallback.md` Amend-Resume relay row (about 36) |
+| e5-intake-tiering | 14740 to 15958 | the Cut-Approval Auto-Tier bullet (+428) plus the coordinator Backlog Intake Loop section, auto-tier writer action and cut-approval-gate row amendment in `coord-03` and the Cheapest-Compliant-Path Intake step 4a in `coord-07`; the handoff notes said 15953 and 15958; growth +1218 is proportionate to about 1780 plus 3800 characters before stripping |
+| e18-write-provenance | 15958 to 16532 | the Stamp-Provenance and QA Completion-Evidence bullets (+574); the coordinator skill was untouched |
+| e24-exemptions-manifest | 16532 to 16720 | the Build-gate exemptions bullet (+188) |
+| e25-git-vocabulary | 16720 to 16779 | the section 6 git-ops bullet edit (about +59) |
+| e59-const6-waiver-clause | 16779 to 16898 | the Dependency-audit bullet rewrite (+119) |
+| e40-nonqa-completed-tasks-write-gate | 16898 to 17281 | the Non-QA Completed-Tasks Gate row (+383); no coordinator fragment touched |
+| e72-claim-vs-state-diff | 17281 to 17498 | the Claim-vs-state mismatch Escalation Routes row plus its Known non-mismatches note in `coord-03-core-fallback.md`; the constitution floor is untouched |
+
 ### Skill token cap histories (pm and sr-engineer)
 
 Both tests measure the body as production composes it, `stripRationale(stripOriginTags(expandSkill(body)))` after removing frontmatter, and assert `~tok <= cap`. Same zero-headroom rule as the lean bundle: a raise is a qa-owned re-measure set to the exact figure unless a row says otherwise. The pm test title still says 4376 while the asserted cap is 4401.

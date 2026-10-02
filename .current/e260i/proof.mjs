@@ -24,7 +24,7 @@ const ALLOWED = [/^specs\/e260i-[^/]+$/, /^qa_reports\/[^/]*E260I[^/]*$/, /^revi
 const FORBIDDEN = ["content", "test/fixtures", "test/eval", "templates", "docs", "specs/fanout-*.md", "CHANGELOG.md", "package.json",
   "CLAUDE.md", "AGENTS.md", ".antigravityrules", ".current/history", "dist", "tools", "gates", "prompts",
   "schema", "lib", "guards", "transport", "bin", "scripts", "index.ts"];
-const DIRECTIVE = /@ts-|eslint-|istanbul|c8 |prettier-ignore|__PURE__|@vite|@vitest/;
+const DIRECTIVE = /@ts-|eslint-|istanbul|\bc8 (?:ignore|disable|enable)|prettier-ignore|__PURE__|@vite|@vitest/;
 // Bare-id (AC7): after removing id tokens (E/AC/DR/T- ids, range forms such as E1A-1..7, e-slugs)
 // and joiners, nothing is left.
 const ID_TOKEN = /\b(?:E\d+[A-Za-z]?(?:-\d+(?:\.\.\d+)?)?|AC-E\d+[A-Za-z]?-\d+(?:\.\.\d+)?|AC-?\d+[A-Za-z]?|DR-?\d+[A-Za-z]?|T-[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*(?:\.\.\d+)?|e\d+[a-z0-9-]*)\b/g;
