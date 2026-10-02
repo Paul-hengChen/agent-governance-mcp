@@ -10,7 +10,7 @@ Blocks of 8 to 20 counted lines that stay in the tests, each with a one-line rea
 
 | file | line at HEAD | counted | reason |
 |---|---|---|---|
-| — | — | — | none yet: filled in as trim tasks land |
+| — | — | — | none: every block was cut to 7 or fewer counted lines (proof `--list-mid` lists no 8-20 block) |
 
 ## test/context-budget.test.mjs
 
