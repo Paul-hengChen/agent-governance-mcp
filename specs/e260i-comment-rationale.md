@@ -71,6 +71,41 @@ The size-delta test measures `buildPromptForRole` with and without `omitConstitu
 
 `runHook()` runs the SessionStart hook against a throwaway workspace with a `.current/` marker. Before the fix it used the repo itself as the project directory, so the hook wrote its cross-process dedup marker into the repo's own `.current/`. That marker is read from disk by the server by design, so a later test process (the teamwork-lite AC3b test, spawning the real server against the same root inside the 120-second window) saw a fresh marker, substituted the sentinel for the constitution and failed its constitution-header assertion. This was a test-infra defect, not a product bug. The fix loosened no assertion; the hook derives its content root from its own file location, not from the project directory variable.
 
+### Design-arm constitution floor history
+
+The AC8 design-arm test measures `stripRationale(stripOriginTags(CONSTITUTION))` with the test's own chars/4 estimator and asserts a cap (final 10057) plus a saving of at least 240 (raw minus stripped). The design arm keeps the design-only fenced text, so this floor sits above the non-design floor. Each bump was qa-owned (sr-owned where noted) and set to the exact re-measured value with zero headroom. A core-tagged edit lands on both arms, so the design-only saving stays put; the saving figures below are raw minus stripped.
+
+| ticket or release | cap change | what happened |
+|---|---|---|
+| constitution-conditional-load phase 2 | rebaselined to 4239 | three more design-only fence pairs (six pairs, twelve marker lines); the markers are not stripped on the design arm, so the figure grew; raw 4311; the non-design path saves about 1830 |
+| v3.28.0 | 4239 to 4304 | the design-sourced-assets line in section 1, inside a design-only fence |
+| v3.40.0 | 4304 to 4523 | the Baseline manifest gate bullet in section 3.1 (design-only fence) |
+| governance-tag-strip | 4523 down to 4487 | the build now strips origin tags first, so the test composes like production; measuring raw-only would have failed at 4735 against the old cap |
+| cut-approval-coordinator-attestation | 4487 to 4957 | the Cut-Approval Gate bullet in `const-08-chain-31-mid.md`, chain-tagged |
+| pm-repair-resume-routing (v3.47.0) | 4957 to 5260 | the Amend-Resume Edge bullet in the same fragment; saving 273 (raw 5533) |
+| a13-section1-polish | 5260 to 5316 | the Terse/Watermark rewrite in `const-01-core-head.md` (output-length policy, two-row watermark table with the `fable` tier); raw 5589; saving 273 |
+| a11-escalation-grammar | 5316 to 5561 | the canonical Escalation call format and WHEN/DO/ELSE bullets in `const-05-chain-mid.md`; raw 5834 |
+| b8-external-ref-ledger | 5561 to 5616 | the section 7 External-reference policy rewrite in `const-15-core-tail.md`; raw 5889 |
+| c7-version-assertion-ownership | 5616 to 5721 | the Test ownership bullet rewrite (about 420 characters net) in `const-05-core-standards.md`; raw 5994 |
+| c9-protocol-fields | 5721 to 6024 | the Escalation-call-format rewrite, the Amend-Resume and code-reviewer-verdict rewrite, and one rewording in `const-12-chain-r10-s4.md`; raw 6297 |
+| c14-dispatch-pins | 6024 to 6100 | the pin-override bullet in `const-01-core-head.md`; raw 6373 |
+| a12-partials-limits-registry | 6100 to 6391 | the new Limits table in `const-01-core-head.md` plus reference-by-name rewrites in four fragments; raw 6664 |
+| a12-followup-qa-round-name | 6391 to 6399 | the `qa_round` name-reference rewrite in `const-06-chain-31-head.md`; raw 6672 |
+| e10-lease-override | 6399 to 7064 | the Lease-Override and Bookkeeping-Write bullets in section 3.1; raw 7362; saving 298 |
+| e7-governed-git-surface (sr-owned) | 7064 to 7275 | the section 6 sanctioned-git-operations whitelist bullet in `const-15-core-tail.md`; unfenced because the exactly-two-rationale-fences test forbids a third, so its full text counts; raw 7573 |
+| e14-e16-release-hardening (sr-owned) | 7275 to 7435 | the single-role judge dispatch charter sentences appended to the Amend-Resume Edge bullet |
+| e5-intake-tiering | 7435 to 7863 | the Cut-Approval Auto-Tier bullet (about 1780 characters); the handoff notes said 7859 and 7863, qa re-measured 7863 |
+| e18-write-provenance | 7863 to 8437 | the Stamp-Provenance and QA Completion-Evidence bullets (about 602 approximate tokens before tag stripping); raw 8790; saving 353 |
+| e24-exemptions-manifest | 8437 to 8625 | the Build-gate exemptions bullet in `const-05-core-standards.md`, same delta as the lean path |
+| e25-git-vocabulary | 8625 to 8685 | the git stash addition and checkout clarification in the section 6 bullet; raw 9038; saving 353 |
+| e59-const6-waiver-clause | 8685 to 8804 | the Dependency-audit bullet rewrite (a pre-dated advisory-record disposition replaces the PR-description waiver); raw 9170; saving 366 |
+| e40-nonqa-completed-tasks-write-gate | 8804 to 9187 | the Non-QA Completed-Tasks Gate row in `const-08-chain-31-mid.md`, core-tagged; raw 9567; saving 380 |
+| e43-test-file-ask-at-dispatch | 9187 to 9374 | the three-branch rewrite of the section 2 test-file rule; the pairing with the non-design floor is unchanged at 2098 |
+| e130-lane-default | 9374 to 9421 | a shrink in `const-05` plus a growth in `const-15`, both core; pairing still 2098 |
+| e178a-integrator-role | 9421 to 9666 | the section 6 amendment (git fetch clause, `commit --amend` forbidden sub-bullet, integrator-only grant, tool-internal-ops sub-bullet); the pairing drifted to 2097 by rounding, not by a design-only regression |
+| E231 | 9666 to 9924 | the information-hygiene and generic-citation rule in the same core fragment; pairing back to 2098 |
+| E258 | 9924 to 10057 | the Comment-discipline bullet in `const-15-core-tail.md` |
+
 ### Skill token cap histories (pm and sr-engineer)
 
 Both tests measure the body as production composes it, `stripRationale(stripOriginTags(expandSkill(body)))` after removing frontmatter, and assert `~tok <= cap`. Same zero-headroom rule as the lean bundle: a raise is a qa-owned re-measure set to the exact figure unless a row says otherwise. The pm test title still says 4376 while the asserted cap is 4401.
