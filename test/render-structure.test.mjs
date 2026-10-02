@@ -151,26 +151,11 @@ test("T-E69-02 AC: content/skill-release-engineer.md renders glue-free via build
 });
 
 // ---------------------------------------------------------------------------
-// Behavioural pin for the Evidence-Citation Convention and the CHANGELOG citation check (T-E8795-02; E87/E95).
-//
-// WHY a golden-refresh + cap-bump ALONE would not catch a regression: the
-// compose-golden fixture and the context-budget floor both PASS just as
-// happily if the new normative text were silently dropped from the source
-// files — a refreshed golden simply re-captures whatever the composer
-// currently emits, and a lower cap only gets easier to clear. Neither proves
-// the convention text actually reaches a dispatched agent. This block asserts
-// the positive (the two conventions render, in both bundles that carry them,
-// at both fullDetail settings) AND the inverse (fenced rationale is stripped
-// at fullDetail=false, and — since stripOriginTags runs unconditionally on
-// every dispatch regardless of fullDetail — zero raw `rationale:`/`origin:`
-// HTML-comment markers ever survive into a rendered bundle at fullDetail=false,
-// the mode every buildPromptForRole/tw_switch_role dispatch actually uses).
-//
-// Also the regression guard for the mid-round asymmetric-fence defect
-// sr-engineer hit and fixed (block-style fences instead of inline): an
-// asymmetric fence here would either fail to strip cleanly at fullDetail=false
-// (leaking rationale prose or a marker) or glue the heading/bullet onto its
-// neighboring line — either failure mode reds one of the assertions below.
+// Behavioural pin for the Evidence-Citation Convention and the CHANGELOG citation check (E87, E95).
+// A golden refresh plus a cap bump would not catch a silently dropped convention: the golden just
+// recaptures whatever the composer emits. This block asserts the text renders in both bundles at
+// both fullDetail settings, rationale is stripped and no raw rationale or origin marker survives
+// at fullDetail=false, and no fence glues a heading or bullet onto its neighbour.
 // ---------------------------------------------------------------------------
 
 test("T-E8795-02 AC: coord-03 Evidence-Citation Convention (E87) renders at fullDetail=false, rationale stripped, zero raw markers", () => {
@@ -237,28 +222,10 @@ test("T-E8795-02 AC: the E87 fence is block-style, not asymmetric — no glue fi
 });
 
 // ---------------------------------------------------------------------------
-// Class-wide structural sweep — every content/{skill-,const-,coord-}*.md
-// fragment on disk, source-level. This is the single assertion that covers
-// "all 11 role SOPs" (9 tw_switch_role roles + the 7 coord-*.md fragments that
-// compose skill-coordinator.md for `teamwork` + skill-coordinator-lite.md for
-// `teamwork-lite`) plus the 15 const-*.md constitution fragments, in one pass,
-// independent of any render-path wiring.
-//
-// CLOSED DEBT (was escalated to pm in qa_reports/review_T-E69-02.md — OUT OF
-// SCOPE for the original render-structure ticket (E69), which touched only content/skill-release-
-// engineer.md): content/skill-pm.md carried 2 live asymmetric spans and
-// content/skill-qa-engineer.md and content/skill-architect.md carried 1 each —
-// same defect class as that ticket (E69), discovered by this test but tracked rather than
-// fixed at the time. a follow-up (E75, T-E75-01) relocated all 4 fences (newline/whitespace
-// only, prose byte-identical — independently verified by code-reviewer and
-// qa-engineer, review_reports/review_T-E75-01.md and
-// qa_reports/review_T-E75-02.md), paying the debt to zero. The allowlist below
-// is now empty (`{}`) rather than removed: it stays a live, zero-tolerance
-// assertion — any asymmetric span appearing anywhere in content/ going
-// forward, in these files or any other, reds the suite immediately. This is a
-// STRONGER guard than the 4-site exemption it replaces, not a weaker one: the
-// prior version tolerated exactly these 4 sites and would only catch a 5th; the
-// empty map tolerates none.
+// Class-wide structural sweep over every skill, const and coord fragment in content/, at source
+// level and independent of render-path wiring. The allowlist below is empty on purpose: the
+// earlier debt (four asymmetric spans in the PM, QA and architect SOPs) was paid by relocating
+// the fences, and the empty map stays as a zero-tolerance guard for any asymmetric span.
 // ---------------------------------------------------------------------------
 
 const KNOWN_ASYMMETRIC_SPAN_COUNTS = {};
@@ -319,15 +286,9 @@ const EXPECTED_RENDER_GLUE_COUNTS = {
 };
 
 test("cross-SOP render sweep (tw_switch_role): glue-finding counts match the tracked debt list exactly, for every role", () => {
-  // Collect-then-assert (fence follow-up, E75/T-E75-02): iterate every role fully BEFORE any
-  // assertion, then compare the whole map in one assert.deepEqual. A
-  // per-iteration assert.equal would fail-fast on the first mismatching role
-  // (alphabetically/insertion-order first is "pm") and never exercise the
-  // rest of the roles in that run — exactly what happened while this ratchet
-  // was red during the fence follow-up (E75; code-reviewer verified architect/qa-engineer separately
-  // by hand because the loop never reached them). Collecting first means a
-  // single run always reports every role's actual count, not just the first
-  // one to differ.
+  // Collect-then-assert: iterate every role before any assertion and compare the whole map once.
+  // A per-iteration assert would fail fast on the first mismatching role and never run the rest,
+  // so a single run reports every role's actual count.
   const actual = {};
   for (const role of Object.keys(ROLE_TO_SKILLFILE)) {
     const resp = JSON.parse(switchRole(role, ROOT));
@@ -379,45 +340,11 @@ test("constitution fragments: all 4 chain x design compose combinations are glue
 });
 
 // ---------------------------------------------------------------------------
-// History-fixture meta-test (T-E77-02; docs/backlog.md:200, 2026-08-18 amendment, folded into the same
-// cut/dispatch as T-E77-01 above by human decision — same file, same qa
-// review surface): class-wide meta-test asserting that NO file under test/
-// reads repository HISTORY as a fixture — a pinned sha, `git show
-// <rev>:<path>`, or `git log` used to source expected test data. This is
-// exactly the class the first fix (T-E77-01) fixed one instance of (the `git show
-// ffa4082:content/skill-release-engineer.md` call two sections above, before
-// this ticket).
-//
-// SCOPE TRAP (recorded in the row, restated here per the row's own
-// instruction): do NOT ban `git` outright. test/feature-lease.test.mjs,
-// test/context-budget.test.mjs, test/e16-judge-dispatch-charter.test.mjs,
-// test/release-staging.test.mjs, and test/verify-release.test.mjs all invoke
-// git legitimately — reading WORKING-TREE state (status, diff --cached,
-// ls-files, rev-parse HEAD/@{u}, init/add/commit/tag/push/config/checkout/
-// remote/reset against a throwaway fixture repo the test itself created) —
-// or merely regex-match SOP prose that *mentions* a git command as a string
-// under test (e.g. release-staging.test.mjs:1571 asserting the SOP defines
-// PREV_TAG via `` `git describe --tags --abbrev=0` ``: that is a string
-// literal being checked with .includes(), never an actual git invocation).
-// The predicate below is "reads history as a fixture", not "calls git" — a
-// coarser guard false-positives on all five files, which, per the lesson of an earlier over-broad guard (E74),
-// lesson is worse than no guard: it trains readers to ignore it.
-//
-// The detector purposely does NOT do a flat textual grep of the whole file
-// for the word "git" (the over-broad-grep trap, E74) — it looks for actual subprocess
-// invocations whose git subcommand is `show`/`log`, or whose argument is a
-// bare pinned commit sha, using a small tokenizer that strips comments and
-// string/regex literal contents first so:
-//   (a) a COMMENT that merely quotes or describes such a call (e.g. this
-//       very file's own provenance note for the first fix (T-E77-01) two sections above, which
-//       literally spells out the old `execFileSync("git", ["show", ...])`
-//       call for provenance) is never mistaken for a live call site, and
-//   (b) a regex literal containing a bare backtick or quote character (e.g.
-//       `BULLET_RE` above, `` /-\s(?:\*\*|`|\[[ xX]\])/g ``) never desyncs
-//       the scanner into treating the rest of the file as "inside a string"
-//       (hit and fixed during authorship: a naive quote-only tokenizer
-//       swallowed real `//` comments for the next ~30 lines because of
-//       exactly this backtick).
+// History-fixture meta-test: no file under test/ may read repository history as a fixture (a
+// pinned sha, or a history lookup used to source expected data). The predicate is that, not
+// "calls git": other tests use git on working-tree or throwaway-repo state, and a coarser guard
+// would false-positive on them. The scan strips comments and treats literal contents as opaque.
+// Rationale: specs/e260i-comment-rationale.md (test/render-structure.test.mjs).
 // ---------------------------------------------------------------------------
 
 function isRegexLiteralContext(lastSignificant) {
@@ -656,14 +583,9 @@ test("T-E77-02 meta-test: no file under test/ reads repository history as a fixt
   );
 });
 
-// Assembles the reconstructed pre-fix invocation text from parts at runtime
-// (never as one static contiguous `execFileSync("git", [...` literal in THIS
-// file's own source) so the history-fixture sweep test above (T-E77-02) -- which scans this
-// same file among test/*.mjs -- does not mistake this guard-the-guard demo
-// DATA for a live call site in render-structure.test.mjs itself. The
-// assembled STRING VALUE handed to findHistoryFixtureReads below is
-// byte-identical to the real pre-fix line either way; only how it is
-// spelled out in THIS file's source changes.
+// Builds the pre-fix invocation text from parts at runtime, never as one contiguous literal in this
+// file's source, so the history-fixture sweep above (which scans this file too) does not mistake
+// this demo data for a live call site. The assembled string value is byte-identical either way.
 function assembleReconstructedCall(execFn, bin, subArgs, opts) {
   return `const baselineRaw = ${execFn}(\n  ${JSON.stringify(bin)},\n  ${JSON.stringify(subArgs)},\n  ${JSON.stringify(opts)},\n);\n`;
 }
