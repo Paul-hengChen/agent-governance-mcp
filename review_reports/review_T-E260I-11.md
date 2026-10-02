@@ -118,3 +118,60 @@ No findings. Comment-only; the transpiled output of both files is byte-identical
 CHANGES_REQUESTED — the proof is sound and the trim is otherwise good, but the moved rationale states a false present-tense fact about the lean bundle's composition (R1) and redirects the e43 fencing-rejection evidence to a record that does not contain it (R2). Both are small spec-only fixes; the recommended comment nits can ride along in the same round.
 
 Follow-up ticket filed in `.current/e260i/pending-tickets.md`: E260I-NEW-1, about two test titles whose stated caps lag their asserts. The test-title drift is out of scope for a comment-only lane.
+
+## Round 2 — CHANGES_REQUESTED — by code-reviewer
+
+Range reviewed: the round-1 fix diff (the review commit to HEAD `a1d7eae`; fix commit `c837f25`, evidence commit `741f400`). Each round-1 item was checked against the code and the base text of `test/context-budget.test.mjs`, not against the author's summary. Only `test/context-budget.test.mjs`, `specs/e260i-comment-rationale.md`, the author evidence file and lane bookkeeping changed; `test/render-structure.test.mjs` and `.current/e260i/proof.mjs` are unchanged since round 1.
+
+## Summary
+- R2 is resolved. R1 is resolved in the intro paragraph but not in the second sentence it named: the "Why the growth was accepted" line now says every bullet is core-tagged, which is false for three rows.
+- The cap-ownership fix introduced a new false attribution: the lean intro now says raises are qa-owned unless a row says sr-owned, but the lean e7 row, sr-owned at base, carries no tag.
+- All recommended items (coordinator "so" and "even", the reconcile-rule carve-out, the dangling label, the missing antecedent, the evidence attribution and list) are fixed and read correctly against the code.
+- Proof lane-wide: `proof: PASS`, exit 0 (scope ok, emit 2/0 differ, leaves 2/0 differ, >20: 0, 8-20: 0, bare-id 0, directives, form, hygiene, width, reflow, pinned ok). The three file tests (context-budget, render-structure, e122): 76/76 pass, exit 0 observed.
+- Verdict: CHANGES_REQUESTED. Both fixes are one edit each in `specs/e260i-comment-rationale.md`; no test file needs to change.
+
+## AC Completeness
+AC1, AC2, AC3, AC4, AC5, AC7, AC8, AC11, AC12, AC13 — implemented — unchanged from round 1; re-confirmed by the lane-wide proof run at HEAD. Added test comment lines are all 100 columns or fewer; no added line carries a home path, URL, sha or history-command text.
+AC6 — partial — R2 fixed; R1 is half fixed (F1 below), and the ownership fix added a wrong attribution (F2 below).
+AC9, AC10 — not judged here (verifier).
+
+## Correctness
+
+### Required
+
+**F1 (R1 not fully resolved) — `specs/e260i-comment-rationale.md:64`: "each bullet is core-tagged and ships on the lean path by design".**
+- Round 1 asked for "core- and design-tagged" at this line. The fix wrote "core-tagged", which is still false for rows in the same table:
+  - v3.31.0, the section 1 self-converge relaxation clause: now in `content/const-04-design-surgical.md`, design-tagged.
+  - v3.28.0, the design-sourced assets line: `content/const-02-design-mvp.md`, design-tagged (the row itself says the design-only line counted).
+  - cut-approval-coordinator-attestation: the Cut-Approval Gate bullet is in `content/const-08-chain-31-mid.md`, chain-tagged.
+- Checked at runtime against `composeConstitution({ chain: false, design: true })`: "Self-converge" and "Design-sourced assets" are present (design fragments ship on lean); "Cut-Approval Gate" is absent.
+- Fix: drop the tag claim ("each bullet ships on the lean path by design; the bumps track proportionate rule growth, not a blowout"), or say "core- or design-tagged". The intro's sentence that the rows record what each bump comment said at the time already covers the cut-approval row.
+
+**F2 (introduced by the fix) — `specs/e260i-comment-rationale.md:35` with `:54`, and the pointer at `test/context-budget.test.mjs:191-192`.**
+- The intro now says each raise was "qa-owned unless a row says sr-owned", and the test comment says "qa-owned unless noted sr-owned". No row of the lean table is tagged, so both now state that e7-governed-git-surface was a qa-owned bump.
+- Base said "e7-governed-git-surface (sr-owned bump per T-E7-03, AC4)" in the lean test. Round 1 had flagged that this row lacks the tag the other three tables carry (design-arm `:95`, coordinator `:140`, non-design `:220`).
+- Fix: change the lean row's ticket cell at `:54` to "e7-governed-git-surface (sr-owned)". With that, the test comment is accurate as written.
+
+### Round-1 items verified
+- R2 — fixed. `qa_reports/archive/e43-test-file-ask-at-dispatch/review_T-E43-02.md` is tracked and its "Decision: rationale-fencing the §2 bullet — considered, REJECTED" heading holds the fencing rejection.
+- R1 intro (`:35`) — fixed: "core- and design-tagged ... (chain-tagged ones are left out)" matches `includeSegment` for `{ chain: false, design: true }`.
+- Coordinator comment (`test/context-budget.test.mjs:570-572`) — base meaning restored.
+- Conditional-load header (`:632-633`) — "§3.2, minus the reconcile rule, and the §3.1 visual bullets" matches the manifest: the reconcile rule sits in the chain-tagged `const-12-chain-r10-s4.md`, which ships on non-design chain dispatch, and section 3.2 and the visual bullets are chain-design tagged.
+- Design-arm ownership (`:556-557`) — accurate: that table tags e7 and e14-e16 sr-owned, matching base.
+- Dangling label — removed. Spec `:304` — now names `content/skill-release-engineer.md`.
+- Author evidence — directive narrowing attributed to T-E260I-06; the "Rationale moved" list now names every moved section.
+
+## Quality
+No new findings beyond F1 and F2. The split cap-rule comment (`:191-193`) is three lines and stays under the trim threshold.
+
+## Architecture
+No architecture spec. Unchanged from round 1.
+
+## Security
+No findings. The only sha added in this round is the fix commit in the lane's own author evidence, which is not a comment line (AC11 covers comment lines).
+
+## Performance
+No findings. Comment-only; the proof's emit check shows byte-identical transpiled output.
+
+## Verdict
+CHANGES_REQUESTED — two small false statements remain in the moved rationale: the "Why the growth was accepted" sentence still makes a tag claim that three rows contradict (round-1 R1 not fully resolved), and the new ownership wording makes the sr-owned e7 lean bump read as qa-owned. Both are single-cell or single-clause edits in `specs/e260i-comment-rationale.md`.
