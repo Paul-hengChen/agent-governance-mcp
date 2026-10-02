@@ -1,72 +1,9 @@
 // Coded by @qa-engineer
-// Tests for the backlog row that asked for a render-structure check (E69, docs/backlog.md:192) — the render-structure
-// regression test the row mandates in the SAME cut as the fence relocation:
-// "assert on applyTextTransforms({fullDetail:false}) output that every
-// numbered step header and top-level bullet still begins a line. ONE
-// assertion covers the whole class across all 11 role SOPs, not just this
-// file; nothing in the suite renders any SOP through the strip pass today."
-//
-// Spec-to-Test map (backlog row is the spec — mini-chain, no specs/<feature>.md):
-//   Fence-relocation criterion (E69; content/skill-release-engineer.md)
-//     -> "T-E69-01 AC", "detector soundness against the ffa4082 baseline"
-//   Class-wide regression-test criterion (E69; all 11 role SOPs + constitution)
-//     -> "structural sweep", "cross-SOP render sweep (switchRole)",
-//        "cross-SOP render sweep (buildPromptForRole)", "constitution fragments"
-//
-// WHY: `stripRationale`'s trailing `\n?` (prompts/text-transforms.ts:28) exists
-// to swallow the blank line a BLOCK-style rationale fence would otherwise leave
-// behind. The contract this depends on (prompts/text-transforms.ts:33-54,
-// comment only — never enforced in code) is that a rationale fence is
-// SYMMETRIC: either both `<!-- rationale:start -->` and `<!-- rationale:end -->`
-// sit alone on their own source line (the intended block shape), or neither
-// does. An ASYMMETRIC fence — `start` glued inline to trailing prose, `end`
-// followed immediately by `\n` — makes the `\n?` eat a newline that was load-
-// bearing: whatever prose preceded `start` ends up fused, same rendered line,
-// directly onto whatever line followed `end`. When that following line is a
-// numbered step header (`7b. **...`) or a top-level bullet (`- **...`, `` - ` ``,
-// `- [ ]`), the fused result no longer parses as a list item or heading at all
-// — exactly the two release-engineer sites the backlog row was filed over (E69, backlog.md:192),
-// found by hand, twice, across two review rounds.
-//
-// Two independent detectors are used and cross-checked against each other and
-// against the known ffa4082 baseline (2 findings, byte-reproduced) before being
-// trusted against the rest of the corpus (guard against the guard rotting —
-// dispatch brief for this ticket, and review_reports/review_T-E69-01.md's own
-// "detector sound on a known positive" methodology):
-//   1. `findAsymmetricRationaleSpans` — SOURCE-level, purely structural: for
-//      every `<!-- rationale:start -->...<!-- rationale:end -->` span, flag it
-//      when `end` is immediately followed by `\n` (the exact trigger condition
-//      for the newline-eating replace) AND `start` is NOT preceded only by
-//      whitespace back to the previous newline (i.e. `start` is inline). This
-//      needs no guess at bullet/header syntax and has zero false-positive risk
-//      — it is the root-cause invariant, not a symptom pattern.
-//   2. `findLineGlueFindings` — RENDER-level (post `applyTextTransforms`,
-//      `fullDetail:false`), symptom-level: per rendered line, flags a numbered
-//      step header (`\d+[a-z]?\. \*\*`) or a top-level bullet marker (`- **`,
-//      `` - ` ``, `- [ ]`/`- [x]`) that appears somewhere OTHER than the line's
-//      own leading (post-indent) position — i.e. it does not begin its own
-//      rendered line. This is what the backlog row's AC literally asks for,
-//      and it is exercised through BOTH real render paths (`tw_switch_role` /
-//      tools/role.ts, and the MCP prompt / prompts/build.ts) per the dispatch
-//      brief's instruction that both paths matter — `tw_switch_role` is the
-//      one the two live glued-line instances (E69) actually shipped through (prompts/text-
-//      transforms.ts:1-18, note on the shared render path, E51).
-//
-// Both detectors agree exactly on every finding below (cross-validated during
-// authorship): the 2 known ffa4082 sites, 0 in the fixed content/skill-release-
-// engineer.md, and — newly discovered by this test, never audited before because
-// nothing rendered any OTHER role SOP through the strip pass — 3 more live sites
-// in content/skill-pm.md (x2) and content/skill-qa-engineer.md (x1) and
-// content/skill-architect.md (x1). Those 4 were OUT OF SCOPE for this ticket
-// (the two earlier fence tickets touched only content/skill-release-engineer.md; T-E69-01/T-E71-01) — see the
-// "KNOWN, TRACKED debt" escalation in qa_reports/review_T-E69-02.md. They were
-// tracked as an exact ratchet (not silently excluded) until a follow-up ticket (E75, T-E75-01)
-// relocated all 4 fences — newline/whitespace only, prose byte-identical,
-// verified by both code-reviewer and qa-engineer (review_reports/review_T-E75-01.md,
-// qa_reports/review_T-E75-02.md) — paying the debt to zero. The ratchet below
-// (KNOWN_ASYMMETRIC_SPAN_COUNTS) is now the empty allowlist `{}`: any asymmetric
-// span found anywhere in content/, now or in the future, reds the suite
-// immediately — a strictly stronger guard than the 4-site exemption it replaces.
+// Render-structure check for backlog row E69: after the strip pass (applyTextTransforms with
+// fullDetail:false) every numbered step header and top-level bullet must still begin its own line.
+// An asymmetric rationale fence (start inline after prose, end followed by a newline) makes the
+// strip fuse two lines; two detectors, one source-level and one render-level, catch it.
+// Rationale: specs/e260i-comment-rationale.md (test/render-structure.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -82,15 +19,9 @@ const { buildPromptForRole, composeConstitution } = await import(path.join(ROOT,
 const { applyTextTransforms, stripOriginTags, stripRationale } = await import(path.join(ROOT, "dist", "prompts", "text-transforms.js"));
 const { composeSkill, hostCapabilitiesFor } = await import(path.join(ROOT, "dist", "prompts", "skill-manifest.js"));
 
-// Composed skill BODY (frontmatter stripped), pre-render-pass — the same shape
-// prompts/build.ts hands to applyTextTransforms. Deliberately NOT
-// buildPromptForRole's full output: that also concatenates this workspace's
-// LIVE `.current/handoff.md` state as a trailing JSON block, and this
-// dogfooding repo's own pending_notes prose (this very feature's, among
-// others) literally discusses the strings "rationale:start"/"origin:start" as
-// prose, which would falsely defeat a raw marker-count assertion below. The
-// composed skill body has no such contamination — reading content/ directly,
-// same as test/context-budget.test.mjs's readSkillFile helper.
+// Composed skill body (frontmatter stripped), before the render pass: the shape build.ts hands to
+// applyTextTransforms. Not buildPromptForRole output, which appends the live handoff state; that
+// prose can mention the rationale and origin markers and defeat a raw marker count.
 function composedSkillBody(f) {
   const composed = composeSkill(f, hostCapabilitiesFor("claude-code"), (g) => fs.readFileSync(path.join(ROOT, "content", g), "utf-8"));
   return composed.startsWith("---") ? composed.slice(composed.indexOf("---", 3) + 3).trimStart() : composed;
@@ -136,14 +67,8 @@ function findLineGlueFindings(text) {
       re.lastIndex = 0;
       let m;
       while ((m = re.exec(line))) {
-        // Exclude an inline CODE-SPAN example of bullet/checkbox syntax, e.g.
-        // "Example cut line: `- [ ] T-BUG-01 ...`" (skill-pm.md:88) — a
-        // backtick immediately before the marker means this is a quoted
-        // illustration, not a rendered list item, and it is legitimately
-        // mid-line by design (verified false-positive during authorship:
-        // structural Detector 1 does NOT flag skill-pm.md's third instance,
-        // and reading the source confirms the whole sentence sits on one
-        // line with no rationale fence anywhere near it).
+        // Skip an inline code-span example of bullet syntax (a backtick right before the marker):
+        // it is a quoted illustration and legitimately mid-line, not a rendered list item.
         const precedingChar = m.index > 0 ? line[m.index - 1] : "";
         if (m.index > leadWS && precedingChar !== "`") {
           findings.push({ lineNo: i, marker: m[0], line });
@@ -155,53 +80,11 @@ function findLineGlueFindings(text) {
 }
 
 // ---------------------------------------------------------------------------
-// Soundness: both detectors must reproduce EXACTLY the 2 known historical
-// sites (docs/backlog.md:192) against the pre-fix baseline, and nothing else.
-// A detector that matches nothing on a known-broken input is worse than no
-// detector (dispatch brief instruction) — this is the guard-the-guard check.
-//
-// HERMETIC FIXTURE (the no-history-fixture fix, E77, docs/backlog.md:200, fixed 2026-08-18): this used to
-// build the baseline by reading repository history —
-// `execFileSync("git", ["show", "ffa4082:content/skill-release-engineer.md"])`
-// — which requires the `ffa4082` commit object to exist in the clone. CI
-// (.github/workflows/ci.yml:17, actions/checkout@v4, no fetch-depth ⇒ action
-// default of 1) does not fetch it, so the call died
-// `fatal: invalid object name 'ffa4082'` on CI (run 32093068950) while passing
-// on every developer machine with a deep clone — the fixture was repository
-// history, so the test passed or failed on clone depth, not on the code under
-// test. Fixed by embedding the two known-broken spans as literals below,
-// copied verbatim from `git show ffa4082:content/skill-release-engineer.md`
-// lines 119-120 (BASELINE_EXCERPT_MKDIR_P) and lines 126-129
-// (BASELINE_EXCERPT_DRIFT_BASELINE) on 2026-08-18 — `ffa4082` is cited here
-// as PROVENANCE only, never read at test time. Verified byte-for-byte against
-// a full deep-clone `git show` of the same commit before this swap (both
-// detectors' finding counts and content unchanged) — this is a fixture swap,
-// not a weakened guard: the two excerpts below still exercise the identical
-// detector code paths (RATIONALE_SPAN_RE / findAsymmetricRationaleSpans over
-// raw text, applyTextTransforms + findLineGlueFindings over the rendered
-// text) against the identical bytes the historical file contained at those
-// two sites; only the surrounding, uninvolved prose (the rest of the ~170-line
-// file) is omitted, and omitting it cannot change either detector's output
-// since both operate on fixed-width local context (a rationale span, or a
-// single rendered line) that never crosses outside these excerpts.
-//
-// STALE-BUT-CORRECT NOTE (after the release step-8 split, E163, 2026-09-22): both excerpts below say
-// "step 8's `git add`" / "step 8's AC4 SKIP branch" — the live
-// content/skill-release-engineer.md no longer has a single "step 8" at all;
-// the release-gate-ordering change (E163) split it into 8a (commit + push branch) / 8b (CI gate) / 8c (tag +
-// push). Do NOT "fix" that by editing the strings below to say 8a/8b/8c.
-// These two constants are frozen, byte-identical RENDERER INPUT copied from
-// commit ffa4082 (predating that split, E163, by over a month) — they exist only to
-// exercise findAsymmetricRationaleSpans/applyTextTransforms/
-// findLineGlueFindings against a KNOWN historical glue shape, never to
-// assert anything about the current live SOP text. That is exactly why this
-// test stayed green through the step rename (E163) and is correctly absent from
-// qa_reports/expected-red_e163-ci-gate-ordering.txt: it never read the live
-// file to begin with, so the rename couldn't have turned it red. Editing
-// these strings to match the current SOP would break the "verified
-// byte-for-byte against ffa4082" provenance claim two paragraphs up without
-// buying back anything — the detector-soundness property this test checks
-// is invariant to which historical commit supplies the input bytes.
+// Soundness: both detectors must reproduce exactly the two known historical glue sites.
+// HERMETIC FIXTURE: the baseline is embedded as two literals, not read from git history, so the
+// test does not depend on clone depth. The excerpts are frozen renderer input and still say
+// "step 8" from before the SOP split it; do not edit them to match the live SOP.
+// Rationale: specs/e260i-comment-rationale.md (test/render-structure.test.mjs).
 // ---------------------------------------------------------------------------
 
 // content/skill-release-engineer.md @ ffa4082, lines 119-120 verbatim — the

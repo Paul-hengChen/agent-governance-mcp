@@ -257,6 +257,52 @@ The strip helper, the six-permutation test and the orphan-marker test no longer 
 - The design-arm byte-equality tests slice a span out of the raw constitution, which still carries origin-fence markup, so they pass the slice through `stripOriginTags` before comparing against dispatch text that was origin-stripped by `buildPromptForRole`.
 - The `fullDetail` round-trip: the section 1 "column-scroller picker" rationale fence sits inside a design-only fence (the rationale is nested inside design-only). `fullDetail` opts out of `stripRationale` but not of the design-only exclusion, so that example is absent on a non-design `fullDetail` dispatch, while the section 7 "see XYZ" example, in no design-only fence, survives on both arms.
 
+### constitution-conditional-load phase 2 test map
+
+The phase 2 section of `specs/constitution-conditional-load.md` extends the design-only axis to the section 4 visual prose (Span A) and three section 1 bullets (Span B). The old header mapped its criteria to tests; names are ids, not literal titles.
+
+| criterion | tests |
+|---|---|
+| section 4 visual block strips on non-design (AC-P2-1) | t-p2-s4-nondesign-strips |
+| section 4 visual block loads on design (AC-P2-2) | t-p2-s4-design-loads |
+| section 1 bullets strip and load (AC-P2-3) | t-p2-s1-strip-load, t-p2-fullDetail-design-aware |
+| nested-rationale permutation sweep (AC-P2-4) | t-p2-hcnest-permutations (removed, see below) |
+| reflow is reorder-only (AC-P2-5) | t-p2-reflow-reorder-only |
+| non-visual section 4 and section 1 survive both arms (AC-P2-6) | t-p2-antisweep-both-arms |
+| floor re-measured (AC-P2-7) | the four AC8 floors |
+| composition order-independent (AC-P2-8) | t-ccl-six-permutations (removed) and t-p2-hcnest-permutations (removed) |
+
+The nested-rationale sweep covered eight subsets of the three strippers to show no marker corruption where a rationale fence sits inside a design-only fence (now fragment `const-02-design-mvp.md`). It was removed with the strippers: chain and design selection is file inclusion in `composeConstitution()`, decided before `stripRationale` runs, and the nested rationale span is stripped like any other. The hard constraints carried from phase 1: no new mechanism, no server-gate change, no reworded rule, and the section 4 reflow only reorders sentences.
+
 ## test/render-structure.test.mjs
 
-(Filled in by the trim tasks T-E260I-09 and T-E260I-10.)
+### Header: purpose, spec map and the two detectors
+
+The file implements the regression test that backlog row E69 asked for in the same cut as the fence relocation in `content/skill-release-engineer.md`: assert on `applyTextTransforms({ fullDetail: false })` output that every numbered step header and top-level bullet still begins a line, as one assertion covering the whole class across all role SOPs (nothing in the suite rendered any SOP through the strip pass before). The backlog row is the spec; there is no `specs/<feature>.md`.
+
+Spec-to-test map: the fence-relocation criterion maps to the "T-E69-01 AC" test and the detector-soundness test against the pre-fix baseline; the class-wide criterion (all role SOPs plus the constitution) maps to "structural sweep", "cross-SOP render sweep (switchRole)", "cross-SOP render sweep (buildPromptForRole)" and "constitution fragments".
+
+Why the bug exists: the trailing newline match in `stripRationale` (`prompts/text-transforms.ts`) exists to swallow the blank line a block-style rationale fence would leave. Its contract, a comment in that module and never enforced in code, is that a fence is symmetric: either both markers sit alone on their own source line, or neither does. In an asymmetric fence the start marker is glued inline to trailing prose and the end marker is followed directly by a newline, so the newline match eats a newline that was load-bearing. The prose before the start then fuses onto whatever line followed the end marker. When that line is a numbered step header or a top-level bullet (`- **`, a dash and a backtick, `- [ ]`), the fused result no longer parses as a list item or heading. Two release-engineer sites were found this way by hand, twice, across two review rounds.
+
+Detectors, cross-checked against each other and against the known pre-fix baseline (2 findings, byte-reproduced) before being trusted on the rest of the corpus:
+
+1. `findAsymmetricRationaleSpans`, source-level and purely structural: for each rationale span, flag it when the end marker is immediately followed by a newline and the start marker is not preceded only by whitespace back to the previous newline. It needs no guess at bullet or header syntax and has no false positives; it is the root-cause invariant.
+2. `findLineGlueFindings`, render-level (after `applyTextTransforms`, `fullDetail: false`), symptom-level: per rendered line, flag a numbered step header (digits, optional letter, dot, bold) or a top-level bullet marker that appears anywhere other than the line's own leading position. It is exercised through both real render paths: `tw_switch_role` (`tools/role.ts`), the one the two live glued-line instances shipped through, and the MCP prompt path (`prompts/build.ts`), per the dispatch brief's instruction that both matter.
+
+Audit history: both detectors agreed exactly. They found the 2 baseline sites, none in the fixed release-engineer SOP, and four more live sites that nothing had audited before: two in `content/skill-pm.md`, one in `content/skill-qa-engineer.md` and one in `content/skill-architect.md`. Those were out of scope for the first ticket, were tracked as an exact ratchet rather than silently excluded, and a follow-up ticket relocated all four fences (whitespace only, prose byte-identical, verified by both the code-reviewer and qa-engineer), paying the debt to zero. The ratchet `KNOWN_ASYMMETRIC_SPAN_COUNTS` is now the empty allowlist: any asymmetric span anywhere in `content/` reds the suite, a strictly stronger guard than the four-site exemption it replaced.
+
+### Composed skill body helper
+
+`composedSkillBody` reads `content/` directly rather than calling `buildPromptForRole`, whose output also concatenates the workspace's live handoff state as a trailing JSON block. In this dogfooding repo that state's notes discuss the strings `rationale:start` and `origin:start` as prose, which would falsely defeat a raw marker-count assertion. This mirrors the `readSkillFile` helper in `test/context-budget.test.mjs`.
+
+### Code-span false positive in the render detector
+
+A backtick immediately before the marker marks an inline code-span example of bullet or checkbox syntax, for example a quoted cut line in the PM SOP. It is legitimately mid-line. The structural detector does not flag that PM site and the source shows the whole sentence on one line with no fence near it, so excluding it is correct and was verified at authoring time.
+
+### Hermetic baseline fixture
+
+The soundness test used to build its baseline by reading repository history (a `git show` of the pre-fix commit), which needs that commit object in the clone. CI uses a shallow checkout and failed with an invalid-object error while developer machines with deep clones passed, so the test depended on clone depth rather than on the code under test. The fix embeds the two known-broken spans as literals (`BASELINE_EXCERPT_MKDIR_P`, lines 119-120 of that file, and `BASELINE_EXCERPT_DRIFT_BASELINE`, lines 126-129), verified byte-for-byte against a deep-clone `git show` before the swap with both detectors' finding counts and content unchanged. It is a fixture swap, not a weakened guard: the excerpts exercise the same code paths (`RATIONALE_SPAN_RE`, `findAsymmetricRationaleSpans`, `applyTextTransforms` plus `findLineGlueFindings`) on the identical bytes, and omitting the rest of the file cannot change either detector's output because both work on local context (one span, or one rendered line).
+
+The excerpts are frozen. They say "step 8's `git add`" and "step 8's AC4 SKIP branch" because they predate the release-gate-ordering change that split step 8 into 8a (commit and push branch), 8b (CI gate) and 8c (tag and push). Do not edit the strings to say 8a, 8b or 8c: they exist only to feed the detectors a known historical glue shape, never to assert about the live SOP, which is why the test stayed green through the rename and is correctly absent from the expected-red manifest of that ticket. Editing them would break the byte-for-byte provenance claim without buying anything.
+
+(Sections for the later blocks of the file are added by T-E260I-10.)

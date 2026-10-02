@@ -898,32 +898,8 @@ test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is
   // Rationale: specs/e260i-comment-rationale.md (test/context-budget.test.mjs).
   const ratStripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));         // design-arm path: 10057 (E258 re-baseline)
   const nonDesign = approxTokens(stripRationale(stripOriginTags(composeConstitution({ chain: true, design: false })))); // non-design path: 7959 (E258 re-baseline)
-  // e43-test-file-ask-at-dispatch (qa-owned bump, T-E43-02): floor raised from 7089 →
-  // 7276 (+187), identical to the design-arm delta above because const-05 is a core
-  // (untagged) fragment present in both paths. Independently re-measured at 7276 ~tok
-  // (exact); the 2098 ~tok design-only saving is unchanged (see the note above).
-  // e130-lane-default (qa-owned bump, T-E130-07): floor raised from 7276 → 7323 (+47),
-  // identical to the design-arm delta above because both edited fragments (const-05
-  // AC9, const-15 AC8) are core/untagged and present in both paths. Independently
-  // re-measured at 7323 ~tok (exact); the 2098 ~tok design-only saving is unchanged
-  // (9421 − 7323 = 2098, see the note above).
-  // e178a-integrator-role (qa-owned bump, T-E178A-06, AC17): floor raised from 7323 →
-  // 7569 (+246), identical (within 1 tok of Math.ceil rounding drift) to the design-arm
-  // delta above (+245) because const-15-core-tail.md is core/untagged and present in
-  // both paths. Independently re-measured at 7569 ~tok (exact); the design-only saving
-  // is 9666 − 7569 = 2097 ~tok (within 1 of the prior 2098 — ordinary rounding drift,
-  // still comfortably above the ≥ 2080 assertion below).
-  // This floor moved again for the same reason as the design-arm floor above: the new
-  // information-hygiene/generic-citation rule sits in the same core-tagged fragment
-  // this non-design path already carries once, so it grows by the same amount.
-  // Independently re-measured (not trusted from sr-engineer's or code-reviewer's
-  // handoff notes) at 7826 ~tok (exact); cap raised from 7569 to that exact measured
-  // value, per the established Phase-2 convention (no additional headroom). The
-  // design-only saving stays 9924 − 7826 = 2098 ~tok, unchanged from the prior pairing
-  // (E231).
-  // Comment-discipline rule bullet (const-15, core-tagged) re-measured at 7959 ~tok (exact);
-  // cap raised from 7826 to that exact value, zero headroom (E258); design-only saving
-  // 10057 − 7959 = 2098 ~tok, unchanged.
+  // Floor bumps from e43 (test-file ask at dispatch) through E258 (comment-discipline bullet)
+  // continue the same cap history, pointed to above.
   assert.ok(nonDesign <= 7959, `non-design constitution (${nonDesign} ~tok) must be ≤ 7959 (AC8 non-design floor, E258 re-baseline)`);
   assert.ok(
     ratStripped - nonDesign >= 2080,
@@ -955,14 +931,10 @@ test("AC8/AC-P2-7: chain-role non-design bundle is ~1830 ~tok lighter than the d
 });
 
 test("AC8/HC3: build.ts arm probe uses the SAME helper as the server PASS gates", () => {
-  // WHY: identity-by-construction — the gate and the constitution text agree iff they key
-  // off the same arm signal. build.ts and the tw_update_state gate handler both import
-  // hasDesignModeRequiringVisual from tools/evidence-file. A cheap source grep pins that
-  // the import is shared (reviewer proved behavioral identity; this guards against a
-  // future divergent re-implementation).
-  // Relocated by the registry-pattern refactor: the tw_update_state gate-orchestration
-  // body (and its hasDesignModeRequiringVisual import) moved verbatim from index.ts to
-  // tools/handoff-orchestrator.ts; index.ts itself no longer imports this helper directly.
+  // WHY: the gate and the constitution text agree only if they key off the same arm signal.
+  // build.ts and the tw_update_state gate handler both import hasDesignModeRequiringVisual; a
+  // source grep pins the shared import against a future divergent re-implementation.
+  // The gate body lives in tools/handoff-orchestrator.ts, not index.ts.
   const buildSrc = fs.readFileSync(path.join(ROOT, "prompts", "build.ts"), "utf-8");
   const orchestratorSrc = fs.readFileSync(path.join(ROOT, "tools", "handoff-orchestrator.ts"), "utf-8");
   // gate-registry refactor (A10, A2): hasDesignModeRequiringVisual moved from
@@ -977,24 +949,11 @@ test("AC8/HC3: build.ts arm probe uses the SAME helper as the server PASS gates"
 });
 
 // ============================================================================
-// constitution-conditional-load PHASE 2 (AC-P2-1…8): extend the design-only axis
-// to two MORE feature-inert spans deferred in Phase 1 — §4 visual prose (Span A,
-// reflow + 1 fence) and §1 L16/L17/L19 (Span B, 2 fences, with a rationale fence
-// NESTED inside §1 fence #1 → HC-NEST). NO new mechanism (reuse stripDesignOnly +
-// the design-only marker pair), NO server-gate change, NO rule reword (HC2 absolute;
-// the §4 reflow is REORDER-ONLY). Spec: specs/constitution-conditional-load.md §Phase 2.
-//
-// Spec-to-Test map:
-//   §4 visual block strips on non-design (AC-P2-1) -> t-p2-s4-nondesign-strips
-//   §4 visual block loads on design (AC-P2-2) -> t-p2-s4-design-loads
-//   §1 L16/17 + L19 strip / load (AC-P2-3) -> t-p2-s1-strip-load,
-//                                                       t-p2-fullDetail-design-aware (above)
-//   HC-NEST permutation sweep (AC-P2-4) -> t-p2-hcnest-permutations
-//   reflow is reorder-only (AC-P2-5) -> t-p2-reflow-reorder-only
-//   non-visual §4/§1 survives both arms (AC-P2-6) -> t-p2-antisweep-both-arms
-//   AC8 floor re-measured (AC-P2-7) -> the four AC8/AC-P2-7 floors above
-//   composition order-independent (AC-P2-8) -> t-ccl-six-permutations (above) +
-//                                                       t-p2-hcnest-permutations
+// constitution-conditional-load phase 2: extend the design-only axis to two more feature-inert
+// spans, the §4 visual prose and three §1 bullets (one rationale fence nested inside a
+// design-only fence). No new mechanism, no server-gate change, no reworded rule; the §4 reflow
+// only reorders. Spec: specs/constitution-conditional-load.md (Phase 2 section).
+// Rationale: specs/e260i-comment-rationale.md (test/context-budget.test.mjs).
 // ============================================================================
 
 test("AC-P2-1: §4 visual block (S3/S4/S5 + design-auditor) is ABSENT on the non-design arm", async () => {
@@ -1035,19 +994,10 @@ test("AC-P2-3: §1 L16/L17 + L19 are ABSENT on non-design, PRESENT on design; L1
   }
 });
 
-// compose-not-strip (ticket A9, T-CNSO-07): the "AC-P2-4/HC-NEST: rationale-
-// inside-design-only nests clean across every strip permutation" test that lived
-// here is REMOVED — it swept 8 subsets of {stripChainOnly, stripRationale,
-// stripDesignOnly} to prove no regex-marker corruption at the HC-NEST site (a
-// rationale fence nested inside a design-only fence, §1 fence #1 / now fragment
-// const-02-design-mvp.md). stripChainOnly/stripDesignOnly are deleted, so there
-// is no marker-parsing interaction left to sweep: chain/design selection is file
-// inclusion (composeConstitution), decided before stripRationale ever runs; the
-// nested rationale span physically lives inside const-02-design-mvp.md and is
-// stripped by stripRationale exactly like any other rationale fence, regardless
-// of which fragment it landed in post-split. The universal-bullet byte-intact
-// contract this test also checked is covered by AC-P2-3/AC-P2-6 below (L15/L18
-// survive both arms) and by the T-GTS-07 stripRationale unit tests above.
+// Removed in the move to composition: the nested-rationale permutation sweep over the three
+// strippers. Fragment selection is file inclusion before stripRationale runs, and the nested
+// rationale span is stripped like any other. The universal-bullet byte-intact contract is
+// covered by the anchoring tests below and the stripRationale unit tests above.
 
 test("AC-P2-5: §4 reflow is REORDER-ONLY — every §4 rule sentence is byte-present (no reword)", async () => {
   // WHY: HC2 (tightened) — the §4 reflow may ONLY reorder sentences / split paragraphs / insert
