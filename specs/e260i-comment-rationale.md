@@ -198,6 +198,65 @@ skill-sr-engineer.md (final cap 2852):
 | e2-bugfix-repro-gate | 2469 to 2642 | the new step 3b "Repro-First (bugfix mode)" (write the repro test, confirm red, record the manifest, then fix; escape to pm); exact |
 | e20-e21-crash-resilience-sop | 2642 to 2852 | two new SOP steps: 4a "Crash checkpoint before long steps" (a `bookkeeping_write` checkpoint before any long build or suite, plus a QA-added file-mode-only caveat) and 4b "HARD — long runs end in-turn"; the code-reviewer had cited 2848 before the caveat; exact |
 
+### Non-design constitution floor history
+
+The AC8 non-design test measures `stripRationale(stripOriginTags(composeConstitution({ chain: true, design: false })))` and asserts a cap (final 7959) plus a design-only saving (design-arm figure minus non-design figure) of at least 2080 approximate tokens. Core- and chain-tagged edits land on both arms, so each bump here mirrors the design-arm bump above and the saving stays near 2098. Every bump was qa-owned (sr-owned where noted), independently re-measured rather than taken from builder notes, and set to the exact value with zero headroom. The "saving" column is the saving after the change.
+
+| ticket or release | cap change | saving | what happened |
+|---|---|---|---|
+| constitution-conditional-load phase 2 | 2409 | 1830 | first measurement on the working tree after the two extra spans were stripped; exact |
+| governance-tag-strip | 2409 to 2403 | 1830 to 2084 | both sides now fold in stripOriginTags like production; the saving grows because the design-only spans also carry origin tags that only the fold removes |
+| cut-approval-coordinator-attestation | 2403 to 2872 | 2085 | the Cut-Approval Gate bullet in `const-08-chain-31-mid.md`, chain-tagged, so it lands on the non-design path; exact |
+| pm-repair-resume-routing (v3.47.0) | 2872 to 3175 | 2085 | the Amend-Resume Edge bullet in the same fragment; design-arm 5260 less 3175 |
+| a13-section1-polish | 3175 to 3232 | 2084 | the `const-01-core-head.md` Terse/Watermark rewrite; core-head, so on both paths |
+| a11-escalation-grammar | 3232 to 3477 | 2084 | the Escalation call format and WHEN/DO/ELSE bullets in `const-05-chain-mid.md`, chain-tagged |
+| b8-external-ref-ledger | 3477 to 3531 | 2085 | the section 7 rewrite in `const-15-core-tail.md` |
+| c7-version-assertion-ownership | 3531 to 3636 | 2085 | the Test ownership bullet rewrite in `const-05-core-standards.md` (about +420 characters net) |
+| c9-protocol-fields | 3636 to 3939 | 2085 | the Escalation-call-format rewrite, the Amend-Resume and code-reviewer-verdict rewrite and one rewording in `const-12-chain-r10-s4.md`, all chain-tagged |
+| c14-dispatch-pins | 3939 to 4016 | 2084 | the Pin-override bullet in `const-01-core-head.md` |
+| a12-partials-limits-registry | 4016 to 4293 | 2098 | the `## Limits` table plus reference-by-name rewrites in three chain-tagged fragments; the saving widens by a few tokens because the `const-09` rewrite is design-only and lands on the design arm alone |
+| a12-followup-qa-round-name | 4293 to 4302 | 2097 | the `qa_round` name-reference rewrite in `const-06-chain-31-head.md`, chain-tagged |
+| e10-lease-override | 4302 to 4966 | 2098 | the Lease-Override and Bookkeeping-Write bullets in section 3.1, chain-tagged |
+| e7-governed-git-surface (sr-owned) | 4966 to 5177 | 2098 | the section 6 sanctioned-git-ops whitelist bullet in `const-15-core-tail.md`, core-tagged so it lands equally on both sides |
+| e14-e16-release-hardening (sr-owned) | 5177 to 5337 | 2098 | the single-role judge dispatch charter sentences in section 3.1, chain-tagged |
+| e5-intake-tiering | 5337 to 5766 | 2097 | the Cut-Approval Auto-Tier bullet (+429, against +428 on the design arm: rounding) |
+| e18-write-provenance | 5766 to 6340 | 2097 | the Stamp-Provenance and QA Completion-Evidence bullets (+574, equal on both arms) |
+| e24-exemptions-manifest | 6340 to 6528 | 2097 | the Build-gate exemptions bullet in `const-05-core-standards.md` (+188) |
+| e25-git-vocabulary | 6528 to 6587 | 2098 | the section 6 git-ops bullet edit (+59 to +60: rounding) |
+| e59-const6-waiver-clause | 6587 to 6706 | 2098 | the Dependency-audit bullet rewrite (+119) |
+| e40-nonqa-completed-tasks-write-gate | 6706 to 7089 | 2098 | the Non-QA Completed-Tasks Gate row in `const-08-chain-31-mid.md`; `const-08` is composed into chain and full-detail bundles, never lite (+383) |
+| e43-test-file-ask-at-dispatch | 7089 to 7276 | 2098 | the Conditional test writing rewrite in `const-05`, core, so identical to the design-arm delta (+187) |
+| e130-lane-default | 7276 to 7323 | 2098 | one shrink in `const-05` and one growth in `const-15`, both core (+47) |
+| e178a-integrator-role | 7323 to 7569 | 2097 | the section 6 amendment in `const-15-core-tail.md` (+246, within 1 of the design-arm +245: rounding) |
+| E231 | 7569 to 7826 | 2098 | the information-hygiene and generic-citation rule in the same core fragment |
+| E258 | 7826 to 7959 | 2098 | the Comment-discipline bullet in `const-15-core-tail.md` |
+
+The bundle test beside it (non-design sr-engineer bundle at least 1830 approximate tokens lighter than the design-armed one) was re-baselined for the two extra stripped spans: the saving grew from 1187 to 1830. It composes the non-design side with `composeConstitution({ chain: true, design: false })` and the design side from `CONSTITUTION`, each with the skill body appended.
+
+### constitution-conditional-load test map
+
+The spec is `specs/constitution-conditional-load.md`. Test names are the ids of the old map, not literal titles.
+
+| criterion | tests |
+|---|---|
+| non-design strips (AC1) | t-ccl-strip-helper, t-ccl-build-nondesign-strips |
+| design loads full (AC2) | t-ccl-build-design-loads, t-ccl-design-byte-equal |
+| safe default (AC3) | t-ccl-no-state-strips, t-ccl-no-design-file-strips |
+| byte-unchanged surviving rules (AC4) | t-ccl-r10-byte-equal, t-ccl-nonvisual-byte-equal |
+| composition (AC5, HC5) | t-ccl-six-permutations, t-ccl-zero-orphans |
+| anti-sweep on both arms (AC6) | t-ccl-antisweep-both-arms |
+| lite interaction (AC7) | t-ccl-lite-nondesign-consistent |
+| rebaselined floors (AC8) | t-ccl-nondesign-floor and the two rebaselined design-arm floors (4200 and 7665 at the time) |
+
+The strip helper, the six-permutation test and the orphan-marker test no longer exist: `stripDesignOnly` and `stripChainOnly` were deleted when constitution fragments began to be composed by tag, so fragment selection happens once in `composeConstitution()` and markers are never parsed. The byte-identity contract is in `test/compose-equivalence.test.mjs`.
+
+### Sentinel notes (conditional-load tests)
+
+- The origin-tag strip removes the version suffix of several sentinels before they are checked, so the pinned literals dropped their suffix: the Visual evidence gate and `visual_round` sub-loop bullets, the Design-baseline scope and Self-converge relaxation bullets, and the reconcile-rule finding code. The Visual Widgets exception (v3.14.0) bullet was left un-fenced on purpose (a skip-site pinned by the builders and the reviewer), so its version tag still ships and its sentinel keeps the tag.
+- Full-bullet anchors are used for the three section 1 Span B bullets because the bold-tag-only forms also appear in skill bodies that cite the constitution (for example the sr-engineer skill cites the Design-baseline scope bullet), which would let a sentinel survive in a skill and fail the section 1 strip check falsely. The openers are unique to the constitution section 1.
+- The design-arm byte-equality tests slice a span out of the raw constitution, which still carries origin-fence markup, so they pass the slice through `stripOriginTags` before comparing against dispatch text that was origin-stripped by `buildPromptForRole`.
+- The `fullDetail` round-trip: the section 1 "column-scroller picker" rationale fence sits inside a design-only fence (the rationale is nested inside design-only). `fullDetail` opts out of `stripRationale` but not of the design-only exclusion, so that example is absent on a non-design `fullDetail` dispatch, while the section 7 "see XYZ" example, in no design-only fence, survives on both arms.
+
 ## test/render-structure.test.mjs
 
 (Filled in by the trim tasks T-E260I-09 and T-E260I-10.)

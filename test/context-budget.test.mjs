@@ -597,16 +597,10 @@ test("AC9: every operative rule/gate/heading survives stripRationale on the cons
 });
 
 test("AC9/AC-P2-3: fullDetail retains both example lists verbatim (design-arm-aware round-trip)", async () => {
-  // WHY: the rationale fence is opt-out, not deletion — fullDetail dispatch (AC3 path)
-  // must carry the constitution verbatim, including both fenced example lists. Source file
-  // always retains them (raw). BUT post-Phase-2 (constitution-conditional-load P2) the §1
-  // L16 "column-scroller picker" rationale fence now sits INSIDE a design-only fence
-  // (Span-B fence #1, L16–L17 — HC-NEST: rationale nested inside design-only). The
-  // design-only strip fires on the NON-design arm REGARDLESS of fullDetail (fullDetail
-  // only opts out of stripRationale, not stripDesignOnly — see build.ts L310 vs L315), so
-  // "column-scroller picker" is gone on a non-design dispatch even with fullDetail=true.
-  // The §7 "see XYZ" rationale fence is NOT inside any design-only fence, so it survives on
-  // both arms with fullDetail. Therefore the round-trip assertion is now DESIGN-ARM-AWARE.
+  // WHY: fullDetail only opts out of stripRationale, not of the design-only exclusion. The §1
+  // "column-scroller picker" example sits in a design-only fence, so it is absent on a non-design
+  // fullDetail dispatch and kept on the design arm. The §7 "see XYZ" example is in no such fence
+  // and survives on both arms.
   for (const m of CONST_FENCED_INTERIORS) {
     assert.ok(CONSTITUTION.includes(m), `raw constitution must retain example-list interior: ${JSON.stringify(m)}`);
   }
@@ -633,24 +627,11 @@ test("AC9/AC-P2-3: fullDetail retains both example lists verbatim (design-arm-aw
 // SURVIVING strippers is pinned above (T-GTS-07/AC4).
 
 // ============================================================================
-// constitution-conditional-load (AC1–AC8): the THIRD, feature-conditional strip
-// axis (stripDesignOnly). On a NON-design feature the server-side visual gates are
-// inert, so §3.2 (minus the reconcile rule, R10) + the §3.1 visual bullets bind NO role and are stripped
-// from the dispatch; on a DESIGN-armed feature the full visual governance loads
-// unchanged. Gated on the SAME arm signal the server PASS gates use
-// (hasDesignModeRequiringVisual) — text present iff the gates can fire (HC1/HC3).
+// constitution-conditional-load: on a non-design feature the visual governance (§3.2 and the
+// §3.1 visual bullets) is left out of the dispatch; a design-armed feature loads it whole.
+// The arm signal is the one the server PASS gates use (hasDesignModeRequiringVisual).
 // Spec: specs/constitution-conditional-load.md.
-//
-// Spec-to-Test map:
-//   non-design strips (AC1) -> t-ccl-strip-helper, t-ccl-build-nondesign-strips
-//   design loads full (AC2) -> t-ccl-build-design-loads, t-ccl-design-byte-equal
-//   safe default (AC3) -> t-ccl-no-state-strips, t-ccl-no-design-file-strips
-//   byte-unchanged surviving (AC4) -> t-ccl-r10-byte-equal, t-ccl-nonvisual-byte-equal
-//   composition (AC5/HC5) -> t-ccl-six-permutations, t-ccl-zero-orphans
-//   anti-sweep both arms (AC6) -> t-ccl-antisweep-both-arms
-//   lite interaction (AC7) -> t-ccl-lite-nondesign-consistent
-//   rebaseline floors (AC8) -> t-ccl-nondesign-floor + the two rebaselined
-//                                     AC8 floors above (4200 / 7665)
+// Rationale: specs/e260i-comment-rationale.md (test/context-budget.test.mjs).
 // ============================================================================
 
 const SEP = "\n\n---\n\n";
@@ -701,19 +682,11 @@ const P2_S4_VISUAL_SENTINELS = [
   "Tasks with no design reference skip the auditor entirely",    // P-AUDITOR closing sentence
 ];
 
-// §1 Span B — the three FEATURE-INERT bullets. ABSENT non-design, PRESENT design.
-// Full-bullet anchors (NOT just the bold tag) — the bold-only forms collide with
-// constitution cross-references inside skill-*.md bodies (e.g. skill-sr-engineer cites
-// "§1 Design-baseline scope (v3.27.0)"), which would make a §1-strip assertion falsely
-// fail on a sentinel that survived in the SKILL, not §1. These openers are unique to
-// content/constitution.md §1 (verified: absent from skill-sr / skill-coordinator).
-// governance-tag-strip (T-GTS-04): the L17 and L19 sentinels lost their "(vX.Y.Z)"
-// suffix — both are now origin-fenced (`scope<!-- origin:start --> (v3.27.0)<!--
-// origin:end -->**: …`, `relaxation<!-- origin:start --> (v3.31.0)<!-- origin:end
-// -->**: …`), stripped unconditionally. The L16 "Visual Widgets exception (v3.14.0)"
-// literal is DELIBERATELY left UNCHANGED — that site was intentionally left un-fenced
-// (test-pinned, per sr-engineer/code-reviewer's skip-site list) so its version tag
-// still ships and this sentinel must NOT be updated.
+// §1 Span B: the three feature-inert bullets, absent on non-design, present on design.
+// Full-bullet anchors, not bare bold tags: the bold-only forms also occur in skill bodies that
+// cite the constitution, so a sentinel could survive there and fail the §1 strip check falsely.
+// The "Visual Widgets exception (v3.14.0)" literal keeps its version tag on purpose: that site
+// is not origin-fenced, so the tag ships. The other two lost theirs to the origin-tag strip.
 const P2_S1_DESIGN_SENTINELS = [
   "**Visual Widgets exception (v3.14.0)**: when a widget is listed in the spec",      // L16, fence #1 (un-fenced by design — do not touch)
   "**Design-baseline scope**: For design-backed work, the canonical design",           // L17, fence #1 (was "... (v3.27.0)**: ...")
@@ -755,14 +728,9 @@ async function buildOnFixture({ mode, skillFile = "skill-sr-engineer.md", noStat
 
 // --- non-design strips the gatable visual span (AC1) ----------------------
 
-// compose-not-strip (ticket A9, T-CNSO-07): the "AC1: stripDesignOnly removes the
-// design-only span and is idempotent" unit test that lived here is REMOVED —
-// stripDesignOnly is deleted; design-fragment inclusion/exclusion is now a file
-// list decision (composeConstitution / includeSegment), not a string-stripping
-// primitive with its own idempotence contract to unit-test. The OUTCOME this test
-// protected — non-design dispatch omits every gated sentinel — is still pinned
-// end-to-end by the test immediately below (through the real buildPromptForRole
-// pipeline) and by test/compose-equivalence.test.mjs (byte-identity, T-CNSO-08).
+// Removed in the move to composition: the stripDesignOnly unit and idempotence test. Design
+// fragments are now chosen by file list in composeConstitution(), so the end-to-end test below
+// and test/compose-equivalence.test.mjs carry the contract.
 
 test("AC1: chain-role build on a NON-design workspace OMITS the §3.2 body + the §3.1 visual bullets", async () => {
   // WHY: end-to-end. A real buildPromptForRole dispatch for a chain role (sr-engineer)
@@ -841,14 +809,10 @@ test("AC3: state present but NO design file, AND `## Mode` = no-design, both => 
 // --- surviving rules are byte-identical to source (AC4) --------------------
 
 test("AC4: §3.2 R10 (carve-out) survives byte-equal on BOTH arms — the gate never rewords it", async () => {
-  // WHY: the reconcile rule (R10; Sequential-context assumption + reconcile) physically ends §3.2 but is
-  // NON-visual (tw_detect_drift / tw_sync after fan-out) — it is carved OUT of fence 3,
-  // which ends BEFORE R10. It must appear byte-identical to source on BOTH the design and
-  // non-design arms (HC2/HC4). Extract the R10 bullet from source and assert containment.
-  // governance-tag-strip (T-GTS-04): the raw anchor shifted — the bare "(R10)" finding
-  // code is now wrapped in an inline origin fence mid-sentence
-  // (`reconcile<!-- origin:start --> (R10)<!-- origin:end -->.**`), so the old
-  // fence-free literal no longer occurs in CONSTITUTION and indexOf returned -1.
+  // WHY: the reconcile rule ends §3.2 but is non-visual (drift check and sync after fan-out), so it
+  // sits outside the design-only fence and must match source byte for byte on both arms.
+  // The source anchor includes the inline origin fence around the finding code, because the raw
+  // constitution still carries it.
   const srcStart = CONSTITUTION.indexOf("- **Sequential-context assumption + reconcile<!-- origin:start --> (R10)<!-- origin:end -->.**");
   const srcEnd = CONSTITUTION.indexOf("## 4. Routing Chain");
   assert.ok(srcStart > -1 && srcEnd > srcStart, "R10 source span anchors must resolve");
@@ -882,17 +846,11 @@ test("AC4: every surviving (non-gated) rule on the non-design arm is byte-identi
 
 // --- composition across all three axes (AC5 / HC5) -------------------------
 
-// compose-not-strip (ticket A9, T-CNSO-07): the two "AC5/HC5" tests that lived
-// here — "all 6 strip-order permutations are byte-identical" and "every strip
-// permutation leaves ZERO orphan markers" — are REMOVED. Both exercised
-// stripChainOnly/stripDesignOnly's regex-marker interaction, which no longer
-// exists: chain/design fragment selection happens once, structurally, in
-// composeConstitution() BEFORE either surviving stripper runs — there is no
-// regex race left to permute, and markers are never parsed (AC11), so an
-// "orphan marker" cannot occur by construction. See T-GTS-07/AC4 above for the
-// narrowed 2-stripper (stripRationale/stripOriginTags) order-independence pin,
-// and test/compose-equivalence.test.mjs for the byte-identity contract that
-// makes the structural claim empirical rather than assumed.
+// Removed in the move to composition: the six strip-order permutation test and the orphan-marker
+// test. Fragment selection now happens once, in composeConstitution(), before the two remaining
+// strippers run, and markers are never parsed, so neither failure can occur. Order independence
+// of those two strippers is pinned earlier in this file; the byte-identity contract is in
+// test/compose-equivalence.test.mjs.
 
 // --- anti-sweep — non-visual contracts survive BOTH arms (AC6) -------------
 
@@ -932,189 +890,12 @@ test("AC7: lite + non-design strips §3.2 once (no reintroduction), consistent w
 // --- rebaseline + pin the new non-design figure (AC8) ----------------------
 
 test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 7959 ~tok)", () => {
-  // WHY: this is the BUDGET WIN that justified the feature, and it must be regression-guarded.
-  // On a non-design chain dispatch buildPromptForRole emits stripDesignOnly(stripRationale(source)).
-  // REBASELINED by constitution-conditional-load PHASE 2: Phase 2 strips two MORE spans on the
-  // non-design arm (§4 visual prose S3–S5 + P-AUDITOR, and §1 L16/L17/L19), so the non-design
-  // figure drops further vs Phase-1's 3013. MEASURED on THIS working tree (chars/4): 2409 ~tok
-  // exactly. That is 1830 ~tok BELOW the rationale-stripped (design-arm) figure of 4239 — the
-  // per-dispatch saving on non-design features (vs the original full-load ~4200, the net win is
-  // ~1790 tok/dispatch). Pin both the floor AND the saving so a fence-shrink regression (less
-  // stripped) or a marker-cost blowout is caught.
-  // governance-tag-strip (T-GTS-06, qa-owned re-baseline): both sides folded to include
-  // stripOriginTags, matching the real buildPromptForRole pipeline (origin strip runs
-  // FIRST, unconditionally, before the rationale/design-only axes). Without the fold,
-  // the raw constitution's added origin-fence marker bytes (~14 pairs) would tick this
-  // floor UP, not down — the exact regression this fold prevents. Cap LOWERED from
-  // 2409 → 2403; the design-only strip saving grows from 1830 → 2084 (more of the
-  // now-larger raw-with-fences delta lands on the design-arm side, since the design-only
-  // fenced spans in §3.1/§3.2/§4 also each carry an origin tag that only the fold removes).
-  // compose-not-strip (ticket A9, T-CNSO-07): stripDesignOnly is deleted — the
-  // non-design path is now composeConstitution({chain:true,design:false}) (drops
-  // exactly the `design`/`chain-design` fragments the old regex stripped) run
-  // through the SAME stripOriginTags→stripRationale pipeline as the design-arm path.
-  // cut-approval-coordinator-attestation (qa-owned bump, C2-06): cap raised from
-  // 2403 → 2872. The new Cut-Approval Gate bullet lives in const-08-chain-31-mid.md,
-  // a `chain`-tagged (not `design`-tagged) fragment, so it is INCLUDED on the
-  // non-design path too (chain:true, design:false still keeps all chain fragments) —
-  // the non-design floor grows by the same bullet the design-arm floor absorbed.
-  // Actual non-design constitution measured at 2872 ~tok (exact); cap set to the
-  // exact measured value per the Phase-2 convention (no additional headroom).
-  // pm-repair-resume-routing (v3.47.0, qa-owned bump, C1-09/AC-11): cap raised from
-  // 2872 → 3175. The new Amend-Resume Edge bullet lives in const-08-chain-31-mid.md,
-  // a `chain`-tagged (not `design`-tagged) fragment, so it is INCLUDED on the
-  // non-design path too — the non-design floor grows by the same bullet the
-  // design-arm floor absorbed. Actual non-design constitution re-measured at 3175
-  // ~tok (exact); cap set to the exact measured value per the established convention
-  // (no additional headroom). Saving margin re-verified: design-arm 5260 − non-design
-  // 3175 = 2085 ~tok, still ≥ 2080.
-  // a13-section1-polish (qa-owned bump, A13-07): cap raised from 3175 → 3232. The
-  // const-01-core-head.md Terse/Watermark rewrite is core-head (not design-only-fenced),
-  // so it lands on the non-design path too, same as the design-arm floor above.
-  // Independently re-measured (not trusted from sr-engineer's handoff note) at 3232
-  // ~tok (exact); cap set to the exact measured value per the established Phase-2
-  // convention (no additional headroom). Saving margin re-verified: design-arm 5316 −
-  // non-design 3232 = 2084 ~tok, still ≥ 2080.
-  // a11-escalation-grammar (qa-owned bump, A11-02): cap raised from 3232 → 3477. The
-  // const-05-chain-mid.md canonical Escalation call format + WHEN/DO/ELSE bullets are
-  // chain-tagged (not design-tagged), so they land on the non-design path too, same as
-  // the design-arm floor above. Independently re-measured (not trusted from
-  // sr-engineer's handoff note) at 3477 ~tok (exact); cap set to the exact measured
-  // value per the established Phase-2 convention (no additional headroom). Saving
-  // margin re-verified: design-arm 5561 − non-design 3477 = 2084 ~tok, still ≥ 2080
-  // (unchanged — the const-05 edit sits outside the design-only fences).
-  // b8-external-ref-ledger (qa-owned bump, B8-09): cap raised from 3477 → 3531. The
-  // const-15-core-tail.md §7 rewrite is chain-tagged core-tail content (not
-  // design-only-fenced), so it lands on the non-design path too, same as the design-arm
-  // floor above. Independently re-measured (not trusted from sr-engineer's handoff note)
-  // at 3531 ~tok (exact); cap set to the exact measured value per the established
-  // Phase-2 convention (no additional headroom). Saving margin re-verified: design-arm
-  // 5616 − non-design 3531 = 2085 ~tok, still ≥ 2080.
-  // c7-version-assertion-ownership (qa-owned bump, AC-8): cap raised from 3531 → 3636. The
-  // const-05-core-standards.md "Test ownership" bullet rewrite (S01, +420 chars net) is
-  // core (not design-only-fenced), so it lands on the non-design path too, same as the
-  // design-arm floor above. Independently re-measured (not trusted from sr-engineer's or
-  // code-reviewer's notes) at 3636 ~tok (exact); cap set to the exact measured value per
-  // the established Phase-2 convention (no additional headroom). Saving margin
-  // re-verified: design-arm 5721 − non-design 3636 = 2085 ~tok, still ≥ 2080 (unchanged —
-  // the const-05 edit sits outside the design-only fences).
-  // c9-protocol-fields (qa-owned bump, T-C9-11/T-C9-12): cap raised from 3636 → 3939. The
-  // const-05-core-standards.md Escalation-call-format rewrite, the const-08-chain-31-mid.md
-  // Amend-Resume/code-reviewer-verdict rewrite, and the const-12-chain-r10-s4.md S6
-  // sentence rewording are all chain-tagged (not design-tagged), so they land on the
-  // non-design path too, same as the design-arm floor above. Independently re-measured at
-  // 3939 ~tok (exact); cap set to the exact measured value per the established Phase-2
-  // convention (no additional headroom). Saving margin re-verified: design-arm 6024 −
-  // non-design 3939 = 2085 ~tok, still ≥ 2080 (unchanged — the edits sit outside the
-  // design-only fences).
-  // c14-dispatch-pins (qa-owned bump, T-C14-11): cap raised from 3939 → 4016. The
-  // const-01-core-head.md AC-7 Pin-override bullet is core-head (not design-only-fenced),
-  // so it lands on the non-design path too, same as the design-arm floor above.
-  // Independently re-measured (not trusted from sr-engineer's or code-reviewer's notes)
-  // at 4016 ~tok (exact); cap set to the exact measured value per the established
-  // Phase-2 convention (no additional headroom). Saving margin re-verified: design-arm
-  // 6100 − non-design 4016 = 2084 ~tok, still ≥ 2080 (unchanged — the const-01 edit sits
-  // outside the design-only fences).
-  // a12-partials-limits-registry (qa-owned bump, T-A12-05/06/AC3/AC4): cap raised from
-  // 4016 → 4293. The new `## Limits` table (const-01-core-head.md, core-head) and the
-  // const-08/const-12/const-15 reference-by-name rewrites (all chain-tagged, not
-  // design-tagged) all land on the non-design path too, same as the design-arm floor
-  // above (const-09 is design-tagged and does NOT land here). Independently re-measured
-  // at 4293 ~tok (exact); cap set to the exact measured value per the established
-  // Phase-2 convention (no additional headroom). Saving margin re-verified: design-arm
-  // 6391 − non-design 4293 = 2098 ~tok, still ≥ 2080 (grows slightly — const-09's
-  // visual_round reference-by-name rewrite is design-only-tagged and lands ONLY on the
-  // design-arm side, widening the saving by a few tokens).
-  // a12-followup-qa-round-name (qa-owned bump, T-A12F-02): cap raised from 4293 → 4302.
-  // The const-06-chain-31-head.md L8 qa_round name-reference rewrite is chain-tagged (not
-  // design-tagged), so it lands on the non-design path too, same as the design-arm floor
-  // above. Independently re-measured (not trusted from code-reviewer's review note) at
-  // 4302 ~tok (exact); cap set to the exact measured value per the established Phase-2
-  // convention (no additional headroom). Saving margin re-verified: design-arm 6399 −
-  // non-design 4302 = 2097 ~tok, still ≥ 2080 (unchanged — the const-06 edit sits outside
-  // the design-only fences).
-  // e10-lease-override (qa-owned bump, T-E10-08): cap raised from 4302 → 4966. The two new
-  // const-08-chain-31-mid.md §3.1 bullets (Lease-Override, Bookkeeping-Write) are
-  // chain-tagged (not design-tagged), so they land on the non-design path too, same as
-  // the design-arm floor above. Independently re-measured (not trusted from
-  // sr-engineer's ~340 ~tok estimate) at 4966 ~tok (exact); cap set to the exact measured
-  // value per the established Phase-2 convention (no additional headroom). Saving margin
-  // re-verified: design-arm 7064 − non-design 4966 = 2098 ~tok, still ≥ 2080 (unchanged —
-  // the two new bullets sit outside the design-only fences).
-  // e7-governed-git-surface (sr-owned bump per T-E7-03, AC4): cap raised from 4966 → 5177.
-  // The new const-15-core-tail.md §6 sanctioned-git-ops whitelist bullet is core-tagged
-  // (includeSegment returns true unconditionally), so it lands on the non-design path too,
-  // same as the design-arm floor above. Measured at 5177 ~tok (exact); cap set to the
-  // exact measured value per the established Phase-2 convention (no additional headroom).
-  // Saving margin re-verified: design-arm 7275 − non-design 5177 = 2098 ~tok, still
-  // ≥ 2080 (unchanged — the new bullet is core-tagged, landing equally on both sides).
-  // e14-e16-release-hardening (sr-owned bump per T-EB-02, E7 precedent): cap raised from
-  // 5177 → 5337. The new §3.1 Single-role judge dispatch charter sentences in
-  // const-08-chain-31-mid.md are chain-tagged (not design-tagged), so they land on the
-  // non-design path too, same as the design-arm floor above. Measured at 5337 ~tok
-  // (exact); cap set to the exact measured value per the established Phase-2 convention
-  // (no additional headroom). Saving margin re-verified: design-arm 7435 − non-design
-  // 5337 = 2098 ~tok, still ≥ 2080 (unchanged — the addition sits outside the
-  // design-only fences).
-  // e5-intake-tiering (qa-owned bump, T-E5-02): cap raised from 5337 → 5766. The new
-  // §3.1 Cut-Approval Auto-Tier bullet in const-08-chain-31-mid.md is chain-tagged
-  // (not design-tagged), so it lands on the non-design path too, same as the
-  // design-arm floor above (+429 ~tok, matching the design-arm's +428 within
-  // measurement rounding). Independently re-measured (not trusted from sr-engineer's
-  // or code-reviewer's handoff notes, both of which said 5766) at 5766 ~tok (exact);
-  // cap set to the exact measured value per the established Phase-2 convention (no
-  // additional headroom). Saving margin re-verified: design-arm 7863 − non-design
-  // 5766 = 2097 ~tok, still ≥ 2080 (unchanged — the addition sits outside the
-  // design-only fences).
-  // e18-write-provenance (qa-owned bump, T-E18-01/02): cap raised from 5766 → 6340. The
-  // two new const-08-chain-31-mid.md §3.1 bullets (Stamp-Provenance, QA
-  // Completion-Evidence) are chain-tagged (not design-tagged), so they land on the
-  // non-design path too, same as the design-arm floor above (+574 ~tok, matching the
-  // design-arm's +574 exactly). Independently re-measured (not trusted from
-  // sr-engineer's or code-reviewer's handoff notes) at 6340 ~tok (exact); cap set to
-  // the exact measured value per the established Phase-2 convention (no additional
-  // headroom). Saving margin re-verified: design-arm 8437 − non-design 6340 = 2097
-  // ~tok, still ≥ 2080 (unchanged — the two new bullets sit outside the design-only
-  // fences).
-  // e24-exemptions-manifest (qa-owned bump, T-E24-03): cap raised from 6340 → 6528. The
-  // new const-05-core-standards.md §2 "Build-gate exemptions" bullet is core-tagged (not
-  // design-tagged), so it lands on the non-design path too, same as the design-arm floor
-  // above (+188 ~tok, matching the design-arm's +188 exactly). Independently re-measured
-  // (not trusted from sr-engineer's or code-reviewer's handoff notes) at 6528 ~tok
-  // (exact); cap set to the exact measured value per the established Phase-2 convention
-  // (no additional headroom). Saving margin re-verified: design-arm 8625 − non-design
-  // 6528 = 2097 ~tok, still ≥ 2080 (unchanged — the bullet sits outside the design-only
-  // fences).
-  // e25-git-vocabulary (qa-owned bump, T-E25-01, e-p3-tail-batch): cap raised from 6528 →
-  // 6587. The const-15-core-tail.md §6 sanctioned-git-ops bullet edit is core-tagged (not
-  // design-tagged), so it lands on the non-design path too, same as the design-arm floor
-  // above (+59-60 ~tok, matching the design-arm's +60 within measurement rounding).
-  // Independently re-measured (not trusted from sr-engineer's or code-reviewer's handoff
-  // notes) at 6587 ~tok (exact); cap set to the exact measured value per the established
-  // Phase-2 convention (no additional headroom). Saving margin re-verified: design-arm
-  // 8685 − non-design 6587 = 2098 ~tok, still ≥ 2080 (unchanged — the bullet sits outside
-  // the design-only fences).
-  // e59-const6-waiver-clause (qa-owned bump, T-E59-03): cap raised from 6587 → 6706. The
-  // const-15-core-tail.md §6 "Dependency audit at build gate" bullet rewrite is
-  // core-tagged (not design-tagged), so it lands on the non-design path too, same as the
-  // design-arm floor above (+119 ~tok, matching the design-arm's +119 exactly).
-  // Independently re-measured (not trusted from sr-engineer's or code-reviewer's handoff
-  // notes, both of whom reported this exact figure) at 6706 ~tok (exact); cap set to the
-  // exact measured value per the established Phase-2 convention (no additional
-  // headroom). Saving margin re-verified: design-arm 8804 − non-design 6706 = 2098 ~tok,
-  // unchanged, still ≥ 2080 (the bullet sits outside the design-only fences).
-  // e40-nonqa-completed-tasks-write-gate (qa-owned bump, T-E40-03): cap raised from
-  // 6706 → 7089. The new const-08-chain-31-mid.md "Non-QA Completed-Tasks Gate" row is
-  // chain-tagged (const-08 is composed into every chain/full-detail bundle, never into
-  // lite mode — the 4 build-lite-*/hook-lite goldens stayed green while the 4 build-full-*/
-  // hook-full goldens moved, T-E40-03's own Phase 4 provenance check), so it lands on the
-  // non-design path too, same as the design-arm floor above (+383 ~tok, matching the
-  // design-arm's +383 exactly). Independently re-measured (not trusted from
-  // sr-engineer's/code-reviewer's handoff notes, though both independently reported this
-  // exact figure across two review rounds) at 7089 ~tok (exact); cap set to the exact
-  // measured value per the established Phase-2 convention (no additional headroom).
-  // Saving margin re-verified: design-arm 9187 − non-design 7089 = 2098 ~tok, unchanged,
-  // still ≥ 2080 (the row sits outside the design-only fences).
+  // WHY: the budget win that justified the feature, regression-guarded. Both sides are measured
+  // like production (origin tags, then rationale, stripped); the non-design side composes without
+  // the design fragments. The cap is the exact measured size (zero headroom) and the design-only
+  // saving must stay at least 2080 ~tok, since core and chain edits land on both arms.
+  // Cap history by ticket:
+  // Rationale: specs/e260i-comment-rationale.md (test/context-budget.test.mjs).
   const ratStripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));         // design-arm path: 10057 (E258 re-baseline)
   const nonDesign = approxTokens(stripRationale(stripOriginTags(composeConstitution({ chain: true, design: false })))); // non-design path: 7959 (E258 re-baseline)
   // e43-test-file-ask-at-dispatch (qa-owned bump, T-E43-02): floor raised from 7089 →
