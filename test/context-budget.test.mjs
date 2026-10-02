@@ -1,32 +1,10 @@
 // Coded by @qa-engineer
-// Tests for spec: specs/context-budget-reduction.md.
-// Spec-to-Test map:
-//   measurement (AC1) -> t-measure-runs, t-measure-labels
-//   reduction (AC2) -> t-strip-reduces, t-lean-under-target
-//   enforcement preserved (AC3) -> t-lite-omits-chain, t-lite-keeps-universal,
-//                                 t-full-keeps-chain, t-hook-lite, t-hook-full
-//   no routing regression (AC4) -> t-full-keeps-chain (chain roles still receive
-//                                 §3.1/§4 verbatim; transition logic untouched —
-//                                 covered by the existing transitions test suite)
-//   manifest imported, not regex-copied (DR-4) -> t-manifest-not-duplicated
-//
-// WHY: the always-on token reduction works by composing OUT the chain-only
-// fragments (constitution §3.1, §4) for LITE contexts only. The risk is twofold —
-// (a) the composition silently drops a rule a lite agent still needs, or (b) a
-// consumer re-derives its own fragment list and drifts from the shared manifest.
-// These tests pin both: lite loses ONLY chain rules, chain roles keep everything,
-// and the hook + measure script both import the one shared manifest.
-//
-// compose-not-strip (ticket A9, T-CNSO-07): this file previously exercised
-// stripChainOnly/stripDesignOnly directly as the mechanism under test — both
-// functions are DELETED (prompts/build.ts now composes fragments additively via
-// composeConstitution(), never strips a monolith). Every test below that probed
-// those two strippers' internals (unit tests, DR-3 regex parity, cross-axis
-// permutation/orphan-marker sweeps) is removed; tests that probed OUTCOMES (what
-// a dispatch mode contains/omits) are re-pointed to composeConstitution() and
-// continue to hold — proving the reduction/enforcement/routing equivalence (AC2/AC3/AC4) empirically, not just by
-// construction. stripRationale/stripOriginTags are UNCHANGED and every test of
-// them below is kept verbatim.
+// Tests for spec: specs/context-budget-reduction.md (lean always-on bundle, enforcement kept).
+// WHY: the lean bundle drops chain-only fragments for LITE contexts only. Pinned here: lite loses
+// ONLY chain rules, chain roles keep everything, and the hook and measure script import the one
+// shared manifest instead of re-deriving a fragment list. Constitution assembly is additive
+// (composeConstitution), so the old stripper-internals tests are gone.
+// Spec-to-test map: specs/e260i-comment-rationale.md (test/context-budget.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -51,15 +29,9 @@ const { composeSkill, hostCapabilitiesFor } = await import(path.join(ROOT, "dist
 function readSkillFile(f) {
   return composeSkill(f, hostCapabilitiesFor("claude-code"), (g) => fs.readFileSync(path.join(ROOT, "content", g), "utf-8"));
 }
-// a12-partials-limits-registry (T-A12-04, AC5): 5 skill files (architect, pm,
-// design-auditor, researcher, sr-engineer) now source their step-1 preflight
-// line from content/partial-step1-preflight.md via {{PARTIAL:step1-preflight}}
-// (buildPromptForRole/switchRole both expand it before frontmatter parsing —
-// see prompts/build.ts L363-371). Any test here that fs.readFileSync's one of
-// those 5 files directly no longer sees the composed text an agent actually
-// receives; it sees the bare, un-expanded token. Import the same expander the
-// real pipeline uses so raw-file-read tests measure/assert against the
-// partial-composed body, not the raw disk bytes.
+// Five skill files (architect, pm, design-auditor, researcher, sr-engineer) take their step-1 line
+// from content/partial-step1-preflight.md through a {{PARTIAL:...}} token that the real pipeline
+// expands. A raw fs.readFileSync would see the bare token, so tests use the same expander.
 const { expandPartials } = await import(path.join(ROOT, "dist", "prompts", "partials-manifest.js"));
 function loadPartial(f) {
   return fs.readFileSync(path.join(ROOT, "content", f), "utf-8");
@@ -124,15 +96,12 @@ const SR_RULE_MARKERS = [
   "QA Round Reply",
 ];
 
-// --- Partial-substitution byte-identity (AC2; a12-partials-limits-registry, T-A12-04) ---
-// WHY: specs/a12-partials-limits-registry-architecture.md's Byte-Identity Contract (its AC2)
-// requires buildPromptForRole's composed output for the 5 partial-adopting roles
-// (architect, pm, design-auditor, researcher, sr-engineer) to be byte-identical, on the
-// SKILL portion, to the pre-refactor hand-authored step-1 line. The direct expandPartials
-// unit test below is architecture's "Recommended primary AC2 assertion"; the per-role
-// buildPromptForRole assertions are the end-to-end proof that both render paths (build.ts
-// AND tools/role.ts; architecture decision DR-4) actually wire it in — a regression in either wiring site would
-// either leak a raw {{PARTIAL:...}} token or drop the line entirely.
+// --- Partial-substitution byte-identity ---
+// WHY: for the 5 partial-adopting roles the composed skill portion must equal the old hand-written
+// step-1 line. The direct expandPartials test is the primary assertion; the per-role
+// buildPromptForRole and switchRole tests prove both render paths wire it in, since a miss would
+// leak a raw {{PARTIAL:...}} token or drop the line.
+// Spec: specs/a12-partials-limits-registry-architecture.md.
 const STEP1_LINE = "1. `tw_get_state` → `tw_detect_drift`.";
 const PARTIAL_ADOPTING_SKILLS = [
   "skill-architect.md",
@@ -199,14 +168,9 @@ test("AC2/DR-4: tools/role.ts switchRole (the second render path) also expands t
 });
 
 test("DR-5 guard (T-A12-09): no literal {{PARTIAL:...}} token may appear in any const-*.md, skill-coordinator.md, or skill-coordinator-lite.md source file", () => {
-  // WHY: the hook-scope decision (architecture DR-5) — the SessionStart hook renders ONLY skill-coordinator.md /
-  // skill-coordinator-lite.md, and neither adopts the partial mechanism; const-*.md
-  // fragments never carried the step-1 line at all. None of these render through
-  // expandPartials (build.ts only calls it on the DISPATCHED skill file, never on the
-  // constitution fragments; the hook doesn't call it either). If a future edit ever
-  // placed a {{PARTIAL:...}} token into any of these files, it would leak to the agent
-  // completely un-expanded — this static source-grep guard catches that at the source,
-  // cheaper than waiting for a composed-output test to notice.
+  // WHY: the SessionStart hook renders only the coordinator skills, and neither they nor the
+  // const-*.md fragments go through expandPartials. A {{PARTIAL:...}} token in any of them would
+  // reach the agent unexpanded; this source grep catches it earlier than a composed-output test.
   const CONTENT_DIR = path.join(ROOT, "content");
   const files = fs.readdirSync(CONTENT_DIR).filter((f) => /^const-\d\d-/.test(f));
   // d6-host-capability-compose-axis (T-D6-04): content/skill-coordinator.md is
@@ -224,171 +188,13 @@ test("DR-5 guard (T-A12-09): no literal {{PARTIAL:...}} token may appear in any 
 // --- reduction (AC2) -------------------------------------------------------
 
 test("AC2: lean always-on bundle is below the raw baseline and within target (<= 5548 ~tok)", () => {
-  // v3.24.0 (B2 backlog fix): cap raised from 2100 → 2300 to provide ~200-token
-  // editing headroom. The v3.22.0 raise (2000 → 2100) left only a 2-token margin
-  // (2098/2100), meaning any minor constitution/skill edit broke CI unexpectedly.
-  // v3.27.0 (qa-owned bump): cap raised from 2300 → 2400 to absorb the net growth
-  // from the real v3.27.0 constitution edits (A1–B3 + A4 wording). Actual lean
-  // bundle measured at 2348 ~tok; 2400 provides ~50-token editing headroom while
-  // staying well below the full coordinator bundle (~3500+ tokens).
-  // v3.31.0 (qa-owned bump): cap raised from 2400 → 2600 to absorb the §1
-  // Self-converge relaxation clause (visual-selfconverge feature). Actual lean
-  // bundle measured at 2528 ~tok; 2600 provides ~70-token editing headroom.
-  // v3.28.0 (qa-owned bump): cap raised from 2600 → 2700 to absorb the §1
-  // Design-sourced assets line (design-asset-source-rule feature). Lean applies
-  // stripChainOnly only (not stripDesignOnly) — the new §1 design-only line counts
-  // on this path. Actual lean bundle measured at 2641 ~tok; 2700 provides ~59-token
-  // editing headroom, consistent with the v3.31.0 ~70-token convention.
-  // v3.38.0 (qa-owned bump): cap raised from 2700 → 2850 to absorb the F2
-  // retro-sop-hardening scope-creep visual-fidelity example added to
-  // skill-coordinator-lite.md (one long line, +91 ~tok net). Actual lean bundle
-  // measured at 2791 ~tok; 2850 provides ~59-token editing headroom, consistent
-  // with the v3.28.0 ~59-token convention.
-  // pm-cut-approval-gate (qa-owned bump): cap raised from 2850 → 3010 to absorb
-  // the cut-approval SOP text added to skill-coordinator-lite.md (halt instruction)
-  // and the skill-pm.md step 7a expansion. Actual lean bundle measured at 2958 ~tok;
-  // 3010 provides ~52-token editing headroom, consistent with prior conventions.
-  // cut-approval-coordinator-attestation (qa-owned bump, C2-06): cap raised from
-  // 3010 → 3030 to absorb the new Cut-Approval Gate bullet in const-08-chain-31-mid.md
-  // (chain-tagged, included on this lean path) plus the skill-pm.md/skill-coordinator-lite.md
-  // pointer-line dedup edits. Actual lean bundle measured at 3030 ~tok (exact); cap set
-  // to the exact measured value per the Phase-2 convention (no additional headroom).
-  // a13-section1-polish (qa-owned bump, A13-07): cap raised from 3030 → 3087 to absorb
-  // the const-01-core-head.md Terse/Watermark rewrite (unified output-length policy +
-  // two-row watermark decision table with the `fable` tier added). const-01-core-head.md
-  // is core-head (untagged chain/design), so it loads on this lean path too. Independently
-  // re-measured (not trusted from sr-engineer's handoff note) at 3087 ~tok (exact); cap
-  // set to the exact measured value per the established Phase-2 convention (no additional
-  // headroom).
-  // a11-escalation-grammar (qa-owned bump, A11-02): cap raised from 3087 → 3332 to absorb
-  // the const-05-chain-mid.md canonical Escalation call format + WHEN/DO/ELSE bullets added
-  // by this ticket (chain-tagged, loads on this lean path). Independently re-measured (not
-  // trusted from sr-engineer's handoff note) at 3332 ~tok (exact); cap set to the exact
-  // measured value per the established Phase-2 convention (no additional headroom).
-  // b8-external-ref-ledger (qa-owned bump, B8-09/B8-10): cap raised from 3332 → 3386 to
-  // absorb the skill-coordinator-lite.md Auto-Routing stop-condition addition for the
-  // EXTERNAL_REFS_UNRESOLVED gate (AC-12). Independently re-measured (not trusted from
-  // sr-engineer's handoff note) at 3386 ~tok (exact); cap set to the exact measured value
-  // per the established Phase-2 convention (no additional headroom).
-  // c7-version-assertion-ownership (qa-owned bump, AC-8): cap raised from 3386 → 3491 to
-  // absorb the const-05-core-standards.md "Test ownership" bullet rewrite (S01: narrow
-  // import/require-path-retarget carve-out naming the earlier import-retarget precedent (A10), net +420 chars).
-  // const-05-core-standards.md is core (untagged chain/design), so it loads on this lean
-  // path too. Independently re-measured (not trusted from sr-engineer's or
-  // code-reviewer's notes) at 3491 ~tok (exact); cap set to the exact measured value per
-  // the established Phase-2 convention (no additional headroom).
-  // c9-protocol-fields (qa-owned bump, T-C9-11): cap raised from 3491 → 3685 to absorb
-  // the const-05-core-standards.md Escalation-call-format rewrite (T-C9-12: next_role/
-  // resume_of/review_verdict promoted to first-class fields, with the new
-  // REVIEW_VERDICT_STATUS_MISMATCH gate prose) plus the const-12-chain-r10-s4.md S6
-  // sentence rewording — both core/chain-tagged, load on this lean path. Independently
-  // re-measured (not trusted from sr-engineer's or code-reviewer's notes) at 3685 ~tok
-  // (exact); cap set to the exact measured value per the established Phase-2 convention
-  // (no additional headroom).
-  // c14-dispatch-pins (qa-owned bump, T-C14-11): cap raised from 3685 → 3761 to absorb
-  // the const-01-core-head.md AC-7 Pin-override bullet (a new line under the Watermark
-  // rule stating dispatch_pins takes precedence over frontmatter/recommended_model
-  // defaults) — const-01-core-head.md is core-head (untagged chain/design), so it loads
-  // on this lean path too. Independently re-measured (not trusted from sr-engineer's or
-  // code-reviewer's notes) at 3761 ~tok (exact); cap set to the exact measured value per
-  // the established Phase-2 convention (no additional headroom).
-  // a12-partials-limits-registry (qa-owned bump, T-A12-05/AC3): cap raised from 3761 →
-  // 4027 to absorb the new `## Limits` table inserted at the top of
-  // const-01-core-head.md (before §1) — const-01 is core-head (untagged chain/design),
-  // so it loads on this lean path too. skill-coordinator-lite.md does not adopt the
-  // {{PARTIAL:...}} mechanism (spec decision DR-5), so no skill-side change here. Independently
-  // re-measured (not trusted from sr-engineer's or code-reviewer's notes) at 4027 ~tok
-  // (exact); cap set to the exact measured value per the established Phase-2 convention
-  // (no additional headroom).
-  // d2-server-brake-accounting (qa-owned bump, T-D2-03): cap raised from 4027 → 4085 to
-  // absorb the hop-counter server-tracked rewiring in skill-coordinator-lite.md (the
-  // hop-cap-exempt note for lite mode, const-01 Limits reference) plus the
-  // const-01-core-head.md `## Limits` table's `hop` cap row and the HOP_CAP_EXCEEDED
-  // server-enforcement bullet (core-head, untagged chain/design, loads on this lean path
-  // too). Independently re-measured (not trusted from sr-engineer's handoff note) at 4085
-  // ~tok (exact); cap set to the exact measured value per the established Phase-2
-  // convention (no additional headroom).
-  // e7-governed-git-surface (sr-owned bump per T-E7-03, AC4): cap raised from 4085 → 4297
-  // to absorb the new §6 "Sanctioned git operations (ALL roles)" whitelist bullet in
-  // const-15-core-tail.md (core-tagged — includeSegment returns true unconditionally, so
-  // it ships on this lean/lite path too; the bullet is unfenced — no rationale fence, per
-  // the exactly-two-fences pin (AC7) — so its full text counts on every path). Measured at
-  // 4297 ~tok (exact); cap set to the exact measured value per the established Phase-2
-  // convention (no additional headroom). This bump also re-syncs the test title with the
-  // live assert (the title had stalled at "<= 3087" since the a11-escalation-grammar bump
-  // raised the assert without updating it — same drift class the e3 bump fixed for skill-pm).
-  // e24-exemptions-manifest (qa-owned bump, T-E24-03): cap raised from 4297 → 4485 to
-  // absorb the new const-05-core-standards.md §2 "Build-gate exemptions" bullet (core-tagged
-  // — includeSegment returns true unconditionally, so it ships on this lean/lite path too;
-  // the bullet carries no rationale fence, so its full text counts on every path).
-  // Independently re-measured (not trusted from sr-engineer's or code-reviewer's handoff
-  // notes) at 4485 ~tok (exact); cap set to the exact measured value per the established
-  // Phase-2 convention (no additional headroom). Growth (+188 ~tok) is proportionate to
-  // the one new §2 bullet — not a blowout.
-  // e25-git-vocabulary (qa-owned bump, T-E25-01, e-p3-tail-batch): cap raised from 4485 →
-  // 4544 to absorb the const-15-core-tail.md §6 sanctioned-git-ops bullet edit (added
-  // `git stash` / `git stash pop` to the sanctioned list; clarified `git checkout --
-  // <file>` as destructive) — const-15-core-tail.md is core-tagged (includeSegment
-  // returns true unconditionally), so it ships on this lean/lite path too. Independently
-  // re-measured (not trusted from sr-engineer's or code-reviewer's handoff notes) at 4544
-  // ~tok (exact); cap set to the exact measured value per the established Phase-2
-  // convention (no additional headroom). Growth (+59 ~tok) is proportionate to the one
-  // bullet edit — not a blowout.
-  // e59-const6-waiver-clause (qa-owned bump, T-E59-03): cap raised from 4544 → 4667 to
-  // absorb the const-15-core-tail.md §6 "Dependency audit at build gate" bullet rewrite —
-  // the "unless waived in the PR description with rationale" escape was replaced with a
-  // pre-dated dependency-advisory-record disposition requirement (advisory id, decision,
-  // re-review trigger) that binds every build-running role, not just release-engineer
-  // (docs/backlog.md E59, origin review_T-E57-01 F7) — same core-tagged bullet as the
-  // e25 bump above, so it ships on this lean/lite path too. Independently re-measured
-  // (not trusted from sr-engineer's or code-reviewer's handoff notes, both of whom
-  // reported this exact figure) at 4667 ~tok (exact); cap set to the exact measured
-  // value per the established Phase-2 convention (no additional headroom). Growth
-  // (+123 ~tok) is proportionate to the one bullet rewrite — not a blowout.
+  // Cap rule: each raise is a qa-owned re-measure, and the cap is set to the exact measured size
+  // (zero headroom). Bump history: specs/e260i-comment-rationale.md (test/context-budget.test.mjs).
   const liteSkill = fs.readFileSync(path.join(ROOT, "content", "skill-coordinator-lite.md"), "utf-8");
   const SEP = "\n\n---\n\n";
   const raw = approxTokens(CONSTITUTION + SEP + liteSkill);
   const lean = approxTokens(LEAN_CONSTITUTION + SEP + liteSkill);
   assert.ok(lean < raw, `lean (${lean}) must be < raw (${raw})`);
-  // e43-test-file-ask-at-dispatch (qa-owned bump, T-E43-02): cap raised from 4667 → 4868
-  // (+201) to absorb the three-branch rewrite of const-05's §2 *Conditional test writing*
-  // bullet (230 → 1032 chars). This is the always-on lean bundle, so this is the widest
-  // blast radius any const-05 edit has — the bullet ships in every dispatch mode. Bought
-  // deliberately: the earlier one-sentence form (before E43) was unexecutable for a Task-dispatched
-  // qa-engineer (docs/backlog.md E43) and had already forced a documented deviation in
-  // E38's QA round, so the growth buys a rule that no longer requires violating it.
-  // Independently re-measured by qa (NOT trusted from sr-engineer's handoff or the
-  // reviewer's report) at 4868 ~tok (exact); cap set to the exact measured value per the
-  // established Phase-2 convention. Rationale-fencing the bullet's causal clause was
-  // considered and REJECTED with the numbers in hand — see qa_reports/review_T-E43-02.md.
-  // e130-lane-default (qa-owned bump, T-E130-07): cap raised from 4868 → 4912 (+44) to
-  // absorb const-05-core-standards.md's AC9 hand-edit-rule edit (removes the stale
-  // "only PM's initial bootstrapping write is exempt" clause — net shrink) plus
-  // const-15-core-tail.md's AC8 Document Priority paragraph (the new
-  // auto-injected-data-blocks-are-not-documents sentence — net growth larger than the
-  // AC9 shrink). Both fragments are core (untagged chain/design), so both land on this
-  // lean/lite path too. Independently re-measured by qa (NOT trusted from sr-engineer's
-  // or code-reviewer's handoff notes) at 4912 ~tok (exact); cap set to the exact measured
-  // value per the established Phase-2 convention (no additional headroom).
-  // e178a-integrator-role (qa-owned bump, T-E178A-06, AC17): cap raised from 4912 → 5157
-  // (+245) to absorb the §6 amendment in const-15-core-tail.md (AC6/AC7/AC8): the
-  // `git fetch` clause, the `commit --amend` FORBIDDEN sub-bullet, the integrator-only
-  // git-ops grant, and the tool-internal-ops sub-bullet. const-15 is core (untagged
-  // chain/design), so it lands on this always-on lean/lite path too — same +245 delta
-  // as the design-arm/non-design/teamwork floors below (they all carry const-15 once
-  // each). Independently re-measured by qa (matches sr-engineer's own re-measurement,
-  // reported independently in review_reports/review_T-E178A-01.md Round 1/2, and not
-  // merely trusted from it) at 5157 ~tok (exact); cap set to the exact measured value
-  // per the established Phase-2 convention (no additional headroom).
-  // The always-on bundle grew again because a new rule now tells every role what it
-  // may never write in any durable output — a comment, a report, a commit message —
-  // and it lives in the same core-tagged fragment as the bullets above, so it reaches
-  // every dispatch mode including lite. Independently re-measured (not trusted from
-  // sr-engineer's or code-reviewer's handoff notes) at 5415 ~tok (exact); cap raised
-  // from 5157 to that exact measured value, per the established Phase-2 convention of
-  // setting the cap to the measured figure with no extra headroom (zero-headroom convention, E231).
-  // Comment-discipline rule bullet (const-15) added to the core-tagged fragment: re-measured
-  // at 5548 ~tok (exact); cap raised from 5415 to that exact value, zero headroom (E258).
   assert.ok(lean <= 5548, `lean always-on (${lean} ~tok) must meet the <= 5548 target (E258 re-baseline)`);
 });
 
@@ -425,26 +231,10 @@ test("AC3/AC4: full (chain-role) constitution RETAINS chain-only sections verbat
 
 // --- SessionStart hook integration (AC3) ----------------------------------
 
-// Test-isolation fix (prompt-state-injection QA, C6C11-QA, review_reports/review_C6C11-REV.md N2): this
-// used to run the hook with CLAUDE_PROJECT_DIR=ROOT, which writes a REAL C11
-// L2 dedup marker (bin/agent-governance-context.mjs's trailing
-// `.agc-hook-marker.json` write) into THIS repo's own `.current/`. That marker
-// is cross-process BY DESIGN (index.ts's hookMarkerFresh reads it from disk),
-// so a later, unrelated test *process* — test/teamwork-lite.test.mjs AC3b —
-// spawning the real server against `PROJECT_ROOT` (== this same ROOT) within
-// the 120s window correctly (per the prompt-state dedup fail-safe contract, C11) saw a fresh
-// marker and substituted the S03 sentinel for the constitution, failing
-// AC3b's `# Constitution v` assertion. That is the product working as
-// designed colliding with a shared on-disk side effect of THIS file's test
-// run — a test-infra defect, not a product bug (confirmed by code-reviewer,
-// APPROVED). Fix: give every runHook() call its own throwaway managed
-// workspace (a temp dir with a `.current/` marker so isManagedWorkspace is
-// true) so the L2 marker it writes never lands in the real repo, and delete
-// that workspace immediately after — no assertion is loosened (AC-10/AC-11:
-// AC3b keeps its unqualified S03-must-be-absent assertion). SERVER_ROOT
-// (content/constitution/skill source) is unaffected: the hook derives it from
-// `__dirname`, not from CLAUDE_PROJECT_DIR, so it still loads the real
-// content/ tree regardless of which workspace we point CLAUDE_PROJECT_DIR at.
+// Isolation: runHook() gives every call its own throwaway managed workspace (a temp dir with a
+// `.current/` marker). Running the hook against the real repo wrote a cross-process dedup marker
+// into its `.current/`, which made a later test process (teamwork-lite AC3b) see a fresh marker
+// and lose the constitution. No assertion is loosened; the hook finds content/ by its own path.
 function runHook(env) {
   const ws = fs.mkdtempSync(path.join(os.tmpdir(), "agc-hook-test-"));
   fs.mkdirSync(path.join(ws, ".current"), { recursive: true });
@@ -472,16 +262,11 @@ test("AC3: SessionStart hook FULL output retains chain sections", () => {
   }
 });
 
-// --- AC-9 (C6C11, C11 dedup outcome): measurable token reduction ----------
-// WHY: spec c6-c11-prompt-state-injection.md AC-9 requires a CONCRETE number,
-// not just "some savings", for the dual-injection scenario the C11 mechanism
-// exists to fix (hook full-emit + a same-session /teamwork* fetch, or
-// /teamwork then /teamwork-lite — see test/prompt-state-footer.test.mjs's
-// e2e dedup test for the end-to-end proof that this mechanism actually fires).
-// This test isolates the PURE size delta buildPromptForRole's omitConstitution
-// param produces (index.ts's L1/L2 decision; DR-6): the second fetch in a
-// dual-injection session pays only the S03 sentinel's cost instead of a full
-// second constitution copy.
+// --- omitConstitution size delta (prompt-state dedup) ---
+// WHY: the dedup needs a concrete saving, not just "some". This isolates the size delta that
+// buildPromptForRole's omitConstitution param produces: a second fetch in a dual-injection session
+// pays only the sentinel instead of a second constitution copy. End-to-end proof is in
+// test/prompt-state-footer.test.mjs; spec: specs/c6-c11-prompt-state-injection.md.
 test("AC-9: omitConstitution=true bundle is measurably smaller than the full bundle by a concrete floor", async () => {
   const ws = fs.mkdtempSync(path.join(os.tmpdir(), "twac9-"));
   setActiveStorage(new FileHandoffStorage());
@@ -492,14 +277,9 @@ test("AC-9: omitConstitution=true bundle is measurably smaller than the full bun
   fs.rmSync(ws, { recursive: true, force: true });
   const fullTok = approxTokens(full);
   const omittedTok = approxTokens(omitted);
-  // c6-c11-prompt-state-injection (qa-owned, AC-9): measured full=2575 ~tok,
-  // omitted=1070 ~tok, saved=1505 ~tok on this working tree (coordinator-lite
-  // skill, non-design fixture — the leanest arm, so this is a conservative
-  // saving; the design-arm / chain-role saving is larger since the full
-  // constitution slice it replaces is bigger). Floor set to 1200 ~tok, ~300
-  // below the measured value, so routine content edits to the S03 sentinel
-  // or skill-coordinator-lite.md don't flap this test while still proving a
-  // real, non-trivial reduction (AC-9's own "concrete number" requirement).
+  // Measured: full 2575, omitted 1070, saved 1505 ~tok (coordinator-lite, non-design fixture: the
+  // leanest arm, so a conservative saving). The 1200 floor sits ~300 below that, so routine edits
+  // to the sentinel or the skill do not flap the test while a real reduction is still proven.
   assert.ok(omittedTok < fullTok, `omit=true bundle (${omittedTok} ~tok) must be smaller than omit=false (${fullTok} ~tok)`);
   assert.ok(
     fullTok - omittedTok >= 1200,
@@ -555,16 +335,10 @@ test("DR-4: hook and measure script import the shared constitution-manifest (no 
   }
 });
 
-// ============================================================================
-// governance-tag-strip (T-GTS-07): new coverage for the fourth sibling stripper,
-// stripOriginTags. Mirrors the stripDesignOnly (AC1) / stripRationale (AC9) unit-test
-// pattern already established above: idempotence, no-marker passthrough, and
-// span-removal at the unit level; a mixed-content site (paren shared between a
-// provenance tag and real normative text) at both the string level and end-to-end
-// through buildPromptForRole; and a representative (not exhaustive 4!=24) composition-
-// order check against the other three strippers. Spec: specs/governance-tag-strip.md
-// AC1-AC4.
-// ============================================================================
+// --- stripOriginTags coverage ---
+// Unit contract (idempotent, no-marker passthrough, span removal), a mixed-content site (a paren
+// shared by a provenance tag and normative text) at string level and through buildPromptForRole,
+// and composition order against stripRationale. Spec: specs/governance-tag-strip.md.
 
 test("T-GTS-07/AC3: stripOriginTags is idempotent, no-marker passthrough, and removes fenced spans", () => {
   // WHY: same unit contract as the three sibling strippers (spec AC3) — a
@@ -662,16 +436,9 @@ test("AC9: stripRationale removes rationale blocks from skill-pm.md", () => {
 });
 
 test("AC9: every operative rule/gate/SOP marker survives stripRationale in skill-pm.md", () => {
-  // WHY: these are the imperative rule headings and gate names the pm role acts on.
-  // None may be inside a rationale fence — if they were, stripping would silently
-  // drop a governance gate from every pm dispatch.
-  // a12-partials-limits-registry (T-A12-04, AC5): skill-pm.md's step-1 line
-  // (the "1. `tw_get_state`" marker below) is now the bare token
-  // {{PARTIAL:step1-preflight}} on disk (T-A12-03) — a raw fs.readFileSync no
-  // longer contains that marker at all. expandSkill() runs the same
-  // expandPartials() pass buildPromptForRole/switchRole run before
-  // stripOriginTags/stripRationale, so this test measures what a pm dispatch
-  // actually contains, not the un-expanded source file.
+  // WHY: these are the rule headings and gate names the pm role acts on; none may sit inside a
+  // rationale fence, or stripping would drop a gate from every pm dispatch. The step-1 line is
+  // the bare {{PARTIAL:...}} token on disk, so expandSkill() applies the expansion a dispatch runs.
   const SKILL_PM = fs.readFileSync(path.join(ROOT, "content", "skill-pm.md"), "utf-8");
   const stripped = stripRationale(expandSkill(SKILL_PM));
   for (const m of PM_RULE_MARKERS) {
@@ -679,18 +446,10 @@ test("AC9: every operative rule/gate/SOP marker survives stripRationale in skill
   }
 });
 
-// skill-pm-consolidation (T-PMC-01, v3.44.0 pending): the gate-sub-step ->
-// Gate Summary table rewrite relocated the Ambiguity Gate's STOP payload
-// (spec Copy/Strings AC-8) from a standalone numbered sub-step into a table
-// cell. specs/skill-pm-consolidation.md AC-8 calls out that this string must
-// survive BYTE-EXACT, specifically preserving the em-dash (U+2014) separator
-// rather than a hyphen -- a paraphrase an editor could introduce without any
-// visual difference in most fonts/renderers. Nothing previously pinned this
-// literal against the SKILL DOC TEXT itself (only the constitution's general
-// pending_notes shape is tested elsewhere) -- this closes that gap so a
-// future doc edit that silently swaps the em-dash for a hyphen fails CI
-// instead of silently corrupting the Blocked-state payload an escalation
-// handler reads verbatim.
+// The Ambiguity Gate STOP payload moved from a numbered sub-step into a Gate Summary table cell.
+// It must stay byte-exact, including the em-dash (U+2014) rather than a hyphen, because an
+// escalation handler reads the Blocked-state payload verbatim and nothing else pins this literal
+// against the skill text. Spec: specs/skill-pm-consolidation.md.
 test("AC8 (skill-pm-consolidation): Ambiguity Gate STOP payload is byte-exact (em-dash, not hyphen)", () => {
   const SKILL_PM = fs.readFileSync(path.join(ROOT, "content", "skill-pm.md"), "utf-8");
   assert.ok(
@@ -700,14 +459,9 @@ test("AC8 (skill-pm-consolidation): Ambiguity Gate STOP payload is byte-exact (e
 });
 
 test("AC9: every operative rule/gate/SOP marker survives stripRationale in skill-sr-engineer.md", () => {
-  // WHY: same contract for sr-engineer — stripped dispatch must carry the full
-  // operative SOP even after rationale-only prose is removed.
-  // a12-partials-limits-registry (T-A12-04, AC5): skill-sr-engineer.md is also one
-  // of the 5 partial-adopting files (T-A12-03); route through expandSkill() so this
-  // measures the composed dispatch text, matching the PM marker test above. None of
-  // SR_RULE_MARKERS names the step-1 line, so this is a consistency fix, not a
-  // regression fix — but the un-expanded raw file is no longer what sr-engineer
-  // dispatch actually contains, so asserting against it would be testing the wrong text.
+  // WHY: the stripped sr-engineer dispatch must keep the full operative SOP once rationale-only
+  // prose is removed. This skill also takes its step-1 line from a partial, so expandSkill() makes
+  // the test measure the composed text (no marker below names that line; consistency only).
   const SKILL_SR = fs.readFileSync(path.join(ROOT, "content", "skill-sr-engineer.md"), "utf-8");
   const expanded = expandSkill(SKILL_SR);
   const stripped = stripRationale(expanded);
