@@ -4,6 +4,7 @@
 //   --base          base revision (default: first line of .current/e260i/base-sha)
 //   --changed-only  run the >20, 8-20 and bare-id checks on changed files only (per-task runs)
 //   --head-root <dir>  self-test only: read HEAD file text from <dir>/<path> instead of the worktree
+//   --through <file>:<line>  per-task runs: limit the >20, 8-20 and bare-id checks of <file> to HEAD lines <= <line>
 //   --list-mid      also print every 8-20 line block as `<file>:<line> <counted>`
 // Prints one line per check, then `proof: PASS` or `proof: FAIL (<checks>)`; exit 1 on FAIL.
 import { execFileSync } from "node:child_process";
@@ -115,6 +116,9 @@ report("leaves", leafBad.length === 0, `leaves: ${changed.length} files, ${leafB
 
 // long blocks (AC4, AC5) and bare-id (AC7)
 const owned = lines(git("ls-files", "--", "test")).filter((f) => OWNED.test(f));
+const thr = argv.indexOf("--through");
+const [thrFile, thrLine] = thr >= 0 ? [argv[thr + 1].split(":")[0], Number(argv[thr + 1].split(":")[1])] : [null, Infinity];
+const upTo = (f, n) => f !== thrFile || n <= thrLine;
 const scanSet = flag("--changed-only") ? changed : owned;
 const over = [];
 const mid = [];
@@ -124,10 +128,11 @@ for (const f of scanSet) {
   const raw = text.split(/\r?\n/);
   const a = analyzeText(text);
   for (const b of a.blocks) {
+    if (!upTo(f, b.start)) continue;
     if (b.counted > 20) over.push(`${f}:${b.start} ${b.counted}`);
     else if (b.counted >= 8) mid.push(`${f}:${b.start} ${b.counted}`);
   }
-  a.lines.forEach((l, i) => { if (l.kind === "comment" && bareId(raw[i])) bare.push(`${f}:${i + 1}`); });
+  a.lines.forEach((l, i) => { if (l.kind === "comment" && upTo(f, i + 1) && bareId(raw[i])) bare.push(`${f}:${i + 1}`); });
 }
 console.log(`scanned: ${scanSet.length} file(s)${flag("--changed-only") ? " (changed only)" : ""}`);
 report(">20", over.length === 0, `>20: ${over.length}`, over);

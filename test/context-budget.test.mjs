@@ -472,100 +472,10 @@ test("AC9: every operative rule/gate/SOP marker survives stripRationale in skill
 });
 
 test("AC1/AC2: skill-pm stripped token count meets ≤ 4376 cap", () => {
-  // WHY: the spec's re-grounded reduction target (AC1) (measured lossless, current file size
-  // including F-A growth) must hold so each pm role dispatch is within budget.
-  // pm-cut-approval-gate (qa-owned bump): cap raised from 2322 → 2850 to absorb
-  // the step 7a Cut-Approval Gate SOP addition to skill-pm.md (inline cut draft
-  // workflow, design-link rule, re-arm description). Actual stripped body measured
-  // at 2800 ~tok; 2850 provides ~50-token editing headroom.
-  // governance-tag-strip (T-GTS-06, qa-owned re-baseline): cap LOWERED from 2850 → 2817.
-  // The real buildPromptForRole pipeline now runs stripOriginTags on the skill body BEFORE
-  // stripRationale (build.ts, unconditional). skill-pm.md carries one origin fence (the
-  // Geometric-Density Split Gate's "(v3.26.0; …)" rationale-nested tag), so folding
-  // stripOriginTags into this test's composition (matching production) trims a few more
-  // bytes than the raw-only 2830 this test previously measured. Actual stripRationale(
-  // stripOriginTags(body)) measured at 2817 ~tok exactly; cap set to the exact measured
-  // value (no headroom) per the constitution-conditional-load Phase-2 convention — the
-  // point of this feature is the cap ending LOWER, not gaining fresh editing slack.
-  // pm-repair-resume-routing (v3.47.0, qa-owned bump, C1-09/AC-11): cap raised from
-  // 2817 → 2918 to absorb the AC-7 PM SOP addition (PM records `resume_of: <role>` on
-  // its pm:In_Progress amend write, pointing to Constitution §3.1). Actual stripped
-  // body re-measured at 2918 ~tok exactly; cap set to the exact measured value (no
-  // headroom) per the established convention.
-  // a13-section1-polish (qa-owned bump, A13-07): cap raised from 2918 → 3196 to absorb
-  // the new `## Spec Schema` minimal-complete-passing-example fenced block added to
-  // skill-pm.md (AC3b) plus the Output-rule word-cap sentence removal (AC3a, a small
-  // reduction that the schema example far outweighs). Independently re-measured
-  // (not trusted from sr-engineer's handoff note) at 3196 ~tok exactly; cap set to
-  // the exact measured value per the established Phase-2 convention (no headroom).
-  // a11-escalation-grammar (qa-owned bump, A11-02): cap raised from 3196 → 3225 to absorb
-  // skill-pm.md's Escalation Routes table conversion to the canonical const-05 call format
-  // (byte-identical | situation | status | note token | next_role | header). Independently
-  // re-measured (not trusted from sr-engineer's handoff note) at 3225 ~tok exactly; cap set
-  // to the exact measured value per the established Phase-2 convention (no headroom).
-  // b8-external-ref-ledger (qa-owned bump, B8-10): cap raised from 3225 → 3327 to absorb
-  // the skill-pm.md Resource Audit Gate row rewrite (records external_refs entries via
-  // tw_update_state, AC-11). Independently re-measured (not trusted from sr-engineer's
-  // handoff note) at 3327 ~tok exactly; cap set to the exact measured value per the
-  // established Phase-2 convention (no headroom).
-  // c9-protocol-fields (qa-owned bump, T-C9-13): cap raised from 3327 → 3377 to absorb
-  // skill-pm.md's Auto-Routing / Escalation Routes / Gate Summary prose rewrite (records
-  // `next_role`/`resume_of` as first-class fields instead of `pending_notes` tokens).
-  // Independently re-measured at 3377 ~tok exactly; cap set to the exact measured value
-  // per the established Phase-2 convention (no headroom).
-  // c16-c10-role-boundary (qa-owned bump, T-C16C10-06): cap raised from 3377 → 3473 to
-  // absorb T-C10-03's new cut-template rule (Task Format section: release bookkeeping —
-  // version bump, CHANGELOG, backlog done-marking — MUST be assigned to release-engineer,
-  // never cut onto a qa-engineer or sr-engineer task by default). Independently re-measured
-  // at 3473 ~tok exactly; cap set to the exact measured value per the established Phase-2
-  // convention (no headroom).
-  // a12-partials-limits-registry (T-A12-04/AC5, qa-owned re-baseline): this test previously
-  // measured the RAW body, which as of T-A12-03 contains the short literal
-  // "{{PARTIAL:step1-preflight}}" instead of the real step-1 line the composed dispatch
-  // ships (buildPromptForRole expands it before stripOriginTags/stripRationale run — see
-  // build.ts L363-371). Folding expandSkill() into this test's composition (matching
-  // production) measures stripRationale(stripOriginTags(expandSkill(body))) at 3473 ~tok
-  // exactly — coincidentally the SAME value as the prior raw-only measurement (the token
-  // placeholder and the expanded line differ by only ~1 ~tok), so the cap itself is
-  // unchanged, but the computation now reflects what pm dispatch actually contains instead
-  // of silently under-measuring it.
-  // e2-bugfix-repro-gate (qa-owned bump): cap raised from 3473 → 3775 to absorb the new
-  // "Bugfix mode" paragraph added to skill-pm.md (step 8 area: dispatch_mode="bugfix"
-  // guidance, AC4 opt-back-in note, one Task-Format example). Independently re-measured
-  // at 3775 ~tok exactly; cap set to the exact measured value per the established Phase-2
-  // convention (no headroom).
-  // e4-design-source-credibility-gate (qa-owned bump, T-E4-03): cap raised from 3775 →
-  // 3922 to absorb the new "Source-Credibility Gate" row added to skill-pm.md's Gate
-  // Summary table (awareness-only pointer to the design-auditor-authored attestation,
-  // per spec Dependencies point — PM does not author the attestation, just needs the
-  // pointer). Independently re-measured at 3922 ~tok exactly; cap set to the exact
-  // measured value per the established Phase-2 convention (no headroom).
-  // e3-outcome-shaped-acceptance (qa-owned bump, T-E3-QA): cap raised from 3922 → 4128
-  // to absorb the new conditional `proof:` annotation convention + worked example added
-  // to the Acceptance Criteria bullet in skill-pm.md's Spec Schema (AC1/AC2). Independently
-  // re-measured (not trusted from code-reviewer's handoff note, which cited the same 4128
-  // figure) at 4128 ~tok exactly; cap set to the exact measured value per the established
-  // Phase-2 convention (no headroom). This bump also fixes a pre-existing title/assert
-  // drift the code-reviewer flagged as a cosmetic nitpick (review_reports/review_T-E3-CR.md):
-  // the test's title string had stalled at "≤ 3775 cap" ever since the e4 bump raised the
-  // live assert to 3922 without updating the title text — the title below now matches the
-  // actual asserted cap again.
-  // e110-pm-parallel-lane-template (qa-owned bump, T-E110-03/AC7): cap raised from
-  // 4128 → 4376 to absorb the new `Parallel-Lane Cut` Gate Summary row (S0 seed →
-  // L1..Ln fan-out → J join template, the per-AC `proof:` audit step, and the
-  // `serial — shared layer` guardrail) plus the step 2 ordered-sequence mention and
-  // the cut-header `touches` column + definition line. Independently re-measured
-  // (not trusted from sr-engineer's handoff note, which cited the same 4376 figure)
-  // at 4376 ~tok exactly; cap set to the exact measured value per the established
-  // Phase-2 convention (no headroom).
-  // e164-e167-content-wave45 (qa-owned bump, T-E164-01/L-CONTENT-NEW-3): cap raised
-  // from 4376 → 4401 to absorb the `touches` definition's governance-bookkeeping
-  // exclusion clause added to skill-pm.md's Cut-Approval inline cut table section
-  // (excludes `tasks.md`, `.current/**`, `qa_reports/**`, `review_reports/**`).
-  // Independently re-measured (not trusted from sr-engineer's handoff note, which
-  // cited the same 4401 figure) at 4401 ~tok exactly; cap set to the exact measured
-  // value per the established Phase-2 convention (no headroom). This is the only
-  // floor this feature moves — the lean always-on floor (4868) is unaffected.
+  // WHY: the stripped pm skill must stay within its reduction budget, bounding each pm dispatch.
+  // Cap rule: a qa-owned re-measure sets the cap to the exact measured size (zero headroom). The
+  // body is measured as production composes it: stripRationale(stripOriginTags(expandSkill(body))).
+  // Bump history: specs/e260i-comment-rationale.md (test/context-budget.test.mjs).
   const SKILL_PM = fs.readFileSync(path.join(ROOT, "content", "skill-pm.md"), "utf-8");
   // Strip frontmatter (--- block) before token-counting the body, matching buildPromptForRole.
   const body = SKILL_PM.startsWith("---")
@@ -577,60 +487,9 @@ test("AC1/AC2: skill-pm stripped token count meets ≤ 4376 cap", () => {
 });
 
 test("AC1/AC2: skill-sr-engineer stripped token count meets ≤ 2642 cap", () => {
-  // WHY: the spec's re-grounded reduction target (AC2) must hold for sr-engineer dispatch budget.
-  // v3.28.0 (qa-owned bump): cap raised from 2048 → 2210 to absorb the
-  // design-asset-source-rule feature's "Source assets, don't redraw them (v3.28.0)"
-  // rule added to skill-sr-engineer's Design-Aware Pre-Flight step 3a. Actual
-  // stripped body measured at 2160 ~tok; 2210 provides ~50-token editing headroom.
-  // governance-tag-strip (T-GTS-06, qa-owned re-baseline — the "5th cap" sr-engineer
-  // flagged and code-reviewer confirmed the spec's Affected Tests section undercounted):
-  // cap LOWERED from 2210 → 2138. skill-sr-engineer.md is the densest origin-tag site
-  // among the skill files (8 fences: Design-Aware Pre-Flight, Scoped Render Self-Check,
-  // Flag-don't-assume, Declared-token, Whole-surface self-converge, Source-assets, plus
-  // 2 more). Folding stripOriginTags into this test's composition (matching the real
-  // buildPromptForRole pipeline, which strips origin tags before rationale) measures
-  // stripRationale(stripOriginTags(body)) at 2138 ~tok exactly; cap set to the exact
-  // measured value (no headroom) per the Phase-2 convention — leaving raw-only would
-  // have left this cap at 2210 despite the body actually shrinking, silently masking
-  // the feature's real saving.
-  // a11-escalation-grammar (qa-owned bump, A11-02): cap raised from 2138 → 2258 to absorb
-  // skill-sr-engineer.md's Escalation Routes table conversion to the canonical const-05
-  // call format (byte-identical header). Independently re-measured (not trusted from
-  // sr-engineer's handoff note) at 2258 ~tok exactly; cap set to the exact measured value
-  // per the established Phase-2 convention (no headroom).
-  // c9-protocol-fields (qa-owned bump, T-C9-14): cap raised from 2258 → 2275 to absorb
-  // skill-sr-engineer.md's Escalation Routes table column rewrite (note-token column →
-  // structured-field column, per T-C9-14). Independently re-measured at 2275 ~tok
-  // exactly; cap set to the exact measured value per the established Phase-2 convention
-  // (no headroom).
-  // c15-expected-red-manifest (qa-owned bump, T-C15-01): cap raised from 2275 → 2469 to
-  // absorb the new SOP step 7a (Expected-Red Manifest emission convention) added to
-  // skill-sr-engineer.md. Independently re-measured (not trusted from sr-engineer's
-  // handoff note) at 2469 ~tok exactly; cap set to the exact measured value per the
-  // established Phase-2 convention (no headroom).
-  // a12-partials-limits-registry (T-A12-04/AC5, qa-owned re-baseline): folded expandSkill()
-  // into this test's composition, matching production (skill-sr-engineer.md is one of the
-  // 5 T-A12-03 partial-adopting files — its raw disk body now carries the bare
-  // "{{PARTIAL:step1-preflight}}" token, not the expanded step-1 line). Re-measured
-  // stripRationale(stripOriginTags(expandSkill(body))) at 2407 ~tok exactly (down slightly
-  // from the prior raw-only 2404 measurement plus the +3 ~tok the fuller expanded line
-  // costs over the token placeholder); still comfortably under the existing 2469 cap, so
-  // the cap itself is unchanged — only the computation is corrected to reflect what
-  // sr-engineer dispatch actually contains.
-  // e2-bugfix-repro-gate (qa-owned bump): cap raised from 2469 → 2642 to absorb the new
-  // step 3b "Repro-First (bugfix mode)" SOP addition to skill-sr-engineer.md (write the
-  // repro test, confirm RED, record the manifest, THEN fix; AC6 escape to pm). Independently
-  // re-measured at 2642 ~tok exactly; cap set to the exact measured value per the
-  // established Phase-2 convention (no headroom).
-  // e20-e21-crash-resilience-sop (qa-owned bump, T-E20-01/T-E21-01): cap raised from
-  // 2642 → 2852 to absorb two new SOP steps added between step 4 and step 5: 4a "Crash
-  // checkpoint before long steps" (E21 — bookkeeping_write checkpoint ahead of any long
-  // build/suite, plus a QA-added "(file-mode only)" caveat per the code-reviewer's
-  // non-blocking advisory) and 4b "HARD — long runs end in-turn" (E20 — synchronous-to-
-  // completion or same-turn poll-harvest requirement). Independently re-measured (not
-  // trusted from the code-reviewer's handoff note, which cited 2848 pre-caveat) at 2852
-  // ~tok exactly; cap set to the exact measured value per the established Phase-2
-  // convention (no headroom).
+  // WHY: the same budget for the sr-engineer dispatch, with the same composition and zero-headroom
+  // cap rule as the pm cap test above. History: specs/e260i-comment-rationale.md
+  // (test/context-budget.test.mjs).
   const SKILL_SR = fs.readFileSync(path.join(ROOT, "content", "skill-sr-engineer.md"), "utf-8");
   const body = SKILL_SR.startsWith("---")
     ? SKILL_SR.slice(SKILL_SR.indexOf("---", 3) + 3).trimStart()
@@ -640,14 +499,12 @@ test("AC1/AC2: skill-sr-engineer stripped token count meets ≤ 2642 cap", () =>
   assert.ok(toks <= 2852, `skill-sr stripped body (${toks} ~tok) must be ≤ 2852 (AC2, e20-e21-crash-resilience-sop re-baseline)`);
 });
 
-// --- governance-text-load Round-2: constitution rationale fencing (T-GTL-06/07) ---
-// WHY: the second round (R2) extended the strip to the highest-leverage lever — the constitution, injected
-// on EVERY role-bundle dispatch. The §1 L16 (HTML-primitive example list) and §7 L143
-// (external-artifact example list) parentheticals are the ONLY two pure-illustration spans;
-// everything else in §1/§7 is rule-dense and §3.1/§3.2 is a hard exclusion zone. These
-// tests pin: (AC7, byte-untouched) §3.x, (AC8, token floor) the measured floor holds, (AC9, losslessness)
-// stripping is lossless w.r.t. every normative rule/gate/heading. See
-// specs/governance-text-load-architecture.md R2 "Test thresholds that change".
+// --- Constitution rationale fencing (second-round strip) ---
+// WHY: the constitution is injected on every role-bundle dispatch, so it is the highest-leverage
+// strip. Only two spans are pure illustration (the HTML-primitive example list in section 1 and the
+// external-artifact example list in section 7); the rest of sections 1 and 7 is rule-dense and
+// sections 3.1 and 3.2 are a hard exclusion zone. Pinned: byte-untouched 3.x, the measured token
+// floor, and lossless stripping. Spec: specs/governance-text-load-architecture.md.
 
 // Markers that MUST survive stripRationale on the constitution (operative rules; AC9).
 const CONST_RULE_MARKERS = [

@@ -71,6 +71,42 @@ The size-delta test measures `buildPromptForRole` with and without `omitConstitu
 
 `runHook()` runs the SessionStart hook against a throwaway workspace with a `.current/` marker. Before the fix it used the repo itself as the project directory, so the hook wrote its cross-process dedup marker into the repo's own `.current/`. That marker is read from disk by the server by design, so a later test process (the teamwork-lite AC3b test, spawning the real server against the same root inside the 120-second window) saw a fresh marker, substituted the sentinel for the constitution and failed its constitution-header assertion. This was a test-infra defect, not a product bug. The fix loosened no assertion; the hook derives its content root from its own file location, not from the project directory variable.
 
+### Skill token cap histories (pm and sr-engineer)
+
+Both tests measure the body as production composes it, `stripRationale(stripOriginTags(expandSkill(body)))` after removing frontmatter, and assert `~tok <= cap`. Same zero-headroom rule as the lean bundle: a raise is a qa-owned re-measure set to the exact figure unless a row says otherwise. The pm test title still says 4376 while the asserted cap is 4401.
+
+skill-pm.md (final cap 4401):
+
+| ticket or release | cap change | what happened |
+|---|---|---|
+| pm-cut-approval-gate | 2322 to 2850 | step 7a Cut-Approval Gate SOP (inline cut draft workflow, design-link rule, re-arm description); measured 2800, so about 50 tokens of headroom |
+| governance-tag-strip | 2850 down to 2817 | the real pipeline strips origin tags before rationale; the skill carries one origin fence (the Geometric-Density Split Gate provenance tag nested in rationale), so composing like production trims a few bytes below the raw-only 2830; the aim was a lower cap, not fresh slack |
+| pm-repair-resume-routing (v3.47.0) | 2817 to 2918 | the PM SOP records `resume_of: <role>` on its amend write, pointing at the constitution chain section; exact |
+| a13-section1-polish | 2918 to 3196 | the `## Spec Schema` minimal-complete-passing-example block, partly offset by removing the Output-rule word-cap sentence; exact |
+| a11-escalation-grammar | 3196 to 3225 | the Escalation Routes table converted to the canonical const-05 call format; exact |
+| b8-external-ref-ledger | 3225 to 3327 | the Resource Audit Gate row rewrite (records `external_refs` entries via `tw_update_state`); exact |
+| c9-protocol-fields | 3327 to 3377 | Auto-Routing, Escalation Routes and Gate Summary prose rewrite (`next_role` and `resume_of` as first-class fields instead of `pending_notes` tokens); exact |
+| c16-c10-role-boundary | 3377 to 3473 | a cut-template rule in the Task Format section: release bookkeeping (version bump, CHANGELOG, backlog done-marking) goes to release-engineer, never onto a qa-engineer or sr-engineer task by default; exact |
+| a12-partials-limits-registry | 3473, unchanged | re-baseline: the test now expands the partial token like production; the figure came out the same as the earlier raw-only one because the token and the expanded step-1 line differ by about 1 token, so only the computation changed |
+| e2-bugfix-repro-gate | 3473 to 3775 | the "Bugfix mode" paragraph (`dispatch_mode="bugfix"` guidance, opt-back-in note, one Task-Format example); exact |
+| e4-design-source-credibility-gate | 3775 to 3922 | the Source-Credibility Gate row in the Gate Summary table (an awareness-only pointer; the design-auditor authors the attestation); exact |
+| e3-outcome-shaped-acceptance | 3922 to 4128 | the conditional `proof:` annotation convention and worked example in the Spec Schema Acceptance Criteria bullet; the same bump fixed a title that had stalled at an older cap; exact |
+| e110-pm-parallel-lane-template | 4128 to 4376 | the `Parallel-Lane Cut` Gate Summary row (seed, fan-out, join template, per-AC `proof:` audit step, `serial — shared layer` guardrail), the step 2 ordered-sequence mention and the cut-header `touches` column with its definition; exact |
+| e164-e167-content-wave45 | 4376 to 4401 | the `touches` definition's governance-bookkeeping exclusion clause (excludes `tasks.md`, `.current/**`, `qa_reports/**`, `review_reports/**`); exact; the lean always-on floor was unaffected |
+
+skill-sr-engineer.md (final cap 2852):
+
+| ticket or release | cap change | what happened |
+|---|---|---|
+| v3.28.0 | 2048 to 2210 | the "Source assets, don't redraw them" rule in Design-Aware Pre-Flight step 3a; measured 2160, about 50 tokens of headroom |
+| governance-tag-strip | 2210 down to 2138 | the densest origin-tag site among the skills (8 fences); composing like production measures 2138, and leaving the raw-only cap would have masked the real saving; exact |
+| a11-escalation-grammar | 2138 to 2258 | the Escalation Routes table converted to the canonical call format; exact |
+| c9-protocol-fields | 2258 to 2275 | the Escalation Routes column rewrite (note-token column became a structured-field column); exact |
+| c15-expected-red-manifest | 2275 to 2469 | the new SOP step 7a (Expected-Red Manifest emission convention); exact |
+| a12-partials-limits-registry | 2469, unchanged | re-baseline: the test now expands the partial token; measured 2407, still under the cap, so only the computation was corrected |
+| e2-bugfix-repro-gate | 2469 to 2642 | the new step 3b "Repro-First (bugfix mode)" (write the repro test, confirm red, record the manifest, then fix; escape to pm); exact |
+| e20-e21-crash-resilience-sop | 2642 to 2852 | two new SOP steps: 4a "Crash checkpoint before long steps" (a `bookkeeping_write` checkpoint before any long build or suite, plus a QA-added file-mode-only caveat) and 4b "HARD — long runs end in-turn"; the code-reviewer had cited 2848 before the caveat; exact |
+
 ## test/render-structure.test.mjs
 
 (Filled in by the trim tasks T-E260I-09 and T-E260I-10.)
