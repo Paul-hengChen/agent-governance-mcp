@@ -70,3 +70,5 @@
 {"ts":"2026-10-01T03:01:27.754Z","feature":"release-v4.4.0","agent_id":"release-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-10-05T06:00:28.180Z","feature":"release-v4.4.1","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
 {"ts":"2026-10-05T06:01:25.372Z","feature":"release-v4.4.1","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-05T06:07:46.616Z","feature":"release-v4.4.1","agent_id":"qa-engineer","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-05T06:08:16.824Z","feature":"release-v4.4.1","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
