@@ -51,7 +51,7 @@ The lean-bundle test asserts `lean <= <cap>` in approximate tokens (characters d
 | c14-dispatch-pins | 3685 to 3761 | the Pin-override bullet under the Watermark rule in `const-01-core-head.md`; exact |
 | a12-partials-limits-registry | 3761 to 4027 | the `## Limits` table at the top of `const-01-core-head.md`; the lite skill does not use the partial mechanism; exact |
 | d2-server-brake-accounting | 4027 to 4085 | server-tracked hop-counter wording in the lite skill, the `hop` row of the Limits table and the `HOP_CAP_EXCEEDED` bullet; exact |
-| e7-governed-git-surface | 4085 to 4297 | the section 6 "Sanctioned git operations (ALL roles)" whitelist bullet in `const-15-core-tail.md`, unfenced so it counts on every path; the same raise re-synced a test title that had stalled at an older cap; exact |
+| e7-governed-git-surface (sr-owned) | 4085 to 4297 | the section 6 "Sanctioned git operations (ALL roles)" whitelist bullet in `const-15-core-tail.md`, unfenced so it counts on every path; the same raise re-synced a test title that had stalled at an older cap; exact |
 | e24-exemptions-manifest | 4297 to 4485 (+188) | the section 2 "Build-gate exemptions" bullet in `const-05-core-standards.md`; exact |
 | e25-git-vocabulary | 4485 to 4544 (+59) | stash and stash-pop added to the sanctioned git list and the destructive file-checkout form clarified in `const-15-core-tail.md`; exact |
 | e59-const6-waiver-clause | 4544 to 4667 (+123) | the section 6 "Dependency audit at build gate" rewrite: the "waived in the PR description" escape became a pre-dated advisory-record disposition (advisory id, decision, re-review trigger) binding every build-running role; exact |
@@ -61,7 +61,7 @@ The lean-bundle test asserts `lean <= <cap>` in approximate tokens (characters d
 | E231 | 5157 to 5415 | a rule telling every role what it may never write in any durable output (comment, report, commit message), in the same core-tagged fragment; exact |
 | E258 | 5415 to 5548 | the Comment-discipline bullet in `const-15-core-tail.md`; exact |
 
-Why the growth was accepted: each bullet is core-tagged and ships on the lean path by design; the bumps track proportionate rule growth, not a blowout.
+Why the growth was accepted: each bump tracks proportionate rule growth, not a blowout; the rows above name the rule text each one absorbed, as the bump comments recorded it at the time (some fragment names and tags in those comments do not match `prompts/constitution-manifest.ts` today).
 
 ### omitConstitution floor
 
