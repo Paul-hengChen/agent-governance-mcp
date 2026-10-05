@@ -1,6 +1,6 @@
 # Review — T-E260I-01..11 (lane e260i, comment-only trim of the context-budget and render-structure tests)
 
-covers: T-E260I-01, T-E260I-02, T-E260I-03, T-E260I-04, T-E260I-05, T-E260I-06, T-E260I-07, T-E260I-08, T-E260I-09, T-E260I-10, T-E260I-11
+covers: T-E260I-01, T-E260I-02, T-E260I-03, T-E260I-04, T-E260I-05, T-E260I-06, T-E260I-07, T-E260I-08, T-E260I-09, T-E260I-10, T-E260I-11, T-E260I-13
 
 ## Round 1 — CHANGES_REQUESTED — by code-reviewer
 
@@ -175,3 +175,57 @@ No findings. Comment-only; the proof's emit check shows byte-identical transpile
 
 ## Verdict
 CHANGES_REQUESTED — two small false statements remain in the moved rationale: the "Why the growth was accepted" sentence still makes a tag claim that three rows contradict (round-1 R1 not fully resolved), and the new ownership wording makes the sr-owned e7 lean bump read as qa-owned. Both are single-cell or single-clause edits in `specs/e260i-comment-rationale.md`.
+
+## Round 3 — APPROVED — by code-reviewer
+
+Range reviewed: `41e6f87..9bbb16a` (T-E260I-13, follow-up feature e260i-r3-fix). The diff touches only `specs/e260i-comment-rationale.md` (two lines) and `.current/e260i/` bookkeeping. `test/`, `content/`, `prompts/` and `.current/e260i/proof.mjs` show no change since round 2. Each fix was checked against `prompts/constitution-manifest.ts`, a runtime build of `composeConstitution({ chain: false, design: true })` from `dist/prompts/build.js`, and the base text of `test/context-budget.test.mjs` at `ab335b8`.
+
+## Summary
+- F1 resolved: the lean "Why the growth was accepted" sentence (`specs/e260i-comment-rationale.md:64`) no longer makes a tag claim. It now says the rows record the bump comments as written and that some fragment names and tags in those comments do not match the manifest today. Both parts are true.
+- F2 resolved: the lean e7 row (`:54`) is tagged `(sr-owned)`. Every sr-owned bump the base names is now tagged in every cap table, so "qa-owned unless a row says sr-owned" (`:35`) and "qa-owned unless noted sr-owned" (`test/context-budget.test.mjs:191`) are true.
+- Lane-wide `node .current/e260i/proof.mjs`: `proof: PASS`, exit 0. `node scripts/check-md-tables.mjs`: exit 0, 0 malformed tables.
+- Verdict: APPROVED.
+
+## AC Completeness
+AC1, AC2, AC3, AC4, AC5, AC7, AC8, AC11, AC12, AC13 — implemented — no test change since round 2; the proof run at HEAD confirms them again.
+AC6 — implemented — F1 and F2 fixed in `specs/e260i-comment-rationale.md:54` and `:64` (checks below).
+AC9, AC10 — not judged here (verifier).
+
+## Correctness
+
+### Round-2 items verified
+**F1 — `specs/e260i-comment-rationale.md:64`.** The new sentence makes two claims, and both hold:
+- "the rows above name the rule text each one absorbed, as the bump comments recorded it at the time". This matches the intro's statement at `:35`. The rows were accepted as faithful in earlier rounds and did not change in this round.
+- "some fragment names and tags in those comments do not match `prompts/constitution-manifest.ts` today". This is true, and the a11 row shows it:
+  - The base comment (base line 264) names `const-05-chain-mid.md` and calls it "chain-tagged, loads on this lean path".
+  - No such file is in the manifest's 15 entries. The Escalation call format now lives in `content/const-05-core-standards.md`, which is core-tagged and is present in the runtime lean build.
+  - So both the name and the tag in that comment are stale. The new sentence flags this honestly rather than repeating it as fact.
+- The c9 row follows the base's "core/chain-tagged" wording for `const-12-chain-r10-s4.md` (base line 283). The manifest tags that file chain-only, which is another case the sentence covers.
+- Runtime lean build (`chain: false, design: true`): "Cut-Approval Gate" is absent. "Escalation call format", "Sanctioned git operations", "design-sourced", "self-converge", "Build-gate exemptions", "Test ownership", "## Limits" and "Comment discipline" are present. This matches the intro's rule at `:35`: core- and design-tagged fragments are in, chain-tagged ones are out.
+
+**F2 — `:54`, `:35`, `test/context-budget.test.mjs:191`.**
+- `grep sr-owned` on the base `test/context-budget.test.mjs` finds seven bump comments:
+  - e7 in the lean table (base 311), the design-arm table (1056), the coordinator table (1355) and the non-design table (2141).
+  - e14-e16 in the design-arm table (1065), the coordinator table (1362) and the non-design table (2148).
+- All seven map to tagged rows: lean `:54`; design-arm `:95-96`; coordinator `:140-141`; non-design `:220-221`.
+- The skill cap section of the base has no sr-owned bump, so "unless a row says otherwise" at `:167` is accurate with no tagged row.
+- `test/render-structure.test.mjs` at base has no sr-owned bump.
+- No other ownership tag appears in the base (searched for `-owned` with qa-owned excluded). The hits are only "not trusted from sr-engineer's handoff note" re-measure notes, "release human-owned" and "qa-visual-owned" rule names, none of which is a bump-ownership tag.
+
+### Optional
+- O1 — `:64`. For the cut-approval row, the stale part is the base comment's claim that a chain-tagged fragment was "included on this lean path" (base 252-253). The fragment name and tag are not stale. The parenthetical, "fragment names and tags", reads slightly narrow for that row. The intro (`:35`) states the true inclusion rule, and the rows are labelled as the comments at the time, so a reader is not misled. Not worth a ticket.
+
+## Quality
+No findings. The new sentence is one line, uses plain wording and introduces no new identifiers.
+
+## Architecture
+No architecture spec. No change.
+
+## Security
+No findings. Neither changed line contains a path, URL, sha or history command.
+
+## Performance
+No findings. Spec-only change.
+
+## Verdict
+APPROVED — both round-2 required items are fixed with true statements, checked against the manifest, the runtime lean build and the base comments, and nothing outside the spec and lane bookkeeping changed since round 2.
