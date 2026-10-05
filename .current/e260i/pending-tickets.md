@@ -1,5 +1,7 @@
 # Pending tickets — lane e260i
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E260I-NEW-1
 title: Two context-budget test titles state a cap that lags the asserted cap (pm says 4376, asserts 4401; sr-engineer says 2642, asserts 2852)
