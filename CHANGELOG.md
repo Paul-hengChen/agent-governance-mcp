@@ -16,6 +16,41 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [4.4.1] - 2026-10-05
+
+PATCH release. It ships E260 (trim this repo's existing long comments) since v4.4.0, merged in
+three fan-out waves: lanes `e260a` to `e260d` through `integ/e260`, `e260e` to `e260h` through
+`integ/e260-w2`, and `e260i` through `integ/e260i`. The change is comment-only, with no
+observable behavior change. No tool input schema, prompt schema or state file format changed,
+and `package.json` dependencies are unchanged. Fan-out plan, per-wave merges and measurements:
+`specs/fanout-e260.md`.
+
+### Changed
+
+- **E260: long comments trimmed to the Comment discipline rule (`tools/`, `gates/`, `prompts/`,
+  `lib/`, `schema/`, `bin/`, `scripts/`, `index.ts`, `test/`)**: existing comment blocks in every
+  JS/TS source directory and in `test/` (fixtures excluded) are cut to short summaries. Rationale
+  still worth keeping moved into per-lane spec files first (`specs/e260a-*` to `specs/e260i-*`),
+  and the comment keeps at most a one-line pointer. Every lane showed its edit is
+  behavior-neutral: emit with comments removed and AST leaves identical to base, and the full
+  suite green. Measured base `e9a19f2` to the merged main: source comment ratio 31.7% to 22.7%,
+  blocks of 8 to 20 lines 250 to 0, blocks over 20 lines 70 to 1 (the error-code table in
+  `gates/registry.ts`, kept by human ruling, tracked by E266), longest block 87 to 34 lines;
+  tests 27.4% to 19.2%, 317 to 0, 132 to 0, longest 250 to 7 lines. `dist/` changes only
+  because TypeScript carries comments into the emitted `.js`, `.d.ts` and `.map` files.
+
+### Notes
+
+- Evidence: this release archives each E260 lane's QA and code-review reports into
+  `qa_reports/archive/<lane feature>/` and `review_reports/archive/<lane feature>/` for
+  `e260a-tools-a-h`, `e260b-tools-i-z`, `e260c-bin-scripts`, `e260d-core-dirs-comment-trim`,
+  `E260E`, `e260f`, `e260g-r3-fix`, `e260h-test-m-z-eval` and `e260i-r3-fix`, and the release
+  gate's QA reports into `qa_reports/archive/release-v4.4.1/`. Release-gate spec:
+  `specs/release-v4.4.1.md`. Each lane's closed handoff is under
+  `.current/history/2026-10/<lane>/` (context, not changed).
+- Follow-ups filed during these lanes (E263 to E274) are in `docs/backlog.md` and are not part of
+  this release.
+
 ## [4.4.0] - 2026-10-01
 
 MINOR release. It ships E246 (lane mailbox teardown) and E259 (comment scan for more languages)
