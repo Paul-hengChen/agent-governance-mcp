@@ -1,7 +1,7 @@
 # Fan-out: E260 縮減本 repo 既有的長註解
 base: e9a19f2    integration branch: integ/e260（第一波）；integ/e260-w2（第二波）；integ/e260i（第三波）
 
-**狀態：人類核准 2026-10-01；第一波已合併（`integ/e260`），第二波已合併（`integ/e260-w2`），第三波已派工（2026-10-02）。** 佇列 #81。人類已核准的切法：依目錄切 8 條只改註解的 lane，分兩波各 4 條（第一波原始碼、第二波測試），最後第三波 e260i 單獨做兩個 budget／結構測試檔。各波之間沒有檔案重疊，分波只為了控制同時進行的 lane 數，以及讓原始碼的 `dist/` 先穩定。
+**狀態：人類核准 2026-10-01；第一波已合併（`integ/e260`），第二波已合併（`integ/e260-w2`），第三波已合併（`integ/e260i`，2026-10-05）；E260 結案。** 佇列 #81。人類已核准的切法：依目錄切 8 條只改註解的 lane，分兩波各 4 條（第一波原始碼、第二波測試），最後第三波 e260i 單獨做兩個 budget／結構測試檔。各波之間沒有檔案重疊，分波只為了控制同時進行的 lane 數，以及讓原始碼的 `dist/` 先穩定。
 
 ## 派工前核對（整合者，2026-10-01）
 - `git worktree list` 只有 primary；main = origin/main = `e9a19f2`（v4.4.0 已發版，`8ec02d2` 記帳，`e9a19f2` 開 E262）；工作樹乾淨；沒有殘留的 `feat/*`／`integ/*` branch。`tw_detect_drift` 無 drift（只有 T-REL4-02 的證據提示）。
@@ -126,6 +126,8 @@ base: e9a19f2    integration branch: integ/e260（第一波）；integ/e260-w2�
 | 2026-10-01 | 整合者 | 接受並記錄的流程偏離：e260e qa 作者對本機未 push 的 commit 用了兩次 `git commit --amend`；e260f round 2 reviewer 為了做 proof 的負向對照用了 `git stash` + `git stash drop`，連帶丟掉自己未 commit 的 handoff 寫入（已重寫；§6 只核准 stash／stash pop，E260F-NEW-1 追蹤）；e260f 在 review APPROVED 後由 coordinator 改了 rationale spec 一句（`fc5d4d5`，驗證者有看到）。三者都只動 lane 本機狀態，不影響合併內容 | 本檔 |
 | 2026-10-01 | 整合者 | lane-status 的 e260h EVIDENCE MISMATCH（帳本 16、磁碟 19）是解析把範圍寫法「T-E260H-11..26.」與兩份 T-26 驗證檔各算成一個 id；16 個 task 都有證據，接受不退回 | 本檔 |
 | 2026-10-02 | 整合者 | 第三波前提重新核對（main `ce60ecf`，等於 origin/main，工作樹乾淨，只有 primary 一個 worktree，沒有殘留的 `feat/*`／`integ/*` branch，`tw_detect_drift` 無 drift）：兩個檔自 base `e9a19f2` 起沒有變動，量測與上表一字不差（`test/context-budget.test.mjs` 8–20 行 20、>20 行 11、最長 250、比例 74.3%；`test/render-structure.test.mjs` 4、5、69、41.4%）；自第二波核對（`97193e8`）以來 `test/`、`tools/`、`scripts/`、`bin/` 沒有新增或刪除的檔 → 第二波「刪掉 `test/` 純註解行後全套仍綠」的結論仍成立，沒有測試讀這兩個檔的註解。唯一讀這兩個檔原文的是 `test/e122-state-render-injection.test.mjs`：以 `const NUMHEADER_RE = /…/;`、`const BULLET_RE = /…/;` 抓 `test/render-structure.test.mjs` 的程式碼（不是註解），lane 不得動這兩行。`specs/`、`qa_reports/`、`review_reports/` tracked → 不需要 symlink；`_mailbox/` 沒有 `e260i`。帶給 e260i 的前兩波經驗：單檔超過 300 行依行號範圍拆成連續 task；改寫的句子要對照程式碼；新增註解行約 100 欄內，不准併行湊行數；proof 的 bare-id 規則涵蓋範圍寫法（E271）；不准 `git stash drop`（E269） | 本檔 |
+| 2026-10-02 | 人類 | e260i review round 2 退回兩句 rationale（F1、F2，只在 `specs/e260i-comment-rationale.md`），hop 8/10 走不完 → 照 e260g 前例在同一條 lane 開後續 feature `e260i-r3-fix`，等舊 lease 過期，不用 override；PM 自己改 spec（不在 `test/`，不需 qa 作者）→ review round 3 → 全新 qa 驗證者 | e260i lane session（信箱 e260i to-integrator#3、to-lane#4、#5） |
+| 2026-10-05 | 整合者 | e260i 的 lane 層全套第一次跑 3043/3039/1/3：`test/e132-lane-registry.test.mjs` gap-6 在負載下撞到測試自己的 200 ms git 上限、回 null（lane 沒碰該檔）；單跑 3/3 綠、全套重跑 3043/3040/0/3 → 以重跑為準，症狀併入 E254 | 本檔 |
 
 ## 結案（第一波）
 - 日期 2026-10-01；合併 branch `integ/e260`（e260a `759c920` → e260b `c488ba7` → e260c `d4c7c8b` → e260d `8d7baa0`，皆 `--no-ff`）；例外：無衝突、無合併審查。
@@ -141,3 +143,21 @@ base: e9a19f2    integration branch: integ/e260（第一波）；integ/e260-w2�
 - 彙總（上限按 lane／feature 計，合計僅供參考）：e260e 11 張 task／hop 9（review 一次退回）；e260f 31／9（review 一次退回）；e260g 9／8+5（兩個 feature：`e260g-test-e3-l-comment-trim` 停在 8，`e260g-r3-fix` 5；review 三輪）；e260h 16／5（review、qa 皆第一輪通過）；合計 67 張 task、36 hop。
 - 新票：`finish --shipped` 配號 E268（E260E-NEW-1）、E269／E270（E260F-NEW-1／2）、E271（E260G-NEW-1）、E272／E273（E260H-NEW-1／2），排進 `docs/v4.0.0-new-tickets.md` 佇列 #89–#94。四條 worktree、branch、信箱都已清掉，`integ/e260-w2` 已刪。
 - 附記：e260g 留下一份檔名含空格的證據 `qa_reports/review_T-E260G-09 T-E260G-10 … T-E260G-17.md`（多個 id 寫進檔名），不影響測試，留待 release 封存時一併處理；e260g、e260h 的 qa／pm commit trailer 寫 Sonnet 5.5（實際模型，不 amend）。
+
+## 結案（第三波）
+- 日期 2026-10-05；base `ab335b8`；合併 branch `integ/e260i`（e260i `c6cb6d0`，`--no-ff`，合併 commit `a90d2f3`）；例外：無衝突、無合併審查；merge-invariants PASS；重建 `dist/` 無差異。
+- 整合者核對：HEAD 與 26 個 commit 相符；`fanout check` 24 檔 0 越界；review round 3 APPROVED、qa T-E260I-12 PASS；工作樹乾淨；goldens、`content/`、`dist/` 無差異；全套見 Decisions 2026-10-05（重跑 3043/3040/0/3）。
+- 量測（同一套掃描器）：`test/context-budget.test.mjs` 8–20 行 20→0、>20 行 11→0、最長 250→7；`test/render-structure.test.mjs` 4→0、5→0、69→7。沒有保留 8–20 行的區塊。
+- 彙總（上限按 lane／feature 計）：e260i 13 張 task／hop 8+3（兩個 feature：`e260i-budget-render-comment-trim` 停在 8，`e260i-r3-fix` 3）；review 三輪（R1、R2 退回，R3 APPROVED）、qa 一輪。
+- 新票：E260I-NEW-1（兩個 context-budget 測試名稱寫的上限落後斷言）由 `finish --shipped` 配號。
+
+## 結案（E260 全票）
+- 量測方式同本檔開頭（`analyzeText`；`git ls-files` 的 JS/TS，排除 `dist/`、`.d.ts`、`test/fixtures/`、`.current/`），base `e9a19f2` → 第三波合併後：
+
+| 範圍 | 檔案數 | 註解比例 | 比例 >30% 的檔 | 8–20 行區塊 | >20 行區塊 | 最長 |
+|---|---|---|---|---|---|---|
+| 原始碼 | 110 | 31.7% → 22.7% | 61 → 36 | 250 → 0 | 70 → 1 | 87 → 34 |
+| 測試 | 165 | 27.4% → 19.2% | 53 → 17 | 317 → 0 | 132 → 0 | 250 → 7 |
+
+- 唯一剩下的 >20 行區塊是 `gates/registry.ts` 的錯誤碼對應表（D1，34 行），由 E266 收掉；檔案比例超標不在 E260 範圍，見 E263。
+- 三波合計（僅供參考）：117 張 task（37＋67＋13），hop 20＋36＋11；完成定義每一列都已成立。
