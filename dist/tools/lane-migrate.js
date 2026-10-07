@@ -229,10 +229,11 @@ export function hasFlatLaneFiles(workspacePath) {
 }
 /**
  * Public, lock-acquiring wrapper around migrateFlatToLaneLocked, for callers
- * that do not hold the lane lock (e.g. readHandoffState). `lane` defaults to
- * resolveCurrentLane(ws), i.e. "_primary" off a feat branch. Creates the lane
- * dir to host the lock and removes it again if the run is refused and the dir
- * is still empty.
+ * that do not hold the lane lock. The synchronous read path does not use it:
+ * migrateOwnWorkspaceIfFlat in tools/handoff-parse.ts calls the lock-free core
+ * directly. `lane` defaults to resolveCurrentLane(ws), i.e. "_primary" off a
+ * feat branch. Creates the lane dir to host the lock and removes it again if
+ * the run is refused and the dir is still empty.
  */
 export async function migrateFlatToLane(workspacePath, opts = {}) {
     const lane = opts.lane ?? resolveCurrentLane(workspacePath);

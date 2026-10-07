@@ -3,7 +3,7 @@
 // state, so deliberately outside the handoff 4-step mutating-tool contract
 // (like the best-effort lock-free append in gates/qa-review.ts). Emits ONLY
 // the 5 gate-fire fields below; per-dispatch token usage lives in
-// tools/usage-accounting.ts and its own `.current/usage.jsonl`. (D3)
+// tools/usage-accounting.ts and its per-lane `.current/<lane>/usage.jsonl`. (D3)
 import * as fs from "fs";
 import * as path from "path";
 import { gate } from "../gates/registry.js";

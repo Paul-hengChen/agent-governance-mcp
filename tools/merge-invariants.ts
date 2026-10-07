@@ -155,9 +155,9 @@ export function parseLedger(file: string, content: string, taskRegex: RegExp): L
         continue;
       }
     }
-    // R-2: the identical per-line rule tools/tasks-file.ts's row parser applies
-    // (`line.trim()` before the row regex, tasks-file.ts:216/703), so an
-    // indented row it counts is never invisible here.
+    // R-2: the identical per-line rule tools/tasks-file.ts's row parsers apply
+    // (`line.trim()` before the row regex, in parseTasks and addTaskInFile), so
+    // an indented row they count is never invisible here.
     const rowLine = line.trim();
     const isVoid = VOID_PREFIX_RE.test(rowLine);
     const m = taskRegex.exec(isVoid ? rowLine.replace(VOID_PREFIX_RE, "- [ ] ") : rowLine);
