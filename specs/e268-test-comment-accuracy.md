@@ -72,6 +72,8 @@ What the `teamwork` template should be checked against today. Facts: see AC12.
 
 PM recommendation: option 1, with the template fix ticketed. The ticket's "table and its comments change together" is satisfied because the table entry is already correct as a logical key and only its comments are wrong; if the human wants the table text itself to change, option 2 is the smallest such change.
 
+**Decision (human, 2026-10-07, at cut approval): option 1.** The integrator pre-review agreed (mailbox to-lane#1). The fan-out manifest's done-criterion "the teamwork expected table no longer maps to a retired file" is reworded, also approved by the human: the expected table and its comments state that `skill-coordinator.md` is the logical key of `skill-manifest`; the stale Read path in the template is ticketed separately. The manifest wording is the integrator's edit, not this lane's. `test/subagent-templates.test.mjs` therefore stays comment-only and is covered by the plain proof run, without `--e272-code`. `E268-NEW-1` was written by the coordinator in `.current/e268/pending-tickets.md`.
+
 ## Copy / Strings
 | string id | exact text (quote verbatim) | source |
 |---|---|---|
@@ -96,7 +98,7 @@ PM recommendation: option 1, with the template fix ticketed. The ticket's "table
 
 ## Dependencies / Prerequisites
 - E260 shipped (v4.4.1). No dependency on lanes e269 and e264 (files are disjoint); merge order in the fan-out manifest is e269, e264, e268.
-- The E272 option is chosen by the human at cut approval.
+- The E272 option is chosen by the human at cut approval (chosen: option 1; see E272 decision).
 - `dist/` is built in the worktree (tests import `dist/`); no source changes are made, so `dist/` is not rebuilt or committed.
 - Design: no `design/<feature>.md`, mode = no-design (Visual Structural Assertions omitted).
 - External refs: none.
