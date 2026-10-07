@@ -2,7 +2,7 @@
 // Tests for the pixel-gate attestation (specs/qa-visual-pixel-gate-attestation.md):
 // the pure predicates isPlaceholderDiffMetric (PD) and parsePixelGateAttestation
 // (PA), parseVisualProvenanceRows (PR), the fs helper checkPixelGateAttestation
-// (CK) and the verbatim error strings in dist/index.js (E).
+// (CK) and the verbatim error strings in dist/tools/handoff-orchestrator.js and dist/gates/registry.js (E).
 // AC map: specs/e260h-comment-rationale.md (test/pixel-gate-attestation.test.mjs).
 
 import { test } from "node:test";
@@ -619,7 +619,7 @@ B1 tool unavailable — LLM fallback
 });
 
 // ===========================================================================
-// E1-E5: End-to-end verbatim error strings (dist/index.js) — Copy/Strings gate (AC-9)
+// E1-E5: End-to-end verbatim error strings (dist/tools/handoff-orchestrator.js, dist/gates/registry.js) — Copy/Strings gate (AC-9)
 // ===========================================================================
 
 // Relocated by the registry-pattern refactor: the tw_update_state gate-orchestration

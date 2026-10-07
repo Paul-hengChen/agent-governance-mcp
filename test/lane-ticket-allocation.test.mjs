@@ -1,7 +1,8 @@
 // Coded by @qa-engineer
 // Tests for tools/lane-ticket-allocation.ts: turning lane-filed pending tickets into real backlog ids, and finding
 // lanes whose worktree is gone (specs/e124-lane-ticket-allocation.md AC1-AC8).
-// AC9 (no `disposition` parameter on allocateTicketIds or markApplied) is checked by reading the signatures, not by a runnable test.
+// AC9 (no `disposition` parameter on allocateTicketIds or markApplied) is checked by reading the signatures,
+// not by a runnable test.
 // Deliberately untested: a block after an existing `## Applied` section is silently archived, and a stray unmatched
 // fence swallows the next block. Both are tracked as follow-up work; asserting them would turn bugs into contracts.
 // Rationale: specs/e260g-comment-rationale.md (test/lane-ticket-allocation.test.mjs).

@@ -2,7 +2,6 @@
 // Tests for spec: agc-cross-agent-adapter-scaffolding: bin/agc-init.mjs adapter scaffolding
 // (T-TEMPLATES, T-INIT-EXTEND, T-AGC-CHECK) and sub-command routing (AC-9). All workspace I/O uses
 // fs.mkdtempSync temp dirs, never the repo root, which already has pre-staged adapter files.
-// Spec-to-Test map lives in qa_reports/review_T-TESTS.md.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
