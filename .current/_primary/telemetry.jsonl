@@ -72,3 +72,6 @@
 {"ts":"2026-10-05T06:01:46.531Z","gate":"validateTransition","error_code":"TRANSITION_REJECTED","agent_id":"qa-engineer","feature":"release-v4.4.1"}
 {"ts":"2026-10-05T06:06:47.793Z","gate":"validateTransition","error_code":"TRANSITION_REJECTED","agent_id":"qa-engineer","feature":"release-v4.4.1"}
 {"ts":"2026-10-05T06:08:05.100Z","gate":"orchestrator","error_code":"AC_EXECUTION_LOG_MISSING","agent_id":"qa-engineer","feature":"release-v4.4.1"}
+{"ts":"2026-10-08T06:14:29.391Z","gate":"validateTransition","error_code":"TRANSITION_REJECTED","agent_id":"qa-engineer","feature":"release-v4.5.0"}
+{"ts":"2026-10-08T06:20:17.390Z","gate":"validateTransition","error_code":"TRANSITION_REJECTED","agent_id":"qa-engineer","feature":"release-v4.5.0"}
+{"ts":"2026-10-08T06:21:12.352Z","gate":"orchestrator","error_code":"AC_EXECUTION_LOG_MISSING","agent_id":"qa-engineer","feature":"release-v4.5.0"}
