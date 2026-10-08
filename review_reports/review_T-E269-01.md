@@ -49,3 +49,41 @@ CHANGES_REQUESTED — every content edit satisfies AC1–AC4 with zero required 
 
 - **required (expected-red manifest)** — addressed. `qa_reports/expected-red_e269-rule-text-budget.txt` now lists the 15 entries: the 11 compose-equivalence goldens and the 4 context-budget caps, each block with its rationale and the measured cap values (5567/10076/20453/7978 ~tok, +19 each). I checked it byte for byte against `node --test test/compose-equivalence.test.mjs test/context-budget.test.mjs`. The sorted manifest names diff clean against the `not ok` names (15/15). No content, test or golden edits.
 - **optional notes** — I made no changes. The (E104) wording was judged warranted, the AC2 sentence's terseness is bound by the 27-byte qa SOP cap room, and moving the qa bullet is cosmetic and would spend that cap room.
+
+## Round 2 — APPROVED — by code-reviewer
+
+Inputs read (clean context): `git diff ea0dd3f..HEAD` (a single fix commit, d6c4447, plus `.current/e269/` bookkeeping), `git diff main...HEAD -- content/`, `qa_reports/expected-red_e269-rule-text-budget.txt` (the step-4a carve-out), and `specs/e269-rule-text-budget.md` as in round 1. Model: the reviewer is opus and sr-engineer is pinned to fable, so the models differ.
+
+## Summary
+- Since round 1 (ea0dd3f), d6c4447 adds `qa_reports/expected-red_e269-rule-text-budget.txt` (15 entries) and an sr-engineer reply under the round 1 section of this file. `git diff --stat ea0dd3f..HEAD -- content/ test/` is empty, so no content, test or golden file changed.
+- The content diff is the same one round 1 judged. `git diff main...ea0dd3f -- content/` and `git diff main...HEAD -- content/` have the same hash (`ccbea8bd…`), and the merge-base is unchanged (f53ea13).
+- The manifest matches an actual run exactly. Full suite run #2: 3025 pass, 15 fail, and the sorted `not ok` names diff clean against the manifest's test-name column (15/15, no extras, none missing).
+- The round 1 required finding is resolved, and there are no new required findings. Verdict: APPROVED.
+
+## AC Completeness
+AC1–AC4 — implemented — unchanged from round 1. The content diff is byte-identical (same hash), so the round 1 evidence still applies.
+AC5–AC9 — out of scope for this round (T-E269-05..07).
+
+## Correctness
+- **Round 1 required finding (manifest missing): resolved.** Step 4a checks:
+  - Format: each of the 15 non-comment lines splits on ` | ` into exactly 2 fields (`<relative test file path> | <exact test name>`). The rationale blocks use `#` lines and there is one file per feature, which matches the sr-engineer SOP step 7a convention that step 4a names. The file ends with a newline.
+  - Sampling: I checked all 15 entries, not just 3. Each is a real, locatable test. Seven are literal titles (`test/context-budget.test.mjs:190`, `:554`, `:569`, `:894`; `test/compose-equivalence.test.mjs:114`, `:119`, `:126`), and the eight `buildPromptForRole(...)` entries are instances of the template title at `test/compose-equivalence.test.mjs:71`.
+  - Exact match against a run: in full-suite run #2 (`node scripts/test-lock.mjs -- node --test test/*.test.mjs`) the red set is identical to the manifest.
+  - Reasons are accurate. The measured values in the manifest (5567 / 10076 / 20453 / 7978 ~tok, +19 each) match the assertion messages in the run. Negative control, run on a copy outside the worktree (rsync to the scratchpad; no `git stash`): with only `content/const-15-core-tail.md` restored to `main`, the two test files go fully green (68 pass, 0 fail). Restoring the lane's const-15 brings back exactly 15 fails (53 pass). So the const-15 §6 delta alone causes all 15 reds, as the manifest's rationale says.
+- **recommended (not this lane's defect)**: there is an intermittent, unrelated failure. On full-suite run #1, `test/feature-lease.test.mjs:1008` ("E10-AC2b: lease_override:true with a MISMATCHED pending_notes[0] … rejected LEASE_OVERRIDE_AUDIT_MISSING") failed once (`result.isError` was false), giving 16 fails. Run #2 passed it, and it passed 5/5 when run alone. The lane diff touches no `test/`, `tools/`, `gates/` or `dist/` file. The lease-override classifier (`gates/lease-override.ts`) only runs inside the FEATURE_LEASE_HELD branch, so a one-off acceptance means the seeded incumbent's lease did not hold on that run. That points to timing or load in the test or seed, not to this content change. It should not go in this manifest, because it is not an intended red. The QA Phase 0.5 diff may still see it, and the coordinator may want to file a flake ticket against the E10 lease tests.
+- **sr-engineer reply in this file: acceptable.** `content/skill-sr-engineer.md:56` (Code-Review Round Reply, step 2) tells sr-engineer to "append a short reply under the corresponding round section" of the review doc. The reply is append-only: d6c4447 adds 5 lines to this file and deletes 0, and the round 1 text is unchanged. It is clearly marked as sr-engineer's, and I did not rely on it, since every claim above was checked again on its own. There is a small tension with this role's clean-context rule (the reply puts builder commentary in the reviewer's input), but the protocol allows it, so no action is needed.
+
+## Quality
+No new findings. The three round 1 optional notes stand as acknowledged. The manifest's comment blocks are short and specific: they tie each block to T-E269-05 and to the human-approved cut, and they say not to blanket-raise the caps. Step 4b: the diff adds no code comments.
+
+## Architecture
+No architecture spec. The fix touches only `qa_reports/` and lane bookkeeping, which are inside the lane's owned surface.
+
+## Security
+No findings. The change is a data file and prose only.
+
+## Performance
+No runtime change. Run #2 took 229.6 s, which is in line with run #1 (235.5 s).
+
+## Verdict
+APPROVED — the expected-red manifest matches the actual red set exactly (15/15) with accurate, negative-control-verified reasons, the content diff is byte-identical to what round 1 approved on AC1–AC4, and no required findings remain. Next: qa-engineer as author of T-E269-05 (golden and cap re-baseline).
