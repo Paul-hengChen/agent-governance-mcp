@@ -26,6 +26,10 @@ _(No active tasks — ready for the next feature.)_
 - [x] T-REL441-01 [P0] qa-engineer: verify AC1 + AC2 (diff scope since v4.4.0 and per-lane evidence for e260a-e260i) | depends_on: none
 - [x] T-REL441-02 [P0] qa-engineer: verify AC3 + AC4 (full suite under test lock, clean build, version check) | depends_on: none
 - [x] T-REL441-03 [P0] qa-engineer: verify AC5 + AC6 (behaviour-neutral spot check, v4.4.0 non-regression) | depends_on: none
+- [x] T-REL450-01 [P0] qa-engineer: verify AC1 + AC2 (diff scope since v4.4.1, per-lane review/qa evidence for e275/e269/e264/e268) | depends_on: none
+- [x] T-REL450-02 [P0] qa-engineer: verify AC3 + AC4 + AC5 (full suite under test lock, clean build, version check, audit exit 0, advisory disposition) | depends_on: none
+- [x] T-REL450-03 [P0] qa-engineer: verify AC6 (stash rule composed into role bundles, goldens and budget ceilings consistent, release-engineer SOP line refs gone) | depends_on: none
+- [x] T-REL450-04 [P0] qa-engineer: verify AC7 + AC8 (behaviour-neutral spot check, v4.4.1 non-regression) | depends_on: none
 
 ## Compacted History
 <!-- compacted: E125c 2026-09-26 — 67 sections, 891 [x] rows, 26 [-] rows summarized below; full rows: git log -i --grep <ticket-id>, or git log -p -- .current/_primary/tasks.md (pre-compaction commit 165b72d is auxiliary and invalidated by a history rewrite, E104) -->
