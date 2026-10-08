@@ -1,5 +1,7 @@
 # Pending tickets — lane e268
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E268-NEW-1
 title: The teamwork subagent template tells the agent to Read the retired content/skill-coordinator.md; fix the path, then tighten the subagent-templates delegate regex
@@ -55,5 +57,3 @@ body: |
   main (or the fan-out base the integrator uses), not a fixed base sha. Same "carry into the next proof
   script" class as the E271 proof-script note; no fix to an archived script is needed.
 ```
-
-## Applied
