@@ -2,7 +2,7 @@
 base: f3ffb97    integration branch: integ/e260-followups
 mailbox: ../agent-governance-mcp-lanes/_mailbox
 
-**狀態：人類核准 2026-10-07；已派工。2026-10-07 追加第四條 lane e275（E275，人類裁決）：三條 lane 的 build 都被 §6 dependency audit 擋住，e275 先修、先合進 main，再由整合者把 main merge 進三條 lane。** E260 結案時留下 12 張後續票（佇列 #84–#95，E263–E274）；人類 2026-10-07 裁決：E263 排除（需要先裁決 Comment discipline 是否涵蓋 `//` 檔頭與 30% 比例要不要再縮）、E269 納入、E266 延後（資料形狀需要設計，chain 最長）。E256（佇列 #77）與 E265 同檔同類，一起納入。E267 只改一份 spec，不開 lane，由整合者在整合後處理。三條並行 lane，檔案互不重疊；共享生成物（`content/**`、`test/fixtures/compose-golden/**`、`test/context-budget.test.mjs`）只歸 e269。
+**狀態：人類核准 2026-10-07；已結案 2026-10-08（四條 lane 皆合併進 main）。** 2026-10-07 追加第四條 lane e275（E275，人類裁決）：三條 lane 的 build 都被 §6 dependency audit 擋住，e275 先修、先合進 main，再由整合者把 main merge 進三條 lane。
 
 ## 派工前核對（整合者，2026-10-07）
 - `git worktree list` 只有 primary；main = origin/main = `f3ffb97`（v4.4.1 已發版，`8359f1a` 記帳，`f3ffb97` 佇列 #81 改成已發版）；工作樹只有一個未追蹤的討論稿 `docs/integrator-session-per-wave-2026-10-07.md`（不屬於本波，不動）。`tw_detect_drift` 無 drift（只有 T-REL4-02 的證據提示）。primary handoff 停在 `release-v4.4.1`。
@@ -84,3 +84,15 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 | 2026-10-07 | 整合者 | e269 escalate：§6 dependency audit 擋住 build；整合者在 primary `f1e6eb1` 重現三則沒有處分的 advisory（sdk high、proxy-addr critical、sharp high），三條 lane 都受影響；三條 lane 改為不 build 的工作照做、碰到 build 停下 | 信箱 e269 to-integrator#2、三條 lane to-lane#2 |
 | 2026-10-07 | 人類 | 三則 advisory 處分為 upgrade；開 E275（P1）放進本波，以第四條 lane e275 執行、先合進 main；同意整合者把 main merge 進 e269、e264、e268 | 整合者 session |
 | 2026-10-07 | 整合者 | E275 配號（`docs/backlog.md`、佇列 #96，插隊）；e275 擁有 `package.json`、`package-lock.json`、`docs/dependency-advisories.md`（從共同禁止中除外）；e275 用自己的 `node_modules`，不經 symlink 改 primary | 本檔 |
+| 2026-10-08 | 整合者 | e275 核對通過（`be2883b`，全套 3043/3040/0/3，audit high exit 0，0 越界，review／qa 皆第一輪通過，hop 4/10）；`integ/e275` 無衝突、merge-invariants PASS，primary `npm ci` 後全套同數字 → ff `main` `6bd35b8` 並 push；`finish e275 --shipped` 配 E276（佇列 #97） | 信箱 e275 to-integrator#2、to-lane#2 |
+| 2026-10-08 | 整合者 | main（`f53ea13`）merge 進三條 lane：e269 `cbb3533`、e264 `90e2cbe`、e268 `6a087bc`，皆無衝突、merge-invariants PASS、各 lane worktree 內 audit exit 0；merge 前三條 lane 都已 ack 乾淨工作區 | 信箱三條 lane to-integrator#4–#5、to-lane#4–#5 |
+| 2026-10-08 | 整合者 | e268 核對通過（`b342495`，全套 3043/3040/0/3，0 越界，T-E268-01..06 皆 PASS）；lane 的 `prd_path` 疑慮查證不成立：tracked handoff 存相對路徑，已 push 的 main 沒有本機絕對路徑，不開票 | 信箱 e268 to-integrator#6–#7、to-lane#6 |
+| 2026-10-08 | 整合者 | e264 核對通過（`51948c5`，全套 3043/3040/0/3，0 越界，`tools/` diff 逐行皆為註解）；reviewer recommended #1（`transpileModule` 會抹掉型別，proof 腳本會把只改型別註記判成只改註解）併入 e268 的 E268-NEW-3，不另開票；commit trailer 不改（amend 禁止） | 信箱 e264 to-integrator#5、to-lane#6 |
+| 2026-10-08 | 整合者 | e269 核對通過（`07fd414`，全套 3045/3042/0/3，0 越界，T-E269-01..07 皆 PASS；內容 review 一輪 CHANGES_REQUESTED（缺 expected-red 清單）後 APPROVED，hop 9/10）；四個上限 5548→5567、10057→10076、20434→20453、7959→7978 | 信箱 e269 to-integrator#5、to-lane#6 |
+
+## 結案
+- 日期 2026-10-08。e275 先行：`integ/e275`（e275 `be2883b`，`--no-ff`）→ ff `main` `6bd35b8`。其餘三條：`integ/e260-followups`（e269 `07fd414` → e264 `51948c5` → e268 `b342495`，皆 `--no-ff`）。四次合併零衝突 → 無合併審查；每次合併後 merge-invariants PASS；重建 `dist/` 無差異；整合層全套 3045/3042/0/3，audit high exit 0。
+- 彙總（上限按 lane 計，合計僅供參考）：e275 2 張 task／hop 4/10；e269 7 張／hop 9/10（內容 review 一輪 CHANGES_REQUESTED）；e264 2 張／hop 4/10；e268 6 張／hop 5/10。合計 17 張 task、hop 22；四條 lane 都在各自上限內，證據與 `completed_tasks` 一致。
+- 完成定義 12 項全部成立：E267 的修正段落加在 `specs/d6-host-capability-compose-axis-architecture.md` 末尾；backlog E256、E264、E265、E267–E275 done-mark，佇列 #77、#85、#86、#88–#96 勾 DONE；E263（#84）、E266（#87）維持開啟。
+- 例外：本波追加了第四條 lane e275（人類裁決），以及整合者把 main merge 進三條 lane（人類同意，非 SOP 既有步驟）。
+- 新票：E276 已由 `finish e275 --shipped` 配號；e269、e264、e268 的 pending-ticket 由各自的 `finish --shipped` 配號。

@@ -347,3 +347,12 @@ _None — the spec's Dependencies / Prerequisites records zero external referenc
 None. The two questions the spec delegated to architect (host-detection mechanism;
 absent-signal default) are resolved above with documented engineering rationale;
 neither requires a human call.
+
+## Amendment (2026-10-08, E267)
+
+The fragment names in *Affected Files* and in *Coordinator Fragment Partition* (`content/skill-coord-NN-*.md`,
+`skill-coord-01-core-head.md` …) are not what shipped. The shipped fragments are `content/coord-01-core-head.md` ..
+`content/coord-07-core-sop.md`, registered under the `"skill-coordinator.md"` key of `SKILL_SEGMENTS` in
+`prompts/skill-manifest.ts`. The `skill-` prefix is kept for whole skill files that carry frontmatter (the
+skill-frontmatter guard globs `content/skill-*.md` and requires `recommended_model`). The text above is left as
+written, since this file records the design as it was decided.
