@@ -1,5 +1,7 @@
 # Pending tickets — lane e275
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E275-NEW-1
 title: Dependency-advisory record — the 2026-10-07 residual note misstates the fast-uri / ip-address re-review triggers, which have already fired on moderate advisories; also tighten the proxy-addr "no source file contains express" wording
@@ -21,5 +23,3 @@ body: |
   Doc-only edit to docs/dependency-advisories.md; whether to also take the fired moderate re-reviews is a
   separate decision for whoever picks this up.
 ```
-
-## Applied
