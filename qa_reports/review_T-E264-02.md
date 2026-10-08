@@ -22,3 +22,10 @@ Phase 3: skipped (integrator scope: no test changes; ACs verified by spec proofs
 - `npm run build` -> zero errors, check:transitions-sync OK, no dist drift beyond committed state (git status showed only .current/e264 state files modified).
 - `npm audit --audit-level=high` -> no high/critical (8 vulnerabilities: 2 low, 6 moderate; pre-existing, not touched by this change).
 - CI runnability: `npm test` headless via test-lock.
+
+## Final Suite
+- AC8: `git status --porcelain` empty on HEAD (after evidence commit), then `node scripts/test-lock.mjs -- npm test` -> tests 3043, pass 3040, fail 0, skipped 3, exit 0. PASS
+- AC9: `grep -rnE "/Use[r]s/|/hom[e]/"` over spec, .current/e264, this review, review_reports/review_T-E264-01.md -> exit=1 (no matches). PASS
+- Evidence-only markdown appended after the suite run; no code/test input changed.
+
+Verdict: PASS (AC1-AC9).
