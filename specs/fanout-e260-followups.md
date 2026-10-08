@@ -89,6 +89,7 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 | 2026-10-08 | 整合者 | e268 核對通過（`b342495`，全套 3043/3040/0/3，0 越界，T-E268-01..06 皆 PASS）；lane 的 `prd_path` 疑慮查證不成立：tracked handoff 存相對路徑，已 push 的 main 沒有本機絕對路徑，不開票 | 信箱 e268 to-integrator#6–#7、to-lane#6 |
 | 2026-10-08 | 整合者 | e264 核對通過（`51948c5`，全套 3043/3040/0/3，0 越界，`tools/` diff 逐行皆為註解）；reviewer recommended #1（`transpileModule` 會抹掉型別，proof 腳本會把只改型別註記判成只改註解）併入 e268 的 E268-NEW-3，不另開票；commit trailer 不改（amend 禁止） | 信箱 e264 to-integrator#5、to-lane#6 |
 | 2026-10-08 | 整合者 | e269 核對通過（`07fd414`，全套 3045/3042/0/3，0 越界，T-E269-01..07 皆 PASS；內容 review 一輪 CHANGES_REQUESTED（缺 expected-red 清單）後 APPROVED，hop 9/10）；四個上限 5548→5567、10057→10076、20434→20453、7959→7978 | 信箱 e269 to-integrator#5、to-lane#6 |
+| 2026-10-08 | 人類 | 確認同意 e269 調高四個 budget 上限（各 +19 ~tok，照 qa 實測值：5567／10076／20453／7978） | 整合者 session |
 
 ## 結案
 - 日期 2026-10-08。e275 先行：`integ/e275`（e275 `be2883b`，`--no-ff`）→ ff `main` `6bd35b8`。其餘三條：`integ/e260-followups`（e269 `07fd414` → e264 `51948c5` → e268 `b342495`，皆 `--no-ff`）。四次合併零衝突 → 無合併審查；每次合併後 merge-invariants PASS；重建 `dist/` 無差異；整合層全套 3045/3042/0/3，audit high exit 0。
