@@ -6,3 +6,4 @@
 {"ts":"2026-10-08T03:15:53.346Z","feature":"e275-advisory-upgrades","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-10-08T03:22:28.003Z","feature":"e275-advisory-upgrades","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-10-08T03:23:24.854Z","feature":"e275-advisory-upgrades","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-10-08T03:27:37.304Z","feature":"e275-advisory-upgrades","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
