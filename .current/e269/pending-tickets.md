@@ -1,5 +1,7 @@
 # Pending tickets — lane e269
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E269-NEW-1
 title: skill-qa-engineer.md has 27 bytes left under its 17900-byte cap in qa-visual-skill-split; the next qa SOP edit will trip it
@@ -40,5 +42,3 @@ body: |
   the next line would be skipped (the found-count floor catches it only if the count drops). Trim the
   header and handle wrapped titles next time the file is touched (qa-engineer edit).
 ```
-
-## Applied
