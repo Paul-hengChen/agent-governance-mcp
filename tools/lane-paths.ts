@@ -3,7 +3,8 @@
 // consumer (resolveLanePaths, the migration runners, dispatch-log) iterates
 // LANE_FILES. Production call sites use resolveCurrentLanePaths; flat
 // `.current/<filename>` is legacy, reached only by the migration runners.
-// Pure path logic except three read-only fs helpers (resolveCurrentLane too).
+// Pure path logic except three read-only fs helpers: hasHistoryLedger,
+// resolveCurrentLane and enumerateLaneSidecarSources.
 // Why: specs/e260b-rationale.md (this file's section)
 
 import * as fs from "fs";
