@@ -2,3 +2,4 @@
 {"ts":"2026-10-08T02:55:35.256Z","feature":"e275-advisory-upgrades","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-10-08T02:56:06.766Z","feature":"e275-advisory-upgrades","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
 {"ts":"2026-10-08T03:02:16.945Z","feature":"e275-advisory-upgrades","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-10-08T03:14:58.149Z","feature":"e275-advisory-upgrades","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
