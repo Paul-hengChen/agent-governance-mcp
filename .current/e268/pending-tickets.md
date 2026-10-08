@@ -40,4 +40,20 @@ body: |
   for item 1 would have cost about five more hops against the lane's hop cap.
 ```
 
+```pending-ticket
+lane_local_id: E268-NEW-3
+title: Lane comment-proof scripts diff their scope check against the fixed base sha, so a main-into-lane merge produces a false scope VIOLATION
+priority: P3
+depends_on: none
+source: fresh qa verifier, lane e268 (qa_reports/verify_E268_T-E268-06.md, AC14), 2026-10-08
+body: |
+  Lane e268's proof script (archived with the lane) builds its scope check from `git diff <base-sha>..HEAD`.
+  After the integrator merged main into the lane (to pick up the dependency-advisory upgrades), the files
+  main brought in showed up as out-of-scope and the script printed `scope: VIOLATION`, although
+  `git diff main...HEAD` lists only lane-owned paths. The verifier had to discount the line by hand.
+  Any future comment-trim / comment-accuracy proof script should compute scope against the merge-base with
+  main (or the fan-out base the integrator uses), not a fixed base sha. Same "carry into the next proof
+  script" class as the E271 proof-script note; no fix to an archived script is needed.
+```
+
 ## Applied
