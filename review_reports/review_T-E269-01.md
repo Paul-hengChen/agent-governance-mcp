@@ -1,0 +1,89 @@
+# Review — T-E269-01, T-E269-02, T-E269-03 (review task T-E269-04)
+
+covers: T-E269-01, T-E269-02, T-E269-03, T-E269-04
+
+## Round 1 — CHANGES_REQUESTED — by code-reviewer
+
+Inputs read (clean context): `git diff main...HEAD -- content/` (lane commits e8d2bfd, 8959489; main merged in at cbb3533 for an unrelated fix), `specs/e269-rule-text-budget.md`. There is no `specs/e269-rule-text-budget-architecture.md`. Disclosure: `tw_get_state` returns sr-engineer's `pending_notes` inline, so I saw them. I did not rely on them. Every claim below was re-measured or re-run on its own. Model: reviewer is opus and sr-engineer is pinned to fable, so this is a different model and same-model bias is not a concern.
+
+## Summary
+- Four content files change. `const-15-core-tail.md` §6: `git stash drop` and `git stash clear` are added to the FORBIDDEN list (+76 chars, one line). `skill-code-reviewer.md` gets a new step 4c and `skill-qa-engineer.md` gets a new Phase 3.5 bullet, both with the same negative-control sentence. `skill-release-engineer.md` replaces four stale pointers.
+- AC1 through AC4 are all implemented, and each AC's `proof:` command gives the expected result. The three targeted test files pass (33 pass, 0 fail, 1 skip that depends on git history). Both byte caps hold: the qa SOP is 17873 bytes against a 17900 cap, and the reviewer SOP is 10519 bytes against a 10725 cap.
+- The full suite via `scripts/test-lock.mjs` gives 3025 pass and 15 fail. The 15 failures are exactly the 11 compose-equivalence goldens and the 4 context-budget caps (5548, 10057, 20434, 7959), all of which T-E269-05 owns. No other test fails.
+- One required finding: this handoff leaves 15 tests red on purpose but has no `qa_reports/expected-red_e269-rule-text-budget.txt` manifest (SOP step 4a). The fix is mechanical. The content edits themselves need no changes.
+- Verdict: CHANGES_REQUESTED, because the manifest is missing. Everything else would be APPROVED.
+
+## AC Completeness
+AC1 — implemented — `content/const-15-core-tail.md:12`. I split the §6 line into sentences and compared old with new: there are 5 sentences both before and after, and only sentence 2 (the FORBIDDEN list) differs. The first sentence, which `test/e178a-integrator-role.test.mjs:249` pins, is byte-identical. The line is 76 chars longer (1180 → 1256), and the whole file is +76 bytes. The only edits are "`git checkout -- <file>` (…reversibly)" gaining ", `git stash drop`, and `git stash clear` (irreversibly discard stashed content)" and the earlier "and" moving to the new last item. `git stash` / `git stash pop` are still allowed. The proof passes: `git diff --stat` shows 1 insertion and 1 deletion, `git diff --quiet main...HEAD -- test/e178a-integrator-role.test.mjs` exits 0, and e178a passes.
+AC2 — implemented — `content/skill-code-reviewer.md:80` (step 4c) and `content/skill-qa-engineer.md:82` (Phase 3.5 bullet). `grep -c "git stash"` returns 1 per file. Each hit is in a sentence that contains both "outside the worktree" and "tw_update_state". The sentence is identical in both files. It has all three parts: (1) "use a copy outside the worktree", (2) "never `git stash`", (3) the reason, "which sweeps up `tw_update_state` writes, uncommitted until the role commits".
+AC3 — implemented — `content/skill-release-engineer.md`. In step 13a (line 249), `:143` became "step 7a's *Shell safety under zsh NOMATCH* rule, E76/E71b". The target is line 145, a bullet inside step 7a (7a spans lines 68–198), and its bold label begins "Shell safety under zsh NOMATCH" and carries both E76 and E71b, so the target is correct. `:196` became "step 8a's *Existence pre-filter*, E71a". The target is line 207, inside step 8a (lines 202–228), with the bold label "Existence pre-filter, mandatory (E71a)", so this target is also correct. The Reason note at line 26 now says "as v3.107.0 context inside a note about a different ticket", which is the behaviour in plain words with no ticket id as the only pointer. Proof: `grep -nE "at :143|at :196|\(E104\)"` prints nothing (rc=1).
+AC4 — implemented — the step 13b Reason paragraph (around line 265) now reads "(the `ahead-of-upstream` check of `scripts/verify-release.mjs --close-out`)". Checked against the script: close-out mode is an inline `if (closeOut)` block (`scripts/verify-release.mjs:75`) that calls `runCheck("ahead-of-upstream", …)` (`:76`) around `git rev-list --count @{u}..HEAD` (`:93`). There is no named function to cite, so sr-engineer's claim holds, and quoting the `runCheck` label word for word is the most precise pointer available. Proof: `grep -n "verify-release.mjs:[0-9]"` prints nothing (rc=1).
+AC5–AC9 — out of scope for this round. They belong to T-E269-05..07 (qa author, re-review, fresh verifier).
+
+## Correctness
+- **required** — Expected-red manifest missing (SOP step 4a; sr-engineer SOP step 7a). This handoff leaves 15 tests red on purpose, and the spec plans them (AC7/AC8, T-E269-05). `qa_reports/expected-red_e269-rule-text-budget.txt` does not exist. The spec names these tests only in prose ("11 compose-equivalence goldens", the cap table). Step 4a exists to replace prose like that with structured `file | test name` pairs, so that the next qa session's Phase 0.5 can tell a planned red from an accidental one. Fix: sr-engineer writes the manifest with one line per test. The 15 entries observed at HEAD 157e37b are:
+  - `test/compose-equivalence.test.mjs` — the 11 tests titled `compose-equivalence: buildPromptForRole(skill-coordinator-lite.md, design=false|true, fullDetail=false|true) …` (4), `compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=false|true, fullDetail=false|true) …` (4), `compose-equivalence: SessionStart hook (lite/default env) …`, `compose-equivalence: SessionStart hook (AGC_DEFAULT_SKILL=full) …`, `compose-equivalence: cat(15 manifest fragments in order) === the pre-refactor constitution.md monolith …`.
+  - `test/context-budget.test.mjs` — `AC2: lean always-on bundle is below the raw baseline and within target (<= 5548 ~tok)`, `AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the measured floor (≤ 10057 ~tok)`, `AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 20434 ~tok)`, `AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 7959 ~tok)`.
+  This is a content-free bookkeeping fix: no content, test or golden edit is needed or allowed.
+- No other findings. The edits contain no logic. For each new cross-reference I opened the target and confirmed it resolves (see AC3/AC4).
+
+## Quality
+- **optional** — The (E104) edit outside the brief, at `content/skill-release-engineer.md:198` ("invalidated by a history rewrite (e.g. E104)"). I judge this edit warranted and in scope. `docs/backlog.md:226` shows E104 is the history-reset ticket, so the original "(E104)" was a correct example pointer, not a stale one. Rewording it to "(e.g. E104)" keeps the meaning, makes its role as an example explicit, touches one token in a file the lane owns, and is the smallest change that lets AC3's `\(E104\)` proof grep print nothing. The proof regex was too broad: it was meant for the line-26 note but also matched this valid pointer. The QA verifier should know this text changed on purpose. PM could narrow the regex in future specs. Nothing to change here.
+- **optional** — Readability of the AC2 sentence. Read with no context, it is clear on where to run (a copy outside the worktree) and what not to do (`git stash`). The reason is terse. "which sweeps up `tw_update_state` writes, uncommitted until the role commits" relies on the reader working out the harm: a `drop`, or a conflicted `pop`, loses the governance write. That was the e260f incident. It still meets AC2 because it says the writes are uncommitted and that a stash sweeps them up. The 27-byte headroom under the qa SOP cap rules out a fuller clause, so I accept it as is.
+- **optional** — Placement in the qa SOP. The bullet sits between the Phase 3.5 FAIL bullet and the PASS GATE bullet. That works, because AC-proof execution is where negative controls happen. Placing it after the PASS GATE bullet would keep the FAIL → PASS GATE pair together. This is cosmetic.
+- Step 4b comment check: the diff adds no code comments, so there is nothing to apply.
+
+## Architecture
+No architecture spec exists for this feature. Section placement matches the spec's task breakdown: const-15 §6 only, two SOP sentences, and release-engineer pointer edits. Nothing outside the lane's owned file list was touched (`git diff main...HEAD --stat` covers content/, specs/e269-*, and .current/e269/ only).
+
+## Security
+No findings. The change is prose only. It tightens the git-safety rule by forbidding two commands that destroy data, and loosens nothing. No secrets and no new trust boundaries.
+
+## Performance
+No runtime code changed. Context cost is +76 chars (about +19 ~tok) in the constitution, which is within the spec's ≤100-char budget. The qa and reviewer SOPs stay under their byte caps. Re-measuring the constitution caps is T-E269-05's job.
+
+## Verdict
+CHANGES_REQUESTED — every content edit satisfies AC1–AC4 with zero required content findings, but the handoff leaves 15 planned reds without the `qa_reports/expected-red_e269-rule-text-budget.txt` manifest that SOP step 4a requires. Adding the manifest (15 lines, listed above) is the only change needed for APPROVED.
+
+### sr-engineer reply — Round 1
+
+- **required (expected-red manifest)** — addressed. `qa_reports/expected-red_e269-rule-text-budget.txt` now lists the 15 entries: the 11 compose-equivalence goldens and the 4 context-budget caps, each block with its rationale and the measured cap values (5567/10076/20453/7978 ~tok, +19 each). I checked it byte for byte against `node --test test/compose-equivalence.test.mjs test/context-budget.test.mjs`. The sorted manifest names diff clean against the `not ok` names (15/15). No content, test or golden edits.
+- **optional notes** — I made no changes. The (E104) wording was judged warranted, the AC2 sentence's terseness is bound by the 27-byte qa SOP cap room, and moving the qa bullet is cosmetic and would spend that cap room.
+
+## Round 2 — APPROVED — by code-reviewer
+
+Inputs read (clean context): `git diff ea0dd3f..HEAD` (a single fix commit, d6c4447, plus `.current/e269/` bookkeeping), `git diff main...HEAD -- content/`, `qa_reports/expected-red_e269-rule-text-budget.txt` (the step-4a carve-out), and `specs/e269-rule-text-budget.md` as in round 1. Model: the reviewer is opus and sr-engineer is pinned to fable, so the models differ.
+
+## Summary
+- Since round 1 (ea0dd3f), d6c4447 adds `qa_reports/expected-red_e269-rule-text-budget.txt` (15 entries) and an sr-engineer reply under the round 1 section of this file. `git diff --stat ea0dd3f..HEAD -- content/ test/` is empty, so no content, test or golden file changed.
+- The content diff is the same one round 1 judged. `git diff main...ea0dd3f -- content/` and `git diff main...HEAD -- content/` have the same hash (`ccbea8bd…`), and the merge-base is unchanged (f53ea13).
+- The manifest matches an actual run exactly. Full suite run #2: 3025 pass, 15 fail, and the sorted `not ok` names diff clean against the manifest's test-name column (15/15, no extras, none missing).
+- The round 1 required finding is resolved, and there are no new required findings. Verdict: APPROVED.
+
+## AC Completeness
+AC1–AC4 — implemented — unchanged from round 1. The content diff is byte-identical (same hash), so the round 1 evidence still applies.
+AC5–AC9 — out of scope for this round (T-E269-05..07).
+
+## Correctness
+- **Round 1 required finding (manifest missing): resolved.** Step 4a checks:
+  - Format: each of the 15 non-comment lines splits on ` | ` into exactly 2 fields (`<relative test file path> | <exact test name>`). The rationale blocks use `#` lines and there is one file per feature, which matches the sr-engineer SOP step 7a convention that step 4a names. The file ends with a newline.
+  - Sampling: I checked all 15 entries, not just 3. Each is a real, locatable test. Seven are literal titles (`test/context-budget.test.mjs:190`, `:554`, `:569`, `:894`; `test/compose-equivalence.test.mjs:114`, `:119`, `:126`), and the eight `buildPromptForRole(...)` entries are instances of the template title at `test/compose-equivalence.test.mjs:71`.
+  - Exact match against a run: in full-suite run #2 (`node scripts/test-lock.mjs -- node --test test/*.test.mjs`) the red set is identical to the manifest.
+  - Reasons are accurate. The measured values in the manifest (5567 / 10076 / 20453 / 7978 ~tok, +19 each) match the assertion messages in the run. Negative control, run on a copy outside the worktree (rsync to the scratchpad; no `git stash`): with only `content/const-15-core-tail.md` restored to `main`, the two test files go fully green (68 pass, 0 fail). Restoring the lane's const-15 brings back exactly 15 fails (53 pass). So the const-15 §6 delta alone causes all 15 reds, as the manifest's rationale says.
+- **recommended (not this lane's defect)**: there is an intermittent, unrelated failure. On full-suite run #1, `test/feature-lease.test.mjs:1008` ("E10-AC2b: lease_override:true with a MISMATCHED pending_notes[0] … rejected LEASE_OVERRIDE_AUDIT_MISSING") failed once (`result.isError` was false), giving 16 fails. Run #2 passed it, and it passed 5/5 when run alone. The lane diff touches no `test/`, `tools/`, `gates/` or `dist/` file. The lease-override classifier (`gates/lease-override.ts`) only runs inside the FEATURE_LEASE_HELD branch, so a one-off acceptance means the seeded incumbent's lease did not hold on that run. That points to timing or load in the test or seed, not to this content change. It should not go in this manifest, because it is not an intended red. The QA Phase 0.5 diff may still see it, and the coordinator may want to file a flake ticket against the E10 lease tests.
+- **sr-engineer reply in this file: acceptable.** `content/skill-sr-engineer.md:56` (Code-Review Round Reply, step 2) tells sr-engineer to "append a short reply under the corresponding round section" of the review doc. The reply is append-only: d6c4447 adds 5 lines to this file and deletes 0, and the round 1 text is unchanged. It is clearly marked as sr-engineer's, and I did not rely on it, since every claim above was checked again on its own. There is a small tension with this role's clean-context rule (the reply puts builder commentary in the reviewer's input), but the protocol allows it, so no action is needed.
+
+## Quality
+No new findings. The three round 1 optional notes stand as acknowledged. The manifest's comment blocks are short and specific: they tie each block to T-E269-05 and to the human-approved cut, and they say not to blanket-raise the caps. Step 4b: the diff adds no code comments.
+
+## Architecture
+No architecture spec. The fix touches only `qa_reports/` and lane bookkeeping, which are inside the lane's owned surface.
+
+## Security
+No findings. The change is a data file and prose only.
+
+## Performance
+No runtime change. Run #2 took 229.6 s, which is in line with run #1 (235.5 s).
+
+## Verdict
+APPROVED — the expected-red manifest matches the actual red set exactly (15/15) with accurate, negative-control-verified reasons, the content diff is byte-identical to what round 1 approved on AC1–AC4, and no required findings remain. Next: qa-engineer as author of T-E269-05 (golden and cap re-baseline).

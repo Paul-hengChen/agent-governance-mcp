@@ -77,6 +77,7 @@ APPROVED — implementation matches AC1 with zero findings in any category.
    ```
 4a. **Expected-Red Sampling**<!-- origin:start --> (v3.57.0, C15)<!-- origin:end -->: WHEN the diff touches test files OR the review context indicates intentionally-red tests (e.g. a test run / `npx tsc --noEmit` shows red tests the diff doesn't explain) → DO check that `qa_reports/expected-red_<active_feature>.txt` exists (the Clean-context carve-out) and sample at least 3 entries (all entries if fewer than 3) by grepping the named test file for the named test string — each sampled entry must be a real, locatable test. Sampling the manifest's structured `file | test name` pairs replaces spot-checking free-text prose summaries. WHEN the manifest is missing while intentional reds evidently exist → record a `CHANGES_REQUESTED` finding under **Correctness**, citing the missing `qa_reports/expected-red_<active_feature>.txt` path.
 4b. **Comment check**: Apply the Comment discipline bullet to every comment the diff adds; each `agc check — comments` warning touching the diff is either kept with a one-line reason in the review report or sent back to be trimmed.
+4c. **Negative control** (break code, see a test fail): use a copy outside the worktree, never `git stash`, which sweeps up `tw_update_state` writes, uncommitted until the role commits.
 5. **Verdict**: WHEN the review verdict is APPROVED → DO hand off per *Escalation Routes: APPROVED*. ELSE (CHANGES_REQUESTED) → DO escalate per *Escalation Routes: CHANGES_REQUESTED*.
 
 ## Escalation Routes

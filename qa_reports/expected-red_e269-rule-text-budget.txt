@@ -1,0 +1,33 @@
+# e269-rule-text-budget — expected-red manifest (emitted by sr-engineer per skill-sr-engineer SOP 7a)
+# Format: <relative test file path> | <exact test name/description string>
+
+# qa-owned golden re-baseline (T-E269-05, human-approved cut): T-E269-01 adds
+# `git stash drop` / `git stash clear` to the §6 FORBIDDEN list in
+# content/const-15-core-tail.md (+76 chars). const-15 is core-tagged and byte-pinned
+# into all 11 compose-golden fixtures, so every fixture that embeds it reds.
+# qa re-baselines the goldens — sr does not touch test/.
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-coordinator-lite.md, design=false, fullDetail=false) is byte-identical to pre-refactor golden build-lite-nondesign.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-coordinator-lite.md, design=true, fullDetail=false) is byte-identical to pre-refactor golden build-lite-design.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-coordinator-lite.md, design=false, fullDetail=true) is byte-identical to pre-refactor golden build-lite-nondesign-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-coordinator-lite.md, design=true, fullDetail=true) is byte-identical to pre-refactor golden build-lite-design-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=false, fullDetail=false) is byte-identical to pre-refactor golden build-full-nondesign.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=true, fullDetail=false) is byte-identical to pre-refactor golden build-full-design.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=false, fullDetail=true) is byte-identical to pre-refactor golden build-full-nondesign-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=true, fullDetail=true) is byte-identical to pre-refactor golden build-full-design-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: SessionStart hook (lite/default env) is byte-identical to pre-refactor golden hook-lite.txt
+test/compose-equivalence.test.mjs | compose-equivalence: SessionStart hook (AGC_DEFAULT_SKILL=full) is byte-identical to pre-refactor golden hook-full.txt
+test/compose-equivalence.test.mjs | compose-equivalence: cat(15 manifest fragments in order) === the pre-refactor constitution.md monolith (DR-1 Option R invariant)
+
+# qa-owned token-cap re-baseline (T-E269-05, human-approved cut): the four caps below
+# had zero headroom after the E258 re-baseline, so the +76-char const-15 delta
+# (core-tagged, lands in every bundle) reds each one by +19 ~tok. Measured at this
+# working tree, `node --test test/context-budget.test.mjs`:
+#   AC2 lean always-on bundle:                     5567 ~tok vs cap 5548  (+19)
+#   AC8 rationale-stripped (design-arm) floor:     10076 ~tok vs cap 10057 (+19)
+#   AC8 teamwork coordinator bundle (design-arm):  20453 ~tok vs cap 20434 (+19)
+#   AC8 non-design floor:                          7978 ~tok vs cap 7959  (+19)
+# Move these 4 caps individually to the measured values — do not blanket-raise.
+test/context-budget.test.mjs | AC2: lean always-on bundle is below the raw baseline and within target (<= 5548 ~tok)
+test/context-budget.test.mjs | AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the measured floor (≤ 10057 ~tok)
+test/context-budget.test.mjs | AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 20434 ~tok)
+test/context-budget.test.mjs | AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 7959 ~tok)
