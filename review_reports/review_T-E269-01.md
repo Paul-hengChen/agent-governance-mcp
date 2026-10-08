@@ -44,3 +44,8 @@ No runtime code changed. Context cost is +76 chars (about +19 ~tok) in the const
 
 ## Verdict
 CHANGES_REQUESTED — every content edit satisfies AC1–AC4 with zero required content findings, but the handoff leaves 15 planned reds without the `qa_reports/expected-red_e269-rule-text-budget.txt` manifest that SOP step 4a requires. Adding the manifest (15 lines, listed above) is the only change needed for APPROVED.
+
+### sr-engineer reply — Round 1
+
+- **required (expected-red manifest)** — addressed. `qa_reports/expected-red_e269-rule-text-budget.txt` now lists the 15 entries: the 11 compose-equivalence goldens and the 4 context-budget caps, each block with its rationale and the measured cap values (5567/10076/20453/7978 ~tok, +19 each). I checked it byte for byte against `node --test test/compose-equivalence.test.mjs test/context-budget.test.mjs`. The sorted manifest names diff clean against the `not ok` names (15/15). No content, test or golden edits.
+- **optional notes** — I made no changes. The (E104) wording was judged warranted, the AC2 sentence's terseness is bound by the 27-byte qa SOP cap room, and moving the qa bullet is cosmetic and would spend that cap room.
