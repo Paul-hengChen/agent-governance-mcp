@@ -17,13 +17,12 @@ const REPO_ROOT = path.resolve(__dirname, "..");
 const TEMPLATE_DIR = path.join(REPO_ROOT, "templates", "claude-code-agents");
 const SKILL_DIR = path.join(REPO_ROOT, "content");
 
-// The monolithic content/skill-coordinator.md is retired (host-capability compose axis, T-D6-04):
-// it is no longer a compose source (all 3 render paths route through
-// composeSkill/SKILL_SEGMENTS). readSkillFile composes the full-capability
-// (taskTool:true) reconstruction, which reproduces the retired monolith
-// byte-for-byte (AC5) — a drop-in replacement for the raw reads below.
+// "skill-coordinator.md" is the logical key of SKILL_SEGMENTS in
+// prompts/skill-manifest.ts, composed from content/coord-01..07-*.md; it is not a
+// file on disk. readSkillFile composes the full-capability (taskTool:true)
+// reconstruction through composeSkill, a drop-in replacement for raw reads.
 // composeSkill falls through to a plain read for any UNSPLIT skill (every
-// file but skill-coordinator.md today), so this is safe to use uniformly.
+// other skill file), so this is safe to use uniformly.
 const { composeSkill, hostCapabilitiesFor } = await import(path.join(REPO_ROOT, "dist", "prompts", "skill-manifest.js"));
 function readSkillFile(f) {
   return composeSkill(f, hostCapabilitiesFor("claude-code"), (g) => fs.readFileSync(path.join(SKILL_DIR, g), "utf-8"));
@@ -50,7 +49,8 @@ const EXPECTED_ROLES = [
 // delegates to the qa-engineer top-level role (it's a lazy sub-skill, not in
 // the RoleName enum) — but its model tier comes from skill-qa-visual.md.
 // v3.21.0: `lite` maps to the unchanged skill-coordinator-lite.md;
-// `teamwork` maps to skill-coordinator.md (full coordinator subagent).
+// `teamwork` maps to the logical key skill-coordinator.md (the composed full
+// coordinator; see readSkillFile above), not a file on disk.
 const ROLE_TO_SKILL = {
   "pm": "skill-pm.md",
   "researcher": "skill-researcher.md",
@@ -68,8 +68,10 @@ const ROLE_TO_SKILL = {
 
 // Templates that delegate by file path instead of tw_switch_role: `lite` is
 // server-read-only and references content/skill-coordinator-lite.md; `teamwork`
-// is the dispatcher, not a tw_switch_role destination, and references
-// content/skill-coordinator.md.
+// is the dispatcher, not a tw_switch_role destination. The teamwork regex pins
+// the template's CURRENT text; that template still tells the subagent to Read a
+// content path that does not exist on disk. The stale Read path is tracked
+// separately, and the regex should be tightened in the same change.
 const FILE_PATH_DELEGATES = {
   "lite": /content\/skill-coordinator-lite\.md/,
   "teamwork": /content\/skill-coordinator\.md/,

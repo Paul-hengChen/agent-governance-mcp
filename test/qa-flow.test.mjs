@@ -1,6 +1,7 @@
 // Coded by @qa-engineer
 // Tests for tools/transitions.ts + tools/evidence-file.ts + handoff qa_round
 // round-trip (v3.2.0 QA-Flow Enforcement). Imports compiled dist/.
+// Extra rationale: specs/e260h-comment-rationale.md (section test/qa-flow.test.mjs).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";

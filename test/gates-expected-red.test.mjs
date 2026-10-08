@@ -1,6 +1,6 @@
 // Coded by @qa-engineer
 // Tests for the expected-red manifest check in gates/expected-red.ts (specs/c15-expected-red-manifest.md):
-// U1-U12 unit-test the arm and disposition predicates, I1-I5 the PASS gate. The server checks only that a
+// U1-U13 unit-test the arm and disposition predicates, I1-I5 the PASS gate. The server checks only that a
 // `## Expected-Red Diff` section EXISTS in qa_reports/review_<id>.md; it never runs the suite or parses manifest rows.
 // Rationale: specs/e260g-comment-rationale.md (test/gates-expected-red.test.mjs).
 

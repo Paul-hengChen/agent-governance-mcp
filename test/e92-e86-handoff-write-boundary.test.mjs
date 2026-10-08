@@ -363,7 +363,7 @@ test("Corpus sweep: every non-blank line of content/*.md and docs/backlog.md is 
 // ==========================================================================
 // AC3: when whole pending notes are dropped for size, a marker line says how many were
 // omitted. Re-runs the five fixtures the code reviewer ran, against the compiled dist.
-// ===========================================================================
+// ==========================================================================
 function mkWorkspace() {
   const ws = fs.mkdtempSync(path.join(os.tmpdir(), "e92e86-qa-"));
   fs.mkdirSync(path.join(ws, ".current"), { recursive: true });

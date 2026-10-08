@@ -1,6 +1,6 @@
 // Coded by @qa-engineer
 // Tests for the opt-in stale-dispatch watch-file notify: `notifyStaleDispatch` in
-// tools/stale-notify.ts, wired by tools/handoff.ts into the v10 `stale_dispatch` advisory
+// tools/stale-notify.ts, wired by tools/handoff-parse.ts into the v10 `stale_dispatch` advisory
 // and armed by the `staleDispatchNotifyFile` key in tools/config.ts (E22, T-E22-01; the
 // backlog row is the spec). Fail direction: LOUD, never SILENT, never THROWN; errors land
 // in `stale_dispatch.notify.error`. Test ids: I* integration, U* unit, S1 no schema bump.
@@ -395,7 +395,7 @@ test("I6: armed config but the dispatch is still WITHIN the threshold window -> 
 
 // I7-I9: a corrupt or future-schema config combined with a stale dispatch. The state read
 // must stay loud but never throw: loadConfig degrades to defaults and surfaces the failure
-// via getConfigError(), which tools/handoff.ts spreads onto the envelope as `config_error`;
+// via getConfigError(), which tools/handoff-parse.ts spreads onto the envelope as `config_error`;
 // notifyStaleDispatch checks it first, so the advisory's notify sub-object carries a
 // matching error (tools/stale-notify.ts). I7b/I8b show the same non-throw on a bare
 // workspace, so the protection lives in loadConfig itself. (E31, e31-config-nonfatal)
@@ -491,7 +491,7 @@ test("S1: sanity — CURRENT_VERSIONS.handoff/config are unchanged by E22 (no sc
   assert.equal(CURRENT_VERSIONS.config, 2, "E22 must not have bumped the config schema version");
 });
 
-// The Crash-Resume pointer appended to `stale_dispatch.message` (tools/handoff.ts) must
+// The Crash-Resume pointer appended to `stale_dispatch.message` (tools/handoff-parse.ts) must
 // reach the watch-file payload through the real readHandoffState -> notifyStaleDispatch
 // wiring, and must not disturb the (dispatched_at, role) dedupe (the key is that pair, not
 // the message). The unit-level advisory() helper builds its own message, so only these two

@@ -32,12 +32,10 @@ function writeRawHandoff(ws, body) {
   fs.writeFileSync(path.join(ws, ".current", "handoff.md"), body);
 }
 
-// tools/drift.ts's skew precheck (readOnDiskVersion, tools/drift.ts:248) reads
-// the raw file at resolveCurrentLanePaths(...).handoffPath — the LANE path —
-// with no lane-then-flat fallback of its own (e123b9 J2, spec AC1/AC13). Writes an
-// ALREADY-MIGRATED fixture directly at that path, for tests that need the skew
-// precheck to actually see the file (see
-// NEW-TICKETS.md J2-NEW-9 for the unmigrated-workspace gap this exposes).
+// tools/drift.ts's skew precheck (readArtifactVersion) reads the raw file at
+// resolveCurrentLanePaths(...).handoffPath — the LANE path — and falls back to the
+// flat path only when the lane file is absent. Writes an ALREADY-MIGRATED fixture
+// directly at the lane path, so the precheck sees an already-migrated workspace.
 function writeRawHandoffAtLanePath(ws, body) {
   const p = resolveCurrentLanePaths(ws).handoffPath;
   fs.mkdirSync(path.dirname(p), { recursive: true });
@@ -168,8 +166,8 @@ test("T32: empty workspace yields no version-skew rows", () => {
 
 test("T32: skew detection short-circuits parser-based drift reasons", async () => {
   const ws = mkWorkspace();
-  // Seed at the LANE path (see the AC-6 test above for why — tools/drift.ts's
-  // skew precheck has no flat fallback; e123b9 J2, spec AC1). Seed a
+  // Seed at the LANE path (see the AC-6 test above for why — the skew precheck
+  // reads the lane path first, so a fixture there is always seen). Seed a
   // future handoff + a tasks.md with a completed task. Without the
   // early-return, parseHandoff would throw before completed-task drift
   // analysis. With early-return, we get only the skew reason — no
