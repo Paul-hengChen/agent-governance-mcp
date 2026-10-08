@@ -16,6 +16,72 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [4.5.0] - 2026-10-08
+
+MINOR release. It ships the E260 follow-up wave since v4.4.1: lane `e275` merged first through
+`integ/e275`, then lanes `e269`, `e264` and `e268` through `integ/e260-followups`. Unlike v4.4.x
+it is not comment-only: it upgrades dependencies (E275) and changes rule text that every role
+bundle receives (E269). No tool input schema, prompt schema or state file format changed. Fan-out
+plan, merge shas and measurements: `specs/fanout-e260-followups.md`.
+
+### Changed
+
+- **E275: dependency upgrades for three HIGH/CRITICAL advisories (`package.json`,
+  `package-lock.json`, `docs/dependency-advisories.md`)**: `@modelcontextprotocol/sdk` `^1.29.0`
+  to `^1.32.1` (GHSA-6qxp-vccf-f47h, high), the `overrides.sharp` floor `^0.35.4` to `^0.35.5`
+  (GHSA-wq5f-xc86-pv6w, high), and the transitive `proxy-addr` 2.0.7 to 2.0.8 by lockfile refresh
+  (GHSA-jqcg-44mw-7w3h, critical). Human disposition 2026-10-07: upgrade all three.
+  `npm audit --audit-level=high` now exits 0 (2 low, 6 moderate). Each advisory's reachability,
+  decision and re-review trigger is recorded in `docs/dependency-advisories.md` (§4 *Third round*,
+  §6, §7).
+- **E269: constitution §6 forbids `git stash drop` and `git stash clear`
+  (`content/const-15-core-tail.md`)**: both join the FORBIDDEN git operations; the first sentence
+  pinned by the e178a test is unchanged. `content/skill-code-reviewer.md` and
+  `content/skill-qa-engineer.md` each gain a negative-control line: break code on a copy outside
+  the worktree, never with `git stash`, which sweeps up uncommitted `tw_update_state` writes. The
+  four context-budget ceilings in `test/context-budget.test.mjs` rise 19 ~tok each (5548 to 5567,
+  10057 to 10076, 20434 to 20453, 7959 to 7978; human-approved 2026-10-08) and the 11
+  `test/fixtures/compose-golden/*` files are regenerated.
+- **E256, E265: release-engineer SOP refers to steps by name (`content/skill-release-engineer.md`)**:
+  step 13a names the steps it depends on instead of line numbers, the E104 pointer is replaced by
+  the behavior it meant, and step 13 names `verify-release.mjs --close-out` instead of a line
+  range.
+- **E274: context-budget test titles match their asserts (`test/context-budget.test.mjs`)**: the
+  two titles now read 4401 and 2852, and the new `test/e269-budget-title-sync.test.mjs` checks
+  that a "≤ N" in a context-budget test title equals the asserted N.
+- **E272: expectation table keyed on the manifest's logical name
+  (`test/subagent-templates.test.mjs`)**: human ruling 2026-10-07, `skill-coordinator.md` is the
+  `prompts/skill-manifest.ts` (context, not changed) logical key, so the table keeps it.
+
+### Fixed
+
+- **E264: four `tools/` comments corrected (`tools/lane-paths.ts`, `tools/merge-invariants.ts`,
+  `tools/telemetry.ts`, `tools/lane-migrate.ts`)**: comment-only, with the matching `dist/tools/`
+  files rebuilt. Emit with comments removed is byte-identical to base.
+- **E268, E270, E271, E273: stale test comments corrected (`test/drift-skew.test.mjs`,
+  `test/agc-adapters.test.mjs`, `test/e22-stale-notify.test.mjs`,
+  `test/gates-expected-red.test.mjs`, `test/e92-e86-handoff-write-boundary.test.mjs`,
+  `test/lane-ticket-allocation.test.mjs`, `test/pixel-gate-attestation.test.mjs`,
+  `test/qa-flow.test.mjs`)**, plus the rationale archives `specs/e260e-comment-rationale.md` and
+  `specs/e260g-comment-rationale.md`. Comment-only; emit with comments removed is identical.
+- **E267: dated correction in `specs/d6-host-capability-compose-axis-architecture.md`**: an
+  amendment paragraph names the coordinator fragment files that actually shipped; the original
+  design text is left as written.
+
+### Notes
+
+- Evidence: this release archives each lane's QA and code-review reports into
+  `qa_reports/archive/<lane feature>/` and `review_reports/archive/<lane feature>/` for
+  `e275-advisory-upgrades`, `e269-rule-text-budget`, `e264-tools-comment-accuracy` and
+  `e268-test-comment-accuracy`, and the release gate's QA reports into
+  `qa_reports/archive/release-v4.5.0/`. Release-gate spec: `specs/release-v4.5.0.md`. Each lane's
+  closed handoff is under `.current/history/2026-10/<lane>/` (context, not changed).
+- Open, non-blocking: the code-reviewer's doc-precision note (Q1) on the E275 residual-advisory
+  paragraph in `docs/dependency-advisories.md` is not addressed in this release; it is filed as
+  E276.
+- Follow-ups filed during these lanes (E276 to E282) are in `docs/backlog.md` and are not part of
+  this release.
+
 ## [4.4.1] - 2026-10-05
 
 PATCH release. It ships E260 (trim this repo's existing long comments) since v4.4.0, merged in
