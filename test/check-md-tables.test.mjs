@@ -446,35 +446,38 @@ test("E105-ADJACENT-EQUAL-COUNT (intended, not a bug — pinned per round-2 revi
 });
 
 // ============================================================================
-// ADV-* — advisory for done-marks whose leading token is wrong (T-E88-01, AC4-AC7).
-// Class assertions, not instance pins (convention since E66/E69) — none of
-// these hardcode a docs/backlog.md line number; the real-corpus check is
-// separate (see AC7 below) and asserts only exit 0, never a fixed count,
-// because docs/backlog.md is edited by seven concurrent Wave 1 lanes.
+// ADV-* — done-mark position rule (T-E88-01, AC4-AC7; promoted from an advisory to a failure by
+// E299 / T-E299-04, re-targeted in T-E299-05). A genuine mark buried mid-cell in the designated
+// docs/backlog.md column now exits 1 with the stderr header `check:md-tables — <n> done-mark position
+// violation(s) (docs/backlog.md E88):`; leading marks, non-designated columns and files other than
+// docs/backlog.md stay silent and exit 0. The done-mark count is its own list, never merged into the
+// malformed-table count. Class assertions, not instance pins (convention since E66/E69) — none of
+// these hardcode a docs/backlog.md line number; the real-corpus checks (AC7, CQ-9) assert exit 0
+// and zero violations, never a fixed count, because docs/backlog.md is edited by concurrent lanes.
 // ============================================================================
 
-test("ADV-ORDER-TABLE (AC4): order-table-shaped fixture (`order | ticket | intake | why here`) with a buried DONE marker in why-here produces a non-fatal advisory naming the file/line/column, exit 0", () => {
+test("ADV-ORDER-TABLE (AC4): order-table-shaped fixture (`order | ticket | intake | why here`) with a buried DONE marker in why-here is a fatal done-mark position violation naming the file/line/column, exit 1", () => {
   const content =
     "| order | ticket | intake | why here |\n" +
     "|---|---|---|---|\n" +
     "| 1a | E90 | x | note text **DONE** (v3.99.0) trailing |\n";
   const root = mkFixtureRepo({ "docs/backlog.md": content });
   const result = run(root);
-  assert.equal(result.status, 0, `advisory must not affect exit code; stderr: ${result.stderr}`);
-  assert.match(result.stdout, /1 advisory note\(s\) \(non-blocking, done-mark convention\):/);
-  assert.match(result.stdout, /docs\/backlog\.md:3 — done-mark \*\*DONE\*\* is buried mid-cell in the why here column \(should lead the cell\) — see docs\/backlog\.md E88/);
-  assert.doesNotMatch(result.stderr, /malformed table/, "an advisory must never be counted as a violation");
+  assert.equal(result.status, 1, `a buried mark must fail the build; stderr: ${result.stderr}`);
+  assert.match(result.stderr, /check:md-tables — 1 done-mark position violation\(s\) \(docs\/backlog\.md E88\):/);
+  assert.match(result.stderr, /docs\/backlog\.md:3 — done-mark \*\*DONE\*\* is buried mid-cell in the why here column \(should lead the cell\) — see docs\/backlog\.md E88/);
+  assert.doesNotMatch(result.stderr, /malformed table/, "a done-mark violation must never be counted as a malformed table");
 });
 
-test("ADV-TICKET-TABLE (AC5, positive): ticket-table-shaped fixture (`id | desc | priority | depends_on | est. files | design-link`) with a buried DONE marker in desc produces the advisory, scoped to desc", () => {
+test("ADV-TICKET-TABLE (AC5, positive): ticket-table-shaped fixture (`id | desc | priority | depends_on | est. files | design-link`) with a buried DONE marker in desc is a fatal violation, scoped to desc", () => {
   const content =
     "| id | desc | priority | depends_on | est. files | design-link |\n" +
     "|---|---|---|---|---|---|\n" +
     "| E90 | buried text **DONE** (v3.99.0) trailing | P3 | none | 1 | N/A |\n";
   const root = mkFixtureRepo({ "docs/backlog.md": content });
   const result = run(root);
-  assert.equal(result.status, 0, `stderr: ${result.stderr}`);
-  assert.match(result.stdout, /docs\/backlog\.md:3 — done-mark \*\*DONE\*\* is buried mid-cell in the desc column \(should lead the cell\) — see docs\/backlog\.md E88/);
+  assert.equal(result.status, 1, `stderr: ${result.stderr}`);
+  assert.match(result.stderr, /docs\/backlog\.md:3 — done-mark \*\*DONE\*\* is buried mid-cell in the desc column \(should lead the cell\) — see docs\/backlog\.md E88/);
 });
 
 test("ADV-TICKET-TABLE-NEG (AC5, negative): a marker-looking bold span buried in a NON-desc column (design-link) with a clean desc cell must NOT fire — the rule is scoped to desc only, never guesses at other columns", () => {
@@ -485,7 +488,7 @@ test("ADV-TICKET-TABLE-NEG (AC5, negative): a marker-looking bold span buried in
   const root = mkFixtureRepo({ "docs/backlog.md": content });
   const result = run(root);
   assert.equal(result.status, 0, `stderr: ${result.stderr}`);
-  assert.doesNotMatch(result.stdout, /advisory note/, "a buried marker-shaped span in design-link/priority/depends_on/est. files must never fire — only desc (ticket table) / why here (order table) are scoped");
+  assert.doesNotMatch(result.stderr, /done-mark position violation/, "a buried marker-shaped span in design-link/priority/depends_on/est. files must never fire — only desc (ticket table) / why here (order table) are scoped");
 });
 
 test("ADV-LEADING (baseline, not a residual): a marker that already LEADS the cell must never advise — 'should lead the cell' only fires on a non-zero index", () => {
@@ -496,7 +499,7 @@ test("ADV-LEADING (baseline, not a residual): a marker that already LEADS the ce
   const root = mkFixtureRepo({ "docs/backlog.md": content });
   const result = run(root);
   assert.equal(result.status, 0);
-  assert.doesNotMatch(result.stdout, /advisory note/);
+  assert.doesNotMatch(result.stderr, /done-mark position violation/);
 });
 
 test("ADV-NON-BACKLOG (AC6): a file at a path OTHER than docs/backlog.md, containing a table shaped identically to the ticket-table convention with an identical buried marker, produces zero advisories — the rule is hardcoded to docs/backlog.md, never corpus-wide", () => {
@@ -507,28 +510,29 @@ test("ADV-NON-BACKLOG (AC6): a file at a path OTHER than docs/backlog.md, contai
   const root = mkFixtureRepo({ "docs/other.md": content });
   const result = run(root);
   assert.equal(result.status, 0, `stderr: ${result.stderr}`);
-  assert.doesNotMatch(result.stdout, /advisory note/, "identical shape outside docs/backlog.md must never fire");
+  assert.doesNotMatch(result.stderr, /done-mark position violation/, "identical shape outside docs/backlog.md must never fire");
 });
 
-test("ADV-NONFATAL-BOTH-DIRECTIONS: an advisory-only tree exits 0; the SAME advisory alongside a genuinely malformed table elsewhere exits 1, counting ONLY the malformed table", () => {
-  // Direction 1: advisory only.
-  const advisoryOnly =
+test("ADV-NONFATAL-BOTH-DIRECTIONS (name kept for the manifest; now the FATAL contract): a buried-mark-only tree exits 1 with only the done-mark list; the SAME mark alongside a genuinely malformed table elsewhere exits 1 with BOTH lists, each counted separately (a done-mark is never counted as a malformed table)", () => {
+  // Direction 1: buried mark only.
+  const markOnly =
     "| id | desc | priority | depends_on | est. files | design-link |\n" +
     "|---|---|---|---|---|---|\n" +
     "| E90 | buried text **DONE** (v3.99.0) trailing | P3 | none | 1 | N/A |\n";
-  const root1 = mkFixtureRepo({ "docs/backlog.md": advisoryOnly });
+  const root1 = mkFixtureRepo({ "docs/backlog.md": markOnly });
   const result1 = run(root1);
-  assert.equal(result1.status, 0, `advisory-only tree must exit 0; stderr: ${result1.stderr}`);
-  assert.match(result1.stdout, /1 advisory note/);
+  assert.equal(result1.status, 1, `a buried mark alone must fail the build; stderr: ${result1.stderr}`);
+  assert.match(result1.stderr, /1 done-mark position violation\(s\)/);
+  assert.doesNotMatch(result1.stderr, /malformed table/, "no malformed table in this tree — the mark must not be counted as one");
+  assert.match(result1.stderr, /check:md-tables — FAILED/);
 
-  // Direction 2: same advisory PLUS a separate, genuinely malformed table.
-  const advisoryPlusMalformed =
-    advisoryOnly + "\n| X | Y |\n| 1 | 2 | 3 |\n";
-  const root2 = mkFixtureRepo({ "docs/backlog.md": advisoryPlusMalformed });
+  // Direction 2: same mark PLUS a separate, genuinely malformed table.
+  const markPlusMalformed = markOnly + "\n| X | Y |\n| 1 | 2 | 3 |\n";
+  const root2 = mkFixtureRepo({ "docs/backlog.md": markPlusMalformed });
   const result2 = run(root2);
-  assert.notEqual(result2.status, 0, "the malformed table must still fail the build");
-  assert.match(result2.stderr, /1 malformed table site/, "count must be 1 — the advisory is never added to allViolations");
-  assert.match(result2.stdout, /1 advisory note/, "the advisory must still print even when the build fails for an unrelated reason");
+  assert.equal(result2.status, 1);
+  assert.match(result2.stderr, /1 malformed table site/, "count must be 1 — the done-mark is never added to the malformed-table list");
+  assert.match(result2.stderr, /1 done-mark position violation\(s\)/, "both lists are printed when both kinds of violation occur");
 });
 
 test("RULE1-SUPPRESSES-ADVISORY (non-regression invariant, the exact v3.105.0 recurrence shape): an unescaped `|` inside a code span in the desc cell still goes FATAL under rule 1 (cell-count), and the advisory is suppressed for that row — splitRow()/headerCellCount are untouched by the E88 advisory code", () => {
@@ -540,7 +544,7 @@ test("RULE1-SUPPRESSES-ADVISORY (non-regression invariant, the exact v3.105.0 re
   const result = run(root);
   assert.notEqual(result.status, 0, "an unescaped pipe inside a code span must still be fatal under rule 1 — column determination is unchanged by this feature");
   assert.match(result.stderr, /docs\/backlog\.md:3 — row has 7 cell\(s\), header declares 6/);
-  assert.doesNotMatch(result.stdout, /advisory note/, "a row that fails rule 1's cell-count check must never also be advisory-checked against an unreliable split");
+  assert.doesNotMatch(result.stderr, /done-mark position violation/, "a row that fails rule 1's cell-count check must never also be advisory-checked against an unreliable split");
 });
 
 test("RESIDUAL-COINCIDENTAL-COLUMN-SHIFT (intended, not a bug — pinned per round-2 review residual note): a row whose cell count coincidentally still equals headerCellCount despite content having shifted (one unescaped pipe adding a split, one missing pipe elsewhere removing one) leaves the advisory SILENT because the mark no longer lands in the desc slice — this is the pre-existing rule-1 blind spot for coincidentally-well-counted rows, not new, and it fails in the safe direction (silence, never a false claim)", () => {
@@ -551,7 +555,7 @@ test("RESIDUAL-COINCIDENTAL-COLUMN-SHIFT (intended, not a bug — pinned per rou
   const root = mkFixtureRepo({ "docs/backlog.md": content });
   const result = run(root);
   assert.equal(result.status, 0, "coincidentally-equal cell count must not trip rule 1 either — this pins the shape, not just the advisory silence");
-  assert.doesNotMatch(result.stdout, /advisory note/, "the marker exists in the row but not in the desc-indexed slice after the coincidental shift — must stay silent, never guess");
+  assert.doesNotMatch(result.stderr, /done-mark position violation/, "the marker exists in the row but not in the desc-indexed slice after the coincidental shift — must stay silent, never guess");
 });
 
 // ============================================================================
@@ -567,7 +571,8 @@ test("CS-UNMATCHED-BACKTICK: a single backtick with no same-length partner anywh
     "| E90 | odd ` backtick then **DONE** (v3.99.0) | P3 | none | 1 | N/A |\n";
   const root = mkFixtureRepo({ "docs/backlog.md": content });
   const result = run(root);
-  assert.match(result.stdout, /done-mark \*\*DONE\*\* is buried mid-cell in the desc column/);
+  assert.equal(result.status, 1, `a genuine buried mark is fatal since E299; stderr: ${result.stderr}`);
+  assert.match(result.stderr, /done-mark \*\*DONE\*\* is buried mid-cell in the desc column/);
 });
 
 test("CS-2RUN-CONTAINING-1RUN (the `` ``a ` b`` `` shape, marker OUTSIDE): a 2-backtick-run span whose interior contains an unpaired single backtick closes correctly at the NEXT 2-run — a marker after the span still fires (a parity-based backtick counter would miscount the interior single backtick and could misplace the span boundary; the shipped equal-length pairing does not)", () => {
@@ -577,7 +582,8 @@ test("CS-2RUN-CONTAINING-1RUN (the `` ``a ` b`` `` shape, marker OUTSIDE): a 2-b
     "| E90 | see ``a ` b`` then **DONE** (v3.99.0) trailing | P3 | none | 1 | N/A |\n";
   const root = mkFixtureRepo({ "docs/backlog.md": content });
   const result = run(root);
-  assert.match(result.stdout, /done-mark \*\*DONE\*\* is buried mid-cell in the desc column/);
+  assert.equal(result.status, 1, `a genuine buried mark is fatal since E299; stderr: ${result.stderr}`);
+  assert.match(result.stderr, /done-mark \*\*DONE\*\* is buried mid-cell in the desc column/);
 });
 
 test("CS-2RUN-CONTAINING-1RUN-MARKER-INSIDE (the same `` ``a ` b`` `` shape, marker INSIDE): the same 2-run-containing-a-1-run span, but the marker itself sits inside it — must be suppressed, since the span still closes at the next matching 2-run and correctly encloses the marker", () => {
@@ -588,7 +594,7 @@ test("CS-2RUN-CONTAINING-1RUN-MARKER-INSIDE (the same `` ``a ` b`` `` shape, mar
   const root = mkFixtureRepo({ "docs/backlog.md": content });
   const result = run(root);
   assert.equal(result.status, 0);
-  assert.doesNotMatch(result.stdout, /advisory note/, "a marker whose bold-open falls inside a code span must never advise, even when the span's interior itself contains an odd backtick");
+  assert.doesNotMatch(result.stderr, /done-mark position violation/, "a marker whose bold-open falls inside a code span must never advise, even when the span's interior itself contains an odd backtick");
 });
 
 test("CS-PAIRED-3BACKTICK: a paired ``` ... ``` span closes correctly (next matching 3-run) — a marker after it fires", () => {
@@ -598,7 +604,8 @@ test("CS-PAIRED-3BACKTICK: a paired ``` ... ``` span closes correctly (next matc
     "| E90 | ```code``` then **DONE** (v3.99.0) | P3 | none | 1 | N/A |\n";
   const root = mkFixtureRepo({ "docs/backlog.md": content });
   const result = run(root);
-  assert.match(result.stdout, /done-mark \*\*DONE\*\* is buried mid-cell in the desc column/);
+  assert.equal(result.status, 1, `a genuine buried mark is fatal since E299; stderr: ${result.stderr}`);
+  assert.match(result.stderr, /done-mark \*\*DONE\*\* is buried mid-cell in the desc column/);
 });
 
 test("CS-UNPAIRED-3BACKTICK: a 3-backtick run with no matching partner in the cell is a literal, not a span opener — the marker after it still fires", () => {
@@ -608,7 +615,8 @@ test("CS-UNPAIRED-3BACKTICK: a 3-backtick run with no matching partner in the ce
     "| E90 | ```code no close then **DONE** (v3.99.0) | P3 | none | 1 | N/A |\n";
   const root = mkFixtureRepo({ "docs/backlog.md": content });
   const result = run(root);
-  assert.match(result.stdout, /done-mark \*\*DONE\*\* is buried mid-cell in the desc column/);
+  assert.equal(result.status, 1, `a genuine buried mark is fatal since E299; stderr: ${result.stderr}`);
+  assert.match(result.stderr, /done-mark \*\*DONE\*\* is buried mid-cell in the desc column/);
 });
 
 test("CS-NO-CLOSING-BOLD (E105/E88-adjacent no-closing-`**` case): a bold span that opens with the token but never closes within the cell is not a real span at all — fails toward silence, never a false claim", () => {
@@ -619,7 +627,7 @@ test("CS-NO-CLOSING-BOLD (E105/E88-adjacent no-closing-`**` case): a bold span t
   const root = mkFixtureRepo({ "docs/backlog.md": content });
   const result = run(root);
   assert.equal(result.status, 0);
-  assert.doesNotMatch(result.stdout, /advisory note/);
+  assert.doesNotMatch(result.stderr, /done-mark position violation/);
 });
 
 test("CS-NON-QUALIFYING-BOLD-BODY: a bold span that opens with the token but whose body is neither empty (self-close) nor carries a version/date stamp is prose, not a done-mark, even though it is buried — fails toward silence", () => {
@@ -630,7 +638,7 @@ test("CS-NON-QUALIFYING-BOLD-BODY: a bold span that opens with the token but who
   const root = mkFixtureRepo({ "docs/backlog.md": content });
   const result = run(root);
   assert.equal(result.status, 0);
-  assert.doesNotMatch(result.stdout, /advisory note/, "'**DONE and shipped**' has no stamp inside its own span and does not self-close — must not be reported as a done-mark");
+  assert.doesNotMatch(result.stderr, /done-mark position violation/, "'**DONE and shipped**' has no stamp inside its own span and does not self-close — must not be reported as a done-mark");
 });
 
 test("CS-MULTI-CANDIDATE: the first bold-DONE candidate is disqualified (its open falls inside a code span) but scanning continues to a SECOND, later, qualifying candidate in the same cell — matchAll iteration, not a return-on-first-match", () => {
@@ -640,7 +648,8 @@ test("CS-MULTI-CANDIDATE: the first bold-DONE candidate is disqualified (its ope
     "| E90 | ``**DONE** inside span`` filler **DONE** (v3.99.0) | P3 | none | 1 | N/A |\n";
   const root = mkFixtureRepo({ "docs/backlog.md": content });
   const result = run(root);
-  assert.match(result.stdout, /done-mark \*\*DONE\*\* is buried mid-cell in the desc column/, "the second, qualifying candidate must still be found even though the first candidate in the cell was disqualified");
+  assert.equal(result.status, 1, `a genuine buried mark is fatal since E299; stderr: ${result.stderr}`);
+  assert.match(result.stderr, /done-mark \*\*DONE\*\* is buried mid-cell in the desc column/, "the second, qualifying candidate must still be found even though the first candidate in the cell was disqualified");
 });
 
 test("CS-ESCAPED-PIPE-ADJACENT: an escaped `\\|` sitting next to a code span, with a genuine buried marker after it, is parsed as one normal cell (rule 1's escape-awareness) and the marker still fires — the two discriminators (escape-awareness, code-span-awareness) are independent and both apply", () => {
@@ -650,8 +659,8 @@ test("CS-ESCAPED-PIPE-ADJACENT: an escaped `\\|` sitting next to a code span, wi
     "| E90 | see `a\\|b` then **DONE** (v3.99.0) trailing | P3 | none | 1 | N/A |\n";
   const root = mkFixtureRepo({ "docs/backlog.md": content });
   const result = run(root);
-  assert.equal(result.status, 0, `an escaped pipe must not be treated as a cell separator; stderr: ${result.stderr}`);
-  assert.match(result.stdout, /done-mark \*\*DONE\*\* is buried mid-cell in the desc column/);
+  assert.equal(result.status, 1, `a genuine buried mark is fatal since E299; stderr: ${result.stderr}`);
+  assert.match(result.stderr, /done-mark \*\*DONE\*\* is buried mid-cell in the desc column/);
 });
 
 // ============================================================================
@@ -669,7 +678,7 @@ test("CQ-CITED-MARK-SUPPRESSED: a done-mark that appears only inside a `*\"…\"
   const root = mkFixtureRepo({ "docs/backlog.md": content });
   const result = run(root);
   assert.equal(result.status, 0, `stderr: ${result.stderr}`);
-  assert.doesNotMatch(result.stdout, /advisory note/, "a mark that only exists inside a citation-quote span must never be attributed to the citing row");
+  assert.doesNotMatch(result.stderr, /done-mark position violation/, "a mark that only exists inside a citation-quote span must never be attributed to the citing row");
 });
 
 test("CQ-MULTI-CANDIDATE: a citation-excluded candidate does not stop the scan — the SECOND, genuine candidate in the same cell still fires (the matchAll invariant, citation exclusion composes with code-span exclusion the same way)", () => {
@@ -679,8 +688,8 @@ test("CQ-MULTI-CANDIDATE: a citation-excluded candidate does not stop the scan �
     '| E90 | cites *"E59 **DONE** (v3.99.0)"* filler **DONE** (v1.0.0) tail | P3 | none | 1 | N/A |\n';
   const root = mkFixtureRepo({ "docs/backlog.md": content });
   const result = run(root);
-  assert.equal(result.status, 0, `stderr: ${result.stderr}`);
-  assert.match(result.stdout, /done-mark \*\*DONE\*\* is buried mid-cell in the desc column/, "the first candidate is disqualified by the citation range, but the scan must continue to the second, genuine one — a citation exclusion that used `return` instead of `continue` would silence this instead");
+  assert.equal(result.status, 1, `a genuine buried mark is fatal since E299; stderr: ${result.stderr}`);
+  assert.match(result.stderr, /done-mark \*\*DONE\*\* is buried mid-cell in the desc column/, "the first candidate is disqualified by the citation range, but the scan must continue to the second, genuine one — a citation exclusion that used `return` instead of `continue` would silence this instead");
 });
 
 test("CQ-GENUINE-OUTSIDE-QUOTE: a genuine buried mark sitting BETWEEN two citation-quote spans still fires — the exclusion is range-scoped, not 'anything after the first quote'", () => {
@@ -690,8 +699,8 @@ test("CQ-GENUINE-OUTSIDE-QUOTE: a genuine buried mark sitting BETWEEN two citati
     '| E90 | *"a"* then **DONE** (v1.0.0) then *"b"* | P3 | none | 1 | N/A |\n';
   const root = mkFixtureRepo({ "docs/backlog.md": content });
   const result = run(root);
-  assert.equal(result.status, 0, `stderr: ${result.stderr}`);
-  assert.match(result.stdout, /done-mark \*\*DONE\*\* is buried mid-cell in the desc column/, "the mark's own open index falls outside both citation ranges and must still advise");
+  assert.equal(result.status, 1, `a genuine buried mark is fatal since E299; stderr: ${result.stderr}`);
+  assert.match(result.stderr, /done-mark \*\*DONE\*\* is buried mid-cell in the desc column/, "the mark's own open index falls outside both citation ranges and must still advise");
 });
 
 test("CQ-UNPAIRED-OPENER (guards the Q1 comment correction): an unpaired `*\"` opener with no matching closing `\"*` later in the cell yields NO citation range — the candidate falls through and still ADVISES, exactly like CS-UNMATCHED-BACKTICK/CS-UNPAIRED-3BACKTICK treat an unmatched delimiter as a literal, not a span", () => {
@@ -701,8 +710,8 @@ test("CQ-UNPAIRED-OPENER (guards the Q1 comment correction): an unpaired `*\"` o
     '| E90 | quote *"unclosed start and then **DONE** (v1.0.0) ships | P3 | none | 1 | N/A |\n';
   const root = mkFixtureRepo({ "docs/backlog.md": content });
   const result = run(root);
-  assert.equal(result.status, 0, `stderr: ${result.stderr}`);
-  assert.match(result.stdout, /done-mark \*\*DONE\*\* is buried mid-cell in the desc column/, "an unpaired opener must not fabricate a range that swallows a real mark — fabricating one here would be the false-claim-avoiding direction taken too far, silencing a genuine mark instead");
+  assert.equal(result.status, 1, `a genuine buried mark is fatal since E299; stderr: ${result.stderr}`);
+  assert.match(result.stderr, /done-mark \*\*DONE\*\* is buried mid-cell in the desc column/, "an unpaired opener must not fabricate a range that swallows a real mark — fabricating one here would be the false-claim-avoiding direction taken too far, silencing a genuine mark instead");
 });
 
 test("CQ-CELL-START: a citation-quote span opening at cell-content offset 0 is still recognized and excludes its own mark — no advisory", () => {
@@ -713,7 +722,7 @@ test("CQ-CELL-START: a citation-quote span opening at cell-content offset 0 is s
   const root = mkFixtureRepo({ "docs/backlog.md": content });
   const result = run(root);
   assert.equal(result.status, 0, `stderr: ${result.stderr}`);
-  assert.doesNotMatch(result.stdout, /advisory note/, "a citation span at the very start of the cell must be recognized, not just one preceded by other text");
+  assert.doesNotMatch(result.stderr, /done-mark position violation/, "a citation span at the very start of the cell must be recognized, not just one preceded by other text");
 });
 
 test("CQ-CELL-END: a citation-quote span closing at the very end of the cell is still recognized and excludes its own mark — no advisory", () => {
@@ -724,7 +733,7 @@ test("CQ-CELL-END: a citation-quote span closing at the very end of the cell is 
   const root = mkFixtureRepo({ "docs/backlog.md": content });
   const result = run(root);
   assert.equal(result.status, 0, `stderr: ${result.stderr}`);
-  assert.doesNotMatch(result.stdout, /advisory note/, "a citation span whose close delimiter is the last thing in the cell must still be recognized");
+  assert.doesNotMatch(result.stderr, /done-mark position violation/, "a citation span whose close delimiter is the last thing in the cell must still be recognized");
 });
 
 test("CQ-ESCAPED-PIPE-IN-CITATION: an escaped `\\|` inside a citation-quote span is one normal cell (rule 1's escape-awareness, untouched by this feature) and the cited mark stays suppressed — no violation, no advisory", () => {
@@ -736,7 +745,7 @@ test("CQ-ESCAPED-PIPE-IN-CITATION: an escaped `\\|` inside a citation-quote span
   const result = run(root);
   assert.equal(result.status, 0, `an escaped pipe inside a citation must not be treated as a cell separator; stderr: ${result.stderr}`);
   assert.doesNotMatch(result.stderr, /malformed table/, "escape-awareness and citation-quote-awareness are independent discriminators; neither should trip the other");
-  assert.doesNotMatch(result.stdout, /advisory note/, "the cited mark stays suppressed even with an escaped pipe inside the same span");
+  assert.doesNotMatch(result.stderr, /done-mark position violation/, "the cited mark stays suppressed even with an escaped pipe inside the same span");
 });
 
 test("CQ-BOLD-RUN-NOT-AN-OPENER (pins C4 as intended, not an oversight): a `**\"…\"**` bold-quoted costume is NOT recognized as a `*\"…\"*` citation opener — the delimiter guards correctly refuse a `**` run, so the cited mark still fires. Widening this predicate would silence genuine marks; a future deliberate widening must flip this test, not stumble into it", () => {
@@ -746,8 +755,8 @@ test("CQ-BOLD-RUN-NOT-AN-OPENER (pins C4 as intended, not an oversight): a `**\"
     '| E90 | **"E59 **DONE** (v3.99.0)"** tail | P3 | none | 1 | N/A |\n';
   const root = mkFixtureRepo({ "docs/backlog.md": content });
   const result = run(root);
-  assert.equal(result.status, 0, `stderr: ${result.stderr}`);
-  assert.match(result.stdout, /done-mark \*\*DONE\*\* is buried mid-cell in the desc column/, "a `**\"..\"**` costume must NOT be excluded — the narrow `*\"…\"*`-only predicate is a deliberate, recorded residual (C4), not a bug to quietly fix by widening the regex");
+  assert.equal(result.status, 1, `a genuine buried mark is fatal since E299; stderr: ${result.stderr}`);
+  assert.match(result.stderr, /done-mark \*\*DONE\*\* is buried mid-cell in the desc column/, "a `**\"..\"**` costume must NOT be excluded — the narrow `*\"…\"*`-only predicate is a deliberate, recorded residual (C4), not a bug to quietly fix by widening the regex");
 });
 
 test("CQ-RESIDUAL-SPAN-SWALLOW (pins C3 as a RECORDED residual, currently silent — a future hardening must flip this deliberately): an opener living inside a code span, paired with an unrelated later `\"*`, produces an over-broad, non-code-span-aware range that swallows a genuine mark — SILENT today", () => {
@@ -758,7 +767,7 @@ test("CQ-RESIDUAL-SPAN-SWALLOW (pins C3 as a RECORDED residual, currently silent
   const root = mkFixtureRepo({ "docs/backlog.md": content });
   const result = run(root);
   assert.equal(result.status, 0, `stderr: ${result.stderr}`);
-  assert.doesNotMatch(result.stdout, /advisory note/, "this is the documented C3 residual: the close search is unbound and not code-span-aware, so a `*\" ` opener inside a code span can pair with a distant `\"*` and swallow a genuine mark; it fails toward the safe (silent) direction and is pinned here so a future one-line hardening (skip an opener whose index is insideCodeSpan) flips this test on purpose");
+  assert.doesNotMatch(result.stderr, /done-mark position violation/, "this is the documented C3 residual: the close search is unbound and not code-span-aware, so a `*\" ` opener inside a code span can pair with a distant `\"*` and swallow a genuine mark; it fails toward the safe (silent) direction and is pinned here so a future one-line hardening (skip an opener whose index is insideCodeSpan) flips this test on purpose");
 });
 
 // ============================================================================
@@ -775,7 +784,7 @@ test("AC7 (real corpus, informational count NOT pinned here): `node scripts/chec
   assert.equal(result.status, 0, `real corpus run must exit 0; stderr: ${result.stderr}`);
 });
 
-test("CQ-9 (real corpus, non-regression, T-E145-02 required case 9): the real docs/backlog.md still exits 0, still advises on the E39/E40/E58/E59 rows, and does NOT advise on the E145 row — identified by TICKET ID via a live line-number lookup, never a hardcoded line number or a fixed advisory count (docs/backlog.md is edited by concurrent lanes)", () => {
+test("CQ-9 (real corpus, rewritten by E299 AC12): the real docs/backlog.md exits 0 with zero done-mark violations — the E39/E40/E58/E59 rows were fixed in the E299 cut, so none is reported — and the E145 row (which only cites E59's mark inside a *\"…\"* span) stays silent; rows are identified by TICKET ID via a live line-number lookup, never a hardcoded line number or a fixed count (docs/backlog.md is edited by concurrent lanes)", () => {
   const backlogPath = path.join(PROJECT_ROOT, "docs", "backlog.md");
   const backlogLines = fs.readFileSync(backlogPath, "utf-8").split("\n");
   const lineOfTicket = (id) => {
@@ -783,22 +792,23 @@ test("CQ-9 (real corpus, non-regression, T-E145-02 required case 9): the real do
     assert.notEqual(idx, -1, `expected a live docs/backlog.md row for ${id} — this test's premise (the ticket exists) no longer holds`);
     return idx + 1; // 1-indexed, matching the script's own lineNo
   };
-  const genuineLines = new Set(["E39", "E40", "E58", "E59"].map(lineOfTicket));
   const falsePositiveLine = lineOfTicket("E145");
+  const fixedLines = ["E39", "E40", "E58", "E59"].map(lineOfTicket);
 
   const result = spawnSync(process.execPath, [path.join(PROJECT_ROOT, "scripts", "check-md-tables.mjs")], {
     cwd: PROJECT_ROOT,
     encoding: "utf-8",
   });
   assert.equal(result.status, 0, `real corpus run must exit 0; stderr: ${result.stderr}`);
+  assert.doesNotMatch(result.stderr, /done-mark position violation/, "the real corpus must carry zero done-mark violations");
 
-  const advisedLines = new Set(
-    [...result.stdout.matchAll(/docs\/backlog\.md:(\d+) — done-mark/g)].map((m) => Number(m[1])),
+  const reportedLines = new Set(
+    [...(result.stderr + result.stdout).matchAll(/docs\/backlog\.md:(\d+) — done-mark/g)].map((m) => Number(m[1])),
   );
-  for (const line of genuineLines) {
-    assert.ok(advisedLines.has(line), `expected an advisory on docs/backlog.md:${line} (a genuine buried own-row mark) — got advisories on lines [${[...advisedLines].join(", ")}]`);
+  assert.ok(!reportedLines.has(falsePositiveLine), `docs/backlog.md:${falsePositiveLine} (E145's own row) must stay silent — got reports on lines [${[...reportedLines].join(", ")}]`);
+  for (const line of fixedLines) {
+    assert.ok(!reportedLines.has(line), `docs/backlog.md:${line} was fixed in the E299 cut and must not be reported`);
   }
-  assert.ok(!advisedLines.has(falsePositiveLine), `docs/backlog.md:${falsePositiveLine} (E145's own row, which only cites another row's mark inside a *"…"*  span) must stay silent — got advisories on lines [${[...advisedLines].join(", ")}]`);
 });
 
 // ============================================================================
