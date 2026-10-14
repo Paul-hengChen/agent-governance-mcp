@@ -29,4 +29,4 @@ Shared generated files (content/**, test/fixtures/compose-golden/**, test/contex
 
 ## Full-suite result
 
-(recorded below after the post-commit run)
+Post-commit (29db6ba, clean tree), `node scripts/test-lock.mjs -- npm test`: 3058 tests, 3055 pass, 0 fail (remainder skipped). `npm run build`: zero errors, tree stayed clean (no dist drift). `npm audit --audit-level=high`: no HIGH/CRITICAL (2 low, 6 moderate).
