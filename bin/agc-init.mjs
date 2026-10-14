@@ -1018,12 +1018,14 @@ const STR_USAGE_FEATURE =
   "          .current/<lane>/ into .current/history/<YYYY-MM>/<lane>/, records a\n" +
   "          lane_closed pointer (pr=<n> from --pr, else none) under\n" +
   "          tasks.md's ## Closed Lanes, commits both on --base, then removes the\n" +
-  "          worktree and deletes the branch; --abandoned moves the lane's\n" +
-  "          qa_reports/ + review_reports/ evidence into abandoned/<ticket-id>/,\n" +
-  "          commits it, removes the worktree, and keeps the branch. Either\n" +
-  "          way, the lane's .current/<lane>/pending-tickets.md findings (if\n" +
-  "          any) first get real ids, appended to docs/backlog.md and\n" +
-  "          committed on --base in the primary checkout. Also deletes\n" +
+  "          worktree and deletes the branch — on origin too when it was pushed\n" +
+  "          (no origin / no remote branch: a hint, not a failure); --abandoned\n" +
+  "          moves the lane's qa_reports/ + review_reports/ evidence into\n" +
+  "          abandoned/<ticket-id>/, commits it, removes the worktree, and\n" +
+  "          keeps the branch. Either way, the lane's\n" +
+  "          .current/<lane>/pending-tickets.md findings (if any) first get\n" +
+  "          real ids, appended to docs/backlog.md and committed on --base in\n" +
+  "          the primary checkout. Also deletes\n" +
   "          <worktree-parent>/_mailbox/<lane>/ when it holds only\n" +
   "          to-integrator.md, to-lane.md and watch-lock sidecars; otherwise\n" +
   "          keeps it with a warning.\n";
@@ -1123,21 +1125,23 @@ function usageError(message) {
   return new FeatureError(message, { exitCode: 2, usage: true });
 }
 
-// git with an argv array; returns stdout, throws on non-zero exit.
-function git(cwd, args) {
+// git with an argv array; returns stdout, throws on non-zero exit. `env`
+// (optional) adds to / overrides the inherited environment for this one call.
+function git(cwd, args, env) {
   return execFileSync("git", args, {
     cwd,
     encoding: "utf-8",
     stdio: ["ignore", "pipe", "pipe"],
+    ...(env ? { env: { ...process.env, ...env } } : {}),
   });
 }
 
 // Like git(), but a non-zero exit is returned rather than thrown so the caller
 // can branch on it and surface git's own stderr verbatim. A spawn failure
 // (git not installed: no numeric status) still throws.
-function gitTry(cwd, args) {
+function gitTry(cwd, args, env) {
   try {
-    return { status: 0, stdout: git(cwd, args), stderr: "" };
+    return { status: 0, stdout: git(cwd, args, env), stderr: "" };
   } catch (err) {
     if (err && typeof err.status === "number") {
       return {
@@ -2753,6 +2757,57 @@ async function applyPendingOnAbandoned({ lanePaths, repoRoot, lanePath, branch, 
   return moves;
 }
 
+// --shipped, after the local branch is gone: drop the lane branch on origin
+// too, so a pushed lane branch does not linger on the remote (E298). Only the
+// branch name is used; the base branch plays no part. Every miss is one stderr
+// hint and a normal return, never a FeatureError: no origin remote, a lane
+// that was never pushed (no remote-tracking ref — the usual case), or a push
+// that fails for any reason (offline, auth, the remote branch already gone).
+// The pre-check is the local remote-tracking ref, not a network round-trip.
+// The push runs with GIT_TERMINAL_PROMPT=0 so it can never stall on a
+// credential prompt; it is never retried and never forced.
+function deleteRemoteLaneBranch(repoRoot, branch) {
+  const remotes = gitTry(repoRoot, ["remote"]);
+  const hasOrigin =
+    remotes.status === 0 &&
+    remotes.stdout
+      .split("\n")
+      .map((line) => line.trim())
+      .includes("origin");
+  if (!hasOrigin) {
+    process.stderr.write(
+      `agc feature finish — no origin remote, nothing to delete remotely for ${branch}\n`
+    );
+    return;
+  }
+  const tracked = gitTry(repoRoot, [
+    "show-ref", "--verify", "--quiet", `refs/remotes/origin/${branch}`,
+  ]);
+  if (tracked.status !== 0) {
+    process.stderr.write(
+      `agc feature finish — ${branch} was never pushed to origin (no remote-tracking ref), ` +
+        `nothing to delete remotely\n`
+    );
+    return;
+  }
+  const push = gitTry(repoRoot, ["push", "origin", "--delete", branch], {
+    GIT_TERMINAL_PROMPT: "0",
+  });
+  if (push.status !== 0) {
+    const reason =
+      push.stderr
+        .split("\n")
+        .map((line) => line.trim())
+        .find((line) => line.length > 0) ?? `git push exited ${push.status}`;
+    process.stderr.write(
+      `agc feature finish — could not delete remote branch origin/${branch} (${reason}); ` +
+        `delete it by hand if it still exists\n`
+    );
+    return;
+  }
+  process.stdout.write(`agc feature finish — deleted remote branch origin/${branch}\n`);
+}
+
 async function runFeatureFinish(cwd, argv) {
   const { positionals, opts } = parseFeatureArgs(argv, ["base", "pr"], ["shipped", "abandoned"]);
   if (positionals.length !== 1) {
@@ -2869,6 +2924,7 @@ async function runFeatureFinish(cwd, argv) {
       );
     }
     process.stdout.write(`agc feature finish — deleted branch ${branch}\n`);
+    deleteRemoteLaneBranch(repoRoot, branch);
     return;
   }
 
