@@ -43,3 +43,10 @@ Phase 0.5: the manifest listed 23 entries. Each was confirmed red on f357a2d ind
 | non-design constitution | 7978 | 8125 | 8129 |
 
 (Each is sr's figure plus 4 ~tok for the 16 characters section 6 grew in round 2.)
+
+## Full suite (AC11)
+`node scripts/test-lock.mjs -- npm test` on the committed, clean HEAD carrying the T-E297-06 tests/goldens: 3054 tests, 3051 pass, 0 fail, 0 cancelled, 3 skipped (pre-existing skips); tree clean before and after. Both `test/e177b-test-lock.test.mjs` AC13a/AC13b tests were green in this run (they were load-induced timeouts in sr's run; nothing in this lane touches the lock code). Reds by name: none.
+`npm run build`: zero errors, dist unchanged. `npm audit --audit-level=high`: no high/critical findings (see handoff note for exit status).
+
+## Verdict
+PASS. AC1-AC11 met; no code defect found. O4 from the code-reviewer (release row recovery wording fits 8c only, not 13a) is optional and left for the backlog.
