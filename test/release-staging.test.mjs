@@ -1246,9 +1246,9 @@ test("E53: Escalation Routes rows :152-154 and :156 (not already byte-pinned by 
   );
 });
 
-test("E53/E163: the Escalation Routes table now carries 9 data rows — E163's two new rows placed FIRST, the E53 empty-baseline-hazard row still LAST", () => {
+test("E53/E163: the Escalation Routes table now carries 10 data rows — E163's two new rows placed FIRST, the E53 empty-baseline-hazard row still LAST", () => {
   // E163 added two Escalation Routes rows, placed first because they fire
-  // earliest in the SOP. This pins 9 rows and their order, not a bare count:
+  // earliest in the SOP. This pins 10 rows and their order, not a bare count:
   // a duplicated, dropped or reordered row, or the hazard row losing last place, fails.
   const tableStart = SKILL.indexOf("| situation | status | pending note | next_role |");
   const scopeRuleStart = SKILL.indexOf("**Expected vs unrelated scope rule**");
@@ -1260,8 +1260,8 @@ test("E53/E163: the Escalation Routes table now carries 9 data rows — E163's t
     .filter((l) => l.startsWith("|") && !l.startsWith("|---") && !l.startsWith("| situation"));
   assert.equal(
     dataRows.length,
-    9,
-    "Escalation Routes table must have exactly 9 data rows (6 pre-E53 + E53's empty-baseline row + E163's two new rows)",
+    10,
+    "Escalation Routes table must have exactly 10 data rows (6 pre-E53 + E53's empty-baseline row + E163's two new rows + E297's pull-request-cannot-merge row)",
   );
   assert.ok(
     dataRows[0].startsWith("| pre-flight CI gate red (step 2a:"),
@@ -1272,7 +1272,7 @@ test("E53/E163: the Escalation Routes table now carries 9 data rows — E163's t
     "E163's CI gate failure row must be SECOND, immediately after the pre-flight row and still ahead of the six pre-existing rows",
   );
   assert.ok(
-    dataRows[8].startsWith("| empty-baseline hazard (step 7a:"),
+    dataRows[9].startsWith("| empty-baseline hazard (step 7a:"),
     "the empty-baseline-hazard row (E53) must remain the LAST row — E163's two new rows are additive at the front, not a reorder of the pre-existing rows",
   );
 });
