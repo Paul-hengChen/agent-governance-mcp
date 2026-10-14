@@ -1,5 +1,7 @@
 # Pending tickets — lane e298
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E298-NEW-1
 title: finish --shipped remote delete — soften the credential-prompt comment, drop the stale tracking ref after a failed delete
@@ -16,5 +18,3 @@ body: |
   same hint — consider `git update-ref -d` on the tracking ref when git reports the remote
   ref does not exist. Also the agc check comment advisory (long block at the helper head).
 ```
-
-## Applied
