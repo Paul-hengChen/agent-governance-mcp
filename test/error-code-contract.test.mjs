@@ -115,18 +115,18 @@ function fmt(codeMap, codes) {
     .join("; ");
 }
 
-// GATE_REGISTRY is the single source of truth. The entry count (33) is pinned so adding or
+// GATE_REGISTRY is the single source of truth. The entry count (34) is pinned so adding or
 // dropping a gate is a deliberate, visible change here. (AC-1, AC-5, E40)
 
-test("AC-1/AC-5: GATE_REGISTRY has exactly 33 entries (32 in, 33 out — e40-nonqa-completed-tasks-write-gate added NON_QA_COMPLETED_TASKS_REJECTED)", () => {
+test("AC-1/AC-5: GATE_REGISTRY has exactly 34 entries (33 in, 34 out — e300-dispatch-pins-enum added DISPATCH_PIN_TIER_REJECTED; before it e40 added NON_QA_COMPLETED_TASKS_REJECTED)", () => {
   assert.equal(
     GATE_REGISTRY.length,
-    33,
-    `expected exactly 33 GateDefinition entries, got ${GATE_REGISTRY.length}: ${GATE_REGISTRY.map((g) => g.errorCode).join(", ")}`,
+    34,
+    `expected exactly 34 GateDefinition entries, got ${GATE_REGISTRY.length}: ${GATE_REGISTRY.map((g) => g.errorCode).join(", ")}`,
   );
   assert.equal(
     ALL_GATE_CODES.length,
-    33,
+    34,
     "ALL_GATE_CODES must be GATE_REGISTRY.map(g => g.errorCode) — same length",
   );
   assert.deepEqual(
@@ -484,6 +484,12 @@ function parseDocFileMappingComment() {
   const LINE_RE = /^\/\/\s{2,}([A-Z][A-Z0-9_]*)\s{2,}(.+)$/gm;
   let m;
   while ((m = LINE_RE.exec(src))) {
+    // E300: the exact marker "(none)" means the code is quoted in NO content file yet
+    // (documentedInProse: false) — an EMPTY file set, not a file literally named "(none)".
+    if (m[2].trim() === "(none)") {
+      map.set(m[1], new Set());
+      continue;
+    }
     map.set(
       m[1],
       new Set(m[2].split(",").map((f) => f.trim()).filter(Boolean)),
@@ -496,8 +502,8 @@ test("doc-file mapping (c12): gates/registry.ts's errorCode→doc-file mapping c
   const mapping = parseDocFileMappingComment();
   assert.equal(
     mapping.size,
-    33,
-    `expected the mapping comment to list all 33 codes, found ${mapping.size}: ${[...mapping.keys()].join(", ")}`,
+    34,
+    `expected the mapping comment to list all 34 codes, found ${mapping.size}: ${[...mapping.keys()].join(", ")}`,
   );
   const docCodes = extractDocCodes();
   for (const g of GATE_REGISTRY) {
@@ -586,6 +592,10 @@ const FREE_TEXT_ALLOWLIST = [
   // nothing to check. (E40)
   { code: "NON_QA_COMPLETED_TASKS_REJECTED", field: "triggerEdge", reason: "free English, no checkable literal — same shape as REVIEWER_COMPLETED_TASKS_REJECTED, its sibling branch" },
   { code: "NON_QA_COMPLETED_TASKS_REJECTED", field: "armCondition", reason: "snake_case field-name shorthand, not a camelCase predicate/function-call literal — same shape as REVIEWER_COMPLETED_TASKS_REJECTED, its sibling branch" },
+  // DISPATCH_PIN_TIER_REJECTED (E300): a tool-boundary zod rejection raised in tools/registry.ts before
+  // UPDATE_STATE_GATE_PIPELINE — there is no transition edge, and the arm condition is the zod enum itself.
+  { code: "DISPATCH_PIN_TIER_REJECTED", field: "triggerEdge", reason: "tool-boundary zod rejection, no role:Status edge pair and no cap literal — it fires before any transition is evaluated" },
+  { code: "DISPATCH_PIN_TIER_REJECTED", field: "armCondition", reason: "tool-boundary zod rejection: the arm condition is the z.enum on each dispatch_pins value, not a camelCase predicate/function-call literal in the orchestrator" },
 ];
 
 test("AC3 (c12): every (errorCode, field) pair for triggerEdge/armCondition is either mechanically checked above or explicitly allowlisted as free-text — no silent exemptions", () => {
@@ -619,4 +629,29 @@ test("AC3 (c12): every (errorCode, field) pair for triggerEdge/armCondition is e
     allowlistKeys.length,
     "FREE_TEXT_ALLOWLIST must not contain duplicate (code, field) entries",
   );
+});
+
+// ---------------------------------------------------------------------------
+// E300: tool-boundary producer (DISPATCH_PIN_TIER_REJECTED)
+// ---------------------------------------------------------------------------
+
+test("E300: tool-boundary-producer entries' errorCode literally appears in tools/registry.ts (the zod boundary that raises it)", () => {
+  const registrySrc = readSource(path.join("tools", "registry.ts"));
+  const boundary = GATE_REGISTRY.filter((g) => g.producer === "tool-boundary");
+  assert.ok(boundary.length >= 1, "at least one tool-boundary entry is expected (DISPATCH_PIN_TIER_REJECTED)");
+  const missing = boundary.filter((g) => !registrySrc.includes(g.errorCode)).map((g) => g.errorCode);
+  assert.deepEqual(missing, [], `tool-boundary codes not found literally in tools/registry.ts: ${missing.join(", ")}`);
+});
+
+test("E300: DISPATCH_PIN_TIER_REJECTED is registered, documentedInProse:false, and backtick-quoted in NO content/*.md this wave", () => {
+  const g = GATE_REGISTRY.find((e) => e.errorCode === "DISPATCH_PIN_TIER_REJECTED");
+  assert.ok(g, "DISPATCH_PIN_TIER_REJECTED must be a GATE_REGISTRY entry");
+  assert.equal(g.producer, "tool-boundary");
+  assert.equal(g.documentedInProse, false);
+  assert.ok(!extractDocCodes().has("DISPATCH_PIN_TIER_REJECTED"),
+    "the prose sentence lands in a later content wave; flip documentedInProse and the mapping row together then");
+});
+
+test("E300: SUFFIX_RE classifies DISPATCH_PIN_TIER_REJECTED as a gate-shaped code (the _REJECTED suffix keeps it visible to both extractors)", () => {
+  assert.ok(SUFFIX_RE.test("DISPATCH_PIN_TIER_REJECTED"));
 });
