@@ -15,11 +15,23 @@
 // A trailing letter on an id (`E10a`) is a split suffix: the id passes the
 // ordering check when its parent `E10` already exists at the base.
 //
+// Suffixed ids in the queue, generic rule: a `票` cell id `E<n><letter>` with
+// no backlog row of its own passes the existence check when its parent `E<n>`
+// has a row, and is skipped by the tick/mark alignment check (there is no row
+// to compare against). No particular id is special-cased anywhere below.
+//
+// Check (2) resolves a dead path by basename, within the cited tree only
+// (qa_reports/ is never searched for a review_reports/ citation). Two shapes
+// are tolerated with a note instead of a failure: a root citation whose file
+// is still at the root (the file moves under archive/ at the next release),
+// and an archive/<dir>/ citation whose file is still at the root (the row
+// predicted the archive folder before release named it).
+//
 // The table and done-mark helpers below are reproduced from
 // scripts/check-md-tables.mjs so this script stays self-contained (it is
 // copied into fixture repositories by its tests). Keep the two in step.
 
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import * as path from "node:path";
@@ -33,6 +45,7 @@ const TICKET_TABLE_HEADER = ["id", "desc", "priority", "depends_on", "est. files
 const ORDER_TABLE_HEADER = ["order", "ticket", "intake", "why here"];
 const DECISIONS_HEADER = ["日期", "裁決者", "內容", "出處"];
 const DECIDERS = new Set(["人類", "整合者"]);
+const EVIDENCE_TREES = ["qa_reports", "review_reports"];
 const BASE_REF_FALLBACKS = ["origin/main", "main"];
 
 // ---------------------------------------------------------------------------
@@ -335,6 +348,121 @@ function checkIds(ticketRows, baseRef) {
 }
 
 // ---------------------------------------------------------------------------
+// Check (2): evidence citations on closed rows.
+// ---------------------------------------------------------------------------
+
+const CITATION_TOKEN_RE = /(?:qa_reports|review_reports)\/[^\s`"'()[\]<>{}*|,;:]*/g;
+const CITATION_SHAPE_RE = /^(qa_reports|review_reports)\/(?:archive\/([^/]+)\/)?([^/]+\.(?:md|txt|json|jsonl|png))$/;
+
+// Index every <tree>/archive/<dir>/<file> once: basename -> [dir, …].
+function buildArchiveIndex() {
+  const index = {};
+  for (const tree of EVIDENCE_TREES) {
+    const byName = new Map();
+    const archiveDir = path.join(root, tree, "archive");
+    let dirs = [];
+    try {
+      dirs = readdirSync(archiveDir).filter((d) => statSync(path.join(archiveDir, d)).isDirectory());
+    } catch {
+      dirs = [];
+    }
+    for (const d of dirs) {
+      let files = [];
+      try {
+        files = readdirSync(path.join(archiveDir, d)).filter((f) =>
+          statSync(path.join(archiveDir, d, f)).isFile()
+        );
+      } catch {
+        files = [];
+      }
+      for (const f of files) {
+        if (!byName.has(f)) byName.set(f, []);
+        byName.get(f).push(d);
+      }
+    }
+    index[tree] = byName;
+  }
+  return index;
+}
+
+function extractCitations(rawRow) {
+  const text = rawRow.replace(/\\\|/g, "|");
+  const out = [];
+  for (const m of text.matchAll(CITATION_TOKEN_RE)) {
+    const token = m[0].replace(/\.+$/, "");
+    const shape = CITATION_SHAPE_RE.exec(token);
+    if (!shape) continue;
+    out.push({ path: token, tree: shape[1], dir: shape[2] ?? null, file: shape[3] });
+  }
+  return out;
+}
+
+function checkCitations(rows, archiveIndex) {
+  for (const r of rows) {
+    if (!r.closed) continue;
+    for (const c of extractCitations(r.raw)) {
+      const existsAsCited = existsSync(path.join(root, c.path));
+      if (existsAsCited) {
+        if (c.dir === null) {
+          note(BACKLOG_REL_PATH, r.lineNo, `${r.id} cites ${c.path} at the root; it moves under ${c.tree}/archive/ at the next release`);
+        }
+        continue;
+      }
+      const rootPath = `${c.tree}/${c.file}`;
+      if (c.dir !== null && existsSync(path.join(root, rootPath))) {
+        note(BACKLOG_REL_PATH, r.lineNo, `${r.id} cites ${c.path}; the file is still at ${rootPath} (not yet archived)`);
+        continue;
+      }
+      const dirs = archiveIndex[c.tree].get(c.file) ?? [];
+      if (dirs.length === 1) {
+        violation(BACKLOG_REL_PATH, r.lineNo, `${r.id} cites ${c.path}, which does not exist; the file is at ${c.tree}/archive/${dirs[0]}/${c.file}`);
+      } else {
+        const candidates = dirs.length > 1
+          ? `; candidates: ${dirs.map((d) => `${c.tree}/archive/${d}/${c.file}`).join(", ")}`
+          : "";
+        violation(BACKLOG_REL_PATH, r.lineNo, `${r.id} cites ${c.path}, which does not exist anywhere under ${c.tree}/${candidates}`);
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Check (3): queue <-> backlog.
+// ---------------------------------------------------------------------------
+
+const QUEUE_ID_RE = /(?<![A-Za-z0-9])E(\d+)([A-Za-z]?)(?![A-Za-z0-9])/g;
+
+function checkQueue(queueLines, ticketRows) {
+  const rowById = new Map(ticketRows.map((r) => [r.id, r]));
+  let checked = 0;
+  for (const t of parseTables(queueLines)) {
+    if (t.headerCells.length < 2 || t.headerCells[0] !== "#" || t.headerCells[1] !== "票") continue;
+    for (const r of t.rows) {
+      if (r.cells.length < 2) continue;
+      if (r.cells[0] === "—") continue;
+      const ids = [...r.cells[1].matchAll(QUEUE_ID_RE)].map((m) => ({ id: m[0], parent: `E${m[1]}`, suffixed: m[2] !== "" }));
+      if (ids.length === 0) continue;
+      checked++;
+      for (const { id, parent, suffixed } of ids) {
+        if (rowById.has(id)) continue;
+        if (suffixed && rowById.has(parent)) continue;
+        violation(QUEUE_REL_PATH, r.lineNo, `${id} has no row in ${BACKLOG_REL_PATH}`);
+      }
+      const first = ids[0];
+      const backlogRow = rowById.get(first.id);
+      if (!backlogRow) continue;
+      const ticked = r.cells[1].includes("✅ DONE");
+      if (ticked && !backlogRow.closed) {
+        violation(QUEUE_REL_PATH, r.lineNo, `${first.id} is ticked DONE here but ${BACKLOG_REL_PATH}:${backlogRow.lineNo} does not lead with a DONE or VOID mark`);
+      } else if (!ticked && backlogRow.closed) {
+        violation(QUEUE_REL_PATH, r.lineNo, `${first.id} is not ticked DONE here but ${BACKLOG_REL_PATH}:${backlogRow.lineNo} is marked ${backlogRow.mark.token}`);
+      }
+    }
+  }
+  return checked;
+}
+
+// ---------------------------------------------------------------------------
 // Check (4): fan-out Decisions rows.
 // ---------------------------------------------------------------------------
 
@@ -397,9 +525,12 @@ const backlogLines = readRequired(BACKLOG_REL_PATH);
 const queueLines = readRequired(QUEUE_REL_PATH);
 const manifests = listFanoutManifests();
 
-const { ticketRows } = backlogModel(backlogLines);
+const { ticketRows, orderRows } = backlogModel(backlogLines);
 checkIds(ticketRows, baseRef);
-const queueChecked = 0; // check (3) lands in T-E299-02
+const archiveIndex = buildArchiveIndex();
+checkCitations(ticketRows, archiveIndex);
+checkCitations(orderRows, archiveIndex);
+const queueChecked = checkQueue(queueLines, ticketRows);
 let decisionRows = 0;
 for (const m of manifests) decisionRows += checkDecisions(m);
 
