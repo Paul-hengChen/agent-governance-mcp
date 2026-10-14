@@ -4,17 +4,18 @@ New blocks go above `## Applied`.
 
 ```pending-ticket
 lane_local_id: E297-NEW-1
-title: Stale pull request recovery under the branch-up-to-date rule (integrator Stage 6, release-engineer 8c/13a)
+title: Stale release pull request under the branch-up-to-date rule (release-engineer 8c/13a only)
 priority: P3
 depends_on: [E297]
-source: pm cut, lane e297
+source: pm cut, lane e297 (narrowed at integrator pre-review)
 body: |
   The ruleset requires a pull request to be up to date with the default branch before
-  merge. When the default branch moves after the pull request opened, E297 rules STOP
-  and report (the D10 collision shape). Decide whether `gh pr update-branch` (a host-side
-  merge of the default branch into the pull request head) joins the Constitution section
-  6 grant for the integrator and release-engineer, with the merge-resolution review duty
-  (integrator 5b-5) applied when it produces a non-trivial merge.
+  merge. The integrator's remedy is in E297 (merge the default branch into the
+  integration branch under its own grant). The release-engineer has no merge
+  authorization, so E297 keeps the STOP (D10 collision shape) for a `release/*` pull
+  request that falls behind. Decide whether `gh pr update-branch` (a host-side merge of
+  the default branch into the pull request head) joins the release-engineer's section 6
+  namespace, and what re-verification (8b strict CI check, 9a) follows it.
 ```
 
 ```pending-ticket
