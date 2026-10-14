@@ -75,14 +75,54 @@ declare const UpdateStateArgs: z.ZodObject<{
         CHANGES_REQUESTED: "CHANGES_REQUESTED";
     }>>;
     dispatch_pins: z.ZodOptional<z.ZodObject<{
-        pm: z.ZodOptional<z.ZodString>;
-        researcher: z.ZodOptional<z.ZodString>;
-        "design-auditor": z.ZodOptional<z.ZodString>;
-        architect: z.ZodOptional<z.ZodString>;
-        "sr-engineer": z.ZodOptional<z.ZodString>;
-        "code-reviewer": z.ZodOptional<z.ZodString>;
-        "qa-engineer": z.ZodOptional<z.ZodString>;
-        "release-engineer": z.ZodOptional<z.ZodString>;
+        pm: z.ZodOptional<z.ZodEnum<{
+            opus: "opus";
+            sonnet: "sonnet";
+            haiku: "haiku";
+            fable: "fable";
+        }>>;
+        researcher: z.ZodOptional<z.ZodEnum<{
+            opus: "opus";
+            sonnet: "sonnet";
+            haiku: "haiku";
+            fable: "fable";
+        }>>;
+        "design-auditor": z.ZodOptional<z.ZodEnum<{
+            opus: "opus";
+            sonnet: "sonnet";
+            haiku: "haiku";
+            fable: "fable";
+        }>>;
+        architect: z.ZodOptional<z.ZodEnum<{
+            opus: "opus";
+            sonnet: "sonnet";
+            haiku: "haiku";
+            fable: "fable";
+        }>>;
+        "sr-engineer": z.ZodOptional<z.ZodEnum<{
+            opus: "opus";
+            sonnet: "sonnet";
+            haiku: "haiku";
+            fable: "fable";
+        }>>;
+        "code-reviewer": z.ZodOptional<z.ZodEnum<{
+            opus: "opus";
+            sonnet: "sonnet";
+            haiku: "haiku";
+            fable: "fable";
+        }>>;
+        "qa-engineer": z.ZodOptional<z.ZodEnum<{
+            opus: "opus";
+            sonnet: "sonnet";
+            haiku: "haiku";
+            fable: "fable";
+        }>>;
+        "release-engineer": z.ZodOptional<z.ZodEnum<{
+            opus: "opus";
+            sonnet: "sonnet";
+            haiku: "haiku";
+            fable: "fable";
+        }>>;
     }, z.core.$strict>>;
     dispatch_mode: z.ZodOptional<z.ZodEnum<{
         feature: "feature";

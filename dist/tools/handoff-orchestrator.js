@@ -24,6 +24,7 @@ import { awaitAllInflightFor } from "./rag-coalesce.js";
 import { emitGateTelemetry, extractGateCodeFromText } from "./telemetry.js";
 import { emitFeatureMetrics } from "./metrics.js";
 import { appendDispatchRecord } from "./dispatch-log.js";
+import { DISPATCH_PIN_TIER_VALUES } from "./handoff-parse.js";
 import { runUpdateStatePipeline, } from "../gates/pipeline.js";
 // ==========================================
 // tw_get_state tool handler. Lives next to its sibling handleUpdateState
@@ -35,7 +36,43 @@ import { runUpdateStatePipeline, } from "../gates/pipeline.js";
 export async function handleGetState(args) {
     const { workspace_path } = args;
     const result = getActiveStorage().readState(workspace_path);
-    return { content: [{ type: "text", text: result }] };
+    return { content: [{ type: "text", text: withDispatchPinsAdvisory(result) }] };
+}
+// Read-side advisory for on-disk dispatch_pins outside the tier enum (E300).
+// A pin written before the enum or by hand is reported, never rejected on
+// read: the boundary rejects the NEXT tw_update_state that carries it. Adds a
+// top-level dispatch_pins_advisory to the envelope only when at least one pin
+// is out of enum; otherwise (no pins, all in enum, payload not a JSON object)
+// returns the original text byte-identical. Advisory only — never throws.
+function withDispatchPinsAdvisory(text) {
+    try {
+        const envelope = JSON.parse(text);
+        if (!envelope || typeof envelope !== "object" || Array.isArray(envelope))
+            return text;
+        const pins = envelope.dispatch_pins;
+        if (!pins || typeof pins !== "object" || Array.isArray(pins))
+            return text;
+        const allowed = DISPATCH_PIN_TIER_VALUES;
+        const offending = {};
+        for (const [role, value] of Object.entries(pins)) {
+            if (typeof value === "string" && !allowed.includes(value))
+                offending[role] = value;
+        }
+        if (Object.keys(offending).length === 0)
+            return text;
+        envelope.dispatch_pins_advisory = {
+            pins: offending,
+            allowed: [...DISPATCH_PIN_TIER_VALUES],
+            hint: "These on-disk dispatch_pins values are outside the model-tier enum; the next " +
+                "tw_update_state carrying them is rejected with DISPATCH_PIN_TIER_REJECTED — rewrite " +
+                "dispatch_pins with one of opus, sonnet, haiku, fable.",
+        };
+        return JSON.stringify(envelope);
+    }
+    catch {
+        // Advisory only — an unparseable payload keeps its original text.
+        return text;
+    }
 }
 // Feature-lease TTL: how long an unfinished feature keeps exclusive hold of
 // the workspace before another feature may take over. A fixed constant, not
