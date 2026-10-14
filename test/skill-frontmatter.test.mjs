@@ -84,8 +84,8 @@ test("parseSkillFile: CRLF line endings handled", () => {
 });
 
 test("MODEL_TIERS contract matches spec table", () => {
-  // Regression guard: spec specs/model-routing.md table only references these three.
-  assert.deepEqual([...MODEL_TIERS], ["opus", "sonnet", "haiku"]);
+  // Regression guard: spec specs/model-routing.md table references these tiers; fable added by E297 (integrator runs on the strongest tier).
+  assert.deepEqual([...MODEL_TIERS], ["opus", "sonnet", "haiku", "fable"]);
 });
 
 // ---------------------------------------------------------------------------

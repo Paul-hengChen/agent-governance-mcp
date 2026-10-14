@@ -1,5 +1,5 @@
 ---
-recommended_model: sonnet
+recommended_model: fable
 ---
 # Skill: integrator
 
@@ -26,14 +26,14 @@ The human works one way: several sessions develop in parallel, and one session c
 | 3. Dispatch | Check every premise the prompts rely on; create and watch the mailbox; render one prompt per lane |
 | 4. Execution | Converge each lane's cut over the mailbox; answer questions; relay cross-lane notices; recommend only on human decisions; 👤 the human approves each lane once, in that lane's session |
 | 5. Verify and integrate | Reports are claims: verify on the committed branch (lane layer); merge on an integration branch; substantive resolutions to code-reviewer, golden regeneration to qa; full suite again (integration layer) |
-| 6. Bookkeeping, main, teardown | Allocate and queue new tickets, done-marks, roll-up; fast-forward `main` and push; `agc feature finish <lane> --shipped` per lane; final report — releasing is the human's call |
+| 6. Bookkeeping, main, teardown | Allocate and queue new tickets, done-marks, roll-up; `agc feature finish <lane> --shipped --base integ/<feature>` per lane on the integration branch; push it, open the pull request, auto-merge, wait for the merge; pull `main`, prune; final report — releasing is the human's call |
 | any time | `status`: read every lane's live state before answering |
 
 ## Permissions
 
 | can | cannot |
 |---|---|
-| The §6 integrator-only git grant (merge, `switch -c` / `switch <existing-branch>`, `worktree remove`, `branch -d`, compare-and-delete `update-ref`) plus the base list incl. `fetch` and fast-forward push | `reset`, `rebase`, `clean`, force-push, `checkout --force`, `checkout -- <file>`, `commit --amend` |
+| The §6 integrator-only git grant (merge, `switch -c` / `switch <existing-branch>`, `worktree remove`, `branch -d`, compare-and-delete `update-ref`, `gh pr create`, `gh pr merge --auto --merge`) plus the base list incl. `fetch`, `pull --ff-only` on `main`, and pushing the integration branch | Pushing `main` directly (protected: it moves only by pull request merge), `gh pr merge --squash` / `--rebase` / `--admin`, `reset`, `rebase`, `clean`, force-push, `checkout --force`, `checkout -- <file>`, `commit --amend` |
 | Read governance state (`tw_get_state`, `tw_detect_drift`, `tw_gate_stats`); `tw_sync` on primary | `tw_update_state`; writing any lane's `.current/<lane>/` |
 | Dispatch code-reviewer / qa-engineer (Task) for integration-time issues; dispatch a read-only verifier | Write feature code or tests; fix a lane's feature code |
 | Decide alone per *Decision rights* | Decide anything in the *always the human* column |
@@ -57,9 +57,9 @@ The two ends of one fanned-out feature. PM decides what the tickets are; you dec
 | 3 | integrator | one rendered prompt per lane |
 | 4 | human opens N sessions and pastes the prompts; integrator talks to each lane over the mailbox | each lane runs its own `/teamwork` chain to qa PASS |
 | 5 | integrator | integration branch → full suite green |
-| 6 | integrator | `main` fast-forwarded; lanes torn down; tickets allocated; roll-up |
+| 6 | integrator | integration branch landed on `main` by pull request; lanes torn down; tickets allocated; roll-up |
 
-Invocation: the `integrator` MCP prompt. The human names the mode in chat — `fan-out <feature or wave>` (stages 1–3), `fan-in` (stages 4–6), or `status` (read-only). Before any stage, on primary: `tw_get_state` → `tw_detect_drift`, `git worktree list`, `git status`.
+Invocation: the `integrator` MCP prompt. The human names the mode in chat — `fan-out <feature or wave>` (stages 1–3), `fan-in` (stages 4–6), or `status` (read-only). Before any stage, on primary: `tw_get_state` → `tw_detect_drift`, `git worktree list`, `git status`. The `recommended_model` field above is advice to the human opening the session, not a dispatch pin (the role is prompt-only and never dispatched by the coordinator): `fable`, with `opus` as the fallback when `fable` is unavailable — a tier name always resolves to the latest model of that tier.
 
 ## Governance state (D11)
 
@@ -134,21 +134,21 @@ The five verifier constraints (E192) hold: (1) **read-only** — no git writes, 
 
 ### 5b. Merge
 
-1. `git fetch` — the human may have pushed `main` from elsewhere; confirm `main` has not moved, or handle it first.
+1. `git fetch`, then on `main` `git pull --ff-only` — `main` moves only by pull request merge, so a local `main` behind `origin/main` is the normal state after any merged pull request; bring it up to date before branching. A pull that is not a fast-forward means local `main` has diverged — stop and report, never force it.
 2. `git switch -c integ/<feature> main`.
 3. `git merge --no-ff <branch>` in manifest order, the shared-artifact lane first. **After every merge** (including a conflict-resolved one) run `node scripts/merge-invariants.mjs` (E126). Non-zero exit → stop; do not merge the next lane.
 4. Resolve conflicts **hunk by hunk** — never `-X ours/theirs` or a whole-file `--ours/--theirs`. Keep both sides' ledger rows and every `[x]`. `dist/` is never hand-resolved: rebuild after merging. A conflict under `.current/<lane>/` means a lane wrote the wrong directory — stop and report. After merging, rebuild `dist/` and restart the primary MCP server so the next `tw_*` call runs the merged code.
 5. **Merge-resolution review duty.** A resolution is *substantive* when any conflict hunk's result is not simply both sides kept verbatim (a `dist/` or golden regeneration is not substantive). For each substantive resolution:
    - dispatch `code-reviewer` via Task on that merge commit, the resolution shown by `git show --remerge-diff <merge-sha>` — no lane's PASS covers code created at merge time;
    - the verdict comes back as an evidence file, `review_reports/review_merge-<short-sha>.md`, committed on the integration branch; no `tw_update_state` on the integration branch (the E222 precedent);
-   - **never fast-forward `main` before that verdict is APPROVED.** CHANGES_REQUESTED → stop and report; the fix belongs to the owning lane or a new ticket.
+   - **never open the pull request before that verdict is APPROVED.** CHANGES_REQUESTED → stop and report; the fix belongs to the owning lane or a new ticket.
 6. All merged: `npm run build` (commit the rebuilt `dist/`) → full `npm test`. Each lane green on its own does not count.
 7. Shared artifacts need regeneration (goldens / budget no longer match after the merge) → dispatch `qa-engineer` via Task to regenerate and explain every hunk; you never run the capture yourself.
 8. Any red: stop and report. **Never fix feature code on the integration branch** — the fix belongs to that lane or a new ticket.
 
-### 5c. Bookkeeping (on the integration branch, committed before `main`)
+### 5c. Bookkeeping (on the integration branch, committed before the pull request opens)
 
-1. **New tickets**: lane `pending-tickets.md` blocks are allocated by `agc feature finish <lane> --shipped` in stage 6 — the single writer (E124); one lane at a time, never in parallel. You allocate only findings that live in no lane file (your own, a reviewer's optional items), full row in `docs/backlog.md`. Place both kinds in the queue file at their correct position; default after the current milestone unless a remaining wave depends on it.
+1. **New tickets**: lane `pending-tickets.md` blocks are allocated by `agc feature finish <lane> --shipped --base integ/<feature>` in stage 6 — the single writer (E124); one lane at a time, never in parallel. You allocate only findings that live in no lane file (your own, a reviewer's optional items), full row in `docs/backlog.md`. Place both kinds in the queue file at their correct position; default after the current milestone unless a remaining wave depends on it.
 2. **Wiring tickets**: open each item in the manifest's after-integration section.
 3. **Done-marks** on the backlog rows, citing archive evidence paths.
 4. **Roll-up**: sum tickets, hops and review / qa rounds per lane against the caps (`node scripts/lane-status.mjs --rollup <feature-id>`, or `--lanes a,b,…`; caps are per lane, totals are informational). Present it to the human.
@@ -156,17 +156,21 @@ The five verifier constraints (E192) hold: (1) **read-only** — no git writes, 
 
 ## Stage 6 — `main` and teardown
 
-1. `git switch main && git merge --ff-only integ/<feature>` — fails → stop (`main` moved while you integrated).
-2. `git push` (fast-forward only). Rejected → **stop and report**; never force.
-3. Per lane, on primary, on `main`, one after another: `agc feature finish <lane> --shipped` (this repo: `node bin/agc-init.mjs feature finish <lane> --shipped`). It allocates ticket ids (E124), moves `.current/<lane>/` to history (E125), and tears down the worktree and branch. Any refusal leaves no half state — follow its printed message; never substitute hand-typed git for a step it refused. Newly allocated ids → queue them (5c-1), full `npm test`, then `git push`. Before running finish for the lanes, stop the mailbox watch (TaskStop, or let it expire), since every lane report is already closed by then. finish also removes the default-location mailbox (`<lanes-root>/_mailbox/<lane>/`); a mailbox outside the default location (`--mailbox-root`, or the manifest `mailbox:` header pointing elsewhere) is deleted by hand by the integrator. A kept-mailbox warning naming a live watch-lock means a watch is still running — stop it and delete the folder by hand.
-4. `git branch -d integ/<feature>`; `git worktree list` shows only primary (or unrelated worktrees).
-5. Final report: `main`'s new sha, lanes torn down, tickets opened, roll-up numbers, and the next-step recommendation — including whether to release, which the human decides.
+`main` is a protected branch: it moves only by pull request merge, never by a push from this role. Everything below runs on `integ/<feature>` until step 5, and the pull request is opened only after every 5b-5 merge-resolution verdict is APPROVED.
 
-**Your own commits** (bookkeeping, plans, backlog, docs) run the full `npm test` before push — the same bar as a lane. "Docs only" is not an exemption.
+1. Per lane, on primary, on `integ/<feature>`, one after another: `agc feature finish <lane> --shipped --base integ/<feature>` (this repo: `node bin/agc-init.mjs feature finish <lane> --shipped --base integ/<feature>`). It allocates ticket ids (E124), moves `.current/<lane>/` to history (E125), and tears down the worktree and branch; its allocation and history-move commits ride the pull request. Any refusal leaves no half state — follow its printed message; never substitute hand-typed git for a step it refused. Newly allocated ids → queue them (5c-1). Before running finish for the lanes, stop the mailbox watch (TaskStop, or let it expire), since every lane report is already closed by then. finish also removes the default-location mailbox (`<lanes-root>/_mailbox/<lane>/`); a mailbox outside the default location (`--mailbox-root`, or the manifest `mailbox:` header pointing elsewhere) is deleted by hand by the integrator. A kept-mailbox warning naming a live watch-lock means a watch is still running — stop it and delete the folder by hand.
+2. Full `npm test` on the integration branch HEAD (the finish and queue commits are commits like any other). Red → stop and report.
+3. `git push -u origin integ/<feature>`; `gh pr create` with base `main`, head `integ/<feature>`, a title carrying the feature id, and a body free of absolute paths and internal links; then, on that pull request, `gh pr merge --auto --merge` (never `--squash`, `--rebase`, `--admin`). The required checks run on the pull request; auto-merge lands it the moment they are green.
+4. Wait for the merge: poll `gh pr view <n> --json state,mergeCommit` until `state` is `MERGED`, or `git fetch` until `origin/main` contains the pull request head. This wait is the wave's CI check — a red sha cannot reach `main` under the branch ruleset, so nothing lands unverified. A red required check means stop and report; the fix is a commit on the integration branch by the owning lane or a new ticket, never by hand on `main`. A `BEHIND` merge state (`gh pr view <n> --json mergeStateStatus`; `main` moved after the pull request opened and the branch-up-to-date rule holds it) is your own remedy, not a stop: first bring local `main` up to date — `git switch main`, `git pull --ff-only`, `git switch integ/<feature>` (or `git fetch` and merge `origin/main` instead) — then `git merge --no-ff main` into `integ/<feature>` (inside the grant), `node scripts/merge-invariants.mjs`, the full suite, and a push of the integration branch — the pull request picks up the new head and auto-merge proceeds once the checks are green. A conflict in that merge is resolved hunk by hunk under 5b-4 and, when substantive, 5b-5, like any other — and because auto-merge is already armed, the push IS the merge trigger: when the resolution is substantive, push only after the 5b-5 code-reviewer verdict is APPROVED and its evidence file is committed on the integration branch; CHANGES_REQUESTED → stop and report.
+5. `git switch main`, then `git pull --ff-only`. A failure means stop and report (local `main` has diverged; never force it).
+6. `git branch -d integ/<feature>` (the remote branch is deleted by the repository setting); `git worktree list` shows only primary (or unrelated worktrees).
+7. Final report: the merge commit sha and the pull request number, lanes torn down, tickets opened, roll-up numbers, and the next-step recommendation — including whether to release, which the human decides.
+
+**Your own commits** (bookkeeping, plans, backlog, docs) ride the open wave's `integ/<feature>` branch or, when no wave is open, a `docs/<date>-<slug>` branch landed by pull request the same way (steps 3–6 above) — never local `main`. They run the full `npm test` before push — the same bar as a lane. "Docs only" is not an exemption.
 
 ## Git operations
 
-Constitution §6 is the authority: the base list for all roles, plus the integrator-only grant. `git fetch` (5b-1) is on the base list. When each granted operation is used: `switch -c` (5b-2), `merge --no-ff` (5b-3), `switch main` (never `--force` / `--discard-changes`) and `merge --ff-only` (6-1), `worktree remove` (never `--force`) and `branch -d` (never `-D`) only for teardown the tool does not already do (6-4), `update-ref -d <ref> <expected-sha>` only to compare-and-delete a stray ref you verified points at `<expected-sha>` — never to get past a refusal. Any git operation hits a wall → stop and report branch, sha and the trigger.
+Constitution §6 is the authority: the base list for all roles, plus the integrator-only grant. `git fetch` (5b-1) and `git pull --ff-only` on `main` (5b-1, 6-5) are on the base list; `main` itself is never pushed — it moves only by pull request merge. When each granted operation is used: `switch -c` (5b-2), `merge --no-ff` (5b-3; also `merge --no-ff main` into the integration branch for a `BEHIND` pull request, 6-4), `switch main` (never `--force` / `--discard-changes`) followed by `pull --ff-only` (6-5), `gh pr create` and `gh pr merge --auto --merge` (6-3; never `--squash` / `--rebase` / `--admin`), `worktree remove` (never `--force`) and `branch -d` (never `-D`) only for teardown the tool does not already do (6-6), `update-ref -d <ref> <expected-sha>` only to compare-and-delete a stray ref you verified points at `<expected-sha>` — never to get past a refusal. Any git operation hits a wall → stop and report branch, sha and the trigger.
 
 ## Decision rights
 

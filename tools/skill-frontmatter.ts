@@ -5,7 +5,7 @@
 
 import * as yaml from "js-yaml";
 
-export const MODEL_TIERS = ["opus", "sonnet", "haiku"] as const;
+export const MODEL_TIERS = ["opus", "sonnet", "haiku", "fable"] as const;
 export type ModelTier = (typeof MODEL_TIERS)[number];
 
 export interface SkillFrontmatter {

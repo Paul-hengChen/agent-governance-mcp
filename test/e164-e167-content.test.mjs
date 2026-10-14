@@ -102,16 +102,13 @@ test("AC2: the Escalation Routes step-8b row is consistent with the fix_try-capp
   assert.match(row, /the first attempt with the normal budget, and only after the first host kill with the budget set below the host timeout/, "the row's re-run guidance must match 8b's sequencing");
 });
 
-test("AC2: every 8b STOP deletes any unpushed local tag with `git tag -d` before the Blocked write", () => {
-  assert.match(
-    STEP_8B,
-    /On every 8b STOP, before that Blocked write, delete any local tag created ahead of this gate per 8c\*\* \(`git tag -d vX\.Y\.Z`\)/,
-    "the printed-result STOP path must delete the unpushed local tag before the Blocked write",
-  );
-  const capSentenceMatch = STEP_8B.match(/Consecutive silent-kill re-runs are bounded by the `fix_try` cap[\s\S]{0,400}?do not keep re-running\./);
-  assert.match(capSentenceMatch[0], /deleting any unpushed local tag first, as above/, "the cap-exhaustion STOP path must also delete the unpushed local tag before the Blocked write");
-  // This must never touch a published tag — the No force pushes Hard rule stays intact.
-  assert.match(STEP_8B, /This never touches a published tag/, "8b must state the tag deletion is scoped to an unpushed (local-only) tag");
+test("AC2 (E297 re-pin): 8b STOPs carry no local-tag cleanup — no tag exists before the merge", () => {
+  // The tag is created on the main merge commit in 8c, so the former
+  // "delete any local tag created ahead of this gate" clauses are retired.
+  assert.ok(!STEP_8B.includes("delete any local tag created ahead of this gate"), "8b must not carry the retired pre-gate tag-deletion clause");
+  assert.ok(!STEP_8B.includes("deleting any unpushed local tag first"), "the cap-exhaustion STOP path must not carry the retired tag-deletion clause");
+  assert.match(STEP_8B, /No tag exists at this point/, "8b must state no tag exists at the gate, so a STOP undoes nothing");
+  assert.match(STEP_8B, /Consecutive silent-kill re-runs are bounded by the `fix_try` cap[\s\S]{0,400}?do not keep re-running\./, "the cap-exhaustion STOP path must remain");
 });
 
 // ---------------------------------------------------------------------------
@@ -138,13 +135,14 @@ test("AC3: the 9a note contains no bare '480' literal", () => {
 // PASSED); step labels 8a/8b/8c/9/9a present and unrenumbered.
 // ---------------------------------------------------------------------------
 
-test("AC4: 8c's tag-create bullet is local/reversible and permitted after step 8a completes, including before 8b", () => {
-  const tagCreateMatch = STEP_8C.match(/- `git tag -a vX\.Y\.Z[\s\S]*?\(see 8b\)\./);
+test("AC4 (E297 re-pin): 8c's tag-create bullet is local/reversible and follows the merge, on that HEAD", () => {
+  const tagCreateMatch = STEP_8C.match(/- `git tag -a vX\.Y\.Z[\s\S]*?until the next bullet\./);
   assert.ok(tagCreateMatch, "8c must retain the git tag -a bullet with its full reversibility/timing clause");
   const tagCreate = tagCreateMatch[0];
   assert.match(tagCreate, /local and reversible \(undo with `git tag -d vX\.Y\.Z`\)/, "the tag-create bullet must call the local tag reversible");
-  assert.match(tagCreate, /any time after step 8a completes/, "the tag-create bullet must permit creation any time after step 8a completes (not merely after its commit)");
-  assert.match(tagCreate, /including before 8b/, "the tag-create bullet must explicitly permit the pre-8b window (E167)");
+  assert.match(tagCreate, /on that HEAD/, "the tag-create bullet must tag the pulled main merge commit");
+  assert.ok(!tagCreate.includes("any time after step 8a completes"), "the retired early-tag allowance must be gone");
+  assert.ok(!tagCreate.includes("including before 8b"), "the retired pre-8b window must be gone");
 });
 
 test("AC4: 8c's tag-push bullet is gated strictly on CI-CHECK PASSED and is the irreversible act", () => {
