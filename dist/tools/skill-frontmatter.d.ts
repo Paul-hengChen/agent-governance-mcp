@@ -1,4 +1,4 @@
-export declare const MODEL_TIERS: readonly ["opus", "sonnet", "haiku"];
+export declare const MODEL_TIERS: readonly ["opus", "sonnet", "haiku", "fable"];
 export type ModelTier = (typeof MODEL_TIERS)[number];
 export interface SkillFrontmatter {
     recommended_model?: ModelTier;
