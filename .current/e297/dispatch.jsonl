@@ -7,3 +7,5 @@
 {"ts":"2026-10-14T11:12:03.973Z","feature":"e297-main-protected-sop","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-10-14T11:18:11.273Z","feature":"e297-main-protected-sop","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-10-14T11:20:45.743Z","feature":"e297-main-protected-sop","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-10-14T11:21:29.411Z","feature":"e297-main-protected-sop","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-14T11:23:12.140Z","feature":"e297-main-protected-sop","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
