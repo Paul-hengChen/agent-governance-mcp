@@ -1,5 +1,7 @@
 # Pending tickets (lane e300)
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E300-NEW-1
 title: zod-boundary rejections never reach emitGateTelemetry, so tw_gate_stats shows DISPATCH_PIN_TIER_REJECTED as zero_fire forever
@@ -16,5 +18,3 @@ body: |
   telemetry for any issue message starting with a registered gate code, then
   rethrow). Out of the e300 lane's owned files.
 ```
-
-## Applied
