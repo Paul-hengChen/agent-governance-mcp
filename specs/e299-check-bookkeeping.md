@@ -159,9 +159,17 @@ table; a row starts with `|` at column 0; the delimiter row is skipped).
   code is 1; the two counts are reported separately (a buried mark is never counted as a
   malformed table). The `findGenuineDoneMark` / `findCodeSpanRanges` /
   `findCitationQuoteRanges` predicates are unchanged.
-  proof: `test/check-md-tables.test.mjs` — the six `ADV-*` cases re-targeted (`ADV-ORDER-TABLE`,
-  `ADV-TICKET-TABLE`, `ADV-NONFATAL-BOTH-DIRECTIONS` now assert exit 1 and the stderr shape;
-  `ADV-TICKET-TABLE-NEG`, `ADV-LEADING`, `ADV-NON-BACKLOG` still assert exit 0 and no output).
+  proof: `test/check-md-tables.test.mjs` — the 14 cases that go red after the promotion are
+  qa's re-target set for T-E299-05: `ADV-ORDER-TABLE`, `ADV-TICKET-TABLE`,
+  `ADV-NONFATAL-BOTH-DIRECTIONS`, `CS-UNMATCHED-BACKTICK`, `CS-2RUN-CONTAINING-1RUN`,
+  `CS-PAIRED-3BACKTICK`, `CS-UNPAIRED-3BACKTICK`, `CS-MULTI-CANDIDATE`,
+  `CS-ESCAPED-PIPE-ADJACENT`, `CQ-MULTI-CANDIDATE`, `CQ-GENUINE-OUTSIDE-QUOTE`,
+  `CQ-UNPAIRED-OPENER`, `CQ-BOLD-RUN-NOT-AN-OPENER`, `CQ-9` (the `CS-*` / `CQ-*` "still fires"
+  cases assert the old exit-0 + stdout advisory shape and now assert exit 1 + the stderr
+  shape; `CQ-9` per AC12). `ADV-TICKET-TABLE-NEG`, `ADV-LEADING`, `ADV-NON-BACKLOG` and the
+  `CS-*` / `CQ-*` "stays silent" cases still assert exit 0 and no output. sr-engineer records
+  the 14 in `qa_reports/expected-red_e299-check-bookkeeping.txt` (sr SOP 7a); qa Phase 0.5
+  diffs the observed red set against that manifest before re-targeting.
 - **AC12** — Given the real corpus after T-E299-03, when `node scripts/check-md-tables.mjs`
   runs, then exit 0 with zero done-mark violations and the E145 row stays silent (its
   `*"…"*` citation of E59's mark). `CQ-9` is rewritten to assert exactly that (zero
@@ -201,8 +209,10 @@ table; a row starts with `|` at column 0; the delimiter row is skipped).
 - **AC16** — Given the real corpus after T-E299-03 (five done-mark relocations, 46 citation
   rewrites, one queue tick — the list in *Mechanical fix list* below), when
   `node scripts/check-bookkeeping.mjs` runs in the lane worktree and on primary, then exit 0
-  with exactly the 22 notes enumerated there (8 root-tolerated + 14 predicted-archive
-  tolerated) and no violation.
+  with exactly the 23 notes enumerated there (9 root-tolerated + 14 predicted-archive
+  tolerated) and no violation. The ninth root-tolerated note is `docs/backlog.md:196` (E74
+  citing `qa_reports/review_T-E3-QA.md:111`, an existing root file with a line suffix; the
+  citation token stops at `:`, so the line-suffixed form resolves).
   proof: `node scripts/check-bookkeeping.mjs; echo "exit=$?"` ends with `exit=0`.
 
 ## Copy / Strings
@@ -276,7 +286,8 @@ governance jargon and name the file, line and fix.
 - T-E299-03 (corpus fixes) must land before T-E299-04 (E88 promotion) in the same branch, or
   `test/check-md-tables.test.mjs` AC7 goes red between commits. Task order below encodes this.
 - `test/**` is qa-owned (Constitution §2): T-E299-05 is the qa-engineer's authoring task; sr
-  tasks write no tests.
+  tasks write no tests. T-E299-04's promotion reds 14 existing cases (AC11 list); sr records
+  them in `qa_reports/expected-red_e299-check-bookkeeping.txt`, qa re-targets them in T-E299-05.
 - Full-suite runs after commit with a clean tree (`check-md-tables` and the new check list
   tracked files only); wrap in `node scripts/test-lock.mjs -- npm test`.
 - The cut was pre-reviewed through the lane mailbox before the human approved it (lane
@@ -292,6 +303,8 @@ governance jargon and name the file, line and fix.
 | 2026-10-14 | PM (proposed) | Check (3) "closed" = genuine `DONE`/`VOID` leading `desc`; `PARTIAL` is open. A suffixed queue id `E<n><letter>` without its own row passes existence through its parent `E<n>` and skips alignment — generic parent pass-through, integrator ruling 2026-10-14 (pre-review close), no finding filed; no E177c row is added on integ (an old number would trip check (1)); the rule lives in the script's file-header comment, never as an id special case. Un-ticketed `—` rows (N12, N13) are skipped. | prototype; mailbox to-lane#2 |
 | 2026-10-14 | 整合者 (pre-review close) | E104 = DONE confirmed: its leading bold gets `DONE — ` inserted (row 226). | mailbox to-lane#2 |
 | 2026-10-14 | 整合者 (pre-review close) | The 7 rewrites that replace a predicted `archive/<lane>/` folder with the actual `release-v4.x.x/` folder (E130, E180, E204, E212, E223 rows) are confirmed mechanical. | mailbox to-lane#2 |
+| 2026-10-14 | code-reviewer (round 1, `review_reports/review_T-E299-01.md`) | Three implementation deviations accepted: (i) the real corpus yields 23 notes, not 22 — a spec arithmetic error, corrected above; (ii) an order-row `<id>` in messages is the first `E<n>` of its `ticket` cell, and "closed" is a genuine DONE/VOID at any index (PARTIAL open) — identical on a green corpus once T-E299-04 makes a non-leading mark fatal; (iii) `check-md-tables` prints one trailing `check:md-tables — FAILED` line for either list (malformed tables and/or buried marks), counts kept separate. | review_T-E299-01 |
+| 2026-10-14 | code-reviewer (round 1) | Red set after the E88 promotion is 14 cases in `test/check-md-tables.test.mjs`, not 7 — listed under AC11; qa's T-E299-05 re-target set. F4 (a parity assertion that the four predicates copied into `check-bookkeeping.mjs` match `check-md-tables.mjs`) is an option for qa in T-E299-05, not a requirement. | review_T-E299-01 |
 | 2026-10-14 | PM (proposed) | Check (4) decider vocabulary is the closed set `人類` / `整合者` (E286 revision O4: "the SOP names the two 裁決者 values"); a manifest without `## Decisions` is skipped silently. | E286 row; 149 live rows pass |
 | 2026-10-14 | PM (proposed) | Check (5) fixes all five live advisories, not the two the manifest lists: E39 (165), E40 (166), E58 (180) are the rows CQ-9 pins as "must advise", so CQ-9 is rewritten rather than the promotion scoped around them. | `node scripts/check-md-tables.mjs` on base: 5 advisories |
 | 2026-10-14 | PM (proposed) | Done-mark relocation rule (mechanical, no prose change): cut the exact span ` **DONE** (<stamp>)` (leading space included) from its mid-cell position and prepend `**DONE** (<stamp>) — ` to the cell. E104's leading bold already carries a date stamp, so `DONE — ` is inserted after its opening `**` instead. | measured mark contexts |
@@ -303,7 +316,7 @@ governance jargon and name the file, line and fix.
 | (1) duplicate ids | 0 (15 when headings are counted — the reason for the id-space decision) | — | — |
 | (1) monotone | 0 new ids vs base (360 ids, max E300) | — | no-op on base by construction |
 | (2) dead citations on closed rows | 46 citations across 29 rows: lines 180, 181, 183, 184, 192, 209, 215, 222, 243, 247 (×6), 252 (×2), 303 (×2), 327, 335, 345, 346 (×2), 357 (×2), 366 (×3), 371 (×3), 373 (×2), 374, 387, 391 (×2), 393, 394 (×3), 395, 396, 397, 515 (order row 5d) | all resolve to exactly one file in the cited tree | mechanical — fix in this lane (T-E299-03) |
-| (2) tolerated (notes) | 22: 8 root citations still at the root (E74 line 196; E235 line 358 ×5; E239 line 362; E243 line 366; order 5d line 515) + 14 predicted-archive citations still at the root (E106 ×2, E108 ×3, E213 ×2, E229, E231 ×2, E232 ×2, E239 ×2) | — | no fix; they turn into AC5 failures at the release that archives them (finding E299-NEW-2) |
+| (2) tolerated (notes) | 23: 9 root citations still at the root (E74 line 196, a `:111` line-suffixed citation of an existing root file; E235 line 358 ×5; E239 line 362; E243 line 366; order 5d line 515) + 14 predicted-archive citations still at the root (E106 ×2, E108 ×3, E213 ×2, E229, E231 ×2, E232 ×2, E239 ×2) | — | no fix; they turn into AC5 failures at the release that archives them (finding E299-NEW-2) |
 | (2) ambiguous / not found | 0 | — | — |
 | (3) queue ↔ backlog | 2 real + 2 skipped: queue line 48 (#7 `E137`) not ticked but backlog line 259 leads with DONE; queue line 98 (#55 `E177c`) has no backlog row; lines 158–159 (`—` rows N12/N13) have no id | E137: mechanical tick (T-E299-03); E177c: generic parent pass-through, integrator ruling 2026-10-14 (pre-review close), no finding filed | 1 mechanical, 1 ruled |
 | (4) Decisions rows | 0 across 149 rows in 15 manifests; 2 manifests without the section | — | — |
