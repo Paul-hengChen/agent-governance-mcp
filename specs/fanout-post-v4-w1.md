@@ -99,3 +99,4 @@ e297 → e299 → e300 → e298（共享生成物的 lane 先；四條檔案互�
 | 2026-10-14 | 整合者 | 四條 lane 的 PM 都先在 session 裡找人類核准 cut、未送信箱；整合者對四條各送 question 要求先寄 proposal 預審。e299 回報 session 已達使用量上限 | 信箱四條 lane to-lane#1、e297／e299 to-integrator#1 |
 | 2026-10-14 | 整合者 | e298 預審通過（mini-chain 無 PM hop；T-E298-01 ci.yml 觸發、T-E298-02 finish 刪 remote branch，AC1–AC7；前置檢查用本地 remote-tracking ref、不 ls-remote；qa 加 --base 非 main 案例） | 信箱 e298 to-integrator#1、to-lane#2 |
 | 2026-10-14 | 整合者 | e300 預審：T-01／02／04 通過，T-03 的 advisory 改放 tw_get_state 信封、不加在 HandoffState（handoff-types／handoff-write 不在擁有範圍）；index.ts 不動（formatZodError 已帶 zod path）；建議方案 A、碼名 DISPATCH_PIN_TIER_REJECTED，兩者交人類裁決 | 信箱 e300 to-integrator#1、to-lane#2 |
+| 2026-10-14 | 整合者 | e300 預審通過（T-E300-01 字面值 enum + zod、02 GATE_REGISTRY 第 34 列 producer tool-boundary、03 advisory 只在 tw_get_state 信封、04 測試）；兩項交人類裁決：方案 A（建議）vs B、碼名 DISPATCH_PIN_TIER_REJECTED | 信箱 e300 to-integrator#2、to-lane#3 |
