@@ -1,3 +1,5 @@
 {"ts":"2026-10-14T10:30:52.994Z","feature":"e297-main-protected-sop","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"fable"}
 {"ts":"2026-10-14T10:41:43.529Z","feature":"e297-main-protected-sop","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
 {"ts":"2026-10-14T10:46:48.942Z","feature":"e297-main-protected-sop","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-10-14T10:49:16.212Z","feature":"e297-main-protected-sop","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-10-14T11:00:16.663Z","feature":"e297-main-protected-sop","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
