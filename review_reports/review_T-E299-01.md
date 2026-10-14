@@ -161,3 +161,79 @@ Other notes:
   - AC16 should read 23 notes.
   - AC11 and T-E299-05 should also name the seven CS-*/CQ-* cases that need re-targeting.
 - **Accepted:** the three recorded deviations.
+
+## Round 2 — APPROVED — by code-reviewer
+
+Range `3b8faac..c7ce44e` (spec amendment `24caa18`, manifest `c7ce44e`). Reviewer tier: opus;
+builder tier: fable.
+
+## Summary
+
+- Round 1 F1 is fixed. `qa_reports/expected-red_e299-check-bookkeeping.txt` now exists, with a
+  `#` rationale header and 14 `test/check-md-tables.test.mjs | <exact test name>` lines.
+- No code changed since round 1. `git diff 3b8faac..HEAD --stat` touches only
+  `specs/e299-check-bookkeeping.md`, `review_reports/review_T-E299-01.md`,
+  `qa_reports/expected-red_e299-check-bookkeeping.txt` and `.current/e299/**`. No script, doc,
+  test or `package.json` change.
+- The spec amendment matches what round 1 asked for and widens no scope.
+- Verdict: **APPROVED**.
+
+## AC Completeness
+
+- AC1–AC15 — unchanged since round 1 (no code delta). The round 1 evidence stands.
+- AC11 — the proof line now names all 14 red cases as qa's T-E299-05 re-target set, plus the
+  manifest path and the qa Phase 0.5 diff step (spec lines 162-172).
+- AC16 — amended to 23 notes (9 root-tolerated + 14 predicted-archive), with the E74 `:111`
+  citation explained. Re-run: `node scripts/check-bookkeeping.mjs` exits 0, stderr is empty,
+  stdout has `23 note(s)` and 23 note lines.
+- AC12 — re-run: `node scripts/check-md-tables.mjs` prints `OK (519 file(s) scanned, 0 malformed tables)` and exits 0.
+
+## Correctness
+
+- **F1 — resolved.** I ran `node --test test/check-md-tables.test.mjs` myself: 49 tests, 35 pass,
+  14 fail, exit 1. I diffed the sorted `not ok` names against the sorted manifest names and got
+  **set-equal**, with 0 missing and 0 extra. Before the diff I undid the TAP reporter's `\|` →
+  `\\|` escaping, which affects only CS-ESCAPED-PIPE-ADJACENT.
+- Byte-for-byte samples (grep `-F` against the test source):
+  - CS-2RUN-CONTAINING-1RUN: located.
+  - CQ-9: located.
+  - ADV-NONFATAL-BOTH-DIRECTIONS: located.
+  - CQ-UNPAIRED-OPENER, CQ-BOLD-RUN-NOT-AN-OPENER and CS-ESCAPED-PIPE-ADJACENT: located at
+    `test/check-md-tables.test.mjs:697`, `:742` and `:646` in their JS-literal form (`\"`, `\\|`).
+    The manifest holds the runtime string, which matches the TAP name exactly. That is the right
+    choice for qa's Phase 0.5 observed-vs-manifest diff, but a raw `grep -F` of those three
+    manifest lines against the source returns no hits. Not a defect. Noted so qa expects it.
+- **F7 — recommended — `.current/e299/tasks.md:10`.** The T-E299-05 task text still says
+  "re-target the six `ADV-*` cases". Three of those six (`ADV-TICKET-TABLE-NEG`, `ADV-LEADING`,
+  `ADV-NON-BACKLOG`) stay green, and it omits the seven CS-*/CQ-* reds. Spec AC11 and the
+  manifest are authoritative and agree with each other. The ledger line is stale prose only, and
+  qa should treat AC11 plus the manifest as the re-target set. This is a PM touch if the line is
+  ever re-cut. It does not block.
+- F2 (optional) is unchanged and still open by design.
+
+## Quality
+
+- The manifest rationale header is three `#` lines and generic. It names the cause (the E88
+  promotion in T-E299-04), the old asserted shape and the owner of the fix (T-E299-05). It has
+  no local paths.
+- F3 and F4 are unchanged. The Decisions row at spec line 307 records F4 as an option for qa
+  in T-E299-05.
+
+## Architecture
+
+No change. No architecture spec exists.
+
+## Security
+
+No change. No tracked file in the round-2 delta contains `/Users/` or a worktree path. F5
+(optional) is unchanged.
+
+## Performance
+
+No change. No code delta.
+
+## Verdict
+
+**APPROVED.** F1, the only required finding, is fixed with a manifest that is set-equal to the
+live red set. The spec amendment is accurate and does not widen scope. F7 (recommended) and
+F2–F5 do not block.

@@ -5,3 +5,5 @@
 {"ts":"2026-10-14T10:57:46.700Z","feature":"e299-check-bookkeeping","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
 {"ts":"2026-10-14T10:58:52.033Z","feature":"e299-check-bookkeeping","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-10-14T11:04:19.431Z","feature":"e299-check-bookkeeping","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-14T11:10:46.740Z","feature":"e299-check-bookkeeping","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-10-14T11:11:28.132Z","feature":"e299-check-bookkeeping","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
