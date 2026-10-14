@@ -3,6 +3,8 @@
 New findings from this lane. Ids are assigned by the integrator at `agc feature finish`; blocks
 above `## Applied` are pending.
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E299-NEW-2
 title: Evidence-Citation Convention asks for an archive folder name that does not exist at write time — 14 live done-marks predicted the wrong folder, 8 cite the root; the release that archives them will now fail check:bookkeeping
@@ -37,5 +39,3 @@ body: |
   promoted by E299 on <date>, after the five rows were normalized. specs/e260c-* is outside
   this lane's ownership; doc-writer or the wave-2 content lane.
 ```
-
-## Applied
