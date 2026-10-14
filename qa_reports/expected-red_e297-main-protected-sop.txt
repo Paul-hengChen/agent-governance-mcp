@@ -1,0 +1,37 @@
+# e297-main-protected-sop — intentional reds left by sr-engineer (T-E297-01..04).
+# Every entry is a pinned literal, a frozen golden, or a measured size ceiling that the
+# spec pre-assigns to qa in T-E297-06 (re-pin / regenerate / set to the measured value).
+# No product-logic regression is hidden here. Two load-induced timeouts in
+# test/e177b-test-lock.test.mjs seen during the full run are NOT listed: that file passes
+# 19/19 standalone and nothing in this lane touches the lock code.
+
+# Goldens pin the pre-E297 section 6 bytes; const-15 (section 6) and coord-03 changed under AC7/AC8.
+# Regenerate test/fixtures/compose-golden/** (T-E297-06).
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-coordinator-lite.md, design=false, fullDetail=false) is byte-identical to pre-refactor golden build-lite-nondesign.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-coordinator-lite.md, design=true, fullDetail=false) is byte-identical to pre-refactor golden build-lite-design.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-coordinator-lite.md, design=false, fullDetail=true) is byte-identical to pre-refactor golden build-lite-nondesign-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-coordinator-lite.md, design=true, fullDetail=true) is byte-identical to pre-refactor golden build-lite-design-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=false, fullDetail=false) is byte-identical to pre-refactor golden build-full-nondesign.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=true, fullDetail=false) is byte-identical to pre-refactor golden build-full-design.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=false, fullDetail=true) is byte-identical to pre-refactor golden build-full-nondesign-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=true, fullDetail=true) is byte-identical to pre-refactor golden build-full-design-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: SessionStart hook (lite/default env) is byte-identical to pre-refactor golden hook-lite.txt
+test/compose-equivalence.test.mjs | compose-equivalence: SessionStart hook (AGC_DEFAULT_SKILL=full) is byte-identical to pre-refactor golden hook-full.txt
+test/compose-equivalence.test.mjs | compose-equivalence: cat(15 manifest fragments in order) === the pre-refactor constitution.md monolith (DR-1 Option R invariant)
+test/skill-manifest.test.mjs | t-golden-byte-identity (AC1/AC5): composeSkill("skill-coordinator.md", {taskTool:true}) === frozen golden monolith, byte-for-byte
+
+# Size ceilings (zero headroom): measured on this HEAD as 5713 / 10222 / 20745 / 8125 ~tok
+# (current pins 5567 / 10076 / 20453 / 7978). qa sets the exact measured values (AC11).
+test/context-budget.test.mjs | AC2: lean always-on bundle is below the raw baseline and within target (<= 5567 ~tok)
+test/context-budget.test.mjs | AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the measured floor (≤ 10076 ~tok)
+test/context-budget.test.mjs | AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 20453 ~tok)
+test/context-budget.test.mjs | AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 7978 ~tok)
+
+# Pinned literals superseded by the rewrite (re-pin to the new text; strings listed in the handoff pending_notes).
+test/e178a-integrator-role.test.mjs | AC1: content/skill-integrator.md — frontmatter, purpose, work-overview, permission table, you-are-not list, no-tier watermark
+test/e178a-integrator-role.test.mjs | AC6: const-15 §6 — integrator-only git grant; base list + FORBIDDEN entries unchanged
+test/e178a-integrator-role.test.mjs | AC9: SOP merge stage — substantive-resolution code-reviewer duty, no-ff-before-APPROVED, qa golden regen, no self-fix
+test/skill-frontmatter.test.mjs | MODEL_TIERS contract matches spec table
+test/e164-e167-content.test.mjs | AC2: every 8b STOP deletes any unpushed local tag with `git tag -d` before the Blocked write
+test/e164-e167-content.test.mjs | AC4: 8c's tag-create bullet is local/reversible and permitted after step 8a completes, including before 8b
+test/release-staging.test.mjs | E53/E163: the Escalation Routes table now carries 9 data rows — E163's two new rows placed FIRST, the E53 empty-baseline-hazard row still LAST
