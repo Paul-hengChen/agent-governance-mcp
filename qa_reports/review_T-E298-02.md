@@ -20,3 +20,7 @@ Regression: five existing finish test files 117/117 pass. Full suite (final HEAD
 - AC5 wording when pushed via a non-origin remote: AC text is satisfied as written.
 - Stale tracking ref left after an AC6 failure: AC6 specifies hint + exit 0 only.
 - Delete push runs the repo's pre-push hook: not specified; observation only.
+## 2026-10-14T11:12:29.921Z — PASS — by qa-engineer
+
+QA round 1 PASS. AC1-AC7 (incl. --base integ/wave) covered by test/e298-finish-remote-delete.test.mjs (10 tests, all pass); five existing finish test files 117/117; full suite 3052 pass / 3055 total, 0 fail, 3 skipped; build green; npm audit --audit-level=high no high; dist unchanged; no ls-remote. Reviewer notes judged non-blocking.
+

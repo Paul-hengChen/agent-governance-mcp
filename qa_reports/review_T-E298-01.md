@@ -11,3 +11,7 @@ Phase 0.5: skipped (no expected-red manifest). Phase 1.5: skipped (no Visual Bas
 
 Build: npm run build green (0 errors); npm audit --audit-level=high: no high/critical (8 low/moderate). dist/ unchanged vs base (git diff --stat 6b8a195..HEAD -- dist/ empty).
 Full suite on final HEAD, clean tree, via test-lock: 3052 pass / 3055 total, 0 fail, 3 skipped (pre-existing skips). agc check run (advisory).
+## 2026-10-14T11:12:29.921Z — PASS — by qa-engineer
+
+QA round 1 PASS. AC1-AC7 (incl. --base integ/wave) covered by test/e298-finish-remote-delete.test.mjs (10 tests, all pass); five existing finish test files 117/117; full suite 3052 pass / 3055 total, 0 fail, 3 skipped; build green; npm audit --audit-level=high no high; dist unchanged; no ls-remote. Reviewer notes judged non-blocking.
+
