@@ -1,0 +1,4 @@
+{"ts":"2026-10-14T10:31:16.167Z","feature":"e299-check-bookkeeping","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-10-14T10:43:20.979Z","feature":"e299-check-bookkeeping","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-10-14T10:45:42.773Z","feature":"e299-check-bookkeeping","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-10-14T10:48:40.399Z","feature":"e299-check-bookkeeping","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"fable"}
