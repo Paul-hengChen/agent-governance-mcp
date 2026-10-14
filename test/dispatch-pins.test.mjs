@@ -321,7 +321,7 @@ dispatch_pins:
   );
   const state = parseHandoff(ws);
   assert.deepEqual(state.dispatch_pins, { architect: "opus" },
-    "empty-string value must be dropped (min-length defensive mirror of the zod bound)");
+    "empty-string value must still be dropped on read (non-empty is a parse-side invariant, independent of the E300 enum)");
 });
 
 test("P3: parseHandoff drops an oversize (>100 char) dispatch_pins value", () => {
@@ -654,6 +654,27 @@ sqliteDescribe("S1: SQLite storage ignores dispatch_pins", () => {
 // ============================================================================
 
 const UPDATE_STATE_ENTRY = TOOL_REGISTRY.find((e) => e.name === "tw_update_state");
+const GET_STATE_ENTRY = TOOL_REGISTRY.find((e) => e.name === "tw_get_state");
+
+// Drives the registry entry's zod parse. run() throws SYNCHRONOUSLY on a zod
+// failure, before any handler/gate/IO, so the issues are returned; on accept
+// the handler starts against an un-read workspace (pre-flight guard blocks the
+// write) and its eventual rejection is swallowed — we only assert the parse.
+function zodIssuesFor(dispatch_pins) {
+  try {
+    const pending = UPDATE_STATE_ENTRY.run({
+      workspace_path: mkWs(),
+      active_feature: "x",
+      status: "In_Progress",
+      agent_id: "pm",
+      dispatch_pins,
+    });
+    Promise.resolve(pending).catch(() => {});
+    return null;
+  } catch (err) {
+    return err.issues ?? [err];
+  }
+}
 
 test("Z1: tw_update_state rejects an unknown dispatch_pins role key at the zod boundary", async () => {
   assert.ok(UPDATE_STATE_ENTRY, "tw_update_state must be registered in TOOL_REGISTRY");
@@ -687,8 +708,8 @@ test("Z2: tw_update_state rejects an empty-string dispatch_pins value at the zod
         dispatch_pins: { "sr-engineer": "" }, // min(1) violated
       });
     },
-    /ZodError|too_small/i,
-    "an empty-string model-tier value must be rejected by zod (min length 1)",
+    /DISPATCH_PIN_TIER_REJECTED/,
+    "an empty-string value is outside the tier enum and must be rejected by zod (E300: min(1) superseded by the enum)",
   );
 });
 
@@ -704,8 +725,8 @@ test("Z3: tw_update_state rejects a >100-char dispatch_pins value at the zod bou
         dispatch_pins: { pm: oversized }, // max(100) violated
       });
     },
-    /ZodError|too_big/i,
-    "a value over 100 chars must be rejected by zod (max length 100)",
+    /DISPATCH_PIN_TIER_REJECTED/,
+    "a value over 100 chars is outside the tier enum and must be rejected by zod (E300: max(100) superseded by the enum)",
   );
 });
 
@@ -820,4 +841,127 @@ test("Z7: tw_update_state ACCEPTS an empty dispatch_pins object ({} clears, per 
 // stamp-only, seeds nothing).
 test("sanity: CURRENT_VERSIONS.handoff is 15 (e123a-lane-layout-migration)", () => {
   assert.equal(CURRENT_VERSIONS.handoff, 15);
+});
+
+// ============================================================================
+// E300: dispatch_pins value enum (opus | sonnet | haiku | fable) at the boundary
+// ============================================================================
+
+test("E300-Z8: every one of the four tiers is accepted at the zod boundary, for every role key (positive control)", () => {
+  for (const tier of ["opus", "sonnet", "haiku", "fable"]) {
+    const pins = Object.fromEntries(
+      ["pm", "architect", "researcher", "design-auditor", "sr-engineer", "qa-engineer", "code-reviewer", "release-engineer"]
+        .map((r) => [r, tier]),
+    );
+    assert.equal(zodIssuesFor(pins), null, `tier ${tier} must be accepted for all 8 roles`);
+  }
+});
+
+test("E300-Z9: an out-of-enum value (dated model id) is rejected; issue path names the role, message names value + code", () => {
+  const bad = "claude-opus-4-1-20250805";
+  const issues = zodIssuesFor({ "sr-engineer": bad });
+  assert.ok(issues, "a fully-qualified dated model id is not a tier and must be rejected");
+  assert.equal(issues.length, 1);
+  assert.deepEqual(issues[0].path, ["dispatch_pins", "sr-engineer"]);
+  assert.match(issues[0].message, /^DISPATCH_PIN_TIER_REJECTED:/);
+  assert.ok(issues[0].message.includes(bad), "the message must echo the offending value");
+  assert.match(issues[0].message, /opus, sonnet, haiku, fable/, "the message must list the allowed tiers");
+});
+
+test("E300-Z10: several bad pins yield one issue per offending role; good siblings are not flagged", () => {
+  const issues = zodIssuesFor({ pm: "gpt-4", architect: "opus", "qa-engineer": "Sonnet" });
+  assert.ok(issues);
+  assert.deepEqual(issues.map((i) => i.path.join(".")).sort(), ["dispatch_pins.pm", "dispatch_pins.qa-engineer"]);
+  for (const i of issues) assert.match(i.message, /^DISPATCH_PIN_TIER_REJECTED:/);
+});
+
+test("E300-Z11: the enum is case-sensitive and exact (no trimming/aliasing) — 'Opus' and ' opus' are rejected", () => {
+  assert.ok(zodIssuesFor({ pm: "Opus" }));
+  assert.ok(zodIssuesFor({ pm: " opus" }));
+});
+
+test("E300-Z12: an unknown role key is still rejected by .strict() even when its value is a valid tier", () => {
+  const issues = zodIssuesFor({ reviewer: "fable" });
+  assert.ok(issues);
+  assert.equal(issues[0].code, "unrecognized_keys");
+});
+
+test("E300-P6: parseHandoff KEEPS an out-of-enum on-disk value (tolerant read; boundary rejects, reader does not)", () => {
+  const ws = mkWs();
+  resetSession();
+  writeRaw(
+    ws,
+    `---
+schema_version: 15
+active_feature: "legacy-pins"
+status: "In_Progress"
+last_updated: "2026-07-01T00:00:00.000Z"
+last_agent: "pm"
+qa_round: 0
+review_round: 0
+visual_round: 0
+dispatch_pins:
+  sr-engineer: "claude-opus-4-1-20250805"
+  pm: "fable"
+---
+## ✅ Completed
+- 無
+
+## ⚠️ Pending & Handoff Notes
+- 無
+`,
+  );
+  const state = parseHandoff(ws);
+  assert.deepEqual(state.dispatch_pins, { "sr-engineer": "claude-opus-4-1-20250805", pm: "fable" },
+    "out-of-enum values carry forward unchanged so a pre-enum pin is never silently destroyed");
+});
+
+async function seedPins(ws, dispatchPins) {
+  resetSession();
+  markStateRead(ws);
+  await writeHandoffState({
+    workspacePath: ws,
+    activeFeature: "pin-read-feat",
+    status: "In_Progress",
+    completedTasks: [],
+    pendingNotes: [],
+    lastAgent: "coordinator",
+    dispatchPins,
+  });
+  resetSession();
+}
+
+test("E300-R1: tw_get_state surfaces dispatch_pins_advisory for an out-of-enum pin; dispatch_pins stays raw", async () => {
+  assert.ok(GET_STATE_ENTRY, "tw_get_state must be registered");
+  const ws = mkWs();
+  await seedPins(ws, { "sr-engineer": "claude-opus-4-1-20250805", pm: "fable" });
+  const out = await GET_STATE_ENTRY.run({ workspace_path: ws });
+  const body = JSON.parse(out.content[0].text);
+  assert.deepEqual(body.dispatch_pins, { "sr-engineer": "claude-opus-4-1-20250805", pm: "fable" }, "dispatch_pins is not rewritten");
+  assert.ok(body.dispatch_pins_advisory, "advisory must be present");
+  assert.deepEqual(body.dispatch_pins_advisory.pins, { "sr-engineer": "claude-opus-4-1-20250805" }, "only the offending pins are listed");
+  assert.deepEqual(body.dispatch_pins_advisory.allowed, ["opus", "sonnet", "haiku", "fable"]);
+  assert.match(body.dispatch_pins_advisory.hint, /DISPATCH_PIN_TIER_REJECTED/);
+});
+
+test("E300-R2: tw_get_state with only in-enum pins emits NO advisory and text identical to the storage read", async () => {
+  const ws = mkWs();
+  await seedPins(ws, { "sr-engineer": "fable", pm: "opus" });
+  const { getActiveStorage } = await import("../dist/tools/storage.js");
+  const expected = getActiveStorage().readState(ws);
+  resetSession();
+  const out = await GET_STATE_ENTRY.run({ workspace_path: ws });
+  assert.ok(!("dispatch_pins_advisory" in JSON.parse(out.content[0].text)));
+  assert.ok(out.content[0].text === expected, "clean pins: byte-identical to storage text");
+});
+
+test("E300-R3: tw_get_state with no pins emits NO advisory and text identical to the storage read", async () => {
+  const ws = mkWs();
+  await seedPins(ws, undefined);
+  const { getActiveStorage } = await import("../dist/tools/storage.js");
+  const expected = getActiveStorage().readState(ws);
+  resetSession();
+  const out = await GET_STATE_ENTRY.run({ workspace_path: ws });
+  assert.ok(!("dispatch_pins_advisory" in JSON.parse(out.content[0].text)));
+  assert.ok(out.content[0].text === expected, "no pins: byte-identical to storage text");
 });

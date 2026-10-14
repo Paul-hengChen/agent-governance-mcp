@@ -1,0 +1,27 @@
+# E300 T-E300-01..03 (sr-engineer handoff): reds left for the qa-owned T-E300-04
+# re-baseline. All are count/shape pins on the pre-E300 rule, not regressions:
+# GATE_REGISTRY grew 33 -> 34 (DISPATCH_PIN_TIER_REJECTED, producer
+# "tool-boundary", documentedInProse: false, mapping-comment row "(none)"), and
+# the new code fires in zod before UPDATE_STATE_GATE_PIPELINE so no step lists it.
+
+# dispatch-pins: the empty / >100-char values ARE still rejected at the zod
+# boundary (ZodError, path dispatch_pins.<role>, DISPATCH_PIN_TIER_REJECTED);
+# the regexes /ZodError|too_small/ and /too_big/ pin the superseded min/max codes.
+test/dispatch-pins.test.mjs | Z2: tw_update_state rejects an empty-string dispatch_pins value at the zod boundary
+test/dispatch-pins.test.mjs | Z3: tw_update_state rejects a >100-char dispatch_pins value at the zod boundary
+
+# gate-stats: 33-code coverage pins.
+test/e26-gate-stats.test.mjs | R1: with zero telemetry, EVERY GATE_REGISTRY code lands in zero_fire, fired is empty, count is 33
+test/e26-gate-stats.test.mjs | R2: fired.length + zero_fire.length === 33 always, and the two sets are disjoint (no code counted twice)
+test/e26-gate-stats.test.mjs | U1: an error_code absent from today's GATE_REGISTRY lands in `unregistered`, never in fired/zero_fire, and never breaks 33/33 coverage
+test/e26-gate-stats.test.mjs | D1: both sidecars absent -> never throws, full 33-code zero_fire coverage, zero counts, honest exists:false + caveats naming both paths
+test/e26-gate-stats.test.mjs | D2: only metrics.jsonl present (telemetry absent) -> telemetry side degrades independently, metrics side still fully populated
+test/e26-gate-stats.test.mjs | T3b: handleGateStats never throws even against a workspace with no .current directory at all
+
+# pipeline parity: the tool-boundary producer has no pipeline step by design.
+test/e35-pipeline-order.test.mjs | t-codes-registry-parity: the union of every step's codes[] equals ALL_GATE_CODES (registry is single source of truth)
+
+# error-code contract: entry count, mapping-comment "(none)" marker, free-text allowlist.
+test/error-code-contract.test.mjs | AC-1/AC-5: GATE_REGISTRY has exactly 33 entries (32 in, 33 out — e40-nonqa-completed-tasks-write-gate added NON_QA_COMPLETED_TASKS_REJECTED)
+test/error-code-contract.test.mjs | doc-file mapping (c12): gates/registry.ts's errorCode→doc-file mapping comment matches the actual backtick-quote sites
+test/error-code-contract.test.mjs | AC3 (c12): every (errorCode, field) pair for triggerEdge/armCondition is either mechanically checked above or explicitly allowlisted as free-text — no silent exemptions

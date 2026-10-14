@@ -106,7 +106,12 @@ test("t-order-exact: TRANSITION_VALIDATION.codes is the registry-exported TRANSI
   );
 });
 
-test("t-codes-registry-parity: the union of every step's codes[] equals ALL_GATE_CODES (registry is single source of truth)", () => {
+test("t-codes-registry-parity: the union of every step's codes[] equals ALL_GATE_CODES minus tool-boundary codes (registry is single source of truth)", async () => {
+  const { GATE_REGISTRY } = await import("../dist/gates/registry.js");
+  // E300: a "tool-boundary" producer is a zod rejection raised in tools/registry.ts BEFORE the
+  // pipeline runs, so by design it has no pipeline step. Every other producer must have one.
+  const toolBoundary = GATE_REGISTRY.filter((g) => g.producer === "tool-boundary").map((g) => g.errorCode);
+  const expectedCodes = ALL_GATE_CODES.filter((c) => !toolBoundary.includes(c));
   const flattened = UPDATE_STATE_GATE_PIPELINE.flatMap((s) => s.codes);
 
   // No duplicate codes across steps — each error code belongs to exactly
@@ -119,15 +124,26 @@ test("t-codes-registry-parity: the union of every step's codes[] equals ALL_GATE
   );
 
   const flattenedSorted = [...flattened].sort();
-  const registrySorted = [...ALL_GATE_CODES].sort();
+  const registrySorted = [...expectedCodes].sort();
   assert.deepEqual(
     flattenedSorted,
     registrySorted,
-    "pipeline steps' codes, flattened, must equal ALL_GATE_CODES exactly " +
+    "pipeline steps' codes, flattened, must equal ALL_GATE_CODES minus tool-boundary codes exactly " +
       "(no gate-registry code missing from the pipeline, and no pipeline " +
       "code absent from the registry) — a mismatch means a gate was added " +
       "to one side without the other, or a code was silently dropped."
   );
+});
+
+test("E300: DISPATCH_PIN_TIER_REJECTED is the only tool-boundary code today and appears in no pipeline step", async () => {
+  const { GATE_REGISTRY } = await import("../dist/gates/registry.js");
+  assert.deepEqual(
+    GATE_REGISTRY.filter((g) => g.producer === "tool-boundary").map((g) => g.errorCode),
+    ["DISPATCH_PIN_TIER_REJECTED"],
+  );
+  const flattened = UPDATE_STATE_GATE_PIPELINE.flatMap((s) => s.codes);
+  assert.ok(!flattened.includes("DISPATCH_PIN_TIER_REJECTED"),
+    "it fires in zod before the pipeline; listing it in a step would claim a pipeline emission that never happens");
 });
 
 test("t-codes-registry-parity: every step's codes are non-empty and every code round-trips through gate()", async () => {

@@ -249,12 +249,22 @@ function parseEnumField(raw, allowed) {
 // v8 — bound mirrored from the zod boundary (tools/registry.ts, spec AC-2);
 // parse-time we only need it to drop grossly malformed hand-edited values.
 const DISPATCH_PIN_VALUE_MAX = 100;
+// E300 — the closed model-tier vocabulary for dispatch_pins values. The tool
+// boundary (tools/registry.ts) rejects any other value with
+// DISPATCH_PIN_TIER_REJECTED; tw_get_state surfaces an on-disk value outside
+// it as an advisory. Deliberately a literal rather than an import of
+// MODEL_TIERS (tools/skill-frontmatter.ts): unifying the two sources is a
+// separate wiring ticket.
+export const DISPATCH_PIN_TIER_VALUES = ["opus", "sonnet", "haiku", "fable"];
 // v8 — defensive parser for the dispatch_pins frontmatter map
 // (c14-dispatch-pins). Returns undefined when raw is not a non-array object
 // with at least one well-formed entry; unknown role keys and empty /
 // non-string / oversize values are dropped (matching parseExternalRefs'
 // defensive posture); never throws. An all-malformed / empty result collapses
 // to undefined so absence stays the single "no pins recorded" sentinel.
+// A value outside DISPATCH_PIN_TIER_VALUES is KEPT (E300): the read side is
+// tolerant so a pre-enum or hand-written pin still carries forward and
+// round-trips; only the tool boundary rejects it, and tw_get_state reports it.
 function parseDispatchPins(raw) {
     if (!raw || typeof raw !== "object" || Array.isArray(raw))
         return undefined;

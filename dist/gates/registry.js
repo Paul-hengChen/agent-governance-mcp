@@ -39,9 +39,13 @@
 //   NON_QA_COMPLETED_TASKS_REJECTED  const-08-chain-31-mid.md
 //   QA_REVIEW_TARGET_REQUIRED       skill-qa-engineer.md
 //   AC_EXECUTION_LOG_MISSING        skill-qa-engineer.md
-// The 33-gate catalog, in documentation order (the non-qa completed_tasks write gate, E40,
+//   DISPATCH_PIN_TIER_REJECTED      (none)
+// The 34-gate catalog, in documentation order (the non-qa completed_tasks write gate, E40,
 // added the 33rd, NON_QA_COMPLETED_TASKS_REJECTED — the reviewer-only completed_tasks gate
-// generalized to every non-qa identity). Array order is DOC order only — it MUST NOT be relied
+// generalized to every non-qa identity; the dispatch_pins tier enum, E300, added the 34th,
+// DISPATCH_PIN_TIER_REJECTED — the first tool-boundary producer, raised by zod before the
+// pipeline and the first documentedInProse: false entry; its "(none)" mapping row above means
+// no content/*.md quotes it yet). Array order is DOC order only — it MUST NOT be relied
 // on for evaluation order (DR-5; that lives in handoff-orchestrator.ts as the ordered
 // UPDATE_STATE_GATE_PIPELINE array, E35).
 export const GATE_REGISTRY = [
@@ -499,6 +503,24 @@ export const GATE_REGISTRY = [
             "truthfulness stays with qa-engineer / code-reviewer. " +
             "See specs/e3-outcome-shaped-acceptance.md AC3/AC4.",
         documentedInProse: true,
+    },
+    // ---- tool-boundary (code 34, producer: zod at tools/registry.ts) ----
+    {
+        // dispatch_pins tier enum (E300): each value must be one of the four tier
+        // names. Rejected by zod before UPDATE_STATE_GATE_PIPELINE, so it has no
+        // pipeline step; file and SQLite mode alike. The zod issue path carries
+        // the role, which index.ts formatZodError prefixes as "dispatch_pins.<role>: ".
+        // An on-disk value outside the enum is surfaced by tw_get_state as
+        // dispatch_pins_advisory, never rejected on read.
+        errorCode: "DISPATCH_PIN_TIER_REJECTED",
+        producer: "tool-boundary",
+        envelope: "plain-text",
+        triggerEdge: "any tw_update_state write whose dispatch_pins carries a value outside the four tier names (any agent, any status; rejected before the pipeline, file and SQLite mode alike)",
+        armCondition: "zod z.enum on each dispatch_pins value (tools/registry.ts UpdateStateArgs); runs before UPDATE_STATE_GATE_PIPELINE",
+        clearingArtifact: "dispatch_pins.<role> set to one of opus, sonnet, haiku, fable",
+        // tools/registry.ts DISPATCH_PIN_TIER_HINT — byte-exact; the received value precedes it.
+        hintStatic: "is not a model tier; allowed: opus, sonnet, haiku, fable",
+        documentedInProse: false,
     },
 ];
 // Precomputed O(1) lookup table. Built once at module load.
