@@ -1,9 +1,10 @@
 ---
 schema_version: 15
 active_feature: "e297-main-protected-sop"
-status: "In_Progress"
-last_updated: "2026-10-14T11:10:34.495Z"
-last_agent: "sr-engineer"
+status: "FAIL"
+last_updated: "2026-10-14T11:18:11.269Z"
+blocking_reason: "Integrator Stage 6 step 4 stale-PR remedy: (F1) `git merge --no-ff main` merges a stale local main (nothing pulls main after 5b-1); (F2) with auto-merge armed, the push can land a substantive conflict resolution before the 5b-5 code-reviewer verdict. Both fixes fit in one sentence of content/skill-integrator.md."
+last_agent: "code-reviewer"
 prd_path: "docs/backlog.md"
 scope_decision: "single-feature"
 scope_decision_why: "One SOP rewrite (integrator Stage 6, release-engineer 8a-8c/13a-13b, Constitution section 6 grant, coord-03 bookkeeping paragraph) plus the one enabling code change (MODEL_TIERS gains fable); splitting would leave the grant and the SOPs inconsistent across pull requests. Spec specs/e297-main-protected-sop.md; tasks T-E297-01..06."
@@ -11,16 +12,17 @@ cut_approved: true
 dispatch_pins:
   sr-engineer: "fable"
 evidence_schema: 2
-next_role: "code-reviewer"
-dispatched_at: "2026-10-14T11:10:34.495Z"
+next_role: "sr-engineer"
+dispatched_at: "2026-10-14T11:18:11.269Z"
+review_verdict: "CHANGES_REQUESTED"
 dispatch_mechanism: "task"
-dispatch_mechanism_tier: "fable"
+dispatch_mechanism_tier: "opus"
 qa_round: 0
-review_round: 0
+review_round: 1
 visual_round: 0
-hop_count: 2
+hop_count: 3
 qa_rounds_total: 0
-review_rounds_total: 0
+review_rounds_total: 1
 visual_rounds_total: 0
 ---
 # Handoff State
@@ -29,18 +31,16 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- sr-engineer: T-E297-01..04 ready for code review (lane branch feat/e297-main-protected-sop; option A grant per the human's cut approval; single PR path; git merge --ff-only kept in the grant)
-- T-E297-01 (4ada51f): tools/skill-frontmatter.ts MODEL_TIERS = [opus, sonnet, haiku, fable]; rebuilt dist/tools/skill-frontmatter.{js,d.ts,js.map,d.ts.map} committed, no other dist churn; AC9 proof prints ["opus","sonnet","haiku","fable"] fable; npm audit --audit-level=high after build: 0 high/critical (8 low/moderate, none new vs docs/dependency-advisories.md)
-- T-E297-02 (cfadf43): content/skill-integrator.md +3202 chars. Frontmatter fable + Invocation sentence (advice to the human, opus fallback). Stage 6 rewritten per AC1: finish --shipped --base integ/<feature> per lane on integ, full suite, push -u, gh pr create, gh pr merge --auto --merge, wait via gh pr view <n> --json state,mergeCommit or git fetch; red = stop; BEHIND = merge --no-ff main into integ + merge-invariants + suite + push; switch main / pull --ff-only; branch -d; report merge sha + PR number. AC10 sentence (a red sha cannot reach `main`). Work overview row 6, Permissions, Lifecycle 6, 5b-1, 5b-5, 5c heading + 5c-1, Git operations, own-commits rewritten; mailbox sentences verbatim; AC2 grep prints nothing; label count 1
-- T-E297-03 (f68ba17): content/skill-release-engineer.md +3976 chars. No-force-pushes rule gains never-push-main + pull --ff-only; 3a pulls main ff-only; new 3b git switch -c release/vX.Y.Z; 8a commits on the release branch, git push -u origin release/vX.Y.Z, gh pr create (base main); 8b strict ci-check against the PR head, local-tag clauses dropped, budget-sequencing sentences verbatim; 8c = gh pr merge <n> --auto --merge after CI-CHECK PASSED, wait MERGED, switch main, pull --ff-only, assert HEAD == mergeCommit.oid, tag, push tag, branch -d; 9a on main; 13a via a release/vX.Y.Z-bookkeeping PR (staging script verbatim); 13b remedies rewritten; new Escalation Routes row 'pull request cannot merge' after the D10 row (D10 row byte-identical); Output rule wording. scripts/verify-release.mjs untouched (AC6 diff --quiet exits 0)
-- T-E297-04 (3b01c84): content/const-15-core-tail.md +585 chars (7376 -> 7963 bytes): new base-list sub-bullet for git pull --ff-only on main (read-plus-ff; a protected branch moves only by PR merge); grant sub-bullet keeps every op, adds gh pr create + gh pr merge --auto --merge (never --squash/--rebase/--admin) and the two namespaces (release-engineer release/*, coordinator docs/*: switch -c / switch main / branch -d own merged branches only + the two gh pr ops); pinned first sentence + FORBIDDEN list byte-identical; constitution-rationale.md untouched. content/coord-03-core-fallback.md +585 chars (20788 -> 21378 bytes): one paragraph 'Bookkeeping never lands on local main' between the lane-findings paragraph and Bounds; e5-intake-tiering pins green
-- Full suite on e1eb3c0 (clean tree, test-lock): 3017/3045 pass, 24 fail, 3 skipped. Expected reds (22) are listed in qa_reports/expected-red_e297-main-protected-sop.txt: compose-equivalence x11 + skill-manifest golden (regenerate goldens); context-budget x4 measured 5713 / 10222 / 20745 / 8125 ~tok vs pins 5567 / 10076 / 20453 / 7978; e178a AC1/AC6/AC9; skill-frontmatter MODEL_TIERS; e164-e167 AC2/AC4; release-staging row count 9 -> 10. Two further reds were load timeouts in test/e177b-test-lock.test.mjs (AC13a 'test timed out after 20000ms', AC13b 'waitFor: timed out'); that file passes 19/19 standalone and this lane touches no lock code; qa please rerun under test-lock on final HEAD
-- qa re-pin (1/3) test/e178a-integrator-role.test.mjs: :77 -> /^---\nrecommended_model: fable\n---\n/ and :78 MODEL_TIERS.includes('fable'); :309 -> '**never open the pull request before that verdict is APPROVED.**'; :264 grant clause -> first sentence of the rewritten sub-bullet: '**Integrator-only grant**: only the `integrator` role may also run `git merge --no-ff`, `git merge --ff-only`, `git switch -c`, `git switch <existing-branch>` (never `--force` / `--discard-changes`), `git worktree remove` (never `--force`), `git branch -d` (never `-D`), `git update-ref -d <ref> <expected-sha>` (compare-and-delete), `gh pr create` and `gh pr merge --auto --merge` (never `--squash` / `--rebase` / `--admin`), when `skill-integrator` says.' (the namespaces sentence follows it; 'every other role stays on the base list' closes that second sentence)
-- qa re-pin (2/3): test/skill-frontmatter.test.mjs:88 -> ["opus","sonnet","haiku","fable"]. test/e164-e167-content.test.mjs AC2: the 8b clauses 'delete any local tag created ahead of this gate', 'deleting any unpushed local tag first, as above' and 'This never touches a published tag' no longer exist (8b now says no tag exists before the merge); AC4: the 8c tag-create bullet is now '`git tag -a vX.Y.Z -m "vX.Y.Z — <one-line summary>"` on that HEAD — local and reversible (undo with `git tag -d vX.Y.Z`) until the next bullet.' ('any time after step 8a completes' / 'including before 8b' / '(see 8b).' retired); the tag-push bullet still carries 'the one irreversible act' and ends with 8b's `CI-CHECK PASSED`.
-- qa re-pin (3/3): test/release-staging.test.mjs:1249 Escalation Routes data rows 9 -> 10; the new row 'pull request cannot merge (step 8c or 13a: ...)' sits right after the D10 row and before the gh-CLI row, so first-two / last-row order assertions hold. Goldens: every changed hunk should be the const-15 section 6 sub-bullets or the coord-03 paragraph.
-- reviewer attention: (1) Stage 6 step 3 says 'then, on that pull request, `gh pr merge --auto --merge`' (literal per AC1's pattern, no <n>); the release SOP uses `gh pr merge <n> --auto --merge` per AC3; (2) Stage 6 step 4 adds `gh pr view <n> --json mergeStateStatus` for the BEHIND check (additive); (3) release 3b adds an inline STOP when release/vX.Y.Z already exists (authored-here, no new Escalation Routes row); (4) 13a's lead-in states why a second PR is needed (the closing write names the main merge commit), per the spec ruling; (5) section 6 grant is two sentences (grant list, then namespaces) for readability
-- coordinator: cut approved by the human in this lane session (2026-10-14) after integrator pre-review close (to-lane#3); human rulings — (a) option A: section 6 gains two namespaces beside the integrator, release-engineer limited to release/*, coordinator limited to docs/*, each sharing git switch -c / git switch main / git branch -d + gh pr create / gh pr merge --auto --merge (never --squash/--rebase/--admin); (b) four budget ceilings may rise, qa sets exact measured values; (c) single PR path, no non-PR fallback; (d) git merge --ff-only stays in the grant
-- pm: spec specs/e297-main-protected-sop.md (commit c0377d8) governs; tasks T-E297-01..04 sr-engineer, T-E297-05 code-reviewer, T-E297-06 qa-engineer; external_refs: none; lane findings in .current/e297/pending-tickets.md (E297-NEW-1..3)
+- review_report: review_reports/review_T-E297-05.md (commit ac52513; covers T-E297-01..05)
+- code-reviewer: CHANGES_REQUESTED round 1. AC1-AC10 implemented, all proofs pass; scope clean; const-15 +585 / coord-03 +585 within budget; pinned sentence + FORBIDDEN list byte-identical; verify-release.mjs zero diff; only skill-frontmatter dist churn
+- F1 required (content/skill-integrator.md:164): before `git merge --no-ff main` bring local main up to date -- `git switch main`, `git pull --ff-only`, `git switch integ/<feature>` -- (or `git fetch` + `git merge --no-ff origin/main`); as written the merge is 'Already up to date' and the PR stays BEHIND
+- F2 required (content/skill-integrator.md:164 vs 5b-5 at :144): auto-merge is armed at step 3, so the push IS the merge trigger; add: when the resolution is substantive, push only after the 5b-5 verdict is APPROVED and its evidence file is committed (CHANGES_REQUESTED -> stop and report)
+- R1 recommended (content/skill-release-engineer.md:56 3b + :287 row): same-version re-baseline collides with 3b's branch-exists STOP; add a clause that the coordinator/human closes the stale PR and removes release/vX.Y.Z before re-entry at 3a
+- optional: O1 Stage 6 step 1 'all as commits inside the pull request' -- worktree/branch teardown are not commits; O2 const-15 'on release/*' could read 'limited to release/*' (not a widening as is); O3 cross-lane: if E298 adds pull_request path filters, .current/-only or docs/* PRs would stall on required checks
+- self-flagged items judged: (1) integrator `gh pr merge --auto --merge` without <n> OK (branch-inferred; both literals forced by AC proofs); (2) mergeStateStatus probe OK and necessary; (3) 3b inline STOP acceptable (see R1); (4) two-sentence grant OK -- e178a:264 re-pins sentence 1 ending 'when `skill-integrator` says.', plus a new assertion for sentence 2 ending 'when the owning SOP says; every other role stays on the base list.'
+- expected-red manifest qa_reports/expected-red_e297-main-protected-sop.txt: in bounds in substance (reviewer SOP 4a carve-out, feature-keyed lowercase name; misses owned glob *E297* by case only); keep until T-E297-06 greens the reds, then qa may fold it into its report and drop it
+- for qa (carry forward): re-pin list = e178a :77/:78 fable, :309 'never open the pull request before that verdict is APPROVED.', :264 grant sentence 1 (+ sentence 2 assertion); skill-frontmatter :88 tiers; e164-e167 AC2/AC4 (8b tag clauses retired, 8c tag bullet 'on that HEAD -- local and reversible ... until the next bullet.'); release-staging :1249 rows 9->10 (order asserts hold); goldens: compose-equivalence x11 + skill-manifest; ceilings measured by sr 5713/10222/20745/8125 (qa re-measures after the F1/F2 fix -- integrator SOP is in no ceiling); re-check two non-expected test/e177b-test-lock.test.mjs timeouts (AC13a/AC13b) under test-lock on final HEAD
+- sr-engineer: carry the qa notes above forward on your re-handoff; after fixing F1/F2 re-run the AC1/AC2/AC10 greps and test/e246-mailbox-teardown.test.mjs
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.
