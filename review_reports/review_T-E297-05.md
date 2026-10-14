@@ -63,3 +63,32 @@ No findings. The one code change extends a four-element constant array; `isModel
 
 ## Verdict
 CHANGES_REQUESTED — AC1–AC10 are implemented and their proofs pass, but Stage 6 step 4's stale pull request remedy fails as written in two ways. It merges a stale local `main` (F1). With auto-merge armed, its push can land a substantive conflict resolution before the 5b-5 code-reviewer verdict (F2). Both fixes fit in one sentence of `content/skill-integrator.md`. R1, O1–O3 do not block.
+
+## Round 2 — APPROVED — by code-reviewer
+
+Diff reviewed: `8a2f7f0..3a38af6` (fix commit `3a38af6`; `a634449` is the handoff). Only three content files change: `content/skill-integrator.md`, `content/skill-release-engineer.md`, `content/const-15-core-tail.md`. `tools/`, `dist/`, `test/` and `content/coord-03-core-fallback.md` have zero diff this round.
+
+### Round 1 findings
+- **F1 — resolved.** `content/skill-integrator.md:164`: the BEHIND remedy now first brings local `main` up to date (`git switch main`, `git pull --ff-only`, `git switch integ/<feature>`, or `git fetch` and merge `origin/main`), then runs `git merge --no-ff main`. Every operation is in the integrator grant or the base list. The remedy no longer merges a stale ref, and it is consistent with 5b-1's statement that a local `main` behind `origin/main` is normal.
+- **F2 — resolved.** Same sentence: "because auto-merge is already armed, the push IS the merge trigger: when the resolution is substantive, push only after the 5b-5 code-reviewer verdict is APPROVED and its evidence file is committed on the integration branch; CHANGES_REQUESTED → stop and report." That is consistent with 5b-5 (:144): the review runs on the local merge commit, the evidence file is committed on the integration branch, and CHANGES_REQUESTED stops. A non-substantive resolution still pushes right after merge-invariants and the suite, as amendment 1 rules.
+- **R1 — resolved.** Release 3b (:56) now says a same-version re-baseline lands on the same name, the coordinator/human closes the stale pull request and removes `release/vX.Y.Z` before re-entry, and release-engineer never deletes it itself. The new Escalation Routes row's note (:287) names the same recovery. The D10 row is byte-identical to base.
+- **O1 — resolved.** Step 1 (:161) now reads "tears down the worktree and branch; its allocation and history-move commits ride the pull request".
+- **O2 — resolved.** `content/const-15-core-tail.md:15` now reads "limited to `release/*`" and "limited to `docs/*`", the human's ruling wording. Section 6 growth vs base is +601 chars (budget 800). The pinned first sentence count is `1`, and the bullet carrying it and the FORBIDDEN list (line 12) is byte-identical to base. `content/constitution-rationale.md` and `scripts/verify-release.mjs` still have zero diff vs `main`.
+- **O3 — closed.** Relayed to the integrator by mailbox, who ruled it not applicable this wave (E298's workflow change adds push branches only, no path filter).
+
+### Proofs re-run on HEAD `a634449`
+- AC1: all six patterns hit inside `## Stage 6` (:157–:169) at :161, :163, :164, :165, :166.
+- AC2: the grep prints nothing (exit 1); the label count is `1`.
+- AC3: each of the four patterns hits; `any time after step 8a completes` count 0.
+- AC7: hits on the section 6 sub-bullets (:14, :15); pinned-sentence count `1`; the rationale file is unchanged.
+- AC10: one hit at :164.
+- `test/e246-mailbox-teardown.test.mjs`, `test/e5-intake-tiering.test.mjs` and `test/release-staging.test.mjs` together: 125 pass, 1 fail. The fail is the known 9 → 10 Escalation Routes row-count pin from the expected-red manifest.
+
+### New observation (non-blocking)
+- **O4 — optional — `content/skill-release-engineer.md:287`.** The row covers step 8c and step 13a, but its note's recovery ("removes release/vX.Y.Z, then re-baseline at step 3a") fits only 8c. At 13a the release is already tagged and published, so the recovery is to bring the `release/vX.Y.Z-bookkeeping` pull request up to date, not to re-baseline. The row routes to the human, who decides either way, so this does not block. It was already present in round 1's row and is noted here for completeness. A later edit could add "(at 13a: update or re-open the bookkeeping pull request)".
+
+### For qa (delta from round 1)
+`test/e178a-integrator-role.test.mjs:264`: re-pin grant sentence 1 unchanged from the round 1 note. The sentence 2 assertion must use the round 2 wording: "Two namespaces sit beside it: `release-engineer` limited to `release/*` and the coordinator limited to `docs/*` each share `git switch -c`, `git switch main`, `git branch -d` (its own merged branches only), `gh pr create` and `gh pr merge --auto --merge`, when the owning SOP says; every other role stays on the base list." Section 6 grew by 16 chars over round 1, so the four ceilings must be re-measured on the final HEAD, not taken from the sr-engineer's round 1 figures.
+
+### Verdict
+APPROVED — F1 and F2 are fixed in a way that is consistent with 5b-1, 5b-4 and 5b-5. R1, O1 and O2 are fixed, the pinned section 6 text and the D10 row are byte-identical, the growth budgets hold, and every AC1–AC10 proof passes. O4 is optional.
