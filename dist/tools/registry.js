@@ -70,9 +70,17 @@ function trailingTagFragmentMessage(field) {
     return `Field "${field}" appears to end with leftover tool-call markup (a trailing tag fragment) — this usually means a malformed multi-argument call bled into this field. Re-issue the call with each argument in its own tag.`;
 }
 // E300 — fixed sentence of the dispatch_pins rejection; the value is the
-// dynamic part. Copied byte-for-byte into gates/registry.ts hintStatic.
-const DISPATCH_PIN_TIER_HINT = "is not a model tier; allowed: opus, sonnet, haiku, fable";
+// dynamic part. Built from the tier list (E308); it must render byte-for-byte
+// as gates/registry.ts hintStatic, which stays a literal because that module
+// is an import-free leaf.
+const DISPATCH_PIN_TIER_HINT = `is not a model tier; allowed: ${DISPATCH_PIN_TIER_VALUES.join(", ")}`;
 const DISPATCH_PIN_TIER_ECHO_MAX = 100;
+// JSON Schema for one dispatch_pins value in the tw_update_state inputSchema.
+// A fresh array per call so the eight role entries never share a mutable
+// reference. (E308)
+function dispatchPinTierJsonSchema() {
+    return { type: "string", enum: [...DISPATCH_PIN_TIER_VALUES] };
+}
 // One dispatch_pins value: a closed enum whose rejection names the received
 // value (echo bounded so an oversize input cannot bloat the envelope); the
 // role is carried by the zod issue path.
@@ -161,9 +169,11 @@ const UpdateStateArgs = z
     // names in DISPATCH_PIN_TIER_VALUES; any other value is rejected here,
     // before the pipeline, with DISPATCH_PIN_TIER_REJECTED — the zod issue
     // path carries the role, so the formatted rejection reads
-    // "dispatch_pins.<role>: DISPATCH_PIN_TIER_REJECTED: ..."). Feature-scoped:
-    // REPLACES the whole map when provided, carried across same-feature
-    // writes, dropped on active_feature change. File-mode only, no gate.
+    // "dispatch_pins.<role>: DISPATCH_PIN_TIER_REJECTED: ..."). That value
+    // check runs here at the tool boundary in file and SQLite mode alike.
+    // Feature-scoped: REPLACES the whole map when provided, carried across
+    // same-feature writes, dropped on active_feature change. The map itself
+    // gates no transition and is persisted in file mode only.
     dispatch_pins: z
         .object({
         pm: dispatchPinTier,
@@ -479,17 +489,17 @@ export const TOOL_REGISTRY = [
                 dispatch_pins: {
                     type: "object",
                     properties: {
-                        pm: { type: "string", enum: ["opus", "sonnet", "haiku", "fable"] },
-                        researcher: { type: "string", enum: ["opus", "sonnet", "haiku", "fable"] },
-                        "design-auditor": { type: "string", enum: ["opus", "sonnet", "haiku", "fable"] },
-                        architect: { type: "string", enum: ["opus", "sonnet", "haiku", "fable"] },
-                        "sr-engineer": { type: "string", enum: ["opus", "sonnet", "haiku", "fable"] },
-                        "code-reviewer": { type: "string", enum: ["opus", "sonnet", "haiku", "fable"] },
-                        "qa-engineer": { type: "string", enum: ["opus", "sonnet", "haiku", "fable"] },
-                        "release-engineer": { type: "string", enum: ["opus", "sonnet", "haiku", "fable"] },
+                        pm: dispatchPinTierJsonSchema(),
+                        researcher: dispatchPinTierJsonSchema(),
+                        "design-auditor": dispatchPinTierJsonSchema(),
+                        architect: dispatchPinTierJsonSchema(),
+                        "sr-engineer": dispatchPinTierJsonSchema(),
+                        "code-reviewer": dispatchPinTierJsonSchema(),
+                        "qa-engineer": dispatchPinTierJsonSchema(),
+                        "release-engineer": dispatchPinTierJsonSchema(),
                     },
                     additionalProperties: false,
-                    description: "Human model-tier pins per role (file-mode only). Object whose keys are the 8 role names (unknown keys rejected) and whose values are one of the four tier names \"opus\", \"sonnet\", \"haiku\", \"fable\" — a tier name always resolves to the latest model of that tier; a fully-qualified or dated model id is NOT accepted. Any other value is rejected at the tool boundary (before any gate) with DISPATCH_PIN_TIER_REJECTED naming the role and the received value; an on-disk pin outside the four (written before this rule or by hand) is reported by tw_get_state as dispatch_pins_advisory, not rejected on read. Passing it REPLACES the map wholesale (not merged) — read the existing pins first and include every still-wanted entry. Feature-scoped: preserved across same-feature writes that omit it, dropped on active_feature change, NOT re-armed on PM re-entry. Advisory bookkeeping — no gate. Replaces the legacy 'dispatch_pins: <role>=<model>' pending_notes convention (handoff schema v8).",
+                    description: "Human model-tier pins per role (file-mode only). Object whose keys are the 8 role names (unknown keys rejected) and whose values are one of the four tier names \"opus\", \"sonnet\", \"haiku\", \"fable\" — a tier name always resolves to the latest model of that tier; a fully-qualified or dated model id is NOT accepted. Any other value is rejected at the tool boundary (before any gate) with DISPATCH_PIN_TIER_REJECTED naming the role and the received value; an on-disk pin outside the four (written before this rule or by hand) is reported by tw_get_state as dispatch_pins_advisory, not rejected on read. Passing it REPLACES the map wholesale (not merged) — read the existing pins first and include every still-wanted entry. Feature-scoped: preserved across same-feature writes that omit it, dropped on active_feature change, NOT re-armed on PM re-entry. The value enum is enforced at the tool boundary in file and SQLite mode alike (DISPATCH_PIN_TIER_REJECTED); the map itself gates no transition and is persisted in file mode only. Replaces the legacy 'dispatch_pins: <role>=<model>' pending_notes convention (handoff schema v8).",
                 },
                 dispatch_mode: {
                     type: "string",
