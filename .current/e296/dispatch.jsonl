@@ -15,3 +15,6 @@
 {"ts":"2026-10-15T08:42:52.625Z","feature":"e296-manifest-tier-cut-approval","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-10-15T08:54:05.068Z","feature":"e296-manifest-tier-cut-approval","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-10-15T08:59:15.848Z","feature":"e296-manifest-tier-cut-approval","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-15T09:03:09.905Z","feature":"e296-manifest-tier-cut-approval","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-15T09:09:14.995Z","feature":"e296-manifest-tier-cut-approval","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-15T09:14:35.105Z","feature":"e296-manifest-tier-cut-approval","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
