@@ -1,25 +1,22 @@
 ---
 schema_version: 15
 active_feature: "e296-manifest-tier-cut-approval"
-status: "FAIL"
-last_updated: "2026-10-15T08:54:05.065Z"
-blocking_reason: "Round 3: check --cut still fails open. C4: an unquoted touches path is dropped unless it is a bare whitespace-separated word, so a 禁止 file next to an owned token exits 0. C5: ticket rows outside the first run of '|'-led lines are ignored (GFM same-table rows, second table), so they also exit 0."
-last_agent: "code-reviewer"
+status: "In_Progress"
+last_updated: "2026-10-15T08:59:15.847Z"
+last_agent: "pm"
 scope_decision: "single-feature"
 scope_decision_why: "Lane e296 of specs/fanout-post-v4-w3.md: E296 items (1)-(8) plus E309's one skill-integrator sentence; scope is the manifest Lanes row, not widened or narrowed. Non-design (no design/ file)."
-cut_approved: true
 dispatch_pins:
   sr-engineer: "opus"
 evidence_schema: 2
 next_role: "sr-engineer"
-dispatched_at: "2026-10-15T08:54:05.065Z"
-review_verdict: "CHANGES_REQUESTED"
+dispatched_at: "2026-10-15T08:59:15.847Z"
 dispatch_mechanism: "task"
 dispatch_mechanism_tier: "opus"
 qa_round: 0
-review_round: 3
+review_round: 0
 visual_round: 0
-hop_count: 8
+hop_count: 9
 qa_rounds_total: 0
 review_rounds_total: 3
 visual_rounds_total: 0
@@ -30,11 +27,13 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- review_report: review_reports/review_T-E296-01.md
-- C4 required — tools/fanout-manifest.ts:1284 (parseCutSection unquoted loop → unquotedPaths :351/:57-58). Failing input, exit 0, 0 out of bounds: touches cell `tools/config.ts` followed by any of: tools/registry.ts:12 | 'tools/registry.ts' | *tools/registry.ts* | <code>tools/registry.ts</code> | [tools/registry.ts](x) | 「tools/registry.ts」 | tools/registry.ts。 | index.ts | tools／registry.ts. Fix: for touches only, after stripping backtick spans, any text containing / or a backslash or ／ or \.[A-Za-z0-9]+\b → CUT_TOUCHES_UNQUOTED_PATH (existing code; unquotedPaths unchanged).
-- C5 required — tools/fanout-manifest.ts:1248 (parseCutSection → firstTable :282). Failing input, exit 0: a second ticket row naming `tools/registry.ts` written with a leading space, without the leading |, as a > blockquote, after a blank line, or in a second table / under ### Extra. Fix: after firstTable, refuse (e.g. CUT_ROW_MALFORMED) when the line right after the table run is non-empty, or when any later section line has an unescaped | outside backticks.
-- Verified, no regression: C3 closed (comma, ;, space, dot segments in every bookkeeping position exit 2); validate/render/check byte-identical to a375368 on 20 manifests / 56 lanes; AC11/AC12 proofs OK; build 0 (dist clean), audit high 0; suite 3128/3110/15/3, reds exactly the known qa-owned 15. R1 (E296-NEW-2) not re-raised.
-- review_round reaches the cap with this FAIL — the next valid hop is (pm, In_Progress).
+- PM re-entry after code-review round cap (3x CHANGES_REQUESTED, one root cause: check --cut searched free Markdown for paths and failed open). Design adopted from the integrator mailbox recommendation: whitelist grammar, not hole-patching.
+- New task T-E296-06 [P1] (sr-engineer, opus pin): spec AC15 section grammar (one table only, else CUT_ROW_MALFORMED) + cell grammar (`—` or backtick spans joined by 、 / , / whitespace; leftover -> CUT_TOUCHES_UNQUOTED_PATH; non-path span -> CUT_TOUCHES_MALFORMED_PATH) + round-2 per-span whitelist kept. Touches tools/fanout-manifest.ts, dist/tools/fanout-manifest.*. Shared helpers byte-unchanged; skill-pm.md untouched (AC3(a) still accurate).
+- sr must run and report every AC15 enumerated input (C4, C5 verbatim from review_reports/review_T-E296-01.md Round 3; R1: Dockerfile, LICENSE, ., .., U+2215, full-width slash+dot; controls: own ## Cut, owned glob byte-identical to 擁有, `—`, 、/,/space-joined pairs) with exit code + code. Both AC15 proofs exit 0 on 59de2ab (the bug), must exit 2 after.
+- Spec amended: AC11 points at AC15; AC13 adds AC15 pins; new AC15; Copy/Strings row e296.cut.grammar; Dependencies re-cut note + hop math; ## Cut gains T-E296-06 and T-E296-05 depends on it (spec ## Cut is authoritative — the T-E296-05 ledger line predates T-E296-06 and still lists depends_on T-E296-01..04). Own ## Cut satisfies AC15; check --cut on it today: 6 tickets, 21 tokens, only OUT = known test/e297-main-protected-sop.test.mjs manifest-version gap.
+- pending-tickets: E296-NEW-2 narrowed to the residual fail-closed capability gap (extension-less root files cannot be named in 擁有 or touches); E296-NEW-3 added (P3, case-insensitive FS, review round 3 R2).
+- Hop budget: hop_count 8 of cap 14; pm(9) -> sr(10) -> code-reviewer(11) -> qa(12), 2 spare. If code review fails again no PM re-cut fits (pm 12 -> sr 13 -> review 14, no qa hop): lane escalates via mailbox type: escalate per lane-protocol §3; the human decides under E295 same-lane continuation rules; never a self-opened -r<n>-fix.
+- cut_approved NOT set (Task dispatch; re-entry re-armed the gate) — coordinator attests after human approval. Nothing committed.
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.
