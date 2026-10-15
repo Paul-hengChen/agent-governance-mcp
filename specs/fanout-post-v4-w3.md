@@ -79,3 +79,4 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 | 2026-10-15 | 人類 | 第 2 波結案後做第 3 波：E296 + E309 一條 content lane ∥ E308 + E303 一條程式 lane；5a／5b 改讀 CI（E298 SOP 已出貨） | 整合者 session |
 | 2026-10-15 | 整合者 | 兩條 lane 擁有集合不相交；`index.ts` 維持共同禁止（E303 的 zod parse 在 `tools/registry.ts:71`）；`gates/registry.ts` 劃給 e308 只限註解；`test/error-code-contract.test.mjs` 劃給 e308；E296 票面 `const-01` 更正為 `const-08`；`approval` 欄做成可選第 9 欄、19 份舊清單不動；E296 建議 architect hop、預審兩次；四個 budget 上限由 qa 實測、人類核准 cut 時定 | 本檔 |
 | 2026-10-15 | 人類 | 核准本清單（含六項裁定：`index.ts` 維持禁止、`gates/registry.ts` 只限註解、error-code-contract 劃給 e308、`const-01` 更正為 `const-08`、`approval` 可選第 9 欄、E296 走 architect hop），開始派工 | 整合者 session |
+| 2026-10-15 | 整合者 | 清單 PR #9（`b49b4ec`，docs-only）CI 紅：`test/e123b9-lane-flip.test.mjs` AC-MIG-3（run 38682362419，1/3128），同一測試 02:36 在 `main` `25bc84c` 也紅過一次；不在 E238／E254／E278 家族 → 依 E298 flake rule 不重跑；開 E312（可能是讀路徑遷移的真 race），在同一 docs branch 補開票 commit，以新 sha 的 CI 為準；AC-MIG-3 是否納入 flake 家族交人類裁決 | 本檔 |
