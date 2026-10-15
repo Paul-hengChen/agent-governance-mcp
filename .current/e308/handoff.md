@@ -2,22 +2,22 @@
 schema_version: 15
 active_feature: "e308-tier-enum-and-zod-telemetry"
 status: "In_Progress"
-last_updated: "2026-10-15T07:27:51.119Z"
-last_agent: "pm"
+last_updated: "2026-10-15T07:32:22.581Z"
+last_agent: "sr-engineer"
 scope_decision: "single-feature"
 scope_decision_why: "E308 + E303 edit the same dispatch_pins code path (tools/registry.ts, handoff-parse.ts, handoff-orchestrator.ts, gates/registry.ts comments); the integrator cut them as one feature with three tasks (T-E308-01 sr, T-E303-01 sr, T-E308-02 qa) per specs/fanout-post-v4-w3.md."
 cut_approved: true
 dispatch_pins:
   sr-engineer: "opus"
 evidence_schema: 2
-next_role: "sr-engineer"
-dispatched_at: "2026-10-15T07:27:51.119Z"
-dispatch_mechanism: "inline"
-dispatch_mechanism_tier: "fable"
+next_role: "code-reviewer"
+dispatched_at: "2026-10-15T07:32:22.581Z"
+dispatch_mechanism: "task"
+dispatch_mechanism_tier: "opus"
 qa_round: 0
 review_round: 0
 visual_round: 0
-hop_count: 1
+hop_count: 2
 qa_rounds_total: 0
 review_rounds_total: 0
 visual_rounds_total: 0
@@ -28,12 +28,12 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- cut-approved: human typed approval in the lane session 2026-10-15 after integrator pre-review close (mailbox to-lane#2); dispatch pin sr-engineer=opus per human ruling relayed in to-lane#3 (spec line updated, commit 0bf1cec).
-- Spec: specs/e308-tier-enum-and-zod-telemetry.md (AC1–AC13; owned/forbidden file lists in the Gate Summary). Start with T-E308-01, then T-E303-01; T-E308-02 is qa-owned.
-- T-E308-01: tools/skill-frontmatter.ts MODEL_TIERS is the single source (no tools/ imports, no cycle); DISPATCH_PIN_TIER_HINT must render byte-identical to gates/registry.ts hintStatic; advisory JSON output in handoff-orchestrator.ts must stay byte-identical (E300-R1). sr-engineer writes no test/**.
-- T-E303-01: emit point is tools/registry.ts defineTool.run (catch ZodError → emitGateTelemetry for issues whose message starts with a GATE_REGISTRY code, raw-args values, skip when workspace_path not absolute → rethrow same error). index.ts is forbidden; if it genuinely must change, STOP and escalate via the lane mailbox, do not edit. gates/registry.ts: comments only; the :107 mapping line and zero '(none)' are pinned by lane e296's test.
-- Finding for qa: test/error-code-contract.test.mjs has no named hint-vs-hintStatic byte-equality assertion today; AC3/AC13 add it.
-- Lane rules: every tw_* call uses the worktree workspace_path; git one command per call, add/commit only, no push; no absolute local paths in tracked files; full suite as `node scripts/test-lock.mjs -- npm test` on the final HEAD after commit with a clean tree.
+- sr-engineer: T-E308-01 and T-E303-01 ready for code review (no completed_tasks; qa flips them).
+- T-E308-01 commit 72c01b1 — files: tools/handoff-parse.ts (DISPATCH_PIN_TIER_VALUES = MODEL_TIERS, same reference; DispatchPinTier type deleted, it had no consumer), tools/registry.ts (DISPATCH_PIN_TIER_HINT is a template over DISPATCH_PIN_TIER_VALUES.join(', '); eight inputSchema role entries call dispatchPinTierJsonSchema() which returns a fresh {type:'string', enum:[...DISPATCH_PIN_TIER_VALUES]} per role; zod-object comment and inputSchema description reworded to the spec's gate-sentence), tools/handoff-orchestrator.ts (advisory hint tier list is a template over the constant), plus dist/tools/{handoff-parse,registry,handoff-orchestrator}.* and .current/e308/{handoff.md,dispatch.jsonl}. tools/skill-frontmatter.ts untouched (MODEL_TIERS value/shape unchanged).
+- T-E303-01 commit cd4b03b — files: tools/registry.ts (defineTool.run: try { parse } catch (err) { if (err instanceof z.ZodError) emitZodGateTelemetry(rawArgs, err); throw err; } — still throws SYNCHRONOUSLY, same instance, so existing zodIssuesFor/assert.rejects idioms and index.ts formatting are unchanged; emitZodGateTelemetry matches each issue.message with /^([A-Z][A-Z0-9_]*)(?![A-Za-z0-9_])/ against a Set built from ALL_GATE_CODES, raw-arg fields string-or-null, whole body in try/catch), gates/registry.ts (producer comment at the GateProducer type only; catalog comment left as-is since it does not overstate), dist/tools/registry.*, dist/gates/registry.{js,d.ts}.map (registry.js unchanged because tsc strips comments). tools/telemetry.ts untouched; index.ts untouched.
+- Reviewer look: (1) deliberate narrowing beyond AC8 — the emit is skipped unless workspace_path is absolute AND fs.statSync says it is an existing directory; rationale: the args failed validation, so an untrusted absolute path must not make emitGateTelemetry's mkdirSync create directories elsewhere on disk; side benefit: existing tests that pass workspace_path '/tmp/does-not-matter' with a bad tier (dispatch-pins Z2/Z3) no longer leave a sidecar in /tmp (verified absent). AC8's qa test uses an existing temp dir, so it is unaffected. (2) AC6 grep proof caveat: `grep -c 'no gate' tools/registry.ts` prints 2, not 0 — the two remaining hits are pre-existing comments on cut_approved_source ('no gate reads it') and dispatch_mechanism ('no gate reads either'), not the dispatch_pins block; the spec's claim that the only hits were in that block is inaccurate. Left untouched as out of scope; qa should scope the AC6 check to the dispatch_pins block.
+- Proofs (run on the lane): AC1 grep 0 + node check prints same; AC2 grep 0, eight enums deep-equal [...MODEL_TIERS] and are 8 distinct arrays; AC3 zod message === 'DISPATCH_PIN_TIER_REJECTED: "claude-opus-4-1" ' + hintStatic (true), hintStatic grep 1; AC4 grep 0; AC5 grep 0; AC6 DISPATCH_PIN_TIER_REJECTED count 4 (see caveat above); AC7 schema/ diff empty; AC8 ad-hoc: absolute temp ws -> one line {gate:tool-boundary, error_code:DISPATCH_PIN_TIER_REJECTED, agent_id:pm, feature:f}, agent_id omitted -> null, relative ws -> no line, unknown role key -> no line; AC9 ad-hoc: .current as a regular file -> same ZodError class, identical issues JSON and message; AC10 ad-hoc: handleGateStats moves DISPATCH_PIN_TIER_REJECTED from zero_fire to fired (fires 1); AC11 non-comment diff lines 0, mapping line 1, '(none)' 0, index.ts diff empty; AC12 GATE_REGISTRY 34, only tool-boundary producer DISPATCH_PIN_TIER_REJECTED.
+- Tests (smoke, not the full suite): dispatch-pins, skill-frontmatter, error-code-contract, telemetry, e26-gate-stats, e35-pipeline-order, e297-main-protected-sop, dispatch-mechanism, e295-hop-cap-and-sop-halves -> 153/153; qa-flow, repro-first-gate, e114, e148, agc-adapters -> 227/227. npm run build clean; npx tsc --noEmit clean; npm audit --audit-level=high exit 0 (8 pre-existing low/moderate, no package change). Full suite under test-lock is qa's T-E308-02.
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.
