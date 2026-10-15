@@ -1,5 +1,7 @@
 # Pending tickets (lane e308)
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E303-NEW-1
 title: Zod-boundary telemetry emit mis-resolves lane dir when workspace_path is <ws>/.current plus a bad dispatch_pins tier
@@ -26,5 +28,3 @@ body: |
   test/error-code-contract.test.mjs). Candidate: compose the description from MODEL_TIERS and
   add a guard for clearingArtifact.
 ```
-
-## Applied
