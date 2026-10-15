@@ -70,7 +70,7 @@ test("T-E5-02 config: present-but-empty {} object arms the tier with conservativ
   const cfg = loadConfig(ws);
   assert.deepEqual(
     cfg.cutApprovalAutoTier,
-    { maxFiles: 2, maxPriority: "P3", allowSchemaChange: false, allowDesignArmed: false },
+    { maxFiles: 2, maxPriority: "P3", allowSchemaChange: false, allowDesignArmed: false, manifest: false },
     "presence of the key (even {}) arms the tier; every omitted field must take its conservative default",
   );
 });
@@ -214,7 +214,7 @@ test("T-E5-02 config: truthy-but-not-true values ('true' string, 1, {}) for allo
 test("T-E5-02 config: CUT_APPROVAL_AUTO_TIER_DEFAULTS export has the exact conservative shape documented in docs/config.md", () => {
   assert.deepEqual(
     CUT_APPROVAL_AUTO_TIER_DEFAULTS,
-    { maxFiles: 2, maxPriority: "P3", allowSchemaChange: false, allowDesignArmed: false },
+    { maxFiles: 2, maxPriority: "P3", allowSchemaChange: false, allowDesignArmed: false, manifest: false },
     "the exported defaults constant is the single source of truth loadConfig falls back to per-field; " +
       "it must match docs/config.md's documented table exactly",
   );
