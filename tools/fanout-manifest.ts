@@ -1232,9 +1232,28 @@ function cutErr(code: string, message: string): FanoutError {
  *   ticket rows, each line starting with `|`, no blank line inside;
  * - touches: exactly `—`, or backtick spans joined only by `、`, `,` or
  *   whitespace, each span a usable path token (`malformedCutSpan`).
+ * A carriage return not followed by a line feed anywhere in the spec text is
+ * an error, because Markdown renders it as a line break the parser would not
+ * see.
  */
 export function parseCutSection(specText: string): CutSectionResult {
-  const cut = splitSections(splitLines(specText)).filter((s) => s.name === "Cut");
+  const lines = splitLines(specText);
+  // A CR without an LF is a line break when Markdown renders the spec, but
+  // splitLines does not split on it, so one parsed line could render as two
+  // rows or hide a second heading. Refuse it anywhere in the text.
+  const bareCrLines = lines.flatMap((l, i) => (/\r(?!\n)/.test(l) ? [i + 1] : []));
+  if (bareCrLines.length > 0) {
+    return {
+      ok: false,
+      errors: [
+        cutErr(
+          FANOUT_CODES.cutRowMalformed,
+          `line(s) ${bareCrLines.join(", ")}: a carriage return without a line feed (Markdown renders it as a line break) — use LF or CRLF line endings only`,
+        ),
+      ],
+    };
+  }
+  const cut = splitSections(lines).filter((s) => s.name === "Cut");
   if (cut.length === 0) {
     return {
       ok: false,

@@ -501,3 +501,25 @@ No regression. The section scan, the `Set` of table line numbers and one or two 
 
 ## Verdict
 CHANGES_REQUESTED. The AC15 whitelists hold against every enumerated and new input except a bare CR (R4-1). That byte makes one parser line render as two cut rows, so `check --cut` exits 0 on a rendered cut whose `touches` names `tools/registry.ts`. The fix is one bounded check in `parseCutSection` under `CUT_ROW_MALFORMED`. R4-2 (lookalike `Cut` headings) is recommended, not blocking.
+
+## Round 4 — sr reply
+
+Human ruling "A" in the lane session: fix R4-1 only; R4-2 is filed as pending ticket E296-NEW-4 (`.current/e296/pending-tickets.md`); the review scope is not narrowed.
+
+- **R4-1 — fixed — tools/fanout-manifest.ts `parseCutSection`.** The first step now splits the text once with the shared `splitLines` and refuses any line containing `/\r(?!\n)/` (any CR left after the `\r?\n` split is a CR not followed by LF in the original text). The result is exit 2, one `CUT_ROW_MALFORMED` error naming every such line as `splitLines` counts it: `line(s) <n>: a carriage return without a line feed (Markdown renders it as a line break) — use LF or CRLF line endings only`. The check covers the whole spec text, not only the `## Cut` section, and does no normalisation. The JSDoc gains one sentence. No shared helper changed, no new `FANOUT_CODES` entry, and `dist/` changes only in `fanout-manifest.*`.
+- Evidence (each `check --cut specs/fanout-post-v4-w3.md e296 <spec>`):
+
+| input | result |
+|---|---|
+| R4-1 row: `\| T-X-00<CR>\| T-X-02 \| x \| none \| ``tools/config.ts`` \| ``tools/registry.ts`` \|` | exit 2 `CUT_ROW_MALFORMED`, line 7 |
+| hidden section: `x<CR>## Cut<CR><CR>table` under `## Notes` (`lone_cr_heading`) | exit 2 `CUT_ROW_MALFORMED` |
+| `lone_cr_row`, `lone_cr_only_row`, `span_cr` | exit 2 `CUT_ROW_MALFORMED` |
+| a CR as the last byte of the file (LF and CRLF copies of the own spec) | exit 2 `CUT_ROW_MALFORMED`, line 147 |
+| a CR in a prose bullet far from `## Cut` (line 47) | exit 2 `CUT_ROW_MALFORMED`, line 47 |
+| `\r\r\n` at the end of a row | exit 2 `CUT_ROW_MALFORMED` (the first CR is bare) |
+| CRLF copy of the own spec without the known `test/e297-main-protected-sop.test.mjs` token | exit 0, output byte-identical to the LF copy |
+| CRLF copy of the own spec with the token | exit 1, the one known e297 `OUT` line |
+
+- The reviewer's `attack.mjs` (49 cases) re-run: every case gives the same result as round 4 except the four bare-CR cases above, which are now exit 2. The `cut_plus_lower` / `cut_plus_tab` / `cut_plus_indent` / `cut_plus_setext` cases still exit 0; they are R4-2 (E296-NEW-4).
+- AC proofs re-run: AC9 (only `fanout-wave5.1.md 2` and `fanout-wave6.md 2`), AC10 (`045b56ae…128a`, `485eabe0…f863`), AC11 (own spec exit 1 for the known e297 gap; oob `1` then `exit=1`), AC12 (`1`), AC15 (section `exit=2` + 1 `CUT_ROW_MALFORMED`; cell `exit=2` + 1 `CUT_TOUCHES_UNQUOTED_PATH`; own spec `1` line).
+- `validate` / `render` / `check <manifest> <lane>`: 20 manifests, 140 outputs, 0 diffs against the `59de2ab` `dist/`.

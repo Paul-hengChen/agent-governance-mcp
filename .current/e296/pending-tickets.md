@@ -57,4 +57,24 @@ body: |
   post-commit check is the backstop on case-insensitive filesystems.
 ```
 
+```pending-ticket
+lane_local_id: E296-NEW-4
+title: check --cut does not recognise heading variants that render as a second Cut section (`##<TAB>Cut`, 1-3 leading spaces, setext `Cut` + `---`, lowercase `## cut`), so their content is unchecked when a valid `## Cut` also exists
+priority: P3
+depends_on: [E296]
+source: code-reviewer, e296 review after re-cut (R4-2)
+body: |
+  parseCutSection reads only sections that splitSections starts (a line
+  beginning with `## `) and whose name is exactly `Cut`. A Markdown renderer
+  also shows `##<TAB>Cut`, ` ## Cut` (1-3 leading spaces), a setext `Cut`
+  heading underlined with `---`, and `## cut` as a Cut heading. When a valid
+  `## Cut` exists as well, the table under the variant is never read, so a
+  touches cell naming a file outside the lane can exit 0. Cheap partial guard:
+  in parseCutSection, count every line matching
+  `/^ {0,3}##[ \t]+cut[ \t#]*$/i` toward CUT_SECTION_DUPLICATE (closes the
+  tab, indent and case variants). Full closure (setext headings, homoglyphs
+  such as Cyrillic `С`) needs a real Markdown parser, the same class as the
+  documented fenced-code-block limit.
+```
+
 ## Applied

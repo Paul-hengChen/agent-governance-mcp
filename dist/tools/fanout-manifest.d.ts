@@ -364,6 +364,9 @@ export type CutCheckResult = {
  *   ticket rows, each line starting with `|`, no blank line inside;
  * - touches: exactly `—`, or backtick spans joined only by `、`, `,` or
  *   whitespace, each span a usable path token (`malformedCutSpan`).
+ * A carriage return not followed by a line feed anywhere in the spec text is
+ * an error, because Markdown renders it as a line break the parser would not
+ * see.
  */
 export declare function parseCutSection(specText: string): CutSectionResult;
 /**
