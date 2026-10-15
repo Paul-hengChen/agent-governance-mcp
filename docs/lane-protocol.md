@@ -39,6 +39,7 @@
 - **E125a 之後，root `tasks.md` 是歷史索引**：lane 不寫它。從 v2 root 分出去的 lane，帳本一開始是空的，task 列在自己的 worktree 用 `tw_add_task` 建（`workspace_path` 傳 worktree）。看到 `TASKS_LEDGER_ABSENT` 或 `TASKS_MIGRATION_BUSY` → 停下來回報，不要手動建檔。
 - **qa 的全套測試必須在 commit 之後、工作區沒有未追蹤檔案時跑。** `check-md-tables` 等檢查只看 `git ls-files`，未 commit 的檔案會被靜默跳過（Wave 5 的 E174：commit 前 2417/2417，commit 後 2415/2417）。
 - **常駐測試不要釘死歷史 commit SHA**，除非斷言本質上就是在測一個歷史 diff（例如某條已收工 lane 自己的 scope-containment 檢查）——這種情況下，SHA 查找必須用 `git rev-parse --verify <sha>^{commit}` 之類的 guard 包住，SHA 不存在時要大聲跳過（`t.skip(...)` + 明顯的警告訊息），絕不能靜默通過。範例見 `test/e130-lane-default.test.mjs`（E229）。
+- **hop 用完（`HOP_CAP_EXCEEDED`）先 escalate**：寫信箱 `type: escalate`，不要自己開續作 feature。同 lane 接續（E295）只在**全部**條件成立、且人類在你這個 session 親手打字裁決時才允許：(a) `review_round` 與 `qa_round` 都還沒到上限（是 hop cap 先到）；(b) 剩餘工作有界、且由最後一次 code-reviewer／qa-engineer 的 verdict 點名；(c) 人類在 lane session 裁決，裁決記進 fan-out 清單的 Decisions 表；(d) 新 `active_feature` 叫 `<feature>-r<n>-fix`，`scope_decision_why` 引用原 feature；(e) 不等 lease 到期 —— 第一次寫入帶 `lease_override: true`，`pending_notes[0]` 是 `lease-override: hop-cap continuation of <feature>`，由該人類見證；(f) 每個 feature 只能接續一次，第二次用完 → 回 pm 重切。
 - 不要 push、不要 merge、不要發版、不要刪 worktree —— 那些是整合者的事。
 
 ## 4. 新發現
@@ -74,7 +75,7 @@ from: <lane 名 | integrator>
 type: question | proposal | reply | report | escalate | ack | close | reopen
 re: <to-lane#n | to-integrator#n —— 一定寫檔名，兩個檔都從 1 編號；或一個短主題>
 time: <用指令產生：date -u +%FT%TZ —— 不要手打>
-hop: <lane 寫：目前 hop_count/上限，例如 7/10；integrator 寫 —>
+hop: <lane 寫：目前 hop_count/上限，例如 7/14；integrator 寫 —>
 ---
 <內容 —— 精簡；引用檔案路徑或 AC 編號，不要貼大段內容；絕不包含 .env 內容>
 ```

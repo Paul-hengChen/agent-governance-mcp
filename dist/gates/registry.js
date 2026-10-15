@@ -39,13 +39,13 @@
 //   NON_QA_COMPLETED_TASKS_REJECTED  const-08-chain-31-mid.md
 //   QA_REVIEW_TARGET_REQUIRED       skill-qa-engineer.md
 //   AC_EXECUTION_LOG_MISSING        skill-qa-engineer.md
-//   DISPATCH_PIN_TIER_REJECTED      (none)
+//   DISPATCH_PIN_TIER_REJECTED      coord-02-host-dispatch.md
 // The 34-gate catalog, in documentation order (the non-qa completed_tasks write gate, E40,
 // added the 33rd, NON_QA_COMPLETED_TASKS_REJECTED — the reviewer-only completed_tasks gate
 // generalized to every non-qa identity; the dispatch_pins tier enum, E300, added the 34th,
 // DISPATCH_PIN_TIER_REJECTED — the first tool-boundary producer, raised by zod before the
-// pipeline and the first documentedInProse: false entry; its "(none)" mapping row above means
-// no content/*.md quotes it yet). Array order is DOC order only — it MUST NOT be relied
+// pipeline; it shipped as the one documentedInProse: false entry and flipped to true when
+// coord-02-host-dispatch.md quoted it, E295). Array order is DOC order only — it MUST NOT be relied
 // on for evaluation order (DR-5; that lives in handoff-orchestrator.ts as the ordered
 // UPDATE_STATE_GATE_PIPELINE array, E35).
 export const GATE_REGISTRY = [
@@ -104,10 +104,10 @@ export const GATE_REGISTRY = [
         errorCode: "HOP_CAP_EXCEEDED",
         producer: "validateTransition",
         envelope: "transition-json",
-        triggerEdge: "prev_hop_count >= 10 on a role transition (next.agent != prev.agent) and next != (pm,In_Progress); feature_changed bypasses",
+        triggerEdge: "prev_hop_count >= 14 on a role transition (next.agent != prev.agent); the (pm,In_Progress) landing is accepted unconditionally (E295, E41); feature_changed bypasses",
         armCondition: "opt-in (counter present)",
         clearingArtifact: "(pm, In_Progress) landing (does NOT reset hop_count) or active_feature change (resets to 0)",
-        hintStatic: " reaches hop cap (10). Only the (pm, In_Progress) landing is allowed; " +
+        hintStatic: " reaches hop cap (14). Only the (pm, In_Progress) landing is allowed; " +
             "hop_count resets only on active_feature change — human must re-scope or override.",
         // DR-7 (d2-server-brake-accounting): the backtick-quoted literal in
         // skill-coordinator.md lands with T-D2-03; both must ship before the C12
@@ -520,7 +520,7 @@ export const GATE_REGISTRY = [
         clearingArtifact: "dispatch_pins.<role> set to one of opus, sonnet, haiku, fable",
         // tools/registry.ts DISPATCH_PIN_TIER_HINT — byte-exact; the received value precedes it.
         hintStatic: "is not a model tier; allowed: opus, sonnet, haiku, fable",
-        documentedInProse: false,
+        documentedInProse: true,
     },
 ];
 // Precomputed O(1) lookup table. Built once at module load.

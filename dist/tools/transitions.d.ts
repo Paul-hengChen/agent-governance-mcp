@@ -69,6 +69,6 @@ export declare function computeNewRound(prev_qa_round: number, prev_review_round
 export declare const ROUND_CAP_EXPORTED = 4;
 export declare const REVIEW_ROUND_CAP_EXPORTED = 4;
 export declare const VISUAL_ROUND_CAP_EXPORTED = 6;
-export declare const HOP_CAP_EXPORTED = 10;
+export declare const HOP_CAP_EXPORTED = 14;
 export {};
 //# sourceMappingURL=transitions.d.ts.map

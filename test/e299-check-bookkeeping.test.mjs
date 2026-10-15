@@ -132,15 +132,14 @@ test("ID-MONO-BASE-FLAG (AC4): `--base <ref>` supplies the base that the default
 
 const closed = (cite) => `**DONE** (shipped v1.0.0) — evidence \`${cite}\``;
 
-test("CITE-ROOT-ARCHIVED (AC5): a closed row citing a root file that now lives under archive/ names the one path it should use", () => {
+test("CITE-ROOT-ARCHIVED (AC5, E295 AC12b): a closed row citing a root file that now lives in exactly one archive dir resolves by basename — silent ok, no note, no violation", () => {
   const root = mkFixture({
     "docs/backlog.md": backlog(trow("E5", closed("qa_reports/review_T-E5-01.md"))),
     "qa_reports/archive/e5-x/review_T-E5-01.md": "x",
   });
-  assertViolation(
-    run(root),
-    /docs\/backlog\.md:3 — E5 cites qa_reports\/review_T-E5-01\.md, which does not exist; the file is at qa_reports\/archive\/e5-x\/review_T-E5-01\.md/,
-  );
+  const r = run(root);
+  assertClean(r);
+  assert.doesNotMatch(r.stderr + r.stdout, /cites/);
 });
 
 test("CITE-MISSING (AC5): a closed row citing a file that exists nowhere under its tree is a violation with the `anywhere under` wording", () => {
@@ -151,17 +150,27 @@ test("CITE-MISSING (AC5): a closed row citing a file that exists nowhere under i
   );
 });
 
-test("CITE-AMBIGUOUS (AC5): several archive candidates are all listed after `candidates:` and none is picked", () => {
+test("CITE-AMBIGUOUS (AC5, E295 AC12b): a moved root citation held by several archive dirs is a NOTE listing every candidate after `candidates:` (exit 0), none picked", () => {
   const root = mkFixture({
     "docs/backlog.md": backlog(trow("E5", closed("qa_reports/review_T-E5-01.md"))),
     "qa_reports/archive/one/review_T-E5-01.md": "x",
     "qa_reports/archive/two/review_T-E5-01.md": "x",
   });
   const r = run(root);
-  assertViolation(r, /which does not exist anywhere under qa_reports\/; candidates: /);
-  assert.match(r.stderr, /qa_reports\/archive\/one\/review_T-E5-01\.md/);
-  assert.match(r.stderr, /qa_reports\/archive\/two\/review_T-E5-01\.md/);
-  assert.doesNotMatch(r.stderr, /the file is at/);
+  assertClean(r);
+  assert.match(r.stdout, /E5 cites qa_reports\/review_T-E5-01\.md, which has been archived; candidates: /);
+  assert.match(r.stdout, /qa_reports\/archive\/one\/review_T-E5-01\.md/);
+  assert.match(r.stdout, /qa_reports\/archive\/two\/review_T-E5-01\.md/);
+  assert.doesNotMatch(r.stdout, /the file is at/);
+});
+
+test("CITE-ROOT-DEAD (E295 AC12b): a root citation whose file is neither at the root nor in any archive dir of its tree is a violation", () => {
+  const root = mkFixture({
+    "docs/backlog.md": backlog(trow("E5", closed("qa_reports/review_T-E5-01.md"))),
+    "qa_reports/archive/e5-x/review_T-OTHER.md": "x",
+    "review_reports/archive/e5-x/review_T-E5-01.md": "x",
+  });
+  assertViolation(run(root), /E5 cites qa_reports\/review_T-E5-01\.md, which does not exist anywhere under qa_reports\//);
 });
 
 test("CITE-PREDICTED-ARCHIVE-TOLERATED (AC6): a cited archive/<dir>/ path whose file is still at the root is a note, not a failure; a DIFFERENT archive dir holding it is a failure", () => {
@@ -182,14 +191,14 @@ test("CITE-WRONG-ARCHIVE-DIR (AC6): a cited archive/<dir>/ path whose file lives
   assertViolation(run(root), /which does not exist; the file is at qa_reports\/archive\/right\/review_T-E5-01\.md/);
 });
 
-test("CITE-ROOT-TOLERATED (AC7): a closed row citing a root file that exists is a note saying it moves at the next release", () => {
+test("CITE-ROOT-TOLERATED (AC7, E295 AC12a): a closed row citing a root file that is still at the root is the convention — it emits nothing (no note, no violation)", () => {
   const root = mkFixture({
     "docs/backlog.md": backlog(trow("E5", closed("qa_reports/review_T-E5-01.md"))),
     "qa_reports/review_T-E5-01.md": "x",
   });
   const r = run(root);
   assertClean(r);
-  assert.match(r.stdout, /docs\/backlog\.md:3 — E5 cites qa_reports\/review_T-E5-01\.md at the root; it moves under qa_reports\/archive\/ at the next release/);
+  assert.doesNotMatch(r.stderr + r.stdout, /cites/);
 });
 
 test("CITE-OPEN-ROW-SKIPPED (AC7): an open row (no genuine leading mark) and a PARTIAL row report nothing even with a dead citation", () => {
@@ -370,7 +379,7 @@ test("ROOT-FROM-SCRIPT-LOCATION (AC14): the root is the script's own checkout, n
 
 test("EXIT-0-WITH-NOTES (AC15): notes alone exit 0 — notes block on stdout with a count, then the OK line with the three counts", () => {
   const root = mkFixture({
-    "docs/backlog.md": backlog(trow("E5", closed("qa_reports/review_T-E5-01.md"))),
+    "docs/backlog.md": backlog(trow("E5", closed("qa_reports/archive/predicted/review_T-E5-01.md"))),
     "docs/v4.0.0-new-tickets.md": queue(qrow(1, "**E5** ✅ DONE（merged）")),
     "specs/fanout-w.md": manifest(DEC_HEAD + decision("2026-10-14", "人類", "x", "y")),
     "qa_reports/review_T-E5-01.md": "x",

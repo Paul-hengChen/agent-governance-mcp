@@ -230,13 +230,13 @@ test("AC4: --rollup sums hop/review_round/qa_round across matching lanes and nam
   await writeLane(primary, { activeFeature: "e177b-unrelated-primary-lane", hopCount: 0 });
   const wtA = addWorktree(t, primary, "feat/e906a-capcheck", "e177b-ac4-a-");
   const wtB = addWorktree(t, primary, "feat/e906b-capcheck", "e177b-ac4-b-");
-  await writeLane(wtA, { activeFeature: "e906-capcheck", hopCount: 6, reviewRound: 3, qaRound: 2 });
-  await writeLane(wtB, { activeFeature: "e906-capcheck", hopCount: 6, reviewRound: 3, qaRound: 3 });
+  await writeLane(wtA, { activeFeature: "e906-capcheck", hopCount: HOP_CAP_EXPORTED + 1, reviewRound: 3, qaRound: 2 });
+  await writeLane(wtB, { activeFeature: "e906-capcheck", hopCount: HOP_CAP_EXPORTED + 1, reviewRound: 3, qaRound: 3 });
 
   const report = computeLaneStatus({ repoRoot: primary });
   const rollup = rollupSameFeature(report, "e906-capcheck");
   assert.equal(rollup.matchingLanes.length, 2);
-  assert.equal(rollup.totals.hop, 12, `must sum only the ${rollup.featureId} lanes, never every lane in the repo`);
+  assert.equal(rollup.totals.hop, 2 * (HOP_CAP_EXPORTED + 1), `must sum only the ${rollup.featureId} lanes, never every lane in the repo`);
   assert.equal(rollup.totals.reviewRounds, 6);
   assert.equal(rollup.totals.qaRounds, 5);
 
@@ -251,7 +251,7 @@ test("AC4: --rollup sums hop/review_round/qa_round across matching lanes and nam
   const rendered = renderSameFeatureRollup(rollup);
   assert.match(
     rendered,
-    new RegExp(`OVER CAP: feature total hop 12 exceeds HOP_CAP_EXPORTED = ${HOP_CAP_EXPORTED} \\(over by ${12 - HOP_CAP_EXPORTED}\\)`),
+    new RegExp(`OVER CAP: feature total hop ${2 * (HOP_CAP_EXPORTED + 1)} exceeds HOP_CAP_EXPORTED = ${HOP_CAP_EXPORTED} \\(over by ${2 * (HOP_CAP_EXPORTED + 1) - HOP_CAP_EXPORTED}\\)`),
   );
   assert.match(
     rendered,
