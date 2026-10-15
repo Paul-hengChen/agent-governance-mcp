@@ -61,8 +61,8 @@ Bounds: PASS stays terminal for the CURRENT feature — release-engineer remains
 
 ## Evidence-Citation Convention<!-- origin:start --> (E87)<!-- origin:end -->
 
-A `docs/backlog.md` row that cites a `qa_reports/`/`review_reports/` evidence file MUST cite its eventual archive path — `<tree>/archive/<feature>/<file>`, `<tree>` matching the file's own source tree — never the pre-archive root.
-<!-- rationale:start --> Release-engineer's step 7a moves it there at the next release regardless of which row cites it, and no role is authorized to repair a stale citation afterward. <!-- rationale:end -->
+A `docs/backlog.md` row that cites a `qa_reports/`/`review_reports/` evidence file MUST cite the file's path as it exists at write time — `<tree>/<file>` while the file is at the root (the normal case for a row written before the release that archives it), or the real `<tree>/archive/<dir>/<file>` once it is archived — `<tree>` matching the file's own source tree, never a predicted archive folder. `check:bookkeeping` is the resolver: a root citation whose file has since moved resolves by basename inside its own tree (E301).
+<!-- rationale:start --> Release-engineer's step 7a moves the file at the next release regardless of which row cites it, names the archive folder after the releasing feature rather than the citing lane, and no role is authorized to repair a stale citation afterward — so only the path that exists when the row is written is checkable when it is written. <!-- rationale:end -->
 
 ## Crash-Resume Protocol<!-- origin:start --> (v3.53.0)<!-- origin:end -->
 

@@ -21,11 +21,16 @@
 // to compare against). No particular id is special-cased anywhere below.
 //
 // Check (2) resolves a dead path by basename, within the cited tree only
-// (qa_reports/ is never searched for a review_reports/ citation). Two shapes
-// are tolerated with a note instead of a failure: a root citation whose file
-// is still at the root (the file moves under archive/ at the next release),
-// and an archive/<dir>/ citation whose file is still at the root (the row
-// predicted the archive folder before release named it).
+// (qa_reports/ is never searched for a review_reports/ citation). A row cites
+// the path as it existed when the row was written (E301), so:
+//   (a) a root citation whose file is still at the root emits nothing;
+//   (b) a root citation whose file has left the root resolves by basename
+//       within the cited tree: exactly one archive/<dir>/ holds it -> ok,
+//       silently; more than one -> a note naming the candidates; none in that
+//       tree -> a violation.
+// An archive/<dir>/ citation keeps its rules: exists -> ok; file still at the
+// root -> a note (the row predicted the archive folder before release named
+// it); otherwise a violation naming the candidate.
 //
 // The table and done-mark helpers below are reproduced from
 // scripts/check-md-tables.mjs so this script stays self-contained (it is
@@ -401,19 +406,27 @@ function checkCitations(rows, archiveIndex) {
   for (const r of rows) {
     if (!r.closed) continue;
     for (const c of extractCitations(r.raw)) {
+      // (a) the path exists as cited: a root citation of a root file, or an
+      // archive citation of an archived file — nothing to say either way.
       const existsAsCited = existsSync(path.join(root, c.path));
-      if (existsAsCited) {
-        if (c.dir === null) {
-          note(BACKLOG_REL_PATH, r.lineNo, `${r.id} cites ${c.path} at the root; it moves under ${c.tree}/archive/ at the next release`);
-        }
-        continue;
-      }
+      if (existsAsCited) continue;
       const rootPath = `${c.tree}/${c.file}`;
       if (c.dir !== null && existsSync(path.join(root, rootPath))) {
         note(BACKLOG_REL_PATH, r.lineNo, `${r.id} cites ${c.path}; the file is still at ${rootPath} (not yet archived)`);
         continue;
       }
       const dirs = archiveIndex[c.tree].get(c.file) ?? [];
+      if (c.dir === null) {
+        // (b) a root citation whose file has left the root: resolve by basename
+        // within the cited tree.
+        if (dirs.length === 1) continue;
+        if (dirs.length > 1) {
+          note(BACKLOG_REL_PATH, r.lineNo, `${r.id} cites ${c.path}, which has been archived; candidates: ${dirs.map((d) => `${c.tree}/archive/${d}/${c.file}`).join(", ")}`);
+          continue;
+        }
+        violation(BACKLOG_REL_PATH, r.lineNo, `${r.id} cites ${c.path}, which does not exist anywhere under ${c.tree}/`);
+        continue;
+      }
       if (dirs.length === 1) {
         violation(BACKLOG_REL_PATH, r.lineNo, `${r.id} cites ${c.path}, which does not exist; the file is at ${c.tree}/archive/${dirs[0]}/${c.file}`);
       } else {
