@@ -19,4 +19,22 @@ body: |
   lane PMs omit the field and name the PRD in pending_notes.
 ```
 
+```pending-ticket
+lane_local_id: E296-NEW-2
+title: check --cut treats some touches spans as prose and drops them silently — extension-less root files (Dockerfile, LICENSE), bare . / .., unicode lookalikes without an ASCII extension
+priority: P3
+depends_on: [E296]
+source: code-reviewer, e296 review round 2 (R1)
+body: |
+  Under the AC3(a) path-token rule a backtick span with no `/` and no ASCII
+  extension is prose, so `fanout check --cut` drops it. A touches cell such as
+  `tools/fanout-manifest.ts`、`Dockerfile` therefore exits 0 although the
+  second file is never checked; the same holds for `LICENSE`, a bare `.` or
+  `..`, and lookalikes such as `tools∕registry` (U+2215) or a full-width
+  slash and dot. `check --cut` is pure (no repo listing), so it cannot tell
+  a real extension-less file from prose. Spec-level option: in a touches cell,
+  every backtick span that is not exactly `—` must be a path token, else exit 2
+  (CUT_TOUCHES_MALFORMED_PATH); prose moves to the desc cell.
+```
+
 ## Applied

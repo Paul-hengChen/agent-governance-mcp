@@ -1080,12 +1080,20 @@ export function parseCutSection(specText) {
     return { ok: true, tickets };
 }
 /**
+ * Plain repo path for a `touches` span: ASCII letters, digits, `_`, `-`, `.`
+ * and `/` only, with no empty segment and no leading or trailing `/`.
+ */
+const CUT_PLAIN_PATH_RE = /^[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*$/;
+/**
  * Why a `touches` backtick span cannot be checked for containment, or
- * undefined when it is prose or a usable path. A path-shaped span (contains
- * `/` or a backslash, or has an extension) that `pathTokens` would drop, such as a
- * `:line` or `#anchor` suffix, would otherwise go unchecked; a `.` / `..`
- * segment or a leading `/` would match the owned globs lexically while naming
- * a file outside them. Both refuse rather than guess.
+ * undefined when it is prose or a usable token. A usable token is either one
+ * plain repo path (CUT_PLAIN_PATH_RE, no `.` / `..` segment) or a glob
+ * (`isGlobToken`), which `isCutTokenInBounds` accepts only when byte-identical
+ * to an 擁有 token. Every other path-shaped span is refused rather than
+ * guessed at: `PATH_TOKEN_RE` admits `,` for `{a,b}` alternation, so a
+ * comma-joined list outside braces would otherwise be matched as one path,
+ * and a `:line` suffix, a dot segment or a leading `/` would match an owned
+ * glob lexically while naming a file outside it.
  */
 function malformedCutSpan(span) {
     if (!isPathToken(span)) {
@@ -1094,6 +1102,13 @@ function malformedCutSpan(span) {
     }
     if (span.startsWith("/") || span.split("/").some((seg) => seg === "." || seg === "..")) {
         return "has a leading / or a . or .. segment — write the normalised repo-relative path";
+    }
+    if (isGlobToken(span))
+        return undefined;
+    if (span.includes(","))
+        return "lists more than one path — give each path its own backtick span";
+    if (!CUT_PLAIN_PATH_RE.test(span)) {
+        return "is not a plain repo path (letters, digits, _ - . and / only; no empty segment) — write the normalised repo-relative path";
     }
     return undefined;
 }

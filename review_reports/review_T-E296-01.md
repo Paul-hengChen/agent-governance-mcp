@@ -108,3 +108,65 @@ Verification: `npm run build` 0 (dist clean afterwards), `tsc --noEmit` 0, `npm 
 
 ## Verdict
 CHANGES_REQUESTED: C1/C2 are fixed with no regression, but a comma-joined `touches` span such as `.current/e296/handoff.md,tools/registry.ts` still exits 0 for a cut that names a forbidden file (C3). The fix is a single fail-closed condition in `malformedCutSpan`.
+
+### sr-engineer reply — Round 2
+
+- **C3: fixed with a whitelist instead of one more blacklist entry.** `malformedCutSpan` (tools/fanout-manifest.ts) now accepts a `touches` span only in two cases:
+  - (a) A plain repo path. `isPathToken` is true, the span matches `CUT_PLAIN_PATH_RE` (`^[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*$`: ASCII letters, digits, `_ - . /`, no empty segment, no leading or trailing `/`), and the existing check finds no `.` / `..` segment.
+  - (b) A glob. `isGlobToken` is true. `isCutTokenInBounds` already accepts a glob only when it is byte-identical to an 擁有 token, so every other glob is OUT.
+- Every other span exits 2 under `CUT_TOUCHES_MALFORMED_PATH`, with one message per reason:
+  - "lists more than one path — give each path its own backtick span" (a `,` outside a glob).
+  - "is not a plain repo path (letters, digits, _ - . and / only; no empty segment) — write the normalised repo-relative path".
+  - The two round-1 messages, unchanged.
+- Why this closes the class: a non-glob span that passes `isPathToken` can differ from the allow-set only by `,`, `}` or an empty segment, and all three are now refused.
+- `pathTokens`, `isPathToken`, `isImplicitBookkeeping`, `matchesGlob` and `isGlobToken` are byte-unchanged.
+- **Behaviour change for qa to pin.** `tools//config.ts` and `test/fixtures/compose-golden//x.json` were OUT (exit 1) and now exit 2. A span with a trailing `/` counts as a glob under `isGlobToken`, so it stays OUT (exit 1) unless it is byte-identical to an 擁有 token.
+- **R1: not addressed, per the coordinator's ruling.** Filed as `E296-NEW-2` in `.current/e296/pending-tickets.md`.
+
+Adversarial sweep. Each input was spliced into T-E296-04's touches next to `tools/fanout-manifest.ts` and run as `check --cut specs/fanout-post-v4-w3.md e296 <spec>`. The spec is a temp copy of the lane spec without the known e297 token, which leaves 17 tokens:
+
+| input | exit | first stderr line / result |
+|---|---|---|
+| `.current/e296/handoff.md,tools/registry.ts` | 2 | `CUT_TOUCHES_MALFORMED_PATH` … lists more than one path — give each path its own backtick span |
+| `review_reports/review_T-E296-01.md,index.ts` | 2 | `CUT_TOUCHES_MALFORMED_PATH` … lists more than one path — give each path its own backtick span |
+| `test/fixtures/compose-golden/a.json,tools/registry.ts` | 2 | `CUT_TOUCHES_MALFORMED_PATH` … lists more than one path — give each path its own backtick span |
+| `a.ts,b.ts` | 2 | `CUT_TOUCHES_MALFORMED_PATH` … lists more than one path — give each path its own backtick span |
+| `tools/config.ts;index.ts` | 2 | `CUT_TOUCHES_MALFORMED_PATH` … is not a bare repo path (no :line, #anchor, spaces or backslashes) — write the file path alone |
+| `tools/config.ts index.ts` | 2 | `CUT_TOUCHES_MALFORMED_PATH` … is not a bare repo path (no :line, #anchor, spaces or backslashes) — write the file path alone |
+| `tools/{config}.ts` | 1 | OUT  `tools/{config}.ts`  (T-E296-04) (1 out of bounds) |
+| `{tools/config.ts,index.ts}` | 1 | OUT  `{tools/config.ts,index.ts}`  (T-E296-04) (1 out of bounds) |
+| `tools/[c]onfig.ts` | 2 | `CUT_TOUCHES_MALFORMED_PATH` … is not a bare repo path (no :line, #anchor, spaces or backslashes) — write the file path alone |
+| `tools/config.ts!` | 2 | `CUT_TOUCHES_MALFORMED_PATH` … is not a bare repo path (no :line, #anchor, spaces or backslashes) — write the file path alone |
+| `tools/config.ts/` | 1 | OUT  `tools/config.ts/`  (T-E296-04) (1 out of bounds) |
+| `tools//config.ts` | 2 | `CUT_TOUCHES_MALFORMED_PATH` … is not a plain repo path (letters, digits, _ - . and / only; no empty segment) — write the normalised repo-relative path |
+| `tools/./config.ts` | 2 | `CUT_TOUCHES_MALFORMED_PATH` … has a leading / or a . or .. segment — write the normalised repo-relative path |
+| `.current/e296/../../index.ts` | 2 | `CUT_TOUCHES_MALFORMED_PATH` … has a leading / or a . or .. segment — write the normalised repo-relative path |
+| `./tools/config.ts` | 2 | `CUT_TOUCHES_MALFORMED_PATH` … has a leading / or a . or .. segment — write the normalised repo-relative path |
+| `/tools/config.ts` | 2 | `CUT_TOUCHES_MALFORMED_PATH` … has a leading / or a . or .. segment — write the normalised repo-relative path |
+| `tools/registry.ts:71` | 2 | `CUT_TOUCHES_MALFORMED_PATH` … is not a bare repo path (no :line, #anchor, spaces or backslashes) — write the file path alone |
+| `gates/registry.ts#L10` | 2 | `CUT_TOUCHES_MALFORMED_PATH` … is not a bare repo path (no :line, #anchor, spaces or backslashes) — write the file path alone |
+| `tools\config.ts` (backslash) | 2 | `CUT_TOUCHES_MALFORMED_PATH` … is not a bare repo path (no :line, #anchor, spaces or backslashes) — write the file path alone |
+| `%2e%2e/index.ts` | 2 | `CUT_TOUCHES_MALFORMED_PATH` … is not a bare repo path (no :line, #anchor, spaces or backslashes) — write the file path alone |
+| `tools／config.ts` (U+FF0F) | 2 | `CUT_TOUCHES_MALFORMED_PATH` … is not a bare repo path (no :line, #anchor, spaces or backslashes) — write the file path alone |
+| `test/fixtures/compose-golden/**` | 0 | 0 out of bounds |
+| `test/fixtures/**` | 1 | OUT  `test/fixtures/**`  (T-E296-04) (1 out of bounds) |
+| `test/e296-*.test.mjs` | 0 | 0 out of bounds |
+| `tools/config.ts}` | 2 | `CUT_TOUCHES_MALFORMED_PATH` … is not a plain repo path (letters, digits, _ - . and / only; no empty segment) — write the normalised repo-relative path |
+| `.current/e296/handoff.md` | 0 | 0 out of bounds |
+
+`test/fixtures/compose-golden/**` and `test/e296-*.test.mjs` are byte-identical to 擁有 tokens in the row, so both are in bounds. The last row is a plain in-bounds control. No input exits 0 when it names a forbidden file.
+
+Regression checks:
+- The lane's own `## Cut` without the e297 token exits 0 (5 tickets, 18 tokens, 0 out). With the token it exits 1, which is the known manifest-version gap.
+- AC9 prints wave5.1 and wave6 at exit 2.
+- AC10 sha256 values are `045b56ae…128a` and `485eabe0…f863`.
+- The AC11 out-of-bounds proof prints `1`, then exits 1.
+- The AC12 count is `1`.
+- Against the HEAD build (`a375368`), `check <manifest> <lane>` is byte-identical for w3/e296 (rc 0), w3/e308 (rc 0) and w2/e295 (rc 2 on both builds). `validate` is byte-identical on all 20 manifests.
+
+Gates:
+- `npm run build` exits 0, and the `dist/` diff is limited to `dist/tools/fanout-manifest.*`.
+- `tsc --noEmit` exits 0.
+- `npm audit --audit-level=high` exits 0.
+- `check:md-tables` reports OK.
+- Suite under test-lock: 3128 tests, 3110 pass, 15 fail, 3 skip. The 15 failures are exactly the known qa-owned list.
