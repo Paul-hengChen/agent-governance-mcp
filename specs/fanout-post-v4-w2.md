@@ -2,7 +2,7 @@
 base: 25bc84c    integration branch: integ/post-v4-w2
 mailbox: ../agent-governance-mcp-lanes/_mailbox
 
-**狀態：人類核准 2026-10-15（含 E301 納入本波、hop 風險對策），待派工。整合者 session 交接：清單 PR 併入 main 後，由新的 integrator session 接手 Stage 3（建 mailbox `_mailbox/e295/`、arm watch、render prompt）。**
+**狀態：結案 2026-10-15。** e295 qa PASS → 整合者 close → `integ/post-v4-w2` merge `6985b3a` → finish e295（E309–E311 配號）→ 記帳 commit → PR + auto-merge（見「結案」）。
 
 本波只有一條 lane：五張票全部碰 `content/**`（共享生成物一波只能一條 lane），而且第 1 波拆出的三句 SOP 文字要引用的程式（`check:bookkeeping`、`DISPATCH_PIN_TIER_REJECTED`、`--ci-check` 流程、`feat/**` CI 觸發）現在都已在 `main` 上，可以在同一個 branch 驗證。Stage 6 照第 1 波同一流程（E297 已出貨，`content/skill-integrator.md` 現行文字即為準）。
 
@@ -35,6 +35,7 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 - 單一 lane，沒有跨 lane 的重劃。清單列出的「只限」條件（`gates/registry.ts` 只動一列、d2 規格只追加、`check-bookkeeping.mjs` 只在 E301 需要時）是 prose 約束，`fanout check` 不會機械檢查，整合者在 5a 看 diff。
 - **E301 建議納入本波**（人類裁決是否進當前里程碑）：它是下一次 release 7a 的必踩紅燈，而人類已決定第 2 波先於發版。不納入的話，發版前要另開一條 content lane。
 - **五張票一條 lane 的 hop 風險**：對策寫在範圍切線（task 併檔、單一 sr session）；整合者預審時把非必要修改改成整合後的票，不在 lane 內來回。
+- **執行中追加的所有權註記（整合者裁定，5a 看 diff 接受）**：(1) `gates/registry.ts` 除 `DISPATCH_PIN_TIER_REJECTED` 一列外，另改了描述該列為「唯一 false／(none)」的兩句註解（否則變成假話）與 `HOP_CAP_EXCEEDED` 列的 predicate／hint 字面值 10 → 14（commit e78057d；error-code-contract 釘住該字面值、hint 是使用者看得到的錯誤文字）；(2) `test/e177b-lane-status.test.mjs`、`test/render-structure.test.mjs` 劃給 e295（qa 限定、只 re-pin：前者 hop fixture 改用 `HOP_CAP_EXPORTED`+1，後者改釘 E301 的 write-time 措辭）—— 兩者都是 cap 14／E301 慣例改變的直接後果；(3) `skill-integrator.md` 5c 第 3 項「citing archive evidence paths」改成 write-time 慣例（E301 (ii) 之後舊句與 coord-03 矛盾）；(4) coordinator 在 lane 擁有的 spec 做了一個字元的 pipe escape（66911d0，qa 證據已揭露）。
 
 ## 完成定義 → 票
 | 完成定義條目 | 由哪張票讓它成立 | 同一波？ |
@@ -56,6 +57,8 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 ## 整合後（整合者自己的 commit／接線）
 - 合併後：重建 `dist/`、`check:bookkeeping`、全套（本機；E298 SOP 出貨後下一波起改讀 CI）。
 - backlog done-mark：E295、E298、E299、E300、E301（若納入）；佇列 #116、0j、0k、0l、#118 勾 DONE。
+- E301 選 (ii) 之後的一次性改寫：預測 archive 路徑的引用實測 19 則（不是票面的 14，E311）全部改成 root 形式，另 5 則 E177／E178 引用指向不存在的 lane 名資料夾、實際已在 `archive/release-v4.0.0/`，改成真實路徑；`check:bookkeeping` 零提示。E41 由 AC2 關閉，補 done-mark。
+- 新票：E309（Stage 6-4 BEHIND 補救一句，content → 第 3 波 E296 同 lane）、E310（7a basename 撞名，下次 release 前）、E311（計數更正，已折進本波記帳）。
 - 第 3 波建議：E296（content，單獨一條 lane）；E308 + E303（程式，不碰 content）可與 E296 平行成第二條 lane。之後才是 integrator 改版 E283–E294（`docs/integrator-revision-2026-10-08.md` §7.3）。
 - 發版：第 2 波結案後 `main` 帶 E297–E301 + E300 server 行為變更 → 建議 MINOR（v4.6.0），由人類決定；是改版後 release SOP 的第一次實跑。
 
@@ -71,3 +74,16 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 | 2026-10-15 | 人類 | 第 1 波結案後先做第 2 波、再考慮發版 | 整合者 session |
 | 2026-10-15 | 整合者 | 第 2 波為單一 content lane e295，票 E295 + E298 SOP 半邊 + E299 5c 一句 + E300 coord-02 一句；建議再納入 E301（下一次 release 7a 的必踩紅燈，發版前必須出貨）交人類裁決；d2 兩份規格檔照 E267 前例只追加修正註記；`gates/registry.ts` 只動 `DISPATCH_PIN_TIER_REJECTED` 一列；hop 風險以「task 併檔、單一 sr session、預審從嚴」對策 | 本檔 |
 | 2026-10-15 | 人類 | 核准本清單（E301 納入本波；接受五張票一條 lane 的 hop 風險與對策），開始派工；整合者改在新 session 接手 Stage 3 起 | 整合者 session |
+| 2026-10-15 | 整合者 | cut 預審 close（to-lane#1）：範圍在 lane 列內、AC1–AC12 各有實作 task；接受 `gates/registry.ts` 兩句註解；E301 建議 (ii)；E41 隨 AC2 關閉 | 信箱 e295 |
+| 2026-10-15 | 人類 | 在 lane session 核准 cut；E301 裁決選項 (ii)（引用寫入時的真實路徑，`check:bookkeeping` 以 basename 解析）；R2 原則核准（只有 coordinator bundle 上限動、值以 qa 實測為準） | lane e295 session（commit b751b6c） |
+| 2026-10-15 | 整合者 | `gates/registry.ts` `HOP_CAP_EXCEEDED` 列字面值 10 → 14 與 5c 措辭對齊 E301：接受（to-lane#2）；`test/e177b-lane-status.test.mjs`、`test/render-structure.test.mjs` 劃給 e295 qa re-pin（to-lane#3／#4） | 信箱 e295 |
+| 2026-10-15 | 整合者 | R2 實測：coordinator bundle 上限 20749 → 21138（零 headroom）；其餘三個上限不動 | lane report（to-integrator#4） |
+| 2026-10-15 | 整合者 | 整合層全套第一輪 3124/3128，唯一紅燈 `test/e132-lane-registry.test.mjs` gap-6 = 已列管的 E254 timing 測試（與本 lane 無關、單跑綠）；依 flake rule 重跑一次 3125/3128 綠 | 本檔 |
+
+## 結案
+- 日期 2026-10-15。`integ/post-v4-w2` ← e295 `6985b3a`（`--no-ff`，零衝突 → 無合併審查；merge-invariants PASS：452 task id 全在、0 lost [x]、sidecar 0 shortfall）。重建 `dist/` 無差異；`check:bookkeeping` OK；整合層全套 3124/3128（E254 flake）→ 重跑 3125/3128/0 fail/3 skipped；記帳 commit 後再跑一次（見 PR）。`main` 以本 branch 的 PR + auto-merge 併入（Stage 6 照現行 `skill-integrator.md`，E297 已出貨）。
+- 彙總（上限按 lane 計）：e295 5 張 task／hop 4/10／review 0 輪／qa 0 輪；證據 `qa_reports/review_E295_T-E295-01-05.md`、`review_reports/review_T-E295-01.md`（皆 covers 五個 id），與 `completed_tasks` 一致。
+- 完成定義 11 項：9 項成立（含 E301 納入）；2 項 ✗ 早有歸屬（E175(d)、E308）。
+- 例外：(1) lane 的 cut 有送信箱預審（第 1 波的漏步已修正），但 qa Blocked 時 lane 沒寄信、由 lane-status watch 發現，整合者主動寫 to-lane#3；(2) 本波在 cap-10 的 server 上跑，hop 4/10，未觸發接續；(3) 整合者第一次全套跑到 E254 的 timing flake，依 E298 剛出貨的 flake rule 重跑一次。
+- 新票：E309、E310、E311 由 `finish --shipped` 配號（E311 折進本波記帳即關）。
+- 第 3 波建議不變：E296（content，建議與 E309 同 lane）∥ E308 + E303（程式）。發版建議 MINOR（v4.6.0），人類決定；E310 在發版前要看。
