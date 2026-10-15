@@ -4,3 +4,5 @@
 {"ts":"2026-10-15T07:37:14.436Z","feature":"e296-manifest-tier-cut-approval","agent_id":"architect","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-10-15T07:53:44.335Z","feature":"e296-manifest-tier-cut-approval","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-10-15T07:59:24.957Z","feature":"e296-manifest-tier-cut-approval","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-15T08:00:26.366Z","feature":"e296-manifest-tier-cut-approval","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-15T08:14:20.965Z","feature":"e296-manifest-tier-cut-approval","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
