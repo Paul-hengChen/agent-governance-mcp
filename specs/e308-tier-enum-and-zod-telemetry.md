@@ -85,7 +85,7 @@ Code comments are not user-facing strings and are not listed; they must describe
 ## Dependencies / Prerequisites
 
 - Base `c392cc3` (`main` after PR #9); wave manifest `specs/fanout-post-v4-w3.md`, human-approved 2026-10-15. E297 (`fable` in `MODEL_TIERS`) and E300 (tier enum, `DISPATCH_PIN_TIER_REJECTED`) are on `main`. Hop cap is 14.
-- Dispatch pin `sr-engineer=fable` is persisted by the coordinator at cut approval, not by this PM write.
+- Dispatch pin `sr-engineer=opus` (human ruling 2026-10-15, relayed via the lane mailbox; was `fable` in the manifest draft) is persisted by the coordinator at cut approval, not by this PM write.
 - `tools/skill-frontmatter.ts` imports only `js-yaml`, so making it the single source introduces no import cycle into `tools/handoff-parse.ts` / `tools/registry.ts` / `tools/handoff-orchestrator.ts`.
 - `emitGateTelemetry(workspacePath, errorCode, agentId, feature)` (`tools/telemetry.ts`) resolves the sidecar through the lane resolver from `workspacePath`, so the emit needs an absolute `workspace_path`; it already never throws and reports `gate: "tool-boundary"` for this code via `gate(code).producer`. No change to `tools/telemetry.ts` is expected; it stays owned in case the raw-args extraction is better placed there.
 - Finding at cut time: `test/error-code-contract.test.mjs` has **no** named assertion today comparing the `tools/registry.ts` hint to `hintStatic` (the manifest's "compares them" refers to the line-638 check that the code literal appears in `tools/registry.ts`). AC3/AC13 make the byte-equality explicit.
