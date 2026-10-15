@@ -76,7 +76,7 @@ Expected: only the coordinator bundle ceiling (20749) moves; qa measures. The hu
 
 | string id | exact text (quote verbatim) | source |
 |---|---|---|
-| e295.limits.hop | `| `hop` cap | 14 |` | docs/backlog.md E295 row item (1) |
+| e295.limits.hop | `\| `hop` cap \| 14 \|` | docs/backlog.md E295 row item (1) |
 | e295.continuation.feature | `<feature>-r<n>-fix` | docs/backlog.md E295 row item (2); `specs/fanout-e260.md` Decisions 2026-10-01 / 2026-10-02 precedent |
 | e295.continuation.note | `lease-override: hop-cap continuation of <feature>` | docs/backlog.md E295 row item (2) |
 | e295.amendment.heading | `## Amendment (2026-10-15, E295)` | authored-here — the E267 amendment-heading shape (`## Amendment (2026-10-08, E267)`) with this ticket's date and id |
