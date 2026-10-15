@@ -229,12 +229,34 @@ test("AC9: LANE_PROVISIONAL says '8- or 9-column'", () => {
   assert.match(r.stderr, /LANE_PROVISIONAL: .*8- or 9-column/);
 });
 
-test("AC10: render output is byte-identical to base (sha256 on w3/e296 and the w2/e295 control)", () => {
-  const sha = (args) => createHash("sha256").update(cli(args).stdout).digest("hex");
-  assert.equal(sha(["render", W3, "e296", "--summary", "x", "--reading", "y", "--base", "c392cc3"]),
-    "045b56ae749b459a808b16e13ac00e273721cd888e9932e9222f2762a780128a");
-  assert.equal(sha(["render", path.join("specs", "fanout-post-v4-w2.md"), "e295", "--summary", "x", "--reading", "y", "--base", "25bc84c"]),
-    "485eabe00700945a3060b04149b59694957061983582519584051f2118b2f863");
+test("AC10: render output is byte-identical to base (HEAD vs base code, same args, w3/e296 and the w2/e295 control)", (t) => {
+  // The base render is produced in the same run from the base commit's own fanout code (extracted to TMP), under
+  // identical arguments incl. fixed --primary/--mailbox-root, so nothing depends on the checkout's absolute path.
+  // Base = the commit the lane forked from (also the --base ref of the w3 render). Needs full history: CI uses fetch-depth 0.
+  const BASE_CODE = "c392cc3";
+  const have = spawnSync("git", ["rev-parse", "--verify", `${BASE_CODE}^{commit}`], { cwd: ROOT, encoding: "utf8" });
+  if (have.status !== 0) {
+    t.skip(`base commit ${BASE_CODE} not present in this clone (shallow?) - AC10 render-vs-base comparison NOT run`);
+    return;
+  }
+  const baseDir = fs.mkdtempSync(path.join(TMP, "base-"));
+  const files = ["package.json", "scripts/fanout.mjs", "dist/tools/fanout-manifest.js"];
+  const arc = spawnSync("git", ["archive", BASE_CODE, "--", ...files], { cwd: ROOT });
+  assert.equal(arc.status, 0, String(arc.stderr));
+  const tar = spawnSync("tar", ["-x", "-C", baseDir], { input: arc.stdout });
+  assert.equal(tar.status, 0, String(tar.stderr));
+  const run = (script, a) => spawnSync(process.execPath, [script, ...a], { cwd: ROOT, encoding: "utf8" });
+  const fixed = ["--primary", ROOT, "--mailbox-root", TMP];
+  for (const [manifest, lane, base] of [[W3, "e296", "c392cc3"], [path.join("specs", "fanout-post-v4-w2.md"), "e295", "25bc84c"]]) {
+    const args = ["render", manifest, lane, "--summary", "x", "--reading", "y", "--base", base, ...fixed];
+    const head = run(FANOUT, args);
+    const old = run(path.join(baseDir, "scripts", "fanout.mjs"), args);
+    assert.equal(old.status, 0, old.stderr);
+    assert.ok(old.stdout.length > 0, "base render produced output");
+    assert.equal(head.status, 0, head.stderr);
+    assert.equal(createHash("sha256").update(head.stdout).digest("hex"), createHash("sha256").update(old.stdout).digest("hex"), `${lane}: HEAD render differs from base render`);
+    assert.equal(head.stdout, old.stdout);
+  }
 });
 
 test("AC10: render ignores the approval column (9-column render == 8-column render)", () => {
