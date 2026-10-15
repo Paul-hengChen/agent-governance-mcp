@@ -19,6 +19,7 @@ export const CUT_APPROVAL_AUTO_TIER_DEFAULTS = {
     maxPriority: "P3",
     allowSchemaChange: false,
     allowDesignArmed: false,
+    manifest: false,
 };
 // Methodology-agnostic defaults. Common task-list filenames in workspace root
 // or under .current/. No project-management-tool-specific paths.
@@ -190,6 +191,8 @@ function loadConfigEntry(workspacePath) {
             // schema-change / design-armed cuts never auto-approve by accident.
             allowSchemaChange: tier.allowSchemaChange === true,
             allowDesignArmed: tier.allowDesignArmed === true,
+            // Anything but `true` leaves only the threshold tier armed.
+            manifest: tier.manifest === true,
         };
     }
     // Additive-optional field (no schema_version bump — same precedent as

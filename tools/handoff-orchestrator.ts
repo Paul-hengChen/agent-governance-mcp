@@ -92,7 +92,7 @@ function withDispatchPinsAdvisory(text: string): string {
       hint:
         "These on-disk dispatch_pins values are outside the model-tier enum; the next " +
         "tw_update_state carrying them is rejected with DISPATCH_PIN_TIER_REJECTED — rewrite " +
-        "dispatch_pins with one of opus, sonnet, haiku, fable.",
+        `dispatch_pins with one of ${DISPATCH_PIN_TIER_VALUES.join(", ")}.`,
     };
     return JSON.stringify(envelope);
   } catch {

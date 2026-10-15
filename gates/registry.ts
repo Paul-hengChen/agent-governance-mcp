@@ -43,8 +43,10 @@ export type GateErrorCode =
   | "DISPATCH_PIN_TIER_REJECTED";
 
 // "tool-boundary": a zod rejection raised by tools/registry.ts before the
-// UPDATE_STATE_GATE_PIPELINE runs (E300); telemetry and gate-stats carry the
-// producer verbatim, so no consumer change is needed.
+// UPDATE_STATE_GATE_PIPELINE runs (E300). No handler sees it, so defineTool.run
+// in tools/registry.ts emits the telemetry line itself when a zod issue message
+// starts with a registered code (E303); telemetry and gate-stats then carry the
+// producer verbatim, so the fire is counted like any other gate.
 export type GateProducer = "validateTransition" | "orchestrator" | "tool-boundary";
 export type GateEnvelope = "transition-json" | "orchestrator-json" | "plain-text";
 

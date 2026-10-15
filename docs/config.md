@@ -58,7 +58,8 @@ Arms the Constitution §3.1 **Cut-Approval Auto-Tier**: a ticket cut meeting ALL
     "maxFiles": 2,
     "maxPriority": "P3",
     "allowSchemaChange": false,
-    "allowDesignArmed": false
+    "allowDesignArmed": false,
+    "manifest": false
   }
 }
 ```
@@ -69,11 +70,13 @@ Arms the Constitution §3.1 **Cut-Approval Auto-Tier**: a ticket cut meeting ALL
 | `maxPriority` | `"P3"` | Least-urgent bound: the ticket's priority must be this or lower-urgency (numerically ≥). At the default, P2/P1/P0 tickets never auto-approve. |
 | `allowSchemaChange` | `false` | `true` lets cuts containing a schema change auto-approve. Never by default. |
 | `allowDesignArmed` | `false` | `true` lets design-armed cuts (design source detected) auto-approve. Never by default. |
+| `manifest` | `false` | `true` lets a fan-out lane cut contained in a human-approved manifest row auto-approve (Constitution §3.1 manifest tier, all eight conditions). Strict `true` only. Never by default. |
 
 Semantics:
 
 - **Absent key = tier disabled.** Every cut halts for human approval, exactly the pre-v3.85.0 behavior. Cut review is the highest-leverage human checkpoint (E5 risk note: remove it last, only once retro data shows the tier is safe) — so removing it is an explicit per-workspace opt-in, never a default.
 - **Present key (even `{}`) = tier armed.** Omitted or invalid fields fall back to the conservative defaults above; a non-object value is treated as absent (tier disabled).
+- **The manifest tier replaces the size threshold, not the safety flags.** With `manifest: true`, the lane row's owned set replaces `maxFiles` / `maxPriority` (they are not added to); the schema-change and design-armed conditions — and `allowSchemaChange` / `allowDesignArmed` — apply exactly as for the threshold tier.
 - **Advisory, not enforced.** The server parses and surfaces the key (`loadConfig`) but never checks the threshold or gates a write on it. The coordinator/PM reads the config and applies the tier — the same attestation trust model as `cut_approved` itself.
 
 ### `staleDispatchNotifyFile` — stale-dispatch watch-file emit (opt-in)

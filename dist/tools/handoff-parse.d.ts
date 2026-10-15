@@ -25,7 +25,6 @@ export declare function getFlatHandoffPath(workspacePath: string): string;
  */
 export declare function assertNoHandoffLayoutConflict(workspacePath: string): void;
 export declare const DISPATCH_PIN_TIER_VALUES: readonly ["opus", "sonnet", "haiku", "fable"];
-export type DispatchPinTier = (typeof DISPATCH_PIN_TIER_VALUES)[number];
 export declare function parseCutApprovedSource(raw: unknown): string | undefined;
 /**
  * Parse handoff.md YAML frontmatter + section content into structured JSON.

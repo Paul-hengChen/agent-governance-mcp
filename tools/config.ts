@@ -28,6 +28,9 @@ export interface CutApprovalAutoTier {
   allowSchemaChange: boolean;
   // Whether a design-armed cut (design source detected) may auto-approve.
   allowDesignArmed: boolean;
+  // Manifest tier (Constitution §3.1): a fan-out lane cut contained in a
+  // human-approved manifest row may auto-approve. Strict === true only.
+  manifest: boolean;
 }
 
 // Conservative defaults, starting small on purpose. Applied per field when
@@ -38,6 +41,7 @@ export const CUT_APPROVAL_AUTO_TIER_DEFAULTS: Readonly<CutApprovalAutoTier> = {
   maxPriority: "P3",
   allowSchemaChange: false,
   allowDesignArmed: false,
+  manifest: false,
 };
 
 export interface WorkspaceConfig {
@@ -259,6 +263,8 @@ function loadConfigEntry(workspacePath: string): ConfigCacheEntry {
       // schema-change / design-armed cuts never auto-approve by accident.
       allowSchemaChange: tier.allowSchemaChange === true,
       allowDesignArmed: tier.allowDesignArmed === true,
+      // Anything but `true` leaves only the threshold tier armed.
+      manifest: tier.manifest === true,
     };
   }
   // Additive-optional field (no schema_version bump — same precedent as

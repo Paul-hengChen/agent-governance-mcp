@@ -299,3 +299,114 @@ test("THROW2: when emitGateTelemetry's internal append fails, handleUpdateState'
     "the returned ToolResult content must be byte-identical whether or not telemetry succeeded — a telemetry throw must never mask or alter the real gate response",
   );
 });
+
+// ---------------------------------------------------------------------------
+// E303: zod-boundary rejections reach the telemetry sidecar
+// (defineTool.run emits for zod issues whose message starts with a registered
+// gate code, then rethrows the SAME ZodError).
+// ---------------------------------------------------------------------------
+
+const { TOOL_REGISTRY } = await import("../dist/tools/registry.js");
+const { ZodError } = await import("zod");
+const UPDATE_STATE_ENTRY = TOOL_REGISTRY.find((e) => e.name === "tw_update_state");
+
+function badTierArgs(ws, extra = {}) {
+  return {
+    workspace_path: ws,
+    active_feature: "f",
+    status: "In_Progress",
+    agent_id: "pm",
+    dispatch_pins: { "sr-engineer": "claude-opus-4-1" },
+    ...extra,
+  };
+}
+
+async function catchRun(args) {
+  try {
+    await UPDATE_STATE_ENTRY.run(args);
+  } catch (e) {
+    return e;
+  }
+  assert.fail("expected a ZodError rejection");
+}
+
+test("E303-T1: bad dispatch_pins tier + existing absolute workspace appends exactly one tool-boundary line", async () => {
+  const ws = mkWorkspace("e303-t1-");
+  const err = await catchRun(badTierArgs(ws));
+  assert.ok(err instanceof ZodError);
+  const lines = readLines(ws);
+  assert.equal(lines.length, 1);
+  const obj = JSON.parse(lines[0]);
+  assert.equal(obj.gate, "tool-boundary");
+  assert.equal(obj.error_code, "DISPATCH_PIN_TIER_REJECTED");
+  assert.equal(obj.agent_id, "pm");
+  assert.equal(obj.feature, "f");
+});
+
+test("E303-T2: absent or non-string agent_id / active_feature fall back to null", async () => {
+  const ws = mkWorkspace("e303-t2-");
+  await catchRun(badTierArgs(ws, { agent_id: undefined }));
+  await catchRun(badTierArgs(ws, { agent_id: 42, active_feature: { x: 1 } }));
+  const objs = readLines(ws).map((l) => JSON.parse(l));
+  assert.equal(objs.length, 2);
+  assert.equal(objs[0].agent_id, null);
+  assert.equal(objs[0].feature, "f");
+  assert.equal(objs[1].agent_id, null);
+  assert.equal(objs[1].feature, null);
+});
+
+test("E303-T3: a relative workspace_path still rejects with a ZodError but writes no sidecar", async () => {
+  const rel = fs.mkdtempSync(path.join(os.tmpdir(), "e303-t3-cwd-"));
+  const prevCwd = process.cwd();
+  process.chdir(rel);
+  try {
+    fs.mkdirSync("relws");
+    const err = await catchRun(badTierArgs("relws"));
+    assert.ok(err instanceof ZodError);
+    assert.equal(fs.existsSync(path.join("relws", ".current")), false);
+    assert.deepEqual(fs.readdirSync("relws"), []);
+  } finally {
+    process.chdir(prevCwd);
+  }
+});
+
+test("E303-T4: a non-existent absolute workspace_path creates nothing", async () => {
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), "e303-t4-"));
+  const ghost = path.join(parent, "does-not-exist");
+  const err = await catchRun(badTierArgs(ghost));
+  assert.ok(err instanceof ZodError);
+  assert.equal(fs.existsSync(ghost), false);
+  assert.deepEqual(fs.readdirSync(parent), []);
+});
+
+test("E303-T5: a ZodError with no gate-coded issue (missing active_feature) emits no telemetry line", async () => {
+  const ws = mkWorkspace("e303-t5-");
+  const err = await catchRun({ workspace_path: ws, status: "In_Progress" });
+  assert.ok(err instanceof ZodError);
+  assert.equal(fs.existsSync(telemetryPath(ws)), false);
+});
+
+test("E303-T6: the rethrown error is a ZodError with issues/message identical to a no-emit run", async () => {
+  const wsGood = mkWorkspace("e303-t6-good-");
+  const errEmit = await catchRun(badTierArgs(wsGood));
+  // Non-existent absolute path => emit skipped; same raw args otherwise.
+  const ghost = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "e303-t6-")), "ghost");
+  const errSkip = await catchRun(badTierArgs(ghost));
+  assert.ok(errEmit instanceof ZodError && errSkip instanceof ZodError);
+  assert.equal(errEmit.message, errSkip.message);
+  assert.deepEqual(errEmit.issues, errSkip.issues);
+});
+
+test("E303-THROW: when the sidecar write fails, the error still rethrows unchanged (healthy vs broken sidecar identical)", async () => {
+  const good = mkWorkspace("e303-throw-good-");
+  const errGood = await catchRun(badTierArgs(good));
+  assert.ok(fs.existsSync(telemetryPath(good)), "control must have emitted");
+
+  const bad = fs.mkdtempSync(path.join(os.tmpdir(), "e303-throw-bad-"));
+  fs.mkdirSync(path.join(bad, ".current"), { recursive: true });
+  fs.writeFileSync(path.join(bad, ".current", "_primary"), "not a directory");
+  const errBad = await catchRun(badTierArgs(bad));
+  assert.ok(errBad instanceof ZodError);
+  assert.equal(JSON.stringify(errBad.issues), JSON.stringify(errGood.issues));
+  assert.equal(errBad.message, errGood.message);
+});
