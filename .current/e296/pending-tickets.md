@@ -2,6 +2,8 @@
 
 New blocks go ABOVE `## Applied`.
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E296-NEW-1
 title: tw_update_state rejects a relative prd_path, but lane handoffs are tracked and lane-protocol §1-1 forbids absolute worktree paths in tracked files
@@ -76,5 +78,3 @@ body: |
   such as Cyrillic `С`) needs a real Markdown parser, the same class as the
   documented fenced-code-block limit.
 ```
-
-## Applied
