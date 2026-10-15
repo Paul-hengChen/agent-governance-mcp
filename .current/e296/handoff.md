@@ -1,25 +1,27 @@
 ---
 schema_version: 15
 active_feature: "e296-manifest-tier-cut-approval"
-status: "In_Progress"
-last_updated: "2026-10-15T09:14:35.103Z"
-last_agent: "sr-engineer"
+status: "FAIL"
+last_updated: "2026-10-15T09:25:45.364Z"
+blocking_reason: "R4-1: a bare CR (U+000D without LF) inside a ## Cut row is a line break in CommonMark/GFM, but splitLines splits only on \\r?\\n. One parser line therefore renders as two cut rows, and check --cut exits 0 while the rendered touches names tools/registry.ts (禁止 tools/**)."
+last_agent: "code-reviewer"
 scope_decision: "single-feature"
 scope_decision_why: "Lane e296 of specs/fanout-post-v4-w3.md: E296 items (1)-(8) plus E309's one skill-integrator sentence; scope is the manifest Lanes row, not widened or narrowed. Non-design (no design/ file)."
 cut_approved: true
 dispatch_pins:
   sr-engineer: "opus"
 evidence_schema: 2
-next_role: "code-reviewer"
-dispatched_at: "2026-10-15T09:14:35.103Z"
+next_role: "sr-engineer"
+dispatched_at: "2026-10-15T09:25:45.364Z"
+review_verdict: "CHANGES_REQUESTED"
 dispatch_mechanism: "task"
 dispatch_mechanism_tier: "opus"
 qa_round: 0
-review_round: 0
+review_round: 1
 visual_round: 0
-hop_count: 10
+hop_count: 11
 qa_rounds_total: 0
-review_rounds_total: 3
+review_rounds_total: 4
 visual_rounds_total: 0
 ---
 # Handoff State
@@ -28,11 +30,11 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- sr-engineer: T-E296-06 ready for code review (commit 1b95930; full AC15 table in review_reports/review_T-E296-01.md ## Round 3 — sr reply).
-- Fix: parseCutSection whitelists the ## Cut section (blank lines + one table: header, 6-cell separator, ticket rows, each starting with |; every other non-blank line -> CUT_ROW_MALFORMED naming its line; missing/invalid separator or a 2nd separator row -> CUT_ROW_MALFORMED) and each touches cell (exactly — or backtick spans joined only by 、 , whitespace; any leftover -> one CUT_TOUCHES_UNQUOTED_PATH per cell); a non-path-token span -> CUT_TOUCHES_MALFORMED_PATH (round-2 per-span whitelist kept). New private cut-only helpers cutTableLines/cutSectionGrammarErrors/cutTouchesLeftover; no new FANOUT_CODES; firstTable/pathTokens/isPathToken/unquotedPaths/matchesGlob/isImplicitBookkeeping/isGlobToken/splitSections byte-identical to 59de2ab; validate/render/check sweep (20 manifests, 60 lanes, 140 outputs) cmp-identical to the pre-change build (= 59de2ab dist).
-- Results: all 15 C4 inputs + cell '— + path' exit 2 UNQUOTED; all 6 C5 forms + prose after/before table + missing separator exit 2 ROW_MALFORMED; R1 Dockerfile/LICENSE/./../U+2215/full-width exit 2 MALFORMED; controls exit 0 (— alone; 、/, /space pairs; compose-golden/** glob; own spec minus e297 token: 20 tokens 0 OUT). Proofs: AC15 section exit=2/1, cell exit=2/1, own-spec 1; AC9 2; AC10 both sha256 match; AC11 exit 1 (e297 gap)/oob 1+exit=1; AC12 1. Round 1-3 attack inputs unchanged (exit 2 MALFORMED / OUT exit 1 / IN exit 0).
-- qa re-pin notes (behaviour changes, all exit 2): prose-only non-— cell (-, –, 'see desc') now UNQUOTED + EMPTY (was EMPTY only); UNQUOTED is one per cell not per word; non-path span now MALFORMED (was ignored); prose-only section -> ROW_MALFORMED line(s) + TABLE_ABSENT; header without separator -> ROW_MALFORMED; grammar errors precede CUT_HEADER_DIFFERS.
-- Gates: build 0 (dist diff = dist/tools/fanout-manifest.* only), tsc 0, audit 0, md-tables OK, suite 3128/3110 pass/15 fail/3 skip — reds exactly the known qa-owned 15 (compose x7 incl skill-manifest:97, ceilings x4, e5 :67/:214, e178a :75, e297 :101). .current/e296/handoff.md + dispatch.jsonl left uncommitted for coordinator.
+- review_report: review_reports/review_T-E296-01.md (## Round 4 (post re-cut) — CHANGES_REQUESTED; covers: T-E296-01, T-E296-02, T-E296-03, T-E296-04, T-E296-06)
+- R4-1 required — tools/fanout-manifest.ts:1256 (parseCutSection over shared splitLines :261). Failing input, exit 0 with '1 ticket(s), 1 token(s), 0 out of bounds': a valid header and separator, then the single physical line '| T-X-00<CR>| T-X-02 | x | none | `tools/config.ts` | `tools/registry.ts` |' (<CR> = one 0x0D byte, no LF). The parser reads touches = `tools/config.ts`. markdown-it 14.1.0 renders row T-X-02 with touches = tools/registry.ts. A variant 'x<CR>## Cut<CR>table' inside another section hides a second Cut section and also exits 0. Fix: refuse /\r(?!\n)/ anywhere in the spec text at the top of parseCutSection with CUT_ROW_MALFORMED (an existing code; shared helpers stay unchanged). qa pins both inputs as exit 2.
+- R4-2 recommended, not blocking (PM: fold in with R4-1 or file as E296-NEW-4): headings that render as a second Cut section but are not splitSections section starts are not read, and exit 0 when a valid ## Cut also exists: '##<TAB>Cut', ' ## Cut' (1-3 leading spaces), setext 'Cut' + '---', '## cut'. A cheap partial guard is to count lines matching /^ {0,3}##[ \t]+cut[ \t#]*$/i toward CUT_SECTION_DUPLICATE. Full closure (setext, homoglyphs) needs a real Markdown parser.
+- Held this round: all 35 AC15 enumerated inputs + controls; all 35 round-1-3 inputs; ~50 new attacks (escaped pipes, pipe in span, HTML comments, header/separator variants, CRLF, trailing ws, tabs, NBSP/ZWSP, double/empty backticks, — with text, shifted column, ## Cut twice / '## Cut ', EOF without newline) are all fail-closed or correct. validate/render/check: 20 manifests / 60 lanes / 100 outputs byte-identical to 59de2ab. AC9/AC10/AC11/AC12/AC15 proofs pass. Shared helpers byte-unchanged; the private cut-only helpers honour the AC15 Scope intent. build 0, audit(high) 0. Suite 3128/3110/15/3, reds = the known qa-owned 15.
+- hop_count note: per the coordinator brief, a CHANGES_REQUESTED at hop 11 means the lane escalates to the human. The R4-1 fix is one bounded check inside parseCutSection.
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.

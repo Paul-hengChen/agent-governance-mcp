@@ -1,6 +1,6 @@
 # Review — T-E296-01 (batched round)
 
-covers: T-E296-01, T-E296-02, T-E296-03, T-E296-04
+covers: T-E296-01, T-E296-02, T-E296-03, T-E296-04, T-E296-06
 
 ## Round 1 — CHANGES_REQUESTED — by code-reviewer
 
@@ -380,3 +380,124 @@ Each one still matches its round-3 result. Every row before the OUT rows exits 2
     - four context-budget ceilings (`context-budget.test.mjs` :475, :554, :569, :894);
     - e5-intake-tiering :67 and :214;
     - AC14 re-pins `e178a-integrator-role.test.mjs:75` and `e297-main-protected-sop.test.mjs:101`.
+
+## Round 4 (post re-cut) — CHANGES_REQUESTED — by code-reviewer
+
+## Summary
+- Round-4 diff `c069f09..HEAD` (`1b95930`, `32b6c89`): `parseCutSection` now whitelists the `## Cut` section and every `touches` cell through three new module-private helpers, `cutTableLines`, `cutSectionGrammarErrors` and `cutTouchesLeftover` (tools/fanout-manifest.ts:1238-1382). It also rebuilds `dist/tools/fanout-manifest.*` and updates lane bookkeeping. Every file is lane-owned, and `dist/` changes only in `fanout-manifest.*`. `npm run build` exits 0 and leaves `dist/` clean. `npm audit --audit-level=high` exits 0 (8 low/moderate, none high).
+- C4, C5 and R1 are closed. All 35 AC15 enumerated inputs give the expected exit code and error code, and all 35 round-1–3 inputs still hold (18 MALFORMED, 13 OUT or refused, 4 IN). Of the ~50 new attack inputs listed in the coordinator brief, all but one fail closed.
+- One concrete fail-open remains (R4-1). A bare carriage return (U+000D with no LF after it) inside a `## Cut` row is a line break under CommonMark/GFM, but `splitLines` splits only on `\r?\n`. One physical "line" can therefore render as two ticket rows. The parser then reads a `touches` cell that is not the rendered one, and `check --cut` exits 0 on a rendered cut whose `touches` names `tools/registry.ts` (禁止 `tools/**`).
+- No regression. `validate`, `render` and `check` are byte-identical to the `59de2ab` build on all 20 manifests and 60 lanes (100 outputs, 0 diffs). The AC9–AC12 and AC15 proofs pass. The shared helpers are byte-unchanged.
+- Verdict: CHANGES_REQUESTED on R4-1 only. The fix is a single bounded check in `parseCutSection` that reuses an existing code.
+
+## AC Completeness
+AC1–AC10, AC12, AC14 — implemented. Unchanged since round 3; the AC9 sweep, the AC10 sha256 pair and AC12 were re-run.
+- AC9: only `specs/fanout-wave5.1.md 2` and `specs/fanout-wave6.md 2` are non-zero.
+- AC10: `045b56ae…128a` and `485eabe0…f863` both match.
+- AC12: `1`.
+
+AC11 — implemented. The own-spec proof gives exit 1, but only because of the known `test/e297-main-protected-sop.test.mjs` manifest-version gap (out of scope). The oob proof prints `1` and then exits 1.
+
+AC15 — partial — tools/fanout-manifest.ts:1256-1382.
+- Section grammar proof: `exit=2`, 1 `CUT_ROW_MALFORMED`.
+- Cell grammar proof: `exit=2`, 1 `CUT_TOUCHES_UNQUOTED_PATH`.
+- Own-spec proof: exactly 1 line, the e297 `OUT`.
+- Every enumerated C4, C5 and R1 input and every control matches AC15.
+
+The whitelist still has a gap: R4-1 is a line inside the `## Cut` section, as `splitSections` bounds it, whose rendered rows differ from the parsed row. That breaks AC15's "anything outside them is exit 2, never skipped".
+
+AC13 — qa-owned, not judged.
+
+## Correctness
+Round-4 attack sweep. Each input is a cut run as `node scripts/fanout.mjs check --cut specs/fanout-post-v4-w3.md e296 <spec>`. `tools/config.ts` is owned; `tools/registry.ts` falls under 禁止 `tools/**`. To check how inputs render, I used markdown-it 14.1.0, installed in an isolated scratch dir; it handles line endings the CommonMark way.
+
+Each of these fails closed with exit 2:
+
+| input | error code |
+|---|---|
+| escaped `\|` inside a span | `MALFORMED` |
+| escaped `\|` outside a span | `UNQUOTED` |
+| a raw `\|` inside a span | the cell count goes to 7: `ROW_MALFORMED` |
+| an HTML comment as a section line, around a first table, or inside a cell | `ROW_MALFORMED` / `UNQUOTED` |
+| a header with 7 or 5 cells | `HEADER_DIFFERS` |
+| a separator with 5 or 7 cells | `ROW_MALFORMED` |
+| a tab-indented row | `ROW_MALFORMED` |
+| a ZWSP between spans | `UNQUOTED` |
+| a ZWSP-only line | `ROW_MALFORMED` |
+| an NBSP-only line followed by a row | `ROW_MALFORMED` (the parser treats the NBSP line as blank, so the later row falls outside the run) |
+| double-backtick spans (``` ``p`` ```, ``` `` `p` `` ```) | `UNQUOTED` (+`MALFORMED`) |
+| an empty span (``` `` ```) | `UNQUOTED` |
+| `— text`, `— span`, `—<br>span` | `UNQUOTED` |
+| backslash-escaped backticks | `UNQUOTED` + `MALFORMED` |
+| a bare CR inside a span | `MALFORMED` |
+| `touches` shifted by an extra `\|` | `ROW_MALFORMED` |
+| `## Cut` twice | `CUT_SECTION_DUPLICATE` |
+| `## cut` as the only heading | `CUT_SECTION_ABSENT` |
+| a fenced block inside the section | `ROW_MALFORMED` |
+
+These behave correctly: exit 0 for an in-bounds cut, exit 1 OUT for an out-of-bounds one.
+- Separator variants `:---:` / `:---` / `---:` and `| --- |` with spaces.
+- CRLF line endings: in bounds gives 0; a second CRLF row naming registry gives OUT exit 1.
+- Trailing whitespace and tabs on the header, separator and rows.
+- A tab or NBSP as the separator between spans: NBSP is `\s` in JS, so both spans are tokenised, and the registry span is OUT.
+- A BOM.
+- `## Cut ` with a trailing space (trimmed to `Cut`, read; registry is OUT).
+- EOF without a final newline, both in bounds (0) and out of bounds (OUT, 1).
+
+Not findings:
+- `| T-X-01 | x \| y | none | 1 | `tools/config.ts` | `tools/registry.ts` |` exits 0, but GFM also keeps `\|` inside the `desc` cell, so the rendered `touches` is `tools/config.ts` and registry sits in `design-link`. Parser and renderer agree.
+- A row containing U+2028 or a form feed exits 0. markdown-it renders it as the same single 6-cell row the parser reads, because CommonMark line endings are only LF, CR and CRLF.
+
+- **R4-1 — required — tools/fanout-manifest.ts:1256 (`parseCutSection` → `cutTableLines` / `cutSectionGrammarErrors`, over the shared `splitLines` at :261-263).** `splitLines` splits on `/\r?\n/`, so a bare CR stays inside a parser line. CommonMark (and GFM, and GitHub, VS Code preview and markdown-it) treats a bare CR as a line ending. Every whitelist in AC15 is applied to the parser's lines, not the rendered ones, so one physical line can carry two rendered rows whose cells the parser joins into one 6-cell row.
+  Failing input (reproduced; `\r` is one U+000D byte, no LF):
+  ```
+  # x
+
+  ## Cut
+
+  | id | desc | depends_on | est. files | touches | design-link |
+  |---|---|---|---|---|---|
+  | T-X-00\r| T-X-02 | x | none | `tools/config.ts` | `tools/registry.ts` |
+  ```
+  - `check --cut` prints `fanout check --cut: e296 — 1 ticket(s), 1 token(s), 0 out of bounds` and exits 0. The parser sees one row: `id` = `T-X-00`, `touches` = cell 5 = `` `tools/config.ts` ``, and `design-link` = `` `tools/registry.ts` ``.
+  - The rendered table (markdown-it) has two rows. Row `T-X-00` has empty cells. Row `T-X-02 ¦ x ¦ none ¦ tools/config.ts ¦ tools/registry.ts ¦ (pad)` puts `tools/registry.ts` in the `touches` column.
+  - A terminal `cat` shows the same thing: the CR returns the cursor and the second row overwrites `T-X-00`.
+
+  So the cut the integrator and the human read names a 禁止 file in `touches`, and the manifest tier auto-approves it. The same byte also hides a whole second `## Cut` heading and table inside another section (`x\r## Cut\r…` under `## Notes`): markdown-it renders two `Cut` sections, `splitSections` sees one, and the result is exit 0.
+  Fix (fail closed; shared helpers unchanged; existing code only): at the top of `parseCutSection`, refuse any CR not followed by LF anywhere in the spec text, e.g. `/\r(?!\n)/`. Report `CUT_ROW_MALFORMED` with the line number and the message "a carriage return without a line feed (Markdown renders it as a line break)". Checking the whole text, not just the section lines, also closes the hidden-heading variant. qa pins both inputs above as exit 2.
+
+- **R4-2 — recommended (follow-up ticket candidate, not blocking) — tools/fanout-manifest.ts:1237 (the `s.name === "Cut"` filter over `splitSections`).** Some headings render as a second `Cut` section but are not section starts for `splitSections`. Content under them is not read, and the result is exit 0 when a valid `## Cut` also exists. Reproduced, each exit 0, rendered by markdown-it as a second `Cut` h2 whose table puts `tools/registry.ts` in `touches`:
+  - `##\tCut` (a tab after the hashes)
+  - ` ## Cut` (1–3 leading spaces)
+  - setext `Cut` + `---`
+  - `## cut` (a different heading text)
+
+  AC11 and AC15 define the section as exactly `Cut` as `splitSections` bounds it. This is the same class as the documented fenced-code limit, and the full closure (setext headings, homoglyph `Сut`) needs a real Markdown parser, so I do not block on it. A cheap partial guard: in `parseCutSection`, treat any line matching `/^ {0,3}##[ \t]+cut[ \t#]*$/i` as a Cut heading for the `CUT_SECTION_DUPLICATE` count. PM can fold this in with R4-1 or file it as E296-NEW-4.
+
+- Round-1–3 inputs re-run, all unchanged. 18 inputs give exit 2 `MALFORMED`: `:line` in a span, comma-, semicolon- and space-joined spans, every dot-segment form, `./`, a leading `-`, `:` or `/`, backslash, tab, ZWSP, U+2024, a fullwidth letter. 13 give exit 1 OUT or a refusal: brace alternation, `test/**`, `tools/*`, the prefix tricks, case variants, backticked `index.ts` / `README.md`. 4 give exit 0 IN: `.current/e296/.../x`, `qa_reports/foo/e296-x.md`, `specs/e296-*`, `qa_reports/*E296*`.
+- Size and backtracking: `cutTouchesLeftover`'s two regexes are linear (`/`[^`]+`/g`, `/[、,\s]+/g`), so ReDoS is impossible.
+
+## Quality
+- Private cut-only helpers versus "shared helpers byte-unchanged": the helpers honour the intent. AC15's Scope bullet named `malformedCutSpan` / `CUT_PLAIN_PATH_RE` because those were the cut-only helpers that existed at the time. The invariant it protects holds:
+  - `firstTable`, `pathTokens`, `isPathToken`, `unquotedPaths`, `matchesGlob`, `isImplicitBookkeeping`, `isGlobToken`, `splitRow`, `isSeparatorRow`, `backtickSpans`, `splitSections` and `splitLines` are all outside every diff hunk.
+  - The three new helpers are module-private and called only from `parseCutSection`.
+  - The 100 manifest outputs are byte-identical.
+- optional — tools/fanout-manifest.ts:1346-1353: `cutTableLines` is the same algorithm as `firstTable` (:282-289), the first run of `|`-leading lines. Calling `firstTable(s)` would remove the duplicate without changing it. Not required.
+- `tableRows` is no longer used on the cut path, but it is still used by the manifest parser (:450, :680), so it is not dead code.
+- Comment discipline (4b): the `parseCutSection` JSDoc addition (:1227-1234, mirrored in `dist/…d.ts`) says WHAT (the two whitelists) and WHY (a skipped line or word could name a file outside the lane). The three helper JSDocs state their contracts. None names a ticket, a reviewer or anything sensitive. All kept.
+- No `any` in the diff. No new `FANOUT_CODES` entry.
+
+## Architecture
+Fits specs/e296-manifest-tier-cut-approval-architecture.md. `check --cut` is still a pure function over two texts (no git), and the changes sit inside `parseCutSection` behind the existing exported surface. The R4-1 fix belongs in the same place.
+
+## Security
+`check --cut` exit 0 stands in for the human's containment review under the manifest tier, so R4-1 is a safety defect: a hidden-byte row reaches auto-approval with a 禁止 path in its rendered `touches`. There is no injection surface (spec text is only regex-matched and echoed) and no secrets. Echoed leftover text goes to the terminal verbatim. A cut containing control characters such as ESC could print terminal escapes in an error message. This is optional hardening and not new to this round.
+
+## Performance
+No regression. The section scan, the `Set` of table line numbers and one or two regex passes per cell are all linear. The 100 manifest outputs are byte-identical.
+
+## Suite
+`node scripts/test-lock.mjs -- npm test` at `32b6c89` (tree clean except `.current/e296/**`): 3128 tests, 3110 pass, 15 fail, 3 skipped. The 15 reds are exactly the known qa-owned set: compose goldens ×7 (`test/compose-equivalence.test.mjs` ×6 + `test/skill-manifest.test.mjs:97`), four context-budget ceilings (`test/context-budget.test.mjs:475/:554/:569/:894`), `test/e5-intake-tiering.test.mjs:67/:214`, `test/e178a-integrator-role.test.mjs:75` and `test/e297-main-protected-sop.test.mjs:101`. No new red. The diff touches no test file, so step 4a is not armed.
+
+## Verdict
+CHANGES_REQUESTED. The AC15 whitelists hold against every enumerated and new input except a bare CR (R4-1). That byte makes one parser line render as two cut rows, so `check --cut` exits 0 on a rendered cut whose `touches` names `tools/registry.ts`. The fix is one bounded check in `parseCutSection` under `CUT_ROW_MALFORMED`. R4-2 (lookalike `Cut` headings) is recommended, not blocking.
