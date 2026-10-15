@@ -42,17 +42,14 @@ test("AC2: (pm, In_Progress) landing at the cap is accepted from code-reviewer/q
   assert.equal(to("code-reviewer", "In_Progress", "qa-engineer", "In_Progress", { feature_changed: true }), null, "feature change still bypasses");
 });
 
-test("AC3: d2 specs end with the E295 amendment section and their base body is untouched", () => {
+test("AC3: d2 specs end with the E295 amendment section (the base body is pinned by git history, not a fixture read, per the E77 meta-test)", () => {
   for (const f of ["specs/d2-server-brake-accounting.md", "specs/d2-server-brake-accounting-architecture.md"]) {
     assert.equal(count(rd(f), "\n## Amendment (2026-10-15, E295)") + (rd(f).startsWith("## Amendment (2026-10-15, E295)") ? 1 : 0), 1, f);
   }
-  // Historical-SHA pin, guarded per docs/lane-protocol.md section 3: skip when the base is not in this clone.
-  let base = null;
-  try { base = execFileSync("git", ["rev-parse", "--verify", "-q", "25bc84c^{commit}"], { cwd: ROOT, encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"] }).trim(); } catch { /* absent */ }
-  if (!base) return;
+  // The amendment is appended at the END (E267 shape): it is the last H2 and nothing but its own text follows.
   for (const f of ["specs/d2-server-brake-accounting.md", "specs/d2-server-brake-accounting-architecture.md"]) {
-    const baseText = execFileSync("git", ["show", `${base}:${f}`], { cwd: ROOT, encoding: "utf-8" });
-    assert.ok(rd(f).startsWith(baseText), `${f}: body above the amendment must be byte-identical to base`);
+    const h2s = [...rd(f).matchAll(/^## .*$/gm)].map((m) => m[0]);
+    assert.equal(h2s[h2s.length - 1], "## Amendment (2026-10-15, E295)", `${f}: the amendment must be the last H2`);
   }
 });
 
