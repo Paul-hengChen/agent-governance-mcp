@@ -59,7 +59,7 @@ Each AC names its ticket item. Tests, golden regeneration and ceiling measuremen
 const-08 (chain tag) enters the design-arm constitution (10226), the coordinator bundle (21138) and the non-design constitution (8129); coord-03 enters the coordinator bundle; skill-pm has its own 4401 ceiling. All four are zero-headroom (E297 re-baseline), so all four are expected to rise. The human approves the principle with this cut ("each ceiling set to the exact measured value, zero headroom"); qa measures and reports the values in the lane report (AC13).
 
 ### R2 — dispatch pin
-`sr-engineer=fable` (manifest *Dispatch pins*; the coordinator persists it in `dispatch_pins` before the sr-engineer dispatch). Not written by PM.
+`sr-engineer=opus` (manifest *Dispatch pins*, human ruling 2026-10-15 in the integrator session, relayed via mailbox to-lane#3; the coordinator persists it in `dispatch_pins` before the sr-engineer dispatch). Not written by PM.
 
 ### Pre-review status
 Cut sent to the integrator mailbox by the coordinator (lane-protocol §5-2); not yet closed. Architect's Open Questions get a second pre-review before the human approves.
@@ -115,7 +115,7 @@ Cut sent to the integrator mailbox by the coordinator (lane-protocol §5-2); not
 - **Pre-existing test pins that will move (qa-owned, in the lane's owned set)**: `test/e5-intake-tiering.test.mjs:73` (defaults `deepEqual`); any `LANE_PROVISIONAL` text pin in `test/e177a-*.test.mjs`. `test/error-code-contract.test.mjs` is e308's; this lane adds no gate code and changes no hint, so it is expected untouched — if qa finds it pinned to content, mailbox, not a fix.
 - Baseline measured on base for AC9 / AC10: 18 of 20 manifests `validate` exit 0; `fanout-wave5.1.md`, `fanout-wave6.md` exit 2 (legacy, no Dispatch pins / Decisions sections); render sha256 for w3/e296 `045b56ae…128a`, w2/e295 `485eabe0…f863`.
 - Resource Audit Gate: the requirement documents (the manifest, backlog rows E296 / E309, the landing-site files) contain no external references (no URLs, design files or foreign ticket systems; `docs/config.md`'s only link is in-repo `arming.md`); `external_refs` omitted.
-- Routing: architect hop (manifest decision: P2, ~8 files, new CLI subcommand, format compatibility); then sr-engineer (`fable`, R2) → code-reviewer → qa-engineer. Hop budget: cap 14; expected use pm 1 + architect 1 + sr 1 + review ≤2 + qa ≤2 = 7.
+- Routing: architect hop (manifest decision: P2, ~8 files, new CLI subcommand, format compatibility); then sr-engineer (`opus`, R2) → code-reviewer → qa-engineer. Hop budget: cap 14; expected use pm 1 + architect 1 + sr 1 + review ≤2 + qa ≤2 = 7.
 - `prd_path` is not recorded on the lane handoff: the tool boundary requires an absolute path and `.current/<lane>/handoff.md` is tracked (lane-protocol §1-1 forbids absolute worktree paths in tracked files; 20 archived lane handoffs carry the relative form). Filed as `E296-NEW-1` in `.current/e296/pending-tickets.md`. The PRD is `docs/backlog.md` rows E296 / E309.
 - Visual Structural Assertions omitted: no `design/<feature>.md`, mode = no-design.
 
