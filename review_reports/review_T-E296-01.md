@@ -523,3 +523,82 @@ Human ruling "A" in the lane session: fix R4-1 only; R4-2 is filed as pending ti
 - The reviewer's `attack.mjs` (49 cases) re-run: every case gives the same result as round 4 except the four bare-CR cases above, which are now exit 2. The `cut_plus_lower` / `cut_plus_tab` / `cut_plus_indent` / `cut_plus_setext` cases still exit 0; they are R4-2 (E296-NEW-4).
 - AC proofs re-run: AC9 (only `fanout-wave5.1.md 2` and `fanout-wave6.md 2`), AC10 (`045b56ae…128a`, `485eabe0…f863`), AC11 (own spec exit 1 for the known e297 gap; oob `1` then `exit=1`), AC12 (`1`), AC15 (section `exit=2` + 1 `CUT_ROW_MALFORMED`; cell `exit=2` + 1 `CUT_TOUCHES_UNQUOTED_PATH`; own spec `1` line).
 - `validate` / `render` / `check <manifest> <lane>`: 20 manifests, 140 outputs, 0 diffs against the `59de2ab` `dist/`.
+
+## Round 5 — APPROVED — by code-reviewer
+
+covers: T-E296-01, T-E296-02, T-E296-03, T-E296-04, T-E296-06
+
+## Summary
+- Round-5 delta `abfab8a..HEAD` (`1a4609d` fix, `d4ad0cc` lane state). Code change is one bounded check at the top of `parseCutSection` (tools/fanout-manifest.ts:1239-1256): split once with the shared `splitLines`, refuse any line still holding a CR (`/\r(?!\n)/`) with one `CUT_ROW_MALFORMED` naming the line(s), then hand the same `lines` to `splitSections`. `dist/` changes only `dist/tools/fanout-manifest.*`; other files are lane bookkeeping (`.current/e296/**`, this report).
+- R4-1 is closed. All four round-4 `lone_cr_*` / `span_cr` inputs now exit 2, along with 13 new CR variants (below). CRLF files still parse, and give the same output as LF.
+- No regression. `validate` / `render` / `check` match the `59de2ab` build byte for byte on all 20 manifests (sweep: 100 outputs, 0 diffs; `r2/run.sh`: 726 lines, identical). The AC9–AC12 and AC15 proofs pass. Every previously-held attack input gives the same result as at `abfab8a`. Shared helpers are byte-unchanged vs `c392cc3`.
+- Gates: `npm run build` 0 with `dist/` clean afterwards, `tsc --noEmit` 0, `npm audit --audit-level=high` 0. The suite reds are the known qa-owned 15 (see Verdict).
+- Verdict: APPROVED. The findings below are recommended or optional only.
+
+## AC Completeness
+AC1–AC10, AC12, AC14 — implemented. Unchanged since round 4. AC9 and AC10 were re-proved by the byte-identity sweep vs `59de2ab`; AC12's usage text has its fourth `check --cut` line.
+
+AC11 — implemented. The own-spec run exits 1 only because of the known `test/e297-main-protected-sop.test.mjs` OUT (manifest-version gap, out of scope). A CRLF copy of the own spec gives output byte-identical to the LF copy, with exit 1 for the same reason.
+
+AC15 — implemented — tools/fanout-manifest.ts:1239-1256 plus the round-4 grammar.
+- Section proof: `exit=2`, 1 `CUT_ROW_MALFORMED`.
+- Cell proof: `exit=2`, 1 `CUT_TOUCHES_UNQUOTED_PATH`.
+- Own-spec proof: `1` (the e297 OUT only).
+- `prior.mjs` rounds 1–3: malformed 18, out 13, in 4, bad 0.
+- The R4-1 gap in "anything outside them is exit 2" is closed: a bare CR can no longer make the parsed lines differ from the rendered rows.
+
+AC13 — qa-owned, not judged.
+
+## Correctness
+R4-1 re-test. `attack5.mjs` is the round-4 `attack.mjs` plus 14 CR / CRLF cases, run on HEAD and on the `abfab8a` dist side by side. Lane `e296` of `specs/fanout-post-v4-w3.md`.
+
+Inputs that changed, all now exit 2 `CUT_ROW_MALFORMED`:
+
+| input | `abfab8a` | HEAD |
+|---|---|---|
+| `lone_cr_row` (the R4-1 failing input) | 0 | 2 |
+| `lone_cr_only_row` | 0 | 2 |
+| `lone_cr_heading` (`x\r## Cut\r…` hidden under `## Notes`) | 0 | 2 |
+| `span_cr` (CR inside a backtick span) | 2 MALFORMED_PATH | 2 |
+| CR at start of file, before `# x` | 0 | 2 |
+| CR at start of file, before `## Cut` | 2 SECTION_ABSENT | 2 |
+| `\r\r\n` line endings throughout | 0 | 2 |
+| `\r\r\n` rows, registry in row 2 | 1 OUT | 2 |
+| CR inside an in-bounds span | 2 | 2 |
+| `## Cut\r ` (CR in the heading line) | 0 | 2 |
+| `## Cut\r<table joined by CR>` hiding an OOB table | 2 SECTION_ABSENT | 2 |
+| `# x\r## Cut\r\r<OOB table>` in the title line | 0 | 2 |
+| trailing bare CR at EOF, LF file | 0 | 2 |
+| trailing bare CR at EOF, CRLF file | 0 | 2 |
+| bare CR inside a fenced block in a far section | 0 | 2 |
+
+Inputs that did not change:
+- `crlf_ok` 0, `crlf_oob` 1 OUT, full-CRLF spec with a `## Notes` section 0, mixed LF/CRLF 0.
+- Every other round-4 case gives the same result as at `abfab8a`, including the `cut_plus_*` heading-variant cases at exit 0 (R4-2, filed as E296-NEW-4, non-blocking by human ruling) and `u2028_row` / `ff_row` at 0. CommonMark line endings are only LF, CR and CRLF, so those two render as the single row the parser reads.
+
+How the check works: `splitLines` splits on `/\r?\n/`, so every CRLF pair is gone before the test runs. Any CR left in a line is therefore bare, and a bare CR is exactly the CommonMark line ending that the parser would otherwise miss. The check runs on the whole text before section bounding, so it also covers a CR that would hide or forge a `## Cut` heading. No current file in `specs/`, `docs/` or `content/` contains a bare CR, so no existing spec is newly refused.
+
+Manifest side stays `validate`'s concern and is byte-identical to `59de2ab`. Three manifest copies (bare CR inside the e296 Lanes row, CR at start of file, full CRLF) give identical exit codes and sha1 outputs on HEAD and `59de2ab` for `validate`, `check` and `render`.
+
+- **optional — follow-up suggestion, not this lane.** A manifest with a bare CR inside a Lanes row still passes `validate` (exit 0, same as base). That is the same render/parse split on the manifest side. The scope rule here is that the manifest side must stay byte-identical to base, so this is suggested as a future ticket, not a finding against the lane.
+
+## Quality
+- **recommended — tools/fanout-manifest.ts:1235-1237 vs :1241-1243.** The new JSDoc paragraph and the inline comment say the same thing. `agc check — comments` flags this block at `tools/fanout-manifest.ts:1221 long-block 16 lines (limit 7)`. It was already over the limit before this round, and the delta adds 3 lines. Keeping one of the two would do. The warning is advisory and the comments are accurate, generic and free of sensitive detail, so I am keeping it with this reason rather than sending it back.
+- **optional — :1244.** The `(?!\n)` lookahead can never fail after `splitLines`, so `/\r/` is equivalent. The lookahead does document intent, so either form is fine.
+- **optional.** The error reuses `CUT_ROW_MALFORMED` even when the CR is outside `## Cut`. The spec forbids new `FANOUT_CODES`, and the message names the line and the remedy, so this is acceptable.
+- No `any` was added, and no test files were touched.
+
+## Architecture
+The check lives in `parseCutSection` only. No new `FANOUT_CODES`, and these shared helpers are byte-identical to `c392cc3`: `splitLines`, `splitSections`, `firstTable`, `pathTokens`, `isPathToken`, `unquotedPaths`, `matchesGlob`, `isImplicitBookkeeping`, `isGlobToken`. Every file in the delta is owned by the lane.
+
+## Security
+No new input surface. The check is a fail-closed refusal, and the error message echoes only line numbers, never spec content.
+
+## Performance
+One extra linear regex pass over the lines, and the text is still split only once. No regression.
+
+## Verdict
+APPROVED — R4-1 is closed for every CR placement tried, CRLF still parses, and validate/render/check plus all previously-held inputs are unchanged.
+
+Suite (`node scripts/test-lock.mjs -- npm test`): 3128 tests, 3110 pass, 15 fail, 3 skipped. The 15 reds are exactly the known qa-owned set: compose-equivalence ×6 (:71 ×4, :119, :126), skill-manifest:97, context-budget :475/:554/:569/:894, e5-intake-tiering :67/:214, e178a:75 and e297:101. None comes from this delta.
+
