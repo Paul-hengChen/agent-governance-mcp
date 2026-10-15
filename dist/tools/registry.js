@@ -4,6 +4,7 @@
 // here instead of a JSON Schema literal, zod const and dispatcher case.
 // Placement is load-bearing: this file stays under tools/ so
 // test/error-code-contract.test.mjs's CODE_SOURCE_FILES glob scans it.
+import * as fs from "node:fs";
 import * as path from "node:path";
 import { z } from "zod";
 import { handleDetectDrift } from "./drift.js";
@@ -14,6 +15,52 @@ import { handleGetNextTask, handleCompleteTask, handleRollbackTask, handleVoidTa
 import { handleUpdateState, handleGetState } from "./handoff-orchestrator.js";
 import { handleIndexPrd, handleClearPrdChunks, DEFAULT_EMBEDDING_MODEL } from "./rag.js";
 import { handleGateStats } from "./gate-stats.js";
+import { emitGateTelemetry } from "./telemetry.js";
+import { ALL_GATE_CODES } from "../gates/registry.js";
+// ==========================================
+// Telemetry for rejections raised by zod (E303)
+// ==========================================
+// A gate code raised inside a zod schema (today DISPATCH_PIN_TIER_REJECTED,
+// producer "tool-boundary") rejects before any handler runs, so the handler-side
+// emitGateTelemetry calls never see it. defineTool.run therefore emits for every
+// zod issue whose message starts with a registered gate code, using the RAW
+// arguments (they failed validation, so each field is read defensively).
+const GATE_CODE_SET = new Set(ALL_GATE_CODES);
+// The leading upper-snake token of an issue message, matched as a whole word so
+// one code that is a prefix of a longer token is never mistaken for it.
+const ISSUE_GATE_CODE_RE = /^([A-Z][A-Z0-9_]*)(?![A-Za-z0-9_])/;
+function rawStringField(rawArgs, key) {
+    if (!rawArgs || typeof rawArgs !== "object" || Array.isArray(rawArgs))
+        return null;
+    const value = rawArgs[key];
+    return typeof value === "string" ? value : null;
+}
+// Best-effort and never throws: the caller always rethrows the original
+// ZodError untouched. The sidecar lives under the workspace, so the emit is
+// skipped unless workspace_path is an absolute path naming an existing
+// directory: an unvalidated caller-supplied path must not cause directories to
+// be created anywhere else on disk.
+function emitZodGateTelemetry(rawArgs, err) {
+    try {
+        const workspacePath = rawStringField(rawArgs, "workspace_path");
+        if (workspacePath === null || !path.isAbsolute(workspacePath))
+            return;
+        if (!fs.statSync(workspacePath).isDirectory())
+            return;
+        const agentId = rawStringField(rawArgs, "agent_id");
+        const feature = rawStringField(rawArgs, "active_feature");
+        for (const issue of err.issues) {
+            const match = ISSUE_GATE_CODE_RE.exec(issue.message);
+            if (match && GATE_CODE_SET.has(match[1])) {
+                emitGateTelemetry(workspacePath, match[1], agentId, feature);
+            }
+        }
+    }
+    catch {
+        // Observability only — a missing workspace, a hostile getter on the raw
+        // args or a sidecar failure must never replace the validation error.
+    }
+}
 export function defineTool(spec) {
     return {
         name: spec.name,
@@ -23,7 +70,21 @@ export function defineTool(spec) {
         // so .parse() returns z.infer<TSchema> — NOT `any` — and feeds a handler
         // typed for exactly that. Erasure to (unknown)=>Promise happens at the
         // `run` boundary. No cast, no `any`, at any point.
-        run: (rawArgs) => spec.handler(spec.zodSchema.parse(rawArgs)),
+        // A parse failure still throws SYNCHRONOUSLY, and the very same ZodError
+        // instance is rethrown after the telemetry emit, so index.ts formats it
+        // exactly as before. (E303)
+        run: (rawArgs) => {
+            let args;
+            try {
+                args = spec.zodSchema.parse(rawArgs);
+            }
+            catch (err) {
+                if (err instanceof z.ZodError)
+                    emitZodGateTelemetry(rawArgs, err);
+                throw err;
+            }
+            return spec.handler(args);
+        },
     };
 }
 // ==========================================
