@@ -2,22 +2,23 @@
 schema_version: 15
 active_feature: "e308-tier-enum-and-zod-telemetry"
 status: "In_Progress"
-last_updated: "2026-10-15T07:32:22.581Z"
-last_agent: "sr-engineer"
+last_updated: "2026-10-15T07:36:39.045Z"
+last_agent: "qa-engineer"
 scope_decision: "single-feature"
 scope_decision_why: "E308 + E303 edit the same dispatch_pins code path (tools/registry.ts, handoff-parse.ts, handoff-orchestrator.ts, gates/registry.ts comments); the integrator cut them as one feature with three tasks (T-E308-01 sr, T-E303-01 sr, T-E308-02 qa) per specs/fanout-post-v4-w3.md."
 cut_approved: true
 dispatch_pins:
   sr-engineer: "opus"
 evidence_schema: 2
-next_role: "code-reviewer"
-dispatched_at: "2026-10-15T07:32:22.581Z"
+next_role: "qa-engineer"
+dispatched_at: "2026-10-15T07:36:39.045Z"
+review_verdict: "APPROVED"
 dispatch_mechanism: "task"
 dispatch_mechanism_tier: "opus"
 qa_round: 0
 review_round: 0
 visual_round: 0
-hop_count: 2
+hop_count: 4
 qa_rounds_total: 0
 review_rounds_total: 0
 visual_rounds_total: 0
@@ -28,12 +29,11 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- sr-engineer: T-E308-01 and T-E303-01 ready for code review (no completed_tasks; qa flips them).
-- T-E308-01 commit 72c01b1 — files: tools/handoff-parse.ts (DISPATCH_PIN_TIER_VALUES = MODEL_TIERS, same reference; DispatchPinTier type deleted, it had no consumer), tools/registry.ts (DISPATCH_PIN_TIER_HINT is a template over DISPATCH_PIN_TIER_VALUES.join(', '); eight inputSchema role entries call dispatchPinTierJsonSchema() which returns a fresh {type:'string', enum:[...DISPATCH_PIN_TIER_VALUES]} per role; zod-object comment and inputSchema description reworded to the spec's gate-sentence), tools/handoff-orchestrator.ts (advisory hint tier list is a template over the constant), plus dist/tools/{handoff-parse,registry,handoff-orchestrator}.* and .current/e308/{handoff.md,dispatch.jsonl}. tools/skill-frontmatter.ts untouched (MODEL_TIERS value/shape unchanged).
-- T-E303-01 commit cd4b03b — files: tools/registry.ts (defineTool.run: try { parse } catch (err) { if (err instanceof z.ZodError) emitZodGateTelemetry(rawArgs, err); throw err; } — still throws SYNCHRONOUSLY, same instance, so existing zodIssuesFor/assert.rejects idioms and index.ts formatting are unchanged; emitZodGateTelemetry matches each issue.message with /^([A-Z][A-Z0-9_]*)(?![A-Za-z0-9_])/ against a Set built from ALL_GATE_CODES, raw-arg fields string-or-null, whole body in try/catch), gates/registry.ts (producer comment at the GateProducer type only; catalog comment left as-is since it does not overstate), dist/tools/registry.*, dist/gates/registry.{js,d.ts}.map (registry.js unchanged because tsc strips comments). tools/telemetry.ts untouched; index.ts untouched.
-- Reviewer look: (1) deliberate narrowing beyond AC8 — the emit is skipped unless workspace_path is absolute AND fs.statSync says it is an existing directory; rationale: the args failed validation, so an untrusted absolute path must not make emitGateTelemetry's mkdirSync create directories elsewhere on disk; side benefit: existing tests that pass workspace_path '/tmp/does-not-matter' with a bad tier (dispatch-pins Z2/Z3) no longer leave a sidecar in /tmp (verified absent). AC8's qa test uses an existing temp dir, so it is unaffected. (2) AC6 grep proof caveat: `grep -c 'no gate' tools/registry.ts` prints 2, not 0 — the two remaining hits are pre-existing comments on cut_approved_source ('no gate reads it') and dispatch_mechanism ('no gate reads either'), not the dispatch_pins block; the spec's claim that the only hits were in that block is inaccurate. Left untouched as out of scope; qa should scope the AC6 check to the dispatch_pins block.
-- Proofs (run on the lane): AC1 grep 0 + node check prints same; AC2 grep 0, eight enums deep-equal [...MODEL_TIERS] and are 8 distinct arrays; AC3 zod message === 'DISPATCH_PIN_TIER_REJECTED: "claude-opus-4-1" ' + hintStatic (true), hintStatic grep 1; AC4 grep 0; AC5 grep 0; AC6 DISPATCH_PIN_TIER_REJECTED count 4 (see caveat above); AC7 schema/ diff empty; AC8 ad-hoc: absolute temp ws -> one line {gate:tool-boundary, error_code:DISPATCH_PIN_TIER_REJECTED, agent_id:pm, feature:f}, agent_id omitted -> null, relative ws -> no line, unknown role key -> no line; AC9 ad-hoc: .current as a regular file -> same ZodError class, identical issues JSON and message; AC10 ad-hoc: handleGateStats moves DISPATCH_PIN_TIER_REJECTED from zero_fire to fired (fires 1); AC11 non-comment diff lines 0, mapping line 1, '(none)' 0, index.ts diff empty; AC12 GATE_REGISTRY 34, only tool-boundary producer DISPATCH_PIN_TIER_REJECTED.
-- Tests (smoke, not the full suite): dispatch-pins, skill-frontmatter, error-code-contract, telemetry, e26-gate-stats, e35-pipeline-order, e297-main-protected-sop, dispatch-mechanism, e295-hop-cap-and-sop-halves -> 153/153; qa-flow, repro-first-gate, e114, e148, agc-adapters -> 227/227. npm run build clean; npx tsc --noEmit clean; npm audit --audit-level=high exit 0 (8 pre-existing low/moderate, no package change). Full suite under test-lock is qa's T-E308-02.
+- code-reviewer: APPROVED T-E308-01 + T-E303-01 (commit a6e71c2). review_report: review_reports/review_T-E308-01.md, review_reports/review_T-E303-01.md. No required findings.
+- qa AC6 scoping: grep -c 'no gate' tools/registry.ts = 2 (confirmed). Both are older comments on cut_approved_source (:317) and dispatch_mechanism (:322), outside the dispatch_pins block. Scope the AC6 assertion to the dispatch_pins zod comment (~:280-291) and the inputSchema description (~:663): assert neither 'File-mode only, no gate' nor 'Advisory bookkeeping — no gate' appears. Do not assert a whole-file count of 0.
+- Ruling, narrowing beyond AC8 (skip unless workspace_path is absolute AND an existing directory): sound. emitGateTelemetry mkdirSync-recursive creates <ws>/.current/<lane>/, so a workspace with no .current/ still records the fire (verified). AC8 tests must use an existing temp directory as workspace_path.
+- Recommended, non-blocking (C1): with workspace_path=<ws>/.current plus a bad dispatch_pins value, zod v4 skips the .current-basename refine, so the emit writes <ws>/.current/.current/_primary/telemetry.jsonl. One-line guard possible. Not required by AC8; qa may record it as a follow-up.
+- Optional (Q1): tier literals remain in the dispatch_pins inputSchema description and in gates/registry.ts clearingArtifact/hintStatic. All three are spec-retained. Only hintStatic gets a guard (qa AC3 byte-equality). Follow-up ticket candidate.
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.
