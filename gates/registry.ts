@@ -63,9 +63,10 @@ export interface GateDefinition {
   // (DR-3, qa-engineer's rewritten error-code-contract test) compares against.
   readonly hintStatic: string;
   // True iff the code is (and must stay) backtick-quoted in >=1 content/*.md.
-  // Every entry is true except DISPATCH_PIN_TIER_REJECTED (E300), whose prose
-  // sentence lands in a later content wave. The field exists so a
-  // code-internal gate can opt out without weakening the parity test.
+  // Every entry is currently true (DISPATCH_PIN_TIER_REJECTED, E300, was the
+  // one false entry until its coord-02 sentence landed with E295). The field
+  // exists so a code-internal gate can opt out without weakening the parity
+  // test.
   readonly documentedInProse: boolean;
 }
 
@@ -103,14 +104,14 @@ export interface GateDefinition {
 //   NON_QA_COMPLETED_TASKS_REJECTED  const-08-chain-31-mid.md
 //   QA_REVIEW_TARGET_REQUIRED       skill-qa-engineer.md
 //   AC_EXECUTION_LOG_MISSING        skill-qa-engineer.md
-//   DISPATCH_PIN_TIER_REJECTED      (none)
+//   DISPATCH_PIN_TIER_REJECTED      coord-02-host-dispatch.md
 
 // The 34-gate catalog, in documentation order (the non-qa completed_tasks write gate, E40,
 // added the 33rd, NON_QA_COMPLETED_TASKS_REJECTED — the reviewer-only completed_tasks gate
 // generalized to every non-qa identity; the dispatch_pins tier enum, E300, added the 34th,
 // DISPATCH_PIN_TIER_REJECTED — the first tool-boundary producer, raised by zod before the
-// pipeline and the first documentedInProse: false entry; its "(none)" mapping row above means
-// no content/*.md quotes it yet). Array order is DOC order only — it MUST NOT be relied
+// pipeline; it shipped as the one documentedInProse: false entry and flipped to true when
+// coord-02-host-dispatch.md quoted it, E295). Array order is DOC order only — it MUST NOT be relied
 // on for evaluation order (DR-5; that lives in handoff-orchestrator.ts as the ordered
 // UPDATE_STATE_GATE_PIPELINE array, E35).
 export const GATE_REGISTRY: readonly GateDefinition[] = [
@@ -631,7 +632,7 @@ export const GATE_REGISTRY: readonly GateDefinition[] = [
     clearingArtifact: "dispatch_pins.<role> set to one of opus, sonnet, haiku, fable",
     // tools/registry.ts DISPATCH_PIN_TIER_HINT — byte-exact; the received value precedes it.
     hintStatic: "is not a model tier; allowed: opus, sonnet, haiku, fable",
-    documentedInProse: false,
+    documentedInProse: true,
   },
 ];
 
