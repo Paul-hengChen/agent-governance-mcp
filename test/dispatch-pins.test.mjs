@@ -965,3 +965,25 @@ test("E300-R3: tw_get_state with no pins emits NO advisory and text identical to
   assert.ok(!("dispatch_pins_advisory" in JSON.parse(out.content[0].text)));
   assert.ok(out.content[0].text === expected, "no pins: byte-identical to storage text");
 });
+
+// ============================================================================
+// E308: single-source tier enum — the eight inputSchema enums are generated
+// ============================================================================
+
+test("E308-S1: the eight dispatch_pins inputSchema enums deep-equal MODEL_TIERS and are eight distinct array objects (no shared mutable reference)", async () => {
+  // WHY: the tier list is one constant; a hand-copied literal in one role entry
+  // would let the tool description drift from the zod enum. Distinct arrays
+  // stop a client mutation of one role's enum from leaking into the others.
+  const { MODEL_TIERS } = await import("../dist/tools/skill-frontmatter.js");
+  const entry = TOOL_REGISTRY.find((e) => e.name === "tw_update_state");
+  const props = entry.inputSchema.properties.dispatch_pins.properties;
+  const roles = ["pm", "researcher", "design-auditor", "architect", "sr-engineer", "code-reviewer", "qa-engineer", "release-engineer"];
+  assert.deepEqual(Object.keys(props).sort(), [...roles].sort());
+  const arrays = roles.map((r) => props[r].enum);
+  for (const [i, arr] of arrays.entries()) {
+    assert.deepEqual(arr, [...MODEL_TIERS], `${roles[i]} enum must deep-equal MODEL_TIERS`);
+  }
+  assert.equal(arrays.length, 8);
+  assert.equal(new Set(arrays).size, 8, "eight distinct array objects");
+  for (const arr of arrays) assert.notEqual(arr, MODEL_TIERS, "must be a copy, not the constant itself");
+});

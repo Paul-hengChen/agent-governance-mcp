@@ -655,3 +655,31 @@ test("E300: DISPATCH_PIN_TIER_REJECTED is registered, documentedInProse:true, an
 test("E300: SUFFIX_RE classifies DISPATCH_PIN_TIER_REJECTED as a gate-shaped code (the _REJECTED suffix keeps it visible to both extractors)", () => {
   assert.ok(SUFFIX_RE.test("DISPATCH_PIN_TIER_REJECTED"));
 });
+
+test("E308/AC3: the zod rejection message for a bad dispatch_pins tier equals `DISPATCH_PIN_TIER_REJECTED: \"<echo>\" ` + gate hintStatic byte-for-byte; registry still has 34 codes", async () => {
+  // WHY: tools/registry.ts composes its hint from MODEL_TIERS while gates/registry.ts
+  // keeps hintStatic as a literal (import-free leaf). This is the only check that the
+  // two renderings cannot drift apart.
+  const { TOOL_REGISTRY } = await import(path.join(PROJECT_ROOT, "dist", "tools", "registry.js"));
+  const entry = TOOL_REGISTRY.find((e) => e.name === "tw_update_state");
+  const echo = "claude-opus-4-1";
+  let err;
+  try {
+    await entry.run({
+      workspace_path: path.join(path.parse(PROJECT_ROOT).root, "e308-nonexistent-ws"),
+      active_feature: "f",
+      status: "In_Progress",
+      dispatch_pins: { "sr-engineer": echo },
+    });
+  } catch (e) {
+    err = e;
+  }
+  assert.ok(err, "bad tier must reject");
+  const issues = err.issues.filter((i) => i.message.startsWith("DISPATCH_PIN_TIER_REJECTED"));
+  assert.equal(issues.length, 1);
+  const g = GATE_REGISTRY.find((e) => e.errorCode === "DISPATCH_PIN_TIER_REJECTED");
+  assert.equal(issues[0].message, `DISPATCH_PIN_TIER_REJECTED: "${echo}" ` + g.hintStatic);
+  assert.equal(g.hintStatic, "is not a model tier; allowed: opus, sonnet, haiku, fable");
+  assert.equal(GATE_REGISTRY.length, 34);
+  assert.equal(ALL_GATE_CODES.length, 34);
+});
