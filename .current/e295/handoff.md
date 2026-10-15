@@ -1,8 +1,9 @@
 ---
 schema_version: 15
 active_feature: "e295-hop-cap-and-sop-halves"
-status: "In_Progress"
-last_updated: "2026-10-15T03:31:29.800Z"
+status: "Blocked"
+last_updated: "2026-10-15T03:43:05.421Z"
+blocking_reason: "QA: full suite on HEAD 42a6903 is 3120/3128 with 5 reds that the brief's named-test set cannot absorb (missed by sr and the reviewer; not on the expected-red list): 3 are test-scope questions for the coordinator/human, 2 are one spec defect. No sr-engineer code defect found; AC1-AC12 all PASS."
 last_agent: "qa-engineer"
 prd_path: "docs/backlog.md"
 scope_decision: "single-feature"
@@ -12,11 +13,8 @@ dispatch_pins:
   sr-engineer: "fable"
 dispatch_mode: "feature"
 evidence_schema: 2
-next_role: "qa-engineer"
-dispatched_at: "2026-10-15T03:31:29.800Z"
-review_verdict: "APPROVED"
 dispatch_mechanism: "task"
-dispatch_mechanism_tier: "opus"
+dispatch_mechanism_tier: "sonnet"
 qa_round: 0
 review_round: 0
 visual_round: 0
@@ -31,11 +29,15 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- review_report: review_reports/review_T-E295-01.md (batched round; covers: T-E295-01, T-E295-02, T-E298-01, T-E300-01, T-E301-01; committed 0a66737). APPROVED — AC1–AC12 implemented, every spec proof passes on 5772bd1; dist rebuild clean; fanout check 22 files / 0 out of bounds; check-bookkeeping exit 0 (moved-root unique/ambiguous/dead re-verified on a scratch overlay).
-- qa R2 (recommended, MUST check before PASS): task ids T-E298-01 and T-E300-01 collide with wave-1 evidence still at the roots — review_reports/review_T-E298-01.md, review_reports/review_T-E300-01.md, qa_reports/review_T-E298-01.md, qa_reports/review_T-E300-01.md. MISSING_REVIEW_EVIDENCE for those ids is satisfied by the wave-1 files regardless (this round's real evidence is the covers: line). Confirm the qa_review auto-record does not overwrite the wave-1 qa files (cited by backlog rows), or record qa evidence via a batched covers: file. Integrator: 7a basename collision at next release.
-- qa R1 (recommended): coord-03 whole-file growth is 1,289 chars — 821 from the AC4 row (within AC4's 1,100) + 468 from AC12's convention rewrite. Report the coordinator-bundle ceiling (20749 → measured, zero headroom, R2) with this split.
-- qa AC13 expected reds (all explained by the diff; 206/216 on the nine named files): context-budget coordinator 20749; e178a 'AC13: SOP verification stage' (porcelain-after-suite bullet replaced per AC8); e299 CITE-ROOT-ARCHIVED, CITE-AMBIGUOUS (root ambiguous now a note, exit 0), CITE-ROOT-TOLERATED (root-at-root note dropped), EXIT-0-WITH-NOTES; error-code-contract E300 documentedInProse:false pin; hop-count-transitions t-const (=== 10) and t-gate-fires-at-cap. feature-rollup, e297, e246 green unchanged. Add the AC2 landing case (code-reviewer/qa-engineer:In_Progress -> pm at 14 -> null; hop 14 -> 15 no reset).
-- integrator (recommended R3): skill-integrator Stage 6-4 BEHIND remedy still names a local full suite before the push — outside AC7 scope, harmless, candidate follow-up. Measured note counts differ from the spec: base 27 tolerated citations (8 root + 19 predicted-archive), not 22; the 5c rewrite is 19 predicted-archive citations, not 14. sr's 5c rewording ('citing archive evidence paths' -> write-time) is required for E301 consistency, not scope creep. e78057d (HOP_CAP_EXCEEDED hintStatic/triggerEdge 10->14) is correct and necessary (the hint is printed in the live rejection).
+- QA verdict: all AC1-AC12 proofs PASS; AC13 done except 5 unabsorbed reds. HEAD 42a6903. Evidence (covers: all five ids, wave-1 files untouched): qa_reports/review_E295_T-E295-01-05.md. NOT passed: PASS write waits on the ruling below.
+- Measured coordinator-bundle ceiling 21138 (20749 -> 21138, zero headroom, set in test/context-budget.test.mjs); the other three ceilings 5717/10226/8129 unchanged and green. coord-03 growth 1,289 chars = 821 AC4 + 468 AC12. Goldens regenerated (const-01 hop row 10->14 and coord-02/03 text only).
+- Full suite on 42a6903 (clean tree): 3120/3128 pass, 5 red. build clean; check-bookkeeping exit 0; npm audit --audit-level=high exit 0 (moderate-only, pre-existing hono/body-parser).
+- RED 1+2 (one defect): test/check-md-tables.test.mjs 'AC7 real corpus' and 'CQ-9' fail because specs/e295-hop-cap-and-sop-halves.md:79 (Copy/Strings row e295.limits.hop) has an unescaped pipe inside a backtick span -> 6 cells vs 3. Fix = escape as \| in that one cell (spec is the pm/lane artifact, not in the qa test set).
+- RED 3: test/e177b-lane-status.test.mjs 'AC4 --rollup ...' sums hopCount 6+6=12 which is now UNDER the cap of 14. Fix = hopCount 8 on each lane (sum 16 > 14) or derive from HOP_CAP_EXPORTED. File not in qa's allowed test list.
+- RED 4+5: test/render-structure.test.mjs 'T-E8795-02' x2 assert the old convention text '<tree>/archive/<feature>/<file>' that E301 intentionally replaced. Fix = pin the new write-time phrase 'as it exists at write time' (and '<tree>/archive/<dir>/<file>' for the archived form). File not in qa's allowed test list.
+- Needed: coordinator/human authorizes qa to edit those two test files (a lane-owned-set widening for tests; same-wave, test-only) AND the spec pipe escape (pm/coordinator or qa with authorization). Then qa re-runs the full suite on the new HEAD and writes PASS + tw_complete_task x5. Do not route to sr-engineer: no source defect.
+- Findings filed in .current/e295/pending-tickets.md (E295-NEW-1..3): Stage 6-4 BEHIND remedy local suite; task-id reuse -> 7a basename collision; E301 counts 27/19 not 22/14. Also: lane-protocol section 3 hygiene — the E77 meta-test forbids git show <rev>:<path> in any test; qa's AC3 body pin was rewritten accordingly (amendment is last H2).
+- Files touched by qa: test/hop-count-transitions.test.mjs, test/error-code-contract.test.mjs, test/e178a-integrator-role.test.mjs, test/e299-check-bookkeeping.test.mjs, test/context-budget.test.mjs, test/e295-hop-cap-and-sop-halves.test.mjs (new), test/fixtures/compose-golden/** (12), qa_reports/review_E295_T-E295-01-05.md, .current/e295/pending-tickets.md.
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.
