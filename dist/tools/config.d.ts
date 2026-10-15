@@ -4,6 +4,7 @@ export interface CutApprovalAutoTier {
     maxPriority: string;
     allowSchemaChange: boolean;
     allowDesignArmed: boolean;
+    manifest: boolean;
 }
 export declare const CUT_APPROVAL_AUTO_TIER_DEFAULTS: Readonly<CutApprovalAutoTier>;
 export interface WorkspaceConfig {

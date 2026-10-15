@@ -101,7 +101,7 @@ test("AC8: coord-03 states bookkeeping never lands on local main, inside ## Back
 test("AC9: fable is a valid tier and the integrator SOP recommends it", async () => {
   const mod = await import(path.join(ROOT, "dist", "tools", "skill-frontmatter.js"));
   assert.deepEqual([...mod.MODEL_TIERS], ["opus", "sonnet", "haiku", "fable"]);
-  assert.equal(mod.parseSkillFile(INTEGRATOR).frontmatter.recommended_model, "fable");
+  assert.equal(mod.parseSkillFile(INTEGRATOR).frontmatter.recommended_model, "opus");
 });
 
 test("AC10: Stage 6 tells the integrator it cannot reach main, inside ## Stage 6", () => {

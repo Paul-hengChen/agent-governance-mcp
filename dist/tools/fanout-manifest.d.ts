@@ -1,5 +1,19 @@
 /** Exact header of a dispatchable `## Lanes…` table, in order. */
 export declare const LANES_HEADER: readonly ["lane", "票", "branch", "worktree", "擁有", "禁止", "範圍切線", "相依"];
+/**
+ * Optional 9th header cell of a dispatchable `## Lanes…` table. Absent in
+ * every older manifest, so the 8-column shape stays exact and dispatchable.
+ */
+export declare const APPROVAL_COLUMN: "approval";
+/**
+ * Allowed `approval` cell values ("" = empty cell, "—" is U+2014). Anything
+ * else is a row error: a misspelt `human` must never read as "not human".
+ */
+export declare const APPROVAL_VALUES: readonly ["human", "—", ""];
+/** Exact header of a spec's `## Cut` table (= skill-pm's inline cut table header). */
+export declare const CUT_HEADER: readonly ["id", "desc", "depends_on", "est. files", "touches", "design-link"];
+/** `touches` value for a ticket that writes only governance bookkeeping. */
+export declare const CUT_TOUCHES_NONE = "\u2014";
 /** Exact header of the `## Decisions…` table, in order. */
 export declare const DECISIONS_HEADER: readonly ["日期", "裁決者", "內容", "出處"];
 /** Allowed `裁決者` values. */
@@ -39,6 +53,18 @@ export declare const FANOUT_CODES: {
     readonly worktreeEmpty: "WORKTREE_EMPTY";
     readonly worktreeTilde: "WORKTREE_TILDE";
     readonly mailboxTilde: "MAILBOX_TILDE";
+    readonly approvalValueUnknown: "APPROVAL_VALUE_UNKNOWN";
+    readonly approvalHuman: "APPROVAL_HUMAN";
+    readonly decisionsHumanRowAbsent: "DECISIONS_HUMAN_ROW_ABSENT";
+    readonly cutSectionAbsent: "CUT_SECTION_ABSENT";
+    readonly cutSectionDuplicate: "CUT_SECTION_DUPLICATE";
+    readonly cutTableAbsent: "CUT_TABLE_ABSENT";
+    readonly cutHeaderDiffers: "CUT_HEADER_DIFFERS";
+    readonly cutRowMalformed: "CUT_ROW_MALFORMED";
+    readonly cutTouchesUnquotedPath: "CUT_TOUCHES_UNQUOTED_PATH";
+    readonly cutTouchesEmpty: "CUT_TOUCHES_EMPTY";
+    readonly cutTouchesMalformedPath: "CUT_TOUCHES_MALFORMED_PATH";
+    readonly specUnreadable: "SPEC_UNREADABLE";
 };
 /**
  * validate warning for a dispatchable row whose worktree cell is an absolute
@@ -55,13 +81,15 @@ export declare const PINS_NONE = "\u7121";
 export declare const USAGE: string;
 export declare const E158_NOTE: (base: string, branch: string) => string;
 export declare const PROSE_NOTE = "note: prose restrictions inside \u64C1\u6709 (e.g. \uFF08\u53EA\u9650 \u2026\uFF09) are not machine-checked.";
+export declare const CUT_GLOB_NOTE = "note: a glob in touches is in bounds only when byte-identical to an \u64C1\u6709 token; glob-in-glob containment is never inferred.";
 /**
  * Which part of the manifest an error belongs to. render/check use it to
  * decide which errors are fatal for the lane they target (a Decisions error
  * never blocks a render; a row error blocks only its own lane).
  * "input" = a CLI/environment input (flag, git ref, file), not the manifest text.
+ * "cut" = the `## Cut` table of a lane spec read by check --cut.
  */
-export type FanoutErrorScope = "title" | "base" | "lanes" | "row" | "pins" | "decisions" | "input";
+export type FanoutErrorScope = "title" | "base" | "lanes" | "row" | "pins" | "decisions" | "cut" | "input";
 export interface FanoutError {
     code: string;
     message: string;
@@ -89,6 +117,11 @@ export interface DispatchableLane {
     heading: string;
     /** 1-based line number of the row in the manifest. */
     line: number;
+    /**
+     * Optional 9th `approval` cell: "human" when the cell is `human`; undefined
+     * for `—`, empty, or an 8-column table. Read only by check --cut.
+     */
+    approval: "human" | undefined;
 }
 export interface ProvisionalLane {
     lane: string;
@@ -273,6 +306,82 @@ export declare function unmatchedOwnedTokens(ownedTokens: string[], basePaths: s
  * own OUT line; exit 1 if any. (E158)
  */
 export declare function checkLane(m: Manifest, laneId: string, opts?: CheckOptions): CheckResult;
+export interface CutTicket {
+    /** `id` cell, trimmed. */
+    id: string;
+    /** Path tokens of the `touches` cell (pathTokens order, de-duplicated within the row); [] when the cell is exactly `—`. */
+    touches: string[];
+    /** 1-based line of the row in the spec. */
+    line: number;
+}
+export type CutSectionResult = {
+    ok: true;
+    tickets: CutTicket[];
+} | {
+    ok: false;
+    errors: FanoutError[];
+};
+export interface CutOut {
+    token: string;
+    ticket: string;
+    /** The 禁止 token it matches, when any (annotation only, as in checkLane). */
+    forbidden?: string;
+}
+export interface CutCheckReport {
+    lane: string;
+    tickets: number;
+    /** Sum over tickets of their (row-de-duplicated) touches tokens. */
+    tokens: number;
+    out: CutOut[];
+    approval: "human" | undefined;
+    humanDecisions: {
+        count: number;
+        latest?: string;
+    };
+    /** APPROVAL_HUMAN / DECISIONS_HUMAN_ROW_ABSENT, in that order, only when failing. */
+    failures: FanoutError[];
+    output: string;
+    exitCode: 0 | 1;
+}
+export type CutCheckResult = {
+    ok: true;
+    report: CutCheckReport;
+} | {
+    ok: false;
+    errors: FanoutError[];
+};
+/**
+ * Parse the `## Cut` table of a lane spec. Pure. Only a section named
+ * exactly `Cut` is read, so prose sections such as `## Cut Decisions` are
+ * ignored. Every row error is collected before returning. Known limit shared
+ * with the manifest parser: fenced code blocks are not recognised, so a
+ * fenced line starting with `## Cut` counts as a section.
+ *
+ * The section and each `touches` cell are whitelists, so anything the
+ * grammar does not name is an error rather than skipped (a skipped line or
+ * word could name a file outside the lane and still read as in bounds):
+ * - section: blank lines plus one table — header, separator row, one or more
+ *   ticket rows, each line starting with `|`, no blank line inside;
+ * - touches: exactly `—`, or backtick spans joined only by `、`, `,` or
+ *   whitespace, each span a usable path token (`malformedCutSpan`).
+ * A carriage return not followed by a line feed anywhere in the spec text is
+ * an error, because Markdown renders it as a line break the parser would not
+ * see.
+ */
+export declare function parseCutSection(specText: string): CutSectionResult;
+/**
+ * Whether one `touches` token is inside the lane's owned set. An exact token
+ * may match an 擁有 glob or the implicit bookkeeping set; a glob token is in
+ * bounds only when byte-identical to an 擁有 token, because containment of
+ * one glob in another is never inferred.
+ */
+export declare function isCutTokenInBounds(token: string, lane: DispatchableLane): boolean;
+/**
+ * Pre-commit containment check of a lane spec's `## Cut` against its manifest
+ * row, plus the two manifest-side facts the manifest tier needs (`approval`
+ * not human, at least one 人類 Decisions row). Pure: no fs, no git.
+ */
+export declare function checkCut(m: Manifest, laneId: string, specText: string): CutCheckResult;
 export interface CliResult {
     stdout: string;
     stderr: string;
@@ -283,4 +392,6 @@ export declare function usageResult(message?: string): CliResult;
 export declare function runValidate(args: string[]): CliResult;
 export declare function runRender(args: string[]): CliResult;
 export declare function runCheck(args: string[]): CliResult;
+/** `check --cut <manifest> <lane> <spec>`: file reads only — no git, no writes. */
+export declare function runCheckCut(args: string[]): CliResult;
 //# sourceMappingURL=fanout-manifest.d.ts.map

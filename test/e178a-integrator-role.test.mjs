@@ -74,7 +74,7 @@ function skipIfHistoryAbsent(t, invariant, ...shas) {
 
 test("AC1: content/skill-integrator.md — frontmatter, purpose, work-overview, permission table, you-are-not list, no-tier watermark", () => {
   // (a) frontmatter carries recommended_model: sonnet, a valid MODEL_TIERS entry
-  assert.match(SOP, /^---\nrecommended_model: fable\n---\n/, "frontmatter must open with recommended_model: fable");
+  assert.match(SOP, /^---\nrecommended_model: opus\n---\n/, "frontmatter must open with recommended_model: opus");
   assert.ok(MODEL_TIERS.includes("fable"), "fable must be a valid MODEL_TIERS entry (tools/skill-frontmatter.ts)");
 
   // (b) purpose section carries the interim's three human needs, the

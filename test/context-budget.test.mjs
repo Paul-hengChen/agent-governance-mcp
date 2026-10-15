@@ -472,7 +472,7 @@ test("AC9: every operative rule/gate/SOP marker survives stripRationale in skill
   }
 });
 
-test("AC1/AC2: skill-pm stripped token count meets ≤ 4401 cap", () => {
+test("AC1/AC2: skill-pm stripped token count meets ≤ 4708 cap", () => {
   // WHY: the stripped pm skill must stay within its reduction budget, bounding each pm dispatch.
   // Cap rule: a qa-owned re-measure sets the cap to the exact measured size (zero headroom). The
   // body is measured as production composes it: stripRationale(stripOriginTags(expandSkill(body))).
@@ -484,7 +484,7 @@ test("AC1/AC2: skill-pm stripped token count meets ≤ 4401 cap", () => {
     : SKILL_PM;
   const stripped = stripRationale(stripOriginTags(expandSkill(body)));
   const toks = approxTokens(stripped);
-  assert.ok(toks <= 4401, `skill-pm stripped body (${toks} ~tok) must be ≤ 4401 (AC9, e164-e167-content-wave45 re-baseline)`);
+  assert.ok(toks <= 4708, `skill-pm stripped body (${toks} ~tok) must be ≤ 4708 (AC9, E296 manifest-tier cut-approval lane re-baseline, zero headroom)`);
 });
 
 test("AC1/AC2: skill-sr-engineer stripped token count meets ≤ 2852 cap", () => {
@@ -551,7 +551,7 @@ test("AC7: exactly two balanced rationale fences, both outside §3.x", () => {
   assert.equal(ends, 2, "exactly two rationale:end markers");
 });
 
-test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the measured floor (≤ 10226 ~tok)", () => {
+test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the measured floor (≤ 10518 ~tok)", () => {
   // WHY: the design arm keeps design-only fenced text, so this floor sits above the non-design one.
   // Each cap is the exact re-measured value (chars/4 estimator), zero headroom; bumps are
   // qa-owned unless noted sr-owned.
@@ -559,14 +559,14 @@ test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the 
   const raw = approxTokens(CONSTITUTION);
   const stripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));
   // The later bumps (down to the Comment-discipline rule) are in the same history section.
-  assert.ok(stripped <= 10226, `stripped constitution (${stripped} ~tok) must be ≤ 10226 (AC8 design-arm floor, E297 re-baseline, zero headroom)`);
+  assert.ok(stripped <= 10518, `stripped constitution (${stripped} ~tok) must be ≤ 10518 (AC8 design-arm floor, E296 manifest-tier cut-approval lane re-baseline, zero headroom)`);
   assert.ok(
     raw - stripped >= 240,
     `constitution rationale+origin-tag saving (${raw - stripped} ~tok) must be ≥ 240 (AC8 measured min, c14-dispatch-pins re-baseline)`,
   );
 });
 
-test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 21138 ~tok)", () => {
+test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 21623 ~tok)", () => {
   // WHY: constitution injected on every dispatch; the full coordinator bundle is the worst case.
   // Composed like buildPromptForRole: stripped constitution + SEP + stripped skill body.
   // The coordinator is a chain role, so on a design feature it must keep the full §3.2.
@@ -582,7 +582,7 @@ test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/b
   // history: specs/e260i-comment-rationale.md, teamwork coordinator bundle cap history.
   // coord-*.md fragments land in this bundle only; the constitution-only floors are untouched.
   // A rationale fence on a normative sentence would delete it from this bundle; keep it unfenced.
-  assert.ok(bundle <= 21138, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 21138 (AC8 design-arm floor, E297 re-baseline, zero headroom)`);
+  assert.ok(bundle <= 21623, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 21623 (AC8 design-arm floor, E296 manifest-tier cut-approval lane re-baseline, zero headroom)`);
 });
 
 test("AC9: every operative rule/gate/heading survives stripRationale on the constitution", () => {
@@ -891,17 +891,17 @@ test("AC7: lite + non-design strips §3.2 once (no reintroduction), consistent w
 
 // --- rebaseline + pin the new non-design figure (AC8) ----------------------
 
-test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 8129 ~tok)", () => {
+test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 8420 ~tok)", () => {
   // WHY: the budget win that justified the feature, regression-guarded. Both sides are measured
   // like production (origin tags, then rationale, stripped); the non-design side composes without
   // the design fragments. The cap is the exact measured size (zero headroom) and the design-only
   // saving must stay at least 2080 ~tok, since core and chain edits land on both arms.
   // Rationale: specs/e260i-comment-rationale.md (test/context-budget.test.mjs).
-  const ratStripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));         // design-arm path: 10226 (E297 re-baseline, zero headroom)
-  const nonDesign = approxTokens(stripRationale(stripOriginTags(composeConstitution({ chain: true, design: false })))); // non-design path: 8129 (E297 re-baseline, zero headroom)
+  const ratStripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));         // design-arm path: 10518 (E296 re-baseline, zero headroom)
+  const nonDesign = approxTokens(stripRationale(stripOriginTags(composeConstitution({ chain: true, design: false })))); // non-design path: 8420 (E296 re-baseline, zero headroom)
   // Floor bumps from e43 (test-file ask at dispatch) through E258 (comment-discipline bullet)
   // continue the same cap history, pointed to above.
-  assert.ok(nonDesign <= 8129, `non-design constitution (${nonDesign} ~tok) must be ≤ 8129 (AC8 non-design floor, E297 re-baseline, zero headroom)`);
+  assert.ok(nonDesign <= 8420, `non-design constitution (${nonDesign} ~tok) must be ≤ 8420 (AC8 non-design floor, E296 manifest-tier cut-approval lane re-baseline, zero headroom)`);
   assert.ok(
     ratStripped - nonDesign >= 2080,
     `design-only strip saving (${ratStripped - nonDesign} ~tok) must be ≥ 2080 (a12-followup-qa-round-name re-baseline)`,
