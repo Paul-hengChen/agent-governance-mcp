@@ -1,5 +1,7 @@
 <!-- pending-tickets for lane e295 (E179). New blocks go ABOVE ## Applied. -->
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E295-NEW-1
 title: skill-integrator Stage 6-4 BEHIND remedy still names a local full suite before the push
@@ -39,5 +41,3 @@ body: |
   rewrite to root form therefore covers 19 rows, not 14. Correct the counts in the backlog row / manifest
   before the 5c rewrite so the rewrite checklist is complete.
 ```
-
-## Applied
