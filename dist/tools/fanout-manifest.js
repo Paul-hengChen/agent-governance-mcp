@@ -1010,6 +1010,14 @@ function cutErr(code, message) {
  * ignored. Every row error is collected before returning. Known limit shared
  * with the manifest parser: fenced code blocks are not recognised, so a
  * fenced line starting with `## Cut` counts as a section.
+ *
+ * The section and each `touches` cell are whitelists, so anything the
+ * grammar does not name is an error rather than skipped (a skipped line or
+ * word could name a file outside the lane and still read as in bounds):
+ * - section: blank lines plus one table — header, separator row, one or more
+ *   ticket rows, each line starting with `|`, no blank line inside;
+ * - touches: exactly `—`, or backtick spans joined only by `、`, `,` or
+ *   whitespace, each span a usable path token (`malformedCutSpan`).
  */
 export function parseCutSection(specText) {
     const cut = splitSections(splitLines(specText)).filter((s) => s.name === "Cut");
@@ -1028,26 +1036,35 @@ export function parseCutSection(specText) {
         };
     }
     const s = cut[0];
-    const table = firstTable(s);
+    const table = cutTableLines(s);
+    const errors = cutSectionGrammarErrors(s, table);
     if (table.length === 0) {
-        return { ok: false, errors: [cutErr(FANOUT_CODES.cutTableAbsent, `section "${s.heading}" (line ${s.line}) has no table`)] };
+        errors.push(cutErr(FANOUT_CODES.cutTableAbsent, `section "${s.heading}" (line ${s.line}) has no table`));
+        return { ok: false, errors };
     }
-    const { header, rows } = tableRows(table);
+    const header = splitRow(table[0].text);
     const headerOk = header.length === CUT_HEADER.length && header.every((c, i) => c === CUT_HEADER[i]);
     if (!headerOk) {
-        return {
-            ok: false,
-            errors: [
-                cutErr(FANOUT_CODES.cutHeaderDiffers, `section "${s.heading}" line ${table[0].line}: header is "${header.join(" | ")}", expected exactly "${CUT_HEADER.join(" | ")}"`),
-            ],
-        };
+        errors.push(cutErr(FANOUT_CODES.cutHeaderDiffers, `section "${s.heading}" line ${table[0].line}: header is "${header.join(" | ")}", expected exactly "${CUT_HEADER.join(" | ")}"`));
+        return { ok: false, errors };
     }
+    const separator = table.length > 1 ? splitRow(table[1].text) : [];
+    if (separator.length !== CUT_HEADER.length || !isSeparatorRow(separator)) {
+        const where = table.length > 1 ? `line ${table[1].line}` : `after line ${table[0].line}`;
+        errors.push(cutErr(FANOUT_CODES.cutRowMalformed, `section "${s.heading}" ${where}: expected the separator row (${CUT_HEADER.length} cells of ---) right after the header`));
+        return { ok: false, errors };
+    }
+    const rows = table.slice(2).map((l) => ({ cells: splitRow(l.text), line: l.line }));
     if (rows.length === 0) {
-        return { ok: false, errors: [cutErr(FANOUT_CODES.cutTableAbsent, `section "${s.heading}" (line ${s.line}) has a header but no ticket row`)] };
+        errors.push(cutErr(FANOUT_CODES.cutTableAbsent, `section "${s.heading}" (line ${s.line}) has a header but no ticket row`));
+        return { ok: false, errors };
     }
-    const errors = [];
     const tickets = [];
     for (const r of rows) {
+        if (isSeparatorRow(r.cells)) {
+            errors.push(cutErr(FANOUT_CODES.cutRowMalformed, `Cut row (line ${r.line}): a second separator row — the table has one header, one separator row, then ticket rows`));
+            continue;
+        }
         if (r.cells.length !== CUT_HEADER.length || r.cells[0] === "") {
             errors.push(cutErr(FANOUT_CODES.cutRowMalformed, `Cut row (line ${r.line}): ${r.cells.length} cell(s) with id "${r.cells[0] ?? ""}" — expected ${CUT_HEADER.length} cells and a non-empty id`));
             continue;
@@ -1055,8 +1072,9 @@ export function parseCutSection(specText) {
         const id = r.cells[0];
         const touches = r.cells[4];
         let ok = true;
-        for (const w of unquotedPaths(touches)) {
-            errors.push(cutErr(FANOUT_CODES.cutTouchesUnquotedPath, `Cut row ${id} (line ${r.line}): touches has unquoted path "${w}" — backtick-quote every path`));
+        const leftover = cutTouchesLeftover(touches);
+        if (leftover !== "") {
+            errors.push(cutErr(FANOUT_CODES.cutTouchesUnquotedPath, `Cut row ${id} (line ${r.line}): touches has text outside backtick spans ("${leftover}") — write exactly —, or backtick-quoted paths joined only by 、 , or spaces`));
             ok = false;
         }
         for (const span of backtickSpans(touches)) {
@@ -1080,25 +1098,63 @@ export function parseCutSection(specText) {
     return { ok: true, tickets };
 }
 /**
+ * The `## Cut` table: the first run of section lines that start with `|`, or
+ * empty when no line does. Every other non-blank line, before or after the
+ * run, is reported by `cutSectionGrammarErrors`.
+ */
+function cutTableLines(section) {
+    const lines = section.lines;
+    const start = lines.findIndex((l) => l.text.startsWith("|"));
+    if (start < 0)
+        return [];
+    let end = start;
+    while (end < lines.length && lines[end].text.startsWith("|"))
+        end++;
+    return lines.slice(start, end);
+}
+/**
+ * One CUT_ROW_MALFORMED per section line that is neither blank nor part of the
+ * table run — prose, a sub-heading, a blockquote, an indented or pipe-less
+ * row (GitHub would render the last two as rows of the table), or a line of a
+ * second table.
+ */
+function cutSectionGrammarErrors(section, table) {
+    const inTable = new Set(table.map((l) => l.line));
+    return section.lines
+        .filter((l) => l.text.trim() !== "" && !inTable.has(l.line))
+        .map((l) => cutErr(FANOUT_CODES.cutRowMalformed, `section "${section.heading}" line ${l.line}: only blank lines and one table (header, separator row, ticket rows, each starting with |) are allowed — found "${l.text.trim()}"`));
+}
+/**
+ * What remains of a `touches` cell once its backtick spans and the allowed
+ * separators (`、`, `,`, whitespace) are removed, each removed run shown as
+ * one space; "" when the cell is exactly `—` or a well-formed list.
+ * Unbalanced backticks remain, so they are refused.
+ */
+function cutTouchesLeftover(touches) {
+    if (touches === CUT_TOUCHES_NONE)
+        return "";
+    return touches.replace(/`[^`]+`/g, " ").replace(/[、,\s]+/g, " ").trim();
+}
+/**
  * Plain repo path for a `touches` span: ASCII letters, digits, `_`, `-`, `.`
  * and `/` only, with no empty segment and no leading or trailing `/`.
  */
 const CUT_PLAIN_PATH_RE = /^[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*$/;
 /**
  * Why a `touches` backtick span cannot be checked for containment, or
- * undefined when it is prose or a usable token. A usable token is either one
+ * undefined when it is a usable token. A usable token is either one
  * plain repo path (CUT_PLAIN_PATH_RE, no `.` / `..` segment) or a glob
  * (`isGlobToken`), which `isCutTokenInBounds` accepts only when byte-identical
- * to an 擁有 token. Every other path-shaped span is refused rather than
- * guessed at: `PATH_TOKEN_RE` admits `,` for `{a,b}` alternation, so a
- * comma-joined list outside braces would otherwise be matched as one path,
- * and a `:line` suffix, a dot segment or a leading `/` would match an owned
- * glob lexically while naming a file outside it.
+ * to an 擁有 token. Every other span is refused rather than guessed at: a
+ * span that is not path-shaped (`Dockerfile`, `.`) is not read as prose,
+ * `PATH_TOKEN_RE` admits `,` for `{a,b}` alternation, so a comma-joined list
+ * outside braces would otherwise be matched as one path, and a `:line`
+ * suffix, a dot segment or a leading `/` would match an owned glob lexically
+ * while naming a file outside it.
  */
 function malformedCutSpan(span) {
     if (!isPathToken(span)) {
-        const pathShaped = span.includes("/") || span.includes("\\") || /\.[A-Za-z0-9]+\b/.test(span);
-        return pathShaped ? "is not a bare repo path (no :line, #anchor, spaces or backslashes) — write the file path alone" : undefined;
+        return "is not a repo path token (a path with a / or a file extension; no :line, #anchor, spaces, backslashes or non-ASCII) — write the file path alone, or move prose to desc";
     }
     if (span.startsWith("/") || span.split("/").some((seg) => seg === "." || seg === "..")) {
         return "has a leading / or a . or .. segment — write the normalised repo-relative path";

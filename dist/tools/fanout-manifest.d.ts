@@ -356,6 +356,14 @@ export type CutCheckResult = {
  * ignored. Every row error is collected before returning. Known limit shared
  * with the manifest parser: fenced code blocks are not recognised, so a
  * fenced line starting with `## Cut` counts as a section.
+ *
+ * The section and each `touches` cell are whitelists, so anything the
+ * grammar does not name is an error rather than skipped (a skipped line or
+ * word could name a file outside the lane and still read as in bounds):
+ * - section: blank lines plus one table — header, separator row, one or more
+ *   ticket rows, each line starting with `|`, no blank line inside;
+ * - touches: exactly `—`, or backtick spans joined only by `、`, `,` or
+ *   whitespace, each span a usable path token (`malformedCutSpan`).
  */
 export declare function parseCutSection(specText: string): CutSectionResult;
 /**

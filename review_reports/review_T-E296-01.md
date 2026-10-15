@@ -239,3 +239,144 @@ No regression. One regex test per span. The adversarial 200 KB and 20 000-segmen
 
 ## Verdict
 CHANGES_REQUESTED. Backtick spans are closed, but unquoted `touches` paths (C4) and ticket rows outside the parsed table run (C5) still let a cut that names a 禁止 file (`tools/registry.ts`, `index.ts`) exit 0. Each fix is a few lines in `parseCutSection` and reuses an existing code. This FAIL hits the `review_round` cap, so routing goes to pm.
+
+## Round 3 — sr reply
+
+T-E296-06 (spec AC15), human-approved re-cut. The fix replaces the round-1 to round-3 hole patching with two whitelists in `parseCutSection`. Whatever they do not name is exit 2. Nothing is skipped.
+
+- **C5 (section grammar), fixed.** `parseCutSection` scans the section's own lines. The table is the first run of lines that start with `|` (`cutTableLines`). Every other non-blank line in the section is one `CUT_ROW_MALFORMED` naming its line number (`cutSectionGrammarErrors`). That covers prose before or after the table, a `###` heading, a `>` blockquote, a row with a leading space or without the leading `|`, a row after a blank line, and every line of a second table. The line after the header must be a 6-cell GFM separator row, or the result is `CUT_ROW_MALFORMED`. A second separator row inside the run is `CUT_ROW_MALFORMED` too. `firstTable` and `splitSections` are not changed or called differently. The manifest parser still uses `firstTable`.
+- **C4 (cell grammar), fixed.** A `touches` cell is exactly `—`, or backtick spans joined only by `、`, `,` and whitespace. `cutTouchesLeftover` removes the spans and those separators. If any character remains, the cell gets one `CUT_TOUCHES_UNQUOTED_PATH`, and the message quotes the leftover text and states the allowed form. The old `unquotedPaths` word filter is no longer called from `parseCutSection`. `unquotedPaths` itself is unchanged and still serves `擁有`.
+- **R1 (bounded part), fixed.** `malformedCutSpan` now refuses every span that fails `isPathToken` with `CUT_TOUCHES_MALFORMED_PATH`, instead of treating it as prose. Examples: `Dockerfile`, `LICENSE`, `.`, `..`, unicode lookalikes. The round-2 per-span whitelist (`CUT_PLAIN_PATH_RE`, no `.`/`..` segment or leading `/`, comma outside braces, a glob only byte-identical to an `擁有` token) is unchanged. An empty cell is still `CUT_TOUCHES_EMPTY`.
+- **Scope.** The TS diff is limited to the `parseCutSection` body and JSDoc, the `malformedCutSpan` prose branch and JSDoc, and three new private, cut-only helpers that only `parseCutSection` calls: `cutTableLines`, `cutSectionGrammarErrors` and `cutTouchesLeftover`. None is exported. The `.d.ts` change is the `parseCutSection` JSDoc only. No new `FANOUT_CODES`. `firstTable`, `pathTokens`, `isPathToken`, `unquotedPaths`, `matchesGlob`, `isImplicitBookkeeping`, `isGlobToken`, `splitSections`, `splitRow`, `tableRows`, `backtickSpans` and `isSeparatorRow` are byte-identical to `59de2ab` (each function body extracted and hashed). `content/skill-pm.md` is untouched.
+- **Byte identity.** The `validate` / `render` / `check <manifest> <lane>` sweep covers 20 manifests, 60 lanes and 140 outputs (stdout, stderr and exit code). I captured it from the pre-change build, which is equal to `59de2ab` (`git diff 59de2ab HEAD -- dist tools scripts` is empty), and compared it with `cmp` after the change: identical.
+- **Behaviour changes that qa needs to pin** (all still exit 2, only the codes printed differ):
+  1. A non-`—` prose-only touches cell (`-`, `–`, `see desc`) now prints `CUT_TOUCHES_UNQUOTED_PATH` followed by `CUT_TOUCHES_EMPTY`. Before, it printed `CUT_TOUCHES_EMPTY` alone.
+  2. An unquoted cell gets one `UNQUOTED` error per cell, not one per word.
+  3. A non-path backtick span is `CUT_TOUCHES_MALFORMED_PATH`. Before, it was ignored.
+  4. A section with prose and no table prints `CUT_ROW_MALFORMED` (one per line) followed by `CUT_TABLE_ABSENT`.
+  5. A header with no separator row is `CUT_ROW_MALFORMED`. Before, the first data row was read as a ticket.
+  6. Section-grammar errors are listed before `CUT_HEADER_DIFFERS`.
+
+  The earlier changes `./tools/config.ts` and `tools//config.ts` → exit 2 stand.
+
+### AC15 enumerated inputs
+
+Each input is a one-row cut, run as `node scripts/fanout.mjs check --cut specs/fanout-post-v4-w3.md e296 <spec>`. "after X" means the touches cell is `` `tools/config.ts` `` followed by a space and X. In the R1 rows, the span is joined with `、`. In the C5 rows, row 2 is `` T-X-02 | x | none | 1 | `tools/registry.ts` | — | ``. "error lines" is the number of stderr lines on exit 2.
+
+| input | exit | error lines | first stderr line (exit 2) / OUT + summary line (exit 0/1) |
+|---|---|---|---|
+| `C4 after tools/registry.ts:12` | 2 | 1 | `fanout: error: CUT_TOUCHES_UNQUOTED_PATH: Cut row T-X-01 (line 7): touches has text outside backtick spans ("tools/registry.ts:12") — write exactly —, or backtick-quoted paths joined only by 、 , or spaces` |
+| `C4 after 'tools/registry.ts'` | 2 | 1 | `fanout: error: CUT_TOUCHES_UNQUOTED_PATH: Cut row T-X-01 (line 7): touches has text outside backtick spans ("'tools/registry.ts'") — write exactly —, or backtick-quoted paths joined only by 、 , or spaces` |
+| `C4 after "tools/registry.ts"` | 2 | 1 | `fanout: error: CUT_TOUCHES_UNQUOTED_PATH: Cut row T-X-01 (line 7): touches has text outside backtick spans (""tools/registry.ts"") — write exactly —, or backtick-quoted paths joined only by 、 , or spaces` |
+| `C4 after *tools/registry.ts*` | 2 | 1 | `fanout: error: CUT_TOUCHES_UNQUOTED_PATH: Cut row T-X-01 (line 7): touches has text outside backtick spans ("*tools/registry.ts*") — write exactly —, or backtick-quoted paths joined only by 、 , or spaces` |
+| `C4 after **tools/registry.ts**` | 2 | 1 | `fanout: error: CUT_TOUCHES_UNQUOTED_PATH: Cut row T-X-01 (line 7): touches has text outside backtick spans ("**tools/registry.ts**") — write exactly —, or backtick-quoted paths joined only by 、 , or spaces` |
+| `C4 after <code>tools/registry.ts</code>` | 2 | 1 | `fanout: error: CUT_TOUCHES_UNQUOTED_PATH: Cut row T-X-01 (line 7): touches has text outside backtick spans ("<code>tools/registry.ts</code>") — write exactly —, or backtick-quoted paths joined only by 、 , or spaces` |
+| `C4 after <kbd>tools/registry.ts</kbd>` | 2 | 1 | `fanout: error: CUT_TOUCHES_UNQUOTED_PATH: Cut row T-X-01 (line 7): touches has text outside backtick spans ("<kbd>tools/registry.ts</kbd>") — write exactly —, or backtick-quoted paths joined only by 、 , or spaces` |
+| `C4 after [tools/registry.ts](x)` | 2 | 1 | `fanout: error: CUT_TOUCHES_UNQUOTED_PATH: Cut row T-X-01 (line 7): touches has text outside backtick spans ("[tools/registry.ts](x)") — write exactly —, or backtick-quoted paths joined only by 、 , or spaces` |
+| `C4 after 「tools/registry.ts」` | 2 | 1 | `fanout: error: CUT_TOUCHES_UNQUOTED_PATH: Cut row T-X-01 (line 7): touches has text outside backtick spans ("「tools/registry.ts」") — write exactly —, or backtick-quoted paths joined only by 、 , or spaces` |
+| `C4 after tools/registry.ts。` | 2 | 1 | `fanout: error: CUT_TOUCHES_UNQUOTED_PATH: Cut row T-X-01 (line 7): touches has text outside backtick spans ("tools/registry.ts。") — write exactly —, or backtick-quoted paths joined only by 、 , or spaces` |
+| `C4 after ~tools/registry.ts~` | 2 | 1 | `fanout: error: CUT_TOUCHES_UNQUOTED_PATH: Cut row T-X-01 (line 7): touches has text outside backtick spans ("~tools/registry.ts~") — write exactly —, or backtick-quoted paths joined only by 、 , or spaces` |
+| `C4 after index.ts` | 2 | 1 | `fanout: error: CUT_TOUCHES_UNQUOTED_PATH: Cut row T-X-01 (line 7): touches has text outside backtick spans ("index.ts") — write exactly —, or backtick-quoted paths joined only by 、 , or spaces` |
+| `C4 after tools／registry.ts` | 2 | 1 | `fanout: error: CUT_TOUCHES_UNQUOTED_PATH: Cut row T-X-01 (line 7): touches has text outside backtick spans ("tools／registry.ts") — write exactly —, or backtick-quoted paths joined only by 、 , or spaces` |
+| `C4 after tools/registry.ts.` | 2 | 1 | `fanout: error: CUT_TOUCHES_UNQUOTED_PATH: Cut row T-X-01 (line 7): touches has text outside backtick spans ("tools/registry.ts.") — write exactly —, or backtick-quoted paths joined only by 、 , or spaces` |
+| `C4 after and tools/registry.ts` | 2 | 1 | `fanout: error: CUT_TOUCHES_UNQUOTED_PATH: Cut row T-X-01 (line 7): touches has text outside backtick spans ("and tools/registry.ts") — write exactly —, or backtick-quoted paths joined only by 、 , or spaces` |
+| `C4 cell — + backtick path` | 2 | 1 | `fanout: error: CUT_TOUCHES_UNQUOTED_PATH: Cut row T-X-01 (line 7): touches has text outside backtick spans ("—") — write exactly —, or backtick-quoted paths joined only by 、 , or spaces` |
+| `C5 row2 leading space` | 2 | 1 | `` fanout: error: CUT_ROW_MALFORMED: section "## Cut" line 8: only blank lines and one table (header, separator row, ticket rows, each starting with \|) are allowed — found "\| T-X-02 \| x \| none \| 1 \| `tools/registry.ts` \| — \|" `` |
+| `C5 row2 no leading \|` | 2 | 1 | `` fanout: error: CUT_ROW_MALFORMED: section "## Cut" line 8: only blank lines and one table (header, separator row, ticket rows, each starting with \|) are allowed — found "T-X-02 \| x \| none \| 1 \| `tools/registry.ts` \| — \|" `` |
+| `C5 row2 > blockquote` | 2 | 1 | `` fanout: error: CUT_ROW_MALFORMED: section "## Cut" line 8: only blank lines and one table (header, separator row, ticket rows, each starting with \|) are allowed — found "> \| T-X-02 \| x \| none \| 1 \| `tools/registry.ts` \| — \|" `` |
+| `C5 row2 after blank line` | 2 | 1 | `` fanout: error: CUT_ROW_MALFORMED: section "## Cut" line 9: only blank lines and one table (header, separator row, ticket rows, each starting with \|) are allowed — found "\| T-X-02 \| x \| none \| 1 \| `tools/registry.ts` \| — \|" `` |
+| `C5 second table after prose` | 2 | 4 | `fanout: error: CUT_ROW_MALFORMED: section "## Cut" line 9: only blank lines and one table (header, separator row, ticket rows, each starting with \|) are allowed — found "More tickets:"` |
+| `C5 second table under ### Extra` | 2 | 4 | `fanout: error: CUT_ROW_MALFORMED: section "## Cut" line 9: only blank lines and one table (header, separator row, ticket rows, each starting with \|) are allowed — found "### Extra"` |
+| `C5 prose after valid table` | 2 | 1 | `fanout: error: CUT_ROW_MALFORMED: section "## Cut" line 9: only blank lines and one table (header, separator row, ticket rows, each starting with \|) are allowed — found "Notes: none."` |
+| `C5 prose before valid table` | 2 | 1 | `fanout: error: CUT_ROW_MALFORMED: section "## Cut" line 5: only blank lines and one table (header, separator row, ticket rows, each starting with \|) are allowed — found "Intro prose."` |
+| `C5 missing separator row` | 2 | 1 | `fanout: error: CUT_ROW_MALFORMED: section "## Cut" line 6: expected the separator row (6 cells of ---) right after the header` |
+| `C5 separator 5 cells` | 2 | 1 | `fanout: error: CUT_ROW_MALFORMED: section "## Cut" line 6: expected the separator row (6 cells of ---) right after the header` |
+| `C5 header only + separator` | 2 | 1 | `fanout: error: CUT_TABLE_ABSENT: section "## Cut" (line 3) has a header but no ticket row` |
+| `` R1 span `Dockerfile` `` | 2 | 1 | `fanout: error: CUT_TOUCHES_MALFORMED_PATH: Cut row T-X-01 (line 7): touches span "Dockerfile" is not a repo path token (a path with a / or a file extension; no :line, #anchor, spaces, backslashes or non-ASCII) — write the file path alone, or move prose to desc` |
+| `` R1 span `LICENSE` `` | 2 | 1 | `fanout: error: CUT_TOUCHES_MALFORMED_PATH: Cut row T-X-01 (line 7): touches span "LICENSE" is not a repo path token (a path with a / or a file extension; no :line, #anchor, spaces, backslashes or non-ASCII) — write the file path alone, or move prose to desc` |
+| `` R1 span `.` `` | 2 | 1 | `fanout: error: CUT_TOUCHES_MALFORMED_PATH: Cut row T-X-01 (line 7): touches span "." is not a repo path token (a path with a / or a file extension; no :line, #anchor, spaces, backslashes or non-ASCII) — write the file path alone, or move prose to desc` |
+| `` R1 span `..` `` | 2 | 1 | `fanout: error: CUT_TOUCHES_MALFORMED_PATH: Cut row T-X-01 (line 7): touches span ".." is not a repo path token (a path with a / or a file extension; no :line, #anchor, spaces, backslashes or non-ASCII) — write the file path alone, or move prose to desc` |
+| `` R1 span `tools∕registry` `` | 2 | 1 | `fanout: error: CUT_TOUCHES_MALFORMED_PATH: Cut row T-X-01 (line 7): touches span "tools∕registry" is not a repo path token (a path with a / or a file extension; no :line, #anchor, spaces, backslashes or non-ASCII) — write the file path alone, or move prose to desc` |
+| `` R1 span `tools／registry．ts` `` | 2 | 1 | `fanout: error: CUT_TOUCHES_MALFORMED_PATH: Cut row T-X-01 (line 7): touches span "tools／registry．ts" is not a repo path token (a path with a / or a file extension; no :line, #anchor, spaces, backslashes or non-ASCII) — write the file path alone, or move prose to desc` |
+| `ctl — alone` | 0 | — | `fanout check --cut: e296 — 1 ticket(s), 0 token(s), 0 out of bounds` |
+| `ctl 、-joined pair` | 0 | — | `fanout check --cut: e296 — 1 ticket(s), 2 token(s), 0 out of bounds` |
+| `ctl ,-joined pair` | 0 | — | `fanout check --cut: e296 — 1 ticket(s), 2 token(s), 0 out of bounds` |
+| `ctl space-joined pair` | 0 | — | `fanout check --cut: e296 — 1 ticket(s), 2 token(s), 0 out of bounds` |
+| `ctl owned glob compose-golden/**` | 0 | — | `fanout check --cut: e296 — 1 ticket(s), 1 token(s), 0 out of bounds` |
+| `ctl two valid rows + trailing blank lines` | 0 | — | `fanout check --cut: e296 — 2 ticket(s), 2 token(s), 0 out of bounds` |
+| `edge empty touches` | 2 | 1 | `fanout: error: CUT_TOUCHES_EMPTY: Cut row T-X-01 (line 7): touches names no backtick-quoted path — list the paths, or write — for a bookkeeping-only ticket` |
+| `edge en dash –` | 2 | 2 | `fanout: error: CUT_TOUCHES_UNQUOTED_PATH: Cut row T-X-01 (line 7): touches has text outside backtick spans ("–") — write exactly —, or backtick-quoted paths joined only by 、 , or spaces` |
+| `edge prose-only touches` | 2 | 2 | `fanout: error: CUT_TOUCHES_UNQUOTED_PATH: Cut row T-X-01 (line 7): touches has text outside backtick spans ("see desc") — write exactly —, or backtick-quoted paths joined only by 、 , or spaces` |
+| `edge unbalanced backtick` | 2 | 1 | `` fanout: error: CUT_TOUCHES_UNQUOTED_PATH: Cut row T-X-01 (line 7): touches has text outside backtick spans ("`tools/registry.ts") — write exactly —, or backtick-quoted paths joined only by 、 , or spaces `` |
+| `edge full-width comma join` | 2 | 1 | `fanout: error: CUT_TOUCHES_UNQUOTED_PATH: Cut row T-X-01 (line 7): touches has text outside backtick spans ("，") — write exactly —, or backtick-quoted paths joined only by 、 , or spaces` |
+| `edge prose-only section` | 2 | 2 | `fanout: error: CUT_ROW_MALFORMED: section "## Cut" line 5: only blank lines and one table (header, separator row, ticket rows, each starting with \|) are allowed — found "Nothing to cut."` |
+| `edge oob backtick (AC11)` | 1 | — | `` OUT  `tools/registry.ts`  (T-X-01)  (禁止: tools/**) fanout check --cut: e296 — 1 ticket(s), 1 token(s), 1 out of bounds `` |
+
+Own-spec controls:
+- `check --cut … specs/e296-manifest-tier-cut-approval.md` prints one OUT line, `` OUT  `test/e297-main-protected-sop.test.mjs`  (T-E296-05)  (禁止: test/**) ``, then `6 ticket(s), 21 token(s), 1 out of bounds`, exit 1. This is the known manifest-version gap, with no exit-2 error.
+- A temp copy with that one touches token removed prints `6 ticket(s), 20 token(s), 0 out of bounds`, exit 0.
+
+### Round 1 / 2 / 3 attack inputs (regression)
+
+Each one still matches its round-3 result. Every row before the OUT rows exits 2 with `CUT_TOUCHES_MALFORMED_PATH`, every OUT row exits 1, and every IN row exits 0. The touches cell is `` `tools/config.ts`、`<span>` ``, except the first R2-C3 row, which is led by `` `tools/fanout-manifest.ts` ``.
+
+| input | exit | error lines | first stderr line (exit 2) / OUT + summary line (exit 0/1) |
+|---|---|---|---|
+| `` R1-C1 `tools/registry.ts:71` `` | 2 | 1 | `fanout: error: CUT_TOUCHES_MALFORMED_PATH: Cut row T-X-01 (line 7): touches span "tools/registry.ts:71" is not a repo path token (a path with a / or a file extension; no :line, #anchor, spaces, backslashes or non-ASCII) — write the file path alone, or move prose to desc` |
+| `` R1-C1 `gates/registry.ts#L10` `` | 2 | 1 | `fanout: error: CUT_TOUCHES_MALFORMED_PATH: Cut row T-X-01 (line 7): touches span "gates/registry.ts#L10" is not a repo path token (a path with a / or a file extension; no :line, #anchor, spaces, backslashes or non-ASCII) — write the file path alone, or move prose to desc` |
+| `` R1-C2 `.current/e296/../../index.ts` `` | 2 | 1 | `fanout: error: CUT_TOUCHES_MALFORMED_PATH: Cut row T-X-01 (line 7): touches span ".current/e296/../../index.ts" has a leading / or a . or .. segment — write the normalised repo-relative path` |
+| `` R1-C2 `test/fixtures/compose-golden/../../../tools/registry.ts` `` | 2 | 1 | `fanout: error: CUT_TOUCHES_MALFORMED_PATH: Cut row T-X-01 (line 7): touches span "test/fixtures/compose-golden/../../../tools/registry.ts" has a leading / or a . or .. segment — write the normalised repo-relative path` |
+| `` R2-C3 `.current/e296/handoff.md,tools/registry.ts` `` | 2 | 1 | `fanout: error: CUT_TOUCHES_MALFORMED_PATH: Cut row T-X-01 (line 7): touches span ".current/e296/handoff.md,tools/registry.ts" lists more than one path — give each path its own backtick span` |
+| `` R2-C3 `review_reports/review_T-E296-01.md,index.ts` `` | 2 | 1 | `fanout: error: CUT_TOUCHES_MALFORMED_PATH: Cut row T-X-01 (line 7): touches span "review_reports/review_T-E296-01.md,index.ts" lists more than one path — give each path its own backtick span` |
+| `` R2-C3 `test/fixtures/compose-golden/a.json,tools/registry.ts` `` | 2 | 1 | `fanout: error: CUT_TOUCHES_MALFORMED_PATH: Cut row T-X-01 (line 7): touches span "test/fixtures/compose-golden/a.json,tools/registry.ts" lists more than one path — give each path its own backtick span` |
+| `` R3 `a.ts;tools/registry.ts` `` | 2 | 1 | `fanout: error: CUT_TOUCHES_MALFORMED_PATH: Cut row T-X-01 (line 7): touches span "tools/config.ts;tools/registry.ts" is not a repo path token (a path with a / or a file extension; no :line, #anchor, spaces, backslashes or non-ASCII) — write the file path alone, or move prose to desc` |
+| `` R3 `tools/config.ts tools/registry.ts` (space in span) `` | 2 | 1 | `fanout: error: CUT_TOUCHES_MALFORMED_PATH: Cut row T-X-01 (line 7): touches span "tools/config.ts tools/registry.ts" is not a repo path token (a path with a / or a file extension; no :line, #anchor, spaces, backslashes or non-ASCII) — write the file path alone, or move prose to desc` |
+| `` R3 `\\|`-joined span `` | 2 | 1 | `fanout: error: CUT_TOUCHES_MALFORMED_PATH: Cut row T-X-01 (line 7): touches span "tools/config.ts\\|tools/registry.ts" is not a repo path token (a path with a / or a file extension; no :line, #anchor, spaces, backslashes or non-ASCII) — write the file path alone, or move prose to desc` |
+| `` R3 `.current/e296/x/..` `` | 2 | 1 | `fanout: error: CUT_TOUCHES_MALFORMED_PATH: Cut row T-X-01 (line 7): touches span ".current/e296/x/.." has a leading / or a . or .. segment — write the normalised repo-relative path` |
+| `` R3 `.current/e296/.` `` | 2 | 1 | `fanout: error: CUT_TOUCHES_MALFORMED_PATH: Cut row T-X-01 (line 7): touches span ".current/e296/." has a leading / or a . or .. segment — write the normalised repo-relative path` |
+| `` R3 `qa_reports/../tools/e296.ts` `` | 2 | 1 | `fanout: error: CUT_TOUCHES_MALFORMED_PATH: Cut row T-X-01 (line 7): touches span "qa_reports/../tools/e296.ts" has a leading / or a . or .. segment — write the normalised repo-relative path` |
+| `` R3 `specs/e296-x/../../tools/registry.ts` `` | 2 | 1 | `fanout: error: CUT_TOUCHES_MALFORMED_PATH: Cut row T-X-01 (line 7): touches span "specs/e296-x/../../tools/registry.ts" has a leading / or a . or .. segment — write the normalised repo-relative path` |
+| `` R3 `./tools/registry.ts` `` | 2 | 1 | `fanout: error: CUT_TOUCHES_MALFORMED_PATH: Cut row T-X-01 (line 7): touches span "./tools/registry.ts" has a leading / or a . or .. segment — write the normalised repo-relative path` |
+| `` R3 `./tools/config.ts` (known change) `` | 2 | 1 | `fanout: error: CUT_TOUCHES_MALFORMED_PATH: Cut row T-X-01 (line 7): touches span "./tools/config.ts" has a leading / or a . or .. segment — write the normalised repo-relative path` |
+| `` R3 `tools//config.ts` (known change) `` | 2 | 1 | `fanout: error: CUT_TOUCHES_MALFORMED_PATH: Cut row T-X-01 (line 7): touches span "tools//config.ts" is not a plain repo path (letters, digits, _ - . and / only; no empty segment) — write the normalised repo-relative path` |
+| `` R3 `-tools/registry.ts` `` | 2 | 1 | `fanout: error: CUT_TOUCHES_MALFORMED_PATH: Cut row T-X-01 (line 7): touches span "-tools/registry.ts" is not a repo path token (a path with a / or a file extension; no :line, #anchor, spaces, backslashes or non-ASCII) — write the file path alone, or move prose to desc` |
+| `` R3 `:tools/registry.ts` `` | 2 | 1 | `fanout: error: CUT_TOUCHES_MALFORMED_PATH: Cut row T-X-01 (line 7): touches span ":tools/registry.ts" is not a repo path token (a path with a / or a file extension; no :line, #anchor, spaces, backslashes or non-ASCII) — write the file path alone, or move prose to desc` |
+| `R3 backslash` | 2 | 1 | `fanout: error: CUT_TOUCHES_MALFORMED_PATH: Cut row T-X-01 (line 7): touches span "tools\registry.ts" is not a repo path token (a path with a / or a file extension; no :line, #anchor, spaces, backslashes or non-ASCII) — write the file path alone, or move prose to desc` |
+| `R3 tab in span` | 2 | 1 | `fanout: error: CUT_TOUCHES_MALFORMED_PATH: Cut row T-X-01 (line 7): touches span "tools/reg` |
+| `R3 ZWSP in span` | 2 | 1 | `fanout: error: CUT_TOUCHES_MALFORMED_PATH: Cut row T-X-01 (line 7): touches span "tools/​registry.ts" is not a repo path token (a path with a / or a file extension; no :line, #anchor, spaces, backslashes or non-ASCII) — write the file path alone, or move prose to desc` |
+| `R3 U+2024 one-dot leader` | 2 | 1 | `fanout: error: CUT_TOUCHES_MALFORMED_PATH: Cut row T-X-01 (line 7): touches span "tools/registry․ts" is not a repo path token (a path with a / or a file extension; no :line, #anchor, spaces, backslashes or non-ASCII) — write the file path alone, or move prose to desc` |
+| `R3 fullwidth letter` | 2 | 1 | `fanout: error: CUT_TOUCHES_MALFORMED_PATH: Cut row T-X-01 (line 7): touches span "tools/ｒegistry.ts" is not a repo path token (a path with a / or a file extension; no :line, #anchor, spaces, backslashes or non-ASCII) — write the file path alone, or move prose to desc` |
+| `` R3 OUT `tools/{config,registry}.ts` `` | 1 | — | `` OUT  `tools/{config,registry}.ts`  (T-X-01) fanout check --cut: e296 — 1 ticket(s), 2 token(s), 1 out of bounds `` |
+| `` R3 OUT `tools/{config}.ts` `` | 1 | — | `` OUT  `tools/{config}.ts`  (T-X-01) fanout check --cut: e296 — 1 ticket(s), 2 token(s), 1 out of bounds `` |
+| `` R3 OUT `{tools/config.ts,tools/registry.ts}` `` | 1 | — | `` OUT  `{tools/config.ts,tools/registry.ts}`  (T-X-01) fanout check --cut: e296 — 1 ticket(s), 2 token(s), 1 out of bounds `` |
+| `` R3 OUT `tools/config.ts,tools/*` `` | 1 | — | `` OUT  `tools/config.ts,tools/*`  (T-X-01) fanout check --cut: e296 — 1 ticket(s), 2 token(s), 1 out of bounds `` |
+| `` R3 OUT `test/**` `` | 1 | — | `` OUT  `test/**`  (T-X-01)  (禁止: test/**) fanout check --cut: e296 — 1 ticket(s), 2 token(s), 1 out of bounds `` |
+| `` R3 OUT `tools/*` `` | 1 | — | `` OUT  `tools/*`  (T-X-01) fanout check --cut: e296 — 1 ticket(s), 2 token(s), 1 out of bounds `` |
+| `` R3 OUT `tools/` `` | 1 | — | `` OUT  `tools/`  (T-X-01) fanout check --cut: e296 — 1 ticket(s), 2 token(s), 1 out of bounds `` |
+| `` R3 OUT `.current/e296x/y.ts` `` | 1 | — | `` OUT  `.current/e296x/y.ts`  (T-X-01) fanout check --cut: e296 — 1 ticket(s), 2 token(s), 1 out of bounds `` |
+| `` R3 OUT `specs/e296-a/b.md` `` | 1 | — | `` OUT  `specs/e296-a/b.md`  (T-X-01)  (禁止: specs/**) fanout check --cut: e296 — 1 ticket(s), 2 token(s), 1 out of bounds `` |
+| `` R3 OUT `Tools/config.ts` `` | 1 | — | `` OUT  `Tools/config.ts`  (T-X-01) fanout check --cut: e296 — 1 ticket(s), 2 token(s), 1 out of bounds `` |
+| `` R3 OUT `.CURRENT/e296/x` `` | 1 | — | `` OUT  `.CURRENT/e296/x`  (T-X-01) fanout check --cut: e296 — 1 ticket(s), 2 token(s), 1 out of bounds `` |
+| `` R3 OUT `.github/workflows/ci.yml` `` | 1 | — | `` OUT  `.github/workflows/ci.yml`  (T-X-01) fanout check --cut: e296 — 1 ticket(s), 2 token(s), 1 out of bounds `` |
+| `` R3 OUT `.registry` `` | 1 | — | `` OUT  `.registry`  (T-X-01) fanout check --cut: e296 — 1 ticket(s), 2 token(s), 1 out of bounds `` |
+| `` R3 OUT `index.ts` `` | 1 | — | `` OUT  `index.ts`  (T-X-01) fanout check --cut: e296 — 1 ticket(s), 2 token(s), 1 out of bounds `` |
+| `` R3 OUT `README.md` `` | 1 | — | `` OUT  `README.md`  (T-X-01) fanout check --cut: e296 — 1 ticket(s), 2 token(s), 1 out of bounds `` |
+| `` R3 IN `.current/e296/.../x` `` | 0 | — | `fanout check --cut: e296 — 1 ticket(s), 2 token(s), 0 out of bounds` |
+| `` R3 IN `qa_reports/foo/e296-x.md` `` | 0 | — | `fanout check --cut: e296 — 1 ticket(s), 2 token(s), 0 out of bounds` |
+| `` R3 IN `specs/e296-*` `` | 0 | — | `fanout check --cut: e296 — 1 ticket(s), 2 token(s), 0 out of bounds` |
+| `` R3 IN `qa_reports/*E296*` `` | 0 | — | `fanout check --cut: e296 — 1 ticket(s), 2 token(s), 0 out of bounds` |
+
+### Proofs and gates
+
+- AC15 section proof: `exit=2`, then `1`. AC15 cell proof: `exit=2`, then `1`. AC15 own-spec proof: `1`.
+- AC9: `2` (`specs/fanout-wave5.1.md 2`, `specs/fanout-wave6.md 2`). AC10: `045b56ae749b459a808b16e13ac00e273721cd888e9932e9222f2762a780128a` and `485eabe00700945a3060b04149b59694957061983582519584051f2118b2f863`. AC11: own spec exit 1 (the e297 gap only), the oob case prints `1` then `exit=1`. AC12: `1`.
+- Gates:
+  - `npm run build`: 0 errors, and the `dist/` diff is limited to `dist/tools/fanout-manifest.{js,js.map,d.ts,d.ts.map}`.
+  - `npx tsc --noEmit`: 0.
+  - `npm audit --audit-level=high`: 0.
+  - `npm run -s check:md-tables`: OK.
+  - `node scripts/test-lock.mjs -- npm test`: 3128 tests, 3110 pass, 15 fail, 3 skipped. The 15 reds are exactly the known qa-owned list, unchanged:
+    - compose goldens ×7: `compose-equivalence.test.mjs` ×6 and `skill-manifest.test.mjs:97`;
+    - four context-budget ceilings (`context-budget.test.mjs` :475, :554, :569, :894);
+    - e5-intake-tiering :67 and :214;
+    - AC14 re-pins `e178a-integrator-role.test.mjs:75` and `e297-main-protected-sop.test.mjs:101`.
