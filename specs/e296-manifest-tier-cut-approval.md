@@ -76,7 +76,7 @@ Cut sent to the integrator mailbox by the coordinator (lane-protocol §5-2); not
 | e296.pm.attest.ok | `manifest-tier: no option choice, no needs-human-ruling item` | authored-here — condition (4)'s two facts in one grep-able line; `needs human ruling` is skill-integrator's existing marker |
 | e296.pm.attest.no | `manifest-tier: not eligible — <reason>` | authored-here — the negative form, so absence of the positive line is never ambiguous |
 | e296.spec.section | `## Cut` | authored-here — the Gate Summary already calls the table "the ticket cut"; exact name so prose sections `## Cut Decisions` / `## Cut amendments` are not read |
-| e296.cut.header | `id | desc | depends_on | est. files | touches | design-link` | content/skill-pm.md Gate Summary (existing, unchanged) |
+| e296.cut.header | `id \| desc \| depends_on \| est. files \| touches \| design-link` | content/skill-pm.md Gate Summary (existing, unchanged) |
 | e296.check.out | `OUT  <token>  (<ticket id>)` | authored-here — the existing `check` OUT-line shape with the ticket id in place of the forbidden-token note |
 | e296.check.approval | `approval: <human\|—>` | authored-here — fact line for the writer |
 | e296.check.decisions | `human-decisions: <n> row(s); latest <date>` | authored-here — fact line for the writer; `<date>` is what the audit line copies |

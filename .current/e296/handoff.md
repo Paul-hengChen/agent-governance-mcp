@@ -2,19 +2,22 @@
 schema_version: 15
 active_feature: "e296-manifest-tier-cut-approval"
 status: "In_Progress"
-last_updated: "2026-10-15T05:58:08.641Z"
-last_agent: "pm"
+last_updated: "2026-10-15T07:37:14.434Z"
+last_agent: "architect"
 scope_decision: "single-feature"
 scope_decision_why: "Lane e296 of specs/fanout-post-v4-w3.md: E296 items (1)-(8) plus E309's one skill-integrator sentence; scope is the manifest Lanes row, not widened or narrowed. Non-design (no design/ file)."
+cut_approved: true
+dispatch_pins:
+  sr-engineer: "opus"
 evidence_schema: 2
-next_role: "architect"
-dispatched_at: "2026-10-15T05:58:08.641Z"
+next_role: "sr-engineer"
+dispatched_at: "2026-10-15T07:37:14.434Z"
 dispatch_mechanism: "task"
-dispatch_mechanism_tier: "fable"
+dispatch_mechanism_tier: "opus"
 qa_round: 0
 review_round: 0
 visual_round: 0
-hop_count: 1
+hop_count: 2
 qa_rounds_total: 0
 review_rounds_total: 0
 visual_rounds_total: 0
@@ -25,12 +28,11 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- pm done: spec specs/e296-manifest-tier-cut-approval.md (AC1-AC13, Design intent, Rulings R1 ceilings / R2 pin, `## Cut` table); tasks T-E296-01..05 in .current/e296/tasks.md (E309 merged into T-E296-02, same file content/skill-integrator.md). Cut NOT yet approved: coordinator sends the `## Cut` table to the integrator mailbox for pre-review (lane-protocol §5-2), then presents to the human; coordinator writes cut_approved after the human approves; architect-hop ticket -> architect Open Questions get a second pre-review.
-- architect: fix (a) `check --cut` runner shape in tools/fanout-manifest.ts (pure file I/O, no git; exit 0/1/2 per AC11; codes in Copy/Strings e296.codes may be renamed), (b) 9-column header acceptance without changing LANES_HEADER or render bytes (AC9/AC10, base sha256 in spec), (c) `## Cut` parser reusing pathTokens/isGlobToken/matchesGlob/isImplicitBookkeeping. Do not widen into tools/registry.ts / handoff-parse.ts (lane e308).
-- qa (T-E296-05): four context-budget ceilings (10226/21138/8129/4401) re-measure -> exact value, zero headroom, approved with the cut (R1); compose goldens 12 files regenerate; test/e5-intake-tiering.test.mjs:73 defaults deepEqual gains manifest:false. Baseline: 18/20 manifests validate exit 0; fanout-wave5.1 and fanout-wave6 already exit 2 on base.
-- Resource Audit Gate: zero external refs in the manifest, backlog rows E296/E309 and landing sites; external_refs omitted.
-- prd_path omitted on purpose (tool requires absolute path; lane handoff is tracked; lane-protocol §1-1) -> pending-ticket E296-NEW-1 in .current/e296/pending-tickets.md. PRD = docs/backlog.md rows E296/E309.
-- dispatch pin per manifest: sr-engineer=fable (coordinator persists dispatch_pins at cut-approval time, not PM).
+- Architecture ready: specs/e296-manifest-tier-cut-approval-architecture.md (untracked; coordinator commits). Open Questions: 1 (AC4 architect-hop timing — cut_approved is written on pm->architect, before Open Questions exist; proposed reading: manifest-tier cut auto-approves after the FIRST pre-review, and the second (OQ) pre-review closing with no `needs human ruling` item gates the sr-engineer dispatch; alternative: require approval=human for every architect-hop lane). Send to integrator mailbox for the second pre-review before sr-engineer.
+- T-E296-04 (tools/fanout-manifest.ts): LANES_HEADER unchanged; isDispatchableHeader accepts 8 cols or 8+`approval`; ROW_CELL_COUNT compares to the table's own header length (8-col message bytes unchanged); APPROVAL_VALUE_UNKNOWN row error (allowed: human, U+2014, empty); DispatchableLane.approval; LANE_PROVISIONAL text '8- or 9-column'. New pure parseCutSection/checkCut/isCutTokenInBounds + runCheckCut; runCheck dispatches args[0]==='--cut' before parseArgs; USAGE 4th line; scripts/fanout.mjs comment-only (routes + single dist import unchanged). OUT line prints the token in backticks (AC11 proof). Decisions-scope parse errors -> exit 2. Added codes beyond spec: CUT_SECTION_DUPLICATE, CUT_ROW_MALFORMED, CUT_TOUCHES_EMPTY, SPEC_UNREADABLE (none carries a gate suffix — error-code-contract safe). checkLane output must stay byte-identical (shared private line helpers).
+- T-E296-03: config.ts manifest: boolean, default false, `tier.manifest === true`; docs/config.md JSON + row + Semantics bullet (allow* flags still apply; only maxFiles/maxPriority replaced). T-E296-01/02: exact anchors + insertion text in the architecture file; const-08 growth ~1.2k chars; coord-03 ~0.75k; skill-pm attestation wording = 'last line before your watermark' (Constitution §1 conflict with 'end the final reply with').
+- qa note: e5-intake-tiering moves at :71-75 AND :215-219 (defaults export deepEqual), not only :73. Architect verified on base parser: this lane's ## Cut is 5 tickets / 17 tokens / 0 OUT; validate sweep 18x0 + wave5.1/wave6 exit 2; render sha 045b56ae...128a.
+- FINDING for coordinator/PM: the tracked PM spec fails `npm run check:md-tables` today — specs/e296-manifest-tier-cut-approval.md:79 (Copy/Strings row e296.cut.header has unescaped `|` inside a code span: 'row has 8 cell(s), header declares 3'). Fix by escaping as `\|` before qa's full suite; it is in the lane's own specs/e296-* set. Architecture file itself passes the checker.
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.
