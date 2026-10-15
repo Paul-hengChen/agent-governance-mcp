@@ -33,7 +33,7 @@ body: |
 
 ```pending-ticket
 lane_local_id: E297-NEW-3
-title: `git merge --ff-only` stays in the Integrator-only grant but no SOP step uses it after E297
+title: "`git merge --ff-only` stays in the Integrator-only grant but no SOP step uses it after E297"
 priority: P3
 depends_on: [E297]
 source: pm cut, lane e297
