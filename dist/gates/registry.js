@@ -104,10 +104,10 @@ export const GATE_REGISTRY = [
         errorCode: "HOP_CAP_EXCEEDED",
         producer: "validateTransition",
         envelope: "transition-json",
-        triggerEdge: "prev_hop_count >= 10 on a role transition (next.agent != prev.agent) and next != (pm,In_Progress); feature_changed bypasses",
+        triggerEdge: "prev_hop_count >= 14 on a role transition (next.agent != prev.agent); the (pm,In_Progress) landing is accepted unconditionally (E295, E41); feature_changed bypasses",
         armCondition: "opt-in (counter present)",
         clearingArtifact: "(pm, In_Progress) landing (does NOT reset hop_count) or active_feature change (resets to 0)",
-        hintStatic: " reaches hop cap (10). Only the (pm, In_Progress) landing is allowed; " +
+        hintStatic: " reaches hop cap (14). Only the (pm, In_Progress) landing is allowed; " +
             "hop_count resets only on active_feature change — human must re-scope or override.",
         // DR-7 (d2-server-brake-accounting): the backtick-quoted literal in
         // skill-coordinator.md lands with T-D2-03; both must ship before the C12
