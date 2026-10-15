@@ -1,8 +1,8 @@
 ---
 schema_version: 15
 active_feature: "e296-manifest-tier-cut-approval"
-status: "In_Progress"
-last_updated: "2026-10-15T09:52:28.405Z"
+status: "PASS"
+last_updated: "2026-10-15T10:05:36.694Z"
 last_agent: "qa-engineer"
 scope_decision: "single-feature"
 scope_decision_why: "Lane e296 of specs/fanout-post-v4-w3.md: E296 items (1)-(8) plus E309's one skill-integrator sentence; scope is the manifest Lanes row, not widened or narrowed. Non-design (no design/ file)."
@@ -10,11 +10,8 @@ cut_approved: true
 dispatch_pins:
   sr-engineer: "opus"
 evidence_schema: 2
-next_role: "qa-engineer"
-dispatched_at: "2026-10-15T09:52:28.405Z"
-review_verdict: "APPROVED"
 dispatch_mechanism: "task"
-dispatch_mechanism_tier: "opus"
+dispatch_mechanism_tier: "sonnet"
 qa_round: 0
 review_round: 0
 visual_round: 0
@@ -26,17 +23,22 @@ visual_rounds_total: 0
 # Handoff State
 
 ## Completed
-- (none)
+- [x] T-E296-01
+- [x] T-E296-02
+- [x] T-E296-03
+- [x] T-E296-04
+- [x] T-E296-05
+- [x] T-E296-06
 
 ## Pending & Handoff Notes
-- ⛔ Hop cap reached (hop_count=14/14): next role transition will be rejected (HOP_CAP_EXCEEDED) — only (pm, In_Progress) may land. Halt autonomous dispatch and surface to human; only an active_feature change resets the counter.
-- code-reviewer: round 5 APPROVED for T-E296-01, T-E296-02, T-E296-03, T-E296-04, T-E296-06 (delta abfab8a..d4ad0cc).
-- review_report: review_reports/review_T-E296-01.md (## Round 5 — APPROVED — by code-reviewer; covers line unchanged; report appended, uncommitted).
-- R4-1 closed: the 4 round-4 bare-CR cases plus 13 new CR variants (CR at SOF, \r\r\n, CR in span, CR in the ## Cut heading line, CR in the title line, trailing CR at EOF in LF and CRLF files, CR in a far fenced block) all exit 2 CUT_ROW_MALFORMED; CRLF/mixed files still parse, and CRLF own spec output == LF output.
-- No regression: validate/render/check byte-identical to 59de2ab on 20 manifests (100 outputs, 0 diffs); manifest-side bare-CR/CRLF copies identical to 59de2ab; AC9-AC12/AC15 proofs pass; prior.mjs bad=0; shared helpers byte-unchanged vs c392cc3.
-- Gates: npm run build 0 (dist clean), tsc --noEmit 0, npm audit --audit-level=high 0; suite 3128/3110/15/3, reds = the known qa-owned 15 exactly.
-- Non-blocking: recommended — trim the duplicated JSDoc/inline CR comment (tools/fanout-manifest.ts:1235-1243; agc check long-block 16). Optional — manifest-side bare CR in a Lanes row still passes validate (same as base; future ticket, not this lane). R4-2 remains E296-NEW-4.
-- Write count: 2 (claim + verdict) — the direct sr-engineer:In_Progress -> qa-engineer:In_Progress edge was rejected TRANSITION_REJECTED, so the SOP step-2 claim was required.
+- QA PASS: T-E296-01, T-E296-02, T-E296-03, T-E296-04, T-E296-05, T-E296-06. Tests commit 1b3234a; evidence in qa_reports/review_T-E296-01.md (covers all six; the server resolves per-id file names, so the batch file carries the first id's name, not review_E296_T-E296-01-06.md).
+- Suite on 1b3234a, clean tree, node scripts/test-lock.mjs -- npm test: 3163 tests / 3160 pass / 0 fail / 3 skipped. npm run build clean (dist not drifting); npm audit --audit-level=high exit 0; check:md-tables OK (541 files). Later commits are qa_reports docs only.
+- Ceilings (R1, zero headroom) old -> new: skill-pm 4401 -> 4708; design-arm constitution 10226 -> 10518; coordinator bundle 21138 -> 21623; non-design constitution 8129 -> 8420.
+- Files touched (tests only): test/e296-manifest-tier.test.mjs (new), test/e5-intake-tiering.test.mjs (manifest: false x2), test/e178a-integrator-role.test.mjs (fable -> opus), test/e297-main-protected-sop.test.mjs (:104 only), test/context-budget.test.mjs (4 ceilings + messages), test/fixtures/compose-golden/** (7 of 12 changed), qa_reports/review_T-E296-01.md. test/e177a-manifest.test.mjs and test/e177a-check-cli.test.mjs unchanged: AC9/AC11/AC12/AC15 cases live in the new file; the LANE_PROVISIONAL count text was never asserted before and is pinned in the new file.
+- Golden diff: 13 insertions / 7 deletions across build-full-{design,nondesign}{,-fd}.txt, constitution-monolith.txt, hook-full.txt, skill-coordinator-monolith.txt; every hunk is the const-08 Cut-Approval Auto-Tier bullet + new Manifest tier sub-bullet or the coord-03 Auto-tier writer action line. Lite goldens and hook-lite unchanged.
+- AC11 own-spec proof prints exit=1 not exit=0: the single OUT line is test/e297-main-protected-sop.test.mjs, the known manifest-version gap (lane manifest copy lacks it in the e296 owned set); a tokenless copy exits 0 (pinned). Resolves once the integrator updates the manifest owned set.
+- .current/e296/tasks.md T-E296-05 line lists depends_on T-E296-01..04 only (predates T-E296-06); spec ## Cut is authoritative; tasks.md not hand-edited.
+- Crash-checkpoint write skipped (tracked handoff would dirty the tree before the clean-tree suite run). No findings; no pending-ticket appended. next_role: none (hop cap 14 reached).
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.

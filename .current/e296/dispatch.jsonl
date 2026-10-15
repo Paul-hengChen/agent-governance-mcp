@@ -23,3 +23,4 @@
 {"ts":"2026-10-15T09:42:08.697Z","feature":"e296-manifest-tier-cut-approval","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-10-15T09:52:21.534Z","feature":"e296-manifest-tier-cut-approval","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-10-15T09:52:28.412Z","feature":"e296-manifest-tier-cut-approval","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-15T10:05:36.696Z","feature":"e296-manifest-tier-cut-approval","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
