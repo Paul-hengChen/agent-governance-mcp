@@ -2,10 +2,11 @@
 // Coded by @sr-engineer
 // Thin CLI wrapper (all logic in tools/fanout-manifest.ts) that validates and
 // renders a multi-lane feature split (E177a); see specs/e260c-bin-scripts.md.
-// Exit codes: 0 = ok / in bounds, 1 = out of bounds (check only), 2 = usage or any parse/input error.
+// Exit codes: 0 = ok / in bounds, 1 = out of bounds or a failed manifest-side condition (check, check --cut), 2 = usage or any parse/input error.
 // Usage: node scripts/fanout.mjs validate <manifest>
 //        node scripts/fanout.mjs render <manifest> <lane> --summary <text> --reading <text>... [--mailbox-root <dir>] [--primary <path>] [--base <sha>]
 //        node scripts/fanout.mjs check <manifest> <lane> [--base main] [--repo <dir>]
+//        node scripts/fanout.mjs check --cut <manifest> <lane> <spec>
 
 import { runValidate, runRender, runCheck, usageResult } from "../dist/tools/fanout-manifest.js";
 

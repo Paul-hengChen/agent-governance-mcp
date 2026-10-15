@@ -1,7 +1,8 @@
 // Coded by @sr-engineer
 // Fan-out manifest parser (parseManifest / validateManifest), dispatch-prompt
-// renderer (renderPrompt) and fan-in ownership check (checkLane); the format
-// contract is the table in specs/e177a-fanout-manifest.md. It never guesses:
+// renderer (renderPrompt), fan-in ownership check (checkLane) and pre-commit
+// cut containment check (checkCut); the format contract is the table in
+// specs/e177a-fanout-manifest.md. It never guesses:
 // a legacy manifest part is reported unreadable by name. Read-only: writes
 // nothing, fires no gate; git is read via execFileSync argv, never a shell.
 // Why: specs/e260a-tools-a-h-rationale.md, "tools/fanout-manifest.ts — never guess".
@@ -14,6 +15,24 @@ import path from "node:path";
 
 /** Exact header of a dispatchable `## Lanes…` table, in order. */
 export const LANES_HEADER = ["lane", "票", "branch", "worktree", "擁有", "禁止", "範圍切線", "相依"] as const;
+
+/**
+ * Optional 9th header cell of a dispatchable `## Lanes…` table. Absent in
+ * every older manifest, so the 8-column shape stays exact and dispatchable.
+ */
+export const APPROVAL_COLUMN = "approval" as const;
+
+/**
+ * Allowed `approval` cell values ("" = empty cell, "—" is U+2014). Anything
+ * else is a row error: a misspelt `human` must never read as "not human".
+ */
+export const APPROVAL_VALUES = ["human", "—", ""] as const;
+
+/** Exact header of a spec's `## Cut` table (= skill-pm's inline cut table header). */
+export const CUT_HEADER = ["id", "desc", "depends_on", "est. files", "touches", "design-link"] as const;
+
+/** `touches` value for a ticket that writes only governance bookkeeping. */
+export const CUT_TOUCHES_NONE = "—";
 
 /** Exact header of the `## Decisions…` table, in order. */
 export const DECISIONS_HEADER = ["日期", "裁決者", "內容", "出處"] as const;
@@ -96,6 +115,20 @@ export const FANOUT_CODES = {
   // Render-only input error: a `mailbox:` header starting with "~". Not
   // raised by the parser, so validate never fails because of it. (E248)
   mailboxTilde: "MAILBOX_TILDE",
+  // Optional `approval` Lanes column holds a value outside APPROVAL_VALUES.
+  approvalValueUnknown: "APPROVAL_VALUE_UNKNOWN",
+  // check --cut manifest-side failures (exit 1, reported as FAIL lines).
+  approvalHuman: "APPROVAL_HUMAN",
+  decisionsHumanRowAbsent: "DECISIONS_HUMAN_ROW_ABSENT",
+  // check --cut spec-side format errors (exit 2): the `## Cut` table.
+  cutSectionAbsent: "CUT_SECTION_ABSENT",
+  cutSectionDuplicate: "CUT_SECTION_DUPLICATE",
+  cutTableAbsent: "CUT_TABLE_ABSENT",
+  cutHeaderDiffers: "CUT_HEADER_DIFFERS",
+  cutRowMalformed: "CUT_ROW_MALFORMED",
+  cutTouchesUnquotedPath: "CUT_TOUCHES_UNQUOTED_PATH",
+  cutTouchesEmpty: "CUT_TOUCHES_EMPTY",
+  specUnreadable: "SPEC_UNREADABLE",
 } as const;
 
 /**
@@ -119,11 +152,14 @@ export const USAGE = [
   "usage: node scripts/fanout.mjs validate <manifest>",
   "       node scripts/fanout.mjs render <manifest> <lane> --summary <text> --reading <text>... [--mailbox-root <dir>] [--primary <path>] [--base <sha>]",
   "       node scripts/fanout.mjs check <manifest> <lane> [--base main] [--repo <dir>]",
+  "       node scripts/fanout.mjs check --cut <manifest> <lane> <spec>",
 ].join("\n");
 
 export const E158_NOTE = (base: string, branch: string): string =>
   `note: only committed changes were checked (git diff --no-renames --name-only ${base}...${branch}); uncommitted and untracked work in the worktree was NOT checked (E158).`;
 export const PROSE_NOTE = "note: prose restrictions inside 擁有 (e.g. （只限 …）) are not machine-checked.";
+export const CUT_GLOB_NOTE =
+  "note: a glob in touches is in bounds only when byte-identical to an 擁有 token; glob-in-glob containment is never inferred.";
 
 // --- types -------------------------------------------------------------------
 
@@ -132,8 +168,9 @@ export const PROSE_NOTE = "note: prose restrictions inside 擁有 (e.g. （只�
  * decide which errors are fatal for the lane they target (a Decisions error
  * never blocks a render; a row error blocks only its own lane).
  * "input" = a CLI/environment input (flag, git ref, file), not the manifest text.
+ * "cut" = the `## Cut` table of a lane spec read by check --cut.
  */
-export type FanoutErrorScope = "title" | "base" | "lanes" | "row" | "pins" | "decisions" | "input";
+export type FanoutErrorScope = "title" | "base" | "lanes" | "row" | "pins" | "decisions" | "cut" | "input";
 
 export interface FanoutError {
   code: string;
@@ -163,6 +200,11 @@ export interface DispatchableLane {
   heading: string;
   /** 1-based line number of the row in the manifest. */
   line: number;
+  /**
+   * Optional 9th `approval` cell: "human" when the cell is `human`; undefined
+   * for `—`, empty, or an 8-column table. Read only by check --cut.
+   */
+  approval: "human" | undefined;
 }
 
 export interface ProvisionalLane {
@@ -412,8 +454,7 @@ function parseLanes(sections: Section[], m: Manifest): Set<string> {
       });
       continue;
     }
-    const dispatchable = header.length === LANES_HEADER.length && header.every((c, i) => c === LANES_HEADER[i]);
-    if (!dispatchable) {
+    if (!isDispatchableHeader(header)) {
       const missing = LANES_HEADER.filter((c) => !header.includes(c));
       for (const r of rows) {
         const id = r.cells[0] ?? "";
@@ -445,11 +486,14 @@ function parseLanes(sections: Section[], m: Manifest): Set<string> {
       const rowErr = (code: string, message: string): void => {
         errors.push({ code, scope: "row", lanes: [id], message: `lane ${id} (${where}): ${message}` });
       };
-      if (r.cells.length !== LANES_HEADER.length) {
-        rowErr("ROW_CELL_COUNT", `row has ${r.cells.length} cell(s), expected ${LANES_HEADER.length} (${LANES_HEADER.join(" | ")})`);
+      // Compared to this table's own header, so an 8-column table reports
+      // exactly the 8-column message it always did.
+      if (r.cells.length !== header.length) {
+        rowErr("ROW_CELL_COUNT", `row has ${r.cells.length} cell(s), expected ${header.length} (${header.join(" | ")})`);
         continue;
       }
       const [lane, ticket, branch, worktree, owned, forbidden, scopeCut, deps] = r.cells;
+      const approvalCell = header.length > LANES_HEADER.length ? r.cells[LANES_HEADER.length] : "";
       let ok = true;
       if (branch === "") {
         rowErr("BRANCH_EMPTY", "branch cell is empty");
@@ -468,6 +512,11 @@ function parseLanes(sections: Section[], m: Manifest): Set<string> {
         rowErr(FANOUT_CODES.scopeCutMarkersAbsent, "範圍切線 cell must contain both 做： and 不做：");
         ok = false;
       }
+      // Case-sensitive on purpose: `Human`, ASCII `-`, `yes` are errors, not guesses.
+      if (!(APPROVAL_VALUES as readonly string[]).includes(approvalCell)) {
+        rowErr(FANOUT_CODES.approvalValueUnknown, `approval cell is "${approvalCell}" — allowed: human, —, or empty`);
+        ok = false;
+      }
       if (!ok) continue;
       m.dispatchable.push({
         lane,
@@ -482,10 +531,22 @@ function parseLanes(sections: Section[], m: Manifest): Set<string> {
         forbiddenTokens: pathTokens(forbidden),
         heading: s.heading,
         line: r.line,
+        approval: approvalCell === "human" ? "human" : undefined,
       });
     }
   }
   return new Set(seen.keys());
+}
+
+/**
+ * A Lanes table is dispatchable when its header is exactly LANES_HEADER, or
+ * exactly LANES_HEADER followed by the optional `approval` column. Any other
+ * shape (a different 9th cell, reordered columns) stays provisional.
+ */
+function isDispatchableHeader(h: string[]): boolean {
+  const prefixOk = LANES_HEADER.every((c, i) => h[i] === c);
+  if (!prefixOk) return false;
+  return h.length === LANES_HEADER.length || (h.length === LANES_HEADER.length + 1 && h[LANES_HEADER.length] === APPROVAL_COLUMN);
 }
 
 function parsePins(sections: Section[], m: Manifest, known: Set<string>): void {
@@ -686,7 +747,7 @@ function lookupLane(m: Manifest, laneId: string): LaneLookup {
       code: "LANE_PROVISIONAL",
       scope: "lanes",
       lanes: [laneId],
-      message: `lane ${laneId} is in a provisional table (${prov.heading}) missing column(s): ${cols} — redo the pre-dispatch premise check and promote it to the 8-column Lanes table`,
+      message: `lane ${laneId} is in a provisional table (${prov.heading}) missing column(s): ${cols} — redo the pre-dispatch premise check and promote it to the 8- or 9-column Lanes table`,
     });
   }
   const lane = m.dispatchable.find((d) => d.lane === laneId);
@@ -1078,8 +1139,8 @@ export function checkLane(m: Manifest, laneId: string, opts: CheckOptions = {}):
   }
 
   const lines = [
-    `owned (from 擁有): ${lane.ownedTokens.join(", ")}`,
-    `implicit lane bookkeeping: .current/${lane.lane}/**, specs/${lane.lane}-*.md, qa_reports|review_reports/*${lane.lane}* (case-insensitive)`,
+    ownedLine(lane),
+    implicitBookkeepingLine(lane),
     ...out.map((o) => `OUT  ${o.path}${o.forbidden ? `  (禁止: ${o.forbidden})` : ""}`),
     `fanout check: ${lane.lane} — ${changed.length} file(s) changed, ${out.length} out of bounds`,
     E158_NOTE(base, lane.branch),
@@ -1102,6 +1163,226 @@ export function checkLane(m: Manifest, laneId: string, opts: CheckOptions = {}):
       ...(unmatchedCheckError !== undefined && { unmatchedCheckError }),
       output: lines.join("\n") + "\n",
       exitCode: out.length > 0 ? 1 : 0,
+    },
+  };
+}
+
+// Shared by checkLane and checkCut so both print the same owned/bookkeeping lines.
+function ownedLine(lane: DispatchableLane): string {
+  return `owned (from 擁有): ${lane.ownedTokens.join(", ")}`;
+}
+
+function implicitBookkeepingLine(lane: DispatchableLane): string {
+  return `implicit lane bookkeeping: .current/${lane.lane}/**, specs/${lane.lane}-*.md, qa_reports|review_reports/*${lane.lane}* (case-insensitive)`;
+}
+
+// --- check --cut -------------------------------------------------------------
+
+export interface CutTicket {
+  /** `id` cell, trimmed. */
+  id: string;
+  /** Path tokens of the `touches` cell (pathTokens order, de-duplicated within the row); [] when the cell is exactly `—`. */
+  touches: string[];
+  /** 1-based line of the row in the spec. */
+  line: number;
+}
+
+export type CutSectionResult = { ok: true; tickets: CutTicket[] } | { ok: false; errors: FanoutError[] };
+
+export interface CutOut {
+  token: string;
+  ticket: string;
+  /** The 禁止 token it matches, when any (annotation only, as in checkLane). */
+  forbidden?: string;
+}
+
+export interface CutCheckReport {
+  lane: string;
+  tickets: number;
+  /** Sum over tickets of their (row-de-duplicated) touches tokens. */
+  tokens: number;
+  out: CutOut[];
+  approval: "human" | undefined;
+  humanDecisions: { count: number; latest?: string };
+  /** APPROVAL_HUMAN / DECISIONS_HUMAN_ROW_ABSENT, in that order, only when failing. */
+  failures: FanoutError[];
+  output: string;
+  exitCode: 0 | 1;
+}
+
+export type CutCheckResult = { ok: true; report: CutCheckReport } | { ok: false; errors: FanoutError[] };
+
+function cutErr(code: string, message: string): FanoutError {
+  return { code, scope: "cut", message };
+}
+
+/**
+ * Parse the `## Cut` table of a lane spec. Pure. Only a section named
+ * exactly `Cut` is read, so prose sections such as `## Cut Decisions` are
+ * ignored. Every row error is collected before returning. Known limit shared
+ * with the manifest parser: fenced code blocks are not recognised, so a
+ * fenced line starting with `## Cut` counts as a section.
+ */
+export function parseCutSection(specText: string): CutSectionResult {
+  const cut = splitSections(splitLines(specText)).filter((s) => s.name === "Cut");
+  if (cut.length === 0) {
+    return {
+      ok: false,
+      errors: [cutErr(FANOUT_CODES.cutSectionAbsent, 'no "## Cut" section found — write the inline cut table under a "## Cut" heading (skill-pm Spec Schema)')],
+    };
+  }
+  if (cut.length > 1) {
+    return {
+      ok: false,
+      errors: [
+        cutErr(
+          FANOUT_CODES.cutSectionDuplicate,
+          `${cut.length} "## Cut" sections found (lines ${cut.map((s) => s.line).join(", ")}); exactly one is allowed`,
+        ),
+      ],
+    };
+  }
+  const s = cut[0];
+  const table = firstTable(s);
+  if (table.length === 0) {
+    return { ok: false, errors: [cutErr(FANOUT_CODES.cutTableAbsent, `section "${s.heading}" (line ${s.line}) has no table`)] };
+  }
+  const { header, rows } = tableRows(table);
+  const headerOk = header.length === CUT_HEADER.length && header.every((c, i) => c === CUT_HEADER[i]);
+  if (!headerOk) {
+    return {
+      ok: false,
+      errors: [
+        cutErr(
+          FANOUT_CODES.cutHeaderDiffers,
+          `section "${s.heading}" line ${table[0].line}: header is "${header.join(" | ")}", expected exactly "${CUT_HEADER.join(" | ")}"`,
+        ),
+      ],
+    };
+  }
+  if (rows.length === 0) {
+    return { ok: false, errors: [cutErr(FANOUT_CODES.cutTableAbsent, `section "${s.heading}" (line ${s.line}) has a header but no ticket row`)] };
+  }
+
+  const errors: FanoutError[] = [];
+  const tickets: CutTicket[] = [];
+  for (const r of rows) {
+    if (r.cells.length !== CUT_HEADER.length || r.cells[0] === "") {
+      errors.push(
+        cutErr(
+          FANOUT_CODES.cutRowMalformed,
+          `Cut row (line ${r.line}): ${r.cells.length} cell(s) with id "${r.cells[0] ?? ""}" — expected ${CUT_HEADER.length} cells and a non-empty id`,
+        ),
+      );
+      continue;
+    }
+    const id = r.cells[0];
+    const touches = r.cells[4];
+    let ok = true;
+    for (const w of unquotedPaths(touches)) {
+      errors.push(cutErr(FANOUT_CODES.cutTouchesUnquotedPath, `Cut row ${id} (line ${r.line}): touches has unquoted path "${w}" — backtick-quote every path`));
+      ok = false;
+    }
+    const toks = [...new Set(pathTokens(touches))];
+    // A prose-only touches cell would otherwise read as "zero tokens, in bounds".
+    if (toks.length === 0 && touches !== CUT_TOUCHES_NONE) {
+      errors.push(
+        cutErr(
+          FANOUT_CODES.cutTouchesEmpty,
+          `Cut row ${id} (line ${r.line}): touches names no backtick-quoted path — list the paths, or write — for a bookkeeping-only ticket`,
+        ),
+      );
+      ok = false;
+    }
+    if (ok) tickets.push({ id, touches: toks, line: r.line });
+  }
+  if (errors.length > 0) return { ok: false, errors };
+  return { ok: true, tickets };
+}
+
+/**
+ * Whether one `touches` token is inside the lane's owned set. An exact token
+ * may match an 擁有 glob or the implicit bookkeeping set; a glob token is in
+ * bounds only when byte-identical to an 擁有 token, because containment of
+ * one glob in another is never inferred.
+ */
+export function isCutTokenInBounds(token: string, lane: DispatchableLane): boolean {
+  if (isGlobToken(token)) return lane.ownedTokens.includes(token);
+  return lane.ownedTokens.some((t) => matchesGlob(token, t)) || isImplicitBookkeeping(token, lane.lane);
+}
+
+/**
+ * Pre-commit containment check of a lane spec's `## Cut` against its manifest
+ * row, plus the two manifest-side facts the manifest tier needs (`approval`
+ * not human, at least one 人類 Decisions row). Pure: no fs, no git.
+ */
+export function checkCut(m: Manifest, laneId: string, specText: string): CutCheckResult {
+  const found = lookupLane(m, laneId);
+  if (!found.ok) return { ok: false, errors: found.errors };
+  const lane = found.lane;
+  // A dropped malformed Decisions row could be the 人類 row or the latest
+  // date, so a Decisions format error refuses rather than counting around it.
+  const decisionErrors = m.errors.filter((e) => e.scope === "decisions");
+  if (decisionErrors.length > 0) return { ok: false, errors: decisionErrors };
+  const parsed = parseCutSection(specText);
+  if (!parsed.ok) return { ok: false, errors: parsed.errors };
+
+  const out: CutOut[] = [];
+  let tokens = 0;
+  for (const t of parsed.tickets) {
+    tokens += t.touches.length;
+    for (const token of t.touches) {
+      if (isCutTokenInBounds(token, lane)) continue;
+      const forbidden = isGlobToken(token)
+        ? lane.forbiddenTokens.find((f) => f === token)
+        : lane.forbiddenTokens.find((f) => matchesGlob(token, f));
+      out.push({ token, ticket: t.id, ...(forbidden !== undefined && { forbidden }) });
+    }
+  }
+
+  const human = m.decisions.rows.filter((d) => d.decider === "人類");
+  // Dates are validated YYYY-MM-DD, so string order is date order.
+  const latest = human.map((d) => d.date).sort().at(-1);
+  const failures: FanoutError[] = [];
+  if (lane.approval === "human") {
+    failures.push({
+      code: FANOUT_CODES.approvalHuman,
+      scope: "row",
+      lanes: [lane.lane],
+      message: `lane ${lane.lane}'s approval cell is human — present this cut to the human in the lane session`,
+    });
+  }
+  if (human.length === 0) {
+    failures.push({
+      code: FANOUT_CODES.decisionsHumanRowAbsent,
+      scope: "decisions",
+      message: "the ## Decisions table has no 人類 row — the manifest is not human-approved",
+    });
+  }
+
+  const lines = [
+    ownedLine(lane),
+    implicitBookkeepingLine(lane),
+    ...out.map((o) => `OUT  \`${o.token}\`  (${o.ticket})${o.forbidden ? `  (禁止: ${o.forbidden})` : ""}`),
+    `approval: ${lane.approval ?? "—"}`,
+    `human-decisions: ${human.length} row(s); latest ${latest ?? "—"}`,
+    ...failures.map((f) => `FAIL  ${f.code}: ${f.message}`),
+    `fanout check --cut: ${lane.lane} — ${parsed.tickets.length} ticket(s), ${tokens} token(s), ${out.length} out of bounds`,
+    CUT_GLOB_NOTE,
+    PROSE_NOTE,
+  ];
+  return {
+    ok: true,
+    report: {
+      lane: lane.lane,
+      tickets: parsed.tickets.length,
+      tokens,
+      out,
+      approval: lane.approval,
+      humanDecisions: { count: human.length, ...(latest !== undefined && { latest }) },
+      failures,
+      output: lines.join("\n") + "\n",
+      exitCode: out.length === 0 && failures.length === 0 ? 0 : 1,
     },
   };
 }
@@ -1166,6 +1447,14 @@ function readManifest(file: string): { text: string } | { error: FanoutError } {
   }
 }
 
+function readSpec(file: string): { text: string } | { error: FanoutError } {
+  try {
+    return { text: fs.readFileSync(file, "utf8") };
+  } catch (err) {
+    return { error: inputErr(FANOUT_CODES.specUnreadable, `cannot read spec "${file}": ${(err as Error).message}`) };
+  }
+}
+
 export function runValidate(args: string[]): CliResult {
   const p = parseArgs(args, []);
   if (typeof p === "string") return usageResult(p);
@@ -1217,6 +1506,8 @@ export function runRender(args: string[]): CliResult {
 }
 
 export function runCheck(args: string[]): CliResult {
+  // Dispatched before parseArgs, which would read `--cut` as a value-taking flag.
+  if (args[0] === "--cut") return runCheckCut(args.slice(1));
   const p = parseArgs(args, ["--base", "--repo"]);
   if (typeof p === "string") return usageResult(p);
   if (p.positional.length !== 2) return usageResult("check takes <manifest> <lane>");
@@ -1229,6 +1520,21 @@ export function runCheck(args: string[]): CliResult {
   if ("error" in r) return fail([r.error]);
   // Same default as render: the git repo that holds the manifest, not cwd.
   const res = checkLane(parseManifest(r.text), lane, { base, repo: repo ?? path.dirname(path.resolve(file)) });
+  if (!res.ok) return fail(res.errors);
+  return { stdout: res.report.output, stderr: "", exitCode: res.report.exitCode };
+}
+
+/** `check --cut <manifest> <lane> <spec>`: file reads only — no git, no writes. */
+export function runCheckCut(args: string[]): CliResult {
+  const p = parseArgs(args, []);
+  if (typeof p === "string") return usageResult(p);
+  if (p.positional.length !== 3) return usageResult("check --cut takes <manifest> <lane> <spec>");
+  const [file, lane, specFile] = p.positional;
+  const r = readManifest(file);
+  if ("error" in r) return fail([r.error]);
+  const spec = readSpec(specFile);
+  if ("error" in spec) return fail([spec.error]);
+  const res = checkCut(parseManifest(r.text), lane, spec.text);
   if (!res.ok) return fail(res.errors);
   return { stdout: res.report.output, stderr: "", exitCode: res.report.exitCode };
 }
