@@ -2,8 +2,12 @@
 // Tests (T-E296-05) for specs/e296-manifest-tier-cut-approval.md AC1-AC12, AC14, AC15: the cut-approval
 // manifest tier (content literals, config key), the optional 9th `approval` Lanes column, and the
 // `check --cut` runner with its whitelist grammar. Each AC is pinned by its spec `proof:` pattern.
-// Fixtures are spec files written to os.tmpdir(); the manifest under test is the committed wave-3 manifest
-// (lane e296), as in the spec proofs. Nothing here writes into the repo or runs git.
+// Fixtures are spec files written to os.tmpdir(). The manifest under test is MANIFEST_TEXT below: a frozen,
+// in-test copy of the wave-3 manifest (lane e296's 擁有 / 禁止 cells verbatim, a fixed Decisions table), NOT
+// the committed specs/fanout-post-v4-w3.md — that file is a living document integrators keep appending to
+// (Decisions rows, close-out sections, lane bookkeeping), so asserting on its content made AC11 rot (T-E296-08).
+// The committed manifests are read only where the AC is about them as files: AC9's validate sweep and AC10's
+// w2 render control. Nothing here writes into the repo; only AC10 runs git (read-only).
 // The goldens, ceilings and re-pins (AC13, AC14 re-pins) live in their own existing test files.
 
 import { test } from "node:test";
@@ -18,7 +22,6 @@ import { fileURLToPath } from "node:url";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
 const FANOUT = path.join(ROOT, "scripts", "fanout.mjs");
-const W3 = path.join("specs", "fanout-post-v4-w3.md");
 const OWN_SPEC = path.join("specs", "e296-manifest-tier-cut-approval.md");
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), "e296-qa-"));
 let seq = 0;
@@ -49,8 +52,58 @@ function tmpFile(name, text) {
   fs.writeFileSync(p, text);
   return p;
 }
-/** Run `check --cut` on spec text against a manifest (default: the wave-3 manifest, lane e296). */
-function runCut(specText, { manifest = W3, lane = "e296" } = {}) {
+/**
+ * Frozen wave-3 manifest (8-column Lanes table, two lanes). Lane e296's 擁有 / 禁止 cells are copied verbatim
+ * from specs/fanout-post-v4-w3.md as it stood at wave close (they drive every containment case below);
+ * 範圍切線 and the whole e308 row are shortened, since no assertion reads them. The Decisions table is fixed
+ * by design: 3 人類 rows whose latest date (2026-10-15) is neither the last row nor the table-wide maximum —
+ * the later 整合者 row (2026-10-16) must not count — so the fact line pins count AND max-of-人類-dates.
+ */
+const MANIFEST_TEXT = [
+  "# Fan-out: post-v4 佇列第 3 波（frozen test copy）",
+  "base: db542da    integration branch: integ/post-v4-w3",
+  "mailbox: ../agent-governance-mcp-lanes/_mailbox",
+  "",
+  "## Lanes",
+  "| lane | 票 | branch | worktree | 擁有 | 禁止 | 範圍切線 | 相依 |",
+  "|---|---|---|---|---|---|---|---|",
+  "| e296 | E296、E309 | feat/e296-manifest-tier-cut-approval | ../agent-governance-mcp-lanes/e296 | " +
+    "`content/const-08-chain-31-mid.md`、`content/coord-03-core-fallback.md`、`content/skill-pm.md`、`content/skill-integrator.md`、" +
+    "`content/constitution-rationale.md`（只在需要搬理由時）、`docs/lane-protocol.md`、`docs/config.md`、" +
+    "`tools/config.ts` 與其 `dist/tools/config.*`、`tools/fanout-manifest.ts` 與其 `dist/tools/fanout-manifest.*`、`scripts/fanout.mjs`、" +
+    "`test/fixtures/compose-golden/**`、`test/context-budget.test.mjs`、`test/e5-intake-tiering.test.mjs`、`test/cut-approval-gate.test.mjs`、" +
+    "`test/e177a-manifest.test.mjs`、`test/e177a-check-cli.test.mjs`、`test/e178b-fanout-unmatched.test.mjs`、`test/e235b-relative-worktree.test.mjs`、" +
+    "`test/e248-relative-mailbox-header.test.mjs`、`test/e178a-integrator-role.test.mjs`、`test/e295-hop-cap-and-sop-halves.test.mjs`、" +
+    "`test/render-structure.test.mjs`、`test/e297-main-protected-sop.test.mjs`（只限 `:104` integrator `recommended_model` re-pin）、" +
+    "`test/config-cache.test.mjs`、`test/config-versioning.test.mjs`、`test/e31-config-nonfatal.test.mjs`、" +
+    "`test/agc-adapters.test.mjs`（只在 adapter 文字提到 auto-tier 時）、`test/p0-onboarding-lite-default.test.mjs`（同上）、" +
+    "`test/e296-*.test.mjs`、`specs/e296-*`、`qa_reports/*E296*`、`qa_reports/*E309*`、`review_reports/*E296*`、`review_reports/*E309*`、`.current/e296/**`" +
+    " | " +
+    "其他 `content/**`、其他 `tools/**`（特別是 `tools/registry.ts`、`tools/handoff-parse.ts`、`tools/handoff-orchestrator.ts`、" +
+    "`tools/skill-frontmatter.ts`、`tools/telemetry.ts`）、`gates/**`、其他 `scripts/**`、其他 `test/**`（特別是 `test/dispatch-pins.test.mjs`、" +
+    "`test/error-code-contract.test.mjs`、`test/telemetry.test.mjs`）、其他 `dist/**`、其他 `specs/**`、其他 `docs/**`、共同禁止的全部項目" +
+    " | 做：E296 + E309（frozen copy，範圍切線節錄）。　不做：其他 lane 的檔案。 | 無 |",
+  "| e308 | E308、E303 | feat/e308-tier-enum-and-zod-telemetry | ../agent-governance-mcp-lanes/e308 | " +
+    "`tools/registry.ts` 與其 `dist/tools/registry.*`、`.current/e308/**` | `content/**`（全部）、共同禁止的全部項目 | " +
+    "做：E308 + E303（frozen copy，節錄）。　不做：`content/**`。 | 無 |",
+  "",
+  "## Dispatch pins",
+  "- e296：`sr-engineer=opus`。",
+  "- e308：`sr-engineer=opus`。",
+  "",
+  "## Decisions",
+  "| 日期 | 裁決者 | 內容 | 出處 |",
+  "|---|---|---|---|",
+  "| 2026-10-13 | 人類 | 開波 | 整合者 session |",
+  "| 2026-10-15 | 人類 | 核准本清單 | 整合者 session |",
+  "| 2026-10-16 | 整合者 | 晚於所有人類列的整合者列（不得算入 latest） | 本檔 |",
+  "| 2026-10-14 | 人類 | 晚於最新日期出現的較早人類列（latest 取最大值，不取最後一列） | lane e296 session |",
+  "",
+].join("\n");
+const MANIFEST = tmpFile("w3-frozen.md", MANIFEST_TEXT);
+
+/** Run `check --cut` on spec text against a manifest (default: the frozen wave-3 copy, lane e296). */
+function runCut(specText, { manifest = MANIFEST, lane = "e296" } = {}) {
   return cli(["check", "--cut", manifest, lane, tmpFile("spec.md", specText)]);
 }
 const firstErr = (r) => r.stderr.split("\n")[0];
@@ -175,10 +228,9 @@ test("AC9: every manifest's validate exit is unchanged from base (only wave5.1 a
   assert.deepEqual(bad, [["fanout-wave5.1.md", 2], ["fanout-wave6.md", 2]]);
 });
 
-const w3Text = read(W3);
-/** w3 with a 9th `approval` column added to the Lanes table (value `v` on every lane row). */
+/** The frozen manifest with a 9th `approval` column added to the Lanes table (value `v` on every lane row). */
 function nineCol(v, { header = "approval" } = {}) {
-  const lines = w3Text.split("\n");
+  const lines = MANIFEST_TEXT.split("\n");
   const start = lines.findIndex((l) => l.startsWith("## Lanes"));
   for (let i = start + 1; i < lines.length && lines[i].startsWith("|"); i++) {
     const k = i - start;
@@ -209,13 +261,13 @@ test("AC9: an approval value outside {human, —, empty} is APPROVAL_VALUE_UNKNO
   const m = parseManifest(nineCol("human"));
   const lane = m.dispatchable.find((l) => l.lane === "e296");
   assert.equal(lane.approval, "human");
-  const m8 = parseManifest(w3Text).dispatchable.find((l) => l.lane === "e296");
+  const m8 = parseManifest(MANIFEST_TEXT).dispatchable.find((l) => l.lane === "e296");
   assert.equal(m8.approval, undefined, "an 8-column row has no approval");
 });
 
 test("AC9: the 8-column header is still accepted exactly and a short row is still an error", () => {
-  assert.equal(cli(["validate", W3]).status, 0);
-  const lines = w3Text.split("\n");
+  assert.equal(cli(["validate", MANIFEST]).status, 0);
+  const lines = MANIFEST_TEXT.split("\n");
   const i = lines.findIndex((l) => l.startsWith("| e296 |"));
   lines[i] = lines[i].replace(/\|[^|]*\|\s*$/, "|"); // drop the last cell: 7 cells under an 8-col header
   const r = cli(["validate", tmpFile("short.md", lines.join("\n"))]);
@@ -233,6 +285,8 @@ test("AC10: render output is byte-identical to base (HEAD vs base code, same arg
   // The base render is produced in the same run from the base commit's own fanout code (extracted to TMP), under
   // identical arguments incl. fixed --primary/--mailbox-root, so nothing depends on the checkout's absolute path.
   // Base = the commit the lane forked from (also the --base ref of the w3 render). Needs full history: CI uses fetch-depth 0.
+  // The w3 input is the frozen in-test copy (an existing 8-column manifest, as AC10 requires); w2 stays the committed
+  // closed-wave file. Both are comparative (HEAD output == base output for the same input), so no manifest content is pinned.
   const BASE_CODE = "c392cc3";
   const have = spawnSync("git", ["rev-parse", "--verify", `${BASE_CODE}^{commit}`], { cwd: ROOT, encoding: "utf8" });
   if (have.status !== 0) {
@@ -247,7 +301,7 @@ test("AC10: render output is byte-identical to base (HEAD vs base code, same arg
   assert.equal(tar.status, 0, String(tar.stderr));
   const run = (script, a) => spawnSync(process.execPath, [script, ...a], { cwd: ROOT, encoding: "utf8" });
   const fixed = ["--primary", ROOT, "--mailbox-root", TMP];
-  for (const [manifest, lane, base] of [[W3, "e296", "c392cc3"], [path.join("specs", "fanout-post-v4-w2.md"), "e295", "25bc84c"]]) {
+  for (const [manifest, lane, base] of [[MANIFEST, "e296", "c392cc3"], [path.join("specs", "fanout-post-v4-w2.md"), "e295", "25bc84c"]]) {
     const args = ["render", manifest, lane, "--summary", "x", "--reading", "y", "--base", base, ...fixed];
     const head = run(FANOUT, args);
     const old = run(path.join(baseDir, "scripts", "fanout.mjs"), args);
@@ -261,7 +315,7 @@ test("AC10: render output is byte-identical to base (HEAD vs base code, same arg
 
 test("AC10: render ignores the approval column (9-column render == 8-column render)", () => {
   const args = ["--summary", "x", "--reading", "y", "--base", "c392cc3", "--primary", ROOT, "--mailbox-root", TMP];
-  const eight = cli(["render", W3, "e296", ...args]).stdout;
+  const eight = cli(["render", MANIFEST, "e296", ...args]).stdout;
   assert.ok(eight.length > 0);
   for (const v of ["human", "—"]) {
     assert.equal(cli(["render", tmpFile("m9r.md", nineCol(v)), "e296", ...args]).stdout, eight);
@@ -275,17 +329,17 @@ test("AC12: usage has the fourth `check --cut` line; the wrapper header lists it
   assert.equal(r.stderr.split("\n").filter((l) => l.startsWith("       node scripts/fanout.mjs")).length, 3, "usage keeps its other three lines");
   assert.ok(read("scripts/fanout.mjs").includes("check --cut <manifest> <lane> <spec>"));
   // unchanged: plain check on an unknown lane and on a repo lacking the branch
-  const nolane = cli(["check", W3, "nolane"]);
+  const nolane = cli(["check", MANIFEST, "nolane"]);
   assert.equal(nolane.status, 2);
   assert.match(nolane.stderr, /LANE_NOT_FOUND/);
   const emptyRepo = fs.mkdtempSync(path.join(TMP, "repo-"));
   const g = (...a) => spawnSync("git", ["-c", "init.defaultBranch=main", "-c", "user.email=a@b.c", "-c", "user.name=t", ...a], { cwd: emptyRepo });
   g("init", "-q");
   g("commit", "-q", "--allow-empty", "-m", "b");
-  const noref = cli(["check", W3, "e296", "--repo", emptyRepo]);
+  const noref = cli(["check", MANIFEST, "e296", "--repo", emptyRepo]);
   assert.equal(noref.status, 2);
   assert.match(noref.stderr, /REF_NOT_FOUND/);
-  const bad = cli(["check", "--cut", W3]);
+  const bad = cli(["check", "--cut", MANIFEST]);
   assert.equal(bad.status, 2, "--cut with too few operands is a usage error");
   assert.match(bad.stderr, /USAGE/);
 });
@@ -299,7 +353,7 @@ test("AC11: in-bounds cut exits 0 and prints the approval / human-decisions fact
   assert.equal(r.status, 0, r.stderr);
   assert.equal(outLines(r).length, 0);
   assert.match(r.stdout, /^approval: —$/m);
-  assert.match(r.stdout, /^human-decisions: 2 row\(s\); latest 2026-10-15$/m);
+  assert.match(r.stdout, /^human-decisions: 3 row\(s\); latest 2026-10-15$/m);
   assert.match(r.stdout, /fanout check --cut: e296 — 1 ticket\(s\), 1 token\(s\), 0 out of bounds/);
 });
 
@@ -353,19 +407,19 @@ test("AC11: approval: human fails with APPROVAL_HUMAN even when every token is i
 });
 
 test("AC11: no 人類 Decisions row fails with DECISIONS_HUMAN_ROW_ABSENT (exit 1)", () => {
-  const m = tmpFile("mnohuman.md", w3Text.replace(/\| 人類 \|/g, "| 整合者 |"));
+  const m = tmpFile("mnohuman.md", MANIFEST_TEXT.replace(/\| 人類 \|/g, "| 整合者 |"));
   const r = runCut(oneRow(C), { manifest: m });
   assert.equal(r.status, 1);
   assert.match(r.stderr + r.stdout, /DECISIONS_HUMAN_ROW_ABSENT/);
-  assert.match(r.stdout, /human-decisions: 0 row\(s\)/);
+  assert.match(r.stdout, /^human-decisions: 0 row\(s\); latest —$/m);
 });
 
 test("AC11: a manifest-side format error (Decisions header) is exit 2, as for check", () => {
-  const m = tmpFile("mbaddec.md", w3Text.replace("| 日期 | 裁決者 |", "| date | 裁決者 |"));
+  const m = tmpFile("mbaddec.md", MANIFEST_TEXT.replace("| 日期 | 裁決者 |", "| date | 裁決者 |"));
   const r = runCut(oneRow(C), { manifest: m });
   assert.equal(r.status, 2);
   assert.match(r.stderr, /DECISIONS_HEADER_DIFFERS/);
-  assert.equal(cli(["check", "--cut", W3, "nolane", tmpFile("s.md", oneRow(C))]).status, 2, "unknown lane is exit 2");
+  assert.equal(cli(["check", "--cut", MANIFEST, "nolane", tmpFile("s.md", oneRow(C))]).status, 2, "unknown lane is exit 2");
 });
 
 test("AC11: spec-side format errors are exit 2 with their own code", () => {
@@ -384,16 +438,16 @@ test("AC11: spec-side format errors are exit 2 with their own code", () => {
     assert.equal(r.status, 2, `${code}: ${r.stdout}${r.stderr}`);
     assert.ok(firstErr(r).startsWith(`fanout: error: ${code}:`), `${code}: ${firstErr(r)}`);
   }
-  const unreadable = cli(["check", "--cut", W3, "e296", path.join(TMP, "does-not-exist.md")]);
+  const unreadable = cli(["check", "--cut", MANIFEST, "e296", path.join(TMP, "does-not-exist.md")]);
   assert.equal(unreadable.status, 2);
   assert.match(unreadable.stderr, /^fanout: error: SPEC_UNREADABLE: /);
 });
 
 test("AC11: check --cut never writes (the spec file and manifest are byte-identical afterwards) and runs no git", () => {
   const p = tmpFile("ro.md", oneRow(C));
-  const before = [fs.readFileSync(p, "utf8"), read(W3)];
-  cli(["check", "--cut", W3, "e296", p]);
-  assert.deepEqual([fs.readFileSync(p, "utf8"), read(W3)], before);
+  const before = [fs.readFileSync(p, "utf8"), fs.readFileSync(MANIFEST, "utf8")];
+  cli(["check", "--cut", MANIFEST, "e296", p]);
+  assert.deepEqual([fs.readFileSync(p, "utf8"), fs.readFileSync(MANIFEST, "utf8")], before);
 });
 
 // ---------------------------------------------------------------------------
@@ -520,8 +574,9 @@ test("AC15 bare CR: a carriage return not followed by a line feed anywhere in th
 });
 
 test("AC15 own spec: no exit-2 error, only the known manifest-version gap may be OUT; CRLF copy == LF copy", () => {
-  // WHY: this lane's manifest copy lacks test/e297-main-protected-sop.test.mjs in the e296 owned set (known
+  // WHY: the lane's own manifest copy lacked test/e297-main-protected-sop.test.mjs in the e296 owned set (known
   // manifest-version gap), so the own spec is pinned as "no format error and nothing OUT except that token".
+  // The frozen MANIFEST_TEXT carries that token, so against it nothing is OUT; the tolerance is kept as written.
   const own = read(OWN_SPEC);
   const r = runCut(own);
   assert.equal(grepC(r.stderr + r.stdout, "fanout: error:"), 0, r.stderr);
