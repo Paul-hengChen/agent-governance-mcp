@@ -2,6 +2,8 @@
 
 New blocks go above `## Applied`.
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E297-NEW-1
 title: Stale release pull request under the branch-up-to-date rule (release-engineer 8c/13a only)
@@ -42,5 +44,3 @@ body: |
   `git merge --ff-only` has no caller in any SOP. A later constitution pass can retire it
   (one sentence, one test re-pin, goldens).
 ```
-
-## Applied
