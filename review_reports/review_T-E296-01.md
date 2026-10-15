@@ -170,3 +170,72 @@ Gates:
 - `npm audit --audit-level=high` exits 0.
 - `check:md-tables` reports OK.
 - Suite under test-lock: 3128 tests, 3110 pass, 15 fail, 3 skip. The 15 failures are exactly the known qa-owned list.
+
+## Round 3 — CHANGES_REQUESTED — by code-reviewer
+
+## Summary
+- Round-3 diff `a375368..HEAD` (`7086395`, `77250f3`): `CUT_PLAIN_PATH_RE` plus three new refusals in `malformedCutSpan` (tools/fanout-manifest.ts:1311-1342), rebuilt `dist/tools/fanout-manifest.*`, and lane bookkeeping (`.current/e296/**`, this file). Every file is lane-owned. `npm run build` exits 0 and leaves `dist/` clean. `npm audit --audit-level=high` exits 0.
+- The C3 fix holds. Comma-joined, `;`-joined and space-joined spans all exit 2, and so do dot segments in every bookkeeping position. No backtick span I could construct names a file outside 擁有 and still exits 0, apart from the R1 class (`E296-NEW-2`), which is not re-raised.
+- No regression. `validate`, `render` and `check` on all 20 manifests and 56 lanes are byte-identical to the `a375368` build (validate: 18 manifests exit 0, wave5.1 and wave6 exit 2). The AC11 and AC12 proofs pass. The suite reds are exactly the known qa-owned 15.
+- The containment class is still not closed. A `touches` path written outside backticks, in any form other than a bare whitespace-separated word, is dropped silently (C4). A ticket row the parser does not count as part of the first table is also dropped (C5). Both reach exit 0 on a cut that names a 禁止 file.
+- Verdict: CHANGES_REQUESTED. This FAIL takes `review_round` to the cap, so the next valid hop is `(pm, In_Progress)`.
+
+## AC Completeness
+AC1–AC10, AC12, AC14 — implemented — unchanged since round 2. Re-verified: the AC9 validate sweep, AC10 (render byte-identical vs `a375368` on all 56 lanes) and AC12 (usage count `1`).
+AC11 — partial — the round-1 and round-2 holes inside backtick spans are closed (tools/fanout-manifest.ts:1328-1342). The own-spec proof is exit 1 only because of the known `test/e297-main-protected-sop.test.mjs` manifest-version gap (the single OUT line), and the oob proof prints `1` then exit 1. AC3(a) says every `touches` path is backtick-quoted and AC11 says an unquoted one is an exit-2 `CUT_TOUCHES_UNQUOTED_PATH`, yet most unquoted forms still pass (C4). "Takes its `## Cut` section … first table" also misreads which rows belong to the first table (C5).
+AC13 — qa-owned, not judged.
+
+## Correctness
+Round-3 sweep. Each input was a one-row cut run as `node scripts/fanout.mjs check --cut specs/fanout-post-v4-w3.md e296 <spec>`; `tools/config.ts` is owned, and `tools/registry.ts` is under 禁止 `tools/**` and owned by lane e308.
+- Whitelist, exit 2 `CUT_TOUCHES_MALFORMED_PATH`: comma-joined, `\|`-joined, `.current/e296/../../tools/registry.ts`, `.current/e296/x/..`, `.current/e296/.`, `qa_reports/../tools/e296.ts`, `specs/e296-x/../../tools/registry.ts`, `./tools/registry.ts`, `-tools/…`, `:tools/…`, backslash, tab, ZWSP, U+2024 one-dot leader, a fullwidth letter.
+- Fails closed, exit 1 OUT: `tools/{config,registry}.ts`, `tools/{config}.ts`, `{tools/config.ts,tools/registry.ts}`, `tools/config.ts,tools/*` (a glob, so it must be byte-identical), `test/**`, `tools/*`, `tools/`, `.current/e296x/y.ts` (prefix trick), `specs/e296-a/b.md`, `Tools/config.ts`, `.CURRENT/e296/x` (case-sensitive both ways), `.github/workflows/ci.yml`, `.registry`, backticked `index.ts` / `README.md`.
+- In bounds, correctly: `.current/e296/.../x` (a literal `...` directory inside the prefix), `qa_reports/foo/e296-x.md`, and the globs byte-identical to 擁有 tokens (`test/fixtures/compose-golden/**`, `specs/e296-*`, `qa_reports/*E296*`).
+- Glob vs 禁止: a glob in bounds is always byte-identical to an 擁有 token. When an 擁有 token overlaps a 禁止 token, both `check` (tools/fanout-manifest.ts:1122) and `check --cut` (:1376-1379) let 擁有 win and use 禁止 only to annotate OUT lines. The two are consistent with each other and with AC11, so this is not a finding.
+- Size: a 200 KB span and a 20 000-segment span both finish immediately. `CUT_PLAIN_PATH_RE` has disjoint alternatives, so it cannot backtrack.
+- Empty `touches` gives `CUT_TOUCHES_EMPTY` exit 2. `—` gives 0 tokens and exit 0. `–` (en dash) or prose-only gives `CUT_TOUCHES_EMPTY` exit 2. `— `+`tools/registry.ts` is OUT.
+
+- **C4 — required — tools/fanout-manifest.ts:1284-1287 (`parseCutSection`'s unquoted-path loop, which reuses `unquotedPaths` at :351-357).** `unquotedPaths` splits the non-backtick text on `UNQUOTED_SPLIT_RE` (:58) and counts a word only when the whole word matches `UNQUOTED_PATH_RE` (:57). Any surrounding punctuation or markup, or a `:line` suffix, takes the word out of that class, so the path is dropped silently. When the cell also has one in-bounds backtick token, `toks` is non-empty and `CUT_TOUCHES_EMPTY` does not fire either.
+  Failing inputs (reproduced, each exit 0 with `1 ticket(s), 1 token(s), 0 out of bounds`; the touches cell is `` `tools/config.ts` `` followed by):
+  - `tools/registry.ts:12`
+  - `'tools/registry.ts'` or `"tools/registry.ts"`
+  - `*tools/registry.ts*` or `**tools/registry.ts**`
+  - `<code>tools/registry.ts</code>` or `<kbd>tools/registry.ts</kbd>`
+  - `[tools/registry.ts](x)`
+  - `「tools/registry.ts」`
+  - `tools/registry.ts。`
+  - `~tools/registry.ts~`
+  - `index.ts` (common-forbidden, bare, with an extension and no slash)
+  - `tools／registry.ts` (U+FF0F)
+
+  By contrast, `tools/registry.ts.` and `and tools/registry.ts` are caught. This is the C1 class again: C1 blocked the backticked `tools/registry.ts:71`, and the same text without backticks still auto-approves. `file:line` and `*emphasis*` are ordinary ways for a PM to write a path, and under the manifest tier exit 0 means no human sees the cut.
+  Fix (fail closed; `unquotedPaths` and `pathTokens` unchanged, so 擁有 parsing does not move): for `touches` only, after stripping backtick spans, report `CUT_TOUCHES_UNQUOTED_PATH` (an existing code, so `test/error-code-contract.test.mjs` is not touched) for any remaining text that contains `/`, a backslash, `／`, or `/\.[A-Za-z0-9]+\b/`. A `touches` cell is a list column. A cut whose only prose is `—`, `、`, `,` or parentheses keeps passing, and a cut with prose such as `v4.5.0` fails closed with a clear message. The R1 strictness suggestion (`E296-NEW-2`) is the bounded version of the same rule. If the sr-engineer folds it in here, that ticket can close.
+
+- **C5 — required — tools/fanout-manifest.ts:1248 and :282-289 (`parseCutSection` → `firstTable`).** The `## Cut` table is taken to be the first run of lines that start with `|`. Every other line in the section is ignored without notice, including lines that GitHub-flavoured Markdown renders as rows of that same table. The integrator pre-reviews the rendered cut, and the coordinator's writer action checks only the exit code.
+  Failing inputs (reproduced, each exit 0 with `1 ticket(s) … 0 out of bounds`): a valid header plus `| T-X-01 | … | `tools/config.ts` | — |`, followed by a second row `T-X-02 | x | none | 1 | `tools/registry.ts` | — |` written as:
+  - with one leading space (GFM: the same table)
+  - without the leading `|` (GFM: the same table)
+  - as a `> ` blockquote line
+  - after a blank line
+  - in a second table after a prose line or under a `### Extra` sub-heading
+
+  AC3(a) says `## Cut` holds the one inline cut table with one row per ticket, so a second ticket table is already outside the format. Ignoring it is fail-open; refusing it is not.
+  Fix (fail closed, `firstTable` unchanged because the manifest parser shares it): in `parseCutSection`, after `firstTable(s)`, report a row error under an existing code such as `CUT_ROW_MALFORMED` when either (a) the section line right after the table run is non-empty (GFM would continue the table), or (b) any later line in the section contains an unescaped `|` outside backtick spans.
+
+- **R2 — optional — case-insensitive filesystems.** On macOS, a `touches` token can differ only in case from an unowned tracked file and still match an 擁有 glob through a `*` (for example 擁有 `tools/A*.ts`, touches `tools/Afoo.ts`, tracked file `tools/afoo.ts`). `check --cut` is pure by architecture, and the post-commit `check` would show the real path as OUT, so I am only noting it.
+
+## Quality
+- Round-3 code is minimal and well placed. `CUT_PLAIN_PATH_RE` is declared next to its only user. The new refusals run after the dot-segment check, so their messages stay specific. The helpers `pathTokens`, `isPathToken`, `isGlobToken`, `matchesGlob` and `isImplicitBookkeeping` are byte-unchanged (the TS diff touches only :1311-1342).
+- Comment discipline (4b): the `CUT_PLAIN_PATH_RE` JSDoc and the reworded `malformedCutSpan` JSDoc explain why (a comma outside braces, a `:line` suffix or a dot segment would otherwise match an owned glob lexically). They name no ticket or reviewer and nothing sensitive. Kept.
+- No `any` in the diff.
+
+## Architecture
+Fits specs/e296-manifest-tier-cut-approval-architecture.md: pure function, no git, no fs beyond the two CLI reads. Both C4 and C5 fixes stay inside `parseCutSection` and leave the shared manifest helpers alone.
+
+## Security
+`check --cut` exit 0 is the mechanical proof of condition (3) for an auto-approval with no human in the loop, so a fail-open here is a safety defect, not cosmetic (C4, C5). No injection surface: spec text is only regex-matched and echoed. No secrets.
+
+## Performance
+No regression. One regex test per span. The adversarial 200 KB and 20 000-segment spans return instantly.
+
+## Verdict
+CHANGES_REQUESTED. Backtick spans are closed, but unquoted `touches` paths (C4) and ticket rows outside the parsed table run (C5) still let a cut that names a 禁止 file (`tools/registry.ts`, `index.ts`) exit 0. Each fix is a few lines in `parseCutSection` and reuses an existing code. This FAIL hits the `review_round` cap, so routing goes to pm.
