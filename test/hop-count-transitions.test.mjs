@@ -69,8 +69,8 @@ async function dispatch(ws, args) {
 // AC-1: HOP_CAP_EXPORTED constant
 // ============================================================================
 
-test("t-const: HOP_CAP_EXPORTED === 10 (const-01 Limits `hop` cap)", () => {
-  assert.equal(HOP_CAP_EXPORTED, 10);
+test("t-const: HOP_CAP_EXPORTED === 14 (const-01 Limits `hop` cap)", () => {
+  assert.equal(HOP_CAP_EXPORTED, 14);
 });
 
 // ============================================================================
@@ -154,13 +154,13 @@ test("t-compute-pm-no-reset: (pm, In_Progress) landing does NOT reset hop_count 
     { agent: "pm", status: "In_Progress" },
     { agent: "qa-engineer", status: "FAIL" },
     [],
-    10, // already at cap
+    14, // already at cap
     false, // NOT a feature change
   );
   assert.equal(result.qa_round, 0, "qa_round resets on pm landing (unchanged sibling behavior)");
   assert.equal(result.review_round, 0, "review_round resets on pm landing (unchanged sibling behavior)");
   assert.equal(result.visual_round, 0, "visual_round resets on pm landing (unchanged sibling behavior)");
-  assert.equal(result.hop_count, 11, "hop_count does NOT reset on pm landing — it still increments (role transition) to 11");
+  assert.equal(result.hop_count, 15, "hop_count does NOT reset on pm landing — it still increments (role transition) from 14 to 15");
 });
 
 test("t-compute-persists-across-many-non-role-writes: hop_count is stable across a long run of self-loops", () => {
@@ -184,10 +184,10 @@ test("t-gate-dormant-under-cap: hop_count < HOP_CAP is dormant for any accepted 
     prev_qa_round: 0,
     prev_review_round: 0,
     prev_visual_round: 0,
-    prev_hop_count: 9,
+    prev_hop_count: 13,
     feature_changed: false,
   });
-  assert.equal(r, null, "hop_count=9 (< cap=10) must not block a legal transition");
+  assert.equal(r, null, "hop_count=13 (< cap=14) must not block a legal transition");
 });
 
 test("t-gate-fires-at-cap: hop_count >= HOP_CAP on a role transition rejects with HOP_CAP_EXCEEDED, only (pm, In_Progress) allowed", () => {
@@ -197,13 +197,13 @@ test("t-gate-fires-at-cap: hop_count >= HOP_CAP on a role transition rejects wit
     prev_qa_round: 0,
     prev_review_round: 0,
     prev_visual_round: 0,
-    prev_hop_count: 10,
+    prev_hop_count: 14,
     feature_changed: false,
   });
   assert.ok(r, "must reject once hop_count has reached the cap");
   assert.equal(r.error, "HOP_CAP_EXCEEDED");
   assert.deepEqual(r.allowed, [{ new_agent: "pm", new_status: "In_Progress" }]);
-  assert.match(r.hint, /hop_count=10/);
+  assert.match(r.hint, /hop_count=14/);
 });
 
 test("t-gate-fires-above-cap: hop_count > HOP_CAP (migration/hand-edit case) still rejects (>= predicate, not ===)", () => {
@@ -227,10 +227,44 @@ test("t-gate-landing-escape: (pm, In_Progress) landing is accepted even at/over 
     prev_qa_round: 0,
     prev_review_round: 0,
     prev_visual_round: 0,
-    prev_hop_count: 12,
+    prev_hop_count: 14,
     feature_changed: false,
   });
   assert.equal(r, null, "the (pm, In_Progress) landing must be accepted at/over cap");
+});
+
+test("t-gate-landing-from-reviewer-and-qa (E295 AC2, E41): (pm, In_Progress) landing is accepted at the cap from code-reviewer/qa-engineer In_Progress, with no hop reset", () => {
+  // WHY: the cap's own landing edge must be reachable from every state, the same
+  // `if (ok) return null` shape the three round caps use; before E295 the table
+  // lookup rejected these two origins with TRANSITION_REJECTED at the cap.
+  for (const agent of ["code-reviewer", "qa-engineer"]) {
+    const r = validateTransition({
+      prev: { agent, status: "In_Progress" },
+      next: { agent: "pm", status: "In_Progress" },
+      prev_qa_round: 0,
+      prev_review_round: 0,
+      prev_visual_round: 0,
+      prev_hop_count: HOP_CAP_EXPORTED,
+      feature_changed: false,
+    });
+    assert.equal(r, null, `${agent}:In_Progress -> pm:In_Progress must be accepted at the cap`);
+    const c = computeNewRound(
+      0, 0, 0,
+      { agent, status: "In_Progress" },
+      { agent: "pm", status: "In_Progress" },
+      [],
+      HOP_CAP_EXPORTED,
+      false,
+    );
+    assert.equal(c.hop_count, HOP_CAP_EXPORTED + 1, "landing increments, never resets (DR-6)");
+  }
+  const other = validateTransition({
+    prev: { agent: "code-reviewer", status: "In_Progress" },
+    next: { agent: "qa-engineer", status: "In_Progress" },
+    prev_qa_round: 0, prev_review_round: 0, prev_visual_round: 0,
+    prev_hop_count: HOP_CAP_EXPORTED, feature_changed: false,
+  });
+  assert.equal(other?.error, "HOP_CAP_EXCEEDED", "any other role transition stays rejected at the cap");
 });
 
 test("t-gate-self-loop-exempt: a same-agent self-loop is accepted even at/over cap (not a counted role transition, DR-9)", () => {
@@ -240,7 +274,7 @@ test("t-gate-self-loop-exempt: a same-agent self-loop is accepted even at/over c
     prev_qa_round: 0,
     prev_review_round: 0,
     prev_visual_round: 0,
-    prev_hop_count: 10,
+    prev_hop_count: 14,
     feature_changed: false,
   });
   assert.equal(r, null, "a self-loop is not a role transition — must not be hop-blocked even at cap");
@@ -273,28 +307,28 @@ test("t-gate-omitted-defaults-dormant: omitting prev_hop_count/feature_changed e
 // AC-8: hop-cap override runs AFTER the three round-cap overrides (precedence)
 // ============================================================================
 
-test("t-precedence-qa-round-wins: prev_qa_round >= 4 AND prev_hop_count >= 10 simultaneously -> QA_ROUND_EXCEEDED fires, not HOP_CAP_EXCEEDED", () => {
+test("t-precedence-qa-round-wins: prev_qa_round >= 4 AND prev_hop_count >= 14 simultaneously -> QA_ROUND_EXCEEDED fires, not HOP_CAP_EXCEEDED", () => {
   const r = validateTransition({
     prev: { agent: "qa-engineer", status: "FAIL" },
     next: { agent: "sr-engineer", status: "In_Progress" },
     prev_qa_round: 4,
     prev_review_round: 0,
     prev_visual_round: 0,
-    prev_hop_count: 10,
+    prev_hop_count: 14,
     feature_changed: false,
   });
   assert.ok(r);
   assert.equal(r.error, "QA_ROUND_EXCEEDED", "the qa_round override must win precedence over the hop-cap override");
 });
 
-test("t-precedence-visual-round-wins: prev_visual_round >= 6 AND prev_hop_count >= 10 simultaneously -> VISUAL_ROUND_EXCEEDED fires first", () => {
+test("t-precedence-visual-round-wins: prev_visual_round >= 6 AND prev_hop_count >= 14 simultaneously -> VISUAL_ROUND_EXCEEDED fires first", () => {
   const r = validateTransition({
     prev: { agent: "qa-engineer", status: "FAIL" },
     next: { agent: "sr-engineer", status: "In_Progress" },
     prev_qa_round: 0,
     prev_review_round: 0,
     prev_visual_round: 6,
-    prev_hop_count: 10,
+    prev_hop_count: 14,
     feature_changed: false,
   });
   assert.ok(r);
@@ -327,7 +361,7 @@ test("t-precedence-existing-round-caps-untouched: round-cap-only scenarios (hop 
 // Drives hop_count from a fresh workspace up to exactly HOP_CAP_EXPORTED via
 // the pm<->sr-engineer bounce. Returns the final parsed state (last_agent is
 // always "sr-engineer" when HOP_CAP_EXPORTED is even, matching the current
-// cap=10 — the seed write is agent=pm=hop 1, then each further bounce write
+// cap=14 — the seed write is agent=pm=hop 1, then each further bounce write
 // alternates and increments by exactly 1).
 async function climbToHopCap(ws, feature) {
   let res = await dispatch(ws, { active_feature: feature, status: "In_Progress", agent_id: "pm", cut_approved: true });

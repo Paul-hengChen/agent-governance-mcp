@@ -2,3 +2,5 @@
 {"ts":"2026-10-15T03:13:34.172Z","feature":"e295-hop-cap-and-sop-halves","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
 {"ts":"2026-10-15T03:15:03.436Z","feature":"e295-hop-cap-and-sop-halves","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"fable"}
 {"ts":"2026-10-15T03:25:41.954Z","feature":"e295-hop-cap-and-sop-halves","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-10-15T03:27:08.336Z","feature":"e295-hop-cap-and-sop-halves","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-15T03:31:29.801Z","feature":"e295-hop-cap-and-sop-halves","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}

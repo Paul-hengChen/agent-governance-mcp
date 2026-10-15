@@ -130,6 +130,7 @@ test("AC2: manual steps replaced by references to shipped mechanisms; no restate
     "lane-status.mjs",
     "mailbox-watch.mjs",
     "test-lock.mjs",
+    "verify-release.mjs --ci-check",
     "merge-invariants.mjs",
     "agc feature finish",
   ]) {
@@ -370,8 +371,9 @@ test("AC13: SOP verification stage — E192 generic read-only verifier (D10), st
     "branch sha + the `main..<branch>` commit list",
     "`diff --stat` against the manifest's owned list, out-of-bounds files named (`fanout check`)",
     "each cited evidence file's verdict line + task id",
-    "the worktree's `status --porcelain` taken **after** the suite ran",
-    "full-suite pass/total, with the full log saved to a scratch file, not returned",
+    "the worktree's `status --porcelain` taken **after** a local `npm run build`",
+    "it runs `node scripts/verify-release.mjs --ci-check --sha <reported sha>` and returns the CI run id plus the verdict (green, or red with the failing job names), never suite output",
+    "under the *CI fallback* it returns the local full-suite pass/total instead, with the full log saved to a scratch file, not returned",
     "the `pending-tickets.md` / `## Applied` / root `NEW-TICKETS.md` check",
   ]) {
     assert.ok(SOP.includes(item), `E192 verifier structured result missing item: ${item}`);

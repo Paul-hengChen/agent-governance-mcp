@@ -566,7 +566,7 @@ test("AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the 
   );
 });
 
-test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 20749 ~tok)", () => {
+test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 21138 ~tok)", () => {
   // WHY: constitution injected on every dispatch; the full coordinator bundle is the worst case.
   // Composed like buildPromptForRole: stripped constitution + SEP + stripped skill body.
   // The coordinator is a chain role, so on a design feature it must keep the full §3.2.
@@ -582,7 +582,7 @@ test("AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/b
   // history: specs/e260i-comment-rationale.md, teamwork coordinator bundle cap history.
   // coord-*.md fragments land in this bundle only; the constitution-only floors are untouched.
   // A rationale fence on a normative sentence would delete it from this bundle; keep it unfenced.
-  assert.ok(bundle <= 20749, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 20749 (AC8 design-arm floor, E297 re-baseline, zero headroom)`);
+  assert.ok(bundle <= 21138, `teamwork stripped bundle (${bundle} ~tok) must be ≤ 21138 (AC8 design-arm floor, E297 re-baseline, zero headroom)`);
 });
 
 test("AC9: every operative rule/gate/heading survives stripRationale on the constitution", () => {
