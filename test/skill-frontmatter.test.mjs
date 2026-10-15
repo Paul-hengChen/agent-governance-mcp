@@ -161,3 +161,11 @@ test("switchRole on a workspace-override skill without frontmatter omits recomme
   );
   assert.ok(out.sop.startsWith("# Skill: pm"));
 });
+
+// E308: DISPATCH_PIN_TIER_VALUES is the same reference as MODEL_TIERS (single source).
+test("E308: DISPATCH_PIN_TIER_VALUES is MODEL_TIERS (single tier source, not a second literal)", async () => {
+  const parse = await import("../dist/tools/handoff-parse.js");
+  const fm = await import("../dist/tools/skill-frontmatter.js");
+  assert.equal(parse.DISPATCH_PIN_TIER_VALUES, fm.MODEL_TIERS);
+  assert.deepEqual([...parse.DISPATCH_PIN_TIER_VALUES], [...fm.MODEL_TIERS]);
+});

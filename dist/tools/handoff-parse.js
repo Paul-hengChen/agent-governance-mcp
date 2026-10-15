@@ -11,6 +11,8 @@ import { markStateRead, refreshSnapshotFor } from "../guards/session.js";
 import { runMigrations } from "../schema/versions.js";
 import { loadExemptions } from "./exemptions.js";
 import { getConfigError } from "./config.js";
+// skill-frontmatter.ts imports no tools/ module, so this edge adds no cycle.
+import { MODEL_TIERS } from "./skill-frontmatter.js";
 import { getLaneRegistrySummary } from "./lane-registry.js";
 import { notifyStaleDispatch } from "./stale-notify.js";
 // gates/feature-lease.ts has ZERO imports (runtime leaf) — importing it here
@@ -252,10 +254,11 @@ const DISPATCH_PIN_VALUE_MAX = 100;
 // E300 — the closed model-tier vocabulary for dispatch_pins values. The tool
 // boundary (tools/registry.ts) rejects any other value with
 // DISPATCH_PIN_TIER_REJECTED; tw_get_state surfaces an on-disk value outside
-// it as an advisory. Deliberately a literal rather than an import of
-// MODEL_TIERS (tools/skill-frontmatter.ts): unifying the two sources is a
-// separate wiring ticket.
-export const DISPATCH_PIN_TIER_VALUES = ["opus", "sonnet", "haiku", "fable"];
+// it as an advisory. The same reference as MODEL_TIERS
+// (tools/skill-frontmatter.ts), the one tier list: the zod enum, the
+// inputSchema enums, the rejection hint and the advisory text all derive from
+// it, so adding or retiring a tier is a single edit there. (E308)
+export const DISPATCH_PIN_TIER_VALUES = MODEL_TIERS;
 // v8 — defensive parser for the dispatch_pins frontmatter map
 // (c14-dispatch-pins). Returns undefined when raw is not a non-array object
 // with at least one well-formed entry; unknown role keys and empty /
