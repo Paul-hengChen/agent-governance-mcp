@@ -1,25 +1,23 @@
 ---
 schema_version: 15
 active_feature: "e296-manifest-tier-cut-approval"
-status: "FAIL"
-last_updated: "2026-10-15T09:25:45.364Z"
-blocking_reason: "R4-1: a bare CR (U+000D without LF) inside a ## Cut row is a line break in CommonMark/GFM, but splitLines splits only on \\r?\\n. One parser line therefore renders as two cut rows, and check --cut exits 0 while the rendered touches names tools/registry.ts (禁止 tools/**)."
-last_agent: "code-reviewer"
+status: "In_Progress"
+last_updated: "2026-10-15T09:42:08.695Z"
+last_agent: "sr-engineer"
 scope_decision: "single-feature"
 scope_decision_why: "Lane e296 of specs/fanout-post-v4-w3.md: E296 items (1)-(8) plus E309's one skill-integrator sentence; scope is the manifest Lanes row, not widened or narrowed. Non-design (no design/ file)."
 cut_approved: true
 dispatch_pins:
   sr-engineer: "opus"
 evidence_schema: 2
-next_role: "sr-engineer"
-dispatched_at: "2026-10-15T09:25:45.364Z"
-review_verdict: "CHANGES_REQUESTED"
+next_role: "code-reviewer"
+dispatched_at: "2026-10-15T09:42:08.695Z"
 dispatch_mechanism: "task"
 dispatch_mechanism_tier: "opus"
 qa_round: 0
 review_round: 1
 visual_round: 0
-hop_count: 11
+hop_count: 12
 qa_rounds_total: 0
 review_rounds_total: 4
 visual_rounds_total: 0
@@ -30,11 +28,11 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- review_report: review_reports/review_T-E296-01.md (## Round 4 (post re-cut) — CHANGES_REQUESTED; covers: T-E296-01, T-E296-02, T-E296-03, T-E296-04, T-E296-06)
-- R4-1 required — tools/fanout-manifest.ts:1256 (parseCutSection over shared splitLines :261). Failing input, exit 0 with '1 ticket(s), 1 token(s), 0 out of bounds': a valid header and separator, then the single physical line '| T-X-00<CR>| T-X-02 | x | none | `tools/config.ts` | `tools/registry.ts` |' (<CR> = one 0x0D byte, no LF). The parser reads touches = `tools/config.ts`. markdown-it 14.1.0 renders row T-X-02 with touches = tools/registry.ts. A variant 'x<CR>## Cut<CR>table' inside another section hides a second Cut section and also exits 0. Fix: refuse /\r(?!\n)/ anywhere in the spec text at the top of parseCutSection with CUT_ROW_MALFORMED (an existing code; shared helpers stay unchanged). qa pins both inputs as exit 2.
-- R4-2 recommended, not blocking (PM: fold in with R4-1 or file as E296-NEW-4): headings that render as a second Cut section but are not splitSections section starts are not read, and exit 0 when a valid ## Cut also exists: '##<TAB>Cut', ' ## Cut' (1-3 leading spaces), setext 'Cut' + '---', '## cut'. A cheap partial guard is to count lines matching /^ {0,3}##[ \t]+cut[ \t#]*$/i toward CUT_SECTION_DUPLICATE. Full closure (setext, homoglyphs) needs a real Markdown parser.
-- Held this round: all 35 AC15 enumerated inputs + controls; all 35 round-1-3 inputs; ~50 new attacks (escaped pipes, pipe in span, HTML comments, header/separator variants, CRLF, trailing ws, tabs, NBSP/ZWSP, double/empty backticks, — with text, shifted column, ## Cut twice / '## Cut ', EOF without newline) are all fail-closed or correct. validate/render/check: 20 manifests / 60 lanes / 100 outputs byte-identical to 59de2ab. AC9/AC10/AC11/AC12/AC15 proofs pass. Shared helpers byte-unchanged; the private cut-only helpers honour the AC15 Scope intent. build 0, audit(high) 0. Suite 3128/3110/15/3, reds = the known qa-owned 15.
-- hop_count note: per the coordinator brief, a CHANGES_REQUESTED at hop 11 means the lane escalates to the human. The R4-1 fix is one bounded check inside parseCutSection.
+- sr-engineer: T-E296-06 R4-1 fixed at 1a4609d, ready for code review (round-4 reply: review_reports/review_T-E296-01.md ## Round 4 — sr reply).
+- Human ruling "A" (lane session): fix R4-1 only; R4-2 filed as pending ticket E296-NEW-4 (.current/e296/pending-tickets.md, P3, depends_on [E296]); review scope not narrowed.
+- Fix: parseCutSection first splits with the shared splitLines and refuses any line matching /\r(?!\n)/ (whole spec text, no normalisation): exit 2, one CUT_ROW_MALFORMED naming the line(s), message 'a carriage return without a line feed (Markdown renders it as a line break) — use LF or CRLF line endings only'. Shared helpers byte-unchanged; no new FANOUT_CODES; dist/ diff only dist/tools/fanout-manifest.*.
+- Verified: R4-1 row input -> exit 2 CUT_ROW_MALFORMED (line 7); hidden 'x<CR>## Cut<CR>table' under ## Notes -> exit 2; CR at EOF (LF and CRLF files) -> exit 2; CR in a far prose line -> exit 2; CRLF copy of own spec minus the known e297 token -> exit 0, output byte-identical to the LF copy. attack.mjs 49 cases: unchanged except the 4 bare-CR cases now exit 2; R4-2 cut_plus_* still exit 0 (E296-NEW-4). AC9/AC10/AC11/AC12/AC15 proofs as before. validate/render/check: 20 manifests, 140 outputs, 0 diffs vs 59de2ab dist.
+- Gates: npm run build 0; tsc --noEmit 0; npm audit --audit-level=high 0; check:md-tables OK; node scripts/test-lock.mjs -- npm test: 3128/3110/15/3, reds = the known qa-owned 15 (compose-equivalence x6, skill-manifest:97, context-budget :475/:554/:569/:894, e5-intake-tiering :67/:214, e178a:75, e297:101). No test files touched. Tree clean; not pushed.
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.
