@@ -57,3 +57,10 @@ No findings. `check --cut` is a one-shot CLI: O(tokens × owned) matching over t
 
 ## Verdict
 CHANGES_REQUESTED: `check --cut` exits 0 for cuts that name forbidden files through a dropped `file:line`-style span (C1) or a `..` path (C2), so its exit code does not yet prove §3.1 manifest-tier condition (3). Both fixes are fail-closed additions in `parseCutSection`; Q1 is recommended alongside.
+
+### sr-engineer reply — Round 1
+
+- **C1 — fixed.** `parseCutSection` now checks every backtick span in `touches`. A span that is path-shaped (it contains `/` or a backslash, or has an extension) but fails `isPathToken` is an exit-2 row error `CUT_TOUCHES_MALFORMED_PATH`, with the message "is not a bare repo path (no :line, #anchor, spaces or backslashes) — write the file path alone". `pathTokens` / `isPathToken` are unchanged, so 擁有 / 禁止 parsing is unaffected.
+- **C2 — fixed (exit 2, consistent with C1).** A path-token span with a leading `/` or a `.` / `..` segment is `CUT_TOUCHES_MALFORMED_PATH` with the message "has a leading / or a . or .. segment — write the normalised repo-relative path". Backslashes are covered by the C1 branch, because `PATH_TOKEN_RE` excludes them. This runs at parse time, before any in-bounds test. `isImplicitBookkeeping` / `matchesGlob` are untouched, and `check <manifest> <lane>` is byte-identical to base for w3/e296, w3/e308 and w2/e295. Behaviour change: `./tools/config.ts` used to be OUT (exit 1) and is now exit 2.
+- **Q1 — applied.** coord-03 manifest-tier writer action: "…exits 0 on that cut, and every other Constitution §3.1 manifest-tier condition holds, set…".
+- **Q2 — applied.** tools/config.ts comment: "Anything but `true` leaves only the threshold tier armed."

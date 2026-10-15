@@ -128,6 +128,8 @@ export const FANOUT_CODES = {
   cutRowMalformed: "CUT_ROW_MALFORMED",
   cutTouchesUnquotedPath: "CUT_TOUCHES_UNQUOTED_PATH",
   cutTouchesEmpty: "CUT_TOUCHES_EMPTY",
+  // A path-shaped touches span that is not a bare, normalised repo path.
+  cutTouchesMalformedPath: "CUT_TOUCHES_MALFORMED_PATH",
   specUnreadable: "SPEC_UNREADABLE",
 } as const;
 
@@ -1283,6 +1285,12 @@ export function parseCutSection(specText: string): CutSectionResult {
       errors.push(cutErr(FANOUT_CODES.cutTouchesUnquotedPath, `Cut row ${id} (line ${r.line}): touches has unquoted path "${w}" — backtick-quote every path`));
       ok = false;
     }
+    for (const span of backtickSpans(touches)) {
+      const why = malformedCutSpan(span);
+      if (why === undefined) continue;
+      errors.push(cutErr(FANOUT_CODES.cutTouchesMalformedPath, `Cut row ${id} (line ${r.line}): touches span "${span}" ${why}`));
+      ok = false;
+    }
     const toks = [...new Set(pathTokens(touches))];
     // A prose-only touches cell would otherwise read as "zero tokens, in bounds".
     if (toks.length === 0 && touches !== CUT_TOUCHES_NONE) {
@@ -1298,6 +1306,25 @@ export function parseCutSection(specText: string): CutSectionResult {
   }
   if (errors.length > 0) return { ok: false, errors };
   return { ok: true, tickets };
+}
+
+/**
+ * Why a `touches` backtick span cannot be checked for containment, or
+ * undefined when it is prose or a usable path. A path-shaped span (contains
+ * `/` or a backslash, or has an extension) that `pathTokens` would drop, such as a
+ * `:line` or `#anchor` suffix, would otherwise go unchecked; a `.` / `..`
+ * segment or a leading `/` would match the owned globs lexically while naming
+ * a file outside them. Both refuse rather than guess.
+ */
+function malformedCutSpan(span: string): string | undefined {
+  if (!isPathToken(span)) {
+    const pathShaped = span.includes("/") || span.includes("\\") || /\.[A-Za-z0-9]+\b/.test(span);
+    return pathShaped ? "is not a bare repo path (no :line, #anchor, spaces or backslashes) — write the file path alone" : undefined;
+  }
+  if (span.startsWith("/") || span.split("/").some((seg) => seg === "." || seg === "..")) {
+    return "has a leading / or a . or .. segment — write the normalised repo-relative path";
+  }
+  return undefined;
 }
 
 /**

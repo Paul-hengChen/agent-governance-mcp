@@ -63,6 +63,7 @@ export declare const FANOUT_CODES: {
     readonly cutRowMalformed: "CUT_ROW_MALFORMED";
     readonly cutTouchesUnquotedPath: "CUT_TOUCHES_UNQUOTED_PATH";
     readonly cutTouchesEmpty: "CUT_TOUCHES_EMPTY";
+    readonly cutTouchesMalformedPath: "CUT_TOUCHES_MALFORMED_PATH";
     readonly specUnreadable: "SPEC_UNREADABLE";
 };
 /**

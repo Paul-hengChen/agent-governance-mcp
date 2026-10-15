@@ -191,7 +191,7 @@ function loadConfigEntry(workspacePath) {
             // schema-change / design-armed cuts never auto-approve by accident.
             allowSchemaChange: tier.allowSchemaChange === true,
             allowDesignArmed: tier.allowDesignArmed === true,
-            // Absent or non-boolean leaves only the threshold tier armed.
+            // Anything but `true` leaves only the threshold tier armed.
             manifest: tier.manifest === true,
         };
     }
