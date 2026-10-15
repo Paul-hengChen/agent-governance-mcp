@@ -345,3 +345,16 @@ merge or drop tasks.
 - [ ] T-D2-DONE [P2] pm/coordinator (post-release): mark backlog D2 done in
   `docs/backlog.md` with mechanism summary and commit reference.
   | depends_on: T-D2-REL
+
+## Amendment (2026-10-15, E295)
+
+The `hop` cap is written as 10 in this document (the Limits reference near line 9 and the
+acceptance criterion near line 119). It is 14 since E295: a chain with an architect hop plus two
+review rounds and two qa rounds lands exactly on 14, so the per-task `review_round` / `qa_round`
+caps now bound that loop before the hop cap does. The cap's `(pm, In_Progress)` landing edge is
+also accepted unconditionally at the cap since E295 (E41): the step-2.5 override in
+`tools/transitions.ts` takes the same `if (ok) return null` shape as the `ROUND_CAP` override, so
+the landing no longer falls through to the transition table and is reachable from
+`code-reviewer:In_Progress` and `qa-engineer:In_Progress`. The landing still does not reset
+`hop_count` (DR-6). The text above is left as written, since this file records the design as it
+was decided.

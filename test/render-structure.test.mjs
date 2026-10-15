@@ -161,7 +161,8 @@ test("T-E69-02 AC: content/skill-release-engineer.md renders glue-free via build
 test("T-E8795-02 AC: coord-03 Evidence-Citation Convention (E87) renders at fullDetail=false, rationale stripped, zero raw markers", () => {
   const text = applyTextTransforms(composedSkillBody("skill-coordinator.md"), { fullDetail: false });
   assert.ok(text.includes("## Evidence-Citation Convention"), "coordinator bundle must carry the E87 heading");
-  assert.ok(text.includes("<tree>/archive/<feature>/<file>"), "coordinator bundle must carry the E87 archive-path template");
+  assert.ok(text.includes("as it exists at write time"), "coordinator bundle must carry the E87 write-time citation rule (E301)");
+  assert.ok(text.includes("<tree>/archive/<dir>/<file>"), "coordinator bundle must carry the E87 archived-form path template");
   assert.ok(
     !text.includes("no role is authorized to repair a stale citation afterward"),
     "fullDetail=false must strip the E87 rationale prose",
@@ -173,7 +174,8 @@ test("T-E8795-02 AC: coord-03 Evidence-Citation Convention (E87) renders at full
 test("T-E8795-02 AC: coord-03 Evidence-Citation Convention (E87) renders at fullDetail=true, with rationale retained", () => {
   const text = applyTextTransforms(composedSkillBody("skill-coordinator.md"), { fullDetail: true });
   assert.ok(text.includes("## Evidence-Citation Convention"), "coordinator bundle must carry the E87 heading");
-  assert.ok(text.includes("<tree>/archive/<feature>/<file>"), "coordinator bundle must carry the E87 archive-path template");
+  assert.ok(text.includes("as it exists at write time"), "coordinator bundle must carry the E87 write-time citation rule (E301)");
+  assert.ok(text.includes("<tree>/archive/<dir>/<file>"), "coordinator bundle must carry the E87 archived-form path template");
   assert.ok(
     text.includes("no role is authorized to repair a stale citation afterward"),
     "fullDetail=true must RETAIN the E87 rationale prose (rationale fence is opt-out, not deletion)",

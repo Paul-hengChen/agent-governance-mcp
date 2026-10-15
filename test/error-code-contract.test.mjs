@@ -643,13 +643,13 @@ test("E300: tool-boundary-producer entries' errorCode literally appears in tools
   assert.deepEqual(missing, [], `tool-boundary codes not found literally in tools/registry.ts: ${missing.join(", ")}`);
 });
 
-test("E300: DISPATCH_PIN_TIER_REJECTED is registered, documentedInProse:false, and backtick-quoted in NO content/*.md this wave", () => {
+test("E300: DISPATCH_PIN_TIER_REJECTED is registered, documentedInProse:true, and backtick-quoted in a content/*.md (coord-02, E295)", () => {
   const g = GATE_REGISTRY.find((e) => e.errorCode === "DISPATCH_PIN_TIER_REJECTED");
   assert.ok(g, "DISPATCH_PIN_TIER_REJECTED must be a GATE_REGISTRY entry");
   assert.equal(g.producer, "tool-boundary");
-  assert.equal(g.documentedInProse, false);
-  assert.ok(!extractDocCodes().has("DISPATCH_PIN_TIER_REJECTED"),
-    "the prose sentence lands in a later content wave; flip documentedInProse and the mapping row together then");
+  assert.equal(g.documentedInProse, true);
+  assert.ok(extractDocCodes().has("DISPATCH_PIN_TIER_REJECTED"),
+    "documentedInProse:true must be backed by a backtick-quote in content/*.md (coord-02-host-dispatch.md)");
 });
 
 test("E300: SUFFIX_RE classifies DISPATCH_PIN_TIER_REJECTED as a gate-shaped code (the _REJECTED suffix keeps it visible to both extractors)", () => {
