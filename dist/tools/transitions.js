@@ -171,12 +171,14 @@ const REVIEW_ROUND_CAP = 4;
 // off-by-one between "rounds completed" and "next write index".
 const VISUAL_ROUND_CAP = 6;
 // v9 (d2-server-brake-accounting) — const-01 Limits: `hop` cap — max
-// auto-routing role transitions per feature. Unlike the three round caps
-// above, hop_count is feature-scoped: it resets ONLY on active_feature
-// change, never on PM re-entry (DR-6), so after the gate fires autonomous
-// dispatch stays frozen at the (pm, In_Progress) landing until a human
-// re-scopes into a new feature.
-const HOP_CAP = 10;
+// auto-routing role transitions per feature. 14 since E295 (was 10): a chain
+// with an architect hop plus two review and two qa rounds lands exactly on
+// 14, so the per-task round caps bound the review/qa loop before the hop cap
+// does. Unlike the three round caps above, hop_count is feature-scoped: it
+// resets ONLY on active_feature change, never on PM re-entry (DR-6), so
+// after the gate fires autonomous dispatch stays frozen at the
+// (pm, In_Progress) landing until a human re-scopes into a new feature.
+const HOP_CAP = 14;
 function isStatus(s) {
     return s === "In_Progress" || s === "PASS" || s === "FAIL" || s === "Blocked";
 }
@@ -251,16 +253,25 @@ export function validateTransition(req) {
     }
     // 2.5 hop-cap override, after the qa/review/visual overrides (their outputs
     // stay byte-identical) and before the self-loop fast path. Fires only when
-    // persisted hop_count >= HOP_CAP, the write is a counted role transition
-    // (next.agent !== prev.agent), and it is not the (pm, In_Progress) landing.
-    // A feature change resets the count, so it bypasses the check; the landing
-    // write does not reset it. (D2)
+    // persisted hop_count >= HOP_CAP and the write is a counted role transition
+    // (next.agent !== prev.agent). Same shape as the ROUND_CAP override above
+    // (E295, E41): the (pm, In_Progress) landing returns null unconditionally
+    // HERE — before the self-loop fast path and the table lookup — so it is
+    // accepted from every state, including code-reviewer:In_Progress and
+    // qa-engineer:In_Progress, which have no table edge to pm (the previous
+    // `!(pm landing)` exclusion let those fall through to the table and be
+    // rejected TRANSITION_REJECTED while the same landing under QA_ROUND_EXCEEDED
+    // was accepted). A feature change resets the count, so it bypasses the
+    // check; the landing write does not reset it (D2, DR-6 — computeNewRound is
+    // untouched).
     const prev_hop_count = req.prev_hop_count ?? 0;
     if (!req.feature_changed &&
         prev_hop_count >= HOP_CAP &&
-        req.next.agent !== req.prev.agent &&
-        !(req.next.agent === "pm" && req.next.status === "In_Progress")) {
+        req.next.agent !== req.prev.agent) {
         const onlyAllowed = [{ agent: "pm", status: "In_Progress" }];
+        const ok = req.next.agent === "pm" && req.next.status === "In_Progress";
+        if (ok)
+            return null;
         return rejection(req, "HOP_CAP_EXCEEDED", onlyAllowed, `hop_count=${prev_hop_count}${gate("HOP_CAP_EXCEEDED").hintStatic}`);
     }
     // 3. self-loop fast path: exactly In_Progress->In_Progress and

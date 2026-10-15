@@ -13,7 +13,7 @@ Sole authoritative definition of every named numeric limit. Body text (constitut
 | `qa_round` cap | 3 | Max qa-engineer FAIL rounds on one task before routing locks to pm. |
 | `review_round` cap | 3 | Max code-reviewer CHANGES_REQUESTED rounds before routing locks to pm. |
 | `visual_round` cap | 5 | Max visual-regression rounds before mandatory split/pm route (design-armed only). |
-| `hop` cap | 10 | Max auto-routing role transitions per `/teamwork` session (lite mode exempt). |
+| `hop` cap | 14 | Max auto-routing role transitions per `/teamwork` session (lite mode exempt). |
 | `fix_try` cap | 2 | Max consecutive auto-fix tries on the same failure (§5 anti-loop). |
 | `read` cap | 3 | Max file reads per target (§5 anti-loop). |
 | `pass_budget` | 250 lines × 5 passes | design-auditor per-feature output ceiling (§5 anti-loop). |

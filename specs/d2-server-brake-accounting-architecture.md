@@ -250,3 +250,16 @@ _None — the spec's Dependencies / Prerequisites shows zero ignored/deferred ex
 
 ## Open Questions
 None.
+
+## Amendment (2026-10-15, E295)
+
+The `hop` cap is written as 10 in this document (Decision 3's `HOP_CAP = 10`, the *Affected Files*
+entry for `tools/transitions.ts`, and the `const HOP_CAP = 10` sketch). It is 14 since E295: a
+chain with an architect hop plus two review rounds and two qa rounds lands exactly on 14, so the
+per-task `review_round` / `qa_round` caps now bound that loop before the hop cap does. The
+`(pm, In_Progress)` landing is also accepted unconditionally at the cap since E295 (E41): the
+step-2.5 override sketched here excluded the landing from the gate and let it fall through to the
+transition table, which has no `code-reviewer:In_Progress → pm` or `qa-engineer:In_Progress → pm`
+edge; it now takes the `ROUND_CAP` override's `if (ok) return null` shape, so the landing is
+accepted from every state. DR-6 is unchanged — the landing does not reset `hop_count`. The text
+above is left as written, since this file records the design as it was decided.
