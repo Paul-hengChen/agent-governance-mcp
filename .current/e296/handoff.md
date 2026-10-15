@@ -1,25 +1,27 @@
 ---
 schema_version: 15
 active_feature: "e296-manifest-tier-cut-approval"
-status: "In_Progress"
-last_updated: "2026-10-15T08:21:51.542Z"
-last_agent: "sr-engineer"
+status: "FAIL"
+last_updated: "2026-10-15T08:32:48.447Z"
+blocking_reason: "C3 (required): check --cut exits 0 for a comma-joined touches span (e.g. `.current/e296/handoff.md,tools/registry.ts`) — tools/fanout-manifest.ts:1319-1328 malformedCutSpan treats it as one in-bounds exact path; fix: refuse a path-token span with `,` outside {…} groups (exit 2)."
+last_agent: "code-reviewer"
 scope_decision: "single-feature"
 scope_decision_why: "Lane e296 of specs/fanout-post-v4-w3.md: E296 items (1)-(8) plus E309's one skill-integrator sentence; scope is the manifest Lanes row, not widened or narrowed. Non-design (no design/ file)."
 cut_approved: true
 dispatch_pins:
   sr-engineer: "opus"
 evidence_schema: 2
-next_role: "code-reviewer"
-dispatched_at: "2026-10-15T08:21:51.542Z"
+next_role: "sr-engineer"
+dispatched_at: "2026-10-15T08:32:48.447Z"
+review_verdict: "CHANGES_REQUESTED"
 dispatch_mechanism: "task"
 dispatch_mechanism_tier: "opus"
 qa_round: 0
-review_round: 1
+review_round: 2
 visual_round: 0
-hop_count: 5
+hop_count: 6
 qa_rounds_total: 0
-review_rounds_total: 1
+review_rounds_total: 2
 visual_rounds_total: 0
 ---
 # Handoff State
@@ -28,12 +30,10 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- sr-engineer: addressed code-reviewer Round 1 (C1, C2, Q1, Q2). Fix commit ae0ece3 on feat/e296-manifest-tier-cut-approval; reply appended to review_reports/review_T-E296-01.md. Ready for code review round 2.
-- New error code (no gate-code suffix): FANOUT_CODES.cutTouchesMalformedPath = "CUT_TOUCHES_MALFORMED_PATH", scope cut, exit 2. Raised in parseCutSection by malformedCutSpan(span) for each touches backtick span: (a) not isPathToken but path-shaped (contains / or a backslash, or matches /\.[A-Za-z0-9]+\b/) -> 'touches span "<span>" is not a bare repo path (no :line, #anchor, spaces or backslashes) — write the file path alone'; (b) isPathToken with a leading / or a . or .. segment -> 'touches span "<span>" has a leading / or a . or .. segment — write the normalised repo-relative path'. pathTokens/isPathToken/isImplicitBookkeeping/matchesGlob are unchanged. CUT_TOUCHES_EMPTY semantics are unchanged (it still fires when no isPathToken span exists, so an all-malformed (a) cell reports both codes, as the unquoted-path precedent does).
-- Behaviour change for qa to pin: `./tools/config.ts` was OUT (exit 1) and is now CUT_TOUCHES_MALFORMED_PATH (exit 2), consistent with the C2 choice.
-- Attack outputs (each spliced into lane T-E296-04's touches next to the in-bounds `tools/fanout-manifest.ts`, check --cut specs/fanout-post-v4-w3.md e296 <spec>; all exit=2): `tools/registry.ts:71` -> 'fanout: error: CUT_TOUCHES_MALFORMED_PATH: Cut row T-E296-04 (line 131): touches span "tools/registry.ts:71" is not a bare repo path (no :line, #anchor, spaces or backslashes) — write the file path alone'; `gates/registry.ts#L10` -> same (a) message; `.current/e296/../../index.ts` -> 'fanout: error: CUT_TOUCHES_MALFORMED_PATH: Cut row T-E296-04 (line 131): touches span ".current/e296/../../index.ts" has a leading / or a . or .. segment — write the normalised repo-relative path'; `test/fixtures/compose-golden/../../../tools/registry.ts` -> same (b) message; `./tools/config.ts` and `/tools/config.ts` -> (b); a backslash path -> (a).
-- Verification: npm run build 0, tsc --noEmit 0, npm audit --audit-level=high 0, check:md-tables OK. The dist diff covers only dist/tools/{fanout-manifest,config}.* (Q2 applied). AC9: validate on 20 manifests is byte-identical to base, with exit 2 only for wave5.1/wave6. AC10: shas are 045b56ae…128a and 485eabe0…f863. AC11: the dogfood (temp copy without the test/e297-main-protected-sop.test.mjs token) exits 0 (5 tickets, 18 tokens, 0 out); the oob proof prints 1 then exit=1. AC12: usage proof prints 1, and `check <m> --cut` still prints USAGE: unknown flag --cut. check <manifest> <lane> is byte-identical to base (stdout+stderr+exit) for w3/e296, w3/e308 and w2/e295. Only this lane's spec in specs/ has a ## Cut section, and no new malformed hit was found there.
-- Suite under test-lock: 3128 tests, 3110 pass, 15 fail, 3 skipped. The 15 are exactly the known qa-owned list: compose goldens x7 (incl. test/skill-manifest.test.mjs:97), four context-budget ceilings (measured now: skill-pm 4708, design-arm constitution 10518, coordinator bundle 21623, non-design 8420 — the coordinator bundle moved because of the Q1 clause; qa re-measures), e5-intake-tiering defaults x2, and the AC14 re-pins e178a AC1 and test/e297-main-protected-sop.test.mjs:101.
+- review_report: review_reports/review_T-E296-01.md (## Round 2 — CHANGES_REQUESTED; covers T-E296-01..04)
+- C3 required — tools/fanout-manifest.ts:1319-1328 malformedCutSpan: PATH_TOKEN_RE allows ',' for {a,b}; a span without '{' is an exact token, so `.current/e296/handoff.md,tools/registry.ts` (implicit bookkeeping prefix) and `review_reports/review_T-E296-01.md,index.ts` and `test/fixtures/compose-golden/a.json,tools/registry.ts` (owned **) are in bounds -> exit 0 next to an in-bounds token; affects every lane via .current/<lane>/. Fix: path-token span whose text minus {…} groups still contains ',' -> CUT_TOUCHES_MALFORMED_PATH exit 2 ('lists more than one path — give each path its own backtick span'). pathTokens/isPathToken/matchesGlob stay unchanged.
+- C1/C2/Q1/Q2 resolved; validate/render/check byte-identical to round-1 build on 182 invocations over 20 manifests; AC9-AC12 proofs pass; suite 3110/15/3, reds = known qa-owned list only; build/tsc/audit 0.
+- R1 recommended (spec-level, non-blocking, follow-up candidate): extensionless root files (Dockerfile, LICENSE), bare '.'/'..', and unicode lookalikes without an ASCII extension are prose under the AC3(a) path-token rule and are dropped.
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.

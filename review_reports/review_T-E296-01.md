@@ -64,3 +64,47 @@ CHANGES_REQUESTED: `check --cut` exits 0 for cuts that name forbidden files thro
 - **C2 — fixed (exit 2, consistent with C1).** A path-token span with a leading `/` or a `.` / `..` segment is `CUT_TOUCHES_MALFORMED_PATH` with the message "has a leading / or a . or .. segment — write the normalised repo-relative path". Backslashes are covered by the C1 branch, because `PATH_TOKEN_RE` excludes them. This runs at parse time, before any in-bounds test. `isImplicitBookkeeping` / `matchesGlob` are untouched, and `check <manifest> <lane>` is byte-identical to base for w3/e296, w3/e308 and w2/e295. Behaviour change: `./tools/config.ts` used to be OUT (exit 1) and is now exit 2.
 - **Q1 — applied.** coord-03 manifest-tier writer action: "…exits 0 on that cut, and every other Constitution §3.1 manifest-tier condition holds, set…".
 - **Q2 — applied.** tools/config.ts comment: "Anything but `true` leaves only the threshold tier armed."
+
+## Round 2 — CHANGES_REQUESTED — by code-reviewer
+
+## Summary
+- Round-2 diff `9038c00..44ef67f`: `malformedCutSpan` plus the `CUT_TOUCHES_MALFORMED_PATH` code in tools/fanout-manifest.ts (C1, C2), the coord-03 clause (Q1), the tools/config.ts comment (Q2), and rebuilt `dist/tools/{config,fanout-manifest}.*`. Every file is lane-owned, and `npm run build` leaves `dist/` clean.
+- The C1 and C2 attacks from round 1 now exit 2, and so do most variants: `%2e%2e` spans, a `**/..` glob, `//..`, `./`, a unicode-slash span with an extension, backslashes, a `:line` span next to `—`, and a malformed span next to OUT tokens.
+- No regression. `validate`, `render` and `check` on all 20 manifests (182 invocations) are byte-identical to the round-1 build. Against base they differ only in the 8 intended "8- or 9-column" lines. AC9–AC12 proofs pass, and the AC11 dogfood exits 0 once the known e297 token is removed.
+- Verdict: CHANGES_REQUESTED, for one new fail-open case in the same class: a comma-joined span counts as one in-bounds path (C3).
+
+## AC Completeness
+AC1–AC10, AC12, AC14 — implemented — unchanged since round 1. Re-verified: AC9 sweep prints exactly wave5.1 / wave6 at exit 2. AC10 sha256 `045b56ae…128a` / `485eabe0…f863`. AC12 usage count 1, and `check <m> --cut x` still gives `USAGE: unknown flag --cut`.
+AC11 — partial — the round-1 holes are closed (tools/fanout-manifest.ts:1288-1293, :1319-1328). The own-spec proof is exit 1 only because of the known `test/e297-main-protected-sop.test.mjs` manifest-version gap; without that token the dogfood exits 0 (5 tickets, 18 tokens, 0 out), and the oob proof prints `1` then exit 1. The guarantee that every file the cut names is in bounds still fails open for a comma-joined span (C3).
+AC13 — qa-owned, not judged.
+
+## Correctness
+Round-2 variant sweep. Each variant was spliced into T-E296-04's touches next to the in-bounds `tools/fanout-manifest.ts` and run as `check --cut specs/fanout-post-v4-w3.md e296 <spec>`:
+- exit 2 `CUT_TOUCHES_MALFORMED_PATH`: `tools/%2e%2e/index.ts`, `%2e%2e/index.ts`, `.current/e296/%2e%2e/%2e%2e/index.ts`, `.current/e296//../x`, `test/fixtures/compose-golden/**/../../../index.ts`, `./`, `tools∕registry.ts` (U+2215), `tools/a.ts\b.ts`, `— `+`tools/registry.ts:71`, and `index.ts`、`gates/registry.ts#L10`、`tools/registry.ts`. A parse error suppresses the OUT lines but still fails closed.
+- exit 1 OUT (fails closed): trailing `/` (`tools/`, `test/fixtures/compose-golden/`, `tools/registry.ts/`, all globs under the byte-identical rule), `tools//registry.ts`, `test/fixtures/compose-golden//x.json`, `{tools,gates}/registry.ts`, `test/fixtures/compose-golden/{..,x}/a.ts`, `tools/Registry.ts`, `tools/.../x.ts`.
+- in bounds, correctly: `.current/e296/.hidden`, `.current/e296/..x`.
+
+- **C3 — required — tools/fanout-manifest.ts:1319-1328 (`malformedCutSpan`).** `PATH_TOKEN_RE` (:56) allows `,` so that `{a,b}` alternation works. Without a `{`, though, `isGlobToken` is false. A comma-joined list in one span is then matched as a single exact path, and the owned `**` glob or the implicit-bookkeeping prefix swallows the forbidden half.
+  Failure scenario (reproduced, exit 0, `0 out of bounds`): touches `` `tools/fanout-manifest.ts`、`.current/e296/handoff.md,tools/registry.ts` `` (`tools/registry.ts` is under 禁止 `tools/**`, and lane e308 owns it). The same happens with `` `review_reports/review_T-E296-01.md,index.ts` `` (`index.ts` is common-forbidden) and with `` `test/fixtures/compose-golden/a.json,tools/registry.ts` ``. Every lane has the implicit `.current/<lane>/` prefix, so this hole exists for every lane, not just e296. Under the manifest tier, exit 0 is an auto-approval with no human in the loop. A comma list inside one span is an ordinary slip: the w3 manifest itself uses `{a,b}` comma syntax, and the space-separated form `a.ts, b.ts` is already caught as (a). So this is the C1 case again, "silently treated as something it is not".
+  Fix (fail closed, `pathTokens` / `isPathToken` / `matchesGlob` unchanged): in `malformedCutSpan`'s path-token branch, also refuse a span that still has a `,` once its `{…}` groups are removed, e.g. `span.replace(/\{[^{}]*\}/g, "").includes(",")`, with a message like "lists more than one path — give each path its own backtick span". Brace alternation stays legal, and it is OUT unless byte-identical to an 擁有 token.
+
+- **R1 — recommended (spec-level, does not block) — AC3(a) path-token rule.** A span with no `/` and no extension is prose by contract, so it is dropped. That includes extensionless root files (`Dockerfile`, which exists at the repo root, and `LICENSE`), `.` / `..`, and unicode lookalikes with no ASCII extension (`tools∕registry`, `tools／registry．ts`). All of these exit 0 next to an in-bounds token. The implementation follows the spec, and `check --cut` is pure by architecture (no repo listing), so this is not a defect in this diff. Suggest a follow-up ticket: either make `—`/prose-free `touches` cells strict (every span must be a path token or exactly `—`), or treat a bare `.` / `..` span as malformed.
+
+## Quality
+- Q1 and Q2 are resolved. The coord-03:45 clause "and every other Constitution §3.1 manifest-tier condition holds" cites §3.1 without restating it. The diff changes only that clause (about 60 characters), and the halt sentence is untouched. The config.ts:266 comment is now accurate.
+- Comment check (4b): the two added comments (the `FANOUT_CODES` line at :131 and the `malformedCutSpan` JSDoc at :1311-1318) state the constraint and why. They carry no absolute paths and no bare ticket ids. Kept.
+- No `any` in the added lines. The new code is placed after `parseCutSection` and follows the `cutErr` / `FANOUT_CODES` conventions.
+
+## Architecture
+The fix is a parse-time refusal inside `parseCutSection`. It leaves `isCutTokenInBounds`, `pathTokens`, `isPathToken`, `isImplicitBookkeeping` and `matchesGlob` byte-unchanged (the diff is additions only), so 擁有 / 禁止 parsing and `check <manifest> <lane>` do not move (byte-identical across 182 invocations vs the round-1 build). The new code `CUT_TOUCHES_MALFORMED_PATH` is a spec-side format error, so exit 2 fits AC11's exit-2 class. The behaviour change for `./tools/config.ts` (OUT/1 → 2) is the consistent choice and qa should pin it. Scope: all round-2 files are lane-owned; `dist/` is limited to `config.*` / `fanout-manifest.*`.
+
+## Security
+C3 is the remaining boundary-validation gap on hand-typed input that feeds an auto-approval decision. Its governance impact is the same as round-1 C1/C2. No other findings: no new I/O, no shell, no secrets. `npm audit --audit-level=high` exit 0.
+
+## Performance
+No findings. One extra pass over the backtick spans per Cut row, constant work per span.
+
+Verification: `npm run build` 0 (dist clean afterwards), `tsc --noEmit` 0, `npm audit --audit-level=high` 0. Suite under test-lock: 3128 tests / 3110 pass / 15 fail / 3 skip. The 15 failures are exactly the known qa-owned list: compose-equivalence ×6 plus `test/skill-manifest.test.mjs:97`, the context-budget ceilings at :475/:554/:569/:894, e5-intake-tiering :67/:214, e178a :75, and e297 :101. No red outside that list.
+
+## Verdict
+CHANGES_REQUESTED: C1/C2 are fixed with no regression, but a comma-joined `touches` span such as `.current/e296/handoff.md,tools/registry.ts` still exits 0 for a cut that names a forbidden file (C3). The fix is a single fail-closed condition in `malformedCutSpan`.
