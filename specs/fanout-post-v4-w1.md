@@ -2,7 +2,7 @@
 base: 6b8a195    integration branch: integ/post-v4-w1
 mailbox: ../agent-governance-mcp-lanes/_mailbox
 
-**狀態：人類核准 2026-10-14（含九項重劃／拆分），開始派工。**
+**狀態：人類核准 2026-10-14（含九項重劃／拆分）；已結案 2026-10-15（四條 lane 皆合併進 `integ/post-v4-w1`，以 PR 併入 `main`）。**
 
 本波是 `main` 加上 ruleset `main-protection` 後的第一波：Stage 6 不再 ff push `main`，改走 E297 票面第 (1) 項（lane 全部 merge 進 `integ/post-v4-w1` → 在 integ branch 上逐條 `finish --shipped --base integ/post-v4-w1` → 記帳也 commit 在 integ branch → `git push -u origin integ/post-v4-w1` → `gh pr create` → `gh pr merge --auto --merge` → 等 merged → `git switch main && git pull --ff-only`）。`content/skill-integrator.md` 現行 Stage 6 文字在本波由 e297 改寫；本波的整合者照票面做，不照現行文字。
 
@@ -66,7 +66,7 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 | `skill-integrator.md` 5c 一句指向 `check:bookkeeping` | 第 2 波 content lane | ✗（第 2 波） |
 | `dispatch_pins` 值 enum 化、拒絕信封點名角色與值、新錯誤碼登記、讀側 advisory | e300 | ✓ |
 | coord-02 *Dispatch-time overrides* 一句點名四個值 | 第 2 波 content lane | ✗（第 2 波） |
-| `dispatch_pins` enum 與 `MODEL_TIERS` 單一來源 | 整合後接線票（整合者 5c 開票） | ✗（接線票） |
+| `dispatch_pins` enum 與 `MODEL_TIERS` 單一來源 | 整合後接線票 → **E308**（佇列 #125） | ✗（接線票，已開） |
 | `ci.yml` 觸發含 `feat/**`、`integ/**`、`release/**`；E170 關閉 | e298 + 整合者 done-mark | ✓ |
 | `agc feature finish --shipped` 刪 remote lane branch，無 remote branch 時 no-op | e298 | ✓ |
 | `skill-integrator.md` 5a `--ci-check`、5b 改讀 CI、verifier brief、fallback、flake rule | 第 2 波 content lane | ✗（第 2 波） |
@@ -96,3 +96,24 @@ e297 → e299 → e300 → e298（共享生成物的 lane 先；四條檔案互�
 | 2026-10-14 | 人類 | post-v4 佇列 0i–0l 與 E295、E296 分三波：第 1 波 E297 + E299／E300／E298 程式半邊；第 2 波 E298 SOP 半邊 + E295；第 3 波 E296。Stage 6 照 E297 票面第 (1) 項（integ branch + PR + auto-merge），不照現行 SOP 文字 | 整合者 session（派工指示） |
 | 2026-10-14 | 整合者 | 拆成 e297 ∥ e299 ∥ e300 ∥ e298；E298／E299／E300 各拆成程式半邊（本波）與 SOP 一句（第 2 波，不併進 e297）；`tools/skill-frontmatter.ts` + 其測試重劃給 e297（`MODEL_TIERS` 缺 `fable`，票面漏列）；e300 寫字面值 enum、不碰 `MODEL_TIERS`，統一來源另開接線票；`gates/registry.ts` + 錯誤碼契約／gate-stats 測試重劃給 e300；`docs/backlog.md`／佇列的機械修正重劃給 e299；`.github/workflows/ci.yml` 重劃給 e298；`scripts/verify-release.mjs` 條件式給 e297；release SOP 13a/13b 與 `--close-out` 列為 e297 PM 必判項 | 本檔 |
 | 2026-10-14 | 人類 | 核准本清單（含九項重劃／拆分：三張小票的 SOP 一句留第 2 波、`skill-frontmatter.ts` 給 e297、e300 字面值 enum、`gates/registry.ts` 給 e300、backlog 機械修正給 e299、`ci.yml` 給 e298、`verify-release.mjs` 條件式給 e297、release 13a/13b 列為必判、coord-02 更正），開始派工 | 整合者 session |
+| 2026-10-14 | 整合者 | 四條 lane 的 PM 都先在 session 裡找人類核准 cut、未送信箱；整合者對四條各送 question 要求先寄 proposal 預審。e299 回報 session 已達使用量上限 | 信箱四條 lane to-lane#1、e297／e299 to-integrator#1 |
+| 2026-10-14 | 整合者 | e298 預審通過（mini-chain 無 PM hop；T-E298-01 ci.yml 觸發、T-E298-02 finish 刪 remote branch，AC1–AC7；前置檢查用本地 remote-tracking ref、不 ls-remote；qa 加 --base 非 main 案例） | 信箱 e298 to-integrator#1、to-lane#2 |
+| 2026-10-14 | 整合者 | e300 預審：T-01／02／04 通過，T-03 的 advisory 改放 tw_get_state 信封、不加在 HandoffState（handoff-types／handoff-write 不在擁有範圍）；index.ts 不動（formatZodError 已帶 zod path）；建議方案 A、碼名 DISPATCH_PIN_TIER_REJECTED，兩者交人類裁決 | 信箱 e300 to-integrator#1、to-lane#2 |
+| 2026-10-14 | 整合者 | e300 預審通過（T-E300-01 字面值 enum + zod、02 GATE_REGISTRY 第 34 列 producer tool-boundary、03 advisory 只在 tw_get_state 信封、04 測試）；兩項交人類裁決：方案 A（建議）vs B、碼名 DISPATCH_PIN_TIER_REJECTED | 信箱 e300 to-integrator#2、to-lane#3 |
+| 2026-10-14 | 整合者 | e299 預審通過（T-E299-01..05；原型量測：46 則死引用機械改寫、E137 #7 勾記、E88 五則全修 + CQ-9 改寫、22 則容忍註記）；E177c 以「E<n><字母> 父列存在即通過」的通用規則處理、不開 E299-NEW-1；E104 視為 DONE；release-v4.x.x/ 路徑改寫視為機械 | 信箱 e299 to-integrator#1、to-lane#2 |
+| 2026-10-14 | 整合者 | e297 預審：Rulings（8b、step 12、13a/13b、Check 1/6、verify-release 零修改）同意；要求補兩處：Stage 6 的 PR 卡 up-to-date 時整合者 merge main 進 integ 而非 STOP；coord-03 記帳段要在 §6 下可執行 → 裁決項 (a) 擴成 release/*（release-engineer）與 docs/*（coordinator）兩個命名空間，交人類 | 信箱 e297 to-integrator#2、to-lane#2 |
+| 2026-10-14 | 整合者 | e297 預審通過（T-E297-01..06；兩處修正已進 spec：Stage 6 PR 卡 up-to-date 由整合者 merge main 進 integ；§6 namespace 裁決改為 A/B 兩選項）；交人類四項：(a) A（建議）vs B、(b) 上限 = qa 實測值、(c) 單一 PR 路徑、(d) merge --ff-only 留在 grant | 信箱 e297 to-integrator#3、to-lane#3 |
+| 2026-10-14 | 人類 | e297 cut 核准（在 e297 lane session）：(a) 選 A —— §6 在整合者之外開 release/*（release-engineer）與 docs/*（coordinator）兩個 namespace，各共用 switch -c／switch main／branch -d + gh pr create／gh pr merge --auto --merge；(b) 四個上限照 qa 實測值；(c) SOP 只寫 PR 單一路徑；(d) merge --ff-only 留在 grant | e297 lane session（信箱 e297 to-integrator#4 轉述） |
+| 2026-10-14 | 整合者 | e298 核對通過（9f5a541，全套 3055/3052/0/3 與回報相同，11 檔 0 越界，T-E298-01/02 review APPROVED + qa PASS，hop 4/10，ci.yml 無 paths 過濾）；e299 回報期間確認 qa_reports/expected-red_e299-check-bookkeeping.txt 屬本票新建檔案、在範圍內 | 信箱 e298 to-integrator#2、to-lane#3；e299 to-integrator#4、to-lane#3 |
+| 2026-10-14 | 整合者 | e300 核對通過（ccc6d56，全套 3058/3055/0/3 與回報相同，33 檔 0 越界，T-E300-01..04 review APPROVED + qa PASS，hop 4/10）；接線票介面：tools/handoff-parse.ts DISPATCH_PIN_TIER_VALUES → 改從 MODEL_TIERS 推導，含 registry.ts inputSchema enum ×8 與 hint 字面值、orchestrator advisory allowed | 信箱 e300 to-integrator#3、to-lane#4 |
+| 2026-10-14 | 整合者 | e299 核對通過（83fd226，全套 3082/3079/0/3 與回報相同，19 檔 0 越界，T-E299-01..05 review r2 APPROVED + qa PASS，hop 6/10，review 一輪 CHANGES_REQUESTED 僅缺 expected-red 清單）；backlog／佇列改動行數相等、純機械 | 信箱 e299 to-integrator#5、to-lane#4 |
+| 2026-10-14 | 整合者 | e297 核對通過（874e921，全套 3054/3051/0/3 與回報相同，39 檔 0 越界，T-E297-01..06 review r2 APPROVED + qa PASS，hop 6/10，review 一輪 CHANGES_REQUESTED 為 Stage 6 step 4 兩處）；四個上限實測 5717/10226/20749/8129（人類核准 cut 時已同意照實測值）；reviewer O4（13a bookkeeping PR 落後時的恢復措辭）併入 E297-NEW-1 | 信箱 e297 to-integrator#6、to-lane#5 |
+| 2026-10-14 | 整合者 | 5b：四條 lane 依序 `--no-ff` 合進 `integ/post-v4-w1`（e297 `06e0f7e` → e299 `32d6122` → e300 `9159476` → e298 `b49ca55`），零衝突、每次 merge-invariants PASS、dist 重建無漂移、audit high exit 0、整合層全套 3114/3111/0/3、`check:bookkeeping` OK。6-3：e299／e300／e298 在 integ 上 `finish --shipped` 配 E301–E304；**e297 的 finish 被拒**（pending-tickets.md 第 3 個 block title 以反引號開頭，YAML 不接受，nothing applied）→ 重開收工議題請 lane 在自己的 branch 修後回 sha；等候中（11:47 寄出，lane 未回） | 本檔；信箱 e297 to-lane#6–#7 |
+| 2026-10-15 | 整合者 | e297 的 pending-tickets 修正（`b197556`，由 e298 session 依人類指示代寫，一行、只加雙引號）重新 merge 進 integ（`ab74a0f`，merge-invariants PASS）→ `finish e297 --shipped` 配 E305–E307；整合者開接線票 E308；E305–E308 排進佇列 #122–#125；結案 | 本檔；信箱 e297 to-integrator#7 |
+
+## 結案
+- 日期 2026-10-15。`integ/post-v4-w1`：e297 `06e0f7e` → e299 `32d6122` → e300 `9159476` → e298 `b49ca55`（皆 `--no-ff`，零衝突 → 無合併審查；每次 merge-invariants PASS）；e297 一行修正補 merge `ab74a0f`。重建 `dist/` 無差異；`npm audit --audit-level=high` exit 0；整合層全套 3114/3111/0/3（記帳 commit 後再跑一次，見下）；`check:bookkeeping` OK。`main` 以本 branch 的 PR + auto-merge 併入（Stage 6 照 E297 票面第 (1) 項；merge sha 記在 PR）。
+- 彙總（上限按 lane 計，合計僅供參考）：e297 6 張 task／hop 6/10（review 一輪 CHANGES_REQUESTED）；e299 5 張／hop 6/10（review 一輪 CHANGES_REQUESTED）；e300 4 張／hop 4/10；e298 2 張／hop 4/10。合計 17 張 task、hop 20；四條 lane 都在各自上限內，證據與 `completed_tasks` 一致。
+- 完成定義 17 項：13 項成立；4 項 ✗ 都已有歸屬 —— 第 2 波 content lane（E298 SOP 半邊、E299 5c 一句、E300 coord-02 一句）與接線票 E308。
+- 例外：(1) 四條 lane 的 PM 都先在 session 找人類核准 cut、未送信箱，整合者各送一則 question 後才補預審（lane-protocol §5-2 在 prompt 裡沒有被讀到，建議第 2 波 prompt 的 summary 明寫「cut 先寄信箱」）；(2) e297 的 finish 被 pending-tickets 的 YAML 擋住，lane session 已結束，修正由 e298 session 依人類指示在 e297 worktree 代寫（一行）；(3) 本波是 `main` 保護後第一波，Stage 6 照票面而非現行 SOP 文字執行。
+- 新票：E301、E302（e299）、E303（e300）、E304（e298）、E305–E307（e297）由各自的 `finish --shipped` 配號；E308（接線）由整合者開。

@@ -21,10 +21,12 @@ const root = path.resolve(here, "..");
 // blast radius: see specs/e260c-bin-scripts.md.
 const EXCLUDED_DIR_PREFIXES = ["qa_reports/", "review_reports/"];
 
-// Done-mark position advisory (E88), advisory-only (never affects the exit
-// code or allViolations): a `**DONE**` / `**PARTIAL**` / `**VOID**` mark
-// buried mid-cell is easy to miss. Scoped to docs/backlog.md's two known
-// table shapes by exact header match. Why advisory: see specs/e260c-bin-scripts.md.
+// Done-mark position rule (E88), fatal since E299: a `**DONE**` /
+// `**PARTIAL**` / `**VOID**` mark buried mid-cell is easy to miss, so a
+// genuine mark that does not lead its cell fails the build, counted
+// separately from malformed tables. Scoped to docs/backlog.md's two known
+// table shapes by exact header match. The rule shipped as an advisory
+// first; why, and what it measured: see specs/e260c-bin-scripts.md.
 const BACKLOG_REL_PATH = "docs/backlog.md";
 // Matches the opening of a bold marker (`**DONE`, word boundary so
 // `**PARTIALLY**` does not match). The closing `**` is not anchored: the
@@ -71,8 +73,8 @@ function findCodeSpanRanges(text) {
 // Round 3 (E145): a `*"…"*` span, this repo's style for quoting another
 // row's text, is excluded exactly like a code span, since a quoted mark
 // with a stamp would otherwise qualify. An unpaired `*"` opener yields no
-// range, so the candidate still advises. Deliberately narrow: other quote
-// styles still advise, because widening would silence genuine marks.
+// range, so the candidate is still reported. Deliberately narrow: other
+// quote styles are still reported, because widening would silence genuine marks.
 // Measurement, the true positive it keeps and known residuals: see specs/e260c-bin-scripts.md.
 function findCitationQuoteRanges(text) {
   const ranges = [];
@@ -171,7 +173,7 @@ function checkFile(relPath) {
   } catch (err) {
     // `git ls-files` lists tracked-but-deleted files too; treat a missing
     // file as nothing to check rather than crashing with a raw stack trace.
-    if (err && err.code === "ENOENT") return { violations: [], advisories: [] };
+    if (err && err.code === "ENOENT") return { violations: [], doneMarkViolations: [] };
     throw err;
   }
   const lines = raw.split("\n");
@@ -227,7 +229,7 @@ function checkFile(relPath) {
   if (run.length) runs.push(run);
 
   const violations = [];
-  const advisories = [];
+  const doneMarkViolations = [];
   const isBacklogFile = relPath === BACKLOG_REL_PATH;
 
   for (const block of runs) {
@@ -289,7 +291,7 @@ function checkFile(relPath) {
       });
       continue;
     }
-    // Done-mark advisory scope (E88): the designated column of a known
+    // Done-mark rule scope (E88): the designated column of a known
     // docs/backlog.md table shape, computed once per block; null otherwise.
     // Headerless blocks already `continue`d above, so the escape-aware
     // splitRow is always the column splitter.
@@ -317,7 +319,7 @@ function checkFile(relPath) {
         const cellTrimmed = (cells[doneMarkCol.index] ?? "").trim();
         const marker = findGenuineDoneMark(cellTrimmed);
         if (marker && marker.index !== 0) {
-          advisories.push({
+          doneMarkViolations.push({
             file: relPath,
             line: row.lineNo,
             token: marker.token,
@@ -328,16 +330,16 @@ function checkFile(relPath) {
     }
   }
 
-  return { violations, advisories };
+  return { violations, doneMarkViolations };
 }
 
 const files = findTrackedMarkdownFiles();
 const allViolations = [];
-const allAdvisories = [];
+const allDoneMarkViolations = [];
 for (const relPath of files) {
-  const { violations, advisories } = checkFile(relPath);
+  const { violations, doneMarkViolations } = checkFile(relPath);
   allViolations.push(...violations);
-  allAdvisories.push(...advisories);
+  allDoneMarkViolations.push(...doneMarkViolations);
 }
 
 if (allViolations.length > 0) {
@@ -369,25 +371,25 @@ if (allViolations.length > 0) {
       }
     }
   }
-  console.error("\ncheck:md-tables — FAILED");
 }
 
-// Done-mark advisories (E88) are advisory-only: printed regardless of the
-// fatal outcome above, but NEVER contributes to allViolations and NEVER
-// changes the exit code below.
-if (allAdvisories.length > 0) {
-  console.log(
-    `check:md-tables — ${allAdvisories.length} advisory note(s) (non-blocking, done-mark convention):\n`
+// Done-mark position violations (E88, fatal since E299) are their own list
+// with their own count: never folded into the malformed-table count above,
+// but they fail the build just the same.
+if (allDoneMarkViolations.length > 0) {
+  console.error(
+    `check:md-tables — ${allDoneMarkViolations.length} done-mark position violation(s) (docs/backlog.md E88):\n`
   );
-  for (const a of allAdvisories) {
-    console.log(
+  for (const a of allDoneMarkViolations) {
+    console.error(
       `  ${a.file}:${a.line} — done-mark **${a.token}** is buried mid-cell in the ${a.column} ` +
         `column (should lead the cell) — see docs/backlog.md E88`
     );
   }
 }
 
-if (allViolations.length > 0) {
+if (allViolations.length > 0 || allDoneMarkViolations.length > 0) {
+  console.error("\ncheck:md-tables — FAILED");
   process.exit(1);
 }
 

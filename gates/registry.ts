@@ -39,9 +39,13 @@ export type GateErrorCode =
   | "REVIEWER_COMPLETED_TASKS_REJECTED"
   | "NON_QA_COMPLETED_TASKS_REJECTED"
   | "QA_REVIEW_TARGET_REQUIRED"
-  | "AC_EXECUTION_LOG_MISSING";
+  | "AC_EXECUTION_LOG_MISSING"
+  | "DISPATCH_PIN_TIER_REJECTED";
 
-export type GateProducer = "validateTransition" | "orchestrator";
+// "tool-boundary": a zod rejection raised by tools/registry.ts before the
+// UPDATE_STATE_GATE_PIPELINE runs (E300); telemetry and gate-stats carry the
+// producer verbatim, so no consumer change is needed.
+export type GateProducer = "validateTransition" | "orchestrator" | "tool-boundary";
 export type GateEnvelope = "transition-json" | "orchestrator-json" | "plain-text";
 
 export interface GateDefinition {
@@ -59,8 +63,9 @@ export interface GateDefinition {
   // (DR-3, qa-engineer's rewritten error-code-contract test) compares against.
   readonly hintStatic: string;
   // True iff the code is (and must stay) backtick-quoted in >=1 content/*.md.
-  // All 30 are true today. The field exists so a future code-internal gate can
-  // opt out without weakening the parity test.
+  // Every entry is true except DISPATCH_PIN_TIER_REJECTED (E300), whose prose
+  // sentence lands in a later content wave. The field exists so a
+  // code-internal gate can opt out without weakening the parity test.
   readonly documentedInProse: boolean;
 }
 
@@ -98,10 +103,14 @@ export interface GateDefinition {
 //   NON_QA_COMPLETED_TASKS_REJECTED  const-08-chain-31-mid.md
 //   QA_REVIEW_TARGET_REQUIRED       skill-qa-engineer.md
 //   AC_EXECUTION_LOG_MISSING        skill-qa-engineer.md
+//   DISPATCH_PIN_TIER_REJECTED      (none)
 
-// The 33-gate catalog, in documentation order (the non-qa completed_tasks write gate, E40,
+// The 34-gate catalog, in documentation order (the non-qa completed_tasks write gate, E40,
 // added the 33rd, NON_QA_COMPLETED_TASKS_REJECTED — the reviewer-only completed_tasks gate
-// generalized to every non-qa identity). Array order is DOC order only — it MUST NOT be relied
+// generalized to every non-qa identity; the dispatch_pins tier enum, E300, added the 34th,
+// DISPATCH_PIN_TIER_REJECTED — the first tool-boundary producer, raised by zod before the
+// pipeline and the first documentedInProse: false entry; its "(none)" mapping row above means
+// no content/*.md quotes it yet). Array order is DOC order only — it MUST NOT be relied
 // on for evaluation order (DR-5; that lives in handoff-orchestrator.ts as the ordered
 // UPDATE_STATE_GATE_PIPELINE array, E35).
 export const GATE_REGISTRY: readonly GateDefinition[] = [
@@ -603,6 +612,26 @@ export const GATE_REGISTRY: readonly GateDefinition[] = [
       "truthfulness stays with qa-engineer / code-reviewer. " +
       "See specs/e3-outcome-shaped-acceptance.md AC3/AC4.",
     documentedInProse: true,
+  },
+  // ---- tool-boundary (code 34, producer: zod at tools/registry.ts) ----
+  {
+    // dispatch_pins tier enum (E300): each value must be one of the four tier
+    // names. Rejected by zod before UPDATE_STATE_GATE_PIPELINE, so it has no
+    // pipeline step; file and SQLite mode alike. The zod issue path carries
+    // the role, which index.ts formatZodError prefixes as "dispatch_pins.<role>: ".
+    // An on-disk value outside the enum is surfaced by tw_get_state as
+    // dispatch_pins_advisory, never rejected on read.
+    errorCode: "DISPATCH_PIN_TIER_REJECTED",
+    producer: "tool-boundary",
+    envelope: "plain-text",
+    triggerEdge:
+      "any tw_update_state write whose dispatch_pins carries a value outside the four tier names (any agent, any status; rejected before the pipeline, file and SQLite mode alike)",
+    armCondition:
+      "zod z.enum on each dispatch_pins value (tools/registry.ts UpdateStateArgs); runs before UPDATE_STATE_GATE_PIPELINE",
+    clearingArtifact: "dispatch_pins.<role> set to one of opus, sonnet, haiku, fable",
+    // tools/registry.ts DISPATCH_PIN_TIER_HINT — byte-exact; the received value precedes it.
+    hintStatic: "is not a model tier; allowed: opus, sonnet, haiku, fable",
+    documentedInProse: false,
   },
 ];
 

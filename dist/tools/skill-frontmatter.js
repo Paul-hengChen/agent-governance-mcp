@@ -3,7 +3,7 @@
 // Consumed by tools/role.ts, prompts/build.ts, and bin/agent-governance-context.mjs
 // so the wire contract lives in exactly one place.
 import * as yaml from "js-yaml";
-export const MODEL_TIERS = ["opus", "sonnet", "haiku"];
+export const MODEL_TIERS = ["opus", "sonnet", "haiku", "fable"];
 const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
 function isModelTier(v) {
     return typeof v === "string" && MODEL_TIERS.includes(v);

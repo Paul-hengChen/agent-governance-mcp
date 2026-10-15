@@ -7,7 +7,7 @@
 import * as path from "node:path";
 import { z } from "zod";
 import { handleDetectDrift } from "./drift.js";
-import { isInsideWorkspace } from "./handoff-parse.js";
+import { isInsideWorkspace, DISPATCH_PIN_TIER_VALUES } from "./handoff-parse.js";
 import { handleSync } from "./sync.js";
 import { handleSwitchRole } from "./role.js";
 import { handleGetNextTask, handleCompleteTask, handleRollbackTask, handleVoidTask, handleAddTask, } from "./tasks.js";
@@ -69,6 +69,24 @@ function hasTrailingTagFragment(value) {
 function trailingTagFragmentMessage(field) {
     return `Field "${field}" appears to end with leftover tool-call markup (a trailing tag fragment) — this usually means a malformed multi-argument call bled into this field. Re-issue the call with each argument in its own tag.`;
 }
+// E300 — fixed sentence of the dispatch_pins rejection; the value is the
+// dynamic part. Copied byte-for-byte into gates/registry.ts hintStatic.
+const DISPATCH_PIN_TIER_HINT = "is not a model tier; allowed: opus, sonnet, haiku, fable";
+const DISPATCH_PIN_TIER_ECHO_MAX = 100;
+// One dispatch_pins value: a closed enum whose rejection names the received
+// value (echo bounded so an oversize input cannot bloat the envelope); the
+// role is carried by the zod issue path.
+const dispatchPinTier = z
+    .enum(DISPATCH_PIN_TIER_VALUES, {
+    error: (iss) => {
+        const input = iss.input;
+        const raw = typeof input === "string" ? input : String(JSON.stringify(input) ?? input);
+        const clipped = raw.length > DISPATCH_PIN_TIER_ECHO_MAX ? `${raw.slice(0, DISPATCH_PIN_TIER_ECHO_MAX)}…` : raw;
+        const echo = typeof input === "string" ? JSON.stringify(clipped) : clipped;
+        return `DISPATCH_PIN_TIER_REJECTED: ${echo} ${DISPATCH_PIN_TIER_HINT}`;
+    },
+})
+    .optional();
 const UpdateStateArgs = z
     .object({
     workspace_path: absoluteWorkspacePath,
@@ -139,20 +157,23 @@ const UpdateStateArgs = z
     // REVIEW_VERDICT_STATUS_MISMATCH orchestrator gate (AC-5).
     review_verdict: z.enum(["APPROVED", "CHANGES_REQUESTED"]).optional(),
     // v8 dispatch_pins map: CLOSED KEYS (the 8 AgentName literals; `.strict()`
-    // rejects an unknown key here), OPEN VALUES (bounded free text naming a
-    // model tier; this server does not own that vocabulary). Feature-scoped:
+    // rejects an unknown key here), CLOSED VALUES (E300: one of the four tier
+    // names in DISPATCH_PIN_TIER_VALUES; any other value is rejected here,
+    // before the pipeline, with DISPATCH_PIN_TIER_REJECTED — the zod issue
+    // path carries the role, so the formatted rejection reads
+    // "dispatch_pins.<role>: DISPATCH_PIN_TIER_REJECTED: ..."). Feature-scoped:
     // REPLACES the whole map when provided, carried across same-feature
     // writes, dropped on active_feature change. File-mode only, no gate.
     dispatch_pins: z
         .object({
-        pm: z.string().min(1).max(100).optional(),
-        researcher: z.string().min(1).max(100).optional(),
-        "design-auditor": z.string().min(1).max(100).optional(),
-        architect: z.string().min(1).max(100).optional(),
-        "sr-engineer": z.string().min(1).max(100).optional(),
-        "code-reviewer": z.string().min(1).max(100).optional(),
-        "qa-engineer": z.string().min(1).max(100).optional(),
-        "release-engineer": z.string().min(1).max(100).optional(),
+        pm: dispatchPinTier,
+        researcher: dispatchPinTier,
+        "design-auditor": dispatchPinTier,
+        architect: dispatchPinTier,
+        "sr-engineer": dispatchPinTier,
+        "code-reviewer": dispatchPinTier,
+        "qa-engineer": dispatchPinTier,
+        "release-engineer": dispatchPinTier,
     })
         .strict()
         .optional(),
@@ -458,17 +479,17 @@ export const TOOL_REGISTRY = [
                 dispatch_pins: {
                     type: "object",
                     properties: {
-                        pm: { type: "string" },
-                        researcher: { type: "string" },
-                        "design-auditor": { type: "string" },
-                        architect: { type: "string" },
-                        "sr-engineer": { type: "string" },
-                        "code-reviewer": { type: "string" },
-                        "qa-engineer": { type: "string" },
-                        "release-engineer": { type: "string" },
+                        pm: { type: "string", enum: ["opus", "sonnet", "haiku", "fable"] },
+                        researcher: { type: "string", enum: ["opus", "sonnet", "haiku", "fable"] },
+                        "design-auditor": { type: "string", enum: ["opus", "sonnet", "haiku", "fable"] },
+                        architect: { type: "string", enum: ["opus", "sonnet", "haiku", "fable"] },
+                        "sr-engineer": { type: "string", enum: ["opus", "sonnet", "haiku", "fable"] },
+                        "code-reviewer": { type: "string", enum: ["opus", "sonnet", "haiku", "fable"] },
+                        "qa-engineer": { type: "string", enum: ["opus", "sonnet", "haiku", "fable"] },
+                        "release-engineer": { type: "string", enum: ["opus", "sonnet", "haiku", "fable"] },
                     },
                     additionalProperties: false,
-                    description: "Human model-tier pins per role (file-mode only). Object whose keys are the 8 role names (unknown keys rejected) and whose values are free-text model-tier strings (non-empty, ≤100 chars; e.g. \"fable\", \"opus\", or a fully-qualified model id — NOT validated against a model vocabulary). Passing it REPLACES the map wholesale (not merged) — read the existing pins first and include every still-wanted entry. Feature-scoped: preserved across same-feature writes that omit it, dropped on active_feature change, NOT re-armed on PM re-entry. Advisory bookkeeping — no gate. Replaces the legacy 'dispatch_pins: <role>=<model>' pending_notes convention (handoff schema v8).",
+                    description: "Human model-tier pins per role (file-mode only). Object whose keys are the 8 role names (unknown keys rejected) and whose values are one of the four tier names \"opus\", \"sonnet\", \"haiku\", \"fable\" — a tier name always resolves to the latest model of that tier; a fully-qualified or dated model id is NOT accepted. Any other value is rejected at the tool boundary (before any gate) with DISPATCH_PIN_TIER_REJECTED naming the role and the received value; an on-disk pin outside the four (written before this rule or by hand) is reported by tw_get_state as dispatch_pins_advisory, not rejected on read. Passing it REPLACES the map wholesale (not merged) — read the existing pins first and include every still-wanted entry. Feature-scoped: preserved across same-feature writes that omit it, dropped on active_feature change, NOT re-armed on PM re-entry. Advisory bookkeeping — no gate. Replaces the legacy 'dispatch_pins: <role>=<model>' pending_notes convention (handoff schema v8).",
                 },
                 dispatch_mode: {
                     type: "string",

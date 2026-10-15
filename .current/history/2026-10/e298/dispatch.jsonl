@@ -1,0 +1,7 @@
+{"ts":"2026-10-14T10:32:07.317Z","feature":"e298-ci-triggers-finish-remote-delete","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-10-14T10:48:35.072Z","feature":"e298-ci-triggers-finish-remote-delete","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-10-14T10:53:39.414Z","feature":"e298-ci-triggers-finish-remote-delete","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-10-14T10:54:36.969Z","feature":"e298-ci-triggers-finish-remote-delete","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-14T10:58:10.296Z","feature":"e298-ci-triggers-finish-remote-delete","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-14T11:02:57.675Z","feature":"e298-ci-triggers-finish-remote-delete","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-10-14T11:12:29.939Z","feature":"e298-ci-triggers-finish-remote-delete","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"fable"}

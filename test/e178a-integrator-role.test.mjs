@@ -74,8 +74,8 @@ function skipIfHistoryAbsent(t, invariant, ...shas) {
 
 test("AC1: content/skill-integrator.md — frontmatter, purpose, work-overview, permission table, you-are-not list, no-tier watermark", () => {
   // (a) frontmatter carries recommended_model: sonnet, a valid MODEL_TIERS entry
-  assert.match(SOP, /^---\nrecommended_model: sonnet\n---\n/, "frontmatter must open with recommended_model: sonnet");
-  assert.ok(MODEL_TIERS.includes("sonnet"), "sonnet must be a valid MODEL_TIERS entry (tools/skill-frontmatter.ts)");
+  assert.match(SOP, /^---\nrecommended_model: fable\n---\n/, "frontmatter must open with recommended_model: fable");
+  assert.ok(MODEL_TIERS.includes("fable"), "fable must be a valid MODEL_TIERS entry (tools/skill-frontmatter.ts)");
 
   // (b) purpose section carries the interim's three human needs, the
   // why-no-existing-role rationale, and the one-sentence summary
@@ -261,9 +261,15 @@ test("AC6: const-15 §6 — integrator-only git grant; base list + FORBIDDEN ent
   // integrator-only grant: exact clause, all six ops + exclusions, scope statement, SOP pointer
   assert.ok(
     CONST15.includes(
-      "**Integrator-only grant**: only the `integrator` role may also run `git merge --no-ff`, `git merge --ff-only`, `git switch -c`, `git switch <existing-branch>` (never `--force` / `--discard-changes`), `git worktree remove` (never `--force`), `git branch -d` (never `-D`) and `git update-ref -d <ref> <expected-sha>` (compare-and-delete), when `skill-integrator` says; every other role stays on the base list.",
+      "**Integrator-only grant**: only the `integrator` role may also run `git merge --no-ff`, `git merge --ff-only`, `git switch -c`, `git switch <existing-branch>` (never `--force` / `--discard-changes`), `git worktree remove` (never `--force`), `git branch -d` (never `-D`), `git update-ref -d <ref> <expected-sha>` (compare-and-delete), `gh pr create` and `gh pr merge --auto --merge` (never `--squash` / `--rebase` / `--admin`), when `skill-integrator` says.",
     ),
     "const-15 must carry the exact integrator-only grant clause",
+  );
+  assert.ok(
+    CONST15.includes(
+      "Two namespaces sit beside it: `release-engineer` limited to `release/*` and the coordinator limited to `docs/*` each share `git switch -c`, `git switch main`, `git branch -d` (its own merged branches only), `gh pr create` and `gh pr merge --auto --merge`, when the owning SOP says; every other role stays on the base list.",
+    ),
+    "const-15 must carry the exact second grant sentence (release-engineer release/* and coordinator docs/* namespaces)",
   );
 });
 
@@ -306,7 +312,7 @@ test("AC9: SOP merge stage — substantive-resolution code-reviewer duty, no-ff-
   assert.ok(SOP.includes("`git show --remerge-diff <merge-sha>`"));
   assert.ok(SOP.includes("`review_reports/review_merge-<short-sha>.md`, committed on the integration branch"));
   assert.ok(SOP.includes("no `tw_update_state` on the integration branch (the E222 precedent)"));
-  assert.ok(SOP.includes("**never fast-forward `main` before that verdict is APPROVED.**"));
+  assert.ok(SOP.includes("never open the pull request before that verdict is APPROVED."));
   assert.ok(SOP.includes("dispatch `qa-engineer` via Task to regenerate and explain every hunk"));
   assert.ok(SOP.includes("**Never fix feature code on the integration branch**"));
 });
