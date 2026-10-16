@@ -30,6 +30,10 @@ _(No active tasks — ready for the next feature.)_
 - [x] T-REL450-02 [P0] qa-engineer: verify AC3 + AC4 + AC5 (full suite under test lock, clean build, version check, audit exit 0, advisory disposition) | depends_on: none
 - [x] T-REL450-03 [P0] qa-engineer: verify AC6 (stash rule composed into role bundles, goldens and budget ceilings consistent, release-engineer SOP line refs gone) | depends_on: none
 - [x] T-REL450-04 [P0] qa-engineer: verify AC7 + AC8 (behaviour-neutral spot check, v4.4.1 non-regression) | depends_on: none
+- [x] T-REL460-01 [P0] qa-engineer: verify AC1 + AC2 (diff-path classification since v4.5.0; per-lane review/qa evidence and PASS handoffs for e295, e296, e297, e298, e299, e300, e308; backlog done-marks cite existing paths) | depends_on: none
+- [x] T-REL460-02 [P0] qa-engineer: verify AC3 + AC4 + AC5 + AC6 (full suite under test lock, clean build, check-version, check:bookkeeping, check:md-tables, npm audit, agc check, transitions-sync) | depends_on: none
+- [x] T-REL460-03 [P0] qa-engineer: verify AC7 (rule/SOP changes composed into the built role bundles; goldens and budget ceilings consistent) | depends_on: none
+- [x] T-REL460-04 [P0] qa-engineer: verify AC8 + AC9 (hop-cap, dispatch-pin enum, single-source tier, gate-count behaviours on compiled output; v4.5.0 non-regression) | depends_on: none
 
 ## Compacted History
 <!-- compacted: E125c 2026-09-26 — 67 sections, 891 [x] rows, 26 [-] rows summarized below; full rows: git log -i --grep <ticket-id>, or git log -p -- .current/_primary/tasks.md (pre-compaction commit 165b72d is auxiliary and invalidated by a history rewrite, E104) -->
