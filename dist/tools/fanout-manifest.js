@@ -24,6 +24,11 @@ export const APPROVAL_COLUMN = "approval";
 export const APPROVAL_VALUES = ["human", "—", ""];
 /** Exact header of a spec's `## Cut` table (= skill-pm's inline cut table header). */
 export const CUT_HEADER = ["id", "desc", "depends_on", "est. files", "touches", "design-link"];
+/**
+ * A line a Markdown renderer shows as a Cut heading: up to three leading
+ * spaces, `##`, a space or tab, `cut` in any case, optional closing `#`s.
+ */
+const CUT_HEADING_RE = /^ {0,3}##[ \t]+cut[ \t#]*$/i;
 /** `touches` value for a ticket that writes only governance bookkeeping. */
 export const CUT_TOUCHES_NONE = "—";
 /** Exact header of the `## Decisions…` table, in order. */
@@ -1007,9 +1012,18 @@ function cutErr(code, message) {
 /**
  * Parse the `## Cut` table of a lane spec. Pure. Only a section named
  * exactly `Cut` is read, so prose sections such as `## Cut Decisions` are
- * ignored. Every row error is collected before returning. Known limit shared
- * with the manifest parser: fenced code blocks are not recognised, so a
- * fenced line starting with `## Cut` counts as a section.
+ * ignored. Every row error is collected before returning.
+ *
+ * Any line a Markdown renderer shows as a Cut heading (CUT_HEADING_RE: up to
+ * three leading spaces, a tab after `##`, any letter case, closing `#`s)
+ * counts toward CUT_SECTION_DUPLICATE, so a second table under such a
+ * variant can never hide behind the one that is read. A lone variant is
+ * still CUT_SECTION_ABSENT, because only a `## Cut` section is read.
+ *
+ * Known limits: fenced code blocks are not recognised (shared with the
+ * manifest parser), so a fenced Cut heading line counts as one; setext
+ * headings (`Cut` underlined with `---`) and homoglyph headings (e.g. a
+ * Cyrillic `С`) are not recognised as Cut headings.
  *
  * The section and each `touches` cell are whitelists, so anything the
  * grammar does not name is an error rather than skipped (a skipped line or
@@ -1037,18 +1051,25 @@ export function parseCutSection(specText) {
         };
     }
     const cut = splitSections(lines).filter((s) => s.name === "Cut");
+    // Variant heading lines plus every section read as `Cut` (trim() also
+    // strips Unicode spaces the regex does not name), so no read section is
+    // ever left out of the count.
+    const headingLines = new Set(lines.flatMap((l, i) => (CUT_HEADING_RE.test(l) ? [i + 1] : [])));
+    for (const s of cut)
+        headingLines.add(s.line);
+    if (headingLines.size > 1) {
+        const at = [...headingLines].sort((a, b) => a - b);
+        return {
+            ok: false,
+            errors: [
+                cutErr(FANOUT_CODES.cutSectionDuplicate, `${at.length} "## Cut" sections found (lines ${at.join(", ")}); exactly one is allowed`),
+            ],
+        };
+    }
     if (cut.length === 0) {
         return {
             ok: false,
             errors: [cutErr(FANOUT_CODES.cutSectionAbsent, 'no "## Cut" section found — write the inline cut table under a "## Cut" heading (skill-pm Spec Schema)')],
-        };
-    }
-    if (cut.length > 1) {
-        return {
-            ok: false,
-            errors: [
-                cutErr(FANOUT_CODES.cutSectionDuplicate, `${cut.length} "## Cut" sections found (lines ${cut.map((s) => s.line).join(", ")}); exactly one is allowed`),
-            ],
         };
     }
     const s = cut[0];

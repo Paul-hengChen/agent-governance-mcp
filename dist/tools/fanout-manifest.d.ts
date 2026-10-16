@@ -353,9 +353,18 @@ export type CutCheckResult = {
 /**
  * Parse the `## Cut` table of a lane spec. Pure. Only a section named
  * exactly `Cut` is read, so prose sections such as `## Cut Decisions` are
- * ignored. Every row error is collected before returning. Known limit shared
- * with the manifest parser: fenced code blocks are not recognised, so a
- * fenced line starting with `## Cut` counts as a section.
+ * ignored. Every row error is collected before returning.
+ *
+ * Any line a Markdown renderer shows as a Cut heading (CUT_HEADING_RE: up to
+ * three leading spaces, a tab after `##`, any letter case, closing `#`s)
+ * counts toward CUT_SECTION_DUPLICATE, so a second table under such a
+ * variant can never hide behind the one that is read. A lone variant is
+ * still CUT_SECTION_ABSENT, because only a `## Cut` section is read.
+ *
+ * Known limits: fenced code blocks are not recognised (shared with the
+ * manifest parser), so a fenced Cut heading line counts as one; setext
+ * headings (`Cut` underlined with `---`) and homoglyph headings (e.g. a
+ * Cyrillic `С`) are not recognised as Cut headings.
  *
  * The section and each `touches` cell are whitelists, so anything the
  * grammar does not name is an error rather than skipped (a skipped line or
