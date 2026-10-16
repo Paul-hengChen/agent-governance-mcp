@@ -131,7 +131,12 @@ function lastUpdatedOf(filePath: string): string {
 export function assertNoHandoffLayoutConflict(workspacePath: string): void {
   const lanePath = getHandoffPath(workspacePath);
   const flatPath = getFlatHandoffPath(workspacePath);
-  if (!fs.existsSync(flatPath) || !fs.existsSync(lanePath)) return;
+  // Unlocked callers race a sibling's atomic rename, so observe lane, flat,
+  // lane. The forward migration only creates lane and removes flat, so lane
+  // then flat proves both existed when flat was seen; the trailing lane
+  // re-check rules out a reverse (lane -> flat) rename between the first two.
+  // (E312)
+  if (!fs.existsSync(lanePath) || !fs.existsSync(flatPath) || !fs.existsSync(lanePath)) return;
   throw new Error(
     `HANDOFF_LAYOUT_CONFLICT: two handoff.md files exist for this workspace: ` +
       `flat ${flatPath} (last_updated: ${lastUpdatedOf(flatPath)}) and ` +
@@ -326,6 +331,18 @@ export function parseCutApprovedSource(raw: unknown): string | undefined {
   return parentFeature.length > 0 ? raw : undefined;
 }
 
+// readFileSync that maps ENOENT / ENOTDIR (a non-directory component in
+// workspace_path) to null — "no prior state". (E123)
+function readHandoffFileIfPresent(filePath: string): string | null {
+  try {
+    return fs.readFileSync(filePath, "utf-8");
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code !== "ENOENT" && code !== "ENOTDIR") throw err;
+    return null;
+  }
+}
+
 // Reads, parses and migrates; the flag lets readHandoffState write the healed
 // state back. Callers that don't need the flag use parseHandoff. Shared by
 // cross-workspace readers, so it never moves files, locks or creates
@@ -334,19 +351,18 @@ export function parseCutApprovedSource(raw: unknown): string | undefined {
 function readAndMigrate(workspacePath: string): HandoffReadResult | null {
   assertNoHandoffLayoutConflict(workspacePath);
   const lanePath = getHandoffPath(workspacePath);
-  const handoffPath = fs.existsSync(lanePath) ? lanePath : getFlatHandoffPath(workspacePath);
-  let content: string;
-  try {
-    content = fs.readFileSync(handoffPath, "utf-8");
-  } catch (err) {
-    // ENOTDIR (a non-directory component in workspace_path) degrades exactly
-    // like ENOENT — "no prior state". (E123)
-    const code = (err as NodeJS.ErrnoException).code;
-    if (code !== "ENOENT" && code !== "ENOTDIR") throw err;
-    // A concurrent migration may have renamed flat -> lane between the check
-    // and the read; the rename is atomic, so the lane path now has it.
-    if (handoffPath === lanePath || !fs.existsSync(lanePath)) return null;
-    content = fs.readFileSync(lanePath, "utf-8");
+  const flatPath = getFlatHandoffPath(workspacePath);
+  const handoffPath = fs.existsSync(lanePath) ? lanePath : flatPath;
+  let content = readHandoffFileIfPresent(handoffPath);
+  if (content === null) {
+    // A sibling migration may have renamed the chosen file between the pick
+    // and the read (flat -> lane forward, lane -> flat reverse). Renames are
+    // atomic, so the other layout's path now holds it: read that once, no
+    // loop. Neither file present is still "no prior state". (E312)
+    const otherPath = handoffPath === lanePath ? flatPath : lanePath;
+    if (!fs.existsSync(otherPath)) return null;
+    content = readHandoffFileIfPresent(otherPath);
+    if (content === null) return null;
   }
 
   // Parse YAML frontmatter with js-yaml (handles quotes, colons in values, etc.)
