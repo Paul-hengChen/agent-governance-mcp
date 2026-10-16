@@ -608,10 +608,132 @@ function parseDecisions(sections, m) {
             m.decisions.rows.push({ date, decider, content, source, row: n, line: r.line });
     });
 }
-/** Every format error in the manifest (validate reports all of them). */
+// --- closed-manifest handoff section (validate only) -------------------------
+/** Status-line text (after removing every `**`) marking a closed manifest. */
+const STATUS_LINE_RE = /^狀態[：:]/;
+const STATUS_CLOSED_RE = /^狀態[：:]\s*已結案/;
+/** Name of the handoff section a closed manifest must carry. */
+export const HANDOFF_SECTION = "接手步驟";
+/** Sub-items (`### ` headings) every handoff section must hold, in order. */
+export const HANDOFF_SUBITEMS = ["核對 primary", "已結案", "待人類決定", "進行中的背景工作"];
+/** The sub-item whose single body line must read 無 once the wave is closed. */
+const HANDOFF_BACKGROUND = "進行中的背景工作";
+const HANDOFF_NONE = "無";
+/**
+ * A machine-local absolute path token: a Windows drive path, `~/` or
+ * `~<user>/`, or a POSIX path with two or more non-empty segments, starting
+ * at a line start, whitespace or opening punctuation. The `//` of a URL
+ * follows a `:`, which is not a boundary, so URLs are never hits.
+ */
+const HANDOFF_ABSOLUTE_PATH_RE = /(?:^|[\s`'"(\[（「：，、=])(?:[A-Za-z]:[\\/]|~[^\s/]*\/|\/[^\s/]+\/[^\s/])/;
+/**
+ * Error codes of the closed-manifest handoff check. CLI codes, named outside
+ * the gate-suffix vocabulary like FANOUT_CODES.
+ */
+export const HANDOFF_CODES = {
+    sectionAbsent: "HANDOFF_SECTION_ABSENT",
+    sectionDuplicate: "HANDOFF_SECTION_DUPLICATE",
+    subitemAbsent: "HANDOFF_SUBITEM_ABSENT",
+    subitemDuplicate: "HANDOFF_SUBITEM_DUPLICATE",
+    subitemEmpty: "HANDOFF_SUBITEM_EMPTY",
+    backgroundNotNone: "HANDOFF_BACKGROUND_NOT_NONE",
+    absolutePath: "HANDOFF_ABSOLUTE_PATH",
+};
+/** Heading name `name`, or `name` followed by a `（…）` / `(…)` qualifier. */
+function isNamedHeading(heading, name) {
+    return heading === name || heading.startsWith(`${name}（`) || heading.startsWith(`${name}(`);
+}
+/**
+ * Whether a manifest is closed: its status line — the first line before the
+ * first `## ` heading that, with every `**` removed, starts `狀態：` (or
+ * `狀態:`) — reads `已結案` right after the colon. Any other wording
+ * (`結案 …`, `已合併`, `…；已結案`) is not closed.
+ */
+export function isManifestClosed(text) {
+    for (const line of splitLines(text)) {
+        if (line.startsWith("## "))
+            return false;
+        const plain = line.replaceAll("**", "");
+        if (STATUS_LINE_RE.test(plain))
+            return STATUS_CLOSED_RE.test(plain);
+    }
+    return false;
+}
+function handoffErr(code, message) {
+    return { code, scope: "handoff", message };
+}
+/**
+ * Format errors of a closed manifest's `## 接手步驟` section: present once,
+ * each mandatory `### ` sub-item present once with a body, the background
+ * sub-item reading 無, and no machine-local absolute path on any line.
+ * Optional (`裝置`, `工具`) and unknown sub-items are not checked.
+ */
+export function handoffSectionErrors(text) {
+    const sections = splitSections(splitLines(text)).filter((s) => isNamedHeading(s.name, HANDOFF_SECTION));
+    if (sections.length === 0) {
+        return [handoffErr(HANDOFF_CODES.sectionAbsent, `manifest is closed (status 已結案) but has no "## ${HANDOFF_SECTION}" section`)];
+    }
+    if (sections.length > 1) {
+        return [
+            handoffErr(HANDOFF_CODES.sectionDuplicate, `${sections.length} "## ${HANDOFF_SECTION}" sections found (lines ${sections.map((s) => s.line).join(", ")}); exactly one is allowed`),
+        ];
+    }
+    const s = sections[0];
+    const errors = [];
+    // Sub-items: each `### ` heading opens a body that runs to the next one.
+    const subitems = [];
+    for (const l of s.lines) {
+        if (l.text.startsWith("### "))
+            subitems.push({ name: l.text.slice(4).trim(), line: l.line, body: [] });
+        else
+            subitems.at(-1)?.body.push(l.text);
+    }
+    for (const name of HANDOFF_SUBITEMS) {
+        const found = subitems.filter((x) => isNamedHeading(x.name, name));
+        if (found.length === 0) {
+            errors.push(handoffErr(HANDOFF_CODES.subitemAbsent, `"## ${HANDOFF_SECTION}" (line ${s.line}) has no "### ${name}" sub-item`));
+            continue;
+        }
+        if (found.length > 1) {
+            errors.push(handoffErr(HANDOFF_CODES.subitemDuplicate, `"### ${name}" appears ${found.length} times (lines ${found.map((x) => x.line).join(", ")})`));
+            continue;
+        }
+        const filled = found[0].body.filter((b) => b.trim() !== "");
+        if (filled.length === 0) {
+            errors.push(handoffErr(HANDOFF_CODES.subitemEmpty, `"### ${name}" (line ${found[0].line}) is empty`));
+            continue;
+        }
+        if (name === HANDOFF_BACKGROUND && (filled.length !== 1 || !readsNone(filled[0]))) {
+            errors.push(handoffErr(HANDOFF_CODES.backgroundNotNone, `"### ${HANDOFF_BACKGROUND}" (line ${found[0].line}) must read 無 when the manifest is closed`));
+        }
+    }
+    // The path itself is never echoed (WORKTREE_ABSOLUTE_WARN convention).
+    for (const l of [{ text: s.heading, line: s.line }, ...s.lines]) {
+        if (HANDOFF_ABSOLUTE_PATH_RE.test(l.text)) {
+            errors.push(handoffErr(HANDOFF_CODES.absolutePath, `"## ${HANDOFF_SECTION}" line ${l.line} has a machine-local absolute path — write it relative to primary or as a placeholder`));
+        }
+    }
+    return errors;
+}
+/** `無`, optionally after one `- ` / `* ` list marker and before one `。`. */
+function readsNone(line) {
+    let t = line.trim();
+    if (t.startsWith("- ") || t.startsWith("* "))
+        t = t.slice(2).trim();
+    if (t.endsWith("。"))
+        t = t.slice(0, -1).trim();
+    return t === HANDOFF_NONE;
+}
+/**
+ * Every format error in the manifest (validate reports all of them). A
+ * closed manifest's handoff section is checked here only, never by the
+ * parser, so render and both check modes never see those errors.
+ */
 export function validateManifest(text) {
     const manifest = parseManifest(text);
-    return { manifest, errors: manifest.errors };
+    if (!isManifestClosed(text))
+        return { manifest, errors: manifest.errors };
+    return { manifest, errors: [...manifest.errors, ...handoffSectionErrors(text)] };
 }
 /**
  * Resolve a dispatchable lane for render/check. Fatal: manifest-wide Lanes

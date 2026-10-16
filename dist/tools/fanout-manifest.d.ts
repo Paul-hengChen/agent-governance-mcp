@@ -88,8 +88,9 @@ export declare const CUT_GLOB_NOTE = "note: a glob in touches is in bounds only 
  * never blocks a render; a row error blocks only its own lane).
  * "input" = a CLI/environment input (flag, git ref, file), not the manifest text.
  * "cut" = the `## Cut` table of a lane spec read by check --cut.
+ * "handoff" = a closed manifest's `## 接手步驟` section (validate only).
  */
-export type FanoutErrorScope = "title" | "base" | "lanes" | "row" | "pins" | "decisions" | "cut" | "input";
+export type FanoutErrorScope = "title" | "base" | "lanes" | "row" | "pins" | "decisions" | "cut" | "input" | "handoff";
 export interface FanoutError {
     code: string;
     message: string;
@@ -181,7 +182,42 @@ export declare function unquotedPaths(cell: string): string[];
  * part is left out of the structured result rather than guessed at.
  */
 export declare function parseManifest(text: string): Manifest;
-/** Every format error in the manifest (validate reports all of them). */
+/** Name of the handoff section a closed manifest must carry. */
+export declare const HANDOFF_SECTION = "\u63A5\u624B\u6B65\u9A5F";
+/** Sub-items (`### ` headings) every handoff section must hold, in order. */
+export declare const HANDOFF_SUBITEMS: readonly ["核對 primary", "已結案", "待人類決定", "進行中的背景工作"];
+/**
+ * Error codes of the closed-manifest handoff check. CLI codes, named outside
+ * the gate-suffix vocabulary like FANOUT_CODES.
+ */
+export declare const HANDOFF_CODES: {
+    readonly sectionAbsent: "HANDOFF_SECTION_ABSENT";
+    readonly sectionDuplicate: "HANDOFF_SECTION_DUPLICATE";
+    readonly subitemAbsent: "HANDOFF_SUBITEM_ABSENT";
+    readonly subitemDuplicate: "HANDOFF_SUBITEM_DUPLICATE";
+    readonly subitemEmpty: "HANDOFF_SUBITEM_EMPTY";
+    readonly backgroundNotNone: "HANDOFF_BACKGROUND_NOT_NONE";
+    readonly absolutePath: "HANDOFF_ABSOLUTE_PATH";
+};
+/**
+ * Whether a manifest is closed: its status line — the first line before the
+ * first `## ` heading that, with every `**` removed, starts `狀態：` (or
+ * `狀態:`) — reads `已結案` right after the colon. Any other wording
+ * (`結案 …`, `已合併`, `…；已結案`) is not closed.
+ */
+export declare function isManifestClosed(text: string): boolean;
+/**
+ * Format errors of a closed manifest's `## 接手步驟` section: present once,
+ * each mandatory `### ` sub-item present once with a body, the background
+ * sub-item reading 無, and no machine-local absolute path on any line.
+ * Optional (`裝置`, `工具`) and unknown sub-items are not checked.
+ */
+export declare function handoffSectionErrors(text: string): FanoutError[];
+/**
+ * Every format error in the manifest (validate reports all of them). A
+ * closed manifest's handoff section is checked here only, never by the
+ * parser, so render and both check modes never see those errors.
+ */
 export declare function validateManifest(text: string): {
     manifest: Manifest;
     errors: FanoutError[];
