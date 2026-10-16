@@ -65,6 +65,8 @@ export declare const FANOUT_CODES: {
     readonly cutTouchesEmpty: "CUT_TOUCHES_EMPTY";
     readonly cutTouchesMalformedPath: "CUT_TOUCHES_MALFORMED_PATH";
     readonly specUnreadable: "SPEC_UNREADABLE";
+    readonly rangeInvalid: "RANGE_INVALID";
+    readonly pathsUnreadable: "PATHS_UNREADABLE";
 };
 /**
  * validate warning for a dispatchable row whose worktree cell is an absolute
@@ -79,6 +81,11 @@ export declare const WORKTREE_ABSOLUTE_WARN: (lane: string, line: number) => str
 export declare const MAILBOX_ABSOLUTE_WARN: (line: number) => string;
 export declare const PINS_NONE = "\u7121";
 export declare const USAGE: string;
+/**
+ * Usage of the owners subcommand, printed on its own usage errors. Kept out
+ * of USAGE so the generic usage text stays byte-identical.
+ */
+export declare const OWNERS_USAGE = "usage: node scripts/fanout.mjs owners <manifest> (--range <a>...<b> [--repo <dir>] | --paths <file|->)";
 export declare const E158_NOTE: (base: string, branch: string) => string;
 export declare const PROSE_NOTE = "note: prose restrictions inside \u64C1\u6709 (e.g. \uFF08\u53EA\u9650 \u2026\uFF09) are not machine-checked.";
 export declare const CUT_GLOB_NOTE = "note: a glob in touches is in bounds only when byte-identical to an \u64C1\u6709 token; glob-in-glob containment is never inferred.";
@@ -427,6 +434,54 @@ export declare function isCutTokenInBounds(token: string, lane: DispatchableLane
  * not human, at least one 人類 Decisions row). Pure: no fs, no git.
  */
 export declare function checkCut(m: Manifest, laneId: string, specText: string): CutCheckResult;
+export interface OwnersHit {
+    path: string;
+    /** Owning lanes in table order; `token` undefined = implicit bookkeeping. */
+    owners: {
+        lane: string;
+        token?: string;
+    }[];
+}
+export interface OwnersReport {
+    paths: string[];
+    hits: OwnersHit[];
+    output: string;
+    exitCode: 0 | 1;
+}
+export type OwnersResult = {
+    ok: true;
+    report: OwnersReport;
+} | {
+    ok: false;
+    errors: FanoutError[];
+};
+/** Source note for paths read from a git range (Copy owners.note.range). */
+export declare const OWNERS_RANGE_NOTE: (range: string) => string;
+/** Source note for paths read from a list file or stdin (Copy owners.note.paths). */
+export declare const OWNERS_PATHS_NOTE: (file: string) => string;
+/**
+ * Every dispatchable lane that owns each path, through an 擁有 token or the
+ * implicit bookkeeping set (a base fix that brings in a lane's own state is
+ * not a clean merge either). Pure. A Lanes or row error is fatal, since a
+ * dropped row could be the lane that owns a path; Pins / Decisions errors
+ * are not. Provisional lanes are named as not checked.
+ */
+export declare function ownersOf(m: Manifest, paths: string[], sourceNote: string): OwnersResult;
+/**
+ * The two sides of an `<a>...<b>` range, or undefined when it is not exactly
+ * that: one `...`, both sides non-empty, no whitespace, no side starting
+ * with `-`, and no `..` or leading / trailing `.` inside a side (none of
+ * which a git ref can hold, so `a....b` is refused rather than resolved).
+ */
+export declare function parseOwnersRange(range: string): [string, string] | undefined;
+/** Paths changed on `<b>` since its merge-base with `<a>`; read-only git. */
+export declare function rangePaths(sides: [string, string], repo: string): {
+    paths: string[];
+} | {
+    errors: FanoutError[];
+};
+/** One repo-relative path per line: trailing CR and surrounding space trimmed, blanks skipped. */
+export declare function parsePathList(text: string): string[];
 export interface CliResult {
     stdout: string;
     stderr: string;
@@ -437,6 +492,12 @@ export declare function usageResult(message?: string): CliResult;
 export declare function runValidate(args: string[]): CliResult;
 export declare function runRender(args: string[]): CliResult;
 export declare function runCheck(args: string[]): CliResult;
+/**
+ * `owners <manifest> (--range <a>...<b> [--repo <dir>] | --paths <file|->)`:
+ * exit 0 = no path is owned, 1 = at least one is, 2 = usage / input /
+ * manifest error. Reads only; git is run read-only.
+ */
+export declare function runOwners(args: string[]): CliResult;
 /** `check --cut <manifest> <lane> <spec>`: file reads only — no git, no writes. */
 export declare function runCheckCut(args: string[]): CliResult;
 //# sourceMappingURL=fanout-manifest.d.ts.map

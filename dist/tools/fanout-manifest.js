@@ -123,6 +123,9 @@ export const FANOUT_CODES = {
     // A path-shaped touches span that is not a bare, normalised repo path.
     cutTouchesMalformedPath: "CUT_TOUCHES_MALFORMED_PATH",
     specUnreadable: "SPEC_UNREADABLE",
+    // owners input errors (exit 2).
+    rangeInvalid: "RANGE_INVALID",
+    pathsUnreadable: "PATHS_UNREADABLE",
 };
 /**
  * validate warning for a dispatchable row whose worktree cell is an absolute
@@ -142,6 +145,11 @@ export const USAGE = [
     "       node scripts/fanout.mjs check <manifest> <lane> [--base main] [--repo <dir>]",
     "       node scripts/fanout.mjs check --cut <manifest> <lane> <spec>",
 ].join("\n");
+/**
+ * Usage of the owners subcommand, printed on its own usage errors. Kept out
+ * of USAGE so the generic usage text stays byte-identical.
+ */
+export const OWNERS_USAGE = "usage: node scripts/fanout.mjs owners <manifest> (--range <a>...<b> [--repo <dir>] | --paths <file|->)";
 export const E158_NOTE = (base, branch) => `note: only committed changes were checked (git diff --no-renames --name-only ${base}...${branch}); uncommitted and untracked work in the worktree was NOT checked (E158).`;
 export const PROSE_NOTE = "note: prose restrictions inside 擁有 (e.g. （只限 …）) are not machine-checked.";
 export const CUT_GLOB_NOTE = "note: a glob in touches is in bounds only when byte-identical to an 擁有 token; glob-in-glob containment is never inferred.";
@@ -1414,6 +1422,86 @@ export function checkCut(m, laneId, specText) {
         },
     };
 }
+/** Source note for paths read from a git range (Copy owners.note.range). */
+export const OWNERS_RANGE_NOTE = (range) => `note: paths from git diff --no-renames --name-only ${range} (committed changes only).`;
+/** Source note for paths read from a list file or stdin (Copy owners.note.paths). */
+export const OWNERS_PATHS_NOTE = (file) => `note: paths from the list ${file} (taken verbatim, not normalised).`;
+/** Manifest errors that block owners: any Lanes or row error. */
+function ownersFatalErrors(m) {
+    return m.errors.filter((e) => e.scope === "lanes" || e.scope === "row");
+}
+/**
+ * Every dispatchable lane that owns each path, through an 擁有 token or the
+ * implicit bookkeeping set (a base fix that brings in a lane's own state is
+ * not a clean merge either). Pure. A Lanes or row error is fatal, since a
+ * dropped row could be the lane that owns a path; Pins / Decisions errors
+ * are not. Provisional lanes are named as not checked.
+ */
+export function ownersOf(m, paths, sourceNote) {
+    const fatal = ownersFatalErrors(m);
+    if (fatal.length > 0)
+        return { ok: false, errors: fatal };
+    const unique = [...new Set(paths)].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+    const hits = [];
+    for (const p of unique) {
+        const owners = [];
+        for (const lane of m.dispatchable) {
+            const token = lane.ownedTokens.find((t) => matchesGlob(p, t));
+            if (token !== undefined)
+                owners.push({ lane: lane.lane, token });
+            else if (isImplicitBookkeeping(p, lane.lane))
+                owners.push({ lane: lane.lane });
+        }
+        if (owners.length > 0)
+            hits.push({ path: p, owners });
+    }
+    const provisional = m.provisional.map((x) => x.lane);
+    const lines = [
+        ...hits.map((h) => `HIT  ${h.path}  (${h.owners.map((o) => `${o.lane}: ${o.token ?? "implicit bookkeeping"}`).join("; ")})`),
+        `fanout owners: ${unique.length} path(s), ${hits.length} hit(s), ${m.dispatchable.length} dispatchable lane(s)`,
+        sourceNote,
+        PROSE_NOTE,
+        ...(provisional.length > 0 ? [`note: ${provisional.length} provisional lane(s) not checked: ${provisional.join(", ")}`] : []),
+    ];
+    return { ok: true, report: { paths: unique, hits, output: lines.join("\n") + "\n", exitCode: hits.length > 0 ? 1 : 0 } };
+}
+/**
+ * The two sides of an `<a>...<b>` range, or undefined when it is not exactly
+ * that: one `...`, both sides non-empty, no whitespace, no side starting
+ * with `-`, and no `..` or leading / trailing `.` inside a side (none of
+ * which a git ref can hold, so `a....b` is refused rather than resolved).
+ */
+export function parseOwnersRange(range) {
+    if (/\s/.test(range))
+        return undefined;
+    const sides = range.split("...");
+    if (sides.length !== 2)
+        return undefined;
+    const ok = sides.every((s) => s !== "" && !s.startsWith("-") && !s.includes("..") && !s.startsWith(".") && !s.endsWith("."));
+    return ok ? [sides[0], sides[1]] : undefined;
+}
+/** Paths changed on `<b>` since its merge-base with `<a>`; read-only git. */
+export function rangePaths(sides, repo) {
+    try {
+        gitOut(["rev-parse", "--git-dir"], repo);
+    }
+    catch {
+        return { errors: [inputErr("REPO_NOT_GIT", `--repo "${repo}" is not inside a git repository`)] };
+    }
+    const errors = sides
+        .filter((ref) => !refOk(ref, repo))
+        .map((ref) => inputErr("REF_NOT_FOUND", `range ref "${ref}" does not resolve (git rev-parse --verify) in ${repo}`));
+    if (errors.length > 0)
+        return { errors };
+    return { paths: nulList(gitOut(["diff", "--no-renames", "--name-only", "-z", `${sides[0]}...${sides[1]}`, "--"], repo)) };
+}
+/** One repo-relative path per line: trailing CR and surrounding space trimmed, blanks skipped. */
+export function parsePathList(text) {
+    return text
+        .split("\n")
+        .map((l) => l.trim())
+        .filter((l) => l !== "");
+}
 export function formatError(e) {
     return `fanout: error: ${e.code}: ${e.message}`;
 }
@@ -1548,6 +1636,74 @@ export function runCheck(args) {
         return fail([r.error]);
     // Same default as render: the git repo that holds the manifest, not cwd.
     const res = checkLane(parseManifest(r.text), lane, { base, repo: repo ?? path.dirname(path.resolve(file)) });
+    if (!res.ok)
+        return fail(res.errors);
+    return { stdout: res.report.output, stderr: "", exitCode: res.report.exitCode };
+}
+function ownersUsage(message) {
+    return { stdout: "", stderr: `${formatError({ code: "USAGE", message })}\n${OWNERS_USAGE}\n`, exitCode: 2 };
+}
+/**
+ * `owners <manifest> (--range <a>...<b> [--repo <dir>] | --paths <file|->)`:
+ * exit 0 = no path is owned, 1 = at least one is, 2 = usage / input /
+ * manifest error. Reads only; git is run read-only.
+ */
+export function runOwners(args) {
+    const p = parseArgs(args, ["--range", "--paths", "--repo"]);
+    if (typeof p === "string")
+        return ownersUsage(p);
+    if (p.positional.length !== 1)
+        return ownersUsage("owners takes exactly one <manifest>");
+    const range = single(p, "--range");
+    if (typeof range === "object")
+        return ownersUsage(range.error);
+    const list = single(p, "--paths");
+    if (typeof list === "object")
+        return ownersUsage(list.error);
+    const repo = single(p, "--repo");
+    if (typeof repo === "object")
+        return ownersUsage(repo.error);
+    if ((range === undefined) === (list === undefined))
+        return ownersUsage("owners takes exactly one of --range or --paths");
+    if (repo !== undefined && range === undefined)
+        return ownersUsage("--repo is only valid with --range");
+    let sides;
+    if (range !== undefined) {
+        sides = parseOwnersRange(range);
+        if (sides === undefined) {
+            return fail([inputErr(FANOUT_CODES.rangeInvalid, `--range "${range}" is not <a>...<b> (one ..., both sides non-empty, no whitespace, no side starting with -)`)]);
+        }
+    }
+    const file = p.positional[0];
+    const r = readManifest(file);
+    if ("error" in r)
+        return fail([r.error]);
+    const m = parseManifest(r.text);
+    // Before any git or file read, so a bad manifest is the whole answer.
+    const fatal = ownersFatalErrors(m);
+    if (fatal.length > 0)
+        return fail(fatal);
+    let paths;
+    let note;
+    if (sides !== undefined) {
+        // Same default as check: the git repo that holds the manifest, not cwd.
+        const got = rangePaths(sides, repo ?? path.dirname(path.resolve(file)));
+        if ("errors" in got)
+            return fail(got.errors);
+        paths = got.paths;
+        note = OWNERS_RANGE_NOTE(`${sides[0]}...${sides[1]}`);
+    }
+    else {
+        const src = list;
+        try {
+            paths = parsePathList(fs.readFileSync(src === "-" ? 0 : src, "utf8"));
+        }
+        catch (err) {
+            return fail([inputErr(FANOUT_CODES.pathsUnreadable, `cannot read path list "${src}": ${err.message}`)]);
+        }
+        note = OWNERS_PATHS_NOTE(src);
+    }
+    const res = ownersOf(m, paths, note);
     if (!res.ok)
         return fail(res.errors);
     return { stdout: res.report.output, stderr: "", exitCode: res.report.exitCode };
