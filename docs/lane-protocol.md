@@ -115,3 +115,12 @@ hop: <lane 寫：目前 hop_count/上限，例如 7/14；integrator 寫 —>
 ```
 
 送出後照 §5 規則 3 繼續掛著等，直到整合者回 `close`（驗證通過）或要求修正。
+
+## 7. 中途修 base（整合者把目標分支 merge 進 lane）
+
+共用 base 有修正、跑到一半的 lane 也需要時，由整合者把目標分支 merge 進你的 lane（條件見整合者 SOP Stage 4 *Mid-wave base fix*）。lane 這一側：
+
+1. **暫停請求**是整合者在 `base-fix <目標分支>@<short sha>` 議題上送的 `type: proposal`。做完手上這一個 hop，不開新的；照 §3 把工作 commit 掉（不用 `git stash` 藏起來），確認 `git status --porcelain` 是空的，再回 `type: ack`，內容帶你的 HEAD sha。
+2. **ack 之後、恢復通知之前**，worktree 裡不做任何寫入：不改檔、不 commit、不呼叫會寫入的 `tw_*`；§5 規則 3 的等待照樣掛著。merge 只由整合者做，等再久你也不自己 merge（30 分鐘沒動靜照 §5 規則 6 告訴人類）。
+3. **恢復通知**是整合者在同一議題上的 `type: close`，帶 merge sha。先確認 `git rev-parse HEAD` 等於它（通知點名要重建的 `dist/` 就先 commit），再繼續。
+4. 目標分支（或 `main`）merge 進來之後，任何 scope 檢查（含註解 proof 腳本）一律對 merge-base 算（`git diff <目標分支>...HEAD`，三個點），不對固定的派工 base sha 算，否則 merge 帶進來的檔案會被當成你越界；註解 proof 另外斷言每一行改動都是註解（只比對去掉註解後的編譯產物，連只改型別註記的改動也會過）。
