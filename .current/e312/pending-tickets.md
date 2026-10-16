@@ -1,5 +1,7 @@
 # Pending tickets — lane e312
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E312-NEW-1
 title: tools/drift.ts reads the handoff with the same pick-then-read window E312 closed in readAndMigrate
@@ -13,5 +15,3 @@ body: |
   Fix shape: route the read through the same one-retry helper as tools/handoff-parse.ts, or call
   parseHandoff. Out of E312's cut (tools/drift.ts is not lane e312's file).
 ```
-
-## Applied
