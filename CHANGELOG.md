@@ -16,6 +16,87 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [4.6.0] - 2026-10-16
+
+MINOR release. It ships three post-v4 fan-out waves since v4.5.0, each landed on `main` by its
+wave pull request (`main` is now branch-protected): wave 1 (lanes `e297`, `e298`, `e299`, `e300`;
+plan `specs/fanout-post-v4-w1.md`), wave 2 (lane `e295`; `specs/fanout-post-v4-w2.md`) and wave 3
+(lanes `e296`, `e308`; `specs/fanout-post-v4-w3.md`). It changes server code and the governance
+content every role bundle receives. The `dispatch_pins` input now rejects values outside the four
+tier names; no prompt schema or state file format changed, and no dependency changed.
+
+### Added
+
+- **E299: `check:bookkeeping` (`scripts/check-bookkeeping.mjs`, `package.json`)**: a mechanical
+  check, run inside `npm test`, that every DONE / VOID row in `docs/backlog.md` cites evidence
+  files that exist, that backlog ticket ids are unique, that the ticket queue agrees with the
+  backlog, and that every fan-out plan's Decisions table is complete. A failing check keeps a wave pull request out of `main`. `package.json` gains only the
+  `check:bookkeeping` script line.
+- **E300, E308, E303: closed `dispatch_pins` tier enum (`tools/registry.ts`,
+  `tools/handoff-parse.ts`, `tools/handoff-orchestrator.ts`, `gates/registry.ts`,
+  `content/coord-02-host-dispatch.md`, `docs/config.md`)**: a `dispatch_pins` value outside
+  `opus` / `sonnet` / `haiku` / `fable` is rejected at the tool boundary with the new
+  `DISPATCH_PIN_TIER_REJECTED` gate code naming role and value (gate registry: 34 entries); an
+  out-of-vocabulary pin already on disk is reported by `tw_get_state` as `dispatch_pins_advisory`.
+  The enum, the hint text and the advisory list are derived from the single `MODEL_TIERS` list
+  (E308), and zod-boundary rejections now emit gate telemetry, so `tw_gate_stats` can count
+  `DISPATCH_PIN_TIER_REJECTED` fires (E303).
+- **E296, E309: manifest tier of cut approval (`content/const-08-chain-31-mid.md`,
+  `content/skill-pm.md`, `content/skill-integrator.md`, `tools/config.ts`,
+  `tools/fanout-manifest.ts`, `scripts/fanout.mjs`, `docs/lane-protocol.md`)**: a lane whose PM
+  cut stays inside its human-approved fan-out manifest row can auto-approve, opted into by
+  `cutApprovalAutoTier.manifest: true` in `.current/.config.json`. The manifest gains an optional
+  9th `approval` column, `fanout.mjs check --cut` validates a fail-closed `## Cut` grammar, and
+  the PM SOP gains a `## Cut` section and a self-attestation row. This workspace does not set
+  `manifest: true`. E309: the integrator's Stage 6-4 BEHIND remedy reads CI on the pushed branch
+  instead of running the full suite locally.
+
+### Changed
+
+- **E295, E41: `hop` cap 14 (`tools/transitions.ts`, `content/const-01-core-head.md`,
+  `content/coord-03-core-fallback.md`, `docs/lane-protocol.md`)**: the cap rises from 10 to 14,
+  and at the cap the `(pm, In_Progress)` landing is always allowed, the same shape as the round
+  caps, so `code-reviewer:In_Progress` and `qa-engineer:In_Progress` can reach pm (E41). The
+  coordinator fallback and lane protocol carry the same-lane continuation conditions (a)-(f).
+- **E297: `main` is branch-protected (`content/skill-integrator.md`,
+  `content/skill-release-engineer.md`, `content/coord-03-core-fallback.md`,
+  `content/const-15-core-tail.md`, `tools/skill-frontmatter.ts`)**: the integrator, the
+  release-engineer and coordinator bookkeeping land work through a branch and pull request with
+  auto-merge instead of pushing `main`. Constitution §6 adds `git pull --ff-only` on `main` to the
+  base list and grants `gh pr create` / `gh pr merge --auto --merge` to the integrator, to
+  release-engineer within `release/*` and to the coordinator within `docs/*`. `MODEL_TIERS` gains
+  `fable`.
+- **E298: verification by CI on pushed branches (`.github/workflows/ci.yml`, `bin/agc-init.mjs`,
+  `content/skill-integrator.md`)**: CI also runs on pushes to `feat/**`, `integ/**` and
+  `release/**`; the integrator reads CI on the pushed lane or integration branch instead of
+  re-running the full suite locally (local suite only as the documented fallback).
+  `agc feature finish --shipped` also deletes a pushed lane branch on origin; a missing remote
+  or branch is a hint, not a failure.
+- **E299: done-mark position is a failure (`scripts/check-md-tables.mjs`)**: the E88 rule that a
+  `**DONE**` / `**PARTIAL**` / `**VOID**` mark must lead its backlog cell was advisory and now
+  fails the check.
+- **E301: evidence citations name the path at write time (`content/coord-03-core-fallback.md`,
+  `content/skill-release-engineer.md`, `scripts/check-bookkeeping.mjs`)**: release step 7a no
+  longer implies rewriting backlog citations; `check:bookkeeping` resolves a root citation whose
+  file was archived by basename within its tree.
+- **Context budgets (`test/context-budget.test.mjs`, `test/fixtures/compose-golden/`)**: ceilings
+  re-measured for the content above (lean 5567 to 5717, design-arm 10076 to 10518, coordinator
+  bundle 20453 to 21623, non-design 7978 to 8420, skill-pm 4401 to 4708) and the 12
+  compose-golden fixtures regenerated.
+- **E303 test retarget (`test/e308-single-source-tier-enum.test.mjs`)**: E303-AC11b and
+  E303-AC11c checked the e308 lane base commit by diff, so this release's `index.ts` version bump
+  failed AC11c. They now check file content: the `gates/registry.ts` mapping line is one whole
+  comment line, and `index.ts` emits no gate telemetry (the zod-boundary emission lives in
+  `tools/registry.ts`). Test-only; no runtime change.
+
+### Notes
+
+- Release gate: `specs/release-v4.6.0.md`, QA PASS on AC1-AC9, then a second QA PASS after the
+  E303 test retarget above (`qa_reports/review_T-REL460-01.md`). Suite 3185 tests, 3182 pass,
+  0 fail, 3 skipped. `npm audit --audit-level=high` exits 0 (2 low, 6 moderate).
+- Task ids T-E298-01 and T-E300-01 were reused by wave 2, so their evidence basenames hold both
+  waves' records (backlog E310).
+
 ## [4.5.0] - 2026-10-08
 
 MINOR release. It ships the E260 follow-up wave since v4.4.1: lane `e275` merged first through
