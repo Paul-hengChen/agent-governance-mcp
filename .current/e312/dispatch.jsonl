@@ -1,1 +1,5 @@
 {"ts":"2026-10-16T06:53:45.219Z","feature":"e312-read-path-migration-race","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-16T06:56:43.749Z","feature":"e312-read-path-migration-race","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-16T06:58:41.597Z","feature":"e312-read-path-migration-race","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-16T06:59:17.400Z","feature":"e312-read-path-migration-race","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-16T07:01:45.030Z","feature":"e312-read-path-migration-race","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
