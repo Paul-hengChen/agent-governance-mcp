@@ -16,6 +16,68 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [4.7.0] - 2026-10-16
+
+MINOR release. It ships post-v4 fan-out wave 4 since v4.6.0, landed on `main` by its wave pull
+request: lanes `e320` (E320, E319, E317, E321), `e286` (E286, with E282 folded in) and `e312`
+(E312); plan `specs/fanout-post-v4-w4.md`, release gate `specs/release-post-v4-w4.md`. Semver:
+MINOR, not PATCH, because E286 adds a new procedure with observable behavior to an existing role
+skill (the integrator's Stage 4 *Mid-wave base fix* and its Decision rights row), the same
+classification v3.116.0 gave a new release-engineer SOP step; the other four changes are bug
+fixes. No tool input schema, prompt schema, state file format, gate registry entry (still 34) or
+dependency changed, and the constitution segment every role bundle receives is unchanged.
+
+### Added
+
+- **E286, E282: integrator *Mid-wave base fix* and lane-side pause (`content/skill-integrator.md`,
+  `docs/lane-protocol.md`)**: Stage 4 gains a procedure for merging a shared-base fix into a
+  running lane, checked per lane against five conditions (fix is an ancestor of the pushed
+  target; nothing merged in is lane-owned; the lane has paused and acked with a clean tree;
+  `git merge-tree --write-tree` predicts no conflict; then the `merge --no-ff`, invariants,
+  build, audit and resume notice). Condition 2 or 4 failing stops with a "needs human ruling"
+  recommendation. The Decision rights table gains the base-fix merge row, the *Git operations*
+  section names the lane-worktree base-fix merge and records `git merge-tree --write-tree` as
+  read-only git under Constitution §6, the Decisions table's decider column takes exactly two
+  values, a lane-session human approval is recorded without re-asking only under three stated
+  conditions, and the integrator watches only its own manifest's mailboxes. `docs/lane-protocol.md`
+  gains §7: the lane-side pause, ack and resume rule, plus the E282 rule that after a target merge
+  every scope check, comment proofs included, is computed against the merge-base
+  (`origin/<target>...HEAD`). Spec: `specs/e286-integrator-trust-and-git.md`; content pins:
+  `test/e286-integrator-trust-and-git.test.mjs`.
+
+### Fixed
+
+- **E320: `--ci-check --sha` queries CI by commit (`scripts/verify-release.mjs`)**: the run lookup
+  uses `gh run list --commit <full sha>` across branches instead of the checkout's branch, so a
+  lane-branch sha checked from the primary checkout no longer reads another branch's green run.
+  An abbreviated sha or ref resolves through `git rev-parse --verify`; an unresolvable, empty or
+  option-like value FAILs; and under `--sha` no completed run within the poll budget FAILs
+  instead of degrading to PASSED. The no-`--sha` path and `--strict` are unchanged. Spec:
+  `specs/e320-ci-check-sha-and-small-fixes.md`; tests: `test/e320-ci-check-sha.test.mjs`.
+- **E319: `parseDesignMode` picks the leftmost known mode (`gates/visual.ts`)**: a Mode line such
+  as `image (no Figma)` now parses as `image`, and `no-design (no Figma)` as `no-design`, instead
+  of the first `KNOWN_MODES` entry appearing anywhere on the line. Both consumers, the visual-gate
+  arm and source credibility, are fixed by the one function. Tests:
+  `test/source-credibility-gate.test.mjs`, `test/visual-evidence-gate.test.mjs`.
+- **E317: no zod-boundary telemetry in a nested `.current` directory (`tools/registry.ts`)**:
+  `emitZodGateTelemetry` returns early when `workspace_path`'s basename is `.current`, so no
+  telemetry tree is created inside the workspace's own `.current` directory. Tests:
+  `test/e303-zod-boundary-telemetry.test.mjs`.
+- **E312: handoff read path tolerates an in-flight flat-to-lane migration
+  (`tools/handoff-parse.ts`)**: `assertNoHandoffLayoutConflict` checks lane, then flat, then lane
+  again and throws only when all three are present, and `readAndMigrate` retries the other layout
+  once on `ENOENT` / `ENOTDIR` in both directions. The read path still takes no lock and has no
+  side effect. Spec: `specs/e312-read-path-migration-race.md`; tests:
+  `test/e312-read-path-race.test.mjs`.
+
+### Notes
+
+- **E321** is a test audit with no source change: the manifest-reading tests and every test that
+  diffs against a fixed lane base were reviewed; follow-ups were filed in `docs/backlog.md`.
+- `dist/` carries the rebuilt `gates/visual`, `tools/registry` and `tools/handoff-parse` outputs
+  plus the version literal. Wave-4 evidence moves to `qa_reports/archive/release-post-v4-w4/` and
+  `review_reports/archive/release-post-v4-w4/`.
+
 ## [4.6.0] - 2026-10-16
 
 MINOR release. It ships three post-v4 fan-out waves since v4.5.0, each landed on `main` by its
