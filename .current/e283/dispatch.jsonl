@@ -5,3 +5,4 @@
 {"ts":"2026-10-16T19:47:29.153Z","feature":"e283-fanout-handoff-and-ref-check","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-10-16T19:48:34.412Z","feature":"e283-fanout-handoff-and-ref-check","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-10-16T20:29:27.784Z","feature":"e283-fanout-handoff-and-ref-check","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-16T20:46:33.281Z","feature":"e283-fanout-handoff-and-ref-check","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
