@@ -474,3 +474,52 @@ test("security: parseBaselineManifestRows — oversized/null-like input with a c
   assert.doesNotThrow(() => parseBaselineManifestRows(null ?? ""));
   assert.doesNotThrow(() => parseBaselineManifestRows(undefined ?? ""));
 });
+
+// ===========================================================================
+// E319: the Mode line's declared (leftmost) mode wins over negation prose
+// ===========================================================================
+
+// Why: before E319 the parser returned the first KNOWN_MODES entry found ANYWHERE
+// on the line, so `image (no Figma)` parsed as figma and armed this gate. The
+// non-compliant audited row makes a mis-parse observable (it would fire).
+function badFigmaRowSource(mode) {
+  return sourceTableWithCredibility([{ medium: mode, pointer: "p-1", status: "audited", credibility: "component-variant" }]);
+}
+
+test("E319 AC-E319-1/3: `image (no Figma)` -> mode image, gate dormant", () => {
+  const ws = tmpWs();
+  writeDesign(ws, "neg-image", `# d\n\n- **Mode** — image (no Figma)\n\n## Source\n\n${badFigmaRowSource("figma")}\n`);
+  const r = checkSourceCredibility(ws, "neg-image");
+  assert.equal(r.mode, "image");
+  assert.equal(r.ok, true);
+});
+
+test("E319 AC-E319-3: `no-design (no Figma)` -> mode no-design, gate dormant", () => {
+  const ws = tmpWs();
+  writeDesign(ws, "neg-nodesign", armedDesignBody("no-design (no Figma)", badFigmaRowSource("figma")));
+  const r = checkSourceCredibility(ws, "neg-nodesign");
+  assert.equal(r.mode, "no-design");
+  assert.equal(r.ok, true);
+});
+
+test("E319 AC-E319-4: multi-mode line `paper / figma` -> leftmost (paper) wins, dormant", () => {
+  const ws = tmpWs();
+  writeDesign(ws, "multi", armedDesignBody("paper / figma", badFigmaRowSource("figma")));
+  const r = checkSourceCredibility(ws, "multi");
+  assert.equal(r.mode, "paper");
+  assert.equal(r.ok, true);
+});
+
+test("E319 AC-E319-5: backtick-wrapped value with trailing prose still parses (`pdf` — exported from Figma -> pdf)", () => {
+  const ws = tmpWs();
+  writeDesign(ws, "bt", "# d\n\nmode: `pdf` — exported from Figma\n");
+  assert.equal(checkSourceCredibility(ws, "bt").mode, "pdf");
+});
+
+test("E319 regression: a plain fetch-based mode (figma) still arms and fires on a bad audited row", () => {
+  const ws = tmpWs();
+  writeDesign(ws, "plain", armedDesignBody("figma", badFigmaRowSource("figma")));
+  const r = checkSourceCredibility(ws, "plain");
+  assert.equal(r.mode, "figma");
+  assert.equal(r.ok, false);
+});

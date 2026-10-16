@@ -1,0 +1,10 @@
+<!-- schema_version: 2 -->
+# Tasks
+
+## Active
+
+- [x] T-E320-01 [P1] sr-engineer: E320 — scripts/verify-release.mjs `--ci-check --sha` queries CI runs by commit (gh run list --commit, not the checkout branch), resolves abbreviated sha via git rev-parse, polls within the existing budget then FAILs when no completed run for the sha; no-`--sha` path, --strict, and gh-unavailable (E298) paths unchanged. Spec specs/e320-ci-check-sha-and-small-fixes.md AC-E320-1..9 | depends_on: none
+- [x] T-E319-01 [P2] sr-engineer: E319 — gates/visual.ts parseDesignMode picks the lowest-index KNOWN_MODES match on the Mode line (no-design still beats bare design; inline/bullet/H2/backtick forms unchanged); fix stale KNOWN_MODES comment; rebuild + commit dist/gates/visual.*. Spec AC-E319-4..6 | depends_on: none
+- [x] T-E317-01 [P2] sr-engineer: E317 — tools/registry.ts emitZodGateTelemetry: one guard, skip emit when path.basename(workspace_path) === ".current"; rebuild + commit dist/tools/registry.*. Spec AC-E317-2 | depends_on: none
+- [x] T-E320-02 [P1] qa-engineer: tests for E320/E319/E317 — test/verify-release.test.mjs or new test/e320-*.test.mjs (AC-E320-1..9; E238 timing tests untouched), test/source-credibility-gate.test.mjs + test/visual-evidence-gate.test.mjs (AC-E319-1..5 negation cases for both consumers), test/e303-zod-boundary-telemetry.test.mjs (AC-E317-1..2); full suite via `node scripts/test-lock.mjs -- npm test` after commit on clean tree; verdict | depends_on: T-E320-01, T-E319-01, T-E317-01
+- [x] T-E321-01 [P2] qa-engineer (qa-only): E321 — audit test/e177b-lane-status, e178b-fanout-unmatched, e235b-relative-worktree, e299-check-bookkeeping for growable real-manifest assertions (move to fixed in-test manifests, or evidence "no change needed"); repo-wide grep of test/** for fixed-lane-base-sha diff-unchanged assertions, list every hit, fix only e320-owned files; second instance → pending-ticket, not an SOP edit. Evidence qa_reports/review_T-E321-01.md. Spec AC-E321-1..3 | depends_on: none

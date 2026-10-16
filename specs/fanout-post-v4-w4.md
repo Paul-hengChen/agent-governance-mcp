@@ -2,7 +2,7 @@
 base: 406ba87    integration branch: integ/post-v4-w4
 mailbox: ../agent-governance-mcp-lanes/_mailbox
 
-**狀態：人類已核准（Stage 2，2026-10-15）；v4.6.0 已發版（2026-10-16），本清單 PR 併入後派工。** `base:` 是規劃基準（v4.6.0 發版記帳 PR #12 merge）；實際派工 base = 本清單併入後的 `main` sha，記在 Decisions 派工列。
+**狀態：結案 2026-10-16。** 三條 lane 皆 qa PASS（CI 綠）→ `integ/post-v4-w4` merge `4468cac`（e286）、`5e58198`（e320）、`9196592`（e312）→ finish 三 lane（E322–E325 配號）→ 記帳 commit → PR + auto-merge（見「結案」）。 `base:` 是規劃基準（v4.6.0 發版記帳 PR #12 merge）；實際派工 base = 本清單併入後的 `main` sha，記在 Decisions 派工列。
 
 第 3 波結案時的建議照做：E320（P1）＋ E319 ＋ E317 是互不重疊的小程式修正，併成一條程式 lane；E321 是純測試稽核（qa 單一 judge），同 lane 順手做。E286（integrator 改版第 1 波）是本波唯一碰 `content/**` 的 lane。E312（AC-MIG-3 可能的真 race）檔案與前兩條不相交，人類核准開成第三條 lane。
 
@@ -79,3 +79,18 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 | 2026-10-15 | 整合者 | 草案：e320（E320＋E319＋E317＋E321）∥ e286（E286，唯一 content lane）∥ e312（E312，可選）；三條擁有集合不相交；`const-15` 條件式劃給 e286；E321 併入 e320；派工 base 放在發版之後；5a 以 `gh run list --branch --commit` 讀 lane CI | 本檔 |
 | 2026-10-15 | 人類 | 核准本清單（全部）：三條 lane（e320、e286、e312）；E282 併入 E286 的 lane-protocol O8 段、隨 E286 結案；`git merge-tree --write-tree` 是否入憲法 §6 由 e286 PM 判定，入則 goldens 重產、budget 上限由 qa 實測、人類核准 cut 時定；派工 base 放在 v4.6.0 發版併入之後 | 整合者 session |
 | 2026-10-16 | 整合者 | v4.6.0 已發版（PR #11 `807828a`、記帳 PR #12 → `main` `406ba87`）；本清單 branch `--no-ff` 併入 `main`（merge-invariants PASS），`base:` 改為 `406ba87`。E321 併入同類：「對固定 lane base 做 diff 斷言不變」的測試在發版 bump 時必紅（v4.6.0 途中 `test/e308-single-source-tier-enum.test.mjs` 已在 `71fb458` 改成內容檢查）→ e320 qa 全 repo grep 列出，只修自己擁有的檔；e286 若動 `const-15`，由其 qa 判斷 `test/e178a-integrator-role.test.mjs:283` | 本檔 |
+| 2026-10-16 | 整合者 | 清單 PR #13 merge `cac3036` = 派工 base；派工前核對：三條 lane 點名的擁有／禁止路徑在 base 存在或標為新建、無殘留 branch／worktree、git 2.50（merge-tree 需 2.38+）、`ci.yml` 對 `feat/**` 觸發；信箱 e320／e286／e312 空建、mailbox-watch 與 lane-status watch 皆 armed；三份 prompt 以 `fanout.mjs render --base cac3036` 產生 | 本檔 |
+| 2026-10-16 | 整合者 | e320 cut 預審 close（to-lane#1，spec `7afa4e3`）：五個 task、無 architect；接受 PM 四個解讀（gh 不可用維持降級、`--sha` 下空清單照輪詢、同 sha 取最新一筆完成的 run、縮寫 sha 先解析）與行號校正 | 信箱 e320 |
+| 2026-10-16 | 整合者 | e312 cut 預審：先 reply 要求補 `## Cut` 段、spec 先 commit、AC7 的 diff 只當證據、AC2 雙向；補齊後 close（to-lane#2，spec `db21de6`）。鑑識判定 (a) 真 race | 信箱 e312 |
+| 2026-10-16 | 整合者 | e286 cut 預審 close（to-lane#2，spec `c46ab01`）：R1 `git merge-tree --write-tree` 不入 §6（SOP 明文寫成唯讀，goldens／budget 不動，呈人類時附替代方案）、R2 條件 2 以三點 diff 人工比對（ref 模式另開 E286-NEW-1）、R3–R5 接受 | 信箱 e286 |
+| 2026-10-16 | 人類 | 在三條 lane 各自的 session 核准 cut（e320、e286、e312） | lane session |
+| 2026-10-16 | 整合者 | 5a 三條 lane 收工 close：e312 `853a8d4`（CI run 38867003659）、e286 `f29fa40`（CI run 38867006683；review 退回 1 輪 C1–C5 → APPROVED；AC7 依來源 O10 表寫、spec 未改，接受）、e320 `d3943cd`（CI run 38868490835）；皆 0 越界、tree 乾淨、共享生成物未動、新發現留在 pending-tickets。lane CI 以 `gh run list --branch --commit` 直接讀（E320 併入前）。記下的疑慮：sr 與 reviewer 同為 opus（三條皆然）；e312 壓測未能區分修前修後，因果證據為決定性 interleave 測試；e320 新增 4 個註解警告保留 | 本檔 |
+
+## 結案
+- 日期 2026-10-16。`integ/post-v4-w4` ← e286（`4468cac`）← e320（`5e58198`）← e312（`9196592`），皆 `--no-ff`、零衝突 → 無合併審查；merge-invariants 三次 PASS；重建 `dist/` 無差異；`npm audit --audit-level=high` exit 0；整合層 CI run 38868934678 在 `9196592` 綠。finish 三 lane 後記帳 commit，再 push 讀 CI，PR + auto-merge。
+- 彙總（上限按 lane 計）：e320 5 張 task／hop 4/14／review 0 輪／qa 0 輪；e286 3 張 task／hop 6/14／review 退回 1 輪／qa 0 輪；e312 2 張 task／hop 4/14／review 0 輪／qa 0 輪。
+- 完成定義 11 項全部成立（E282 依人類裁決併入 E286；E312 判定為真 race、已修，AC-MIG-3 不提 flake 家族）。
+- 例外：(1) 發版先行，派工 base 在 v4.6.0 之後；發版途中 `test/e308-single-source-tier-enum.test.mjs` 對固定 base 的 diff 斷言被版本 bump 打紅，已在 release commit 改成內容檢查，同類問題併入 E321；(2) e286 review 退回 1 輪；(3) 三條 lane 的 sr 與 code-reviewer 同為 opus。
+- 新票：E322（e286，`fanout check` ref 模式）、E323（e320，非擁有的固定 base diff 測試＋慣例句）、E324（e320，lane 目錄 workspace_path 的 telemetry 路徑）、E325（e312，`tools/drift.ts` 同類窗口），皆 P3，由 `finish --shipped` 配號，排在佇列 #139–#142。
+- 下一波建議：E283（`fanout.mjs validate` 交接段）＋ E287（finish 不再遺失新發現）是改版第 1 波剩下的兩張程式票，檔案不相交，可以兩條 lane 並行；E322 與 E283 同檔，併入 E283 那條。content lane 候選：E288（integrator Stage 0）或 E285（等 E284）。
+- 發版：`main` 帶 E320（integrator 5a 的 CI 檢查行為改變）、E312（讀路徑 race 修正）、E319、E317、E286 SOP → 建議 PATCH v4.6.1 或併入下一波後的 MINOR，由人類決定。

@@ -77,9 +77,12 @@ export function hasDesignModeRequiringVisual(workspacePath, activeFeature) {
 }
 // Permissive Mode extractor. Accepts BOTH the H2-section style
 // (`## Mode` heading, value on a following line) AND the inline/bullet style
-// (`**Mode** — <value>` or `mode: <value>`). Returns the first token that
-// matches a known mode enum value, lowercased; null if none found. Tolerant of
-// surrounding markdown (backticks, bold, em-dash) per design-auditor template.
+// (`**Mode** — <value>` or `mode: <value>`). Returns the known mode enum value
+// that appears EARLIEST on the candidate line (lowest match index), lowercased;
+// null if none found. Position, not list order, decides: trailing prose such as
+// `image (no Figma)` or `no-design (no Figma)` must not let a later-mentioned
+// mode win (E319). Tolerant of surrounding markdown (backticks, bold, em-dash)
+// per design-auditor template.
 const KNOWN_MODES = ["figma", "sketch", "xd", "penpot", "pdf", "image", "paper", "no-design"];
 function parseDesignMode(content) {
     // 1. Inline form: `mode: no-design` (no-design fast path, design-auditor L14)
@@ -98,14 +101,17 @@ function parseDesignMode(content) {
         candidates.push(mH2[1]);
     for (const raw of candidates) {
         const lc = raw.toLowerCase();
+        // Lowest-index word-boundary match wins. Bare `design` is not a listed
+        // mode, so `no-design` can never lose to it.
+        let best = null;
         for (const mode of KNOWN_MODES) {
-            // word-boundary-ish: `no-design` must win over `design`; check longest first
-            // (KNOWN_MODES has no overlap risk except substring `design`, which is not
-            // a listed mode, so first-match over the enum is safe).
-            if (new RegExp(`\\b${mode.replace(/[-]/g, "\\-")}\\b`).test(lc)) {
-                return mode;
+            const m = new RegExp(`\\b${mode.replace(/[-]/g, "\\-")}\\b`).exec(lc);
+            if (m && (best === null || m.index < best.index)) {
+                best = { mode, index: m.index };
             }
         }
+        if (best !== null)
+            return best.mode;
     }
     return null;
 }
