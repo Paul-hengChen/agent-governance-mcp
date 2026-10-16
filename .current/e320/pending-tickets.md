@@ -1,5 +1,7 @@
 # Pending tickets — lane e320
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E321-NEW-1
 title: test hygiene — fixed-lane-base diff tests in non-owned files, plus the one-line convention for growable manifests and fixed-base diffs
@@ -31,5 +33,3 @@ body: |
   <ws>/.current/<lane>/.current/_primary/telemetry.jsonl. Probe on the lane build reproduced it.
   Fix shape: reject any workspace_path that contains a `.current` path segment, not just a trailing one.
 ```
-
-## Applied
