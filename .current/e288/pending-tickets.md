@@ -14,4 +14,20 @@ body: |
   one exception. Candidate vehicle: E290 (lane-protocol rewritten generically). Lane e288 does not own docs/**.
 ```
 
+```pending-ticket
+lane_local_id: E288-NEW-1
+title: skill-integrator Stage 0 — name the 裁決者 value for the hand-off note Decisions row, and state that re-dispatching PM to revise the cut file is covered by the Stage 0 permission row
+priority: P3
+depends_on: [E288]
+source: code-reviewer, T-E288-01 review (review_reports/review_T-E288-01.md, optional findings 2 and 3); integrator asked to file it (mailbox to-lane#2)
+body: |
+  Two wording gaps in the Stage 0 section of content/skill-integrator.md:
+  (a) The cross-repo hand-off note becomes the manifest's first Decisions row, but the section does not say
+      whether 裁決者 is 人類 or 整合者; validate accepts only those two values, so a wrong value fails loudly,
+      but the SOP should name the expected one.
+  (b) Stage 1 says to send a changed ticket back to PM. When the cut came from Stage 0, the SOP does not say
+      that re-dispatching PM to revise the ticket-cut file falls under the "Stage 0 only" permission row.
+  Write both explicitly.
+```
+
 ## Applied
