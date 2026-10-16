@@ -65,4 +65,6 @@ Reviewer's four advisory comment warnings (visual.ts:98, visual.ts ratio, verify
 
 ## Full suite
 
-SUITE_RESULT_PLACEHOLDER
+Command: `node scripts/test-lock.mjs -- npm test`, run after the tests and evidence were committed, on a clean tree (no untracked files), on HEAD a08049c (the evidence-only commit that records this result follows it; it changes no code or test).
+
+Result: tests 3213, pass 3210, fail 0, cancelled 0, skipped 3, exit 0. The 3 skips are the pre-existing loud-skips (no new skip introduced by this lane). Shared generated files (content/**, compose goldens, context-budget) unchanged and green; nothing re-baselined. E238-named timing tests: none exist in test/verify-release.test.mjs; that file has an empty diff against cac3036 and the whole file passed in this run.
