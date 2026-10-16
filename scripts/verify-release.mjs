@@ -5,6 +5,8 @@
 // pushed upstream, (3) check-version.mjs green, (4) CHANGELOG entry, (5) dist/
 // committed with a matching Server() version, (6) CI ground truth for this sha.
 // Usage: node scripts/verify-release.mjs [vX.Y.Z] | --close-out | --ci-check [--strict] [--sha <sha>]
+// (--sha: the sha is resolved via git and its runs are found by commit on any
+// branch; no completed run within the poll budget FAILs — E320.)
 // Modes, posture and degradation rules: see specs/e260c-bin-scripts.md.
 
 import { readFileSync } from "node:fs";
@@ -46,6 +48,29 @@ if (shaFlagIdx !== -1) {
     process.exit(1);
   }
   shaOverride = shaValue;
+}
+
+// Resolves a --sha value (full or abbreviated) to the full commit sha, so the
+// by-commit CI query and the exact headSha match below compare like with like.
+// A dash-led value is never handed to git (it would parse as an option), and
+// anything git cannot resolve to a commit fails loudly: answering about a sha
+// we could not identify would report "unverified" as "verified" (E320).
+function resolveShaOverride(value) {
+  const unresolved = (why) => {
+    console.error(
+      `FAIL: CI ground-truth — --sha ${JSON.stringify(value)} could not be resolved to a commit in this checkout (${why}) — refusing to report a verdict for an unidentified commit`
+    );
+    console.error(`check:release — CI-CHECK FAILED (${String(value).slice(0, 12)})`);
+    process.exit(1);
+  };
+  if (value === "" || value.startsWith("-")) {
+    unresolved("not a commit id");
+  }
+  try {
+    return git(["rev-parse", "--verify", "--quiet", `${value}^{commit}`]);
+  } catch {
+    unresolved("git rev-parse --verify found no such commit");
+  }
 }
 
 // --- Independent check runner -----------------------------------------------
@@ -121,12 +146,16 @@ if (closeOut) {
 // required. `--strict` is the whole behavioral difference between step 2a's
 // and step 8b's use of this mode; see the top-of-file comment for why.
 if (ciCheck) {
-  const sha = shaOverride || git(["rev-parse", "HEAD"]);
+  // With --sha (E320) the caller names a commit that may live on any branch
+  // (an integrator on `main` checking a lane's sha), so the sha is resolved
+  // to its full form and runs are queried by commit, not by the checkout's
+  // branch. Without --sha the HEAD path below is unchanged.
+  const sha = shaOverride !== undefined ? resolveShaOverride(shaOverride) : git(["rev-parse", "HEAD"]);
   console.log(
     `check:release — CI-only check (${ciCheckStrict ? "strict" : "lenient"}) for ${sha.slice(0, 12)}`
   );
   runCheck("CI ground-truth", (fails) => {
-    evaluateCIGroundTruth({ sha, strict: ciCheckStrict, fails });
+    evaluateCIGroundTruth({ sha, strict: ciCheckStrict, fails, byCommit: shaOverride !== undefined });
   });
   if (failedChecks.length === 0) {
     console.log(`check:release — CI-CHECK PASSED (${sha.slice(0, 12)})`);
@@ -353,7 +382,12 @@ runCheck("dist committed+parity", (fails) => {
 // Check 6 and --ci-check (SOP steps 2a and 8b) share this one implementation.
 // `strict` is the only parameter: false is Check 6's WARN-and-continue on any
 // inability to get ground truth; true turns each such WARN into a FAIL (8b).
-function evaluateCIGroundTruth({ sha: releaseSha, strict, fails }) {
+// `byCommit` (E320, --ci-check --sha only): query runs by commit across all
+// branches instead of the checkout-derived branch, poll an empty list like a
+// not-yet-listed sha, and FAIL — never WARN — when gh answers but no completed
+// run for the sha appears within the budget. The gh-cannot-answer paths
+// (spawn failure, non-zero exit, unparseable output) still go through warn().
+function evaluateCIGroundTruth({ sha: releaseSha, strict, fails, byCommit = false }) {
   // WARNs (and poll-progress lines) go to stdout, not stderr: the script's
   // contract (pinned by VR-8) reserves stderr for FAIL lines — a fully
   // passing run prints nothing there. In strict mode there is no WARN path at
@@ -432,18 +466,22 @@ function evaluateCIGroundTruth({ sha: releaseSha, strict, fails }) {
     return { branch, label };
   }
 
-  const derived = deriveCIBranch();
-  if (derived === null) return;
-  const { branch: ciBranch, label: ciBranchLabel } = derived;
+  let ciBranch;
+  let ciBranchLabel;
+  if (!byCommit) {
+    const derived = deriveCIBranch();
+    if (derived === null) return;
+    ({ branch: ciBranch, label: ciBranchLabel } = derived);
+  }
 
   function listCompletedRuns() {
+    const scope = byCommit ? ["--commit", releaseSha] : ["--branch", ciBranch];
     return spawnSync(
       "gh",
       [
         "run",
         "list",
-        "--branch",
-        ciBranch,
+        ...scope,
         "--workflow",
         "CI",
         "--status",
@@ -451,7 +489,7 @@ function evaluateCIGroundTruth({ sha: releaseSha, strict, fails }) {
         "--limit",
         "10",
         "--json",
-        "conclusion,headSha,url,updatedAt",
+        byCommit ? "conclusion,headSha,headBranch,url,updatedAt" : "conclusion,headSha,url,updatedAt",
       ],
       { cwd: root, encoding: "utf-8" }
     );
@@ -491,7 +529,14 @@ function evaluateCIGroundTruth({ sha: releaseSha, strict, fails }) {
       warn("could not parse gh run list output");
       return;
     }
-    if (!Array.isArray(runs) || runs.length === 0) {
+    if (byCommit) {
+      // A commit-scoped query answering [] is the normal "CI not finished
+      // yet" reply, so it is polled below; only a non-array is unparseable.
+      if (!Array.isArray(runs)) {
+        warn("could not parse gh run list output");
+        return;
+      }
+    } else if (!Array.isArray(runs) || runs.length === 0) {
       warn(`no completed CI runs found on ${ciBranchLabel}`);
       return;
     }
@@ -505,7 +550,9 @@ function evaluateCIGroundTruth({ sha: releaseSha, strict, fails }) {
       const { conclusion, headSha, url } = matched;
       if (conclusion !== "success") {
         fails.push(
-          `FAIL: latest completed CI run on ${ciBranch} concluded "${conclusion}" (head ${String(headSha).slice(0, 12)}) — ${url ?? "no url"}`
+          byCommit
+            ? `FAIL: CI ground-truth — latest completed CI run for ${releaseSha.slice(0, 12)} (branch ${matched.headBranch ?? "unknown"}) concluded "${conclusion}" — ${url ?? "no url"}`
+            : `FAIL: latest completed CI run on ${ciBranch} concluded "${conclusion}" (head ${String(headSha).slice(0, 12)}) — ${url ?? "no url"}`
         );
       }
       return;
@@ -513,6 +560,14 @@ function evaluateCIGroundTruth({ sha: releaseSha, strict, fails }) {
 
     const remainingMs = deadline - Date.now();
     if (remainingMs <= 0) {
+      if (byCommit) {
+        // gh answered, and no completed run for this sha exists: that is
+        // "not verified", which must never print as PASSED (E320).
+        fails.push(
+          `FAIL: CI ground-truth — no completed CI run for ${releaseSha.slice(0, 12)} found on any branch within the ${waitBudgetSeconds}s poll budget (gh run list --commit) — cannot verify this commit`
+        );
+        return;
+      }
       warn(
         `this commit's CI has not completed yet (head ${releaseSha.slice(0, 12)} not found among the last ${runs.length} completed run(s) on ${ciBranch})`
       );

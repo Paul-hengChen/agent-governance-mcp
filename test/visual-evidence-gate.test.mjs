@@ -639,3 +639,41 @@ test("AC-8: SCOPE_DECISION_REQUIRED is in the TransitionRejection.error union (t
     "transitions.ts must stay pure (no fs import) — gate reads fs handler-side only",
   );
 });
+
+// ---------- E319: the declared (leftmost) mode wins over negation prose ----------
+
+test("E319 AC-E319-3: `image (no Figma)` -> mode image, required:true (was mis-parsed as figma)", () => {
+  const ws = mkWorkspace();
+  writeDesignWithMode(ws, "feat", "# design/feat\n\n- **Mode** — image (no Figma)\n");
+  const r = hasDesignModeRequiringVisual(ws, "feat");
+  assert.equal(r.mode, "image");
+  assert.equal(r.required, true);
+});
+
+test("E319 AC-E319-2: `mode: no-design (no Figma)` -> mode no-design, required:false", () => {
+  const ws = mkWorkspace();
+  writeDesignWithMode(ws, "feat", "# design/feat\n\nmode: no-design (no Figma)\n");
+  const r = hasDesignModeRequiringVisual(ws, "feat");
+  assert.equal(r.mode, "no-design");
+  assert.equal(r.required, false);
+});
+
+test("E319 AC-E319-4: multi-mode line `mode: paper / figma` -> leftmost wins (paper)", () => {
+  const ws = mkWorkspace();
+  writeDesignWithMode(ws, "feat", "# design/feat\n\nmode: paper / figma\n");
+  assert.equal(hasDesignModeRequiringVisual(ws, "feat").mode, "paper");
+});
+
+test("E319 AC-E319-5: backtick-wrapped value with trailing prose (`pdf` — exported from Figma) -> pdf", () => {
+  const ws = mkWorkspace();
+  writeDesignWithMode(ws, "feat", "# design/feat\n\nmode: `pdf` — exported from Figma\n");
+  assert.equal(hasDesignModeRequiringVisual(ws, "feat").mode, "pdf");
+});
+
+test("E319 AC-E319-5: a Mode line naming no known mode still returns mode null", () => {
+  const ws = mkWorkspace();
+  writeDesignWithMode(ws, "feat", "# design/feat\n\nmode: freehand\n");
+  const r = hasDesignModeRequiringVisual(ws, "feat");
+  assert.equal(r.mode, null);
+  assert.equal(r.required, false);
+});

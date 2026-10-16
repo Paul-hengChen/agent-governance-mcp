@@ -79,12 +79,15 @@ function rawStringField(rawArgs: unknown, key: string): string | null {
 // Best-effort and never throws: the caller always rethrows the original
 // ZodError untouched. The sidecar lives under the workspace, so the emit is
 // skipped unless workspace_path is an absolute path naming an existing
-// directory: an unvalidated caller-supplied path must not cause directories to
-// be created anywhere else on disk.
+// directory other than a `.current` dir: an unvalidated caller-supplied path
+// must not cause directories to be created anywhere else on disk.
 function emitZodGateTelemetry(rawArgs: unknown, err: z.ZodError): void {
   try {
     const workspacePath = rawStringField(rawArgs, "workspace_path");
     if (workspacePath === null || !path.isAbsolute(workspacePath)) return;
+    // A path naming `.current` itself is never a workspace root: emitting
+    // there would create a stray `<ws>/.current/.current/**` tree (E317).
+    if (path.basename(workspacePath) === ".current") return;
     if (!fs.statSync(workspacePath).isDirectory()) return;
     const agentId = rawStringField(rawArgs, "agent_id");
     const feature = rawStringField(rawArgs, "active_feature");
