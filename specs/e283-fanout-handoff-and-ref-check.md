@@ -81,7 +81,7 @@ All fixtures are in-test manifests / specs (no assertion on the growing content 
   proof: `test/e283-validate-handoff.test.mjs` case "sub-item absent / duplicate / empty".
 - **AC-E283-4** — Given 進行中的背景工作 bodies `無`, `- 無`, `* 無`, `無。`, then validate passes; given `監看 e283 信箱`, `無\n- 整合分支未刪`, or `none`, then it exits 2 with `HANDOFF_BACKGROUND_NOT_NONE`.
   proof: `test/e283-validate-handoff.test.mjs` case "background must be 無".
-- **AC-E283-5** — Given a section line containing `/Users/x/repo`, `/home/a/b`, `` `/tmp/x/y` ``, `（/private/var/z）`, `C:\work\x`, or `~/lanes/e283`, then validate exits 2 with one `HANDOFF_ABSOLUTE_PATH` per offending line naming its line number, and the stderr does not contain the path; given only `../lanes/e283`, `.current/history/x`, `origin/main`, `/teamwork`, `https://github.com/a/b`, then no `HANDOFF_ABSOLUTE_PATH`.
+- **AC-E283-5** — Given a section line containing `/Users/x/repo`, `/home/user/b`, `` `/tmp/x/y` ``, `（/private/var/z）`, `C:\work\x`, or `~/lanes/e283`, then validate exits 2 with one `HANDOFF_ABSOLUTE_PATH` per offending line naming its line number, and the stderr does not contain the path; given only `../lanes/e283`, `.current/history/x`, `origin/main`, `/teamwork`, `https://github.com/a/b`, then no `HANDOFF_ABSOLUTE_PATH`.
   proof: `test/e283-validate-handoff.test.mjs` case "absolute path".
 - **AC-E283-6** — Given a closed manifest with complete mandatory sub-items, with or without `### 裝置` / `### 工具`, and with an extra unknown `### 備註`, then validate exits 0.
   proof: `test/e283-validate-handoff.test.mjs` case "optional and unknown sub-items".
@@ -100,7 +100,7 @@ All fixtures are in-test manifests / specs (no assertion on the growing content 
 
 ### E322 — `owners` subcommand
 
-- **AC-E322-1** — Given an in-test manifest with lanes A (`擁有` `tools/a.ts`, `test/a-*.test.mjs`) and B, and a path list `tools/a.ts`, `test/a-x.test.mjs`, `.current/b/handoff.md`, `README.md`, when `owners <m> --paths <file>` runs, then stdout has `HIT  tools/a.ts  (A: tools/a.ts)`, `HIT  test/a-x.test.mjs  (A: test/a-*.test.mjs)`, `HIT  .current/b/handoff.md  (B: implicit bookkeeping)`, no line for `README.md`, the summary `fanout owners: 4 path(s), 3 hit(s), 2 dispatchable lane(s)`, and exit 1.
+- **AC-E322-1** — Given an in-test manifest with lanes `a` (`擁有` `tools/a.ts`, `test/a-*.test.mjs`) and `b` (lane ids lowercase: implicit-bookkeeping matching is case-sensitive, same as `check`), and a path list `tools/a.ts`, `test/a-x.test.mjs`, `.current/b/handoff.md`, `README.md`, when `owners <m> --paths <file>` runs, then stdout has `HIT  tools/a.ts  (a: tools/a.ts)`, `HIT  test/a-x.test.mjs  (a: test/a-*.test.mjs)`, `HIT  .current/b/handoff.md  (b: implicit bookkeeping)`, no line for `README.md`, the summary `fanout owners: 4 path(s), 3 hit(s), 2 dispatchable lane(s)`, and exit 1.
   proof: `test/e322-owners.test.mjs` case "paths with hits".
 - **AC-E322-2** — Given a path owned by two lanes, then one HIT line lists both, `; `-separated in table order.
   proof: `test/e322-owners.test.mjs` case "multi-lane hit".
