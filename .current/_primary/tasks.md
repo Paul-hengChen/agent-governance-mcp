@@ -34,6 +34,10 @@ _(No active tasks — ready for the next feature.)_
 - [x] T-REL460-02 [P0] qa-engineer: verify AC3 + AC4 + AC5 + AC6 (full suite under test lock, clean build, check-version, check:bookkeeping, check:md-tables, npm audit, agc check, transitions-sync) | depends_on: none
 - [x] T-REL460-03 [P0] qa-engineer: verify AC7 (rule/SOP changes composed into the built role bundles; goldens and budget ceilings consistent) | depends_on: none
 - [x] T-REL460-04 [P0] qa-engineer: verify AC8 + AC9 (hop-cap, dispatch-pin enum, single-source tier, gate-count behaviours on compiled output; v4.5.0 non-regression) | depends_on: none
+- [x] T-RELW4-01 [P0] qa-engineer: verify AC1 + AC2 (diff-path classification since v4.6.0; per-lane review/qa evidence, closed PASS handoffs and ledgers for e320, e286, e312; backlog done-marks and merge shas). Spec: specs/release-post-v4-w4.md | depends_on: none
+- [x] T-RELW4-02 [P0] qa-engineer: verify AC3 + AC4 + AC5 + AC6 (full suite under test lock, clean build, check-version at 4.6.0, check:bookkeeping, check:md-tables, npm audit, agc check, transitions-sync). Spec: specs/release-post-v4-w4.md | depends_on: none
+- [x] T-RELW4-03 [P0] qa-engineer: verify AC7 (E286 Mid-wave base fix composed into the integrator bundle; const-15, goldens and budget untouched; lane-protocol §7 and content-pin tests). Spec: specs/release-post-v4-w4.md | depends_on: none
+- [x] T-RELW4-04 [P0] qa-engineer: verify AC8 + AC9 (E320/E319/E317/E312 fixed behaviours on compiled output; v4.6.0 non-regression). Spec: specs/release-post-v4-w4.md | depends_on: none
 
 ## Compacted History
 <!-- compacted: E125c 2026-09-26 — 67 sections, 891 [x] rows, 26 [-] rows summarized below; full rows: git log -i --grep <ticket-id>, or git log -p -- .current/_primary/tasks.md (pre-compaction commit 165b72d is auxiliary and invalidated by a history rewrite, E104) -->
