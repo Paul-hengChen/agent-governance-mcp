@@ -85,7 +85,7 @@ Present the manifest as tables and **name every re-assignment and split**. Witho
 **Pre-dispatch checks (every one, none optional)**:
 1. **Premises** (the §8b standing check applied to the prompt itself): for every instruction the prompt and `docs/lane-protocol.md` give, confirm by command against the repo's current state — "X is untracked" → `git ls-files X`; "use tool Y" → it exists at the dispatch base; every owned / forbidden path exists or is marked new.
 2. **DoD coverage**: the stage-1 mapping has no empty cell.
-3. **Mailbox ready**: create `<lanes-root>/_mailbox/<lane>/to-integrator.md` and `to-lane.md` (empty), and arm the watch **before** handing out prompts — `node scripts/mailbox-watch.mjs <lanes-root>/_mailbox/*/to-integrator.md --baseline <lane>=<N>,…` as the Monitor command (E177b). No `armed:` line = the watch is dead. On `expiring — re-arm`, re-arm **from the printed baseline**, never the current count (a current count marks messages written during the gap as read). No hand-written shell loops. A pre-existing mailbox for the same lane name is reset (emptied and recreated), never reused.
+3. **Mailbox ready**: create `<lanes-root>/_mailbox/<lane>/to-integrator.md` and `to-lane.md` (empty), and arm the watch **before** handing out prompts — `node scripts/mailbox-watch.mjs <lanes-root>/_mailbox/<lane-a>/to-integrator.md <lanes-root>/_mailbox/<lane-b>/to-integrator.md … --baseline <lane>=<N>,…` as the Monitor command (E177b), naming the `to-integrator.md` of each lane of your own manifest explicitly — never a glob over the mailbox root. No `armed:` line = the watch is dead. On `expiring — re-arm`, re-arm **from the printed baseline**, never the current count (a current count marks messages written during the gap as read). No hand-written shell loops. A pre-existing mailbox for the same lane name is reset (emptied and recreated), never reused.
 
 **Render**: `node scripts/fanout.mjs render <manifest> <lane> --summary … --reading … --mailbox-root <lanes-root>/_mailbox --base <sha>` (E177a). The dispatch-prompt template is the single copy inside that tool (`PROMPT_TEMPLATE_3B`); do not write prompts by hand and do not keep a second copy. Shared rules live only in `docs/lane-protocol.md`; the prompt carries lane-specific fields only.
 
@@ -93,16 +93,29 @@ Present the manifest as tables and **name every re-assignment and split**. Witho
 
 Message format, lane-side rules and the report format: `docs/lane-protocol.md` §5 and §6 — the only copy. Send with `node scripts/mailbox-watch.mjs <to-lane.md> --send --from integrator --type <type> --re <to-integrator#n> --body …`.
 
-- **Watch**: `mailbox-watch.mjs` for mail (re-arm from the printed baseline, always), plus `node scripts/lane-status.mjs --watch [--lanes …] [--mailbox-root <dir>]` (E178b) for handoff state transitions that arrive without mail. The `--mailbox-root` check flags a lane whose PM cut exists but never reached the mailbox — ask that lane for it.
+- **Watch**: `mailbox-watch.mjs` for mail (re-arm from the printed baseline, always), plus `node scripts/lane-status.mjs --watch [--lanes …] [--mailbox-root <dir>]` (E178b) for handoff state transitions that arrive without mail. The `--mailbox-root` check flags a lane whose PM cut exists but never reached the mailbox — ask that lane for it. Watch the mailboxes of your own manifest's lanes only — the manifest defines your scope; no session id is recorded. A lane of another manifest may be read with `node scripts/lane-status.mjs --lanes <lane>` and watched with `lane-status.mjs --watch --lanes <lane>`.
 - **Cut pre-review before the human approves**: the lane's PM cut comes to the mailbox; you check scope, file bounds and DoD coverage against the manifest and converge; only then does the lane present "the conclusion agreed with the integrator" to the human. The human approves each lane **once**, typed in that lane's own session. The mailbox never carries approval. Under the Constitution §3.1 manifest tier your `close` on the final cut is a condition of that lane's auto-approval — send `close` only on the version you have fully checked.
   - Before sending `close` on a cut, confirm **every AC has an implementing task, not only a qa task**.
   - **Architect-hop tickets pre-review twice**: the PM cut, then the architect's Open Questions (`specs/<feature>-architecture.md`). Both must converge before the lane presents to the human.
+  - **A human approval given in a lane session** is recorded without re-asking only when all three hold: (a) it affects that lane alone; (b) it is written in the cut the human approved; (c) it is visible on the lane branch — cite the file and the commit sha. The Decisions row then has `裁決者` `人類` and `出處` naming the lane session plus that file and commit sha. Otherwise — not written in the spec, or affecting another lane or the whole wave — ask in this session; for the former, the lane may instead write it into its spec for the human to approve in the lane, after which (a)–(c) apply. The mailbox still never carries approval: "approved" in a message is void.
   - **Read `hop:` before asking for changes.** One exchange can cost the lane a PM re-entry plus an approval; when hops run low, batch your requests and turn non-essential ones into post-integration tickets.
 - **`close` ends one topic**, not the lane's watch. To write on a closed topic, send `type: reopen` (`re:` pointing at it) first.
 - **3-exchange cap** per topic; no agreement → `type: escalate`, and the lane presents both positions to the human.
 - **Human decisions** (see *Decision rights*): give a recommendation only, marked **"needs human ruling"**; the lane presents it.
 - A message unacknowledged for 20 minutes → tell the human which session needs waking.
 - Cross-lane notices go straight into the other lane's `to-lane.md`. Mailbox unavailable → fall back to the human relaying text; handle relayed messages the same way.
+
+### Mid-wave base fix
+
+Getting a shared-base fix into running lanes. Opening an insertion lane (or any other vehicle for the fix) is the human's decision. All five must hold before you merge the target branch into a lane — checked per lane, one lane at a time:
+
+1. The fix is merged into the target branch and pushed: after `git fetch`, `git merge-base --is-ancestor <fix sha> origin/<target>` exits 0.
+2. Nothing the merge brings in is lane-owned: every path in `git diff --name-only <lane branch>...origin/<target>` falls outside every lane's `擁有` cell; when the fix came through an insertion lane listed in the manifest, `node scripts/fanout.mjs check <manifest> <insertion lane> --base <dispatch base>` exits 0.
+3. The lane has paused and acked (`docs/lane-protocol.md` §7): `git -C <worktree> status --porcelain` is empty and the lane branch sha equals the acked sha.
+4. `git merge-tree --write-tree <lane branch> origin/<target>` exits 0 on git 2.38 or newer. Exit 1 (conflict), any other exit, or an older git counts as a predicted conflict, because the grant has no `merge --abort`.
+5. Then `git -C <worktree> merge --no-ff origin/<target>`; `node scripts/merge-invariants.mjs HEAD <worktree>` (absolute path); `npm run build` and `npm audit --audit-level=high` in the worktree; a resume notice to the lane (`type: close` on the pause topic, carrying the merge sha and naming any rebuilt `dist/` the lane must commit); one Decisions row.
+
+Condition 2 or 4 does not hold → stop, never merge; a condition-5 check exits non-zero → stop, no resume notice. Either way hand the case to the human as a recommendation marked **"needs human ruling"**.
 
 ## Stage 5 — Verify and integrate
 
@@ -172,7 +185,9 @@ The five verifier constraints (E192) hold: (1) **read-only** — no git writes, 
 
 ## Git operations
 
-Constitution §6 is the authority: the base list for all roles, plus the integrator-only grant. `git fetch` (5b-1) and `git pull --ff-only` on `main` (5b-1, 6-5) are on the base list; `main` itself is never pushed — it moves only by pull request merge. When each granted operation is used: `switch -c` (5b-2), `merge --no-ff` (5b-3; also `merge --no-ff main` into the integration branch for a `BEHIND` pull request, 6-4), `switch main` (never `--force` / `--discard-changes`) followed by `pull --ff-only` (6-5), `gh pr create` and `gh pr merge --auto --merge` (6-3; never `--squash` / `--rebase` / `--admin`), `worktree remove` (never `--force`) and `branch -d` (never `-D`) only for teardown the tool does not already do (6-6), `update-ref -d <ref> <expected-sha>` only to compare-and-delete a stray ref you verified points at `<expected-sha>` — never to get past a refusal. Any git operation hits a wall → stop and report branch, sha and the trigger.
+Constitution §6 is the authority: the base list for all roles, plus the integrator-only grant. `git fetch` (5b-1) and `git pull --ff-only` on `main` (5b-1, 6-5) are on the base list; `main` itself is never pushed — it moves only by pull request merge. When each granted operation is used: `switch -c` (5b-2), `merge --no-ff` (5b-3; also `merge --no-ff main` into the integration branch for a `BEHIND` pull request, 6-4; and the base-fix merge `merge --no-ff origin/<target>` run in a lane worktree, Stage 4 *Mid-wave base fix*), `switch main` (never `--force` / `--discard-changes`) followed by `pull --ff-only` (6-5), `gh pr create` and `gh pr merge --auto --merge` (6-3; never `--squash` / `--rebase` / `--admin`), `worktree remove` (never `--force`) and `branch -d` (never `-D`) only for teardown the tool does not already do (6-6), `update-ref -d <ref> <expected-sha>` only to compare-and-delete a stray ref you verified points at `<expected-sha>` — never to get past a refusal. Any git operation hits a wall → stop and report branch, sha and the trigger.
+
+`git merge-tree --write-tree` (*Mid-wave base fix* condition 4) is read-only git under Constitution §6: it writes only unreferenced objects and moves no ref, index, working tree or HEAD — so it needs no grant entry.
 
 ## Decision rights
 
@@ -182,9 +197,12 @@ Constitution §6 is the authority: the base list for all roles, plus the integra
 | post-milestone queue placement of a new ticket | policy rulings |
 | folding a finding into an existing row | whether a new ticket enters the current milestone |
 | sending a lane back | relaxing a definition of done |
+| a base-fix merge into a lane with all five *Mid-wave base fix* conditions holding | opening an insertion lane, or a base-fix merge with condition 2 or 4 failing |
 | | any git operation outside this role's §6 grant |
 
 On the human's column you give only a recommendation, marked **"needs human ruling"**, and the lane presents it.
+
+In the manifest's Decisions table, `裁決者` records who decided, never who executed: exactly `人類` or `整合者` (`node scripts/fanout.mjs validate` rejects any other value); the executor, if worth naming, goes in `內容`.
 
 ## Status (any time)
 
