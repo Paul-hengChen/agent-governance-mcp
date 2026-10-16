@@ -51,3 +51,71 @@ No findings. The change is documentation only, with no runtime path.
 CHANGES_REQUESTED — three required correctness defects. The O10 parenthetical contradicts revision §4 O10 (C1), condition-5 `merge-invariants` checks primary instead of the lane worktree (C2), and the E282 diff ref can be a stale local branch that reproduces the false scope violation (C3).
 
 Note: the reviewer and the sr both ran on opus (same-model bias possible).
+
+## Round 2 — APPROVED — by code-reviewer
+
+covers: T-E286-01, T-E286-02
+
+Delta: `3763417..8c16821`. Full feature diff: `c46ab01..8c16821 -- content docs`. Contract: `specs/e286-integrator-trust-and-git.md` (AC1–AC10, R1–R5). Source of truth for O8 and O10: `docs/integrator-revision-2026-10-08.md` §4.
+
+## Summary
+- The sr fix addresses all three required findings (C1–C3) and both recommended findings (C4, C5). It also makes two trims: the O5 parenthetical and part of the merge-tree read-only sentence.
+- I re-ran the AC1–AC9 proof commands on the full diff, and all of them pass. The AC10 owned tests also pass: 98 pass, 0 fail, 1 skipped.
+- I verified C2 by reading the code and by running the command. The `HEAD <worktree>` arguments do check the lane worktree's HEAD.
+- Verdict: APPROVED.
+
+## AC Completeness
+AC1 — implemented — content/skill-integrator.md:108-118. The heading is at line 108, between `## Stage 4` (line 92) and `## Stage 5` (line 120). Every proof string is present.
+AC2 — implemented — content/skill-integrator.md:118 has the stop rule, now with the condition-5 branch added. `needs human ruling` occurs once. The Decision-rights `insertion lane` row occurs once.
+AC3 — implemented — content/skill-integrator.md:188 (base-fix `merge --no-ff`) and :190 (`merge-tree --write-tree` read-only). The regex count is 1, and `Mid-wave base fix` occurs in that section.
+AC4 — implemented — `git diff --quiet <base-sha>...HEAD -- …` gives exit=0.
+AC5 — implemented — docs/lane-protocol.md:123-125. Every proof string is present. Rule 3 now orders the steps as confirm HEAD, then commit `dist/`, then continue, which matches the AC5 parenthetical.
+AC6 — implemented — docs/lane-protocol.md:126. It uses `git diff origin/<目標分支>...HEAD`, and every proof string is present. C3 is resolved.
+AC7 — implemented — content/skill-integrator.md:100. The proof strings are present, and the text now matches revision §4 O10 row 2 (see C1).
+AC8 — implemented — content/skill-integrator.md (`裁決者` sentence below the Decision-rights table). Every proof string is present.
+AC9 — implemented — the `_mailbox/*/` count is 0, and `own manifest`, `another manifest` and `lane-status.mjs --watch --lanes` are present.
+AC10 — implemented — the 6 owned test files pass (98/0/1 skipped). `信箱**永遠不傳核准**` and the §3 no-push line still occur once each. `merge --ff-only` and ``fast-forward `main` `` are still absent.
+
+## Correctness
+Round-1 dispositions:
+- **C1 — resolved.** content/skill-integrator.md:100 now reads: "Otherwise — not written in the spec, or affecting another lane or the whole wave — ask in this session; for the former, the lane may instead write it into its spec for the human to approve in the lane, after which (a)–(c) apply." The O10 table in revision §4 has four rows, and the SOP now matches each one:
+  - Row 1 (no re-ask): the (a)–(c) test.
+  - Row 2 (仍要問；或請 lane 寫回 spec，人類在 lane 上核准): the write-back is now the alternative to asking, not a case for asking.
+  - Row 3 (other lane or whole wave → ask): kept.
+  - Row 4 (mailbox approval void): kept.
+- **C2 — resolved, verified.** `tools/merge-invariants.ts:582-604` (`runMergeInvariantsCli`) parses its arguments as follows:
+  - A non-option argument that does not start with `/` becomes `ref`. Here that is `HEAD`.
+  - The first argument that starts with `/` becomes `repoRoot`.
+  - `runMergeInvariants` then runs every git call with `cwd: repoRoot` (:74-76), so `HEAD` resolves to the lane worktree's own HEAD.
+  - Empirical check: from primary (HEAD `cac3036`, a merge commit), `node scripts/merge-invariants.mjs HEAD <e286 worktree>` reported `NOT_A_MERGE_COMMIT — HEAD (8c16821)`, which is the worktree's sha, not primary's.
+  - The SOP's "(absolute path)" note is load-bearing: a relative path would be taken as a second ref and rejected with USAGE_ERROR, so it fails closed. Build and audit are now stated to run "in the worktree".
+- **C3 — resolved.** `origin/<目標分支>` is a remote-tracking ref shared by every worktree and kept current by the integrator's condition-1 fetch. The merge-base also stays correct if the target moves again later, because the merged commit remains an ancestor of both sides.
+- **C4 — done.** content/skill-integrator.md:118: when a condition-5 check exits non-zero, the integrator stops and sends no resume notice. The case goes to the human marked "needs human ruling". This fits lane §7 rule 2: the lane stays paused, and the §5 rule-6 30-minute rule surfaces the case to the human.
+- **C5 — done.** docs/lane-protocol.md:125 states the order explicitly: confirm `git rev-parse HEAD` equals the merge sha, then commit the named `dist/`, then continue.
+
+New findings in the delta: none `required`, none `recommended`.
+
+## Quality
+- `optional` — content/skill-integrator.md:96. The trim dropped the parenthetical "(lanes of different manifests can depend on each other)" from the Watch bullet. That parenthetical is the reason given in revision §3.2 (因為不同清單的 lane 可能互相依賴) and it appears in the AC9 description, but the AC9 proof does not require it. The rule itself is intact: read and watch another manifest's lane. Removing a rationale clause is acceptable under Constitution §1 brevity.
+- `optional` — content/skill-integrator.md:190. The trimmed sentence dropped "computes a merge … to the object store", which is in the AC3(b) wording. The load-bearing claims remain: writes only unreferenced objects, moves no ref, index, working tree or HEAD, needs no grant entry. The AC3 proof passes.
+- Comment check (4b): the diff is Markdown only and adds no code comments.
+
+## Architecture
+No architecture spec exists. R1–R5 still hold on the full diff:
+- R1: merge-tree is not in §6, and const-15 is untouched (AC4 exit=0).
+- R2: condition 2 is checked on `<lane branch>...origin/<target>`.
+- R3: only existing message types are used (proposal, ack, close).
+- R4: `裁決者` is `人類`, and the lane session goes in `出處`.
+- R5: §7 is the last section, §1–§6 are unchanged, and the no-push line count is 1.
+O8: all five conditions and the stop rule follow revision §4 in order, and the added condition-5 stop branch only adds safety.
+
+## Security
+No findings. The new commands are `merge-invariants` (read-only), and `npm run build` and `npm audit` run in the worktree. Both are within Constitution §6 and the integrator grant. The diff adds no `merge --abort`, `reset`, `--force` or `stash` path. The mailbox still never carries approval.
+
+## Performance
+No findings. The change is documentation only.
+
+## Verdict
+APPROVED — C1–C3 are resolved and C2 is verified against the CLI parser and a live run. C4 and C5 are adopted, all AC1–AC10 proofs pass on the full diff, and the delta introduces no new required finding.
+
+Note: the reviewer and the sr both ran on opus (same-model bias possible).

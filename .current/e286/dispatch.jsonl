@@ -4,3 +4,5 @@
 {"ts":"2026-10-16T07:00:45.254Z","feature":"e286-integrator-trust-and-git","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-10-16T07:03:31.233Z","feature":"e286-integrator-trust-and-git","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-10-16T07:07:16.119Z","feature":"e286-integrator-trust-and-git","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-16T07:07:48.978Z","feature":"e286-integrator-trust-and-git","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-16T07:10:32.578Z","feature":"e286-integrator-trust-and-git","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
