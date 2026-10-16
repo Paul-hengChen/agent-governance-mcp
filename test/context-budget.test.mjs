@@ -472,7 +472,7 @@ test("AC9: every operative rule/gate/SOP marker survives stripRationale in skill
   }
 });
 
-test("AC1/AC2: skill-pm stripped token count meets ≤ 4708 cap", () => {
+test("AC1/AC2: skill-pm stripped token count meets ≤ 4823 cap", () => {
   // WHY: the stripped pm skill must stay within its reduction budget, bounding each pm dispatch.
   // Cap rule: a qa-owned re-measure sets the cap to the exact measured size (zero headroom). The
   // body is measured as production composes it: stripRationale(stripOriginTags(expandSkill(body))).
@@ -484,7 +484,7 @@ test("AC1/AC2: skill-pm stripped token count meets ≤ 4708 cap", () => {
     : SKILL_PM;
   const stripped = stripRationale(stripOriginTags(expandSkill(body)));
   const toks = approxTokens(stripped);
-  assert.ok(toks <= 4708, `skill-pm stripped body (${toks} ~tok) must be ≤ 4708 (AC9, E296 manifest-tier cut-approval lane re-baseline, zero headroom)`);
+  assert.ok(toks <= 4823, `skill-pm stripped body (${toks} ~tok) must be ≤ 4823 (AC9, E288 integrator Stage 0 row re-baseline, zero headroom)`);
 });
 
 test("AC1/AC2: skill-sr-engineer stripped token count meets ≤ 2852 cap", () => {
