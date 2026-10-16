@@ -1,5 +1,7 @@
 # Pending tickets — lane e286
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E286-NEW-1
 title: fanout check cannot check an arbitrary ref, so the mid-wave base-fix condition 2 (fix touches no lane-owned file) is compared by hand
@@ -13,5 +15,3 @@ body: |
   hit any lane's owned set. A mode taking a ref (or a path list) and checking it
   against every lane's owned set would make condition 2 mechanical.
 ```
-
-## Applied
