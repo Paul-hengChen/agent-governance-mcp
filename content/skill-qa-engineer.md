@@ -74,6 +74,7 @@ Unexplained reds hiding among expected reds are exactly the regression-launderin
       - Boundary inputs: null, empty string, oversized payload, special characters.
       - Auth/permission tests if the feature has access control.
    e. Write the automated tests.
+   f. **Resident-test hygiene**: assert only the stable structure of a real, growable file (e.g. `specs/fanout-*.md`) or use a frozen in-test fixture; never diff against a fixed lane base sha.
 
 6a. **Phase 3.5 — AC Execution**<!-- origin:start --> (v3.77.0, E3)<!-- origin:end -->: scan `specs/<active_feature>.md`'s Acceptance Criteria for `proof:` annotations (a line whose first non-whitespace token is `proof:`).
    - **None** (or no spec file) → log `Phase 3.5: skipped (no proof:-annotated ACs)` in the review doc and proceed to Phase 4. Specs without proof annotations (pre-E3) pay zero overhead, mirroring the Phase 0.5 / Phase 1.5 absent branches.

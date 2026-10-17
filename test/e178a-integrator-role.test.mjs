@@ -16,7 +16,6 @@ import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
 const ROOT = path.resolve(path.dirname(__filename), "..");
-const BASE_SHA = "3c72a83"; // lane e178a's base per specs/e178a-integrator-role.md
 
 const SOP = fs.readFileSync(path.join(ROOT, "content", "skill-integrator.md"), "utf-8");
 const CONST15 = fs.readFileSync(path.join(ROOT, "content", "const-15-core-tail.md"), "utf-8");
@@ -40,35 +39,6 @@ function mkWorkspace() {
 
 const INTEGRATOR_DESCRIPTION =
   "Integrator — plan parallel lanes, pre-review cuts, verify lane reports, merge, tear down. Cross-lane; writes no handoff state.";
-
-// History-independent scope tests (E229): a permanent test must not assert on a historical
-// commit SHA unless the assertion is about a historical diff (docs/lane-protocol.md guard
-// note), and then must guard the lookup and skip loudly (shallow clone, adopter fork,
-// single-commit recreation, E104). Mirrors test/e130-lane-default.test.mjs's copy of this
-// helper, duplicated rather than imported so each file's proof stands alone.
-function unresolvedSha(...shas) {
-  for (const sha of shas) {
-    try {
-      execFileSync("git", ["rev-parse", "--verify", `${sha}^{commit}`], {
-        cwd: ROOT,
-        encoding: "utf-8",
-        stdio: ["ignore", "pipe", "pipe"],
-      });
-    } catch {
-      return sha;
-    }
-  }
-  return null;
-}
-
-function skipIfHistoryAbsent(t, invariant, ...shas) {
-  const missing = unresolvedSha(...shas);
-  if (missing === null) return false;
-  const notice = `HISTORY-DEPENDENT AC SKIPPED: commit ${missing} is not resolvable in this repo's history — skipping check of: ${invariant}`;
-  console.warn(notice);
-  t.skip(notice);
-  return true;
-}
 
 // ---------------------------------------------------------------------------
 
@@ -274,17 +244,21 @@ test("AC6: const-15 §6 — integrator-only git grant; base list + FORBIDDEN ent
   );
 });
 
-// Split out — "how many lines were added at ticket time" has no
-// current-tree equivalent, so this sub-check stays inherently historical and
-// is guarded + loud-skipped (same guard contract as
-// test/e130-lane-default.test.mjs) rather than folded into the substance test
-// above (E229 AC5).
-test("AC6 (historical): const-15 §6 addition stays terse vs base", (t) => {
-  if (skipIfHistoryAbsent(t, "const-15 §6 addition added-lines-count (<= 6) vs base " + BASE_SHA, BASE_SHA)) return;
-  const addedLines = execFileSync("git", ["diff", BASE_SHA, "--", "content/const-15-core-tail.md"], { cwd: ROOT, encoding: "utf-8" })
-    .split("\n")
-    .filter((l) => l.startsWith("+") && !l.startsWith("+++"));
-  assert.ok(addedLines.length <= 6, `const-15 §6 addition should stay small (≤ ~4 lines budget, some slack for the fetch-clause edit); got ${addedLines.length} added lines`);
+// Structural replacement (E323) for the former "added lines vs a fixed lane base sha" check: that
+// diff rotted under any legitimate later const-15 edit. The invariant it stood for is that the
+// integrator grant stays one terse paragraph, so assert that stable structure on the current text.
+test("AC6 (terse grant): the integrator-only grant is one paragraph", () => {
+  const lines = CONST15.split("\n");
+  const grantLines = lines.filter((l) => l.includes("**Integrator-only grant**"));
+  assert.equal(grantLines.length, 1, "the integrator-only grant label must occur exactly once");
+  assert.ok(
+    grantLines[0].includes("only the `integrator` role may also run `git merge --no-ff`") &&
+      grantLines[0].includes("when `skill-integrator` says."),
+    "the whole grant clause must sit on that one line (not split across lines)",
+  );
+  for (const marker of ["Two namespaces sit beside it", "**Tool-internal ops**"]) {
+    assert.equal(CONST15.split(marker).length - 1, 1, `${marker} must occur exactly once in const-15`);
+  }
 });
 
 test("AC7: `git commit --amend` disposition — FORBIDDEN for all roles, names the rule not the incident", () => {

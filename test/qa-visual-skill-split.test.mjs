@@ -108,12 +108,12 @@ test("AC-5: byte counts stay within v3.14.0-relaxed budgets (savings invariant v
   const qaSize = fs.statSync(QA_PATH).size;
   const qaVisualSize = fs.statSync(QA_VISUAL_PATH).size;
 
-  // qa-engineer.md cap: 17900 bytes. This SOP loads on every QA hop, so the
+  // qa-engineer.md cap: 18500 bytes. This SOP loads on every QA hop, so the
   // cap moves only on purpose: after a reviewed addition it is raised to the
   // measured size (`wc -c`) plus about 350-550 bytes, kept tight because
   // headroom is growth nobody decided to allow. Raise history:
-  // specs/e260h-comment-rationale.md (test/qa-visual-skill-split.test.mjs).
-  assert.ok(qaSize <= 17900, `qa-engineer.md must be <= 17900 bytes (got ${qaSize})`);
+  // specs/e260h-comment-rationale.md; raised to 18500 by specs/e288-integrator-stage0-and-test-hygiene.md (D1).
+  assert.ok(qaSize <= 18500, `qa-engineer.md must be <= 18500 bytes (got ${qaSize})`);
   // qa-visual.md cap: 20700 bytes, under the same headroom convention. It is
   // lazy-loaded only when the visual gate arms, so non-visual tasks pay nothing.
   // Raise history: specs/e260h-comment-rationale.md (test/qa-visual-skill-split.test.mjs).

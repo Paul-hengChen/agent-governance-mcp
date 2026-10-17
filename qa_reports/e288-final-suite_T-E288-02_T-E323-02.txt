@@ -1,0 +1,10 @@
+T-E288-02 / T-E323-02 final suite record (no local paths)
+HEAD under test: 65b12f6 (clean worktree, no untracked files; git status --porcelain empty)
+Command: node scripts/test-lock.mjs -- npm test
+Run 2 (final): tests 3239, pass 3237, fail 0, skipped 2, exit 0
+Run 1 (same HEAD): pass 3234, fail 3 (test/e108-eject AC4 purge-knowledge; test/e320-ci-check-sha AC-E320-2; test/verify-release VR-22 wall-clock <wait=0>), all subprocess/wall-clock tests.
+Disposition of run 1: host load average was 30-45 (shared machine, other lanes running suites); the failing tests are untouched by this lane
+(none of them is in git diff dac6069..HEAD), exit status was null (killed by timeout) or a wall-clock threshold; an isolated re-run failed two
+different timing tests (host-trace subdir, E320 AC-E320-6) and the full re-run on the same HEAD passed with 0 failures. Environmental flake, not a regression.
+Scope: node scripts/fanout.mjs check specs/fanout-post-v4-w5.md e288 --base main -> 16 files, 1 OUT: test/qa-visual-skill-split.test.mjs (the D1 re-pin, human-approved).
+Caps pinned: skill-pm 4823 ~tok (exact measured; ceiling 4860), skill-qa-engineer.md 18500 bytes (measured 18066; D1).
