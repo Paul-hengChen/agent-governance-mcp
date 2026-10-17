@@ -823,7 +823,8 @@ async function checkOrphanLanes(cwd) {
       if (lane === lp.LEGACY_LANE || !lp.isSafeLaneName(lane) || lp.NON_LANE_DIRS.has(lane)) continue;
       const text = readBlob(cwd, ref, path.posix.join(".current", lane, filename));
       // Two-argument parse (E124 AC7's contract): no backlog cross-check.
-      const has = text !== null && ta.parsePendingTickets(text, lane).entries.length > 0;
+      // target_repo entries are another repo's (E287 D4): never this repo's orphans.
+      const has = text !== null && ta.parsePendingTickets(text, lane).entries.some((e) => e.targetRepo === undefined);
       laneOf.set(branch, lane);
       candidates.push({ branch, hasUnappliedPendingTickets: has });
     }
@@ -1022,10 +1023,17 @@ const STR_USAGE_FEATURE =
   "          (no origin / no remote branch: a hint, not a failure); --abandoned\n" +
   "          moves the lane's qa_reports/ + review_reports/ evidence into\n" +
   "          abandoned/<ticket-id>/, commits it, removes the worktree, and\n" +
-  "          keeps the branch. Either way, the lane's\n" +
+  "          keeps the branch. Either way, the lane's committed\n" +
   "          .current/<lane>/pending-tickets.md findings (if any) first get\n" +
   "          real ids, appended to docs/backlog.md and committed on --base in\n" +
-  "          the primary checkout. Also deletes\n" +
+  "          the primary checkout. Only the copy committed on --base\n" +
+  "          (--shipped) or on the branch (--abandoned) is numbered: a\n" +
+  "          pending-tickets.md that exists only in the worktree is not\n" +
+  "          numbered — finish warns, lists its findings and keeps a copy\n" +
+  "          under .current/history/<YYYY-MM>/<lane>/. A finding that carries\n" +
+  "          target_repo: <repo> belongs to another repo: it gets no id here,\n" +
+  "          is archived with the others and is listed on stderr for a human\n" +
+  "          ruling. Also deletes\n" +
   "          <worktree-parent>/_mailbox/<lane>/ when it holds only\n" +
   "          to-integrator.md, to-lane.md and watch-lock sidecars; otherwise\n" +
   "          keeps it with a warning.\n";
@@ -1964,7 +1972,9 @@ function readBlob(cwd, rev, rel) {
 // pending file's blob; `revLabel` names where it was read from. Returns null
 // for a silent no-op (zero unapplied entries), else
 // { backlogText, pendingText, skipped: Map<laneLocalId,rowId>, toAllocate,
-//   allocated, newBacklogText }. Throws FeatureError, listing every error
+//   external, allocated, newBacklogText, backlogPresent }. `external` holds
+// the live target_repo entries with no backlog provenance (E287 D4): never
+// numbered, archived with the rest. Throws FeatureError, listing every error
 // verbatim.
 function planPendingApply({ alloc, repoRoot, pendingText, revLabel, base, lane, pendingRel, verb }) {
   const backlogBlob = readBlob(repoRoot, base, BACKLOG_REL);
@@ -1984,16 +1994,22 @@ function planPendingApply({ alloc, repoRoot, pendingText, revLabel, base, lane, 
 
   const skipped = new Map();
   const toAllocate = [];
+  const external = [];
   for (const entry of parsed.entries) {
+    // Provenance wins whatever target_repo says, so a re-run stays idempotent.
     const row = prov.get(entry.laneLocalId);
     if (row !== undefined) skipped.set(entry.laneLocalId, row);
+    else if (entry.targetRepo !== undefined) external.push(entry);
     else toAllocate.push(entry);
   }
   let allocated = [];
   if (toAllocate.length > 0) {
+    // External entries ride along only so a local depends_on naming one is
+    // refused with a reason that says target_repo (E287 Q5); the allocator
+    // never numbers them.
     const res = alloc.allocateTicketIds({
       currentMaxId: alloc.extractMaxBacklogId(backlogText),
-      batches: [{ lane, entries: toAllocate }],
+      batches: [{ lane, entries: [...toAllocate, ...external] }],
     });
     if (res.unresolvedDependencies.length > 0) {
       throw new FeatureError(
@@ -2030,7 +2046,10 @@ function planPendingApply({ alloc, repoRoot, pendingText, revLabel, base, lane, 
       );
     }
   }
-  return { backlogText, newBacklogText, pendingText, skipped, toAllocate, allocated };
+  return {
+    backlogText, newBacklogText, pendingText, skipped, toAllocate, external, allocated,
+    backlogPresent: backlogBlob !== null,
+  };
 }
 
 // C2 + C3 (spec AC2 (a)/(b)): the primary checkout must have --base checked
@@ -2092,6 +2111,8 @@ function newPendingText(alloc, plan) {
   return alloc.markApplied(plan.pendingText, [
     ...plan.allocated.map((t) => t.laneLocalId),
     ...plan.skipped.keys(),
+    // E287 Q4: target_repo entries are archived in the same commit.
+    ...plan.external.map((e) => e.laneLocalId),
   ]);
 }
 
@@ -2111,7 +2132,9 @@ async function planPendingOnShipped({ lanePaths, repoRoot, base, lane }) {
     alloc, repoRoot, pendingText, revLabel: base, base, lane, pendingRel, verb: "--shipped",
   });
   if (plan === null) return null; // zero unapplied entries: silent no-op
-  return { alloc, plan, pendingRel, rels: [BACKLOG_REL, pendingRel] };
+  // The backlog is named only when it exists at --base: an external-only file
+  // with no backlog commits the pending file alone (E287 AC-E287-7).
+  return { alloc, plan, pendingRel, rels: plan.backlogPresent ? [BACKLOG_REL, pendingRel] : [pendingRel] };
 }
 
 function commitPendingOnShipped({ repoRoot, base, lane, pending }) {
@@ -2126,16 +2149,222 @@ function commitPendingOnShipped({ repoRoot, base, lane, pending }) {
     repoRoot,
     ids.length > 0
       ? `chore(backlog): allocate ${ids.join(", ")} from lane ${lane} (shipped)`
-      : `chore(backlog): mark lane ${lane} pending tickets applied`,
+      : plan.skipped.size > 0
+        ? `chore(backlog): mark lane ${lane} pending tickets applied`
+        : `chore(lane): archive lane ${lane} target_repo finding(s) (shipped, not allocated here)`,
     rels,
     [
-      { abs: backlogAbs, text: plan.backlogText },
+      // The backlog is restored only when this run wrote it: an absent one
+      // must never be re-created as an empty file (E287).
+      ...(plan.allocated.length > 0 ? [{ abs: backlogAbs, text: plan.backlogText }] : []),
       { abs: pendingAbs, text: plan.pendingText },
     ],
     `agc feature finish --shipped: git commit on ${base} failed — ${BACKLOG_REL} and ` +
       `${pendingRel} restored; nothing applied, nothing removed`
   );
   printAppliedSummary(plan.allocated);
+  printTargetRepoListing(lane, plan.external);
+}
+
+// --- finish-time unallocated findings + target_repo listing (E287) ---------
+// O6: a lane's pending-tickets.md that is in the worktree but NOT at the
+// revision finish reads (git-excluded agc artifacts) is never numbered — only
+// what was committed is (E179 AC4). finish reports it on stderr and keeps a
+// verified copy in the lane's .current/history/<YYYY-MM>/<lane>/ dir in the
+// primary checkout, so `git worktree remove` never deletes the only copy.
+// D4: a block carrying `target_repo` belongs to another repo — it gets no id
+// here, is archived with the rest and is listed on stderr for a human ruling.
+// Every refusal runs at plan time, before the first mutation.
+
+// Display form of a free-text field on a one-line message: whitespace runs
+// (incl. newlines) → one space, trimmed, then escapeSegmentForDisplay.
+function displayField(s) {
+  return escapeSegmentForDisplay(String(s).replace(/\s+/g, " ").trim());
+}
+
+// True when `abs` is a regular file (lstat, no link-following) whose bytes equal `buf`.
+function fileHasBytes(abs, buf) {
+  try {
+    const st = fs.lstatSync(abs);
+    if (!st.isFile() || st.size !== buf.length) return false;
+    return fs.readFileSync(abs).equals(buf);
+  } catch {
+    return false;
+  }
+}
+
+// O6 detector. Read-only. null when the worktree file is absent or not a
+// regular file, when it IS at `rev` (the E179 path owns it), or when it holds
+// no pending-ticket block at all. Two-argument parse: report only, never
+// numbered. The allocation module is loaded only once such a file is found.
+async function readUnallocatedFindings({ lanePaths, repoRoot, lanePath, lane, rev, revLabel }) {
+  const filename = lanePaths.laneFile("pendingTickets").filename;
+  const pendingRel = path.posix.join(".current", lane, filename);
+  const abs = path.join(lanePath, ".current", lane, filename);
+  let bytes;
+  try {
+    if (!fs.statSync(abs).isFile()) return null;
+    bytes = fs.readFileSync(abs);
+  } catch {
+    return null;
+  }
+  if (gitTry(repoRoot, ["cat-file", "-e", `${rev}:${pendingRel}`]).status === 0) return null;
+  const alloc = await loadTicketAllocation();
+  const parsed = alloc.parsePendingTickets(bytes.toString("utf-8"), lane);
+  if (parsed.entries.length === 0 && parsed.errors.length === 0) return null;
+  return { lane, pendingRel, filename, bytes, entries: parsed.entries, errors: parsed.errors, revLabel };
+}
+
+// --shipped destination. First run: the lane-close dir, covered when the
+// untracked-dir harvest copies the lane's .current/<lane>/; a tracked lane dir
+// is `git mv`'d, which carries primary's own untracked copy (`carryAbs`).
+// Re-run: the pointer's dir, covered when the refresh re-copies the file.
+function shippedFindingsTarget({ close, findings, repoRoot }) {
+  if (close.alreadyClosed) {
+    if (close.hist === null) {
+      // Copy / Strings e287.preserve-nohist-refuse.
+      throw new FeatureError(
+        `agc feature finish --shipped: lane ${findings.lane} is already recorded under ${TASKS_REL} ` +
+          `${CLOSED_LANES_HEADING}, but its pointer's history= field does not resolve to a ` +
+          `.current/history/<YYYY-MM>/${findings.lane}/ dir, so the ${findings.entries.length} unallocated ` +
+          `finding(s) in ${findings.pendingRel} have nowhere to be kept — copy the file somewhere safe ` +
+          `and remove the worktree by hand (nothing removed)`
+      );
+    }
+    return {
+      histAbs: close.hist.histAbs,
+      histRel: close.hist.histRel,
+      covered: close.refresh?.files.some((f) => f.rel === findings.pendingRel) ?? false,
+      carryAbs: null,
+    };
+  }
+  return {
+    histAbs: close.histAbs,
+    histRel: close.histRel,
+    covered: close.harvestSrc !== null,
+    carryAbs: close.tracked ? path.join(repoRoot, findings.pendingRel) : null,
+  };
+}
+
+// --abandoned destination. `now` is the SAME Date planAbandonCurrentHarvest
+// got, so both land in one bucket. Covered when that harvest runs.
+function abandonedFindingsTarget({ lanePaths, repoRoot, currentHarvest, ticketId, now }) {
+  if (currentHarvest !== null) {
+    return {
+      histAbs: currentHarvest.histAbs,
+      histRel: path.posix.join(".current", "history", currentHarvest.bucket, ticketId),
+      covered: true,
+      carryAbs: null,
+    };
+  }
+  const bucket = lanePaths.resolveHistoryBucket(now);
+  const histAbs = lanePaths.resolveHistoryLaneDir(repoRoot, bucket, ticketId);
+  if (lstatOrNull(histAbs) !== null && !isDirectoryPath(histAbs)) {
+    // Copy / Strings e194.current-harvest-refuse-line.
+    throw new FeatureError(
+      `agc feature finish --abandoned: .current/history/${bucket}/${ticketId}/ already exists in the ` +
+        `primary checkout and is not a directory — move it aside first (nothing moved, worktree left in place)`
+    );
+  }
+  return {
+    histAbs,
+    histRel: path.posix.join(".current", "history", bucket, ticketId),
+    covered: false,
+    carryAbs: null,
+  };
+}
+
+// Plan-time collision check (read-only), the E180 discipline: an existing
+// different file is never overwritten by this copy. Skipped when an existing
+// harvest step writes the destination from the same lane file this run.
+function planFindingsPreserve({ findings, target, verb }) {
+  const dstAbs = path.join(target.histAbs, findings.filename);
+  const dstRel = path.posix.join(target.histRel, findings.filename);
+  const n = findings.entries.length;
+  if (!target.covered) {
+    if (
+      target.carryAbs !== null &&
+      lstatOrNull(target.carryAbs) !== null &&
+      !fileHasBytes(target.carryAbs, findings.bytes)
+    ) {
+      // Copy / Strings e287.preserve-carry-refuse.
+      throw new FeatureError(
+        `agc feature finish --shipped: the primary checkout's untracked ${findings.pendingRel} differs ` +
+          `from the lane's copy (${n} unallocated finding(s)), and the lane close would carry it into ` +
+          `${target.histRel}/ — move it aside first (nothing applied, nothing removed)`
+      );
+    }
+    if (lstatOrNull(dstAbs) !== null && !fileHasBytes(dstAbs, findings.bytes)) {
+      // Copy / Strings e287.preserve-differs-refuse.
+      throw new FeatureError(
+        `agc feature finish ${verb}: ${dstRel} already exists in the primary checkout and differs from ` +
+          `the lane's ${findings.pendingRel} (${n} unallocated finding(s)) — move it aside first ` +
+          `(nothing applied, nothing removed)`
+      );
+    }
+  }
+  return { ...findings, dstAbs, dstRel, verb };
+}
+
+// Runs after the harvest step that may cover the file and before the worktree
+// is removed. The warning names the destination only once it is verified to
+// be a regular file byte-identical to the lane's (AC-E287-3).
+function executeFindingsPreserve(p) {
+  // Copy / Strings e287.preserve-fail.
+  const fail = (reason) =>
+    new FeatureError(
+      `agc feature finish ${p.verb}: could not keep ${p.pendingRel} at ${p.dstRel} (${reason}) — ` +
+        `worktree and branch left in place (re-running finish is safe)`
+    );
+  const msg = (err) => (err && err.message ? err.message : String(err));
+  try {
+    fs.mkdirSync(path.dirname(p.dstAbs), { recursive: true });
+  } catch (err) {
+    throw fail(msg(err));
+  }
+  if (lstatOrNull(p.dstAbs) === null) {
+    try {
+      fs.writeFileSync(p.dstAbs, p.bytes, { flag: "wx" });
+    } catch (err) {
+      if (!err || err.code !== "EEXIST") fs.rmSync(p.dstAbs, { force: true });
+      throw fail(msg(err));
+    }
+  }
+  if (!fileHasBytes(p.dstAbs, p.bytes)) throw fail("a different file is already there");
+  process.stderr.write(formatUnallocatedWarning(p));
+}
+
+// Copy / Strings e287.unallocated-warning — the ONE composer.
+function formatUnallocatedWarning(p) {
+  const lines = [
+    `agc feature finish — warning: lane ${p.lane}: ${p.pendingRel} is not committed on ${p.revLabel}, ` +
+      `so its ${p.entries.length} unapplied finding(s) were not allocated ids (only a committed ` +
+      `pending-tickets.md is numbered); kept at ${p.dstRel} in the primary checkout (fs copy, not ` +
+      `committed) — a human must file them:\n`,
+  ];
+  for (const e of p.entries) {
+    lines.push(
+      e.targetRepo === undefined
+        ? `  ${displayField(e.laneLocalId)} — ${displayField(e.title)}\n`
+        : `  ${displayField(e.laneLocalId)} — ${displayField(e.title)} [target_repo: ` +
+            `${displayField(e.targetRepo)} — needs a human ruling, not this repo's]\n`
+    );
+  }
+  if (p.errors.length > 0) {
+    lines.push(`  (+ ${p.errors.length} malformed pending-ticket block(s), not listed — see ${p.dstRel})\n`);
+  }
+  return lines.join("");
+}
+
+// Copy / Strings e287.target-repo-line, one stderr line per entry; no-op on [].
+function printTargetRepoListing(lane, external) {
+  for (const e of external) {
+    process.stderr.write(
+      `agc feature finish — ${lane}/${displayField(e.laneLocalId)} "${displayField(e.title)}" names ` +
+        `target_repo ${displayField(e.targetRepo)}: not allocated here, archived under ## Applied — ` +
+        `needs a human ruling (file it in that repo)\n`
+    );
+  }
 }
 
 // --- finish-time lane close writeback (E125b, specs/e125b-*.md) -----------
@@ -2285,8 +2514,10 @@ function planLaneClose({ lanePaths, repoRoot, lanePath, ticketId, branch, pr, no
   const laneRel = path.posix.join(".current", ticketId);
   if (tasksText !== null && hasClosedLanePointer(tasksText, ticketId, branch)) {
     const atRisk = laneIgnoredStateFiles(lanePaths, lanePath, laneRel);
-    if (atRisk.length === 0) return { alreadyClosed: true, refresh: null };
+    // `hist` is returned on both paths: the E287 unallocated-findings copy
+    // needs the pointer's dir even when no ignored lane state is at risk.
     const hist = closedLanePointerHistory(lanePaths, repoRoot, tasksText, ticketId, branch);
+    if (atRisk.length === 0) return { alreadyClosed: true, refresh: null, hist };
     if (hist === null) {
       throw new FeatureError(
         `agc feature finish --shipped: lane ${ticketId} is already recorded under ${TASKS_REL} ` +
@@ -2304,7 +2535,7 @@ function planLaneClose({ lanePaths, repoRoot, lanePath, ticketId, branch, pr, no
         rel: p,
       }))
       .filter((f) => !sameFileBytes(f.src, f.dst));
-    return { alreadyClosed: true, refresh: files.length > 0 ? { ...hist, files } : null };
+    return { alreadyClosed: true, refresh: files.length > 0 ? { ...hist, files } : null, hist };
   }
   if (branch.includes("-->")) {
     throw new FeatureError(
@@ -2739,7 +2970,11 @@ async function applyPendingOnAbandoned({ lanePaths, repoRoot, lanePath, branch, 
 
   const pendingAbs = path.join(lanePath, pendingRel);
   atomicWriteFile(pendingAbs, newPendingText(alloc, plan));
-  const archived = [...ids, ...plan.skipped.values()];
+  const archived = [
+    ...ids,
+    ...plan.skipped.values(),
+    ...plan.external.map((e) => `${e.laneLocalId} (target_repo)`),
+  ];
   commitPathsOrRestore(
     lanePath,
     `chore(lane): mark ${lane} pending tickets applied (${archived.join(", ")})`,
@@ -2754,6 +2989,7 @@ async function applyPendingOnAbandoned({ lanePaths, repoRoot, lanePath, branch, 
   );
   process.stdout.write(`agc feature finish — archived pending tickets on ${branch}\n`);
   printAppliedSummary(plan.allocated);
+  printTargetRepoListing(lane, plan.external);
   return moves;
 }
 
@@ -2892,6 +3128,16 @@ async function runFeatureFinish(cwd, argv) {
     // alreadyClosed re-run included (a refused worktree remove leaves the
     // evidence at risk until it goes).
     const evidenceHarvest = planShippedEvidenceHarvest({ repoRoot, lanePath, ticketId });
+    // E287 O6: a pending file only in the worktree is reported and kept, never
+    // numbered; its collision checks run here, before the first mutation.
+    const findings = await readUnallocatedFindings({
+      lanePaths, repoRoot, lanePath, lane: ticketId, rev: base, revLabel: base,
+    });
+    const preserve =
+      findings &&
+      planFindingsPreserve({
+        findings, target: shippedFindingsTarget({ close, findings, repoRoot }), verb: "--shipped",
+      });
     if (pending !== null || !close.alreadyClosed) {
       assertPrimaryWritable(
         repoRoot,
@@ -2911,6 +3157,7 @@ async function runFeatureFinish(cwd, argv) {
     } else {
       executeLaneClose({ repoRoot, base, close });
     }
+    if (preserve) executeFindingsPreserve(preserve);
     applyShippedEvidenceHarvest(evidenceHarvest);
     removeWorktreeNoForce(repoRoot, lanePath); // AC17/AC19
     process.stdout.write(`agc feature finish — removed worktree ${lanePath}\n`);
@@ -2933,9 +3180,21 @@ async function runFeatureFinish(cwd, argv) {
   // evidence move as its own commit (DR-4). The `.current/<ticket>/`
   // harvest is planned (its refusal included) before any of those mutations
   // and executed last, just before the worktree is removed.
+  const now = new Date();
   const currentHarvest = planAbandonCurrentHarvest({
-    lanePaths, lanePath, ticketId, branch, now: new Date(),
+    lanePaths, lanePath, ticketId, branch, now,
   });
+  // E287 O6 (see the --shipped branch): read and planned before any mutation.
+  const findings = await readUnallocatedFindings({
+    lanePaths, repoRoot, lanePath, lane: ticketId, rev: `refs/heads/${branch}`, revLabel: branch,
+  });
+  const preserve =
+    findings &&
+    planFindingsPreserve({
+      findings,
+      target: abandonedFindingsTarget({ lanePaths, repoRoot, currentHarvest, ticketId, now }),
+      verb: "--abandoned",
+    });
   const plannedMoves = await applyPendingOnAbandoned({
     lanePaths,
     repoRoot,
@@ -2957,6 +3216,7 @@ async function runFeatureFinish(cwd, argv) {
         ` — git add + commit it in the lane and re-run, or remove the worktree by hand`
       : null;
   if (currentHarvest !== null) executeAbandonCurrentHarvest(currentHarvest);
+  if (preserve) executeFindingsPreserve(preserve);
   removeWorktreeNoForce(repoRoot, lanePath, hint);
   process.stdout.write(`agc feature finish — removed worktree ${lanePath}\n`);
   removeLaneMailbox(lanePath, ticketId);

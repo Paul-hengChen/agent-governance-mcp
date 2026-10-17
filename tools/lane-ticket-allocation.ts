@@ -18,6 +18,11 @@ export interface PendingTicketEntry {
   priority: string;
   dependsOn: string[];
   source?: string;
+  /** E287 (D4): trimmed `target_repo` value. Set ONLY when the block carries
+   *  the key (same "absent key → absent property" rule as `source`), so every
+   *  existing deepEqual over a local entry is unchanged. Presence alone means
+   *  "belongs to another repo": never numbered here. */
+  targetRepo?: string;
   body: string;
   lane: string;
 }
@@ -27,8 +32,9 @@ export interface ParsePendingTicketsOptions {
   /** laneLocalIds that docs/backlog.md already records for THIS lane (from
    *  `findAppliedProvenance`). When provided, every well-formed ARCHIVED
    *  block (under `## Applied`) whose `lane_local_id` is NOT in the set is
-   *  reported in `errors` — it will never be allocated. When omitted,
-   *  archived blocks are never inspected. (E179) */
+   *  reported in `errors` — it will never be allocated. Archived blocks
+   *  that carry `target_repo` are exempt: by design they get no backlog row
+   *  (E287 Q4). When omitted, archived blocks are never inspected. (E179) */
   appliedLaneLocalIds?: ReadonlySet<string>;
 }
 
@@ -347,6 +353,13 @@ function validateBlock(
   if (rec.body !== undefined && rec.body !== null && typeof rec.body !== "string") {
     return { error: "body must be a string when present" };
   }
+  // Unlike source/body, a present-but-null (bare `target_repo:`) value is
+  // malformed, not absent: the key alone would otherwise mean "another repo".
+  if (Object.prototype.hasOwnProperty.call(rec, "target_repo") && !isNonEmptyString(rec.target_repo)) {
+    return {
+      error: "target_repo must be a non-empty string when present (omit it for a finding that belongs to this repo)",
+    };
+  }
 
   const entry: PendingTicketEntry = {
     laneLocalId,
@@ -357,6 +370,7 @@ function validateBlock(
     lane,
   };
   if (isNonEmptyString(rec.source)) entry.source = rec.source.trim();
+  if (Object.prototype.hasOwnProperty.call(rec, "target_repo")) entry.targetRepo = (rec.target_repo as string).trim();
   return { entry };
 }
 
@@ -366,8 +380,11 @@ function validateBlock(
  * ignored. A bad block (unclosed, not a mapping, a required field missing, an
  * `id` field, an `E<n>`-shaped or duplicate `lane_local_id`, a malformed
  * optional field) is skipped and reported in `errors`. Swallowed openers and,
- * with `opts.appliedLaneLocalIds`, archived blocks with no backlog provenance
- * row are reported too. Never throws. (E179)
+ * with `opts.appliedLaneLocalIds`, archived local blocks with no backlog
+ * provenance row are reported too; an archived `target_repo` block is exempt,
+ * since it never gets a row (E287 Q4). Live `target_repo` blocks are returned
+ * in `entries` like any other, so the duplicate check spans both. Never
+ * throws. (E179)
  */
 export function parsePendingTickets(
   fileText: string,
@@ -385,7 +402,7 @@ export function parsePendingTickets(
     if (block.archived) {
       if (applied === undefined) continue;
       const v = validateBlock(block, lane);
-      if ("entry" in v && !applied.has(v.entry.laneLocalId)) {
+      if ("entry" in v && v.entry.targetRepo === undefined && !applied.has(v.entry.laneLocalId)) {
         errors.push(
           `${where}: sits under "## Applied" but docs/backlog.md records no row for lane ` +
             `\`${lane}\` as \`${v.entry.laneLocalId}\` — it will never be allocated; ` +
@@ -452,7 +469,8 @@ function formatBacklogRow(t: Omit<AllocatedTicket, "backlogRow">): string {
  * (AC3); a ticket's `lane` is its batch's. Lane-local `depends_on` tokens are
  * rewritten once every id is known; a missing, ambiguous or self reference
  * lands in `unresolvedDependencies` instead. Collision-free (AC5) only under
- * single-writer sequential apply.
+ * single-writer sequential apply. `target_repo` entries are never numbered; a
+ * lane-local reference to one is unresolved (E287 Q5).
  * Why: specs/e260b-rationale.md (tools/lane-ticket-allocation.ts)
  * @throws RangeError when `currentMaxId` is not a non-negative safe integer.
  */
@@ -464,11 +482,19 @@ export function allocateTicketIds(input: AllocateTicketIdsInput): AllocationResu
     );
   }
 
-  // Pass 1 — number every entry.
+  // Pass 1 — number every local entry. A `target_repo` entry belongs to
+  // another repo: it is recorded so pass 2 can name it, never consumes an id.
   const numbered: { batch: number; entry: PendingTicketEntry; lane: string; id: string }[] = [];
+  const external = new Map<string, { batch: number; targetRepo: string }[]>();
   let next = currentMaxId;
   batches.forEach((batch, b) => {
     for (const entry of batch.entries) {
+      if (entry.targetRepo !== undefined) {
+        const list = external.get(entry.laneLocalId) ?? [];
+        list.push({ batch: b, targetRepo: entry.targetRepo });
+        external.set(entry.laneLocalId, list);
+        continue;
+      }
       next += 1;
       numbered.push({ batch: b, entry, lane: batch.lane, id: `E${next}` });
     }
@@ -508,7 +534,17 @@ export function allocateTicketIds(input: AllocateTicketIdsInput): AllocationResu
       const sameBatch = candidates.filter((c) => numbered[c].batch === n.batch);
       const pool = sameBatch.length > 0 ? sameBatch : candidates;
       if (pool.length === 0) {
-        unresolved(rawRef, "not an E<n> id and no entry with that lane_local_id is part of this allocation");
+        const ext = external.get(ref) ?? [];
+        const hit = ext.find((e) => e.batch === n.batch) ?? ext[0];
+        if (hit !== undefined) {
+          const repo = hit.targetRepo.replace(/\s+/g, " ").trim();
+          unresolved(
+            rawRef,
+            `depends on a target_repo finding (target_repo: ${repo}), which gets no id in this repo — rewrite the reference as prose in body`,
+          );
+        } else {
+          unresolved(rawRef, "not an E<n> id and no entry with that lane_local_id is part of this allocation");
+        }
       } else if (pool.length > 1) {
         const where = sameBatch.length > 0 ? `lane "${n.lane}"` : "this allocation";
         unresolved(rawRef, `ambiguous: ${pool.length} entries in ${where} share that lane_local_id`);
