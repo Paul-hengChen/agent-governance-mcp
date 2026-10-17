@@ -51,12 +51,15 @@
   title: 一行摘要
   priority: P3
   depends_on: [E179]               # 或 none
+  target_repo: other-repo           # 選填：只在這筆發現屬於別的 repo 時寫
   source: 誰在哪一輪發現的          # 選填
   body: |                          # 選填
     任意長度的說明。
   ```
   ````
 - **不要自己配 E 號**。真正的票號只在整合者跑 `agc feature finish` 時配出並寫進 `docs/backlog.md`；檔案裡的 block 會被移到 `## Applied` 之下。新 block 一律寫在 `## Applied` **上方**，寫在下方會被 finish 拒絕。
+- **選填 `target_repo: <repo>`**：這筆發現屬於別的 repo。finish 不在本 repo 配號，照樣把它移到 `## Applied` 之下，並在 stderr 列出、等人類裁決（由整合者到那個 repo 建票）。有寫就不能是空值；本 repo 的其他 block 不能在 `depends_on` 引用它（finish 會拒絕），要提就寫進 `body`。
+- **`pending-tickets.md` 一定要 commit 進你的 branch**：只存在 worktree、從未 commit 的檔案不會配號 —— finish 警告並列出這些發現，在 primary 的 `.current/history/<YYYY-MM>/<lane>/` 留一份（不 commit），由整合者手動建票。
 - root 的 `NEW-TICKETS.md` 已退役，**不要再寫**。
 
 ## 5. 信箱（lane ↔ 整合者）
