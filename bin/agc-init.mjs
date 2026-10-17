@@ -1901,22 +1901,13 @@ function planAbandonCurrentHarvest({ lanePaths, lanePath, ticketId, branch, now 
   };
 }
 
-// The copy planAbandonCurrentHarvest asked for, just before the worktree is
-// removed (so it captures the lane's final state). Every file, no exclusions
-// (--abandoned writes no pointer line that base-sha would duplicate). A
-// copy-over, NEVER rm-then-copy (AC10): lane files overwrite same-named
-// history files, history-only files (an earlier harvest under the same id)
-// are kept — lossless, since agc's only writer of this dir is this harvest.
+// The copy planAbandonCurrentHarvest asked for, just before worktree removal.
+// Copy-over of every file, NEVER rm-then-copy (AC10): history-only files stay.
 // A failed copy leaves the worktree in place; re-running redoes it.
-// `preserve` is the E287 findings plan (or null). A symlinked lane
-// pending-tickets.md it covers ends as a regular file of the detector's bytes
-// (E335 D7). An earlier refused run's history copy of it (file or link) is
-// renamed aside for the copy, since copying the link over it fails (EEXIST
-// over a regular file); it is put back if the harvest fails and deleted only
-// once the regular file is in place, so AC10 stays lossless. The whole-dir copy itself
-// is unchanged (no cpSync filter: that switches Node to a copy path that
-// refuses a link over an identical link), so every other lane file, symlinks
-// included, is copied as before.
+// `preserve` is the findings plan (or null): a symlinked pending-tickets.md it
+// covers ends as a regular file of the detector's bytes, and an earlier run's
+// history copy of it is set aside for the copy and restored on failure.
+// Rationale (no cpSync filter): see the E335 T-E335-03 commit message.
 function executeAbandonCurrentHarvest(harvest, preserve) {
   const { ticketId, branch, bucket, histAbs, srcAbs, sourceIgnored } = harvest;
   const derefPending =
