@@ -110,3 +110,65 @@ Evidence: dist rebuild clean on HEAD; 221/221 on the targeted existing suites; a
 - **R3: deferred, no change.** Making a symlinked lane `pending-tickets.md` converge means either changing the E194/E125b harvest to dereference links, or adding a new plan-time refusal (a new Copy string plus an architecture decision). Both are outside R1–R3's wording scope. The fail-closed outcome is what the "Truthful destination" DR accepts. Suggest filing it as a follow-up.
 - Copy table: no Copy-table string changed. Q1–Q6 / DR-8 untouched. The only string change is the R2 one above (a pre-existing E179 failMessage, now conditional).
 - Evidence: 221/221 on the targeted existing suites (finish-history, lifecycle, e180, e213, e246, e298, lane-ticket-allocation, e303, e312, e320, drift-*). `tools/` is untouched, so there was no dist rebuild.
+
+## Round 2 — APPROVED — by code-reviewer
+
+Range reviewed: the fix `git diff 8672061..55bf682 -- bin/`, then the full `git diff dac6069...HEAD` (HEAD 2394721) re-checked against the round-1 focus list, `specs/e287-finish-findings-and-small-fixes.md` and its architecture.
+
+## Summary
+- R1 is closed. `readUnallocatedFindings` takes `revs`. `--shipped` probes `[base, refs/heads/<branch>]`, and `--abandoned` probes `[refs/heads/<branch>]`, which is unchanged in effect. A re-run after a late failure now exits 0 with no warning, for both a local committed file and a `target_repo`-only committed file.
+- The O6/E179 mutual exclusion holds. A file that was never committed still warns, is never numbered, and converges on re-run.
+- R2 is correct. It is the only string change. R3's deferral is accepted and filed as `E287-NEW-2` in `.current/e287/pending-tickets.md`.
+- No regression in the full diff: `npm run build` gives no dist diff, and the targeted suites pass 276/276.
+- Verdict: APPROVED.
+
+## AC Completeness
+- AC-E287-4 — implemented (was partial). The E179 idempotent re-run is restored. s8: the first run exits 1 at `git worktree remove`; after the blocker is removed, the re-run exits 0 with "already recorded … skipping the close writeback", the worktree is removed and the branch is deleted.
+- AC-E287-8 — implemented (was partial). s5 uses AC-E287-8's own proof shape: a `target_repo`-only file, no `docs/backlog.md`, committed, then a forced late failure. The re-run exits 0, prints no warning, and creates no backlog.
+- AC-E287-1/2/3 — implemented, re-verified on HEAD (s1, s2, s3, s3a). Every case warns, and the history copy is byte-identical.
+- All other ACs (E287-5/6/7/9/10, E324-1..3, E325-1..4, E326-1..7): unchanged since round 1. `tools/`, `dist/` and `scripts/` are untouched by 55bf682, and the round-1 lines stand.
+
+## Correctness
+R1 fix, adversarial probes. Each was run against HEAD and against a `git archive 8672061` snapshot, in throwaway `$TMPDIR` repos:
+- **Pending file committed on the branch after the merge into base (s14).** Unreachable. The `merge-base --is-ancestor` guard refuses because the branch tip is no longer contained in `--base` ("not merged into main … nothing removed"). Both builds behave the same.
+- **Branch moved after the merge.**
+  - If the branch moves forward, the same guard refuses.
+  - If it is rewound to an ancestor that still has the file while `--base` has since dropped it (s15), the file is now tracked at the lane HEAD. This is no longer an O6 shape, which the architecture defines as a git-excluded artifact.
+- **Uncommitted additions to a tracked pending file.** `git worktree remove` (never `--force`) refuses on a dirty tracked file, so nothing is lost silently. The behaviour is the same as the round-1 `rev = base` probe.
+- **R4 — optional, accepted as is.** When `--base` deliberately drops a lane's committed `pending-tickets.md` after the merge (s13; s15 is the rewound variant):
+  - The round-1 build warned "not committed on main" and kept a copy.
+  - HEAD is silent. E179 reads `--base`, finds nothing and does nothing, and the branch probe suppresses O6.
+  - Nothing is lost: the lane-close harvest still copies `.current/<lane>/` (the pending file included) into `.current/history/<bucket>/<lane>/`, and the blob stays in base's history (s13: `main~2:<pendingRel>` exists).
+  - The behaviour matches pre-E287 `dac6069`, and the drop is a deliberate human act on `--base`. No follow-up is needed.
+  - If one is ever wanted, the narrower form is to probe the branch only when `close.alreadyClosed`.
+- **Never-committed counterpart (s11).** An ignored `.current/` with a forced late failure warns on both runs. The re-run exits 0, and the history copy is byte-identical. The mutual exclusion is intact.
+
+R2: `commitPendingOnShipped` builds the failure message from `rels`, and `rels` contains `BACKLOG_REL` iff `plan.backlogPresent`. s12 (a pre-commit hook rejects the commit, external-only, no backlog) prints `… git commit on main failed — .current/e9/pending-tickets.md restored; nothing applied, nothing removed`, and no backlog is created. The fix diff changes no other string literal. The only other change is the `revs` wiring at the two call sites. The Copy table, Q1–Q6 and DR-8 are untouched.
+
+R3 deferral: accepted. Round 1 tagged R3 optional. The outcome fails closed, which is what the architecture's "Truthful destination" DR accepts. A converging fix would mean either a harvest change that dereferences symlinks (E194/E125b) or a new plan-time refusal with a new Copy string. Both are architecture-level and outside this ticket's AC set. Filed as `E287-NEW-2` (P3, depends_on [E287]).
+
+## Quality
+- The `revs` rename and the probe loop are minimal. The comments at both the call site and the helper state the new contract.
+- Comment check (4b), `agc check — comments` warnings that touch the diff:
+  - `bin/agc-init.mjs:1971` (8 lines) — kept. It is `planPendingApply`'s return-shape contract, which grew by `external` / `backlogPresent`.
+  - `bin/agc-init.mjs:2171` (9 lines) — kept. It is the E287 banner section the architecture requires.
+  - `tools/lane-ticket-allocation.ts:377` (10 lines) — kept. It is the exported parser's contract, and the `target_repo` exemption belongs in the contract.
+  - All three were present in round 1 and are advisory. Optional: trim when next touched.
+- Optional: the new comment tag `(E287 R2)` cites a review-finding id that is opaque to later readers. Surrounding comments cite ACs (`AC-E287-7`). Not blocking.
+
+## Architecture
+The fix stays inside the O6 detector and its two call sites, as round 1 required ("no architecture re-open"). It widens the architecture's *Re-run / idempotency* O6 key from `<rev>:<pendingRel>` to "at `--base` or at the merged lane branch". sr recorded this in the round-1 reply, and that satisfies the round-1 condition. A later architecture touch should fold the wider key into that section; the E287-NEW-1 doc ticket is the natural place.
+
+## Security
+No findings. The new probe is one more `git cat-file -e` with argv (`gitTry`), and `refs/heads/<branch>` comes from `git worktree list`. Git branch names cannot contain `:`, so `<rev>:<path>` cannot be split ambiguously.
+
+## Performance
+No findings. There is at most one extra `git cat-file -e` per `--shipped` run, and only when the worktree pending file exists.
+
+## Verdict
+APPROVED — R1 is closed without weakening the O6/E179 mutual exclusion, R2 is exact, and R3 is rightly deferred to E287-NEW-2. The full diff shows no regression from the fix.
+
+Evidence:
+- `npm run build` on HEAD: no dist diff.
+- `node --test` on the targeted suites (finish-history, lifecycle, drift-*, e112, e180, e213, e246, e298, e303, e312, e320, error-code-contract, lane-ticket-allocation): 276/276.
+- Smokes s1–s6, s8, s10–s12 (sr's fixtures) and s13–s15 (new adversarial cases) were run on HEAD, and s13–s15 also on the 8672061 snapshot. They ran in throwaway `$TMPDIR` repos and were not committed.
