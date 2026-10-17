@@ -1,9 +1,10 @@
 ---
 schema_version: 15
 active_feature: "e287-finish-findings-and-small-fixes"
-status: "In_Progress"
-last_updated: "2026-10-17T08:53:41.394Z"
-last_agent: "sr-engineer"
+status: "FAIL"
+last_updated: "2026-10-17T09:00:50.382Z"
+blocking_reason: "R1 (required): --shipped re-run after a late failure is permanently refused for any lane with a committed pending-tickets.md + tracked lane dir — the first run's git mv moves the file off <base>:.current/<lane>/, so readUnallocatedFindings misfires on the stale worktree copy and planFindingsPreserve refuses (base re-run exits 0). Violates AC-E287-4 / AC-E287-8."
+last_agent: "code-reviewer"
 prd_path: "specs/e287-finish-findings-and-small-fixes.md"
 scope_decision: "single-feature"
 scope_decision_why: "Four pairwise-disjoint tickets (E287 bin/agc-init.mjs + tools/lane-ticket-allocation.ts; E324 tools/registry.ts; E325 tools/drift.ts; E326 scripts/verify-release.mjs) batched by the human-approved wave-5 manifest e287 row; no shared contract, one sr pass after the mandatory E287 architect hop."
@@ -11,16 +12,17 @@ cut_approved: true
 dispatch_pins:
   sr-engineer: "opus"
 evidence_schema: 2
-next_role: "code-reviewer"
-dispatched_at: "2026-10-17T08:53:41.394Z"
+next_role: "sr-engineer"
+dispatched_at: "2026-10-17T09:00:50.382Z"
+review_verdict: "CHANGES_REQUESTED"
 dispatch_mechanism: "task"
 dispatch_mechanism_tier: "opus"
 qa_round: 0
-review_round: 0
+review_round: 1
 visual_round: 0
-hop_count: 3
+hop_count: 4
 qa_rounds_total: 0
-review_rounds_total: 0
+review_rounds_total: 1
 visual_rounds_total: 0
 ---
 # Handoff State
@@ -29,14 +31,9 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- sr-engineer: T-E287-01, T-E324-01, T-E325-01, T-E326-01 ready for code review (base dac6069).
-- T-E324-01 @ 3567a9d — tools/registry.ts emitZodGateTelemetry: workspace_path normalized via path.resolve, emit skipped when any whole segment === '.current' (replaces basename check); emit uses the normalized path. dist/tools/registry.* rebuilt.
-- T-E325-01 @ d894c44 — tools/drift.ts readArtifactVersion(handoff): local readFileIfPresent (null on missing/ENOENT/ENOTDIR, other errors to the outer catch); on a miss re-reads the other layout once (lane<->flat), mirroring E312. tools/handoff-parse.ts untouched. dist/tools/drift.* rebuilt.
-- T-E326-01 @ ebf1fbd — scripts/verify-release.mjs (option A): branch-scoped [] is polled in the existing budget (own poll-progress line: 'no completed CI runs on <label> yet; polling again in …'); at budget end warn() with the unchanged 'no completed CI runs found on <label>' reason (strict FAIL / lenient WARN). Non-array JSON still degrades immediately with the same reason; --sha and gh-unavailable paths unchanged.
-- T-E287-01 @ 2358b2a — per architecture: lane-ticket-allocation.ts (targetRepo field + validation, archived target_repo provenance exemption, allocateTicketIds skips externals + Q5 reason); bin/agc-init.mjs (checkOrphanLanes local-only, usage text, planPendingApply external/backlogPresent, newPendingText archives externals, planPendingOnShipped rels, commitPendingOnShipped restore/message/listing, planLaneClose hist on both alreadyClosed returns, applyPendingOnAbandoned archived list + listing, E287 helper block after commitPendingOnShipped, runFeatureFinish wiring incl. hoisted shared `now`); .current/e287/pending-tickets.md with E287-NEW-1 verbatim.
-- Deviations (minor, flag for review): (1) newPendingText also passes external laneLocalIds to markApplied — required by Q4 archive, not spelled out in the architecture's changed-function list. (2) displayField is applied to laneLocalId too (not only title/repo) in both warning and listing — identical output for normal ids. (3) executeFindingsPreserve runs the byte-identical post-check after a fresh write too (reason text 'a different file is already there' reused).
-- Tests (sr sanity, no test/** edits): lane-ticket-allocation + agc-feature-lifecycle + agc-feature-finish-history + e213 + e180 + e298 + e246 = 152/152; drift-* + e112 + e312 = 79/79; e303 5/5; e320 15/15; verify-release 61/61 BUT ~546s — VR-15 now waits the 480s default budget (passes); needs qa's AGC_VERIFY_CI_WAIT_SECONDS:'0' pin as planned. Ad-hoc scratch smokes: O6 shipped/abandoned, tracked-dir+ignored-file shipped/abandoned (copy byte-identical), D4 external-only no-backlog + mixed for both verbs, orphan scan (only local-entry branch flagged) — all as specified.
-- npm run build changed only dist/tools/{registry,drift,lane-ticket-allocation}.*; no other dist drift.
+- review_report: review_reports/review_T-E287-01.md (covers T-E287-01, T-E324-01, T-E325-01, T-E326-01; commit 4a072a1)
+- R1 required — bin/agc-init.mjs readUnallocatedFindings + --shipped wiring: repro = lane commits .current/<lane>/pending-tickets.md, merge, untracked blocker in worktree, finish --shipped (allocates + git mv lane dir, worktree remove refused), remove blocker, re-run → exit 1 e287.preserve-differs-refuse; base dac6069 re-run → exit 0. Same with target_repo-only files (AC-E287-8's own scenario). Fix (sr's choice, keep O6/E179 mutual exclusion): (a) on --shipped also treat the file as committed when `git cat-file -e refs/heads/<branch>:<pendingRel>` succeeds (merge guard already proved branch ⊂ base), or (b) on alreadyClosed re-run also probe <base>:<close.hist.histRel>/<filename>. Rebuild dist if tools/ touched (it should not be). qa should add the committed-file + forced-late-failure + re-run regression case in T-E287-02.
+- R2/R3 optional only (failMessage wording in external-only no-backlog commit; symlinked lane pending file in a covered harvest never converges, reason text misleading). sr's three flagged deviations judged ACCEPTED. E324/E325/E326 approved as-is; VR-15 480s wait is expected under option A (qa pin). dist rebuild clean on HEAD; 221/221 targeted existing suites green.
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.
