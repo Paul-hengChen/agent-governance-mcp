@@ -1,5 +1,7 @@
 # Pending tickets — lane e291
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E291-NEW-1
 title: No task-list tool edits an existing unchecked task's description or depends_on
@@ -13,5 +15,3 @@ body: |
   named after. Consider a tool that rewrites the description / depends_on of an unchecked task in
   place, refusing on checked or voided tasks, so amendments stay on tools and keep their ids.
 ```
-
-## Applied
