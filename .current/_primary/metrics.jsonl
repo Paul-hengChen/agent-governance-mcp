@@ -61,3 +61,4 @@
 {"ts":"2026-10-16T05:48:33.300Z","feature":"release-v4.6.0","tickets":0,"qa_rounds":0,"review_rounds":0,"visual_rounds":0,"hops":5,"one_pass":true,"released_version":"4.6.0"}
 {"ts":"2026-10-16T09:02:33.154Z","feature":"release-post-v4-w4","tickets":0,"qa_rounds":0,"review_rounds":0,"visual_rounds":0,"hops":3,"one_pass":true,"released_version":"4.7.0"}
 {"ts":"2026-10-17T11:19:22.216Z","feature":"release-post-v4-w5","tickets":0,"qa_rounds":0,"review_rounds":0,"visual_rounds":0,"hops":3,"one_pass":true,"released_version":"4.8.0"}
+{"ts":"2026-10-17T16:56:02.794Z","feature":"release-post-v4-w6","tickets":0,"qa_rounds":0,"review_rounds":0,"visual_rounds":0,"hops":3,"one_pass":true,"released_version":"4.9.0"}
