@@ -67,6 +67,7 @@ export declare const FANOUT_CODES: {
     readonly specUnreadable: "SPEC_UNREADABLE";
     readonly rangeInvalid: "RANGE_INVALID";
     readonly pathsUnreadable: "PATHS_UNREADABLE";
+    readonly gitDiffFailed: "GIT_DIFF_FAILED";
 };
 /**
  * validate warning for a dispatchable row whose worktree cell is an absolute
@@ -342,6 +343,8 @@ export declare function isGlobToken(token: string): boolean;
  * is usually a prose aside that happens to be path-shaped.
  */
 export declare function unmatchedOwnedTokens(ownedTokens: string[], basePaths: string[], addedPaths: string[]): string[];
+/** First non-blank stderr line of a failed git call, else the first line of its message. */
+export declare function gitErrorLine(err: unknown): string;
 /**
  * Fan-in ownership check: every file the lane branch changed vs `<base>`
  * (committed changes only, so uncommitted work never counts) that is

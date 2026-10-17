@@ -140,6 +140,9 @@ export const FANOUT_CODES = {
   // owners input errors (exit 2).
   rangeInvalid: "RANGE_INVALID",
   pathsUnreadable: "PATHS_UNREADABLE",
+  // owners --range / check input error (exit 2): the `git diff <a>...<b>`
+  // itself failed, e.g. the two sides share no merge base.
+  gitDiffFailed: "GIT_DIFF_FAILED",
 } as const;
 
 /**
@@ -1231,6 +1234,27 @@ function nulList(raw: string): string[] {
   return raw.split("\0").filter((p) => p.length > 0);
 }
 
+/** First non-blank stderr line of a failed git call, else the first line of its message. */
+export function gitErrorLine(err: unknown): string {
+  const stderr = (err as { stderr?: unknown }).stderr;
+  const fromStderr = typeof stderr === "string" ? stderr.split(/\r?\n/).find((l) => l.trim() !== "") : undefined;
+  if (fromStderr !== undefined) return fromStderr.trim();
+  return ((err as Error)?.message ?? String(err)).split(/\r?\n/)[0];
+}
+
+/**
+ * `git diff --no-renames --name-only -z <a>...<b>`, or a GIT_DIFF_FAILED
+ * input error when git fails (e.g. no merge base), so a failed diff is never
+ * read as an empty or out-of-bounds change set.
+ */
+function diffNames(a: string, b: string, repo: string): { raw: string } | { error: FanoutError } {
+  try {
+    return { raw: gitOut(["diff", "--no-renames", "--name-only", "-z", `${a}...${b}`, "--"], repo) };
+  } catch (err) {
+    return { error: inputErr(FANOUT_CODES.gitDiffFailed, `git diff ${a}...${b} failed in ${repo}: ${gitErrorLine(err)}`) };
+  }
+}
+
 function refOk(ref: string, cwd: string): boolean {
   try {
     gitOut(["rev-parse", "--verify", "--quiet", `${ref}^{commit}`], cwd);
@@ -1271,8 +1295,9 @@ export function checkLane(m: Manifest, laneId: string, opts: CheckOptions = {}):
   }
   if (errors.length > 0) return { ok: false, errors };
 
-  const raw = gitOut(["diff", "--no-renames", "--name-only", "-z", `${base}...${lane.branch}`, "--"], repo);
-  const changed = [...new Set(raw.split("\0").filter((p) => p.length > 0))].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  const diff = diffNames(base, lane.branch, repo);
+  if ("error" in diff) return { ok: false, errors: [diff.error] };
+  const changed = [...new Set(diff.raw.split("\0").filter((p) => p.length > 0))].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
 
   const out: { path: string; forbidden?: string }[] = [];
   for (const p of changed) {
@@ -1775,7 +1800,9 @@ export function rangePaths(sides: [string, string], repo: string): { paths: stri
     .filter((ref) => !refOk(ref, repo))
     .map((ref) => inputErr("REF_NOT_FOUND", `range ref "${ref}" does not resolve (git rev-parse --verify) in ${repo}`));
   if (errors.length > 0) return { errors };
-  return { paths: nulList(gitOut(["diff", "--no-renames", "--name-only", "-z", `${sides[0]}...${sides[1]}`, "--"], repo)) };
+  const diff = diffNames(sides[0], sides[1], repo);
+  if ("error" in diff) return { errors: [diff.error] };
+  return { paths: nulList(diff.raw) };
 }
 
 /** One repo-relative path per line: trailing CR and surrounding space trimmed, blanks skipped. */
