@@ -5,3 +5,5 @@
 {"ts":"2026-10-17T12:29:26.622Z","feature":"e291-start-link-locations","agent_id":"code-reviewer","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-10-17T12:29:32.585Z","feature":"e291-start-link-locations","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-10-17T12:34:48.606Z","feature":"e291-start-link-locations","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-17T12:39:16.508Z","feature":"e291-start-link-locations","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-17T12:42:29.214Z","feature":"e291-start-link-locations","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
