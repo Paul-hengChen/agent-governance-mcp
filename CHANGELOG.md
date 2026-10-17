@@ -16,6 +16,89 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [4.9.0] - 2026-10-18
+
+MINOR release. It ships post-v4 fan-out wave 6 since v4.8.0, landed on `main` by its wave pull
+request: lanes `e284` (E284, E331, E330, E332, E333), `e291` (E291, E335) and `e329` (E329,
+E328, E334, E327); plan `specs/fanout-post-v4-w6.md`, release gate `specs/release-post-v4-w6.md`.
+Semver: MINOR, not PATCH, because two changes add backwards-compatible capability: a new
+`handoff` subcommand for `scripts/fanout.mjs` (E284) and a new optional `nodeModulesLinks` key in
+`.current/.config.json` read by `agc feature start` (E291). The other changes are bug fixes, SOP
+and protocol wording, and test hygiene. No MCP tool input schema, prompt schema, state file
+format, gate registry entry (still 34), schema version (config `schema_version` stays 2) or
+dependency changed, and the constitution and coordinator fragments are unchanged.
+
+### Added
+
+- **E284: `fanout.mjs handoff` (`tools/fanout-handoff.ts`, `scripts/fanout.mjs`)**: a new
+  subcommand, `node scripts/fanout.mjs handoff [--check] <manifest> [--target <branch>] [--repo
+  <dir>] [--mailbox-root <dir>] [--closing]`, loaded only when used. Generate mode prints a
+  `## 接手步驟` section skeleton with the ten fact keys filled in from git, `lane-status` and the
+  mailbox, and placeholders for the judgement items. `--check` re-collects the facts from a
+  manifest's existing section and prints a `DIFF` or `MOVED` line per key plus a
+  `fanout handoff --check: <n> fact(s) checked, <d> differ, <m> moved` summary; exit 0 means no
+  `DIFF` (`MOVED` allowed), 1 at least one `DIFF`, 2 a usage or input error (including the new
+  `HANDOFF_FACT_DUPLICATE` and `HANDOFF_GIT_FAILED` codes). `--closing` omits the integration
+  branch and writes primary as `<target> ← <integ> @ <sha7>`. Both modes are read-only. Spec:
+  `specs/e284-fanout-handoff-command.md`; tests: `test/e284-fanout-handoff.test.mjs`.
+- **E291: `nodeModulesLinks` for `agc feature start` (`tools/config.ts`, `bin/agc-init.mjs`,
+  `docs/config.md`)**: a new optional `.current/.config.json` key, an array of repo-relative
+  directories (`"."` is the repo root), tells `agc feature start` which `node_modules` locations
+  to link into a lane worktree, each with its own `/<dir>/node_modules` exclude rule. The list
+  replaces the root default; with the key absent the behavior is unchanged. Invalid entries are
+  skipped with a warning. The parser is `parseNodeModulesLinks`; `loadConfig` surfaces the
+  normalized list as `WorkspaceConfig.nodeModulesLinks`. Additive-optional: no config schema
+  bump and no migration. Spec: `specs/e291-start-link-locations.md`; tests:
+  `test/e291-start-link-locations.test.mjs`.
+
+### Fixed
+
+- **E331: a failed `git diff` exits 2 (`tools/fanout-manifest.ts`)**: `fanout.mjs owners
+  --range` and `check` now report a failing `git diff` (for example, a range with no merge base)
+  as exit 2 with the new `GIT_DIFF_FAILED` code and the first git error line, instead of a stack
+  trace and exit 1, which `owners` reserves for "hit". Tests:
+  `test/e331-git-diff-failure.test.mjs`.
+- **E332: closed-manifest absolute-path detection (`tools/fanout-manifest.ts`)**: the
+  `## 接手步驟` absolute-path check also catches a path right after `**`, an ASCII colon or comma,
+  inside `|…|`, and the `file:///`, `$HOME/`, `${HOME}/` and UNC forms, and no longer flags a
+  `~10/17`-style date. Every existing manifest's validate result is unchanged. Tests:
+  `test/e332-absolute-path-boundaries.test.mjs`.
+- **E335: `agc feature finish` with a symlinked `pending-tickets.md` (`bin/agc-init.mjs`)**: the
+  lane-close harvest converges when the lane's `pending-tickets.md` is a symlink. The history copy
+  becomes a regular file holding the target's bytes on `--shipped`, `--abandoned` and re-runs,
+  and an `--abandoned` re-run first sets aside colliding history links; verified on Node 20 and
+  22. Tests: `test/e335-symlinked-pending-harvest.test.mjs`.
+
+### Changed
+
+- **E330: generic `fanout.mjs` usage (`tools/fanout-manifest.ts`)**: the usage printed with no
+  or an unknown subcommand now lists the `owners` and `handoff` forms (five continuation lines).
+  `test/e296-manifest-tier.test.mjs` (AC12) and `test/e322-owners.test.mjs` are re-pinned.
+- **E329, E328: integrator SOP (`content/skill-integrator.md`)**: Stage 4 *Mid-wave base fix*
+  condition 2 runs `node scripts/fanout.mjs owners <manifest> --range <lane branch>...origin/<target>`
+  (exit 0 holds; exit 1 or 2 does not). Stage 6 states the canonical closed status line and the
+  `## 接手步驟` sub-items, with `fanout.mjs validate` exiting 0 before the wave push. Stage 0 names
+  `人類` as the `裁決者` of the cross-repo hand-off note's Decisions row and adds a step for
+  revising a Stage 0 ticket cut. `test/e286-integrator-trust-and-git.test.mjs` re-pins its
+  condition-2 literals. Spec: `specs/e329-integrator-sop-followups.md`; tests:
+  `test/e329-integrator-sop-followups.test.mjs`.
+- **E334: lane protocol §4 and integrator Stage 6 (`docs/lane-protocol.md`,
+  `content/skill-integrator.md`)**: §4 documents the optional `target_repo: <repo>` pending-ticket
+  field and that a never-committed `pending-tickets.md` is not numbered; Stage 6 tells the
+  integrator to get a human ruling on each `target_repo` finding and to hand-file each warned
+  unallocated finding.
+- **E327: QA SOP resident-test hygiene (`content/skill-qa-engineer.md`)**: the hygiene rule names
+  its one exception, a closed historical range with both ends fixed shas, guarded by
+  `git rev-parse --verify` and skipped loudly when absent. The file stays under its 18500-byte cap.
+- **E333: faster handoff validate tests (`test/e283-validate-handoff.test.mjs`)**: the grammar
+  cases call the validator in-process; a few CLI cases remain for exit codes and stderr.
+
+### Notes
+
+- `dist/` carries the rebuilt `tools/config`, `tools/fanout-handoff` and `tools/fanout-manifest`
+  outputs plus the version literal. Wave-6 evidence moves to
+  `qa_reports/archive/release-post-v4-w6/` and `review_reports/archive/release-post-v4-w6/`.
+
 ## [4.8.0] - 2026-10-17
 
 MINOR release. It ships post-v4 fan-out wave 5 since v4.7.0, landed on `main` by its wave pull
