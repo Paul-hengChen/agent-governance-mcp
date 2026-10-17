@@ -1,3 +1,5 @@
+## Applied
+
 ```pending-ticket
 lane_local_id: E287-NEW-1
 title: Document the pending-ticket target_repo field and finish's unallocated-findings warning in docs/lane-protocol.md §4 and the integrator SOP Stage 6
