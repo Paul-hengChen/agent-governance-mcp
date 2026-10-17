@@ -1901,32 +1901,54 @@ function planAbandonCurrentHarvest({ lanePaths, lanePath, ticketId, branch, now 
   };
 }
 
+// E335 D8: renames aside (into `asides`) each history link a same-named lane
+// link would be copied over — Node 20 cpSync refuses link over link. Walks
+// without following links; recurses only where both sides are real dirs.
+function setAsideCollidingHistoryLinks(srcDir, histDir, asides) {
+  for (const ent of fs.readdirSync(srcDir, { withFileTypes: true })) {
+    const dst = path.join(histDir, ent.name);
+    if (ent.isDirectory()) {
+      if (lstatOrNull(dst)?.isDirectory() === true) {
+        setAsideCollidingHistoryLinks(path.join(srcDir, ent.name), dst, asides);
+      }
+    } else if (ent.isSymbolicLink() && lstatOrNull(dst)?.isSymbolicLink() === true) {
+      const aside = `${dst}.${process.pid}.${Date.now()}.aside.tmp`;
+      fs.renameSync(dst, aside);
+      asides.push({ orig: dst, aside });
+    }
+  }
+}
+
 // The copy planAbandonCurrentHarvest asked for, just before worktree removal.
 // Copy-over of every file, NEVER rm-then-copy (AC10): history-only files stay.
 // A failed copy leaves the worktree in place; re-running redoes it.
 // `preserve` is the findings plan (or null): a symlinked pending-tickets.md it
-// covers ends as a regular file of the detector's bytes, and an earlier run's
-// history copy of it is set aside for the copy and restored on failure.
-// Rationale (no cpSync filter): see the E335 T-E335-03 commit message.
+// covers ends as a regular file of the detector's bytes. History entries the
+// copy replaces (that file's earlier copy; links under lane links, D8) are set
+// aside first and restored on failure. Rationale: E335 T-E335-03/04 commits.
 function executeAbandonCurrentHarvest(harvest, preserve) {
   const { ticketId, branch, bucket, histAbs, srcAbs, sourceIgnored } = harvest;
   const derefPending =
     preserve?.covered === true &&
     lstatOrNull(path.join(srcAbs, preserve.filename))?.isSymbolicLink() === true;
   const prior = derefPending ? lstatOrNull(preserve.dstAbs) : null;
-  const aside =
-    prior !== null && (prior.isFile() || prior.isSymbolicLink())
-      ? `${preserve.dstAbs}.${process.pid}.${Date.now()}.aside.tmp`
-      : null;
+  const asides = [];
   try {
     fs.mkdirSync(histAbs, { recursive: true });
-    if (aside !== null) fs.renameSync(preserve.dstAbs, aside);
+    if (prior !== null && (prior.isFile() || prior.isSymbolicLink())) {
+      const aside = `${preserve.dstAbs}.${process.pid}.${Date.now()}.aside.tmp`;
+      fs.renameSync(preserve.dstAbs, aside);
+      asides.push({ orig: preserve.dstAbs, aside });
+    }
+    // After the pending-tickets.md set-aside, so that file is never set aside twice.
+    setAsideCollidingHistoryLinks(srcAbs, histAbs, asides);
     fs.cpSync(srcAbs, histAbs, { recursive: true, force: true, errorOnExist: false });
     if (derefPending) materializeFindingsCopy(preserve.dstAbs, preserve.bytes);
   } catch (err) {
-    if (aside !== null && lstatOrNull(aside) !== null) {
+    for (const { orig, aside } of asides.reverse()) {
+      if (lstatOrNull(aside) === null) continue;
       try {
-        fs.renameSync(aside, preserve.dstAbs);
+        fs.renameSync(aside, orig);
       } catch {
         // left at `aside` (lossless); the error below is the one to report
       }
@@ -1937,11 +1959,11 @@ function executeAbandonCurrentHarvest(harvest, preserve) {
         `(re-running finish is safe)`
     );
   }
-  if (aside !== null) {
+  for (const { aside } of asides) {
     try {
       fs.rmSync(aside, { force: true });
     } catch {
-      // a leftover copy of the old history file is harmless
+      // a leftover copy of the old history entry is harmless
     }
   }
   // Copy / Strings e194.current-harvest-line (reason clause per sourceIgnored).
