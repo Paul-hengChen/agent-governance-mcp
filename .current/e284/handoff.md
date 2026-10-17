@@ -2,22 +2,23 @@
 schema_version: 15
 active_feature: "e284-fanout-handoff-command"
 status: "In_Progress"
-last_updated: "2026-10-17T12:36:44.000Z"
-last_agent: "sr-engineer"
+last_updated: "2026-10-17T12:46:34.385Z"
+last_agent: "qa-engineer"
 scope_decision: "single-feature"
 scope_decision_why: "Five tickets (E284, E331, E330, E332, E333) batched into one lane feature by the human-approved wave-6 manifest (specs/fanout-post-v4-w6.md, e284 row); all touch the same fanout tool files, so they are cut serially in one feature with a single review + QA round."
 cut_approved: true
 dispatch_pins:
   sr-engineer: "opus"
 evidence_schema: 2
-next_role: "code-reviewer"
-dispatched_at: "2026-10-17T12:36:44.000Z"
+next_role: "qa-engineer"
+dispatched_at: "2026-10-17T12:46:34.385Z"
+review_verdict: "APPROVED"
 dispatch_mechanism: "task"
 dispatch_mechanism_tier: "opus"
 qa_round: 0
 review_round: 0
 visual_round: 0
-hop_count: 2
+hop_count: 4
 qa_rounds_total: 0
 review_rounds_total: 0
 visual_rounds_total: 0
@@ -28,13 +29,11 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- sr-engineer: T-E331-01, T-E332-01, T-E330-01, T-E284-01, T-E284-02 ready for code review. Commits (lane branch, not pushed): b0e77ec E331, f0517fd E332, 670d489 E330, a1af4ff E284 (T-E284-01 + T-E284-02 together: generate and --check share one module).
-- Files: tools/fanout-manifest.ts (+dist/tools/fanout-manifest.*), new tools/fanout-handoff.ts (+dist/tools/fanout-handoff.*), scripts/fanout.mjs (header + lazily imported handoff route), qa_reports/expected-red_e284-fanout-handoff-command.txt. tools/lane-status.ts and scripts/mailbox-watch.mjs untouched (no new exports). npm run build changed no other dist file.
-- New exports in fanout-manifest.ts (no behaviour change): BASE_RE, isNamedHeading, findHandoffSections, readsNone, HANDOFF_BACKGROUND, HANDOFF_NONE, HANDOFF_USAGE, gitErrorLine; FANOUT_CODES.gitDiffFailed. HANDOFF_SECTION / HANDOFF_SUBITEMS names and values unchanged.
-- Exports in fanout-handoff.ts for qa: runHandoff, collectFacts, renderHandoffSection, readHandoffFacts, compareFacts, watchLockPath + formatWatchCommand (the AC-E284-11 parity pair; they match mailbox-watch's watchLockPath / formatRearmCommand minus the prefix, checked ad hoc for one and two files), HANDOFF_FACT_KEYS and the Copy constants.
-- Hard conditions checked: (1) validate sweep of all 23 specs/fanout-*.md: only wave5.1 and wave6 exit 2 {DECISIONS_SECTION_ABSENT, PINS_SECTION_ABSENT}, the rest exit 0. (2)+(3) base-vs-lane CLI comparison, 316 runs (validate, render twice per dispatchable lane, check per lane, owners --paths / --range / bad range per manifest, usage errors): byte-identical except the 4 generic-usage stderr texts (E330, exit still 2). (4)+(6) lane-status.ts / mailbox-watch.mjs not modified. (5) HANDOFF_SECTION / HANDOFF_SUBITEMS unchanged. tsc 0 errors; npm audit --audit-level=high: 0 high/critical (2 low, 6 moderate).
-- Tests: e177a, e283, e322, e296, e316, e178b, e235b, e248, e177b, e178a and error-code-contract: 226 pass, 2 fail. The 2 failures are the expected reds in the manifest: e296 AC12 and e322 AC-E322-9 (generic usage now has 5 continuation lines; qa re-pins per D4). Ad-hoc temp-repo runs covered: generate, clean check, DIFF lines, R1 MOVED and its non-ancestor DIFF, the R2 --closing round trip (validate 0, unmerged = DIFF, merged = 3 MOVED / exit 0, a primary status change = DIFF), error and usage paths, the no-mailbox note, and E331 with no merge base (owners and check both exit 2 GIT_DIFF_FAILED, no stack trace).
-- Judgement calls for review: (a) the primary lane-status row takes clean/dirty from the manifest-excluded git status fact, so pasting the section does not make AC-E284-6 DIFF; (b) the fanout.mjs handoff route is a dynamic import, so the other subcommands do not load lane-status; (c) DIFF writes an absent side as handoff「（缺）」; (d) a --target that starts with '-' or has whitespace is REF_NOT_FOUND; (e) the `.`/`..` lane ids are skipped for mailbox reads; (f) `N fact(s) checked` counts keys present on either side.
+- code-reviewer: round 1 APPROVED for T-E331-01, T-E332-01, T-E330-01, T-E284-01, T-E284-02 (batched, covers: line). 0 required, 2 recommended (R-1 core.quotePath: a non-ASCII manifest name is not excluded from the git status fact; R-2 comment says four primary keys, there are five), 5 optional.
+- review_report: review_reports/review_T-E284-01.md
+- Judgement call (a) ACCEPTED as an in-scope deviation (recorded under Architecture): the primary lane-status row's clean/dirty follows the manifest-excluded git status fact; without it AC-E284-6 cannot hold. (b)-(f) accepted.
+- Expected reds confirmed: exactly e296 AC12 and e322 AC-E322-9 fail (226/228 on the targeted suites); qa re-pins per D4. T-E333-01 (qa-only) still open.
+- Filed 1 pending-ticket in .current/e284/pending-tickets.md: a D5 bold-opener rule false positive on a leading glob `**/a/b` after a boundary (spec-conformant implementation; rule gap).
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.
