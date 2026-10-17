@@ -1002,7 +1002,9 @@ test("VR-14 (E14 degradation): gh exits non-zero (API/auth error) -> WARN on std
 test("VR-15 (E14 degradation): zero completed CI runs on main -> WARN on stdout, never a FAIL, exit 0", () => {
   const { root } = mkFixtureRepo({ version: "10.0.4", tag: "at-head", origin: "pushed" });
   const shimDir = mkGhShim(ghJsonShim("[]"));
-  const result = runVerifyWithPath(root, `${shimDir}:${noGhSystemPath()}`, ["v10.0.4"]);
+  const result = runVerifyWithPath(root, `${shimDir}:${noGhSystemPath()}`, ["v10.0.4"], {
+    AGC_VERIFY_CI_WAIT_SECONDS: "0",
+  });
   assert.equal(result.status, 0, `zero completed CI runs must never fail the release; stderr: ${result.stderr}`);
   assert.match(
     result.stdout,
@@ -2008,4 +2010,36 @@ test("VR-49 (E126 AC10): a post-tag commit touching only .current/<lane>/tasks.m
   );
   assert.match(result.stdout, /OK: tag-at-HEAD/);
   assert.equal(result.stderr, "", "a tolerated pass must not print anything to stderr");
+});
+
+// ---------------------------------------------------------------------------
+// E326 (option A, AC-E326-7): Check 6 of the full release run polls an empty
+// branch-scoped list within the budget like --ci-check does (one shared rule,
+// E163), then degrades through the unchanged lenient WARN. WHY: a freshly
+// pushed branch has no completed run yet; an immediate WARN there is the same
+// "CI not finished" condition the sha-not-listed path already waits for.
+// ---------------------------------------------------------------------------
+test("E326 AC-E326-7: Check 6 with [] and a non-zero budget polls (>= 2 gh calls), then the unchanged WARN, exit 0", () => {
+  const { root } = mkFixtureRepo({ version: "10.0.40", tag: "at-head", origin: "pushed" });
+  const { dir: shimDir, counterPath } = mkGhCallCounterShim("[]");
+  const result = runVerifyWithPath(root, `${shimDir}:${noGhSystemPath()}`, ["v10.0.40"], {
+    AGC_VERIFY_CI_WAIT_SECONDS: "2",
+  });
+  assert.equal(result.status, 0, `lenient Check 6 must never fail; stderr: ${result.stderr}`);
+  assert.ok(Number(fs.readFileSync(counterPath, "utf-8").trim()) >= 2, "empty list must be re-polled inside the budget");
+  assert.match(result.stdout, /no completed CI runs on origin\/main yet; polling again in/);
+  assert.match(
+    result.stdout,
+    /WARN: CI ground-truth — no completed CI runs found on origin\/main; continuing without CI verification \(graceful degradation, E14\)/,
+  );
+});
+
+test("E326 AC-E326-7: Check 6 with [] and budget 0 makes exactly one gh call", () => {
+  const { root } = mkFixtureRepo({ version: "10.0.41", tag: "at-head", origin: "pushed" });
+  const { dir: shimDir, counterPath } = mkGhCallCounterShim("[]");
+  const result = runVerifyWithPath(root, `${shimDir}:${noGhSystemPath()}`, ["v10.0.41"], {
+    AGC_VERIFY_CI_WAIT_SECONDS: "0",
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(fs.readFileSync(counterPath, "utf-8").trim(), "1");
 });
