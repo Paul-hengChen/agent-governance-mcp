@@ -1908,17 +1908,50 @@ function planAbandonCurrentHarvest({ lanePaths, lanePath, ticketId, branch, now 
 // history files, history-only files (an earlier harvest under the same id)
 // are kept — lossless, since agc's only writer of this dir is this harvest.
 // A failed copy leaves the worktree in place; re-running redoes it.
-function executeAbandonCurrentHarvest(harvest) {
+// `preserve` is the E287 findings plan (or null). A symlinked lane
+// pending-tickets.md it covers ends as a regular file of the detector's bytes
+// (E335 D7). An earlier refused run's history copy of it (file or link) is
+// renamed aside for the copy, since copying the link over it fails (EEXIST
+// over a regular file); it is put back if the harvest fails and deleted only
+// once the regular file is in place, so AC10 stays lossless. The whole-dir copy itself
+// is unchanged (no cpSync filter: that switches Node to a copy path that
+// refuses a link over an identical link), so every other lane file, symlinks
+// included, is copied as before.
+function executeAbandonCurrentHarvest(harvest, preserve) {
   const { ticketId, branch, bucket, histAbs, srcAbs, sourceIgnored } = harvest;
+  const derefPending =
+    preserve?.covered === true &&
+    lstatOrNull(path.join(srcAbs, preserve.filename))?.isSymbolicLink() === true;
+  const prior = derefPending ? lstatOrNull(preserve.dstAbs) : null;
+  const aside =
+    prior !== null && (prior.isFile() || prior.isSymbolicLink())
+      ? `${preserve.dstAbs}.${process.pid}.${Date.now()}.aside.tmp`
+      : null;
   try {
     fs.mkdirSync(histAbs, { recursive: true });
+    if (aside !== null) fs.renameSync(preserve.dstAbs, aside);
     fs.cpSync(srcAbs, histAbs, { recursive: true, force: true, errorOnExist: false });
+    if (derefPending) materializeFindingsCopy(preserve.dstAbs, preserve.bytes);
   } catch (err) {
+    if (aside !== null && lstatOrNull(aside) !== null) {
+      try {
+        fs.renameSync(aside, preserve.dstAbs);
+      } catch {
+        // left at `aside` (lossless); the error below is the one to report
+      }
+    }
     throw new FeatureError(
       `agc feature finish --abandoned: harvest of .current/${ticketId}/ into .current/history/${bucket}/${ticketId}/ ` +
         `failed (${err && err.message ? err.message : String(err)}) — worktree and branch left in place ` +
         `(re-running finish is safe)`
     );
+  }
+  if (aside !== null) {
+    try {
+      fs.rmSync(aside, { force: true });
+    } catch {
+      // a leftover copy of the old history file is harmless
+    }
   }
   // Copy / Strings e194.current-harvest-line (reason clause per sourceIgnored).
   const reason = sourceIgnored
@@ -3346,7 +3379,7 @@ async function runFeatureFinish(cwd, argv) {
         untrackedMoved.join(", ") +
         ` — git add + commit it in the lane and re-run, or remove the worktree by hand`
       : null;
-  if (currentHarvest !== null) executeAbandonCurrentHarvest(currentHarvest);
+  if (currentHarvest !== null) executeAbandonCurrentHarvest(currentHarvest, preserve);
   if (preserve) executeFindingsPreserve(preserve);
   removeWorktreeNoForce(repoRoot, lanePath, hint);
   process.stdout.write(`agc feature finish — removed worktree ${lanePath}\n`);
