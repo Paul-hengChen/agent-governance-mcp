@@ -2,3 +2,5 @@
 {"ts":"2026-10-17T12:11:32.992Z","feature":"e291-start-link-locations","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-10-17T12:20:49.488Z","feature":"e291-start-link-locations","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-10-17T12:21:44.118Z","feature":"e291-start-link-locations","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-17T12:29:26.622Z","feature":"e291-start-link-locations","agent_id":"code-reviewer","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-17T12:29:32.585Z","feature":"e291-start-link-locations","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
