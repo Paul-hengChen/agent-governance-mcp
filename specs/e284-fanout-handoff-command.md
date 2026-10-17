@@ -71,6 +71,12 @@ Fact values. Every value is deterministic for a given repo state. No absolute pa
 | `git status` | 核對 primary | `乾淨`, or `<n> 項：<porcelain v1 line>；…` in git's order, from `git status --porcelain` in primary. **The manifest file itself is excluded**: pasting the section always dirties it. |
 | `worktree` | 核對 primary | `git worktree list --porcelain` order, `；`-joined: `primary（<branch>）` first, then `<relative path>（<branch>）`; detached = `（detached @ <sha7>）`; a worktree whose branch is not a dispatchable lane branch of this manifest gets the suffix ` ［別的清單］`. |
 | `lane-status` | 核對 primary | From `computeLaneStatus({ repoRoot: primary, baseRef: <target> })`. Only the primary row and rows whose branch equals a dispatchable lane's `branch` cell of this manifest are included; other sessions' lanes show only in `worktree` (integrator revision §3.2: watch only your own manifest's lanes). Each row is `<primary or lane id>（<branch>）<active_feature>／<status>／<last_agent>，hop <n>，commits <n>，<clean or dirty>`, with `-` for null. An unreadable row is `<lane>（<branch>）unreadable`, and its reason (which can hold a path) is never echoed. Rows are `；`-joined in lane-status order. |
+
+**Primary on the integration branch under `--closing` (R2).** This rule applies only when `--closing` is given and primary's current branch is the manifest's integration branch. Primary's branch is then written as the closing annotation `<target> ← <integ> @ <sha7>`, where `<sha7>` is primary's HEAD at generation time:
+- in the `worktree` fact, as `primary（<target> ← <integ> @ <sha7>）`;
+- in the `lane-status` primary row, as `primary（<target> ← <integ> @ <sha7>）…`, with `commits 0`. That is the post-merge expectation; it is checked, not trusted.
+
+Every other primary fact (active_feature / status / last_agent / hop / clean or dirty) is written as collected. Without `--closing`, or when primary is on any other branch, primary's facts are a plain snapshot.
 | `整合分支` | 背景工作 | Present only when the manifest's `integration branch:` header (base line) names a branch that exists locally: `<branch> @ <sha7>（origin 有）` or `（origin 無）`. Omitted under `--closing` (R2). |
 | `未 push 的 commit` | 背景工作 | For each existing local branch among {target, integration branch, each dispatchable lane branch}: `<branch> <n>` with `n = git rev-list --count <branch> --not --remotes` and n > 0, `；`-joined in that order. Present only when one or more branches qualify. Under `--closing` the integration branch is skipped (R2). |
 | `信箱` | 背景工作 | For each dispatchable lane whose `<mailbox-root>/<lane>/` directory exists: `<lane> to-integrator <n>／to-lane <n>`, where n is the message count (`parseMailboxHeaders(...).length`) and a missing file shows as `-`. Present only when one or more such directories exist. |
@@ -85,7 +91,16 @@ Fact values. Every value is deterministic for a given repo state. No absolute pa
 2. Take every line in it of the form `- <key>：<value>` whose key is one of the ten keys above. The fact's sub-item position is not enforced.
 3. If the `### 進行中的背景工作` sub-item reads `無` (the E283 `readsNone` rule), treat every background key as absent in the handoff.
 4. Re-collect the facts with the same flags and compare key by key (absent equals absent).
-5. Print a `DIFF` line for each differing key (absent on one side is written `（缺）`), and `MOVED` for the `目標分支` forward move (R1).
+5. Print a `DIFF` line for each differing key (absent on one side is written `（缺）`). Print `MOVED` instead in two cases:
+   - the `目標分支` forward move (R1);
+   - a closing annotation (R2) on `worktree` or `lane-status`, when all three hold:
+     - primary is now on `<target>`;
+     - the annotated `<sha7>` resolves to a commit that is an ancestor of (or equal to) the current `<target>`, i.e. the wave PR merged;
+     - the line, with the annotation replaced by `<target>`, equals the re-collected line.
+
+     The `MOVED` line says `（<integ> @ <sha7> 已合併進 <target>）`. If any of the three fails (PR not merged, sha unknown, primary elsewhere, or another part of the line changed), the result is a `DIFF`.
+
+   This check needs the sha, not the branch name, so it still works after the integration branch is deleted.
 6. Print the summary line. Placeholders and other lines are ignored.
 
 ### D3: E331 error code
@@ -164,7 +179,11 @@ All fixtures are in-test manifests, repos and mailboxes under `$TMPDIR`: no asse
   proof: `test/e284-fanout-handoff.test.mjs` case "target relation".
 - **AC-E284-4**: The `git status` line lists porcelain entries of primary and excludes the manifest file. A worktree on a branch that is not a lane of this manifest gets `［別的清單］` in `worktree` and has no `lane-status` row. A watch-lock file (named as `watchLockPath` from `scripts/mailbox-watch.mjs` names it) beside a lane's `to-integrator.md` produces the `監看` line.
   proof: `test/e284-fanout-handoff.test.mjs` case "status, foreign worktrees, watch-lock".
-- **AC-E284-5** (R1, R2): Given an existing local integration branch named by the manifest's `integration branch:` header, then `整合分支` and its `未 push 的 commit` entry appear, and under `--closing` both are omitted. `--closing` together with `--check` is a usage error (exit 2).
+- **AC-E284-5** (R2): Given an existing local integration branch named by the manifest's `integration branch:` header, then `整合分支` and its `未 push 的 commit` entry appear, and under `--closing` both are omitted. Given primary checked out on that integration branch, then:
+  - without `--closing`, the `worktree` / `lane-status` primary entries name the integration branch (plain snapshot);
+  - with `--closing`, they read `primary（main ← <integ> @ <sha7>）`, and the primary row has `commits 0`.
+
+  `--closing` with primary on `main` changes nothing but the two omissions. `--closing` together with `--check` is a usage error (exit 2).
   proof: `test/e284-fanout-handoff.test.mjs` case "integration branch and --closing".
 - **AC-E284-6**: Given a manifest whose section was just generated and pasted, with the repo unchanged, when `handoff --check <manifest>` runs, then it exits 0 and prints only the summary line `fanout handoff --check: <n> fact(s) checked, 0 differ, 0 moved`. Judgement text edited by hand (placeholders replaced, extra prose lines) does not affect the result.
   proof: `test/e284-fanout-handoff.test.mjs` case "check clean".
@@ -181,6 +200,12 @@ All fixtures are in-test manifests, repos and mailboxes under `$TMPDIR`: no asse
   proof: `test/e284-fanout-handoff.test.mjs` case "check names each difference".
 - **AC-E284-8** (R1): Given the handoff's `目標分支` sha is a strict ancestor of the current target, then `--check` prints `MOVED  目標分支: handoff「…」／repo「…」（前進 <n> 個 commit）`. With no other difference it exits 0. Given the recorded sha is not an ancestor (or unknown), it is a `DIFF` with exit 1.
   proof: `test/e284-fanout-handoff.test.mjs` case "target moved forward".
+- **AC-E284-12** (R2 closure round trip): Given a temp repo where:
+  - primary is on the manifest's integration branch, with commits ahead of `main` and `origin/main`;
+  - no lane worktrees, mailbox dirs or watch-locks exist;
+
+  when `handoff --closing` runs and its section is pasted into the closed manifest and committed, then `validate` exits 0. When the integration branch is then merged into `main` (`--no-ff`), `origin/main` is updated to it, primary switches to `main`, and the integration branch is deleted, `handoff --check` exits 0, prints `MOVED` lines for `目標分支`, `worktree` and `lane-status`, and prints no `DIFF`. Given the same handoff with the merge not done (primary switched to `main` but the integration branch not merged), or with the primary row's `status` changed, the affected line is a `DIFF` with exit 1.
+  proof: `test/e284-fanout-handoff.test.mjs` case "closing round trip".
 - **AC-E284-9**: Given:
   - no `## 接手步驟` section, then `--check` exits 2 with `HANDOFF_SECTION_ABSENT`;
   - two sections, then it exits 2 with `HANDOFF_SECTION_DUPLICATE`;
@@ -264,6 +289,8 @@ All fixtures are in-test manifests, repos and mailboxes under `$TMPDIR`: no asse
 | handoff.background.none | `無` | E283 HANDOFF_NONE |
 | handoff.check.diff | `DIFF  <key>: handoff「<old>」／repo「<new>」` (absent side = `（缺）`) | authored-here: two-space separator like check's `OUT` lines |
 | handoff.check.moved | `MOVED  <key>: handoff「<old>」／repo「<new>」（前進 <n> 個 commit）` | authored-here: R1 |
+| handoff.check.moved-closing | `MOVED  <key>: handoff「<old>」／repo「<new>」（<integ> @ <sha7> 已合併進 <target>）` | authored-here: R2 |
+| handoff.closing.annotation | `<target> ← <integ> @ <sha7>` | authored-here: R2 primary closing annotation |
 | handoff.check.summary | `fanout handoff --check: <n> fact(s) checked, <d> differ, <m> moved` | authored-here: mirrors `fanout check:` / `fanout owners:` summaries |
 | handoff.note.no-mailbox | `note: no mailbox root (no mailbox: header and no --mailbox-root) — mailbox facts not collected.` | authored-here |
 | handoff.err.fact-duplicate | `HANDOFF_FACT_DUPLICATE: fact "<key>" appears on <n> lines (lines <l>, …) of "## 接手步驟"` | authored-here: CLI code, outside the gate-suffix vocabulary |
@@ -318,9 +345,15 @@ All fixtures are in-test manifests, repos and mailboxes under `$TMPDIR`: no asse
   - (a) **Recommended**: a recorded sha that is a strict ancestor of the current target prints `MOVED` and does not by itself fail (exit 0). A non-ancestor is a `DIFF` (exit 1).
   - (b) Strict: any sha change is a `DIFF` (exit 1), so every post-merge `--check` fails on this line.
 - **R2: What goes in `### 進行中的背景工作` at closure?** The integrator-session-per-wave P2 table puts the watch, the integration branch and unpushed commits there, and validate requires 無 once closed. The wave-5 closure writes the handoff on the integration branch before the PR, while that branch still exists unpushed. The generator would then list it, and a closed manifest would fail `validate` with `HANDOFF_BACKGROUND_NOT_NONE`.
-  - (a) **Recommended**: snapshot faithfully by default, plus `--closing`, which omits the integration branch and its unpushed count (the wave PR closes them). Then `--check` in the next session expects them gone, and a mid-wave pause (no `--closing`) stays a truthful snapshot.
-  - (b) No flag: background always reflects the live repo. Closure handoffs are then generated only after the wave PR merges, which E285 must schedule and which needs a second PR on protected `main`.
-  - (c) Move the integration branch and unpushed commits under `### 核對 primary`, so that only mailboxes and watch-locks count as background. This departs from the P2 table.
+  The same timing also affects `### 核對 primary`: at closure primary stands on the integration branch. The `worktree` primary entry and the `lane-status` primary row (branch, and commits counted against target) would therefore always `DIFF` once the next session runs `--check` on `main` after the merge (integrator pre-review).
+  - (a) **Recommended**: snapshot faithfully by default, plus `--closing`, which does two things:
+    - omits the integration branch and its unpushed count (the wave PR closes them);
+    - writes primary's branch as the annotation `<target> ← <integ> @ <sha7>`, with the primary row at `commits 0`.
+
+    `--check` reports an annotated line as `MOVED` (exit 0) only when primary is now on target, the annotated sha is an ancestor of target (the PR merged), and the rest of the line is unchanged. Anything else is a `DIFF`. This is verifiable from the sha alone after the integration branch is deleted. A mid-wave pause (no `--closing`) stays a plain snapshot. Primary-row active_feature / status changes (e.g. a later release) stay a `DIFF`.
+  - (b) No flag: background and primary always reflect the live repo. Closure handoffs are then generated only after the wave PR merges and primary is back on `main`, which E285 must schedule and which needs a second PR on protected `main`.
+  - (c) `--closing` writes primary directly in its predicted post-merge state (`primary（<target>）`, `commits 0`) with no annotation. The diff is simpler, but `--check` cannot tell whether the merge actually happened (an unmerged integration branch reads the same once primary switches back), so the prediction is never verified.
+  - (d) `--check`-side only (no annotation): `MOVED` when primary changed from the integration branch to target and that branch is merged into target. The merge order deletes the integration branch after the merge, so the merged-ness check would have to fall back to the sha, which the plain snapshot does not record in a parseable form. This is (a) without the explicit marker.
 
 ## Cut
 
@@ -329,6 +362,6 @@ All fixtures are in-test manifests, repos and mailboxes under `$TMPDIR`: no asse
 | T-E331-01 | sr: wrap the `git diff` in `rangePaths` and `checkLane` → exit 2 `GIT_DIFF_FAILED`, no stack trace (D3); rebuild dist. qa: new test (AC-E331-1..3) | none | 5 | `tools/fanout-manifest.ts`、`dist/tools/fanout-manifest.*`、`test/e331-git-diff-failure.test.mjs` | — |
 | T-E332-01 | sr: widen the handoff absolute-path boundaries and forms, narrow the tilde form to exclude dates (D5); rebuild dist. qa: new fixture test + hard-condition validate sweep (AC-E332-1..3) | T-E331-01 | 5 | `tools/fanout-manifest.ts`、`dist/tools/fanout-manifest.*`、`test/e332-absolute-path-boundaries.test.mjs` | — |
 | T-E330-01 | sr: `USAGE` gains the owners and handoff continuation lines; wrapper header comment updated (D4); rebuild dist. qa: re-pin e296 AC12 (3 → 5, AC12 only) and AC-E322-9 (AC-E330-1) | T-E332-01 | 7 | `tools/fanout-manifest.ts`、`dist/tools/fanout-manifest.*`、`scripts/fanout.mjs`、`test/e296-manifest-tier.test.mjs`、`test/e322-owners.test.mjs` | — |
-| T-E284-01 | sr: new `tools/fanout-handoff.ts`: fact collection + D2 section rendering, `--closing`, flags, generate exit codes; `handoff` route in `scripts/fanout.mjs`; build dist. qa: new test (AC-E284-1..5, 10, 11) | T-E330-01 | 6 | `tools/fanout-handoff.ts`、`dist/tools/fanout-handoff.*`、`scripts/fanout.mjs`、`test/e284-fanout-handoff.test.mjs` | — |
-| T-E284-02 | sr: `handoff --check`: parse fact lines, background-無 rule, key-by-key compare, `DIFF` / `MOVED` lines, summary, exit 0 / 1 / 2, `HANDOFF_FACT_DUPLICATE` (D1, D2, R1); rebuild dist. qa: extend the E284 test (AC-E284-6..9) + lane-wide hard conditions (AC-HC-1..3) | T-E284-01 | 5 | `tools/fanout-handoff.ts`、`dist/tools/fanout-handoff.*`、`test/e284-fanout-handoff.test.mjs` | — |
+| T-E284-01 | sr: new `tools/fanout-handoff.ts`: fact collection + D2 section rendering, `--closing` (omissions + primary closing annotation, R2), flags, generate exit codes; `handoff` route in `scripts/fanout.mjs`; build dist. qa: new test (AC-E284-1..5, 10, 11) | T-E330-01 | 6 | `tools/fanout-handoff.ts`、`dist/tools/fanout-handoff.*`、`scripts/fanout.mjs`、`test/e284-fanout-handoff.test.mjs` | — |
+| T-E284-02 | sr: `handoff --check`: parse fact lines, background-無 rule, key-by-key compare, `DIFF` / `MOVED` lines (R1 target move, R2 closing annotation with the merged-sha check), summary, exit 0 / 1 / 2, `HANDOFF_FACT_DUPLICATE` (D1, D2); rebuild dist. qa: extend the E284 test (AC-E284-6..9, 12) + lane-wide hard conditions (AC-HC-1..3) | T-E284-01 | 5 | `tools/fanout-handoff.ts`、`dist/tools/fanout-handoff.*`、`test/e284-fanout-handoff.test.mjs` | — |
 | T-E333-01 | qa: convert the E283 grammar cases to in-process `validateManifest`, keep ≤ 6 CLI cases, record before/after timing (D6, AC-E333-1) | T-E332-01 | 1 | `test/e283-validate-handoff.test.mjs` | — |
