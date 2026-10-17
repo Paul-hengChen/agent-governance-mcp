@@ -1,2 +1,4 @@
 {"ts":"2026-10-17T12:10:18.812Z","feature":"e329-integrator-sop-followups","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-10-17T12:12:32.873Z","feature":"e329-integrator-sop-followups","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-17T12:15:03.595Z","feature":"e329-integrator-sop-followups","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-17T12:19:49.355Z","feature":"e329-integrator-sop-followups","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
