@@ -211,6 +211,21 @@ function compressDriftDetails(details: string[]): string[] {
   return out;
 }
 
+// Read a file's text, or null when it is missing at read time (ENOENT, or
+// ENOTDIR when a path component is no longer a directory). Any other error
+// propagates to the caller's catch. Local to drift: the handoff-parse reader
+// of the same shape is module-private. (E325)
+function readFileIfPresent(filePath: string): string | null {
+  if (!fs.existsSync(filePath)) return null;
+  try {
+    return fs.readFileSync(filePath, "utf-8");
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code !== "ENOENT" && code !== "ENOTDIR") throw err;
+    return null;
+  }
+}
+
 // Read the raw on-disk schema_version for a file-backed artifact, bypassing
 // the lazy-migrate readers (which always return CURRENT in memory). Returns
 // null when the artifact is absent — typical in SQLite mode, where these
@@ -225,9 +240,20 @@ function readArtifactVersion(workspacePath: string, kind: SchemaKind): number | 
       // the parser's raw refusal. No lock, no migration, no write.
       const abs = path.resolve(workspacePath);
       const lanePath = resolveCurrentLanePaths(abs).handoffPath;
-      const p = fs.existsSync(lanePath) ? lanePath : resolveFlatLanePaths(abs).handoffPath;
-      if (!fs.existsSync(p)) return null;
-      const content = fs.readFileSync(p, "utf-8");
+      const flatPath = resolveFlatLanePaths(abs).handoffPath;
+      const p = fs.existsSync(lanePath) ? lanePath : flatPath;
+      let content = readFileIfPresent(p);
+      if (content === null) {
+        // A concurrent flat <-> lane migration may have renamed the chosen
+        // file between the pick and the read. Renames are atomic, so the
+        // other layout's path now holds it: read that once, no loop, mirroring
+        // readAndMigrate's retry (E312). Neither file present is still null.
+        // (E325)
+        const otherPath = p === lanePath ? flatPath : lanePath;
+        if (!fs.existsSync(otherPath)) return null;
+        content = readFileIfPresent(otherPath);
+        if (content === null) return null;
+      }
       const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
       if (!match) return 0;
       const parsed = yaml.load(match[1]);
