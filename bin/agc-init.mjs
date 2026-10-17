@@ -1012,7 +1012,8 @@ const STR_USAGE_FEATURE =
   "          Cut a lane from the primary checkout: branch feat/<ticket-slug>\n" +
   "          (from --base, default main) + a linked git worktree at --path\n" +
   "          (default <parent>/<repo>-lanes/<ticket-id>), node_modules\n" +
-  "          symlinked to primary's, .env byte-copied.\n" +
+  "          symlinked to primary's (root, or the directories listed in\n" +
+  "          .current/.config.json nodeModulesLinks), .env byte-copied.\n" +
   "  feature finish <ticket-id> (--shipped|--abandoned) [--base <branch>] [--pr <n>]\n" +
   "          Tear a lane down from the primary checkout. --shipped requires\n" +
   "          the branch merged into --base (default main), moves the lane's\n" +
@@ -1390,22 +1391,84 @@ function trackedArtifactPaths(repoRoot, artifactPaths) {
   );
 }
 
-// Env bootstrap for a freshly-added lane (AC9–AC14). Returns
-// { out: string[], warn: string[] } lines for the caller to print.
-function bootstrapLaneEnv(repoRoot, lanePath) {
-  const out = [];
-  const warn = [];
-
-  // Exclude rules first, so the lane's `git status` is clean the moment the
-  // link / copy below exist (AC8, AC13).
-  const added = upsertSharedExclude(repoRoot, LANE_EXCLUDE_RULES);
-  if (added.length > 0) {
-    out.push(`agc feature start — added ${added.join(", ")} to the shared info/exclude`);
+// The node_modules link locations `feature start` uses (E291 D1/D4): "." is
+// the repo root. Read raw from the primary checkout's config, never through
+// loadConfig (which may heal-write). Key absent, or no usable config file:
+// the root-only default, and dist/tools/config.js is not loaded at all.
+// `warn` holds the invalid-entry / not-array lines, printed before any
+// per-location line. Runs before `git worktree add`, so a load failure
+// creates nothing.
+async function resolveNodeModulesLinks(repoRoot) {
+  const rootOnly = { locations: ["."], warn: [] };
+  let parsed;
+  try {
+    parsed = JSON.parse(fs.readFileSync(path.join(repoRoot, ".current", ".config.json"), "utf-8"));
+  } catch {
+    return rootOnly;
   }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return rootOnly;
+  if (!Object.prototype.hasOwnProperty.call(parsed, "nodeModulesLinks")) return rootOnly;
+  let config;
+  try {
+    config = await import(new URL("../dist/tools/config.js", import.meta.url).href);
+  } catch (err) {
+    throw new FeatureError(
+      `agc feature: cannot load dist/tools/config.js from the agc install ` +
+        `(${err && err.message ? err.message : String(err)}) — run \`npm run build\` (nothing created)`
+    );
+  }
+  const result = config.parseNodeModulesLinks(parsed.nodeModulesLinks);
+  if (result === null) {
+    // Copy / Strings e291.not-array.
+    return {
+      locations: ["."],
+      warn: [
+        "agc feature start — warning: .current/.config.json nodeModulesLinks is not an array — " +
+          "ignored, linking the root node_modules only",
+      ],
+    };
+  }
+  // Copy / Strings e291.invalid-entry, one line per rejected entry.
+  const warn = result.rejected.map(
+    (entry) =>
+      `agc feature start — warning: .current/.config.json nodeModulesLinks entry ${JSON.stringify(entry)} ` +
+      `is not a repo-relative directory path (no absolute path, no empty, "." or ".." segment, no ` +
+      `backslash, wildcard or control character) — skipped`
+  );
+  return { locations: result.links, warn };
+}
 
-  // node_modules: a symlink to primary's install, never a copy (AC9).
-  const primaryNm = path.join(repoRoot, "node_modules");
-  const laneNm = path.join(lanePath, "node_modules");
+// True when every segment of `segs` below `lanePath` is a real directory —
+// no missing segment and no symlink (E291 D6 step 1).
+function isRealLaneDir(lanePath, segs) {
+  let cur = lanePath;
+  for (const seg of segs) {
+    cur = path.join(cur, seg);
+    const st = lstatOrNull(cur);
+    if (!st || st.isSymbolicLink() || !st.isDirectory()) return false;
+  }
+  return true;
+}
+
+// node_modules for one location: a symlink to primary's install, never a
+// copy (AC9; E291 D6). The "." rendering of every line is byte-identical to
+// the pre-E291 root-only text.
+function linkLaneNodeModules(repoRoot, lanePath, loc, out, warn) {
+  const root = loc === ".";
+  const segs = root ? [] : loc.split("/");
+  const rel = root ? "node_modules" : `${loc}/node_modules`;
+  if (!root && !isRealLaneDir(lanePath, segs)) {
+    // Copy / Strings e291.lane-dir-missing.
+    warn.push(
+      `agc feature start — warning: ${loc}/ is not a directory in the lane checkout — ` +
+        `no ${loc}/node_modules link created`
+    );
+    return;
+  }
+  const where = root ? "the lane" : `the lane's ${loc}/`;
+  const pwhere = root ? "the primary checkout" : `the primary checkout's ${loc}/`;
+  const primaryNm = path.join(repoRoot, ...segs, "node_modules");
+  const laneNm = path.join(lanePath, ...segs, "node_modules");
   let nmStat = null;
   try {
     nmStat = fs.statSync(primaryNm);
@@ -1413,28 +1476,52 @@ function bootstrapLaneEnv(repoRoot, lanePath) {
     nmStat = null;
   }
   if (!nmStat || !nmStat.isDirectory()) {
+    // Copy / Strings e291.primary-missing.
     warn.push(
-      `agc feature start — warning: the primary checkout has no node_modules ` +
-        `(${primaryNm}) — run \`npm install\` in the primary checkout first; the ` +
-        `lane was created without a node_modules link`
+      `agc feature start — warning: the primary checkout has no ${rel} ` +
+        `(${primaryNm}) — run \`npm install\` in ${pwhere} first; the ` +
+        `lane was created without a ${rel} link`
     );
   } else if (lstatOrNull(laneNm)) {
+    // Copy / Strings e291.lane-exists.
     warn.push(
       `agc feature start — warning: ${laneNm} already exists after checkout ` +
         `(tracked in this repo?) — left as checked out, not linked`
     );
   } else {
     fs.symlinkSync(primaryNm, laneNm, process.platform === "win32" ? "junction" : "dir");
-    out.push(`agc feature start — linked node_modules -> ${primaryNm}`);
-    // AC14 — one line, stdout, right after the link exists.
+    // Copy / Strings e291.link-line.
+    out.push(`agc feature start — linked ${rel} -> ${primaryNm}`);
+    // AC14 — one line, stdout, right after the link exists. e291.shared-warning.
     out.push(
-      "agc feature start — warning: node_modules is shared with the primary " +
-        "checkout (symlink) — never run `npm ci` / `npm install` inside the lane " +
-        "(`npm ci` deletes the directory first, which would delete primary's real " +
-        "node_modules through the link); for an independent install, `rm " +
-        "node_modules` (removes only the link) and then run `npm ci` in the lane"
+      `agc feature start — warning: ${rel} is shared with the primary ` +
+        `checkout (symlink) — never run \`npm ci\` / \`npm install\` inside ${where} ` +
+        `(\`npm ci\` deletes the directory first, which would delete primary's real ` +
+        `${rel} through the link); for an independent install, \`rm ` +
+        `${rel}\` (removes only the link) and then run \`npm ci\` in ${where}`
     );
   }
+}
+
+// Env bootstrap for a freshly-added lane (AC9–AC14). `nmLinks` is
+// resolveNodeModulesLinks()'s result. Returns { out: string[], warn: string[] }
+// lines for the caller to print.
+function bootstrapLaneEnv(repoRoot, lanePath, nmLinks) {
+  const out = [];
+  const warn = [...nmLinks.warn];
+
+  // Exclude rules first, so the lane's `git status` is clean the moment the
+  // link / copy below exist (AC8, AC13). One `/<loc>/node_modules` per
+  // non-root location, after the static rules (E291 D5).
+  const added = upsertSharedExclude(repoRoot, [
+    ...LANE_EXCLUDE_RULES,
+    ...nmLinks.locations.filter((loc) => loc !== ".").map((loc) => `/${loc}/node_modules`),
+  ]);
+  if (added.length > 0) {
+    out.push(`agc feature start — added ${added.join(", ")} to the shared info/exclude`);
+  }
+
+  for (const loc of nmLinks.locations) linkLaneNodeModules(repoRoot, lanePath, loc, out, warn);
 
   // .env: byte copy only — fs.copyFileSync never materializes the content as
   // a JS string (§6). COPYFILE_EXCL: never clobber a .env the checkout
@@ -1513,6 +1600,9 @@ async function runFeatureStart(cwd, argv) {
     );
   }
 
+  // E291 D4 — the node_modules link locations, resolved before any mutation.
+  const nmLinks = await resolveNodeModulesLinks(repoRoot);
+
   // AC1 — git creates any missing leading directories of lanePath itself.
   // AC7 — deliberately NOT followed by `agc init` / writeClaudeBlock: that
   // would rewrite the lane's tracked CLAUDE.md and leave it dirty.
@@ -1529,7 +1619,7 @@ async function runFeatureStart(cwd, argv) {
     `agc feature start — created branch ${branch} (from ${base}) and worktree ${lanePath}\n`
   );
 
-  const { out, warn } = bootstrapLaneEnv(repoRoot, lanePath);
+  const { out, warn } = bootstrapLaneEnv(repoRoot, lanePath, nmLinks);
   for (const line of out) process.stdout.write(`${line}\n`);
   for (const line of warn) process.stderr.write(`${line}\n`);
 
