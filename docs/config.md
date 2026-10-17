@@ -105,6 +105,34 @@ Verify it works:
 4. Call `tw_get_state` again: `notify.skipped_duplicate: true`, file mtime unchanged.
 5. Example watcher (macOS): `fswatch .current/stale-dispatch.notify | while read -r _; do osascript -e 'display notification "stale agent dispatch" with title "agent-governance"'; done`
 
+### `nodeModulesLinks` — `agc feature start` node_modules link locations (optional)
+
+By default `agc feature start` links one `node_modules`: the lane's root `node_modules` becomes a symlink to the primary checkout's. A repo whose JavaScript lives in a subdirectory (for example `web/`) can list the directories to link instead:
+
+```json
+{
+  "nodeModulesLinks": ["web"]
+}
+```
+
+| Value | What `agc feature start` links |
+|---|---|
+| absent | The root `node_modules` only — the behavior before this key existed. |
+| `["web"]` | `web/node_modules` only. No root link, and no warning about a missing root `node_modules`. |
+| `[".", "web"]` | Both, root first (list order). |
+| `[]` | Nothing; no `node_modules` line is printed. |
+
+Semantics:
+
+- **Optional.** An array of repo-relative directory paths. `"."` means the repo root. Each listed `<dir>/node_modules` in the lane is linked to the same `<dir>/node_modules` in the primary checkout.
+- **The list replaces the root default.** It is not added to it: list `"."` to keep the root link.
+- **Validation.** An entry is valid when it is a non-empty string that, after one trailing `/` is stripped, is exactly `.` or a `/`-separated path whose every segment is non-empty, is not `.` or `..`, and contains no backslash, no `*` `?` `[` `]` and no control character (C0 or DEL); and it does not start with `/` or a Windows drive prefix (`C:`). So `./web`, `a//b`, `../up` and `/abs` are invalid. Duplicates (`"web"` and `"web/"`) are linked once, at the first occurrence.
+- **Invalid entries are skipped with a warning.** Each one prints one warning line; the valid entries still apply. A value that is not an array (a string, `null`, an object) is ignored with a warning, and only the root `node_modules` is linked.
+- **Where it is read.** At `agc feature start`, from the primary checkout's `<repo root>/.current/.config.json` (raw JSON, never written). A missing or unparseable config file counts as "key absent". A subdirectory workspace's own `.current/.config.json` is not read for this key.
+- **Per-location checks.** A non-root directory must already be a real directory in the lane checkout (no symlinked path segment); otherwise `start` warns and creates nothing there. The primary's `<dir>/node_modules` must exist (else the usual "run `npm install` first" warning), and a `<dir>/node_modules` that the checkout already produced is left alone.
+- **Exclude rules.** Each listed directory other than `"."` adds a `/<dir>/node_modules` rule (no trailing slash: the lane copy is a symlink) to the shared `.git/info/exclude`, next to the usual lane rules, so the link never shows in `git status`.
+- **No schema version change.** The key is additive-optional; config `schema_version` stays 2 and no migration exists. `loadConfig` surfaces the normalized, deduplicated valid list as `WorkspaceConfig.nodeModulesLinks` (present only when the key is an array); the parser is `parseNodeModulesLinks` in `tools/config.ts`.
+
 ---
 
 ## `.current/const-*.md` — constitution override

@@ -16,8 +16,20 @@ export interface WorkspaceConfig {
     cutApprovalAutoTier?: CutApprovalAutoTier;
     staleDispatchNotifyFile?: string;
     artifacts?: WorkspaceArtifactsMode;
+    nodeModulesLinks?: string[];
 }
 export type WorkspaceArtifactsMode = "local" | "repo";
+export interface NodeModulesLinksParse {
+    links: string[];
+    rejected: unknown[];
+}
+/**
+ * The one validation definition for the `nodeModulesLinks` key (E291 D2).
+ * Returns null when `value` is not an array (null included). Otherwise
+ * every entry is either kept (one trailing "/" stripped; first occurrence
+ * wins on duplicates) or listed in `rejected`, both in list order. Never throws.
+ */
+export declare function parseNodeModulesLinks(value: unknown): NodeModulesLinksParse | null;
 export declare const DEFAULT_TASK_REGEX: RegExp;
 /**
  * Typed workspace config view. Absent file OR any unusable config file
