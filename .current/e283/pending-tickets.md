@@ -1,5 +1,7 @@
 # Pending tickets — lane e283
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E283-NEW-1
 title: Integrator SOP adopts the E283 closed-status wording and the E322 owners mode (Stage 6 close, Stage 4 mid-wave base fix condition 2)
@@ -64,5 +66,3 @@ body: |
   Most cases spawn the CLI. Call validateManifest in-process for the grammar cases and keep a few
   CLI cases for exit codes and stderr.
 ```
-
-## Applied
