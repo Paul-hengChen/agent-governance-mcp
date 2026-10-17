@@ -8,6 +8,11 @@ export interface PendingTicketEntry {
     priority: string;
     dependsOn: string[];
     source?: string;
+    /** E287 (D4): trimmed `target_repo` value. Set ONLY when the block carries
+     *  the key (same "absent key → absent property" rule as `source`), so every
+     *  existing deepEqual over a local entry is unchanged. Presence alone means
+     *  "belongs to another repo": never numbered here. */
+    targetRepo?: string;
     body: string;
     lane: string;
 }
@@ -16,8 +21,9 @@ export interface ParsePendingTicketsOptions {
     /** laneLocalIds that docs/backlog.md already records for THIS lane (from
      *  `findAppliedProvenance`). When provided, every well-formed ARCHIVED
      *  block (under `## Applied`) whose `lane_local_id` is NOT in the set is
-     *  reported in `errors` — it will never be allocated. When omitted,
-     *  archived blocks are never inspected. (E179) */
+     *  reported in `errors` — it will never be allocated. Archived blocks
+     *  that carry `target_repo` are exempt: by design they get no backlog row
+     *  (E287 Q4). When omitted, archived blocks are never inspected. (E179) */
     appliedLaneLocalIds?: ReadonlySet<string>;
 }
 export interface ParsePendingTicketsResult {
@@ -75,8 +81,11 @@ export interface AllocateTicketIdsInput {
  * ignored. A bad block (unclosed, not a mapping, a required field missing, an
  * `id` field, an `E<n>`-shaped or duplicate `lane_local_id`, a malformed
  * optional field) is skipped and reported in `errors`. Swallowed openers and,
- * with `opts.appliedLaneLocalIds`, archived blocks with no backlog provenance
- * row are reported too. Never throws. (E179)
+ * with `opts.appliedLaneLocalIds`, archived local blocks with no backlog
+ * provenance row are reported too; an archived `target_repo` block is exempt,
+ * since it never gets a row (E287 Q4). Live `target_repo` blocks are returned
+ * in `entries` like any other, so the duplicate check spans both. Never
+ * throws. (E179)
  */
 export declare function parsePendingTickets(fileText: string, lane: string, opts?: ParsePendingTicketsOptions): ParsePendingTicketsResult;
 /**
@@ -84,7 +93,8 @@ export declare function parsePendingTickets(fileText: string, lane: string, opts
  * (AC3); a ticket's `lane` is its batch's. Lane-local `depends_on` tokens are
  * rewritten once every id is known; a missing, ambiguous or self reference
  * lands in `unresolvedDependencies` instead. Collision-free (AC5) only under
- * single-writer sequential apply.
+ * single-writer sequential apply. `target_repo` entries are never numbered; a
+ * lane-local reference to one is unresolved (E287 Q5).
  * Why: specs/e260b-rationale.md (tools/lane-ticket-allocation.ts)
  * @throws RangeError when `currentMaxId` is not a non-negative safe integer.
  */
