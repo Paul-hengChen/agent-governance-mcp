@@ -1,0 +1,3 @@
+# T-E329-01 replaced base-fix condition 2 with the int.basefix.cond2 literal (fanout.mjs owners --range);
+# AC1 still pins the removed `git diff --name-only` literal. qa re-pins it in T-E329-02 (spec re-pin list).
+test/e286-integrator-trust-and-git.test.mjs | AC1: human owns the vehicle decision; five conditions are an ordered numbered list with their commands

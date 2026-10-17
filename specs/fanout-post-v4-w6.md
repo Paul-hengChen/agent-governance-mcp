@@ -2,7 +2,7 @@
 base: cebeb64    integration branch: integ/post-v4-w6
 mailbox: ../agent-governance-mcp-lanes/_mailbox
 
-**狀態：人類已核准（Stage 2，2026-10-17），本清單 PR 併入後派工。** `base:` 是規劃基準（v4.8.0 發版記帳 PR #20 merge）；實際派工 base = 本清單併入後的 `main` sha，記在 Decisions 派工列。
+**狀態：已結案 2026-10-17。** 三條 lane 皆 qa PASS（CI 綠）→ `integ/post-v4-w6` merge `d4855e4`（e329）、`ec6697b`（e284）、`047a652`（e291）→ finish 三 lane（E337–E340 配號）→ 記帳 commit → PR + auto-merge（見「結案」與「接手步驟」）。 `base:` 是規劃基準（v4.8.0 發版記帳 PR #20 merge）；實際派工 base = 本清單併入後的 `main` sha，記在 Decisions 派工列。
 
 照第 5 波結案的建議做，再加上 integrator 改版第 2 波剩下的票。E284（`fanout.mjs handoff`）原本等的 E283 已出貨；E331、E330、E332 和它改同一組檔案，併成一條 lane；E333 只改 E283 的測試檔，也併進來。E329、E328、E334 都改 `content/skill-integrator.md`，E327 改 `docs/lane-protocol.md` §3，四張併成本波唯一的 content lane。E291 原本等的 E287 已出貨；E335 改的也是 `bin/agc-init.mjs` 的 finish，和 E291 併成一條 lane。改版第 2 波的 E294 本波不做，因為票面要先實測，而且 prompt 範本那一行在 `scripts/fanout.mjs`，和 e284 同檔；E288 已在第 5 波出貨。
 
@@ -87,3 +87,41 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 | 2026-10-17 | 整合者 | 草案：e284（E284＋E331＋E330＋E332＋E333）∥ e329（E329＋E328＋E334＋E327，唯一 content lane）∥ e291（E291＋E335）；三條擁有集合不相交；`bin/agc-init.mjs` 劃給 e291；`docs/lane-protocol.md`（§3、§4）劃給 e329；`docs/config.md` 劃給 e291；`test/e296-manifest-tier.test.mjs` 只限 AC12 劃給 e284；`test/e246-mailbox-teardown.test.mjs` 只限句子重新固定劃給 e329；E294 本波不做 | 本檔 |
 | 2026-10-17 | 整合者 | E336 配號（backlog 列＋佇列 #153），來源為 v4.8.0 release-engineer 的回報（primary handoff pending_notes），不屬任何 lane 檔 | 本檔 |
 | 2026-10-17 | 人類 | 核准本清單（全部）：三條 lane（e284、e329、e291）與六項所有權重劃；E294 本波不做 | 整合者 session |
+| 2026-10-17 | 整合者 | 清單 PR #21 merge `902462e` = 派工 base；派工前核對：三條 lane 點名的擁有／禁止路徑在 base 存在或標為新建、無殘留 branch／worktree、`owners --range` 可用；信箱 e284／e329／e291 空建、mailbox-watch 與 lane-status watch 皆 armed；三份 prompt 以 `fanout.mjs render --base 902462e` 產生 | 本檔 |
+| 2026-10-17 | 整合者 | 三條 cut 預審 close：e291（`e4ea650`，一次通過）、e329（`cec96d7`；退回一次：條件 2 的 exit 2 改寫成 usage／manifest／git 錯誤，全套 proof 包 test-lock）、e284（`2a3e3b3`；退回一次：R2 補上 primary 在 integ 分支上的結案註記與 merge 後以 sha 驗證的 MOVED） | 信箱 e284／e329／e291 |
+| 2026-10-17 | 人類 | 在三條 lane 各自的 session 核准 cut：e291（`e4ea650`）、e329（`cec96d7`，D1–D3 一併接受）、e284（`2a3e3b3`，R1＝(a)、R2＝(a)） | lane session；各 lane spec 與 handoff commit |
+| 2026-10-17 | 人類 | opus 週額度用完時不改用 fable，照舊用 opus：遇到 429 重試一次，再被擋就暫停等重置。e329 曾把「continue」解讀成可換 tier 而加了 `code-reviewer=fable`，人類在 lane session 確認後移除（`5bdff14`，fable 審查未留任何證據），改用 opus 重審 | 整合者 session；lane session（e329 `5bdff14`） |
+| 2026-10-17 | 人類 | 本波 qa-engineer 用 opus：e284、e291 的 `dispatch_pins` 帶 `qa-engineer=opus`（起因是整合者轉達時把「不要換成 fable」寫成「所有角色照舊用 opus」，已更正）；e329 的 qa 用預設 sonnet | 整合者 session |
+| 2026-10-17 | 人類 | e291：E335 的 `--abandoned` 重跑缺口在本 lane 一起修（修訂 cut `03f2133`）；Node 20 的修正（修訂 cut `0709431`，D8、AC-E335-7）也在本 lane 修 | lane session；e291 `a93dbb0`、`7910cee` |
+| 2026-10-17 | 整合者 | 接受的偏離：e291 D7 改為 refresh 與 preserve 兩處共用 helper（spec 已補記）；e291 `868b28d` 在審查後只改註解（qa 已註明）；e284 primary 列的 clean／dirty 排除清單檔，與 git status 事實同一規則（reviewer 記入證據）；e291 PM 手改一次未勾選 task 行（已揭露，工具缺口立為 E340） | 信箱 e284／e291 |
+| 2026-10-17 | 整合者 | 5a：e329 `0b39648`（run 39033629359）close；e291 `cc4ae03` 退回 —— run 39035552502 的 test (20) 紅（AC-E335-6 (a)(b)，Node 20 的 `cpSync` 不能把 link 蓋過同名 link），修正後 `cf29621`（run 39045233532，test (20)／test (22) 皆綠）close；e284 `e7d43fa`（run 39036891542）close，qa 第 1 輪 FAIL 只因 spec 範例的家目錄名被路徑檢查擋下，第 2 輪 PASS | 本檔 |
+| 2026-10-17 | 整合者 | 5b：`integ/post-v4-w6` ← e329 `d4855e4` ← e284 `ec6697b` ← e291 `047a652`，皆 `--no-ff`、零衝突 → 無合併審查；merge-invariants 三次 PASS；重建 `dist/` 無差異；`npm audit --audit-level=high` exit 0；整合層 CI run 39045490708 在 `047a652` 綠；finish 三 lane 配號 E337（e329）、E338、E339（e284）、E340（e291） | 本檔 |
+| 2026-10-17 | 人類 | 使用者層級的 teamwork 子代理改用 opus（第 5 波待決項）；repo 範本 `templates/claude-code-agents/` 的 pm／teamwork 預設維持 sonnet（新使用者的預設，不是落後） | 整合者 session |
+
+## 結案
+- 日期 2026-10-17。`integ/post-v4-w6` ← e329（`d4855e4`）← e284（`ec6697b`）← e291（`047a652`），皆 `--no-ff`、零衝突 → 無合併審查；merge-invariants 三次 PASS；重建 `dist/` 無差異；`npm audit --audit-level=high` exit 0；整合層 CI run 39045490708 在 `047a652` 綠。
+- 彙總（上限按 lane 計）：e329 5 張 task／hop 4/14／review 0 輪／qa 0 輪；e284 6 張 task／hop 6/14／review 0 輪／qa 退回 1 輪（spec 範例文字）；e291 8 張 task（cut 修訂兩次）／hop 11/14／review 0 輪／qa 0 輪，但 qa PASS 被 CI 的 Node 20 job 推翻一次。
+- 完成定義 14 項全部成立（本清單自己的 `## 接手步驟` 為最後一項，由 e284 剛出貨的 `fanout.mjs handoff --closing` 產生事實欄位 —— 這是工具的第一次實戰使用）。
+- 例外：(1) opus 週額度在派工後約 20 分鐘用完，三條 lane 各停一次，人類裁定照舊用 opus、不換 fable；(2) e291 的 qa PASS 在本機 Node 22 成立、在 CI Node 20 失敗 —— 本機與 CI 的 Node 版本不同，lane 在本機用 Node 20 跑全套時，共用的 node_modules（為 Node 22 編譯）會讓 SQLite 測試失敗，Node 20 的定論以 CI 為準；(3) 三條 lane 的 sr、reviewer 都是 opus，e284、e291 的 qa 也是 opus（同模型疑慮，各審查報告已註明）；(4) 記帳 commit `12ef68b` 的一格表格沒跳脫 `|`，由 `c4e6fcb` 修正（不改寫歷史）。
+- 新票：E337（e329）、E338、E339（e284）、E340（e291），由 `finish --shipped` 配號，排在佇列 #154–#157；E336（整合者配號，規劃時）在 #153。
+- 下一波建議：integrator 改版第 3 波 —— content lane E285（SOP 引用 `fanout.mjs handoff`、接手模式；可帶 E294 的 lane-protocol §1 那一半）；程式 lane E289（render 補充檔，原本等的 E284、E291 都已出貨）＋ E337 ＋ E338 ＋ E339（同為 `tools/fanout-manifest.ts`）。E336（`pull --ff-only` 寫法，動憲法 §6）要人類先裁定寫法，再進 content lane。E340 是 `tw_*` 工具票，可獨立一條。
+- 發版：`main` 帶 E284（`fanout.mjs handoff` 新指令）、E291（新設定 key `nodeModulesLinks`）、E331／E330／E332／E333／E335（修正）、E329／E328／E334／E327（SOP 與 lane-protocol）→ 建議 MINOR v4.9.0，由人類決定。
+
+## 接手步驟
+（事實欄位由 `node scripts/fanout.mjs handoff` 產生；接手時先跑 `node scripts/fanout.mjs handoff --check <manifest>`。`<待填：…>` 由整合者填寫。）
+### 核對 primary
+- 目標分支：main @ 902462e
+- 目標分支對 origin：一致
+- git status：乾淨
+- worktree：primary（main ← integ/post-v4-w6 @ c4e6fcb）
+- lane-status：primary（main ← integ/post-v4-w6 @ c4e6fcb）release-post-v4-w5／In_Progress／release-engineer，hop 3，commits 0，clean
+### 已結案
+- 第 6 波三條 lane（e329、e284、e291）已合併、finish、拆除；lane 紀錄在 `.current/history/2026-10/`，記帳與本清單在同一個 wave PR。
+- 未配號的新發現：無（四筆都已配號 E337–E340）。
+### 待人類決定
+- 是否發版（建議 MINOR v4.9.0）。
+- 下一波範圍（建議見「結案」）。
+- E336 的寫法（`git -c pull.rebase=false pull --ff-only`，或 `git fetch` 加 `git merge --ff-only origin/main` —— 後者要改憲法 §6 的授權）。
+- v4.8.0 回報的 9a 逾時與 CI 警告問題要併進 E82 還是另開票（整合者建議併進 E82）。
+### 進行中的背景工作
+無

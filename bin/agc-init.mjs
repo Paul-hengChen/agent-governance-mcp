@@ -1012,7 +1012,8 @@ const STR_USAGE_FEATURE =
   "          Cut a lane from the primary checkout: branch feat/<ticket-slug>\n" +
   "          (from --base, default main) + a linked git worktree at --path\n" +
   "          (default <parent>/<repo>-lanes/<ticket-id>), node_modules\n" +
-  "          symlinked to primary's, .env byte-copied.\n" +
+  "          symlinked to primary's (root, or the directories listed in\n" +
+  "          .current/.config.json nodeModulesLinks), .env byte-copied.\n" +
   "  feature finish <ticket-id> (--shipped|--abandoned) [--base <branch>] [--pr <n>]\n" +
   "          Tear a lane down from the primary checkout. --shipped requires\n" +
   "          the branch merged into --base (default main), moves the lane's\n" +
@@ -1390,22 +1391,84 @@ function trackedArtifactPaths(repoRoot, artifactPaths) {
   );
 }
 
-// Env bootstrap for a freshly-added lane (AC9–AC14). Returns
-// { out: string[], warn: string[] } lines for the caller to print.
-function bootstrapLaneEnv(repoRoot, lanePath) {
-  const out = [];
-  const warn = [];
-
-  // Exclude rules first, so the lane's `git status` is clean the moment the
-  // link / copy below exist (AC8, AC13).
-  const added = upsertSharedExclude(repoRoot, LANE_EXCLUDE_RULES);
-  if (added.length > 0) {
-    out.push(`agc feature start — added ${added.join(", ")} to the shared info/exclude`);
+// The node_modules link locations `feature start` uses (E291 D1/D4): "." is
+// the repo root. Read raw from the primary checkout's config, never through
+// loadConfig (which may heal-write). Key absent, or no usable config file:
+// the root-only default, and dist/tools/config.js is not loaded at all.
+// `warn` holds the invalid-entry / not-array lines, printed before any
+// per-location line. Runs before `git worktree add`, so a load failure
+// creates nothing.
+async function resolveNodeModulesLinks(repoRoot) {
+  const rootOnly = { locations: ["."], warn: [] };
+  let parsed;
+  try {
+    parsed = JSON.parse(fs.readFileSync(path.join(repoRoot, ".current", ".config.json"), "utf-8"));
+  } catch {
+    return rootOnly;
   }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return rootOnly;
+  if (!Object.prototype.hasOwnProperty.call(parsed, "nodeModulesLinks")) return rootOnly;
+  let config;
+  try {
+    config = await import(new URL("../dist/tools/config.js", import.meta.url).href);
+  } catch (err) {
+    throw new FeatureError(
+      `agc feature: cannot load dist/tools/config.js from the agc install ` +
+        `(${err && err.message ? err.message : String(err)}) — run \`npm run build\` (nothing created)`
+    );
+  }
+  const result = config.parseNodeModulesLinks(parsed.nodeModulesLinks);
+  if (result === null) {
+    // Copy / Strings e291.not-array.
+    return {
+      locations: ["."],
+      warn: [
+        "agc feature start — warning: .current/.config.json nodeModulesLinks is not an array — " +
+          "ignored, linking the root node_modules only",
+      ],
+    };
+  }
+  // Copy / Strings e291.invalid-entry, one line per rejected entry.
+  const warn = result.rejected.map(
+    (entry) =>
+      `agc feature start — warning: .current/.config.json nodeModulesLinks entry ${JSON.stringify(entry)} ` +
+      `is not a repo-relative directory path (no absolute path, no empty, "." or ".." segment, no ` +
+      `backslash, wildcard or control character) — skipped`
+  );
+  return { locations: result.links, warn };
+}
 
-  // node_modules: a symlink to primary's install, never a copy (AC9).
-  const primaryNm = path.join(repoRoot, "node_modules");
-  const laneNm = path.join(lanePath, "node_modules");
+// True when every segment of `segs` below `lanePath` is a real directory —
+// no missing segment and no symlink (E291 D6 step 1).
+function isRealLaneDir(lanePath, segs) {
+  let cur = lanePath;
+  for (const seg of segs) {
+    cur = path.join(cur, seg);
+    const st = lstatOrNull(cur);
+    if (!st || st.isSymbolicLink() || !st.isDirectory()) return false;
+  }
+  return true;
+}
+
+// node_modules for one location: a symlink to primary's install, never a
+// copy (AC9; E291 D6). The "." rendering of every line is byte-identical to
+// the pre-E291 root-only text.
+function linkLaneNodeModules(repoRoot, lanePath, loc, out, warn) {
+  const root = loc === ".";
+  const segs = root ? [] : loc.split("/");
+  const rel = root ? "node_modules" : `${loc}/node_modules`;
+  if (!root && !isRealLaneDir(lanePath, segs)) {
+    // Copy / Strings e291.lane-dir-missing.
+    warn.push(
+      `agc feature start — warning: ${loc}/ is not a directory in the lane checkout — ` +
+        `no ${loc}/node_modules link created`
+    );
+    return;
+  }
+  const where = root ? "the lane" : `the lane's ${loc}/`;
+  const pwhere = root ? "the primary checkout" : `the primary checkout's ${loc}/`;
+  const primaryNm = path.join(repoRoot, ...segs, "node_modules");
+  const laneNm = path.join(lanePath, ...segs, "node_modules");
   let nmStat = null;
   try {
     nmStat = fs.statSync(primaryNm);
@@ -1413,28 +1476,52 @@ function bootstrapLaneEnv(repoRoot, lanePath) {
     nmStat = null;
   }
   if (!nmStat || !nmStat.isDirectory()) {
+    // Copy / Strings e291.primary-missing.
     warn.push(
-      `agc feature start — warning: the primary checkout has no node_modules ` +
-        `(${primaryNm}) — run \`npm install\` in the primary checkout first; the ` +
-        `lane was created without a node_modules link`
+      `agc feature start — warning: the primary checkout has no ${rel} ` +
+        `(${primaryNm}) — run \`npm install\` in ${pwhere} first; the ` +
+        `lane was created without a ${rel} link`
     );
   } else if (lstatOrNull(laneNm)) {
+    // Copy / Strings e291.lane-exists.
     warn.push(
       `agc feature start — warning: ${laneNm} already exists after checkout ` +
         `(tracked in this repo?) — left as checked out, not linked`
     );
   } else {
     fs.symlinkSync(primaryNm, laneNm, process.platform === "win32" ? "junction" : "dir");
-    out.push(`agc feature start — linked node_modules -> ${primaryNm}`);
-    // AC14 — one line, stdout, right after the link exists.
+    // Copy / Strings e291.link-line.
+    out.push(`agc feature start — linked ${rel} -> ${primaryNm}`);
+    // AC14 — one line, stdout, right after the link exists. e291.shared-warning.
     out.push(
-      "agc feature start — warning: node_modules is shared with the primary " +
-        "checkout (symlink) — never run `npm ci` / `npm install` inside the lane " +
-        "(`npm ci` deletes the directory first, which would delete primary's real " +
-        "node_modules through the link); for an independent install, `rm " +
-        "node_modules` (removes only the link) and then run `npm ci` in the lane"
+      `agc feature start — warning: ${rel} is shared with the primary ` +
+        `checkout (symlink) — never run \`npm ci\` / \`npm install\` inside ${where} ` +
+        `(\`npm ci\` deletes the directory first, which would delete primary's real ` +
+        `${rel} through the link); for an independent install, \`rm ` +
+        `${rel}\` (removes only the link) and then run \`npm ci\` in ${where}`
     );
   }
+}
+
+// Env bootstrap for a freshly-added lane (AC9–AC14). `nmLinks` is
+// resolveNodeModulesLinks()'s result. Returns { out: string[], warn: string[] }
+// lines for the caller to print.
+function bootstrapLaneEnv(repoRoot, lanePath, nmLinks) {
+  const out = [];
+  const warn = [...nmLinks.warn];
+
+  // Exclude rules first, so the lane's `git status` is clean the moment the
+  // link / copy below exist (AC8, AC13). One `/<loc>/node_modules` per
+  // non-root location, after the static rules (E291 D5).
+  const added = upsertSharedExclude(repoRoot, [
+    ...LANE_EXCLUDE_RULES,
+    ...nmLinks.locations.filter((loc) => loc !== ".").map((loc) => `/${loc}/node_modules`),
+  ]);
+  if (added.length > 0) {
+    out.push(`agc feature start — added ${added.join(", ")} to the shared info/exclude`);
+  }
+
+  for (const loc of nmLinks.locations) linkLaneNodeModules(repoRoot, lanePath, loc, out, warn);
 
   // .env: byte copy only — fs.copyFileSync never materializes the content as
   // a JS string (§6). COPYFILE_EXCL: never clobber a .env the checkout
@@ -1513,6 +1600,9 @@ async function runFeatureStart(cwd, argv) {
     );
   }
 
+  // E291 D4 — the node_modules link locations, resolved before any mutation.
+  const nmLinks = await resolveNodeModulesLinks(repoRoot);
+
   // AC1 — git creates any missing leading directories of lanePath itself.
   // AC7 — deliberately NOT followed by `agc init` / writeClaudeBlock: that
   // would rewrite the lane's tracked CLAUDE.md and leave it dirty.
@@ -1529,7 +1619,7 @@ async function runFeatureStart(cwd, argv) {
     `agc feature start — created branch ${branch} (from ${base}) and worktree ${lanePath}\n`
   );
 
-  const { out, warn } = bootstrapLaneEnv(repoRoot, lanePath);
+  const { out, warn } = bootstrapLaneEnv(repoRoot, lanePath, nmLinks);
   for (const line of out) process.stdout.write(`${line}\n`);
   for (const line of warn) process.stderr.write(`${line}\n`);
 
@@ -1811,24 +1901,70 @@ function planAbandonCurrentHarvest({ lanePaths, lanePath, ticketId, branch, now 
   };
 }
 
-// The copy planAbandonCurrentHarvest asked for, just before the worktree is
-// removed (so it captures the lane's final state). Every file, no exclusions
-// (--abandoned writes no pointer line that base-sha would duplicate). A
-// copy-over, NEVER rm-then-copy (AC10): lane files overwrite same-named
-// history files, history-only files (an earlier harvest under the same id)
-// are kept — lossless, since agc's only writer of this dir is this harvest.
+// E335 D8: renames aside (into `asides`) each history link a same-named lane
+// link would be copied over — Node 20 cpSync refuses link over link. Walks
+// without following links; recurses only where both sides are real dirs.
+function setAsideCollidingHistoryLinks(srcDir, histDir, asides) {
+  for (const ent of fs.readdirSync(srcDir, { withFileTypes: true })) {
+    const dst = path.join(histDir, ent.name);
+    if (ent.isDirectory()) {
+      if (lstatOrNull(dst)?.isDirectory() === true) {
+        setAsideCollidingHistoryLinks(path.join(srcDir, ent.name), dst, asides);
+      }
+    } else if (ent.isSymbolicLink() && lstatOrNull(dst)?.isSymbolicLink() === true) {
+      const aside = `${dst}.${process.pid}.${Date.now()}.aside.tmp`;
+      fs.renameSync(dst, aside);
+      asides.push({ orig: dst, aside });
+    }
+  }
+}
+
+// The copy planAbandonCurrentHarvest asked for, just before worktree removal.
+// Copy-over of every file, NEVER rm-then-copy (AC10): history-only files stay.
 // A failed copy leaves the worktree in place; re-running redoes it.
-function executeAbandonCurrentHarvest(harvest) {
+// `preserve` is the findings plan (or null): a symlinked pending-tickets.md it
+// covers ends as a regular file of the detector's bytes. History entries the
+// copy replaces (that file's earlier copy; links under lane links, D8) are set
+// aside first and restored on failure. Rationale: E335 T-E335-03/04 commits.
+function executeAbandonCurrentHarvest(harvest, preserve) {
   const { ticketId, branch, bucket, histAbs, srcAbs, sourceIgnored } = harvest;
+  const derefPending =
+    preserve?.covered === true &&
+    lstatOrNull(path.join(srcAbs, preserve.filename))?.isSymbolicLink() === true;
+  const prior = derefPending ? lstatOrNull(preserve.dstAbs) : null;
+  const asides = [];
   try {
     fs.mkdirSync(histAbs, { recursive: true });
+    if (prior !== null && (prior.isFile() || prior.isSymbolicLink())) {
+      const aside = `${preserve.dstAbs}.${process.pid}.${Date.now()}.aside.tmp`;
+      fs.renameSync(preserve.dstAbs, aside);
+      asides.push({ orig: preserve.dstAbs, aside });
+    }
+    // After the pending-tickets.md set-aside, so that file is never set aside twice.
+    setAsideCollidingHistoryLinks(srcAbs, histAbs, asides);
     fs.cpSync(srcAbs, histAbs, { recursive: true, force: true, errorOnExist: false });
+    if (derefPending) materializeFindingsCopy(preserve.dstAbs, preserve.bytes);
   } catch (err) {
+    for (const { orig, aside } of asides.reverse()) {
+      if (lstatOrNull(aside) === null) continue;
+      try {
+        fs.renameSync(aside, orig);
+      } catch {
+        // left at `aside` (lossless); the error below is the one to report
+      }
+    }
     throw new FeatureError(
       `agc feature finish --abandoned: harvest of .current/${ticketId}/ into .current/history/${bucket}/${ticketId}/ ` +
         `failed (${err && err.message ? err.message : String(err)}) — worktree and branch left in place ` +
         `(re-running finish is safe)`
     );
+  }
+  for (const { aside } of asides) {
+    try {
+      fs.rmSync(aside, { force: true });
+    } catch {
+      // a leftover copy of the old history entry is harmless
+    }
   }
   // Copy / Strings e194.current-harvest-line (reason clause per sourceIgnored).
   const reason = sourceIgnored
@@ -2308,7 +2444,22 @@ function planFindingsPreserve({ findings, target, verb }) {
       );
     }
   }
-  return { ...findings, dstAbs, dstRel, verb };
+  return { ...findings, dstAbs, dstRel, verb, covered: target.covered };
+}
+
+// E335 D7: replaces the directory entry at `dstAbs` (a symlink a harvest
+// copied as a link) with a regular file holding `bytes` — sibling temp file,
+// then renameSync over the entry itself, so nothing is written through the
+// link. Throws on failure, after removing its own temp file.
+function materializeFindingsCopy(dstAbs, bytes) {
+  const tmp = `${dstAbs}.${process.pid}.${Date.now()}.tmp`;
+  try {
+    fs.writeFileSync(tmp, bytes, { flag: "wx" });
+    fs.renameSync(tmp, dstAbs);
+  } catch (err) {
+    if (!err || err.code !== "EEXIST") fs.rmSync(tmp, { force: true });
+    throw err;
+  }
 }
 
 // Runs after the harvest step that may cover the file and before the worktree
@@ -2327,11 +2478,20 @@ function executeFindingsPreserve(p) {
   } catch (err) {
     throw fail(msg(err));
   }
-  if (lstatOrNull(p.dstAbs) === null) {
+  const dstStat = lstatOrNull(p.dstAbs);
+  if (dstStat === null) {
     try {
       fs.writeFileSync(p.dstAbs, p.bytes, { flag: "wx" });
     } catch (err) {
       if (!err || err.code !== "EEXIST") fs.rmSync(p.dstAbs, { force: true });
+      throw fail(msg(err));
+    }
+  } else if (dstStat.isSymbolicLink() && p.covered) {
+    // E335 D7: only a link this run's harvest put there; an uncovered one
+    // was already refused at plan time (e287.preserve-differs-refuse).
+    try {
+      materializeFindingsCopy(p.dstAbs, p.bytes);
+    } catch (err) {
       throw fail(msg(err));
     }
   }
@@ -2738,11 +2898,19 @@ function executeLaneClose({ repoRoot, base, close }) {
 // over that copy, BEFORE removeWorktreeNoForce. Overwriting is lossless (why:
 // see specs/e260c-bin-scripts.md). Files only in the history copy are kept; a
 // failed copy leaves the worktree in place, and a re-run redoes the comparison.
-function executeHarvestRefresh({ ticketId, refresh }) {
+// `preserve` is the E287 findings plan (or null). A symlinked lane
+// pending-tickets.md it covers is written as the detector's bytes instead of
+// copied as a link (E335 D7): cpSync refuses a link over the history link
+// a failed earlier run left ("src and dest cannot be the same").
+function executeHarvestRefresh({ ticketId, refresh, preserve }) {
   try {
     for (const f of refresh.files) {
       fs.mkdirSync(path.dirname(f.dst), { recursive: true });
-      fs.cpSync(f.src, f.dst, { force: true });
+      if (preserve && f.rel === preserve.pendingRel && lstatOrNull(f.src)?.isSymbolicLink()) {
+        materializeFindingsCopy(f.dst, preserve.bytes);
+      } else {
+        fs.cpSync(f.src, f.dst, { force: true });
+      }
     }
   } catch (err) {
     throw new FeatureError(
@@ -3162,7 +3330,7 @@ async function runFeatureFinish(cwd, argv) {
         `agc feature finish — lane ${ticketId} already recorded under ${TASKS_REL} ${CLOSED_LANES_HEADING}, ` +
           `skipping the close writeback\n`
       );
-      if (close.refresh !== null) executeHarvestRefresh({ ticketId, refresh: close.refresh });
+      if (close.refresh !== null) executeHarvestRefresh({ ticketId, refresh: close.refresh, preserve });
     } else {
       executeLaneClose({ repoRoot, base, close });
     }
@@ -3224,7 +3392,7 @@ async function runFeatureFinish(cwd, argv) {
         untrackedMoved.join(", ") +
         ` — git add + commit it in the lane and re-run, or remove the worktree by hand`
       : null;
-  if (currentHarvest !== null) executeAbandonCurrentHarvest(currentHarvest);
+  if (currentHarvest !== null) executeAbandonCurrentHarvest(currentHarvest, preserve);
   if (preserve) executeFindingsPreserve(preserve);
   removeWorktreeNoForce(repoRoot, lanePath, hint);
   process.stdout.write(`agc feature finish — removed worktree ${lanePath}\n`);

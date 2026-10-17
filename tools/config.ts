@@ -74,9 +74,54 @@ export interface WorkspaceConfig {
   // NOT defaulted to "local" here, because `agc check` reports an undeclared
   // workspace and a synthesized default would hide that.
   artifacts?: WorkspaceArtifactsMode;
+  // Directories whose node_modules `agc feature start` links to the primary
+  // checkout's (E291), normalized by parseNodeModulesLinks: "." is the repo
+  // root. Present (possibly []) only when the key is an array; it replaces
+  // the root-only default. bin/agc-init.mjs reads the key raw, not here.
+  nodeModulesLinks?: string[];
 }
 
 export type WorkspaceArtifactsMode = "local" | "repo";
+
+// Result of parseNodeModulesLinks for an array value: the valid entries,
+// normalized and deduplicated in list order, plus every rejected raw entry.
+export interface NodeModulesLinksParse {
+  links: string[];
+  rejected: unknown[];
+}
+
+// Same character class as bin/agc-init.mjs GITIGNORE_UNSAFE_SEGMENT_RE: each
+// location becomes a `/<loc>/node_modules` exclude rule.
+const NODE_MODULES_LINK_UNSAFE_RE = /[*?[\]\\\x00-\x1f\x7f]/;
+
+function normalizeNodeModulesLink(entry: unknown): string | null {
+  if (typeof entry !== "string" || entry.length === 0) return null;
+  if (entry.startsWith("/") || /^[A-Za-z]:/.test(entry)) return null;
+  const loc = entry.endsWith("/") ? entry.slice(0, -1) : entry;
+  if (loc === ".") return loc;
+  const ok = loc.split("/").every(
+    (seg) => seg.length > 0 && seg !== "." && seg !== ".." && !NODE_MODULES_LINK_UNSAFE_RE.test(seg)
+  );
+  return ok ? loc : null;
+}
+
+/**
+ * The one validation definition for the `nodeModulesLinks` key (E291 D2).
+ * Returns null when `value` is not an array (null included). Otherwise
+ * every entry is either kept (one trailing "/" stripped; first occurrence
+ * wins on duplicates) or listed in `rejected`, both in list order. Never throws.
+ */
+export function parseNodeModulesLinks(value: unknown): NodeModulesLinksParse | null {
+  if (!Array.isArray(value)) return null;
+  const links: string[] = [];
+  const rejected: unknown[] = [];
+  for (const entry of value) {
+    const loc = normalizeNodeModulesLink(entry);
+    if (loc === null) rejected.push(entry);
+    else if (!links.includes(loc)) links.push(loc);
+  }
+  return { links, rejected };
+}
 
 // Methodology-agnostic defaults. Common task-list filenames in workspace root
 // or under .current/. No project-management-tool-specific paths.
@@ -282,6 +327,13 @@ function loadConfigEntry(workspacePath: string): ConfigCacheEntry {
   const artifacts = migration.payload.artifacts;
   if (artifacts === "local" || artifacts === "repo") {
     result.artifacts = artifacts;
+  }
+  // Additive-optional field (no schema_version bump — same precedent as
+  // host/driftBaselineIds). Surfaced only for an array value; invalid
+  // entries are dropped here, never an error (E291).
+  const nodeModulesLinks = parseNodeModulesLinks(migration.payload.nodeModulesLinks);
+  if (nodeModulesLinks !== null) {
+    result.nodeModulesLinks = nodeModulesLinks.links;
   }
   // Cache under the pre-read mtime. If the migration heal-on-read above
   // rewrote the file, the recorded mtime is already stale — the NEXT call's

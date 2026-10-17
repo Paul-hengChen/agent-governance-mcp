@@ -1,0 +1,3 @@
+# E330 (T-E330-01): the generic usage now lists owners and handoff (5 continuation lines); qa re-pins both per spec D4.
+test/e296-manifest-tier.test.mjs | AC12: usage has the fourth `check --cut` line; the wrapper header lists it; check <manifest> <lane> is unchanged
+test/e322-owners.test.mjs | AC-E322-9 usage unchanged and read-only

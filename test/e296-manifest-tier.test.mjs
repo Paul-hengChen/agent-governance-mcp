@@ -310,7 +310,7 @@ test("AC12: usage has the fourth `check --cut` line; the wrapper header lists it
   const r = cli([]);
   assert.equal(r.status, 2);
   assert.equal(grepC(r.stderr, "check --cut <manifest> <lane> <spec>"), 1);
-  assert.equal(r.stderr.split("\n").filter((l) => l.startsWith("       node scripts/fanout.mjs")).length, 3, "usage keeps its other three lines");
+  assert.equal(r.stderr.split("\n").filter((l) => l.startsWith("       node scripts/fanout.mjs")).length, 5, "usage has five continuation lines (owners and handoff included, E330)");
   assert.ok(read("scripts/fanout.mjs").includes("check --cut <manifest> <lane> <spec>"));
   // unchanged: plain check on an unknown lane and on a repo lacking the branch
   const nolane = cli(["check", MANIFEST, "nolane"]);

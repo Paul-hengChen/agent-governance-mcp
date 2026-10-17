@@ -51,7 +51,7 @@ const PATH_TOKEN_RE = /^[A-Za-z0-9_.\-*/{},]+$/;
 const UNQUOTED_PATH_RE = /^[A-Za-z0-9_.\-]*\/[A-Za-z0-9_.\-*/{}]*$/;
 const UNQUOTED_SPLIT_RE = /[\s,、，；;（）()]+/;
 const TITLE_RE = /^# Fan-out: (.+)$/;
-const BASE_RE = /^base:\s*([0-9a-f]{7,40})\b/;
+export const BASE_RE = /^base:\s*([0-9a-f]{7,40})\b/;
 const MAILBOX_RE = /^mailbox:\s*(\S+)/;
 const SHA_RE = /^[0-9a-f]{7,40}$/;
 const PIN_SPAN_RE = /^([a-z-]+)=(\S+)$/;
@@ -126,6 +126,9 @@ export const FANOUT_CODES = {
     // owners input errors (exit 2).
     rangeInvalid: "RANGE_INVALID",
     pathsUnreadable: "PATHS_UNREADABLE",
+    // owners --range / check input error (exit 2): the `git diff <a>...<b>`
+    // itself failed, e.g. the two sides share no merge base.
+    gitDiffFailed: "GIT_DIFF_FAILED",
 };
 /**
  * validate warning for a dispatchable row whose worktree cell is an absolute
@@ -139,17 +142,20 @@ export const WORKTREE_ABSOLUTE_WARN = (lane, line) => `WARN  lane ${lane} (line 
  */
 export const MAILBOX_ABSOLUTE_WARN = (line) => `WARN  mailbox header (line ${line}): mailbox: is an absolute path — write it relative to primary (e.g. ../<lanes-dir>/_mailbox); render still accepts it`;
 export const PINS_NONE = "無";
+/** Usage of the owners subcommand, printed on its own usage errors. */
+export const OWNERS_USAGE = "usage: node scripts/fanout.mjs owners <manifest> (--range <a>...<b> [--repo <dir>] | --paths <file|->)";
+/** Usage of the handoff subcommand, printed on its own usage errors. */
+export const HANDOFF_USAGE = "usage: node scripts/fanout.mjs handoff [--check] <manifest> [--target <branch>] [--repo <dir>] [--mailbox-root <dir>] [--closing]";
+/** A subcommand usage line as a continuation line of USAGE (`usage: ` → 7 spaces). */
+const usageContinuation = (line) => `       ${line.slice("usage: ".length)}`;
 export const USAGE = [
     "usage: node scripts/fanout.mjs validate <manifest>",
     "       node scripts/fanout.mjs render <manifest> <lane> --summary <text> --reading <text>... [--mailbox-root <dir>] [--primary <path>] [--base <sha>]",
     "       node scripts/fanout.mjs check <manifest> <lane> [--base main] [--repo <dir>]",
     "       node scripts/fanout.mjs check --cut <manifest> <lane> <spec>",
+    usageContinuation(OWNERS_USAGE),
+    usageContinuation(HANDOFF_USAGE),
 ].join("\n");
-/**
- * Usage of the owners subcommand, printed on its own usage errors. Kept out
- * of USAGE so the generic usage text stays byte-identical.
- */
-export const OWNERS_USAGE = "usage: node scripts/fanout.mjs owners <manifest> (--range <a>...<b> [--repo <dir>] | --paths <file|->)";
 export const E158_NOTE = (base, branch) => `note: only committed changes were checked (git diff --no-renames --name-only ${base}...${branch}); uncommitted and untracked work in the worktree was NOT checked (E158).`;
 export const PROSE_NOTE = "note: prose restrictions inside 擁有 (e.g. （只限 …）) are not machine-checked.";
 export const CUT_GLOB_NOTE = "note: a glob in touches is in bounds only when byte-identical to an 擁有 token; glob-in-glob containment is never inferred.";
@@ -625,15 +631,40 @@ export const HANDOFF_SECTION = "接手步驟";
 /** Sub-items (`### ` headings) every handoff section must hold, in order. */
 export const HANDOFF_SUBITEMS = ["核對 primary", "已結案", "待人類決定", "進行中的背景工作"];
 /** The sub-item whose single body line must read 無 once the wave is closed. */
-const HANDOFF_BACKGROUND = "進行中的背景工作";
-const HANDOFF_NONE = "無";
+export const HANDOFF_BACKGROUND = "進行中的背景工作";
+export const HANDOFF_NONE = "無";
 /**
- * A machine-local absolute path token: a Windows drive path, `~/` or
- * `~<user>/`, or a POSIX path with two or more non-empty segments, starting
- * at a line start, whitespace or opening punctuation. The `//` of a URL
- * follows a `:`, which is not a boundary, so URLs are never hits.
+ * Characters after which a path token may start: whitespace, quotes, opening
+ * brackets, fullwidth and ASCII colon / comma, `、`, `=` and `|`.
  */
-const HANDOFF_ABSOLUTE_PATH_RE = /(?:^|[\s`'"(\[（「：，、=])(?:[A-Za-z]:[\\/]|~[^\s/]*\/|\/[^\s/]+\/[^\s/])/;
+const PATH_BOUNDARY = "[\\s`'\"(\\[（「：，、=:,|]";
+/**
+ * Where a path token may start: a line start, a boundary character, or a
+ * bold opener `**` that itself follows a line start or a boundary character
+ * (so `tools/**` + `/a/b` is not a start).
+ */
+const PATH_START = `(?:^|${PATH_BOUNDARY})(?:\\*\\*)?`;
+/**
+ * Machine-local absolute path forms:
+ * - Windows drive: `C:\` or `C:/`;
+ * - home: `~/` or `~<name>/`, the name starting with a letter or `_`, so a
+ *   date such as `~10/17` is not one;
+ * - POSIX: `/` + two or more segments, the first non-empty;
+ * - `file:///`;
+ * - `$HOME/` and `${HOME}/`;
+ * - UNC: `\\<host>\<share>`.
+ * A URL's `//` (after `https:`) and a protocol-relative `//host/a` never
+ * match: the POSIX form needs a non-empty first segment.
+ */
+const PATH_FORMS = [
+    "[A-Za-z]:[\\\\/]",
+    "~(?:[A-Za-z_][A-Za-z0-9._-]*)?\\/",
+    "\\/[^\\s/]+\\/[^\\s/]",
+    "file:\\/\\/\\/",
+    "\\$(?:HOME|\\{HOME\\})\\/",
+    "\\\\\\\\[^\\s\\\\/]+\\\\[^\\s\\\\/]",
+];
+const HANDOFF_ABSOLUTE_PATH_RE = new RegExp(`${PATH_START}(?:${PATH_FORMS.join("|")})`);
 /**
  * Error codes of the closed-manifest handoff check. CLI codes, named outside
  * the gate-suffix vocabulary like FANOUT_CODES.
@@ -648,7 +679,7 @@ export const HANDOFF_CODES = {
     absolutePath: "HANDOFF_ABSOLUTE_PATH",
 };
 /** Heading name `name`, or `name` followed by a `（…）` / `(…)` qualifier. */
-function isNamedHeading(heading, name) {
+export function isNamedHeading(heading, name) {
     return heading === name || heading.startsWith(`${name}（`) || heading.startsWith(`${name}(`);
 }
 /**
@@ -677,7 +708,7 @@ function handoffErr(code, message) {
  * Optional (`裝置`, `工具`) and unknown sub-items are not checked.
  */
 export function handoffSectionErrors(text) {
-    const sections = splitSections(splitLines(text)).filter((s) => isNamedHeading(s.name, HANDOFF_SECTION));
+    const sections = findHandoffSections(text);
     if (sections.length === 0) {
         return [handoffErr(HANDOFF_CODES.sectionAbsent, `manifest is closed (status 已結案) but has no "## ${HANDOFF_SECTION}" section`)];
     }
@@ -723,8 +754,14 @@ export function handoffSectionErrors(text) {
     }
     return errors;
 }
+/** Every `## 接手步驟` section (name optionally qualified), in file order. */
+export function findHandoffSections(text) {
+    return splitSections(splitLines(text))
+        .filter((s) => isNamedHeading(s.name, HANDOFF_SECTION))
+        .map((s) => ({ heading: s.heading, line: s.line, lines: s.lines }));
+}
 /** `無`, optionally after one `- ` / `* ` list marker and before one `。`. */
-function readsNone(line) {
+export function readsNone(line) {
     let t = line.trim();
     if (t.startsWith("- ") || t.startsWith("* "))
         t = t.slice(2).trim();
@@ -1035,6 +1072,27 @@ export function unmatchedOwnedTokens(ownedTokens, basePaths, addedPaths) {
 function nulList(raw) {
     return raw.split("\0").filter((p) => p.length > 0);
 }
+/** First non-blank stderr line of a failed git call, else the first line of its message. */
+export function gitErrorLine(err) {
+    const stderr = err.stderr;
+    const fromStderr = typeof stderr === "string" ? stderr.split(/\r?\n/).find((l) => l.trim() !== "") : undefined;
+    if (fromStderr !== undefined)
+        return fromStderr.trim();
+    return (err?.message ?? String(err)).split(/\r?\n/)[0];
+}
+/**
+ * `git diff --no-renames --name-only -z <a>...<b>`, or a GIT_DIFF_FAILED
+ * input error when git fails (e.g. no merge base), so a failed diff is never
+ * read as an empty or out-of-bounds change set.
+ */
+function diffNames(a, b, repo) {
+    try {
+        return { raw: gitOut(["diff", "--no-renames", "--name-only", "-z", `${a}...${b}`, "--"], repo) };
+    }
+    catch (err) {
+        return { error: inputErr(FANOUT_CODES.gitDiffFailed, `git diff ${a}...${b} failed in ${repo}: ${gitErrorLine(err)}`) };
+    }
+}
 function refOk(ref, cwd) {
     try {
         gitOut(["rev-parse", "--verify", "--quiet", `${ref}^{commit}`], cwd);
@@ -1077,8 +1135,10 @@ export function checkLane(m, laneId, opts = {}) {
     }
     if (errors.length > 0)
         return { ok: false, errors };
-    const raw = gitOut(["diff", "--no-renames", "--name-only", "-z", `${base}...${lane.branch}`, "--"], repo);
-    const changed = [...new Set(raw.split("\0").filter((p) => p.length > 0))].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+    const diff = diffNames(base, lane.branch, repo);
+    if ("error" in diff)
+        return { ok: false, errors: [diff.error] };
+    const changed = [...new Set(diff.raw.split("\0").filter((p) => p.length > 0))].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
     const out = [];
     for (const p of changed) {
         if (lane.ownedTokens.some((t) => matchesGlob(p, t)))
@@ -1493,7 +1553,10 @@ export function rangePaths(sides, repo) {
         .map((ref) => inputErr("REF_NOT_FOUND", `range ref "${ref}" does not resolve (git rev-parse --verify) in ${repo}`));
     if (errors.length > 0)
         return { errors };
-    return { paths: nulList(gitOut(["diff", "--no-renames", "--name-only", "-z", `${sides[0]}...${sides[1]}`, "--"], repo)) };
+    const diff = diffNames(sides[0], sides[1], repo);
+    if ("error" in diff)
+        return { errors: [diff.error] };
+    return { paths: nulList(diff.raw) };
 }
 /** One repo-relative path per line: trailing CR and surrounding space trimmed, blanks skipped. */
 export function parsePathList(text) {

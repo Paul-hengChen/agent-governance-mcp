@@ -2,6 +2,10 @@
 // Tests (T-E283-01) for specs/e283-fanout-handoff-and-ref-check.md AC-E283-1..10 and the structural form of the
 // hard condition AC-E283-11: `fanout.mjs validate` requires a `## 接手步驟` section once a manifest is closed
 // (status text after `狀態：` starts with `已結案`), and only then; the handoff checks are validate-only.
+// Grammar cases call validateManifest / isManifestClosed in-process (T-E333-01: one child process per case made this
+// file slow). A child process is spawned only where the case is about the CLI itself: the exit-0 stdout line, the
+// exit-2 stderr format, the path not being echoed on stderr, and the wrapper's render route (AC-E283-9). The
+// other AC-E283-9 subcommands run in-process through the same exported run* functions the wrapper routes to.
 // All fixtures are in-test manifests under os.tmpdir(). The committed specs/fanout-*.md are read only for an
 // invariant that stays stable as manifests are added (no non-closed manifest gets a handoff-scope error).
 
@@ -12,13 +16,23 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import {
+  validateManifest,
+  isManifestClosed,
+  runRender,
+  runCheck,
+  runOwners,
+} from "../dist/tools/fanout-manifest.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const FANOUT = path.join(ROOT, "scripts", "fanout.mjs");
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), "e283-qa-"));
 let seq = 0;
+/** Child processes spawned by this file; the budget (at most 6) is asserted by the last test. */
+let spawned = 0;
 
 function cli(args) {
+  spawned++;
   const r = spawnSync(process.execPath, [FANOUT, ...args], { cwd: ROOT, encoding: "utf8" });
   return { status: r.status, stdout: r.stdout, stderr: r.stderr };
 }
@@ -27,12 +41,16 @@ function tmpFile(name, text) {
   fs.writeFileSync(p, text);
   return p;
 }
-const errCodes = (r) =>
-  r.stderr
-    .split("\n")
-    .filter((l) => l.startsWith("fanout: error:"))
-    .map((l) => l.split(":")[2].trim());
-const errLines = (r, code) => r.stderr.split("\n").filter((l) => l.startsWith(`fanout: error: ${code}:`));
+
+/**
+ * In-process validate: the exit status the CLI would give (2 when any error, else 0), the error codes in report
+ * order and the error messages per code.
+ */
+function validate(text) {
+  const { errors } = validateManifest(text);
+  return { status: errors.length > 0 ? 2 : 0, codes: errors.map((e) => e.code), errors };
+}
+const errMessages = (r, code) => r.errors.filter((e) => e.code === code).map((e) => e.message);
 
 const CLOSED = "**狀態：已結案 2026-10-17。**";
 const DECISIONS_OK = ["| 2026-10-13 | 人類 | 開波 | s |"];
@@ -75,39 +93,55 @@ function section({ heading = "## 接手步驟", bodies = {}, extra = "" } = {}) 
   if (extra) parts.push(extra, "");
   return parts.join("\n");
 }
-const validate = (text) => cli(["validate", tmpFile("m.md", text)]);
 const closedWith = (sec, opts = {}) => validate(manifest({ tail: sec, ...opts }));
+const OPEN = "**狀態：人類核准 2026-10-13。**";
 
 test("fixture sanity: a not-closed manifest validates", () => {
   // WHY: every case below is judged against this; a red baseline would fake passes.
-  const r = validate(manifest({ status: "**狀態：人類核准 2026-10-13。**" }));
+  const text = manifest({ status: OPEN });
+  assert.equal(isManifestClosed(text), false);
+  const r = validate(text);
+  assert.equal(r.status, 0, JSON.stringify(r.errors));
+});
+
+test("CLI: exit 0 prints the `fanout: ok` line", () => {
+  const r = cli(["validate", tmpFile("m.md", manifest({ tail: section() }))]);
   assert.equal(r.status, 0, r.stderr);
-  assert.match(r.stdout, /^fanout: ok — /);
+  assert.match(r.stdout, /^fanout: ok — 1 dispatchable lane\(s\), 0 provisional, 1 decision\(s\)/);
+});
+
+test("CLI: exit 2 prints `fanout: error: <CODE>:` on stderr, no stack trace", () => {
+  const r = cli(["validate", tmpFile("m.md", manifest())]);
+  assert.equal(r.status, 2);
+  assert.ok(r.stderr.includes("fanout: error: HANDOFF_SECTION_ABSENT:"), r.stderr);
+  assert.ok(!/^\s+at /m.test(r.stderr), r.stderr);
 });
 
 test("AC-E283-1 closed without section", () => {
-  const r = validate(manifest());
+  const text = manifest();
+  assert.equal(isManifestClosed(text), true);
+  const r = validate(text);
   assert.equal(r.status, 2);
-  assert.ok(r.stderr.includes("fanout: error: HANDOFF_SECTION_ABSENT:"), r.stderr);
+  assert.ok(r.codes.includes("HANDOFF_SECTION_ABSENT"), r.codes.join(","));
 });
 
 test("AC-E283-2 closed with complete section", () => {
   const plain = closedWith(section());
-  assert.equal(plain.status, 0, plain.stderr);
-  assert.match(plain.stdout, /^fanout: ok — 1 dispatchable lane\(s\), 0 provisional, 1 decision\(s\)/);
+  assert.equal(plain.status, 0, JSON.stringify(plain.errors));
   // heading suffix and sub-item suffix accepted
   const suffixed = closedWith(
     section({ heading: "## 接手步驟（換 session 用）" }).replace("### 已結案", "### 已結案（本波）"),
   );
-  assert.equal(suffixed.status, 0, suffixed.stderr);
+  assert.equal(suffixed.status, 0, JSON.stringify(suffixed.errors));
   const ascii = closedWith(section({ heading: "## 接手步驟(換 session 用)" }));
-  assert.equal(ascii.status, 0, ascii.stderr);
+  assert.equal(ascii.status, 0, JSON.stringify(ascii.errors));
   // alternative closed spellings
   for (const st of ["**狀態**：已結案 2026-10-17。", "**狀態:已結案 2026-10-17**", "狀態： 已結案"]) {
+    assert.equal(isManifestClosed(manifest({ status: st })), true, st);
     const r = validate(manifest({ status: st, tail: section() }));
-    assert.equal(r.status, 0, `${st}: ${r.stderr}`);
+    assert.equal(r.status, 0, `${st}: ${JSON.stringify(r.errors)}`);
     const missing = validate(manifest({ status: st }));
-    assert.ok(errCodes(missing).includes("HANDOFF_SECTION_ABSENT"), `${st} must count as closed`);
+    assert.ok(missing.codes.includes("HANDOFF_SECTION_ABSENT"), `${st} must count as closed`);
   }
 });
 
@@ -115,28 +149,28 @@ test("AC-E283-3 sub-item absent / duplicate / empty", () => {
   for (const name of MANDATORY) {
     const absent = closedWith(section({ bodies: { [name]: undefined } }));
     assert.equal(absent.status, 2, name);
-    const l = errLines(absent, "HANDOFF_SUBITEM_ABSENT");
-    assert.ok(l.length >= 1 && l.some((x) => x.includes(name)), `absent ${name}: ${absent.stderr}`);
+    const l = errMessages(absent, "HANDOFF_SUBITEM_ABSENT");
+    assert.ok(l.length >= 1 && l.some((x) => x.includes(name)), `absent ${name}: ${absent.codes}`);
 
     const dup = closedWith(section({ extra: `### ${name}\n再一次` }));
     assert.equal(dup.status, 2, name);
-    assert.ok(errLines(dup, "HANDOFF_SUBITEM_DUPLICATE").some((x) => x.includes(name)), `dup ${name}: ${dup.stderr}`);
+    assert.ok(errMessages(dup, "HANDOFF_SUBITEM_DUPLICATE").some((x) => x.includes(name)), `dup ${name}: ${dup.codes}`);
 
     const empty = closedWith(section({ bodies: { [name]: "\n   \n" } }));
     assert.equal(empty.status, 2, name);
-    assert.ok(errLines(empty, "HANDOFF_SUBITEM_EMPTY").some((x) => x.includes(name)), `empty ${name}: ${empty.stderr}`);
+    assert.ok(errMessages(empty, "HANDOFF_SUBITEM_EMPTY").some((x) => x.includes(name)), `empty ${name}: ${empty.codes}`);
   }
 });
 
 test("AC-E283-4 background must be 無", () => {
   for (const ok of ["無", "- 無", "* 無", "無。"]) {
     const r = closedWith(section({ bodies: { 進行中的背景工作: ok } }));
-    assert.equal(r.status, 0, `${JSON.stringify(ok)}: ${r.stderr}`);
+    assert.equal(r.status, 0, `${JSON.stringify(ok)}: ${JSON.stringify(r.errors)}`);
   }
   for (const bad of ["監看 e283 信箱", "無\n- 整合分支未刪", "none"]) {
     const r = closedWith(section({ bodies: { 進行中的背景工作: bad } }));
     assert.equal(r.status, 2, JSON.stringify(bad));
-    assert.ok(errCodes(r).includes("HANDOFF_BACKGROUND_NOT_NONE"), `${JSON.stringify(bad)}: ${r.stderr}`);
+    assert.ok(r.codes.includes("HANDOFF_BACKGROUND_NOT_NONE"), `${JSON.stringify(bad)}: ${r.codes}`);
   }
 });
 
@@ -145,24 +179,32 @@ test("AC-E283-5 absolute path", () => {
   for (const h of hits) {
     const r = closedWith(section({ bodies: { "核對 primary": `在 ${h} 底下` } }));
     assert.equal(r.status, 2, h);
-    const l = errLines(r, "HANDOFF_ABSOLUTE_PATH");
-    assert.equal(l.length, 1, `${h}: exactly one per offending line: ${r.stderr}`);
+    const l = errMessages(r, "HANDOFF_ABSOLUTE_PATH");
+    assert.equal(l.length, 1, `${h}: exactly one per offending line: ${l}`);
     assert.match(l[0], /line \d+/, "names the line number");
     const needle = h.replace(/[`（）]/g, "");
-    assert.ok(!r.stderr.includes(needle), `stderr must not echo the path ${needle}`);
+    assert.ok(!r.errors.some((e) => e.message.includes(needle)), `message must not echo the path ${needle}`);
   }
   // one error per offending line, not per path occurrence
   const two = closedWith(section({ bodies: { "核對 primary": "`/a/b` 與 `/c/d`\n另一行 /x/y/z" } }));
-  assert.equal(errLines(two, "HANDOFF_ABSOLUTE_PATH").length, 2);
+  assert.equal(errMessages(two, "HANDOFF_ABSOLUTE_PATH").length, 2);
   // heading lines are scanned too
   const head = closedWith(section({ extra: "### 備註 /Users/x/y" }));
-  assert.ok(errCodes(head).includes("HANDOFF_ABSOLUTE_PATH"));
+  assert.ok(head.codes.includes("HANDOFF_ABSOLUTE_PATH"));
   // relative / non-path forms are not hits
   for (const ok of ["../lanes/e283", ".current/history/x", "origin/main", "/teamwork", "https://github.com/a/b"]) {
     const r = closedWith(section({ bodies: { "核對 primary": `見 ${ok}` } }));
-    assert.ok(!errCodes(r).includes("HANDOFF_ABSOLUTE_PATH"), `${ok}: ${r.stderr}`);
-    assert.equal(r.status, 0, `${ok}: ${r.stderr}`);
+    assert.ok(!r.codes.includes("HANDOFF_ABSOLUTE_PATH"), `${ok}: ${r.codes}`);
+    assert.equal(r.status, 0, `${ok}: ${JSON.stringify(r.errors)}`);
   }
+});
+
+test("CLI: the absolute path is not echoed on stderr", () => {
+  // WHY: stderr lands in terminals and logs a later session reads; the CLI must not print the local path.
+  const r = cli(["validate", tmpFile("m.md", manifest({ tail: section({ bodies: { "核對 primary": "在 /Users/x/repo 底下" } }) }))]);
+  assert.equal(r.status, 2);
+  assert.ok(r.stderr.includes("fanout: error: HANDOFF_ABSOLUTE_PATH:"), r.stderr);
+  assert.ok(!r.stderr.includes("/Users/x/repo"), r.stderr);
 });
 
 test("AC-E283-6 optional and unknown sub-items", () => {
@@ -175,7 +217,7 @@ test("AC-E283-6 optional and unknown sub-items", () => {
 test("AC-E283-7 duplicate section", () => {
   const r = closedWith(section() + "\n" + section({ heading: "## 接手步驟（第二份）" }));
   assert.equal(r.status, 2);
-  assert.ok(errCodes(r).includes("HANDOFF_SECTION_DUPLICATE"), r.stderr);
+  assert.ok(r.codes.includes("HANDOFF_SECTION_DUPLICATE"), r.codes.join(","));
 });
 
 test("AC-E283-8 not closed is not checked", () => {
@@ -189,13 +231,14 @@ test("AC-E283-8 not closed is not checked", () => {
   ];
   const badSections = ["", section({ bodies: { 進行中的背景工作: "還有" } }), section({ bodies: { "核對 primary": "/Users/x/y" } }), section({ bodies: { 已結案: undefined } })];
   for (const st of statuses) {
+    assert.equal(isManifestClosed(manifest({ status: st })), false, `${st}`);
     const baseline = validate(manifest({ status: st }));
-    assert.equal(baseline.status, 0, `${st}: ${baseline.stderr}`);
+    assert.equal(baseline.status, 0, `${st}: ${JSON.stringify(baseline.errors)}`);
     for (const sec of badSections) {
       const r = validate(manifest({ status: st, tail: sec }));
       assert.equal(r.status, baseline.status, `${st}`);
-      assert.deepEqual(errCodes(r), errCodes(baseline));
-      assert.ok(!r.stderr.includes("HANDOFF_"), `${st}: ${r.stderr}`);
+      assert.deepEqual(r.codes, baseline.codes);
+      assert.ok(!r.codes.some((c) => c.startsWith("HANDOFF_")), `${st}: ${r.codes}`);
     }
   }
 });
@@ -203,46 +246,53 @@ test("AC-E283-8 not closed is not checked", () => {
 test("AC-E283-8 status line is only read before the first ## heading", () => {
   // WHY: a `狀態：已結案` line inside a later section must not arm the check.
   const text = manifest({ status: null, tail: "## 備註\n**狀態：已結案 2026-10-17。**\n" });
+  assert.equal(isManifestClosed(text), false);
   const r = validate(text);
-  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.status, 0, JSON.stringify(r.errors));
 });
 
 test("AC-E283-9 validate-only", () => {
+  // WHY: the handoff checks belong to validate alone; render / check / check --cut / owners must answer a closed
+  // manifest with a bad handoff exactly as they answer the same manifest when it is not closed.
   const bad = section({ bodies: { 進行中的背景工作: "還有", "核對 primary": "/Users/x/y" } });
   const closedBad = manifest({ tail: bad });
-  const open = manifest({ status: "**狀態：人類核准 2026-10-13。**", tail: bad });
+  const open = manifest({ status: OPEN, tail: bad });
   const specFile = tmpFile(
     "spec.md",
     "# x\n\n## Cut\n\n| id | desc | depends_on | est. files | touches | design-link |\n|---|---|---|---|---|---|\n| T-X-01 | x | none | 1 | `tools/a.ts` | — |\n",
   );
   const pathsFile = tmpFile("paths.txt", "tools/a.ts\nREADME.md\n");
-  const mk = (t) => tmpFile("m.md", t);
-  const c = mk(closedBad);
-  const o = mk(open);
+  const c = tmpFile("m.md", closedBad);
+  const o = tmpFile("m.md", open);
   const runs = (m) => [
-    cli(["render", m, "a", "--summary", "s", "--reading", "r"]),
-    cli(["check", m, "a", "--repo", ROOT]),
-    cli(["check", "--cut", m, "a", specFile]),
-    cli(["owners", m, "--paths", pathsFile]),
+    runRender([m, "a", "--summary", "s", "--reading", "r"]),
+    runCheck([m, "a", "--repo", ROOT]),
+    runCheck(["--cut", m, "a", specFile]),
+    runOwners([m, "--paths", pathsFile]),
   ];
   const rc = runs(c);
   const ro = runs(o);
   for (let i = 0; i < rc.length; i++) {
-    assert.equal(rc[i].status, ro[i].status, `cmd ${i}`);
+    assert.equal(rc[i].exitCode, ro[i].exitCode, `cmd ${i}`);
     assert.ok(!rc[i].stderr.includes("HANDOFF_"), `cmd ${i}: ${rc[i].stderr}`);
     assert.ok(!rc[i].stdout.includes("HANDOFF_"));
   }
+  // the wrapper's render route gives the same answer for both
+  const cliC = cli(["render", c, "a", "--summary", "s", "--reading", "r"]);
+  const cliO = cli(["render", o, "a", "--summary", "s", "--reading", "r"]);
+  assert.equal(cliC.status, cliO.status, cliC.stderr);
+  assert.equal(cliC.status, rc[0].exitCode);
+  assert.ok(!cliC.stderr.includes("HANDOFF_") && !cliC.stdout.includes("HANDOFF_"));
   // and validate does fire on the closed one
-  assert.equal(cli(["validate", c]).status, 2);
-  assert.equal(cli(["validate", o]).status, 0);
+  assert.equal(validate(closedBad).status, 2);
+  assert.equal(validate(open).status, 0);
 });
 
 test("AC-E283-10 reported with other errors", () => {
   const r = validate(manifest({ decisions: ["| 13 Oct | 人類 | 開波 | s |"] }));
   assert.equal(r.status, 2);
-  const codes = errCodes(r);
-  assert.ok(codes.includes("HANDOFF_SECTION_ABSENT"), r.stderr);
-  assert.ok(codes.some((c) => c !== "HANDOFF_SECTION_ABSENT"), `a decisions error is also reported: ${r.stderr}`);
+  assert.ok(r.codes.includes("HANDOFF_SECTION_ABSENT"), r.codes.join(","));
+  assert.ok(r.codes.some((c) => c !== "HANDOFF_SECTION_ABSENT"), `a decisions error is also reported: ${r.codes}`);
 });
 
 test("AC-E283-11 (invariant) no committed manifest that is not closed gets a handoff error", () => {
@@ -256,7 +306,12 @@ test("AC-E283-11 (invariant) no committed manifest that is not closed gets a han
     const head = text.split(/^## /m)[0].split("\n");
     const status = head.map((l) => l.replace(/\*\*/g, "")).find((l) => /^狀態[：:]/.test(l));
     const closed = status !== undefined && /^狀態[：:]\s*已結案/.test(status);
-    const r = cli(["validate", path.join(dir, f)]);
-    if (!closed) assert.ok(!r.stderr.includes("HANDOFF_"), `${f}: ${r.stderr}`);
+    const r = validate(text);
+    if (!closed) assert.ok(!r.codes.some((c) => c.startsWith("HANDOFF_")), `${f}: ${r.codes}`);
   }
+});
+
+test("CLI spawn budget: at most 6 child processes in this file", () => {
+  // WHY: the in-process conversion is what keeps this file fast (T-E333-01); a new spawning case would undo it.
+  assert.ok(spawned <= 6, `spawned ${spawned}`);
 });
