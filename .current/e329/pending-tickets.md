@@ -1,5 +1,7 @@
 # Pending tickets — lane e329
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E329-NEW-1
 title: fanout-manifest HANDOFF_SUBITEMS doc comment says "in order" but validate does not enforce sub-item order
@@ -13,5 +15,3 @@ body: |
   (with a new HANDOFF_* code). The integrator SOP text written by lane e329 lists the headings in the
   canonical order without claiming validate enforces it. Lane e329 does not own tools/**.
 ```
-
-## Applied
