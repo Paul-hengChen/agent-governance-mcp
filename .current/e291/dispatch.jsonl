@@ -17,3 +17,5 @@
 {"ts":"2026-10-17T13:31:24.544Z","feature":"e291-start-link-locations","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-10-17T13:32:03.218Z","feature":"e291-start-link-locations","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-10-17T13:37:33.437Z","feature":"e291-start-link-locations","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-17T13:38:19.222Z","feature":"e291-start-link-locations","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-17T15:16:53.387Z","feature":"e291-start-link-locations","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
