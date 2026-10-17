@@ -1,5 +1,7 @@
 # Pending tickets — lane e284
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E284-NEW-1
 title: Handoff absolute-path check flags a leading glob `**/a/b` after a boundary
@@ -32,5 +34,3 @@ body: |
   reports a difference. Every existing manifest name is ASCII, so nothing fails today. Fix: run
   that git status call with `-c core.quotePath=false`, plus a fixture test with a non-ASCII name.
 ```
-
-## Applied
