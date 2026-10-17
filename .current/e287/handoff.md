@@ -1,10 +1,9 @@
 ---
 schema_version: 15
 active_feature: "e287-finish-findings-and-small-fixes"
-status: "FAIL"
-last_updated: "2026-10-17T09:00:50.382Z"
-blocking_reason: "R1 (required): --shipped re-run after a late failure is permanently refused for any lane with a committed pending-tickets.md + tracked lane dir — the first run's git mv moves the file off <base>:.current/<lane>/, so readUnallocatedFindings misfires on the stale worktree copy and planFindingsPreserve refuses (base re-run exits 0). Violates AC-E287-4 / AC-E287-8."
-last_agent: "code-reviewer"
+status: "In_Progress"
+last_updated: "2026-10-17T09:04:54.585Z"
+last_agent: "sr-engineer"
 prd_path: "specs/e287-finish-findings-and-small-fixes.md"
 scope_decision: "single-feature"
 scope_decision_why: "Four pairwise-disjoint tickets (E287 bin/agc-init.mjs + tools/lane-ticket-allocation.ts; E324 tools/registry.ts; E325 tools/drift.ts; E326 scripts/verify-release.mjs) batched by the human-approved wave-5 manifest e287 row; no shared contract, one sr pass after the mandatory E287 architect hop."
@@ -12,15 +11,14 @@ cut_approved: true
 dispatch_pins:
   sr-engineer: "opus"
 evidence_schema: 2
-next_role: "sr-engineer"
-dispatched_at: "2026-10-17T09:00:50.382Z"
-review_verdict: "CHANGES_REQUESTED"
+next_role: "code-reviewer"
+dispatched_at: "2026-10-17T09:04:54.585Z"
 dispatch_mechanism: "task"
 dispatch_mechanism_tier: "opus"
 qa_round: 0
 review_round: 1
 visual_round: 0
-hop_count: 4
+hop_count: 5
 qa_rounds_total: 0
 review_rounds_total: 1
 visual_rounds_total: 0
@@ -31,9 +29,12 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- review_report: review_reports/review_T-E287-01.md (covers T-E287-01, T-E324-01, T-E325-01, T-E326-01; commit 4a072a1)
-- R1 required — bin/agc-init.mjs readUnallocatedFindings + --shipped wiring: repro = lane commits .current/<lane>/pending-tickets.md, merge, untracked blocker in worktree, finish --shipped (allocates + git mv lane dir, worktree remove refused), remove blocker, re-run → exit 1 e287.preserve-differs-refuse; base dac6069 re-run → exit 0. Same with target_repo-only files (AC-E287-8's own scenario). Fix (sr's choice, keep O6/E179 mutual exclusion): (a) on --shipped also treat the file as committed when `git cat-file -e refs/heads/<branch>:<pendingRel>` succeeds (merge guard already proved branch ⊂ base), or (b) on alreadyClosed re-run also probe <base>:<close.hist.histRel>/<filename>. Rebuild dist if tools/ touched (it should not be). qa should add the committed-file + forced-late-failure + re-run regression case in T-E287-02.
-- R2/R3 optional only (failMessage wording in external-only no-backlog commit; symlinked lane pending file in a covered harvest never converges, reason text misleading). sr's three flagged deviations judged ACCEPTED. E324/E325/E326 approved as-is; VR-15 480s wait is expected under option A (qa pin). dist rebuild clean on HEAD; 221/221 targeted existing suites green.
+- sr-engineer: addressed code-reviewer Round 1 (T-E287-01) — commit 55bf682; reply appended to review_reports/review_T-E287-01.md
+- R1 fixed via option (a): bin/agc-init.mjs readUnallocatedFindings now takes revs[] (null if <pendingRel> exists at ANY rev); --shipped passes [base, refs/heads/<branch>] (merge guard proved branch ⊂ base), --abandoned passes [refs/heads/<branch>] (unchanged behaviour). O6/E179 mutual exclusion kept: a never-committed file is in neither rev and still warns. (b) not added: the branch survives until git branch -d, which runs after worktree remove, so (a) covers every reachable re-run. Repro on 8672061: reviewer s8/s5 re-run exit 1 e287.preserve-differs-refuse; after fix both exit 0 with no warning, worktree removed, branch deleted. s1/s2/s3/s3a (AC-E287-1/2/3 both verbs) still warn + byte-identical copy; s4 refusal unchanged; new s11 (never-committed file + forced late failure) warns on both runs and the re-run exits 0.
+- R2 fixed — the ONLY string change: commitPendingOnShipped failMessage names docs/backlog.md only when rels include it; external-only no-backlog path now reads `agc feature finish --shipped: git commit on <base> failed — <pendingRel> restored; nothing applied, nothing removed`. All other paths byte-identical. No Copy-table string changed; Q1–Q6/DR-8 untouched.
+- R3 deferred (no change): convergence for a symlinked lane pending file needs an E194/E125b harvest change (dereference) or a new plan-time refusal + Copy string (architecture decision); fail-closed is DR-accepted ('Truthful destination'). Suggest a follow-up ticket.
+- qa T-E287-02 regression to pin: (1) lane commits .current/<lane>/pending-tickets.md (local entry, and separately target_repo-only with no docs/backlog.md), tracked lane dir, merged; untracked blocker file in worktree; finish --shipped → exit 1 at git worktree remove after allocate/archive + lane-close git mv; remove blocker; re-run finish --shipped → exit 0, no 'not committed on' warning on stderr, worktree removed, branch deleted, history file = archived (applied) version. (2) counterpart: never-committed pending file under ignored .current/, same forced late failure → both runs warn, re-run exit 0, history copy byte-identical. (3) optional R2: pre-commit hook rejecting on the external-only no-backlog commit → stderr names only the pending file, no backlog created.
+- Evidence: targeted existing suites 221/221 (agc-feature-finish-history, agc-feature-lifecycle, e180, e213, e246, e298, lane-ticket-allocation, e303, e312, e320, drift-*). tools/ untouched → no dist rebuild needed. Smoke fixtures in session scratchpad (not committed).
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.
