@@ -6,3 +6,5 @@
 {"ts":"2026-10-17T08:54:35.236Z","feature":"e287-finish-findings-and-small-fixes","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-10-17T09:00:50.384Z","feature":"e287-finish-findings-and-small-fixes","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-10-17T09:04:54.589Z","feature":"e287-finish-findings-and-small-fixes","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-17T09:05:44.064Z","feature":"e287-finish-findings-and-small-fixes","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-17T09:10:18.844Z","feature":"e287-finish-findings-and-small-fixes","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
