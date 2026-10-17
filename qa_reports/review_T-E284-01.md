@@ -146,3 +146,13 @@ No implementation defect was found in T-E331-01, T-E332-01, T-E330-01, T-E284-01
 
 QA round 1 FAIL (report: qa_reports/review_T-E284-01.md, covers all six ids). Implementation verified against every AC; the only defect is a spec text line. Expected-Red Diff: clean (2/2 manifest entries red before re-pin, 0 unexplained). Tests: new e284 (13 cases, AC-E284-1..12), e331 (3), e332 (4); e283 rewritten in-process (17 cases, 5 CLI spawns); e296 AC12 + e322 AC-E322-9 re-pinned to the 5-line usage. Negative controls: e331/e332 fail on the base build; 9 of 10 dist mutants of fanout-handoff killed (1 equivalent). AC-E332-3 sweep: 23 manifests, 0 differ (only wave5.1/wave6 exit 2 with DECISIONS/PINS_SECTION_ABSENT). AC-HC-1 render: 65 lanes, 0 byte diffs. AC-HC-2: lane-status.ts / mailbox-watch.mjs / dist lane-status untouched; HANDOFF_SECTION/SUBITEMS unchanged. T-E333 timing: before 30.47/39.79/36.23 s, after 3.11/2.63/2.66 s. Full suite on 8179ec4: 3342/3345, 1 fail = e234 AC16 hygiene. Two hits were in QA's e332 fixture (fixed in 2b414ee); one remains at specs/e284-fanout-handoff-command.md:239 (D-1). Fix: write that home-dir segment as a placeholder name. Then round 2 re-runs the full suite.
 
+
+## Round 2 — PASS — by qa-engineer
+
+D-1 is fixed by d43048f. That commit changes only the spec (line 239's colon-boundary example now uses the placeholder home-dir name; the rule is unchanged) and `.current/e284/pending-tickets.md`. No code, `dist/` or test file changed since round 1, so the round 1 AC Execution Log and test results still hold.
+
+- `git status --porcelain` before the run: only the lane's tracked state files (`.current/e284/dispatch.jsonl`, `.current/e284/handoff.md`) were modified; no untracked files.
+- AC-HC-3: `node scripts/test-lock.mjs -- npm test` on d43048f: `# tests 3345 / pass 3343 / fail 0 / cancelled 0 / skipped 2`, exit 0. `test/e234-hygiene-scan.test.mjs` AC16 is green. The prebuild left `dist/` unchanged.
+- Expected-Red Diff (round 2): clean. The 2 manifest entries are re-pinned and green, and there are 0 reds.
+
+Verdict: PASS for T-E331-01, T-E332-01, T-E330-01, T-E284-01, T-E284-02, T-E333-01.
