@@ -53,7 +53,7 @@ test("AC1: human owns the vehicle decision; five conditions are an ordered numbe
     "merge-base --is-ancestor", "fanout.mjs check", "status --porcelain",
     "git merge-tree --write-tree", "2.38", "merge --abort", "merge --no-ff origin/<target>",
     "merge-invariants.mjs", "npm audit --audit-level=high", "Decisions",
-    "git diff --name-only <lane branch>...origin/<target>", "擁有",
+    "fanout.mjs owners <manifest> --range <lane branch>...origin/<target>", "擁有",
   ], "base-fix");
   const lines = BASEFIX.split("\n");
   const pos = [1, 2, 3, 4, 5].map((n) => lines.findIndex((l) => l.startsWith(`${n}. `)));
@@ -61,7 +61,7 @@ test("AC1: human owns the vehicle decision; five conditions are an ordered numbe
   assert.deepEqual([...pos].sort((a, b) => a - b), pos, "conditions appear in order 1..5");
   const item = (n) => lines[pos[n - 1]];
   assert.match(item(1), /merge-base --is-ancestor/);
-  assert.match(item(2), /git diff --name-only/);
+  assert.match(item(2), /fanout\.mjs owners/);
   assert.match(item(2), /fanout\.mjs check/);
   assert.match(item(3), /status --porcelain/);
   assert.match(item(3), /acked sha/);
