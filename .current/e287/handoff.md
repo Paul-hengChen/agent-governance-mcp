@@ -2,8 +2,8 @@
 schema_version: 15
 active_feature: "e287-finish-findings-and-small-fixes"
 status: "In_Progress"
-last_updated: "2026-10-16T19:46:27.199Z"
-last_agent: "architect"
+last_updated: "2026-10-17T08:53:41.394Z"
+last_agent: "sr-engineer"
 prd_path: "specs/e287-finish-findings-and-small-fixes.md"
 scope_decision: "single-feature"
 scope_decision_why: "Four pairwise-disjoint tickets (E287 bin/agc-init.mjs + tools/lane-ticket-allocation.ts; E324 tools/registry.ts; E325 tools/drift.ts; E326 scripts/verify-release.mjs) batched by the human-approved wave-5 manifest e287 row; no shared contract, one sr pass after the mandatory E287 architect hop."
@@ -11,14 +11,14 @@ cut_approved: true
 dispatch_pins:
   sr-engineer: "opus"
 evidence_schema: 2
-next_role: "sr-engineer"
-dispatched_at: "2026-10-16T19:46:27.199Z"
-dispatch_mechanism: "inline"
+next_role: "code-reviewer"
+dispatched_at: "2026-10-17T08:53:41.394Z"
+dispatch_mechanism: "task"
 dispatch_mechanism_tier: "opus"
 qa_round: 0
 review_round: 0
 visual_round: 0
-hop_count: 2
+hop_count: 3
 qa_rounds_total: 0
 review_rounds_total: 0
 visual_rounds_total: 0
@@ -29,11 +29,14 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- Architecture ready: specs/e287-finish-findings-and-small-fixes-architecture.md @ 5d0e5ea (E287 only; E324/E325/E326 need no architecture).
-- O-E326 RULED by the human in the coordinator chat (2026-10-17): option A — the shared evaluator polls an empty branch-scoped list for both --ci-check and full-release Check 6; VR-15 gets AGC_VERIFY_CI_WAIT_SECONDS="0", assertions unchanged. Integrator informed (to-integrator#2).
-- Open Questions: none. One non-blocking item flagged for the second mailbox pre-review: DR-8 (checkOrphanLanes counts only local live entries per AC-E287-8 literal text) — recommend keep.
-- sr dispatch HELD by coordinator until the second mailbox pre-review closes and the human approves (per spec routing).
-- sr placement constraints: new E287 helpers go after commitPendingOnShipped; never add the word 'history' inside checkOrphanLanes (e125b grep test) and nothing between deleteRemoteLaneBranch and runFeatureFinish (e298 slice test).
+- sr-engineer: T-E287-01, T-E324-01, T-E325-01, T-E326-01 ready for code review (base dac6069).
+- T-E324-01 @ 3567a9d — tools/registry.ts emitZodGateTelemetry: workspace_path normalized via path.resolve, emit skipped when any whole segment === '.current' (replaces basename check); emit uses the normalized path. dist/tools/registry.* rebuilt.
+- T-E325-01 @ d894c44 — tools/drift.ts readArtifactVersion(handoff): local readFileIfPresent (null on missing/ENOENT/ENOTDIR, other errors to the outer catch); on a miss re-reads the other layout once (lane<->flat), mirroring E312. tools/handoff-parse.ts untouched. dist/tools/drift.* rebuilt.
+- T-E326-01 @ ebf1fbd — scripts/verify-release.mjs (option A): branch-scoped [] is polled in the existing budget (own poll-progress line: 'no completed CI runs on <label> yet; polling again in …'); at budget end warn() with the unchanged 'no completed CI runs found on <label>' reason (strict FAIL / lenient WARN). Non-array JSON still degrades immediately with the same reason; --sha and gh-unavailable paths unchanged.
+- T-E287-01 @ 2358b2a — per architecture: lane-ticket-allocation.ts (targetRepo field + validation, archived target_repo provenance exemption, allocateTicketIds skips externals + Q5 reason); bin/agc-init.mjs (checkOrphanLanes local-only, usage text, planPendingApply external/backlogPresent, newPendingText archives externals, planPendingOnShipped rels, commitPendingOnShipped restore/message/listing, planLaneClose hist on both alreadyClosed returns, applyPendingOnAbandoned archived list + listing, E287 helper block after commitPendingOnShipped, runFeatureFinish wiring incl. hoisted shared `now`); .current/e287/pending-tickets.md with E287-NEW-1 verbatim.
+- Deviations (minor, flag for review): (1) newPendingText also passes external laneLocalIds to markApplied — required by Q4 archive, not spelled out in the architecture's changed-function list. (2) displayField is applied to laneLocalId too (not only title/repo) in both warning and listing — identical output for normal ids. (3) executeFindingsPreserve runs the byte-identical post-check after a fresh write too (reason text 'a different file is already there' reused).
+- Tests (sr sanity, no test/** edits): lane-ticket-allocation + agc-feature-lifecycle + agc-feature-finish-history + e213 + e180 + e298 + e246 = 152/152; drift-* + e112 + e312 = 79/79; e303 5/5; e320 15/15; verify-release 61/61 BUT ~546s — VR-15 now waits the 480s default budget (passes); needs qa's AGC_VERIFY_CI_WAIT_SECONDS:'0' pin as planned. Ad-hoc scratch smokes: O6 shipped/abandoned, tracked-dir+ignored-file shipped/abandoned (copy byte-identical), D4 external-only no-backlog + mixed for both verbs, orphan scan (only local-entry branch flagged) — all as specified.
+- npm run build changed only dist/tools/{registry,drift,lane-ticket-allocation}.*; no other dist drift.
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.
