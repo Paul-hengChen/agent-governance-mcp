@@ -1,0 +1,7 @@
+{"ts":"2026-10-16T10:04:25.648Z","feature":"e288-integrator-stage0-and-test-hygiene","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-16T19:37:33.662Z","feature":"e288-integrator-stage0-and-test-hygiene","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-16T19:45:33.660Z","feature":"e288-integrator-stage0-and-test-hygiene","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-16T19:46:26.239Z","feature":"e288-integrator-stage0-and-test-hygiene","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-16T19:49:14.049Z","feature":"e288-integrator-stage0-and-test-hygiene","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-16T19:50:07.713Z","feature":"e288-integrator-stage0-and-test-hygiene","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-10-16T21:42:26.601Z","feature":"e288-integrator-stage0-and-test-hygiene","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}

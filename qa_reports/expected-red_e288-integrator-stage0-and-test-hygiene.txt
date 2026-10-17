@@ -1,0 +1,5 @@
+# T-E288-01: skill-pm gains the Integrator Stage 0 cut Gate Summary row (measured 4823 ~tok vs cap 4708; approved ceiling 4860). qa re-pins in T-E288-02 (T3).
+test/context-budget.test.mjs | AC1/AC2: skill-pm stripped token count meets ≤ 4708 cap
+
+# T-E323-01: skill-qa-engineer gains the resident-test hygiene line (18066 bytes vs cap 17900; D1 approved re-pin to 18500). qa re-pins in T-E323-02 (T4).
+test/qa-visual-skill-split.test.mjs | AC-5: byte counts stay within v3.14.0-relaxed budgets (savings invariant vs v3.8.2 baseline)

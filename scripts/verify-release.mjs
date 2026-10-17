@@ -536,10 +536,15 @@ function evaluateCIGroundTruth({ sha: releaseSha, strict, fails, byCommit = fals
         warn("could not parse gh run list output");
         return;
       }
-    } else if (!Array.isArray(runs) || runs.length === 0) {
+    } else if (!Array.isArray(runs)) {
       warn(`no completed CI runs found on ${ciBranchLabel}`);
       return;
     }
+    // A branch-scoped [] is also "CI not finished yet" on a freshly pushed
+    // branch, so it is polled within the same budget as a not-yet-listed sha
+    // (one rule for Check 6 and --ci-check alike); only once the budget is
+    // used does it degrade through warn() with the unchanged reason. (E326)
+    const emptyBranchList = !byCommit && runs.length === 0;
 
     // Ground truth is the completed run whose headSha IS the released commit,
     // not runs[0], which may belong to an earlier commit (E78). A run for an
@@ -568,6 +573,10 @@ function evaluateCIGroundTruth({ sha: releaseSha, strict, fails, byCommit = fals
         );
         return;
       }
+      if (emptyBranchList) {
+        warn(`no completed CI runs found on ${ciBranchLabel}`);
+        return;
+      }
       warn(
         `this commit's CI has not completed yet (head ${releaseSha.slice(0, 12)} not found among the last ${runs.length} completed run(s) on ${ciBranch})`
       );
@@ -576,7 +585,9 @@ function evaluateCIGroundTruth({ sha: releaseSha, strict, fails, byCommit = fals
 
     const sleepMs = Math.min(POLL_INTERVAL_SECONDS * 1000, remainingMs);
     console.log(
-      `check:release — CI ground-truth: head ${releaseSha.slice(0, 12)} not found among the last ${runs.length} completed run(s) yet; polling again in ${Math.round(sleepMs / 1000)}s (~${Math.round(remainingMs / 1000)}s left in budget)`
+      emptyBranchList
+        ? `check:release — CI ground-truth: no completed CI runs on ${ciBranchLabel} yet; polling again in ${Math.round(sleepMs / 1000)}s (~${Math.round(remainingMs / 1000)}s left in budget)`
+        : `check:release — CI ground-truth: head ${releaseSha.slice(0, 12)} not found among the last ${runs.length} completed run(s) yet; polling again in ${Math.round(sleepMs / 1000)}s (~${Math.round(remainingMs / 1000)}s left in budget)`
     );
     sleepSync(sleepMs);
   }

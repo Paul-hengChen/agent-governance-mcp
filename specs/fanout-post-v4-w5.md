@@ -2,7 +2,7 @@
 base: 2099162    integration branch: integ/post-v4-w5
 mailbox: ../agent-governance-mcp-lanes/_mailbox
 
-**狀態：人類已核准（Stage 2，2026-10-16），本清單 PR 併入後派工。** `base:` 是規劃基準（v4.7.0 發版記帳 PR #16 merge）；實際派工 base = 本清單併入後的 `main` sha，記在 Decisions 派工列。
+**狀態：已結案 2026-10-17。** 三條 lane 皆 qa PASS（CI 綠）→ `integ/post-v4-w5` merge `b9d9eab`（e288）、`1f0535e`（e283）、`95ec767`（e287）→ finish 三 lane（E327–E335 配號）→ 記帳 commit → PR + auto-merge（見「結案」與「接手步驟」）。本清單是 E283 的「已結案」規則併入後的第一份結案清單。 `base:` 是規劃基準（v4.7.0 發版記帳 PR #16 merge）；實際派工 base = 本清單併入後的 `main` sha，記在 Decisions 派工列。
 
 第 4 波結案時的建議照做：integrator 改版第 1 波剩下的兩張程式票 E283（`fanout.mjs validate` 交接段）與 E287（finish 不再遺失新發現）檔案不相交，各成一條 lane；E322（`fanout check` ref 模式）與 E283 同檔，併入；E316（`check --cut` 標題變體）也是同檔的小修，併入。E324（telemetry 路徑）與 E325（`tools/drift.ts` 同類窗口）是第 4 波留下的 P3 小修，檔案和 e287 不重疊，併進 e287。content lane 是 E288（integrator Stage 0）＋ E323（固定 base diff 測試與慣例句；兩個測試檔都讀 content，與 E288 同 lane 最不衝突）。
 
@@ -82,3 +82,32 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 | 2026-10-16 | 整合者 | 草案：e283（E283＋E322＋E316）∥ e287（E287＋E324＋E325，E326 待裁決）∥ e288（E288＋E323，唯一 content lane）；三條擁有集合不相交；`bin/agc-init.mjs` 劃給 e287；`test/e296-manifest-tier.test.mjs` 劃給 e288；E322 只做工具不改 SOP；e287 建議 architect hop | 本檔 |
 | 2026-10-16 | 人類 | 核准本清單（全部）：三條 lane（e283、e287、e288）；E326 開票（P2）並入第 5 波、併入 e287；e287 走 architect hop | 整合者 session |
 | 2026-10-16 | 整合者 | E326 配號（backlog 列＋佇列 #143），來源為 v4.7.0 release-engineer 的回報（primary handoff pending_notes），不屬任何 lane 檔 | 本檔 |
+| 2026-10-16 | 整合者 | 清單 PR #17 merge `dac6069` = 派工 base；派工前核對：三條 lane 點名的擁有／禁止路徑在 base 存在或標為新建、無殘留 branch／worktree；信箱 e283／e287／e288 空建、mailbox-watch 與 lane-status watch 皆 armed；三份 prompt 以 `fanout.mjs render --base dac6069` 產生 | 本檔 |
+| 2026-10-16 | 整合者 | 三條 cut 預審 close：e287（`4b8d551`，第一次）、e283（`befadd7`；D1–D5 接受：「已結案」開頭才算結案、舊清單自然豁免，`owners` 介面，Cut 標題變體）、e288（`91c5384`；D1 改劃、D2 上限、D3–D6 接受） | 信箱 e283／e287／e288 |
+| 2026-10-16 | 人類 | 在三條 lane 各自的 session 核准 cut；e287 選 O-E326＝A（完整發版的 Check 6 也輪詢空清單）；e288 核准 D1（`test/qa-visual-skill-split.test.mjs` 改劃給 e288，只限把 qa SOP 位元組上限 17900 調到 18500）與 D2（PM budget 上限 4708→4860；清單與票面寫的 4401 是舊值，實際為 4708） | lane session |
+| 2026-10-16 | 整合者 | e287 第二次預審（architect `5d0e5ea`）close：Q1–Q6 照 PM 提案，DR-8 維持（`agc check` 孤兒掃描只算本地未處理項）；e283 核准後的 spec 修正 `1cffc6b`（範例家目錄改佔位名、AC-E322-1 lane id 小寫）只動範例、AC 語意不變，不需重新核准；e283 `RANGE_INVALID` 比 spec 嚴（git ref 規則本就禁止），接受；e288 review 選修 2＋3 合為 E288-NEW-1 | 信箱 e283／e287／e288 |
+| 2026-10-17 | 人類 | 在 e287 session 核准 architect 結論（session 重啟後） | lane session |
+| 2026-10-17 | 整合者 | 5a 三條 lane 收工 close，皆以 `verify-release.mjs --ci-check --sha` 讀 CI（E320 修正後第一次用於 5a）：e288 `3226f5d`（run 38973015994；唯一越界即 D1 那個檔，diff 只改上限）、e283 `33483ae`（run 38974393927；0 越界）、e287 `3cdc90b`（run 39021138304；0 越界；review 第 1 輪 R1 修法選 (a)、R3 延後為 E287-NEW-2、R4 接受不開票）。記下的疑慮：三條 lane 的 sr 與 reviewer 皆為 opus；e288 第一次全套有 3 個計時 flake（主機高負載，重跑全綠，CI 綠） | 本檔 |
+
+## 結案
+- 日期 2026-10-17。`integ/post-v4-w5` ← e288（`b9d9eab`）← e283（`1f0535e`）← e287（`95ec767`），皆 `--no-ff`、零衝突 → 無合併審查；merge-invariants 三次 PASS；重建 `dist/` 無差異；`npm audit --audit-level=high` exit 0；所有 `specs/fanout-*.md` 的 validate 結果與派工 base 相同；整合層 CI run 39021413586 在 `95ec767` 綠。
+- 彙總（上限按 lane 計）：e283 3 張 task／hop 4/14／review 0 輪／qa 0 輪；e287 8 張 task（走 architect）／hop 7/14／review 退回 1 輪／qa 0 輪；e288 4 張 task／hop 4/14／review 0 輪／qa 0 輪。
+- 完成定義 12 項全部成立（本清單自己的 `## 接手步驟` 為最後一項）。
+- 例外：(1) e288 越界一處（D1，人類核准）；(2) e283 核准後的 spec 範例修正；(3) 2026-10-16 夜間主機重啟，三條 lane session 以接續 prompt 重開，lane 狀態無遺失；(4) 三條 lane 的 sr 與 reviewer 同為 opus。
+- 新票：E327、E328（e288）、E329–E333（e283）、E334、E335（e287），由 `finish --shipped` 配號，排在佇列 #144–#152；E329（P2）是下一個 content lane 的第一張。
+- 下一波建議：content lane E329＋E328＋E334（同為 `content/skill-integrator.md`，E334 另碰 lane-protocol §4）；程式 lane E331＋E330＋E332（`tools/fanout-manifest.ts`，可與 E284 同批）；E333 qa 單一 judge 隨時可做。
+- 發版：`main` 帶 E283／E322／E316（fanout 工具）、E287（finish 行為）、E324／E325／E326（修正）、E288／E323（SOP 與測試）→ 建議 MINOR v4.8.0，由人類決定。
+
+## 接手步驟
+### 核對 primary
+- `git switch main`、`git pull --ff-only` 後，`main` 應含 `integ/post-v4-w5` 的 wave PR merge；`git worktree list` 只有 primary；`git status` 乾淨。
+- `tw_get_state` → `tw_detect_drift`：預期只有 T-REL4-02 的既有證據提示。
+### 已結案
+- 第 5 波三條 lane（e283、e287、e288）已合併、finish、拆除；記帳與本清單在同一個 wave PR。
+### 待人類決定
+- 是否發版（建議 MINOR v4.8.0）。
+- 是否在 `.current/.config.json` 加 `cutApprovalAutoTier.manifest: true`。
+- 使用者層級的 teamwork 子代理定義檔是否由 fable 改為 opus。
+- 下一波範圍（建議見「結案」）。
+### 進行中的背景工作
+無

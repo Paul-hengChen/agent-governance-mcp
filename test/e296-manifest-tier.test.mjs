@@ -6,8 +6,8 @@
 // in-test copy of the wave-3 manifest (lane e296's 擁有 / 禁止 cells verbatim, a fixed Decisions table), NOT
 // the committed specs/fanout-post-v4-w3.md — that file is a living document integrators keep appending to
 // (Decisions rows, close-out sections, lane bookkeeping), so asserting on its content made AC11 rot (T-E296-08).
-// The committed manifests are read only where the AC is about them as files: AC9's validate sweep and AC10's
-// w2 render control. Nothing here writes into the repo; only AC10 runs git (read-only).
+// The committed manifests are read only where the AC is about them as files: AC9's validate sweep.
+// Nothing here writes into the repo and no test runs git or diffs against a fixed base sha (E323).
 // The goldens, ceilings and re-pins (AC13, AC14 re-pins) live in their own existing test files.
 
 import { test } from "node:test";
@@ -16,7 +16,6 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { spawnSync } from "node:child_process";
-import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -281,40 +280,25 @@ test("AC9: LANE_PROVISIONAL says '8- or 9-column'", () => {
   assert.match(r.stderr, /LANE_PROVISIONAL: .*8- or 9-column/);
 });
 
-test("AC10: render output is byte-identical to base (HEAD vs base code, same args, w3/e296 and the w2/e295 control)", (t) => {
-  // The base render is produced in the same run from the base commit's own fanout code (extracted to TMP), under
-  // identical arguments incl. fixed --primary/--mailbox-root, so nothing depends on the checkout's absolute path.
-  // Base = the commit the lane forked from (also the --base ref of the w3 render). Needs full history: CI uses fetch-depth 0.
-  // The w3 input is the frozen in-test copy (an existing 8-column manifest, as AC10 requires); w2 stays the committed
-  // closed-wave file. Both are comparative (HEAD output == base output for the same input), so no manifest content is pinned.
-  const BASE_CODE = "c392cc3";
-  const have = spawnSync("git", ["rev-parse", "--verify", `${BASE_CODE}^{commit}`], { cwd: ROOT, encoding: "utf8" });
-  if (have.status !== 0) {
-    t.skip(`base commit ${BASE_CODE} not present in this clone (shallow?) - AC10 render-vs-base comparison NOT run`);
-    return;
+test("AC10: render of the frozen 8-column manifest carries the lane's own fields", async () => {
+  // E323: replaces the former HEAD-vs-fixed-base-code render comparison, which rotted under legitimate later
+  // fanout edits. This asserts stable structure of the render of the frozen in-test manifest instead.
+  const { parseManifest } = await import("../dist/tools/fanout-manifest.js");
+  const lane = parseManifest(MANIFEST_TEXT).dispatchable.find((l) => l.lane === "e296");
+  assert.ok(lane, "frozen manifest has dispatchable lane e296");
+  const BASE = "abc1234";
+  const r = cli(["render", MANIFEST, "e296", "--summary", "SUMMARY-MARK", "--reading", "READING-MARK", "--base", BASE, "--primary", ROOT, "--mailbox-root", TMP]);
+  assert.equal(r.status, 0, r.stderr);
+  assert.ok(r.stdout.length > 0, "render produced output");
+  for (const [what, v] of [["branch", lane.branch], ["擁有 cell", lane.owned], ["禁止 cell", lane.forbidden], ["--summary", "SUMMARY-MARK"], ["--reading", "READING-MARK"], ["--base", BASE], ["mailbox path", path.join(TMP, "e296")]]) {
+    assert.ok(v && r.stdout.includes(v), `render must contain the lane's ${what}: ${JSON.stringify(v)}`);
   }
-  const baseDir = fs.mkdtempSync(path.join(TMP, "base-"));
-  const files = ["package.json", "scripts/fanout.mjs", "dist/tools/fanout-manifest.js"];
-  const arc = spawnSync("git", ["archive", BASE_CODE, "--", ...files], { cwd: ROOT });
-  assert.equal(arc.status, 0, String(arc.stderr));
-  const tar = spawnSync("tar", ["-x", "-C", baseDir], { input: arc.stdout });
-  assert.equal(tar.status, 0, String(tar.stderr));
-  const run = (script, a) => spawnSync(process.execPath, [script, ...a], { cwd: ROOT, encoding: "utf8" });
-  const fixed = ["--primary", ROOT, "--mailbox-root", TMP];
-  for (const [manifest, lane, base] of [[MANIFEST, "e296", "c392cc3"], [path.join("specs", "fanout-post-v4-w2.md"), "e295", "25bc84c"]]) {
-    const args = ["render", manifest, lane, "--summary", "x", "--reading", "y", "--base", base, ...fixed];
-    const head = run(FANOUT, args);
-    const old = run(path.join(baseDir, "scripts", "fanout.mjs"), args);
-    assert.equal(old.status, 0, old.stderr);
-    assert.ok(old.stdout.length > 0, "base render produced output");
-    assert.equal(head.status, 0, head.stderr);
-    assert.equal(createHash("sha256").update(head.stdout).digest("hex"), createHash("sha256").update(old.stdout).digest("hex"), `${lane}: HEAD render differs from base render`);
-    assert.equal(head.stdout, old.stdout);
-  }
+  // the lane cells legitimately contain `cut-approval` in file names; only a bare header word would be the column
+  assert.ok(!/(?<![\w-])approval(?![\w-])/.test(r.stdout), "render must not carry the approval column header");
 });
 
 test("AC10: render ignores the approval column (9-column render == 8-column render)", () => {
-  const args = ["--summary", "x", "--reading", "y", "--base", "c392cc3", "--primary", ROOT, "--mailbox-root", TMP];
+  const args = ["--summary", "x", "--reading", "y", "--base", "abc1234", "--primary", ROOT, "--mailbox-root", TMP];
   const eight = cli(["render", MANIFEST, "e296", ...args]).stdout;
   assert.ok(eight.length > 0);
   for (const v of ["human", "—"]) {
