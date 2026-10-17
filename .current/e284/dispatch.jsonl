@@ -1,3 +1,4 @@
 {"ts":"2026-10-17T12:10:51.399Z","feature":"e284-fanout-handoff-command","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-10-17T12:11:22.357Z","feature":"e284-fanout-handoff-command","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-10-17T12:15:41.725Z","feature":"e284-fanout-handoff-command","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-17T12:26:01.446Z","feature":"e284-fanout-handoff-command","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}

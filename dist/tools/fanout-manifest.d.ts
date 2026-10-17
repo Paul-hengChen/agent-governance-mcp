@@ -21,6 +21,7 @@ export declare const DECIDERS: readonly ["人類", "整合者"];
 /** The 8 `dispatch_pins` roles (mirrors tw_update_state's dispatch_pins keys). */
 export declare const PIN_ROLES: readonly ["pm", "researcher", "design-auditor", "architect", "sr-engineer", "code-reviewer", "qa-engineer", "release-engineer"];
 export declare const LANE_ID_RE: RegExp;
+export declare const BASE_RE: RegExp;
 /**
  * Integrator dispatch-prompt template — the single canonical copy (E178a).
  * `content/skill-integrator.md` (the `integrator` MCP prompt, stage 3) does
@@ -193,6 +194,9 @@ export declare function parseManifest(text: string): Manifest;
 export declare const HANDOFF_SECTION = "\u63A5\u624B\u6B65\u9A5F";
 /** Sub-items (`### ` headings) every handoff section must hold, in order. */
 export declare const HANDOFF_SUBITEMS: readonly ["核對 primary", "已結案", "待人類決定", "進行中的背景工作"];
+/** The sub-item whose single body line must read 無 once the wave is closed. */
+export declare const HANDOFF_BACKGROUND = "\u9032\u884C\u4E2D\u7684\u80CC\u666F\u5DE5\u4F5C";
+export declare const HANDOFF_NONE = "\u7121";
 /**
  * Error codes of the closed-manifest handoff check. CLI codes, named outside
  * the gate-suffix vocabulary like FANOUT_CODES.
@@ -206,6 +210,8 @@ export declare const HANDOFF_CODES: {
     readonly backgroundNotNone: "HANDOFF_BACKGROUND_NOT_NONE";
     readonly absolutePath: "HANDOFF_ABSOLUTE_PATH";
 };
+/** Heading name `name`, or `name` followed by a `（…）` / `(…)` qualifier. */
+export declare function isNamedHeading(heading: string, name: string): boolean;
 /**
  * Whether a manifest is closed: its status line — the first line before the
  * first `## ` heading that, with every `**` removed, starts `狀態：` (or
@@ -220,6 +226,17 @@ export declare function isManifestClosed(text: string): boolean;
  * Optional (`裝置`, `工具`) and unknown sub-items are not checked.
  */
 export declare function handoffSectionErrors(text: string): FanoutError[];
+/** Every `## 接手步驟` section (name optionally qualified), in file order. */
+export declare function findHandoffSections(text: string): {
+    heading: string;
+    line: number;
+    lines: {
+        text: string;
+        line: number;
+    }[];
+}[];
+/** `無`, optionally after one `- ` / `* ` list marker and before one `。`. */
+export declare function readsNone(line: string): boolean;
 /**
  * Every format error in the manifest (validate reports all of them). A
  * closed manifest's handoff section is checked here only, never by the

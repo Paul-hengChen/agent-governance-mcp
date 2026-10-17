@@ -51,7 +51,7 @@ const PATH_TOKEN_RE = /^[A-Za-z0-9_.\-*/{},]+$/;
 const UNQUOTED_PATH_RE = /^[A-Za-z0-9_.\-]*\/[A-Za-z0-9_.\-*/{}]*$/;
 const UNQUOTED_SPLIT_RE = /[\s,、，；;（）()]+/;
 const TITLE_RE = /^# Fan-out: (.+)$/;
-const BASE_RE = /^base:\s*([0-9a-f]{7,40})\b/;
+export const BASE_RE = /^base:\s*([0-9a-f]{7,40})\b/;
 const MAILBOX_RE = /^mailbox:\s*(\S+)/;
 const SHA_RE = /^[0-9a-f]{7,40}$/;
 const PIN_SPAN_RE = /^([a-z-]+)=(\S+)$/;
@@ -631,8 +631,8 @@ export const HANDOFF_SECTION = "接手步驟";
 /** Sub-items (`### ` headings) every handoff section must hold, in order. */
 export const HANDOFF_SUBITEMS = ["核對 primary", "已結案", "待人類決定", "進行中的背景工作"];
 /** The sub-item whose single body line must read 無 once the wave is closed. */
-const HANDOFF_BACKGROUND = "進行中的背景工作";
-const HANDOFF_NONE = "無";
+export const HANDOFF_BACKGROUND = "進行中的背景工作";
+export const HANDOFF_NONE = "無";
 /**
  * Characters after which a path token may start: whitespace, quotes, opening
  * brackets, fullwidth and ASCII colon / comma, `、`, `=` and `|`.
@@ -679,7 +679,7 @@ export const HANDOFF_CODES = {
     absolutePath: "HANDOFF_ABSOLUTE_PATH",
 };
 /** Heading name `name`, or `name` followed by a `（…）` / `(…)` qualifier. */
-function isNamedHeading(heading, name) {
+export function isNamedHeading(heading, name) {
     return heading === name || heading.startsWith(`${name}（`) || heading.startsWith(`${name}(`);
 }
 /**
@@ -708,7 +708,7 @@ function handoffErr(code, message) {
  * Optional (`裝置`, `工具`) and unknown sub-items are not checked.
  */
 export function handoffSectionErrors(text) {
-    const sections = splitSections(splitLines(text)).filter((s) => isNamedHeading(s.name, HANDOFF_SECTION));
+    const sections = findHandoffSections(text);
     if (sections.length === 0) {
         return [handoffErr(HANDOFF_CODES.sectionAbsent, `manifest is closed (status 已結案) but has no "## ${HANDOFF_SECTION}" section`)];
     }
@@ -754,8 +754,14 @@ export function handoffSectionErrors(text) {
     }
     return errors;
 }
+/** Every `## 接手步驟` section (name optionally qualified), in file order. */
+export function findHandoffSections(text) {
+    return splitSections(splitLines(text))
+        .filter((s) => isNamedHeading(s.name, HANDOFF_SECTION))
+        .map((s) => ({ heading: s.heading, line: s.line, lines: s.lines }));
+}
 /** `無`, optionally after one `- ` / `* ` list marker and before one `。`. */
-function readsNone(line) {
+export function readsNone(line) {
     let t = line.trim();
     if (t.startsWith("- ") || t.startsWith("* "))
         t = t.slice(2).trim();
