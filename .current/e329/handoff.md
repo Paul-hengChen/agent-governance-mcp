@@ -2,7 +2,7 @@
 schema_version: 15
 active_feature: "e329-integrator-sop-followups"
 status: "In_Progress"
-last_updated: "2026-10-17T12:10:18.808Z"
+last_updated: "2026-10-17T12:12:32.869Z"
 last_agent: "pm"
 prd_path: "specs/e329-integrator-sop-followups.md"
 scope_decision: "single-feature"
@@ -11,7 +11,7 @@ dispatch_pins:
   sr-engineer: "opus"
 evidence_schema: 2
 next_role: "sr-engineer"
-dispatched_at: "2026-10-17T12:10:18.808Z"
+dispatched_at: "2026-10-17T12:12:32.869Z"
 dispatch_mechanism: "task"
 dispatch_mechanism_tier: "opus"
 qa_round: 0
@@ -28,11 +28,11 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- PM cut committed at 3030e54 (specs/e329-integrator-sop-followups.md, ## Cut: T-E329-01, T-E328-01, T-E334-01, T-E327-01 sr; T-E329-02 qa). cut_approved NOT set — awaiting integrator mailbox pre-review, then human approval in this lane session.
+- PM cut revised at cec96d7 per integrator pre-review (base cut 3030e54): int.basefix.cond2 exit 2 = 'a usage, manifest or git error' (true after e284's E331); AC-LANE-1 proof = node scripts/test-lock.mjs -- npm test; Dependencies note the new test imports HANDOFF_SUBITEMS / HANDOFF_SECTION from dist/tools/fanout-manifest.js (integrator asks e284 to keep names stable). check --cut exit 0. cut_approved NOT set — awaiting human approval in this lane session.
 - sr-engineer: insert the Copy / Strings literals verbatim (text between the double-backtick delimiters, placement per source cell); do T-E329-01 -> T-E328-01 -> T-E334-01 serially (all touch content/skill-integrator.md), T-E327-01 independent. Do not touch the Permissions table, Stage 2, Stage 6 steps 2-7, lane-protocol §3/§5, or anything e296 pins (list in spec Dependencies).
 - Decisions for human at cut approval: D1 E327 = name the exception in the qa line, §3 unchanged, no qa cap change (18066 -> ~18253 <= 18500); D2 hand-off note 裁決者 = 人類; D3 Stage 6 items as sub-bullets under step 1.
-- Re-pin list for qa: test/e286-integrator-trust-and-git.test.mjs AC1 condition-2 literals only; goldens/context-budget expected unchanged (neither SOP is in any golden).
-- Finding filed: .current/e329/pending-tickets.md E329-NEW-1 (HANDOFF_SUBITEMS comment says 'in order', not enforced).
+- Re-pin list for qa: test/e286-integrator-trust-and-git.test.mjs AC1 condition-2 literals only; goldens/context-budget expected unchanged.
+- Finding filed: .current/e329/pending-tickets.md E329-NEW-1.
 - manifest-tier: not eligible — config has no manifest key
 
 ---
