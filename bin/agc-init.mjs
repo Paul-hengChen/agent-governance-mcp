@@ -2159,8 +2159,10 @@ function commitPendingOnShipped({ repoRoot, base, lane, pending }) {
       ...(plan.allocated.length > 0 ? [{ abs: backlogAbs, text: plan.backlogText }] : []),
       { abs: pendingAbs, text: plan.pendingText },
     ],
-    `agc feature finish --shipped: git commit on ${base} failed — ${BACKLOG_REL} and ` +
-      `${pendingRel} restored; nothing applied, nothing removed`
+    // An external-only commit with no backlog names only the pending file (E287 R2).
+    `agc feature finish --shipped: git commit on ${base} failed — ` +
+      `${rels.includes(BACKLOG_REL) ? `${BACKLOG_REL} and ` : ""}${pendingRel} restored; ` +
+      `nothing applied, nothing removed`
   );
   printAppliedSummary(plan.allocated);
   printTargetRepoListing(lane, plan.external);
@@ -2194,10 +2196,11 @@ function fileHasBytes(abs, buf) {
 }
 
 // O6 detector. Read-only. null when the worktree file is absent or not a
-// regular file, when it IS at `rev` (the E179 path owns it), or when it holds
-// no pending-ticket block at all. Two-argument parse: report only, never
-// numbered. The allocation module is loaded only once such a file is found.
-async function readUnallocatedFindings({ lanePaths, repoRoot, lanePath, lane, rev, revLabel }) {
+// regular file, when it IS at any of `revs` (the E179 path owns it), or when
+// it holds no pending-ticket block at all. Two-argument parse: report only,
+// never numbered. The allocation module is loaded only once such a file is
+// found.
+async function readUnallocatedFindings({ lanePaths, repoRoot, lanePath, lane, revs, revLabel }) {
   const filename = lanePaths.laneFile("pendingTickets").filename;
   const pendingRel = path.posix.join(".current", lane, filename);
   const abs = path.join(lanePath, ".current", lane, filename);
@@ -2208,7 +2211,9 @@ async function readUnallocatedFindings({ lanePaths, repoRoot, lanePath, lane, re
   } catch {
     return null;
   }
-  if (gitTry(repoRoot, ["cat-file", "-e", `${rev}:${pendingRel}`]).status === 0) return null;
+  for (const rev of revs) {
+    if (gitTry(repoRoot, ["cat-file", "-e", `${rev}:${pendingRel}`]).status === 0) return null;
+  }
   const alloc = await loadTicketAllocation();
   const parsed = alloc.parsePendingTickets(bytes.toString("utf-8"), lane);
   if (parsed.entries.length === 0 && parsed.errors.length === 0) return null;
@@ -3130,8 +3135,12 @@ async function runFeatureFinish(cwd, argv) {
     const evidenceHarvest = planShippedEvidenceHarvest({ repoRoot, lanePath, ticketId });
     // E287 O6: a pending file only in the worktree is reported and kept, never
     // numbered; its collision checks run here, before the first mutation.
+    // The lane branch is probed too: the merge guard proved it is contained in
+    // --base, so a file committed there went the E179 path at merge time even
+    // when --base no longer has it at <pendingRel> — e.g. a re-run after a late
+    // failure, where the first run's lane close moved it into history.
     const findings = await readUnallocatedFindings({
-      lanePaths, repoRoot, lanePath, lane: ticketId, rev: base, revLabel: base,
+      lanePaths, repoRoot, lanePath, lane: ticketId, revs: [base, `refs/heads/${branch}`], revLabel: base,
     });
     const preserve =
       findings &&
@@ -3186,7 +3195,7 @@ async function runFeatureFinish(cwd, argv) {
   });
   // E287 O6 (see the --shipped branch): read and planned before any mutation.
   const findings = await readUnallocatedFindings({
-    lanePaths, repoRoot, lanePath, lane: ticketId, rev: `refs/heads/${branch}`, revLabel: branch,
+    lanePaths, repoRoot, lanePath, lane: ticketId, revs: [`refs/heads/${branch}`], revLabel: branch,
   });
   const preserve =
     findings &&
