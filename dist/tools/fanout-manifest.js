@@ -631,12 +631,37 @@ export const HANDOFF_SUBITEMS = ["核對 primary", "已結案", "待人類決定
 const HANDOFF_BACKGROUND = "進行中的背景工作";
 const HANDOFF_NONE = "無";
 /**
- * A machine-local absolute path token: a Windows drive path, `~/` or
- * `~<user>/`, or a POSIX path with two or more non-empty segments, starting
- * at a line start, whitespace or opening punctuation. The `//` of a URL
- * follows a `:`, which is not a boundary, so URLs are never hits.
+ * Characters after which a path token may start: whitespace, quotes, opening
+ * brackets, fullwidth and ASCII colon / comma, `、`, `=` and `|`.
  */
-const HANDOFF_ABSOLUTE_PATH_RE = /(?:^|[\s`'"(\[（「：，、=])(?:[A-Za-z]:[\\/]|~[^\s/]*\/|\/[^\s/]+\/[^\s/])/;
+const PATH_BOUNDARY = "[\\s`'\"(\\[（「：，、=:,|]";
+/**
+ * Where a path token may start: a line start, a boundary character, or a
+ * bold opener `**` that itself follows a line start or a boundary character
+ * (so `tools/**` + `/a/b` is not a start).
+ */
+const PATH_START = `(?:^|${PATH_BOUNDARY})(?:\\*\\*)?`;
+/**
+ * Machine-local absolute path forms:
+ * - Windows drive: `C:\` or `C:/`;
+ * - home: `~/` or `~<name>/`, the name starting with a letter or `_`, so a
+ *   date such as `~10/17` is not one;
+ * - POSIX: `/` + two or more segments, the first non-empty;
+ * - `file:///`;
+ * - `$HOME/` and `${HOME}/`;
+ * - UNC: `\\<host>\<share>`.
+ * A URL's `//` (after `https:`) and a protocol-relative `//host/a` never
+ * match: the POSIX form needs a non-empty first segment.
+ */
+const PATH_FORMS = [
+    "[A-Za-z]:[\\\\/]",
+    "~(?:[A-Za-z_][A-Za-z0-9._-]*)?\\/",
+    "\\/[^\\s/]+\\/[^\\s/]",
+    "file:\\/\\/\\/",
+    "\\$(?:HOME|\\{HOME\\})\\/",
+    "\\\\\\\\[^\\s\\\\/]+\\\\[^\\s\\\\/]",
+];
+const HANDOFF_ABSOLUTE_PATH_RE = new RegExp(`${PATH_START}(?:${PATH_FORMS.join("|")})`);
 /**
  * Error codes of the closed-manifest handoff check. CLI codes, named outside
  * the gate-suffix vocabulary like FANOUT_CODES.
