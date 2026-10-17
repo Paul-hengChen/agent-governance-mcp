@@ -2398,7 +2398,22 @@ function planFindingsPreserve({ findings, target, verb }) {
       );
     }
   }
-  return { ...findings, dstAbs, dstRel, verb };
+  return { ...findings, dstAbs, dstRel, verb, covered: target.covered };
+}
+
+// E335 D7: replaces the directory entry at `dstAbs` (a symlink a harvest
+// copied as a link) with a regular file holding `bytes` — sibling temp file,
+// then renameSync over the entry itself, so nothing is written through the
+// link. Throws on failure, after removing its own temp file.
+function materializeFindingsCopy(dstAbs, bytes) {
+  const tmp = `${dstAbs}.${process.pid}.${Date.now()}.tmp`;
+  try {
+    fs.writeFileSync(tmp, bytes, { flag: "wx" });
+    fs.renameSync(tmp, dstAbs);
+  } catch (err) {
+    if (!err || err.code !== "EEXIST") fs.rmSync(tmp, { force: true });
+    throw err;
+  }
 }
 
 // Runs after the harvest step that may cover the file and before the worktree
@@ -2417,11 +2432,20 @@ function executeFindingsPreserve(p) {
   } catch (err) {
     throw fail(msg(err));
   }
-  if (lstatOrNull(p.dstAbs) === null) {
+  const dstStat = lstatOrNull(p.dstAbs);
+  if (dstStat === null) {
     try {
       fs.writeFileSync(p.dstAbs, p.bytes, { flag: "wx" });
     } catch (err) {
       if (!err || err.code !== "EEXIST") fs.rmSync(p.dstAbs, { force: true });
+      throw fail(msg(err));
+    }
+  } else if (dstStat.isSymbolicLink() && p.covered) {
+    // E335 D7: only a link this run's harvest put there; an uncovered one
+    // was already refused at plan time (e287.preserve-differs-refuse).
+    try {
+      materializeFindingsCopy(p.dstAbs, p.bytes);
+    } catch (err) {
       throw fail(msg(err));
     }
   }
@@ -2828,11 +2852,19 @@ function executeLaneClose({ repoRoot, base, close }) {
 // over that copy, BEFORE removeWorktreeNoForce. Overwriting is lossless (why:
 // see specs/e260c-bin-scripts.md). Files only in the history copy are kept; a
 // failed copy leaves the worktree in place, and a re-run redoes the comparison.
-function executeHarvestRefresh({ ticketId, refresh }) {
+// `preserve` is the E287 findings plan (or null). A symlinked lane
+// pending-tickets.md it covers is written as the detector's bytes instead of
+// copied as a link (E335 D7): cpSync refuses a link over the history link
+// a failed earlier run left ("src and dest cannot be the same").
+function executeHarvestRefresh({ ticketId, refresh, preserve }) {
   try {
     for (const f of refresh.files) {
       fs.mkdirSync(path.dirname(f.dst), { recursive: true });
-      fs.cpSync(f.src, f.dst, { force: true });
+      if (preserve && f.rel === preserve.pendingRel && lstatOrNull(f.src)?.isSymbolicLink()) {
+        materializeFindingsCopy(f.dst, preserve.bytes);
+      } else {
+        fs.cpSync(f.src, f.dst, { force: true });
+      }
     }
   } catch (err) {
     throw new FeatureError(
@@ -3252,7 +3284,7 @@ async function runFeatureFinish(cwd, argv) {
         `agc feature finish — lane ${ticketId} already recorded under ${TASKS_REL} ${CLOSED_LANES_HEADING}, ` +
           `skipping the close writeback\n`
       );
-      if (close.refresh !== null) executeHarvestRefresh({ ticketId, refresh: close.refresh });
+      if (close.refresh !== null) executeHarvestRefresh({ ticketId, refresh: close.refresh, preserve });
     } else {
       executeLaneClose({ repoRoot, base, close });
     }
