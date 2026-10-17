@@ -75,8 +75,9 @@ Skip it when the tickets are already cut. It runs only when the human gives a sc
 1. **Dispatch PM via Task** with a brief naming the input path(s) and the output path `specs/ticket-cut-<feature>.md`. PM writes only that ticket-cut file: no spec, no `tasks.md`, no write-type `tw_*` call. The brief does not restate this protocol — the PM SOP's *Integrator Stage 0 cut* row carries it.
 2. **Read the cut as Stage 1 input.** A `NEW-<n>` ticket gets its full backlog row from you at Stage 1, under the same authority as 5c-1; a `needs human ruling` item goes to the human at Stage 2.
 3. **Present and commit the cut file with the manifest**: it is approved together with the manifest at Stage 2.
+4. **Revising the cut**: when a ticket from a Stage 0 cut goes back to PM (Stage 1 step 4), re-dispatch PM via Task to revise `specs/ticket-cut-<feature>.md` — the *Stage 0 only* permission row covers it, with the same limits (that file only); the revised file is presented with the manifest at Stage 2 like the first one.
 
-**Cross-repo hand-off note**: one Stage 0 input, written in the sending repo, in four parts in this order — **Background** (the settled contract and its sources), **Current state**, **To do**, **Not to do**. The human carries its path; no repo reads another on its own. Record the note as the manifest's first Decisions row, with `出處` naming the sending repo and the note's repo-relative path (never an absolute path).
+**Cross-repo hand-off note**: one Stage 0 input, written in the sending repo, in four parts in this order — **Background** (the settled contract and its sources), **Current state**, **To do**, **Not to do**. The human carries its path; no repo reads another on its own. Record the note as the manifest's first Decisions row, with `出處` naming the sending repo and the note's repo-relative path (never an absolute path). Its `裁決者` is `人類`: the human settled the contract and carries the note here; you only record it.
 
 ## Stage 1 — Fan-out planning
 
