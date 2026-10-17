@@ -58,3 +58,7 @@ None. No existing test file was changed except the pre-authorized VR-15 env pin.
 
 - `agc check` prints 3 advisory comment-discipline warnings in `tools/lane-ticket-allocation.ts` / one other file (long comment block); advisory, code-reviewer territory, not a QA failure.
 - `git diff dac6069 --name-only` also lists `specs/e287-*`, `review_reports/`, `.current/e287/` bookkeeping (lane process files).
+## 2026-10-17T09:20:51.662Z — PASS — by qa-engineer
+
+PASS. Full suite via test-lock on a clean tree at lane HEAD 9f9f9ca: 3281 pass / 3284 total, 0 fail, 3 skipped (pre-existing skips). New tests: test/e287-finish-findings.test.mjs (29), e324-zod-telemetry-under-current (6), e325-drift-version-peek-race (8), e326-empty-branch-run-poll (7), plus two Check 6 cases and the VR-15 env pin in test/verify-release.test.mjs (option A). Review round-2 pins covered (R1-s8, R1-s5, R1-s11). Negative control on base dac6069: 34 new behaviour cases red there, regression pins green. VR-22 and VR-23 untouched and green; e320 unmodified and green. Zero re-pins. Full AC map in qa_reports/review_T-E287-02.md.
+
