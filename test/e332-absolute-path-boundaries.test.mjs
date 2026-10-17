@@ -59,7 +59,7 @@ test("fixture sanity: the closed manifest with a plain body validates clean", ()
 test("new boundaries and forms", () => {
   const probes = [
     "- 見 **/Users/x/y**",
-    "- path:/home/u/r",
+    "- path:/home/user/r",
     "- a,/srv/a/b",
     "- | /opt/a/b |",
     "- |/opt/a/b|",
@@ -77,7 +77,7 @@ test("new boundaries and forms", () => {
     assert.equal(errs.filter((e) => e.message.includes(`line ${n} `)).length, 1, `${p} is reported on line ${n}`);
   }
   // the message never echoes the path
-  for (const needle of ["/Users/x/y", "/home/u/r", "/srv/a/b", "/opt/a/b", "file:///", "$HOME", "${HOME}", "\\\\server", "server\\share"]) {
+  for (const needle of ["/Users/x/y", "/home/user/r", "/srv/a/b", "/opt/a/b", "file:///", "$HOME", "${HOME}", "\\\\server", "server\\share"]) {
     assert.ok(!errs.some((e) => e.message.includes(needle)), `message must not contain ${needle}`);
   }
   // each probe alone is a hit (no probe relies on a neighbour line)
