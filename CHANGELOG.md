@@ -16,6 +16,93 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [4.8.0] - 2026-10-17
+
+MINOR release. It ships post-v4 fan-out wave 5 since v4.7.0, landed on `main` by its wave pull
+request: lanes `e283` (E283, E322, E316), `e287` (E287, E324, E325, E326) and `e288` (E288,
+E323); plan `specs/fanout-post-v4-w5.md`, release gate `specs/release-post-v4-w5.md`. Semver:
+MINOR, not PATCH, because three changes add backwards-compatible capability with observable
+behavior: a new `owners` subcommand for `scripts/fanout.mjs` (E322), a new `validate` rule with
+seven new `HANDOFF_*` error codes for closed manifests (E283), and a new optional `target_repo`
+field on lane pending-ticket blocks honored by `agc feature finish` (E287); E288 also adds an
+optional Stage 0 to the integrator skill. The other five changes are bug fixes or test hygiene.
+No MCP tool input schema, prompt schema, state file format, gate registry entry (still 34),
+schema version or dependency changed, and the constitution fragments are unchanged.
+
+### Added
+
+- **E322: `fanout.mjs owners` (`tools/fanout-manifest.ts`, `scripts/fanout.mjs`)**: a new
+  read-only subcommand, `node scripts/fanout.mjs owners <manifest> (--range <a>...<b> [--repo
+  <dir>] | --paths <file|->)`, reports every path in a git range or path list that is owned by
+  any dispatchable lane (owned tokens or implicit bookkeeping). Exit 0 means no hit, 1 a hit, 2 a
+  usage or input error (`RANGE_INVALID`, `PATHS_UNREADABLE`). It makes the integrator's mid-wave
+  base-fix condition 2 mechanical. Implemented by `runOwners`, `ownersOf`, `parseOwnersRange`,
+  `rangePaths` and `parsePathList`; the generic usage text is unchanged. Tests:
+  `test/e322-owners.test.mjs`.
+- **E283: closed-manifest handoff section (`tools/fanout-manifest.ts`)**: `fanout.mjs validate`
+  now requires a `## 接手步驟` section when a manifest's status line starts with `已結案`, with
+  four mandatory sub-items (核對 primary, 已結案, 待人類決定, 進行中的背景工作); 進行中的背景工作
+  must read 無, and no machine-local absolute path may appear in the section. Violations report
+  one of seven `HANDOFF_*` codes (`HANDOFF_SECTION_ABSENT`, `HANDOFF_SECTION_DUPLICATE`,
+  `HANDOFF_SUBITEM_ABSENT`, `HANDOFF_SUBITEM_DUPLICATE`, `HANDOFF_SUBITEM_EMPTY`,
+  `HANDOFF_BACKGROUND_NOT_NONE`, `HANDOFF_ABSOLUTE_PATH`), from `validate` only. Manifests closed
+  with other wording are exempt, so every existing manifest keeps its previous validate result.
+  Spec: `specs/e283-fanout-handoff-and-ref-check.md`; tests: `test/e283-validate-handoff.test.mjs`.
+- **E287: `agc feature finish` keeps unallocated findings and honors `target_repo`
+  (`bin/agc-init.mjs`, `tools/lane-ticket-allocation.ts`)**: when the lane's `pending-tickets.md`
+  exists in the worktree but is not committed at the revision finish reads, finish no longer
+  stays silent: it keeps a verified copy under `.current/history/<YYYY-MM>/<lane>/` and warns on
+  stderr, listing the findings for a human to file. A pending-ticket block carrying
+  `target_repo: <repo>` belongs to another repo: `allocateTicketIds` never numbers it, it is
+  archived under `## Applied` with the others and listed on stderr for a human ruling, and a
+  lane-local `depends_on` reference to it is reported as unresolved. A bare `target_repo:` is
+  rejected as malformed. Spec: `specs/e287-finish-findings-and-small-fixes.md`, architecture
+  `specs/e287-finish-findings-and-small-fixes-architecture.md`; tests:
+  `test/e287-finish-findings.test.mjs`.
+- **E288: integrator Stage 0 ticket cut (`content/skill-integrator.md`, `content/skill-pm.md`)**:
+  an optional Stage 0, skipped when tickets are already cut, lets the integrator dispatch PM via
+  Task to write only `specs/ticket-cut-<feature>.md` from a scope draft or a four-part cross-repo
+  hand-off note (Background, Current state, To do, Not to do); the cut is approved together with
+  the manifest at Stage 2. The PM skill gains the matching *Integrator Stage 0 cut* Gate Summary
+  row, and the PM token cap in `test/context-budget.test.mjs` moves from 4708 to 4823. Spec:
+  `specs/e288-integrator-stage0-and-test-hygiene.md`; tests: `test/e288-integrator-stage0.test.mjs`.
+
+### Fixed
+
+- **E326: empty branch-scoped CI run list is polled (`scripts/verify-release.mjs`)**: on a freshly
+  pushed branch with no completed run yet, the branch-scoped lookup now polls within the existing
+  `AGC_VERIFY_CI_WAIT_SECONDS` budget before the strict FAIL or lenient WARN, for both
+  `--ci-check` and Check 6 of the full release run. The `--sha` path and the `gh`-unavailable
+  degradation are unchanged. Tests: `test/e326-empty-branch-run-poll.test.mjs`,
+  `test/verify-release.test.mjs`.
+- **E324: no zod-boundary telemetry under any `.current` segment (`tools/registry.ts`)**:
+  `emitZodGateTelemetry` normalizes `workspace_path` and skips it when any path segment is
+  `.current`, so a lane directory passed as the workspace no longer gets a nested telemetry tree.
+  Tests: `test/e324-zod-telemetry-under-current.test.mjs`.
+- **E325: drift's schema-version peek tolerates an in-flight layout migration
+  (`tools/drift.ts`)**: `readArtifactVersion` re-reads the other handoff layout once when the
+  chosen path vanished between pick and read, via a local `readFileIfPresent` helper. Tests:
+  `test/e325-drift-version-peek-race.test.mjs`.
+- **E316: `## Cut` heading variants count as duplicates (`tools/fanout-manifest.ts`)**:
+  `parseCutSection` counts every `## Cut` heading variant (tab, 1-3 leading spaces, any case,
+  trailing `#`) toward `CUT_SECTION_DUPLICATE`; setext and homoglyph headings remain a documented
+  limit. Tests: `test/e316-cut-heading-variants.test.mjs`.
+
+### Changed
+
+- **E323: resident-test hygiene (`content/skill-qa-engineer.md`)**:
+  `test/e178a-integrator-role.test.mjs` and `test/e296-manifest-tier.test.mjs` (AC10) no longer
+  diff against a fixed base commit; they use structural assertions and a frozen in-test manifest.
+  The QA skill gains a one-line resident-test hygiene rule, and its byte cap in
+  `test/qa-visual-skill-split.test.mjs` moves from 17900 to 18500 (human decision).
+
+### Notes
+
+- `dist/` carries the rebuilt `tools/drift`, `tools/fanout-manifest`,
+  `tools/lane-ticket-allocation` and `tools/registry` outputs plus the version literal. Wave-5
+  evidence moves to `qa_reports/archive/release-post-v4-w5/` and
+  `review_reports/archive/release-post-v4-w5/`.
+
 ## [4.7.0] - 2026-10-16
 
 MINOR release. It ships post-v4 fan-out wave 4 since v4.6.0, landed on `main` by its wave pull
