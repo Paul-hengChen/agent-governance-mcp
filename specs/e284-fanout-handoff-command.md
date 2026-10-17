@@ -236,7 +236,7 @@ All fixtures are in-test manifests, repos and mailboxes under `$TMPDIR`: no asse
 
 - **AC-E332-1**: Given a closed in-test manifest whose handoff section has one line each containing:
   - `**/Users/x/y**`
-  - `path:/home/u/r`
+  - `path:/home/user/r`
   - `a,/srv/a/b`
   - `| /opt/a/b |` and `|/opt/a/b|`
   - `file:///Users/x/y`
