@@ -81,12 +81,11 @@ export declare const WORKTREE_ABSOLUTE_WARN: (lane: string, line: number) => str
  */
 export declare const MAILBOX_ABSOLUTE_WARN: (line: number) => string;
 export declare const PINS_NONE = "\u7121";
-export declare const USAGE: string;
-/**
- * Usage of the owners subcommand, printed on its own usage errors. Kept out
- * of USAGE so the generic usage text stays byte-identical.
- */
+/** Usage of the owners subcommand, printed on its own usage errors. */
 export declare const OWNERS_USAGE = "usage: node scripts/fanout.mjs owners <manifest> (--range <a>...<b> [--repo <dir>] | --paths <file|->)";
+/** Usage of the handoff subcommand, printed on its own usage errors. */
+export declare const HANDOFF_USAGE = "usage: node scripts/fanout.mjs handoff [--check] <manifest> [--target <branch>] [--repo <dir>] [--mailbox-root <dir>] [--closing]";
+export declare const USAGE: string;
 export declare const E158_NOTE: (base: string, branch: string) => string;
 export declare const PROSE_NOTE = "note: prose restrictions inside \u64C1\u6709 (e.g. \uFF08\u53EA\u9650 \u2026\uFF09) are not machine-checked.";
 export declare const CUT_GLOB_NOTE = "note: a glob in touches is in bounds only when byte-identical to an \u64C1\u6709 token; glob-in-glob containment is never inferred.";

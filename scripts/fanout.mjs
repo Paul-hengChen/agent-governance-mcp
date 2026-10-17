@@ -2,13 +2,13 @@
 // Coded by @sr-engineer
 // Thin CLI wrapper (all logic in tools/fanout-manifest.ts) that validates and
 // renders a multi-lane feature split (E177a); see specs/e260c-bin-scripts.md.
-// Exit codes: 0 = ok / in bounds, 1 = out of bounds or a failed manifest-side condition (check, check --cut) or an owned path (owners), 2 = usage or any parse/input error.
+// Exit codes: 0 = ok / in bounds, 1 = out of bounds or a failed manifest-side condition (check, check --cut) or an owned path (owners) or a differing fact (handoff --check), 2 = usage or any parse/input error.
 // Usage: node scripts/fanout.mjs validate <manifest>
 //        node scripts/fanout.mjs render <manifest> <lane> --summary <text> --reading <text>... [--mailbox-root <dir>] [--primary <path>] [--base <sha>]
 //        node scripts/fanout.mjs check <manifest> <lane> [--base main] [--repo <dir>]
 //        node scripts/fanout.mjs check --cut <manifest> <lane> <spec>
 //        node scripts/fanout.mjs owners <manifest> (--range <a>...<b> [--repo <dir>] | --paths <file|->)
-// owners is not in the generic usage text yet (E322); it prints its own usage line.
+//        node scripts/fanout.mjs handoff [--check] <manifest> [--target <branch>] [--repo <dir>] [--mailbox-root <dir>] [--closing]
 
 import { runValidate, runRender, runCheck, runOwners, usageResult } from "../dist/tools/fanout-manifest.js";
 

@@ -142,17 +142,20 @@ export const WORKTREE_ABSOLUTE_WARN = (lane, line) => `WARN  lane ${lane} (line 
  */
 export const MAILBOX_ABSOLUTE_WARN = (line) => `WARN  mailbox header (line ${line}): mailbox: is an absolute path — write it relative to primary (e.g. ../<lanes-dir>/_mailbox); render still accepts it`;
 export const PINS_NONE = "無";
+/** Usage of the owners subcommand, printed on its own usage errors. */
+export const OWNERS_USAGE = "usage: node scripts/fanout.mjs owners <manifest> (--range <a>...<b> [--repo <dir>] | --paths <file|->)";
+/** Usage of the handoff subcommand, printed on its own usage errors. */
+export const HANDOFF_USAGE = "usage: node scripts/fanout.mjs handoff [--check] <manifest> [--target <branch>] [--repo <dir>] [--mailbox-root <dir>] [--closing]";
+/** A subcommand usage line as a continuation line of USAGE (`usage: ` → 7 spaces). */
+const usageContinuation = (line) => `       ${line.slice("usage: ".length)}`;
 export const USAGE = [
     "usage: node scripts/fanout.mjs validate <manifest>",
     "       node scripts/fanout.mjs render <manifest> <lane> --summary <text> --reading <text>... [--mailbox-root <dir>] [--primary <path>] [--base <sha>]",
     "       node scripts/fanout.mjs check <manifest> <lane> [--base main] [--repo <dir>]",
     "       node scripts/fanout.mjs check --cut <manifest> <lane> <spec>",
+    usageContinuation(OWNERS_USAGE),
+    usageContinuation(HANDOFF_USAGE),
 ].join("\n");
-/**
- * Usage of the owners subcommand, printed on its own usage errors. Kept out
- * of USAGE so the generic usage text stays byte-identical.
- */
-export const OWNERS_USAGE = "usage: node scripts/fanout.mjs owners <manifest> (--range <a>...<b> [--repo <dir>] | --paths <file|->)";
 export const E158_NOTE = (base, branch) => `note: only committed changes were checked (git diff --no-renames --name-only ${base}...${branch}); uncommitted and untracked work in the worktree was NOT checked (E158).`;
 export const PROSE_NOTE = "note: prose restrictions inside 擁有 (e.g. （只限 …）) are not machine-checked.";
 export const CUT_GLOB_NOTE = "note: a glob in touches is in bounds only when byte-identical to an 擁有 token; glob-in-glob containment is never inferred.";
