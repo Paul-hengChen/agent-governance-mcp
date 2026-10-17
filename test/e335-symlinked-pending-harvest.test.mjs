@@ -379,3 +379,66 @@ test("AC-E335-6 (failure path): a failed --abandoned harvest restores the earlie
   assert.equal(rerun.status, 0, rerun.stderr);
   assertConverged(repo, rerun, target);
 });
+
+// ============================================================================
+// AC-E335-7 — failure clause of the D8 set-aside (T-E335-05, review recommendation R1)
+// ============================================================================
+
+// D8 sets aside every history link a same-named lane link would be copied over, sharing one aside
+// list with the T-E335-03 pending-tickets.md set-aside. The failure test above holds only that first
+// entry, so a restore loop that put back only the first aside would stay green there. Here the
+// history dir holds TWO set-aside entries — the earlier pending-tickets.md copy (set aside first) and
+// an other-link.md link pointing at a DIFFERENT target than the lane's link — so every aside must be
+// restored for the history link to come back at its old target. "Nothing written through it" is
+// checked on the old target's bytes: only rename may touch a history link.
+test("AC-E335-7 (failure path): a failed --abandoned harvest restores every set-aside history link (old target, nothing written through it, no aside left) and a later run converges", (t) => {
+  if (typeof process.getuid === "function" && process.getuid() === 0) {
+    t.skip("root ignores file permissions, so the copy failure cannot be injected");
+    return;
+  }
+  if (process.platform === "win32") {
+    t.skip("chmod-based failure injection is POSIX-only");
+    return;
+  }
+  const repo = makeRepo();
+  const lane = startLane(repo);
+  const target = LINK_SHAPES[2].make(lane);
+  const laneOther = addOtherLink(lane);
+  writeFile(histPend(repo), "OLD-HISTORY\n");
+  const oldOther = path.join(mkTmp("e335-old-other-"), "old-other-target.md");
+  writeFile(oldOther, "old other\n");
+  const histOther = path.join(histDir(repo), "other-link.md");
+  fs.symlinkSync(oldOther, histOther);
+  assert.notEqual(fs.realpathSync(oldOther), fs.realpathSync(laneOther), "fixture: the two links differ in target");
+  const unreadable = path.join(laneDir(lane), "locked.md");
+  writeFile(unreadable, "secret\n");
+  fs.chmodSync(unreadable, 0o000);
+
+  const failed = feature(repo, ["finish", "e9", "--abandoned"]);
+  assert.notEqual(failed.status, 0);
+  assert.match(failed.stderr, /harvest of \.current\/e9\/ into \.current\/history\/.*failed/);
+  assert.match(failed.stderr, /worktree and branch left in place/, "unchanged harvest-failed error");
+  assert.ok(fs.existsSync(lane), "worktree left in place");
+  assert.equal(branchExists(repo), true, "branch left in place");
+  assert.equal(fs.readFileSync(histPend(repo), "utf-8"), "OLD-HISTORY\n", "earlier history copy restored");
+  assert.ok(lstat(histOther)?.isSymbolicLink(), "the set-aside history link is back at its original path");
+  assert.equal(fs.readlinkSync(histOther), oldOther, "restored history link still points at its old target");
+  assert.equal(fs.readFileSync(oldOther, "utf-8"), "old other\n", "nothing written through the history link");
+  assert.equal(fs.readFileSync(laneOther, "utf-8"), "other\n", "lane link target untouched");
+  assert.deepEqual(
+    fs.readdirSync(histDir(repo)).filter((f) => f.endsWith(".aside.tmp")),
+    [],
+    "no .aside.tmp file left"
+  );
+  assert.deepEqual(noTempLeft(histDir(repo)), [], "no temp file left");
+
+  fs.chmodSync(unreadable, 0o600);
+  const rerun = feature(repo, ["finish", "e9", "--abandoned"]);
+  assert.equal(rerun.status, 0, rerun.stderr);
+  assert.ok(!fs.existsSync(lane), "worktree removed");
+  assert.equal(branchExists(repo), true, "branch kept");
+  assertConverged(repo, rerun, target);
+  assert.ok(lstat(histOther)?.isSymbolicLink(), "other symlinked lane file still copied as a link");
+  assert.equal(fs.realpathSync(histOther), fs.realpathSync(laneOther), "history link now resolves to the lane link's target");
+  assert.equal(fs.readFileSync(oldOther, "utf-8"), "old other\n", "old target never written");
+});
