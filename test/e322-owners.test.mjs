@@ -232,17 +232,23 @@ test("AC-E322-8 manifest errors and provisional lanes", () => {
 
 const sha = (f) => createHash("sha256").update(fs.readFileSync(f)).digest("hex");
 
-test("AC-E322-9 usage unchanged and read-only", () => {
-  // WHY: e296 AC12 pins exactly three generic-usage continuation lines; owners must not leak into the generic usage.
+test("AC-E322-9 generic usage lists owners; owners usage unchanged; read-only", () => {
+  // WHY: the generic usage is the CLI's discoverable index, so it names every subcommand (E330 re-pin); the
+  // owners-specific usage line printed on owners usage errors stays the same text.
   const g = cli([]);
   assert.equal(g.status, 2);
-  assert.equal(g.stderr.split("\n").filter((l) => l.startsWith("       node scripts/fanout.mjs")).length, 3);
-  assert.ok(!g.stderr.includes("owners"), "generic usage does not list owners");
+  const cont = g.stderr.split("\n").filter((l) => l.startsWith("       node scripts/fanout.mjs"));
+  assert.equal(cont.length, 5);
+  assert.equal(cont.filter((l) => l === `       ${OWNERS_USAGE.slice("usage: ".length)}`).length, 1, "generic usage lists the owners form once");
   const unk = cli(["nonsense"]);
   assert.equal(unk.stderr, g.stderr);
-  // header comment lists the owners form
+  const ownersBad = cli(["owners"]);
+  assert.equal(ownersBad.status, 2);
+  assert.ok(ownersBad.stderr.split("\n").includes(OWNERS_USAGE), ownersBad.stderr);
+  // header comment lists the owners form and no longer says owners is missing from the generic usage
   const header = fs.readFileSync(FANOUT, "utf8").split("\n").slice(0, 15).join("\n");
   assert.ok(header.includes("node scripts/fanout.mjs owners <manifest> (--range <a>...<b> [--repo <dir>] | --paths <file|->)"));
+  assert.ok(!header.includes("not in the generic usage"), header);
   // read-only: manifest, path file, repo HEAD and worktree untouched
   const repo = makeRepo();
   const pf = paths("tools/a.ts", "docs/x.md");
