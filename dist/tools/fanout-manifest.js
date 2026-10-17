@@ -24,6 +24,11 @@ export const APPROVAL_COLUMN = "approval";
 export const APPROVAL_VALUES = ["human", "—", ""];
 /** Exact header of a spec's `## Cut` table (= skill-pm's inline cut table header). */
 export const CUT_HEADER = ["id", "desc", "depends_on", "est. files", "touches", "design-link"];
+/**
+ * A line a Markdown renderer shows as a Cut heading: up to three leading
+ * spaces, `##`, a space or tab, `cut` in any case, optional closing `#`s.
+ */
+const CUT_HEADING_RE = /^ {0,3}##[ \t]+cut[ \t#]*$/i;
 /** `touches` value for a ticket that writes only governance bookkeeping. */
 export const CUT_TOUCHES_NONE = "—";
 /** Exact header of the `## Decisions…` table, in order. */
@@ -118,6 +123,9 @@ export const FANOUT_CODES = {
     // A path-shaped touches span that is not a bare, normalised repo path.
     cutTouchesMalformedPath: "CUT_TOUCHES_MALFORMED_PATH",
     specUnreadable: "SPEC_UNREADABLE",
+    // owners input errors (exit 2).
+    rangeInvalid: "RANGE_INVALID",
+    pathsUnreadable: "PATHS_UNREADABLE",
 };
 /**
  * validate warning for a dispatchable row whose worktree cell is an absolute
@@ -137,6 +145,11 @@ export const USAGE = [
     "       node scripts/fanout.mjs check <manifest> <lane> [--base main] [--repo <dir>]",
     "       node scripts/fanout.mjs check --cut <manifest> <lane> <spec>",
 ].join("\n");
+/**
+ * Usage of the owners subcommand, printed on its own usage errors. Kept out
+ * of USAGE so the generic usage text stays byte-identical.
+ */
+export const OWNERS_USAGE = "usage: node scripts/fanout.mjs owners <manifest> (--range <a>...<b> [--repo <dir>] | --paths <file|->)";
 export const E158_NOTE = (base, branch) => `note: only committed changes were checked (git diff --no-renames --name-only ${base}...${branch}); uncommitted and untracked work in the worktree was NOT checked (E158).`;
 export const PROSE_NOTE = "note: prose restrictions inside 擁有 (e.g. （只限 …）) are not machine-checked.";
 export const CUT_GLOB_NOTE = "note: a glob in touches is in bounds only when byte-identical to an 擁有 token; glob-in-glob containment is never inferred.";
@@ -603,10 +616,132 @@ function parseDecisions(sections, m) {
             m.decisions.rows.push({ date, decider, content, source, row: n, line: r.line });
     });
 }
-/** Every format error in the manifest (validate reports all of them). */
+// --- closed-manifest handoff section (validate only) -------------------------
+/** Status-line text (after removing every `**`) marking a closed manifest. */
+const STATUS_LINE_RE = /^狀態[：:]/;
+const STATUS_CLOSED_RE = /^狀態[：:]\s*已結案/;
+/** Name of the handoff section a closed manifest must carry. */
+export const HANDOFF_SECTION = "接手步驟";
+/** Sub-items (`### ` headings) every handoff section must hold, in order. */
+export const HANDOFF_SUBITEMS = ["核對 primary", "已結案", "待人類決定", "進行中的背景工作"];
+/** The sub-item whose single body line must read 無 once the wave is closed. */
+const HANDOFF_BACKGROUND = "進行中的背景工作";
+const HANDOFF_NONE = "無";
+/**
+ * A machine-local absolute path token: a Windows drive path, `~/` or
+ * `~<user>/`, or a POSIX path with two or more non-empty segments, starting
+ * at a line start, whitespace or opening punctuation. The `//` of a URL
+ * follows a `:`, which is not a boundary, so URLs are never hits.
+ */
+const HANDOFF_ABSOLUTE_PATH_RE = /(?:^|[\s`'"(\[（「：，、=])(?:[A-Za-z]:[\\/]|~[^\s/]*\/|\/[^\s/]+\/[^\s/])/;
+/**
+ * Error codes of the closed-manifest handoff check. CLI codes, named outside
+ * the gate-suffix vocabulary like FANOUT_CODES.
+ */
+export const HANDOFF_CODES = {
+    sectionAbsent: "HANDOFF_SECTION_ABSENT",
+    sectionDuplicate: "HANDOFF_SECTION_DUPLICATE",
+    subitemAbsent: "HANDOFF_SUBITEM_ABSENT",
+    subitemDuplicate: "HANDOFF_SUBITEM_DUPLICATE",
+    subitemEmpty: "HANDOFF_SUBITEM_EMPTY",
+    backgroundNotNone: "HANDOFF_BACKGROUND_NOT_NONE",
+    absolutePath: "HANDOFF_ABSOLUTE_PATH",
+};
+/** Heading name `name`, or `name` followed by a `（…）` / `(…)` qualifier. */
+function isNamedHeading(heading, name) {
+    return heading === name || heading.startsWith(`${name}（`) || heading.startsWith(`${name}(`);
+}
+/**
+ * Whether a manifest is closed: its status line — the first line before the
+ * first `## ` heading that, with every `**` removed, starts `狀態：` (or
+ * `狀態:`) — reads `已結案` right after the colon. Any other wording
+ * (`結案 …`, `已合併`, `…；已結案`) is not closed.
+ */
+export function isManifestClosed(text) {
+    for (const line of splitLines(text)) {
+        if (line.startsWith("## "))
+            return false;
+        const plain = line.replaceAll("**", "");
+        if (STATUS_LINE_RE.test(plain))
+            return STATUS_CLOSED_RE.test(plain);
+    }
+    return false;
+}
+function handoffErr(code, message) {
+    return { code, scope: "handoff", message };
+}
+/**
+ * Format errors of a closed manifest's `## 接手步驟` section: present once,
+ * each mandatory `### ` sub-item present once with a body, the background
+ * sub-item reading 無, and no machine-local absolute path on any line.
+ * Optional (`裝置`, `工具`) and unknown sub-items are not checked.
+ */
+export function handoffSectionErrors(text) {
+    const sections = splitSections(splitLines(text)).filter((s) => isNamedHeading(s.name, HANDOFF_SECTION));
+    if (sections.length === 0) {
+        return [handoffErr(HANDOFF_CODES.sectionAbsent, `manifest is closed (status 已結案) but has no "## ${HANDOFF_SECTION}" section`)];
+    }
+    if (sections.length > 1) {
+        return [
+            handoffErr(HANDOFF_CODES.sectionDuplicate, `${sections.length} "## ${HANDOFF_SECTION}" sections found (lines ${sections.map((s) => s.line).join(", ")}); exactly one is allowed`),
+        ];
+    }
+    const s = sections[0];
+    const errors = [];
+    // Sub-items: each `### ` heading opens a body that runs to the next one.
+    const subitems = [];
+    for (const l of s.lines) {
+        if (l.text.startsWith("### "))
+            subitems.push({ name: l.text.slice(4).trim(), line: l.line, body: [] });
+        else
+            subitems.at(-1)?.body.push(l.text);
+    }
+    for (const name of HANDOFF_SUBITEMS) {
+        const found = subitems.filter((x) => isNamedHeading(x.name, name));
+        if (found.length === 0) {
+            errors.push(handoffErr(HANDOFF_CODES.subitemAbsent, `"## ${HANDOFF_SECTION}" (line ${s.line}) has no "### ${name}" sub-item`));
+            continue;
+        }
+        if (found.length > 1) {
+            errors.push(handoffErr(HANDOFF_CODES.subitemDuplicate, `"### ${name}" appears ${found.length} times (lines ${found.map((x) => x.line).join(", ")})`));
+            continue;
+        }
+        const filled = found[0].body.filter((b) => b.trim() !== "");
+        if (filled.length === 0) {
+            errors.push(handoffErr(HANDOFF_CODES.subitemEmpty, `"### ${name}" (line ${found[0].line}) is empty`));
+            continue;
+        }
+        if (name === HANDOFF_BACKGROUND && (filled.length !== 1 || !readsNone(filled[0]))) {
+            errors.push(handoffErr(HANDOFF_CODES.backgroundNotNone, `"### ${HANDOFF_BACKGROUND}" (line ${found[0].line}) must read 無 when the manifest is closed`));
+        }
+    }
+    // The path itself is never echoed (WORKTREE_ABSOLUTE_WARN convention).
+    for (const l of [{ text: s.heading, line: s.line }, ...s.lines]) {
+        if (HANDOFF_ABSOLUTE_PATH_RE.test(l.text)) {
+            errors.push(handoffErr(HANDOFF_CODES.absolutePath, `"## ${HANDOFF_SECTION}" line ${l.line} has a machine-local absolute path — write it relative to primary or as a placeholder`));
+        }
+    }
+    return errors;
+}
+/** `無`, optionally after one `- ` / `* ` list marker and before one `。`. */
+function readsNone(line) {
+    let t = line.trim();
+    if (t.startsWith("- ") || t.startsWith("* "))
+        t = t.slice(2).trim();
+    if (t.endsWith("。"))
+        t = t.slice(0, -1).trim();
+    return t === HANDOFF_NONE;
+}
+/**
+ * Every format error in the manifest (validate reports all of them). A
+ * closed manifest's handoff section is checked here only, never by the
+ * parser, so render and both check modes never see those errors.
+ */
 export function validateManifest(text) {
     const manifest = parseManifest(text);
-    return { manifest, errors: manifest.errors };
+    if (!isManifestClosed(text))
+        return { manifest, errors: manifest.errors };
+    return { manifest, errors: [...manifest.errors, ...handoffSectionErrors(text)] };
 }
 /**
  * Resolve a dispatchable lane for render/check. Fatal: manifest-wide Lanes
@@ -1007,9 +1142,18 @@ function cutErr(code, message) {
 /**
  * Parse the `## Cut` table of a lane spec. Pure. Only a section named
  * exactly `Cut` is read, so prose sections such as `## Cut Decisions` are
- * ignored. Every row error is collected before returning. Known limit shared
- * with the manifest parser: fenced code blocks are not recognised, so a
- * fenced line starting with `## Cut` counts as a section.
+ * ignored. Every row error is collected before returning.
+ *
+ * Any line a Markdown renderer shows as a Cut heading (CUT_HEADING_RE: up to
+ * three leading spaces, a tab after `##`, any letter case, closing `#`s)
+ * counts toward CUT_SECTION_DUPLICATE, so a second table under such a
+ * variant can never hide behind the one that is read. A lone variant is
+ * still CUT_SECTION_ABSENT, because only a `## Cut` section is read.
+ *
+ * Known limits: fenced code blocks are not recognised (shared with the
+ * manifest parser), so a fenced Cut heading line counts as one; setext
+ * headings (`Cut` underlined with `---`) and homoglyph headings (e.g. a
+ * Cyrillic `С`) are not recognised as Cut headings.
  *
  * The section and each `touches` cell are whitelists, so anything the
  * grammar does not name is an error rather than skipped (a skipped line or
@@ -1037,18 +1181,25 @@ export function parseCutSection(specText) {
         };
     }
     const cut = splitSections(lines).filter((s) => s.name === "Cut");
+    // Variant heading lines plus every section read as `Cut` (trim() also
+    // strips Unicode spaces the regex does not name), so no read section is
+    // ever left out of the count.
+    const headingLines = new Set(lines.flatMap((l, i) => (CUT_HEADING_RE.test(l) ? [i + 1] : [])));
+    for (const s of cut)
+        headingLines.add(s.line);
+    if (headingLines.size > 1) {
+        const at = [...headingLines].sort((a, b) => a - b);
+        return {
+            ok: false,
+            errors: [
+                cutErr(FANOUT_CODES.cutSectionDuplicate, `${at.length} "## Cut" sections found (lines ${at.join(", ")}); exactly one is allowed`),
+            ],
+        };
+    }
     if (cut.length === 0) {
         return {
             ok: false,
             errors: [cutErr(FANOUT_CODES.cutSectionAbsent, 'no "## Cut" section found — write the inline cut table under a "## Cut" heading (skill-pm Spec Schema)')],
-        };
-    }
-    if (cut.length > 1) {
-        return {
-            ok: false,
-            errors: [
-                cutErr(FANOUT_CODES.cutSectionDuplicate, `${cut.length} "## Cut" sections found (lines ${cut.map((s) => s.line).join(", ")}); exactly one is allowed`),
-            ],
         };
     }
     const s = cut[0];
@@ -1271,6 +1422,86 @@ export function checkCut(m, laneId, specText) {
         },
     };
 }
+/** Source note for paths read from a git range (Copy owners.note.range). */
+export const OWNERS_RANGE_NOTE = (range) => `note: paths from git diff --no-renames --name-only ${range} (committed changes only).`;
+/** Source note for paths read from a list file or stdin (Copy owners.note.paths). */
+export const OWNERS_PATHS_NOTE = (file) => `note: paths from the list ${file} (taken verbatim, not normalised).`;
+/** Manifest errors that block owners: any Lanes or row error. */
+function ownersFatalErrors(m) {
+    return m.errors.filter((e) => e.scope === "lanes" || e.scope === "row");
+}
+/**
+ * Every dispatchable lane that owns each path, through an 擁有 token or the
+ * implicit bookkeeping set (a base fix that brings in a lane's own state is
+ * not a clean merge either). Pure. A Lanes or row error is fatal, since a
+ * dropped row could be the lane that owns a path; Pins / Decisions errors
+ * are not. Provisional lanes are named as not checked.
+ */
+export function ownersOf(m, paths, sourceNote) {
+    const fatal = ownersFatalErrors(m);
+    if (fatal.length > 0)
+        return { ok: false, errors: fatal };
+    const unique = [...new Set(paths)].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+    const hits = [];
+    for (const p of unique) {
+        const owners = [];
+        for (const lane of m.dispatchable) {
+            const token = lane.ownedTokens.find((t) => matchesGlob(p, t));
+            if (token !== undefined)
+                owners.push({ lane: lane.lane, token });
+            else if (isImplicitBookkeeping(p, lane.lane))
+                owners.push({ lane: lane.lane });
+        }
+        if (owners.length > 0)
+            hits.push({ path: p, owners });
+    }
+    const provisional = m.provisional.map((x) => x.lane);
+    const lines = [
+        ...hits.map((h) => `HIT  ${h.path}  (${h.owners.map((o) => `${o.lane}: ${o.token ?? "implicit bookkeeping"}`).join("; ")})`),
+        `fanout owners: ${unique.length} path(s), ${hits.length} hit(s), ${m.dispatchable.length} dispatchable lane(s)`,
+        sourceNote,
+        PROSE_NOTE,
+        ...(provisional.length > 0 ? [`note: ${provisional.length} provisional lane(s) not checked: ${provisional.join(", ")}`] : []),
+    ];
+    return { ok: true, report: { paths: unique, hits, output: lines.join("\n") + "\n", exitCode: hits.length > 0 ? 1 : 0 } };
+}
+/**
+ * The two sides of an `<a>...<b>` range, or undefined when it is not exactly
+ * that: one `...`, both sides non-empty, no whitespace, no side starting
+ * with `-`, and no `..` or leading / trailing `.` inside a side (none of
+ * which a git ref can hold, so `a....b` is refused rather than resolved).
+ */
+export function parseOwnersRange(range) {
+    if (/\s/.test(range))
+        return undefined;
+    const sides = range.split("...");
+    if (sides.length !== 2)
+        return undefined;
+    const ok = sides.every((s) => s !== "" && !s.startsWith("-") && !s.includes("..") && !s.startsWith(".") && !s.endsWith("."));
+    return ok ? [sides[0], sides[1]] : undefined;
+}
+/** Paths changed on `<b>` since its merge-base with `<a>`; read-only git. */
+export function rangePaths(sides, repo) {
+    try {
+        gitOut(["rev-parse", "--git-dir"], repo);
+    }
+    catch {
+        return { errors: [inputErr("REPO_NOT_GIT", `--repo "${repo}" is not inside a git repository`)] };
+    }
+    const errors = sides
+        .filter((ref) => !refOk(ref, repo))
+        .map((ref) => inputErr("REF_NOT_FOUND", `range ref "${ref}" does not resolve (git rev-parse --verify) in ${repo}`));
+    if (errors.length > 0)
+        return { errors };
+    return { paths: nulList(gitOut(["diff", "--no-renames", "--name-only", "-z", `${sides[0]}...${sides[1]}`, "--"], repo)) };
+}
+/** One repo-relative path per line: trailing CR and surrounding space trimmed, blanks skipped. */
+export function parsePathList(text) {
+    return text
+        .split("\n")
+        .map((l) => l.trim())
+        .filter((l) => l !== "");
+}
 export function formatError(e) {
     return `fanout: error: ${e.code}: ${e.message}`;
 }
@@ -1405,6 +1636,74 @@ export function runCheck(args) {
         return fail([r.error]);
     // Same default as render: the git repo that holds the manifest, not cwd.
     const res = checkLane(parseManifest(r.text), lane, { base, repo: repo ?? path.dirname(path.resolve(file)) });
+    if (!res.ok)
+        return fail(res.errors);
+    return { stdout: res.report.output, stderr: "", exitCode: res.report.exitCode };
+}
+function ownersUsage(message) {
+    return { stdout: "", stderr: `${formatError({ code: "USAGE", message })}\n${OWNERS_USAGE}\n`, exitCode: 2 };
+}
+/**
+ * `owners <manifest> (--range <a>...<b> [--repo <dir>] | --paths <file|->)`:
+ * exit 0 = no path is owned, 1 = at least one is, 2 = usage / input /
+ * manifest error. Reads only; git is run read-only.
+ */
+export function runOwners(args) {
+    const p = parseArgs(args, ["--range", "--paths", "--repo"]);
+    if (typeof p === "string")
+        return ownersUsage(p);
+    if (p.positional.length !== 1)
+        return ownersUsage("owners takes exactly one <manifest>");
+    const range = single(p, "--range");
+    if (typeof range === "object")
+        return ownersUsage(range.error);
+    const list = single(p, "--paths");
+    if (typeof list === "object")
+        return ownersUsage(list.error);
+    const repo = single(p, "--repo");
+    if (typeof repo === "object")
+        return ownersUsage(repo.error);
+    if ((range === undefined) === (list === undefined))
+        return ownersUsage("owners takes exactly one of --range or --paths");
+    if (repo !== undefined && range === undefined)
+        return ownersUsage("--repo is only valid with --range");
+    let sides;
+    if (range !== undefined) {
+        sides = parseOwnersRange(range);
+        if (sides === undefined) {
+            return fail([inputErr(FANOUT_CODES.rangeInvalid, `--range "${range}" is not <a>...<b> (one ..., both sides non-empty, no whitespace, no side starting with -)`)]);
+        }
+    }
+    const file = p.positional[0];
+    const r = readManifest(file);
+    if ("error" in r)
+        return fail([r.error]);
+    const m = parseManifest(r.text);
+    // Before any git or file read, so a bad manifest is the whole answer.
+    const fatal = ownersFatalErrors(m);
+    if (fatal.length > 0)
+        return fail(fatal);
+    let paths;
+    let note;
+    if (sides !== undefined) {
+        // Same default as check: the git repo that holds the manifest, not cwd.
+        const got = rangePaths(sides, repo ?? path.dirname(path.resolve(file)));
+        if ("errors" in got)
+            return fail(got.errors);
+        paths = got.paths;
+        note = OWNERS_RANGE_NOTE(`${sides[0]}...${sides[1]}`);
+    }
+    else {
+        const src = list;
+        try {
+            paths = parsePathList(fs.readFileSync(src === "-" ? 0 : src, "utf8"));
+        }
+        catch (err) {
+            return fail([inputErr(FANOUT_CODES.pathsUnreadable, `cannot read path list "${src}": ${err.message}`)]);
+        }
+        note = OWNERS_PATHS_NOTE(src);
+    }
+    const res = ownersOf(m, paths, note);
     if (!res.ok)
         return fail(res.errors);
     return { stdout: res.report.output, stderr: "", exitCode: res.report.exitCode };
