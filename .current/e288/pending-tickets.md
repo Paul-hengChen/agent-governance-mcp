@@ -1,5 +1,7 @@
 # Pending tickets — lane e288
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E323-NEW-1
 title: align docs/lane-protocol.md §3 historical-SHA allowance with the E323 "never diff against a fixed lane base sha" convention
@@ -29,5 +31,3 @@ body: |
       that re-dispatching PM to revise the ticket-cut file falls under the "Stage 0 only" permission row.
   Write both explicitly.
 ```
-
-## Applied
