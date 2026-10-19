@@ -26,7 +26,7 @@ AC-E289-9 — implemented — `tools/fanout-manifest.ts:1141-1181`. `ADDENDUM_IN
 AC-E289-10 — implemented — the provenance comment above `PROMPT_TEMPLATE_3B` (`tools/fanout-manifest.ts:75-81`) is untouched and still holds `content/skill-integrator.md`, `the single canonical copy` and `E177a render golden`. e178a and e296 pass and are unmodified.
 AC-E337-1 — implemented — `tools/fanout-manifest.ts:795`. The comment equals copy `comment.subitems` and no longer says "in order". No new `HANDOFF_*` code was added.
 AC-E338-1 — implemented — `tools/fanout-manifest.ts:816` (`(?:(?<!\`)\*\*)?`). Reviewer probe: all four AC lines give 0 `HANDOFF_ABSOLUTE_PATH`.
-AC-E338-2 — implemented — reviewer probe: `**/a/b`, `- see **/src/a/b`, `- x=**/a/b`, `- 見 **/Users/x/y**` and ``- `/tmp/x/y` `` each give exactly 1 hit. Extra probes also behave as before: `- **/Users/x/y**`, `- (**/tmp/a/b)`, `` - `x` **/Users/x/y** `` and `` - `**` /Users/x/y `` each give 1; `- tools/**/Users/a` gives 0. The comment at `:808-815` names the code-span remedy.
+AC-E338-2 — implemented — reviewer probe: a bold-prefixed absolute path at line start, a bold-prefixed absolute path after whitespace in a list item, a bold-prefixed absolute path directly after `=`, a bold-wrapped home-directory-shaped path after CJK text and whitespace, and a temp-directory-shaped absolute path inside a code span each give exactly 1 hit. Extra probes also behave as before: a bold-wrapped home-directory-shaped path at list-item start, a bold-prefixed temp-directory-shaped path inside parentheses, a bold-wrapped home-directory-shaped path after a code span, and a home-directory-shaped path after a code span holding only `**` each give 1; a glob-style `**` segment inside a relative path that runs into a home-directory-shaped tail gives 0. The comment at `:808-815` names the code-span remedy. (Round 2: probe literals described by class to keep this report clear of the hygiene scan.)
 AC-E338-3 — implemented — e332 and e283 pass and are unmodified.
 AC-E339-1 — implemented (code) — `tools/fanout-handoff.ts:297`. The status call now runs with `-c core.quotePath=false`, so a non-ASCII manifest path prints unescaped and matches `manifestRel` in the self-exclusion filter. Fixture proof is qa scope.
 AC-E339-2 — implemented (code) — same line. Untracked non-ASCII names now print unquoted.
@@ -62,3 +62,14 @@ No findings. The change adds two `stat` calls, two `realpath` calls and one mtim
 
 ## Verdict
 APPROVED — every sr-owned AC is implemented and was verified by probes and by the scope, dist and validate sweeps. The two red tests are qa's golden re-pin work, and the golden differs by exactly the one specified line.
+
+## Round 2 — APPROVED — by code-reviewer
+
+### Summary
+- Trigger: QA round 1 FAIL on AC-HC-3 only. The e234 hygiene scan (AC16) flagged a `home-path` hit in this report's own AC-E338-2 evidence line, which quoted path-shaped probe literals.
+- Fix: the AC-E338-2 line above now describes each probe by class. The probes, their counts and the verdict are unchanged. No other line in this report carries a home-directory-shaped literal.
+- Product code is unchanged since round 1 (`git diff --quiet e048694 HEAD -- tools gates prompts schema index.ts dist bin lib content` exits 0).
+- qa's a8f775c was checked only for anything that could change the verdict. The E177a golden gains exactly the one `EnterWorktree` line verified in round 1. The e235b per-line exception now covers the lines that carry the worktree path, and it still requires a byte-exact absolute-path substitution. Nothing there changes the verdict.
+
+### Verdict
+APPROVED — round 1's findings stand. The only change is a hygiene reword of reviewer evidence, with no source or test defect.
