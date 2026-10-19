@@ -17,6 +17,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
 const SOP = read("content/skill-integrator.md");
 const LANE = read("docs/lane-protocol.md");
+const ADD = read("docs/lane-protocol-addendum.md"); // E290: repo-specific lane rules (dist/, comment-only proof) live here
 
 /** Mirror of the spec's sec(): heading line through the line before the next heading of any level. */
 function sec(heading, text) {
@@ -118,8 +119,10 @@ test("AC5: lane-protocol section 7 is the last section and carries the pause / a
   need(s7, [
     "type: proposal", "base-fix", "type: ack", "HEAD sha", "type: close", "git stash",
     "status --porcelain", "rev-parse HEAD", "tw_*", "§5 規則 3", "§5 規則 6", "30 分鐘",
-    "§3", "dist/",
+    "§3", "建置產物",
   ], "lane section 7");
+  // E290: the repo-specific half of the rebuilt-artifact rule lives in the addendum's §7.
+  need(sec("## §7", ADD), ["dist/"], "addendum section 7");
   assert.match(s7, /不開新的/);
   assert.match(s7, /不自己 merge/);
   assert.match(s7, /不改檔、不 commit/);
@@ -127,7 +130,9 @@ test("AC5: lane-protocol section 7 is the last section and carries the pause / a
 
 test("AC6: section 7 carries the E282 merge-base scope sentence", () => {
   const s7 = sec("## 7. 中途修 base", LANE);
-  need(s7, ["merge-base", "...HEAD", "註解 proof", "每一行改動都是註解", "不對固定的派工 base sha 算"], "E282");
+  need(s7, ["merge-base", "...HEAD", "不對固定的派工 base sha 算"], "E282");
+  // E290: the comment-only proof is this repo's own check, so it moved to the addendum.
+  need(sec("## §7", ADD), ["註解 proof", "每一行改動都是註解"], "E282 addendum");
 });
 
 test("AC7: lane-session approval is recorded without re-asking only under the three-part test", () => {
