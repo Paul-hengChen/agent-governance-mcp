@@ -6,3 +6,5 @@
 {"ts":"2026-10-19T06:57:10.005Z","feature":"e290-lane-protocol-generic","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-10-19T06:59:34.721Z","feature":"e290-lane-protocol-generic","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
 {"ts":"2026-10-19T07:06:30.531Z","feature":"e290-lane-protocol-generic","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-10-19T07:07:28.528Z","feature":"e290-lane-protocol-generic","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-19T07:08:17.042Z","feature":"e290-lane-protocol-generic","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
