@@ -670,9 +670,13 @@ const PATH_BOUNDARY = "[\\s`'\"(\\[（「：，、=:,|]";
 /**
  * Where a path token may start: a line start, a boundary character, or a
  * bold opener `**` that itself follows a line start or a boundary character
- * (so `tools/**` + `/a/b` is not a start).
+ * (so `tools/**` + `/a/b` is not a start). A backtick never opens bold:
+ * inside a code span `**` is literal, so a glob written in a code span
+ * (`**` + `/a/b` after a backtick) is not a path start. Every other boundary
+ * before `**` still opens bold — the remedy for a bare glob that reads as an
+ * absolute path is to write the glob inside a code span.
  */
-const PATH_START = `(?:^|${PATH_BOUNDARY})(?:\\*\\*)?`;
+const PATH_START = `(?:^|${PATH_BOUNDARY})(?:(?<!\`)\\*\\*)?`;
 /**
  * Machine-local absolute path forms:
  * - Windows drive: `C:\` or `C:/`;
