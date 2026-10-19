@@ -16,6 +16,73 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [4.11.0] - 2026-10-19
+
+MINOR release. It ships post-v4 fan-out wave 8 since v4.10.0, landed on `main` by its wave pull
+request: lanes `e292` (E292, E342, E343, E344) and `e290` (E290); plan
+`specs/fanout-post-v4-w8.md`, release gate `specs/release-post-v4-w8.md`. Semver: MINOR, not
+PATCH, because E292 adds backwards-compatible capability: a new optional `sisterRepos` key in
+`.current/.config.json`, a new optional `## 外部依賴` manifest section, and new error codes for
+`fanout.mjs validate` and `fanout.mjs handoff --check`. E290 changes where this repo's rendered
+lane prompts point for their rules. No MCP tool input schema, prompt schema, state file format,
+gate registry entry (still 34), schema version (config `schema_version` stays 2) or dependency
+changed; under `content/`, only `content/skill-integrator.md` changes.
+
+### Added
+
+- **E292: sister repos for fan-out waves (`tools/config.ts`, `tools/fanout-manifest.ts`,
+  `tools/fanout-handoff.ts`, `docs/config.md`, `content/skill-integrator.md`)**: a new optional
+  `.current/.config.json` key `sisterRepos` declares each sister repo once (`name`, a
+  repo-relative `path`, `owns`, optional `backlog` and `contracts`). `parseSisterRepos` drops
+  invalid entries silently (absolute or `~` paths, bad names, duplicates) and `loadConfig`
+  surfaces the kept entries as `WorkspaceConfig.sisterRepos`. A fan-out manifest may carry an
+  optional `## 外部依賴` section whose table header is exactly `repo | 票 | branch | sha | 協定出處`;
+  `fanout.mjs validate` checks it only when present, with the new codes
+  `EXTERNAL_DEPS_SECTION_DUPLICATE`, `EXTERNAL_DEPS_TABLE_ABSENT`, `EXTERNAL_DEPS_HEADER_DIFFERS`
+  and `EXTERNAL_DEPS_ROW_INVALID`. `fanout.mjs handoff --check` compares each recorded sha with
+  the sister branch now (a difference is reported as DIFF and exits 1), and stops with
+  `SISTER_REPO_UNKNOWN` for an undeclared repo or `SISTER_REPO_NOT_GIT` for a declared path that
+  is not a git repository. The integrator SOP's *Status*, *Take-over* step 4 and Stage 1 step 6
+  read sister repos read-only. Additive-optional: no config schema bump and no migration. Spec:
+  `specs/e292-sister-repos.md`; tests: `test/e292-config-sister-repos.test.mjs`,
+  `test/e292-external-deps-validate.test.mjs`, `test/e292-handoff-sister-sha.test.mjs`,
+  `test/e292-integrator-sop.test.mjs`.
+- **E343: render pointer guard (`tools/fanout-manifest.ts`)**: `fanout.mjs render` now fails with
+  `TEMPLATE_POINTER_ABSENT` when the prompt template does not hold the lane-rules pointer exactly
+  once, instead of rendering a prompt that silently lacks it. Exports `LANE_PROTOCOL_POINTER` and
+  `replaceLanePointer`, plus a `template` test seam; `PROMPT_TEMPLATE_3B` itself is unchanged.
+  Tests: `test/e343-render-pointer-guard.test.mjs`.
+
+### Changed
+
+- **E290: generic lane protocol plus repo addendum (`docs/lane-protocol.md`,
+  `docs/lane-protocol-addendum.md`, `.current/.config.json`, `content/skill-integrator.md`)**:
+  `docs/lane-protocol.md` now holds only agc's generic lane rules (its `## ` headings are
+  unchanged); this repo's own rules move to the new `docs/lane-protocol-addendum.md`, and this
+  repo's `.current/.config.json` sets `laneProtocolAddendum` to it, so `render` from this repo
+  points a lane at both files. The integrator SOP's Stage 3 check 1, Stage 3 *Render* and the
+  Stage 4 opening name both layers. Spec: `specs/e290-lane-protocol-generic.md`; tests:
+  `test/e290-lane-protocol-generic.test.mjs`, with lane-protocol assertions re-pinned in
+  `test/e286-integrator-trust-and-git.test.mjs` and `test/e329-integrator-sop-followups.test.mjs`.
+- **E342: `docs/config.md` wording**: `ADDENDUM_INVALID` now reads "a path whose first segment is
+  `..`" (a name such as `..foo` is accepted), and a new sentence says to run `render` from
+  primary, not from a lane worktree's build output. Tests: `test/e342-config-doc-wording.test.mjs`.
+- **E344: integrator watch resume and handoff timing (`content/skill-integrator.md`)**: resuming
+  after the two-hour idle stop restarts `lane-status.mjs --watch` as well as the mailbox watch,
+  and the Stage 6 *Write the handoff* timing names the bookkeeping edits. Tests: E344 assertions
+  added to `test/e285-integrator-session-handoff.test.mjs`; `test/e178a-integrator-role.test.mjs`
+  AC10 re-pinned by one line.
+
+### Notes
+
+- `dist/` carries the rebuilt `tools/config`, `tools/fanout-handoff` and `tools/fanout-manifest`
+  outputs plus the version literal. Wave-8 evidence moves to
+  `qa_reports/archive/release-post-v4-w8/` and `review_reports/archive/release-post-v4-w8/`.
+- The range also carries the adopter observation report
+  `docs/existing-test-allowlist-drift-2026-10-19.md` (outside the wave's scope) and the lane
+  ledgers archived under `.current/history/2026-10/`. The first `finish e290` was refused on an
+  unquoted `: ` in a pending-ticket title; the lane fixed it and re-merged (backlog E353).
+
 ## [4.10.0] - 2026-10-19
 
 MINOR release. It ships post-v4 fan-out wave 7 since v4.9.0, landed on `main` by its wave pull
