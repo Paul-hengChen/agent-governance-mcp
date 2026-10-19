@@ -46,4 +46,18 @@ body: |
   generic file (or declare fan-out repo-mode only) once the tool side is decided.
 ```
 
+```pending-ticket
+lane_local_id: E290-NEW-4
+title: generic lane protocol gives no fallback when agc is not on PATH and no addendum exists
+priority: P3
+depends_on: [E290]
+source: code-reviewer, e290 round 1 (review_reports/review_T-E290-01.md, optional finding 1)
+body: |
+  docs/lane-protocol.md §1 now says the call form for an agc that is not on PATH comes from the repo
+  addendum. An adopter with no addendum whose agc is not on PATH (e.g. installed only as a project
+  dependency) gets no runnable form from the generic file. Add a generic fallback (for example the
+  package runner form, or `node <agc install>/bin/agc-init.mjs`, matching how §5 now names the fan-out
+  tool). New rule wording, so it was out of E290's fixed copy.
+```
+
 ## Applied
