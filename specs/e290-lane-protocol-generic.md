@@ -46,7 +46,7 @@ Ticket E290 (lane e290, fan-out wave 8, plan `specs/fanout-post-v4-w8.md`, dispa
 - **AC-E290-13** — Given the final lane HEAD with a clean working tree, when the full suite runs, then it is green.
   proof: `node scripts/test-lock.mjs -- npm test` exits 0 (run after commit, per lane-protocol §3).
 - **AC-E290-14** — Given the lane's diff, when it is searched for machine-local absolute paths, then none is found.
-  proof: `git diff origin/main...HEAD | grep -nE '^\+.*(/Users/|/home/|/private/tmp/)'` prints nothing.
+  proof: `node --test test/e234-hygiene-scan.test.mjs` passes (its AC16 runs the `agc check` hygiene scan — home-directory, macOS/Linux temp-directory and similar machine-local path shapes — over committed HEAD), and `git diff origin/main...HEAD | grep -nE '^\+.*(/[U]sers/|/[h]ome/|/[p]rivate/[t]mp/)'` prints nothing (one bracketed character per prefix keeps this proof from matching itself).
 
 ## Copy / Strings
 
