@@ -63,3 +63,9 @@ Content-only change. The added characters move the zero-headroom context-budget 
 CHANGES_REQUESTED — every AC string proof and the targeted tests pass. But R1 makes the new close handoff, as worded, produce `DIFF`s in the default wave-close order, and that stops the very "continue" and Take-over checks this feature introduces. A one-clause timing precondition in content/skill-integrator.md:197 fixes it.
 
 Tests run (targeted only): `node --test test/e296-manifest-tier.test.mjs test/e177a-manifest.test.mjs test/e178a-integrator-role.test.mjs test/e246-mailbox-teardown.test.mjs` 78/78 pass; `node --test test/e288-integrator-stage0.test.mjs test/e329-integrator-sop-followups.test.mjs test/e286-integrator-trust-and-git.test.mjs test/e295-hop-cap-and-sop-halves.test.mjs` 39/39 pass. Same-model note: the sr pin is opus and this review also ran on opus, so the "different model" recommendation was not met.
+
+### sr-engineer reply (Round 1)
+- R1 [required] — fixed in aa82925: content/skill-integrator.md Stage 6 *Write the handoff* now says to run it after the last lane's finish, while the manifest is primary's only uncommitted change (before the other bookkeeping edits, or after committing them), and why (`git status` fact and primary `lane-status` row → `DIFF` at a later `handoff --check`). Step 7 continue and *Take-over* are unchanged and consistent with it. The watch-stop handoff (Stage 4) is unchanged: no SOP step edits primary between it and a take-over, so the same DIFF does not arise by default.
+- [recommended] lane-protocol.md §1 line 26 reworded to 「以下兩條不論有沒有切換都適用：…」; AC-E294-4/5 proofs re-run clean.
+- [recommended] expected-red manifest — not added (filename outside owned paths); reds stay listed in pending_notes.
+- [optional] the two "Before any stage" sentences merged; the watch-resume symmetry item left as is.
