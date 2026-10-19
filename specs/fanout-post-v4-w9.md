@@ -89,3 +89,21 @@ integrator 改版的收尾波：E290 把 lane 規則拆成 agc 通用檔加 repo
 | 2026-10-19 | 人類 | 在 e226 lane session 核准 cut（`fac8990`） | e226 lane session；`specs/e226-integrator-sop-portable.md`，commit `fac8990` |
 | 2026-10-19 | 整合者 | 5a：e351 `436f189`（CI run 39239867881）close —— review、qa 皆 0 輪退回；reviewer 選填 (1)（通用檔 E196 子句未提 E206 併入的 `--abandoned` 同型缺口）不退回，記在 done-mark。e226 `c1c9132`（CI run 39246128505）close —— review 退回 1 輪（缺 expected-red 清單，程序性），qa 0 輪；golden 7 檔與 context budget 4 個上限由 lane qa 重擷／重定 | 本檔 |
 | 2026-10-19 | 整合者 | 5b：`integ/post-v4-w9` ← e226 `61acbc9` ← e351 `e91c254`，皆 `--no-ff`、零衝突 → 無合併審查；merge-invariants 兩次 PASS；重建 `dist/` 無差異；`npm audit --audit-level=high` exit 0；整合層 CI run 39246553167 綠；finish e226 配號 E354–E356、finish e351 配號 E357 | 本檔 |
+
+## 接手步驟
+（事實欄位由 `node scripts/fanout.mjs handoff` 產生；接手時先跑 `node scripts/fanout.mjs handoff --check <manifest>`。`<待填：…>` 由整合者填寫。）
+### 核對 primary
+- 目標分支：main @ 125b552
+- 目標分支對 origin：一致
+- git status：乾淨
+- worktree：primary（main ← integ/post-v4-w9 @ 4a48a1e）
+- lane-status：primary（main ← integ/post-v4-w9 @ 4a48a1e）release-post-v4-w8／In_Progress／release-engineer，hop 3，commits 0，clean
+### 已結案
+- 第 9 波兩條 lane（e226、e351）已合併、finish、拆除；lane 紀錄在 `.current/history/2026-10/`，記帳與本清單在同一個 wave PR。integrator 改版的後續票 E226、E349–E352 至此完成；原 12 張改版票只剩暫緩的 E293。
+- 未配號的新發現：無（E354–E357 由 finish 配號）。
+### 待人類決定
+- 是否發版：`main` 帶 integrator／PM SOP 與憲法 §3.1 manifest tier 條件 3 的呼叫方式改動、補充檔 §5 新三行、通用 lane-protocol 的 local 模式規則與 `agc` 後備；版號由人類決定（文件與 SOP 行為改動，無新程式功能）。
+- 是否開下一波：佇列後段有 E340、E341、E345–E348、E353 與本波新票 E354–E357（#171–#174）；E293 仍暫緩。
+- 建議：下一步（發版或下一波）開新 session 進行；若要在本 session 繼續，先跑 `node scripts/fanout.mjs handoff --check specs/fanout-post-v4-w9.md`，exit 0 才繼續。
+### 進行中的背景工作
+無
