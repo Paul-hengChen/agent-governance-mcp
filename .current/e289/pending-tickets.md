@@ -1,5 +1,7 @@
 # Pending tickets — lane e289
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E289-NEW-1
 title: docs/config.md laneProtocolAddendum section — say "first path segment is .." and recommend running render from primary
@@ -30,5 +32,3 @@ body: |
   guard or a direct test assertion that the template contains the pointer would make
   the coupling explicit.
 ```
-
-## Applied
