@@ -14,3 +14,11 @@ AC proofs run: AC-E289-2 git diff --quiet 93ed15c...HEAD on schema/versions.ts, 
 
 Required fix: reword line 29 of review_reports/review_T-E289-01.md so it describes the bold-wrapped Users-style probe by class instead of quoting the literal path-like text (constitution section 6 hygiene), commit, then QA reruns the full suite on the new HEAD. No code or test change is needed.
 
+## 2026-10-19T03:59:30.106Z — PASS — by qa-engineer
+
+QA round 2 PASS for E289 E337 E338 E339. Round 1 FAILed only on the AC-HC-3 hygiene hit in the code review report; the code-reviewer reworded that line (d301b3b) and re-approved. Product code and QA tests are unchanged since round 1, so every round-1 AC proof stands by reference (qa_reports/review_T-E289-01.md and siblings). Full suite on HEAD 41092b6 via the test lock: 3433 tests, 3431 pass, 0 fail, 0 cancelled, 2 skipped (exit 0). The hygiene scan (AC-HC-3) is re-verified after the evidence commit. No negative control re-run this round, because it would need compound git operations and no code changed. Evidence text describes probes by class, with no local path literals.
+
+## 2026-10-19T04:02:55.829Z — PASS — by qa-engineer
+
+QA round 2 PASS for E289 E337 E338 E339. Round 1 failed only on the hygiene AC in the code review report; reworded in d301b3b. Full suite on HEAD 41092b6: 3433 tests, 3431 pass, 0 fail, 2 skipped. All spec proofs re-run (108/108 on the targeted test files, diff proofs exit 0, fanout check 0 out of bounds); see the AC Execution Log in qa_reports/review_T-E289-01.md. Negative control skipped: no code changed since round 1.
+

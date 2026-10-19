@@ -14,3 +14,32 @@ AC proofs run: AC-E289-2 git diff --quiet 93ed15c...HEAD on schema/versions.ts, 
 
 Required fix: reword line 29 of review_reports/review_T-E289-01.md so it describes the bold-wrapped Users-style probe by class instead of quoting the literal path-like text (constitution section 6 hygiene), commit, then QA reruns the full suite on the new HEAD. No code or test change is needed.
 
+## 2026-10-19T03:59:30.106Z — PASS — by qa-engineer
+
+QA round 2 PASS for E289 E337 E338 E339. Round 1 FAILed only on the AC-HC-3 hygiene hit in the code review report; the code-reviewer reworded that line (d301b3b) and re-approved. Product code and QA tests are unchanged since round 1, so every round-1 AC proof stands by reference (qa_reports/review_T-E289-01.md and siblings). Full suite on HEAD 41092b6 via the test lock: 3433 tests, 3431 pass, 0 fail, 0 cancelled, 2 skipped (exit 0). The hygiene scan (AC-HC-3) is re-verified after the evidence commit. No negative control re-run this round, because it would need compound git operations and no code changed. Evidence text describes probes by class, with no local path literals.
+
+
+covers: T-E289-01, T-E289-02, T-E337-01, T-E338-01, T-E339-01
+
+## AC Execution Log
+
+Round 2 on HEAD 41092b6 (product code and QA tests unchanged since round 1).
+
+- AC-E289-1..3 proof `node --test test/e289-config-key.test.mjs`: part of the combined run below, green. PASS.
+- AC-E289-2 proof `git diff --quiet 93ed15c...HEAD -- schema/versions.ts schema/migrations-config.ts docs/schema-versions.md test/config-versioning.test.mjs`: exit=0. PASS.
+- AC-E289-4,6..9 proof `node --test test/e289-render-addendum.test.mjs`: green. PASS.
+- AC-E289-5 proof `git diff --numstat 93ed15c...HEAD -- test/fixtures/e177a/render-e177a.golden.txt`: prints `1	0	test/fixtures/e177a/render-e177a.golden.txt`; e177a-manifest test green. PASS.
+- AC-E289-10 proof: e178a-integrator-role and e296-manifest-tier tests green; `git diff --quiet` on both files exit=0. PASS.
+- AC-E337-1,3 proof `node --test test/e337-subitem-order.test.mjs`: green. PASS.
+- AC-E338-1,2 proof `node --test test/e338-backtick-glob.test.mjs`: green. PASS.
+- AC-E338-3 proof: e332-absolute-path-boundaries and e283-validate-handoff tests green; `git diff --quiet` on both files exit=0. PASS.
+- AC-E339-1,2 proof `node --test test/e339-non-ascii-manifest.test.mjs`: green. PASS.
+- AC-E339-3 proof (code reading of the git-fact status call): done by code-reviewer in review rounds 1 and 2. PASS.
+- Combined run of the ten test files above: tests 108, pass 108, fail 0, skipped 0.
+- AC-HC-1 validate sweep over specs/fanout-*.md: exit 0 for every manifest except two that report the decisions-section-absent and pins-section-absent codes with exit 2 (the two oldest wave manifests, as in the D5 table). PASS.
+- AC-HC-2 `node scripts/fanout.mjs check specs/fanout-post-v4-w7.md e289`: "32 file(s) changed, 0 out of bounds", exit=0. PASS.
+- AC-HC-3 `node scripts/test-lock.mjs -- npm test`: tests 3433, pass 3431, fail 0, cancelled 0, skipped 2, exit 0. The round-1 hygiene hit is gone (reworded in d301b3b). PASS.
+## 2026-10-19T04:02:55.829Z — PASS — by qa-engineer
+
+QA round 2 PASS for E289 E337 E338 E339. Round 1 failed only on the hygiene AC in the code review report; reworded in d301b3b. Full suite on HEAD 41092b6: 3433 tests, 3431 pass, 0 fail, 2 skipped. All spec proofs re-run (108/108 on the targeted test files, diff proofs exit 0, fanout check 0 out of bounds); see the AC Execution Log in qa_reports/review_T-E289-01.md. Negative control skipped: no code changed since round 1.
+
