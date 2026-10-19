@@ -1,0 +1,3 @@
+# T-E292-04: Stage 4 opening sentence replaced by copy sop.stage4-layers (AC-E292-9);
+# qa re-pins AC10 from the old sentence to the new copy literal.
+test/e178a-integrator-role.test.mjs | AC10: SOP execution stage — mailbox + cut pre-review formalized
