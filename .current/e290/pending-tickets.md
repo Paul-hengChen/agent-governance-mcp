@@ -34,7 +34,7 @@ body: |
 
 ```pending-ticket
 lane_local_id: E290-NEW-3
-title: lane-protocol commit rules assume artifacts: repo
+title: "lane-protocol commit rules assume artifacts: repo"
 priority: P3
 depends_on: [E290]
 source: pm, e290 cut (specs/e290-lane-protocol-generic.md, Findings filed)
