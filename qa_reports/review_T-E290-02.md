@@ -1,6 +1,6 @@
 covers: T-E290-01, T-E290-02
 
-# QA review: E290 (T-E290-01, T-E290-02) — verdict FAIL (spec hygiene defect, route to PM)
+# QA review: E290 (T-E290-01, T-E290-02) — round 2 verdict PASS (round 1 FAIL was a spec hygiene defect, fixed by PM)
 
 Reviewed commits: 7c01795 (T-E290-01 content), 880b99e (tests + re-pins), final HEAD recorded in the dispatch reply.
 Code review: APPROVED round 1 (`review_reports/review_T-E290-01.md`, 0 required findings); AC-E290-4 relied on that review.
@@ -56,4 +56,18 @@ Phase 4 FAIL; owner of the fix is pm (spec), not sr-engineer. Tests, re-pins and
 ## 2026-10-19T07:06:30.515Z — FAIL — by qa-engineer
 
 FAIL: all AC-specific tests, e286/e329 re-pins, e294 and hard-condition files green (see qa_reports/review_T-E290-02.md). Full suite 3457/3460 on 6972e2e; sole red is e234 AC16 hygiene scan on the spec's AC-E290-14 proof line. Route to pm for spec rewording.
+
+## Round 2 (Amend-Resume) — PASS
+
+PM reworded the AC-E290-14 proof (bracketed grep, names e234 AC16) at 17959e3; no test, re-pin or doc change was needed.
+
+### AC Execution Log (round 2, AC-E290-14 and AC-E290-13)
+
+| AC | command | output | verdict |
+|---|---|---|---|
+| AC-E290-14 | `node --test test/e234-hygiene-scan.test.mjs` | 20/20 pass (AC16 green) | pass |
+| AC-E290-14 | bracketed grep over the cumulative diff vs dispatch base | no output, grep rc=1 | pass |
+| AC-E290-13 | `node scripts/test-lock.mjs -- npm test` on clean HEAD a4eed51 | exit 0; 3458 pass, 0 fail, 2 skipped, of 3460 | pass |
+
+Round-1 results for AC-E290-1..12 stand; the files they cover are unchanged since (only spec and ledger commits landed).
 
