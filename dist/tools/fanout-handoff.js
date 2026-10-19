@@ -4,12 +4,15 @@
 // worktrees, lane-status rows, background work), and `handoff --check`
 // re-collects the same facts and names each one that changed since the
 // section was written. Contract: specs/e284-fanout-handoff-command.md (D1, D2).
+// When the manifest has a `## 外部依賴` section, `--check` also compares each
+// recorded sister-repo sha with that branch now (specs/e292-sister-repos.md D5).
 // Read-only: no fetch, no file or ref writes; git is read via execFileSync
 // argv, never a shell. No path written into the section is absolute.
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { BASE_RE, HANDOFF_BACKGROUND, HANDOFF_CODES, HANDOFF_SECTION, HANDOFF_SUBITEMS, HANDOFF_NONE, HANDOFF_USAGE, findHandoffSections, formatError, gitErrorLine, isNamedHeading, parseManifest, readsNone, resolveMailboxHeader, resolvePrimary, } from "./fanout-manifest.js";
+import { getConfigError, loadConfig } from "./config.js";
+import { BASE_RE, EXTERNAL_DEPS_SECTION, HANDOFF_BACKGROUND, HANDOFF_CODES, HANDOFF_SECTION, HANDOFF_SUBITEMS, HANDOFF_NONE, HANDOFF_USAGE, findHandoffSections, formatError, gitErrorLine, isNamedHeading, parseManifest, readExternalDeps, readsNone, resolveMailboxHeader, resolvePrimary, } from "./fanout-manifest.js";
 import { LANE_TO_INTEGRATOR_FILE, computeLaneStatus, parseMailboxHeaders } from "./lane-status.js";
 // --- section text ------------------------------------------------------------
 /** Fact keys, in section order: four primary checks, then the background ones. */
@@ -441,8 +444,73 @@ function movedReason(key, written, now, c) {
     }
     return undefined;
 }
-/** Compare the written facts with freshly collected ones, key by key (absent equals absent). */
-export function compareFacts(written, c) {
+// --- sister-repo shas (`## 外部依賴`, handoff --check only) -----------------------
+/** CLI codes of the sister-repo comparison, named outside the gate-suffix vocabulary. */
+export const SISTER_REPO_CODES = {
+    unknown: "SISTER_REPO_UNKNOWN",
+    notGit: "SISTER_REPO_NOT_GIT",
+};
+/** handoff --check line for a `## 外部依賴` row whose branch no longer points at the recorded sha. */
+export const EXTERNAL_DIFF_LINE = (repo, branch, recorded, now) => `DIFF  外部依賴 ${repo} ${branch}: 清單「${recorded}」／repo「${now}」`;
+/**
+ * Compare each well-formed `## 外部依賴` row with its sister repo's branch
+ * now. `primary` is the repo whose `.current/.config.json` declares
+ * sisterRepos; each row's sister root is path.resolve(primary, entry.path).
+ * Throws HandoffFailure carrying every format and resolution error of the
+ * run together. A branch that moved — forward or not — is a DIFF (never
+ * MOVED); a missing branch reads （缺）. Read-only git, argv only.
+ */
+export function compareExternalDeps(text, primary) {
+    const ext = readExternalDeps(text);
+    const errors = [...ext.errors];
+    const roots = new Map();
+    if (ext.rows.length > 0) {
+        const configError = getConfigError(primary);
+        if (configError !== null) {
+            errors.push(inputErr(SISTER_REPO_CODES.unknown, `${EXTERNAL_DEPS_SECTION} names sister repos, but .current/.config.json could not be read (${configError.replace(/\s*[\r\n]+\s*/g, " ")})`));
+        }
+        else {
+            const declared = loadConfig(primary).sisterRepos ?? [];
+            const notGit = new Set();
+            for (const dep of ext.rows) {
+                const entry = declared.find((s) => s.name === dep.repo);
+                if (entry === undefined) {
+                    errors.push(inputErr(SISTER_REPO_CODES.unknown, `${EXTERNAL_DEPS_SECTION} row ${dep.row}: repo "${dep.repo}" is not declared in sisterRepos of .current/.config.json`));
+                    continue;
+                }
+                if (roots.has(entry.name) || notGit.has(entry.name))
+                    continue;
+                const root = path.resolve(primary, entry.path);
+                try {
+                    git(["rev-parse", "--git-dir"], root);
+                    roots.set(entry.name, root);
+                }
+                catch {
+                    // The path is deliberately not echoed (WORKTREE_ABSOLUTE_WARN convention).
+                    notGit.add(entry.name);
+                    errors.push(inputErr(SISTER_REPO_CODES.notGit, `sister repo "${entry.name}" (sisterRepos in .current/.config.json) is not a git repository at its declared path`));
+                }
+            }
+        }
+    }
+    if (errors.length > 0)
+        throw new HandoffFailure(errors);
+    const lines = [];
+    for (const dep of ext.rows) {
+        const now = resolveCommit(dep.branch, roots.get(dep.repo));
+        if (now !== undefined && now.startsWith(dep.sha))
+            continue;
+        lines.push(EXTERNAL_DIFF_LINE(dep.repo, dep.branch, dep.sha, now === undefined ? FACT_ABSENT : now.slice(0, dep.sha.length)));
+    }
+    return { checked: ext.rows.length, differ: lines.length, lines };
+}
+/**
+ * Compare the written facts with freshly collected ones, key by key (absent
+ * equals absent). `external` (the `## 外部依賴` comparison, when the manifest
+ * has that section) adds its lines after every fact line and its counts to
+ * the summary.
+ */
+export function compareFacts(written, c, external) {
     const lines = [];
     let checked = 0;
     let differ = 0;
@@ -465,6 +533,11 @@ export function compareFacts(written, c) {
             differ++;
             lines.push(`DIFF  ${pair}`);
         }
+    }
+    if (external !== undefined) {
+        checked += external.checked;
+        differ += external.differ;
+        lines.push(...external.lines);
     }
     lines.push(HANDOFF_CHECK_SUMMARY(checked, differ, moved));
     return { checked, differ, moved, output: lines.join("\n") + "\n", exitCode: differ > 0 ? 1 : 0 };
@@ -559,7 +632,9 @@ export function runHandoff(args) {
         const stderr = collected.notes.map((n) => `${n}\n`).join("");
         if (written === undefined)
             return { stdout: renderHandoffSection(collected.facts), stderr, exitCode: 0 };
-        const report = compareFacts(written, collected);
+        // Primary's config is read only when the manifest has a `## 外部依賴` section.
+        const external = readExternalDeps(text).present ? compareExternalDeps(text, collected.primary) : undefined;
+        const report = compareFacts(written, collected, external);
         return { stdout: report.output, stderr, exitCode: report.exitCode };
     }
     catch (err) {
