@@ -53,3 +53,7 @@ Required fix (PM-owned, spec file; QA must not edit specs): rewrite the AC-E290-
 ## Escalation
 
 Phase 4 FAIL; owner of the fix is pm (spec), not sr-engineer. Tests, re-pins and docs need no change.
+## 2026-10-19T07:06:30.515Z — FAIL — by qa-engineer
+
+FAIL: all AC-specific tests, e286/e329 re-pins, e294 and hard-condition files green (see qa_reports/review_T-E290-02.md). Full suite 3457/3460 on 6972e2e; sole red is e234 AC16 hygiene scan on the spec's AC-E290-14 proof line. Route to pm for spec rewording.
+
