@@ -1,5 +1,7 @@
 # Pending tickets — lane e292
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E292-NEW-1
 title: fanout-handoff.ts file-header comment is 10 lines, over the agc check long-block limit
@@ -50,5 +52,3 @@ body: |
   The lane registry drops to null when its git subprocess exceeds the time ceiling, so a
   loaded machine can trip it. Consider a longer ceiling seam for that test.
 ```
-
-## Applied
