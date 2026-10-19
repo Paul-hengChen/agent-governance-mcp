@@ -110,7 +110,7 @@ test("AC-E285-7: every fanout.mjs handoff mention matches the shipped usage; --c
 // working files); the sentence names the bookkeeping edits that must not be uncommitted, and why.
 
 const IDLE_RESUME =
-  "Resuming — the human says so in this session, or a `接手 <manifest>` session takes over — re-arms the mailbox watch from that section's `watch baseline` line, never the current count, and simply restarts `node scripts/lane-status.mjs --watch` with the same options (it has no baseline in the handoff).";
+  "Resuming — the human says so in this session, or a `接手 <manifest>` session takes over — re-arms the mailbox watch from that section's `watch baseline` line, never the current count, and simply restarts `node <agc install>/scripts/lane-status.mjs --watch` with the same options (it has no baseline in the handoff).";
 const HANDOFF_TIMING =
   "Run it after the last lane's finish while none of the other bookkeeping edits (queue entries, backlog rows and done-marks, the plan document) is uncommitted — before making them, or after committing them: the tool records every uncommitted path except the manifest in its `git status` fact and marks the primary `lane-status` row `dirty`, so a bookkeeping edit left uncommitted then is gone from both facts once the pull request merges, and a later `handoff --check <manifest>` (step 7 continue, *Take-over*) reports both as `DIFF` and stops; a file that stays uncommitted across the merge, such as primary's own `.current/` working files, leaves both facts unchanged.";
 

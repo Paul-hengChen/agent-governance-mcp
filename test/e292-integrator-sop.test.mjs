@@ -43,7 +43,7 @@ const COPY = {
   stage4Layers:
     "Message format, lane-side rules and the report format: `docs/lane-protocol.md` §5 and §6 — the only copy; a repo's own lane rules live in the addendum named by `laneProtocolAddendum`.",
   statusSister:
-    "When `.current/.config.json` declares `sisterRepos`, also read each sister repo, read-only: `node scripts/lane-status.mjs --repo <path>` for its in-flight lanes and their branches, and `git -C <path> rev-parse --short <branch>` for each branch's sha (`<path>` resolved against primary).",
+    "When `.current/.config.json` declares `sisterRepos`, also read each sister repo, read-only: `node <agc install>/scripts/lane-status.mjs --repo <path>` for its in-flight lanes and their branches, and `git -C <path> rev-parse --short <branch>` for each branch's sha (`<path>` resolved against primary).",
   takeoverSister:
     "When `sisterRepos` is declared, also read each sister repo as in *Status* before acting; step 2 already compared every sha in the manifest's `## 外部依賴` section.",
   stage1Ext:
@@ -70,7 +70,7 @@ test("AC-E292-9 sop.render-layers sits in Stage 3 Render", () => {
 test("AC-E292-9 sop.stage4-layers is the first paragraph of Stage 4 and the `Send with` sentence follows", () => {
   const body = h2("## Stage 4").slice(1);
   const first = body.find((l) => l.trim() !== "");
-  assert.ok(first.startsWith(COPY.stage4Layers + " Send with `node scripts/mailbox-watch.mjs <to-lane.md> --send"), first);
+  assert.ok(first.startsWith(COPY.stage4Layers + " Send with `node <agc install>/scripts/mailbox-watch.mjs <to-lane.md> --send"), first);
   assert.ok(first.includes("the only copy"), "keeps `the only copy` (e178a file check)");
 });
 
@@ -78,7 +78,7 @@ test("AC-E292-9 sop.status-sister sits in Status, right after its first sentence
   const status = h2("## Status (any time)").join("\n");
   assert.equal(count(status, COPY.statusSister), 1);
   const at = status.indexOf(COPY.statusSister);
-  assert.ok(status.slice(0, at).includes("Read-only: `node scripts/lane-status.mjs`"));
+  assert.ok(status.slice(0, at).includes("Read-only: `node <agc install>/scripts/lane-status.mjs`"));
   assert.ok(status.slice(at + COPY.statusSister.length).startsWith(" **Check before answering; never infer progress from the conversation.**"));
 });
 

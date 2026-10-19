@@ -1,0 +1,15 @@
+{"ts":"2026-10-19T10:20:23.984Z","feature":"e226-integrator-sop-portable","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-19T10:29:08.505Z","feature":"e226-integrator-sop-portable","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-19T10:35:37.704Z","feature":"e226-integrator-sop-portable","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-19T10:42:41.663Z","feature":"e226-integrator-sop-portable","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-19T10:44:24.306Z","feature":"e226-integrator-sop-portable","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-19T10:47:19.507Z","feature":"e226-integrator-sop-portable","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-19T10:48:14.533Z","feature":"e226-integrator-sop-portable","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-19T10:55:04.025Z","feature":"e226-integrator-sop-portable","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-19T10:56:07.041Z","feature":"e226-integrator-sop-portable","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-19T11:04:00.844Z","feature":"e226-integrator-sop-portable","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-19T11:04:39.601Z","feature":"e226-integrator-sop-portable","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-19T11:19:22.607Z","feature":"e226-integrator-sop-portable","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-19T11:20:14.519Z","feature":"e226-integrator-sop-portable","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-10-19T11:31:18.526Z","feature":"e226-integrator-sop-portable","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-10-19T11:37:09.634Z","feature":"e226-integrator-sop-portable","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}

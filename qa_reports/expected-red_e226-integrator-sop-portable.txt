@@ -1,0 +1,49 @@
+# e226-integrator-sop-portable — intentional reds left by sr-engineer
+# (T-E226-01, T-E226-02, T-E349-01, T-E350-01; text commit aecfd29).
+# Derived from a full `node --test test/*.test.mjs` run on the lane HEAD:
+# 3557 tests, 27 fail, every failure listed below. Every red maps to an intended
+# text change in content/skill-integrator.md, content/skill-pm.md,
+# content/const-08-chain-31-mid.md or content/coord-03-core-fallback.md.
+# No product-logic regression is hidden here: text-only change, no runtime code.
+# Format: <relative test file path> | <exact test name>
+
+# Integrator SOP pins (content/skill-integrator.md text moved to <agc install> paths,
+# "the repo's CI check", the Stage 6 close/finish text, and the 5b-5 / 5c rewording).
+# qa re-pins these assertions in T-E226-03 / T-E349-02 (any remainder in T-E226-05).
+test/e178a-integrator-role.test.mjs | AC2: manual steps replaced by references to shipped mechanisms; no restated dispatch-prompt template
+test/e178a-integrator-role.test.mjs | AC9: SOP merge stage — substantive-resolution code-reviewer duty, no-ff-before-APPROVED, qa golden regen, no self-fix
+test/e178a-integrator-role.test.mjs | AC13: SOP verification stage — E192 generic read-only verifier (D10), structured result, five constraints named
+test/e285-integrator-session-handoff.test.mjs | AC-E344-1: the Two-hour idle stop sub-bullet ends with sop.idle-resume, exactly once inside Stage 4
+test/e286-integrator-trust-and-git.test.mjs | AC1: human owns the vehicle decision; five conditions are an ordered numbered list with their commands
+test/e292-integrator-sop.test.mjs | AC-E292-9 every new copy literal occurs exactly once in the whole file
+test/e292-integrator-sop.test.mjs | AC-E292-9 sop.stage4-layers is the first paragraph of Stage 4 and the `Send with` sentence follows
+test/e292-integrator-sop.test.mjs | AC-E292-9 sop.status-sister sits in Status, right after its first sentence
+test/e295-hop-cap-and-sop-halves.test.mjs | AC6: integrator 5a lane layer pushes then reads CI; test-lock stays for the fallback
+test/e295-hop-cap-and-sop-halves.test.mjs | AC7: integration layer and Stage 6 use push + --ci-check; `cannot reach `main`` kept
+test/e295-hop-cap-and-sop-halves.test.mjs | AC8: verifier brief returns CI run id + verdict, never suite output; porcelain after a local build; five constraints kept
+test/e295-hop-cap-and-sop-halves.test.mjs | AC10: 5c names npm run check:bookkeeping exactly once
+test/e296-manifest-tier.test.mjs | AC6: Stage 6-4 BEHIND remedy is CI-first; the e295-pinned sentence and the old wording behave as specified
+test/e329-integrator-sop-followups.test.mjs | AC-E329-1: Stage 6 carries the close literal; status-line wording, headings, exit-0 rule
+test/e329-integrator-sop-followups.test.mjs | AC-E329-3: base-fix condition 2 uses owners --range, keeps insertion-lane check, no hand diff
+test/e329-integrator-sop-followups.test.mjs | AC-E334-3: Stage 6 findings sub-bullet; e246-pinned fragments and §5 sentence intact
+
+# Token caps / floors grow with the skill-pm manifest row (pm.manifest-row) and the
+# const-08 cond3 / coord-03 writer+rollup text. qa re-baselines the caps in T-E350-03.
+test/context-budget.test.mjs | AC1/AC2: skill-pm stripped token count meets ≤ 4823 cap
+test/context-budget.test.mjs | AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the measured floor (≤ 10523 ~tok)
+test/context-budget.test.mjs | AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 21633 ~tok)
+test/context-budget.test.mjs | AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 8426 ~tok)
+
+# NOT OWNED BY THIS LANE — golden-only reds. test/compose-equivalence.test.mjs and
+# test/skill-manifest.test.mjs are never edited by this lane. They turn green only when
+# qa regenerates the frozen goldens in T-E350-03 (const-08 text in the build-full-* /
+# hook-full / constitution monolith goldens; coord-03 text in skill-coordinator-monolith.txt).
+# AC-E350-2's proof command does not run test/skill-manifest.test.mjs; include it in the
+# T-E350-03 run.
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=false, fullDetail=false) is byte-identical to pre-refactor golden build-full-nondesign.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=true, fullDetail=false) is byte-identical to pre-refactor golden build-full-design.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=false, fullDetail=true) is byte-identical to pre-refactor golden build-full-nondesign-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=true, fullDetail=true) is byte-identical to pre-refactor golden build-full-design-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: SessionStart hook (AGC_DEFAULT_SKILL=full) is byte-identical to pre-refactor golden hook-full.txt
+test/compose-equivalence.test.mjs | compose-equivalence: cat(15 manifest fragments in order) === the pre-refactor constitution.md monolith (DR-1 Option R invariant)
+test/skill-manifest.test.mjs | t-golden-byte-identity (AC1/AC5): composeSkill("skill-coordinator.md", {taskTool:true}) === frozen golden monolith, byte-for-byte
