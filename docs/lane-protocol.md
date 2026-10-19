@@ -23,7 +23,7 @@
 2. lane 名由 branch 自動解析（`feat/<ticket-id>-<slug>` → `<ticket-id>`），狀態寫進 `.current/<lane>/`。
 3. **所有 `tw_*` 的 `workspace_path` 一律傳你的 worktree 路徑**，絕不傳 primary。
 4. `EnterWorktree` 不能用時（host 不是 Claude Code，或工具拒絕切換），harness 每次 Bash 呼叫後會把 cwd 重置回 primary，照原規則：每個會建立或修改檔案的 bash 呼叫都要自帶 `cd <worktree> &&`，或用絕對路徑。
-   不論有沒有切換，以下兩條都照舊：臨時檔放 `$TMPDIR` 或 scratchpad，**永遠不要**在 repo 根目錄建臨時目錄；信箱檔案在 worktree 之外，一律用絕對路徑讀寫。
+   以下兩條不論有沒有切換都適用：臨時檔放 `$TMPDIR` 或 scratchpad，**永遠不要**在 repo 根目錄建臨時目錄；信箱檔案在 worktree 之外，一律用絕對路徑讀寫。
 5. 看到 `HANDOFF_LAYOUT_CONFLICT` → 停下來回報，不要刪檔。
 6. 開工時先讀一次你的信箱 `to-lane.md`（§5），整合者可能已經留了訊息。
 
