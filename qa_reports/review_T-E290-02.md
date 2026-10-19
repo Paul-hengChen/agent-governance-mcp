@@ -71,3 +71,7 @@ PM reworded the AC-E290-14 proof (bracketed grep, names e234 AC16) at 17959e3; n
 
 Round-1 results for AC-E290-1..12 stand; the files they cover are unchanged since (only spec and ledger commits landed).
 
+## 2026-10-19T07:16:15.749Z — PASS — by qa-engineer
+
+PASS round 2: AC-E290-14 re-verified with the reworded proof (e234 20/20, bracketed grep empty); full suite green 3458 pass / 0 fail / 2 skipped of 3460 on clean HEAD a4eed51; all other ACs verified in round 1 and unchanged. See qa_reports/review_T-E290-02.md.
+
