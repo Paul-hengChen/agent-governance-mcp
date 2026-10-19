@@ -1,5 +1,7 @@
 <!-- pending-tickets for lane e351 (E179). New blocks go ABOVE ## Applied. -->
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E351-NEW-1
 title: lane-protocol §3 task-row recovery fallback (git log --grep) finds no rows under artifacts local
@@ -14,5 +16,3 @@ body: |
   State the local-mode recovery path (read the history copy) in the generic file and, if needed, in the
   release SOP. Out of E351's fixed scope (D2 covers the commit and findings rules only).
 ```
-
-## Applied
