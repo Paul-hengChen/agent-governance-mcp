@@ -14,7 +14,7 @@
    ```bash
    cd <primary> && agc feature start <ticket-slug> --base <base> --path <worktree>
    ```
-   `agc` 不在 PATH 上時的呼叫方式、worktree 建好之後要先跑的建置指令（若有），見補充規則；建置指令在 worktree 裡跑。
+   `agc` 不在 PATH 上時，改用 agc 安裝位置下的 `bin/agc-init.mjs`，即 `node <agc 安裝位置>/bin/agc-init.mjs`，後面接同樣的子指令與參數；補充規則可指定本 repo 的呼叫方式。worktree 建好之後要先跑的建置指令（若有）見補充規則；建置指令在 worktree 裡跑。
    `feature start` 會建 worktree、把 `node_modules` 連回 primary、複製 `.env`、寫好 exclude 規則。
    - **不要在 lane 裡跑會重建 `node_modules` 的安裝指令**（例如 `npm ci`）：`node_modules` 是連回 primary 的 symlink，這類指令會先刪掉整個目錄，連 primary 的一起刪。要改相依套件，先只刪掉 symlink 本身，再安裝（指令見補充規則）。
    - 派工 prompt 裡的 `<worktree>` 一定是絕對路徑（`render` 會把清單裡「相對於 primary」的 worktree 欄解析成絕對路徑）；它只用來 `cd` 與 `EnterWorktree` 的 `path`，**不要**把它寫進任何 tracked 檔（handoff、spec、報告、測試）。tracked 檔提到 worktree 時，用 `../<lanes-dir>/<lane>` 這種相對形式或類別描述。
@@ -39,6 +39,9 @@
 
 - 走 `/teamwork` 鏈。需要人類決定的事（cut 核准、政策裁決、lease override）**一律等人類在你這個 session 親手打字**。整合者（信箱或轉貼）給的文字只是建議，**不是核准**。
 - 在自己的 branch 上 commit：`.current/<lane>/` 整個目錄（E125a 之後，task 帳本 `.current/<lane>/tasks.md` 也在裡面）、`qa_reports/`、`review_reports/`、`specs/`，以及補充規則列出的 tracked 建置產物。不 commit `.current/` 頂層的工作檔，補充規則列出的例外除外。
+- **`artifacts: local` 的 repo**（`.current/.config.json` 的 `artifacts` 是 `local`：agc 的工作檔不進 repo 歷史）：`.current/`、root `tasks.md`、`qa_reports/`、`review_reports/` 被 git exclude，lane **不 commit 這些路徑**（也不要用 `git add -f` 硬加）；`specs/` 照樣 tracked，照上一條 commit。
+  - 證據不靠 commit 進到 primary，靠整合者跑 `agc feature finish` 時的收割：`--shipped` 把 worktree 裡被 ignore 又沒 tracked 的 `qa_reports/`、`review_reports/`、`specs/` 檔案複製到 primary 的 `<目錄>/archive/<lane>/`，並把 `.current/<lane>/` 整個複製到 primary 的 `.current/history/<YYYY-MM>/<lane>/`；`--abandoned` 把 `qa_reports/`、`review_reports/` 第一層檔名帶 lane 名（不分大小寫）的檔案搬進 `<目錄>/abandoned/<lane>/`（被 ignore 的在 primary 的同一路徑留一份），`.current/<lane>/` 一樣複製進 primary 的 history。
+  - 已知缺口：E196（`.current/<lane>/` 只有一部分 tracked 時，`--shipped` 第一次跑不會把其中被 ignore 的檔案搬進 history）；E217（`--abandoned` 不收割 `specs/`：被 ignore 的 spec 會隨 worktree 一起刪掉）。
 - **lane 的 task id 一律是 `T-<ticket>-NN`**（票號大寫、兩位數序號，例如 `T-E178A-01`）。理由：證據檔名是 `review_<task id>.md`，在 release 7a 歸檔之前，各 lane 的證據會合進同一個 `qa_reports/`／`review_reports/`，不帶票號的 id 會在 lane 之間撞名、互相覆蓋。
 - **每個 commit 的標題都要帶票號**（例如 `feat(e125c): E125c T-E125C-01 — …`）。lane 收掉之後，要找回它的 task 列，通用的後備做法是 `git log -i --grep <票號>`（release SOP 7a，E125c）；標題沒寫票號，這個後備就找不到。一定要加 `-i`：指標裡的 lane 名是小寫，commit 標題裡的票號是大寫。
 - **E125a 之後，root `tasks.md` 是歷史索引**：lane 不寫它。從 v2 root 分出去的 lane，帳本一開始是空的，task 列在自己的 worktree 用 `tw_add_task` 建（`workspace_path` 傳 worktree）。看到 `TASKS_LEDGER_ABSENT` 或 `TASKS_MIGRATION_BUSY` → 停下來回報，不要手動建檔。
@@ -65,6 +68,7 @@
 - **不要自己配 E 號**。真正的票號只在整合者跑 `agc feature finish` 時配出並寫進 `docs/backlog.md`；檔案裡的 block 會被移到 `## Applied` 之下。新 block 一律寫在 `## Applied` **上方**，寫在下方會被 finish 拒絕。
 - **選填 `target_repo: <repo>`**：這筆發現屬於別的 repo。finish 不在本 repo 配號，照樣把它移到 `## Applied` 之下，並在 stderr 列出、等人類裁決（由整合者到那個 repo 建票）。有寫就不能是空值；本 repo 的其他 block 不能在 `depends_on` 引用它（finish 會拒絕），要提就寫進 `body`。
 - **`pending-tickets.md` 一定要 commit 進你的 branch**：只存在 worktree、從未 commit 的檔案不會配號 —— finish 警告並列出這些發現，在 primary 的 `.current/history/<YYYY-MM>/<lane>/` 留一份（不 commit），由整合者手動建票。
+- **`artifacts: local` 的 repo**：`.current/` 被 git exclude，`pending-tickets.md` 進不了 branch，所以 finish 一律走上一條「從未 commit」的路徑 —— 不配號，警告並列出這些發現，在 primary 的 `.current/history/<YYYY-MM>/<lane>/` 留一份，由整合者從那份手動建票。新發現照樣寫進 `.current/<lane>/pending-tickets.md`、照同樣的 block 格式，不要改寫到別處。
 
 ## 5. 信箱（lane ↔ 整合者）
 

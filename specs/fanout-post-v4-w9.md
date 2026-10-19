@@ -2,7 +2,7 @@
 base: 9205e84    integration branch: integ/post-v4-w9
 mailbox: ../agent-governance-mcp-lanes/_mailbox
 
-**狀態：已核准（2026-10-19），待派工。** `base:` 是規劃基準（v4.11.0 發版記帳 PR #32 merge）；實際派工 base = 本清單併入後的 `main` sha，記在 Decisions 派工列。
+**狀態：已結案 2026-10-19。** 兩條 lane 皆 qa PASS（CI 綠）→ `integ/post-v4-w9` merge `61acbc9`（e226）、`e91c254`（e226 之後的 e351）→ finish 兩 lane（E354–E357 配號）→ 記帳 commit → PR + auto-merge（見「結案」與「接手步驟」）。 `base:` 是規劃基準（v4.11.0 發版記帳 PR #32 merge）；實際派工 base = 本清單併入後的 `main` sha，記在 Decisions 派工列。
 
 integrator 改版的收尾波：E290 把 lane 規則拆成 agc 通用檔加 repo 補充檔之後，SOP 與通用檔還有幾處只在本 repo 成立。五張票分兩條 lane：e226 讓 integrator／PM SOP 在 adopter 的 workspace 也能照做（`content/**` 一波只能一條 lane，所以三張都在這裡）；e351 補通用 lane-protocol 的兩個缺口（`artifacts: local` 的 commit 規則、`agc` 不在 PATH 又沒有補充檔時的呼叫方式）。
 
@@ -31,7 +31,7 @@ integrator 改版的收尾波：E290 把 lane 規則拆成 agc 通用檔加 repo
 | lane | 票 | branch | worktree | 擁有 | 禁止 | 範圍切線 | 相依 |
 |---|---|---|---|---|---|---|---|
 | e226 | E226、E349、E350 | feat/e226-integrator-sop-portable | ../agent-governance-mcp-lanes/e226 | `content/skill-integrator.md`、`content/skill-pm.md`、`content/const-08-chain-31-mid.md`、`content/coord-03-core-fallback.md`、`docs/lane-protocol-addendum.md`、`test/fixtures/compose-golden/**`（只在需要重新固定時）、`test/context-budget.test.mjs`（同上）、`test/e178a-integrator-role.test.mjs`、`test/e285-integrator-session-handoff.test.mjs`、`test/e286-integrator-trust-and-git.test.mjs`（只限 SOP 斷言）、`test/e288-integrator-stage0.test.mjs`、`test/e292-integrator-sop.test.mjs`、`test/e295-hop-cap-and-sop-halves.test.mjs`（只限 SOP 斷言）、`test/e296-manifest-tier.test.mjs`（只限 SOP、PM SOP 與憲法斷言）、`test/e297-main-protected-sop.test.mjs`、`test/e329-integrator-sop-followups.test.mjs`（只限 SOP 斷言）、`test/e336-portable-pull.test.mjs`、`test/skill-frontmatter.test.mjs`（只在需要時）、`test/e226-*.test.mjs`、`test/e349-*.test.mjs`、`test/e350-*.test.mjs`、`specs/e226-*`、`qa_reports/*E226*`、`qa_reports/*E349*`、`qa_reports/*E350*`、`review_reports/*E226*`、`review_reports/*E349*`、`review_reports/*E350*`、`.current/e226/**` | 其他 `content/**`、`docs/lane-protocol.md`、其他 `docs/**`、其他 `.current/**`、其他 `test/**`（特別是 `test/e290-lane-protocol-generic.test.mjs`、`test/e294-lane-enterworktree.test.mjs`、`test/e177a-manifest.test.mjs`、`test/e246-mailbox-teardown.test.mjs`、`test/e289-*.test.mjs`）、其他 `specs/**`、共同禁止的全部項目 | 做：(1) E226＋E349：`content/skill-integrator.md` 裡的 `node scripts/<x>.mjs` 改成通用呼叫 `node <agc 安裝位置>/scripts/<x>.mjs`，並說明 repo 的呼叫方式見補充檔；Stage 1 共享生成物清單、Stage 4 base-fix 第 5 步的建置與相依稽核、Stage 6 第 1 步「this repo: …」改成指向補充檔（依 D1 裁決）；補充檔 §5 擴成涵蓋全部 `scripts/*.mjs` 的本 repo 呼叫方式。依 D2 裁決選 (i) 時，SOP 5a 的證據列與新發現列補 `artifacts: local` 的讀法（讀 worktree 檔案、`pending-tickets.md` 未 commit 時由 finish 留下的 history 那份手動建票），措辭與 e351 的通用檔一致（以 Decisions 的 D2 列為準，不讀 e351 的 branch）。(2) E350：`content/skill-pm.md` Manifest-Tier 列、`content/const-08-chain-31-mid.md` Manifest tier 條件 3、`content/coord-03-core-fallback.md` Manifest-tier writer action 的 `node scripts/fanout.mjs` 改成同一套通用寫法。硬條件：`test/e290-lane-protocol-generic.test.mjs`、`test/e294-lane-enterworktree.test.mjs`、`test/e177a-manifest.test.mjs` AC7、`test/e246-mailbox-teardown.test.mjs`、`test/e289-render-addendum.test.mjs` AC-E289-6（不擁有）全綠不改；補充檔仍只填通用檔寫「見補充規則」的地方、標題結構不變、路徑不含單字 `approval`（e296 AC10）；SOP 不得出現「本 repo 規則絕不在本 SOP」之類的新斷言（e292 cut 預審退回過）。　不做：`docs/lane-protocol.md`（e351）；`tools/fanout-handoff.ts` 產生的文字（見派工前核對「不在本波」）；`skill-release-engineer.md` 的 `node scripts/*.mjs`（本 repo 的發版工具，不屬於 adopter 流程）。 | 無 |
-| e351 | E351、E352 | feat/e351-lane-protocol-gaps | ../agent-governance-mcp-lanes/e351 | `docs/lane-protocol.md`、`test/e290-lane-protocol-generic.test.mjs`（只在需要重新固定時）、`test/e294-lane-enterworktree.test.mjs`（只限 §1 斷言）、`test/e351-*.test.mjs`、`test/e352-*.test.mjs`、`specs/e351-*`、`qa_reports/*E351*`、`qa_reports/*E352*`、`review_reports/*E351*`、`review_reports/*E352*`、`.current/e351/**` | `content/**`、`test/fixtures/compose-golden/**`、`test/context-budget.test.mjs`、`docs/lane-protocol-addendum.md`、其他 `docs/**`、其他 `.current/**`、其他 `test/**`（特別是 e226 擁有的測試、`test/e130-lane-default.test.mjs`、`test/e177a-manifest.test.mjs`、`test/e177b-mailbox-watch.test.mjs`、`test/e246-mailbox-teardown.test.mjs`、`test/e289-*.test.mjs`、`test/e342-*.test.mjs`、`test/e343-*.test.mjs`）、其他 `specs/**`、共同禁止的全部項目 | 做：(1) E351：依 D2 裁決，在通用檔 §3（commit 規則）與 §4（`pending-tickets.md` 一定要 commit）寫明 `artifacts: local` 的行為 —— (i) 寫工具現況並點名 E196／E217 為已知缺口，或 (ii) 宣告 fan-out 目前只支援 `artifacts: repo`。(2) E352：§1「`agc` 不在 PATH 上時」先給通用後備 `node <agc 安裝位置>/bin/agc-init.mjs`（與 §5 的寫法一致），補充檔可覆寫。硬條件：通用檔路徑不變；`## 1.`、`## 3. `、`## 4. ` 標題位置與「§7 是最後一個 `## ` 標題」不變；e178a AC11／AC14／AC15、e246、e295 AC5、e296 AC4／AC10、e286 AC5／AC6、e329、e177a AC7、e289 AC-E289-6 全綠不改；新行不得與 `PROMPT_TEMPLATE_3B` 任何一行相同；通用檔不得出現本 repo 專用字樣（`node scripts/`、`bin/agc-init.mjs` 以外的本 repo 路徑，e290 測試）。　不做：改工具（`bin/**`；E196、E217 是各自的票）；補充檔與 SOP（e226）。 | 無 |
+| e351 | E351、E352 | feat/e351-lane-protocol-gaps | ../agent-governance-mcp-lanes/e351 | `docs/lane-protocol.md`、`test/e290-lane-protocol-generic.test.mjs`（只在需要重新固定時）、`test/e294-lane-enterworktree.test.mjs`（只限 §1 斷言）、`test/e351-*.test.mjs`、`test/e352-*.test.mjs`、`specs/e351-*`、`qa_reports/*E351*`、`qa_reports/*E352*`、`review_reports/*E351*`、`review_reports/*E352*`、`.current/e351/**` | `content/**`、`test/fixtures/compose-golden/**`、`test/context-budget.test.mjs`、`docs/lane-protocol-addendum.md`、其他 `docs/**`、其他 `.current/**`、其他 `test/**`（特別是 e226 擁有的測試、`test/e130-lane-default.test.mjs`、`test/e177a-manifest.test.mjs`、`test/e177b-mailbox-watch.test.mjs`、`test/e246-mailbox-teardown.test.mjs`、`test/e289-*.test.mjs`、`test/e342-*.test.mjs`、`test/e343-*.test.mjs`）、其他 `specs/**`、共同禁止的全部項目 | 做：(1) E351：依 D2 裁決，在通用檔 §3（commit 規則）與 §4（`pending-tickets.md` 一定要 commit）寫明 `artifacts: local` 的行為 —— (i) 寫工具現況並點名 E196／E217 為已知缺口，或 (ii) 宣告 fan-out 目前只支援 `artifacts: repo`。(2) E352：§1「`agc` 不在 PATH 上時」先給通用後備 `node <agc 安裝位置>/bin/agc-init.mjs`（與 §5 的寫法一致），補充檔可覆寫。硬條件：通用檔路徑不變；`## 1.`、`## 3. `、`## 4. ` 標題位置與「§7 是最後一個 `## ` 標題」不變；e178a AC11／AC14／AC15、e246、e295 AC5、e296 AC4／AC10、e286 AC5／AC6、e329、e177a AC7、e289 AC-E289-6 全綠不改；新行不得與 `PROMPT_TEMPLATE_3B` 任何一行相同；通用檔仍不得含 `test/e290-lane-protocol-generic.test.mjs` AC-E290-3 列出的本 repo 字串（例如 `node bin/agc-init.mjs`、`dist/`、`test/`）—— `node <agc 安裝位置>/bin/agc-init.mjs` 不含這些子字串，可以用。　不做：改工具（`bin/**`；E196、E217 是各自的票）；補充檔與 SOP（e226）。 | 無 |
 
 ## 所有權重劃（相對於預設）
 - 兩條 lane 擁有集合不相交；共享生成物（`content/**`、`test/fixtures/compose-golden/**`、`test/context-budget.test.mjs`）全部在 e226。
@@ -64,6 +64,14 @@ integrator 改版的收尾波：E290 把 lane 規則拆成 agc 通用檔加 repo
 ## 合併順序
 `integ/post-v4-w9` ← `--no-ff` e226（共享生成物 lane 先）→ merge-invariants → `--no-ff` e351 → merge-invariants → 重建 `dist/` → `check:bookkeeping` → 在 integ 上依序 `finish <lane> --shipped --base integ/post-v4-w9` → 記帳 commit → push → 讀 CI → `gh pr create` → `gh pr merge --auto --merge` → merged 後 `git switch main`、`git -c pull.rebase=false pull --ff-only` → `git branch -d integ/post-v4-w9`。預期零檔案衝突（擁有集合不相交）；`dist/` 不手解，重建。
 
+## 結案
+- 日期 2026-10-19。`integ/post-v4-w9` ← e226（`61acbc9`）← e351（`e91c254`），皆 `--no-ff`、零衝突 → 無合併審查；merge-invariants 兩次 PASS；重建 `dist/` 無差異；`npm audit --audit-level=high` exit 0；整合層 CI run 39246553167 在 `e91c254` 綠。
+- 彙總（上限按 lane 計）：e226 10 張 task／hop 6/14／review 退回 1 輪（缺 expected-red 清單，程序性）／qa 0 輪；e351 2 張 task／hop 4/14／review 0 輪／qa 0 輪。合計 12 張 task、hop 10，每條 lane 都在自己的上限內。
+- 完成定義 10 項全部成立（本清單的 `## 接手步驟` 為最後一項）。
+- 例外：(1) 兩條 lane 的 PM 都先寫 `next_role=sr-engineer` 才送 cut 預審，整合者在信箱追問後補送；兩條都沒有在預審 close 前派 sr。(2) e226 PM 修 cut 時手改 `.current/e226/tasks.md` 五筆描述（核取未動，E340 的缺口），lane 已在 pending_notes 註明。(3) 兩條 lane 的 sr、reviewer 都是 opus（同模型疑慮，兩份 review 都已註明並以逐字比對補償）；qa 用預設 sonnet。(4) e226 的 sr 有一次沒包 test-lock 跑全套；最終全套由 qa 在 test-lock 下重跑。
+- 新票：E354–E356（e226）、E357（e351），都由 `finish --shipped` 配號，排在佇列 #171–#174。
+- 發版：`main` 帶 E226／E349／E350（integrator 與 PM SOP、憲法 §3.1 manifest tier 條件 3、coord-03 改用 agc 安裝位置呼叫工具；本 repo 事實移到補充檔；compose golden 與 context budget 重定）、E351／E352（通用 lane-protocol 的 local 模式規則與 `agc` 不在 PATH 時的後備）→ 是否發版與版號由人類決定。
+
 ## Dispatch pins
 - e226：`pm=opus`、`sr-engineer=opus`。
 - e351：`pm=opus`、`sr-engineer=opus`。
@@ -73,3 +81,29 @@ integrator 改版的收尾波：E290 把 lane 規則拆成 agc 通用檔加 repo
 |---|---|---|---|
 | 2026-10-19 | 整合者 | 草案：e226（E226＋E349＋E350，唯一 content lane，擁有補充檔）∥ e351（E351＋E352，通用 lane-protocol）；兩條擁有集合不相交；E350 折進 `const-08`、`coord-03` 的同類呼叫；local 模式的 SOP 讀法劃給 e226；e290／e294 測試劃給 e351，e178a／e285／e286／e288／e292／e295／e296／e297／e329／e336 劃給 e226（只限 SOP 斷言），互為對方的硬條件；`tools/**`、`scripts/**`、`bin/**`、`dist/**`、`.current/.config.json` 加進共同禁止；`tools/fanout-handoff.ts` 的產生文字與 E345 不併入 | 本檔 |
 | 2026-10-19 | 人類 | 核准本清單（全部）：兩條 lane（e226、e351）與四項重劃／折入；D1 —— integrator 讀同一份補充檔（`laneProtocolAddendum`），不新增 key 或檔案，補充檔 §5 擴成涵蓋全部 `scripts/*.mjs`；D2 —— 選 (i)：通用檔寫明 `artifacts: local` 的工具現況並點名 E196／E217 為已知缺口，integrator SOP 5a 的證據與新發現兩列補 local 模式讀法（歸 e226）；Lanes 表不加 `approval` 欄。人類回覆「approve」，D1、D2 照整合者建議記錄 | 整合者 session |
+| 2026-10-19 | 整合者 | 清單 PR #33 merge `125b552` = 派工 base（CI 在 `173a1ae` 綠）；派工前核對：兩條 lane 點名的擁有／禁止路徑在 base 存在、無殘留 branch／worktree；信箱 e226／e351 空建、mailbox-watch 與 lane-status watch 皆 armed；兩份 prompt 以 `fanout.mjs render --base 125b552` 產生。派工前把 e351 硬條件的 e290 字串句改寫清楚（原句把 `bin/agc-init.mjs` 列成禁字，與 E352 本身衝突；實際禁的是 AC-E290-3 的子字串），此修正隨記帳 commit 進 integ | 本檔 |
+| 2026-10-19 | 整合者 | e351 cut 預審 close（`19fc049`，to-lane#2）：範圍、檔案邊界、DoD 對照皆符合；check --cut exit 0。選填：AC-E351-5 改成解析陣列比對集合 | 信箱 e351 |
+| 2026-10-19 | 人類 | 在 e351 lane session 核准 cut（`19fc049`） | e351 lane session；`specs/e351-lane-protocol-gaps.md`，commit `19fc049` |
+| 2026-10-19 | 整合者 | e226 cut 預審退回一次（`683251c`，to-lane#2）：`verify-release.mjs` 與 `check-bookkeeping.mjs` 從自己的安裝目錄找 repo root，通用呼叫在 adopter 會查錯 repo → verify-release 比照 C1 改成「repo 的 CI 檢查」（補充檔 §5 給本 repo 寫法，無補充檔時用 `gh` 讀該 sha 的 run）；相依稽核不進補充檔，SOP 改指憲法 §6；`coord-03` 的 `feature-rollup.mjs` 折進 E350 | 信箱 e226 |
+| 2026-10-19 | 整合者 | e226 cut 預審 close（`fac8990`，to-lane#3）：verify-release 改成「repo 的 CI 檢查」並有 `gh` 後備（AC-E226-5），相依稽核指憲法 §6，補充檔 §7 不加行；check --cut exit 0。例外：PM 手改 `.current/e226/tasks.md` 五筆 task 的描述（核取狀態未動）—— 憲法 §3 不允許，但沒有改描述的工具（E340），記成例外，lane 在 pending_notes 註明 | 信箱 e226 |
+| 2026-10-19 | 人類 | 在 e226 lane session 核准 cut（`fac8990`） | e226 lane session；`specs/e226-integrator-sop-portable.md`，commit `fac8990` |
+| 2026-10-19 | 整合者 | 5a：e351 `436f189`（CI run 39239867881）close —— review、qa 皆 0 輪退回；reviewer 選填 (1)（通用檔 E196 子句未提 E206 併入的 `--abandoned` 同型缺口）不退回，記在 done-mark。e226 `c1c9132`（CI run 39246128505）close —— review 退回 1 輪（缺 expected-red 清單，程序性），qa 0 輪；golden 7 檔與 context budget 4 個上限由 lane qa 重擷／重定 | 本檔 |
+| 2026-10-19 | 整合者 | 5b：`integ/post-v4-w9` ← e226 `61acbc9` ← e351 `e91c254`，皆 `--no-ff`、零衝突 → 無合併審查；merge-invariants 兩次 PASS；重建 `dist/` 無差異；`npm audit --audit-level=high` exit 0；整合層 CI run 39246553167 綠；finish e226 配號 E354–E356、finish e351 配號 E357 | 本檔 |
+
+## 接手步驟
+（事實欄位由 `node scripts/fanout.mjs handoff` 產生；接手時先跑 `node scripts/fanout.mjs handoff --check <manifest>`。`<待填：…>` 由整合者填寫。）
+### 核對 primary
+- 目標分支：main @ 125b552
+- 目標分支對 origin：一致
+- git status：乾淨
+- worktree：primary（main ← integ/post-v4-w9 @ 4a48a1e）
+- lane-status：primary（main ← integ/post-v4-w9 @ 4a48a1e）release-post-v4-w8／In_Progress／release-engineer，hop 3，commits 0，clean
+### 已結案
+- 第 9 波兩條 lane（e226、e351）已合併、finish、拆除；lane 紀錄在 `.current/history/2026-10/`，記帳與本清單在同一個 wave PR。integrator 改版的後續票 E226、E349–E352 至此完成；原 12 張改版票只剩暫緩的 E293。
+- 未配號的新發現：無（E354–E357 由 finish 配號）。
+### 待人類決定
+- 是否發版：`main` 帶 integrator／PM SOP 與憲法 §3.1 manifest tier 條件 3 的呼叫方式改動、補充檔 §5 新三行、通用 lane-protocol 的 local 模式規則與 `agc` 後備；版號由人類決定（文件與 SOP 行為改動，無新程式功能）。
+- 是否開下一波：佇列後段有 E340、E341、E345–E348、E353 與本波新票 E354–E357（#171–#174）；E293 仍暫緩。
+- 建議：下一步（發版或下一波）開新 session 進行；若要在本 session 繼續，先跑 `node scripts/fanout.mjs handoff --check specs/fanout-post-v4-w9.md`，exit 0 才繼續。
+### 進行中的背景工作
+無

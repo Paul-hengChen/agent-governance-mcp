@@ -171,11 +171,11 @@ test("AC6: Stage 6-4 BEHIND remedy is CI-first; the e295-pinned sentence and the
   // full suite, untouched) pins the 5a / 5c strings that this one-sentence edit must not move.
   const t = read("content/skill-integrator.md");
   const step4 = awkRange(t, /^4\. Wait for the merge/, /^5\. `git switch main`/);
-  assert.equal(grepC(step4, "verify-release.mjs --ci-check --sha <HEAD>"), 1);
+  assert.equal(grepC(step4, "the repo's CI check on `<HEAD>`"), 1);
   assert.equal(grepC(step4, "the full suite, and a push"), 0);
   assert.equal(grepC(t, "cannot reach `main`"), 1);
   const i = (s) => step4.indexOf(s);
-  assert.ok(i("merge-invariants.mjs") >= 0 && i("merge-invariants.mjs") < i("verify-release.mjs --ci-check"), "invariants run before the CI check");
+  assert.ok(i("merge-invariants.mjs") >= 0 && i("merge-invariants.mjs") < i("the repo's CI check"), "invariants run before the CI check");
   assert.ok(step4.includes("CI fallback"), "the local full suite is only under the CI fallback");
 });
 

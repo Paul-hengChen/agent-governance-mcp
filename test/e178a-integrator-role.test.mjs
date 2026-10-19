@@ -100,7 +100,7 @@ test("AC2: manual steps replaced by references to shipped mechanisms; no restate
     "lane-status.mjs",
     "mailbox-watch.mjs",
     "test-lock.mjs",
-    "verify-release.mjs --ci-check",
+    "the repo's CI check",
     "merge-invariants.mjs",
     "agc feature finish",
   ]) {
@@ -282,7 +282,7 @@ test("AC8: tool-internal git ops of `agc feature start`/`finish` are sanctioned 
 
 test("AC9: SOP merge stage — substantive-resolution code-reviewer duty, no-ff-before-APPROVED, qa golden regen, no self-fix", () => {
   assert.ok(SOP.includes("A resolution is *substantive* when any conflict hunk's result is not simply both sides kept verbatim"));
-  assert.ok(SOP.includes("a `dist/` or golden regeneration is not substantive"));
+  assert.ok(SOP.includes("a build-output or golden regeneration is not substantive"));
   assert.ok(SOP.includes("dispatch `code-reviewer` via Task on that merge commit"));
   assert.ok(SOP.includes("`git show --remerge-diff <merge-sha>`"));
   assert.ok(SOP.includes("`review_reports/review_merge-<short-sha>.md`, committed on the integration branch"));
@@ -345,8 +345,8 @@ test("AC13: SOP verification stage — E192 generic read-only verifier (D10), st
     "branch sha + the `main..<branch>` commit list",
     "`diff --stat` against the manifest's owned list, out-of-bounds files named (`fanout check`)",
     "each cited evidence file's verdict line + task id",
-    "the worktree's `status --porcelain` taken **after** a local `npm run build`",
-    "it runs `node scripts/verify-release.mjs --ci-check --sha <reported sha>` and returns the CI run id plus the verdict (green, or red with the failing job names), never suite output",
+    "the worktree's `status --porcelain` taken **after** a local run of the repo's build command (the addendum names it) — non-empty is itself a finding (tracked build output not rebuilt at commit)",
+    "it runs the repo's CI check on `<reported sha>` and returns the CI run id plus the verdict (green, or red with the failing job names), never suite output",
     "under the *CI fallback* it returns the local full-suite pass/total instead, with the full log saved to a scratch file, not returned",
     "the `pending-tickets.md` / `## Applied` / root `NEW-TICKETS.md` check",
   ]) {
