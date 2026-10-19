@@ -30,6 +30,14 @@ export declare const BASE_RE: RegExp;
  * here without re-baselining that golden.
  */
 export declare const PROMPT_TEMPLATE_3B = "\u958B\u59CB\u505A <\u8A08\u5283\u6216 feature>\uFF0C\u4F60\u53EA\u8CA0\u8CAC <lane> lane \u7684 <\u7968>\uFF08<\u4E00\u53E5\u8A71>\uFF09\u3002\n\n\u5148\u5B8C\u6574\u8B80 docs/lane-protocol.md\uFF08\u5171\u540C\u898F\u5247\uFF0C\u5305\u62EC\u4FE1\u7BB1\u8207\u56DE\u5831\u683C\u5F0F\uFF09\uFF0C\u518D\u8B80 <\u8A08\u5283\u7684\u5FC5\u8B80\u7AE0\u7BC0> + <\u7968\u9762 row>\u3002\n`feature start` \u5EFA\u597D worktree \u4E4B\u5F8C\uFF0C\u547C\u53EB `EnterWorktree`\uFF08path = <worktree>\uFF09\u628A\u9019\u500B session \u5207\u9032\u53BB\uFF1B\u9019\u500B\u5DE5\u5177\u4E0D\u80FD\u7528\u6642\uFF0C\u6BCF\u500B Bash \u6307\u4EE4\u7167\u820A\u81EA\u5E36 `cd <worktree> &&`\u3002\n\u4F60\u53EA\u8CA0\u8CAC\u9019\u5F35\u7968\u8D70\u5230 qa PASS\uFF1B\u6CE2\u6B21\u5C64\u7D1A\u7684\u6838\u53D6\u9805\u5C6C\u65BC\u6574\u5408\u8005\u3002\n\n\u3010\u4F60\u7684\u6B04\u4F4D\u3011\n- primary: <primary \u8DEF\u5F91>    base: <base>    ticket-slug: <ticket-slug>\n- branch: <branch>    worktree: <worktree>    lane: <lane>\n- \u4FE1\u7BB1: <lanes-root>/_mailbox/<lane>/\uFF08\u4F60\u5BEB to-integrator.md\uFF0C\u8B80 to-lane.md\uFF09\n- dispatch pins: <\u4F8B\u5982 sr-engineer=fable>\n\n\u3010\u4F60\u64C1\u6709\u7684\u6A94\u6848\u3011<\u64C1\u6709>\uFF0C\u52A0\u4E0A\u9019\u5F35\u7968\u65B0\u5EFA\u7684\u6A94\u6848\u8207\u5B83\u81EA\u5DF1\u7684\u6E2C\u8A66\u6A94\n\u3010\u4E0D\u51C6\u78B0\u3011<\u7981\u6B62>\n\u3010\u7BC4\u570D\u5207\u7DDA\uFF08\u6574\u5408\u8005\u5DF2\u6C7A\u5B9A\uFF09\u3011\u505A\uFF1A<\u2026>\u3000\u4E0D\u505A\uFF1A<\u2026>\n\n\u9700\u8981\u8DDF\u6574\u5408\u8005\u8A0E\u8AD6\u7684\u4E8B\u4E00\u5F8B\u8D70\u4FE1\u7BB1\uFF0C\u4E0D\u8981\u8ACB\u6211\u8F49\u8CBC\u3002\u9700\u8981\u6211\u6838\u51C6\u7684\u4E8B\uFF0C\u7B49\u6211\u5728\u9019\u88E1\u89AA\u624B\u6253\u5B57\u3002\n";
+/** The template's single lane-rules pointer, used while laneProtocolAddendum is unset. */
+export declare const LANE_PROTOCOL_POINTER = "\u5148\u5B8C\u6574\u8B80 docs/lane-protocol.md\uFF08\u5171\u540C\u898F\u5247\uFF0C\u5305\u62EC\u4FE1\u7BB1\u8207\u56DE\u5831\u683C\u5F0F\uFF09\uFF0C";
+/**
+ * `template` with its one LANE_PROTOCOL_POINTER replaced by `replacement`,
+ * or undefined when the pointer occurs zero times or more than once — so a
+ * template whose wording drifted can never silently drop the addendum. (E343)
+ */
+export declare function replaceLanePointer(template: string, replacement: string): string | undefined;
 /**
  * Error codes of this CLI whose spec names would otherwise read as absence /
  * mismatch conditions. These are CLI codes, not tw_update_state gate codes, so
@@ -71,6 +79,7 @@ export declare const FANOUT_CODES: {
     readonly addendumInvalid: "ADDENDUM_INVALID";
     readonly addendumAbsent: "ADDENDUM_ABSENT";
     readonly laneProtocolAbsent: "LANE_PROTOCOL_ABSENT";
+    readonly templatePointerAbsent: "TEMPLATE_POINTER_ABSENT";
     readonly gitDiffFailed: "GIT_DIFF_FAILED";
 };
 /**
@@ -306,6 +315,11 @@ export interface RenderOptions {
      * that holds this module.
      */
     installRoot?: string;
+    /**
+     * Test seam: the dispatch-prompt template to fill. The CLI never sets it;
+     * the default is PROMPT_TEMPLATE_3B.
+     */
+    template?: string;
 }
 /** `warnings`: non-fatal lines for stderr (render still succeeds); present only when non-empty. */
 export type RenderResult = {

@@ -85,7 +85,18 @@ export const PROMPT_TEMPLATE_3B = `開始做 <計劃或 feature>，你只負責 
 需要跟整合者討論的事一律走信箱，不要請我轉貼。需要我核准的事，等我在這裡親手打字。
 `;
 /** The template's single lane-rules pointer, used while laneProtocolAddendum is unset. */
-const LANE_PROTOCOL_POINTER = "先完整讀 docs/lane-protocol.md（共同規則，包括信箱與回報格式），";
+export const LANE_PROTOCOL_POINTER = "先完整讀 docs/lane-protocol.md（共同規則，包括信箱與回報格式），";
+/**
+ * `template` with its one LANE_PROTOCOL_POINTER replaced by `replacement`,
+ * or undefined when the pointer occurs zero times or more than once — so a
+ * template whose wording drifted can never silently drop the addendum. (E343)
+ */
+export function replaceLanePointer(template, replacement) {
+    const at = template.indexOf(LANE_PROTOCOL_POINTER);
+    if (at < 0 || template.indexOf(LANE_PROTOCOL_POINTER, at + 1) >= 0)
+        return undefined;
+    return template.slice(0, at) + replacement + template.slice(at + LANE_PROTOCOL_POINTER.length);
+}
 /**
  * Replacement for LANE_PROTOCOL_POINTER when primary's config sets
  * laneProtocolAddendum: agc's generic lane rules plus the repo's addendum.
@@ -155,6 +166,9 @@ export const FANOUT_CODES = {
     addendumInvalid: "ADDENDUM_INVALID",
     addendumAbsent: "ADDENDUM_ABSENT",
     laneProtocolAbsent: "LANE_PROTOCOL_ABSENT",
+    // render input error while the two-layer pointer applies (exit 2): the
+    // template does not hold LANE_PROTOCOL_POINTER exactly once. (E343)
+    templatePointerAbsent: "TEMPLATE_POINTER_ABSENT",
     // owners --range / check input error (exit 2): the `git diff <a>...<b>`
     // itself failed, e.g. the two sides share no merge base.
     gitDiffFailed: "GIT_DIFF_FAILED",
@@ -1161,6 +1175,16 @@ export function renderPrompt(m, laneId, opts) {
     if (primary !== undefined) {
         pointer = resolveLanePointer(primary, opts.installRoot ?? DEFAULT_INSTALL_ROOT, errors, warnings);
     }
+    let template = opts.template ?? PROMPT_TEMPLATE_3B;
+    if (pointer !== undefined) {
+        const replaced = replaceLanePointer(template, LANE_PROTOCOL_POINTER_TWO_LAYER);
+        if (replaced === undefined) {
+            errors.push(inputErr(FANOUT_CODES.templatePointerAbsent, "the dispatch-prompt template does not hold the lane-rules pointer exactly once, so the two-layer pointer cannot replace it — fix PROMPT_TEMPLATE_3B or LANE_PROTOCOL_POINTER in tools/fanout-manifest.ts"));
+        }
+        else {
+            template = replaced;
+        }
+    }
     if (errors.length > 0)
         return { ok: false, errors };
     let pinsText = PINS_NONE;
@@ -1185,9 +1209,7 @@ export function renderPrompt(m, laneId, opts) {
         "<禁止>": lane.forbidden,
         "<票>": lane.ticket,
     };
-    let template = PROMPT_TEMPLATE_3B;
     if (pointer !== undefined) {
-        template = template.replace(LANE_PROTOCOL_POINTER, LANE_PROTOCOL_POINTER_TWO_LAYER);
         values["<generic>"] = pointer.generic;
         values["<addendum>"] = pointer.addendum;
     }
