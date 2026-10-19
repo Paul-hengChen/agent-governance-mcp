@@ -90,3 +90,7 @@ Other gates: `npm run build` zero errors (including check:transitions-sync); `np
 ## Verdict
 
 PASS, subject to the final full-suite result recorded below.
+
+## Final full suite (AC-HC-4)
+
+`node scripts/test-lock.mjs -- npm test` at commit d194776 (clean tree, `git status --porcelain` empty): 3430 tests, 3428 pass, 0 fail, exit 0. This evidence line is the only change after that commit.
