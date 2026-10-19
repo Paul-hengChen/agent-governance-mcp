@@ -1,5 +1,7 @@
 # Pending tickets — lane e290
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E290-NEW-1
 title: integrator SOP still carries this repo's own commands outside the two-layer sentences
@@ -59,5 +61,3 @@ body: |
   package runner form, or `node <agc install>/bin/agc-init.mjs`, matching how §5 now names the fan-out
   tool). New rule wording, so it was out of E290's fixed copy.
 ```
-
-## Applied
