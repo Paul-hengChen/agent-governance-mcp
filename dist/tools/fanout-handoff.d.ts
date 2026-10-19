@@ -79,8 +79,36 @@ export interface HandoffCheckReport {
     output: string;
     exitCode: 0 | 1;
 }
-/** Compare the written facts with freshly collected ones, key by key (absent equals absent). */
-export declare function compareFacts(written: Map<HandoffFactKey, string>, c: CollectedFacts): HandoffCheckReport;
+/** CLI codes of the sister-repo comparison, named outside the gate-suffix vocabulary. */
+export declare const SISTER_REPO_CODES: {
+    readonly unknown: "SISTER_REPO_UNKNOWN";
+    readonly notGit: "SISTER_REPO_NOT_GIT";
+};
+/** handoff --check line for a `## 外部依賴` row whose branch no longer points at the recorded sha. */
+export declare const EXTERNAL_DIFF_LINE: (repo: string, branch: string, recorded: string, now: string) => string;
+/** Result of comparing every `## 外部依賴` row with its sister branch now. */
+export interface ExternalComparison {
+    checked: number;
+    differ: number;
+    /** DIFF lines, in table order. */
+    lines: string[];
+}
+/**
+ * Compare each well-formed `## 外部依賴` row with its sister repo's branch
+ * now. `primary` is the repo whose `.current/.config.json` declares
+ * sisterRepos; each row's sister root is path.resolve(primary, entry.path).
+ * Throws HandoffFailure carrying every format and resolution error of the
+ * run together. A branch that moved — forward or not — is a DIFF (never
+ * MOVED); a missing branch reads （缺）. Read-only git, argv only.
+ */
+export declare function compareExternalDeps(text: string, primary: string): ExternalComparison;
+/**
+ * Compare the written facts with freshly collected ones, key by key (absent
+ * equals absent). `external` (the `## 外部依賴` comparison, when the manifest
+ * has that section) adds its lines after every fact line and its counts to
+ * the summary.
+ */
+export declare function compareFacts(written: Map<HandoffFactKey, string>, c: CollectedFacts, external?: ExternalComparison): HandoffCheckReport;
 /**
  * `handoff [--check] <manifest> [--target <branch>] [--repo <dir>]
  * [--mailbox-root <dir>] [--closing]`. Generate: exit 0 = section printed,

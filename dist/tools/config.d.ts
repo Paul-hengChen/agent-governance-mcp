@@ -18,6 +18,14 @@ export interface WorkspaceConfig {
     artifacts?: WorkspaceArtifactsMode;
     nodeModulesLinks?: string[];
     laneProtocolAddendum?: string;
+    sisterRepos?: SisterRepo[];
+}
+export interface SisterRepo {
+    name: string;
+    path: string;
+    owns: string;
+    backlog?: string;
+    contracts?: string[];
 }
 export type WorkspaceArtifactsMode = "local" | "repo";
 export interface NodeModulesLinksParse {
@@ -31,6 +39,13 @@ export interface NodeModulesLinksParse {
  * wins on duplicates) or listed in `rejected`, both in list order. Never throws.
  */
 export declare function parseNodeModulesLinks(value: unknown): NodeModulesLinksParse | null;
+/**
+ * The one validation definition for the `sisterRepos` key (E292 D1).
+ * Returns the valid entries in list order (an entry whose name was already
+ * kept is dropped), or null when `value` is not an array or holds no valid
+ * entry. Invalid entries are dropped silently. Never throws.
+ */
+export declare function parseSisterRepos(value: unknown): SisterRepo[] | null;
 export declare const DEFAULT_TASK_REGEX: RegExp;
 /**
  * Typed workspace config view. Absent file OR any unusable config file

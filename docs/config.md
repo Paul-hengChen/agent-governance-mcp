@@ -152,13 +152,40 @@ Semantics:
 
 - **Optional.** A path relative to the repo root that names a file. Keep it a tracked file, so it exists in every lane worktree; the path goes into the prompt byte-verbatim and resolves the same in primary and in the worktree.
 - **Where it is read.** By `render`, from the primary checkout's `<repo root>/.current/.config.json` (through `loadConfig`), once primary is known. With no primary, `PRIMARY_NOT_FOUND` stays the only report.
-- **Where the generic rules come from (key set).** When `render` runs from the agc install that is the primary checkout itself (the two resolve to the same real path), the prompt names the relative `docs/lane-protocol.md`. Otherwise it names the absolute path of `docs/lane-protocol.md` inside the agc install. That absolute path appears only in the rendered prompt, never in a tracked file.
+- **Where the generic rules come from (key set).** When `render` runs from the agc install that is the primary checkout itself (the two resolve to the same real path), the prompt names the relative `docs/lane-protocol.md`. Otherwise it names the absolute path of `docs/lane-protocol.md` inside the agc install. That absolute path appears only in the rendered prompt, never in a tracked file. Run `render` from primary: run from a lane worktree's own build output, the agc install is that worktree, so the prompt would name an absolute path into the worktree.
 - **Errors (key set only, exit 2, no prompt printed).** Each is reported together with any other missing source:
-  - `ADDENDUM_INVALID` — the value is absolute, starts with `~`, or normalizes to `.` or to a path that starts with `..`. The message does not echo the value.
+  - `ADDENDUM_INVALID` — the value is absolute, starts with `~`, or normalizes to `.` or to a path whose first segment is `..` (a name such as `..foo` is accepted). The message does not echo the value.
   - `ADDENDUM_ABSENT` — the value names no regular file under primary (missing, or a directory).
   - `LANE_PROTOCOL_ABSENT` — the agc install holds no `docs/lane-protocol.md`. Never raised while the key is unset.
 - **Unusable config is a warning, not a failure.** When primary's `.current/.config.json` cannot be used (unreadable, unparseable, a future `schema_version`), `render` still prints the key-unset prompt and exits 0, with one `CONFIG_UNREADABLE` warning line on stderr naming the load error.
 - **No schema version change.** The key is additive-optional; config `schema_version` stays 2 and no migration exists. `loadConfig` surfaces a non-empty string value verbatim as `WorkspaceConfig.laneProtocolAddendum`; any other value is treated as absent, never as an error.
+
+### `sisterRepos` — sister repos the integrator reads (optional)
+
+A repo whose fan-out waves depend on work in another repo (a "sister repo") declares that repo here once, so the integrator does not have to remember where it lives:
+
+```json
+{
+  "sisterRepos": [
+    {
+      "name": "receiver",
+      "path": "../receiver",
+      "owns": "the device protocol",
+      "backlog": "docs/backlog.md",
+      "contracts": ["README.md"]
+    }
+  ]
+}
+```
+
+Semantics:
+
+- **Optional.** The value is an array of objects. Each object has `name` (the short name manifests use), `path` (where the sister repo's checkout is), `owns` (what that repo owns, free text) and, optionally, `backlog` (its backlog document) and `contracts` (an array of its contract documents).
+- **Paths.** `path` is relative to this repo's root, so it resolves the same for everyone who clones the two repos side by side; an absolute path (POSIX, Windows or drive form) or a `~` path is dropped, so no local path lands in this tracked file. `backlog` and `contracts` are paths relative to the sister repo's root.
+- **Which entries are dropped.** An entry is dropped when it is not an object; when `name` is not a string matching `^[A-Za-z0-9_.-]+$`, or is `.` or `..`; when `path` is not a non-empty string, or is absolute or starts with `~`; or when `owns` is not a non-empty string. A `backlog` that is not a non-empty string is left out of the entry, and a `contracts` array keeps only its non-empty strings (left out when none remains). A later entry whose `name` was already kept is dropped (the first one wins). Dropping is silent: it is never an error, and the other entries still apply.
+- **Absent when nothing is valid.** `loadConfig` surfaces the kept entries, in list order and byte-verbatim, as `WorkspaceConfig.sisterRepos` only when at least one entry is valid. A missing key, a value that is not an array, or an array with no valid entry all mean "no sister repos".
+- **Who reads it.** The integrator SOP's `status` and take-over (`接手`) modes read each sister repo, read-only, through `node scripts/lane-status.mjs --repo <path>` (its in-flight lanes and their branches) and `git -C <path> rev-parse --short <branch>` (each branch's sha), with `<path>` resolved against primary. `node scripts/fanout.mjs handoff --check <manifest>` resolves each row of the manifest's optional `## 外部依賴` table through this key: the row's `repo` cell is a `name` declared here, and the recorded sha is compared with that branch in the sister repo now. A row naming an undeclared repo stops the check with `SISTER_REPO_UNKNOWN`; a declared `path` that is not a git repository stops it with `SISTER_REPO_NOT_GIT`. Nothing else reads the key.
+- **No schema version change.** The key is additive-optional; config `schema_version` stays 2 and no migration exists. The parser is `parseSisterRepos` in `tools/config.ts`.
 
 ---
 
