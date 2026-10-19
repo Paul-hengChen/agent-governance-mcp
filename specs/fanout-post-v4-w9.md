@@ -2,7 +2,7 @@
 base: 9205e84    integration branch: integ/post-v4-w9
 mailbox: ../agent-governance-mcp-lanes/_mailbox
 
-**狀態：已派工（2026-10-19）。** `base:` 是規劃基準（v4.11.0 發版記帳 PR #32 merge）；實際派工 base = 本清單併入後的 `main` sha，記在 Decisions 派工列。
+**狀態：已結案 2026-10-19。** 兩條 lane 皆 qa PASS（CI 綠）→ `integ/post-v4-w9` merge `61acbc9`（e226）、`e91c254`（e226 之後的 e351）→ finish 兩 lane（E354–E357 配號）→ 記帳 commit → PR + auto-merge（見「結案」與「接手步驟」）。 `base:` 是規劃基準（v4.11.0 發版記帳 PR #32 merge）；實際派工 base = 本清單併入後的 `main` sha，記在 Decisions 派工列。
 
 integrator 改版的收尾波：E290 把 lane 規則拆成 agc 通用檔加 repo 補充檔之後，SOP 與通用檔還有幾處只在本 repo 成立。五張票分兩條 lane：e226 讓 integrator／PM SOP 在 adopter 的 workspace 也能照做（`content/**` 一波只能一條 lane，所以三張都在這裡）；e351 補通用 lane-protocol 的兩個缺口（`artifacts: local` 的 commit 規則、`agc` 不在 PATH 又沒有補充檔時的呼叫方式）。
 
@@ -64,6 +64,14 @@ integrator 改版的收尾波：E290 把 lane 規則拆成 agc 通用檔加 repo
 ## 合併順序
 `integ/post-v4-w9` ← `--no-ff` e226（共享生成物 lane 先）→ merge-invariants → `--no-ff` e351 → merge-invariants → 重建 `dist/` → `check:bookkeeping` → 在 integ 上依序 `finish <lane> --shipped --base integ/post-v4-w9` → 記帳 commit → push → 讀 CI → `gh pr create` → `gh pr merge --auto --merge` → merged 後 `git switch main`、`git -c pull.rebase=false pull --ff-only` → `git branch -d integ/post-v4-w9`。預期零檔案衝突（擁有集合不相交）；`dist/` 不手解，重建。
 
+## 結案
+- 日期 2026-10-19。`integ/post-v4-w9` ← e226（`61acbc9`）← e351（`e91c254`），皆 `--no-ff`、零衝突 → 無合併審查；merge-invariants 兩次 PASS；重建 `dist/` 無差異；`npm audit --audit-level=high` exit 0；整合層 CI run 39246553167 在 `e91c254` 綠。
+- 彙總（上限按 lane 計）：e226 10 張 task／hop 6/14／review 退回 1 輪（缺 expected-red 清單，程序性）／qa 0 輪；e351 2 張 task／hop 4/14／review 0 輪／qa 0 輪。合計 12 張 task、hop 10，每條 lane 都在自己的上限內。
+- 完成定義 10 項全部成立（本清單的 `## 接手步驟` 為最後一項）。
+- 例外：(1) 兩條 lane 的 PM 都先寫 `next_role=sr-engineer` 才送 cut 預審，整合者在信箱追問後補送；兩條都沒有在預審 close 前派 sr。(2) e226 PM 修 cut 時手改 `.current/e226/tasks.md` 五筆描述（核取未動，E340 的缺口），lane 已在 pending_notes 註明。(3) 兩條 lane 的 sr、reviewer 都是 opus（同模型疑慮，兩份 review 都已註明並以逐字比對補償）；qa 用預設 sonnet。(4) e226 的 sr 有一次沒包 test-lock 跑全套；最終全套由 qa 在 test-lock 下重跑。
+- 新票：E354–E356（e226）、E357（e351），都由 `finish --shipped` 配號，排在佇列 #171–#174。
+- 發版：`main` 帶 E226／E349／E350（integrator 與 PM SOP、憲法 §3.1 manifest tier 條件 3、coord-03 改用 agc 安裝位置呼叫工具；本 repo 事實移到補充檔；compose golden 與 context budget 重定）、E351／E352（通用 lane-protocol 的 local 模式規則與 `agc` 不在 PATH 時的後備）→ 是否發版與版號由人類決定。
+
 ## Dispatch pins
 - e226：`pm=opus`、`sr-engineer=opus`。
 - e351：`pm=opus`、`sr-engineer=opus`。
@@ -80,3 +88,4 @@ integrator 改版的收尾波：E290 把 lane 規則拆成 agc 通用檔加 repo
 | 2026-10-19 | 整合者 | e226 cut 預審 close（`fac8990`，to-lane#3）：verify-release 改成「repo 的 CI 檢查」並有 `gh` 後備（AC-E226-5），相依稽核指憲法 §6，補充檔 §7 不加行；check --cut exit 0。例外：PM 手改 `.current/e226/tasks.md` 五筆 task 的描述（核取狀態未動）—— 憲法 §3 不允許，但沒有改描述的工具（E340），記成例外，lane 在 pending_notes 註明 | 信箱 e226 |
 | 2026-10-19 | 人類 | 在 e226 lane session 核准 cut（`fac8990`） | e226 lane session；`specs/e226-integrator-sop-portable.md`，commit `fac8990` |
 | 2026-10-19 | 整合者 | 5a：e351 `436f189`（CI run 39239867881）close —— review、qa 皆 0 輪退回；reviewer 選填 (1)（通用檔 E196 子句未提 E206 併入的 `--abandoned` 同型缺口）不退回，記在 done-mark。e226 `c1c9132`（CI run 39246128505）close —— review 退回 1 輪（缺 expected-red 清單，程序性），qa 0 輪；golden 7 檔與 context budget 4 個上限由 lane qa 重擷／重定 | 本檔 |
+| 2026-10-19 | 整合者 | 5b：`integ/post-v4-w9` ← e226 `61acbc9` ← e351 `e91c254`，皆 `--no-ff`、零衝突 → 無合併審查；merge-invariants 兩次 PASS；重建 `dist/` 無差異；`npm audit --audit-level=high` exit 0；整合層 CI run 39246553167 綠；finish e226 配號 E354–E356、finish e351 配號 E357 | 本檔 |
