@@ -98,3 +98,21 @@ integrator 改版第 4 波，也是最後一波：原 12 張改版票只剩 E290
 | 2026-10-19 | 整合者 | 5a：e290 `18d93c3`（CI run 39215855179）close —— review 0 輪退回，qa 第 1 輪 FAIL 只因 spec 驗證指令寫了本機路徑前綴字面值（hygiene 掃描），PM 改 spec 後 PASS；e292 `473a694`（CI run 39219402518）close —— review、qa 皆 0 輪退回 | 本檔 |
 | 2026-10-19 | 整合者 | 5b：`integ/post-v4-w8` ← e292 `936be52` ← e290 `dfd585b`，皆 `--no-ff`、零衝突 → 無合併審查；merge-invariants 兩次 PASS；重建 `dist/` 無差異；`npm audit --audit-level=high` exit 0；整合層 CI run 39219943832 在 `dfd585b` 綠；finish e292 配號 E345–E348 | 本檔 |
 | 2026-10-19 | 整合者 | finish e290 被拒（`pending-tickets.md` 一個 block 的 title 含未加引號的「: 」，YAML 解析失敗，未套用也未拆除）：退回 lane 修一行（`c54587a`，CI run 39221918215），再 merge `7af69ca`（merge-invariants PASS）後 finish 配號 E349–E352；整合者配號 E353（帳本格式提早檢查）；E345–E353 排在佇列 #162–#170 | 本檔 |
+
+## 接手步驟
+（事實欄位由 `node scripts/fanout.mjs handoff` 產生；接手時先跑 `node scripts/fanout.mjs handoff --check <manifest>`。`<待填：…>` 由整合者填寫。）
+### 核對 primary
+- 目標分支：main @ a67d799
+- 目標分支對 origin：一致
+- git status：乾淨
+- worktree：primary（main ← integ/post-v4-w8 @ a7d7ea9）
+- lane-status：primary（main ← integ/post-v4-w8 @ a7d7ea9）release-post-v4-w7／In_Progress／release-engineer，hop 3，commits 0，clean
+### 已結案
+- 第 8 波兩條 lane（e290、e292）已合併、finish、拆除；lane 紀錄在 `.current/history/2026-10/`，記帳與本清單在同一個 wave PR。integrator 改版 12 張票至此只剩暫緩的 E293。
+- 未配號的新發現：無（E345–E352 由 finish 配號，E353 由整合者配號）。
+### 待人類決定
+- 是否發版：`main` 帶新設定 key `sisterRepos`、清單 `## 外部依賴` 段與 `handoff --check` 的姊妹 repo 核對、新錯誤碼、通用 lane-protocol 與本 repo 補充檔 —— 版號由人類決定（新功能，整合者建議 MINOR）。
+- 是否開下一波：佇列後段有 E340、E341 與本波新票 E345–E353（#162–#170）；E293 仍暫緩。
+- 建議：下一步（發版或下一波）開新 session 進行；若要在本 session 繼續，先跑 `node scripts/fanout.mjs handoff --check specs/fanout-post-v4-w8.md`，exit 0 才繼續。
+### 進行中的背景工作
+無
