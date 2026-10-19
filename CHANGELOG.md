@@ -16,6 +16,77 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [4.10.0] - 2026-10-19
+
+MINOR release. It ships post-v4 fan-out wave 7 since v4.9.0, landed on `main` by its wave pull
+request: lanes `e285` (E285, E294, E336) and `e289` (E289, E337, E338, E339); plan
+`specs/fanout-post-v4-w7.md`, release gate `specs/release-post-v4-w7.md`. Semver: MINOR, not
+PATCH, because two changes add backwards-compatible capability: a new optional
+`laneProtocolAddendum` key in `.current/.config.json` read by `fanout.mjs render` (E289) and a new
+`接手 <manifest>` take-over mode for the integrator (E285). The other changes are SOP and protocol
+wording and bug fixes. No MCP tool input schema, prompt schema, state file format, gate registry
+entry (still 34), schema version (config `schema_version` stays 2) or dependency changed; under
+`content/`, only `content/const-15-core-tail.md` and `content/coord-03-core-fallback.md` change
+among the constitution and coordinator fragments, each by the one E336 command substitution.
+
+### Added
+
+- **E289: `laneProtocolAddendum` for `fanout.mjs render` (`tools/config.ts`,
+  `tools/fanout-manifest.ts`, `docs/config.md`)**: a new optional `.current/.config.json` key
+  naming a repo-relative lane-protocol addendum file. When it is set, the rendered lane prompt
+  points at agc's generic lane rules and then the addendum; an absolute, `~` or `..`-first value
+  exits 2 with `ADDENDUM_INVALID` (the value is not echoed), a missing file with
+  `ADDENDUM_ABSENT`, and an unusable primary config prints the key-unset prompt with one
+  `CONFIG_UNREADABLE` warning. With the key absent the prompt is unchanged except for the
+  template line below. `loadConfig` surfaces the value as `WorkspaceConfig.laneProtocolAddendum`.
+  Additive-optional: no config schema bump and no migration. `PROMPT_TEMPLATE_3B` gains one line
+  telling the lane to call `EnterWorktree` after `feature start` (with the `cd <worktree> &&`
+  fallback); `test/fixtures/e177a/render-e177a.golden.txt` gains exactly that line. Spec:
+  `specs/e289-render-addendum.md`; tests: `test/e289-config-key.test.mjs`,
+  `test/e289-render-addendum.test.mjs`, `test/e235b-relative-worktree.test.mjs`.
+- **E285: integrator session handoff and take-over (`content/skill-integrator.md`)**: at every
+  wave close the integrator writes the manifest's `## 接手步驟` section with
+  `fanout.mjs handoff <manifest> --closing`; the Stage 6 final report lists the
+  pending human decisions and recommends a new session. A fourth chat mode, `接手 <manifest>`
+  (new *Take-over* section), runs `handoff --check` and stops on any mismatch. The watches stop
+  after two idle hours, every local full suite runs inside the read-only verifier, and an
+  advisory new-session check is added. Spec: `specs/e285-integrator-session-handoff.md`; tests:
+  `test/e285-integrator-session-handoff.test.mjs`.
+
+### Changed
+
+- **E336: portable pull form (`content/const-15-core-tail.md`, `content/coord-03-core-fallback.md`,
+  `content/skill-release-engineer.md`, `content/skill-integrator.md`)**: all 12 `git pull
+  --ff-only` sites now read `git -c pull.rebase=false pull --ff-only`, so a user-level
+  `pull.rebase` setting cannot turn the fast-forward pull into a rebase. The Constitution §6 base
+  list is unchanged. The 12 compose goldens under `test/fixtures/compose-golden/` change by one
+  line each, four `test/context-budget.test.mjs` caps are re-measured (5717→5723, 10518→10523,
+  21623→21633, 8420→8426), and `test/e297-main-protected-sop.test.mjs` re-pins its two
+  command-form literals. Tests: `test/e336-portable-pull.test.mjs`.
+- **E294: lane protocol §1 `EnterWorktree` (`docs/lane-protocol.md`)**: after `feature start` the
+  lane switches into its worktree with `EnterWorktree`, confirms `pwd` and the branch in two
+  separate calls, issues git one command per call, and falls back to per-command
+  `cd <worktree> &&` when the tool is unavailable. Only §1 changes. Tests:
+  `test/e294-lane-enterworktree.test.mjs`.
+
+### Fixed
+
+- **E338: backtick before `**` (`tools/fanout-manifest.ts`)**: in the `## 接手步驟`
+  absolute-path check, a backtick directly before `**` no longer opens bold. Tests:
+  `test/e338-backtick-glob.test.mjs`.
+- **E339: non-ASCII manifest paths in `fanout.mjs handoff` (`tools/fanout-handoff.ts`)**: the
+  `git status` fact runs with `-c core.quotePath=false`, so a non-ASCII path is read as typed, and
+  the `HANDOFF_GIT_FAILED` subcommand lookup skips the `-c` value. Tests:
+  `test/e339-non-ascii-manifest.test.mjs`.
+- **E337: `HANDOFF_SUBITEMS` comment (`tools/fanout-manifest.ts`)**: the comment now says the
+  sub-item order is not checked. Tests: `test/e337-subitem-order.test.mjs`.
+
+### Notes
+
+- `dist/` carries the rebuilt `tools/config`, `tools/fanout-handoff` and `tools/fanout-manifest`
+  outputs plus the version literal. Wave-7 evidence moves to
+  `qa_reports/archive/release-post-v4-w7/` and `review_reports/archive/release-post-v4-w7/`.
+
 ## [4.9.0] - 2026-10-18
 
 MINOR release. It ships post-v4 fan-out wave 6 since v4.8.0, landed on `main` by its wave pull
