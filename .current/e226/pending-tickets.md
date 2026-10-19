@@ -1,5 +1,7 @@
 # Pending tickets — lane e226
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E226-NEW-1
 title: verify-release／check-bookkeeping 沒有可在 adopter 使用的版本
@@ -51,5 +53,3 @@ body: |
   facts their own heading. The heading structure is frozen by test/e290 in this wave, so this is
   a follow-up, not a change in lane e226.
 ```
-
-## Applied
