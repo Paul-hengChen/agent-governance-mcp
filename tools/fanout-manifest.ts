@@ -791,7 +791,7 @@ const STATUS_CLOSED_RE = /^狀態[：:]\s*已結案/;
 /** Name of the handoff section a closed manifest must carry. */
 export const HANDOFF_SECTION = "接手步驟";
 
-/** Sub-items (`### ` headings) every handoff section must hold, in order. */
+/** Sub-items (`### ` headings) every handoff section must hold, each exactly once with a non-empty body; their order is not checked. */
 export const HANDOFF_SUBITEMS = ["核對 primary", "已結案", "待人類決定", "進行中的背景工作"] as const;
 
 /** The sub-item whose single body line must read 無 once the wave is closed. */

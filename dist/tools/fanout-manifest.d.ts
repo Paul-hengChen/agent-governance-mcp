@@ -195,7 +195,7 @@ export declare function unquotedPaths(cell: string): string[];
 export declare function parseManifest(text: string): Manifest;
 /** Name of the handoff section a closed manifest must carry. */
 export declare const HANDOFF_SECTION = "\u63A5\u624B\u6B65\u9A5F";
-/** Sub-items (`### ` headings) every handoff section must hold, in order. */
+/** Sub-items (`### ` headings) every handoff section must hold, each exactly once with a non-empty body; their order is not checked. */
 export declare const HANDOFF_SUBITEMS: readonly ["核對 primary", "已結案", "待人類決定", "進行中的背景工作"];
 /** The sub-item whose single body line must read 無 once the wave is closed. */
 export declare const HANDOFF_BACKGROUND = "\u9032\u884C\u4E2D\u7684\u80CC\u666F\u5DE5\u4F5C";
