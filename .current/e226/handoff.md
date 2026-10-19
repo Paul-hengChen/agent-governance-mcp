@@ -1,9 +1,10 @@
 ---
 schema_version: 15
 active_feature: "e226-integrator-sop-portable"
-status: "In_Progress"
-last_updated: "2026-10-19T10:47:19.505Z"
-last_agent: "sr-engineer"
+status: "FAIL"
+last_updated: "2026-10-19T10:55:04.019Z"
+blocking_reason: "Expected-red manifest qa_reports/expected-red_e226-integrator-sop-portable.txt missing while ~28 intentional reds exist (code-reviewer SOP 4a); all text changes verbatim and in scope."
+last_agent: "code-reviewer"
 prd_path: "docs/backlog.md"
 scope_decision: "single-feature"
 scope_decision_why: "Fan-out lane e226 of post-v4 wave 9 (manifest specs/fanout-post-v4-w9.md): E226 + E349 + E350 are text-only SOP/addendum edits in one content lane, cut at fac8990, integrator pre-review closed (to-lane#3)."
@@ -12,16 +13,17 @@ dispatch_pins:
   pm: "opus"
   sr-engineer: "opus"
 evidence_schema: 2
-next_role: "code-reviewer"
-dispatched_at: "2026-10-19T10:47:19.505Z"
+next_role: "sr-engineer"
+dispatched_at: "2026-10-19T10:55:04.019Z"
+review_verdict: "CHANGES_REQUESTED"
 dispatch_mechanism: "task"
 dispatch_mechanism_tier: "opus"
 qa_round: 0
-review_round: 0
+review_round: 1
 visual_round: 0
-hop_count: 2
+hop_count: 3
 qa_rounds_total: 0
-review_rounds_total: 0
+review_rounds_total: 1
 visual_rounds_total: 0
 ---
 # Handoff State
@@ -30,11 +32,10 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- sr-engineer: T-E226-01, T-E226-02, T-E349-01, T-E350-01 ready for code review — commit aecfd29 (lane branch, not pushed). Files: content/skill-integrator.md, content/skill-pm.md, content/const-08-chain-31-mid.md, content/coord-03-core-fallback.md, docs/lane-protocol-addendum.md (+ .current/e226/ state). All Copy/Strings written verbatim (sop.tool-calls, sop.ci-call, sop.ci-6-2, sop.stage1-shared, sop.basefix-5, sop.stage6-finish, sop.5a-evidence, sop.5a-findings, sop.verifier-build, sop.5b-4/5/6, sop.5c-3, add.5-tools/ci/bookkeeping, pm.manifest-row, const08.cond3, coord03.writer, coord03.rollup).
-- Self-checks on skill-integrator.md: 0 `node scripts/`, 0 `verify-release`, 0 `this repo` (case-insensitive), 0 of content/** / compose-golden / context-budget.test / npm run build / npm audit / check:bookkeeping / dist/; each of fanout, mailbox-watch, lane-status, merge-invariants, test-lock present in `<agc install>` form; `the repo's CI check` at 6 sites; Stage 6 step 4: merge-invariants before the single `the repo's CI check on `<HEAD>``; one **Tool calls** paragraph between Invocation and ## Governance state; Stage 6 `Findings finish did not number` bullet byte-identical (not in -U0 diff). Addendum: +3 lines directly after the existing §5 fanout line, nothing else changed, §7 untouched. No absolute paths added.
-- Hard-condition tests: e290, e294, e177a, e246, e289 — 49/49 pass. npm run build OK, git status --porcelain clean after build (no dist/ diff). npm audit --audit-level=high exit 0 (8 low/moderate only). check-md-tables OK. fanout check --cut specs/fanout-post-v4-w9.md e226 specs/e226-integrator-sop-portable.md exit 0 (0 out of bounds).
-- Expected-red owned tests (qa re-pins, T-E226-03 / T-E349-02 / T-E350-03): e178a AC2 (verify-release.mjs --ci-check mechanism list), AC9 (:285 `a `dist/` or golden regeneration is not substantive` -> sop.5b-5; NOT in the spec's re-pin inventory — add it to T-E349-02), AC13 (verifier npm run build bullet -> sop.verifier-build); e285 AC-E344-1 (sop.idle-resume lane-status path); e286 AC1 (base-fix npm build/audit -> sop.basefix-5); e292 AC-E292-9 x3 (lane-status/mailbox-watch path, cases 1/4/5); e295 AC6, AC7, AC8, AC10; e296 AC6 (step 4 CI check); e329 AC-E329-1 (STAGE6_CLOSE), AC-E329-3 (COND2), AC-E334-3 (fails only because STAGE6_CLOSE indexOf is -1 — STAGE6_FINDINGS count is still 1, clears with the STAGE6_CLOSE re-pin); compose-equivalence 5,6,7,8,10,11 (const-08 text in goldens); context-budget 30 (skill-pm), 34, 35, 47 (constitution / teamwork bundle). Unaffected and green: e288, e297, e336, skill-frontmatter, e90.
-- Not done (scope restriction from dispatch): qa_reports/expected-red_e226-integrator-sop-portable.txt (sr SOP step 7a) was NOT written — the dispatch limited sr edits to the five files; the expected-red list above is the catalogue. Coordinator: route it to qa or authorize sr to write it if QA Phase 0.5 needs the manifest.
+- review_report: review_reports/review_T-E226-01.md (also review_T-E226-02.md, review_T-E349-01.md, review_T-E350-01.md); committed bd7434a
+- code-reviewer round 1: CHANGES_REQUESTED. Sole required finding: write qa_reports/expected-red_e226-integrator-sop-portable.txt (in lane bounds via isImplicitBookkeeping, basename contains e226) as `file | test name` lines covering every intentional red on aecfd29. No content/docs change requested — all 21 Copy/Strings ids verbatim, AC-E226-1..5, AC-E349-1..3, AC-E350-1 implemented; hard-condition set 49/49 green.
+- Additions to qa re-pin list (beyond the spec's Planned re-pins table): (1) test/e178a-integrator-role.test.mjs AC9 :285 `a `dist/` or golden regeneration is not substantive` -> sop.5b-5 (T-E349-02); (2) test/skill-manifest.test.mjs `t-golden-byte-identity (AC1/AC5)` — red from coord-03 text; clears via T-E350-03 regen of skill-coordinator-monolith.txt (no test edit), but AC-E350-2's proof command does not run this file — include it in the T-E350-03 run.
+- Recommended follow-up (not this lane): docs/lane-protocol-addendum.md:3 preamble says it only fills generic 見補充規則 places; the new §5 CI-check / 5c-bookkeeping / tools bullets fill places the integrator SOP points at — file a finding to widen the preamble or give integrator-only facts their own heading.
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.
