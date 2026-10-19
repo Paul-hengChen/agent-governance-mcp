@@ -15,6 +15,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), "utf8");
 const SOP = read("content/skill-integrator.md");
 const LP = read("docs/lane-protocol.md");
+const ADD = read("docs/lane-protocol-addendum.md"); // E290: repo-specific examples live here
 const QA = read("content/skill-qa-engineer.md");
 
 const count = (text, needle) => text.split(needle).length - 1;
@@ -137,7 +138,8 @@ test("AC-E327-1: qa SOP item f equals the hygiene literal, exactly once", () => 
 test("AC-E327-2: lane-protocol §3 keeps its 常駐測試 exception bullet; qa SOP within byte cap", () => {
   const s3 = sec("## 3. ", LP);
   const b = s3.split("\n").find((l) => l.startsWith("- **常駐測試不要釘死歷史 commit SHA**")) ?? "";
-  assert.ok(b.includes("git rev-parse --verify <sha>^{commit}") && b.includes("test/e130-lane-default.test.mjs"), "§3 exception kept");
+  assert.ok(b.includes("git rev-parse --verify <sha>^{commit}") && !b.includes("test/e130-lane-default.test.mjs"), "§3 exception kept, repo example moved out (E290)");
+  assert.ok(ADD.includes("test/e130-lane-default.test.mjs"), "addendum holds the e130 example");
   const bytes = Buffer.byteLength(QA, "utf8");
   assert.ok(bytes <= 18500, `qa SOP ${bytes} bytes exceeds 18500`);
   const split = read("test/qa-visual-skill-split.test.mjs");
