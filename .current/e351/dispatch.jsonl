@@ -1,0 +1,7 @@
+{"ts":"2026-10-19T10:21:24.300Z","feature":"e351-lane-protocol-gaps","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-19T10:27:41.663Z","feature":"e351-lane-protocol-gaps","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-19T10:30:10.539Z","feature":"e351-lane-protocol-gaps","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-19T10:32:21.298Z","feature":"e351-lane-protocol-gaps","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-19T10:33:17.450Z","feature":"e351-lane-protocol-gaps","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-19T10:37:35.916Z","feature":"e351-lane-protocol-gaps","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-19T10:45:33.562Z","feature":"e351-lane-protocol-gaps","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
