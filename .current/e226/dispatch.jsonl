@@ -1,3 +1,5 @@
 {"ts":"2026-10-19T10:20:23.984Z","feature":"e226-integrator-sop-portable","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-10-19T10:29:08.505Z","feature":"e226-integrator-sop-portable","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-10-19T10:35:37.704Z","feature":"e226-integrator-sop-portable","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-19T10:42:41.663Z","feature":"e226-integrator-sop-portable","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-19T10:44:24.306Z","feature":"e226-integrator-sop-portable","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
