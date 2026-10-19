@@ -74,18 +74,18 @@ test("AC5: lane-protocol carries the hop rule, 7/14 example, and keeps the no-pu
 
 test("AC6: integrator 5a lane layer pushes then reads CI; test-lock stays for the fallback", () => {
   const line = INTEGRATOR.split("\n").filter((l) => l.includes("git push -u origin <branch>"));
-  assert.ok(line.some((l) => l.includes("verify-release.mjs --ci-check --sha <reported sha>")));
+  assert.ok(line.some((l) => l.includes("the repo's CI check on `<reported sha>`")));
   assert.ok(count(INTEGRATOR, "test-lock.mjs") >= 1);
 });
 
 test("AC7: integration layer and Stage 6 use push + --ci-check; `cannot reach `main`` kept", () => {
-  assert.ok(count(INTEGRATOR, "verify-release.mjs --ci-check --sha") >= 3);
+  assert.ok(count(INTEGRATOR, "the repo's CI check on") >= 3);
   assert.equal(count(INTEGRATOR, "cannot reach `main`"), 1);
 });
 
 test("AC8: verifier brief returns CI run id + verdict, never suite output; porcelain after a local build; five constraints kept", () => {
   assert.ok(INTEGRATOR.split("\n").some((l) => l.includes("run id") && l.includes("never suite output")));
-  assert.ok(INTEGRATOR.includes("`status --porcelain` taken **after** a local `npm run build`"));
+  assert.ok(INTEGRATOR.includes("`status --porcelain` taken **after** a local run of the repo's build command (the addendum names it)"));
   for (const c of ["(1) **read-only**", "(2) **the report is a claim**", "(3) **serial runs**", "(4) **never a lane's session**", "(5) **not code-reviewer / qa-engineer**"]) {
     assert.ok(INTEGRATOR.includes(c), c);
   }
@@ -97,11 +97,13 @@ test("AC9: CI fallback Decisions row wording and the E238/E254/E278 flake rule",
   assert.ok(INTEGRATOR.includes("gh run rerun --failed <run id>"));
 });
 
-test("AC10: 5c names npm run check:bookkeeping exactly once", () => {
+test("AC10: 5c names the repo's bookkeeping check exactly once (sop.5c-3); the addendum names npm run check:bookkeeping (add.5-bookkeeping)", () => {
   const i = INTEGRATOR.indexOf("### 5c.");
   const j = INTEGRATOR.indexOf("## Stage 6", i);
   assert.ok(i >= 0 && j > i);
-  assert.equal(count(INTEGRATOR.slice(i, j), "npm run check:bookkeeping"), 1);
+  assert.equal(count(INTEGRATOR.slice(i, j), "run the repo's bookkeeping check when the addendum names one, and require exit 0"), 1);
+  // E226/E349: the SOP is generic; the repo-specific command now lives in the addendum, once.
+  assert.equal(count(rd("docs/lane-protocol-addendum.md"), "npm run check:bookkeeping"), 1);
 });
 
 test("AC11: coord-02 names the four tiers, the code and the advisory; registry row flipped to documentedInProse true", () => {

@@ -53,7 +53,7 @@ test("AC1: human owns the vehicle decision; five conditions are an ordered numbe
     "insertion lane", "human's decision", "one lane at a time",
     "merge-base --is-ancestor", "fanout.mjs check", "status --porcelain",
     "git merge-tree --write-tree", "2.38", "merge --abort", "merge --no-ff origin/<target>",
-    "merge-invariants.mjs", "npm audit --audit-level=high", "Decisions",
+    "merge-invariants.mjs", "the dependency audit Constitution §6 requires", "Decisions",
     "fanout.mjs owners <manifest> --range <lane branch>...origin/<target>", "擁有",
   ], "base-fix");
   const lines = BASEFIX.split("\n");
@@ -71,8 +71,8 @@ test("AC1: human owns the vehicle decision; five conditions are an ordered numbe
   assert.match(item(4), /merge --abort/);
   assert.match(item(5), /merge --no-ff origin\/<target>/);
   assert.match(item(5), /merge-invariants\.mjs/);
-  assert.match(item(5), /npm run build/);
-  assert.match(item(5), /npm audit --audit-level=high/);
+  assert.match(item(5), /the repo's build/);
+  assert.match(item(5), /the dependency audit Constitution §6 requires/);
 });
 
 test("AC2: conditions 2 and 4 failing means stop and hand to the human, never merge", () => {
