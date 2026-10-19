@@ -229,8 +229,9 @@ export const CUT_GLOB_NOTE =
  * "input" = a CLI/environment input (flag, git ref, file), not the manifest text.
  * "cut" = the `## Cut` table of a lane spec read by check --cut.
  * "handoff" = a closed manifest's `## 接手步驟` section (validate only).
+ * "external" = the optional `## 外部依賴` section (validate and handoff --check only).
  */
-export type FanoutErrorScope = "title" | "base" | "lanes" | "row" | "pins" | "decisions" | "cut" | "input" | "handoff";
+export type FanoutErrorScope = "title" | "base" | "lanes" | "row" | "pins" | "decisions" | "cut" | "input" | "handoff" | "external";
 
 export interface FanoutError {
   code: string;
@@ -957,15 +958,141 @@ export function readsNone(line: string): boolean {
   return t === HANDOFF_NONE;
 }
 
+// --- optional external-dependency section (validate + handoff --check) -------
+
+/** Name of the optional section recording work this wave depends on in sister repos. */
+export const EXTERNAL_DEPS_SECTION = "外部依賴";
+
+/** Exact header of the `## 外部依賴` table; `repo` is a `sisterRepos` name. */
+export const EXTERNAL_DEPS_HEADER = ["repo", "票", "branch", "sha", "協定出處"] as const;
+
+/**
+ * Format error codes of the `## 外部依賴` section. CLI codes, named outside
+ * the gate-suffix vocabulary like FANOUT_CODES.
+ */
+export const EXTERNAL_DEPS_CODES = {
+  sectionDuplicate: "EXTERNAL_DEPS_SECTION_DUPLICATE",
+  tableAbsent: "EXTERNAL_DEPS_TABLE_ABSENT",
+  headerDiffers: "EXTERNAL_DEPS_HEADER_DIFFERS",
+  rowInvalid: "EXTERNAL_DEPS_ROW_INVALID",
+} as const;
+
+/** One well-formed `## 外部依賴` row (repo, branch and sha with one backtick pair stripped). */
+export interface ExternalDep {
+  repo: string;
+  ticket: string;
+  branch: string;
+  sha: string;
+  source: string;
+  /** 1-based data-row number within the table. */
+  row: number;
+  line: number;
+}
+
+export interface ExternalDepsRead {
+  /** Whether the manifest has at least one `## 外部依賴` heading. */
+  present: boolean;
+  /** Well-formed rows in table order; empty whenever a section-level error is found. */
+  rows: ExternalDep[];
+  errors: FanoutError[];
+}
+
+function externalErr(code: string, message: string): FanoutError {
+  return { code, scope: "external", message };
+}
+
+/** The cell with one surrounding backtick pair removed. */
+function unBacktick(cell: string): string {
+  return cell.length >= 2 && cell.startsWith("`") && cell.endsWith("`") ? cell.slice(1, -1) : cell;
+}
+
+/** Why a `## 外部依賴` data row is malformed (the first defect found), or undefined. */
+function externalRowDefect(cells: string[]): string | undefined {
+  if (cells.length !== EXTERNAL_DEPS_HEADER.length) return `${cells.length} cell(s), expected ${EXTERNAL_DEPS_HEADER.length}`;
+  const [rawRepo, ticket, rawBranch, rawSha, source] = cells;
+  const repo = unBacktick(rawRepo);
+  const branch = unBacktick(rawBranch);
+  const sha = unBacktick(rawSha);
+  if (!LANE_ID_RE.test(repo) || repo === "." || repo === "..") return `repo "${repo}" is not a name of [A-Za-z0-9_.-]`;
+  if (ticket === "") return "票 is empty";
+  if (branch === "" || /\s/.test(branch) || branch.startsWith("-")) return `branch "${branch}" is not a single ref name`;
+  if (!SHA_RE.test(sha)) return `sha "${sha}" is not 7–40 lowercase hex`;
+  if (source === "") return "協定出處 is empty";
+  return undefined;
+}
+
+/**
+ * Read the optional `## 外部依賴` section (heading name optionally qualified).
+ * Pure. No section ⇒ no rows and no errors. Otherwise: exactly one section,
+ * its first table headed exactly EXTERNAL_DEPS_HEADER with at least one data
+ * row, and one EXTERNAL_DEPS_ROW_INVALID per malformed row. Validated whether
+ * or not the manifest is closed. parseManifest never calls it, so render,
+ * check, owners and handoff generate are unaffected by the section.
+ */
+export function readExternalDeps(text: string): ExternalDepsRead {
+  const sections = splitSections(splitLines(text)).filter((s) => isNamedHeading(s.name, EXTERNAL_DEPS_SECTION));
+  if (sections.length === 0) return { present: false, rows: [], errors: [] };
+  if (sections.length > 1) {
+    return {
+      present: true,
+      rows: [],
+      errors: [
+        externalErr(
+          EXTERNAL_DEPS_CODES.sectionDuplicate,
+          `${sections.length} "## ${EXTERNAL_DEPS_SECTION}" sections found (lines ${sections.map((s) => s.line).join(", ")}); exactly one is allowed`,
+        ),
+      ],
+    };
+  }
+  const s = sections[0];
+  const table = firstTable(s);
+  const parsed = table.length > 0 ? tableRows(table) : undefined;
+  if (parsed === undefined || parsed.rows.length === 0) {
+    return {
+      present: true,
+      rows: [],
+      errors: [externalErr(EXTERNAL_DEPS_CODES.tableAbsent, `section "${s.heading}" (line ${s.line}) has no table with a data row`)],
+    };
+  }
+  const { header, rows } = parsed;
+  const headerOk = header.length === EXTERNAL_DEPS_HEADER.length && header.every((c, i) => c === EXTERNAL_DEPS_HEADER[i]);
+  if (!headerOk) {
+    return {
+      present: true,
+      rows: [],
+      errors: [
+        externalErr(
+          EXTERNAL_DEPS_CODES.headerDiffers,
+          `section "${s.heading}" line ${table[0].line}: header is "${header.join(" | ")}", expected exactly "${EXTERNAL_DEPS_HEADER.join(" | ")}"`,
+        ),
+      ],
+    };
+  }
+  const out: ExternalDep[] = [];
+  const errors: FanoutError[] = [];
+  rows.forEach((r, idx) => {
+    const n = idx + 1;
+    const defect = externalRowDefect(r.cells);
+    if (defect !== undefined) {
+      errors.push(externalErr(EXTERNAL_DEPS_CODES.rowInvalid, `${EXTERNAL_DEPS_SECTION} row ${n} (line ${r.line}): ${defect}`));
+      return;
+    }
+    const [repo, ticket, branch, sha, source] = r.cells;
+    out.push({ repo: unBacktick(repo), ticket, branch: unBacktick(branch), sha: unBacktick(sha), source, row: n, line: r.line });
+  });
+  return { present: true, rows: out, errors };
+}
+
 /**
  * Every format error in the manifest (validate reports all of them). A
- * closed manifest's handoff section is checked here only, never by the
- * parser, so render and both check modes never see those errors.
+ * closed manifest's handoff section and the optional `## 外部依賴` section
+ * are checked here only, never by the parser, so render and both check
+ * modes never see those errors.
  */
 export function validateManifest(text: string): { manifest: Manifest; errors: FanoutError[] } {
   const manifest = parseManifest(text);
-  if (!isManifestClosed(text)) return { manifest, errors: manifest.errors };
-  return { manifest, errors: [...manifest.errors, ...handoffSectionErrors(text)] };
+  const handoff = isManifestClosed(text) ? handoffSectionErrors(text) : [];
+  return { manifest, errors: [...manifest.errors, ...handoff, ...readExternalDeps(text).errors] };
 }
 
 // --- lane lookup -------------------------------------------------------------

@@ -100,8 +100,9 @@ export declare const CUT_GLOB_NOTE = "note: a glob in touches is in bounds only 
  * "input" = a CLI/environment input (flag, git ref, file), not the manifest text.
  * "cut" = the `## Cut` table of a lane spec read by check --cut.
  * "handoff" = a closed manifest's `## 接手步驟` section (validate only).
+ * "external" = the optional `## 外部依賴` section (validate and handoff --check only).
  */
-export type FanoutErrorScope = "title" | "base" | "lanes" | "row" | "pins" | "decisions" | "cut" | "input" | "handoff";
+export type FanoutErrorScope = "title" | "base" | "lanes" | "row" | "pins" | "decisions" | "cut" | "input" | "handoff" | "external";
 export interface FanoutError {
     code: string;
     message: string;
@@ -240,10 +241,52 @@ export declare function findHandoffSections(text: string): {
 }[];
 /** `無`, optionally after one `- ` / `* ` list marker and before one `。`. */
 export declare function readsNone(line: string): boolean;
+/** Name of the optional section recording work this wave depends on in sister repos. */
+export declare const EXTERNAL_DEPS_SECTION = "\u5916\u90E8\u4F9D\u8CF4";
+/** Exact header of the `## 外部依賴` table; `repo` is a `sisterRepos` name. */
+export declare const EXTERNAL_DEPS_HEADER: readonly ["repo", "票", "branch", "sha", "協定出處"];
+/**
+ * Format error codes of the `## 外部依賴` section. CLI codes, named outside
+ * the gate-suffix vocabulary like FANOUT_CODES.
+ */
+export declare const EXTERNAL_DEPS_CODES: {
+    readonly sectionDuplicate: "EXTERNAL_DEPS_SECTION_DUPLICATE";
+    readonly tableAbsent: "EXTERNAL_DEPS_TABLE_ABSENT";
+    readonly headerDiffers: "EXTERNAL_DEPS_HEADER_DIFFERS";
+    readonly rowInvalid: "EXTERNAL_DEPS_ROW_INVALID";
+};
+/** One well-formed `## 外部依賴` row (repo, branch and sha with one backtick pair stripped). */
+export interface ExternalDep {
+    repo: string;
+    ticket: string;
+    branch: string;
+    sha: string;
+    source: string;
+    /** 1-based data-row number within the table. */
+    row: number;
+    line: number;
+}
+export interface ExternalDepsRead {
+    /** Whether the manifest has at least one `## 外部依賴` heading. */
+    present: boolean;
+    /** Well-formed rows in table order; empty whenever a section-level error is found. */
+    rows: ExternalDep[];
+    errors: FanoutError[];
+}
+/**
+ * Read the optional `## 外部依賴` section (heading name optionally qualified).
+ * Pure. No section ⇒ no rows and no errors. Otherwise: exactly one section,
+ * its first table headed exactly EXTERNAL_DEPS_HEADER with at least one data
+ * row, and one EXTERNAL_DEPS_ROW_INVALID per malformed row. Validated whether
+ * or not the manifest is closed. parseManifest never calls it, so render,
+ * check, owners and handoff generate are unaffected by the section.
+ */
+export declare function readExternalDeps(text: string): ExternalDepsRead;
 /**
  * Every format error in the manifest (validate reports all of them). A
- * closed manifest's handoff section is checked here only, never by the
- * parser, so render and both check modes never see those errors.
+ * closed manifest's handoff section and the optional `## 外部依賴` section
+ * are checked here only, never by the parser, so render and both check
+ * modes never see those errors.
  */
 export declare function validateManifest(text: string): {
     manifest: Manifest;
