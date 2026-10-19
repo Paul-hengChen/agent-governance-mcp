@@ -309,7 +309,7 @@ test("AC10: SOP execution stage — mailbox + cut pre-review formalized", () => 
   assert.ok(SOP.includes("lane-status.mjs --watch"));
   assert.ok(SOP.includes("--mailbox-root"));
   // format referenced, not copied
-  assert.ok(SOP.includes("Message format, lane-side rules and the report format: `docs/lane-protocol.md` §5 and §6 — the only copy."));
+  assert.ok(SOP.includes("Message format, lane-side rules and the report format: `docs/lane-protocol.md` §5 and §6 — the only copy; a repo's own lane rules live in the addendum named by `laneProtocolAddendum`."));
 });
 
 test("AC11: docs/lane-protocol.md §5 — wait armed across every human-approval pause; architect second pre-review; Q3 default", () => {
