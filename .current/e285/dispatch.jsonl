@@ -1,0 +1,10 @@
+{"ts":"2026-10-19T03:15:04.891Z","feature":"e285-integrator-session-handoff","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-19T03:18:52.649Z","feature":"e285-integrator-session-handoff","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-19T03:24:34.773Z","feature":"e285-integrator-session-handoff","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-19T03:25:27.501Z","feature":"e285-integrator-session-handoff","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-19T03:32:47.180Z","feature":"e285-integrator-session-handoff","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-19T03:37:11.994Z","feature":"e285-integrator-session-handoff","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-19T03:37:44.022Z","feature":"e285-integrator-session-handoff","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-19T03:40:40.552Z","feature":"e285-integrator-session-handoff","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-19T03:41:27.064Z","feature":"e285-integrator-session-handoff","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-10-19T03:54:37.216Z","feature":"e285-integrator-session-handoff","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}

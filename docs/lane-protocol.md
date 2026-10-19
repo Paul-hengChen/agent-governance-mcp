@@ -16,10 +16,14 @@
    `agc` 在本 repo 不在 PATH 上，一律用 `node bin/agc-init.mjs` 呼叫（adopter 裝了套件後才有 `agc`）。
    `feature start` 會建 worktree、把 `node_modules` 連回 primary、複製 `.env`、寫好 exclude 規則。
    - **不要在 lane 裡跑 `npm ci` / `npm install`**：`node_modules` 是連回 primary 的 symlink，`npm ci` 會先刪掉整個目錄，連 primary 的一起刪。要改相依套件，先 `rm node_modules`（只刪 symlink）再 `npm ci`。
-   - 派工 prompt 裡的 `<worktree>` 一定是絕對路徑（`render` 會把清單裡「相對於 primary」的 worktree 欄解析成絕對路徑）；它只用來 `cd`，**不要**把它寫進任何 tracked 檔（handoff、spec、報告、測試）。tracked 檔提到 worktree 時，用 `../<lanes-dir>/<lane>` 這種相對形式或類別描述。
+   - 派工 prompt 裡的 `<worktree>` 一定是絕對路徑（`render` 會把清單裡「相對於 primary」的 worktree 欄解析成絕對路徑）；它只用來 `cd` 與 `EnterWorktree` 的 `path`，**不要**把它寫進任何 tracked 檔（handoff、spec、報告、測試）。tracked 檔提到 worktree 時，用 `../<lanes-dir>/<lane>` 這種相對形式或類別描述。
+   - **切進 worktree**：`feature start` 成功之後、其他任何步驟之前，lane 以 `EnterWorktree` 工具（參數 `path` 設為自己的 worktree 絕對路徑）讓 session 改在 worktree 裡執行；切換成功後，harness 每次重置 cwd 都回到 worktree 而不是 primary，所以指令前面不必再逐條加 `cd`。
+   - **確認位置**：切換後先用兩次各自獨立的 Bash 呼叫分別跑 `pwd` 與 `git branch --show-current`，確認前者印出你的 worktree、後者印出派工的 branch；任何一項不符 → 停下來回報，這時還不呼叫任何 `tw_*`。
+   - **git 一條一條下**：切進 worktree 的 session 有 git 防護，會拒絕 `git -C <primary> …`，也會拒絕任何含 git 的複合指令（例如 `a && git b`、`git a; b`）；所以 git 指令一條一條下，每次 Bash 呼叫只放一條單純的 git 指令。
 2. lane 名由 branch 自動解析（`feat/<ticket-id>-<slug>` → `<ticket-id>`），狀態寫進 `.current/<lane>/`。
 3. **所有 `tw_*` 的 `workspace_path` 一律傳你的 worktree 路徑**，絕不傳 primary。
-4. harness 每次 Bash 呼叫後會把 cwd 重置回 primary：每個會建立或修改檔案的 bash 呼叫都要自帶 `cd <worktree> &&`，或用絕對路徑。臨時檔放 `$TMPDIR` 或 scratchpad，**永遠不要**在 repo 根目錄建臨時目錄。
+4. `EnterWorktree` 不能用時（host 不是 Claude Code，或工具拒絕切換），harness 每次 Bash 呼叫後會把 cwd 重置回 primary，照原規則：每個會建立或修改檔案的 bash 呼叫都要自帶 `cd <worktree> &&`，或用絕對路徑。
+   以下兩條不論有沒有切換都適用：臨時檔放 `$TMPDIR` 或 scratchpad，**永遠不要**在 repo 根目錄建臨時目錄；信箱檔案在 worktree 之外，一律用絕對路徑讀寫。
 5. 看到 `HANDOFF_LAYOUT_CONFLICT` → 停下來回報，不要刪檔。
 6. 開工時先讀一次你的信箱 `to-lane.md`（§5），整合者可能已經留了訊息。
 

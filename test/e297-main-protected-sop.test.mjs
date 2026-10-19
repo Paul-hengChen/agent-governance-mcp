@@ -34,7 +34,7 @@ test("AC1: integrator Stage 6 lands the wave by pull request — all six pattern
     "git push -u origin integ/<feature>",
     "gh pr merge --auto --merge",
     "gh pr view <n> --json state,mergeCommit",
-    "git pull --ff-only",
+    "git -c pull.rebase=false pull --ff-only",
     "git branch -d integ/<feature>",
   ]) {
     assert.ok(stage6.includes(pattern), `Stage 6 must contain: ${pattern}`);
@@ -73,7 +73,7 @@ test("AC5: 13a-13b close-out lands bookkeeping by pull request (D10 row kept)", 
 test("AC7: Constitution section 6 — grant names gh pr create/merge, namespaces, pinned sentence and FORBIDDEN list unchanged", () => {
   assert.ok(CONST15.includes("gh pr create"));
   assert.ok(CONST15.includes("gh pr merge --auto --merge"));
-  assert.ok(CONST15.includes("`git pull --ff-only` on `main` is on the base list as read-plus-ff"));
+  assert.ok(CONST15.includes("`git -c pull.rebase=false pull --ff-only` on `main` is on the base list as read-plus-ff"));
   assert.ok(CONST15.includes("`release-engineer` limited to `release/*`"), "release-engineer namespace");
   assert.ok(CONST15.includes("the coordinator limited to `docs/*`"), "coordinator namespace");
   // Pinned first sentence — byte-identical, so the base list cannot widen by accident.
