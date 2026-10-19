@@ -79,6 +79,11 @@ export interface WorkspaceConfig {
   // root. Present (possibly []) only when the key is an array; it replaces
   // the root-only default. bin/agc-init.mjs reads the key raw, not here.
   nodeModulesLinks?: string[];
+  // Repo-level lane-protocol addendum that `fanout.mjs render` points each
+  // lane at next to agc's generic lane rules: a path relative to the repo
+  // root. Surfaced verbatim when it is a non-empty string; render, not this
+  // loader, rejects absolute / "~" / ".." values and a missing file.
+  laneProtocolAddendum?: string;
 }
 
 export type WorkspaceArtifactsMode = "local" | "repo";
@@ -334,6 +339,14 @@ function loadConfigEntry(workspacePath: string): ConfigCacheEntry {
   const nodeModulesLinks = parseNodeModulesLinks(migration.payload.nodeModulesLinks);
   if (nodeModulesLinks !== null) {
     result.nodeModulesLinks = nodeModulesLinks.links;
+  }
+  // Additive-optional field (no schema_version bump — same precedent as
+  // staleDispatchNotifyFile). Non-fatal filter: only a non-empty string is
+  // surfaced, byte-verbatim; anything else is treated as absent (render keeps
+  // its single generic pointer), never an error.
+  const laneProtocolAddendum = migration.payload.laneProtocolAddendum;
+  if (typeof laneProtocolAddendum === "string" && laneProtocolAddendum.length > 0) {
+    result.laneProtocolAddendum = laneProtocolAddendum;
   }
   // Cache under the pre-read mtime. If the migration heal-on-read above
   // rewrote the file, the recorded mtime is already stale — the NEXT call's

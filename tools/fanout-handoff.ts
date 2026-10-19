@@ -105,12 +105,27 @@ function git(args: string[], cwd: string): string {
   return execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: GIT_MAX_BUFFER });
 }
 
+/**
+ * The git subcommand in `args`: the first argument that is not an option,
+ * skipping a `-c <name>=<value>` pair so its value is never read as the subcommand.
+ */
+function gitSubcommand(args: string[]): string {
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "-c") {
+      i++;
+      continue;
+    }
+    if (!args[i].startsWith("-")) return args[i];
+  }
+  return args[0];
+}
+
 /** git output for a required fact; a failure is HANDOFF_GIT_FAILED naming the fact and the subcommand. */
 function gitFact(key: string, args: string[], cwd: string): string {
   try {
     return git(args, cwd);
   } catch (err) {
-    const sub = args.find((x) => !x.startsWith("-")) ?? args[0];
+    const sub = gitSubcommand(args);
     throw new HandoffFailure([inputErr(HANDOFF_CLI_CODES.gitFailed, `git ${sub} failed for fact "${key}": ${gitErrorLine(err)}`)]);
   }
 }
@@ -275,8 +290,11 @@ export function collectFacts(m: Manifest, manifestText: string, opts: HandoffOpt
   }
 
   // Pasting the section dirties the manifest itself, so it is left out.
+  // core.quotePath=false keeps a non-ASCII path unquoted and unescaped, so
+  // the manifest's own line still matches manifestRel and other paths read
+  // as typed.
   const manifestRel = opts.manifestPath !== undefined ? relToPrimary(primaryReal, opts.manifestPath) : undefined;
-  const statusLines = gitFact("git status", ["--no-optional-locks", "status", "--porcelain"], primary)
+  const statusLines = gitFact("git status", ["-c", "core.quotePath=false", "--no-optional-locks", "status", "--porcelain"], primary)
     .split(/\r?\n/)
     .filter((l) => l.trim() !== "")
     .filter((l) => {

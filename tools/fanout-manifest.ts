@@ -4,12 +4,16 @@
 // cut containment check (checkCut); the format contract is the table in
 // specs/e177a-fanout-manifest.md. It never guesses:
 // a legacy manifest part is reported unreadable by name. Read-only: writes
-// nothing, fires no gate; git is read via execFileSync argv, never a shell.
+// nothing of its own and fires no gate (render reads primary's config through
+// loadConfig, which shares that loader's heal-on-read); git is read via
+// execFileSync argv, never a shell.
 // Why: specs/e260a-tools-a-h-rationale.md, "tools/fanout-manifest.ts — never guess".
 
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { getConfigError, loadConfig } from "./config.js";
 
 // --- constants ---------------------------------------------------------------
 
@@ -78,6 +82,7 @@ const PIN_SPAN_RE = /^([a-z-]+)=(\S+)$/;
 export const PROMPT_TEMPLATE_3B = `開始做 <計劃或 feature>，你只負責 <lane> lane 的 <票>（<一句話>）。
 
 先完整讀 docs/lane-protocol.md（共同規則，包括信箱與回報格式），再讀 <計劃的必讀章節> + <票面 row>。
+\`feature start\` 建好 worktree 之後，呼叫 \`EnterWorktree\`（path = <worktree>）把這個 session 切進去；這個工具不能用時，每個 Bash 指令照舊自帶 \`cd <worktree> &&\`。
 你只負責這張票走到 qa PASS；波次層級的核取項屬於整合者。
 
 【你的欄位】
@@ -92,6 +97,27 @@ export const PROMPT_TEMPLATE_3B = `開始做 <計劃或 feature>，你只負責 
 
 需要跟整合者討論的事一律走信箱，不要請我轉貼。需要我核准的事，等我在這裡親手打字。
 `;
+
+/** The template's single lane-rules pointer, used while laneProtocolAddendum is unset. */
+const LANE_PROTOCOL_POINTER = "先完整讀 docs/lane-protocol.md（共同規則，包括信箱與回報格式），";
+
+/**
+ * Replacement for LANE_PROTOCOL_POINTER when primary's config sets
+ * laneProtocolAddendum: agc's generic lane rules plus the repo's addendum.
+ * `<generic>` and `<addendum>` are filled by the same single substitution
+ * pass as every other placeholder.
+ */
+const LANE_PROTOCOL_POINTER_TWO_LAYER = "先完整讀 <generic>（agc 通用規則，包括信箱與回報格式）和 <addendum>（本 repo 的補充規則），";
+
+/** agc's generic lane rules, relative to an agc checkout or install root. */
+const GENERIC_LANE_PROTOCOL = "docs/lane-protocol.md";
+
+/**
+ * Root of the agc install that holds this module: two directories up from
+ * the compiled dist/tools/fanout-manifest.js. The package ships the whole
+ * repo, docs/ included, so the generic lane rules live under it.
+ */
+const DEFAULT_INSTALL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 /**
  * Error codes of this CLI whose spec names would otherwise read as absence /
@@ -140,6 +166,13 @@ export const FANOUT_CODES = {
   // owners input errors (exit 2).
   rangeInvalid: "RANGE_INVALID",
   pathsUnreadable: "PATHS_UNREADABLE",
+  // render input errors, raised only while primary's config sets
+  // laneProtocolAddendum (exit 2): the value is not a relative path inside
+  // the repo, it names no file under primary, or the agc install lacks the
+  // generic lane rules.
+  addendumInvalid: "ADDENDUM_INVALID",
+  addendumAbsent: "ADDENDUM_ABSENT",
+  laneProtocolAbsent: "LANE_PROTOCOL_ABSENT",
   // owners --range / check input error (exit 2): the `git diff <a>...<b>`
   // itself failed, e.g. the two sides share no merge base.
   gitDiffFailed: "GIT_DIFF_FAILED",
@@ -758,7 +791,7 @@ const STATUS_CLOSED_RE = /^狀態[：:]\s*已結案/;
 /** Name of the handoff section a closed manifest must carry. */
 export const HANDOFF_SECTION = "接手步驟";
 
-/** Sub-items (`### ` headings) every handoff section must hold, in order. */
+/** Sub-items (`### ` headings) every handoff section must hold, each exactly once with a non-empty body; their order is not checked. */
 export const HANDOFF_SUBITEMS = ["核對 primary", "已結案", "待人類決定", "進行中的背景工作"] as const;
 
 /** The sub-item whose single body line must read 無 once the wave is closed. */
@@ -774,9 +807,13 @@ const PATH_BOUNDARY = "[\\s`'\"(\\[（「：，、=:,|]";
 /**
  * Where a path token may start: a line start, a boundary character, or a
  * bold opener `**` that itself follows a line start or a boundary character
- * (so `tools/**` + `/a/b` is not a start).
+ * (so `tools/**` + `/a/b` is not a start). A backtick never opens bold:
+ * inside a code span `**` is literal, so a glob written in a code span
+ * (`**` + `/a/b` after a backtick) is not a path start. Every other boundary
+ * before `**` still opens bold — the remedy for a bare glob that reads as an
+ * absolute path is to write the glob inside a code span.
  */
-const PATH_START = `(?:^|${PATH_BOUNDARY})(?:\\*\\*)?`;
+const PATH_START = `(?:^|${PATH_BOUNDARY})(?:(?<!\`)\\*\\*)?`;
 
 /**
  * Machine-local absolute path forms:
@@ -971,9 +1008,20 @@ export interface RenderOptions {
   base?: string;
   /** Directory used to resolve `primary` via `git worktree list --porcelain` when `primary` is absent. */
   manifestDir?: string;
+  /**
+   * Test seam: the agc install root whose docs/lane-protocol.md is the
+   * generic lane rules. The CLI never sets it; the default is the install
+   * that holds this module.
+   */
+  installRoot?: string;
 }
 
-export type RenderResult = { ok: true; prompt: string } | { ok: false; errors: FanoutError[] };
+/** `warnings`: non-fatal lines for stderr (render still succeeds); present only when non-empty. */
+export type RenderResult = { ok: true; prompt: string; warnings?: string[] } | { ok: false; errors: FanoutError[] };
+
+/** render warning: primary's config cannot be used, so the addendum pointer is dropped. */
+export const CONFIG_UNREADABLE_WARN = (configError: string): string =>
+  `WARN  CONFIG_UNREADABLE: laneProtocolAddendum could not be read (${configError}) — the prompt points only at docs/lane-protocol.md`;
 
 // 64 MiB: `git ls-tree -r` lists every path at base (for the owned-token
 // existence check); execFileSync's 1 MiB default would fail on a large repo.
@@ -1045,6 +1093,91 @@ export function resolveMailboxHeader(header: string, primary: string): MailboxRe
 
 function inputErr(code: string, message: string): FanoutError {
   return { code, scope: "input", message };
+}
+
+/** fs.realpathSync, or path.resolve when the path cannot be resolved on disk. */
+function realOrResolved(p: string): string {
+  try {
+    return fs.realpathSync(p);
+  } catch {
+    return path.resolve(p);
+  }
+}
+
+function isRegularFile(p: string): boolean {
+  try {
+    return fs.statSync(p).isFile();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Whether a laneProtocolAddendum value is a path relative to the repo root
+ * that stays inside it: not absolute (POSIX or Windows form), not starting
+ * with "~", and not normalizing to "." or to a path whose first segment is "..".
+ */
+export function isValidAddendumPath(value: string): boolean {
+  if (path.isAbsolute(value) || path.win32.isAbsolute(value) || /^[A-Za-z]:/.test(value)) return false;
+  if (value.startsWith("~")) return false;
+  const norm = path.posix.normalize(value.replaceAll("\\", "/")).replace(/\/+$/, "") || ".";
+  return norm !== "." && norm.split("/")[0] !== "..";
+}
+
+type LanePointer = { generic: string; addendum: string };
+
+/**
+ * Lane-rules pointer for the prompt, read from primary's config. Returns
+ * undefined (the unchanged single pointer) when the key is unset or the
+ * config is unusable — the latter adds a CONFIG_UNREADABLE warning, since a
+ * key-less workspace with a broken config must keep rendering. With the key
+ * set, every problem is pushed to `errors`; the value is echoed only by
+ * ADDENDUM_ABSENT, after it is known to be relative.
+ */
+function resolveLanePointer(
+  primary: string,
+  installRoot: string,
+  errors: FanoutError[],
+  warnings: string[],
+): LanePointer | undefined {
+  const configError = getConfigError(primary);
+  if (configError !== null) {
+    // One stderr line, whatever the load error text holds.
+    warnings.push(CONFIG_UNREADABLE_WARN(configError.replace(/\s*[\r\n]+\s*/g, " ")));
+    return undefined;
+  }
+  const addendum = loadConfig(primary).laneProtocolAddendum;
+  if (addendum === undefined) return undefined;
+
+  let ok = true;
+  if (!isValidAddendumPath(addendum)) {
+    errors.push(
+      inputErr(
+        FANOUT_CODES.addendumInvalid,
+        'laneProtocolAddendum in .current/.config.json must be a path relative to the repo root and inside it — absolute, "~" and ".." paths are refused',
+      ),
+    );
+    ok = false;
+  } else if (!isRegularFile(path.resolve(primary, addendum))) {
+    errors.push(inputErr(FANOUT_CODES.addendumAbsent, `laneProtocolAddendum "${addendum}" (.current/.config.json) is not a file under primary`));
+    ok = false;
+  }
+  if (!isRegularFile(path.join(installRoot, GENERIC_LANE_PROTOCOL))) {
+    errors.push(
+      inputErr(
+        FANOUT_CODES.laneProtocolAbsent,
+        "laneProtocolAddendum is set, but the agc generic rules docs/lane-protocol.md were not found in the agc install",
+      ),
+    );
+    ok = false;
+  }
+  if (!ok) return undefined;
+  // Same checkout: the relative pointer also resolves inside a lane worktree
+  // of this repo. Otherwise the absolute path inside the agc install, which
+  // only ever lands in the rendered prompt, never in a tracked file.
+  const generic =
+    realOrResolved(installRoot) === realOrResolved(primary) ? GENERIC_LANE_PROTOCOL : path.join(installRoot, GENERIC_LANE_PROTOCOL);
+  return { generic, addendum };
 }
 
 /**
@@ -1128,6 +1261,14 @@ export function renderPrompt(m: Manifest, laneId: string, opts: RenderOptions): 
     else errors.push(inputErr(mb.code, mb.message));
   }
 
+  // Lane-rules pointer: primary's config is read only once primary is known,
+  // under the same skip as the worktree and mailbox resolution above.
+  const warnings: string[] = [];
+  let pointer: LanePointer | undefined;
+  if (primary !== undefined) {
+    pointer = resolveLanePointer(primary, opts.installRoot ?? DEFAULT_INSTALL_ROOT, errors, warnings);
+  }
+
   if (errors.length > 0) return { ok: false, errors };
 
   let pinsText = PINS_NONE;
@@ -1152,11 +1293,17 @@ export function renderPrompt(m: Manifest, laneId: string, opts: RenderOptions): 
     "<禁止>": lane.forbidden,
     "<票>": lane.ticket,
   };
+  let template = PROMPT_TEMPLATE_3B;
+  if (pointer !== undefined) {
+    template = template.replace(LANE_PROTOCOL_POINTER, LANE_PROTOCOL_POINTER_TWO_LAYER);
+    values["<generic>"] = pointer.generic;
+    values["<addendum>"] = pointer.addendum;
+  }
   // Single pass so substituted cell text is never re-scanned for placeholders.
   const keys = Object.keys(values).sort((a, b) => b.length - a.length);
   const re = new RegExp(keys.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|"), "g");
-  const prompt = PROMPT_TEMPLATE_3B.replace(re, (k) => values[k]);
-  return { ok: true, prompt };
+  const prompt = template.replace(re, (k) => values[k]);
+  return warnings.length > 0 ? { ok: true, prompt, warnings } : { ok: true, prompt };
 }
 
 // --- glob + check ------------------------------------------------------------
@@ -1969,7 +2116,8 @@ export function runRender(args: string[]): CliResult {
   opts.manifestDir = path.dirname(path.resolve(file));
   const res = renderPrompt(parseManifest(r.text), lane, opts);
   if (!res.ok) return fail(res.errors);
-  return { stdout: res.prompt, stderr: "", exitCode: 0 };
+  const stderr = (res.warnings ?? []).map((w) => `${w}\n`).join("");
+  return { stdout: res.prompt, stderr, exitCode: 0 };
 }
 
 export function runCheck(args: string[]): CliResult {

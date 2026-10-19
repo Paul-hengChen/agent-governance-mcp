@@ -29,7 +29,7 @@ export declare const BASE_RE: RegExp;
  * The bytes are pinned by the E177a render golden — do not edit the wording
  * here without re-baselining that golden.
  */
-export declare const PROMPT_TEMPLATE_3B = "\u958B\u59CB\u505A <\u8A08\u5283\u6216 feature>\uFF0C\u4F60\u53EA\u8CA0\u8CAC <lane> lane \u7684 <\u7968>\uFF08<\u4E00\u53E5\u8A71>\uFF09\u3002\n\n\u5148\u5B8C\u6574\u8B80 docs/lane-protocol.md\uFF08\u5171\u540C\u898F\u5247\uFF0C\u5305\u62EC\u4FE1\u7BB1\u8207\u56DE\u5831\u683C\u5F0F\uFF09\uFF0C\u518D\u8B80 <\u8A08\u5283\u7684\u5FC5\u8B80\u7AE0\u7BC0> + <\u7968\u9762 row>\u3002\n\u4F60\u53EA\u8CA0\u8CAC\u9019\u5F35\u7968\u8D70\u5230 qa PASS\uFF1B\u6CE2\u6B21\u5C64\u7D1A\u7684\u6838\u53D6\u9805\u5C6C\u65BC\u6574\u5408\u8005\u3002\n\n\u3010\u4F60\u7684\u6B04\u4F4D\u3011\n- primary: <primary \u8DEF\u5F91>    base: <base>    ticket-slug: <ticket-slug>\n- branch: <branch>    worktree: <worktree>    lane: <lane>\n- \u4FE1\u7BB1: <lanes-root>/_mailbox/<lane>/\uFF08\u4F60\u5BEB to-integrator.md\uFF0C\u8B80 to-lane.md\uFF09\n- dispatch pins: <\u4F8B\u5982 sr-engineer=fable>\n\n\u3010\u4F60\u64C1\u6709\u7684\u6A94\u6848\u3011<\u64C1\u6709>\uFF0C\u52A0\u4E0A\u9019\u5F35\u7968\u65B0\u5EFA\u7684\u6A94\u6848\u8207\u5B83\u81EA\u5DF1\u7684\u6E2C\u8A66\u6A94\n\u3010\u4E0D\u51C6\u78B0\u3011<\u7981\u6B62>\n\u3010\u7BC4\u570D\u5207\u7DDA\uFF08\u6574\u5408\u8005\u5DF2\u6C7A\u5B9A\uFF09\u3011\u505A\uFF1A<\u2026>\u3000\u4E0D\u505A\uFF1A<\u2026>\n\n\u9700\u8981\u8DDF\u6574\u5408\u8005\u8A0E\u8AD6\u7684\u4E8B\u4E00\u5F8B\u8D70\u4FE1\u7BB1\uFF0C\u4E0D\u8981\u8ACB\u6211\u8F49\u8CBC\u3002\u9700\u8981\u6211\u6838\u51C6\u7684\u4E8B\uFF0C\u7B49\u6211\u5728\u9019\u88E1\u89AA\u624B\u6253\u5B57\u3002\n";
+export declare const PROMPT_TEMPLATE_3B = "\u958B\u59CB\u505A <\u8A08\u5283\u6216 feature>\uFF0C\u4F60\u53EA\u8CA0\u8CAC <lane> lane \u7684 <\u7968>\uFF08<\u4E00\u53E5\u8A71>\uFF09\u3002\n\n\u5148\u5B8C\u6574\u8B80 docs/lane-protocol.md\uFF08\u5171\u540C\u898F\u5247\uFF0C\u5305\u62EC\u4FE1\u7BB1\u8207\u56DE\u5831\u683C\u5F0F\uFF09\uFF0C\u518D\u8B80 <\u8A08\u5283\u7684\u5FC5\u8B80\u7AE0\u7BC0> + <\u7968\u9762 row>\u3002\n`feature start` \u5EFA\u597D worktree \u4E4B\u5F8C\uFF0C\u547C\u53EB `EnterWorktree`\uFF08path = <worktree>\uFF09\u628A\u9019\u500B session \u5207\u9032\u53BB\uFF1B\u9019\u500B\u5DE5\u5177\u4E0D\u80FD\u7528\u6642\uFF0C\u6BCF\u500B Bash \u6307\u4EE4\u7167\u820A\u81EA\u5E36 `cd <worktree> &&`\u3002\n\u4F60\u53EA\u8CA0\u8CAC\u9019\u5F35\u7968\u8D70\u5230 qa PASS\uFF1B\u6CE2\u6B21\u5C64\u7D1A\u7684\u6838\u53D6\u9805\u5C6C\u65BC\u6574\u5408\u8005\u3002\n\n\u3010\u4F60\u7684\u6B04\u4F4D\u3011\n- primary: <primary \u8DEF\u5F91>    base: <base>    ticket-slug: <ticket-slug>\n- branch: <branch>    worktree: <worktree>    lane: <lane>\n- \u4FE1\u7BB1: <lanes-root>/_mailbox/<lane>/\uFF08\u4F60\u5BEB to-integrator.md\uFF0C\u8B80 to-lane.md\uFF09\n- dispatch pins: <\u4F8B\u5982 sr-engineer=fable>\n\n\u3010\u4F60\u64C1\u6709\u7684\u6A94\u6848\u3011<\u64C1\u6709>\uFF0C\u52A0\u4E0A\u9019\u5F35\u7968\u65B0\u5EFA\u7684\u6A94\u6848\u8207\u5B83\u81EA\u5DF1\u7684\u6E2C\u8A66\u6A94\n\u3010\u4E0D\u51C6\u78B0\u3011<\u7981\u6B62>\n\u3010\u7BC4\u570D\u5207\u7DDA\uFF08\u6574\u5408\u8005\u5DF2\u6C7A\u5B9A\uFF09\u3011\u505A\uFF1A<\u2026>\u3000\u4E0D\u505A\uFF1A<\u2026>\n\n\u9700\u8981\u8DDF\u6574\u5408\u8005\u8A0E\u8AD6\u7684\u4E8B\u4E00\u5F8B\u8D70\u4FE1\u7BB1\uFF0C\u4E0D\u8981\u8ACB\u6211\u8F49\u8CBC\u3002\u9700\u8981\u6211\u6838\u51C6\u7684\u4E8B\uFF0C\u7B49\u6211\u5728\u9019\u88E1\u89AA\u624B\u6253\u5B57\u3002\n";
 /**
  * Error codes of this CLI whose spec names would otherwise read as absence /
  * mismatch conditions. These are CLI codes, not tw_update_state gate codes, so
@@ -68,6 +68,9 @@ export declare const FANOUT_CODES: {
     readonly specUnreadable: "SPEC_UNREADABLE";
     readonly rangeInvalid: "RANGE_INVALID";
     readonly pathsUnreadable: "PATHS_UNREADABLE";
+    readonly addendumInvalid: "ADDENDUM_INVALID";
+    readonly addendumAbsent: "ADDENDUM_ABSENT";
+    readonly laneProtocolAbsent: "LANE_PROTOCOL_ABSENT";
     readonly gitDiffFailed: "GIT_DIFF_FAILED";
 };
 /**
@@ -192,7 +195,7 @@ export declare function unquotedPaths(cell: string): string[];
 export declare function parseManifest(text: string): Manifest;
 /** Name of the handoff section a closed manifest must carry. */
 export declare const HANDOFF_SECTION = "\u63A5\u624B\u6B65\u9A5F";
-/** Sub-items (`### ` headings) every handoff section must hold, in order. */
+/** Sub-items (`### ` headings) every handoff section must hold, each exactly once with a non-empty body; their order is not checked. */
 export declare const HANDOFF_SUBITEMS: readonly ["核對 primary", "已結案", "待人類決定", "進行中的背景工作"];
 /** The sub-item whose single body line must read 無 once the wave is closed. */
 export declare const HANDOFF_BACKGROUND = "\u9032\u884C\u4E2D\u7684\u80CC\u666F\u5DE5\u4F5C";
@@ -254,14 +257,24 @@ export interface RenderOptions {
     base?: string;
     /** Directory used to resolve `primary` via `git worktree list --porcelain` when `primary` is absent. */
     manifestDir?: string;
+    /**
+     * Test seam: the agc install root whose docs/lane-protocol.md is the
+     * generic lane rules. The CLI never sets it; the default is the install
+     * that holds this module.
+     */
+    installRoot?: string;
 }
+/** `warnings`: non-fatal lines for stderr (render still succeeds); present only when non-empty. */
 export type RenderResult = {
     ok: true;
     prompt: string;
+    warnings?: string[];
 } | {
     ok: false;
     errors: FanoutError[];
 };
+/** render warning: primary's config cannot be used, so the addendum pointer is dropped. */
+export declare const CONFIG_UNREADABLE_WARN: (configError: string) => string;
 /** First `worktree` entry of `git worktree list --porcelain` (git lists the main worktree first). */
 export declare function resolvePrimary(dir: string): string | undefined;
 /** True when a worktree cell is an absolute path (platform `path.isAbsolute`). */
@@ -297,6 +310,12 @@ export type MailboxResolution = {
  * relative → path.resolve(primary, header), and `..` above primary is allowed.
  */
 export declare function resolveMailboxHeader(header: string, primary: string): MailboxResolution;
+/**
+ * Whether a laneProtocolAddendum value is a path relative to the repo root
+ * that stays inside it: not absolute (POSIX or Windows form), not starting
+ * with "~", and not normalizing to "." or to a path whose first segment is "..".
+ */
+export declare function isValidAddendumPath(value: string): boolean;
 /**
  * Render the §3b dispatch prompt for one dispatchable lane. Every field comes
  * from a stated source (spec "Render field sources"); an absent source is an

@@ -133,6 +133,33 @@ Semantics:
 - **Exclude rules.** Each listed directory other than `"."` adds a `/<dir>/node_modules` rule (no trailing slash: the lane copy is a symlink) to the shared `.git/info/exclude`, next to the usual lane rules, so the link never shows in `git status`.
 - **No schema version change.** The key is additive-optional; config `schema_version` stays 2 and no migration exists. `loadConfig` surfaces the normalized, deduplicated valid list as `WorkspaceConfig.nodeModulesLinks` (present only when the key is an array); the parser is `parseNodeModulesLinks` in `tools/config.ts`.
 
+### `laneProtocolAddendum` — repo lane-protocol addendum for `fanout.mjs render` (optional)
+
+`node scripts/fanout.mjs render` writes the dispatch prompt for one fan-out lane. By default that prompt tells the lane to read `docs/lane-protocol.md` and nothing else. A repo that adds its own lane rules on top of agc's generic ones names its addendum file here, and `render` then points the lane at both:
+
+```json
+{
+  "laneProtocolAddendum": "docs/lane-protocol-addendum.md"
+}
+```
+
+| Value | What the rendered prompt tells the lane to read first |
+|---|---|
+| absent (or not a non-empty string) | `docs/lane-protocol.md` only — the prompt before this key existed. |
+| set | agc's generic lane rules, then the configured addendum. |
+
+Semantics:
+
+- **Optional.** A path relative to the repo root that names a file. Keep it a tracked file, so it exists in every lane worktree; the path goes into the prompt byte-verbatim and resolves the same in primary and in the worktree.
+- **Where it is read.** By `render`, from the primary checkout's `<repo root>/.current/.config.json` (through `loadConfig`), once primary is known. With no primary, `PRIMARY_NOT_FOUND` stays the only report.
+- **Where the generic rules come from (key set).** When `render` runs from the agc install that is the primary checkout itself (the two resolve to the same real path), the prompt names the relative `docs/lane-protocol.md`. Otherwise it names the absolute path of `docs/lane-protocol.md` inside the agc install. That absolute path appears only in the rendered prompt, never in a tracked file.
+- **Errors (key set only, exit 2, no prompt printed).** Each is reported together with any other missing source:
+  - `ADDENDUM_INVALID` — the value is absolute, starts with `~`, or normalizes to `.` or to a path that starts with `..`. The message does not echo the value.
+  - `ADDENDUM_ABSENT` — the value names no regular file under primary (missing, or a directory).
+  - `LANE_PROTOCOL_ABSENT` — the agc install holds no `docs/lane-protocol.md`. Never raised while the key is unset.
+- **Unusable config is a warning, not a failure.** When primary's `.current/.config.json` cannot be used (unreadable, unparseable, a future `schema_version`), `render` still prints the key-unset prompt and exits 0, with one `CONFIG_UNREADABLE` warning line on stderr naming the load error.
+- **No schema version change.** The key is additive-optional; config `schema_version` stays 2 and no migration exists. `loadConfig` surfaces a non-empty string value verbatim as `WorkspaceConfig.laneProtocolAddendum`; any other value is treated as absent, never as an error.
+
 ---
 
 ## `.current/const-*.md` — constitution override

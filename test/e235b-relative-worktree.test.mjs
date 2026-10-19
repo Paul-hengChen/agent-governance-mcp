@@ -140,11 +140,12 @@ test("R3 AC2 golden", () => {
   const promptLines = r.prompt.split("\n");
   assert.equal(promptLines.length, goldenLines.length);
   for (let i = 0; i < goldenLines.length; i++) {
-    if (goldenLines[i].includes("worktree: /agm-lanes/e177a")) {
+    if (goldenLines[i].includes("/agm-lanes/e177a")) {
+      // The fields line and the EnterWorktree line (E289) both carry the worktree path.
       assert.equal(
         promptLines[i],
-        goldenLines[i].replace("worktree: /agm-lanes/e177a", "worktree: /abs/agm-lanes/e177a"),
-        "only the worktree line may differ, and it must equal the absolute cell byte-verbatim",
+        goldenLines[i].replaceAll("/agm-lanes/e177a", "/abs/agm-lanes/e177a"),
+        "only the lines carrying the worktree path may differ, and they must equal the absolute cell byte-verbatim",
       );
     } else {
       assert.equal(promptLines[i], goldenLines[i], `line ${i} must be unchanged from the golden`);

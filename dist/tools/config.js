@@ -252,6 +252,14 @@ function loadConfigEntry(workspacePath) {
     if (nodeModulesLinks !== null) {
         result.nodeModulesLinks = nodeModulesLinks.links;
     }
+    // Additive-optional field (no schema_version bump — same precedent as
+    // staleDispatchNotifyFile). Non-fatal filter: only a non-empty string is
+    // surfaced, byte-verbatim; anything else is treated as absent (render keeps
+    // its single generic pointer), never an error.
+    const laneProtocolAddendum = migration.payload.laneProtocolAddendum;
+    if (typeof laneProtocolAddendum === "string" && laneProtocolAddendum.length > 0) {
+        result.laneProtocolAddendum = laneProtocolAddendum;
+    }
     // Cache under the pre-read mtime. If the migration heal-on-read above
     // rewrote the file, the recorded mtime is already stale — the NEXT call's
     // stat will mismatch and trigger one redundant (but correct) re-read,

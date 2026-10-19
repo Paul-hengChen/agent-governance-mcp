@@ -17,6 +17,7 @@ export interface WorkspaceConfig {
     staleDispatchNotifyFile?: string;
     artifacts?: WorkspaceArtifactsMode;
     nodeModulesLinks?: string[];
+    laneProtocolAddendum?: string;
 }
 export type WorkspaceArtifactsMode = "local" | "repo";
 export interface NodeModulesLinksParse {
