@@ -35,4 +35,21 @@ body: |
   written as npm test. Decide which become generic wording plus an addendum line, as E349 did.
 ```
 
+```pending-ticket
+lane_local_id: E226-NEW-3
+title: lane-protocol addendum preamble says it only fills 見補充規則 places, but §5 now also carries integrator-SOP tool/CI/bookkeeping facts
+priority: P3
+depends_on: [E349]
+source: code-reviewer round 1, lane e226
+body: |
+  docs/lane-protocol-addendum.md line 3 says the addendum only fills the generic 見補充規則 places
+  in the lane protocol. After E226/E349, §5 also carries the tools, CI-check and 5c-bookkeeping
+  lines that the integrator SOP points at ("the repo's CI check", "the repo's bookkeeping check
+  when the addendum names one"). Those lines fill places in the integrator SOP, not 見補充規則
+  places, so the preamble understates what the addendum holds. Either widen the preamble to say
+  the addendum also supplies the repo facts the integrator SOP defers to, or give integrator-only
+  facts their own heading. The heading structure is frozen by test/e290 in this wave, so this is
+  a follow-up, not a change in lane e226.
+```
+
 ## Applied
