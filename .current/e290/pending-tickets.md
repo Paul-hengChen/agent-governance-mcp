@@ -27,7 +27,8 @@ body: |
   content/skill-pm.md's Manifest-Tier Self-Attestation row says to run
   `node scripts/fanout.mjs check --cut ...`. That path exists only when the workspace is the agc
   checkout itself; in an adopter the script lives in the agc install. E290 made the generic
-  lane-protocol say "agc's fan-out manifest tool (scripts/fanout.mjs), call per the addendum". Align the
+  lane-protocol name `node <agc install>/scripts/fanout.mjs`, with the repo addendum free to give the
+  repo's own call. Align the
   PM SOP wording (shared artifact: content/**, compose goldens and the PM context budget may move).
 ```
 
