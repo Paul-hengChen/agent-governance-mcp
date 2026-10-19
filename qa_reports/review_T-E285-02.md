@@ -94,3 +94,7 @@ PASS, subject to the final full-suite result recorded below.
 ## Final full suite (AC-HC-4)
 
 `node scripts/test-lock.mjs -- npm test` at commit d194776 (clean tree, `git status --porcelain` empty): 3430 tests, 3428 pass, 0 fail, exit 0. This evidence line is the only change after that commit.
+## 2026-10-19T03:54:37.155Z — PASS — by qa-engineer
+
+QA PASS for lane e285 (covers T-E336-01, T-E294-01, T-E285-01, T-E336-02, T-E294-02, T-E285-02). Every AC proof in the spec was executed and passes (AC Execution Log in qa_reports/review_T-E285-02.md). E297 AC1/AC7 re-pinned; compose goldens regenerated via scripts/capture-constitution-golden.mjs; context-budget caps re-measured 5717->5723, 10518->10523, 21623->21633, 8420->8426 (E336 command-form, ~22 chars per site). Three new test files added; e296/e177a unchanged and green; owned-files-only check exit 0. Final full suite on a clean tree: 3430 tests, 3428 pass, 0 fail, 2 skipped. Build clean; npm audit shows no high or critical findings.
+
