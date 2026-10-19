@@ -1,6 +1,7 @@
 開始做 v4.0.0 Wave 7（翻開關），你只負責 e177a lane 的 E177a（S）。
 
 先完整讀 docs/lane-protocol.md（共同規則，包括信箱與回報格式），再讀 R1 + R2。
+`feature start` 建好 worktree 之後，呼叫 `EnterWorktree`（path = /agm-lanes/e177a）把這個 session 切進去；這個工具不能用時，每個 Bash 指令照舊自帶 `cd /agm-lanes/e177a &&`。
 你只負責這張票走到 qa PASS；波次層級的核取項屬於整合者。
 
 【你的欄位】

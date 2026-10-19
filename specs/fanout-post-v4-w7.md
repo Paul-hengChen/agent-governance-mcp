@@ -2,7 +2,7 @@
 base: 76ed29a    integration branch: integ/post-v4-w7
 mailbox: ../agent-governance-mcp-lanes/_mailbox
 
-**狀態：已核准 2026-10-19，待派工。** `base:` 是規劃基準（v4.9.0 發版記帳 PR #24 merge）；實際派工 base = 本清單併入後的 `main` sha，記在 Decisions 派工列。
+**狀態：已結案 2026-10-19。** 兩條 lane 皆 qa PASS（CI 綠）→ `integ/post-v4-w7` merge `a7af0f3`（e285）、`259c7ad`（e289）→ finish 兩 lane（E342、E343 配號）→ 記帳 commit → PR + auto-merge（見「結案」與「接手步驟」）。 `base:` 是規劃基準（v4.9.0 發版記帳 PR #24 merge）；實際派工 base = 本清單併入後的 `main` sha，記在 Decisions 派工列。
 
 照第 6 波結案的建議做：integrator 改版第 3 波。content lane 是 E285（integrator SOP 引用 `fanout.mjs handoff`、接手模式、session 節奏），加上 E294 剩下的 lane-protocol §1 那一半（實測已在 2026-10-14 完成），以及 E336（`git pull --ff-only` 的可攜寫法，改憲法 §6 等四處 content 與 goldens）—— 三張都要改 `content/**` 或 `docs/lane-protocol.md`，而共享生成物一波只能在一條 lane。程式 lane 是 E289（render 指向 repo 補充檔、prompt 範本加 `EnterWorktree` 一行；原本等的 E284、E291 都已出貨），加上 E337、E338、E339（同為 `tools/fanout-manifest.ts`／`tools/fanout-handoff.ts`）。E340（新 `tw_*` 工具）本波不做：照預設排在佇列後段，且新工具要同步 README／CLAUDE.md 的工具數與 SOP 引用，屬共同禁止範圍。E290、E292 是改版第 4 波（分別等 E289＋E294、E285＋E289）。
 
@@ -78,3 +78,36 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 | 2026-10-19 | 整合者 | 草案：e285（E285＋E294＋E336，唯一 content lane）∥ e289（E289＋E337＋E338＋E339）；兩條擁有集合不相交；`docs/lane-protocol.md`（只限 §1）與三個 content 檔（只限 E336 那一句）劃給 e285；`docs/config.md` 劃給 e289；e178a 與 e177a 互為對方的硬條件；E340 本波不做；`README.md` 加進共同禁止 | 本檔 |
 | 2026-10-19 | 人類 | 核准本清單（全部）：兩條 lane（e285、e289）與七項所有權重劃；一併接受整合者的四項建議 —— E336 用 (a) `git -c pull.rebase=false pull --ff-only`、不動 §6 授權清單；E340 本波不做；`cutApprovalAutoTier.manifest` 本波不開；v4.8.0 回報的 9a 問題照建議處理 | 整合者 session |
 | 2026-10-19 | 整合者 | v4.8.0 回報的 9a 問題不併進 E82：E82 已在 v3.111.0 完成且只處理 CI 輪詢預算，這次是整體執行時間與 API 連線錯誤只給警告；改配號 E341（backlog 列＋佇列 #158，排在後段），列內註明與 E82 相關 | 本檔 |
+| 2026-10-19 | 整合者 | 清單 PR #25 merge `93ed15c` = 派工 base；派工前核對：兩條 lane 點名的擁有／禁止路徑在 base 存在、無殘留 branch／worktree；信箱 e285／e289 空建、mailbox-watch 與 lane-status watch 皆 armed；兩份 prompt 以 `fanout.mjs render --base 93ed15c` 產生 | 本檔 |
+| 2026-10-19 | 整合者 | 兩條 cut 預審 close：e289（`e4beb2b`；退回一次：G3b 的 `CONFIG_UNREADABLE` 從 exit 2 改為警告、照 key 未設輸出，守住「沒設 key 時 render 不變」）、e285（`fb7aae5`，一次通過）；e285 G1 解讀：e285 列「只限 E336 那一句」= 只限 E336 的指令替換，`content/skill-release-engineer.md` 6 處（5 行）全改；跨 lane 通知 e289 範本行給 e285（e177a AC7） | 信箱 e285／e289 |
+| 2026-10-19 | 人類 | 在兩條 lane 各自的 session 核准 cut：e289（`e4beb2b`，G1–G9 照呈）、e285（`fb7aae5`，G1–G4 照呈） | lane session；各 lane spec 與 handoff commit |
+| 2026-10-19 | 整合者 | 5a：e285 `3c096c0`（CI run 39197789385）close —— review 退回 1 輪（結案交接產生時機），qa 0 輪；e289 `89512bd`（CI run 39197761306）close —— review 0 輪，qa 第 1 輪 FAIL 只因 review 報告引用了像家目錄路徑的字串（改寫後 PASS）；e285 的 lane-protocol 全檔對 e289 最終範本行 AC7 交叉比對 0 命中 | 本檔 |
+| 2026-10-19 | 整合者 | 5b：`integ/post-v4-w7` ← e285 `a7af0f3` ← e289 `259c7ad`，皆 `--no-ff`、零衝突 → 無合併審查；merge-invariants 兩次 PASS；重建 `dist/` 無差異；`npm audit --audit-level=high` exit 0；整合層 CI run 39198090267 在 `259c7ad` 綠；finish 兩 lane：e285 無新發現，e289 配號 E342、E343 | 本檔 |
+| 2026-10-19 | 整合者 | E344 配號（backlog 列＋佇列 #161）：e285 review 的兩項選填（停 watch 後 lane-status watch 的恢復、結案交接時機「唯一未 commit」措辭）lane 未做；E342、E343 排在佇列 #159、#160 | 本檔 |
+
+## 結案
+- 日期 2026-10-19。`integ/post-v4-w7` ← e285（`a7af0f3`）← e289（`259c7ad`），皆 `--no-ff`、零衝突 → 無合併審查；merge-invariants 兩次 PASS；重建 `dist/` 無差異；`npm audit --audit-level=high` exit 0；整合層 CI run 39198090267 在 `259c7ad` 綠。
+- 彙總（上限按 lane 計）：e285 6 張 task／hop 6/14／review 退回 1 輪／qa 0 輪；e289 5 張 task／hop 7/14／review 0 輪／qa 退回 1 輪（review 報告的路徑字樣）。合計 11 張 task、hop 13，每條 lane 都在自己的上限內。
+- 完成定義 13 項全部成立（本清單的 `## 接手步驟` 為最後一項，依 E285 新 SOP：記帳 commit 之後、清單是唯一未 commit 的改動時，以 `fanout.mjs handoff --closing` 產生）。
+- 例外：(1) 兩條 lane 的 sr、reviewer 都是 opus（同模型疑慮，e285 報告已註明）；qa 用預設 sonnet。(2) e285 沒寫 expected-red 清單檔（檔名不在擁有範圍），預期紅改列在 handoff 並由 qa 全部轉綠。(3) e285 spec AC-E336-4 的 golden diff 指令寫法本身無法輸出空白，qa 改用去前綴版本驗證 —— spec 瑕疵，不影響產物。
+- 新票：E342、E343（e289，`finish --shipped` 配號）、E344（整合者配號），排在佇列 #159–#161；E341（規劃時配號）在 #158。
+- 發版：`main` 帶 E289（新設定 key `laneProtocolAddendum`、render 指向 repo 補充檔、範本 `EnterWorktree` 行）、E285（integrator 交接與接手模式）、E294、E336（四份 SOP 的 pull 寫法）、E337／E338／E339（修正）→ 是否發版與版號由人類決定。
+
+## 接手步驟
+（事實欄位由 `node scripts/fanout.mjs handoff` 產生；接手時先跑 `node scripts/fanout.mjs handoff --check <manifest>`。`<待填：…>` 由整合者填寫。）
+### 核對 primary
+- 目標分支：main @ 93ed15c
+- 目標分支對 origin：一致
+- git status：乾淨
+- worktree：primary（main ← integ/post-v4-w7 @ cea86e6）
+- lane-status：primary（main ← integ/post-v4-w7 @ cea86e6）release-post-v4-w6／In_Progress／release-engineer，hop 3，commits 0，clean
+### 已結案
+- 第 7 波兩條 lane（e285、e289）已合併、finish、拆除；lane 紀錄在 `.current/history/2026-10/`，記帳與本清單在同一個 wave PR。
+- 未配號的新發現：無（E342、E343 由 finish 配號，E344 由整合者配號）。
+### 待人類決定
+- 是否發版：`main` 帶新設定 key `laneProtocolAddendum`、integrator 接手模式與 SOP 改字 —— 版號由人類決定（新功能，整合者建議 MINOR）。
+- 是否開下一波：integrator 改版剩 E290、E292（E293 暫緩）；佇列後段另有 E340–E344。
+- 遠端已合併的 `release/v4.9.0`、`release/v4.9.0-bookkeeping` 兩個分支要不要刪（刪遠端分支不在整合者授權內）。
+- 建議：下一步（發版或下一波）開新 session 進行；若要在本 session 繼續，先跑 `node scripts/fanout.mjs handoff --check specs/fanout-post-v4-w7.md`，exit 0 才繼續。
+### 進行中的背景工作
+無
