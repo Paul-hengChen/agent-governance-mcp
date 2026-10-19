@@ -69,3 +69,56 @@ Tests run (targeted only): `node --test test/e296-manifest-tier.test.mjs test/e1
 - [recommended] lane-protocol.md §1 line 26 reworded to 「以下兩條不論有沒有切換都適用：…」; AC-E294-4/5 proofs re-run clean.
 - [recommended] expected-red manifest — not added (filename outside owned paths); reds stay listed in pending_notes.
 - [optional] the two "Before any stage" sentences merged; the watch-resume symmetry item left as is.
+
+## Round 2 — APPROVED — by code-reviewer
+
+covers: T-E336-01, T-E294-01, T-E285-01
+
+Range reviewed: fix `dfdd16c..079f09a` (aa82925 fix, 079f09a sr reply), with a regression pass over the full `fb7aae5..079f09a`. Inputs: the diff, `specs/e285-integrator-session-handoff.md` and `tools/fanout-handoff.ts`. Still no architecture spec.
+
+## Summary
+- R1 is fixed. content/skill-integrator.md:197 now says when to run `handoff <manifest> --closing`: after the last lane's finish, while the manifest is primary's only uncommitted change, so either before the other bookkeeping edits or after they are committed. It also gives the reason (the `git status` fact and the primary `lane-status` row would later `DIFF`).
+- The recommended §1 rewording is applied at docs/lane-protocol.md:26 and AC-E294-4/5 still hold. The optional merge of the two "Before any stage" sentences at :66 is also applied, and no pinned sentence breaks.
+- The full diff `fb7aae5..079f09a` touches 6 files, all owned. `fanout check` reports 10 files changed, 0 out of bounds, exit 0. No new regressions.
+- Targeted tests: 117/117 pass.
+- Verdict: APPROVED.
+
+## AC Completeness
+Unchanged from Round 1 except for the lines rechecked below. Every AC listed in Round 1 as implemented is still implemented. AC-E336-4 and AC-HC-4 are still qa-owned.
+AC-E285-1 — implemented — content/skill-integrator.md:197. "commit it in the bookkeeping commit" and "not overridable" are kept (count 1), and the new timing clause sits between them.
+AC-E285-6 — implemented — content/skill-integrator.md:66. "another role's work", "new session" and "advisory" are all still in the merged sentence, inside the `## Lifecycle` slice.
+AC-E285-7 — implemented — the `fanout.mjs handoff` forms are still only `handoff <manifest>` (1), `handoff <manifest> --closing` (1) and `handoff --check <manifest>` (2). `--closing` never appears together with `--check`.
+AC-E294-4 — implemented — compared with base 93ed15c, the part above `## 1.` is byte-identical and so is everything from `## 2.` on (scripted slice compare: both true).
+AC-E294-5 — implemented — the reworded line 26 is 95 characters (201 bytes). No added trimmed line is 21-59 bytes long, and no code-fence line was added. Every trimmed `## 1.` line over 20 characters gets 0 substring hits against `PROMPT_TEMPLATE_3B` (dist/tools/fanout-manifest.js) and against the frozen `E289_CANDIDATE`. A whole-file check also gives 0 hits, and e177a AC7 is green.
+
+## Correctness
+- **R1 — resolved.** I checked the clause against the tool:
+  - The `git status` fact leaves out only the manifest (tools/fanout-handoff.ts:277-287). The primary `lane-status` clean/dirty value follows that fact (:315). So once the manifest is the only uncommitted path, the handoff records `乾淨` and a `clean` primary row.
+  - After the merge, step 6-5 leaves primary on `main` and clean. `git status` then compares equal. `worktree` and `lane-status` take the `MOVED` path in `movedReason` (:494-500), because the closing annotation is the only part of the line that differs: the primary row's commits are forced to 0 under the annotation (:313) and read 0 on `main`, and `clean` matches `clean`.
+  - Both orderings keep the annotated sha an ancestor of the merge. It is the integration-branch HEAD at the time the handoff is generated (:254-258), and every later commit (bookkeeping, 6-4 `BEHIND` merge) descends from it. `git commit --amend` is forbidden for all roles (content/const-15-core-tail.md:13), so the "after committing them" ordering always produces a follow-up commit and never rewrites the annotated sha.
+  - "After the last lane's finish" is also correct. finish commits its own allocation and history moves and tears down the lane worktree, so the `worktree` fact and the lane rows are final by then.
+  - Stage 6 order still holds. Step 1 runs finish, then *Findings finish did not number* (backlog rows), then *Close the manifest* (manifest only), then *Write the handoff*. The new clause names exactly the bookkeeping that sits between those steps or comes before them in 5c (queue entries, backlog rows and done-marks, plan document).
+  - Step 7 "continue" and *Take-over* are unchanged and now line up with this clause.
+- **[optional]** content/skill-integrator.md:197. Read literally, "while the manifest is primary's only uncommitted change" cannot be met when primary already carries uncommitted tracked files the integrator may not commit, such as `.current/_primary/*` state left by an earlier release (the same files the E336 reason clause mentions). This is harmless in practice: a file that stays uncommitted and unchanged across the merge produces an identical `git status` line, so it does not `DIFF`. A possible wording is "only uncommitted change that the bookkeeping commit will carry". This does not block approval.
+- **[optional]** content/skill-integrator.md:197. Under the "after committing them" ordering, "commit it in the bookkeeping commit" in practice means a follow-up bookkeeping commit, since amend is forbidden. Not ambiguous enough to block.
+- Expected reds (SOP 4a): the test files in the diff are unchanged. The known reds (e297 AC1/AC7, the skill-manifest golden, the compose goldens, the context-budget caps) are still spec-planned and owned by T-E336-02. `qa_reports/expected-red_e285-integrator-session-handoff.txt` is still absent, so Round 1's [recommended] item carries over as an open recommendation to QA. Not blocking, for the same reason as in Round 1.
+
+## Quality
+- docs/lane-protocol.md:26: 「以下兩條不論有沒有切換都適用」 no longer suggests an earlier copy of the mailbox rule exists. Resolved.
+- content/skill-integrator.md:66: the merged sentence reads cleanly ("… continue when the human says so — then, on primary: …"). The e288 test slices `## Lifecycle`..`Invocation:` and stops before this paragraph, and no test pins either of the old sentence openings. Resolved.
+- Round 1's optional item on the watch-resume symmetry (:112) was left as is, by choice. Acceptable.
+- Comment check (4b): content and docs only, so there are no code comments. No finding.
+
+## Architecture
+No change since Round 1. No finding.
+
+## Security
+None of the added lines in either file contains a local absolute path (grep for `/Users/`, `/home/`, `/private/` returns 0). No finding.
+
+## Performance
+Content-only change, no runtime path. No finding.
+
+## Verdict
+APPROVED. R1 is fixed correctly against `tools/fanout-handoff.ts`. The recommended and optional Round 1 items are applied without breaking AC-E294-4/5 or any pinned sentence. The only new findings are two optional wording notes.
+
+Tests run (targeted only): `node --test test/e296-manifest-tier.test.mjs test/e177a-manifest.test.mjs test/e178a-integrator-role.test.mjs test/e246-mailbox-teardown.test.mjs test/e329-integrator-sop-followups.test.mjs test/e288-integrator-stage0.test.mjs test/e286-integrator-trust-and-git.test.mjs test/e295-hop-cap-and-sop-halves.test.mjs` 117/117 pass. Same-model note: this review and the sr hop both ran on opus.
