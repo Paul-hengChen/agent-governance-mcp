@@ -102,3 +102,32 @@ test("AC-E285-7: every fanout.mjs handoff mention matches the shipped usage; --c
   assert.ok(FANOUT.includes("handoff [--check] <manifest>"), "scripts/fanout.mjs usage still lists the handoff shape");
   assert.ok(FANOUT.includes("--closing"), "scripts/fanout.mjs usage lists --closing");
 });
+
+// --- E344 (specs/e292-sister-repos.md AC-E344-1, AC-E344-2) ---------------------------------------------------
+// WHY: the idle-stop resume must tell the integrator to simply restart the `lane-status.mjs --watch` (it has no
+// baseline in the handoff, so "re-arm from the baseline" cannot apply to it), and the close-handoff timing must
+// not claim the manifest is primary's only uncommitted change (false whenever primary holds its usual `.current/`
+// working files); the sentence names the bookkeeping edits that must not be uncommitted, and why.
+
+const IDLE_RESUME =
+  "Resuming — the human says so in this session, or a `接手 <manifest>` session takes over — re-arms the mailbox watch from that section's `watch baseline` line, never the current count, and simply restarts `node scripts/lane-status.mjs --watch` with the same options (it has no baseline in the handoff).";
+const HANDOFF_TIMING =
+  "Run it after the last lane's finish while none of the other bookkeeping edits (queue entries, backlog rows and done-marks, the plan document) is uncommitted — before making them, or after committing them: the tool records every uncommitted path except the manifest in its `git status` fact and marks the primary `lane-status` row `dirty`, so a bookkeeping edit left uncommitted then is gone from both facts once the pull request merges, and a later `handoff --check <manifest>` (step 7 continue, *Take-over*) reports both as `DIFF` and stops; a file that stays uncommitted across the merge, such as primary's own `.current/` working files, leaves both facts unchanged.";
+
+test("AC-E344-1: the Two-hour idle stop sub-bullet ends with sop.idle-resume, exactly once inside Stage 4", () => {
+  assert.equal(count(sec("## Stage 4"), IDLE_RESUME), 1);
+  assert.equal(count(SOP, IDLE_RESUME), 1);
+  const bullet = sec("## Stage 4").split("\n").filter((l) => l.includes("**Two-hour idle stop**"));
+  assert.equal(bullet.length, 1);
+  assert.ok(bullet[0].endsWith(IDLE_RESUME), "the copy is the sub-bullet's last sentence");
+  assert.equal(count(SOP, "re-arm from the printed baseline, always"), 1, "the AC-E285-4 pinned sentence is untouched");
+});
+
+test("AC-E344-2: the Stage 6 Write-the-handoff sub-bullet holds sop.handoff-timing once; the old claim is gone", () => {
+  const bullet = sec("## Stage 6").split("\n").filter((l) => l.includes("**Write the handoff**"));
+  assert.equal(bullet.length, 1);
+  assert.equal(count(bullet[0], HANDOFF_TIMING), 1);
+  assert.equal(count(SOP, HANDOFF_TIMING), 1);
+  assert.equal(count(SOP, "primary's only uncommitted change"), 0);
+  assert.ok(bullet[0].endsWith("This step is not overridable: it runs even when the human asks to skip it or to go straight to the next wave."));
+});

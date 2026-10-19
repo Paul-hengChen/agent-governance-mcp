@@ -1,0 +1,9 @@
+# e290-lane-protocol-generic — expected-red manifest (emitted by sr-engineer per skill-sr-engineer SOP 7a)
+# Format: <relative test file path> | <exact test name/description string>
+
+# T-E290-01 moved repo-specific text (dist/, the comment-only proof, the e130 example) out of
+# docs/lane-protocol.md into docs/lane-protocol-addendum.md. These assertions pin the moved text
+# and are re-pinned by qa in T-E290-02 (spec AC-E290-11). Every other test stays green.
+test/e286-integrator-trust-and-git.test.mjs | AC5: lane-protocol section 7 is the last section and carries the pause / ack / resume rule
+test/e286-integrator-trust-and-git.test.mjs | AC6: section 7 carries the E282 merge-base scope sentence
+test/e329-integrator-sop-followups.test.mjs | AC-E327-2: lane-protocol §3 keeps its 常駐測試 exception bullet; qa SOP within byte cap

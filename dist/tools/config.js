@@ -55,6 +55,55 @@ export function parseNodeModulesLinks(value) {
     }
     return { links, rejected };
 }
+const SISTER_REPO_NAME_RE = /^[A-Za-z0-9_.-]+$/;
+function isNonEmptyString(value) {
+    return typeof value === "string" && value.length > 0;
+}
+// Absolute in POSIX, Windows (rooted or UNC) or drive form, or "~"-relative.
+function isRejectedSisterPath(p) {
+    return (path.posix.isAbsolute(p) ||
+        path.win32.isAbsolute(p) ||
+        /^[A-Za-z]:/.test(p) ||
+        p.startsWith("~"));
+}
+function normalizeSisterRepo(entry) {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry))
+        return null;
+    const { name, path: repoPath, owns, backlog, contracts } = entry;
+    if (typeof name !== "string" || !SISTER_REPO_NAME_RE.test(name) || name === "." || name === "..") {
+        return null;
+    }
+    if (!isNonEmptyString(repoPath) || isRejectedSisterPath(repoPath))
+        return null;
+    if (!isNonEmptyString(owns))
+        return null;
+    const repo = { name, path: repoPath, owns };
+    if (isNonEmptyString(backlog))
+        repo.backlog = backlog;
+    if (Array.isArray(contracts)) {
+        const kept = contracts.filter(isNonEmptyString);
+        if (kept.length > 0)
+            repo.contracts = kept;
+    }
+    return repo;
+}
+/**
+ * The one validation definition for the `sisterRepos` key (E292 D1).
+ * Returns the valid entries in list order (an entry whose name was already
+ * kept is dropped), or null when `value` is not an array or holds no valid
+ * entry. Invalid entries are dropped silently. Never throws.
+ */
+export function parseSisterRepos(value) {
+    if (!Array.isArray(value))
+        return null;
+    const repos = [];
+    for (const entry of value) {
+        const repo = normalizeSisterRepo(entry);
+        if (repo !== null && !repos.some((r) => r.name === repo.name))
+            repos.push(repo);
+    }
+    return repos.length > 0 ? repos : null;
+}
 // Methodology-agnostic defaults. Common task-list filenames in workspace root
 // or under .current/. No project-management-tool-specific paths.
 const DEFAULT_TASK_PATHS = [
@@ -259,6 +308,13 @@ function loadConfigEntry(workspacePath) {
     const laneProtocolAddendum = migration.payload.laneProtocolAddendum;
     if (typeof laneProtocolAddendum === "string" && laneProtocolAddendum.length > 0) {
         result.laneProtocolAddendum = laneProtocolAddendum;
+    }
+    // Additive-optional field (no schema_version bump — same precedent as
+    // laneProtocolAddendum/nodeModulesLinks). Non-fatal filter: invalid
+    // entries are dropped, never an error (E292).
+    const sisterRepos = parseSisterRepos(migration.payload.sisterRepos);
+    if (sisterRepos !== null) {
+        result.sisterRepos = sisterRepos;
     }
     // Cache under the pre-read mtime. If the migration heal-on-read above
     // rewrote the file, the recorded mtime is already stale — the NEXT call's

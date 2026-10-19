@@ -2,7 +2,7 @@
 base: ef9aec6    integration branch: integ/post-v4-w8
 mailbox: ../agent-governance-mcp-lanes/_mailbox
 
-**狀態：已核准，派工中。** `base:` 是規劃基準（v4.10.0 發版記帳 PR #28 merge）；實際派工 base = 本清單併入後的 `main` sha，記在 Decisions 派工列。
+**狀態：已結案 2026-10-19。** 兩條 lane 皆 qa PASS（CI 綠）→ `integ/post-v4-w8` merge `936be52`（e292）、`dfd585b`（e290；修帳本後再 merge `7af69ca`）→ finish 兩 lane（E345–E352 配號）→ 記帳 commit → PR + auto-merge（見「結案」與「接手步驟」）。 `base:` 是規劃基準（v4.10.0 發版記帳 PR #28 merge）；實際派工 base = 本清單併入後的 `main` sha，記在 Decisions 派工列。
 
 integrator 改版第 4 波，也是最後一波：原 12 張改版票只剩 E290、E292（E293 暫緩，不做）。E290 等的 E289、E294，E292 等的 E285、E289 都已在第 7 波出貨（v4.10.0）。E342、E343、E344 是第 7 波結案時配的號，和 E290／E292 改同一批檔案，人類 2026-10-19 裁定本波一起做（見 Decisions）。
 
@@ -74,6 +74,14 @@ integrator 改版第 4 波，也是最後一波：原 12 張改版票只剩 E290
 ## 合併順序
 `integ/post-v4-w8` ← `--no-ff` e292（共享生成物 lane 先）→ merge-invariants → `--no-ff` e290 → merge-invariants → 重建 `dist/` → `check:bookkeeping` → 在 integ 上依序 `finish <lane> --shipped --base integ/post-v4-w8` → 記帳 commit → push → 讀 CI → `gh pr create` → `gh pr merge --auto --merge` → merged 後 `git switch main`、`git -c pull.rebase=false pull --ff-only` → `git branch -d integ/post-v4-w8`。預期零檔案衝突（擁有集合不相交）；`dist/` 不手解，重建。
 
+## 結案
+- 日期 2026-10-19。`integ/post-v4-w8` ← e292（`936be52`）← e290（`dfd585b`，帳本修正 `7af69ca`），皆 `--no-ff`、零衝突 → 無合併審查；merge-invariants 三次 PASS；重建 `dist/` 無差異；`npm audit --audit-level=high` exit 0；整合層 CI run 39219943832 在 `dfd585b` 綠。
+- 彙總（上限按 lane 計）：e290 2 張 task／hop 6/14／review 0 輪退回／qa 退回 1 輪（spec 驗證指令的路徑字樣）；e292 7 張 task／hop 4/14／review 0 輪／qa 0 輪。合計 9 張 task、hop 10，每條 lane 都在自己的上限內。
+- 完成定義 13 項全部成立（本清單的 `## 接手步驟` 為最後一項）。
+- 例外：(1) 兩條 lane 的 sr、reviewer 都是 opus（同模型疑慮，e290 報告已註明）；qa 用預設 sonnet。(2) e290 finish 第一次被拒，修帳本多一輪 lane commit、CI 與 merge（已配號 E353）。(3) 兩條 cut 預審都漏看一點：e290 spec 的驗證指令寫了本機路徑前綴，由 qa 的全套抓到。
+- 新票：E345–E348（e292）、E349–E352（e290，`finish --shipped` 配號）、E353（整合者配號），排在佇列 #162–#170。
+- 發版：`main` 帶 E290（通用 lane-protocol 與本 repo 補充檔、`.current/.config.json` 設 `laneProtocolAddendum`）、E292（`sisterRepos` 設定 key、清單 `## 外部依賴` 段、`handoff --check` 核對姊妹 repo sha、新錯誤碼）、E342／E343／E344（文件、render 防呆、SOP 措辭）→ 是否發版與版號由人類決定。
+
 ## Dispatch pins
 - e290：`pm=opus`、`sr-engineer=opus`。
 - e292：`pm=opus`、`sr-engineer=opus`。
@@ -83,3 +91,28 @@ integrator 改版第 4 波，也是最後一波：原 12 張改版票只剩 E290
 |---|---|---|---|
 | 2026-10-19 | 整合者 | 草案：e290（E290，lane-protocol 與補充檔、`.current/.config.json` 的一個 key）∥ e292（E292＋E342＋E343＋E344，唯一 content lane）；兩條擁有集合不相交；SOP 的 lane-protocol 兩層說法（E290 連帶）劃給 e292；e286／e329／e294 劃給 e290、e178a／e177a 劃給 e292，互為對方的硬條件；`docs/integrator-revision-2026-10-08.md` 加進共同禁止 | 本檔 |
 | 2026-10-19 | 人類 | 核准本清單（全部）：兩條 lane（e290、e292）與六項重劃／切分；E342、E343、E344 本波一起做（歸 e292）；E292 本波不升 config schema；未追蹤的 adopter 觀察報告 `docs/existing-test-allowlist-drift-2026-10-19.md` 照 (a) 在本清單的 docs PR 另開 commit 收進來（不屬於本波範圍）；Lanes 表不加 `approval` 欄 | 整合者 session |
+| 2026-10-19 | 整合者 | 清單 PR #29 merge `a67d799` = 派工 base（未追蹤的 adopter 觀察報告以另一個 commit 一併收進）；派工前核對：兩條 lane 點名的擁有／禁止路徑在 base 存在（新檔已標註）、無殘留 branch／worktree；信箱 e290／e292 空建、mailbox-watch 與 lane-status watch 皆 armed；兩份 prompt 以 `fanout.mjs render --base a67d799` 產生 | 本檔 |
+| 2026-10-19 | 整合者 | 兩條 cut 預審 close：e290（`c1d0784`；退回一次：§5 的 `fanout.mjs` 呼叫改成沒有補充檔也能照做的安裝位置寫法）、e292（`57edf6f`；退回一次：拿掉 SOP Stage 4 新句「本 repo 規則絕不在本 SOP」的錯誤斷言；G10 Stage 1 提外部依賴段，整合者確認保留） | 信箱 e290／e292 |
+| 2026-10-19 | 人類 | 在兩條 lane 各自的 session 核准 cut：e290（`c1d0784`）、e292（`57edf6f`） | lane session；各 lane spec 與 handoff commit |
+| 2026-10-19 | 人類 | e292 G6：姊妹 repo 分支前進時 `handoff --check` 報 `DIFF`、exit 1，不給 `MOVED`（照 PM 與整合者建議；看過收工回報後再次確認） | e292 lane session；`specs/e292-sister-repos.md` Gate Summary G6，commit `964de08` |
+| 2026-10-19 | 整合者 | 5a：e290 `18d93c3`（CI run 39215855179）close —— review 0 輪退回，qa 第 1 輪 FAIL 只因 spec 驗證指令寫了本機路徑前綴字面值（hygiene 掃描），PM 改 spec 後 PASS；e292 `473a694`（CI run 39219402518）close —— review、qa 皆 0 輪退回 | 本檔 |
+| 2026-10-19 | 整合者 | 5b：`integ/post-v4-w8` ← e292 `936be52` ← e290 `dfd585b`，皆 `--no-ff`、零衝突 → 無合併審查；merge-invariants 兩次 PASS；重建 `dist/` 無差異；`npm audit --audit-level=high` exit 0；整合層 CI run 39219943832 在 `dfd585b` 綠；finish e292 配號 E345–E348 | 本檔 |
+| 2026-10-19 | 整合者 | finish e290 被拒（`pending-tickets.md` 一個 block 的 title 含未加引號的「: 」，YAML 解析失敗，未套用也未拆除）：退回 lane 修一行（`c54587a`，CI run 39221918215），再 merge `7af69ca`（merge-invariants PASS）後 finish 配號 E349–E352；整合者配號 E353（帳本格式提早檢查）；E345–E353 排在佇列 #162–#170 | 本檔 |
+
+## 接手步驟
+（事實欄位由 `node scripts/fanout.mjs handoff` 產生；接手時先跑 `node scripts/fanout.mjs handoff --check <manifest>`。`<待填：…>` 由整合者填寫。）
+### 核對 primary
+- 目標分支：main @ a67d799
+- 目標分支對 origin：一致
+- git status：乾淨
+- worktree：primary（main ← integ/post-v4-w8 @ a7d7ea9）
+- lane-status：primary（main ← integ/post-v4-w8 @ a7d7ea9）release-post-v4-w7／In_Progress／release-engineer，hop 3，commits 0，clean
+### 已結案
+- 第 8 波兩條 lane（e290、e292）已合併、finish、拆除；lane 紀錄在 `.current/history/2026-10/`，記帳與本清單在同一個 wave PR。integrator 改版 12 張票至此只剩暫緩的 E293。
+- 未配號的新發現：無（E345–E352 由 finish 配號，E353 由整合者配號）。
+### 待人類決定
+- 是否發版：`main` 帶新設定 key `sisterRepos`、清單 `## 外部依賴` 段與 `handoff --check` 的姊妹 repo 核對、新錯誤碼、通用 lane-protocol 與本 repo 補充檔 —— 版號由人類決定（新功能，整合者建議 MINOR）。
+- 是否開下一波：佇列後段有 E340、E341 與本波新票 E345–E353（#162–#170）；E293 仍暫緩。
+- 建議：下一步（發版或下一波）開新 session 進行；若要在本 session 繼續，先跑 `node scripts/fanout.mjs handoff --check specs/fanout-post-v4-w8.md`，exit 0 才繼續。
+### 進行中的背景工作
+無
