@@ -1,0 +1,30 @@
+covers: T-RELW9-01, T-RELW9-02, T-RELW9-03, T-RELW9-04, T-RELW9-05
+
+# QA review: release-post-v4-w9 (v4.12.0 MINOR gate, verified against current 4.11.0)
+
+Environment: Node v22 (see `node --version` in the verdict), HEAD c1ea80be512708d61b6a11888cbb6b3c25672fdc, no version bump, no code/content/test/doc edits. Probes wrote only under $TMPDIR; `git status --porcelain` identical before and after (4 entries: three `.current/_primary/*` files and the uncommitted spec).
+
+Phase 0.5: skipped (no expected-red manifest declared for release-post-v4-w9).
+Phase 1.5: skipped (no Visual Baselines declared). Copy/Visual audits: N/A (spec declares none).
+Phase 3: skipped (verification-only gate; dispatch brief says no test file created or edited).
+
+## AC Execution Log
+
+- AC1 (T-RELW9-01): `git log --oneline v4.11.0..HEAD | wc -l` = 34. Forbidden-path diff command: empty. `git diff --name-only v4.11.0..HEAD -- content test/fixtures` = exactly the four content files (const-08-chain-31-mid, coord-03-core-fallback, skill-integrator, skill-pm) and the seven goldens. Remaining paths all in e226/e351/lane-evidence/bookkeeping classes; none unclassified. PASS.
+- AC2 (T-RELW9-01): review_reports: each of E226-01/02, E349-01, E350-01 shows CHANGES_REQUESTED then APPROVED (latest governs); E351-01 APPROVED. qa_reports: one PASS block per id; review_T-E226-05.md covers all ten e226 ids; review_T-E351-01.md covers T-E351-01/02. expected-red file exists. Lane handoffs e226 and e351: status PASS, last_agent qa-engineer. Ledgers: e226 10 `[x]`/0 open, e351 2 `[x]`/0 open. backlog E226/E349/E350 DONE naming 61acbc9; E351/E352 DONE naming e91c254; E354-E357 present (not DONE). 61acbc9, e91c254, 125b552, 9205e84 all ancestors of HEAD (exit 0 each). PASS.
+- AC3 (T-RELW9-02): `node scripts/test-lock.mjs -- npm test` exit=0; tests 3576, pass 3574, fail 0, cancelled 0, skipped 2, todo 0. No reds, so no load-sensitive rerun needed. PASS.
+- AC4 (T-RELW9-02): `npm run build` exit 0; `git status --porcelain dist/` empty. check-version exit 0 (4.11.0; note HEAD past tag, expected). check:bookkeeping OK (401/189/262 rows) exit 0. check:md-tables OK (620 files, 0 malformed) exit 0. PASS.
+- AC5 (T-RELW9-02): `npm audit --audit-level=high` exit=0 (8 vulnerabilities: 2 low, 6 moderate, 0 high/critical). `git diff --stat v4.11.0..HEAD -- package.json package-lock.json` empty. PASS.
+- AC6 (T-RELW9-02): `node bin/agc-init.mjs check` -> "agc check — OK (4.11.0) — all adapters current", exit 0. check-transitions-sync OK (21 keys), exit 0. PASS.
+- AC7 (T-RELW9-02): HEAD = c1ea80b. Runs 39248384039 (c1ea80b), 39247223059 (4490696), 39246553167 (e91c254), 39246128505 (c1c9132), 39239867881 (436f189): each conclusion success, `test (20) success`, `test (22) success`. PASS. (Node 20 verdict rests on these CI runs.)
+- AC8 (T-RELW9-03): (a) only fanout-wave5.1 and fanout-wave6 exit 2 with exactly DECISIONS_SECTION_ABSENT + PINS_SECTION_ABSENT; w9 validates `fanout: ok — 2 dispatchable lane(s), 0 provisional, 10 decision(s)`. (b) owners exit 1; `61 path(s), 45 hit(s), 2 dispatchable lane(s)`; 39 e226 / 6 e351 HITs; the five e226 files attributed to e226 and docs/lane-protocol.md to e351; the 16 non-HIT paths (computed as diff minus HITs) are all bookkeeping class. (c) handoff --closing exit 0, `## 接手步驟` with the four `###` sub-items. (d) handoff --check exit 1, `5 fact(s) checked, 2 differ, 2 moved`; MOVED lines (branch, worktree) acceptable; the two DIFF lines are `git status` (this feature's uncommitted spec + .current/_primary files) and `lane-status` (new active_feature release-post-v4-w9): both permitted. (e) usage exit 2, 5 lines. No stack traces; `git status --porcelain` unchanged. (f) 19 fanout test files: 221/221 pass. PASS.
+- AC9 (T-RELW9-04): (a) `grep -l 'node scripts/' content/*.md` = only skill-release-engineer.md (unchanged since v4.11.0); counts 1, 2, 2. (b) bundle probe: `pm 1 1 1 0`, `coordinator 1 1 2 0`, `sr-engineer 1 0`. Goldens word-diff exactly 7 fanout + 1 feature-rollup swaps (each side); no golden holds the old forms; lite goldens unchanged (AC1). `git diff --numstat` context-budget = `14 10`; caps 4849/10527/21644/8429 present (old 4823/10523/21633/8426 removed). (e) 11 composition/golden/budget files: 241/241 pass. PASS.
+- AC10 (T-RELW9-05): lane-protocol headings same (8); numstat `5 1`; agc-init fallback 1, `artifacts: local` 2 (0 at v4.11.0), E196+E217 line 1 -> `1 2 0 1`; E290 invariant fourteen `0`. Addendum: six headings same, numstat `3 0`, outside-§5 identical, §5 holds the three call forms (one each). Render exit 0; line 3 starts `先完整讀 docs/lane-protocol.md` and names `docs/lane-protocol-addendum.md`; line 4 starts `` `feature start` 建好 worktree 之後 ``; leak check: no LEAK line. Tests (12 files): 150/150 pass. PASS.
+- AC11 (T-RELW9-05): integrator probe `1 1 1 1 1 1 1 0 0 0`; source counts `0 0 0 0 0`; `<agc install>` 28; `the repo's CI check` 6. Re-pin numstat: e178a 4/4, e285 1/1, e286 3/3, e292 3/3, e295 7/5, e296 2/2, e329 2/2. v4.11.0 tag = c04af500814b8a5e32c89848feafa75c23c845a0, ancestor of HEAD (exit 0); CHANGELOG `[4.11.0]` at line 19; `const HOP_CAP = 14`; probe `34 {"handoff":15,"tasks":2,"sqlite":2,"config":2}`. SOP tests (14 files): 113 tests, 111 pass, 2 skipped (the same 2 skips as the suite), 0 fail; non-regression/governance-core tests (15 files): 343/343 pass. PASS.
+
+## Verdict
+All of AC1-AC11 hold on HEAD c1ea80b against 4.11.0. Full suite 3576 total / 3574 pass / 2 skipped / 0 fail on Node 22.
+## 2026-10-20T03:00:25.781Z — PASS — by qa-engineer
+
+AC1-AC11 verified on HEAD c1ea80b against 4.11.0 (see qa_reports/review_T-RELW9-01.md, covers all five ids). Full suite under test-lock on Node v22.22.3: 3576 tests, 3574 pass, 0 fail, 2 skipped. Build dist byte-identical, check-version/bookkeeping/md-tables/agc check/transitions-sync green, npm audit exit 0 (0 high), package files unchanged, 5 CI runs green on test (20)+(22), fanout/bundle/golden/budget/lane-rules/integrator probes and tests all as specified.
+
