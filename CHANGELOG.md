@@ -16,6 +16,60 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [4.12.0] - 2026-10-20
+
+MINOR release. It ships post-v4 fan-out wave 9 since v4.11.0, landed on `main` by its wave pull
+request: lanes `e226` (E226, E349, E350) and `e351` (E351, E352); plan
+`specs/fanout-post-v4-w9.md`, release gate `specs/release-post-v4-w9.md`. Semver: MINOR (decided
+by the human), because the release changes governance text that every bundle composes:
+Constitution §3.1 manifest-tier condition 3, the coordinator SOP, and the PM and integrator role
+SOPs now call agc's tools from the agc install location, so the same text works in an adopter
+workspace. Content-only: no compiled code, MCP tool input schema, prompt schema, state file
+format, gate registry entry (still 34), schema version or dependency changed; `dist/` changes
+only by the version literal.
+
+### Changed
+
+- **E226 / E349: portable integrator SOP (`content/skill-integrator.md`,
+  `docs/lane-protocol-addendum.md`)**: a new *Tool calls* paragraph writes every agc tool call as
+  `node <agc install>/scripts/<tool>.mjs`, and `agc …` falls back to
+  `node <agc install>/bin/agc-init.mjs …` when `agc` is not on PATH. CI verdicts read "the repo's
+  CI check", with a `gh run list --commit <sha>` then `gh run view <run id>` fallback when no
+  addendum names a command. The 5a evidence and new-findings rows gain an `artifacts: "local"`
+  reading, and the base-fix dependency audit points at Constitution §6. This repo's own facts
+  (shared generated artifacts, build, `dist/`, bookkeeping check, repo-relative call forms) move
+  to the addendum: `docs/lane-protocol-addendum.md` §5 gains three lines (other agc tools'
+  call forms, this repo's CI check, the bookkeeping check); its other sections and its `## `
+  headings are unchanged. Spec: `specs/e226-integrator-sop-portable.md`; tests:
+  `test/e226-integrator-sop-portable.test.mjs`, `test/e349-integrator-repo-facts.test.mjs`, with
+  integrator-SOP assertions re-pinned in `test/e178a-integrator-role.test.mjs`,
+  `test/e285-integrator-session-handoff.test.mjs`, `test/e286-integrator-trust-and-git.test.mjs`,
+  `test/e292-integrator-sop.test.mjs`, `test/e295-hop-cap-and-sop-halves.test.mjs` and
+  `test/e329-integrator-sop-followups.test.mjs`.
+- **E350: fan-out call form in constitution, coordinator and PM SOPs
+  (`content/const-08-chain-31-mid.md`, `content/coord-03-core-fallback.md`,
+  `content/skill-pm.md`)**: Constitution §3.1 manifest-tier condition 3, the coordinator's
+  manifest-tier writer action and feature-rollup call, and the PM SOP's Manifest-Tier row call
+  `node <agc install>/scripts/…` instead of the repo-relative `node scripts/…`; the PM SOP defines
+  `<agc install>` inline. Because const-08 and coord-03 are composed into bundles, seven compose
+  goldens under `test/fixtures/compose-golden/` are regenerated and four caps in
+  `test/context-budget.test.mjs` are re-baselined (skill-pm 4849, design-arm constitution 10527,
+  teamwork bundle 21644, non-design constitution 8429). Tests:
+  `test/e350-fanout-call-form.test.mjs`, with `test/e296-manifest-tier.test.mjs` re-pinned.
+- **E351 / E352: generic lane rules (`docs/lane-protocol.md`)**: §1 gives a fallback call form,
+  `node <agc 安裝位置>/bin/agc-init.mjs`, when `agc` is not on PATH (the addendum may override it).
+  §3 and §4 state the `artifacts: local` behaviour as the tool does it today and name E196 and
+  E217 as known gaps. The `## ` headings are unchanged. Spec: `specs/e351-lane-protocol-gaps.md`;
+  tests: `test/e351-lane-protocol-gaps.test.mjs`.
+
+### Notes
+
+- `dist/` changes only by the version literal. Wave-9 evidence moves to
+  `qa_reports/archive/release-post-v4-w9/` and `review_reports/archive/release-post-v4-w9/`, and
+  the e226 expected-red list to `qa_reports/archive/e226-integrator-sop-portable/`; the lane
+  ledgers are archived under `.current/history/2026-10/`.
+- New follow-up tickets E354–E357 are filed in `docs/backlog.md`, not shipped.
+
 ## [4.11.0] - 2026-10-19
 
 MINOR release. It ships post-v4 fan-out wave 8 since v4.10.0, landed on `main` by its wave pull
