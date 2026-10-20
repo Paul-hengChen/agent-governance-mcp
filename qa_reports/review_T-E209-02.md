@@ -45,3 +45,7 @@ Phase 0.5: manifest present; diff dispositioned as above.
 - AC-E209-1 interpretation (integrator + reviewer agreed, spec text unchanged): the interposer passes the STALE observation `""` (the reclaimer saw an earlier, old empty lock) to the exported `reclaimStale` at the moment the new lock first appears. Reading it as the post-publish content would be red on HEAD too, because `reclaimStale` unlinks whatever matches the caller's observation by contract.
 - Interposer patches the CJS `node:fs` object (`openSync` for the base shape, `linkSync` for the fix shape) plus `syncBuiltinESMExports()`; deterministic, no sleeps. It asserts the interposer fired exactly once so a miss can't pass vacuously.
 - AC-LANE-3: the resident test runs against the working tree. `E209_SCRIPT_UNDER_TEST` is an opt-in env path (not a sha), used only in this session for the red run above.
+## 2026-10-20T12:11:49.720Z — PASS — by qa-engineer
+
+QA round 1 PASS. Evidence: qa_reports/review_T-E209-02.md (covers batch, Expected-Red Diff, AC Execution Log), review_T-E183-02.md, review_T-E182-01.md (incl. ## E156 cause judgment: unrelated). AC-E209-1 red on base copy (lock lost), green on HEAD; AC-E183-4/5 red on base, green on HEAD; E8-S4 re-pinned; runHook timeout 20000 ms + env override, 8-copy x3 rounds 24/24 green (baseline 9/24 red). AC-LANE-1: node scripts/test-lock.mjs -- npm test on clean tree at d909908: 3590 pass / 3592 total (2 skipped, 0 fail). AC-LANE-2: diff within owned set. Pending tickets: E209-NEW-1 (reviewer), hook-spawn headroom (qa, P3).
+
