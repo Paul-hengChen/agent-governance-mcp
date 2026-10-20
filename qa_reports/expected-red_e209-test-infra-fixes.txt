@@ -1,3 +1,4 @@
 # T-E183-01 (AC-E183-5): a missing explicit path now exits 1 with a stderr
 # diagnostic instead of exit 0 "no metrics yet"; qa re-pins this case in T-E183-02.
 test/success-metrics.test.mjs | E8-S4: summarizer on a missing file exits 0 with a 'no metrics yet' notice (never throws ENOENT)
+# DISPOSITION (qa-engineer, T-E183-02): the entry above is re-pinned to exit 1 + 'no metrics file at <path>' and is green; the line is kept as the historical record of the intentional red.
