@@ -98,14 +98,19 @@ write (see `specs/e8-success-telemetry.md` / `tools/metrics.ts`). Summarize it
 for the retro with:
 
 ```bash
-node scripts/summarize-metrics.mjs   # default: .current/metrics.jsonl
+node scripts/summarize-metrics.mjs   # no argument: the current lane's metrics.jsonl
 ```
 
 which prints a per-feature table plus the aggregate one-pass rate and mean
 rounds/hops.
 
-That default is still the pre-lane flat path, so for a single-lane snapshot pass
-the current lane's path explicitly
+With no argument it reads the current lane's `.current/<lane>/metrics.jsonl`
+(`.current/_primary/metrics.jsonl` on a primary checkout), falls back to a
+legacy flat `.current/metrics.jsonl` (with a stderr note) in a not-yet-migrated
+workspace, and exits non-zero naming every path it tried when none exists. An
+explicit path argument that is missing or unreadable also exits non-zero; an
+existing file with no valid records still prints `no metrics yet`. To read
+another lane's snapshot, pass its path explicitly
 (`node scripts/summarize-metrics.mjs .current/<lane>/metrics.jsonl`). For real
 cross-lane totals prefer `tw_gate_stats`'s deduped metrics summary — do NOT
 glob multiple `metrics.jsonl` copies into this script; it has no dedup logic.
