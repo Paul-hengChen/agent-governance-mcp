@@ -1,4 +1,19 @@
-<!-- pending-tickets for lane e209 (E179). New blocks go ABOVE ## Applied. -->
+<!-- pending-tickets for lane e209 (E179). New blocks go ABOVE ```pending-ticket
+title: usage-accounting hook tests still take up to ~11.5 s per spawn under 8 concurrent copies on 8 cores, so the 20 s ceiling is only ~1.7x headroom
+priority: P3
+depends_on: [E182]
+source: qa-engineer round 1, e209 lane (qa_reports/review_T-E182-01.md, load evidence)
+body: |
+  After E182's runHook ceiling was raised from 5000 ms to 20000 ms (env override AGC_USAGE_HOOK_TEST_TIMEOUT_MS),
+  3 rounds of 8 concurrent copies of test/usage-accounting.test.mjs on an 8-core host were all 35/35, but the
+  slowest single hook-test spawn observed was 11.5 s (10.3 s second). That is more than 2x the old ceiling and
+  only ~1.7x under the new one. Heavier multi-lane load (the e73/e124/e137 reports were at load ~7+ with other
+  suites running) could still cross 20 s. Candidate follow-up: investigate why a no-op hook spawn (node cold start +
+  dist import) takes >10 s under CPU saturation, or run the hook in-process for the pure cases, instead of only
+  raising ceilings. Not a failure today; recorded as a data point.
+```
+
+## Applied. -->
 
 ```pending-ticket
 lane_local_id: E209-NEW-1

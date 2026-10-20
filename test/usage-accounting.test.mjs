@@ -5,6 +5,11 @@
 // best-effort, lock-free and never throws, outside the mutating-tool contract.
 // Pins the pure module, the opt-in hook end to end and crash survival.
 // Spec-to-test map: specs/e260h-comment-rationale.md (test/usage-accounting.test.mjs).
+// E182 — runHook's spawn timeout: default HOOK_TIMEOUT_MS = 20000 (was a fixed 5000 that a
+// hook spawn exceeded under concurrent-lane load, killing the child so `status` was null),
+// overridable with AGC_USAGE_HOOK_TEST_TIMEOUT_MS (a non-numeric or non-positive value falls
+// back to the default). Always finite, so a genuinely hung hook still fails. 20000 matches the
+// ceiling test/teamwork-lite.test.mjs's spawnAndAwait uses.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -340,7 +345,12 @@ test("t-crash-reconstruct-mixed-features: reconstruction stays feature-scoped ev
 // Opt-in hook contract: bin/agent-governance-usage-hook.mjs (AC-9)
 // ============================================================================
 
-function runHook(payload, { cwd, timeoutMs = 5000 } = {}) {
+const HOOK_TIMEOUT_MS = (() => {
+  const n = Number(process.env.AGC_USAGE_HOOK_TEST_TIMEOUT_MS);
+  return Number.isFinite(n) && n > 0 ? n : 20000;
+})();
+
+function runHook(payload, { cwd, timeoutMs = HOOK_TIMEOUT_MS } = {}) {
   const result = spawnSync(process.execPath, [HOOK_SCRIPT], {
     input: typeof payload === "string" ? payload : JSON.stringify(payload),
     encoding: "utf-8",
