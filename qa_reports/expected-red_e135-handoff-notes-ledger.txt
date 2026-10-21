@@ -18,3 +18,9 @@ test/e92-e86-handoff-write-boundary.test.mjs | AC3: 2500 + 1000 + 1000 chars (pa
 test/e92-e86-handoff-write-boundary.test.mjs | AC3: 3000 + 50x10-char notes -> omitted=50, marker byte-exact
 test/e92-e86-handoff-write-boundary-repro.test.mjs | E92 repro: a wholly-dropped pending_notes entry leaves a synthetic omission marker as the array's last element
 test/token-efficiency.test.mjs | pending_notes: notes exceeding 3000 chars are truncated
+
+# T-E135-03 — no new expected reds (verified on the e92 / e92-repro / token-efficiency
+# files: only the entries above are red).
+# T-E150-05 — no new expected reds (verified on the 61 test files that reference the
+# completion ledger, tw_sync or the drift evidence line, plus the SQLite, schema and
+# inputSchema files: only the entries above are red).

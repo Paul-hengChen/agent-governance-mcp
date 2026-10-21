@@ -323,8 +323,8 @@ const UpdateStateArgs = z
     cut_approved: z.boolean().optional(),
     // v6 — external-reference ledger (b8-external-ref-ledger). PM records one
     // entry per external artifact its spec references during the Resource Audit
-    // Gate. Passing the field REPLACES the whole array (wholesale, like
-    // completed_tasks — never merged). Closed state enum (AC-9): an out-of-enum
+    // Gate. Passing the field REPLACES the whole array (wholesale, never
+    // merged). Closed state enum (AC-9): an out-of-enum
     // state is rejected by zod before the gate runs, no server error code.
     external_refs: z
       .array(
@@ -654,7 +654,8 @@ export const TOOL_REGISTRY: ToolRegistryEntry[] = [
         completed_tasks: {
           type: "array",
           items: { type: "string" },
-          description: "Tasks completed now",
+          description:
+            'Task ids QA has completed for this feature (only agent_id "qa-engineer" may change it). File mode: a qa-engineer list is added to the ids already recorded; kept across same-feature writes that omit it or pass []; a qa-engineer FAIL write removes its review_task_ids; cleared when active_feature changes. SQLite: stored as given.',
         },
         pending_notes: {
           type: "array",
