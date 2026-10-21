@@ -11,6 +11,7 @@ import { z } from "zod";
 import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
 import { handleDetectDrift } from "./drift.js";
 import { isInsideWorkspace, DISPATCH_PIN_TIER_VALUES } from "./handoff-parse.js";
+import { READ_VIEW_MARKER_PREFIX } from "./handoff-types.js";
 import { handleSync } from "./sync.js";
 import { handleSwitchRole } from "./role.js";
 import {
@@ -222,10 +223,30 @@ function ledgerMultilineMessage(i: number): string {
   return `completed_tasks[${i}] contains a line break. handoff.md stores each completed id as one "- [x]" line, so the id would be split, or forge another id, on read-back.`;
 }
 
+function noteReadViewMessage(i: number): string {
+  return `pending_notes[${i}] contains tw_get_state read-view display text (the "${READ_VIEW_MARKER_PREFIX}" marker or a legacy "…[truncated]" / "further note(s) omitted" marker), not an author's note. Drop it before writing; the omitted notes are still on disk.`;
+}
+
+// E135 — true when a note carries tw_get_state display text rather than an
+// author's words: the shared read-view prefix anywhere in the note
+// (containment, AC12), or one of the two shapes the pre-E138 reader emitted
+// (a "…[truncated]" suffix; E92's whole-note omission marker). The legacy
+// literals live only here — the reader no longer emits them.
+const LEGACY_OMITTED_MARKER_RE = /^…\[\d+ further note\(s\) omitted — see pending_notes_truncated\]$/;
+
+function isReadViewDisplayText(note: string): boolean {
+  return (
+    note.includes(READ_VIEW_MARKER_PREFIX) ||
+    note.trimEnd().endsWith("…[truncated]") ||
+    LEGACY_OMITTED_MARKER_RE.test(note.trim())
+  );
+}
+
 // First round-trip defect of one note, or null — at most ONE issue per note,
-// in precedence order: multiline → bracket-led → empty-sentinel.
+// in precedence order: multiline → read-view → bracket-led → empty-sentinel.
 function pendingNoteRoundTripIssue(note: string, i: number): string | null {
   if (hasLineBreak(note)) return noteMultilineMessage(i);
+  if (isReadViewDisplayText(note)) return noteReadViewMessage(i);
   if (/^\s*\[/.test(note)) return noteBracketLedMessage(i);
   const trimmed = note.trim();
   if (trimmed === "" || trimmed === "(none)" || trimmed === "無") return noteEmptySentinelMessage(i);
@@ -466,7 +487,7 @@ const UpdateStateArgs = z
   })
   // Round-trip check — see pendingNoteRoundTripIssue above. A separate
   // superRefine appended AFTER the E86 one, so an E86 issue on the same note
-  // keeps its place and its byte-identical message. (E181)
+  // keeps its place and its byte-identical message. (E181, E135)
   .superRefine((d, ctx) => {
     (d.pending_notes ?? []).forEach((note, i) => {
       const message = pendingNoteRoundTripIssue(note, i);
