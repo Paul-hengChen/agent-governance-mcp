@@ -6,7 +6,9 @@ handoff's read view, its on-disk serialisation and what an author actually wrote
 apart, and every hop compounds the error.
 
 Revision: integrator pre-review round 1 (mailbox `to-lane#1`) applied — R1 chain shape, R2
-rollback path, Q2/O1 reading recorded, Q3/O2 folded into E181.
+rollback path, Q2/O1 reading recorded, Q3/O2 folded into E181. Revision 2: architecture
+`specs/e135-handoff-notes-ledger-architecture.md` Open Questions ruled by the human
+(2026-10-21) and integrator pre-review round 2 (`to-lane#3`) applied — see Cut Decisions.
 
 ## Problem Statement
 
@@ -67,7 +69,8 @@ forward a rolled-back id would stay in it and the next `tw_sync` would re-mark i
   proof: `node --test test/e181-pending-notes-roundtrip.test.mjs` — qa runs it red against a copy
   of base `2ad039d` and green against HEAD, and records both runs in its evidence.
 - **AC2** — Given the fix, when `tw_update_state` is called with a `pending_notes` entry that
-  contains `\n` or `\r`, then the call is rejected at the tool boundary (zod, the same layer as
+  contains a line break (`\n`, `\r`, U+2028, U+2029 — architecture DR-7, human ruling OQ2), then
+  the call is rejected at the tool boundary (zod, the same layer as
   E86's trailing-tag check) with the `note.multiline` message naming the index, and nothing is
   written.
   proof: `node --test test/e181-pending-notes-roundtrip.test.mjs` (boundary cases) green.
@@ -80,10 +83,18 @@ forward a rolled-back id would stay in it and the next `tw_sync` would re-mark i
   normalisation) and the count is unchanged.
   proof: same test file, round-trip property case green.
 - **AC5** — Given the fix, when `tw_update_state` is called with a `completed_tasks` id that
-  contains `\n` or `\r` (e.g. `"T-1\n- [x] T-FORGED"`), then the call is rejected at the tool
+  contains a line break (`\n`, `\r`, U+2028, U+2029 — same class as AC2) (e.g. `"T-1\n- [x] T-FORGED"`), then the call is rejected at the tool
   boundary with the `ledger.multiline` message naming the index, before any gate runs, and
   nothing is written. (Folded in by the integrator, round 1 Q3.)
-  proof: same test file, `completed_tasks` line-break case green (red at base: accepted).
+  proof: same test file, `completed_tasks` line-break cases (all four characters) green (red at
+  base: accepted).
+- **AC5a** — Given the fix, when `tw_update_state` is called with a `completed_tasks` id that is
+  empty or whitespace-only, then the call is rejected at the tool boundary with the `ledger.empty`
+  message naming the index, before any gate runs, and nothing is written (today it is accepted,
+  written as `- [x] ` and lost on read-back). (Architecture finding F1, folded into T-E181-03 by
+  the integrator, round 2.)
+  proof: same test file, `completed_tasks` empty / whitespace-only cases green (red at base:
+  accepted).
 - **AC6** — Given the fix, no `schema_version` changes and no existing rejection condition or
   error message changes (E86's `trailingTagFragmentMessage` stays byte-identical).
   proof: `git diff 2ad039d...HEAD -- schema/` is empty and `test/e92-e86-handoff-write-boundary.test.mjs`'s
@@ -197,10 +208,11 @@ forward a rolled-back id would stay in it and the next `tw_sync` would re-mark i
 | note.multiline | `pending_notes[{i}] contains a line break. handoff.md stores each note as one list line, so a multi-line note would be split or forged on read-back. Send each line as its own note.` | authored-here — E181 fix (reject, fail loud: the scope_decision_why precedent cited by E138) |
 | note.bracket-led | `pending_notes[{i}] starts with "[". handoff.md skips a "[" -led list line on read-back (it reads as a checkbox), so the note would be lost. Reword it so it does not start with "[".` | authored-here — E181 round-trip class found by the PM repro |
 | note.empty-sentinel | `pending_notes[{i}] is empty or an empty-section sentinel ("(none)", "無") and would be dropped on read-back. Remove it or reword it.` | authored-here — E181 round-trip class found by the PM repro |
+| ledger.empty | `completed_tasks[{i}] is empty or whitespace-only. handoff.md would write it as a bare "- [x]" line and lose it on read-back.` | authored-here — architecture finding F1, folded into E181 by the integrator (round 2) |
 | ledger.multiline | `completed_tasks[{i}] contains a line break. handoff.md stores each completed id as one "- [x]" line, so the id would be split, or forge another id, on read-back.` | authored-here — E181 extension folded in by the integrator (round 1 Q3) |
 | note.read-view | `pending_notes[{i}] contains tw_get_state read-view display text (the "⟦agc read-view⟧" marker or a legacy "…[truncated]" / "further note(s) omitted" marker), not an author's note. Drop it before writing; the omitted notes are still on disk.` | authored-here — E135 fix shape 1 (write boundary rejects the sentinel, reusing E86's zod superRefine) |
 | drift.evidence-line (changed sentence) | `completed_tasks is feature-scoped: it carries forward across same-feature writes and empties on an active_feature change (E150).` | authored-here — replaces `completed_tasks is feature-scoped and legitimately empties on an active_feature change, and a merged parallel lane's ledger can be discarded on conflict (root cause: E150 — not fixed by this detector).` in `tools/drift.ts` `buildEvidenceBackedLine`; the rest of that line is unchanged |
-| tool.completed_tasks.description | `Task ids QA has completed for this feature (only agent_id "qa-engineer" may change it). File mode: kept across same-feature writes that omit it or pass []; a qa-engineer FAIL write removes its review_task_ids; cleared when active_feature changes. SQLite: stored as given.` | authored-here — E150; final wording follows the architecture's `[]` / merge / shrink decision (AC15–AC16) |
+| tool.completed_tasks.description | `Task ids QA has completed for this feature (only agent_id "qa-engineer" may change it). File mode: a qa-engineer list is added to the ids already recorded; kept across same-feature writes that omit it or pass []; a qa-engineer FAIL write removes its review_task_ids; cleared when active_feature changes. SQLite: stored as given.` | authored-here — E150; the architecture's final string (Interface Contracts → E150 → Strings), human ruling OQ3 2026-10-21. Changed by T-E150-05 only; T-E181-03 changes no inputSchema description (`pending_notes`' "Notes for next agent" stays) |
 
 ## Visual Tokens
 
@@ -228,6 +240,10 @@ forward a rolled-back id would stay in it and the next `tw_sync` would re-mark i
   `test/token-efficiency.test.mjs` pins; the keep-both-ends policy addresses the loss without it.
 - Leading/trailing whitespace inside a note is trimmed on read today and stays so (meaning-
   preserving; rejecting it would refuse ordinary input).
+- The void-after-rollback residual (architecture OQ1): an id rolled back WITHOUT the paired qa
+  FAIL write stays in the carried ledger, so `tw_void_task` keeps refusing it and `tw_sync` would
+  re-mark it, until a qa FAIL names it. Accepted for this lane by human ruling (2026-10-21);
+  recorded as a new finding in `.current/e135/pending-tickets.md`.
 
 ## Dependencies / Prerequisites
 
@@ -301,6 +317,20 @@ because the proposal does not need them; a spec amendment adds them.
 `dispatch_mode: "feature"`, chain pm → architect → sr-engineer → code-reviewer → qa-engineer
 (integrator round 1 R1; see Dependencies, "Repro discipline").
 
+Human rulings, 2026-10-21, lane session, on the architecture's Open Questions
+(`specs/e135-handoff-notes-ledger-architecture.md` @ ba4d5af): **OQ1 accept** — the
+void-after-rollback-without-qa-FAIL residual stays (Out of Scope) and is filed as a new finding;
+**OQ2 accept** — the line-break rule covers `\n`, `\r`, U+2028 and U+2029 (AC2, AC5);
+**OQ3 accept** — `tool.completed_tasks.description` is the architecture's final string, and
+T-E181-03 changes no `pending_notes` description (its ledger row's "+ schema description" means
+none; the cut row below is corrected). Integrator pre-review round 2 (`to-lane#3`): architecture
+finding **F1** (empty / whitespace-only `completed_tasks` id) is folded into T-E181-03 as AC5a with
+a qa case in `test/e181-pending-notes-roundtrip.test.mjs`; **F2** (qa-visual SOP FAIL rows omit
+`review_task_ids`) and the **P3 note** (ledger removal reuses `tw_sync`'s `\b` whole-word match,
+so removing `T-CR-02` also removes hyphen-suffixed ids such as `T-CR-02-REV`; consistent with
+`tw_sync`, unchanged in this lane) are filed in `.current/e135/pending-tickets.md`. Task ids,
+files and AC ranges in the table are unchanged (AC5a falls inside AC2–AC6 / AC1–AC6).
+
 Task ids: the round-0 rows T-E150-01..03, T-E181-01..02, T-E138-01..02, T-E135-01..02 were
 voided in the lane ledger (never started; their order and dependencies encoded the declined qa
 pre-pass) and re-cut under fresh ids below — a voided id is never re-cut (E120).
@@ -323,7 +353,7 @@ tasks (T-E181-04, T-E138-04); the `depends_on` chain serialises them. All in one
 | id | desc | depends_on | est. files | touches | design-link |
 |---|---|---|---|---|---|
 | T-E150-04 | architect: ledger lifetime blueprint — `[]` semantics, qa merge vs replace, qa FAIL shrink + rollback/`tw_sync` path, omission detection without zod side fields, SQLite isolation, content/** decision (AC13–AC20) | none | 1 | `specs/e135-handoff-notes-ledger-architecture.md` | — |
-| T-E181-03 | sr-engineer: zod rejection of non-round-trippable notes (multiline, `[`-led, empty/sentinel) and of `completed_tasks` ids with a line break + schema description; list newly-red existing tests in the expected-red manifest; rebuild dist (AC2–AC6) | none | 2 | `tools/registry.ts`, `dist/tools/registry.*` | — |
+| T-E181-03 | sr-engineer: zod rejection of non-round-trippable notes (multiline, `[`-led, empty/sentinel) and of `completed_tasks` ids with a line break or empty / whitespace-only; no inputSchema description change; list newly-red existing tests in the expected-red manifest; rebuild dist (AC2–AC6) | none | 2 | `tools/registry.ts`, `dist/tools/registry.*` | — |
 | T-E138-03 | sr-engineer: read-view keep-both-ends, never slice, one elision marker, `omitted_notes`; export the marker prefix constant; list newly-red existing tests in the expected-red manifest; rebuild dist (AC7–AC10) | T-E181-03 | 4 | `tools/handoff-parse.ts`, `tools/handoff-types.ts`, `dist/tools/handoff-parse.*`, `dist/tools/handoff-types.*` | — |
 | T-E135-03 | sr-engineer: boundary rejection of read-view display text (prefix containment + two legacy shapes) using the shared constant; rebuild dist (AC11–AC12) | T-E138-03 | 2 | `tools/registry.ts`, `dist/tools/registry.*` | — |
 | T-E150-05 | sr-engineer: `completed_tasks` carry-forward and qa FAIL shrink per the architecture (boundary optional, orchestrator normalisation, file-writer clause), schema description, drift hint; rebuild dist (AC13–AC20) | T-E150-04, T-E135-03 | 8 | `tools/registry.ts`, `tools/handoff-orchestrator.ts`, `tools/handoff-write.ts`, `tools/drift.ts`, `dist/tools/registry.*`, `dist/tools/handoff-orchestrator.*`, `dist/tools/handoff-write.*`, `dist/tools/drift.*` | — |

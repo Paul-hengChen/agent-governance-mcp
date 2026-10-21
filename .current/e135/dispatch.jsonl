@@ -1,3 +1,7 @@
 {"ts":"2026-10-20T11:48:39.228Z","feature":"e135-handoff-notes-ledger","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-10-20T12:04:19.443Z","feature":"e135-handoff-notes-ledger","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-10-20T12:09:32.833Z","feature":"e135-handoff-notes-ledger","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-21T02:29:21.729Z","feature":"e135-handoff-notes-ledger","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-21T02:37:02.313Z","feature":"e135-handoff-notes-ledger","agent_id":"architect","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-21T02:37:08.367Z","feature":"e135-handoff-notes-ledger","agent_id":"architect","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-21T02:42:25.295Z","feature":"e135-handoff-notes-ledger","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
