@@ -25,6 +25,7 @@ import { isReleaseClosingWrite } from "../gates/feature-lease.js";
 // runMigrations; ES module caching means the side effect still fires exactly
 // once regardless of which file imports it first.
 import "../schema/migrations-handoff.js";
+import { READ_VIEW_MARKER_PREFIX } from "./handoff-types.js";
 import { writeHandoffState } from "./handoff-write.js";
 import { resolveCurrentLanePaths, resolveCurrentLane, resolveLaneLockPath } from "./lane-paths.js";
 import { hasFlatLaneFiles, migrateFlatToLaneLocked } from "./lane-migrate.js";
@@ -35,6 +36,45 @@ const COMPLETED_TASKS_RETURN_LIMIT = 50;
 // Long deliverable descriptions (common in sr-engineer handoffs) can bloat
 // the LLM context on every tw_get_state call. Full notes remain on disk.
 const PENDING_NOTES_CHAR_LIMIT = 3000;
+/** marker.elided — the single synthetic entry the read view inserts at the
+ *  elision point, built from READ_VIEW_MARKER_PREFIX; text quoted verbatim
+ *  from the spec's Copy/Strings table except for the "{n}" substitution.
+ *  (specs/e135-handoff-notes-ledger.md) */
+export function formatElidedMarker(n) {
+    return `${READ_VIEW_MARKER_PREFIX} ${n} note(s) omitted here — full text is on disk; see pending_notes_truncated. Do not write this line back.`;
+}
+/**
+ * Pure read-view selection for pending_notes (E138). Never slices a note.
+ * Under the limit the input is returned unchanged with truncated: null (no
+ * key, no marker). Over it: note[0] is kept if it fits the budget (the
+ * orchestrator unshifts server warnings there); then whole notes are kept
+ * from the END backwards, stopping at the first that does not fit, so the
+ * kept tail is contiguous and there is exactly one elision point; one
+ * marker.elided entry stands there (index 1 when note[0] is kept, else 0).
+ * The marker is not charged to the budget.
+ */
+export function selectPendingNotesView(notes, limit) {
+    const total = notes.reduce((sum, n) => sum + n.length, 0);
+    if (total <= limit)
+        return { notes: [...notes], truncated: null };
+    let budget = limit;
+    const keptHead = notes.length > 0 && notes[0].length <= budget;
+    if (keptHead)
+        budget -= notes[0].length;
+    const start = keptHead ? 1 : 0;
+    const tail = [];
+    for (let j = notes.length - 1; j >= start; j--) {
+        if (notes[j].length > budget)
+            break;
+        tail.unshift(notes[j]);
+        budget -= notes[j].length;
+    }
+    const omitted = notes.length - start - tail.length;
+    return {
+        notes: [...(keptHead ? [notes[0]] : []), formatElidedMarker(omitted), ...tail],
+        truncated: { total_chars: total, limit, omitted_notes: omitted },
+    };
+}
 // v10 — staleness threshold for the tw_get_state stale-dispatch advisory.
 // Fixed constant, NOT config-driven (DR-4): the advisory never blocks a write,
 // so a false positive costs one cheap ground-truth check, and there is no
@@ -601,65 +641,24 @@ export function readHandoffState(workspacePath) {
         });
     }
     const truncated = state.completed_tasks.length > COMPLETED_TASKS_RETURN_LIMIT;
-    // Truncate pending_notes by total character count. Keep notes from the
-    // front (writers put the most load-bearing prose first; routing itself now
-    // travels in the structured next_role field, v7). Drop trailing notes that
-    // push past the limit.
-    let pendingNotes = state.pending_notes;
-    let pendingTruncated = false;
-    const totalChars = pendingNotes.reduce((sum, n) => sum + n.length, 0);
-    if (totalChars > PENDING_NOTES_CHAR_LIMIT) {
-        const kept = [];
-        let charBudget = PENDING_NOTES_CHAR_LIMIT;
-        // A note that is PARTIALLY kept already gets an inline "…[truncated]"
-        // marker (above), but a note dropped WHOLLY (charBudget <= 0 before it
-        // is even considered) would leave no inline trace — only the sibling
-        // pending_notes_truncated advisory below, which a caller who does not
-        // look for it never notices. omittedCount counts every note from the
-        // break point onward (index i within pendingNotes) so one synthetic
-        // marker can be appended as the array's last entry. (E92)
-        let omittedCount = 0;
-        for (let i = 0; i < pendingNotes.length; i++) {
-            if (charBudget <= 0) {
-                omittedCount = pendingNotes.length - i;
-                break;
-            }
-            const note = pendingNotes[i];
-            if (note.length <= charBudget) {
-                kept.push(note);
-                charBudget -= note.length;
-            }
-            else {
-                kept.push(note.slice(0, charBudget) + "…[truncated]");
-                charBudget = 0;
-            }
-        }
-        if (omittedCount > 0) {
-            // Omission-marker text, quoted verbatim from the spec's Copy/Strings
-            // table except for the "{n}" substitution the table declares.
-            // (specs/e92-e86-handoff-write-boundary.md)
-            kept.push(`…[${omittedCount} further note(s) omitted — see pending_notes_truncated]`);
-        }
-        pendingNotes = kept;
-        pendingTruncated = true;
-    }
+    // Bound pending_notes by total character count: keep note[0] and the
+    // newest notes, elide the middle behind one marker, never slice a note.
+    // Full notes remain on disk. (E138; see selectPendingNotesView)
+    const notesView = selectPendingNotesView(state.pending_notes, PENDING_NOTES_CHAR_LIMIT);
     const view = {
         ...state,
         completed_tasks: truncated
             ? state.completed_tasks.slice(-COMPLETED_TASKS_RETURN_LIMIT)
             : state.completed_tasks,
-        pending_notes: pendingNotes,
+        pending_notes: notesView.notes,
         ...(truncated && {
             completed_tasks_truncated: {
                 showing: COMPLETED_TASKS_RETURN_LIMIT,
                 total: state.completed_tasks.length,
             },
         }),
-        ...(pendingTruncated && {
-            pending_notes_truncated: {
-                total_chars: totalChars,
-                limit: PENDING_NOTES_CHAR_LIMIT,
-            },
+        ...(notesView.truncated !== null && {
+            pending_notes_truncated: notesView.truncated,
         }),
     };
     // Stale-dispatch advisory, computed at read time from next_role,

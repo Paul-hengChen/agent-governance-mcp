@@ -1,5 +1,24 @@
 import "../schema/migrations-handoff.js";
-import type { HandoffState } from "./handoff-types.js";
+import type { HandoffState, PendingNotesTruncated } from "./handoff-types.js";
+/** marker.elided — the single synthetic entry the read view inserts at the
+ *  elision point, built from READ_VIEW_MARKER_PREFIX; text quoted verbatim
+ *  from the spec's Copy/Strings table except for the "{n}" substitution.
+ *  (specs/e135-handoff-notes-ledger.md) */
+export declare function formatElidedMarker(n: number): string;
+/**
+ * Pure read-view selection for pending_notes (E138). Never slices a note.
+ * Under the limit the input is returned unchanged with truncated: null (no
+ * key, no marker). Over it: note[0] is kept if it fits the budget (the
+ * orchestrator unshifts server warnings there); then whole notes are kept
+ * from the END backwards, stopping at the first that does not fit, so the
+ * kept tail is contiguous and there is exactly one elision point; one
+ * marker.elided entry stands there (index 1 when note[0] is kept, else 0).
+ * The marker is not charged to the budget.
+ */
+export declare function selectPendingNotesView(notes: readonly string[], limit: number): {
+    notes: string[];
+    truncated: PendingNotesTruncated | null;
+};
 /** The workspace traversal bound. `candidateAbs` MUST already be resolved.
  *  Lexical (no realpath), matching the zod refines' original bound exactly,
  *  so it is neither loosened nor tightened. */
