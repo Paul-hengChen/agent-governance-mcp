@@ -187,6 +187,59 @@ function trailingTagFragmentMessage(field: string): string {
   return `Field "${field}" appears to end with leftover tool-call markup (a trailing tag fragment) — this usually means a malformed multi-argument call bled into this field. Re-issue the call with each argument in its own tag.`;
 }
 
+// E181 — handoff.md stores each pending_notes entry as one `- <note>` line and
+// each completed_tasks id as one `- [x] <id>` line, and reads them back with
+// line-anchored regexes. Any value that cannot survive that round trip is
+// rejected here, at the tool boundary, in both storage modes, before any gate.
+// The line-break class is the four characters JS `.` and `^`/m treat as line
+// ends (same class as tools/tasks-file.ts containsLineBreak), escaped rather
+// than embedded literally. (specs/e135-handoff-notes-ledger.md AC2–AC5a)
+const LINE_BREAK_RE = /[\r\n\u2028\u2029]/;
+
+function hasLineBreak(value: string): boolean {
+  return LINE_BREAK_RE.test(value);
+}
+
+// Rejection message texts, quoted verbatim from the spec's Copy/Strings table
+// except for the "{i}" index substitution the table declares.
+function noteMultilineMessage(i: number): string {
+  return `pending_notes[${i}] contains a line break. handoff.md stores each note as one list line, so a multi-line note would be split or forged on read-back. Send each line as its own note.`;
+}
+
+function noteBracketLedMessage(i: number): string {
+  return `pending_notes[${i}] starts with "[". handoff.md skips a "[" -led list line on read-back (it reads as a checkbox), so the note would be lost. Reword it so it does not start with "[".`;
+}
+
+function noteEmptySentinelMessage(i: number): string {
+  return `pending_notes[${i}] is empty or an empty-section sentinel ("(none)", "無") and would be dropped on read-back. Remove it or reword it.`;
+}
+
+function ledgerEmptyMessage(i: number): string {
+  return `completed_tasks[${i}] is empty or whitespace-only. handoff.md would write it as a bare "- [x]" line and lose it on read-back.`;
+}
+
+function ledgerMultilineMessage(i: number): string {
+  return `completed_tasks[${i}] contains a line break. handoff.md stores each completed id as one "- [x]" line, so the id would be split, or forge another id, on read-back.`;
+}
+
+// First round-trip defect of one note, or null — at most ONE issue per note,
+// in precedence order: multiline → bracket-led → empty-sentinel.
+function pendingNoteRoundTripIssue(note: string, i: number): string | null {
+  if (hasLineBreak(note)) return noteMultilineMessage(i);
+  if (/^\s*\[/.test(note)) return noteBracketLedMessage(i);
+  const trimmed = note.trim();
+  if (trimmed === "" || trimmed === "(none)" || trimmed === "無") return noteEmptySentinelMessage(i);
+  return null;
+}
+
+// First round-trip defect of one completed_tasks id, or null (multiline →
+// empty).
+function completedTaskIdRoundTripIssue(id: string, i: number): string | null {
+  if (hasLineBreak(id)) return ledgerMultilineMessage(i);
+  if (id.trim() === "") return ledgerEmptyMessage(i);
+  return null;
+}
+
 // E300 — fixed sentence of the dispatch_pins rejection; the value is the
 // dynamic part. Built from the tier list (E308); it must render byte-for-byte
 // as gates/registry.ts hintStatic, which stays a literal because that module
@@ -408,6 +461,23 @@ const UpdateStateArgs = z
           message: trailingTagFragmentMessage(`pending_notes[${i}]`),
           path: ["pending_notes", i],
         });
+      }
+    });
+  })
+  // Round-trip check — see pendingNoteRoundTripIssue above. A separate
+  // superRefine appended AFTER the E86 one, so an E86 issue on the same note
+  // keeps its place and its byte-identical message. (E181)
+  .superRefine((d, ctx) => {
+    (d.pending_notes ?? []).forEach((note, i) => {
+      const message = pendingNoteRoundTripIssue(note, i);
+      if (message !== null) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message, path: ["pending_notes", i] });
+      }
+    });
+    (d.completed_tasks ?? []).forEach((id, i) => {
+      const message = completedTaskIdRoundTripIssue(id, i);
+      if (message !== null) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message, path: ["completed_tasks", i] });
       }
     });
   });

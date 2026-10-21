@@ -1,0 +1,7 @@
+# e135-handoff-notes-ledger — intentional reds left by sr-engineer. qa re-pins each
+# listed test to the new behaviour (spec Cut Decisions, owned test files).
+
+# T-E181-03 — the tool boundary now rejects a pending_notes entry that contains a
+# line break (note.multiline, AC2). This E92 case pins the newline acceptance that
+# E181 removes; qa re-pins it in T-E181-04.
+test/e92-e86-handoff-write-boundary.test.mjs | AC2 (documented accepted miss, NOT a defect): pending_notes[0] accepts NEW-4: unterminated attribute value containing a newline
