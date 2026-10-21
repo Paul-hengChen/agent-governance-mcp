@@ -1,0 +1,41 @@
+# run: RED against base 2ad039d copy
+# command: node --test test/e181-pending-notes-roundtrip.test.mjs
+# tree: tar export of 2ad039d, dist rebuilt with tsc, node_modules symlinked
+not ok 1 - AC1: the six lossy notes from the Problem Statement are rejected and nothing is written
+not ok 2 - AC1: a forged ledger id smuggled in a note never reaches completed_tasks
+not ok 3 - AC1: a rejected write leaves previously stored notes untouched
+not ok 4 - AC2: a note containing LF is rejected with note.multiline naming the index
+not ok 5 - AC2: a note containing CR is rejected with note.multiline naming the index
+not ok 6 - AC2: a note containing CRLF is rejected with note.multiline naming the index
+not ok 7 - AC2: a note containing U+2028 is rejected with note.multiline naming the index
+not ok 8 - AC2: a note containing U+2029 is rejected with note.multiline naming the index
+not ok 9 - AC2: a trailing line break after trimmable text is still a line break
+not ok 10 - AC3: bracket-led note is rejected with note.bracket-led
+not ok 11 - AC3: bracket after leading whitespace note is rejected with note.bracket-led
+not ok 12 - AC3: bare bracket note is rejected with note.bracket-led
+not ok 13 - AC3: empty string note is rejected with note.empty-sentinel
+not ok 14 - AC3: whitespace only note is rejected with note.empty-sentinel
+not ok 15 - AC3: (none) note is rejected with note.empty-sentinel
+not ok 16 - AC3: (none) with padding note is rejected with note.empty-sentinel
+not ok 17 - AC3: 無 note is rejected with note.empty-sentinel
+not ok 18 - AC3: 無 with padding note is rejected with note.empty-sentinel
+ok 19 - AC3: near-misses that DO round-trip are not over-rejected
+not ok 20 - DR-8: a note that is both multi-line and bracket-led yields exactly one issue (multiline)
+ok 21 - AC4: accepted arrays read back as trimmed notes with an unchanged count (fixed + seeded corpus)
+not ok 22 - AC5: a completed_tasks id containing LF is rejected with ledger.multiline before any gate
+not ok 23 - AC5: a completed_tasks id containing CR is rejected with ledger.multiline before any gate
+not ok 24 - AC5: a completed_tasks id containing CRLF is rejected with ledger.multiline before any gate
+not ok 25 - AC5: a completed_tasks id containing U+2028 is rejected with ledger.multiline before any gate
+not ok 26 - AC5: a completed_tasks id containing U+2029 is rejected with ledger.multiline before any gate
+not ok 27 - AC5: the rejection is the zod layer, not a gate (pm + ledger id would otherwise hit NON_QA_COMPLETED_TASKS_REJECTED)
+not ok 28 - AC5a: a completed_tasks id that is empty string is rejected with ledger.empty
+not ok 29 - AC5a: a completed_tasks id that is spaces is rejected with ledger.empty
+not ok 30 - AC5a: a completed_tasks id that is tab is rejected with ledger.empty
+ok 31 - AC6: E86's trailing-tag message is unchanged and still emitted for a note the E181 rules accept
+ok 32 - smoke: an empty pending_notes array and omitted pending_notes are still accepted
+ok 33 - smoke: a long single-line note (1000 chars, the per-note cap, special characters) round-trips
+ok 34 - smoke: a 1001-char note is still rejected by the pre-existing length cap (unchanged rejection)
+# tests 34
+# pass 6
+# fail 28
+# skipped 0
