@@ -30,7 +30,7 @@ were run against the built code, not just read).
   No `schema/`, `content/`, `gates/`, `test/`, `tools/sync.ts`,
   `tools/tasks-file.ts`, `tools/storage*.ts` or `tools/transitions.ts`
   changes since base `2ad039d`.
-- Verdict: APPROVED. No `required` findings; 2 `recommended`, 2 `optional`.
+- Verdict: APPROVED. No `required` findings; 1 `recommended`, 2 `optional`.
 
 ## AC Completeness
 AC1 — implemented — tools/registry.ts:487-504. The boundary now rejects every lossy shape in the Problem Statement (probed). The red-on-base / green-on-HEAD test is qa's (T-E181-04).
