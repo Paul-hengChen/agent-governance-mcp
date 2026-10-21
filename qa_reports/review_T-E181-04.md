@@ -1,6 +1,18 @@
 # QA review — T-E181-04, T-E138-04, T-E135-04, T-E150-06 (lane e135, feature e135-handoff-notes-ledger)
 
-covers: T-E181-04, T-E138-04, T-E135-04, T-E150-06
+covers: T-E181-04, T-E138-04, T-E135-04, T-E150-06, T-E150-04, T-E181-03, T-E138-03, T-E135-03, T-E150-05
+
+## Addendum — closing the lane's architect and sr rows at qa PASS (coordinator follow-up, lane precedent e226)
+
+No code or test changed. Each deliverable below is verified by the tests and runs recorded in this file:
+
+| task | deliverable | verified by |
+|---|---|---|
+| T-E150-04 | architecture `specs/e135-handoff-notes-ledger-architecture.md` @ ba4d5af | implemented as written and verified by T-E150-06 (AC13-AC20 tests: `[]` == omission, qa union, FAIL shrink, SQLite replace) |
+| T-E181-03 | zod boundary rejection of non-round-trippable notes / ledger ids | T-E181-04 (AC1-AC6, AC5a) green on HEAD, red on base; code-reviewer `review_reports/review_T-E181-03.md` APPROVED |
+| T-E138-03 | keep-both-ends read view, marker constant, `omitted_notes` | T-E138-04 (AC7-AC9) and T-E135-04 AC10 green; red on base |
+| T-E135-03 | read-view display text refused on write-back | T-E135-04 (AC11, AC12) green; red on base |
+| T-E150-05 | carry-forward, merge, qa FAIL shrink, drift line, schema description | T-E150-06 (AC13-AC20) green; red on base; full suite 3673/3675 at 0930039 |
 
 Role: qa-engineer (sonnet). Under test: sr commits 2e4b787 (T-E181-03), de6e2bf (T-E138-03), 691f5af (T-E135-03),
 025a40e (T-E150-05); code-reviewer APPROVED round 1 (`review_reports/review_T-E181-03.md`, 0 required findings).
@@ -129,3 +141,7 @@ AC18 SQLite, "no truncation = same view"). Logs: `qa_reports/e135-evidence/<file
 ## Verdict
 
 PASS for T-E181-04, T-E138-04, T-E135-04 and T-E150-06 subject to the AC21 full-suite line (green) in the final report.
+## 2026-10-21T10:21:40.118Z — PASS — by qa-engineer
+
+PASS T-E181-04 T-E138-04 T-E135-04 T-E150-06. Four new test files (34/15/17/32 tests) red on a base 2ad039d copy (28/12/15/27 fail) and green on HEAD; 7 expected-red manifest cases re-pinned to the new behaviour (each dispositioned in qa_reports/review_T-E181-04.md); AC1-AC21 mapped. Final full suite via test-lock at HEAD 0930039, clean tree: 3673 pass / 0 fail / 2 skipped of 3675; e209-owned tests untouched and green. Detail: qa_reports/review_T-E181-04.md, qa_reports/e135-evidence/.
+
