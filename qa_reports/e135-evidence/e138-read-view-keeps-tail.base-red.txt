@@ -1,0 +1,22 @@
+# run: RED against base 2ad039d copy
+# command: node --test test/e138-read-view-keeps-tail.test.mjs
+# tree: tar export of 2ad039d, dist rebuilt with tsc, node_modules symlinked
+not ok 1 - AC7: 2x2000 chars -> note[0] kept whole, the newest note elided, marker at index 1, nothing sliced
+not ok 2 - AC7: the newest notes survive; the middle is elided with the marker at index 1 when note[0] fits
+not ok 3 - AC7: when note[0] itself does not fit the budget the marker stands at index 0
+not ok 4 - AC7: the kept tail is contiguous — it stops at the first note from the end that does not fit
+not ok 5 - AC7: a long middle note ahead of short newer notes is kept when it still fits (whole, unsliced)
+not ok 6 - AC7: no note is ever sliced and the retired '…[truncated]' suffix never appears
+not ok 7 - AC7: a single on-disk note larger than the whole budget is elided whole, never sliced
+ok 8 - AC7: reading never alters what is on disk (the elision is view-only)
+not ok 9 - AC8: 13-note handover (5113 chars) — the last notes come back and the marker counts the middle ones
+not ok 10 - AC9: pending_notes_truncated carries total_chars, limit and omitted_notes (in that order)
+ok 11 - AC9: exactly at the limit nothing fires — no key, no marker, notes byte-identical
+not ok 12 - AC9: one char over the limit fires the elision
+ok 13 - AC9: short notes are returned untouched with no truncation metadata
+not ok 14 - pure: formatElidedMarker is the verbatim spec string and selectPendingNotesView is the same function the view uses
+not ok 15 - pure: empty and under-limit input is returned unchanged with truncated null
+# tests 15
+# pass 3
+# fail 12
+# skipped 0

@@ -45,23 +45,28 @@ test("E86 repro: pending_notes entry ending in leftover tool-call tag markup is 
   );
 });
 
-test("E92 repro: a wholly-dropped pending_notes entry leaves a synthetic omission marker as the array's last element", async () => {
+// Re-pinned by T-E138-04 (e135 lane, spec AC7/AC9): the omission marker is no longer a trailing
+// "…[n further note(s) omitted …]" entry. The read view keeps note[0] and the newest whole notes
+// and puts ONE "⟦agc read-view⟧ n note(s) omitted here …" marker at the elision point. The E92
+// intent survives: a wholly dropped note must never vanish silently.
+test("E92 repro (re-pinned by E138): a wholly-dropped pending_notes entry leaves one omission marker at the elision point, not at the end", async () => {
   const ws = mkWorkspace();
   resetSession(ws);
   markStateRead(ws);
 
-  // Three 1000-char notes exactly fill the 3000-char read-view budget; a
-  // fourth 1000-char note is dropped WHOLLY (charBudget <= 0 before it is
-  // considered), so the marker must appear. (spec AC3)
+  // Four 1000-char notes exceed the 3000-char read-view budget by one whole note. (spec AC3)
   const notes = [0, 1, 2, 3].map((i) => `n${i}-`.padEnd(1000, "x"));
   await writeHandoffState(ws, "e92-e86-handoff-write-boundary", "In_Progress", [], notes, undefined, "sr-engineer");
 
   const state = JSON.parse(readHandoffState(ws));
   assert.ok(state.pending_notes_truncated, "expected pending_notes_truncated advisory to be set");
-  const last = state.pending_notes[state.pending_notes.length - 1];
-  assert.match(
-    last,
-    /further note\(s\) omitted — see pending_notes_truncated/,
-    `expected the last pending_notes entry to be a synthetic omission marker, got: ${JSON.stringify(last)}`,
+  assert.equal(state.pending_notes_truncated.omitted_notes, 1);
+  const markers = state.pending_notes.filter((n) => n.startsWith("⟦agc read-view⟧"));
+  assert.equal(markers.length, 1, `expected exactly one marker, got: ${JSON.stringify(state.pending_notes.map((n) => n.slice(0, 30)))}`);
+  assert.equal(
+    markers[0],
+    "⟦agc read-view⟧ 1 note(s) omitted here — full text is on disk; see pending_notes_truncated. Do not write this line back.",
   );
+  assert.equal(state.pending_notes.indexOf(markers[0]), 1, "the marker stands at the elision point (index 1 after note[0])");
+  assert.equal(state.pending_notes[state.pending_notes.length - 1], notes[3], "the newest note is the last entry, not a marker");
 });

@@ -43,8 +43,10 @@ const E92_OMISSION_TEMPLATE = "…[{n} further note(s) omitted — see pending_n
 function e86Message(field) {
   return E86_REJECTION_TEMPLATE.replace("<field>", field);
 }
-function e92Marker(n) {
-  return E92_OMISSION_TEMPLATE.replace("{n}", String(n));
+// E135/E138 (T-E138-04): the E92 trailing "…[n further note(s) omitted …]" marker is retired; the
+// read view now emits one marker at the elision point (spec Copy/Strings marker.elided).
+function elidedMarker(n) {
+  return `⟦agc read-view⟧ ${n} note(s) omitted here — full text is on disk; see pending_notes_truncated. Do not write this line back.`;
 }
 
 test("Copy/Strings oracle: spec still mandates the e86/e92 strings this file hardcodes", () => {
@@ -131,6 +133,10 @@ function assertRejectedWithMarkupMessage(tool, rawArgs, expectedMessage) {
       return true;
     },
   );
+}
+
+function updateStateArgsFor(note) {
+  return { ...baseUpdateStateArgs(), pending_notes: [note] };
 }
 
 function assertAccepted(tool, rawArgs) {
@@ -241,13 +247,41 @@ const ACCEPTED_BY_DESIGN_SHAPES = [
   ],
 ];
 
+// Re-pinned by T-E181-04 (e135 lane): the tool boundary now rejects a pending_notes entry that
+// contains a line break (note.multiline — a multi-line note cannot round-trip through handoff.md),
+// so the NEW-4 "unterminated attribute value containing a newline" shape is no longer an accepted
+// miss for pending_notes[0]. It stays accepted in the other four fields (they store free text).
+const E181_REJECTED_FOR_PENDING_NOTES = new Set([
+  "NEW-4: unterminated attribute value containing a newline",
+]);
+
 for (const field of GUARDED_FIELDS) {
   for (const [label, value] of ACCEPTED_BY_DESIGN_SHAPES) {
+    if (field.name === "pending_notes[0]" && E181_REJECTED_FOR_PENDING_NOTES.has(label)) continue;
     test(`AC2 (documented accepted miss, NOT a defect): ${field.name} accepts ${label}`, () => {
       assertAccepted(field.tool, field.build(value));
     });
   }
 }
+
+test("AC2 (re-pinned by E181): pending_notes[0] REJECTS NEW-4: unterminated attribute value containing a newline, with note.multiline", () => {
+  const value = '<parameter name="pending\nnotes';
+  assert.throws(
+    () => updateStateTool.run(updateStateArgsFor(value)),
+    (err) => {
+      assert.ok(Array.isArray(err.issues), "expected a ZodError with an issues array");
+      const messages = err.issues.map((i) => i.message);
+      assert.ok(
+        messages.some((m) => m.startsWith("pending_notes[0] contains a line break.")),
+        `expected note.multiline, got ${JSON.stringify(messages)}`,
+      );
+      // The newline shape never matched E86 (the tail has no tag fragment after the break), so
+      // the E86 message is absent: the rejection is E181's alone, not a change to E86.
+      assert.ok(!messages.includes(e86Message("pending_notes[0]")));
+      return true;
+    },
+  );
+});
 
 // ===========================================================================
 // Whitespace / Unicode boundary (NEW-2): a trailing space, tab, newline, CRLF, NBSP, U+2028,
@@ -381,43 +415,51 @@ async function writeNotesAndRead(ws, notes) {
   return JSON.parse(readHandoffState(ws));
 }
 
-test("AC3: 4x1000-char notes (3 fill the 3000-char budget exactly, 4th dropped wholly) -> omitted=1, marker is the last entry", async () => {
+// Re-pinned by T-E138-04 (e135 lane, spec AC7-AC9): the read view keeps note[0], then whole notes
+// from the END backwards while they fit, and states the elided count in ONE marker at the elision
+// point. No note is sliced and the E92 trailing marker / "…[truncated]" suffix are retired. The
+// five fixtures below are the original E92 AC3 shapes; only the expected view changed. The fuller
+// matrix lives in test/e138-read-view-keeps-tail.test.mjs.
+test("AC3: 4x1000-char notes (budget 3000) -> note[0] kept, newest two kept, one note elided at index 1 -> omitted=1", async () => {
   const notes = [0, 1, 2, 3].map((i) => mkNote(1000, `n${i}`));
   const state = await writeNotesAndRead(mkWorkspace(), notes);
   assert.ok(state.pending_notes_truncated, "expected pending_notes_truncated advisory");
-  assert.equal(state.pending_notes[state.pending_notes.length - 1], e92Marker(1));
+  assert.deepEqual(state.pending_notes, [notes[0], elidedMarker(1), notes[2], notes[3]]);
+  assert.equal(state.pending_notes_truncated.omitted_notes, 1);
 });
 
-test("AC3: 5x900-char notes (note 4 partially kept, note 5 dropped wholly) -> omitted=1", async () => {
+test("AC3: 5x900-char notes -> note[0] and the newest two kept whole (nothing sliced), two elided -> omitted=2", async () => {
   const notes = [0, 1, 2, 3, 4].map((i) => mkNote(900, `n${i}`));
   const state = await writeNotesAndRead(mkWorkspace(), notes);
-  assert.equal(state.pending_notes[state.pending_notes.length - 1], e92Marker(1));
-  // The partially-kept 4th note still carries the pre-existing per-note
-  // marker (unchanged convention) — not replaced by the whole-drop marker.
-  assert.match(state.pending_notes[3], /…\[truncated\]$/);
-});
-
-test("AC3: 1x4000-char note (partial only, nothing dropped) -> no whole-drop marker emitted", async () => {
-  const notes = [mkNote(4000, "n0")];
-  const state = await writeNotesAndRead(mkWorkspace(), notes);
-  assert.equal(state.pending_notes.length, 1, "no synthetic marker entry should be appended");
-  assert.doesNotMatch(
-    state.pending_notes[0],
-    /further note\(s\) omitted/,
-    "the single partially-kept note must not be mistaken for a whole-drop marker",
+  assert.deepEqual(state.pending_notes, [notes[0], elidedMarker(2), notes[3], notes[4]]);
+  assert.ok(
+    state.pending_notes.every((n) => !/…\[truncated\]$/.test(n)),
+    "the per-note '…[truncated]' suffix is retired — no note is ever partially kept",
   );
 });
 
-test("AC3: 2500 + 1000 + 1000 chars (partial then a wholly-dropped note) -> omitted=1", async () => {
-  const notes = [mkNote(2500, "n0"), mkNote(1000, "n1"), mkNote(1000, "n2")];
+test("AC3: 1x4000-char note (larger than the whole budget) -> elided whole behind one marker, never sliced", async () => {
+  const notes = [mkNote(4000, "n0")];
   const state = await writeNotesAndRead(mkWorkspace(), notes);
-  assert.equal(state.pending_notes[state.pending_notes.length - 1], e92Marker(1));
+  assert.deepEqual(state.pending_notes, [elidedMarker(1)]);
+  assert.doesNotMatch(
+    state.pending_notes[0],
+    /further note\(s\) omitted/,
+    "the retired E92 marker shape must not come back",
+  );
 });
 
-test("AC3: 3000 + 50x10-char notes -> omitted=50, marker byte-exact", async () => {
+test("AC3: 2500 + 1000 + 1000 chars -> note[0] kept, neither later note fits the remaining 500 -> omitted=2", async () => {
+  const notes = [mkNote(2500, "n0"), mkNote(1000, "n1"), mkNote(1000, "n2")];
+  const state = await writeNotesAndRead(mkWorkspace(), notes);
+  assert.deepEqual(state.pending_notes, [notes[0], elidedMarker(2)]);
+});
+
+test("AC3: 3000 + 50x10-char notes -> note[0] fills the budget exactly, omitted=50, marker byte-exact", async () => {
   const notes = [mkNote(3000, "n0"), ...Array.from({ length: 50 }, (_, i) => mkNote(10, `m${i}`))];
   const state = await writeNotesAndRead(mkWorkspace(), notes);
-  assert.equal(state.pending_notes[state.pending_notes.length - 1], e92Marker(50));
+  assert.deepEqual(state.pending_notes, [notes[0], elidedMarker(50)]);
+  assert.equal(state.pending_notes[1], elidedMarker(50));
 });
 
 // ==========================================================================
