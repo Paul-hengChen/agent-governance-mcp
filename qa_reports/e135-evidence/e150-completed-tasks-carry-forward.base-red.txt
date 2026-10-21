@@ -1,0 +1,39 @@
+# run: RED against base 2ad039d copy
+# command: node --test test/e150-completed-tasks-carry-forward.test.mjs
+# tree: tar export of 2ad039d, dist rebuilt with tsc, node_modules symlinked
+not ok 1 - AC13: ledger [A] survives a same-feature write that omits completed_tasks — sr-engineer -> code-reviewer (review hand-off)
+not ok 2 - AC13: ledger [A] survives a same-feature write that omits completed_tasks — pm amendment (pm -> pm)
+not ok 3 - AC13: ledger [A] survives a same-feature write that omits completed_tasks — sr-engineer -> sr-engineer
+not ok 4 - AC13: ledger [A] survives a same-feature write that omits completed_tasks — qa-engineer In_Progress (no ids)
+not ok 5 - AC13: the same holds through the real tool boundary (zod defaults the field to [])
+not ok 6 - AC13: successive same-feature writes keep carrying the ledger (no erosion over several hops)
+not ok 7 - AC15: completed_tasks: [] never shrinks the ledger — pm
+not ok 8 - AC15: completed_tasks: [] never shrinks the ledger — sr-engineer
+not ok 9 - AC15: completed_tasks: [] never shrinks the ledger — code-reviewer
+not ok 10 - AC15: completed_tasks: [] never shrinks the ledger — qa-engineer
+not ok 11 - AC15: a direct caller that bypasses zod with completed_tasks undefined is normalised the same way
+not ok 12 - AC15: qa-engineer writing [B] with ledger [A] yields [A, B], not [B]
+not ok 13 - AC15: a cumulative list [A, B] on ledger [A] adds only B (no duplicate, on-disk order first)
+ok 14 - AC15: the writer's union dedupes on the trimmed id (writer-level, directive present)
+not ok 15 - AC15: a qa PASS carrying only the current ids keeps earlier PASSes on the ledger
+not ok 16 - AC14: a write naming a different active_feature starts with an empty ledger and archives the old file
+not ok 17 - AC14: the new feature's own qa write grows its fresh ledger from empty (old ids are not merged in)
+not ok 18 - AC16: qa FAIL with review_task_ids [B] on ledger [A, B] leaves [A]
+not ok 19 - AC16: the explicit completed_tasks: [] spelling of the same FAIL write also shrinks
+not ok 20 - AC16 (DR-3): when one FAIL write both lists B in completed_tasks and names it in review_task_ids, removal wins
+not ok 21 - AC16: a ledger entry that wraps the id in prose is matched on a word boundary (same predicate as tw_sync)
+not ok 22 - AC16: only qa-engineer + FAIL + non-empty review_task_ids shrinks — APPROVED row (qa In_Progress + review_task_ids) never does
+not ok 23 - AC16: a qa FAIL that names no review_task_ids cannot remove anything (the write is refused, ledger intact)
+not ok 24 - AC16: a non-qa agent naming review_task_ids can never shrink the ledger
+not ok 25 - AC16: qa FAIL + tw_rollback_task + tw_sync (FAIL write first) — B stays out of the ledger and is not re-marked [x]
+not ok 26 - AC16: qa FAIL + tw_rollback_task + tw_sync (rollback first) — B stays out of the ledger and is not re-marked [x]
+ok 27 - AC17: a non-qa write carrying a non-empty completed_tasks is still rejected and the ledger is untouched
+ok 28 - AC17: the QA completion-evidence gate still diffs the incoming list against the on-disk set (new id without evidence is refused)
+ok 29 - AC17: ids already on disk need no fresh evidence even when re-sent (cumulative list never re-gates)
+ok 30 - AC18: SQLite storage stores an omitted completed_tasks as [] exactly as before (carry-forward is file-mode only)
+not ok 31 - AC19: tools/drift.ts and its dist no longer claim a merged lane's ledger 'can be discarded on conflict'
+not ok 32 - AC20: the tw_update_state completed_tasks description states the new lifetime (final architecture string) and 'Tasks completed now' is gone
+# tests 32
+# pass 5
+# fail 27
+# skipped 0
