@@ -2,7 +2,7 @@
 base: 57f3f4e    integration branch: integ/post-v4-w10
 mailbox: ../agent-governance-mcp-lanes/_mailbox
 
-**狀態：已核准 2026-10-20（D1 併入 E138、D2 開 e209），已派工（base `2ad039d`）。** `base:` 是規劃基準（E358 立票 PR #37 merge）；實際派工 base = 本清單併入後的 `main` sha，記在 Decisions 派工列。
+**狀態：已結案 2026-10-22。** 兩條 lane 皆 qa PASS（CI 綠）→ `integ/post-v4-w10` merge `cfc3c68`（e135）、`88e8da9`（e209）→ finish 兩 lane（E359–E363 配號）→ 記帳 commit → PR + auto-merge（見「結案」與「接手步驟」）。 `base:` 是規劃基準（E358 立票 PR #37 merge）；實際派工 base = 本清單併入後的 `main` sha，記在 Decisions 派工列。
 
 佇列 P2 段開頭三張（#1 E135、#2 E181、#3 E150）是同一類問題：handoff 的讀取視圖、序列化格式與作者寫的內容分不清，每多一跳就多累積一次。三張都落在同一組檔案（`tools/registry.ts` 的寫入邊界、`tools/handoff-parse.ts`、`tools/handoff-write.ts`），擁有集合無法拆開，所以放同一條 lane 依序做；E138 依 D1 併入同一條 lane。第二條 lane（D2）從 P2 段挑三張檔案完全不相交、成本低的測試基礎設施票平行跑。
 
@@ -85,6 +85,14 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 
 預期零檔案衝突（擁有集合不相交）；`dist/` 不手解，一律重建。
 
+## 結案
+- 日期 2026-10-22。`integ/post-v4-w10` ← e135（`cfc3c68`）← e209（`88e8da9`），皆 `--no-ff`、零衝突 → 無合併審查；merge-invariants 兩次 PASS；重建 `dist/` 無差異；`npm audit --audit-level=high` exit 0；整合層 CI run 39711742858 在 `88e8da9` 綠。
+- 彙總（上限按 lane 計）：e135 9 張 task（另 9 張因 cut 改版 void）／hop 6/14／review 0 輪退回／qa 0 輪退回；e209 5 張 task／hop 4/14／review 0 輪／qa 0 輪。合計 14 張 task、hop 10，每條 lane 都在自己的上限內。
+- 完成定義 12 項全部成立（本清單的 `## 接手步驟` 為最後一項）。
+- 例外：(1) e209 PM 在 cut 預審 close 前就寫了 `next_role=sr-engineer`（cut gate 擋住，沒有派工）。(2) e135 cut 預審退回一次：qa 預寫測試那一跳不在 ledger 上，改成 feature 模式；E150 的回滾路徑補了 AC16。(3) e135 照 E262 的實際順序走：人類先核准 cut → architect → 第二次預審 → 人類裁決 OQ。(4) e135 的 sr session 停住約 7 小時，人類喚醒後接續。(5) e135 有 5 個 task 打勾但沒進 handoff 完成清單（E237 同類），證據齊全。(6) e135 的越界 6 檔是 `qa_reports/e135-evidence/` 下的原始 log，整合者接受。(7) 兩條 lane 的 sr、reviewer 都是 opus（同模型疑慮，review 報告已註明）。
+- 新票：E359–E361（e135）、E362–E363（e209），都由 `finish --shipped` 配號；E362 排在佇列 #13a（P2，人類裁決不拉進本波），其餘排在 #176–#179。
+- 發版：`main` 帶 E181／E135／E138／E150（handoff 讀寫邊界與完成清單的保留規則，`tools/registry.ts`、`handoff-parse/write/types/orchestrator.ts`、`drift.ts`）與 E209／E182／E183（test-lock 發佈方式、hook 測試逾時、summarize-metrics 預設路徑）→ 是否發版與版號由人類決定。
+
 ## Dispatch pins
 - e135：`pm=opus`、`sr-engineer=opus`。
 - e209：`pm=opus`、`sr-engineer=opus`。
@@ -105,6 +113,7 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 | 2026-10-21 | 整合者 | e135 第二次預審 close（architecture `ba4d5af`，to-lane#3）：同意 AC15（[] 等同省略、qa 用併集）與 AC16（只有 qa FAIL 加 review_task_ids 才縮小，在 writer 的鎖內處理）；`content/**` 不改。給人類的 OQ 建議：OQ1 接受並另開新發現、OQ2 接受（四個換行字元）、OQ3 接受。F1（空白的 completed_tasks id）由整合者折進 T-E181-03；F2（qa-visual FAIL 列缺 review_task_ids）與 `\b` 比對會連帶移除連字號後綴 id 的問題，都記成新發現 | 信箱 e135 |
 | 2026-10-21 | 人類 | 在 e135 lane session 裁決 architect 的 OQ1–OQ3（照建議接受）；PM 修訂 spec 第 2 版（AC2／AC5 四個換行字元、completed_tasks 描述最終字串、AC5a 併入 F1、OQ1 殘留列入 Out of Scope） | e135 lane session；`specs/e135-handoff-notes-ledger.md`，commit `3c460ec` |
 | 2026-10-22 | 整合者 | 5a：e135 `b9d977a`（CI run 39711237967）close —— review、qa 都是一輪通過；9 個 task 由 `qa_reports/review_T-E181-04.md` 的 covers 涵蓋；越界 6 檔是 `qa_reports/e135-evidence/` 下的原始 log（子目錄對不上 `*E135*` glob，內容無本機路徑），屬機械性越界，整合者接受。T-E150-04、T-E181-03、T-E138-03、T-E135-03、T-E150-05 在 tasks.md 已打勾，但沒進 handoff 完成清單（qa:PASS → qa:PASS 沒有邊，E237 同類），證據齊全，drift 未報。中途 sr session 停住約 7 小時，人類喚醒後 lane 自行接續 | 本檔 |
+| 2026-10-22 | 整合者 | 5b：`integ/post-v4-w10` ← e135 `cfc3c68` ← e209 `88e8da9`，皆 `--no-ff`、零衝突 → 無合併審查；merge-invariants 兩次 PASS；重建 `dist/` 無差異；`npm audit --audit-level=high` exit 0；整合層 CI run 39711742858 綠；finish e135 配號 E359–E361、finish e209 配號 E362–E363 | 本檔 |
 
 ## 接手步驟
 （事實欄位由 `node scripts/fanout.mjs handoff` 產生；接手時先跑 `node scripts/fanout.mjs handoff --check <manifest>`。`<待填：…>` 由整合者填寫。）
@@ -112,16 +121,14 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 - 目標分支：main @ 2ad039d
 - 目標分支對 origin：一致
 - git status：乾淨
-- worktree：primary（main）；../agent-governance-mcp-lanes/e135（feat/e135-handoff-notes-ledger）；../agent-governance-mcp-lanes/e209（feat/e209-test-infra-fixes）
-- lane-status：primary（main）release-post-v4-w9／In_Progress／release-engineer，hop 3，commits 0，clean；e135（feat/e135-handoff-notes-ledger）e135-handoff-notes-ledger／In_Progress／sr-engineer，hop 4，commits 6，dirty；e209（feat/e209-test-infra-fixes）e209-test-infra-fixes／PASS／qa-engineer，hop 4，commits 14，clean
+- worktree：primary（main ← integ/post-v4-w10 @ 2190ccc）
+- lane-status：primary（main ← integ/post-v4-w10 @ 2190ccc）release-post-v4-w9／In_Progress／release-engineer，hop 3，commits 0，clean
 ### 已結案
-- e209 lane：qa PASS，5a 核對 close（`c68f00a`，CI run 39421355881 綠），branch 已 push，等合併；不再 commit。E209-NEW-1 不拉進本波（人類 2026-10-21 裁決）。
-- e135 lane：cut（`62297e8`）、architect（`ba4d5af`）、spec 第 2 版（`3c460ec`）都已預審 close 並經人類核准／裁決；sr 已 commit T-E181-03（`2e4b787`）、T-E138-03（`de6e2bf`）。T-E135-03 的 `tools/registry.ts` 與 `dist/tools/registry.*` 改動未 commit，worktree 自 2026-10-21 03:04Z 起無任何檔案變動，lane 也沒有寄信（疑似 sr session 中斷）。
-- 未配號的新發現：e209 的 E209-NEW-1、E182-NEW-1；e135 的 E150-NEW-1～3，都已 commit 在各自 lane branch，由 finish 配號。
+- 第 10 波兩條 lane（e135、e209）已合併、finish、拆除；lane 紀錄在 `.current/history/2026-10/`，記帳與本清單在同一個 wave PR。佇列 P2 段的 E135、E181、E150、E138、E182、E209、E183 至此完成。
+- 未配號的新發現：無（E359–E363 由 finish 配號）。
 ### 待人類決定
-- 喚醒 e135 lane session：若 sr 已中斷，lane 先照 Crash-Resume Protocol 以 `git status`／diff 核對 T-E135-03 的實際進度，再依 `dispatch_pins`（sr-engineer=opus）重派 sr；剩 T-E135-03、T-E150-05 兩個 sr task，之後 code-reviewer 與 qa。
-- 兩小時無新信、無狀態變化，watch 已停；恢復時（人類在本 session 說繼續，或 `接手` session）從下方 watch baseline 重新 arm 信箱監看，`lane-status.mjs --watch --lanes e135,e209 --mailbox-root ../agent-governance-mcp-lanes/_mailbox` 直接重開。
+- 是否發版：`main` 帶 handoff 讀寫邊界的輸入拒絕規則（多行、`[` 開頭、空白 note 與 task id 會被拒）、讀取視圖的標記與保留頭尾、完成清單在同一 feature 內保留，以及 test-lock、hook 測試逾時、summarize-metrics 的修正；版號由人類決定（輸入規則收緊屬行為改動）。
+- 是否開下一波：佇列 P2 段還有 E139、E136、E154、E152、E158、E161、E215、E184、E236 與新的 E362；E293 仍暫緩。
+- 建議：下一步（發版或下一波）開新 session 進行；若要在本 session 繼續，先跑 `node scripts/fanout.mjs handoff --check specs/fanout-post-v4-w10.md`，exit 0 才繼續。
 ### 進行中的背景工作
-- 未 push 的 commit：feat/e135-handoff-notes-ledger 6
-- 信箱：e135 to-integrator 4／to-lane 4；e209 to-integrator 6／to-lane 6
-- watch baseline：node scripts/mailbox-watch.mjs ../agent-governance-mcp-lanes/_mailbox/e135/to-integrator.md ../agent-governance-mcp-lanes/_mailbox/e209/to-integrator.md --baseline e135=4,e209=6
+無
