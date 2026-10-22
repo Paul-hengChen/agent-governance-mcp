@@ -1,5 +1,7 @@
 <!-- pending-tickets for lane e209 (E179). New blocks go ABOVE ## Applied. -->
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E209-NEW-1
 title: test-lock reclaimStale guard file is created empty then written, so a stalled live reclaimer can still delete a live lock
@@ -33,5 +35,3 @@ body: |
   dist import) takes >10 s under CPU saturation, or run the hook in-process for the pure cases, instead of only
   raising ceilings. Not a failure today; recorded as a data point.
 ```
-
-## Applied
