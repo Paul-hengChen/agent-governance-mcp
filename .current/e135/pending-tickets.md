@@ -1,5 +1,7 @@
 # Pending tickets — lane e135
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E150-NEW-1
 title: tw_void_task keeps refusing, and tw_sync re-marks, an id rolled back without a paired qa FAIL write
@@ -45,5 +47,3 @@ body: |
   is left unchanged in the e135 lane. A later fix would tighten both matchers together (e.g. an
   id terminator that excludes "-"), so the ledger and tw_sync never disagree.
 ```
-
-## Applied
