@@ -1,4 +1,19 @@
 import type { AgentName } from "./transitions.js";
+/** Prefix of every synthetic entry the tw_get_state read view may emit
+ *  (marker.prefix, U+27E6 … U+27E7). Emitted by tools/handoff-parse.ts,
+ *  refused on write-back by tools/registry.ts. The ONLY copy of the literal
+ *  in tools/ source. (specs/e135-handoff-notes-ledger.md AC10) */
+export declare const READ_VIEW_MARKER_PREFIX = "\u27E6agc read-view\u27E7";
+/** View-only sibling key of pending_notes, present only when the read view
+ *  elided notes. (E138 AC9) */
+export interface PendingNotesTruncated {
+    /** Sum of on-disk note lengths. */
+    total_chars: number;
+    /** PENDING_NOTES_CHAR_LIMIT. */
+    limit: number;
+    /** Count of elided notes. */
+    omitted_notes: number;
+}
 export type ExternalRefState = "fetched" | "indexed" | "user-confirmed-ignorable" | "unresolved";
 export interface ExternalRef {
     ref: string;

@@ -9,6 +9,7 @@ import * as path from "node:path";
 import { z } from "zod";
 import { handleDetectDrift } from "./drift.js";
 import { isInsideWorkspace, DISPATCH_PIN_TIER_VALUES } from "./handoff-parse.js";
+import { READ_VIEW_MARKER_PREFIX } from "./handoff-types.js";
 import { handleSync } from "./sync.js";
 import { handleSwitchRole } from "./role.js";
 import { handleGetNextTask, handleCompleteTask, handleRollbackTask, handleVoidTask, handleAddTask, } from "./tasks.js";
@@ -139,6 +140,71 @@ function hasTrailingTagFragment(value) {
 function trailingTagFragmentMessage(field) {
     return `Field "${field}" appears to end with leftover tool-call markup (a trailing tag fragment) — this usually means a malformed multi-argument call bled into this field. Re-issue the call with each argument in its own tag.`;
 }
+// E181 — handoff.md stores each pending_notes entry as one `- <note>` line and
+// each completed_tasks id as one `- [x] <id>` line, and reads them back with
+// line-anchored regexes. Any value that cannot survive that round trip is
+// rejected here, at the tool boundary, in both storage modes, before any gate.
+// The line-break class is the four characters JS `.` and `^`/m treat as line
+// ends (same class as tools/tasks-file.ts containsLineBreak), escaped rather
+// than embedded literally. (specs/e135-handoff-notes-ledger.md AC2–AC5a)
+const LINE_BREAK_RE = /[\r\n\u2028\u2029]/;
+function hasLineBreak(value) {
+    return LINE_BREAK_RE.test(value);
+}
+// Rejection message texts, quoted verbatim from the spec's Copy/Strings table
+// except for the "{i}" index substitution the table declares.
+function noteMultilineMessage(i) {
+    return `pending_notes[${i}] contains a line break. handoff.md stores each note as one list line, so a multi-line note would be split or forged on read-back. Send each line as its own note.`;
+}
+function noteBracketLedMessage(i) {
+    return `pending_notes[${i}] starts with "[". handoff.md skips a "[" -led list line on read-back (it reads as a checkbox), so the note would be lost. Reword it so it does not start with "[".`;
+}
+function noteEmptySentinelMessage(i) {
+    return `pending_notes[${i}] is empty or an empty-section sentinel ("(none)", "無") and would be dropped on read-back. Remove it or reword it.`;
+}
+function ledgerEmptyMessage(i) {
+    return `completed_tasks[${i}] is empty or whitespace-only. handoff.md would write it as a bare "- [x]" line and lose it on read-back.`;
+}
+function ledgerMultilineMessage(i) {
+    return `completed_tasks[${i}] contains a line break. handoff.md stores each completed id as one "- [x]" line, so the id would be split, or forge another id, on read-back.`;
+}
+function noteReadViewMessage(i) {
+    return `pending_notes[${i}] contains tw_get_state read-view display text (the "${READ_VIEW_MARKER_PREFIX}" marker or a legacy "…[truncated]" / "further note(s) omitted" marker), not an author's note. Drop it before writing; the omitted notes are still on disk.`;
+}
+// E135 — true when a note carries tw_get_state display text rather than an
+// author's words: the shared read-view prefix anywhere in the note
+// (containment, AC12), or one of the two shapes the pre-E138 reader emitted
+// (a "…[truncated]" suffix; E92's whole-note omission marker). The legacy
+// literals live only here — the reader no longer emits them.
+const LEGACY_OMITTED_MARKER_RE = /^…\[\d+ further note\(s\) omitted — see pending_notes_truncated\]$/;
+function isReadViewDisplayText(note) {
+    return (note.includes(READ_VIEW_MARKER_PREFIX) ||
+        note.trimEnd().endsWith("…[truncated]") ||
+        LEGACY_OMITTED_MARKER_RE.test(note.trim()));
+}
+// First round-trip defect of one note, or null — at most ONE issue per note,
+// in precedence order: multiline → read-view → bracket-led → empty-sentinel.
+function pendingNoteRoundTripIssue(note, i) {
+    if (hasLineBreak(note))
+        return noteMultilineMessage(i);
+    if (isReadViewDisplayText(note))
+        return noteReadViewMessage(i);
+    if (/^\s*\[/.test(note))
+        return noteBracketLedMessage(i);
+    const trimmed = note.trim();
+    if (trimmed === "" || trimmed === "(none)" || trimmed === "無")
+        return noteEmptySentinelMessage(i);
+    return null;
+}
+// First round-trip defect of one completed_tasks id, or null (multiline →
+// empty).
+function completedTaskIdRoundTripIssue(id, i) {
+    if (hasLineBreak(id))
+        return ledgerMultilineMessage(i);
+    if (id.trim() === "")
+        return ledgerEmptyMessage(i);
+    return null;
+}
 // E300 — fixed sentence of the dispatch_pins rejection; the value is the
 // dynamic part. Built from the tier list (E308); it must render byte-for-byte
 // as gates/registry.ts hintStatic, which stays a literal because that module
@@ -198,8 +264,8 @@ const UpdateStateArgs = z
     cut_approved: z.boolean().optional(),
     // v6 — external-reference ledger (b8-external-ref-ledger). PM records one
     // entry per external artifact its spec references during the Resource Audit
-    // Gate. Passing the field REPLACES the whole array (wholesale, like
-    // completed_tasks — never merged). Closed state enum (AC-9): an out-of-enum
+    // Gate. Passing the field REPLACES the whole array (wholesale, never
+    // merged). Closed state enum (AC-9): an out-of-enum
     // state is rejected by zod before the gate runs, no server error code.
     external_refs: z
         .array(z.object({
@@ -355,6 +421,23 @@ const UpdateStateArgs = z
             });
         }
     });
+})
+    // Round-trip check — see pendingNoteRoundTripIssue above. A separate
+    // superRefine appended AFTER the E86 one, so an E86 issue on the same note
+    // keeps its place and its byte-identical message. (E181, E135)
+    .superRefine((d, ctx) => {
+    (d.pending_notes ?? []).forEach((note, i) => {
+        const message = pendingNoteRoundTripIssue(note, i);
+        if (message !== null) {
+            ctx.addIssue({ code: z.ZodIssueCode.custom, message, path: ["pending_notes", i] });
+        }
+    });
+    (d.completed_tasks ?? []).forEach((id, i) => {
+        const message = completedTaskIdRoundTripIssue(id, i);
+        if (message !== null) {
+            ctx.addIssue({ code: z.ZodIssueCode.custom, message, path: ["completed_tasks", i] });
+        }
+    });
 });
 const CompleteTaskArgs = z.object({
     workspace_path: absoluteWorkspacePath,
@@ -476,7 +559,7 @@ export const TOOL_REGISTRY = [
                 completed_tasks: {
                     type: "array",
                     items: { type: "string" },
-                    description: "Tasks completed now",
+                    description: 'Task ids QA has completed for this feature (only agent_id "qa-engineer" may change it). File mode: a qa-engineer list is added to the ids already recorded; kept across same-feature writes that omit it or pass []; a qa-engineer FAIL write removes its review_task_ids; cleared when active_feature changes. SQLite: stored as given.',
                 },
                 pending_notes: {
                     type: "array",

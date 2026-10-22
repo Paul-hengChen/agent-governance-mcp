@@ -1,0 +1,24 @@
+# run: GREEN against lane worktree HEAD
+# command: node --test test/e135-read-view-marker.test.mjs
+# tree: lane worktree, committed dist
+ok 1 - AC10: handoff-types exports READ_VIEW_MARKER_PREFIX equal to the spec's marker.prefix
+ok 2 - AC10: the emitter builds its marker from that constant
+ok 3 - AC10: the literal occurs exactly once across tools/*.ts source (the constant's definition)
+ok 4 - AC11: a real tw_get_state view containing the elision marker is rejected when written back verbatim
+ok 5 - AC11: the marker entry alone is rejected with note.read-view
+ok 6 - AC11 (legacy shape): a note ending in the retired '…[truncated]' suffix is rejected
+ok 7 - AC11 (legacy shape): '…[truncated]' followed by trailing whitespace is still the suffix
+ok 8 - AC11 (legacy shape): E92's whole-note '…[n further note(s) omitted — see pending_notes_truncated]' is rejected
+ok 9 - AC11 (legacy shape): E92's marker with surrounding whitespace is still the whole note
+ok 10 - DR-10: prose that quotes a legacy marker mid-note (not as the shape the reader emitted) is accepted and round-trips
+ok 11 - AC12: prefix mid-note prose is rejected with note.read-view (containment)
+ok 12 - AC12: prefix at the very end is rejected with note.read-view (containment)
+ok 13 - AC12: prefix at the very start is rejected with note.read-view (containment)
+ok 14 - AC12: prefix bare prefix only is rejected with note.read-view (containment)
+ok 15 - AC12: near-misses of the prefix (ASCII brackets / missing closer) are not read-view text
+ok 16 - precedence: a multi-line note carrying the marker yields only note.multiline
+ok 17 - precedence: a '['-led note carrying the marker yields note.read-view, not note.bracket-led
+# tests 17
+# pass 17
+# fail 0
+# skipped 0

@@ -1,1 +1,1 @@
-{"version":3,"file":"handoff-types.js","sourceRoot":"","sources":["../../tools/handoff-types.ts"],"names":[],"mappings":"AAAA,wBAAwB;AACxB,uEAAuE;AACvE,yEAAyE;AACzE,2EAA2E;AAC3E,8BAA8B"}
+{"version":3,"file":"handoff-types.js","sourceRoot":"","sources":["../../tools/handoff-types.ts"],"names":[],"mappings":"AAAA,wBAAwB;AACxB,uEAAuE;AACvE,yEAAyE;AACzE,2EAA2E;AAC3E,4EAA4E;AAC5E,8EAA8E;AAC9E,iEAAiE;AAMjE;;;kEAGkE;AAClE,MAAM,CAAC,MAAM,uBAAuB,GAAG,iBAAiB,CAAC"}

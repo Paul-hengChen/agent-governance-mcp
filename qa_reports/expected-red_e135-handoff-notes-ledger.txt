@@ -1,0 +1,26 @@
+# e135-handoff-notes-ledger — intentional reds left by sr-engineer. qa re-pins each
+# listed test to the new behaviour (spec Cut Decisions, owned test files).
+
+# T-E181-03 — the tool boundary now rejects a pending_notes entry that contains a
+# line break (note.multiline, AC2). This E92 case pins the newline acceptance that
+# E181 removes; qa re-pins it in T-E181-04.
+test/e92-e86-handoff-write-boundary.test.mjs | AC2 (documented accepted miss, NOT a defect): pending_notes[0] accepts NEW-4: unterminated attribute value containing a newline
+
+# T-E138-03 — the tw_get_state read view now keeps note[0] plus the newest notes,
+# never slices a note (the "…[truncated]" suffix is retired), and emits one
+# "⟦agc read-view⟧ {n} note(s) omitted here — …" marker at the elision point
+# (index 1 / 0, not the last entry); pending_notes_truncated gains omitted_notes.
+# These cases pin the old keep-from-head / slice / trailing E92 marker shape;
+# qa re-pins them in T-E138-04.
+test/e92-e86-handoff-write-boundary.test.mjs | AC3: 4x1000-char notes (3 fill the 3000-char budget exactly, 4th dropped wholly) -> omitted=1, marker is the last entry
+test/e92-e86-handoff-write-boundary.test.mjs | AC3: 5x900-char notes (note 4 partially kept, note 5 dropped wholly) -> omitted=1
+test/e92-e86-handoff-write-boundary.test.mjs | AC3: 2500 + 1000 + 1000 chars (partial then a wholly-dropped note) -> omitted=1
+test/e92-e86-handoff-write-boundary.test.mjs | AC3: 3000 + 50x10-char notes -> omitted=50, marker byte-exact
+test/e92-e86-handoff-write-boundary-repro.test.mjs | E92 repro: a wholly-dropped pending_notes entry leaves a synthetic omission marker as the array's last element
+test/token-efficiency.test.mjs | pending_notes: notes exceeding 3000 chars are truncated
+
+# T-E135-03 — no new expected reds (verified on the e92 / e92-repro / token-efficiency
+# files: only the entries above are red).
+# T-E150-05 — no new expected reds (verified on the 61 test files that reference the
+# completion ledger, tw_sync or the drift evidence line, plus the SQLite, schema and
+# inputSchema files: only the entries above are red).
