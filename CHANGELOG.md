@@ -16,6 +16,85 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [4.13.0] - 2026-10-22
+
+MINOR release. It ships post-v4 fan-out wave 10 since v4.12.0, landed on `main` by its wave pull
+request: lanes `e135` (E181, E135, E138, E150) and `e209` (E209, E182, E183); plan
+`specs/fanout-post-v4-w10.md`, release gate `specs/release-post-v4-w10.md`. Semver: MINOR
+(decided by the human). Unlike v4.12.0, this release changes compiled code: the `tw_update_state`
+input contract is tighter (some inputs accepted at v4.12.0 are now rejected, see *Changed*), the
+`tw_get_state` read view keeps the newest notes, and the `completed_tasks` ledger lives for the
+whole feature in file mode. No MCP tool was added or removed, and no gate registry entry (still
+34), schema version (handoff 15, tasks 2, sqlite 2, config 2), constitution or role SOP text, or
+dependency changed.
+
+### Changed
+
+- **E181: `tw_update_state` rejects notes and task ids that would not read back intact
+  (`tools/registry.ts`)**. At the tool boundary, before any gate and in both storage modes, the
+  write is refused when:
+  - a `pending_notes` entry contains a line break (`\n`, `\r`, U+2028 or U+2029);
+  - a `pending_notes` entry starts with `[` (after leading whitespace);
+  - a `pending_notes` entry is blank, or its trimmed content is exactly `(none)` or `無`;
+  - a `completed_tasks` id contains a line break, or is empty or whitespace-only.
+
+  A rejected write leaves the on-disk handoff unchanged. Callers that wrote multi-line notes,
+  `[`-led notes or placeholder notes must now write one single-line note per entry, or omit
+  `pending_notes`. Tests: `test/e181-pending-notes-roundtrip.test.mjs`.
+- **E135: the read view's synthetic note is marked and cannot be written back
+  (`tools/handoff-types.ts`, `tools/handoff-parse.ts`, `tools/registry.ts`)**. The only
+  synthetic entry `tw_get_state` puts into `pending_notes` now starts with the exported constant
+  `READ_VIEW_MARKER_PREFIX` (`⟦agc read-view⟧`). `tw_update_state` rejects a note that contains
+  that marker anywhere, a note that ends in the legacy `…[truncated]` suffix, and a note in the
+  legacy E92 `…[N further note(s) omitted — see pending_notes_truncated]` shape, so carrying
+  notes forward can no longer persist display text as real state. Tests:
+  `test/e135-read-view-marker.test.mjs`.
+- **E138: the read view keeps the newest notes (`tools/handoff-parse.ts`,
+  `tools/handoff-types.ts`)**. When the notes exceed the unchanged 3000-character read cap, the
+  view keeps note[0] and then whole notes from the end, puts one marker at the elision point, and
+  never slices a note. `pending_notes_truncated` gains an `omitted_notes` count. Nothing is lost
+  on disk. Tests: `test/e138-read-view-keeps-tail.test.mjs`, with
+  `test/token-efficiency.test.mjs` re-pinned.
+- **E150: `completed_tasks` is kept for the whole feature in file mode
+  (`tools/handoff-orchestrator.ts`, `tools/handoff-write.ts`, `tools/registry.ts`,
+  `tools/drift.ts`)**. The ledger carries forward across same-feature writes; omitting
+  `completed_tasks` and passing `[]` are the same; a `qa-engineer` list is merged into the ids
+  already recorded; only a `qa-engineer` FAIL write that carries `review_task_ids` removes ids;
+  a change of `active_feature` still empties it. SQLite mode keeps storing the list as given. The
+  `completed_tasks` input-schema description and the `tw_detect_drift` evidence line are
+  reworded to match. Tests: `test/e150-completed-tasks-carry-forward.test.mjs`, with
+  `test/e92-e86-handoff-write-boundary.test.mjs` and
+  `test/e92-e86-handoff-write-boundary-repro.test.mjs` re-pinned. Specs:
+  `specs/e135-handoff-notes-ledger.md`, `specs/e135-handoff-notes-ledger-architecture.md`.
+
+### Fixed
+
+- **E209: the test lock is never seen empty (`scripts/test-lock.mjs`)**. The lock payload is
+  written to a temp file in the same directory and published with `linkSync`, so a stale-lock
+  reclaimer can no longer mistake a new holder's empty lock for the stale one and delete a live
+  lock. CLI, exit codes and payload shape are unchanged. Tests:
+  `test/e209-test-lock-publish.test.mjs`.
+- **E182: hook-spawn test timeout (`test/usage-accounting.test.mjs`)**. `runHook` now defaults to
+  20000 ms instead of 5000 ms and honours `AGC_USAGE_HOOK_TEST_TIMEOUT_MS`, so the tests no
+  longer flake under concurrent-lane load.
+- **E183: `summarize-metrics` reads the current lane (`scripts/summarize-metrics.mjs`,
+  `docs/gate-retro-procedure.md`)**. With no argument the script reads the current lane's
+  metrics file (the `_primary` lane on a primary checkout) through the shipped
+  `dist/tools/lane-paths.js` (context, not changed), falls back to the legacy flat metrics file
+  directly under the state directory with a stderr note, and exits 1 when no file exists or an
+  explicit path is missing, instead of silently reporting zero features. Tests:
+  `test/e183-summarize-metrics-lane.test.mjs`, with `test/success-metrics.test.mjs` re-pinned.
+  Spec: `specs/e209-test-infra-fixes.md`.
+
+### Notes
+
+- `dist/tools/` is rebuilt for the six changed `tools/` modules; `dist/index.js` changes by the
+  version literal. Wave-10 evidence moves to `qa_reports/archive/release-post-v4-w10/` and
+  `review_reports/archive/release-post-v4-w10/`, and the two expected-red lists to
+  `qa_reports/archive/e135-handoff-notes-ledger/` and `qa_reports/archive/e209-test-infra-fixes/`;
+  the lane ledgers are archived under `.current/history/2026-10/`.
+- Follow-up tickets E359–E363 are filed in `docs/backlog.md`, not shipped.
+
 ## [4.12.0] - 2026-10-20
 
 MINOR release. It ships post-v4 fan-out wave 9 since v4.11.0, landed on `main` by its wave pull
