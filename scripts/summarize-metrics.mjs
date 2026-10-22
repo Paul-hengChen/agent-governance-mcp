@@ -1,23 +1,62 @@
 #!/usr/bin/env node
 // Coded by @sr-engineer
 // Retro summarizer for the per-feature success-telemetry sidecar (E8 AC9): reads
-// .current/metrics.jsonl (one line per shipped feature, from tools/metrics.ts)
-// and prints a per-feature table plus the one-pass rate and mean rounds and hops.
+// one metrics.jsonl (one line per shipped feature, from tools/metrics.ts) and
+// prints a per-feature table plus the one-pass rate and mean rounds and hops.
 // Malformed lines are skipped and counted, never thrown on; see specs/e260c-bin-scripts.md.
 // Usage: node scripts/summarize-metrics.mjs [path-to-metrics.jsonl]
-//        (default: .current/metrics.jsonl relative to the current directory)
+//        (no argument: the current lane's .current/<lane>/metrics.jsonl —
+//        .current/_primary/metrics.jsonl on a primary checkout — then a legacy
+//        flat .current/metrics.jsonl; exits 1 when no file is found or readable)
 
 import { readFileSync } from "node:fs";
 import * as path from "node:path";
+import { resolveCurrentLanePaths, resolveFlatLanePaths } from "../dist/tools/lane-paths.js";
 
-const target = process.argv[2] ?? path.join(".current", "metrics.jsonl");
+// E183 — a missing or unreadable file is a loud failure, never a silent zero.
+function fail(message) {
+  console.error(`summarize-metrics: ${message}`);
+  process.exit(1);
+}
 
+/** { text } on success, { missing: true } on ENOENT; any other read error exits 1. */
+function readMetrics(file) {
+  try {
+    return { text: readFileSync(file, "utf-8") };
+  } catch (err) {
+    if (err && err.code === "ENOENT") return { missing: true };
+    fail(`cannot read ${file} (${err && err.code ? err.code : String(err)}).`);
+  }
+}
+
+let target;
 let text;
-try {
-  text = readFileSync(target, "utf-8");
-} catch {
-  console.log(`summarize-metrics — no metrics yet (${target} not found or unreadable).`);
-  process.exit(0);
+if (process.argv[2] !== undefined) {
+  target = process.argv[2];
+  const read = readMetrics(target);
+  if (read.missing) fail(`no metrics file at ${target}.`);
+  text = read.text;
+} else {
+  const cwd = process.cwd();
+  const shown = (p) => path.relative(cwd, p) || p;
+  const lanePath = shown(resolveCurrentLanePaths(cwd).metricsPath);
+  const flatPath = shown(resolveFlatLanePaths(cwd).metricsPath);
+  target = lanePath;
+  let read = readMetrics(lanePath);
+  if (read.missing) {
+    read = readMetrics(flatPath);
+    if (!read.missing) {
+      target = flatPath;
+      console.error(`summarize-metrics: ${lanePath} not found; reading legacy flat ${flatPath}.`);
+    }
+  }
+  if (read.missing) {
+    fail(
+      `no metrics file found (tried ${lanePath}, ${flatPath}). Pass a path explicitly ` +
+        "(node scripts/summarize-metrics.mjs <path-to-metrics.jsonl>), or use tw_gate_stats for cross-lane totals.",
+    );
+  }
+  text = read.text;
 }
 
 const records = [];
