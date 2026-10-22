@@ -1,0 +1,17 @@
+{"ts":"2026-10-20T11:48:39.228Z","feature":"e135-handoff-notes-ledger","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-20T12:04:19.443Z","feature":"e135-handoff-notes-ledger","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-20T12:09:32.833Z","feature":"e135-handoff-notes-ledger","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-21T02:29:21.729Z","feature":"e135-handoff-notes-ledger","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-21T02:37:02.313Z","feature":"e135-handoff-notes-ledger","agent_id":"architect","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-21T02:37:08.367Z","feature":"e135-handoff-notes-ledger","agent_id":"architect","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-21T02:42:25.295Z","feature":"e135-handoff-notes-ledger","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-21T02:42:52.291Z","feature":"e135-handoff-notes-ledger","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-21T02:43:33.081Z","feature":"e135-handoff-notes-ledger","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-21T02:58:02.119Z","feature":"e135-handoff-notes-ledger","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-21T03:03:55.828Z","feature":"e135-handoff-notes-ledger","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-21T09:51:52.278Z","feature":"e135-handoff-notes-ledger","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-21T09:52:38.695Z","feature":"e135-handoff-notes-ledger","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-21T10:01:07.489Z","feature":"e135-handoff-notes-ledger","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-21T10:01:56.617Z","feature":"e135-handoff-notes-ledger","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-10-21T10:16:00.956Z","feature":"e135-handoff-notes-ledger","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-10-21T10:21:40.131Z","feature":"e135-handoff-notes-ledger","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}

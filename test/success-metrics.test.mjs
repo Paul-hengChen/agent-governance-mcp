@@ -938,11 +938,12 @@ test("E8-S3: summarizer on an empty file exits 0 with a 'no metrics yet' notice"
   assert.match(result.stdout, /no metrics yet/);
 });
 
-test("E8-S4: summarizer on a missing file exits 0 with a 'no metrics yet' notice (never throws ENOENT)", () => {
+test("E8-S4: summarizer on a missing file exits 1 with a 'no metrics file at <path>' stderr (loud failure, never a silent zero)", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "e8-sum-missing-"));
   const file = path.join(dir, "does-not-exist.jsonl");
   const result = runSummarizer(file);
-  assert.equal(result.status, 0, `must exit 0 on a missing file; stderr: ${result.stderr}`);
-  assert.match(result.stdout, /no metrics yet/);
-  assert.match(result.stdout, /not found or unreadable/);
+  assert.equal(result.status, 1, `must exit 1 on a missing file; stderr: ${result.stderr}`);
+  assert.match(result.stderr, /^summarize-metrics:/);
+  assert.ok(result.stderr.includes(`no metrics file at ${file}`), `stderr must name the path; got: ${result.stderr}`);
+  assert.doesNotMatch(result.stdout, /no metrics yet/, "a missing file is not the same as an empty one");
 });

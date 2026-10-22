@@ -70,8 +70,8 @@ function buildEvidenceBackedLine(ids: string[]): string {
     `state. A QA record exists on disk for them (qa_reports/ or qa_reports/archive/<feature>/) whose most ` +
     `recently recorded verdict is PASS, or which records no verdict at all (a hand-authored covering report) — ` +
     `that is what this check establishes, not an independent re-verification that the work is correct. ` +
-    `completed_tasks is feature-scoped and legitimately empties on an active_feature change, and a merged ` +
-    `parallel lane's ledger can be discarded on conflict (root cause: E150 — not fixed by this detector). ` +
+    `completed_tasks is feature-scoped: it carries forward across same-feature writes and empties on an ` +
+    `active_feature change (E150). ` +
     `Do NOT run tw_sync to "fix" this: tw_sync would carry the previous feature's completion marks into the new ` +
     `feature's ledger. Verify via the cited qa_reports evidence instead.`
   );

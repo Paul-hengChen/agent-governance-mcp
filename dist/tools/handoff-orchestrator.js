@@ -1035,6 +1035,10 @@ function effectiveAllowedSuccessors(prev, counters, options = {}) {
 // --- GUARDED: must call tw_get_state first ---
 async function handleUpdateStateCore(parsed) {
     enforcePreFlight(parsed.workspace_path, "tw_update_state");
+    // zod already defaults completed_tasks to []; a direct caller that
+    // skips zod may omit it. Normalise once so every gate reads a list
+    // and omission and [] stay one input class. (E150)
+    parsed = { ...parsed, completed_tasks: parsed.completed_tasks ?? [] };
     // Defense-in-depth: zod refine already enforces this on PASS, but a
     // client that bypasses zod still hits this guard.
     if (parsed.status === "PASS") {
@@ -1158,11 +1162,27 @@ async function handleUpdateStateCore(parsed) {
     // storage.writeState. Each field is named, eliminating the
     // 11-positional risk that motivated the refactor. The positional
     // overload remains @deprecated for backwards-compat callers.
+    // E150 ledger lifetime, file mode only. Policy lives here (who may
+    // shrink, by what key); resolution against the on-disk ledger runs in
+    // writeHandoffState inside the lock. Only a qa-engineer FAIL write
+    // with non-empty review_task_ids removes ids; every other file-mode
+    // write keeps the same-feature ledger and adds its incoming ids
+    // (which only qa can carry past the unchanged gates). SQLite never
+    // gets the directive and stores completed_tasks as given.
+    const ledgerRemove = parsed.agent_id === "qa-engineer" &&
+        parsed.status === "FAIL" &&
+        parsed.review_task_ids !== undefined &&
+        parsed.review_task_ids.length > 0
+        ? parsed.review_task_ids
+        : [];
     const result = await storage.writeState({
         workspacePath: parsed.workspace_path,
         activeFeature: parsed.active_feature,
         status: parsed.status,
         completedTasks: parsed.completed_tasks,
+        ...(storage instanceof FileHandoffStorage && {
+            completedTasksCarry: { remove: ledgerRemove },
+        }),
         pendingNotes: pending,
         blockingReason: parsed.blocking_reason,
         lastAgent: parsed.agent_id,

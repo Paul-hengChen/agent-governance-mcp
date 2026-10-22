@@ -8,7 +8,7 @@
 // same lock skips acquiring. Details: see specs/e260c-bin-scripts.md.
 
 import { spawn, execFileSync } from "node:child_process";
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -181,6 +181,39 @@ function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+let publishSeq = 0;
+
+/**
+ * E209 — create `lockPath` already holding `payload`: write a per-attempt
+ * temp file next to it, then hard-link it into place, so the lock is never
+ * observable empty (an empty lock could be mistaken by a late reclaimer for
+ * the stale empty file it observed earlier). Throws EEXIST when the lock is
+ * held; the temp file is removed in every outcome.
+ */
+function publishLock(lockPath, payload) {
+  const tmp = `${lockPath}.acquire-${process.pid}-${++publishSeq}-${randomBytes(4).toString("hex")}`;
+  try {
+    const fd = fs.openSync(tmp, "w");
+    try {
+      fs.writeSync(fd, JSON.stringify(payload));
+      try {
+        fs.fsyncSync(fd);
+      } catch {
+        /* fsync unsupported on some FS */
+      }
+    } finally {
+      fs.closeSync(fd);
+    }
+    fs.linkSync(tmp, lockPath);
+  } finally {
+    try {
+      fs.unlinkSync(tmp);
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
 /**
  * Acquire the lock (AC7, AC10-AC13). Resolves `{ acquired: true, payload }`
  * or `{ acquired: false, reason: "timeout", holder }` when `maxWaitMs`
@@ -202,7 +235,6 @@ export async function acquireLock({
   let holder = null;
   for (;;) {
     try {
-      const fd = fs.openSync(lockPath, "wx");
       const t = now();
       const payload = {
         pid: process.pid,
@@ -210,16 +242,7 @@ export async function acquireLock({
         worktreePath,
         startedAt: new Date(t).toISOString(),
       };
-      try {
-        fs.writeSync(fd, JSON.stringify(payload));
-        try {
-          fs.fsyncSync(fd);
-        } catch {
-          /* fsync unsupported on some FS */
-        }
-      } finally {
-        fs.closeSync(fd);
-      }
+      publishLock(lockPath, payload);
       return { acquired: true, payload };
     } catch (err) {
       if (!err || err.code !== "EEXIST") throw err;

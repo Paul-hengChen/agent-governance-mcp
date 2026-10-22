@@ -100,8 +100,18 @@ export interface WriteHandoffStateOptions {
   // rule in writeHandoffStateCore (it re-arms on every PM In_Progress
   // re-entry and on any active_feature change).
   cutApproved?: boolean;
+  // E150 file-mode ledger lifetime. Transient: never persisted, never read
+  // from existing state. When PRESENT, the written ledger is
+  //   (sameFeatureExisting ∪ completedTasks) minus every entry matching an id
+  //   in `remove` (tw_sync's word-boundary match),
+  // where sameFeatureExisting is the on-disk ledger when its active_feature
+  // equals this write's, else []. When ABSENT, completedTasks replaces the
+  // ledger exactly as before, so the heal-write, the positional overload and
+  // every direct caller are unchanged. Only the orchestrator sets it, in
+  // file mode. (specs/e135-handoff-notes-ledger-architecture.md, E150)
+  completedTasksCarry?: { remove: readonly string[] };
   // v6 — external-reference ledger (b8-external-ref-ledger). REPLACE semantics
-  // when provided (wholesale, like completedTasks — never merged); feature-
+  // when provided (wholesale, never merged); feature-
   // scoped preserve-if-omitted, reset ONLY on active_feature change, NOT on PM
   // re-entry (inverse polarity to cutApproved — see writeHandoffStateCore).
   externalRefs?: ExternalRef[];
@@ -152,6 +162,17 @@ export interface WriteHandoffStateOptions {
   // records no progress cannot extend the incumbent feature's lease. Selects
   // the timestamp only; never written or carried forward. File mode only.
   bookkeepingWrite?: boolean;
+}
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// True when a completed_tasks ledger entry names `id`. Mirrors the
+// word-boundary match in tools/sync.ts and tools/drift.ts exactly, so an
+// entry removed here is one the next tw_sync can no longer re-mark. (E150)
+function ledgerEntryMatchesId(entry: string, id: string): boolean {
+  return new RegExp(`\\b${escapeRegExp(id)}\\b`).test(entry);
 }
 
 /**
@@ -257,9 +278,6 @@ async function writeHandoffStateCore(opts: WriteHandoffStateOptions): Promise<st
 
     const now = new Date().toISOString();
 
-    const completedList = completedTasks.length
-      ? completedTasks.map((t) => `- [x] ${t}`).join("\n")
-      : "- (none)";
     // Plain list items (no checkbox) so they are visually distinct from task IDs.
     const pendingList = pendingNotes.length
       ? pendingNotes.map((t) => `- ${t}`).join("\n")
@@ -380,6 +398,32 @@ async function writeHandoffStateCore(opts: WriteHandoffStateOptions): Promise<st
           existing?.active_feature === _activeFeature ? existing?.cut_approved_source : undefined;
       }
     }
+    // completed_tasks ledger (E150). With the orchestrator's carry directive,
+    // resolve against the same-feature on-disk ledger read above, inside this
+    // lock: union (on-disk order first, incoming ids appended, deduped on the
+    // trimmed value), then drop every entry a qa FAIL's review_task_ids names.
+    // Without it, the incoming list replaces the ledger as before.
+    let effectiveCompletedTasks: string[] = completedTasks;
+    if (opts.completedTasksCarry !== undefined) {
+      const remove = opts.completedTasksCarry.remove;
+      const base = existing?.active_feature === _activeFeature ? existing.completed_tasks : [];
+      const seen = new Set(base.map((s) => s.trim()));
+      const merged = [...base];
+      for (const id of completedTasks) {
+        const key = id.trim();
+        if (!seen.has(key)) {
+          seen.add(key);
+          merged.push(id);
+        }
+      }
+      effectiveCompletedTasks = merged.filter(
+        (entry) => !remove.some((id) => ledgerEntryMatchesId(entry, id)),
+      );
+    }
+    const completedList = effectiveCompletedTasks.length
+      ? effectiveCompletedTasks.map((t) => `- [x] ${t}`).join("\n")
+      : "- (none)";
+
     // Archive-on-feature-change: copy the old file before this write replaces
     // it. Separate from the preserve rules above; it never touches
     // frontmatterData. Fires only when active_feature actually changes, inside

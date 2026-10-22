@@ -2,11 +2,30 @@
 // Shared handoff.md types, in their own module so handoff-parse.ts and
 // handoff-write.ts share them without importing each other's types; only
 // parseHandoff and writeHandoffState cross that boundary. tools/handoff.ts
-// re-exports every type here.
+// re-exports every type here. READ_VIEW_MARKER_PREFIX is this module's only
+// runtime export (E135/E138): a dependency-free string constant shared by the
+// read view that emits it and the tool boundary that refuses it.
 
 // Type-only import (erased at compile): the runtime graph stays one-directional
 // (transitions.ts never imports handoff.ts / handoff-parse.ts / handoff-write.ts).
 import type { AgentName } from "./transitions.js";
+
+/** Prefix of every synthetic entry the tw_get_state read view may emit
+ *  (marker.prefix, U+27E6 … U+27E7). Emitted by tools/handoff-parse.ts,
+ *  refused on write-back by tools/registry.ts. The ONLY copy of the literal
+ *  in tools/ source. (specs/e135-handoff-notes-ledger.md AC10) */
+export const READ_VIEW_MARKER_PREFIX = "⟦agc read-view⟧";
+
+/** View-only sibling key of pending_notes, present only when the read view
+ *  elided notes. (E138 AC9) */
+export interface PendingNotesTruncated {
+  /** Sum of on-disk note lengths. */
+  total_chars: number;
+  /** PENDING_NOTES_CHAR_LIMIT. */
+  limit: number;
+  /** Count of elided notes. */
+  omitted_notes: number;
+}
 
 // External-reference ledger entry state (handoff schema v6,
 // b8-external-ref-ledger). Closed enum (spec AC-9/S03): `unresolved` is the

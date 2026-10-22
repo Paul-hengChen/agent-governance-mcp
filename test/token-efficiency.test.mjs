@@ -167,7 +167,7 @@ test("pending_notes: short notes pass through untruncated", async () => {
   assert.equal(result.pending_notes_truncated, undefined, "should not have truncation metadata");
 });
 
-test("pending_notes: notes exceeding 3000 chars are truncated", async () => {
+test("pending_notes: notes exceeding 3000 chars are elided whole behind one marker (never sliced)", async () => {
   const ws = mkWorkspace();
   const longNote = "x".repeat(2000);
   const notes = [longNote, longNote]; // 4000 chars total > 3000 limit
@@ -179,10 +179,27 @@ test("pending_notes: notes exceeding 3000 chars are truncated", async () => {
   assert.ok(result.pending_notes_truncated, "should have truncation metadata");
   assert.equal(result.pending_notes_truncated.total_chars, 4000);
   assert.equal(result.pending_notes_truncated.limit, 3000);
-  // First note (2000 chars) fits fully; second should be truncated
+  // Re-pinned by T-E138-04 (e135 spec AC7/AC9): the first note (2000 chars) fits and is kept
+  // whole; the second does not fit the remaining 1000 and is elided WHOLE — never sliced, no
+  // "…[truncated]" suffix — and one marker states the count at the elision point.
+  assert.equal(result.pending_notes_truncated.omitted_notes, 1);
   assert.equal(result.pending_notes[0], longNote);
-  assert.ok(result.pending_notes[1].endsWith("…[truncated]"), "second note should be truncated");
-  assert.ok(result.pending_notes[1].length < 2000, "truncated note should be shorter");
+  assert.equal(
+    result.pending_notes[1],
+    "⟦agc read-view⟧ 1 note(s) omitted here — full text is on disk; see pending_notes_truncated. Do not write this line back.",
+  );
+  assert.equal(result.pending_notes.length, 2);
+});
+
+test("pending_notes: when truncation does not fire the view is unchanged (no key, no marker) — spec AC9", async () => {
+  const ws = mkWorkspace();
+  const notes = ["a".repeat(1500), "b".repeat(1500)]; // exactly 3000 = the limit
+  await seedHandoff(ws, [], notes);
+  resetSession();
+
+  const result = JSON.parse(readHandoffState(ws));
+  assert.deepEqual(result.pending_notes, notes);
+  assert.equal(result.pending_notes_truncated, undefined);
 });
 
 test("pending_notes: truncation preserves front notes (routing directives)", async () => {

@@ -24,6 +24,9 @@ export interface WriteHandoffStateOptions {
     scopeDecision?: string;
     scopeDecisionWhy?: string;
     cutApproved?: boolean;
+    completedTasksCarry?: {
+        remove: readonly string[];
+    };
     externalRefs?: ExternalRef[];
     nextRole?: AgentName;
     resumeOf?: ResumeOfTarget;

@@ -28,6 +28,15 @@ function ensureDir(handoffPath) {
         fs.mkdirSync(dir, { recursive: true });
     }
 }
+function escapeRegExp(s) {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+// True when a completed_tasks ledger entry names `id`. Mirrors the
+// word-boundary match in tools/sync.ts and tools/drift.ts exactly, so an
+// entry removed here is one the next tw_sync can no longer re-mark. (E150)
+function ledgerEntryMatchesId(entry, id) {
+    return new RegExp(`\\b${escapeRegExp(id)}\\b`).test(entry);
+}
 /**
  * The real implementation. Every writeHandoffState call — options-object
  * callers directly, positional callers via the thin packing wrapper below —
@@ -126,9 +135,6 @@ async function writeHandoffStateCore(opts) {
         // Reject if another process / hand-edit touched the file since we read it.
         verifyFreshness(workspacePath, handoffPath, "handoff");
         const now = new Date().toISOString();
-        const completedList = completedTasks.length
-            ? completedTasks.map((t) => `- [x] ${t}`).join("\n")
-            : "- (none)";
         // Plain list items (no checkbox) so they are visually distinct from task IDs.
         const pendingList = pendingNotes.length
             ? pendingNotes.map((t) => `- ${t}`).join("\n")
@@ -248,6 +254,29 @@ async function writeHandoffStateCore(opts) {
                     existing?.active_feature === _activeFeature ? existing?.cut_approved_source : undefined;
             }
         }
+        // completed_tasks ledger (E150). With the orchestrator's carry directive,
+        // resolve against the same-feature on-disk ledger read above, inside this
+        // lock: union (on-disk order first, incoming ids appended, deduped on the
+        // trimmed value), then drop every entry a qa FAIL's review_task_ids names.
+        // Without it, the incoming list replaces the ledger as before.
+        let effectiveCompletedTasks = completedTasks;
+        if (opts.completedTasksCarry !== undefined) {
+            const remove = opts.completedTasksCarry.remove;
+            const base = existing?.active_feature === _activeFeature ? existing.completed_tasks : [];
+            const seen = new Set(base.map((s) => s.trim()));
+            const merged = [...base];
+            for (const id of completedTasks) {
+                const key = id.trim();
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    merged.push(id);
+                }
+            }
+            effectiveCompletedTasks = merged.filter((entry) => !remove.some((id) => ledgerEntryMatchesId(entry, id)));
+        }
+        const completedList = effectiveCompletedTasks.length
+            ? effectiveCompletedTasks.map((t) => `- [x] ${t}`).join("\n")
+            : "- (none)";
         // Archive-on-feature-change: copy the old file before this write replaces
         // it. Separate from the preserve rules above; it never touches
         // frontmatterData. Fires only when active_feature actually changes, inside
