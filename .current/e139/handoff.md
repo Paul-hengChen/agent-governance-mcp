@@ -1,24 +1,24 @@
 ---
 schema_version: 15
 active_feature: "e139-evidence-verdict-integrity"
-status: "In_Progress"
-last_updated: "2026-10-28T03:52:32.513Z"
-last_agent: "pm"
+status: "Blocked"
+last_updated: "2026-10-28T04:06:31.046Z"
+blocking_reason: "npm audit HIGH: zod GHSA-mrhx-c7xc-m3w5, body-parser GHSA-27r3-jxmh-p828 — no disposition record; wave-wide, integrator handling via mid-wave base fix"
+last_agent: "sr-engineer"
 prd_path: "docs/backlog.md"
 scope_decision: "single-feature"
 scope_decision_why: "Manifest D1 (human, 2026-10-28): the four evidence/verdict tickets stay in one lane because they share tools/handoff-orchestrator.ts, gates/qa-review.ts and tools/evidence-file.ts; cut as one serial sr chain (5 tasks) plus 5 qa tasks, no architect hop (no open design question)."
+cut_approved: true
 dispatch_pins:
   pm: "opus"
   sr-engineer: "opus"
 evidence_schema: 2
-next_role: "sr-engineer"
-dispatched_at: "2026-10-28T03:52:32.513Z"
 dispatch_mechanism: "task"
 dispatch_mechanism_tier: "opus"
 qa_round: 0
 review_round: 0
 visual_round: 0
-hop_count: 1
+hop_count: 2
 qa_rounds_total: 0
 review_rounds_total: 0
 visual_rounds_total: 0
@@ -29,11 +29,13 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- PM: cut drafted in specs/e139-evidence-verdict-integrity.md ## Cut, committed 3a53bf8 — 10 tasks (sr: T-E154-01, T-E136-01, T-E136-02, T-E139-01, T-E236-01 serial; qa: T-E154-02, T-E136-03, T-E139-02, T-E236-02, T-E139-03). fanout check --cut exit 0 (34 tokens, 0 out of bounds).
-- PM: cut_approved NOT set (Task-dispatched) — coordinator sends the cut to the integrator mailbox for pre-review, then to the human.
-- PM: needs human ruling R1 — grant test/e308-single-source-tier-enum.test.mjs (E303-AC12 GATE_REGISTRY.length 34 -> 35 + title only) to the lane; required by the E139 registry entry.
-- PM: decisions — E139 = one step / two codes + new registry entry NON_REVIEWER_VERDICT_REJECTED, file-mode only, documentedInProse false (content/**, goldens, context-budget untouched); E236 = file-mode rollback; E136 = encodeEvidenceId (identity on [A-Z0-9.-], a-z -> _X, other code units -> __HHHH); E154 = line 1 verbatim + later lines add new ids.
-- PM: findings E139-NEW-1, E236-NEW-1, E136-NEW-1, E136-NEW-2 in .current/e139/pending-tickets.md.
+- sr-engineer: all five sr tasks implemented and committed, ready for code review once the audit block clears: T-E154-01 dd55449, T-E136-01 71dbdfc, T-E136-02 4cfee36, T-E139-01 1658a62, T-E236-01 8995ecb (dist/ committed alongside each). npm run build: zero errors.
+- sr-engineer: npm audit --audit-level=high shows exactly the two known wave-wide HIGH advisories (zod GHSA-mrhx-c7xc-m3w5, body-parser GHSA-27r3-jxmh-p828) and nothing else HIGH/CRITICAL. No deps bumped, no advisory record written.
+- sr-engineer: EXPECTED reds awaiting qa T-E139-03 re-pins (all in the cut's hit table): e26-gate-stats R1/R2/U1/D1/D2/T3b (34->35); e35-pipeline-order t-order-exact (step codes); error-code-contract AC-1/AC-5, doc-file mapping (c12), AC3 (c12) FREE_TEXT_ALLOWLIST triggerEdge row for NON_REVIEWER_VERDICT_REJECTED, E308/AC3 (34->35); e308-single-source-tier-enum E303-AC12 (34->35, R1); qa-flow 'recordReviewInFile sanitises path-traversal in task id', T-C9-10/AC-2, T-C9-10/AC-5.
+- sr-engineer: UNEXPECTED red, NOT in the cut's hit table and NOT covered by R1 as ruled: test/e308-single-source-tier-enum.test.mjs 'E303-AC11a: gates/registry.ts keeps the mapping line exactly once and zero (none)' asserts count(registry source, '(none)') === 0. The spec-mandated mapping row '//   NON_REVIEWER_VERDICT_REJECTED   (none)' necessarily makes it 1 (error-code-contract's mapping parser requires the exact '(none)' marker for an empty file set, so no alternative spelling satisfies both). Needs an R1 widening from the integrator/human: allow qa to change that one assertion 0 -> 1 (and its title) in e308.
+- sr-engineer: green, unmodified: covering-evidence, e177b-lane-status, qa-review-scoped-append, reviewer-completed-tasks-gate, e18-write-provenance, e32-e33-gate-hardening, ac-execution, gates-expected-red, visual-evidence-gate, visual-widgets-unverified-gate, e112-drift-fanout-feature-scope, release-staging, context-budget (382/382); plus e20-e21, e28, e38, e296, dispatch-mechanism, cut-approval-gate, handoff-migration green. Scratch smoke confirmed E236 undo on QA_COMPLETION_EVIDENCE_MISSING and on STATE DRIFT throw, E139 sr rejection, E139-8 no evidence, APPROVED row accepted.
+- sr-engineer: deviation (comment only): gates/registry.ts GateDefinition.documentedInProse interface comment said 'Every entry is currently true'; rewritten to name NON_REVIEWER_VERDICT_REJECTED as the false entry, since leaving it would make the comment false. Outside every GateDefinition object, so AC-L2's proof holds, but it is a removed line beyond the three listed exceptions.
+- sr-engineer: SOP 7a note: no qa_reports/expected-red_e139-evidence-verdict-integrity.txt written — the coordinator's file boundary excluded it and the reds above are qa re-pins due in-lane before PASS. Coordinator to decide whether a manifest is wanted.
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.
