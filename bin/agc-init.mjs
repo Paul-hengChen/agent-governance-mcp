@@ -1557,6 +1557,43 @@ function bootstrapLaneEnv(repoRoot, lanePath, nmLinks) {
   return { out, warn };
 }
 
+// The lane's missing-hooks warning (E215), or null. git resolves a relative
+// core.hooksPath against each checkout's own working-tree root (githooks(5)),
+// so a hooks directory that is generated and git-ignored (husky's `.husky/_`)
+// exists in primary but not in a fresh worktree, and git then runs NO hooks
+// in the lane without saying so. Quiet when the value is unset, absolute or
+// `~`-relative, when the lane has the directory, or when primary lacks it
+// too (the lane then behaves like primary). Warns only, creating nothing: a
+// link could run hooks generated for primary's tree and would leave the
+// lane's status dirty (specs/e217-lane-lifecycle-gaps.md D-E215-1).
+// Best-effort and never throws: any git status other than 0, or any error,
+// skips the check.
+function laneHooksPathWarning(repoRoot, lanePath) {
+  try {
+    const r = gitTry(lanePath, ["config", "--get", "core.hooksPath"]);
+    if (r.status !== 0) return null; // 1 = unset; anything else: skip silently
+    const value = r.stdout.replace(/\n$/, "");
+    if (value === "" || value.startsWith("~") || path.isAbsolute(value)) return null;
+    // stat, not lstat: git follows a symlinked hooks directory.
+    const isDir = (p) => {
+      try {
+        return fs.statSync(p).isDirectory();
+      } catch {
+        return false;
+      }
+    };
+    if (isDir(path.join(lanePath, value)) || !isDir(path.join(repoRoot, value))) return null;
+    // Copy / Strings e215.hooks-missing.
+    return (
+      `agc feature start — warning: core.hooksPath "${escapeSegmentForDisplay(value)}" is a relative path ` +
+      `that the primary checkout has but the lane worktree does not — git runs NO hooks in this lane ` +
+      `until it exists; recreate it inside the lane with the tool that generated it (for husky: \`npx husky\`)`
+    );
+  } catch {
+    return null;
+  }
+}
+
 async function runFeatureStart(cwd, argv) {
   const { positionals, opts } = parseFeatureArgs(argv, ["base", "path"], []);
   if (positionals.length !== 1) {
@@ -1630,6 +1667,8 @@ async function runFeatureStart(cwd, argv) {
   );
 
   const { out, warn } = bootstrapLaneEnv(repoRoot, lanePath, nmLinks);
+  const hooksWarning = laneHooksPathWarning(repoRoot, lanePath);
+  if (hooksWarning !== null) warn.push(hooksWarning);
   for (const line of out) process.stdout.write(`${line}\n`);
   for (const line of warn) process.stderr.write(`${line}\n`);
 
