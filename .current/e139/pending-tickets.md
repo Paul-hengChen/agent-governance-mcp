@@ -1,5 +1,7 @@
 # Pending tickets (lane e139)
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E139-NEW-1
 title: Quote NON_REVIEWER_VERDICT_REJECTED in constitution prose and flip it to documentedInProse true
@@ -58,5 +60,3 @@ body: |
   resolve to one spec/design/manifest file. Feature names are human-chosen slugs, so the
   exposure is lower than for task ids; out of the e139 scope (task-id evidence paths only).
 ```
-
-## Applied
