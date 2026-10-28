@@ -6,3 +6,5 @@
 {"ts":"2026-10-28T06:08:56.119Z","feature":"e364-audit-high-upgrade","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-10-28T06:10:41.573Z","feature":"e364-audit-high-upgrade","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-10-28T06:10:46.745Z","feature":"e364-audit-high-upgrade","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-28T06:11:28.993Z","feature":"e364-audit-high-upgrade","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-10-28T06:18:00.015Z","feature":"e364-audit-high-upgrade","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
