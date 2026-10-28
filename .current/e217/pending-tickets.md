@@ -1,5 +1,7 @@
 <!-- pending-tickets for lane e217 (E179). New blocks go ABOVE ## Applied. -->
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E217-NEW-1
 title: docs still describe pre-E217 --abandoned (specs/ never touched; E217 listed as a known gap)
@@ -34,5 +36,3 @@ body: |
   outside lane e217's owned set. Historical specs (e213, e287 architecture) can keep the old
   names as a record of what shipped then.
 ```
-
-## Applied
