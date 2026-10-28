@@ -651,7 +651,7 @@ test("recordReviewInFile sanitises path-traversal in task id", async () => {
   // Resulting file must live inside qa_reports/, not above
   const evilEscape = path.join(ws, "qa_reports", "review_..", "escape.md");
   assert.equal(fs.existsSync(evilEscape), false);
-  const safe = path.join(ws, "qa_reports", "review_.._escape.md");
+  const safe = path.join(ws, "qa_reports", "review_..__002F_E_S_C_A_P_E.md");
   assert.ok(fs.existsSync(safe));
 });
 
@@ -1641,7 +1641,7 @@ test("T-C9-10/AC-2: tw_update_state rejects a lowercase (out-of-enum) review_ver
   );
 });
 
-test("T-C9-10/AC-2: tw_update_state ACCEPTS valid enum values for all three fields (zod parse succeeds — real write goes through)", async () => {
+test("T-C9-10/AC-2: tw_update_state ACCEPTS valid enum values for all three fields at the zod boundary (the pm write then trips NON_REVIEWER_VERDICT_REJECTED, not a ZodError)", async () => {
   // Positive control for the three rejection tests above — proves the schema
   // isn't accidentally rejecting everything. Exercises a real self-loop write
   // (pm:In_Progress -> pm:In_Progress, untouched by the scope/cut/external-refs
@@ -1664,7 +1664,11 @@ test("T-C9-10/AC-2: tw_update_state ACCEPTS valid enum values for all three fiel
     resume_of: "qa-engineer",
     review_verdict: "APPROVED",
   });
-  assert.ok(!result.isError, `valid enum values on all three fields must not be rejected; got: ${result.content?.[0]?.text}`);
+  // Zod accepted all three enum values (no throw above). The write itself is now refused by the
+  // authorship half of the verdict gate: pm may not carry review_verdict. Reaching that gate,
+  // rather than a ZodError, is what proves the enum definitions are intact.
+  assert.ok(result.isError, "a pm write carrying review_verdict is rejected by NON_REVIEWER_VERDICT_REJECTED");
+  assert.match(result.content?.[0]?.text ?? "", /NON_REVIEWER_VERDICT_REJECTED/);
 });
 
 // ---------- AC-5/DR-8: REVIEW_VERDICT_STATUS_MISMATCH gate matrix (integration, real orchestrator) ----------
@@ -1791,7 +1795,7 @@ test("T-C9-10/AC-5: code-reviewer FAIL with review_verdict ABSENT is ACCEPTED (g
   assert.ok(!result.isError, `a code-reviewer FAIL with no review_verdict must be legal; got: ${result.content?.[0]?.text}`);
 });
 
-test("T-C9-10/AC-5: sr-engineer write carrying review_verdict=APPROVED is ACCEPTED (gate is code-reviewer-only, never fires for other agents)", async () => {
+test("T-C9-10/AC-5: sr-engineer write carrying review_verdict=APPROVED is REJECTED by NON_REVIEWER_VERDICT_REJECTED (REVIEW_VERDICT_STATUS_MISMATCH stays code-reviewer-only)", async () => {
   // Uses the sr-engineer:Blocked -> sr-engineer:In_Progress self-resume edge
   // (not a pm->build-entry edge) so SCOPE_DECISION_REQUIRED/CUT_APPROVAL_REQUIRED
   // — unrelated build-entry gates — cannot confound this assertion.
@@ -1809,7 +1813,12 @@ test("T-C9-10/AC-5: sr-engineer write carrying review_verdict=APPROVED is ACCEPT
     pending_notes: ["sr-engineer: implementing"],
     review_verdict: "APPROVED", // nonsensical for this role, but the gate only keys on agent_id === "code-reviewer"
   });
-  assert.ok(!result.isError, `a non-code-reviewer write must never trip REVIEW_VERDICT_STATUS_MISMATCH; got: ${result.content?.[0]?.text}`);
+  // The consistency gate stays code-reviewer-only (it never fires here); the authorship gate
+  // now rejects the same write under its own code.
+  assert.ok(result.isError, "an sr-engineer write carrying review_verdict is rejected");
+  const text = result.content?.[0]?.text ?? "";
+  assert.match(text, /NON_REVIEWER_VERDICT_REJECTED/);
+  assert.doesNotMatch(text, /REVIEW_VERDICT_STATUS_MISMATCH/);
 });
 
 // ============================================================================

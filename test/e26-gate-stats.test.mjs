@@ -67,20 +67,20 @@ function metricRecord({
 // R1-R3 — every GATE_REGISTRY code is covered by the report (T-E26-01)
 // ============================================================================
 
-// The hardcoded "34" below is the current size of GATE_REGISTRY. The report
+// The hardcoded "35" below is the current size of GATE_REGISTRY. The report
 // sums to the registry length by construction (tools/gate-stats.ts iterates
 // GATE_REGISTRY, not a fixed list), so when a gate is added this number
 // moves with it; the coverage contract itself does not change. The last
-// addition was DISPATCH_PIN_TIER_REJECTED (E300, T-E300-04); before it NON_QA_COMPLETED_TASKS_REJECTED. (E40, T-E40-03)
-test("R1: with zero telemetry, EVERY GATE_REGISTRY code lands in zero_fire, fired is empty, count is 34", () => {
+// addition was NON_REVIEWER_VERDICT_REJECTED (E139); before it DISPATCH_PIN_TIER_REJECTED (E300, T-E300-04); before it NON_QA_COMPLETED_TASKS_REJECTED. (E40, T-E40-03)
+test("R1: with zero telemetry, EVERY GATE_REGISTRY code lands in zero_fire, fired is empty, count is 35", () => {
   const ws = mkWorkspace();
   const report = computeGateStats(ws);
-  assert.equal(GATE_REGISTRY.length, 34, "sanity: registry is 34 entries as of this ticket");
+  assert.equal(GATE_REGISTRY.length, 35, "sanity: registry is 35 entries as of this ticket");
   assert.equal(report.fired.length, 0);
-  assert.equal(report.zero_fire.length, 34);
+  assert.equal(report.zero_fire.length, 35);
 });
 
-test("R2: fired.length + zero_fire.length === 34 always, and the two sets are disjoint (no code counted twice)", () => {
+test("R2: fired.length + zero_fire.length === 35 always, and the two sets are disjoint (no code counted twice)", () => {
   const ws = mkWorkspace();
   writeLines(telemetryPath(ws), [
     telemetryEvent({ ts: "2026-07-16T01:00:00.000Z", error_code: "TRANSITION_REJECTED" }),
@@ -88,7 +88,7 @@ test("R2: fired.length + zero_fire.length === 34 always, and the two sets are di
     telemetryEvent({ ts: "2026-07-16T01:00:02.000Z", error_code: "FEATURE_LEASE_HELD" }),
   ]);
   const report = computeGateStats(ws);
-  assert.equal(report.fired.length + report.zero_fire.length, 34, "coverage must sum to the full registry every time");
+  assert.equal(report.fired.length + report.zero_fire.length, 35, "coverage must sum to the full registry every time");
   const firedCodes = new Set(report.fired.map((f) => f.error_code));
   const zeroCodes = new Set(report.zero_fire);
   assert.equal(firedCodes.size, report.fired.length, "no duplicate codes within fired");
@@ -198,7 +198,7 @@ test("F5: by_feature / by_agent / first_ts / last_ts accumulate correctly across
 // U1 — unregistered-code bucket
 // ============================================================================
 
-test("U1: an error_code absent from today's GATE_REGISTRY lands in `unregistered`, never in fired/zero_fire, and never breaks 34/34 coverage", () => {
+test("U1: an error_code absent from today's GATE_REGISTRY lands in `unregistered`, never in fired/zero_fire, and never breaks 35/35 coverage", () => {
   const ws = mkWorkspace();
   writeLines(telemetryPath(ws), [
     telemetryEvent({ ts: "2026-07-16T01:00:00.000Z", error_code: "SOME_RETIRED_CODE_NO_LONGER_IN_REGISTRY", feature: "old-feat" }),
@@ -211,7 +211,7 @@ test("U1: an error_code absent from today's GATE_REGISTRY lands in `unregistered
   assert.equal(report.unregistered[0].category, "unregistered");
   assert.ok(!report.zero_fire.includes("SOME_RETIRED_CODE_NO_LONGER_IN_REGISTRY"));
   assert.ok(!report.fired.some((f) => f.error_code === "SOME_RETIRED_CODE_NO_LONGER_IN_REGISTRY"));
-  assert.equal(report.fired.length + report.zero_fire.length, 34, "an unregistered code must not perturb full-registry coverage");
+  assert.equal(report.fired.length + report.zero_fire.length, 35, "an unregistered code must not perturb full-registry coverage");
 });
 
 // ============================================================================
@@ -317,7 +317,7 @@ test("M4: an unreadable (permission-denied) sidecar never throws — degrades to
 // D1-D2 — missing-sidecar degradation
 // ============================================================================
 
-test("D1: both sidecars absent -> never throws, full 34-code zero_fire coverage, zero counts, honest exists:false + caveats naming both paths", () => {
+test("D1: both sidecars absent -> never throws, full 35-code zero_fire coverage, zero counts, honest exists:false + caveats naming both paths", () => {
   const ws = mkWorkspace();
   let report;
   assert.doesNotThrow(() => {
@@ -326,7 +326,7 @@ test("D1: both sidecars absent -> never throws, full 34-code zero_fire coverage,
   assert.equal(report.telemetry.exists, false);
   assert.equal(report.metrics.exists, false);
   assert.equal(report.fired.length, 0);
-  assert.equal(report.zero_fire.length, 34, "coverage must hold even with zero telemetry data — a young workspace is not an error");
+  assert.equal(report.zero_fire.length, 35, "coverage must hold even with zero telemetry data — a young workspace is not an error");
   assert.equal(report.metrics.features, 0);
   assert.equal(report.metrics.one_pass_rate, null, "no fake 0% when there is no data");
   assert.ok(report.caveats.some((c) => c.includes("No telemetry yet") && c.includes(telemetryPath(ws))));
@@ -340,7 +340,7 @@ test("D2: only metrics.jsonl present (telemetry absent) -> telemetry side degrad
   assert.equal(report.telemetry.exists, false);
   assert.equal(report.metrics.exists, true);
   assert.equal(report.metrics.features, 1);
-  assert.equal(report.zero_fire.length, 34);
+  assert.equal(report.zero_fire.length, 35);
   assert.ok(report.caveats.some((c) => c.includes("No telemetry yet")));
   assert.ok(!report.caveats.some((c) => c.includes("No metrics yet")), "metrics caveat must not fire when the sidecar is present");
 });
@@ -653,5 +653,5 @@ test("T3b: handleGateStats never throws even against a workspace with no .curren
     result = await handleGateStats({ workspace_path: bareWs });
   });
   const parsed = JSON.parse(result.content[0].text);
-  assert.equal(parsed.zero_fire.length, 34);
+  assert.equal(parsed.zero_fire.length, 35);
 });
