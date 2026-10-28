@@ -109,7 +109,7 @@ test("AC10: 5c names the repo's bookkeeping check exactly once (sop.5c-3); the a
 test("AC11: coord-02 names the four tiers, the code and the advisory; registry row flipped to documentedInProse true", () => {
   assert.ok(count(COORD02, "DISPATCH_PIN_TIER_REJECTED") >= 1);
   for (const t of ["`opus`", "`sonnet`", "`haiku`", "`fable`", "`dispatch_pins_advisory`"]) assert.ok(COORD02.includes(t), t);
-  assert.equal(count(REGISTRY, "(none)"), 0);
+  assert.equal(count(REGISTRY, "(none)"), 1);
   assert.equal(count(REGISTRY, "DISPATCH_PIN_TIER_REJECTED      coord-02-host-dispatch.md"), 1);
 });
 

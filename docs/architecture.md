@@ -109,7 +109,7 @@ caller: tw_update_state({ agent_id, status, completed_tasks, qa_review?, ... })
                                   handoff state updated
 ```
 
-Gate metadata (error code, owning role, exemptions) is declared once per gate in `gates/registry.ts` — 33 entries covering the pipeline gates plus the read-path and task-tool gates. `tw_gate_stats` aggregates fire counts per gate from the telemetry sidecar.
+Gate metadata (error code, owning role, exemptions) is declared once per gate in `gates/registry.ts` — 35 entries covering the pipeline gates plus the read-path and task-tool gates. `tw_gate_stats` aggregates fire counts per gate from the telemetry sidecar.
 
 ---
 

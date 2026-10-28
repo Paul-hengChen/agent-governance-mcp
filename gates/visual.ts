@@ -17,6 +17,7 @@ import {
   parseAssertionFailures,
   parseRegionDiffFailures,
   normalizeStatus,
+  encodeEvidenceId,
 } from "../tools/evidence-file.js";
 
 // ---------- visual evidence (v3.14.0) ----------
@@ -26,9 +27,9 @@ import {
 
 // Exported so the VISUAL_EVIDENCE_MISSING / VISUAL_REPORT_INCOMPLETE emit
 // sites in tools/handoff-orchestrator.ts name the exact file path checked (E23 D3).
+// The stem is the same injective encodeEvidenceId as the review_ files.
 export function visualEvidencePath(workspacePath: string, taskId: string): string {
-  const safe = taskId.replace(/[^A-Za-z0-9._-]/g, "_");
-  return path.join(workspacePath, "qa_reports", `visual_${safe}.md`);
+  return path.join(workspacePath, "qa_reports", `visual_${encodeEvidenceId(taskId)}.md`);
 }
 
 // Relocated from tools/evidence-file.ts (single consumer: this module — all its

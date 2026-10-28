@@ -8,14 +8,13 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import { buildCoverageIndex } from "./evidence-file.js";
+import { buildCoverageIndex, encodeEvidenceId } from "./evidence-file.js";
 
-// Path hygiene precedent: gates/qa-review.ts:26-28 (evidencePath) uses the
-// identical sanitisation. Applied independently here so this module carries
-// no import-time coupling to that gate's internals (it is a live gate
-// predicate this feature must not touch).
+// Same filename stem as gates/qa-review.ts evidencePath: both derive it via
+// the shared injective encodeEvidenceId, so this lookup and the live gate
+// always agree on which file belongs to which task id.
 function sanitizeTaskId(taskId: string): string {
-  return taskId.replace(/[^A-Za-z0-9._-]/g, "_");
+  return encodeEvidenceId(taskId);
 }
 
 function safeReaddir(dir: string): string[] {
