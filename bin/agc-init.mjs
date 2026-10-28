@@ -1023,8 +1023,9 @@ const STR_USAGE_FEATURE =
   "          worktree and deletes the branch — on origin too when it was pushed\n" +
   "          (no origin / no remote branch: a hint, not a failure); --abandoned\n" +
   "          moves the lane's qa_reports/ + review_reports/ evidence into\n" +
-  "          abandoned/<ticket-id>/, commits it, removes the worktree, and\n" +
-  "          keeps the branch. Either way, the lane's committed\n" +
+  "          abandoned/<ticket-id>/, commits it, copies git-ignored specs/\n" +
+  "          files into primary's specs/abandoned/<ticket-id>/, removes the\n" +
+  "          worktree, and keeps the branch. Either way, the lane's committed\n" +
   "          .current/<lane>/pending-tickets.md findings (if any) first get\n" +
   "          real ids, appended to docs/backlog.md and committed on --base in\n" +
   "          the primary checkout. Only the copy committed on --base\n" +
@@ -1110,10 +1111,19 @@ function artifactPathsForPrefix(prefix, baseRules = ARTIFACT_EXCLUDE_RULES) {
   });
 }
 
-// Evidence directories whose ticket-named files `finish --abandoned` retires.
-// specs/ is deliberately absent (D2: a spec is a design record, kept in place
-// so a re-picked-up ticket still finds it).
+// Evidence directories whose ticket-named files `finish --abandoned` retires
+// (moved into abandoned/<ticket>/ and committed on the kept branch). specs/
+// is deliberately absent (D2: a spec is a design record, kept in place so a
+// re-picked-up ticket still finds it); its git-ignored files are copied out
+// instead — see ABANDON_HARVEST_DIRS.
 const ABANDON_EVIDENCE_DIRS = ["qa_reports", "review_reports"];
+
+// Directories `finish --abandoned` only COPIES from (E217): every git-ignored,
+// untracked file under them, recursively and with no ticket-token filter (in
+// a fresh worktree every such file was written by this lane), goes to
+// primary's `<dir>/abandoned/<ticket>/<relpath>`, never committed. Tracked
+// files stay where they are on the kept branch, so a move would save nothing.
+const ABANDON_HARVEST_DIRS = ["specs"];
 
 // Evidence directories `finish --shipped` harvests into primary (E214). A
 // separate list on purpose: specs/ belongs here (integrator ruling
@@ -1547,6 +1557,43 @@ function bootstrapLaneEnv(repoRoot, lanePath, nmLinks) {
   return { out, warn };
 }
 
+// The lane's missing-hooks warning (E215), or null. git resolves a relative
+// core.hooksPath against each checkout's own working-tree root (githooks(5)),
+// so a hooks directory that is generated and git-ignored (husky's `.husky/_`)
+// exists in primary but not in a fresh worktree, and git then runs NO hooks
+// in the lane without saying so. Quiet when the value is unset, absolute or
+// `~`-relative, when the lane has the directory, or when primary lacks it
+// too (the lane then behaves like primary). Warns only, creating nothing: a
+// link could run hooks generated for primary's tree and would leave the
+// lane's status dirty (specs/e217-lane-lifecycle-gaps.md D-E215-1).
+// Best-effort and never throws: any git status other than 0, or any error,
+// skips the check.
+function laneHooksPathWarning(repoRoot, lanePath) {
+  try {
+    const r = gitTry(lanePath, ["config", "--get", "core.hooksPath"]);
+    if (r.status !== 0) return null; // 1 = unset; anything else: skip silently
+    const value = r.stdout.replace(/\n$/, "");
+    if (value === "" || value.startsWith("~") || path.isAbsolute(value)) return null;
+    // stat, not lstat: git follows a symlinked hooks directory.
+    const isDir = (p) => {
+      try {
+        return fs.statSync(p).isDirectory();
+      } catch {
+        return false;
+      }
+    };
+    if (isDir(path.join(lanePath, value)) || !isDir(path.join(repoRoot, value))) return null;
+    // Copy / Strings e215.hooks-missing.
+    return (
+      `agc feature start — warning: core.hooksPath "${escapeSegmentForDisplay(value)}" is a relative path ` +
+      `that the primary checkout has but the lane worktree does not — git runs NO hooks in this lane ` +
+      `until it exists; recreate it inside the lane with the tool that generated it (for husky: \`npx husky\`)`
+    );
+  } catch {
+    return null;
+  }
+}
+
 async function runFeatureStart(cwd, argv) {
   const { positionals, opts } = parseFeatureArgs(argv, ["base", "path"], []);
   if (positionals.length !== 1) {
@@ -1620,6 +1667,8 @@ async function runFeatureStart(cwd, argv) {
   );
 
   const { out, warn } = bootstrapLaneEnv(repoRoot, lanePath, nmLinks);
+  const hooksWarning = laneHooksPathWarning(repoRoot, lanePath);
+  if (hooksWarning !== null) warn.push(hooksWarning);
   for (const line of out) process.stdout.write(`${line}\n`);
   for (const line of warn) process.stderr.write(`${line}\n`);
 
@@ -2927,13 +2976,18 @@ function executeHarvestRefresh({ ticketId, refresh, preserve }) {
   );
 }
 
-// --- finish --shipped evidence harvest (E214, specs/e213-shipped-ignored-shape.md) ---
+// --- finish ignored-evidence harvest (E214 --shipped, E217 --abandoned specs/) ---
 // `git worktree remove` (never --force) deletes untracked, git-ignored files
 // WITHOUT refusing, so ignored evidence dirs not linked back to primary would
-// lose the lane's review trail. Like --abandoned (E180) but every file, walked
-// recursively, into `<dir>/archive/<ticket>/<relpath>` (specs/e260c-bin-scripts.md).
-//   planShippedEvidenceHarvest  — reads and refuses only (AC8, AC17), before any mutation.
-//   applyShippedEvidenceHarvest — the fs copies, just before removal; never committed.
+// lose the lane's review trail. Unlike the token-filtered --abandoned move
+// (E180), every file is walked recursively and copied into primary's
+// `<dir>/<bucket>/<ticket>/<relpath>` (specs/e260c-bin-scripts.md): bucket
+// `archive` for --shipped, `abandoned` for --abandoned's copy-only dirs.
+//   planIgnoredEvidenceHarvest  — reads and refuses only (AC8, AC17), before any mutation.
+//   applyIgnoredEvidenceHarvest — the fs copies, just before removal; never committed.
+// `verb` is the flag token the messages name; `display` renders every path
+// and error reason they echo — identity for --shipped (its output is pinned
+// as shipped), escapeSegmentForDisplay for --abandoned (no raw control byte).
 
 // Every regular file under `rootAbs` (a real directory, or a symlink to one the
 // caller resolved), as { rel, readAbs } with `rel` posix and relative to the
@@ -2941,14 +2995,15 @@ function executeHarvestRefresh({ ticketId, refresh, preserve }) {
 // never a link into the worktree about to go, and a dir link is walked through.
 // An unresolvable link lands in `dangling`. `chain` holds the real paths on the
 // current descent, so a link cycle stops (its target is already walked).
-function walkEvidenceTree(dirAbs, relPrefix, chain, files, dangling) {
+// `msg` is the caller's { verb, display } for the read-failure message.
+function walkEvidenceTree(dirAbs, relPrefix, chain, files, dangling, msg) {
   let entries;
   try {
     entries = fs.readdirSync(dirAbs, { withFileTypes: true });
   } catch (err) {
     throw new FeatureError(
-      `agc feature finish --shipped: could not read ${relPrefix}/ in the lane worktree ` +
-        `(${err && err.message ? err.message : String(err)}) — nothing removed`
+      `agc feature finish ${msg.verb}: could not read ${msg.display(relPrefix)}/ in the lane worktree ` +
+        `(${msg.display(err && err.message ? err.message : String(err))}) — nothing removed`
     );
   }
   entries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
@@ -2966,7 +3021,7 @@ function walkEvidenceTree(dirAbs, relPrefix, chain, files, dangling) {
         continue;
       }
       if (st.isDirectory()) {
-        if (!chain.has(real)) walkEvidenceTree(real, rel, new Set([...chain, real]), files, dangling);
+        if (!chain.has(real)) walkEvidenceTree(real, rel, new Set([...chain, real]), files, dangling, msg);
       } else if (st.isFile()) {
         files.push({ rel, readAbs: real });
       }
@@ -2977,7 +3032,7 @@ function walkEvidenceTree(dirAbs, relPrefix, chain, files, dangling) {
       } catch {
         real = abs;
       }
-      walkEvidenceTree(abs, rel, new Set([...chain, real]), files, dangling);
+      walkEvidenceTree(abs, rel, new Set([...chain, real]), files, dangling, msg);
     } else if (d.isFile()) {
       files.push({ rel, readAbs: abs });
     }
@@ -3000,15 +3055,18 @@ function blockingAncestor(abs, stopAt) {
   return null;
 }
 
-// Read-only. Returns { copies: [{ src, dst, dir, readAbs, dstAbs }] }, the
-// copies still to make (an identical destination needs none, AC9), or throws
-// before any mutation on an unresolvable symlink (AC17) or a differing
-// destination (AC8). "At risk" is per FILE: untracked, and `git check-ignore`
-// not exit 1; other non-zero exits fail toward harvesting, as evidenceAtRisk
-// does. A plain untracked file (exit 1) is left alone: remove refuses (AC10).
-function planShippedEvidenceHarvest({ repoRoot, lanePath, ticketId }) {
+// Read-only. Returns { copies: [{ src, dst, dir, readAbs, dstAbs }], verb,
+// display }, the copies still to make (an identical destination needs none,
+// AC9), or throws before any mutation on an unresolvable symlink (AC17) or a
+// differing destination (AC8). "At risk" is per FILE: untracked, and `git
+// check-ignore` not exit 1; other non-zero exits fail toward harvesting, as
+// evidenceAtRisk does. A plain untracked file (exit 1) is left alone: remove
+// refuses (AC10). `dirs` are lane-relative evidence dirs, `bucket` the
+// primary subdirectory the copies land under.
+function planIgnoredEvidenceHarvest({ repoRoot, lanePath, ticketId, dirs, bucket, verb, display }) {
+  const msg = { verb, display };
   const tracked = new Set(
-    git(lanePath, ["ls-files", "-z", "--", ...SHIPPED_EVIDENCE_DIRS])
+    git(lanePath, ["ls-files", "-z", "--", ...dirs])
       .split("\0")
       .filter((p) => p.length > 0)
   );
@@ -3018,7 +3076,7 @@ function planShippedEvidenceHarvest({ repoRoot, lanePath, ticketId }) {
   const copies = [];
   const conflicts = [];
   const danglingByDir = [];
-  for (const dir of SHIPPED_EVIDENCE_DIRS) {
+  for (const dir of dirs) {
     const rootAbs = path.join(lanePath, dir);
     const st = lstatOrNull(rootAbs);
     if (st === null) continue; // AC11 — absent
@@ -3034,13 +3092,13 @@ function planShippedEvidenceHarvest({ repoRoot, lanePath, ticketId }) {
     if (!isDirectoryPath(rootReal)) continue;
     const files = [];
     const dangling = [];
-    walkEvidenceTree(rootReal, dir, new Set([rootReal]), files, dangling);
+    walkEvidenceTree(rootReal, dir, new Set([rootReal]), files, dangling, msg);
     const danglingAtRisk = dangling.filter(atRisk);
     if (danglingAtRisk.length > 0) danglingByDir.push({ dir, paths: danglingAtRisk });
     for (const f of files) {
       if (!atRisk(f.rel)) continue;
       const sub = f.rel.slice(dir.length + 1);
-      const dst = path.posix.join(dir, "archive", ticketId, sub);
+      const dst = path.posix.join(dir, bucket, ticketId, sub);
       const dstAbs = path.join(repoRoot, ...dst.split("/"));
       const blocker = blockingAncestor(dstAbs, repoRoot);
       if (blocker !== null) {
@@ -3058,30 +3116,32 @@ function planShippedEvidenceHarvest({ repoRoot, lanePath, ticketId }) {
       danglingByDir
         .map(
           ({ dir, paths }) =>
-            `agc feature finish --shipped: harvest of ${dir}/ found unresolvable symlink(s) — ` +
+            `agc feature finish ${verb}: harvest of ${dir}/ found unresolvable symlink(s) — ` +
             `refusing before any mutation (nothing moved):\n` +
-            paths.map((p) => `  ${p}`).join("\n")
+            paths.map((p) => `  ${display(p)}`).join("\n")
         )
         .join("\n")
     );
   }
   if (conflicts.length > 0) {
-    // Copy / Strings e180.evidence-harvest-refuse-line, --shipped verb token.
+    // Copy / Strings e180.evidence-harvest-refuse-line, with the caller's verb token.
     throw new FeatureError(
-      `agc feature finish --shipped: harvest destination already exists in the primary checkout and differs (nothing moved):\n` +
-        [...new Set(conflicts)].map((p) => `  ${p}`).join("\n")
+      `agc feature finish ${verb}: harvest destination already exists in the primary checkout and differs (nothing moved):\n` +
+        [...new Set(conflicts)].map((p) => `  ${display(p)}`).join("\n")
     );
   }
-  return { copies };
+  return { copies, verb, display };
 }
 
-// The copies planShippedEvidenceHarvest asked for, after the lane close and
-// just before removeWorktreeNoForce (so they capture the lane's final state).
+// The copies planIgnoredEvidenceHarvest asked for, after the caller's commits
+// and just before removeWorktreeNoForce (so they capture the lane's final
+// state).
 // COPYFILE_EXCL, content only (readAbs is already dereferenced). A copy that
 // throws drops its own partial output and leaves the worktree and branch in
 // place; the copies already made are byte-identical on a re-run, which then
 // makes none of them again (AC9).
-function applyShippedEvidenceHarvest(harvest) {
+function applyIgnoredEvidenceHarvest(harvest) {
+  const { verb, display } = harvest;
   for (const c of harvest.copies) {
     try {
       fs.mkdirSync(path.dirname(c.dstAbs), { recursive: true });
@@ -3089,14 +3149,14 @@ function applyShippedEvidenceHarvest(harvest) {
     } catch (err) {
       if (!err || err.code !== "EEXIST") fs.rmSync(c.dstAbs, { force: true });
       throw new FeatureError(
-        `agc feature finish --shipped: harvest of ${c.src} into the primary checkout failed ` +
-          `(${err && err.message ? err.message : String(err)}) — worktree and branch left in place ` +
+        `agc feature finish ${verb}: harvest of ${display(c.src)} into the primary checkout failed ` +
+          `(${display(err && err.message ? err.message : String(err))}) — worktree and branch left in place ` +
           `(re-running finish is safe)`
       );
     }
-    // Copy / Strings e180.evidence-harvest-line (reused; dst under archive/<ticket>/).
+    // Copy / Strings e180.evidence-harvest-line (reused; dst under <bucket>/<ticket>/).
     process.stdout.write(
-      `agc feature finish — harvested git-ignored evidence ${c.src} -> primary ${c.dst} ` +
+      `agc feature finish — harvested git-ignored evidence ${display(c.src)} -> primary ${display(c.dst)} ` +
         `(fs copy, not committed — ${c.dir}/ is git-ignored here and not linked outside the worktree, ` +
         `so \`git worktree remove\` would otherwise delete it silently)\n`
     );
@@ -3300,7 +3360,15 @@ async function runFeatureFinish(cwd, argv) {
     // The shipped evidence harvest (E214) is planned on every run, the
     // alreadyClosed re-run included (a refused worktree remove leaves the
     // evidence at risk until it goes).
-    const evidenceHarvest = planShippedEvidenceHarvest({ repoRoot, lanePath, ticketId });
+    const evidenceHarvest = planIgnoredEvidenceHarvest({
+      repoRoot,
+      lanePath,
+      ticketId,
+      dirs: SHIPPED_EVIDENCE_DIRS,
+      bucket: "archive",
+      verb: "--shipped",
+      display: (s) => s,
+    });
     // E287 O6: a pending file only in the worktree is reported and kept, never
     // numbered; its collision checks run here, before the first mutation.
     // The lane branch is probed too: the merge guard proved it is contained in
@@ -3335,7 +3403,7 @@ async function runFeatureFinish(cwd, argv) {
       executeLaneClose({ repoRoot, base, close });
     }
     if (preserve) executeFindingsPreserve(preserve);
-    applyShippedEvidenceHarvest(evidenceHarvest);
+    applyIgnoredEvidenceHarvest(evidenceHarvest);
     removeWorktreeNoForce(repoRoot, lanePath); // AC17/AC19
     process.stdout.write(`agc feature finish — removed worktree ${lanePath}\n`);
     removeLaneMailbox(lanePath, ticketId); // E246: before branch -d, so its refusal cannot skip it
@@ -3354,12 +3422,23 @@ async function runFeatureFinish(cwd, argv) {
 
   // --abandoned: no merge guard (AC20). Pending tickets first (E179 AC3;
   // their checks include the evidence precondition, hoisted), then the
-  // evidence move as its own commit (DR-4). The `.current/<ticket>/`
-  // harvest is planned (its refusal included) before any of those mutations
-  // and executed last, just before the worktree is removed.
+  // evidence move as its own commit (DR-4). The git-ignored specs/ copy and
+  // the `.current/<ticket>/` harvest are planned (their refusals included)
+  // before any of those mutations and executed last, in that order, just
+  // before the worktree is removed.
   const now = new Date();
   const currentHarvest = planAbandonCurrentHarvest({
     lanePaths, lanePath, ticketId, branch, now,
+  });
+  // E217: git-ignored specs would otherwise be deleted with the worktree.
+  const specsHarvest = planIgnoredEvidenceHarvest({
+    repoRoot,
+    lanePath,
+    ticketId,
+    dirs: ABANDON_HARVEST_DIRS,
+    bucket: "abandoned",
+    verb: "--abandoned",
+    display: escapeSegmentForDisplay,
   });
   // E287 O6 (see the --shipped branch): read and planned before any mutation.
   const findings = await readUnallocatedFindings({
@@ -3392,6 +3471,7 @@ async function runFeatureFinish(cwd, argv) {
         untrackedMoved.join(", ") +
         ` — git add + commit it in the lane and re-run, or remove the worktree by hand`
       : null;
+  applyIgnoredEvidenceHarvest(specsHarvest);
   if (currentHarvest !== null) executeAbandonCurrentHarvest(currentHarvest, preserve);
   if (preserve) executeFindingsPreserve(preserve);
   removeWorktreeNoForce(repoRoot, lanePath, hint);

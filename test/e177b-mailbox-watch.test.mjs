@@ -267,7 +267,11 @@ test("AC17: a second, independent mailbox-watch process on the SAME file refuses
       firstChild = child;
     },
   });
-  await waitFor(() => fs.existsSync(lockPath));
+  // E224: the first watch's spawn-to-lock latency, not the product, is what this waits out; a fixed
+  // 3000 ms went red under multi-lane load. Raised to 15000 ms (inside the 20 s test timeout),
+  // overridable via AGC_E177B_WAIT_MS (non-numeric or non-positive falls back to 15000). Still finite.
+  const lockWaitMs = Number(process.env.AGC_E177B_WAIT_MS);
+  await waitFor(() => fs.existsSync(lockPath), { timeoutMs: Number.isFinite(lockWaitMs) && lockWaitMs > 0 ? lockWaitMs : 15000 });
 
   // Defensive --deadline on the probe too: IF refusal somehow does not fire
   // (a genuine product bug), this must still terminate promptly rather than

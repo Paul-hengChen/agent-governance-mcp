@@ -81,7 +81,16 @@ function writeStaleLock(lockPath, overrides = {}) {
   return payload;
 }
 
-async function waitFor(predicate, { timeoutMs = 3000, intervalMs = 10 } = {}) {
+// E224: AC13b's spawn/exit waits went red on fixed 2-3 s budgets under multi-lane load (the product
+// was fine). Budgets are raised (defaults below, in ms) and overridable by ONE env knob,
+// AGC_E177B_WAIT_MS (non-numeric or non-positive falls back to the default), which replaces every
+// AC13b waitFor budget. They stay finite so a genuinely stuck child still fails.
+function waitBudget(defaultMs) {
+  const n = Number(process.env.AGC_E177B_WAIT_MS);
+  return Number.isFinite(n) && n > 0 ? n : defaultMs;
+}
+
+async function waitFor(predicate, { timeoutMs = waitBudget(15000), intervalMs = 10 } = {}) {
   const start = Date.now();
   for (;;) {
     if (predicate()) return true;
@@ -225,20 +234,17 @@ test("AC9 (unit): the re-entrancy check is keyed on the EXACT resolved lock path
 test("AC10: a lock left by a DEAD pid is reclaimed promptly regardless of its age", { timeout: 20000 }, async (t) => {
   const lockPath = mkLockPath(t, "e177b-ac10-");
   writeStaleLock(lockPath, { acquiredAt: Date.now() - 60_000 }); // 1 minute "old" but the point is liveness, not age
-  const start = Date.now();
+  // E224/AC-E224-3: "promptly" used to be a wall-clock bound (elapsed < 8s) that INCLUDED the wrapper's
+  // node spawn; under multi-lane load (16 concurrent copies on 8 cores) spawn alone took 8-12s and the
+  // test went red with the product fine. The discriminator is now the wrapper's OWN clock: --max-wait 5
+  // starts after the wrapper is running, so spawn latency is excluded. A liveness-based reclaim takes
+  // milliseconds; a reclaim that is age-based or waits out CORRUPT_GRACE_MS (10s) outlasts 5s, so the
+  // wrapper exits with the lock-timeout code and the exit-0 assertion below fails.
   const result = await runTestLock(
-    ["--lock-path", lockPath, "--poll-ms", "10", "--max-wait", "15"], // safety net; reclaim is expected in well under 1s
+    ["--lock-path", lockPath, "--poll-ms", "10", "--max-wait", "5"],
     [process.execPath, "-e", "process.exit(0)"],
   );
-  const elapsedMs = Date.now() - start;
-  assert.equal(result.code, 0);
-  // "Promptly" distinguishes an immediate reclaim (liveness-based, AC10) from
-  // CORRUPT_GRACE_MS-style waiting (10s) — not a tight perf benchmark. Under
-  // the full 2700+-test suite's CPU contention this was observed at ~2.4s
-  // once; 8s stays well clear of the 10s corrupt-payload grace period this
-  // test must be distinguished from, while tolerating slow-machine/
-  // full-suite scheduling delays.
-  assert.ok(elapsedMs < 8_000, `a dead-pid lock must be reclaimed promptly (well under the 10s corrupt-grace period), took ${elapsedMs}ms`);
+  assert.equal(result.code, 0, "a dead-pid lock must be reclaimed within the wrapper's own 5s --max-wait (well under the 10s corrupt-grace period)");
   assert.match(result.stderr, /reclaiming stale lock from dead pid 999999/);
 });
 
@@ -395,7 +401,7 @@ test("AC13a (unit): reclaimStale is idempotent — a second call with the SAME o
 // AC13b — a SIGKILLed wrapper's still-live child is never treated as dead
 // ---------------------------------------------------------------------------
 
-test("AC13b: SIGKILLing the wrapper does not free the lock while its spawned child is still running; a new waiter reclaims only after the child exits", { timeout: 20000 }, async (t) => {
+test("AC13b: SIGKILLing the wrapper does not free the lock while its spawned child is still running; a new waiter reclaims only after the child exits", { timeout: 60000 }, async (t) => {
   const lockPath = mkLockPath(t, "e177b-ac13b-");
   const dir = mkTmpDir(t, "e177b-ac13b-child-");
   const doneFile = path.join(dir, "done");
@@ -466,7 +472,7 @@ fs.writeFileSync(${JSON.stringify(doneFile)}, "done");
   assert.ok(isPidAlive(childPid), "the child must be alive before we kill the wrapper");
 
   wrapper.kill("SIGKILL");
-  await waitFor(() => !isPidAlive(wrapper.pid), { timeoutMs: 2000 });
+  await waitFor(() => !isPidAlive(wrapper.pid), { timeoutMs: waitBudget(10000) });
   assert.ok(isPidAlive(childPid), "the child must survive its wrapper's SIGKILL (children are not killed transitively)");
 
   // A new request must NOT reclaim while the child is still alive.
@@ -481,10 +487,10 @@ fs.writeFileSync(${JSON.stringify(doneFile)}, "done");
   // the child finish, so its exit can never race the probe's observation.
   fs.writeFileSync(releaseFile, "go");
 
-  await waitFor(() => fs.existsSync(doneFile), { timeoutMs: 3000 });
-  await waitFor(() => !isPidAlive(childPid), { timeoutMs: 2000 });
+  await waitFor(() => fs.existsSync(doneFile), { timeoutMs: waitBudget(15000) });
+  await waitFor(() => !isPidAlive(childPid), { timeoutMs: waitBudget(10000) });
 
-  const after = await runTestLock(["--lock-path", lockPath, "--poll-ms", "10", "--max-wait", "2"], [process.execPath, "-e", "process.exit(0)"]);
+  const after = await runTestLock(["--lock-path", lockPath, "--poll-ms", "10", "--max-wait", "10"], [process.execPath, "-e", "process.exit(0)"]);
   assert.equal(after.code, 0, "once the orphaned child has actually exited, a new waiter must reclaim and succeed");
 });
 

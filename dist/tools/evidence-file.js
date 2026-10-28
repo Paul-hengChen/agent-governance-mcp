@@ -7,6 +7,35 @@
 // import graph acyclic.
 import * as fs from "fs";
 import * as path from "path";
+// ---------- task-id → evidence filename stem ----------
+// Every evidence filename (`review_<stem>.md`, `visual_<stem>.md`) derives its
+// stem from the task id through this one encoder, so two distinct ids can
+// never share an evidence file. It works one UTF-16 code unit at a time:
+//   [A-Z0-9.-]   → unchanged
+//   [a-z]        → "_" + the upper-case letter
+//   anything else → "__" + the unit as exactly 4 upper-case hex digits
+// Properties: identity on canonical ids (`^[A-Z0-9.-]*$`, e.g. T-E139-01), so
+// their paths never move; injective, because "_" only ever starts a token and
+// the next character says which kind; no lower-case output, so two stems never
+// collide under a case-insensitive filesystem; output alphabet [A-Z0-9._-], so
+// no path separator, NUL or drive colon can appear.
+export function encodeEvidenceId(taskId) {
+    let out = "";
+    for (let i = 0; i < taskId.length; i++) {
+        const unit = taskId.charCodeAt(i);
+        const ch = taskId[i];
+        if ((ch >= "A" && ch <= "Z") || (ch >= "0" && ch <= "9") || ch === "." || ch === "-") {
+            out += ch;
+        }
+        else if (ch >= "a" && ch <= "z") {
+            out += "_" + ch.toUpperCase();
+        }
+        else {
+            out += "__" + unit.toString(16).toUpperCase().padStart(4, "0");
+        }
+    }
+    return out;
+}
 // ---------- `covers:` label-line plumbing ----------
 // One review file may declare `covers: <id1>, <id2>, ...` to satisfy the
 // evidence gates for a batched round instead of one stub per id. File mode
@@ -19,20 +48,41 @@ import * as path from "path";
 // does not match (capture requires >= 1 char), so an empty label yields no ids
 // (AC-5).
 export const COVERS_LINE_RE = /^[^\S\n]*(?:[-*][^\S\n]*)?(?:\*\*[^\S\n]*)?covers(?:[^\S\n]*\*\*)?[^\S\n]*[:—-][^\S\n]*([^\n]+?)[^\S\n]*$/im;
-// Pure parser (no I/O, never throws). Extracts the id list from the FIRST
-// `covers:` line in `content`. Splits on comma/whitespace, strips surrounding
-// backticks/brackets and residual emphasis per token, drops empties. Returns
-// [] when the label is absent or its value is empty/whitespace (AC-5).
-export function parseCoversIds(content) {
-    if (!content)
-        return [];
-    const m = COVERS_LINE_RE.exec(content);
-    if (!m)
-        return [];
-    return m[1]
+// Split one `covers:` value into its id tokens: split on comma/whitespace,
+// strip surrounding backticks/brackets and residual emphasis per token, drop
+// empties.
+function coversTokens(value) {
+    return value
         .split(/[,\s]+/)
         .map((t) => t.replace(/^[`[\]()<>*_]+|[`[\]()<>*_]+$/g, "").trim())
         .filter((t) => t.length > 0);
+}
+// Pure parser (no I/O, never throws). Extracts the id list from EVERY
+// `covers:` line in `content`, in document order, so a later review round
+// that appends a second `covers:` line widens the coverage. The first line's
+// tokens are returned as-is (within-line duplicates included); each later
+// line adds only the tokens not already collected. Returns [] when the label
+// is absent or every value is empty/whitespace (AC-5).
+export function parseCoversIds(content) {
+    if (!content)
+        return [];
+    // Global copy: the exported regex keeps its `im` flags (and so its
+    // first-match exec semantics) for any other caller.
+    const lineRe = new RegExp(COVERS_LINE_RE.source, "gim");
+    let ids = null;
+    let m;
+    while ((m = lineRe.exec(content)) !== null) {
+        const tokens = coversTokens(m[1]);
+        if (ids === null) {
+            ids = tokens;
+            continue;
+        }
+        for (const t of tokens) {
+            if (!ids.includes(t))
+                ids.push(t);
+        }
+    }
+    return ids ?? [];
 }
 // Scans every `*.md` file in `dir` for a `covers:` line and returns a
 // first-seen-wins `coveredId -> filename` map. Directory listing is sorted so

@@ -7,15 +7,14 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import { buildCoverageIndex } from "../tools/evidence-file.js";
+import { buildCoverageIndex, encodeEvidenceId } from "../tools/evidence-file.js";
 
 function codeReviewDir(workspacePath: string): string {
   return path.join(workspacePath, "review_reports");
 }
 
 function codeReviewPath(workspacePath: string, taskId: string): string {
-  const safe = taskId.replace(/[^A-Za-z0-9._-]/g, "_");
-  return path.join(codeReviewDir(workspacePath), `review_${safe}.md`);
+  return path.join(codeReviewDir(workspacePath), `review_${encodeEvidenceId(taskId)}.md`);
 }
 
 export async function recordCodeReviewInFile(

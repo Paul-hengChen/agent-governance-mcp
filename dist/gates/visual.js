@@ -7,16 +7,16 @@
 // parsers stay generic in tools/evidence-file.ts.
 import * as fs from "fs";
 import * as path from "path";
-import { sliceH2Section, sliceH2SectionAt, findH2LineAt, splitTableCells, parseUncheckedLabels, parseAssertionFailures, parseRegionDiffFailures, normalizeStatus, } from "../tools/evidence-file.js";
+import { sliceH2Section, sliceH2SectionAt, findH2LineAt, splitTableCells, parseUncheckedLabels, parseAssertionFailures, parseRegionDiffFailures, normalizeStatus, encodeEvidenceId, } from "../tools/evidence-file.js";
 // ---------- visual evidence (v3.14.0) ----------
 // Constitution §3.1 visual evidence gate: when `design/<active_feature>.md`
 // contains a `## Visual Baselines` H2, PASS additionally requires
 // `qa_reports/visual_<task-id>.md` for every task id in the round.
 // Exported so the VISUAL_EVIDENCE_MISSING / VISUAL_REPORT_INCOMPLETE emit
 // sites in tools/handoff-orchestrator.ts name the exact file path checked (E23 D3).
+// The stem is the same injective encodeEvidenceId as the review_ files.
 export function visualEvidencePath(workspacePath, taskId) {
-    const safe = taskId.replace(/[^A-Za-z0-9._-]/g, "_");
-    return path.join(workspacePath, "qa_reports", `visual_${safe}.md`);
+    return path.join(workspacePath, "qa_reports", `visual_${encodeEvidenceId(taskId)}.md`);
 }
 // Relocated from tools/evidence-file.ts (single consumer: this module — all its
 // callers live here). Per the A2 shared-helper placement rule, a single-consumer

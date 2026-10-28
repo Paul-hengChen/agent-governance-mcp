@@ -6,7 +6,7 @@
 // Design: specs/e3-outcome-shaped-acceptance-architecture.md.
 import * as fs from "fs";
 import * as path from "path";
-import { sliceH2SectionAt, buildCoverageIndex } from "../tools/evidence-file.js";
+import { sliceH2SectionAt, buildCoverageIndex, encodeEvidenceId } from "../tools/evidence-file.js";
 // The H2 heading qa-engineer's Phase 3.5 writes (skill-qa-engineer SOP 6a).
 const DISPOSITION_HEADING = "AC Execution Log";
 // Arm regex (architecture Interface Contracts, verified against the live spec
@@ -27,10 +27,10 @@ export function specFilePath(workspacePath, activeFeature) {
         .replace(/\.\.+/g, "_");
     return path.join(workspacePath, "specs", `${safe}.md`);
 }
-// Mirrors gates/expected-red.ts reviewPath (same directory, same sanitiser).
+// Mirrors gates/expected-red.ts reviewPath (same directory, same
+// encodeEvidenceId stem as gates/qa-review.ts evidencePath).
 function reviewPath(workspacePath, taskId) {
-    const safe = taskId.replace(/[^A-Za-z0-9._-]/g, "_");
-    return path.join(qaReportsDir(workspacePath), `review_${safe}.md`);
+    return path.join(qaReportsDir(workspacePath), `review_${encodeEvidenceId(taskId)}.md`);
 }
 // Arm check (AC4/AC5, Decision b): armed iff specs/<feature>.md exists AND
 // contains >= 1 line whose first non-whitespace token is `proof:`. Absence of

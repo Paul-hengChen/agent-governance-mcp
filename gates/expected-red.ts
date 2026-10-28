@@ -8,7 +8,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import { sliceH2Section, buildCoverageIndex } from "../tools/evidence-file.js";
+import { sliceH2Section, buildCoverageIndex, encodeEvidenceId } from "../tools/evidence-file.js";
 
 // The H2 heading qa-engineer's Phase 0.5 writes (skill-qa-engineer SOP 2a).
 const DISPOSITION_HEADING = "Expected-Red Diff";
@@ -30,10 +30,10 @@ export function expectedRedManifestPath(
   return path.join(qaReportsDir(workspacePath), `expected-red_${safe}.txt`);
 }
 
-// Mirrors gates/qa-review.ts evidencePath (same directory, same sanitiser).
+// Mirrors gates/qa-review.ts evidencePath (same directory, same
+// encodeEvidenceId stem).
 function reviewPath(workspacePath: string, taskId: string): string {
-  const safe = taskId.replace(/[^A-Za-z0-9._-]/g, "_");
-  return path.join(qaReportsDir(workspacePath), `review_${safe}.md`);
+  return path.join(qaReportsDir(workspacePath), `review_${encodeEvidenceId(taskId)}.md`);
 }
 
 // Arm check (AC-4 arming polarity, mirrors hasVisualBaselinesInDesign's

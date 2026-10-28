@@ -107,16 +107,17 @@ export function readLock(lockPath) {
 /**
  * AC13a — remove the stale file at `targetPath` whose content we observed as
  * `observedRaw`, safe against any number of concurrent reclaimers: only the
- * winner of an O_EXCL guard named after that content's hash may unlink it, and
+ * winner of an exclusive guard named after that content's hash may unlink it, and
  * only while it still holds exactly that content. A dead or corrupt guard is
  * reclaimed the same way, one level down. Never throws. See specs/e260c-bin-scripts.md.
  */
 export function reclaimStale(targetPath, observedRaw, depth = 0) {
   const digest = createHash("sha256").update(observedRaw).digest("hex").slice(0, 16);
   const guardPath = `${targetPath}.reclaim-${digest}`;
-  let fd;
   try {
-    fd = fs.openSync(guardPath, "wx");
+    // Published by link, never created empty: an empty guard reads as corrupt,
+    // so a second reclaimer could take it from us while we still act on it.
+    linkPublish(guardPath, "publish", JSON.stringify({ pid: process.pid, at: new Date().toISOString() }));
   } catch (err) {
     if (err && err.code === "EEXIST" && depth < 2) {
       let guard = null;
@@ -134,11 +135,6 @@ export function reclaimStale(targetPath, observedRaw, depth = 0) {
     return;
   }
   try {
-    try {
-      fs.writeSync(fd, JSON.stringify({ pid: process.pid, at: new Date().toISOString() }));
-    } finally {
-      fs.closeSync(fd);
-    }
     let current = null;
     try {
       current = fs.readFileSync(targetPath, "utf-8");
@@ -191,11 +187,21 @@ let publishSeq = 0;
  * held; the temp file is removed in every outcome.
  */
 function publishLock(lockPath, payload) {
-  const tmp = `${lockPath}.acquire-${process.pid}-${++publishSeq}-${randomBytes(4).toString("hex")}`;
+  linkPublish(lockPath, "acquire", JSON.stringify(payload));
+}
+
+/**
+ * Create `destPath` already holding `content` (shared by the lock and the
+ * reclaim guard): temp file `<destPath>.<tag>-<pid>-<seq>-<hex>` next to it,
+ * best-effort fsync, then hard-link into place. Throws EEXIST when `destPath`
+ * exists and any other error as-is; the temp file is removed in every outcome.
+ */
+function linkPublish(destPath, tag, content) {
+  const tmp = `${destPath}.${tag}-${process.pid}-${++publishSeq}-${randomBytes(4).toString("hex")}`;
   try {
     const fd = fs.openSync(tmp, "w");
     try {
-      fs.writeSync(fd, JSON.stringify(payload));
+      fs.writeSync(fd, content);
       try {
         fs.fsyncSync(fd);
       } catch {
@@ -204,7 +210,7 @@ function publishLock(lockPath, payload) {
     } finally {
       fs.closeSync(fd);
     }
-    fs.linkSync(tmp, lockPath);
+    fs.linkSync(tmp, destPath);
   } finally {
     try {
       fs.unlinkSync(tmp);

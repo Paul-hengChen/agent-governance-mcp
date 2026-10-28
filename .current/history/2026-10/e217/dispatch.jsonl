@@ -1,0 +1,10 @@
+{"ts":"2026-10-28T03:35:30.438Z","feature":"e217-lane-lifecycle-gaps","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-28T03:43:42.420Z","feature":"e217-lane-lifecycle-gaps","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-28T03:50:20.468Z","feature":"e217-lane-lifecycle-gaps","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-28T03:55:11.912Z","feature":"e217-lane-lifecycle-gaps","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-28T03:57:39.163Z","feature":"e217-lane-lifecycle-gaps","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-28T07:09:41.773Z","feature":"e217-lane-lifecycle-gaps","agent_id":"sr-engineer","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-28T07:10:07.542Z","feature":"e217-lane-lifecycle-gaps","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-28T07:15:52.997Z","feature":"e217-lane-lifecycle-gaps","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-28T07:23:05.448Z","feature":"e217-lane-lifecycle-gaps","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-10-28T07:31:04.735Z","feature":"e217-lane-lifecycle-gaps","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}

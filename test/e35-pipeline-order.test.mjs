@@ -28,7 +28,7 @@ const EXPECTED_PIPELINE = [
   { name: "EXTERNAL_REFS_UNRESOLVED", codes: ["EXTERNAL_REFS_UNRESOLVED"] },
   { name: "SOURCE_CREDIBILITY_UNVERIFIED", codes: ["SOURCE_CREDIBILITY_UNVERIFIED"] },
   { name: "REPRO_MANIFEST_MISSING", codes: ["REPRO_MANIFEST_MISSING"] },
-  { name: "REVIEW_VERDICT_STATUS_MISMATCH", codes: ["REVIEW_VERDICT_STATUS_MISMATCH"] },
+  { name: "REVIEW_VERDICT_STATUS_MISMATCH", codes: ["REVIEW_VERDICT_STATUS_MISMATCH", "NON_REVIEWER_VERDICT_REJECTED"] },
   // This step has two codes. It rejects completed_tasks from any role other
   // than qa-engineer: code-reviewer keeps its original code and envelope
   // unchanged, which is why the step keeps its original name, and every other

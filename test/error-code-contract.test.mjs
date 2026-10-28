@@ -115,18 +115,18 @@ function fmt(codeMap, codes) {
     .join("; ");
 }
 
-// GATE_REGISTRY is the single source of truth. The entry count (34) is pinned so adding or
+// GATE_REGISTRY is the single source of truth. The entry count (35) is pinned so adding or
 // dropping a gate is a deliberate, visible change here. (AC-1, AC-5, E40)
 
-test("AC-1/AC-5: GATE_REGISTRY has exactly 34 entries (33 in, 34 out — e300-dispatch-pins-enum added DISPATCH_PIN_TIER_REJECTED; before it e40 added NON_QA_COMPLETED_TASKS_REJECTED)", () => {
+test("AC-1/AC-5: GATE_REGISTRY has exactly 35 entries (34 in, 35 out — e139 added NON_REVIEWER_VERDICT_REJECTED; before it e300-dispatch-pins-enum added DISPATCH_PIN_TIER_REJECTED; before it e40 added NON_QA_COMPLETED_TASKS_REJECTED)", () => {
   assert.equal(
     GATE_REGISTRY.length,
-    34,
-    `expected exactly 34 GateDefinition entries, got ${GATE_REGISTRY.length}: ${GATE_REGISTRY.map((g) => g.errorCode).join(", ")}`,
+    35,
+    `expected exactly 35 GateDefinition entries, got ${GATE_REGISTRY.length}: ${GATE_REGISTRY.map((g) => g.errorCode).join(", ")}`,
   );
   assert.equal(
     ALL_GATE_CODES.length,
-    34,
+    35,
     "ALL_GATE_CODES must be GATE_REGISTRY.map(g => g.errorCode) — same length",
   );
   assert.deepEqual(
@@ -502,8 +502,8 @@ test("doc-file mapping (c12): gates/registry.ts's errorCode→doc-file mapping c
   const mapping = parseDocFileMappingComment();
   assert.equal(
     mapping.size,
-    34,
-    `expected the mapping comment to list all 34 codes, found ${mapping.size}: ${[...mapping.keys()].join(", ")}`,
+    35,
+    `expected the mapping comment to list all 35 codes, found ${mapping.size}: ${[...mapping.keys()].join(", ")}`,
   );
   const docCodes = extractDocCodes();
   for (const g of GATE_REGISTRY) {
@@ -545,6 +545,7 @@ const FREE_TEXT_ALLOWLIST = [
   { code: "BASELINE_MANIFEST_MISSING", field: "triggerEdge", reason: "free English, no checkable literal" },
   { code: "BASELINE_PROVENANCE_INCOMPLETE", field: "triggerEdge", reason: "free English — the \">=2\" is a hardcoded threshold, not sourced from an exported constant the way the 4/4/6 round caps are" },
   { code: "PIXEL_GATE_ATTESTATION_MISSING", field: "triggerEdge", reason: "references the pixel_gate_complete:true prose field name, not a role:Status edge or named constant" },
+  { code: "NON_REVIEWER_VERDICT_REJECTED", field: "triggerEdge", reason: "free English — the role:Status-shaped substring (code-reviewer:In_Progress -> qa-engineer:In_Progress) names the single exempt edge, not a rejecting edge, and the code is documentedInProse:false so no mapped doc file exists to check it against" },
   { code: "REVIEW_VERDICT_STATUS_MISMATCH", field: "triggerEdge", reason: "free English, no checkable literal" },
   { code: "REVIEW_VERDICT_STATUS_MISMATCH", field: "armCondition", reason: "\"agent_id=code-reviewer && review_verdict present\" — snake_case field-name shorthand, not a camelCase predicate/function-call literal" },
   { code: "REVIEWER_COMPLETED_TASKS_REJECTED", field: "triggerEdge", reason: "free English, no checkable literal" },
@@ -656,7 +657,7 @@ test("E300: SUFFIX_RE classifies DISPATCH_PIN_TIER_REJECTED as a gate-shaped cod
   assert.ok(SUFFIX_RE.test("DISPATCH_PIN_TIER_REJECTED"));
 });
 
-test("E308/AC3: the zod rejection message for a bad dispatch_pins tier equals `DISPATCH_PIN_TIER_REJECTED: \"<echo>\" ` + gate hintStatic byte-for-byte; registry still has 34 codes", async () => {
+test("E308/AC3: the zod rejection message for a bad dispatch_pins tier equals `DISPATCH_PIN_TIER_REJECTED: \"<echo>\" ` + gate hintStatic byte-for-byte; registry still has 35 codes", async () => {
   // WHY: tools/registry.ts composes its hint from MODEL_TIERS while gates/registry.ts
   // keeps hintStatic as a literal (import-free leaf). This is the only check that the
   // two renderings cannot drift apart.
@@ -680,6 +681,6 @@ test("E308/AC3: the zod rejection message for a bad dispatch_pins tier equals `D
   const g = GATE_REGISTRY.find((e) => e.errorCode === "DISPATCH_PIN_TIER_REJECTED");
   assert.equal(issues[0].message, `DISPATCH_PIN_TIER_REJECTED: "${echo}" ` + g.hintStatic);
   assert.equal(g.hintStatic, "is not a model tier; allowed: opus, sonnet, haiku, fable");
-  assert.equal(GATE_REGISTRY.length, 34);
-  assert.equal(ALL_GATE_CODES.length, 34);
+  assert.equal(GATE_REGISTRY.length, 35);
+  assert.equal(ALL_GATE_CODES.length, 35);
 });
