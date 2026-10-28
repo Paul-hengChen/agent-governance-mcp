@@ -2,11 +2,12 @@
 schema_version: 15
 active_feature: "e364-audit-high-upgrade"
 status: "In_Progress"
-last_updated: "2026-10-28T05:51:38.769Z"
-last_agent: "pm"
+last_updated: "2026-10-28T06:08:56.118Z"
+last_agent: "sr-engineer"
 prd_path: "docs/backlog.md"
 scope_decision: "single-feature"
 scope_decision_why: "One dependency chore: two in-range advisory fixes delivered by one lockfile refresh plus one record update; 3 files, no code, no design surface. Split would only add a hop."
+cut_approved: true
 external_refs:
   - ref: "https://github.com/advisories/GHSA-mrhx-c7xc-m3w5"
     state: "fetched"
@@ -16,14 +17,14 @@ dispatch_pins:
   pm: "opus"
   sr-engineer: "opus"
 evidence_schema: 2
-next_role: "sr-engineer"
-dispatched_at: "2026-10-28T05:51:38.769Z"
+next_role: "code-reviewer"
+dispatched_at: "2026-10-28T06:08:56.118Z"
 dispatch_mechanism: "task"
 dispatch_mechanism_tier: "opus"
 qa_round: 0
 review_round: 0
 visual_round: 0
-hop_count: 1
+hop_count: 2
 qa_rounds_total: 0
 review_rounds_total: 0
 visual_rounds_total: 0
@@ -34,11 +35,14 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- PM cut: specs/e364-audit-high-upgrade.md (## Cut = T-E364-01 sr, T-E364-02 qa; chain sr -> code-reviewer -> qa; no architect). `node scripts/fanout.mjs check --cut specs/fanout-post-v4-w11.md e364 specs/e364-audit-high-upgrade.md` exit 0 (2 tickets, 3 tokens, 0 out of bounds).
-- Zod floor decision: raise to ^4.6.6 (first fixed) — npm ignores a dependency's own lockfile, so the declared range is the only constraint for consumers installing this package; same reason as advisories §1 round 2. body-parser: lockfile only, no override (overrides do not propagate to consumers either).
-- Expected lockfile delta (PM re-measured on scratch copy WITH the floor raise, npm 10.9.8): root dependencies.zod ^4.4.3->^4.6.6; zod 4.4.3->4.6.7; body-parser 2.2.2->2.4.0; iconv-lite 0.7.2->0.7.3; type-is 2.0.1->2.1.0; +body-parser/node_modules/content-type@2.1.0; +type-is/node_modules/content-type@2.1.0; nothing else; audit after = 0 high/0 critical, 6 moderate, 1 low. sr must re-verify in-lane (AC3) and STOP on any deviation.
-- Hard conditions: rm node_modules (symlink only) then npm ci; never npm audit fix (any form); no overrides; no dist/ diff (stop+escalate if any); stop-rule AC11 with one bisect (zod exactly 4.6.6).
-- cut_approved NOT set — Task-dispatched PM; coordinator attests after human approval. manifest-tier: not eligible (.current/.config.json cutApprovalAutoTier has no manifest entry) — human approval required.
+- sr-engineer: T-E364-01 ready for code review. Commit 14fa252 on feat/e364-audit-high-upgrade (not pushed). Files: package.json, package-lock.json, docs/dependency-advisories.md.
+- AC10 command sequence (lane worktree only): `ls -la node_modules` (symlink to primary confirmed) -> `test -L node_modules` (0) -> `rm node_modules` (no -r; primary node_modules still intact) -> `npm ci` (baseline) -> audit/build/suite baseline -> edit package.json zod ^4.4.3->^4.6.6 -> `npm update zod body-parser --package-lock-only` -> `npm ci` -> verify. `npm audit fix` never run in any form; no overrides; no SDK change. Final `test -L node_modules; echo $?` = 1 (real dir).
+- Baseline @ab8dfbb (lane npm ci): `npm audit --audit-level=high` exit=1; 9 findings (1 low, 6 moderate, 2 high: zod GHSA-mrhx-c7xc-m3w5, body-parser GHSA-27r3-jxmh-p828); build exit 0, dist clean; suite (test-lock) exit 0: tests 3691, pass 3689, skipped 2, fail 0.
+- AC3 measured lockfile delta (AC3 script vs ab8dfbb) = EXACTLY the 7 expected: "" root dependencies.zod ^4.4.3->^4.6.6 (only root field changed); zod 4.4.3->4.6.7; body-parser 2.2.2->2.4.0; iconv-lite 0.7.2->0.7.3; type-is 2.0.1->2.1.0; +body-parser/node_modules/content-type 2.1.0; +type-is/node_modules/content-type 2.1.0. No top-level lockfile field changed. No deviation.
+- After: `npm audit --audit-level=high` exit=0; totals 7 (info 0, low 1, moderate 6, high 0, critical 0): @hono/node-server, esbuild(low), fast-uri, hono, ip-address, protobufjs, qs. `npm ls zod body-parser --all`: single zod@4.6.7 (deduped under @modelcontextprotocol/sdk, zod-to-json-schema, dev-only @anthropic-ai/sdk), body-parser@2.4.0 under express@5.2.1, no invalid/UNMET/extraneous markers (full-tree `npm ls --all` shows pre-existing platform optional UNMET/extraneous for sharp/esbuild/emnapi/tslib, untouched by the delta).
+- After: `npx tsc --noEmit` exit 0; `npm run build` exit 0; `git status --porcelain dist` empty. Suite `node scripts/test-lock.mjs -- npm test` exit 0: tests 3691, pass 3689, skipped 2, fail 0 = identical to baseline. AC11 stop-rule not triggered; zod 4.6.6 bisect not used.
+- Reachability verified from source before writing: no project import of express/body-parser; project imports only SDK server/index, server/stdio, server/streamableHttp, types; inside SDK, express is imported only by server/express.js, server/auth/*, examples. Runtime ESM resolve-hook probe of dist/tools/registry.js + dist/transport/http.js + those 4 SDK entry points: express/body-parser never resolved; zod resolves to root node_modules/zod. zod: project's 3 z.array fields are .max()-capped, but SDK types.js has 32/33 uncapped z.array (e.g. initialize clientInfo.icons) -> reachable. GHSA CVSS/CWE taken from GitHub advisory API (zod 7.5 CWE-770; body-parser 7.5 CWE-248). Record: heading 7->9 packages, new §8 zod, §9 body-parser, one appended 2026-10-28 residual note; existing table/notes untouched.
+- AC9: `git diff --name-only ab8dfbb` = .current/e364/{dispatch.jsonl,handoff.md,tasks.md}, docs/dependency-advisories.md, package-lock.json, package.json, specs/e364-audit-high-upgrade.md.
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.
