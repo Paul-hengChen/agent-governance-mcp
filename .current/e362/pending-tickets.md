@@ -1,5 +1,7 @@
 <!-- pending-tickets for lane e362 (E179). New blocks go ABOVE ## Applied. -->
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E362-NEW-1
 title: test-lock acquireLock busy-spins (no sleep, no --max-wait check) while a dead-pid lock is blocked by a live or in-grace reclaim guard
@@ -39,5 +41,3 @@ body: |
   outer wall clock. Out of E362 scope: the lane may touch only AC10/AC13b in
   test/e177b-test-lock.test.mjs.
 ```
-
-## Applied
