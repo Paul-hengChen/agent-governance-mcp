@@ -57,3 +57,7 @@ Phase 3.5: ACs carry proof: annotations; executed above. Each proof's test or gr
 The single red: test/e177b-mailbox-watch.test.mjs "AC17: a second, independent mailbox-watch process ... refuses to start" (waitFor: timed out). Unrelated to this lane (mailbox watcher; no mailbox file touched by the lane diff); run on its own it passes 22/22. Disposition: load-induced timing flake in a full-suite run.
 
 Verdict: PASS. No required findings. Non-blocking: code-reviewer's note about trimming the 11-line laneHooksPathWarning comment stands.
+## 2026-10-28T07:31:04.716Z — PASS — by qa-engineer
+
+PASS. New tests: test/e217-abandoned-specs-harvest.test.mjs 15/15, test/e215-start-hooks-path.test.mjs 13/13; e213/e180/e291 unmodified 68/68; AC-E215-8 grep empty; owned-set and no-schema checks clean. Full suite on a9c1909 (clean tree): 3716 pass / 1 fail / 2 skipped of 3719; the one red (e177b-mailbox-watch AC17, waitFor timeout) is unrelated and passes 22/22 alone. Report: qa_reports/review_T-E217-01.md (covers all five ids).
+
