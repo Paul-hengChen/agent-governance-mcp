@@ -38,6 +38,7 @@ export type GateErrorCode =
   | "REVIEW_VERDICT_STATUS_MISMATCH"
   | "REVIEWER_COMPLETED_TASKS_REJECTED"
   | "NON_QA_COMPLETED_TASKS_REJECTED"
+  | "NON_REVIEWER_VERDICT_REJECTED"
   | "QA_REVIEW_TARGET_REQUIRED"
   | "AC_EXECUTION_LOG_MISSING"
   | "DISPATCH_PIN_TIER_REJECTED";
@@ -65,8 +66,10 @@ export interface GateDefinition {
   // (DR-3, qa-engineer's rewritten error-code-contract test) compares against.
   readonly hintStatic: string;
   // True iff the code is (and must stay) backtick-quoted in >=1 content/*.md.
-  // Every entry is currently true (DISPATCH_PIN_TIER_REJECTED, E300, was the
-  // one false entry until its coord-02 sentence landed with E295). The field
+  // Every entry is currently true except NON_REVIEWER_VERDICT_REJECTED, whose
+  // rejection envelope explains itself and which no content/*.md quotes yet
+  // (DISPATCH_PIN_TIER_REJECTED, E300, shipped false the same way until its
+  // coord-02 sentence landed with E295). The field
   // exists so a code-internal gate can opt out without weakening the parity
   // test.
   readonly documentedInProse: boolean;
@@ -104,16 +107,19 @@ export interface GateDefinition {
 //   REVIEW_VERDICT_STATUS_MISMATCH  const-05-core-standards.md, const-08-chain-31-mid.md, skill-code-reviewer.md
 //   REVIEWER_COMPLETED_TASKS_REJECTED  const-08-chain-31-mid.md, skill-code-reviewer.md
 //   NON_QA_COMPLETED_TASKS_REJECTED  const-08-chain-31-mid.md
+//   NON_REVIEWER_VERDICT_REJECTED   (none)
 //   QA_REVIEW_TARGET_REQUIRED       skill-qa-engineer.md
 //   AC_EXECUTION_LOG_MISSING        skill-qa-engineer.md
 //   DISPATCH_PIN_TIER_REJECTED      coord-02-host-dispatch.md
 
-// The 34-gate catalog, in documentation order (the non-qa completed_tasks write gate, E40,
+// The 35-gate catalog, in documentation order (the non-qa completed_tasks write gate, E40,
 // added the 33rd, NON_QA_COMPLETED_TASKS_REJECTED — the reviewer-only completed_tasks gate
 // generalized to every non-qa identity; the dispatch_pins tier enum, E300, added the 34th,
 // DISPATCH_PIN_TIER_REJECTED — the first tool-boundary producer, raised by zod before the
 // pipeline; it shipped as the one documentedInProse: false entry and flipped to true when
-// coord-02-host-dispatch.md quoted it, E295). Array order is DOC order only — it MUST NOT be relied
+// coord-02-host-dispatch.md quoted it, E295; the review_verdict authorship gate, E139, added
+// the 35th, NON_REVIEWER_VERDICT_REJECTED — the authorship half of the review_verdict
+// consistency gate, shipped documentedInProse: false). Array order is DOC order only — it MUST NOT be relied
 // on for evaluation order (DR-5; that lives in handoff-orchestrator.ts as the ordered
 // UPDATE_STATE_GATE_PIPELINE array, E35).
 export const GATE_REGISTRY: readonly GateDefinition[] = [
@@ -576,6 +582,29 @@ export const GATE_REGISTRY: readonly GateDefinition[] = [
     documentedInProse: true,
   },
   {
+    // Authorship half of the review_verdict check (the consistency half is
+    // REVIEW_VERDICT_STATUS_MISMATCH): only the code-reviewer may stamp a
+    // verdict, so a forged APPROVED cannot advance auto-routing. Emitted by the
+    // same pipeline step as REVIEW_VERDICT_STATUS_MISMATCH; file mode only
+    // (SQLite never persists review_verdict, so there is nothing to forge).
+    errorCode: "NON_REVIEWER_VERDICT_REJECTED",
+    producer: "orchestrator",
+    envelope: "plain-text",
+    triggerEdge:
+      "any file-mode write whose agent_id is present and is NOT code-reviewer, carrying review_verdict, except the APPROVED handoff (code-reviewer:In_Progress -> qa-engineer:In_Progress with review_verdict=APPROVED)",
+    armCondition:
+      "FileHandoffStorage && review_verdict present && agent_id present && agent_id !== \"code-reviewer\" && !(prevTuple code-reviewer:In_Progress && nextTuple qa-engineer:In_Progress && review_verdict=APPROVED)",
+    clearingArtifact:
+      "omit review_verdict on any write not stamped agent_id=code-reviewer; the one exception is the APPROVED handoff row (agent_id=qa-engineer on code-reviewer:In_Progress -> qa-engineer:In_Progress)",
+    hintStatic:
+      "review_verdict is the code-reviewer's verdict field: only an " +
+      "agent_id=code-reviewer write, or the APPROVED handoff the code-reviewer " +
+      "stamps agent_id=qa-engineer on the code-reviewer:In_Progress -> " +
+      "qa-engineer:In_Progress edge, may carry it. Omit review_verdict on this " +
+      "write. See docs/backlog.md E139.",
+    documentedInProse: false,
+  },
+  {
     errorCode: "QA_REVIEW_TARGET_REQUIRED",
     producer: "orchestrator",
     envelope: "plain-text",
@@ -616,7 +645,7 @@ export const GATE_REGISTRY: readonly GateDefinition[] = [
       "See specs/e3-outcome-shaped-acceptance.md AC3/AC4.",
     documentedInProse: true,
   },
-  // ---- tool-boundary (code 34, producer: zod at tools/registry.ts) ----
+  // ---- tool-boundary (code 35, producer: zod at tools/registry.ts) ----
   {
     // dispatch_pins tier enum (E300): each value must be one of the four tier
     // names. Rejected by zod before UPDATE_STATE_GATE_PIPELINE, so it has no

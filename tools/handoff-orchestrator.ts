@@ -566,7 +566,7 @@ export const UPDATE_STATE_GATE_PIPELINE: readonly UpdateStateGateStep[] = [
   },
   {
     name: "REVIEW_VERDICT_STATUS_MISMATCH",
-    codes: ["REVIEW_VERDICT_STATUS_MISMATCH"],
+    codes: ["REVIEW_VERDICT_STATUS_MISMATCH", "NON_REVIEWER_VERDICT_REJECTED"],
     run: (ctx) => {
       const { parsed } = ctx;
         // Review-verdict/status mismatch gate: fires only when a code-reviewer
@@ -587,6 +587,39 @@ export const UPDATE_STATE_GATE_PIPELINE: readonly UpdateStateGateStep[] = [
                   `⛔ REVIEW_VERDICT_STATUS_MISMATCH: review_verdict=${parsed.review_verdict} ` +
                   `with status=${parsed.status}. ` +
                   gate("REVIEW_VERDICT_STATUS_MISMATCH").hintStatic,
+              }],
+              isError: true,
+            };
+          }
+        }
+        // Authorship half: review_verdict belongs to the code-reviewer, so any
+        // other identity carrying it is rejected; otherwise a forged APPROVED
+        // would move auto-routing on to qa. The one legal non-reviewer carrier
+        // is the APPROVED handoff the code-reviewer stamps agent_id=qa-engineer,
+        // recognised from the server-derived on-disk prevTuple (the same edge
+        // MISSING_REVIEW_EVIDENCE arms on), never from a client field. Disjoint
+        // from the branch above (it splits on agent_id). File mode only: SQLite
+        // never persists review_verdict, so nothing downstream reads a forgery.
+        if (
+          ctx.storage instanceof FileHandoffStorage &&
+          parsed.review_verdict &&
+          parsed.agent_id &&
+          parsed.agent_id !== "code-reviewer"
+        ) {
+          const isApprovedHandoff =
+            ctx.prevTuple.agent === "code-reviewer" &&
+            ctx.prevTuple.status === "In_Progress" &&
+            ctx.nextTuple.agent === "qa-engineer" &&
+            ctx.nextTuple.status === "In_Progress" &&
+            parsed.review_verdict === "APPROVED";
+          if (!isApprovedHandoff) {
+            return {
+              content: [{
+                type: "text" as const,
+                text:
+                  `⛔ NON_REVIEWER_VERDICT_REJECTED: review_verdict=${parsed.review_verdict} ` +
+                  `on an agent_id=${parsed.agent_id} write. ` +
+                  gate("NON_REVIEWER_VERDICT_REJECTED").hintStatic,
               }],
               isError: true,
             };
