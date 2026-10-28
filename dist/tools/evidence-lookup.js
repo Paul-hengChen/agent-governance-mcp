@@ -7,13 +7,12 @@
 // Why: specs/e260a-tools-a-h-rationale.md, "tools/evidence-lookup.ts — verdict rule".
 import * as fs from "fs";
 import * as path from "path";
-import { buildCoverageIndex } from "./evidence-file.js";
-// Path hygiene precedent: gates/qa-review.ts:26-28 (evidencePath) uses the
-// identical sanitisation. Applied independently here so this module carries
-// no import-time coupling to that gate's internals (it is a live gate
-// predicate this feature must not touch).
+import { buildCoverageIndex, encodeEvidenceId } from "./evidence-file.js";
+// Same filename stem as gates/qa-review.ts evidencePath: both derive it via
+// the shared injective encodeEvidenceId, so this lookup and the live gate
+// always agree on which file belongs to which task id.
 function sanitizeTaskId(taskId) {
-    return taskId.replace(/[^A-Za-z0-9._-]/g, "_");
+    return encodeEvidenceId(taskId);
 }
 function safeReaddir(dir) {
     try {

@@ -9,6 +9,34 @@
 import * as fs from "fs";
 import * as path from "path";
 
+// ---------- task-id → evidence filename stem ----------
+// Every evidence filename (`review_<stem>.md`, `visual_<stem>.md`) derives its
+// stem from the task id through this one encoder, so two distinct ids can
+// never share an evidence file. It works one UTF-16 code unit at a time:
+//   [A-Z0-9.-]   → unchanged
+//   [a-z]        → "_" + the upper-case letter
+//   anything else → "__" + the unit as exactly 4 upper-case hex digits
+// Properties: identity on canonical ids (`^[A-Z0-9.-]*$`, e.g. T-E139-01), so
+// their paths never move; injective, because "_" only ever starts a token and
+// the next character says which kind; no lower-case output, so two stems never
+// collide under a case-insensitive filesystem; output alphabet [A-Z0-9._-], so
+// no path separator, NUL or drive colon can appear.
+export function encodeEvidenceId(taskId: string): string {
+  let out = "";
+  for (let i = 0; i < taskId.length; i++) {
+    const unit = taskId.charCodeAt(i);
+    const ch = taskId[i];
+    if ((ch >= "A" && ch <= "Z") || (ch >= "0" && ch <= "9") || ch === "." || ch === "-") {
+      out += ch;
+    } else if (ch >= "a" && ch <= "z") {
+      out += "_" + ch.toUpperCase();
+    } else {
+      out += "__" + unit.toString(16).toUpperCase().padStart(4, "0");
+    }
+  }
+  return out;
+}
+
 // ---------- `covers:` label-line plumbing ----------
 // One review file may declare `covers: <id1>, <id2>, ...` to satisfy the
 // evidence gates for a batched round instead of one stub per id. File mode

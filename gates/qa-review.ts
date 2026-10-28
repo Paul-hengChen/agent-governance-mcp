@@ -7,17 +7,16 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import { buildCoverageIndex } from "../tools/evidence-file.js";
+import { buildCoverageIndex, encodeEvidenceId } from "../tools/evidence-file.js";
 
 function evidenceDir(workspacePath: string): string {
   return path.join(workspacePath, "qa_reports");
 }
 
 function evidencePath(workspacePath: string, taskId: string): string {
-  // Hard sanitise task id — prevent path traversal in case caller passes
-  // a malicious id. Only allow ascii alnum + dash/underscore/dot.
-  const safe = taskId.replace(/[^A-Za-z0-9._-]/g, "_");
-  return path.join(evidenceDir(workspacePath), `review_${safe}.md`);
+  // The injective encoder keeps distinct ids on distinct files and blocks
+  // path traversal (its output has no separator characters).
+  return path.join(evidenceDir(workspacePath), `review_${encodeEvidenceId(taskId)}.md`);
 }
 
 // Exported so the QA completion-evidence rejection names the exact expected file,
