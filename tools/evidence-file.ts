@@ -23,18 +23,40 @@ import * as path from "path";
 // (AC-5).
 export const COVERS_LINE_RE = /^[^\S\n]*(?:[-*][^\S\n]*)?(?:\*\*[^\S\n]*)?covers(?:[^\S\n]*\*\*)?[^\S\n]*[:—-][^\S\n]*([^\n]+?)[^\S\n]*$/im;
 
-// Pure parser (no I/O, never throws). Extracts the id list from the FIRST
-// `covers:` line in `content`. Splits on comma/whitespace, strips surrounding
-// backticks/brackets and residual emphasis per token, drops empties. Returns
-// [] when the label is absent or its value is empty/whitespace (AC-5).
-export function parseCoversIds(content: string): string[] {
-  if (!content) return [];
-  const m = COVERS_LINE_RE.exec(content);
-  if (!m) return [];
-  return m[1]
+// Split one `covers:` value into its id tokens: split on comma/whitespace,
+// strip surrounding backticks/brackets and residual emphasis per token, drop
+// empties.
+function coversTokens(value: string): string[] {
+  return value
     .split(/[,\s]+/)
     .map((t) => t.replace(/^[`[\]()<>*_]+|[`[\]()<>*_]+$/g, "").trim())
     .filter((t) => t.length > 0);
+}
+
+// Pure parser (no I/O, never throws). Extracts the id list from EVERY
+// `covers:` line in `content`, in document order, so a later review round
+// that appends a second `covers:` line widens the coverage. The first line's
+// tokens are returned as-is (within-line duplicates included); each later
+// line adds only the tokens not already collected. Returns [] when the label
+// is absent or every value is empty/whitespace (AC-5).
+export function parseCoversIds(content: string): string[] {
+  if (!content) return [];
+  // Global copy: the exported regex keeps its `im` flags (and so its
+  // first-match exec semantics) for any other caller.
+  const lineRe = new RegExp(COVERS_LINE_RE.source, "gim");
+  let ids: string[] | null = null;
+  let m: RegExpExecArray | null;
+  while ((m = lineRe.exec(content)) !== null) {
+    const tokens = coversTokens(m[1]);
+    if (ids === null) {
+      ids = tokens;
+      continue;
+    }
+    for (const t of tokens) {
+      if (!ids.includes(t)) ids.push(t);
+    }
+  }
+  return ids ?? [];
 }
 
 // Scans every `*.md` file in `dir` for a `covers:` line and returns a
