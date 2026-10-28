@@ -21,4 +21,23 @@ body: |
   content observed before the call.
 ```
 
+```pending-ticket
+lane_local_id: E362-NEW-2
+title: e177b-test-lock AC9 and AC13a go red under multi-lane load on fixed wall-clock / timeout budgets (same class as E224)
+priority: P3
+depends_on: [E224]
+source: qa, e362 lane (T-E224-01 load runs)
+body: |
+  While loading the E224 files with 8 concurrent copies of test/e177b-test-lock.test.mjs and
+  test/e177b-mailbox-watch.test.mjs on an 8-core host (load average about 25), three rounds showed
+  AC9 ("a nested test-lock under the SAME --lock-path returns promptly") red 3 times with
+  "took 10140ms", "took 10000ms" and "took 18377ms" against its fixed elapsed < 10_000 bound, and
+  AC13a ("5 processes racing to reclaim ONE dead-pid lock") red once on the 20000 ms node:test
+  timeout. With 16 copies (2x cores) AC13a, AC7, AC13 (queues) and the corrupt-payload security
+  case also timed out. All pass alone. Same cause as AC10: the elapsed bound includes node spawn
+  latency. Suggested fix for AC9: judge the nested run by the wrapper's own clock rather than the
+  outer wall clock. Out of E362 scope: the lane may touch only AC10/AC13b in
+  test/e177b-test-lock.test.mjs.
+```
+
 ## Applied
