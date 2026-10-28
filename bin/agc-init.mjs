@@ -1023,8 +1023,9 @@ const STR_USAGE_FEATURE =
   "          worktree and deletes the branch — on origin too when it was pushed\n" +
   "          (no origin / no remote branch: a hint, not a failure); --abandoned\n" +
   "          moves the lane's qa_reports/ + review_reports/ evidence into\n" +
-  "          abandoned/<ticket-id>/, commits it, removes the worktree, and\n" +
-  "          keeps the branch. Either way, the lane's committed\n" +
+  "          abandoned/<ticket-id>/, commits it, copies git-ignored specs/\n" +
+  "          files into primary's specs/abandoned/<ticket-id>/, removes the\n" +
+  "          worktree, and keeps the branch. Either way, the lane's committed\n" +
   "          .current/<lane>/pending-tickets.md findings (if any) first get\n" +
   "          real ids, appended to docs/backlog.md and committed on --base in\n" +
   "          the primary checkout. Only the copy committed on --base\n" +
@@ -1110,10 +1111,19 @@ function artifactPathsForPrefix(prefix, baseRules = ARTIFACT_EXCLUDE_RULES) {
   });
 }
 
-// Evidence directories whose ticket-named files `finish --abandoned` retires.
-// specs/ is deliberately absent (D2: a spec is a design record, kept in place
-// so a re-picked-up ticket still finds it).
+// Evidence directories whose ticket-named files `finish --abandoned` retires
+// (moved into abandoned/<ticket>/ and committed on the kept branch). specs/
+// is deliberately absent (D2: a spec is a design record, kept in place so a
+// re-picked-up ticket still finds it); its git-ignored files are copied out
+// instead — see ABANDON_HARVEST_DIRS.
 const ABANDON_EVIDENCE_DIRS = ["qa_reports", "review_reports"];
+
+// Directories `finish --abandoned` only COPIES from (E217): every git-ignored,
+// untracked file under them, recursively and with no ticket-token filter (in
+// a fresh worktree every such file was written by this lane), goes to
+// primary's `<dir>/abandoned/<ticket>/<relpath>`, never committed. Tracked
+// files stay where they are on the kept branch, so a move would save nothing.
+const ABANDON_HARVEST_DIRS = ["specs"];
 
 // Evidence directories `finish --shipped` harvests into primary (E214). A
 // separate list on purpose: specs/ belongs here (integrator ruling
@@ -3373,12 +3383,23 @@ async function runFeatureFinish(cwd, argv) {
 
   // --abandoned: no merge guard (AC20). Pending tickets first (E179 AC3;
   // their checks include the evidence precondition, hoisted), then the
-  // evidence move as its own commit (DR-4). The `.current/<ticket>/`
-  // harvest is planned (its refusal included) before any of those mutations
-  // and executed last, just before the worktree is removed.
+  // evidence move as its own commit (DR-4). The git-ignored specs/ copy and
+  // the `.current/<ticket>/` harvest are planned (their refusals included)
+  // before any of those mutations and executed last, in that order, just
+  // before the worktree is removed.
   const now = new Date();
   const currentHarvest = planAbandonCurrentHarvest({
     lanePaths, lanePath, ticketId, branch, now,
+  });
+  // E217: git-ignored specs would otherwise be deleted with the worktree.
+  const specsHarvest = planIgnoredEvidenceHarvest({
+    repoRoot,
+    lanePath,
+    ticketId,
+    dirs: ABANDON_HARVEST_DIRS,
+    bucket: "abandoned",
+    verb: "--abandoned",
+    display: escapeSegmentForDisplay,
   });
   // E287 O6 (see the --shipped branch): read and planned before any mutation.
   const findings = await readUnallocatedFindings({
@@ -3411,6 +3432,7 @@ async function runFeatureFinish(cwd, argv) {
         untrackedMoved.join(", ") +
         ` — git add + commit it in the lane and re-run, or remove the worktree by hand`
       : null;
+  applyIgnoredEvidenceHarvest(specsHarvest);
   if (currentHarvest !== null) executeAbandonCurrentHarvest(currentHarvest, preserve);
   if (preserve) executeFindingsPreserve(preserve);
   removeWorktreeNoForce(repoRoot, lanePath, hint);
