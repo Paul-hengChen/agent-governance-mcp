@@ -6,3 +6,4 @@
 {"ts":"2026-10-28T07:09:57.278Z","feature":"e362-test-lock-guard","agent_id":"sr-engineer","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-10-28T07:10:22.063Z","feature":"e362-test-lock-guard","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-10-28T07:14:24.753Z","feature":"e362-test-lock-guard","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-28T07:47:48.038Z","feature":"e362-test-lock-guard","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
