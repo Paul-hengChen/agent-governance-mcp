@@ -4,3 +4,5 @@
 {"ts":"2026-10-28T04:06:19.348Z","feature":"e139-evidence-verdict-integrity","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-10-28T04:06:31.047Z","feature":"e139-evidence-verdict-integrity","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-10-28T07:09:14.542Z","feature":"e139-evidence-verdict-integrity","agent_id":"sr-engineer","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-28T07:09:43.144Z","feature":"e139-evidence-verdict-integrity","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-28T07:19:07.400Z","feature":"e139-evidence-verdict-integrity","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
