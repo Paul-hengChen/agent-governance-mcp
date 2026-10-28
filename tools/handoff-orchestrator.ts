@@ -40,7 +40,7 @@ import { hasCutApproval } from "../gates/cut-approval.js";
 import { EVIDENCE_SCHEMA_CURRENT } from "../gates/evidence-schema.js";
 import { classifyLeaseOverride } from "../gates/lease-override.js";
 import { isHandAuthoredStamp, hasStampRemediationAudit } from "../gates/stamp-provenance.js";
-import { hasEvidenceInFile, qaEvidencePath } from "../gates/qa-review.js";
+import { hasEvidenceInFile, qaEvidencePath, recordReviewInFileUndoable } from "../gates/qa-review.js";
 import { hasUnresolvedRefs, listUnresolvedRefs } from "../gates/external-refs.js";
 import { gate, TRANSITION_GATE_CODES } from "../gates/registry.js";
 import { awaitAllInflightFor } from "./rag-coalesce.js";
@@ -127,6 +127,38 @@ export async function handleUpdateState(parsed: UpdateStateInput): Promise<ToolR
     }
   }
   return result;
+}
+
+// Undo for the qa_review evidence the QA_REVIEW_RECORD step appended on this
+// write (file mode), keyed by the write's gate context. A write that does not
+// land (a later step rejects it, or the pipeline or the state write throws)
+// runs it, so the evidence files never record a verdict the server refused. A
+// WeakMap, because the readonly context type is owned by gates/pipeline.ts.
+const evidenceUndoByCtx = new WeakMap<UpdateStateGateContext, () => void>();
+
+// Runs and forgets the evidence undo registered for `ctx`, if any. Never
+// throws (the undo itself never throws).
+function undoRecordedEvidence(ctx: UpdateStateGateContext): void {
+  const undo = evidenceUndoByCtx.get(ctx);
+  evidenceUndoByCtx.delete(ctx);
+  if (undo) undo();
+}
+
+// Runs the state write for `ctx`: on success the recorded evidence is kept
+// (the undo is discarded); on a throw it is undone and the same error is
+// rethrown.
+async function writeStateKeepingEvidence(
+  ctx: UpdateStateGateContext,
+  write: () => Promise<string>,
+): Promise<string> {
+  try {
+    const written = await write();
+    evidenceUndoByCtx.delete(ctx);
+    return written;
+  } catch (err) {
+    undoRecordedEvidence(ctx);
+    throw err;
+  }
 }
 
 // The tw_update_state gate pipeline: this array IS the frozen, additive check
@@ -710,7 +742,17 @@ export const UPDATE_STATE_GATE_PIPELINE: readonly UpdateStateGateStep[] = [
               isError: true,
             };
           }
-          await storage.recordReview(parsed.workspace_path, ids, parsed.status, "qa-engineer", parsed.qa_review);
+          // File mode records through the undoable variant (same bytes) so
+          // handleUpdateStateCore can revert it if this write does not land.
+          // Other modes record as before.
+          if (storage instanceof FileHandoffStorage) {
+            evidenceUndoByCtx.set(
+              ctx,
+              await recordReviewInFileUndoable(parsed.workspace_path, ids, parsed.status, "qa-engineer", parsed.qa_review),
+            );
+          } else {
+            await storage.recordReview(parsed.workspace_path, ids, parsed.status, "qa-engineer", parsed.qa_review);
+          }
         }
       return null;
     },
@@ -1246,8 +1288,18 @@ async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResu
           evidenceSchemaPin,
           evidenceSchemaLabel,
         };
-        const pipelineRejection = await runUpdateStatePipeline(UPDATE_STATE_GATE_PIPELINE, ctx);
+        // A rejection or a throw means this write does not land, so any
+        // evidence QA_REVIEW_RECORD appended is undone first; the rejection
+        // envelope and the thrown error pass through unchanged.
+        let pipelineRejection: ToolResult | null;
+        try {
+          pipelineRejection = await runUpdateStatePipeline(UPDATE_STATE_GATE_PIPELINE, ctx);
+        } catch (err) {
+          undoRecordedEvidence(ctx);
+          throw err;
+        }
         if (pipelineRejection) {
+          undoRecordedEvidence(ctx);
           return pipelineRejection;
         }
 
@@ -1332,7 +1384,7 @@ async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResu
           parsed.review_task_ids.length > 0
             ? parsed.review_task_ids
             : [];
-        const result = await storage.writeState({
+        const result = await writeStateKeepingEvidence(ctx, () => storage.writeState({
           workspacePath: parsed.workspace_path,
           activeFeature: parsed.active_feature,
           status: parsed.status,
@@ -1409,7 +1461,7 @@ async function handleUpdateStateCore(parsed: UpdateStateInput): Promise<ToolResu
           // write only: never persisted to frontmatter, no schema bump. File
           // mode only: SqliteHandoffStorage.writeState ignores it. (E10)
           bookkeepingWrite: parsed.bookkeeping_write,
-        });
+        }));
 
         // Append one line per hop to the dispatch-mechanism sidecar so the
         // record survives later state rewrites. Runs only after the state write
