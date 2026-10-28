@@ -2,7 +2,7 @@
 base: ac7e25b    integration branch: integ/post-v4-w11
 mailbox: ../agent-governance-mcp-lanes/_mailbox
 
-**狀態：已核准 2026-10-28（D1 不拆、D2 開 e217），派工中；同日追加插入 lane e364（E364，人類裁決升版）。** `base:` 是規劃基準（v4.13.0 發版後記帳 PR #41 merge）；實際派工 base = 本清單併入後的 `main` sha，記在 Decisions 派工列。
+**狀態：已結案 2026-10-28。** 插入 lane e364 先行（`integ/e364`，PR #44 merge `e5f325d`），再以中途修 base 帶進三條 lane；三條 lane 皆 qa PASS（CI 綠）→ `integ/post-v4-w11` merge `aa31d3c`（e139）、`6eeae73`（e362）、`c13237e`（e217）→ finish 三條（E365–E372 配號）→ 記帳 commit → PR + auto-merge（見「結案」與「接手步驟」）。 `base:` 是規劃基準（v4.13.0 發版後記帳 PR #41 merge）；實際派工 base = 本清單併入後的 `main` sha，記在 Decisions 派工列。
 
 佇列 P2 段剩下 12 張。本波挑其中 8 張，依檔案範圍分成三組，三組的擁有集合互不相交：
 - (1) 證據與判決完整性：E139、E236、E136、E154。共同問題是閘門被錯的證據或錯的作者放行，或留下伺服器沒接受的紀錄。四張共用 `tools/handoff-orchestrator.ts`、`gates/qa-review.ts`、`tools/evidence-file.ts`，所以放同一條 lane。
@@ -107,6 +107,33 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 
 預期零檔案衝突（擁有集合不相交）；`dist/` 不手解，一律重建。
 
+
+## 結案
+- 日期 2026-10-28。e364 先行：`integ/e364` ← e364 `8adb9ba`（`--no-ff`，merge `163c397`）→ PR #44 → `main` `e5f325d`。其餘三條：`integ/post-v4-w11` ← e139 `7cb2bdb`（merge `aa31d3c`）← e362 `bad8a49`（`6eeae73`）← e217 `f563a91`（`c13237e`），皆 `--no-ff`、零衝突 → 無合併審查；每次合併後 merge-invariants PASS；重建 `dist/` 無差異；`npm audit --audit-level=high` exit 0；整合層 CI run 40654088449 在 `c13237e` 綠。
+- 彙總（上限按 lane 計，合計僅供參考）：e139 10 張 task／hop 4/14；e362 3 張／hop 4/14；e217 5 張／hop 4/14；e364 2 張／hop 4/14；四條 lane 的 review、qa 都是 0 輪退回。合計 20 張 task、hop 16，每條 lane 都在自己的上限內，證據與 `completed_tasks` 一致。
+- 完成定義 13 項全部成立（本清單的 `## 接手步驟` 為最後一項）。
+- 例外：(1) 派工後追加插入 lane e364（人類裁決升版），並以中途修 base 把 `main` 帶進三條 lane（三條都暫停並 ack、無衝突）。(2) 四條 lane 的 PM 都在預審前就寫了 `next_role=sr-engineer`、沒寄預審信，整合者寫信索取（cut gate 擋住，沒有派工）。(3) e139 cut 的命中表漏列兩個釘 registry `(none)` 數量的斷言，整合者以機械性越界准許 qa 改 `test/e308-single-source-tier-enum.test.mjs`、`test/e295-hop-cap-and-sop-halves.test.mjs`。(4) e364 的 code-reviewer 被誤派成 sonnet、handoff 記成 opus；人類裁決不重審，lane 補了更正行。(5) e139 qa 第一次 PASS 寫入打到已安裝的舊版 MCP server，E236 的舊行為在證據檔留下被拒的段落，qa 手動刪除後重寫（已 commit 的證據只有被接受那一次）。(6) e139、e217 的 sr 與 code-reviewer 都是 opus（同模型疑慮，review 報告已註明）。(7) PR #44 剛開時 GitHub 回報 clean 狀態、拒絕設 auto-merge，等 pull-request 檢查開跑後重設成功。(8) e217 qa 中途一次全套撞到 E224 的偶發逾時，最後 HEAD 的全套綠。
+- 新票：E364（整合者立票，本波完成）；E365–E368（e139）、E369–E370（e362）、E371–E372（e217）由 `finish --shipped` 配號，排在佇列 #180–#187；E369 併入 e362 review 的兩條註解建議，E371 的 `docs/install.md` 半邊已在本波記帳修好。
+- 發版：`main` 帶 E139／E236／E136／E154（新閘門 `NON_REVIEWER_VERDICT_REJECTED`、被拒寫入的證據回滾、單射的證據路徑編碼、多行 `covers:`；`tools/`、`gates/`、`dist/`）、E362／E224（`scripts/test-lock.mjs` 的 guard 發佈方式與測試等待預算）、E217／E215（`bin/agc-init.mjs` 的 `finish --abandoned` 收割 `specs/`、`feature start` 的 hooksPath 警告）與 E364（`zod` 4.6.7、下限 `^4.6.6`，`body-parser` 2.4.0）。給發版的注意：`GATE_REGISTRY` 34 → 35（`CLAUDE.md` 的閘門數）；E136 讓非正規 task id 的證據檔名改變且不回退，屬 adopter 可見的行為改動。是否發版與版號由人類決定。
+
+
+## 接手步驟
+（事實欄位由 `node scripts/fanout.mjs handoff` 產生；接手時先跑 `node scripts/fanout.mjs handoff --check <manifest>`。`<待填：…>` 由整合者填寫。）
+### 核對 primary
+- 目標分支：main @ e5f325d
+- 目標分支對 origin：一致
+- git status：乾淨
+- worktree：primary（main ← integ/post-v4-w11 @ 5d13ef4）
+- lane-status：primary（main ← integ/post-v4-w11 @ 5d13ef4）release-post-v4-w10／In_Progress／release-engineer，hop 3，commits 0，clean
+### 已結案
+- 第 11 波四條 lane（e139、e362、e217、插入 lane e364）都已合併、finish、拆除；lane 紀錄在 `.current/history/2026-10/`。e364 經 PR #44 先進 `main`，其餘三條的記帳與本清單在同一個 wave PR。佇列 E139、E136、E154、E362、E224、E217、E215、E236 與插隊的 E364 至此完成。
+- 未配號的新發現：無（E365–E372 由 finish 配號，排在佇列 #180–#187）。
+### 待人類決定
+- 是否發版：`main` 帶新的作者閘門 `NON_REVIEWER_VERDICT_REJECTED`（`GATE_REGISTRY` 34 → 35）、被拒寫入的證據回滾、單射的證據路徑編碼（非正規 task id 的證據檔名改變、不回退，adopter 可見）、多行 `covers:`、test-lock guard 發佈方式、`finish --abandoned` 收割 `specs/`、`feature start` 的 hooksPath 警告，以及 `zod` 4.6.7（下限 `^4.6.6`）與 `body-parser` 2.4.0；版號由人類決定（含新的拒絕規則與相依下限提高）。
+- 是否開下一波：佇列 P2 段還有 E152、E158、E161、E184；P3 段新增 E365–E372。
+- 建議：下一步（發版或下一波）開新 session 進行；若要在本 session 繼續，先跑 `node scripts/fanout.mjs handoff --check specs/fanout-post-v4-w11.md`，exit 0 才繼續。
+### 進行中的背景工作
+無
 ## Dispatch pins
 - e139：`pm=opus`、`sr-engineer=opus`。
 - e362：`pm=opus`、`sr-engineer=opus`。
@@ -135,3 +162,10 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 | 2026-10-28 | 整合者 | 5a：e364 `8adb9ba`（CI run 40643730940）close —— review 一輪通過（見 sonnet 派工例外）、qa 一輪通過；10 檔都在擁有範圍內；lockfile 正好 7 項變動、audit high exit 0、全套 3689／2 skipped／0 fail（lane 回報，CI 綠）；沒有新發現 | 本檔 |
 | 2026-10-28 | 人類 | e364 不用 opus 重審（照整合者建議）；sonnet 派工的例外以 lane handoff 的更正行為準。人類回覆「ok 不重審」 | 整合者 session |
 | 2026-10-28 | 整合者 | e364 先行：`integ/e364` ← e364 `8adb9ba`（`--no-ff`，merge `163c397`，零衝突 → 無合併審查）；merge-invariants PASS；primary `npm ci` 後 `zod` 4.6.7、`body-parser` 2.4.0；重建 `dist/` 無差異；`npm audit --audit-level=high` exit 0；roll-up e364 2 張 task／hop 4/14／review 0 輪／qa 0 輪；`finish e364 --shipped --base integ/e364`（`aa8c566`）沒有新發現；E364 done-mark 與佇列 #3a DONE | 本檔 |
+| 2026-10-28 | 整合者 | E364 經 PR #44 合進 `main`（`e5f325d`；`integ/e364` 的 CI run 40647241866 在 `6de1157` 綠；PR 剛開時 GitHub 回報 clean 狀態、拒絕設 auto-merge，等 pull-request 檢查開跑後重設成功）；primary `main` 上 `npm audit --audit-level=high` exit 0。中途修 base（目標 `main@e5f325d`）：條件 1 成立；條件 4 三條 lane 的 `merge-tree` 都 exit 0（git 2.50.1）；條件 2 的 `fanout owners` 三條都 exit 1，但 7 個標出的檔案全屬插入 lane e364（修正本身），e364 的 `fanout check` 已在 5a（`8adb9ba`，即被 merge 的同一批 commit）exit 0，且人類 2026-10-28 的升版裁決已涵蓋「再由整合者用中途修 base 帶進三條 lane」→ 判定條件 2 成立。已送暫停請求（e139 to-lane#6、e362 to-lane#4、e217 to-lane#4） | 本檔 |
+| 2026-10-28 | 整合者 | 中途修 base 完成（目標 `main@e5f325d`），逐條 lane：三條都 ack（e139 `2b9a803`、e217 `add08cd`、e362 `19707ab`，工作區皆乾淨）→ `merge --no-ff origin/main`：e139 `8ff8666`、e217 `94cd9fc`、e362 `df29975`，皆無衝突；每條 merge-invariants PASS、`npm run build` 後 `dist/` 無差異、`npm audit --audit-level=high` exit 0 → 恢復通知（e139 to-lane#7、e217 to-lane#5、e362 to-lane#5），三條從 code review 繼續 | 本檔 |
+| 2026-10-28 | 整合者 | e139 R1 再擴大（機械性越界，to-lane#8）：`test/e295-hop-cap-and-sop-halves.test.mjs` AC11 也斷言 registry 的 `(none)` 出現 0 次，與 E303-AC11a 同一成因（整合者核對：全 `test/` 只有這兩處）。准許 qa 只改該斷言 0 → 1（精確比對）與必要時的標題；同測試下一行已釘 `DISPATCH_PIN_TIER_REJECTED` 的對照列，原意保留。e139 code review 第一輪 APPROVED（`49e2cc1`） | 信箱 e139 |
+| 2026-10-28 | 整合者 | 5a：e217 `f563a91`（CI run 40651826921）close —— review、qa 都一輪通過；15 檔都在擁有範圍內；既有測試檔沒有任何改動；新發現 E217-NEW-1（`docs/install.md`、`docs/lane-protocol.md` §3 仍描述舊行為；install.md 半邊由整合者修）、E217-NEW-2（兩份 spec 仍寫舊函式名）等 finish 配號。qa 中途一次全套有 `test/e177b-mailbox-watch.test.mjs` AC17 偶發逾時（E224，歸 e362），最後 HEAD 的全套綠 | 本檔 |
+| 2026-10-28 | 整合者 | 5a：e139 `7cb2bdb`（CI run 40653092971）close —— review、qa 都一輪通過；56 檔都在擁有範圍內，e308／e295 的 re-pin 與 to-lane#4／#5／#8 准許的一致；新發現 E139-NEW-1、E236-NEW-1、E136-NEW-1、E136-NEW-2 等 finish 配號。例外：(1) qa 第一次 PASS 寫入被 `AC_EXECUTION_LOG_MISSING` 拒絕時，打到的是已安裝的舊版 MCP server，E236 的舊行為在證據檔留下一段被拒的 PASS，qa 手動刪掉後重寫（已 commit 的證據只有被接受那一次；這正是 E236 的現場重現，修正發版後生效）；(2) sr、code-reviewer 都是 opus（同模型疑慮，review 報告已註明）。給發版：`GATE_REGISTRY` 34 → 35（`CLAUDE.md` 的閘門數）；E136 讓非正規 task id 的證據檔名改變且不回退，屬 adopter 可見的行為改動 | 本檔 |
+| 2026-10-28 | 整合者 | 5a：e362 `bad8a49`（CI run 40653573982）close —— review、qa 都一輪通過；13 檔都在擁有範圍內；E224 決定：等待預算調高並可用 `AGC_E177B_WAIT_MS` 覆寫，AC10 改用 wrapper 自己的 `--max-wait 5`（仍抓得到等滿 grace 的回收）；新發現 E362-NEW-1、E362-NEW-2 等 finish 配號。reviewer 兩條非阻擋建議（`scripts/test-lock.mjs` 函式內註解、doc 摘要超過 80 欄）不另開 sr hop，配號時併進 E362-NEW-1（同一個檔案） | 本檔 |
+| 2026-10-28 | 整合者 | 5b：`integ/post-v4-w11` ← e139 `aa31d3c` ← e362 `6eeae73` ← e217 `c13237e`，皆 `--no-ff`、零衝突 → 無合併審查；merge-invariants 三次 PASS；重建 `dist/` 無差異；`npm audit --audit-level=high` exit 0；整合層 CI run 40654088449 綠；finish e139 配號 E365–E368、finish e362 配號 E369–E370、finish e217 配號 E371–E372；E369 併入 e362 review 的兩條註解建議；`docs/install.md` 改寫 `--abandoned` 對 `specs/` 的描述（E371 的一半） | 本檔 |
