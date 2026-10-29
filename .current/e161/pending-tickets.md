@@ -39,4 +39,18 @@ body: |
   re-pinned.
 ```
 
+```pending-ticket
+lane_local_id: E366-NEW-1
+title: SQLite-mode duplicate review_task_ids hit the reports primary key and throw a raw error; file mode de-duplicates
+priority: P4
+depends_on: [E366]
+source: architect, e161 lane (specs/e161-qa-claim-and-state-reads-architecture.md, OQ-6); integrator asked the lane to file it
+body: |
+  Existing behavior, not changed by lane e161: a qa PASS/FAIL write whose review_task_ids repeats an
+  id records evidence once per id. In file mode the repeat is de-duplicated; in SQLite/HTTP mode the
+  second insert collides with the reports table's primary key and the raw database error surfaces
+  to the caller. Suggested fix: de-duplicate the target ids before recording in both modes (or
+  reject duplicates with a clear message), with a qa test for the SQLite path.
+```
+
 ## Applied
