@@ -1,2 +1,4 @@
 {"ts":"2026-10-29T07:17:32.718Z","feature":"e161-qa-claim-and-state-reads","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-10-29T07:24:38.772Z","feature":"e161-qa-claim-and-state-reads","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-29T07:32:56.565Z","feature":"e161-qa-claim-and-state-reads","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-29T07:39:35.118Z","feature":"e161-qa-claim-and-state-reads","agent_id":"architect","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
