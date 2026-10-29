@@ -212,6 +212,8 @@ function isBookkeepingPath(p) {
 // A tag not at HEAD keeps the FAIL UNLESS (i) the tag is an ancestor of HEAD
 // AND (ii) every commit in <tag>..HEAD touches only the bookkeeping allowlist
 // above — either condition failing keeps the existing FAIL (spec AC2/AC4).
+// An empty range, or a commit listing no changed path, is never tolerated:
+// a for-all over nothing would pass without inspecting anything.
 runCheck("tag-at-HEAD", (fails) => {
   const tag = `v${version}`;
   let tagSha;
@@ -254,8 +256,13 @@ runCheck("tag-at-HEAD", (fails) => {
     return;
   }
 
-  // AC6: an empty range cannot occur here — tagSha !== headSha and tagSha is
-  // an ancestor of headSha together guarantee at least one commit ahead.
+  if (commits.length === 0) {
+    fails.push(
+      `${pointsAtHeadFail} — git rev-list enumerated no commits in ${tag}..HEAD — refusing to tolerate an empty range`
+    );
+    return;
+  }
+
   const offenders = [];
   for (const sha of commits) {
     let files;
@@ -268,6 +275,12 @@ runCheck("tag-at-HEAD", (fails) => {
         .filter(Boolean);
     } catch (err) {
       offenders.push(`${sha} (could not list changed paths: ${err?.message ?? err})`);
+      continue;
+    }
+    if (files.length === 0) {
+      offenders.push(
+        `${sha.slice(0, 12)} lists no changed paths (an empty commit cannot be judged bookkeeping-only)`
+      );
       continue;
     }
     const badPaths = [...new Set(files.filter((f) => !isBookkeepingPath(f)))];
