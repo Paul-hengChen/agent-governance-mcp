@@ -2,3 +2,5 @@
 {"ts":"2026-10-29T07:35:02.847Z","feature":"e367-evidence-and-feature-path-encoding","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-10-29T07:36:07.096Z","feature":"e367-evidence-and-feature-path-encoding","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-10-29T07:37:26.495Z","feature":"e367-evidence-and-feature-path-encoding","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-29T07:38:07.249Z","feature":"e367-evidence-and-feature-path-encoding","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-29T07:41:57.887Z","feature":"e367-evidence-and-feature-path-encoding","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
