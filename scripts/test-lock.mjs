@@ -109,14 +109,18 @@ export function readLock(lockPath) {
  * `observedRaw`, safe against any number of concurrent reclaimers: only the
  * winner of an exclusive guard named after that content's hash may unlink it, and
  * only while it still holds exactly that content. A dead or corrupt guard is
- * reclaimed the same way, one level down. Never throws. See specs/e260c-bin-scripts.md.
+ * reclaimed the same way, one level down. The guard is published by link,
+ * never created empty: an empty guard reads as corrupt, so a second reclaimer
+ * could take it from us while we still act on it. Returns true iff, on
+ * return, the target no longer holds `observedRaw`; false on guard
+ * contention, a recursive guard reclaim, or an unlink error, so the caller
+ * waits instead of retrying at once. Never throws. See
+ * specs/e260c-bin-scripts.md.
  */
 export function reclaimStale(targetPath, observedRaw, depth = 0) {
   const digest = createHash("sha256").update(observedRaw).digest("hex").slice(0, 16);
   const guardPath = `${targetPath}.reclaim-${digest}`;
   try {
-    // Published by link, never created empty: an empty guard reads as corrupt,
-    // so a second reclaimer could take it from us while we still act on it.
     linkPublish(guardPath, "publish", JSON.stringify({ pid: process.pid, at: new Date().toISOString() }));
   } catch (err) {
     if (err && err.code === "EEXIST" && depth < 2) {
@@ -132,7 +136,7 @@ export function reclaimStale(targetPath, observedRaw, depth = 0) {
         reclaimStale(guardPath, guard.raw, depth + 1);
       }
     }
-    return;
+    return false;
   }
   try {
     let current = null;
@@ -142,8 +146,9 @@ export function reclaimStale(targetPath, observedRaw, depth = 0) {
       /* already gone */
     }
     if (current === observedRaw) fs.unlinkSync(targetPath);
-  } catch {
-    /* best effort — the acquire loop retries */
+    return true;
+  } catch (err) {
+    return Boolean(err && err.code === "ENOENT");
   } finally {
     try {
       fs.unlinkSync(guardPath);
@@ -179,13 +184,7 @@ function sleep(ms) {
 
 let publishSeq = 0;
 
-/**
- * E209 — create `lockPath` already holding `payload`: write a per-attempt
- * temp file next to it, then hard-link it into place, so the lock is never
- * observable empty (an empty lock could be mistaken by a late reclaimer for
- * the stale empty file it observed earlier). Throws EEXIST when the lock is
- * held; the temp file is removed in every outcome.
- */
+/** Create `lockPath` already holding `payload`; throws EEXIST when held. */
 function publishLock(lockPath, payload) {
   linkPublish(lockPath, "acquire", JSON.stringify(payload));
 }
@@ -238,6 +237,7 @@ export async function acquireLock({
   const start = now();
   let lastNotifyAt = null;
   let lastNotifiedPid = null;
+  let lastReclaimLoggedRaw = null;
   let holder = null;
   for (;;) {
     try {
@@ -261,15 +261,19 @@ export async function acquireLock({
       if (!isHolderAlive(lock.payload)) {
         // AC10 — dead holder (wrapper AND recorded child, AC13b): reclaim
         // regardless of age. Serialized per incarnation (AC13a).
-        log(`test-lock: reclaiming stale lock from dead pid ${lock.payload.pid}`);
-        reclaimStale(lockPath, lock.raw);
-        continue;
+        if (lock.raw !== lastReclaimLoggedRaw) {
+          log(`test-lock: reclaiming stale lock from dead pid ${lock.payload.pid}`);
+          lastReclaimLoggedRaw = lock.raw;
+        }
+        if (reclaimStale(lockPath, lock.raw)) continue;
       }
       // AC11 — live holder: held, however old acquiredAt is.
     } else if (now() - lock.mtimeMs > CORRUPT_GRACE_MS) {
-      log("test-lock: reclaiming lock with unparseable payload");
-      reclaimStale(lockPath, lock.raw);
-      continue;
+      if (lock.raw !== lastReclaimLoggedRaw) {
+        log("test-lock: reclaiming lock with unparseable payload");
+        lastReclaimLoggedRaw = lock.raw;
+      }
+      if (reclaimStale(lockPath, lock.raw)) continue;
     }
 
     const t = now();
