@@ -1,4 +1,5 @@
 export declare function encodeEvidenceId(taskId: string): string;
+export declare function decodeEvidenceId(stem: string): string | null;
 export declare const COVERS_LINE_RE: RegExp;
 export declare function parseCoversIds(content: string): string[];
 export declare function buildCoverageIndex(dir: string): Map<string, string>;

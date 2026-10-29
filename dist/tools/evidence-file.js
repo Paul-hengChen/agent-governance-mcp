@@ -36,6 +36,54 @@ export function encodeEvidenceId(taskId) {
     }
     return out;
 }
+// Strict inverse of encodeEvidenceId: reads the stem left to right, one token
+// at a time:
+//   [A-Z0-9.-]                 → itself
+//   "_" + [A-Z]                → that letter in lower case
+//   "__" + exactly 4 [0-9A-F]  → that UTF-16 code unit, only when the unit is
+//                                outside [A-Za-z0-9.-]
+//   anything else              → the whole stem is not decodable → null
+// Returns non-null exactly for the stems encodeEvidenceId can produce, so
+// decodeEvidenceId(encodeEvidenceId(id)) === id for every string and a
+// non-null result re-encodes to the input. Strict on purpose: accepting
+// lower-case hex or an escape of a literal-kept character would map two file
+// names to one id. Pure, total, never throws; "" decodes to "".
+export function decodeEvidenceId(stem) {
+    let out = "";
+    let i = 0;
+    while (i < stem.length) {
+        const ch = stem[i];
+        if ((ch >= "A" && ch <= "Z") || (ch >= "0" && ch <= "9") || ch === "." || ch === "-") {
+            out += ch;
+            i += 1;
+        }
+        else if (ch !== "_") {
+            return null;
+        }
+        else {
+            const next = stem[i + 1];
+            if (next !== undefined && next >= "A" && next <= "Z") {
+                out += next.toLowerCase();
+                i += 2;
+            }
+            else if (next === "_") {
+                const hex = stem.slice(i + 2, i + 6);
+                if (!/^[0-9A-F]{4}$/.test(hex))
+                    return null;
+                const unit = parseInt(hex, 16);
+                const decoded = String.fromCharCode(unit);
+                if (/^[A-Za-z0-9.-]$/.test(decoded))
+                    return null;
+                out += decoded;
+                i += 6;
+            }
+            else {
+                return null;
+            }
+        }
+    }
+    return out;
+}
 // ---------- `covers:` label-line plumbing ----------
 // One review file may declare `covers: <id1>, <id2>, ...` to satisfy the
 // evidence gates for a batched round instead of one stub per id. File mode
