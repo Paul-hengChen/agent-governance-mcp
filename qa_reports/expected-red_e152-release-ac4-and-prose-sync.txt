@@ -1,0 +1,41 @@
+# e152-release-ac4-and-prose-sync — expected-red manifest (emitted by sr-engineer per skill-sr-engineer SOP 7a)
+# Format: <relative test file path> | <exact test name/description string>
+#
+# Measured at the sr HEAD with the full suite (`node scripts/test-lock.mjs -- npm test`):
+# 3751 tests, 3735 pass, 14 fail — exactly the 14 entries below, all inside the spec's
+# "Pinned tests to re-pin (qa), complete list". sr does not touch test/** (spec Routing).
+# T-E152-01 (content/skill-release-engineer.md) and T-E372-01 (specs/e260c-*, specs/e351-*)
+# leave no reds; their tests are owned by T-E152-02 / T-E371-02.
+
+# T-E365-01 -> T-E365-02 (qa golden re-pin): the new NON_REVIEWER_VERDICT_REJECTED sentence in
+# content/const-08-chain-31-mid.md (chain-tagged) is byte-pinned into the full/chain-mode compose
+# goldens and the constitution monolith; lite goldens do not include const-08 and stay green.
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=false, fullDetail=false) is byte-identical to pre-refactor golden build-full-nondesign.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=true, fullDetail=false) is byte-identical to pre-refactor golden build-full-design.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=false, fullDetail=true) is byte-identical to pre-refactor golden build-full-nondesign-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=true, fullDetail=true) is byte-identical to pre-refactor golden build-full-design-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: SessionStart hook (AGC_DEFAULT_SKILL=full) is byte-identical to pre-refactor golden hook-full.txt
+test/compose-equivalence.test.mjs | compose-equivalence: cat(15 manifest fragments in order) === the pre-refactor constitution.md monolith (DR-1 Option R invariant)
+
+# T-E365-01 -> T-E365-02 (qa token-cap re-pin): the same const-08 sentence moves the three
+# zero-headroom chain-mode floors. Measured at this HEAD (move each cap individually, not blanket):
+#   design-arm rationale-stripped constitution: 10598 ~tok vs cap 10527 (+71)
+#   teamwork coordinator bundle (design-arm):   21715 ~tok vs cap 21644 (+71)
+#   non-design constitution floor:               8501 ~tok vs cap  8429 (+72)
+# AC2 lean always-on bundle and the ~1830 ~tok design/non-design delta stay green.
+test/context-budget.test.mjs | AC8/AC-P2-7: rationale-stripped (design-arm) constitution is at/below the measured floor (≤ 10527 ~tok)
+test/context-budget.test.mjs | AC8/AC-P2-7: teamwork coordinator bundle (design-arm, both strips) is at/below the floor (≤ 21644 ~tok)
+test/context-budget.test.mjs | AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 8429 ~tok)
+
+# T-E365-01 -> T-E365-02 (qa registry re-pin): gates/registry.ts flips NON_REVIEWER_VERDICT_REJECTED
+# to documentedInProse: true and its doc-mapping row from "(none)" to const-08-chain-31-mid.md,
+# so the "(none)" count goes 1 -> 0 and the documentedInProse assertion goes false -> true.
+test/e139-non-reviewer-verdict.test.mjs | AC-E139-7 (telemetry + registry facets): a rejection appends one telemetry line with the code and tw_gate_stats lists it
+test/e295-hop-cap-and-sop-halves.test.mjs | AC11: coord-02 names the four tiers, the code and the advisory; registry row flipped to documentedInProse true
+test/e308-single-source-tier-enum.test.mjs | E303-AC11a: gates/registry.ts keeps the mapping line exactly once and exactly one '(none)' (NON_REVIEWER_VERDICT_REJECTED)
+
+# T-E371-01 -> T-E371-02 (qa lane-protocol re-pin): docs/lane-protocol.md §3 harvest and
+# known-gaps lines were rewritten (the --abandoned specs/ copy closes the E217 gap; E217 count 1 -> 0),
+# so the pinned S3_HARVEST / S3_GAPS text and the E217 count no longer match.
+test/e351-lane-protocol-gaps.test.mjs | AC-E351-2: harvest sub-bullet directly follows the local bullet
+test/e351-lane-protocol-gaps.test.mjs | AC-E351-3: known-gaps sub-bullet follows harvest; E196 and E217 each appear once, with their clause

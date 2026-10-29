@@ -545,7 +545,7 @@ const FREE_TEXT_ALLOWLIST = [
   { code: "BASELINE_MANIFEST_MISSING", field: "triggerEdge", reason: "free English, no checkable literal" },
   { code: "BASELINE_PROVENANCE_INCOMPLETE", field: "triggerEdge", reason: "free English — the \">=2\" is a hardcoded threshold, not sourced from an exported constant the way the 4/4/6 round caps are" },
   { code: "PIXEL_GATE_ATTESTATION_MISSING", field: "triggerEdge", reason: "references the pixel_gate_complete:true prose field name, not a role:Status edge or named constant" },
-  { code: "NON_REVIEWER_VERDICT_REJECTED", field: "triggerEdge", reason: "free English — the role:Status-shaped substring (code-reviewer:In_Progress -> qa-engineer:In_Progress) names the single exempt edge, not a rejecting edge, and the code is documentedInProse:false so no mapped doc file exists to check it against" },
+  { code: "NON_REVIEWER_VERDICT_REJECTED", field: "triggerEdge", reason: "free English — the role:Status-shaped substring (code-reviewer:In_Progress -> qa-engineer:In_Progress) names the single exempt edge, not a rejecting edge; the code is documentedInProse:true and mapped to const-08-chain-31-mid.md, but the exempt-edge literal stays allowlisted" },
   { code: "REVIEW_VERDICT_STATUS_MISMATCH", field: "triggerEdge", reason: "free English, no checkable literal" },
   { code: "REVIEW_VERDICT_STATUS_MISMATCH", field: "armCondition", reason: "\"agent_id=code-reviewer && review_verdict present\" — snake_case field-name shorthand, not a camelCase predicate/function-call literal" },
   { code: "REVIEWER_COMPLETED_TASKS_REJECTED", field: "triggerEdge", reason: "free English, no checkable literal" },

@@ -108,14 +108,17 @@ test("ID-MONO-SPLIT (AC3): a suffixed id whose parent is in the base (E10a besid
   assertClean(run(root));
 });
 
-test("ID-MONO-NO-BASE-NOTE (AC4): when no base ref resolves the monotone half is skipped with one stdout note and the exit code is unaffected", () => {
-  // Branch `trunk` + one commit: neither origin/main nor main resolves.
+test("ID-MONO-NO-BASE-NOTE (AC4, re-pinned by E158 AC-E158-4b): when no base ref resolves the check exits 2 with one stderr line instead of silently skipping the id-ordering half", () => {
+  // WHY: a skipped monotone check reads as "no violation" while inspecting nothing. Branch `trunk` + one commit: neither origin/main nor main resolves.
   const root = mkFixture({ "docs/backlog.md": backlog(trow("E10", "a")) }, { branch: "trunk" });
   write(root, "docs/backlog.md", backlog(trow("E10", "a"), trow("E9", "would be late")));
   const r = run(root);
-  assertClean(r, "(ordering is not checked without a base)");
-  assert.match(r.stdout, /docs\/backlog\.md — id ordering not checked: no base commit found \(pass --base <ref>\)/);
-  assert.equal(r.stdout.match(/id ordering not checked/g).length, 1, "exactly one note");
+  assert.equal(r.status, 2, `stdout: ${r.stdout} stderr: ${r.stderr}`);
+  assert.equal(
+    r.stderr,
+    "check:bookkeeping — cannot run: no base commit found for the id-ordering check (tried origin/main, main; pass --base <ref>)\n"
+  );
+  assert.doesNotMatch(r.stdout, /id ordering not checked/);
 });
 
 test("ID-MONO-BASE-FLAG (AC4): `--base <ref>` supplies the base that the default lookup cannot find", () => {

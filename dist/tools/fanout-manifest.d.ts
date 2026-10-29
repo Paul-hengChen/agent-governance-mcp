@@ -81,6 +81,7 @@ export declare const FANOUT_CODES: {
     readonly laneProtocolAbsent: "LANE_PROTOCOL_ABSENT";
     readonly templatePointerAbsent: "TEMPLATE_POINTER_ABSENT";
     readonly gitDiffFailed: "GIT_DIFF_FAILED";
+    readonly rangeEmpty: "RANGE_EMPTY";
 };
 /**
  * validate warning for a dispatchable row whose worktree cell is an absolute
@@ -441,7 +442,8 @@ export declare function gitErrorLine(err: unknown): string;
  * Fan-in ownership check: every file the lane branch changed vs `<base>`
  * (committed changes only, so uncommitted work never counts) that is
  * outside the owned tokens and the implicit bookkeeping set is listed on its
- * own OUT line; exit 1 if any. (E158)
+ * own OUT line; exit 1 if any. An empty range is the RANGE_EMPTY input
+ * error, never a vacuous pass. (E158)
  */
 export declare function checkLane(m: Manifest, laneId: string, opts?: CheckOptions): CheckResult;
 export interface CutTicket {
@@ -569,7 +571,7 @@ export declare function ownersOf(m: Manifest, paths: string[], sourceNote: strin
  * which a git ref can hold, so `a....b` is refused rather than resolved).
  */
 export declare function parseOwnersRange(range: string): [string, string] | undefined;
-/** Paths changed on `<b>` since its merge-base with `<a>`; read-only git. */
+/** Paths changed on `<b>` since merge-base with `<a>`; none = RANGE_EMPTY. */
 export declare function rangePaths(sides: [string, string], repo: string): {
     paths: string[];
 } | {

@@ -16,7 +16,7 @@ import { laneRegistryList } from "./lane-registry.js";
 import { parseHandoff } from "./handoff-parse.js";
 import type { HandoffState } from "./handoff-types.js";
 import { HOP_CAP_EXPORTED, ROUND_CAP_EXPORTED, REVIEW_ROUND_CAP_EXPORTED } from "./transitions.js";
-import { parseCoversIds } from "./evidence-file.js";
+import { decodeEvidenceId, parseCoversIds } from "./evidence-file.js";
 // Only these tools/lane-paths.ts helpers, never lane-paths' resolver
 // functions: those have pinned caller allow-lists in test/lane-paths.test.mjs.
 import { LEGACY_LANE, PRIMARY_LANE, isSafeLaneName, laneFile, resolveLaneName } from "./lane-paths.js";
@@ -263,9 +263,13 @@ function isSafeArchiveSegment(s: string): boolean {
 /**
  * Task ids backed by a PASS-bearing evidence file in `dir` (AC5b): each
  * `*.md` whose content carries a `— PASS — by qa-engineer` section header
- * contributes its own `review_<id>.md` id plus every id its `covers:` line
- * names (tools/evidence-file.ts `parseCoversIds`). A FAIL-only file
- * contributes nothing. Not `buildCoverageIndex`: its first-seen-wins map
+ * contributes its own id plus every id its `covers:` line names
+ * (tools/evidence-file.ts `parseCoversIds`). The own id is the
+ * `review_<stem>.md` stem decoded by tools/evidence-file.ts
+ * `decodeEvidenceId`; a stem the encoder cannot produce (a name written by
+ * the older identity sanitiser) falls back to the raw stem, so such evidence
+ * keeps counting. `covers:` ids are raw ids and are not decoded. A FAIL-only
+ * file contributes nothing. Not `buildCoverageIndex`: its first-seen-wins map
  * would hide a later PASS file covering an id a FAIL-only file covered first.
  * Never throws — an unlistable dir or unreadable file reads as no evidence.
  */
@@ -287,7 +291,7 @@ function passEvidenceIdsIn(dir: string): Set<string> {
     }
     if (!QA_PASS_HEADER_RE.test(content)) continue;
     const m = REVIEW_FILE_RE.exec(name);
-    if (m) ids.add(m[1]);
+    if (m) ids.add(decodeEvidenceId(m[1]) ?? m[1]);
     for (const id of parseCoversIds(content)) ids.add(id);
   }
   return ids;

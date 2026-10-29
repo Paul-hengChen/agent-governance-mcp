@@ -65,7 +65,7 @@ import {
 export async function handleGetState(args: WorkspaceOnlyInput): Promise<ToolResult> {
   const { workspace_path } = args;
   const result = getActiveStorage().readState(workspace_path);
-  return { content: [{ type: "text" as const, text: withDispatchPinsAdvisory(result) }] };
+  return { content: [{ type: "text" as const, text: withDispatchPinsAdvisory(withoutDispatchMechanismTier(result)) }] };
 }
 
 // Read-side advisory for on-disk dispatch_pins outside the tier enum (E300).
@@ -101,6 +101,25 @@ function withDispatchPinsAdvisory(text: string): string {
   }
 }
 
+// Read-view omission of the previous hop's dispatch_mechanism_tier (E184).
+// The next writer reads tw_get_state first, so a tier value there invites
+// copying instead of self-reporting. The record itself is untouched: the
+// handoff file, readHandoffState/parseHandoff and .current/<lane>/dispatch.jsonl
+// still carry it. Drops only the TOP-LEVEL key; when it is absent, or the
+// payload is not a JSON object, returns the original text byte-identical.
+// Never throws.
+function withoutDispatchMechanismTier(text: string): string {
+  try {
+    const envelope = JSON.parse(text) as unknown;
+    if (!envelope || typeof envelope !== "object" || Array.isArray(envelope)) return text;
+    if (!Object.prototype.hasOwnProperty.call(envelope, "dispatch_mechanism_tier")) return text;
+    delete (envelope as Record<string, unknown>).dispatch_mechanism_tier;
+    return JSON.stringify(envelope);
+  } catch {
+    return text;
+  }
+}
+
 // Feature-lease TTL: how long an unfinished feature keeps exclusive hold of
 // the workspace before another feature may take over. A fixed constant, not
 // a config knob (like STALE_DISPATCH_THRESHOLD_MIN in tools/handoff-parse.ts
@@ -130,7 +149,8 @@ export async function handleUpdateState(parsed: UpdateStateInput): Promise<ToolR
 }
 
 // Undo for the qa_review evidence the QA_REVIEW_RECORD step appended on this
-// write (file mode), keyed by the write's gate context. A write that does not
+// write (file mode, or a storage offering recordReviewUndoable, i.e. SQLite),
+// keyed by the write's gate context. A write that does not
 // land (a later step rejects it, or the pipeline or the state write throws)
 // runs it, so the evidence files never record a verdict the server refused. A
 // WeakMap, because the readonly context type is owned by gates/pipeline.ts.
@@ -159,6 +179,25 @@ async function writeStateKeepingEvidence(
     undoRecordedEvidence(ctx);
     throw err;
   }
+}
+
+type QaSuiteResult = NonNullable<UpdateStateInput["qa_suite_result"]>;
+
+// The fixed, server-formatted suite-result line (spec Copy/Strings
+// e161.suite-line / e161.suite-line-cmd). command is recorded verbatim; the
+// zod boundary already guarantees it is one line. (E161)
+function suiteResultLine(r: QaSuiteResult): string {
+  const base = `suite-result: ${r.passed}/${r.total} passed (server-recorded from qa_suite_result`;
+  return r.command !== undefined ? `${base}; command: ${r.command})` : `${base})`;
+}
+
+// The notes QA_REVIEW_RECORD hands to the record call. Without
+// qa_suite_result: qaReview itself, unchanged (byte-identical record). With
+// it: the suite line, a blank line, then the trimmed qa_review text — the
+// line first, so it never lands inside a qa-authored subsection.
+function composeQaReviewNotes(qaReview: string, suite: QaSuiteResult | undefined): string {
+  if (suite === undefined) return qaReview;
+  return `${suiteResultLine(suite)}\n\n${qaReview.trim()}`;
 }
 
 // The tw_update_state gate pipeline: this array IS the frozen, additive check
@@ -742,16 +781,23 @@ export const UPDATE_STATE_GATE_PIPELINE: readonly UpdateStateGateStep[] = [
               isError: true,
             };
           }
-          // File mode records through the undoable variant (same bytes) so
-          // handleUpdateStateCore can revert it if this write does not land.
-          // Other modes record as before.
+          const notes = composeQaReviewNotes(parsed.qa_review, parsed.qa_suite_result);
+          // File mode records through the undoable variant (same bytes), and a
+          // storage that offers recordReviewUndoable (SQLite) does the same, so
+          // handleUpdateStateCore can revert the record if this write does not
+          // land. Any other storage records as before, with no undo.
           if (storage instanceof FileHandoffStorage) {
             evidenceUndoByCtx.set(
               ctx,
-              await recordReviewInFileUndoable(parsed.workspace_path, ids, parsed.status, "qa-engineer", parsed.qa_review),
+              await recordReviewInFileUndoable(parsed.workspace_path, ids, parsed.status, "qa-engineer", notes),
+            );
+          } else if (storage.recordReviewUndoable) {
+            evidenceUndoByCtx.set(
+              ctx,
+              await storage.recordReviewUndoable(parsed.workspace_path, ids, parsed.status, "qa-engineer", notes),
             );
           } else {
-            await storage.recordReview(parsed.workspace_path, ids, parsed.status, "qa-engineer", parsed.qa_review);
+            await storage.recordReview(parsed.workspace_path, ids, parsed.status, "qa-engineer", notes);
           }
         }
       return null;

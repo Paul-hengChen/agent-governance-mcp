@@ -201,21 +201,23 @@ test("AC8: resolveLockPath returns null outside any git repository (never throws
 // AC9 — re-entrant: a nested wrap under the SAME lock path runs directly
 // ---------------------------------------------------------------------------
 
-test("AC9: a nested `test-lock -- test-lock -- <cmd>` under the SAME --lock-path returns promptly, never self-deadlocking", { timeout: 20000 }, async (t) => {
+// E370: both cases below went red under full-suite load on a fixed budget, never on the product. The
+// extra budget is derived from the existing AGC_E177B_WAIT_MS knob and stays finite, so a genuinely stuck
+// child still fails.
+const LOAD_SAFE_MAX_WAIT_S = Math.round(waitBudget(15000) / 1000) + 25;
+const LOAD_SAFE_TEST_TIMEOUT_MS = (LOAD_SAFE_MAX_WAIT_S + 20) * 1000;
+
+test("AC9: a nested `test-lock -- test-lock -- <cmd>` under the SAME --lock-path short-circuits, never self-deadlocking or queueing on its own lock", { timeout: LOAD_SAFE_TEST_TIMEOUT_MS }, async (t) => {
   const lockPath = mkLockPath(t, "e177b-ac9-");
-  const start = Date.now();
+  // E370: judged by the nested wrapper's own behaviour, not by the outer wall clock (which includes two node
+  // spawns and goes red under load). A nested wrapper that queued on its own lock prints the AC12 waiting
+  // line immediately and, with its finite --max-wait, exits 75; a short-circuit prints neither and exits 0.
   const result = await runTestLock(
     ["--lock-path", lockPath, "--poll-ms", "10"],
-    [process.execPath, TEST_LOCK_SCRIPT, "--lock-path", lockPath, "--poll-ms", "10", "--", "true"],
+    [process.execPath, TEST_LOCK_SCRIPT, "--lock-path", lockPath, "--poll-ms", "10", "--max-wait", String(LOAD_SAFE_MAX_WAIT_S), "--", "true"],
   );
-  const elapsedMs = Date.now() - start;
-  assert.equal(result.code, 0);
-  // "Fast" distinguishes a genuine short-circuit from a stuck/queued run —
-  // it is not a tight perf benchmark. 10s tolerates full-suite CPU
-  // contention (observed once at ~2.4s for a related dead-pid reclaim under
-  // the full 2700+-test suite); a true self-deadlock would instead hang
-  // until this test's own 20s node:test timeout, never merely run slow.
-  assert.ok(elapsedMs < 10_000, `nested re-entrant run must be fast (not self-deadlocked), took ${elapsedMs}ms`);
+  assert.equal(result.code, 0, `nested run must exit 0 (75 = it queued on its own lock): ${JSON.stringify(result)}`);
+  assert.doesNotMatch(result.stderr, /waiting for test lock held by pid/, "a nested run must not wait on the lock its own parent holds");
   assert.equal(fs.existsSync(lockPath), false);
 });
 
@@ -358,7 +360,7 @@ test("AC13: omitting --max-wait waits indefinitely (queues) rather than throwing
 // AC13a — >=3 concurrent reclaimers of one dead lock: exactly one ever holds
 // ---------------------------------------------------------------------------
 
-test("AC13a: 5 processes racing to reclaim ONE dead-pid lock simultaneously never produce two concurrent holders", { timeout: 20000 }, async (t) => {
+test("AC13a: 5 processes racing to reclaim ONE dead-pid lock simultaneously never produce two concurrent holders", { timeout: LOAD_SAFE_TEST_TIMEOUT_MS }, async (t) => {
   const lockPath = mkLockPath(t, "e177b-ac13a-");
   writeStaleLock(lockPath);
   const resultsFile = path.join(mkTmpDir(t, "e177b-ac13a-results-"), "results.jsonl");
@@ -366,10 +368,10 @@ test("AC13a: 5 processes racing to reclaim ONE dead-pid lock simultaneously neve
 
   const N = 5;
   // Safety-net --max-wait (never expected to fire — worst-case fully
-  // serialized is ~600ms): converts a hypothetical reclaim-race hang into a
-  // fast failure instead of stalling the whole suite.
+  // serialized is ~600ms unloaded): converts a hypothetical reclaim-race hang
+  // into a failure instead of stalling the whole suite. E370: sized for full-suite load.
   const runs = Array.from({ length: N }, () =>
-    runTestLock(["--lock-path", lockPath, "--poll-ms", "5", "--max-wait", "15"], [process.execPath, recorder, resultsFile, "120"]),
+    runTestLock(["--lock-path", lockPath, "--poll-ms", "5", "--max-wait", String(LOAD_SAFE_MAX_WAIT_S)], [process.execPath, recorder, resultsFile, "120"]),
   );
   const results = await Promise.all(runs);
   for (const r of results) assert.equal(r.code, 0, `every racer must eventually succeed: ${JSON.stringify(r)}`);

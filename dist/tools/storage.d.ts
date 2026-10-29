@@ -22,6 +22,7 @@ export interface HandoffStorage {
     voidTask(workspacePath: string, taskId: string, reason: string): Promise<string>;
     addTask(workspacePath: string, taskId: string, description: string, section?: string): Promise<string>;
     recordReview(workspacePath: string, taskIds: string[], status: "PASS" | "FAIL", reviewer: string, notes: string): Promise<void>;
+    recordReviewUndoable?(workspacePath: string, taskIds: string[], status: "PASS" | "FAIL", reviewer: string, notes: string): Promise<() => void>;
     hasEvidence(workspacePath: string, taskIds: string[]): Promise<EvidenceCheck>;
     recordCodeReview(workspacePath: string, taskIds: string[], verdict: "APPROVED" | "CHANGES_REQUESTED", reviewer: string, notes: string): Promise<void>;
     hasCodeReviewEvidence(workspacePath: string, taskIds: string[]): Promise<EvidenceCheck>;

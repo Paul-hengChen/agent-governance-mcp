@@ -1,0 +1,8 @@
+{"ts":"2026-10-29T07:24:41.327Z","feature":"e158-range-subject-audit","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-29T07:33:13.804Z","feature":"e158-range-subject-audit","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-29T07:35:50.729Z","feature":"e158-range-subject-audit","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-29T07:39:32.169Z","feature":"e158-range-subject-audit","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-29T07:40:36.213Z","feature":"e158-range-subject-audit","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-29T07:47:55.109Z","feature":"e158-range-subject-audit","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-29T07:57:32.535Z","feature":"e158-range-subject-audit","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-10-29T08:32:35.486Z","feature":"e158-range-subject-audit","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}

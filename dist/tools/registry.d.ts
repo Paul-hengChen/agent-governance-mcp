@@ -41,6 +41,11 @@ declare const UpdateStateArgs: z.ZodObject<{
     blocking_reason: z.ZodOptional<z.ZodString>;
     agent_id: z.ZodOptional<z.ZodString>;
     qa_review: z.ZodOptional<z.ZodString>;
+    qa_suite_result: z.ZodOptional<z.ZodObject<{
+        passed: z.ZodNumber;
+        total: z.ZodNumber;
+        command: z.ZodOptional<z.ZodString>;
+    }, z.core.$strict>>;
     prd_path: z.ZodOptional<z.ZodString>;
     scope_decision: z.ZodOptional<z.ZodEnum<{
         "single-feature": "single-feature";

@@ -37,7 +37,7 @@
 //   REVIEW_VERDICT_STATUS_MISMATCH  const-05-core-standards.md, const-08-chain-31-mid.md, skill-code-reviewer.md
 //   REVIEWER_COMPLETED_TASKS_REJECTED  const-08-chain-31-mid.md, skill-code-reviewer.md
 //   NON_QA_COMPLETED_TASKS_REJECTED  const-08-chain-31-mid.md
-//   NON_REVIEWER_VERDICT_REJECTED   (none)
+//   NON_REVIEWER_VERDICT_REJECTED   const-08-chain-31-mid.md
 //   QA_REVIEW_TARGET_REQUIRED       skill-qa-engineer.md
 //   AC_EXECUTION_LOG_MISSING        skill-qa-engineer.md
 //   DISPATCH_PIN_TIER_REJECTED      coord-02-host-dispatch.md
@@ -48,7 +48,8 @@
 // pipeline; it shipped as the one documentedInProse: false entry and flipped to true when
 // coord-02-host-dispatch.md quoted it, E295; the review_verdict authorship gate, E139, added
 // the 35th, NON_REVIEWER_VERDICT_REJECTED — the authorship half of the review_verdict
-// consistency gate, shipped documentedInProse: false). Array order is DOC order only — it MUST NOT be relied
+// consistency gate, shipped documentedInProse: false and flipped to true when
+// const-08-chain-31-mid.md quoted it, E365). Array order is DOC order only — it MUST NOT be relied
 // on for evaluation order (DR-5; that lives in handoff-orchestrator.ts as the ordered
 // UPDATE_STATE_GATE_PIPELINE array, E35).
 export const GATE_REGISTRY = [
@@ -487,7 +488,7 @@ export const GATE_REGISTRY = [
             "stamps agent_id=qa-engineer on the code-reviewer:In_Progress -> " +
             "qa-engineer:In_Progress edge, may carry it. Omit review_verdict on this " +
             "write. See docs/backlog.md E139.",
-        documentedInProse: false,
+        documentedInProse: true,
     },
     {
         errorCode: "QA_REVIEW_TARGET_REQUIRED",

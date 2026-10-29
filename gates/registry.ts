@@ -66,10 +66,9 @@ export interface GateDefinition {
   // (DR-3, qa-engineer's rewritten error-code-contract test) compares against.
   readonly hintStatic: string;
   // True iff the code is (and must stay) backtick-quoted in >=1 content/*.md.
-  // Every entry is currently true except NON_REVIEWER_VERDICT_REJECTED, whose
-  // rejection envelope explains itself and which no content/*.md quotes yet
-  // (DISPATCH_PIN_TIER_REJECTED, E300, shipped false the same way until its
-  // coord-02 sentence landed with E295). The field
+  // Every entry is true (DISPATCH_PIN_TIER_REJECTED, E300, and
+  // NON_REVIEWER_VERDICT_REJECTED, E139, each shipped false until a content/*.md
+  // sentence quoted it — E295 in coord-02, E365 in const-08). The field
   // exists so a code-internal gate can opt out without weakening the parity
   // test.
   readonly documentedInProse: boolean;
@@ -107,7 +106,7 @@ export interface GateDefinition {
 //   REVIEW_VERDICT_STATUS_MISMATCH  const-05-core-standards.md, const-08-chain-31-mid.md, skill-code-reviewer.md
 //   REVIEWER_COMPLETED_TASKS_REJECTED  const-08-chain-31-mid.md, skill-code-reviewer.md
 //   NON_QA_COMPLETED_TASKS_REJECTED  const-08-chain-31-mid.md
-//   NON_REVIEWER_VERDICT_REJECTED   (none)
+//   NON_REVIEWER_VERDICT_REJECTED   const-08-chain-31-mid.md
 //   QA_REVIEW_TARGET_REQUIRED       skill-qa-engineer.md
 //   AC_EXECUTION_LOG_MISSING        skill-qa-engineer.md
 //   DISPATCH_PIN_TIER_REJECTED      coord-02-host-dispatch.md
@@ -119,7 +118,8 @@ export interface GateDefinition {
 // pipeline; it shipped as the one documentedInProse: false entry and flipped to true when
 // coord-02-host-dispatch.md quoted it, E295; the review_verdict authorship gate, E139, added
 // the 35th, NON_REVIEWER_VERDICT_REJECTED — the authorship half of the review_verdict
-// consistency gate, shipped documentedInProse: false). Array order is DOC order only — it MUST NOT be relied
+// consistency gate, shipped documentedInProse: false and flipped to true when
+// const-08-chain-31-mid.md quoted it, E365). Array order is DOC order only — it MUST NOT be relied
 // on for evaluation order (DR-5; that lives in handoff-orchestrator.ts as the ordered
 // UPDATE_STATE_GATE_PIPELINE array, E35).
 export const GATE_REGISTRY: readonly GateDefinition[] = [
@@ -602,7 +602,7 @@ export const GATE_REGISTRY: readonly GateDefinition[] = [
       "stamps agent_id=qa-engineer on the code-reviewer:In_Progress -> " +
       "qa-engineer:In_Progress edge, may carry it. Omit review_verdict on this " +
       "write. See docs/backlog.md E139.",
-    documentedInProse: false,
+    documentedInProse: true,
   },
   {
     errorCode: "QA_REVIEW_TARGET_REQUIRED",

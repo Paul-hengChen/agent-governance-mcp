@@ -205,7 +205,8 @@ Appended by sr-engineer as blocks are trimmed: one entry per moved rationale, he
 
 ### bin/agc-init.mjs — finish --shipped evidence harvest (E214)
 - The three differences from the `--abandoned` harvest (E180) are deliberate: every file is taken, with no ticket-token filter, because the worktree belongs to one dedicated lane and goes away for good; the walk is recursive and each file keeps its path relative to the directory root; and the destination follows the release-engineer 7a convention `<dir>/archive/<ticket>/<relpath>`.
-- `planShippedEvidenceHarvest` runs together with `planLaneClose` before any mutation; `applyShippedEvidenceHarvest` copies just before the worktree is removed.
+- `planIgnoredEvidenceHarvest` runs together with `planLaneClose` before any mutation; `applyIgnoredEvidenceHarvest` copies just before the worktree is removed.
+- The same `planIgnoredEvidenceHarvest` / `applyIgnoredEvidenceHarvest` pair also does `--abandoned`'s `specs/` copy (bucket `abandoned`).
 - Why "at risk" is decided per file and not per directory: the directory-level check is the same quirk described for `hasIgnoredUntrackedContent`. A `git check-ignore` exit other than 0 or 1 (128, for a path beyond a symlink) cannot prove the file survives removal, so it fails toward harvesting, as `evidenceAtRisk` does. Exit 1 is a plain untracked file, which git's own `worktree remove` refuses over (AC10).
 - `walkEvidenceTree` stops a symlink cycle because the content the cycle points at is already walked by the ancestor that closed it.
 

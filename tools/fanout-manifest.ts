@@ -190,6 +190,9 @@ export const FANOUT_CODES = {
   // owners --range / check input error (exit 2): the `git diff <a>...<b>`
   // itself failed, e.g. the two sides share no merge base.
   gitDiffFailed: "GIT_DIFF_FAILED",
+  // owners --range / check input error (exit 2): the `git diff <a>...<b>`
+  // lists no path, so a pass would inspect nothing. (E158)
+  rangeEmpty: "RANGE_EMPTY",
 } as const;
 
 /**
@@ -1614,7 +1617,8 @@ function refOk(ref: string, cwd: string): boolean {
  * Fan-in ownership check: every file the lane branch changed vs `<base>`
  * (committed changes only, so uncommitted work never counts) that is
  * outside the owned tokens and the implicit bookkeeping set is listed on its
- * own OUT line; exit 1 if any. (E158)
+ * own OUT line; exit 1 if any. An empty range is the RANGE_EMPTY input
+ * error, never a vacuous pass. (E158)
  */
 export function checkLane(m: Manifest, laneId: string, opts: CheckOptions = {}): CheckResult {
   const found = lookupLane(m, laneId);
@@ -1644,6 +1648,17 @@ export function checkLane(m: Manifest, laneId: string, opts: CheckOptions = {}):
   const diff = diffNames(base, lane.branch, repo);
   if ("error" in diff) return { ok: false, errors: [diff.error] };
   const changed = [...new Set(diff.raw.split("\0").filter((p) => p.length > 0))].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  if (changed.length === 0) {
+    return {
+      ok: false,
+      errors: [
+        inputErr(
+          FANOUT_CODES.rangeEmpty,
+          `git diff ${base}...${lane.branch} lists no committed change in ${repo} — nothing was checked; commit the lane's work first (uncommitted and untracked work is never checked) (E158)`,
+        ),
+      ],
+    };
+  }
 
   const out: { path: string; forbidden?: string }[] = [];
   for (const p of changed) {
@@ -2135,7 +2150,7 @@ export function parseOwnersRange(range: string): [string, string] | undefined {
   return ok ? [sides[0], sides[1]] : undefined;
 }
 
-/** Paths changed on `<b>` since its merge-base with `<a>`; read-only git. */
+/** Paths changed on `<b>` since merge-base with `<a>`; none = RANGE_EMPTY. */
 export function rangePaths(sides: [string, string], repo: string): { paths: string[] } | { errors: FanoutError[] } {
   try {
     gitOut(["rev-parse", "--git-dir"], repo);
@@ -2148,7 +2163,18 @@ export function rangePaths(sides: [string, string], repo: string): { paths: stri
   if (errors.length > 0) return { errors };
   const diff = diffNames(sides[0], sides[1], repo);
   if ("error" in diff) return { errors: [diff.error] };
-  return { paths: nulList(diff.raw) };
+  const paths = nulList(diff.raw);
+  if (paths.length === 0) {
+    return {
+      errors: [
+        inputErr(
+          FANOUT_CODES.rangeEmpty,
+          `git diff ${sides[0]}...${sides[1]} lists no committed change in ${repo} — an empty range proves nothing about ownership (E158)`,
+        ),
+      ],
+    };
+  }
+  return { paths };
 }
 
 /** One repo-relative path per line: trailing CR and surrounding space trimmed, blanks skipped. */
