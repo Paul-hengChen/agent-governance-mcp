@@ -225,7 +225,7 @@ test("AC-E139-7 (telemetry + registry facets): a rejection appends one telemetry
   assert.ok(entry, "registered");
   assert.equal(entry.producer, "orchestrator");
   assert.equal(entry.envelope, "plain-text");
-  assert.equal(entry.documentedInProse, false);
+  assert.equal(entry.documentedInProse, true);
   const ws = mkWorkspace("e139-7-");
   await seed(ws, "e139-7", "pm", "Blocked");
   const r = await handleUpdateState({
