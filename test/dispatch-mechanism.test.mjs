@@ -99,7 +99,7 @@ test("RT1b: a tier-only write (no dispatch_mechanism) persists the tier alone â€
   assert.equal(state.dispatch_mechanism_tier, "opus", "dispatch_mechanism_tier must persist independently of dispatch_mechanism");
 });
 
-test("RT2: a real tw_update_state write through the orchestrator round-trips dispatch_mechanism/dispatch_mechanism_tier via tw_get_state-equivalent read", async () => {
+test("RT2: a real tw_update_state write through the orchestrator round-trips dispatch_mechanism/dispatch_mechanism_tier through the library read (readHandoffState; tw_get_state omits the tier, E184)", async () => {
   setActiveStorage(new FileHandoffStorage());
   const ws = mkWs();
   resetSession(ws);
@@ -117,8 +117,8 @@ test("RT2: a real tw_update_state write through the orchestrator round-trips dis
   assert.ok(!res.isError, `a write carrying valid dispatch_mechanism/dispatch_mechanism_tier must be accepted: ${res.content?.[0]?.text}`);
 
   const getState = JSON.parse(readHandoffState(ws));
-  assert.equal(getState.dispatch_mechanism, "switch_role", "tw_get_state-equivalent read must surface dispatch_mechanism");
-  assert.equal(getState.dispatch_mechanism_tier, "sonnet", "tw_get_state-equivalent read must surface dispatch_mechanism_tier");
+  assert.equal(getState.dispatch_mechanism, "switch_role", "library read (readHandoffState) must surface dispatch_mechanism");
+  assert.equal(getState.dispatch_mechanism_tier, "sonnet", "library read (readHandoffState) must surface dispatch_mechanism_tier");
 });
 
 // ============================================================================

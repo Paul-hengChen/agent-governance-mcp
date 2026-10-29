@@ -290,6 +290,10 @@ const dispatchPinTier = z
   })
   .optional();
 
+// C0 controls (includes \t \n \v \f \r), DEL, NEL, and the two JS regex line
+// terminators that `^` in m-flag mode treats as a line start. (E161)
+const QA_SUITE_COMMAND_FORBIDDEN_RE = /[\u0000-\u001F\u007F\u0085\u2028\u2029]/;
+
 const UpdateStateArgs = z
   .object({
     workspace_path: absoluteWorkspacePath,
@@ -303,6 +307,33 @@ const UpdateStateArgs = z
     // (agent_id === "qa-engineer"). Storage records the review to
     // qa_reports/review_<id>.md (file mode) or the reports table (SQLite).
     qa_review: z.string().max(10000).optional(),
+    // qa_suite_result: qa's structured suite figures. Shape-checked here (no
+    // gate, no error code); recorded by QA_REVIEW_RECORD as one fixed
+    // server-formatted line at the head of the qa evidence, only on a write
+    // that records qa_review evidence. Never persisted to the handoff; no
+    // schema bump. passed < total is recorded as given, not rejected. (E161)
+    qa_suite_result: z
+      .object({
+        passed: z.number().int().min(0),
+        total: z.number().int().min(1),
+        command: z
+          .string()
+          .min(1)
+          .max(200)
+          .refine((s) => !QA_SUITE_COMMAND_FORBIDDEN_RE.test(s), {
+            message: "qa_suite_result.command must be one line: no control characters, U+0085, U+2028 or U+2029",
+          })
+          .refine((s) => s.trim().length > 0, {
+            message: "qa_suite_result.command must not be blank",
+          })
+          .optional(),
+      })
+      .strict()
+      .refine((r) => r.passed <= r.total, {
+        message: "qa_suite_result.passed must not exceed qa_suite_result.total",
+        path: ["passed"],
+      })
+      .optional(),
     // Optional absolute path to this workspace's PRD. PM typically sets it
     // once; downstream roles can omit it (storage preserves the prior value).
     // Consumed by the RAG lazy-reindex hook (prompts/build.ts:appendSpecContext).
@@ -675,6 +706,23 @@ export const TOOL_REGISTRY: ToolRegistryEntry[] = [
           type: "string",
           description:
             "Review notes. Recorded as evidence when agent_id=qa-engineer and status in {PASS, FAIL}.",
+        },
+        qa_suite_result: {
+          type: "object",
+          properties: {
+            passed: { type: "integer", minimum: 0, description: "Tests that passed." },
+            total: { type: "integer", minimum: 1, description: "Tests run; passed must not exceed it." },
+            command: {
+              type: "string",
+              minLength: 1,
+              maxLength: 200,
+              description: "Optional exact suite command, one line (no control characters, U+0085, U+2028 or U+2029).",
+            },
+          },
+          required: ["passed", "total"],
+          additionalProperties: false,
+          description:
+            "Optional structured suite result for a qa-engineer PASS/FAIL write: {passed, total, command?}, integers with 0 ≤ passed ≤ total and total ≥ 1. Attested, not verified. When this write records qa_review evidence (agent_id \"qa-engineer\", status PASS or FAIL, qa_review set), the server records it as one fixed line at the head of that evidence — `suite-result: <passed>/<total> passed (server-recorded from qa_suite_result)`, or `…; command: <command>)` when command is given — followed by a blank line and the qa_review text (file mode: the new section of qa_reports/review_<id>.md; SQLite: each reports row's notes). Ignored on any other write. Not persisted to the handoff. Transient: applies to THIS write only. Recording-only — gates nothing; passed < total is recorded as given.",
         },
         review_task_ids: {
           type: "array",

@@ -88,6 +88,18 @@ export interface HandoffStorage {
     reviewer: string,
     notes: string,
   ): Promise<void>;
+  // Optional undoable variant of recordReview: records exactly the same
+  // rows/bytes and returns an undo that removes only what THIS call recorded.
+  // The undo never throws; on failure it leaves the record as it is. Used by
+  // tw_update_state so a write the server refuses leaves no verdict behind.
+  // A storage without it is recorded through recordReview, with no undo.
+  recordReviewUndoable?(
+    workspacePath: string,
+    taskIds: string[],
+    status: "PASS" | "FAIL",
+    reviewer: string,
+    notes: string,
+  ): Promise<() => void>;
   hasEvidence(workspacePath: string, taskIds: string[]): Promise<EvidenceCheck>;
 
   // --- Code-reviewer evidence (mirrors QA pair; gates sr ↔ code-reviewer → qa) ---

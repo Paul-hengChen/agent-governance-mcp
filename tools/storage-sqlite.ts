@@ -195,6 +195,7 @@ export class SqliteHandoffStorage implements HandoffStorage {
   private txVoidTask: (workspacePath: string, taskId: string, reason: string, voidedAt: string) => Database.RunResult;
 
   private insertReportStmt: Database.Statement<[string, string, string, string, string, string]>;
+  private deleteReportStmt: Database.Statement<[string, string, string, string, string, string]>;
   private selectReportsByTaskStmt: Database.Statement<[string, string]>;
   private insertCodeReviewStmt: Database.Statement<[string, string, string, string, string, string]>;
   private selectCodeReviewByTaskStmt: Database.Statement<[string, string]>;
@@ -364,6 +365,13 @@ export class SqliteHandoffStorage implements HandoffStorage {
     this.insertReportStmt = this.db.prepare<[string, string, string, string, string, string]>(
       `INSERT INTO reports (workspace_path, task_id, status, reviewer, notes, created_at)
        VALUES (?, ?, ?, ?, ?, ?)`,
+    );
+    // Removes one row only while it is still exactly the row a record call
+    // wrote: the primary key plus status/reviewer/notes.
+    this.deleteReportStmt = this.db.prepare<[string, string, string, string, string, string]>(
+      `DELETE FROM reports
+       WHERE workspace_path = ? AND task_id = ? AND created_at = ?
+         AND status = ? AND reviewer = ? AND notes = ?`,
     );
     // PASS-status reports satisfy hasEvidence() in SQLite mode. File mode is
     // laxer (any file is enough) because pass/fail isn't decodable from disk.
@@ -828,17 +836,60 @@ export class SqliteHandoffStorage implements HandoffStorage {
     reviewer: string,
     notes: string,
   ): Promise<void> {
+    this.insertReportRows(workspacePath, taskIds, status, reviewer, notes);
+    return Promise.resolve();
+  }
+
+  // Records the same rows as recordReview and returns a one-shot undo that
+  // deletes only those rows, in one transaction. The undo never throws: a
+  // closed database or a failed delete leaves the rows as they are. A throw
+  // from the insert itself propagates exactly as from recordReview, with
+  // nothing inserted and no undo returned.
+  recordReviewUndoable(
+    workspacePath: string,
+    taskIds: string[],
+    status: "PASS" | "FAIL",
+    reviewer: string,
+    notes: string,
+  ): Promise<() => void> {
+    const createdAt = this.insertReportRows(workspacePath, taskIds, status, reviewer, notes);
+    const ids = [...taskIds];
+    let done = false;
+    const undo = (): void => {
+      if (done) return;
+      done = true;
+      try {
+        this.db.transaction((rows: string[]) => {
+          for (const id of rows) {
+            this.deleteReportStmt.run(workspacePath, id, createdAt, status, reviewer, notes);
+          }
+        })(ids);
+      } catch {
+        return;
+      }
+    };
+    return Promise.resolve(undo);
+  }
+
+  // Inserts one reports row per id in one synchronous transaction, all sharing
+  // one created_at, and returns that created_at. A duplicate (ws, id,
+  // created_at) — two calls in the same ms, or a repeated id — violates the
+  // primary key: the transaction rolls back and the error propagates.
+  private insertReportRows(
+    workspacePath: string,
+    taskIds: string[],
+    status: "PASS" | "FAIL",
+    reviewer: string,
+    notes: string,
+  ): string {
     const now = new Date().toISOString();
-    // Insert per id in a single implicit transaction. Duplicate (ws, id,
-    // created_at) is theoretically possible if called twice in the same ms;
-    // the PRIMARY KEY constraint then throws — caller's retry path.
     const insertMany = this.db.transaction((ids: string[]) => {
       for (const id of ids) {
         this.insertReportStmt.run(workspacePath, id, status, reviewer, notes, now);
       }
     });
     insertMany(taskIds);
-    return Promise.resolve();
+    return now;
   }
 
   hasEvidence(workspacePath: string, taskIds: string[]): Promise<EvidenceCheck> {
