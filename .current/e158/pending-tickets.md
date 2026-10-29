@@ -18,4 +18,18 @@ body: |
   Out of the e158 lane's scope: tools/comment-scan.ts is not owned by that lane.
 ```
 
+```pending-ticket
+lane_local_id: E158-NEW-2
+title: check-bookkeeping silently ignores an empty or valueless --base and falls back to origin/main
+priority: P3
+depends_on: [E158]
+source: code-reviewer, e158 lane round 1 (review_reports/review_T-E158-01.md)
+body: |
+  scripts/check-bookkeeping.mjs parseArgs drops `--base=` (empty value) and a trailing `--base`
+  with no value, so the run proceeds as if no base was named and falls back to origin/main, then
+  main, without a message. This is the same class as the explicit-but-unresolvable --base that
+  E158 made fail loud: the caller asked for a base and got a different one. Suggested fix: treat
+  an empty or missing --base value as a usage error and exit 2 with one stderr line.
+```
+
 ## Applied
