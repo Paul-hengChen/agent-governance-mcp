@@ -105,8 +105,11 @@ test("other owners / check exit codes are unchanged on the same repo", () => {
   const hit = cli(["owners", MANIFEST, "--range", "main...feat/a", "--repo", REPO]);
   assert.equal(hit.status, 1, hit.stderr);
   assert.match(hit.stdout, /^HIT  tools\/a\.ts  \(a: tools\/a\.ts\)$/m);
+  // E158: an empty range proves nothing about ownership, so it is the RANGE_EMPTY input error (was status 0).
   const none = cli(["owners", MANIFEST, "--range", "main...main", "--repo", REPO]);
-  assert.equal(none.status, 0, none.stderr);
+  assert.equal(none.status, 2, none.stderr);
+  assert.match(none.stderr, /fanout: error: RANGE_EMPTY:/);
+  assert.equal(none.stdout, "", "an empty range prints no verdict on stdout");
   const inBounds = cli(["check", MANIFEST, "a", "--base", "main", "--repo", REPO]);
   assert.equal(inBounds.status, 0, inBounds.stdout + inBounds.stderr);
   const noRef = cli(["owners", MANIFEST, "--range", "main...nope", "--repo", REPO]);
