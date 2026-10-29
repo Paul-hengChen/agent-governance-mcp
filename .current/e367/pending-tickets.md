@@ -1,5 +1,7 @@
 <!-- pending-tickets for lane e367 (E179). New blocks go ABOVE ## Applied. -->
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E368-NEW-1
 title: make active_feature spec/design/expected-red paths injective (deferred E368 read side) together with the raw-name writer convention (write side)
@@ -35,5 +37,3 @@ body: |
   Exposure at filing: 0 shipped files with non-canonical names; 1 of 84 historical
   active_feature values in .current/ was non-canonical (E260E), with no spec/design/manifest.
 ```
-
-## Applied
