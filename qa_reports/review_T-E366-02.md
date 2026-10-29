@@ -1,6 +1,13 @@
 # QA review — T-E366-02, T-E161-03, T-E184-02, T-E161-04
 
-covers: T-E366-02, T-E161-03, T-E184-02, T-E161-04
+covers: T-E366-02, T-E161-03, T-E184-02, T-E161-04, T-E161-01, T-E366-01, T-E161-02, T-E184-01
+
+## Per-id verdicts (build tasks verified through the ACs they implement)
+
+- T-E161-01: PASS. AC-E161-1 (`grep -n "D-E161"` on the architecture doc prints lines; D-E161 confirmed, four checks answered).
+- T-E366-01: PASS. AC-E366-1..4 in `test/e366-sqlite-rejected-write-evidence.test.mjs`; AC-E366-5 named existing tests green unmodified.
+- T-E161-02: PASS. AC-E161-2..9 in `test/e161-qa-suite-result.test.mjs`; AC-L1 pipeline-order and error-code-contract green.
+- T-E184-01: PASS. AC-E184-1..3 in `test/e184-get-state-omits-tier.test.mjs`; AC-E184-4 dispatch-log and dispatch-mechanism green.
 
 Lane `e161`, feature `e161-qa-claim-and-state-reads`. Code review APPROVED round 1 (`review_reports/review_T-E366-01.md`). Tests run against the lane's built `dist/` (`npm run build` first, clean).
 
