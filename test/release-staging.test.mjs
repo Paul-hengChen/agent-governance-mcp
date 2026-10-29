@@ -133,12 +133,30 @@ const AC4_UNCLASSIFIABLE_STOP =
   "AC4 unclassifiable: no specs/<active_feature>.md in the tree, pending_notes does not record a multi-feature release, and scope_decision_why does not record a backlog-row-as-spec mini-chain — record the dispatch shape in scope_decision_why (or author specs/<active_feature>.md) and re-run.";
 
 /**
+ * Derive the release's feature-spec set from the range, mirroring the SOP's
+ * command (E152): `git diff "$PREV_TAG"..HEAD --name-only -- specs/ | grep -E
+ * '^specs/[^/]+\.md$' | grep -vE '^specs/(fanout-.*|.*-architecture)\.md$'`.
+ * Top-level feature specs only; wave manifests and architecture companions out.
+ */
+function deriveRangeSpecs(gitDiffRange) {
+  return gitDiffRange
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => /^specs\/[^/]+\.md$/.test(l))
+    .filter((l) => !/^specs\/(fanout-.*|.*-architecture)\.md$/.test(l));
+}
+
+/**
  * Simulate the AC4 post-commit spec-file check (content/skill-release-engineer.md
- * step 8). Returns { pass, branch, errorMsg }. Branches, with S = spec exists
- * in tree, M = pending_notes records "Multi-feature release: ...", W = mini-chain:
- * M -> MULTI-FEATURE (always); S and not M -> REQUIRE; neither, W -> SKIP;
- * otherwise UNCLASSIFIABLE. Under MULTI-FEATURE a named feature with no spec in
- * the tree is skipped; one whose spec exists but is not in the range STOPs.
+ * step 8a). Returns { pass, branch, errorMsg, rangeDerived }. Inputs: S = spec
+ * exists in tree, M = pending_notes records "Multi-feature release: ...",
+ * R = the range-derived feature-spec set holds a path other than
+ * specs/<active_feature>.md (E152), W = mini-chain. Branches:
+ * M or R -> MULTI-FEATURE; else S -> REQUIRE; else W -> SKIP; else UNCLASSIFIABLE.
+ * Under MULTI-FEATURE a line-named feature with no spec in the tree is skipped;
+ * one whose spec exists but is not in the range STOPs. When only R fires (not M)
+ * the active feature is still classified by the single-feature rules, so the
+ * REQUIRE / UNCLASSIFIABLE strings stay byte-identical (non-weakening).
  */
 function simulatePostCommitCheck(
   gitDiffRange,
@@ -149,9 +167,30 @@ function simulatePostCommitCheck(
   multiFeatureSpecsInTree = {},
 ) {
   const specFile = `specs/${activeFeature}.md`;
+  const rangeDerived = deriveRangeSpecs(gitDiffRange);
+  const R = rangeDerived.some((p) => p !== specFile);
 
   const multiFeatureMatch = pendingNotes.match(/Multi-feature release:\s*(.+?)\.?\s*$/m);
-  if (multiFeatureMatch) {
+  const M = Boolean(multiFeatureMatch);
+
+  if (M || R) {
+    if (!M) {
+      // R-only: the active feature keeps its single-feature classification.
+      if (specExistsInTree) {
+        if (!gitDiffRange.includes(specFile)) {
+          return {
+            pass: false,
+            branch: "MULTI-FEATURE",
+            rangeDerived,
+            errorMsg: `Release commit incomplete: specs/${activeFeature}.md is absent from the release range <prev-tag>..HEAD. Stage missing files and amend or create a fix commit.`,
+          };
+        }
+      } else if (!scopeDecisionWhyRecordsMiniChain(scopeDecisionWhy)) {
+        return { pass: false, branch: "MULTI-FEATURE", rangeDerived, errorMsg: AC4_UNCLASSIFIABLE_STOP };
+      }
+      // Range-derived siblings are in the range by construction: logged, pass.
+      return { pass: true, branch: "MULTI-FEATURE", rangeDerived, errorMsg: null };
+    }
     const names = multiFeatureMatch[1]
       .split(",")
       .map((s) => s.replace(/\s*\([^)]*\)\s*$/, "").trim())
@@ -165,31 +204,34 @@ function simulatePostCommitCheck(
         return {
           pass: false,
           branch: "MULTI-FEATURE",
+          rangeDerived,
           errorMsg: `Release commit incomplete: ${nameSpecFile} is absent from the release range <prev-tag>..HEAD. Stage missing files and amend or create a fix commit.`,
         };
       }
     }
-    return { pass: true, branch: "MULTI-FEATURE", errorMsg: null };
+    return { pass: true, branch: "MULTI-FEATURE", rangeDerived, errorMsg: null };
   }
 
   if (specExistsInTree) {
     if (gitDiffRange.includes(specFile)) {
-      return { pass: true, branch: "REQUIRE", errorMsg: null };
+      return { pass: true, branch: "REQUIRE", rangeDerived, errorMsg: null };
     }
     return {
       pass: false,
       branch: "REQUIRE",
+      rangeDerived,
       errorMsg: `Release commit incomplete: specs/${activeFeature}.md is absent from the release range <prev-tag>..HEAD. Stage missing files and amend or create a fix commit.`,
     };
   }
 
   if (scopeDecisionWhyRecordsMiniChain(scopeDecisionWhy)) {
-    return { pass: true, branch: "SKIP", errorMsg: null };
+    return { pass: true, branch: "SKIP", rangeDerived, errorMsg: null };
   }
 
   return {
     pass: false,
     branch: "UNCLASSIFIABLE",
+    rangeDerived,
     errorMsg: AC4_UNCLASSIFIABLE_STOP,
   };
 }
@@ -498,6 +540,31 @@ test("AC4 (E44/E142(b)): skill-release-engineer.md's post-commit check is condit
     SKILL,
     /logged and skipped by design/,
     "MULTI-FEATURE branch must record the E142(b) Decision — a named feature with no spec file is logged-and-skipped, not STOPped",
+  );
+
+  // Range-derived feature set (E152, AC-E152-1): the SOP derives the sibling
+  // spec set from the release range, so a missing pending_notes line can no
+  // longer reduce the check to the active feature's spec alone.
+  assert.ok(
+    SKILL.includes(
+      `git diff "$PREV_TAG"..HEAD --name-only -- specs/ | grep -E '^specs/[^/]+\\.md$' | grep -vE '^specs/(fanout-.*|.*-architecture)\\.md$'`,
+    ),
+    "SOP must give the range-derived feature-spec command with the fanout-*/*-architecture exclusion (E152)",
+  );
+  assert.match(
+    SKILL,
+    /MULTI-FEATURE branch\*\*[^\n]*WHEN M OR R holds \(M ∨ R\)/,
+    "MULTI-FEATURE branch must fire on the pending_notes line OR another feature spec in the range (M ∨ R) (E152)",
+  );
+  assert.match(
+    SKILL,
+    /That line is optional extra input, never required/,
+    "the Multi-feature release pending_notes line must be documented as optional (E152)",
+  );
+  assert.match(
+    SKILL,
+    /neither `pending_notes` records a multi-feature release nor the range carries another feature spec \(¬M ∧ ¬R/,
+    "REQUIRE/SKIP/UNCLASSIFIABLE triggers must be keyed on ¬M ∧ ¬R (E152)",
   );
 });
 
@@ -810,40 +877,101 @@ test("Fixture K (AC4/MULTI-FEATURE non-weakening): MULTI-FEATURE fires regardles
   }
 });
 
-test("AC4 branch exhaustiveness: exactly one of REQUIRE/MULTI-FEATURE/SKIP/UNCLASSIFIABLE fires for every (specExistsInTree x recordsMultiFeature x recordsMiniChain) combination", () => {
+// ---------------------------------------------------------------------------
+// E152 fixtures: range-derived feature set (option A). R fires without M.
+// ---------------------------------------------------------------------------
+test("Fixture L (AC-E152-2, the E152 defect): two feature specs in the range and NO pending_notes line -> MULTI-FEATURE, both specs reported, pass", () => {
+  const gitDiffRange = ["CHANGELOG.md", "specs/e-active.md", "specs/e-sibling.md"].join("\n");
+  const result = simulatePostCommitCheck(gitDiffRange, "e-active", true, "", /* no Multi-feature release line */ "");
+  assert.equal(result.branch, "MULTI-FEATURE", "range carrying a second feature spec must select MULTI-FEATURE without the pending_notes line");
+  assert.equal(result.pass, true);
+  assert.equal(result.errorMsg, null);
+  assert.deepEqual(
+    [...result.rangeDerived].sort(),
+    ["specs/e-active.md", "specs/e-sibling.md"],
+    "both spec paths must be reported as verified",
+  );
+});
+
+test("Fixture M (AC-E152-3, R without M): active spec in tree but absent from the range -> STOP with the byte-identical REQUIRE string", () => {
+  const gitDiffRange = ["CHANGELOG.md", "specs/e-sibling.md"].join("\n");
+  const result = simulatePostCommitCheck(gitDiffRange, "e-active", true, "");
+  assert.equal(result.pass, false);
+  assert.equal(
+    result.errorMsg,
+    AC4_REQUIRE_STOP.replace("specs/<active_feature>.md", "specs/e-active.md"),
+    "R-only must not weaken the active feature's REQUIRE check",
+  );
+});
+
+test("Fixture N (AC-E152-3, R without M): no active spec and no mini-chain record -> STOP with the verbatim UNCLASSIFIABLE string", () => {
+  const gitDiffRange = ["CHANGELOG.md", "specs/e-sibling.md"].join("\n");
+  const result = simulatePostCommitCheck(gitDiffRange, "e-active", false, "");
+  assert.equal(result.pass, false);
+  assert.equal(result.errorMsg, AC4_UNCLASSIFIABLE_STOP);
+});
+
+test("Fixture O (AC-E152-3, R without M): no active spec and a mini-chain record -> pass", () => {
+  const gitDiffRange = ["CHANGELOG.md", "specs/e-sibling.md"].join("\n");
+  const result = simulatePostCommitCheck(gitDiffRange, "e-active", false, MINI_CHAIN_SCOPE_WHY);
+  assert.equal(result.pass, true);
+  assert.equal(result.branch, "MULTI-FEATURE");
+  assert.equal(result.errorMsg, null);
+});
+
+test("Fixture P (AC-E152-6): fanout-*, *-architecture and nested specs are excluded from the derived set, so R is false and the check stays single-feature", () => {
+  const gitDiffRange = [
+    "specs/fanout-x.md",
+    "specs/e-active-architecture.md",
+    "specs/e-active.md",
+    "specs/abandoned/lane/e-other.md",
+  ].join("\n");
+  assert.deepEqual(deriveRangeSpecs(gitDiffRange), ["specs/e-active.md"]);
+  const result = simulatePostCommitCheck(gitDiffRange, "e-active", true, "");
+  assert.equal(result.branch, "REQUIRE", "R false -> exactly the pre-E152 single-feature REQUIRE branch");
+  assert.equal(result.pass, true);
+});
+
+test("AC4 branch exhaustiveness: exactly one of REQUIRE/MULTI-FEATURE/SKIP/UNCLASSIFIABLE fires for every (specExistsInTree x recordsMultiFeature x rangeCarriesOtherSpec x recordsMiniChain) combination (16)", () => {
   const activeFeature = "exhaustiveness-check-feature";
-  // code-reviewer round 2 F1's re-derivation: REQUIRE = S∧¬M, MULTI-FEATURE =
-  // M (any S/W), SKIP = ¬S∧¬M∧W, UNCLASSIFIABLE = ¬S∧¬M∧¬W — all 8 (S,M,W)
-  // assignments covered, all six pairs unsatisfiable.
-  const combos = [
-    { specExistsInTree: true, recordsMultiFeature: false, scopeDecisionWhy: "", expectedBranch: "REQUIRE" },
-    { specExistsInTree: true, recordsMultiFeature: false, scopeDecisionWhy: MINI_CHAIN_SCOPE_WHY, expectedBranch: "REQUIRE" },
-    { specExistsInTree: false, recordsMultiFeature: false, scopeDecisionWhy: MINI_CHAIN_SCOPE_WHY, expectedBranch: "SKIP" },
-    { specExistsInTree: false, recordsMultiFeature: false, scopeDecisionWhy: "", expectedBranch: "UNCLASSIFIABLE" },
-    { specExistsInTree: true, recordsMultiFeature: true, scopeDecisionWhy: "", expectedBranch: "MULTI-FEATURE" },
-    { specExistsInTree: true, recordsMultiFeature: true, scopeDecisionWhy: MINI_CHAIN_SCOPE_WHY, expectedBranch: "MULTI-FEATURE" },
-    { specExistsInTree: false, recordsMultiFeature: true, scopeDecisionWhy: MINI_CHAIN_SCOPE_WHY, expectedBranch: "MULTI-FEATURE" },
-    { specExistsInTree: false, recordsMultiFeature: true, scopeDecisionWhy: "", expectedBranch: "MULTI-FEATURE" },
-  ];
+  // Re-derivation (E152): MULTI-FEATURE = M or R (any S/W), REQUIRE = S and not M and not R,
+  // SKIP = not S, not M, not R, W; UNCLASSIFIABLE = not S, not M, not R, not W. All 16 (S,M,R,W)
+  // assignments covered, branches pairwise exclusive.
+  const combos = [];
+  for (const S of [true, false]) {
+    for (const M of [true, false]) {
+      for (const R of [true, false]) {
+        for (const W of [true, false]) {
+          const expectedBranch = M || R ? "MULTI-FEATURE" : S ? "REQUIRE" : W ? "SKIP" : "UNCLASSIFIABLE";
+          combos.push({ S, M, R, W, expectedBranch });
+        }
+      }
+    }
+  }
+  assert.equal(combos.length, 16);
   const seenBranches = new Set();
-  for (const { specExistsInTree, recordsMultiFeature, scopeDecisionWhy, expectedBranch } of combos) {
-    const pendingNotes = recordsMultiFeature ? V3113_PENDING_NOTES : "";
-    // A range containing every named feature's spec (when recordsMultiFeature)
-    // so this exhaustiveness pin isolates branch SELECTION, not the
-    // MULTI-FEATURE STOP/PASS sub-outcome (Fixtures I/J cover that).
-    const gitDiffRange = recordsMultiFeature ? "specs/e109-workspace-feature-anchoring.md" : "";
+  for (const { S, M, R, W, expectedBranch } of combos) {
+    const pendingNotes = M ? V3113_PENDING_NOTES : "";
+    // The range carries every spec the combination needs so the pin isolates
+    // branch SELECTION, not the MULTI-FEATURE STOP/PASS sub-outcome (Fixtures
+    // I/J/L-O cover that): the active spec when S, the line-named spec when M,
+    // another feature's spec when R.
+    const range = [];
+    if (S) range.push(`specs/${activeFeature}.md`);
+    if (M) range.push("specs/e109-workspace-feature-anchoring.md");
+    if (R) range.push("specs/some-other-feature.md");
     const result = simulatePostCommitCheck(
-      gitDiffRange,
+      range.join("\n"),
       activeFeature,
-      specExistsInTree,
-      scopeDecisionWhy,
+      S,
+      W ? MINI_CHAIN_SCOPE_WHY : "",
       pendingNotes,
       V3113_SPECS_IN_TREE,
     );
     assert.equal(
       result.branch,
       expectedBranch,
-      `specExistsInTree=${specExistsInTree}, recordsMultiFeature=${recordsMultiFeature}, scope_decision_why=${JSON.stringify(scopeDecisionWhy)} must yield branch=${expectedBranch}, got ${result.branch}`,
+      `S=${S}, M=${M}, R=${R}, W=${W} must yield branch=${expectedBranch}, got ${result.branch}`,
     );
     seenBranches.add(result.branch);
   }
