@@ -56,3 +56,39 @@ No findings. Prose and metadata only; the one runtime-visible change is a boolea
 
 ## Verdict
 CHANGES_REQUESTED — every text change matches the spec and the code it describes, but the handoff leaves 14 intentional reds with no `qa_reports/expected-red_e152-release-ac4-and-prose-sync.txt` manifest (F1, required); add the manifest and this review can approve without re-reading the text diffs.
+
+## Round 2 — APPROVED — by code-reviewer
+
+Re-review range: `c6a8e2f..HEAD` (sr fix `b767ba0`, ledger `370c0df`), against base `f5485a7` and `specs/e152-release-ac4-and-prose-sync.md`.
+
+## Summary
+- The round-2 delta adds `qa_reports/expected-red_e152-release-ac4-and-prose-sync.txt` (14 entries) plus lane bookkeeping. Nothing else changed.
+- `git diff --stat c6a8e2f..HEAD` lists only the manifest, `.current/e152/dispatch.jsonl` and `.current/e152/handoff.md`. The text diffs approved in round 1 (`content/`, `gates/registry.ts`, `dist/gates/registry.*`, `docs/lane-protocol.md`, `specs/e260c-*`, `specs/e351-*`) are byte-unchanged since `c6a8e2f`.
+- F1 is resolved: the manifest exists, follows the repo convention, and matches the reds at HEAD exactly in both directions.
+- Verdict: APPROVED.
+
+## AC Completeness
+The round 1 per-AC table still applies, because no implementation file changed since `c6a8e2f`. The ACs deferred to qa (AC-E152-5/6, AC-E365-4/5, AC-E371-2, AC-L1) are still qa-owned re-pins. Every red that blocks them is now listed in the manifest. AC-L2 is implemented: `node scripts/fanout.mjs check --cut specs/fanout-post-v4-w12.md e152 specs/e152-release-ac4-and-prose-sync.md` exits 0 (`7 ticket(s), 16 token(s), 0 out of bounds`).
+
+## Correctness
+- **F1 — resolved.** I verified the manifest independently:
+  - **Format.** Each data line has the form `<relative test file path> | <exact test name>`, with `#` rationale lines grouped by ticket. This matches the existing convention (e.g. `qa_reports/expected-red_e18-write-provenance.txt`, which carries the same 6 compose-equivalence and 3 context-budget line shapes) and the header contract in `gates/expected-red.ts:1-6`. The gate only checks that the file exists (`hasExpectedRedManifest`, `gates/expected-red.ts:46-53`), and the filename matches `expectedRedManifestPath("e152-release-ac4-and-prose-sync")`.
+  - **Both-way diff at HEAD.** `npm run build` was a no-op (tree stayed clean). I then ran each of the six named files under `node --test --test-reporter=tap` and collected the `not ok` names as `file | name` pairs. Result: 14 actual fails and 14 manifest entries. Manifest entries that do not fail: `[]`. Fails missing from the manifest: `[]`. Combined run: 106 tests, 92 pass, 14 fail.
+  - **Inside the spec's re-pin list.** All 14 reds fall under rows of the "Pinned tests to re-pin (qa), complete list" table (spec lines 205-217): compose goldens ×6 and `context-budget` ×3 (E365), `e139` AC-E139-7, `e295` AC11 and `e308` E303-AC11a (E365), and `e351` AC-E351-2/3 (E371). No red falls outside the list.
+- **O2 (optional, carried from round 1): sr's rationale holds.** Spec AC-E152-1 (spec line 31) quotes the range pipeline verbatim. `content/skill-release-engineer.md:224` reproduces it byte-for-byte, so appending `|| true` would break that spec/SOP identity. The SOP never sets `-e`/`pipefail`, and the agent reads the pipeline's output rather than its exit status, so an empty set's exit 1 just means R = false. This stays optional and is not re-raised.
+- **O1:** unchanged, no action.
+
+## Quality
+No findings. The manifest's `#` rationale blocks give per-cap token deltas (+71/+71/+72) and the reason for each ticket. This matches earlier manifests. No code comments were added (SOP 4b: nothing to check).
+
+## Architecture
+No architecture spec exists for this feature. Round 2 adds only a data file, so layering is unchanged.
+
+## Security
+No findings. The manifest is plain data with no secrets and no executable content.
+
+## Performance
+No findings. Round 2 changed no code.
+
+## Verdict
+APPROVED — F1 is fixed: the manifest exists, follows the convention, and matches the 14 HEAD reds exactly in both directions. Every red is inside the spec's re-pin list, the round-1-approved text is unchanged, and the lane scope check exits 0.
