@@ -2,7 +2,7 @@
 base: b8aaf7d    integration branch: integ/post-v4-w12
 mailbox: ../agent-governance-mcp-lanes/_mailbox
 
-**狀態：已核准 2026-10-29（D1 照草案建議 A），派工中。** `base:` 是規劃基準（第 11 波交接更新 PR #48 merge）；實際派工 base = 本清單併入後的 `main` sha，記在 Decisions 派工列。
+**狀態：已結案 2026-10-29。** 四條 lane 皆 qa PASS（CI 綠）→ `integ/post-v4-w12` merge `3b09c59`（e152）、`eb7e146`（e158）、`2223697`（e161）、`7b06d46`（e367）→ finish 四條（E373–E379 配號）→ 記帳 commit → PR + auto-merge（見「結案」與「接手步驟」）。E368 依人類裁決 B 延後，由 E379 取代。 `base:` 是規劃基準（第 11 波交接更新 PR #48 merge）；實際派工 base = 本清單併入後的 `main` sha，記在 Decisions 派工列。
 
 範圍由人類指定（第 11 波交接「待人類決定」的選項 b）：佇列 P2 段剩下的 E152、E158、E161、E184，加上第 11 波 finish 配號的 E365–E372，共 12 張。依檔案範圍分成四組，四組的擁有集合互不相交：
 - (1) 文字同步：E152、E365、E371、E372。都是散文或文件改動，加上釘住那些文字的測試。E152、E365 都改 `content/**`，所以共享生成物只歸這條 lane。
@@ -86,7 +86,7 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 | `tw_get_state` 不再以可照抄的形式呈現上一跳的 `dispatch_mechanism_tier` | e161（E184） | ✓ |
 | SQLite／HTTP 模式下被拒絕的 qa 寫入不留下 reports 列，有 qa 的測試 | e161（E366） | ✓ |
 | lane-status 認得出非正規 task id 的 PASS 證據 | e367（E367） | ✓ |
-| 只有大小寫或被消毒字元不同的兩個 feature 名稱不會解析到同一個 spec／design／manifest；正規名稱路徑不變 | e367（E368） | ✓ |
+| 只有大小寫或被消毒字元不同的兩個 feature 名稱不會解析到同一個 spec／design／manifest；正規名稱路徑不變 | 延後（人類裁決 NHR-1 = B）：與 E368-NEW-1 的寫入端合成一張票，由 finish 配號，排到能動 `content/**` 的波次 | ✗（人類同意延後） |
 | 被改變行為釘住的測試重新固定，其他測試全綠不改 | e152、e158、e161、e367（各自的 qa） | ✓ |
 | 12 張票 done-mark；佇列對應列勾 DONE | 整合者（5c） | ✓ |
 | 本清單結案時寫 `## 接手步驟`，狀態行以「已結案」開頭 | 整合者（5c） | ✓ |
@@ -109,6 +109,32 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 
 預期零檔案衝突（擁有集合不相交）；`dist/` 不手解，一律重建。
 
+## 結案
+- 日期 2026-10-29。`integ/post-v4-w12` ← e152 `13a75be`（merge `3b09c59`）← e158 `d794fce`（`eb7e146`）← e161 `6f040e1`（`2223697`）← e367 `4017a3e`（`7b06d46`），皆 `--no-ff`、零衝突 → 無合併審查；每次合併後 merge-invariants PASS；重建 `dist/` 無差異；`check:bookkeeping` OK；`npm audit --audit-level=high` exit 0；整合層 CI run 40845607789 在 `7b06d46` 綠。
+- 彙總（上限按 lane 計，合計僅供參考）：e152 7 張 task／hop 6/14／review 退回 1 輪（缺 expected-red 清單）／qa 0 輪；e158 6 張／hop 4/14；e161 8 張（handoff 的 `completed_tasks` 記 4 個，其餘 4 個由 `tw_complete_task` 加 covers 證據完成，lane 已揭露）／hop 5/14；e367 3 張（另 void 3 張 E368 task）／hop 4/14。合計 24 張 task、hop 19；除 e152 的一輪 review 退回外都是 0 輪退回；每條 lane 都在自己的上限內。
+- 完成定義：16 項中 14 項成立；兩項依人類裁決延後 —— E161 的 qa SOP 句子（D1 A → E380）、E368（NHR-1 B → E379）。
+- 例外：(1) e367 依人類裁決 B 縮小 cut，E368 由 E379 取代。(2) e158 的 sr 在 cut 核准後加了一個大聲失敗（`--base` 無 merge-base 時 exit 2），code review 保留、qa 有 fixture、spec 已寫明。(3) e161 第一次回報的 CI 在 Node 20 紅（`test/e177b-mailbox-watch.test.mjs` AC19/AC15，不在負載敏感清單），依規則不 rerun 而退回；lane 確認無關、記成 E378 後以新 sha 的 CI 綠放行。(4) e161 的 qa 寫 PASS 時預設 `next_role=release-engineer`，整合者去信，lane 沒有派。(5) 四條 lane 的 sr 與 code-reviewer 都是 opus（同模型疑慮，比照第 11 波）。(6) lane 本機全套多次撞到計時偶發（VR-21、VR-22、E254 的 gap-6），CI 都綠。
+- 新票：E373–E379 由 `finish --shipped` 配號；E380（D1 A 的 qa SOP 句子）、E381（`check --cut` 把擁有欄說明文字解析成 glob）、E382（test-lock 的 dangling symlink 鎖路徑仍空轉）由整合者立票；E373–E382 排在佇列 #188–#197。
+- 發版：`main` 帶 E152／E365／E371／E372（`content/skill-release-engineer.md` AC4、`content/const-08-chain-31-mid.md`、`gates/registry.ts` 的 `documentedInProse`、golden 與 context budget、`docs/lane-protocol.md` §3）、E158／E369／E370（`scripts/verify-release.mjs`、`scripts/check-bookkeeping.mjs`、`scripts/test-lock.mjs`、`tools/fanout-manifest.ts` 的 `RANGE_EMPTY`）、E161／E184／E366（`tw_update_state` 新選填參數 `qa_suite_result`、`tw_get_state` 不再回 `dispatch_mechanism_tier`、SQLite 回滾）、E367（`decodeEvidenceId`）。給發版的注意：`tw_get_state` 少一個鍵與 `check-bookkeeping` 找不到 base 時 exit 2 屬 adopter 可見的行為改動；`GATE_REGISTRY` 仍是 35；不升 schema。是否發版與版號由人類決定。
+
+## 接手步驟
+（事實欄位由 `node scripts/fanout.mjs handoff` 產生；接手時先跑 `node scripts/fanout.mjs handoff --check <manifest>`。`<待填：…>` 由整合者填寫。）
+### 核對 primary
+- 目標分支：main @ f5485a7
+- 目標分支對 origin：一致
+- git status：乾淨
+- worktree：primary（main ← integ/post-v4-w12 @ 67192ff）
+- lane-status：primary（main ← integ/post-v4-w12 @ 67192ff）release-post-v4-w11／In_Progress／release-engineer，hop 3，commits 0，clean
+### 已結案
+- 第 12 波四條 lane（e152、e158、e161、e367）都已合併、finish、拆除；lane 紀錄在 `.current/history/2026-10/`。記帳與本清單在同一個 wave PR。佇列 E152、E158、E161、E184、E365、E366、E367、E369、E370、E371、E372 至此完成；E368 作廢，由 E379 取代（人類裁決 B）。
+- 未配號的新發現：無（E373–E379 由 finish 配號，E380–E382 由整合者立票，排在佇列 #188–#197）。
+### 待人類決定
+- 是否發版、版號（本波動到 `tools/`、`gates/registry.ts`、`scripts/`、`content/`、`dist/`；`tw_get_state` 少回一個鍵、`check-bookkeeping` 找不到 base 時改 exit 2，屬 adopter 可見的行為改動）。
+- 是否開下一波。
+- 是否把 `test/e177b-mailbox-watch.test.mjs` 的 AC19/AC15（E378）列入負載敏感清單：列入後，它在 CI 紅時整合者可以 rerun 一次；目前只能退回 lane。
+### 進行中的背景工作
+無
+
 ## Dispatch pins
 - e152：`pm=opus`、`sr-engineer=opus`。
 - e158：`pm=opus`、`sr-engineer=opus`。
@@ -121,3 +147,21 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 | 2026-10-29 | 人類 | 第 12 波範圍：佇列 P2 段剩下的 E152、E158、E161、E184，加上 E365–E372（第 11 波交接「待人類決定」的選項 b）。人類回覆「option b」 | 整合者 session |
 | 2026-10-29 | 整合者 | 草案：e152（E152＋E365＋E371＋E372，文字同步，唯一碰共享生成物的 lane）∥ e158（E158＋E369＋E370，`scripts/`）∥ e161（E161＋E184＋E366，handoff 讀寫路徑）∥ e367（E367＋E368，E136 編碼的後續）。重劃：`docs/lane-protocol.md` §3 與兩份 spec 的函式名劃給 e152；`gates/registry.ts` 只限 E365 的條目劃給 e152；`scripts/**` 與（條件式）`tools/fanout-manifest.ts` 劃給 e158；`tools/lane-status.ts`、`tools/evidence-*.ts` 劃給 e367；`schema/**`、`tools/registry.ts` 條件式劃給 e161；`bin/**` 回到共同禁止。E152 的修法限在 SOP。E359、E360、E361、E363 不在範圍內。待人類裁決：D1（E161 的 SOP 那半） | 本檔 |
 | 2026-10-29 | 人類 | 核准本清單（全部）：四條 lane（e152、e158、e161、e367）與所有重劃；D1 照草案建議 A —— e161 只做設計決定與伺服器端，E161 若選結構化欄位，qa SOP 那半由整合者在 5c 立新票、排到下一個能動 `content/**` 的波次（完成定義該列延後）；Lanes 表不加 `approval` 欄。人類回覆「approve」 | 整合者 session |
+| 2026-10-29 | 整合者 | 清單 PR #49 merge `f5485a7` = 派工 base（PR 的 CI run 40832968597 綠）；派工前核對：四條 lane 點名的擁有／禁止路徑在 base 都存在，沒有殘留 branch／worktree；信箱 e152／e158／e161／e367 已建空檔，mailbox-watch 與 lane-status watch 都已 armed；四份 prompt 以 `fanout.mjs render --base f5485a7` 產生。此列隨記帳 commit 進 integ | 本檔 |
+| 2026-10-29 | 整合者 | e161 cut 預審 close（`4358674`，to-lane#1）：check --cut exit 0（8 tasks）；每條 AC 都有實作 task；同意 D-E161（選填 `qa_suite_result`，伺服器寫進證據，不升版、不加閘門）、D-E184（從 `tw_get_state` 拿掉 tier；`content/` 沒有 SOP 從讀取視圖讀它）、D-E366（undo handle）。新發現 E161-NEW-1（suite result 的閘門）、E184-NEW-1（`prompts/build.ts` 狀態區塊仍呈現 tier）等 finish 配號。architect 的 Open Questions 還要再預審一次 | 信箱 e161 |
+| 2026-10-29 | 整合者 | e158 cut 預審 close（`a4a0ccc`，to-lane#1）：check --cut exit 0；17 列稽核表逐列核對，`tag-at-HEAD` 的改動不碰 tag 等於 HEAD 的正常路徑；`fanout check`／`owners --range` 空範圍改 exit 2（新碼 `RANGE_EMPTY`），整合者 SOP 不改。給人類的建議（needs human ruling，由 lane 呈）：R1 選 A（找不到 base 時 exit 2，推翻 E299 AC4 的 note；CI 是 `fetch-depth: 0`，正常路徑不受影響）。整合者自己的新發現：`check --cut` 把擁有欄的說明文字解析成 glob token，範圍外的測試檔在機器層擋不住（5c 立票）。新發現 E158-NEW-1 等 finish 配號 | 信箱 e158 |
+| 2026-10-29 | 整合者 | e152 cut 預審 close（`2d03c50`，to-lane#1）：check --cut exit 0（7 tasks）；同意 E152 選項 A（從發版範圍推導 feature spec，那一行改為可選；只因範圍觸發時 active 的判定不放寬），要求 lane 向人類講明 A 對範圍內 sibling spec 的檢查必然通過、spec 不在範圍內的 feature 仍看不到；E365 寫在 const-08 §3.1；`(none)` 對照列解讀為把 `(none)` 換成檔名、保留整列 | 信箱 e152 |
+| 2026-10-29 | 整合者 | e367 cut 預審 close（`28dee4a`，to-lane#1）：check --cut exit 0；`encodeFeatureStem` 技術上成立（已出貨的 380 個名稱 0 搬動）。給人類的建議（needs human ruling，由 lane 呈）：NHR-1 選 B —— 本波只出 E367，E368 延後並與 E368-NEW-1（寫入端）合成一張票，排到能動 `content/**` 的波次；理由：A 會讓用大寫或底線命名 feature 的 adopter，其 AC-execution／visual 閘門安靜地不武裝（fail-open），比 A 修掉的 P4 碰撞更糟。選 B 時 lane 寄新 sha，整合者只核對它是原 cut 的子集。R2 同意 `test/visual-evidence-gate.test.mjs` 的 re-pin | 信箱 e367 |
+| 2026-10-29 | 人類 | 在 e152 lane session 核准 cut（`2d03c50`）。人類回覆「approve」 | e152 lane session；`specs/e152-release-ac4-and-prose-sync.md`，commit `2d03c50` |
+| 2026-10-29 | 人類 | 在 e158 lane session 核准 cut（`a4a0ccc`）；R1 裁決選 A（找不到 base 時 `check-bookkeeping` exit 2，推翻 E299 AC4 的 note，`ID-MONO-NO-BASE-NOTE` 重新固定）。人類回覆「approve cut, R1=A」 | e158 lane session；`specs/e158-range-subject-audit.md`，commit `10e024f` |
+| 2026-10-29 | 人類 | e367 NHR-1 裁決選 B：本波只出 E367，E368 延後，與 E368-NEW-1（寫入端）合成一張票；清單完成定義的 E368 列延後；核准縮小後的 cut。人類回覆「approve, B」 | e367 lane session；`specs/e367-evidence-and-feature-path-encoding.md`，commit `b2233d5` |
+| 2026-10-29 | 整合者 | e367 縮小後的 cut 預審 close（`b2233d5`，to-lane#2）：Cut 只剩 T-E367-01／T-E367-02，加上只做 lane 層驗證的 T-E367-03，是 `28dee4a` 的子集；check --cut exit 0；E368 的 re-pin 全部取消 | 信箱 e367 |
+| 2026-10-29 | 人類 | 在 e161 lane session 核准 cut（`4358674`），三個 PM 選項照建議（D-E161 結構化欄位、D-E184 拿掉 tier、D-E366 undo handle）。人類回覆「approve」 | e161 lane session；`specs/e161-qa-claim-and-state-reads.md`，commit `4358674`（`cut_approved` 見 `97f8a7b`） |
+| 2026-10-29 | 整合者 | e161 architect Open Questions 預審 close（`87f1531`，to-lane#2）：D-E161 確認、檔案集合不變；OQ-1（`command` 另拒 C0、DEL、U+0085、U+2028、U+2029，防止偽造 `covers:` 行與 verdict 標題）等七題全部同意，0 項需人類裁決；OQ-6（SQLite 模式重複的 `review_task_ids` 撞主鍵，現有行為）由 lane 記成新發現 | 信箱 e161 |
+| 2026-10-29 | 人類 | 在 e161 lane session 核准 architect 的 Open Questions（OQ-1..OQ-7 照 architect 裁定）；OQ-6 記成 E366-NEW-1（P4） | e161 lane session；`specs/e161-qa-claim-and-state-reads-architecture.md`，commit `87f1531` |
+| 2026-10-29 | 整合者 | 5a：e367 `4017a3e`（CI run 40840673883）close —— review、qa 都一輪通過；19 檔都在擁有範圍內；E368 依人類裁決 B 的三張 task 已 void；lane 本機兩次全套各有一個不同的計時紅燈（`test/verify-release.test.mjs` VR-22、`test/e132-lane-registry.test.mjs` gap-6，四條 lane 同時跑全套的負載），CI 綠；新發現 E368-NEW-1（E368 讀寫兩半）等 finish 配號 | 本檔 |
+| 2026-10-29 | 整合者 | 5a：e152 `13a75be`（CI run 40841507117）close —— review 第 1 輪 CHANGES_REQUESTED（缺 expected-red 清單）、第 2 輪 APPROVED，qa 一輪通過；35 檔都在擁有範圍內；`gates/registry.ts` 只動 E365 的條目、對照列與兩段註解；`docs/lane-protocol.md` 只動 §3 兩行；6 個 full 模式 golden 與 context budget 三個上限重新固定（lite golden 不變）；沒有新發現。lane 本機一次全套撞到 E254（`test/e132-lane-registry.test.mjs` gap-6），重跑全綠，CI 綠 | 本檔 |
+| 2026-10-29 | 整合者 | 5a：e158 `d794fce`（CI run 40843087004）close —— review、qa 都一輪通過；25 檔都在擁有範圍內；`fanout check`／`owners --range` 空範圍改 exit 2（`RANGE_EMPTY`）；`check-bookkeeping` 在 `--base` 解析不到、無 merge-base（核准後新增，reviewer 保留、qa 有 fixture、spec 已寫明）、完全找不到 base（R1=A）時都 exit 2；E370 的 AC9 改看巢狀 wrapper 自己的行為、AC13a 預算由 `AGC_E177B_WAIT_MS` 推算。新發現 E158-NEW-1、E158-NEW-2 等 finish 配號；整合者另立一張（test-lock 的鎖路徑是斷掉的 symlink 時仍空轉，既有問題） | 本檔 |
+| 2026-10-29 | 整合者 | 5a：e161 第一次回報 `1faf645` 的 CI run 40844508566 紅（Node 20 job，`test/e177b-mailbox-watch.test.mjs` AC19/AC15 的固定時間預算；不在負載敏感清單，依規則不 rerun，退回 lane）。lane 以 Node 20／22 各跑 5 次確認與本 lane 改動無關，補新發現 E161-NEW-2 → `6f040e1`（CI run 40845142058 綠）close —— review、qa 都一輪通過；31 檔都在擁有範圍內；`schema/`、`gates/`、`content/` 未動；新發現 E161-NEW-1、E161-NEW-2、E184-NEW-1、E366-NEW-1 等 finish 配號 | 本檔 |
+| 2026-10-29 | 整合者 | 5b：`integ/post-v4-w12` ← e152 `3b09c59` ← e158 `eb7e146` ← e161 `2223697` ← e367 `7b06d46`，皆 `--no-ff`、零衝突 → 無合併審查；merge-invariants 四次 PASS；重建 `dist/` 無差異；`npm audit --audit-level=high` exit 0；整合層 CI run 40845607789 綠 | 本檔 |
+| 2026-10-29 | 整合者 | 5c／6：finish e152（無新發現）、finish e158 配號 E373–E374、finish e161 配號 E375–E378、finish e367 配號 E379；整合者立 E380（D1 A 的 qa SOP 句子）、E381（`check --cut` 把擁有欄說明文字解析成 glob）、E382（test-lock 的 dangling symlink 鎖路徑）；E373–E382 排在佇列 #188–#197（本波之後的 P2／P3 段尾）；E368 標 VOID、由 E379 取代；12 張票 done-mark 與佇列 DONE | 本檔 |
