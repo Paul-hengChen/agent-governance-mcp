@@ -16,6 +16,114 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [4.14.0] - 2026-10-29
+
+MINOR release. It ships post-v4 fan-out wave 11 since v4.13.0, landed on `main` by two pull
+requests: the insertion lane `e364` (E364) and the wave itself, lanes `e139` (E139, E236, E136,
+E154), `e362` (E362, E224) and `e217` (E217, E215); plan `specs/fanout-post-v4-w11.md`, release
+gate `specs/release-post-v4-w11.md`. Semver: MINOR (decided by the human). This release changes
+compiled code and the dependency set: `tw_update_state` gains one rejection rule in file mode,
+evidence filenames change for task ids outside the canonical character set (read *Upgrade notes*
+first), and the `zod` floor is raised. No MCP tool was added or removed, no schema version
+changed (handoff 15, tasks 2, sqlite 2, config 2), and no constitution or role SOP text changed.
+The gate registry grows from 34 to 35 entries; the write pipeline stays at 18 steps.
+
+### Upgrade notes
+
+- **E136: evidence filenames for non-canonical task ids change.** Evidence files under
+  `qa_reports/` and `review_reports/` (`review_<id>.md`, `visual_<id>.md`) are now named by an
+  injective encoding of the task id. A task id made only of `A`–`Z`, `0`–`9`, `.` and `-` (for
+  example `T-E139-01`, `T01`, `JIRA-42`) keeps its filename, so every canonical `T-<ticket>-NN` id
+  is unchanged. Any id containing a character outside `[A-Z0-9.-]` now encodes differently from
+  v4.13.0: a lower-case letter, `_`, a space, `/`, or any non-ASCII character. For example
+  `T-e139-01` → `review_T-_E139-01.md`, `T-A_1` → `review_T-A__005F1.md`, `T-A/1` →
+  `review_T-A__002F1.md`, `T-A 1` → `review_T-A__00201.md`, `T-é-1` → `review_T-__00E9-1.md`.
+  There is no fallback to the old name: evidence recorded under the v4.13.0 name for such an id
+  must be re-recorded (or renamed) before its gate will find it. Ids that v4.13.0 collapsed onto
+  one filename (`T-A_1`, `T-A/1` and `T-A 1` all mapped to `review_T-A_1.md`) now get distinct
+  files. The `active_feature`-derived paths (spec, expected-red list, design file) are unchanged.
+- **E139: only the code-reviewer may record a review verdict (file mode).** A `tw_update_state`
+  write that carries `review_verdict` is now rejected with the new code
+  `NON_REVIEWER_VERDICT_REJECTED` unless it is stamped `agent_id=code-reviewer`, or it is the
+  approved hand-off from review to QA (`code-reviewer:In_Progress` → `qa-engineer:In_Progress`
+  with `review_verdict=APPROVED`). A rejected write leaves the handoff unchanged. SQLite mode is
+  unchanged.
+- **E364: dependency floors.** The `zod` floor rises from `^4.4.3` to `^4.6.6` (installed 4.6.7),
+  and `body-parser` moves to 2.4.0 through the lockfile. Both close HIGH advisories; see
+  *Changed* and `docs/dependency-advisories.md` §8 and §9.
+
+### Added
+
+- **E139: a new rejection code, `NON_REVIEWER_VERDICT_REJECTED`, so a role other than the
+  code-reviewer cannot record a review verdict (`gates/registry.ts`,
+  `tools/handoff-orchestrator.ts`)**. It is a new `GATE_REGISTRY` entry (34 → 35) raised by the
+  existing review-verdict consistency step, so the pipeline keeps 18 steps. It ships
+  `documentedInProse: false` (no role prompt text quotes it yet). `docs/architecture.md` carries
+  the new gate count. Tests: `test/e139-non-reviewer-verdict.test.mjs`, with
+  `test/e35-pipeline-order.test.mjs`, `test/error-code-contract.test.mjs`,
+  `test/e26-gate-stats.test.mjs`, `test/qa-flow.test.mjs`,
+  `test/e308-single-source-tier-enum.test.mjs` and `test/e295-hop-cap-and-sop-halves.test.mjs`
+  re-pinned.
+- **E217: abandoning a lane keeps its unsaved specs (`bin/agc-init.mjs`)**. `agc feature finish
+  --abandoned` copies the lane's untracked, git-ignored, unlinked files under `specs/`
+  (recursively) into the primary checkout at `specs/abandoned/<ticket-id>/` before the worktree
+  is removed. The copy is not committed, and `--shipped` output is unchanged. `docs/install.md`
+  describes the step. Tests: `test/e217-abandoned-specs-harvest.test.mjs`. Spec:
+  `specs/e217-lane-lifecycle-gaps.md`.
+- **E215: `agc feature start` warns about a missing git hooks directory (`bin/agc-init.mjs`)**.
+  When the primary checkout sets a relative `core.hooksPath` that does not exist in the new lane
+  worktree, the command prints a warning. It only warns: nothing is linked, no config key is
+  added, and no `npm` command runs. Tests: `test/e215-start-hooks-path.test.mjs`.
+
+### Changed
+
+- **E136: one injective encoder names every task-id evidence file (`tools/evidence-file.ts`,
+  `tools/evidence-lookup.ts`, `gates/qa-review.ts`, `gates/code-review.ts`,
+  `gates/ac-execution.ts`, `gates/expected-red.ts`, `gates/visual.ts`)**. All six sites that turn
+  a task id into an evidence path share `encodeEvidenceId`: `A`–`Z`, `0`–`9`, `.` and `-` pass
+  through, a lower-case letter becomes `_` plus its upper-case form, and any other character
+  becomes `__` plus four upper-case hex digits. See *Upgrade notes*. Tests:
+  `test/e136-evidence-path-injective.test.mjs`, with `test/qa-flow.test.mjs` re-pinned.
+- **E154: a review file may list its covered ids over several `covers:` lines
+  (`tools/evidence-file.ts`)**. `parseCoversIds` takes the union of every `covers:` line: the
+  first line as before, later lines adding only new ids. Tests: `test/e154-multi-covers.test.mjs`.
+- **E364: dependency upgrades close two HIGH advisories (`package.json`,
+  `package-lock.json`)**. `zod` 4.4.3 → 4.6.7 (GHSA-mrhx-c7xc-m3w5) and `body-parser` 2.2.2 →
+  2.4.0 (GHSA-27r3-jxmh-p828), fixed by upgrade rather than waived. The lockfile also moves
+  `iconv-lite` to 0.7.3 and `type-is` to 2.1.0 and adds two nested `content-type` 2.1.0 entries;
+  no `overrides` entry changed. The decisions and re-review triggers are recorded in
+  `docs/dependency-advisories.md` §8 (zod) and §9 (body-parser). `npm audit --audit-level=high`
+  exits 0 at this release (one low and six moderate findings remain, below that threshold). Spec:
+  `specs/e364-audit-high-upgrade.md`.
+
+### Fixed
+
+- **E236: a rejected QA verdict write no longer leaves its evidence behind
+  (`tools/handoff-orchestrator.ts`)**. In file mode, when a qa-engineer PASS or FAIL write records
+  its `qa_review` evidence and the write is then rejected (or the state write throws), the
+  evidence is rolled back and `qa_reports/` is left byte-identical. SQLite mode is unchanged.
+  Tests: `test/e236-rejected-write-evidence.test.mjs`. Spec:
+  `specs/e139-evidence-verdict-integrity.md`.
+- **E362: the test-lock reclaim guard is never seen empty (`scripts/test-lock.mjs`)**. The reclaim
+  guard file is published through the same temp-file-plus-`linkSync` helper the lock file already
+  uses, so a concurrent reclaimer cannot read a half-written guard. The CLI and the lock-file
+  publish are unchanged. Tests: `test/e362-reclaim-guard-publish.test.mjs`. Spec:
+  `specs/e362-test-lock-guard.md`.
+- **E224: longer, overridable wait budgets in two lock tests (`test/e177b-mailbox-watch.test.mjs`,
+  `test/e177b-test-lock.test.mjs`)**. The waits that timed out under multi-lane load are raised
+  and can be overridden with `AGC_E177B_WAIT_MS`. Test-only change. Spec:
+  `specs/e362-test-lock-guard.md`.
+
+### Notes
+
+- `dist/gates/` and `dist/tools/` are rebuilt for the nine changed modules; `dist/index.js`
+  changes by the version literal. `CLAUDE.md` count corrections: gate registry 33 → 35 (two
+  places), test files 87 → 210 (two places), `tw_*` tools twelve → thirteen.
+- Wave-11 evidence moves to `qa_reports/archive/release-post-v4-w11/` and
+  `review_reports/archive/release-post-v4-w11/`; the lane ledgers are archived under
+  `.current/history/2026-10/`.
+- Follow-up tickets E365–E372 are filed in `docs/backlog.md`, not shipped.
+
 ## [4.13.0] - 2026-10-22
 
 MINOR release. It ships post-v4 fan-out wave 10 since v4.12.0, landed on `main` by its wave pull
