@@ -16,6 +16,126 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [4.15.0] - 2026-10-29
+
+MINOR release. It ships post-v4 fan-out wave 12 since v4.14.0, landed on `main` by one wave pull
+request: lanes `e152` (E152, E365, E371, E372), `e158` (E158, E369, E370), `e161` (E161, E184,
+E366) and `e367` (E367); E368 is void, superseded by the open E379. Plan
+`specs/fanout-post-v4-w12.md`, release gate `specs/release-post-v4-w12.md`. Semver: MINOR (decided
+by the human). This release changes compiled code, three shipped scripts and two constitution
+fragments: `tw_get_state` returns one key fewer, `tw_update_state` gains an optional argument, and
+`check-bookkeeping`, `fanout check` / `owners --range` and `verify-release` now fail loud on an
+empty or unusable subject (read *Upgrade notes* first). No MCP tool was added or removed, no
+schema version changed (handoff 15, tasks 2, sqlite 2, config 2), no dependency changed, and the
+gate registry stays at 35 entries with an 18-step write pipeline.
+
+### Upgrade notes
+
+- **E184: `tw_get_state` no longer returns `dispatch_mechanism_tier`.** The key is removed from the
+  `tw_get_state` response only; `dispatch_mechanism` is still returned. The handoff file, the
+  handoff parser and the lane's `dispatch.jsonl` still carry the tier, so read it from there if you
+  need it. The state block rendered into role prompts and the SessionStart context is unchanged
+  and still shows it (tracked as E376).
+- **E161: `tw_update_state` accepts an optional `qa_suite_result`.** Shape `{passed, total,
+  command?}`: integers with `0 ≤ passed ≤ total` and `total ≥ 1`, an optional one-line `command`,
+  no other keys; a malformed value is rejected at the schema boundary and leaves state and evidence
+  untouched. On a qa-engineer PASS or FAIL write that records `qa_review`, the server writes
+  `suite-result: <passed>/<total> passed (server-recorded from qa_suite_result)` (or `...; command:
+  <command>)` when a command is given) as the first line of that evidence, followed by a blank line
+  and the review text. The value is attested, not verified, is not persisted to the handoff, and
+  gates nothing (`passed < total` is recorded as given). Writes without it are byte-identical to
+  v4.14.0.
+- **E158: `scripts/check-bookkeeping.mjs` (`npm run check:bookkeeping`) exits 2 when it has no
+  usable base.** It now exits 2 (`check:bookkeeping — cannot run: ...`) when `--base` does not
+  resolve to a commit, when `--base` has no merge-base with HEAD, or when no `--base` is given and
+  neither `origin/main` nor `main` resolves. v4.14.0 exited 0 in all three cases (the last with a
+  stdout note). A CI job that runs the check on a shallow or detached clone must fetch a base or
+  pass `--base`.
+- **E158: `fanout check` and `fanout owners --range` exit 2 on an empty range.** When the range
+  lists no committed change, both commands now exit 2 with the new code `RANGE_EMPTY`
+  (`fanout: error: RANGE_EMPTY: git diff <a>...<b> lists no committed change in <repo> — ...`)
+  instead of exiting 0. Commit the lane's work before checking it; uncommitted and untracked work
+  is never checked.
+
+### Added
+
+- **E161: optional `qa_suite_result` on `tw_update_state` (`tools/registry.ts`,
+  `tools/handoff-orchestrator.ts`)**. See *Upgrade notes*. File mode writes the line into the new
+  section of the task's `qa_reports/` evidence; SQLite mode writes it into each `reports` row's
+  notes. Making it required or gating on it is E375; the QA SOP sentence that asks for it is E380.
+  Tests: `test/e161-qa-suite-result.test.mjs`. Spec: `specs/e161-qa-claim-and-state-reads.md`,
+  architecture `specs/e161-qa-claim-and-state-reads-architecture.md`.
+- **E367: `decodeEvidenceId`, the strict inverse of the evidence-filename encoder
+  (`tools/evidence-file.ts`, `tools/lane-status.ts`)**. It returns the task id for any stem the
+  E136 encoder can produce and `null` for any other stem. Lane status now decodes PASS-evidence
+  filenames before crediting them, so a non-canonical task id is credited under its real id
+  (falling back to the raw stem). Canonical `T-<ticket>-NN` filenames are unchanged, and the
+  `active_feature`-derived paths are unchanged (that work is E379). Tests:
+  `test/e367-lane-status-decode.test.mjs`. Spec: `specs/e367-evidence-and-feature-path-encoding.md`.
+- **E158: a new fanout error code, `RANGE_EMPTY` (`tools/fanout-manifest.ts`)**, used by `fanout
+  check` and `fanout owners --range` (`scripts/fanout.mjs` (context, not changed)). See *Upgrade
+  notes*.
+
+### Changed
+
+- **E184: `tw_get_state` drops `dispatch_mechanism_tier` from its response
+  (`tools/handoff-orchestrator.ts`)**. See *Upgrade notes*. Tests:
+  `test/e184-get-state-omits-tier.test.mjs`, with `test/dispatch-mechanism.test.mjs` re-pinned.
+- **E158: range-derived checks fail loud on an empty or unusable subject (`scripts/check-bookkeeping.mjs`,
+  `scripts/verify-release.mjs`, `tools/fanout-manifest.ts`)**. A 17-site audit of range-derived
+  check subjects (`specs/e158-range-subject-audit.md`) found three that passed on an empty subject.
+  Besides the two in *Upgrade notes*, `verify-release` Check 1 (`tag-at-HEAD`) now fails when a
+  commit in `<tag>..HEAD` lists no changed path (an empty commit cannot be judged bookkeeping-only)
+  and when the commit enumeration of `<tag>..HEAD` is empty. Tests:
+  `test/e158-range-subject.test.mjs`, with `test/e299-check-bookkeeping.test.mjs` and
+  `test/e331-git-diff-failure.test.mjs` re-pinned.
+- **E365: the constitution names `NON_REVIEWER_VERDICT_REJECTED`
+  (`content/const-08-chain-31-mid.md`, `gates/registry.ts`)**. The §3.1 `review_verdict` bullet
+  quotes the code once, and its `GATE_REGISTRY` entry is now `documentedInProse: true`, so no
+  registry entry is undocumented. Error codes and rejection conditions are unchanged. The six
+  full-mode compose goldens under `test/fixtures/compose-golden/` and
+  `test/context-budget.test.mjs` are re-pinned for the longer text.
+- **E152: the release-engineer's post-commit spec check reads the release range
+  (`content/skill-release-engineer.md`)**. Step 8a's AC4 check derives the release's feature-spec
+  set from `<prev-tag>..HEAD` (top-level `specs/*.md`, leaving out `specs/fanout-*.md` and
+  `specs/*-architecture.md`), so a multi-feature release no longer depends on a `Multi-feature
+  release:` line in `pending_notes`; that line becomes optional extra input. The four branches
+  (REQUIRE, MULTI-FEATURE, SKIP, UNCLASSIFIABLE) are kept. Tests: `test/release-staging.test.mjs`.
+  Spec: `specs/e152-release-ac4-and-prose-sync.md`.
+- **E371, E372: documentation brought up to date (`docs/lane-protocol.md`,
+  `specs/e260c-bin-scripts.md`, `specs/e351-lane-protocol-gaps.md`)**. Lane protocol §3 no longer
+  lists E217 as a known gap and describes the `specs/` copy that `agc feature finish --abandoned`
+  makes; the two design docs name the current `planIgnoredEvidenceHarvest` /
+  `applyIgnoredEvidenceHarvest` functions. Tests: `test/e351-lane-protocol-gaps.test.mjs`.
+
+### Fixed
+
+- **E366: a rejected QA verdict write leaves no evidence row in SQLite/HTTP mode
+  (`tools/storage.ts`, `tools/storage-sqlite.ts`, `tools/handoff-orchestrator.ts`)**. When a
+  qa-engineer PASS or FAIL write records its `qa_review` evidence and the write is then rejected or
+  fails, the `reports` rows it inserted are rolled back (`recordReviewUndoable`), matching the
+  file-mode behaviour v4.14.0 introduced (E236). Tests:
+  `test/e366-sqlite-rejected-write-evidence.test.mjs`.
+- **E369: the test lock waits instead of busy-spinning (`scripts/test-lock.mjs`)**. When the
+  reclaim guard blocks a stale-lock reclaim, `acquireLock` now falls through to the normal
+  wait/notify path and honours `--max-wait` (exit 75). The CLI is unchanged. Tests:
+  `test/e369-acquire-lock-wait.test.mjs`.
+- **E370: load-tolerant budgets for two test-lock tests (`test/e177b-test-lock.test.mjs`)**. AC9
+  and AC13a no longer depend on fixed wall-clock budgets under load. Test-only change.
+
+### Notes
+
+- `dist/` is rebuilt for the eight changed modules (`gates/registry.ts` and seven `tools/`
+  modules); `dist/index.js` changes by the version literal. `CLAUDE.md` count correction: test files 210 →
+  216 (two places).
+- Wave-12 evidence moves to `qa_reports/archive/release-post-v4-w12/` and
+  `review_reports/archive/release-post-v4-w12/`, and the E152 expected-red list to
+  `qa_reports/archive/e152-release-ac4-and-prose-sync/`; the lane ledgers are archived under
+  `.current/history/2026-10/`.
+- `npm audit --audit-level=high` exits 0 at this release (one low and six moderate findings
+  remain, below that threshold).
+- Follow-up tickets E373–E382 are filed in `docs/backlog.md`, not shipped.
+
 ## [4.14.0] - 2026-10-29
 
 MINOR release. It ships post-v4 fan-out wave 11 since v4.13.0, landed on `main` by two pull
