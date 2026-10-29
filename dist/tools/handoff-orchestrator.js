@@ -36,7 +36,7 @@ import { runUpdateStatePipeline, } from "../gates/pipeline.js";
 export async function handleGetState(args) {
     const { workspace_path } = args;
     const result = getActiveStorage().readState(workspace_path);
-    return { content: [{ type: "text", text: withDispatchPinsAdvisory(result) }] };
+    return { content: [{ type: "text", text: withDispatchPinsAdvisory(withoutDispatchMechanismTier(result)) }] };
 }
 // Read-side advisory for on-disk dispatch_pins outside the tier enum (E300).
 // A pin written before the enum or by hand is reported, never rejected on
@@ -71,6 +71,27 @@ function withDispatchPinsAdvisory(text) {
     }
     catch {
         // Advisory only — an unparseable payload keeps its original text.
+        return text;
+    }
+}
+// Read-view omission of the previous hop's dispatch_mechanism_tier (E184).
+// The next writer reads tw_get_state first, so a tier value there invites
+// copying instead of self-reporting. The record itself is untouched: the
+// handoff file, readHandoffState/parseHandoff and .current/<lane>/dispatch.jsonl
+// still carry it. Drops only the TOP-LEVEL key; when it is absent, or the
+// payload is not a JSON object, returns the original text byte-identical.
+// Never throws.
+function withoutDispatchMechanismTier(text) {
+    try {
+        const envelope = JSON.parse(text);
+        if (!envelope || typeof envelope !== "object" || Array.isArray(envelope))
+            return text;
+        if (!Object.prototype.hasOwnProperty.call(envelope, "dispatch_mechanism_tier"))
+            return text;
+        delete envelope.dispatch_mechanism_tier;
+        return JSON.stringify(envelope);
+    }
+    catch {
         return text;
     }
 }
