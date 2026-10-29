@@ -1,5 +1,7 @@
 <!-- pending-tickets for lane e161 (E179). New blocks go ABOVE ## Applied. -->
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E161-NEW-1
 title: gate the structured qa suite result (qa_suite_result) — passed < total on PASS, required on PASS, non-qa authorship
@@ -75,5 +77,3 @@ body: |
   does) or append before arming and assert on the first poll, instead of racing a sub-second real
   deadline; or add it to the load-sensitive list with a recorded rationale.
 ```
-
-## Applied
