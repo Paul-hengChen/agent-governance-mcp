@@ -42,9 +42,9 @@ const S3_COMMIT_KEPT =
 const S3_LOCAL =
   "- **`artifacts: local` 的 repo**（`.current/.config.json` 的 `artifacts` 是 `local`：agc 的工作檔不進 repo 歷史）：`.current/`、root `tasks.md`、`qa_reports/`、`review_reports/` 被 git exclude，lane **不 commit 這些路徑**（也不要用 `git add -f` 硬加）；`specs/` 照樣 tracked，照上一條 commit。";
 const S3_HARVEST =
-  "  - 證據不靠 commit 進到 primary，靠整合者跑 `agc feature finish` 時的收割：`--shipped` 把 worktree 裡被 ignore 又沒 tracked 的 `qa_reports/`、`review_reports/`、`specs/` 檔案複製到 primary 的 `<目錄>/archive/<lane>/`，並把 `.current/<lane>/` 整個複製到 primary 的 `.current/history/<YYYY-MM>/<lane>/`；`--abandoned` 把 `qa_reports/`、`review_reports/` 第一層檔名帶 lane 名（不分大小寫）的檔案搬進 `<目錄>/abandoned/<lane>/`（被 ignore 的在 primary 的同一路徑留一份），`.current/<lane>/` 一樣複製進 primary 的 history。";
+  "  - 證據不靠 commit 進到 primary，靠整合者跑 `agc feature finish` 時的收割：`--shipped` 把 worktree 裡被 ignore 又沒 tracked 的 `qa_reports/`、`review_reports/`、`specs/` 檔案複製到 primary 的 `<目錄>/archive/<lane>/`，並把 `.current/<lane>/` 整個複製到 primary 的 `.current/history/<YYYY-MM>/<lane>/`；`--abandoned` 把 `qa_reports/`、`review_reports/` 第一層檔名帶 lane 名（不分大小寫）的檔案搬進 `<目錄>/abandoned/<lane>/`（被 ignore 的在 primary 的同一路徑留一份），並把 `specs/` 底下每個被 ignore 又沒 tracked 的檔案複製到 primary 的 `specs/abandoned/<lane>/<相對路徑>`（遞迴、不看 lane 名、不 commit；tracked 的 spec 留在保留的分支上原處），`.current/<lane>/` 一樣複製進 primary 的 history。";
 const S3_GAPS =
-  "  - 已知缺口：E196（`.current/<lane>/` 只有一部分 tracked 時，`--shipped` 第一次跑不會把其中被 ignore 的檔案搬進 history）；E217（`--abandoned` 不收割 `specs/`：被 ignore 的 spec 會隨 worktree 一起刪掉）。";
+  "  - 已知缺口：E196（`.current/<lane>/` 只有一部分 tracked 時，`--shipped` 第一次跑不會把其中被 ignore 的檔案搬進 history）。";
 const S4_COMMIT_KEPT =
   "- **`pending-tickets.md` 一定要 commit 進你的 branch**：只存在 worktree、從未 commit 的檔案不會配號 —— finish 警告並列出這些發現，在 primary 的 `.current/history/<YYYY-MM>/<lane>/` 留一份（不 commit），由整合者手動建票。";
 const S4_LOCAL =
@@ -78,10 +78,10 @@ test("AC-E351-2: harvest sub-bullet directly follows the local bullet", () => {
   assert.equal(nextLine(sec("## 3. "), S3_LOCAL), S3_HARVEST);
 });
 
-test("AC-E351-3: known-gaps sub-bullet follows harvest; E196 and E217 each appear once, with their clause", () => {
+test("AC-E351-3: known-gaps sub-bullet follows harvest; E196 appears once with its clause; E217 no longer appears (closed by the --abandoned specs/ copy)", () => {
   assert.equal(nextLine(sec("## 3. "), S3_HARVEST), S3_GAPS);
   assert.equal(count(GENERIC, "E196"), 1);
-  assert.equal(count(GENERIC, "E217"), 1);
+  assert.equal(count(GENERIC, "E217"), 0);
 });
 
 test("AC-E351-4: §4 keeps the pinned commit line once; the local-mode line follows it", () => {
@@ -112,7 +112,8 @@ test("AC-E351-5: the path lists the doc names match bin/agc-init.mjs constants",
   assert.deepEqual(constArray(src, "SHIPPED_EVIDENCE_DIRS"), ["qa_reports", "review_reports", "specs"]);
   const abandon = constArray(src, "ABANDON_EVIDENCE_DIRS");
   assert.deepEqual(abandon, ["qa_reports", "review_reports"]);
-  assert.ok(!abandon.includes("specs"), "specs absent from abandon harvest is the E217 gap");
+  assert.ok(!abandon.includes("specs"), "specs is not in the evidence-move list: it is copied by the separate ABANDON_HARVEST_DIRS pass");
+  assert.deepEqual(constArray(src, "ABANDON_HARVEST_DIRS"), ["specs"]);
   const usage = constText(src, "STR_USAGE_FEATURE");
   assert.ok(
     usage.includes("is not numbered — finish warns, lists its findings and keeps a copy under .current/history/<YYYY-MM>/<lane>/"),
