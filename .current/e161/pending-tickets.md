@@ -53,4 +53,27 @@ body: |
   reject duplicates with a clear message), with a qa test for the SQLite path.
 ```
 
+```pending-ticket
+lane_local_id: E161-NEW-2
+title: e177b-mailbox-watch "AC19/AC15 multi-file mode names WHICH file changed" races a fixed wall-clock budget and went red under CI Node 20 load
+priority: P3
+depends_on: none
+source: integrator CI read of lane e161 at 1faf645 (GitHub Actions run 40844508566, job test (20)); lane e161 reproduction attempt
+body: |
+  CI run 40844508566 on lane e161's HEAD 1faf645: the Node 22 job was green, the Node 20 job failed
+  exactly one of 3767 tests, test/e177b-mailbox-watch.test.mjs "AC19/AC15: multi-file mode names
+  WHICH file changed and keeps watching the others until the deadline", with
+  "expected a changed line naming e204" — the watcher reached its deadline before it observed the
+  append. The test starts a real-clock watch with --deadline 0.006 (about 360 ms) and
+  --interval 0.05, and appends the message from a setTimeout at 100 ms, so a loaded runner that
+  delays the timer or a poll past the deadline turns it red. Same class as E224 and the load-sensitive
+  list (E238, E254, E278), but this test is not on that list, so a CI rerun cannot clear it.
+  Unrelated to lane e161: the lane changes nothing under scripts/, dist/tools/handoff-parse.js,
+  dist/tools/transitions.js or this test file, and on 1faf645 the file passed 5/5 runs under Node 20
+  and 5/5 under Node 22 locally (22/22 each).
+  Suggested fix: drive the watcher with an injected clock/sleep (as AC16 in the same file already
+  does) or append before arming and assert on the first poll, instead of racing a sub-second real
+  deadline; or add it to the load-sensitive list with a recorded rationale.
+```
+
 ## Applied
