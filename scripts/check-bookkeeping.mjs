@@ -2,7 +2,8 @@
 // Fail the build when the repository's bookkeeping files disagree with each
 // other or with the evidence on disk (E299). Four checks:
 //   (1) docs/backlog.md ticket ids are unique, and every id added since the
-//       base commit is numerically above the base's maximum;
+//       base commit is numerically above the base's maximum (a --base that
+//       does not resolve, or no base at all, is exit 2: never a silent skip);
 //   (2) every DONE / VOID row in docs/backlog.md cites evidence files that
 //       exist, and a dead citation is reported with the path it should use;
 //   (3) docs/v4.0.0-new-tickets.md queue rows name tickets that have a
@@ -291,9 +292,22 @@ function backlogModel(lines) {
 // Check (1): ids unique and monotone.
 // ---------------------------------------------------------------------------
 
+// Merge-base of HEAD with --base, else the first fallback that has one.
+// Never returns without a base: an unusable base is exit 2, not a skip.
 function resolveBase(baseRef) {
-  const candidates = baseRef ? [baseRef, ...BASE_REF_FALLBACKS] : BASE_REF_FALLBACKS;
-  for (const ref of candidates) {
+  if (baseRef) {
+    try {
+      git(["rev-parse", "--verify", "--quiet", `${baseRef}^{commit}`]);
+    } catch {
+      return cannotRun(`--base ${baseRef} does not resolve to a commit`);
+    }
+    try {
+      return git(["merge-base", "HEAD", baseRef]).trim();
+    } catch {
+      return cannotRun(`--base ${baseRef} has no merge-base with HEAD`);
+    }
+  }
+  for (const ref of BASE_REF_FALLBACKS) {
     try {
       git(["rev-parse", "--verify", "--quiet", `${ref}^{commit}`]);
       return git(["merge-base", "HEAD", ref]).trim();
@@ -301,7 +315,9 @@ function resolveBase(baseRef) {
       continue;
     }
   }
-  return null;
+  return cannotRun(
+    `no base commit found for the id-ordering check (tried ${BASE_REF_FALLBACKS.join(", ")}; pass --base <ref>)`
+  );
 }
 
 function checkIds(ticketRows, baseRef) {
@@ -317,12 +333,10 @@ function checkIds(ticketRows, baseRef) {
 
   const base = resolveBase(baseRef);
   let baseLines = null;
-  if (base !== null) {
-    try {
-      baseLines = git(["show", `${base}:${BACKLOG_REL_PATH}`]).split("\n");
-    } catch {
-      baseLines = null;
-    }
+  try {
+    baseLines = git(["show", `${base}:${BACKLOG_REL_PATH}`]).split("\n");
+  } catch {
+    baseLines = null;
   }
   if (baseLines === null) {
     notes.push(`${BACKLOG_REL_PATH} — id ordering not checked: no base commit found (pass --base <ref>)`);
