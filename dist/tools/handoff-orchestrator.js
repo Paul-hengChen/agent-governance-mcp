@@ -129,6 +129,22 @@ async function writeStateKeepingEvidence(ctx, write) {
         throw err;
     }
 }
+// The fixed, server-formatted suite-result line (spec Copy/Strings
+// e161.suite-line / e161.suite-line-cmd). command is recorded verbatim; the
+// zod boundary already guarantees it is one line. (E161)
+function suiteResultLine(r) {
+    const base = `suite-result: ${r.passed}/${r.total} passed (server-recorded from qa_suite_result`;
+    return r.command !== undefined ? `${base}; command: ${r.command})` : `${base})`;
+}
+// The notes QA_REVIEW_RECORD hands to the record call. Without
+// qa_suite_result: qaReview itself, unchanged (byte-identical record). With
+// it: the suite line, a blank line, then the trimmed qa_review text — the
+// line first, so it never lands inside a qa-authored subsection.
+function composeQaReviewNotes(qaReview, suite) {
+    if (suite === undefined)
+        return qaReview;
+    return `${suiteResultLine(suite)}\n\n${qaReview.trim()}`;
+}
 // The tw_update_state gate pipeline: this array IS the frozen, additive check
 // order. Add a gate by inserting a step at its position, never by editing a
 // neighbour's body. One step per gate family; the PASS-path visual sub-gates
@@ -679,7 +695,7 @@ export const UPDATE_STATE_GATE_PIPELINE = [
                         isError: true,
                     };
                 }
-                const notes = parsed.qa_review;
+                const notes = composeQaReviewNotes(parsed.qa_review, parsed.qa_suite_result);
                 // File mode records through the undoable variant (same bytes), and a
                 // storage that offers recordReviewUndoable (SQLite) does the same, so
                 // handleUpdateStateCore can revert the record if this write does not
