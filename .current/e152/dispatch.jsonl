@@ -6,3 +6,4 @@
 {"ts":"2026-10-29T07:49:51.284Z","feature":"e152-release-ac4-and-prose-sync","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-10-29T07:50:37.077Z","feature":"e152-release-ac4-and-prose-sync","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-10-29T07:52:26.293Z","feature":"e152-release-ac4-and-prose-sync","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-29T07:55:25.695Z","feature":"e152-release-ac4-and-prose-sync","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
