@@ -1,5 +1,7 @@
 <!-- pending-tickets for lane e158 (E179). New blocks go ABOVE ## Applied. -->
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E158-NEW-1
 title: comment-scan silently narrows its subject to uncommitted work when no base ref resolves
@@ -31,5 +33,3 @@ body: |
   E158 made fail loud: the caller asked for a base and got a different one. Suggested fix: treat
   an empty or missing --base value as a usage error and exit 2 with one stderr line.
 ```
-
-## Applied
