@@ -130,7 +130,8 @@ export async function handleUpdateState(parsed: UpdateStateInput): Promise<ToolR
 }
 
 // Undo for the qa_review evidence the QA_REVIEW_RECORD step appended on this
-// write (file mode), keyed by the write's gate context. A write that does not
+// write (file mode, or a storage offering recordReviewUndoable, i.e. SQLite),
+// keyed by the write's gate context. A write that does not
 // land (a later step rejects it, or the pipeline or the state write throws)
 // runs it, so the evidence files never record a verdict the server refused. A
 // WeakMap, because the readonly context type is owned by gates/pipeline.ts.
@@ -742,16 +743,23 @@ export const UPDATE_STATE_GATE_PIPELINE: readonly UpdateStateGateStep[] = [
               isError: true,
             };
           }
-          // File mode records through the undoable variant (same bytes) so
-          // handleUpdateStateCore can revert it if this write does not land.
-          // Other modes record as before.
+          const notes = parsed.qa_review;
+          // File mode records through the undoable variant (same bytes), and a
+          // storage that offers recordReviewUndoable (SQLite) does the same, so
+          // handleUpdateStateCore can revert the record if this write does not
+          // land. Any other storage records as before, with no undo.
           if (storage instanceof FileHandoffStorage) {
             evidenceUndoByCtx.set(
               ctx,
-              await recordReviewInFileUndoable(parsed.workspace_path, ids, parsed.status, "qa-engineer", parsed.qa_review),
+              await recordReviewInFileUndoable(parsed.workspace_path, ids, parsed.status, "qa-engineer", notes),
+            );
+          } else if (storage.recordReviewUndoable) {
+            evidenceUndoByCtx.set(
+              ctx,
+              await storage.recordReviewUndoable(parsed.workspace_path, ids, parsed.status, "qa-engineer", notes),
             );
           } else {
-            await storage.recordReview(parsed.workspace_path, ids, parsed.status, "qa-engineer", parsed.qa_review);
+            await storage.recordReview(parsed.workspace_path, ids, parsed.status, "qa-engineer", notes);
           }
         }
       return null;
