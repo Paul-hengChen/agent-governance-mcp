@@ -1,12 +1,12 @@
 ---
 schema_version: 15
-active_feature: "release-post-v4-w12"
+active_feature: "release-post-v4-w13"
 status: "In_Progress"
-last_updated: "2026-10-29T10:21:18.497Z"
+last_updated: "2026-10-30T06:03:03.376Z"
 last_agent: "release-engineer"
 prd_path: "docs/backlog.md"
 scope_decision: "single-feature"
-scope_decision_why: "Evidence-only release gate, same shape as release-post-v4-w11 (v4.14.0), 10th use (v4.5.0-v4.14.0). Covers post-v4 fan-out wave 12 (PR #50, merge 2b409c5, head 8662494; plan specs/fanout-post-v4-w12.md) plus bookkeeping PRs #47 (v4.14.0 post-release, 5bc512b), #48 (w11 handoff refresh, b8aaf7d) and #49 (w12 plan, f5485a7): lanes e152 (E152, E365, E371, E372; merge 3b09c59; range-derived release-engineer AC4, NON_REVIEWER_VERDICT_REJECTED quoted in const-08 with documentedInProse true, goldens and context budget re-pinned, lane-protocol §3, two design-doc function names), e158 (E158, E369, E370; merge eb7e146; check-bookkeeping exit 2 on unusable/absent base, fanout check/owners RANGE_EMPTY exit 2, verify-release Check 1 empty-commit FAIL, test-lock acquireLock wait, e177b load budgets), e161 (E161, E184, E366; merge 2223697; optional qa_suite_result recorded into evidence, tw_get_state drops dispatch_mechanism_tier, SQLite rejected qa write rollback) and e367 (E367; merge 7b06d46; decodeEvidenceId and lane-status decoding; E368 void, superseded by E379). 78 commits, 118 paths; compiled code in tools/ and gates/registry.ts, three scripts and two content fragments; no dependency, schema or bin change; GATE_REGISTRY stays 35. Five qa-engineer verification tasks (T-RELW12-01..05), no code or test changes; the four adopter-visible changes are executed old-vs-new against the shipped dist/ and scripts (AC9, AC10). Version decided by the human: v4.15.0 MINOR; QA verifies against the current 4.14.0. Release-engineer owns the bump, CHANGELOG with upgrade notes, stamps, CLAUDE.md test-file count correction, release/v4.15.0 PR, tag on its merged commit, GitHub release, archiving and the follow-up bookkeeping PR."
+scope_decision_why: "Evidence-only release gate, same shape as release-post-v4-w12 (v4.15.0), 11th use (v4.5.0-v4.15.0). Covers post-v4 fan-out wave 13 (PR #55, merge 6e3002f, head 8eb32bd; plan specs/fanout-post-v4-w13.md) plus bookkeeping PRs #52 (v4.15.0 post-release, 7209e1a), #53 (wc32 ticket filing, 1530622) and #54 (w13 plan, 35f20e2): lanes e383 (E383, E385; merge 5e0b8b1; lane ledger kept as .current/<lane>/tasks.md in a linked worktree whose lane path is git-ignored, Worktree bootstrap obligation inverted to no evidence symlinks, agc check advisory flipped, lane-protocol section 1/3, one golden re-captured; feature finish, tasks-file and PROMPT_TEMPLATE_3B unchanged) and e384 (E384, E386, E346; merge 029f94d; parseDesignMode reads the declared token, handoff --check defaults to the recorded target, sister repo toplevel check). 33 commits, 56 paths; compiled code in tools/ (tasks-lane-migrate, fanout-handoff) and gates/visual.ts, one bin/ file (bin/agc-init.mjs, agc check advisory only; no command, flag, help or exit-code change), one content fragment; no dependency, schema, scripts or error-code change; GATE_REGISTRY stays 35. Five qa-engineer verification tasks (T-RELW13-01..05), no code or test changes; the four adopter-visible changes are executed old-vs-new against the shipped dist/, bin and scripts (AC9, AC10). Version decided by the human: v4.16.0 MINOR; QA verifies against the current 4.15.0. Release-engineer owns the bump, CHANGELOG with upgrade notes, stamps, CLAUDE.md test-file count correction (216 -> 221), release/v4.16.0 PR, tag on its merged commit, GitHub release, archiving and the follow-up bookkeeping PR."
 cut_approved: true
 dispatch_pins:
   pm: "opus"
@@ -14,7 +14,7 @@ dispatch_pins:
   release-engineer: "opus"
 evidence_schema: 2
 next_role: "pm"
-dispatched_at: "2026-10-29T10:21:18.497Z"
+dispatched_at: "2026-10-30T06:03:03.376Z"
 dispatch_mechanism: "task"
 dispatch_mechanism_tier: "opus"
 qa_round: 0
@@ -28,15 +28,19 @@ visual_rounds_total: 0
 # Handoff State
 
 ## Completed
-- [x] T-RELW12-01
-- [x] T-RELW12-02
-- [x] T-RELW12-03
-- [x] T-RELW12-04
-- [x] T-RELW12-05
+- [x] T-RELW13-01
+- [x] T-RELW13-02
+- [x] T-RELW13-03
+- [x] T-RELW13-04
+- [x] T-RELW13-05
 
 ## Pending & Handoff Notes
-- Released v4.15.0
-- tag: f016252da3bfa7ca07bf22f0bb586a064ed21341
+- Released v4.16.0
+- tag: 62bf4d523e375d4d48e4c9ca22c55ef9f489503f
+- release PR #56 (release/v4.16.0, head a6158de) merged as 62bf4d5; tag v4.16.0 on the merge commit; GitHub release created
+- checks: npm test 3836/3838 pass (2 skipped, 0 fail); check-version OK 4.16.0; agc check OK 4.16.0; npm audit --audit-level=high exit 0 (1 low, 6 moderate); step 8b CI-CHECK PASSED a6158de; step 9a verify-release ALL CHECKS PASSED (CI wait budget DEFAULT_WAIT_SECONDS=480, AGC_VERIFY_CI_WAIT_SECONDS unset)
+- step 7a CODES={E346 E383 E384 E385 E386 RELW13}; evidence archived to qa_reports/archive/release-post-v4-w13/, review_reports/archive/release-post-v4-w13/, qa_reports/archive/e383-lane-ledger-and-worktree-evidence/; AC4 MULTI-FEATURE branch: specs/e383-lane-ledger-and-worktree-evidence.md, specs/e384-design-mode-and-handoff-target.md, specs/release-post-v4-w13.md present in v4.15.0..HEAD
+- docs/agc-ticket-draft-wc32.md left untracked, not part of the release (open human question)
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.
