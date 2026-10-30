@@ -2,7 +2,7 @@
 base: 1530622    integration branch: integ/post-v4-w13
 mailbox: ../agent-governance-mcp-lanes/_mailbox
 
-**狀態：已核准，派工中。** `base:` 是規劃基準（E383–E386 開票的 PR #53 merge）；實際派工 base = 本清單併入後的 `main` sha，記在 Decisions 派工列。
+**狀態：已結案 2026-10-30。** 兩條 lane 皆 qa PASS（CI 綠）→ `integ/post-v4-w13` merge `5e0b8b1`（e383）、`029f94d`（e384）→ finish 兩條（E387–E390 配號）→ 記帳 commit → PR + auto-merge（見「結案」與「接手步驟」）。 `base:` 是規劃基準（E383–E386 開票的 PR #53 merge）；實際派工 base = 本清單併入後的 `main` sha，記在 Decisions 派工列。
 
 範圍由人類指定：E383–E386，來自一個 adopter repo 的 lane 波次回報（2026-10-19／20），PR #53 開票。依檔案範圍分成兩組，擁有集合互不相交：
 - (1) lane 工作流：E383、E385。兩張都落在 lane 的開工與收尾流程上，共用 `bin/agc-init.mjs`（`feature finish` 收割、`agc check` 的 worktree 證據目錄警告）與 `docs/lane-protocol.md`（§1 切進 worktree、§3 帳本與證據）。E385 可能要改 `content/coord-03-core-fallback.md` 的 Worktree bootstrap obligation，所以共享生成物只歸這條 lane。
@@ -77,6 +77,32 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 
 預期零檔案衝突（擁有集合不相交）；`dist/` 不手解，一律重建。
 
+## 結案
+- 日期 2026-10-30。`integ/post-v4-w13` ← e383 `d3926a0`（merge `5e0b8b1`）← e384 `c103f89`（`029f94d`），皆 `--no-ff`、零衝突 → 無合併審查；每次合併後 merge-invariants PASS；重建 `dist/` 無差異；`check:bookkeeping` OK；`npm audit --audit-level=high` exit 0（只有 moderate）；整合層 CI run 41001717456 在 `029f94d` 綠（golden 與 context budget 在合併後仍綠）。
+- 彙總（上限按 lane 計，合計僅供參考）：e383 7 張 task／hop 4/14／review 0 輪退回／qa 0 輪；e384 7 張／hop 4/14／0／0。合計 14 張 task、hop 8，每條 lane 都在自己的上限內，證據與 `completed_tasks` 一致。
+- 完成定義：9 項全部成立（E386 的 `checkLane` 預設以新發現 E390 結案，符合核准的範圍縮減）。
+- 例外：(1) 兩條 lane 的 sr 與 code-reviewer 都是 opus（同模型疑慮，比照第 11、12 波）。(2) e384 的 qa 沒有做負對照（沒在 base 上確認新測試會紅，lane 已揭露）；e383 的 golden 舊版紅燈由重抓推定。(3) e383 本機一次全套撞到 `test/e132-lane-registry.test.mjs` gap-4 計時，重跑全綠，CI 綠。
+- 新發現：E387–E389（e383）、E390（e384）由 `finish --shipped` 配號，排在佇列 #202–#205；e384 code review 的兩處 `gates/visual.ts` 註解問題由整合者併入 E345。
+- 發版：`main` 帶 E383（`tools/tasks-lane-migrate.ts`）、E385（`content/coord-03-core-fallback.md`、`bin/agc-init.mjs` 的 `agc check` 提示、`docs/lane-protocol.md` §1／§3、golden）、E384（`gates/visual.ts`）、E386／E346（`tools/fanout-handoff.ts`）。給發版的注意（adopter 可見）：Mode 行的宣告值不在清單內時（含 `mode: Design from Figma` 這種散文式寫法）不再武裝 visual 閘門；`agc check` 不再要求 symlink 證據目錄，反而對指向 worktree 外的 symlink 提示；coordinator SOP 的 Worktree bootstrap obligation 改寫。`GATE_REGISTRY` 仍是 35；不升 schema。是否發版與版號由人類決定。
+
+## 接手步驟
+（事實欄位由 `node scripts/fanout.mjs handoff` 產生；接手時先跑 `node scripts/fanout.mjs handoff --check <manifest>`。`<待填：…>` 由整合者填寫。）
+### 核對 primary
+- 目標分支：main @ 35f20e2
+- 目標分支對 origin：一致
+- git status：1 項：?? docs/agc-ticket-draft-wc32.md
+- worktree：primary（main ← integ/post-v4-w13 @ 39df897）
+- lane-status：primary（main ← integ/post-v4-w13 @ 39df897）release-post-v4-w12／In_Progress／release-engineer，hop 3，commits 0，dirty
+### 已結案
+- 第 13 波兩條 lane（e383、e384）都已合併、finish、拆除；lane 紀錄在 `.current/history/2026-10/`。記帳與本清單在同一個 wave PR。佇列 E383、E384、E385、E386、E346 至此完成。
+- 未配號的新發現：無（E387–E390 由 finish 配號，排在佇列 #202–#205；兩處註解問題併入 E345）。
+### 待人類決定
+- 是否發版、版號（本波動到 `tools/`、`gates/visual.ts`、`bin/agc-init.mjs`、`content/`、`docs/lane-protocol.md`、`dist/`；Mode 宣告值的解讀與 `agc check` 的證據目錄提示屬 adopter 可見的行為改變）。
+- 是否開下一波。
+- primary 上未追蹤的開票草稿 `docs/agc-ticket-draft-wc32.md` 要不要刪（內容已全數開成 E383–E386；它含外部專案名稱，不進 repo）。
+### 進行中的背景工作
+無
+
 ## Dispatch pins
 - e383：`pm=opus`、`sr-engineer=opus`。
 - e384：`pm=opus`、`sr-engineer=opus`。
@@ -87,3 +113,13 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 | 2026-10-30 | 人類 | 第 13 波範圍：E383–E386（PR #53 開票，來自一個 adopter repo 的 lane 波次回報）。人類回覆「fan-out 這四張票開始實作」 | 整合者 session |
 | 2026-10-30 | 整合者 | 草案：e383（E383＋E385，lane 工作流，唯一碰共享生成物的 lane）∥ e384（E384＋E386，兩個各約一檔的工具小修合成一條）。重劃：`bin/agc-init.mjs` 從共同禁止移出、劃給 e383；`docs/lane-protocol.md` §1／§3 與 `tools/fanout-manifest.ts` 的 `PROMPT_TEMPLATE_3B` 劃給 e383；`gates/visual.ts` 的 `parseDesignMode` 與 `tools/fanout-handoff.ts` 劃給 e384。範圍縮減：E386 票面「`checkLane` 的 `--base` 預設一併查看」改成只查看、要改就記成新發現（`tools/fanout-manifest.ts` 本波歸 e383）。待人類裁決：E345、E346 是否併入 e384 | 本檔 |
 | 2026-10-30 | 人類 | 核准本清單（全部）：兩條 lane（e383、e384）、所有重劃、E386 的範圍縮減（`checkLane` 只查看、要改就記成新發現）；E346 併入 e384；E345 未併入，留在佇列。人類回覆「approve，E346 併入 e384」 | 整合者 session |
+| 2026-10-30 | 整合者 | 清單 PR #54 merge `35f20e2` = 派工 base（PR 的 CI run 40995764581 綠）；派工前核對：兩條 lane 點名的擁有／禁止路徑在 base 都存在，沒有殘留 branch／worktree；信箱 e383／e384 已建空檔，mailbox-watch 與 lane-status watch 都已 armed；兩份 prompt 以 `fanout.mjs render --base 35f20e2` 產生。此列隨記帳 commit 進 integ | 本檔 |
+| 2026-10-30 | 整合者 | e384 cut 預審 close（`f8b86a4`，to-lane#2）：check --cut exit 0（7 tasks）；每條 AC 都有實作 task。第一版 `325f042` 退回一點：E384 把 `figma-export` 這類「已知 mode + 連字號後綴」讀成未宣告，會引入新的 fail-open 方向；lane 改成開頭是完整已知 mode 加連字號就取該 mode（`no-design` 先比對），只有開頭不是已知 mode 的值（`code`）才當成未宣告。E384 選「未宣告」而非大聲報錯（要新的 GATE_REGISTRY 條目），lane 呈給人類時須講明這是刻意的行為改變。E386 只有 `--check` 讀記錄的目標分支；E346 `--show-toplevel` 失敗時退回現行判斷。新發現 E386-NEW-1（`checkLane` 的 `--base` 預設）等 finish 配號 | 信箱 e384 |
+| 2026-10-30 | 整合者 | e383 cut 預審 close（`9ce871e`，to-lane#1）：check --cut exit 0（7 tasks）；每條 AC 都有實作 task。同意 D-E383 (b)（linked worktree、非 `_primary`、路徑被忽略、沒有舊帳本 → 用 lane 帳本；finish 與 `tools/tasks-file.ts` 不改）、D-E385 (b)（證據目錄不 symlink、真目錄由 finish 收割；改 bootstrap obligation 與 `agc check` 提示）、`PROMPT_TEMPLATE_3B` 不改。給人類的建議（needs human ruling，由 lane 呈）：R1 照 PM 建議，指向 worktree 外的證據 symlink 改成警告（翻轉 E111(ii)，只是提示）。非阻擋：`.git` 是檔案也可能是 submodule，留給 sr／reviewer。新發現 E383-NEW-1、E383-NEW-2 等 finish 配號 | 信箱 e383 |
+| 2026-10-30 | 人類 | 在 e384 lane session 核准 cut（`f8b86a4`），含 E384 的選項與刻意行為改變（宣告值不在清單內 → 未宣告；已知 mode 加連字號 → 取該 mode；大聲報錯不在本 lane） | e384 lane session；`specs/e384-design-mode-and-handoff-target.md`，commit `f8b86a4`（`cut_approved` 見 lane 的 handoff，尚未 commit） |
+| 2026-10-30 | 人類 | 在 e383 lane session 核准 cut（`9ce871e`），R1 裁決照建議：指向 worktree 外的證據目錄 symlink 改成 `agc check` 警告（翻轉 E111(ii)，只是提示） | e383 lane session；`specs/e383-lane-ledger-and-worktree-evidence.md`，commit `8dd1f7b`（R1 與 `cut_approved` 記在同一 commit） |
+| 2026-10-30 | 整合者 | e383 E383-NEW-3（finish 區段 `evidenceAtRisk` 的註解指向本 lane 刪掉的 helper）：在清單擁有範圍內、只超出 lane 自己 AC-E385-7 的區段限制，認定為機械性小改 —— code review 若退回就順手修（只改註解），一輪通過則留成新發現 | 信箱 e383（to-lane#2） |
+| 2026-10-30 | 整合者 | 5a：e384 `c103f89`（CI run 40999642992）close —— review、qa 都一輪通過；22 檔都在擁有範圍內，`gates/visual.ts` 只動 `parseDesignMode` 與其上方註解；共享生成物未動；新發現 E386-NEW-1 等 finish 配號。review 的註解類非阻擋項（`KNOWN_MODES` 上方 14 行註解、`parseDesignMode` 內過時舊註解）由整合者在 5c 併入 E345。qa 未做負對照（lane 已揭露） | 本檔 |
+| 2026-10-30 | 整合者 | 5a：e383 `d3926a0`（CI run 41001309654）close —— review、qa 都一輪通過；27 檔都在擁有範圍內；`bin/agc-init.mjs` 只動 `agc check` 證據警告區段，`tools/fanout-manifest.ts`（`PROMPT_TEMPLATE_3B`）、`tools/tasks-file.ts`、`feature finish` 未動；`content/coord-03-core-fallback.md` 一行、`skill-coordinator-monolith` golden 重抓，context budget 不必重釘。lane 本機一次全套撞到 `test/e132-lane-registry.test.mjs` gap-4 計時（重跑全綠），CI 綠。新發現 E383-NEW-1..3 等 finish 配號；review 選修（`isLinkedWorktree` 第三份拷貝）只記錄 | 本檔 |
+| 2026-10-30 | 整合者 | 5b：`integ/post-v4-w13` ← e383 `5e0b8b1` ← e384 `029f94d`，皆 `--no-ff`、零衝突 → 無合併審查；merge-invariants 兩次 PASS；重建 `dist/` 無差異；`npm audit --audit-level=high` exit 0；整合層 CI run 41001717456 綠 | 本檔 |
+| 2026-10-30 | 整合者 | 5c／6：finish e383 配號 E387–E389、finish e384 配號 E390；E387–E390 排在佇列 #202–#205；e384 code review 的兩處 `gates/visual.ts` 註解問題併入 E345；E383、E384、E385、E386、E346 done-mark 與佇列 DONE | 本檔 |
