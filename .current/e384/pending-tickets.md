@@ -1,5 +1,7 @@
 <!-- pending-tickets for lane e384 (E179). New blocks go ABOVE ## Applied. -->
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E386-NEW-1
 title: fanout.mjs check <manifest> <lane> defaults --base to main, fails REF_NOT_FOUND in a repo without main, and the message does not name --base
@@ -21,5 +23,3 @@ body: |
   behaviour, error codes and exit codes unchanged. Not done in lane e384 because
   tools/fanout-manifest.ts belonged to lane e383 in wave 13.
 ```
-
-## Applied
