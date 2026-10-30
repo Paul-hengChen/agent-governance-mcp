@@ -98,12 +98,18 @@ export function hasDesignModeRequiringVisual(
 
 // Permissive Mode extractor. Accepts BOTH the H2-section style
 // (`## Mode` heading, value on a following line) AND the inline/bullet style
-// (`**Mode** — <value>` or `mode: <value>`). Returns the known mode enum value
-// that appears EARLIEST on the candidate line (lowest match index), lowercased;
-// null if none found. Position, not list order, decides: trailing prose such as
-// `image (no Figma)` or `no-design (no Figma)` must not let a later-mentioned
-// mode win (E319). Tolerant of surrounding markdown (backticks, bold, em-dash)
-// per design-auditor template.
+// (`**Mode** — <value>` or `mode: <value>`). The declared value decides: after
+// stripping leading whitespace and markdown wrappers (`` ` * _ " ' ( [ ``), the
+// leading token (`[a-z][a-z0-9]*(?:-[a-z0-9]+)*`, case-insensitive, lowercased)
+// is compared whole against the known modes. A token that is not itself a known
+// mode but starts with `<known mode>-` (`no-design` first) resolves to that mode
+// (`figma-export` -> figma). Any other token (`code`, `freehand`) means that
+// candidate line yields no mode and the next candidate is tried, so explanatory
+// prose such as `code (not from Figma)` cannot arm a Figma-only gate (E384).
+// Only a candidate line with no token at all (e.g. `<figma>`) falls back to the
+// known mode that appears EARLIEST on the line (lowest match index): trailing
+// prose such as `image (no Figma)` must not let a later-mentioned mode win
+// (E319). Returns null if no candidate yields a mode.
 const KNOWN_MODES = ["figma", "sketch", "xd", "penpot", "pdf", "image", "paper", "no-design"] as const;
 
 function parseDesignMode(content: string): string | null {
@@ -121,10 +127,23 @@ function parseDesignMode(content: string): string | null {
   const mH2 = h2Re.exec(content);
   if (mH2) candidates.push(mH2[1]);
 
+  // `no-design` first, so a hyphenated token is tried against it before any
+  // other known-mode prefix.
+  const prefixOrder = ["no-design", ...KNOWN_MODES.filter((m) => m !== "no-design")];
+
   for (const raw of candidates) {
     const lc = raw.toLowerCase();
-    // Lowest-index word-boundary match wins. Bare `design` is not a listed
-    // mode, so `no-design` can never lose to it.
+    const declared = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*/.exec(lc.replace(/^[\s`*_"'([]+/, ""));
+    if (declared) {
+      const token = declared[0];
+      if ((KNOWN_MODES as readonly string[]).includes(token)) return token;
+      const prefixed = prefixOrder.find((mode) => token.startsWith(`${mode}-`));
+      if (prefixed !== undefined) return prefixed;
+      // A declared value outside the known list: this candidate yields nothing.
+      continue;
+    }
+    // No declared token. Lowest-index word-boundary match wins. Bare `design`
+    // is not a listed mode, so `no-design` can never lose to it.
     let best: { mode: string; index: number } | null = null;
     for (const mode of KNOWN_MODES) {
       const m = new RegExp(`\\b${mode.replace(/[-]/g, "\\-")}\\b`).exec(lc);
