@@ -1,5 +1,7 @@
 # Pending tickets — lane e383
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E383-NEW-1
 title: specs/e260c-bin-scripts.md still describes the pre-E385 agc check worktree evidence advisory
@@ -45,5 +47,3 @@ body: |
   is left dangling. Inline the one-sentence reason (a directory holding one tracked file
   reports "not ignored" to git check-ignore) in place of the pointer.
 ```
-
-## Applied
