@@ -561,6 +561,28 @@ export interface ExternalComparison {
 }
 
 /**
+ * Whether `root` is the top level of a git repository. A plain directory
+ * nested in another repo's working tree passes `rev-parse --git-dir` too, so
+ * the realpath of `rev-parse --show-toplevel` must equal the root's own. When
+ * `--show-toplevel` fails (a bare repository, a path inside `.git`), the
+ * `--git-dir` test alone decides.
+ */
+function isRepoRoot(root: string): boolean {
+  let top: string;
+  try {
+    top = git(["rev-parse", "--show-toplevel"], root).trim();
+  } catch {
+    try {
+      git(["rev-parse", "--git-dir"], root);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  return realOrResolved(top) === realOrResolved(root);
+}
+
+/**
  * Compare each well-formed `## 外部依賴` row with its sister repo's branch
  * now. `primary` is the repo whose `.current/.config.json` declares
  * sisterRepos; each row's sister root is path.resolve(primary, entry.path).
@@ -597,10 +619,9 @@ export function compareExternalDeps(text: string, primary: string): ExternalComp
         }
         if (roots.has(entry.name) || notGit.has(entry.name)) continue;
         const root = path.resolve(primary, entry.path);
-        try {
-          git(["rev-parse", "--git-dir"], root);
+        if (isRepoRoot(root)) {
           roots.set(entry.name, root);
-        } catch {
+        } else {
           // The path is deliberately not echoed (WORKTREE_ABSOLUTE_WARN convention).
           notGit.add(entry.name);
           errors.push(

@@ -458,6 +458,29 @@ export const SISTER_REPO_CODES = {
 /** handoff --check line for a `## 外部依賴` row whose branch no longer points at the recorded sha. */
 export const EXTERNAL_DIFF_LINE = (repo, branch, recorded, now) => `DIFF  外部依賴 ${repo} ${branch}: 清單「${recorded}」／repo「${now}」`;
 /**
+ * Whether `root` is the top level of a git repository. A plain directory
+ * nested in another repo's working tree passes `rev-parse --git-dir` too, so
+ * the realpath of `rev-parse --show-toplevel` must equal the root's own. When
+ * `--show-toplevel` fails (a bare repository, a path inside `.git`), the
+ * `--git-dir` test alone decides.
+ */
+function isRepoRoot(root) {
+    let top;
+    try {
+        top = git(["rev-parse", "--show-toplevel"], root).trim();
+    }
+    catch {
+        try {
+            git(["rev-parse", "--git-dir"], root);
+            return true;
+        }
+        catch {
+            return false;
+        }
+    }
+    return realOrResolved(top) === realOrResolved(root);
+}
+/**
  * Compare each well-formed `## 外部依賴` row with its sister repo's branch
  * now. `primary` is the repo whose `.current/.config.json` declares
  * sisterRepos; each row's sister root is path.resolve(primary, entry.path).
@@ -486,11 +509,10 @@ export function compareExternalDeps(text, primary) {
                 if (roots.has(entry.name) || notGit.has(entry.name))
                     continue;
                 const root = path.resolve(primary, entry.path);
-                try {
-                    git(["rev-parse", "--git-dir"], root);
+                if (isRepoRoot(root)) {
                     roots.set(entry.name, root);
                 }
-                catch {
+                else {
                     // The path is deliberately not echoed (WORKTREE_ABSOLUTE_WARN convention).
                     notGit.add(entry.name);
                     errors.push(inputErr(SISTER_REPO_CODES.notGit, `sister repo "${entry.name}" (sisterRepos in .current/.config.json) is not a git repository at its declared path`));
