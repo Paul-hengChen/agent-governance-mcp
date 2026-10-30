@@ -159,19 +159,19 @@ test("AC5: the Lane-start default paragraph declares universal applicability wit
 });
 
 // ---------------------------------------------------------------------------
-// AC6: the Worktree bootstrap obligation paragraph's symlink step is needed
-// ONLY when qa_reports/review_reports/specs are untracked; a tracked-
-// evidence repo carries evidence via the lane branch's own commits instead.
+// AC6 (re-pinned by E385): the Worktree bootstrap obligation paragraph forbids
+// symlinking the evidence dirs back to primary (an EnterWorktree-isolated
+// session cannot write through such a link), keeps untracked evidence a real
+// directory that finish harvests, and keeps the tracked-evidence alternative.
 // ---------------------------------------------------------------------------
 
-test("AC6: the Worktree bootstrap obligation paragraph states the symlink precondition (untracked-only) and the tracked-evidence alternative", () => {
+test("AC6: the Worktree bootstrap obligation paragraph forbids the symlink, keeps untracked evidence a real dir harvested by finish, and keeps the tracked-evidence alternative", () => {
   const worktreeObligation = extractBetween(COORD_03, "**Worktree bootstrap obligation**", "\n\n## Escalation Routes", "AC6");
-  assert.match(worktreeObligation, /needed ONLY when untracked/, "must state the symlink is needed ONLY when untracked");
-  assert.match(worktreeObligation, /a tracked-evidence repo carries evidence to the lane via the lane branch's own commits instead, no symlink needed/, "must state the tracked-evidence alternative verbatim");
-  // The follow-on sentence must agree with the untracked-only carve-out, not
-  // flatly contradict it (review round-2 fix, review_reports/review_T-E130-09.md).
-  assert.doesNotMatch(worktreeObligation, /a fresh worktree has none of these by default/, "the pre-fix contradictory wording ('none of these by default') must not reappear");
-  assert.match(worktreeObligation, /an untracked one is absent from a fresh worktree/, "the fixed wording must scope 'absent from a fresh worktree' to the untracked case");
+  assert.match(worktreeObligation, /do NOT symlink `qa_reports\/`, `review_reports\/` or `specs\/` back to primary/, "must forbid the symlink");
+  assert.match(worktreeObligation, /An untracked \(gitignored\) one stays a real directory in the worktree/, "must keep untracked evidence a real directory");
+  assert.match(worktreeObligation, /`agc feature finish` harvests git-ignored evidence into primary before it removes the worktree/, "must name finish as the harvester");
+  assert.match(worktreeObligation, /A tracked-evidence repo carries evidence to the lane via the lane branch's own commits instead, no symlink needed/, "must keep the tracked-evidence alternative");
+  assert.doesNotMatch(worktreeObligation, /needed ONLY when untracked|symlink back to primary each of/, "the old symlink-step wording must not reappear");
 });
 
 // ---------------------------------------------------------------------------

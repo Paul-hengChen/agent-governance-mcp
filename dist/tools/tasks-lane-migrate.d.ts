@@ -27,10 +27,13 @@ export declare function primaryIndexReceiptSha(body: string): string;
  */
 export declare function isLanePathIgnored(workspacePath: string, lanePath: string): boolean;
 /**
- * The file tw_* reads and writes as the task ledger: the lane ledger, except
- * in a workspace whose absent lane path is git-ignored — there the legacy
- * file stays the ledger (or, with none yet, the first taskPaths candidate).
- * (E125a)
+ * The file tw_* reads and writes as the task ledger (every tools/tasks-file.ts
+ * reader and writer resolves through here): the lane ledger, except in a
+ * workspace whose absent lane path is git-ignored. There the legacy file stays
+ * the ledger (E125a option A). With no legacy file, a feat lane in a linked
+ * git worktree still gets its lane ledger, so `agc feature finish` harvests it
+ * with `.current/<lane>/` (E383); anywhere else (a primary checkout, or the
+ * `_primary` lane) it is the first taskPaths candidate.
  */
 export declare function resolveTasksLedgerPath(workspacePath: string, laneTasksPath: string): string;
 /** The one-line option-A advisory (Copy `tasks.ignored-lane-advisory`), or null. */
