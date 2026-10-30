@@ -171,6 +171,7 @@ export function integrationBranchOf(text) {
  */
 export function collectFacts(m, manifestText, opts) {
     const target = opts.target ?? "main";
+    const targetSource = opts.targetSource ?? (opts.target !== undefined ? "flag" : "default");
     const fail = (code, message) => {
         throw new HandoffFailure([inputErr(code, message)]);
     };
@@ -184,7 +185,11 @@ export function collectFacts(m, manifestText, opts) {
     const primary = resolvePrimary(repo) ?? fail("REPO_NOT_GIT", `--repo "${opts.repo}" has no main worktree (git worktree list failed)`);
     const primaryReal = realOrResolved(primary);
     const targetSha = (target !== "" && !target.startsWith("-") && !/\s/.test(target) ? resolveCommit(target, primary) : undefined) ??
-        fail("REF_NOT_FOUND", `--target "${target}" does not resolve to a commit (git rev-parse --verify)`);
+        fail("REF_NOT_FOUND", targetSource === "manifest"
+            ? `target branch "${target}" recorded in the manifest (目標分支 under ### 核對 primary) does not resolve to a commit (git rev-parse --verify) — pass --target <branch> to check against another branch`
+            : targetSource === "default"
+                ? `default target "main" does not resolve to a commit (git rev-parse --verify) and the manifest records no target branch (目標分支 under ### 核對 primary) — pass --target <branch>`
+                : `--target "${target}" does not resolve to a commit (git rev-parse --verify)`);
     const notes = [];
     let mailboxRoot;
     if (opts.mailboxRoot !== undefined && opts.mailboxRoot.trim() !== "") {
@@ -621,9 +626,15 @@ export function runHandoff(args) {
             return fail(r.errors);
         written = r.facts;
     }
+    // --check without --target compares against the branch the section recorded;
+    // generate and --closing keep the `main` default.
+    const recordedTarget = a.target === undefined ? TARGET_FACT_RE.exec(written?.get("目標分支") ?? "")?.[1] : undefined;
+    const target = a.target ?? recordedTarget;
+    const targetSource = a.target !== undefined ? "flag" : recordedTarget !== undefined ? "manifest" : "default";
     try {
         const collected = collectFacts(m, text, {
-            target: a.target,
+            target,
+            targetSource,
             repo: a.repo ?? path.dirname(path.resolve(a.manifest)),
             mailboxRoot: a.mailboxRoot,
             closing: a.closing,

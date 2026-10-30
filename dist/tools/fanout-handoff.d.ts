@@ -33,8 +33,16 @@ export declare function formatWatchCommand(entries: {
 /** `integration branch: <name>` on the manifest's base line, if any. */
 export declare function integrationBranchOf(text: string): string | undefined;
 export interface HandoffOptions {
-    /** Default `main`. */
+    /**
+     * Default `main`. `handoff --check` without `--target` passes the branch
+     * recorded in the section's 目標分支 fact instead, when it parses.
+     */
     target?: string;
+    /**
+     * Where `target` came from, which picks the REF_NOT_FOUND message. Absent:
+     * "flag" when `target` is set, else "default".
+     */
+    targetSource?: "flag" | "manifest" | "default";
     /** Directory inside the repo; primary = its main worktree. */
     repo: string;
     /** Overrides the manifest's `mailbox:` header; resolved against cwd. */
