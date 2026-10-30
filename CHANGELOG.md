@@ -16,6 +16,94 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [4.16.0] - 2026-10-30
+
+MINOR release. It ships post-v4 fan-out wave 13 since v4.15.0, landed on `main` by one wave pull
+request: lanes `e383` (E383, E385) and `e384` (E384, E386, E346). Plan
+`specs/fanout-post-v4-w13.md`, release gate `specs/release-post-v4-w13.md`. Semver: MINOR (decided
+by the human). This release changes compiled code in two `tools/` modules and `gates/visual.ts`,
+one shipped `bin/` script and one coordinator SOP fragment: a design file's Mode line is read by
+its declared value, a linked lane worktree keeps its task ledger under its own lane path, lane
+evidence directories are no longer symlinked back to primary (and the `agc check` advisory flips
+with that), and `fanout.mjs handoff --check` defaults to the recorded target branch (read
+*Upgrade notes* first). No MCP tool was added or removed, no schema version changed (handoff 15,
+tasks 2, sqlite 2, config 2), no dependency changed, no error code was added, and the gate
+registry stays at 35 entries with an 18-step write pipeline.
+
+### Upgrade notes
+
+- **E384: a design file's Mode line is decided by its declared leading value
+  (`gates/visual.ts`).** A value outside the known mode list (`code`, `Design from Figma`, …) no
+  longer arms the visual gates; v4.15.0 found a known mode in the trailing prose of such a line and
+  armed them. A `<known mode>-<suffix>` value (for example `figma-export`) resolves to that known
+  mode, and a line with no leading token keeps the earlier earliest-match rule (E319). If your
+  design files relied on prose to arm the visual gates, declare a known mode first.
+- **E383: the lane task ledger in a linked worktree (`tools/tasks-lane-migrate.ts`).** In a linked
+  lane worktree whose lane path is git-ignored and that holds no legacy ledger file, the `tw_*`
+  tools now use `.current/<lane>/tasks.md`. v4.15.0 used the first `taskPaths` candidate, a ledger
+  outside the lane path that `agc feature finish` did not harvest. Primary checkouts, the
+  `_primary` lane, and worktrees that already hold a legacy ledger are unchanged.
+- **E385: lane evidence directories stay real directories (`content/coord-03-core-fallback.md`,
+  `bin/agc-init.mjs`).** The coordinator SOP's Worktree bootstrap obligation is inverted: do not
+  symlink `qa_reports/`, `review_reports/` or `specs/` from a lane worktree back to primary; keep
+  them as real directories and tear the worktree down only with `agc feature finish`, which
+  harvests git-ignored evidence. The `agc check` worktree-evidence advisory flips with it: real
+  evidence directories in a linked worktree are now silent, while a symlink that resolves outside
+  the worktree (the shape v4.15.0 recommended) now warns, as does a dangling one. Lanes set up with
+  v4.15.0's symlinks will see the new warning. `bin/agc-init.mjs` changed only in this advisory:
+  no command, flag, help text or exit code changed, and the advisory never affects the exit code.
+- **E386: `fanout.mjs handoff --check` checks against the recorded target branch
+  (`tools/fanout-handoff.ts`; `scripts/fanout.mjs` (context, not changed)).** Without `--target`,
+  it now checks against the branch the manifest records under `### 核對 primary` (`目標分支`),
+  falling back to `main`; v4.15.0 always used `main`. The `REF_NOT_FOUND` messages for the
+  recorded and default cases now name `--target`. Generate and `--closing` keep the `main`
+  default, and an explicit `--target` behaves as before.
+- **E346: `fanout.mjs handoff --check` requires a sister repo path to be a repository top level
+  (`tools/fanout-handoff.ts`).** A declared sister repo is accepted only when `git rev-parse
+  --show-toplevel` run there resolves to that same path, so a plain directory nested in another
+  repository's working tree is now rejected with the existing `SISTER_REPO_NOT_GIT` code (v4.15.0
+  accepted it).
+
+### Changed
+
+- **E384: declared-mode parsing in `parseDesignMode` (`gates/visual.ts`)**. See *Upgrade notes*.
+  Tests: `test/e384-design-mode-declared.test.mjs`. Spec:
+  `specs/e384-design-mode-and-handoff-target.md`.
+- **E383: lane ledger resolution in linked worktrees (`tools/tasks-lane-migrate.ts`)**. See
+  *Upgrade notes*. Tests: `test/e383-lane-ledger-worktree.test.mjs`, with
+  `test/e130-lane-default.test.mjs` re-pinned. Spec:
+  `specs/e383-lane-ledger-and-worktree-evidence.md`.
+- **E385: no evidence symlinks in lane worktrees (`content/coord-03-core-fallback.md`,
+  `bin/agc-init.mjs`)**. See *Upgrade notes*. The coordinator monolith compose golden
+  (`test/fixtures/compose-golden/skill-coordinator-monolith.txt`) is re-captured for the changed
+  fragment. Tests: `test/e385-worktree-evidence.test.mjs`, with `test/agc-adapters.test.mjs`
+  re-pinned. Spec: `specs/e383-lane-ledger-and-worktree-evidence.md`.
+- **E386: recorded target branch for `handoff --check` (`tools/fanout-handoff.ts`)**. See
+  *Upgrade notes*. Tests: `test/e386-handoff-recorded-target.test.mjs`. Spec:
+  `specs/e384-design-mode-and-handoff-target.md`.
+- **Lane protocol (`docs/lane-protocol.md`)**. §1 notes that an env-prefixed git command
+  (`PATH=… git …`) is refused like a compound one; §3 documents the E383 ledger and E385 evidence
+  rules.
+
+### Fixed
+
+- **E346: a nested plain directory is no longer accepted as a sister repo
+  (`tools/fanout-handoff.ts`)**. See *Upgrade notes*. Tests:
+  `test/e346-sister-nested-dir.test.mjs`.
+
+### Notes
+
+- `dist/` is rebuilt for the three changed modules (`gates/visual.ts`, `tools/fanout-handoff.ts`,
+  `tools/tasks-lane-migrate.ts`); `dist/index.js` changes by the version literal. `CLAUDE.md`
+  count correction: test files 216 → 221 (two places).
+- Wave-13 evidence moves to `qa_reports/archive/release-post-v4-w13/` and
+  `review_reports/archive/release-post-v4-w13/`, and the E383 expected-red list to
+  `qa_reports/archive/e383-lane-ledger-and-worktree-evidence/`; the lane ledgers are archived under
+  `.current/history/2026-10/`.
+- `npm audit --audit-level=high` exits 0 at this release (one low and six moderate findings
+  remain, below that threshold).
+- Follow-up tickets E387–E390 are filed in `docs/backlog.md`, not shipped.
+
 ## [4.15.0] - 2026-10-29
 
 MINOR release. It ships post-v4 fan-out wave 12 since v4.14.0, landed on `main` by one wave pull
