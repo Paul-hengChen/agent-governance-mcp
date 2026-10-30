@@ -209,8 +209,16 @@ export function integrationBranchOf(text: string): string | undefined {
 // --- fact collection ------------------------------------------------------------
 
 export interface HandoffOptions {
-  /** Default `main`. */
+  /**
+   * Default `main`. `handoff --check` without `--target` passes the branch
+   * recorded in the section's 目標分支 fact instead, when it parses.
+   */
   target?: string;
+  /**
+   * Where `target` came from, which picks the REF_NOT_FOUND message. Absent:
+   * "flag" when `target` is set, else "default".
+   */
+  targetSource?: "flag" | "manifest" | "default";
   /** Directory inside the repo; primary = its main worktree. */
   repo: string;
   /** Overrides the manifest's `mailbox:` header; resolved against cwd. */
@@ -237,6 +245,7 @@ export interface CollectedFacts {
  */
 export function collectFacts(m: Manifest, manifestText: string, opts: HandoffOptions): CollectedFacts {
   const target = opts.target ?? "main";
+  const targetSource = opts.targetSource ?? (opts.target !== undefined ? "flag" : "default");
   const fail = (code: string, message: string): never => {
     throw new HandoffFailure([inputErr(code, message)]);
   };
@@ -250,7 +259,14 @@ export function collectFacts(m: Manifest, manifestText: string, opts: HandoffOpt
   const primaryReal = realOrResolved(primary);
   const targetSha =
     (target !== "" && !target.startsWith("-") && !/\s/.test(target) ? resolveCommit(target, primary) : undefined) ??
-    fail("REF_NOT_FOUND", `--target "${target}" does not resolve to a commit (git rev-parse --verify)`);
+    fail(
+      "REF_NOT_FOUND",
+      targetSource === "manifest"
+        ? `target branch "${target}" recorded in the manifest (目標分支 under ### 核對 primary) does not resolve to a commit (git rev-parse --verify) — pass --target <branch> to check against another branch`
+        : targetSource === "default"
+          ? `default target "main" does not resolve to a commit (git rev-parse --verify) and the manifest records no target branch (目標分支 under ### 核對 primary) — pass --target <branch>`
+          : `--target "${target}" does not resolve to a commit (git rev-parse --verify)`,
+    );
 
   const notes: string[] = [];
   let mailboxRoot: string | undefined;
@@ -545,6 +561,28 @@ export interface ExternalComparison {
 }
 
 /**
+ * Whether `root` is the top level of a git repository. A plain directory
+ * nested in another repo's working tree passes `rev-parse --git-dir` too, so
+ * the realpath of `rev-parse --show-toplevel` must equal the root's own. When
+ * `--show-toplevel` fails (a bare repository, a path inside `.git`), the
+ * `--git-dir` test alone decides.
+ */
+function isRepoRoot(root: string): boolean {
+  let top: string;
+  try {
+    top = git(["rev-parse", "--show-toplevel"], root).trim();
+  } catch {
+    try {
+      git(["rev-parse", "--git-dir"], root);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  return realOrResolved(top) === realOrResolved(root);
+}
+
+/**
  * Compare each well-formed `## 外部依賴` row with its sister repo's branch
  * now. `primary` is the repo whose `.current/.config.json` declares
  * sisterRepos; each row's sister root is path.resolve(primary, entry.path).
@@ -581,10 +619,9 @@ export function compareExternalDeps(text: string, primary: string): ExternalComp
         }
         if (roots.has(entry.name) || notGit.has(entry.name)) continue;
         const root = path.resolve(primary, entry.path);
-        try {
-          git(["rev-parse", "--git-dir"], root);
+        if (isRepoRoot(root)) {
           roots.set(entry.name, root);
-        } catch {
+        } else {
           // The path is deliberately not echoed (WORKTREE_ABSOLUTE_WARN convention).
           notGit.add(entry.name);
           errors.push(
@@ -726,9 +763,16 @@ export function runHandoff(args: string[]): CliResult {
     written = r.facts;
   }
 
+  // --check without --target compares against the branch the section recorded;
+  // generate and --closing keep the `main` default.
+  const recordedTarget = a.target === undefined ? TARGET_FACT_RE.exec(written?.get("目標分支") ?? "")?.[1] : undefined;
+  const target = a.target ?? recordedTarget;
+  const targetSource = a.target !== undefined ? "flag" : recordedTarget !== undefined ? "manifest" : "default";
+
   try {
     const collected = collectFacts(m, text, {
-      target: a.target,
+      target,
+      targetSource,
       repo: a.repo ?? path.dirname(path.resolve(a.manifest)),
       mailboxRoot: a.mailboxRoot,
       closing: a.closing,
