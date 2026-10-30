@@ -130,6 +130,7 @@ Removed strings: the two `agc check` warnings `… is a real, untracked director
 - Resource Audit: the E383/E385 rows and the wave manifest contain no URL, Figma, mockup or external-ticket reference ("an adopter repo" is a description, not a link). Zero external refs, so `external_refs` is omitted.
 - No architect hop. Scope is one branch in one function (`tools/tasks-lane-migrate.ts`), one advisory function (`bin/agc-init.mjs`) and three prose sites, with no new data model and no cross-cutting API.
 - Human ruling requested at cut approval (R1): the outside-link warning flips E111(ii) from silent to warning. A lane that symlinked before this change will see the advisory on its next `agc check`. That is intended, because it is the exact E385 failure shape. The alternative is to keep it silent and warn only on dangling links.
+  - Ruled 2026-10-30 by the human at cut approval: warn on outside links (the PM and integrator recommendation).
 - Visual Structural Assertions omitted: no `design/<feature>.md`, mode = no-design.
 
 ## Cut
