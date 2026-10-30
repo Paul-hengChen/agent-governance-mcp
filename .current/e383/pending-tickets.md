@@ -31,4 +31,19 @@ body: |
   lane worktrees, or require taskPaths to opt into TODO.md.
 ```
 
+```pending-ticket
+lane_local_id: E383-NEW-3
+title: bin/agc-init.mjs evidenceAtRisk comment points at the removed hasIgnoredUntrackedContent helper
+priority: P3
+depends_on: none
+source: sr-engineer, e383 T-E385-01
+body: |
+  E385 removed the agc check advisory helper hasIgnoredUntrackedContent (no caller left).
+  The comment above evidenceAtRisk (the agc feature finish harvest path) still says
+  "see hasIgnoredUntrackedContent" to explain why ignore status is asked per file, not
+  per directory. Lane e383 may not change the finish region (AC-E385-7), so the pointer
+  is left dangling. Inline the one-sentence reason (a directory holding one tracked file
+  reports "not ignored" to git check-ignore) in place of the pointer.
+```
+
 ## Applied

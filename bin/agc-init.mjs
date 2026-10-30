@@ -622,13 +622,16 @@ function checkResearchBinaries(cwd) {
   }
 }
 
-// --- linked-worktree evidence advisory (E111 prevention) --------------------
-// In a linked worktree (`.git` is a file), warn per evidence dir when it is a
-// real directory that is empty, or holds untracked files and either some are
-// ignored or none are tracked; or when it is a symlink that does not resolve
-// outside the worktree. Without the link back to primary, `git worktree
-// remove` deletes the lane's evidence. Advisory only (exit 0). Trigger
-// details and known false positives: see specs/e260c-bin-scripts.md.
+// --- linked-worktree evidence advisory (E111, E385) -------------------------
+// In a linked worktree (`.git` is a file), an evidence dir is expected to be a
+// real directory: `agc feature finish` harvests git-ignored evidence into the
+// primary checkout before it removes the worktree. So an absent dir, a real
+// dir (empty, tracked or holding untracked content) and a symlink resolving
+// inside the worktree (finish dereferences it) are all silent. Warn per dir
+// only when it is a symlink that resolves outside the worktree (a session
+// isolated to the worktree, e.g. Claude Code EnterWorktree, cannot write
+// through it) or one that does not resolve at all. A primary checkout is a
+// no-op. Advisory only: never affects the exit code.
 const WORKTREE_EVIDENCE_DIRS = ["qa_reports", "review_reports", "specs"];
 
 function isLinkedWorktree(cwd) {
@@ -639,65 +642,11 @@ function isLinkedWorktree(cwd) {
   }
 }
 
-// A real directory with no entries at all, as right after `mkdir -p
-// qa_reports review_reports specs`. `git ls-files --others` is silent for an
-// empty dir, so this is a plain fs check. A read error counts as "not empty",
-// leaving the decision to the untracked-content check.
-function isEmptyDir(target) {
-  try {
-    return fs.readdirSync(target).length === 0;
-  } catch {
-    return false;
-  }
-}
-
-// Asks `git ls-files --others` (does the dir hold a file the index lacks?),
-// not index membership: one force-added .gitkeep would make the whole dir
-// look tracked. Deliberately WITHOUT `--exclude-standard`, which would filter
-// out the ignored-and-untracked files this check exists to find.
-function hasUntrackedContent(cwd, rel) {
-  try {
-    // Same `-z` / NUL-split / execFileSync-argv discipline as
-    // checkResearchBinaries above, and the same fail-closed-and-silent
-    // catch (git absent, not a repo, zero commits): on error we report "no
-    // untracked content" so the caller skips the warning rather than
-    // risking a false positive in an environment this check cannot
-    // actually evaluate.
-    const out = execFileSync("git", ["ls-files", "-z", "--others", "--", rel], {
-      cwd,
-      encoding: "utf-8",
-      stdio: ["ignore", "pipe", "ignore"],
-    });
-    return out.split("\0").some((line) => line.length > 0);
-  } catch {
-    return false;
-  }
-}
-
-// Warns when untracked content is all a directory holds, but stays silent for
-// a straggler in a directory this repo already tracks (the fix there is to
-// commit it). Checks file by file with `--others --ignored --exclude-standard`,
-// because `git check-ignore` on the directory itself gets it wrong once a
-// tracked file sits inside: see specs/e260c-bin-scripts.md.
-// Same fail-closed-and-silent catch as the others above.
-function hasIgnoredUntrackedContent(cwd, rel) {
-  try {
-    const out = execFileSync(
-      "git",
-      ["ls-files", "-z", "--others", "--ignored", "--exclude-standard", "--", rel],
-      { cwd, encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"] }
-    );
-    return out.split("\0").some((line) => line.length > 0);
-  } catch {
-    return false;
-  }
-}
-
-// The other half of the distinguisher above: a directory with zero tracked
-// files looks like a fresh gitignored evidence dir even when nothing ignores
-// it, so it must still warn. Same `-z` / argv / fail-closed discipline as
-// hasUntrackedContent. An error reads as "zero tracked files", which never
-// manufactures a warning, because hasUntrackedContent fails closed the same way.
+// true iff `git ls-files` lists at least one tracked file under `rel` (used
+// by `agc feature finish`: tracked content is durable via the kept branch).
+// Same `-z` / NUL-split / execFileSync-argv discipline as
+// checkResearchBinaries above. Any git failure (git absent, not a repo, zero
+// commits) reads as "zero tracked files".
 function hasTrackedContent(cwd, rel) {
   try {
     const out = execFileSync("git", ["ls-files", "-z", "--", rel], {
@@ -711,13 +660,11 @@ function hasTrackedContent(cwd, rel) {
   }
 }
 
-// The only shape that survives `git worktree remove` is a symlink
-// whose target resolves to a real path OUTSIDE this worktree (i.e. back to
-// primary, or anywhere else that isn't torn down with the lane). A symlink
-// resolving INSIDE the lane (e.g. `qa_reports -> ./local-eviddir`) is
-// deleted along with its target by the same `worktree remove`, and a
-// dangling symlink protects nothing by construction — both must still
-// warn, not be treated as "already linked".
+// true iff `target` resolves to a real path OUTSIDE this worktree (back to
+// primary, or anywhere else not torn down with the lane), so it survives
+// `git worktree remove` on its own. A symlink resolving INSIDE the lane
+// (e.g. `qa_reports -> ./local-eviddir`) is deleted along with its target,
+// and a dangling symlink resolves nowhere: both are false.
 function isSafelyLinkedOutside(cwd, target) {
   let real;
   try {
@@ -746,44 +693,28 @@ function checkWorktreeEvidence(cwd) {
       continue; // absent entirely — nothing to warn about
     }
 
-    if (st.isSymbolicLink()) {
-      if (isSafelyLinkedOutside(cwd, target)) continue; // resolves outside this worktree — protected
-      // falls through to warn: dangling, or resolves inside the lane itself.
-      // These are two different diagnoses for a reader, so say which one
-      // fired instead of a disjunction that's half-false either way.
-      let dangling;
-      try {
-        fs.realpathSync(target);
-        dangling = false;
-      } catch {
-        dangling = true; // cannot resolve at all
-      }
+    // A real directory (or any non-link) is the expected shape: finish
+    // harvests it. Silent.
+    if (!st.isSymbolicLink()) continue;
+
+    let dangling;
+    try {
+      fs.realpathSync(target);
+      dangling = false;
+    } catch {
+      dangling = true; // cannot resolve at all
+    }
+    if (dangling) {
       process.stderr.write(
-        dangling
-          ? `agc check — warning: ${rel}/ is a symlink that does not resolve to anything (dangling) in a linked git worktree — point it at a location outside this worktree (e.g. the primary checkout) before build, so its code-review/QA evidence survives \`git worktree remove\`\n`
-          : `agc check — warning: ${rel}/ is a symlink that resolves INSIDE this worktree instead of outside it, in a linked git worktree — point it at a location outside this worktree (e.g. the primary checkout) before build, so its code-review/QA evidence survives \`git worktree remove\`\n`
+        `agc check — warning: ${rel}/ is a symlink that does not resolve to anything (dangling) in a linked git worktree — evidence writes into it fail; replace it with a real directory in the worktree: \`agc feature finish\` harvests git-ignored evidence into the primary checkout before it removes the worktree\n`
       );
-      continue;
+    } else if (isSafelyLinkedOutside(cwd, target)) {
+      process.stderr.write(
+        `agc check — warning: ${rel}/ is a symlink that resolves outside this linked git worktree — a session isolated to the worktree (e.g. Claude Code EnterWorktree) cannot write through it, so code-review/QA evidence cannot land; replace it with a real directory in the worktree: \`agc feature finish\` harvests git-ignored evidence into the primary checkout before it removes the worktree\n`
+      );
     }
-
-    if (!st.isDirectory()) continue; // neither a symlink nor a directory — n/a
-
-    if (!isEmptyDir(target)) {
-      // Non-empty real directory: warn only when it holds untracked content
-      // (the empty-dir case above skips straight through to the warn below)
-      // AND that content isn't just a straggler in a directory this repo
-      // already tracks — i.e. it's gitignored, or has zero tracked files at
-      // all, so a symlink is the only fix available.
-      if (!hasUntrackedContent(cwd, rel)) continue; // no untracked content at risk here
-      if (!hasIgnoredUntrackedContent(cwd, rel) && hasTrackedContent(cwd, rel)) continue; // tracked dir + an untracked, non-ignored straggler — diagnosis is "commit it", not "symlink the dir away"
-    }
-    // else: real directory, completely empty — falls through to warn
-    // unconditionally; see isEmptyDir above for why this has no
-    // false-positive cost.
-
-    process.stderr.write(
-      `agc check — warning: ${rel}/ is a real, untracked directory in a linked git worktree — symlink it back to a location outside this worktree (e.g. the primary checkout) before build, so its code-review/QA evidence survives \`git worktree remove\`\n`
-    );
+    // else: resolves inside this worktree — finish dereferences and harvests
+    // it. Silent.
   }
 }
 

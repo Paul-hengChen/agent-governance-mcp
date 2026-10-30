@@ -151,3 +151,10 @@ Recorded in `.current/e383/pending-tickets.md`:
 
 - `E383-NEW-1`: `specs/e260c-bin-scripts.md`'s E111 worktree-advisory section (trigger details, known false positives) describes the pre-E385 advisory and goes stale. That file is forbidden to this lane.
 - `E383-NEW-2`: in a workspace whose lane path is git-ignored, a tracked `TODO.md` or root `tasks.md` in a lane worktree becomes that lane's `tw_*` ledger (E125a option A), so lane task rows get committed into a team file.
+- `E383-NEW-3` (sr-engineer): the comment above `evidenceAtRisk` in `bin/agc-init.mjs` (the finish path, outside this lane's editable region) points at the removed `hasIgnoredUntrackedContent` helper.
+
+## Implementation notes (sr-engineer)
+
+- **Linked-worktree test (integrator note).** T-E383-01 adds a module-private `isLinkedWorktree` in `tools/tasks-lane-migrate.ts` that mirrors `tools/drift.ts`: `fs.statSync(<ws>/.git).isFile()`, no git spawn. It does not compare `git rev-parse --git-dir` with `--git-common-dir`. Known residual: a submodule's own checkout also has a `.git` file, so a submodule checked out on a `feat/` branch, with an ignored lane path and no legacy task file, gets its lane ledger `.current/<lane>/tasks.md` instead of `.current/tasks.md`. In that case the ledger sits next to the handoff that already lives in `.current/<lane>/`, so nothing is lost, but it is a resolution difference from a plain primary checkout.
+- **coord-03 byte delta.** The bootstrap-obligation line goes from 1427 to 935 bytes (newline excluded), a delta of -492 bytes in the raw fragment. The origin tag content grows from ` (E111)` to ` (E111, E385)` (+6 bytes), and `stripOriginTags` removes it, so the composed `teamwork` prompt shrinks by 498 bytes. `test/context-budget.test.mjs` still passes at this commit.
+- **Kept helpers.** `hasTrackedContent` and `isSafelyLinkedOutside` stay (finish uses them). Their comments were rewritten because they referred to the removed helpers and to the old warn-on-inside-link rule. Their code is unchanged.
