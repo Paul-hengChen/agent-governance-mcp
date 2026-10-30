@@ -1,0 +1,8 @@
+{"ts":"2026-10-30T03:28:05.787Z","feature":"e383-lane-ledger-and-worktree-evidence","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-30T03:31:13.524Z","feature":"e383-lane-ledger-and-worktree-evidence","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-30T03:33:51.630Z","feature":"e383-lane-ledger-and-worktree-evidence","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-30T03:42:05.135Z","feature":"e383-lane-ledger-and-worktree-evidence","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-30T03:42:59.680Z","feature":"e383-lane-ledger-and-worktree-evidence","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-30T03:49:36.943Z","feature":"e383-lane-ledger-and-worktree-evidence","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-10-30T03:56:12.139Z","feature":"e383-lane-ledger-and-worktree-evidence","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
+{"ts":"2026-10-30T04:08:24.620Z","feature":"e383-lane-ledger-and-worktree-evidence","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}

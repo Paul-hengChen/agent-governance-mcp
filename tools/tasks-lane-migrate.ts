@@ -334,15 +334,33 @@ export function isLanePathIgnored(workspacePath: string, lanePath: string): bool
   return ignored;
 }
 
+// A linked git worktree's `.git` is a FILE (a "gitdir: <path>" gitfile); a
+// primary checkout's is a directory. Pure fs.statSync, no git spawn: the
+// same test tools/drift.ts and bin/agc-init.mjs (isLinkedWorktree) use.
+function isLinkedWorktree(workspacePath: string): boolean {
+  try {
+    return fs.statSync(path.join(workspacePath, ".git")).isFile();
+  } catch {
+    return false;
+  }
+}
+
 /**
- * The file tw_* reads and writes as the task ledger: the lane ledger, except
- * in a workspace whose absent lane path is git-ignored — there the legacy
- * file stays the ledger (or, with none yet, the first taskPaths candidate).
- * (E125a)
+ * The file tw_* reads and writes as the task ledger (every tools/tasks-file.ts
+ * reader and writer resolves through here): the lane ledger, except in a
+ * workspace whose absent lane path is git-ignored. There the legacy file stays
+ * the ledger (E125a option A). With no legacy file, a feat lane in a linked
+ * git worktree still gets its lane ledger, so `agc feature finish` harvests it
+ * with `.current/<lane>/` (E383); anywhere else (a primary checkout, or the
+ * `_primary` lane) it is the first taskPaths candidate.
  */
 export function resolveTasksLedgerPath(workspacePath: string, laneTasksPath: string): string {
   if (fs.existsSync(laneTasksPath) || !isLanePathIgnored(workspacePath, laneTasksPath)) return laneTasksPath;
-  return findLegacyTasksFile(workspacePath) ?? resolveTaskPaths(workspacePath)[0] ?? laneTasksPath;
+  const legacyPath = findLegacyTasksFile(workspacePath);
+  if (legacyPath !== null) return legacyPath;
+  const lane = path.basename(path.dirname(laneTasksPath));
+  if (lane !== PRIMARY_LANE && isLinkedWorktree(workspacePath)) return laneTasksPath;
+  return resolveTaskPaths(workspacePath)[0] ?? laneTasksPath;
 }
 
 /** The one-line option-A advisory (Copy `tasks.ignored-lane-advisory`), or null. */

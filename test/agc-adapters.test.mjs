@@ -974,9 +974,10 @@ test("E104(ii): this repo has zero tracked binaries under research/ (the day-one
 
 // --- Linked-worktree evidence advisory (bin/agc-init.mjs checkWorktreeEvidence()) (E111) ---
 // A fixture is mandatory: this repo tracks all three evidence dirs, so it cannot reproduce the
-// defect. The contract is the 23-row matrix in
-// review_reports/archive/e111-lane-worktree-evidence/review_T-E111-01.md (round 3
-// binding); assert only warn/silent stderr text and exit code, never which git command fires.
+// defect. Since E385 the advisory is flipped: a real evidence dir (empty, untracked, ignored) and
+// a symlink resolving INSIDE the worktree are silent (`agc feature finish` harvests them); a
+// symlink resolving OUTSIDE the worktree, or a dangling one, warns. Assert only warn/silent
+// stderr text and exit code, never which git command fires.
 // More: specs/e260e-comment-rationale.md (agc-adapters.test.mjs).
 
 function mkWorktreeFixture(prefix) {
@@ -997,16 +998,14 @@ function mkWorktreeFixture(prefix) {
   return { primary, worktree };
 }
 
-test("E111(i): agc check warns on a plain untracked real evidence dir inside a linked worktree (W1), and does NOT go silent when a force-added tracked .gitkeep sits beside real untracked evidence in a gitignored dir (W3) — the C1 hole a directory-level ignore test would reopen", () => {
+test("E111(i) re-pinned by E385: agc check stays SILENT on a plain untracked real evidence dir (W1) and on a gitignored dir holding a force-added tracked .gitkeep beside untracked evidence (W3) — real dirs are the expected shape, finish harvests them", () => {
   const { worktree } = mkWorktreeFixture("e111-w1w3-");
 
   // W1: plain untracked real dir — nothing tracked, not gitignored.
   fs.mkdirSync(path.join(worktree, "qa_reports"), { recursive: true });
   fs.writeFileSync(path.join(worktree, "qa_reports", "review_T1.md"), "evidence\n");
 
-  // W3: gitignored dir + force-added tracked .gitkeep + untracked real evidence beside it: a
-  // directory-level membership test would stay silent. Pins the outcome, never the git plumbing.
-  // More: specs/e260e-comment-rationale.md (agc-adapters.test.mjs).
+  // W3: gitignored dir + force-added tracked .gitkeep + untracked real evidence beside it.
   fs.writeFileSync(path.join(worktree, ".gitignore"), "review_reports/\n");
   fs.mkdirSync(path.join(worktree, "review_reports"), { recursive: true });
   fs.writeFileSync(path.join(worktree, "review_reports", ".gitkeep"), "");
@@ -1016,27 +1015,19 @@ test("E111(i): agc check warns on a plain untracked real evidence dir inside a l
 
   const r = runAgc(worktree, ["check"]);
   assert.equal(r.status, 0, `advisory must never affect the exit code (stderr=${r.stderr})`);
-  assert.match(
-    r.stderr,
-    /qa_reports\/ is a real, untracked directory in a linked git worktree/,
-    "W1: plain untracked real dir must warn",
-  );
-  assert.match(
-    r.stderr,
-    /review_reports\/ is a real, untracked directory in a linked git worktree/,
-    "W3: gitignored dir with a tracked .gitkeep + untracked evidence must still warn — this is C1; closed by a per-untracked-file ignore test, not a per-directory one",
-  );
+  assert.doesNotMatch(r.stderr, /qa_reports\//, "W1: plain untracked real dir must be silent");
+  assert.doesNotMatch(r.stderr, /review_reports\//, "W3: gitignored dir with a tracked .gitkeep + untracked evidence must be silent");
 });
 
-test("E111(ii): agc check stays silent when an evidence dir is a symlink resolving OUTSIDE the worktree (S1) — this is the exact state the E111 bootstrap rule (content/coord-03-core-fallback.md) produces, and a false positive here would train readers to ignore the check", () => {
+test("E111(ii) re-pinned by E385: agc check WARNS (worktree-evidence.outside-link) when an evidence dir is a symlink resolving OUTSIDE the worktree (S1) — a session isolated to the worktree cannot write through it; exit code stays 0", () => {
   const { primary, worktree } = mkWorktreeFixture("e111-s1-");
-  const target = path.join(primary, "qa_reports"); // "linked back to primary" per the bootstrap obligation
+  const target = path.join(primary, "qa_reports");
   fs.mkdirSync(target, { recursive: true });
   fs.symlinkSync(target, path.join(worktree, "qa_reports"), "dir");
 
   const r = runAgc(worktree, ["check"]);
   assert.equal(r.status, 0, `advisory must never affect the exit code (stderr=${r.stderr})`);
-  assert.doesNotMatch(r.stderr, /qa_reports\//, "a symlink resolving outside the worktree must be silent");
+  assert.match(r.stderr, /qa_reports\/ is a symlink that resolves outside this linked git worktree/);
 });
 
 test("E111(iii): agc check stays silent on every tracked-evidence shape — fully tracked and clean (W6), tracked content plus an untracked straggler which is THIS REPO's own shape (W5), and tracked content with a locally modified tracked file (W7)", () => {
@@ -1089,11 +1080,8 @@ test("E111(iv): agc check stays silent from a PRIMARY checkout regardless of evi
   assert.equal(r.stderr, "", "a primary checkout must produce zero worktree-evidence warnings regardless of directory state");
 });
 
-test("E111 R1 regression guard: a freshly bootstrapped, completely empty evidence dir in a linked worktree still warns (W4) — the only moment remediation is free, per review_reports/review_T-E111-01.md Round 1 and Round 3", () => {
+test("E111 R1 guard re-pinned by E385: a freshly bootstrapped, completely empty evidence dir in a linked worktree is now SILENT (W4) — the real dir is the expected shape", () => {
   const { worktree } = mkWorktreeFixture("e111-w4-");
-  // The state right after `mkdir -p qa_reports review_reports specs` and
-  // nothing else — no tracked files (git can't track an empty directory)
-  // and no untracked ones either.
   fs.mkdirSync(path.join(worktree, "qa_reports"));
   fs.mkdirSync(path.join(worktree, "review_reports"));
   fs.mkdirSync(path.join(worktree, "specs"));
@@ -1101,18 +1089,15 @@ test("E111 R1 regression guard: a freshly bootstrapped, completely empty evidenc
   const r = runAgc(worktree, ["check"]);
   assert.equal(r.status, 0, `advisory must never affect the exit code (stderr=${r.stderr})`);
   for (const rel of ["qa_reports", "review_reports", "specs"]) {
-    assert.match(
-      r.stderr,
-      new RegExp(`${rel}\\/ is a real, untracked directory in a linked git worktree`),
-      `${rel}/ empty (zero tracked, zero untracked) must still warn — R1's fix; the empty bootstrap moment is the only one remediation is free`,
-    );
+    assert.doesNotMatch(r.stderr, new RegExp(`${rel}\\/`), `${rel}/ empty real dir must be silent`);
   }
 });
 
-test("E111: the advisory never changes the exit code — agc check exits 0 with warnings present, and the pre-existing stale-adapter exit-1 path fires independently when both conditions hold at once", () => {
-  const { worktree } = mkWorktreeFixture("e111-exit-");
-  fs.mkdirSync(path.join(worktree, "qa_reports"), { recursive: true });
-  fs.writeFileSync(path.join(worktree, "qa_reports", "review_T1.md"), "evidence\n");
+test("E111: the advisory never changes the exit code — the pre-existing stale-adapter exit-1 path fires independently alongside an outside-link worktree-evidence warning", () => {
+  const { primary, worktree } = mkWorktreeFixture("e111-exit-");
+  const target = path.join(primary, "qa_reports");
+  fs.mkdirSync(target, { recursive: true });
+  fs.symlinkSync(target, path.join(worktree, "qa_reports"), "dir");
 
   const OLD_VERSION = "0.0.1";
   fs.writeFileSync(path.join(worktree, "AGENTS.md"), `# agc-version: ${OLD_VERSION}\n# stale file\n`);
@@ -1125,7 +1110,7 @@ test("E111: the advisory never changes the exit code — agc check exits 0 with 
   );
   assert.match(
     r.stderr,
-    /qa_reports\/ is a real, untracked directory in a linked git worktree/,
+    /qa_reports\/ is a symlink that resolves outside this linked git worktree/,
     "the advisory warning must still be present alongside the stale-adapter message",
   );
   assert.match(r.stderr, /stale adapter.*AGENTS\.md/, "the pre-existing stale-adapter path must be untouched");
