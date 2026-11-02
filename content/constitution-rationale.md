@@ -7,7 +7,7 @@
 > constitution section id (e.g. "see Constitution §3.2"); the constitution does not
 > reference back.
 >
-> Scope: §1, §3.1, §3.2, §5, §6, §7.
+> Scope: §1, §3, §3.1, §3.2, §5, §6, §7.
 >
 > Primary sources: `research/oobe-visual-fidelity-retrospective-2026-06-05.md`
 > (the false-PASS retrospective), `research/process-retrospective.md` (the Language-step
@@ -131,10 +131,9 @@ dispatch prompt is **void**.
 **Why "builder ≠ judge" (role-collapse guard).** Retrospective D2/C5: under subagent rate
 limits, the coordinator absorbed the design-auditor, sr-engineer, and qa roles inline —
 the same actor wrote the code, authored the verdict criteria, and signed the PASS, with no
-independent adversary left. The guard: if subagent limits force a role inline, that actor
-MAY build/edit but MUST NOT author the visual verdict nor self-issue a visual PASS. With no
-independent qa context available, visual-backed work stops at `status=Blocked` ("awaiting
-independent QA") — never a builder-signed PASS.
+independent adversary left. The guard was born here for the visual verdict; it now lives in
+§3, generalized to every code-review verdict, qa verdict and PASS, because the same collapse
+voids a non-visual verdict just as surely. See Constitution §3.
 
 **Why "no global-frame metric" (false-PASS prevention).** Retrospective B2: the Language
 screen scored 6.18% whole-frame difference on a mostly-empty 1280×720 dark canvas, which
@@ -162,7 +161,7 @@ promotes a `tasks.md`-only `[x]`). Tasks-ahead "vibe drift" is reported, not rec
 > don't touch adjacent". The relaxation lets sr fix all VSA-detected deviations in one
 > self-converge pass — but it is deliberately bounded so it does not reopen the false-PASS
 > hole: scope is the pre-handoff self-converge loop only, QA still independently verifies
-> every VSA row at PASS, and §3.2 is unchanged (no global-frame metric; builder ≠ judge).
+> every VSA row at PASS, §3.2 is unchanged (no global-frame metric), and so is §3 builder ≠ judge.
 
 ---
 
@@ -181,8 +180,8 @@ That is what unbounded iteration costs. The circuit breaker forces an early, lou
 on limit, stop tool use immediately, report what is missing, and wait for a human. Per
 §Document Priority, when §5 trips the hand-back is Blocked/FAIL — never an error-laden PASS,
 and never an extended loop. The `visual_round` split-escalation hatch (§3.1) is the
-same philosophy applied to pixel iteration: at Round 3, prefer splitting the oversized
-widget over grinding two more rounds toward threshold renegotiation.
+same philosophy applied to pixel iteration: from the `visual_split` threshold on, prefer
+splitting the oversized widget over grinding the remaining rounds toward threshold renegotiation.
 
 ---
 
