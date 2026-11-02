@@ -2,6 +2,8 @@
 
 New findings from the E391 PM cut (lane-protocol §4). Full context: `specs/e391-prompt-audit-stale-facts.md` § Findings filed.
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E391-NEW-2
 title: CLAUDE.md carries more literal counts that will go stale, and Layout omits further 4.x tools/ modules
@@ -18,5 +20,3 @@ body: |
   pins some of the CLAUDE.md counts, so that test needs a re-pin if they change.
   Out of E391's scope (E391 only touches the four named findings G2-03/13/15/24).
 ```
-
-## Applied
