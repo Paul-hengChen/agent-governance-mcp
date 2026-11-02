@@ -1,0 +1,2 @@
+{"ts":"2026-11-02T04:07:22.389Z","feature":"e391-prompt-audit-stale-facts","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"fable"}
+{"ts":"2026-11-02T04:18:34.843Z","feature":"e391-prompt-audit-stale-facts","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
