@@ -47,7 +47,7 @@ names a test case in that file.
   of the four `{chain, design}` combinations contains its anchor `**Builder ≠ judge (role-collapse guard)**:` exactly once:
 
   ```
-  - **Builder ≠ judge (role-collapse guard)**: the actor that built or edited a change — even a role run inline in another role's context — MUST NOT author its code-review verdict, its qa verdict (visual verdict included), or its PASS. With no independent judge context available, the work stops at `status=Blocked` ("awaiting independent QA") — never a builder-signed verdict.
+  - **Builder ≠ judge (role-collapse guard)**: the actor that built or edited a change MUST NOT author its code-review verdict, its qa verdict (visual verdict included), or its PASS. With no independent judge context available, the work stops at `status=Blocked` ("awaiting independent QA") — never a builder-signed verdict.
   ```
   proof: e393 "AC-A1: builder ≠ judge rule is in const-05 §3 and in all four compositions"
 - **AC-A2** — Given the lane HEAD, when `content/const-11-design-chain-32.md` is read, then the
@@ -194,6 +194,22 @@ exact measured value with a one-line E393 re-baseline comment.
   proof: `node --test test/context-budget.test.mjs test/e391-prompt-audit-stale-facts.test.mjs`
   (inside the suite lock)
 
+#### Amendment after the cut (coordinator, post-review) — needs human ruling
+
+Found by the sr-engineer while writing the expected-red manifest, confirmed by the code-reviewer
+and the integrator (mailbox): `test/context-budget.test.mjs:914` pins the design-only strip
+**saving** (design-arm stripped minus non-design stripped), a floor, not a size ceiling. Moving
+the builder ≠ judge bullet out of the chain-design fragment into core shrinks the design-only
+span, so the saving necessarily drops; no equal-bytes trim restores it (it measures the gap
+between the two arms, not a size). Option (i-b) does not cover it.
+
+| figure (test line) | kind | old pin | measured after E393 | proposal |
+|---|---|---|---|---|
+| design-only strip saving (`context-budget.test.mjs:914`) | floor | ≥ 2080 (a12 re-baseline) | 1999 | lower the floor to 1999 with the assertion message naming E393 as the re-baseline (same shape as the a12 re-baseline it replaces); no other ceiling moves |
+
+Integrator recommendation: lower to the measured value. qa records the floor change and the
+(i-b) outcome in the qa report with before/after numbers.
+
 ### F. Tests and goldens (T-E393-06, qa-owned)
 
 Tests whose pinned strings change (grep-verified on the base tree):
@@ -237,7 +253,7 @@ B and C tables above with its exact text; this table names the new strings.
 
 | string id | exact text (quote verbatim) | source |
 |---|---|---|
-| const05.builder-judge | `- **Builder ≠ judge (role-collapse guard)**: the actor that built or edited a change — even a role run inline in another role's context — MUST NOT author its code-review verdict, its qa verdict (visual verdict included), or its PASS. With no independent judge context available, the work stops at `status=Blocked` ("awaiting independent QA") — never a builder-signed verdict.` | `docs/backlog.md` E393 (human decision option (A)); `docs/prompt-audit-2026-11-02.md` G2-10; generalized from const-11:22–26 |
+| const05.builder-judge | `- **Builder ≠ judge (role-collapse guard)**: the actor that built or edited a change MUST NOT author its code-review verdict, its qa verdict (visual verdict included), or its PASS. With no independent judge context available, the work stops at `status=Blocked` ("awaiting independent QA") — never a builder-signed verdict.` | `docs/backlog.md` E393 (human decision option (A)); `docs/prompt-audit-2026-11-02.md` G2-10; generalized from const-11:22–26 |
 | anchor.citation | `§3 builder ≠ judge` / `§3 builder != judge` (adapter) | authored-here — shortest anchor naming section + rule, mirrors the old `§3.2 builder ≠ judge` form |
 | const01.limits.visual_split | \| `visual_split` threshold \| 3 \| `visual_round` at which sr-engineer MAY request a split (design-armed only). \| | `docs/backlog.md` E393; G2-21 ("在 Limits 表加 `visual_split` 門檻"); value from const-09:3 `visual_round >= 3` |
 | qa.route.cap | `unresolved at the `qa_round` cap` (situation) / `QA: <task-id> unresolved at the qa_round cap` (pending note) | authored-here — matches the existing step-66 label "Unresolved at the `qa_round` cap" and its rollback reason |
@@ -327,3 +343,19 @@ Tasks (all `T-E393-NN`; each within the `task_size` budget; each site maps to ex
 - **Resource Audit Gate**: `external_refs` = none (all in-repo).
 - **Scope decision**: single feature (one ticket, one lane, disjoint by construction).
 - manifest-tier: not eligible — config cutApprovalAutoTier has no manifest:true; cut is human-approved in the lane session
+
+### Rulings recorded (post-cut, coordinator)
+
+- **Cut approved** by the human in the lane session after the integrator's mailbox pre-review
+  close (spec c501816).
+- **Budget**: option **(i-b) + w2'** — trims t1–t6, w1, w3 applied; w2 is a move, not a
+  deletion: the const-15 D10 "Reason" sentence now lives in `content/constitution-rationale.md`
+  §6 (integrator's w2'). Ceilings in `test/context-budget.test.mjs` unchanged; ownership widened
+  by the integrator for const-05:5, const-15:12, the const-01 line-1 comment and the rationale
+  §6 paragraph (mailbox to-lane#1).
+- **Header**: `Constitution v3.40.0` → `v3.41.0` (AC-D1 approved); comment shortened (w3).
+- **t3 applied**: the shipped AC-A1 bullet omits the inline-role clause (the AC-A1 text above
+  is updated to the shipped form; the `(role-collapse guard)` label and the coord-03 Blocked row
+  still name the inline case).
+- **Saving floor** (`context-budget.test.mjs:914`, §E amendment): pending the human's ruling at
+  the time of this amendment; qa applies whatever is ruled.
