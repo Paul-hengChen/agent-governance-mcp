@@ -84,7 +84,7 @@ test("AC-3: lazy-load hook has both Absent and Present branches with correct con
   assert.match(body, /Do NOT Read.*skill-qa-visual\.md/is, "Absent branch must explicitly forbid Reading the sub-skill");
 
   // Present branch: Read the sub-skill via the Read tool + name the gate
-  assert.match(body, /Present[^\n]*Read\s+`?content\/skill-qa-visual\.md`?[^\n]*Read tool/is, "Present branch must Read the sub-skill via the Read tool");
+  assert.match(body, /Present[^\n]*Read\s+`?(?:<agc install>\/)?content\/skill-qa-visual\.md`?[^\n]*Read tool/is, "Present branch must Read the sub-skill via the Read tool");
   assert.match(body, /VISUAL_EVIDENCE_MISSING/, "Present branch must name the server error code");
   assert.match(body, /PASS GATE.*v3\.14\.0/i, "Present branch must declare the PASS gate");
 });

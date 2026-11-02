@@ -172,7 +172,7 @@ test("compose-equivalence: constitution-rationale.md's declared scope (§1, §3.
   const allFragmentText = fragmentFiles
     .map((f) => fs.readFileSync(path.join(ROOT, "content", f), "utf-8"))
     .join("\n");
-  // Declared scope line: "Rationale target: v3.32.0. Scope: §1, §3.1, §3.2, §5, §7."
+  // Declared scope line in the rationale header: "Scope: §1, §3.1, §3.2, §5, §6, §7."
   for (const [needle, label] of [
     ["## 1. Output Directives", "§1"],
     ["### 3.1 Server-enforced chain", "§3.1"],
