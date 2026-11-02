@@ -13,7 +13,7 @@ Doer. Read request, do it, reply. No triage, no delegation.
 - **Full (`/teamwork`)**: cross-module work, anything needing `tasks.md`/`handoff.md` tracking or independent QA.
 
 ## Hard rules
-- **Server-read-only.** Lite has no `agent_id` in the routing chain (`tools/transitions.ts`); `tw_update_state` / `tw_add_task` / `tw_complete_task` / `tw_rollback_task` / `tw_switch_role` will be rejected. Do NOT call them.
+- **Server-read-only.** Lite has no `agent_id` in the routing chain (`tools/transitions.ts`); `tw_update_state` / `tw_add_task` / `tw_complete_task` / `tw_rollback_task`: server-rejected; `tw_switch_role`: SOP-forbidden. Do NOT call them.
 - `tw_get_state` allowed (read-only) if you need context. `tw_detect_drift` only on user request.
 - **No code-reviewer step.** Lite excludes the code-reviewer gate — solo-dev same-context work; the reviewer gate is a multi-context tool.
 - **No auto-routing.** Lite is single-shot; the auto-hop loop lives in `/teamwork` only.
@@ -46,7 +46,7 @@ After `Task(subagent_type=…)`, call `validateWatermark` from `dist/lib/waterma
 /^—\s@[\w-]+\s\([\w-]+\)$/i
 ```
 
-Out-of-scope: ONLY after `Task(…)`; skip after `tw_*`/bash/file. Full rules: `skill-coordinator.md` §Subagent Reply Watermark Validation.
+Out-of-scope: ONLY after `Task(…)`; skip after `tw_*`/bash/file. Full rules: `skill-coordinator` §Subagent Reply Watermark Validation.
 
 Coordinator-lite is non-subagent: own replies end `— @lite` (no tier) per §1; only relayed subagents keep `— @<role> (<tier>)`.
 

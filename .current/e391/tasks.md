@@ -1,0 +1,13 @@
+<!-- schema_version: 2 -->
+# Tasks
+
+## Active
+
+- [x] T-E391-01 [P1] sr (G2-06, G2-18, G2-11, G2-26; budget-sensitive): apply Copy/Strings g2-06.const08-2, g2-18.const08-4, g2-26.const15-6, g2-11.lite-16, g2-18.lite-49 verbatim on const-08 L2/L4, const-15 L6, skill-coordinator-lite L16/L49 only; measure-context-cost bundle lean must be <= 5722 | depends_on: none
+- [x] T-E391-02 [P1] sr (G2-02, G2-04, G2-05, G2-07, G2-08): apply Copy/Strings rows for skill-release-engineer L292, constitution-rationale L3/L10/L15/L173-174, skill-design-auditor L71/L89, skill-doc-writer L13 (re-verify each against current line first; named lines only) | depends_on: none
+- [-] T-E391-03 [P1] sr (G2-12): apply Copy/Strings g2-12.qa-engineer-60/95/101 and g2-12.qa-visual-24 (<agc install>/content/... form) on those four lines only; skill-qa-engineer.md must stay <= 18500 bytes | depends_on: none (voided: re-cut: G2-12 widened to 6 sites by integrator pre-review)
+- [x] T-E391-04 [P1] sr (G2-03, G2-13, G2-15, G2-24): apply Copy/Strings g2-03/g2-13/g2-15/g2-24 rows to CLAUDE.md, only inside Layout / Testing changes / What this server does NOT do / Governance context loading; add rows, never move; adapter blocks + agc-version stamp untouched | depends_on: none
+- [x] T-E391-05 [P1] qa (golden + budget): npm run build && node scripts/capture-constitution-golden.mjs; per-hunk explanation of test/fixtures/compose-golden/** moves in the QA report; record measure-context-cost before (lean 5723) / after and the four AC-BUDGET ceiling values; test/context-budget.test.mjs not edited | depends_on: T-E391-01, T-E391-02, T-E391-03
+- [x] T-E391-06 [P1] qa (re-pins + AC test): re-pin test/qa-visual-skill-split.test.mjs AC-3 (:87 regex vs <agc install>/ prefix); optional comment refresh test/compose-equivalence.test.mjs:175; new test/e391-prompt-audit-stale-facts.test.mjs pinning AC-G2-02..AC-G2-26 (reads content/** and CLAUDE.md only) | depends_on: T-E391-04, T-E391-05
+- [x] T-E391-07 [P1] qa (lane verification): final committed HEAD, clean tree: AC-SCOPE, AC-DIST (npm run build; git diff --stat dist/ empty), AC-STAMP (node bin/agc-init.mjs check exit 0), AC-BUDGET, full suite under node scripts/test-lock.mjs -- npm test with qa_suite_result; listed regression files stay unmodified | depends_on: T-E391-06
+- [x] T-E391-08 [P1] sr (G2-12, widened by integrator pre-review; replaces voided T-E391-03): apply Copy/Strings g2-12.qa-engineer-59/60/95/101 and g2-12.qa-visual-24/65 (<agc install>/content/... form) on those six lines only (qa-engineer L59/L60/L95/L101, qa-visual L24/L65); byte cap unchanged: skill-qa-engineer.md must stay <= 18500 bytes | depends_on: none
