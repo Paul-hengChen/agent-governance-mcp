@@ -10,12 +10,12 @@
 
 ```
 researcher (optional) → design-auditor (optional) → pm → architect (if complex) → sr-engineer ↔ code-reviewer → qa-engineer
-                                                                                          ↑________________________|  (Round 1-3 QA review; Round 1-5 visual review)
+                                                                                          ↑________________________|
 ```
 
-sr-engineer ↔ code-reviewer loops on `(code-reviewer, FAIL)` for up to 3
-rounds (`review_round` cap). The qa-engineer loop back to sr-engineer
-(review Round 1 through the `qa_round` cap) runs `qa_round` independently.
+sr-engineer ↔ code-reviewer loops on `(code-reviewer, FAIL)` up to the
+`review_round` cap. The qa-engineer loop back to sr-engineer
+(up to the `qa_round` cap) runs `qa_round` independently.
 
 Each role finishes with `tw_update_state` whose first-class `next_role` field names the successor role so the coordinator (or human) knows where to route (`pending_notes` stays free-text prose for the next reader — it carries no routing token).
 
