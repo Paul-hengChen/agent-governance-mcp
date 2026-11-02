@@ -655,7 +655,7 @@ const DESIGN_ONLY_SENTINELS = [
   "Visual evidence gate",                 // §3.1 fence 1, bullet 1 (was "Visual evidence gate (v3.16.0)")
   "Visual report schema gate",            // §3.1 fence 1, bullet 2
   "`visual_round` sub-loop",              // §3.1 fence 2, bullet 1 (was "`visual_round` sub-loop (v3.14.0)")
-  "Split escalation (Round 3)",           // §3.1 fence 2, bullet 2
+  "Split escalation (`visual_split`)",    // §3.1 fence 2, bullet 2 (E393: was "Split escalation (Round 3)")
   "3.2 Visual Verdict Authority",         // §3.2 header (fence 3)
   "Visual verdict is qa-visual-owned",    // §3.2 body
   "No global-frame metric",               // §3.2 body — the qa-visual-owned PASS-metric rule
@@ -709,7 +709,7 @@ const P2_S1_ANTISWEEP_SENTINELS = ["**MVP strict**", "**Surgical changes**"];
 // DIAGRAM, S1 (review_round), S2 (qa_round loop), S6 (Each role finishes…).
 const P2_S4_ANTISWEEP_SENTINELS = [
   "researcher (optional) → design-auditor",                      // DIAGRAM
-  "loops on `(code-reviewer, FAIL)` for up to 3",                // S1 review_round mechanics
+  "loops on `(code-reviewer, FAIL)` up to the",                  // S1 review_round mechanics (E393: named cap, was "for up to 3")
   "The qa-engineer loop back to sr-engineer",                    // S2 qa_round mechanics
   "Each role finishes with `tw_update_state`",                   // S6 universal handoff convention
 ];
@@ -901,7 +901,7 @@ test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is
   // WHY: the budget win that justified the feature, regression-guarded. Both sides are measured
   // like production (origin tags, then rationale, stripped); the non-design side composes without
   // the design fragments. The cap is the exact measured size (zero headroom) and the design-only
-  // saving must stay at least 2080 ~tok, since core and chain edits land on both arms.
+  // saving must stay at least 1999 ~tok, since core and chain edits land on both arms.
   // Rationale: specs/e260i-comment-rationale.md (test/context-budget.test.mjs).
   const ratStripped = approxTokens(stripRationale(stripOriginTags(CONSTITUTION)));         // design-arm path: 10598 (E365 re-baseline, zero headroom)
   const nonDesign = approxTokens(stripRationale(stripOriginTags(composeConstitution({ chain: true, design: false })))); // non-design path: 8501 (E365 re-baseline, zero headroom)
@@ -911,8 +911,8 @@ test("AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is
   // E350 re-baseline: const-08 cond 3 `<agc install>/scripts/fanout.mjs`, +3 ~tok; was 8426, zero headroom.
   assert.ok(nonDesign <= 8501, `non-design constitution (${nonDesign} ~tok) must be ≤ 8501 (AC8 non-design floor, E365 re-baseline, zero headroom)`);
   assert.ok(
-    ratStripped - nonDesign >= 2080,
-    `design-only strip saving (${ratStripped - nonDesign} ~tok) must be ≥ 2080 (a12-followup-qa-round-name re-baseline)`,
+    ratStripped - nonDesign >= 1999,
+    `design-only strip saving (${ratStripped - nonDesign} ~tok) must be ≥ 1999 (E393 re-baseline: builder ≠ judge moved from the design-only §3.2 fragment into core §3)`,
   );
 });
 
@@ -1019,7 +1019,7 @@ test("AC-P2-5: §4 reflow is REORDER-ONLY — every §4 rule sentence is byte-pr
     // DIAGRAM (non-visual)
     "researcher (optional) → design-auditor (optional) → pm → architect (if complex) → sr-engineer ↔ code-reviewer → qa-engineer",
     // S1 (non-visual) — review_round
-    "sr-engineer ↔ code-reviewer loops on `(code-reviewer, FAIL)` for up to 3",
+    "sr-engineer ↔ code-reviewer loops on `(code-reviewer, FAIL)` up to the", // E393: named cap, was "for up to 3"
     // S2 (non-visual) — qa_round
     "The qa-engineer loop back to sr-engineer",
     // S6 (non-visual) — universal handoff convention. c9-protocol-fields

@@ -379,10 +379,10 @@ test("T-E5-03 content: coord-07 carries step 4a Cheapest-Compliant-Path Intake, 
   assert.match(COORD07, /\(iii\) full chain/, "must enumerate the full-chain classification");
 });
 
-test("T-E5-03 content: coord-07 step 4a states the §2/§3.2 hard floor is never bypassed by any classification", () => {
+test("T-E5-03 content: coord-07 step 4a states the §2/§3 builder ≠ judge hard floor is never bypassed by any classification", () => {
   assert.match(
     COORD07,
-    /Hard floor — no classification ever bypasses it: §2 test ownership \(only qa-engineer authors tests\) and §3\.2 builder ≠ judge/,
+    /Hard floor — no classification ever bypasses it: §2 test ownership \(only qa-engineer authors tests\) and §3 builder ≠ judge/,
     "the hard-floor sentence is the load-bearing safety clause of fix (c) — a cheapest-path optimization must never be able to " +
       "route around test ownership or builder/judge separation",
   );

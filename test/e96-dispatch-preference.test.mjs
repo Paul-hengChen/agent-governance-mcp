@@ -49,7 +49,7 @@ test("t-anti-nudge-request: coord-02 states an explicit /teamwork invocation (or
 //    mechanism at all and the rule would fire on every compliant hop).
 // ---------------------------------------------------------------------------
 
-const WHEN_DO_MARKER = /DO surface it in chat as a §3\.2 builder ≠ judge downgrade/;
+const WHEN_DO_MARKER = /DO surface it in chat as a §3 builder ≠ judge downgrade/;
 
 test("t-when-do-compose-axis-absent-lean: the WHEN/DO §3.2 surfacing rule is ABSENT from the lean (undefined host) composition", () => {
   const lean = composeSkill("skill-coordinator.md", hostCapabilitiesFor(undefined), readContent);

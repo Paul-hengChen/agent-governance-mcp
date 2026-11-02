@@ -64,7 +64,7 @@ test("AC-4: Phase 0.5 wires the split-escalation guidance for visual_round >= 3"
   // pending_notes token, so the check looks for the `=` form.
   // (c9-protocol-fields, T-C9-14)
   const body = fs.readFileSync(SKILL_SR, "utf-8");
-  assert.match(body, /visual_round\s*>=\s*3/, "must reference visual_round >= 3 threshold");
+  assert.match(body, /`visual_round`\s*≥\s*`visual_split`/, "must reference the `visual_round` ≥ `visual_split` threshold (E393: named cap, was visual_round >= 3)");
   assert.match(body, /visual_split_requested:/, "must include the pending_notes token");
   assert.match(body, /next_role\s*=\s*["']?pm/, "must route to pm via the first-class next_role field");
 });
