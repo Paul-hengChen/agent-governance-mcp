@@ -2,8 +2,8 @@
 schema_version: 15
 active_feature: "e391-prompt-audit-stale-facts"
 status: "In_Progress"
-last_updated: "2026-11-02T05:44:30.122Z"
-last_agent: "sr-engineer"
+last_updated: "2026-11-02T05:49:33.198Z"
+last_agent: "code-reviewer"
 prd_path: "docs/backlog.md"
 scope_decision: "single-feature"
 scope_decision_why: "Single-lane fan-out wave per specs/fanout-e391-prompt-audit.md (human-approved 2026-11-02): one ticket E391, mini-chain pm -> sr-engineer -> code-reviewer -> qa-engineer, no architect; wording-only (14 findings, no gate/routing/schema/error-code change), owned set fixed by the manifest's Lanes row."
@@ -13,14 +13,15 @@ dispatch_pins:
   sr-engineer: "opus"
   qa-engineer: "sonnet"
 evidence_schema: 2
-next_role: "code-reviewer"
-dispatched_at: "2026-11-02T05:44:30.122Z"
+next_role: "qa-engineer"
+dispatched_at: "2026-11-02T05:49:33.198Z"
+review_verdict: "APPROVED"
 dispatch_mechanism: "task"
 dispatch_mechanism_tier: "opus"
 qa_round: 0
 review_round: 0
 visual_round: 0
-hop_count: 2
+hop_count: 3
 qa_rounds_total: 0
 review_rounds_total: 0
 visual_rounds_total: 0
@@ -31,13 +32,13 @@ visual_rounds_total: 0
 - (none)
 
 ## Pending & Handoff Notes
-- sr-engineer: T-E391-01, T-E391-02, T-E391-08, T-E391-04 ready for code review
-- Commits (one per task, in order): c06cbd8 T-E391-01 (const-08 L2/L4, const-15 L6, lite L16/L49); 9ffa4ef T-E391-02 (release-engineer L292, rationale L3/L10/L15/L173-174, design-auditor L71/L89, doc-writer L13); d2376fa T-E391-08 (qa-engineer L59/L60/L95/L101, qa-visual L24/L65); a081f20 T-E391-04 (CLAUDE.md Layout / Testing changes / What this server does NOT do / Governance context loading). A follow-up chore commit carries this handoff write plus qa_reports/expected-red_e391-prompt-audit-stale-facts.txt.
-- measure-context-cost 'bundle lean' 5723 -> 5722. Test-formula ceilings before -> after: lean 5723 -> 5722 (cap 5723), design-arm stripped 10598 -> 10593 (cap 10598), teamwork bundle 21593 -> 21588 (cap 21715), non-design 8501 -> 8495 (cap 8501). Matches the spec's dry run exactly; test/context-budget.test.mjs not edited.
-- wc -c content/skill-qa-engineer.md = 18371 (cap 18500; base 18253). skill-qa-visual.md = 17035 (cap 20700).
-- Before-text check: every named site matched the spec's 'before' text on the named line; no deviations. CLAUDE.md G2-13 line kept unwrapped (no rewrap of 189-197); pipe is a plain |. G2-15 bullet uses 2-space continuation indent like its siblings.
-- Checks: npm run build exit 0 and git diff dist/ empty before each commit; node bin/agc-init.mjs check exit 0; node scripts/fanout.mjs check specs/fanout-e391-prompt-audit.md e391 --base 664e147 exit 0 (15 files, 0 out of bounds); content/ hunk headers list only the named lines.
-- Smoke: node --test test/context-budget.test.mjs test/e178a-integrator-role.test.mjs test/teamwork-lite.test.mjs -> 78/78 pass. Planned reds (qa-owned, listed in qa_reports/expected-red_e391-prompt-audit-stale-facts.txt): 11 tests in test/compose-equivalence.test.mjs (golden re-capture, T-E391-05) and test/qa-visual-skill-split.test.mjs AC-3 (:87 re-pin, T-E391-06).
+- review_report: review_reports/review_T-E391-01.md (covers: T-E391-01, T-E391-02, T-E391-08, T-E391-04), committed a5acd54. Verdict APPROVED; findings are 3 optional, 0 required.
+- Q1 verbatim: every changed content/ line matches its Copy / Strings row exactly (per-line prefix/suffix diff vs 664e147 plus full-line reads). content/ hunk headers equal the site table. CLAUDE.md hunks fall only in Layout / Testing changes / What this server does NOT do / Governance context loading; rows were added, never moved; the adapter blocks and agc-version have no diff.
+- Q2 facts: coord-03 :19 ## Escalation Routes, :43 Cut-approval gate writer obligation; skill-pm :97 Gate Summary, :104 Geometric-Density row; const-01 hop 14 / fix_try 2 / read 3; feature-rollup.ts and lane-registry.ts run git worktree list; no tools/*.ts runs a state-changing git verb; lib/render-boundary.ts, tools/lane-paths.ts, tools/lane-status.ts and tools/fanout-{manifest,handoff}.ts exist and match their row text; suite-result: lines exist in release-post-v4-w12/-w13.
+- Q3 hard conditions: no tools/gates/schema/prompts/bin/scripts/lib/templates/test/dist diff; after npm run build, dist/ is clean; agc check exits 0 (4.16.0); bundle lean 5722; skill-qa-engineer.md 18371 B; no number literal added to CLAUDE.md (plain pipe); the Twelve / other ten / other 11 sentences are unchanged.
+- Q4 scope: fanout check exits 0 (16 files, 0 out of bounds); no E392/E393/E394 hunk (const-08 L12 has no diff); no G2-17 restatement; no new Limits row.
+- Q5 expected-red: compose-equivalence + qa-visual-skill-split give 12 failures (compose #1-#11 and AC-3), all 12 listed verbatim in the manifest, nothing unlisted. The 7-file guard set passes 133/133; extra guards (e234, e258b, agc-adapters, skill-manifest, cut-approval-gate, e296) pass 187/187.
+- For QA: F1 (optional, spec wording) CLAUDE.md:163 says 'latest release-*'; sorted by name that is release-v4.6.0, which has no suite-result: line. F2 (optional) the AC-G2-24 '^-[a-z]' proof returns 4, not 3: the extra removed line is the authorized G2-13 auto-injects line, so do not pin 3 in test/e391-prompt-audit-stale-facts.test.mjs. F3 (optional) the G2-13 line was left unwrapped.
 
 ---
 > System Note: Auto-generated by agent-governance-mcp. Do NOT edit manually.

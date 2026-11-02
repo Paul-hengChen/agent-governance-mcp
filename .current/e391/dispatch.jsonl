@@ -3,3 +3,5 @@
 {"ts":"2026-11-02T04:23:34.527Z","feature":"e391-prompt-audit-stale-facts","agent_id":"pm","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-02T05:40:29.254Z","feature":"e391-prompt-audit-stale-facts","agent_id":"pm","dispatch_mechanism":"inline","dispatch_mechanism_tier":"fable"}
 {"ts":"2026-11-02T05:44:30.124Z","feature":"e391-prompt-audit-stale-facts","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-02T05:45:56.285Z","feature":"e391-prompt-audit-stale-facts","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-02T05:49:33.199Z","feature":"e391-prompt-audit-stale-facts","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
