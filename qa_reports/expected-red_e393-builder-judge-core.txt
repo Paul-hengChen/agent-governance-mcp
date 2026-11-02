@@ -1,0 +1,53 @@
+# E393 (e393-builder-judge-core), sr-engineer: expected reds from the prose
+# edits in T-E393-01..05 (commits ef8a21a, 492215b, 88dad12, a9bc04f, 4e93a6b).
+# builder != judge moved to §3, bare round numbers became named caps
+# (`review_round` / `visual_round` caps, `visual_split`), and the header went to
+# v3.41.0. These are re-baseline reds, not product defects: goldens and pinned
+# strings still hold the pre-E393 text. qa-engineer owns the re-capture and
+# re-pin in T-E393-06 (spec section F). No .ts file changed, so no server
+# behaviour test is red. 22 reds in three classes: 12 golden fixtures,
+# 4 context-budget pins, 6 per-file string pins. Each was run per file on the
+# lane HEAD and its failure message matched to an E393 edit.
+
+# -- golden fixtures: test/fixtures/compose-golden/** hold pre-E393 bytes
+# (const-01/04/05 hit lite + full + hooks + monolith; chain const-* and
+# skill-sr-engineer hit build-full-*; coord-* hit the coordinator monolith).
+# Fix: re-capture with scripts/capture-constitution-golden.mjs.
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-coordinator-lite.md, design=false, fullDetail=false) is byte-identical to pre-refactor golden build-lite-nondesign.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-coordinator-lite.md, design=true, fullDetail=false) is byte-identical to pre-refactor golden build-lite-design.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-coordinator-lite.md, design=false, fullDetail=true) is byte-identical to pre-refactor golden build-lite-nondesign-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-coordinator-lite.md, design=true, fullDetail=true) is byte-identical to pre-refactor golden build-lite-design-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=false, fullDetail=false) is byte-identical to pre-refactor golden build-full-nondesign.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=true, fullDetail=false) is byte-identical to pre-refactor golden build-full-design.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=false, fullDetail=true) is byte-identical to pre-refactor golden build-full-nondesign-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: buildPromptForRole(skill-sr-engineer.md, design=true, fullDetail=true) is byte-identical to pre-refactor golden build-full-design-fd.txt
+test/compose-equivalence.test.mjs | compose-equivalence: SessionStart hook (lite/default env) is byte-identical to pre-refactor golden hook-lite.txt
+test/compose-equivalence.test.mjs | compose-equivalence: SessionStart hook (AGC_DEFAULT_SKILL=full) is byte-identical to pre-refactor golden hook-full.txt
+test/compose-equivalence.test.mjs | compose-equivalence: cat(15 manifest fragments in order) === the pre-refactor constitution.md monolith (DR-1 Option R invariant)
+test/skill-manifest.test.mjs | t-golden-byte-identity (AC1/AC5): composeSkill("skill-coordinator.md", {taskTool:true}) === frozen golden monolith, byte-for-byte
+
+# -- context-budget pins (test/context-budget.test.mjs)
+# Sentinel `Split escalation (Round 3)` is now `Split escalation (`visual_split`)` (spec F :658).
+test/context-budget.test.mjs | AC2: chain-role build on a DESIGN-armed workspace LOADS the full §3.2 + visual §3.1
+# Non-design ceiling holds (8476 <= 8501), but the design-only saving sub-assertion
+# (>= 2080) fails at 1999 because the design-only fragments shrank (trim t1 in
+# const-04, named-cap rewording). This is the :906-907 floor in spec F; qa
+# re-baselines it alongside the budget ruling.
+test/context-budget.test.mjs | AC8/AC-P2-7: non-design (design-only + rationale stripped) constitution is at/below the floor (≤ 8501 ~tok)
+# Anchor `... loops on `(code-reviewer, FAIL)` for up to 3` was reworded to name
+# the `review_round` cap (spec F :712, :1022).
+test/context-budget.test.mjs | AC-P2-5: §4 reflow is REORDER-ONLY — every §4 rule sentence is byte-present (no reword)
+test/context-budget.test.mjs | AC-P2-6: non-visual §4 (DIAGRAM/S1/S2/S6) + §1 (L15/L18) survive byte-for-byte on BOTH arms
+
+# -- per-file string pins: §3.2 builder != judge is now §3, bare round numbers are named caps
+# skill-integrator no longer cites §3.2 (spec F e178a :83).
+test/e178a-integrator-role.test.mjs | AC1: content/skill-integrator.md — frontmatter, purpose, work-overview, permission table, you-are-not list, no-tier watermark
+# `(Round 4 of `review_round`)` count 1 -> 0 (spec F e391 :91-94).
+test/e391-prompt-audit-stale-facts.test.mjs | AC-G2-18: bare skill names in const-08 / lite; const-08 Round-4 wording intact
+# Regex `§3\.2 builder ≠ judge` -> `§3 builder ≠ judge` (spec F e5 :385).
+test/e5-intake-tiering.test.mjs | T-E5-03 content: coord-07 step 4a states the §2/§3.2 hard floor is never bypassed by any classification
+# Regex `as a §3\.2 builder ≠ judge downgrade` -> `§3` (spec F e96 :52); both cases share that regex.
+test/e96-dispatch-preference.test.mjs | t-when-do-compose-axis-present-cc: the WHEN/DO §3.2 surfacing rule IS present under the claude-code (taskTool:true) composition
+test/e96-dispatch-preference.test.mjs | t-when-do-same-fragment-as-dispatch-mechanic: the WHEN/DO rule lives in coord-02 (host:claude-code), NOT coord-03 (core)
+# `/visual_round\s*>=\s*3/` is now `visual_round` >= `visual_split` (spec F phase-0-5 :67).
+test/phase-0-5-sop.test.mjs | AC-4: Phase 0.5 wires the split-escalation guidance for visual_round >= 3

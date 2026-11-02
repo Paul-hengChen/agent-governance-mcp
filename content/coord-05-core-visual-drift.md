@@ -1,6 +1,6 @@
 ## Visual Verdict Boundary<!-- origin:start --> (v3.26.0)<!-- origin:end -->
 
-Per Constitution §3.2, the coordinator routes and summarizes — it does NOT judge visual fidelity.
+Per Constitution §3 builder ≠ judge and, when design-armed, §3.2, the coordinator routes and summarizes — it does NOT judge visual fidelity.
 
 - **No accept-policy injection.** When dispatching `qa-visual` (Task or `tw_switch_role`), the brief MAY
   carry context only: baseline paths, Figma node ids, route, and the canonical-state setup the impl

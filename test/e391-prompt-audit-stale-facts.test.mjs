@@ -88,10 +88,12 @@ test("AC-G2-12: QA skills reference each other as <agc install>/content/...", ()
   assert.ok(Buffer.byteLength(qe) <= 18500, "skill-qa-engineer.md byte cap");
 });
 
-test("AC-G2-18: bare skill names in const-08 / lite; const-08 Round-4 wording intact", () => {
+test("AC-G2-18: bare skill names in const-08 / lite; const-08 review_round cap names the cap (E393: no bare Round 4)", () => {
   assert.doesNotMatch(C("const-08-chain-31-mid.md"), /`skill-(coordinator|pm)\.md`/);
   assert.equal(count(C("skill-coordinator-lite.md"), "`skill-coordinator.md`"), 0);
-  assert.equal(count(C("const-08-chain-31-mid.md"), "(Round 4 of `review_round`)"), 1);
+  // E393 (AC-C03): the bare "(Round 4 of `review_round`)" restatement became a named cap.
+  assert.equal(count(C("const-08-chain-31-mid.md"), "(Round 4 of `review_round`)"), 0);
+  assert.equal(count(C("const-08-chain-31-mid.md"), "cap of code-reviewer FAILs is exhausted"), 1);
 });
 
 test("AC-G2-26: const-15 points at Escalation Routes, an H2 in coord-03", () => {
