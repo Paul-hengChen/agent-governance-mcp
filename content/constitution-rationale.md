@@ -214,6 +214,10 @@ readability proposal (backlog E107, which had exempted this repo's own bare tick
 comments); that exemption was dropped once the repo was headed for public readers who do
 not run this tooling.
 
+**Why the git list is a hard list (D10, generalized).** A destructive "fix" under
+push-rejection pressure once discarded a committed release — recovery is coordinator-owned,
+never agent-improvised.
+
 ---
 
 ## §7 — External-reference policy: a spec is incomplete until its references are resolved

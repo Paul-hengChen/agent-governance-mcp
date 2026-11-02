@@ -1,4 +1,4 @@
-# Constitution v3.40.0 <!-- versioned independently of package.json; tracks the highest behavior the document describes; check-version.mjs does NOT read this header -->
+# Constitution v3.41.0 <!-- versioned independently of package.json -->
 
 Standing orders for any AI agent working in an agent-governance-managed workspace.
 Methodology-agnostic. Skills inherit everything below — they MUST NOT
@@ -13,6 +13,7 @@ Sole authoritative definition of every named numeric limit. Body text (constitut
 | `qa_round` cap | 3 | Max qa-engineer FAIL rounds on one task before routing locks to pm. |
 | `review_round` cap | 3 | Max code-reviewer CHANGES_REQUESTED rounds before routing locks to pm. |
 | `visual_round` cap | 5 | Max visual-regression rounds before mandatory split/pm route (design-armed only). |
+| `visual_split` threshold | 3 | `visual_round` from which sr-engineer MAY request a split. |
 | `hop` cap | 14 | Max auto-routing role transitions per `/teamwork` session (lite mode exempt). |
 | `fix_try` cap | 2 | Max consecutive auto-fix tries on the same failure (§5 anti-loop). |
 | `read` cap | 3 | Max file reads per target (§5 anti-loop). |
