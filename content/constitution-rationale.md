@@ -1,18 +1,18 @@
 # Constitution Rationale — the "why" behind the rules
 
-> Companion to `content/constitution.md` (v3.27.0). This document is **non-normative**:
+> Companion to the constitution (`content/const-*.md`, composed per `prompts/constitution-manifest.ts`). This document is **non-normative**:
 > the constitution remains the single source of truth. Nothing here adds, relaxes, or
 > overrides a rule — it records the design intent and war-stories behind the rules that
 > are easiest to misread as arbitrary. References point **one-way**, from this doc to a
 > constitution section id (e.g. "see Constitution §3.2"); the constitution does not
 > reference back.
 >
-> Rationale target: v3.32.0. Scope: §1, §3.1, §3.2, §5, §6, §7.
+> Scope: §1, §3.1, §3.2, §5, §6, §7.
 >
 > Primary sources: `research/oobe-visual-fidelity-retrospective-2026-06-05.md`
 > (the false-PASS retrospective), `research/process-retrospective.md` (the Language-step
 > token/cost retrospective), and the inline `<!-- rationale -->` notes already in
-> `content/constitution.md` and the skill files.
+> `content/const-*.md` and the skill files.
 
 ---
 
@@ -170,8 +170,8 @@ promotes a `tasks.md`-only `[x]`). Tasks-ahead "vibe drift" is reported, not rec
 
 See Constitution §5.
 
-The caps (max 2 consecutive auto-fix tries on the same failure, max 3 reads per target,
-max 10 role transitions per `/teamwork` session) exist because an agent's natural response
+The caps (the `fix_try`, `read`, and `hop` caps — values live in the Constitution's Limits
+table, not here) exist because an agent's natural response
 to a failure it cannot diagnose is to *try again* — re-reading the same file, re-applying a
 near-identical fix — which burns tokens without converging. The process-retrospective is
 the cautionary data point at the *macro* scale: a single screen (Language) consumed
