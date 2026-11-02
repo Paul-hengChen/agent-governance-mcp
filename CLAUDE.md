@@ -85,6 +85,9 @@ tools/gate-stats.ts       tw_gate_stats — telemetry/metrics sidecar aggregatio
 tools/usage-accounting.ts .current/usage.jsonl token sidecar reader (D2)
 tools/rag.ts              PRD chunking + embeddings (SQLite mode, v3.3.0)
 tools/rag-coalesce.ts     shared _indexingInFlight registry (v3.3.0)
+tools/lane-paths.ts       lane-layout seam: sole owner of the lane-scoped .current/ filenames
+tools/lane-status.ts      integrator lane observability + roll-up (scripts/lane-status.mjs); read-only, fires no gate
+tools/fanout-*.ts         fan-out manifest parse / render / ownership + cut checks and the wave handoff section (scripts/fanout.mjs)
 gates/registry.ts         GATE_REGISTRY — 35 gate definitions (code, owner, exemptions)
 gates/pipeline.ts         runUpdateStatePipeline() step runner
 gates/*.ts                one module per gate predicate (cut-approval, scope-decision,
@@ -96,7 +99,8 @@ schema/migrations-*.ts    handoff / tasks / sqlite / config migration runners (v
 guards/session.ts         per-(process,workspace) snapshot of "agent read state"
 guards/file-lock.ts       cross-process O_EXCL lock with stale-PID detection
 transport/http.ts         Streamable HTTP transport + auth / origin guard
-lib/                      small shared helpers (watermark check, tsconfig source dirs)
+lib/                      small shared helpers (watermark check, tsconfig source dirs, render boundary)
+lib/render-boundary.ts    renderDataBlock(): the one labelled, fenced path for reported data (handoff state, PRD chunks) into prompt text
 prompts/build.ts          shared buildPromptForRole() — assembles constitution via composeConstitution() then applies stripOriginTags / stripRationale per mode
 prompts/constitution-manifest.ts  ordered segment registry (CONSTITUTION_SEGMENTS + includeSegment predicate); replaces subtractive strip model (v3.44.0+)
 prompts/skill-manifest.ts ordered coordinator SOP segments (coord-*.md), host-tagged
@@ -118,7 +122,7 @@ templates/claude-code-agents/ 12 model-pinned Claude Code subagent templates
 specs/                    design docs (qa-flow, rag-lifecycle, schema-versioning, etc.)
 docs/schema-versions.md   how to ship a new schema version (v3.4.0)
 docs/backlog.md           the PRD / backlog (prd_path in handoff state)
-scripts/check-version.mjs verify package.json version matches index.ts Server() literal
+scripts/check-version.mjs verify package.json version matches the index.ts Server() literal, dist/index.js, package-lock.json and the latest CHANGELOG heading (git tag: advisory)
 test/                     221 test files (node --test); test/eval/ = behavioural eval harness
 dist/                     compiled output (committed for npx remote usage)
 ```
@@ -156,7 +160,7 @@ gate in `GATE_REGISTRY`, drift and sync, schema migrations, prompt composition
 and context budget, the agc adapters, and RAG. Run with:
 
 ```bash
-npm test          # prebuild + node --test test/*.test.mjs  (1633/1633 at v3.94.0)
+npm test          # prebuild + node --test test/*.test.mjs  (pass count: the suite-result: line in the latest qa_reports/archive/release-*/review_*.md)
 npm run eval      # separate behavioural eval harness (test/eval/)
 ```
 
@@ -177,7 +181,10 @@ node --input-type=module -e "import { writeHandoffState, parseHandoff } from './
   stopped from editing `.current/handoff.md` directly. (But `tw_detect_drift`
   will surface the inconsistency on the next session.)
 - It is NOT cross-machine. The file lock is local-fs only.
-- It does NOT touch git. Commit/PR workflow is out of scope.
+- Its `tw_*` tools never write to git (no commit, branch, push or pull request);
+  some read it, e.g. `git worktree list` for the lane registry. The commit /
+  pull-request workflow is governed by Constitution §6 and the
+  `skill-release-engineer` / `skill-integrator` SOPs, not by tool code.
 
 ## Governance context loading (invocation-scoped since 2026-07-15; SessionStart hook is opt-in)
 
@@ -188,7 +195,7 @@ exists per session.
 
 The SessionStart hook (`bin/agent-governance-context.mjs`) is **opt-in and no
 longer registered by default** (backlog E19, human decision 2026-07-15). It
-auto-injects the constitution + coordinator-lite skill (~18.7KB) into every
+auto-injects the constitution + coordinator-lite skill (size: `node bin/agent-governance-context.mjs | wc -c`) into every
 session in a workspace with `.current/`, `tasks.md`, or `TODO.md` — including
 sessions that never touch governed state — and, when a `/teamwork` follows,
 leaves two contradictory mode declarations in one context. Users who prefer

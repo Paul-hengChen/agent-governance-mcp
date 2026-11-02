@@ -60,7 +60,7 @@ Sole authoritative definition of every named numeric limit. Body text (constitut
 - **Fix attempts**: Max consecutive auto-fix tries on the same failure is the `fix_try` cap. Then STOP.
 - **File reads per target**: Max is the `read` cap. Then STOP.
 - **Escalation**: On limit, stop tool use immediately. Report what's missing and wait for human instruction.
-- **Auto-routing hop cap**: per `/teamwork` session, role transitions are capped at the `hop` cap. See `skill-coordinator` §Auto-Routing for the full stop-condition list. Lite mode is exempt (no auto-routing).
+- **Auto-routing hop cap**: per `/teamwork` session, role transitions are capped at the `hop` cap. Stop conditions: `skill-coordinator` §Escalation Routes. Lite mode is exempt (no auto-routing).
 
 ## 6. Security & Privacy
 
