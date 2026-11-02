@@ -76,6 +76,14 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 4. 記帳 commit → push → 讀 CI → `gh pr create` → `gh pr merge --auto --merge`。
 5. merged 之後 `git switch main`、`git -c pull.rebase=false pull --ff-only`，再 `git branch -d integ/e391-prompt-audit`。
 
+## 結案
+- 日期 2026-11-02。`integ/e391-prompt-audit` ← e391 `5b27a16`（merge `34bd318`），`--no-ff`、零衝突 → 無合併審查；merge-invariants PASS；重建 `dist/` 無差異；`check:bookkeeping` OK；`npm audit --audit-level=high` exit 0；整合層 CI run 41397788105 在 `34bd318` 綠。
+- 彙總（上限按 lane 計）：e391 7 張 task／hop 4/14／review 0 輪退回／qa 0 輪；證據與 `completed_tasks` 一致。
+- 完成定義：6 項全部成立。
+- 例外：(1) sr 與 code-reviewer 都是 opus（同模型疑慮，比照前幾波）。(2) 全套 3851/3853，2 skipped（既有的 skip）。(3) lane 回報 `covers:` 證據檔命名引發 `EXPECTED_RED_DIFF_MISSING`，未重現，開 E396。
+- 新發現：E395（e391，finish 配號）、E396（整合者）排在佇列 #210–#211；E391–E394 補進佇列 #206–#209（開票時漏排）。
+- 發版：`main` 帶 E391（`content/` 九檔的點名行、`CLAUDE.md` 四段、11 個 compose-golden、一個測試重釘、一個新 AC 測試）。adopter 可見：無行為變更；design-auditor SOP 的每 surface 上限改為引用 Limits 表的 `fix_try`／`read`（2／3，原文寫 3／5）。是否發版與版號由人類決定。
+
 ## Dispatch pins
 - e391：`pm=opus`、`sr-engineer=opus`、`qa-engineer=sonnet`。
 
@@ -85,3 +93,11 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 | 2026-11-02 | 人類 | 第 1 波範圍：只做 E391（PR #58 開票，來源 `docs/prompt-audit-2026-11-02.md`）。人類回覆「先 fan-out E391」 | 整合者 session |
 | 2026-11-02 | 整合者 | 草案：單 lane e391，mini-chain（PM cut、無 architect）。重劃：`CLAUDE.md` 從共同禁止移出、劃給 e391，只限四段正文。範圍限定：報告 diff 未按 finding 標 hunk，lane 只套用「派工前核對」點名的站點；同檔其他 hunk（E393 的 round cap、E394 的敘事）禁止。G2-05 若需要獨立額度，lane 停下來寄信 | 本檔 |
 | 2026-11-02 | 人類 | 核准本清單（全部）：單 lane e391、mini-chain、`CLAUDE.md` 四段正文重劃、報告 diff 只套用點名站點、G2-05 預設具名引用（需獨立額度則寄信）。人類回覆「approve，E391 照清單派工」 | 整合者 session |
+| 2026-11-02 | 整合者 | 清單 PR #59 merge `664e147` = 派工 base；派工前核對：lane 點名的擁有／禁止路徑與工具在 base 都存在，14 個站點的現行字句與清單一致（G2-15 站點在現行第 180 行）；沒有殘留 e391 branch／worktree；信箱 e391 已建空檔，mailbox-watch 與 lane-status watch 都已 armed；prompt 以 `fanout.mjs render --base 664e147` 產生。此列隨記帳 commit 進 integ | 本檔 |
+| 2026-11-02 | 整合者 | e391 cut 預審第一輪（spec `be3abe7`，to-lane#1）：check --cut exit 0（7 tasks）；每條 AC 都有實作 task。同意四項偏離：預算導向的較短字句且 `test/context-budget.test.mjs` 上限不下修（餘裕留給 E393）；G2-15 改成「工具不寫 git、部分會讀」（報告 hunk「never run git」是錯的，`tools/feature-rollup.ts` 跑 `git worktree list`，不採用）；G2-05 用清單預設、lane 呈給人類時須明說行為效果（auditor 每 surface 上限變成 2 次嘗試／3 次讀取）；CLAUDE.md 不留任何數字。重劃（整合者裁定）：G2-12 擴及 `skill-qa-engineer.md:59` 與 `skill-qa-visual.md:65`（同一 finding、同一機械改法、同一擁有檔案），E391-NEW-1 因此撤銷；E391-NEW-3 不開票（只是對一次性報告的註記，記在此列） | 信箱 e391 |
+| 2026-11-02 | 整合者 | e391 cut 預審 close（spec `023eaa8`，lane HEAD `d412b4f`，to-lane#2）：check --cut exit 0（7 tasks）；G2-12 擴及六處、T-E391-03 作廢改 T-E391-08、E391-NEW-1／NEW-3 撤銷、E391-NEW-2 保留。lane 呈給人類時附 G2-05 行為效果；核准在 lane session 親手打字 | 信箱 e391 |
+| 2026-11-02 | 人類 | 在 e391 lane session 核准 cut（spec `023eaa8`），含 G2-05 行為效果（design-auditor 每 surface 上限改為 `fix_try`／`read` 的值）與 G2-15 改寫（工具不寫 git、部分會讀） | e391 lane session；`specs/e391-prompt-audit-stale-facts.md`，commit `023eaa8`（`cut_approved` 見 lane 的 handoff，尚未 commit） |
+| 2026-11-02 | 整合者 | e391 code review 一輪 APPROVED（`review_reports/review_T-E391-01.md`，commit `a5acd54`；sr 四個 task commit `c06cbd8`、`9ffa4ef`、`d2376fa`、`a081f20`）。選修註記三則只記錄：F1 `CLAUDE.md` 指「最新的 release 證據資料夾」帶 `suite-result:` 是按日期而非按名稱排序成立；F2 AC-G2-24 的刪除行計數是 4 不是 3（含 G2-13 那行，已授權）；F3 G2-13 行未換行（spec 允許） | 信箱 e391（to-integrator#5） |
+| 2026-11-02 | 整合者 | 5a：e391 `5b27a16`（CI run 41397320316）close —— review、qa 都一輪通過（review 0 輪退回、qa 0 輪）；39 檔都在擁有範圍內；content/ 只動點名行、CLAUDE.md 只動四段；11 個 compose-golden 重抓（三個字串）、qa-visual-skill-split :87 重釘、新增 AC 測試；`dist/` 零差異；budget lean 5722/5723、stripped 10593/10598、teamwork 21588/21715、non-design 8495/8501。全套 3851/3853（2 skipped）。新發現 E391-NEW-2 等 finish 配號；F1 字句併入其後續；lane 回報 `covers:` 證據檔不叫 `review_<task-id>.md` 時 PASS 被 `EXPECTED_RED_DIFF_MISSING` 拒絕，疑似伺服器缺陷，由整合者在 5c 開票 | 本檔 |
+| 2026-11-02 | 整合者 | 5b：`integ/e391-prompt-audit` ← e391 `5b27a16`（merge `34bd318`），`--no-ff`、零衝突 → 無合併審查；merge-invariants PASS；重建 `dist/` 無差異；`check:bookkeeping` OK；`npm audit --audit-level=high` exit 0；整合層 CI run 41397788105 在 `34bd318` 綠 | 本檔 |
+| 2026-11-02 | 整合者 | 5c／6：finish e391 配號 E395；整合者開 E396（covers: 證據檔命名的 PASS 拒絕，未重現）；E391–E396 排進佇列 #206–#211（E391–E394 開票時漏排，此處補上）；E391 done-mark；F1 字句併入 E395 | 本檔 |
