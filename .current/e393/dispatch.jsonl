@@ -9,3 +9,4 @@
 {"ts":"2026-11-02T08:16:35.313Z","feature":"e393-builder-judge-core","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-02T08:17:36.428Z","feature":"e393-builder-judge-core","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-02T08:22:33.966Z","feature":"e393-builder-judge-core","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-02T10:39:39.653Z","feature":"e393-builder-judge-core","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
