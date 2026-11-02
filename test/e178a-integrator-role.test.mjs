@@ -80,7 +80,8 @@ test("AC1: content/skill-integrator.md — frontmatter, purpose, work-overview, 
   for (const item of ["a builder", "a judge substitute", "any lane's session", "release-engineer"]) {
     assert.ok(SOP.includes(item), `"you are not" list missing: ${item}`);
   }
-  assert.ok(SOP.includes("§3.2"), "the any-lane's-session item must cite §3.2 (builder != judge)");
+  // E393: builder != judge moved from §3.2 to §3; skill-integrator cites "§3 builder ≠ judge".
+  assert.ok(SOP.includes("§3 builder ≠ judge"), "the any-lane's-session item must cite §3 builder ≠ judge");
 
   // (f) ends with the watermark rule, no tier
   const tail = SOP.trimEnd();

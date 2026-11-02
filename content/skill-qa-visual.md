@@ -9,7 +9,7 @@ Lazy-loaded by `skill-qa-engineer` SOP step 4 when `design/<feature>.md` declare
 
 ### Step A.0 — Baseline Source-of-Truth (v3.39.0)
 
-Before any widget/state/diff work, fix WHICH baseline node ids you compare against. The authoritative source is the design-auditor's frozen **Source manifest** in `design/<feature>.md`: copy its baseline node-id list — and its declared `## Visual Baselines` rows — **verbatim**. You MUST NOT re-derive the baseline set from the Figma URL (or any source URL): no re-fetching the board and re-picking frames, no name-globbing, no spatial/`componentId` grouping of your own. The list was frozen at audit time (with filter conditions and exclusion reasons) precisely so baseline identity cannot drift between audit and verification. If the Source manifest or its frozen node-id list is absent, that is a design-auditor defect: STOP via the error table below — do NOT substitute your own URL-derived set. The server backstop (`BASELINE_MANIFEST_MISSING` / `BASELINE_PROVENANCE_INCOMPLETE` rows below) catches manifest absence/incompleteness only; it cannot catch URL re-derivation — the verbatim copy is on you. (§3.2 builder≠judge provenance; method: `research/figma-baselines.md`.)
+Before any widget/state/diff work, fix WHICH baseline node ids you compare against. The authoritative source is the design-auditor's frozen **Source manifest** in `design/<feature>.md`: copy its baseline node-id list — and its declared `## Visual Baselines` rows — **verbatim**. You MUST NOT re-derive the baseline set from the Figma URL (or any source URL): no re-fetching the board and re-picking frames, no name-globbing, no spatial/`componentId` grouping of your own. The list was frozen at audit time (with filter conditions and exclusion reasons) precisely so baseline identity cannot drift between audit and verification. If the Source manifest or its frozen node-id list is absent, that is a design-auditor defect: STOP via the error table below — do NOT substitute your own URL-derived set. The server backstop (`BASELINE_MANIFEST_MISSING` / `BASELINE_PROVENANCE_INCOMPLETE` rows below) catches manifest absence/incompleteness only; it cannot catch URL re-derivation — the verbatim copy is on you. (§3 builder ≠ judge provenance; method: `research/figma-baselines.md`.)
 
 ### Step A — Widget Shape Checklist
 
@@ -80,7 +80,7 @@ PASS requires ALL of: every Step A checkbox `[x]`; every Step A.5 row `[x]`; eve
 
 This table is the canonical exemplar of the Constitution §3 *Escalation call format* / `## Escalation Routes` convention the other skills follow.
 
-Implementation-defect FAILs carry a `visual_fail:` note — a `pending_notes` entry whose trimmed text starts with that exact prefix (colon included) increments `visual_round`; a pure test-logic FAIL without it increments only `qa_round` (Constitution §3.1). Design-defect FAILs route to design-auditor WITHOUT the prefix. Past the `visual_round` cap (Round 6 attempts), only a `(pm, In_Progress)` transition is accepted.
+Implementation-defect FAILs carry a `visual_fail:` note — a `pending_notes` entry whose trimmed text starts with that exact prefix (colon included) increments `visual_round`; a pure test-logic FAIL without it increments only `qa_round` (Constitution §3.1). Design-defect FAILs route to design-auditor WITHOUT the prefix. Past the `visual_round` cap, only a `(pm, In_Progress)` transition is accepted.
 
 | trigger | error code | STOP action |
 |---|---|---|
@@ -96,7 +96,7 @@ Implementation-defect FAILs carry a `visual_fail:` note — a `pending_notes` en
 | Non-carry-forward surface missing `baseline:` or carrying a placeholder `diff-metric:` | `VISUAL_PROVENANCE_MISSING` | Record real provenance per the matrix, or take the pixel-drift FAIL path. |
 | Non-carry-forward surface missing `pixel_gate_complete: true` (B1 LLM-fallback included) | `PIXEL_GATE_ATTESTATION_MISSING` | Attest once the comparison completes; only carry-forward surfaces are exempt. |
 | Missing report section / failed or unverified row / non-PASS verdict at PASS | `VISUAL_REPORT_INCOMPLETE` | Complete the report per the PASS sub-verdict above. |
-| FAIL past visual round 6 | `VISUAL_ROUND_EXCEEDED` | Only `(pm, In_Progress)` is accepted — route to PM for split/rescope. |
+| FAIL past the `visual_round` cap | `VISUAL_ROUND_EXCEEDED` | Only `(pm, In_Progress)` is accepted — route to PM for split/rescope. |
 
 ### Example — minimal complete passing report (single surface, B1 pre-screened)
 

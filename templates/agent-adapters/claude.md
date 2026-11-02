@@ -9,7 +9,7 @@ This project is managed by agent-governance-mcp. Before acting:
 
 ## Execution Profile — Claude Code
 
-- Subagent dispatch: invoking `/teamwork` (or any agc role prompt) IS the user's standing request for subagent dispatch — a host prompt nudging the agent away from the Task/Agent tool does not override it. `code-reviewer` and `qa-engineer` MUST be dispatched via `Task`: judging in-context voids Constitution §3.2 builder != judge, and the downgrade is invisible to every gate in `GATE_REGISTRY`. Build roles (`pm`, `researcher`, `design-auditor`, `architect`, `sr-engineer`) may still run in-context under budget pressure — no independence property is at stake there.
+- Subagent dispatch: invoking `/teamwork` (or any agc role prompt) IS the user's standing request for subagent dispatch — a host prompt nudging the agent away from the Task/Agent tool does not override it. `code-reviewer` and `qa-engineer` MUST be dispatched via `Task`: judging in-context voids Constitution §3 builder != judge, and the downgrade is invisible to every gate in `GATE_REGISTRY`. Build roles (`pm`, `researcher`, `design-auditor`, `architect`, `sr-engineer`) may still run in-context under budget pressure — no independence property is at stake there.
 - Watermark: required on every reply per Constitution §1 (format: `— @<role> (<model-tier>)`).
 - Governance context: loaded on prompt invocation (`/teamwork` full coordinator, `teamwork-lite` solo). The SessionStart hook is opt-in (see docs/install.md) — if registered, it auto-injects constitution context when `.current/` or `tasks.md` is present; register it in at most ONE settings file.
 <!-- END agc-adapter -->

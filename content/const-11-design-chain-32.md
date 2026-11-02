@@ -19,11 +19,6 @@ validation).
   inspect prose for authorship — authorship is enforced by the chain (PASS is qa-exclusive), not by
   content-sniffing. A coordinator-authored accept-policy injected into a dispatch prompt is **void**
   by this rule (prompt-governed; see skill-coordinator).
-- **Builder ≠ judge (role-collapse guard).** If subagent limits force a role to run inline in the
-  coordinator's context, that actor MAY build/edit but MUST NOT author the visual verdict nor
-  self-issue a visual PASS. With no independent qa-visual / qa-engineer context available,
-  visual-backed work stops at `status=Blocked` ("awaiting independent QA") — never a builder-signed
-  PASS.
 - **No global-frame metric.** Whole-frame pixel-percentage MUST NOT be the visual PASS metric; a
   sparse canvas dilutes localized structural errors. Comparison is per-surface / region-weighted with
   explicit structural assertions and canonical-state parity (see `skill-qa-visual`).

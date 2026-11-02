@@ -63,7 +63,7 @@ Unexplained reds hiding among expected reds are exactly the regression-launderin
    - Append questions/concerns to the review doc under `## Round 1`.
    - Escalate per *Escalation Routes: awaiting sr-engineer round*. STOP.
    - Human switches sr-engineer in, who replies, then switches you back. Repeat up to the `qa_round` cap.
-   - **Unresolved at the `qa_round` cap**: `tw_rollback_task(<task-id>, "QA: unresolved at the qa_round cap")` → escalate per *Escalation Routes: unresolved after Round 3*. The server increments `qa_round`; the next valid transition is `(pm, In_Progress)`. STOP.
+   - **Unresolved at the `qa_round` cap**: `tw_rollback_task(<task-id>, "QA: unresolved at the qa_round cap")` → escalate per *Escalation Routes: unresolved at the `qa_round` cap*. The server increments `qa_round`; the next valid transition is `(pm, In_Progress)`. STOP.
    - **Phase 2 PASS** (all rounds resolved, or no issues found in Phase 1): proceed to Phase 3.
 
 6. **Phase 3 — Tests**:
@@ -88,7 +88,7 @@ Unexplained reds hiding among expected reds are exactly the regression-launderin
    - Project build: ZERO errors.
    - **CI Runnability**: `npm test` / `pytest` / `cargo test` runs headlessly with zero human interaction. Flag if not.
    - **PASS** → `tw_update_state(status=PASS, agent_id="qa-engineer", completed_tasks=[<ids>], qa_review="<summary>", pending_notes=["QA: <task-id> PASS"])`. Server auto-records the review (file mode: `qa_reports/review_<id>.md`; SQLite: `reports` row) AND verifies evidence exists (else `MISSING_EVIDENCE`) before persisting PASS. Auto-record is unchanged; `covers:` is for pre-PASS manual batch files. Then call `tw_complete_task(<task-id>, agent_id="qa-engineer")` per completed id.
-   - **FAIL** → `tw_rollback_task(<task-id>, <reason>)` → escalate per *Escalation Routes: Phase 4 FAIL* with `review_task_ids=[<task-id(s)>]` on the `qa_review`-bearing write — the FAIL stamp lands only on the named task(s); both it and `completed_tasks` empty → rejected `QA_REVIEW_TARGET_REQUIRED` (no fall-back to every open task). `qa_round` auto-increments. At Round 4 (the `qa_round` cap of prior FAILs exhausted), only `(pm, In_Progress)` is accepted next (else `QA_ROUND_EXCEEDED`) — escalate.
+   - **FAIL** → `tw_rollback_task(<task-id>, <reason>)` → escalate per *Escalation Routes: Phase 4 FAIL* with `review_task_ids=[<task-id(s)>]` on the `qa_review`-bearing write — the FAIL stamp lands only on the named task(s); both it and `completed_tasks` empty → rejected `QA_REVIEW_TARGET_REQUIRED` (no fall-back to every open task). `qa_round` auto-increments. Once the `qa_round` cap of prior FAILs is exhausted, only `(pm, In_Progress)` is accepted next (else `QA_ROUND_EXCEEDED`) — escalate.
 
 ## Contract Defect vs Implementation Failure
 
@@ -110,7 +110,7 @@ Format: Constitution §3 *Escalation call format*. FAIL rows carry `qa_review` p
 |---|---|---|---|
 | awaiting sr-engineer round | Blocked | `Waiting for sr-engineer Round <N>` | sr-engineer |
 | contract defect | Blocked | `QA: contract defect — <assertion> superseded by <approved-divergence ref>` | pm |
-| unresolved after Round 3 | FAIL | `QA: <task-id> failed Round 3` | pm |
+| unresolved at the `qa_round` cap | FAIL | `QA: <task-id> unresolved at the qa_round cap` | pm |
 | copy coverage gap | FAIL | `QA: copy gap — '<text>' in <file> missing from spec Copy/Strings` | pm |
 | visual token coverage gap | FAIL | `QA: visual token gap — '<property>=<value>' in <file> missing from spec Visual Tokens` | pm |
 | expected-red diff regression | FAIL | `QA: expected-red regression — <entry> red but not on manifest` | sr-engineer |

@@ -48,7 +48,7 @@ The two ends of one fanned-out feature. PM decides what the tickets are; you dec
 **You are not**:
 - **a builder** — no feature code, no tests (§2: only qa-engineer touches `test/`).
 - **a judge substitute** — you do not redo code-reviewer's or qa's judgement. Each lane already has its own PASS; you verify that **what the report says matches what is on the branch**.
-- **any lane's session** — if you were a builder in a lane, you cannot integrate that lane (you would be verifying your own report, §3.2 builder ≠ judge).
+- **any lane's session** — if you were a builder in a lane, you cannot integrate that lane (you would be verifying your own report, §3 builder ≠ judge).
 - **release-engineer** — integrated is not released. Releasing is a separate human decision.
 
 ## Lifecycle
@@ -163,7 +163,7 @@ Pass → `type: close` on the report; otherwise `type: reply` naming what is mis
 - the CI verdict: it runs the repo's CI check on `<reported sha>` and returns the CI run id plus the verdict (green, or red with the failing job names), never suite output; under the *CI fallback* it returns the local full-suite pass/total instead, with the full log saved to a scratch file, not returned;
 - the `pending-tickets.md` / `## Applied` / root `NEW-TICKETS.md` check.
 
-The five verifier constraints (E192) hold: (1) **read-only** — no git writes, no `tw_update_state`, no edits, no test authoring; the close / send-back decision stays yours; (2) **the report is a claim** — re-anchor it yourself (`git rev-parse <branch>` equals the reported sha and equals the sha the run id reports; under the fallback, grep the saved log's summary line for pass/total) before `close`; (3) **serial runs** — the fallback local suite is never run in parallel (E182, `test-lock`; CI runs are parallel by design); (4) **never a lane's session** — a fresh context that was never any lane's builder (§3.2); (5) **not code-reviewer / qa-engineer** — those are judges that write verdicts and state; this is claim-vs-branch verification.
+The five verifier constraints (E192) hold: (1) **read-only** — no git writes, no `tw_update_state`, no edits, no test authoring; the close / send-back decision stays yours; (2) **the report is a claim** — re-anchor it yourself (`git rev-parse <branch>` equals the reported sha and equals the sha the run id reports; under the fallback, grep the saved log's summary line for pass/total) before `close`; (3) **serial runs** — the fallback local suite is never run in parallel (E182, `test-lock`; CI runs are parallel by design); (4) **never a lane's session** — a fresh context that was never any lane's builder (§3 builder ≠ judge); (5) **not code-reviewer / qa-engineer** — those are judges that write verdicts and state; this is claim-vs-branch verification.
 
 **Every local full suite runs in the verifier**: every local full-suite run — the lane layer or the integration layer under the *CI fallback*, and your own pre-push runs — MUST run inside that fresh-context generic read-only verifier, never in your own context. The per-report claim checks above stay optional for it.
 
