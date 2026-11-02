@@ -16,6 +16,80 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [4.16.1] - 2026-11-02
+
+PATCH release. It ships prompt-audit wave 1 since v4.16.0, landed on `main` by one wave pull
+request: lane `e391` (E391, prompt-audit Group 2: stale facts and dangling references). Plan
+`specs/fanout-e391-prompt-audit.md`, release gate `specs/release-prompt-audit-w1.md`, audit report
+`docs/prompt-audit-2026-11-02.md`. Semver: PATCH (decided by the human). This is a text-only
+release: it changes named lines in nine `content/` fragments and four `CLAUDE.md` passages, and
+the tests that pin them. No compiled code changed (`dist/` changes only by the version literal),
+no `bin/` or `scripts/` file changed, no MCP tool was added or removed, no gate or routing rule
+changed, no schema version changed (handoff 15, tasks 2, sqlite 2, config 2), no error code was
+added, no dependency changed, and the gate registry stays at 35 entries with an 18-step write
+pipeline. Three changes are visible to adopters (read *Upgrade notes*).
+
+### Upgrade notes
+
+- **design-auditor per-surface ceiling now follows the Constitution Limits table
+  (`content/skill-design-auditor.md`).** The `Hard limits:` line no longer states its own numbers
+  (v4.16.0 said max 3 extraction attempts and max 5 file reads per surface). It now cites the
+  Limits table's `fix_try` and `read` caps, which are 2 and 3, so the effective ceiling per
+  surface is 2 consecutive extraction attempts and 3 file reads.
+- **qa skill cross-references use the agc install path (`content/skill-qa-engineer.md`,
+  `content/skill-qa-visual.md`).** The qa-engineer and qa-visual SOPs now reference each other as
+  `<agc install>/content/skill-qa-*.md`, where `<agc install>` is agc's install directory, not
+  the workspace. An agent in an adopter workspace no longer looks for
+  `content/skill-qa-visual.md` inside that workspace.
+- **`CLAUDE.md` drops two literals (this repo's own file, relevant if you read it as a
+  reference).** The `npm test` line no longer states a suite pass count; it points at the
+  server-recorded `suite-result:` line in the latest `qa_reports/archive/release-*/review_*.md`.
+  The SessionStart hook size is no longer stated; it points at
+  `node bin/agent-governance-context.mjs | wc -c`. The test-file count literal stays (tracked as
+  E395) and is corrected in this release to the current count. The "does NOT do" git bullet now
+  says the `tw_*` tools never write to git but some read it, and that commit and pull-request
+  work is governed by Constitution §6 and the release-engineer / integrator SOPs.
+
+### Changed
+
+- **E391: stale references in the constitution fragments (`content/const-08-chain-31-mid.md`,
+  `content/const-15-core-tail.md`).** The Cut-Approval Gate and Manifest tier lines name
+  `skill-pm` / `skill-coordinator` sections instead of `.md` file names and a numbered stop
+  condition; the auto-routing hop cap line points its stop conditions at `skill-coordinator`
+  §Escalation Routes.
+- **E391: stale references in the SOPs and rationale (`content/constitution-rationale.md`,
+  `content/skill-coordinator-lite.md`, `content/skill-design-auditor.md`,
+  `content/skill-doc-writer.md`, `content/skill-qa-engineer.md`, `content/skill-qa-visual.md`,
+  `content/skill-release-engineer.md`).** The rationale cites the composed `content/const-*.md`
+  instead of a retired single file, drops its stale version line, and names the round caps instead
+  of restating their values; the lite SOP says `tw_switch_role` is SOP-forbidden, not
+  server-rejected; the doc-writer forbidden-edit list names `content/const-*.md` and
+  `content/coord-*.md`; the release-engineer SOP no longer states a literal gate count; the design-auditor
+  geometric-density flag points at the `skill-pm` Gate Summary instead of a numbered step. The
+  design-auditor Hard limits and qa changes are described under *Upgrade notes*.
+- **E391: `CLAUDE.md` body (four passages).** The Layout block gains rows for
+  `tools/lane-paths.ts`, `tools/lane-status.ts`, `tools/fanout-*.ts` and `lib/render-boundary.ts`
+  (context, not changed), and the `scripts/check-version.mjs` (context, not changed) row names the
+  five checks it runs; the Testing and SessionStart-hook passages and the git bullet change as
+  described under *Upgrade notes*.
+- **Tests.** 11 compose-golden fixtures under `test/fixtures/compose-golden/` are re-captured for
+  three changed constitution strings; the qa-visual split test's AC-3 regex
+  (`test/qa-visual-skill-split.test.mjs`) also accepts the `<agc install>/` prefix; one comment
+  line changes in `test/compose-equivalence.test.mjs`. New test:
+  `test/e391-prompt-audit-stale-facts.test.mjs`. Spec: `specs/e391-prompt-audit-stale-facts.md`.
+
+### Notes
+
+- `dist/` is rebuilt; only `dist/index.js` changes, by the version literal. `CLAUDE.md` count
+  correction: test files 221 → 222 (two places).
+- Wave evidence moves to `qa_reports/archive/release-prompt-audit-w1/` and
+  `review_reports/archive/release-prompt-audit-w1/`, and the E391 expected-red list to
+  `qa_reports/archive/e391-prompt-audit-stale-facts/`; the lane ledger is archived under
+  `.current/history/2026-11/`.
+- `npm audit --audit-level=high` exits 0 at this release (one low and six moderate findings
+  remain, below that threshold).
+- Follow-up tickets E392–E396 are filed in `docs/backlog.md`, not shipped.
+
 ## [4.16.0] - 2026-10-30
 
 MINOR release. It ships post-v4 fan-out wave 13 since v4.15.0, landed on `main` by one wave pull
