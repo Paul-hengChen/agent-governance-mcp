@@ -84,6 +84,25 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 - 新發現：E395（e391，finish 配號）、E396（整合者）排在佇列 #210–#211；E391–E394 補進佇列 #206–#209（開票時漏排）。
 - 發版：`main` 帶 E391（`content/` 九檔的點名行、`CLAUDE.md` 四段、11 個 compose-golden、一個測試重釘、一個新 AC 測試）。adopter 可見：無行為變更；design-auditor SOP 的每 surface 上限改為引用 Limits 表的 `fix_try`／`read`（2／3，原文寫 3／5）。是否發版與版號由人類決定。
 
+## 接手步驟
+（事實欄位由 `node scripts/fanout.mjs handoff` 產生；接手時先跑 `node scripts/fanout.mjs handoff --check <manifest>`。`<待填：…>` 由整合者填寫。）
+### 核對 primary
+- 目標分支：main @ 664e147
+- 目標分支對 origin：一致
+- git status：3 項： M .current/_primary/dispatch.jsonl； M .current/_primary/handoff.md；?? docs/agc-ticket-draft-wc32.md
+- worktree：primary（main ← integ/e391-prompt-audit @ 17b566e）
+- lane-status：primary（main ← integ/e391-prompt-audit @ 17b566e）release-post-v4-w13／In_Progress／release-engineer，hop 3，commits 0，dirty
+### 已結案
+- prompt-audit 第 1 波的唯一 lane（e391）已合併、finish、拆除；lane 紀錄在 `.current/history/2026-11/e391/`。記帳與本清單在同一個 wave PR。佇列 E391 至此完成。
+- 未配號的新發現：無（E395 由 finish 配號、E396 由整合者開，排在佇列 #210–#211）。
+### 待人類決定
+- 是否發版、版號（本波只動 `content/` 字句、`CLAUDE.md` 四段、golden 與測試；無行為變更，design-auditor SOP 的 surface 上限改為引用 Limits 表）。
+- 是否開下一波（候選依佇列順序：E393 → E392 → E394；E393 已不再被 E391 擋住）。
+- E392 開票時：`teamwork` subagent 模板要修還是刪。
+- primary 上未追蹤的開票草稿 `docs/agc-ticket-draft-wc32.md` 要不要刪（上一波已提過）。
+### 進行中的背景工作
+無
+
 ## Dispatch pins
 - e391：`pm=opus`、`sr-engineer=opus`、`qa-engineer=sonnet`。
 
