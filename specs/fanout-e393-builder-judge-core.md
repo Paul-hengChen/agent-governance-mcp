@@ -2,7 +2,7 @@
 base: 8a79731    integration branch: integ/e393-builder-judge-core
 mailbox: ../agent-governance-mcp-lanes/_mailbox
 
-**狀態：規劃中 2026-11-02。** `base:` 是規劃基準（PR #60，prompt-audit 第 1 波結案的 merge）；實際派工 base = 本清單併入後的 `main` sha，記在 Decisions 派工列。
+**狀態：已結案 2026-11-02。** 單 lane e393 已合併（`integ/e393-builder-judge-core` ← e393 `e9f5de0`，merge `29f5844`）、finish、拆除；派工 base `f664ec9`（本清單的 PR #63 merge）。`base:` 標頭是規劃基準（PR #60）。
 
 範圍由人類指定：只做 E393（來源 `docs/prompt-audit-2026-11-02.md` 的 G2-10、G2-21）。單一 lane。E392 不同波：它也改 `coord-02`、`templates/agent-adapters/claude.md` 與 `CLAUDE.md` 的 adapter 區塊，和本票檔案重疊，排在本波之後。E391 已合併，E393 的「依賴 E391」解除。本波是文字與（必要時）manifest 一列，不改任何 gate 程式、routing 表、schema、錯誤碼。
 
@@ -60,6 +60,7 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 - **`CLAUDE.md` 從共同禁止移出，劃給 e393，只限第 233 行**（adapter 區塊的 Subagent dispatch），和 `templates/agent-adapters/claude.md` 第 12 行一起改。發版 session 同時改 `CLAUDE.md` 的戳記與「221 test files」，hunk 不重疊；整合時若衝突，5b-4 逐 hunk 解。
 - **`templates/agent-adapters/claude.md` 從共同禁止移出**，只限第 12 行；`templates/claude-code-agents/**` 仍禁止（E392）。
 - **條件式擁有**：`prompts/constitution-manifest.ts` 與 `dist/prompts/constitution-manifest.*` 只在人類核准新增 segment 時歸 e393；否則禁止。
+- **條件式擁有（cut 預審，整合者 2026-11-02）**：`content/const-05-core-standards.md` 第 5 行（trim w1）、`content/const-15-core-tail.md` 第 12 行（trim w2，可改成搬進 `constitution-rationale.md` 的 §6 範圍）、`const-01` 第 1 行的標頭註解（trim w3）只在人類選 budget 選項 (i-b) 時歸 e393；否則維持禁止。
 - 人類清單外、整合者補列的站點：`skill-sr-engineer.md` 第 26 行、`skill-qa-visual.md` 第 12 行、`const-04` 第 2 行、`constitution-rationale.md` 的 §3.2 錨點；以及 `const-12` 第 18 行、`skill-qa-engineer.md` 第 91 行（「At Round 4」，人類清單的第 92 行）與第 113 行（Escalation Routes 列，第 66 行的引用目標）。`constitution-rationale.md` 第 184 行「at Round 3, prefer splitting」是非規範性的敘事，不在點名站點；PM 若要一併改，cut 裡寫明即可（整合者裁定，不需人類）。
 
 ## 完成定義 → 票
@@ -86,6 +87,33 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 4. 記帳 commit → push → 讀 CI → `gh pr create` → `gh pr merge --auto --merge`。
 5. merged 之後 `git switch main`、`git -c pull.rebase=false pull --ff-only`，再 `git branch -d integ/e393-builder-judge-core`。
 
+## 結案
+- 日期 2026-11-02。`integ/e393-builder-judge-core` ← e393 `e9f5de0`（merge `29f5844`），`--no-ff`、零衝突 → 無合併審查；merge-invariants PASS（694 task id、0 lost [x]、129 sidecar）；重建 `dist/` 無差異；`check:bookkeeping` OK；`npm audit --audit-level=high` exit 0（只剩已登錄處置的 moderate）；lane 層 CI run 41430890850 在 `e9f5de0` 綠；整合層 CI 見 Decisions。
+- 彙總（上限按 lane 計）：e393 6 張 task／hop 4/14／review 0 輪退回／qa 0 輪／visual 0；證據與 `completed_tasks` 一致。
+- 完成定義：7 項全部成立（builder ≠ judge 在 const-05 §3、§3.2 剩兩條 visual 規則；13 個引用站點改指 §3、adapter 模板與 `CLAUDE.md` 第 233 行同字、AC 測試 `test/e393-builder-judge-core.test.mjs` 證明四種組合都解析；點名站點無裸 round 數字、Limits 表有 `visual_split`；12 個 golden 重抓且逐 hunk 說明、budget 前後值在 qa 報告、四個大小上限未動；被改字句釘住的測試重釘、全套 3857/3859、`dist/` 無差異；E393 done-mark、佇列 #207 DONE；本段與 `## 接手步驟`）。
+- 例外：(1) sr 與 code-reviewer 都是 opus（同模型疑慮，比照前幾波）。(2) 全套 3857/3859，2 skipped（既有的 skip）。(3) `test/context-budget.test.mjs:914` 的 design-only 剝除「省下量」下限由人類在 lane session 裁定從 ≥ 2080 下修到 ≥ 1999（選項 (A) 的必然結果，非大小上限）。(4) `agc check` advisory：context-budget.test.mjs 註解比 38.9% > 30%（E397）。
+- 新發現：E397（budget 測試註解比）、E398（e96 lean 案例空通過），finish 配號，排在佇列 #212–#213。
+- 政策改變（adopter 可見、無伺服器行為變更）：builder ≠ judge 從「design-armed 的 visual verdict」擴到「每種組合的 code-review verdict、qa verdict、PASS」，憲法標頭升 v3.41.0；design-auditor 以外的角色 SOP 只改引用與 cap 名稱。是否發版與版號由人類決定。
+
+## 接手步驟
+（事實欄位由 `node scripts/fanout.mjs handoff` 產生；接手時先跑 `node scripts/fanout.mjs handoff --check <manifest>`。`<待填：…>` 由整合者填寫。）
+### 核對 primary
+- 目標分支：main @ f664ec9
+- 目標分支對 origin：一致
+- git status：1 項：?? docs/agc-ticket-draft-wc32.md
+- worktree：primary（main ← integ/e393-builder-judge-core @ 1288010）
+- lane-status：primary（main ← integ/e393-builder-judge-core @ 1288010）release-prompt-audit-w1／In_Progress／release-engineer，hop 3，commits 0，dirty
+### 已結案
+- prompt-audit 第 2 波的唯一 lane（e393）已合併、finish、拆除；lane 紀錄在 `.current/history/2026-11/e393/`。記帳與本清單在同一個 wave PR。佇列 E393 至此完成。
+- 未配號的新發現：無（E397、E398 由 finish 配號，排在佇列 #212–#213）。
+### 待人類決定
+- 是否發版、版號（本波只動 `content/` 字句、`CLAUDE.md` 第 233 行與 adapter 模板、golden 與測試；無伺服器行為變更，但 builder ≠ judge 的適用範圍擴到每種組合的所有 verdict，憲法標頭升 v3.41.0；design-only 剝除「省下量」測試下限由 ≥ 2080 改 ≥ 1999）。
+- 是否開下一波（候選依佇列順序：E392 → E394 → E395；E392 會再動 `coord-02`、adapter 模板與 `CLAUDE.md` adapter 區塊，本波已把這些檔案改到新引用，E392 要以合併後的 `main` 為 base）。
+- E392 開票時：`teamwork` subagent 模板要修還是刪。
+- primary 上未追蹤的開票草稿 `docs/agc-ticket-draft-wc32.md` 要不要刪（前兩波已提過）。
+### 進行中的背景工作
+無
+
 ## Dispatch pins
 - e393：`pm=opus`、`sr-engineer=opus`、`qa-engineer=sonnet`。
 
@@ -98,3 +126,10 @@ mailbox: ../agent-governance-mcp-lanes/_mailbox
 | 2026-11-02 | 整合者 | 新 session 接手：從前一個 session 的紀錄復原草案，在 `8a79731` 逐站重新核對（builder ≠ judge 13 個站點、G2-21 站點、Limits 表、manifest 標籤、budget 四個數字、會被擊中的測試）全部一致；補列 `skill-qa-engineer.md` 第 91 行「At Round 4」（人類清單的第 92 行，前一版草案誤判為無裸數字）；golden 計數改為 12 個全部重抓；補「待人類裁定」段（目的地替代方案建議維持 (A)；docs PR 與派工等 primary 回到 `main`）。`fanout.mjs validate` exit 0 | 本檔 |
 | 2026-11-02 | 人類 | 核准本清單（全部）：單 lane e393、mini-chain、四項所有權重劃（`CLAUDE.md` 第 233 行、adapter 模板第 12 行、manifest 條件式擁有、共享生成物歸 e393）、補列的站點（含 `skill-qa-engineer.md` 第 91 行）、目的地維持 (A)、budget 超過時由 lane 在 cut 提 (i)／(ii)。人類回覆「approve」 | 整合者 session |
 | 2026-11-02 | 整合者 | 草案：單 lane e393，mini-chain（PM cut、無 architect；新增 segment 才改 full chain）。重劃：`CLAUDE.md` 第 233 行與 `templates/agent-adapters/claude.md` 第 12 行從共同禁止移出、劃給 e393；manifest 與其 `dist/` 條件式擁有。補列人類清單外的引用站點（`skill-sr-engineer.md:26`、`skill-qa-visual.md:12`、`const-04:2`、rationale §3.2 錨點、`const-12:18`、`skill-qa-engineer.md:113`）。budget 實測：除 lean 外，non-design（餘裕 6）也必然超過。E392 與本票檔案重疊，排在本波之後 | 本檔 |
+| 2026-11-02 | 整合者 | 清單 PR #63 merge `f664ec9` = 派工 base（docs branch `docs/2026-11-02-fanout-e393` 已刪）；派工前核對在 `f664ec9` 重做：`8a79731..f664ec9` 只有發版（PR #61、#62）與本清單，`content/**`、`templates/**`、`prompts/**`、compose-golden、`test/context-budget.test.mjs` 無差異，點名站點行號不變；lane 點名的擁有／禁止路徑與工具都在 base 上存在；沒有殘留 e393 branch／worktree；信箱 e393 已建空檔、mailbox-watch 已 armed（baseline e393=0）；prompt 以 `fanout.mjs render --base f664ec9` 產生。此列隨記帳 commit 進 integ | 本檔 |
+| 2026-11-02 | 整合者 | e393 cut 預審 close（spec `c501816`，to-lane#1）：check --cut exit 0（28 tokens，0 越界）；每個 AC 都有實作 task；目的地 const-05 §3 末；一般化字句接受；13 個引用站點改指「§3 builder ≠ judge」。Q1：w1／w2／w3 的擁有權條件式放寬（只在人類選 (i-b)），w2 建議改成搬進 rationale §6 而非刪除。Q2：rationale :184 無異議。給人類的建議（needs human ruling，由 lane 呈）：budget 偏向 (i-b)、(ii) 為備案、hybrid 可接受；憲法標頭升 v3.41.0。lane 另發現 `skill-sr-engineer` stripped 上限（2852）也會超 4，同一擁有檔，併入 budget 裁決。實測前後值（lane 模擬）：lean 5722→5844、non-design 8495→8609、design-arm 10593→10626、teamwork 21588→21630 | 信箱 e393 |
+| 2026-11-02 | 人類 | 在 e393 lane session 核准 cut（spec `c501816`）：budget 選 (i-b)+w2'（t1–t6、w1、w3 為刪減；const-15 第 12 行的 D10「Reason」句原文搬進 `constitution-rationale.md` §6，不刪），`test/context-budget.test.mjs` 上限不動、qa 在真實樹上重量；憲法標頭升 v3.41.0 並縮短第 1 行註解（w3）；接受 builder ≠ judge 適用範圍變寬的政策改變。條件式放寬的擁有權（const-05:5、const-15:12、const-01 第 1 行註解、rationale §6 段）因此生效 | e393 lane session；`specs/e393-builder-judge-core.md` commit `c501816`（選項表）；`cut_approved` 與裁決在 lane 的 handoff pending_notes，尚未 commit |
+| 2026-11-02 | 整合者 | e393 進度：sr 五個 task `ef8a21a`、`492215b`、`88dad12`、`a9bc04f`、`4e93a6b`（content/、`CLAUDE.md` 第 233 行、adapter 模板；dist/ 每 hop 無差異）；expected-red `f528d13`（22 個預期紅燈全為本票字句）；code review 一輪 APPROVED（`review_reports/review_T-E393-01.md`，commit `97909c6`，0 required）。budget 在 T-04 後全部回到上限以下（lean 5711、non-design 8476、design-arm 10475、teamwork 21479）。lane 發現 `test/context-budget.test.mjs:914` 的 design-only 剝除「省下量」下限（≥ 2080）在選項 (A) 下必然降到 1999，非大小上限、刪減救不回；整合者建議下修到實測值並標 E393（needs human ruling，lane 呈）；lane 已把裁決列寫進 spec §E 並 commit `15be5f3`，等人類在 lane session 裁決後派 qa T-E393-06。條件式放寬的擁有權已記在本檔「所有權重劃」與預審列（隨記帳 commit 進 integ） | 信箱 e393（to-integrator#9、#10） |
+| 2026-11-02 | 人類 | 在 e393 lane session 裁決：`test/context-budget.test.mjs:914` 的 design-only 剝除「省下量」下限由 ≥ 2080 下修到 ≥ 1999，斷言訊息標 E393 為新基準（比照它取代的 a12 基準），其他上限不動 | e393 lane session；`specs/e393-builder-judge-core.md` §E「Amendment after the cut」列，commit `15be5f3`；裁決記在 lane handoff 的 pending note，尚未 commit |
+| 2026-11-02 | 整合者 | 5a：e393 `e9f5de0`（CI run 41430890850 綠）close —— review 一輪 APPROVED（0 退回）、qa 一輪 PASS（qa_round 0）、hop 4/14；53 檔 0 越界；點名行以外只有人類選 (i-b) 後生效的 w1／w2'／w3 與 rationale §6；`qa_reports/review_T-E393-06.md` covers 01..06、suite 3857/3859（2 既有 skip）；`review_reports/review_T-E393-01.md` covers 01..05；12 個 golden 重抓、context-budget 重釘、design-only 省下量下限依人類裁決改 ≥ 1999；`dist/` 零差異；`agc check` 戳記未動（advisory：context-budget.test.mjs 註解比 38.9%）。budget 最終：lean 5711/5723、non-design 8476/8501、design-arm 10475/10598、teamwork 21479/21715、skill-sr-engineer stripped 2851/2852。新發現 E393-NEW-1（budget 測試註解比，建議開票）、E393-NEW-2（e96 lean 案例空通過）等 finish 配號 | 本檔 |
+| 2026-11-02 | 整合者 | 5b：`integ/e393-builder-judge-core` ← e393 `e9f5de0`（merge `29f5844`），`--no-ff`、零衝突 → 無合併審查；merge-invariants PASS；重建 `dist/` 無差異；`check:bookkeeping` OK；`npm audit --audit-level=high` exit 0。6-1：finish e393 配號 E397、E398（`3f2cf40`），lane 紀錄搬到 `.current/history/2026-11/e393/`（`ffb2520`），worktree、本地與遠端 branch、信箱都已拆 | 本檔 |
