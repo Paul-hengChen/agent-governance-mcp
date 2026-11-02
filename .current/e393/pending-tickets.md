@@ -1,5 +1,7 @@
 # Pending tickets — lane e393
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E393-NEW-1
 title: test/context-budget.test.mjs comment ratio 38.9% exceeds the agc check 30% limit — move the cap-history comments into a spec
@@ -26,5 +28,3 @@ body: |
   change at coord-02 cannot leave the lean case silently meaningless. The e96 case titles
   still say "§3.2"; rename them with the same change (qa-owned, test-only).
 ```
-
-## Applied
