@@ -68,13 +68,14 @@ const ROLE_TO_SKILL = {
 
 // Templates that delegate by file path instead of tw_switch_role: `lite` is
 // server-read-only and references content/skill-coordinator-lite.md; `teamwork`
-// is the dispatcher, not a tw_switch_role destination. The teamwork regex pins
-// the template's CURRENT text; that template still tells the subagent to Read a
-// content path that does not exist on disk. The stale Read path is tracked
-// separately, and the regex should be tightened in the same change.
+// loads its SOP through tw_switch_role("coordinator") (the coordinator key is a
+// switchRole destination since E392) and names content/skill-coordinator.md only
+// as the SOP's logical name — no such file exists on disk. The teamwork regex
+// pins both the tool call and the logical-name clause, so the pre-E392 text
+// ("Read content/skill-coordinator.md") no longer satisfies it.
 const FILE_PATH_DELEGATES = {
   "lite": /content\/skill-coordinator-lite\.md/,
-  "teamwork": /content\/skill-coordinator\.md/,
+  "teamwork": /tw_switch_role\("coordinator"\)[\s\S]*`content\/skill-coordinator\.md` is only the SOP's logical name/,
 };
 
 function readTemplateRaw(role) {
@@ -394,7 +395,7 @@ test("v3.21.2 AC1: every template body's FIRST non-blank line is the CRITICAL: w
 // v3.21.2 AC2: haiku templates must contain an example reply suffix block
 // ---------------------------------------------------------------------------
 
-const HAIKU_ROLES = ["lite", "doc-writer", "release-engineer"];
+const HAIKU_ROLES = ["lite", "doc-writer"];
 
 test("v3.21.2 AC2: haiku templates each contain an example reply suffix line preceded by a blank line", () => {
   // Contract: a one-shot output-shape example is required for haiku-tier templates

@@ -9,6 +9,7 @@ declare const ROLE_SKILL_MAP: {
     readonly architect: "skill-architect.md";
     readonly "doc-writer": "skill-doc-writer.md";
     readonly "release-engineer": "skill-release-engineer.md";
+    readonly coordinator: "skill-coordinator.md";
 };
 export type RoleName = keyof typeof ROLE_SKILL_MAP;
 export declare function switchRole(role: RoleName, workspacePath: string): string;

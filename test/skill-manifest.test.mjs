@@ -33,9 +33,13 @@ const { applyTextTransforms } = await import(path.join(ROOT, "dist", "prompts", 
 const { parseSkillFile } = await import(path.join(ROOT, "dist", "tools", "skill-frontmatter.js"));
 const { expandPartials } = await import(path.join(ROOT, "dist", "prompts", "partials-manifest.js"));
 
-// The 9 keys of ROLE_SKILL_MAP (tools/role.ts) — every role tw_switch_role can
-// reach. NOT 10: `teamwork` / `teamwork-lite` are prompt ids served by
-// prompts/build.ts, not switchRole roles.
+// The 9 per-role keys of ROLE_SKILL_MAP (tools/role.ts) whose skill file is
+// `skill-<role>.md` on disk. ROLE_SKILL_MAP also holds a 10th key, `coordinator`
+// (E392), mapped to the split logical skill `skill-coordinator.md`; it is NOT in
+// this list because the witness test below reads `skill-${role}.md` from disk and
+// that file does not exist. `teamwork` / `teamwork-lite` are prompt ids served by
+// prompts/build.ts, not switchRole roles. The coordinator switchRole path is
+// covered by test/e392-subagent-templates.test.mjs.
 const ALL_SWITCHROLE_ROLES = [
   "pm",
   "researcher",
@@ -319,9 +323,11 @@ test("t-config-host-precedence: a workspace-local whole-file .current/skill-coor
 });
 
 // ---------------------------------------------------------------------------
-// switchRole (tools/role.ts), the second render path. No switchRole-reachable
-// role maps to a split skill yet, so host filtering has no visible effect
-// there; this pins that an unsplit skill's output is host-independent.
+// switchRole (tools/role.ts), the second render path. The 9 per-role keys listed
+// above map to unsplit skills, so host filtering has no visible effect there;
+// this pins that an unsplit skill's output is host-independent. (The one split
+// skill reachable via switchRole, `coordinator`, is host-filtered and is covered
+// by test/e392-subagent-templates.test.mjs.)
 // ---------------------------------------------------------------------------
 
 test("t-switchRole-unsplit-host-independent: switchRole(\"sr-engineer\", ws) returns identical sop text with and without host:\"claude-code\" configured", () => {

@@ -1,0 +1,7 @@
+# release-engineer leaves the haiku tier: the (haiku) example-suffix pins and HAIKU_ROLES go red until qa updates them (T-E392-08, T-E392-05)
+test/feature-lease.test.mjs | E9A-S5 (regression guard): the pre-existing pinned template blocks survive alongside the new E9A paragraph
+test/feature-lease.test.mjs | E17-S4 (regression guard): the pre-existing pinned template blocks and skill Hard rules survive alongside the new E17 paragraph
+test/subagent-templates.test.mjs | v3.21.2 AC2: haiku templates each contain an example reply suffix line preceded by a blank line
+
+# coord-02 alias + coord-04 haiku list change the composed coordinator monolith; golden recapture pending (T-E392-07)
+test/skill-manifest.test.mjs | t-golden-byte-identity (AC1/AC5): composeSkill("skill-coordinator.md", {taskTool:true}) === frozen golden monolith, byte-for-byte
