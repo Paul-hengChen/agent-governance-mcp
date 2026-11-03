@@ -20,3 +20,6 @@
 {"ts":"2026-11-03T07:40:38.794Z","feature":"e394-release-sop-rewrite","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-03T07:45:26.582Z","feature":"e394-release-sop-rewrite","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
 {"ts":"2026-11-03T08:03:54.620Z","feature":"e394-release-sop-rewrite","agent_id":"sr-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-03T08:05:07.701Z","feature":"e394-release-sop-rewrite","agent_id":"code-reviewer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-03T08:13:52.650Z","feature":"e394-release-sop-rewrite","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"opus"}
+{"ts":"2026-11-03T08:39:16.787Z","feature":"e394-release-sop-rewrite","agent_id":"qa-engineer","dispatch_mechanism":"task","dispatch_mechanism_tier":"sonnet"}
