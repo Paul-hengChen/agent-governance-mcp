@@ -86,3 +86,52 @@ Expected-red disposition (step 4a): `qa_reports/expected-red_e394-release-sop-re
 
 ## Verdict
 APPROVED — every AC in sr scope is implemented, the three absorbed scripts and `dist/` are untouched, the history move is byte-verified, the exit/Escalation bijection holds, and the fixture runs of all three phases behave as specified; the findings are recommended/optional hardening only.
+
+## Round 2 — APPROVED — by code-reviewer
+
+Re-review of the qa FAIL round 1 fix, task T-E394-02 (touches T-E394-10 SOP step 1). Diff `2932dad..HEAD -- scripts/release.mjs content/skill-release-engineer.md` (b387c9e, 01b102d). Reviewer did not build the fix; same model family as sr (opus), so independence rests on clean context.
+
+## Summary
+- README pin checks now match `#<tag>` as a whole token (`pinsTag`, `scripts/release.mjs:211-212`, used at `:297-298`).
+- CLI entry guard compares real paths (`:1097-1104`); `preInputs` refuses a truncated read view (`:216-219`, `:251`).
+- `--state` also takes a verbatim `handoff.md` copy, parsed by the compiled canonical parser in a throwaway `os.tmpdir()` workspace (`:223-245`); SOP step 1 changed by one sentence (`content/skill-release-engineer.md:34`).
+- Verdict: APPROVED. Two recommended findings, none blocking.
+
+## AC Completeness
+covers: T-E394-02
+AC-S2 (R3 stale pin) — implemented — `scripts/release.mjs:211-212,297-298`; `test/e394-release-script.test.mjs:353` green with no test edit (e394 files 86/86).
+AC-S1 / pre-1 USAGE (`--state` contract, integrator ruling b') — implemented — `scripts/release.mjs:216-256`.
+AC-P3 / SOP step 1 — implemented — `content/skill-release-engineer.md:34`; SOP 14,434 B (≤ 15,000); the SOP structure tests (Escalation bijection included) pass.
+AC-S3 (verb allow-list) — unchanged — the diff adds no `spawn`/`git`/`gh` call and no shell; `parseHandoff` resolves the lane by pure fs (`tools/lane-paths.ts:239-272`, no subprocess).
+AC-S9 / three absorbed scripts and `dist/` — unchanged — `git diff 89e01c6..HEAD -- scripts/verify-release.mjs scripts/check-version.mjs scripts/check-bookkeeping.mjs dist` is empty.
+
+## Correctness
+No required findings. Probes run from a scratch dir via a symlinked `scripts/` dir (`node <link>/release.mjs prepare … --dry-run`):
+- lane copy (code-reviewer, In_Progress) → USAGE 2; PASS copy → passes pre-1, stops WRONG_BRANCH 10 as expected on a feature branch; untruncated JSON → same.
+- JSON with `completed_tasks_truncated` → USAGE; JSON with a `⟦agc read-view⟧` note → USAGE; malformed frontmatter → USAGE with the parser's message.
+- `release-state-*` dirs under `os.tmpdir()`: 0 before, 0 after all runs (including the throw paths); worktree status unchanged by the runs.
+- Symlinked absolute invocation with a bad phase → exit 2 (was silent 0); `import()` of the module through the symlink does not run `main`.
+- `pinsTag` regex: `#v1\.2\.1(?!\w|\.\d)` rejects `#v1.2.10`, and tag `v1.2.10` rejects `#v1.2.100`; `reEscape` covers every regex metacharacter a `git describe` tag can carry.
+- `completed_tasks_truncated` is in scope: step 7b (`:438`) writes `ctx.state.completed_tasks` into `driftBaselineIds`, and the read view keeps only the last 50 ids (`tools/handoff-parse.ts:704-722`), so accepting it would silently drop baseline ids.
+- `preInputs` became async; the phase runner already awaits every step (`:1085`).
+
+## Quality
+- **R1 (recommended)** `scripts/release.mjs:243` — the fence detection strips a leading BOM, but `parseHandoffCopy` writes the original text (`:230`), so the parser's `^---` frontmatter match fails and a BOM copy stops USAGE with `(got undefined, )` — fails closed, but the message points at the wrong cause. Either write the BOM-stripped text or drop the BOM tolerance. A server-written or `cp` copy carries no BOM, so this is cosmetic.
+- Comment discipline (Constitution §6): the added comments state what the code does, carry no ticket id, sha or local path; `E37` example neutralised to `ABC` (`:331`). The `:221-222` comment says the parser "may write migration results there" — `parseHandoff` itself does not write, but the comment errs safe; kept.
+- `READ_VIEW_MARKER` duplicates `READ_VIEW_MARKER_PREFIX` (`tools/handoff-types.ts:17`); acceptable in a script that only imports `dist/` lazily, and `startsWith` matches where the reader places it (`tools/handoff-parse.ts:61`).
+
+## Architecture
+- **R2 (recommended)** `specs/e394-release-sop-rewrite-architecture.md:41,208,438,483` still describe `--state` as the `tw_get_state` JSON only. The handoff-copy form comes from an integrator ruling recorded outside the repo; the implementation is a superset (JSON form kept), so it does not contradict the doc, but the doc should name the second form and the truncation refusal (architect/pm follow-up, not sr scope).
+- Parsing reuses the canonical parser (no duplicated YAML/section parsing), injectable via `deps.importHandoffParse`; layering fits the doc's "script reads compiled helpers" pattern.
+
+## Security
+No findings. The temp workspace is `mkdtempSync` under `os.tmpdir()` (unpredictable name), removed in `finally`; nothing is written under the repository. The dynamic import path is fixed (`<root>/dist/tools/handoff-parse.js`), never input-derived. `--state` still goes through `readInput`'s outside-the-root check before any parse.
+
+## Performance
+No findings. One extra temp dir + one file write + one module import per `prepare` run; no hot path.
+
+## Expected-red and suite
+`node scripts/test-lock.mjs -- npm test`: 3864 pass / 66 fail / 2 skipped of 3932. 65 fails are listed in `qa_reports/expected-red_e394-release-sop-rewrite.txt` (sampled 3: `test/e130-lane-default.test.mjs` AC11, `test/release-staging.test.mjs` D10-AC1, `test/render-structure.test.mjs` T-E8795-02 — all locatable). The one unlisted fail is `test/render-structure.test.mjs:567` (T-E77-02) flagging `test/e394-release-sop.test.mjs:31` (`git show ${BASE}:…`) — a qa-authored test file reading repository history, not an implementation defect; qa owns it next round.
+
+## Verdict
+APPROVED — all five fix items are implemented and verified by probe, the R3 red is green without a test edit, no new git/gh verb or repository mutation is introduced, and the two findings are recommended only.
