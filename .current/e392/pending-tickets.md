@@ -1,5 +1,7 @@
 # Pending tickets — lane e392
 
+## Applied
+
 ```pending-ticket
 lane_local_id: E392-NEW-1
 title: coord-03 still says `Task` on the no-host / lean path, where coord-02's `Task(...)` alias definition does not load
@@ -18,5 +20,3 @@ body: |
   so the test changes with it; re-capture the compose goldens and re-measure the teamwork and
   lean budgets.
 ```
-
-## Applied
