@@ -230,28 +230,39 @@ test("AC10: coord-01's Split Table \"How to proceed\" prose states equal `order`
 });
 
 // ---------------------------------------------------------------------------
-// AC11: skill-release-engineer step 8a stages .current/_primary/tasks.md in
-// BOTH the explicit git-add list and the PATHS= pre-filter variable, and the
-// Artifact allowlist bullet names + explains it.
+// AC11: the release staging list stages .current/_primary/tasks.md both in the
+// plan and through the existence pre-filter (now scripts/release.mjs STAGE_PATHS /
+// planStage, E394), and the SOP Artifact bullet names it (rationale in
+// specs/release-sop-history.md).
 // ---------------------------------------------------------------------------
 
-test("AC11: step 8a's explicit git-add list stages .current/_primary/tasks.md", () => {
-  const gitAddMatch = RELEASE_ENGINEER.match(/^\s+git add -- (.+)$/m);
-  assert.ok(gitAddMatch, "must find the git-add line");
-  assert.match(gitAddMatch[1], /(^|\s)\.current\/_primary\/tasks\.md(\s|$)/, "the git-add line must stage .current/_primary/tasks.md");
+test("AC11 [E394 re-pin AC-S6]: the release script's staging list (STAGE_PATHS) includes .current/_primary/tasks.md and the plan stages it when changed", async () => {
+  const { STAGE_PATHS, planStage } = await import("../scripts/release.mjs");
+  assert.ok(
+    STAGE_PATHS.metadataPaths.includes(".current/_primary/tasks.md"),
+    "the script's staging list must include .current/_primary/tasks.md",
+  );
+  assert.ok(STAGE_PATHS.metadataPaths.includes("tasks.md"), "the script's staging list must still include root tasks.md");
+  const plan = planStage({ changed: [".current/_primary/tasks.md"], exists: () => true });
+  assert.ok(plan.includes(".current/_primary/tasks.md"), "a changed .current/_primary/tasks.md must be planned for `git add`");
 });
 
-test("AC11: step 8a's PATHS= existence pre-filter variable stages .current/_primary/tasks.md", () => {
-  const pathsMatch = RELEASE_ENGINEER.match(/PATHS="([^"]+)"/);
-  assert.ok(pathsMatch, "must find the PATHS= existence pre-filter variable");
-  assert.match(pathsMatch[1], /(^|\s)\.current\/_primary\/tasks\.md(\s|$)/, "the PATHS= variable must include .current/_primary/tasks.md");
+test("AC11 [E394 re-pin AC-S6]: the script's existence pre-filter drops a missing .current/_primary/tasks.md instead of planning a pathspec that would stage nothing", async () => {
+  const { planStage } = await import("../scripts/release.mjs");
+  const changed = [".current/_primary/tasks.md", "CHANGELOG.md"];
+  const plan = planStage({ changed, exists: (m) => m !== ".current/_primary/tasks.md" });
+  assert.ok(!plan.includes(".current/_primary/tasks.md"), "a pathspec that does not exist must be filtered out of the plan");
+  assert.ok(plan.includes("CHANGELOG.md"), "existing changed members are still planned");
 });
 
-test("AC11: the Artifact allowlist bullet names .current/_primary/tasks.md and explains the post-E125a ownership", () => {
-  const bulletMatch = RELEASE_ENGINEER.match(/- `tasks\.md` and `\.current\/_primary\/tasks\.md`.*$/m);
-  assert.ok(bulletMatch, "must find the amended Artifact allowlist bullet naming both tasks.md and .current/_primary/tasks.md");
-  assert.match(bulletMatch[0], /post-E125a/, "must cite the post-E125a ownership rationale");
-  assert.match(bulletMatch[0], /`tw_complete_task` on primary writes the `_primary` ledger, not root `tasks\.md`/, "must explain why both paths are staged");
+test("AC11 [E394 re-pin AC-P7/AC-P10]: the SOP Artifact bullet names .current/_primary/tasks.md (staged, never edited) and the history keeps the post-E125a ownership explanation", () => {
+  const bulletMatch = RELEASE_ENGINEER.match(/`tasks\.md` and `\.current\/_primary\/tasks\.md` \(staged by the release commit, never edited\)/);
+  assert.ok(bulletMatch, "the SOP Artifact list must name both tasks.md and .current/_primary/tasks.md as staged, never edited");
+  const history = fs.readFileSync(path.join(ROOT, "specs", "release-sop-history.md"), "utf-8");
+  const histBullet = history.match(/- `tasks\.md` and `\.current\/_primary\/tasks\.md`.*$/m);
+  assert.ok(histBullet, "history must keep the amended Artifact allowlist bullet naming both paths");
+  assert.match(histBullet[0], /post-E125a/, "history must cite the post-E125a ownership rationale");
+  assert.match(histBullet[0], /`tw_complete_task` on primary writes the `_primary` ledger, not root `tasks\.md`/, "history must explain why both paths are staged");
 });
 
 // ---------------------------------------------------------------------------

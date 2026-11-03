@@ -178,6 +178,7 @@ declare const SwitchRoleArgs: z.ZodObject<{
         "qa-engineer": "qa-engineer";
         "release-engineer": "release-engineer";
         "doc-writer": "doc-writer";
+        coordinator: "coordinator";
     }>;
 }, z.core.$strip>;
 declare const IndexPrdArgs: z.ZodObject<{

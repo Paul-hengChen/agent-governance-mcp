@@ -31,6 +31,8 @@ const ROLE_SKILL_MAP = {
     // skill-release-engineer.md "Side-channel constraint" clause).
     "doc-writer": "skill-doc-writer.md",
     "release-engineer": "skill-release-engineer.md",
+    // Coordinator SOP, composed from the coord-*.md fragments under this logical key; loadable here, not a chain role.
+    "coordinator": "skill-coordinator.md",
 };
 export function switchRole(role, workspacePath) {
     const skillFile = ROLE_SKILL_MAP[role];

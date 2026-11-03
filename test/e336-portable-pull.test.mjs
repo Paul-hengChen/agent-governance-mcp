@@ -36,7 +36,9 @@ const SITES = [
   ["const-15-core-tail.md", 1],
   ["coord-03-core-fallback.md", 1],
   ["skill-integrator.md", 4],
-  ["skill-release-engineer.md", 6],
+  // E394 re-pin (AC-P6): the rewritten SOP keeps two prose sites (Git Hard rule, step 5); the other
+  // former sites (8c, 13a, 3a-adjacent recovery) now run inside scripts/release.mjs, pinned below.
+  ["skill-release-engineer.md", 2],
 ];
 
 for (const [file, n] of SITES) {
@@ -46,6 +48,22 @@ for (const [file, n] of SITES) {
     assert.equal(count(read(file), PORTABLE), n, `${file} must name the portable form ${n} time(s)`);
   });
 }
+
+test("AC-E336-1 [E394 re-pin AC-S3]: scripts/release.mjs pulls main only through the portable array-argv form (every pull site carries -c pull.rebase=false)", () => {
+  const script = fs.readFileSync(path.join(ROOT, "scripts", "release.mjs"), "utf-8");
+  const PORTABLE_ARGV = '["-c", "pull.rebase=false", "pull", "--ff-only"]';
+  const BARE_PULL = '"pull", "--ff-only"';
+  assert.equal(count(script, PORTABLE_ARGV), 1, "the script must name the portable pull argv exactly once (pullMain)");
+  // Every executed pull site is the portable one: no bare pull argv anywhere else.
+  assert.equal(count(script, BARE_PULL), count(script, PORTABLE_ARGV), "no pull argv may omit the -c pull.rebase=false override");
+  // The only plain spelling is the failure-message label in pullMain (a message, not a command site).
+  assert.equal(count(script, `failedAt(ctx, "${PLAIN}", pull, step)`), count(script, PLAIN), "the plain form may appear only as pullMain's failure label");
+  // The runner allow-list entry names the same override and restricts the pull to main.
+  assert.ok(
+    script.includes('"-c pull.rebase=false pull --ff-only, on main only"'),
+    "the verb allow-list must describe the pull as the portable form, main only",
+  );
+});
 
 test("AC-E336-1: the two bare grant-name mentions in the integrator SOP stay as grant names", () => {
   const text = read("skill-integrator.md");

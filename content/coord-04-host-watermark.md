@@ -2,7 +2,7 @@
 
 This validation applies ONLY to **Task-dispatched subagent replies** (which still emit the `— @<name> (<tier>)` with-tier form per Constitution §1). The coordinator's **own** main-loop replies are non-subagent context and end with `— @coordinator` (no tier) — they are not processed by `validateWatermark`.
 
-When the parent (this coordinator) dispatches a role via `Task(subagent_type="<role>", …)` and receives back a reply, the parent MUST verify the watermark before relaying the reply to the user. Haiku-tier subagents (`@lite`, `@doc-writer`, `@release-engineer`) sometimes omit the `— @<name> (<tier>)` suffix mandated by Constitution §1 even with `CRITICAL:` template reminders; this step closes that gap at the layer that has guaranteed execution.
+When the parent (this coordinator) dispatches a role via `Task(subagent_type="<role>", …)` and receives back a reply, the parent MUST verify the watermark before relaying the reply to the user. Haiku-tier subagents (`@lite`, `@doc-writer`) sometimes omit the `— @<name> (<tier>)` suffix mandated by Constitution §1 even with `CRITICAL:` template reminders; this step closes that gap at the layer that has guaranteed execution.
 
 **Detection regex** — applied to the last non-empty line of the subagent reply, after stripping leading/trailing whitespace from that line:
 

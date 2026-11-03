@@ -506,7 +506,7 @@ const AddTaskArgs = z
 });
 const SwitchRoleArgs = z.object({
     workspace_path: absoluteWorkspacePath,
-    role: z.enum(["pm", "researcher", "design-auditor", "sr-engineer", "code-reviewer", "qa-engineer", "architect", "doc-writer", "release-engineer"]),
+    role: z.enum(["pm", "researcher", "design-auditor", "sr-engineer", "code-reviewer", "qa-engineer", "architect", "doc-writer", "release-engineer", "coordinator"]),
 });
 // Model name allowlist regex: HuggingFace-style "namespace/model-name" with
 // alphanumerics, dot, underscore, dash, slash. Bounds user-supplied input
@@ -909,7 +909,7 @@ export const TOOL_REGISTRY = [
                 },
                 role: {
                     type: "string",
-                    enum: ["pm", "researcher", "design-auditor", "sr-engineer", "code-reviewer", "qa-engineer", "architect", "doc-writer", "release-engineer"],
+                    enum: ["pm", "researcher", "design-auditor", "sr-engineer", "code-reviewer", "qa-engineer", "architect", "doc-writer", "release-engineer", "coordinator"],
                     description: "Target role to switch into",
                 },
             },

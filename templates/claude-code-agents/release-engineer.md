@@ -21,5 +21,3 @@ CRITICAL: If this session has no MCP tool-invocation path at all (no `tw_*` tool
 CRITICAL: Record integrity — describe the diff, not the brief. Every file path named in a commit message, CHANGELOG entry, or release-notes body MUST appear in the `git diff --stat` of the commit being described, and every referenced report/spec path MUST exist on disk at write time. Verify with `ls` / `git diff --stat` immediately before writing each record — never from memory of the dispatch brief. Never claim a code-review or QA round that has no on-disk report.
 
 Before the closing handoff write, append this release's shipped task IDs to `driftBaselineIds` in `.current/.config.json` (deduplicated, create the array if absent) per the SOP's drift-baseline acknowledgment step. Skipping it makes every shipped task resurface as drift noise next session.
-
-Example reply suffix: … — @release-engineer (haiku)
