@@ -4,7 +4,7 @@
 // <CLASS_ID>: <detail>`; `--dry-run` runs every read and only records mutations.
 // Contract: specs/e394-release-sop-rewrite-architecture.md.
 
-import { existsSync, readFileSync, realpathSync, writeFileSync, renameSync, mkdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync, renameSync, mkdirSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import * as path from "node:path";
@@ -209,6 +209,7 @@ function preInputs(ctx) {
   try { state = JSON.parse(readInput(root, opts.statePath, "--state")); } catch (e) { throw e instanceof ReleaseStop ? e : usage(`--state is not JSON: ${e.message}`); }
   const pass = state?.last_agent === "qa-engineer" && state.status === "PASS" && typeof state.active_feature === "string" && state.active_feature;
   if (!pass) throw usage(`--state must be a (qa-engineer, PASS) snapshot with an active_feature (got ${state?.last_agent}, ${state?.status})`);
+  if (!safeSegment(state.active_feature)) throw usage(`--state active_feature ${JSON.stringify(state.active_feature)} cannot name an archive directory`);
   const message = readInput(root, opts.messageFile, "--message-file");
   const subject = new RegExp(`^chore\\(release\\): v${opts.version.replace(/\./g, "\\.")} — .+$`);
   if (!subject.test(message.split("\n")[0])) throw usage(`--message-file first line must be "chore(release): v${opts.version} — <summary>"`);
@@ -269,11 +270,110 @@ function preCloseOut(ctx) {
   ctx.pr = pr;
 }
 
+// ---- Step 7a: archive the shipped feature's evidence (qa_reports/, review_reports/) ----
+
+// A `covers:` label line, optionally bulleted and bolded; separator `:`, `—` or `-`.
+export const COVERS_RE = /^\s*([-*]\s*)?(\*\*\s*)?covers(\s*\*\*)?\s*[:—-]/i;
+const CODE_RE = /^[a-z_]*T-([A-Za-z0-9]+)-/;
+const ER_PREFIX = "expected-red_";
+const TREES = [["qa", "qa_reports", ["review_T-", "visual_T-"]], ["rr", "review_reports", ["review_T-"]]];
+// One path segment that cannot climb out of the archive directory.
+const safeSegment = (s) => typeof s === "string" && s !== "" && s !== "." && s !== ".." && !/[\\/\0]/.test(s);
+// `name` matches the glob `<prefix>*<suffix>`.
+const globbed = (name, prefix, suffix) => name.length >= prefix.length + suffix.length && name.startsWith(prefix) && name.endsWith(suffix);
+
+// The ticket code in an evidence basename (`review_T-E37-01.md` → E37), or null.
+export function codeFromBasename(basename) {
+  const m = CODE_RE.exec(basename);
+  return m ? m[1].toUpperCase() : null;
+}
+// Sorted unique codes of the files new to this release, over both trees.
+export function deriveCodes({ qaAdmitted = [], rrAdmitted = [] }) {
+  const codes = [...qaAdmitted, ...rrAdmitted].map((f) => codeFromBasename(path.posix.basename(f)));
+  return [...new Set(codes.filter(Boolean))].sort();
+}
+// STOP when a tree has root files and no previous-release listing to diff
+// them against: an empty baseline would admit every root file.
+export function classifyArchiveTree({ prevTag, treeExists, baselineHasFiles, rootHasFiles }) {
+  if (!prevTag) return "STOP";
+  if (!treeExists) return "EXCLUDE";
+  if (baselineHasFiles) return "INCLUDE";
+  return rootHasFiles ? "STOP" : "EXCLUDE";
+}
+// Moves in this order: per code the review/visual files of each tree, then new
+// expected-red files into their own feature's dir, then the remaining `.md`
+// files whose first `covers:` line names a code. Each tree archives into itself.
+export function planArchiveMoves({ feature, codes, qaRoot = [], rrRoot = [], coversLine, newExpectedRed = [], participating }) {
+  const moves = [], taken = new Set();
+  const add = (tree, name, dir) => {
+    const from = `${tree}/${name}`;
+    if (!taken.has(from)) { taken.add(from); moves.push({ from, to: `${tree}/archive/${dir}/${name}` }); }
+  };
+  const trees = TREES.map(([key, tree, kinds]) => ({ tree, kinds, on: Boolean(participating?.[key]), names: key === "qa" ? qaRoot : rrRoot }));
+  for (const c of codes) {
+    for (const t of trees) if (t.on) for (const n of t.names) if (t.kinds.some((k) => globbed(n, `${k}${c}-`, ".md"))) add(t.tree, n, feature);
+  }
+  if (participating?.qa) {
+    for (const n of newExpectedRed) {
+      const f = n.slice(ER_PREFIX.length, -".txt".length);
+      if (globbed(n, ER_PREFIX, ".txt") && safeSegment(f)) add("qa_reports", n, f);
+    }
+  }
+  for (const t of trees) {
+    if (!t.on) continue;
+    for (const n of t.names) {
+      if (!n.endsWith(".md") || taken.has(`${t.tree}/${n}`)) continue;
+      const line = coversLine(`${t.tree}/${n}`);
+      if (line && codes.some((c) => line.includes(`T-${c}-`))) add(t.tree, n, feature);
+    }
+  }
+  return moves;
+}
+
+const rootFileNames = (abs) => readdirSync(abs, { withFileTypes: true }).filter((d) => d.isFile()).map((d) => d.name).sort();
+function firstCoversLine(abs) {
+  try { return readFileSync(abs, "utf-8").split("\n").find((l) => COVERS_RE.test(l)) ?? null; } catch { return null; }
+}
+
+// Classifies both trees before any write, logs the code set (also when
+// empty), then makes the directories and the no-clobber moves.
+function step7a(ctx) {
+  const { root, runner: r, prevTag = null } = ctx, feature = ctx.state.active_feature;
+  const trees = {};
+  for (const [key, tree] of TREES) {
+    const abs = path.join(root, tree), treeExists = existsSync(abs) && statSync(abs).isDirectory();
+    const names = treeExists ? rootFileNames(abs) : [];
+    let baseline = new Set();
+    if (prevTag && treeExists) {
+      const res = r.read("git", ["ls-tree", "-r", "-z", "--name-only", prevTag, "--", `${tree}/`], { step: "7a" });
+      if (res.status === 0) baseline = new Set(res.stdout.split("\0").filter(Boolean));
+    }
+    const verdict = classifyArchiveTree({ prevTag, treeExists, baselineHasFiles: baseline.size > 0, rootHasFiles: names.length > 0 });
+    trees[key] = { tree, names, verdict, fresh: names.filter((n) => !baseline.has(`${tree}/${n}`)) };
+  }
+  if (trees.qa.verdict === "STOP" || trees.rr.verdict === "STOP") {
+    throw new ReleaseStop("EMPTY_BASELINE", `step 7a has no membership baseline for <qa_reports|review_reports> (PREV_TAG='${prevTag ?? ""}') — that tree has root-level evidence files and no baseline to diff them against; refusing to derive <CODES> for it rather than risk an unbounded sweep.`);
+  }
+  const on = { qa: trees.qa.verdict === "INCLUDE", rr: trees.rr.verdict === "INCLUDE" };
+  const codes = deriveCodes({ qaAdmitted: on.qa ? trees.qa.fresh : [], rrAdmitted: on.rr ? trees.rr.fresh : [] });
+  ctx.out(`step 7a: <CODES> = {${codes.join(",") || "∅"}}\n`);
+  const plan = planArchiveMoves({
+    feature, codes, qaRoot: trees.qa.names, rrRoot: trees.rr.names, participating: on,
+    coversLine: (rel) => firstCoversLine(path.join(root, rel)),
+    newExpectedRed: on.qa ? trees.qa.fresh.filter((n) => globbed(n, ER_PREFIX, ".txt")) : [],
+  });
+  const dirs = new Set(TREES.filter(([key]) => on[key]).map(([, tree]) => `${tree}/archive/${feature}`));
+  for (const m of plan) dirs.add(path.posix.dirname(m.to));
+  for (const d of dirs) r.mkdir(d, { step: "7a" });
+  for (const m of plan) if (!r.move(m.from, m.to, { step: "7a" })) ctx.out(`release: [7a] kept ${m.from} — ${m.to} already exists\n`);
+  Object.assign(ctx, { codes, archived: plan });
+}
+
 // Steps after the preconditions are not built yet; each phase stops as
 // INTERNAL there, so no run reports success for work it did not do.
 const notYet = (what) => () => { throw new ReleaseStop("INTERNAL", `${what} not implemented yet`); };
 const PHASES = {
-  prepare: [preInputs, preGh, prePrepare, notYet("prepare steps 7a-8a")],
+  prepare: [preInputs, preGh, prePrepare, step7a, notYet("prepare steps 7b-8a")],
   publish: [preGh, prePublish, notYet("publish steps 8b-9a")],
   "close-out": [preGh, preCloseOut, notYet("close-out steps 13a-13b")],
 };
@@ -283,7 +383,7 @@ export async function main(argv, deps = {}) {
   try {
     const opts = parseArgs(argv);
     if (opts.phase === "help") { out(USAGE_TEXT); return 0; }
-    const root = deps.root ?? ROOT, ctx = { opts, root, deps };
+    const root = deps.root ?? ROOT, ctx = { opts, root, deps, out };
     ctx.runner = createRunner({ root, dryRun: opts.dryRun, spawn: deps.spawn, env: deps.env ?? process.env, out, err });
     for (const step of PHASES[opts.phase]) await step(ctx);
     const v = `v${opts.version}`;
