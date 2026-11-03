@@ -799,21 +799,52 @@ function releaseText(ctx, commit, step) {
 
 // Polls until the pull request is MERGED; a dry-run records one poll and
 // carries a placeholder merge commit forward.
-async function waitMerged(ctx, rel, pr) {
+async function waitMerged(ctx, rel, pr, step) {
   const env = ctx.deps.env ?? process.env, sleep = ctx.deps.sleep ?? ((ms) => new Promise((done) => setTimeout(done, ms)));
   const budget = envSeconds(env, "AGC_RELEASE_MERGE_WAIT_SECONDS", 900), poll = Math.max(1, envSeconds(env, "AGC_RELEASE_POLL_SECONDS", 15));
   const deadline = Date.now() + budget * 1000;
   for (;;) {
-    const seen = viewPr(ctx, rel, "8c-2", "deferred");
+    const seen = viewPr(ctx, rel, step, "deferred");
     if (ctx.runner.dryRun) return { ...pr, state: "MERGED", mergeCommit: { oid: "<merge-commit>" } };
     if (seen && classifyPr(seen) === "MERGED") return seen;
     const why = seen && cannotMergeReason(seen);
     if (why) throw new ReleaseStop("PR_CANNOT_MERGE", `${why} while waiting for the merge — never update the branch or merge with --admin`);
     const left = deadline - Date.now();
-    if (left <= 0) throw new ReleaseStop("MERGE_WAIT_TIMEOUT", `#${pr.number} not merged within ${budget}s (AGC_RELEASE_MERGE_WAIT_SECONDS)${seen ? "" : "; the last gh pr view failed"} — re-run publish to keep waiting`);
-    ctx.out(`release: [8c-2] #${pr.number} not merged yet; polling again in ${Math.round(Math.min(poll * 1000, left) / 1000)}s\n`);
+    if (left <= 0) throw new ReleaseStop("MERGE_WAIT_TIMEOUT", `#${pr.number} not merged within ${budget}s (AGC_RELEASE_MERGE_WAIT_SECONDS)${seen ? "" : "; the last gh pr view failed"} — re-run ${ctx.opts.phase} to keep waiting`);
+    ctx.out(`release: [${step}] #${pr.number} not merged yet; polling again in ${Math.round(Math.min(poll * 1000, left) / 1000)}s\n`);
     await sleep(Math.min(poll * 1000, left));
   }
+}
+
+// Refuses a pull request that cannot merge, asks for an auto-merge, then
+// waits for MERGED. A dry-run of a pull request this run would create has no
+// number yet, so its merge is printed as planned instead of recorded.
+async function autoMerge(ctx, rel, pr, step, waitStep = step) {
+  const why = cannotMergeReason(pr);
+  if (why) throw new ReleaseStop("PR_CANNOT_MERGE", `${why} — never update the branch or merge with --admin`);
+  if (pr.number === undefined) ctx.out(`release: DRY-RUN [${step}] gh pr merge <new pull request> --auto --merge\n`);
+  else {
+    const merge = ctx.runner.mutate("gh", ["pr", "merge", String(pr.number), "--auto", "--merge"], { step });
+    if (merge.status !== 0) throw new ReleaseStop("PR_CANNOT_MERGE", failedAt(ctx, `gh pr merge ${pr.number} --auto --merge`, merge, step));
+  }
+  return waitMerged(ctx, rel, pr, waitStep);
+}
+// `git switch main` unless already there, then a fast-forward-only pull.
+function pullMain(ctx, step) {
+  const r = ctx.runner;
+  if (r.branch !== "main") {
+    const sw = r.mutate("git", ["switch", "main"], { step });
+    if (sw.status !== 0) throw new ReleaseStop("MUTATION_FAILED", failedAt(ctx, "git switch main", sw, step));
+  }
+  const pull = r.mutate("git", ["-c", "pull.rebase=false", "pull", "--ff-only"], { step });
+  if (pull.status !== 0) throw new ReleaseStop("MAIN_DIVERGED", failedAt(ctx, "git pull --ff-only", pull, step));
+}
+// `git branch -d` of a merged branch when it exists locally; `known`: this run created it.
+function deleteMergedBranch(ctx, rel, step, known = false) {
+  const r = ctx.runner;
+  if (!known && gitOut(r, ["rev-parse", "-q", "--verify", `refs/heads/${rel}`], step) === null) return;
+  const res = r.mutate("git", ["branch", "-d", rel], { step });
+  if (res.status !== 0) throw new ReleaseStop("MUTATION_FAILED", failedAt(ctx, `git branch -d ${rel}`, res, step));
 }
 
 // Each mutation is skipped when a re-run finds it done: the merge (PR MERGED),
@@ -835,22 +866,13 @@ async function stepPublish(ctx) {
     if (ci.status !== 0 || !ci.stdout.includes("CI-CHECK PASSED")) {
       throw new ReleaseStop("CI_GATE_FAILED", `verify-release.mjs --ci-check --strict exited ${ci.status} for ${pr.headRefOid} — ${failLines(ci)}`);
     }
-    const why = cannotMergeReason(pr);
-    if (why) throw new ReleaseStop("PR_CANNOT_MERGE", `${why} — never update the branch or merge with --admin`);
-    const merge = r.mutate("gh", ["pr", "merge", String(pr.number), "--auto", "--merge"], { step: "8c-1" });
-    if (merge.status !== 0) throw new ReleaseStop("PR_CANNOT_MERGE", failedAt(ctx, `gh pr merge ${pr.number} --auto --merge`, merge, "8c-1"));
-    pr = await waitMerged(ctx, rel, pr);
+    pr = await autoMerge(ctx, rel, pr, "8c-1", "8c-2");
   }
   const oid = pr.mergeCommit?.oid;
   if (!oid) throw new ReleaseStop("INTERNAL", `#${pr.number} is MERGED but gh reports no merge commit`);
   const [onLocal, onOrigin] = [tags.local === oid, tags.origin === oid];
 
-  if (r.branch !== "main") {
-    const sw = r.mutate("git", ["switch", "main"], { step: "8c-3" });
-    if (sw.status !== 0) throw new ReleaseStop("MUTATION_FAILED", failedAt(ctx, "git switch main", sw, "8c-3"));
-  }
-  const pull = r.mutate("git", ["-c", "pull.rebase=false", "pull", "--ff-only"], { step: "8c-3" });
-  if (pull.status !== 0) throw new ReleaseStop("MAIN_DIVERGED", failedAt(ctx, "git pull --ff-only", pull, "8c-3"));
+  pullMain(ctx, "8c-3");
   // A tag already at the merge commit is never re-created, so main may have moved past it.
   const head = onLocal || onOrigin ? null : r.deferred("git", ["rev-parse", "HEAD"], { step: "8c-3" });
   if (head && head.stdout.trim() !== oid) {
@@ -868,10 +890,7 @@ async function stepPublish(ctx) {
     const res = r.mutate("git", ["push", "origin", tag], { step: "8c-5" });
     if (res.status !== 0) throw new ReleaseStop("PUSH_REJECTED", failedAt(ctx, `git push origin ${tag}`, res, "8c-5"));
   }
-  if (gitOut(r, ["rev-parse", "-q", "--verify", `refs/heads/${rel}`], "8c-6") !== null) {
-    const res = r.mutate("git", ["branch", "-d", rel], { step: "8c-6" });
-    if (res.status !== 0) throw new ReleaseStop("MUTATION_FAILED", failedAt(ctx, `git branch -d ${rel}`, res, "8c-6"));
-  }
+  deleteMergedBranch(ctx, rel, "8c-6");
 
   if (r.read("gh", ["release", "view", tag, "--json", "tagName"], { step: "9" }).status === 0) ctx.out(`release: [9] release skipped — ${tag} already has a GitHub release\n`);
   else {
@@ -884,13 +903,140 @@ async function stepPublish(ctx) {
   ctx.okSuffix = ` — tag at ${oid}`;
 }
 
-// Close-out is not built yet; it stops as INTERNAL there, so no run
-// reports success for work it did not do.
-const notYet = (what) => () => { throw new ReleaseStop("INTERNAL", `${what} not implemented yet`); };
+// ---- Close-out (13a-13b): bookkeeping pull request, then verify-release --close-out ----
+
+// The fields the closing write sets: frontmatter scalars (null when absent)
+// and the first bullet under `## Pending & Handoff Notes`.
+export function readClosingWrite(handoffText) {
+  const text = String(handoffText ?? "").replace(/\r\n/g, "\n");
+  const fm = /^---\n([\s\S]*?)\n---(\n|$)/.exec(text)?.[1] ?? "";
+  const field = (key) => {
+    const raw = new RegExp(`^${key}:[ \\t]*(.*?)[ \\t]*$`, "m").exec(fm)?.[1];
+    if (raw === undefined || raw === "") return null;
+    if (/^".*"$/.test(raw)) { try { return JSON.parse(raw); } catch { return raw.slice(1, -1); } }
+    return raw.replace(/^'(.*)'$/, "$1");
+  };
+  const lines = text.split("\n"), at = lines.indexOf("## Pending & Handoff Notes");
+  let firstNote = null;
+  for (let i = at + 1; at >= 0 && i < lines.length && !/^(## |---)/.test(lines[i]); i++) {
+    if (lines[i].startsWith("- ")) { firstNote = lines[i].slice(2).trim(); break; }
+  }
+  return { lastAgent: field("last_agent"), status: field("status"), nextRole: field("next_role"), firstNote };
+}
+
+// verify-release.mjs --close-out prints one FAIL line per failed check on stderr;
+// its two known FAILs have different remedies, anything else is unverified.
+export function classifyCloseOut(stderr) {
+  const lines = String(stderr ?? "").split("\n").map((l) => l.trim());
+  if (lines.includes("FAIL: no upstream tracking branch configured")) return "CLOSE_OUT_NO_UPSTREAM";
+  if (lines.some((l) => /^FAIL: HEAD is \d+ commit\(s\) ahead of upstream /.test(l))) return "CLOSE_OUT_AHEAD";
+  return "CLOSE_OUT_UNVERIFIED";
+}
+const CLOSE_OUT_REMEDY = {
+  CLOSE_OUT_NO_UPSTREAM: " — not on main with an upstream; pushing never fixes this",
+  CLOSE_OUT_AHEAD: " — wait for the bookkeeping merge, pull --ff-only and re-run close-out; never push main",
+  CLOSE_OUT_UNVERIFIED: "",
+};
+
+// The lane directory, as the compiled lane resolver names it.
+async function laneDir(ctx) {
+  const { root, deps } = ctx, load = deps.importLanePaths ?? (() => import(pathToFileURL(path.join(root, "dist/tools/lane-paths.js")).href));
+  let lane;
+  try { lane = (await load()).resolveCurrentLane(root); } catch (e) {
+    throw new ReleaseStop("LANE_UNRESOLVED", `cannot resolve the lane via dist/tools/lane-paths.js resolveCurrentLane — ${e?.message ?? e}`);
+  }
+  const dir = `.current/${lane}`, abs = path.join(root, dir);
+  if (!safeSegment(lane) || !existsSync(abs) || !statSync(abs).isDirectory()) throw new ReleaseStop("LANE_UNRESOLVED", `lane ${JSON.stringify(lane)}: ${dir}/ does not exist`);
+  ctx.out(`release: [13a-1] lane ${lane}\n`);
+  return dir;
+}
+
+// The closing write must be on disk before it is committed.
+function requireClosingWrite(ctx, handoff) {
+  const abs = path.join(ctx.root, handoff), v = ctx.opts.version;
+  const seen = readClosingWrite(existsSync(abs) ? readFileSync(abs, "utf-8") : "");
+  const miss = [["last_agent", seen.lastAgent, "release-engineer"], ["status", seen.status, "In_Progress"], ["next_role", seen.nextRole, "pm"]]
+    .filter(([, got, want]) => got !== want).map(([k, got, want]) => `${k} is ${got ?? "absent"} (want ${want})`);
+  if (!new RegExp(`^Released ${versionToken(v).source}`).test(seen.firstNote ?? "")) miss.push(`first pending note is ${JSON.stringify(seen.firstNote)} (want "Released v${v}")`);
+  if (miss.length > 0) throw new ReleaseStop("CLOSING_WRITE_ABSENT", `${handoff} lacks the closing write: ${miss.join("; ")} — make the closing write and its read-back, then re-run`);
+}
+
+// From main: branch, stage the lane's handoff and jsonl sidecars, commit,
+// push and open the bookkeeping pull request. Returns that pull request.
+async function openBookkeepingPr(ctx, bk) {
+  const { root, runner: r, opts } = ctx, title = `chore(governance): post-release bookkeeping for v${opts.version}`;
+  const dir = await laneDir(ctx), handoff = `${dir}/handoff.md`;
+  requireClosingWrite(ctx, handoff);
+  // Sidecars are enumerated, never globbed: a missing pattern must not drop the handoff.
+  const changed = new Set(readStatusPaths(r, "13a-3"));
+  const sidecars = readdirSync(path.join(root, dir), { withFileTypes: true })
+    .filter((d) => d.isFile() && d.name.endsWith(".jsonl")).map((d) => `${dir}/${d.name}`).sort();
+  const plan = [handoff, ...sidecars].filter((p) => changed.has(p)), inPlan = (p) => plan.includes(p);
+  if (plan.length === 0) throw new ReleaseStop("EMPTY_STAGE", `nothing to stage — ${handoff} and ${dir}/*.jsonl have no changes`);
+  const local = gitOut(r, ["rev-parse", "-q", "--verify", `refs/heads/${bk}`], "13a-3");
+  const remote = r.read("git", ["ls-remote", "--heads", "origin", `refs/heads/${bk}`], { step: "13a-3" });
+  if (remote.status !== 0) throw new ReleaseStop("INTERNAL", `git ls-remote --heads origin exited ${remote.status} — cannot tell whether origin has ${bk}`);
+  const where = [local && "locally", remote.stdout.trim() && "on origin"].filter(Boolean);
+  if (where.length > 0) throw new ReleaseStop("BRANCH_EXISTS", `${bk} exists ${where.join(" and ")} with no pull request — never delete it`);
+
+  const index = r.read("git", ["diff", "--cached", "--name-only", "-z", "--no-renames"], { step: "13a-4" });
+  if (index.status !== 0) throw new ReleaseStop("INTERNAL", `git diff --cached exited ${index.status}`);
+  const before = nulList(index.stdout).filter((p) => !inPlan(p));
+  if (before.length > 0) throw new ReleaseStop("UNRELATED_CHANGES", `the index already holds ${before.join(" ")}, outside the bookkeeping plan — unstage it first`);
+  const sw = r.mutate("git", ["switch", "-c", bk], { step: "13a-4" });
+  if (sw.status !== 0) throw new ReleaseStop("MUTATION_FAILED", failedAt(ctx, `git switch -c ${bk}`, sw, "13a-4"));
+  const add = r.mutate("git", ["add", "--", ...plan], { step: "13a-4" });
+  if (add.status !== 0) throw new ReleaseStop("MUTATION_FAILED", failedAt(ctx, "git add", add, "13a-4"));
+  const cached = r.deferred("git", ["diff", "--cached", "--name-only", "-z", "--no-renames"], { step: "13a-4" });
+  if (cached && cached.status !== 0) throw new ReleaseStop("INTERNAL", `git diff --cached exited ${cached.status}`);
+  const staged = cached ? nulList(cached.stdout) : plan;
+  if (staged.length === 0) throw new ReleaseStop("EMPTY_STAGE", `nothing staged after git add -- ${plan.join(" ")} — not committing`);
+  const stray = staged.filter((p) => !inPlan(p));
+  if (stray.length > 0) throw new ReleaseStop("UNRELATED_CHANGES", `the index holds ${stray.join(" ")}, outside the bookkeeping plan`);
+
+  const commit = r.mutate("git", ["commit", "-m", title], { step: "13a-5" });
+  if (commit.status !== 0) throw new ReleaseStop("MUTATION_FAILED", failedAt(ctx, "git commit", commit, "13a-5"));
+  const push = r.mutate("git", ["push", "-u", "origin", bk], { step: "13a-5" });
+  if (push.status !== 0) throw new ReleaseStop("PUSH_REJECTED", failedAt(ctx, `git push -u origin ${bk}`, push, "13a-5"));
+  const body = `Post-release governance bookkeeping for v${opts.version}: ${plan.join(", ")}.`;
+  const made = r.mutate("gh", ["pr", "create", "--base", "main", "--head", bk, "--title", title, "--body", body], { step: "13a-5" });
+  if (made.status !== 0) throw new ReleaseStop("MUTATION_FAILED", failedAt(ctx, "gh pr create", made, "13a-5"));
+  const number = /\/pull\/(\d+)\s*$/.exec(made.stdout.trim())?.[1];
+  const pr = viewPr(ctx, bk, "13a-5", "deferred") ?? { number: number === undefined ? undefined : Number(number), state: "OPEN" };
+  if (!r.dryRun && pr.number === undefined) throw new ReleaseStop("INTERNAL", `gh pr create for ${bk} reported no pull request number`);
+  return pr;
+}
+
+// Each part is skipped when a re-run finds it done: an existing bookkeeping
+// pull request was opened from the closing write, so only its merge remains.
+async function stepCloseOut(ctx) {
+  const { runner: r, opts } = ctx, bk = `release/v${opts.version}-bookkeeping`;
+  let pr = ctx.pr;
+  const created = !pr;
+  if (pr) ctx.out(`release: [13a-2] bookkeeping pull request #${pr.number} is ${pr.state} — its commit carries the closing write\n`);
+  else pr = await openBookkeepingPr(ctx, bk);
+  if (pr.state === "OPEN") pr = await autoMerge(ctx, bk, pr, "13a-6");
+  const oid = pr.mergeCommit?.oid;
+  if (!oid) throw new ReleaseStop("INTERNAL", `#${pr.number} is MERGED but gh reports no merge commit`);
+  pullMain(ctx, "13a-6");
+  // Nothing is tagged here, so main may have moved past the merge commit; it must contain it.
+  const reach = r.deferred("git", ["rev-list", "--count", `HEAD..${oid}`], { step: "13a-6" });
+  if (reach && (reach.status !== 0 || reach.stdout.trim() !== "0")) {
+    throw new ReleaseStop("MAIN_DIVERGED", `main does not contain merge commit ${oid} of #${pr.number} after pull --ff-only`);
+  }
+  deleteMergedBranch(ctx, bk, "13a-6", created && r.dryRun);
+  const res = r.deferred("node", ["scripts/verify-release.mjs", "--close-out"], { step: "13b" });
+  if (res && (res.status !== 0 || !res.stdout.includes("CLOSE-OUT PASSED"))) {
+    const id = classifyCloseOut(res.stderr);
+    throw new ReleaseStop(id, `verify-release.mjs --close-out exited ${res.status} — ${failLines(res)}${CLOSE_OUT_REMEDY[id]}`);
+  }
+  ctx.okSuffix = " — CLOSE-OUT PASSED";
+}
+
 const PHASES = {
   prepare: [preInputs, preGh, prePrepare, step7a, step7b, step7c, step7d, step8aStage, step8aCitations, step8aSpecs, step8aCommitPushPr],
   publish: [preGh, prePublish, stepPublish],
-  "close-out": [preGh, preCloseOut, notYet("close-out steps 13a-13b")],
+  "close-out": [preGh, preCloseOut, stepCloseOut],
 };
 
 export async function main(argv, deps = {}) {
