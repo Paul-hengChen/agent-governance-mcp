@@ -62,22 +62,28 @@ test("T-E166-01b: template's staging line defers to the SOP's step 8a by name (\
   );
 });
 
-test("T-E166-01c: the named anchors exist in content/skill-release-engineer.md, inside step 8a", () => {
-  const step8aStart = SKILL.indexOf("\n8a. ");
-  const step8bStart = SKILL.indexOf("\n8b. ");
-  assert.ok(step8aStart !== -1, "content/skill-release-engineer.md must contain a step 8a (T-E166-01)");
-  assert.ok(step8bStart !== -1, "content/skill-release-engineer.md must contain a step 8b (T-E166-01)");
-  assert.ok(step8aStart < step8bStart, "step 8a must precede step 8b (T-E166-01)");
+test("T-E166-01c [E394 re-pin AC-S6/AC-P3]: the staging contract the template defers to now lives in the `prepare` phase — SOP step 12 delegates it, scripts/release.mjs holds the single normative list and the pre-commit verify, and the history keeps the named anchors", () => {
+  // The rewritten SOP no longer has step 8a: the explicit list and the pre-commit verify run inside `prepare`.
+  const prepareStep = SKILL.match(/^12\. Prepare \(.*$/m);
+  assert.ok(prepareStep, "content/skill-release-engineer.md must contain the prepare step (12) (T-E166-01)");
+  assert.match(
+    prepareStep[0],
+    /staging and citation checks, release commit/,
+    "the prepare step must own staging, its completeness check and the release commit (T-E166-01)",
+  );
+  assert.match(SKILL, /\| exit 30 STAGING_INCOMPLETE \| Blocked \|/, "an incomplete stage must be a Blocked escalation row (STOP on any missing path)");
 
-  const step8aBody = SKILL.slice(step8aStart, step8bStart);
-  assert.match(
-    step8aBody,
-    /\*\*Stage explicitly\*\*/,
-    'step 8a must contain the "Stage explicitly" anchor the template defers to (T-E166-01)',
-  );
-  assert.match(
-    step8aBody,
-    /\*\*Pre-commit verify \(AC2\)\*\*/,
-    'step 8a must contain the "Pre-commit verify" anchor the template defers to (T-E166-01)',
-  );
+  const script = fs.readFileSync(path.join(ROOT, "scripts", "release.mjs"), "utf-8");
+  // "Stage explicitly": one normative, existence-pre-filtered list, staged by explicit pathspec, never from memory.
+  assert.match(script, /export const STAGE_PATHS = Object\.freeze\(/, "the script must hold the single normative staging list (T-E166-01)");
+  assert.match(script, /export function planStage\(\{ changed, exists \}\)[\s\S]*?exists\(m\)/, "the list must be existence-pre-filtered (T-E166-01)");
+  assert.match(script, /\["add", "--", \.\.\.plan\]/, "staging must be by explicit pathspec list (T-E166-01)");
+  // "Pre-commit verify": the staged set is checked for completeness before the commit; a miss stops.
+  assert.match(script, /export function checkStagingCompleteness\(/, "the pre-commit verify must exist as checkStagingCompleteness (T-E166-01)");
+  assert.match(script, /throw new ReleaseStop\("STAGING_INCOMPLETE", `\$\{verdict\.problems\.join/, "an incomplete stage must STOP before the commit (T-E166-01)");
+
+  // The named anchors the template cites are kept verbatim in the history file.
+  const history = fs.readFileSync(path.join(ROOT, "specs", "release-sop-history.md"), "utf-8");
+  assert.match(history, /\*\*Stage explicitly\*\*/, 'history must keep the "Stage explicitly" anchor (T-E166-01)');
+  assert.match(history, /\*\*Pre-commit verify \(AC2\)\*\*/, 'history must keep the "Pre-commit verify" anchor (T-E166-01)');
 });

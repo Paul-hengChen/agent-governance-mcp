@@ -18,6 +18,16 @@ const ROOT = path.resolve(path.dirname(__filename), "..");
 const RELEASE_ENGINEER = fs.readFileSync(path.join(ROOT, "content", "skill-release-engineer.md"), "utf-8");
 const COORDINATOR_LITE = fs.readFileSync(path.join(ROOT, "content", "skill-coordinator-lite.md"), "utf-8");
 const SKILL_PM = fs.readFileSync(path.join(ROOT, "content", "skill-pm.md"), "utf-8");
+// E394 re-pin: the rewritten SOP states each rule once and delegates the mechanics to scripts/release.mjs; the
+// base step 8b/8c/9a prose moved verbatim into specs/release-sop-history.md. Rule assertions run against the SOP
+// and the script; the verbatim wording assertions run against the history extracts.
+const HISTORY = fs.readFileSync(path.join(ROOT, "specs", "release-sop-history.md"), "utf-8");
+const RELEASE_SCRIPT = fs.readFileSync(path.join(ROOT, "scripts", "release.mjs"), "utf-8");
+const HOST_KILL = RELEASE_ENGINEER.slice(
+  RELEASE_ENGINEER.indexOf("**Host kill**"),
+  RELEASE_ENGINEER.indexOf("## Escalation Routes"),
+);
+const PUBLISH_STEP = RELEASE_ENGINEER.match(/^13\. Publish:.*$/m)?.[0] ?? "";
 
 // Isolate step 8b's body: from its numbered marker to the next numbered step marker (8c).
 function extractStep(content, startMarker, endMarker) {
@@ -28,9 +38,10 @@ function extractStep(content, startMarker, endMarker) {
   return content.slice(startIdx, endIdx);
 }
 
-const STEP_8B = extractStep(RELEASE_ENGINEER, "8b. **CI gate**", "\n8c. **Tag + push**");
-const STEP_8C = extractStep(RELEASE_ENGINEER, "8c. **Tag + push**", "\n9. **GitHub release**");
-const STEP_9A = extractStep(RELEASE_ENGINEER, "9a. **Release self-check**", "<!-- rationale:start -->");
+const STEP_8B = extractStep(HISTORY, "8b. **CI gate**", "\n8c. **Tag + push**");
+const STEP_8C = extractStep(HISTORY, "8c. **Tag + push**", "\n9. **GitHub release**");
+const STEP_9A = extractStep(HISTORY, "9a. **Release self-check**", "<!-- rationale:start -->");
+assert.ok(HOST_KILL.length > 20 && PUBLISH_STEP.length > 0, "the rewritten SOP must carry the Host kill paragraph and the publish step");
 
 // ---------------------------------------------------------------------------
 // AC1: step 8b — first attempt with normal budget; after first host silent
@@ -38,7 +49,9 @@ const STEP_9A = extractStep(RELEASE_ENGINEER, "9a. **Release self-check**", "<!-
 // then ends in a printed strict FAIL.
 // ---------------------------------------------------------------------------
 
-test("AC1: 8b makes the first CI-gate attempt with the normal budget", () => {
+test("AC1 [E394 re-pin AC-P4/AC-P10]: the first CI-gate attempt uses the normal budget — the SOP lowers the budget only after the first kill; the history keeps 8b's verbatim sequencing", () => {
+  assert.match(HOST_KILL, /After the first kill, set `AGC_VERIFY_CI_WAIT_SECONDS`/, "SOP: the budget is lowered only after the first kill, never pre-emptively");
+  assert.ok(!/pre-emptive|before the first/i.test(PUBLISH_STEP), "SOP step 13 must not pre-emptively lower the budget");
   assert.match(
     STEP_8B,
     /make the FIRST attempt with the normal budget/,
@@ -51,7 +64,12 @@ test("AC1: 8b makes the first CI-gate attempt with the normal budget", () => {
   );
 });
 
-test("AC1: 8b lowers AGC_VERIFY_CI_WAIT_SECONDS below the host timeout only after the first silent kill", () => {
+test("AC1 [E394 re-pin AC-P4/AC-P10]: AGC_VERIFY_CI_WAIT_SECONDS is lowered below the host timeout only after the first silent kill (SOP Host kill rule; verbatim 8b sequencing in the history)", () => {
+  assert.match(
+    HOST_KILL,
+    /a phase killed before it printed `release: <phase> OK` or a `RELEASE_STOP` line is silence, not a result — re-run the same command\. After the first kill, set `AGC_VERIFY_CI_WAIT_SECONDS` and `AGC_RELEASE_MERGE_WAIT_SECONDS` below the host timeout/,
+    "SOP: a silent kill is no result; re-run, and set the budgets below the host timeout only after the first kill",
+  );
   assert.match(
     STEP_8B,
     /Only after that first host-level silent kill, re-run the identical command with `AGC_VERIFY_CI_WAIT_SECONDS` set below the host's command timeout/,
@@ -64,7 +82,10 @@ test("AC1: 8b lowers AGC_VERIFY_CI_WAIT_SECONDS below the host timeout only afte
   assert.ok(firstAttemptIdx >= 0 && lowerAfterKillIdx > firstAttemptIdx, "normal-budget-first must precede lower-after-kill in step 8b's prose");
 });
 
-test("AC1: 8b states a hung run ends in a printed strict FAIL, not another silent kill", () => {
+test("AC1 [E394 re-pin AC-P4/AC-P10]: a hung run ends in a printed strict FAIL, not another silent kill (the script's bounded poll prints CI-CHECK FAILED; verbatim 8b text in the history)", () => {
+  const verify = fs.readFileSync(path.join(ROOT, "scripts", "verify-release.mjs"), "utf-8");
+  assert.ok(verify.includes("DEFAULT_WAIT_SECONDS") && verify.includes("AGC_VERIFY_CI_WAIT_SECONDS"), "the script must bound its CI poll with a named, env-overridable budget");
+  assert.ok(RELEASE_SCRIPT.includes('"CI_GATE_FAILED"') && /\| exit 41 CI_GATE_FAILED \| Blocked \|/.test(RELEASE_ENGINEER), "a failed gate is a printed CI_GATE_FAILED stop with its own Blocked row");
   assert.match(
     STEP_8B,
     /a run that hangs now ends in the script's own printed strict `FAIL:`/,
@@ -81,7 +102,9 @@ test("AC1: 8b states a hung run ends in a printed strict FAIL, not another silen
 // unpushed local tag before the Blocked write (C2 / L-CONTENT-NEW-5).
 // ---------------------------------------------------------------------------
 
-test("AC2: consecutive silent-kill re-runs are bounded by the named fix_try cap, not a bare number", () => {
+test("AC2 [E394 re-pin AC-P4]: consecutive silent-kill re-runs are bounded by the named fix_try cap, not a bare number (SOP + history)", () => {
+  assert.match(HOST_KILL, /At the `fix_try` cap use row \*host-killed phase\*/, "SOP: the cap is the named fix_try, routed to the host-killed-phase row");
+  assert.ok(!/\bcap (?:of|is|=|:)\s*\d+/i.test(HOST_KILL), "SOP: the fix_try cap must not be restated as a bare number");
   const capSentenceMatch = STEP_8B.match(/Consecutive silent-kill re-runs are bounded by the `fix_try` cap[\s\S]{0,400}?do not keep re-running\./);
   assert.ok(capSentenceMatch, "8b must state the fix_try-cap sentence verbatim through its 'do not keep re-running' clause");
   const capSentence = capSentenceMatch[0];
@@ -94,15 +117,20 @@ test("AC2: consecutive silent-kill re-runs are bounded by the named fix_try cap,
   );
 });
 
-test("AC2: the Escalation Routes step-8b row is consistent with the fix_try-capped, sequenced re-run wording", () => {
-  const rowMatch = RELEASE_ENGINEER.match(/\| CI gate failure \(step 8b:[\s\S]*?\| human \|/);
-  assert.ok(rowMatch, "Escalation Routes must retain a step-8b CI-gate-failure row");
+test("AC2 [E394 re-pin AC-P4]: the Escalation Routes rows are consistent with the fix_try-capped, sequenced re-run wording (SOP: host-killed-phase row hands back to the human; history keeps the verbatim 8b row)", () => {
+  const sopRow = RELEASE_ENGINEER.match(/^\| host-killed phase at the `fix_try` cap \| Blocked \| .*\| — \|$/m);
+  assert.ok(sopRow, "the SOP must carry a host-killed-phase-at-the-fix_try-cap Blocked row (no next_role: hands back to the human)");
+  assert.match(sopRow[0], /killed by the host <n> times, no result printed/, "the SOP row must name the no-result cap condition");
+  const rowMatch = HISTORY.match(/\| CI gate failure \(step 8b:[\s\S]*?\| human \|/);
+  assert.ok(rowMatch, "the history must keep the verbatim step-8b CI-gate-failure row");
   const row = rowMatch[0];
   assert.match(row, /`fix_try` cap/, "the Escalation Routes row must name the fix_try cap (not a bare number)");
   assert.match(row, /the first attempt with the normal budget, and only after the first host kill with the budget set below the host timeout/, "the row's re-run guidance must match 8b's sequencing");
 });
 
-test("AC2 (E297 re-pin): 8b STOPs carry no local-tag cleanup — no tag exists before the merge", () => {
+test("AC2 (E297 re-pin) [E394 re-pin AC-S7]: 8b STOPs carry no local-tag cleanup — no tag exists before the merge (SOP has no tag deletion; the script tags only after the gate and merge)", () => {
+  assert.ok(!RELEASE_ENGINEER.includes("delete any local tag") && !RELEASE_ENGINEER.includes("deleting any unpushed local tag"), "the SOP must carry no tag-deletion clause");
+  assert.match(RELEASE_ENGINEER, /tags are immutable \(never move, delete or re-create one/, "SOP: tags are never deleted or re-created");
   // The tag is created on the main merge commit in 8c, so the former
   // "delete any local tag created ahead of this gate" clauses are retired.
   assert.ok(!STEP_8B.includes("delete any local tag created ahead of this gate"), "8b must not carry the retired pre-gate tag-deletion clause");
@@ -116,7 +144,8 @@ test("AC2 (E297 re-pin): 8b STOPs carry no local-tag cleanup — no tag exists b
 // "480" literal in that note.
 // ---------------------------------------------------------------------------
 
-test("AC3: 9a carries the sequenced budget note and names DEFAULT_WAIT_SECONDS", () => {
+test("AC3 [E394 re-pin AC-P10]: the sequenced budget note names DEFAULT_WAIT_SECONDS (history 9a) and the SOP shares one Host kill rule across the CI poll and the merge wait", () => {
+  assert.match(HOST_KILL, /\(steps 12, 13, 16\)/, "SOP: one host-kill rule covers prepare, publish and close-out");
   assert.match(
     STEP_9A,
     /Step 8b's sequenced budget advice applies to this poll too, since it shares the knob/,
@@ -125,7 +154,8 @@ test("AC3: 9a carries the sequenced budget note and names DEFAULT_WAIT_SECONDS",
   assert.match(STEP_9A, /`DEFAULT_WAIT_SECONDS`/, "9a must name DEFAULT_WAIT_SECONDS rather than restating its value");
 });
 
-test("AC3: the 9a note contains no bare '480' literal", () => {
+test("AC3 [E394 re-pin AC-P10]: neither the 9a note (history) nor the SOP's budget text contains a bare '480' literal", () => {
+  assert.ok(!HOST_KILL.includes("480") && !PUBLISH_STEP.includes("480"), "the SOP must not restate the DEFAULT_WAIT_SECONDS figure");
   assert.ok(!STEP_9A.includes("480"), "9a's step body must not restate the DEFAULT_WAIT_SECONDS figure as a bare '480' literal");
 });
 
@@ -135,7 +165,10 @@ test("AC3: the 9a note contains no bare '480' literal", () => {
 // PASSED); step labels 8a/8b/8c/9/9a present and unrenumbered.
 // ---------------------------------------------------------------------------
 
-test("AC4 (E297 re-pin): 8c's tag-create bullet is local/reversible and follows the merge, on that HEAD", () => {
+test("AC4 (E297 re-pin) [E394 re-pin AC-S7/AC-P10]: the tag follows the merge on the pulled merge commit (SOP publish step + script order); history keeps 8c's local/reversible tag-create bullet", () => {
+  assert.match(PUBLISH_STEP, /merges with `--auto --merge`, pulls `main`, tags the merge commit, pushes the tag/, "SOP: publish merges, pulls main, then tags the merge commit, then pushes the tag");
+  const publish = RELEASE_SCRIPT.slice(RELEASE_SCRIPT.indexOf("async function stepPublish("));
+  assert.ok(publish.indexOf("pullMain(ctx") < publish.indexOf('["tag", "-a", tag'), "script: pull main before tagging");
   const tagCreateMatch = STEP_8C.match(/- `git tag -a vX\.Y\.Z[\s\S]*?until the next bullet\./);
   assert.ok(tagCreateMatch, "8c must retain the git tag -a bullet with its full reversibility/timing clause");
   const tagCreate = tagCreateMatch[0];
@@ -145,15 +178,20 @@ test("AC4 (E297 re-pin): 8c's tag-create bullet is local/reversible and follows 
   assert.ok(!tagCreate.includes("including before 8b"), "the retired pre-8b window must be gone");
 });
 
-test("AC4: 8c's tag-push bullet is gated strictly on CI-CHECK PASSED and is the irreversible act", () => {
+test("AC4 [E394 re-pin AC-S7/AC-P10]: the tag push is gated strictly on CI-CHECK PASSED (SOP + script order) and is the irreversible act (history 8c)", () => {
+  assert.match(PUBLISH_STEP, /only `CI-CHECK PASSED` continues/, "SOP: only CI-CHECK PASSED lets publish continue");
+  const publish = RELEASE_SCRIPT.slice(RELEASE_SCRIPT.indexOf("async function stepPublish("));
+  assert.ok(publish.indexOf('"CI-CHECK PASSED"') > -1 && publish.indexOf('"CI-CHECK PASSED"') < publish.indexOf('["push", "origin", tag]'), "script: the CI-CHECK PASSED check precedes the tag push");
   const tagPushMatch = STEP_8C.match(/- `git push origin vX\.Y\.Z`[\s\S]*?`CI-CHECK PASSED`\./);
   assert.ok(tagPushMatch, "8c must retain the git push origin bullet gated on CI-CHECK PASSED");
   assert.match(tagPushMatch[0], /the one irreversible act/, "the tag-push bullet must be the one identified as irreversible, not the tag-create bullet");
 });
 
-test("AC4: step labels 8a/8b/8c/9/9a are present and unrenumbered", () => {
+test("AC4 [E394 re-pin AC-P3/AC-P10]: the rewritten SOP has contiguous step labels 1..17 (renumbered whole); the base 8a/8b/8c/9/9a labels survive verbatim in the history", () => {
+  const nums = [...RELEASE_ENGINEER.matchAll(/^(\d+)\. /gm)].map((m) => Number(m[1]));
+  assert.deepEqual(nums, Array.from({ length: 17 }, (_, i) => i + 1), "SOP step labels must be 1..17, in order, none skipped or duplicated");
   for (const label of ["8a. **Commit + push branch**", "8b. **CI gate**", "8c. **Tag + push**", "9. **GitHub release**", "9a. **Release self-check**"]) {
-    assert.ok(RELEASE_ENGINEER.includes(label), `expected unrenumbered step label ${JSON.stringify(label)} to survive`);
+    assert.ok(HISTORY.includes(label), `expected base step label ${JSON.stringify(label)} to survive in the history`);
   }
 });
 

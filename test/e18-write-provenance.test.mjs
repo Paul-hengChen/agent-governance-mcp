@@ -547,20 +547,27 @@ test("CONTENT-2: const-08 QA Completion-Evidence bullet carries the (v3.86.0, E1
   );
 });
 
-test("CONTENT-3: skill-release-engineer.md carries the COORDINATOR-RELAYED hard line (E18) naming the v3.85.0 incident and the new server-side gate", () => {
-  assert.match(
-    SKILL_RELEASE_ENGINEER,
-    /CRITICAL — Closing write is COORDINATOR-RELAYED; no dispatch brief can override this/,
-    "must locate the E18 COORDINATOR-RELAYED hard line heading",
-  );
-  const lineMatch = SKILL_RELEASE_ENGINEER.match(/^-\s+\*\*CRITICAL — Closing write is COORDINATOR-RELAYED.*$/m);
-  assert.ok(lineMatch, "must locate the full COORDINATOR-RELAYED bullet line");
+test("CONTENT-3 [E394 re-pin AC-P6/AC-P10]: the SOP carries the coordinator-relayed rule (no brief overrides, STAMP_PROVENANCE_SUSPECT backstop); the history keeps the E18 line naming the v3.85.0 incident", () => {
+  // Rule: one condensed Hard-rule bullet in the rewritten SOP.
+  const ruleMatch = SKILL_RELEASE_ENGINEER.match(/^-\s+\*\*No-MCP-path sessions relay\*\*.*$/m);
+  assert.ok(ruleMatch, "must locate the No-MCP-path relay Hard rule bullet");
   assert.ok(
-    lineMatch[0].includes("outranks ANY dispatch brief"),
-    "the hard line must state it outranks any dispatch brief instructing otherwise",
+    ruleMatch[0].includes("the coordinator makes it"),
+    "the rule must state the coordinator makes the relayed write",
   );
   assert.ok(
-    lineMatch[0].includes("STAMP_PROVENANCE_SUSPECT"),
-    "the hard line must cross-reference the new server-side gate that now also catches this incident class",
+    ruleMatch[0].includes("No dispatch brief overrides this rule"),
+    "the rule must state it outranks any dispatch brief instructing otherwise",
   );
+  assert.ok(
+    ruleMatch[0].includes("STAMP_PROVENANCE_SUSPECT"),
+    "the rule must cross-reference the server-side gate that also catches this incident class",
+  );
+  // Incident: the verbatim E18 line (v3.85.0 incident) moved to the history file.
+  const history = fs.readFileSync(path.join(ROOT, "specs", "release-sop-history.md"), "utf-8");
+  const lineMatch = history.match(/^-\s+\*\*CRITICAL — Closing write is COORDINATOR-RELAYED.*$/m);
+  assert.ok(lineMatch, "history must keep the full COORDINATOR-RELAYED bullet line (E18)");
+  assert.ok(lineMatch[0].includes("outranks ANY dispatch brief"), "the history line must keep the outranks-any-brief wording");
+  assert.ok(lineMatch[0].includes("v3.85.0 incident"), "the history line must name the v3.85.0 incident");
+  assert.ok(lineMatch[0].includes("STAMP_PROVENANCE_SUSPECT"), "the history line must keep the server-side gate cross-reference");
 });

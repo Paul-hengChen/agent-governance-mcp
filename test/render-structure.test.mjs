@@ -124,30 +124,40 @@ test("detector soundness: both detectors reproduce exactly the 2 known ffa4082 g
 // per the ticket's literal wording.
 // ---------------------------------------------------------------------------
 
-test("T-E69-02 AC: content/skill-release-engineer.md renders glue-free via tw_switch_role (tools/role.ts)", () => {
+// E394 re-pin (AC-P9): the rewritten SOP has no rationale/origin fences at all (narratives moved to
+// specs/release-sop-history.md), so the base anchors (the mkdir-p bullet, the 7b header) are gone. The
+// positive assertions now pin that the rewritten SOP's own list bullets and numbered steps each begin
+// their own rendered line.
+const RELEASE_RENDER_ANCHORS = [
+  ["the Artifact list's first bullet", "- `package.json` `version`"],
+  ["the Artifact list's staging bullet", "- `.current/.config.json` `driftBaselineIds`"],
+  ["step 12 (prepare)", "12. Prepare ("],
+  ["step 13 (publish)", "13. Publish:"],
+  ["step 16 (close-out)", "16. Close-out ("],
+];
+function assertReleaseAnchorsOwnLines(lines) {
+  for (const [what, prefix] of RELEASE_RENDER_ANCHORS) {
+    assert.ok(lines.some((l) => l.startsWith(prefix)), `${what} must begin its own rendered line`);
+  }
+}
+
+test("T-E69-02 AC [E394 re-pin AC-P9]: content/skill-release-engineer.md renders glue-free via tw_switch_role (tools/role.ts)", () => {
   const resp = JSON.parse(switchRole("release-engineer", ROOT));
   const findings = findLineGlueFindings(resp.sop);
   assert.deepEqual(findings, [], "tw_switch_role(release-engineer) dispatch text must have zero glue findings");
 
   const lines = resp.sop.split("\n").map((l) => l.trim());
-  assert.ok(
-    lines.some((l) => l.startsWith("- `mkdir -p`")),
-    "the mkdir-p archive-dir bullet must begin its own rendered line",
-  );
-  assert.ok(
-    lines.some((l) => l.startsWith("7b. **Drift-baseline acknowledgment**")),
-    "step 7b's header must begin its own rendered line",
-  );
+  assertReleaseAnchorsOwnLines(lines);
+  assert.equal((resp.sop.match(/rationale:start|rationale:end|origin:start|origin:end/g) || []).length, 0, "the rewritten SOP must render with zero raw fence markers");
 });
 
-test("T-E69-02 AC: content/skill-release-engineer.md renders glue-free via buildPromptForRole (MCP prompt path)", () => {
+test("T-E69-02 AC [E394 re-pin AC-P9]: content/skill-release-engineer.md renders glue-free via buildPromptForRole (MCP prompt path)", () => {
   const text = buildPromptForRole("skill-release-engineer.md", "probe", ROOT, false).messages[0].content.text;
   const findings = findLineGlueFindings(text);
   assert.deepEqual(findings, [], "buildPromptForRole(skill-release-engineer.md) dispatch text must have zero glue findings");
 
   const lines = text.split("\n").map((l) => l.trim());
-  assert.ok(lines.some((l) => l.startsWith("- `mkdir -p`")), "the mkdir-p archive-dir bullet must begin its own rendered line");
-  assert.ok(lines.some((l) => l.startsWith("7b. **Drift-baseline acknowledgment**")), "step 7b's header must begin its own rendered line");
+  assertReleaseAnchorsOwnLines(lines);
 });
 
 // ---------------------------------------------------------------------------
@@ -185,27 +195,30 @@ test("T-E8795-02 AC: coord-03 Evidence-Citation Convention (E87) renders at full
   assert.equal((text.match(/origin:start|origin:end/g) || []).length, 0, "origin markers strip unconditionally, even at fullDetail=true");
 });
 
-test("T-E8795-02 AC: skill-release-engineer.md CHANGELOG citation check (E95) renders at fullDetail=false, rationale stripped, zero raw markers", () => {
-  // Bullet re-baselined after the release-range check change (T-E142-05, E142(a)): label gained a
-  // "range-corrected — E142(a)" suffix when the check moved from `--cached`
-  // alone to the union of the release range and staged changes.
+test("T-E8795-02 AC [E394 re-pin AC-P9/AC-P10]: skill-release-engineer.md record-integrity citation rule (E95) renders at fullDetail=false, worked example absent, zero raw markers", () => {
+  // The E95 citation check is now the SOP's Record integrity rule (checked by the script's CHANGELOG
+  // citation check, exit 31); the v3.104.2 worked example moved to specs/release-sop-history.md.
   const text = applyTextTransforms(composedSkillBody("skill-release-engineer.md"), { fullDetail: false });
-  assert.ok(text.includes("CHANGELOG citation check (E95"), "release-engineer bundle must carry the E95 bullet");
+  assert.ok(text.includes("**Record integrity**: describe the diff, not the brief."), "release-engineer bundle must carry the record-integrity (E95) rule");
+  assert.ok(text.includes("CHANGELOG_CITATION"), "release-engineer bundle must carry the CHANGELOG_CITATION escalation row");
   assert.ok(
     !text.includes("didn't ship until the v3.104.3 corrective patch"),
-    "fullDetail=false must strip the E95 rationale prose (the v3.104.2 worked example)",
+    "the bundle must not carry the E95 worked example (history only)",
   );
   assert.equal((text.match(/rationale:start|rationale:end/g) || []).length, 0, "zero raw rationale markers may survive fullDetail=false");
   assert.equal((text.match(/origin:start|origin:end/g) || []).length, 0, "zero raw origin markers may survive fullDetail=false");
 });
 
-test("T-E8795-02 AC: skill-release-engineer.md CHANGELOG citation check (E95) renders at fullDetail=true, with rationale retained", () => {
+test("T-E8795-02 AC [E394 re-pin AC-P9/AC-P10]: skill-release-engineer.md record-integrity citation rule (E95) renders at fullDetail=true, no fence needed; the history keeps the E95 bullet and its worked example", () => {
   const text = applyTextTransforms(composedSkillBody("skill-release-engineer.md"), { fullDetail: true });
-  assert.ok(text.includes("CHANGELOG citation check (E95"), "release-engineer bundle must carry the E95 bullet");
+  assert.ok(text.includes("**Record integrity**: describe the diff, not the brief."), "release-engineer bundle must carry the record-integrity (E95) rule at fullDetail=true");
+  const history = fs.readFileSync(path.join(ROOT, "specs", "release-sop-history.md"), "utf-8");
+  assert.ok(history.includes("CHANGELOG citation check (E95"), "history must keep the verbatim E95 bullet");
   assert.ok(
-    text.includes("didn't ship until the v3.104.3 corrective patch"),
-    "fullDetail=true must RETAIN the E95 rationale prose (rationale fence is opt-out, not deletion)",
+    history.includes("didn't ship until the v3.104.3 corrective patch"),
+    "history must RETAIN the E95 worked example (moved, not deleted)",
   );
+  assert.equal((text.match(/rationale:start|rationale:end/g) || []).length, 0, "the rewritten SOP carries no rationale fences");
   assert.equal((text.match(/origin:start|origin:end/g) || []).length, 0, "origin markers strip unconditionally, even at fullDetail=true");
 });
 
